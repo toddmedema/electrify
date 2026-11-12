@@ -90,6 +90,21 @@ it.each([
   },
 );
 
+it("migrates a legacy couch setup into independent preferences without runtime TV flags", () => {
+  localStorage.setItem("textSize", "large");
+  localStorage.setItem("tvMode", "true");
+  localStorage.setItem("tvScale", "1.75");
+  localStorage.setItem("tvInset", "4");
+  const { initialSettings } = settings();
+  expect(initialSettings).toMatchObject({
+    interfaceScale: 1.96875,
+    workspace: "single",
+    screenEdgePadding: 4,
+  });
+  expect(initialSettings).not.toHaveProperty("tvMode");
+  expect(initialSettings).not.toHaveProperty("tvScale");
+});
+
 it("restores explicit scale independently of old preferences and persists changes", () => {
   localStorage.setItem("interfaceScale", "1.75");
   localStorage.setItem("textSize", "larger");
@@ -132,24 +147,6 @@ it.each([
   },
 );
 
-it("keeps TV presentation opt-in and restores its bounded device choices", () => {
-  window.electrifyDesktop = { apiVersion: 1 } as DesktopBridge;
-  const { default: reducer, initialSettings, change } = settings();
-  expect(initialSettings.tvMode).toBeUndefined();
-  const tv = reducer(initialSettings, change({ tvMode: true, tvScale: 1.75 }));
-  expect(tv).toMatchObject({ tvMode: true, tvScale: 1.75 });
-  expect(settings().initialSettings).toMatchObject({
-    tvMode: true,
-    tvScale: 1.75,
-  });
-  const invalid = reducer(tv, change({ tvScale: 99 }));
-  expect(invalid).toMatchObject({ tvScale: 1.5 });
-  const desktop = reducer(invalid, change({ tvMode: false }));
-  expect(desktop.tvMode).toBe(false);
-  expect(settings().initialSettings.tvMode).toBe(false);
-  expect(desktop.interfaceScale).toBe(initialSettings.interfaceScale);
-});
-
 it.each(["standalone", "ios"])(
   "defaults installed %s PWA sound on and remembers an explicit mute after relaunch",
   (platform) => {
@@ -169,8 +166,6 @@ it.each(["standalone", "ios"])(
     expect(initialSettings.audioEnabled).toBe(true);
     expect(initialSettings.controllerVibrationEnabled).toBeUndefined();
     expect(initialSettings.steamTimelineEnabled).toBeUndefined();
-    expect(initialSettings.tvMode).toBeUndefined();
-    expect(initialSettings.tvScale).toBeUndefined();
     expect(initialSettings.screenEdgePadding).toBe(0);
     reducer(initialSettings, change({ audioEnabled: false }));
     expect(settings().initialSettings.audioEnabled).toBe(false);

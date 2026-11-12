@@ -1,13 +1,12 @@
 import type { SettingsType } from "../Types";
 
-/** Project shared preferences onto a company without giving it independent TV/audio ownership. */
+/** Project shared preferences onto a company without giving it independent display/audio ownership. */
 export function seatPresentation(settings: SettingsType) {
   return {
     theme: settings.theme,
     interfaceScale: settings.interfaceScale,
     units: settings.units,
     workspace: "single",
-    tvMode: true,
     screenEdgePadding: 0,
     audioEnabled: false,
   } as const;

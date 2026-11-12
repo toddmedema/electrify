@@ -68,7 +68,7 @@ it("preserves every legacy text and explicit TV-scale product", () => {
 });
 
 it.each([1, 1.5])(
-  "projects scale %p to seats without another TV multiplier",
+  "projects scale %p to seats without another multiplier",
   (interfaceScale) => {
     const settings: SettingsType = {
       theme: "system",
@@ -76,8 +76,6 @@ it.each([1, 1.5])(
       musicVolume: 1,
       soundEffectsVolume: 1,
       interfaceScale,
-      tvMode: true,
-      tvScale: 2,
     };
     const seat = seatPresentation(settings);
     expect(seat.interfaceScale).toBe(interfaceScale);

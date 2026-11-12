@@ -1,13 +1,11 @@
 import { expect, Page } from "@playwright/test";
 
-/** The desktop preference is lazy, but it is a real stop in the title's keyboard order. */
-export async function waitForDesktopTvEntry(page: Page) {
-  const tv = page.getByRole("button", {
-    name: /^(Playing on a TV\? Use TV layout|TV layout on · switch to desktop)$/,
-  });
-  if (await page.evaluate(() => !!window.electrifyDesktop))
-    await expect(tv).toBeVisible();
-  return tv;
+/** Wait for the lazy desktop input runtime before dispatching its first native frame. */
+export async function waitForDesktopInput(page: Page): Promise<void> {
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-mock-input-context",
+    "Menu",
+  );
 }
 
 /** The caller installs the clock before loading; keep return focus pending for a body key. */
@@ -37,7 +35,6 @@ export async function exitSettingsWithBodyArrow(page: Page): Promise<void> {
 }
 
 export async function openSettingsWithKeyboard(page: Page): Promise<void> {
-  const tv = await waitForDesktopTvEntry(page);
   const start = page.getByRole("button", {
     name: "Play",
     exact: true,
@@ -58,10 +55,6 @@ export async function openSettingsWithKeyboard(page: Page): Promise<void> {
   });
   if (await achievements.isVisible()) {
     await expect(achievements).toBeFocused();
-    await page.keyboard.press("ArrowDown");
-  }
-  if (await tv.isVisible()) {
-    await expect(tv).toBeFocused();
     await page.keyboard.press("ArrowDown");
   }
   await expect(
@@ -134,7 +127,6 @@ export async function verifyMenuKeyboard(page: Page): Promise<void> {
     page.getByRole("slider", { name: "Effects volume", exact: true }),
   ).toBeFocused();
   await page.keyboard.press("Escape");
-  const tv = await waitForDesktopTvEntry(page);
   const start = page.getByRole("button", {
     name: "Play",
     exact: true,
@@ -158,18 +150,10 @@ export async function verifyMenuKeyboard(page: Page): Promise<void> {
     await expect(achievements).toBeFocused();
     await page.keyboard.press("ArrowDown");
   }
-  if (await tv.isVisible()) {
-    await expect(tv).toBeFocused();
-    await page.keyboard.press("ArrowDown");
-  }
   await expect(
     page.getByRole("button", { name: "Manual", exact: true }),
   ).toBeFocused();
   await page.keyboard.press("ArrowUp");
-  if (await tv.isVisible()) {
-    await expect(tv).toBeFocused();
-    await page.keyboard.press("ArrowUp");
-  }
   if (await achievements.isVisible()) {
     await expect(achievements).toBeFocused();
     await page.keyboard.press("ArrowUp");

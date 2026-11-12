@@ -1509,9 +1509,6 @@ export interface SettingsType {
   workspace?: WorkspaceType;
   // Percent of the shorter screen edge, shared by the app frame and overlays.
   screenEdgePadding?: ScreenEdgePaddingType;
-  // TV presentation belongs to this device, independently of saved campaigns.
-  tvMode?: boolean;
-  tvScale?: number;
 }
 
 export interface DialogType {

@@ -19,7 +19,6 @@ afterEach(() => {
   Object.defineProperties(window, originalViewport);
   document.documentElement.style.removeProperty("--screen-edge-inset");
   document.documentElement.style.removeProperty("font-size");
-  delete document.documentElement.dataset.tvLayout;
   delete document.documentElement.dataset.interfaceScale;
   localStorage.clear();
   setManualHelpAnchor(null);
@@ -34,7 +33,7 @@ it.each([undefined, null, NaN, -4, 3, 100, "4", true])(
 );
 
 it.each(["popover", "menu", "manual"] as const)(
-  "keeps %s inside the frame padding without TV mode, across scale and resize",
+  "keeps %s inside the frame padding independently across scale and resize",
   (overlay) => {
     const store = configureStore({
       reducer: { settings: settingsReducer },
@@ -42,7 +41,6 @@ it.each(["popover", "menu", "manual"] as const)(
         settings: {
           ...initialSettings,
           screenEdgePadding: 4 as const,
-          tvMode: false,
         },
       },
     });
@@ -103,7 +101,6 @@ it.each(["popover", "menu", "manual"] as const)(
       name: overlay === "manual" ? "Manual help" : "Overlay",
     });
     const expected = `${Math.ceil(Math.min(window.innerWidth, window.innerHeight) * 0.04)}px`;
-    expect(document.documentElement).toHaveAttribute("data-tv-layout", "false");
     expect(
       document.documentElement.style.getPropertyValue("--screen-edge-inset"),
     ).toBe(expected);

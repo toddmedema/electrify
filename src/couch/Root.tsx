@@ -1545,8 +1545,8 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
           )}
           {invalidLayout && (
             <Typography>
-              Restore the display area and TV scale to fit readable companies,
-              or save and quit.
+              Restore the display area and interface scale to fit readable
+              companies, or save and quit.
             </Typography>
           )}
           {missing.map((seat) => (

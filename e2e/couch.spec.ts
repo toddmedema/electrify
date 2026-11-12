@@ -1002,14 +1002,15 @@ test("TV couch player toolbars own speed with edge-to-edge panes and global paus
       .digest("hex");
   const desktopBackdrop = couch.backdropRevision();
   const desktopGeometry = JSON.stringify(couch.layout());
-  const interfaceLayout = globalSettings.getByRole("group", {
-    name: "Interface layout",
+  const interfaceScale = globalSettings.getByRole("combobox", {
+    name: "Interface scale",
     exact: true,
   });
-  await interfaceLayout
-    .getByRole("button", { name: "TV", exact: true })
-    .click();
-  await expect(page.locator("html")).toHaveAttribute("data-tv-layout", "true");
+  await interfaceScale.selectOption("1.5");
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-interface-scale",
+    "1.5",
+  );
   await expectSharedSettings(globalSettings);
   await expectSettingsClearance(globalSettings);
   await expectSharedCaptionSize(page, p1, couch.layout()!.zoom);
@@ -1020,17 +1021,18 @@ test("TV couch player toolbars own speed with edge-to-edge panes and global paus
       })
       .toBeGreaterThan(desktopBackdrop);
   await expectPlayersPainted(page);
-  const tvBackdrop = couch.backdropRevision();
-  const tvGeometry = JSON.stringify(couch.layout());
-  await interfaceLayout
-    .getByRole("button", { name: "Desktop", exact: true })
-    .click();
-  await expect(page.locator("html")).toHaveAttribute("data-tv-layout", "false");
+  const scaledBackdrop = couch.backdropRevision();
+  const scaledGeometry = JSON.stringify(couch.layout());
+  await interfaceScale.selectOption("1");
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-interface-scale",
+    "1",
+  );
   await expectSharedSettings(globalSettings);
   await expectSettingsClearance(globalSettings);
   await expectSharedCaptionSize(page, p1, couch.layout()!.zoom);
-  if (JSON.stringify(couch.layout()) !== tvGeometry)
-    await expect.poll(couch.backdropRevision).toBeGreaterThan(tvBackdrop);
+  if (JSON.stringify(couch.layout()) !== scaledGeometry)
+    await expect.poll(couch.backdropRevision).toBeGreaterThan(scaledBackdrop);
   await expectPlayersPainted(page);
   const previousBackdrop = await backdropHash();
   const originalTheme =

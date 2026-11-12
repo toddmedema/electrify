@@ -59,7 +59,6 @@ import { InstallPromptProvider } from "./components/base/InstallAppButton";
 import type { DesktopPowerState } from "./Desktop";
 import { applyInterfaceScale } from "./InterfaceScale";
 import "./InterfaceLayout.scss";
-import { tvLayoutEnabled } from "./TvLayout";
 import {
   ScreenEdgePaddingProvider,
   screenEdgePaddingPixels,
@@ -76,6 +75,10 @@ const MultiplayerRoot =
   process.env.REACT_APP_DESKTOP === "true"
     ? lazy(() => import("./multiplayer/Root"))
     : undefined;
+const CouchSettingsPrompt =
+  process.env.REACT_APP_DESKTOP === "true"
+    ? lazy(() => import("./components/base/CouchSettingsPrompt"))
+    : null;
 const DesktopInputHints =
   process.env.REACT_APP_DESKTOP === "true"
     ? lazy(() => import("./desktop/InputHints"))
@@ -149,7 +152,6 @@ export function ThemedApp(props: {
   );
   const settings = useAppSelector((state) => state.settings);
   const { interfaceScale, screenEdgePadding } = settings;
-  const tvMode = tvLayoutEnabled(settings);
   const [viewport, setViewport] = useState(() => ({
     width: window.innerWidth,
     height: window.innerHeight,
@@ -157,10 +159,9 @@ export function ThemedApp(props: {
   const edgePadding = screenEdgePaddingPixels(screenEdgePadding, viewport);
   useLayoutEffect(() => {
     // The explicit preference applies equally to the shell and seats. Native seat zoom
-    // remains independent; neither resolution nor TV layout contributes another multiplier.
+    // remains independent; display resolution contributes no automatic multiplier.
     const apply = () => {
       const root = document.documentElement;
-      root.dataset.tvLayout = String(tvMode);
       root.style.setProperty(
         "--screen-edge-inset",
         `${screenEdgePaddingPixels(screenEdgePadding, {
@@ -177,7 +178,7 @@ export function ThemedApp(props: {
     };
     window.addEventListener("resize", resize);
     return () => window.removeEventListener("resize", resize);
-  }, [interfaceScale, tvMode, screenEdgePadding]);
+  }, [interfaceScale, screenEdgePadding]);
   // "System" is a standing instruction rather than a value, and the system can change its mind
   // while the game is open - at sunset, on a schedule, or because the player just flipped it
   const [systemDark, setSystemDark] = useState(prefersDarkMode);
@@ -605,6 +606,11 @@ export default function App() {
               <div className="appFrameBody">
                 <CompositorContainer store={store} />
               </div>
+              {CouchSettingsPrompt && isDesktopApp() && (
+                <Suspense fallback={null}>
+                  <CouchSettingsPrompt />
+                </Suspense>
+              )}
               {DesktopInputHints && isDesktopApp() && (
                 <Suspense fallback={null}>
                   <DesktopInputHints />

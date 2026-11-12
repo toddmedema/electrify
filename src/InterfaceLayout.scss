@@ -49,21 +49,6 @@
     --toast-edge-gap: 24px;
   }
 }
-.tvLayoutSettings {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 16px;
-  .MuiToggleButton-root {
-    min-width: 5rem;
-  }
-}
-.tvPresetEntry.MuiButton-root {
-  min-height: 48px;
-  margin: 16px auto;
-}
-
 html[data-interface-scale]:not([data-interface-scale="1"]) {
   --control-size: 3rem;
 
@@ -246,10 +231,6 @@ html[data-interface-scale]:not([data-interface-scale="1"]) {
       border-bottom: 0;
     }
   }
-}
-
-.base_main #menuCard #centeredMenu .tvPresetEntry.MuiButton-root {
-  margin: 1rem auto;
 }
 
 // Shared enlarged surfaces use the same type-derived measure, from setup through the final decision.
@@ -653,8 +634,7 @@ html[data-interface-scale]:not([data-interface-scale="1"]) {
 html[data-interface-scale]:not([data-interface-scale="1"])
   #menuCard
   #centeredMenu {
-  :is(.mainActions, .resourceActions, .discoveryActions) .MuiButton-root,
-  .tvPresetEntry.MuiButton-root {
+  :is(.mainActions, .resourceActions, .discoveryActions) .MuiButton-root {
     width: min(100%, 24rem);
   }
 }

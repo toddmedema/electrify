@@ -17,7 +17,6 @@ import {
   migrateInterfaceScale,
   normalizeInterfaceScale,
 } from "../InterfaceScale";
-import { normalizeTvScale } from "../TvLayout";
 import { WORKSPACE_CHOICES, normalizeWorkspace } from "../WorkspaceLayout";
 import {
   normalizeScreenEdgePadding,
@@ -87,8 +86,6 @@ function normalizedChanges(
     changes.screenEdgePadding = normalizeScreenEdgePadding(
       changes.screenEdgePadding,
     );
-  if (Object.prototype.hasOwnProperty.call(changes, "tvScale"))
-    changes.tvScale = normalizeTvScale(changes.tvScale);
   return changes;
 }
 
@@ -116,10 +113,6 @@ if (
 }
 
 if (process.env.REACT_APP_DESKTOP === "true" && isDesktopApp()) {
-  // Undefined means the player has not chosen yet. Both true and false suppress
-  // the first-launch suggestion, including after restarting Steam offline.
-  initialSettings.tvMode = getStorageBooleanOrUndefined("tvMode");
-  initialSettings.tvScale = normalizeTvScale(getStorageNumber("tvScale", 1.5));
   initialSettings.controllerVibrationEnabled =
     getStorageBooleanOrUndefined("controllerVibrationEnabled") ?? false;
   initialSettings.steamTimelineEnabled =

@@ -377,8 +377,8 @@ it("reserves room for the larger dock on large windows", () => {
   expect(dockCenter(2200, 2, 0, 480)).toBe(1580);
 });
 
-it("uses Single tool on a wide window independently of the old TV preference", async () => {
-  const { user, action } = setup(2560, { workspace: "single", tvMode: false });
+it("uses Single tool on a wide window independently of device presentation", async () => {
+  const { user, action } = setup(2560, { workspace: "single" });
   await user.click(action("Programs"));
   expect(
     screen.getByRole("slider", { name: "Electricity rate" }),

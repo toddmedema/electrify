@@ -48,10 +48,6 @@ import type { SignInOptions } from "../../Globals";
 import GoogleSignIn from "../base/GoogleSignIn";
 import ConfirmDialog from "../base/ConfirmDialog";
 const CreditsDialog = React.lazy(() => import("../base/CreditsDialog"));
-const TvLayoutSettings =
-  process.env.REACT_APP_DESKTOP === "true"
-    ? React.lazy(() => import("../base/TvLayoutSettings"))
-    : () => null;
 const DesktopDisplaySettings =
   process.env.REACT_APP_DESKTOP === "true"
     ? React.lazy(() => import("../base/DesktopDisplaySettings"))
@@ -475,7 +471,6 @@ export default function Settings(props: Props): React.JSX.Element {
                   </Typography>
                 }
               >
-                <TvLayoutSettings />
                 <DesktopDisplaySettings />
               </React.Suspense>
             )}

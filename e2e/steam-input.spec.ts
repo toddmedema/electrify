@@ -1,6 +1,6 @@
 import { expect, test, Page, Locator, TestInfo } from "./fixtures";
 import path from "node:path";
-import { waitForDesktopTvEntry } from "./menu-keyboard";
+import { waitForDesktopInput } from "./menu-keyboard";
 import { foregroundContrast } from "./contrast";
 import { decodeSave } from "../src/SaveEncoding";
 import type { SaveGameType } from "../src/Types";
@@ -154,10 +154,18 @@ async function select(
   ).toBeFocused();
 }
 
-test.beforeEach(async ({ page }) => {
-  await page.addInitScript((glyphs) => {
+test.beforeEach(async ({ page }, info) => {
+  const showPrompt = info.title.startsWith("TV first launch");
+  const setup = {
+    glyphs,
+    showPrompt,
+    connected: !showPrompt || info.title.includes("connected-controller"),
+  };
+  await page.addInitScript((setup) => {
+    const { glyphs, showPrompt, connected } = setup;
     if (sessionStorage.getItem("mockKeepPreferencesOnReload") !== "true")
       localStorage.clear();
+    if (!showPrompt) localStorage.setItem("couchPromptShown", "true");
     // Keep game hazards independent of retries, wall time and worker scheduling.
     Math.random = () => 0.25;
     localStorage.setItem("audioEnabled", "false");
@@ -176,7 +184,7 @@ test.beforeEach(async ({ page }) => {
       resolutions: [{ width: 1280, height: 800 }],
     };
     const frame = {
-      connected: true,
+      connected,
       actions: [],
       glyphs,
     };
@@ -302,7 +310,7 @@ test.beforeEach(async ({ page }) => {
         });
       },
     };
-  }, glyphs);
+  }, setup);
 });
 
 test("desktop home buttons share a width and Escape returns from menu pages", async ({
@@ -310,7 +318,7 @@ test("desktop home buttons share a width and Escape returns from menu pages", as
 }, testInfo) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/");
-  await waitForDesktopTvEntry(page);
+  await waitForDesktopInput(page);
   const play = page.getByRole("button", { name: "Play", exact: true });
   await expect(play).toBeVisible();
   await expect(
@@ -365,14 +373,12 @@ test("menu movement under a stationary pointer preserves keyboard navigation", a
     exact: true,
   });
   const manual = page.getByRole("button", { name: "Manual", exact: true });
-  const tv = await waitForDesktopTvEntry(page);
+  await waitForDesktopInput(page);
   await friends.hover();
   await expect(friends).toBeFocused();
   await play.focus();
   await page.keyboard.press("ArrowDown");
   await expect(friends).toBeFocused();
-  await page.keyboard.press("ArrowDown");
-  await expect(tv).toBeFocused();
   await page.keyboard.press("ArrowDown");
   await expect(manual).toBeFocused();
 
@@ -1013,12 +1019,12 @@ test("controller reviews, cancels and confirms a utility acquisition", async ({
   ).toBe(true);
 });
 
-test("TV layout keeps gameplay and controls readable with explicit device setup", async ({
+test("TV couch settings keep gameplay and controls readable with explicit device setup", async ({
   page,
 }, info) => {
   await tvJourney(page, info, false);
 });
-test("TV maximum scale, Larger text and screen inset keep focused controls clear", async ({
+test("TV maximum interface scale and screen-edge padding keep focused controls clear", async ({
   page,
 }, info) => {
   await tvJourney(page, info, true);
@@ -1056,13 +1062,7 @@ test("controller help accepts pointer and physical keyboard activation without a
 async function setupTv(page: Page, maximum: boolean, theme: "light" | "dark") {
   await page.emulateMedia({ colorScheme: theme });
   await page.goto("/");
-  await expect(page.locator("html")).toHaveAttribute("data-tv-layout", "false");
-  const tv = page.getByRole("button", {
-    name: "Playing on a TV? Use TV layout",
-  });
-  await select(page, tv);
-  await input(page, "confirm");
-  await expect(page.locator("html")).toHaveAttribute("data-tv-layout", "true");
+  await waitForDesktopInput(page);
   await select(
     page,
     page.getByRole("button", { name: "Settings", exact: true }),
@@ -1071,10 +1071,28 @@ async function setupTv(page: Page, maximum: boolean, theme: "light" | "dark") {
   await page
     .getByRole("combobox", { name: "Interface scale", exact: true })
     .selectOption(maximum ? "2.5" : "1.5");
+  await select(
+    page,
+    page.getByRole("button", { name: "Single tool", exact: true }),
+  );
+  await input(page, "confirm");
   if (maximum) {
+    await select(
+      page,
+      page.getByRole("button", { name: "Advanced display", exact: true }),
+    );
+    await input(page, "confirm");
     await select(page, page.getByRole("button", { name: "4%", exact: true }));
     await input(page, "confirm");
   }
+  if (process.env.REVIEW_SCREENSHOT_DIR)
+    await page.screenshot({
+      path: path.join(
+        process.env.REVIEW_SCREENSHOT_DIR,
+        `couch-settings-${theme}-${maximum ? "maximum" : "standard"}.png`,
+      ),
+      animations: "disabled",
+    });
   await input(page, "back");
 }
 
@@ -1142,7 +1160,10 @@ test("TV saved preferences style direct scenario links before play", async ({
   await page.goto("/?scenario=116");
   const start = page.getByRole("button", { name: "Start game", exact: true });
   await expect(start).toBeVisible();
-  await expect(page.locator("html")).toHaveAttribute("data-tv-layout", "true");
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-interface-scale",
+    "2.5",
+  );
   const edge = await page.locator(".appFrame").evaluate((element) => ({
     actual: parseFloat(getComputedStyle(element).paddingTop),
     expected: Math.min(innerWidth, innerHeight) * 0.04,
@@ -1812,8 +1833,13 @@ async function tvJourney(page: Page, testInfo: TestInfo, maximum: boolean) {
   }
 }
 
-for (const source of ["big-picture", "remote-play-tv"] as const) {
-  test(`TV first launch suggests ${source} and remembers the player's choice`, async ({
+for (const source of [
+  "big-picture",
+  "remote-play-tv",
+  "connected-controller",
+  "steam-deck",
+] as const) {
+  test(`TV first launch offers nonblocking couch settings for ${source} once`, async ({
     page,
   }, info) => {
     test.skip(info.project.name !== "tv-1080-dark");
@@ -1821,82 +1847,93 @@ for (const source of ["big-picture", "remote-play-tv"] as const) {
       sessionStorage.setItem(
         "mockSteamPresentation",
         JSON.stringify({
-          bigPicture: source === "big-picture",
+          bigPicture: source === "big-picture" || source === "steam-deck",
           remotePlayTv: source === "remote-play-tv",
-          steamDeck: false,
+          steamDeck: source === "steam-deck",
         }),
       );
     }, source);
     await page.goto("/");
-    const suggestion = page.getByRole("dialog", { name: "Playing on a TV?" });
-    await expect(suggestion).toBeVisible();
-    await expect(page.locator("#appStartup")).toHaveCount(0);
+    await waitForDesktopInput(page);
+    const prompt = page.getByRole("complementary", {
+      name: "Couch settings suggestion",
+      exact: true,
+    });
+    const play = page.getByRole("button", { name: "Play", exact: true });
+    await expect(prompt).toBeVisible();
+    await expect(play).toBeFocused();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
     await expect(page.locator("html")).toHaveAttribute(
-      "data-mock-input-context",
-      "Menu",
+      "data-interface-scale",
+      "1",
     );
+    expect(
+      await page.evaluate(() => localStorage.getItem("couchPromptShown")),
+    ).toBe("true");
+    await input(page, "down");
     await expect(
-      suggestion.getByRole("button", { name: "Use TV layout", exact: true }),
-    ).toBeFocused();
+      page.getByRole("complementary", {
+        name: "Controller controls",
+        exact: true,
+      }),
+    ).toBeVisible();
+    const geometry = await prompt.evaluate((element) => {
+      const prompt = element.getBoundingClientRect();
+      const body = document
+        .querySelector(".appFrameBody")!
+        .getBoundingClientRect();
+      const hints = document
+        .querySelector(".controllerHints")
+        ?.getBoundingClientRect();
+      return {
+        promptTop: prompt.top,
+        promptBottom: prompt.bottom,
+        bodyBottom: body.bottom,
+        hintsTop: hints?.top,
+        viewport: innerHeight,
+      };
+    });
+    expect(geometry.promptTop).toBeGreaterThanOrEqual(geometry.bodyBottom - 1);
+    expect(geometry.promptBottom).toBeLessThanOrEqual(
+      geometry.hintsTop ?? geometry.viewport,
+    );
+    if (process.env.REVIEW_SCREENSHOT_DIR && source === "big-picture")
+      await page.screenshot({
+        path: path.join(
+          process.env.REVIEW_SCREENSHOT_DIR,
+          "couch-prompt-1080-dark.png",
+        ),
+        animations: "disabled",
+      });
+    const accept = source === "big-picture" || source === "steam-deck";
+    await select(
+      page,
+      prompt.getByRole("button", {
+        name: accept ? "Use couch settings" : "Dismiss",
+        exact: true,
+      }),
+    );
+    await input(page, "confirm");
+    await expect(prompt).toHaveCount(0);
     await expect(page.locator("html")).toHaveAttribute(
-      "data-tv-layout",
-      "false",
+      "data-interface-scale",
+      accept ? "1.5" : "1",
     );
-    const useTv = source === "big-picture";
-    if (useTv) await input(page, "confirm");
-    else
-      await suggestion
-        .getByRole("button", { name: "Keep desktop layout", exact: true })
-        .press("Enter");
-    await expect(suggestion).not.toBeVisible();
-    await expect(page.locator("html")).toHaveAttribute(
-      "data-tv-layout",
-      String(useTv),
+    expect(await page.evaluate(() => localStorage.getItem("workspace"))).toBe(
+      accept ? "single" : "automatic",
     );
-    expect(await page.evaluate(() => localStorage.getItem("tvMode"))).toBe(
-      String(useTv),
-    );
-    // Retain the actual device storage instead of resetting this fresh-page fixture.
+    expect(
+      await page.evaluate(() => localStorage.getItem("screenEdgePadding")),
+    ).toBe("0");
     await page.evaluate(() =>
       sessionStorage.setItem("mockKeepPreferencesOnReload", "true"),
     );
     await page.reload();
-    await waitForDesktopTvEntry(page);
-    await expect(suggestion).toHaveCount(0);
+    await waitForDesktopInput(page);
+    await expect(prompt).toHaveCount(0);
     await expect(page.locator("html")).toHaveAttribute(
-      "data-tv-layout",
-      String(useTv),
+      "data-interface-scale",
+      accept ? "1.5" : "1",
     );
   });
 }
-
-test("TV first launch leaves handheld Steam Deck layout unchanged in Big Picture", async ({
-  page,
-}, info) => {
-  test.skip(info.project.name !== "deck-800-dark");
-  await page.addInitScript(() => {
-    sessionStorage.setItem(
-      "mockSteamPresentation",
-      JSON.stringify({
-        bigPicture: true,
-        steamDeck: true,
-        remotePlayTv: false,
-      }),
-    );
-  });
-  await page.goto("/");
-  await waitForDesktopTvEntry(page);
-  await expect(
-    page.getByRole("dialog", { name: "Playing on a TV?" }),
-  ).toHaveCount(0);
-  await expect(page.locator("html")).toHaveAttribute("data-tv-layout", "false");
-  expect(await page.evaluate(() => localStorage.getItem("tvMode"))).toBeNull();
-  // Handheld protection does not prevent a player explicitly choosing TV for a dock.
-  await page
-    .getByRole("button", {
-      name: "Playing on a TV? Use TV layout",
-      exact: true,
-    })
-    .press("Enter");
-  await expect(page.locator("html")).toHaveAttribute("data-tv-layout", "true");
-});

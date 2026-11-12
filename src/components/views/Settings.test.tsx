@@ -199,7 +199,6 @@ describe("Settings", () => {
     await userEvent.selectOptions(scale, "1.5");
     await userEvent.selectOptions(scale, "2.5");
     expect(onInterfaceScaleChange.mock.calls).toEqual([[1.5], [2.5]]);
-    expect(screen.queryByText("TV scale")).not.toBeInTheDocument();
   });
 
   it("offers Automatic and Single tool workspaces outside the desktop app", async () => {

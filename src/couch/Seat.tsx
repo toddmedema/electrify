@@ -37,7 +37,6 @@ export default function CouchSeat() {
     store.dispatch(
       applyPresentation({
         workspace: "single",
-        tvMode: true,
         screenEdgePadding: 0,
         audioEnabled: false,
       }),
