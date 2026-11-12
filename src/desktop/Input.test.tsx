@@ -84,7 +84,6 @@ function Game() {
 it.each(["pointerdown", "keydown"] as const)(
   "keeps controller help mounted through trusted %s activation and hands off outside the footer",
   async (eventType) => {
-    document.documentElement.dataset.tvLayout = "true";
     const listeners = jest.spyOn(document, "addEventListener");
     render(
       <Provider store={store}>
@@ -119,7 +118,6 @@ it.each(["pointerdown", "keydown"] as const)(
     );
     expect(getInputPresentation().active).toBe(false);
     store.dispatch(dialogClose());
-    delete document.documentElement.dataset.tvLayout;
   },
 );
 
@@ -163,6 +161,19 @@ it.each(["submitted", "cancelled", "unavailable"] as const)(
       await Promise.resolve();
     });
     const field = screen.getByRole("textbox", { name: "Save name" });
+    for (const [index, control] of [
+      field,
+      screen.getByRole("button", { name: "Rename" }),
+    ].entries()) {
+      jest.spyOn(control, "getBoundingClientRect").mockReturnValue({
+        left: 0,
+        right: 160,
+        top: index * 60,
+        bottom: index * 60 + 40,
+        width: 160,
+        height: 40,
+      } as DOMRect);
+    }
     field.focus();
     f.emit({ actions: ["confirm"] });
     expect(showTextInput).toHaveBeenCalledWith({

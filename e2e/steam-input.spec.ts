@@ -68,10 +68,10 @@ async function select(
   await expect(control).toBeVisible();
   await expect(control).toBeEnabled();
   const group = control.locator("..");
-  if (
+  const roving =
     (await control.getAttribute("tabindex")) === "-1" &&
-    ["group", "tablist"].includes((await group.getAttribute("role")) ?? "")
-  ) {
+    ["group", "tablist"].includes((await group.getAttribute("role")) ?? "");
+  if (roving) {
     // Roving groups expose one vertical tab stop. Enter it before moving within
     // the group, just as a player does with the D-pad.
     const entry = group.locator('button[tabindex="0"]');
@@ -88,53 +88,6 @@ async function select(
       (await group.getAttribute("aria-orientation")) === "vertical";
     action = vertical ? (forward ? "down" : "up") : forward ? "right" : "left";
   }
-  if ((await page.locator("html").getAttribute("data-tv-layout")) === "true") {
-    const visited = new Map<string, number>();
-    for (let attempt = 0; attempt < limit; attempt++) {
-      if (
-        await control.evaluate((element) => element === document.activeElement)
-      )
-        return;
-      const movement = await control.evaluate((element) => {
-        const target = element.getBoundingClientRect();
-        const active = document.activeElement as HTMLElement | null;
-        if (!active || active === document.body)
-          return { direction: "down", key: "body" };
-        const from = active.getBoundingClientRect();
-        const sameRow =
-          Math.min(from.bottom, target.bottom) >
-          Math.max(from.top, target.top) +
-            Math.min(from.height, target.height) / 2;
-        const horizontal =
-          sameRow &&
-          !active.matches(
-            'input[type="range"],select,[role="combobox"],.accessibleChart > [role="img"]',
-          );
-        return {
-          direction: horizontal
-            ? target.left > from.left
-              ? "right"
-              : "left"
-            : target.top > from.top
-              ? "down"
-              : "up",
-          key: `${active.tagName}/${active.id}/${active.getAttribute("aria-label")}/${active.textContent?.slice(0, 50)}/${active.parentElement?.textContent?.slice(0, 60)}`,
-        };
-      });
-      const count = visited.get(movement.key) ?? 0;
-      visited.set(movement.key, count + 1);
-      const direction =
-        count < 2
-          ? movement.direction
-          : ["down", "right", "up", "left"][count % 4];
-      await input(page, direction as InputAction);
-    }
-    await expect(
-      control,
-      "reachable through the visible TV rows",
-    ).toBeFocused();
-    return;
-  }
   const popupSurfaces = () =>
     page
       .locator('[role="dialog"],[role="menu"],[role="listbox"]')
@@ -147,22 +100,57 @@ async function select(
         })),
       );
   const expectedSurfaces = await popupSurfaces();
-  for (let index = 0; index < limit; index++) {
+  const visited = new Map<string, number>();
+  for (let attempt = 0; attempt < limit; attempt++) {
     if (await control.evaluate((element) => element === document.activeElement))
       return;
     expect(
-      expectedSurfaces,
-      "directional focus traversal must not open an unexpected popup",
-    ).toEqual(expect.arrayContaining(await popupSurfaces()));
+      await popupSurfaces(),
+      "directional focus traversal must not open or dismiss a popup",
+    ).toEqual(expectedSurfaces);
     expect(
       await control.count(),
       "the target must remain available during navigation",
     ).toBe(1);
-    await input(page, action);
+    const movement = await control.evaluate((element) => {
+      const target = element.getBoundingClientRect();
+      const active = document.activeElement as HTMLElement | null;
+      if (!active || active === document.body)
+        return { direction: "down", key: "body" };
+      const from = active.getBoundingClientRect();
+      const sameRow =
+        Math.min(from.bottom, target.bottom) >
+        Math.max(from.top, target.top) +
+          Math.min(from.height, target.height) / 2;
+      const horizontal =
+        sameRow &&
+        !active.matches(
+          'input[type="range"],select,[role="combobox"],.accessibleChart > [role="img"]',
+        );
+      return {
+        direction: horizontal
+          ? target.left > from.left
+            ? "right"
+            : "left"
+          : target.top > from.top
+            ? "down"
+            : "up",
+        key: `${active.tagName}/${active.id}/${active.getAttribute("aria-label")}/${active.textContent?.slice(0, 50)}/${active.parentElement?.textContent?.slice(0, 60)}`,
+      };
+    });
+    const count = visited.get(movement.key) ?? 0;
+    visited.set(movement.key, count + 1);
+    const direction =
+      count < 2
+        ? roving
+          ? action
+          : movement.direction
+        : ["down", "right", "up", "left"][count % 4];
+    await input(page, direction as InputAction);
   }
   await expect(
     control,
-    "reachable with semantic controller navigation",
+    "reachable through the rendered control positions",
   ).toBeFocused();
 }
 
@@ -1036,14 +1024,13 @@ test("TV maximum scale, Larger text and screen inset keep focused controls clear
   await tvJourney(page, info, true);
 });
 
-test("TV controller help accepts pointer and physical keyboard activation", async ({
+test("controller help accepts pointer and physical keyboard activation without a layout preference", async ({
   page,
-}, info) => {
-  skipNonTv(info);
-  await setupTv(
-    page,
-    false,
-    info.project.use.colorScheme === "dark" ? "dark" : "light",
+}) => {
+  await page.goto("/");
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-mock-input-context",
+    "Menu",
   );
   const help = page.getByRole("button", { name: "All controls", exact: true });
   const dialog = page.getByRole("dialog", {

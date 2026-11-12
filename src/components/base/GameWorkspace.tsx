@@ -128,7 +128,7 @@ function Workspace({
   const localMemory = React.useRef(new Map<string, unknown>());
   const memory = sharedMemory ?? localMemory.current;
   const workspace = React.useRef<HTMLDivElement>(null);
-  useToolFocusMemory(workspace, memory, active ?? "fleet", tvMode);
+  useToolFocusMemory(workspace, memory, active ?? "fleet");
   const [programBack, setProgramBack] = React.useState<() => void>();
   const retainFocus = React.useRef(false);
   const layout = tvMode

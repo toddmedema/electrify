@@ -1,5 +1,4 @@
 import { revealControl } from "../components/base/RevealControl";
-import { isTvLayout } from "../TvLayout";
 
 const controlSelector =
   "button,a[href],input,select,textarea,summary,[role=button],[tabindex]";
@@ -52,8 +51,10 @@ export function inputScope(): HTMLElement {
   const screen = screens[screens.length - 1];
   const container = screen?.closest<HTMLElement>(".app_container");
   const tutorial = container?.querySelector<HTMLElement>(".tutorialHud");
-  if (isTvLayout())
-    return screen?.closest<HTMLElement>(".appFrame") ?? screen ?? document.body;
+  // Shared controller help and tutorial actions are siblings of the current screen.
+  // Popups above still own input, and inert outgoing screens stay unavailable.
+  const frame = screen?.closest<HTMLElement>(".appFrame");
+  if (frame) return frame;
   return tutorial && visible(tutorial) ? container! : (screen ?? document.body);
 }
 
@@ -149,10 +150,14 @@ function spatialDestination(
     return undefined;
   };
   const scrolling = vertical ? scrollParent(target) : undefined;
+  const pane = target.closest("[data-game-tool],.gameFleet");
   const cx = (from.left + from.right) / 2;
   const cy = (from.top + from.bottom) / 2;
   const candidates = controls.flatMap((element) => {
     if (element === target) return [];
+    // Up/Down follows this pane to its boundary; Left/Right crosses columns.
+    const otherPane = element.closest("[data-game-tool],.gameFleet");
+    if (vertical && pane && otherPane && pane !== otherPane) return [];
     const rect = element.getBoundingClientRect();
     if (!rect.width || !rect.height) return [];
     const dx = (rect.left + rect.right) / 2 - cx;
@@ -230,27 +235,23 @@ export function moveInputFocus(
   const controls = visibleControls(scope);
   if (!controls.length) return;
   const index = controls.indexOf(target);
-  if (isTvLayout() && index >= 0) {
+  if (index >= 0) {
     const next = spatialDestination(target, controls, direction);
     if (next) focus(next);
     return;
   }
-  if (index >= 0) {
-    focus(controls[(index + step + controls.length) % controls.length]);
-  } else {
-    // A tool heading receives initial focus; continue immediately after that heading.
-    const candidates = controls.filter(
-      (element) =>
-        target.compareDocumentPosition(element) &
-        (step > 0
-          ? Node.DOCUMENT_POSITION_FOLLOWING
-          : Node.DOCUMENT_POSITION_PRECEDING),
-    );
-    focus(
-      (step > 0 ? candidates[0] : candidates[candidates.length - 1]) ??
-        controls[step > 0 ? 0 : controls.length - 1],
-    );
-  }
+  // A tool heading receives initial focus; continue immediately after that heading.
+  const candidates = controls.filter(
+    (element) =>
+      target.compareDocumentPosition(element) &
+      (step > 0
+        ? Node.DOCUMENT_POSITION_FOLLOWING
+        : Node.DOCUMENT_POSITION_PRECEDING),
+  );
+  focus(
+    (step > 0 ? candidates[0] : candidates[candidates.length - 1]) ??
+      controls[step > 0 ? 0 : controls.length - 1],
+  );
 }
 
 export function confirmInput(): void {

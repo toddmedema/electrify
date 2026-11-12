@@ -1,4 +1,5 @@
 import * as React from "react";
+import { revealControl } from "./RevealControl";
 
 // View preferences belong to this workspace, not to saves or simulation state.
 // Unmounted tools release workers and decision pauses without losing their place.
@@ -129,10 +130,9 @@ export function useToolFocusMemory(
   ref: React.RefObject<HTMLElement | null>,
   memory: Map<string, unknown>,
   active: string,
-  enabled: boolean,
 ) {
+  const keyboard = React.useRef(false);
   React.useEffect(() => {
-    if (!enabled) return;
     const root = ref.current;
     if (!root) return;
     const remember = (event: FocusEvent) => {
@@ -153,13 +153,25 @@ export function useToolFocusMemory(
         tag: element.tagName,
       } satisfies FocusMemory);
     };
+    const onKeyboard = () => (keyboard.current = true);
+    const onPointer = () => (keyboard.current = false);
     root.addEventListener("focusin", remember);
-    return () => root.removeEventListener("focusin", remember);
-  }, [enabled, memory, ref]);
+    document.addEventListener("keydown", onKeyboard, true);
+    document.addEventListener("pointerdown", onPointer, true);
+    return () => {
+      root.removeEventListener("focusin", remember);
+      document.removeEventListener("keydown", onKeyboard, true);
+      document.removeEventListener("pointerdown", onPointer, true);
+    };
+  }, [memory, ref]);
   React.useEffect(() => {
-    if (!enabled) return;
+    if (
+      document.documentElement.dataset.controllerInput !== "true" &&
+      !keyboard.current
+    )
+      return;
     const saved = memory.get(`focus.${active}`) as FocusMemory | undefined;
-    if (!saved) return;
+    if (!saved && active !== "fleet") return;
     let frame: number | undefined;
     let cancelled = false;
     const cancel = () => {
@@ -173,24 +185,34 @@ export function useToolFocusMemory(
       );
       const target =
         root && !root.hidden
-          ? root.contains(saved.element)
-            ? saved.element
-            : Array.from(
-                root.querySelectorAll<HTMLElement>(
-                  "button,input,select,textarea,summary,a[href],[tabindex]",
-                ),
-              ).find((element) =>
-                saved.id
-                  ? element.id === saved.id
-                  : saved.label
-                    ? element.getAttribute("aria-label") === saved.label
-                    : element.tagName === saved.tag &&
-                      element.textContent === saved.text,
+          ? !saved
+            ? root.querySelector<HTMLElement>(
+                "button:not(:disabled),input:not(:disabled),select:not(:disabled),textarea:not(:disabled),summary,a[href],[tabindex='0']",
               )
+            : root.contains(saved.element)
+              ? saved.element
+              : Array.from(
+                  root.querySelectorAll<HTMLElement>(
+                    "button,input,select,textarea,summary,a[href],[tabindex]",
+                  ),
+                ).find((element) =>
+                  saved.id
+                    ? element.id === saved.id
+                    : saved.label
+                      ? element.getAttribute("aria-label") === saved.label
+                      : element.tagName === saved.tag &&
+                        element.textContent === saved.text,
+                )
           : undefined;
-      if (target && !target.matches(":disabled,[aria-disabled=true]"))
+      if (
+        target &&
+        !target.matches(":disabled,[aria-disabled=true]") &&
+        !target.closest("[hidden],[inert],[aria-hidden=true]") &&
+        getComputedStyle(target).visibility !== "hidden"
+      ) {
         target.focus({ preventScroll: true });
-      else if (attempt < RESTORE_FRAMES)
+        revealControl(target);
+      } else if (attempt < RESTORE_FRAMES)
         frame = requestAnimationFrame(() => restore(attempt + 1));
     };
     frame = requestAnimationFrame(() => restore(0));
@@ -201,5 +223,5 @@ export function useToolFocusMemory(
       document.removeEventListener("keydown", cancel, true);
       document.removeEventListener("pointerdown", cancel, true);
     };
-  }, [active, enabled, memory, ref]);
+  }, [active, memory, ref]);
 }

@@ -15,10 +15,30 @@ beforeEach(() => {
   jest
     .spyOn(HTMLElement.prototype, "getClientRects")
     .mockReturnValue([{}] as unknown as DOMRectList);
+  // JSDOM has no layout. Give ordinary fixtures a rendered vertical control list;
+  // spatial tests below override this with the actual row/column arrangement.
+  jest
+    .spyOn(HTMLElement.prototype, "getBoundingClientRect")
+    .mockImplementation(function (this: HTMLElement) {
+      const index = Array.from(
+        // eslint-disable-next-line testing-library/no-node-access -- JSDOM geometry follows document order.
+        document.querySelectorAll(
+          "button,input,select,textarea,summary,[tabindex]",
+        ),
+      ).indexOf(this);
+      return {
+        left: 0,
+        right: 80,
+        top: index * 60,
+        bottom: index * 60 + 40,
+        width: 80,
+        height: 40,
+      } as DOMRect;
+    });
 });
 afterEach(() => jest.restoreAllMocks());
 
-it("uses real focus, skips unavailable controls, wraps and continues after a tool heading", () => {
+it("uses real focus, skips unavailable controls, stops at boundaries and continues after a tool heading", () => {
   render(
     <main className="base_main">
       <button>Pause</button>
@@ -36,12 +56,12 @@ it("uses real focus, skips unavailable controls, wraps and continues after a too
   screen.getByText("Build").focus();
   moveInputFocus("down");
   expect(screen.getByText("Close Build")).toHaveFocus();
-  moveInputFocus("right");
+  moveInputFocus("down");
   expect(screen.getByText("Build solar")).toHaveFocus();
   moveInputFocus("down");
-  expect(screen.getByText("Pause")).toHaveFocus();
-  moveInputFocus("up");
   expect(screen.getByText("Build solar")).toHaveFocus();
+  moveInputFocus("up");
+  expect(screen.getByText("Close Build")).toHaveFocus();
   expect(visibleControls(inputScope())).toHaveLength(3);
 });
 
@@ -110,7 +130,7 @@ it("keeps the covered compact fleet out of controller navigation and confirmatio
   moveInputFocus("down");
   expect(screen.getByRole("button", { name: /^Build$/ })).toHaveFocus();
   moveInputFocus("down");
-  expect(screen.getByRole("button", { name: "Game menu" })).toHaveFocus();
+  expect(screen.getByRole("button", { name: /^Build$/ })).toHaveFocus();
   screen.getByRole("button", { name: "Pause coal" }).focus();
   confirmInput();
   expect(pauseCoal).not.toHaveBeenCalled();
@@ -162,7 +182,7 @@ it("includes the tutorial's sibling actions while skipping an outgoing inert scr
   confirmInput();
   expect(next).toHaveBeenCalledTimes(1);
   moveInputFocus("down");
-  expect(screen.getByText("Close Build")).toHaveFocus();
+  expect(screen.getByText("Next step")).toHaveFocus();
 });
 
 it("routes portaled listbox keys through its combobox owner", () => {
@@ -428,11 +448,7 @@ it.each(["cancel", "drop"] as const)(
   },
 );
 
-afterEach(() => {
-  delete document.documentElement.dataset.tvLayout;
-});
-it("TV directions follow visible rows while widget handlers retain first refusal", () => {
-  document.documentElement.dataset.tvLayout = "true";
+it("directions follow visible rows without a layout preference while widgets retain first refusal", () => {
   render(
     <main className="base_main">
       <button>Top left</button>
@@ -471,11 +487,70 @@ it("TV directions follow visible rows while widget handlers retain first refusal
   expect(screen.getByRole("button", { name: "Bottom right" })).toHaveFocus();
   moveInputFocus("left");
   expect(screen.getByRole("button", { name: "Bottom left" })).toHaveFocus();
+  moveInputFocus("left");
+  expect(screen.getByRole("button", { name: "Bottom left" })).toHaveFocus();
   const range = screen.getByRole("slider", { name: "Output" });
   range.focus();
   moveInputFocus("right");
   expect(range).toHaveFocus();
   expect(range).toHaveValue("6");
+});
+
+it("includes sibling controller help in the frame while popups retain their scope", () => {
+  render(
+    <div className="appFrame">
+      <main className="base_main">
+        <button>Play</button>
+      </main>
+      <aside>
+        <button>All controls</button>
+      </aside>
+    </div>,
+  );
+  screen.getByRole("button", { name: "Play" }).focus();
+  moveInputFocus("down");
+  expect(screen.getByRole("button", { name: "All controls" })).toHaveFocus();
+  moveInputFocus("up");
+  expect(screen.getByRole("button", { name: "Play" })).toHaveFocus();
+});
+
+it("keeps vertical navigation in its pane and uses horizontal navigation across panels", () => {
+  render(
+    <main className="base_main">
+      <section data-game-tool="BUILD_GENERATORS">
+        <button>Build solar</button>
+      </section>
+      <section data-game-tool="INSIGHTS">
+        <button>Demand</button>
+        <button>Emissions</button>
+      </section>
+      <button>Dock</button>
+    </main>,
+  );
+  for (const [name, left, top] of [
+    ["Build solar", 0, 0],
+    ["Demand", 100, 0],
+    ["Emissions", 100, 80],
+    ["Dock", 0, 160],
+  ] as const) {
+    jest
+      .spyOn(screen.getByRole("button", { name }), "getBoundingClientRect")
+      .mockReturnValue({
+        left,
+        right: left + 80,
+        top,
+        bottom: top + 40,
+        width: 80,
+        height: 40,
+      } as DOMRect);
+  }
+  screen.getByRole("button", { name: "Build solar" }).focus();
+  moveInputFocus("right");
+  expect(screen.getByRole("button", { name: "Demand" })).toHaveFocus();
+  moveInputFocus("left");
+  expect(screen.getByRole("button", { name: "Build solar" })).toHaveFocus();
+  moveInputFocus("down");
+  expect(screen.getByRole("button", { name: "Dock" })).toHaveFocus();
 });
 
 it("excludes closed disclosure content even when the browser retains its layout boxes", () => {
