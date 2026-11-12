@@ -374,7 +374,7 @@ for (const theme of ["light", "dark"] as const) {
         goals.getByText("Retire original oil plants", { exact: true }),
       ).toBeVisible();
       await expect(
-        goals.getByText("Acquire Valley Electric or Ridge Electric", {
+        goals.getByText("Acquire a utility", {
           exact: true,
         }),
       ).toBeVisible();
@@ -386,8 +386,12 @@ for (const theme of ["light", "dark"] as const) {
         name: "Supply plan",
         exact: true,
       });
-      await expect(plan).toContainText("Valley Oil · Dec 2023");
-      if (index === 1) await expect(plan).toContainText("Ridge Oil · Dec 2023");
+      await expect(plan).not.toContainText(
+        /Budget for|Build-time example|Gas example|Lower rates|before selling|order by/i,
+      );
+      await expect(plan).toContainText("Valley Oil: retirement due Dec 2023");
+      if (index === 1)
+        await expect(plan).toContainText("Ridge Oil: retirement due Dec 2023");
       await scenario
         .getByRole("button", { name: "Close Scenario", exact: true })
         .click();

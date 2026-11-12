@@ -194,6 +194,40 @@ export function objectiveGoalText(
     : `${objectiveTargetText(objective)} · ${window}`;
 }
 
+/** A short heading names the goal; its target carries quantities, conditions and dates. */
+export function objectiveHeadingText(objective: CompiledRuleObjective): string {
+  switch (objective.metric) {
+    case "customerRetention":
+      return "Retain customers";
+    case "utilityOwnership":
+      return "Acquire a utility";
+    case "assetRetirement":
+      return "Retire original plants";
+    case "emissionsBudget":
+      return "Limit total emissions";
+    case "emissionsPerDeliveredMWh":
+      return "Limit emissions intensity";
+    case "localFuelShare":
+      return "Generate locally";
+    case "fuelRetirement":
+      return `Retire ${objective.fuel} plants`;
+    case "monthlyBilledRate":
+      return "Keep bills affordable";
+    case "monthEndDebt":
+      return "Limit debt";
+    case "financialCoverage":
+      return "Financial stability";
+    case "customerCount":
+      return "Grow the customer base";
+    case "reserveMargin":
+      return "Maintain a reserve";
+    case "efficiencySavings":
+      return "Improve efficiency";
+    case "demandServedShare":
+      return "Keep service reliable";
+  }
+}
+
 /** Combine the valley's two retirement deadlines for display, preserving both scored rules. */
 export function objectiveGoalGroups(
   objectives: CompiledRuleObjective[],
@@ -230,7 +264,7 @@ export function objectiveGoalGroups(
     return [
       {
         id: objective.id,
-        label: objective.label,
+        label: objectiveHeadingText(objective),
         required: objective.required,
         goals: [
           objectiveGoalText(

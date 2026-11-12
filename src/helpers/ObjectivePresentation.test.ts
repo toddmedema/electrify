@@ -264,7 +264,7 @@ it("keeps lone retirement goals and optional obligations distinct", () => {
   );
   const lone = objectiveGoalGroups(retirements.slice(0, 1), 2005, 240);
   expect(lone).toHaveLength(1);
-  expect(lone[0].label).toBe(retirements[0].label);
+  expect(lone[0].goals[0]).toContain(retirements[0].label);
   const mixed = objectiveGoalGroups(
     [retirements[0], { ...retirements[1], required: false }],
     2005,

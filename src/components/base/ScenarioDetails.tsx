@@ -161,20 +161,15 @@ function ScoreOutlook({
             <dd>
               {projection ? formatScore(projection.final) : "—"}
               {change !== 0 && (
-                <span
+                <Box
+                  component="span"
                   className="scenarioOutlookChange"
-                  data-direction={
-                    outlook?.status === "loss"
-                      ? "neutral"
-                      : change > 0
-                        ? "up"
-                        : "down"
-                  }
+                  data-direction={change > 0 ? "up" : "down"}
+                  sx={{ color: change > 0 ? "success.main" : "error.main" }}
                 >
                   {change > 0 ? "+" : "−"}
                   {formatScore(Math.abs(change))}
-                  <span> from now</span>
-                </span>
+                </Box>
               )}
             </dd>
           </div>

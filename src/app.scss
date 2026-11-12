@@ -6909,14 +6909,6 @@ $programs_column: 800px;
   font-size: var(--font-size-body2);
   font-weight: 600;
   letter-spacing: 0;
-
-  &[data-direction="up"] {
-    color: var(--delta-good);
-  }
-
-  &[data-direction="down"] {
-    color: var(--delta-bad);
-  }
 }
 
 .transmissionUpgrade {

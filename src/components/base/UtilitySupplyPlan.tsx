@@ -2,10 +2,7 @@ import * as React from "react";
 import { Box, Typography } from "@mui/material";
 import type { GameType } from "../../Types";
 import type { ProjectionView } from "../../helpers/Projection";
-import {
-  utilityPlanning,
-  UTILITY_PLANNING_REFERENCE_W,
-} from "../../helpers/UtilityPlanning";
+import { utilityPlanning } from "../../helpers/UtilityPlanning";
 import { MONTHS } from "../../Constants";
 import { formatWatts } from "../../helpers/Format";
 import UtilityContractSchedule from "./UtilityContractSchedule";
@@ -49,32 +46,13 @@ export default function UtilitySupplyPlan({
         {plan.retirements.map((retirement) => (
           <li key={retirement.id}>
             <Typography variant="body2">
-              <strong>
-                {facilityDisplayName(retirement)} ·{" "}
-                {month(retirement.deadlineMonth)}:
-              </strong>{" "}
-              Retire the original plant; replace its supply before selling.
+              <strong>{facilityDisplayName(retirement)}:</strong> retirement due{" "}
+              {month(retirement.deadlineMonth)}.
             </Typography>
           </li>
         ))}
       </Box>
-      <UtilityContractSchedule game={game} showReference={false} />
-      {plan.buildMonths !== undefined && (
-        <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
-          <strong>Build-time example:</strong> a{" "}
-          {formatWatts(UTILITY_PLANNING_REFERENCE_W)} combined-cycle gas plant
-          takes {plan.buildMonths} months.
-          {plan.gap?.startMonth !== undefined &&
-            (plan.gap.startMonth < game.date.monthsElapsed
-              ? " It would already need to be underway to finish before the service risk."
-              : ` Order by ${month(plan.gap.startMonth)} to finish before the service risk.`)}{" "}
-          Check capacity and lead times for your chosen projects or customer
-          programs.
-        </Typography>
-      )}
-      <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
-        Lower rates can grow demand faster than you can add supply.
-      </Typography>
+      <UtilityContractSchedule game={game} />
     </Box>
   );
 }

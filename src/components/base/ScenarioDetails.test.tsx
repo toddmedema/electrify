@@ -1,3 +1,4 @@
+import { createTheme, ThemeProvider } from "@mui/material/styles";
 import { render, screen, within } from "@testing-library/react";
 import * as DateTime from "../../helpers/DateTime";
 import { createGame } from "../../testing/Simulator";
@@ -5,6 +6,7 @@ import { activeScenario } from "../../helpers/GameSelectors";
 import { ScenarioDetailsContent } from "./ScenarioDetails";
 import * as MissionProjection from "../../helpers/MissionProjection";
 import * as DeferredProjection from "./DeferredProjection";
+import * as ScenarioOutlook from "./ScenarioOutlook";
 
 afterEach(() => jest.restoreAllMocks());
 
@@ -211,4 +213,58 @@ it("combines the oil-retirement goal while retaining both fleet deadlines", () =
   expect(goals).toHaveTextContent("Acquired original oil plants by Dec 2023");
   expect(goals).not.toHaveTextContent("Retire acquired original oil assets");
   expect(goals).not.toHaveTextContent("Retire Champlain's original Oil A");
+});
+
+it.each([-198, 198])(
+  "uses monthly-profit theme colors for a score change of %s, including projected losses",
+  (change) => {
+    const game = createGame({ scenarioId: 111 });
+    const theme = createTheme({
+      palette: { error: { main: "#b51230" }, success: { main: "#087f5b" } },
+    });
+    jest.spyOn(ScenarioOutlook, "scenarioScoreProjection").mockReturnValue({
+      actual: [200],
+      projected: [200 + change],
+      final: 200 + change,
+    });
+    jest.spyOn(MissionProjection, "projectMission").mockReturnValue({
+      status: "loss",
+      through: "Dec 2026",
+      requirements: [],
+    });
+    render(
+      <ThemeProvider theme={theme}>
+        <ScenarioDetailsContent game={game} scenario={activeScenario(game)!} />
+      </ThemeProvider>,
+    );
+    const outlook = screen.getByRole("region", { name: "Score outlook" });
+    const delta = within(outlook).getByText(`${change < 0 ? "−" : "+"}198`);
+    expect(delta).toHaveStyle({
+      color: change < 0 ? theme.palette.error.main : theme.palette.success.main,
+    });
+    expect(outlook).not.toHaveTextContent("from now");
+  },
+);
+
+it("presents supply facts and concise goal headings without coaching the player", () => {
+  const game = createGame({ scenarioId: 116 });
+  renderDetails(game);
+  const plan = screen.getByRole("region", { name: "Supply plan" });
+  expect(plan).toHaveTextContent("1.5× opening upkeep");
+  expect(plan).toHaveTextContent("2× opening upkeep");
+  expect(plan).toHaveTextContent("Regional nuclear ends");
+  expect(plan).not.toHaveTextContent(
+    /Budget for|Build-time example|Gas example|Lower rates|before selling|order by/i,
+  );
+  const goals = screen.getByRole("region", { name: "Goals" });
+  expect(
+    within(goals).getByText("Acquire a utility", { exact: true }),
+  ).toBeInTheDocument();
+  expect(
+    within(goals).getByText("Retain customers", { exact: true }),
+  ).toBeInTheDocument();
+  expect(goals).toHaveTextContent(
+    "Acquire Valley Electric or Ridge Electric · Dec 2014",
+  );
+  expect(goals).toHaveTextContent("Keep ≥90% of customer baseline by Dec 2024");
 });
