@@ -1,3 +1,4 @@
+import { invalidateLeaderboards } from "../../Leaderboard";
 import * as React from "react";
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -467,7 +468,7 @@ describe("NewGameDetails reads every difficulty up front", () => {
     expect(screen.queryByText(/Couldn't load/)).toBeNull();
   });
 
-  it("keeps Your best through difficulty changes, with one query per difficulty", async () => {
+  it("loads Your best on demand and keeps visited difficulties cached", async () => {
     // Each difficulty's best is distinct: 101 for Beginner up to 105 for Expert
     const bestAt = (difficulty?: DifficultyType) =>
       101 + DIFFICULTY_IDS.indexOf(difficulty as DifficultyType);
@@ -482,6 +483,7 @@ describe("NewGameDetails reads every difficulty up front", () => {
     await screen.findByRole("row", { name: /Your best 102/ });
     await flush();
 
+    expect(mockGetDocs).toHaveBeenCalledTimes(DIFFICULTY_IDS.length + 1);
     for (const difficulty of DIFFICULTY_IDS) {
       rerender(
         <NewGameDetails
@@ -489,7 +491,9 @@ describe("NewGameDetails reads every difficulty up front", () => {
         />,
       );
       expect(
-        screen.getByRole("row", { name: `Your best ${bestAt(difficulty)}` }),
+        await screen.findByRole("row", {
+          name: `Your best ${bestAt(difficulty)}`,
+        }),
       ).toBeInTheDocument();
     }
     const asks = mockGetDocs.mock.calls.map(([built]) => asked(built));
@@ -500,12 +504,39 @@ describe("NewGameDetails reads every difficulty up front", () => {
     expect(mine.every((ask) => ask.limit === 1)).toBe(true);
     expect(asks).toHaveLength(DIFFICULTY_IDS.length * 2);
 
-    // Signing out drops them; signing in again reads each difficulty once more
+    // Signing out drops private rows; signing back in reuses the account-scoped cache.
     rerender(<NewGameDetails {...props()} />);
     expect(screen.queryByText("Your best")).toBeNull();
     rerender(<NewGameDetails {...props({ uid: "player" })} />);
     await screen.findByRole("row", { name: /Your best 102/ });
-    expect(mockGetDocs).toHaveBeenCalledTimes(DIFFICULTY_IDS.length * 3);
+    expect(mockGetDocs).toHaveBeenCalledTimes(DIFFICULTY_IDS.length * 2);
+  });
+
+  it("keeps account-switched private results isolated and exposes personal-best retry", async () => {
+    const alice = deferred<ScoreType[]>();
+    let bobReads = 0;
+    respond(({ uid, difficulty }) => {
+      if (uid === "alice") return alice.promise;
+      if (uid === "bob" && bobReads++ === 0) throw new Error("offline");
+      return uid ? [scoreRow("Bob", 222, { uid })] : [topRow(difficulty)];
+    });
+    jest.spyOn(console, "warn").mockImplementation(() => {});
+    const { rerender } = render(
+      <NewGameDetails {...props({ uid: "alice" })} />,
+    );
+    await screen.findByText("Top Employee");
+    rerender(<NewGameDetails {...props({ uid: "bob" })} />);
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Retry your best score" }),
+    );
+    await screen.findByRole("row", { name: "Your best 222" });
+    await act(async () => {
+      alice.resolve([scoreRow("Alice", 999, { uid: "alice" })]);
+    });
+    expect(
+      screen.getByRole("row", { name: "Your best 222" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("row", { name: "Your best 999" })).toBeNull();
   });
 
   it("reads every difficulty again for a new scenario and ignores answers about the old one", async () => {
@@ -524,7 +555,7 @@ describe("NewGameDetails reads every difficulty up front", () => {
     );
     await screen.findByText("S100 Employee");
     await screen.findByRole("row", { name: "Your best 100" });
-    expect(mockGetDocs).toHaveBeenCalledTimes(DIFFICULTY_IDS.length * 2);
+    expect(mockGetDocs).toHaveBeenCalledTimes(DIFFICULTY_IDS.length + 1);
 
     rerender(
       <NewGameDetails
@@ -536,8 +567,8 @@ describe("NewGameDetails reads every difficulty up front", () => {
     await flush();
     const asks = mockGetDocs.mock.calls.map(([built]) => asked(built));
     const forNew = asks.filter((ask) => ask.scenarioId === 101);
-    expect(forNew).toHaveLength(DIFFICULTY_IDS.length * 2);
-    expect(forNew.filter((ask) => ask.uid)).toHaveLength(DIFFICULTY_IDS.length);
+    expect(forNew).toHaveLength(DIFFICULTY_IDS.length + 1);
+    expect(forNew.filter((ask) => ask.uid)).toHaveLength(1);
 
     rerender(
       <NewGameDetails
@@ -576,7 +607,7 @@ describe("NewGameDetails reads every difficulty up front", () => {
     // Steam is asked for just the top ten each board shows
     expect(reads("global")).toHaveLength(DIFFICULTY_IDS.length);
     expect(reads("global").every(({ rows }) => rows === 10)).toBe(true);
-    expect(reads("player")).toHaveLength(DIFFICULTY_IDS.length);
+    expect(reads("player")).toHaveLength(1);
     rerender(
       <NewGameDetails {...props({ uid: "steam:1", game: game("VP") })} />,
     );
@@ -591,7 +622,7 @@ describe("NewGameDetails reads every difficulty up front", () => {
         .sort(),
     ).toEqual([...DIFFICULTY_IDS].sort());
     // Your best doesn't depend on the scope, and nothing else was asked
-    expect(reads("player")).toHaveLength(DIFFICULTY_IDS.length);
+    expect(reads("player")).toHaveLength(2);
     expect(reads("global")).toHaveLength(DIFFICULTY_IDS.length);
 
     rerender(
@@ -613,7 +644,7 @@ describe("NewGameDetails reads every difficulty up front", () => {
     const { unmount } = render(
       <NewGameDetails ref={instance} {...props({ uid: "player" })} />,
     );
-    expect(mockGetDocs).toHaveBeenCalledTimes(DIFFICULTY_IDS.length * 2);
+    expect(mockGetDocs).toHaveBeenCalledTimes(DIFFICULTY_IDS.length + 1);
     const setState = jest.spyOn(instance.current!, "setState");
     unmount();
 
@@ -662,7 +693,7 @@ describe("NewGameDetails reads every difficulty up front", () => {
     rerender(<NewGameDetails {...props({ uid: "player" })} />);
     await screen.findByText("Top Employee");
     await screen.findByRole("row", { name: "Your best 321" });
-    expect(mockGetDocs).toHaveBeenCalledTimes(DIFFICULTY_IDS.length * 2);
+    expect(mockGetDocs).toHaveBeenCalledTimes(DIFFICULTY_IDS.length + 1);
   });
 
   it("still loads the all-levels board only when it is asked for", async () => {
@@ -697,6 +728,7 @@ describe("NewGameDetails reads every difficulty up front", () => {
 // The query builders echo their arguments (Jest resets their implementations before each test), so
 // that a getDocs mock can read which board it was asked for.
 beforeEach(() => {
+  invalidateLeaderboards();
   const firestore = jest.requireMock("firebase/firestore") as Record<
     string,
     jest.Mock
