@@ -191,6 +191,22 @@ for (const theme of ["light", "dark"] as const) {
     const signedAgreement = line
       .locator(".powerAgreement")
       .filter({ hasText: "Scheduled · starts 1 Jan 2020" });
+    const confirmation = page.locator(".snackbarContent");
+    await expect(confirmation).toContainText("Agreement accepted");
+    const dismiss = confirmation.getByRole("button", {
+      name: "Dismiss notification",
+    });
+    if (await dismiss.isVisible()) {
+      await dismiss.click();
+    } else {
+      // Phones use the existing swipe-to-dismiss action rather than a close button.
+      await confirmation.click({ trial: true });
+      const box = (await confirmation.boundingBox())!;
+      await page.mouse.move(box.x + 24, box.y + box.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(box.x + 184, box.y + box.height / 2, { steps: 8 });
+      await page.mouse.up();
+    }
     await expect(page.locator(".MuiSnackbar-root")).toHaveCount(0);
     await signedAgreement.scrollIntoViewIfNeeded();
     await expect(signedAgreement).toBeInViewport();
