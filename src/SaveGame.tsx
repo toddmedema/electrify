@@ -175,6 +175,11 @@ function validLineInvestment(
   year: number,
   context?: IntertieAccessContext,
 ): boolean {
+  // Acquisition closes new upgrade orders, but preserves tiers and jobs already paid for.
+  // Reconstruct their canonical investment terms independently of today's order eligibility.
+  const investmentContext = context?.ownedUtilityCorridors?.length
+    ? { ...context, ownedUtilityCorridors: undefined }
+    : context;
   let expected = {
     corridorId: corridor.id,
     capacityW: corridor.capacityW,
@@ -187,7 +192,7 @@ function validLineInvestment(
     log(line.capacityW! / corridor.capacityW) / log(INTERTIE_UPGRADE_STEP),
   );
   for (let step = 0; step < steps; step++) {
-    const quote = intertieUpgradeQuote(expected, year, 1, 1, context);
+    const quote = intertieUpgradeQuote(expected, year, 1, 1, investmentContext);
     if (!quote) return false;
     expected = {
       ...expected,
@@ -209,7 +214,7 @@ function validLineInvestment(
       line.yearsToBuildLeft !== 0
     )
       return false;
-    const quote = intertieUpgradeQuote(expected, year, 1, 1, context);
+    const quote = intertieUpgradeQuote(expected, year, 1, 1, investmentContext);
     const upgrade = line.upgrade;
     if (
       !quote ||
