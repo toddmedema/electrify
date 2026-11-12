@@ -2,6 +2,7 @@ import {
   collection,
   doc,
   getDocsFromServer,
+  onSnapshot,
   getDocFromServer,
   runTransaction,
   serverTimestamp,
@@ -36,6 +37,11 @@ export interface CloudSaveHead {
 }
 export interface CloudSaveTransport {
   list(uid: string): Promise<CloudSaveHead[]>;
+  subscribe?(
+    uid: string,
+    changed: () => void,
+    failed: (error: Error) => void,
+  ): () => void;
   read(head: CloudSaveHead): Promise<SaveRecord>;
   write(
     uid: string,
@@ -148,29 +154,101 @@ async function readFile(chunks: string[]): Promise<SaveFileType> {
 }
 
 export class FirebaseSaveTransport implements CloudSaveTransport {
+  private cleanups = new Map<string, Promise<void>>();
+  private heads = new Map<string, CloudSaveHead>();
+  private uid?: string;
+  private ready?: Promise<void>;
+  private epoch = 0;
+  subscribe(
+    uid: string,
+    changed: () => void,
+    failed: (error: Error) => void,
+  ): () => void {
+    const epoch = ++this.epoch;
+    this.uid = uid;
+    this.heads.clear();
+    this.cleanups.clear();
+    let resolve!: () => void;
+    let reject!: (error: Error) => void;
+    this.ready = new Promise<void>((done, fail) => {
+      resolve = done;
+      reject = fail;
+    });
+    // An error can arrive before reconciliation starts waiting for the first snapshot.
+    void this.ready.catch(() => undefined);
+    let initialized = false;
+    const unsubscribe = onSnapshot(
+      collection(getDb(), "users", uid, "cloudSaves"),
+      { includeMetadataChanges: true },
+      (snapshot) => {
+        if (epoch !== this.epoch) return;
+        // A cached empty snapshot is not authoritative for uploads/tombstones.
+        if (snapshot.metadata.fromCache) return;
+        let updated = !initialized;
+        const changes = initialized
+          ? snapshot.docChanges()
+          : snapshot.docs.map((doc) => ({ type: "added", doc }));
+        initialized = true;
+        for (const change of changes) {
+          updated = true;
+          if (change.type === "removed") this.heads.delete(change.doc.id);
+          else {
+            const head = this.parse(change.doc.id, change.doc.data());
+            this.heads.set(head.id, head);
+            if (head.garbage?.length)
+              void this.cleanup(uid, head.id, head.version, head.garbage).catch(
+                () => undefined,
+              );
+          }
+        }
+        resolve();
+        if (updated) changed();
+      },
+      (error) => {
+        if (epoch !== this.epoch) return;
+        reject(error);
+        failed(error);
+      },
+    );
+    return () => {
+      unsubscribe();
+      if (epoch === this.epoch) {
+        this.epoch++;
+        this.uid = undefined;
+        this.ready = undefined;
+        this.heads.clear();
+        this.cleanups.clear();
+        reject(new Error("Cloud sync ownership changed."));
+      }
+    };
+  }
+  private parse(id: string, raw: Record<string, unknown>): CloudSaveHead {
+    try {
+      return parseHead(id, raw);
+    } catch {
+      return { id, version: "", deleted: false, chunks: [], invalid: true };
+    }
+  }
   async list(uid: string): Promise<CloudSaveHead[]> {
+    const epoch = this.epoch;
+    if (this.uid === uid && this.ready) {
+      await this.ready;
+      if (epoch !== this.epoch || this.uid !== uid)
+        throw new Error("Cloud sync ownership changed.");
+      return [...this.heads.values()];
+    }
+    // One-shot callers (including tools) do not own a foreground subscription.
     const result = await getDocsFromServer(
       collection(getDb(), "users", uid, "cloudSaves"),
     );
-    const heads = result.docs.map((snapshot) => {
-      try {
-        return parseHead(snapshot.id, snapshot.data());
-      } catch {
-        return {
-          id: snapshot.id,
-          version: "",
-          deleted: false,
-          chunks: [],
-          invalid: true,
-        } as CloudSaveHead;
-      }
-    });
-    for (const head of heads) {
+    const heads = result.docs.map((snapshot) =>
+      this.parse(snapshot.id, snapshot.data()),
+    );
+    for (const head of heads)
       if (head.garbage?.length)
         await this.cleanup(uid, head.id, head.version, head.garbage).catch(
           () => undefined,
         );
-    }
     return heads;
   }
   async read(head: CloudSaveHead): Promise<SaveRecord> {
@@ -217,6 +295,7 @@ export class FirebaseSaveTransport implements CloudSaveTransport {
     expected: string | undefined,
     record: SaveRecord | null,
   ): Promise<string> {
+    const epoch = this.epoch;
     const ref = doc(getDb(), "users", uid, "cloudSaves", id);
     const chunks = record
       ? saveChunks({
@@ -274,10 +353,51 @@ export class FirebaseSaveTransport implements CloudSaveTransport {
     // Separating cleanup keeps replacement of two large revisions below the 10 MiB
     // transaction limit. The manifest remembers leftovers if cleanup is interrupted.
     await this.cleanup(uid, id, version, garbage).catch(() => undefined);
+    if (this.uid === uid && this.epoch === epoch) {
+      const existing = this.heads.get(id);
+      // A newer listener version must not be replaced by this older acknowledgement.
+      if (
+        !existing ||
+        existing.version === expected ||
+        existing.version === version
+      )
+        this.heads.set(id, {
+          id,
+          version,
+          deleted: !record,
+          chunks: ids,
+          metadata: record?.metadata,
+          writerDeviceId: record?.metadata.cloud?.writerDeviceId,
+          writerLocalId: record?.metadata.id,
+          sourceRevision: record?.metadata.revision,
+          uploadedAt: Date.now(),
+          uploadedMinute: record?.save.game.date.minute,
+        });
+    }
     return version;
   }
 
-  private async cleanup(
+  private cleanup(
+    uid: string,
+    id: string,
+    version: string,
+    garbage: string[],
+  ): Promise<void> {
+    if (!garbage.length) return Promise.resolve();
+    const key = `${uid}:${id}:${version}`;
+    const existing = this.cleanups.get(key);
+    if (existing) return existing;
+    const request = this.cleanupChunks(uid, id, version, garbage).catch(
+      (error) => {
+        this.cleanups.delete(key);
+        throw error;
+      },
+    );
+    this.cleanups.set(key, request);
+    return request;
+  }
+
+  private async cleanupChunks(
     uid: string,
     id: string,
     version: string,

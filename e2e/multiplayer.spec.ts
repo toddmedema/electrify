@@ -1,5 +1,5 @@
 import { unlockAllDifficulties } from "./difficulty-fixture";
-import { expect, Page, Browser } from "@playwright/test";
+import { expect, isolateAnalytics, Page, Browser } from "./fixtures";
 import { gzipSync } from "node:zlib";
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -40,6 +40,7 @@ type SteamTestWindow = typeof window & {
     responses: { key: string; optionId: string }[];
   }[];
   nativeForecastReplies?: string[];
+  videoWorkload?: { frames: () => Promise<number>; stop: () => void };
 };
 
 test.afterEach(async ({ browser }) => {
@@ -481,6 +482,7 @@ class SteamRoom {
       isMobile: mobile,
       permissions: ["clipboard-read", "clipboard-write"],
     });
+    await isolateAnalytics(context);
     const page = await context.newPage();
     await unlockAllDifficulties(page);
     page.on("request", (request) => {
@@ -1269,6 +1271,185 @@ test("desktop menu keyboard journey includes Play with friends in both direction
 
 const clock = (page: Page) =>
   page.locator(".multiplayerSpeedToggles:visible").last();
+
+test("multiplayer speed controls stay at the right edge in desktop and touch layouts", async ({
+  browser,
+}) => {
+  const { room, pages, errors } = await startSharedGame(browser, 4);
+  for (const page of pages) await ready(page);
+  for (const width of [1440, 1280, 800, 390, 360]) {
+    const page = width < 600 ? pages[3] : pages[0];
+    await page.setViewportSize({ width, height: width < 600 ? 844 : 900 });
+    for (const theme of ["light", "dark"] as const) {
+      await page.emulateMedia({ colorScheme: theme });
+      await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
+      await expectClockInViewport(page);
+      await expect(async () => {
+        const gap = await clock(page).evaluate((group) => {
+          const toolbar = group.closest(".MuiToolbar-root")!;
+          const edge =
+            toolbar.getBoundingClientRect().right -
+            parseFloat(getComputedStyle(toolbar).paddingRight);
+          return edge - group.getBoundingClientRect().right;
+        });
+        expect(Math.abs(gap)).toBeLessThanOrEqual(1);
+      }).toPass({ timeout: 20000 });
+      if (
+        (width === 1280 && theme === "light") ||
+        (width === 390 && theme === "dark")
+      ) {
+        await page.mouse.move(0, 0);
+        await expect(page.getByRole("tooltip")).toBeHidden();
+        await reviewScreenshot(page.locator("#appbar"), {
+          path: test.info().outputPath("speed-" + width + "-" + theme + ".png"),
+          animations: "disabled",
+        });
+      }
+    }
+  }
+  expect(errors).toEqual([]);
+  expect(room.transportErrors).toEqual([]);
+});
+
+test("12x multiplayer speed controls respond while video chat is encoding", async ({
+  browser,
+}) => {
+  const { room, pages, errors } = await startSharedGame(browser, 2);
+  const host = pages[0];
+  const cdp = await host.context().newCDPSession(host);
+  // Reserve CPU headroom for the competing call, on a production desktop renderer too.
+  await cdp.send("Emulation.setCPUThrottlingRate", { rate: 6 });
+  await host.evaluate(async () => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 640;
+    canvas.height = 360;
+    const context = canvas.getContext("2d")!;
+    let frame = 0;
+    const draw = () => {
+      for (let x = 0; x < 640; x += 20) {
+        context.fillStyle = `hsl(${(frame * 7 + x) % 360} 50% 50%)`;
+        context.fillRect(x, 0, 20, 360);
+      }
+      frame++;
+    };
+    draw();
+    const timer = window.setInterval(draw, 1000 / 30);
+    const stream = canvas.captureStream(30);
+    const sender = new RTCPeerConnection();
+    const receiver = new RTCPeerConnection();
+    const video = document.createElement("video");
+    video.muted = true;
+    video.autoplay = true;
+    // Exercise encoding, decoding and video presentation without covering the game controls.
+    Object.assign(video.style, {
+      position: "fixed",
+      width: "160px",
+      height: "90px",
+      bottom: "0",
+      right: "0",
+      pointerEvents: "none",
+    });
+    document.body.append(video);
+    receiver.ontrack = (event) => {
+      video.srcObject = event.streams[0];
+    };
+    sender.onicecandidate = (event) => {
+      if (event.candidate) void receiver.addIceCandidate(event.candidate);
+    };
+    receiver.onicecandidate = (event) => {
+      if (event.candidate) void sender.addIceCandidate(event.candidate);
+    };
+    stream.getTracks().forEach((track) => sender.addTrack(track, stream));
+    await sender.setLocalDescription(await sender.createOffer());
+    await receiver.setRemoteDescription(sender.localDescription!);
+    await receiver.setLocalDescription(await receiver.createAnswer());
+    await sender.setRemoteDescription(receiver.localDescription!);
+    (window as SteamTestWindow).videoWorkload = {
+      frames: async () => {
+        let encoded = 0;
+        (await sender.getStats()).forEach((report) => {
+          if (report.type === "outbound-rtp" && report.kind === "video")
+            encoded += report.framesEncoded ?? 0;
+        });
+        return encoded;
+      },
+      stop: () => {
+        clearInterval(timer);
+        stream.getTracks().forEach((track) => track.stop());
+        sender.close();
+        receiver.close();
+        video.remove();
+      },
+    };
+  });
+  const responses: { input: string; ms: number }[] = [];
+  const frames = () =>
+    host.evaluate(() => (window as SteamTestWindow).videoWorkload!.frames());
+  try {
+    await expect.poll(frames).toBeGreaterThan(10);
+    for (const page of pages) await ready(page);
+    for (const page of pages)
+      await clock(page)
+        .getByRole("button", { name: "fast speed", exact: true })
+        .click();
+    await expect(clock(host)).toHaveAttribute("data-active-speed", "FAST");
+    await expect
+      .poll(
+        () => room.views.get("76561198000000002")?.game?.date.monthsElapsed,
+        {
+          timeout: 60000,
+        },
+      )
+      .toBeGreaterThanOrEqual(12);
+    const encodedBefore = await frames();
+    for (const page of pages) {
+      for (const [key, speed] of [
+        ["1", "SLOW"],
+        ["3", "FAST"],
+        ["0", "PAUSED"],
+        ["3", "FAST"],
+      ]) {
+        const started = Date.now();
+        await page.keyboard.press(key);
+        for (const peer of pages)
+          await expect(clock(peer)).toHaveAttribute(
+            "data-active-speed",
+            speed,
+            { timeout: 3000 },
+          );
+        responses.push({ input: `key ${key}`, ms: Date.now() - started });
+      }
+      const started = Date.now();
+      await clock(page)
+        .getByRole("button", { name: "normal speed", exact: true })
+        .click({ timeout: 3000 });
+      for (const peer of pages)
+        await expect(clock(peer)).toHaveAttribute(
+          "data-active-speed",
+          "NORMAL",
+          { timeout: 3000 },
+        );
+      responses.push({ input: "click 3x", ms: Date.now() - started });
+      await page.keyboard.press("3");
+      for (const peer of pages)
+        await expect(clock(peer)).toHaveAttribute("data-active-speed", "FAST");
+    }
+    await expect.poll(frames).toBeGreaterThan(encodedBefore);
+    expect(errors).toEqual([]);
+    expect(room.transportErrors).toEqual([]);
+    await test.info().attach("speed-response-under-video-load", {
+      body: JSON.stringify(responses),
+      contentType: "application/json",
+    });
+  } finally {
+    await host.evaluate(() =>
+      (window as SteamTestWindow).videoWorkload!.stop(),
+    );
+    await cdp.send("Emulation.setCPUThrottlingRate", { rate: 1 });
+    await cdp.detach();
+  }
+});
+
 async function ready(page: Page) {
   await clock(page)
     .getByRole("button", { name: "slow speed", exact: true })
@@ -1503,6 +1684,7 @@ async function verifySpeedLayouts(browser: Browser, pages: Page[]) {
       isMobile: touch,
       colorScheme: "light",
     });
+    await isolateAnalytics(context);
     const baseline = await context.newPage();
     await baseline.addInitScript(() => {
       localStorage.setItem("theme", "system");
@@ -2084,14 +2266,10 @@ for (const count of [2, 4]) {
       await expect(
         pages[0].getByRole("button", { name: /Player speeds;/ }),
       ).toHaveCount(0);
-      // The ordinary build catalog pauses the shared clock, and normal purchases reach the host.
+      // Shopping in the build catalog never pauses the shared clock, and normal purchases reach
+      // the host. The purchase follows the catalog opening, so a pause would have arrived by then.
       const fleetBefore = room.views.get(buyerId)?.game?.facilities.length ?? 0;
       await buyer.locator(".button-buildFacility").click();
-      for (const page of pages)
-        await expect(clock(page)).toHaveAttribute(
-          "data-active-speed",
-          "PAUSED",
-        );
       await buyer
         .getByRole("button", { name: "Review purchase of Wind", exact: true })
         .click();
@@ -2101,7 +2279,9 @@ for (const count of [2, 4]) {
       await expect
         .poll(() => room.views.get(buyerId)?.game?.facilities.length)
         .toBe(fleetBefore + 1);
-      // A side panel stays open after a purchase, and holds the clock until it closes.
+      for (const page of pages)
+        await expect(clock(page)).toHaveAttribute("data-active-speed", "SLOW");
+      // A side panel stays open after a purchase; the clock keeps running behind it.
       if (buyer.viewportSize()!.width >= 1024)
         await buyer
           .getByRole("button", { name: "Close Build", exact: true })

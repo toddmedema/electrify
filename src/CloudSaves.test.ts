@@ -8,6 +8,9 @@ let mockAuth: (user: { uid: string } | null) => void;
 let mockChanged: () => void;
 const mockSync = jest.fn();
 const mockList = jest.fn();
+const mockSubscribe = jest.fn();
+const mockStopRemote = jest.fn();
+let mockRemoteChanged: () => void;
 const mockUnsubscribeAuth = jest.fn();
 const mockUnsubscribeRepository = jest.fn();
 jest.mock("./Globals", () => ({
@@ -33,7 +36,11 @@ jest.mock("./CloudSaveSync", () => ({
     sync = mockSync;
   },
 }));
-jest.mock("./CloudSaveTransport", () => ({ FirebaseSaveTransport: class {} }));
+jest.mock("./CloudSaveTransport", () => ({
+  FirebaseSaveTransport: class {
+    subscribe = mockSubscribe;
+  },
+}));
 
 const settle = async () => {
   for (let index = 0; index < 8; index++) await Promise.resolve();
@@ -46,6 +53,11 @@ function configureTestStore() {
 
 beforeEach(() => {
   jest.useFakeTimers();
+  localStorage.clear();
+  Object.defineProperty(document, "hidden", {
+    configurable: true,
+    value: false,
+  });
   jest.clearAllMocks();
   Object.defineProperty(navigator, "onLine", {
     configurable: true,
@@ -53,6 +65,10 @@ beforeEach(() => {
   });
   mockSync.mockResolvedValue({ conflicts: false, deferred: false });
   mockList.mockResolvedValue([]);
+  mockSubscribe.mockImplementation((_uid, changed) => {
+    mockRemoteChanged = changed;
+    return mockStopRemote;
+  });
   store = configureTestStore();
   stop = startCloudSaves(store as unknown as AppStore);
 });
@@ -91,6 +107,7 @@ it("immediately syncs an explicitly saved game, including an interaction during 
       }),
   );
   mockAuth({ uid: "alice" });
+  await settle();
   requestCloudSave("A");
   resolve({ conflicts: false, deferred: false });
   await settle();
@@ -184,6 +201,7 @@ it("does not apply stale status after an account switch and syncs the new accoun
       }),
   );
   mockAuth({ uid: "alice" });
+  await settle();
   const current = mockSync.mock.calls[0][1] as () => boolean;
   mockAuth({ uid: "bob" });
   expect(current()).toBe(false);
@@ -242,6 +260,7 @@ it("unsubscribes listeners and invalidates unfinished work on teardown", async (
       }),
   );
   mockAuth({ uid: "alice" });
+  await settle();
   const current = mockSync.mock.calls[0][1] as () => boolean;
   stop();
   expect(current()).toBe(false);
@@ -253,4 +272,78 @@ it("unsubscribes listeners and invalidates unfinished work on teardown", async (
   jest.advanceTimersByTime(60_000);
   expect(mockSync).toHaveBeenCalledTimes(1);
   expect(store.getState().saves.cloudState).toBe("syncing");
+});
+
+it("does no idle rescans and handles remote notifications immediately within the upload cadence", async () => {
+  mockAuth({ uid: "alice" });
+  await settle();
+  expect(mockSubscribe).toHaveBeenCalledTimes(1);
+  jest.advanceTimersByTime(1_800_000);
+  await settle();
+  expect(mockSync).toHaveBeenCalledTimes(1);
+  mockRemoteChanged();
+  await settle();
+  expect(mockSync).toHaveBeenCalledTimes(2);
+  mockRemoteChanged();
+  await settle();
+  expect(mockSync).toHaveBeenCalledTimes(3);
+});
+it("stops hidden listeners, retains manual intent and invalidates an unfinished tenure", async () => {
+  let finish!: (value: unknown) => void;
+  mockSync.mockImplementationOnce(
+    () =>
+      new Promise((done) => {
+        finish = done;
+      }),
+  );
+  mockAuth({ uid: "alice" });
+  await settle();
+  const current = mockSync.mock.calls[0][1] as () => boolean;
+  Object.defineProperty(document, "hidden", {
+    configurable: true,
+    value: true,
+  });
+  document.dispatchEvent(new Event("visibilitychange"));
+  expect(current()).toBe(false);
+  expect(mockStopRemote).toHaveBeenCalledTimes(1);
+  requestCloudSave("hidden");
+  finish({ conflicts: false, deferred: false });
+  await settle();
+  expect(mockSync).toHaveBeenCalledTimes(1);
+  Object.defineProperty(document, "hidden", {
+    configurable: true,
+    value: false,
+  });
+  document.dispatchEvent(new Event("visibilitychange"));
+  await settle();
+  expect(mockSync).toHaveBeenCalledTimes(2);
+  expect(mockSync.mock.calls[1][2].forceIds).toEqual(new Set(["hidden"]));
+});
+
+it("followers consume account-scoped status and backup warnings without a second listener", async () => {
+  mockAuth({ uid: "alice" });
+  await settle();
+  const followerStore = configureTestStore();
+  const stopFollower = startCloudSaves(followerStore as unknown as AppStore);
+  mockAuth({ uid: "alice" });
+  await settle();
+  expect(mockSubscribe).toHaveBeenCalledTimes(1);
+  expect(followerStore.getState().saves.cloudState).toBe("synced");
+  const key = "electrify-sync:cloud-saves:alice:status";
+  const incompatibleCloudSaves = [{ id: "newer-schema", version: "1" }];
+  localStorage.setItem(
+    key,
+    JSON.stringify({
+      cloudState: "synced",
+      cloudConflicts: true,
+      incompatibleCloudSaves,
+    }),
+  );
+  window.dispatchEvent(new StorageEvent("storage", { key }));
+  expect(followerStore.getState().saves).toMatchObject({
+    cloudState: "synced",
+    cloudConflicts: true,
+    incompatibleCloudSaves,
+  });
+  stopFollower();
 });

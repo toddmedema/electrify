@@ -8,6 +8,7 @@ import {
   useSyncExternalStore,
 } from "react";
 import { getDesktop } from "../Desktop";
+import type { GameType } from "../Types";
 import { initEconomy } from "../data/Economy";
 import { initFuelPrices } from "../data/FuelPrices";
 import { initWeather } from "../data/Weather";
@@ -204,9 +205,11 @@ export default function MultiplayerRoot() {
     let live = true,
       initialized = false,
       loading = false;
+    let appliedGame: GameType | undefined;
     const sync = () => {
       const current = session.getSnapshot();
       if (!current.view?.game) {
+        appliedGame = undefined;
         if (initialized) {
           initialized = false;
           registerMultiplayerRuntime(undefined);
@@ -251,7 +254,11 @@ export default function MultiplayerRoot() {
           });
         return;
       }
-      store.dispatch(multiplayerSnapshot(current.view.game));
+      // Pending commands, lobby heartbeats and save status also notify this subscription.
+      // They must not replay the previous grid and repaint the whole game before input is sent.
+      if (appliedGame === current.view.game) return;
+      appliedGame = current.view.game;
+      store.dispatch(multiplayerSnapshot(appliedGame));
     };
     const stop = session.subscribe(sync);
     const stopCoop = session.subscribe(syncCoop);

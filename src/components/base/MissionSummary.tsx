@@ -12,7 +12,7 @@ import {
   ActiveEventGroupType,
   UpcomingStoryEventType,
 } from "../views/StoryEventSelectors";
-import ConceptIcon from "./ConceptIcon";
+import StatusReadout from "./StatusReadout";
 import {
   projectionReady,
   requestProjection,
@@ -198,9 +198,11 @@ export default function MissionSummary({
           {/* A risk to the goal takes the goal's place so the bar stays one line; the goal
               itself is always one tap away in the dock's Scenario action. */}
           {shownRisk ? (
-            <Button
+            <StatusReadout
               className={`missionRiskButton${warning ? "" : " missionRiskEvent"}`}
-              color="primary"
+              textClassName="missionRiskText"
+              concept={warning ? "danger" : "forecast"}
+              color={warning ? "inherit" : "primary"}
               aria-label={`${shownRisk.shortLabel}. ${shownRisk.label}`}
               title={shownRisk.label}
               onClick={() =>
@@ -209,15 +211,8 @@ export default function MissionSummary({
                   : onEvidence?.(shownRisk.target)
               }
             >
-              {/* Inline rather than startIcon, so it keeps the grid readout's exact size and inset. */}
-              <span className="statusIcon" aria-hidden="true">
-                <ConceptIcon
-                  concept={warning ? "danger" : "forecast"}
-                  fontSize="small"
-                />
-              </span>
-              <span className="missionRiskText statusLabel">{shortLabel}</span>
-            </Button>
+              {shortLabel}
+            </StatusReadout>
           ) : (
             !eventsOnly &&
             mission.headline &&

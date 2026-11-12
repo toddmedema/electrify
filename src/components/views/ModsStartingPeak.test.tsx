@@ -90,9 +90,11 @@ afterEach(() => {
 });
 
 it("prepares every mod's real baseline before exposing its launch details", async () => {
-  setup([entry("ordinary-grid", false)]);
+  await act(async () => {
+    setup([entry("ordinary-grid", false)]);
+  });
   expect(
-    await screen.findByRole("button", { name: "Play ordinary-grid" }),
+    screen.getByRole("button", { name: "Play ordinary-grid" }),
   ).toBeEnabled();
   expect(mockPrepare).toHaveBeenCalledWith(entry("ordinary-grid", false).pack);
 });

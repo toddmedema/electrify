@@ -57,8 +57,12 @@ for (const theme of ["light", "dark"] as const) {
     await expect(chart.locator("canvas")).toBeVisible();
     await expect(chart).toHaveAccessibleName(/largest peak shortfall is/);
     await expect(track.locator(".chartLegend")).toContainText("Unmet demand");
-    await expect(track.locator(".chartLegend")).toContainText(
-      "Red height shows peak shortfall on the same MW scale, capped at full height.",
+    const warning = track.getByRole("note");
+    await expect(warning).toContainText(
+      /^Shortfalls start \d{4}: ~.+ unmet · ~.+ peak$/,
+    );
+    await expect(warning).toHaveAccessibleName(
+      /^Forecast shortfalls start \d{4}: about .* of demand unmet, about .* peak$/,
     );
     await expect.poll(() => shortfallCapPixels(chart)).toBeGreaterThan(0);
     await chart.scrollIntoViewIfNeeded();

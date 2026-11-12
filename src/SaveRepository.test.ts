@@ -585,6 +585,30 @@ describe("SaveRepository", () => {
     });
   });
 
+  it("notifies other tabs through storage when BroadcastChannel is unavailable", async () => {
+    await repository.initialize();
+    await other.initialize();
+    const changed = jest.fn();
+    const stop = other.subscribe(changed);
+    const file = fakeSaveGame();
+    await repository.create({
+      name: "Follower save",
+      save: serializeSave(file),
+      scenarioName: "test",
+    });
+    const key = `${databaseName}:changes`;
+    expect(localStorage.getItem(key)).not.toBeNull();
+    window.dispatchEvent(
+      new StorageEvent("storage", { key, newValue: localStorage.getItem(key) }),
+    );
+    expect(changed).toHaveBeenCalledTimes(1);
+    expect(await other.list()).toHaveLength(1);
+    other.close();
+    window.dispatchEvent(new StorageEvent("storage", { key }));
+    expect(changed).toHaveBeenCalledTimes(1);
+    stop();
+  });
+
   it("notifies subscribers after committed changes, without notifying failed writes", async () => {
     const listener = jest.fn();
     const unsubscribe = repository.subscribe(listener);

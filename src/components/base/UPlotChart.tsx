@@ -7,6 +7,7 @@ import {
   chartScale,
   eventMarkersPlugin,
   expandedChartOptions,
+  hoverPoints,
 } from "./UPlotHelpers";
 import { getThemeVersion, subscribeThemeMode } from "../../Theme";
 import { getTextScale, subscribeTextSize } from "../../TextSize";
@@ -669,6 +670,8 @@ export default function UPlotChart<S>(
         // matching their y scales would line up numbers that have nothing to do with each other
         cursor: {
           ...built.cursor,
+          // Every chart marks where the hover line crosses each of its lines.
+          points: hoverPoints(),
           // Keyboard selection owns the cursor until dismissal or new pointer input. In
           // particular, a delayed touch compatibility mouseleave cannot clear half the state.
           move: (plot, left, top) => {

@@ -1,5 +1,5 @@
 import { unlockAllDifficulties } from "./difficulty-fixture";
-import { test, expect, type Page, type Locator } from "@playwright/test";
+import { test, expect, type Page, type Locator } from "./fixtures";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { packageDigest, validateMod } from "../src/mods/ModSchema";

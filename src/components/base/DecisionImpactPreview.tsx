@@ -13,15 +13,17 @@ export interface DecisionImpactFactType {
 }
 
 export interface DecisionImpactPreviewProps {
+  label?: string;
   facts: DecisionImpactFactType[];
 }
 
 /** A common before-commit grammar: action first, exact delta second, explanation last. */
 export default function DecisionImpactPreview({
+  label = "Expected impact",
   facts,
 }: DecisionImpactPreviewProps): React.JSX.Element {
   return (
-    <section className="decisionImpact" aria-label="Expected impact">
+    <section className="decisionImpact" aria-label={label}>
       <div className="decisionImpactFacts">
         {facts.map((fact) => (
           <div

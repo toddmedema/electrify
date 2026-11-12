@@ -297,7 +297,6 @@ function buildOptions({
     cursor: {
       x: true,
       y: false,
-      points: { show: false },
       drag: { x: false, y: false, setScale: false },
     },
     legend: { show: false },
@@ -447,7 +446,7 @@ export function formatProductionTooltip(
   minute = state.timeline[idx].minute,
 ): string {
   const d = state.timeline[idx];
-  const date = getDateFromMinute(d.minute, state.startingYear);
+  const date = getDateFromMinute(minute, state.startingYear);
   const time = formatClockTime(date.minuteOfDay);
   const weather = productionWeather(d, state.units ?? "metric");
   const loads: Array<[string, number | undefined]> = [

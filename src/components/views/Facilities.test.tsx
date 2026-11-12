@@ -1282,10 +1282,20 @@ it.each([false, true])(
         />
       </Provider>,
     );
+    expect(
+      screen.queryByRole("button", { name: "Acquire Ridge Electric" }),
+    ).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /^Inspect Ridge/ }));
     expect(
       screen.getByRole("button", { name: "Acquire Ridge Electric" }),
     ).toBeVisible();
+    expect(
+      screen.queryByText(/Review the company terms/),
+    ).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /^Inspect Ridge/ }));
+    expect(
+      screen.queryByRole("button", { name: "Acquire Ridge Electric" }),
+    ).not.toBeInTheDocument();
   },
 );
 
@@ -1341,7 +1351,7 @@ describe("the intertie upgrade control", () => {
     expect(handleUpgrade).not.toHaveBeenCalled();
     const dialog = screen.getByRole("dialog");
     expect(dialog).toHaveTextContent(/Construction emits.*CO2e/);
-    expect(dialog).toHaveTextContent(/\(\d+\.\d+% for 30 years\)/);
+    expect(dialog).toHaveTextContent(/New loan: \d+\.\d+% for 30 years\./);
     expect(dialog).toHaveTextContent("Upkeep after upgrade");
     expect(dialog).not.toHaveTextContent("Line capacity");
     expect(dialog).toHaveTextContent("Import capacity150MW → 210MW");

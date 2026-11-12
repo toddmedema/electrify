@@ -511,7 +511,6 @@ it.each(["seat", "online"])(
     clock("PAUSED", true);
     store.dispatch(navigate("FACILITIES"));
     const runtime = {
-      foregroundMode: "application" as const,
       command: jest.fn(),
       submit: jest.fn().mockResolvedValue(undefined),
       activity: jest.fn(),

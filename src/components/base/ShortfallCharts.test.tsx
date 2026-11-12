@@ -82,3 +82,29 @@ it.each([
     ).not.toMatch(/\d+(?:MW|W) (?:avg )?unmet/);
   },
 );
+
+it.each([
+  [
+    "daily",
+    <ChartSupplyDemand {...forecastProps} location={LOCATIONS.SF} />,
+    "12:45 AM",
+    "Total supply: 60MW",
+  ],
+  [
+    "hourly forecast",
+    <ChartForecastSupplyDemand {...forecastProps} multiyear={false} />,
+    "Jan 2020, 12 AM",
+    "Supply: 60MW",
+  ],
+])(
+  "%s tooltip pairs the inspection time with interpolated unmet demand",
+  (_name, chart, heading, supply) => {
+    jest.mocked(UPlotChart).mockClear();
+    render(chart);
+    const props = jest.mocked(UPlotChart).mock.calls[0][0];
+    const label = props.tooltip!(1, props.state, 45);
+    expect(label.split("\n")[0]).toBe(`${heading} · 25MW unmet`);
+    expect(label).toContain(supply);
+    expect(label).toContain("Demand: 100MW");
+  },
+);

@@ -1154,7 +1154,7 @@ export const SCENARIOS: ScenarioType[] = [
     icon: "carbon fee",
     locationId: "SF",
     summary:
-      "Coal was cheap, but now pollution has a price. Decide what replaces your aging plants.",
+      "Coal was cheap, but now pollution has a price. Your plants are aging.",
     threat:
       "Coal's high emissions mean higher fees. You don't have much cash to replace it.",
     themes: ["Energy transition"],
@@ -1283,8 +1283,7 @@ export const SCENARIOS: ScenarioType[] = [
     name: "Hurricane Season",
     icon: "hurricane season",
     locationId: "SJU",
-    summary:
-      "Hurricanes are coming to Puerto Rico. Build a grid that can take the hit.",
+    summary: "Hurricanes are coming to Puerto Rico.",
     threat:
       "Storms can damage several plants at once. A little spare capacity may not be enough.",
     themes: ["Extreme weather"],
@@ -1324,8 +1323,7 @@ export const SCENARIOS: ScenarioType[] = [
     name: "The End of an Era",
     icon: "the end of an era",
     locationId: "PIT",
-    summary:
-      "Your company was built on coal. Decide what replaces it as the plants age.",
+    summary: "Your company was built on coal. Its plants are aging.",
     threat: "Competitors are moving in, and replacements take years to build.",
     themes: ["Energy transition"],
     ownership: "Investor",
@@ -1583,8 +1581,7 @@ export const SCENARIOS: ScenarioType[] = [
       timeZone: "Europe/Paris",
       resources: { hydro: false },
     },
-    summary:
-      "Your biggest reactor will shut down without warning. Have backup ready.",
+    summary: "Your biggest reactor will shut down without warning.",
     threat: "The reactor stays offline for the rest of the mission.",
     themes: ["Energy transition"],
     ownership: "Public",
@@ -1638,8 +1635,7 @@ export const SCENARIOS: ScenarioType[] = [
     name: "Wildfire Emergency",
     icon: "wildfire emergency",
     locationId: "LA",
-    summary:
-      "Wildfire will cut your power imports in early 2025. Build a backup plan before then.",
+    summary: "Wildfire will cut your power imports in early 2025.",
     threat: "Your existing northern intertie will lose 90% of its capacity.",
     themes: ["Extreme weather"],
     ownership: "Public",
@@ -1940,7 +1936,7 @@ export const SCENARIOS: ScenarioType[] = [
     summary:
       "Connect to your neighbors, acquire a utility, and keep your larger company supplied.",
     threat:
-      "Network upkeep rises in 2015 and 2020, and power purchase limits shrink from 2017. Compare company terms before connecting.",
+      "Network upkeep rises in 2015 and 2020, and the power purchase limit shrinks in 2017.",
     themes: ["Rapid growth"],
     ownership: "Investor",
     startingYear: 2005,

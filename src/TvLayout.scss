@@ -849,7 +849,8 @@ html[data-tv-layout="true"] {
   .tvComparisonItem {
     grid-column: 1 / -1;
   }
-  .chartTooltip {
+  .chartTooltip,
+  .chartEventTooltip {
     max-width: min(30rem, 100%);
     padding: 0.25rem;
     font-size: 0.75rem;
