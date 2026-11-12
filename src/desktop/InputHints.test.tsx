@@ -88,14 +88,7 @@ it("keeps the existing solo behavior when pointer input becomes active", () => {
 });
 
 it("shows the complete shared menu legend with the requesting controller bindings", () => {
-  window.electrifyCouch = {
-    role: "seat",
-    seatId: "local-p1",
-    getGeneration: () => 1,
-    ready: async () => {},
-    onMessage: () => () => {},
-    post: () => {},
-  };
+  // The shared shell owns the legend without a company-seat bridge.
   render(
     <ControlsLegend
       glyphs={{

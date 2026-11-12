@@ -151,7 +151,7 @@ export function ControlsLegend({
     ["right", "Move right"],
     ["confirm", "Select"],
     ["back", "Back"],
-    menuHint(),
+    ["menu", "Game menu"],
     ...gameHints.slice(3),
   ];
   return (
