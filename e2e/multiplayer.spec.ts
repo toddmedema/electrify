@@ -1,5 +1,5 @@
 import { unlockAllDifficulties } from "./difficulty-fixture";
-import { expect, Page, Browser } from "@playwright/test";
+import { expect, isolateAnalytics, Page, Browser } from "./fixtures";
 import { gzipSync } from "node:zlib";
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -482,6 +482,7 @@ class SteamRoom {
       isMobile: mobile,
       permissions: ["clipboard-read", "clipboard-write"],
     });
+    await isolateAnalytics(context);
     const page = await context.newPage();
     await unlockAllDifficulties(page);
     page.on("request", (request) => {
@@ -1683,6 +1684,7 @@ async function verifySpeedLayouts(browser: Browser, pages: Page[]) {
       isMobile: touch,
       colorScheme: "light",
     });
+    await isolateAnalytics(context);
     const baseline = await context.newPage();
     await baseline.addInitScript(() => {
       localStorage.setItem("theme", "system");

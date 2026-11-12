@@ -1,4 +1,3 @@
-import type { Analytics } from "firebase/analytics";
 import { initializeApp } from "firebase/app";
 import {
   getAuth,
@@ -27,7 +26,6 @@ const firebaseApp =
         storageBucket: "electrify-game.appspot.com",
         messagingSenderId: "882673691459",
         appId: "1:882673691459:web:b6af63afe7ddf377a31df6",
-        measurementId: "G-M064W1XFDY",
       });
 // Desktop accounts come from Steam; even constructing Firebase Auth starts web transport.
 export const firebaseAppAuth = firebaseApp ? getAuth(firebaseApp) : undefined;
@@ -81,7 +79,6 @@ interface HistoryApi {
 }
 
 const refs = {
-  analytics: null as Analytics | null,
   db: null as Firestore | null,
   history:
     typeof window !== "undefined" && typeof window.history !== "undefined"
@@ -95,56 +92,40 @@ const refs = {
   audioContext: null as AudioContext | null,
 };
 
-let analyticsModule: Promise<typeof import("firebase/analytics")> | undefined;
+declare global {
+  interface Window {
+    electrifyAnalyticsQueue?: { name: string; params: object }[];
+    electrifyAnalytics?: {
+      initialize(): void;
+      logEvent(eventName: string, args?: object): void;
+    };
+  }
+}
 
-/**
- * Logs a Google Analytics event, initializing analytics on first use once the browser is online.
- *
- * getAnalytics() kicks off a background registration with Firebase Installations, and while the
- * page is offline that registration fails inside the SDK (installations/app-offline). The SDK
- * keeps the rejected promise without a handler, so it surfaces as an unhandled rejection, which
- * the dev server's error overlay turns into a red screen over the whole game -- the manual
- * included, even though nothing in it needs the network. So initialization waits until the
- * browser reports being online, and the first event after that brings analytics up for good.
- *
- * Only the initialization is gated. Once the SDK is up, events keep being handed to it while
- * offline: a player who started online stays measured across a dropout, and the SDK's own
- * logEvent already catches its internal rejections. getAnalytics() is the only entry point that
- * does not.
- *
- * Chunk-load failures and synchronous SDK throws are caught below. A background registration
- * that fails while the browser still claims to be online (an ad blocker on the Google endpoints,
- * a captive portal, DNS) rejects that way and is out of reach;
- * outside the dev overlay it is a console line rather than anything the game reacts to.
- */
+/** Public pages and the game share the browser-only Google tag runtime in analytics.js. */
 export function logEvent(eventName: string, args?: object): void {
   if (
-    (process.env.REACT_APP_DESKTOP === "true" && isDesktopApp()) ||
-    !firebaseApp
+    typeof window === "undefined" ||
+    !/^https?:$/.test(window.location.protocol) ||
+    window.electrifyDesktop ||
+    window.electrifyCouch
   )
     return;
-  if (!refs.analytics && typeof navigator !== "undefined" && !navigator.onLine)
-    return;
-  // Share one SDK load; events queued during it keep their order without delaying gameplay.
-  analyticsModule ??= import(
-    /* webpackChunkName: "analytics" */ "firebase/analytics"
-  );
-  void analyticsModule
-    .then(({ getAnalytics, logEvent: firebaseLogEvent }) => {
-      if (!refs.analytics) {
-        // Connectivity can change while the chunk is loading.
-        if (typeof navigator !== "undefined" && !navigator.onLine) return;
-        refs.analytics = getAnalytics(firebaseApp);
-      }
-      firebaseLogEvent(refs.analytics, eventName, {
-        ...args,
-        app_version: APP_VERSION,
-      });
-    })
-    .catch(() => {
-      // A failed chunk load or SDK initialization remains retryable on the next event.
-      analyticsModule = undefined;
-    });
+  try {
+    const params = {
+      ...args,
+      app_version: APP_VERSION,
+    };
+    if (window.electrifyAnalytics) {
+      window.electrifyAnalytics.logEvent(eventName, params);
+    } else {
+      // Bound early events even if the optional local runtime never arrives.
+      const pending = (window.electrifyAnalyticsQueue ||= []);
+      if (pending.length < 100) pending.push({ name: eventName, params });
+    }
+  } catch {
+    // Analytics is optional, including when its local script is unavailable offline.
+  }
 }
 
 export function getDb(): Firestore {

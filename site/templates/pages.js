@@ -37,6 +37,7 @@ function documentShell(metadata, body, schema, context, isIndex = false) {
 <html lang="en">
   <head>
     <meta charset="utf-8" />
+    <script async src="/analytics.js"></script>
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>${e(metadata.title)}</title>
     <meta name="description" content="${e(metadata.description)}" />

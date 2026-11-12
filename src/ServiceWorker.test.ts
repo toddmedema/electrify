@@ -471,12 +471,13 @@ describe("cacheBuild", () => {
     },
   );
 
-  it("adds the fonts and logos the first screen needs on install", async () => {
+  it("adds the local analytics runtime, fonts and logos on install", async () => {
     const sw = buildWorker();
     await Promise.all(sw.install());
     const shell = sw.addAll.mock.calls[0][0];
     expect(shell).toEqual(
       expect.arrayContaining([
+        "/analytics.js",
         "/fonts/inter/inter.css",
         "/fonts/inter/InterVariable.woff2",
         "/images/logo-home.svg",
@@ -484,6 +485,7 @@ describe("cacheBuild", () => {
       ]),
     );
     expect(shell).not.toContain("/");
+    expect(shell.every((url: string) => url.startsWith("/"))).toBe(true);
   });
 
   it("downloads only bundles it does not already have", async () => {

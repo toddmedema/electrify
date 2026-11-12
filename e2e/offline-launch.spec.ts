@@ -4,6 +4,11 @@ test("one online visit stores everything a styled offline launch needs", async (
   page,
   context,
 }) => {
+  let tagRequests = 0;
+  await page.route("https://www.googletagmanager.com/**", (route) => {
+    tagRequests++;
+    return route.fulfill({ contentType: "application/javascript", body: "" });
+  });
   await page.goto("/");
   const play = page.getByRole("button", { name: "Play" });
   await expect(play).toBeVisible();
@@ -21,6 +26,11 @@ test("one online visit stores everything a styled offline launch needs", async (
     return loaded.filter(Boolean);
   });
   expect(uncached).toEqual([]);
+  expect(
+    await page.evaluate(async () =>
+      Boolean(await caches.match("/analytics.js")),
+    ),
+  ).toBe(true);
 
   await context.setOffline(true);
   await page.reload();
@@ -30,4 +40,23 @@ test("one online visit stores everything a styled offline launch needs", async (
   await expect(page.locator("body")).toHaveCSS("font-family", /Inter/);
   const heading = await page.locator("h1").boundingBox();
   expect(heading!.width).toBeLessThanOrEqual(1);
+  // The local runtime survives an offline launch, then initializes when connectivity returns.
+  expect(await page.evaluate(() => Boolean(window.electrifyAnalytics))).toBe(
+    true,
+  );
+  const offlineRequests = tagRequests;
+  await context.setOffline(false);
+  await expect.poll(() => tagRequests).toBe(offlineRequests + 1);
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          Array.from(
+            (window as typeof window & { dataLayer: ArrayLike<unknown>[] })
+              .dataLayer || [],
+            (command) => Array.from(command),
+          ).filter(([name]) => name === "config").length,
+      ),
+    )
+    .toBe(1);
 });

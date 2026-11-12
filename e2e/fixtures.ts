@@ -1,13 +1,30 @@
-import { Request, test as base } from "@playwright/test";
+import { BrowserContext, Request, test as base } from "@playwright/test";
 
 export * from "@playwright/test";
+
+/** Tests must never report usage to the production Analytics stream. Page routes can supply
+ * a local Google tag stub when a spec needs observable analytics behavior. */
+export async function isolateAnalytics(context: BrowserContext): Promise<void> {
+  await context.route(
+    /^https:\/\/(?:[^/]+\.)?(?:googletagmanager|google-analytics)\.com\//,
+    (route) => route.abort(),
+  );
+}
 
 export const test = base.extend<{
   showCloudSaveInvitation: boolean;
   cloudSaveInvitationSetup: void;
   networkDiagnostics: void;
+  analyticsIsolation: void;
 }>({
   showCloudSaveInvitation: [false, { option: true }],
+  analyticsIsolation: [
+    async ({ context }, use) => {
+      await isolateAnalytics(context);
+      await use();
+    },
+    { auto: true },
+  ],
   networkDiagnostics: [
     async ({ context, baseURL }, use, info) => {
       const failures: string[] = [];

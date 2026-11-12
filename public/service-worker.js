@@ -21,6 +21,7 @@ const MARKET_DATA = ["/data/FuelPricesRaw.csv", "/data/EconomyRaw.csv"];
 const ASSET_MANIFEST = "/asset-manifest.json";
 // "/" is not listed: cacheBuild() stores it once the bundles it references are safely cached.
 const APP_SHELL = [
+  "/analytics.js",
   "/manifest.json",
   "/fonts/inter/inter.css",
   "/fonts/inter/InterVariable.woff2",
