@@ -1164,6 +1164,8 @@ export default function UPlotChart<S>(
           width: "100%",
           minWidth: 0,
           maxWidth: "100%",
+          // Expanded keyboard details live outside uPlot's positioned plot surface.
+          position: "relative",
           overflow: "hidden",
         }}
       />

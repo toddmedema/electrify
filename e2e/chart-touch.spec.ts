@@ -314,7 +314,7 @@ for (const theme of ["light", "dark"]) {
     // Keep enough height for the player's native touch gesture to stay inside the viewport.
     await page.setViewportSize({
       width: 360,
-      height: 600,
+      height: 900,
     });
     await page.addInitScript((theme) => {
       localStorage.clear();
@@ -336,8 +336,36 @@ for (const theme of ["light", "dark"]) {
         .poll(() => tooltip.evaluate((el) => el.scrollHeight - el.clientHeight))
         .toBeGreaterThan(30);
       const bounds = (await tooltip.boundingBox())!;
+      const chartBounds = (await chart.boundingBox())!;
+      expect(bounds.x).toBeGreaterThanOrEqual(chartBounds.x - 1);
+      expect(bounds.y).toBeGreaterThanOrEqual(chartBounds.y - 1);
+      expect(bounds.x + bounds.width).toBeLessThanOrEqual(
+        chartBounds.x + chartBounds.width + 1,
+      );
+      expect(bounds.y + bounds.height).toBeLessThanOrEqual(
+        chartBounds.y + chartBounds.height + 1,
+      );
+      const pane = (await page.locator(".facilitiesBody").boundingBox())!;
+      const top = Math.max(bounds.y, pane.y, 0);
+      const bottom = Math.min(
+        bounds.y + bounds.height,
+        pane.y + pane.height,
+        page.viewportSize()!.height,
+      );
+      expect(
+        bottom - top,
+        "visible details leave room for a real swipe",
+      ).toBeGreaterThan(96);
       const x = Math.round(bounds.x + bounds.width / 2);
-      const y = Math.round(bounds.y + bounds.height * 0.8);
+      const y = Math.floor(bottom - 16);
+      expect(
+        await tooltip.evaluate(
+          (element, point) =>
+            element.contains(document.elementFromPoint(point.x, point.y)),
+          { x, y },
+        ),
+        "the touch starts on visible breakdown details",
+      ).toBe(true);
       await session.send("Input.dispatchTouchEvent", {
         type: "touchStart",
         touchPoints: [{ x, y }],

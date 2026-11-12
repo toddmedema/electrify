@@ -1220,6 +1220,12 @@ test("TV saved preferences style direct scenario links before play", async ({
   await expect(
     help.getByRole("button", { name: "close", exact: true }),
   ).toBeVisible();
+  // Visibility precedes the end of the popover's opening scale transition.
+  await help.evaluate(async (element) => {
+    await Promise.all(
+      element.getAnimations().map((animation) => animation.finished),
+    );
+  });
   const helpBounds = await help.boundingBox();
   const articleWidth = await help.evaluate(() =>
     Math.min(
@@ -1238,10 +1244,14 @@ test("TV saved preferences style direct scenario links before play", async ({
     helpBounds!.y,
     "help stays inside the screen inset",
   ).toBeGreaterThanOrEqual(edge.actual);
+  const footer = page.locator(".controllerHints:visible");
+  const bottomLimit = (await footer.count())
+    ? (await footer.boundingBox())!.y
+    : page.viewportSize()!.height - edge.actual;
   expect(
     helpBounds!.y + helpBounds!.height,
-    "help clears the controller footer",
-  ).toBeLessThan(page.viewportSize()!.height - edge.actual - 80);
+    "help clears the visible controller footer or screen inset",
+  ).toBeLessThanOrEqual(bottomLimit + 1);
   await help.getByRole("button", { name: "close", exact: true }).click();
 });
 
@@ -1338,7 +1348,7 @@ test("TV maximum custom setup gives location and select values enough room", asy
         parseFloat(countStyle.lineHeight),
       widthShare:
         element.getBoundingClientRect().width /
-        element.closest(".customSetupColumns")!.getBoundingClientRect().width,
+        element.closest(".coopFieldset")!.getBoundingClientRect().width,
     };
   });
   expect(
