@@ -24,7 +24,7 @@ import { facilitySignature } from "../helpers/Projection";
 import { intertieForecastKey } from "../helpers/IntertieOutlook";
 import { parseSave, serializeSave } from "../SaveGame";
 import { SAVE_SCHEMA_VERSION } from "../SaveSchema";
-import { GAME_TO_REAL_YEARS, TICKS_PER_HOUR } from "../Constants";
+import { GAME_TO_REAL_YEARS, TICK_MINUTES, TICKS_PER_HOUR } from "../Constants";
 import { DEMAND_TYPES } from "../data/DemandProfiles";
 import reducer, {
   generateForecastTimeline,
@@ -122,6 +122,32 @@ it("rejects a forged public quote, accepts its valid neighbor once and invalidat
   );
   expect(facilitySignature(paused)).not.toBe(facilitySignature(signed));
   expect(intertieForecastKey(paused)).not.toBe(intertieForecastKey(signed));
+});
+it("keeps unchanged reviewed terms across ticks but rejects a changed delivery month", () => {
+  const game = at();
+  const quote = powerAgreementQuote(game, "champlain-nuclear")!;
+  game.date = getDateFromMinute(game.date.minute + TICK_MINUTES, 2005);
+  expect(powerAgreementQuote(game, quote.id)!.quoteKey).toBe(quote.quoteKey);
+  const accepted = reducer(
+    game,
+    acceptPowerAgreement({ blockId: quote.id, quoteKey: quote.quoteKey }),
+  );
+  expect(accepted.transmission!.acceptedAgreements).toEqual([
+    { ...quote.receipt, acceptedMinute: game.date.minute },
+  ]);
+
+  const late = at(181);
+  const lateQuote = powerAgreementQuote(late, "champlain-nuclear")!;
+  late.date = getDateFromMinute(182 * MINUTES_PER_MONTH, 2005);
+  expect(
+    reducer(
+      late,
+      acceptPowerAgreement({
+        blockId: lateQuote.id,
+        quoteKey: lateQuote.quoteKey,
+      }),
+    ),
+  ).toEqual(late);
 });
 it("owns exact inherited dates and calendar terms, including late signing and recurring cycles", () => {
   const game = at(155);

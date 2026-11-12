@@ -116,12 +116,19 @@ export function powerAgreementQuote(game: GameType, blockId: string) {
     startMinute,
     endMinute: startMinute + block.years * 12 * MINUTES_PER_MONTH,
   };
+  // A review binds commercial terms; the acceptance timestamp is recorded on confirmation.
+  const { acceptedMinute: _acceptedMinute, ...terms } = receipt;
   return {
     ...block,
     receipt,
     deliverableW: block.nominalW * 0.95,
     priceToday: agreementPrice(game, block.pricePerMWh),
-    quoteKey: JSON.stringify(receipt),
+    quoteKey: JSON.stringify({
+      ...terms,
+      nominalW: block.nominalW,
+      pricePerMWh: block.pricePerMWh,
+      deliverability: 0.95,
+    }),
   };
 }
 export function validPowerAgreementAction(

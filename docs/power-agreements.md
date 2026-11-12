@@ -84,6 +84,10 @@ and an empty acceptance ledger. It preserves recorded history, company accounts,
 construction and acquisition receipts; continuation refreshes current/future
 forecasts through the existing data-loaded owner.
 
+Reviews bind the agreed coverage, real price and delivery term rather than a
+particular clock tick. Confirmation records the actual acceptance time, while a
+change to the delivery month requires a fresh review.
+
 ## Historical context, not reconstructed utility books
 
 [CVPS's 2006 Form 10-K](https://www.sec.gov/Archives/edgar/data/18808/000001880807000013/fnl10k.htm)
