@@ -1,3 +1,5 @@
+import PowerAgreements, { agreementSummary } from "../base/PowerAgreements";
+import { inheritedUtilityForCorridor } from "../../helpers/PowerAgreements";
 import { BUYING_LABELS, SELLING_LABELS } from "../../helpers/TradingRules";
 import { getCostTableIndex } from "../../data/Economy";
 import { activeScenario, currentTick } from "../../helpers/GameSelectors";
@@ -867,6 +869,13 @@ export default function TransmissionPanel({
                   aria-label="Interties"
                 >
                   {state.lines.map((line, index) => {
+                    const inherited = inheritedUtilityForCorridor(
+                      line.corridorId,
+                    );
+                    const agreementText = agreementSummary(
+                      game,
+                      line.corridorId,
+                    );
                     const acquisitionTarget = isUtilityExpansionGame(game)
                       ? acquisitionTargetForCorridor(line.corridorId)
                       : undefined;
@@ -1012,6 +1021,7 @@ export default function TransmissionPanel({
                             ref={provided.innerRef}
                             {...provided.draggableProps}
                             role="listitem"
+                            data-corridor-id={line.corridorId}
                             style={{
                               userSelect: "none",
                               ...provided.draggableProps.style,
@@ -1036,6 +1046,7 @@ export default function TransmissionPanel({
                               )}
                               <button
                                 type="button"
+                                id={`intertie-disclosure-${line.id}`}
                                 className="facilityDisclosure"
                                 aria-label={`Inspect ${line.name}, ${flowDescription}`}
                                 aria-expanded={selectedLine === line.id}
@@ -1053,7 +1064,7 @@ export default function TransmissionPanel({
                                       <>
                                         <span className="facilityName">
                                           {utilityOwned
-                                            ? `Owned · ${acquisitionTarget.name}`
+                                            ? `${line.name} · Owned`
                                             : line.name}
                                         </span>
                                         {restricted &&
@@ -1076,9 +1087,13 @@ export default function TransmissionPanel({
                                           ? "Acquired utility"
                                           : line.paused
                                             ? "Paused"
-                                            : `${word} ${flowReading}`
+                                            : inherited && direction === "IDLE"
+                                              ? `Idle · ${formatWatts(flowCapacityW)}`
+                                              : `${word} ${flowReading}`
                                     }
-                                    detail={construction?.detail}
+                                    detail={
+                                      construction?.detail ?? agreementText
+                                    }
                                     progress={
                                       building
                                         ? {
@@ -1314,8 +1329,13 @@ export default function TransmissionPanel({
                                     .
                                   </Typography>
                                 )}
-                                {outlook && <IntertieYear outlook={outlook} />}
-                                {!building && !utilityOwned && (
+                                {outlook && !inherited && (
+                                  <IntertieYear outlook={outlook} />
+                                )}
+                                {inherited && (
+                                  <PowerAgreements game={game} line={line} />
+                                )}
+                                {!building && !utilityOwned && !inherited && (
                                   <>
                                     {peer?.upgradeRequestedBy && (
                                       <Typography

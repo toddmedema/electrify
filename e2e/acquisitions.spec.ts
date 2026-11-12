@@ -120,14 +120,23 @@ for (const theme of ["light", "dark"] as const) {
       facilities.getByRole("button", { name: /^Acquire / }),
     ).toHaveCount(0);
     const unfinished = await readSavedGame(page);
-    expect(unfinished?.transmission?.lines).toHaveLength(2);
     expect(
-      unfinished?.transmission?.lines.every(
-        (line) => line.yearsToBuildLeft > 0,
+      unfinished?.transmission?.lines.filter(
+        (line) =>
+          line.corridorId === "vt-champlain-valley" ||
+          line.corridorId === "vt-champlain-ridge",
       ),
+    ).toHaveLength(2);
+    expect(
+      unfinished?.transmission?.lines
+        .filter((line) => line.buildCost > 0)
+        .every((line) => line.yearsToBuildLeft > 0),
     ).toBe(true);
     await editSavedGame(page, ({ game }) => {
-      for (const line of game.transmission!.lines) line.yearsToBuildLeft = 0;
+      for (const line of game.transmission!.lines.filter(
+        (line) => line.buildCost > 0,
+      ))
+        line.yearsToBuildLeft = 0;
       // UI fixture: exercise cash as well as financed acquisition without running years of economics.
       for (const tick of game.timeline) tick.cash = 1e9;
     });
@@ -142,9 +151,9 @@ for (const theme of ["light", "dark"] as const) {
       "Valley Electric",
       "Ridge Electric",
     ].entries()) {
-      const line = facilities
-        .locator(".transmissionLine")
-        .filter({ hasText: target });
+      const line = facilities.locator(
+        `.transmissionLine[data-corridor-id="vt-champlain-${index === 0 ? "valley" : "ridge"}"]`,
+      );
       const acquire = line.getByRole("button", {
         name: `Acquire ${target}`,
         exact: true,
@@ -350,7 +359,7 @@ for (const theme of ["light", "dark"] as const) {
       await purchase.focus();
       await page.keyboard.press("Enter");
       await expect(dialog).toHaveCount(0);
-      await expect(line).toContainText(`Owned · ${target}`);
+      await expect(line).toContainText("Owned");
       const inspectOwned = line.getByRole("button", { name: /^Inspect / });
       if ((await inspectOwned.getAttribute("aria-expanded")) !== "true")
         await inspectOwned.click();
