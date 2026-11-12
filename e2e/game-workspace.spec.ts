@@ -38,6 +38,36 @@ async function settleSheets(page: Page) {
   });
 }
 
+test("snackbars clear medium and large floating docks", async ({
+  page,
+}, info) => {
+  test.skip(info.project.name !== "desktop-chromium");
+  await startGame(page, "light", 111);
+  for (const width of [1600, 2200]) {
+    await page.setViewportSize({ width, height: 1080 });
+    await expect(page.locator(".gameWorkspace")).toHaveAttribute(
+      "data-dock-size",
+      width === 2200 ? "large" : "medium",
+    );
+    await page.keyboard.press("Shift+1");
+    const snackbar = page.locator(".snackbar-above-nav");
+    await expect(snackbar).toBeVisible();
+    await expect
+      .poll(async () => {
+        const [toast, dock] = await Promise.all([
+          snackbar.boundingBox(),
+          page.locator("#navfooter").boundingBox(),
+        ]);
+        return toast!.y + toast!.height - dock!.y;
+      })
+      .toBeLessThanOrEqual(-8);
+    await snackbar
+      .getByRole("button", { name: "Dismiss notification", exact: true })
+      .click();
+    await expect(snackbar).not.toBeVisible();
+  }
+});
+
 for (const side of [false, true]) {
   test(`purchases ${side ? "keep Build open in a side panel" : "close Build in an overlay"}`, async ({
     page,

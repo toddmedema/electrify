@@ -14,7 +14,7 @@
 }
 
 // These breakpoints follow available width at the chosen scale, including edge padding.
-.gameWorkspace[data-dock-size="medium"] {
+:root:has(.gameWorkspace[data-dock-size="medium"]) {
   --game-dock-bottom: max(1.5rem, env(safe-area-inset-bottom));
   --game-dock-button-width: 5.5rem;
   --game-dock-button-height: 4rem;
@@ -22,7 +22,7 @@
   --game-dock-label-size: 0.8125rem;
   --game-dock-label-line: 1.125rem;
 }
-.gameWorkspace[data-dock-size="large"] {
+:root:has(.gameWorkspace[data-dock-size="large"]) {
   --game-dock-bottom: max(2.5rem, env(safe-area-inset-bottom));
   --game-dock-button-width: 6.5rem;
   --game-dock-button-height: 4.75rem;
