@@ -978,6 +978,10 @@ export class MultiplayerSession {
             );
           }
         }
+        // Subscribers apply the host grid synchronously. Only then may the worker clone
+        // another bundle; small clock/liveness messages remain independent of this credit.
+        if (current() && this.worker === worker)
+          this.post({ kind: "views-applied" });
       };
       this.worker.onerror = () => {
         if (!current() || this.worker !== worker) return;

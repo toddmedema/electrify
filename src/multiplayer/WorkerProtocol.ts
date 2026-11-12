@@ -7,6 +7,8 @@ import type {
 } from "./Types";
 export type WorkerRequest =
   | { kind: "heartbeat" }
+  /** The shell consumed the previous view bundle; allow the newest projection to follow. */
+  | { kind: "views-applied" }
   | {
       kind: "create";
       local?: boolean;
