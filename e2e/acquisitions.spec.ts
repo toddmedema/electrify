@@ -201,14 +201,6 @@ for (const theme of ["light", "dark"] as const) {
       await expect(
         dialog
           .locator(".decisionImpactFact")
-          .filter({ hasText: /^Customers/ })
-          .locator(".decisionImpactFactValue"),
-      ).toHaveText(
-        index === 0 ? "90,000 → 249,000 (+177%)" : "249,000 → 299,000 (+20%)",
-      );
-      await expect(
-        dialog
-          .locator(".decisionImpactFact")
           .filter({ hasText: /^Supply margin/ })
           .locator(".decisionImpactFactValue"),
       ).toHaveText(/^[\d.]+[kMG]?W → [\d.]+[kMG]?W spare$/);
@@ -348,10 +340,29 @@ for (const theme of ["light", "dark"] as const) {
         name: index === 0 ? "Take loan" : "Pay cash",
         exact: true,
       });
+      const beforePurchase = (await readSavedGame(page))!;
+      const customersBefore = beforePurchase.timeline
+        .filter((tick) => tick.minute <= beforePurchase.date.minute)
+        .at(-1)!.customers;
+      const customerPreview = await dialog
+        .locator(".decisionImpactFact")
+        .filter({ hasText: /^Customers/ })
+        .locator(".decisionImpactFactValue")
+        .textContent();
       await purchase.focus();
       await page.keyboard.press("Enter");
       await expect(dialog).toHaveCount(0);
       await expect(line).toContainText(`Owned · ${target}`);
+      const afterPurchase = (await readSavedGame(page))!;
+      const receipt = afterPurchase.utilityExpansion!.acquisitions.find(
+        (entry) =>
+          entry.targetId ===
+          (index === 0 ? "valley-electric" : "ridge-electric"),
+      )!;
+      expect(receipt).toBeDefined();
+      expect(customerPreview).toBe(
+        `${Math.round(customersBefore).toLocaleString("en-US")} → ${Math.round(customersBefore + receipt.transferredCustomers).toLocaleString("en-US")} (+${Math.round((receipt.transferredCustomers / customersBefore) * 100)}%)`,
+      );
       const inspectOwned = line.getByRole("button", { name: /^Inspect / });
       if ((await inspectOwned.getAttribute("aria-expanded")) !== "true")
         await inspectOwned.click();
