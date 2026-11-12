@@ -361,7 +361,7 @@ describe("insight forecast charts", () => {
           width,
           bbox: { width },
           scales: { x: { min: domain.x[0], max: domain.x[1] } },
-        } as uPlot;
+        } as unknown as uPlot;
         const inset =
           typeof right === "function"
             ? right(plot, 1, [false, false, true, true], 0)
