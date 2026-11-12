@@ -296,7 +296,33 @@ export function expandedChartOptions(
             typeof originalSize === "function"
               ? originalSize(plot, values, axisIndex, cycle)
               : (originalSize ?? (vertical ? 50 : 25));
-          if (!vertical) return natural * fontScale;
+          if (!vertical) {
+            // Endpoint labels are painted by the plugin, so uPlot's values omit them.
+            const lines = Math.max(
+              0,
+              ...[
+                ...(values || []),
+                ...(endpoints.get(axisIndex) || []).map(({ label }) => label),
+              ].map((value) =>
+                value == null || value === ""
+                  ? 0
+                  : String(value).split("\n").length,
+              ),
+            );
+            if (lines <= 1) return natural * fontScale;
+            return Math.ceil(
+              Math.max(
+                natural * fontScale,
+                (axis.ticks?.show === false
+                  ? 0
+                  : (axis.ticks?.size ?? TICK_SIZE)) +
+                  (axis.gap ?? LABEL_GAP) +
+                  Number.parseFloat(font) *
+                    (1 + (lines - 1) * (axis.lineGap ?? 1.5)) +
+                  LABEL_EDGE_PAD * getInterfaceScale(),
+              ),
+            );
+          }
           // Includes fixed right axes: their old reserve may be narrower than the final label.
           const sizePx = Number.parseFloat(font);
           const widest = Math.max(

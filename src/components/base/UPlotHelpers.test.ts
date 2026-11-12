@@ -88,6 +88,7 @@ it.each([
           height: 80 * ratio,
         },
         width: 350,
+        height: 150,
         valToPos: (value: number) => (60 + value * 137) * ratio,
       } as unknown as uPlot;
       const labels = (options.axes![0].values as uPlot.Axis.DynamicValues)(
@@ -98,6 +99,24 @@ it.each([
         0,
       );
       expect(labels).toEqual([null, "Jan\n2030", null]);
+      // uPlot subtracts the measured axis reserve from the canvas before drawing labels.
+      const axisSize = (
+        options.axes![0].size as Exclude<uPlot.Axis.Size, number>
+      )(
+        plot,
+        labels.map((label) => (label == null ? "" : String(label))),
+        0,
+        1,
+      );
+      expect(
+        (options.axes![0].size as Exclude<uPlot.Axis.Size, number>)(
+          plot,
+          ["", ""],
+          0,
+          1,
+        ),
+      ).toBe(axisSize);
+      plot.bbox.height = (plot.height - 10 - axisSize) * ratio;
       (options.plugins!.at(-1)!.hooks.drawAxes as (plot: uPlot) => void)(plot);
       expect(fillText.mock.calls.map(([text]) => text)).toEqual([
         "Jan",
@@ -114,6 +133,7 @@ it.each([
         expect(x / ratio - 48).toBeGreaterThanOrEqual(0);
         expect(x / ratio + 48).toBeLessThanOrEqual(plot.width);
         expect(y).toBeGreaterThan(plot.bbox.top + plot.bbox.height);
+        expect(y + fontPx).toBeLessThanOrEqual(plot.height * ratio);
       }
       expect(options.padding![1]).toBe(16);
       expect(options.axes![1].values).toBe(topValues);
