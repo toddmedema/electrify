@@ -1701,7 +1701,6 @@ async function tvJourney(page: Page, testInfo: TestInfo, maximum: boolean) {
         const control = bounds(".insightsViewportButtons button");
         const title = bounds(".insightEventTitle");
         const eventDate = bounds(".insightEventDate");
-        const legend = bounds(".insightsTrack .chartLegend");
         const chart = bounds(".insightsTrack .accessibleChart > [role=img]");
         return {
           dateControlAlignment: Math.abs(
@@ -1709,7 +1708,6 @@ async function tvJourney(page: Page, testInfo: TestInfo, maximum: boolean) {
           ),
           controlOverflow: control.bottom - buttons.bottom,
           eventLineGap: eventDate.top - title.bottom,
-          legendChartGap: chart.top - legend.bottom,
           chartBottom: chart.bottom,
           paneBottom: view.closest(".gameToolBody")!.getBoundingClientRect()
             .bottom,
@@ -1730,10 +1728,6 @@ async function tvJourney(page: Page, testInfo: TestInfo, maximum: boolean) {
       insightRows.eventLineGap,
       "event title and date have separate readable lines",
     ).toBeGreaterThanOrEqual(insightRows.textScale / 8);
-    expect(
-      insightRows.legendChartGap,
-      "the focused chart clears its legend",
-    ).toBeGreaterThanOrEqual(insightRows.textScale / 4);
     if (!maximum)
       expect(
         insightRows.chartBottom,
@@ -1744,6 +1738,39 @@ async function tvJourney(page: Page, testInfo: TestInfo, maximum: boolean) {
       .locator('.accessibleChart > [role="img"][tabindex="0"]:visible')
       .first();
     await select(page, chart);
+    await expect(chart).toBeFocused();
+    const legendClearance = await chart.evaluate((element) => {
+      const legend = element
+        .closest(".insightsTrack")!
+        .querySelector(".chartLegend")!;
+      const contentBoxes = Array.from(legend.children)
+        .filter((child) => child.textContent?.trim())
+        .flatMap((child) => Array.from(child.getClientRects()))
+        .filter((bounds) => bounds.width > 0 && bounds.height > 0);
+      const contentBottom = Math.max(
+        ...contentBoxes.map((bounds) => bounds.bottom),
+      );
+      const style = getComputedStyle(element);
+      return {
+        contentLines: contentBoxes.length,
+        gap: element.getBoundingClientRect().top - contentBottom,
+        outlineStyle: style.outlineStyle,
+        outlineWidth: parseFloat(style.outlineWidth),
+        outlineOffset: parseFloat(style.outlineOffset),
+      };
+    });
+    expect(legendClearance.contentLines).toBeGreaterThan(0);
+    expect(Number.isFinite(legendClearance.gap)).toBe(true);
+    expect(legendClearance.outlineStyle).not.toBe("none");
+    expect(legendClearance.outlineWidth).toBeGreaterThan(0);
+    expect(
+      legendClearance.gap,
+      "legend content clears the focused chart's visible outline",
+    ).toBeGreaterThanOrEqual(
+      legendClearance.outlineWidth +
+        Math.max(legendClearance.outlineOffset, 0) +
+        1,
+    );
     await input(page, "confirm");
     await input(page, "right");
     await expect(
