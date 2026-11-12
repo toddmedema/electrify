@@ -587,9 +587,7 @@ it("shows natural-gas base, per-start, and daily-start estimated O&M", async () 
   expect(impact).not.toHaveTextContent("What changes");
   expect(impact).toHaveTextContent("Cash option");
   expect(impact).not.toHaveTextContent("Cash purchase");
-  expect(impact).toHaveTextContent(
-    /Loan option.* \+ .*\/mo \(\d+\.\d+% for 30 years\)/,
-  );
+  expect(impact).toHaveTextContent(/Loan option.* \+ .*\/mo/);
   expect(impact).toHaveTextContent("Maintenance");
   expect(impact).not.toHaveTextContent("Estimated upkeep");
   expect(impact).not.toHaveTextContent("loan payments");
@@ -598,6 +596,7 @@ it("shows natural-gas base, per-start, and daily-start estimated O&M", async () 
   expect(impact).not.toHaveTextContent("Typical output");
   expect(impact).not.toHaveTextContent("weather may limit it");
   expect(impact).not.toHaveTextContent("largest forecast shortage");
+  expect(impact).toHaveTextContent(/New loan: \d+\.\d+% for 30 years\./);
   expect(impact).not.toHaveTextContent("Loan:");
   expect(
     screen.queryByRole("table", { name: "Financing terms" }),

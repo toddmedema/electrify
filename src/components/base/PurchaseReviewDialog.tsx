@@ -182,20 +182,16 @@ export default function PurchaseReviewDialog(
       ),
       value:
         props.paymentSummary?.loan.value ??
-        `${formatMoneyConcise(financedCashDue)} now + ${formatMoneyConcise(loan.monthlyPayment)}/mo (${(interestRate * 100).toFixed(2)}% for ${loanMonths / 12} years)`,
-      detail:
-        props.paymentSummary?.loan.detail ??
-        ([
-          cashOnlyFee > 0
-            ? `Includes a ${formatMoneyConcise(cashOnlyFee)} cash-only transaction fee.`
-            : undefined,
-          refinancedBalance > 0
-            ? `Includes refinancing the existing ${formatMoneyConcise(refinancedBalance)} balance at this rate and term.`
-            : undefined,
-        ]
-          .filter(Boolean)
-          .join(" ") ||
-          undefined),
+        `${formatMoneyConcise(financedCashDue)} now + ${formatMoneyConcise(loan.monthlyPayment)}/mo`,
+      detail: [
+        `New loan: ${(interestRate * 100).toFixed(2)}% for ${loanMonths / 12} years.`,
+        props.paymentSummary?.loan.detail,
+        refinancedBalance > 0
+          ? `Includes refinancing the existing ${formatMoneyConcise(refinancedBalance)} balance at this rate and term.`
+          : undefined,
+      ]
+        .filter(Boolean)
+        .join(" "),
     },
     ...(props.paymentSummary !== undefined
       ? []

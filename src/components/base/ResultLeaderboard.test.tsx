@@ -1,3 +1,4 @@
+import { invalidateLeaderboards } from "../../Leaderboard";
 import { act, render, screen, within } from "@testing-library/react";
 import ResultLeaderboard from "./ResultLeaderboard";
 
@@ -21,6 +22,7 @@ jest.mock("firebase/firestore", () => ({
 }));
 
 beforeEach(() => {
+  invalidateLeaderboards();
   jest.clearAllMocks();
   mockGetCount.mockResolvedValue({ data: () => ({ count: 46 }) });
   mockDesktopScoreRank.mockResolvedValue(47);
@@ -52,7 +54,7 @@ it("loads the public top three current completed scores for the played scenario 
     ["scenarioId", "==", 101],
     ["difficulty", "==", "CEO"],
     ["score", "desc"],
-    [3],
+    [10],
   ]);
 });
 
@@ -65,6 +67,7 @@ it("keeps this run visible on an empty board and during a network failure", asyn
     await screen.findByRole("row", { name: "This run" }),
   ).toHaveTextContent("You540");
   unmount();
+  invalidateLeaderboards();
   mockGetDocs.mockRejectedValueOnce(new Error("offline"));
   render(
     <ResultLeaderboard scenarioId={101} difficulty="CEO" currentScore={540} />,
@@ -116,7 +119,7 @@ it("uses the native Steam board for the same difficulty", async () => {
     <ResultLeaderboard scenarioId={101} difficulty="CEO" currentScore={540} />,
   );
   expect(await screen.findByText("Steam planner")).toBeInTheDocument();
-  expect(mockDesktopScores).toHaveBeenCalledWith(101, "CEO", "global");
+  expect(mockDesktopScores).toHaveBeenCalledWith(101, "CEO", "global", 10);
 });
 
 it("shows this run below the leaders even when the player has a higher previous best", async () => {

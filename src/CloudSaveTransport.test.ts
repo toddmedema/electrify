@@ -2,6 +2,7 @@ import { TextEncoder } from "util";
 import { randomFillSync } from "crypto";
 import {
   getDocFromServer,
+  onSnapshot,
   getDocsFromServer,
   runTransaction,
   Timestamp,
@@ -37,6 +38,7 @@ jest.mock("firebase/firestore", () => {
     doc: (_db: unknown, ...path: string[]) => path.join("/"),
     getDocFromServer: jest.fn(),
     getDocsFromServer: jest.fn(),
+    onSnapshot: jest.fn(),
     runTransaction: jest.fn(),
     writeBatch: jest.fn(),
     serverTimestamp: () => "server timestamp",
@@ -149,6 +151,63 @@ describe("CloudSaveTransport", () => {
     });
     return { raw, head };
   }
+
+  it("uses one authoritative initial snapshot, applies only changed heads and clears account data on disposal", async () => {
+    let notify!: (snapshot: unknown) => void;
+    const unsubscribe = jest.fn();
+    (onSnapshot as jest.Mock).mockImplementation(
+      (_query, _options, changed) => {
+        notify = changed;
+        return unsubscribe;
+      },
+    );
+    const transport = new FirebaseSaveTransport();
+    const changed = jest.fn();
+    const stop = transport.subscribe("alice", changed, jest.fn());
+    const head = (id: string, version = OLD_VERSION, deleted = false) => ({
+      id,
+      data: () => ({ version, deleted, chunks: [] }),
+    });
+    notify({
+      metadata: { fromCache: true },
+      docs: [head("first")],
+      docChanges: () => [],
+    });
+    let resolved = false;
+    const initial = transport.list("alice").then((heads) => {
+      resolved = true;
+      return heads;
+    });
+    await Promise.resolve();
+    expect(resolved).toBe(false);
+    // Server metadata may have no document changes after an ignored cache snapshot.
+    notify({
+      metadata: { fromCache: false },
+      docs: [head("first")],
+      docChanges: () => [],
+    });
+    expect(await initial).toHaveLength(1);
+    notify({
+      metadata: { fromCache: false },
+      docChanges: () => [
+        { type: "modified", doc: head("first", "c".repeat(32), true) },
+        { type: "added", doc: head("second") },
+      ],
+    });
+    expect(await transport.list("alice")).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: "first", deleted: true }),
+        expect.objectContaining({ id: "second" }),
+      ]),
+    );
+    await transport.list("alice");
+    expect(getDocsFromServer).not.toHaveBeenCalled();
+    expect(getDocFromServer).not.toHaveBeenCalled();
+    stop();
+    expect(unsubscribe).toHaveBeenCalledTimes(1);
+    (getDocsFromServer as jest.Mock).mockResolvedValue({ docs: [] });
+    expect(await transport.list("bob")).toEqual([]);
+  });
 
   it("rejects future save schemas without changing the stored backup", async () => {
     const { raw, head } = incompatibleBackup();

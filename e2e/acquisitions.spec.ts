@@ -1,6 +1,7 @@
 import path from "path";
 import { expect, test } from "./fixtures";
 import { openBuild, openPane } from "./layout";
+import { expectPurchaseFactTable } from "./purchase-review-layout";
 import { expectDialogToFit } from "./dialog-layout";
 import { expectContinuousDialogSurface } from "./dialog-surface";
 import { editSavedGame, readSavedGame, readSaveRecords } from "./save-fixture";
@@ -54,6 +55,24 @@ for (const theme of ["light", "dark"] as const) {
         exact: true,
       }),
     ).toBeVisible();
+    await openBuild(page);
+    await page.getByRole("tab", { name: "Generators", exact: true }).click();
+    await page.getByRole("slider").first().press("Home");
+    await page
+      .getByRole("button", { name: "Review purchase of Wind", exact: true })
+      .click();
+    const buildDialog = page.getByRole("dialog");
+    const facilityStyle = await expectPurchaseFactTable(buildDialog, [
+      "Cash option",
+      "Loan option",
+      "Maintenance",
+      "Online in",
+      "Average output over a year",
+      "Direct emissions",
+    ]);
+    await buildDialog
+      .getByRole("button", { name: "close", exact: true })
+      .click();
     await openBuild(page);
     await page.getByRole("tab", { name: "Interties", exact: true }).click();
     for (const target of ["Valley Electric", "Ridge Electric"]) {
@@ -149,11 +168,25 @@ for (const theme of ["light", "dark"] as const) {
         name: `Acquire ${target}`,
         exact: true,
       });
+      await expect(acquire).toHaveCount(0);
+      const inspect = line.getByRole("button", { name: /^Inspect / });
+      await inspect.click();
       await expect(acquire).toBeVisible();
-      // The ready action is visible without expanding Inspect.
+      await expect(line).not.toContainText("Review the company terms");
+      const upgrade = line.getByRole("button", { name: /^Review upgrade/ });
+      if ((testInfo.project.use.viewport?.width ?? 1280) >= 600) {
+        const [acquireBox, upgradeBox] = await Promise.all([
+          acquire.boundingBox(),
+          upgrade.boundingBox(),
+        ]);
+        expect(Math.abs(acquireBox!.y - upgradeBox!.y)).toBeLessThanOrEqual(1);
+      }
       expect((await acquire.boundingBox())!.height).toBeGreaterThanOrEqual(
         testInfo.project.use.hasTouch ? 44 : 40,
       );
+      await inspect.click();
+      await expect(acquire).toHaveCount(0);
+      await inspect.click();
       await acquire.click();
       const dialog = page.getByRole("dialog", {
         name: `Acquire ${target}?`,
@@ -162,101 +195,95 @@ for (const theme of ["light", "dark"] as const) {
       await expect(dialog).toHaveAccessibleName(`Acquire ${target}?`);
       await expectContinuousDialogSurface(dialog);
       await expectDialogToFit(dialog);
-      await expect(dialog).not.toContainText("Seller equity price");
-      await expect(dialog).not.toContainText("Assumed debt");
-      await expect(dialog).not.toContainText("Service-network costs");
-      await expect(dialog).not.toContainText("Combined debt payments");
-      for (const label of ["Cash purchase", "Loan option"]) {
+      await expect(
+        dialog.getByText("Customers", { exact: true }),
+      ).toBeVisible();
+      await expect(
+        dialog
+          .locator(".decisionImpactFact")
+          .filter({ hasText: /^Supply margin/ })
+          .locator(".decisionImpactFactValue"),
+      ).toHaveText(/^[\d.]+[kMG]?W → [\d.]+[kMG]?W spare$/);
+      await expect(
+        dialog.getByRole("region", { name: "Acquisition obligations" }),
+      ).toBeVisible();
+      await expect(dialog).not.toContainText(
+        /Plant operating costs|cash-only transaction fee/,
+      );
+      await expectPurchaseFactTable(
+        dialog,
+        ["Cash option", "Loan option", "Customers", "Supply margin"],
+        facilityStyle,
+      );
+      for (const label of ["Cash option", "Loan option"]) {
         const payment = dialog
           .locator(".decisionImpactFact")
           .filter({ hasText: new RegExp(`^${label}`) });
-        await expect(payment).toHaveCount(1);
         await expect(payment.locator(".decisionImpactFactValue")).toContainText(
-          /upfront \+ .*\/mo/,
+          /now \+ .*\/mo/,
         );
-        await expect(
-          payment.locator(".decisionImpactFactDetail"),
-        ).toContainText("current network costs included");
-        await expect(
-          payment.locator(".decisionImpactFactDetail"),
-        ).not.toContainText("Plant operations and purchased power vary");
       }
-      await expect(dialog).toContainText("Company supply margin");
-      await expect(dialog).not.toContainText("Projected month-end cash");
-      await expect(dialog).not.toContainText("fee included");
-      await expect(dialog).not.toContainText(
-        "Acquire either utility by December 2014",
-      );
-      const plants = dialog
-        .locator(".decisionImpactFact")
-        .filter({ hasText: /^Operating plants/ })
-        .locator(".decisionImpactFactValue");
-      await plants.scrollIntoViewIfNeeded();
-      const plantLines = (await plants.innerText()).split("\n");
+      for (const details of await dialog.locator("details").all())
+        await expect(details).not.toHaveAttribute("open");
+      const assets = dialog
+        .locator("details")
+        .filter({ hasText: "Plants & purchased power" });
+      await assets.locator("summary").click();
+      const plants = assets.getByRole("region", {
+        name: "Operating plants",
+        exact: true,
+      });
+      const plantLines = await plants
+        .locator(".decisionImpactFactValue")
+        .allInnerTexts();
       expect(plantLines).toHaveLength(3);
-      const capacities = plantLines.map((line) =>
-        Number(line.match(/([\d.]+)MW/)![1]),
+      const capacities = plantLines.map((text) =>
+        Number(text.match(/([\d.]+)MW/)![1]),
       );
       expect(capacities).toEqual([...capacities].sort((a, b) => b - a));
-      await expect(dialog).toContainText("Operating plants");
-      await expect(dialog).toContainText("Purchased power");
-      await expect(dialog).not.toContainText(
-        "Ownership, customers, plants and contracts transfer immediately",
+      await expect(
+        assets.getByRole("heading", { name: "Purchased power", exact: true }),
+      ).toBeVisible();
+      if (target === "Valley Electric") {
+        await expect(assets).toContainText("Up to 50MW delivered");
+        await expect(assets).toContainText("not firm reserve");
+      }
+      await assets.locator("summary").click();
+      const finance = dialog
+        .locator("details")
+        .filter({ hasText: "Financing breakdown" });
+      await finance.locator("summary").focus();
+      await page.keyboard.press("Enter");
+      await expect(finance).toHaveAttribute("open");
+      await expectPurchaseFactTable(
+        dialog,
+        [
+          "Purchase price",
+          "Transaction fee",
+          "Inherited debt",
+          "New loan",
+          "Added network upkeep",
+        ],
+        facilityStyle,
+        "Financing breakdown",
       );
-      await expect(dialog).not.toContainText(
-        "This debt remains after selling plants",
-      );
-      await expect(dialog).not.toContainText("addressable accounts");
-      await dialog.locator(".MuiDialogContent-root").evaluate((element) => {
-        element.scrollTop = 0;
-      });
-      const [titleBox, firstFactBox] = await Promise.all([
-        dialog.locator(".closableDialogTitleText").boundingBox(),
-        dialog.locator(".decisionImpactFactLabel").first().boundingBox(),
-      ]);
-      expect(
-        firstFactBox!.y - titleBox!.y - titleBox!.height,
-      ).toBeLessThanOrEqual(32);
-      const loanFact = dialog
-        .locator(".decisionImpactFact")
-        .filter({ hasText: /^Loan option/ });
-      const help = loanFact.getByRole("button", {
+      await expect(finance).toContainText("5% over 20 years");
+      await expect(finance).toContainText("over 30 years");
+      await expect(finance).toContainText("Paid in cash with either option");
+      await finance.locator("summary").click();
+      const schedule = dialog
+        .locator("details")
+        .filter({ hasText: "Supply & network changes" });
+      await schedule.locator("summary").click();
+      await expect(schedule).toContainText("Jan 2020");
+      await expect(schedule).toContainText("Jan 2015: 1.5× opening upkeep");
+      if (target === "Valley Electric")
+        await expect(schedule).toContainText("Jan 2017");
+      await schedule.locator("summary").click();
+      const help = dialog.getByRole("button", {
         name: "What is interest rate?",
         exact: true,
       });
-      await loanFact.scrollIntoViewIfNeeded();
-      await expect(loanFact.locator(".decisionImpactFactValue")).toBeInViewport(
-        { ratio: 1 },
-      );
-      await expect(
-        loanFact.locator(".decisionImpactFactDetail"),
-      ).toBeInViewport({ ratio: 1 });
-      const [labelBox, valueBox, iconBox, helpBox] = await Promise.all([
-        loanFact.locator(".decisionImpactFactLabel").boundingBox(),
-        loanFact.locator(".decisionImpactFactValue").boundingBox(),
-        loanFact.locator(":scope > .conceptIcon").boundingBox(),
-        help.boundingBox(),
-      ]);
-      expect(
-        Math.abs(
-          iconBox!.y + iconBox!.height / 2 - labelBox!.y - labelBox!.height / 2,
-        ),
-      ).toBeLessThanOrEqual(3);
-      expect(helpBox!.height).toBeGreaterThanOrEqual(
-        testInfo.project.use.hasTouch ? 44 : 40,
-      );
-      expect(helpBox!.x).toBeGreaterThanOrEqual(
-        valueBox!.x + valueBox!.width - 1,
-      );
-      if ((testInfo.project.use.viewport?.width ?? 1280) >= 600) {
-        expect(Math.abs(labelBox!.y - valueBox!.y)).toBeLessThanOrEqual(1);
-        const cashValueBox = await dialog
-          .locator(".decisionImpactFact")
-          .filter({ hasText: /^Cash purchase/ })
-          .locator(".decisionImpactFactValue")
-          .boundingBox();
-        expect(Math.abs(cashValueBox!.x - valueBox!.x)).toBeLessThanOrEqual(1);
-      }
       await help.focus();
       await page.keyboard.press("Enter");
       const manual = page.getByRole("dialog", {
@@ -273,19 +300,8 @@ for (const theme of ["light", "dark"] as const) {
       await expect(manual).toBeHidden();
       await expect(help).toBeFocused();
       await expect(dialog).toBeVisible();
-      if (target === "Valley Electric") {
-        const obligations = dialog
-          .locator(".decisionImpactFact")
-          .filter({ hasText: /^Acquisition obligations/ });
-        await expect(obligations).toContainText("January 2017");
-        await expect(dialog).not.toContainText("Plan replacement supply");
-        await expect(dialog).toContainText(
-          "up to 50MW · variable availability",
-        );
-        await expect(dialog).toContainText("Not firm reserve");
-      }
       const beforeCancel = await readSavedGame(page);
-      await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+      await dialog.getByRole("button", { name: "close", exact: true }).click();
       await expect(dialog).toHaveCount(0);
       const afterCancel = await readSavedGame(page);
       expect(afterCancel?.utilityExpansion).toEqual(
@@ -300,29 +316,6 @@ for (const theme of ["light", "dark"] as const) {
           testInfo.project.use.hasTouch ? 44 : 40,
         );
       }
-      if ((testInfo.project.use.viewport?.width ?? 1280) <= 390) {
-        const [cancelBox, cashBox, loanBox] = await Promise.all([
-          dialog
-            .getByRole("button", { name: "Cancel", exact: true })
-            .boundingBox(),
-          dialog
-            .getByRole("button", { name: "Pay cash", exact: true })
-            .boundingBox(),
-          dialog
-            .getByRole("button", { name: "Take loan", exact: true })
-            .boundingBox(),
-        ]);
-        expect(Math.abs(cashBox!.y - loanBox!.y)).toBeLessThanOrEqual(1);
-        expect(Math.abs(cashBox!.width - loanBox!.width)).toBeLessThanOrEqual(
-          1,
-        );
-        expect(cancelBox!.y + cancelBox!.height).toBeLessThanOrEqual(
-          cashBox!.y + 1,
-        );
-        expect(cancelBox!.width).toBeGreaterThanOrEqual(
-          cashBox!.width + loanBox!.width,
-        );
-      }
       if (
         process.env.REVIEW_SCREENSHOT_DIR &&
         index === 0 &&
@@ -334,7 +327,7 @@ for (const theme of ["light", "dark"] as const) {
           element.scrollTop = 0;
         });
         await page.mouse.move(0, 0);
-        await page.screenshot({
+        await dialog.screenshot({
           path: path.join(
             process.env.REVIEW_SCREENSHOT_DIR,
             `acquisition-${testInfo.project.name}-${theme}.png`,
@@ -347,10 +340,29 @@ for (const theme of ["light", "dark"] as const) {
         name: index === 0 ? "Take loan" : "Pay cash",
         exact: true,
       });
+      const beforePurchase = (await readSavedGame(page))!;
+      const customersBefore = beforePurchase.timeline
+        .filter((tick) => tick.minute <= beforePurchase.date.minute)
+        .at(-1)!.customers;
+      const customerPreview = await dialog
+        .locator(".decisionImpactFact")
+        .filter({ hasText: /^Customers/ })
+        .locator(".decisionImpactFactValue")
+        .textContent();
       await purchase.focus();
       await page.keyboard.press("Enter");
       await expect(dialog).toHaveCount(0);
       await expect(line).toContainText(`Owned · ${target}`);
+      const afterPurchase = (await readSavedGame(page))!;
+      const receipt = afterPurchase.utilityExpansion!.acquisitions.find(
+        (entry) =>
+          entry.targetId ===
+          (index === 0 ? "valley-electric" : "ridge-electric"),
+      )!;
+      expect(receipt).toBeDefined();
+      expect(customerPreview).toBe(
+        `${Math.round(customersBefore).toLocaleString("en-US")} → ${Math.round(customersBefore + receipt.transferredCustomers).toLocaleString("en-US")} (+${Math.round((receipt.transferredCustomers / customersBefore) * 100)}%)`,
+      );
       const inspectOwned = line.getByRole("button", { name: /^Inspect / });
       if ((await inspectOwned.getAttribute("aria-expanded")) !== "true")
         await inspectOwned.click();

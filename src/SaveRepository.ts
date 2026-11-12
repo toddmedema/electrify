@@ -220,6 +220,8 @@ export class SaveRepository {
             // Focus refresh remains available when browser privacy settings block notifications.
           }
         }
+        if (!this.channel && typeof window !== "undefined")
+          window.addEventListener("storage", this.storageChanged);
         resolve();
       };
     }).catch((error) => {
@@ -240,7 +242,13 @@ export class SaveRepository {
     this.opening = undefined;
     this.channel?.close();
     this.channel = undefined;
+    if (typeof window !== "undefined")
+      window.removeEventListener("storage", this.storageChanged);
   }
+
+  private storageChanged = (event: StorageEvent) => {
+    if (event.key === `${this.databaseName}:changes`) this.emit();
+  };
 
   private emit(): void {
     this.listeners.forEach((listener) => {
@@ -255,7 +263,12 @@ export class SaveRepository {
   private changed(): void {
     this.emit();
     try {
-      this.channel?.postMessage("changed");
+      if (this.channel) this.channel.postMessage("changed");
+      else if (typeof window !== "undefined")
+        window.localStorage.setItem(
+          `${this.databaseName}:changes`,
+          `${Date.now()}:${Math.random()}`,
+        );
     } catch (_error) {
       // Broadcast is a refresh hint; transactions enforce ownership and focus refresh recovers it.
     }
