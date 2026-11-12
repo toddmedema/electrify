@@ -1,8 +1,8 @@
 import { RefObject, useLayoutEffect, useState } from "react";
 import { normalizeInterfaceScale } from "./InterfaceScale";
 import { SIDE_TOOL_MIN_WIDTH } from "./Globals";
-export { SIDE_TOOL_MIN_WIDTH } from "./Globals";
 import type { SettingsType, WorkspaceType } from "./Types";
+export { SIDE_TOOL_MIN_WIDTH } from "./Globals";
 
 export const WORKSPACE_CHOICES = ["automatic", "single"] as const;
 export const normalizeWorkspace = (value: unknown): WorkspaceType =>

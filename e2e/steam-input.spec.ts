@@ -411,8 +411,6 @@ test("menu movement under a stationary pointer preserves keyboard navigation", a
   await expect(friends).toHaveAttribute("data-pointer-boundary", "returned");
   await expect(manual).toBeFocused();
   await page.keyboard.press("ArrowUp");
-  await expect(tv).toBeFocused();
-  await page.keyboard.press("ArrowUp");
   await expect(friends).toBeFocused();
 
   // Moving the mouse intentionally still selects the hovered control.
@@ -475,10 +473,12 @@ test("controller text entry searches the manual, cancels and restores field focu
   await expect(search).not.toBeFocused();
 });
 
-test("semantic actions play, build, adjust pricing, inspect charts and save at Larger text size", async ({
+test("semantic actions play, build, adjust pricing, inspect charts and save at 125% interface scale", async ({
   page,
 }, testInfo) => {
-  await page.addInitScript(() => localStorage.setItem("textSize", "larger"));
+  await page.addInitScript(() =>
+    localStorage.setItem("interfaceScale", "1.25"),
+  );
   await page.goto("/");
   await expect(page.locator("html")).toHaveAttribute(
     "data-mock-input-context",

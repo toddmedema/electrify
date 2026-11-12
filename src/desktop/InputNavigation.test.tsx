@@ -11,7 +11,9 @@ import {
   visibleControls,
 } from "./InputNavigation";
 
+let positions = new WeakMap<HTMLElement, DOMRect>();
 beforeEach(() => {
+  positions = new WeakMap();
   jest
     .spyOn(HTMLElement.prototype, "getClientRects")
     .mockReturnValue([{}] as unknown as DOMRectList);
@@ -20,6 +22,8 @@ beforeEach(() => {
   jest
     .spyOn(HTMLElement.prototype, "getBoundingClientRect")
     .mockImplementation(function (this: HTMLElement) {
+      const placed = positions.get(this);
+      if (placed) return placed;
       const index = Array.from(
         // eslint-disable-next-line testing-library/no-node-access -- JSDOM geometry follows document order.
         document.querySelectorAll(
@@ -465,16 +469,14 @@ it("directions follow visible rows without a layout preference while widgets ret
     </main>,
   );
   const place = (name: string, x: number, y: number) => {
-    jest
-      .spyOn(screen.getByRole("button", { name }), "getBoundingClientRect")
-      .mockReturnValue({
-        left: x,
-        right: x + 80,
-        top: y,
-        bottom: y + 40,
-        width: 80,
-        height: 40,
-      } as DOMRect);
+    positions.set(screen.getByRole("button", { name }), {
+      left: x,
+      right: x + 80,
+      top: y,
+      bottom: y + 40,
+      width: 80,
+      height: 40,
+    } as DOMRect);
   };
   place("Top left", 0, 0);
   place("Bottom left", 0, 80);
@@ -533,16 +535,14 @@ it("keeps vertical navigation in its pane and uses horizontal navigation across 
     ["Emissions", 100, 80],
     ["Dock", 0, 160],
   ] as const) {
-    jest
-      .spyOn(screen.getByRole("button", { name }), "getBoundingClientRect")
-      .mockReturnValue({
-        left,
-        right: left + 80,
-        top,
-        bottom: top + 40,
-        width: 80,
-        height: 40,
-      } as DOMRect);
+    positions.set(screen.getByRole("button", { name }), {
+      left,
+      right: left + 80,
+      top,
+      bottom: top + 40,
+      width: 80,
+      height: 40,
+    } as DOMRect);
   }
   screen.getByRole("button", { name: "Build solar" }).focus();
   moveInputFocus("right");

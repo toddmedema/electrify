@@ -310,7 +310,7 @@ for (const theme of ["light", "dark"]) {
     page,
   }, info) => {
     test.skip(!info.project.use.hasTouch);
-    // A short viewport and the supported larger text setting make the real breakdown overflow.
+    // A short viewport and 125% interface scale make the real breakdown overflow.
     await page.setViewportSize({
       width: info.project.use.viewport!.width,
       height: 480,
@@ -319,7 +319,7 @@ for (const theme of ["light", "dark"]) {
       localStorage.clear();
       localStorage.setItem("theme", theme);
       localStorage.setItem("audioEnabled", "false");
-      localStorage.setItem("textSize", "larger");
+      localStorage.setItem("interfaceScale", "1.25");
     }, theme);
     await page.goto("/?scenario=107");
     await page.getByRole("button", { name: "Start game" }).click();

@@ -94,7 +94,7 @@ function setup(width = 390, settings: Partial<SettingsType> = {}) {
       settings: {
         ...initialSettings,
         interfaceScale: 1,
-        workspace: "automatic",
+        workspace: "automatic" as const,
         ...settings,
       },
     },

@@ -49,12 +49,12 @@ it.each(["popover", "menu", "manual"] as const)(
     jest.spyOn(anchor, "getBoundingClientRect").mockReturnValue({
       width: 40,
       height: 40,
-      top: 0,
-      bottom: 0,
-      left: 0,
-      right: 40,
-      x: 0,
-      y: 0,
+      top: -100,
+      bottom: -60,
+      left: -100,
+      right: -60,
+      x: -100,
+      y: -100,
       toJSON: () => undefined,
     });
     setManualHelpAnchor(anchor);

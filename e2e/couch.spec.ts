@@ -1326,7 +1326,7 @@ test("TV couch coalesces visual preferences without capturing audio changes", as
   expect
     .soft(
       couch.refreshRequests(),
-      "one refresh captures the latest burst, including its final theme and text size",
+      "one refresh captures the latest burst, including its final theme and interface scale",
     )
     .toBe(beforeVisual + 1);
 

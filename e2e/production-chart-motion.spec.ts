@@ -26,7 +26,7 @@ function interpolates(
       ).length >= 2
   );
 }
-async function start(page: Page, theme: string, textSize = "standard") {
+async function start(page: Page, theme: string, interfaceScale = 1) {
   // Drive the real chart/tick timers on one clock. Shared-runner scheduling must not turn
   // a 100 ms midpoint into a >150 ms gap or move ticks outside the observation window.
   await page.clock.install();
@@ -35,9 +35,9 @@ async function start(page: Page, theme: string, textSize = "standard") {
       localStorage.clear();
       localStorage.setItem("audioEnabled", "false");
       localStorage.setItem("theme", mode);
-      localStorage.setItem("textSize", size);
+      localStorage.setItem("interfaceScale", String(size));
     },
-    { mode: theme, size: textSize },
+    { mode: theme, size: interfaceScale },
   );
   await page.goto("/?scenario=103");
   await page.getByRole("button", { name: "Start game", exact: true }).click();
@@ -216,7 +216,7 @@ test.describe("larger chart text at high pixel density", () => {
     test.skip(info.project.name !== "desktop-chromium");
     await page.setViewportSize({ width: 1920, height: 1080 });
     await page.emulateMedia({ reducedMotion: "no-preference" });
-    await start(page, "dark", "larger");
+    await start(page, "dark", 1.25);
     await page
       .locator("#appbar:visible")
       .first()

@@ -662,7 +662,7 @@ export async function createCouchFixture(
   await context.addInitScript(() => {
     if (!/^https?:$/.test(location.protocol)) return;
     localStorage.setItem("audioEnabled", "false");
-    localStorage.setItem("textSize", "larger");
+    localStorage.setItem("interfaceScale", "1.25");
     localStorage.setItem(
       "plays",
       JSON.stringify({
