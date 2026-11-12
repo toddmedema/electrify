@@ -13,6 +13,7 @@ export function useAgreementForecast(
   game: GameType,
   agreementId?: string,
   offer?: PowerAgreementReceipt,
+  committed = true,
 ) {
   const worker = React.useRef<Worker>();
   const requestId = React.useRef(0);
@@ -44,28 +45,47 @@ export function useAgreementForecast(
     key?: string;
     result?: AgreementForecast;
     error?: boolean;
+    updating?: boolean;
   }>();
   const latest = React.useRef({ game, agreementId, offer });
   latest.current = { game, agreementId, offer };
   const cache = React.useRef(new Map<string, AgreementForecast>());
   React.useEffect(() => {
     const id = ++requestId.current;
-    if (!key) return;
+    if (!key) {
+      setState(undefined);
+      return;
+    }
+    if (!committed) return;
     const cached = cache.current.get(key);
     if (cached) {
       setState({ key, result: cached });
       return;
     }
-    setState({ key });
+    setState((previous) => ({ key, updating: !!previous?.key }));
+    let active: Worker | undefined;
+    let cancelled = false;
+    const stop = () => {
+      if (!active) return;
+      const stopped = active;
+      active = undefined;
+      stopped.onmessage = null;
+      stopped.onerror = null;
+      stopped.onmessageerror = null;
+      stopped.terminate();
+      if (worker.current === stopped) worker.current = undefined;
+    };
     const fail = () => {
-      if (requestId.current === id) setState({ key, error: true });
-      worker.current?.terminate();
-      worker.current = undefined;
+      if (cancelled || requestId.current !== id) return;
+      setState({ key, error: true });
+      stop();
     };
     try {
-      const active = (worker.current ??= createProjectionWorker());
+      active = createProjectionWorker();
+      worker.current = active;
       active.onmessage = (event: MessageEvent<AgreementForecastReply>) => {
         if (
+          cancelled ||
           event.data.requestId !== requestId.current ||
           event.data.requestId !== id
         )
@@ -91,13 +111,18 @@ export function useAgreementForecast(
     } catch (_error) {
       fail();
     }
-  }, [key, retry, epoch]);
-  React.useEffect(() => () => worker.current?.terminate(), []);
+    // Each new key cancels the previous computation rather than queuing more work.
+    return () => {
+      cancelled = true;
+      stop();
+    };
+  }, [key, retry, epoch, committed]);
   return {
     blocked,
-    result: state?.key === key ? state?.result : undefined,
-    error: state?.key === key && state?.error,
-    updating: !!state?.result || (!!state && state.key !== key),
+    result: committed && state?.key === key ? state?.result : undefined,
+    error: committed && state?.key === key && state?.error,
+    updating:
+      !committed || (state?.key === key ? !!state?.updating : !!state?.key),
     retry: retryForecast,
   };
 }

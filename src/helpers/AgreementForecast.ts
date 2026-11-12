@@ -56,7 +56,26 @@ export function agreementForecastKey(
   agreementId: string,
   offer?: PowerAgreementReceipt,
 ): string {
-  return `${projectionSignature(game)}|${agreementId}|${JSON.stringify(offer && { ...offer, acceptedMinute: 0 })}`;
+  const hasMonthlyMinimum =
+    game.transmission?.inheritedAgreementTerms === 3 ||
+    game.transmission?.acceptedAgreements?.some(
+      (receipt) => receipt.termsVersion === 3,
+    ) ||
+    offer?.termsVersion === 3;
+  const meter = hasMonthlyMinimum
+    ? JSON.stringify([
+        game.date.minute,
+        game.transmission?.agreementAccounts
+          ?.filter((account) => account.termsVersion === 3)
+          .map((account) => [
+            account.agreementId,
+            account.accountingStartMinute,
+            account.accountedThroughMinute,
+            account.months.at(-1),
+          ]),
+      ])
+    : "";
+  return `${projectionSignature(game)}|${meter}|${agreementId}|${JSON.stringify(offer && { ...offer, acceptedMinute: 0 })}`;
 }
 
 const emptyEnergy = (): AgreementEnergy => ({
@@ -132,7 +151,7 @@ export function computeAgreementForecast(
   const ticks = (end - cutoff) / TICK_MINUTES + 1;
   if (!Number.isSafeInteger(ticks) || ticks <= 1)
     throw new Error("Invalid delivery boundary");
-  const baselineKey = `${cacheEpoch}|${projectionSignature(assessed)}|${cutoff}|${end}`;
+  const baselineKey = `${cacheEpoch}|${agreementForecastKey(assessed, agreementId)}|${cutoff}|${end}`;
   if (baseline?.key !== baselineKey)
     baseline = {
       key: baselineKey,
@@ -162,6 +181,11 @@ export function computeAgreementForecast(
     remaining.availableMWh += available;
     remaining.usefulMWh += useful;
     remaining.payment += payment;
+    if (source.termsVersion === 3)
+      remaining.unusedPayment += Math.max(
+        0,
+        payment - (tick.agreementUsefulValues?.[agreementId] ?? 0),
+      );
     if (source.termsVersion === 2 && available > 0)
       remaining.unusedPayment += payment * Math.max(0, 1 - useful / available);
   }
@@ -173,6 +197,8 @@ export function computeAgreementForecast(
     recorded.availableMWh += row.availableMWh;
     recorded.usefulMWh += row.usefulMWh;
     recorded.payment += row.payment;
+    if (source.termsVersion === 3)
+      recorded.unusedPayment += Math.max(0, row.payment - row.usefulValue!);
     if (source.termsVersion === 2 && row.availableMWh > 0)
       recorded.unusedPayment +=
         row.payment * Math.max(0, 1 - row.usefulMWh / row.availableMWh);

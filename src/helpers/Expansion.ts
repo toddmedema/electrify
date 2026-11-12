@@ -1,5 +1,6 @@
 import {
   connectionAgreements,
+  agreementRate,
   inheritedConnection,
   INHERITED_CONNECTIONS,
   utilityOwnedAt,
@@ -488,31 +489,45 @@ export function entitlementSources(
             source.id !== excludedAgreementId &&
             source.active &&
             source.nominalW > 0 &&
-            (!supplierReady || source.termsVersion === 2) &&
+            (!supplierReady || source.termsVersion >= 2) &&
             (!legacyOnly || source.termsVersion === 1),
         )
-        .map((source) => ({
-          id: source.id,
-          termsVersion: source.termsVersion,
-          startMinute: source.startMinute,
-          endMinute: source.endMinute,
-          paused: !!line.paused,
-          utilityId,
-          lineId: line.id,
-          capacityW: source.nominalW * source.deliverability,
-          pricePerMWh: source.priceToday,
-          emissionsKgPerMWh: source.emissionsKgPerMWh,
-          offer: {
-            ...(source.termsVersion === 2 ? firmLimits : limits),
-            lineId: `${game.multiplayer?.seat ?? "local"}:${line.id}`,
-            lineImportLimitW: transmissionRatingW(availableLine, now),
-            importLimitW: Math.min(
-              (source.termsVersion === 2 ? firmLimits : limits).importLimitW,
-              source.nominalW * source.deliverability,
-            ),
-            pricePerMWh: source.priceToday,
-          },
-        }));
+        .map((source) => {
+          const pricePerMWh =
+            source.termsVersion === 3
+              ? agreementRate(
+                  game,
+                  source.pricePerMWh,
+                  source.durationYears,
+                  line.corridorId,
+                  agreementMinute,
+                  now,
+                  now.minute,
+                )
+              : source.priceToday;
+          return {
+            id: source.id,
+            termsVersion: source.termsVersion,
+            startMinute: source.startMinute,
+            endMinute: source.endMinute,
+            paused: !!line.paused,
+            utilityId,
+            lineId: line.id,
+            capacityW: source.nominalW * source.deliverability,
+            pricePerMWh,
+            emissionsKgPerMWh: source.emissionsKgPerMWh,
+            offer: {
+              ...(source.termsVersion >= 2 ? firmLimits : limits),
+              lineId: `${game.multiplayer?.seat ?? "local"}:${line.id}`,
+              lineImportLimitW: transmissionRatingW(availableLine, now),
+              importLimitW: Math.min(
+                (source.termsVersion >= 2 ? firmLimits : limits).importLimitW,
+                source.nominalW * source.deliverability,
+              ),
+              pricePerMWh,
+            },
+          };
+        });
     })
     .sort((a, b) => a.pricePerMWh - b.pricePerMWh || a.id.localeCompare(b.id));
   const allocated = allocateIntertieFlows(

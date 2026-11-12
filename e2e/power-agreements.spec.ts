@@ -144,33 +144,82 @@ for (const theme of ["light", "dark"] as const) {
     await expect(dialog).not.toContainText(
       "Local generation can reduce purchases",
     );
-    const marketNow = await line
-      .locator(".facilityStat")
-      .filter({ hasText: "Market price now" })
-      .locator("dd")
-      .innerText();
-    await expect(
-      dialog.getByRole("row", { name: /Vs market now/ }),
-    ).toContainText(marketNow);
-    for (const fact of [
-      "Coverage57MW",
-      "1 Jan 2020–31 Dec 2029",
-      "Follows inflation",
-      "$0 upfront",
-      "Pay for 57MW whenever available",
-    ])
-      await expect(dialog).toContainText(fact);
-    await expect(
-      dialog.getByRole("button", { name: "Accept agreement", exact: true }),
-    ).toBeVisible();
-    await expect(
-      dialog.getByLabel("Agreement forecast", { exact: true }),
-    ).toBeVisible({
-      timeout: 30000,
+    const table = dialog.getByRole("table", {
+      name: "Replacement agreement terms",
     });
+    await expect(table.getByRole("rowheader")).toHaveText([
+      "Agreement price",
+      "Market price",
+      "Minimum supply",
+      "Maximum supply",
+      "Duration",
+      "Forecasted savings",
+    ]);
+    await expect(
+      dialog.getByRole("row", { name: /Minimum supply/ }),
+    ).toContainText("MWh/month");
+    await expect(
+      dialog.getByRole("row", { name: /Minimum supply/ }),
+    ).toContainText("Paid for even if you don't use it");
+    await expect(
+      dialog.getByRole("row", { name: /Maximum supply/ }),
+    ).toContainText("57 MW");
+    await expect(
+      dialog.getByRole("row", { name: /Maximum supply/ }),
+    ).toContainText("MWh/month");
+    await expect(
+      dialog.getByRole("row", { name: /Maximum supply/ }),
+    ).not.toContainText("60 MW");
+    const agreementRate = async () =>
+      Number(
+        (await dialog.getByRole("row", { name: /Agreement price/ }).innerText())
+          .match(/\$([\d,.]+)\/MWh/)![1]
+          .replaceAll(",", ""),
+      );
+    const marketRate = Number(
+      (await dialog.getByRole("row", { name: /Market price/ }).innerText())
+        .match(/\$([\d,.]+)\/MWh/)![1]
+        .replaceAll(",", ""),
+    );
+    const tenYearRate = await agreementRate();
+    expect(tenYearRate).toBeLessThan(marketRate);
+    await expect(
+      dialog.getByRole("row", { name: /Market price/ }),
+    ).toContainText(/\d+(\.\d+)?% higher/);
+    const slider = dialog.getByRole("slider", { name: /^Duration/ });
+    await expect(slider).toHaveAttribute("min", "1");
+    await expect(slider).toHaveAttribute("max", "10");
+    await slider.focus();
+    await page.keyboard.press("Home");
+    await expect(slider).toHaveAttribute("aria-valuenow", "1");
+    await expect(dialog.getByRole("row", { name: /Duration/ })).toContainText(
+      "1 yearEnds Dec 2020",
+    );
+    const oneYearRate = await agreementRate();
+    expect(oneYearRate).toBeGreaterThan(tenYearRate);
+    expect(oneYearRate).toBeLessThan(marketRate);
+    await page.keyboard.press("End");
+    await expect(slider).toHaveAttribute("aria-valuenow", "10");
+    expect(await agreementRate()).toBe(tenYearRate);
+    await page.keyboard.press("Home");
+    for (let year = 1; year < 5; year++)
+      await page.keyboard.press("ArrowRight");
+    await expect(slider).toHaveAttribute("aria-valuenow", "5");
+    await expect(slider).toHaveAttribute("aria-valuetext", "5 years");
+    await expect(dialog.getByRole("row", { name: /Duration/ })).toContainText(
+      "5 yearsEnds Dec 2024",
+    );
+    expect(await agreementRate()).toBeGreaterThan(tenYearRate);
+    expect(await agreementRate()).toBeLessThan(oneYearRate);
+    const savings = dialog.getByRole("row", { name: /Forecasted savings/ });
+    await expect(savings).toContainText(/-?\$[\d.,]+[kMBT]? over 5 years/, {
+      timeout: 45000,
+    });
+    await expect(savings).toContainText("Based on current supply and demand");
     await expect(
       dialog.getByRole("heading", { name: "Demand served" }),
-    ).toBeVisible();
+    ).toHaveCount(0);
+    await expectDialogToFit(dialog);
     await reviewScreenshot(dialog, {
       path: testInfo.outputPath(`ppa-review-${theme}.png`),
       animations: "disabled",
@@ -185,6 +234,13 @@ for (const theme of ["light", "dark"] as const) {
     await dialog.getByRole("button", { name: "Back", exact: true }).click();
     await expect(review).toBeFocused();
     await review.click();
+    await slider.focus();
+    await page.keyboard.press("Home");
+    for (let year = 1; year < 5; year++)
+      await page.keyboard.press("ArrowRight");
+    await expect(dialog.getByRole("row", { name: /Duration/ })).toContainText(
+      "5 yearsEnds Dec 2024",
+    );
     const accept = dialog.getByRole("button", {
       name: "Accept agreement",
       exact: true,
@@ -193,7 +249,7 @@ for (const theme of ["light", "dark"] as const) {
     await page.keyboard.press("Enter");
     await expect(dialog).toHaveCount(0);
     await expect(line).toContainText("Scheduled · starts 1 Jan 2020");
-    await expect(line).toContainText("1 Jan 2020–31 Dec 2029");
+    await expect(line).toContainText("1 Jan 2020–31 Dec 2024");
     await expect(inspect).toBeFocused();
     await expect(review).toHaveCount(0);
     const signedAgreement = line
@@ -229,14 +285,18 @@ for (const theme of ["light", "dark"] as const) {
       name: "Québec hydro remaining term",
       exact: true,
     });
+    await expect(remaining.getByRole("slider")).toHaveCount(0);
     await expect(
-      remaining.getByLabel("Agreement forecast", { exact: true }),
-    ).toBeVisible({
-      timeout: 30000,
+      remaining.getByRole("row", { name: /Forecasted savings/ }),
+    ).toContainText(/-?\$[\d.,]+[kMBT]? over 5 years remaining/, {
+      timeout: 45000,
     });
-    await expect(remaining).toContainText("Remaining delivery term");
-    await expect(remaining).toContainText("Full-term use");
-    await expect(remaining).toContainText("Pay for 57MW whenever available");
+    await expect(
+      remaining.getByRole("row", { name: /Duration/ }),
+    ).toContainText("5 yearsEnds Dec 2024");
+    await expect(
+      remaining.getByRole("row", { name: /Minimum supply/ }),
+    ).toContainText("MWh/month");
     await expectDialogToFit(remaining);
     await reviewScreenshot(remaining, {
       path: testInfo.outputPath(`ppa-remaining-${theme}.png`),
@@ -246,6 +306,12 @@ for (const theme of ["light", "dark"] as const) {
     await expect(remaining).toHaveCount(0);
     const signed = await readSavedGame(page);
     expect(signed!.transmission!.acceptedAgreements).toHaveLength(1);
+    expect(signed!.transmission!.acceptedAgreements![0]).toMatchObject({
+      termsVersion: 3,
+      durationYears: 5,
+      startMinute: 180 * 1440,
+      endMinute: 240 * 1440,
+    });
     await page.reload();
     await page.getByRole("button", { name: "Continue", exact: true }).click();
     await openPane(
@@ -254,6 +320,7 @@ for (const theme of ["light", "dark"] as const) {
     );
     await inspect.click();
     await expect(line).toContainText("Scheduled · starts 1 Jan 2020");
+    await expect(line).toContainText("1 Jan 2020–31 Dec 2024");
     expect(
       (await readSavedGame(page))!.transmission!.acceptedAgreements,
     ).toEqual(signed!.transmission!.acceptedAgreements);

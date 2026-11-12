@@ -1979,7 +1979,7 @@ export const gameSlice = createSlice({
       }
 
       if (isUtilityExpansionGame(state)) {
-        state.transmission!.inheritedAgreementTerms = 2;
+        state.transmission!.inheritedAgreementTerms = 3;
         state.utilityExpansion = {
           networkAssets: [],
           loans: [],
@@ -4055,6 +4055,7 @@ export function* tickStatePhases(
       sharedImportRound(sharedImportRounds, 0),
       undefined,
       true,
+      state.date.minute,
     );
     desktopSimulationHooks()?.tick(state, now);
     logHailRepairsCompleted(state);
@@ -5052,6 +5053,7 @@ function* supplyFacilitiesFinancesPhases(
   sharedClearing?: SharedImportClearing,
   excludedAgreementId?: string,
   settleAgreementAccounts = false,
+  settlementEndMinute = now.minute,
 ): Generator<
   SharedTickPhase,
   TickPresentFutureType,
@@ -5304,7 +5306,7 @@ function* supplyFacilitiesFinancesPhases(
   // Update supply and facility outputs
   // The settled frame represents [end - step, end). The last frame of a month is
   // clamped to its previous timestamp, while the live clock has reached the exclusive end.
-  const agreementEnd = settleAgreementAccounts ? state.date.minute : now.minute;
+  const agreementEnd = settlementEndMinute;
   const agreementStart =
     preRoll || !advanceConstruction ? now.minute : agreementEnd - stepMinutes;
   // Eligibility belongs to the elapsed contract interval; physical readiness must
@@ -5351,6 +5353,8 @@ function* supplyFacilitiesFinancesPhases(
     excludedAgreementId,
     agreementStart,
   );
+  // Use fully paid blocks before adding monthly-minimum usage, then pay-as-used supply.
+  const agreementDispatchPriority = { 1: 2, 2: 0, 3: 1 };
   const entitlementOffers = [
     ...readyAgreements.map((source) => ({
       ...source,
@@ -5359,7 +5363,8 @@ function* supplyFacilitiesFinancesPhases(
     ...legacyAgreements,
   ].sort(
     (a, b) =>
-      b.termsVersion - a.termsVersion ||
+      agreementDispatchPriority[a.termsVersion] -
+        agreementDispatchPriority[b.termsVersion] ||
       a.pricePerMWh - b.pricePerMWh ||
       a.id.localeCompare(b.id),
   );
@@ -6117,6 +6122,12 @@ function* supplyFacilitiesFinancesPhases(
       availableMWh,
       usefulMWh,
       payment,
+      ...(offer.termsVersion === 3
+        ? {
+            availableValue: availableMWh * offer.pricePerMWh,
+            usefulValue: usefulMWh * offer.pricePerMWh,
+          }
+        : {}),
     });
     importEmissionsWeight += delivered * offer.emissionsKgPerMWh;
     importEmissionsBasisW += delivered;
@@ -6217,7 +6228,17 @@ function* supplyFacilitiesFinancesPhases(
     importedW > 0
       ? (importedWh / 1000000) * (importCostPerHour / importedW)
       : 0;
+  const monthlyAgreementTopUp =
+    settleAgreementAccounts && !preRoll && advanceConstruction
+      ? recordAgreementSettlements(
+          state,
+          agreementStart,
+          agreementEnd,
+          agreementSettlements,
+        )
+      : 0;
   const unusedAgreementExpenses =
+    monthlyAgreementTopUp +
     ((unusedAgreementCostPerHour / ticksPerHour) * GAME_TO_REAL_YEARS) / 1e6;
   const expensesImports = physicalImportExpenses + unusedAgreementExpenses;
   if (state.utilityExpansion) {
@@ -6234,13 +6255,15 @@ function* supplyFacilitiesFinancesPhases(
     now.agreementPayments = Object.fromEntries(
       agreementSettlements.map((entry) => [entry.agreementId, entry.payment]),
     );
-    if (settleAgreementAccounts && !preRoll && advanceConstruction)
-      recordAgreementSettlements(
-        state,
-        agreementStart,
-        agreementEnd,
-        agreementSettlements,
-      );
+    now.agreementUsefulValues = Object.fromEntries(
+      agreementSettlements.map((entry) => [
+        entry.agreementId,
+        entry.usefulValue ??
+          entry.usefulMWh *
+            (entitlementOffers.find((source) => source.id === entry.agreementId)
+              ?.pricePerMWh ?? 0),
+      ]),
+    );
   }
   const revenueExports =
     exportedW > 0
@@ -6774,6 +6797,7 @@ function supplyForecastPass(
         t.minute !== state.date.minute,
         undefined,
         excludedAgreementId,
+        true,
       );
       // The current tick already happened. Reforecast its supply against the player's action,
       // but keep the transaction and customer balance that caused this reforecast. Otherwise
@@ -6843,7 +6867,21 @@ export function forecastMonthClosingCashAtCustomerRate(
     const now = getTimeFromTimeline(minute, forecast.timeline);
     const prev = getTimeFromTimeline(minute - TICK_MINUTES, forecast.timeline);
     if (!now || !prev) return -Infinity;
-    updateSupplyFacilitiesFinances(forecast, prev, now, true);
+    // Replay elapsed settlements on this private ledger, including the exclusive month end.
+    updateSupplyFacilitiesFinances(
+      forecast,
+      prev,
+      now,
+      true,
+      false,
+      true,
+      TICK_MINUTES,
+      true,
+      undefined,
+      undefined,
+      true,
+      minute,
+    );
   }
   // The real rollover books one more tick against the final forecast frame before checking cash.
   return (

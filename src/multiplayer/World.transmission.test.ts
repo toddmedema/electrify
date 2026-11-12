@@ -18,7 +18,13 @@ import {
 import { customerMarketSizeAt } from "../helpers/Customers";
 import { loadSimData } from "../testing/SimData";
 import { coopSeats } from "../testing/MultiplayerFixtures";
-import { applyCommand, createWorld, stepWorld } from "./World";
+import {
+  applyCommand,
+  checkpointWorld,
+  createWorld,
+  restoreWorld,
+  stepWorld,
+} from "./World";
 import { ViewPublication } from "./ViewPublication";
 
 function ready(keepNative = false) {
@@ -30,6 +36,7 @@ function ready(keepNative = false) {
     "epoch",
   );
   world.grids.forEach((grid) => {
+    grid.transmission!.inheritedAgreementTerms = 2;
     if (!keepNative) grid.facilities = [];
   });
   for (const seat of world.seats)
@@ -298,4 +305,62 @@ it("reserves a later company's useful agreement delivery before an earlier compa
   stepWorld(world);
   expect(currentTick(world.grids[1])!.entitlementImportedW).toBe(100e6);
   assertFeasible(world);
+});
+
+it("closes shared v3 monthly minima once and restores a midmonth checkpoint identically", () => {
+  const world = ready();
+  for (const grid of world.grids) {
+    grid.transmission!.inheritedAgreementTerms = 3;
+    grid.transmission!.lines[0].paused = true;
+    grid.transmission!.buyingRule = "NONE";
+  }
+  for (let i = 0; i < 48; i++) stepWorld(world);
+  const checkpoint = JSON.parse(JSON.stringify(checkpointWorld(world)));
+  const restored = restoreWorld(checkpoint, "monthly-resume");
+  for (const seat of restored.seats) {
+    expect(
+      applyCommand(restored, seat.id, {
+        matchId: restored.matchId,
+        epoch: restored.epoch,
+        sequence: 1,
+        command: { kind: "ready" },
+      }),
+    ).toBeUndefined();
+  }
+  for (let i = 0; i < 48; i++) {
+    stepWorld(world);
+    stepWorld(restored);
+  }
+  expect(world.grids[0].date.minute).toBe(1440);
+  for (const [index, grid] of world.grids.entries()) {
+    const accounts = grid.transmission!.agreementAccounts!;
+    expect(accounts.length).toBeGreaterThan(0);
+    expect(restored.grids[index].transmission!.agreementAccounts).toEqual(
+      accounts,
+    );
+    expect(currentTick(restored.grids[index])!.cash).toBe(
+      currentTick(grid)!.cash,
+    );
+    for (const account of accounts) {
+      expect(account.accountedThroughMinute).toBe(1440);
+      expect(account.months[0].payment).toBeCloseTo(
+        account.months[0].availableValue! * 0.7,
+        6,
+      );
+      expect(account.months[0].usefulMWh).toBe(0);
+    }
+    expect(currentTick(grid)!.importedW).toBe(0);
+    expect(currentTick(grid)!.importedKgco2e).toBe(0);
+  }
+  const closed = cloneDeep(
+    world.grids.map((grid) =>
+      grid.transmission!.agreementAccounts!.map((account) => account.months[0]),
+    ),
+  );
+  stepWorld(world);
+  expect(
+    world.grids.map((grid) =>
+      grid.transmission!.agreementAccounts!.map((account) => account.months[0]),
+    ),
+  ).toEqual(closed);
 });

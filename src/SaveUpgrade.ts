@@ -123,6 +123,9 @@ const migrations: readonly Migration[] = [
       },
     };
   },
+  // 11 -> 12: variable-duration monthly-energy terms are opt-in new promises only.
+  // Preserve every existing v1/v2 receipt, inherited term, meter and recorded dollar.
+  (save) => save,
 ];
 
 /** Structure versions are independent of app releases and simulation compatibility. */

@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Box, Button, Typography } from "@mui/material";
+import { Box, Button, Slider, Typography } from "@mui/material";
 import type { GameType, TransmissionLineOperatingType } from "../../Types";
 import {
   agreementDate,
@@ -9,11 +9,8 @@ import {
   POWER_AGREEMENT_BLOCKS,
   powerAgreementQuote,
 } from "../../helpers/PowerAgreements";
-import {
-  formatMoneyConcise,
-  formatPercent,
-  formatWatts,
-} from "../../helpers/Format";
+import { formatNumber, formatPercent, formatWatts } from "../../helpers/Format";
+import { MINUTES_PER_MONTH } from "../../helpers/DateTime";
 import { currentTick } from "../../helpers/GameSelectors";
 import {
   adjacentMarketPricePerMWh,
@@ -26,7 +23,9 @@ import {
   openPolicyDecision,
   snackbarOpen,
 } from "../../reducers/GameActions";
-import AgreementForecastDetails from "./AgreementForecastDetails";
+import AgreementForecastDetails, {
+  RecordedAgreementHistory,
+} from "./AgreementForecastDetails";
 import { useAgreementForecast } from "./useAgreementForecast";
 import DecisionDialog from "./DecisionDialog";
 import BuildDetails, { BuildDetailRow } from "./BuildDetails";
@@ -45,11 +44,47 @@ export function agreementSummary(game: GameType, corridorId: string) {
   );
   return `${formatWatts(coverage)} under agreement${replacement ? " · Replacement available" : ""}`;
 }
-function rateComparison(price: number, marketPrice: number) {
-  const difference = price / marketPrice - 1;
-  return Math.abs(difference) < 0.0005
+const rate = (value: number) =>
+  Number.isFinite(value)
+    ? `$${formatNumber(value, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/MWh`
+    : "Unavailable";
+const monthlyEnergy = (value: number) =>
+  `${formatNumber(value, { maximumFractionDigits: 0 })} MWh/month`;
+const years = (value: number) => {
+  const amount = formatNumber(value, {
+    maximumFractionDigits: value < 0.01 ? 5 : value < 0.1 ? 3 : 1,
+  });
+  return `${amount} ${Number(amount) === 1 ? "year" : "years"}`;
+};
+function marketComparison(price: number, marketPrice?: number) {
+  if (
+    !(price > 0) ||
+    marketPrice === undefined ||
+    !Number.isFinite(marketPrice)
+  )
+    return "Comparison unavailable";
+  const difference = (marketPrice / price - 1) * 100;
+  return Math.abs(difference) < 0.05
     ? "About the same"
-    : `${formatPercent(Math.abs(difference), 1)} ${difference < 0 ? "below" : "above"}`;
+    : `${formatNumber(Math.abs(difference), { maximumFractionDigits: 1 })}% ${difference > 0 ? "higher" : "lower"}`;
+}
+function DetailValue({
+  value,
+  caption,
+}: {
+  value: React.ReactNode;
+  caption?: React.ReactNode;
+}) {
+  return (
+    <>
+      <span>{value}</span>
+      {caption && (
+        <Typography component="div" variant="caption" color="textSecondary">
+          {caption}
+        </Typography>
+      )}
+    </>
+  );
 }
 
 export default function PowerAgreements({
@@ -63,6 +98,8 @@ export default function PowerAgreements({
   const [review, setReview] =
     React.useState<ReturnType<typeof powerAgreementQuote>>();
   const [assessmentId, setAssessmentId] = React.useState<string>();
+  const [forecastCommitted, setForecastCommitted] = React.useState(true);
+  const durationLabelId = React.useId();
   const utility = inheritedUtilityForCorridor(line.corridorId);
   const sources = utility ? connectionAgreements(game, utility) : [];
   const assessment = sources.find((source) => source.id === assessmentId);
@@ -76,16 +113,18 @@ export default function PowerAgreements({
         ? undefined
         : assessmentId,
     review?.receipt,
+    !review || forecastCommitted,
   );
   const restore = React.useRef<HTMLElement | null>(null);
   const token = `power-agreement:${line.id}`;
+  const reviewing = !!review;
   React.useEffect(() => {
-    if (!review && !assessmentId) return;
+    if (!reviewing && !assessmentId) return;
     dispatch(openPolicyDecision(token));
     return () => {
       dispatch(closePolicyDecision(token));
     };
-  }, [dispatch, token, review, assessmentId]);
+  }, [dispatch, token, reviewing, assessmentId]);
   if (!utility) return null;
   const now = currentTick(game);
   const marketPrice = now
@@ -96,6 +135,31 @@ export default function PowerAgreements({
         now,
       )
     : undefined;
+  const terms = review
+    ? { ...review, termsVersion: review.receipt.termsVersion }
+    : assessment;
+  const deliverableW =
+    review?.deliverableW ??
+    (assessment ? assessment.nominalW * assessment.deliverability : 0);
+  const startMinute =
+    review?.receipt.startMinute ?? assessment?.startMinute ?? 0;
+  const endMinute = review?.receipt.endMinute ?? assessment?.endMinute ?? 0;
+  const remainingYears =
+    Math.max(0, endMinute - Math.max(game.date.minute, startMinute)) /
+    (12 * MINUTES_PER_MONTH);
+  const changeDuration = (value: number | number[]) => {
+    if (!review) return;
+    const quote = powerAgreementQuote(
+      game,
+      review.id,
+      3,
+      Array.isArray(value) ? value[0] : value,
+    );
+    if (quote) {
+      setReview(quote);
+      setForecastCommitted(false);
+    }
+  };
   const close = () => {
     setReview(undefined);
     setAssessmentId(undefined);
@@ -143,22 +207,20 @@ export default function PowerAgreements({
               <>
                 <Typography variant="body2">
                   {formatWatts(source.nominalW * source.deliverability)} covered
-                  · {formatMoneyConcise(source.priceToday)}/MWh, follows
-                  inflation
+                  · {rate(source.priceToday)}, follows inflation
                 </Typography>
                 {marketPrice !== undefined && marketPrice > 0 && (
                   <Typography variant="body2" color="textSecondary">
-                    Market now {formatMoneyConcise(marketPrice)}/MWh · agreement{" "}
-                    {rateComparison(
-                      source.priceToday,
-                      marketPrice,
-                    ).toLowerCase()}
+                    Market now {rate(marketPrice)} ·{" "}
+                    {marketComparison(source.priceToday, marketPrice)}
                   </Typography>
                 )}
                 <Typography variant="body2" color="textSecondary">
                   {source.termsVersion === 1
                     ? "No minimum purchase"
-                    : `Minimum: pay for ${formatWatts(source.nominalW * source.deliverability)} whenever available`}
+                    : source.termsVersion === 3
+                      ? `Minimum: ${monthlyEnergy(source.minimumMWhPerMonth)}`
+                      : `Minimum: pay for ${formatWatts(source.nominalW * source.deliverability)} whenever available`}
                 </Typography>
                 <Typography variant="body2">
                   {source.inherited
@@ -222,6 +284,7 @@ export default function PowerAgreements({
                 aria-label={`Review ${quote.name} replacement`}
                 onClick={(event) => {
                   restore.current = event.currentTarget;
+                  setForecastCommitted(true);
                   setReview(quote);
                 }}
               >
@@ -256,7 +319,12 @@ export default function PowerAgreements({
                 variant="contained"
                 onClick={() => {
                   if (!review) return;
-                  const fresh = powerAgreementQuote(game, review.id);
+                  const fresh = powerAgreementQuote(
+                    game,
+                    review.id,
+                    3,
+                    review.durationYears,
+                  );
                   if (fresh?.quoteKey !== review.quoteKey) {
                     close();
                     dispatch(
@@ -270,6 +338,7 @@ export default function PowerAgreements({
                     acceptPowerAgreement({
                       blockId: review.id,
                       quoteKey: review.quoteKey,
+                      durationYears: review.durationYears,
                     }),
                   );
                   restore.current = document.getElementById(
@@ -289,105 +358,133 @@ export default function PowerAgreements({
           </>
         }
       >
-        <AgreementForecastDetails
-          forecast={forecast}
-          offer={!!review}
-          expired={expiredAssessment}
-          legacy={assessment?.termsVersion === 1}
-          account={game.transmission?.agreementAccounts?.find(
-            (entry) => entry.agreementId === assessmentId,
-          )}
-        />
-        {assessment && (
-          <Box className="powerAgreementTerms">
-            <BuildDetails label="Active agreement terms">
-              <BuildDetailRow
-                label="Minimum"
-                value={
-                  assessment.termsVersion === 1
-                    ? "No minimum purchase"
-                    : `Pay for ${formatWatts(assessment.nominalW * assessment.deliverability)} whenever available`
-                }
-              />
-              <BuildDetailRow
-                label="Delivery ends"
-                value={agreementDate(assessment.endMinute, true)}
-              />
-              <BuildDetailRow
-                label="Price today"
-                value={`${formatMoneyConcise(assessment.priceToday)}/MWh · Follows inflation`}
-              />
-            </BuildDetails>
-          </Box>
-        )}
-        {review && (
-          <>
-            <Box className="powerAgreementTerms">
-              <BuildDetails label="Replacement agreement terms">
-                <BuildDetailRow
-                  label="Minimum"
-                  value={
-                    <>
-                      Pay for {formatWatts(review.deliverableW)} whenever
-                      available
-                      <Typography
-                        component="div"
-                        variant="caption"
-                        color="textSecondary"
-                      >
-                        $0 upfront
-                      </Typography>
-                    </>
+        {expiredAssessment ? (
+          <RecordedAgreementHistory
+            startMinute={assessment?.startMinute}
+            account={game.transmission?.agreementAccounts?.find(
+              (entry) => entry.agreementId === assessmentId,
+            )}
+          />
+        ) : (
+          terms && (
+            <>
+              {review && (
+                <Box className="powerAgreementDuration">
+                  <Typography id={durationLabelId} variant="body2">
+                    Duration <strong>{years(review.durationYears)}</strong>
+                  </Typography>
+                  <Slider
+                    className="constructionCapacitySlider"
+                    aria-labelledby={durationLabelId}
+                    value={review.durationYears}
+                    min={1}
+                    max={10}
+                    step={1}
+                    valueLabelDisplay="off"
+                    getAriaValueText={years}
+                    onChange={(_event, value) => changeDuration(value)}
+                    onChangeCommitted={() => setForecastCommitted(true)}
+                  />
+                </Box>
+              )}
+              <Box className="powerAgreementTerms">
+                <BuildDetails
+                  label={
+                    review
+                      ? "Replacement agreement terms"
+                      : "Active agreement terms"
                   }
-                />
-                <BuildDetailRow
-                  label="Coverage"
-                  value={formatWatts(review.deliverableW)}
-                />
-                <BuildDetailRow
-                  label="Delivery"
-                  value={`${agreementDate(review.receipt.startMinute)}–${agreementDate(review.receipt.endMinute, true)}`}
-                />
-                <BuildDetailRow
-                  label="Price today"
-                  value={
-                    <>
-                      {formatMoneyConcise(review.priceToday)}/MWh
-                      <Typography
-                        component="div"
-                        variant="caption"
-                        color="textSecondary"
-                      >
-                        Follows inflation
-                      </Typography>
-                    </>
-                  }
-                />
-                {marketPrice !== undefined && marketPrice > 0 && (
+                >
                   <BuildDetailRow
-                    label="Vs market now"
+                    label="Agreement price"
                     value={
-                      <>
-                        {rateComparison(review.priceToday, marketPrice)}
-                        <Typography
-                          component="div"
-                          variant="caption"
-                          color="textSecondary"
-                        >
-                          Market {formatMoneyConcise(marketPrice)}/MWh
-                        </Typography>
-                      </>
+                      <DetailValue
+                        value={rate(terms.priceToday)}
+                        caption="Follows inflation"
+                      />
                     }
                   />
-                )}
-              </BuildDetails>
-            </Box>
-            <Typography variant="body2" sx={{ mt: 2 }}>
-              Pay for the available minimum even when unused or the connection
-              is paused. Supplier outages reduce the minimum. Unused energy
-              cannot be stored or resold. Uncovered purchases use market prices.
-            </Typography>
-          </>
+                  <BuildDetailRow
+                    label="Market price"
+                    value={
+                      <DetailValue
+                        value={
+                          marketPrice === undefined
+                            ? "Unavailable"
+                            : rate(marketPrice)
+                        }
+                        caption={marketComparison(
+                          terms.priceToday,
+                          marketPrice,
+                        )}
+                      />
+                    }
+                  />
+                  <BuildDetailRow
+                    label="Minimum supply"
+                    value={
+                      <DetailValue
+                        value={
+                          terms.termsVersion === 1
+                            ? "No minimum purchase"
+                            : terms.termsVersion === 2
+                              ? `${formatWatts(deliverableW)} whenever available`
+                              : monthlyEnergy(terms.minimumMWhPerMonth)
+                        }
+                        caption={
+                          terms.termsVersion === 1
+                            ? "Pay for energy used"
+                            : "Paid for even if you don't use it"
+                        }
+                      />
+                    }
+                  />
+                  <BuildDetailRow
+                    label="Maximum supply"
+                    value={
+                      <DetailValue
+                        value={`${formatNumber(deliverableW / 1e6, { maximumFractionDigits: 1 })} MW`}
+                        caption={monthlyEnergy(terms.maximumMWhPerMonth)}
+                      />
+                    }
+                  />
+                  <BuildDetailRow
+                    label="Duration"
+                    value={
+                      <DetailValue
+                        value={years(terms.durationYears)}
+                        caption={`Ends ${agreementDate(endMinute, true).replace(/^\d+ /, "")}`}
+                      />
+                    }
+                  />
+                  <BuildDetailRow
+                    label="Forecasted savings"
+                    value={
+                      <AgreementForecastDetails
+                        forecast={forecast}
+                        horizon={
+                          review
+                            ? `over ${years(review.durationYears)}`
+                            : `over ${years(remainingYears)} remaining`
+                        }
+                      />
+                    }
+                  />
+                </BuildDetails>
+              </Box>
+              {terms.termsVersion === 3 && (
+                <Typography
+                  variant="body2"
+                  color="textSecondary"
+                  sx={{ mt: 2 }}
+                >
+                  The price follows inflation, capped below the current market
+                  price. Monthly amounts assume full supplier availability;
+                  supplier outages reduce the minimum.
+                </Typography>
+              )}
+            </>
+          )
         )}
       </DecisionDialog>
     </Box>

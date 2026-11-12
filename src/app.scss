@@ -8635,13 +8635,40 @@ option {
   white-space: normal;
 }
 
-.powerAgreementTerms .buildDetails,
-.agreementForecast .buildDetails {
+.powerAgreementTerms .buildDetails {
+  width: 100%;
+  table-layout: fixed;
+  th,
+  td {
+    padding: 8px;
+    overflow-wrap: normal;
+    font-variant-numeric: tabular-nums;
+  }
   .buildDetailLabel {
-    width: 32%;
+    width: 40%;
   }
   .buildDetailHelp {
     display: none;
+  }
+}
+
+.powerAgreementDuration {
+  display: grid;
+  grid-template-columns: max-content minmax(80px, 1fr);
+  align-items: center;
+  gap: 12px;
+  min-height: 50px;
+  padding-inline: 16px;
+  margin-bottom: 8px;
+  > .MuiTypography-root {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    strong {
+      min-width: 7ch;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
   }
 }
 

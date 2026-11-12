@@ -119,12 +119,15 @@ export interface IntertieUpgradeType {
   constructionKgco2eEmitted?: number;
 }
 
-export type PowerAgreementTermsVersion = 1 | 2;
+export type PowerAgreementTermsVersion = 1 | 2 | 3;
 
 export interface PowerAgreementMonth {
   month: number;
   availableMWh: number;
   usefulMWh: number;
+  /** Version 3 meters retain actual interval prices for monthly energy settlement. */
+  availableValue?: number;
+  usefulValue?: number;
   payment: number;
 }
 
@@ -140,6 +143,9 @@ export interface PowerAgreementSettlement {
   agreementId: string;
   availableMWh: number;
   usefulMWh: number;
+  /** Version 3 meters retain actual interval prices for monthly energy settlement. */
+  availableValue?: number;
+  usefulValue?: number;
   payment: number;
 }
 
@@ -150,10 +156,13 @@ export interface PowerAgreementReceipt {
   acceptedMinute: number;
   startMinute: number;
   endMinute: number;
+  /** Present only on version 3 receipts. */
+  durationYears?: number;
 }
 export interface AcceptPowerAgreementAction {
   blockId: string;
   quoteKey: string;
+  durationYears?: number;
 }
 
 export interface TransmissionStateType {
@@ -421,7 +430,8 @@ export type TickPresentFutureType = Partial<FuelPricesType> &
     agreementAvailableMWh?: Record<string, number>;
     agreementUsefulMWh?: Record<string, number>;
     agreementPayments?: Record<string, number>;
-    /** This frame's expense for available fixed-block energy that was not imported. */
+    agreementUsefulValues?: Record<string, number>;
+    /** This frame's payment for committed energy that was not imported. */
     agreementUnusedExpenses?: number;
     minute: number;
     supplyW: number; // Watts

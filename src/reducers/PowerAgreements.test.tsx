@@ -17,7 +17,11 @@ import {
   connectionAgreements,
   inheritedConnection,
   powerAgreementQuote,
+  agreementDurationDiscount,
+  recordAgreementSettlements,
+  validPowerAgreementAction,
 } from "../helpers/PowerAgreements";
+import * as Transmission from "../helpers/Transmission";
 import { entitlementSources } from "../helpers/Expansion";
 import {
   adjacentMarketPricePerMWh,
@@ -29,7 +33,6 @@ import {
 import { facilitySignature } from "../helpers/Projection";
 import { intertieForecastKey } from "../helpers/IntertieOutlook";
 import { parseSave, serializeSave } from "../SaveGame";
-import { SAVE_SCHEMA_VERSION } from "../SaveSchema";
 import { GAME_TO_REAL_YEARS, TICK_MINUTES, TICKS_PER_HOUR } from "../Constants";
 import { DEMAND_TYPES } from "../data/DemandProfiles";
 import reducer, {
@@ -45,6 +48,7 @@ function at(month = 156) {
     seed: 12345,
     difficulty: "Employee",
   });
+  game.transmission!.inheritedAgreementTerms = 2;
   game.date = getDateFromMinute(month * MINUTES_PER_MONTH, 2005);
   // This clock-boundary fixture has no played historical objective observations.
   game.objectiveProgress = undefined;
@@ -77,8 +81,11 @@ function playedAgreement() {
       seed: 12345,
       difficulty: "Employee",
     });
+    played.transmission!.inheritedAgreementTerms = 2;
     runMonths(played, 156);
-    playedSignedGame = sign(played);
+    const quote = powerAgreementQuote(played, "champlain-nuclear", 2)!;
+    played.transmission!.acceptedAgreements = [quote.receipt];
+    playedSignedGame = played;
   }
   return copyOfficialGame(playedSignedGame);
 }
@@ -299,7 +306,7 @@ it("rejects impossible saved receipts and inherited provenance through the real 
     expect(parseSave(malformed)).toBeNull();
   }
   const legacy = JSON.parse(JSON.stringify(serializeSave(at(0))));
-  legacy.schemaVersion = SAVE_SCHEMA_VERSION - 2;
+  legacy.schemaVersion = 9;
   delete legacy.game.transmission.inheritedAgreementTerms;
   legacy.game.transmission.lines = [];
   const upgraded = parseSave(legacy)!;
@@ -508,8 +515,11 @@ it("prorates half-open terms and records the final elapsed interval before expir
   expect(game.transmission!.agreementAccounts).toEqual(accounts);
 });
 
-it("preserves existing delivered-energy promises while future offers bind fixed-block terms", () => {
-  const game = sign(at());
+it("preserves existing delivered-energy promises while future offers bind monthly-energy terms", () => {
+  const game = at();
+  game.transmission!.acceptedAgreements = [
+    powerAgreementQuote(game, "champlain-nuclear", 1)!.receipt,
+  ];
   const raw = JSON.parse(JSON.stringify(serializeSave(game)));
   raw.schemaVersion = 10;
   delete raw.game.transmission.inheritedAgreementTerms;
@@ -521,14 +531,14 @@ it("preserves existing delivered-energy promises while future offers bind fixed-
   expect(migrated.game.transmission!.acceptedAgreements![0].termsVersion).toBe(
     1,
   );
-  expect(migrated.game.timeline).toEqual(game.timeline);
+  expect(migrated.game.timeline).toEqual(raw.game.timeline);
   const live = copyOfficialGame(migrated.game);
   live.transmission!.lines[0].paused = true;
   request(live, 0);
   tickState(live);
   expect(currentTick(live)!.expensesImports).toBe(0);
   const nextOffer = powerAgreementQuote(live, "champlain-quebec")!;
-  expect(nextOffer.receipt.termsVersion).toBe(2);
+  expect(nextOffer.receipt.termsVersion).toBe(3);
 });
 
 it("reduces the payable minimum to zero when the physical route is unavailable", () => {
@@ -580,3 +590,312 @@ it("uses the dispatch timestamp's shared physical supply when an agreement inter
   expect(now.entitlementImportedW).toBeGreaterThan(0);
   expect(now.importedW).toBeLessThanOrEqual(pool + 1);
 });
+
+it("v3 defers unused monthly energy payment until the exclusive month end", () => {
+  const game = at(0);
+  game.transmission!.inheritedAgreementTerms = 3;
+  game.transmission!.buyingRule = "NONE";
+  request(game, 0);
+  tickState(game);
+  expect(currentTick(game)!.expensesImports).toBe(0);
+  expect(game.transmission!.agreementAccounts![0].months[0].payment).toBe(0);
+  expect(game.transmission!.agreementAccounts![0].months[0]).toHaveProperty(
+    "availableValue",
+  );
+});
+
+it("uses fully paid v2 supply before v3 monthly energy credit in a mixed-version month", () => {
+  jest.spyOn(Transmission, "adjacentMarketPricePerMWh").mockReturnValue(20);
+  const accepted = powerAgreementQuote(
+    at(),
+    "champlain-nuclear",
+    3,
+    10,
+  )!.receipt;
+  const game = at(180);
+  game.transmission!.acceptedAgreements = [accepted];
+  game.transmission!.buyingRule = "NONE";
+  game.monthlyHistory = Array.from(
+    { length: 180 },
+    () => ({ year: 2019, month: 11 }) as (typeof game.monthlyHistory)[number],
+  );
+  game.facilities = [];
+  for (let i = 0; i < 96; i++) {
+    const frame = getTimeFromTimeline(
+      game.date.minute + TICK_MINUTES,
+      game.timeline,
+    )!;
+    frame.demandW = 80e6;
+    DEMAND_TYPES.forEach((type) => {
+      frame.demandByType[type] = type === "Residential" ? 80e6 : 0;
+    });
+    tickState(game);
+  }
+  const accounts = game.transmission!.agreementAccounts!;
+  const inherited = accounts.find(
+    (account) => account.agreementId === "champlain-quebec",
+  )!;
+  const replacement = accounts.find(
+    (account) => account.agreementId !== "champlain-quebec",
+  )!;
+  expect(inherited.termsVersion).toBe(2);
+  expect(replacement.termsVersion).toBe(3);
+  const paid = inherited.months[0];
+  const minimum = replacement.months[0];
+  expect(paid.usefulMWh).toBeCloseTo(paid.availableMWh, 6);
+  expect(minimum.usefulMWh / minimum.availableMWh).toBeCloseTo(23 / 95, 10);
+  expect(minimum.payment).toBeCloseTo(minimum.availableValue! * 0.7, 6);
+  expect(paid.payment).toBeGreaterThan(0);
+});
+
+afterEach(() => jest.restoreAllMocks());
+
+it("binds 1–10 whole years to canonical duration, discount, action and saved receipt", () => {
+  const game = at();
+  expect(agreementDurationDiscount(1)).toBeCloseTo(0.01, 12);
+  expect(agreementDurationDiscount(10)).toBeCloseTo(0.2, 12);
+  for (const years of [1, 4, 10]) {
+    const quote = powerAgreementQuote(game, "champlain-nuclear", 3, years)!;
+    const action = {
+      blockId: quote.id,
+      quoteKey: quote.quoteKey,
+      durationYears: years,
+    };
+    expect(quote.receipt.endMinute - quote.receipt.startMinute).toBe(
+      years * 12 * MINUTES_PER_MONTH,
+    );
+    expect(quote.minimumMWhPerMonth).toBeCloseTo(
+      quote.maximumMWhPerMonth * 0.7,
+      9,
+    );
+    expect(validPowerAgreementAction(game, action)).toBe(true);
+    expect(
+      validPowerAgreementAction(game, {
+        ...action,
+        durationYears: years === 1 ? 10 : 1,
+      }),
+    ).toBe(false);
+    const signed = copyOfficialGame(
+      reducer(game, acceptPowerAgreement(action)),
+    );
+    const raw = JSON.parse(JSON.stringify(serializeSave(signed)));
+    expect(parseSave(raw)?.game.transmission!.acceptedAgreements).toEqual([
+      quote.receipt,
+    ]);
+    for (const invalid of [undefined, 0, 11, 1.5, "5", null]) {
+      const forged = cloneDeep(raw);
+      forged.game.transmission.acceptedAgreements[0].durationYears = invalid;
+      expect(parseSave(forged)).toBeNull();
+    }
+  }
+  for (const durationYears of [0, 11, 1.5, NaN, Infinity]) {
+    expect(
+      powerAgreementQuote(game, "champlain-nuclear", 3, durationYears),
+    ).toBeUndefined();
+  }
+});
+
+it.each([5, 250])(
+  "caps actual v3 dispatch below the unchanged current spot price %s",
+  (price) => {
+    const game = at(0);
+    game.transmission!.inheritedAgreementTerms = 3;
+    // A falling market between interval start and dispatch catches stale-price capping.
+    const next = game.timeline[1];
+    jest
+      .spyOn(Transmission, "adjacentMarketPricePerMWh")
+      .mockImplementation((_id, _context, minute) =>
+        minute === next.minute ? price : 500,
+      );
+    request(game, 500e6);
+    tickState(game);
+    const now = currentTick(game)!;
+    for (const [id, usefulMWh] of Object.entries(now.agreementUsefulMWh!)) {
+      expect(usefulMWh).toBeGreaterThan(0);
+      expect(now.agreementPayments![id] / usefulMWh).toBeLessThanOrEqual(
+        price * 0.8 + 1e-8,
+      );
+    }
+  },
+);
+
+it("credits shifted monthly MWh and closes one prorated weighted-rate minimum, without phantom delivery", () => {
+  const game = at(0);
+  game.transmission!.inheritedAgreementTerms = 3;
+  const profiles = [
+    [80, 0],
+    [0, 80],
+  ];
+  const payments = profiles.map((profile) => {
+    const ledger = cloneDeep(game);
+    for (let i = 0; i < 2; i++) {
+      const usefulMWh = profile[i];
+      const row = {
+        agreementId: "champlain-nuclear",
+        availableMWh: 100,
+        usefulMWh,
+        availableValue: 2000,
+        usefulValue: usefulMWh * 20,
+        payment: usefulMWh * 20,
+      };
+      const start = (i * MINUTES_PER_MONTH) / 2;
+      const topUp = recordAgreementSettlements(
+        ledger,
+        start,
+        start + MINUTES_PER_MONTH / 2,
+        [row],
+      );
+      expect(topUp).toBe(i === 0 ? 0 : 1200);
+      expect(ledger.transmission!.agreementAccounts![0].months[0].payment).toBe(
+        profile.slice(0, i + 1).reduce((sum, energy) => sum + energy * 20, 0) +
+          (i === 1 ? 1200 : 0),
+      );
+    }
+    return ledger.transmission!.agreementAccounts![0].months[0];
+  });
+  expect(payments[0]).toEqual(payments[1]);
+  expect(payments[0].payment).toBe(2800);
+  const aboveMinimum = {
+    agreementId: "champlain-nuclear",
+    availableMWh: 100,
+    usefulMWh: 75,
+    availableValue: 2000,
+    usefulValue: 1500,
+    payment: 1500,
+  };
+  expect(
+    recordAgreementSettlements(cloneDeep(game), 0, MINUTES_PER_MONTH, [
+      aboveMinimum,
+    ]),
+  ).toBe(0);
+  const outage = {
+    ...aboveMinimum,
+    availableMWh: 0,
+    usefulMWh: 0,
+    availableValue: 0,
+    usefulValue: 0,
+    payment: 0,
+  };
+  expect(
+    recordAgreementSettlements(cloneDeep(game), 0, MINUTES_PER_MONTH, [outage]),
+  ).toBe(0);
+});
+
+it("bills the real v3 month once after pause, preserves schema11 promises, and rejects forged weighted meters", () => {
+  const game = at(0);
+  game.transmission!.inheritedAgreementTerms = 3;
+  game.transmission!.lines[0].paused = true;
+  game.facilities = [];
+  for (let i = 0; i < 48; i++) {
+    tickState(game);
+    expect(
+      game.transmission!.agreementAccounts!.every(
+        (account) => account.months[0].payment === 0,
+      ),
+    ).toBe(true);
+  }
+  const rawV3 = JSON.parse(JSON.stringify(serializeSave(game)));
+  expect(parseSave(rawV3)).not.toBeNull();
+  const restored = copyOfficialGame(
+    reducer(reducer(undefined, resume(parseSave(rawV3)!.game)), loaded()),
+  );
+  for (const mutate of [
+    (save: typeof rawV3) => {
+      save.game.transmission.agreementAccounts[0].months[0].availableValue = 1e20;
+    },
+    (save: typeof rawV3) => {
+      save.game.transmission.agreementAccounts[0].months[0].usefulValue = 1;
+    },
+    (save: typeof rawV3) => {
+      save.game.transmission.agreementAccounts[0].months[0].payment += 1;
+    },
+  ]) {
+    const forged = cloneDeep(rawV3);
+    mutate(forged);
+    expect(parseSave(forged)).toBeNull();
+  }
+  for (let i = 0; i < 47; i++) {
+    tickState(game);
+    tickState(restored);
+    expect(
+      game.transmission!.agreementAccounts!.every(
+        (account) => account.months[0].payment === 0,
+      ),
+    ).toBe(true);
+  }
+  tickState(game);
+  tickState(restored);
+  expect(game.date.minute).toBe(MINUTES_PER_MONTH);
+  expect(restored!.transmission).toEqual(game.transmission);
+  expect(currentTick(restored!)!.cash).toBe(currentTick(game)!.cash);
+  for (const account of game.transmission!.agreementAccounts!) {
+    expect(account.accountedThroughMinute).toBe(MINUTES_PER_MONTH);
+    expect(account.months[0].payment).toBeCloseTo(
+      account.months[0].availableValue! * 0.7,
+      6,
+    );
+    expect(account.months[0].usefulMWh).toBe(0);
+  }
+  expect(currentTick(game)!.importedW).toBe(0);
+  const before = cloneDeep(game.transmission!.agreementAccounts);
+  tickState(game);
+  expect(
+    game.transmission!.agreementAccounts!.map((account) => account.months[0]),
+  ).toEqual(before!.map((account) => account.months[0]));
+  const legacy = at(0);
+  request(legacy, 0);
+  tickState(legacy);
+  const raw = JSON.parse(JSON.stringify(serializeSave(legacy)));
+  raw.schemaVersion = 11;
+  expect(parseSave(raw)?.game.transmission).toEqual(legacy.transmission);
+});
+
+it("allows all canonical annual renewal cycles beyond the old six-receipt limit", () => {
+  const game = at();
+  for (let i = 0; i < 5; i++) {
+    game.date = getDateFromMinute(agreementYearMinute(2018 + i), 2005);
+    for (const blockId of ["champlain-nuclear", "champlain-quebec"]) {
+      const quote = powerAgreementQuote(game, blockId, 3, 1)!;
+      expect(quote).toBeDefined();
+      (game.transmission!.acceptedAgreements ??= []).push(quote.receipt);
+    }
+  }
+  expect(game.transmission!.acceptedAgreements).toHaveLength(10);
+  expect(validPowerAgreements(game)).toBe(true);
+});
+
+it.each([48, 72])(
+  "real reducer gives equal monthly energy credit when %s full-delivery intervals shift",
+  (usedTicks) => {
+    jest.spyOn(Transmission, "adjacentMarketPricePerMWh").mockReturnValue(20);
+    const rows = [false, true].map((late) => {
+      const game = at(0);
+      game.transmission!.inheritedAgreementTerms = 3;
+      game.transmission!.buyingRule = "NONE";
+      game.facilities = [];
+      for (let i = 0; i < 96; i++) {
+        const used = late ? i >= 96 - usedTicks : i < usedTicks;
+        const frame = getTimeFromTimeline(
+          game.date.minute + TICK_MINUTES,
+          game.timeline,
+        )!;
+        frame.demandW = used ? 209e6 : 0;
+        DEMAND_TYPES.forEach((type) => {
+          frame.demandByType[type] = type === "Residential" ? frame.demandW : 0;
+        });
+        tickState(game);
+      }
+      return game.transmission!.agreementAccounts!.map(
+        (account) => account.months[0],
+      );
+    });
+    expect(rows[0]).toEqual(rows[1]);
+    for (const row of rows[0]) {
+      expect(row.usefulMWh / row.availableMWh).toBeCloseTo(usedTicks / 96, 10);
+      expect(row.payment).toBeCloseTo(
+        Math.max(row.usefulMWh, row.availableMWh * 0.7) * 16,
+        6,
+      );
+    }
+  },
+);

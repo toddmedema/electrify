@@ -3,6 +3,8 @@ import type {
   AcceptPowerAgreementAction,
   GameType,
   PowerAgreementReceipt,
+  PowerAgreementMonth,
+  PowerAgreementSettlement,
   PowerAgreementTermsVersion,
   TransmissionLineOperatingType,
   UtilityId,
@@ -15,6 +17,11 @@ import {
 import { getDateFromMinute, MINUTES_PER_MONTH } from "./DateTime";
 import { getInflationIndex, hasEconomy } from "../data/Economy";
 import { importEmissionsKgco2ePerMWh } from "../data/ImportEmissions";
+import {
+  adjacentMarketPricePerMWh,
+  intertieContextForGame,
+} from "./Transmission";
+import { getTimeFromTimeline } from "./DateTime";
 
 export const INHERITED_CONNECTIONS: Readonly<Record<UtilityId, string>> = {
   champlain: "vt-champlain-regional",
@@ -72,6 +79,65 @@ export function agreementDate(minute: number, lastDay = false): string {
 export const agreementYearMinute = (year: number) =>
   (year - 2005) * 12 * MINUTES_PER_MONTH;
 const FINISH = agreementYearMinute(2025);
+export const AGREEMENT_MINIMUM_FRACTION = 0.7;
+/** Calibrated game rule: one-year reward 1%, ten-year reward 20%. */
+export function agreementDurationDiscount(years: number): number {
+  return 0.01 + ((Math.min(10, Math.max(1, years)) - 1) * 0.19) / 9;
+}
+export function agreementMonthlyEnergy(
+  deliverableW: number,
+  termsVersion: PowerAgreementTermsVersion = 3,
+) {
+  const maximumMWhPerMonth =
+    (deliverableW * (MINUTES_PER_MONTH / 60) * GAME_TO_REAL_YEARS) / 1e6;
+  return {
+    maximumMWhPerMonth,
+    minimumMWhPerMonth:
+      maximumMWhPerMonth *
+      (termsVersion === 3
+        ? AGREEMENT_MINIMUM_FRACTION
+        : termsVersion === 2
+          ? 1
+          : 0),
+  };
+}
+/** Supplier capacity and ordinary market pricing are independent of this commercial cap. */
+export function agreementRate(
+  game: GameType,
+  base: number,
+  durationYears: number,
+  corridorId: string,
+  minute = game.date.minute,
+  conditions = getTimeFromTimeline(minute, game.timeline) ?? {
+    temperatureC: 15,
+  },
+  marketMinute = minute,
+): number {
+  return (
+    Math.min(
+      agreementPrice(game, base, minute),
+      adjacentMarketPricePerMWh(
+        corridorId,
+        intertieContextForGame(game),
+        marketMinute,
+        conditions,
+      ),
+    ) *
+    (1 - agreementDurationDiscount(durationYears))
+  );
+}
+// One-year renewals can start only before FINISH. Keep hostile save arrays bounded.
+const MAX_RECEIPTS = POWER_AGREEMENT_BLOCKS.reduce(
+  (sum, block) => sum + Math.max(0, 2025 - block.lossYear),
+  0,
+);
+const MAX_ACCOUNTS =
+  MAX_RECEIPTS +
+  Object.values(UTILITY_AREAS).reduce(
+    (sum, utility) =>
+      sum + utility.entitlements.filter((entry) => !entry.balancing).length,
+    0,
+  );
 
 export function agreementPrice(
   game: GameType,
@@ -89,11 +155,25 @@ export function agreementPrice(
 export function powerAgreementQuote(
   game: GameType,
   blockId: string,
-  termsVersion: PowerAgreementTermsVersion = 2,
+  termsVersion: PowerAgreementTermsVersion = 3,
+  selectedDurationYears?: number,
 ) {
   if (game.scenarioId !== 116 || game.customScenario) return undefined;
   const block = POWER_AGREEMENT_BLOCKS.find((entry) => entry.id === blockId);
   if (!block || !utilityOwnedAt(game, block.utilityId, game.date.minute))
+    return undefined;
+  const durationYears =
+    termsVersion === 3
+      ? selectedDurationYears === undefined
+        ? block.years
+        : selectedDurationYears
+      : block.years;
+  if (
+    termsVersion === 3 &&
+    (!Number.isSafeInteger(durationYears) ||
+      durationYears < 1 ||
+      durationYears > 10)
+  )
     return undefined;
   const line = game.transmission?.lines.find(
     (entry) =>
@@ -120,7 +200,8 @@ export function powerAgreementQuote(
     cycle: receipts.length,
     acceptedMinute: game.date.minute,
     startMinute,
-    endMinute: startMinute + block.years * 12 * MINUTES_PER_MONTH,
+    endMinute: startMinute + durationYears * 12 * MINUTES_PER_MONTH,
+    ...(termsVersion === 3 ? { durationYears } : {}),
   };
   // A review binds commercial terms; the acceptance timestamp is recorded on confirmation.
   const { acceptedMinute: _acceptedMinute, ...terms } = receipt;
@@ -128,7 +209,19 @@ export function powerAgreementQuote(
     ...block,
     receipt,
     deliverableW: block.nominalW * 0.95,
-    priceToday: agreementPrice(game, block.pricePerMWh),
+    durationYears,
+    durationDiscount:
+      termsVersion === 3 ? agreementDurationDiscount(durationYears) : 0,
+    ...agreementMonthlyEnergy(block.nominalW * 0.95, termsVersion),
+    priceToday:
+      termsVersion === 3
+        ? agreementRate(
+            game,
+            block.pricePerMWh,
+            durationYears,
+            INHERITED_CONNECTIONS[block.utilityId],
+          )
+        : agreementPrice(game, block.pricePerMWh),
     quoteKey: JSON.stringify({
       ...terms,
       nominalW: block.nominalW,
@@ -145,14 +238,26 @@ export function validPowerAgreementAction(
   const action = value as Partial<AcceptPowerAgreementAction>;
   const quote =
     typeof action.blockId === "string"
-      ? powerAgreementQuote(game, action.blockId)
+      ? powerAgreementQuote(game, action.blockId, 3, action.durationYears)
       : undefined;
-  return !!quote && quote.quoteKey === action.quoteKey;
+  return (
+    !!quote &&
+    (action.durationYears === undefined ||
+      (Number.isSafeInteger(action.durationYears) &&
+        action.durationYears >= 1 &&
+        action.durationYears <= 10)) &&
+    quote.quoteKey === action.quoteKey
+  );
 }
 export function acceptAgreement(game: GameType, value: unknown): boolean {
   if (!validPowerAgreementAction(game, value) || !game.transmission)
     return false;
-  const quote = powerAgreementQuote(game, value.blockId)!;
+  const quote = powerAgreementQuote(
+    game,
+    value.blockId,
+    3,
+    value.durationYears,
+  )!;
   (game.transmission.acceptedAgreements ??= []).push(quote.receipt);
   return true;
 }
@@ -167,7 +272,9 @@ export function connectionAgreements(
     (source) => ({
       ...source,
       inherited: true,
-      termsVersion: game.transmission?.inheritedAgreementTerms ?? 2,
+      termsVersion: game.transmission?.inheritedAgreementTerms ?? 3,
+      durationYears:
+        (source.reducedNominalW === 0 ? source.reductionYear! : 2025) - 2005,
       startMinute: 0,
       endMinute: agreementYearMinute(
         source.reducedNominalW === 0 ? source.reductionYear! : 2025,
@@ -183,7 +290,10 @@ export function connectionAgreements(
           ...source,
           nominalW: 0,
           inherited: true,
-          termsVersion: game.transmission?.inheritedAgreementTerms ?? 2,
+          termsVersion: game.transmission?.inheritedAgreementTerms ?? 3,
+          durationYears:
+            (source.reducedNominalW === 0 ? source.reductionYear! : 2025) -
+            2005,
           startMinute: 0,
           endMinute: agreementYearMinute(
             source.reducedNominalW === 0 ? source.reductionYear! : 2025,
@@ -210,6 +320,7 @@ export function connectionAgreements(
               reducedNominalW: undefined as number | undefined,
               inherited: false,
               termsVersion: receipt.termsVersion,
+              durationYears: receipt.durationYears ?? block.years,
               startMinute: receipt.startMinute,
               endMinute: receipt.endMinute,
             },
@@ -220,7 +331,24 @@ export function connectionAgreements(
   return [...records, ...replacements].map((source) => ({
     ...source,
     active: minute >= source.startMinute && minute < source.endMinute,
-    priceToday: agreementPrice(game, source.pricePerMWh, minute),
+    durationDiscount:
+      source.termsVersion === 3
+        ? agreementDurationDiscount(source.durationYears)
+        : 0,
+    ...agreementMonthlyEnergy(
+      source.nominalW * source.deliverability,
+      source.termsVersion,
+    ),
+    priceToday:
+      source.termsVersion === 3
+        ? agreementRate(
+            game,
+            source.pricePerMWh,
+            source.durationYears,
+            INHERITED_CONNECTIONS[utilityId],
+            minute,
+          )
+        : agreementPrice(game, source.pricePerMWh, minute),
     emissionsKgPerMWh:
       source.emissionsKgPerMWh ??
       importEmissionsKgco2ePerMWh(
@@ -233,7 +361,7 @@ export function validPowerAgreements(game: GameType): boolean {
   const receipts = game.transmission?.acceptedAgreements;
   if (
     receipts !== undefined &&
-    (!Array.isArray(receipts) || receipts.length > 6)
+    (!Array.isArray(receipts) || receipts.length > MAX_RECEIPTS)
   )
     return false;
   if (receipts?.length && (game.scenarioId !== 116 || game.customScenario))
@@ -241,7 +369,7 @@ export function validPowerAgreements(game: GameType): boolean {
   for (const [index, receipt] of (receipts ?? []).entries()) {
     if (
       !receipt ||
-      (receipt.termsVersion !== 1 && receipt.termsVersion !== 2) ||
+      ![1, 2, 3].includes(receipt.termsVersion) ||
       typeof receipt !== "object" ||
       ![
         receipt.cycle,
@@ -267,6 +395,7 @@ export function validPowerAgreements(game: GameType): boolean {
       atAcceptance,
       receipt.blockId,
       receipt.termsVersion,
+      receipt.durationYears,
     );
     if (
       !quote ||
@@ -278,8 +407,11 @@ export function validPowerAgreements(game: GameType): boolean {
           acceptedMinute: receipt.acceptedMinute,
           startMinute: receipt.startMinute,
           endMinute: receipt.endMinute,
+          ...(receipt.termsVersion === 3
+            ? { durationYears: receipt.durationYears }
+            : {}),
         }) ||
-      Object.keys(receipt).length !== 6
+      Object.keys(receipt).length !== (receipt.termsVersion === 3 ? 7 : 6)
     )
       return false;
   }
@@ -291,7 +423,7 @@ export function validPowerAgreements(game: GameType): boolean {
         inheritedUtilityForCorridor(line.corridorId),
       )
     );
-  if (![1, 2].includes(game.transmission?.inheritedAgreementTerms ?? 0))
+  if (![1, 2, 3].includes(game.transmission?.inheritedAgreementTerms ?? 0))
     return false;
   for (const utility of Object.keys(INHERITED_CONNECTIONS) as UtilityId[]) {
     const line = game.transmission?.lines.find(
@@ -335,19 +467,34 @@ export function agreementIntervalMinutes(
   );
 }
 
-/** Append only completed elapsed intervals. Forecasts use the same settlements privately. */
+/** Monthly energy, with a weighted availability rate for unused minimum energy. */
+export function agreementMonthTopUp(row: PowerAgreementMonth): number {
+  return row.availableMWh > 0
+    ? Math.max(
+        0,
+        AGREEMENT_MINIMUM_FRACTION * row.availableMWh - row.usefulMWh,
+      ) *
+        (row.availableValue! / row.availableMWh)
+    : 0;
+}
+
+/** Append completed intervals and return the new, cash-payable v3 month-closing top-up. */
 export function recordAgreementSettlements(
   game: GameType,
   start: number,
   end: number,
-  settlements: import("../Types").PowerAgreementSettlement[],
-): void {
-  if (!game.transmission || end <= start || !settlements.length) return;
+  settlements: PowerAgreementSettlement[],
+): number {
+  if (!game.transmission || end <= start || !settlements.length) return 0;
   const accounts = (game.transmission.agreementAccounts ??= []);
+  const sources = (Object.keys(INHERITED_CONNECTIONS) as UtilityId[]).flatMap(
+    (id) => connectionAgreements(game, id, start),
+  );
+  let topUps = 0;
   for (const settlement of settlements) {
-    const source = (Object.keys(INHERITED_CONNECTIONS) as UtilityId[])
-      .flatMap((id) => connectionAgreements(game, id, start))
-      .find((entry) => entry.id === settlement.agreementId)!;
+    const source = sources.find(
+      (entry) => entry.id === settlement.agreementId,
+    )!;
     const from = Math.max(start, source.startMinute);
     const through = Math.min(end, source.endMinute);
     if (through <= from) continue;
@@ -364,17 +511,44 @@ export function recordAgreementSettlements(
     }
     if (account.accountedThroughMinute !== from)
       throw new Error("Noncontiguous agreement settlement");
-    const month = Math.floor(from / MINUTES_PER_MONTH);
-    let row = account.months.at(-1);
-    if (!row || row.month !== month) {
-      row = { month, availableMWh: 0, usefulMWh: 0, payment: 0 };
-      account.months.push(row);
+    // Hourly sampled horizons opened between hours can straddle a calendar boundary.
+    let cursor = from;
+    while (cursor < through) {
+      const month = Math.floor(cursor / MINUTES_PER_MONTH);
+      const boundary = Math.min(through, (month + 1) * MINUTES_PER_MONTH);
+      const fraction = (boundary - cursor) / (through - from);
+      let row = account.months.at(-1);
+      if (!row || row.month !== month) {
+        row = {
+          month,
+          availableMWh: 0,
+          usefulMWh: 0,
+          payment: 0,
+          ...(source.termsVersion === 3
+            ? { availableValue: 0, usefulValue: 0 }
+            : {}),
+        };
+        account.months.push(row);
+      }
+      row.availableMWh += settlement.availableMWh * fraction;
+      row.usefulMWh += settlement.usefulMWh * fraction;
+      if (source.termsVersion === 3) {
+        row.availableValue! += settlement.availableValue! * fraction;
+        row.usefulValue! += settlement.usefulValue! * fraction;
+        const topUp =
+          boundary ===
+          Math.min((month + 1) * MINUTES_PER_MONTH, source.endMinute)
+            ? agreementMonthTopUp(row)
+            : 0;
+        row.payment = row.usefulValue! + topUp;
+        settlement.payment += topUp;
+        topUps += topUp;
+      } else row.payment += settlement.payment * fraction;
+      cursor = boundary;
     }
-    row.availableMWh += settlement.availableMWh;
-    row.usefulMWh += settlement.usefulMWh;
-    row.payment += settlement.payment;
     account.accountedThroughMinute = through;
   }
+  return topUps;
 }
 
 function validAgreementAccounts(game: GameType): boolean {
@@ -383,7 +557,7 @@ function validAgreementAccounts(game: GameType): boolean {
   if (
     !game.utilityExpansion ||
     !Array.isArray(accounts) ||
-    accounts.length > 30
+    accounts.length > MAX_ACCOUNTS
   )
     return false;
   const ids = new Set<string>();
@@ -438,7 +612,7 @@ function validAgreementAccounts(game: GameType): boolean {
       if (
         !row ||
         typeof row !== "object" ||
-        Object.keys(row).length !== 4 ||
+        Object.keys(row).length !== (source.termsVersion === 3 ? 6 : 4) ||
         row.month !== firstMonth + index ||
         ![row.availableMWh, row.usefulMWh, row.payment].every(
           (value) => Number.isFinite(value) && value >= 0,
@@ -461,6 +635,61 @@ function validAgreementAccounts(game: GameType): boolean {
           60) *
           GAME_TO_REAL_YEARS) /
         1e6;
+      if (source.termsVersion === 3) {
+        const values = [row.availableValue, row.usefulValue];
+        if (
+          !values.every(
+            (value) =>
+              typeof value === "number" && Number.isFinite(value) && value >= 0,
+          ) ||
+          row.usefulValue! > row.availableValue! + 1e-5
+        )
+          return false;
+        const closed =
+          end >= Math.min(minute + MINUTES_PER_MONTH, source.endMinute);
+        const payment =
+          row.usefulValue! + (closed ? agreementMonthTopUp(row) : 0);
+        const tolerance = Math.max(1e-5, payment * 1e-10);
+        if (
+          row.availableMWh > maximumMWh + 1e-6 ||
+          Math.abs(row.payment - payment) > tolerance
+        )
+          return false;
+        if (hasEconomy()) {
+          // The bounded aggregate is not an invented replay of unrecorded hourly spot prices.
+          const ceiling =
+            Math.max(
+              agreementPrice(game, monthlySource.pricePerMWh, minute),
+              agreementPrice(
+                game,
+                monthlySource.pricePerMWh,
+                minute + MINUTES_PER_MONTH,
+              ),
+            ) *
+            (1 - monthlySource.durationDiscount);
+          const floor =
+            Math.min(
+              5,
+              agreementPrice(game, monthlySource.pricePerMWh, minute),
+            ) *
+            (1 - monthlySource.durationDiscount);
+          for (const [energy, value] of [
+            [row.availableMWh, row.availableValue!],
+            [row.usefulMWh, row.usefulValue!],
+            [
+              row.availableMWh - row.usefulMWh,
+              row.availableValue! - row.usefulValue!,
+            ],
+          ]) {
+            if (
+              value > energy * ceiling + tolerance ||
+              value < energy * floor - tolerance
+            )
+              return false;
+          }
+        }
+        continue;
+      }
       const purchasedMWh =
         source.termsVersion === 2 ? row.availableMWh : row.usefulMWh;
       const payment = purchasedMWh * monthlySource.priceToday;

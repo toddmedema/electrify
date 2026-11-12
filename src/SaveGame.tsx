@@ -559,6 +559,7 @@ export function parseSave(raw: unknown): SaveGameType | null {
           tick.agreementAvailableMWh,
           tick.agreementUsefulMWh,
           tick.agreementPayments,
+          tick.agreementUsefulValues,
         ].some(
           (values) =>
             values !== undefined &&

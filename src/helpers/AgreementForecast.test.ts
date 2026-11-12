@@ -4,7 +4,10 @@ import { GAME_TO_REAL_YEARS, TICK_MINUTES } from "../Constants";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "./DateTime";
 import { currentTick } from "./GameSelectors";
 import { powerAgreementQuote } from "./PowerAgreements";
-import { computeAgreementForecast } from "./AgreementForecast";
+import {
+  agreementForecastKey,
+  computeAgreementForecast,
+} from "./AgreementForecast";
 import { generateForecastTimeline, tickState } from "../reducers/Game";
 import * as Transmission from "./Transmission";
 import * as Access from "../data/IntertieAccess";
@@ -15,9 +18,10 @@ function fixture(month = 299) {
     seed: 12345,
     difficulty: "Employee",
   });
+  game.transmission!.inheritedAgreementTerms = 2;
   game.facilities = [];
   game.date = getDateFromMinute(156 * MINUTES_PER_MONTH, 2005);
-  const offer = powerAgreementQuote(game, "champlain-quebec")!.receipt;
+  const offer = powerAgreementQuote(game, "champlain-quebec", 2)!.receipt;
   game.transmission!.acceptedAgreements = [offer];
   game.date = getDateFromMinute(month * MINUTES_PER_MONTH, 2005);
   for (const tick of game.timeline) tick.minute += game.date.minute;
@@ -158,4 +162,68 @@ it("freezes recorded-plus-remaining totals at its accounting cutoff instead of o
   expect(
     game.transmission!.agreementAccounts![0].months[0].availableMWh,
   ).toBeGreaterThan(recorded);
+});
+
+it("carries actual v3 monthly usage into private forecast settlement and closing cash", () => {
+  jest.spyOn(Transmission, "adjacentMarketPricePerMWh").mockReturnValue(20);
+  const game = createGame({
+    scenarioId: 116,
+    seed: 12345,
+    difficulty: "Employee",
+  });
+  game.facilities = [];
+  game.transmission!.lines[0].paused = true;
+  for (let i = 0; i < 48; i++) tickState(game);
+  const before = JSON.stringify(game.transmission!.agreementAccounts);
+  const key = agreementForecastKey(game, "champlain-nuclear");
+  let finalAccounts: NonNullable<typeof game.transmission>["agreementAccounts"];
+  const now = currentTick(game)!;
+  const forecast = generateForecastTimeline(
+    game,
+    now.cash,
+    now.customers,
+    49,
+    TICK_MINUTES,
+    (privateGame, frame) => {
+      if (frame.minute === MINUTES_PER_MONTH)
+        finalAccounts = cloneDeep(privateGame.transmission!.agreementAccounts);
+    },
+  );
+  expect(JSON.stringify(game.transmission!.agreementAccounts)).toBe(before);
+  const closing = forecast.at(-1)!;
+  expect(closing.minute).toBe(MINUTES_PER_MONTH);
+  const expectedTopUp = finalAccounts!.reduce(
+    (sum, account) => sum + account.months[0].availableValue! * 0.7,
+    0,
+  );
+  expect(closing.agreementUnusedExpenses).toBeCloseTo(expectedTopUp, 6);
+  // Replay the very same real-reducer weather/demand frames, so only accounting ownership differs.
+  game.timeline = forecast;
+  for (let i = 0; i < 48; i++) tickState(game);
+  expect(game.transmission!.agreementAccounts).toEqual(finalAccounts!);
+  expect(currentTick(game)!.cash).toBeCloseTo(closing.cash, 6);
+  expect(agreementForecastKey(game, "champlain-nuclear")).not.toBe(key);
+});
+
+it("allows a v3 forecast loss from unused monthly energy despite its below-market rate", () => {
+  jest.spyOn(Transmission, "adjacentMarketPricePerMWh").mockReturnValue(20);
+  const game = fixture();
+  game.date = getDateFromMinute(156 * MINUTES_PER_MONTH, 2005);
+  game.transmission!.acceptedAgreements = [];
+  game.transmission!.acceptedAgreements = [
+    powerAgreementQuote(game, "champlain-quebec", 3, 10)!.receipt,
+  ];
+  game.date = getDateFromMinute(299 * MINUTES_PER_MONTH, 2005);
+  currentTick(game)!.customers = 100;
+  const result = computeAgreementForecast(
+    game,
+    "champlain-quebec:0",
+    undefined,
+    "monthly-underuse",
+  );
+  expect(result.cashDifference).toBeLessThan(0);
+  expect(result.remaining.unusedPayment).toBeGreaterThan(0);
+  expect(result.remaining.payment).toBeGreaterThan(
+    result.remaining.unusedPayment,
+  );
 });
