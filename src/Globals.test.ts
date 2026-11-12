@@ -57,6 +57,20 @@ describe("logEvent", () => {
     });
   });
 
+  it.each(["electrifyDesktop", "electrifyCouch"] as const)(
+    "does not buffer events for the native %s host",
+    (host) => {
+      Object.defineProperty(window, host, { configurable: true, value: {} });
+      try {
+        const { logEvent } = require("./Globals") as typeof import("./Globals");
+        logEvent("launch");
+        expect(window.electrifyAnalyticsQueue).toBeUndefined();
+      } finally {
+        delete window[host];
+      }
+    },
+  );
+
   it("swallows an optional analytics bridge failure", () => {
     window.electrifyAnalytics = {
       initialize: jest.fn(),
