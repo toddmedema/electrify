@@ -325,6 +325,22 @@ export default function PowerAgreements({
             <Box className="powerAgreementTerms">
               <BuildDetails label="Replacement agreement terms">
                 <BuildDetailRow
+                  label="Minimum"
+                  value={
+                    <>
+                      Pay for {formatWatts(review.deliverableW)} whenever
+                      supplier-available
+                      <Typography
+                        component="div"
+                        variant="caption"
+                        color="textSecondary"
+                      >
+                        $0 upfront
+                      </Typography>
+                    </>
+                  }
+                />
+                <BuildDetailRow
                   label="Coverage"
                   value={formatWatts(review.deliverableW)}
                 />
@@ -364,22 +380,6 @@ export default function PowerAgreements({
                     }
                   />
                 )}
-                <BuildDetailRow
-                  label="Payment"
-                  value={
-                    <>
-                      $0 upfront
-                      <Typography
-                        component="div"
-                        variant="caption"
-                        color="textSecondary"
-                      >
-                        Pay for {formatWatts(review.deliverableW)} whenever
-                        supplier-available
-                      </Typography>
-                    </>
-                  }
-                />
               </BuildDetails>
             </Box>
             <Typography variant="body2" sx={{ mt: 2 }}>

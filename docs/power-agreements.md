@@ -95,8 +95,9 @@ must come from the actual forecast, with measured balance comparisons maintained
 alongside the scenario simulation evidence. Other scenarios retain their ordinary
 market path and seeded outputs.
 
-Measured seed-12345 Employee playthroughs use the same acquisition and retirement
-actions before and after this change. Opening-year import costs move by about
+The earlier interface-only comparison, with pay-as-delivered agreements, used
+seed-12345 Employee playthroughs with the same acquisition and retirement
+actions. Opening-year import costs moved by about
 $231 on an $83.47M total. The old inherited-only routes stopped in month 183;
 retained connections now let both routes play the full 240 months, although
 surviving the supply withdrawal does not guarantee that all mission goals pass.
@@ -107,6 +108,16 @@ representative-day model. Whole-company dispatch and retained customers also
 change, so the runs are not an isolated price sensitivity: Valley's 2020 import
 bill is about $218M without replacements and $300M with them. Agreements hedge
 market exposure; they do not promise cheaper energy or eliminate shortages.
+
+For the new fixed-block obligations, matched 24-month Employee runs with seed
+12345 and strategy `none` compare the pre-minimum implementation at `9dd567c3`
+with the minimum implementation at `ebc19f96`. Ending cash changes from about
+$238M to $216M and total expenses from $314M to $336M. Both serve all 4.1 TWh of
+requested energy, end with 97,270 customers, and emit 440,414 tons. The roughly
+$22M additional cost is payment for available but unused inherited supply; the
+minimum does not create physical imports or emissions. The full scenario sweep
+also retains its economic invariants. These measurements describe the authored
+opening contracts, not a promised saving from a replacement offer.
 
 Schema 11 versions accepted receipts separately from inherited terms. New games
 inherit fixed-block obligations from ownership, and all newly accepted offers bind
