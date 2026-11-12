@@ -369,9 +369,23 @@ for (const theme of ["light", "dark"]) {
     await reviewScreenshot(chart, {
       path: info.outputPath(`keyboard-selection-${theme}.png`),
     });
-    // An intentional pointer move takes over from keyboard selection. Screenshots may
-    // scroll the plot on phones, so let the locator resolve its current viewport position.
-    await plot.hover({ position: { x: bounds.width * 0.6, y: 8 } });
+    // Expanded keyboard details cover the plot's middle on phones. Return to a genuinely
+    // exposed plot edge after review captures have potentially scrolled the chart.
+    await plot.scrollIntoViewIfNeeded();
+    const pointer = await plot.evaluate((element) => {
+      const bounds = element.getBoundingClientRect();
+      const position = { x: bounds.width - 2, y: 2 };
+      return {
+        position,
+        exposed:
+          document.elementFromPoint(
+            bounds.x + position.x,
+            bounds.y + position.y,
+          ) === element,
+      };
+    });
+    expect(pointer.exposed, "pointer takeover starts on the plot").toBe(true);
+    await plot.hover({ position: pointer.position });
     await expect(chart.getByRole("status")).toBeEmpty();
     await expect(time).not.toHaveText(selectedTime!);
     await image.press("Home");
