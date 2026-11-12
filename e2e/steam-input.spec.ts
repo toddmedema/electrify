@@ -1019,7 +1019,7 @@ test("controller reviews, cancels and confirms a utility acquisition", async ({
   );
   await input(page, "confirm");
   await expect(dialog).toHaveCount(0);
-  await expect(line).toContainText("Owned · Ridge Electric");
+  await expect(line).toContainText("Ridge expansion connection · Owned");
   const saved = await readSavedGame(page);
   expect(
     saved?.utilityExpansion?.acquisitions.some(
