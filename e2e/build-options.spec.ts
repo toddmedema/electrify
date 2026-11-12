@@ -427,6 +427,12 @@ for (const theme of ["light", "dark"] as const) {
         name: "What is interest rate?",
       });
       await expect(cashValue).toHaveText(/^\$[\d,.]+[kMBT]? now$/);
+      await expect(loanValue).toHaveText(
+        /^\$[\d,.]+[kMBT]? now \+ \$[\d,.]+[kMBT]?\/mo$/,
+      );
+      await expect(loanFact.locator(".decisionImpactFactDetail")).toHaveText(
+        /^New loan: \d+\.\d+% for \d+ years\.$/,
+      );
       await expect(dialog).not.toContainText("Payments start now");
       await loanFact.scrollIntoViewIfNeeded();
       const [labelBox, loanBox, cashBox, helpBox] = await Promise.all([
