@@ -43,10 +43,12 @@ import reducer, {
   initGame,
   start,
   tickStatePhases,
+  SharedImportClearing,
   upgradeTransmissionLine,
 } from "../reducers/Game";
 import * as gameActions from "../reducers/GameActions";
 import { clearPeerMarket } from "./Market";
+import { allocateIntertieFlows } from "../helpers/Transmission";
 import type {
   CommandEnvelope,
   MatchSpec,
@@ -58,6 +60,7 @@ import type {
   CompanyResultType,
   GameType,
   LocationType,
+  PeerPlan,
   ScenarioType,
   SpeedType,
 } from "../Types";
@@ -589,9 +592,18 @@ export function stepWorld(world: World): void {
   world.pricePerMWh = Math.max(
     ...active.map((i) => basePeerTradePrice(currentTick(world.grids[i])!)),
   );
-  const sharedImports:
-    import("../helpers/Transmission").IntertieReservation[] | undefined =
+  const sharedImportRounds: SharedImportClearing[] | undefined =
     world.grids.some((grid) => grid.utilityExpansion) ? [] : undefined;
+  const tradingPlan = (plan: PeerPlan, i: number) => {
+    plan = { ...plan };
+    const grid = world.grids[i];
+    if (grid.transmission?.sellingRule === "NONE") plan.offerW = 0;
+    if (grid.transmission?.buyingRule === "NONE") {
+      plan.shortageW = 0;
+      plan.storageChargeW = 0;
+    }
+    return plan;
+  };
   const phases = world.grids.map((g, i) => {
     // A retired company neither buys nor sells; its frozen grid only keeps its seat.
     if (!active.includes(i))
@@ -608,17 +620,11 @@ export function stepWorld(world: World): void {
       };
     selectWeatherLocation(g.location.id);
     g.multiplayer!.pricePerMWh = world.pricePerMWh;
-    const phase = tickStatePhases(g, undefined, undefined, sharedImports);
+    const phase = tickStatePhases(g, undefined, undefined, sharedImportRounds);
     const planned = phase.next();
-    if (planned.done)
+    if (planned.done || !("offerW" in planned.value))
       throw new Error("A grid could not prepare its shared tick");
-    const plan = { ...planned.value };
-    if (g.transmission?.sellingRule === "NONE") plan.offerW = 0;
-    if (g.transmission?.buyingRule === "NONE") {
-      plan.shortageW = 0;
-      plan.storageChargeW = 0;
-    }
-    return { phase, plan };
+    return { phase, plan: tradingPlan(planned.value, i) };
   });
   // Construction advances during planning, so completed upgrades apply to this settlement.
   world.edges.forEach((edge) => {
@@ -639,16 +645,62 @@ export function stepWorld(world: World): void {
       0,
     );
   });
-  const settlements = clearPeerMarket(
-    world.seats.map((s) => s.id),
-    phases.map((p) => p.plan),
-    world.edges,
-  );
+  // Each refresh uses the same settlement owner and a fresh regional budget. The barrier
+  // leaves every company settled before reserve, history and month-opening work continues.
+  let round = 0;
+  let plans = phases.map((p) => p.plan);
+  while (true) {
+    const settlements = clearPeerMarket(
+      world.seats.map((s) => s.id),
+      plans,
+      world.edges,
+    );
+    phases.forEach(({ phase }, i) => {
+      if (!phase) return;
+      selectWeatherLocation(world.grids[i].location.id);
+      const settled = phase.next(settlements[i]);
+      if (
+        sharedImportRounds
+          ? settled.done ||
+            !("kind" in settled.value) ||
+            settled.value.kind !== "settled"
+          : !settled.done
+      )
+        throw new Error("A grid did not finish its shared settlement");
+    });
+    if (!sharedImportRounds) break;
+    const clearing = sharedImportRounds[round++];
+    const reserved = [...clearing.reservations];
+    for (const { tick, offers, limitW } of clearing.headroom) {
+      const headroom = allocateIntertieFlows(
+        offers,
+        limitW,
+        0,
+        reserved,
+      ).importedW;
+      const watts = headroom.reduce((sum, value) => sum + value, 0);
+      tick.availableSupplyW = (tick.availableSupplyW ?? tick.supplyW) + watts;
+      tick.reserveW = (tick.reserveW ?? tick.supplyW - tick.demandW) + watts;
+      headroom.forEach((value, i) =>
+        reserved.push({ offer: offers[i], watts: value }),
+      );
+    }
+    let nextPlans = 0;
+    plans = phases.map(({ phase, plan }, i) => {
+      if (!phase) return plan;
+      selectWeatherLocation(world.grids[i].location.id);
+      const next = phase.next();
+      if (next.done) return plan;
+      if (!("offerW" in next.value))
+        throw new Error("A grid did not prepare its next refresh");
+      nextPlans++;
+      return tradingPlan(next.value, i);
+    });
+    if (!nextPlans) break;
+    if (nextPlans !== active.length) throw new Error("Shared refresh diverged");
+  }
   phases.forEach(({ phase }, i) => {
     if (!phase) return;
-    selectWeatherLocation(world.grids[i].location.id);
-    if (!phase.next(settlements[i]).done)
-      throw new Error("A grid settled more than once");
     const grid = world.grids[i];
     let capacity = currentTick(grid)!.transmissionCapacityW || 0;
     grid.transmission?.lines.forEach((line) => {

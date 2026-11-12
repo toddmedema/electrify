@@ -3956,13 +3956,32 @@ export function tickState(
   }
 }
 
+/** A match finalizes jointly feasible import reserves before history or rollover proceeds. */
+export interface SharedImportClearing {
+  reservations: IntertieReservation[];
+  headroom: {
+    tick: TickPresentFutureType;
+    offers: IntertieOffer[];
+    limitW: number;
+  }[];
+}
+
+type SharedTickPhase = PeerPlan | { kind: "settled" };
+
+function sharedImportRound(
+  rounds: SharedImportClearing[] | undefined,
+  round: number,
+) {
+  return rounds && (rounds[round] ??= { reservations: [], headroom: [] });
+}
+
 /** Plan every grid before resuming any grid's settlement. */
 export function* tickStatePhases(
   state: GameType,
   saveEffects?: RunSaveEffects,
   onCompletedMonth?: CompletedMonthObserver,
-  sharedImports?: IntertieReservation[],
-): Generator<PeerPlan, void, PeerSettlement | undefined> {
+  sharedImportRounds?: SharedImportClearing[],
+): Generator<SharedTickPhase, void, PeerSettlement | undefined> {
   if (isDraft(state)) {
     const snapshot = current(state);
     const working = tickWorkingState(snapshot);
@@ -4008,7 +4027,7 @@ export function* tickStatePhases(
       true,
       TICK_MINUTES,
       true,
-      sharedImports,
+      sharedImportRound(sharedImportRounds, 0),
     );
     desktopSimulationHooks()?.tick(state, now);
     logHailRepairsCompleted(state);
@@ -4156,13 +4175,27 @@ export function* tickStatePhases(
 
       // Pre-roll a few frames to compensate for temperature / demand jumps across months
       for (let i = 0; i < 4; i++) {
-        updateSupplyFacilitiesFinances(
-          state,
-          state.timeline[0],
-          state.timeline[0],
-          true,
-          true,
-        );
+        if (sharedImportRounds) {
+          yield* supplyFacilitiesFinancesPhases(
+            state,
+            state.timeline[0],
+            state.timeline[0],
+            true,
+            true,
+            true,
+            TICK_MINUTES,
+            false,
+            sharedImportRound(sharedImportRounds, i + 1),
+          );
+        } else {
+          updateSupplyFacilitiesFinances(
+            state,
+            state.timeline[0],
+            state.timeline[0],
+            true,
+            true,
+          );
+        }
       }
 
       if (state.multiplayer) {
@@ -4989,8 +5022,13 @@ function* supplyFacilitiesFinancesPhases(
   optimizeCommitment = true,
   stepMinutes = TICK_MINUTES,
   advanceConstruction = true,
-  sharedImports?: IntertieReservation[],
-): Generator<PeerPlan, TickPresentFutureType, PeerSettlement | undefined> {
+  sharedClearing?: SharedImportClearing,
+): Generator<
+  SharedTickPhase,
+  TickPresentFutureType,
+  PeerSettlement | undefined
+> {
+  const sharedImports = sharedClearing?.reservations;
   const { facilities } = state;
   // Compare each settled/forecast tick, not the rollover clock that may already be next month.
   for (const facility of facilities)
@@ -5079,9 +5117,10 @@ function* supplyFacilitiesFinancesPhases(
     now.demandW -= batteryBefore.dischargeW;
   }
   const difficulty = DIFFICULTIES[state.difficulty];
-  // Only a live co-op tick settles with peers. Forecasts and pre-rolls estimate peer supply as
-  // zero, so they charge storage and value spare output like a single-player grid.
-  const peerSettlement = !!state.multiplayer && !simulated;
+  // The host also coordinates the month-opening refresh without advancing storage or assets.
+  // Private forecasts continue to estimate peer supply as zero.
+  const peerSettlement =
+    !!state.multiplayer && (!simulated || !!sharedClearing);
 
   // Everything being built right now emits while it is being built, spread evenly across each
   // project's schedule. Derived from how far each clock actually moved rather than from elapsed
@@ -6005,6 +6044,30 @@ function* supplyFacilitiesFinancesPhases(
     reachableHeadroomW +
     exportedW +
     remainingImportHeadroomW;
+  if (sharedClearing) {
+    // Actual purchases across every company have priority over anybody's unused headroom.
+    // Keep native generation reserves here; the host assigns the remaining regional budget
+    // after all companies settle, using these same line/access/source limits.
+    let coveredW = entitlementDeliveredW;
+    const headroomOffers =
+      transmission.buyingRule === "NONE"
+        ? entitlementOffers.map((source) => {
+            const deliveredW = Math.min(coveredW, source.capacityW);
+            coveredW -= deliveredW;
+            return {
+              ...source.offer,
+              importLimitW: source.capacityW - deliveredW,
+            };
+          })
+        : offers;
+    now.availableSupplyW -= remainingImportHeadroomW;
+    now.reserveW -= remainingImportHeadroomW;
+    sharedClearing.headroom.push({
+      tick: now,
+      offers: headroomOffers,
+      limitW: remainingImportHeadroomW,
+    });
+  }
   now.importKgco2ePerMWh =
     importEmissionsBasisW > 0
       ? importEmissionsWeight / importEmissionsBasisW
@@ -6487,6 +6550,8 @@ function* supplyFacilitiesFinancesPhases(
       state,
     );
   }
+  // Stop before tick history/failure checks or another refresh can observe partial clearing.
+  if (sharedClearing) yield { kind: "settled" };
   return now;
 }
 
