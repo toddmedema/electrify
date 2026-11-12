@@ -196,6 +196,11 @@ export function objectiveGoalText(
 
 /** A short heading names the goal; its target carries quantities, conditions and dates. */
 export function objectiveHeadingText(objective: CompiledRuleObjective): string {
+  if (
+    objective.label !== objectiveTargetText(objective) &&
+    !/\d/.test(objective.label)
+  )
+    return objective.label;
   switch (objective.metric) {
     case "customerRetention":
       return "Retain customers";
