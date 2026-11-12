@@ -910,16 +910,98 @@ it("draws each generator's typical year against one shared scale", () => {
     screen.getAllByRole("img", { name: /^Typical year: .*lowest in/ }).length,
   ).toBeGreaterThan(0);
   expect(
-    screen.getAllByText(/^[A-Z][a-z]{2} low: \d+% of capacity$/).length,
+    screen.getAllByText(/^[A-Z][a-z]{2}: \d+% capacity$/).length,
   ).toBeGreaterThan(0);
   expect(screen.getAllByText("On demand").length).toBeGreaterThan(0);
   expect(
-    screen.getByText(/^[A-Z][a-z]{2} low: \d+% of typical water$/),
+    screen.getByText(/^[A-Z][a-z]{2}: \d+% of typical water$/),
   ).toBeVisible();
   expect(
     screen.getByRole("img", { name: /^Typical year of water inflow: / }),
   ).toBeInTheDocument();
 });
+
+it.each(["weather", "water-inflow"] as const)(
+  "inspects each %s month and restores the low month after leaving",
+  (kind) => {
+    const game = createGame({ scenarioId: 100, difficulty: "Employee" });
+    const generator = GENERATORS(game, 1000000, [], [500]).find(
+      (candidate) => candidate.name === "Solar",
+    )!;
+    const monthly = [
+      0.12, 0.23, 0.34, 0.45, 0.56, 0.67, 0.78, 0.07, 0.89, 1, 0.21, 0.32,
+    ];
+    render(
+      <GeneratorBuildItem
+        cash={1e9}
+        date={game.date}
+        interestRate={game.interestRate}
+        generator={generator}
+        location={game.location}
+        seed={game.seed}
+        outputShape={{ kind, monthly, lowMonth: 7, mean: 0.47 }}
+        onBuild={jest.fn()}
+      />,
+    );
+    const unit = kind === "weather" ? "capacity" : "of typical water";
+    const chart = screen.getByRole("img", { name: /^Typical year/ });
+    const bounds = jest
+      .spyOn(HTMLElement.prototype, "getBoundingClientRect")
+      .mockReturnValue({
+        left: 10,
+        width: 96,
+      } as DOMRect);
+    const metric = screen.getByRole("group", { name: /Typical monthly/ });
+    expect(metric).toHaveTextContent(`Aug: 7% ${unit}`);
+    const months = [
+      "Jan",
+      "Feb",
+      "Mar",
+      "Apr",
+      "May",
+      "Jun",
+      "Jul",
+      "Aug",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dec",
+    ];
+    months.forEach((month, index) => {
+      fireEvent(
+        chart,
+        new MouseEvent("pointermove", {
+          bubbles: true,
+          clientX: 10 + (index / 11) * 96,
+        }),
+      );
+      expect(metric).toHaveTextContent(
+        `${month}: ${Math.round(monthly[index] * 100)}% ${unit}`,
+      );
+    });
+    fireEvent.pointerLeave(metric);
+    expect(metric).toHaveTextContent(`Aug: 7% ${unit}`);
+    fireEvent(
+      chart,
+      new MouseEvent("pointerdown", { bubbles: true, clientX: 10 }),
+    );
+    expect(metric).toHaveTextContent(`Jan: 12% ${unit}`);
+    fireEvent.pointerCancel(metric);
+    expect(metric).toHaveTextContent(`Aug: 7% ${unit}`);
+    fireEvent.focus(metric);
+    fireEvent.keyDown(metric, { key: "ArrowRight" });
+    expect(metric).toHaveTextContent(`Sep: 89% ${unit}`);
+    fireEvent.keyDown(metric, { key: "Home" });
+    fireEvent.keyDown(metric, { key: "ArrowLeft" });
+    expect(metric).toHaveTextContent(`Jan: 12% ${unit}`);
+    fireEvent.keyDown(metric, { key: "End" });
+    fireEvent.keyDown(metric, { key: "ArrowRight" });
+    expect(metric).toHaveTextContent(`Dec: 32% ${unit}`);
+    fireEvent.blur(metric);
+    expect(metric).toHaveTextContent(`Aug: 7% ${unit}`);
+    bounds.mockRestore();
+  },
+);
 
 it("pins up to three current-grid choices into a comparison tray", () => {
   const game = createGame({ scenarioId: 100, difficulty: "Employee" });
