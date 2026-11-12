@@ -14,6 +14,7 @@ import gameReducer, {
 import { GameType, GeneratorShoppingType } from "../Types";
 import { GENERATORS, constructionKgco2eCurve } from "../data/Facilities";
 import { corridorConstructionKgco2e } from "../helpers/Transmission";
+import { inheritedUtilityForCorridor } from "../helpers/PowerAgreements";
 import { TRANSMISSION_CORRIDORS } from "../data/AdjacentMarkets";
 import { validBuildFacility } from "../helpers/BuildValidation";
 
@@ -305,9 +306,19 @@ describe("construction emissions", () => {
     expect(perW(existing)).toBeLessThan(perW(fresh));
 
     // Absolute magnitude, not just the ordering. A line is metal-heavy per kilometre but
-    // metal-light per watt, because one circuit moves gigawatts: every corridor should land
-    // between simple-cycle gas at 0.06 and nuclear at 0.30, and well under onshore wind's 0.42.
-    TRANSMISSION_CORRIDORS.forEach((c) => {
+    // metal-light per watt, because one circuit moves gigawatts. New construction stays
+    // well under onshore wind's 0.42; inherited interfaces require no construction work.
+    const inherited = TRANSMISSION_CORRIDORS.filter((c) =>
+      inheritedUtilityForCorridor(c.id),
+    );
+    expect(inherited).toHaveLength(3);
+    inherited.forEach((c) => {
+      expect(c.buildCost).toBe(0);
+      expect(corridorConstructionKgco2e(c)).toBe(0);
+    });
+    TRANSMISSION_CORRIDORS.filter(
+      (c) => !inheritedUtilityForCorridor(c.id),
+    ).forEach((c) => {
       expect(corridorConstructionKgco2e(c) / c.capacityW).toBeGreaterThan(0.02);
       expect(corridorConstructionKgco2e(c) / c.capacityW).toBeLessThan(0.3);
     });

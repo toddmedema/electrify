@@ -19,6 +19,9 @@ import AcquisitionReviewDialog from "./AcquisitionReviewDialog";
 import { facilityDisplayName } from "./FacilityLabels";
 
 function review(targetId: UtilityTargetId, year = 2005) {
+  const corridorId = UTILITY_TARGETS.find(
+    (target) => target.id === targetId,
+  )!.corridorId;
   const initial = createGame({
     scenarioId: 116,
     seed: 12345,
@@ -29,13 +32,14 @@ function review(targetId: UtilityTargetId, year = 2005) {
     reducer(
       initial,
       buildTransmissionLine({
-        corridorId: UTILITY_TARGETS.find((target) => target.id === targetId)!
-          .corridorId,
+        corridorId,
         financed: false,
       }),
     ),
   );
-  game.transmission!.lines[0].yearsToBuildLeft = 0;
+  game.transmission!.lines.find(
+    (line) => line.corridorId === corridorId,
+  )!.yearsToBuildLeft = 0;
   if (year !== 2005) {
     game.date = getDateFromMinute(
       (year - game.startingYear) * 12 * MINUTES_PER_MONTH,
