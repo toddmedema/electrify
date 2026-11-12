@@ -1,3 +1,4 @@
+import { UTILITY_EXPANSION_OBJECTIVES } from "../data/UtilityExpansionObjectives";
 import type { CompiledRuleObjective } from "../data/ScenarioRules";
 import type { ObjectiveResult } from "../data/ScenarioObjectives";
 import { objectiveDefinition } from "./ScenarioObjectives";
@@ -8,6 +9,7 @@ import {
   objectiveValueText,
   objectiveWindowText,
   objectiveDefinitionText,
+  objectiveGoalGroups,
 } from "./ObjectivePresentation";
 
 const localShare: CompiledRuleObjective = {
@@ -254,4 +256,20 @@ it.each<[CompiledRuleObjective, number, string]>([
 it("clears zero signs without hiding a genuinely negative objective measurement", () => {
   expect(objectiveValueText(localShare, -0)).toBe("0%");
   expect(objectiveValueText(localShare, -0.00001)).not.toBe("0%");
+});
+
+it("keeps lone retirement goals and optional obligations distinct", () => {
+  const retirements = UTILITY_EXPANSION_OBJECTIVES.filter(
+    (objective) => objective.metric === "assetRetirement",
+  );
+  const lone = objectiveGoalGroups(retirements.slice(0, 1), 2005, 240);
+  expect(lone).toHaveLength(1);
+  expect(lone[0].label).toBe(retirements[0].label);
+  const mixed = objectiveGoalGroups(
+    [retirements[0], { ...retirements[1], required: false }],
+    2005,
+    240,
+  );
+  expect(mixed).toHaveLength(2);
+  expect(mixed.map((goal) => goal.required)).toEqual([true, false]);
 });

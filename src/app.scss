@@ -7331,10 +7331,6 @@ img[src$="/transmission.svg"] {
   display: flex;
   flex-direction: column;
 }
-.scenarioBuildNothing {
-  display: block;
-  color: var(--font-color-faded);
-}
 // Phones lead with the outcome, directly under the section title.
 @media (max-width: 599px) {
   .scenarioOutlook > [aria-label="Scenario forecast"] {

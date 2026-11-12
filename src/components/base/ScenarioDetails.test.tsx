@@ -88,11 +88,12 @@ it("shows the score so far beside where the current pace ends it", () => {
   ).toHaveTextContent(/TWh supplied/i);
 });
 
-it("keeps one concise loss line under the score chart and removes redundant goal forecasts", () => {
+it("lists each projected failure separately and removes redundant goal forecasts", () => {
   const game = createGame({ scenarioId: 111 });
   jest.spyOn(MissionProjection, "projectMission").mockReturnValue({
     status: "loss",
     through: "Dec 2026",
+    shortageFrom: "Jul 2022",
     requirements: [
       {
         id: "cash",
@@ -117,9 +118,13 @@ it("keeps one concise loss line under the score chart and removes redundant goal
   const status = within(outlook).getByRole("status", {
     name: "Scenario forecast",
   });
-  expect(status).toHaveTextContent(
-    "Projected loss: Cash below $0 by Jan 2022. Under 95% of demand served for 3 months by Jan 2025.",
+  const failures = within(status).getAllByRole("listitem");
+  expect(failures).toHaveLength(2);
+  expect(failures[0]).toHaveTextContent("Cash below $0 by Jan 2022.");
+  expect(failures[1]).toHaveTextContent(
+    "Under 95% of demand served for 3 months by Jan 2025.",
   );
+  expect(outlook).not.toHaveTextContent("If you build nothing");
   expect(
     screen.getByRole("img", { name: /Projected loss periods shaded/ }),
   ).toBeInTheDocument();
@@ -154,7 +159,12 @@ it("clears a stale win while an edited plan is being forecast", () => {
   const game = createGame({ scenarioId: 111 });
   jest
     .spyOn(MissionProjection, "projectMission")
-    .mockReturnValue({ status: "win", through: "Dec 2026", requirements: [] });
+    .mockReturnValue({
+      status: "win",
+      through: "Dec 2026",
+      shortageFrom: "Jul 2022",
+      requirements: [],
+    });
   const ready = jest
     .spyOn(DeferredProjection, "projectionReady")
     .mockReturnValue(true);
@@ -165,6 +175,7 @@ it("clears a stale win while an edited plan is being forecast", () => {
   expect(
     screen.getByRole("status", { name: "Scenario forecast" }),
   ).toHaveTextContent("Projected win.");
+  expect(screen.queryByText(/If you build nothing/)).toBeNull();
   const originalWorker = global.Worker;
   Object.defineProperty(global, "Worker", {
     configurable: true,
@@ -188,4 +199,18 @@ it("clears a stale win while an edited plan is being forecast", () => {
       value: originalWorker,
     });
   }
+});
+
+it("combines the oil-retirement goal while retaining both fleet deadlines", () => {
+  const game = createGame({ scenarioId: 116 });
+  renderDetails(game);
+  const goals = screen.getByRole("region", { name: "Goals" });
+  expect(within(goals).getAllByText("Retire original oil plants")).toHaveLength(
+    1,
+  );
+  expect(within(goals).getAllByRole("listitem")).toHaveLength(2);
+  expect(goals).toHaveTextContent("Champlain’s Oil A by Dec 2020");
+  expect(goals).toHaveTextContent("Acquired original oil plants by Dec 2023");
+  expect(goals).not.toHaveTextContent("Retire acquired original oil assets");
+  expect(goals).not.toHaveTextContent("Retire Champlain's original Oil A");
 });

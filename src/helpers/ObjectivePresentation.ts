@@ -194,6 +194,57 @@ export function objectiveGoalText(
     : `${objectiveTargetText(objective)} · ${window}`;
 }
 
+/** Combine the valley's two retirement deadlines for display, preserving both scored rules. */
+export function objectiveGoalGroups(
+  objectives: CompiledRuleObjective[],
+  startingYear: number,
+  durationMonths: number,
+  monthOffset = 0,
+): { id: string; label: string; required: boolean; goals: string[] }[] {
+  const champlain = objectives.find(
+    (objective) =>
+      objective.id === "retire-champlain-oil" &&
+      objective.metric === "assetRetirement",
+  );
+  const acquired = objectives.find(
+    (objective) =>
+      objective.id === "retire-acquired-oil" &&
+      objective.metric === "assetRetirement",
+  );
+  const combine =
+    champlain && acquired && champlain.required === acquired.required;
+  return objectives.flatMap((objective) => {
+    if (combine && objective === acquired) return [];
+    if (combine && objective === champlain)
+      return [
+        {
+          id: objective.id,
+          label: "Retire original oil plants",
+          required: objective.required,
+          goals: [
+            `Champlain’s Oil A by ${objectiveWindowText(champlain, startingYear, durationMonths, monthOffset)}`,
+            `Acquired original oil plants by ${objectiveWindowText(acquired, startingYear, durationMonths, monthOffset)}`,
+          ],
+        },
+      ];
+    return [
+      {
+        id: objective.id,
+        label: objective.label,
+        required: objective.required,
+        goals: [
+          objectiveGoalText(
+            objective,
+            startingYear,
+            durationMonths,
+            monthOffset,
+          ),
+        ],
+      },
+    ];
+  });
+}
+
 /** The plain-language definition; the authored sentence stays canonical for saves and mods. */
 export function objectiveDefinitionText(
   result: Pick<ObjectiveResult, "metric" | "definition"> &

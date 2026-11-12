@@ -1,7 +1,7 @@
 import * as React from "react";
 import { DifficultyType, ScenarioType } from "../../Types";
 import { Box, Typography } from "@mui/material";
-import { objectiveGoalText } from "../../helpers/ObjectivePresentation";
+import { objectiveGoalGroups } from "../../helpers/ObjectivePresentation";
 import { formatLargeMassApprox, KG_PER_MEGATONNE } from "../../helpers/Units";
 import { useUnits } from "./UnitsContext";
 import { scoreLabel, scoreRuleText } from "../../helpers/Scoring";
@@ -34,19 +34,26 @@ export default function VictoryConditions({
   const optional = objectives.filter((objective) => !objective.required);
   const objectiveRows = (goals: typeof objectives) => (
     <ul className="victoryObjectiveList">
-      {goals.map((objective) => (
+      {objectiveGoalGroups(
+        goals,
+        scenario.startingYear,
+        scenario.durationMonths,
+        (scenario.startingMonth ?? 1) - 1,
+      ).map((objective) => (
         <li key={objective.id}>
           <Typography component="p" variant="body2" sx={{ fontWeight: 600 }}>
             {objective.label}
           </Typography>
-          <Typography component="p" variant="body2" color="textSecondary">
-            {objectiveGoalText(
-              objective,
-              scenario.startingYear,
-              scenario.durationMonths,
-              (scenario.startingMonth ?? 1) - 1,
-            )}
-          </Typography>
+          {objective.goals.map((goal) => (
+            <Typography
+              key={goal}
+              component="p"
+              variant="body2"
+              color="textSecondary"
+            >
+              {goal}
+            </Typography>
+          ))}
         </li>
       ))}
     </ul>

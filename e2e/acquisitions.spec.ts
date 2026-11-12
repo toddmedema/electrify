@@ -80,12 +80,12 @@ for (const theme of ["light", "dark"] as const) {
         "Operating plants",
         "Purchased power",
         "Scenario obligations",
-        "Champlain Electric, January 2020",
-        "opening upkeep from January 2015",
+        "Jan 2020 · Champlain Electric",
+        "Jan 2015: 1.5× opening upkeep",
       ])
         await expect(terms).toContainText(text);
       if (target === "Valley Electric")
-        await expect(terms).toContainText("January 2017");
+        await expect(terms).toContainText("Jan 2017");
       await expect(terms).toContainText(
         target === "Valley Electric"
           ? "2.2TWh annual delivered energy · 406MW peak demand"
@@ -277,7 +277,7 @@ for (const theme of ["light", "dark"] as const) {
         const obligations = dialog
           .locator(".decisionImpactFact")
           .filter({ hasText: /^Acquisition obligations/ });
-        await expect(obligations).toContainText("January 2017");
+        await expect(obligations).toContainText("Jan 2017");
         await expect(dialog).not.toContainText("Plan replacement supply");
         await expect(dialog).toContainText(
           "up to 50MW · variable availability",
@@ -371,20 +371,23 @@ for (const theme of ["light", "dark"] as const) {
       );
       const goals = scenario.locator(".missionRequirements");
       await expect(
-        goals.getByText("Retire Champlain's original Oil A", { exact: true }),
+        goals.getByText("Retire original oil plants", { exact: true }),
       ).toBeVisible();
       await expect(
         goals.getByText("Acquire Valley Electric or Ridge Electric", {
           exact: true,
         }),
       ).toBeVisible();
+      await expect(goals).toContainText("Champlain’s Oil A by Dec 2020");
+      await expect(goals).toContainText(
+        "Acquired original oil plants by Dec 2023",
+      );
       const plan = scenario.getByRole("region", {
         name: "Supply plan",
         exact: true,
       });
-      await expect(plan).toContainText("Retire original Valley Oil");
-      if (index === 1)
-        await expect(plan).toContainText("Retire original Ridge Oil");
+      await expect(plan).toContainText("Valley Oil · Dec 2023");
+      if (index === 1) await expect(plan).toContainText("Ridge Oil · Dec 2023");
       await scenario
         .getByRole("button", { name: "Close Scenario", exact: true })
         .click();
