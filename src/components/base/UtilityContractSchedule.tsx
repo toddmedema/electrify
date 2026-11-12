@@ -5,6 +5,7 @@ import {
   utilityPlanning,
   UTILITY_PLANNING_REFERENCE_W,
 } from "../../helpers/UtilityPlanning";
+import { MONTHS } from "../../Constants";
 import { formatWatts } from "../../helpers/Format";
 import { UTILITY_NETWORK_RENEWAL_STAGES } from "../../data/UtilityExpansion";
 
@@ -20,6 +21,8 @@ export default function UtilityContractSchedule({
 }) {
   const plan = utilityPlanning(game, undefined, targetId);
   if (!plan) return null;
+  const month = (value: number) =>
+    `${MONTHS[((value % 12) + 12) % 12]} ${game.startingYear + Math.floor(value / 12)}`;
   return (
     <Box sx={{ mt: 2 }}>
       {!!plan.supplyChanges.length && (
@@ -42,6 +45,18 @@ export default function UtilityContractSchedule({
                     )
                     .join("; ")}
                   .
+                  {change.startMonth !== undefined && (
+                    <Typography
+                      component="span"
+                      variant="body2"
+                      color="textSecondary"
+                      sx={{ display: "block" }}
+                    >
+                      {change.startMonth < game.date.monthsElapsed
+                        ? "Gas example: would need to be underway."
+                        : `Gas example: order by ${month(change.startMonth)}.`}
+                    </Typography>
+                  )}
                 </Typography>
               </li>
             ))}

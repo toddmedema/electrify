@@ -277,7 +277,7 @@ for (const theme of ["light", "dark"] as const) {
         const obligations = dialog
           .locator(".decisionImpactFact")
           .filter({ hasText: /^Acquisition obligations/ });
-        await expect(obligations).toContainText("Jan 2017");
+        await expect(obligations).toContainText("January 2017");
         await expect(dialog).not.toContainText("Plan replacement supply");
         await expect(dialog).toContainText(
           "up to 50MW · variable availability",
