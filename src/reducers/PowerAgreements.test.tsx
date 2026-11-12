@@ -3,7 +3,11 @@ import { validUtilityExpansion } from "../helpers/ExpansionValidation";
 import cloneDeep from "lodash.clonedeep";
 import { createGame } from "../testing/Simulator";
 import { copyOfficialGame } from "../testing/OfficialScenarioExecutionFixtures";
-import { MINUTES_PER_MONTH, getDateFromMinute } from "../helpers/DateTime";
+import {
+  MINUTES_PER_MONTH,
+  getDateFromMinute,
+  getTimeFromTimeline,
+} from "../helpers/DateTime";
 import { currentTick } from "../helpers/GameSelectors";
 import {
   agreementDate,
@@ -20,6 +24,7 @@ import {
   intertieContextForGame,
   intertieBuildQuote,
   intertieUpgradeQuote,
+  physicalNeighborImportSupplyW,
 } from "../helpers/Transmission";
 import { facilitySignature } from "../helpers/Projection";
 import { intertieForecastKey } from "../helpers/IntertieOutlook";
@@ -535,4 +540,43 @@ it("reduces the payable minimum to zero when the physical route is unavailable",
   expect(Object.values(currentTick(game)!.agreementAvailableMWh!)).toEqual([
     0, 0,
   ]);
+});
+
+it("uses the dispatch timestamp's shared physical supply when an agreement interval starts before peak scarcity", () => {
+  const game = at(96);
+  game.difficulty = "CEO";
+  game.utilityExpansion!.acquisitions.push({
+    targetId: "valley-electric",
+    minute: 0,
+    financed: false,
+    transferredCustomers: 159000,
+  });
+  game.transmission!.lines.push(inheritedConnection("valley-electric", 2));
+  game.monthlyHistory = Array.from(
+    { length: 96 },
+    () => ({ year: 2012, month: 12 }) as (typeof game.monthlyHistory)[number],
+  );
+  game.date = getDateFromMinute(game.date.minute + 16 * 60 + 45, 2005);
+  game.facilities = [];
+  const next = getTimeFromTimeline(
+    game.date.minute + TICK_MINUTES,
+    game.timeline,
+  )!;
+  next.demandW = 1e9;
+  next.temperatureC = -30;
+  DEMAND_TYPES.forEach((type) => {
+    next.demandByType[type] = type === "Residential" ? 1e9 : 0;
+  });
+  tickState(game);
+  const now = currentTick(game)!;
+  expect(now.minute % MINUTES_PER_MONTH).toBe(17 * 60);
+  const pool = physicalNeighborImportSupplyW(
+    game.transmission!.lines[0].corridorId,
+    intertieContextForGame(game),
+    now.minute,
+    now,
+  );
+  expect(now.demandW).toBe(1e9);
+  expect(now.entitlementImportedW).toBeGreaterThan(0);
+  expect(now.importedW).toBeLessThanOrEqual(pool + 1);
 });

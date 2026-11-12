@@ -720,12 +720,26 @@ function checkTrade(
     );
   }
   const importsFlow = importedW > 0;
-  const importsPaid = (now.expensesImports || 0) > 0;
-  if (importsFlow !== importsPaid) {
+  const unusedAgreementExpenses = now.agreementUnusedExpenses ?? 0;
+  const physicalImportExpenses =
+    (now.expensesImports || 0) - unusedAgreementExpenses;
+  const expenseTolerance = Math.max(
+    1e-6,
+    Math.abs(now.expensesImports || 0) * RELATIVE_TOLERANCE,
+  );
+  if (
+    !Number.isFinite(unusedAgreementExpenses) ||
+    unusedAgreementExpenses < 0 ||
+    (!state.utilityExpansion && unusedAgreementExpenses !== 0) ||
+    physicalImportExpenses < -expenseTolerance ||
+    (importsFlow
+      ? physicalImportExpenses <= 0
+      : Math.abs(physicalImportExpenses) > expenseTolerance)
+  ) {
     collector.add(
-      "imports are paid for exactly when they flow",
+      "import expenses match physical flows and minimum obligations",
       when,
-      `imported ${importedW}W, import expenses ${now.expensesImports}`,
+      `imported ${importedW}W, import expenses ${now.expensesImports}, unused minimum expenses ${unusedAgreementExpenses}`,
     );
   }
   const exportsFlow = exportedW > 0;

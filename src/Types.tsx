@@ -421,6 +421,8 @@ export type TickPresentFutureType = Partial<FuelPricesType> &
     agreementAvailableMWh?: Record<string, number>;
     agreementUsefulMWh?: Record<string, number>;
     agreementPayments?: Record<string, number>;
+    /** This frame's expense for available fixed-block energy that was not imported. */
+    agreementUnusedExpenses?: number;
     minute: number;
     supplyW: number; // Watts
     availableSupplyW?: number; // Supply plus unused fuel-burning generation capacity

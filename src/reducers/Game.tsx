@@ -5307,14 +5307,16 @@ function* supplyFacilitiesFinancesPhases(
   const agreementEnd = settleAgreementAccounts ? state.date.minute : now.minute;
   const agreementStart =
     preRoll || !advanceConstruction ? now.minute : agreementEnd - stepMinutes;
-  const agreementFrame = { ...now, minute: agreementStart };
+  // Eligibility belongs to the elapsed contract interval; physical readiness must
+  // share this dispatch frame's weather/scarcity budget with ordinary imports.
   const readyAgreements = entitlementSources(
     state,
-    agreementFrame,
+    now,
     sharedClearing?.commitments,
     true,
     false,
     excludedAgreementId,
+    agreementStart,
   );
   if (sharedClearing) {
     sharedClearing.commitments.push(
@@ -5334,7 +5336,7 @@ function* supplyFacilitiesFinancesPhases(
     }));
   const legacyAgreements = entitlementSources(
     state,
-    agreementFrame,
+    now,
     [
       ...commitmentReservations,
       ...(sharedImports ?? []).filter(
@@ -5347,6 +5349,7 @@ function* supplyFacilitiesFinancesPhases(
     false,
     true,
     excludedAgreementId,
+    agreementStart,
   );
   const entitlementOffers = [
     ...readyAgreements.map((source) => ({
@@ -6214,10 +6217,11 @@ function* supplyFacilitiesFinancesPhases(
     importedW > 0
       ? (importedWh / 1000000) * (importCostPerHour / importedW)
       : 0;
-  const expensesImports =
-    physicalImportExpenses +
+  const unusedAgreementExpenses =
     ((unusedAgreementCostPerHour / ticksPerHour) * GAME_TO_REAL_YEARS) / 1e6;
+  const expensesImports = physicalImportExpenses + unusedAgreementExpenses;
   if (state.utilityExpansion) {
+    now.agreementUnusedExpenses = unusedAgreementExpenses;
     now.agreementAvailableMWh = Object.fromEntries(
       agreementSettlements.map((entry) => [
         entry.agreementId,

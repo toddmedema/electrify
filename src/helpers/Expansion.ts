@@ -456,12 +456,13 @@ export function entitlementSources(
   supplierReady = false,
   legacyOnly = false,
   excludedAgreementId?: string,
+  agreementMinute = now.minute,
 ) {
   if (!game.utilityExpansion) return [];
   const context = intertieContextForGame(game);
   const sources = (Object.keys(INHERITED_CONNECTIONS) as UtilityId[])
     .flatMap((utilityId) => {
-      if (!utilityOwnedAt(game, utilityId, now.minute)) return [];
+      if (!utilityOwnedAt(game, utilityId, agreementMinute)) return [];
       const line = game.transmission?.lines.find(
         (entry) =>
           entry.corridorId === INHERITED_CONNECTIONS[utilityId] &&
@@ -481,7 +482,7 @@ export function entitlementSources(
         now.minute,
         now,
       );
-      return connectionAgreements(game, utilityId, now.minute)
+      return connectionAgreements(game, utilityId, agreementMinute)
         .filter(
           (source) =>
             source.id !== excludedAgreementId &&
