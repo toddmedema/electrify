@@ -1,7 +1,6 @@
 import * as React from "react";
-import { Box, ToggleButton, ToggleButtonGroup } from "@mui/material";
+import { ToggleButton, ToggleButtonGroup } from "@mui/material";
 import PauseIcon from "@mui/icons-material/Pause";
-import PersonIcon from "@mui/icons-material/Person";
 import { TICK_MS } from "../../Constants";
 import { GameType, SpeedType } from "../../Types";
 import "./SpeedControls.scss";
@@ -71,6 +70,19 @@ function describeSharedClock(
   return `Game speed: ${selectionLabel(multiplayer.activeSpeed)}. Your selection: ${selectionLabel(speed)}. The slowest player sets the game speed. Any paused player pauses everyone. ${reason}${players}.${resume ? " Select a speed to resume." : ""}`;
 }
 
+/** What a screen reader hears when the shared clock stops or waits for you: pauses and the
+ * resume prompt only, never every speed change. Empty while the game is simply running. */
+function describeClockStatus(
+  multiplayer: MultiplayerSpeedOptionsProps,
+  resume: boolean,
+): string {
+  if (resume) return "Select a speed to resume.";
+  if (multiplayer.activeSpeed !== "PAUSED") return "";
+  return multiplayer.reason
+    ? `Game paused: ${multiplayer.reason}.`
+    : "Game paused.";
+}
+
 /** Hovering a shared-clock speed names every player at it, by their Steam name. */
 function playersAtSpeed(
   multiplayer: MultiplayerSpeedOptionsProps,
@@ -93,7 +105,11 @@ function playersAtSpeed(
 }
 
 /** Keep a player's requested selection distinct from the clock's effective running speed.
- * Shared-clock reselections are emitted too, preserving quick reversals and explicit readiness. */
+ * Shared-clock reselections are emitted too, preserving quick reversals and explicit readiness.
+ *
+ * The group is a recessed track with one thumb under the speed the game is really running at,
+ * driven by --speed-index. Single-player's thumb follows the selection, since the two are the
+ * same thing there. In co-op a ring marks your own request whenever the thumb is elsewhere. */
 function speedOptions(
   { speed, onSpeedChange, desktop, multiplayer, disabled }: SpeedOptionsProps,
   descriptionId?: string,
@@ -102,6 +118,12 @@ function speedOptions(
   const description = multiplayer
     ? describeSharedClock(multiplayer, speed, resume)
     : undefined;
+  const options = [
+    "PAUSED",
+    ...(desktop || multiplayer ? DESKTOP_SPEEDS : RUNNING_SPEEDS),
+  ] as SpeedType[];
+  const thumbSpeed = multiplayer ? multiplayer.activeSpeed : speed;
+  const thumbIndex = options.indexOf(thumbSpeed);
   return (
     <>
       <ToggleButtonGroup
@@ -122,18 +144,18 @@ function speedOptions(
         aria-describedby={descriptionId}
         title={description}
         data-active-speed={multiplayer?.activeSpeed}
-        sx={
-          multiplayer
-            ? { "& .MuiToggleButton-root": { position: "relative" } }
-            : undefined
+        // Still on your earlier pick, but the clock is waiting for you to confirm it.
+        data-resume={resume ? "true" : undefined}
+        data-disabled={disabled ? "true" : undefined}
+        data-no-thumb={thumbIndex < 0 ? "true" : undefined}
+        style={
+          {
+            "--speed-index": Math.max(thumbIndex, 0),
+            "--speed-count": options.length,
+          } as React.CSSProperties
         }
       >
-        {(
-          [
-            "PAUSED",
-            ...(desktop || multiplayer ? DESKTOP_SPEEDS : RUNNING_SPEEDS),
-          ] as SpeedType[]
-        ).map((option) => {
+        {options.map((option) => {
           const peers =
             multiplayer?.players.filter(
               (player) =>
@@ -145,11 +167,15 @@ function speedOptions(
             <ToggleButton
               key={option}
               value={option}
+              // The thumb's slide is the feedback; a Material ripple would fight it.
+              disableRipple
               aria-label={SPEED_ARIA_LABELS[option]}
               aria-describedby={descriptionId}
               title={
                 multiplayer ? playersAtSpeed(multiplayer, option) : description
               }
+              // The button the thumb sits under, so its label can take the thumb's ink.
+              data-thumb={option === thumbSpeed ? "true" : undefined}
               data-active-speed={
                 multiplayer?.activeSpeed === option ? "true" : undefined
               }
@@ -158,53 +184,39 @@ function speedOptions(
               }
             >
               {peers.length > 0 && (
-                <Box
-                  component="span"
-                  className="multiplayerSpeedPeers"
-                  aria-hidden="true"
-                  sx={{ position: "absolute", inset: 0, pointerEvents: "none" }}
-                >
-                  {/* One neutral marker per other player, filling slots from the left on a
-                      12 px pitch about the centre, so the side slots clear your selection ring.
-                      Who chose what is in the title and description, not marker colour. */}
+                <span className="multiplayerSpeedPeers" aria-hidden="true">
+                  {/* One neutral pip per other player, centred along the bottom of the
+                      segment. Who chose what is in the title and description, not in colour. */}
                   {peers.map((player, slot) => (
-                    <PersonIcon
+                    <svg
                       key={player.id}
+                      className="multiplayerSpeedPip"
+                      viewBox="0 0 6 6"
+                      focusable="false"
                       data-player-id={player.id}
                       data-slot={slot}
                       data-testid={`speed-peer-${option}-${player.id}`}
-                      sx={{
-                        position: "absolute",
-                        bottom: 1,
-                        left: `calc(50% + ${(slot - 1) * 12}px)`,
-                        transform: "translateX(-50%)",
-                        width: 12,
-                        height: 12,
-                      }}
-                    />
-                  ))}
-                </Box>
-              )}
-              <Box
-                component="span"
-                className={multiplayer ? "multiplayerSpeedLabel" : undefined}
-                sx={
-                  multiplayer
-                    ? {
-                        position: "relative",
-                        zIndex: 1,
-                        display: "inline-flex",
-                        alignItems: "center",
+                      style={
+                        {
+                          "--slot": slot,
+                          "--peers": peers.length,
+                        } as React.CSSProperties
                       }
-                    : { display: "contents" }
-                }
+                    >
+                      <path d="M0 3a3 3 0 1 0 6 0a3 3 0 1 0-6 0z" />
+                    </svg>
+                  ))}
+                </span>
+              )}
+              <span
+                className={multiplayer ? "multiplayerSpeedLabel" : "speedLabel"}
               >
                 {option === "PAUSED" ? (
                   <PauseIcon fontSize="small" />
                 ) : (
                   selectionLabel(option)
                 )}
-              </Box>
+              </span>
             </ToggleButton>
           );
         })}
@@ -212,6 +224,11 @@ function speedOptions(
       {description && (
         <span className="srOnly" id={descriptionId}>
           {description}
+        </span>
+      )}
+      {multiplayer && (
+        <span className="srOnly" role="status">
+          {describeClockStatus(multiplayer, resume)}
         </span>
       )}
     </>

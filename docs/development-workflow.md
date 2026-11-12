@@ -42,6 +42,29 @@ lifetimes and cancellation are covered by child-process tests.
 
 ## Evidence and hosted CI
 
+### PR monitor survey
+
+`node scripts/dev/pr-triage.js --repo toddmedema/electrify` prints one compact JSON
+snapshot of every open PR. It fetches only metadata: head/base commits, mergeability,
+failed/pending head checks, and opaque GraphQL feedback IDs/update times from `toddmedema` and
+CodeRabbit. It includes unresolved outdated threads for the monitor to assess;
+resolved threads are omitted. Every relevant connection is paginated, and UNKNOWN
+mergeability is retried once. Errors exit nonzero and never produce a clean result.
+
+The helper is read-only. The monitor keeps its existing durable ledger, worker
+ownership, three-attempt budget per unresolved issue, and body-on-demand feedback
+assessment. A dispatched comment is not automatically handled, and an agent's
+own push does not renew its attempt budget. The helper does not decide which
+feedback is actionable or run repairs.
+
+An installed monitor should load the helper from the current remote `master`,
+using a temporary file when its checkout is on another branch. Until this helper
+lands on `master`, keep the monitor's existing metadata query. Do not execute a
+feature branch's copy as the shared monitor. Treat an API or helper error as a
+failed survey, preserve the ledger, and report the error.
+
+### Validation evidence
+
 Check reports retain separate `timing.queueMs` and `timing.executionMs` values.
 All existing gates, source-change detection, coverage thresholds, viewport
 projects, diagnostic retries, and flake rejection remain required. Run focused

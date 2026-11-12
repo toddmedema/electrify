@@ -558,9 +558,9 @@ html[data-tv-layout="true"] {
     flex: 0 0 auto;
     margin-left: auto;
   }
-  .speedToggles .MuiToggleButton-root {
-    min-width: 2.75rem;
-    padding: 0.5rem;
+  .speedToggles {
+    --speed-segment: 3.25rem;
+    --speed-inset: 0.25rem;
   }
   .gameStatusBar {
     display: flex;
@@ -849,7 +849,8 @@ html[data-tv-layout="true"] {
   .tvComparisonItem {
     grid-column: 1 / -1;
   }
-  .chartTooltip {
+  .chartTooltip,
+  .chartEventTooltip {
     max-width: min(30rem, 100%);
     padding: 0.25rem;
     font-size: 0.75rem;

@@ -160,7 +160,6 @@ function buildOptions(showXLabels: boolean) {
       cursor: {
         x: true,
         y: false,
-        points: { show: false },
         drag: { x: false, y: false, setScale: false },
       },
       legend: { show: false },
@@ -305,7 +304,7 @@ export default class ChartForecastPowerExchange extends React.PureComponent<
           {transmission?.buyingRule === "NONE" &&
           transmission.sellingRule === "NONE"
             ? "No power is crossing your interties because trading is turned off."
-            : "No imports or exports in this period. Your interties only trade when you fall short or have surplus to sell."}
+            : "No imports or exports in this period."}
         </Typography>
       );
     }

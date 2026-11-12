@@ -1525,6 +1525,17 @@ function setForegroundSpeed(state: GameType, speed: SpeedType) {
   }
 }
 
+/**
+ * Whether opening this card holds the clock. A shared multiplayer clock belongs to every company,
+ * so its construction catalogs never freeze it for the player shopping.
+ */
+function blocksClock(state: GameType, name: string): boolean {
+  return (
+    BLOCKING_CARDS.has(name) &&
+    !(state.multiplayer && name.startsWith("BUILD_"))
+  );
+}
+
 function enterBlockingCard(state: GameType, name: string) {
   if (!state.inGame) return;
   const enteringFlow = speedBeforeBlockingCard === undefined;
@@ -2204,8 +2215,17 @@ export const gameSlice = createSlice({
         state.location.id === incoming.location.id &&
         state.scenarioId === incoming.scenarioId &&
         state.startingYear === incoming.startingYear;
+      // The worker/transport clones every view. An unchanged four-player clock should not
+      // rebuild the speed controls on every ordinary snapshot while the player is clicking.
+      const clock =
+        sameGrid &&
+        JSON.stringify(state.multiplayer?.clock) ===
+          JSON.stringify(incoming.multiplayer?.clock)
+          ? state.multiplayer?.clock
+          : incoming.multiplayer?.clock;
       return {
         ...incoming,
+        multiplayer: incoming.multiplayer && { ...incoming.multiplayer, clock },
         // Completed months and the authored location are immutable. Keeping their identity lets
         // normal forecasts finish while authoritative tick snapshots continue to arrive.
         location: sameGrid ? state.location : incoming.location,
@@ -2388,13 +2408,13 @@ export const gameSlice = createSlice({
     builder.addCase(navigate, (state, action) => {
       const payload = action.payload;
       const name = typeof payload === "string" ? payload : payload?.name;
-      if (!name || !BLOCKING_CARDS.has(name)) {
+      if (!name || !blocksClock(state, name)) {
         // Navigating anywhere else (rather than backing out) still counts as leaving it
         restoreSpeedAfterBlockingCard(state);
       } else enterBlockingCard(state, name);
     });
     builder.addCase(navigateBack, (state, action) => {
-      if (!action.payload || !BLOCKING_CARDS.has(action.payload))
+      if (!action.payload || !blocksClock(state, action.payload))
         restoreSpeedAfterBlockingCard(state);
       else enterBlockingCard(state, action.payload);
     });
@@ -2439,7 +2459,13 @@ export const gameSlice = createSlice({
         state.scenarioChoicePause = "PAUSED";
     });
     builder.addCase(pageHidden, (state) => {
-      if (state.inGame && speedBeforeHidden === undefined) {
+      // A shared clock keeps running for the other companies while this window is in the
+      // background, so only a game this renderer owns freezes with the page.
+      if (
+        state.inGame &&
+        !state.multiplayer &&
+        speedBeforeHidden === undefined
+      ) {
         speedBeforeHidden = state.speed;
         state.speed = "PAUSED";
       }

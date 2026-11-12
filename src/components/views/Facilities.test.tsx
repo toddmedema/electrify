@@ -292,9 +292,11 @@ describe("the fleet list", () => {
     expect(screen.queryByText("Non-fuel start cost")).toBeNull();
   });
 
-  it("labels a facility whose output is constrained by a world event", () => {
+  it("shows the available MW and explains only events limiting this facility", async () => {
     const constrained = createGame({ scenarioId: 104 });
     const facility = constrained.facilities[0];
+    facility.peakW = 300e6;
+    facility.currentW = 0;
     constrained.worldEvents.active = [
       {
         key: "story:104:hurricane-2008:landfall",
@@ -302,10 +304,20 @@ describe("the fleet list", () => {
         startsMinute: 0,
         endsMinute: MINUTES_PER_MONTH,
         attributes: {},
+        title: "Extreme heat",
         effects: {
           facilityOutputMultipliersById: { [String(facility.id)]: 0.6 },
           facilityOutputMultipliersByFuel: { [facility.fuel!]: 0.5 },
         },
+      },
+      {
+        key: "unrelated",
+        definitionId: "unrelated",
+        startsMinute: 0,
+        endsMinute: MINUTES_PER_MONTH,
+        attributes: {},
+        title: "Fuel shortage",
+        effects: { facilityOutputMultipliersById: { "-1": 0.5 } },
       },
     ];
     renderFacilities(constrained, null);
@@ -313,7 +325,46 @@ describe("the fleet list", () => {
     expect(
       screen.getByLabelText("Temporarily limited to 30% of rated output"),
     ).toBeInTheDocument();
+    expect(rows()[0]).toHaveTextContent("0/300 90MW");
+    expect(within(rows()[0]).getByText("300", { selector: "s" })).toBeVisible();
+    await user.hover(screen.getByText("30% limit"));
+    expect(await screen.findByRole("tooltip")).toHaveTextContent(
+      "Limited due to Extreme heat",
+    );
+    expect(screen.getByRole("tooltip")).not.toHaveTextContent("Fuel shortage");
   });
+
+  it.each([
+    [300e6, 0, "0/300 0MW", "300"],
+    [300e6, 0.98, "0/300 294MW", "300"],
+    [300e6, 1, "0/300MW", "300"],
+    [1e9, 0.98, "0/1 0.98GW", "1"],
+    [1.234e9, 0.98, "0/1.234 1.209GW", "1.234"],
+  ] as const)(
+    "shows a %sW facility with a %s output cap without changing nameplate MW",
+    (peakW, limit, expected, rated) => {
+      const state = createGame({ scenarioId: 104 });
+      const facility = state.facilities[0];
+      facility.peakW = peakW;
+      facility.currentW = 0;
+      state.worldEvents.active = [
+        {
+          key: "limit",
+          definitionId: "limit",
+          startsMinute: 0,
+          endsMinute: MINUTES_PER_MONTH,
+          attributes: {},
+          effects: { facilityOutputMultipliersById: { [facility.id]: limit } },
+        },
+      ];
+      renderFacilities(state, null);
+      expect(rows()[0]).toHaveTextContent(expected);
+      expect(
+        within(rows()[0]).queryByText(rated, { selector: "s" }) !== null,
+      ).toBe(limit < 1);
+      expect(facility.peakW).toBe(peakW);
+    },
+  );
 
   it("scrolls live wheel input with its units while preserving zoom and edge gestures", () => {
     const initial = cloneDeep(game);
@@ -1231,10 +1282,20 @@ it.each([false, true])(
         />
       </Provider>,
     );
+    expect(
+      screen.queryByRole("button", { name: "Acquire Ridge Electric" }),
+    ).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /^Inspect Ridge/ }));
     expect(
       screen.getByRole("button", { name: "Acquire Ridge Electric" }),
     ).toBeVisible();
+    expect(
+      screen.queryByText(/Review the company terms/),
+    ).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /^Inspect Ridge/ }));
+    expect(
+      screen.queryByRole("button", { name: "Acquire Ridge Electric" }),
+    ).not.toBeInTheDocument();
   },
 );
 
@@ -1290,7 +1351,7 @@ describe("the intertie upgrade control", () => {
     expect(handleUpgrade).not.toHaveBeenCalled();
     const dialog = screen.getByRole("dialog");
     expect(dialog).toHaveTextContent(/Construction emits.*CO2e/);
-    expect(dialog).toHaveTextContent(/\(\d+\.\d+% for 30 years\)/);
+    expect(dialog).toHaveTextContent(/New loan: \d+\.\d+% for 30 years\./);
     expect(dialog).toHaveTextContent("Upkeep after upgrade");
     expect(dialog).not.toHaveTextContent("Line capacity");
     expect(dialog).toHaveTextContent("Import capacity150MW → 210MW");
@@ -1939,7 +2000,7 @@ it("removes an already-paused reactor's resume control when its permanent shutdo
 
   expect(
     screen.getByRole("button", { name: /^Inspect Chernobyl Unit 4/ }),
-  ).toHaveTextContent("0/1GW · 0% · paused");
+  ).toHaveTextContent("0/1 0GW · 0% · paused");
 
   expect(
     screen.queryByRole("button", { name: "Resume Chernobyl Unit 4" }),

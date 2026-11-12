@@ -10,6 +10,7 @@ import {
   List,
   ListItem,
   ListItemAvatar,
+  Tooltip,
   Typography,
 } from "@mui/material";
 import CheckIcon from "@mui/icons-material/Check";
@@ -58,6 +59,8 @@ import {
   formatWatts,
   formatWattsOfPeak,
   formatFacilitySize,
+  formatWattsInUnit,
+  getWattUnit,
 } from "../../helpers/Format";
 import ChartSupplyDemand from "../base/ChartSupplyDemand";
 import { getDispatchOrderedFuels } from "../../helpers/Energy";
@@ -103,6 +106,7 @@ interface FacilityListItemProps {
   onRowClick: (id: number, event: React.MouseEvent) => void;
   onContextMenu: (id: number, event: React.MouseEvent) => void;
   storyOutputMultiplier: number;
+  limitReason: string;
   hazardStatus?: FacilityHazardStatusType;
   onTogglePause: DispatchProps["onTogglePause"];
   onPause: DispatchProps["onPause"];
@@ -361,6 +365,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
     onPause,
     selected,
     storyOutputMultiplier,
+    limitReason,
     hazardStatus,
     arriving: arrivalRequested,
     onArrivalShown,
@@ -464,7 +469,21 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
           ),
         )
       : 1;
-  let reading = "";
+  const limited = storyOutputMultiplier < 1;
+  const unit = getWattUnit(facility.peakW);
+  // Keep small derates visible on GW plants, with the same precision for both capacities.
+  const outputReading = limited ? (
+    <>
+      {formatWattsOfPeak(outputW, facility.peakW).split("/")[0]}/
+      <s>
+        {formatWattsInUnit(facility.peakW, unit, 3).replace(/[^0-9.,]/g, "")}
+      </s>{" "}
+      {formatWattsInUnit(facility.peakW * storyOutputMultiplier, unit, 3)}
+    </>
+  ) : (
+    formatWattsOfPeak(outputW, facility.peakW)
+  );
+  let reading: React.ReactNode = "";
   let detail: React.ReactNode = null;
   if (underConstruction) {
     ({ reading, detail } = constructionStatus(
@@ -474,7 +493,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
   } else if (upgrading) {
     const daysLeft = upgradeDaysLeft(installing!, game.date.minute);
     reading = partialUpgrade
-      ? formatWattsOfPeak(outputW, facility.peakW)
+      ? outputReading
       : `Upgrading ${Math.round(builtFraction * 100)}%`;
     detail = (
       <>
@@ -490,10 +509,14 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
   } else if (facility.peakWh) {
     reading = formatWattHoursOfPeak(facility.currentWh, facility.peakWh);
   } else {
-    reading = formatWattsOfPeak(outputW, facility.peakW);
+    reading = outputReading;
     // A reservoir row's percentage would read as how full it is, which its gauge already shows.
     if (!(fuel === "Hydro" && facility.reservoirCapacityWh))
-      reading += ` · ${Math.round(Math.abs(outputFraction) * 100)}%`;
+      reading = (
+        <>
+          {reading} · {Math.round(Math.abs(outputFraction) * 100)}%
+        </>
+      );
     if (fuel === "Hydro" && facility.reservoirCapacityWh) {
       // Last-tick water balance stays meaningful on mount and selection. Paused turbines can
       // retain ramping currentW internally, so exclude their output from the water balance.
@@ -526,9 +549,15 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
   }
   // Output communicates normal operation; keep explicit labels for other states.
   const status =
-    offlineForWork || partialUpgrade || activity === "RUNNING"
-      ? reading
-      : `${reading} · ${ACTIVITY_LABELS[activity]}`;
+    offlineForWork || partialUpgrade || activity === "RUNNING" ? (
+      reading
+    ) : typeof reading === "string" ? (
+      `${reading} · ${ACTIVITY_LABELS[activity]}`
+    ) : (
+      <>
+        {reading} · {ACTIVITY_LABELS[activity]}
+      </>
+    );
 
   const icon = (
     <ListItemAvatar
@@ -647,13 +676,19 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                         <span className="facilityReadyLabel">Ready</span>
                       )}
                       {storyOutputMultiplier < 1 && (
-                        <Chip
-                          className="storyDerateBadge"
-                          color="warning"
-                          size="small"
-                          label={`${Math.round(storyOutputMultiplier * 100)}% limit`}
-                          aria-label={`Temporarily limited to ${Math.round(storyOutputMultiplier * 100)}% of rated output`}
-                        />
+                        <Tooltip
+                          title={limitReason}
+                          placement="top"
+                          describeChild
+                        >
+                          <Chip
+                            className="storyDerateBadge"
+                            color="warning"
+                            size="small"
+                            label={`${Math.round(storyOutputMultiplier * 100)}% limit`}
+                            aria-label={`Temporarily limited to ${Math.round(storyOutputMultiplier * 100)}% of rated output`}
+                          />
+                        </Tooltip>
                       )}
                     </>
                   }
@@ -1376,14 +1411,13 @@ export default class Facilities extends React.Component<Props, SelectionState> {
       game.transmission &&
       (game.multiplayer || corridorsForLocation(game.location).length)
     );
-    const storyEffects = combineStoryEffects(
-      game.worldEvents.active.filter(
-        (event) =>
-          game.date.minute >= event.startsMinute &&
-          game.date.minute < event.endsMinute &&
-          !isWeatherHazardEvent(event.definitionId),
-      ),
+    const activeStoryEvents = game.worldEvents.active.filter(
+      (event) =>
+        game.date.minute >= event.startsMinute &&
+        game.date.minute < event.endsMinute &&
+        !isWeatherHazardEvent(event.definitionId),
     );
+    const storyEffects = combineStoryEffects(activeStoryEvents);
 
     return (
       <GameCard className="facilities" id="facilitiesPane">
@@ -1497,7 +1531,24 @@ export default class Facilities extends React.Component<Props, SelectionState> {
                             storyOutputMultiplier={storyOutputMultiplier(
                               g,
                               storyEffects,
+                              game.date.minute,
                             )}
+                            limitReason={(() => {
+                              const reasons = activeStoryEvents
+                                .filter(
+                                  (event) =>
+                                    storyOutputMultiplier(
+                                      g,
+                                      event.effects,
+                                      game.date.minute,
+                                    ) < 1,
+                                )
+                                .map((event) => event.title || event.message)
+                                .filter(Boolean);
+                              return reasons.length
+                                ? `Limited due to ${Array.from(new Set(reasons)).join("; ")}`
+                                : "Limited by an active event";
+                            })()}
                             hazardStatus={facilityHazardStatus(game, g)}
                             spotInList={i}
                           />

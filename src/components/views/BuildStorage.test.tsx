@@ -183,7 +183,7 @@ it("submits a storage purchase only once on a double-click", () => {
   expect(onBuildStorage).toHaveBeenCalledTimes(1);
 });
 
-it("deduplicates storage purchase impact and shows loan terms inline", async () => {
+it("deduplicates storage purchase impact and shows loan terms below the payment", async () => {
   render(
     <BuildStorage
       game={game()}
@@ -198,11 +198,10 @@ it("deduplicates storage purchase impact and shows loan terms inline", async () 
 
   const impact = screen.getByRole("region", { name: "Expected impact" });
   expect(impact).toHaveTextContent("Cash purchase");
-  expect(impact).toHaveTextContent(
-    /Loan option.* \+ .*\/mo \(\d+\.\d+% for 30 years\)/,
-  );
+  expect(impact).toHaveTextContent(/Loan option.* \+ .*\/mo/);
   expect(impact).toHaveTextContent("Estimated upkeep");
   expect(impact).toHaveTextContent("Online in");
+  expect(impact).toHaveTextContent(/New loan: \d+\.\d+% for 30 years\./);
   expect(impact).not.toHaveTextContent("Loan:");
   expect(screen.queryByText("Cash cost")).not.toBeInTheDocument();
   expect(screen.queryByText("Time to build")).not.toBeInTheDocument();

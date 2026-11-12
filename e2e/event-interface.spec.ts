@@ -73,3 +73,52 @@ for (const theme of ["light", "dark"] as const) {
     ).toBeVisible();
   });
 }
+
+test("the full-screen chart names its numbered events and each badge names itself on hover", async ({
+  page,
+}) => {
+  await page.addInitScript(() => localStorage.clear());
+  await page.goto("/?scenario=106");
+  await page.getByRole("button", { name: "Start game", exact: true }).click();
+  await openPane(
+    page.locator(".insights:visible"),
+    page.getByRole("button", { name: "Insights", exact: true }),
+  );
+  const paneEvent = page
+    .getByRole("region", { name: "Upcoming scenario events" })
+    .getByRole("button")
+    .first();
+  await expect(paneEvent).toBeVisible();
+  const title = (
+    await paneEvent.locator(".insightEventTitle").innerText()
+  ).trim();
+
+  await page
+    .getByRole("button", { name: "Expand Supply & Demand chart" })
+    .click();
+  const dialog = page.getByRole("dialog", { name: "Supply & Demand" });
+  const rail = dialog.getByRole("region", { name: "Upcoming scenario events" });
+  await expect(rail).toContainText(title);
+  // Opening an event inside the chart keeps its details in the chart.
+  await rail.getByRole("button").first().click();
+  await expect(dialog.locator(".insightEventDetails")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(dialog.locator(".insightEventDetails")).toBeHidden();
+  await expect(dialog).toBeVisible();
+
+  // The badges are canvas pixels in the row above the plot: sweep it for the first one.
+  const plot = (await dialog.locator(".u-over").first().boundingBox())!;
+  const tooltip = dialog.locator(".chartEventTooltip").first();
+  let named = "";
+  for (let x = plot.x; x < plot.x + plot.width && !named; x += 3) {
+    await page.mouse.move(x, plot.y - 12);
+    if (
+      (await tooltip.evaluate((el) => getComputedStyle(el).display)) === "block"
+    )
+      named = await tooltip.innerText();
+  }
+  expect(named).toContain(title);
+  // Moving down onto the data takes the badge's name away.
+  await page.mouse.move(plot.x + plot.width / 2, plot.y + plot.height / 2);
+  await expect(tooltip).toBeHidden();
+});

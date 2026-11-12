@@ -6,8 +6,9 @@ files are large, so broad rewrites create expensive review diffs.
 
 ## Start here
 
-- Use Node 26. Install exactly the lockfile with `npm ci` in a new checkout or when the lockfile
-  changes; reuse that install across turns while it still matches the lockfile.
+- Use Node 26. Verify with `node --version` and put the installed Node 26 on `PATH` if needed.
+  Install exactly the lockfile with `npm ci` in a new checkout or when the lockfile changes;
+  reuse that install across turns while it still matches the lockfile.
 - Reserve the checkout before editing with `npm run task -- claim` (Codex supplies the chat ID;
   otherwise pass an ID or set `ELECTRIFY_TASK_ID`). If another task owns it, use an isolated
   worktree. Release it with `npm run task -- release` when finished. See
@@ -85,6 +86,22 @@ For behavior changes and new guardrails, use the repo-local
 and demonstrate that its check catches a violation. Prefer types, owning APIs, lint rules,
 and behavioral tests over adding instructions here.
 
+## Agent efficiency
+
+Every turn re-reads the whole conversation, so many small turns and large images cost the most.
+
+- Batch independent lookups: several `rg -n` or `sed -n` calls in one command, or parallel tool
+  calls, instead of one lookup per turn.
+- Prefer DOM text, computed styles and test assertions to screenshots. When you need an image,
+  use `npm run shot` (see `npm run shot -- --help`) instead of a throwaway Playwright script: it
+  is headless, writes device-scale-1 PNGs, and `--clip <selector>` captures just the component.
+  It photographs the dev server that `npm start` is running in this checkout.
+- Look at each image once; do not reopen unchanged screenshots after later edits.
+- For any task that uses subagents, follow the
+  [multi-agent-work skill](.agents/skills/multi-agent-work/SKILL.md): one shared brief, capped
+  read-only reviewer findings, a fresh coder per cluster of about five findings, and a final
+  review of `git diff origin/master...`.
+
 ## Run compatibility manifest
 
 `src/data/RunCompatibility.json` is a generated, git-ignored identity of the game reducer's
@@ -123,6 +140,7 @@ untracked. Agents without a verified hook should format the files they changed b
 - When opening a pull request with user-visible UI changes, capture 1-3 screenshots of the
   finished interface and embed them in the pull request description. Choose views that clearly
   show the change, including both desktop and mobile layouts when responsive behavior is relevant.
+  `npm run shot` produces small, clipped captures at each width and theme.
 - Keep review screenshots in a temporary location and upload them with GitHub CLI 2.99 or newer
   using `gh pr create --attach`, `gh pr edit --attach`, or `gh pr comment --attach`. Do not commit
   screenshots that exist only to illustrate a pull request; GitHub-hosted attachments keep them
@@ -206,38 +224,14 @@ untracked. Agents without a verified hook should format the files they changed b
 - Never make color or an icon the only carrier of meaning. Pair symbols and state colors with text;
   distinguish chart series with direct labels, patterns, or line styles as well as color.
 
-## Scenario writing
+## Task guidance skills
 
-- Keep event descriptions brief: lead with the main change the player needs to respond to,
-  usually in one short sentence. Do not narrate every simulation modifier.
-- Omit minor secondary cost changes (such as 8% higher running costs or a 10% fuel increase)
-  when a supply loss is the event's main consequence. Keep major price shocks, decision
-  tradeoffs, and timing that affects preparation or recovery.
-- Use direct wording: "Coal output is down to 67%." Avoid qualifiers such as "of nominal",
-  "normal maximum output", and "for the year" when the context already supplies the meaning.
-- Keep previews brief and in future tense; report exact effects and recorded outcomes in live
-  messages. Shortening copy must not change simulation effects, schedules, or seeded outcomes.
+Read the matching file before starting; each holds guidance only that task needs.
 
-## Icon design
-
-- Match the existing scenario and facility icon system: use a `0 0 500 500` SVG view box, a bold
-  circular boundary where appropriate, flat fills, black outlines, and a small palette drawn from
-  nearby icons. Do not use text, gradients, filters, or a one-off illustration style.
-- Communicate one concept with a strong silhouette and the fewest useful shapes and anchor points.
-  Build on clean circles, straight segments, and simple curves; remove incidental detail rather
-  than relying on the full-size artwork to carry it.
-- Use the shared stroke hierarchy exactly: `40` for the outer boundary, `20` for primary interior
-  shapes, and `10` for secondary detail. Do not treat intermediate widths found in legacy icons as
-  precedent or use them to compensate for imprecise geometry.
-- Align geometry to deliberate centers, baselines, and axes. Use whole-number coordinates, mirror
-  symmetric elements from a shared axis, keep repeated elements equal in size and spacing, and
-  account for stroke extents so forms do not crowd or clip the canvas.
-- Design for the icon's actual 40-48 px UI size. Review the full-size SVG and rasterized small-size
-  previews on both light and dark backgrounds, checking silhouette, contrast, optical centering,
-  negative-space separation, and whether fine details merge or disappear.
-- Include concise SVG `<title>` and `<desc>` elements for scenario icons. Keep visible text labels
-  beside icons in the interface so first-time players and assistive-technology users do not have to
-  infer meaning from the artwork.
+- Writing or editing scenario, event and story copy:
+  [.agents/skills/scenario-writing/SKILL.md](.agents/skills/scenario-writing/SKILL.md).
+- Designing or revising scenario and facility icons:
+  [.agents/skills/icon-design/SKILL.md](.agents/skills/icon-design/SKILL.md).
 
 ## Guardrails
 
@@ -252,23 +246,3 @@ untracked. Agents without a verified hook should format the files they changed b
   actions through it, and `reducers/ImportOrder.test.tsx` protects startup from dependency cycles.
 - Treat `public/data/`, large media, and generated output as artifacts. Prefer changing their source
   or generator, and avoid formatting or rewriting them incidentally.
-
-## Open Sprint Runtime Contract
-
-Open Sprint manages task state internally. Do not use external task CLIs.
-
-- Native Claude Code (`claude-cli`) and Codex (`codex`) agents use local subscription sign-in, not API-key settings. Their task prompts are passed on stdin. Provider, model, and optional effort are configured by task type: Planning, Design, Coding, QA, and Code Review. Effort uses the selected model’s supported levels; omitted effort preserves CLI defaults. Explicit effort is verified before launch and passed through the native CLI configuration, including task-file runs. Sandbox restrictions remain active; if a required action is blocked, report it rather than claiming success. The orchestrator commits remaining worktree changes before merge.
-- Pull request delivery uses a shared plan branch; the orchestrator publishes the PR and retains the branch for human merge. Execute agents must leave publication to the orchestrator. PR delivery requires no active or retained review governance; governed projects use direct delivery.
-- Execute agents start in a prepared worktree with the task branch already checked out.
-- Agent admission is cancellable and FIFO. Recheck attempt generation and owning slot after admission and immediately before launch; cancelled or replaced queued attempts must never launch. Concurrency limit changes preserve active accounting.
-- Recovered PIDs are observation-only until ownership is independently verified. Retain uncertain assignments instead of killing or requeueing them. A stop request becomes stopped only after observed completion. A terminal result file alone cannot complete an unverified recovered process. Guidance receipts distinguish durable queue acceptance from inclusion in a model turn.
-- Run the smallest relevant non-watch verification for touched workspaces while iterating. Use scoped tests first, add scoped build/typecheck and lint commands when your changes could affect them, and leave the branch in a state where the project’s configured merge quality gates are expected to pass before reporting success.
-- If you add, remove, or upgrade dependencies: run the repository’s documented install workflow from the repository root, update manifests/lockfiles required by that ecosystem, and commit dependency metadata changes together with the code that uses them.
-- If the project’s build/typecheck includes tests, ensure test-runner globals and typing/runtime configuration are set up so build/typecheck still passes after your changes.
-- Report completion or blocking questions by writing the exact `.opensprint/active/<task-id>/result.json` payload requested in the task prompt.
-- Commit incremental logical units while working so crash recovery can preserve progress.
-- If blocked by ambiguity, return `status: "failed"` with `open_questions` instead of guessing.
-- Do not push, merge, or close tasks manually; the orchestrator handles validation, task state, merging, and remote publication.
-- When review governance is enabled, use the assignment's pinned policy release and structured findings/appeals. Repository edits cannot alter governing authority. Human governance rulings are separate from ordinary open-question answers; do not resolve dockets or access approval credentials. Hard gates and protected-path scope cannot be waived; under enforcement only an owner's structured scope grant unlocks protected paths, never task wording.
-- Governance waiting tasks retain their worktree and durable evidence while releasing agent slots. Only a valid code/policy-bound disposition permits resumption. Policy amendments and rollback require authorized human approval and complete isolated evaluation.
-- Prepared remote publication tasks start with fresh review and hard checks against the assigned remote base and original per-file scope; rejected code may then enter a fix cycle. Pending publication cannot trigger automatic deployment.

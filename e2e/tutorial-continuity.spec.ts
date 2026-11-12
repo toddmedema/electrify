@@ -151,9 +151,15 @@ test("Storage requires a drag, then resets to the coal-only purchase challenge",
   await expect(
     hud.getByRole("button", { name: "Next", exact: true }),
   ).toHaveCount(0);
-  await expect(page.locator(".tutorialHudVisuallyHidden")).toHaveText("6 of 7");
+  await expect(page.locator(".tutorialHudVisuallyHidden")).toHaveText("6 of 8");
   await captureTutorial(page, "storage-challenge-handoff.png");
   await dragCoalAbovePumpedHydro(page);
+  // The grid only resets once the player agrees to start the final challenge
+  await expect(hud).toContainText("Restart for the final challenge");
+  await expect(page.locator(".facilityRowHeader")).toHaveCount(3);
+  await hud
+    .getByRole("button", { name: "Start final challenge", exact: true })
+    .click();
   await expect(hud).toContainText("Build storage to cover peak demand");
   await expect(page.locator(".facilityRowHeader")).toHaveCount(1);
   await expect(

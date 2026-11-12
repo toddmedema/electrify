@@ -8,6 +8,7 @@ import { activeScenario } from "../../helpers/GameSelectors";
 import { ScenarioDetailsContent } from "./ScenarioDetails";
 import { RunDebrief } from "./RunResult";
 import VictoryDialog from "./VictoryDialog";
+import VictoryConditions from "./VictoryConditions";
 import SavedResultDialog from "./SavedResultDialog";
 import type { VictoryType } from "../../Types";
 import { getScenario } from "../../data/Scenarios";
@@ -212,3 +213,20 @@ for (const view of ["live", "saved"] as const) {
     },
   );
 }
+
+it("shows the same combined retirement goal before starting Across the Valley", () => {
+  render(
+    <VictoryConditions scenario={getScenario(116)!} difficulty="Employee" />,
+  );
+  const requirements = screen.getByRole("region", { name: "Requirements" });
+  expect(
+    within(requirements).getAllByText("Retire original oil plants"),
+  ).toHaveLength(1);
+  expect(requirements).toHaveTextContent("Champlain’s Oil A by Dec 2020");
+  expect(requirements).toHaveTextContent(
+    "Acquired original oil plants by Dec 2023",
+  );
+  expect(requirements).not.toHaveTextContent(
+    "Retire acquired original oil assets",
+  );
+});

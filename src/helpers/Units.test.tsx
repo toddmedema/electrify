@@ -1,6 +1,7 @@
 import {
   formatLargeMass,
   formatLargeMassApprox,
+  formatLargeMassSignificant,
   formatLargeMassValue,
   formatLargeMassValueConcise,
   formatMass,
@@ -58,6 +59,21 @@ describe("Units", () => {
 it("does not show negative zero for a per-ton price rounded to zero", () => {
   expect(formatPricePerLargeMass(-0.00001, "metric")).toBe("$0/tonne");
   expect(formatPricePerLargeMass(-0.001, "metric")).toBe("$-1/tonne");
+});
+
+it("rounds a headline mass to three significant digits with k/M/G", () => {
+  expect(formatLargeMassSignificant(0, "metric")).toBe("0 tonnes");
+  expect(formatLargeMassSignificant(523000, "metric")).toBe("523 tonnes");
+  expect(formatLargeMassSignificant(5234000, "metric")).toBe("5.23k tonnes");
+  expect(formatLargeMassSignificant(12345000, "metric")).toBe("12.3k tonnes");
+  expect(formatLargeMassSignificant(123456000, "metric")).toBe("123k tonnes");
+  expect(formatLargeMassSignificant(1234567000, "metric")).toBe("1.23M tonnes");
+  expect(formatLargeMassSignificant(1200000000, "metric")).toBe("1.2M tonnes");
+  expect(formatLargeMassSignificant(1.234e12, "metric")).toBe("1.23G tonnes");
+  // Rounding up past a prefix boundary promotes it instead of printing 1000k
+  expect(formatLargeMassSignificant(999600000, "metric")).toBe("1M tonnes");
+  expect(formatLargeMassSignificant(907184740, "imperial")).toBe("1M tons");
+  expect(formatLargeMassSignificant(1.5e15, "metric")).toBe("1500G tonnes");
 });
 
 it("preserves mass precision and compact unit thresholds in both systems", () => {

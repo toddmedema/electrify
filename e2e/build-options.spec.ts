@@ -186,6 +186,94 @@ for (const theme of ["light", "dark"] as const) {
         expect(strokes[0]).toBe(
           theme === "light" ? "rgb(84, 110, 122)" : "rgb(154, 169, 186)",
         );
+        for (const name of ["Solar", "Hydro"]) {
+          const card = cards.filter({
+            has: page.getByRole("button", {
+              name: `Review purchase of ${name}`,
+              exact: true,
+            }),
+          });
+          const output = card.getByRole("group", { name: /^Typical monthly/ });
+          await expect(output).toBeVisible();
+          await output.scrollIntoViewIfNeeded();
+          const caption = output.locator(".buildOptionOutputCaption");
+          const lowCaption = await caption.textContent();
+          const chart = output.locator("svg");
+          await chart.hover({ position: { x: 0, y: 12 } });
+          await expect(caption).toHaveText(/^Jan: \d+%/);
+          const chartBox = (await chart.boundingBox())!;
+          const layout = () =>
+            output.evaluate((element) => {
+              const parent = element.getBoundingClientRect();
+              return ["svg", ".buildOptionOutputCaption"].map((selector) => {
+                const rect = element
+                  .querySelector(selector)!
+                  .getBoundingClientRect();
+                return {
+                  x: rect.x - parent.x,
+                  y: rect.y - parent.y,
+                  width: rect.width,
+                  height: rect.height,
+                };
+              });
+            });
+          const initialLayout = await layout();
+          const months = [
+            "Jan",
+            "Feb",
+            "Mar",
+            "Apr",
+            "May",
+            "Jun",
+            "Jul",
+            "Aug",
+            "Sep",
+            "Oct",
+            "Nov",
+            "Dec",
+          ];
+          for (const [index, month] of months.entries()) {
+            await page.mouse.move(
+              chartBox.x + (index / 11) * (chartBox.width - 0.1),
+              chartBox.y + chartBox.height / 2,
+            );
+            await expect(caption).toHaveText(
+              new RegExp(
+                `^${month}: \\d+% ${name === "Hydro" ? "of typical water" : "capacity"}$`,
+              ),
+            );
+            expect(await layout()).toEqual(initialLayout);
+          }
+          const textLayout = await caption.evaluate((element) => {
+            const range = document.createRange();
+            range.selectNodeContents(element);
+            return {
+              height: range.getBoundingClientRect().height,
+              lineHeight: parseFloat(getComputedStyle(element).lineHeight),
+              whiteSpace: getComputedStyle(element).whiteSpace,
+            };
+          });
+          expect(textLayout.height).toBeLessThanOrEqual(textLayout.lineHeight);
+          expect(textLayout.whiteSpace).toBe("nowrap");
+          if (testInfo.project.use.hasTouch) {
+            await page.touchscreen.tap(
+              chartBox.x,
+              chartBox.y + chartBox.height / 2,
+            );
+          } else {
+            await output.focus();
+            await output.press("Home");
+          }
+          await expect(caption).toHaveText(/^Jan: \d+%/);
+          await reviewScreenshot(card, {
+            path: testInfo.outputPath(`${name}-monthly-${theme}.png`),
+            animations: "disabled",
+          });
+          await page.mouse.move(0, 0);
+          await output.evaluate((element: HTMLElement) => element.blur());
+          await expect(caption).toHaveText(lowCaption!);
+        }
+        await first.scrollIntoViewIfNeeded();
         // Metrics reflow at a readable minimum width.
         const cells = await metrics
           .locator(".buildOptionMetric")
@@ -339,6 +427,12 @@ for (const theme of ["light", "dark"] as const) {
         name: "What is interest rate?",
       });
       await expect(cashValue).toHaveText(/^\$[\d,.]+[kMBT]? now$/);
+      await expect(loanValue).toHaveText(
+        /^\$[\d,.]+[kMBT]? now \+ \$[\d,.]+[kMBT]?\/mo$/,
+      );
+      await expect(loanFact.locator(".decisionImpactFactDetail")).toHaveText(
+        /^New loan: \d+\.\d+% for \d+ years\.$/,
+      );
       await expect(dialog).not.toContainText("Payments start now");
       await loanFact.scrollIntoViewIfNeeded();
       const [labelBox, loanBox, cashBox, helpBox] = await Promise.all([

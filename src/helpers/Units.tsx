@@ -110,6 +110,29 @@ export function formatLargeMass(kg: number, units: UnitSystemType): string {
   return `${formatLargeMassValue(kg, units)} ${largeMassUnit(units)}`;
 }
 
+const SI_PREFIXES = [
+  { divisor: 1e9, prefix: "G" },
+  { divisor: 1e6, prefix: "M" },
+  { divisor: 1e3, prefix: "k" },
+];
+
+/**
+ * A total in k/M/G of the player's ton, rounded to three significant digits ("12.3k tonnes",
+ * "1.23G tonnes"), for a headline figure whose last few digits are noise. Rounding comes first so
+ * 999,600 reads "1M" rather than "1000k".
+ */
+export function formatLargeMassSignificant(
+  kg: number,
+  units: UnitSystemType,
+): string {
+  const value = toDisplayLargeMass(kg, units);
+  if (!Number.isFinite(value)) return `${value} ${largeMassUnit(units)}`;
+  const rounded = Number(value.toPrecision(3));
+  const si = SI_PREFIXES.find(({ divisor }) => Math.abs(rounded) >= divisor);
+  const scaled = si ? Number((rounded / si.divisor).toPrecision(3)) : rounded;
+  return `${scaled}${si?.prefix ?? ""} ${largeMassUnit(units)}`;
+}
+
 /**
  * A round number of tons in one system is a lopsided one in the other, so a quantity used as a
  * yardstick - the megatonne the score deducts per, the fee quoted per ton - is rounded to

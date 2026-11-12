@@ -87,6 +87,7 @@ import {
   fuelColors,
   fuelDashArrays,
   waterDashArrays,
+  withAlpha,
 } from "../../Theme";
 import ChartForecastDemandByType, {
   demandTypesBySizeAtStart,
@@ -99,7 +100,6 @@ import FuelFilter from "../base/FuelFilter";
 import { ExpandedChartPresentation } from "../base/ChartPresentationContext";
 import ChartForecastFuelPrices from "../base/ChartForecastFuelPrices";
 import ChartForecastPowerExchange from "../base/ChartForecastPowerExchange";
-import ChartForecastRenewableCapacityFactor from "../base/ChartForecastRenewableCapacityFactor";
 import ChartForecastStorage from "../base/ChartForecastStorage";
 import ChartForecastSupplyByFuel, {
   forecastFuels,
@@ -109,7 +109,10 @@ import ChartForecastWater from "../base/ChartForecastWater";
 import ChartForecastWeather from "../base/ChartForecastWeather";
 import ChartLegend from "../base/ChartLegend";
 import GameCard from "../base/GameCard";
-import { forecastShortfalls } from "../../helpers/ForecastShortfalls";
+import {
+  firstShortfallMinute,
+  forecastShortfalls,
+} from "../../helpers/ForecastShortfalls";
 import { largeMassUnit, temperatureUnit } from "../../helpers/Units";
 import { UnitsContext } from "../base/UnitsContext";
 import {
@@ -135,7 +138,11 @@ import PowerExchangeSummary, {
   LivePowerExchangeSummary,
 } from "../base/PowerExchangeSummary";
 import { transmissionAvailable } from "../../data/AdjacentMarkets";
-import ChartSupplyDemandRanges from "../base/ChartSupplyDemandRanges";
+import ChartSupplyDemandRanges, {
+  monthlyShortfalls,
+  shortfallsWithin,
+  supplyDemandMonthlyRanges,
+} from "../base/ChartSupplyDemandRanges";
 import ChartMonthlySpareCapacity from "../base/ChartMonthlySpareCapacity";
 import { getTutorialStep } from "../../data/Scenarios";
 import { ToolScrollMemory } from "../base/GameToolMemory";
@@ -151,12 +158,9 @@ export type InsightLayerId =
   | "supplyByFuel"
   | "storage"
   | "fuelPrices"
-  | "solarCapacityFactor"
   | "water"
   | "weather"
   | "profit"
-  | "revenue"
-  | "expenses"
   | "cash"
   | "customers"
   | "emissions"
@@ -195,8 +199,6 @@ export const INSIGHT_LAYERS: readonly InsightLayerDefinition[] = [
   },
   { id: "customers", label: "Customers", group: "Customers" },
   { id: "profit", label: "Profit", group: "Economics" },
-  { id: "revenue", label: "Revenue", group: "Economics" },
-  { id: "expenses", label: "Expenses", group: "Economics" },
   { id: "cash", label: "Cash", group: "Economics" },
   { id: "financeDetails", label: "Finance details", group: "Economics" },
   { id: "fuelPrices", label: "Fuel Prices", group: "Economics" },
@@ -208,11 +210,6 @@ export const INSIGHT_LAYERS: readonly InsightLayerDefinition[] = [
   {
     id: "emissions",
     label: "Emissions (CO₂e)",
-    group: "Environment",
-  },
-  {
-    id: "solarCapacityFactor",
-    label: "Renewable output",
     group: "Environment",
   },
   { id: "weather", label: "Temperature", group: "Environment" },
@@ -245,13 +242,10 @@ export const INSIGHT_LAYER_MANUAL: Record<ChartLayerId, ManualEntryTitleType> =
     storage: MANUAL_ENTRY.POWER_AND_ENERGY,
     customers: MANUAL_ENTRY.CUSTOMERS,
     profit: MANUAL_ENTRY.FORECASTS,
-    revenue: MANUAL_ENTRY.RATES,
-    expenses: MANUAL_ENTRY.OPERATING_COSTS,
     cash: MANUAL_ENTRY.FORECASTS,
     fuelPrices: MANUAL_ENTRY.FUEL_COSTS,
     inflationInterest: MANUAL_ENTRY.INTEREST_RATES,
     emissions: MANUAL_ENTRY.EMISSIONS,
-    solarCapacityFactor: MANUAL_ENTRY.CAPACITY_FACTOR,
     weather: MANUAL_ENTRY.FORECASTS,
     water: MANUAL_ENTRY.HYDROPOWER,
   };
@@ -298,11 +292,11 @@ export const INSIGHT_PRESETS: Record<
   },
   profitability: {
     label: "Profitability",
-    layers: ["profit", "cash", "revenue", "expenses", "fuelPrices"],
+    layers: ["profit", "cash", "fuelPrices"],
   },
   growth: {
     label: "Growth & pricing",
-    layers: ["customers", "demandByType", "supplyDemand", "revenue", "profit"],
+    layers: ["customers", "demandByType", "supplyDemand", "profit"],
   },
   decarbonization: {
     label: "Cutting emissions",
@@ -442,6 +436,7 @@ function viewportAnnouncement(
 function timelineWithin(
   timeline: TickPresentFutureType[],
   range: ChartViewportRange,
+  completeMonths = false,
 ): TickPresentFutureType[] {
   if (timeline.length <= 2) return timeline;
   let first = 0;
@@ -451,7 +446,7 @@ function timelineWithin(
     if (timeline[middle].minute < range[0]) first = middle + 1;
     else last = middle;
   }
-  const from = Math.max(0, first - 1);
+  let from = Math.max(0, first - 1);
   first = from;
   last = timeline.length;
   while (first < last) {
@@ -459,7 +454,24 @@ function timelineWithin(
     if (timeline[middle].minute <= range[1]) first = middle + 1;
     else last = middle;
   }
-  return timeline.slice(from, Math.min(timeline.length, first + 1));
+  let to = Math.min(timeline.length, first + 1);
+  if (completeMonths) {
+    // Keep every available hour in the edge months, including the neighbouring points used
+    // for clipping. Panning must not change a month's extrema, peak shortfall or unmet share.
+    const firstMonth = Math.floor(timeline[from].minute / MINUTES_PER_MONTH);
+    const lastMonth = Math.floor(timeline[to - 1].minute / MINUTES_PER_MONTH);
+    while (
+      from > 0 &&
+      Math.floor(timeline[from - 1].minute / MINUTES_PER_MONTH) === firstMonth
+    )
+      from--;
+    while (
+      to < timeline.length &&
+      Math.floor(timeline[to].minute / MINUTES_PER_MONTH) === lastMonth
+    )
+      to++;
+  }
+  return timeline.slice(from, to);
 }
 
 function sameLayers(left: InsightLayerId[], right: InsightLayerId[]): boolean {
@@ -625,8 +637,6 @@ const FINANCE_LAYER_METRICS: Partial<
   Record<InsightLayerId, HistoryMetricKeyType & DerivedHistoryKeysType>
 > = {
   profit: "profit",
-  revenue: "revenue",
-  expenses: "expenses",
   cash: "cash",
   customers: "customers",
   emissions: "kgco2e",
@@ -940,7 +950,9 @@ export default class Insights extends React.Component<Props, State> {
       }
       this.props.onEvidenceReady?.(
         request,
-        document.querySelector<HTMLElement>(".insightEventChip.active"),
+        document.querySelector<HTMLElement>(
+          ".insightsChartDialog .insightEventChip.active",
+        ) ?? document.querySelector<HTMLElement>(".insightEventChip.active"),
       );
       return;
     }
@@ -1417,12 +1429,16 @@ export default class Insights extends React.Component<Props, State> {
       projection.projectionStepMinutes,
       0,
     );
+    const firstMinute = firstShortfallMinute(forecast);
     const shortfall =
-      blackoutTotalWh > 0
+      blackoutTotalWh > 0 && firstMinute !== undefined
         ? {
             wh: blackoutTotalWh,
             peakW,
-            label: viewportLabel(range, this.props.game.startingYear),
+            startYear: getDateFromMinute(
+              firstMinute,
+              this.props.game.startingYear,
+            ).year,
           }
         : undefined;
     this.shortfallCache = { projection, range, shortfall };
@@ -1673,30 +1689,58 @@ export default class Insights extends React.Component<Props, State> {
                 component="p"
                 sx={{ mx: 2, my: 1, color: "text.secondary" }}
               >
-                Lowest reserve in each month. Below zero means a reserve
-                deficit.
+                Lowest reserve in each month. Below zero is a shortage.
               </Typography>
             </>
           );
           break;
-        case "supplyDemand":
+        case "supplyDemand": {
+          // Beyond two years the chart aggregates to monthly ranges, whose shortfall markers
+          // are derived from those ranges rather than from the hourly blackout spans. The
+          // legend follows the markers that reach into the viewport, not the hourly shortfall
+          // total, so a mark on the plot always has its key.
+          const rangedSupplyDemand =
+            projection.domain.x[1] - projection.domain.x[0] >
+            24 * MINUTES_PER_MONTH;
+          // Share the hourly aggregation with the chart; the legend must not repeat it.
+          const monthlyRanges = rangedSupplyDemand
+            ? supplyDemandMonthlyRanges(
+                projection.supplyDemandTimeline,
+                projection.forecast[0]?.minute,
+              )
+            : [];
+          const unmetDemandMarked =
+            shortfallsWithin(
+              monthlyShortfalls(monthlyRanges),
+              projection.domain.x,
+            ).length > 0;
           body = (
             <>
               <ChartLegend
                 items={[
                   { name: "Supply", color: chartPalette().supply, dash: "20" },
                   { name: "Demand", color: chartPalette().demand, dash: "20" },
+                  ...(unmetDemandMarked
+                    ? [
+                        {
+                          name: "Unmet demand",
+                          color: chartPalette().blackout,
+                          pattern: "cap" as const,
+                          fill: withAlpha(
+                            chartPalette().blackout,
+                            chartPalette().bandAlpha,
+                          ),
+                        },
+                      ]
+                    : []),
                 ]}
               />
-              {projection.domain.x[1] - projection.domain.x[0] >
-              24 * MINUTES_PER_MONTH ? (
+              {rangedSupplyDemand ? (
                 <ChartSupplyDemandRanges
                   height={160}
-                  timeline={projection.supplyDemandTimeline}
-                  blackouts={projection.blackouts}
+                  ranges={monthlyRanges}
                   domain={projection.domain}
                   startingYear={game.startingYear}
-                  currentMinute={projection.forecast[0]?.minute}
                   syncKey={syncKey}
                 />
               ) : (
@@ -1717,7 +1761,7 @@ export default class Insights extends React.Component<Props, State> {
                   className="insightsWarning"
                   variant="body2"
                   role="note"
-                  aria-label={`Forecast shortfall for ${projection.shortfall.label}: about ${formatWattHours(Number(projection.shortfall.wh.toPrecision(2)))} of demand unmet, about ${formatWatts(Number(projection.shortfall.peakW.toPrecision(2)))} peak`}
+                  aria-label={`Forecast shortfalls start ${projection.shortfall.startYear}: about ${formatWattHours(Number(projection.shortfall.wh.toPrecision(2)))} of demand unmet, about ${formatWatts(Number(projection.shortfall.peakW.toPrecision(2)))} peak`}
                 >
                   <ConceptIcon
                     concept="danger"
@@ -1726,7 +1770,10 @@ export default class Insights extends React.Component<Props, State> {
                     decorative
                   />
                   <span>
-                    <strong>Shortfall, {projection.shortfall.label}:</strong> ~
+                    <strong>
+                      Shortfalls start {projection.shortfall.startYear}:
+                    </strong>{" "}
+                    ~
                     {formatWattHours(
                       Number(projection.shortfall.wh.toPrecision(2)),
                     )}{" "}
@@ -1741,6 +1788,7 @@ export default class Insights extends React.Component<Props, State> {
             </>
           );
           break;
+        }
         case "powerExchange":
           body = (
             <>
@@ -1875,19 +1923,6 @@ export default class Insights extends React.Component<Props, State> {
                 syncKey={syncKey}
               />
             </>
-          );
-          break;
-        case "solarCapacityFactor":
-          body = (
-            <ChartForecastRenewableCapacityFactor
-              game={game}
-              height={140}
-              timeline={projection.timeline}
-              domain={{ x: projection.domain.x }}
-              startingYear={game.startingYear}
-              multiyear={multiyear}
-              syncKey={syncKey}
-            />
           );
           break;
         case "water":
@@ -2221,9 +2256,12 @@ export default class Insights extends React.Component<Props, State> {
       minViewportSpan,
     );
     const viewportTimeline = timelineWithin(projection.timeline, viewportRange);
+    const monthlySupplyDemand =
+      viewportRange[1] - viewportRange[0] > 24 * MINUTES_PER_MONTH;
     const viewportSupplyDemand = timelineWithin(
       projection.supplyDemandTimeline,
       viewportRange,
+      monthlySupplyDemand,
     );
     const viewportSampleInterval = Math.max(
       projection.projectionStepMinutes,
@@ -2238,10 +2276,9 @@ export default class Insights extends React.Component<Props, State> {
       viewportSampleInterval,
     );
     // Range bands must see every modeled hour so brief peaks and shortages survive aggregation.
-    const supplyDemandTimeline =
-      viewportRange[1] - viewportRange[0] > 24 * MINUTES_PER_MONTH
-        ? viewportSupplyDemand
-        : sampleForecastTimeline(viewportSupplyDemand, viewportSampleInterval);
+    const supplyDemandTimeline = monthlySupplyDemand
+      ? viewportSupplyDemand
+      : sampleForecastTimeline(viewportSupplyDemand, viewportSampleInterval);
     let viewportDomainMin = Number.POSITIVE_INFINITY;
     let viewportDomainMax = Number.NEGATIVE_INFINITY;
     for (const tick of supplyDemandTimeline) {
@@ -2312,11 +2349,37 @@ export default class Insights extends React.Component<Props, State> {
         event.startsMinute >= viewportRange[0] &&
         event.startsMinute <= viewportRange[1],
     );
+    const expandedOpen =
+      !!this.state.expandedLayer && visible.includes(this.state.expandedLayer);
+    // The numbered events the charts mark, named once. Inside the full-screen chart the details
+    // open in place, because a portalled popper would sit outside the dialog's focus trap.
+    const renderEventRail = (showDetails: boolean, inDialog = false) => (
+      <InsightEventRail
+        events={upcomingEvents}
+        activeKey={this.state.activeEventKey}
+        showDetails={showDetails}
+        disablePortal={inDialog}
+        onActiveChange={(activeEventKey) => this.setState({ activeEventKey })}
+        onZoom={(event) =>
+          this.setViewport(
+            viewportBounds,
+            minViewportSpan,
+            eventChartViewport(
+              viewportBounds,
+              event.startsMinute!,
+              event.endsMinute,
+              minViewportSpan,
+            ),
+          )
+        }
+      />
+    );
     const annotations = {
       events: upcomingEvents.map((event, index) => ({
         key: event.key,
         x: event.startsMinute!,
         number: index + 1,
+        title: event.title || "Scenario event",
       })),
       activeEventKey: this.state.activeEventKey,
     };
@@ -2513,27 +2576,9 @@ export default class Insights extends React.Component<Props, State> {
             )}
           </div>
           {this.renderLayerPanel(projection)}
-          {!!upcomingEvents.length && (
-            <InsightEventRail
-              events={upcomingEvents}
-              activeKey={this.state.activeEventKey}
-              onActiveChange={(activeEventKey) =>
-                this.setState({ activeEventKey })
-              }
-              onZoom={(event) =>
-                this.setViewport(
-                  viewportBounds,
-                  minViewportSpan,
-                  eventChartViewport(
-                    viewportBounds,
-                    event.startsMinute!,
-                    event.endsMinute,
-                    minViewportSpan,
-                  ),
-                )
-              }
-            />
-          )}
+          {!!upcomingEvents.length &&
+            // The full-screen chart carries its own rail; two would open the same details twice.
+            renderEventRail(!expandedOpen)}
           <ChartViewportContext.Provider value={viewportContext}>
             <ChartAnnotationsContext.Provider value={annotations}>
               <ChartAxisAlignment>
@@ -2548,70 +2593,66 @@ export default class Insights extends React.Component<Props, State> {
                   )}
                 </div>
               </ChartAxisAlignment>
-              {this.state.expandedLayer &&
-                visible.includes(this.state.expandedLayer) && (
-                  <Dialog
-                    fullScreen
-                    open
-                    className="insightsChartDialog"
-                    aria-labelledby="expanded-chart-title"
-                    onClose={() => this.setState({ expandedLayer: undefined })}
+              {this.state.expandedLayer && expandedOpen && (
+                <Dialog
+                  fullScreen
+                  open
+                  className="insightsChartDialog"
+                  aria-labelledby="expanded-chart-title"
+                  onClose={() => this.setState({ expandedLayer: undefined })}
+                >
+                  <DialogTitle
+                    id="expanded-chart-heading"
+                    className="expandedChartTitle"
                   >
-                    <DialogTitle
-                      id="expanded-chart-heading"
-                      className="expandedChartTitle"
-                    >
-                      <span className="expandedChartHeading">
-                        <span id="expanded-chart-title">
-                          {
-                            INSIGHT_LAYERS.find(
-                              (layer) => layer.id === this.state.expandedLayer,
-                            )!.label
-                          }
-                        </span>
-                        {isChartLayer(this.state.expandedLayer) && (
-                          <ManualLink
-                            entry={
-                              INSIGHT_LAYER_MANUAL[this.state.expandedLayer]
-                            }
-                          />
-                        )}
+                    <span className="expandedChartHeading">
+                      <span id="expanded-chart-title">
+                        {
+                          INSIGHT_LAYERS.find(
+                            (layer) => layer.id === this.state.expandedLayer,
+                          )!.label
+                        }
                       </span>
-                      <IconButton
-                        autoFocus
-                        aria-label={`Close ${INSIGHT_LAYERS.find((layer) => layer.id === this.state.expandedLayer)!.label} chart`}
-                        onClick={() =>
-                          this.setState({ expandedLayer: undefined })
-                        }
-                      >
-                        <CloseIcon />
-                      </IconButton>
-                    </DialogTitle>
-                    {this.renderViewportControls(
-                      viewportBounds,
-                      viewportRange,
-                      minViewportSpan,
-                      "expandedViewportHint",
-                    )}
-                    <DialogContent className="expandedChartContent">
-                      <ExpandedChartPresentation
-                        plots={
-                          this.state.expandedLayer === "inflationInterest"
-                            ? 2
-                            : 1
-                        }
-                      >
-                        <ChartAxisAlignment>
-                          {this.renderTrackBody(
-                            this.state.expandedLayer,
-                            viewportProjection,
-                            true,
-                          )}
-                        </ChartAxisAlignment>
-                      </ExpandedChartPresentation>
-                    </DialogContent>
-                  </Dialog>
-                )}
+                      {isChartLayer(this.state.expandedLayer) && (
+                        <ManualLink
+                          entry={INSIGHT_LAYER_MANUAL[this.state.expandedLayer]}
+                        />
+                      )}
+                    </span>
+                    <IconButton
+                      autoFocus
+                      aria-label={`Close ${INSIGHT_LAYERS.find((layer) => layer.id === this.state.expandedLayer)!.label} chart`}
+                      onClick={() =>
+                        this.setState({ expandedLayer: undefined })
+                      }
+                    >
+                      <CloseIcon />
+                    </IconButton>
+                  </DialogTitle>
+                  {this.renderViewportControls(
+                    viewportBounds,
+                    viewportRange,
+                    minViewportSpan,
+                    "expandedViewportHint",
+                  )}
+                  {!!upcomingEvents.length && renderEventRail(true, true)}
+                  <DialogContent className="expandedChartContent">
+                    <ExpandedChartPresentation
+                      plots={
+                        this.state.expandedLayer === "inflationInterest" ? 2 : 1
+                      }
+                    >
+                      <ChartAxisAlignment>
+                        {this.renderTrackBody(
+                          this.state.expandedLayer,
+                          viewportProjection,
+                          true,
+                        )}
+                      </ChartAxisAlignment>
+                    </ExpandedChartPresentation>
+                  </DialogContent>
+                </Dialog>
+              )}
             </ChartAnnotationsContext.Provider>
           </ChartViewportContext.Provider>
         </div>

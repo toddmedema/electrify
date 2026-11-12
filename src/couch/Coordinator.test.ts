@@ -134,6 +134,26 @@ function fixture(
   };
 }
 
+it("returns worker view credit after shared presentation and drops credit after disposal", () => {
+  const f = fixture();
+  try {
+    f.posts.length = 0;
+    f.onSharedView.mockImplementation(() => {
+      expect(f.posts).not.toContainEqual({ kind: "views-applied" });
+    });
+    f.publish();
+    expect(f.onSharedView).toHaveBeenCalled();
+    expect(f.posts).toEqual([{ kind: "views-applied" }]);
+    f.posts.length = 0;
+    f.onSharedView.mockImplementation(() => f.coordinator.dispose());
+    f.publish();
+    expect(f.worker.terminate).toHaveBeenCalled();
+    expect(f.posts).toEqual([]);
+  } finally {
+    f.dispose();
+  }
+});
+
 it("uses independent sequence one commands for simultaneous seat actions and rejects forged/stale routes", async () => {
   const f = fixture();
   try {

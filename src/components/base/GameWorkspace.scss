@@ -2,7 +2,39 @@
 // On the root, because toasts render outside the workspace and clear the same dock.
 :root {
   --game-dock-bottom: max(12px, env(safe-area-inset-bottom));
-  --game-dock-clearance: calc(80px + var(--game-dock-bottom));
+  --game-dock-button-width: 72px;
+  --game-dock-button-height: 56px;
+  --game-dock-icon-size: 24px;
+  --game-dock-label-size: var(--font-size-caption-sm);
+  --game-dock-label-line: 16px;
+  // The dock and 24px of air above it.
+  --game-dock-clearance: calc(
+    var(--game-dock-button-height) + 24px + var(--game-dock-bottom)
+  );
+}
+
+// A dock sized for a phone-width window is lost on a large one, sitting small against the bottom
+// edge far from the fleet. Grow it, and lift it off the edge, in steps. GameWorkspace's
+// dockButtonWidth mirrors these widths.
+@media (min-width: 1600px) {
+  :root {
+    --game-dock-bottom: max(24px, env(safe-area-inset-bottom));
+    --game-dock-button-width: 88px;
+    --game-dock-button-height: 64px;
+    --game-dock-icon-size: 28px;
+    --game-dock-label-size: 0.8125rem;
+    --game-dock-label-line: 18px;
+  }
+}
+@media (min-width: 2200px) {
+  :root {
+    --game-dock-bottom: max(40px, env(safe-area-inset-bottom));
+    --game-dock-button-width: 104px;
+    --game-dock-button-height: 76px;
+    --game-dock-icon-size: 34px;
+    --game-dock-label-size: 0.9375rem;
+    --game-dock-label-line: 20px;
+  }
 }
 
 .gameWorkspace {
@@ -75,9 +107,9 @@
 }
 
 .gameActionDock .gameDockAction.MuiButton-root {
-  min-width: 72px;
-  width: 72px;
-  min-height: 56px;
+  min-width: var(--game-dock-button-width);
+  width: var(--game-dock-button-width);
+  min-height: var(--game-dock-button-height);
   padding: 4px;
   display: flex;
   flex-direction: column;
@@ -86,12 +118,12 @@
   border-radius: var(--radius-md);
   color: var(--interactive-blue);
   background: transparent;
-  font-size: var(--font-size-caption-sm);
-  line-height: 16px;
+  font-size: var(--game-dock-label-size);
+  line-height: var(--game-dock-label-line);
   text-transform: none;
 
   > .MuiBadge-root > svg {
-    font-size: 24px;
+    font-size: var(--game-dock-icon-size);
   }
   // Touch browsers can retain :hover after closing a tool. Only a mouse needs this fill.
   @media (hover: hover) and (pointer: fine) {
@@ -319,8 +351,8 @@
   flex: 0 1 auto;
 }
 .gameDockLabel {
-  font-size: var(--font-size-caption-sm);
-  line-height: 16px;
+  font-size: var(--game-dock-label-size);
+  line-height: var(--game-dock-label-line);
   font-weight: var(--font-weight-emphasis);
   white-space: nowrap;
 }

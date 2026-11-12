@@ -631,6 +631,130 @@ export function bandsPlugin(
   };
 }
 
+/** One stretch of x with unmet demand and its largest coincident shortfall in watts. */
+export interface ShortfallBar {
+  from: number;
+  to: number;
+  peakShortfall: number;
+}
+
+/** A rectangle hanging from the top of the plot, in device pixels. */
+export interface ShortfallRect {
+  x: number;
+  width: number;
+  height: number;
+}
+
+const SHORTFALL_CAP_PX = 4;
+const SHORTFALL_HEM_ALPHA = 0.7;
+
+/**
+ * The silhouette of shortfall bars as non-overlapping device-pixel rectangles. A bar reaches
+ * down the plot in proportion to its height share, capped at the full height, and is never
+ * shorter than the cap. Months can be narrower than a pixel, so several may land in one column;
+ * each column keeps the tallest, and equal neighbours merge, so translucent shading never
+ * stacks into false darkness and abutting bars leave no anti-aliased seam. Coverage stays
+ * inside the original spans, including fractional edge pixels, to match the nearest-point hover.
+ */
+export function shortfallSkyline(
+  bars: Array<{ x0: number; x1: number; heightShare: number }>,
+  plot: { left: number; width: number; height: number },
+  capPx: number,
+): ShortfallRect[] {
+  const first = Math.floor(plot.left);
+  const last = Math.ceil(plot.left + plot.width);
+  const plotHeight = Math.round(plot.height);
+  const heights = new Array<number>(Math.max(0, last - first)).fill(0);
+  const spans: Array<[number, number]> = [];
+  for (const { x0, x1, heightShare } of bars) {
+    const left = Math.max(x0, plot.left);
+    const right = Math.min(x1, plot.left + plot.width);
+    if (right <= left) continue;
+    spans.push([left, right]);
+    const share = Number.isFinite(heightShare)
+      ? Math.min(1, Math.max(0, heightShare))
+      : 0;
+    const height = Math.min(
+      plotHeight,
+      Math.max(capPx, Math.round(share * plotHeight)),
+    );
+    for (let column = Math.floor(left); column < Math.ceil(right); column++) {
+      heights[column - first] = Math.max(heights[column - first], height);
+    }
+  }
+  const rects: ShortfallRect[] = [];
+  for (const [from, to] of mergeBandPixels(spans, 0)) {
+    for (let column = Math.floor(from); column < Math.ceil(to); column++) {
+      const x = Math.max(from, column);
+      const right = Math.min(to, column + 1);
+      const height = heights[column - first];
+      const previous = rects[rects.length - 1];
+      if (
+        previous &&
+        previous.height === height &&
+        previous.x + previous.width === x
+      ) {
+        previous.width = right - previous.x;
+      } else if (height > 0) {
+        rects.push({ x, width: right - x, height });
+      }
+    }
+  }
+  return rects;
+}
+
+/**
+ * Shading for the stretches that ran short, using the actual rendered Y span to give peak
+ * shortfall the same watts-to-pixels scale as the series, capped at full height. A dark cap
+ * marks the top, the original light wash fills down to the shortfall height, and a hairline on
+ * the wash's lower edge makes that height readable against the faint bands. Painted before
+ * the axes and series, like a recession band, it never tints a line.
+ */
+export function shortfallBarsPlugin(
+  getBars: () => ShortfallBar[],
+  color: string,
+): uPlot.Plugin {
+  return {
+    hooks: {
+      drawClear: (u: uPlot) => {
+        const bars = getBars();
+        if (bars.length === 0) {
+          return;
+        }
+        const { ctx, bbox } = u;
+        const ratio = uPlot.pxRatio;
+        const ySpan = (u.scales.y.max ?? 0) - (u.scales.y.min ?? 0);
+        const capPx = Math.round(SHORTFALL_CAP_PX * ratio);
+        const hemPx = Math.max(1, Math.round(ratio));
+        const rects = shortfallSkyline(
+          bars.map((bar) => ({
+            x0: u.valToPos(bar.from, "x", true),
+            x1: u.valToPos(bar.to, "x", true),
+            heightShare: ySpan > 0 ? bar.peakShortfall / ySpan : 0,
+          })),
+          bbox,
+          capPx,
+        );
+        const wash = withAlpha(color, chartPalette().bandAlpha);
+        const hem = withAlpha(color, SHORTFALL_HEM_ALPHA);
+        ctx.save();
+        clipToPlot(u);
+        for (const { x, width, height } of rects) {
+          if (height > capPx) {
+            ctx.fillStyle = wash;
+            ctx.fillRect(x, bbox.top, width, height);
+            ctx.fillStyle = hem;
+            ctx.fillRect(x, bbox.top + height - hemPx, width, hemPx);
+          }
+          ctx.fillStyle = color;
+          ctx.fillRect(x, bbox.top, width, capPx);
+        }
+        ctx.restore();
+      },
+    },
+  };
+}
+
 /** The "you are here" line dividing recorded history from the forecast. */
 export function verticalLinePlugin(
   getX: () => number | null,
@@ -757,12 +881,74 @@ export function patternFill(
   };
 }
 
+const HOVER_POINT_SIZE = 10;
+const HOVER_POINT_RING = 2;
+
+/**
+ * A dot on each plotted line where the hover crosshair crosses it, in the line's own colour and
+ * ringed in the chart surface so it reads over a neighbouring line. Filled areas have no line to
+ * mark. A stroke the colour of the surface is a separator between stacked areas, not a line.
+ * Where a line has no value at the hovered x, uPlot parks its dot off the plot.
+ */
+export function hoverPoints(): uPlot.Cursor.Points {
+  const lineColor = (plot: uPlot, seriesIndex: number): string | undefined => {
+    const series = plot.series[seriesIndex] as uPlot.Series & {
+      _stroke?: unknown;
+    };
+    const stroke = series.stroke;
+    const color =
+      series._stroke ??
+      (typeof stroke === "function" ? stroke(plot, seriesIndex) : stroke);
+    return typeof color === "string" && color !== chartPalette().background
+      ? color
+      : undefined;
+  };
+  return {
+    show: (plot, seriesIndex) => {
+      const dot = document.createElement("div");
+      dot.style.borderWidth = `${HOVER_POINT_RING}px`;
+      // Nothing to mark on a series with no line of its own
+      dot.hidden = !lineColor(plot, seriesIndex);
+      return dot;
+    },
+    size: HOVER_POINT_SIZE,
+    fill: (plot, seriesIndex) => lineColor(plot, seriesIndex) ?? "transparent",
+    stroke: () => chartPalette().background,
+  };
+}
+
+const EVENT_TOOLTIP_GAP = 6;
+// Pointer slop around a badge, in CSS pixels, so a small target is not a precision exercise
+const EVENT_BADGE_SLOP = 3;
+
+interface EventBadgeHit {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+  text: string;
+}
+
+/**
+ * What hovering a badge says: the one event's name, or for a merged badge each event on its own
+ * line behind its number, matching the rail below the toolbar.
+ */
+export function eventBadgeText(events: ChartEventMarker[]): string {
+  const name = (event: ChartEventMarker) => event.title || "Scenario event";
+  return events.length === 1
+    ? name(events[0])
+    : events.map((event) => `${event.number}. ${name(event)}`).join("\n");
+}
+
 /** Scenario-event onset markers shared by the stacked Insight charts. */
 export function eventMarkersPlugin(
   getMarkers: () => ChartEventMarker[],
   getActiveKey: () => string | undefined,
   fontScale = 1,
 ): uPlot.Plugin {
+  // Where each badge sits on the canvas, in CSS pixels from the plot's top left, as last drawn.
+  let hits: EventBadgeHit[] = [];
+  let teardown: (() => void) | undefined;
   return {
     opts: (_plot, options) => {
       const padding: uPlot.Padding = options.padding
@@ -783,7 +969,53 @@ export function eventMarkersPlugin(
       options.padding = padding;
     },
     hooks: {
+      init: (u: uPlot) => {
+        // The badges are canvas pixels above the plot, outside uPlot's own pointer surface, so
+        // their tooltip listens on the plot's wrapper, which is the plot's coordinate space.
+        const wrap = u.over.parentElement!;
+        const tooltip = document.createElement("div");
+        tooltip.className = "chartEventTooltip";
+        tooltip.setAttribute("aria-hidden", "true");
+        wrap.appendChild(tooltip);
+        const hide = () => {
+          tooltip.style.display = "none";
+        };
+        const inspect = (event: MouseEvent) => {
+          const bounds = wrap.getBoundingClientRect();
+          const x = event.clientX - bounds.left;
+          const y = event.clientY - bounds.top;
+          const hit = hits.find(
+            (badge) =>
+              x >= badge.left - EVENT_BADGE_SLOP &&
+              x <= badge.right + EVENT_BADGE_SLOP &&
+              y >= badge.top - EVENT_BADGE_SLOP &&
+              y <= badge.bottom + EVENT_BADGE_SLOP,
+          );
+          if (!hit) {
+            hide();
+            return;
+          }
+          tooltip.textContent = hit.text;
+          tooltip.style.display = "block";
+          tooltip.style.maxWidth = `${wrap.clientWidth}px`;
+          const center = (hit.left + hit.right) / 2;
+          tooltip.style.left = `${Math.max(0, Math.min(wrap.clientWidth - tooltip.offsetWidth, center - tooltip.offsetWidth / 2))}px`;
+          tooltip.style.top = `${hit.bottom + EVENT_TOOLTIP_GAP}px`;
+        };
+        wrap.addEventListener("mousemove", inspect);
+        wrap.addEventListener("mouseleave", hide);
+        teardown = () => {
+          wrap.removeEventListener("mousemove", inspect);
+          wrap.removeEventListener("mouseleave", hide);
+          tooltip.remove();
+        };
+      },
+      destroy: () => {
+        teardown?.();
+        teardown = undefined;
+      },
       draw: (u: uPlot) => {
+        hits = [];
         const domainMin = u.scales.x.min;
         const domainMax = u.scales.x.max;
         const markers = getMarkers().filter(
@@ -894,6 +1126,13 @@ export function eventMarkersPlugin(
           u.ctx.textAlign = "center";
           u.ctx.textBaseline = "middle";
           u.ctx.fillText(group.label, group.x, badgeY);
+          hits.push({
+            left: (group.x - group.width / 2) / uPlot.pxRatio,
+            top: (badgeY - radius) / uPlot.pxRatio,
+            right: (group.x + group.width / 2) / uPlot.pxRatio,
+            bottom: (badgeY + radius) / uPlot.pxRatio,
+            text: eventBadgeText(group.events),
+          });
         }
         u.ctx.restore();
       },

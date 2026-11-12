@@ -87,32 +87,21 @@ let loadingGeneration: number | undefined;
 // Simulation data caches are shared. Finish an older download before starting a newer
 // location, otherwise a stale completion could overwrite the current mission’s cache.
 let dataLoading: Promise<void> = Promise.resolve();
-let loadListeners: Array<{
-  onProgress: (message: string) => void;
-  onError: (message: string) => void;
-}> = [];
+let loadListeners: Array<{ onError: (message: string) => void }> = [];
 
 export const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
   return {
     onExit: () => void quitSavedGame({ toScenarioList: true }),
-    load: async (
-      game: GameType,
-      onProgress: (message: string) => void,
-      onError: (message: string) => void,
-    ) => {
+    load: async (game: GameType, onError: (message: string) => void) => {
       const request = getLoadingGeneration();
       if (loadingGeneration !== request) loadListeners = [];
-      loadListeners.push({ onProgress, onError });
+      loadListeners.push({ onError });
       if (loadingGeneration === request) {
         // StrictMode and card transitions can mount the loading view twice. Both renders share
         // this module, so only the first one starts the downloads.
         return;
       }
       loadingGeneration = request;
-      const reportProgress = (message: string) => {
-        if (isCurrentLoadingGeneration(request))
-          loadListeners.forEach((listener) => listener.onProgress(message));
-      };
       const reportError = (message: string) => {
         if (isCurrentLoadingGeneration(request))
           loadListeners.forEach((listener) => listener.onError(message));
@@ -144,7 +133,6 @@ export const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
         return;
       }
 
-      reportProgress("Loading weather and market data…");
       try {
         const task = dataLoading
           .catch(() => undefined)
@@ -165,7 +153,6 @@ export const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
         dataLoading = task;
         await task;
         if (!isCurrentLoadingGeneration(request)) return;
-        reportProgress("Starting your mission…");
         if (!resumed) {
           // A new game uses the scenario's authored opening fleet.
           dispatch(

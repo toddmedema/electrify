@@ -25,7 +25,10 @@ function createAlignment() {
       axes.set(key, { width: 0, redraw });
       return {
         measure(naturalWidth: number) {
-          const axis = axes.get(key)!;
+          const axis = axes.get(key);
+          // uPlot finishes a queued redraw after its plot is destroyed. A plot that has been
+          // replaced no longer shares a gutter, so it just reports its own width.
+          if (!axis) return naturalWidth;
           if (axis.width !== naturalWidth) {
             axis.width = naturalWidth;
             schedule();

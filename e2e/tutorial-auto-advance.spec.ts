@@ -165,11 +165,13 @@ for (const mission of [
         await expect(hud).toContainText("Find customer growth");
       } else {
         await expect(hud).toContainText("Change the chart time period");
-        // A one-month tutorial is already at the minimum zoom and spans the whole scenario.
-        // Fit full timeline expands to the longer forecast rather than pressing disabled zoom.
+        // The one-month scenario already fits, so pan into the longer forecast instead.
+        const displayedRange = page.locator(".insightsViewportDate");
+        const beforeRange = await displayedRange.innerText();
         await page
-          .getByRole("button", { name: "Fit full timeline", exact: true })
+          .getByRole("button", { name: "Pan later", exact: true })
           .click();
+        await expect(displayedRange).not.toHaveText(beforeRange);
         await expect(hud).toContainText(
           "Tap Layers, or choose a preset question",
         );
@@ -376,10 +378,22 @@ for (const mission of [
         animations: "disabled",
       });
       await hud.getByRole("button", { name: "Next" }).click();
+      // Fast-forwarding changes the chart month by month; the last step before the capstone
+      // says why, and the player continues from it instead of landing in the challenge
+      await expect(hud).toContainText(
+        "Watch demand change from month to month",
+      );
+      await expect(page.locator("#chartSupplyDemand")).toHaveClass(
+        /tutorialTarget/,
+      );
+      await expect(progress).not.toHaveClass(/tutorialTarget/);
+      await hud.getByRole("button", { name: "Next", exact: true }).click();
       await expect(hud).toContainText(
         "Order a second generator of a different type",
       );
-      await expect(progress).not.toHaveClass(/tutorialTarget/);
+      await expect(page.locator("#chartSupplyDemand")).not.toHaveClass(
+        /tutorialTarget/,
+      );
       await expect(sweep).toHaveCount(0);
       await expect(hud.locator(".tutorialHudNextPulse")).toHaveCount(0);
       await expect(
@@ -394,6 +408,12 @@ for (const mission of [
       ).toHaveCount(0);
       await expect(hud.getByTestId("tutorial-hud-sweep")).toHaveCount(0);
       await dragCoalAbovePumpedHydro(page);
+      // The drag's last move must not rebuild the grid under the player
+      await expect(hud).toContainText("Restart for the final challenge");
+      await expect(page.locator(".facilityRowHeader")).toHaveCount(3);
+      await hud
+        .getByRole("button", { name: "Start final challenge", exact: true })
+        .click();
       await expect(hud).toContainText("Build storage to cover peak demand");
       await expect(page.locator(".facilityRowHeader")).toHaveCount(1);
     }

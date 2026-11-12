@@ -8,7 +8,7 @@ import {
   formatScore,
 } from "../../helpers/Format";
 import { scoreLabel } from "../../helpers/Scoring";
-import { formatLargeMass } from "../../helpers/Units";
+import { formatLargeMassSignificant } from "../../helpers/Units";
 import { useUnits } from "./UnitsContext";
 import {
   finishedObjectiveStatusText,
@@ -102,7 +102,7 @@ export function RunDebrief({
     {
       concept: "danger" as const,
       label: "emissions",
-      value: formatLargeMass(debrief.kgco2e, units),
+      value: formatLargeMassSignificant(debrief.kgco2e, units),
     },
     ...(debrief.scenarioMetrics || []).map((metric) => ({
       concept: metric.concept,

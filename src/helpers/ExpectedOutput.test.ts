@@ -5,10 +5,7 @@ import { createGame } from "../testing/Simulator";
 import { GameType, TickPresentFutureType } from "../Types";
 import { MINUTES_PER_MONTH } from "./DateTime";
 import { HYDRO_TARGET_CAPACITY_FACTOR } from "./Hydro";
-import {
-  expectedMonthlyOutputShape,
-  monthlyRenewableCapacityFactors,
-} from "./ExpectedOutput";
+import { expectedMonthlyOutputShape } from "./ExpectedOutput";
 
 function forecast(game: GameType): TickPresentFutureType[] {
   return generateNewTimeline(
@@ -121,21 +118,5 @@ describe("expectedMonthlyOutputShape", () => {
     });
     expect(shape.mean).toBeGreaterThan(HYDRO_TARGET_CAPACITY_FACTOR / 2);
     expect(shape.mean).toBeLessThan(HYDRO_TARGET_CAPACITY_FACTOR * 2);
-  });
-
-  it("uses the same formula as the Forecasts chart", () => {
-    const game = createGame({ scenarioId: 108 });
-    const timeline = forecast(game).filter(
-      (tick) => tick.minute < 12 * MINUTES_PER_MONTH + game.date.minute,
-    );
-    const wind = generator(game, "Wind", timeline);
-    const byMonth = monthlyRenewableCapacityFactors(timeline, [wind]);
-    const shape = expectedMonthlyOutputShape(wind, timeline);
-    expect(byMonth).toHaveLength(12);
-    expect(shape).toBeDefined();
-    byMonth.forEach((point) => {
-      const month = Math.floor(point.minute / MINUTES_PER_MONTH) % 12;
-      expect(shape!.monthly[month]).toBeCloseTo(point.factors.Wind);
-    });
   });
 });

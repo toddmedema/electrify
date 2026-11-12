@@ -686,9 +686,9 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
             jump, so check before building fuel-burning plants.
           </li>
           <li>
-            <strong>Profit, Revenue, Expenses and Cash:</strong> Recorded
-            months, then estimates. Your{" "}
-            <EntryLink to={MANUAL_ENTRY.RATES}>rate</EntryLink> sets revenue;{" "}
+            <strong>Profit and Cash:</strong> Recorded months, then estimates.
+            Your <EntryLink to={MANUAL_ENTRY.RATES}>rate</EntryLink> sets
+            revenue;{" "}
             <EntryLink to={MANUAL_ENTRY.OPERATING_COSTS}>
               operating costs
             </EntryLink>
@@ -700,12 +700,8 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
             make up expenses.
           </li>
           <li>
-            <strong>Temperature</strong> and{" "}
-            <EntryLink to={MANUAL_ENTRY.CAPACITY_FACTOR}>
-              <strong>Renewable Capacity Factors</strong>
-            </EntryLink>
-            : Weather and expected output. Hydro owners also get a{" "}
-            <strong>Water</strong> chart.
+            <strong>Temperature:</strong> Weather forecasts. Hydro owners also
+            get a <strong>Water</strong> chart.
           </li>
         </ul>
         <p>

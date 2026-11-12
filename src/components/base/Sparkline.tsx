@@ -5,7 +5,8 @@ import * as React from "react";
  *
  * Deliberately not a uPlot chart: the fleet list draws one of these per expanded facility, and
  * uPlot's per-instance canvas, resize observer and cursor plugins are all overhead for a shape
- * with no axes, no ticks and nothing to hover. An inline SVG polyline costs a string.
+ * with no axes or ticks. An inline SVG polyline costs a string; callers can add lightweight
+ * point inspection when needed.
  */
 
 export interface Props {
@@ -28,6 +29,8 @@ export interface Props {
   dash?: boolean;
   /** A hollow dot on the lowest value */
   lowMarker?: boolean;
+  /** Inspect a particular point instead of marking the lowest value */
+  markerIndex?: number;
   /** Let CSS resize the line; strokes keep their width as the shape stretches */
   stretch?: boolean;
 }
@@ -87,6 +90,7 @@ export default function Sparkline(props: Props): React.JSX.Element | null {
     (low, value, i) => (value < values[low] ? i : low),
     0,
   );
+  const markerIndex = props.markerIndex ?? lowIndex;
 
   return (
     <svg
@@ -130,8 +134,8 @@ export default function Sparkline(props: Props): React.JSX.Element | null {
       {lowMarker && !dash && (
         <circle
           className="sparklineMarker"
-          cx={coordinates[lowIndex][0].toFixed(1)}
-          cy={coordinates[lowIndex][1].toFixed(1)}
+          cx={coordinates[markerIndex][0].toFixed(1)}
+          cy={coordinates[markerIndex][1].toFixed(1)}
           r={MARKER_RADIUS}
           stroke={color}
           strokeWidth={STROKE_WIDTH}

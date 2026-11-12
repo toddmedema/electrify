@@ -466,6 +466,23 @@ describe("fixed upkeep", () => {
       `Fixed upkeep${formatMoneyConcise(facility.annualOperatingCost)}/yr`,
     );
     expect(economics).not.toHaveTextContent("Variable upkeep");
+    expect(economics).not.toHaveTextContent("while paused");
+  });
+
+  // The tick charges a paused facility half its fixed cost (FacilityLifetime.test.tsx pins that),
+  // so the row must not present the full annual figure as what a paused plant is paying
+  it("shows half the fixed upkeep, and says why, while a facility is paused", () => {
+    const game = createGame({ scenarioId: 108 });
+    const solar = game.facilities.find((f) => f.fuel === "Sun")!;
+    solar.paused = true;
+    showDetails(game, solar);
+    const economics = screen.getByRole("region", { name: "Economics" });
+    expect(economics).toHaveTextContent(
+      `Fixed upkeep${formatMoneyConcise(solar.annualOperatingCost / 2)}/yr · half rate while paused`,
+    );
+    expect(economics).not.toHaveTextContent(
+      `${formatMoneyConcise(solar.annualOperatingCost)}/yr`,
+    );
   });
 
   it("still lists the variable part beside it for a fuel plant", () => {

@@ -364,6 +364,15 @@ export const SCENARIOS: ScenarioType[] = [
       {
         card: "FACILITIES",
         hideUi: EARLY_MISSION_HIDDEN,
+        target: "#chartSupplyDemand",
+        action: "Watch demand change from month to month",
+        content: (
+          <TutorialPrompt text="The chart shows one day per month, so it changes as time moves forward. Demand shifts with the seasons: more heating in winter, more cooling in summer." />
+        ),
+      },
+      {
+        card: "FACILITIES",
+        hideUi: EARLY_MISSION_HIDDEN,
         action: "Order a second generator of a different type",
         content: (
           <TutorialPrompt text="Compare output timing and running costs. Choose a plant that complements your grid." />
@@ -477,7 +486,18 @@ export const SCENARIOS: ScenarioType[] = [
         },
         action: "Drag Coal above Pumped Hydro",
         content: (
-          <TutorialPrompt text="Drag Coal’s handle above Pumped Hydro so spare generation can charge it. Then try a new grid with only a coal plant." />
+          <TutorialPrompt text="Drag Coal’s handle above Pumped Hydro so spare generation can charge it." />
+        ),
+      },
+      {
+        // Entering the capstone rebuilds the grid, so name that before it happens instead of
+        // letting the fleet change under the player the moment their drag lands
+        card: "FACILITIES",
+        hideUi: EARLY_MISSION_HIDDEN,
+        nextLabel: "Start final challenge",
+        action: "Restart for the final challenge",
+        content: (
+          <TutorialPrompt text="The next step starts a new grid with only a coal plant. Then you’ll build storage to cover its peaks." />
         ),
       },
       {
@@ -1102,6 +1122,15 @@ export const SCENARIOS: ScenarioType[] = [
       },
       {
         card: "FACILITIES",
+        action: "Get ready to supply a limited month",
+        // Time stays locked until the capstone begins
+        phase: "INTERTIE_STRESS_INSPECT",
+        content: (
+          <TutorialPrompt text="Time is still paused. The next step lets it run while the neighbor’s supply stays limited." />
+        ),
+      },
+      {
+        card: "FACILITIES",
         action: "Supply a full month with limited imports",
         phase: "INTERTIE_STRESS_SUPPLY",
         content: (
@@ -1125,7 +1154,7 @@ export const SCENARIOS: ScenarioType[] = [
     icon: "carbon fee",
     locationId: "SF",
     summary:
-      "Coal was cheap, but now pollution has a price. Decide what replaces your aging plants.",
+      "Coal was cheap, but now pollution has a price. Your plants are aging.",
     threat:
       "Coal's high emissions mean higher fees. You don't have much cash to replace it.",
     themes: ["Energy transition"],
@@ -1254,8 +1283,7 @@ export const SCENARIOS: ScenarioType[] = [
     name: "Hurricane Season",
     icon: "hurricane season",
     locationId: "SJU",
-    summary:
-      "Hurricanes are coming to Puerto Rico. Build a grid that can take the hit.",
+    summary: "Hurricanes are coming to Puerto Rico.",
     threat:
       "Storms can damage several plants at once. A little spare capacity may not be enough.",
     themes: ["Extreme weather"],
@@ -1295,8 +1323,7 @@ export const SCENARIOS: ScenarioType[] = [
     name: "The End of an Era",
     icon: "the end of an era",
     locationId: "PIT",
-    summary:
-      "Your company was built on coal. Decide what replaces it as the plants age.",
+    summary: "Your company was built on coal. Its plants are aging.",
     threat: "Competitors are moving in, and replacements take years to build.",
     themes: ["Energy transition"],
     ownership: "Investor",
@@ -1554,8 +1581,7 @@ export const SCENARIOS: ScenarioType[] = [
       timeZone: "Europe/Paris",
       resources: { hydro: false },
     },
-    summary:
-      "Your biggest reactor will shut down without warning. Have backup ready.",
+    summary: "Your biggest reactor will shut down without warning.",
     threat: "The reactor stays offline for the rest of the mission.",
     themes: ["Energy transition"],
     ownership: "Public",
@@ -1609,8 +1635,7 @@ export const SCENARIOS: ScenarioType[] = [
     name: "Wildfire Emergency",
     icon: "wildfire emergency",
     locationId: "LA",
-    summary:
-      "Wildfire will cut your power imports in early 2025. Build a backup plan before then.",
+    summary: "Wildfire will cut your power imports in early 2025.",
     threat: "Your existing northern intertie will lose 90% of its capacity.",
     themes: ["Extreme weather"],
     ownership: "Public",
@@ -1911,7 +1936,7 @@ export const SCENARIOS: ScenarioType[] = [
     summary:
       "Connect to your neighbors, acquire a utility, and keep your larger company supplied.",
     threat:
-      "Network upkeep rises in 2015 and 2020, and power purchase limits shrink from 2017. Compare company terms before connecting.",
+      "Network upkeep rises in 2015 and 2020, and the power purchase limit shrinks in 2017.",
     themes: ["Rapid growth"],
     ownership: "Investor",
     startingYear: 2005,

@@ -67,6 +67,12 @@
      #f5f5f5 manages only 3.4:1 */
   --interactive-contrast: #ffffff;
   --interactive-blue: #0084f8; /* the logo blue - 3.7:1 on white */
+  /* The deeper blue for small interactive text and the speed thumb, where the logo blue falls
+     short of 4.5:1: 5.6:1 on white and under a white label, 4.9:1 on --speed-track */
+  --interactive-strong: #0066cc;
+  /* The recessed channel the speed thumb slides in: a tonal step below the bar */
+  --speed-track: var(--bg-sunken);
+  --speed-thumb: var(--interactive-strong);
   // Neutral list sparklines: fuel colours would compete with blue's "interactive" meaning
   --spark-stroke: #546e7a; /* blueGray600 */
   --spark-fill: rgba(84, 110, 122, 0.12);
@@ -148,6 +154,11 @@
      6.6:1 on --bg-primary, 6.9:1 under the #0a0a0a button label. The logo's dark twins
      (logo-dark.svg, logo-home-dark.svg) are painted in this blue, as is LOGO_BLUE.dark. */
   --interactive-blue: #629be1;
+  /* Small interactive text: 7.8:1 on --speed-track, 6.6:1 on the selected tint */
+  --interactive-strong: #8db6ee;
+  /* --bg-sunken is nearly the page here, so the channel steps up to the raised surface instead */
+  --speed-track: var(--bg-raised);
+  --speed-thumb: var(--interactive-blue);
   --spark-stroke: #9aa9ba;
   --spark-fill: rgba(154, 169, 186, 0.16);
   --spark-baseline: rgba(148, 163, 184, 0.34);
@@ -774,7 +785,8 @@ html:is(:not([data-touch-input="true"]), [data-controller-input="true"])
 .facilityStatusDetail,
 .insightsRateMetricValue,
 table,
-.chartTooltip {
+.chartTooltip,
+.chartEventTooltip {
   font-variant-numeric: lining-nums tabular-nums;
   letter-spacing: normal;
 }
@@ -1131,16 +1143,13 @@ $topbar_height: 56px;
   }
   // Pulled out by its own padding so its icon or text starts on the row's inset, in line with
   // a plain headline and with the grid readout's icon when the two rows stack.
-  .missionRiskButton {
-    min-width: 0;
+  .missionRiskButton.MuiButton-root {
     flex: 0 1 auto;
-    gap: 8px;
     margin-inline-start: -8px;
     padding-inline: 8px;
-    white-space: nowrap;
   }
-  .missionRiskEvent .statusLabel {
-    font-weight: 400;
+  .missionRiskEvent.MuiButton-root {
+    background: var(--variant-textBg, transparent);
   }
   // The icon signals the action without making the entire status line look like a link.
   .missionRiskEvent .conceptIcon {
@@ -1178,8 +1187,7 @@ $topbar_height: 56px;
   // Expand the hit area without increasing the status row's height.
   margin-block: -12px;
 }
-.missionSummaryHeadline,
-.missionRiskText {
+.missionSummaryHeadline {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1263,25 +1271,7 @@ $topbar_height: 56px;
 }
 
 .gridHealthSummary {
-  display: flex;
-  align-items: center;
-}
-
-.gridHealthSummary {
   flex: 1;
-  gap: 8px;
-}
-
-.gridHealthMetric {
-  font-weight: 400;
-}
-
-.gridHealthMetric {
-  margin-left: 0;
-  min-width: 0;
-  text-align: left;
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
 }
 
 .gridHealth-stable .conceptIcon {
@@ -1299,7 +1289,6 @@ $topbar_height: 56px;
   }
 }
 .gameStatusBar .missionSummary.statusWarning {
-  .missionRiskButton.MuiButton-root,
   .missionSummaryMonths.MuiButton-root {
     color: inherit;
   }
@@ -1323,10 +1312,32 @@ $topbar_height: 56px;
   }
 }
 
-.statusLabel {
+.statusReadout.MuiButton-root {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: inherit;
+  font: inherit;
   font-size: var(--font-size-caption);
-  font-weight: 600;
+  font-weight: 400;
   line-height: 1.25;
+  letter-spacing: normal;
+  text-align: left;
+  cursor: pointer;
+}
+
+.statusReadoutText {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 // Keep every grid state alongside the mission on wide screens. Long mission copy can wrap
@@ -1352,7 +1363,6 @@ $topbar_height: 56px;
   .gameStatusBar .gridHealthSummary {
     flex-wrap: wrap;
     justify-content: flex-start;
-    gap: 4px 8px;
   }
   .gameStatusBar .missionSummary {
     flex: 1 1 0;
@@ -2031,6 +2041,12 @@ $pane_header_height: 48px;
 .insights {
   container-type: inline-size;
   container-name: insights;
+
+  > .scrollable {
+    // Chart heights follow their width. Reserve classic scrollbar space so overflow cannot
+    // repeatedly narrow/shrink the charts, disappear, then widen/grow them again.
+    scrollbar-gutter: stable;
+  }
 }
 
 .insightsTracks {
@@ -2401,7 +2417,8 @@ $pane_header_height: 48px;
 // top of the data and clip. Plain HTML so they wrap on narrow screens and screen readers see them.
 // One tooltip covering every series at the hovered x, the way the Victory voronoi container's
 // did, positioned by the chart's own cursor handler
-.chartTooltip {
+.chartTooltip,
+.chartEventTooltip {
   box-sizing: border-box;
   position: absolute;
   display: none;
@@ -4566,12 +4583,36 @@ $pane_header_height: 48px;
     font-size: var(--font-size-caption);
     font-weight: 400;
   }
-  .tutorialHud-namedAction {
-    grid-template-rows: minmax(0, 1fr) auto auto;
+  // A named action (such as "Start final challenge") is too wide to share a row, so it takes
+  // the full width. Exit and the step counter step aside instead of adding a row for
+  // themselves: the game menu still leaves the tutorial, and the counter stays in the
+  // accessibility tree because it names the region. Back, when there is one, shares the row.
+  .tutorialHud-namedAction .tutorialHudFooter > button:first-child {
+    display: none;
+  }
+  .tutorialHud-namedAction .tutorialHudHeader {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
   }
   .tutorialHud-namedAction .tutorialHudFooter > .tutorialHudNav:last-child {
-    grid-row: 3;
     grid-column: 1 / -1;
+  }
+  .tutorialHud-namedAction
+    .tutorialHudFooter
+    > .tutorialHudNav:not(:last-child) {
+    grid-column: 1;
+  }
+  .tutorialHud-namedAction
+    .tutorialHudFooter
+    > .tutorialHudNav:not(:last-child)
+    + .tutorialHudNav:last-child {
+    grid-column: 2 / -1;
   }
 }
 
@@ -5287,10 +5328,31 @@ $homeSmokeCycle: 5.6s;
     row-gap: 0;
     min-width: 0;
   }
+  .buildOptionOutput[role="group"] {
+    min-height: 40px;
+    touch-action: pan-y;
+
+    &:focus-visible {
+      outline: 2px solid var(--interactive-blue);
+      outline-offset: 2px;
+    }
+
+    @media (pointer: coarse) {
+      min-height: 44px;
+    }
+  }
+  .buildOptionOutputCaption {
+    font-size: var(--font-size-caption-sm);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
   .buildOptionSparkline {
     // Reserved even before the forecast can draw a line, so the card doesn't jump. The gap keeps
     // a line along the top edge from reading as an underline of the caption.
     height: 24px;
+    width: 96px;
+    max-width: 100%;
     margin-top: 4px;
     .sparkline {
       display: block;
@@ -5646,6 +5708,12 @@ $homeSmokeCycle: 5.6s;
     transparent 0 5px,
     currentColor 5px 6px
   );
+}
+// A shortfall bar in miniature: a solid cap on a light wash with a hairline along its lower edge.
+.chartLegendSwatch-cap {
+  background:
+    linear-gradient(currentColor, currentColor) top / 100% 3px no-repeat,
+    linear-gradient(currentColor, currentColor) bottom / 100% 1px no-repeat;
 }
 @media (max-width: ($phone_width - 1px)) {
   .facilities .facilitiesBody {
@@ -6839,14 +6907,6 @@ $programs_column: 800px;
   font-size: var(--font-size-body2);
   font-weight: 600;
   letter-spacing: 0;
-
-  &[data-direction="up"] {
-    color: var(--delta-good);
-  }
-
-  &[data-direction="down"] {
-    color: var(--delta-bad);
-  }
 }
 
 .transmissionUpgrade {
@@ -7260,7 +7320,7 @@ img[src$="/transmission.svg"] {
 }
 // The controls stay text-sized in the bar; a transparent target gives them full height.
 .gameMonthlyProfitButton,
-.gridHealthHelp {
+.statusReadout {
   position: relative;
   &::after {
     content: "";
@@ -7274,7 +7334,7 @@ img[src$="/transmission.svg"] {
 }
 @media (pointer: coarse) {
   .gameMonthlyProfitButton,
-  .gridHealthHelp {
+  .statusReadout {
     &::after {
       height: 44px;
     }
@@ -7283,10 +7343,6 @@ img[src$="/transmission.svg"] {
 .scenarioOutlook {
   display: flex;
   flex-direction: column;
-}
-.scenarioBuildNothing {
-  display: block;
-  color: var(--font-color-faded);
 }
 // Phones lead with the outcome, directly under the section title.
 @media (max-width: 599px) {
@@ -7297,17 +7353,6 @@ img[src$="/transmission.svg"] {
     order: -2;
   }
 }
-// The grid readout opens its manual entry, without looking like a second primary control.
-.gridHealthHelp {
-  padding: 0;
-  border: 0;
-  background: none;
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
 // Tablets have room for words, so the readout sits beside the mission instead of icon-only.
 @media (min-width: 600px) and (max-width: 1023px) {
   .gameStatusBar {
@@ -8298,6 +8343,11 @@ option {
     flex-shrink: 0;
     max-width: none;
   }
+  // The events the chart marks, named above it at the full width of the screen
+  .insightEventRail {
+    flex-shrink: 0;
+    max-width: none;
+  }
   .expandedChartContent {
     display: flex;
     flex-direction: column;
@@ -8319,7 +8369,8 @@ option {
   .fuelFilter .MuiButton-root {
     font-size: var(--font-size-body1);
   }
-  .chartTooltip {
+  .chartTooltip,
+  .chartEventTooltip {
     font-size: var(--font-size-body1);
   }
   .chartLegend {
@@ -8483,36 +8534,70 @@ option {
   white-space: normal;
 }
 
-#utility-acquisition-title-heading + .MuiDialogContent-root {
-  > .decisionImpact {
-    padding-top: 0;
-
-    .decisionImpactFact:first-child {
-      padding-top: 0;
-      border-top: 0;
-    }
-  }
-
-  .decisionImpactFactValue,
-  .decisionImpactFactDetail {
-    white-space: pre-line;
-  }
-}
-
 .acquisitionReviewIntro {
   display: grid;
-  gap: 12px;
-  padding: 0 16px 12px;
-  border-bottom: 1px solid var(--border-strong);
-}
-
-.transmissionAcquisition {
-  display: grid;
   gap: 8px;
-  justify-items: start;
-  padding-block: 8px;
-
-  .MuiButton-root {
+  padding: 0 16px 12px;
+}
+.acquisitionReviewDetails {
+  padding: 16px;
+}
+.acquisitionObligations {
+  padding-block: 16px;
+  ul {
+    margin: 8px 0 0;
+    padding-left: 20px;
+    font-size: var(--font-size-body2);
+    line-height: 1.5;
+  }
+  li + li {
+    margin-top: 4px;
+  }
+}
+.acquisitionDisclosure {
+  border-top: 1px solid var(--border-subtle);
+  > summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 44px;
+    padding-block: 8px;
+    list-style: none;
+    cursor: pointer;
+    font-size: var(--font-size-body2);
+    font-weight: 500;
+    &::-webkit-details-marker {
+      display: none;
+    }
+    &::after {
+      content: "›";
+      color: var(--font-color-faded);
+      font-size: 1.5rem;
+    }
+    &:focus-visible {
+      outline: 2px solid var(--interactive-blue);
+      outline-offset: 2px;
+      border-radius: var(--radius-sm);
+    }
+  }
+  &[open] > summary::after {
+    transform: rotate(90deg);
+  }
+  > div {
+    padding-block: 8px 16px;
+  }
+}
+.acquisitionDisclosure .decisionImpact {
+  padding-inline: 0;
+  border-bottom: 0;
+}
+.transmissionDecisionActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 8px;
+  > .MuiButton-root {
     min-height: 40px;
     @media (pointer: coarse) {
       min-height: 44px;

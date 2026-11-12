@@ -2,7 +2,13 @@ import { modScenario } from "../mods/ModScenario";
 import { modBrowseSummary } from "./ModBrowse";
 import { selectionKey, validBrowseState } from "./Browse";
 import { utf8Bytes } from "../helpers/RuleIdentity";
-import { HOST_LEFT, MultiplayerSession } from "./Session";
+import {
+  CONNECTION_LOST,
+  HOST_LEFT,
+  MultiplayerSession,
+  isConnectionLoss,
+  offersDisconnect,
+} from "./Session";
 import type { DesktopBridge } from "../Desktop";
 import type {
   LobbyState,
@@ -236,7 +242,9 @@ test("resuming a campaign creates its invitation lobby before starting and waits
     kind: "lock",
     ids: [host, guest, "retired"],
   });
-  expect(f.posts.at(-1)).toMatchObject({
+  expect(
+    f.posts.findLast((request) => request.kind === "restore"),
+  ).toMatchObject({
     kind: "restore",
     seats: campaign.players,
   });
@@ -297,7 +305,9 @@ test("a friend who was not in the save claims an open company and resumes it", a
     kind: "lock",
     ids: [host, "friend", "retired"],
   });
-  expect(f.posts.at(-1)).toMatchObject({
+  expect(
+    f.posts.findLast((request) => request.kind === "restore"),
+  ).toMatchObject({
     kind: "restore",
     seats: [
       { id: host, name: "Host" },
@@ -593,6 +603,43 @@ test("a command that loses a race with the host link drops is not a new failure"
   expect(f.session.getSnapshot().pending).toBe(true);
   f.session.dispose();
 });
+test("only a lost connection counts as one, so other errors never offer a way out that skips the save", async () => {
+  const f = fixture();
+  await f.session.initialize();
+  deliver(f, {});
+  f.event({ kind: "disconnected", sender: host });
+  expect(f.session.getSnapshot().error).toBe(CONNECTION_LOST);
+  expect(isConnectionLoss(f.session.getSnapshot().error)).toBe(true);
+  // Native lobby errors come only from its connection failures.
+  expect(isConnectionLoss(undefined, "The host left.")).toBe(true);
+  expect(isConnectionLoss("Multiplayer save failed: Disk full")).toBe(false);
+  expect(isConnectionLoss("Multiplayer save failed: Disk full", "x")).toBe(
+    false,
+  );
+  expect(isConnectionLoss("Not enough cash")).toBe(false);
+  expect(isConnectionLoss()).toBe(false);
+  f.session.dispose();
+});
+test("only a guest's lost connection offers Disconnect, never a host that can still save", () => {
+  const guestSide = { hostId: host, selfId: guest };
+  expect(offersDisconnect({ error: CONNECTION_LOST, ...guestSide })).toBe(true);
+  expect(offersDisconnect({ lobbyError: "The host left.", ...guestSide })).toBe(
+    true,
+  );
+  expect(offersDisconnect({ error: "Not enough cash", ...guestSide })).toBe(
+    false,
+  );
+  // A native lobby error can reach a host whose simulation keeps running.
+  const hostSide = { hostId: host, selfId: host };
+  expect(
+    offersDisconnect({
+      lobbyError: "Steam connection interrupted.",
+      ...hostSide,
+    }),
+  ).toBe(false);
+  expect(offersDisconnect({ error: CONNECTION_LOST, ...hostSide })).toBe(false);
+  expect(offersDisconnect({ error: CONNECTION_LOST })).toBe(false);
+});
 test("players read the transport's message, never Electron's invoke wrapper", async () => {
   const f = fixture();
   await f.session.initialize();
@@ -815,6 +862,42 @@ test("worker keepalives relay only to connected guests without replacing the hos
   expect(f.requests.at(-1)).toEqual({ kind: "send", to: guest, payload: data });
   expect(f.session.getSnapshot()).toBe(previous);
   f.session.dispose();
+});
+
+test("worker view credit follows synchronous host consumption and cannot outlive its session", async () => {
+  const f = fixture(true);
+  await f.session.initialize();
+  await f.session.start({ spec: COOP_TEST_SPEC });
+  f.posts.length = 0;
+  const consumed = jest.fn(() => {
+    expect(f.posts).not.toContainEqual({ kind: "views-applied" });
+  });
+  const stop = f.session.subscribe(consumed);
+  const publish = () =>
+    f.worker.onmessage?.({
+      data: {
+        kind: "views",
+        views: {
+          [host]: view({ revision: 2 }),
+          [guest]: view({ revision: 2 }),
+        },
+      },
+    } as unknown as MessageEvent<WorkerResponse>);
+  publish();
+  expect(consumed).toHaveBeenCalledTimes(1);
+  expect(f.session.getSnapshot().view?.revision).toBe(2);
+  expect(f.requests.at(-1)).toMatchObject({
+    kind: "send",
+    to: guest,
+    payload: { kind: "view" },
+  });
+  expect(f.posts).toEqual([{ kind: "views-applied" }]);
+  stop();
+  f.posts.length = 0;
+  f.session.subscribe(() => f.session.dispose());
+  publish();
+  expect(f.worker.terminate).toHaveBeenCalled();
+  expect(f.posts).toEqual([]);
 });
 
 test.each(["command", "disconnect"])(

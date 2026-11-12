@@ -17,6 +17,7 @@ import type {
 } from "../src/multiplayer/Native";
 import type { RoomView, World } from "../src/multiplayer/Types";
 import { verifyMenuKeyboard } from "./menu-keyboard";
+import { reviewScreenshot } from "./review-screenshot";
 
 type SteamTestWindow = typeof window & {
   mockSteamDeliveries?: Set<Promise<void>>;
@@ -39,6 +40,7 @@ type SteamTestWindow = typeof window & {
     responses: { key: string; optionId: string }[];
   }[];
   nativeForecastReplies?: string[];
+  videoWorkload?: { frames: () => Promise<number>; stop: () => void };
 };
 
 test.afterEach(async ({ browser }) => {
@@ -231,6 +233,7 @@ class SteamRoom {
   >();
   members: LobbyState["members"] = [];
   checkpoint?: World;
+  checkpointError?: string;
   private saveResults = new Map<
     string,
     Extract<WireMessage, { kind: "save-result" }>
@@ -400,6 +403,7 @@ class SteamRoom {
       return;
     }
     if (input.kind === "checkpoint") {
+      if (this.checkpointError) throw new Error(this.checkpointError);
       this.checkpoint = input.world;
       // Native persistence returns before renderer notifications finish decoding.
       // Slow delivery must not block the session's queue of locally durable saves.
@@ -1266,6 +1270,185 @@ test("desktop menu keyboard journey includes Play with friends in both direction
 
 const clock = (page: Page) =>
   page.locator(".multiplayerSpeedToggles:visible").last();
+
+test("multiplayer speed controls stay at the right edge in desktop and touch layouts", async ({
+  browser,
+}) => {
+  const { room, pages, errors } = await startSharedGame(browser, 4);
+  for (const page of pages) await ready(page);
+  for (const width of [1440, 1280, 800, 390, 360]) {
+    const page = width < 600 ? pages[3] : pages[0];
+    await page.setViewportSize({ width, height: width < 600 ? 844 : 900 });
+    for (const theme of ["light", "dark"] as const) {
+      await page.emulateMedia({ colorScheme: theme });
+      await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
+      await expectClockInViewport(page);
+      await expect(async () => {
+        const gap = await clock(page).evaluate((group) => {
+          const toolbar = group.closest(".MuiToolbar-root")!;
+          const edge =
+            toolbar.getBoundingClientRect().right -
+            parseFloat(getComputedStyle(toolbar).paddingRight);
+          return edge - group.getBoundingClientRect().right;
+        });
+        expect(Math.abs(gap)).toBeLessThanOrEqual(1);
+      }).toPass({ timeout: 20000 });
+      if (
+        (width === 1280 && theme === "light") ||
+        (width === 390 && theme === "dark")
+      ) {
+        await page.mouse.move(0, 0);
+        await expect(page.getByRole("tooltip")).toBeHidden();
+        await reviewScreenshot(page.locator("#appbar"), {
+          path: test.info().outputPath("speed-" + width + "-" + theme + ".png"),
+          animations: "disabled",
+        });
+      }
+    }
+  }
+  expect(errors).toEqual([]);
+  expect(room.transportErrors).toEqual([]);
+});
+
+test("12x multiplayer speed controls respond while video chat is encoding", async ({
+  browser,
+}) => {
+  const { room, pages, errors } = await startSharedGame(browser, 2);
+  const host = pages[0];
+  const cdp = await host.context().newCDPSession(host);
+  // Reserve CPU headroom for the competing call, on a production desktop renderer too.
+  await cdp.send("Emulation.setCPUThrottlingRate", { rate: 6 });
+  await host.evaluate(async () => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 640;
+    canvas.height = 360;
+    const context = canvas.getContext("2d")!;
+    let frame = 0;
+    const draw = () => {
+      for (let x = 0; x < 640; x += 20) {
+        context.fillStyle = `hsl(${(frame * 7 + x) % 360} 50% 50%)`;
+        context.fillRect(x, 0, 20, 360);
+      }
+      frame++;
+    };
+    draw();
+    const timer = window.setInterval(draw, 1000 / 30);
+    const stream = canvas.captureStream(30);
+    const sender = new RTCPeerConnection();
+    const receiver = new RTCPeerConnection();
+    const video = document.createElement("video");
+    video.muted = true;
+    video.autoplay = true;
+    // Exercise encoding, decoding and video presentation without covering the game controls.
+    Object.assign(video.style, {
+      position: "fixed",
+      width: "160px",
+      height: "90px",
+      bottom: "0",
+      right: "0",
+      pointerEvents: "none",
+    });
+    document.body.append(video);
+    receiver.ontrack = (event) => {
+      video.srcObject = event.streams[0];
+    };
+    sender.onicecandidate = (event) => {
+      if (event.candidate) void receiver.addIceCandidate(event.candidate);
+    };
+    receiver.onicecandidate = (event) => {
+      if (event.candidate) void sender.addIceCandidate(event.candidate);
+    };
+    stream.getTracks().forEach((track) => sender.addTrack(track, stream));
+    await sender.setLocalDescription(await sender.createOffer());
+    await receiver.setRemoteDescription(sender.localDescription!);
+    await receiver.setLocalDescription(await receiver.createAnswer());
+    await sender.setRemoteDescription(receiver.localDescription!);
+    (window as SteamTestWindow).videoWorkload = {
+      frames: async () => {
+        let encoded = 0;
+        (await sender.getStats()).forEach((report) => {
+          if (report.type === "outbound-rtp" && report.kind === "video")
+            encoded += report.framesEncoded ?? 0;
+        });
+        return encoded;
+      },
+      stop: () => {
+        clearInterval(timer);
+        stream.getTracks().forEach((track) => track.stop());
+        sender.close();
+        receiver.close();
+        video.remove();
+      },
+    };
+  });
+  const responses: { input: string; ms: number }[] = [];
+  const frames = () =>
+    host.evaluate(() => (window as SteamTestWindow).videoWorkload!.frames());
+  try {
+    await expect.poll(frames).toBeGreaterThan(10);
+    for (const page of pages) await ready(page);
+    for (const page of pages)
+      await clock(page)
+        .getByRole("button", { name: "fast speed", exact: true })
+        .click();
+    await expect(clock(host)).toHaveAttribute("data-active-speed", "FAST");
+    await expect
+      .poll(
+        () => room.views.get("76561198000000002")?.game?.date.monthsElapsed,
+        {
+          timeout: 60000,
+        },
+      )
+      .toBeGreaterThanOrEqual(12);
+    const encodedBefore = await frames();
+    for (const page of pages) {
+      for (const [key, speed] of [
+        ["1", "SLOW"],
+        ["3", "FAST"],
+        ["0", "PAUSED"],
+        ["3", "FAST"],
+      ]) {
+        const started = Date.now();
+        await page.keyboard.press(key);
+        for (const peer of pages)
+          await expect(clock(peer)).toHaveAttribute(
+            "data-active-speed",
+            speed,
+            { timeout: 3000 },
+          );
+        responses.push({ input: `key ${key}`, ms: Date.now() - started });
+      }
+      const started = Date.now();
+      await clock(page)
+        .getByRole("button", { name: "normal speed", exact: true })
+        .click({ timeout: 3000 });
+      for (const peer of pages)
+        await expect(clock(peer)).toHaveAttribute(
+          "data-active-speed",
+          "NORMAL",
+          { timeout: 3000 },
+        );
+      responses.push({ input: "click 3x", ms: Date.now() - started });
+      await page.keyboard.press("3");
+      for (const peer of pages)
+        await expect(clock(peer)).toHaveAttribute("data-active-speed", "FAST");
+    }
+    await expect.poll(frames).toBeGreaterThan(encodedBefore);
+    expect(errors).toEqual([]);
+    expect(room.transportErrors).toEqual([]);
+    await test.info().attach("speed-response-under-video-load", {
+      body: JSON.stringify(responses),
+      contentType: "application/json",
+    });
+  } finally {
+    await host.evaluate(() =>
+      (window as SteamTestWindow).videoWorkload!.stop(),
+    );
+    await cdp.send("Emulation.setCPUThrottlingRate", { rate: 1 });
+    await cdp.detach();
+  }
+});
+
 async function ready(page: Page) {
   await clock(page)
     .getByRole("button", { name: "slow speed", exact: true })
@@ -1369,7 +1552,8 @@ async function expectClockInViewport(page: Page) {
       for (const inset of Object.values(icon))
         expect(inset).toBeGreaterThanOrEqual(0);
       expect(icon.top).toBeGreaterThanOrEqual(buttonHeight / 2);
-      expect(icon.bottom).toBeLessThanOrEqual(3);
+      // Pips sit 8 px above the bottom edge, inside the thumb's footprint.
+      expect(icon.bottom).toBeLessThanOrEqual(10);
     }
   }).toPass({ timeout: 20000 });
 }
@@ -1393,47 +1577,98 @@ async function expectClockMeaning(
     1,
   );
   const fill = (element: Element) => getComputedStyle(element).backgroundColor;
-  // The actual game speed is the filled segment.
-  expect(await active.evaluate(fill)).not.toBe("rgba(0, 0, 0, 0)");
-  // Your request has a quiet static ring, even while someone else holds the clock.
-  const ring = await selected.evaluate((element) => {
-    const style = getComputedStyle(element, "::before");
-    const button = element.getBoundingClientRect();
-    const label = element
-      .querySelector(".multiplayerSpeedLabel")!
-      .getBoundingClientRect();
-    const size = parseFloat(style.width);
-    const centerY = button.top + element.clientTop + parseFloat(style.top);
-    return {
-      content: style.content,
-      radius: style.borderTopLeftRadius,
-      animation: style.animationName,
-      color: style.borderTopColor,
-      labelColor: getComputedStyle(element).color,
-      top: centerY - size / 2 - button.top,
-      bottom: button.bottom - (centerY + size / 2),
-      offCenter: Math.abs(label.top + label.height / 2 - centerY),
-      clearance: size - 2 * parseFloat(style.borderTopWidth) - label.width,
-    };
-  });
-  expect(ring.content).not.toBe("none");
-  expect(ring.radius).toBe("50%");
-  expect(ring.animation).toBe("none");
-  expect(ring.color).toBe(ring.labelColor);
-  // It sits inside the segment, around the lifted label, and clears the label's sides.
-  expect(ring.top).toBeGreaterThanOrEqual(1);
-  expect(ring.bottom).toBeGreaterThanOrEqual(1);
-  expect(ring.offCenter).toBeLessThanOrEqual(1);
-  expect(ring.clearance).toBeGreaterThanOrEqual(2);
-  if (selectedName !== activeName) {
-    expect(
-      await active.evaluate(
-        (element) => getComputedStyle(element, "::before").content,
-      ),
-    ).toBe("none");
-    expect(await selected.evaluate(fill)).toBe("rgba(0, 0, 0, 0)");
-    await expect(selected).not.toHaveAttribute("aria-current");
-  }
+  // The thumb is the group's ::before and sits under the actual speed, and under nothing else.
+  // It slides, so measure until it settles.
+  await expect(async () => {
+    const thumb = await clock(page).evaluate((group) => {
+      const style = getComputedStyle(group, "::before");
+      const target = group.querySelector('button[aria-current="true"]')!;
+      const groupBox = group.getBoundingClientRect();
+      const box = target.getBoundingClientRect();
+      const centre =
+        groupBox.left +
+        parseFloat(style.left) +
+        new DOMMatrix(style.transform).m41 +
+        parseFloat(style.width) / 2;
+      return {
+        background: style.backgroundColor,
+        offCentre: Math.abs(centre - (box.left + box.width / 2)),
+        inset: parseFloat(style.top),
+        height: parseFloat(style.height),
+        buttonHeight: box.height,
+      };
+    });
+    expect(thumb.background).not.toBe("rgba(0, 0, 0, 0)");
+    expect(thumb.offCentre).toBeLessThanOrEqual(1);
+    expect(thumb.inset).toBeGreaterThanOrEqual(4);
+    expect(thumb.height + 2 * thumb.inset).toBeCloseTo(thumb.buttonHeight, 0);
+  }).toPass({ timeout: 20000 });
+  // The thumb carries the actual speed, so the active button itself has no fill of its own.
+  expect(await active.evaluate(fill)).toBe("rgba(0, 0, 0, 0)");
+  // The label's colour eases in behind the thumb, so read until both have settled.
+  await expect(async () => {
+    const ring = await selected.evaluate((element) => {
+      const style = getComputedStyle(element, "::before");
+      const label = element
+        .querySelector(".multiplayerSpeedLabel")!
+        .getBoundingClientRect();
+      const button = element.getBoundingClientRect();
+      const height = parseFloat(style.height);
+      const centreY = parseFloat(style.top) + height / 2;
+      return {
+        content: style.content,
+        radius: parseFloat(style.borderTopLeftRadius),
+        height,
+        animation: style.animationName,
+        style: style.borderTopStyle,
+        color: style.borderTopColor,
+        labelColor: getComputedStyle(element).color,
+        top: parseFloat(style.top),
+        bottom: button.height - (parseFloat(style.top) + height),
+        // How far above the ring's centre the label sits, leaving room for the pips below it.
+        lift: centreY - (label.top - button.top + label.height / 2),
+        clearance:
+          parseFloat(style.width) -
+          2 * parseFloat(style.borderTopWidth) -
+          label.width,
+      };
+    });
+    if (selectedName === activeName) {
+      // Your request and the clock agree, so the thumb says both and the ring steps aside.
+      expect(ring.content).toBe("none");
+      return;
+    }
+    // Your request has a quiet static capsule ring, even while someone else holds the clock.
+    expect(ring.content).not.toBe("none");
+    expect(ring.radius).toBeGreaterThanOrEqual(ring.height / 2);
+    expect(ring.animation).toBe("none");
+    expect(ring.style).toBe("solid");
+    expect(ring.color).toBe(ring.labelColor);
+    // It matches the thumb's footprint and clears the label's sides.
+    expect(ring.top).toBeGreaterThanOrEqual(4);
+    expect(ring.bottom).toBeGreaterThanOrEqual(4);
+    expect(ring.lift).toBeGreaterThanOrEqual(1);
+    expect(ring.lift).toBeLessThanOrEqual(3);
+    expect(ring.clearance).toBeGreaterThanOrEqual(2);
+  }).toPass({ timeout: 20000 });
+  if (selectedName === activeName) return;
+  expect(
+    await active.evaluate(
+      (element) => getComputedStyle(element, "::before").content,
+    ),
+  ).toBe("none");
+  expect(await selected.evaluate(fill)).toBe("rgba(0, 0, 0, 0)");
+  await expect(selected).not.toHaveAttribute("aria-current");
+  // Waiting for you to confirm is a shape change, not a colour change: the ring turns dashed.
+  await clock(page).evaluate((group) =>
+    group.setAttribute("data-resume", "true"),
+  );
+  expect(
+    await selected.evaluate(
+      (element) => getComputedStyle(element, "::before").borderTopStyle,
+    ),
+  ).toBe("dashed");
+  await clock(page).evaluate((group) => group.removeAttribute("data-resume"));
 }
 
 async function verifySpeedLayouts(browser: Browser, pages: Page[]) {
@@ -1517,6 +1752,12 @@ async function verifySpeedLayouts(browser: Browser, pages: Page[]) {
           report.push({ width, theme, touch, catalog, buttons: actual });
         };
         await compare(false);
+        // The thumb glides into place instead of jumping, unless reduced motion is requested.
+        expect(
+          await clock(target).evaluate(
+            (group) => getComputedStyle(group, "::before").transitionDuration,
+          ),
+        ).toBe("0.32s");
         const capture = async (state = "") => {
           if (!process.env.MULTIPLAYER_SCREENSHOTS) return;
           await target.mouse.move(0, 0);
@@ -1623,6 +1864,93 @@ async function saveAndQuit(page: Page) {
   ).toBeVisible();
 }
 
+async function reviewConnectionNotice(page: Page, state: string) {
+  if (!process.env.REVIEW_SCREENSHOT_DIR) return;
+  for (const width of [1280, 390, 360]) {
+    for (const theme of ["light", "dark"] as const) {
+      await page.setViewportSize({ width, height: width === 1280 ? 900 : 844 });
+      await page.emulateMedia({ colorScheme: theme });
+      await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
+      await reviewScreenshot(page, {
+        path: test.info().outputPath(`${state}-${width}-${theme}.png`),
+        fullPage: true,
+        animations: "disabled",
+      });
+    }
+  }
+}
+
+test("save failures, refused commands and native host errors never offer checkpoint-skipping Disconnect", async ({
+  browser,
+}) => {
+  const { room, pages, errors } = await startSharedGame(browser, 2);
+  const host = pages[0];
+  const guestId = room.members[1].id;
+  await expect(host.locator(".facilities:visible")).toBeVisible();
+  // Exercise the real host worker's save failure through the native persistence boundary.
+  room.checkpointError = "Disk full";
+  await room.request(guestId, {
+    kind: "send",
+    to: room.host,
+    payload: { kind: "save-request", requestId: "failed-checkpoint" },
+  });
+  const notice = host.getByRole("dialog", { name: "Multiplayer", exact: true });
+  await expect(notice).toContainText("Multiplayer save failed: Disk full");
+  await expect(
+    notice.getByRole("button", { name: "Disconnect", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    notice.getByRole("button", { name: "Reconnect", exact: true }),
+  ).toBeVisible();
+  await reviewConnectionNotice(host, "save-failed");
+  await notice.getByRole("button", { name: "OK", exact: true }).click();
+  await expect(notice).toBeHidden();
+  room.checkpointError = undefined;
+
+  // A native transport failure does not stop the host's local simulation or its ability to save.
+  await room.event(room.host, {
+    kind: "state",
+    state: {
+      ...room.state(room.host),
+      error: "Steam connection interrupted. Reconnect to continue.",
+    },
+  });
+  await expect(notice).toContainText("Steam connection interrupted");
+  await expect(
+    notice.getByRole("button", { name: "Disconnect", exact: true }),
+  ).toHaveCount(0);
+  await notice.getByRole("button", { name: "OK", exact: true }).click();
+  await expect(notice).toBeHidden();
+  await room.saveCheckpoint(guestId);
+  expect(room.checkpoint).toBeDefined();
+  // Refusals also reach the guest through the host worker's normal command receipt.
+  const view = room.views.get(guestId)!;
+  await room.request(guestId, {
+    kind: "send",
+    to: room.host,
+    payload: {
+      kind: "command",
+      envelope: {
+        matchId: view.matchId,
+        epoch: view.epoch,
+        sequence: view.lastSequence + 1,
+        command: { kind: "rate", value: -1 },
+      },
+    },
+  });
+  const refused = pages[1].getByRole("dialog", {
+    name: "Multiplayer",
+    exact: true,
+  });
+  await expect(refused).toContainText("Choose a rate between");
+  await expect(
+    refused.getByRole("button", { name: "Disconnect", exact: true }),
+  ).toHaveCount(0);
+  expect(room.members).toHaveLength(2);
+  expect(errors).toEqual([]);
+  expect(room.transportErrors).toEqual([]);
+});
+
 test("a guest who lost the host can disconnect from the connection notice", async ({
   browser,
 }) => {
@@ -1643,6 +1971,7 @@ test("a guest who lost the host can disconnect from the connection notice", asyn
   await expect(
     notice.getByRole("button", { name: "Reconnect", exact: true }),
   ).toBeVisible();
+  await reviewConnectionNotice(guest, "connection-lost");
   await notice.getByRole("button", { name: "Disconnect", exact: true }).click();
   await expect(
     guest.getByRole("button", { name: "Play with friends", exact: true }),
@@ -1935,14 +2264,10 @@ for (const count of [2, 4]) {
       await expect(
         pages[0].getByRole("button", { name: /Player speeds;/ }),
       ).toHaveCount(0);
-      // The ordinary build catalog pauses the shared clock, and normal purchases reach the host.
+      // Shopping in the build catalog never pauses the shared clock, and normal purchases reach
+      // the host. The purchase follows the catalog opening, so a pause would have arrived by then.
       const fleetBefore = room.views.get(buyerId)?.game?.facilities.length ?? 0;
       await buyer.locator(".button-buildFacility").click();
-      for (const page of pages)
-        await expect(clock(page)).toHaveAttribute(
-          "data-active-speed",
-          "PAUSED",
-        );
       await buyer
         .getByRole("button", { name: "Review purchase of Wind", exact: true })
         .click();
@@ -1952,7 +2277,9 @@ for (const count of [2, 4]) {
       await expect
         .poll(() => room.views.get(buyerId)?.game?.facilities.length)
         .toBe(fleetBefore + 1);
-      // A side panel stays open after a purchase, and holds the clock until it closes.
+      for (const page of pages)
+        await expect(clock(page)).toHaveAttribute("data-active-speed", "SLOW");
+      // A side panel stays open after a purchase; the clock keeps running behind it.
       if (buyer.viewportSize()!.width >= 1024)
         await buyer
           .getByRole("button", { name: "Close Build", exact: true })

@@ -1,11 +1,17 @@
-/** The startup entrance is already painted from index.html before the game bundle runs. */
+/**
+ * The startup entrance is already painted from index.html before the game bundle runs, with the
+ * same message as the web build. This only restores that message after a failed attempt is retried;
+ * the first call leaves the painted entrance untouched.
+ */
 export function prepareDesktopStartup(): void {
   const entrance = document.getElementById("appStartup");
   if (!entrance) return;
-  entrance.classList.remove("appStartupFailed");
   const status = entrance.querySelector("[data-startup-status]");
-  status?.setAttribute("role", "status");
-  status?.replaceChildren("Reticulating splines...");
+  if (entrance.classList.contains("appStartupFailed")) {
+    entrance.classList.remove("appStartupFailed");
+    status?.setAttribute("role", "status");
+    status?.replaceChildren("Loading…");
+  }
 }
 
 export function failDesktopStartup(retry: () => void, quit: () => void): void {

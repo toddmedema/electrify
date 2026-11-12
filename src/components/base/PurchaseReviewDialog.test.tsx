@@ -46,15 +46,32 @@ describe("PurchaseReviewDialog", () => {
       screen.getByText(`${formatMoneyConcise(2000000)} now`),
     ).toBeInTheDocument();
     expect(screen.queryByText(/Payments start now/)).not.toBeInTheDocument();
-    expect(screen.getByText(/\/mo \(/)).toHaveTextContent(
-      `${formatMoneyConcise(terms.downpayment)} now + ${formatMoneyConcise(terms.monthlyPayment)}/mo (5.00% for 30 years)`,
+    expect(
+      screen.getByText(/ now \+ /, { selector: "strong" }),
+    ).toHaveTextContent(
+      `${formatMoneyConcise(terms.downpayment)} now + ${formatMoneyConcise(terms.monthlyPayment)}/mo`,
     );
-    expect(screen.getByText(/Includes refinancing/)).toBeInTheDocument();
+    expect(screen.getByText(/Includes refinancing/)).toHaveTextContent(
+      /^New loan: 5.00% for 30 years\. Includes refinancing/,
+    );
     expect(screen.getByText("Online in")).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "What is interest rate?" }),
     ).toBeVisible();
   });
+
+  it.each([120, 240, 360])(
+    "shows the %i-month loan terms below the payment",
+    (loanMonths) => {
+      renderDialog({ interestRate: 0.0525, loanMonths });
+      const payment = screen.getByText(/ now \+ /, { selector: "strong" });
+      expect(payment).toHaveTextContent(/\/mo$/);
+      expect(payment).not.toHaveTextContent(/%|years/);
+      expect(
+        screen.getByText(`New loan: 5.25% for ${loanMonths / 12} years.`),
+      ).toHaveClass("decisionImpactFactDetail");
+    },
+  );
 
   it("gates each option on what it costs now", () => {
     const { button } = renderDialog({ cash: 100000 });
@@ -101,10 +118,14 @@ describe("PurchaseReviewDialog", () => {
     const { button } = renderDialog({ cash: 450000, cashOnlyFee: 100000 });
     const terms = purchaseTerms(2000000, true, 0.05);
     expect(button("Take loan")).toBeDisabled();
-    expect(screen.getByText(/\/mo \(/)).toHaveTextContent(
+    expect(
+      screen.getByText(/ now \+ /, { selector: "strong" }),
+    ).toHaveTextContent(
       `${formatMoneyConcise(terms.downpayment + 100000)} now + ${formatMoneyConcise(terms.monthlyPayment)}/mo`,
     );
-    expect(screen.getByText(/cash-only transaction fee/)).toBeInTheDocument();
+    expect(
+      screen.queryByText(/cash-only transaction fee/),
+    ).not.toBeInTheDocument();
   });
 
   it("offers explicit cancellation without submitting a purchase", () => {
