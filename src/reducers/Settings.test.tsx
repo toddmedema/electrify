@@ -181,3 +181,32 @@ it.each(["standalone", "ios"])(
     expect(settings().initialSettings.audioEnabled).toBe(true);
   },
 );
+
+it("migrates the old chosen TV layout once and restores explicit workspace choices", () => {
+  localStorage.setItem("tvMode", "true");
+  const { default: reducer, initialSettings, change } = settings();
+  expect(initialSettings.workspace).toBe("single");
+  expect(localStorage.getItem("workspace")).toBe("single");
+  const updated = reducer(initialSettings, change({ workspace: "automatic" }));
+  expect(updated.workspace).toBe("automatic");
+  expect(settings().initialSettings.workspace).toBe("automatic");
+});
+
+it.each(["invalid", "true", "null", '"single"', ""])(
+  "rejects a malformed stored workspace instead of reviving an old preset: %p",
+  (workspace) => {
+    localStorage.setItem("tvMode", "true");
+    localStorage.setItem("workspace", workspace);
+    expect(settings().initialSettings.workspace).toBe("automatic");
+  },
+);
+
+it("rejects an invalid runtime workspace and persists the valid fallback", () => {
+  const { default: reducer, initialSettings, change } = settings();
+  const updated = reducer(
+    initialSettings,
+    change({ workspace: "tv" } as unknown as Parameters<typeof change>[0]),
+  );
+  expect(updated.workspace).toBe("automatic");
+  expect(settings().initialSettings.workspace).toBe("automatic");
+});

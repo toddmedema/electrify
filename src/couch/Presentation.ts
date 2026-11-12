@@ -6,6 +6,7 @@ export function seatPresentation(settings: SettingsType) {
     theme: settings.theme,
     interfaceScale: settings.interfaceScale,
     units: settings.units,
+    workspace: "single",
     tvMode: true,
     tvInset: 0,
     audioEnabled: false,

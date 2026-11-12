@@ -58,6 +58,7 @@ import { ThemeChoiceType } from "./Types";
 import { InstallPromptProvider } from "./components/base/InstallAppButton";
 import type { DesktopPowerState } from "./Desktop";
 import { applyInterfaceScale } from "./InterfaceScale";
+import "./InterfaceLayout.scss";
 import { normalizeTvInset, tvLayoutEnabled } from "./TvLayout";
 import { getDesktop, isDesktopApp } from "./Desktop";
 

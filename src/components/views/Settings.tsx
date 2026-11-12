@@ -16,12 +16,18 @@ import {
   Typography,
 } from "@mui/material";
 import { ChevronDownGlyph } from "../base/Glyphs";
-import { SettingsType, ThemeChoiceType, UnitSystemType } from "../../Types";
+import {
+  SettingsType,
+  ThemeChoiceType,
+  UnitSystemType,
+  WorkspaceType,
+} from "../../Types";
 import {
   INTERFACE_SCALES,
   interfaceScaleLabel,
   normalizeInterfaceScale,
 } from "../../InterfaceScale";
+import { normalizeWorkspace } from "../../WorkspaceLayout";
 import { useControllerInput } from "../../desktop/InputPresentation";
 import { UNIT_SYSTEMS, UNIT_SYSTEM_LABELS } from "../../helpers/Units";
 import { THEME_CHOICES, THEME_LABELS } from "../../Theme";
@@ -67,6 +73,7 @@ export interface DispatchProps {
   onUnitsChange: (change: UnitSystemType) => void;
   onThemeChange: (change: ThemeChoiceType) => void;
   onInterfaceScaleChange: (change: number) => void;
+  onWorkspaceChange: (change: WorkspaceType) => void;
   onBack: () => void;
 }
 
@@ -387,8 +394,30 @@ export default function Settings(props: Props): React.JSX.Element {
             </Stack>
           </SettingsGroup>
 
-          {desktopApp && (
-            <SettingsGroup id="display-settings" title="Display">
+          <SettingsGroup id="display-settings" title="Display">
+            <SettingRow
+              label="Workspace"
+              description="Automatic fits tools beside Fleet when there is room. Single tool gives the active tool the main area."
+              stackOnMobile
+            >
+              <ToggleButtonGroup
+                exclusive
+                size="small"
+                value={normalizeWorkspace(props.settings.workspace)}
+                aria-label="Workspace"
+                onChange={(_event, value: WorkspaceType | null) =>
+                  value && props.onWorkspaceChange(value)
+                }
+                sx={{
+                  width: { xs: "100%", sm: "auto" },
+                  "& .MuiToggleButton-root": { flex: 1, textTransform: "none" },
+                }}
+              >
+                <ToggleButton value="automatic">Automatic</ToggleButton>
+                <ToggleButton value="single">Single tool</ToggleButton>
+              </ToggleButtonGroup>
+            </SettingRow>
+            {desktopApp && (
               <React.Suspense
                 fallback={
                   <Typography sx={{ p: 2 }}>
@@ -399,8 +428,8 @@ export default function Settings(props: Props): React.JSX.Element {
                 <TvLayoutSettings />
                 <DesktopDisplaySettings />
               </React.Suspense>
-            </SettingsGroup>
-          )}
+            )}
+          </SettingsGroup>
           <SettingsGroup
             id="leaderboard-settings"
             title={desktopApp ? "Steam" : "Leaderboard"}

@@ -518,12 +518,12 @@ test("Insights and Events reopen at the scroll position the player left", async 
   }
 });
 
-async function expectFloatingDock(page: Page) {
+async function expectWorkspaceDock(page: Page) {
   await expect(async () => {
     // Read one layout snapshot after navigation instead of mixing animation frames
     // across separate boundingBox requests.
-    const { stage, facilities, fleet, dock, width } = await page.evaluate(
-      () => {
+    const { stage, facilities, fleet, dock, width, single } =
+      await page.evaluate(() => {
         const box = (selector: string) => {
           const element = document.querySelector(selector);
           if (!element) throw new Error(`Missing layout element: ${selector}`);
@@ -536,11 +536,24 @@ async function expectFloatingDock(page: Page) {
           fleet: box(".gameFleet"),
           dock: box("#navfooter"),
           width: window.innerWidth,
+          single:
+            document
+              .querySelector(".gameWorkspace")
+              ?.getAttribute("data-workspace-layout") === "single",
         };
-      },
-    );
-    expect(facilities.height).toBeGreaterThan(0);
+      });
     expect(dock.height).toBeGreaterThan(0);
+    if (single) {
+      // The active tool gets the whole stage, with navigation reserved beneath it.
+      expect(dock.y).toBeGreaterThanOrEqual(stage.y + stage.height - 1);
+      expect(dock.y + dock.height).toBeLessThanOrEqual(
+        page.viewportSize()!.height,
+      );
+      expect(dock.x).toBeGreaterThanOrEqual(0);
+      expect(dock.x + dock.width).toBeLessThanOrEqual(width);
+      return;
+    }
+    expect(facilities.height).toBeGreaterThan(0);
     // The dock overlays the full-height fleet instead of reserving a blank footer band.
     expect(
       Math.abs(facilities.y + facilities.height - stage.y - stage.height),
@@ -580,11 +593,11 @@ async function expectSideRails(page: Page) {
       panel.right <= fleet.x + 1 || panel.left >= fleet.x + fleet.width - 1,
     ).toBe(true);
   }
-  await expectFloatingDock(page);
+  await expectWorkspaceDock(page);
 }
 
 for (const theme of ["light", "dark"] as const) {
-  test(`game dock and sheets stay usable in ${theme}`, async ({
+  test(`game dock and tools stay usable in ${theme}`, async ({
     page,
   }, testInfo) => {
     await startGame(page, theme);
@@ -600,7 +613,7 @@ for (const theme of ["light", "dark"] as const) {
         testInfo.project.use.hasTouch ? 44 : 40,
       );
     }
-    await expectFloatingDock(page);
+    await expectWorkspaceDock(page);
     await reviewScreenshot(page, {
       path: testInfo.outputPath(`workspace-facilities-${theme}.png`),
       animations: "disabled",
@@ -634,7 +647,15 @@ for (const theme of ["light", "dark"] as const) {
     ).toHaveCount(1);
     // The daily fleet chart has keyboard detail inspection. Its Escape owns the tooltip
     // even while a tool is open above the fleet.
-    const chart = page.locator("#chartSupplyDemand").getByRole("img");
+    const single =
+      (await page.locator(".gameStage").getAttribute("data-layout")) ===
+      "single";
+    if (single) await expect(fleet).toBeHidden();
+    const chart = (
+      single
+        ? insights.locator("#chartForecastSupplyDemand")
+        : page.locator("#chartSupplyDemand")
+    ).getByRole("img");
     await chart.focus();
     await chart.press("Enter");
     await chart.press("Escape");
@@ -652,7 +673,8 @@ for (const theme of ["light", "dark"] as const) {
       Math.abs(sheetBox!.y + sheetBox!.height - stageBox!.y - stageBox!.height),
     ).toBeLessThanOrEqual(1);
     if (
-      (await page.locator(".gameStage").getAttribute("data-layout")) !== "sheet"
+      (await page.locator(".gameStage").getAttribute("data-layout")) !==
+      "single"
     ) {
       await expectSideRails(page);
     }
@@ -971,7 +993,7 @@ test("Programs owns pricing and Build keeps purchase dialogs above its sheet", a
   await expect(build).toBeVisible();
   // A sheet shows one tool at a time; side columns keep Programs open beside Build.
   if (
-    (await page.locator(".gameStage").getAttribute("data-layout")) === "sheet"
+    (await page.locator(".gameStage").getAttribute("data-layout")) === "single"
   )
     await expect(programs).toHaveCount(0);
   else await expect(programs).toBeVisible();
@@ -1001,7 +1023,7 @@ test("wide screens keep several tools beside the fleet and remember them across 
   await page.setViewportSize({ width: 2240, height: 1100 });
   await startGame(page, "light");
   await page.locator("#buildNav").click();
-  await expectFloatingDock(page);
+  await expectWorkspaceDock(page);
   await page.locator("#insightsNav").click();
   await expect(page.locator(".gameToolPanel")).toHaveCount(2);
   await expect
@@ -1079,10 +1101,10 @@ test("wide screens keep several tools beside the fleet and remember them across 
   await page.setViewportSize({ width: 1023, height: 900 });
   await expect(page.locator(".gameStage")).toHaveAttribute(
     "data-layout",
-    "sheet",
+    "single",
   );
   await expect(page.locator(".gameToolPanel:visible")).toHaveCount(1);
-  await expectFloatingDock(page);
+  await expectWorkspaceDock(page);
   await page.locator("#eventsNav").click();
   await expect(
     page.getByRole("region", { name: "Events", exact: true }),
@@ -1331,16 +1353,16 @@ test("short desktop rails keep their heading, scroll body, and floating dock rea
 });
 
 for (const width of [360, 390]) {
-  test(`compact ${width}px sheets and final actions remain usable behind the floating dock`, async ({
+  test(`compact ${width}px tools and final actions stay above the dock`, async ({
     page,
   }, testInfo) => {
     await page.setViewportSize({ width, height: 640 });
     await startGame(page, "dark");
     await expect(page.locator(".gameStage")).toHaveAttribute(
       "data-layout",
-      "sheet",
+      "single",
     );
-    await expectFloatingDock(page);
+    await expectWorkspaceDock(page);
     await page
       .getByRole("button", { name: "Inspect Coal", exact: true })
       .click();

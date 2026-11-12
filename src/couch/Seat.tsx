@@ -21,7 +21,6 @@ import type { SettingsType } from "../Types";
 import type { GameType } from "../Types";
 import type { EvidenceTargetType } from "../Types";
 import { openEvidence } from "../helpers/Evidence";
-import "../TvLayout.scss";
 import "./couch.scss";
 
 /** A seat deliberately boots no save leases, account observers, music or solo clock. */
@@ -35,7 +34,14 @@ export default function CouchSeat() {
   const [loadError, setLoadError] = useState("");
   useEffect(() => {
     document.documentElement.dataset.couchSeat = bridge.seatId;
-    store.dispatch(change({ tvMode: true, tvInset: 0, audioEnabled: false }));
+    store.dispatch(
+      change({
+        workspace: "single",
+        tvMode: true,
+        tvInset: 0,
+        audioEnabled: false,
+      }),
+    );
     registerMultiplayerRuntime(client);
     let previous: GameType | undefined;
     const stopStore = client.subscribe(() => {

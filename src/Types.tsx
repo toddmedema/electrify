@@ -1490,6 +1490,8 @@ export type ThemeModeType = "light" | "dark";
 // follow the OS rather than a palette of its own, and it can change while the game is open
 export type ThemeChoiceType = ThemeModeType | "system";
 
+export type WorkspaceType = "automatic" | "single";
+
 export interface SettingsType {
   audioEnabled?: boolean;
   // Independent buses: zero mutes one without silencing the other. audioEnabled is the master
@@ -1502,6 +1504,8 @@ export interface SettingsType {
   theme: ThemeChoiceType;
   // Explicit device multiplier; absent in older fixtures means 100%.
   interfaceScale?: number;
+  // Device workspace preference; Automatic adapts to the space remaining at this scale.
+  workspace?: WorkspaceType;
   // TV presentation belongs to this device, independently of saved campaigns.
   tvMode?: boolean;
   tvScale?: number;

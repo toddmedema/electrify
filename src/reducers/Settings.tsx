@@ -18,10 +18,21 @@ import {
   normalizeInterfaceScale,
 } from "../InterfaceScale";
 import { normalizeTvInset, normalizeTvScale } from "../TvLayout";
+import { WORKSPACE_CHOICES, normalizeWorkspace } from "../WorkspaceLayout";
 
 function storedVolume(key: string): number {
   const value = getStorageNumber(key, 1);
   return Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : 1;
+}
+
+function storedWorkspace(): SettingsType["workspace"] {
+  const stored = getLocalStorage().getItem("workspace");
+  if (stored !== null)
+    return getStorageChoice("workspace", WORKSPACE_CHOICES, "automatic");
+  const workspace =
+    getStorageBooleanOrUndefined("tvMode") === true ? "single" : "automatic";
+  setStorageKeyValue("workspace", workspace);
+  return workspace;
 }
 
 function storedInterfaceScale(): number {
@@ -54,6 +65,7 @@ export const initialSettings: SettingsType = {
   // asked, and it is what every other app on their machine does
   theme: getStorageChoice("theme", THEME_CHOICES, "system"),
   interfaceScale: storedInterfaceScale(),
+  workspace: storedWorkspace(),
 };
 
 // Installed apps start with sound enabled; a saved preference always wins.
@@ -86,6 +98,8 @@ export const settingsSlice = createSlice({
         changes.interfaceScale = normalizeInterfaceScale(
           changes.interfaceScale,
         );
+      if (Object.prototype.hasOwnProperty.call(changes, "workspace"))
+        changes.workspace = normalizeWorkspace(changes.workspace);
       if (Object.prototype.hasOwnProperty.call(changes, "tvScale"))
         changes.tvScale = normalizeTvScale(changes.tvScale);
       if (Object.prototype.hasOwnProperty.call(changes, "tvInset"))

@@ -13,32 +13,26 @@
   );
 }
 
-// A dock sized for a phone-width window is lost on a large one, sitting small against the bottom
-// edge far from the fleet. Grow it, and lift it off the edge, in steps. GameWorkspace's
-// dockButtonWidth mirrors these widths.
-@media (min-width: 1600px) {
-  :root {
-    --game-dock-bottom: max(24px, env(safe-area-inset-bottom));
-    --game-dock-button-width: 5.5rem;
-    --game-dock-button-height: 4rem;
-    --game-dock-icon-size: 1.75rem;
-    --game-dock-label-size: 0.8125rem;
-    --game-dock-label-line: 1.125rem;
-  }
+// These breakpoints follow available width at the chosen scale, including edge padding.
+.gameWorkspace[data-dock-size="medium"] {
+  --game-dock-bottom: max(1.5rem, env(safe-area-inset-bottom));
+  --game-dock-button-width: 5.5rem;
+  --game-dock-button-height: 4rem;
+  --game-dock-icon-size: 1.75rem;
+  --game-dock-label-size: 0.8125rem;
+  --game-dock-label-line: 1.125rem;
 }
-@media (min-width: 2200px) {
-  :root {
-    --game-dock-bottom: max(40px, env(safe-area-inset-bottom));
-    --game-dock-button-width: 6.5rem;
-    --game-dock-button-height: 4.75rem;
-    --game-dock-icon-size: 2.125rem;
-    --game-dock-label-size: 0.9375rem;
-    --game-dock-label-line: 1.25rem;
-  }
+.gameWorkspace[data-dock-size="large"] {
+  --game-dock-bottom: max(2.5rem, env(safe-area-inset-bottom));
+  --game-dock-button-width: 6.5rem;
+  --game-dock-button-height: 4.75rem;
+  --game-dock-icon-size: 2.125rem;
+  --game-dock-label-size: 0.9375rem;
+  --game-dock-label-line: 1.25rem;
 }
 
 .gameWorkspace {
-  --game-tool-width: clamp(360px, 28vw, 480px);
+  --game-tool-width: clamp(22.5rem, 28vw, 30rem);
   position: relative;
   display: flex;
   flex-direction: column;
@@ -86,15 +80,15 @@
   z-index: 6;
   display: flex;
   align-items: stretch;
-  gap: 4px;
+  gap: 0.25rem;
   bottom: var(--game-dock-bottom);
   // Centered on the whole window so opening or closing a side tool never moves it, unless a
   // narrow window would put it over that tool (see dockCenter).
   left: var(--game-dock-left, 50%);
   transform: translateX(-50%);
   width: max-content;
-  max-width: calc(100% - 16px);
-  padding: 4px;
+  max-width: calc(100% - 1rem);
+  padding: 0.25rem;
   box-sizing: border-box;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
@@ -110,7 +104,7 @@
   min-width: var(--game-dock-button-width);
   width: var(--game-dock-button-width);
   min-height: var(--game-dock-button-height);
-  padding: 4px;
+  padding: 0.25rem;
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -290,13 +284,6 @@
   }
 }
 
-// Portrait tablets: the sheet's top meets the chart, so a decision never hides its evidence.
-@media (min-width: 700px) and (orientation: portrait) {
-  .gameStage[data-layout="sheet"] .gameToolTray {
-    height: calc(100% - var(--game-chart-block, 294px));
-  }
-}
-
 // Sheets, and a side tool the window-centered dock floats over, extend behind it. Only their
 // final scrolling content needs clearance.
 .gameStage .gameToolBody {
@@ -386,47 +373,77 @@
   }
 }
 
-// Too narrow for a floating dock: a full-width tab bar, one equal column per tool.
-@media (max-width: 699px) {
-  :root {
-    --game-dock-bottom: 0px;
-    --game-dock-clearance: calc(56px + env(safe-area-inset-bottom));
-  }
-  .gameWorkspace #navfooter.gameActionDock {
-    display: grid;
-    grid-auto-flow: column;
-    grid-auto-columns: minmax(0, 1fr);
-    gap: 0;
-    left: 0;
-    right: 0;
+// A single tool owns the flexible main area. The status and dock remain in normal flow.
+.gameWorkspace[data-workspace-layout="single"] {
+  --game-dock-clearance: 0px;
+  #navfooter.gameActionDock {
+    position: static;
+    flex: 0 0 auto;
+    align-self: center;
     transform: none;
-    width: 100%;
-    max-width: none;
-    padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom)
-      env(safe-area-inset-left);
-    border-width: 1px 0 0;
-    border-radius: 0;
+    margin: 0.5rem;
+    max-width: calc(100% - 1rem);
+    overflow-x: auto;
+    touch-action: pan-x;
     box-shadow: none;
   }
+  .gameFleet[hidden] {
+    display: none;
+  }
+  .gameToolTray {
+    position: static;
+    height: auto;
+    min-height: 0;
+    grid-area: 1 / 1;
+  }
+  .gameToolPanel {
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    animation: none;
+  }
   .gameActionDock .gameDockAction.MuiButton-root {
+    flex: 0 0 auto;
+    min-height: 2.75rem;
+  }
+  .gameStatusBar {
+    display: flex;
+    flex-wrap: wrap;
+    min-height: 2.5rem;
+  }
+  .gameStatusBar .missionSummary {
     min-width: 0;
-    width: 100%;
-    height: 56px;
+    flex: 1 1 24rem;
+  }
+  .missionSummaryHeadline,
+  .missionRiskText {
+    white-space: normal;
+    overflow: visible;
+  }
+}
+
+// Compact docks keep all text labels. At high scale the rail scrolls rather than shrinking controls.
+.gameWorkspace[data-compact-dock="true"] #navfooter.gameActionDock {
+  width: 100%;
+  max-width: 100%;
+  margin-inline: 0;
+  padding-inline: 0;
+  gap: 0;
+  border-width: 1px 0 0;
+  border-radius: 0;
+  .gameDockAction.MuiButton-root {
+    flex: 1 0 auto;
+    min-width: 4.25rem;
+    width: 4.25rem;
+    min-height: 3.5rem;
     gap: 0;
     border-radius: 0;
   }
   .gameDockLabel {
     font-size: 0.6875rem;
   }
-  // The bar's buttons touch each other, which an outside ring would overlap
-  .gameActionDock .gameDockAction.MuiButton-root:focus-visible {
+  .gameDockAction.MuiButton-root:focus-visible {
     outline-offset: -2px;
-  }
-}
-
-@media (max-width: 599px) {
-  .gameToolTray {
-    height: calc(100% - 8px);
   }
 }
 

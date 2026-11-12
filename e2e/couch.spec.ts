@@ -423,7 +423,7 @@ test("TV couch companies keep independent dialogs and purchases through atomic s
     await expect(seat.locator("#appbar:visible")).toBeVisible();
     await expect(seat.locator(".gameStage")).toHaveAttribute(
       "data-layout",
-      "tv",
+      "single",
     );
   }
   await expect(page.locator(".appFrameBody")).toBeHidden();

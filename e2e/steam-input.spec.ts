@@ -1152,7 +1152,10 @@ test("TV saved preferences style direct scenario links before play", async ({
     "TV geometry must be loaded on the first direct-link screen",
   ).toBeCloseTo(edge.expected, 1);
   await start.press("Enter");
-  await expect(page.locator(".gameStage")).toHaveAttribute("data-layout", "tv");
+  await expect(page.locator(".gameStage")).toHaveAttribute(
+    "data-layout",
+    "single",
+  );
   await expect(page.locator("#appbar:visible")).toBeVisible();
   const warning = page.locator(".missionSummary.statusWarning");
   await expect(warning).toBeVisible();
@@ -1381,7 +1384,7 @@ async function tvJourney(page: Page, testInfo: TestInfo, maximum: boolean) {
     await expect(page.locator("#appbar:visible")).toBeVisible();
     await expect(page.locator(".gameStage")).toHaveAttribute(
       "data-layout",
-      "tv",
+      "single",
     );
     const capture = async (view: string) => {
       await expect(page.locator(".base_main")).toHaveCount(1);

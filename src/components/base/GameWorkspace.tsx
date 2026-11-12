@@ -12,7 +12,7 @@ import { useAppDispatch, useAppSelector } from "../../Store";
 import { navigate } from "../../reducers/Card";
 import { selectTutorialActions } from "../../reducers/Tutorial";
 import { CardNameType } from "../../Types";
-import { SIDE_TOOL_MIN_WIDTH } from "../../Globals";
+import { useWorkspaceLayout } from "../../WorkspaceLayout";
 import GameAppBar from "./GameAppBar";
 import Navigation, {
   GAME_TOOLS,
@@ -29,9 +29,9 @@ import {
   GameWorkspaceContext,
   GameToolCloseContext,
   GameBuildCompleteContext,
+  GameWorkspaceLayoutContext,
 } from "./GameWorkspaceContext";
 import "./GameWorkspace.scss";
-import { tvLayoutEnabled } from "../../TvLayout";
 
 type ToolSide = "decision" | "intelligence";
 const sideFor = (tool: GameTool): ToolSide =>
@@ -39,19 +39,12 @@ const sideFor = (tool: GameTool): ToolSide =>
     ? "decision"
     : "intelligence";
 
-/** Below this, tools rise as one sheet over the fleet instead of taking their own columns. */
-export { SIDE_TOOL_MIN_WIDTH };
-/** The fleet never gets narrower than the widest common phone, so it stays fully usable. */
-export const MIN_FLEET_WIDTH = 430;
-const MIN_TOOL_WIDTH = 360;
-const MAX_TOOL_WIDTH = 480;
-
-/** Sets --game-tool-width: 28vw within its limits, in whole pixels so text stays sharp. */
-export function toolWidth(width: number) {
-  return Math.round(
-    Math.min(MAX_TOOL_WIDTH, Math.max(MIN_TOOL_WIDTH, width * 0.28)),
-  );
-}
+export {
+  SIDE_TOOL_MIN_WIDTH,
+  MIN_FLEET_WIDTH,
+  maxOpenTools,
+  toolWidth,
+} from "../../WorkspaceLayout";
 
 /** The dock's button width at this window width; keep in step with GameWorkspace.scss. */
 function dockButtonWidth(width: number): number {
@@ -59,8 +52,10 @@ function dockButtonWidth(width: number): number {
 }
 
 /** Five actions, their gaps, the dock's padding and border, and a margin each side. */
-export function dockClearanceWidth(width: number): number {
-  return 5 * dockButtonWidth(width) + 4 * 4 + 2 * 4 + 2 + 2 * 8;
+export function dockClearanceWidth(width: number, scale = 1): number {
+  return (
+    (5 * dockButtonWidth(width / scale) + 4 * 4 + 2 * 4 + 2 + 2 * 8) * scale
+  );
 }
 
 /**
@@ -72,29 +67,18 @@ export function dockCenter(
   leftTools: number,
   rightTools: number,
   tool: number,
+  scale = 1,
 ): number | undefined {
   const start = leftTools * tool;
   const end = width - rightTools * tool;
-  const half = dockClearanceWidth(width) / 2;
+  const half = dockClearanceWidth(width, scale) / 2;
   return width / 2 - half >= start && width / 2 + half <= end
     ? undefined
     : (start + end) / 2;
 }
 
-/** How many tools fit beside the fleet at this window width, keeping it at phone width or more. */
-export function maxOpenTools(width: number) {
-  if (width < SIDE_TOOL_MIN_WIDTH) return 1;
-  return Math.max(
-    1,
-    Math.min(
-      GAME_TOOLS.length,
-      Math.floor((width - MIN_FLEET_WIDTH) / toolWidth(width)),
-    ),
-  );
-}
-
 /**
- * Side columns protect fleet space; compact screens use one sheet over the stage. Wide screens
+ * Side columns protect fleet space; constrained screens give one tool the main area. Wide screens
  * keep several tools open at once, as many as fit beside a phone-width fleet. Decision tools sit
  * left of the fleet and intelligence tools right of it, each in action bar order, so opening
  * another never moves the ones already open.
@@ -102,11 +86,7 @@ export function maxOpenTools(width: number) {
 export default function GameWorkspace({
   memory,
 }: { memory?: Map<string, unknown> } = {}) {
-  return (
-    <BuildForecastProvider>
-      <Workspace memory={memory} />
-    </BuildForecastProvider>
-  );
+  return <Workspace memory={memory} />;
 }
 
 function Workspace({
@@ -117,11 +97,10 @@ function Workspace({
   const dispatch = useAppDispatch();
   const card = useAppSelector((state) => state.card.name);
   const active = gameToolForCard(card);
-  const tvMode = useAppSelector((state) => tvLayoutEnabled(state.settings));
+  const settings = useAppSelector((state) => state.settings);
   const tutorialActions = useAppSelector(selectTutorialActions);
   // Open tools, least recently opened first. The newest ones win when they don't all fit.
   const [remembered, setRemembered] = React.useState<GameTool[]>([]);
-  const [width, setWidth] = React.useState(window.innerWidth);
   const [buildCategory, setBuildCategory] =
     React.useState<CardNameType>("BUILD_GENERATORS");
   const headings = React.useRef(new Map<GameTool, HTMLHeadingElement>());
@@ -131,16 +110,24 @@ function Workspace({
   useToolFocusMemory(workspace, memory, active ?? "fleet");
   const [programBack, setProgramBack] = React.useState<() => void>();
   const retainFocus = React.useRef(false);
-  const layout = tvMode
-    ? "tv"
-    : width >= SIDE_TOOL_MIN_WIDTH
-      ? "side"
-      : "sheet";
-  const capacity = tvMode ? 1 : maxOpenTools(width);
+  const presentation = useWorkspaceLayout(workspace, settings);
+  const { layout, capacity, width, scale, effectiveWidth } = presentation;
+  const fleetVisible = layout === "side" || !active;
+  // Capture focus before a disappearing column unmounts its children. A scale or inset change
+  // can collapse columns without a window resize; the control being edited wins that collapse.
+  const previousCapacity = React.useRef(capacity);
+  const retainedTool =
+    capacity < previousCapacity.current
+      ? (document.activeElement?.closest<HTMLElement>("[data-game-tool]")
+          ?.dataset.gameTool as GameTool | undefined)
+      : undefined;
+  const requested = retainedTool ?? active;
   // Derive the newly requested tool immediately; remembering it in an effect must not flash
   // the previous rail or unmount the fleet during navigation.
   const tools: GameTool[] = (
-    active ? [...remembered.filter((tool) => tool !== active), active] : []
+    requested
+      ? [...remembered.filter((tool) => tool !== requested), requested]
+      : []
   ).filter((tool) => !tutorialActions || tutorialActions.includes(tool));
   const visible = tools.slice(-capacity);
   const ordered = GAME_TOOLS.map((tool) => tool.id).filter((id) =>
@@ -152,34 +139,25 @@ function Workspace({
   const right = shownOnSide("intelligence");
   const dockLeft =
     layout === "side"
-      ? dockCenter(width, left.length, right.length, toolWidth(width))
+      ? dockCenter(
+          width,
+          left.length,
+          right.length,
+          presentation.toolWidth,
+          scale,
+        )
       : undefined;
-  const resizeState = React.useRef({ active, tools, buildCategory });
   React.useLayoutEffect(() => {
-    resizeState.current = { active, tools, buildCategory };
-  });
-  React.useEffect(() => {
-    const resize = () => {
-      const { active, tools, buildCategory } = resizeState.current;
-      // Keep the rail the player is working in when columns collapse.
-      const focused =
-        document.activeElement?.closest<HTMLElement>("[data-game-tool]");
-      const tool = focused?.dataset.gameTool as GameTool | undefined;
-      if (
-        tool &&
-        tool !== active &&
-        !tools.slice(-maxOpenTools(window.innerWidth)).includes(tool)
-      ) {
-        retainFocus.current = true;
-        dispatch(navigate(tool === "BUILD_GENERATORS" ? buildCategory : tool));
-      }
-      setWidth(window.innerWidth);
-    };
-    // An earlier resize listener can synchronously redraw the workspace. Keep this
-    // subscription in place so that redraw cannot remove it from the current event.
-    window.addEventListener("resize", resize);
-    return () => window.removeEventListener("resize", resize);
-  }, [dispatch]);
+    previousCapacity.current = capacity;
+    if (retainedTool && retainedTool !== active) {
+      retainFocus.current = true;
+      dispatch(
+        navigate(
+          retainedTool === "BUILD_GENERATORS" ? buildCategory : retainedTool,
+        ),
+      );
+    }
+  }, [capacity, retainedTool, active, buildCategory, dispatch]);
   React.useLayoutEffect(() => {
     // Keep focus in the active tool when the layout changes, without stealing it
     // from a retained pricing slider or chart.
@@ -248,142 +226,161 @@ function Workspace({
   return (
     <GameToolMemoryContext.Provider value={memory}>
       <GameWorkspaceContext.Provider value={true}>
-        <div
-          className="gameWorkspace"
-          ref={workspace}
-          style={
-            dockLeft === undefined
-              ? undefined
-              : { ["--game-dock-left" as string]: `${dockLeft}px` }
-          }
+        <GameWorkspaceLayoutContext.Provider
+          value={{ ...presentation, fleetVisible }}
         >
-          <GameAppBar />
-          <div
-            className="gameStage"
-            data-layout={layout}
-            data-panel-count={visible.length}
-            style={
-              layout === "side" && visible.length
-                ? {
-                    ["--game-tool-width" as string]: `${toolWidth(width)}px`,
-                    gridTemplateColumns: [
-                      ...left.map(() => "var(--game-tool-width)"),
-                      `minmax(${MIN_FLEET_WIDTH}px, 1fr)`,
-                      ...right.map(() => "var(--game-tool-width)"),
-                    ].join(" "),
-                  }
-                : undefined
-            }
-          >
+          <BuildForecastProvider>
             <div
-              className="gameFleet"
-              hidden={tvMode && !!active}
+              className="gameWorkspace"
+              data-workspace-layout={layout}
+              data-compact-dock={effectiveWidth < 700}
+              data-dock-size={
+                effectiveWidth >= 2200
+                  ? "large"
+                  : effectiveWidth >= 1600
+                    ? "medium"
+                    : "normal"
+              }
+              ref={workspace}
               style={
-                layout === "side" ? { gridColumn: left.length + 1 } : undefined
+                dockLeft === undefined
+                  ? undefined
+                  : { ["--game-dock-left" as string]: `${dockLeft}px` }
               }
             >
-              <Facilities />
-            </div>
-            <div className="gameToolTray">
-              {ordered.map((tool) => {
-                const config = GAME_TOOLS.find((item) => item.id === tool)!;
-                const shown = visible.includes(tool);
-                const side = sideFor(tool);
-                const column =
-                  side === "decision"
-                    ? left.indexOf(tool) + 1
-                    : left.length + 2 + right.indexOf(tool);
-                return (
-                  <section
-                    key={tool}
-                    id={`tool-${tool}`}
-                    className="gameToolPanel"
-                    aria-label={config.label}
-                    data-game-tool={tool}
-                    data-tool-side={side}
-                    hidden={!shown}
-                    style={
-                      layout === "side" && shown
-                        ? { gridColumn: column }
-                        : undefined
-                    }
-                  >
-                    <header className="gameToolHeader">
-                      {tool === "PROGRAMS" && programBack && (
-                        <IconButton
-                          color="primary"
-                          aria-label="Back to programs"
-                          onClick={programBack}
-                        >
-                          <ChevronLeftIcon />
-                        </IconButton>
-                      )}
-                      <h2
-                        className="gameToolTitle"
-                        tabIndex={-1}
-                        ref={(node) => {
-                          if (node) headings.current.set(tool, node);
-                          else headings.current.delete(tool);
-                        }}
+              <GameAppBar />
+              <div
+                className="gameStage"
+                data-layout={layout}
+                data-panel-count={visible.length}
+                style={
+                  layout === "side" && visible.length
+                    ? {
+                        ["--game-tool-width" as string]: `${presentation.toolWidth}px`,
+                        gridTemplateColumns: [
+                          ...left.map(() => "var(--game-tool-width)"),
+                          `minmax(${presentation.minFleetWidth}px, 1fr)`,
+                          ...right.map(() => "var(--game-tool-width)"),
+                        ].join(" "),
+                      }
+                    : undefined
+                }
+              >
+                <div
+                  className="gameFleet"
+                  hidden={!fleetVisible}
+                  style={
+                    layout === "side"
+                      ? { gridColumn: left.length + 1 }
+                      : undefined
+                  }
+                >
+                  <Facilities />
+                </div>
+                <div className="gameToolTray">
+                  {ordered.map((tool) => {
+                    const config = GAME_TOOLS.find((item) => item.id === tool)!;
+                    const shown = visible.includes(tool);
+                    const side = sideFor(tool);
+                    const column =
+                      side === "decision"
+                        ? left.indexOf(tool) + 1
+                        : left.length + 2 + right.indexOf(tool);
+                    return (
+                      <section
+                        key={tool}
+                        id={`tool-${tool}`}
+                        className="gameToolPanel"
+                        aria-label={config.label}
+                        data-game-tool={tool}
+                        data-tool-side={side}
+                        hidden={!shown}
+                        style={
+                          layout === "side" && shown
+                            ? { gridColumn: column }
+                            : undefined
+                        }
                       >
-                        <span className="gameToolTitleIcon">{config.icon}</span>
-                        {config.label}
-                      </h2>
-                      <IconButton
-                        aria-label={`Close ${config.label}`}
-                        onClick={() => close(tool)}
-                      >
-                        <CloseIcon />
-                      </IconButton>
-                    </header>
-                    <ToolBody tool={tool}>
-                      {/* Hidden compact rails release decision pause tokens; the visible tool keeps
-                      its DOM, input focus and scroll position when it moves into a side column. */}
-                      {shown && (
-                        <GameToolCloseContext.Provider
-                          value={() => close(tool)}
-                        >
-                          {tool === "BUILD_GENERATORS" && (
-                            <GameBuildCompleteContext.Provider
-                              value={() => {
-                                if (layout !== "side") close(tool);
-                              }}
+                        <header className="gameToolHeader">
+                          {tool === "PROGRAMS" && programBack && (
+                            <IconButton
+                              color="primary"
+                              aria-label="Back to programs"
+                              onClick={programBack}
                             >
-                              <BuildFacilities
-                                embedded
-                                category={
-                                  card.startsWith("BUILD_")
-                                    ? card
-                                    : buildCategory
-                                }
-                              />
-                            </GameBuildCompleteContext.Provider>
+                              <ChevronLeftIcon />
+                            </IconButton>
                           )}
-                          {tool === "PROGRAMS" && (
-                            <Programs
-                              onClose={() => close(tool)}
-                              onBackChange={setProgramBack}
-                            />
+                          <h2
+                            className="gameToolTitle"
+                            tabIndex={-1}
+                            ref={(node) => {
+                              if (node) headings.current.set(tool, node);
+                              else headings.current.delete(tool);
+                            }}
+                          >
+                            <span className="gameToolTitleIcon">
+                              {config.icon}
+                            </span>
+                            {config.label}
+                          </h2>
+                          <IconButton
+                            aria-label={`Close ${config.label}`}
+                            onClick={() => close(tool)}
+                          >
+                            <CloseIcon />
+                          </IconButton>
+                        </header>
+                        <ToolBody tool={tool}>
+                          {/* Hidden compact rails release decision pause tokens; the visible tool keeps
+                      its DOM, input focus and scroll position when it moves into a side column. */}
+                          {shown && (
+                            <GameToolCloseContext.Provider
+                              value={() => close(tool)}
+                            >
+                              {tool === "BUILD_GENERATORS" && (
+                                <GameBuildCompleteContext.Provider
+                                  value={() => {
+                                    if (layout !== "side") close(tool);
+                                  }}
+                                >
+                                  <BuildFacilities
+                                    embedded
+                                    category={
+                                      card.startsWith("BUILD_")
+                                        ? card
+                                        : buildCategory
+                                    }
+                                  />
+                                </GameBuildCompleteContext.Provider>
+                              )}
+                              {tool === "PROGRAMS" && (
+                                <Programs
+                                  onClose={() => close(tool)}
+                                  onBackChange={setProgramBack}
+                                />
+                              )}
+                              {tool === "INSIGHTS" && <Insights />}
+                              {tool === "EVENTS" && <EventLog />}
+                              {tool === "SCENARIO" && <ScenarioDetails />}
+                            </GameToolCloseContext.Provider>
                           )}
-                          {tool === "INSIGHTS" && <Insights />}
-                          {tool === "EVENTS" && <EventLog />}
-                          {tool === "SCENARIO" && <ScenarioDetails />}
-                        </GameToolCloseContext.Provider>
-                      )}
-                    </ToolBody>
-                  </section>
-                );
-              })}
+                        </ToolBody>
+                      </section>
+                    );
+                  })}
+                </div>
+              </div>
+              <Navigation
+                openTools={visible}
+                onToggle={(tool) => {
+                  if (visible.includes(tool)) close(tool);
+                  else dispatch(navigate(destination(tool)));
+                }}
+              />
             </div>
-          </div>
-          <Navigation
-            openTools={visible}
-            onToggle={(tool) => {
-              if (visible.includes(tool)) close(tool);
-              else dispatch(navigate(destination(tool)));
-            }}
-          />
-        </div>
+          </BuildForecastProvider>
+        </GameWorkspaceLayoutContext.Provider>
       </GameWorkspaceContext.Provider>
     </GameToolMemoryContext.Provider>
   );

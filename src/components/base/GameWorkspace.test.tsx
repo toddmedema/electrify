@@ -1,3 +1,4 @@
+import { StrictMode } from "react";
 import { configureStore } from "@reduxjs/toolkit";
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -5,6 +6,12 @@ import { Provider } from "react-redux";
 import { flushSync } from "react-dom";
 import cardReducer, { initialCard } from "../../reducers/Card";
 import gameReducer from "../../reducers/Game";
+import settingsReducer, {
+  initialSettings,
+  change,
+} from "../../reducers/Settings";
+import type { SettingsType } from "../../Types";
+import { workspaceLayout } from "../../WorkspaceLayout";
 import GameWorkspace, {
   MIN_FLEET_WIDTH,
   dockCenter,
@@ -70,11 +77,12 @@ function resize(width: number) {
   fireEvent(window, new Event("resize"));
 }
 
-function setup(width = 390) {
+function setup(width = 390, settings: Partial<SettingsType> = {}) {
   resize(width);
   const store = configureStore({
     reducer: {
       card: cardReducer,
+      settings: settingsReducer,
       game: () => ({
         ...gameReducer(undefined, { type: "workspace-test/init" }),
         inGame: true,
@@ -83,12 +91,20 @@ function setup(width = 390) {
     },
     preloadedState: {
       card: { ...initialCard, name: "FACILITIES" as const },
+      settings: {
+        ...initialSettings,
+        interfaceScale: 1,
+        workspace: "automatic",
+        ...settings,
+      },
     },
   });
   const view = render(
-    <Provider store={store}>
-      <GameWorkspace />
-    </Provider>,
+    <StrictMode>
+      <Provider store={store}>
+        <GameWorkspace />
+      </Provider>
+    </StrictMode>,
   );
   return {
     store,
@@ -101,9 +117,12 @@ function setup(width = 390) {
   };
 }
 
-afterEach(() => resize(originalWidth));
+afterEach(() => {
+  resize(originalWidth);
+  jest.restoreAllMocks();
+});
 
-it("switches and toggles compact tools while preserving the Facilities stage", async () => {
+it("switches and toggles single tools while preserving the hidden Facilities stage", async () => {
   const { user, action } = setup();
   const facilityNotes = screen.getByRole("textbox", { name: "Facility notes" });
   await user.type(facilityNotes, "Inspect the coal plant next");
@@ -113,14 +132,16 @@ it("switches and toggles compact tools while preserving the Facilities stage", a
   await user.click(action("Events"));
   expect(screen.queryByRole("region", { name: "Insights" })).toBeNull();
   expect(screen.getByRole("region", { name: "Events" })).toBeVisible();
-  expect(screen.getByRole("textbox", { name: "Facility notes" })).toBe(
-    facilityNotes,
-  );
+  expect(screen.queryByRole("textbox", { name: "Facility notes" })).toBeNull();
+  expect(facilityNotes).toBeInTheDocument();
   expect(facilityNotes).toHaveValue("Inspect the coal plant next");
   await user.click(action("Events"));
   expect(screen.queryByRole("region")).toBeNull();
   expect(action("Events")).toHaveAttribute("aria-expanded", "false");
   expect(action("Events")).toHaveFocus();
+  expect(screen.getByRole("textbox", { name: "Facility notes" })).toBe(
+    facilityNotes,
+  );
 });
 
 it("closes a focused range with Escape when only an inactive modal remains mounted", async () => {
@@ -245,9 +266,11 @@ it("restores side rails when an earlier resize listener redraws the workspace", 
 
     redraw = () =>
       rerender(
-        <Provider store={store}>
-          <GameWorkspace />
-        </Provider>,
+        <StrictMode>
+          <Provider store={store}>
+            <GameWorkspace />
+          </Provider>
+        </StrictMode>,
       );
     resize(2240);
     expect(screen.getAllByRole("region")).toHaveLength(2);
@@ -352,4 +375,74 @@ it("reserves room for the larger dock on large windows", () => {
   expect(dockCenter(1600, 1, 1, 448)).toBeUndefined();
   // ...but two tools on the left of a 2200px window would cover it.
   expect(dockCenter(2200, 2, 0, 480)).toBe(1580);
+});
+
+it("uses Single tool on a wide window independently of the old TV preference", async () => {
+  const { user, action } = setup(2560, { workspace: "single", tvMode: false });
+  await user.click(action("Programs"));
+  expect(
+    screen.getByRole("slider", { name: "Electricity rate" }),
+  ).toBeVisible();
+  expect(screen.queryByRole("textbox", { name: "Facility notes" })).toBeNull();
+  expect(
+    screen.getByRole("navigation", { name: "Game actions" }),
+  ).toBeVisible();
+  expect(screen.getByText("Game status")).toBeVisible();
+  await user.click(action("Insights"));
+  expect(screen.getAllByRole("region")).toHaveLength(1);
+  expect(screen.queryByRole("region", { name: "Programs" })).toBeNull();
+  await user.click(action("Insights"));
+  expect(screen.getByRole("textbox", { name: "Facility notes" })).toBeVisible();
+});
+
+it("adapts Automatic to the explicit scale while retaining focused controls", async () => {
+  const { store, user, action } = setup(1920);
+  await user.click(action("Programs"));
+  await user.click(action("Insights"));
+  const rate = screen.getByRole("slider", { name: "Electricity rate" });
+  act(() => rate.focus());
+  act(() => store.dispatch(change({ interfaceScale: 2.5 })));
+  expect(screen.getAllByRole("region")).toHaveLength(1);
+  expect(screen.getByRole("region", { name: "Programs" })).toBeVisible();
+  expect(rate).toHaveFocus();
+  expect(screen.queryByRole("textbox", { name: "Facility notes" })).toBeNull();
+  act(() => store.dispatch(change({ interfaceScale: 1 })));
+  expect(screen.getAllByRole("region")).toHaveLength(2);
+  expect(rate).toHaveFocus();
+  expect(screen.getByRole("textbox", { name: "Facility notes" })).toBeVisible();
+});
+
+it("uses the rendered workspace width after screen-edge padding", async () => {
+  let availableWidth = 1100;
+  const originalBounds = HTMLElement.prototype.getBoundingClientRect;
+  jest
+    .spyOn(HTMLElement.prototype, "getBoundingClientRect")
+    .mockImplementation(function (this: HTMLElement) {
+      return this.classList.contains("gameWorkspace")
+        ? ({ width: availableWidth } as DOMRect)
+        : originalBounds.call(this);
+    });
+  const { user, action } = setup(1440);
+  await user.click(action("Build"));
+  expect(screen.getByRole("textbox", { name: "Facility notes" })).toBeVisible();
+  // Padding can take the frame below the column boundary without changing the window width.
+  availableWidth = 1000;
+  resize(1440);
+  expect(screen.getByRole("region", { name: "Build" })).toBeVisible();
+  expect(screen.queryByRole("textbox", { name: "Facility notes" })).toBeNull();
+});
+
+it("fits columns using the chosen scale, with Single tool overriding abundant space", () => {
+  expect(workspaceLayout(1920, 1, "automatic")).toMatchObject({
+    layout: "side",
+    capacity: 3,
+  });
+  expect(workspaceLayout(1920, 2.5, "automatic")).toMatchObject({
+    layout: "single",
+    capacity: 1,
+  });
+  expect(workspaceLayout(3840, 1, "single")).toMatchObject({
+    layout: "single",
+    capacity: 1,
+  });
 });

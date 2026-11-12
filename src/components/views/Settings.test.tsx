@@ -37,6 +37,7 @@ function renderSettings(overrides: Partial<Props> = {}) {
     onUnitsChange: () => undefined,
     onThemeChange: () => undefined,
     onInterfaceScaleChange: () => undefined,
+    onWorkspaceChange: () => undefined,
     onBack: () => undefined,
     ...overrides,
   };
@@ -198,6 +199,17 @@ describe("Settings", () => {
     await userEvent.selectOptions(scale, "2.5");
     expect(onInterfaceScaleChange.mock.calls).toEqual([[1.5], [2.5]]);
     expect(screen.queryByText("TV scale")).not.toBeInTheDocument();
+  });
+
+  it("offers Automatic and Single tool workspaces outside the desktop app", async () => {
+    const onWorkspaceChange = jest.fn();
+    renderSettings({ onWorkspaceChange });
+    expect(screen.getByRole("button", { name: "Automatic" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Single tool" }));
+    expect(onWorkspaceChange).toHaveBeenCalledWith("single");
   });
 
   it("displays an exact migrated intermediate scale", () => {

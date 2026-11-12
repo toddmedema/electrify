@@ -53,6 +53,9 @@ const mapDispatchToProps = (
     onInterfaceScaleChange: (interfaceScale: number) => {
       dispatch(changeSettings({ interfaceScale }));
     },
+    onWorkspaceChange: (workspace) => {
+      dispatch(changeSettings({ workspace }));
+    },
     // Mirrors Manual: Settings can now be reached mid-game too, so back has to return wherever
     // the player came from rather than always dropping them at the main menu
     /** Let a shared modal owner close Settings without navigating a company's card history.
