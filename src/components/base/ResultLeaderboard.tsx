@@ -1,20 +1,9 @@
 import * as React from "react";
 import { Box, Typography } from "@mui/material";
-import {
-  collection,
-  getCountFromServer,
-  getDocs,
-  limit,
-  orderBy,
-  query,
-  where,
-} from "firebase/firestore";
 import { DIFFICULTY_LABELS } from "../../Constants";
-import { isDesktopApp } from "../../Desktop";
-import { getDb } from "../../Globals";
 import { DifficultyType, ScoreType } from "../../Types";
 import { formatScore } from "../../helpers/Format";
-import { SCORE_VERSION } from "../../helpers/Scoring";
+import { loadLeaderboard, loadLeaderboardRank } from "../../Leaderboard";
 
 type Standing = Pick<ScoreType, "uid" | "displayName" | "score"> & {
   rank?: number;
@@ -46,30 +35,13 @@ export default function ResultLeaderboard({
     setRank(undefined);
     setFailed(false);
     async function load() {
-      const native = process.env.REACT_APP_DESKTOP === "true" && isDesktopApp();
-      const filters = [
-        where("scoreVersion", "==", SCORE_VERSION),
-        where("outcome", "==", "completed"),
-        where("scenarioId", "==", scenarioId),
-        where("difficulty", "==", difficulty),
-      ];
       // Independent requests: a failed board must not hide this run or its available rank.
-      const standings = (async () => {
-        let leaders: Standing[];
-        if (native) {
-          const { desktopScores } = await import("../../DesktopScores");
-          leaders = await desktopScores(scenarioId, difficulty, "global");
-        } else {
-          const snapshot = await getDocs(
-            query(
-              collection(getDb(), "scores"),
-              ...filters,
-              orderBy("score", "desc"),
-              limit(3),
-            ),
-          );
-          leaders = snapshot.docs.map((doc) => doc.data() as ScoreType);
-        }
+      const standings = loadLeaderboard(
+        scenarioId,
+        difficulty,
+        "global",
+        uid,
+      ).then((leaders) => {
         if (live)
           setScores(
             leaders.slice(0, 3).map((entry, index) => ({
@@ -77,29 +49,14 @@ export default function ResultLeaderboard({
               rank: entry.rank ?? index + 1,
             })),
           );
-      })();
-      const placement = (async () => {
-        let position: number;
-        if (native) {
-          const { desktopScoreRank } = await import("../../DesktopScores");
-          position = await desktopScoreRank(
-            scenarioId,
-            difficulty,
-            currentScore,
-          );
-        } else {
-          const better = await getCountFromServer(
-            query(
-              collection(getDb(), "scores"),
-              ...filters,
-              where("score", ">", currentScore),
-              orderBy("score", "desc"),
-            ),
-          );
-          position = better.data().count + 1;
-        }
+      });
+      const placement = loadLeaderboardRank(
+        scenarioId,
+        difficulty,
+        currentScore,
+      ).then((position) => {
         if (live) setRank(position);
-      })();
+      });
       const results = await Promise.allSettled([standings, placement]);
       if (live && results.some((result) => result.status === "rejected"))
         setFailed(true);
@@ -108,7 +65,7 @@ export default function ResultLeaderboard({
     return () => {
       live = false;
     };
-  }, [scenarioId, difficulty, currentScore]);
+  }, [scenarioId, difficulty, currentScore, uid]);
 
   const current: Standing = {
     uid: uid || "",

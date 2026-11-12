@@ -30,11 +30,17 @@ export class CloudSaveSync {
     private transport: CloudSaveTransport,
   ) {}
 
+  reset(): void {
+    this.incompatible.clear();
+    this.incompatibleUid = undefined;
+  }
+
   async sync(
     uid: string,
     current: () => boolean = () => true,
     options: { automatic?: boolean; forceIds?: ReadonlySet<string> } = {},
   ): Promise<SyncResult> {
+    if (!current()) return { conflicts: false, deferred: false };
     if (typeof navigator !== "undefined" && navigator.locks?.request) {
       return navigator.locks.request(`electrify-cloud-sync:${uid}`, () =>
         current()
@@ -50,9 +56,11 @@ export class CloudSaveSync {
     current: () => boolean,
     options: { automatic?: boolean; forceIds?: ReadonlySet<string> },
   ): Promise<SyncResult> {
+    if (!current()) return { conflicts: false, deferred: false };
     const remote = new Map(
       (await this.transport.list(uid)).map((head) => [head.id, head]),
     );
+    if (!current()) return { conflicts: false, deferred: false };
     if (this.incompatibleUid !== uid) {
       this.incompatible.clear();
       this.incompatibleUid = uid;
@@ -141,6 +149,7 @@ export class CloudSaveSync {
           head.sourceRevision <= entry.revision &&
           head.version !== entry.cloud.version
         ) {
+          if (!current()) return { conflicts, deferred };
           await this.repository.acknowledgeCloud(
             entry.id,
             uid,
@@ -305,8 +314,8 @@ export class CloudSaveSync {
     const record: SaveRecord = await this.repository.read(entry.id);
     if (!current()) return false;
     const version = await this.transport.write(uid, cloudId, expected, record);
-    // A committed write must update its original account's local bookkeeping even
-    // if auth changed meanwhile, or signing back in would duplicate that same save.
+    // The next owner recognizes the committed writer/revision if this tenure ended.
+    if (!current()) return false;
     await this.repository.acknowledgeCloud(
       entry.id,
       uid,
