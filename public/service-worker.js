@@ -21,7 +21,6 @@ const MARKET_DATA = ["/data/FuelPricesRaw.csv", "/data/EconomyRaw.csv"];
 const ASSET_MANIFEST = "/asset-manifest.json";
 // "/" is not listed: cacheBuild() stores it once the bundles it references are safely cached.
 const APP_SHELL = [
-  "/analytics.js",
   "/manifest.json",
   "/fonts/inter/inter.css",
   "/fonts/inter/InterVariable.woff2",
@@ -249,6 +248,13 @@ async function syncOfflineData() {
 }
 
 self.addEventListener("install", (event) => {
+  // Analytics is optional: fetching or storing it must not block a playable offline build.
+  event.waitUntil(
+    caches
+      .open(CACHE_VERSION)
+      .then((cache) => fetchAndCache(cache, "/analytics.js"))
+      .catch(() => undefined),
+  );
   event.waitUntil(
     caches
       .open(CACHE_VERSION)
