@@ -163,7 +163,9 @@ for (const theme of ["light", "dark"] as const) {
     await expect(
       dialog.getByRole("button", { name: "Accept agreement", exact: true }),
     ).toBeVisible();
-    await expect(dialog.getByLabel("Agreement forecast")).toBeVisible({
+    await expect(
+      dialog.getByLabel("Agreement forecast", { exact: true }),
+    ).toBeVisible({
       timeout: 30000,
     });
     await expect(
@@ -227,13 +229,19 @@ for (const theme of ["light", "dark"] as const) {
       name: "Québec hydro remaining term",
       exact: true,
     });
-    await expect(remaining.getByLabel("Agreement forecast")).toBeVisible({
+    await expect(
+      remaining.getByLabel("Agreement forecast", { exact: true }),
+    ).toBeVisible({
       timeout: 30000,
     });
     await expect(remaining).toContainText("Remaining delivery term");
     await expect(remaining).toContainText("Full-term use");
     await expect(remaining).toContainText("Pay for 57MW whenever available");
     await expectDialogToFit(remaining);
+    await reviewScreenshot(remaining, {
+      path: testInfo.outputPath(`ppa-remaining-${theme}.png`),
+      animations: "disabled",
+    });
     await page.keyboard.press("Escape");
     await expect(remaining).toHaveCount(0);
     const signed = await readSavedGame(page);
