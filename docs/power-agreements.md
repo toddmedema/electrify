@@ -119,6 +119,17 @@ minimum does not create physical imports or emissions. The full scenario sweep
 also retains its economic invariants. These measurements describe the authored
 opening contracts, not a promised saving from a replacement offer.
 
+The cash-funded Valley mixed reference plan also changes its capital timing to
+cover these obligations. It orders its planned 150 MW gas peaker in month 72
+instead of 84, and its first 200 MW wind farm in month 120 instead of 60. Every
+plant size, financing choice and retail-rate action stays the same. The earlier
+peaker bridges the acquired demand while wind is built, and the later wind order
+preserves the cash acquisition reserve. At CEO difficulty with seed 12345 and a
+month-108 purchase, the plan completes all four mission goals and serves 99.957%
+of lifetime demand. Its lowest month-end cash is about $24.8M and its final cash
+about $1.070B; retained customers are 130.1% of the expanded retention baseline.
+These are outcomes of one paid operating plan, not guaranteed acquisition returns.
+
 Schema 11 versions accepted receipts separately from inherited terms. New games
 inherit fixed-block obligations from ownership, and all newly accepted offers bind
 fixed-block terms in their quote keys. The schema-10 migration explicitly preserves
