@@ -77,7 +77,8 @@ function validationStatus(steps, explicitPath, root = process.cwd()) {
             !["executed", "reused"].includes(gate.execution)) ||
           (gate.execution === "reused" && gate.status !== "passed") ||
           (gate.status === "passed" &&
-            (gate.ok === false ||
+            (gate.execution == null ||
+              gate.ok === false ||
               gate.exitCode !== 0 ||
               gate.reportErrors?.length)),
       )

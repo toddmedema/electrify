@@ -80,6 +80,81 @@ function report(selected = steps) {
 const older = ".tmp/check-runs/2020-01-01T00-00-00-000-old/report.json";
 const newest = ".tmp/check-runs/2020-01-02T00-00-00-000-new/report.json";
 
+test("report operands reject reserved options while retaining leading-dash filenames", (t) => {
+  const { write, run } = fixture(t);
+  for (const operand of [
+    "--resume",
+    "--ci",
+    "--steps",
+    "--help",
+    "--report",
+    "--status",
+    "--json",
+  ]) {
+    write(operand, report());
+    const rejected = run(["--report", operand]);
+    assert.equal(rejected.status, 1, operand);
+    assert.match(rejected.stderr, /Usage: npm run check/);
+    assert.equal(rejected.stdout, "");
+    const explicit = run(["--report", `./${operand}`]);
+    assert.equal(explicit.status, 0, explicit.stderr);
+    assert.match(explicit.stdout, /Local validation: passed/);
+  }
+  for (const operand of ["-", "-report.json", "--report.json"]) {
+    write(operand, report());
+    const accepted = run(["--report", operand]);
+    assert.equal(accepted.status, 0, accepted.stderr);
+    assert.match(accepted.stdout, /Local validation: passed/);
+  }
+});
+
+test("passing gates require execution evidence in the newest report and preserve accurate counts", (t) => {
+  const { root, write, inspect } = fixture(t);
+  write(older, report());
+  for (const execution of [undefined, null]) {
+    const incomplete = report();
+    for (const gate of incomplete.gates) {
+      if (execution === undefined) delete gate.execution;
+      else gate.execution = execution;
+    }
+    write(newest, incomplete);
+    const { result, status } = inspect();
+    assert.equal(result.status, 1);
+    assert.equal(status.availability, "unavailable");
+    assert.equal(status.reportPath, path.join(root, newest));
+    assert.match(status.reason, /Incomplete or unsupported validation report/);
+    assert.equal(status.recordedStatus, undefined);
+  }
+  const valid = report();
+  write(newest, valid);
+  let { status } = inspect();
+  assert.equal(status.recordedStatus, "passed");
+  assert.equal(status.counts.executed, steps.length);
+  assert.equal(status.counts.reused, 0);
+  valid.gates[0].execution = "reused";
+  write(newest, valid);
+  status = inspect().status;
+  assert.equal(status.recordedStatus, "passed");
+  assert.equal(status.counts.executed, steps.length - 1);
+  assert.equal(status.counts.reused, 1);
+
+  valid.status = "failed";
+  Object.assign(valid.gates[0], {
+    status: "failed",
+    execution: "executed",
+    exitCode: 1,
+  });
+  Object.assign(valid.gates[1], { status: "skipped", exitCode: undefined });
+  delete valid.gates[1].execution;
+  write(newest, valid);
+  status = inspect().status;
+  assert.equal(status.recordedStatus, "failed");
+  assert.equal(status.counts.failed, 1);
+  assert.equal(status.counts.skipped, 1);
+  assert.equal(status.counts.executed, steps.length - 1);
+  assert.equal(status.counts.reused, 0);
+});
+
 test("status discovers only the newest recorded run and preserves historical provenance and safe retries", (t) => {
   const { root, write, inspect, run } = fixture(t);
   write(older, report());
@@ -237,12 +312,15 @@ test("inconsistent completed reports are unavailable; partial and abandoned runs
   abandoned.source.after = null;
   abandoned.gates[0].status = "running";
   abandoned.gates[1].status = "pending";
+  delete abandoned.gates[0].execution;
+  delete abandoned.gates[1].execution;
   write(newest, abandoned);
   status = inspect().status;
   assert.equal(status.recordedStatus, "running");
   assert.equal(status.completed, false);
   assert.equal(status.counts.running, 1);
   assert.equal(status.counts.pending, 1);
+  assert.equal(status.counts.executed, steps.length - 2);
   assert.equal(status.activity.ownerAlive, "unknown");
 });
 

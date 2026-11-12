@@ -238,6 +238,15 @@ test("mixed check diagnostics are rejected before bypass or executable work, whi
     ["--status", "--json", "--json"],
     ["--status", "one.json", "two.json"],
     ["--report", "report.json", "--steps", "lint"],
+    ...[
+      "--ci",
+      "--resume",
+      "--steps",
+      "--help",
+      "--report",
+      "--status",
+      "--json",
+    ].map((option) => ["--report", option]),
     ["--steps", "lint", "--help"],
   ]) {
     const result = run("check", args);

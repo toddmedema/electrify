@@ -107,7 +107,19 @@ const usage = `Usage: npm run check -- [--ci] [--resume] [--steps ${steps.map((s
 // Both entry points classify the entire invocation before allowing a diagnostic bypass.
 function parseCheckArguments(argv) {
   if (argv.length === 1 && argv[0] === "--help") return { mode: "help" };
-  if (argv.length === 2 && argv[0] === "--report")
+  if (
+    argv.length === 2 &&
+    argv[0] === "--report" &&
+    ![
+      "--ci",
+      "--resume",
+      "--steps",
+      "--help",
+      "--report",
+      "--status",
+      "--json",
+    ].includes(argv[1])
+  )
     return { mode: "report", reportPath: argv[1] };
   if (argv[0] === "--status") {
     const rest = argv.slice(1).filter((arg) => arg !== "--json");
