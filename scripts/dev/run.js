@@ -45,9 +45,11 @@ async function runCommand(command, args = [], options = {}) {
   )
     throw new Error("PORT and E2E_PORT must match when both are set");
   const diagnostic =
-    args.includes("--help") ||
-    args.includes("--report") ||
-    args.includes("--list");
+    command === "check"
+      ? require("../check").parseCheckArguments(args).mode !== "check"
+      : args.includes("--help") ||
+        args.includes("--report") ||
+        args.includes("--list");
   const local = env.GITHUB_ACTIONS !== "true" && !diagnostic;
   const abort = new AbortController();
   let child, lease, portLease;

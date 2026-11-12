@@ -6,6 +6,7 @@ const { createHash } = require("node:crypto");
 const os = require("node:os");
 const { checkAssets } = require("./check-assets");
 const cache = require("./ci/validation-cache");
+const { validationStatus, formatStatus } = require("./ci/validation-status");
 
 const steps = [
   { id: "types", name: "Types", script: "typecheck", parallel: true },
@@ -101,7 +102,29 @@ const steps = [
     reports: ["results.json"],
   },
 ];
-const usage = `Usage: npm run check -- [--ci] [--resume] [--steps ${steps.map((step) => step.id).join(",")}]\n       npm run check -- --report <report.json>`;
+const usage = `Usage: npm run check -- [--ci] [--resume] [--steps ${steps.map((step) => step.id).join(",")}]\n       npm run check -- --report <report.json>\n       npm run check -- --status [report.json] [--json]`;
+
+// Both entry points classify the entire invocation before allowing a diagnostic bypass.
+function parseCheckArguments(argv) {
+  if (argv.length === 1 && argv[0] === "--help") return { mode: "help" };
+  if (argv.length === 2 && argv[0] === "--report")
+    return { mode: "report", reportPath: argv[1] };
+  if (argv[0] === "--status") {
+    const rest = argv.slice(1).filter((arg) => arg !== "--json");
+    if (
+      argv.filter((arg) => arg === "--json").length > 1 ||
+      rest.length > 1 ||
+      rest.some((arg) => !arg || arg.startsWith("-"))
+    )
+      throw new Error(usage);
+    return {
+      mode: "status",
+      reportPath: rest[0],
+      json: argv.includes("--json"),
+    };
+  }
+  return { mode: "check", selected: selectSteps(argv) };
+}
 
 // The default check omits CI-only gates; --ci runs every gate, and --steps may name any gate.
 // Build prerequisites remain selected even on resume: they must execute or have verified evidence.
@@ -408,17 +431,26 @@ async function execute(selected, runStep) {
 }
 
 async function main(argv = process.argv.slice(2)) {
-  if (argv.length === 2 && argv[0] === "--report") {
+  const options = parseCheckArguments(argv);
+  if (options.mode === "status") {
+    const status = validationStatus(steps, options.reportPath);
     process.stdout.write(
-      `${summarizeReport(JSON.parse(fs.readFileSync(argv[1], "utf8")))}\n`,
+      `${options.json ? JSON.stringify(status, null, 2) : formatStatus(status)}\n`,
+    );
+    if (status.availability !== "available") process.exitCode = 1;
+    return;
+  }
+  if (options.mode === "report") {
+    process.stdout.write(
+      `${summarizeReport(JSON.parse(fs.readFileSync(options.reportPath, "utf8")))}\n`,
     );
     return;
   }
-  if (argv.length === 1 && argv[0] === "--help") {
+  if (options.mode === "help") {
     console.error(usage);
     return;
   }
-  const selected = selectSteps(argv);
+  const selected = options.selected;
   const workers = workerCount(process.env);
   if (selected.some((step) => step.assets)) checkAssets();
   const sourceBefore = sourceSnapshot();
@@ -479,8 +511,17 @@ async function main(argv = process.argv.slice(2)) {
       status: "pending",
     })),
   };
-  const saveReport = () =>
-    fs.writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`);
+  const saveReport = () => {
+    const temporary = `${reportPath}.${process.pid}.tmp`;
+    try {
+      fs.writeFileSync(temporary, `${JSON.stringify(report, null, 2)}\n`, {
+        flag: "wx",
+      });
+      fs.renameSync(temporary, reportPath);
+    } finally {
+      fs.rmSync(temporary, { force: true });
+    }
+  };
   saveReport();
   console.error(`Running ${selected.length}/${available} check gates.`);
   console.error(`Validation report: ${reportPath}`);
@@ -606,6 +647,7 @@ if (require.main === module)
   });
 module.exports = {
   steps,
+  parseCheckArguments,
   selectSteps,
   isFullCheck,
   workerCount,

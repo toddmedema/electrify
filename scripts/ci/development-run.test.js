@@ -7,6 +7,7 @@ const { spawn, spawnSync, execFileSync } = require("node:child_process");
 const { once } = require("node:events");
 const { setTimeout: delay } = require("node:timers/promises");
 const { alive, acquireLease, readOwner } = require("../dev/coordination");
+const { claimTask } = require("../dev/task");
 
 function fixture(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "electrify-run-test-"));
@@ -126,6 +127,131 @@ test("bad dependency installations fail before generators or work execute", (t) 
   assert.match(result.stderr, /Dependency preflight failed/);
   assert(!fs.existsSync(path.join(root, "generators.log")));
   assert(!fs.existsSync(path.join(root, "ran")));
+});
+
+test("the public status command bypasses occupied claims, reservations, installation, assets and generators", async (t) => {
+  const { root, write, env } = fixture(t);
+  const reportPath = path.join(
+    root,
+    ".tmp/check-runs/2020-01-01T00-00-00-000-fixture/report.json",
+  );
+  write(path.relative(root, reportPath), {
+    schemaVersion: 1,
+    status: "passed",
+    startedAt: "2020-01-01T00:00:00.000Z",
+    finishedAt: "2020-01-01T00:00:01.000Z",
+    source: { changedDuringRun: false },
+    scope: { profile: "quick", full: false, selected: ["formatting"] },
+    gates: [
+      {
+        id: "formatting",
+        status: "passed",
+        exitCode: 0,
+        execution: "executed",
+      },
+    ],
+  });
+  write("package.json", { scripts: { check: "node runner.cjs check" } });
+  write(
+    "scripts/check.js",
+    `
+    const result = require('node:child_process').spawnSync(process.execPath,
+      [${JSON.stringify(path.resolve(__dirname, "../check.js"))}, ...process.argv.slice(2)], {stdio:'inherit'});
+    process.exitCode = result.status ?? 1;
+  `,
+  );
+  fs.rmSync(path.join(root, "node_modules"), { recursive: true });
+  write("public/missing.png", "version https://git-lfs.github.com/spec/v1\n");
+  execFileSync("git", ["add", "public/missing.png"], {
+    cwd: root,
+    stdio: "pipe",
+    windowsHide: true,
+  });
+  const owner = claimTask(root, "another-task");
+  const leases = [];
+  t.after(() => leases.forEach((lease) => lease.release()));
+  for (let index = 0; index < 3; index++)
+    leases.push(
+      await acquireLease("heavy", {
+        root: path.join(root, "locks"),
+        slots: 3,
+        wait: false,
+      }),
+    );
+  const invoke = (args) =>
+    spawnSync(
+      process.platform === "win32" ? "npm.cmd" : "npm",
+      ["run", "--silent", "check", "--", ...args],
+      {
+        cwd: root,
+        env,
+        encoding: "utf8",
+        windowsHide: true,
+        timeout: 10000,
+        shell: process.platform === "win32",
+      },
+    );
+  for (const args of [
+    ["--status", "--json"],
+    ["--status", reportPath, "--json"],
+    ["--help"],
+  ]) {
+    const result = invoke(args);
+    assert.equal(result.status, 0, result.stderr || result.error?.message);
+    if (args.includes("--json")) {
+      const status = JSON.parse(result.stdout);
+      assert.equal(status.recordedStatus, "passed");
+      assert.equal(status.currentValidation, "not-checked");
+    }
+    assert.doesNotMatch(
+      result.stderr,
+      /Waiting for validation|Validation slot acquired|preflight|Starting/,
+    );
+  }
+  assert.equal(
+    readOwner(path.join(root, ".tmp/development-task")).token,
+    owner.token,
+  );
+  for (const [index, lease] of leases.entries())
+    assert.equal(
+      readOwner(
+        path.join(root, index ? `locks/heavy-${index + 1}` : "locks/heavy"),
+      ).token,
+      lease.token,
+    );
+  assert(!fs.existsSync(path.join(root, "generators.log")));
+});
+
+test("mixed check diagnostics are rejected before bypass or executable work, while normal checks retain setup", (t) => {
+  const { root, write, run } = fixture(t);
+  write(
+    "scripts/check.js",
+    "require('node:fs').writeFileSync('entered-check','bad')",
+  );
+  fs.rmSync(path.join(root, "node_modules"), { recursive: true });
+  for (const args of [
+    ["--status", "--steps", "lint"],
+    ["--steps", "lint", "--status"],
+    ["--ci", "--status"],
+    ["--status", "--resume"],
+    ["--status", "--help"],
+    ["--status", "--json", "--json"],
+    ["--status", "one.json", "two.json"],
+    ["--report", "report.json", "--steps", "lint"],
+    ["--steps", "lint", "--help"],
+  ]) {
+    const result = run("check", args);
+    assert.equal(result.status, 1, args.join(" "));
+    assert.match(result.stderr, /Usage: npm run check/);
+    assert(!fs.existsSync(path.join(root, "entered-check")));
+    assert(!fs.existsSync(path.join(root, "generators.log")));
+    assert(!fs.existsSync(path.join(root, ".tmp/development-task")));
+    assert(!fs.existsSync(path.join(root, "locks")));
+  }
+  const executable = run("check", ["--steps", "lint"]);
+  assert.equal(executable.status, 1);
+  assert.match(executable.stderr, /Dependency preflight failed/);
+  assert(!fs.existsSync(path.join(root, "entered-check")));
 });
 
 test("conflicting start ports fail before preparing or starting the server", (t) => {
