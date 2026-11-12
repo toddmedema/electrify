@@ -126,17 +126,30 @@ export default function AgreementForecastDetails({
         <BuildDetailRow
           label={
             legacy
-              ? "Forecast purchases"
+              ? "Purchases through expiry"
               : offer
                 ? "Forecast use"
                 : result.completeHistory
-                  ? "Full-term use"
-                  : `Use since ${agreementDate(result.recordingStartMinute)}`
+                  ? "Full-term use estimate"
+                  : "Use estimate through expiry"
           }
           value={
-            legacy
-              ? formatWattHours(combined.usefulMWh * 1e6)
-              : energyUse(combined)
+            <>
+              {legacy
+                ? formatWattHours(combined.usefulMWh * 1e6)
+                : energyUse(combined)}
+              {!offer && (
+                <Typography
+                  component="div"
+                  variant="caption"
+                  color="textSecondary"
+                >
+                  {result.completeHistory
+                    ? "Recorded + forecast"
+                    : `Recorded since ${agreementDate(result.recordingStartMinute)} + forecast`}
+                </Typography>
+              )}
+            </>
           }
         />
         <BuildDetailRow

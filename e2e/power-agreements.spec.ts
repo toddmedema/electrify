@@ -157,7 +157,7 @@ for (const theme of ["light", "dark"] as const) {
       "1 Jan 2020–31 Dec 2029",
       "Follows inflation",
       "$0 upfront",
-      "Pay for 57MW whenever supplier-available",
+      "Pay for 57MW whenever available",
     ])
       await expect(dialog).toContainText(fact);
     await expect(
@@ -232,9 +232,7 @@ for (const theme of ["light", "dark"] as const) {
     });
     await expect(remaining).toContainText("Remaining delivery term");
     await expect(remaining).toContainText("Full-term use");
-    await expect(remaining).toContainText(
-      "Pay for 57MW whenever supplier-available",
-    );
+    await expect(remaining).toContainText("Pay for 57MW whenever available");
     await expectDialogToFit(remaining);
     await page.keyboard.press("Escape");
     await expect(remaining).toHaveCount(0);

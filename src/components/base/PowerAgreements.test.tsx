@@ -72,7 +72,7 @@ it("uses maximum deliverable coverage consistently without a second capacity fig
   ).not.toHaveTextContent("60MW");
   expect(
     within(dialog).getByRole("row", { name: /Minimum/ }),
-  ).toHaveTextContent("Pay for 57MW whenever supplier-available");
+  ).toHaveTextContent("Pay for 57MW whenever available");
   expect(dialog).not.toHaveTextContent("2005 dollars");
   expect(dialog).not.toHaveTextContent("Local generation can reduce purchases");
 });

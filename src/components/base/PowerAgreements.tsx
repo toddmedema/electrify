@@ -158,7 +158,7 @@ export default function PowerAgreements({
                 <Typography variant="body2" color="textSecondary">
                   {source.termsVersion === 1
                     ? "No minimum purchase"
-                    : `Minimum: pay for ${formatWatts(source.nominalW * source.deliverability)} whenever supplier-available`}
+                    : `Minimum: pay for ${formatWatts(source.nominalW * source.deliverability)} whenever available`}
                 </Typography>
                 <Typography variant="body2">
                   {source.inherited
@@ -306,7 +306,7 @@ export default function PowerAgreements({
                 value={
                   assessment.termsVersion === 1
                     ? "No minimum purchase"
-                    : `Pay for ${formatWatts(assessment.nominalW * assessment.deliverability)} whenever supplier-available`
+                    : `Pay for ${formatWatts(assessment.nominalW * assessment.deliverability)} whenever available`
                 }
               />
               <BuildDetailRow
@@ -329,7 +329,7 @@ export default function PowerAgreements({
                   value={
                     <>
                       Pay for {formatWatts(review.deliverableW)} whenever
-                      supplier-available
+                      available
                       <Typography
                         component="div"
                         variant="caption"
