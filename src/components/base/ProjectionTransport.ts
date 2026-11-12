@@ -21,6 +21,7 @@ const objectFields = {
   agreementUsefulMWh: "dictionary",
   agreementPayments: "dictionary",
   agreementUsefulValues: "dictionary",
+  agreementClosingExpenses: "dictionary",
   supplyByFuel: "dictionary",
   demandByType: "dictionary",
   renewableCapacityFactors: "dictionary",

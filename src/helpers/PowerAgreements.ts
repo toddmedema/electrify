@@ -521,6 +521,7 @@ export function recordAgreementSettlements(
   start: number,
   end: number,
   settlements: PowerAgreementSettlement[],
+  closingExpenses?: Record<string, number>,
 ): number {
   if (!game.transmission || end <= start || !settlements.length) return 0;
   const accounts = (game.transmission.agreementAccounts ??= []);
@@ -580,6 +581,8 @@ export function recordAgreementSettlements(
         row.payment = row.usefulValue! + topUp;
         settlement.payment += topUp;
         topUps += topUp;
+        if (closingExpenses && topUp > 0)
+          closingExpenses[month] = (closingExpenses[month] ?? 0) + topUp;
       } else row.payment += settlement.payment * fraction;
       cursor = boundary;
     }

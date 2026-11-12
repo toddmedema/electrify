@@ -277,7 +277,7 @@ export function validUtilityExpansion(game: GameType): boolean {
       nonnegative(tick.entitlementImportedW) &&
       nonnegative(tick.entitlementImportCapacityW) &&
       tick.entitlementImportCapacityW <= capacity + 0.01 &&
-      tick.entitlementImportedW <= capacity + 0.01 &&
+      tick.entitlementImportedW <= tick.entitlementImportCapacityW + 0.01 &&
       tick.entitlementImportedW <= (tick.importedW ?? 0) + 0.01
     );
   });

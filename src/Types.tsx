@@ -447,6 +447,8 @@ export type TickPresentFutureType = Partial<FuelPricesType> &
     agreementUsefulValues?: Record<string, number>;
     /** This frame's payment for committed energy that was not imported. */
     agreementUnusedExpenses?: number;
+    /** Closing minimum payments keyed by the elapsed month they settle. */
+    agreementClosingExpenses?: Record<string, number>;
     minute: number;
     supplyW: number; // Watts
     availableSupplyW?: number; // Supply plus unused fuel-burning generation capacity

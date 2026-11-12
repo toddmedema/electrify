@@ -5729,7 +5729,7 @@ function* supplyFacilitiesFinancesPhases(
   // Weather generation serves load first; never buy an entitlement merely to export it.
   const redundantEntitlementW = Math.min(
     entitlementDeliveredW,
-    Math.max(0, supply - now.demandW),
+    Math.max(0, supply - charge - now.demandW),
   );
   entitlementDeliveredW -= redundantEntitlementW;
   supply -= redundantEntitlementW;
@@ -6228,6 +6228,7 @@ function* supplyFacilitiesFinancesPhases(
     importedW > 0
       ? (importedWh / 1000000) * (importCostPerHour / importedW)
       : 0;
+  const agreementClosingExpenses: Record<string, number> = {};
   const monthlyAgreementTopUp =
     settleAgreementAccounts && !preRoll && advanceConstruction
       ? recordAgreementSettlements(
@@ -6235,6 +6236,7 @@ function* supplyFacilitiesFinancesPhases(
           agreementStart,
           agreementEnd,
           agreementSettlements,
+          agreementClosingExpenses,
         )
       : 0;
   const unusedAgreementExpenses =
@@ -6243,6 +6245,9 @@ function* supplyFacilitiesFinancesPhases(
   const expensesImports = physicalImportExpenses + unusedAgreementExpenses;
   if (state.utilityExpansion) {
     now.agreementUnusedExpenses = unusedAgreementExpenses;
+    if (Object.keys(agreementClosingExpenses).length)
+      now.agreementClosingExpenses = agreementClosingExpenses;
+    else delete now.agreementClosingExpenses;
     now.agreementAvailableMWh = Object.fromEntries(
       agreementSettlements.map((entry) => [
         entry.agreementId,
@@ -6752,7 +6757,7 @@ function supplyForecastPass(
   const currentCash = current?.cash;
   const currentCustomers = current?.customers;
   let prev = newState.timeline[0];
-  return newState.timeline.map((t: TickPresentFutureType) => {
+  return newState.timeline.map((t: TickPresentFutureType, index) => {
     const sourceTick = t;
     if (
       t.minute >= state.date.minute &&
@@ -6841,6 +6846,33 @@ function supplyForecastPass(
         });
       }
     }
+    // Live rollover settles one more elapsed interval against the last frame. Include that
+    // exclusive closing payment in the ordinary month forecast too, on the same private ledger.
+    // Longer horizons already settle internal boundaries on their next frame.
+    const closesMinute = t.minute + stepMinutes;
+    if (
+      index === newState.timeline.length - 1 &&
+      closesMinute % MINUTES_PER_MONTH === 0 &&
+      t.minute > state.date.minute &&
+      newState.transmission.agreementAccounts?.some(
+        (account) => account.termsVersion === 3,
+      )
+    ) {
+      t = updateSupplyFacilitiesFinances(
+        newState,
+        t,
+        t,
+        simulated,
+        false,
+        !withoutMinimumStableOutput,
+        stepMinutes,
+        true,
+        undefined,
+        excludedAgreementId,
+        true,
+        closesMinute,
+      );
+    }
     observe?.(newState, t);
     prev = t;
     return t;
@@ -6848,10 +6880,10 @@ function supplyForecastPass(
 }
 
 /** Forecast a rate choice through the bankruptcy check at rollover, on a private copy. */
-export function forecastMonthClosingCashAtCustomerRate(
+export function forecastMonthClosingTimelineAtCustomerRate(
   state: GameType,
   dollarsPerkWh: number,
-): number {
+): TickPresentFutureType[] | undefined {
   const forecast = cloneDeep(state);
   forecast.dollarsPerkWh = dollarsPerkWh;
   forecast.rateFollowsInflation = false;
@@ -6866,7 +6898,7 @@ export function forecastMonthClosingCashAtCustomerRate(
     completeRetrofits(forecast, true);
     const now = getTimeFromTimeline(minute, forecast.timeline);
     const prev = getTimeFromTimeline(minute - TICK_MINUTES, forecast.timeline);
-    if (!now || !prev) return -Infinity;
+    if (!now || !prev) return undefined;
     // Replay elapsed settlements on this private ledger, including the exclusive month end.
     updateSupplyFacilitiesFinances(
       forecast,
@@ -6883,9 +6915,21 @@ export function forecastMonthClosingCashAtCustomerRate(
       minute,
     );
   }
-  // The real rollover books one more tick against the final forecast frame before checking cash.
+  return forecast.timeline;
+}
+
+/** The rate-choice warning and finance projection share the exclusive closing settlement. */
+export function forecastMonthClosingCashAtCustomerRate(
+  state: GameType,
+  dollarsPerkWh: number,
+): number {
+  const timeline = forecastMonthClosingTimelineAtCustomerRate(
+    state,
+    dollarsPerkWh,
+  );
+  const closesMinute = (state.date.monthsElapsed + 1) * MINUTES_PER_MONTH;
   return (
-    getTimeFromTimeline(closesMinute, forecast.timeline)?.cash ?? -Infinity
+    (timeline && getTimeFromTimeline(closesMinute, timeline)?.cash) ?? -Infinity
   );
 }
 

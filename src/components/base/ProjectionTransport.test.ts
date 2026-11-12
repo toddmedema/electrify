@@ -28,6 +28,7 @@ function fixture() {
       agreementAvailableMWh: { nuclear: 10 },
       agreementUsefulMWh: { nuclear: 6 },
       agreementPayments: { nuclear: 400 },
+      agreementClosingExpenses: { 0: 200 },
       renewableCapacityFactors: { a: 0.2, b: NaN },
       availableSupplyW: undefined,
       deferredResidential: [

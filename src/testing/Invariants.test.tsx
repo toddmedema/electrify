@@ -335,3 +335,26 @@ it.each([0, 5.960464477539063e-8, 1])(
     ).toBe(outsideImportW > 0 ? 1 : undefined);
   },
 );
+
+it("reports total imports in a transmission-capacity violation that includes agreement power", () => {
+  const game = createGame({ scenarioId: 116, seed: 12345 });
+  tickState(game);
+  const now = {
+    ...getTimeFromTimeline(game.date.minute, game.timeline)!,
+    importedW: 400e6,
+    entitlementImportedW: 100e6,
+    entitlementImportCapacityW: 200e6,
+    exportedW: 0,
+    transmissionCapacityW: 300e6,
+  };
+  const collector = new InvariantCollector();
+  checkTick(collector, game, null, now, "total imports", false);
+  expect(collector.getViolations()).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        rule: "trade stays within transmission capacity",
+        detail: "imported 400000000W + exported 0W vs 300000000W",
+      }),
+    ]),
+  );
+});

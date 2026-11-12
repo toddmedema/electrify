@@ -67,6 +67,16 @@ const migrations: readonly Migration[] = [
       !Array.isArray(game.transmission.lines)
     )
       return null;
+    if (
+      game.transmission.lines.some(
+        (line) =>
+          !object(line) ||
+          typeof line.id !== "number" ||
+          !Number.isSafeInteger(line.id) ||
+          line.id < 1,
+      )
+    )
+      return null;
     const lines = [...game.transmission.lines] as NonNullable<
       GameType["transmission"]
     >["lines"];

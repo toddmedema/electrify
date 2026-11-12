@@ -1,3 +1,5 @@
+import type { GeneratorOperatingType, StorageOperatingType } from "../Types";
+import { STORAGE } from "../data/Facilities";
 import { runMonths } from "../testing/SimulationTestHelpers";
 import { validUtilityExpansion } from "../helpers/ExpansionValidation";
 import cloneDeep from "lodash.clonedeep";
@@ -7,6 +9,8 @@ import {
   MINUTES_PER_MONTH,
   getDateFromMinute,
   getTimeFromTimeline,
+  summarizeTimeline,
+  summarizeTimelineByMonth,
 } from "../helpers/DateTime";
 import { currentTick } from "../helpers/GameSelectors";
 import {
@@ -31,13 +35,15 @@ import {
   intertieUpgradeQuote,
   physicalNeighborImportSupplyW,
 } from "../helpers/Transmission";
-import { facilitySignature } from "../helpers/Projection";
+import { facilitySignature, selectProjection } from "../helpers/Projection";
 import { intertieForecastKey } from "../helpers/IntertieOutlook";
 import { parseSave, serializeSave } from "../SaveGame";
 import { GAME_TO_REAL_YEARS, TICK_MINUTES, TICKS_PER_HOUR } from "../Constants";
 import { DEMAND_TYPES } from "../data/DemandProfiles";
 import reducer, {
   generateForecastTimeline,
+  generateNewTimeline,
+  forecastMonthClosingCashAtCustomerRate,
   tickState,
   togglePauseTransmissionLine,
 } from "./Game";
@@ -1058,3 +1064,138 @@ it.each([48, 72])(
     }
   },
 );
+
+it("rejects historical agreement delivery above the capacity recorded for that tick", () => {
+  const game = at(0);
+  const raw = JSON.parse(JSON.stringify(serializeSave(game)));
+  expect(parseSave(raw)).not.toBeNull();
+  const tick = raw.game.timeline[0];
+  tick.entitlementImportedW = 50e6;
+  tick.importedW = Math.max(tick.importedW, 50e6);
+  tick.entitlementImportCapacityW = 0;
+  expect(parseSave(raw)).toBeNull();
+});
+
+it.each(["NONE", "SHORTAGES"] as const)(
+  "preserves agreement supply used to charge storage under %s",
+  (buyingRule) => {
+    const game = at(0);
+    game.transmission!.buyingRule = buyingRule;
+    game.transmission!.sellingRule = "NONE";
+    const base = game.facilities[0];
+    const generator: GeneratorOperatingType = {
+      ...base,
+      fuel: "Natural Gas",
+      id: 100,
+      peakW: 100e6,
+      currentW: 0,
+      yearsToBuildLeft: 0,
+      spinMinutes: 1,
+      minimumStableOutput: 0,
+      paused: false,
+      tracksStarts: false,
+    } as GeneratorOperatingType;
+    const battery: StorageOperatingType = {
+      ...STORAGE({ ...game, date: { ...game.date, year: 2030 } }, 1000e6).find(
+        (facility) => facility.name === "Battery",
+      )!,
+      id: 101,
+      peakW: 100e6,
+      currentW: 0,
+      currentWh: 0,
+      yearsToBuildLeft: 0,
+      minuteCreated: 0,
+      spinMinutes: 1,
+      paused: false,
+      roundTripEfficiency: 0.8,
+      hourlyLoss: 0,
+      loanAmountLeft: 0,
+      loanAmountTotal: 0,
+      loanMonthlyPayment: 0,
+      interestRate: 0,
+      lifetimeWh: 0,
+      lifetimePotentialWh: 0,
+      lifetimeRevenue: 0,
+      lifetimeExpenses: 0,
+    };
+    request(game, 100e6);
+    game.facilities = [generator, battery];
+    tickState(game);
+    const now = currentTick(game)!;
+    expect(now.storageChargeW).toBeGreaterThan(0);
+    expect(now.supplyW).toBeGreaterThanOrEqual(now.demandW);
+    expect(now.entitlementImportedW).toBeCloseTo(100e6, 0);
+    expect(now.importedW).toBe(now.entitlementImportedW);
+  },
+);
+
+it.each([0, 15])(
+  "includes exclusive monthly minimums in forecast cash and the closing month from offset %s",
+  (offset) => {
+    const game = at(0);
+    game.transmission!.inheritedAgreementTerms = 3;
+    game.transmission!.lines[0].paused = true;
+    game.facilities = [];
+    const now = currentTick(game)!;
+    game.timeline = generateNewTimeline(game, now.cash, now.customers);
+    const expected = summarizeTimeline(game.timeline, game.startingYear);
+    expect(expected.expensesImports).toBeGreaterThan(0);
+    runMonths(game, 1);
+    expect(game.monthlyHistory[0].expensesImports).toBeCloseTo(
+      expected.expensesImports!,
+      6,
+    );
+    expect(game.monthlyHistory[0].cash).toBeCloseTo(expected.cash, 6);
+
+    if (offset) tickState(game);
+    const accounts: NonNullable<
+      NonNullable<typeof game.transmission>["agreementAccounts"]
+    > = [];
+    const timeline = generateForecastTimeline(
+      game,
+      currentTick(game)!.cash,
+      currentTick(game)!.customers,
+      48,
+      60,
+      (state) => {
+        accounts.splice(
+          0,
+          accounts.length,
+          ...state.transmission!.agreementAccounts!,
+        );
+      },
+    );
+    const months = summarizeTimelineByMonth(timeline, game.startingYear);
+    for (const month of months) {
+      const index = (month.year - game.startingYear) * 12 + month.month - 1;
+      const payment = accounts.reduce(
+        (sum, account) =>
+          sum +
+          (account.months.find((row) => row.month === index)?.payment ?? 0),
+        0,
+      );
+      const complete = accounts.every(
+        (account) =>
+          account.accountedThroughMinute >= (index + 1) * MINUTES_PER_MONTH,
+      );
+      expect(payment > 0).toBe(complete);
+      expect(month.expensesImports).toBeCloseTo(payment, 6);
+    }
+  },
+);
+
+it("keeps the closing minimum in the finance projection when the current frame is the last in the month", () => {
+  const game = at(0);
+  game.transmission!.inheritedAgreementTerms = 3;
+  game.transmission!.lines[0].paused = true;
+  game.facilities = [];
+  for (let i = 0; i < 95; i++) tickState(game);
+  const closingCash = forecastMonthClosingCashAtCustomerRate(
+    game,
+    game.dollarsPerkWh,
+  );
+  expect(closingCash).toBeLessThan(currentTick(game)!.cash);
+  expect(
+    selectProjection(game, currentTick(game)!).financeProjected[0].cash,
+  ).toBeCloseTo(closingCash, 6);
+});

@@ -8,7 +8,10 @@ import {
 } from "./DateTime";
 import { forecastShortfalls } from "./ForecastShortfalls";
 import { sampleForecastTimeline } from "./ForecastSampling";
-import { generateForecastTimeline } from "../reducers/Game";
+import {
+  generateForecastTimeline,
+  forecastMonthClosingTimelineAtCustomerRate,
+} from "../reducers/Game";
 import { GameType, MonthlyHistoryType, TickPresentFutureType } from "../Types";
 import type { ObjectiveMonthFacts } from "../data/ScenarioObjectives";
 import {
@@ -322,7 +325,10 @@ function buildProjection(
   const sampled = sampleForecastTimeline(timeline, 240 * MAX_FORECAST_YEARS);
 
   const currentMonth = summarizeTimeline(
-    game.timeline,
+    game.utilityExpansion
+      ? (forecastMonthClosingTimelineAtCustomerRate(game, game.dollarsPerkWh) ??
+          game.timeline)
+      : game.timeline,
     game.startingYear,
     undefined,
     needsObjectiveEnergyMeters(game),

@@ -707,7 +707,7 @@ function checkTrade(
     collector.add(
       "trade stays within transmission capacity",
       when,
-      `imported ${Math.round(externalImportW)}W + exported ${Math.round(exportedW)}W vs ${Math.round(capacityW)}W`,
+      `imported ${Math.round(importedW)}W + exported ${Math.round(exportedW)}W vs ${Math.round(capacityW)}W`,
     );
   }
   // Bounded source rights can serve local load while native generation supplies a
