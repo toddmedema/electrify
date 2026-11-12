@@ -115,3 +115,37 @@ it("holds a Web Lock for the tenure so followers do not run serialized duplicate
     value: undefined,
   });
 });
+
+it("ignores malformed queued values without skipping a neighboring manual request", async () => {
+  const owner = new ForegroundSync("test", jest.fn(), jest.fn(), valid);
+  owner.setAccount("alice");
+  await flush();
+  localStorage.setItem("electrify-sync:test:alice:request:bad", "null");
+  localStorage.setItem(
+    "electrify-sync:test:alice:request:good",
+    JSON.stringify({ id: "manual" }),
+  );
+  expect([...owner.pending().values()]).toEqual([{ id: "manual" }]);
+  owner.stop();
+});
+it("keeps local foreground sync and manual intent usable if storage is disabled", async () => {
+  const read = jest
+    .spyOn(Storage.prototype, "getItem")
+    .mockImplementation(() => {
+      throw new Error("disabled");
+    });
+  const write = jest
+    .spyOn(Storage.prototype, "setItem")
+    .mockImplementation(() => {
+      throw new Error("disabled");
+    });
+  const owner = new ForegroundSync("test", jest.fn(), jest.fn(), valid);
+  owner.setAccount("alice");
+  await flush();
+  expect(owner.isOwner()).toBe(true);
+  owner.request({ id: "manual" });
+  expect([...owner.pending().values()]).toEqual([{ id: "manual" }]);
+  owner.stop();
+  read.mockRestore();
+  write.mockRestore();
+});

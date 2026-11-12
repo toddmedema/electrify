@@ -31,6 +31,7 @@ export function startAchievementServices(
 ): () => void {
   let stopped = false;
   let epoch = 0;
+  let accountGeneration = 0;
   let inFlight = false;
   let acknowledged = "";
   let refreshPending = true;
@@ -44,25 +45,29 @@ export function startAchievementServices(
   journal.activate(uid);
   const current = (owner: string, generation: number) =>
     !stopped && uid === owner && generation === epoch && coordinator.isOwner();
-  const sync = async () => {
+  const setSync = (state: Parameters<AchievementJournal["setSync"]>[0]) => {
+    journal.setSync(state);
+    coordinator.report(state);
+  };
+  const sync = async (): Promise<void> => {
     journal.retryStorage();
-    if (stopped || !uid || !transport || inFlight || !coordinator.isOwner())
+    if (stopped || !uid || !transport) return;
+    if (!navigator.onLine) {
+      setSync("offline");
       return;
+    }
+    if (inFlight || !coordinator.isOwner()) return;
     journal.refresh();
     const progress = journal.getSnapshot().progress;
     const signature = JSON.stringify(progress);
     const requests = coordinator.pending();
     if (!refreshPending && !requests.size && signature === acknowledged) return;
-    if (!navigator.onLine) {
-      journal.setSync("offline");
-      return;
-    }
     const owner = uid;
     const generation = epoch;
     inFlight = true;
     refreshPending = false;
     clearTimeout(retryTimer);
-    journal.setSync("syncing");
+    setSync("syncing");
     let succeeded = false;
     try {
       const remote = await transport.merge(owner, progress, () =>
@@ -74,7 +79,7 @@ export function startAchievementServices(
       coordinator.acknowledge(requests.keys());
       retryDelay = 30_000;
       succeeded = true;
-      journal.setSync(
+      setSync(
         JSON.stringify(journal.getSnapshot().progress) === acknowledged
           ? "synced"
           : "syncing",
@@ -82,7 +87,7 @@ export function startAchievementServices(
     } catch {
       if (current(owner, generation)) {
         refreshPending = true;
-        journal.setSync(navigator.onLine ? "failed" : "offline");
+        setSync(navigator.onLine ? "failed" : "offline");
         retryTimer = setTimeout(() => void sync(), retryDelay);
         retryDelay = Math.min(300_000, retryDelay * 2);
       }
@@ -93,6 +98,7 @@ export function startAchievementServices(
         (generation !== epoch ||
           (succeeded &&
             (refreshPending ||
+              coordinator.pending().size > 0 ||
               JSON.stringify(journal.getSnapshot().progress) !== acknowledged)))
       )
         void sync();
@@ -114,12 +120,22 @@ export function startAchievementServices(
       typeof value === "object" &&
       !Array.isArray(value) &&
       Object.keys(value).length === 0,
+    (value) => {
+      if (
+        value === "synced" ||
+        value === "syncing" ||
+        value === "failed" ||
+        value === "offline"
+      )
+        journal.setSync(value);
+    },
   );
   const publish = () => {
     const { game, user, saves } = store.getState();
     if (uid !== user.uid) {
       uid = user.uid;
       epoch++;
+      accountGeneration++;
       observed = "";
       acknowledged = "";
       refreshPending = true;
@@ -170,11 +186,11 @@ export function startAchievementServices(
     process.env.REACT_APP_DESKTOP === "true" ? getDesktop() : undefined;
   const refreshNative = () => {
     const owner = uid;
-    const generation = epoch;
+    const generation = accountGeneration;
     void desktop
       ?.readAchievements?.()
       .then((record) => {
-        if (!stopped && owner === uid && generation === epoch)
+        if (!stopped && owner === uid && generation === accountGeneration)
           journal.merge(record);
       })
       .catch(() => undefined);

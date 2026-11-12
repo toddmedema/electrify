@@ -509,6 +509,33 @@ describe("NewGameDetails reads every difficulty up front", () => {
     expect(mockGetDocs).toHaveBeenCalledTimes(DIFFICULTY_IDS.length * 2);
   });
 
+  it("keeps account-switched private results isolated and exposes personal-best retry", async () => {
+    const alice = deferred<ScoreType[]>();
+    let bobReads = 0;
+    respond(({ uid, difficulty }) => {
+      if (uid === "alice") return alice.promise;
+      if (uid === "bob" && bobReads++ === 0) throw new Error("offline");
+      return uid ? [scoreRow("Bob", 222, { uid })] : [topRow(difficulty)];
+    });
+    jest.spyOn(console, "warn").mockImplementation(() => {});
+    const { rerender } = render(
+      <NewGameDetails {...props({ uid: "alice" })} />,
+    );
+    await screen.findByText("Top Employee");
+    rerender(<NewGameDetails {...props({ uid: "bob" })} />);
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Retry your best score" }),
+    );
+    await screen.findByRole("row", { name: "Your best 222" });
+    await act(async () => {
+      alice.resolve([scoreRow("Alice", 999, { uid: "alice" })]);
+    });
+    expect(
+      screen.getByRole("row", { name: "Your best 222" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("row", { name: "Your best 999" })).toBeNull();
+  });
+
   it("reads every difficulty again for a new scenario and ignores answers about the old one", async () => {
     const oldBoard = deferred<ScoreType[]>();
     respond(({ scenarioId, difficulty, uid }) => {

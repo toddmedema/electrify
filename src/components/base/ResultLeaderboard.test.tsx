@@ -119,7 +119,7 @@ it("uses the native Steam board for the same difficulty", async () => {
     <ResultLeaderboard scenarioId={101} difficulty="CEO" currentScore={540} />,
   );
   expect(await screen.findByText("Steam planner")).toBeInTheDocument();
-  expect(mockDesktopScores).toHaveBeenCalledWith(101, "CEO", "global");
+  expect(mockDesktopScores).toHaveBeenCalledWith(101, "CEO", "global", 10);
 });
 
 it("shows this run below the leaders even when the player has a higher previous best", async () => {

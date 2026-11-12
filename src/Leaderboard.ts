@@ -60,7 +60,7 @@ export function loadLeaderboard(
   difficulty?: DifficultyType,
   scope: LeaderboardScope = "global",
   uid?: string,
-): Promise<ScoreType[]> {
+): Promise<(ScoreType & { rank?: number })[]> {
   const native = source() === "desktop";
   const key = JSON.stringify([
     source(),

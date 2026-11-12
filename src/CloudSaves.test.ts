@@ -319,3 +319,31 @@ it("stops hidden listeners, retains manual intent and invalidates an unfinished 
   expect(mockSync).toHaveBeenCalledTimes(2);
   expect(mockSync.mock.calls[1][2].forceIds).toEqual(new Set(["hidden"]));
 });
+
+it("followers consume account-scoped status and backup warnings without a second listener", async () => {
+  mockAuth({ uid: "alice" });
+  await settle();
+  const followerStore = configureTestStore();
+  const stopFollower = startCloudSaves(followerStore as unknown as AppStore);
+  mockAuth({ uid: "alice" });
+  await settle();
+  expect(mockSubscribe).toHaveBeenCalledTimes(1);
+  expect(followerStore.getState().saves.cloudState).toBe("synced");
+  const key = "electrify-sync:cloud-saves:alice:status";
+  const incompatibleCloudSaves = [{ id: "newer-schema", version: "1" }];
+  localStorage.setItem(
+    key,
+    JSON.stringify({
+      cloudState: "synced",
+      cloudConflicts: true,
+      incompatibleCloudSaves,
+    }),
+  );
+  window.dispatchEvent(new StorageEvent("storage", { key }));
+  expect(followerStore.getState().saves).toMatchObject({
+    cloudState: "synced",
+    cloudConflicts: true,
+    incompatibleCloudSaves,
+  });
+  stopFollower();
+});

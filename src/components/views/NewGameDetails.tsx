@@ -309,9 +309,12 @@ export default class NewGameDetails extends React.Component<Props, State> {
           scenario,
           location: getScenarioLocation(scenario) || null,
           leaderboardMinHeight: undefined,
+          allScores: undefined,
+          allScoresFailed: false,
         },
         () => {
           this.loadBoards();
+          if (this.state.leaderboardExpanded) void this.loadAllScores();
           if (this.props.uid) this.loadMyBests(this.props.uid);
         },
       );
@@ -394,7 +397,7 @@ export default class NewGameDetails extends React.Component<Props, State> {
       Math.floor(
         ((scenario.startingMonth ?? 1) - 1 + scenario.durationMonths - 1) / 12,
       );
-    // The selected difficulty's board and best come straight from what was read up front
+    // Public boards are eager; a visited difficulty keeps its own personal best.
     const scores = boards[game.difficulty]?.scores;
     const boardFailed = boards[game.difficulty]?.failed;
     const myTopScore = myBests[game.difficulty]?.score;

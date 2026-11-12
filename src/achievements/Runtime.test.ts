@@ -1,3 +1,4 @@
+import type { DesktopBridge } from "../Desktop";
 import { unlockedDifficulty } from "./DifficultyUnlocks";
 import cloneDeep from "lodash.clonedeep";
 import { store, RootState } from "../Store";
@@ -65,6 +66,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   jest.clearAllTimers();
+  delete window.electrifyDesktop;
   jest.useRealTimers();
 });
 
@@ -185,6 +187,8 @@ test("a late cloud response and the prior account's active run cannot leak into 
     .mockImplementationOnce(() => first)
     .mockImplementation(async (_uid, local) => local);
   const stop = startAchievementServices(f.observer, f.journal, { merge });
+  await flush();
+  expect(merge.mock.calls[0][0]).toBe("alice");
   f.publish({
     inGame: true,
     desktopAchievements: {
@@ -317,4 +321,71 @@ test("pauses hidden network work and retries failed transactions with backoff", 
   expect(merge).toHaveBeenCalledTimes(3);
   expect(f.journal.getSnapshot().sync).toBe("synced");
   stop();
+});
+
+test("drains a deliberate refresh requested during an unchanged in-flight merge", async () => {
+  const f = fixture("alice");
+  let finish!: (value: ReturnType<typeof emptyRecord>) => void;
+  const merge = jest
+    .fn()
+    .mockImplementationOnce(
+      () =>
+        new Promise((done) => {
+          finish = done;
+        }),
+    )
+    .mockImplementation(async (_uid, local) => local);
+  const stop = startAchievementServices(f.observer, f.journal, { merge });
+  await flush();
+  retryAchievementSync();
+  finish(emptyRecord());
+  await flush();
+  expect(merge).toHaveBeenCalledTimes(2);
+  expect(f.journal.getSnapshot().sync).toBe("synced");
+  stop();
+});
+
+test("initial cloud ownership does not discard an asynchronous native achievement read", async () => {
+  const f = fixture("alice");
+  let finish!: (record: ReturnType<typeof emptyRecord>) => void;
+  window.electrifyDesktop = {
+    apiVersion: 1,
+    readAchievements: () =>
+      new Promise((done) => {
+        finish = done;
+      }),
+    getState: async () => ({ steam: { available: false } }),
+    onStateChanged: () => () => {},
+  } as unknown as DesktopBridge;
+  const merge = jest.fn(async (_uid, local) => local);
+  const stop = startAchievementServices(f.observer, f.journal, { merge });
+  await flush();
+  finish(recordIntent({ earned: ["LIGHTS_ON"] }));
+  await flush();
+  expect(f.journal.getSnapshot().progress.earned).toEqual(["LIGHTS_ON"]);
+  stop();
+  delete window.electrifyDesktop;
+});
+test("followers receive account-scoped sync status without duplicate merges", async () => {
+  const leader = fixture("alice"),
+    follower = fixture("alice");
+  const merge = jest.fn(async (_uid, local) => local);
+  const stopLeader = startAchievementServices(leader.observer, leader.journal, {
+    merge,
+  });
+  await flush();
+  const stopFollower = startAchievementServices(
+    follower.observer,
+    follower.journal,
+    { merge },
+  );
+  await flush();
+  expect(merge).toHaveBeenCalledTimes(1);
+  expect(follower.journal.getSnapshot().sync).toBe("synced");
+  const key = "electrify-sync:achievements:alice:status";
+  localStorage.setItem(key, JSON.stringify("failed"));
+  window.dispatchEvent(new StorageEvent("storage", { key }));
+  expect(follower.journal.getSnapshot().sync).toBe("failed");
+  stopLeader();
+  stopFollower();
 });

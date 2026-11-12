@@ -1,3 +1,4 @@
+import { invalidateLeaderboards, loadLeaderboard } from "../Leaderboard";
 import { configureStore } from "@reduxjs/toolkit";
 import userReducer, {
   delta,
@@ -71,6 +72,7 @@ function silenceWarnings() {
 }
 
 beforeEach(() => {
+  invalidateLeaderboards();
   jest.clearAllMocks();
   mockAddDoc.mockResolvedValue({ id: "score-1" });
   mockSetDoc.mockResolvedValue(undefined);
@@ -480,4 +482,32 @@ describe("async account ownership", () => {
     await pending;
     expect(store.getState().user).toEqual({});
   });
+});
+
+it("invalidates the shared public and private score caches after a submitted score", async () => {
+  await loadLeaderboard(101, "Employee");
+  await loadLeaderboard(101, "Employee", "player", SIGNED_IN.uid);
+  expect(mockGetDocs).toHaveBeenCalledTimes(2);
+  await makeStore(SIGNED_IN).dispatch(submitHighscore(aSubmission()));
+  await loadLeaderboard(101, "Employee");
+  await loadLeaderboard(101, "Employee", "player", SIGNED_IN.uid);
+  expect(mockGetDocs).toHaveBeenCalledTimes(4);
+});
+it("invalidates boards when a name changes and again when its delayed backfill finishes", async () => {
+  await loadLeaderboard(101, "Employee");
+  let finish!: () => void;
+  mockGetDocs.mockResolvedValueOnce({ empty: false, forEach: () => undefined });
+  mockBatchCommit.mockReturnValueOnce(
+    new Promise<void>((resolve) => {
+      finish = resolve;
+    }),
+  );
+  await makeStore(SIGNED_IN).dispatch(saveDisplayName("Ada"));
+  await loadLeaderboard(101, "Employee");
+  expect(mockGetDocs).toHaveBeenCalledTimes(3);
+  finish();
+  await Promise.resolve();
+  await Promise.resolve();
+  await loadLeaderboard(101, "Employee");
+  expect(mockGetDocs).toHaveBeenCalledTimes(4);
 });

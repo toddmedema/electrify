@@ -27,6 +27,7 @@ export class ForegroundSync<T> {
   ) {
     window.addEventListener("storage", this.storage);
     window.addEventListener("online", this.check);
+    window.addEventListener("offline", this.check);
     document.addEventListener("visibilitychange", this.check);
     window.addEventListener("electrify-sync-request", this.storage);
     this.timer = setInterval(this.check, HEARTBEAT_MS);
@@ -50,7 +51,10 @@ export class ForegroundSync<T> {
     this.changed(value);
   }
   isOwner = () => {
-    const lease = navigator.locks?.request ? undefined : this.readLease();
+    const lease =
+      typeof navigator.locks?.request === "function"
+        ? undefined
+        : this.readLease();
     return (
       this.owned &&
       !this.stopped &&
@@ -179,8 +183,10 @@ export class ForegroundSync<T> {
           this.memory.delete(key);
           this.persisted.delete(key);
         }
-      for (let index = 0; index < localStorage.length; index++) {
-        const key = localStorage.key(index);
+      const keys = Array.from({ length: localStorage.length }, (_, index) =>
+        localStorage.key(index),
+      );
+      for (const key of keys) {
         if (key?.startsWith(this.prefix() + "request:")) {
           try {
             const value: unknown = JSON.parse(localStorage.getItem(key)!);
@@ -231,6 +237,7 @@ export class ForegroundSync<T> {
     clearInterval(this.timer);
     window.removeEventListener("storage", this.storage);
     window.removeEventListener("online", this.check);
+    window.removeEventListener("offline", this.check);
     document.removeEventListener("visibilitychange", this.check);
     window.removeEventListener("electrify-sync-request", this.storage);
   }

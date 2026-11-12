@@ -53,6 +53,8 @@ export function startCloudSaves(store: AppStore): () => void {
       coordinator.report({
         cloudState: patch.cloudState,
         cloudError: patch.cloudError,
+        cloudConflicts: store.getState().saves.cloudConflicts,
+        incompatibleCloudSaves: store.getState().saves.incompatibleCloudSaves,
       });
   };
   const run = async () => {
@@ -154,7 +156,8 @@ export function startCloudSaves(store: AppStore): () => void {
       if (
         !stopped &&
         coordinator.isOwner() &&
-        (remotePending || (rerun && newRequest))
+        (remotePending ||
+          (rerun && (newRequest || coordinator.pending().size > 0)))
       )
         void run();
       else if (
@@ -230,6 +233,19 @@ export function startCloudSaves(store: AppStore): () => void {
         store.dispatch(
           sessionChanged({
             cloudState,
+            cloudConflicts:
+              "cloudConflicts" in value && value.cloudConflicts === true,
+            incompatibleCloudSaves:
+              "incompatibleCloudSaves" in value &&
+              Array.isArray(value.incompatibleCloudSaves)
+                ? value.incompatibleCloudSaves.filter(
+                    (issue): issue is { id: string; version: string } =>
+                      !!issue &&
+                      typeof issue === "object" &&
+                      typeof issue.id === "string" &&
+                      typeof issue.version === "string",
+                  )
+                : [],
             cloudError:
               "cloudError" in value && typeof value.cloudError === "string"
                 ? value.cloudError
