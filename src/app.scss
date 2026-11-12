@@ -8614,7 +8614,8 @@ option {
   white-space: normal;
 }
 
-.powerAgreementTerms .buildDetails {
+.powerAgreementTerms .buildDetails,
+.agreementForecast .buildDetails {
   .buildDetailLabel {
     width: 32%;
   }

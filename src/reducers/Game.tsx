@@ -6136,14 +6136,22 @@ function* supplyFacilitiesFinancesPhases(
   now.transmissionCapacityW = transmissionCapacity;
   now.marketPricePerMWh = marketPricePerMWh;
   now.supplyW = supply;
-  // Exported surplus remains available to redirect to local demand in the setup outlook.
+  // Firm agreement headroom uses its own access limits, including when spot buying is off.
+  let usedCoveredW = entitlementDeliveredW;
+  const agreementHeadroomOffers = entitlementOffers.map((source) => {
+    const used = Math.min(usedCoveredW, source.capacityW);
+    usedCoveredW -= used;
+    return { ...source.offer, importLimitW: source.capacityW - used };
+  });
   const remainingImportHeadroomW = !state.utilityExpansion
     ? 0
     : transmission.buyingRule === "NONE"
-      ? Math.min(
-          Math.max(0, entitlementCapacityW - entitlementDeliveredW),
-          Math.max(0, marketImportLimitW - clearing.importedW),
-        )
+      ? allocateIntertieFlows(
+          agreementHeadroomOffers,
+          Infinity,
+          0,
+          importReservations,
+        ).importedW.reduce((sum, watts) => sum + watts, 0)
       : Math.max(0, marketImportLimitW - clearing.importedW);
   now.availableSupplyW =
     supply + spareGenerationW + exportedW + remainingImportHeadroomW;
@@ -6158,18 +6166,8 @@ function* supplyFacilitiesFinancesPhases(
     // Actual purchases across every company have priority over anybody's unused headroom.
     // Keep native generation reserves here; the host assigns the remaining regional budget
     // after all companies settle, using these same line/access/source limits.
-    let coveredW = entitlementDeliveredW;
     const headroomOffers =
-      transmission.buyingRule === "NONE"
-        ? entitlementOffers.map((source) => {
-            const deliveredW = Math.min(coveredW, source.capacityW);
-            coveredW -= deliveredW;
-            return {
-              ...source.offer,
-              importLimitW: source.capacityW - deliveredW,
-            };
-          })
-        : offers;
+      transmission.buyingRule === "NONE" ? agreementHeadroomOffers : offers;
     now.availableSupplyW -= remainingImportHeadroomW;
     now.reserveW -= remainingImportHeadroomW;
     sharedClearing.headroom.push({

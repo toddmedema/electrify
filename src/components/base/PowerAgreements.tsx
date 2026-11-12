@@ -26,6 +26,8 @@ import {
   openPolicyDecision,
   snackbarOpen,
 } from "../../reducers/GameActions";
+import AgreementForecastDetails from "./AgreementForecastDetails";
+import { useAgreementForecast } from "./useAgreementForecast";
 import DecisionDialog from "./DecisionDialog";
 import BuildDetails, { BuildDetailRow } from "./BuildDetails";
 
@@ -60,18 +62,31 @@ export default function PowerAgreements({
   const dispatch = useAppDispatch();
   const [review, setReview] =
     React.useState<ReturnType<typeof powerAgreementQuote>>();
-  const restore = React.useRef<HTMLElement | null>(null);
+  const [assessmentId, setAssessmentId] = React.useState<string>();
   const utility = inheritedUtilityForCorridor(line.corridorId);
+  const sources = utility ? connectionAgreements(game, utility) : [];
+  const assessment = sources.find((source) => source.id === assessmentId);
+  const expiredAssessment =
+    !!assessment && game.date.minute >= assessment.endMinute;
+  const forecast = useAgreementForecast(
+    game,
+    review
+      ? `${review.id}:${review.receipt.cycle}`
+      : expiredAssessment
+        ? undefined
+        : assessmentId,
+    review?.receipt,
+  );
+  const restore = React.useRef<HTMLElement | null>(null);
   const token = `power-agreement:${line.id}`;
   React.useEffect(() => {
-    if (!review) return;
+    if (!review && !assessmentId) return;
     dispatch(openPolicyDecision(token));
     return () => {
       dispatch(closePolicyDecision(token));
     };
-  }, [dispatch, token, review]);
+  }, [dispatch, token, review, assessmentId]);
   if (!utility) return null;
-  const sources = connectionAgreements(game, utility);
   const now = currentTick(game);
   const marketPrice = now
     ? adjacentMarketPricePerMWh(
@@ -81,7 +96,10 @@ export default function PowerAgreements({
         now,
       )
     : undefined;
-  const close = () => setReview(undefined);
+  const close = () => {
+    setReview(undefined);
+    setAssessmentId(undefined);
+  };
   return (
     <Box
       component="section"
@@ -93,6 +111,9 @@ export default function PowerAgreements({
       </Typography>
       {sources.map((source) => {
         const expired = game.date.minute >= source.endMinute;
+        const account = game.transmission?.agreementAccounts?.find(
+          (entry) => entry.agreementId === source.id,
+        );
         // A block's next cycle belongs beneath its latest agreement, never duplicated beneath
         // the original inherited reduction after that replacement was accepted.
         const block = POWER_AGREEMENT_BLOCKS.find((entry) =>
@@ -158,6 +179,42 @@ export default function PowerAgreements({
                   )}
               </>
             )}
+            {(() => {
+              if (!account) return null;
+              const available = account.months.reduce(
+                (sum, row) => sum + row.availableMWh,
+                0,
+              );
+              const useful = account.months.reduce(
+                (sum, row) => sum + row.usefulMWh,
+                0,
+              );
+              return (
+                <Typography variant="body2" color="textSecondary">
+                  Recorded since {agreementDate(account.accountingStartMinute)}{" "}
+                  ·{" "}
+                  {available > 0
+                    ? `${formatPercent(useful / available, 1)} used`
+                    : "No available minimum"}
+                </Typography>
+              );
+            })()}
+            {(!expired || account) && (
+              <Button
+                size="small"
+                onClick={(event) => {
+                  restore.current = event.currentTarget;
+                  setAssessmentId(source.id);
+                }}
+                aria-label={
+                  expired
+                    ? `${source.name} recorded history`
+                    : `Forecast ${source.name} remaining term`
+                }
+              >
+                {expired ? "View recorded history" : "Forecast remaining term"}
+              </Button>
+            )}
             {quote && (
               <Button
                 variant="outlined"
@@ -179,53 +236,90 @@ export default function PowerAgreements({
         purchases use regional market prices and availability.
       </Typography>
       <DecisionDialog
-        open={!!review}
+        open={!!review || !!assessment}
         fullWidth
         maxWidth="sm"
         closable
-        title={`Review ${review?.name ?? "power"} replacement`}
+        title={
+          review
+            ? `Review ${review.name} replacement`
+            : `${assessment?.name ?? "Agreement"} ${expiredAssessment ? "recorded history" : "remaining term"}`
+        }
         onClose={close}
         disableRestoreFocus
         onExited={() => restore.current?.focus()}
         actions={
           <>
             <Button onClick={close}>Back</Button>
-            <Button
-              variant="contained"
-              onClick={() => {
-                if (!review) return;
-                const fresh = powerAgreementQuote(game, review.id);
-                if (fresh?.quoteKey !== review.quoteKey) {
+            {review && (
+              <Button
+                variant="contained"
+                onClick={() => {
+                  if (!review) return;
+                  const fresh = powerAgreementQuote(game, review.id);
+                  if (fresh?.quoteKey !== review.quoteKey) {
+                    close();
+                    dispatch(
+                      snackbarOpen(
+                        "Agreement terms changed; review the replacement again.",
+                      ),
+                    );
+                    return;
+                  }
+                  dispatch(
+                    acceptPowerAgreement({
+                      blockId: review.id,
+                      quoteKey: review.quoteKey,
+                    }),
+                  );
+                  restore.current = document.getElementById(
+                    `intertie-disclosure-${line.id}`,
+                  );
                   close();
                   dispatch(
                     snackbarOpen(
-                      "Agreement terms changed; review the replacement again.",
+                      `Agreement accepted; delivery starts ${agreementDate(review.receipt.startMinute)}`,
                     ),
                   );
-                  return;
-                }
-                dispatch(
-                  acceptPowerAgreement({
-                    blockId: review.id,
-                    quoteKey: review.quoteKey,
-                  }),
-                );
-                restore.current = document.getElementById(
-                  `intertie-disclosure-${line.id}`,
-                );
-                close();
-                dispatch(
-                  snackbarOpen(
-                    `Agreement accepted; delivery starts ${agreementDate(review.receipt.startMinute)}`,
-                  ),
-                );
-              }}
-            >
-              Accept agreement
-            </Button>
+                }}
+              >
+                Accept agreement
+              </Button>
+            )}
           </>
         }
       >
+        <AgreementForecastDetails
+          forecast={forecast}
+          offer={!!review}
+          expired={expiredAssessment}
+          legacy={assessment?.termsVersion === 1}
+          account={game.transmission?.agreementAccounts?.find(
+            (entry) => entry.agreementId === assessmentId,
+          )}
+        />
+        {assessment && (
+          <Box className="powerAgreementTerms">
+            <BuildDetails label="Active agreement terms">
+              <BuildDetailRow
+                label="Minimum"
+                value={
+                  assessment.termsVersion === 1
+                    ? "No minimum purchase"
+                    : `Pay for ${formatWatts(assessment.nominalW * assessment.deliverability)} whenever supplier-available`
+                }
+              />
+              <BuildDetailRow
+                label="Delivery ends"
+                value={agreementDate(assessment.endMinute, true)}
+              />
+              <BuildDetailRow
+                label="Price today"
+                value={`${formatMoneyConcise(assessment.priceToday)}/MWh · Follows inflation`}
+              />
+            </BuildDetails>
+          </Box>
+        )}
         {review && (
           <>
             <Box className="powerAgreementTerms">

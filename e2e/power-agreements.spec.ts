@@ -156,12 +156,18 @@ for (const theme of ["light", "dark"] as const) {
       "Coverage57MW",
       "1 Jan 2020–31 Dec 2029",
       "Follows inflation",
-      "$0 upfront · pay for delivered energy",
-      "No minimum purchase",
+      "$0 upfront",
+      "Pay for 57MW whenever supplier-available",
     ])
       await expect(dialog).toContainText(fact);
     await expect(
       dialog.getByRole("button", { name: "Accept agreement", exact: true }),
+    ).toBeVisible();
+    await expect(dialog.getByLabel("Agreement forecast")).toBeVisible({
+      timeout: 30000,
+    });
+    await expect(
+      dialog.getByRole("heading", { name: "Demand served" }),
     ).toBeVisible();
     await reviewScreenshot(dialog, {
       path: testInfo.outputPath(`ppa-review-${theme}.png`),

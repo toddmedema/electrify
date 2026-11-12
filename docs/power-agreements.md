@@ -158,3 +158,37 @@ energy. The [DOE PPA overview](https://www1.eere.energy.gov/wip/solutioncenter/p
 describes commitments to purchase delivered output. These support modeling an
 explicit commitment, but do not establish a universal minimum percentage or a
 guaranteed discount; this game's full available-block product is an authored choice.
+
+## Decision forecast
+
+The selected agreement is compared against otherwise identical ordinary market
+purchases through its exact exclusive delivery end, including years beyond the
+mission. Both branches use the real forecast reducer and the same seeded expected
+weather. Only the assessed agreement is omitted in the market branch; its wire,
+other agreements, current fleet, trading rules, policies and scheduled effects stay
+in place. The headline cash benefit/cost is the difference in closing company cash,
+including customer and export income, all operating and financing costs, and unused
+minimum payments. It is future nominal money, undiscounted, not agreement profit
+or an equivalent-energy price saving.
+
+Each demand-served percentage divides served customer energy by that alternative's
+own requested customer energy over the displayed term. Customer retention can
+change both denominators. Missing market energy is never treated as comparable
+cheap energy, and equal service shares are explicitly shown. A comparison with
+market buying disabled is unavailable rather than silently enabling purchases.
+Co-op forecasting is unavailable until it can use complete world context; observed
+usage and payments remain accessible in both cases.
+
+Offers show the full delivery term; existing agreements show remaining-term cash
+and service. Recorded and projected energy are added before dividing to show
+full-term use where history is complete, or an explicitly dated since-recording
+estimate where it is partial. Inherited signing dates remain unknown. Expired
+accounts remain accessible. No observed historical counterfactual is invented.
+
+The existing persistent projection worker serializes data loading and performs
+both runs off the main thread. A bounded result cache and shared with-agreement
+baseline avoid repeated work. Monthly and meaningful decision changes invalidate
+it, and stale request IDs are discarded. Ordinary ticks update observed progress
+without launching new paired runs. Forecast results retain their exact accounting
+cutoff: newer live actuals are never added to an overlapping cached remainder.
+Unavailable, loading, updating, error and retry states keep acceptance accessible.
