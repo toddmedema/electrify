@@ -3,6 +3,7 @@ import { Box, Button, Typography } from "@mui/material";
 import type { PowerAgreementAccount } from "../../Types";
 import { agreementDate } from "../../helpers/PowerAgreements";
 import {
+  formatFixed,
   formatMoneyConcise,
   formatPercent,
   formatWattHours,
@@ -16,7 +17,7 @@ import BuildDetails, { BuildDetailRow } from "./BuildDetails";
 
 const serviceShare = (value: AgreementService) =>
   value.demandMWh > 0
-    ? formatPercent(value.servedMWh / value.demandMWh, 3)
+    ? `${Number(formatFixed((value.servedMWh / value.demandMWh) * 100, 3))}%`
     : "No customer demand";
 const energyUse = (value: AgreementEnergy) =>
   value.availableMWh > 0
