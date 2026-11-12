@@ -40,6 +40,104 @@ async function range(page: Page) {
     ]);
 }
 for (const theme of ["light", "dark"]) {
+  test(`mission warnings match the low-reserve readout in ${theme}`, async ({
+    page,
+  }, info) => {
+    test.skip(!reviewProjects.has(info.project.name));
+    // Wide windows show the two tinted readouts together inside the top bar.
+    if (info.project.name === "desktop-chromium")
+      await page.setViewportSize({ width: 1440, height: 900 });
+    await page.addInitScript((mode) => {
+      localStorage.setItem("theme", mode);
+      localStorage.setItem("audioEnabled", "false");
+    }, theme);
+    await page.goto("/?scenario=116");
+    await page.getByRole("button", { name: "Start game", exact: true }).click();
+    await waitForSave(page);
+    await editSavedGame(page, (save) => {
+      // Keep finances solvent and today's sample supplied so the long-term supply risk
+      // appears beside low reserve, through the real forecast and saved-game entry point.
+      save.game.dollarsPerkWh = 0.08;
+      for (const tick of save.game.timeline) {
+        tick.cash = 1e12;
+        tick.supplyW = tick.demandW;
+        tick.reserveW = tick.demandW * 0.05;
+      }
+    });
+    await page.reload();
+    await page.getByRole("button", { name: "Continue", exact: true }).click();
+    const risk = page.getByRole("button", { name: /^Supply risk:/ });
+    await expect(risk).toBeVisible({ timeout: 30_000 });
+    const grid = page.locator(".gridHealth:visible");
+    await expect(grid).toHaveClass(/gridHealth-low-reserve/);
+    if (info.project.name === "desktop-chromium") {
+      const styles = await page
+        .locator(".gameStatusBar:visible")
+        .evaluate((bar) => {
+          const properties = [
+            "fontSize",
+            "fontWeight",
+            "lineHeight",
+            "color",
+          ] as const;
+          const read = (element: Element) => {
+            const style = getComputedStyle(element);
+            return Object.fromEntries(
+              properties.map((key) => [key, style[key]]),
+            );
+          };
+          const grid = bar.querySelector(".gridHealth")!;
+          const risk = bar.querySelector(".missionRiskButton")!;
+          return {
+            gridText: read(grid.querySelector(".gridHealthMetric")!),
+            riskText: read(risk.querySelector(".missionRiskText")!),
+            gridHeight: grid.getBoundingClientRect().height,
+            riskHeight: risk.getBoundingClientRect().height,
+            gridBackground: getComputedStyle(grid).backgroundColor,
+            riskBackground: getComputedStyle(risk).backgroundColor,
+            gridIcon: read(grid.querySelector(".conceptIcon")!),
+            riskIcon: read(risk.querySelector(".conceptIcon")!),
+            gridGap: getComputedStyle(grid.querySelector("button")!).gap,
+            riskGap: getComputedStyle(risk).gap,
+          };
+        });
+      expect(styles.riskText).toEqual(styles.gridText);
+      expect(styles.riskHeight).toBe(styles.gridHeight);
+      expect(styles.riskBackground).toBe(styles.gridBackground);
+      expect(styles.riskIcon).toEqual(styles.gridIcon);
+      expect(styles.riskGap).toBe(styles.gridGap);
+      await grid.getByRole("button").click();
+      await expect(
+        page.getByRole("dialog", { name: "Manual help" }),
+      ).toBeVisible();
+      await page.keyboard.press("Escape");
+    }
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth - innerWidth,
+      ),
+    ).toBeLessThanOrEqual(1);
+    const screenshotDir = process.env.REVIEW_SCREENSHOT_DIR;
+    if (
+      screenshotDir &&
+      (info.project.name === "desktop-chromium" ||
+        (theme === "dark" && info.project.name === "mobile-390px"))
+    ) {
+      await page.locator("#appbar:visible").screenshot({
+        path: path.join(
+          screenshotDir,
+          `warnings-${info.project.name}-${theme}.png`,
+        ),
+        animations: "disabled",
+      });
+    }
+    await risk.focus();
+    await page.keyboard.press("Enter");
+    await expect(
+      page.getByRole("region", { name: "Scenario", exact: true }),
+    ).toBeVisible();
+  });
+
   test(`compact mission tracker opens scenario info and stays usable during blackouts in ${theme}`, async ({
     page,
   }, info) => {

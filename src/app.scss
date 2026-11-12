@@ -1143,16 +1143,13 @@ $topbar_height: 56px;
   }
   // Pulled out by its own padding so its icon or text starts on the row's inset, in line with
   // a plain headline and with the grid readout's icon when the two rows stack.
-  .missionRiskButton {
-    min-width: 0;
+  .missionRiskButton.MuiButton-root {
     flex: 0 1 auto;
-    gap: 8px;
     margin-inline-start: -8px;
     padding-inline: 8px;
-    white-space: nowrap;
   }
-  .missionRiskEvent .statusLabel {
-    font-weight: 400;
+  .missionRiskEvent.MuiButton-root {
+    background: var(--variant-textBg, transparent);
   }
   // The icon signals the action without making the entire status line look like a link.
   .missionRiskEvent .conceptIcon {
@@ -1190,8 +1187,7 @@ $topbar_height: 56px;
   // Expand the hit area without increasing the status row's height.
   margin-block: -12px;
 }
-.missionSummaryHeadline,
-.missionRiskText {
+.missionSummaryHeadline {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1275,25 +1271,7 @@ $topbar_height: 56px;
 }
 
 .gridHealthSummary {
-  display: flex;
-  align-items: center;
-}
-
-.gridHealthSummary {
   flex: 1;
-  gap: 8px;
-}
-
-.gridHealthMetric {
-  font-weight: 400;
-}
-
-.gridHealthMetric {
-  margin-left: 0;
-  min-width: 0;
-  text-align: left;
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
 }
 
 .gridHealth-stable .conceptIcon {
@@ -1311,7 +1289,6 @@ $topbar_height: 56px;
   }
 }
 .gameStatusBar .missionSummary.statusWarning {
-  .missionRiskButton.MuiButton-root,
   .missionSummaryMonths.MuiButton-root {
     color: inherit;
   }
@@ -1335,10 +1312,32 @@ $topbar_height: 56px;
   }
 }
 
-.statusLabel {
+.statusReadout.MuiButton-root {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: inherit;
+  font: inherit;
   font-size: var(--font-size-caption);
-  font-weight: 600;
+  font-weight: 400;
   line-height: 1.25;
+  letter-spacing: normal;
+  text-align: left;
+  cursor: pointer;
+}
+
+.statusReadoutText {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 // Keep every grid state alongside the mission on wide screens. Long mission copy can wrap
@@ -1364,7 +1363,6 @@ $topbar_height: 56px;
   .gameStatusBar .gridHealthSummary {
     flex-wrap: wrap;
     justify-content: flex-start;
-    gap: 4px 8px;
   }
   .gameStatusBar .missionSummary {
     flex: 1 1 0;
@@ -7322,7 +7320,7 @@ img[src$="/transmission.svg"] {
 }
 // The controls stay text-sized in the bar; a transparent target gives them full height.
 .gameMonthlyProfitButton,
-.gridHealthHelp {
+.statusReadout {
   position: relative;
   &::after {
     content: "";
@@ -7336,7 +7334,7 @@ img[src$="/transmission.svg"] {
 }
 @media (pointer: coarse) {
   .gameMonthlyProfitButton,
-  .gridHealthHelp {
+  .statusReadout {
     &::after {
       height: 44px;
     }
@@ -7355,17 +7353,6 @@ img[src$="/transmission.svg"] {
     order: -2;
   }
 }
-// The grid readout opens its manual entry, without looking like a second primary control.
-.gridHealthHelp {
-  padding: 0;
-  border: 0;
-  background: none;
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
 // Tablets have room for words, so the readout sits beside the mission instead of icon-only.
 @media (min-width: 600px) and (max-width: 1023px) {
   .gameStatusBar {
