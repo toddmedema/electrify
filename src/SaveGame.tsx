@@ -555,6 +555,23 @@ export function parseSave(raw: unknown): SaveGameType | null {
     game.timeline.some(
       (tick) =>
         !validEmissions(tick) ||
+        [
+          tick.agreementAvailableMWh,
+          tick.agreementUsefulMWh,
+          tick.agreementPayments,
+        ].some(
+          (values) =>
+            values !== undefined &&
+            (!values ||
+              typeof values !== "object" ||
+              Array.isArray(values) ||
+              Object.values(values).some(
+                (value) =>
+                  typeof value !== "number" ||
+                  !Number.isFinite(value) ||
+                  value < 0,
+              )),
+        ) ||
         (tick.storageImportedW !== undefined &&
           (typeof tick.storageImportedW !== "number" ||
             !Number.isFinite(tick.storageImportedW) ||

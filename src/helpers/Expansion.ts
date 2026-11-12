@@ -7,6 +7,7 @@ import {
 import {
   allocateIntertieFlows,
   intertieOfferLimits,
+  firmIntertieOfferLimits,
   transmissionRatingW,
   type IntertieReservation,
 } from "./Transmission";
@@ -452,6 +453,9 @@ export function entitlementSources(
   game: GameType,
   now: import("../Types").TickPresentFutureType,
   reserved: readonly IntertieReservation[] = [],
+  supplierReady = false,
+  legacyOnly = false,
+  excludedAgreementId?: string,
 ) {
   if (!game.utilityExpansion) return [];
   const context = intertieContextForGame(game);
@@ -464,22 +468,45 @@ export function entitlementSources(
           entry.yearsToBuildLeft === 0,
       );
       if (!line) return [];
-      const limits = intertieOfferLimits(line, context, now.minute, now);
+      const availableLine = supplierReady ? { ...line, paused: false } : line;
+      const limits = intertieOfferLimits(
+        availableLine,
+        context,
+        now.minute,
+        now,
+      );
+      const firmLimits = firmIntertieOfferLimits(
+        availableLine,
+        context,
+        now.minute,
+        now,
+      );
       return connectionAgreements(game, utilityId, now.minute)
-        .filter((source) => source.active && source.nominalW > 0)
+        .filter(
+          (source) =>
+            source.id !== excludedAgreementId &&
+            source.active &&
+            source.nominalW > 0 &&
+            (!supplierReady || source.termsVersion === 2) &&
+            (!legacyOnly || source.termsVersion === 1),
+        )
         .map((source) => ({
           id: source.id,
+          termsVersion: source.termsVersion,
+          startMinute: source.startMinute,
+          endMinute: source.endMinute,
+          paused: !!line.paused,
           utilityId,
           lineId: line.id,
           capacityW: source.nominalW * source.deliverability,
           pricePerMWh: source.priceToday,
           emissionsKgPerMWh: source.emissionsKgPerMWh,
           offer: {
-            ...limits,
+            ...(source.termsVersion === 2 ? firmLimits : limits),
             lineId: `${game.multiplayer?.seat ?? "local"}:${line.id}`,
-            lineImportLimitW: transmissionRatingW(line, now),
+            lineImportLimitW: transmissionRatingW(availableLine, now),
             importLimitW: Math.min(
-              limits.importLimitW,
+              (source.termsVersion === 2 ? firmLimits : limits).importLimitW,
               source.nominalW * source.deliverability,
             ),
             pricePerMWh: source.priceToday,

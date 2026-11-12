@@ -31,8 +31,9 @@ and custom scenarios cannot accept these products. Québec replacements cover
 Regional firm replacements cover the lost Champlain 100 MW, Valley 80 MW or
 Ridge 20 MW block for five calendar years at $70/MWh in 2005 dollars, following
 inflation. These prices, terms, the two-year review window, 95% delivery and
-$0 upfront payment are game assumptions. The game charges only delivered energy;
-there is no capacity payment, deposit, take-or-pay obligation or cancellation.
+$0 upfront payment are game assumptions. New contracts commit the whole deliverable
+block whenever the supplier is available: there is no arbitrary minimum utilization
+fraction. Existing saved contracts retain their pay-as-delivered terms.
 
 A block becomes reviewable 24 calendar months before its loss. On-time acceptance
 starts at the loss boundary. Late acceptance starts at the strictly next calendar
@@ -46,14 +47,39 @@ The interface shows only maximum deliverable coverage, rather than both nominal
 and deliverable capacities. Prices are shown in today's money with their inflation
 rule. The market comparison uses the same current spot price as the connection,
 including current conditions; it is not a forecast of prices over the agreement's
-term. Reviews explicitly disclose the current model's lack of a minimum purchase
-and that covered purchases retain the agreed rate even when market prices fall.
+term. Reviews disclose the minimum purchase and that covered purchases retain the
+agreed rate even when market prices fall.
 
 Active agreement slices serve purchased customer energy before residual market
-purchases, ordered by agreed price and stable identity. They are not must-take:
-weather generation can displace purchases. Contract and market flows consume one
-physical line rating and the same purchased access and regional source budgets.
-Co-op planning reserves agreement delivery before residual market settlement.
+purchases, ordered by agreed price and stable identity. Local generation can displace
+physical deliveries, but cannot remove the minimum payment. Supplier-ready minimums
+are allocated before buyer decisions, within the commissioned route's weather and
+incident rating, purchased access, and upstream source budgets. Buyer pause is
+ignored only for this availability calculation; physical flow still stops.
+Physical outages and source scarcity reduce the minimum; low customer demand,
+market-buying settings, and buyer pause do not. There is no extra penalty, banking,
+refund, or make-up right. Unused minimum charges are import expenses and create no
+energy, emissions, storage, export revenue, or change to physical-flow price averages.
+
+Co-op clears supplier-ready commitments once in stable company order with a
+separate commitment budget. Every company's useful contract delivery is physically
+reserved before any residual spot purchase. Unused commitments can release physical
+energy for spot purchases, without enlarging another company's payable minimum.
+Legacy pay-as-delivered purchases use remaining supply after fixed commitments.
+Contract and market flows consume one physical line rating and the same regional
+source budget. New fixed-block products buy firm access up to the unscaled purchased
+access ceiling, while merchant access retains its weather/scarcity scaling. Both
+remain constrained by the scaled gross supplier pool: firm access never creates
+extra generation. Where purchased access is lower than that pool, firm commitments
+can serve demand that the buyer's merchant allocation cannot. The inherited regional
+routes currently expose the entire supplier pool as access, so direct solo reliability
+can be equal even with firm terms. Paid fixed blocks serve load before legacy
+pay-as-delivered imports; unused commitments still cannot supply exports or storage.
+
+Terms are half-open `[startMinute, endMinute)`. Completed elapsed intervals alone
+append actual accounts and reduce cash. Initial dispatch, current-frame reforecasts,
+month-opening pre-rolls, and paused clocks cannot accrue actual energy or payments.
+The final elapsed interval before expiry is settled before the expired preview.
 Pausing a connection stops all flow without cancelling its agreements or moving
 their terms. Market buying **None** stops discretionary market and peer imports
 while committed agreements remain available. Contract coverage cannot fund
@@ -82,7 +108,18 @@ change, so the runs are not an isolated price sensitivity: Valley's 2020 import
 bill is about $218M without replacements and $300M with them. Agreements hedge
 market exposure; they do not promise cheaper energy or eliminate shortages.
 
-Schema 10 persists accepted block/cycle identity, acceptance minute and resolved
+Schema 11 versions accepted receipts separately from inherited terms. New games
+inherit fixed-block obligations from ownership, and all newly accepted offers bind
+fixed-block terms in their quote keys. The schema-10 migration explicitly preserves
+legacy pay-as-delivered contracts without changing recorded cash or history.
+Per-agreement monthly accounts retain supplier-available MWh, useful MWh and
+payments, with accounting start and exclusive accounted-through boundaries,
+including after expiry. Partial accounting starts at the first observed interval;
+it never reconstructs unknown earlier usage. The parser rejects noncanonical
+identities, versions, dates, discontinuous months, useful energy above availability,
+energy above canonical coverage and elapsed time, or inconsistent payment arithmetic.
+
+Accepted receipts persist block/cycle identity, acceptance minute and resolved
 start/end. Capacity, price and emissions are derived from canonical authoring.
 The reducer revalidates the reviewed quote; the save parser rejects forged terms,
 duplicates, overlap, unknown blocks, acceptance before ownership and invalid
@@ -114,3 +151,10 @@ volumes. [VEC's 2021 audited accounts](https://vermontelectric.coop/client_media
 describe both a twenty-year nuclear contract and a four-year shortfall purchase.
 These support offering long-term supply and shorter bridge products; they do not
 establish the game's replacement prices or its simplified payment terms.
+
+The [World Bank PPA overview](https://ppp.worldbank.org/sector/energy/energy-power-agreements/power-purchase-agreements)
+describes purchase obligations and capacity payments even when buyers do not take
+energy. The [DOE PPA overview](https://www1.eere.energy.gov/wip/solutioncenter/pdfs/exploringpowerpurchaseagreementsthebasicspart1.pdf)
+describes commitments to purchase delivered output. These support modeling an
+explicit commitment, but do not establish a universal minimum percentage or a
+guaranteed discount; this game's full available-block product is an authored choice.

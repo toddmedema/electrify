@@ -134,6 +134,11 @@ export default function PowerAgreements({
                     ).toLowerCase()}
                   </Typography>
                 )}
+                <Typography variant="body2" color="textSecondary">
+                  {source.termsVersion === 1
+                    ? "No minimum purchase"
+                    : `Minimum: pay for ${formatWatts(source.nominalW * source.deliverability)} whenever supplier-available`}
+                </Typography>
                 <Typography variant="body2">
                   {source.inherited
                     ? `Through ${agreementDate(source.endMinute, true)}`
@@ -269,13 +274,14 @@ export default function PowerAgreements({
                   label="Payment"
                   value={
                     <>
-                      $0 upfront · pay for delivered energy
+                      $0 upfront
                       <Typography
                         component="div"
                         variant="caption"
                         color="textSecondary"
                       >
-                        No minimum purchase
+                        Pay for {formatWatts(review.deliverableW)} whenever
+                        supplier-available
                       </Typography>
                     </>
                   }
@@ -283,8 +289,9 @@ export default function PowerAgreements({
               </BuildDetails>
             </Box>
             <Typography variant="body2" sx={{ mt: 2 }}>
-              Covered imports use this agreed rate for the full term, even if
-              market prices fall. Uncovered purchases use market prices.
+              Pay for the available minimum even when unused or the connection
+              is paused. Supplier outages reduce the minimum. Unused energy
+              cannot be stored or resold. Uncovered purchases use market prices.
             </Typography>
           </>
         )}

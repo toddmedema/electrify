@@ -153,7 +153,7 @@ export function facilitySignature(game: GameType): string {
       ].join(":"),
     )
     .join("|");
-  return `${facilities}/${game.transmission?.buyingRule || "SHORTAGES"}/${game.transmission?.sellingRule || "SURPLUS"}/${transmission}/${JSON.stringify(game.transmission?.acceptedAgreements ?? [])}`;
+  return `${facilities}/${game.transmission?.buyingRule || "SHORTAGES"}/${game.transmission?.sellingRule || "SURPLUS"}/${transmission}/${JSON.stringify(game.transmission?.acceptedAgreements ?? [])}/${game.transmission?.inheritedAgreementTerms ?? ""}`;
 }
 
 /**

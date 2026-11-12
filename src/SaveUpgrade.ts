@@ -96,6 +96,33 @@ const migrations: readonly Migration[] = [
       },
     };
   },
+  // 10 -> 11: preserve the pay-as-delivered promises already accepted or inherited.
+  (save) => {
+    if (!object(save.game)) return null;
+    const game = save.game;
+    if (!game.utilityExpansion) return save;
+    if (!object(game.transmission)) return null;
+    const receipts = game.transmission.acceptedAgreements ?? [];
+    if (
+      !Array.isArray(receipts) ||
+      receipts.some((receipt) => !object(receipt) || "termsVersion" in receipt)
+    )
+      return null;
+    return {
+      ...save,
+      game: {
+        ...game,
+        transmission: {
+          ...game.transmission,
+          inheritedAgreementTerms: 1,
+          acceptedAgreements: receipts.map((receipt) => ({
+            ...receipt,
+            termsVersion: 1,
+          })),
+        },
+      },
+    };
+  },
 ];
 
 /** Structure versions are independent of app releases and simulation compatibility. */

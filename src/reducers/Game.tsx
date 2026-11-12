@@ -28,6 +28,8 @@ import { utilityNetworkAnnualOM } from "../data/UtilityExpansion";
 import { acquireUtility, acceptPowerAgreement } from "./GameActions";
 import {
   acceptAgreement,
+  agreementIntervalMinutes,
+  recordAgreementSettlements,
   inheritedConnection,
 } from "../helpers/PowerAgreements";
 import type { IntertieReservation } from "../helpers/Transmission";
@@ -1977,6 +1979,7 @@ export const gameSlice = createSlice({
       }
 
       if (isUtilityExpansionGame(state)) {
+        state.transmission!.inheritedAgreementTerms = 2;
         state.utilityExpansion = {
           networkAssets: [],
           loans: [],
@@ -3864,6 +3867,7 @@ function tickWorkingState(state: GameType): GameType {
       transmission: state.transmission.lines.length
         ? {
             ...state.transmission,
+            agreementAccounts: cloneDeep(state.transmission.agreementAccounts),
             acceptedAgreements: state.transmission.acceptedAgreements?.map(
               (receipt) => ({ ...receipt }),
             ),
@@ -3975,6 +3979,7 @@ export function tickState(
 
 /** A match finalizes jointly feasible import reserves before history or rollover proceeds. */
 export interface SharedImportClearing {
+  commitments: IntertieReservation[];
   reservations: IntertieReservation[];
   headroom: {
     tick: TickPresentFutureType;
@@ -3983,13 +3988,16 @@ export interface SharedImportClearing {
   }[];
 }
 
-type SharedTickPhase = PeerPlan | { kind: "settled" };
+type SharedTickPhase = PeerPlan | { kind: "ready" | "settled" };
 
 function sharedImportRound(
   rounds: SharedImportClearing[] | undefined,
   round: number,
 ) {
-  return rounds && (rounds[round] ??= { reservations: [], headroom: [] });
+  return (
+    rounds &&
+    (rounds[round] ??= { commitments: [], reservations: [], headroom: [] })
+  );
 }
 
 /** Plan every grid before resuming any grid's settlement. */
@@ -5040,6 +5048,7 @@ function* supplyFacilitiesFinancesPhases(
   stepMinutes = TICK_MINUTES,
   advanceConstruction = true,
   sharedClearing?: SharedImportClearing,
+  excludedAgreementId?: string,
 ): Generator<
   SharedTickPhase,
   TickPresentFutureType,
@@ -5290,7 +5299,64 @@ function* supplyFacilitiesFinancesPhases(
       tickStoryEffects.transmissionCapacityLimitsWByCorridor;
   else delete now.transmissionCapacityLimitsWByCorridor;
   // Update supply and facility outputs
-  const entitlementOffers = entitlementSources(state, now, sharedImports);
+  // The settled frame represents [end - step, end). The last frame of a month is
+  // clamped to its previous timestamp, while the live clock has reached the exclusive end.
+  const agreementEnd = simulated ? now.minute : state.date.minute;
+  const agreementStart =
+    preRoll || !advanceConstruction ? now.minute : agreementEnd - stepMinutes;
+  const agreementFrame = { ...now, minute: agreementStart };
+  const readyAgreements = entitlementSources(
+    state,
+    agreementFrame,
+    sharedClearing?.commitments,
+    true,
+    false,
+    excludedAgreementId,
+  );
+  if (sharedClearing) {
+    sharedClearing.commitments.push(
+      ...readyAgreements.map((source) => ({
+        offer: source.offer,
+        watts: source.capacityW,
+      })),
+    );
+    // Every company's supplier readiness is assigned before buyer dispatch and physical spot flows.
+    yield { kind: "ready" };
+  }
+  const commitmentReservations =
+    sharedClearing?.commitments ??
+    readyAgreements.map((source) => ({
+      offer: source.offer,
+      watts: source.capacityW,
+    }));
+  const legacyAgreements = entitlementSources(
+    state,
+    agreementFrame,
+    [
+      ...commitmentReservations,
+      ...(sharedImports ?? []).filter(
+        (reservation) =>
+          !commitmentReservations.some(
+            (commitment) => commitment.offer === reservation.offer,
+          ),
+      ),
+    ],
+    false,
+    true,
+    excludedAgreementId,
+  );
+  const entitlementOffers = [
+    ...readyAgreements.map((source) => ({
+      ...source,
+      capacityW: source.paused ? 0 : source.capacityW,
+    })),
+    ...legacyAgreements,
+  ].sort(
+    (a, b) =>
+      b.termsVersion - a.termsVersion ||
+      a.pricePerMWh - b.pricePerMWh ||
+      a.id.localeCompare(b.id),
+  );
   const entitlementCapacityW = entitlementOffers.reduce(
     (sum, offer) => sum + offer.capacityW,
     0,
@@ -6014,11 +6080,38 @@ function* supplyFacilitiesFinancesPhases(
   });
   importCostPerHour += (peer?.importedW || 0) * peerTradePrice(state, now);
   exportRevenuePerHour += (peer?.exportedW || 0) * peerTradePrice(state, now);
+  let unusedAgreementCostPerHour = 0;
+  const agreementSettlements: import("../Types").PowerAgreementSettlement[] =
+    [];
   let entitlementLeftW = entitlementDeliveredW;
   for (const offer of entitlementOffers) {
     const delivered = Math.min(entitlementLeftW, offer.capacityW);
     entitlementLeftW -= delivered;
     importCostPerHour += delivered * offer.pricePerMWh;
+    const availableW = (
+      readyAgreements.find((source) => source.id === offer.id) ?? offer
+    ).capacityW;
+    const minutes = agreementIntervalMinutes(
+      agreementStart,
+      agreementEnd,
+      offer.startMinute,
+      offer.endMinute,
+    );
+    const energyFactor = ((minutes / 60) * GAME_TO_REAL_YEARS) / 1e6;
+    const availableMWh = availableW * energyFactor;
+    const usefulMWh = delivered * energyFactor;
+    const payment =
+      (offer.termsVersion === 2 ? availableMWh : usefulMWh) * offer.pricePerMWh;
+    unusedAgreementCostPerHour +=
+      offer.termsVersion === 2
+        ? Math.max(0, availableW - delivered) * offer.pricePerMWh
+        : 0;
+    agreementSettlements.push({
+      agreementId: offer.id,
+      availableMWh,
+      usefulMWh,
+      payment,
+    });
     importEmissionsWeight += delivered * offer.emissionsKgPerMWh;
     importEmissionsBasisW += delivered;
   }
@@ -6116,10 +6209,34 @@ function* supplyFacilitiesFinancesPhases(
     (supplyWh / 1000) * (now.customerBillingRate ?? state.dollarsPerkWh);
   const importedWh = (importedW / ticksPerHour) * GAME_TO_REAL_YEARS;
   const exportedWh = (exportedW / ticksPerHour) * GAME_TO_REAL_YEARS;
-  const expensesImports =
+  const physicalImportExpenses =
     importedW > 0
       ? (importedWh / 1000000) * (importCostPerHour / importedW)
       : 0;
+  const expensesImports =
+    physicalImportExpenses +
+    ((unusedAgreementCostPerHour / ticksPerHour) * GAME_TO_REAL_YEARS) / 1e6;
+  if (state.utilityExpansion) {
+    now.agreementAvailableMWh = Object.fromEntries(
+      agreementSettlements.map((entry) => [
+        entry.agreementId,
+        entry.availableMWh,
+      ]),
+    );
+    now.agreementUsefulMWh = Object.fromEntries(
+      agreementSettlements.map((entry) => [entry.agreementId, entry.usefulMWh]),
+    );
+    now.agreementPayments = Object.fromEntries(
+      agreementSettlements.map((entry) => [entry.agreementId, entry.payment]),
+    );
+    if (!simulated && !preRoll && advanceConstruction)
+      recordAgreementSettlements(
+        state,
+        agreementStart,
+        agreementEnd,
+        agreementSettlements,
+      );
+  }
   const revenueExports =
     exportedW > 0
       ? (exportedWh / 1000000) * (exportRevenuePerHour / exportedW)
@@ -6581,6 +6698,7 @@ function supplyForecastPass(
   stepMinutes = TICK_MINUTES,
   observe?: ForecastObserver,
   preserveCurrentFrame = false,
+  excludedAgreementId?: string,
 ): TickPresentFutureType[] {
   // updateSupplyFacilitiesFinances ramps generators, charges batteries and pays down loans by
   // mutating the facilities in place, so forecasting has to run against a copy of them. A shallow
@@ -6649,6 +6767,8 @@ function supplyForecastPass(
         // Re-evaluating this tick is not elapsed construction time. Advancing the clone here
         // would drop one tick's emissions from the future and open projects one tick early.
         t.minute !== state.date.minute,
+        undefined,
+        excludedAgreementId,
       );
       // The current tick already happened. Reforecast its supply against the player's action,
       // but keep the transaction and customer balance that caused this reforecast. Otherwise
@@ -6732,6 +6852,7 @@ function reforecastSupply(
   stepMinutes = TICK_MINUTES,
   observe?: ForecastObserver,
   preserveCurrentFrame = false,
+  excludedAgreementId?: string,
 ): TickPresentFutureType[] {
   // First record the merit-order request each generator would receive without minimum-load
   // constraints. The optimized pass then scans those per-facility requests to compare the cost
@@ -6744,6 +6865,7 @@ function reforecastSupply(
     stepMinutes,
     undefined,
     preserveCurrentFrame,
+    excludedAgreementId,
   );
   // Recorded ticks can be Immer drafts when this is called from a reducer. Commitment metadata
   // is deliberately attached with Object.defineProperty, which Immer forbids on a draft; the
@@ -6791,6 +6913,7 @@ function reforecastSupply(
     stepMinutes,
     observe,
     preserveCurrentFrame,
+    excludedAgreementId,
   );
 }
 
@@ -6822,6 +6945,7 @@ export function generateForecastTimeline(
   ticks = TICKS_PER_DAY,
   stepMinutes = TICK_MINUTES,
   observe?: ForecastObserver,
+  excludedAgreementId?: string,
 ): TickPresentFutureType[] {
   return generateTimeline(
     state,
@@ -6831,6 +6955,7 @@ export function generateForecastTimeline(
     stepMinutes,
     true,
     observe,
+    excludedAgreementId,
   );
 }
 
@@ -6842,6 +6967,7 @@ function generateTimeline(
   stepMinutes: number,
   forecastWeather: boolean,
   observe?: ForecastObserver,
+  excludedAgreementId?: string,
 ): TickPresentFutureType[] {
   // Forecasts only read the live state. Snapshot a draft once so the horizon does not repeatedly
   // traverse Immer proxies for location, events, history and other shared inputs. `current`, not
@@ -6985,7 +7111,14 @@ function generateTimeline(
     state.timeline[0].customerBatteryWhStart = batteryCarry;
     state.timeline[0].customerBatteryWh = batteryCarry;
   }
-  state.timeline = reforecastSupply(state, true, stepMinutes, observe);
+  state.timeline = reforecastSupply(
+    state,
+    true,
+    stepMinutes,
+    observe,
+    false,
+    excludedAgreementId,
+  );
   return state.timeline;
 }
 

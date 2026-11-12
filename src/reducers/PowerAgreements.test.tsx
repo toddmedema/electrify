@@ -7,6 +7,7 @@ import { MINUTES_PER_MONTH, getDateFromMinute } from "../helpers/DateTime";
 import { currentTick } from "../helpers/GameSelectors";
 import {
   agreementDate,
+  agreementIntervalMinutes,
   validPowerAgreements,
   agreementYearMinute,
   connectionAgreements,
@@ -293,7 +294,8 @@ it("rejects impossible saved receipts and inherited provenance through the real 
     expect(parseSave(malformed)).toBeNull();
   }
   const legacy = JSON.parse(JSON.stringify(serializeSave(at(0))));
-  legacy.schemaVersion = SAVE_SCHEMA_VERSION - 1;
+  legacy.schemaVersion = SAVE_SCHEMA_VERSION - 2;
+  delete legacy.game.transmission.inheritedAgreementTerms;
   legacy.game.transmission.lines = [];
   const upgraded = parseSave(legacy)!;
   expect(upgraded).not.toBeNull();
@@ -387,4 +389,136 @@ it("keeps real played saves deterministic after signing and after a pause decisi
 it("formats calendar month ends accurately across a leap year without inventing inherited starts", () => {
   expect(agreementDate(182 * MINUTES_PER_MONTH, true)).toBe("29 Feb 2020");
   expect(agreementDate(194 * MINUTES_PER_MONTH, true)).toBe("28 Feb 2021");
+});
+
+it("charges supplier-ready minimums with zero demand and buyer pause, without phantom energy", () => {
+  for (const paused of [false, true]) {
+    const game = at(0);
+    game.transmission!.buyingRule = "NONE";
+    game.transmission!.lines[0].paused = paused;
+    request(game, 0);
+    tickState(game);
+    const now = currentTick(game)!;
+    expect(now.expensesImports).toBeGreaterThan(0);
+    expect(now.importedW).toBe(0);
+    expect(now.importedKgco2e).toBe(0);
+    expect(now.exportedW).toBe(0);
+    expect(game.transmission!.agreementAccounts).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          agreementId: "champlain-nuclear",
+          accountedThroughMinute: TICK_MINUTES,
+          months: [
+            expect.objectContaining({
+              usefulMWh: 0,
+              payment: expect.any(Number),
+            }),
+          ],
+        }),
+      ]),
+    );
+  }
+});
+
+it("records available, useful and payment separately and rejects forged history", () => {
+  const game = at(0);
+  request(game, 1e6);
+  tickState(game);
+  const raw = JSON.parse(JSON.stringify(serializeSave(game)));
+  expect(parseSave(raw)).not.toBeNull();
+  const account = game.transmission!.agreementAccounts![0];
+  expect(account.months[0].availableMWh).toBeGreaterThan(
+    account.months[0].usefulMWh,
+  );
+  for (const mutate of [
+    (save: typeof raw) => {
+      save.game.transmission.agreementAccounts[0].months[0].payment += 1;
+    },
+    (save: typeof raw) => {
+      save.game.transmission.agreementAccounts[0].months[0].usefulMWh = 1e20;
+    },
+    (save: typeof raw) => {
+      save.game.transmission.agreementAccounts[0].accountedThroughMinute +=
+        TICK_MINUTES;
+    },
+    (save: typeof raw) => {
+      save.game.transmission.agreementAccounts[0].agreementId = "invented";
+    },
+    (save: typeof raw) => {
+      save.game.transmission.agreementAccounts[0].months[0].month += 1;
+    },
+  ]) {
+    const forged = cloneDeep(raw);
+    mutate(forged);
+    expect(parseSave(forged)).toBeNull();
+  }
+  const before = JSON.stringify(game.transmission!.agreementAccounts);
+  generateForecastTimeline(
+    game,
+    currentTick(game)!.cash,
+    currentTick(game)!.customers,
+    96,
+  );
+  expect(JSON.stringify(game.transmission!.agreementAccounts)).toBe(before);
+});
+
+it("prorates half-open terms and records the final elapsed interval before expiry exactly once", () => {
+  expect(agreementIntervalMinutes(0, 15, 5, 10)).toBe(5);
+  expect(agreementIntervalMinutes(0, 15, 15, 30)).toBe(0);
+  const game = at(239);
+  game.date = getDateFromMinute(agreementYearMinute(2025) - TICK_MINUTES, 2005);
+  // Keep the engine's clamped last monthly frame and completed-month ownership.
+  game.monthlyHistory = Array.from(
+    { length: 239 },
+    () => ({ year: 2024, month: 11 }) as (typeof game.monthlyHistory)[number],
+  );
+  game.timeline.forEach((tick, index) => {
+    tick.minute = 239 * MINUTES_PER_MONTH + index * TICK_MINUTES;
+  });
+  game.facilities = [];
+  tickState(game);
+  const accounts = cloneDeep(game.transmission!.agreementAccounts);
+  expect(
+    accounts!.every(
+      (account) => account.accountedThroughMinute === agreementYearMinute(2025),
+    ),
+  ).toBe(true);
+  expect(accounts!.every((account) => account.months.length === 1)).toBe(true);
+  expect(currentTick(game)!.entitlementImportedW).toBe(0);
+  tickState(game);
+  expect(game.transmission!.agreementAccounts).toEqual(accounts);
+});
+
+it("preserves existing delivered-energy promises while future offers bind fixed-block terms", () => {
+  const game = sign(at());
+  const raw = JSON.parse(JSON.stringify(serializeSave(game)));
+  raw.schemaVersion = 10;
+  delete raw.game.transmission.inheritedAgreementTerms;
+  for (const receipt of raw.game.transmission.acceptedAgreements)
+    delete receipt.termsVersion;
+  const migrated = parseSave(raw)!;
+  expect(migrated).not.toBeNull();
+  expect(migrated.game.transmission!.inheritedAgreementTerms).toBe(1);
+  expect(migrated.game.transmission!.acceptedAgreements![0].termsVersion).toBe(
+    1,
+  );
+  expect(migrated.game.timeline).toEqual(game.timeline);
+  const live = copyOfficialGame(migrated.game);
+  live.transmission!.lines[0].paused = true;
+  request(live, 0);
+  tickState(live);
+  expect(currentTick(live)!.expensesImports).toBe(0);
+  const nextOffer = powerAgreementQuote(live, "champlain-quebec")!;
+  expect(nextOffer.receipt.termsVersion).toBe(2);
+});
+
+it("reduces the payable minimum to zero when the physical route is unavailable", () => {
+  const game = at(0);
+  request(game, 0);
+  game.transmission!.lines[0].capacityW = 0;
+  tickState(game);
+  expect(currentTick(game)!.expensesImports).toBe(0);
+  expect(Object.values(currentTick(game)!.agreementAvailableMWh!)).toEqual([
+    0, 0,
+  ]);
 });

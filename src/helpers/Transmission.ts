@@ -499,6 +499,30 @@ export function intertieOfferLimits(
     exportLimitW: Math.min(rating, accessExportLimitW),
   };
 }
+/** A fixed-block product buys firm access, still inside the same physical source budget. */
+export function firmIntertieOfferLimits(
+  line: Pick<
+    TransmissionLineOperatingType,
+    "corridorId" | "capacityW" | "paused"
+  >,
+  context: IntertieContext,
+  minute: number,
+  conditions: TransmissionConditions,
+): Omit<IntertieOffer, "pricePerMWh"> {
+  const limits = intertieOfferLimits(line, context, minute, conditions);
+  const accessImportLimitW =
+    effectiveMarket(line.corridorId, context, line.capacityW)
+      ?.availableSupplyW ?? 0;
+  return {
+    ...limits,
+    accessImportLimitW,
+    importLimitW: Math.min(
+      transmissionRatingW(line, conditions),
+      accessImportLimitW,
+    ),
+  };
+}
+
 export interface IntertieReservation {
   offer: IntertieOffer;
   watts: number;

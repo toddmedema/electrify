@@ -1,8 +1,9 @@
-import { TICK_MINUTES } from "../Constants";
+import { GAME_TO_REAL_YEARS, TICK_MINUTES } from "../Constants";
 import type {
   AcceptPowerAgreementAction,
   GameType,
   PowerAgreementReceipt,
+  PowerAgreementTermsVersion,
   TransmissionLineOperatingType,
   UtilityId,
 } from "../Types";
@@ -85,7 +86,11 @@ export function agreementPrice(
   );
 }
 /** Quotes resolve dates once; the reducer verifies exactly what the player reviewed. */
-export function powerAgreementQuote(game: GameType, blockId: string) {
+export function powerAgreementQuote(
+  game: GameType,
+  blockId: string,
+  termsVersion: PowerAgreementTermsVersion = 2,
+) {
   if (game.scenarioId !== 116 || game.customScenario) return undefined;
   const block = POWER_AGREEMENT_BLOCKS.find((entry) => entry.id === blockId);
   if (!block || !utilityOwnedAt(game, block.utilityId, game.date.minute))
@@ -110,6 +115,7 @@ export function powerAgreementQuote(game: GameType, blockId: string) {
         MINUTES_PER_MONTH;
   if (startMinute >= FINISH) return undefined;
   const receipt: PowerAgreementReceipt = {
+    termsVersion,
     blockId,
     cycle: receipts.length,
     acceptedMinute: game.date.minute,
@@ -161,6 +167,7 @@ export function connectionAgreements(
     (source) => ({
       ...source,
       inherited: true,
+      termsVersion: game.transmission?.inheritedAgreementTerms ?? 2,
       startMinute: 0,
       endMinute: agreementYearMinute(
         source.reducedNominalW === 0 ? source.reductionYear! : 2025,
@@ -176,6 +183,7 @@ export function connectionAgreements(
           ...source,
           nominalW: 0,
           inherited: true,
+          termsVersion: game.transmission?.inheritedAgreementTerms ?? 2,
           startMinute: 0,
           endMinute: agreementYearMinute(
             source.reducedNominalW === 0 ? source.reductionYear! : 2025,
@@ -201,6 +209,7 @@ export function connectionAgreements(
               reductionYear: undefined as number | undefined,
               reducedNominalW: undefined as number | undefined,
               inherited: false,
+              termsVersion: receipt.termsVersion,
               startMinute: receipt.startMinute,
               endMinute: receipt.endMinute,
             },
@@ -232,6 +241,7 @@ export function validPowerAgreements(game: GameType): boolean {
   for (const [index, receipt] of (receipts ?? []).entries()) {
     if (
       !receipt ||
+      (receipt.termsVersion !== 1 && receipt.termsVersion !== 2) ||
       typeof receipt !== "object" ||
       ![
         receipt.cycle,
@@ -253,25 +263,36 @@ export function validPowerAgreements(game: GameType): boolean {
         acceptedAgreements: receipts!.slice(0, index),
       },
     };
-    const quote = powerAgreementQuote(atAcceptance, receipt.blockId);
+    const quote = powerAgreementQuote(
+      atAcceptance,
+      receipt.blockId,
+      receipt.termsVersion,
+    );
     if (
       !quote ||
       JSON.stringify(quote.receipt) !==
         JSON.stringify({
+          termsVersion: receipt.termsVersion,
           blockId: receipt.blockId,
           cycle: receipt.cycle,
           acceptedMinute: receipt.acceptedMinute,
           startMinute: receipt.startMinute,
           endMinute: receipt.endMinute,
         }) ||
-      Object.keys(receipt).length !== 5
+      Object.keys(receipt).length !== 6
     )
       return false;
   }
+  if (!validAgreementAccounts(game)) return false;
   if (!game.utilityExpansion)
-    return !game.transmission?.lines.some((line) =>
-      inheritedUtilityForCorridor(line.corridorId),
+    return (
+      game.transmission?.inheritedAgreementTerms === undefined &&
+      !game.transmission?.lines.some((line) =>
+        inheritedUtilityForCorridor(line.corridorId),
+      )
     );
+  if (![1, 2].includes(game.transmission?.inheritedAgreementTerms ?? 0))
+    return false;
   for (const utility of Object.keys(INHERITED_CONNECTIONS) as UtilityId[]) {
     const line = game.transmission?.lines.find(
       (entry) => entry.corridorId === INHERITED_CONNECTIONS[utility],
@@ -297,6 +318,158 @@ export function validPowerAgreements(game: GameType): boolean {
               )!.minute))
     )
       return false;
+  }
+  return true;
+}
+
+/** A settled interval overlaps a half-open delivery term; calendar energy uses the engine scale. */
+export function agreementIntervalMinutes(
+  start: number,
+  end: number,
+  deliveryStart: number,
+  deliveryEnd: number,
+): number {
+  return Math.max(
+    0,
+    Math.min(end, deliveryEnd) - Math.max(start, deliveryStart),
+  );
+}
+
+/** Append only completed elapsed intervals. Forecasts use the same settlements privately. */
+export function recordAgreementSettlements(
+  game: GameType,
+  start: number,
+  end: number,
+  settlements: import("../Types").PowerAgreementSettlement[],
+): void {
+  if (!game.transmission || end <= start || !settlements.length) return;
+  const accounts = (game.transmission.agreementAccounts ??= []);
+  for (const settlement of settlements) {
+    const source = (Object.keys(INHERITED_CONNECTIONS) as UtilityId[])
+      .flatMap((id) => connectionAgreements(game, id, start))
+      .find((entry) => entry.id === settlement.agreementId)!;
+    const from = Math.max(start, source.startMinute);
+    const through = Math.min(end, source.endMinute);
+    if (through <= from) continue;
+    let account = accounts.find((entry) => entry.agreementId === source.id);
+    if (!account) {
+      account = {
+        agreementId: source.id,
+        termsVersion: source.termsVersion,
+        accountingStartMinute: from,
+        accountedThroughMinute: from,
+        months: [],
+      };
+      accounts.push(account);
+    }
+    if (account.accountedThroughMinute !== from)
+      throw new Error("Noncontiguous agreement settlement");
+    const month = Math.floor(from / MINUTES_PER_MONTH);
+    let row = account.months.at(-1);
+    if (!row || row.month !== month) {
+      row = { month, availableMWh: 0, usefulMWh: 0, payment: 0 };
+      account.months.push(row);
+    }
+    row.availableMWh += settlement.availableMWh;
+    row.usefulMWh += settlement.usefulMWh;
+    row.payment += settlement.payment;
+    account.accountedThroughMinute = through;
+  }
+}
+
+function validAgreementAccounts(game: GameType): boolean {
+  const accounts = game.transmission?.agreementAccounts;
+  if (accounts === undefined) return true;
+  if (
+    !game.utilityExpansion ||
+    !Array.isArray(accounts) ||
+    accounts.length > 30
+  )
+    return false;
+  const ids = new Set<string>();
+  for (const account of accounts) {
+    if (
+      !account ||
+      typeof account !== "object" ||
+      ids.has(account.agreementId) ||
+      Object.keys(account).length !== 5 ||
+      !Array.isArray(account.months) ||
+      account.months.length > 600
+    )
+      return false;
+    ids.add(account.agreementId);
+    const utility = (Object.keys(INHERITED_CONNECTIONS) as UtilityId[]).find(
+      (id) =>
+        utilityOwnedAt(game, id, game.date.minute) &&
+        connectionAgreements(game, id).some(
+          (source) => source.id === account.agreementId,
+        ),
+    );
+    const source =
+      utility &&
+      connectionAgreements(game, utility).find(
+        (entry) => entry.id === account.agreementId,
+      );
+    if (!source || source.termsVersion !== account.termsVersion) return false;
+    const ownership =
+      utility === "champlain"
+        ? 0
+        : game.utilityExpansion.acquisitions.find(
+            (receipt) => receipt.targetId === utility,
+          )!.minute;
+    const { accountingStartMinute: start, accountedThroughMinute: end } =
+      account;
+    if (
+      ![start, end].every(
+        (value) => Number.isSafeInteger(value) && value % TICK_MINUTES === 0,
+      ) ||
+      start < Math.max(source.startMinute, ownership) ||
+      end <= start ||
+      end > Math.min(game.date.minute, source.endMinute)
+    )
+      return false;
+    const firstMonth = Math.floor(start / MINUTES_PER_MONTH);
+    if (
+      account.months.length !==
+      Math.floor((end - 1) / MINUTES_PER_MONTH) - firstMonth + 1
+    )
+      return false;
+    for (const [index, row] of account.months.entries()) {
+      if (
+        !row ||
+        typeof row !== "object" ||
+        Object.keys(row).length !== 4 ||
+        row.month !== firstMonth + index ||
+        ![row.availableMWh, row.usefulMWh, row.payment].every(
+          (value) => Number.isFinite(value) && value >= 0,
+        ) ||
+        row.usefulMWh > row.availableMWh + 1e-6
+      )
+        return false;
+      const minute = row.month * MINUTES_PER_MONTH;
+      const monthlySource = connectionAgreements(game, utility!, minute).find(
+        (entry) => entry.id === source.id,
+      )!;
+      const overlap = agreementIntervalMinutes(
+        start,
+        end,
+        minute,
+        minute + MINUTES_PER_MONTH,
+      );
+      const maximumMWh =
+        (((monthlySource.nominalW * monthlySource.deliverability * overlap) /
+          60) *
+          GAME_TO_REAL_YEARS) /
+        1e6;
+      const payment =
+        (source.termsVersion === 2 ? row.availableMWh : row.usefulMWh) *
+        monthlySource.priceToday;
+      if (
+        row.availableMWh > maximumMWh + 1e-6 ||
+        Math.abs(row.payment - payment) > Math.max(1e-5, payment * 1e-10)
+      )
+        return false;
+    }
   }
   return true;
 }

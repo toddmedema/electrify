@@ -99,6 +99,7 @@ export function computeOutlook<K extends OutlookKind>(
       ...game,
       facilities: game.facilities.filter((f) => f.yearsToBuildLeft <= 0),
       transmission: {
+        ...game.transmission,
         acceptedAgreements: game.transmission?.acceptedAgreements?.map(
           (receipt) => ({ ...receipt }),
         ),

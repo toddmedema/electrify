@@ -119,7 +119,32 @@ export interface IntertieUpgradeType {
   constructionKgco2eEmitted?: number;
 }
 
+export type PowerAgreementTermsVersion = 1 | 2;
+
+export interface PowerAgreementMonth {
+  month: number;
+  availableMWh: number;
+  usefulMWh: number;
+  payment: number;
+}
+
+export interface PowerAgreementAccount {
+  agreementId: string;
+  termsVersion: PowerAgreementTermsVersion;
+  accountingStartMinute: number;
+  accountedThroughMinute: number;
+  months: PowerAgreementMonth[];
+}
+
+export interface PowerAgreementSettlement {
+  agreementId: string;
+  availableMWh: number;
+  usefulMWh: number;
+  payment: number;
+}
+
 export interface PowerAgreementReceipt {
+  termsVersion: PowerAgreementTermsVersion;
   blockId: string;
   cycle: number;
   acceptedMinute: number;
@@ -136,6 +161,8 @@ export interface TransmissionStateType {
   sellingRule: SellingRuleType;
   lines: TransmissionLineOperatingType[];
   acceptedAgreements?: PowerAgreementReceipt[];
+  inheritedAgreementTerms?: PowerAgreementTermsVersion;
+  agreementAccounts?: PowerAgreementAccount[];
 }
 
 // Deliberately open rather than a union of the places that happen to ship today: a custom game
@@ -390,6 +417,10 @@ export interface RawWeatherType {
 // All amounts are the average across the time window
 export type TickPresentFutureType = Partial<FuelPricesType> &
   HistoryForecastShared & {
+    /** Interval settlements, separate from physical imports. */
+    agreementAvailableMWh?: Record<string, number>;
+    agreementUsefulMWh?: Record<string, number>;
+    agreementPayments?: Record<string, number>;
     minute: number;
     supplyW: number; // Watts
     availableSupplyW?: number; // Supply plus unused fuel-burning generation capacity

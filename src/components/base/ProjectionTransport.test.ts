@@ -25,6 +25,9 @@ function fixture() {
       hydroReservoirCapacityWh: 0,
       demandByType: { Residential: 10, Commercial: undefined },
       supplyByFuel: { Coal: 20 },
+      agreementAvailableMWh: { nuclear: 10 },
+      agreementUsefulMWh: { nuclear: 6 },
+      agreementPayments: { nuclear: 400 },
       renewableCapacityFactors: { a: 0.2, b: NaN },
       availableSupplyW: undefined,
       deferredResidential: [

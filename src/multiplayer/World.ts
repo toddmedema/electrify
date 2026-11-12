@@ -622,10 +622,38 @@ export function stepWorld(world: World): void {
     g.multiplayer!.pricePerMWh = world.pricePerMWh;
     const phase = tickStatePhases(g, undefined, undefined, sharedImportRounds);
     const planned = phase.next();
-    if (planned.done || !("offerW" in planned.value))
+    if (
+      planned.done ||
+      (sharedImportRounds
+        ? !("kind" in planned.value) || planned.value.kind !== "ready"
+        : !("offerW" in planned.value))
+    )
       throw new Error("A grid could not prepare its shared tick");
-    return { phase, plan: tradingPlan(planned.value, i) };
+    // With shared regional supply, all grids first stop at supplier readiness.
+    return {
+      phase,
+      plan:
+        "offerW" in planned.value
+          ? tradingPlan(planned.value, i)
+          : {
+              offerW: 0,
+              shortageW: 0,
+              pricePerMWh: world.pricePerMWh,
+              temperatureC: 0,
+              solarIrradianceWM2: 0,
+              emissionsAt: () => 0,
+            },
+    };
   });
+  if (sharedImportRounds)
+    phases.forEach(({ phase }, i) => {
+      if (!phase) return;
+      selectWeatherLocation(world.grids[i].location.id);
+      const planned = phase.next();
+      if (planned.done || !("offerW" in planned.value))
+        throw new Error("A grid did not plan after readiness");
+      phases[i].plan = tradingPlan(planned.value, i);
+    });
   // Construction advances during planning, so completed upgrades apply to this settlement.
   world.edges.forEach((edge) => {
     const lines = world.grids.flatMap(
@@ -691,13 +719,21 @@ export function stepWorld(world: World): void {
       selectWeatherLocation(world.grids[i].location.id);
       const next = phase.next();
       if (next.done) return plan;
-      if (!("offerW" in next.value))
+      if (!("kind" in next.value) || next.value.kind !== "ready")
         throw new Error("A grid did not prepare its next refresh");
       nextPlans++;
-      return tradingPlan(next.value, i);
+      return plan;
     });
     if (!nextPlans) break;
     if (nextPlans !== active.length) throw new Error("Shared refresh diverged");
+    plans = phases.map(({ phase, plan }, i) => {
+      if (!phase) return plan;
+      selectWeatherLocation(world.grids[i].location.id);
+      const next = phase.next();
+      if (next.done || !("offerW" in next.value))
+        throw new Error("A grid did not plan its next refresh");
+      return tradingPlan(next.value, i);
+    });
   }
   phases.forEach(({ phase }, i) => {
     if (!phase) return;

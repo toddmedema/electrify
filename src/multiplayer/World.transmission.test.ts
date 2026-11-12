@@ -3,6 +3,7 @@ import cloneDeep from "lodash.clonedeep";
 import { DEMAND_TYPES } from "../data/DemandProfiles";
 import { UTILITY_AREAS } from "../data/UtilityExpansion";
 import { TICK_MINUTES, TICKS_PER_HOUR, GAME_TO_REAL_YEARS } from "../Constants";
+import { connectionAgreements } from "../helpers/PowerAgreements";
 import { currentTick } from "../helpers/GameSelectors";
 import {
   intertieContextForGame,
@@ -82,7 +83,19 @@ function assertFeasible(world: ReturnType<typeof ready>) {
       limits.importLimitW + 1e-5,
     );
     expect(line.currentFlowW).toBeCloseTo(tick.importedW!, 5);
-    expect(tick.expensesImports).toBeCloseTo(
+    const unusedCost = Object.entries(tick.agreementAvailableMWh ?? {}).reduce(
+      (sum, [id, available]) => {
+        const source = connectionAgreements(grid, "champlain").find(
+          (entry) => entry.id === id,
+        )!;
+        return (
+          sum +
+          (available - (tick.agreementUsefulMWh?.[id] ?? 0)) * source.priceToday
+        );
+      },
+      0,
+    );
+    expect(tick.expensesImports - unusedCost).toBeCloseTo(
       (((tick.importedW! / TICKS_PER_HOUR) * GAME_TO_REAL_YEARS) / 1e6) *
         tick.marketPricePerMWh!,
       5,
@@ -112,16 +125,20 @@ it.each(["NONE", "SHORTAGES", "SHORTAGES_AND_STORAGE"] as const)(
     });
     setNextDemand(world, 100e6);
     stepWorld(world);
-    expect(world.grids.map((g) => currentTick(g)!.importedW)).toEqual([
-      100e6, 100e6, 100e6, 100e6,
-    ]);
+    expect(world.grids.map((g) => currentTick(g)!.importedW)).toEqual(
+      buyingRule === "NONE"
+        ? [100e6, 100e6, 0, 0]
+        : [100e6, 100e6, 100e6, 100e6],
+    );
     assertFeasible(world);
-    expect(
-      world.grids.reduce(
-        (sum, grid) => sum + currentTick(grid)!.availableSupplyW!,
-        0,
-      ),
-    ).toBeCloseTo(regionalBudget(world), 5);
+    const available = world.grids.reduce(
+      (sum, grid) => sum + currentTick(grid)!.availableSupplyW!,
+      0,
+    );
+    expect(available).toBeLessThanOrEqual(regionalBudget(world) + 1e-5);
+    expect(available / regionalBudget(world)).toBeGreaterThan(
+      buyingRule === "NONE" ? 0 : 0.99999,
+    );
   },
 );
 
@@ -192,4 +209,37 @@ it("keeps the refreshed month-opening imports within the shared regional budget"
       customerMarketSizeAt(grid.customerMarketSize, grid.date.minute),
     );
   });
+});
+
+it("assigns supplier-ready commitments once independently from pause and consumption", () => {
+  const world = ready();
+  setNextDemand(world, 0);
+  const paused = cloneDeep(world);
+  paused.grids[0].transmission!.lines[0].paused = true;
+  stepWorld(world);
+  stepWorld(paused);
+  const available = (grid: (typeof world.grids)[number]) =>
+    Object.values(currentTick(grid)!.agreementAvailableMWh ?? {}).reduce(
+      (sum, value) => sum + value,
+      0,
+    );
+  expect(paused.grids.map(available)).toEqual(world.grids.map(available));
+  const totalMWh = world.grids.reduce((sum, grid) => sum + available(grid), 0);
+  expect(totalMWh).toBeCloseTo(
+    ((regionalBudget(world) / TICKS_PER_HOUR) * GAME_TO_REAL_YEARS) / 1e6,
+    5,
+  );
+  world.grids.forEach((grid) => {
+    expect(currentTick(grid)!.importedW).toBe(0);
+    expect(currentTick(grid)!.exportedW).toBe(0);
+  });
+});
+
+it("reserves a later company's useful agreement delivery before an earlier company's spot demand", () => {
+  const world = ready();
+  setNextDemand(world, 100e6);
+  world.grids[0].timeline[1].demandW = 300e6;
+  stepWorld(world);
+  expect(currentTick(world.grids[1])!.entitlementImportedW).toBe(100e6);
+  assertFeasible(world);
 });
