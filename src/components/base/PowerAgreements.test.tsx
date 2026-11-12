@@ -112,7 +112,7 @@ function review(temperatureC = 20) {
   };
 }
 
-it("shows exactly the requested six rows with full monthly energy and deliverable power", () => {
+it("shows the direct discount alongside monthly energy and deliverable power", () => {
   const { game, line, dialog, quote } = review();
   expect(agreementSummary(game, line.corridorId)).toContain(
     "209MW under agreement",
@@ -125,6 +125,7 @@ it("shows exactly the requested six rows with full monthly energy and deliverabl
   ).toEqual([
     "Agreement price",
     "Market price",
+    "Discount",
     "Minimum supply",
     "Maximum supply",
     "Duration",
@@ -147,6 +148,15 @@ it("shows exactly the requested six rows with full monthly energy and deliverabl
   expect(dialog).not.toHaveTextContent("Demand served");
   expect(dialog).not.toHaveTextContent("2005 dollars");
   expect(dialog).not.toHaveTextContent("Local generation can reduce purchases");
+  expect(dialog).not.toHaveTextContent("The price follows inflation");
+  expect(
+    within(dialog).getByRole("slider", { name: "Duration" }),
+  ).toBeVisible();
+  expect(
+    within(dialog).queryByText("Duration", {
+      selector: ".powerAgreementDuration .MuiTypography-root",
+    }),
+  ).not.toBeInTheDocument();
 });
 
 it.each([20, -40])(
@@ -161,7 +171,10 @@ it.each([20, -40])(
       name: /Market price/,
     });
     expect(comparison).toHaveTextContent(rate(marketPrice));
-    expect(comparison).toHaveTextContent(/[0-9.]+% higher/);
+    expect(comparison).not.toHaveTextContent("higher");
+    expect(
+      within(dialog).getByRole("row", { name: /^Discount/ }),
+    ).toHaveTextContent("20%");
   },
 );
 
@@ -177,6 +190,9 @@ it("changes price and end date with duration and signs that exact canonical quot
   ).toHaveTextContent(rate(short.priceToday));
   expect(short.priceToday).toBeGreaterThan(quote.priceToday);
   expect(
+    within(dialog).getByRole("row", { name: /^Discount/ }),
+  ).toHaveTextContent("1%");
+  expect(
     within(dialog).getByRole("row", { name: /Duration/ }),
   ).toHaveTextContent("1 yearEnds Dec 2020");
   expect(mockForecast).toHaveBeenLastCalledWith(
@@ -187,6 +203,9 @@ it("changes price and end date with duration and signs that exact canonical quot
   );
   fireEvent.change(slider, { target: { value: "5" } });
   const selected = powerAgreementQuote(game, quote.id, 3, 5)!;
+  expect(
+    within(dialog).getByRole("row", { name: /^Discount/ }),
+  ).toHaveTextContent("9.4%");
   expect(
     within(dialog).getByRole("row", { name: /Duration/ }),
   ).toHaveTextContent("5 yearsEnds Dec 2024");
@@ -392,8 +411,6 @@ it.each([1, 2, 3] as PowerAgreementTermsVersion[])(
     ).toHaveTextContent(
       "-$1.23k over 2 years remainingBased on current supply and demand",
     );
-    expect(
-      dialog.textContent?.includes("capped below the current market price"),
-    ).toBe(version === 3);
+    expect(dialog).not.toHaveTextContent("The price follows inflation");
   },
 );

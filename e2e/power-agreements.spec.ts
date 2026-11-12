@@ -153,6 +153,7 @@ for (const theme of ["light", "dark"] as const) {
     await expect(table.getByRole("rowheader")).toHaveText([
       "Agreement price",
       "Market price",
+      "Discount",
       "Minimum supply",
       "Maximum supply",
       "Duration",
@@ -186,9 +187,11 @@ for (const theme of ["light", "dark"] as const) {
     );
     const tenYearRate = await agreementRate();
     expect(tenYearRate).toBeLessThan(marketRate);
-    await expect(
-      dialog.getByRole("row", { name: /Market price/ }),
-    ).toContainText(/\d+(\.\d+)?% higher/);
+    const discount = dialog.getByRole("row", { name: /^Discount/ });
+    await expect(discount).toHaveText("Discount20%");
+    await expect(dialog.getByText(/The price follows inflation/)).toHaveCount(
+      0,
+    );
     const slider = dialog.getByRole("slider", { name: /^Duration/ });
     await expect(slider).toHaveAttribute("min", "1");
     await expect(slider).toHaveAttribute("max", "10");
@@ -199,16 +202,22 @@ for (const theme of ["light", "dark"] as const) {
       "1 yearEnds Dec 2020",
     );
     const oneYearRate = await agreementRate();
+    await expect(discount).toHaveText("Discount1%");
     expect(oneYearRate).toBeGreaterThan(tenYearRate);
     expect(oneYearRate).toBeLessThan(marketRate);
     await page.keyboard.press("End");
     await expect(slider).toHaveAttribute("aria-valuenow", "10");
     expect(await agreementRate()).toBe(tenYearRate);
+    await expect(discount).toHaveText("Discount20%");
     await page.keyboard.press("Home");
     for (let year = 1; year < 5; year++)
       await page.keyboard.press("ArrowRight");
     await expect(slider).toHaveAttribute("aria-valuenow", "5");
     await expect(slider).toHaveAttribute("aria-valuetext", "5 years");
+    await expect(dialog.locator(".powerAgreementDuration")).toHaveText(
+      "5 years",
+    );
+    await expect(discount).toHaveText("Discount9.4%");
     await expect(dialog.getByRole("row", { name: /Duration/ })).toContainText(
       "5 yearsEnds Dec 2024",
     );

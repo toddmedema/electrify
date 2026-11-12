@@ -267,7 +267,7 @@ The general hourly outlook remains a sampled estimate and can approximate contra
 changes inside a sample when opened between hours.
 
 The reducer also computes each alternative's requested and served customer energy
-internally; the six-row terms table displays the cash comparison over the selected
+internally; the terms table displays the cash comparison over the selected
 term. Offers compare the full delivery term, while signed agreements compare the
 remaining term. Recorded use and payments appear separately with their accounting
 start date, including for expired accounts. Earlier missing history is identified.

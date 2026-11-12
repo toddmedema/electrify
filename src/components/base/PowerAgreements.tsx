@@ -57,6 +57,17 @@ const years = (value: number) => {
   });
   return `${amount} ${Number(amount) === 1 ? "year" : "years"}`;
 };
+function discountRate(price: number, marketPrice?: number) {
+  if (
+    !(price > 0) ||
+    !Number.isFinite(price) ||
+    marketPrice === undefined ||
+    !(marketPrice > 0) ||
+    !Number.isFinite(marketPrice)
+  )
+    return "Unavailable";
+  return `${formatNumber((1 - price / marketPrice) * 100, { maximumFractionDigits: 1 })}%`;
+}
 function marketComparison(price: number, marketPrice?: number) {
   if (
     !(price > 0) ||
@@ -102,7 +113,6 @@ export default function PowerAgreements({
   const [forecastCommitted, setForecastCommitted] = React.useState(true);
   const [accepting, setAccepting] = React.useState(false);
   const [acceptanceError, setAcceptanceError] = React.useState<string>();
-  const durationLabelId = React.useId();
   const utility = inheritedUtilityForCorridor(line.corridorId);
   const sources = utility ? connectionAgreements(game, utility) : [];
   const assessment = sources.find((source) => source.id === assessmentId);
@@ -424,13 +434,13 @@ export default function PowerAgreements({
             <>
               {review && (
                 <Box className="powerAgreementDuration">
-                  <Typography id={durationLabelId} variant="body2">
-                    Duration <strong>{years(review.durationYears)}</strong>
+                  <Typography variant="body2">
+                    <strong>{years(review.durationYears)}</strong>
                   </Typography>
                   <Slider
                     disabled={accepting}
                     className="constructionCapacitySlider"
-                    aria-labelledby={durationLabelId}
+                    aria-label="Duration"
                     value={review.durationYears}
                     min={1}
                     max={10}
@@ -462,18 +472,14 @@ export default function PowerAgreements({
                   <BuildDetailRow
                     label="Market price"
                     value={
-                      <DetailValue
-                        value={
-                          marketPrice === undefined
-                            ? "Unavailable"
-                            : rate(marketPrice)
-                        }
-                        caption={marketComparison(
-                          terms.priceToday,
-                          marketPrice,
-                        )}
-                      />
+                      marketPrice === undefined
+                        ? "Unavailable"
+                        : rate(marketPrice)
                     }
+                  />
+                  <BuildDetailRow
+                    label="Discount"
+                    value={discountRate(terms.priceToday, marketPrice)}
                   />
                   <BuildDetailRow
                     label="Minimum supply"
@@ -527,17 +533,6 @@ export default function PowerAgreements({
                   />
                 </BuildDetails>
               </Box>
-              {terms.termsVersion === 3 && (
-                <Typography
-                  variant="body2"
-                  color="textSecondary"
-                  sx={{ mt: 2 }}
-                >
-                  The price follows inflation, capped below the current market
-                  price. Monthly amounts assume full supplier availability;
-                  supplier outages reduce the minimum.
-                </Typography>
-              )}
             </>
           )
         )}
