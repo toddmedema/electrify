@@ -65,6 +65,25 @@ failed survey, preserve the ledger, and report the error.
 
 ### Validation evidence
 
+Run `npm run check -- --status` to inspect the latest recorded local run without
+claiming the checkout, reserving a validation slot, checking installation/assets,
+or running generators or gates. Add `--json` for structured output, or pass a
+report path: `npm run check -- --status .tmp/check-runs/<run>/report.json --json`.
+Use `npm run --silent check -- --status --json` when piping JSON to another tool.
+The newest run directory is selected by its timestamped name; an empty or broken
+newest run reports unavailable evidence instead of falling back to an older pass.
+Unavailable or inconsistent reports exit nonzero. Reports are replaced atomically;
+older partial writes are treated as unavailable after one bounded read.
+
+Status shows recorded scope, gate states, execution/reuse counts, source/runtime
+provenance, timings, available evidence paths and failed-gate retry commands.
+Every result is historical: status does not compare the current source, verify
+environment/artifacts/evidence contents, or decide whether a gate can be reused.
+Queued commands have no report yet, and owner liveness is unknown; even a report
+marked `running` can belong to an abandoned command. Inspection never reruns checks
+or authorizes skipping required gates. Use `--resume` for verified reuse decisions.
+The existing `--report <report.json>` source-comparison summary remains available.
+
 Check reports retain separate `timing.queueMs` and `timing.executionMs` values.
 All existing gates, source-change detection, coverage thresholds, viewport
 projects, diagnostic retries, and flake rejection remain required. Run focused
