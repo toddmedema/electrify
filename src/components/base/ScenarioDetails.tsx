@@ -22,6 +22,8 @@ import ConceptIcon from "./ConceptIcon";
 import UtilitySupplyPlan from "./UtilitySupplyPlan";
 import { formatScore } from "../../helpers/Format";
 import { getMissionStatus } from "../../helpers/MissionStatus";
+import { scenarioObjectiveDefinitions } from "../../helpers/ObjectiveRules";
+import { objectiveGoalGroups } from "../../helpers/ObjectivePresentation";
 import {
   legacyCompletedMonths,
   legacyMonthOffset,
@@ -159,20 +161,15 @@ function ScoreOutlook({
             <dd>
               {projection ? formatScore(projection.final) : "—"}
               {change !== 0 && (
-                <span
+                <Box
+                  component="span"
                   className="scenarioOutlookChange"
-                  data-direction={
-                    outlook?.status === "loss"
-                      ? "neutral"
-                      : change > 0
-                        ? "up"
-                        : "down"
-                  }
+                  data-direction={change > 0 ? "up" : "down"}
+                  sx={{ color: change > 0 ? "success.main" : "error.main" }}
                 >
                   {change > 0 ? "+" : "−"}
                   {formatScore(Math.abs(change))}
-                  <span> from now</span>
-                </span>
+                </Box>
               )}
             </dd>
           </div>
@@ -193,7 +190,7 @@ function ScoreOutlook({
       />
       {!ended && (
         <Typography
-          component="p"
+          component="div"
           variant="body2"
           role="status"
           aria-label="Scenario forecast"
@@ -210,24 +207,20 @@ function ScoreOutlook({
                 color="inherit"
                 decorative
               />
-              <span>
-                <strong>Projected loss:</strong> {loss.text}
-                {outlook.shortageFrom && (
-                  <span className="scenarioBuildNothing">
-                    If you build nothing: shortages from {outlook.shortageFrom}.
-                  </span>
-                )}
-              </span>
+              <div>
+                <strong>Projected loss:</strong>
+                <Box
+                  component="ul"
+                  sx={{ m: 0, mt: 0.5, pl: 2.5, "& li + li": { mt: 0.5 } }}
+                >
+                  {loss.failures.map((failure) => (
+                    <li key={failure.id}>{failure.text}</li>
+                  ))}
+                </Box>
+              </div>
             </>
           ) : (
-            <>
-              {loss.text}
-              {outlook?.shortageFrom && (
-                <span className="scenarioBuildNothing">
-                  If you build nothing: shortages from {outlook.shortageFrom}.
-                </span>
-              )}
-            </>
+            loss.text
           )}
         </Typography>
       )}
@@ -274,6 +267,22 @@ export function ScenarioDetailsContent({
   const units = useUnits();
   const location = getScenarioLocation(scenario);
   const mission = getMissionStatus(game);
+  const objectives = scenarioObjectiveDefinitions(scenario, game);
+  const objectiveIds = new Set(objectives.map((objective) => objective.id));
+  const goals = [
+    ...objectiveGoalGroups(
+      objectives,
+      game.startingYear,
+      scenario.durationMonths,
+      legacyMonthOffset(game),
+    ),
+    ...mission.requirements
+      .filter((requirement) => !objectiveIds.has(requirement.id))
+      .map((requirement) => ({
+        ...requirement,
+        goals: [requirement.target],
+      })),
+  ];
   const forecast = useScenarioForecast(game);
   const missionProjection = forecast
     ? projectMission(game, forecast)
@@ -341,13 +350,13 @@ export function ScenarioDetailsContent({
       >
         {scenario.name}
       </Typography>
-      <UtilitySupplyPlan game={game} forecast={forecast} />
       <ScoreOutlook
         projection={projection}
         history={history}
         game={game}
         outlook={missionProjection}
       />
+      <UtilitySupplyPlan game={game} forecast={forecast} />
       <Box component="dl" className="scenarioFacts">
         {facts.map(({ label, value }) => (
           <div key={label}>
@@ -445,7 +454,7 @@ export function ScenarioDetailsContent({
         </Typography>
         {scenario.id === 3 && <CustomerGrowthChallenge />}
         <Box component="dl" className="missionRequirements">
-          {[...mission.requirements]
+          {goals
             .sort(
               (a, b) =>
                 Number(a.required === false) - Number(b.required === false),
@@ -473,7 +482,18 @@ export function ScenarioDetailsContent({
                   variant="body2"
                   sx={{ overflowWrap: "anywhere" }}
                 >
-                  {requirement.target}
+                  {requirement.goals.length === 1 ? (
+                    requirement.goals[0]
+                  ) : (
+                    <Box
+                      component="ul"
+                      sx={{ m: 0, pl: 2.5, "& li + li": { mt: 0.5 } }}
+                    >
+                      {requirement.goals.map((goal) => (
+                        <li key={goal}>{goal}</li>
+                      ))}
+                    </Box>
+                  )}
                 </Typography>
               </React.Fragment>
             ))}

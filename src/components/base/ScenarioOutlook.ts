@@ -44,8 +44,12 @@ export function scenarioScoreProjection(
 export function scenarioLossSummary(
   game: GameType,
   outlook: MissionProjection | undefined,
-): { text: string; firstMonth?: number } {
-  if (!outlook) return { text: "Updating forecast…" };
+): {
+  text: string;
+  failures: { id: string; text: string }[];
+  firstMonth?: number;
+} {
+  if (!outlook) return { text: "Updating forecast…", failures: [] };
   const risks = outlook.requirements
     .filter(
       (row) =>
@@ -60,6 +64,7 @@ export function scenarioLossSummary(
     return {
       text:
         outlook.status === "win" ? "Projected win." : "Forecast incomplete.",
+      failures: [],
     };
   const objectives = new Map(
     gameObjectiveResults(game).map((row) => [row.id, row]),
@@ -119,15 +124,18 @@ export function scenarioLossSummary(
       }
     } else phrase = risk.label;
     const month = risk.failureMonth;
-    return month === undefined
-      ? `${phrase}.`
-      : `${phrase} by ${MONTHS[month % 12]} ${game.startingYear + Math.floor(month / 12)}.`;
+    const text =
+      month === undefined
+        ? `${phrase}.`
+        : `${phrase} by ${MONTHS[month % 12]} ${game.startingYear + Math.floor(month / 12)}.`;
+    return { id: risk.id, text };
   });
   const months = risks.flatMap((risk) =>
     risk.failureMonth === undefined ? [] : [risk.failureMonth],
   );
   return {
-    text: descriptions.join(" "),
+    text: descriptions.map((description) => description.text).join(" "),
+    failures: descriptions,
     firstMonth: months.length ? Math.min(...months) : game.date.monthsElapsed,
   };
 }
