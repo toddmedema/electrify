@@ -182,13 +182,28 @@ for (const theme of ["light", "dark"] as const) {
       await inspect.click();
       await expect(acquire).toBeVisible();
       await expect(line).not.toContainText("Review the company terms");
-      const upgrade = line.getByRole("button", { name: /^Review upgrade/ });
+      // New expansion routes have reached their corridor limit at Tier 1.
+      // Keep the acquisition action aligned with the available capacity status.
+      const capacityStatus = line.getByText(
+        "Corridor full. More capacity needs a new route.",
+        { exact: true },
+      );
+      await expect(capacityStatus).toBeVisible();
+      await expect(
+        line.getByRole("button", { name: /^Review upgrade/ }),
+      ).toHaveCount(0);
       if ((testInfo.project.use.viewport?.width ?? 1280) >= 600) {
-        const [acquireBox, upgradeBox] = await Promise.all([
+        const [acquireBox, capacityBox] = await Promise.all([
           acquire.boundingBox(),
-          upgrade.boundingBox(),
+          capacityStatus.boundingBox(),
         ]);
-        expect(Math.abs(acquireBox!.y - upgradeBox!.y)).toBeLessThanOrEqual(1);
+        expect(
+          Math.abs(
+            acquireBox!.y +
+              acquireBox!.height -
+              (capacityBox!.y + capacityBox!.height),
+          ),
+        ).toBeLessThanOrEqual(1);
       }
       expect((await acquire.boundingBox())!.height).toBeGreaterThanOrEqual(
         testInfo.project.use.hasTouch ? 44 : 40,
