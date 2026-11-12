@@ -9,7 +9,16 @@ import {
   POWER_AGREEMENT_BLOCKS,
   powerAgreementQuote,
 } from "../../helpers/PowerAgreements";
-import { formatMoneyConcise, formatWatts } from "../../helpers/Format";
+import {
+  formatMoneyConcise,
+  formatPercent,
+  formatWatts,
+} from "../../helpers/Format";
+import { currentTick } from "../../helpers/GameSelectors";
+import {
+  adjacentMarketPricePerMWh,
+  intertieContextForGame,
+} from "../../helpers/Transmission";
 import { useAppDispatch } from "../../Store";
 import {
   acceptPowerAgreement,
@@ -24,7 +33,8 @@ export function agreementSummary(game: GameType, corridorId: string) {
   const utility = inheritedUtilityForCorridor(corridorId);
   if (!utility) return undefined;
   const coverage = connectionAgreements(game, utility).reduce(
-    (sum, source) => sum + (source.active ? source.nominalW : 0),
+    (sum, source) =>
+      sum + (source.active ? source.nominalW * source.deliverability : 0),
     0,
   );
   const replacement = POWER_AGREEMENT_BLOCKS.some(
@@ -33,6 +43,13 @@ export function agreementSummary(game: GameType, corridorId: string) {
   );
   return `${formatWatts(coverage)} under agreement${replacement ? " · Replacement available" : ""}`;
 }
+function rateComparison(price: number, marketPrice: number) {
+  const difference = price / marketPrice - 1;
+  return Math.abs(difference) < 0.0005
+    ? "About the same"
+    : `${formatPercent(Math.abs(difference), 1)} ${difference < 0 ? "below" : "above"}`;
+}
+
 export default function PowerAgreements({
   game,
   line,
@@ -55,6 +72,15 @@ export default function PowerAgreements({
   }, [dispatch, token, review]);
   if (!utility) return null;
   const sources = connectionAgreements(game, utility);
+  const now = currentTick(game);
+  const marketPrice = now
+    ? adjacentMarketPricePerMWh(
+        line.corridorId,
+        intertieContextForGame(game),
+        now.minute,
+        now,
+      )
+    : undefined;
   const close = () => setReview(undefined);
   return (
     <Box
@@ -95,18 +121,19 @@ export default function PowerAgreements({
             {!expired && (
               <>
                 <Typography variant="body2">
-                  {formatWatts(source.nominalW)} covered ·{" "}
-                  {formatMoneyConcise(source.priceToday)}/MWh, follows inflation
+                  {formatWatts(source.nominalW * source.deliverability)} covered
+                  · {formatMoneyConcise(source.priceToday)}/MWh, follows
+                  inflation
                 </Typography>
-                <Typography
-                  variant="caption"
-                  color="textSecondary"
-                  component="p"
-                  sx={{ my: 0.5 }}
-                >
-                  Up to {formatWatts(source.nominalW * source.deliverability)}{" "}
-                  deliverable
-                </Typography>
+                {marketPrice !== undefined && marketPrice > 0 && (
+                  <Typography variant="body2" color="textSecondary">
+                    Market now {formatMoneyConcise(marketPrice)}/MWh · agreement{" "}
+                    {rateComparison(
+                      source.priceToday,
+                      marketPrice,
+                    ).toLowerCase()}
+                  </Typography>
+                )}
                 <Typography variant="body2">
                   {source.inherited
                     ? `Through ${agreementDate(source.endMinute, true)}`
@@ -117,9 +144,11 @@ export default function PowerAgreements({
                     agreementYearMinute(source.reductionYear) &&
                   (source.reducedNominalW ?? 0) > 0 && (
                     <Typography variant="body2" color="warning.main">
-                      {formatWatts(source.nominalW)} →{" "}
-                      {formatWatts(source.reducedNominalW!)} on 1 Jan{" "}
-                      {source.reductionYear}
+                      {formatWatts(source.nominalW * source.deliverability)} →{" "}
+                      {formatWatts(
+                        source.reducedNominalW! * source.deliverability,
+                      )}{" "}
+                      on 1 Jan {source.reductionYear}
                     </Typography>
                   )}
               </>
@@ -198,7 +227,7 @@ export default function PowerAgreements({
               <BuildDetails label="Replacement agreement terms">
                 <BuildDetailRow
                   label="Coverage"
-                  value={`${formatWatts(review.nominalW)} · up to ${formatWatts(review.deliverableW)} deliverable`}
+                  value={formatWatts(review.deliverableW)}
                 />
                 <BuildDetailRow
                   label="Delivery"
@@ -214,21 +243,48 @@ export default function PowerAgreements({
                         variant="caption"
                         color="textSecondary"
                       >
-                        Follows inflation · ${review.pricePerMWh}/MWh in 2005
-                        dollars
+                        Follows inflation
                       </Typography>
                     </>
                   }
                 />
+                {marketPrice !== undefined && marketPrice > 0 && (
+                  <BuildDetailRow
+                    label="Vs market now"
+                    value={
+                      <>
+                        {rateComparison(review.priceToday, marketPrice)}
+                        <Typography
+                          component="div"
+                          variant="caption"
+                          color="textSecondary"
+                        >
+                          Market {formatMoneyConcise(marketPrice)}/MWh
+                        </Typography>
+                      </>
+                    }
+                  />
+                )}
                 <BuildDetailRow
                   label="Payment"
-                  value="$0 upfront · pay for delivered energy"
+                  value={
+                    <>
+                      $0 upfront · pay for delivered energy
+                      <Typography
+                        component="div"
+                        variant="caption"
+                        color="textSecondary"
+                      >
+                        No minimum purchase
+                      </Typography>
+                    </>
+                  }
                 />
               </BuildDetails>
             </Box>
             <Typography variant="body2" sx={{ mt: 2 }}>
-              Covered imports use this agreed rate before market pricing. Local
-              generation can reduce purchases.
+              Covered imports use this agreed rate for the full term, even if
+              market prices fall. Uncovered purchases use market prices.
             </Typography>
           </>
         )}

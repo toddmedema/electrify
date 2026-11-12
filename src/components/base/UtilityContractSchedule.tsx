@@ -69,7 +69,7 @@ export default function UtilityContractSchedule({
             .map((source) => (
               <Typography key={source.id} variant="body2" sx={{ mb: 1 }}>
                 {source.name}: signed replacement covers{" "}
-                {formatWatts(source.nominalW)},{" "}
+                {formatWatts(source.nominalW * source.deliverability)},{" "}
                 {agreementDate(source.startMinute)}–
                 {agreementDate(source.endMinute, true)}. Delivery shares the
                 inherited regional connection.

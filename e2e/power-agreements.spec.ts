@@ -27,7 +27,7 @@ for (const theme of ["light", "dark"] as const) {
     let line = facilities
       .locator(".transmissionLine")
       .filter({ hasText: "Champlain regional connection" });
-    await expect(line).toContainText("220MW under agreement");
+    await expect(line).toContainText("209MW under agreement");
     await expect(
       line.getByRole("button", { name: /^Review upgrade/ }),
     ).toHaveCount(0);
@@ -105,7 +105,7 @@ for (const theme of ["light", "dark"] as const) {
     await expect(line).toContainText("Power purchase agreements");
     await expect(line).toContainText("Regional nuclear · Inherited");
     await expect(line).toContainText("Through 31 Dec 2019");
-    await expect(line).toContainText("120MW → 60MW on 1 Jan 2020");
+    await expect(line).toContainText("114MW → 57MW on 1 Jan 2020");
     const summary = line.locator(".powerAgreementSummary");
     await expect(summary).toContainText("Replacement available");
     expect(
@@ -140,11 +140,24 @@ for (const theme of ["light", "dark"] as const) {
       exact: true,
     });
     await expectDialogToFit(dialog);
+    await expect(dialog).not.toContainText("2005 dollars");
+    await expect(dialog).not.toContainText(
+      "Local generation can reduce purchases",
+    );
+    const marketNow = await line
+      .locator(".facilityStat")
+      .filter({ hasText: "Market price now" })
+      .locator("dd")
+      .innerText();
+    await expect(
+      dialog.getByRole("row", { name: /Vs market now/ }),
+    ).toContainText(marketNow);
     for (const fact of [
-      "60MW · up to 57MW deliverable",
+      "Coverage57MW",
       "1 Jan 2020–31 Dec 2029",
-      "Follows inflation · $65/MWh in 2005 dollars",
+      "Follows inflation",
       "$0 upfront · pay for delivered energy",
+      "No minimum purchase",
     ])
       await expect(dialog).toContainText(fact);
     await expect(

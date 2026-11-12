@@ -42,6 +42,13 @@ an accepted agreement when its term ends, provided new delivery starts before
 
 ## Dispatch and persistence
 
+The interface shows only maximum deliverable coverage, rather than both nominal
+and deliverable capacities. Prices are shown in today's money with their inflation
+rule. The market comparison uses the same current spot price as the connection,
+including current conditions; it is not a forecast of prices over the agreement's
+term. Reviews explicitly disclose the current model's lack of a minimum purchase
+and that covered purchases retain the agreed rate even when market prices fall.
+
 Active agreement slices serve purchased customer energy before residual market
 purchases, ordered by agreed price and stable identity. They are not must-take:
 weather generation can displace purchases. Contract and market flows consume one

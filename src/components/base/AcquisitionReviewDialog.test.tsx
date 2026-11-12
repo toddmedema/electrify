@@ -114,10 +114,7 @@ it("keeps Valley's dated supply reduction with acquisition obligations", () => {
   review("valley-electric");
   const obligations = within(fact("Acquisition obligations"));
   expect(obligations.getByText(/January 2017/)).toHaveTextContent(
-    "160 to 80 MW",
-  );
-  expect(obligations.getByText(/January 2017/)).toHaveTextContent(
-    "152 to 76 MW deliverable",
+    "152 to 76 MW",
   );
   expect(screen.queryByText(/Plan replacement supply/)).not.toBeInTheDocument();
 });
@@ -130,7 +127,7 @@ it.each([2017, 2024])(
       within(fact("Acquisition obligations")).getByText(
         /nuclear purchase is now/,
       ),
-    ).toHaveTextContent("80MW (76MW deliverable)");
+    ).toHaveTextContent("76MW");
   },
 );
 
