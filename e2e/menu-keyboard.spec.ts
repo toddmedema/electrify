@@ -19,7 +19,7 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
-test("main menu and settings work entirely with arrows, Enter and Escape", async ({
+test("main menu and settings work entirely with the keyboard", async ({
   page,
 }) => {
   await page.goto("/");

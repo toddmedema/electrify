@@ -95,13 +95,13 @@ it("keeps movement and confirmation within the top popup, even when it has no ac
 it("keeps the covered compact fleet out of controller navigation and confirmation", () => {
   const pauseCoal = jest.fn();
   const inspect = jest.fn();
-  const workspace = (layout: "sheet" | "side", toolOpen = true) => (
+  const workspace = (layout: "single" | "side", toolOpen = true) => (
     <main className="base_main">
       <header>
         <button>Game menu</button>
       </header>
       <div className="gameStage" data-layout={layout}>
-        <div className="gameFleet">
+        <div className="gameFleet" hidden={layout === "single" && toolOpen}>
           <button onClick={pauseCoal}>Pause coal</button>
           <div
             role="img"
@@ -125,7 +125,7 @@ it("keeps the covered compact fleet out of controller navigation and confirmatio
       </nav>
     </main>
   );
-  const view = render(workspace("sheet"));
+  const view = render(workspace("single"));
   screen.getByRole("button", { name: "Game menu" }).focus();
   moveInputFocus("down");
   expect(screen.getByRole("button", { name: "Close Build" })).toHaveFocus();
@@ -135,10 +135,10 @@ it("keeps the covered compact fleet out of controller navigation and confirmatio
   expect(screen.getByRole("button", { name: /^Build$/ })).toHaveFocus();
   moveInputFocus("down");
   expect(screen.getByRole("button", { name: /^Build$/ })).toHaveFocus();
-  screen.getByRole("button", { name: "Pause coal" }).focus();
+  screen.getByRole("button", { name: "Pause coal", hidden: true }).focus();
   confirmInput();
   expect(pauseCoal).not.toHaveBeenCalled();
-  screen.getByRole("img").focus();
+  screen.getByRole("img", { hidden: true }).focus();
   moveInputFocus("right");
   expect(inspect).not.toHaveBeenCalled();
   expect(screen.getByRole("button", { name: "Game menu" })).toHaveFocus();
@@ -150,7 +150,7 @@ it("keeps the covered compact fleet out of controller navigation and confirmatio
   confirmInput();
   expect(pauseCoal).toHaveBeenCalledTimes(1);
 
-  view.rerender(workspace("sheet", false));
+  view.rerender(workspace("single", false));
   screen.getByRole("button", { name: "Game menu" }).focus();
   moveInputFocus("down");
   expect(screen.getByRole("button", { name: "Pause coal" })).toHaveFocus();
@@ -514,6 +514,41 @@ it("includes sibling controller help in the frame while popups retain their scop
   expect(screen.getByRole("button", { name: "All controls" })).toHaveFocus();
   moveInputFocus("up");
   expect(screen.getByRole("button", { name: "Play" })).toHaveFocus();
+});
+
+it("reaches a wide overlapping row before a farther control with a nearer center", () => {
+  render(
+    <main className="base_main">
+      <button>Workspace</button>
+      <button>Advanced display</button>
+      <button>Fullscreen</button>
+    </main>,
+  );
+  for (const [name, left, top, width] of [
+    ["Workspace", 2800, 0, 200],
+    ["Advanced display", 0, 100, 3000],
+    ["Fullscreen", 2800, 200, 200],
+  ] as const) {
+    positions.set(screen.getByRole("button", { name }), {
+      left,
+      right: left + width,
+      top,
+      bottom: top + 40,
+      width,
+      height: 40,
+    } as DOMRect);
+  }
+  screen.getByRole("button", { name: "Workspace" }).focus();
+  moveInputFocus("down");
+  expect(
+    screen.getByRole("button", { name: "Advanced display" }),
+  ).toHaveFocus();
+  moveInputFocus("down");
+  expect(screen.getByRole("button", { name: "Fullscreen" })).toHaveFocus();
+  moveInputFocus("up");
+  expect(
+    screen.getByRole("button", { name: "Advanced display" }),
+  ).toHaveFocus();
 });
 
 it("keeps vertical navigation in its pane and uses horizontal navigation across panels", () => {

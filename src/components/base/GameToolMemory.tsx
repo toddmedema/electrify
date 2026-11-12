@@ -125,13 +125,24 @@ interface FocusMemory {
   tag: string;
 }
 
+/** Track intent for the memory owner's lifetime, including while Settings replaces the workspace. */
+export function rememberToolInput(memory: () => Map<string, unknown>) {
+  const keyboard = () => memory().set("focus.keyboard", true);
+  const pointer = () => memory().set("focus.keyboard", false);
+  document.addEventListener("keydown", keyboard, true);
+  document.addEventListener("pointerdown", pointer, true);
+  return () => {
+    document.removeEventListener("keydown", keyboard, true);
+    document.removeEventListener("pointerdown", pointer, true);
+  };
+}
+
 /** Focus shares the workspace lifetime and scroll memory; no DOM nodes enter a game save. */
 export function useToolFocusMemory(
   ref: React.RefObject<HTMLElement | null>,
   memory: Map<string, unknown>,
   active: string,
 ) {
-  const keyboard = React.useRef(false);
   React.useEffect(() => {
     const root = ref.current;
     if (!root) return;
@@ -153,21 +164,15 @@ export function useToolFocusMemory(
         tag: element.tagName,
       } satisfies FocusMemory);
     };
-    const onKeyboard = () => (keyboard.current = true);
-    const onPointer = () => (keyboard.current = false);
     root.addEventListener("focusin", remember);
-    document.addEventListener("keydown", onKeyboard, true);
-    document.addEventListener("pointerdown", onPointer, true);
     return () => {
       root.removeEventListener("focusin", remember);
-      document.removeEventListener("keydown", onKeyboard, true);
-      document.removeEventListener("pointerdown", onPointer, true);
     };
   }, [memory, ref]);
   React.useEffect(() => {
     if (
       document.documentElement.dataset.controllerInput !== "true" &&
-      !keyboard.current
+      !memory.get("focus.keyboard")
     )
       return;
     const saved = memory.get(`focus.${active}`) as FocusMemory | undefined;
@@ -180,6 +185,16 @@ export function useToolFocusMemory(
     };
     const restore = (attempt: number) => {
       if (cancelled) return;
+      const focused = document.activeElement;
+      // Closing a tool, chart shortcuts and native focus restoration choose explicit destinations.
+      // Only replace an unfocused document or the workspace's initial tool heading.
+      if (
+        focused instanceof HTMLElement &&
+        focused !== document.body &&
+        !focused.matches("h1,h2,h3,h4,h5,h6") &&
+        !focused.closest("[hidden],[inert],[aria-hidden=true]")
+      )
+        return;
       const root = ref.current?.querySelector<HTMLElement>(
         active === "fleet" ? ".gameFleet" : `[data-game-tool="${active}"]`,
       );

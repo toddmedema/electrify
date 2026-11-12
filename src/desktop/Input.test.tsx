@@ -451,45 +451,59 @@ it("waits for context activation and leaves older/native-unavailable editions us
   expect(getInputPresentation().active).toBe(false);
 });
 
-it("reveals fleet charts before focusing them when a compact tool covers the fleet", async () => {
-  store.dispatch(delta({ inGame: true }));
-  store.dispatch(navigate("PROGRAMS"));
-  function Surface() {
-    const card = useAppSelector((state) => state.card.name);
-    return (
-      <main className="base_main">
-        <div className="gameWorkspace">
-          <div className="gameStage" data-layout="sheet">
-            <div className="gameFleet">
-              <div className="accessibleChart">
-                <div role="img" aria-label="Supply chart" tabIndex={0} />
+it.each([
+  ["PROGRAMS", "nextChart"],
+  ["PROGRAMS", "previousChart"],
+  ["EVENTS", "nextChart"],
+  ["EVENTS", "previousChart"],
+] as const)(
+  "%s %s reveals hidden fleet charts before focusing them in a single-tool workspace",
+  async (tool, action) => {
+    store.dispatch(delta({ inGame: true }));
+    store.dispatch(navigate(tool));
+    function Surface() {
+      const card = useAppSelector((state) => state.card.name);
+      return (
+        <main className="base_main">
+          <div className="gameWorkspace">
+            <div className="gameStage" data-layout="single">
+              <div className="gameFleet" hidden={card !== "FACILITIES"}>
+                <div className="accessibleChart">
+                  <div role="img" aria-label="Supply chart" tabIndex={0} />
+                  <div role="img" aria-label="Demand chart" tabIndex={0} />
+                </div>
               </div>
+              <section
+                className="gameToolPanel"
+                data-game-tool={tool}
+                hidden={card === "FACILITIES"}
+              >
+                <button>Close tool</button>
+              </section>
             </div>
-            <section
-              className="gameToolPanel"
-              data-game-tool="PROGRAMS"
-              hidden={card === "FACILITIES"}
-            >
-              <button>Close Programs</button>
-            </section>
           </div>
-        </div>
-      </main>
+        </main>
+      );
+    }
+    render(
+      <Provider store={store}>
+        <Surface />
+      </Provider>,
     );
-  }
-  render(
-    <Provider store={store}>
-      <Surface />
-    </Provider>,
-  );
-  const f = bridge();
-  stop = startDesktopInput(store, f.desktop);
-  await Promise.resolve();
-  f.emit({ actions: ["nextChart"] });
-  expect(store.getState().card.name).toBe("FACILITIES");
-  act(() => jest.advanceTimersByTime(20));
-  expect(screen.getByRole("img", { name: "Supply chart" })).toHaveFocus();
-});
+    const f = bridge();
+    stop = startDesktopInput(store, f.desktop);
+    await Promise.resolve();
+    expect(screen.queryByRole("img")).not.toBeInTheDocument();
+    f.emit({ actions: [action] });
+    expect(store.getState().card.name).toBe("FACILITIES");
+    act(() => jest.advanceTimersByTime(20));
+    expect(
+      screen.getByRole("img", {
+        name: action === "nextChart" ? "Supply chart" : "Demand chart",
+      }),
+    ).toHaveFocus();
+  },
+);
 
 it.each(["seat", "online"])(
   "routes %s speed and readiness through the shared clock",

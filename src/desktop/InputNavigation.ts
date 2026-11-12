@@ -23,15 +23,6 @@ function visible(element: HTMLElement): boolean {
     if (!details.querySelector(":scope > summary")?.contains(element))
       return false;
   }
-  // Compact tools cover the fleet without unmounting it or changing pointer/keyboard access.
-  // Controller focus must stay on the exposed surface, including when a resize covers focus.
-  if (
-    element.closest(".gameFleet") &&
-    element
-      .closest('.gameStage[data-layout="sheet"]')
-      ?.querySelector(".gameToolPanel:not([hidden])")
-  )
-    return false;
   return (
     !element.closest("[hidden],[inert],[aria-hidden=true]") &&
     !!element.getClientRects().length &&
@@ -169,7 +160,9 @@ function spatialDestination(
       : Math.min(from.bottom, rect.bottom) - Math.max(from.top, rect.top);
     // Horizontal navigation follows the current row; Down/Up leaves that row.
     if (!vertical && overlap <= 0) return [];
-    const cross = Math.abs(vertical ? dx : dy);
+    // Overlapping rows are aligned even when one spans the entire settings pane.
+    // Its distant center must not make a wide disclosure lose to a later narrow control.
+    const cross = Math.max(0, -overlap);
     return [
       {
         element,

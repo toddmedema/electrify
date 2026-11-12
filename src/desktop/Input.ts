@@ -198,7 +198,7 @@ export function startDesktopInput(
     if (!charts.length) {
       if (
         document.querySelector(
-          '.gameStage[data-layout="sheet"] .gameToolPanel:not([hidden])',
+          '.gameStage[data-layout="single"] .gameToolPanel:not([hidden])',
         )
       ) {
         store.dispatch(navigate("FACILITIES"));

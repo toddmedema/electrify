@@ -10,7 +10,15 @@ import {
   GameToolMemoryContext,
   useToolScroll,
   useToolFocusMemory,
+  rememberToolInput,
 } from "./GameToolMemory";
+
+let inputMemory: Map<string, unknown>;
+let stopInput: () => void;
+beforeEach(() => {
+  inputMemory = new Map();
+  stopInput = rememberToolInput(() => inputMemory);
+});
 
 test("opening a detail remembers a scroll that has not dispatched its scroll event yet", () => {
   function Tool() {
@@ -38,12 +46,15 @@ test("opening a detail remembers a scroll that has not dispatched its scroll eve
   expect(body.scrollTop).toBe(180);
 });
 
-afterEach(() => delete document.documentElement.dataset.controllerInput);
+afterEach(() => {
+  stopInput();
+  delete document.documentElement.dataset.controllerInput;
+});
 
 test.each(["keyboard", "controller"])(
   "%s tools restore the same semantic control after remount and delayed readiness without a layout preference",
   async (device) => {
-    const memory = new Map<string, unknown>();
+    const memory = inputMemory;
     function Workspace({
       tool,
       loading = false,
@@ -87,7 +98,7 @@ test.each(["keyboard", "controller"])(
 );
 
 test("pointer tool changes and pointer input during a pending restore retain pointer focus", async () => {
-  const memory = new Map<string, unknown>();
+  const memory = inputMemory;
   function Workspace({ tool }: { tool: string }) {
     const ref = React.useRef<HTMLDivElement>(null);
     useToolFocusMemory(ref, memory, tool);
@@ -120,3 +131,82 @@ test("pointer tool changes and pointer input during a pending restore retain poi
   });
   expect(screen.getByRole("button", { name: "Dock" })).toHaveFocus();
 });
+
+test.each(["keyboard", "pointer"])(
+  "%s intent while Settings replaces the workspace governs restored widget focus and scrolling",
+  async (device) => {
+    function Workspace() {
+      const ref = React.useRef<HTMLDivElement>(null);
+      useToolFocusMemory(ref, inputMemory, "Programs");
+      const scroll = useToolScroll<HTMLDivElement>("programs.scroll");
+      return (
+        <div ref={ref}>
+          <section data-game-tool="Programs" ref={scroll} aria-label="Programs">
+            <button>First</button>
+            <input type="range" aria-label="Electricity price" />
+          </section>
+        </div>
+      );
+    }
+    function App({ settings = false }) {
+      return (
+        <GameToolMemoryContext.Provider value={inputMemory}>
+          {settings ? <button>Settings</button> : <Workspace />}
+        </GameToolMemoryContext.Provider>
+      );
+    }
+    const view = render(<App />);
+    fireEvent.keyDown(document, { key: "Tab" });
+    act(() => screen.getByRole("slider").focus());
+    const pane = screen.getByRole("region", { name: "Programs" });
+    pane.scrollTop = 180;
+    fireEvent.scroll(pane);
+    view.rerender(<App settings />);
+    // Input must still be remembered while the workspace and its hook are unmounted.
+    if (device === "keyboard") fireEvent.keyDown(document, { key: "Escape" });
+    else
+      fireEvent.pointerDown(screen.getByRole("button", { name: "Settings" }));
+    view.rerender(<App />);
+    await act(async () => {
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+    });
+    const price = screen.getByRole("slider", { name: "Electricity price" });
+    expect(price.matches(":focus")).toBe(device === "keyboard");
+    expect(screen.getByRole("region", { name: "Programs" }).scrollTop).toBe(
+      180,
+    );
+  },
+);
+
+test.each(["keyboard", "controller"])(
+  "%s tool closure preserves its explicitly focused dock destination",
+  async (device) => {
+    function Workspace({ tool = true }) {
+      const ref = React.useRef<HTMLDivElement>(null);
+      useToolFocusMemory(ref, inputMemory, tool ? "Programs" : "fleet");
+      return (
+        <div ref={ref}>
+          <button>Programs dock</button>
+          <div className="gameFleet" hidden={tool}>
+            <button>Fleet action</button>
+          </div>
+          {tool && (
+            <section data-game-tool="Programs">
+              <button>Close Programs</button>
+            </section>
+          )}
+        </div>
+      );
+    }
+    const view = render(<Workspace />);
+    if (device === "controller")
+      document.documentElement.dataset.controllerInput = "true";
+    else fireEvent.keyDown(document, { key: "Escape" });
+    act(() => screen.getByRole("button", { name: "Programs dock" }).focus());
+    view.rerender(<Workspace tool={false} />);
+    await act(async () => {
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+    });
+    expect(screen.getByRole("button", { name: "Programs dock" })).toHaveFocus();
+  },
+);

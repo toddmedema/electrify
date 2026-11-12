@@ -714,7 +714,7 @@ for (const theme of ["light", "dark"] as const) {
   });
 }
 
-test("icon labels support hover, keyboard focus, and touch hold-and-slide without opening tools", async ({
+test("dock labels support pointer, keyboard and touch without accidental tool activation", async ({
   page,
 }, testInfo) => {
   await startGame(page, "light");
@@ -770,6 +770,49 @@ test("icon labels support hover, keyboard focus, and touch hold-and-slide withou
   const session = await page.context().newCDPSession(page);
   const dockBox = (await dock.boundingBox())!;
   const y = dockBox.y + dockBox.height / 2;
+  if (
+    (await page.locator(".gameStage").getAttribute("data-layout")) === "single"
+  ) {
+    // The compact dock now keeps its text visible and permits native horizontal swiping.
+    // A swipe can cancel tooltip preview; labels and accessible names stay available throughout.
+    const actions = ["Build", "Programs", "Insights", "Events"];
+    for (const label of actions) {
+      const action = dock.getByRole("button", { name: label, exact: true });
+      await expect(action.locator(".gameDockLabel")).toHaveText(label);
+      await expect(action.locator(".gameDockLabel")).toBeVisible();
+    }
+    const build = (await page.locator("#buildNav").boundingBox())!;
+    await session.send("Input.dispatchTouchEvent", {
+      type: "touchStart",
+      touchPoints: [{ x: build.x + build.width / 2, y }],
+    });
+    await page.waitForTimeout(600);
+    await expect(
+      page.getByRole("tooltip", { name: "Build", exact: true }),
+    ).toBeVisible();
+    for (const label of actions.slice(1)) {
+      const action = dock.getByRole("button", { name: label, exact: true });
+      const box = (await action.boundingBox())!;
+      await session.send("Input.dispatchTouchEvent", {
+        type: "touchMove",
+        touchPoints: [{ x: box.x + box.width / 2, y }],
+      });
+      await expect(action.locator(".gameDockLabel")).toBeVisible();
+      await expect(page.locator(".gameToolPanel")).toHaveCount(0);
+    }
+    await session.send("Input.dispatchTouchEvent", {
+      type: "touchEnd",
+      touchPoints: [],
+    });
+    await expect(page.getByRole("tooltip")).toHaveCount(0);
+    await expect(page.locator(".gameToolPanel")).toHaveCount(0);
+    await dock.getByRole("button", { name: "Build", exact: true }).tap();
+    await expect(
+      page.getByRole("region", { name: "Build", exact: true }),
+    ).toBeVisible();
+    await session.detach();
+    return;
+  }
   // Start on the bar's padding, then move across every icon while holding the same finger.
   await session.send("Input.dispatchTouchEvent", {
     type: "touchStart",

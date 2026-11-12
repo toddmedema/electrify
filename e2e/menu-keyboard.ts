@@ -102,14 +102,17 @@ export async function verifyMenuKeyboard(page: Page): Promise<void> {
   });
   await expect(scale).toBeFocused();
   await expect(scale).toHaveValue("1");
-  // Native select arrows edit its choice; Tab leaves the widget.
-  await page.keyboard.press("ArrowDown");
+  // Native typeahead works with both desktop popups and mobile pickers; Tab commits the choice.
+  await page.keyboard.type("112.5%");
+  await page.keyboard.press("Tab");
   await expect(scale).toHaveValue("1.125");
   await expect(page.locator("html")).toHaveCSS("font-size", "18px");
-  await page.keyboard.press("ArrowUp");
+  await page.keyboard.press("Shift+Tab");
+  await expect(scale).toBeFocused();
+  await page.keyboard.type("100%");
+  await page.keyboard.press("Tab");
   await expect(scale).toHaveValue("1");
   await expect(page.locator("html")).toHaveCSS("font-size", "16px");
-  await page.keyboard.press("Tab");
   const sound = page.getByRole("switch", { name: "Sound", exact: true });
   await expect(sound).toBeFocused();
   await expect(sound).not.toBeChecked();
