@@ -3,6 +3,75 @@ import { expect, test } from "./fixtures";
 import { openBuild, openPane } from "./layout";
 
 for (const theme of ["light", "dark"] as const) {
+  test(`enlarged manual help keeps its header and scroll body in a short viewport in ${theme}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({
+      width: page.viewportSize()!.width,
+      height: 1080,
+    });
+    await page.addInitScript((mode) => {
+      localStorage.clear();
+      localStorage.setItem("interfaceScale", "2.5");
+      localStorage.setItem("theme", mode);
+      localStorage.setItem("audioEnabled", "false");
+    }, theme);
+    await page.goto("/?scenario=111");
+    await page.getByRole("button", { name: "Start game", exact: true }).click();
+    const build = await openBuild(page);
+    const option = build.locator(".buildOption").first();
+    await option.getByRole("button", { name: /^Show .* details$/ }).click();
+    await option
+      .getByRole("button", { name: /^What is / })
+      .first()
+      .click();
+    const manual = page.getByRole("dialog", { name: "Manual help" });
+    await expect(manual).toBeVisible();
+    await page.setViewportSize({
+      width: page.viewportSize()!.width,
+      height: 360,
+    });
+    const close = manual.getByRole("button", { name: "close", exact: true });
+    await expect(close).toBeInViewport({ ratio: 1 });
+    await expect
+      .poll(async () => {
+        const box = (await manual.boundingBox())!;
+        return box.y + box.height;
+      })
+      .toBeLessThanOrEqual(353);
+    const body = manual.locator(".manual-popover-body");
+    const geometry = await manual.evaluate((element) => {
+      const box = element.getBoundingClientRect();
+      const header = element
+        .querySelector(".manual-popover-header")!
+        .getBoundingClientRect();
+      const body = element.querySelector(".manual-popover-body")!;
+      return {
+        top: box.top,
+        bottom: box.bottom,
+        headerBottom: header.bottom,
+        bodyHeight: body.clientHeight,
+        scrollHeight: body.scrollHeight,
+      };
+    });
+    expect(geometry.top).toBeGreaterThanOrEqual(8);
+    expect(geometry.bottom).toBeLessThanOrEqual(353);
+    expect(geometry.headerBottom).toBeLessThan(geometry.bottom);
+    expect(geometry.bodyHeight).toBeGreaterThanOrEqual(40);
+    expect(geometry.scrollHeight).toBeGreaterThan(geometry.bodyHeight);
+    await body.evaluate((element) => {
+      element.scrollTop = element.scrollHeight;
+    });
+    expect(await body.evaluate((element) => element.scrollTop)).toBeGreaterThan(
+      0,
+    );
+    await expect(close).toBeInViewport({ ratio: 1 });
+    await close.click();
+    await expect(manual).not.toBeVisible();
+  });
+}
+
+for (const theme of ["light", "dark"] as const) {
   test(`contextual learning preserves a storage decision in ${theme}`, async ({
     page,
   }, testInfo) => {

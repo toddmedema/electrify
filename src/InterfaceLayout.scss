@@ -258,9 +258,16 @@ html[data-interface-scale]:not([data-interface-scale="1"]) {
     grid-template-columns: minmax(0, 1fr);
     gap: 1rem;
   }
+  .screenPage:has(.locationPicker) > .scrollable {
+    container: location-picker / inline-size;
+  }
   .locationPicker {
-    grid-template-columns: minmax(0, 1.5fr) minmax(16rem, 1fr);
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "heading" "details" "map";
     margin-block: 1rem;
+    &.locationPickerWithoutHeading {
+      grid-template-areas: "details" "map";
+    }
   }
   .locationPickerCount {
     line-height: 1.5;
@@ -304,7 +311,10 @@ html[data-interface-scale]:not([data-interface-scale="1"]) {
   .manual-popover.MuiPaper-root {
     width: min(40rem, calc(100vw - 2 * var(--screen-edge-margin)));
     max-width: none;
-    max-height: min(32rem, calc(100dvh - 2 * var(--screen-edge-margin) - 8rem));
+    max-height: min(
+      32rem,
+      calc(100dvh - 2 * var(--screen-edge-margin) - min(8rem, 20dvh))
+    );
   }
   .manual-popover-header {
     flex: 0 0 auto;
@@ -538,5 +548,16 @@ html[data-interface-scale]:not([data-interface-scale="1"]) {
   }
   .chartTooltip-breakdown {
     width: 30rem;
+  }
+}
+
+// A readable map, details column and gap must all fit at the player's chosen scale.
+@container location-picker (min-width: 41rem) {
+  html[data-interface-scale]:not([data-interface-scale="1"]) .locationPicker {
+    grid-template-columns: minmax(0, 1.5fr) minmax(16rem, 1fr);
+    grid-template-areas: "heading heading" "map details";
+    &.locationPickerWithoutHeading {
+      grid-template-areas: "map details";
+    }
   }
 }

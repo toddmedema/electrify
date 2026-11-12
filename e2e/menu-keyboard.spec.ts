@@ -90,6 +90,67 @@ test("interface scale persists and scales controls with text at every display he
   ).toBeLessThanOrEqual(1);
 });
 
+for (const theme of ["light", "dark"] as const) {
+  test(`scaled location picker stacks until both columns fit in ${theme}`, async ({
+    page,
+  }) => {
+    await page.addInitScript((mode) => {
+      localStorage.setItem("interfaceScale", "2.5");
+      localStorage.setItem("theme", mode);
+      localStorage.setItem(
+        "plays",
+        JSON.stringify({
+          plays: [
+            { scenarioId: 0, timesPlayed: 1, date: new Date().toString() },
+          ],
+        }),
+      );
+    }, theme);
+    await page.goto("/");
+    await page.getByRole("button", { name: "Play", exact: true }).click();
+    await page
+      .getByRole("button", { name: "View Custom Game details" })
+      .click();
+    const picker = page.locator(".locationPicker");
+    await expect(picker).toBeVisible();
+    const geometry = () =>
+      picker.evaluate((element) => {
+        const box = element.getBoundingClientRect();
+        const map = element.querySelector(".worldMap")!.getBoundingClientRect();
+        const details = element
+          .querySelector(".locationPickerDetails")!
+          .getBoundingClientRect();
+        return {
+          width: box.width,
+          map: { x: map.x, y: map.y, width: map.width },
+          details: { x: details.x, y: details.y, width: details.width },
+        };
+      });
+    const originalViewport = page.viewportSize()!;
+    for (const width of [originalViewport.width, 700, 1280]) {
+      await page.setViewportSize({ width, height: originalViewport.height });
+      await expect
+        .poll(async () => (await geometry()).map.width)
+        .toBeGreaterThanOrEqual(width - 100);
+      const current = await geometry();
+      expect(current.map.width).toBeCloseTo(current.width, 0);
+      expect(current.details.width).toBeCloseTo(current.width, 0);
+      expect(current.map.y).toBeGreaterThan(current.details.y);
+    }
+    await page.setViewportSize({ width: 1920, height: 1080 });
+    await expect
+      .poll(async () => {
+        const current = await geometry();
+        return current.details.x - current.map.x - current.map.width;
+      })
+      .toBeGreaterThanOrEqual(39);
+    const wide = await geometry();
+    expect(wide.map.width).toBeGreaterThanOrEqual(960);
+    expect(wide.details.width).toBeGreaterThanOrEqual(640);
+    await expect(page.locator("html")).toHaveCSS("font-size", "40px");
+  });
+}
+
 test("Space toggles Sound", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Settings", exact: true }).click();
