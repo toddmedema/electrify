@@ -22,33 +22,39 @@ it("keeps the app usable when storage reads are blocked", () => {
   expect(screen.getByText("Game")).toBeInTheDocument();
 });
 
-it("handles install dismissal and completion when persistence writes fail", async () => {
-  jest.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
-    throw new DOMException("Full", "QuotaExceededError");
-  });
-  jest.spyOn(Storage.prototype, "removeItem").mockImplementation(() => {
-    throw new DOMException("Blocked", "SecurityError");
-  });
-  render(
-    <InstallPromptProvider>
-      <InstallAppButton />
-    </InstallPromptProvider>,
-  );
-  const prompt = jest.fn().mockResolvedValue(undefined);
-  act(() => {
-    window.dispatchEvent(
-      Object.assign(new Event("beforeinstallprompt"), {
-        prompt,
-        userChoice: Promise.resolve({ outcome: "dismissed", platform: "web" }),
-      }),
+it.each([false, true])(
+  "handles install dismissal and completion when persistence writes fail (icon only: %s)",
+  async (iconOnly) => {
+    jest.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new DOMException("Full", "QuotaExceededError");
+    });
+    jest.spyOn(Storage.prototype, "removeItem").mockImplementation(() => {
+      throw new DOMException("Blocked", "SecurityError");
+    });
+    render(
+      <InstallPromptProvider>
+        <InstallAppButton iconOnly={iconOnly} />
+      </InstallPromptProvider>,
     );
-  });
-  await userEvent.click(screen.getByRole("button", { name: "Install app" }));
-  expect(prompt).toHaveBeenCalledTimes(1);
-  expect(
-    screen.queryByRole("button", { name: "Install app" }),
-  ).not.toBeInTheDocument();
-  act(() => {
-    window.dispatchEvent(new Event("appinstalled"));
-  });
-});
+    const prompt = jest.fn().mockResolvedValue(undefined);
+    act(() => {
+      window.dispatchEvent(
+        Object.assign(new Event("beforeinstallprompt"), {
+          prompt,
+          userChoice: Promise.resolve({
+            outcome: "dismissed",
+            platform: "web",
+          }),
+        }),
+      );
+    });
+    await userEvent.click(screen.getByRole("button", { name: "Install app" }));
+    expect(prompt).toHaveBeenCalledTimes(1);
+    expect(
+      screen.queryByRole("button", { name: "Install app" }),
+    ).not.toBeInTheDocument();
+    act(() => {
+      window.dispatchEvent(new Event("appinstalled"));
+    });
+  },
+);

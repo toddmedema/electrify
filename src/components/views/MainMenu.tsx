@@ -6,12 +6,15 @@ import {
   IconButton,
   Stack,
   SvgIcon,
+  Tooltip,
   Typography,
   useTheme,
 } from "@mui/material";
 import EmailIcon from "@mui/icons-material/Email";
 import InfoIcon from "@mui/icons-material/Info";
 import ShareIcon from "@mui/icons-material/Share";
+import MenuBookIcon from "@mui/icons-material/MenuBook";
+import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
 import {
   buildGameShareContent,
   canShare,
@@ -59,8 +62,7 @@ const DiscordIcon = () => (
 // Mouse movement shares selection with keyboard/controller focus. A touch drag is scrolling,
 // not hover selection. Boundary events alone can also come from the entrance moving beneath
 // a stationary pointer.
-const HOME_MENU_BUTTONS =
-  ".mainActions button, .resourceActions button, .discoveryActions button";
+const HOME_MENU_BUTTONS = "button,a[href]";
 function focusHomeButton(event: React.PointerEvent) {
   if (event.pointerType !== "mouse") return;
   const target = event.target as HTMLElement;
@@ -132,8 +134,13 @@ const MainMenu = (props: Props): React.JSX.Element => {
   return (
     <div
       id="menuCard"
+      className="keyboardMenu"
+      {...menuKeys}
       onPointerDown={onTouchPress}
-      onPointerMove={onTouchMove}
+      onPointerMove={(event) => {
+        onTouchMove(event);
+        focusHomeButton(event);
+      }}
       onPointerUp={clearTouchPress}
       onPointerCancel={clearTouchPress}
       onPointerLeave={clearTouchPress}
@@ -175,13 +182,7 @@ const MainMenu = (props: Props): React.JSX.Element => {
       <Typography component="h1" className="srOnly">
         Electrify
       </Typography>
-      <Box
-        id="centeredMenu"
-        className="keyboardMenu"
-        {...menuKeys}
-        onPointerMove={focusHomeButton}
-        sx={{ px: 3 }}
-      >
+      <Box id="centeredMenu" sx={{ px: 3 }}>
         <Stack
           component="section"
           aria-label="Primary actions"
@@ -240,24 +241,6 @@ const MainMenu = (props: Props): React.JSX.Element => {
             justifyContent: "center",
           }}
         >
-          {!desktopApp && (
-            <Button
-              data-achievements-trigger
-              variant="text"
-              color="primary"
-              onClick={props.onAchievements}
-            >
-              Achievements
-            </Button>
-          )}
-          <Button
-            data-manual-trigger
-            variant="text"
-            color="primary"
-            onClick={props.onManual}
-          >
-            Manual
-          </Button>
           {desktopApp && getDesktop()?.mods && (
             <Button
               data-mods-trigger
@@ -299,7 +282,6 @@ const MainMenu = (props: Props): React.JSX.Element => {
               justifyContent: "center",
             }}
           >
-            {!desktopApp && <InstallAppButton showIcon={false} />}
             {props.audioEnabled === undefined && !desktopApp && (
               <Button color="primary" onClick={() => props.onAudioChange(true)}>
                 Turn on sound
@@ -312,6 +294,31 @@ const MainMenu = (props: Props): React.JSX.Element => {
         </Typography>
       </Box>
       <footer className="mainMenuFooter">
+        <Tooltip title="Manual">
+          <IconButton
+            data-manual-trigger
+            color="primary"
+            aria-label="Manual"
+            size="large"
+            onClick={props.onManual}
+          >
+            <MenuBookIcon />
+          </IconButton>
+        </Tooltip>
+        {!desktopApp && <InstallAppButton iconOnly />}
+        {!desktopApp && (
+          <Tooltip title="Achievements">
+            <IconButton
+              data-achievements-trigger
+              color="primary"
+              aria-label="Achievements"
+              size="large"
+              onClick={props.onAchievements}
+            >
+              <EmojiEventsIcon />
+            </IconButton>
+          </Tooltip>
+        )}
         <IconButton
           color="primary"
           href={DISCORD_URL}

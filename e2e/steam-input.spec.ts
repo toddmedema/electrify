@@ -88,7 +88,10 @@ async function select(
       (await group.getAttribute("aria-orientation")) === "vertical";
     action = vertical ? (forward ? "down" : "up") : forward ? "right" : "left";
   }
-  if ((await page.locator("html").getAttribute("data-tv-layout")) === "true") {
+  if (
+    (await page.locator("html").getAttribute("data-tv-layout")) === "true" &&
+    !(await control.evaluate((element) => !!element.closest("#menuCard")))
+  ) {
     const visited = new Map<string, number>();
     for (let attempt = 0; attempt < limit; attempt++) {
       if (
@@ -376,7 +379,7 @@ test("menu movement under a stationary pointer preserves keyboard navigation", a
     name: "Play with friends",
     exact: true,
   });
-  const manual = page.getByRole("button", { name: "Manual", exact: true });
+  const mods = page.getByRole("button", { name: "Mods", exact: true });
   const tv = await waitForDesktopTvEntry(page);
   await friends.hover();
   await expect(friends).toBeFocused();
@@ -386,7 +389,7 @@ test("menu movement under a stationary pointer preserves keyboard navigation", a
   await page.keyboard.press("ArrowDown");
   await expect(tv).toBeFocused();
   await page.keyboard.press("ArrowDown");
-  await expect(manual).toBeFocused();
+  await expect(mods).toBeFocused();
 
   // Like the desktop entrance, move controls away and back beneath an unmoved mouse.
   await friends.evaluate((button) => {
@@ -415,15 +418,51 @@ test("menu movement under a stationary pointer preserves keyboard navigation", a
     menu.style.transform = "none";
   });
   await expect(friends).toHaveAttribute("data-pointer-boundary", "returned");
-  await expect(manual).toBeFocused();
+  await expect(mods).toBeFocused();
   await page.keyboard.press("ArrowUp");
   await expect(tv).toBeFocused();
   await page.keyboard.press("ArrowUp");
   await expect(friends).toBeFocused();
 
   // Moving the mouse intentionally still selects the hovered control.
-  await manual.hover();
-  await expect(manual).toBeFocused();
+  await mods.hover();
+  await expect(mods).toBeFocused();
+});
+
+test("TV home controller navigation includes every footer icon and wraps", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await waitForDesktopTvEntry(page);
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-mock-input-context",
+    "Menu",
+  );
+  const actions = page.locator("#menuCard button,#menuCard a[href]");
+  const count = await actions.count();
+  await expect(actions.first()).toBeFocused();
+  for (const direction of ["down", "right"] as const) {
+    for (let index = 1; index <= count; index++) {
+      await input(page, direction);
+      await expect(actions.nth(index % count)).toBeFocused();
+    }
+  }
+  for (const direction of ["up", "left"] as const) {
+    for (let index = count - 1; index >= 0; index--) {
+      await input(page, direction);
+      await expect(actions.nth(index)).toBeFocused();
+    }
+  }
+  const manual = page
+    .locator(".mainMenuFooter")
+    .getByRole("button", { name: "Manual", exact: true });
+  await select(page, manual);
+  await input(page, "confirm");
+  await expect(
+    page.getByRole("heading", { name: "Manual", exact: true }),
+  ).toBeVisible();
+  await input(page, "back");
+  await expect(actions.first()).toBeFocused();
 });
 
 test("controller text entry searches the manual, cancels and restores field focus", async ({

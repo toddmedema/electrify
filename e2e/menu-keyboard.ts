@@ -52,22 +52,10 @@ export async function openSettingsWithKeyboard(page: Page): Promise<void> {
     await expect(friends).toBeFocused();
     await page.keyboard.press("ArrowDown");
   }
-  const achievements = page.getByRole("button", {
-    name: "Achievements",
-    exact: true,
-  });
-  if (await achievements.isVisible()) {
-    await expect(achievements).toBeFocused();
-    await page.keyboard.press("ArrowDown");
-  }
   if (await tv.isVisible()) {
     await expect(tv).toBeFocused();
     await page.keyboard.press("ArrowDown");
   }
-  await expect(
-    page.getByRole("button", { name: "Manual", exact: true }),
-  ).toBeFocused();
-  await page.keyboard.press("ArrowDown");
   const mods = page.getByRole("button", { name: "Mods", exact: true });
   if (await mods.isVisible()) {
     await expect(mods).toBeFocused();
@@ -137,50 +125,20 @@ export async function verifyMenuKeyboard(page: Page): Promise<void> {
     page.getByRole("slider", { name: "Effects volume", exact: true }),
   ).toBeFocused();
   await page.keyboard.press("Escape");
-  const tv = await waitForDesktopTvEntry(page);
+  await waitForDesktopTvEntry(page);
   const start = page.getByRole("button", {
     name: "Play",
     exact: true,
   });
   await expect(start).toBeVisible();
   await expect(start).toBeFocused();
-  await page.keyboard.press("ArrowDown");
-  const friends = page.getByRole("button", {
-    name: "Play with friends",
-    exact: true,
-  });
-  if (await friends.isVisible()) {
-    await expect(friends).toBeFocused();
-    await page.keyboard.press("ArrowDown");
-  }
-  const achievements = page.getByRole("button", {
-    name: "Achievements",
-    exact: true,
-  });
-  if (await achievements.isVisible()) {
-    await expect(achievements).toBeFocused();
-    await page.keyboard.press("ArrowDown");
-  }
-  if (await tv.isVisible()) {
-    await expect(tv).toBeFocused();
-    await page.keyboard.press("ArrowDown");
-  }
-  await expect(
-    page.getByRole("button", { name: "Manual", exact: true }),
-  ).toBeFocused();
+  // Up wraps from the first action to the rightmost footer icon; Down returns to Play.
+  const last = page
+    .locator(".mainMenuFooter button,.mainMenuFooter a[href]")
+    .last();
   await page.keyboard.press("ArrowUp");
-  if (await tv.isVisible()) {
-    await expect(tv).toBeFocused();
-    await page.keyboard.press("ArrowUp");
-  }
-  if (await achievements.isVisible()) {
-    await expect(achievements).toBeFocused();
-    await page.keyboard.press("ArrowUp");
-  }
-  if (await friends.isVisible()) {
-    await expect(friends).toBeFocused();
-    await page.keyboard.press("ArrowUp");
-  }
+  await expect(last).toBeFocused();
+  await page.keyboard.press("ArrowDown");
   await expect(start).toBeFocused();
   await page.keyboard.press("Enter");
   await expect(page.locator(".facilities:visible")).toBeVisible();
