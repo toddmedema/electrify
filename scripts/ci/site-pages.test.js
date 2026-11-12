@@ -131,7 +131,7 @@ test("authored text remains text in metadata, HTML and structured data", async (
     t.after(() => dom.window.close());
     const document = dom.window.document;
     assert.equal(document.querySelectorAll("b[data-x]").length, 0);
-    for (const script of document.querySelectorAll("script")) {
+    for (const script of document.querySelectorAll("script:not([src])")) {
       assert.equal(script.type, "application/ld+json");
       assert.doesNotThrow(() => JSON.parse(script.textContent));
     }

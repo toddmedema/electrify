@@ -1,180 +1,85 @@
 jest.mock("./AppVersion", () => ({ APP_VERSION: "26sept26-1507" }));
 
-// setupTests stubs firebase/analytics so no real transport runs under jsdom; this suite replaces
-// the stub with spies so it can assert whether initialization is attempted. jest.mock's factory
-// is hoisted above every declaration in the file, so the spies it closes over have to be named
-// mock* -- the only identifiers Jest allows out of that scope.
-const mockGetAnalytics = jest.fn();
-const mockFirebaseLogEvent = jest.fn();
-const mockLoadAnalytics = jest.fn();
-
-jest.mock("firebase/analytics", () => {
-  mockLoadAnalytics();
-  return {
-    getAnalytics: (...args: unknown[]) => mockGetAnalytics(...args),
-    logEvent: (...args: unknown[]) => mockFirebaseLogEvent(...args),
-  };
-});
-
-// jsdom serves onLine from a getter on Navigator.prototype, so shadow it with an own property for
-// each test and drop that property afterwards to uncover the original getter again.
-const originalOnLineDescriptor = Object.getOwnPropertyDescriptor(
-  window.navigator,
-  "onLine",
-);
-
-function setOnline(online: boolean): void {
-  Object.defineProperty(window.navigator, "onLine", {
-    configurable: true,
-    get: () => online,
-  });
-}
-
-// Globals keeps the Analytics instance for the life of the module, so each test loads its own
-// copy of it to start from "not initialized yet".
-function loadLogEvent(): typeof import("./Globals").logEvent {
-  let logEvent!: typeof import("./Globals").logEvent;
-  jest.isolateModules(() => {
-    logEvent = (require("./Globals") as typeof import("./Globals")).logEvent;
-  });
-  return logEvent;
-}
-
-async function flushAnalytics() {
-  for (let i = 0; i < 5; i++) await Promise.resolve();
-}
-
 beforeEach(() => jest.resetModules());
-
 afterEach(() => {
-  if (originalOnLineDescriptor) {
-    Object.defineProperty(window.navigator, "onLine", originalOnLineDescriptor);
-  } else {
-    delete (window.navigator as unknown as { onLine?: boolean }).onLine;
-  }
-  // react-scripts sets resetMocks, so call counts and implementations are already cleared here.
+  delete window.electrifyAnalytics;
+  delete window.electrifyAnalyticsQueue;
 });
 
 describe("logEvent", () => {
-  it("skips loading and initializing analytics while the page is offline", async () => {
-    setOnline(false);
-    const logEvent = loadLogEvent();
-
-    // Initializing while offline fails inside the Firebase SDK with an unhandled rejection
-    // (installations/app-offline) that the dev build renders as a full error overlay, so
-    // navigating -- the manual, any card -- must not reach getAnalytics() at all.
-    logEvent("card_view", { card: "MANUAL" });
-    await flushAnalytics();
-
-    expect(mockLoadAnalytics).not.toHaveBeenCalled();
-    expect(mockGetAnalytics).not.toHaveBeenCalled();
-    expect(mockFirebaseLogEvent).not.toHaveBeenCalled();
+  it("preserves custom event names, parameters and order with the shipped app version", () => {
+    const report = jest.fn();
+    window.electrifyAnalytics = { initialize: jest.fn(), logEvent: report };
+    const { logEvent } = require("./Globals") as typeof import("./Globals");
+    logEvent("scenario_start", { scenario: 108, difficulty: "normal" });
+    logEvent("card_view", { card: "MANUAL", app_version: "caller-version" });
+    expect(report.mock.calls).toEqual([
+      [
+        "scenario_start",
+        { scenario: 108, difficulty: "normal", app_version: "26sept26-1507" },
+      ],
+      ["card_view", { card: "MANUAL", app_version: "26sept26-1507" }],
+    ]);
+    expect(window.electrifyAnalytics.initialize).not.toHaveBeenCalled();
   });
 
-  it("loads analytics on demand once and preserves pending events in order", async () => {
-    setOnline(true);
-    const analytics = {};
-    mockGetAnalytics.mockReturnValue(analytics);
-    const logEvent = loadLogEvent();
+  it("keeps the game usable when the shared local runtime is unavailable", () => {
+    const { logEvent } = require("./Globals") as typeof import("./Globals");
+    expect(() => logEvent("card_view")).not.toThrow();
+    expect(
+      document.querySelector('script[src*="googletagmanager"]'),
+    ).toBeNull();
+  });
 
-    expect(mockLoadAnalytics).not.toHaveBeenCalled();
-    logEvent("scenario_start", {});
-    logEvent("card_view", { card: "MANUAL" });
-    expect(mockGetAnalytics).not.toHaveBeenCalled();
-    await flushAnalytics();
-
-    expect(mockLoadAnalytics).toHaveBeenCalledTimes(1);
-    expect(mockGetAnalytics).toHaveBeenCalledTimes(1);
-    expect(mockFirebaseLogEvent).toHaveBeenCalledWith(analytics, "card_view", {
-      card: "MANUAL",
-      app_version: "26sept26-1507",
-    });
-    expect(mockFirebaseLogEvent).toHaveBeenCalledTimes(2);
-    expect(mockFirebaseLogEvent.mock.calls.map((call) => call[1])).toEqual([
-      "scenario_start",
-      "card_view",
+  it("buffers early events in order with the app version until the runtime arrives", () => {
+    const { logEvent } = require("./Globals") as typeof import("./Globals");
+    logEvent("scenario_start", { id: 107 });
+    logEvent("card_view", { card: "MANUAL", app_version: "caller-version" });
+    expect(window.electrifyAnalyticsQueue).toEqual([
+      {
+        name: "scenario_start",
+        params: { id: 107, app_version: "26sept26-1507" },
+      },
+      {
+        name: "card_view",
+        params: { card: "MANUAL", app_version: "26sept26-1507" },
+      },
     ]);
   });
 
-  it("keeps reporting through a dropout once analytics is up", async () => {
-    setOnline(true);
-    mockGetAnalytics.mockReturnValue({});
-    const logEvent = loadLogEvent();
-    logEvent("scenario_start", {});
-    await flushAnalytics();
-
-    // Only the initialization needs the network; a player who started online stays measured
-    // rather than going silent for the rest of the session.
-    setOnline(false);
-    logEvent("card_view", { card: "MANUAL" });
-    await flushAnalytics();
-
-    expect(mockGetAnalytics).toHaveBeenCalledTimes(1);
-    expect(mockFirebaseLogEvent).toHaveBeenCalledTimes(2);
-  });
-
-  it("initializes on the first event after the browser comes back online", async () => {
-    setOnline(false);
-    mockGetAnalytics.mockReturnValue({});
-    const logEvent = loadLogEvent();
-    logEvent("card_view", { card: "MANUAL" });
-    await flushAnalytics();
-
-    setOnline(true);
-    logEvent("card_view", { card: "MANUAL" });
-    await flushAnalytics();
-
-    expect(mockGetAnalytics).toHaveBeenCalledTimes(1);
-    expect(mockFirebaseLogEvent).toHaveBeenCalledTimes(1);
-  });
-
-  it("does not initialize if connectivity drops while the chunk is loading", async () => {
-    setOnline(true);
-    const logEvent = loadLogEvent();
-    logEvent("scenario_start", {});
-    setOnline(false);
-    await flushAnalytics();
-    expect(mockGetAnalytics).not.toHaveBeenCalled();
-    expect(mockFirebaseLogEvent).not.toHaveBeenCalled();
-    setOnline(true);
-    mockGetAnalytics.mockReturnValue({});
-    logEvent("card_view", { card: "MANUAL" });
-    await flushAnalytics();
-    expect(mockGetAnalytics).toHaveBeenCalledTimes(1);
-    expect(mockFirebaseLogEvent).toHaveBeenCalledTimes(1);
-  });
-
-  it("swallows an SDK initialization failure and retries on the next event", async () => {
-    setOnline(true);
-    mockGetAnalytics.mockImplementationOnce(() => {
-      throw new Error("boom");
+  it("bounds the queue when the local runtime stays unavailable", () => {
+    const { logEvent } = require("./Globals") as typeof import("./Globals");
+    for (let i = 0; i < 1000; i++) logEvent("card_view", { i });
+    expect(window.electrifyAnalyticsQueue).toHaveLength(100);
+    expect(window.electrifyAnalyticsQueue?.at(-1)).toEqual({
+      name: "card_view",
+      params: { i: 99, app_version: "26sept26-1507" },
     });
-    const logEvent = loadLogEvent();
-
-    expect(() => logEvent("card_view", { card: "MANUAL" })).not.toThrow();
-    await flushAnalytics();
-    expect(mockFirebaseLogEvent).not.toHaveBeenCalled();
-    mockGetAnalytics.mockReturnValue({});
-    logEvent("scenario_start", {});
-    await flushAnalytics();
-    expect(mockGetAnalytics).toHaveBeenCalledTimes(2);
-    expect(mockFirebaseLogEvent).toHaveBeenCalledTimes(1);
   });
 
-  it("catches a chunk-load rejection and retries on the next event", async () => {
-    setOnline(true);
-    mockLoadAnalytics.mockImplementationOnce(() => {
-      throw new Error("chunk unavailable");
-    });
-    const logEvent = loadLogEvent();
-    logEvent("card_view", { card: "MANUAL" });
-    await flushAnalytics();
-    expect(mockGetAnalytics).not.toHaveBeenCalled();
-    mockGetAnalytics.mockReturnValue({});
-    logEvent("scenario_start", {});
-    await flushAnalytics();
-    expect(mockLoadAnalytics).toHaveBeenCalledTimes(2);
-    expect(mockFirebaseLogEvent).toHaveBeenCalledTimes(1);
+  it.each(["electrifyDesktop", "electrifyCouch"] as const)(
+    "does not buffer events for the native %s host",
+    (host) => {
+      Object.defineProperty(window, host, { configurable: true, value: {} });
+      try {
+        const { logEvent } = require("./Globals") as typeof import("./Globals");
+        logEvent("launch");
+        expect(window.electrifyAnalyticsQueue).toBeUndefined();
+      } finally {
+        delete window[host];
+      }
+    },
+  );
+
+  it("swallows an optional analytics bridge failure", () => {
+    window.electrifyAnalytics = {
+      initialize: jest.fn(),
+      logEvent: () => {
+        throw new Error("blocked");
+      },
+    };
+    const { logEvent } = require("./Globals") as typeof import("./Globals");
+    expect(() => logEvent("card_view")).not.toThrow();
   });
 });
 

@@ -52,12 +52,11 @@ if (!window.ResizeObserver) {
   };
 }
 
-// jsdom has no IndexedDB, so Firebase Analytics warns loudly the first time anything logs an
-// event. Nothing under test cares what was reported, so the transport is stubbed out entirely.
-jest.mock("firebase/analytics", () => ({
-  getAnalytics: () => ({}),
-  logEvent: () => undefined,
-}));
+// Browser analytics lives in public/analytics.js, which jsdom does not load. Game tests have
+// no analytics bridge or remote script; clear their bounded local event buffer after each test.
+afterEach(() => {
+  delete window.electrifyAnalyticsQueue;
+});
 
 // Webpack recognizes import.meta.url as the entry point for a code-split Web Worker, while Jest's
 // CommonJS parser intentionally does not. Component tests replace this browser-only constructor
