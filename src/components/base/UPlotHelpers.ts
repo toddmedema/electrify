@@ -135,52 +135,105 @@ export function expandedChartOptions(
       /(\d+)px/,
       (_match, size) => `${Math.round(Number(size) * fontScale)}px`,
     );
-  const padding: uPlot.Padding = options.padding
-    ? [...options.padding]
-    : [null, null, null, null];
-  const xAxisIndex =
-    options.axes?.findIndex((axis) => axis.scale === "x") ?? -1;
-  if (xAxisIndex >= 0 && !options.axes?.some((axis) => axis.side === 1)) {
-    const axis = options.axes![xAxisIndex];
-    const originalRight = padding[1];
-    padding[1] = (plot, side, sides, cycle) => {
-      const reserve =
-        typeof originalRight === "function"
-          ? originalRight(plot, side, sides, cycle)
-          : (originalRight ?? 0);
-      const range = plot.scales.x;
-      const splits =
-        typeof axis.splits === "function"
-          ? axis.splits(plot, xAxisIndex, range.min ?? 0, range.max ?? 0, 0, 0)
-          : (axis.splits ?? []);
-      const labels =
-        typeof axis.values === "function"
-          ? axis.values(plot, splits, xAxisIndex, 0, 0)
-          : [];
-      const finalLabel = labels[labels.length - 1];
-      if (finalLabel == null) return reserve;
-      const font = enlargeFont(axis.font);
-      // Endpoint dates are centered on the plot edge; enlarged labels need room beyond it.
-      return Math.ceil(
-        Math.max(
-          reserve,
-          textWidth(String(finalLabel), font, Number.parseFloat(font)) / 2 +
-            4 * getInterfaceScale(),
-        ),
-      );
-    };
-  }
+  const endpoints = new Map<
+    number,
+    { split: number; label: string; font: string }[]
+  >();
+  const labelPosition = (
+    position: number,
+    width: number,
+    canvasWidth: number,
+  ) => Math.max(width / 2 + 2, Math.min(canvasWidth - width / 2 - 2, position));
   return {
     ...options,
-    padding,
+    plugins: [
+      ...(options.plugins ?? []),
+      {
+        hooks: {
+          drawAxes: (plot) => {
+            const ratio = uPlot.pxRatio || 1;
+            const { ctx, bbox } = plot;
+            ctx.save();
+            ctx.textAlign = "center";
+            ctx.textBaseline = "top";
+            endpoints.forEach((labels, axisIndex) => {
+              const axis = plot.axes[axisIndex];
+              ctx.fillStyle =
+                typeof axis.stroke === "function"
+                  ? axis.stroke(plot, axisIndex)
+                  : (axis.stroke ?? tickLabelFill());
+              const y =
+                bbox.top +
+                bbox.height +
+                ((axis.ticks?.show === false ? 0 : (axis.ticks?.size ?? 5)) +
+                  (axis.gap ?? 5)) *
+                  ratio;
+              labels.forEach(({ split, label, font }) => {
+                ctx.font = font.replace(
+                  /(\d+)px/,
+                  (_match, size) => `${Number(size) * ratio}px`,
+                );
+                const lines = label.split("\n");
+                // Keep dates readable without moving the aligned data edge or its ticks.
+                const x = labelPosition(
+                  plot.valToPos(split, "x", true) / ratio,
+                  Math.max(
+                    ...lines.map((line) => ctx.measureText(line).width),
+                  ) / ratio,
+                  plot.width,
+                );
+                lines.forEach((line, index) =>
+                  ctx.fillText(
+                    line,
+                    x * ratio,
+                    y +
+                      index *
+                        Number.parseFloat(ctx.font) *
+                        (axis.lineGap ?? 1.5),
+                  ),
+                );
+              });
+            });
+            ctx.restore();
+          },
+        },
+      },
+    ],
     axes: options.axes?.map((axis) => {
       const font = enlargeFont(axis.font);
       const originalSize = axis.size;
       const vertical = axis.side === 1 || axis.side === 3 || axis.scale === "y";
+      const clampEndpoints =
+        axis.scale === "x" && (axis.side ?? 2) === 2 && !axis.rotate;
       return {
         ...axis,
         font,
         labelFont: enlargeFont(axis.labelFont),
+        values:
+          clampEndpoints && typeof axis.values === "function"
+            ? (plot, splits, axisIndex, space, increment) => {
+                const labels = (axis.values as uPlot.Axis.DynamicValues)(
+                  plot,
+                  splits,
+                  axisIndex,
+                  space,
+                  increment,
+                );
+                endpoints.set(axisIndex, []);
+                return labels.map((label, index) => {
+                  if (
+                    label == null ||
+                    label === "" ||
+                    (index !== 0 && index !== labels.length - 1)
+                  )
+                    return label;
+                  endpoints
+                    .get(axisIndex)!
+                    .push({ split: splits[index], label: String(label), font });
+                  return null;
+                });
+              }
+            : axis.values,
         splits:
           vertical || !axis.splits
             ? axis.splits
@@ -201,13 +254,26 @@ export function expandedChartOptions(
                 const widths = labels.map((label) =>
                   label == null
                     ? 0
-                    : textWidth(String(label), font, Number.parseFloat(font)),
+                    : Math.max(
+                        ...String(label)
+                          .split("\n")
+                          .map((line) =>
+                            textWidth(line, font, Number.parseFloat(font)),
+                          ),
+                      ),
                 );
                 const ratio = uPlot.pxRatio || 1;
                 const plotWidth =
                   (plot.bbox?.width ?? plot.width * ratio) / ratio;
-                const position = (index: number) =>
-                  ((splits[index] - min) / Math.max(1, max - min)) * plotWidth;
+                const position = (index: number) => {
+                  const x =
+                    (plot.bbox?.left ?? 0) / ratio +
+                    ((splits[index] - min) / Math.max(1, max - min)) *
+                      plotWidth;
+                  return clampEndpoints
+                    ? labelPosition(x, widths[index], plot.width)
+                    : x;
+                };
                 const fits = (left: number, right: number) =>
                   position(right) - position(left) >=
                   (widths[left] + widths[right]) / 2 + 12 * getInterfaceScale();

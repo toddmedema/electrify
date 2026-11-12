@@ -142,10 +142,12 @@ test("1x smoothly advances Now with stationary curves, then snaps for inspection
     name: /electricity supply and demand over the day/,
   });
   const canvas = chart.locator(".u-wrap > canvas");
-  const bounds = await canvas.boundingBox();
   await appbar.getByRole("button", { name: "slow speed", exact: true }).click();
   // The label stays clamped near the day's edges, then moves with the guide.
   await page.clock.runFor(1200);
+  // Starting playback can finish status/layout changes; anchor the stationary-curve
+  // observation after their debounced chart rebuild, before sampling ongoing ticks.
+  const bounds = await canvas.boundingBox();
   const motion = await sample(page);
   expect(interpolates(motion.samples)).toBe(true);
   expect(motion.samples.every(({ x, boundary }) => x >= boundary - 0.01)).toBe(

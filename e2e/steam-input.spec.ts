@@ -1166,7 +1166,7 @@ test("TV saved preferences style direct scenario links before play", async ({
   );
   const edge = await page.locator(".appFrame").evaluate((element) => ({
     actual: parseFloat(getComputedStyle(element).paddingTop),
-    expected: Math.min(innerWidth, innerHeight) * 0.04,
+    expected: Math.ceil(Math.min(innerWidth, innerHeight) * 0.04),
   }));
   expect(
     edge.actual,

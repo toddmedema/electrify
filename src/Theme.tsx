@@ -502,17 +502,38 @@ export function createAppTheme(mode: ThemeModeType): Theme {
       },
       MuiAccordionSummary: {
         styleOverrides: {
+          root: { minHeight: "3rem", "&.Mui-expanded": { minHeight: "4rem" } },
+          content: {
+            marginBlock: "0.75rem",
+            "&.Mui-expanded": { marginBlock: "1.25rem" },
+          },
           expandIconWrapper: {
             color: palette.interactive,
             ".Mui-disabled &": { color: "var(--font-color-faded)" },
           },
         },
       },
+      MuiAvatar: {
+        styleOverrides: { root: { width: "2.5rem", height: "2.5rem" } },
+      },
       MuiInputBase: {
         styleOverrides: {
           root: {
             minHeight: "2.5rem",
             "@media (pointer: coarse)": { minHeight: "2.75rem" },
+          },
+        },
+      },
+      MuiInputLabel: {
+        styleOverrides: {
+          outlined: {
+            transform: "translate(0.875rem, 1rem) scale(1)",
+            "&.MuiInputLabel-sizeSmall": {
+              transform: "translate(0.875rem, 0.5625rem) scale(1)",
+            },
+            "&.MuiInputLabel-shrink": {
+              transform: "translate(0.875rem, -0.5625rem) scale(0.75)",
+            },
           },
         },
       },
@@ -550,6 +571,7 @@ export function createAppTheme(mode: ThemeModeType): Theme {
             width: "3.625rem",
             height: "2.375rem",
             padding: "0.75rem",
+            flexShrink: 0,
             "&.MuiSwitch-sizeSmall": {
               width: "2.5rem",
               height: "1.5rem",
@@ -557,6 +579,7 @@ export function createAppTheme(mode: ThemeModeType): Theme {
             },
           },
           thumb: { width: "1.25rem", height: "1.25rem" },
+          track: { borderRadius: "0.4375rem" },
           switchBase: {
             padding: "0.5625rem",
             "&.Mui-checked": { transform: "translateX(1.25rem)" },
@@ -621,7 +644,7 @@ export function createAppTheme(mode: ThemeModeType): Theme {
           root: { padding: 16, overflowWrap: "anywhere" },
         },
       },
-      MuiDialogContent: { styleOverrides: { root: { padding: 16 } } },
+      MuiDialogContent: { styleOverrides: { root: { padding: "1rem" } } },
       MuiDialogActions: {
         defaultProps: { disableSpacing: true },
         styleOverrides: {

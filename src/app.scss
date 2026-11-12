@@ -1963,7 +1963,7 @@ $pane_header_height: 48px;
   min-height: 60px;
   align-items: center;
   gap: 12px;
-  padding: 8px 0 8px 16px;
+  padding: 0.5rem 0 0.5rem 1rem;
   margin: 0 auto;
   border-bottom: $border_accent;
 }
@@ -1992,11 +1992,11 @@ $pane_header_height: 48px;
 .insightEventChip {
   display: inline-flex;
   min-width: 0;
-  min-height: 44px;
+  min-height: 2.75rem;
   max-width: calc(100cqw - 32px);
   align-items: center;
-  gap: 8px;
-  padding: 4px 8px;
+  gap: 0.5rem;
+  padding: 0.25rem 0.5rem;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   background: var(--bg-raised);
@@ -2021,9 +2021,9 @@ $pane_header_height: 48px;
 
 .insightEventNumber {
   display: inline-flex;
-  width: 20px;
-  height: 20px;
-  flex: 0 0 20px;
+  width: 1.25rem;
+  height: 1.25rem;
+  flex: 0 0 1.25rem;
   align-items: center;
   justify-content: center;
   border-radius: 50%;
@@ -2042,7 +2042,7 @@ $pane_header_height: 48px;
 .insightEventCopy {
   display: flex;
   min-width: 0;
-  max-width: 256px;
+  max-width: 16rem;
   flex-direction: column;
   align-items: flex-start;
   text-align: left;
@@ -4210,7 +4210,7 @@ $pane_header_height: 48px;
 
   .eventLogCopy {
     display: grid;
-    gap: 4px;
+    gap: 0.25rem;
 
     > strong {
       line-height: 1.3;
@@ -4460,7 +4460,7 @@ $pane_header_height: 48px;
 .tutorialHudAction {
   display: flex;
   align-items: flex-start;
-  gap: 8px;
+  gap: 0.5rem;
   margin: 0;
   color: $font_color_primary;
   font-size: var(--font-size-subtitle);
@@ -4469,8 +4469,8 @@ $pane_header_height: 48px;
 
   svg {
     flex: none;
-    width: 20px;
-    height: 20px;
+    width: 1.25rem;
+    height: 1.25rem;
     color: $font_color_faded;
   }
 }
@@ -5777,7 +5777,7 @@ $homeSmokeCycle: 5.6s;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  min-height: 40px;
+  min-height: 2.5rem;
   box-sizing: border-box;
   padding: 8px 16px;
   font-size: var(--font-size-body2);
@@ -5826,7 +5826,7 @@ $homeSmokeCycle: 5.6s;
   flex: 1;
   width: 100%;
   min-width: 0;
-  min-height: 64px;
+  min-height: 4rem;
   padding: 0;
   border: 0;
   background: transparent;
@@ -6025,7 +6025,7 @@ $homeSmokeCycle: 5.6s;
   align-items: center;
   gap: 4px;
   align-self: stretch;
-  width: 72px;
+  width: 4.5rem;
   min-height: var(--control-size);
   margin: 0;
   padding: 12px 0 12px 4px;
@@ -6468,7 +6468,7 @@ $programs_column: 800px;
   flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;
-  gap: $space-2;
+  gap: 0.5rem;
   padding-top: $space-3;
   padding-bottom: max($space-3, env(safe-area-inset-bottom));
   border-top: $border_accent;
