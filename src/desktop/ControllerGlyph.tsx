@@ -1,6 +1,6 @@
 import paths from "./ControllerGlyphPaths.json";
 
-// Kenney Input Prompts 1.5A, CC0. See legal/kenney-input-prompts-LICENSE.txt.
+// Kenney Input Prompts 1.5A, CC0. See LICENSE.md, "Kenney Input Prompts".
 // Match the supplied physical origin only: actions may have arbitrary remaps.
 const aliases: [keyof typeof paths, string[]][] = [
   ["xbox_button_a", ["A", "A button", "Button A"]],
