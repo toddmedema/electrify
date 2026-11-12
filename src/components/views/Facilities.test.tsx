@@ -1282,10 +1282,20 @@ it.each([false, true])(
         />
       </Provider>,
     );
+    expect(
+      screen.queryByRole("button", { name: "Acquire Ridge Electric" }),
+    ).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /^Inspect Ridge/ }));
     expect(
       screen.getByRole("button", { name: "Acquire Ridge Electric" }),
     ).toBeVisible();
+    expect(
+      screen.queryByText(/Review the company terms/),
+    ).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /^Inspect Ridge/ }));
+    expect(
+      screen.queryByRole("button", { name: "Acquire Ridge Electric" }),
+    ).not.toBeInTheDocument();
   },
 );
 

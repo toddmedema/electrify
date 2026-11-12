@@ -1,3 +1,4 @@
+import userEvent from "@testing-library/user-event";
 import { render, screen, within } from "@testing-library/react";
 import { configureStore } from "@reduxjs/toolkit";
 import { Provider } from "react-redux";
@@ -60,89 +61,123 @@ function review(targetId: UtilityTargetId, year = 2005) {
   return quote;
 }
 
-function fact(label: string) {
-  return screen.getByText(label).closest(".decisionImpactFact") as HTMLElement;
+function disclosure(label: string) {
+  return screen.getByText(label, { selector: "summary" }).closest("details")!;
 }
 
 it.each(["valley-electric", "ridge-electric"] as const)(
-  "shows the full upfront and monthly debt/network acquisition costs once for %s",
-  (targetId) => {
+  "keeps the %s purchase decision concise and its full terms discoverable",
+  async (targetId) => {
+    const user = userEvent.setup();
     const quote = review(targetId);
-    const cash = within(fact("Cash purchase"));
-    const loan = within(fact("Loan option"));
-    expect(cash.getByText(/upfront/, { selector: "strong" })).toHaveTextContent(
-      `${formatMoneyConcise(quote.cashDue)} upfront + ${formatMoneyConcise(quote.cashMonthlyDebtService + quote.networkOMPerMonth)}/mo`,
+    expect(
+      screen.getByText(Math.round(quote.customers).toLocaleString()),
+    ).toBeVisible();
+    expect(screen.getByText(/Retain 90%/)).toBeVisible();
+    expect(screen.getByText(/Retire the acquired original oil/)).toBeVisible();
+    const payments = screen.getByRole("region", { name: "Expected impact" });
+    expect(payments).toHaveTextContent(
+      `${formatMoneyConcise(quote.cashDue)} upfront`,
     );
-    expect(loan.getByText(/upfront/, { selector: "strong" })).toHaveTextContent(
-      `${formatMoneyConcise(quote.financedCashDue)} upfront + ${formatMoneyConcise(quote.monthlyDebtService + quote.networkOMPerMonth)}/mo`,
+    expect(payments).toHaveTextContent(
+      `${formatMoneyConcise(quote.financedCashDue)} upfront`,
     );
-    expect(cash.getByText(/assumed debt/)).toHaveTextContent("5% for 20 years");
-    expect(loan.getByText(/New loan/)).toHaveTextContent("30 years");
-    expect(screen.queryByText(/fee included/)).not.toBeInTheDocument();
+    expect(payments).toHaveTextContent(
+      `${formatMoneyConcise(quote.cashMonthlyDebtService + quote.networkOMPerMonth)}/mo · debt + network upkeep`,
+    );
+    expect(payments).toHaveTextContent(
+      `${formatMoneyConcise(quote.monthlyDebtService + quote.networkOMPerMonth)}/mo · debt + network upkeep`,
+    );
     expect(
-      screen.queryByText(/Plant operations and purchased power vary/),
-    ).not.toBeInTheDocument();
+      screen.getByText(/Plant operations and purchased power are extra/),
+    ).toBeVisible();
     expect(
-      screen.queryByText(/Acquire either utility by December 2014/),
-    ).not.toBeInTheDocument();
+      screen.getByRole("button", { name: "Pay cash", exact: true }),
+    ).toBeEnabled();
     expect(
-      screen.queryByText("Projected month-end cash with financing"),
-    ).not.toBeInTheDocument();
-    const plants = within(fact("Operating plants")).getByText(/years old/);
-    expect(plants.textContent?.split("\n")).toEqual(
+      screen.getByRole("button", { name: "Take loan", exact: true }),
+    ).toBeEnabled();
+
+    const assets = disclosure("Plants & purchased power");
+    expect(within(assets).getByText("Operating plants")).not.toBeVisible();
+    await user.click(within(assets).getByText("Plants & purchased power"));
+    expect(within(assets).getByText("Operating plants")).toBeVisible();
+    expect(
+      within(assets)
+        .getAllByText(/years old/)
+        .map((node) => node.textContent),
+    ).toEqual(
       [...quote.facilities]
         .sort((a, b) => b.peakW - a.peakW)
         .map(
           (plant) =>
-            `${facilityDisplayName(plant)} ${formatWatts(plant.peakW)} · ${plant.ageYears.toFixed(1)} years old`,
+            `${formatWatts(plant.peakW)} · ${plant.ageYears.toFixed(1)} years old`,
         ),
     );
-    expect(screen.queryByText("Seller equity price")).not.toBeInTheDocument();
-    expect(screen.queryByText("Assumed debt")).not.toBeInTheDocument();
-    expect(screen.queryByText("Service-network costs")).not.toBeInTheDocument();
+    for (const plant of quote.facilities)
+      expect(
+        within(assets).getByText(facilityDisplayName(plant)),
+      ).toBeVisible();
+    for (const contract of quote.contracts)
+      expect(within(assets).getByText(contract.name)).toBeVisible();
+
+    const financing = disclosure("Financing breakdown");
+    expect(within(financing).getByText("Inherited debt")).not.toBeVisible();
+    await user.click(within(financing).getByText("Financing breakdown"));
+    expect(financing).toHaveTextContent(formatMoneyConcise(quote.assumedDebt));
+    expect(financing).toHaveTextContent(formatMoneyConcise(quote.equityPrice));
+    expect(financing).toHaveTextContent(formatMoneyConcise(quote.fee));
+    expect(within(financing).getByText(/5% over 20 years/)).toBeVisible();
+    expect(within(financing).getByText(/over 30 years/)).toBeVisible();
+
+    const schedule = disclosure("Supply & network changes");
     expect(
-      screen.queryByText("Combined debt payments with financing"),
-    ).not.toBeInTheDocument();
+      within(schedule).getByText(/opening upkeep from January 2015/),
+    ).not.toBeVisible();
+    await user.click(within(schedule).getByText("Supply & network changes"));
+    expect(
+      within(schedule).getByText(/opening upkeep from January 2015/),
+    ).toBeVisible();
+    expect(schedule).toHaveTextContent("January 2020");
   },
 );
 
-it("keeps Valley's dated supply reduction with acquisition obligations", () => {
+it("keeps Valley’s future reduction and variable-power warning discoverable", async () => {
   review("valley-electric");
-  const obligations = within(fact("Acquisition obligations"));
-  expect(obligations.getByText(/January 2017/)).toHaveTextContent(
-    "160 to 80 MW",
-  );
-  expect(obligations.getByText(/January 2017/)).toHaveTextContent(
-    "152 to 76 MW deliverable",
-  );
-  expect(screen.queryByText(/Plan replacement supply/)).not.toBeInTheDocument();
+  const assets = disclosure("Plants & purchased power");
+  const schedule = disclosure("Supply & network changes");
+  await userEvent.click(within(assets).getByText("Plants & purchased power"));
+  await userEvent.click(within(schedule).getByText("Supply & network changes"));
+  expect(schedule).toHaveTextContent("January 2017");
+  expect(schedule).toHaveTextContent("76MW deliverable");
+  expect(assets).toHaveTextContent("not firm reserve");
 });
 
 it.each([2017, 2024])(
-  "uses the dated company offer for active Valley nuclear supply in %i",
-  (year) => {
+  "keeps the current Valley supply and its reduction date discoverable in %i",
+  async (year) => {
     review("valley-electric", year);
+    const assets = disclosure("Plants & purchased power");
+    await userEvent.click(within(assets).getByText("Plants & purchased power"));
     expect(
-      within(fact("Acquisition obligations")).getByText(
-        /nuclear purchase is now/,
-      ),
+      within(assets).getByText(/nuclear purchase is now/),
     ).toHaveTextContent("80MW (76MW deliverable)");
+    expect(assets).toHaveTextContent("January 2017");
   },
 );
 
-it("describes Valley nuclear rights as expired after 2024", () => {
+it("excludes expired power rights and past oil retirement commitments from a 2025 purchase", async () => {
   const quote = review("valley-electric", 2025);
   expect(quote.contracts).toEqual([]);
-  const obligations = within(fact("Acquisition obligations"));
+  const assets = disclosure("Plants & purchased power");
+  await userEvent.click(within(assets).getByText("Plants & purchased power"));
   expect(
-    obligations.getByText(/nuclear purchase has expired/),
-  ).toBeInTheDocument();
+    within(assets).getByText(/nuclear purchase has expired/),
+  ).toBeVisible();
   expect(
-    obligations.queryByText(/nuclear purchase is now/),
+    within(assets).getByText("No inherited purchased-power rights remain."),
+  ).toBeVisible();
+  expect(
+    screen.queryByText(/Retire the acquired original oil/),
   ).not.toBeInTheDocument();
-  expect(
-    within(fact("Purchased power")).getByText(
-      "No inherited purchased-power rights remain.",
-    ),
-  ).toBeInTheDocument();
 });
