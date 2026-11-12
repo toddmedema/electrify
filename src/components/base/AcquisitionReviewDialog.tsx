@@ -12,6 +12,7 @@ import { acquisitionQuote } from "../../helpers/Expansion";
 import { formatMoneyConcise, formatWatts } from "../../helpers/Format";
 import { currentTick } from "../../helpers/GameSelectors";
 import PurchaseReviewDialog from "./PurchaseReviewDialog";
+import DecisionImpactPreview from "./DecisionImpactPreview";
 import { useBuildCash } from "./useBuildCash";
 import { LOAN_MONTHS } from "../../Constants";
 import UtilityContractSchedule from "./UtilityContractSchedule";
@@ -87,50 +88,53 @@ export default function AcquisitionReviewDialog({
       buildCost={quote.equityPrice}
       cashOnlyFee={quote.fee}
       interestRate={game.interestRate}
-      cancelLabel="Cancel"
       upkeepPerMonth={quote.networkOMPerMonth}
+      cashLabel="Cash option"
       paymentSummary={{
         cash: {
-          value: `${formatMoneyConcise(quote.cashDue)} upfront`,
-          detail: `${formatMoneyConcise(quote.cashMonthlyDebtService + quote.networkOMPerMonth)}/mo · debt + network upkeep.`,
+          value: `${formatMoneyConcise(quote.cashDue)} now + ${formatMoneyConcise(quote.cashMonthlyDebtService + quote.networkOMPerMonth)}/mo`,
         },
         loan: {
-          value: `${formatMoneyConcise(quote.financedCashDue)} upfront`,
-          detail: `${formatMoneyConcise(quote.monthlyDebtService + quote.networkOMPerMonth)}/mo · debt + network upkeep.`,
+          value: `${formatMoneyConcise(quote.financedCashDue)} now + ${formatMoneyConcise(quote.monthlyDebtService + quote.networkOMPerMonth)}/mo`,
+          detail: `New loan: ${(game.interestRate * 100).toFixed(2)}% for ${LOAN_MONTHS / 12} years.`,
         },
       }}
+      extraFacts={[
+        {
+          concept: "customers",
+          label: "Customers joining",
+          value: Math.round(quote.customers).toLocaleString(),
+        },
+        {
+          concept: "supply",
+          label: "Company supply margin",
+          value: preview
+            ? `${marginText(preview.beforeMarginW)} → ${marginText(preview.afterMarginW)}`
+            : "Forecast unavailable",
+        },
+      ]}
       preface={
-        <div className="acquisitionReviewIntro">
-          <Typography className="acquisitionCustomerGain" component="p">
-            <strong>{Math.round(quote.customers).toLocaleString()}</strong>{" "}
-            customers joining
-          </Typography>
-          <Typography variant="body2" color="textSecondary">
-            Company supply margin{" "}
-            <span className="acquisitionMargin">
-              {preview
-                ? `${marginText(preview.beforeMarginW)} → ${marginText(preview.afterMarginW)}`
-                : "Forecast unavailable"}
-            </span>
-          </Typography>
-          {error && (
-            <Typography role="alert" color="error">
-              {error}
-            </Typography>
-          )}
-          {cash < quote.financedCashDue && (
-            <Typography variant="body2" color="warning.main">
-              Need {formatMoneyConcise(quote.financedCashDue)} cash for the down
-              payment and fee. You have {formatMoneyConcise(cash)}.
-            </Typography>
-          )}
-        </div>
+        error || cash < quote.financedCashDue ? (
+          <div className="acquisitionReviewIntro">
+            {error && (
+              <Typography role="alert" color="error">
+                {error}
+              </Typography>
+            )}
+            {cash < quote.financedCashDue && (
+              <Typography variant="body2" color="warning.main">
+                Need {formatMoneyConcise(quote.financedCashDue)} cash for the
+                down payment and fee. You have {formatMoneyConcise(cash)}.
+              </Typography>
+            )}
+          </div>
+        ) : undefined
       }
       afterFacts={
         <div className="acquisitionReviewDetails">
           <Typography variant="caption" color="textSecondary" component="p">
-            Both options include inherited debt and current network upkeep.
-            Plant operations and purchased power are extra.
+            Monthly figures include debt and network upkeep. Plant operations
+            and purchased power are extra.
           </Typography>
           <section
             className="acquisitionObligations"
@@ -156,39 +160,31 @@ export default function AcquisitionReviewDialog({
               <Typography component="h3" variant="subtitle2">
                 Operating plants
               </Typography>
-              <dl className="acquisitionInventory">
-                {[...quote.facilities]
+              <DecisionImpactPreview
+                label="Operating plants"
+                facts={[...quote.facilities]
                   .sort((a, b) => b.peakW - a.peakW)
-                  .map((facility) => (
-                    <div key={facility.startingAssetId}>
-                      <dt>{facilityDisplayName(facility)}</dt>
-                      <dd>
-                        {formatWatts(facility.peakW)} ·{" "}
-                        {facility.ageYears.toFixed(1)} years old
-                      </dd>
-                    </div>
-                  ))}
-              </dl>
+                  .map((facility) => ({
+                    concept: "supply",
+                    label: facilityDisplayName(facility),
+                    value: formatWatts(facility.peakW),
+                    detail: `${facility.ageYears.toFixed(1)} years old`,
+                  }))}
+              />
               <Typography component="h3" variant="subtitle2">
                 Purchased power
               </Typography>
-              <dl className="acquisitionInventory">
-                {quote.contracts.map((contract) => (
-                  <div key={contract.name}>
-                    <dt>{contract.name}</dt>
-                    <dd>
-                      {contract.balancing ? "Up to " : ""}
-                      {formatWatts(contract.deliverableW)} delivered
-                      <span>
-                        {formatMoneyConcise(contract.pricePerMWh)}/MWh
-                        {contract.balancing
-                          ? " reference · variable price and availability, not firm reserve"
-                          : ""}
-                      </span>
-                    </dd>
-                  </div>
-                ))}
-              </dl>
+              {!!quote.contracts.length && (
+                <DecisionImpactPreview
+                  label="Purchased power"
+                  facts={quote.contracts.map((contract) => ({
+                    concept: "supply",
+                    label: contract.name,
+                    value: `${contract.balancing ? "Up to " : ""}${formatWatts(contract.deliverableW)} delivered`,
+                    detail: `${formatMoneyConcise(contract.pricePerMWh)}/MWh${contract.balancing ? " reference · variable price and availability, not firm reserve" : ""}`,
+                  }))}
+                />
+              )}
               {!quote.contracts.length && (
                 <Typography variant="body2">
                   No inherited purchased-power rights remain.
@@ -204,50 +200,40 @@ export default function AcquisitionReviewDialog({
           <details className="acquisitionDisclosure">
             <summary>Financing breakdown</summary>
             <div>
-              <dl className="acquisitionInventory">
-                <div>
-                  <dt>Purchase price</dt>
-                  <dd>{formatMoneyConcise(quote.equityPrice)}</dd>
-                </div>
-                <div>
-                  <dt>Transaction fee</dt>
-                  <dd>
-                    {formatMoneyConcise(quote.fee)}
-                    <span>Paid in cash with either option</span>
-                  </dd>
-                </div>
-                <div>
-                  <dt>Inherited debt</dt>
-                  <dd>
-                    {formatMoneyConcise(quote.assumedDebt)}
-                    <span>
-                      5% over 20 years ·{" "}
-                      {formatMoneyConcise(quote.cashMonthlyDebtService)}/mo
-                    </span>
-                  </dd>
-                </div>
-                <div>
-                  <dt>New loan</dt>
-                  <dd>
-                    {formatMoneyConcise(quote.newLoan)}
-                    <span>
-                      {(game.interestRate * 100).toFixed(2)}% over{" "}
-                      {LOAN_MONTHS / 12} years ·{" "}
-                      {formatMoneyConcise(
-                        quote.monthlyDebtService - quote.cashMonthlyDebtService,
-                      )}
-                      /mo
-                    </span>
-                  </dd>
-                </div>
-                <div>
-                  <dt>Added network upkeep</dt>
-                  <dd>
-                    {formatMoneyConcise(quote.networkOMPerMonth)}/mo
-                    <span>At today’s costs</span>
-                  </dd>
-                </div>
-              </dl>
+              <DecisionImpactPreview
+                label="Financing breakdown"
+                facts={[
+                  {
+                    concept: "money",
+                    label: "Purchase price",
+                    value: formatMoneyConcise(quote.equityPrice),
+                  },
+                  {
+                    concept: "money",
+                    label: "Transaction fee",
+                    value: formatMoneyConcise(quote.fee),
+                    detail: "Paid in cash with either option",
+                  },
+                  {
+                    concept: "finances",
+                    label: "Inherited debt",
+                    value: formatMoneyConcise(quote.assumedDebt),
+                    detail: `5% over 20 years · ${formatMoneyConcise(quote.cashMonthlyDebtService)}/mo`,
+                  },
+                  {
+                    concept: "finances",
+                    label: "New loan",
+                    value: formatMoneyConcise(quote.newLoan),
+                    detail: `${(game.interestRate * 100).toFixed(2)}% over ${LOAN_MONTHS / 12} years · ${formatMoneyConcise(quote.monthlyDebtService - quote.cashMonthlyDebtService)}/mo`,
+                  },
+                  {
+                    concept: "money",
+                    label: "Added network upkeep",
+                    value: `${formatMoneyConcise(quote.networkOMPerMonth)}/mo`,
+                    detail: "At today’s costs",
+                  },
+                ]}
+              />
             </div>
           </details>
           <details className="acquisitionDisclosure">

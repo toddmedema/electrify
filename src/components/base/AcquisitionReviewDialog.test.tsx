@@ -66,7 +66,7 @@ function disclosure(label: string) {
 }
 
 it.each(["valley-electric", "ridge-electric"] as const)(
-  "keeps the %s purchase decision concise and its full terms discoverable",
+  "shows %s pricing first in the shared purchase table and keeps full terms discoverable",
   async (targetId) => {
     const user = userEvent.setup();
     const quote = review(targetId);
@@ -77,17 +77,26 @@ it.each(["valley-electric", "ridge-electric"] as const)(
     expect(screen.getByText(/Retire the acquired original oil/)).toBeVisible();
     const payments = screen.getByRole("region", { name: "Expected impact" });
     expect(payments).toHaveTextContent(
-      `${formatMoneyConcise(quote.cashDue)} upfront`,
+      `${formatMoneyConcise(quote.cashDue)} now + ${formatMoneyConcise(quote.cashMonthlyDebtService + quote.networkOMPerMonth)}/mo`,
     );
     expect(payments).toHaveTextContent(
-      `${formatMoneyConcise(quote.financedCashDue)} upfront`,
+      `${formatMoneyConcise(quote.financedCashDue)} now + ${formatMoneyConcise(quote.monthlyDebtService + quote.networkOMPerMonth)}/mo`,
     );
-    expect(payments).toHaveTextContent(
-      `${formatMoneyConcise(quote.cashMonthlyDebtService + quote.networkOMPerMonth)}/mo · debt + network upkeep`,
-    );
-    expect(payments).toHaveTextContent(
-      `${formatMoneyConcise(quote.monthlyDebtService + quote.networkOMPerMonth)}/mo · debt + network upkeep`,
-    );
+    expect(
+      within(payments)
+        .getAllByText(
+          /^(Cash option|Loan option|Customers joining|Company supply margin)$/,
+        )
+        .map((node) => node.textContent),
+    ).toEqual([
+      "Cash option",
+      "Loan option",
+      "Customers joining",
+      "Company supply margin",
+    ]);
+    expect(
+      screen.getAllByRole("button", { name: /Pay cash|Take loan/ }),
+    ).toHaveLength(2);
     expect(
       screen.getByText(/Plant operations and purchased power are extra/),
     ).toBeVisible();
@@ -105,15 +114,15 @@ it.each(["valley-electric", "ridge-electric"] as const)(
     ).toEqual(
       [...quote.facilities]
         .sort((a, b) => b.peakW - a.peakW)
-        .map(
-          (plant) =>
-            `${formatWatts(plant.peakW)} · ${plant.ageYears.toFixed(1)} years old`,
-        ),
+        .map((plant) => `${plant.ageYears.toFixed(1)} years old`),
     );
-    for (const plant of quote.facilities)
-      expect(
-        within(assets).getByText(facilityDisplayName(plant)),
-      ).toBeVisible();
+    const plants = within(
+      within(assets).getByRole("region", { name: "Operating plants" }),
+    );
+    for (const plant of quote.facilities) {
+      expect(plants.getByText(facilityDisplayName(plant))).toBeVisible();
+      expect(plants.getByText(formatWatts(plant.peakW))).toBeVisible();
+    }
     for (const contract of quote.contracts)
       expect(within(assets).getByText(contract.name)).toBeVisible();
 

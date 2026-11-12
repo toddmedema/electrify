@@ -1,6 +1,7 @@
 import path from "path";
 import { expect, test } from "./fixtures";
 import { openBuild, openPane } from "./layout";
+import { expectPurchaseFactTable } from "./purchase-review-layout";
 import { expectDialogToFit } from "./dialog-layout";
 import { expectContinuousDialogSurface } from "./dialog-surface";
 import { editSavedGame, readSavedGame, readSaveRecords } from "./save-fixture";
@@ -54,6 +55,24 @@ for (const theme of ["light", "dark"] as const) {
         exact: true,
       }),
     ).toBeVisible();
+    await openBuild(page);
+    await page.getByRole("tab", { name: "Generators", exact: true }).click();
+    await page.getByRole("slider").first().press("Home");
+    await page
+      .getByRole("button", { name: "Review purchase of Wind", exact: true })
+      .click();
+    const buildDialog = page.getByRole("dialog");
+    const facilityStyle = await expectPurchaseFactTable(buildDialog, [
+      "Cash option",
+      "Loan option",
+      "Maintenance",
+      "Online in",
+      "Average output over a year",
+      "Direct emissions",
+    ]);
+    await buildDialog
+      .getByRole("button", { name: "close", exact: true })
+      .click();
     await openBuild(page);
     await page.getByRole("tab", { name: "Interties", exact: true }).click();
     for (const target of ["Valley Electric", "Ridge Electric"]) {
@@ -176,23 +195,32 @@ for (const theme of ["light", "dark"] as const) {
       await expect(dialog).toHaveAccessibleName(`Acquire ${target}?`);
       await expectContinuousDialogSurface(dialog);
       await expectDialogToFit(dialog);
-      await expect(dialog.getByText(/customers joining/)).toBeVisible();
+      await expect(
+        dialog.getByText("Customers joining", { exact: true }),
+      ).toBeVisible();
       await expect(
         dialog.getByRole("region", { name: "Acquisition obligations" }),
       ).toBeVisible();
       await expect(
         dialog.getByText(/Plant operations and purchased power are extra/),
       ).toBeVisible();
-      for (const label of ["Cash purchase", "Loan option"]) {
+      await expectPurchaseFactTable(
+        dialog,
+        [
+          "Cash option",
+          "Loan option",
+          "Customers joining",
+          "Company supply margin",
+        ],
+        facilityStyle,
+      );
+      for (const label of ["Cash option", "Loan option"]) {
         const payment = dialog
           .locator(".decisionImpactFact")
           .filter({ hasText: new RegExp(`^${label}`) });
         await expect(payment.locator(".decisionImpactFactValue")).toContainText(
-          /upfront/,
+          /now \+ .*\/mo/,
         );
-        await expect(
-          payment.locator(".decisionImpactFactDetail"),
-        ).toContainText(/\/mo · debt \+ network upkeep/);
       }
       for (const details of await dialog.locator("details").all())
         await expect(details).not.toHaveAttribute("open");
@@ -200,8 +228,13 @@ for (const theme of ["light", "dark"] as const) {
         .locator("details")
         .filter({ hasText: "Plants & purchased power" });
       await assets.locator("summary").click();
-      const plants = assets.locator(".acquisitionInventory").first();
-      const plantLines = await plants.locator("dd").allInnerTexts();
+      const plants = assets.getByRole("region", {
+        name: "Operating plants",
+        exact: true,
+      });
+      const plantLines = await plants
+        .locator(".decisionImpactFactValue")
+        .allInnerTexts();
       expect(plantLines).toHaveLength(3);
       const capacities = plantLines.map((text) =>
         Number(text.match(/([\d.]+)MW/)![1]),
@@ -221,6 +254,18 @@ for (const theme of ["light", "dark"] as const) {
       await finance.locator("summary").focus();
       await page.keyboard.press("Enter");
       await expect(finance).toHaveAttribute("open");
+      await expectPurchaseFactTable(
+        dialog,
+        [
+          "Purchase price",
+          "Transaction fee",
+          "Inherited debt",
+          "New loan",
+          "Added network upkeep",
+        ],
+        facilityStyle,
+        "Financing breakdown",
+      );
       await expect(finance).toContainText("5% over 20 years");
       await expect(finance).toContainText("over 30 years");
       await expect(finance).toContainText("Paid in cash with either option");
@@ -255,7 +300,7 @@ for (const theme of ["light", "dark"] as const) {
       await expect(help).toBeFocused();
       await expect(dialog).toBeVisible();
       const beforeCancel = await readSavedGame(page);
-      await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+      await dialog.getByRole("button", { name: "close", exact: true }).click();
       await expect(dialog).toHaveCount(0);
       const afterCancel = await readSavedGame(page);
       expect(afterCancel?.utilityExpansion).toEqual(
@@ -270,29 +315,6 @@ for (const theme of ["light", "dark"] as const) {
           testInfo.project.use.hasTouch ? 44 : 40,
         );
       }
-      if ((testInfo.project.use.viewport?.width ?? 1280) <= 390) {
-        const [cancelBox, cashBox, loanBox] = await Promise.all([
-          dialog
-            .getByRole("button", { name: "Cancel", exact: true })
-            .boundingBox(),
-          dialog
-            .getByRole("button", { name: "Pay cash", exact: true })
-            .boundingBox(),
-          dialog
-            .getByRole("button", { name: "Take loan", exact: true })
-            .boundingBox(),
-        ]);
-        expect(Math.abs(cashBox!.y - loanBox!.y)).toBeLessThanOrEqual(1);
-        expect(Math.abs(cashBox!.width - loanBox!.width)).toBeLessThanOrEqual(
-          1,
-        );
-        expect(cancelBox!.y + cancelBox!.height).toBeLessThanOrEqual(
-          cashBox!.y + 1,
-        );
-        expect(cancelBox!.width).toBeGreaterThanOrEqual(
-          cashBox!.width + loanBox!.width,
-        );
-      }
       if (
         process.env.REVIEW_SCREENSHOT_DIR &&
         index === 0 &&
@@ -304,7 +326,7 @@ for (const theme of ["light", "dark"] as const) {
           element.scrollTop = 0;
         });
         await page.mouse.move(0, 0);
-        await page.screenshot({
+        await dialog.screenshot({
           path: path.join(
             process.env.REVIEW_SCREENSHOT_DIR,
             `acquisition-${testInfo.project.name}-${theme}.png`,

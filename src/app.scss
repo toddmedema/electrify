@@ -8559,86 +8559,13 @@ option {
   white-space: normal;
 }
 
-#utility-acquisition-title-heading + .MuiDialogContent-root {
-  > .decisionImpact {
-    padding: 0 24px;
-    border: 0;
-  }
-  .decisionImpactFacts {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 24px;
-  }
-  .decisionImpactFact {
-    position: relative;
-    display: block;
-    padding: 16px 0;
-    border-top: 1px solid var(--border-subtle);
-    > .conceptIcon {
-      display: none;
-    }
-  }
-  .decisionImpactFactContent {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    gap: 8px;
-  }
-  .decisionImpactFactLabel {
-    color: var(--font-color-faded);
-  }
-  .decisionImpactFactValue {
-    font-size: var(--font-size-subtitle);
-    line-height: 1.3;
-    font-variant-numeric: tabular-nums;
-  }
-  .decisionImpactFactDetail {
-    grid-column: 1;
-  }
-  .decisionImpactFactHelp {
-    position: absolute;
-    top: 12px;
-    right: 0;
-    .manual-link {
-      margin: -8px;
-    }
-  }
-  @media (max-width: 599px) {
-    > .decisionImpact {
-      padding-inline: 16px;
-    }
-    .decisionImpactFacts {
-      grid-template-columns: minmax(0, 1fr);
-      gap: 0;
-    }
-    .decisionImpactFact {
-      padding-block: 12px;
-    }
-    .decisionImpactFactContent {
-      gap: 4px;
-    }
-  }
-}
-
 .acquisitionReviewIntro {
   display: grid;
   gap: 8px;
-  padding: 0 24px 16px;
-  .acquisitionCustomerGain {
-    font-size: var(--font-size-subtitle);
-  }
-  @media (max-width: 599px) {
-    padding-inline: 16px;
-  }
-}
-.acquisitionMargin {
-  display: block;
-  color: var(--font-color-primary);
-  font-variant-numeric: tabular-nums;
+  padding: 0 16px 12px;
 }
 .acquisitionReviewDetails {
-  padding: 0 24px 8px;
-  @media (max-width: 599px) {
-    padding-inline: 16px;
-  }
+  padding: 16px;
 }
 .acquisitionObligations {
   padding-block: 16px;
@@ -8686,31 +8613,9 @@ option {
     padding-block: 8px 16px;
   }
 }
-.acquisitionInventory {
-  margin: 8px 0 16px;
-  font-size: var(--font-size-body2);
-  line-height: 1.5;
-  &:last-child {
-    margin-bottom: 0;
-  }
-  > div {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr);
-    gap: 12px;
-    padding-block: 8px;
-  }
-  dt {
-    color: var(--font-color-faded);
-  }
-  dd {
-    margin: 0;
-    font-variant-numeric: tabular-nums;
-    span {
-      display: block;
-      color: var(--font-color-faded);
-      font-size: var(--font-size-caption);
-    }
-  }
+.acquisitionDisclosure .decisionImpact {
+  padding-inline: 0;
+  border-bottom: 0;
 }
 .transmissionDecisionActions {
   display: flex;

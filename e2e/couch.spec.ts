@@ -21,6 +21,10 @@ async function startCouch<Actor extends Page | Frame>(
   await expect(
     page.getByRole("button", { name: "Choose a game", exact: true }),
   ).toBeDisabled();
+  // The visible dialog renders before its native event subscription and setup finish.
+  await expect
+    .poll(() => couch.settledNativeRequests("setup"))
+    .toBeGreaterThan(0);
   await couch.input({ "101": ["confirm"], "202": ["confirm"] });
   await expect(
     page.getByText("Controller joined", { exact: true }),
@@ -1357,6 +1361,9 @@ for (const committed of [false, true]) {
       exact: true,
     });
     await expect(setup).toBeVisible();
+    await expect
+      .poll(() => couch.settledNativeRequests("setup"))
+      .toBeGreaterThan(0);
     await couch.input({ "202": ["confirm"] });
     await expect(
       setup.getByText("Controller joined", { exact: true }),
