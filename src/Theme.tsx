@@ -461,6 +461,7 @@ export function createAppTheme(mode: ThemeModeType): Theme {
           select: {
             paddingTop: "0.5rem",
             paddingBottom: "0.5rem",
+            "&.MuiSelect-select": { paddingRight: "3rem" },
             "&:not(.Mui-disabled)": {
               color: palette.interactive,
             },
@@ -542,7 +543,7 @@ export function createAppTheme(mode: ThemeModeType): Theme {
           input: {
             "&.MuiNativeSelect-select, &.MuiSelect-select": {
               boxSizing: "border-box",
-              padding: "0.5rem 2rem 0.5rem 0.875rem",
+              padding: "0.5rem 3rem 0.5rem 0.875rem",
             },
           },
           root: {
@@ -651,7 +652,7 @@ export function createAppTheme(mode: ThemeModeType): Theme {
           root: {
             padding: 16,
             paddingBottom: "max(16px, env(safe-area-inset-bottom))",
-            gap: 8,
+            gap: "0.5rem",
             flexWrap: "wrap",
           },
         },

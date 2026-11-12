@@ -3547,7 +3547,7 @@ $pane_header_height: 48px;
   }
 
   .customSetupActions {
-    padding: 12px;
+    padding: 0.75rem;
     text-align: center;
   }
 
@@ -5473,7 +5473,7 @@ $homeSmokeCycle: 5.6s;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: $space-2;
+  gap: 0.5rem;
   padding: $space-1 $space-2 $space-1 $space-4;
   border-bottom: 1px solid var(--border-subtle);
 
@@ -7909,14 +7909,14 @@ img[src$="/transmission.svg"] {
 
 .locationPickerCount {
   display: block;
-  margin-top: 8px;
+  margin-top: 0.5rem;
   color: $font_color_faded;
 }
 
 .locationPickerSearchRow {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 0.5rem;
 
   .MuiAutocomplete-root {
     flex: 1;

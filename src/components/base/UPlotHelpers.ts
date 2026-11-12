@@ -306,7 +306,15 @@ export function expandedChartOptions(
             ),
           );
           return Math.ceil(
-            Math.max(natural, widest + 20 * getInterfaceScale()),
+            Math.max(
+              natural,
+              widest +
+                (axis.ticks?.show === false
+                  ? 0
+                  : (axis.ticks?.size ?? TICK_SIZE)) +
+                (axis.gap ?? LABEL_GAP) +
+                LABEL_EDGE_PAD * getInterfaceScale(),
+            ),
           );
         },
       };

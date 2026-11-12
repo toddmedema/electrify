@@ -310,10 +310,11 @@ for (const theme of ["light", "dark"]) {
     page,
   }, info) => {
     test.skip(!info.project.use.hasTouch);
-    // The supported largest scale makes the real breakdown overflow its full-chart host.
+    // The supported narrowest phone and largest scale make the real breakdown overflow.
+    // Keep enough height for the player's native touch gesture to stay inside the viewport.
     await page.setViewportSize({
-      width: info.project.use.viewport!.width,
-      height: 480,
+      width: 360,
+      height: 600,
     });
     await page.addInitScript((theme) => {
       localStorage.clear();

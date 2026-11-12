@@ -74,10 +74,6 @@ html[data-interface-scale]:not([data-interface-scale="1"]) {
     padding: 0 0.5rem 0 1rem;
     h2 {
       font-size: 1.125rem;
-      line-height: 1.5;
-    }
-    .gameToolTitleIcon > svg {
-      font-size: 1.25rem;
     }
   }
   .gameFleet {
@@ -155,6 +151,7 @@ html[data-interface-scale]:not([data-interface-scale="1"]) {
   }
   .insightsTrackHeader {
     flex-wrap: wrap;
+    gap: 0.5rem;
   }
   .insights .insightsTrackHeader {
     padding-block: 0;
@@ -214,7 +211,6 @@ html[data-interface-scale]:not([data-interface-scale="1"]) {
   }
   #topbar .screenHeaderBar {
     min-height: 3.5rem;
-    max-width: 64rem;
     gap: 0.75rem;
     padding-inline: 0.75rem;
     .MuiIconButton-edgeStart {
@@ -225,8 +221,6 @@ html[data-interface-scale]:not([data-interface-scale="1"]) {
     margin: 1rem;
   }
   .MuiDialogActions-root {
-    flex-wrap: wrap;
-    gap: 0.5rem;
     padding: 0.75rem;
   }
   .MuiMenuItem-root,
@@ -272,11 +266,7 @@ html[data-interface-scale]:not([data-interface-scale="1"]) {
     margin-block: 1rem;
   }
   .locationPickerCount {
-    margin-top: 0.5rem;
     line-height: 1.5;
-  }
-  .locationPickerSearchRow {
-    gap: 0.5rem;
   }
   .worldMap {
     max-width: none;
@@ -321,14 +311,6 @@ html[data-interface-scale]:not([data-interface-scale="1"]) {
       max-width: 100%;
     }
   }
-  .customSetupActions {
-    padding: 0.75rem;
-    gap: 0.75rem;
-  }
-  .difficultyPicker {
-    flex-wrap: wrap;
-    gap: 0.5rem;
-  }
   .manual-popover.MuiPaper-root {
     width: min(40rem, calc(100vw - 2 * var(--screen-edge-margin)));
     max-width: none;
@@ -336,7 +318,6 @@ html[data-interface-scale]:not([data-interface-scale="1"]) {
   }
   .manual-popover-header {
     flex: 0 0 auto;
-    gap: 0.5rem;
     padding: 0.5rem 0.5rem 0.5rem 1rem;
   }
   .manual-popover-body {
@@ -390,18 +371,12 @@ html[data-interface-scale]:not([data-interface-scale="1"]) {
   .facilityRow .MuiBadge-badge {
     font-size: 0.625rem;
   }
-  .insightsTrackHeader {
-    gap: 0.5rem;
-  }
   .generatorComparisonChoices {
     grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
   }
   .generatorComparisonChoice img {
     width: 2.5rem;
     height: 2.5rem;
-  }
-  .constructionSizeBar {
-    padding: 0.5rem 1rem;
   }
   .constructionPanel {
     min-height: 0;

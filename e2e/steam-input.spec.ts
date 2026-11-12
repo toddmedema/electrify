@@ -1221,10 +1221,19 @@ test("TV saved preferences style direct scenario links before play", async ({
     help.getByRole("button", { name: "close", exact: true }),
   ).toBeVisible();
   const helpBounds = await help.boundingBox();
+  const articleWidth = await help.evaluate(() =>
+    Math.min(
+      40 * parseFloat(getComputedStyle(document.documentElement).fontSize),
+      innerWidth,
+    ),
+  );
   expect(
     helpBounds!.width,
-    "TV help uses a readable article width",
-  ).toBeGreaterThan(page.viewportSize()!.width / 2);
+    "help uses the chosen scale's article width within the screen inset",
+  ).toBeGreaterThan(
+    Math.min(articleWidth, page.viewportSize()!.width - 2 * edge.actual) * 0.9,
+  );
+  expect(helpBounds!.width).toBeLessThanOrEqual(articleWidth + 1);
   expect(
     helpBounds!.y,
     "help stays inside the screen inset",
@@ -1327,7 +1336,9 @@ test("TV maximum custom setup gives location and select values enough room", asy
       countLines:
         count.getBoundingClientRect().height /
         parseFloat(countStyle.lineHeight),
-      widthShare: element.getBoundingClientRect().width / innerWidth,
+      widthShare:
+        element.getBoundingClientRect().width /
+        element.closest(".customSetupColumns")!.getBoundingClientRect().width,
     };
   });
   expect(
@@ -1348,7 +1359,7 @@ test("TV maximum custom setup gives location and select values enough room", asy
   ).toBeLessThanOrEqual(1.1);
   expect(
     geometry.widthShare,
-    "custom setup must use the shared TV reading width",
+    "custom setup must use the shared reading column at the chosen scale",
   ).toBeGreaterThan(0.8);
   await input(page);
   await captureTvPage(page, info, "custom");

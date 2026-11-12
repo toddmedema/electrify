@@ -125,6 +125,41 @@ it.each([
   },
 );
 
+it("retains an ordinary axis's measured native tick, gap and edge reserve", () => {
+  const context = jest
+    .spyOn(HTMLCanvasElement.prototype, "getContext")
+    .mockReturnValue(null);
+  try {
+    const axis = yAxis(1, { values: () => ["100MW"] });
+    const options = expandedChartOptions(
+      {
+        width: 350,
+        height: 150,
+        axes: [axis],
+        series: [{}],
+      },
+      1,
+      false,
+    );
+    const plot = {} as uPlot;
+    const natural = (axis.size as Exclude<uPlot.Axis.Size, number>)(
+      plot,
+      ["100MW"],
+      0,
+      0,
+    );
+    const fitted = (options.axes![0].size as Exclude<uPlot.Axis.Size, number>)(
+      plot,
+      ["100MW"],
+      0,
+      0,
+    );
+    expect(fitted).toBe(natural);
+  } finally {
+    context.mockRestore();
+  }
+});
+
 describe("anchored forecast dashes", () => {
   class RecordedPath {
     commands: Array<[string, ...number[]]> = [];
