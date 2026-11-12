@@ -5330,10 +5330,31 @@ $homeSmokeCycle: 5.6s;
     row-gap: 0;
     min-width: 0;
   }
+  .buildOptionOutput[role="group"] {
+    min-height: 40px;
+    touch-action: pan-y;
+
+    &:focus-visible {
+      outline: 2px solid var(--interactive-blue);
+      outline-offset: 2px;
+    }
+
+    @media (pointer: coarse) {
+      min-height: 44px;
+    }
+  }
+  .buildOptionOutputCaption {
+    font-size: var(--font-size-caption-sm);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
   .buildOptionSparkline {
     // Reserved even before the forecast can draw a line, so the card doesn't jump. The gap keeps
     // a line along the top edge from reading as an underline of the caption.
     height: 24px;
+    width: 96px;
+    max-width: 100%;
     margin-top: 4px;
     .sparkline {
       display: block;
