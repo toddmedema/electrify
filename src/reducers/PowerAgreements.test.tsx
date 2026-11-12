@@ -18,6 +18,7 @@ import {
   inheritedConnection,
   powerAgreementQuote,
   agreementDurationDiscount,
+  agreementPrice,
   recordAgreementSettlements,
   validPowerAgreementAction,
 } from "../helpers/PowerAgreements";
@@ -136,17 +137,28 @@ it("rejects a forged public quote, accepts its valid neighbor once and invalidat
   expect(facilitySignature(paused)).not.toBe(facilitySignature(signed));
   expect(intertieForecastKey(paused)).not.toBe(intertieForecastKey(signed));
 });
-it("keeps unchanged reviewed terms across ticks but rejects a changed delivery month", () => {
+it("refreshes v3 reviews when the signing market changes and rejects a changed delivery month", () => {
   const game = at();
   const quote = powerAgreementQuote(game, "champlain-nuclear")!;
+  const legacy = powerAgreementQuote(game, quote.id, 2)!;
   game.date = getDateFromMinute(game.date.minute + TICK_MINUTES, 2005);
-  expect(powerAgreementQuote(game, quote.id)!.quoteKey).toBe(quote.quoteKey);
+  expect(powerAgreementQuote(game, quote.id, 2)!.quoteKey).toBe(
+    legacy.quoteKey,
+  );
+  const refreshed = powerAgreementQuote(game, quote.id)!;
+  expect(refreshed.quoteKey).not.toBe(quote.quoteKey);
+  expect(
+    reducer(
+      game,
+      acceptPowerAgreement({ blockId: quote.id, quoteKey: quote.quoteKey }),
+    ),
+  ).toEqual(game);
   const accepted = reducer(
     game,
-    acceptPowerAgreement({ blockId: quote.id, quoteKey: quote.quoteKey }),
+    acceptPowerAgreement({ blockId: quote.id, quoteKey: refreshed.quoteKey }),
   );
   expect(accepted.transmission!.acceptedAgreements).toEqual([
-    { ...quote.receipt, acceptedMinute: game.date.minute },
+    refreshed.receipt,
   ]);
 
   const late = at(181);
@@ -299,6 +311,24 @@ it("rejects impossible saved receipts and inherited provenance through the real 
     },
     (save: typeof raw) => {
       save.game.transmission.lines[0].capacityW += 1;
+    },
+    (save: typeof raw) => {
+      save.game.transmission.acceptedAgreements[0].signingMarketPricePerMWh += 0.1;
+    },
+    (save: typeof raw) => {
+      delete save.game.transmission.acceptedAgreements[0].signingTemperatureC;
+    },
+    (save: typeof raw) => {
+      save.game.transmission.acceptedAgreements[0].signingTemperatureC = -101;
+    },
+    (save: typeof raw) => {
+      save.game.transmission.acceptedAgreements[0].signingTemperatureC = 20;
+    },
+    (save: typeof raw) => {
+      save.game.transmission.acceptedAgreements[0].signingTemperatureC = null;
+    },
+    (save: typeof raw) => {
+      save.game.transmission.acceptedAgreements[0].pricePerMWh = 1;
     },
   ]) {
     const malformed = cloneDeep(raw);
@@ -693,6 +723,135 @@ it("binds 1–10 whole years to canonical duration, discount, action and saved r
       powerAgreementQuote(game, "champlain-nuclear", 3, durationYears),
     ).toBeUndefined();
   }
+});
+
+it.each([20, -40])(
+  "quotes new v3 terms exactly 1%% or 20%% below the current market at %s°C",
+  (temperatureC) => {
+    const game = at();
+    currentTick(game)!.temperatureC = temperatureC;
+    const spot = adjacentMarketPricePerMWh(
+      game.transmission!.lines[0].corridorId,
+      intertieContextForGame(game),
+      game.date.minute,
+      currentTick(game)!,
+    );
+    for (const [years, fraction] of [
+      [1, 0.99],
+      [10, 0.8],
+    ]) {
+      const quote = powerAgreementQuote(game, "champlain-nuclear", 3, years)!;
+      expect(quote.priceToday).toBeCloseTo(spot * fraction, 10);
+      expect(quote.receipt).toMatchObject({
+        signingMarketPricePerMWh: spot,
+        signingTemperatureC: temperatureC,
+      });
+    }
+  },
+);
+
+it("indexes each signed ceiling from its own signing CPI and preserves the authored older promises", () => {
+  const game = at();
+  for (const termsVersion of [1, 2] as const) {
+    game.transmission!.acceptedAgreements = [];
+    const receipt = powerAgreementQuote(
+      game,
+      "champlain-nuclear",
+      termsVersion,
+    )!.receipt;
+    expect(Object.keys(receipt)).toHaveLength(6);
+    game.transmission!.acceptedAgreements = [receipt];
+    const source = connectionAgreements(game, "champlain").find(
+      (entry) => !entry.inherited,
+    )!;
+    expect(source.pricePerMWh).toBe(70);
+    expect(source.priceToday).toBe(agreementPrice(game, 70));
+  }
+  game.transmission!.acceptedAgreements = [];
+  game.transmission!.inheritedAgreementTerms = 3;
+  currentTick(game)!.temperatureC = -40;
+  const first = powerAgreementQuote(game, "champlain-nuclear", 3, 1)!;
+  game.transmission!.acceptedAgreements = [first.receipt];
+  game.date = getDateFromMinute(168 * MINUTES_PER_MONTH, 2005);
+  const second = powerAgreementQuote(game, "champlain-quebec", 3, 10)!;
+  game.transmission!.acceptedAgreements.push(second.receipt);
+  const sources = connectionAgreements(
+    game,
+    "champlain",
+    agreementYearMinute(2020),
+  );
+  expect(
+    sources.find(
+      (source) => source.inherited && source.id === "champlain-quebec",
+    )!.pricePerMWh,
+  ).toBe(60);
+  for (const quote of [first, second]) {
+    const source = sources.find((entry) => entry.id === `${quote.id}:0`)!;
+    expect(
+      agreementPrice(game, source.pricePerMWh, quote.receipt.acceptedMinute),
+    ).toBeCloseTo(quote.receipt.signingMarketPricePerMWh!, 10);
+  }
+  const futureMinute = agreementYearMinute(2021);
+  const market = jest
+    .spyOn(Transmission, "adjacentMarketPricePerMWh")
+    .mockReturnValue(500);
+  for (const quote of [first, second]) {
+    const source = connectionAgreements(game, "champlain", futureMinute).find(
+      (entry) => entry.id === `${quote.id}:0`,
+    )!;
+    expect(source.priceToday).toBeCloseTo(
+      (quote.priceToday * agreementPrice(game, 1, futureMinute)) /
+        agreementPrice(game, 1, quote.receipt.acceptedMinute),
+      10,
+    );
+  }
+  market.mockReturnValue(5);
+  expect(
+    connectionAgreements(game, "champlain", futureMinute).find(
+      (entry) => entry.id === `${second.id}:0`,
+    )!.priceToday,
+  ).toBeCloseTo(4, 10);
+});
+
+it("settles and reloads a v3 signing ceiling above the old authored ceiling, using bounded historical quote conditions", () => {
+  const game = playedAgreement();
+  runMonths(game, 24);
+  game.transmission!.acceptedAgreements = [];
+  currentTick(game)!.temperatureC = -40;
+  const quote = powerAgreementQuote(game, "champlain-nuclear", 3, 1)!;
+  const payload = {
+    blockId: quote.id,
+    quoteKey: quote.quoteKey,
+    durationYears: 1,
+    signingMarketPricePerMWh: 1,
+    signingTemperatureC: 100,
+  };
+  const signed = copyOfficialGame(reducer(game, acceptPowerAgreement(payload)));
+  expect(signed.transmission!.acceptedAgreements).toEqual([quote.receipt]);
+  request(signed, 500e6);
+  signed.timeline[1].temperatureC = -40;
+  tickState(signed);
+  const row = signed.transmission!.agreementAccounts!.find(
+    (account) => account.agreementId === `${quote.id}:0`,
+  )!.months[0];
+  expect(row.usefulMWh).toBeGreaterThan(0);
+  expect(row.availableValue! / row.availableMWh).toBeGreaterThan(
+    agreementPrice(signed, 70),
+  );
+  // Old acceptance weather can leave the rolling timeline; validate its canonical seeded snapshot.
+  signed.timeline[0].temperatureC = 20;
+  expect(validPowerAgreements(signed)).toBe(true);
+  expect(validUtilityExpansion(signed)).toBe(true);
+  const raw = JSON.parse(JSON.stringify(serializeSave(signed)));
+  const parsed = parseSave(raw);
+  expect(parsed).not.toBeNull();
+  const restored = copyOfficialGame(parsed!.game);
+  for (let i = 0; i < 3; i++) {
+    tickState(signed);
+    tickState(restored);
+  }
+  expect(restored.transmission).toEqual(signed.transmission);
+  expect(currentTick(restored)).toEqual(currentTick(signed));
 });
 
 it.each([5, 250])(

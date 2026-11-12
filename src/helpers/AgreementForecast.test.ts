@@ -227,3 +227,38 @@ it("allows a v3 forecast loss from unused monthly energy despite its below-marke
     result.remaining.unusedPayment,
   );
 });
+
+it("uses each offered signing ceiling in the real-reducer forecast and its cache", () => {
+  const spot = jest.spyOn(Transmission, "adjacentMarketPricePerMWh");
+  const game = fixture();
+  game.transmission!.acceptedAgreements = [];
+  game.date = getDateFromMinute(156 * MINUTES_PER_MONTH, 2005);
+  spot.mockReturnValue(20);
+  const lower = powerAgreementQuote(game, "champlain-quebec", 3, 10)!;
+  spot.mockReturnValue(250);
+  const higher = powerAgreementQuote(game, "champlain-quebec", 3, 10)!;
+  game.date = getDateFromMinute(299 * MINUTES_PER_MONTH, 2005);
+  spot.mockReturnValue(500);
+  const lowerForecast = computeAgreementForecast(
+    game,
+    "champlain-quebec:0",
+    lower.receipt,
+    "signing-ceilings",
+  );
+  const higherForecast = computeAgreementForecast(
+    game,
+    "champlain-quebec:0",
+    higher.receipt,
+    "signing-ceilings",
+  );
+  expect(lowerForecast.cashDifference).toBeGreaterThan(
+    higherForecast.cashDifference,
+  );
+  expect(lowerForecast.remaining.payment).toBeLessThan(
+    higherForecast.remaining.payment,
+  );
+  expect(lowerForecast.remaining.availableMWh).toBe(
+    higherForecast.remaining.availableMWh,
+  );
+  expect(lowerForecast.withAgreement).toEqual(higherForecast.withAgreement);
+});

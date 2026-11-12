@@ -41,53 +41,63 @@ it("accepts an unchanged pair of real consecutive ticks", () => {
   expect(inspect().getViolations()).toEqual([]);
 });
 
-it("accepts a real minimum payment without imports and still rejects phantom or missing charges", () => {
-  const game = createGame({ scenarioId: 116, seed: 12345 });
-  game.transmission!.lines[0].paused = true;
-  tickState(game);
-  const now = getTimeFromTimeline(game.date.minute, game.timeline)!;
-  expect(now.importedW).toBe(0);
-  expect(now.expensesImports).toBeGreaterThan(0);
-  const inspectImports = (expensesImports = now.expensesImports) => {
-    const collector = new InvariantCollector();
-    checkTick(
-      collector,
-      game,
-      null,
-      { ...now, expensesImports },
-      "minimum payment",
-      false,
-    );
-    return collector.getViolations();
-  };
-  expect(inspectImports()).toEqual([]);
-  for (const expenses of [0, now.expensesImports! * 2])
-    expect(inspectImports(expenses)).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          rule: "import expenses match physical flows and minimum obligations",
-        }),
-      ]),
-    );
-  for (const agreementUnusedExpenses of [-1, NaN, Infinity]) {
-    const collector = new InvariantCollector();
-    checkTick(
-      collector,
-      game,
-      null,
-      { ...now, agreementUnusedExpenses },
-      "invalid minimum expense",
-      false,
-    );
-    expect(collector.getViolations()).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          rule: "import expenses match physical flows and minimum obligations",
-        }),
-      ]),
-    );
-  }
-});
+it.each([2, 3] as const)(
+  "accepts a real v%s minimum payment without imports and still rejects phantom or missing charges",
+  (termsVersion) => {
+    const game = createGame({ scenarioId: 116, seed: 12345 });
+    game.transmission!.inheritedAgreementTerms = termsVersion;
+    game.transmission!.lines[0].paused = true;
+    tickState(game);
+    let now = getTimeFromTimeline(game.date.minute, game.timeline)!;
+    expect(now.expensesImports === 0).toBe(termsVersion === 3);
+    const observeClosedMonth = (timeline: readonly TickPresentFutureType[]) => {
+      now = timeline[timeline.length - 1];
+    };
+    while (termsVersion === 3 && game.date.minute < MINUTES_PER_MONTH)
+      tickState(game, undefined, observeClosedMonth);
+    expect(now.importedW).toBe(0);
+    expect(now.expensesImports).toBeGreaterThan(0);
+    const inspectImports = (expensesImports = now.expensesImports) => {
+      const collector = new InvariantCollector();
+      checkTick(
+        collector,
+        game,
+        null,
+        { ...now, expensesImports },
+        "minimum payment",
+        false,
+      );
+      return collector.getViolations();
+    };
+    expect(inspectImports()).toEqual([]);
+    for (const expenses of [0, now.expensesImports! * 2])
+      expect(inspectImports(expenses)).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            rule: "import expenses match physical flows and minimum obligations",
+          }),
+        ]),
+      );
+    for (const agreementUnusedExpenses of [-1, NaN, Infinity]) {
+      const collector = new InvariantCollector();
+      checkTick(
+        collector,
+        game,
+        null,
+        { ...now, agreementUnusedExpenses },
+        "invalid minimum expense",
+        false,
+      );
+      expect(collector.getViolations()).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            rule: "import expenses match physical flows and minimum obligations",
+          }),
+        ]),
+      );
+    }
+  },
+);
 
 it("rejects import charges without either physical imports or an agreement minimum", () => {
   const collector = inspect((tick) => {

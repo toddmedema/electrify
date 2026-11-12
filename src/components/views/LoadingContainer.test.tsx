@@ -21,14 +21,29 @@ import {
   mapDispatchToProps,
 } from "./LoadingContainer";
 
-it.each([false, true])(
-  "finishes deferred agreement price validation after loading (forged payment: %s)",
-  async (forged) => {
+it.each([
+  [2, false],
+  [2, true],
+  [3, false],
+  [3, true],
+] as const)(
+  "finishes deferred v%s agreement price validation after loading (forged payment: %s)",
+  async (termsVersion, forged) => {
     const game = createGame({ scenarioId: 116, seed: 12345 });
+    game.transmission!.inheritedAgreementTerms = termsVersion;
     tickState(game);
     const wire = JSON.parse(JSON.stringify(serializeSave(game)));
-    if (forged)
-      wire.game.transmission.agreementAccounts[0].months[0].payment += 1;
+    const row = wire.game.transmission.agreementAccounts[0].months[0];
+    expect(row.payment).toBeGreaterThan(0);
+    if (forged) {
+      if (termsVersion === 2) row.payment += 1;
+      else {
+        // Preserve the v3 arithmetic while putting its rate above the authored ceiling.
+        row.availableValue *= 1e6;
+        row.usefulValue *= 1e6;
+        row.payment *= 1e6;
+      }
+    }
     const unloaded = jest.spyOn(Economy, "hasEconomy").mockReturnValue(false);
     const parsed = parseSave(wire);
     expect(parsed).not.toBeNull();

@@ -149,16 +149,30 @@ export interface PowerAgreementSettlement {
   payment: number;
 }
 
-export interface PowerAgreementReceipt {
-  termsVersion: PowerAgreementTermsVersion;
+interface PowerAgreementReceiptDates {
   blockId: string;
   cycle: number;
   acceptedMinute: number;
   startMinute: number;
   endMinute: number;
-  /** Present only on version 3 receipts. */
-  durationYears?: number;
 }
+export type PowerAgreementReceipt = PowerAgreementReceiptDates &
+  (
+    | {
+        termsVersion: 1 | 2;
+        durationYears?: never;
+        signingMarketPricePerMWh?: never;
+        signingTemperatureC?: never;
+      }
+    | {
+        termsVersion: 3;
+        durationYears: number;
+        /** Undiscounted regional spot; the indexed ceiling starts at this signing price. */
+        signingMarketPricePerMWh: number;
+        /** Conditions needed to reproduce the seeded signing spot without old hourly weather. */
+        signingTemperatureC: number;
+      }
+  );
 export interface AcceptPowerAgreementAction {
   blockId: string;
   quoteKey: string;

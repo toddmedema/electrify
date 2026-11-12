@@ -158,6 +158,22 @@ export function powerAgreementQuote(
   termsVersion: PowerAgreementTermsVersion = 3,
   selectedDurationYears?: number,
 ) {
+  return quotePowerAgreement(
+    game,
+    blockId,
+    termsVersion,
+    selectedDurationYears,
+  );
+}
+/** Only receipt validation may provide historical signing conditions. */
+function quotePowerAgreement(
+  game: GameType,
+  blockId: string,
+  termsVersion: PowerAgreementTermsVersion,
+  selectedDurationYears?: number,
+  signingTemperatureC = getTimeFromTimeline(game.date.minute, game.timeline)
+    ?.temperatureC ?? 15,
+) {
   if (game.scenarioId !== 116 || game.customScenario) return undefined;
   const block = POWER_AGREEMENT_BLOCKS.find((entry) => entry.id === blockId);
   if (!block || !utilityOwnedAt(game, block.utilityId, game.date.minute))
@@ -172,7 +188,9 @@ export function powerAgreementQuote(
     termsVersion === 3 &&
     (!Number.isSafeInteger(durationYears) ||
       durationYears < 1 ||
-      durationYears > 10)
+      durationYears > 10 ||
+      !Number.isFinite(signingTemperatureC) ||
+      Math.abs(signingTemperatureC) > 100)
   )
     return undefined;
   const line = game.transmission?.lines.find(
@@ -194,15 +212,29 @@ export function powerAgreementQuote(
       : (Math.floor(game.date.minute / MINUTES_PER_MONTH) + 1) *
         MINUTES_PER_MONTH;
   if (startMinute >= FINISH) return undefined;
-  const receipt: PowerAgreementReceipt = {
-    termsVersion,
+  const dates = {
     blockId,
     cycle: receipts.length,
     acceptedMinute: game.date.minute,
     startMinute,
     endMinute: startMinute + durationYears * 12 * MINUTES_PER_MONTH,
-    ...(termsVersion === 3 ? { durationYears } : {}),
   };
+  const signingMarketPricePerMWh = adjacentMarketPricePerMWh(
+    INHERITED_CONNECTIONS[block.utilityId],
+    intertieContextForGame(game),
+    game.date.minute,
+    { temperatureC: signingTemperatureC },
+  );
+  const receipt: PowerAgreementReceipt =
+    termsVersion === 3
+      ? {
+          termsVersion,
+          ...dates,
+          durationYears,
+          signingMarketPricePerMWh,
+          signingTemperatureC,
+        }
+      : { termsVersion, ...dates };
   // A review binds commercial terms; the acceptance timestamp is recorded on confirmation.
   const { acceptedMinute: _acceptedMinute, ...terms } = receipt;
   return {
@@ -215,12 +247,8 @@ export function powerAgreementQuote(
     ...agreementMonthlyEnergy(block.nominalW * 0.95, termsVersion),
     priceToday:
       termsVersion === 3
-        ? agreementRate(
-            game,
-            block.pricePerMWh,
-            durationYears,
-            INHERITED_CONNECTIONS[block.utilityId],
-          )
+        ? signingMarketPricePerMWh *
+          (1 - agreementDurationDiscount(durationYears))
         : agreementPrice(game, block.pricePerMWh),
     quoteKey: JSON.stringify({
       ...terms,
@@ -313,7 +341,11 @@ export function connectionAgreements(
               name: block.name,
               nominalW: block.nominalW,
               deliverability: 0.95,
-              pricePerMWh: block.pricePerMWh,
+              pricePerMWh:
+                receipt.termsVersion === 3
+                  ? receipt.signingMarketPricePerMWh /
+                    agreementPrice(game, 1, receipt.acceptedMinute)
+                  : block.pricePerMWh,
               marketId: "marketId" in block ? block.marketId : "vt-valley-pool",
               emissionsKgPerMWh: undefined as number | undefined,
               reductionYear: undefined as number | undefined,
@@ -391,11 +423,12 @@ export function validPowerAgreements(game: GameType): boolean {
         acceptedAgreements: receipts!.slice(0, index),
       },
     };
-    const quote = powerAgreementQuote(
+    const quote = quotePowerAgreement(
       atAcceptance,
       receipt.blockId,
       receipt.termsVersion,
       receipt.durationYears,
+      receipt.signingTemperatureC,
     );
     if (
       !quote ||
@@ -408,10 +441,14 @@ export function validPowerAgreements(game: GameType): boolean {
           startMinute: receipt.startMinute,
           endMinute: receipt.endMinute,
           ...(receipt.termsVersion === 3
-            ? { durationYears: receipt.durationYears }
+            ? {
+                durationYears: receipt.durationYears,
+                signingMarketPricePerMWh: receipt.signingMarketPricePerMWh,
+                signingTemperatureC: receipt.signingTemperatureC,
+              }
             : {}),
         }) ||
-      Object.keys(receipt).length !== (receipt.termsVersion === 3 ? 7 : 6)
+      Object.keys(receipt).length !== (receipt.termsVersion === 3 ? 9 : 6)
     )
       return false;
   }

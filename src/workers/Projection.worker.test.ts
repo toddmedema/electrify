@@ -1,4 +1,9 @@
-import type { GameType, LocationType, TickPresentFutureType } from "../Types";
+import type {
+  GameType,
+  LocationType,
+  PowerAgreementReceipt,
+  TickPresentFutureType,
+} from "../Types";
 
 const mockEconomy = jest.fn();
 const mockFuelPrices = jest.fn();
@@ -120,6 +125,17 @@ it("retries an unsuccessful economy load", async () => {
 
 it("uses the existing serialized data loader for paired agreement forecasts without packing a second projection", async () => {
   const game = { seed: 7, location: { id: "london" } } as GameType;
+  const offer: PowerAgreementReceipt = {
+    termsVersion: 3,
+    blockId: "champlain-nuclear",
+    cycle: 0,
+    acceptedMinute: 224640,
+    startMinute: 259200,
+    endMinute: 276480,
+    durationYears: 1,
+    signingMarketPricePerMWh: 98.2,
+    signingTemperatureC: -5.8,
+  };
   const response = new Promise((resolve) =>
     reply.mockImplementationOnce(resolve),
   );
@@ -129,6 +145,7 @@ it("uses the existing serialized data loader for paired agreement forecasts with
       requestId: ++requestId,
       game,
       agreementId: "nuclear",
+      offer,
       cacheEpoch: "new-session",
     },
   } as MessageEvent);
@@ -136,7 +153,7 @@ it("uses the existing serialized data loader for paired agreement forecasts with
   expect(mockAgreementForecast).toHaveBeenCalledWith(
     game,
     "nuclear",
-    undefined,
+    offer,
     "new-session",
   );
   expect(mockProjection).not.toHaveBeenCalled();

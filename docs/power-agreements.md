@@ -21,21 +21,27 @@ Inherited nominal coverage and 2005-dollar prices are unchanged: Champlain has
 regional firm at $55/MWh. Deliverability is 95%. Valley nuclear falls to 80 MW on
 1 January 2017. Québec coverage falls to 60 MW per utility and Ridge firm to
 20 MW on 1 January 2020. Champlain nuclear ends on that date; the remaining
-inherited coverage ends on 1 January 2025. These authored prices are inflation-indexed ceilings for new v3 terms; their
-duration discount and current-market cap apply below. Existing v1/v2 prices
-continue following their original inflation rule. Nuclear's zero operational emissions remain confined to its
-inherited contract; regional replacements use regional market emissions.
+inherited coverage ends on 1 January 2025. These authored prices remain the
+inflation-indexed ceilings for inherited v3 terms; their duration discount and
+current-market cap apply below. Existing v1/v2 prices continue following their
+original inflation rule. Nuclear's zero operational emissions remain confined to
+its inherited contract; regional replacements use regional market emissions.
 
 Only the authored scenario 116 offers replacements, including in co-op. Modded
-and custom scenarios cannot accept these products. Québec replacement blocks retain their $65/MWh authored 2005-dollar ceiling;
-regional firm blocks retain $70/MWh. All new offers use v3 terms, with an integer
-choice of 1–10 calendar years. The authored five- or ten-year duration remains the
-default. The discount rises linearly from 1% at one year to 20% at ten years.
-New inherited terms use their canonical remaining/end dates and clamp the discount
-at ten years. At every dispatch interval the rate is the lower of the CPI-indexed
-authored ceiling and that connection's unchanged current regional market price,
-multiplied by one minus the duration discount. This is an explicit game guarantee,
-including when spot falls; it is not a claim that real PPAs always beat spot.
+and custom scenarios cannot accept these products. Existing v1/v2 Québec
+replacement blocks retain their $65/MWh authored 2005-dollar price; regional firm
+blocks retain $70/MWh. All new offers use v3 terms, with an integer choice of
+1–10 calendar years. The authored five- or ten-year duration remains the default.
+The discount rises linearly from 1% at one year to 20% at ten years. New offers
+anchor their undiscounted ceiling to the connection's current regional spot
+price at signing, so their initial rate is exactly 1% or 20% below that price at
+the duration endpoints. The ceiling follows CPI relative to the signing month.
+Inherited v3 terms retain their authored 2005-dollar ceilings and canonical end
+dates, with the discount clamped at ten years. At every dispatch interval the
+rate is the lower of that source's CPI-indexed ceiling and the connection's
+unchanged current regional market price, multiplied by one minus the duration
+discount. This is an explicit game guarantee, including when spot falls; it is
+not a claim that real PPAs always beat spot.
 A one-year market price is at least 1/0.99 times the agreement price, exceeding the
 requested 0.5% premium. The market itself is unchanged for uncovered purchases.
 
@@ -170,8 +176,16 @@ and before the saved grid opens. Receipt/account limits derive from the five
 canonical blocks and the maximum possible one-year renewal cycles before 2025.
 
 Accepted receipts persist block/cycle identity, acceptance minute and resolved
-start/end; v3 also persists its canonical integer duration. Capacity, price and emissions are derived from canonical authoring.
-The reducer revalidates the reviewed quote; the save parser rejects forged terms,
+start/end; v3 also persists its canonical integer duration, undiscounted signing
+spot and signing temperature. Each v3 replacement derives its own real price
+ceiling by dividing that spot by the signing month's CPI index. The parser
+reproduces the seeded spot from the acceptance minute, run context and stored
+temperature, which must be finite and between −100°C and 100°C. This proves the
+price follows the canonical market formula; it cannot independently authenticate
+historical temperature after those hourly frames leave the rolling timeline.
+Capacity and emissions still derive from canonical authoring. The public action
+accepts only block identity, duration and the reviewed quote key; the reducer
+computes the signing snapshot itself. The save parser rejects forged terms,
 duplicates, overlap, unknown blocks, acceptance before ownership and invalid
 inherited interfaces. The schema-9 migration adds only already-owned interfaces
 and an empty acceptance ledger. It preserves recorded history, company accounts,
@@ -180,9 +194,9 @@ forecasts through the existing data-loaded owner. Private forecasts advance thei
 own monthly meters at every elapsed interval; current-frame redispatch and pre-roll
 never write the live ledger.
 
-Reviews bind the agreed coverage, real price and delivery term rather than a
-particular clock tick. Confirmation records the actual acceptance time, while a
-change to the delivery month requires a fresh review.
+Reviews bind coverage, the current signing quote and delivery term. Confirmation
+records the actual acceptance time. Changes to the signing market conditions or
+delivery month require a fresh review; the review modal pauses ordinary play.
 
 ## Historical context, not reconstructed utility books
 
