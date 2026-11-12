@@ -242,7 +242,9 @@ test("resuming a campaign creates its invitation lobby before starting and waits
     kind: "lock",
     ids: [host, guest, "retired"],
   });
-  expect(f.posts.at(-1)).toMatchObject({
+  expect(
+    f.posts.findLast((request) => request.kind === "restore"),
+  ).toMatchObject({
     kind: "restore",
     seats: campaign.players,
   });
@@ -303,7 +305,9 @@ test("a friend who was not in the save claims an open company and resumes it", a
     kind: "lock",
     ids: [host, "friend", "retired"],
   });
-  expect(f.posts.at(-1)).toMatchObject({
+  expect(
+    f.posts.findLast((request) => request.kind === "restore"),
+  ).toMatchObject({
     kind: "restore",
     seats: [
       { id: host, name: "Host" },
@@ -858,6 +862,42 @@ test("worker keepalives relay only to connected guests without replacing the hos
   expect(f.requests.at(-1)).toEqual({ kind: "send", to: guest, payload: data });
   expect(f.session.getSnapshot()).toBe(previous);
   f.session.dispose();
+});
+
+test("worker view credit follows synchronous host consumption and cannot outlive its session", async () => {
+  const f = fixture(true);
+  await f.session.initialize();
+  await f.session.start({ spec: COOP_TEST_SPEC });
+  f.posts.length = 0;
+  const consumed = jest.fn(() => {
+    expect(f.posts).not.toContainEqual({ kind: "views-applied" });
+  });
+  const stop = f.session.subscribe(consumed);
+  const publish = () =>
+    f.worker.onmessage?.({
+      data: {
+        kind: "views",
+        views: {
+          [host]: view({ revision: 2 }),
+          [guest]: view({ revision: 2 }),
+        },
+      },
+    } as unknown as MessageEvent<WorkerResponse>);
+  publish();
+  expect(consumed).toHaveBeenCalledTimes(1);
+  expect(f.session.getSnapshot().view?.revision).toBe(2);
+  expect(f.requests.at(-1)).toMatchObject({
+    kind: "send",
+    to: guest,
+    payload: { kind: "view" },
+  });
+  expect(f.posts).toEqual([{ kind: "views-applied" }]);
+  stop();
+  f.posts.length = 0;
+  f.session.subscribe(() => f.session.dispose());
+  publish();
+  expect(f.worker.terminate).toHaveBeenCalled();
+  expect(f.posts).toEqual([]);
 });
 
 test.each(["command", "disconnect"])(
