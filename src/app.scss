@@ -8686,7 +8686,7 @@ option {
 .transmissionDecisionActions {
   display: flex;
   flex-wrap: wrap;
-  align-items: start;
+  align-items: end;
   gap: 8px;
   > .MuiButton-root {
     min-height: 40px;

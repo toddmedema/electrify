@@ -1309,13 +1309,14 @@ export default function TransmissionPanel({
                                       {availableAcquisition && onAcquire && (
                                         <Button
                                           variant="contained"
+                                          aria-label={`Acquire ${acquisitionTarget.name}`}
                                           onClick={() =>
                                             setAcquisitionTargetId(
                                               acquisitionTarget.id,
                                             )
                                           }
                                         >
-                                          Acquire {acquisitionTarget.name}
+                                          Acquire
                                         </Button>
                                       )}
                                       <IntertieUpgradeControl

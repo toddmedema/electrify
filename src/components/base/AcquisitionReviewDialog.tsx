@@ -182,7 +182,7 @@ export default function AcquisitionReviewDialog({
                       <span>
                         {formatMoneyConcise(contract.pricePerMWh)}/MWh
                         {contract.balancing
-                          ? " reference · variable availability, not firm reserve"
+                          ? " reference · variable price and availability, not firm reserve"
                           : ""}
                       </span>
                     </dd>
