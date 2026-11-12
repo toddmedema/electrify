@@ -194,36 +194,38 @@ export default function PowerAgreements({
       >
         {review && (
           <>
-            <BuildDetails label="Replacement agreement terms">
-              <BuildDetailRow
-                label="Coverage"
-                value={`${formatWatts(review.nominalW)} · up to ${formatWatts(review.deliverableW)} deliverable`}
-              />
-              <BuildDetailRow
-                label="Delivery"
-                value={`${agreementDate(review.receipt.startMinute)}–${agreementDate(review.receipt.endMinute, true)}`}
-              />
-              <BuildDetailRow
-                label="Price today"
-                value={
-                  <>
-                    {formatMoneyConcise(review.priceToday)}/MWh
-                    <Typography
-                      component="div"
-                      variant="caption"
-                      color="textSecondary"
-                    >
-                      Follows inflation · ${review.pricePerMWh}/MWh in 2005
-                      dollars
-                    </Typography>
-                  </>
-                }
-              />
-              <BuildDetailRow
-                label="Payment"
-                value="$0 upfront · pay for delivered energy"
-              />
-            </BuildDetails>
+            <Box className="powerAgreementTerms">
+              <BuildDetails label="Replacement agreement terms">
+                <BuildDetailRow
+                  label="Coverage"
+                  value={`${formatWatts(review.nominalW)} · up to ${formatWatts(review.deliverableW)} deliverable`}
+                />
+                <BuildDetailRow
+                  label="Delivery"
+                  value={`${agreementDate(review.receipt.startMinute)}–${agreementDate(review.receipt.endMinute, true)}`}
+                />
+                <BuildDetailRow
+                  label="Price today"
+                  value={
+                    <>
+                      {formatMoneyConcise(review.priceToday)}/MWh
+                      <Typography
+                        component="div"
+                        variant="caption"
+                        color="textSecondary"
+                      >
+                        Follows inflation · ${review.pricePerMWh}/MWh in 2005
+                        dollars
+                      </Typography>
+                    </>
+                  }
+                />
+                <BuildDetailRow
+                  label="Payment"
+                  value="$0 upfront · pay for delivered energy"
+                />
+              </BuildDetails>
+            </Box>
             <Typography variant="body2" sx={{ mt: 2 }}>
               Covered imports use this agreed rate before market pricing. Local
               generation can reduce purchases.

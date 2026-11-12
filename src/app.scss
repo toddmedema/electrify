@@ -8591,6 +8591,21 @@ option {
   }
 }
 
+.powerAgreementSummary {
+  display: block;
+  margin-top: 4px;
+  white-space: normal;
+}
+
+.powerAgreementTerms .buildDetails {
+  .buildDetailLabel {
+    width: 32%;
+  }
+  .buildDetailHelp {
+    display: none;
+  }
+}
+
 .powerAgreements {
   margin-top: 16px;
   padding-top: 16px;

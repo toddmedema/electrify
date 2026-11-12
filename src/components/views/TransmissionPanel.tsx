@@ -1102,9 +1102,7 @@ export default function TransmissionPanel({
                                               ? `Idle · ${formatWatts(flowCapacityW)}`
                                               : `${word} ${flowReading}`
                                     }
-                                    detail={
-                                      construction?.detail ?? agreementText
-                                    }
+                                    detail={construction?.detail}
                                     progress={
                                       building
                                         ? {
@@ -1114,6 +1112,16 @@ export default function TransmissionPanel({
                                         : undefined
                                     }
                                   >
+                                    {agreementText && (
+                                      <Typography
+                                        component="span"
+                                        variant="caption"
+                                        color="textSecondary"
+                                        className="powerAgreementSummary"
+                                      >
+                                        {agreementText}
+                                      </Typography>
+                                    )}
                                     {availableAcquisition && (
                                       <Typography
                                         component="span"
@@ -1246,7 +1254,7 @@ export default function TransmissionPanel({
                                       <div className="facilityStat">
                                         <dt>
                                           {inherited
-                                            ? "Market imports available"
+                                            ? "Market import limit"
                                             : "Import available now"}
                                         </dt>
                                         <dd className="facilityStatValue">

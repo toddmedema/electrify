@@ -63,6 +63,20 @@ function request(game: ReturnType<typeof at>, watts: number) {
   });
 }
 
+let playedSignedGame: ReturnType<typeof at> | undefined;
+function playedAgreement() {
+  if (!playedSignedGame) {
+    const played = createGame({
+      scenarioId: 116,
+      seed: 12345,
+      difficulty: "Employee",
+    });
+    runMonths(played, 156);
+    playedSignedGame = sign(played);
+  }
+  return copyOfficialGame(playedSignedGame);
+}
+
 it("opens with a real inherited operating interface that cannot be built, financed or upgraded", () => {
   const game = at(0);
   expect(game.transmission!.lines).toEqual([
@@ -292,12 +306,9 @@ it("isolates forecast clones and exposes no offers or acceptance outside the aut
 it.each([20, -40])(
   "bills covered rates before the real spot rate at %s°C, including when spot is cheaper",
   (temperatureC) => {
-    const game = sign(at(), "champlain-nuclear");
-    const offset = agreementYearMinute(2020) - game.date.minute;
-    game.date = getDateFromMinute(agreementYearMinute(2020), 2005);
-    game.timeline.forEach((tick) => {
-      tick.minute += offset;
-    });
+    const game = playedAgreement();
+    runMonths(game, 24);
+    expect(game.date.minute).toBe(agreementYearMinute(2020));
     request(game, 400e6);
     const next = game.timeline[1];
     next.temperatureC = temperatureC;
@@ -331,13 +342,7 @@ it.each([20, -40])(
   },
 );
 it("keeps real played saves deterministic after signing and after a pause decision", () => {
-  const played = createGame({
-    scenarioId: 116,
-    seed: 12345,
-    difficulty: "Employee",
-  });
-  runMonths(played, 156);
-  let live = sign(played);
+  let live = playedAgreement();
   live = copyOfficialGame(
     reducer(live, togglePauseTransmissionLine(live.transmission!.lines[0].id)),
   );

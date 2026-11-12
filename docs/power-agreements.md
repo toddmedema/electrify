@@ -62,6 +62,19 @@ must come from the actual forecast, with measured balance comparisons maintained
 alongside the scenario simulation evidence. Other scenarios retain their ordinary
 market path and seeded outputs.
 
+Measured seed-12345 Employee playthroughs use the same acquisition and retirement
+actions before and after this change. Opening-year import costs move by about
+$231 on an $83.47M total. The old inherited-only routes stopped in month 183;
+retained connections now let both routes play the full 240 months, although
+surviving the supply withdrawal does not guarantee that all mission goals pass.
+In 2020, the Valley route buys about 1,282 GWh from the market without replacements,
+6 GWh with on-time replacements, or 126 GWh when signing late. Ridge's respective
+figures are 1,308, 279 and 461 GWh. These are annualized recorded flows in the
+representative-day model. Whole-company dispatch and retained customers also
+change, so the runs are not an isolated price sensitivity: Valley's 2020 import
+bill is about $218M without replacements and $300M with them. Agreements hedge
+market exposure; they do not promise cheaper energy or eliminate shortages.
+
 Schema 10 persists accepted block/cycle identity, acceptance minute and resolved
 start/end. Capacity, price and emissions are derived from canonical authoring.
 The reducer revalidates the reviewed quote; the save parser rejects forged terms,

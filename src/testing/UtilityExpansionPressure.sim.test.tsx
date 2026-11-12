@@ -67,15 +67,14 @@ for (const seed of [12345, 1, 7])
       expect(purchasesAfter.marketMeanMW).toBeGreaterThan(0);
       expect(purchasesAfter.cost).toBeGreaterThan(0);
       for (const utility of ["champlain", target] as const) {
-        expect(
-          result.finalTransmissionLines.find(
-            (line) => line.corridorId === INHERITED_CONNECTIONS[utility],
-          ),
-        ).toMatchObject({
+        const line = result.finalTransmissionLines.find(
+          (line) => line.corridorId === INHERITED_CONNECTIONS[utility],
+        );
+        expect(line).toMatchObject({
           capacityW: UTILITY_AREAS[utility].sourceInterfaceW,
           yearsToBuildLeft: 0,
-          paused: false,
         });
+        expect(line?.paused).not.toBe(true);
       }
       evidence.push({
         seed,

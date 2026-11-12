@@ -106,6 +106,16 @@ for (const theme of ["light", "dark"] as const) {
     await expect(line).toContainText("Regional nuclear · Inherited");
     await expect(line).toContainText("Through 31 Dec 2019");
     await expect(line).toContainText("120MW → 60MW on 1 Jan 2020");
+    const summary = line.locator(".powerAgreementSummary");
+    await expect(summary).toContainText("Replacement available");
+    expect(
+      await line
+        .locator(".facilityStatus")
+        .evaluate((element) => element.scrollWidth <= element.clientWidth + 1),
+    ).toBe(true);
+    expect(
+      await summary.evaluate((element) => getComputedStyle(element).whiteSpace),
+    ).toBe("normal");
     const review = line.getByRole("button", {
       name: "Review Québec hydro replacement",
       exact: true,
@@ -115,6 +125,14 @@ for (const theme of ["light", "dark"] as const) {
     await reviewScreenshot(line, {
       path: testInfo.outputPath(`ppa-agreements-${theme}.png`),
       animations: "disabled",
+    });
+    const header = line.locator(".facilityRowHeader");
+    await header.scrollIntoViewIfNeeded();
+    const headerBounds = (await header.boundingBox())!;
+    await reviewScreenshot(page, {
+      path: testInfo.outputPath(`ppa-connection-${theme}.png`),
+      animations: "disabled",
+      clip: { ...headerBounds, width: Math.min(560, headerBounds.width) },
     });
     await review.click();
     const dialog = page.getByRole("dialog", {
@@ -157,8 +175,13 @@ for (const theme of ["light", "dark"] as const) {
     await expect(line).toContainText("1 Jan 2020–31 Dec 2029");
     await expect(inspect).toBeFocused();
     await expect(review).toHaveCount(0);
-    await line.scrollIntoViewIfNeeded();
-    await reviewScreenshot(line, {
+    const signedAgreement = line
+      .locator(".powerAgreement")
+      .filter({ hasText: "Scheduled · starts 1 Jan 2020" });
+    await expect(page.locator(".MuiSnackbar-root")).toHaveCount(0);
+    await signedAgreement.scrollIntoViewIfNeeded();
+    await expect(signedAgreement).toBeInViewport();
+    await reviewScreenshot(signedAgreement, {
       path: testInfo.outputPath(`ppa-signed-${theme}.png`),
       animations: "disabled",
     });

@@ -288,10 +288,9 @@ for (const theme of ["light", "dark"] as const) {
           .filter({ hasText: /^Acquisition obligations/ });
         await expect(obligations).toContainText("January 2017");
         await expect(dialog).not.toContainText("Plan replacement supply");
-        await expect(dialog).toContainText(
-          "up to 50MW · variable availability",
-        );
-        await expect(dialog).toContainText("Not firm reserve");
+        await expect(dialog).toContainText("Regional nuclear");
+        await expect(dialog).toContainText("Québec hydro");
+        await expect(dialog).not.toContainText("New England balancing");
       }
       const beforeCancel = await readSavedGame(page);
       await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
@@ -500,8 +499,12 @@ for (const theme of ["light", "dark"] as const) {
       facilities,
       page.getByRole("button", { name: "Facilities", exact: true }),
     );
-    await expect(facilities).toContainText("Owned · Valley Electric");
-    await expect(facilities).toContainText("Owned · Ridge Electric");
+    for (const target of ["Valley", "Ridge"])
+      await expect(
+        facilities
+          .locator(".transmissionLine")
+          .filter({ hasText: `${target} expansion connection` }),
+      ).toContainText("· Owned");
     const resumed = await readSavedGame(page);
     expect(resumed?.utilityExpansion).toEqual(acquired?.utilityExpansion);
     expect(errors).toEqual([]);
@@ -517,6 +520,7 @@ test("normal valley play saves across the first year and resumes from IndexedDB"
   await page.getByRole("button", { name: "Start game", exact: true }).click();
   await openBuild(page);
   await page.getByRole("tab", { name: "Interties", exact: true }).click();
+  await page.getByRole("slider", { name: /Construction tier/ }).press("Home");
   await page
     .getByRole("button", { name: /Review purchase of .*Valley Electric/ })
     .click();
