@@ -234,7 +234,7 @@ export default function PurchaseReviewDialog(
       titleId={props.titleId}
       title={props.title}
       closable
-      actionsClassName={`tvPurchaseReviewActions${props.cancelLabel ? " purchaseReviewActions" : ""}`}
+      actionsClassName={`purchaseReviewControls${props.cancelLabel ? " purchaseReviewActions" : ""}`}
       contentClassName="noPadding purchaseReviewContent"
       actions={
         <>

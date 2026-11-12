@@ -124,10 +124,11 @@ function textWidth(text: string, font: string, sizePx: number): number {
   return measureCtx.measureText(text).width;
 }
 
-/** Enlarge rendered options and measure the final font, without changing compact charts. */
+/** Fit final axis labels to the plot; expanded inspection may also emphasize its lines. */
 export function expandedChartOptions(
   options: uPlot.Options,
   fontScale: number,
+  emphasize = true,
 ): uPlot.Options {
   const enlargeFont = (font: string | undefined) =>
     (font || chartFont()).replace(
@@ -245,7 +246,7 @@ export function expandedChartOptions(
       };
     }),
     series: options.series.map((series, index) =>
-      index === 0
+      index === 0 || !emphasize
         ? series
         : {
             ...series,

@@ -1,4 +1,3 @@
-import { isTvLayout } from "../../TvLayout";
 import {
   getInterfaceScale,
   subscribeInterfaceScale,
@@ -813,7 +812,7 @@ function FacilitySupplyChart({
   anchor: React.RefObject<HTMLDivElement>;
 }) {
   const fuelOrder = getDispatchOrderedFuels(game.facilities);
-  const height = useFleetChartHeight();
+  const height = useFleetChartHeight(anchor);
   // A portrait tablet's sheet starts where this block ends.
   React.useLayoutEffect(() => {
     const element = anchor.current;
@@ -859,7 +858,7 @@ function FacilitySupplyChart({
 const HINT_MIN_FACILITIES = 4;
 const BULK_HINT_SEEN_KEY = "facilityBulkHintSeen";
 
-/** The fleet chart grows with the window; single-pane layouts keep it 15% shorter. */
+/** The fleet chart grows with its pane; narrow panes keep it 15% shorter. */
 export function fleetChartHeight(width: number, height: number): number {
   const fit = (min: number, share: number, max: number) =>
     Math.round(Math.max(min, Math.min(max, height * share)));
@@ -874,29 +873,38 @@ export function fleetChartHeight(width: number, height: number): number {
 }
 
 /**
- * Keep chart height synchronized with window and text-size changes.
+ * Keep chart height synchronized with its rendered pane and interface scale.
  * Couch panes reserve 20% of the usual plot height for the rest of each company's fleet.
  */
-function useFleetChartHeight(): number {
-  /** Measure the plot in CSS pixels, applying text scale to TV design dimensions once.
-   * The couch reduction reserves fleet space before native view zoom magnifies the whole pane. */
-  const measure = () => {
-    const height = isTvLayout()
-      ? Math.round(220 * getInterfaceScale())
-      : fleetChartHeight(window.innerWidth, window.innerHeight);
+function useFleetChartHeight(anchor: React.RefObject<HTMLDivElement>): number {
+  const measure = React.useCallback(() => {
+    const pane = anchor.current?.closest(".facilitiesBody");
+    const width =
+      anchor.current?.getBoundingClientRect().width || window.innerWidth;
+    const availableHeight =
+      pane?.getBoundingClientRect().height || window.innerHeight;
+    const scale = getInterfaceScale();
+    const height = Math.round(
+      fleetChartHeight(width / scale, availableHeight / scale) * scale,
+    );
     // Split-screen keeps the daily plot 20% shorter to leave room for the fleet.
     return window.electrifyCouch ? Math.round(height * 0.8) : height;
-  };
+  }, [anchor]);
   const [height, setHeight] = React.useState(measure);
-  React.useEffect(() => {
+  React.useLayoutEffect(() => {
     const resize = () => setHeight(measure());
+    resize();
+    const observer = new ResizeObserver(resize);
+    const pane = anchor.current?.closest(".facilitiesBody");
+    if (pane) observer.observe(pane);
     window.addEventListener("resize", resize);
     const stop = subscribeInterfaceScale(resize);
     return () => {
       window.removeEventListener("resize", resize);
+      observer.disconnect();
       stop();
     };
-  }, []);
+  }, [anchor, measure]);
   return height;
 }
 

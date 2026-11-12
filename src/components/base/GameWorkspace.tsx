@@ -268,6 +268,7 @@ function Workspace({
               >
                 <div
                   className="gameFleet"
+                  data-chart-viewport
                   hidden={!fleetVisible}
                   style={
                     layout === "side"
@@ -395,7 +396,7 @@ function ToolBody({
 }) {
   const ref = useToolScroll<HTMLDivElement>(`workspace.${tool}.scroll`);
   return (
-    <div className="gameToolBody" ref={ref}>
+    <div className="gameToolBody" data-chart-viewport ref={ref}>
       {children}
     </div>
   );

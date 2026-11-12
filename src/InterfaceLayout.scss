@@ -181,7 +181,7 @@ html[data-interface-scale]:not([data-interface-scale="1"]) {
   .insights .insightsTrackHeader {
     padding-block: 0;
   }
-  .tvPurchaseReviewActions {
+  .purchaseReviewControls {
     flex-wrap: wrap;
     gap: 0.5rem;
     padding: 1rem;
@@ -522,22 +522,6 @@ html[data-interface-scale]:not([data-interface-scale="1"]) {
   .buildOptionSparkline {
     min-height: 2rem;
   }
-  .tvBuildContext {
-    flex: 0 0 auto;
-    padding: 0.5rem 1rem;
-    border-bottom: 1px solid var(--border-subtle);
-  }
-  .tvBuildContext summary {
-    min-height: 2.5rem;
-    display: flex;
-    align-items: center;
-    cursor: pointer;
-    color: var(--interactive-blue);
-    font-weight: 600;
-  }
-  .tvBuildContext .chartLegend {
-    margin: 0;
-  }
   .customerProgramsEmbedded,
   .eventLog,
   .scenarioDetails {
@@ -645,14 +629,32 @@ html[data-interface-scale]:not([data-interface-scale="1"])
   }
 }
 
-html[data-interface-scale]:not([data-interface-scale="1"])
-  .tvBuildContext[open] {
+.buildGridEvidence {
+  flex: 0 0 auto;
+  min-width: 0;
+  padding: 0.5rem 1rem;
+  border-bottom: 1px solid var(--border-subtle);
+  summary {
+    min-height: 2.75rem;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    color: var(--interactive-blue);
+    font-weight: 600;
+  }
+  .chartLegend {
+    margin: 0;
+  }
+}
+
+.buildGridEvidence[open] {
   max-height: 45%;
   overflow-y: auto;
 }
 
-html[data-interface-scale]:not([data-interface-scale="1"]) .tvComparisonItem {
+.buildComparisonItem {
   list-style: none;
+  grid-column: 1 / -1;
 }
 
 html[data-interface-scale]:not([data-interface-scale="1"]) {
@@ -726,9 +728,6 @@ html[data-interface-scale]:not([data-interface-scale="1"]) {
     grid-template-columns: repeat(auto-fit, minmax(min(100%, 24rem), 1fr));
     align-content: start;
     gap: 1rem;
-  }
-  .tvComparisonItem {
-    grid-column: 1 / -1;
   }
   .chartTooltip,
   .chartEventTooltip {
