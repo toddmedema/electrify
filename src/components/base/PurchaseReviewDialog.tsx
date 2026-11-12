@@ -186,9 +186,6 @@ export default function PurchaseReviewDialog(
       detail: [
         `New loan: ${(interestRate * 100).toFixed(2)}% for ${loanMonths / 12} years.`,
         props.paymentSummary?.loan.detail,
-        cashOnlyFee > 0
-          ? `Includes a ${formatMoneyConcise(cashOnlyFee)} cash-only transaction fee.`
-          : undefined,
         refinancedBalance > 0
           ? `Includes refinancing the existing ${formatMoneyConcise(refinancedBalance)} balance at this rate and term.`
           : undefined,

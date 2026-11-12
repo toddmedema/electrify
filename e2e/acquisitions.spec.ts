@@ -201,11 +201,9 @@ for (const theme of ["light", "dark"] as const) {
       await expect(
         dialog.getByRole("region", { name: "Acquisition obligations" }),
       ).toBeVisible();
-      await expect(
-        dialog.getByText(
-          /Plant operating costs and payments to outside power suppliers are extra/,
-        ),
-      ).toBeVisible();
+      await expect(dialog).not.toContainText(
+        /Plant operating costs|cash-only transaction fee/,
+      );
       await expectPurchaseFactTable(
         dialog,
         [

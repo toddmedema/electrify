@@ -97,11 +97,10 @@ it.each(["valley-electric", "ridge-electric"] as const)(
     expect(
       screen.getAllByRole("button", { name: /Pay cash|Take loan/ }),
     ).toHaveLength(2);
+    expect(screen.queryByText(/Plant operating costs/)).not.toBeInTheDocument();
     expect(
-      screen.getByText(
-        /Plant operating costs and payments to outside power suppliers are extra/,
-      ),
-    ).toBeVisible();
+      screen.queryByText(/cash-only transaction fee/),
+    ).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Pay cash" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Take loan" })).toBeEnabled();
 
@@ -172,10 +171,6 @@ it.each([2017, 2024])(
 it("excludes expired power rights and past oil retirement commitments from a 2025 purchase", async () => {
   const quote = review("valley-electric", 2025);
   expect(quote.contracts).toEqual([]);
-  expect(screen.getByText(/Plant operating costs are extra/)).toBeVisible();
-  expect(
-    screen.queryByText(/payments to outside power suppliers are extra/),
-  ).not.toBeInTheDocument();
   const assets = disclosure("Plants & purchased power");
   await userEvent.click(within(assets).getByText("Plants & purchased power"));
   expect(

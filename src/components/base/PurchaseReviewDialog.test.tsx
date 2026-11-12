@@ -123,7 +123,9 @@ describe("PurchaseReviewDialog", () => {
     ).toHaveTextContent(
       `${formatMoneyConcise(terms.downpayment + 100000)} now + ${formatMoneyConcise(terms.monthlyPayment)}/mo`,
     );
-    expect(screen.getByText(/cash-only transaction fee/)).toBeInTheDocument();
+    expect(
+      screen.queryByText(/cash-only transaction fee/),
+    ).not.toBeInTheDocument();
   });
 
   it("offers explicit cancellation without submitting a purchase", () => {

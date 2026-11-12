@@ -132,12 +132,7 @@ export default function AcquisitionReviewDialog({
       afterFacts={
         <div className="acquisitionReviewDetails">
           <Typography variant="caption" color="textSecondary" component="p">
-            Monthly figures include debt and network upkeep. Plant operating
-            costs
-            {quote.contracts.length > 0
-              ? " and payments to outside power suppliers"
-              : ""}{" "}
-            are extra.
+            Monthly figures include debt and network upkeep.
           </Typography>
           <section
             className="acquisitionObligations"
