@@ -5,6 +5,7 @@ import { getLocalStorage } from "../../Globals";
 import { setStorageKeyValue } from "../../LocalStorage";
 import { useAppDispatch, useAppSelector } from "../../Store";
 import { change } from "../../reducers/Settings";
+import { inputScope, moveInputFocus } from "../../desktop/InputNavigation";
 import {
   getInputPresentation,
   subscribeInputPresentation,
@@ -46,24 +47,73 @@ export default function CouchSettingsPrompt() {
     received.current = true;
     setStorageKeyValue("couchPromptShown", true);
   }, [open, onTitleScreen]);
+  useEffect(() => {
+    if (!open || !onTitleScreen) return;
+    const directions = {
+      ArrowUp: "up",
+      ArrowDown: "down",
+      ArrowLeft: "left",
+      ArrowRight: "right",
+    } as const;
+    const navigate = (event: KeyboardEvent) => {
+      // Controller navigation sends its own widget keys; handle physical keys once.
+      const direction = directions[event.key as keyof typeof directions];
+      const target = event.target;
+      if (
+        !event.isTrusted ||
+        event.defaultPrevented ||
+        !direction ||
+        event.altKey ||
+        event.ctrlKey ||
+        event.metaKey ||
+        event.shiftKey ||
+        !(target instanceof HTMLElement) ||
+        !target.closest("#menuCard,.couchSettingsPrompt") ||
+        inputScope() !== target.closest(".appFrame")
+      )
+        return;
+      event.preventDefault();
+      moveInputFocus(direction);
+    };
+    document.addEventListener("keydown", navigate);
+    return () => document.removeEventListener("keydown", navigate);
+  }, [open, onTitleScreen]);
+  const close = () => {
+    setOpen(false);
+    document
+      .querySelector<HTMLElement>("#menuCard [data-main-action]")
+      ?.focus({ preventScroll: true });
+  };
   if (!open || !onTitleScreen) return null;
   return (
     <aside
       className="couchSettingsPrompt"
       aria-label="Couch settings suggestion"
+      onPointerMove={(event) => {
+        if (event.pointerType !== "mouse" || !(event.target instanceof Element))
+          return;
+        const button = event.target.closest<HTMLElement>("button");
+        if (button) {
+          delete document.documentElement.dataset.touchInput;
+          button.focus({ preventScroll: true });
+        }
+      }}
     >
       <p>Playing from the couch? Try larger controls and a focused layout.</p>
       <div className="couchSettingsPromptActions">
         <Button
-          variant="contained"
+          variant="text"
+          disableRipple
           onClick={() => {
             dispatch(change({ interfaceScale: 1.5, workspace: "single" }));
-            setOpen(false);
+            close();
           }}
         >
           Use couch settings
         </Button>
-        <Button onClick={() => setOpen(false)}>Dismiss</Button>
+        <Button variant="text" disableRipple onClick={close}>
+          Dismiss
+        </Button>
       </div>
     </aside>
   );

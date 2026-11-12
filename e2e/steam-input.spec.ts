@@ -1918,6 +1918,94 @@ async function tvJourney(page: Page, testInfo: TestInfo, maximum: boolean) {
   }
 }
 
+test("TV first launch shares one focus selection with keyboard and controller", async ({
+  page,
+}, info) => {
+  test.skip(!["tv-1080-light", "tv-1080-dark"].includes(info.project.name));
+  await page.addInitScript(() =>
+    sessionStorage.setItem(
+      "mockSteamPresentation",
+      JSON.stringify({ bigPicture: true }),
+    ),
+  );
+  await page.goto("/");
+  await waitForDesktopInput(page);
+  const prompt = page.getByRole("complementary", {
+    name: "Couch settings suggestion",
+    exact: true,
+  });
+  const play = page.getByRole("button", { name: "Play", exact: true });
+  const accept = prompt.getByRole("button", {
+    name: "Use couch settings",
+    exact: true,
+  });
+  const dismiss = prompt.getByRole("button", { name: "Dismiss", exact: true });
+  const transparent = "rgba(0, 0, 0, 0)";
+  await expect(prompt).toBeVisible();
+  await expect(play).toBeFocused();
+  await expect(accept).not.toBeFocused();
+  await expect(dismiss).not.toBeFocused();
+  await expect(accept).toHaveCSS("background-color", transparent);
+  await expect(dismiss).toHaveCSS("background-color", transparent);
+  await expect(accept).toHaveCSS(
+    "color",
+    await dismiss.evaluate((element) => getComputedStyle(element).color),
+  );
+  const selectedFill = await play.evaluate(
+    (element) => getComputedStyle(element).backgroundColor,
+  );
+  expect(selectedFill).not.toBe(transparent);
+  for (const device of ["keyboard", "controller"] as const) {
+    const direction = async (action: "up" | "down" | "left" | "right") => {
+      if (device === "keyboard")
+        await page.keyboard.press(
+          `Arrow${action[0].toUpperCase()}${action.slice(1)}`,
+        );
+      else await input(page, action);
+    };
+    const reach = async (target: Locator, action: "up" | "down") => {
+      for (let attempt = 0; attempt < 20; attempt++) {
+        if (
+          await target.evaluate((element) => document.activeElement === element)
+        )
+          break;
+        await direction(action);
+      }
+      await expect(
+        target,
+        `${device} arrows reach the rendered action`,
+      ).toBeFocused();
+    };
+    const oneSelection = async () => {
+      expect(
+        await page
+          .locator("#centeredMenu button, .couchSettingsPrompt button")
+          .evaluateAll(
+            (buttons, fill) =>
+              buttons.filter(
+                (button) => getComputedStyle(button).backgroundColor === fill,
+              ).length,
+            selectedFill,
+          ),
+      ).toBe(1);
+    };
+    await reach(accept, "down");
+    await expect(accept).toHaveCSS("background-color", selectedFill);
+    await expect(dismiss).toHaveCSS("background-color", transparent);
+    await oneSelection();
+    await direction("right");
+    await expect(dismiss).toBeFocused();
+    await expect(dismiss).toHaveCSS("background-color", selectedFill);
+    await expect(accept).toHaveCSS("background-color", transparent);
+    await oneSelection();
+    await direction("left");
+    await expect(accept).toBeFocused();
+    await reach(play, "up");
+    await expect(accept).toHaveCSS("background-color", transparent);
+    await expect(dismiss).toHaveCSS("background-color", transparent);
+  }
+});
+
 for (const source of [
   "big-picture",
   "remote-play-tv",
@@ -2000,6 +2088,7 @@ for (const source of [
     );
     await input(page, "confirm");
     await expect(prompt).toHaveCount(0);
+    await expect(play).toBeFocused();
     await expect(page.locator("html")).toHaveAttribute(
       "data-interface-scale",
       accept ? "1.5" : "1",

@@ -175,6 +175,15 @@ const MainMenu = (props: Props): React.JSX.Element => {
         id="centeredMenu"
         className="keyboardMenu"
         {...menuKeys}
+        onKeyDown={(event) => {
+          // The title-screen prompt shares spatial arrows with the full menu frame.
+          if (
+            event.key.startsWith("Arrow") &&
+            document.querySelector(".couchSettingsPrompt")
+          )
+            return;
+          menuKeys.onKeyDown(event);
+        }}
         onPointerMove={focusHomeButton}
         sx={{ px: 3 }}
       >

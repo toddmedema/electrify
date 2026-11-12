@@ -48,8 +48,8 @@ function mount(presentation?: DesktopState["steam"]["presentation"]) {
   const view = render(
     <Provider store={store}>
       <div className="appFrame">
-        <main className="base_main">
-          <button>Play</button>
+        <main className="base_main" id="menuCard">
+          <button data-main-action>Play</button>
         </main>
         <CouchSettingsPrompt />
       </div>
@@ -115,6 +115,7 @@ it("applies only scale and Single tool on acceptance, retaining hardware padding
   });
   expect(localStorage.getItem("interfaceScale")).toBe("1.5");
   expect(localStorage.getItem("workspace")).toBe("single");
+  expect(screen.getByRole("button", { name: "Play" })).toHaveFocus();
 });
 
 it.each(["dismiss", "restart"])(
