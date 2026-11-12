@@ -4,9 +4,18 @@ test("one online visit stores everything a styled offline launch needs", async (
   page,
   context,
 }) => {
+  const offlineKey = "electrify-test-offline";
+  await page.addInitScript((key) => {
+    // Chromium's emulated network state can update after cached startup scripts run.
+    Object.defineProperty(navigator, "onLine", {
+      get: () => sessionStorage.getItem(key) !== "true",
+    });
+  }, offlineKey);
+  let offline = false;
   let tagRequests = 0;
   await page.route("https://www.googletagmanager.com/**", (route) => {
     tagRequests++;
+    if (offline) return route.abort();
     return route.fulfill({ contentType: "application/javascript", body: "" });
   });
   await page.goto("/");
@@ -32,6 +41,10 @@ test("one online visit stores everything a styled offline launch needs", async (
     ),
   ).toBe(true);
 
+  await expect.poll(() => tagRequests).toBe(1);
+  const onlineRequests = tagRequests;
+  offline = true;
+  await page.evaluate((key) => sessionStorage.setItem(key, "true"), offlineKey);
   await context.setOffline(true);
   await page.reload();
 
@@ -41,22 +54,32 @@ test("one online visit stores everything a styled offline launch needs", async (
   const heading = await page.locator("h1").boundingBox();
   expect(heading!.width).toBeLessThanOrEqual(1);
   // The local runtime survives an offline launch, then initializes when connectivity returns.
+  expect(await page.evaluate(() => navigator.onLine)).toBe(false);
   expect(await page.evaluate(() => Boolean(window.electrifyAnalytics))).toBe(
     true,
   );
-  const offlineRequests = tagRequests;
+  const configCount = () =>
+    page.evaluate(
+      () =>
+        Array.from(
+          (window as typeof window & { dataLayer: ArrayLike<unknown>[] })
+            .dataLayer || [],
+          (command) => Array.from(command),
+        ).filter(([name]) => name === "config").length,
+    );
+  expect(tagRequests).toBe(onlineRequests);
+  expect(await configCount()).toBe(0);
+
+  const tagResponse = page.waitForResponse(
+    "https://www.googletagmanager.com/**",
+  );
+  offline = false;
   await context.setOffline(false);
-  await expect.poll(() => tagRequests).toBe(offlineRequests + 1);
-  await expect
-    .poll(() =>
-      page.evaluate(
-        () =>
-          Array.from(
-            (window as typeof window & { dataLayer: ArrayLike<unknown>[] })
-              .dataLayer || [],
-            (command) => Array.from(command),
-          ).filter(([name]) => name === "config").length,
-      ),
-    )
-    .toBe(1);
+  await page.evaluate((key) => {
+    sessionStorage.removeItem(key);
+    window.dispatchEvent(new Event("online"));
+  }, offlineKey);
+  expect((await tagResponse).ok()).toBe(true);
+  await expect.poll(() => tagRequests).toBe(onlineRequests + 1);
+  await expect.poll(configCount).toBe(1);
 });
