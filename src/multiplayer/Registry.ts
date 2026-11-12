@@ -4,7 +4,6 @@ import type { Command } from "./Types";
 import { isGameCommand } from "./Commands";
 
 interface Runtime {
-  foregroundMode?: "application";
   command: (command: Command) => void;
   submit: (command: Command) => Promise<void>;
   activity: (reason: string | null) => void;
@@ -13,25 +12,19 @@ interface Runtime {
 }
 let runtime: Runtime | undefined;
 export const multiplayerRuntime = () => runtime;
-/** Replace the command owner for this document and reset its foreground-pause baseline.
- * Native seats use application focus so sibling-view visibility cannot pause their companies. */
+/** Replace the command owner for this document. */
 export function registerMultiplayerRuntime(value: Runtime | undefined) {
   runtime = value;
-  hidden =
-    value?.foregroundMode !== "application" &&
-    typeof document !== "undefined" &&
-    document.hidden;
 }
 let openLobby: (() => void) | undefined;
 export const registerLobbyOpener = (open?: () => void) => {
   openLobby = open;
 };
 export const showMultiplayerLobby = () => openLobby?.();
-let hidden = false;
+// Cards that hold the shared clock while a player reads them. The construction catalogs are not
+// here: a shared clock is every company's, so one player shopping does not freeze it, and
+// backgrounding the window does not either. A player who wants a pause chooses one.
 const BLOCKING = new Set([
-  "BUILD_GENERATORS",
-  "BUILD_STORAGE",
-  "BUILD_INTERTIES",
   "MANUAL",
   "SETTINGS",
   "SAVED_GAMES",
@@ -74,15 +67,10 @@ export const multiplayerMiddleware: Middleware<object, AppStateType> =
       });
     if (name === "systemSuspend")
       runtime.command({ kind: "speed", speed: "PAUSED" });
-    if (runtime.foregroundMode !== "application") {
-      if (name === "pageHidden") hidden = true;
-      if (name === "pageVisible") hidden = false;
-    }
     const result = next(action);
     const state = api.getState();
-    const reason = hidden
-      ? "Game in background"
-      : state.ui.dialog.open || state.ui.victory
+    const reason =
+      state.ui.dialog.open || state.ui.victory
         ? "Reading notification"
         : state.ui.facilityDragActive
           ? "Reordering facilities"
@@ -91,9 +79,7 @@ export const multiplayerMiddleware: Middleware<object, AppStateType> =
               ? "Reviewing an acquisition"
               : "Choosing a policy"
             : BLOCKING.has(state.card.name)
-              ? state.card.name.startsWith("BUILD_")
-                ? "Building capacity"
-                : "Reading " + state.card.name.toLowerCase().replace(/_/g, " ")
+              ? "Reading " + state.card.name.toLowerCase().replace(/_/g, " ")
               : state.ui.manualHelpEntry
                 ? "Reading help"
                 : null;

@@ -22,7 +22,6 @@ export interface CouchClientState {
 
 /** A seat owns UI state and commands, never the worker, account services or persistence. */
 export class CouchClient {
-  readonly foregroundMode = "application";
   private state: CouchClientState = {
     pending: false,
     connected: false,

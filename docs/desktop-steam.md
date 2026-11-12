@@ -575,8 +575,8 @@ Other players' person markers sit along the bottom of their effective speed, fil
 from the left. Names, selections and pause reasons remain in accessible descriptions and hover
 text. Temporarily paused players appear only under Pause; their requested speed is retained for
 resuming. The controller Pause action also readies an online player after a safety stop.
-Opening the build screen, reading a notification, opening settings, or putting the game
-in the background pauses everyone without changing anyone's selection. Closing the interruption
+Reading a notification or opening settings pauses everyone without changing anyone's selection;
+opening the build screen or putting the game in the background does not. Closing the interruption
 restores the slowest remaining speed. Manual pause stays selected until that player changes it.
 Starting, reconnecting, and restoring a save require everyone to select a running speed. Construction
 controls keep working while paused. Save & Quit uses the normal top-left menu; guests request

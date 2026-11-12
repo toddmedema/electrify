@@ -95,6 +95,16 @@ export function formatWatts(i: number, mantissa?: number): string {
 }
 
 /**
+ * A labelled reserve reading. Negative values are labelled "Shortage". Reserve includes reachable
+ * headroom and can differ from unmet demand.
+ */
+export function formatReserveLine(reserveW: number, label: string): string {
+  return reserveW < 0
+    ? `Shortage: ${formatWatts(-reserveW)}`
+    : `${label}: ${formatWatts(reserveW)}`;
+}
+
+/**
  * Rounds down to two significant digits, so a maximum shown as "1.2GW" is a size that can really
  * be built rather than a rounded-up value just past the limit.
  */
