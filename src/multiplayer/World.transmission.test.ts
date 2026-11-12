@@ -284,10 +284,9 @@ it("publishes signed terms and current minimum-payment history to each owning re
     expect(published.transmission!.agreementAccounts).toEqual(
       grid.transmission!.agreementAccounts,
     );
-    if (grid.transmission!.agreementAccounts)
-      expect(published.transmission!.agreementAccounts).not.toBe(
-        grid.transmission!.agreementAccounts,
-      );
+    expect(published.transmission!.agreementAccounts ?? []).not.toBe(
+      grid.transmission!.agreementAccounts,
+    );
   }
   expect(views["1"].game!.transmission!.acceptedAgreements).toBeUndefined();
 });
