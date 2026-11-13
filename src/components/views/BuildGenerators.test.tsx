@@ -548,7 +548,7 @@ it("shows natural-gas base, per-start, and daily-start estimated O&M", async () 
   expect(
     screen.queryByText("Est. operations & maintenance"),
   ).not.toBeInTheDocument();
-  expect(screen.queryByText("$11.9M/yr")).not.toBeInTheDocument();
+  expect(screen.queryByText("$12M/yr")).not.toBeInTheDocument();
   expect(screen.queryByText("Flexible power")).toBeNull();
   expect(
     screen.queryByText(/Average output over a year/),
@@ -557,26 +557,18 @@ it("shows natural-gas base, per-start, and daily-start estimated O&M", async () 
     screen.getByRole("button", { name: "Show Natural Gas Peaker details" }),
   );
 
-  expect(
-    screen.getByRole("row", {
-      name: /Fixed upkeep.*\$2\.88M/,
-    }),
-  ).toBeInTheDocument();
-  expect(
-    screen.getByRole("row", {
-      name: /Variable upkeep.*\$1\.24\/MWh/,
-    }),
-  ).toBeInTheDocument();
-  expect(
-    screen.getByRole("row", {
-      name: /Non-fuel start cost.*\$23\.1k\/start/,
-    }),
-  ).toBeInTheDocument();
-  expect(
-    screen.getByRole("row", {
-      name: /Estimated annual upkeep.*\$12M\/yr/,
-    }),
-  ).toBeInTheDocument();
+  const rows = screen.getAllByRole("row");
+  for (const name of [
+    /Fixed upkeep.*\$2\.88M/,
+    /Variable upkeep.*\$1\.24\/MWh/,
+    /Non-fuel start cost.*\$23\.1k\/start/,
+    /Estimated annual upkeep.*\$12M\/yr/,
+  ]) {
+    const matches = rows.filter((row) => name.test(row.textContent || ""));
+    expect(matches).toHaveLength(1);
+    expect(matches[0]).toHaveAccessibleName(name);
+    expect(matches[0]).toBeInTheDocument();
+  }
 
   fireEvent.click(
     screen.getByRole("button", {
@@ -1560,10 +1552,15 @@ it.each([undefined, "Natural Gas"] as const)(
     const choicesInOrder = screen.getAllByRole("button", {
       name: /^Review purchase of /,
     });
-    const index = (name: string) =>
-      choicesInOrder.indexOf(
-        screen.getByRole("button", { name: `Review purchase of ${name}` }),
+    const index = (name: string) => {
+      const label = `Review purchase of ${name}`;
+      const matches = choicesInOrder.filter(
+        (button) => button.getAttribute("aria-label") === label,
       );
+      expect(matches).toHaveLength(1);
+      expect(matches[0]).toHaveAccessibleName(label);
+      return choicesInOrder.indexOf(matches[0]);
+    };
     expect(index("Solar")).toBeLessThan(index("Natural Gas CC"));
     expect(index("Natural Gas CC")).toBeLessThan(index("Natural Gas Peaker"));
     expect(index("Natural Gas Peaker")).toBeLessThan(index("Coal"));

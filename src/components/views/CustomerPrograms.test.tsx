@@ -1,5 +1,12 @@
 import * as React from "react";
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  isInaccessible,
+  render,
+  screen,
+  within,
+} from "@testing-library/react";
 import { Provider } from "react-redux";
 import { configureStore } from "@reduxjs/toolkit";
 import gameReducer from "../../reducers/Game";
@@ -18,12 +25,15 @@ import { suggestedPolicyStartHour } from "../../helpers/PolicyWindow";
 
 /** The value beside a build-out fact's label, if the fact is shown. */
 const fact = (label: string) => {
-  const index = screen
-    .queryAllByRole("term")
-    .findIndex((term) => term.textContent === label);
-  return index < 0
-    ? undefined
-    : screen.getAllByRole("definition")[index].textContent;
+  const term = screen.queryByText(label, { selector: "dt" });
+  if (!term) return undefined;
+  expect(term).toHaveRole("term");
+  expect(term).toBeVisible();
+  expect(isInaccessible(term)).toBe(false);
+  // Each div in the description list groups one term with its own definition.
+  // eslint-disable-next-line testing-library/no-node-access
+  const definition = within(term.parentElement!).getByRole("definition");
+  return definition.textContent;
 };
 
 jest.mock("../../helpers/PolicyPreviewClient", () => ({
@@ -578,11 +588,13 @@ test("solar facts compare a same-size facility and distinguish annual energy fro
   expect(fact("Monthly cost")).toMatch(/^\$[\d.]+[kKMB]?\/mo$/);
   fireEvent.click(screen.getByText("Compare utility solar"));
   const impact = fact("At completion")!;
-  const comparable = screen
-    .getAllByRole("term")
-    .find((term) =>
-      term.textContent?.startsWith("Facility comparable"),
-    )!.textContent!;
+  const comparableTerm = screen.getByText(/^Facility comparable/, {
+    selector: "dt",
+  });
+  expect(comparableTerm).toHaveRole("term");
+  expect(comparableTerm).toBeVisible();
+  expect(isInaccessible(comparableTerm)).toBe(false);
+  const comparable = comparableTerm.textContent!;
   const capacity = impact.split(" ")[0];
   expect(comparable).toContain("(" + capacity + "/");
   const annualGWh = (text: string) => Number(text.match(/([\d.]+)GWh\/yr/)![1]);

@@ -1,5 +1,11 @@
 import * as React from "react";
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  isInaccessible,
+  render,
+  screen,
+} from "@testing-library/react";
 import {
   CUSTOM_SCENARIO_ID,
   DEFAULT_CUSTOM_SCENARIO,
@@ -43,6 +49,15 @@ afterEach(() => {
   mockCreateForecastWorker.mockReset();
 });
 
+// Check one labelled control instead of recomputing names for every setup select.
+function setupCombobox(name: string) {
+  const control = screen.getByLabelText(name);
+  expect(control).toHaveRole("combobox");
+  expect(control).toHaveAccessibleName(name);
+  expect(isInaccessible(control)).toBe(false);
+  return control;
+}
+
 it("opens after economic data is loaded and names every setup control", () => {
   // createGame loads the economy, matching the path that used to make this screen crash after
   // quitting an active game.
@@ -78,7 +93,7 @@ it("opens after economic data is loaded and names every setup control", () => {
     "Facility type",
     "Facility size",
   ].forEach((name) => {
-    expect(screen.getByRole("combobox", { name })).toBeInTheDocument();
+    expect(setupCombobox(name)).toBeInTheDocument();
   });
   expect(screen.getByRole("textbox", { name: "Seed" })).toBeInTheDocument();
   expect(
@@ -471,9 +486,9 @@ it("offers researched Hydro maxima below 100MW and rejects oversized starting fl
       onStart={onStart}
     />,
   );
-  fireEvent.mouseDown(screen.getByRole("combobox", { name: "Facility type" }));
+  fireEvent.mouseDown(setupCombobox("Facility type"));
   fireEvent.click(screen.getByRole("option", { name: "Hydro" }));
-  fireEvent.mouseDown(screen.getByRole("combobox", { name: "Facility size" }));
+  fireEvent.mouseDown(setupCombobox("Facility size"));
   const options = screen.getAllByRole("option");
   expect(
     options.some((option) =>

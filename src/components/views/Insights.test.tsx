@@ -648,8 +648,16 @@ function gameWithHistory(): GameType {
 }
 
 async function choosePreset(label: string) {
-  await user.click(screen.getByRole("combobox", { name: "Insight preset" }));
+  await user.click(presetControl());
   await user.click(within(await screen.findByRole("listbox")).getByText(label));
+}
+
+function presetControl() {
+  const preset = screen.getByLabelText("Insight preset");
+  expect(preset).toHaveRole("combobox");
+  expect(preset).toHaveAccessibleName("Insight preset");
+  expect(isInaccessible(preset)).toBe(false);
+  return preset;
 }
 
 function storeCustomPreset(name: string) {
@@ -719,7 +727,9 @@ describe("Insights layers", () => {
     renderInsights();
     await user.click(labelledButton(/Layers/));
     for (const name of ["Revenue", "Expenses", "Renewable output"]) {
-      expect(screen.queryByRole("checkbox", { name })).toBeNull();
+      expect(
+        screen.queryByLabelText(name, { selector: 'input[type="checkbox"]' }),
+      ).toBeNull();
       expect(screen.queryByRole("heading", { name })).toBeNull();
     }
     expect(screen.getByRole("heading", { name: "Profit" })).toBeVisible();
@@ -846,35 +856,40 @@ describe("Insights layers", () => {
     );
     renderInsights();
     const layers = localStorage.getItem("insightsLayers");
-    fireEvent.click(screen.getByRole("button", { name: "Coal" }));
+    const fuels = within(
+      screen.getByRole("group", { name: "Show fuel prices" }),
+    );
+    fireEvent.click(fuels.getByRole("button", { name: "Coal" }));
     expect(
       screen.getByRole("img", { name: "Fuel price inspection" }),
     ).toHaveAttribute("data-fuel", "Coal");
-    const expand = screen.getByRole("button", {
-      name: "Expand Fuel Prices chart",
-    });
+    const expand = labelledButton("Expand Fuel Prices chart");
     act(() => expand.focus());
     fireEvent.click(expand);
     const dialog = screen.getByRole("dialog", { name: "Fuel Prices" });
+    const expanded = within(dialog);
     // The title names the dialog on its own; the help button beside it doesn't join the name
+    expect(labelledButton("What is Fuel Prices?", dialog)).toBeVisible();
     expect(
-      within(dialog).getByRole("button", { name: "What is Fuel Prices?" }),
-    ).toBeVisible();
-    expect(
-      within(dialog).getByRole("button", { name: "Coal" }),
+      within(
+        expanded.getByRole("group", { name: "Show fuel prices" }),
+      ).getByRole("button", { name: "Coal" }),
     ).toHaveAttribute("aria-pressed", "true");
-    const chart = within(dialog).getByRole("img", {
+    const chart = expanded.getByRole("img", {
       name: "Fuel price inspection",
     });
     expect(chart).toHaveAttribute("data-fuel", "Coal");
-    fireEvent.click(within(dialog).getByRole("button", { name: "Zoom in" }));
-    const date = within(dialog).getByLabelText(
-      /^Displayed date range:/,
-    ).textContent;
-    fireEvent.click(within(dialog).getByRole("button", { name: "All fuels" }));
-    expect(
-      within(dialog).getByRole("img", { name: "Fuel price inspection" }),
-    ).toHaveAttribute("data-fuel", "all");
+    fireEvent.click(labelledButton("Zoom in", dialog));
+    const date = expanded.getByLabelText(/^Displayed date range:/).textContent;
+    fireEvent.click(
+      within(
+        expanded.getByRole("group", { name: "Show fuel prices" }),
+      ).getByRole("button", { name: "All fuels" }),
+    );
+    expect(chart).toHaveRole("img");
+    expect(chart).toHaveAccessibleName("Fuel price inspection");
+    expect(isInaccessible(chart)).toBe(false);
+    expect(chart).toHaveAttribute("data-fuel", "all");
     fireEvent.keyDown(dialog, { key: "Escape" });
     await waitFor(() =>
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
@@ -909,20 +924,20 @@ describe("Insights layers", () => {
     const chart = () =>
       screen.getByRole("img", { name: "Supply by fuel inspection" });
     expect(chart()).toHaveAttribute("data-fuels", "Coal,Natural Gas,Wind");
-    expect(
-      within(key).getByRole("button", { name: "All fuels" }),
-    ).toHaveAttribute("aria-pressed", "true");
+    const all = within(key).getByRole("button", { name: "All fuels" });
+    const gas = within(key).getByRole("button", { name: "Natural Gas" });
+    expect(all).toHaveAttribute("aria-pressed", "true");
 
-    fireEvent.click(within(key).getByRole("button", { name: "Natural Gas" }));
+    fireEvent.click(gas);
     expect(chart()).toHaveAttribute("data-fuels", "Natural Gas");
-    expect(
-      within(key).getByRole("button", { name: "Natural Gas" }),
-    ).toHaveAttribute("aria-pressed", "true");
-    expect(
-      within(key).getByRole("button", { name: "All fuels" }),
-    ).toHaveAttribute("aria-pressed", "false");
+    expect(gas).toHaveAccessibleName("Natural Gas");
+    expect(isInaccessible(gas)).toBe(false);
+    expect(gas).toHaveAttribute("aria-pressed", "true");
+    expect(all).toHaveAccessibleName("All fuels");
+    expect(isInaccessible(all)).toBe(false);
+    expect(all).toHaveAttribute("aria-pressed", "false");
 
-    fireEvent.click(within(key).getByRole("button", { name: "All fuels" }));
+    fireEvent.click(all);
     expect(chart()).toHaveAttribute("data-fuels", "Coal,Natural Gas,Wind");
   });
 
@@ -1071,11 +1086,7 @@ describe("Insights layers", () => {
     expect(headings[0]).toHaveTextContent("Supply & Demand");
     expect(headings[1]).toHaveTextContent("Lowest reserve");
     await user.click(labelledButton(/Layers/));
-    await user.click(
-      screen.getByRole("checkbox", {
-        name: "Lowest reserve",
-      }),
-    );
+    await user.click(labelledCheckbox("Lowest reserve"));
     expect(
       screen.queryByRole("region", { name: "Lowest reserve evidence" }),
     ).not.toBeInTheDocument();
@@ -1894,7 +1905,7 @@ describe("Insights layers", () => {
   it("persists edited layer order, saves the preset, and restores its original layers", async () => {
     let view = renderInsights();
     await user.click(labelledButton(/Layers/));
-    await user.click(screen.getByRole("checkbox", { name: "Profit" }));
+    await user.click(labelledCheckbox("Profit"));
     await user.click(labelledButton("Move Profit up"));
 
     const layers = ["supplyDemand", "cash", "profit", "emissions"];
@@ -1902,9 +1913,7 @@ describe("Insights layers", () => {
     view.unmount();
     view = renderInsights();
     expect(screen.getByText("Profit", { selector: "h3" })).toBeVisible();
-    expect(
-      screen.getByRole("combobox", { name: "Insight preset" }),
-    ).toHaveTextContent("OverviewEdited");
+    expect(presetControl()).toHaveTextContent("OverviewEdited");
     const headings = screen
       .getAllByRole("heading", { level: 3 })
       .map((heading) => heading.textContent);
@@ -1928,12 +1937,9 @@ describe("Insights layers", () => {
         .getAllByRole("heading", { level: 3 })
         .map((heading) => heading.textContent),
     ).toEqual(headings);
-    expect(
-      screen.getByRole("combobox", { name: "Insight preset" }),
-    ).toHaveTextContent("Overview");
-    expect(
-      screen.getByRole("combobox", { name: "Insight preset" }),
-    ).not.toHaveTextContent("Edited");
+    const preset = presetControl();
+    expect(preset).toHaveTextContent("Overview");
+    expect(preset).not.toHaveTextContent("Edited");
     await user.click(labelledButton("Preset actions"));
     await user.click(
       screen.getByRole("menuitem", { name: "Reset to default" }),
@@ -1950,7 +1956,7 @@ describe("Insights layers", () => {
   it("resets unsaved changes to a standard preset", async () => {
     renderInsights();
     await user.click(labelledButton(/Layers/));
-    await user.click(screen.getByRole("checkbox", { name: "Profit" }));
+    await user.click(labelledCheckbox("Profit"));
     await user.click(labelledButton("Preset actions"));
     await user.click(
       screen.getByRole("menuitem", { name: "Reset to default" }),
@@ -1965,7 +1971,7 @@ describe("Insights layers", () => {
 
   it("only groups the preset choices when custom presets exist", async () => {
     const view = renderInsights();
-    await user.click(screen.getByRole("combobox", { name: "Insight preset" }));
+    await user.click(presetControl());
     expect(screen.queryByText("Default presets")).toBeNull();
     expect(screen.queryByText("Your presets")).toBeNull();
     expect(screen.queryByRole("option", { name: "Unsaved view" })).toBeNull();
@@ -1974,7 +1980,7 @@ describe("Insights layers", () => {
 
     storeCustomPreset("Peak watch");
     renderInsights();
-    await user.click(screen.getByRole("combobox", { name: "Insight preset" }));
+    await user.click(presetControl());
     expect(screen.getByText("Default presets")).toBeVisible();
     expect(screen.getByText("Your presets", { exact: true })).toBeVisible();
     expect(screen.getByRole("option", { name: "Peak watch" })).toBeVisible();
@@ -1991,13 +1997,11 @@ describe("Insights layers", () => {
     );
     await user.click(screen.getByRole("button", { name: "Save preset" }));
 
-    expect(
-      screen.getByRole("combobox", { name: "Insight preset" }),
-    ).toHaveTextContent("Peak watch");
+    const preset = presetControl();
+    expect(preset).toHaveTextContent("Peak watch");
 
     await user.click(labelledButton(/Layers/));
-    await user.click(screen.getByRole("checkbox", { name: "Profit" }));
-    const preset = screen.getByRole("combobox", { name: "Insight preset" });
+    await user.click(labelledCheckbox("Profit"));
     expect(preset).toHaveTextContent("Peak watchEdited");
     await user.click(preset);
     expect(screen.getByRole("option", { name: "Peak watch" })).toHaveAttribute(
@@ -2027,21 +2031,16 @@ describe("Insights layers", () => {
     await user.clear(name);
     await user.type(name, "Morning peak");
     await user.click(screen.getByRole("button", { name: "Rename" }));
-    expect(
-      screen.getByRole("combobox", { name: "Insight preset" }),
-    ).toHaveTextContent("Morning peak");
+    expect(presetControl()).toHaveTextContent("Morning peak");
 
     view.unmount();
     renderInsights();
-    expect(
-      screen.getByRole("combobox", { name: "Insight preset" }),
-    ).toHaveTextContent("Morning peak");
+    const preset = presetControl();
+    expect(preset).toHaveTextContent("Morning peak");
     await user.click(labelledButton("Preset actions"));
     await user.click(screen.getByRole("menuitem", { name: /Delete custom/ }));
     await user.click(screen.getByRole("button", { name: "Delete" }));
-    expect(
-      screen.getByRole("combobox", { name: "Insight preset" }),
-    ).toHaveTextContent("Unsaved view");
+    expect(presetControl()).toHaveTextContent("Unsaved view");
     const library = JSON.parse(
       localStorage.getItem("insightsPresetLibrary") || "{}",
     );
@@ -2106,8 +2105,8 @@ describe("Insights layers", () => {
     ).toBeGreaterThan(3);
 
     await user.click(labelledButton(/Layers/));
-    expect(screen.getByRole("checkbox", { name: "Fuel Prices" })).toBeEnabled();
-    expect(screen.getByRole("checkbox", { name: "Profit" })).toBeEnabled();
+    expect(labelledCheckbox("Fuel Prices")).toBeEnabled();
+    expect(labelledCheckbox("Profit")).toBeEnabled();
   });
 
   it("defers chart projection updates until a facility drag ends", () => {
@@ -2225,14 +2224,21 @@ function labelledCheckbox(label: string): HTMLElement {
   const checkbox = screen.getByLabelText(label, {
     selector: 'input[type="checkbox"]',
   });
+  expect(checkbox).toHaveRole("checkbox");
+  expect(checkbox).toHaveAccessibleName(label);
   expect(isInaccessible(checkbox)).toBe(false);
   return checkbox;
 }
 
-function labelledButton(label: string | RegExp): HTMLElement {
-  const button = screen.getByLabelText(label, {
-    selector: "button",
-  });
+function labelledButton(
+  label: string | RegExp,
+  scope?: HTMLElement,
+): HTMLElement {
+  const button = scope
+    ? within(scope).getByLabelText(label, { selector: "button" })
+    : screen.getByLabelText(label, { selector: "button" });
+  expect(button).toHaveRole("button");
+  expect(button).toHaveAccessibleName(label);
   expect(button).toBeVisible();
   expect(isInaccessible(button)).toBe(false);
   return button;
