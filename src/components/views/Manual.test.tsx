@@ -223,9 +223,7 @@ describe("Manual", () => {
       "aria-expanded",
       "true",
     );
-    expect(
-      screen.getByRole("heading", { name: "Water", exact: true }),
-    ).toHaveFocus();
+    expect(screen.getByRole("heading", { name: "Water" })).toHaveFocus();
     expect(entryHeader(MANUAL_ENTRY.BLACKOUTS)).toHaveAttribute(
       "aria-expanded",
       "false",
@@ -235,9 +233,7 @@ describe("Manual", () => {
   it("records the subsection when following one of its related links", async () => {
     const onFollowLink = jest.fn();
     renderManual(MANUAL_SECTION.WATER, onFollowLink);
-    await userEvent.click(
-      screen.getByRole("link", { name: "hydropower", exact: true }),
-    );
+    await userEvent.click(screen.getByRole("link", { name: "hydropower" }));
     expect(onFollowLink).toHaveBeenCalledWith(
       MANUAL_ENTRY.HYDROPOWER,
       MANUAL_SECTION.WATER,
