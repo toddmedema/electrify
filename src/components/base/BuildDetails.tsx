@@ -28,17 +28,27 @@ export function BuildDetailRow(props: {
   entry?: ManualEntryTitleType;
 }): React.JSX.Element {
   return (
-    <TableRow>
-      <TableCell component="th" scope="row" className="buildDetailLabel">
-        {props.label}
+    <TableRow className={props.entry ? "manual-help-region" : undefined}>
+      <TableCell
+        component="th"
+        scope="row"
+        aria-label={props.label}
+        className="buildDetailLabel"
+      >
+        {props.entry ? (
+          <ManualLink
+            entry={props.entry}
+            label={props.label.toLowerCase()}
+            region
+          >
+            {props.label}
+          </ManualLink>
+        ) : (
+          props.label
+        )}
       </TableCell>
       <TableCell align="right" className="buildDetailValue">
         {props.value}
-      </TableCell>
-      <TableCell className="buildDetailHelp">
-        {props.entry && (
-          <ManualLink entry={props.entry} label={props.label.toLowerCase()} />
-        )}
       </TableCell>
     </TableRow>
   );

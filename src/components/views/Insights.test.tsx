@@ -778,7 +778,7 @@ describe("Insights layers", () => {
     expect(charts).toHaveLength(INSIGHT_LAYERS.length - tables.length);
     for (const { track, name, id } of charts) {
       // Nothing interactive sits between the two, and both follow the title
-      const [expand, help] = within(track).getAllByRole("button");
+      const [help, expand] = within(track).getAllByRole("button");
       expect(expand).toHaveAccessibleName(`Expand ${name} chart`);
       expect(help).toHaveAccessibleName(`What is ${INSIGHT_LAYER_MANUAL[id]}?`);
       const [title] = within(track).getAllByRole("heading", { level: 3 });
@@ -787,7 +787,7 @@ describe("Insights layers", () => {
           Node.DOCUMENT_POSITION_FOLLOWING,
       ).toBeTruthy();
       expect(
-        expand.compareDocumentPosition(help) & Node.DOCUMENT_POSITION_FOLLOWING,
+        help.compareDocumentPosition(expand) & Node.DOCUMENT_POSITION_FOLLOWING,
       ).toBeTruthy();
     }
   });
@@ -803,8 +803,8 @@ describe("Insights layers", () => {
         .slice(0, 5)
         .map((button) => button.getAttribute("aria-label")),
     ).toEqual([
-      "Expand Cash chart",
       "What is Cash?",
+      "Expand Cash chart",
       "Move Cash up",
       "Move Cash down",
       "Remove Cash",
@@ -1893,8 +1893,12 @@ describe("Insights layers", () => {
     renderInsights();
     await choosePreset("Profitability");
 
-    expect(screen.getByText("Profit", { selector: "h3" })).toBeVisible();
-    expect(screen.getByText("Fuel Prices", { selector: "h3" })).toBeVisible();
+    expect(
+      screen.getByRole("heading", { name: "Profit", level: 3 }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole("heading", { name: "Fuel Prices", level: 3 }),
+    ).toBeVisible();
     screen
       .getAllByRole("img")
       .forEach((chart) =>
@@ -1912,7 +1916,9 @@ describe("Insights layers", () => {
     expect(JSON.parse(localStorage.getItem("insightsLayers")!)).toEqual(layers);
     view.unmount();
     view = renderInsights();
-    expect(screen.getByText("Profit", { selector: "h3" })).toBeVisible();
+    expect(
+      screen.getByRole("heading", { name: "Profit", level: 3 }),
+    ).toBeVisible();
     expect(presetControl()).toHaveTextContent("OverviewEdited");
     const headings = screen
       .getAllByRole("heading", { level: 3 })
@@ -1931,7 +1937,9 @@ describe("Insights layers", () => {
     view.unmount();
 
     renderInsights();
-    expect(screen.getByText("Profit", { selector: "h3" })).toBeVisible();
+    expect(
+      screen.getByRole("heading", { name: "Profit", level: 3 }),
+    ).toBeVisible();
     expect(
       screen
         .getAllByRole("heading", { level: 3 })
@@ -1946,7 +1954,9 @@ describe("Insights layers", () => {
     );
     await user.click(screen.getByRole("button", { name: "Restore" }));
 
-    expect(screen.queryByText("Profit", { selector: "h3" })).toBeNull();
+    expect(
+      screen.queryByRole("heading", { name: "Profit", level: 3 }),
+    ).toBeNull();
     const restoredLibrary = JSON.parse(
       localStorage.getItem("insightsPresetLibrary") || "{}",
     );
@@ -1962,7 +1972,9 @@ describe("Insights layers", () => {
       screen.getByRole("menuitem", { name: "Reset to default" }),
     );
     await user.click(screen.getByRole("button", { name: "Restore" }));
-    expect(screen.queryByText("Profit", { selector: "h3" })).toBeNull();
+    expect(
+      screen.queryByRole("heading", { name: "Profit", level: 3 }),
+    ).toBeNull();
     await user.click(labelledButton("Preset actions"));
     expect(
       screen.getByRole("menuitem", { name: "Save changes" }),
@@ -2085,10 +2097,14 @@ describe("Insights layers", () => {
       screen.queryByRole("region", { name: "Electricity pricing" }),
     ).not.toBeInTheDocument();
     expect(
-      screen.getByText("Supply & Demand", { selector: "h3" }),
+      screen.getByRole("heading", { name: "Supply & Demand", level: 3 }),
     ).toBeVisible();
-    expect(screen.getByText("Profit", { selector: "h3" })).toBeVisible();
-    expect(screen.getByText("Fuel Prices", { selector: "h3" })).toBeVisible();
+    expect(
+      screen.getByRole("heading", { name: "Profit", level: 3 }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole("heading", { name: "Fuel Prices", level: 3 }),
+    ).toBeVisible();
     const profit = screen.getByTestId("chartInsightsProfitPlot");
     expect(profit).toHaveAttribute("data-history-points", "3");
     expect(
@@ -2200,7 +2216,9 @@ describe("Insights layers", () => {
     expect(
       screen.queryByRole("checkbox", { name: "Power exchange" }),
     ).toBeNull();
-    expect(screen.queryByText("Power exchange", { selector: "h3" })).toBeNull();
+    expect(
+      screen.queryByRole("heading", { name: "Power exchange", level: 3 }),
+    ).toBeNull();
   });
 });
 

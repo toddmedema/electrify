@@ -1,5 +1,21 @@
 import path from "node:path";
 import { expect, test } from "./fixtures";
+import { selectManualText } from "./manual-selection";
+
+test("manual text can be selected", async ({ page }) => {
+  await openManual(page);
+  await page
+    .getByRole("button", { name: /how to play/i })
+    .first()
+    .click();
+  const paragraph = page.locator("#manual-how-to-play-content p").first();
+  await expect(paragraph).toBeVisible();
+  await selectManualText(page, paragraph);
+  await selectManualText(
+    page,
+    page.locator("#manual-how-to-play-header .MuiTypography-root").first(),
+  );
+});
 
 async function openManual(page: import("@playwright/test").Page) {
   await page.goto("/");

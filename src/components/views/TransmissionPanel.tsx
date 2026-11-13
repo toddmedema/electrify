@@ -342,23 +342,28 @@ function IntertieBuildItem(props: {
         <>
           <BuildMetric
             label="Import capacity"
+            entry={MANUAL_ENTRY.INTERTIES}
             value={formatWatts(props.importCapacityW)}
           />
           <BuildMetric
             label="Export capacity"
+            entry={MANUAL_ENTRY.INTERTIES}
             value={formatWatts(props.exportCapacityW)}
           />
           <BuildMetric
             label="Build time"
+            entry={MANUAL_ENTRY.INTERTIES}
             value={formatBuildMonths(corridor.yearsToBuild)}
           />
           <BuildMetric
             label="Total cost"
+            entry={MANUAL_ENTRY.INTERTIES}
             value={formatMoneyConcise(corridor.buildCost)}
           />
           {market && (
             <BuildMetric
               label="Emissions"
+              entry={MANUAL_ENTRY.EMISSIONS}
               value={`${formatMass(importEmissionsKgco2ePerMWh(market.id, props.year), units)}/MWh`}
             />
           )}
@@ -366,14 +371,17 @@ function IntertieBuildItem(props: {
             <>
               <BuildMetric
                 label="Company equity price"
+                entry={MANUAL_ENTRY.INTERTIES}
                 value={formatMoneyConcise(props.company.equityPrice)}
               />
               <BuildMetric
                 label="Assumed debt"
+                entry={MANUAL_ENTRY.INTEREST_RATES}
                 value={formatMoneyConcise(props.company.assumedDebt)}
               />
               <BuildMetric
                 label="Company customers"
+                entry={MANUAL_ENTRY.CUSTOMERS}
                 value={formatCount(props.company.customers)}
               />
             </>

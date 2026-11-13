@@ -147,22 +147,27 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
         <>
           <BuildMetric
             label="Discharge power"
+            entry={MANUAL_ENTRY.POWER_AND_ENERGY}
             value={formatWatts(storage.peakW)}
           />
           <BuildMetric
             label="Build cost"
+            entry={MANUAL_ENTRY.TOTAL_COST_OF_ENERGY}
             value={formatMoneyConcise(storage.buildCost)}
           />
           <BuildMetric
             label="Build time"
+            entry={MANUAL_ENTRY.HOW_TO_PLAY}
             value={`${Math.round(storage.yearsToBuild * 12)} mo`}
           />
           <BuildMetric
             label="At full power"
+            entry={MANUAL_ENTRY.POWER_AND_ENERGY}
             value={`${formatNumber(storage.peakWh / storage.peakW)} hr`}
           />
           <BuildMetric
             label="Efficiency"
+            entry={MANUAL_ENTRY.ROUND_TRIP_EFFICIENCY}
             value={`${Math.round(storage.roundTripEfficiency * 100)}%`}
           />
         </>

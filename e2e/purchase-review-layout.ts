@@ -14,7 +14,16 @@ export async function expectPurchaseFactTable(
   const rows = table.locator(".decisionImpactFact");
   await expect(rows.locator(".decisionImpactFactLabel")).toHaveText(labels);
   for (const row of await rows.all()) {
-    await expect(row.locator(":scope > .conceptIcon")).toBeVisible();
+    if (
+      await row.evaluate((element) =>
+        element.classList.contains("decisionImpactFactMoney"),
+      )
+    ) {
+      await expect(row.locator(":scope > .conceptIcon")).toHaveCount(0);
+      await expect(row.locator(".decisionImpactFactValue")).toContainText("$");
+    } else {
+      await expect(row.locator(":scope > .conceptIcon")).toBeVisible();
+    }
   }
   const style = await purchaseFactStyle(table);
   if (reference) expect(style).toEqual(reference);
@@ -63,7 +72,9 @@ async function purchaseFactStyle(table: Locator) {
       columns,
       label: textStyle(label),
       value: textStyle(value.querySelector("strong")!),
-      icon: textStyle(first.querySelector(":scope > .conceptIcon")!),
+      icon: textStyle(
+        section.querySelector(".decisionImpactFact > .conceptIcon")!,
+      ),
       padding: rowStyle.padding,
       gap: rowStyle.gap,
       border: rowStyle.borderTop,

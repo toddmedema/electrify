@@ -10,7 +10,7 @@ import { ManualEntryNavigation } from "./ManualEntryLink";
 import { useControllerInput } from "../../desktop/InputPresentation";
 import { useScreenEdgeMargin } from "../../ScreenEdgePadding";
 
-// The (?) the player tapped. A DOM node has no place in the store, so it lives here beside the
+// The term the player tapped. A DOM node has no place in the store, so it lives here beside the
 // popover that reads it; ManualLink records it just before asking for the entry
 let helpAnchor: HTMLElement | null = null;
 
@@ -112,7 +112,7 @@ export default function ManualHelpPopover(
 
   const entry = shown ? ENTRIES_BY_TITLE[shown] : undefined;
   const open = !!props.entry && !!entry;
-  // A row can re-render its (?) away while the entry is open. Without a node still on the page
+  // A row can re-render its term away while the entry is open. Without a node still on the page
   // to point at, the popover centres itself instead of flying to the corner
   const anchored = !controllerInput && !!helpAnchor?.isConnected;
 

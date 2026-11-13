@@ -123,19 +123,30 @@ for (const colorScheme of ["light", "dark"] as const) {
           const outlook = water.locator(".facilityWaterOutlook");
           await expect(outlook).toBeVisible();
           const stats = water.locator(".facilityStats");
-          const statsBounds = (await stats.boundingBox())!;
-          const reservoirBounds = (await water
-            .locator(".facilityStat")
-            .nth(0)
-            .boundingBox())!;
-          const inflowBounds = (await water
-            .locator(".facilityStat")
-            .nth(1)
-            .boundingBox())!;
-          const gap = await stats.evaluate((element) =>
-            parseFloat(getComputedStyle(element).columnGap),
-          );
-          const outlookBounds = (await outlook.boundingBox())!;
+          // The water worker can change status copy and scroll anchoring while it settles.
+          // Read related rectangles in one frame so they describe the same layout.
+          const {
+            statsBounds,
+            reservoirBounds,
+            inflowBounds,
+            gap,
+            outlookBounds,
+          } = await stats.evaluate((element) => {
+            const rect = (node: Element) => {
+              const { x, y, width, height } = node.getBoundingClientRect();
+              return { x, y, width, height };
+            };
+            const cells = element.querySelectorAll(".facilityStat");
+            return {
+              statsBounds: rect(element),
+              reservoirBounds: rect(cells[0]),
+              inflowBounds: rect(cells[1]),
+              gap: parseFloat(getComputedStyle(element).columnGap),
+              outlookBounds: rect(
+                element.querySelector(".facilityWaterOutlook")!,
+              ),
+            };
+          });
           expect(
             outlookBounds.width,
             "the forecast spans two standard cells",

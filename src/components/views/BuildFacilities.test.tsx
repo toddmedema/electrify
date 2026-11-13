@@ -10,6 +10,10 @@ import BuildFacilities from "./BuildFacilities";
 jest.mock("./BuildGeneratorsContainer", () => () => (
   <div>
     Generator catalog
+    <button type="button" className="manual-link">
+      Upkeep help
+    </button>
+    <button type="button">Review purchase</button>
     <div className="constructionHeader">
       <div
         className="constructionControls"
@@ -119,6 +123,14 @@ it("leaves sliders, their control area, vertical scrolls, short drags and cancel
   swipe(panel, -100);
   expect(screen.getByRole("tabpanel")).toHaveAccessibleName("Storage");
   swipe(screen.getByRole("tabpanel"), -100);
+  expect(screen.getByRole("tabpanel")).toHaveAccessibleName("Storage");
+});
+
+it("allows swipes from concept help while keeping purchase controls separate", () => {
+  setup(103, 0, false);
+  swipe(screen.getByRole("button", { name: "Review purchase" }), -100);
+  expect(screen.getByRole("tabpanel")).toHaveAccessibleName("Generators");
+  swipe(screen.getByRole("button", { name: "Upkeep help" }), -100);
   expect(screen.getByRole("tabpanel")).toHaveAccessibleName("Storage");
 });
 

@@ -259,7 +259,7 @@ test("expanded chart axes and fuel controls fit at 125% interface scale after re
   }
   await fuel.getByRole("button", { name: "Close Fuel Prices chart" }).click();
   await expect(fuel).toHaveCount(0);
-  for (const name of ["Water", "Inflation & interest rate"]) {
+  for (const name of ["Water", "Inflation & Interest"]) {
     await insights
       .getByRole("button", { name: `Expand ${name} chart` })
       .click();
@@ -336,31 +336,27 @@ test("every chart header keeps its help button beside the expand control, even w
       const where = `${layer}${editing ? " while editing" : ""}`;
       expect(helpCount, `${where} has exactly one help button`).toBe(1);
       expect(expand && help && title, `${where} header controls`).toBeTruthy();
-      // Left-aligned: the help button follows the expand control by a small gap, not the edge
-      expect(help!.left - expand!.right, `${where} gap`).toBeGreaterThanOrEqual(
-        0,
+      // The title itself opens help, with a separate adjacent expand control.
+      expect(help!.right, `${where} title clears expand`).toBeLessThanOrEqual(
+        expand!.left + 1,
       );
-      expect(help!.left - expand!.right, `${where} gap`).toBeLessThanOrEqual(8);
       expect(
-        Math.abs(help!.top - expand!.top),
-        `${where} row`,
-      ).toBeLessThanOrEqual(1);
+        help!.left,
+        `${where} help starts at title`,
+      ).toBeGreaterThanOrEqual(title!.left - 1);
       expect(help!.width, `${where} target width`).toBeGreaterThanOrEqual(
         minimum,
       );
       expect(help!.height, `${where} target height`).toBeGreaterThanOrEqual(
         minimum,
       );
-      expect(
-        title!.right,
-        `${where} title clears the controls`,
-      ).toBeLessThanOrEqual(expand!.left + 1);
       expect(overflow, `${where} header overflow`).toBeLessThanOrEqual(1);
       if (editing) {
         expect(actions, `${where} actions`).toBeTruthy();
         // After the help button on its row, or on the row beneath when a narrow header needs it
         expect(
-          actions!.left >= help!.right - 1 || actions!.top >= help!.bottom - 1,
+          actions!.left >= expand!.right - 1 ||
+            actions!.top >= expand!.bottom - 1,
           `${where} actions follow`,
         ).toBe(true);
         expect(
@@ -540,14 +536,14 @@ for (const theme of ["light", "dark"] as const) {
       insights.getByRole("button", { name: "All fuels", exact: true }),
     ).toHaveAttribute("aria-pressed", "true");
     await expectMobileFuelLegend(insights, page);
-    for (const name of ["Water", "Inflation & interest rate", "Cash"]) {
+    for (const name of ["Water", "Inflation & Interest", "Cash"]) {
       const button = insights.getByRole("button", {
         name: `Expand ${name} chart`,
       });
       await button.click();
       const focused = page.getByRole("dialog", { name, exact: true });
       await expect(focused.locator(".uplot")).toHaveCount(
-        name === "Inflation & interest rate" ? 2 : 1,
+        name === "Inflation & Interest" ? 2 : 1,
       );
       await expect(focused.locator(".uplot").first()).toBeVisible();
       await expectChartAxesInView(focused);

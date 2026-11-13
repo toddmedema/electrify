@@ -119,7 +119,9 @@ export function RunDebrief({
     <section className="victoryDebrief" aria-label="Mission results">
       {metrics.map((metric) => (
         <div key={metric.label} className="victoryMetric">
-          <ConceptIcon concept={metric.concept} fontSize="small" />
+          {metric.concept !== "money" && (
+            <ConceptIcon concept={metric.concept} fontSize="small" />
+          )}
           <strong>{metric.value}</strong>
           <span>{metric.label}</span>
         </div>

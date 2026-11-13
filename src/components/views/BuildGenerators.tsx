@@ -248,7 +248,8 @@ function ExpectedOutputMetric(props: {
         variant="caption"
         color="textSecondary"
         component="div"
-        title={caption}
+        // A native title tooltip can cover the chart while the player is inspecting months.
+        title={inspectedMonth === null ? caption : undefined}
       >
         {caption}
       </Typography>
@@ -400,7 +401,7 @@ export function GeneratorBuildItem(
             ? ["Efficient, slow to start", "Best run steadily for hours."]
             : generator.spinMinutes > 60
               ? ["Steady supply", "Best for demand that lasts for hours."]
-              : ["Fast response", "Can follow changing demand."];
+              : ["Fast response", ""];
   const openReview = (e: React.SyntheticEvent) => {
     setResilienceSelection(defaultSelection());
     setOpen(true);
@@ -589,6 +590,7 @@ export function GeneratorBuildItem(
         <>
           <BuildMetric
             label="Build cost"
+            entry={MANUAL_ENTRY.TOTAL_COST_OF_ENERGY}
             value={formatMoneyConcise(generator.buildCost)}
             note={
               includedOptions.length
@@ -598,6 +600,7 @@ export function GeneratorBuildItem(
           />
           <BuildMetric
             label="Build time"
+            entry={MANUAL_ENTRY.HOW_TO_PLAY}
             value={formatBuildMonths(generator.yearsToBuild)}
           />
           <ExpectedOutputMetric
@@ -607,6 +610,7 @@ export function GeneratorBuildItem(
           {props.secondaryMetric === "lcWh" && (
             <BuildMetric
               label="Cost per MWh"
+              entry={MANUAL_ENTRY.TOTAL_COST_OF_ENERGY}
               value={`${fuelPrices[generator.fuel] ? "~" : ""}${outputPending ? "Calculating…" : formatForecastMoney(generator.lcWh * 1000000)}`}
             />
           )}

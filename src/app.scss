@@ -2975,7 +2975,7 @@ $pane_header_height: 48px;
   }
 }
 
-// The "?" next to a term the game shows, which opens that term's manual entry
+// A concept label that opens its manual entry.
 .manual-link {
   display: inline-flex;
   align-items: center;
@@ -2994,6 +2994,52 @@ $pane_header_height: 48px;
   &:focus-visible {
     border-radius: var(--radius-sm);
   }
+}
+
+// The term carries the help action; a stretched native button makes its value clickable too.
+.manual-link.manual-link-label {
+  gap: 4px;
+  justify-content: flex-start;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  padding: 0;
+}
+.manual-help-region {
+  position: relative;
+  min-height: var(--control-size);
+  cursor: pointer;
+
+  &:hover {
+    background: var(--bg-raised);
+  }
+}
+.manual-link.manual-link-region {
+  min-width: 0;
+  min-height: 0;
+
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: var(--radius-sm);
+  }
+  &:focus-visible {
+    outline: none;
+  }
+  &:focus-visible::after {
+    outline: 2px solid var(--interactive-blue);
+    outline-offset: -2px;
+  }
+}
+
+// Manual help can inherit nonselection from a clickable facility row, including through portals.
+#manual,
+#manual *,
+.manual-popover,
+.manual-popover * {
+  -webkit-user-select: text;
+  user-select: text;
 }
 
 .victoryDebrief {
@@ -3026,6 +3072,10 @@ $pane_header_height: 48px;
     font-size: var(--font-size-caption-sm);
     line-height: 1.2;
   }
+}
+
+.victoryMetric:not(:has(.conceptIcon)) {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .victoryScore,
@@ -3922,14 +3972,6 @@ $pane_header_height: 48px;
     dd {
       margin: 0;
     }
-  }
-
-  // Centred on the caption's 16 px line, in the label's faded tone. Flex
-  // centring holds across fonts, where a baseline offset drifts.
-  .facilityStat dt:has(> .facilityStatIcon) {
-    display: flex;
-    align-items: center;
-    gap: 4px;
   }
 
   .facilityStatIcon {
@@ -6214,15 +6256,10 @@ $homeSmokeCycle: 5.6s;
   border-radius: 0;
   background: transparent;
   gap: 12px;
-  // Keep each value column aligned even when only one row has a manual help target.
-  grid-template-columns: auto minmax(0, 1fr) var(--control-size);
+  grid-template-columns: 20px minmax(0, 1fr);
 }
-.decisionImpactFactHelp {
-  display: flex;
-  align-items: flex-start;
-  grid-column: 3;
-  grid-row: 1;
-  justify-self: end;
+.decisionImpactFactMoney .decisionImpactFactContent {
+  grid-column: 2;
 }
 .decisionImpactFactContent {
   display: grid;
@@ -6233,9 +6270,6 @@ $homeSmokeCycle: 5.6s;
 // Neutral: green is kept for favorable deltas, and the help target adds no row height.
 .decisionImpactFact > .conceptIcon {
   color: var(--font-color-faded);
-}
-.decisionImpactFact .manual-link {
-  margin-block: -12px;
 }
 .MuiDialog-paper {
   timeline-scope: --dialog-scroll;
@@ -6635,10 +6669,6 @@ $programs_column: 800px;
   .decisionImpactFactContent {
     grid-template-columns: 1fr;
   }
-  .decisionImpactFact:not(.decisionImpactFactWithHelp)
-    .decisionImpactFactContent {
-    grid-column: 2 / -1;
-  }
   .decisionImpactFactDetail {
     grid-column: 1;
   }
@@ -6711,8 +6741,7 @@ $programs_column: 800px;
 .buildDetails {
   table-layout: fixed;
   .MuiTableCell-root {
-    // Include both cell padding and the divider around the help control. Two-line labels
-    // must fit this same row instead of stretching it by a font-dependent fraction.
+    // Keep two-line labels inside the same generous click target as one-line labels.
     height: calc(var(--control-size) + 12px);
     box-sizing: border-box;
     padding: 4px 12px;
@@ -6727,16 +6756,6 @@ $programs_column: 800px;
     text-align: right;
     font-variant-numeric: tabular-nums;
   }
-  .buildDetailHelp {
-    width: 48px;
-    padding: 4px;
-  }
-  .manual-link {
-    margin: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
 }
 // Leave enough room for complete cost/unit values beside the help target.
 .gameToolPanel .buildDetails .buildDetailLabel {
@@ -6745,11 +6764,6 @@ $programs_column: 800px;
 @media (max-width: ($phone_width - 1px)) {
   .buildDetails .buildDetailLabel {
     width: 44%;
-  }
-}
-@media (pointer: coarse) {
-  .buildDetails .buildDetailHelp {
-    width: 52px;
   }
 }
 
@@ -8271,12 +8285,10 @@ option {
   color: var(--interactive-blue);
   flex-shrink: 0;
 }
-// The (?) follows the expand control straight away, left-aligned in the header with it; only the
-// layer-editing actions are pushed to the trailing edge
+// The chart title opens help; layer-editing actions stay at the trailing edge.
 .insightsTrackHeader .manual-link {
   flex-shrink: 0;
-  margin-left: 4px;
-  color: var(--interactive-blue);
+  margin-left: 0;
 }
 .fuelFilter {
   display: flex;
@@ -8358,7 +8370,7 @@ option {
       flex-shrink: 0;
     }
   }
-  // The title and its (?) stay together at the leading edge; the close button keeps the other
+  // The linked title stays at the leading edge; the close button keeps the other.
   .expandedChartHeading {
     display: flex;
     align-items: center;
@@ -8675,9 +8687,6 @@ option {
   }
   .buildDetailLabel {
     width: 40%;
-  }
-  .buildDetailHelp {
-    display: none;
   }
 }
 

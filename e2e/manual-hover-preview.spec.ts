@@ -1,5 +1,6 @@
 import { expect, Page, test } from "./fixtures";
 import { openBuild } from "./layout";
+import { selectManualText } from "./manual-selection";
 
 async function openWorkspaceHelp(page: Page) {
   await page.addInitScript(() => {
@@ -41,6 +42,8 @@ test("a mouse previews manual entries without leaving the workspace on Escape", 
   const pinned = page.getByRole("dialog", { name: "Manual help" });
   await expect(preview).toBeVisible();
   await expect(pinned).toHaveCount(0);
+  await selectManualText(page, preview.locator("p").first());
+  await selectManualText(page, preview.getByRole("heading").first());
   await page.keyboard.press("Escape");
   await expect(preview).toHaveCount(0);
   await expect(build).toBeVisible();
@@ -63,6 +66,8 @@ test("a mouse previews manual entries without leaving the workspace on Escape", 
   await expect(build).toBeVisible();
   await help.click();
   await expect(pinned).toBeVisible();
+  await selectManualText(page, pinned.locator("p").first());
+  await selectManualText(page, pinned.getByRole("heading").first());
   await expect(preview).toHaveCount(0);
   await page.keyboard.press("Escape");
   await expect(pinned).toHaveCount(0);
