@@ -4,6 +4,7 @@ import { TickPresentFutureType } from "../../Types";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "../../helpers/DateTime";
 import {
   formatForecastWatts as formatWatts,
+  formatWatts as formatObservedWatts,
   formatForecastWattsAxis as formatWattsAxis,
   formatForecastNumber,
   formatForecastPercent,
@@ -226,7 +227,7 @@ function tooltip(index: number, state: State): string {
   const date = getDateFromMinute(range.minute, state.startingYear);
   const period = `${date.month} ${date.year}`;
   if (!range.projected) {
-    return `${period} · recorded average\nSupply: ${formatWatts(range.supplyMin)}\nDemand: ${formatWatts(range.demandMin)}`;
+    return `${period} · recorded average\nSupply: ${formatObservedWatts(range.supplyMin)}\nDemand: ${formatObservedWatts(range.demandMin)}`;
   }
   const share = unmetShare(range);
   const served = formatForecastPercent(1 - share);
@@ -279,7 +280,9 @@ export default function ChartSupplyDemandRanges(
     <UPlotChart<State>
       id="chartForecastSupplyDemand"
       ariaLabel={`Monthly ranges of estimated electricity supply and demand. ${worst && worstDate ? `${formatForecastNumber(marked)} forecast ${marked === 1 ? "month" : "months"} with unmet demand marked; the largest peak shortfall is ${formatWatts(worst.peakShortfall)} in ${worstDate.month} ${worstDate.year}` : "No forecast months with unmet demand"}`}
-      formatSummaryValue={formatWatts}
+      formatSummaryValue={(value, series) =>
+        (series % 2 === 0 ? formatObservedWatts : formatWatts)(value)
+      }
       height={props.height}
       state={{
         ranges,

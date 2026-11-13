@@ -87,7 +87,11 @@ export function RunDebrief({
   // scenario isn't recorded with the result, so it keeps the month count.
   const scenario =
     scenarioId === undefined ? undefined : getScenario(scenarioId);
-  const reliability = formatPercent(debrief.reliability, 2);
+  const roundedReliability = formatPercent(debrief.reliability, 2);
+  const reliability =
+    debrief.reliability < 1 && roundedReliability === "100%"
+      ? "<100%"
+      : roundedReliability;
   const metrics = [
     { concept: "supply" as const, label: "served", value: reliability },
     {

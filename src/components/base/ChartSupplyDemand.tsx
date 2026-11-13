@@ -42,7 +42,9 @@ import {
   getHourTicks,
 } from "../../helpers/DateTime";
 import {
-  formatForecastWatts as formatWatts,
+  formatForecastWatts,
+  formatWatts,
+  formatNumber,
   formatForecastNumber,
   formatForecastWattsAxis as formatWattsAxis,
 } from "../../helpers/Format";
@@ -57,7 +59,10 @@ import {
   UnitSystemType,
 } from "../../Types";
 
-import { formatForecastTemperature as formatTemperature } from "../../helpers/Units";
+import {
+  formatForecastTemperature,
+  formatTemperature,
+} from "../../helpers/Units";
 import { useUnits } from "./UnitsContext";
 
 type ChartData = Pick<
@@ -420,17 +425,20 @@ function buildOptions({
 export function productionWeather(
   tick: Pick<ChartData, "temperatureC" | "windKph">,
   units: UnitSystemType,
+  projected = true,
 ): string[] {
   const conditions: string[] = [];
   if (tick.temperatureC !== undefined) {
     const label =
       tick.temperatureC <= 0 ? "Cold " : tick.temperatureC >= 30 ? "Hot " : "";
-    conditions.push(`${label}${formatTemperature(tick.temperatureC, units)}`);
+    conditions.push(
+      `${label}${(projected ? formatForecastTemperature : formatTemperature)(tick.temperatureC, units)}`,
+    );
   }
   if (tick.windKph !== undefined) {
     const speed = units === "imperial" ? tick.windKph / 1.609344 : tick.windKph;
     conditions.push(
-      `${tick.windKph >= 30 ? "Windy" : "Wind"} ${formatForecastNumber(speed)} ${units === "imperial" ? "mph" : "km/h"}`,
+      `${tick.windKph >= 30 ? "Windy" : "Wind"} ${(projected ? formatForecastNumber : formatNumber)(speed)} ${units === "imperial" ? "mph" : "km/h"}`,
     );
   }
   return conditions;
@@ -446,13 +454,19 @@ export function formatProductionTooltip(
     | "supply"
     | "totalDemand"
     | "startingYear"
-  > & { units?: UnitSystemType; shortfalls?: ShortfallInterval[] },
+  > & {
+    units?: UnitSystemType;
+    shortfalls?: ShortfallInterval[];
+    minute?: number;
+  },
   minute = state.timeline[idx].minute,
 ): string {
   const d = state.timeline[idx];
   const date = getDateFromMinute(minute, state.startingYear);
   const time = formatClockTime(date.minuteOfDay);
-  const weather = productionWeather(d, state.units ?? "metric");
+  const projected = d.minute >= (state.minute ?? 0);
+  const watts = projected ? formatForecastWatts : formatWatts;
+  const weather = productionWeather(d, state.units ?? "metric", projected);
   const loads: Array<[string, number | undefined]> = [
     ["Storage charging", storageChargingW(d)],
     ["Interties", d.exportedW],
@@ -461,19 +475,20 @@ export function formatProductionTooltip(
     state.timeline,
     state.shortfalls || [],
     minute,
+    watts,
   );
   return [
     time + shortfall,
-    `Total supply: ${formatWatts(state.supply[idx])}`,
+    `Total supply: ${watts(state.supply[idx])}`,
     ...state.sources.map(
-      (source, i) => `${source}: ${formatWatts(state.bySource[i][idx])}`,
+      (source, i) => `${source}: ${watts(state.bySource[i][idx])}`,
     ),
     "",
-    `Total load: ${formatWatts(state.totalDemand[idx])}`,
-    `Demand: ${formatWatts(d.demandW)}`,
+    `Total load: ${watts(state.totalDemand[idx])}`,
+    `Demand: ${watts(d.demandW)}`,
     ...loads
       .filter(([_label, value]) => value && value > 0)
-      .map(([label, value]) => `${label}: ${formatWatts(value!)}`),
+      .map(([label, value]) => `${label}: ${watts(value!)}`),
     ...(weather.length ? ["", `Weather: ${weather.join(" · ")}`] : []),
   ].join("\n");
 }
@@ -655,7 +670,9 @@ const ChartSupplyDemand = (props: Props): React.JSX.Element => {
         exactHeight={props.exactHeight}
         ariaLabel={`Chart of electricity supply and demand over the day. Day/night ribbon: ${describeDayNight(dayNight)}. Generation is grouped as Variable and Dispatchable. Storage discharge and imports add to supply; charging and exports use matching patterned bands above customer demand. The top load boundary includes charging and exports. Unfilled gaps between total load and supply show unused surplus. ${blackoutCount ? `${blackoutCount} blackout period${blackoutCount === 1 ? "" : "s"} shaded` : "No blackouts"}`}
         interactiveTooltip
-        formatSummaryValue={formatWatts}
+        formatSummaryValue={(value, _series, point) =>
+          (isForecast[point] ? formatForecastWatts : formatWatts)(value)
+        }
         height={height}
         state={state}
         data={[

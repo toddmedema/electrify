@@ -84,7 +84,11 @@ export interface UPlotChartProps<S> {
   /** Human names for each y-series, used by the screen-reader label. */
   seriesLabels?: readonly string[];
   /** Formats label values with the same compact units the visible chart uses. */
-  formatSummaryValue?: (value: number, seriesIndex: number) => string;
+  formatSummaryValue?: (
+    value: number,
+    seriesIndex: number,
+    pointIndex: number,
+  ) => string;
 }
 
 const TOOLTIP_OFFSET = 8;
@@ -403,8 +407,10 @@ export default function UPlotChart<S>(
   );
   const summaryFormatter =
     props.formatSummaryValue || ((value: number) => number.format(value));
-  const formatSummaryValue = (value: number, index: number) =>
-    withoutNegativeZero(summaryFormatter(value === 0 ? 0 : value, index));
+  const formatSummaryValue = (value: number, index: number, point: number) =>
+    withoutNegativeZero(
+      summaryFormatter(value === 0 ? 0 : value, index, point),
+    );
   const seriesSummary = (props.summaryData || data)
     .slice(1)
     .map((series, index) => {
@@ -416,6 +422,9 @@ export default function UPlotChart<S>(
       let minimum = Number.POSITIVE_INFINITY;
       let maximum = Number.NEGATIVE_INFINITY;
       let found = false;
+      let latestIndex = 0;
+      let minimumIndex = 0;
+      let maximumIndex = 0;
       for (let i = 0; i < series.length; i++) {
         const value = series[i];
         if (typeof value !== "number" || !isFinite(value)) {
@@ -426,8 +435,15 @@ export default function UPlotChart<S>(
           found = true;
         }
         latest = value;
-        minimum = Math.min(minimum, value);
-        maximum = Math.max(maximum, value);
+        latestIndex = i;
+        if (value < minimum) {
+          minimum = value;
+          minimumIndex = i;
+        }
+        if (value > maximum) {
+          maximum = value;
+          maximumIndex = i;
+        }
       }
       if (!found) {
         minimum = 0;
@@ -435,9 +451,9 @@ export default function UPlotChart<S>(
       }
       return {
         label: props.seriesLabels?.[index] || `Series ${index + 1}`,
-        latest: formatSummaryValue(latest, index),
-        minimum: formatSummaryValue(minimum, index),
-        maximum: formatSummaryValue(maximum, index),
+        latest: formatSummaryValue(latest, index, latestIndex),
+        minimum: formatSummaryValue(minimum, index, minimumIndex),
+        maximum: formatSummaryValue(maximum, index, maximumIndex),
         trend: latest > first ? "up" : latest < first ? "down" : "flat",
       };
     });

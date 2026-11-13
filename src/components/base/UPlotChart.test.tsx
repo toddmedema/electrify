@@ -101,6 +101,24 @@ describe("UPlotChart resizing", () => {
     jest.useRealTimers();
   });
 
+  it("formats summary extrema using their original point indices", () => {
+    render(
+      <UPlotChart
+        ariaLabel="Mixed precision"
+        state={{}}
+        data={[
+          [0, 1, 2, 3],
+          [null, 123, 124, 122],
+        ]}
+        formatSummaryValue={(value, _series, point) => `${value} at ${point}`}
+        buildOptions={() => ({ width: 0, height: 0, series: [{}, {}] })}
+      />,
+    );
+    expect(screen.getByRole("img")).toHaveAccessibleName(
+      /latest 122 at 3, range 122 at 3 to 124 at 2/,
+    );
+  });
+
   it("never announces negative zero in a chart summary", () => {
     const props = {
       ariaLabel: "Zero chart",

@@ -20,8 +20,10 @@ import {
 import { TickPresentFutureType } from "../../Types";
 import { formatMinuteAsTooltipHeader } from "../../helpers/DateTime";
 import {
-  formatForecastReserveLine as formatReserveLine,
-  formatForecastWatts as formatWatts,
+  formatForecastReserveLine,
+  formatReserveLine,
+  formatForecastWatts,
+  formatWatts,
   formatForecastWattsAxis as formatWattsAxis,
 } from "../../helpers/Format";
 import { chartPalette } from "../../Theme";
@@ -56,6 +58,7 @@ interface State {
   shortfalls: ShortfallInterval[];
   startingYear: number;
   multiyear: boolean;
+  currentMinute?: number;
 }
 
 function buildOptions(showXLabels: boolean) {
@@ -128,12 +131,16 @@ function tooltip(
   minute = state.timeline[idx].minute,
 ): string {
   const d = state.timeline[idx];
+  const projected =
+    state.currentMinute !== undefined && d.minute >= state.currentMinute;
+  const watts = projected ? formatForecastWatts : formatWatts;
+  const reserveLine = projected ? formatForecastReserveLine : formatReserveLine;
   const header = formatMinuteAsTooltipHeader(minute, state.startingYear);
   const reserve =
     d.reserveW === undefined
       ? ""
-      : `\n${formatReserveLine(d.reserveW, "Reserve margin")}`;
-  return `${header}${shortfallTooltip(state.timeline, state.shortfalls, minute)}\nSupply: ${formatWatts(d.supplyW)}\nDemand: ${formatWatts(d.demandW)}${reserve}`;
+      : `\n${reserveLine(d.reserveW, "Reserve margin")}`;
+  return `${header}${shortfallTooltip(state.timeline, state.shortfalls, minute, watts)}\nSupply: ${watts(d.supplyW)}\nDemand: ${watts(d.demandW)}${reserve}`;
 }
 
 // This is a pureComponent because its props should change much less frequently than it renders
@@ -179,13 +186,16 @@ export default class chartForecastSupplyDemand extends React.PureComponent<
       shortfalls: shortfallIntervals(timeline, spansFromEdges(blackouts)),
       startingYear,
       multiyear,
+      currentMinute,
     };
 
     return (
       <UPlotChart<State>
         id="chartForecastSupplyDemand"
         ariaLabel="Chart of estimated electricity supply and demand"
-        formatSummaryValue={formatWatts}
+        formatSummaryValue={(value, series) =>
+          (series % 2 === 0 ? formatWatts : formatForecastWatts)(value)
+        }
         height={height}
         state={state}
         data={[
