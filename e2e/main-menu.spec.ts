@@ -1,5 +1,20 @@
-import { expect, test } from "./fixtures";
+import { expect, test, Locator, Page } from "./fixtures";
+import { foregroundContrast } from "./contrast";
 import { readSavedGame } from "./save-fixture";
+
+async function expectFooterTooltip(page: Page, action: Locator) {
+  const footerAction = await action.evaluate(
+    (element) => !!element.closest(".mainMenuFooter"),
+  );
+  const tooltip = page.getByRole("tooltip");
+  if (footerAction) {
+    await expect(tooltip).toHaveText(
+      (await action.getAttribute("aria-label"))!,
+    );
+  } else {
+    await expect(tooltip).toHaveCount(0);
+  }
+}
 
 // The bundle delays must control repeat visits even when production caching is available.
 test.use({ serviceWorkers: "block" });
@@ -709,6 +724,7 @@ for (const theme of ["light", "dark"]) {
         await page.keyboard.press(key);
         const selected = actions.nth(index % count);
         await expect(selected).toBeFocused();
+        await expectFooterTooltip(page, selected);
         await expect(selected).not.toHaveCSS(
           "background-color",
           "rgba(0, 0, 0, 0)",
@@ -719,6 +735,7 @@ for (const theme of ["light", "dark"]) {
       for (let index = count - 1; index >= 0; index--) {
         await page.keyboard.press(key);
         await expect(actions.nth(index)).toBeFocused();
+        await expectFooterTooltip(page, actions.nth(index));
       }
     }
     await footer.getByRole("button", { name: "Achievements" }).hover();
@@ -731,6 +748,7 @@ for (const theme of ["light", "dark"]) {
     ).toBeFocused();
     await page.evaluate(() => window.dispatchEvent(new Event("appinstalled")));
     await expect(actions.first()).toBeFocused();
+    await expect(page.getByRole("tooltip")).toHaveCount(0);
   });
 }
 
@@ -759,3 +777,113 @@ test("background clicks and returning to the page restore the first home action"
   await expect(first).toBeFocused();
   await other.close();
 });
+
+for (const theme of ["light", "dark"]) {
+  test(`every footer icon has a consistent readable tooltip in ${theme}`, async ({
+    page,
+  }, info) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.addInitScript(
+      (value) => localStorage.setItem("theme", value),
+      theme,
+    );
+    await page.goto("/");
+    await expect(page.locator("#appStartup")).toHaveCount(0);
+    await page.evaluate(() =>
+      window.dispatchEvent(
+        new Event("beforeinstallprompt", { cancelable: true }),
+      ),
+    );
+    const footer = page.locator(".mainMenuFooter");
+    const actions = footer.locator("button,a[href]");
+    await expect(actions).toHaveCount(7);
+    const styles: Record<string, string>[] = [];
+    for (const action of await actions.all()) {
+      const name = (await action.getAttribute("aria-label"))!;
+      await action.hover();
+      const tooltip = page.getByRole("tooltip");
+      await expect(tooltip).toHaveText(name);
+      await expect(tooltip).toHaveAttribute("data-popper-placement", "top");
+      await expect(tooltip).toHaveCSS("pointer-events", "none");
+      const surface = tooltip.locator(".mainMenuTooltip");
+      expect(await foregroundContrast(surface), name).toBeGreaterThanOrEqual(
+        4.5,
+      );
+      const bounds = (await tooltip.boundingBox())!;
+      const icon = (await action.boundingBox())!;
+      expect(bounds.x, name).toBeGreaterThanOrEqual(7);
+      expect(bounds.x + bounds.width, name).toBeLessThanOrEqual(
+        page.viewportSize()!.width - 7,
+      );
+      expect(bounds.y, name).toBeGreaterThanOrEqual(0);
+      expect(icon.y - bounds.y - bounds.height, name).toBeGreaterThanOrEqual(7);
+      expect(icon.y - bounds.y - bounds.height, name).toBeLessThanOrEqual(9);
+      styles.push(
+        await surface.evaluate((element) => {
+          const style = getComputedStyle(element);
+          return {
+            fontFamily: style.fontFamily,
+            fontSize: style.fontSize,
+            fontWeight: style.fontWeight,
+            lineHeight: style.lineHeight,
+            padding: style.padding,
+            border: style.border,
+            borderRadius: style.borderRadius,
+            background: style.backgroundColor,
+            color: style.color,
+            shadow: style.boxShadow,
+          };
+        }),
+      );
+      const capture =
+        process.env.REVIEW_SCREENSHOT_DIR &&
+        ((theme === "light" &&
+          info.project.name === "desktop-chromium" &&
+          name === "Join the Electrify Discord") ||
+          (theme === "light" &&
+            info.project.name === "mobile-360px" &&
+            name === "Manual") ||
+          (theme === "dark" &&
+            info.project.name === "mobile-390px" &&
+            name === "Share Electrify"));
+      if (capture) {
+        const first = (await actions.first().boundingBox())!;
+        const last = (await actions.last().boundingBox())!;
+        const left = Math.max(0, Math.floor(Math.min(first.x, bounds.x) - 8));
+        const top = Math.max(0, Math.floor(bounds.y - 8));
+        const right = Math.min(
+          page.viewportSize()!.width,
+          Math.ceil(Math.max(last.x + last.width, bounds.x + bounds.width) + 8),
+        );
+        const bottom = Math.min(
+          page.viewportSize()!.height,
+          Math.ceil(last.y + last.height),
+        );
+        await page.screenshot({
+          path: `${process.env.REVIEW_SCREENSHOT_DIR}/tooltip-${theme}-${info.project.name}.png`,
+          ...(info.project.name === "desktop-chromium"
+            ? {}
+            : {
+                clip: {
+                  x: left,
+                  y: top,
+                  width: right - left,
+                  height: bottom - top,
+                },
+              }),
+          animations: "disabled",
+        });
+      }
+    }
+    for (const style of styles) expect(style).toEqual(styles[0]);
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("tooltip")).toHaveCount(0);
+    await page.keyboard.press("ArrowDown");
+    await expect(
+      page.getByRole("button", { name: "Play", exact: true }),
+    ).toBeFocused();
+    await expect(page.getByRole("tooltip")).toHaveCount(0);
+    await page.keyboard.press("ArrowUp");
+    await expectFooterTooltip(page, actions.last());
+  });
+}

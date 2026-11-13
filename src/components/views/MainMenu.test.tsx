@@ -1,4 +1,11 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  within,
+  waitFor,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import MainMenu, { Props } from "./MainMenu";
 import type { DesktopBridge, DesktopState } from "../../Desktop";
@@ -6,6 +13,10 @@ import { configureStore } from "@reduxjs/toolkit";
 import { Provider } from "react-redux";
 import settingsReducer from "../../reducers/Settings";
 import cardReducer from "../../reducers/Card";
+import {
+  resetInputPresentation,
+  updateInputPresentation,
+} from "../../desktop/InputPresentation";
 
 function desktopBridge(available = false): DesktopBridge {
   const state: DesktopState = {
@@ -65,6 +76,7 @@ describe("MainMenu", () => {
   afterEach(() => {
     delete window.electrifyDesktop;
     localStorage.removeItem("tvMode");
+    resetInputPresentation();
     jest.restoreAllMocks();
   });
 
@@ -260,6 +272,31 @@ describe("MainMenu", () => {
     await userEvent.click(footer.getByRole("button", { name: "Manual" }));
     expect(onManual).toHaveBeenCalledTimes(1);
   });
+
+  it.each(["Manual", "Join the Electrify Discord"])(
+    "shows the %s tooltip for controller focus without native focus-visible",
+    async (name) => {
+      const matches = Element.prototype.matches;
+      jest.spyOn(Element.prototype, "matches").mockImplementation(function (
+        this: Element,
+        selector,
+      ) {
+        return selector === ":focus-visible"
+          ? false
+          : matches.call(this, selector);
+      });
+      renderMainMenu(<MainMenu {...props()} />);
+      act(() => updateInputPresentation({ active: true, connected: true }));
+      const control = screen.getByLabelText(name);
+      act(() => control.focus());
+      expect(await screen.findByRole("tooltip")).toHaveTextContent(name);
+      await userEvent.keyboard("{Escape}");
+      await waitFor(() =>
+        expect(screen.queryByRole("tooltip")).not.toBeInTheDocument(),
+      );
+      expect(control).toHaveFocus();
+    },
+  );
 
   it("links to Discord first among the external footer links", () => {
     renderMainMenu(<MainMenu {...props()} />);

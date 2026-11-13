@@ -1,7 +1,8 @@
 import * as React from "react";
-import { Button, IconButton, Tooltip, Typography } from "@mui/material";
+import { Button, Typography } from "@mui/material";
 import InstallMobileIcon from "@mui/icons-material/InstallMobile";
 import InfoDialog from "./InfoDialog";
+import MenuIconButton from "./MenuIconButton";
 import { isInstalledWebApp } from "../../InstalledApp";
 import {
   getPlayedScenarioIds,
@@ -172,16 +173,12 @@ export default function InstallAppButton(props: {
   return (
     <>
       {props.iconOnly ? (
-        <Tooltip title={props.label || "Install app"}>
-          <IconButton
-            color="primary"
-            size="large"
-            aria-label={props.label || "Install app"}
-            onClick={onInstall}
-          >
-            <InstallMobileIcon />
-          </IconButton>
-        </Tooltip>
+        <MenuIconButton
+          label={props.label || "Install app"}
+          onClick={onInstall}
+        >
+          <InstallMobileIcon />
+        </MenuIconButton>
       ) : (
         <Button
           variant="text"

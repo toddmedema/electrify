@@ -449,7 +449,19 @@ test("TV home controller navigation includes every footer icon and wraps", async
   for (const direction of ["down", "right"] as const) {
     for (let index = 1; index <= count; index++) {
       await input(page, direction);
-      await expect(actions.nth(index % count)).toBeFocused();
+      const selected = actions.nth(index % count);
+      await expect(selected).toBeFocused();
+      if (
+        await selected.evaluate(
+          (element) => !!element.closest(".mainMenuFooter"),
+        )
+      ) {
+        await expect(page.getByRole("tooltip")).toHaveText(
+          (await selected.getAttribute("aria-label"))!,
+        );
+      } else {
+        await expect(page.getByRole("tooltip")).toHaveCount(0);
+      }
     }
   }
   for (const direction of ["up", "left"] as const) {
@@ -462,12 +474,43 @@ test("TV home controller navigation includes every footer icon and wraps", async
     .locator(".mainMenuFooter")
     .getByRole("button", { name: "Manual", exact: true });
   await select(page, manual);
+  await expect(page.getByRole("tooltip")).toHaveText("Manual");
   await input(page, "confirm");
   await expect(
     page.getByRole("heading", { name: "Manual", exact: true }),
   ).toBeVisible();
   await input(page, "back");
   await expect(actions.first()).toBeFocused();
+});
+
+test("TV footer tooltips follow controller selection after mouse input", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const tv = await waitForDesktopTvEntry(page);
+  await tv.click();
+  await expect(page.locator("html")).toHaveAttribute("data-tv-layout", "true");
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-mock-input-context",
+    "Menu",
+  );
+  const manual = page
+    .locator(".mainMenuFooter")
+    .getByRole("button", { name: "Manual", exact: true });
+  await select(page, manual);
+  expect(
+    await manual.evaluate((element) => element.matches(":focus-visible")),
+  ).toBe(false);
+  await expect(page.getByRole("tooltip")).toHaveText("Manual");
+  await input(page, "back");
+  await expect(page.getByRole("tooltip")).toHaveCount(0);
+  await expect(manual).toBeFocused();
+  await input(page, "right");
+  await expect(page.getByRole("tooltip")).toHaveText(
+    "Join the Electrify Discord",
+  );
+  await input(page, "left");
+  await expect(page.getByRole("tooltip")).toHaveText("Manual");
 });
 
 test("controller text entry searches the manual, cancels and restores field focus", async ({

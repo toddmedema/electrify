@@ -3,10 +3,8 @@ import * as React from "react";
 import {
   Box,
   Button,
-  IconButton,
   Stack,
   SvgIcon,
-  Tooltip,
   Typography,
   useTheme,
 } from "@mui/material";
@@ -21,6 +19,7 @@ import {
   shareText,
 } from "../../helpers/Share";
 import InstallAppButton from "../base/InstallAppButton";
+import MenuIconButton from "../base/MenuIconButton";
 import { getDesktop, isDesktopApp } from "../../Desktop";
 import { useMenuKeys } from "../base/useMenuKeys";
 const TvLayoutSettings =
@@ -294,69 +293,47 @@ const MainMenu = (props: Props): React.JSX.Element => {
         </Typography>
       </Box>
       <footer className="mainMenuFooter">
-        <Tooltip title="Manual">
-          <IconButton
-            data-manual-trigger
-            color="primary"
-            aria-label="Manual"
-            size="large"
-            onClick={props.onManual}
-          >
-            <MenuBookIcon />
-          </IconButton>
-        </Tooltip>
+        <MenuIconButton
+          data-manual-trigger
+          label="Manual"
+          onClick={props.onManual}
+        >
+          <MenuBookIcon />
+        </MenuIconButton>
         {!desktopApp && <InstallAppButton iconOnly />}
         {!desktopApp && (
-          <Tooltip title="Achievements">
-            <IconButton
-              data-achievements-trigger
-              color="primary"
-              aria-label="Achievements"
-              size="large"
-              onClick={props.onAchievements}
-            >
-              <EmojiEventsIcon />
-            </IconButton>
-          </Tooltip>
+          <MenuIconButton
+            data-achievements-trigger
+            label="Achievements"
+            onClick={props.onAchievements}
+          >
+            <EmojiEventsIcon />
+          </MenuIconButton>
         )}
-        <IconButton
-          color="primary"
+        <MenuIconButton
           href={DISCORD_URL}
           target="_blank"
           rel="noopener noreferrer"
-          aria-label="Join the Electrify Discord"
-          size="large"
+          label="Join the Electrify Discord"
         >
           <DiscordIcon />
-        </IconButton>
-        <IconButton
-          color="primary"
+        </MenuIconButton>
+        <MenuIconButton
           href={FEEDBACK_URL}
           target="_blank"
           rel="noopener noreferrer"
-          aria-label="Send feedback"
-          size="large"
+          label="Send feedback"
         >
           <EmailIcon />
-        </IconButton>
-        <IconButton
-          color="primary"
-          {...sitePage("/about.html")}
-          aria-label="About Electrify"
-          size="large"
-        >
+        </MenuIconButton>
+        <MenuIconButton {...sitePage("/about.html")} label="About Electrify">
           <InfoIcon />
-        </IconButton>
+        </MenuIconButton>
         {canShare() && (
-          <IconButton
-            color="primary"
-            onClick={onShare}
-            aria-label="Share Electrify"
-            size="large"
-          >
+          <MenuIconButton onClick={onShare} label="Share Electrify">
             {/* Share has one extra pixel of leading whitespace beside the other footer glyphs. */}
             <ShareIcon sx={{ transform: "translateX(-1px)" }} />
-          </IconButton>
+          </MenuIconButton>
         )}
       </footer>
     </div>
