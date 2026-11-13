@@ -285,3 +285,46 @@ test("manual search keeps chart subsections inside the insights page", async ({
   ).toBeVisible();
   await expect(entry.locator("mark")).toHaveText(["dwindling reserves"]);
 });
+
+for (const theme of ["light", "dark"] as const) {
+  test(`hydro and storage help link directly to Water in ${theme}`, async ({
+    page,
+  }, info) => {
+    await page.addInitScript((mode) => {
+      localStorage.setItem("theme", mode);
+      localStorage.setItem("audioEnabled", "false");
+    }, theme);
+    await page.goto("/");
+    await page.getByRole("button", { name: "Manual", exact: true }).click();
+    await page.locator("#manual-insights-data-layers-header").click();
+    const storage = page.locator("section:has(> #manual-stored-energy)");
+    const shots = process.env.REVIEW_SCREENSHOT_DIR;
+    if (
+      shots &&
+      ((theme === "light" && info.project.name === "desktop-chromium") ||
+        (theme === "dark" && info.project.name === "mobile-390px"))
+    ) {
+      await storage.screenshot({
+        path: path.join(
+          shots,
+          `storage-water-${info.project.name}-${theme}.png`,
+        ),
+        animations: "disabled",
+      });
+    }
+    await storage.getByRole("link", { name: "Water", exact: true }).click();
+    const water = page.getByRole("heading", { name: "Water", exact: true });
+    await expect(water).toBeVisible();
+    await expect(water).toBeFocused();
+    await page
+      .locator("section:has(> #manual-water)")
+      .getByRole("link", { name: "hydropower", exact: true })
+      .click();
+    await page.getByRole("link", { name: "Water chart", exact: true }).click();
+    await expect(water).toBeVisible();
+    await expect(water).toBeFocused();
+    await expect(
+      page.locator("#manual-insights-data-layers-header"),
+    ).toHaveAttribute("aria-expanded", "true");
+  });
+}

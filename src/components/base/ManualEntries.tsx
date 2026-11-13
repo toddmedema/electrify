@@ -533,7 +533,7 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
         </p>
         <p>
           Once you own hydro, the{" "}
-          <EntryLink to={MANUAL_ENTRY.FORECASTS}>
+          <EntryLink to={MANUAL_SECTION.WATER}>
             <strong>Water</strong> chart
           </EntryLink>{" "}
           shows precipitation, snow and reservoir levels. Select a dam to see
@@ -689,7 +689,7 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
         title: MANUAL_SECTION.SUPPLY_DEMAND,
         entry: (
           <p>
-            Compares available supply with demand. Shading marks predicted{" "}
+            Compares electricity supplied with demand. Shading marks predicted{" "}
             <EntryLink to={MANUAL_ENTRY.BLACKOUTS}>blackouts</EntryLink>, with
             missing energy scaled to a month and the largest power shortage.
             Check when gaps happen before choosing what to build.
@@ -750,10 +750,12 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
         title: MANUAL_SECTION.STORED_ENERGY,
         entry: (
           <p>
-            Energy left in batteries and reservoirs, measured in{" "}
+            Energy left in batteries and pumped-hydro storage, measured in{" "}
             <EntryLink to={MANUAL_ENTRY.POWER_AND_ENERGY}>MWh</EntryLink>. Watch
             for storage running empty before a demand peak. Power ratings limit
-            how quickly you can charge or discharge it.
+            how quickly you can charge or discharge it. Conventional-hydro
+            reservoirs appear in{" "}
+            <EntryLink to={MANUAL_SECTION.WATER}>Water</EntryLink>.
           </p>
         ),
       },

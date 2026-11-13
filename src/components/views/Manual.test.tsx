@@ -233,6 +233,19 @@ describe("Manual", () => {
     );
   });
 
+  it.each([
+    [MANUAL_ENTRY.HYDROPOWER, "Water chart"],
+    [MANUAL_SECTION.STORED_ENERGY, "Water"],
+  ])("opens and focuses Water from %s", async (from, linkName) => {
+    renderManual(from);
+    await userEvent.click(screen.getByRole("link", { name: linkName }));
+    expect(entryHeader(MANUAL_ENTRY.FORECASTS)).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
+    expect(screen.getByRole("heading", { name: "Water" })).toHaveFocus();
+  });
+
   it("refocuses the subsection when revisiting a collapsed parent", async () => {
     const props = {
       focusEntry: MANUAL_SECTION.WATER,
