@@ -919,7 +919,7 @@ describe("the interties view", () => {
     renderFacilities(createGame({ scenarioId: 112 }), null);
     expect(screen.queryByRole("tablist")).toBeNull();
     expect(screen.queryByRole("button", { name: "Build" })).toBeNull();
-    expect(screen.queryByText(/Plants & storage/)).toBeNull();
+    expect(screen.getByText("Plants & storage")).toBeInTheDocument();
     expect(screen.queryByText(/Interties/)).toBeNull();
   });
 
@@ -1536,6 +1536,26 @@ describe("mouse facility selection", () => {
     fireEvent.keyUp(document.body, { key });
     expect(screen.queryByRole("checkbox")).toBeNull();
     expect(screen.queryByRole("button", { name: "Actions" })).toBeNull();
+  });
+
+  it("replaces generation with bulk actions, including without interties", async () => {
+    const game = fleet();
+    game.transmission = undefined;
+    renderFacilities(game, null);
+    expect(screen.getByText(/^Generating /)).toBeInTheDocument();
+    expect(screen.queryByText(/^Facilities \(/)).toBeNull();
+    fireEvent.click(rows()[0], { metaKey: true });
+    expect(
+      screen.getByRole("status", { name: "Facility selection" }),
+    ).toHaveTextContent("1 facility selected");
+    expect(screen.queryByText(/^Generating /)).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Actions" }));
+    expect(
+      screen.getByRole("menu", { name: "Facility actions" }),
+    ).toBeVisible();
+    await user.keyboard("{Escape}");
+    expect(screen.getByText(/^Generating /)).toBeInTheDocument();
+    await waitFor(() => expect(rows()[0]).toHaveFocus());
   });
 
   it("keeps checkboxes after a deliberate selection and separates toggling from inspection", async () => {

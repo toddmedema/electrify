@@ -33,6 +33,21 @@ for (const theme of ["light", "dark"]) {
     await expect(page.locator("#menuCard")).toBeHidden();
     await openPane(pane, nav);
     const rows = pane.locator(".facilityRow");
+    const heading = pane.locator("#dispatch-order");
+    await expect(heading).toContainText("Generating");
+    await expect(pane.getByText(/^Facilities \(/)).toHaveCount(0);
+    // Only inspect collapsed rows: expanded details intentionally change fleet geometry.
+    const fleetLayout = () =>
+      pane.evaluate((element) =>
+        [".facilitySupplyChart", "#dispatch-order", ".facilityRow"].map(
+          (selector) => {
+            const { y, height } = element
+              .querySelector(selector)!
+              .getBoundingClientRect();
+            return { y, height };
+          },
+        ),
+      );
     const disclosure = (index: number) =>
       rows.nth(index).locator(".facilityDisclosure");
     if (info.project.use.hasTouch) {
@@ -65,6 +80,15 @@ for (const theme of ["light", "dark"]) {
     }
     const checkboxes = pane.getByRole("checkbox", { name: /^Select / });
     await expect(checkboxes).toHaveCount(0);
+    await disclosure(0).click({ trial: true });
+    const idleLayout = await fleetLayout();
+    await disclosure(0).click({ modifiers: ["Meta"] });
+    await expect(heading.getByRole("status")).toHaveText("1 facility selected");
+    await expect(heading).not.toContainText("Generating");
+    expect(await fleetLayout()).toEqual(idleLayout);
+    await heading.getByRole("button", { name: "Clear selection" }).click();
+    await expect(heading).toContainText("Generating");
+    expect(await fleetLayout()).toEqual(idleLayout);
     // Preview is reversible and keeps facility text in place, including when modifiers overlap.
     const textLayout = () =>
       rows.first().evaluate((row) => {
@@ -151,6 +175,9 @@ for (const theme of ["light", "dark"]) {
     await selectPair();
     await rows.first().scrollIntoViewIfNeeded();
     const actions = pane.getByRole("button", { name: "Actions", exact: true });
+    await reviewScreenshot(pane, {
+      path: info.outputPath(`facility-inline-selection-${theme}.png`),
+    });
     await actions.click();
     const menu = page.getByRole("menu", { name: "Facility actions" });
     await page.keyboard.press("Escape");
@@ -300,37 +327,57 @@ for (const theme of ["light", "dark"]) {
       original[4],
     ]);
     // A narrow window can still have a mouse. The context menu must stay within it.
-    await page.setViewportSize({ width: 360, height: 800 });
-    await disclosure(0).click();
-    await disclosure(1).click({ modifiers: ["Meta"] });
-    await expect(actions).toBeVisible();
-    await expect(checkboxes).toHaveCount(3);
-    await expect(pane).toHaveJSProperty(
-      "scrollWidth",
-      await pane.evaluate((el) => el.clientWidth),
-    );
-    await actions.click();
-    await expect(menu).toBeVisible();
-    await expect(page.locator(".facilityContextMenu")).toHaveCSS(
-      "transform",
-      "none",
-    );
-    const box = (await menu.boundingBox())!;
-    expect(box.x).toBeGreaterThanOrEqual(0);
-    expect(box.x + box.width).toBeLessThanOrEqual(360);
-    for (const item of await menu.getByRole("menuitem").all()) {
-      expect((await item.boundingBox())!.height).toBeGreaterThanOrEqual(40);
-    }
-    await reviewScreenshot(page, {
-      path: info.outputPath(`facility-menu-mouse-360-${theme}.png`),
-    });
-    if (process.env.PR_SCREENSHOTS) {
-      await page.screenshot({
-        path: path.join(
-          process.env.PR_SCREENSHOTS,
-          `facilities-selection-360-${theme}.png`,
+    for (const width of [600, 561, 560, 360]) {
+      await page.setViewportSize({ width, height: 800 });
+      await page.keyboard.press("Escape");
+      await expect(heading).toContainText("Generating");
+      // The responsive chrome and ResizeObserver-driven chart must settle before
+      // recording the baseline; selection itself must still preserve it exactly.
+      await disclosure(0).click({ trial: true });
+      const narrowLayout = await fleetLayout();
+      await disclosure(0).click({ modifiers: ["Meta"] });
+      await disclosure(1).click({ modifiers: ["Meta"] });
+      expect(await fleetLayout()).toEqual(narrowLayout);
+      for (const button of await heading.getByRole("button").all()) {
+        const box = (await button.boundingBox())!;
+        expect(box.height).toBeGreaterThanOrEqual(40);
+        expect(box.x).toBeGreaterThanOrEqual(0);
+        expect(box.x + box.width).toBeLessThanOrEqual(width);
+      }
+      await reviewScreenshot(pane, {
+        path: info.outputPath(
+          `facility-inline-selection-${width}-${theme}.png`,
         ),
       });
+      await expect(actions).toBeVisible();
+      await expect(checkboxes).toHaveCount(3);
+      await expect(pane).toHaveJSProperty(
+        "scrollWidth",
+        await pane.evaluate((el) => el.clientWidth),
+      );
+      await actions.click();
+      await expect(menu).toBeVisible();
+      await expect(page.locator(".facilityContextMenu")).toHaveCSS(
+        "transform",
+        "none",
+      );
+      const box = (await menu.boundingBox())!;
+      expect(box.x).toBeGreaterThanOrEqual(0);
+      expect(box.x + box.width).toBeLessThanOrEqual(width);
+      for (const item of await menu.getByRole("menuitem").all()) {
+        expect((await item.boundingBox())!.height).toBeGreaterThanOrEqual(40);
+      }
+      await reviewScreenshot(page, {
+        path: info.outputPath(`facility-menu-mouse-${width}-${theme}.png`),
+      });
+      if (process.env.PR_SCREENSHOTS) {
+        await page.screenshot({
+          path: path.join(
+            process.env.PR_SCREENSHOTS,
+            `facilities-selection-${width}-${theme}.png`,
+          ),
+        });
+      }
     }
   });
 }
