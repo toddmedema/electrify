@@ -209,7 +209,7 @@ function ManualItem(props: ManualItemProps): React.JSX.Element {
           {entry.sections?.map((section) => (
             <section key={section.title}>
               <Typography
-                component="h3"
+                component="h4"
                 variant="subtitle1"
                 id={manualEntryId(section.title)}
                 tabIndex={-1}
@@ -327,14 +327,16 @@ export default function Manual(props: Props): React.JSX.Element {
 
   React.useLayoutEffect(() => {
     if (revealRequested.current === 1 && focusRef.current) {
-      revealRequested.current = 2;
       // Focus without the browser scrolling to an intermediate accordion height.
       const target = focusSection
         ? document.getElementById(manualEntryId(focusSection))
         : focusRef.current.querySelector<HTMLButtonElement>(
             ".MuiAccordionSummary-root",
           );
-      target?.focus({ preventScroll: true });
+      // Reopening a collapsed parent mounts its subsections on the next render.
+      if (!target) return;
+      revealRequested.current = 2;
+      target.focus({ preventScroll: true });
       // A link can both collapse earlier entries and expand its target. Align only once
       // all those transitions finish, or the closing content moves the target again.
       revealFocusedEntry();

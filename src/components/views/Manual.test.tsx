@@ -203,13 +203,16 @@ describe("Manual", () => {
 
   it("keeps chart subsections in one searchable parent page", () => {
     renderManual(MANUAL_ENTRY.FORECASTS);
+    expect(
+      screen.getByRole("heading", { name: MANUAL_ENTRY.FORECASTS, level: 3 }),
+    ).toBeVisible();
     const page = screen.getByRole("region", { name: MANUAL_ENTRY.FORECASTS });
     const sections = MANUAL_ENTRIES.find(
       (entry) => entry.title === MANUAL_ENTRY.FORECASTS,
     )!.sections!;
     expect(
       within(page)
-        .getAllByRole("heading", { level: 3 })
+        .getAllByRole("heading", { level: 4 })
         .map((heading) => heading.textContent),
     ).toEqual(sections.map((section) => section.title));
     search("dwindling reserves");
@@ -227,6 +230,23 @@ describe("Manual", () => {
     expect(entryHeader(MANUAL_ENTRY.BLACKOUTS)).toHaveAttribute(
       "aria-expanded",
       "false",
+    );
+  });
+
+  it("refocuses the subsection when revisiting a collapsed parent", async () => {
+    const props = {
+      focusEntry: MANUAL_SECTION.WATER,
+      onBack: () => undefined,
+      onFollowLink: () => undefined,
+    };
+    const view = render(<Manual {...props} focusKey={0} />);
+    await userEvent.click(entryHeader(MANUAL_ENTRY.FORECASTS));
+    await waitFor(() =>
+      expect(screen.queryByRole("heading", { name: "Water" })).toBeNull(),
+    );
+    view.rerender(<Manual {...props} focusKey={1} />);
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { name: "Water" })).toHaveFocus(),
     );
   });
 
