@@ -5679,6 +5679,83 @@ $homeSmokeCycle: 5.6s;
   border-top: 1px solid var(--border-subtle);
   margin-top: 12px;
 }
+.acquiredUtilities {
+  border-top: 1px solid var(--border-subtle);
+  margin-top: 12px;
+
+  > summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    min-height: 40px;
+    box-sizing: border-box;
+    padding: 8px 16px;
+    color: var(--font-color-primary);
+    font-size: var(--font-size-body2);
+    font-weight: 500;
+    list-style: none;
+    cursor: pointer;
+
+    &::-webkit-details-marker {
+      display: none;
+    }
+    &:focus-visible {
+      outline: 2px solid var(--focus-ring);
+      outline-offset: -2px;
+    }
+    @media (hover: hover) and (pointer: fine) {
+      &:hover {
+        background: var(--bg-raised);
+      }
+    }
+    @media (pointer: coarse) {
+      min-height: 44px;
+    }
+    .rowChevron {
+      flex-shrink: 0;
+      color: var(--font-color-faded);
+      transform: rotate(-90deg);
+    }
+  }
+  &[open] > summary .rowChevron {
+    transform: none;
+  }
+  > ul {
+    list-style: none;
+    margin: 0;
+    padding: 0 16px;
+    > li {
+      padding: 16px 0 8px;
+      + li {
+        border-top: 1px solid var(--border-subtle);
+      }
+    }
+  }
+  .facilityDetailHeading {
+    margin-bottom: 4px;
+  }
+  .facilityStats {
+    row-gap: 4px;
+  }
+  .facilityStat {
+    display: grid;
+    grid-row: span 2;
+    grid-template-rows: subgrid;
+    dt {
+      margin: 0;
+    }
+    dd {
+      padding-bottom: 8px;
+    }
+  }
+}
+.acquiredUtilityDate {
+  margin: 0 0 12px;
+  color: var(--font-color-faded);
+  font-size: var(--font-size-caption);
+  line-height: 20px;
+}
 .tradingControls {
   padding: 0 16px 12px;
   display: grid;
