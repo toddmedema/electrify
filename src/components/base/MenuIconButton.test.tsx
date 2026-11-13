@@ -1,4 +1,4 @@
-import { act, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
   resetInputPresentation,
@@ -61,8 +61,10 @@ it("distinguishes hover selection from keyboard focus even when focus-visible is
 });
 
 afterEach(() => {
-  resetInputPresentation();
-  jest.runOnlyPendingTimers();
+  act(() => {
+    resetInputPresentation();
+    jest.runOnlyPendingTimers();
+  });
   jest.useRealTimers();
   jest.restoreAllMocks();
 });
@@ -107,4 +109,42 @@ it("opens for controller selection without native focus-visible, respects Escape
   expect(screen.getByRole("button", { name: "Send feedback" })).toHaveFocus();
   expect(screen.getAllByRole("tooltip")).toHaveLength(1);
   expect(screen.getByRole("tooltip")).toHaveTextContent("Send feedback");
+});
+
+it("allows deliberate rehover after Escape without reopening under the resting pointer", async () => {
+  const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
+  render(<MenuIconButton label="Manual">Book</MenuIconButton>);
+  const manual = screen.getByRole("button", { name: "Manual" });
+  await user.hover(manual);
+  act(() => manual.focus());
+  act(() => jest.advanceTimersByTime(300));
+  expect(screen.getByRole("tooltip")).toHaveTextContent("Manual");
+  await user.keyboard("{Escape}");
+  act(() => jest.advanceTimersByTime(500));
+  expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+  await user.unhover(manual);
+  await user.hover(manual);
+  act(() => jest.advanceTimersByTime(300));
+  expect(screen.getByRole("tooltip")).toHaveTextContent("Manual");
+});
+
+it("keeps one controller label when layout moves another icon under a stationary pointer", () => {
+  act(() => updateInputPresentation({ active: true, connected: true }));
+  render(
+    <>
+      <MenuIconButton label="Manual">Book</MenuIconButton>
+      <MenuIconButton label="Send feedback">Email</MenuIconButton>
+    </>,
+  );
+  act(() => screen.getByRole("button", { name: "Manual" }).focus());
+  const feedback = screen.getByRole("button", { name: "Send feedback" });
+  fireEvent(
+    feedback,
+    Object.assign(new Event("pointerover", { bubbles: true }), {
+      pointerType: "mouse",
+    }),
+  );
+  act(() => jest.advanceTimersByTime(500));
+  expect(screen.getAllByRole("tooltip")).toHaveLength(1);
+  expect(screen.getByRole("tooltip")).toHaveTextContent("Manual");
 });

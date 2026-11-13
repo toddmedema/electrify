@@ -486,6 +486,15 @@ test("TV home controller navigation includes every footer icon and wraps", async
 test("TV footer tooltips follow controller selection after mouse input", async ({
   page,
 }) => {
+  await page.addInitScript(() => {
+    // Controller focus visibility differs by browser; exercise the fallback explicitly.
+    const matches = Element.prototype.matches;
+    Element.prototype.matches = function (this: Element, selector: string) {
+      return selector === ":focus-visible" && this.closest(".mainMenuFooter")
+        ? false
+        : matches.call(this, selector);
+    };
+  });
   await page.goto("/");
   const tv = await waitForDesktopTvEntry(page);
   await tv.click();

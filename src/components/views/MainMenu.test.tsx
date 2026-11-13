@@ -76,7 +76,7 @@ describe("MainMenu", () => {
   afterEach(() => {
     delete window.electrifyDesktop;
     localStorage.removeItem("tvMode");
-    resetInputPresentation();
+    act(() => resetInputPresentation());
     jest.restoreAllMocks();
   });
 
