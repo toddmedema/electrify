@@ -61,6 +61,10 @@ import {
 import {
   formatBuildMonths,
   formatMoneyConcise,
+  formatCount,
+  formatNumber,
+  formatForecastMoney,
+  formatForecastWatts,
   formatWatts,
   formatWattsOfPeak,
 } from "../../helpers/Format";
@@ -148,8 +152,8 @@ const DIRECTION_WORDS: Record<IntertieDirection, string> = {
 
 function priceRange(outlook: IntertieOutlook): string {
   // Whole dollars: a typical range is an estimate, and cents would suggest otherwise
-  const low = formatMoneyConcise(Math.round(outlook.priceLow));
-  const high = formatMoneyConcise(Math.round(outlook.priceHigh));
+  const low = formatForecastMoney(outlook.priceLow);
+  const high = formatForecastMoney(outlook.priceHigh);
   return low === high ? `${low}/MWh` : `${low}–${high.replace("$", "")}/MWh`;
 }
 
@@ -210,7 +214,7 @@ function IntertieYear({
         baseline
         fill
         lowMarker={!prominent}
-        ariaLabel={`Typical year of import room: most in ${MONTH_NAMES[highMonth]} at ${formatWatts(monthly[highMonth] * importCapacityW)}, least in ${MONTH_NAMES[lowMonth]} at ${formatWatts(monthly[lowMonth] * importCapacityW)}.`}
+        ariaLabel={`Typical year of import room: most in ${MONTH_NAMES[highMonth]} at ${formatForecastWatts(monthly[highMonth] * importCapacityW)}, least in ${MONTH_NAMES[lowMonth]} at ${formatForecastWatts(monthly[lowMonth] * importCapacityW)}.`}
       />
       {prominent && <span className="intertieAvailabilityLimit">0%</span>}
       {prominent ? (
@@ -218,7 +222,7 @@ function IntertieYear({
           <span>Jan</span>
           <span>
             Low {MONTHS[lowMonth]}{" "}
-            {formatWatts(monthly[lowMonth] * importCapacityW)}
+            {formatForecastWatts(monthly[lowMonth] * importCapacityW)}
           </span>
           <span>Dec</span>
         </div>
@@ -229,7 +233,7 @@ function IntertieYear({
           component="figcaption"
         >
           Typical year · Low {MONTHS[lowMonth]}{" "}
-          {formatWatts(monthly[lowMonth] * importCapacityW)}
+          {formatForecastWatts(monthly[lowMonth] * importCapacityW)}
         </Typography>
       )}
     </figure>
@@ -370,7 +374,7 @@ function IntertieBuildItem(props: {
               />
               <BuildMetric
                 label="Company customers"
-                value={Math.round(props.company.customers).toLocaleString()}
+                value={formatCount(props.company.customers)}
               />
             </>
           )}
@@ -408,7 +412,7 @@ function IntertieBuildItem(props: {
               <>
                 <BuildDetailRow
                   label="At your peak"
-                  value={`~${formatWatts(outlook.atPeak * outlook.importCapacityW)}`}
+                  value={`~${formatForecastWatts(outlook.atPeak * outlook.importCapacityW)}`}
                   entry={MANUAL_ENTRY.INTERTIES}
                 />
                 <BuildDetailRow
@@ -467,7 +471,7 @@ function IntertieUpgradeControl(props: {
         Upgrading ·{" "}
         {years < 1
           ? `${Math.max(1, Math.round(years * 12))} months`
-          : `${years.toFixed(1)} years`}{" "}
+          : `${formatNumber(years)} years`}{" "}
         remaining. Current capacities stay in use until completion.
       </Typography>
     );

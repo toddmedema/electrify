@@ -279,7 +279,7 @@ describe("the fleet list", () => {
 
   it("shows Oil fixed and variable O&M without turbine start details", () => {
     // Rise of Renewables opens in 2002, so the 2023-dollar EIA figures are deflated by CPI-U
-    // (179.9 / 304.702): $3.09M/yr and $25.71/MWh become $1.82M/yr and $15.18/MWh.
+    // (179.9 / 304.702): $3.09M/yr and $25.71/MWh become $1.82M/yr and $15.2/MWh.
     const oilGame = createGame({ scenarioId: 101, difficulty: "CEO" });
     const oil = oilGame.facilities.find((facility) => facility.name === "Oil")!;
     renderFacilities(oilGame, oil.id);
@@ -287,7 +287,7 @@ describe("the fleet list", () => {
     expect(screen.getByText("Fixed upkeep")).toBeInTheDocument();
     expect(screen.getByText("$1.82M/yr")).toBeInTheDocument();
     expect(screen.getByText("Variable upkeep")).toBeInTheDocument();
-    expect(screen.getByText("$15.18/MWh")).toBeInTheDocument();
+    expect(screen.getByText("$15.2/MWh")).toBeInTheDocument();
     expect(screen.queryByText("Starts")).toBeNull();
     expect(screen.queryByText("Non-fuel start cost")).toBeNull();
   });
@@ -339,7 +339,7 @@ describe("the fleet list", () => {
     [300e6, 0.98, "0/300 294MW", "300"],
     [300e6, 1, "0/300MW", "300"],
     [1e9, 0.98, "0/1 0.98GW", "1"],
-    [1.234e9, 0.98, "0/1.234 1.209GW", "1.234"],
+    [1.234e9, 0.98, "0/1.23 1.21GW", "1.23"],
   ] as const)(
     "shows a %sW facility with a %s output cap without changing nameplate MW",
     (peakW, limit, expected, rated) => {

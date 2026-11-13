@@ -6,7 +6,7 @@ import {
 } from "./ExpansionContext";
 import { expansionRetentionBaseline } from "./Expansion";
 import { UTILITY_AREAS } from "../data/UtilityExpansion";
-import { formatCount, formatNumber } from "./Format";
+import { formatCount, formatNumber, formatForecastNumber } from "./Format";
 import {
   DifficultyType,
   GameType,
@@ -414,7 +414,7 @@ function inheritedResultReasons(
       );
       return {
         ...result,
-        reason: `Customer attrition left you with ${formatCount(customers)} customers. Even the fastest possible growth reaches only ${formatCount(bestCase)} by the end of the term, short of the ${formatNumber(Math.ceil(progress.retentionBaseline * result.target))} this mission requires.`,
+        reason: `Customer attrition left you with ${formatCount(customers)} customers. Even the fastest possible growth reaches only ${formatForecastNumber(bestCase)} by the end of the term, short of the ${formatNumber(Math.ceil(progress.retentionBaseline * result.target))} this mission requires.`,
       };
     }
     return result;

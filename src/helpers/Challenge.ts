@@ -95,7 +95,7 @@ export function challengeShareContent(
   const reliability = victory.debrief;
   const story =
     reliability && (reliability.demandWh ?? 0) > 0
-      ? `I served ${(Math.max(0, Math.min(reliability.reliability, 1)) * 100).toFixed(1)}% of electricity demand`
+      ? `I served ${formatNumber(Math.max(0, Math.min(reliability.reliability, 1)) * 100)}% of electricity demand`
       : "I finished a run";
   return {
     challenge: true,
@@ -122,6 +122,6 @@ export function challengeComparison(victory: VictoryType): string | undefined {
   return difference === BigInt(0)
     ? "You tied the shared score."
     : difference > BigInt(0)
-      ? `You beat the shared score by ${difference.toLocaleString("en-US")} points.`
-      : `You finished ${(-difference).toLocaleString("en-US")} points below the shared score.`;
+      ? `You beat the shared score by ${formatNumber(difference)} points.`
+      : `You finished ${formatNumber(-difference)} points below the shared score.`;
 }

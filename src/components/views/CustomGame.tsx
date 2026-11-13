@@ -61,6 +61,8 @@ import {
   formatMoneyConcise,
   formatWattHours,
   formatWatts,
+  formatForecastWatts,
+  formatForecastNumber,
   formatCount,
   formatCustomerCount,
   formatFacilitySize,
@@ -215,9 +217,9 @@ function demandServedLabel(outlook: YearOneOutlook): string {
   const percent = outlook.demandServed * 100;
   // Preserve a near-100% annual deficit without hiding surplus generation.
   if (percent >= 99 && percent < 100) {
-    return `${Math.min(99.9, percent).toFixed(1)}%`;
+    return "<100%";
   }
-  return `${Math.round(percent)}%`;
+  return `${formatForecastNumber(percent)}%`;
 }
 
 /**
@@ -908,7 +910,7 @@ export default function CustomGame(props: Props): React.JSX.Element {
                         <div>
                           <strong>
                             {outlook.outlook.worstShortfallW > 0
-                              ? `Up to ${formatWatts(outlook.outlook.worstShortfallW)} short`
+                              ? `Up to ${formatForecastWatts(outlook.outlook.worstShortfallW)} short`
                               : "No forecast shortfall"}
                           </strong>
                         </div>

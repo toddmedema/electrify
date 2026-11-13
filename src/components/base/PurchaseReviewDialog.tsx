@@ -9,7 +9,7 @@ import DecisionImpactPreview, {
   DecisionImpactFactType,
 } from "./DecisionImpactPreview";
 import { purchaseTerms } from "../../helpers/Financials";
-import { formatMoneyConcise } from "../../helpers/Format";
+import { formatMoneyConcise, formatNumber } from "../../helpers/Format";
 import { LOAN_MONTHS } from "../../Constants";
 import { useBuildCash } from "./useBuildCash";
 
@@ -184,7 +184,7 @@ export default function PurchaseReviewDialog(
         props.paymentSummary?.loan.value ??
         `${formatMoneyConcise(financedCashDue)} now + ${formatMoneyConcise(loan.monthlyPayment)}/mo`,
       detail: [
-        `New loan: ${(interestRate * 100).toFixed(2)}% for ${loanMonths / 12} years.`,
+        `New loan: ${formatNumber(interestRate * 100)}% for ${loanMonths / 12} years.`,
         props.paymentSummary?.loan.detail,
         refinancedBalance > 0
           ? `Includes refinancing the existing ${formatMoneyConcise(refinancedBalance)} balance at this rate and term.`

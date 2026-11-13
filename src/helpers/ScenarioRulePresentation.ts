@@ -1,4 +1,4 @@
-import { formatFixed } from "./Format";
+import { formatPercent } from "./Format";
 import type {
   CompiledRuleEvent,
   CompiledScenarioRules,
@@ -19,8 +19,7 @@ import { scenarioEffectsSummary } from "./ScenarioEffectsSummary";
 type Occurrence = ActiveWorldEventType & StoryPhaseDescriptionType;
 const share = (part: number, whole: number) =>
   whole > 0 ? Math.max(0, Math.min(1, part / whole)) : 0;
-const percent = (value: number) =>
-  `${formatFixed(value * 100, value >= 0.1 ? 0 : 1)}%`;
+const percent = (value: number) => formatPercent(value, value >= 0.1 ? 0 : 1);
 export const officialPresentation = (event: CompiledRuleEvent) =>
   event.source
     ? officialScenarioRuleDefinition(event.source.scenarioId)?.presentation[

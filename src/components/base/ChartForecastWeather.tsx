@@ -10,10 +10,11 @@ import {
 } from "./UPlotHelpers";
 import { TickPresentFutureType, UnitSystemType } from "../../Types";
 import { sampleTimeline } from "../../helpers/ForecastSampling";
+import { formatCount, formatForecastNumber } from "../../helpers/Format";
 import { formatMinuteAsTooltipHeader } from "../../helpers/DateTime";
 import { chartPalette } from "../../Theme";
 import {
-  formatTemperature,
+  formatForecastTemperature as formatTemperature,
   temperatureUnit,
   toDisplayTemperature,
 } from "../../helpers/Units";
@@ -67,7 +68,7 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
         grid: true,
         // Neutral like every other axis: red already means a shortage or harm
         label: `Temperature (${temperatureUnit(getState().units)})`,
-        values: (_u, splits) => splits.map((t) => String(Math.round(t))),
+        values: (_u, splits) => splits.map((t) => formatForecastNumber(t)),
       }),
     ],
     series,
@@ -108,6 +109,9 @@ export default class ChartForecastWeather extends React.PureComponent<
       <UPlotChart<State>
         id="chartForecastWeather"
         ariaLabel="Chart of predicted temperature"
+        formatSummaryValue={(value) =>
+          `${formatCount(value, 2)}${temperatureUnit(units)}`
+        }
         height={height}
         state={{ data, domain, startingYear, multiyear, units }}
         data={[minutes, temperature]}

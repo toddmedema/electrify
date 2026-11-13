@@ -5,12 +5,16 @@ import {
   dashArray,
   FORECAST_RIGHT_PAD,
   padRange,
+  stepTicks,
   SPLINE,
   forecastMonthAxis,
   yAxis,
 } from "./UPlotHelpers";
 import { formatMinuteAsTooltipHeader } from "../../helpers/DateTime";
-import { formatMoneyConcise, formatMoneyStable } from "../../helpers/Format";
+import {
+  formatForecastMoney as formatMoneyConcise,
+  formatForecastMoney as formatMoneyStable,
+} from "../../helpers/Format";
 import { PRICED_FUELS } from "../../Constants";
 import { TickPresentFutureType, PricedFuelNameType } from "../../Types";
 import { fuelColors, fuelDashArrays } from "../../Theme";
@@ -37,6 +41,15 @@ interface State {
   multiyear: boolean;
 }
 
+// A forecast axis must use positions the two-digit, cent-limited money labels can
+// represent. Widen a narrow padded range to those steps instead of repeating labels.
+function priceStep(min: number, max: number): number {
+  const magnitude = Math.max(Math.abs(min), Math.abs(max));
+  const exponent =
+    magnitude === 0 ? 0 : Number(magnitude.toExponential().split("e")[1]);
+  return Math.max(0.01, Number(`1e${exponent - 1}`));
+}
+
 function buildOptions(
   showXLabels: boolean,
   fuels: readonly PricedFuelNameType[],
@@ -53,13 +66,21 @@ function buildOptions(
     legend: { show: false },
     scales: {
       x: { time: false, range: () => getState().domain.x },
-      y: { range: (_u, min, max) => padRange(min, max) },
+      y: {
+        range: (_u, min, max) => {
+          const [low, high] = padRange(min, max);
+          const step = priceStep(low, high);
+          return [Math.floor(low / step) * step, Math.ceil(high / step) * step];
+        },
+      },
     },
     axes: [
       forecastMonthAxis(scale, getState, showXLabels),
       yAxis(scale, {
         grid: true,
         label: "Price per MMBtu",
+        splits: (_u, _axis, min, max) =>
+          stepTicks(min, max, priceStep(min, max)),
         values: (_u, splits) => splits.map((t) => formatMoneyConcise(t)),
       }),
     ],

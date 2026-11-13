@@ -7,6 +7,7 @@ import { scenarioObjectiveDefinitions } from "../../helpers/ObjectiveRules";
 import { objectiveGoalGroups } from "../../helpers/ObjectivePresentation";
 import {
   formatMoneyConcise,
+  formatCount,
   formatWatts,
   formatWattHours,
 } from "../../helpers/Format";
@@ -84,7 +85,7 @@ export default function UtilityOfferDialog({
         <BuildDetailRow label="Assumed debt" value={money(offer.assumedDebt)} />
         <BuildDetailRow
           label="Customers joining today"
-          value={Math.round(offer.customers).toLocaleString()}
+          value={formatCount(offer.customers)}
         />
         <BuildDetailRow label="Cash purchase" value={money(offer.cashDue)} />
         <BuildDetailRow
@@ -133,7 +134,7 @@ export default function UtilityOfferDialog({
         Seller load reference · January 2005
       </Typography>
       <Typography variant="body2" sx={{ mt: 1 }}>
-        {Math.round(seller.customers).toLocaleString()} opening accounts ·{" "}
+        {formatCount(seller.customers)} opening accounts ·{" "}
         {formatWattHours(seller.annualEnergyMWh * 1e6)} annual delivered energy
         · {formatWatts(seller.peakDemandW)} peak demand.
       </Typography>

@@ -13,7 +13,7 @@ import {
   summarizeTimeline,
 } from "../../helpers/DateTime";
 import { TICK_MINUTES } from "../../Constants";
-import { formatMoneyStable } from "../../helpers/Format";
+import { formatMoneyStable, formatForecastMoney } from "../../helpers/Format";
 import { ThemeProvider } from "@mui/material/styles";
 import { createAppTheme } from "../../Theme";
 import userEvent from "@testing-library/user-event";
@@ -197,10 +197,10 @@ describe("GameAppBar", () => {
         const expected = sign > 0 ? 370000 : sign < 0 ? -230000 : 0;
         renderAppBar({ game });
         const profit = screen.getByLabelText(
-          `Monthly profit forecast ${formatMoneyStable(expected)}`,
+          `Monthly profit forecast ${formatForecastMoney(expected)}`,
         );
         expect(profit).toHaveTextContent(
-          `${expected > 0 ? "+" : ""}${formatMoneyStable(expected)}/mo`,
+          `${expected > 0 ? "+" : ""}${formatForecastMoney(expected)}/mo`,
         );
         const palette = createAppTheme("light").palette;
         expect(profit).toHaveStyle({

@@ -12,6 +12,7 @@ import { facilityLoanMonths, purchaseTerms } from "../../helpers/Financials";
 import {
   floorToTwoSignificantDigits,
   formatMoneyConcise,
+  formatNumber,
   formatWattHours,
   formatWatts,
 } from "../../helpers/Format";
@@ -158,7 +159,7 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
           />
           <BuildMetric
             label="At full power"
-            value={`${Number((storage.peakWh / storage.peakW).toFixed(1))} hr`}
+            value={`${formatNumber(storage.peakWh / storage.peakW)} hr`}
           />
           <BuildMetric
             label="Efficiency"
@@ -185,7 +186,7 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
           />
           <BuildDetailRow
             label="Stored energy lost per hour"
-            value={`${Number((storage.hourlyLoss * 100).toFixed(3))}%`}
+            value={`${formatNumber(storage.hourlyLoss * 100)}%`}
             entry={MANUAL_ENTRY.ROUND_TRIP_EFFICIENCY}
           />
           {sites && (

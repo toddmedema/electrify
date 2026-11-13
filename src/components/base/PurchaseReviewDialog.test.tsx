@@ -52,7 +52,7 @@ describe("PurchaseReviewDialog", () => {
       `${formatMoneyConcise(terms.downpayment)} now + ${formatMoneyConcise(terms.monthlyPayment)}/mo`,
     );
     expect(screen.getByText(/Includes refinancing/)).toHaveTextContent(
-      /^New loan: 5.00% for 30 years\. Includes refinancing/,
+      /^New loan: 5% for 30 years\. Includes refinancing/,
     );
     expect(screen.getByText("Online in")).toBeInTheDocument();
     expect(

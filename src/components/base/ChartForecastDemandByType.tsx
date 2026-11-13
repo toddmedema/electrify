@@ -7,7 +7,10 @@ import {
   TickPresentFutureType,
 } from "../../Types";
 import { formatMinuteAsTooltipHeader } from "../../helpers/DateTime";
-import { formatWatts, formatWattsAxis } from "../../helpers/Format";
+import {
+  formatForecastWatts as formatWatts,
+  formatForecastWattsAxis as formatWattsAxis,
+} from "../../helpers/Format";
 import { chartPalette, demandTypeColors } from "../../Theme";
 import UPlotChart, { BuildContext } from "./UPlotChart";
 import { FORECAST_RIGHT_PAD, forecastMonthAxis, yAxis } from "./UPlotHelpers";

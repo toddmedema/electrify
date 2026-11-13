@@ -574,7 +574,7 @@ it("shows natural-gas base, per-start, and daily-start estimated O&M", async () 
   ).toBeInTheDocument();
   expect(
     screen.getByRole("row", {
-      name: /Estimated annual upkeep.*\$11\.9M\/yr/,
+      name: /Estimated annual upkeep.*\$12M\/yr/,
     }),
   ).toBeInTheDocument();
 
@@ -711,12 +711,12 @@ it("shows Oil's fixed, variable, and expected-output O&M", () => {
   ).toBeInTheDocument();
   expect(
     screen.getByRole("row", {
-      name: /Variable upkeep.*\$25\.71\/MWh/,
+      name: /Variable upkeep.*\$25\.7\/MWh/,
     }),
   ).toBeInTheDocument();
   expect(
     screen.getByRole("row", {
-      name: /Estimated annual upkeep.*\$7\.59M\/yr/,
+      name: /Estimated annual upkeep.*\$7\.6M\/yr/,
     }),
   ).toBeInTheDocument();
   expect(screen.queryByText("Non-fuel start cost")).toBeNull();
@@ -921,6 +921,43 @@ it("draws each generator's typical year against one shared scale", () => {
     screen.getByRole("img", { name: /^Typical year of water inflow: / }),
   ).toBeInTheDocument();
 });
+
+it.each(["weather", "water-inflow"] as const)(
+  "rounds low and over-nameplate %s output once in captions and summaries",
+  (kind) => {
+    const game = createGame({ scenarioId: 100, difficulty: "Employee" });
+    const generator = GENERATORS(game, 1000000, [], [500]).find(
+      (candidate) => candidate.name === "Solar",
+    )!;
+    render(
+      <GeneratorBuildItem
+        cash={1e9}
+        date={game.date}
+        interestRate={game.interestRate}
+        generator={generator}
+        location={game.location}
+        seed={game.seed}
+        outputShape={{
+          kind,
+          monthly: [1.449, ...Array(11).fill(0.0449)],
+          lowMonth: 1,
+          mean: 0.16,
+        }}
+        onBuild={jest.fn()}
+      />,
+    );
+    const metric = screen.getByRole("group", { name: /Typical monthly/ });
+    const unit = kind === "weather" ? "capacity" : "of typical water";
+    expect(metric).toHaveTextContent(`Feb: 4.5% ${unit}`);
+    expect(
+      screen.getByRole("img", { name: /^Typical year/ }),
+    ).toHaveAccessibleName(
+      /highest in January at 140%, lowest in February at 4.5%/,
+    );
+    fireEvent.keyDown(metric, { key: "Home" });
+    expect(metric).toHaveTextContent(`Jan: 140% ${unit}`);
+  },
+);
 
 it.each(["weather", "water-inflow"] as const)(
   "inspects each %s month and restores the low month after leaving",

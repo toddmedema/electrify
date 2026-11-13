@@ -256,7 +256,7 @@ describe("reliability feedback", () => {
       context([month(0, { demandWh: 1000, supplyWh: 998.999 })]),
     );
     expect(result.importance).toBe("NOTABLE");
-    expect(result.message).toContain("99.8999%");
+    expect(result.message).toContain("99.9% (below threshold)");
   });
 
   it("supports a supplied reliability threshold and label", () => {
@@ -677,9 +677,7 @@ describe("deep-freeze debrief feedback", () => {
       value: 25,
       unit: "W",
     });
-    expect(metric(result, "electricityRate").value).toBe(
-      "10000¢/kWh → 20000¢/kWh",
-    );
+    expect(metric(result, "electricityRate").value).toBe("10k¢/kWh → 20k¢/kWh");
     expect(metric(result, "cashStayedPositive")).toMatchObject({
       value: true,
       unit: "boolean",
@@ -839,7 +837,7 @@ describe("catalog debrief observations before the term ends", () => {
     });
     expect(metric(result, "electricityRate")).toMatchObject({
       label: "Billed rate · Jan 2040 → Mar 2040",
-      value: "9000¢/kWh → 10000¢/kWh",
+      value: "9k¢/kWh → 10k¢/kWh",
     });
     const strict = interpretRuleReport(
       freeze,

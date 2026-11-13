@@ -205,7 +205,7 @@ it("changes price and end date with duration and signs that exact canonical quot
   const selected = powerAgreementQuote(game, quote.id, 3, 5)!;
   expect(
     within(dialog).getByRole("row", { name: /^Discount/ }),
-  ).toHaveTextContent("9.4%");
+  ).toHaveTextContent("9.44%");
   expect(
     within(dialog).getByRole("row", { name: /Duration/ }),
   ).toHaveTextContent("5 yearsEnds Dec 2024");
@@ -409,7 +409,7 @@ it.each([1, 2, 3] as PowerAgreementTermsVersion[])(
     expect(
       within(dialog).getByRole("row", { name: /Forecasted savings/ }),
     ).toHaveTextContent(
-      "-$1.23k over 2 years remainingBased on current supply and demand",
+      "-$1.2k over 2 years remainingBased on current supply and demand",
     );
     expect(dialog).not.toHaveTextContent("The price follows inflation");
   },

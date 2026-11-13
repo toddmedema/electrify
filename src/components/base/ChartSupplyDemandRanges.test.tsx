@@ -326,7 +326,7 @@ describe("ChartSupplyDemandRanges", () => {
     );
     const props = drawnChartProps(hours);
     expect(props.tooltip!(0, props.state as State)).toContain(
-      "Demand unmet: <0.1% (>99.9% served)",
+      "Demand unmet: <0.1% (>99% served)",
     );
   });
 

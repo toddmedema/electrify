@@ -476,21 +476,22 @@ test("immutable tick reads reuse cached projections without simulation mutations
 });
 
 test.each([
-  [0, 1200, 240, true],
-  [0, 1200, 241, false],
-  [360, 1200, 240, true],
-  [360, 1200, 241, false],
-  [0, 36, 13, true],
-  [0, 36, 36, true],
-  [0, 36, 37, false],
-  [34, 36, 2, true],
-  [34, 36, 3, false],
-  [36, 36, 2, false],
-  [0, undefined, 12, true],
-  [0, undefined, 13, false],
+  [0, 1200, 123, true, "120"],
+  [0, 1200, 240, true, "240"],
+  [0, 1200, 241, false, undefined],
+  [360, 1200, 240, true, "240"],
+  [360, 1200, 241, false, undefined],
+  [0, 36, 13, true, "13"],
+  [0, 36, 36, true, "36"],
+  [0, 36, 37, false, undefined],
+  [34, 36, 2, true, "2"],
+  [34, 36, 3, false, undefined],
+  [36, 36, 2, false, undefined],
+  [0, undefined, 12, true, "12"],
+  [0, undefined, 13, false, undefined],
 ])(
   "cash warning at elapsed %i, duration %s, crossing %i: %s",
-  (elapsed, duration, crossing, warns) => {
+  (elapsed, duration, crossing, warns, shownMonths) => {
     const game = createNextState(fixture(elapsed), (draft) => {
       draft.scenarioId = CUSTOM_SCENARIO_ID;
       draft.customScenario =
@@ -517,6 +518,15 @@ test.each([
       );
     try {
       expect(cashRunwayMonths(game)).toBe(warns ? crossing : undefined);
+      const risk = selectMissionRisk(game);
+      expect(warns ? risk?.label : undefined).toEqual(
+        warns
+          ? expect.stringContaining(`about ${shownMonths} months`)
+          : undefined,
+      );
+      expect(warns ? risk?.shortLabel : undefined).toBe(
+        warns ? `Cash out in ~${shownMonths} mo` : undefined,
+      );
       expect(selectMissionRisk(game)?.id === "cash-runway").toBe(warns);
     } finally {
       generate.mockRestore();

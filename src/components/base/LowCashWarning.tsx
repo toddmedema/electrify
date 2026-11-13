@@ -6,6 +6,7 @@ import {
   LOW_CASH_THRESHOLD,
   lowCashRateQuote,
 } from "../../helpers/LowCashRate";
+import { formatNumber } from "../../helpers/Format";
 import { pendingScenarioChoice } from "../../helpers/ScenarioChoices";
 import { delta } from "../../reducers/Game";
 import { dialogClose, dialogOpen } from "../../reducers/UI";
@@ -39,9 +40,9 @@ export const offerLowCashWarning = (): AppThunk => (dispatch, getState) => {
   const rate = quote.dollarsPerkWh;
   const increase =
     rate !== null && game.dollarsPerkWh > 0
-      ? `+${Math.round((rate / game.dollarsPerkWh - 1) * 100)}%`
+      ? `+${formatNumber((rate / game.dollarsPerkWh - 1) * 100)}%`
       : undefined;
-  const price = rate !== null ? `${(rate * 100).toFixed(2)}¢/kWh` : "";
+  const price = rate !== null ? `${formatNumber(rate * 100)}¢/kWh` : "";
   const message =
     rate === null
       ? quote.projectedCash >= 0

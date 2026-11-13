@@ -1874,8 +1874,8 @@ describe("Insights layers", () => {
     localStorage.setItem("insightsLayers", JSON.stringify(["customers"]));
     renderInsights();
     const chart = screen.getByTestId("chartInsightsCustomersPlot");
-    expect(chart).toHaveAttribute("data-axis-value", "120K");
-    expect(chart).toHaveAttribute("data-inspected-value", "123K");
+    expect(chart).toHaveAttribute("data-axis-value", "120k");
+    expect(chart).toHaveAttribute("data-inspected-value", "123k");
   });
 
   it("applies presets and gives every chart the shared cursor key", async () => {

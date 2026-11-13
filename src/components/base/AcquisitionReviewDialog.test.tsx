@@ -5,7 +5,12 @@ import { Provider } from "react-redux";
 import { UTILITY_TARGETS } from "../../data/UtilityExpansion";
 import { acquisitionQuote } from "../../helpers/Expansion";
 import { currentTick } from "../../helpers/GameSelectors";
-import { formatMoneyConcise, formatWatts } from "../../helpers/Format";
+import {
+  formatMoneyConcise,
+  formatNumber,
+  formatWatts,
+  formatForecastWatts,
+} from "../../helpers/Format";
 import { copyOfficialGame } from "../../testing/OfficialScenarioExecutionFixtures";
 import { createGame } from "../../testing/Simulator";
 import {
@@ -74,7 +79,7 @@ function disclosure(label: string) {
 function expectedMargin(
   preview: NonNullable<ReturnType<typeof previewUtilityAcquisition>>,
 ) {
-  return `${formatWatts(preview.beforeMarginW)} → ${formatWatts(Math.abs(preview.afterMarginW))} ${preview.afterMarginW < 0 ? "shortfall" : "spare"}`;
+  return `${formatForecastWatts(preview.beforeMarginW)} → ${formatForecastWatts(Math.abs(preview.afterMarginW))} ${preview.afterMarginW < 0 ? "shortfall" : "spare"}`;
 }
 
 it.each(["valley-electric", "ridge-electric"] as const)(
@@ -85,8 +90,8 @@ it.each(["valley-electric", "ridge-electric"] as const)(
     expect(
       screen.getByText(
         targetId === "valley-electric"
-          ? "90,000 → 249,000 (+177%)"
-          : "90,000 → 140,000 (+56%)",
+          ? "90k → 249k (+177%)"
+          : "90k → 140k (+56%)",
       ),
     ).toBeVisible();
     expect(screen.getByText(/Retain 90%/)).toBeVisible();
@@ -125,7 +130,7 @@ it.each(["valley-electric", "ridge-electric"] as const)(
     ).toEqual(
       [...quote.facilities]
         .sort((a, b) => b.peakW - a.peakW)
-        .map((plant) => `${plant.ageYears.toFixed(1)} years old`),
+        .map((plant) => `${formatNumber(plant.ageYears)} years old`),
     );
     const plants = within(
       within(assets).getByRole("region", { name: "Operating plants" }),
@@ -200,8 +205,8 @@ it("excludes expired power rights and past oil retirement commitments from a 202
 });
 
 it.each([
-  [50000, "50,000 → 209,000 (+318%)"],
-  [0, "0 → 159,000"],
+  [50000, "50k → 209k (+318%)"],
+  [0, "0 → 159k"],
 ] as const)(
   "shows customer impact from an existing base of %i",
   (customers, value) => {

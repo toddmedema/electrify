@@ -5,6 +5,7 @@ import { MONTH_NAMES, MONTHS } from "../../Constants";
 import { MANUAL_ENTRY } from "./ManualEntries";
 import {
   formatPercent,
+  formatForecastPercent,
   formatWattHours,
   formatWattHoursOfPeak,
 } from "../../helpers/Format";
@@ -100,7 +101,7 @@ export default function HydroWaterSection(props: {
   const outlookLabels = [
     fleet ? undefined : `Now ${formatPercent(values[0])}`,
     lowIndex > 0 && lowPoint
-      ? `Low ${MONTHS[lowPoint.monthNumber - 1]} ${formatPercent(lowPoint.fraction)}`
+      ? `Low ${MONTHS[lowPoint.monthNumber - 1]} ${formatForecastPercent(lowPoint.fraction)}`
       : undefined,
   ].filter(Boolean);
   // A line pressed flat against the baseline says nothing a sentence can't say better
@@ -146,7 +147,7 @@ export default function HydroWaterSection(props: {
                     baseline
                     lowMarker
                     stretch
-                    ariaLabel={`Reservoir forecast for the next ${values.length - 1} months: now ${formatPercent(values[0])}, lowest in ${MONTH_NAMES[lowPoint.monthNumber - 1]} at ${formatPercent(lowPoint.fraction)}.`}
+                    ariaLabel={`Reservoir forecast for the next ${values.length - 1} months: now ${formatPercent(values[0])}, lowest in ${MONTH_NAMES[lowPoint.monthNumber - 1]} at ${formatForecastPercent(lowPoint.fraction)}.`}
                   />
                   {outlookLabels.length > 0 && (
                     <Typography
