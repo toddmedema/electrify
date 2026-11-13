@@ -115,7 +115,7 @@ export const MANUAL_SECTION = {
   PROFIT: "Profit",
   CASH: "Cash",
   FUEL_PRICES: "Fuel Prices",
-  INFLATION_INTEREST: "Inflation & interest rate",
+  INFLATION_INTEREST: "Inflation & Interest",
   EMISSIONS: "Emissions (CO₂e)",
   TEMPERATURE: "Temperature",
   WATER: "Water",
@@ -463,8 +463,7 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
             choices
           </EntryLink>{" "}
           decide how often coal and gas run. Wind and solar follow the weather,
-          and hot panels produce less. Wind estimates are simplified; real
-          output also depends on terrain and siting.
+          and hot panels produce less.
         </p>
       </div>
     ),
@@ -558,7 +557,7 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
             losing some energy on the way
           </EntryLink>
           . In Electrify it gets no river or rain inflow and slowly loses water
-          to evaporation. The game simplifies reservoir sizes.
+          to evaporation.
         </p>
       </div>
     ),
@@ -676,11 +675,6 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           reorder plants and the forecasts update, so you can test an idea
           before running the clock. Choose a preset, or select Layers to compare
           charts over the same dates.
-        </p>
-        <p>
-          Forecasts use one day per month (see{" "}
-          <EntryLink to={MANUAL_ENTRY.HOW_TO_PLAY}>How to play</EntryLink>), so
-          they can't test a week of clouds or still air.
         </p>
       </div>
     ),
@@ -987,7 +981,6 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           </EntryLink>
           , along with market and target{" "}
           <EntryLink to={MANUAL_ENTRY.RATES}>electricity rates</EntryLink>.
-          Future economic conditions are estimates.
         </p>
       </div>
     ),
@@ -1177,8 +1170,8 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           the 2022 energy crisis raise import prices. Each year's estimated{" "}
           <EntryLink to={MANUAL_ENTRY.EMISSIONS}>emissions</EntryLink> count
           toward your <EntryLink to={MANUAL_ENTRY.SCORE}>score</EntryLink>. You
-          can only build a connection once it existed in the real world. The
-          game uses annual averages and a simplified network. Sources:
+          can only build a connection once it existed in the real world.
+          Neighbor prices and emissions use annual averages. Sources:
         </p>
         <IntertieTrendSources />
       </div>
@@ -1469,7 +1462,14 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           A plant isn't retired when its accounting lifetime ends. Some real{" "}
           <EntryLink to={MANUAL_ENTRY.HYDROPOWER}>hydro dams</EntryLink> are
           over a century old. Some technologies do lose a little output each
-          year.
+          year. Age in facility details counts years since opening. A battery's
+          cycles used counts total discharged energy divided by its energy
+          capacity. Batteries are rated for 7,300 full cycles to 80% capacity
+          and keep operating afterward.
+        </p>
+        <p>
+          Canceling construction refunds the build cost after paying off its
+          loan.
         </p>
       </div>
     ),

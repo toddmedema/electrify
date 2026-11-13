@@ -146,6 +146,27 @@ describe("ManualLink", () => {
     );
   });
 
+  it.each([
+    [80, 0],
+    [0, 80],
+  ])("suppresses a synthesized click after a drag of %s, %s", (dx, dy) => {
+    const link = showLink();
+    const touch = { identifier: 1, clientX: 100, clientY: 100 };
+    fireEvent.touchStart(link, { touches: [touch] });
+    fireEvent.touchMove(link, {
+      touches: [{ ...touch, clientX: 100 + dx, clientY: 100 + dy }],
+    });
+    expect(fireEvent.touchEnd(link, { touches: [] })).toBe(false);
+    expect(store.getState().ui.manualHelpEntry).toBeUndefined();
+    // A following tap still opens the entry.
+    fireEvent.touchStart(link, { touches: [touch] });
+    expect(fireEvent.touchEnd(link, { touches: [] })).toBe(true);
+    fireEvent.click(link);
+    expect(store.getState().ui.manualHelpEntry).toBe(
+      MANUAL_ENTRY.POWER_AND_ENERGY,
+    );
+  });
+
   it("gives way to the pinned entry when clicked mid-hover", () => {
     const link = showLink();
     hover(link);

@@ -127,7 +127,7 @@ export default function BuildFacilities({
             introductoryChoices ||
             event.touches.length !== 1 ||
             (event.target as Element).closest(
-              ".constructionHeader, .MuiSlider-root, button, input, select, [role='slider']",
+              ".constructionHeader, .manual-popover, .MuiSlider-root, button:not(.manual-link), input, select, [role='slider']",
             )
           )
             return;

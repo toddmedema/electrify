@@ -17,7 +17,9 @@ import FacilityDetails from "./FacilityDetails";
 import { UnitsContext } from "./UnitsContext";
 
 // A dam's water section links to the manual, which reads the store; these tests have none
-jest.mock("./ManualLink", () => () => null);
+jest.mock("./ManualLink", () => (props: { children?: React.ReactNode }) => (
+  <>{props.children}</>
+));
 
 // Carbon Fee: a non-tutorial game in San Francisco, starting with a gas plant
 function carbonFee(): GameType {

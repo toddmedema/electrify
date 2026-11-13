@@ -3,7 +3,6 @@ import * as React from "react";
 import { Button, Typography } from "@mui/material";
 import DecisionDialog from "./DecisionDialog";
 import ConceptIcon from "./ConceptIcon";
-import ManualLink from "./ManualLink";
 import { MANUAL_ENTRY } from "./ManualEntries";
 import DecisionImpactPreview, {
   DecisionImpactFactType,
@@ -177,9 +176,8 @@ export default function PurchaseReviewDialog(
     {
       concept: "finances",
       label: "Loan option",
-      help: (
-        <ManualLink entry={MANUAL_ENTRY.INTEREST_RATES} label="interest rate" />
-      ),
+      entry: MANUAL_ENTRY.INTEREST_RATES,
+      helpLabel: "interest rate",
       value:
         props.paymentSummary?.loan.value ??
         `${formatMoneyConcise(financedCashDue)} now + ${formatMoneyConcise(loan.monthlyPayment)}/mo`,

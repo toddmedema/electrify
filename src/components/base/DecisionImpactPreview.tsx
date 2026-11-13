@@ -1,6 +1,8 @@
 import * as React from "react";
 import { Typography } from "@mui/material";
 import ConceptIcon, { ConceptNameType } from "./ConceptIcon";
+import ManualLink from "./ManualLink";
+import type { ManualEntryTitleType } from "./ManualEntries";
 
 export interface DecisionImpactFactType {
   concept: ConceptNameType;
@@ -9,7 +11,8 @@ export interface DecisionImpactFactType {
   detail?: string;
   /** Lets a control point at this explanation with aria-describedby */
   detailId?: string;
-  help?: React.ReactNode;
+  entry?: ManualEntryTitleType;
+  helpLabel?: string;
 }
 
 export interface DecisionImpactPreviewProps {
@@ -27,17 +30,29 @@ export default function DecisionImpactPreview({
       <div className="decisionImpactFacts">
         {facts.map((fact) => (
           <div
-            className={`decisionImpactFact${fact.help ? " decisionImpactFactWithHelp" : ""}`}
+            className={`decisionImpactFact${fact.entry ? " manual-help-region" : ""}${fact.concept === "money" ? " decisionImpactFactMoney" : ""}`}
             key={fact.label}
           >
-            <ConceptIcon concept={fact.concept} fontSize="small" />
+            {fact.concept !== "money" && (
+              <ConceptIcon concept={fact.concept} fontSize="small" />
+            )}
             <div className="decisionImpactFactContent">
               <Typography
                 className="decisionImpactFactLabel"
                 variant="caption"
                 component="div"
               >
-                {fact.label}
+                {fact.entry ? (
+                  <ManualLink
+                    entry={fact.entry}
+                    label={fact.helpLabel || fact.label.toLowerCase()}
+                    region
+                  >
+                    {fact.label}
+                  </ManualLink>
+                ) : (
+                  fact.label
+                )}
               </Typography>
               <Typography
                 className="decisionImpactFactValue"
@@ -57,9 +72,6 @@ export default function DecisionImpactPreview({
                 </Typography>
               )}
             </div>
-            {fact.help && (
-              <div className="decisionImpactFactHelp">{fact.help}</div>
-            )}
           </div>
         ))}
       </div>

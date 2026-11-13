@@ -1,7 +1,6 @@
 import * as React from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { Fade, Paper, Popper } from "@mui/material";
-import HelpOutlineIcon from "@mui/icons-material/HelpOutlineOutlined";
 import type { AppDispatch, RootState } from "../../Store";
 import { manualHelpOpen } from "../../reducers/UI";
 import type { ManualEntryTitleType } from "./ManualEntries";
@@ -17,12 +16,15 @@ interface Props {
   // The term as it reads on screen, if it differs from the entry's title
   label?: string;
   text?: string;
+  children?: React.ReactNode;
+  // Stretch the native button's hit area over its .manual-help-region parent.
+  region?: boolean;
 }
 
 // Long enough that sweeping the mouse across a row doesn't flash entries open, short enough
-// that resting on the (?) feels like asking
+// that resting on the term feels like asking
 const HOVER_OPEN_MS = 300;
-// Grace for crossing the gap between the (?) and the preview, or overshooting its edge
+// Grace for crossing the gap between the term and the preview, or overshooting its edge
 const HOVER_CLOSE_MS = 250;
 
 function isMouse(event: React.PointerEvent): boolean {
@@ -41,15 +43,21 @@ export default function ManualLink(props: Props): React.JSX.Element {
   const pinned = useSelector((state: RootState) => !!state.ui.manualHelpEntry);
   const label = props.label || props.entry;
   const anchorRef = React.useRef<HTMLButtonElement>(null);
+  const anchor = () =>
+    (props.region &&
+      anchorRef.current?.closest<HTMLElement>(".manual-help-region")) ||
+    anchorRef.current;
   const [preview, setPreview] = React.useState(false);
   const timer = React.useRef<number | undefined>(undefined);
   // Set by a click. Closing the pinned entry takes its backdrop away from under a mouse that
-  // hasn't moved, which the browser reports as entering the (?) again; the preview waits until
+  // hasn't moved, which the browser reports as entering the term again; the preview waits until
   // the mouse has actually left instead of popping straight back up
   const suppressed = React.useRef(false);
   // Set once a moving mouse has asked for the preview. Boundary events alone can't do that: a
-  // dialog can open with its (?) beneath a mouse that hasn't moved, which still reports entering.
+  // dialog can open with its term beneath a mouse that hasn't moved, which still reports entering.
   const hovering = React.useRef(false);
+  const touchStart = React.useRef<{ x: number; y: number } | null>(null);
+  const touchMoved = React.useRef(false);
   const pinnedRef = React.useRef(pinned);
   pinnedRef.current = pinned;
 
@@ -70,7 +78,7 @@ export default function ManualLink(props: Props): React.JSX.Element {
       event.preventDefault();
       event.stopImmediatePropagation();
       cancel();
-      suppressed.current = true;
+      suppressed.current = hovering.current;
       setPreview(false);
     };
     // Focus may still be in the workspace; consume Escape before its document listener.
@@ -82,7 +90,7 @@ export default function ManualLink(props: Props): React.JSX.Element {
     cancel();
     suppressed.current = true;
     setPreview(false);
-    setManualHelpAnchor(anchorRef.current);
+    setManualHelpAnchor(anchor());
     dispatch(manualHelpOpen(entry));
   };
 
@@ -92,8 +100,37 @@ export default function ManualLink(props: Props): React.JSX.Element {
       <button
         type="button"
         ref={anchorRef}
-        className={props.text ? "manual-link manual-link-text" : "manual-link"}
+        className={`manual-link${props.text ? " manual-link-text" : " manual-link-label"}${props.region ? " manual-link-region" : ""}`}
         aria-label={props.text || `What is ${label}?`}
+        onTouchStart={(event) => {
+          const touch =
+            event.touches.length === 1 ? event.touches[0] : undefined;
+          touchStart.current = touch
+            ? { x: touch.clientX, y: touch.clientY }
+            : null;
+          touchMoved.current = false;
+        }}
+        onTouchMove={(event) => {
+          const start = touchStart.current;
+          const touch = event.touches[0];
+          if (
+            start &&
+            touch &&
+            (Math.abs(touch.clientX - start.x) > 10 ||
+              Math.abs(touch.clientY - start.y) > 10)
+          ) {
+            touchMoved.current = true;
+          }
+        }}
+        onTouchEnd={(event) => {
+          // Let the catalog handle swipes and the browser handle scrolling, without a
+          // synthesized click opening help after the gesture.
+          if (touchMoved.current) event.preventDefault();
+          touchStart.current = null;
+        }}
+        onTouchCancel={() => {
+          touchStart.current = null;
+        }}
         onPointerMove={(event: React.PointerEvent) => {
           if (isMouse(event) && !suppressed.current && !hovering.current) {
             hovering.current = true;
@@ -114,14 +151,14 @@ export default function ManualLink(props: Props): React.JSX.Element {
           pin(props.entry);
         }}
       >
-        {props.text || <HelpOutlineIcon fontSize="inherit" />}
+        {props.children || props.text || label}
       </button>
       {entry && (
         <Popper
           // A Popper rather than a Popover: nothing modal, so the page underneath keeps its
           // pointer, focus and accessibility tree while the preview is up
           open={preview && !pinned}
-          anchorEl={anchorRef.current}
+          anchorEl={anchor()}
           placement="bottom"
           transition
           sx={{ zIndex: (theme) => theme.zIndex.tooltip }}
@@ -142,7 +179,7 @@ export default function ManualLink(props: Props): React.JSX.Element {
                 onPointerLeave={(event: React.PointerEvent) => {
                   if (isMouse(event)) schedule(false, HOVER_CLOSE_MS);
                 }}
-                // The (?) often sits inside a clickable row, which the preview's own clicks
+                // The term often sits inside a clickable row, which the preview's own clicks
                 // (scrolling, a related entry) shouldn't reach through the React tree
                 onClick={(event: React.MouseEvent) => event.stopPropagation()}
               >

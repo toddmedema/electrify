@@ -212,7 +212,7 @@ export const INSIGHT_LAYERS: readonly InsightLayerDefinition[] = [
   { id: "fuelPrices", label: "Fuel Prices", group: "Economics" },
   {
     id: "inflationInterest",
-    label: "Inflation & interest rate",
+    label: "Inflation & Interest",
     group: "Economics",
   },
   {
@@ -305,7 +305,7 @@ export const INSIGHT_PRESETS: Record<
     layers: ["customers", "demandByType", "supplyDemand", "profit"],
   },
   decarbonization: {
-    label: "Cutting emissions",
+    label: "Emissions",
     layers: [
       "emissions",
       "supplyByFuel",
@@ -2005,6 +2005,12 @@ export default class Insights extends React.Component<Props, State> {
   ) {
     const { game } = this.props;
     const definition = INSIGHT_LAYERS.find((layer) => layer.id === id)!;
+    const title =
+      id === "weather"
+        ? `Temperature (${temperatureUnit(this.context as UnitSystemType)})`
+        : id === "emissions"
+          ? `Emissions (${largeMassUnit(this.context as UnitSystemType)} CO₂e)`
+          : definition.label;
     const configured = this.state.layers.includes(id);
     const previousConfigured = visible
       .slice(0, index)
@@ -2023,12 +2029,12 @@ export default class Insights extends React.Component<Props, State> {
         aria-label={`${definition.label} evidence`}
       >
         <Toolbar className="insightsTrackHeader">
-          <Typography component="h3" variant="h6">
-            {id === "weather"
-              ? `Temperature (${temperatureUnit(this.context as UnitSystemType)})`
-              : id === "emissions"
-                ? `Emissions (${largeMassUnit(this.context as UnitSystemType)} CO₂e)`
-                : definition.label}
+          <Typography component="h3" variant="h6" aria-label={title}>
+            {isChartLayer(id) ? (
+              <ManualLink entry={INSIGHT_LAYER_MANUAL[id]}>{title}</ManualLink>
+            ) : (
+              definition.label
+            )}
           </Typography>
           {isChartLayer(id) && (
             <>
@@ -2051,8 +2057,6 @@ export default class Insights extends React.Component<Props, State> {
                   <FullscreenIcon fontSize="small" />
                 </IconButton>
               </Tooltip>
-              {/* Straight after the expand control, ahead of the layer-editing actions */}
-              <ManualLink entry={INSIGHT_LAYER_MANUAL[id]} />
             </>
           )}
           {this.state.layersOpen && (
@@ -2614,18 +2618,33 @@ export default class Insights extends React.Component<Props, State> {
                     className="expandedChartTitle"
                   >
                     <span className="expandedChartHeading">
-                      <span id="expanded-chart-title">
-                        {
+                      <span
+                        id="expanded-chart-title"
+                        aria-label={
                           INSIGHT_LAYERS.find(
                             (layer) => layer.id === this.state.expandedLayer,
                           )!.label
                         }
+                      >
+                        {isChartLayer(this.state.expandedLayer) ? (
+                          <ManualLink
+                            entry={
+                              INSIGHT_LAYER_MANUAL[this.state.expandedLayer]
+                            }
+                          >
+                            {
+                              INSIGHT_LAYERS.find(
+                                (layer) =>
+                                  layer.id === this.state.expandedLayer,
+                              )!.label
+                            }
+                          </ManualLink>
+                        ) : (
+                          INSIGHT_LAYERS.find(
+                            (layer) => layer.id === this.state.expandedLayer,
+                          )!.label
+                        )}
                       </span>
-                      {isChartLayer(this.state.expandedLayer) && (
-                        <ManualLink
-                          entry={INSIGHT_LAYER_MANUAL[this.state.expandedLayer]}
-                        />
-                      )}
                     </span>
                     <IconButton
                       autoFocus

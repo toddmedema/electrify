@@ -34,7 +34,10 @@ import { computeOutlook } from "../base/OutlookForecast";
 import type { EvidenceRequestType } from "../../Types";
 import { LEGACY_SCENARIOS } from "../../data/LegacyCampaign";
 
-jest.mock("../base/ManualLink", () => () => null);
+jest.mock(
+  "../base/ManualLink",
+  () => (props: { children?: React.ReactNode }) => <>{props.children}</>,
+);
 
 it("buys a sub-megawatt generator through the campaign's ordinary size and loan controls", () => {
   const game = createGame({

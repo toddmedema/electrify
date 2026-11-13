@@ -57,7 +57,9 @@ import {
 } from "../../Types";
 import HydroWaterSection from "./HydroWaterSection";
 import Sparkline from "./Sparkline";
-import ConceptIcon, { ConceptNameType } from "./ConceptIcon";
+import Stat from "./FacilityStat";
+import ManualLink from "./ManualLink";
+import { MANUAL_ENTRY, MANUAL_SECTION } from "./ManualEntries";
 import { MONTHS } from "../../Constants";
 
 /**
@@ -82,47 +84,6 @@ export interface Props {
   game?: GameType;
   onRetrofit?: (payload: RetrofitFacilityAction) => void;
 }
-
-interface StatProps {
-  label: string;
-  // The game's glyph for what this number measures, drawn ahead of the label
-  concept?: ConceptNameType;
-  value: React.ReactNode;
-  // Profit is the one number here that means something different either side of zero
-  tone?: "good" | "bad";
-}
-
-// The label names the stat in words; the glyph only helps the eye find it again
-function StatIcon(props: { concept: ConceptNameType }): React.JSX.Element {
-  return (
-    <ConceptIcon
-      concept={props.concept}
-      className="facilityStatIcon"
-      color="inherit"
-      decorative
-      monochrome
-      style={{ width: 14, height: 14 }}
-    />
-  );
-}
-
-const Stat = React.memo(function Stat(props: StatProps): React.JSX.Element {
-  return (
-    <div className="facilityStat">
-      <Typography variant="caption" color="textSecondary" component="dt">
-        {props.concept && <StatIcon concept={props.concept} />}
-        {props.label}
-      </Typography>
-      <Typography
-        variant="body2"
-        component="dd"
-        className={`facilityStatValue${props.tone ? ` ${props.tone}` : ""}`}
-      >
-        {props.value}
-      </Typography>
-    </div>
-  );
-});
 
 /**
  * The last year of this fuel's price, oldest first. Empty when the game hasn't been running long
@@ -232,6 +193,7 @@ function WeatherResilienceSection(props: {
         {installing && (
           <Stat
             label="Upgrade"
+            entry={MANUAL_ENTRY.WEATHER_DAMAGE}
             value={
               <>
                 Installing {resilienceName(installing.upgrade)}
@@ -380,17 +342,20 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
           <dl className="facilityStats">
             <Stat
               label="Capacity"
+              entry={MANUAL_ENTRY.POWER_AND_ENERGY}
               concept="supply"
               value={formatWatts(facility.peakW)}
             />
             {storage && (
               <Stat
                 label="Energy capacity"
+                entry={MANUAL_ENTRY.POWER_AND_ENERGY}
                 value={formatWattHours(storage.peakWh)}
               />
             )}
             <Stat
               label="Refund if canceled"
+              entry={MANUAL_ENTRY.ACCOUNTING_LIFETIME}
               value={
                 <>
                   {formatMoneyConcise(facilityCashBack(facility, date.minute))}
@@ -411,33 +376,46 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
           <dl className="facilityStats">
             <Stat
               label="Capacity"
+              entry={MANUAL_ENTRY.POWER_AND_ENERGY}
               concept="supply"
               value={formatWatts(facility.peakW)}
             />
             {!storage && maxOutputFactor < 1 && (
               <Stat
                 label="Current max output"
+                entry={
+                  hazard
+                    ? MANUAL_ENTRY.WEATHER_DAMAGE
+                    : MANUAL_ENTRY.ACCOUNTING_LIFETIME
+                }
                 value={`${formatWatts(facility.peakW * maxOutputFactor)} (${maxOutputPercent})`}
               />
             )}
             <Stat
               label="Age"
+              entry={MANUAL_ENTRY.ACCOUNTING_LIFETIME}
               value={`${formatNumber(ageYears)} / ${facility.lifespanYears} yr`}
             />
             <Stat
               // Capacity factor is the generator's word for it; a battery isn't producing
               // anything, it's being used or it isn't
               label={storage ? "Time in use" : "Avg output"}
+              entry={MANUAL_ENTRY.CAPACITY_FACTOR}
               value={
                 lifetime.capacityFactor === undefined
                   ? "—"
                   : formatPercent(lifetime.capacityFactor)
               }
             />
-            <Stat label="Delivered" value={formatWattHours(lifetime.wh)} />
+            <Stat
+              label="Delivered"
+              entry={MANUAL_ENTRY.POWER_AND_ENERGY}
+              value={formatWattHours(lifetime.wh)}
+            />
             {storage && (
               <Stat
                 label="Charge"
+                entry={MANUAL_ENTRY.ROUND_TRIP_EFFICIENCY}
                 concept="storage"
                 value={formatWattHoursOfPeak(storage.currentWh, storage.peakWh)}
               />
@@ -445,6 +423,7 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
             {facility.name === "Battery" && equivalentCycles !== undefined && (
               <Stat
                 label="Cycles used"
+                entry={MANUAL_ENTRY.ACCOUNTING_LIFETIME}
                 value={
                   <>
                     {formatCount(equivalentCycles)} / 7.3k
@@ -459,24 +438,28 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
             {minimumStableOutput !== undefined && (
               <Stat
                 label="Minimum output"
+                entry={MANUAL_ENTRY.RAMP_RATE}
                 value={`${formatPercent(minimumStableOutput)} · ${formatWatts(facility.peakW * minimumStableOutput)}`}
               />
             )}
             {facility.tracksStarts && (
               <Stat
                 label="Starts"
+                entry={MANUAL_ENTRY.OPERATING_COSTS}
                 value={formatCount(facility.lifetimeStarts || 0)}
               />
             )}
             {storage && (
               <Stat
                 label="Efficiency"
+                entry={MANUAL_ENTRY.ROUND_TRIP_EFFICIENCY}
                 value={formatPercent(storage.roundTripEfficiency)}
               />
             )}
             {hazard && (
               <Stat
                 label={hazard.label}
+                entry={MANUAL_ENTRY.WEATHER_DAMAGE}
                 concept="severeWeather"
                 value={
                   <span className="facilityStatWarning">
@@ -504,6 +487,7 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
           <dl className="facilityStats">
             <Stat
               label="Lifetime cost per MWh"
+              entry={MANUAL_ENTRY.TOTAL_COST_OF_ENERGY}
               value={
                 lifetime.costPerMWh === undefined
                   ? "—"
@@ -512,7 +496,7 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
             />
             <Stat
               label="Lifetime profit"
-              concept="money"
+              entry={MANUAL_SECTION.PROFIT}
               value={`${lifetime.profit > 0 ? "+" : ""}${formatMoneyConcise(lifetime.profit)}`}
               tone={
                 lifetime.profit < 0
@@ -525,6 +509,7 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
             {facility.loanAmountLeft > 0 && (
               <Stat
                 label="Loan balance"
+                entry={MANUAL_ENTRY.INTEREST_RATES}
                 value={formatMoneyConcise(facility.loanAmountLeft)}
               />
             )}
@@ -534,6 +519,7 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
             {facilityMaintenanceCost(facility, date.minute) === undefined && (
               <Stat
                 label="Fixed upkeep"
+                entry={MANUAL_ENTRY.OPERATING_COSTS}
                 value={
                   facility.paused
                     ? `${formatMoneyConcise(facility.annualOperatingCost / 2)}/yr · half rate while paused`
@@ -545,6 +531,7 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
               facilityMaintenanceCost(facility, date.minute) === undefined && (
                 <Stat
                   label="Variable upkeep"
+                  entry={MANUAL_ENTRY.OPERATING_COSTS}
                   value={`$${formatNumber(variableOperatingCostPerMWh)}/MWh`}
                 />
               )}
@@ -552,12 +539,14 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
               facilityMaintenanceCost(facility, date.minute) === undefined && (
                 <Stat
                   label="Non-fuel start cost"
+                  entry={MANUAL_ENTRY.OPERATING_COSTS}
                   value={`${formatMoneyConcise(facility.costPerStart)}/start`}
                 />
               )}
             {facility.maintenanceObligation && (
               <Stat
                 label={facility.maintenanceObligation.reason}
+                entry={MANUAL_ENTRY.OPERATING_COSTS}
                 value={
                   <>
                     {formatMoneyConcise(
@@ -576,14 +565,19 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
               />
             )}
             {trend.length > 1 && fuel && (
-              <div className="facilityStat facilityFuelTrend">
+              <div className="facilityStat facilityFuelTrend manual-help-region">
                 <Typography
                   variant="caption"
                   color="textSecondary"
                   component="dt"
                 >
-                  <StatIcon concept="fuel" />
-                  {fuel} price, {trend.length}mo
+                  <ManualLink
+                    entry={MANUAL_ENTRY.FUEL_COSTS}
+                    label="fuel price"
+                    region
+                  >
+                    {fuel} price, {trend.length}mo
+                  </ManualLink>
                 </Typography>
                 <dd className="facilityTrend">
                   <Sparkline

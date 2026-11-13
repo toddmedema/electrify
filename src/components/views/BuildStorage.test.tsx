@@ -14,7 +14,10 @@ import { purchaseTerms } from "../../helpers/Financials";
 import { configureStore } from "@reduxjs/toolkit";
 import { Provider } from "react-redux";
 
-jest.mock("../base/ManualLink", () => () => null);
+jest.mock(
+  "../base/ManualLink",
+  () => (props: { children?: React.ReactNode }) => <>{props.children}</>,
+);
 
 it.each([false, true])(
   "resizes an unaffordable battery to the largest affordable slider size (live cash: %s)",

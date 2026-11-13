@@ -448,7 +448,7 @@ export function GENERATORS(
       fuel: FACILITY_FUELS["Natural Gas Peaker"],
       gasCycle: "simple",
       description:
-        "A single gas turbine: cheap to build and running in minutes, but it burns about half again as much gas per MWh as a combined cycle",
+        "Cheap to build and running in minutes, but it burns about half again as much gas per MWh as a combined cycle",
       available: year > 1940, // First full scale plant was 4MW in Switzerland in 1940
       buildCost: scaledBuildCost(
         costBetween(year, 2019, 0.713 * CPI_2019_TO_2023, 2023, 0.836),
@@ -529,8 +529,7 @@ export function GENERATORS(
     {
       name: "Oil",
       fuel: FACILITY_FUELS.Oil,
-      description:
-        "Starts quickly, but fuel is costly and produces direct emissions",
+      description: "Starts quickly, but fuel is costly and has high emissions",
       available: true,
       buildCost: scaledBuildCost(
         costBetween(year, 2019, 1.8 * CPI_2019_TO_2023, 2023, 1.248),
@@ -601,7 +600,7 @@ export function GENERATORS(
       name: "Wind",
       fuel: FACILITY_FUELS.Wind,
       description:
-        "Output changes with local wind and is often strongest in spring and fall",
+        "Output changes with the wind, which is often strong in spring and fall.",
       available: year > 1941, // First megawatt-size turbine was in Vermont in 1941
       buildCost: scaledBuildCost(
         windCostPerW(year),

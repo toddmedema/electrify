@@ -15,6 +15,7 @@ import {
 } from "../../helpers/HydroOutlook";
 import { FacilityOperatingType, GameType } from "../../Types";
 import ManualLink from "./ManualLink";
+import Stat from "./FacilityStat";
 import { useOutlookWorker } from "./useOutlookWorker";
 import { signature } from "./DeferredProjection";
 import Sparkline from "./Sparkline";
@@ -33,22 +34,6 @@ function useReservoirOutlook(
   return useOutlookWorker("hydro", enabled ? signature(game) : undefined, game);
 }
 
-const Stat = React.memo(function Stat(props: {
-  label: string;
-  value: React.ReactNode;
-}) {
-  return (
-    <div className="facilityStat">
-      <Typography variant="caption" color="textSecondary" component="dt">
-        {props.label}
-      </Typography>
-      <Typography variant="body2" component="dd" className="facilityStatValue">
-        {props.value}
-      </Typography>
-    </div>
-  );
-});
-
 /** Why a dam is producing what it is, and where its water is heading, beside the dam itself. */
 export default function HydroWaterSection(props: {
   facility: FacilityOperatingType;
@@ -60,8 +45,7 @@ export default function HydroWaterSection(props: {
   const capacityWh = facility.reservoirCapacityWh || 0;
   const heading = (
     <Typography component="h3" className="facilityDetailHeading">
-      Water
-      <ManualLink entry={MANUAL_ENTRY.HYDROPOWER} label="hydropower" />
+      <ManualLink entry={MANUAL_ENTRY.HYDROPOWER} text="Water" />
     </Typography>
   );
 
@@ -116,10 +100,12 @@ export default function HydroWaterSection(props: {
       <dl className="facilityStats">
         <Stat
           label="Reservoir"
+          entry={MANUAL_ENTRY.HYDROPOWER}
           value={formatWattHoursOfPeak(facility.reservoirWh || 0, capacityWh)}
         />
         <Stat
           label="Inflow this month"
+          entry={MANUAL_ENTRY.HYDROPOWER}
           value={
             now
               ? formatWattHours(
@@ -129,11 +115,16 @@ export default function HydroWaterSection(props: {
           }
         />
         {values.length > 2 && lowPoint && (
-          <div className="facilityStat facilityWaterOutlook">
+          <div className="facilityStat facilityWaterOutlook manual-help-region">
             <Typography variant="caption" color="textSecondary" component="dt">
-              {fleet ? "All your dams, next 12 months" : "Next 12 months"}
-              {/* A lone dam's status already says no refill is coming */}
-              {emptyAllYear && fleet && ": no refill expected"}
+              <ManualLink
+                entry={MANUAL_ENTRY.HYDROPOWER}
+                label="reservoir forecast"
+                region
+              >
+                {fleet ? "All your dams, next 12 months" : "Next 12 months"}
+                {emptyAllYear && fleet && ": no refill expected"}
+              </ManualLink>
             </Typography>
             <dd className="facilityTrend">
               {!emptyAllYear && (

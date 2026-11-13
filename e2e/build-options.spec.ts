@@ -371,11 +371,12 @@ for (const theme of ["light", "dark"] as const) {
       const properties = detailCard.getByRole("table");
       await expect(properties).toBeVisible();
       for (const row of await properties.getByRole("row").all()) {
-        await expect(row.locator(":scope > *")).toHaveCount(3);
+        await expect(row.locator(":scope > *")).toHaveCount(2);
         const help = row.getByRole("button");
         if (await help.count()) {
           const cells = await row.locator(":scope > *").all();
-          await expect(cells[2].getByRole("button")).toBeVisible();
+          await expect(cells[0].getByRole("button")).toBeVisible();
+          await expect(row).toHaveCSS("cursor", "pointer");
         }
       }
       if (kind === "Storage") {
@@ -445,10 +446,9 @@ for (const theme of ["light", "dark"] as const) {
         cashValue.boundingBox(),
         help.boundingBox(),
       ]);
-      expect(helpBox!.x).toBeGreaterThanOrEqual(
-        loanBox!.x + loanBox!.width - 1,
-      );
-      expect(helpBox!.height).toBeGreaterThanOrEqual(
+      expect(helpBox!.x).toBeCloseTo(labelBox!.x, 0);
+      await expect(loanFact).toHaveCSS("cursor", "pointer");
+      expect((await loanFact.boundingBox())!.height).toBeGreaterThanOrEqual(
         testInfo.project.use.hasTouch ? 44 : 40,
       );
       if ((testInfo.project.use.viewport?.width ?? 1280) >= 600) {

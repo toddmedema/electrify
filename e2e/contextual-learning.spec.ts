@@ -1,6 +1,116 @@
 import path from "path";
+import type { Locator } from "@playwright/test";
 import { expect, test } from "./fixtures";
 import { openBuild, openPane } from "./layout";
+import { selectManualText } from "./manual-selection";
+import { reviewScreenshot } from "./review-screenshot";
+
+async function clickValue(region: Locator, value: Locator) {
+  await value.scrollIntoViewIfNeeded();
+  const box = (await region.boundingBox())!;
+  const target = (await value.boundingBox())!;
+  await region.click({
+    position: {
+      x: target.x - box.x + target.width / 2,
+      y: target.y - box.y + target.height / 2,
+    },
+  });
+}
+
+for (const theme of ["light", "dark"] as const) {
+  test(`facility values and build rows open the concept manual in ${theme}`, async ({
+    page,
+  }, info) => {
+    await page.addInitScript((mode) => {
+      localStorage.clear();
+      localStorage.setItem("audioEnabled", "false");
+      localStorage.setItem("theme", mode);
+    }, theme);
+    await page.goto("/?scenario=100");
+    await page.getByRole("button", { name: "Start game", exact: true }).click();
+    const facilities = page.locator(".facilities");
+    await openPane(
+      facilities,
+      page.getByRole("button", { name: "Facilities", exact: true }),
+    );
+    await facilities.locator(".facilityDisclosure").first().click();
+    const details = facilities.locator(".facilityDetails").first();
+    const manual = page.getByRole("dialog", { name: "Manual help" });
+    for (const [label, title] of [
+      ["Capacity", "Power and energy"],
+      ["Age", "Accounting lifetime"],
+      ["Fixed upkeep", "Operating costs"],
+      ["Lifetime profit", "Profit"],
+    ]) {
+      const stat = details.locator(".facilityStat").filter({
+        has: page.getByRole("button", {
+          name: `What is ${label.toLowerCase()}?`,
+          exact: true,
+        }),
+      });
+      await expect(stat).toHaveCSS("cursor", "pointer");
+      await clickValue(stat, stat.locator("dd"));
+      await expect(
+        manual.getByRole("heading", { name: title, exact: true }),
+      ).toBeVisible();
+      await selectManualText(page, manual.locator("p").first());
+      await page.keyboard.press("Escape");
+      await expect(page.locator(".manual-popover")).toHaveCount(0);
+    }
+    await expect(
+      details
+        .locator(".facilityStat")
+        .filter({ hasNot: page.locator(".manual-link") }),
+    ).toHaveCount(0);
+    await page.mouse.move(5, 5);
+    await page.evaluate(() => {
+      window.getSelection()?.removeAllRanges();
+      (document.activeElement as HTMLElement)?.blur();
+    });
+    await expect(
+      page.getByRole("dialog", { name: "Manual preview" }),
+    ).toHaveCount(0);
+    if (theme === "dark" && info.project.name === "desktop-chromium") {
+      await reviewScreenshot(details, {
+        path: info.outputPath("facility-details-dark.png"),
+      });
+    }
+    const build = await openBuild(page);
+    const gas = build
+      .locator(".buildOption")
+      .filter({ has: page.getByText("Natural Gas Peaker", { exact: true }) });
+    await gas.getByRole("button", { name: /^Show .* details$/ }).click();
+    for (const [label, title] of [
+      ["Minimum output", "Ramp rate"],
+      ["Non-fuel start cost", "Operating costs"],
+    ]) {
+      const row = gas.getByRole("row", { name: new RegExp(label, "i") });
+      await expect(row).toHaveCSS("cursor", "pointer");
+      await clickValue(row, row.locator("td").last());
+      await expect(
+        manual.getByRole("heading", { name: title, exact: true }),
+      ).toBeVisible();
+      await page.keyboard.press("Escape");
+      await expect(page.locator(".manual-popover")).toHaveCount(0);
+      const trigger = row.getByRole("button");
+      await trigger.focus();
+      await trigger.press("Enter");
+      await expect(manual).toBeVisible();
+      if (
+        label === "Non-fuel start cost" &&
+        theme === "light" &&
+        info.project.name === "mobile-390px"
+      ) {
+        await expect(manual).toHaveCSS("opacity", "1");
+        await reviewScreenshot(page, {
+          path: info.outputPath("build-row-manual-mobile.png"),
+        });
+      }
+      await page.keyboard.press("Escape");
+      await expect(page.locator(".manual-popover")).toHaveCount(0);
+    }
+  });
+}
 
 for (const theme of ["light", "dark"] as const) {
   test(`enlarged manual help keeps its header and scroll body in a short viewport in ${theme}`, async ({
@@ -119,9 +229,11 @@ for (const theme of ["light", "dark"] as const) {
       exact: true,
     });
     await expect(help).toBeVisible();
-    expect((await help.boundingBox())!.height).toBeGreaterThanOrEqual(
-      testInfo.project.use.hasTouch ? 44 : 40,
-    );
+    expect(
+      (await help
+        .locator("xpath=ancestor::*[contains(@class, 'manual-help-region')][1]")
+        .boundingBox())!.height,
+    ).toBeGreaterThanOrEqual(testInfo.project.use.hasTouch ? 44 : 40);
     await help.click();
     const manual = page.getByRole("dialog", { name: "Manual help" });
     await expect(manual).toBeVisible();

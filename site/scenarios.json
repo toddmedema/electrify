@@ -492,7 +492,7 @@
     "description": "Manage five years of electricity recovery after Chernobyl in Electrify. Restore service, fund cleanup and avoid bankruptcy in a regional recovery model.",
     "setup": [
       "The scenario begins in March 1986, with the site's four reactors operating alongside regional coal and oil support. The disaster takes all four reactors offline; the surviving units return at different times, while Unit 4 is permanently lost.",
-      "Your term runs through February 1991. This is a regional recovery model, with calibrated finances and support capacity rather than a reconstruction of the Soviet grid. Blackouts reduce your score without ending the run. Bankruptcy can still end it, and the damaged reactor carries an ongoing cleanup obligation."
+      "Your term runs through February 1991. Blackouts reduce your score without ending the run. Bankruptcy can still end it, and the damaged reactor carries an ongoing cleanup obligation."
     ],
     "decisions": [
       {
@@ -505,7 +505,7 @@
       },
       {
         "title": "Review recovery beyond the score",
-        "body": "Track service, customer bills and emissions through the five-year term. The model's endpoint does not represent an end to the disaster's human or environmental consequences."
+        "body": "Track service, customer bills and emissions through the five-year term."
       }
     ],
     "takeaway": "How much service can you restore while keeping the recovery effort financially viable?",

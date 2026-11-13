@@ -661,7 +661,7 @@ test("expanded finance and economic rates remain readable", async ({
     });
     if (testInfo.project.name === "desktop-chromium") {
       await insights
-        .getByText("Inflation & interest rate", { exact: true })
+        .getByText("Inflation & Interest", { exact: true })
         .scrollIntoViewIfNeeded();
       await page.screenshot({
         path: path.join(reviewDir, "economic-rates-desktop.png"),
@@ -670,6 +670,9 @@ test("expanded finance and economic rates remain readable", async ({
   }
   await insights.getByRole("button", { name: /Layers/ }).click();
   await expect(
-    insights.getByLabel("Inflation & interest rate", { exact: true }),
+    insights.getByRole("checkbox", {
+      name: "Inflation & Interest",
+      exact: true,
+    }),
   ).toBeChecked();
 });
