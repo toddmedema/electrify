@@ -1,17 +1,53 @@
-# Web sign-in and optional mailing-list signup
+# Web sign-in
 
-Web sign-in uses the existing Google Firebase OAuth popup. The auth-state
-listener starts profile, achievement and cloud-save sync. The Steam desktop
-edition continues using Steam accounts.
+All web sign-in entry points offer Google and Apple through the shared
+`SignInButtons` control. Its two equal columns keep both providers next to each
+other, including on 360 px phones. Firebase handles the OAuth popup and session;
+the existing auth-state listener starts profile, achievement and cloud-save sync
+for either provider. The Steam desktop edition continues using Steam accounts.
+
+## Enable Apple in production
+
+Before deploying the client, configure Sign in with Apple in the Apple Developer
+account and enable Apple under Firebase Authentication's sign-in providers:
+
+1. Register a Services ID associated with an app enabled for Sign in with Apple.
+2. Register `electrify-game.firebaseapp.com` as the web domain and
+   `https://electrify-game.firebaseapp.com/__/auth/handler` as the return URL.
+3. Create a Sign in with Apple key. In Firebase's Apple provider configuration,
+   enter the Services ID, Apple Team ID, key ID and private key. Keep the private
+   key in the provider configuration; it must never enter the web bundle.
+4. Confirm the deployed site's domains are authorized in Firebase Authentication.
+5. Test a real Apple sign-in on desktop and iOS Safari, including cancellation,
+   returning sign-in and Hide My Email. Confirm cloud saves and achievements sync
+   after signing out and back in with the same provider.
+
+The app uses Firebase's `OAuthProvider("apple.com")` and the same popup flow as
+Google. Firebase requests Apple's email and name scopes with its default
+one-account-per-email setting. Apple may omit a name on later sign-ins and does
+not provide an avatar; the player still chooses their own public leaderboard name.
+Hide My Email relay addresses are accepted as Firebase identities. There is no
+custom account-linking flow; players should use the same provider to return to
+their existing saves. If Firebase sends account emails, configure Apple's private
+email relay for the Firebase sender as well. The mailing-list signup also
+subscribes relay addresses, so Mailchimp's sender must be registered too; see
+[Production setup](#production-setup) step 3.
+
+See [Firebase's Apple authentication setup](https://firebase.google.com/docs/auth/web/apple).
+Local automated tests exercise provider selection, cancellation, retries, sharing,
+and responsive controls without Apple credentials. A successful live Apple login
+also requires the console configuration above and an eligible Apple account.
+
+## Optional mailing-list signup
 
 Each web sign-in entry point includes an unchecked “Join the Electrify
 mailing list” checkbox. Choosing it subscribes the account email after a successful
-Google login. Leaving it unchecked, cancelling OAuth, restoring an existing
+Google or Apple login. Leaving it unchecked, cancelling OAuth, restoring an existing
 session or playing through Steam never initiates a subscription. The choice is
 local to the sign-in screen and is not saved to the account or device.
 
 The client calls `subscribeMailingList` in `us-central1` without delaying login or
-cloud sync. The callable validates Firebase authentication, a verified Google
+cloud sync. The callable validates Firebase authentication, a verified Google or Apple
 email and explicit consent. It derives the email from the verified token, never from
 a client-supplied address. The Mailchimp API key remains in Firebase Secret Manager.
 Failures appear in the function's Cloud Logging entries as `Mailing-list signup
@@ -43,16 +79,24 @@ management or unsubscribe control.
    subscribers. The signup API does **not** send a welcome email itself;
    [Mailchimp's final welcome email](https://mailchimp.com/help/enable-or-disable-final-welcome-email/)
    is a signup-form setting; use the welcome automation for these API signups.
+   Apple's private relay rejects mail from unregistered senders, so also register
+   the Mailchimp From domain or address under Sign in with Apple for Email
+   Communication. Publish an SPF record for that domain, but note that Mailchimp
+   normally sends from its own envelope-sender domain, so SPF alone will not
+   satisfy Apple. Configure Mailchimp custom DKIM authentication and verify that
+   the DKIM signature covers the From header and its domain exactly matches the
+   From domain.
 4. Install the server lockfile with `npm ci --prefix firebase/functions`, then
    deploy with
    `npx firebase-tools@15.32.1 deploy --only functions:mailing-list --project electrify-game`.
    The production workflow also installs and deploys this function with Firestore
    before the web bundle. Both backend deployments must succeed before publishing
    the client; resolve the setup or deployment failure before retrying.
-5. With a fresh Google test address, check the box and sign in. Verify exactly one
-   subscribed contact in Mailchimp and one welcome notification, without any
-   confirmation requirement. Test unchecked and cancelled sign-ins, repeat logins,
-   an existing subscriber and a prior unsubscribe. Verify that a signup failure
+5. With fresh Google and Apple test addresses, including an Apple Hide My Email
+   relay address, check the box and sign in. Verify exactly one
+   subscribed contact in Mailchimp and one welcome notification (delivered to the
+   relay address too), without any confirmation requirement. Test unchecked and
+   cancelled sign-ins, repeat logins, an existing subscriber and a prior unsubscribe. Verify that a signup failure
    still permits cloud saves. Remove test contacts afterward.
 
 Local tests mock Mailchimp and Firebase OAuth; they do not send emails. Live

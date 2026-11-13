@@ -1,5 +1,14 @@
+import { login } from "../../Globals";
 import * as React from "react";
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  waitForElementToBeRemoved,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { configureStore } from "@reduxjs/toolkit";
 import { Provider } from "react-redux";
@@ -8,6 +17,11 @@ import { clearAppCache } from "../../helpers/Cache";
 import settingsReducer from "../../reducers/Settings";
 import type { DesktopBridge } from "../../Desktop";
 import { updateInputPresentation } from "../../desktop/InputPresentation";
+
+jest.mock("../../Globals", () => ({
+  ...jest.requireActual("../../Globals"),
+  login: jest.fn(async () => true),
+}));
 
 jest.mock("../../AppVersion", () => ({ APP_VERSION: "26sept26-1507" }));
 
@@ -28,7 +42,6 @@ function renderSettings(overrides: Partial<Props> = {}) {
       theme: "system",
     },
     loggedIn: false,
-    onLogin: () => undefined,
     onLogout: () => undefined,
     onChangeName: () => undefined,
     onAudioChange: () => undefined,
@@ -65,37 +78,54 @@ afterEach(() => {
 });
 
 describe("Settings", () => {
-  it("passes only the current mailing-list choice to Google sign-in", async () => {
-    const onLogin = jest.fn();
-    const view = renderSettings({ onLogin });
-    const leaderboard = within(
-      screen.getByRole("region", { name: "Leaderboard" }),
-    );
-    const checkbox = leaderboard.getByRole("checkbox", {
-      name: "Join the Electrify mailing list",
-    });
-    const signIn = leaderboard.getByRole("button", {
-      name: "Sign in with Google",
-    });
-    expect(checkbox).not.toBeChecked();
-    await userEvent.click(signIn);
-    expect(onLogin).toHaveBeenLastCalledWith({ mailingList: false });
-    await userEvent.click(checkbox);
-    await userEvent.click(signIn);
-    expect(onLogin).toHaveBeenLastCalledWith({ mailingList: true });
-    await userEvent.click(checkbox);
-    await userEvent.click(signIn);
-    expect(onLogin).toHaveBeenLastCalledWith({ mailingList: false });
-    view.unmount();
-    renderSettings();
-    expect(
+  it.each(["google", "apple"] as const)(
+    "passes only the current mailing-list choice to %s sign-in",
+    async (provider) => {
+      const onLogin = login as jest.Mock;
+      renderSettings();
+      const region = screen.getByLabelText("Leaderboard", {
+        selector: "section",
+      });
+      expect(region).toHaveRole("region");
+      const leaderboard = within(region);
+      const checkbox = leaderboard.getByRole("checkbox", {
+        name: "Join the Electrify mailing list",
+      });
+      const signIn = leaderboard.getByRole("button", {
+        name: `Sign in with ${provider === "google" ? "Google" : "Apple"}`,
+      });
+
+      async function signInAndWait() {
+        fireEvent.click(signIn);
+        await waitFor(() => expect(signIn).toBeEnabled());
+      }
+      expect(checkbox).not.toBeChecked();
+      await signInAndWait();
+      fireEvent.click(checkbox);
+      await signInAndWait();
+      fireEvent.click(checkbox);
+      await signInAndWait();
+      expect(onLogin.mock.calls).toEqual([
+        [{ provider, mailingList: false }],
+        [{ provider, mailingList: true }],
+        [{ provider, mailingList: false }],
+      ]);
+    },
+  );
+
+  it("resets mailing-list consent when Settings reopens", () => {
+    const getConsent = () =>
       within(screen.getByRole("region", { name: "Leaderboard" })).getByRole(
         "checkbox",
-        {
-          name: "Join the Electrify mailing list",
-        },
-      ),
-    ).not.toBeChecked();
+        { name: "Join the Electrify mailing list" },
+      );
+    const view = renderSettings();
+    const checkbox = getConsent();
+    fireEvent.click(checkbox);
+    expect(checkbox).toBeChecked();
+    view.unmount();
+    renderSettings();
+    expect(getConsent()).not.toBeChecked();
   });
 
   afterEach(() => {
@@ -134,6 +164,8 @@ describe("Settings", () => {
       })),
       onStateChanged: jest.fn(() => () => {}),
     } as unknown as DesktopBridge;
+    // Preload the real lazy controls so a cold module transform cannot consume findBy's timeout.
+    await import("../base/DesktopFeedbackSettings");
     renderSettings({
       settings: {
         audioEnabled: false,
@@ -143,7 +175,6 @@ describe("Settings", () => {
         theme: "system",
       },
     });
-    // Let the lazy desktop controls load without repeatedly computing every switch's name.
     const vibration = await screen.findByLabelText("Controller vibration");
     const recording = await screen.findByLabelText("Recorded highlights");
     expect(vibration).toHaveRole("switch");
@@ -157,7 +188,8 @@ describe("Settings", () => {
     ).toBeVisible();
     expect(vibration).not.toBeChecked();
     expect(recording).not.toBeChecked();
-    expect(screen.getByRole("switch", { name: /^Sound$/ })).not.toBeChecked();
+    const sound = screen.getByRole("switch", { name: "Sound" });
+    expect(sound).not.toBeChecked();
     expect(screen.queryByRole("slider", { name: "Effects volume" })).toBeNull();
     expect(
       await screen.findByText(/Steam Game Recording is unavailable right now/),
@@ -165,13 +197,14 @@ describe("Settings", () => {
     expect(
       screen.getByText(/does not start video recording/),
     ).toBeInTheDocument();
-    await userEvent.click(vibration);
-    await userEvent.click(recording);
+    fireEvent.click(vibration);
+    fireEvent.click(recording);
     expect(vibration).toBeChecked();
     expect(recording).toBeChecked();
     expect(localStorage.getItem("controllerVibrationEnabled")).toBe("true");
     expect(localStorage.getItem("steamTimelineEnabled")).toBe("true");
-    expect(screen.getByRole("switch", { name: /^Sound$/ })).not.toBeChecked();
+    expect(sound).toBeInTheDocument();
+    expect(sound).not.toBeChecked();
   });
   it("keeps mod management and quitting out of Settings even with a desktop bridge", async () => {
     const state = {
@@ -193,22 +226,17 @@ describe("Settings", () => {
     expect(window.electrifyDesktop.mods).not.toHaveBeenCalled();
   });
 
-  it("changes appearance and units with direct choices", async () => {
+  it("changes appearance and units with direct choices", () => {
     const onThemeChange = jest.fn();
     const onUnitsChange = jest.fn();
     renderSettings({ onThemeChange, onUnitsChange });
 
-    await userEvent.click(
-      within(screen.getByRole("group", { name: "Appearance" })).getByRole(
-        "button",
-        { name: "Dark" },
-      ),
-    );
-    await userEvent.click(
-      within(screen.getByRole("group", { name: "Units" })).getByRole("button", {
-        name: "Imperial",
-      }),
-    );
+    const appearance = screen.getByLabelText("Appearance");
+    const units = screen.getByLabelText("Units");
+    expect(appearance).toHaveRole("group");
+    expect(units).toHaveRole("group");
+    fireEvent.click(within(appearance).getByRole("button", { name: "Dark" }));
+    fireEvent.click(within(units).getByRole("button", { name: "Imperial" }));
 
     expect(onThemeChange).toHaveBeenCalledWith("dark");
     expect(onUnitsChange).toHaveBeenCalledWith("imperial");
@@ -227,16 +255,17 @@ describe("Settings", () => {
   it("offers Automatic and Single tool workspaces outside the desktop app", async () => {
     const onWorkspaceChange = jest.fn();
     renderSettings({ onWorkspaceChange });
-    expect(screen.getByRole("button", { name: "Automatic" })).toHaveAttribute(
-      "aria-pressed",
-      "true",
+    const workspace = within(screen.getByLabelText("Workspace"));
+    expect(
+      workspace.getByRole("button", { name: "Automatic" }),
+    ).toHaveAttribute("aria-pressed", "true");
+    await userEvent.click(
+      workspace.getByRole("button", { name: "Single tool" }),
     );
-    await userEvent.click(screen.getByRole("button", { name: "Single tool" }));
     expect(onWorkspaceChange).toHaveBeenCalledWith("single");
   });
 
   it("offers independent screen-edge padding in advanced Display settings outside the desktop app", async () => {
-    const user = userEvent.setup();
     const onScreenEdgePaddingChange = jest.fn();
     const onInterfaceScaleChange = jest.fn();
     const onWorkspaceChange = jest.fn();
@@ -245,39 +274,35 @@ describe("Settings", () => {
       onInterfaceScaleChange,
       onWorkspaceChange,
     });
-    const display = within(screen.getByRole("region", { name: "Display" }));
+    const region = screen.getByLabelText("Display", { selector: "section" });
+    expect(region).toHaveRole("region");
+    const display = within(region);
     const advanced = display.getByRole("button", { name: "Advanced display" });
-    // The accordion keeps its controls mounted while collapsed. Target their labels/text,
-    // then check visibility explicitly instead of recomputing all ancestor styles per role query.
+    // The browser suite checks visibility of each choice through the real accordion transition.
+    // Here, exercise the callbacks and the settings that must remain independent.
     const padding = display.getByLabelText("Screen-edge padding");
     const scale = screen.getByLabelText("Interface scale");
     const automatic = display.getByText("Automatic", { selector: "button" });
     expect(advanced).toHaveAttribute("aria-expanded", "false");
-    expect(padding).not.toBeVisible();
-    await user.click(advanced);
+    await userEvent.click(advanced);
     expect(advanced).toHaveAttribute("aria-expanded", "true");
     expect(padding).toHaveRole("group");
     expect(padding).toHaveAccessibleName("Screen-edge padding");
-    expect(padding).toBeVisible();
     const choices = within(padding);
     const defaultPadding = choices.getByText("0%", { selector: "button" });
     expect(defaultPadding).toHaveAccessibleName("0%");
-    expect(defaultPadding).toBeVisible();
     expect(defaultPadding).toHaveAttribute("aria-pressed", "true");
     for (const value of [2, 4]) {
       const choice = choices.getByText(`${value}%`, { selector: "button" });
       expect(choice).toHaveAccessibleName(`${value}%`);
-      expect(choice).toBeVisible();
-      await user.click(choice);
+      fireEvent.click(choice);
     }
     expect(onScreenEdgePaddingChange.mock.calls).toEqual([[2], [4]]);
     expect(onInterfaceScaleChange).not.toHaveBeenCalled();
     expect(onWorkspaceChange).not.toHaveBeenCalled();
     expect(scale).toHaveRole("combobox");
     expect(scale).toHaveAccessibleName("Interface scale");
-    expect(scale).toBeVisible();
     expect(scale).toHaveValue("1");
-    expect(automatic).toBeVisible();
     expect(automatic).toHaveAccessibleName("Automatic");
     expect(automatic).toHaveAttribute("aria-pressed", "true");
   });
@@ -384,7 +409,7 @@ describe("Settings", () => {
     renderSettings();
 
     expect(screen.getByText("26sept26-1507")).toBeInTheDocument();
-    const button = screen.getByRole("button", { name: "Clear cache" });
+    const button = screen.getByText("Clear cache", { selector: "button" });
     expect(
       within(screen.getByRole("contentinfo")).getByRole("button", {
         name: "Clear cache",
@@ -408,13 +433,14 @@ describe("Settings", () => {
 
   it("does not clear the cache when the confirmation is cancelled", async () => {
     renderSettings();
-    await userEvent.click(screen.getByRole("button", { name: "Clear cache" }));
+    const footer = within(screen.getByRole("contentinfo"));
+    fireEvent.click(footer.getByRole("button", { name: "Clear cache" }));
     const dialog = await screen.findByRole("dialog", {
       name: "Clear cache and reload?",
     });
-    await userEvent.click(
-      within(dialog).getByRole("button", { name: "Cancel" }),
-    );
+    const closed = waitForElementToBeRemoved(dialog);
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    await closed;
 
     expect(mockedClearAppCache).not.toHaveBeenCalled();
   });

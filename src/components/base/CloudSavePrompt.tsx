@@ -13,7 +13,7 @@ import { cloudSavePromptVisible } from "../../reducers/GameActions";
 import { getLocalStorage, login } from "../../Globals";
 import { setStorageKeyValue } from "../../LocalStorage";
 import { isDesktopApp } from "../../Desktop";
-import MailingListCheckbox from "./MailingListCheckbox";
+import SignInButtons from "./SignInButtons";
 
 export const CLOUD_PROMPT_KEY = "electrify-cloud-save-prompt-seen";
 export default function CloudSavePrompt(): React.JSX.Element {
@@ -22,8 +22,6 @@ export default function CloudSavePrompt(): React.JSX.Element {
   const seen = useRef(false);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState(false);
-  const [mailingList, setMailingList] = useState(false);
   const visible =
     !(process.env.REACT_APP_DESKTOP === "true" && isDesktopApp()) &&
     open &&
@@ -77,34 +75,24 @@ export default function CloudSavePrompt(): React.JSX.Element {
           <Typography variant="body2" color="text.secondary">
             You can also sign in later from Saved games.
           </Typography>
-          <MailingListCheckbox
-            checked={mailingList}
-            onChange={setMailingList}
-            disabled={busy}
-          />
-          {error && (
-            <Typography color="error" role="alert">
-              Couldn't finish sign-in. Try again.
-            </Typography>
-          )}
         </Stack>
       </DialogContent>
       <DialogActions
         sx={{ flexDirection: "column", alignItems: "stretch", pt: 1, gap: 1 }}
       >
-        <Button
+        <SignInButtons
           variant="contained"
-          disabled={busy}
-          onClick={async () => {
+          onSignIn={async (options) => {
             setBusy(true);
-            const ok = await login({ mailingList });
-            setBusy(false);
-            if (ok) setOpen(false);
-            else setError(true);
+            try {
+              const ok = await login(options);
+              if (ok) setOpen(false);
+              return ok;
+            } finally {
+              setBusy(false);
+            }
           }}
-        >
-          {busy ? "Signing in…" : "Sign in with Google"}
-        </Button>
+        />
         <Button disabled={busy} onClick={dismiss}>
           Continue without syncing
         </Button>

@@ -154,7 +154,10 @@ describe("NewGameDetails leaderboard", () => {
       await userEvent.click(
         screen.getByRole("button", { name: "Sign in with Google" }),
       );
-      expect(login).toHaveBeenLastCalledWith({ mailingList });
+      expect(login).toHaveBeenLastCalledWith({
+        provider: "google",
+        mailingList,
+      });
     },
   );
 

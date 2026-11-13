@@ -1,3 +1,4 @@
+import { login } from "../../Globals";
 import { captureRunIdentity } from "../../helpers/RunIdentity";
 import { SCENARIOS } from "../../data/Scenarios";
 import * as React from "react";
@@ -5,6 +6,11 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import VictoryDialog, { Props } from "./VictoryDialog";
 import { VictoryType } from "../../Types";
+
+jest.mock("../../Globals", () => ({
+  ...jest.requireActual("../../Globals"),
+  login: jest.fn(async () => true),
+}));
 
 const mockFetchGlobalRank = jest.fn();
 jest.mock("./ResultLeaderboard", () => ({
@@ -57,7 +63,6 @@ function renderDialog(overrides: Partial<Props> = {}) {
     onClose: () => undefined,
     onQuit: () => undefined,
     onRetry: () => undefined,
-    onLogin: () => undefined,
     onShared: () => undefined,
     onShareFailed: () => undefined,
     ...overrides,
@@ -112,17 +117,17 @@ describe("VictoryDialog", () => {
   it.each([false, true])(
     "passes mailing-list choice %s from the result invitation",
     async (mailingList) => {
-      const onLogin = jest.fn();
-      renderDialog({ loggedIn: false, onLogin });
+      const onLogin = login as jest.Mock;
+      renderDialog({ loggedIn: false });
       const checkbox = screen.getByRole("checkbox", {
         name: "Join the Electrify mailing list",
       });
       expect(checkbox).not.toBeChecked();
       if (mailingList) await userEvent.click(checkbox);
       await userEvent.click(
-        screen.getByRole("button", { name: "Sign in to join the leaderboard" }),
+        screen.getByRole("button", { name: "Sign in with Google" }),
       );
-      expect(onLogin).toHaveBeenCalledWith({ mailingList });
+      expect(onLogin).toHaveBeenCalledWith({ provider: "google", mailingList });
     },
   );
 
@@ -269,6 +274,12 @@ describe("VictoryDialog", () => {
     renderDialog({ loggedIn: false });
     expect(screen.queryByText(/personal best/)).not.toBeInTheDocument();
     expect(screen.getByText(/join the leaderboard/)).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Sign in with Google" }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: "Sign in with Apple" }),
+    ).toBeVisible();
   });
 
   // Custom games share a scenario id, so their scores are not comparable on the board.

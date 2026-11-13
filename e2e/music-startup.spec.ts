@@ -18,6 +18,26 @@ async function prepared(page: import("@playwright/test").Page) {
     );
 }
 
+function readPlayhead() {
+  const { source, offset, startTime } = window.electrifyMusicPlayback.at(-1)!;
+  return {
+    seconds: offset + (source.context.currentTime - startTime),
+    sampleRate: source.buffer!.sampleRate,
+  };
+}
+
+function expectResumedPlayhead(
+  offset: number,
+  before: ReturnType<typeof readPlayhead>,
+) {
+  // The observed and resumed playheads can round in opposite directions. Half a decoded
+  // sample absorbs that rounding while still detecting a one-sample rewind.
+  expect(offset).toBeGreaterThanOrEqual(
+    Math.max(0, before.seconds - 0.5 / before.sampleRate),
+  );
+  expect(offset).toBeLessThan(before.seconds + 2);
+}
+
 test("enabling prepared installed-app sound starts on that gesture and quick toggles retain position", async ({
   page,
 }) => {
@@ -64,10 +84,7 @@ test("enabling prepared installed-app sound starts on that gesture and quick tog
     )
     .toBeGreaterThan(0.3);
   for (let i = 0; i < 4; i++) {
-    const before = await page.evaluate(() => {
-      const entry = window.electrifyMusicPlayback.at(-1)!;
-      return entry.offset + entry.source.context.currentTime - entry.startTime;
-    });
+    const before = await page.evaluate(readPlayhead);
     await sound.click();
     await sound.click();
     await expect
@@ -83,8 +100,7 @@ test("enabling prepared installed-app sound starts on that gesture and quick tog
     const resumed = await page.evaluate(() =>
       window.electrifyMusicStarts.at(-1)!,
     );
-    expect(resumed.offset).toBeGreaterThanOrEqual(before);
-    expect(resumed.offset).toBeLessThan(before + 2);
+    expectResumedPlayhead(resumed.offset, before);
   }
   await page.getByRole("button", { name: "Back", exact: true }).click();
   await page.getByRole("button", { name: "Play", exact: true }).click();
@@ -100,10 +116,7 @@ test("enabling prepared installed-app sound starts on that gesture and quick tog
     )
     .toBe(3);
   for (let i = 0; i < 2; i++) {
-    const before = await page.evaluate(() => {
-      const entry = window.electrifyMusicPlayback.at(-1)!;
-      return entry.offset + entry.source.context.currentTime - entry.startTime;
-    });
+    const before = await page.evaluate(readPlayhead);
     await page.evaluate(async () => {
       Object.defineProperty(document, "visibilityState", {
         configurable: true,
@@ -144,8 +157,7 @@ test("enabling prepared installed-app sound starts on that gesture and quick tog
     const offset = await page.evaluate(
       () => window.electrifyMusicStarts.at(-1)!.offset,
     );
-    expect(offset).toBeGreaterThanOrEqual(Math.max(0, before));
-    expect(offset).toBeLessThan(before + 2);
+    expectResumedPlayhead(offset, before);
   }
 });
 test.afterEach(async ({ page }, testInfo) => {

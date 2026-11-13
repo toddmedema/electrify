@@ -23,32 +23,38 @@ const response = (status, data) => ({
   json: async () => data,
 });
 
-test("subscribes immediately using the token email", async () => {
-  const calls = [];
-  const input = request();
-  input.data.email = "someone-else@example.com";
-  const result = await subscribe(input, {
-    apiKey: key,
-    fetch: async (...args) => {
-      calls.push(args);
-      return response(200, { status: "subscribed" });
-    },
+for (const [provider, email] of [
+  ["google.com", "Player@example.com"],
+  ["apple.com", "Player@example.com"],
+  ["apple.com", "relay@privaterelay.appleid.com"],
+]) {
+  test(`subscribes ${provider} ${email.split("@")[1]} immediately using the token email`, async () => {
+    const calls = [];
+    const input = request(provider, email);
+    input.data.email = "someone-else@example.com";
+    const result = await subscribe(input, {
+      apiKey: key,
+      fetch: async (...args) => {
+        calls.push(args);
+        return response(200, { status: "subscribed" });
+      },
+    });
+    assert.deepEqual(result, { status: "subscribed" });
+    assert.equal(calls.length, 1);
+    const [url, options] = calls[0];
+    assert.equal(
+      url,
+      "https://us10.api.mailchimp.com/3.0/lists/8ccd05ccba/members",
+    );
+    assert.equal(options.method, "POST");
+    assert.equal(options.headers.Authorization, `Bearer ${key}`);
+    const body = JSON.parse(options.body);
+    assert.equal(body.email_address, email.toLowerCase());
+    assert.equal(body.status, "subscribed");
+    assert.ok(body.tags.includes("electrify-updates-v1"));
+    assert.ok(!Number.isNaN(Date.parse(body.timestamp_signup)));
   });
-  assert.deepEqual(result, { status: "subscribed" });
-  assert.equal(calls.length, 1);
-  const [url, options] = calls[0];
-  assert.equal(
-    url,
-    "https://us10.api.mailchimp.com/3.0/lists/8ccd05ccba/members",
-  );
-  assert.equal(options.method, "POST");
-  assert.equal(options.headers.Authorization, `Bearer ${key}`);
-  const body = JSON.parse(options.body);
-  assert.equal(body.email_address, "player@example.com");
-  assert.equal(body.status, "subscribed");
-  assert.ok(body.tags.includes("electrify-updates-v1"));
-  assert.ok(!Number.isNaN(Date.parse(body.timestamp_signup)));
-});
+}
 
 test("sends the signup timestamp as UTC seconds in Mailchimp's accepted format", async (t) => {
   t.mock.timers.enable({
@@ -76,6 +82,11 @@ for (const [name, mutate, code] of [
     "failed-precondition",
   ],
   ["missing email", (r) => delete r.auth.token.email, "failed-precondition"],
+  [
+    "unsupported OAuth provider",
+    (r) => (r.auth.token.firebase.sign_in_provider = "github.com"),
+    "failed-precondition",
+  ],
   [
     "unsupported identity",
     (r) => (r.auth.token.firebase.sign_in_provider = "anonymous"),
