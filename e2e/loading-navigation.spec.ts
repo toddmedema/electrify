@@ -1,12 +1,10 @@
-import path from "node:path";
-import catalog from "../src/achievements/AchievementCatalog.json";
 import { expect, test } from "./fixtures";
 
 test.use({ serviceWorkers: "block" });
 
-test("a mission finishing its load cannot replace Achievements opened from a notification", async ({
+test("dismissing an achievement notification during loading leaves the next mission playable", async ({
   page,
-}, info) => {
+}) => {
   await page.addInitScript(() => {
     localStorage.setItem("audioEnabled", "false");
   });
@@ -21,7 +19,7 @@ test("a mission finishing its load cannot replace Achievements opened from a not
   ).toBeVisible({ timeout: 60000 });
   await page.clock.install();
   await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 1000);
-  // Hold the next mission's data so the notification click definitely precedes loaded().
+  // Hold the next mission's data so card dismissal definitely precedes loaded().
   let release!: () => void;
   const held = new Promise<void>((resolve) => {
     release = resolve;
@@ -36,35 +34,18 @@ test("a mission finishing its load cannot replace Achievements opened from a not
       .click();
     await page.clock.runFor(1000);
     await expect(page.getByRole("dialog")).toBeHidden();
-    await page
-      .getByRole("button", { name: "View achievements", exact: true })
-      .click();
+    await page.getByRole("button", { name: /Dismiss First Spark/ }).click();
+    await expect(page.locator(".achievementToastPanel")).toHaveCount(0);
     await expect(
       page.getByRole("heading", { name: "Achievements", exact: true }),
-    ).toBeVisible();
+    ).toBeHidden();
     release();
     await page.clock.resume();
     // This objective appears only after loaded() and its delayed restoration both finish.
     await expect(
       page.getByRole("region", { name: "Step 1 of 10", exact: true }),
     ).toBeVisible();
-    await expect(
-      page.getByText(`1 of ${catalog.length} unlocked`, { exact: true }),
-    ).toBeVisible();
-    if (process.env.REVIEW_SCREENSHOT_DIR)
-      await page.screenshot({
-        path: path.join(
-          process.env.REVIEW_SCREENSHOT_DIR,
-          `loading-gallery-${info.project.name}.png`,
-        ),
-        animations: "disabled",
-      });
-    // Back returns to the playable mission, not the loading screen or main menu.
-    await page.keyboard.press("Escape");
     await expect(page.locator(".facilities:visible")).toBeVisible();
-    await expect(
-      page.getByRole("region", { name: "Step 1 of 10", exact: true }),
-    ).toBeVisible();
   } finally {
     release();
     await page.unrouteAll({ behavior: "wait" });

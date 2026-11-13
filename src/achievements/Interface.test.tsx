@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { Provider } from "react-redux";
 import { Dialog, DialogTitle } from "@mui/material";
 import { store } from "../Store";
@@ -88,7 +88,25 @@ test("synced accounts omit the account panel, while sync failures keep retry ava
   achievementJournal.activate();
 });
 
-test("the stack stays readable while any notification is focused or hovered", () => {
+test("cards dismiss from their content without opening the gallery or needing separate controls", () => {
+  achievementJournal.merge(recordIntent({ earned: ["FIRST_SPARK"] }), true);
+  const view = render(
+    <Provider store={store}>
+      <AchievementNotifications />
+    </Provider>,
+  );
+  const card = screen.getByRole("button", { name: /Dismiss First Spark/ });
+  expect(card).toHaveTextContent("First Spark");
+  expect(within(card).queryByRole("button")).not.toBeInTheDocument();
+  expect(screen.queryByText("View achievements")).not.toBeInTheDocument();
+  const currentCard = store.getState().card;
+  fireEvent.click(screen.getByText("First Spark", { exact: true }));
+  expect(card).not.toBeInTheDocument();
+  expect(store.getState().card).toBe(currentCard);
+  view.unmount();
+});
+
+test("cards dismiss after ten seconds even when hovered or focused", () => {
   jest.useFakeTimers();
   achievementJournal.merge(
     recordIntent({ earned: ["FIRST_SPARK", "OUT_OF_JUICE"] }),
@@ -99,31 +117,61 @@ test("the stack stays readable while any notification is focused or hovered", ()
       <AchievementNotifications />
     </Provider>,
   );
-  const close = screen.getByRole("button", { name: /Dismiss First Spark/ });
-  const panel = screen.getAllByText("Achievement unlocked", { exact: true })[0];
-  fireEvent.mouseEnter(panel);
-  act(() => close.focus());
-  fireEvent.mouseLeave(panel);
-  act(() => jest.advanceTimersByTime(9000));
-  expect(close).toBeInTheDocument();
-  fireEvent.click(close);
-  const next = screen.getByRole("button", { name: /Dismiss Out of Juice/ });
-  expect(next).toHaveFocus();
-  act(() => jest.advanceTimersByTime(9000));
-  expect(next).toBeInTheDocument();
-  fireEvent.mouseEnter(next);
-  act(() => next.blur());
-  act(() => jest.advanceTimersByTime(9000));
-  expect(next).toBeInTheDocument();
-  fireEvent.mouseLeave(next);
-  act(() => jest.advanceTimersByTime(ACHIEVEMENT_TOAST_MS - 1));
-  expect(next).toBeInTheDocument();
+  const first = screen.getByRole("button", { name: /Dismiss First Spark/ });
+  const second = screen.getByRole("button", { name: /Dismiss Out of Juice/ });
+  fireEvent.mouseEnter(first);
+  act(() => second.focus());
+  act(() => jest.advanceTimersByTime(9999));
+  expect(first).toBeInTheDocument();
+  expect(second).toBeInTheDocument();
   act(() => jest.advanceTimersByTime(1));
-  expect(
-    screen.queryByRole("button", { name: /Dismiss Out of Juice/ }),
-  ).not.toBeInTheDocument();
+  expect(first).not.toBeInTheDocument();
+  expect(second).not.toBeInTheDocument();
   view.unmount();
   jest.useRealTimers();
+});
+
+test.each(["Enter", " "])(
+  "%s dismisses the focused card and moves focus to its neighbor",
+  (key) => {
+    achievementJournal.merge(
+      recordIntent({ earned: ["FIRST_SPARK", "OUT_OF_JUICE"] }),
+      true,
+    );
+    const view = render(
+      <Provider store={store}>
+        <AchievementNotifications />
+      </Provider>,
+    );
+    const first = screen.getByRole("button", { name: /Dismiss First Spark/ });
+    const second = screen.getByRole("button", { name: /Dismiss Out of Juice/ });
+    act(() => first.focus());
+    fireEvent.keyDown(first, { key });
+    expect(first).not.toBeInTheDocument();
+    expect(second).toHaveFocus();
+    view.unmount();
+  },
+);
+
+test("Steam keeps notification ownership and the fallback returns when Steam is unavailable", () => {
+  achievementJournal.setSteamAvailable(true);
+  const view = render(
+    <Provider store={store}>
+      <AchievementNotifications />
+    </Provider>,
+  );
+  act(() =>
+    achievementJournal.merge(recordIntent({ earned: ["FIRST_SPARK"] }), true),
+  );
+  expect(screen.queryByText("First Spark")).not.toBeInTheDocument();
+  act(() => {
+    achievementJournal.setSteamAvailable(false);
+    achievementJournal.merge(recordIntent({ earned: ["OUT_OF_JUICE"] }), true);
+  });
+  expect(
+    screen.getByRole("button", { name: /Dismiss Out of Juice/ }),
+  ).toBeVisible();
+  view.unmount();
 });
 
 test("an award arriving during the stack gets its own reading time", () => {
