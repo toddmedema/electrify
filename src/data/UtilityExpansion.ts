@@ -220,15 +220,6 @@ export const UTILITY_AREAS: Readonly<Record<UtilityId, UtilityAreaDefinition>> =
           reducedNominalW: 60e6,
           marketId: "newengland-quebec-upgrade-market",
         },
-        {
-          id: "valley-balancing",
-          name: "New England balancing",
-          nominalW: 50e6,
-          deliverability: 1,
-          pricePerMWh: 75,
-          marketId: VERMONT_REGIONAL_MARKET_ID,
-          balancing: true,
-        },
       ],
     },
     "ridge-electric": {
@@ -316,13 +307,15 @@ export function utilityEntitlementsAt(
   year: number,
 ): UtilityEntitlementDefinition[] {
   if (year > 2024) return [];
-  return UTILITY_AREAS[areaId].entitlements.map((source) => ({
-    ...source,
-    nominalW:
-      source.reductionYear !== undefined && year >= source.reductionYear
-        ? (source.reducedNominalW ?? source.nominalW)
-        : source.nominalW,
-  }));
+  return UTILITY_AREAS[areaId].entitlements
+    .filter((source) => !source.balancing)
+    .map((source) => ({
+      ...source,
+      nominalW:
+        source.reductionYear !== undefined && year >= source.reductionYear
+          ? (source.reducedNominalW ?? source.nominalW)
+          : source.nominalW,
+    }));
 }
 
 /** One pooled company funds the service network for its actual customer count. */
@@ -346,3 +339,54 @@ export function utilityNetworkAnnualOM(
       .find((stage) => year >= stage.year)?.multiplier ?? 1;
   return base * Math.max(1, customers / accounts) * renewal;
 }
+
+/** Fixed replacement blocks and delivered-energy prices, authored in 2005 dollars. */
+export const POWER_AGREEMENT_BLOCKS = [
+  {
+    id: "champlain-nuclear",
+    utilityId: "champlain",
+    name: "Regional firm",
+    lossYear: 2020,
+    nominalW: 100e6,
+    years: 5,
+    pricePerMWh: 70,
+  },
+  {
+    id: "champlain-quebec",
+    utilityId: "champlain",
+    name: "Québec hydro",
+    lossYear: 2020,
+    nominalW: 60e6,
+    years: 10,
+    pricePerMWh: 65,
+    marketId: "newengland-quebec-upgrade-market",
+  },
+  {
+    id: "valley-nuclear",
+    utilityId: "valley-electric",
+    name: "Regional firm",
+    lossYear: 2017,
+    nominalW: 80e6,
+    years: 5,
+    pricePerMWh: 70,
+  },
+  {
+    id: "valley-quebec",
+    utilityId: "valley-electric",
+    name: "Québec hydro",
+    lossYear: 2020,
+    nominalW: 60e6,
+    years: 10,
+    pricePerMWh: 65,
+    marketId: "newengland-quebec-upgrade-market",
+  },
+  {
+    id: "ridge-firm",
+    utilityId: "ridge-electric",
+    name: "Regional firm",
+    lossYear: 2020,
+    nominalW: 20e6,
+    years: 5,
+    pricePerMWh: 70,
+  },
+] as const;

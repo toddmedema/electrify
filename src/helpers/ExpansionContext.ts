@@ -81,6 +81,7 @@ export function validUtilityExpansionSetup(scenario: ScenarioType): boolean {
   return (
     validUtilityExpansionParameters({ ...scenario }) &&
     validUtilityExpansionHeader(scenario) &&
+    scenario.intertiesEnabled !== false &&
     scenario.locationId === UTILITY_AREAS.champlain.location.id &&
     sameDefinition(scenario.location, UTILITY_AREAS.champlain.location) &&
     scenario.demandShapeExponent ===

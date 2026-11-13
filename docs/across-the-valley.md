@@ -5,6 +5,13 @@ A completed Tier-1 connection to Valley Electric or Ridge Electric unlocks that
 utility's acquisition. Optional upgrades buy transfer capacity, not permission to
 acquire. Human co-op companies remain independent.
 
+Champlain starts with an operating 300 MW regional connection carrying its
+inherited nuclear and Québec hydro power purchase agreements. Buying Valley or
+Ridge adds that company's operating regional connection and original agreements.
+These inherited interfaces are separate from the expansion projects needed for
+acquisition. Contracts, replacement offers, shared capacity and market fallback
+are documented in [Physical interties and power purchase agreements](power-agreements.md).
+
 ## Authored portfolios and historical references
 
 The three utilities, their ownership, acquisition prerequisite, fleet capacities,
@@ -136,10 +143,13 @@ The fictional purchased-power changes are visible before buying a connection:
 Valley's nuclear right falls from 160 to 80 MW in January 2017 (152 to 76 MW
 deliverable). In January 2020, Champlain's 100 MW nuclear right ends, both Québec
 rights fall from 120 to 60 MW (114 to 57 MW deliverable), and Ridge's firm pool
-falls from 40 to 20 MW (38 to 19 MW deliverable). Prices stay unchanged. This
-withdraws capacity rather than forcing players to buy repriced power while their
-own cheaper plants sit idle. The Valley reminder arrives in 2013, and the common
-2020 change is announced in 2016.
+falls from 40 to 20 MW (38 to 19 MW deliverable). The remaining agreements keep
+their existing real prices. These changes reduce contracted coverage; the
+physical connections remain available for uncovered purchases at regional market
+prices and availability. Players can review replacement agreements on the
+connection, use the market or build their own supply. Contracted and market
+purchases share the same wire and source limits. The Valley reminder arrives in
+2013, and the common 2020 change is announced in 2016.
 
 Both companies' read-only terms can be inspected before the connection purchase.
 They show a dated offer, the existing company's and seller's future contract
@@ -180,18 +190,20 @@ transactions, timed obligations and outcomes. Early losses are not evidence abou
 later events. Current-format saves persist the aggregate customer and market
 totals, transaction and financial ledgers, and one forecast timeline.
 
-The renewal revision passes all 195 cases in the full matrix, including 135
-prepared plans, plus 24 explicit pressure and acquisition-window cases in
-`UtilityExpansionPressure.sim.test.tsx`. At Employee difficulty, inherited supply
-alone now loses both target routes in month 183 on all three seeds. Ridge's
-inherited-only route previously completed. At CEO, both mixed cash routes complete
-with acquisitions in January, March or May 2014 on all three seeds, with lowest
-month-end cash of $33–69M for Valley and $76M for Ridge. These plans make an
-additional reserve investment in 2016 before the 2020 supply withdrawal.
+The pre-PPA renewal revision passed all 195 cases in the full matrix, including
+135 prepared plans, plus 24 pressure and acquisition-window cases. A frozen
+baseline confirmed that its inherited-only Employee routes were fired in month
+183 on all three seeds. That result depended on withdrawn agreements also removing
+effective import access. With explicit retained regional connections, those
+routes can purchase uncovered energy from the market. The pressure suite now
+checks falling contracted delivery, increasing market purchases and retained
+physical capacity across complete 2019 and 2020 years. Its prepared CEO cases
+continue to check acquisitions in January, March and May 2014.
 
-For seed 12345, the original and revised prepared fixtures compare as follows.
-The changes include the additional investment and a later cash acquisition, so
-these are complete strategy outcomes rather than an isolated cost sensitivity.
+The following seed-12345 figures record the earlier renewal revision, before
+explicit regional connections and generic PPA market fallback. They include an
+additional investment and a later cash acquisition, so they are complete strategy
+outcomes rather than an isolated cost sensitivity.
 
 | CEO prepared route     | Original ending cash | Revised ending cash | Original / revised builds |
 | ---------------------- | -------------------: | ------------------: | ------------------------: |
@@ -200,12 +212,11 @@ these are complete strategy outcomes rather than an isolated cost sensitivity.
 | Ridge, mixed, cash     |              $2.488B |             $1.391B |                     5 / 6 |
 | Both, firm, financed   |              $3.873B |             $2.225B |                     7 / 8 |
 
-Prepared companies still earn comfortable late profits: the two CEO mixed cash
-plans add $124–184M annually during 2020–24. The design rewards preparation; it
-does not impose a terminal cash cap or a universal construction quota. Ridge
-remains a lower-risk alternative when enough supply is built early. The pressure
-checks assert outcomes for inherited-only controls and viable neighboring cash
-purchase dates, rather than treating lower final cash as the balance criterion.
+In that pre-PPA revision, the two CEO mixed cash plans added $124–184M annually
+during 2020–24. The design does not impose a terminal cash cap or a universal
+construction quota. Current pressure checks exercise retained-wire market
+fallback and viable neighboring cash purchase dates, rather than treating lower
+final cash or the former forced shortage date as the balance criterion.
 
 The save regression uses a normal first-year rollover with inactive optional
 customer-battery meters, raw validation before JSON normalization, and a full

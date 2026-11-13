@@ -12,6 +12,7 @@ import { waitForLoad } from "../../helpers/WaitForLoad";
 import { navigate } from "../../reducers/Card";
 import { initGame, loaded, delta } from "../../reducers/Game";
 import { isResumedGame } from "../../SaveGame";
+import { validPowerAgreements } from "../../helpers/PowerAgreements";
 import {
   completeSaveLoading,
   failSaveLoading,
@@ -153,6 +154,12 @@ export const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
         dataLoading = task;
         await task;
         if (!isCurrentLoadingGeneration(request)) return;
+        // Import can check ledger structure before the CSV loads; finish its dated
+        // price checks before opening the save or allowing the first elapsed tick.
+        if (resumed && !validPowerAgreements(game))
+          throw new Error(
+            "This save's power agreement history does not match its terms. Your saved progress has been preserved.",
+          );
         if (!resumed) {
           // A new game uses the scenario's authored opening fleet.
           dispatch(

@@ -1,3 +1,4 @@
+import { validPowerAgreementAction } from "../helpers/PowerAgreements";
 import { isBuyingRule, isSellingRule } from "../helpers/TradingRules";
 import { isUtilityExpansionGame } from "../helpers/ExpansionContext";
 import { acquisitionQuote, validAcquisitionAction } from "../helpers/Expansion";
@@ -131,6 +132,10 @@ const buildFacility: Validator = (game, payload) => {
 
 /** The co-op allowlist: every game action a player may send, with its payload check. */
 const GAME_COMMAND_VALIDATORS = {
+  acceptPowerAgreement: (game, payload) =>
+    validPowerAgreementAction(game, payload)
+      ? { payload }
+      : { error: "This agreement quote has changed. Review it again." },
   acquireUtility: (game, payload) => {
     if (!validAcquisitionAction(payload))
       return { error: "Choose a valid acquisition" };

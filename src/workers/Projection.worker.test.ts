@@ -1,9 +1,19 @@
-import type { GameType, LocationType, TickPresentFutureType } from "../Types";
+import type {
+  GameType,
+  LocationType,
+  PowerAgreementReceipt,
+  TickPresentFutureType,
+} from "../Types";
 
 const mockEconomy = jest.fn();
 const mockFuelPrices = jest.fn();
 const mockWeather = jest.fn();
 const mockProjection = jest.fn();
+const mockAgreementForecast = jest.fn();
+jest.mock("../helpers/AgreementForecast", () => ({
+  computeAgreementForecast: (...args: unknown[]) =>
+    mockAgreementForecast(...args),
+}));
 const mockPackProjection = jest.fn((projection: unknown) => ({
   transport: projection,
   transfers: [],
@@ -35,6 +45,7 @@ beforeEach(() => {
   mockFuelPrices.mockReset().mockImplementation((done) => done());
   mockWeather.mockReset().mockImplementation((_location, done) => done());
   mockProjection.mockReset().mockReturnValue({ forecast: [] });
+  mockAgreementForecast.mockReset().mockReturnValue({ cashDifference: -100 });
   mockPackProjection.mockReset().mockImplementation((projection) => ({
     transport: projection,
     transfers: [],
@@ -110,4 +121,45 @@ it("retries an unsuccessful economy load", async () => {
   expect(mockEconomy).toHaveBeenCalledTimes(2);
   expect(mockFuelPrices).toHaveBeenCalledTimes(1);
   expect(mockWeather).toHaveBeenCalledTimes(1);
+});
+
+it("uses the existing serialized data loader for paired agreement forecasts without packing a second projection", async () => {
+  const game = { seed: 7, location: { id: "london" } } as GameType;
+  const offer: PowerAgreementReceipt = {
+    termsVersion: 3,
+    blockId: "champlain-nuclear",
+    cycle: 0,
+    acceptedMinute: 224640,
+    startMinute: 259200,
+    endMinute: 276480,
+    durationYears: 1,
+    signingMarketPricePerMWh: 98.2,
+    signingTemperatureC: -5.8,
+  };
+  const response = new Promise((resolve) =>
+    reply.mockImplementationOnce(resolve),
+  );
+  worker.onmessage?.({
+    data: {
+      kind: "agreement",
+      requestId: ++requestId,
+      game,
+      agreementId: "nuclear",
+      offer,
+      cacheEpoch: "new-session",
+    },
+  } as MessageEvent);
+  await response;
+  expect(mockAgreementForecast).toHaveBeenCalledWith(
+    game,
+    "nuclear",
+    offer,
+    "new-session",
+  );
+  expect(mockProjection).not.toHaveBeenCalled();
+  expect(mockPackProjection).not.toHaveBeenCalled();
+  expect(reply).toHaveBeenCalledWith({
+    requestId,
+    agreementForecast: { cashDifference: -100 },
+  });
 });

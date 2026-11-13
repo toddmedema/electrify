@@ -1,8 +1,10 @@
+import { powerAgreementQuote } from "../helpers/PowerAgreements";
 import { getTotalDebt } from "../helpers/Financials";
 import { pendingScenarioChoice } from "../helpers/ScenarioChoices";
 import {
   chooseScenarioResponse,
   acquireUtility,
+  acceptPowerAgreement,
 } from "../reducers/GameActions";
 import { acquisitionQuote } from "../helpers/Expansion";
 // The game reducer dispatches follow-up actions of its own (the construction complete snackbar,
@@ -78,6 +80,7 @@ export type InitialBuildType = InitialBuildBaseType &
   ({ peakW: number; peakWh?: never } | { peakWh: number; peakW?: never });
 
 export type ScheduledSimActionType =
+  | { month: number; type: "agreement"; blockId: string }
   | {
       month: number;
       type: "acquire";
@@ -503,6 +506,26 @@ export function runSimulation(options: SimOptionsType): SimResultType {
       .forEach((action) => {
         const previousIds = new Set(state.facilities.map(({ id }) => id));
         switch (action.type) {
+          case "agreement": {
+            const quote = powerAgreementQuote(state, action.blockId);
+            if (!quote)
+              throw new Error(
+                `No agreement ${action.blockId} in month ${month}`,
+              );
+            const count = state.transmission?.acceptedAgreements?.length ?? 0;
+            state = cloneDeep(
+              gameReducer(
+                state,
+                acceptPowerAgreement({
+                  blockId: action.blockId,
+                  quoteKey: quote.quoteKey,
+                }),
+              ),
+            );
+            if (state.transmission?.acceptedAgreements?.length !== count + 1)
+              throw new Error(`Agreement rejected: ${action.blockId}`);
+            break;
+          }
           case "acquire": {
             const quote = acquisitionQuote(state, action.targetId);
             if (!quote)

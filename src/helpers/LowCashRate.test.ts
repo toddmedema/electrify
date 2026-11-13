@@ -6,6 +6,7 @@ import {
   tickState,
 } from "../reducers/Game";
 import { serializeSave, parseSave } from "../SaveGame";
+import cloneDeep from "lodash.clonedeep";
 
 beforeEach(() => jest.useFakeTimers());
 afterEach(() => jest.useRealTimers());
@@ -42,6 +43,38 @@ it("reports when even a public utility's capped rate cannot save it", () => {
     capped: true,
   });
 });
+
+it.each([1, 3] as const)(
+  "includes the actual month-closing agreement payment in the public low-cash forecast for v%s terms",
+  (termsVersion) => {
+    const game = createGame({
+      scenarioId: 116,
+      seed: 12345,
+      difficulty: "Employee",
+    });
+    game.transmission!.inheritedAgreementTerms = termsVersion;
+    game.transmission!.lines[0].paused = true;
+    game.facilities = [];
+    for (let i = 0; i < 48; i++) tickState(game);
+    const before = JSON.stringify(game);
+    const closingCash = forecastMonthClosingCashAtCustomerRate(
+      game,
+      game.dollarsPerkWh,
+    );
+    const quote = lowCashRateQuote(game);
+    expect(JSON.stringify(game)).toBe(before);
+    const live = cloneDeep(game);
+    while (live.date.monthsElapsed < 1) tickState(live);
+    expect(closingCash).toBe(live.monthlyHistory[0].cash);
+    expect(quote.projectedCash).toBe(live.monthlyHistory[0].cash);
+    expect(currentTick(live)!.cash).toBe(live.monthlyHistory[0].cash);
+    expect(live.transmission!.agreementAccounts).toHaveLength(2);
+    for (const account of live.transmission!.agreementAccounts!) {
+      expect(account.months[0].usefulMWh).toBe(0);
+      expect(account.months[0].payment > 0).toBe(termsVersion === 3);
+    }
+  },
+);
 
 it("does not promise a rescue when there is no electricity to sell", () => {
   const game = createGame({ scenarioId: 100, seed: 123 });

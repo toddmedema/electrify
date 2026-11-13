@@ -149,13 +149,19 @@ describe("Across the Valley catalog", () => {
     expect(scenario).not.toHaveProperty("reliabilityObjective");
     expect(scenario.durationMonths).toBe(240);
     expect(scenario.ownership).toBe("Investor");
-    const corridors = corridorsForLocation(UTILITY_AREAS.champlain.location);
+    const allCorridors = corridorsForLocation(UTILITY_AREAS.champlain.location);
+    expect(
+      allCorridors
+        .filter((corridor) => corridor.buildCost === 0)
+        .map((corridor) => corridor.capacityW),
+    ).toEqual([300e6, 350e6, 60e6]);
+    const corridors = allCorridors.filter((corridor) => corridor.buildCost > 0);
     expect(corridors.map(({ id }) => id)).toEqual(
       UTILITY_TARGETS.map(({ corridorId }) => corridorId),
     );
     corridors.forEach((corridor) => {
       expect(corridor.capacityW).toBe(100e6);
-      expect(corridor.routeType).toBe("EXISTING");
+      expect(corridor.routeType).toBe("NEW");
     });
     const assets = Object.values(UTILITY_AREAS).flatMap(({ facilities }) =>
       facilities.map(({ assetId }) => assetId),

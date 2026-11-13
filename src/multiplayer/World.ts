@@ -43,10 +43,12 @@ import reducer, {
   initGame,
   start,
   tickStatePhases,
+  SharedImportClearing,
   upgradeTransmissionLine,
 } from "../reducers/Game";
 import * as gameActions from "../reducers/GameActions";
 import { clearPeerMarket } from "./Market";
+import { allocateIntertieFlows } from "../helpers/Transmission";
 import type {
   CommandEnvelope,
   MatchSpec,
@@ -58,6 +60,7 @@ import type {
   CompanyResultType,
   GameType,
   LocationType,
+  PeerPlan,
   ScenarioType,
   SpeedType,
 } from "../Types";
@@ -282,10 +285,13 @@ export function createWorld(
     const result = cloneGrid(game);
     // Keep explicitly authored existing assets; player links replace optional outside markets.
     result.transmission = {
+      ...result.transmission,
       buyingRule: "SHORTAGES",
       sellingRule: "PROFITABLE",
-      lines: (result.transmission?.lines || []).filter((line) =>
-        scenario.startingInterties?.includes(line.corridorId),
+      lines: (result.transmission?.lines || []).filter(
+        (line) =>
+          scenario.startingInterties?.includes(line.corridorId) ||
+          (isUtilityExpansionGame(result) && line.buildCost === 0),
       ),
     };
     result.inGame = true;
@@ -587,6 +593,18 @@ export function stepWorld(world: World): void {
   world.pricePerMWh = Math.max(
     ...active.map((i) => basePeerTradePrice(currentTick(world.grids[i])!)),
   );
+  const sharedImportRounds: SharedImportClearing[] | undefined =
+    world.grids.some((grid) => grid.utilityExpansion) ? [] : undefined;
+  const tradingPlan = (plan: PeerPlan, i: number) => {
+    plan = { ...plan };
+    const grid = world.grids[i];
+    if (grid.transmission?.sellingRule === "NONE") plan.offerW = 0;
+    if (grid.transmission?.buyingRule === "NONE") {
+      plan.shortageW = 0;
+      plan.storageChargeW = 0;
+    }
+    return plan;
+  };
   const phases = world.grids.map((g, i) => {
     // A retired company neither buys nor sells; its frozen grid only keeps its seat.
     if (!active.includes(i))
@@ -603,18 +621,40 @@ export function stepWorld(world: World): void {
       };
     selectWeatherLocation(g.location.id);
     g.multiplayer!.pricePerMWh = world.pricePerMWh;
-    const phase = tickStatePhases(g);
+    const phase = tickStatePhases(g, undefined, undefined, sharedImportRounds);
     const planned = phase.next();
-    if (planned.done)
+    if (
+      planned.done ||
+      (sharedImportRounds
+        ? !("kind" in planned.value) || planned.value.kind !== "ready"
+        : !("offerW" in planned.value))
+    )
       throw new Error("A grid could not prepare its shared tick");
-    const plan = { ...planned.value };
-    if (g.transmission?.sellingRule === "NONE") plan.offerW = 0;
-    if (g.transmission?.buyingRule === "NONE") {
-      plan.shortageW = 0;
-      plan.storageChargeW = 0;
-    }
-    return { phase, plan };
+    // With shared regional supply, all grids first stop at supplier readiness.
+    return {
+      phase,
+      plan:
+        "offerW" in planned.value
+          ? tradingPlan(planned.value, i)
+          : {
+              offerW: 0,
+              shortageW: 0,
+              pricePerMWh: world.pricePerMWh,
+              temperatureC: 0,
+              solarIrradianceWM2: 0,
+              emissionsAt: () => 0,
+            },
+    };
   });
+  if (sharedImportRounds)
+    phases.forEach(({ phase }, i) => {
+      if (!phase) return;
+      selectWeatherLocation(world.grids[i].location.id);
+      const planned = phase.next();
+      if (planned.done || !("offerW" in planned.value))
+        throw new Error("A grid did not plan after readiness");
+      phases[i].plan = tradingPlan(planned.value, i);
+    });
   // Construction advances during planning, so completed upgrades apply to this settlement.
   world.edges.forEach((edge) => {
     const lines = world.grids.flatMap(
@@ -634,16 +674,70 @@ export function stepWorld(world: World): void {
       0,
     );
   });
-  const settlements = clearPeerMarket(
-    world.seats.map((s) => s.id),
-    phases.map((p) => p.plan),
-    world.edges,
-  );
+  // Each refresh uses the same settlement owner and a fresh regional budget. The barrier
+  // leaves every company settled before reserve, history and month-opening work continues.
+  let round = 0;
+  let plans = phases.map((p) => p.plan);
+  while (true) {
+    const settlements = clearPeerMarket(
+      world.seats.map((s) => s.id),
+      plans,
+      world.edges,
+    );
+    phases.forEach(({ phase }, i) => {
+      if (!phase) return;
+      selectWeatherLocation(world.grids[i].location.id);
+      const settled = phase.next(settlements[i]);
+      if (
+        sharedImportRounds
+          ? settled.done ||
+            !("kind" in settled.value) ||
+            settled.value.kind !== "settled"
+          : !settled.done
+      )
+        throw new Error("A grid did not finish its shared settlement");
+    });
+    if (!sharedImportRounds) break;
+    const clearing = sharedImportRounds[round++];
+    const reserved = [...clearing.reservations];
+    for (const { tick, offers, limitW } of clearing.headroom) {
+      const headroom = allocateIntertieFlows(
+        offers,
+        limitW,
+        0,
+        reserved,
+      ).importedW;
+      const watts = headroom.reduce((sum, value) => sum + value, 0);
+      tick.availableSupplyW = (tick.availableSupplyW ?? tick.supplyW) + watts;
+      tick.reserveW = (tick.reserveW ?? tick.supplyW - tick.demandW) + watts;
+      headroom.forEach((value, i) =>
+        reserved.push({ offer: offers[i], watts: value }),
+      );
+    }
+    let nextPlans = 0;
+    plans = phases.map(({ phase, plan }, i) => {
+      if (!phase) return plan;
+      selectWeatherLocation(world.grids[i].location.id);
+      const next = phase.next();
+      if (next.done) return plan;
+      if (!("kind" in next.value) || next.value.kind !== "ready")
+        throw new Error("A grid did not prepare its next refresh");
+      nextPlans++;
+      return plan;
+    });
+    if (!nextPlans) break;
+    if (nextPlans !== active.length) throw new Error("Shared refresh diverged");
+    plans = phases.map(({ phase, plan }, i) => {
+      if (!phase) return plan;
+      selectWeatherLocation(world.grids[i].location.id);
+      const next = phase.next();
+      if (next.done || !("offerW" in next.value))
+        throw new Error("A grid did not plan its next refresh");
+      return tradingPlan(next.value, i);
+    });
+  }
   phases.forEach(({ phase }, i) => {
     if (!phase) return;
-    selectWeatherLocation(world.grids[i].location.id);
-    if (!phase.next(settlements[i]).done)
-      throw new Error("A grid settled more than once");
     const grid = world.grids[i];
     let capacity = currentTick(grid)!.transmissionCapacityW || 0;
     grid.transmission?.lines.forEach((line) => {
@@ -914,10 +1008,19 @@ function validGrid(world: World, initial: World, i: number) {
   const expectedConnections = initial.grids[i].transmission!.lines;
   const nativeLines = isUtilityExpansionGame(g)
     ? (g.transmission?.lines ?? []).filter((line) =>
-        ["vt-champlain-valley", "vt-champlain-ridge"].includes(line.corridorId),
+        [
+          "vt-champlain-valley",
+          "vt-champlain-ridge",
+          "vt-champlain-regional",
+          "vt-valley-regional",
+          "vt-ridge-regional",
+        ].includes(line.corridorId),
       )
     : [];
-  const lineCount = expectedConnections.length + nativeLines.length;
+  const lineCount =
+    expectedConnections.filter(
+      (line) => !isUtilityExpansionGame(g) || isPeerCorridorId(line.corridorId),
+    ).length + nativeLines.length;
   return (
     !!parseSave(
       serializeSave({
@@ -928,6 +1031,9 @@ function validGrid(world: World, initial: World, i: number) {
               buyingRule: g.transmission!.buyingRule,
               sellingRule: g.transmission!.sellingRule,
               lines: nativeLines,
+              acceptedAgreements: g.transmission!.acceptedAgreements,
+              inheritedAgreementTerms: g.transmission!.inheritedAgreementTerms,
+              agreementAccounts: g.transmission!.agreementAccounts,
             }
           : undefined,
       }),
