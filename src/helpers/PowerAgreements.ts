@@ -80,6 +80,31 @@ export const agreementYearMinute = (year: number) =>
   (year - 2005) * 12 * MINUTES_PER_MONTH;
 const FINISH = agreementYearMinute(2025);
 export const AGREEMENT_MINIMUM_FRACTION = 0.7;
+
+type AgreementDispatchSource = {
+  id: string;
+  termsVersion: PowerAgreementTermsVersion;
+  pricePerMWh: number;
+};
+const AGREEMENT_DISPATCH_PRIORITY: Record<PowerAgreementTermsVersion, number> =
+  {
+    1: 2,
+    2: 0,
+    3: 1,
+  };
+/** Assign scarce readiness and useful delivery to fully paid blocks before monthly minima. */
+export function compareAgreementDispatchPriority(
+  a: AgreementDispatchSource,
+  b: AgreementDispatchSource,
+): number {
+  return (
+    AGREEMENT_DISPATCH_PRIORITY[a.termsVersion] -
+      AGREEMENT_DISPATCH_PRIORITY[b.termsVersion] ||
+    a.pricePerMWh - b.pricePerMWh ||
+    a.id.localeCompare(b.id)
+  );
+}
+
 /** Calibrated game rule: one-year reward 1%, ten-year reward 20%. */
 export function agreementDurationDiscount(years: number): number {
   return 0.01 + ((Math.min(10, Math.max(1, years)) - 1) * 0.19) / 9;

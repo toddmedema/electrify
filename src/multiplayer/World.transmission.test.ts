@@ -10,6 +10,7 @@ import {
 } from "../helpers/PowerAgreements";
 import { getDateFromMinute } from "../helpers/DateTime";
 import { currentTick } from "../helpers/GameSelectors";
+import * as Transmission from "../helpers/Transmission";
 import {
   intertieContextForGame,
   intertieOfferLimits,
@@ -246,6 +247,83 @@ it("assigns supplier-ready commitments once independently from pause and consump
     expect(currentTick(grid)!.importedW).toBe(0);
     expect(currentTick(grid)!.exportedW).toBe(0);
   });
+});
+
+it("allocates scarce supplier readiness to paid v2 before cheaper v3 within each company", () => {
+  const price = jest
+    .spyOn(Transmission, "adjacentMarketPricePerMWh")
+    .mockReturnValue(20);
+  try {
+    const world = ready();
+    for (const grid of world.grids) {
+      const signingMinute = agreementYearMinute(2018);
+      grid.date = getDateFromMinute(signingMinute, grid.startingYear);
+      grid.timeline.forEach((frame) => (frame.minute += signingMinute));
+      const quote = powerAgreementQuote(grid, "champlain-nuclear", 3, 10)!;
+      expect(quote).toBeDefined();
+      grid.transmission!.acceptedAgreements = [quote.receipt];
+      grid.transmission!.buyingRule = "NONE";
+      const start = agreementYearMinute(2020);
+      grid.date = getDateFromMinute(start + 16 * 60 + 45, grid.startingYear);
+      grid.monthlyHistory = Array.from(
+        { length: 180 },
+        () =>
+          ({ year: 2019, month: 12 }) as (typeof grid.monthlyHistory)[number],
+      );
+      grid.timeline.forEach((frame) => (frame.minute += start - signingMinute));
+      grid.objectiveProgress = undefined;
+    }
+    setNextDemand(world, 1e9);
+    world.grids.forEach((grid) => {
+      const next = grid.timeline.find(
+        (frame) => frame.minute === grid.date.minute + TICK_MINUTES,
+      )!;
+      next.temperatureC = -30;
+    });
+    stepWorld(world);
+    let remainingW = regionalBudget(world);
+    const originalPoolW = remainingW;
+    const energyPerW = GAME_TO_REAL_YEARS / TICKS_PER_HOUR / 1e6;
+    expect(originalPoolW).toBeLessThan(4 * (57e6 + 95e6));
+    for (const grid of world.grids) {
+      const now = currentTick(grid)!;
+      expect(now.minute).toBe(agreementYearMinute(2020) + 17 * 60);
+      const sources = connectionAgreements(grid, "champlain");
+      const v2 = sources.find(
+        (source) => source.termsVersion === 2 && source.active,
+      )!;
+      const v3 = sources.find(
+        (source) => source.termsVersion === 3 && source.active,
+      )!;
+      expect(v3.priceToday).toBeLessThan(v2.priceToday);
+      const paidW = Math.min(57e6, remainingW);
+      remainingW -= paidW;
+      const minimumW = Math.min(95e6, remainingW);
+      remainingW -= minimumW;
+      expect(now.agreementAvailableMWh?.[v2.id] ?? 0).toBeCloseTo(
+        paidW * energyPerW,
+        6,
+      );
+      expect(now.agreementUsefulMWh?.[v2.id] ?? 0).toBeCloseTo(
+        paidW * energyPerW,
+        6,
+      );
+      expect(now.agreementAvailableMWh?.[v3.id] ?? 0).toBeCloseTo(
+        minimumW * energyPerW,
+        6,
+      );
+      expect(now.agreementUsefulMWh?.[v3.id] ?? 0).toBeCloseTo(
+        minimumW * energyPerW,
+        6,
+      );
+    }
+    expect(
+      world.grids.reduce((sum, grid) => sum + currentTick(grid)!.importedW!, 0),
+    ).toBeLessThanOrEqual(originalPoolW + 1e-5);
+    expect(remainingW).toBeCloseTo(0, 5);
+  } finally {
+    price.mockRestore();
+  }
 });
 
 it("publishes signed terms and current minimum-payment history to each owning renderer", () => {

@@ -1,5 +1,6 @@
 import {
   connectionAgreements,
+  compareAgreementDispatchPriority,
   agreementRate,
   inheritedConnection,
   INHERITED_CONNECTIONS,
@@ -529,7 +530,7 @@ export function entitlementSources(
           };
         });
     })
-    .sort((a, b) => a.pricePerMWh - b.pricePerMWh || a.id.localeCompare(b.id));
+    .sort(compareAgreementDispatchPriority);
   const allocated = allocateIntertieFlows(
     sources.map((source) => source.offer),
     Infinity,

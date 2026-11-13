@@ -28,6 +28,7 @@ import { utilityNetworkAnnualOM } from "../data/UtilityExpansion";
 import { acquireUtility, acceptPowerAgreement } from "./GameActions";
 import {
   acceptAgreement,
+  compareAgreementDispatchPriority,
   agreementIntervalMinutes,
   recordAgreementSettlements,
   inheritedConnection,
@@ -5354,20 +5355,13 @@ function* supplyFacilitiesFinancesPhases(
     agreementStart,
   );
   // Use fully paid blocks before adding monthly-minimum usage, then pay-as-used supply.
-  const agreementDispatchPriority = { 1: 2, 2: 0, 3: 1 };
   const entitlementOffers = [
     ...readyAgreements.map((source) => ({
       ...source,
       capacityW: source.paused ? 0 : source.capacityW,
     })),
     ...legacyAgreements,
-  ].sort(
-    (a, b) =>
-      agreementDispatchPriority[a.termsVersion] -
-        agreementDispatchPriority[b.termsVersion] ||
-      a.pricePerMWh - b.pricePerMWh ||
-      a.id.localeCompare(b.id),
-  );
+  ].sort(compareAgreementDispatchPriority);
   const entitlementCapacityW = entitlementOffers.reduce(
     (sum, offer) => sum + offer.capacityW,
     0,

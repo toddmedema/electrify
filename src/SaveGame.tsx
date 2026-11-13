@@ -574,6 +574,13 @@ export function parseSave(raw: unknown): SaveGameType | null {
                   value < 0,
               )),
         ) ||
+        (tick.agreementClosingExpenses !== undefined &&
+          Object.keys(tick.agreementClosingExpenses).some(
+            (month) =>
+              !Number.isSafeInteger(Number(month)) ||
+              Number(month) < 0 ||
+              String(Number(month)) !== month,
+          )) ||
         (tick.storageImportedW !== undefined &&
           (typeof tick.storageImportedW !== "number" ||
             !Number.isFinite(tick.storageImportedW) ||

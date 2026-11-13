@@ -31,6 +31,28 @@ describe("SaveGame", () => {
     expect(save!.game).toEqual(JSON.parse(JSON.stringify(game)));
   });
 
+  it.each(["0", "1", "180", String(Number.MAX_SAFE_INTEGER)])(
+    "accepts canonical agreement closing month %s",
+    (month) => {
+      const raw = JSON.parse(JSON.stringify(serializeSave(game)));
+      raw.game.timeline[0].agreementClosingExpenses = { [month]: 12 };
+      expect(parseSave(raw)?.game.timeline[0].agreementClosingExpenses).toEqual(
+        {
+          [month]: 12,
+        },
+      );
+    },
+  );
+
+  it.each(["bogus", "-1", "1.5", "01", "1e2", "", "9007199254740992"])(
+    "rejects invalid agreement closing month %p",
+    (month) => {
+      const raw = JSON.parse(JSON.stringify(serializeSave(game)));
+      raw.game.timeline[0].agreementClosingExpenses = { [month]: 12 };
+      expect(parseSave(raw)).toBeNull();
+    },
+  );
+
   it.each([NaN, Infinity, -1, 0.5, 4294967296])(
     "rejects an invalid scenario seed %p without compiling it",
     (seed) => {
