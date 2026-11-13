@@ -362,7 +362,7 @@ No deleted/renamed spec was explicitly selected by CI or referenced in `.github/
 | investor-objectives.spec.ts         | Merge into Carbon Fee victory-conditions case, preserving briefing and live customer requirements.                                      |
 | low-cash-warning.spec.ts            | Keep: exact warning quote applies once per month and remains paused/reload-safe.                                                        |
 | main-menu-spacing.spec.ts           | Replace with main-menu.spec.ts: prompt independence and shared short-home reachability; cosmetic pixel rhythm removed.                  |
-| manual-help-interaction.spec.ts     | Keep: quiet hover cues, click/tap and keyboard help, focus return, no reopening on hover.                                                |
+| manual-hover-preview.spec.ts        | Keep: hover preview stays open while inspected, leaves cleanly, click pins, closing does not reopen.                                    |
 | manual-sticky-headers.spec.ts       | Keep: actual scrolled group/entry headers and linked entry stay visible and do not overlap.                                             |
 | menu-keyboard.spec.ts               | Keep: shared keyboard-only journey plus dark selected focus/overflow; browser context differs from native.                              |
 | mission-evidence.spec.ts            | Keep: mission details focus, blackout status, saved movable divider, temporary/configured evidence, large text and purchase context.    |
