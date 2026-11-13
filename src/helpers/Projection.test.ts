@@ -228,7 +228,9 @@ function acquiredGame(seed = 12345) {
       }),
     ),
   );
-  game.transmission!.lines[0].yearsToBuildLeft = 0;
+  game.transmission!.lines.find(
+    (line) => line.corridorId === "vt-champlain-ridge",
+  )!.yearsToBuildLeft = 0;
   const quote = acquisitionQuote(game, "ridge-electric")!;
   game = cloneDeep(
     reducer(

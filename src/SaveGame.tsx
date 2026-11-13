@@ -1,3 +1,4 @@
+import { validPowerAgreements } from "./helpers/PowerAgreements";
 import { POLICY_IDS } from "./data/Policies";
 import { validLegacyCampaign } from "./helpers/LegacyCampaign";
 import { validLegacyCampaignEvidence } from "./helpers/ObjectiveRules";
@@ -174,6 +175,11 @@ function validLineInvestment(
   year: number,
   context?: IntertieAccessContext,
 ): boolean {
+  // Acquisition closes new upgrade orders, but preserves tiers and jobs already paid for.
+  // Reconstruct their canonical investment terms independently of today's order eligibility.
+  const investmentContext = context?.ownedUtilityCorridors?.length
+    ? { ...context, ownedUtilityCorridors: undefined }
+    : context;
   let expected = {
     corridorId: corridor.id,
     capacityW: corridor.capacityW,
@@ -186,7 +192,7 @@ function validLineInvestment(
     log(line.capacityW! / corridor.capacityW) / log(INTERTIE_UPGRADE_STEP),
   );
   for (let step = 0; step < steps; step++) {
-    const quote = intertieUpgradeQuote(expected, year, 1, 1, context);
+    const quote = intertieUpgradeQuote(expected, year, 1, 1, investmentContext);
     if (!quote) return false;
     expected = {
       ...expected,
@@ -208,7 +214,7 @@ function validLineInvestment(
       line.yearsToBuildLeft !== 0
     )
       return false;
-    const quote = intertieUpgradeQuote(expected, year, 1, 1, context);
+    const quote = intertieUpgradeQuote(expected, year, 1, 1, investmentContext);
     const upgrade = line.upgrade;
     if (
       !quote ||
@@ -549,6 +555,32 @@ export function parseSave(raw: unknown): SaveGameType | null {
     game.timeline.some(
       (tick) =>
         !validEmissions(tick) ||
+        [
+          tick.agreementAvailableMWh,
+          tick.agreementUsefulMWh,
+          tick.agreementPayments,
+          tick.agreementUsefulValues,
+          tick.agreementClosingExpenses,
+        ].some(
+          (values) =>
+            values !== undefined &&
+            (!values ||
+              typeof values !== "object" ||
+              Array.isArray(values) ||
+              Object.values(values).some(
+                (value) =>
+                  typeof value !== "number" ||
+                  !Number.isFinite(value) ||
+                  value < 0,
+              )),
+        ) ||
+        (tick.agreementClosingExpenses !== undefined &&
+          Object.keys(tick.agreementClosingExpenses).some(
+            (month) =>
+              !Number.isSafeInteger(Number(month)) ||
+              Number(month) < 0 ||
+              String(Number(month)) !== month,
+          )) ||
         (tick.storageImportedW !== undefined &&
           (typeof tick.storageImportedW !== "number" ||
             !Number.isFinite(tick.storageImportedW) ||
@@ -752,6 +784,7 @@ export function parseSave(raw: unknown): SaveGameType | null {
       !validLegacyCampaign(game as GameType) ||
       !validLegacyCampaignEvidence(game as GameType) ||
       !validUtilityExpansion(game as GameType) ||
+      !validPowerAgreements(game as GameType) ||
       !validScenarioRuleState(game as GameType) ||
       !validGameObjectiveProgress(game as GameType)
     )

@@ -5,6 +5,11 @@ import { UTILITY_AREAS } from "../data/UtilityExpansion";
 import { currentTick } from "../helpers/GameSelectors";
 import { acquisitionQuote } from "../helpers/Expansion";
 import { isUtilityExpansionGame } from "../helpers/ExpansionContext";
+import {
+  modRuntimeDigest,
+  modSetupDigest,
+  validScenarioMod,
+} from "../helpers/ScenarioMod";
 import { serializeSave, parseSave } from "../SaveGame";
 import reducer, {
   buildTransmissionLine,
@@ -51,6 +56,52 @@ const pack = (): ModPackage => ({
 
 beforeEach(() => loadSimData(UTILITY_AREAS.champlain.location));
 
+function scenarioWithInterties(intertiesEnabled: boolean | undefined) {
+  const scenario = modScenario(pack());
+  if (intertiesEnabled === undefined) delete scenario.intertiesEnabled;
+  else scenario.intertiesEnabled = intertiesEnabled;
+  scenario.mod!.setupDigest = modSetupDigest(scenario);
+  scenario.mod!.runtimeDigest = modRuntimeDigest(scenario.mod!);
+  return scenario;
+}
+
+it("rejects disabled expansion interties even after setup and runtime digests are recomputed", () => {
+  const scenario = scenarioWithInterties(false);
+  expect(validScenarioMod(scenario.mod)).toBe(true);
+  expect(validScenarioMod(scenario.mod, scenario)).toBe(false);
+});
+
+it("rejects disabled expansion interties with the normal launch validation error", () => {
+  const scenario = scenarioWithInterties(false);
+  expect(() =>
+    createGame({
+      scenarioId: 999,
+      scenario,
+      seed: 12345,
+      difficulty: "Employee",
+    }),
+  ).toThrow(/This mod's runtime snapshot is invalid/);
+});
+
+it.each([undefined, true])(
+  "preserves inherited expansion connections and saved terms with intertiesEnabled %s",
+  (intertiesEnabled) => {
+    const scenario = scenarioWithInterties(intertiesEnabled);
+    expect(validScenarioMod(scenario.mod, scenario)).toBe(true);
+    const game = createGame({
+      scenarioId: 999,
+      scenario,
+      seed: 12345,
+      difficulty: "Employee",
+    });
+    expect(game.transmission!.inheritedAgreementTerms).toBe(3);
+    expect(currentTick(game)!.entitlementImportCapacityW).toBeGreaterThan(0);
+    const restored = parseSave(JSON.parse(JSON.stringify(serializeSave(game))));
+    expect(restored).not.toBeNull();
+    expect(restored!.game.transmission).toEqual(game.transmission);
+  },
+);
+
 it("mod base 116 preserves source rights, company customers, obligations and exact save/forecast behavior", () => {
   const scenario = modScenario(pack());
   let game = createGame({
@@ -73,7 +124,9 @@ it("mod base 116 preserves source rights, company customers, obligations and exa
       }),
     ),
   );
-  game.transmission!.lines[0].yearsToBuildLeft = 0;
+  game.transmission!.lines.find(
+    (line) => line.corridorId === "vt-champlain-ridge",
+  )!.yearsToBuildLeft = 0;
   const quote = acquisitionQuote(game, "ridge-electric")!;
   expect(quote).toBeDefined();
   game = copyOfficialGame(

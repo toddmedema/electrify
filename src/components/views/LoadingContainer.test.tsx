@@ -1,4 +1,10 @@
 import { initWeather } from "../../data/Weather";
+import * as Weather from "../../data/Weather";
+import * as Economy from "../../data/Economy";
+import * as FuelPrices from "../../data/FuelPrices";
+import { createGame } from "../../testing/Simulator";
+import { tickState } from "../../reducers/Game";
+import { parseSave, serializeSave } from "../../SaveGame";
 import cardReducer, {
   initialCard,
   navigate,
@@ -12,7 +18,61 @@ import {
   restoreLoadedTutorial,
   restoreTutorialAfterLoading,
   weatherFailureMessage,
+  mapDispatchToProps,
 } from "./LoadingContainer";
+
+it.each([
+  [2, false],
+  [2, true],
+  [3, false],
+  [3, true],
+] as const)(
+  "finishes deferred v%s agreement price validation after loading (forged payment: %s)",
+  async (termsVersion, forged) => {
+    const game = createGame({ scenarioId: 116, seed: 12345 });
+    game.transmission!.inheritedAgreementTerms = termsVersion;
+    tickState(game);
+    const wire = JSON.parse(JSON.stringify(serializeSave(game)));
+    const row = wire.game.transmission.agreementAccounts[0].months[0];
+    expect(row.payment).toBeGreaterThan(0);
+    if (forged) {
+      if (termsVersion === 2) row.payment += 1;
+      else {
+        // Preserve the v3 arithmetic while putting its rate above the authored ceiling.
+        row.availableValue *= 1e6;
+        row.usefulValue *= 1e6;
+        row.payment *= 1e6;
+      }
+    }
+    const unloaded = jest.spyOn(Economy, "hasEconomy").mockReturnValue(false);
+    const parsed = parseSave(wire);
+    expect(parsed).not.toBeNull();
+    unloaded.mockRestore();
+    const economy = jest
+      .spyOn(Economy, "initEconomy")
+      .mockImplementation((done) => done?.());
+    const fuel = jest
+      .spyOn(FuelPrices, "initFuelPrices")
+      .mockImplementation((done) => done?.());
+    const weather = jest
+      .spyOn(Weather, "initWeather")
+      .mockImplementation((_location, done) => done?.());
+    try {
+      const dispatch = jest.fn();
+      const onError = jest.fn();
+      await mapDispatchToProps(dispatch as never).load(parsed!.game, onError);
+      expect(onError.mock.calls).toEqual(
+        forged ? [[expect.stringContaining("power agreement history")]] : [],
+      );
+      expect(dispatch.mock.calls).toEqual(forged ? [] : [[loaded()]]);
+      expect(parseSave(wire) === null).toBe(forged);
+    } finally {
+      economy.mockRestore();
+      fuel.mockRestore();
+      weather.mockRestore();
+    }
+  },
+);
 
 it("restores a capstone's authored pane after rebuilding its scenario", () => {
   const finances = TUTORIALS.find((tutorial) => tutorial.id === 4)!;

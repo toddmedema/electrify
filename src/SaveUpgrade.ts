@@ -1,4 +1,5 @@
-import type { BuyingRuleType, SellingRuleType } from "./Types";
+import type { BuyingRuleType, SellingRuleType, GameType } from "./Types";
+import { inheritedConnection } from "./helpers/PowerAgreements";
 
 type DecodedSave = Record<string, unknown>;
 type Migration = (save: DecodedSave) => DecodedSave | null;
@@ -53,6 +54,87 @@ const migrations: readonly Migration[] = [
   },
   // 8 -> 9: continued runs need future-only forecast refresh after data loads. Older apps do not
   // implement that continuation behavior and must not load these saves.
+  (save) => save,
+  // 9 -> 10: make already-owned inherited interfaces visible without inventing past purchases.
+  (save) => {
+    if (!object(save.game)) return null;
+    const game = save.game;
+    if (!game.utilityExpansion) return save;
+    if (
+      !object(game.utilityExpansion) ||
+      !Array.isArray(game.utilityExpansion.acquisitions) ||
+      !object(game.transmission) ||
+      !Array.isArray(game.transmission.lines)
+    )
+      return null;
+    if (
+      game.transmission.lines.some(
+        (line) =>
+          !object(line) ||
+          typeof line.id !== "number" ||
+          !Number.isSafeInteger(line.id) ||
+          line.id < 1,
+      )
+    )
+      return null;
+    const lines = [...game.transmission.lines] as NonNullable<
+      GameType["transmission"]
+    >["lines"];
+    let nextId = Math.max(0, ...lines.map((line) => line?.id || 0)) + 1;
+    const additions = [inheritedConnection("champlain", nextId++)];
+    for (const receipt of game.utilityExpansion.acquisitions) {
+      if (
+        !object(receipt) ||
+        (receipt.targetId !== "valley-electric" &&
+          receipt.targetId !== "ridge-electric") ||
+        typeof receipt.minute !== "number"
+      )
+        return null;
+      additions.push(
+        inheritedConnection(receipt.targetId, nextId++, receipt.minute),
+      );
+    }
+    return {
+      ...save,
+      game: {
+        ...game,
+        transmission: {
+          ...game.transmission,
+          lines: [...lines, ...additions],
+          acceptedAgreements: [],
+        },
+      },
+    };
+  },
+  // 10 -> 11: preserve the pay-as-delivered promises already accepted or inherited.
+  (save) => {
+    if (!object(save.game)) return null;
+    const game = save.game;
+    if (!game.utilityExpansion) return save;
+    if (!object(game.transmission)) return null;
+    const receipts = game.transmission.acceptedAgreements ?? [];
+    if (
+      !Array.isArray(receipts) ||
+      receipts.some((receipt) => !object(receipt) || "termsVersion" in receipt)
+    )
+      return null;
+    return {
+      ...save,
+      game: {
+        ...game,
+        transmission: {
+          ...game.transmission,
+          inheritedAgreementTerms: 1,
+          acceptedAgreements: receipts.map((receipt) => ({
+            ...receipt,
+            termsVersion: 1,
+          })),
+        },
+      },
+    };
+  },
+  // 11 -> 12: variable-duration monthly-energy terms are opt-in new promises only.
+  // Preserve every existing v1/v2 receipt, inherited term, meter and recorded dollar.
   (save) => save,
 ];
 

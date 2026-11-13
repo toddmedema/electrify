@@ -23,6 +23,7 @@ function footer() {
         <p>Electrify. Take charge of the power markets.</p>
         <nav aria-label="Footer navigation">
           <a href="/scenarios.html">All scenarios</a>
+          <a href="/power-grid-simulator.html">How to play</a>
           <a href="/about.html">About</a>
           <a href="/privacy.html">Privacy</a>
           <a href="https://github.com/toddmedema/electrify">Source code</a>

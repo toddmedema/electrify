@@ -14,7 +14,6 @@ import {
 import {
   acquisitionAssets,
   sellerCustomers,
-  entitlementSources,
   expansionRetentionBaseline,
 } from "./Expansion";
 import {
@@ -261,15 +260,24 @@ export function validUtilityExpansion(game: GameType): boolean {
       tick.entitlementImportCapacityW === undefined
     )
       return false;
-    const capacity = entitlementSources(game, tick).reduce(
-      (sum, source) => sum + source.capacityW,
+    // Readings before a player decision retain their recorded delivery. Today's pause and
+    // signed receipts cannot retroactively change it; canonical owned interfaces bound history.
+    const capacity = [
+      "champlain",
+      ...state.acquisitions
+        .filter((receipt) => receipt.minute <= tick.minute)
+        .map((receipt) => receipt.targetId),
+    ].reduce(
+      (sum, id) =>
+        sum +
+        UTILITY_AREAS[id as import("../Types").UtilityId].sourceInterfaceW,
       0,
     );
     return (
       nonnegative(tick.entitlementImportedW) &&
       nonnegative(tick.entitlementImportCapacityW) &&
-      close(tick.entitlementImportCapacityW, capacity) &&
-      tick.entitlementImportedW <= capacity + 0.01 &&
+      tick.entitlementImportCapacityW <= capacity + 0.01 &&
+      tick.entitlementImportedW <= tick.entitlementImportCapacityW + 0.01 &&
       tick.entitlementImportedW <= (tick.importedW ?? 0) + 0.01
     );
   });

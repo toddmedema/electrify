@@ -1269,7 +1269,9 @@ it.each([false, true])(
         }),
       ),
     );
-    game.transmission!.lines[0].yearsToBuildLeft = 0;
+    game.transmission!.lines.find(
+      (line) => line.corridorId === "vt-champlain-ridge",
+    )!.yearsToBuildLeft = 0;
     render(
       <Provider store={configureStore({ reducer: { ui: uiReducer } })}>
         <TransmissionPanel

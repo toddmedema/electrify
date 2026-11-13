@@ -40,6 +40,7 @@ import Insights, {
   isChartLayer,
   withRequiredLayers,
 } from "./Insights";
+import { MANUAL_ENTRIES, MANUAL_ENTRY } from "../base/ManualEntries";
 import { manualEntryByTitle } from "../base/ManualHelpPopover";
 import { UpcomingStoryEventType } from "./StoryEventSelectors";
 
@@ -793,7 +794,7 @@ describe("Insights layers", () => {
         .map((button) => button.getAttribute("aria-label")),
     ).toEqual([
       "Expand Cash chart",
-      "What is Insights & data layers?",
+      "What is Cash?",
       "Move Cash up",
       "Move Cash down",
       "Remove Cash",
@@ -813,9 +814,9 @@ describe("Insights layers", () => {
       </Provider>,
     );
     await user.click(
-      screen.getByRole("button", { name: "What is Reserve capacity?" }),
+      screen.getByRole("button", { name: "What is Lowest reserve?" }),
     );
-    expect(store.getState().ui.manualHelpEntry).toBe("Reserve capacity");
+    expect(store.getState().ui.manualHelpEntry).toBe("Lowest reserve");
   });
 
   it("points every chart layer at a manual entry that exists", () => {
@@ -827,6 +828,12 @@ describe("Insights layers", () => {
       if (!manualEntryByTitle(INSIGHT_LAYER_MANUAL[id])) missing.push(id);
     }
     expect(missing).toEqual([]);
+    const sections = MANUAL_ENTRIES.find(
+      (entry) => entry.title === MANUAL_ENTRY.FORECASTS,
+    )!.sections!;
+    expect(Object.values(INSIGHT_LAYER_MANUAL).sort()).toEqual(
+      sections.map((section) => section.title).sort(),
+    );
     expect(Object.keys(INSIGHT_LAYER_MANUAL).sort()).toEqual(charts.sort());
     // The finance table has no plot to explain
     expect(isChartLayer("financeDetails")).toBe(false);
@@ -851,7 +858,7 @@ describe("Insights layers", () => {
     const dialog = screen.getByRole("dialog", { name: "Fuel Prices" });
     // The title names the dialog on its own; the help button beside it doesn't join the name
     expect(
-      within(dialog).getByRole("button", { name: "What is Fuel costs?" }),
+      within(dialog).getByRole("button", { name: "What is Fuel Prices?" }),
     ).toBeVisible();
     expect(
       within(dialog).getByRole("button", { name: "Coal" }),
@@ -1734,7 +1741,7 @@ describe("Insights layers", () => {
       name: "Power exchange evidence",
     });
     expect(
-      within(exchange).getByRole("button", { name: "What is Interties?" }),
+      within(exchange).getByRole("button", { name: "What is Power exchange?" }),
     ).toBeVisible();
     expect(within(exchange).queryByText("How interties work")).toBeNull();
     expect(localStorage.getItem("insightsLayers")).toBe(
@@ -1814,7 +1821,7 @@ describe("Insights layers", () => {
       within(dialog).getByRole("img", { name: "Power exchange inspection" }),
     ).toHaveAttribute("data-sync-key", "insights-expanded");
     expect(
-      within(dialog).getByRole("button", { name: "What is Interties?" }),
+      within(dialog).getByRole("button", { name: "What is Power exchange?" }),
     ).toBeVisible();
     fireEvent.keyDown(dialog, { key: "Escape" });
     await waitFor(() =>

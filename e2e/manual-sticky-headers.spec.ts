@@ -250,7 +250,7 @@ for (const shortWindow of [false, true]) {
     await page
       .locator("#manual-insights-data-layers-content")
       .getByRole("link", {
-        name: "energy and the largest power shortage",
+        name: "MWh",
         exact: true,
       })
       .click();

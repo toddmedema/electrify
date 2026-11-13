@@ -106,6 +106,15 @@ it("host acquires a fictional utility while keeping other human companies indepe
     });
   stepWorld(world);
   expect(world.grids[0].date.minute).toBe(world.grids[1].date.minute);
+  const playedCheckpoint = JSON.parse(JSON.stringify(checkpointWorld(world)));
+  const playedRestored = restoreWorld(playedCheckpoint, "played-epoch");
+  expect(playedRestored.grids[0].transmission!.agreementAccounts).toEqual(
+    world.grids[0].transmission!.agreementAccounts,
+  );
+  playedCheckpoint.grids[0].transmission.agreementAccounts[0].months[0].payment += 1;
+  expect(() => restoreWorld(playedCheckpoint, "forged-epoch")).toThrow(
+    /invalid grids/,
+  );
 });
 
 it("host rejects forged human-target ownership and wrong-target connections", () => {

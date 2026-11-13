@@ -8650,3 +8650,67 @@ option {
     }
   }
 }
+
+.powerAgreementSummary {
+  display: block;
+  margin-top: 4px;
+  white-space: normal;
+}
+
+.powerAgreementTerms .buildDetails {
+  width: 100%;
+  table-layout: fixed;
+  th,
+  td {
+    padding: 8px;
+    overflow-wrap: normal;
+    font-variant-numeric: tabular-nums;
+  }
+  .buildDetailLabel {
+    width: 40%;
+  }
+  .buildDetailHelp {
+    display: none;
+  }
+}
+
+.powerAgreementDuration {
+  display: grid;
+  grid-template-columns: max-content minmax(80px, 1fr);
+  align-items: center;
+  gap: 12px;
+  min-height: 50px;
+  padding-inline: 16px;
+  margin-bottom: 8px;
+  > .MuiTypography-root {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    strong {
+      min-width: 7ch;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+  }
+}
+
+.powerAgreements {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-subtle);
+  overflow-wrap: anywhere;
+  .powerAgreement {
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border-subtle);
+    margin-bottom: 12px;
+    button {
+      min-height: 40px;
+      margin-top: 8px;
+    }
+  }
+  @media (pointer: coarse) {
+    .powerAgreement button {
+      min-height: 44px;
+    }
+  }
+}

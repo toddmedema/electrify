@@ -999,3 +999,36 @@ describe("expected luck", () => {
     expect(new Set(at(1, false)).size).toBeGreaterThan(1);
   });
 });
+
+it("reserves covered imports against the same line, access and source before ordinary spot allocation", () => {
+  const coverage = {
+    lineId: "inherited",
+    lineImportLimitW: 300,
+    marketId: "shared",
+    marketImportLimitW: 400,
+    accessId: "inherited-access",
+    accessImportLimitW: 300,
+    importLimitW: 200,
+    exportLimitW: 0,
+    pricePerMWh: 70,
+  };
+  const spot = { ...coverage, importLimitW: 300, pricePerMWh: 30 };
+  const secondRoute = {
+    ...spot,
+    lineId: "expansion",
+    accessId: "expansion-access",
+  };
+  const covered = allocateIntertieFlows([coverage], 180, 0).importedW[0];
+  expect(
+    allocateIntertieFlows([spot, secondRoute], Infinity, 0, [
+      { offer: coverage, watts: covered },
+    ]).importedW,
+  ).toEqual([120, 100]);
+  // A second participant's distinct line cannot mint another copy of the source budget.
+  expect(
+    allocateIntertieFlows([{ ...spot, lineId: "peer-company" }], Infinity, 0, [
+      { offer: coverage, watts: 180 },
+      { offer: secondRoute, watts: 200 },
+    ]).importedW,
+  ).toEqual([20]);
+});

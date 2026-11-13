@@ -327,6 +327,11 @@ export const INTERTIE_CORRIDOR_YEARS: Readonly<Record<string, readonly [from: nu
   // Fictional local acquisition routes are available from the authored 2005 scenario opening.
   "vt-champlain-valley": [2005],
   "vt-champlain-ridge": [2005],
+  // Authored inherited-interface availability starts at the 2005 scenario opening;
+  // these aggregate utility connections do not model historical commissioning dates.
+  "vt-champlain-regional": [2005],
+  "vt-valley-regional": [2005],
+  "vt-ridge-regional": [2005],
   "california-north": [1968],
   "california-south": [1980],
   "pjm-miso-upgrade": [1965],
