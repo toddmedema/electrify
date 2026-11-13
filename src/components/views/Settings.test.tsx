@@ -143,12 +143,18 @@ describe("Settings", () => {
         theme: "system",
       },
     });
-    const vibration = await screen.findByRole("switch", {
-      name: "Controller vibration",
-    });
-    const recording = await screen.findByRole("switch", {
-      name: "Recorded highlights",
-    });
+    // Let the lazy desktop controls load without repeatedly computing every switch's name.
+    const vibration = await screen.findByLabelText("Controller vibration");
+    const recording = await screen.findByLabelText("Recorded highlights");
+    expect(vibration).toHaveRole("switch");
+    expect(recording).toHaveRole("switch");
+    // MUI's native switch inputs are transparent; their labels carry the visible choice.
+    expect(
+      screen.getByText("Controller vibration", { selector: "label" }),
+    ).toBeVisible();
+    expect(
+      screen.getByText("Recorded highlights", { selector: "label" }),
+    ).toBeVisible();
     expect(vibration).not.toBeChecked();
     expect(recording).not.toBeChecked();
     expect(screen.getByRole("switch", { name: /^Sound$/ })).not.toBeChecked();
@@ -230,32 +236,50 @@ describe("Settings", () => {
   });
 
   it("offers independent screen-edge padding in advanced Display settings outside the desktop app", async () => {
+    const user = userEvent.setup();
     const onScreenEdgePaddingChange = jest.fn();
-    renderSettings({ onScreenEdgePaddingChange });
+    const onInterfaceScaleChange = jest.fn();
+    const onWorkspaceChange = jest.fn();
+    renderSettings({
+      onScreenEdgePaddingChange,
+      onInterfaceScaleChange,
+      onWorkspaceChange,
+    });
     const display = within(screen.getByRole("region", { name: "Display" }));
-    expect(
-      display.queryByRole("group", { name: "Screen-edge padding" }),
-    ).not.toBeInTheDocument();
-    await userEvent.click(
-      display.getByRole("button", { name: "Advanced display" }),
-    );
-    const padding = display.getByRole("group", { name: "Screen-edge padding" });
-    expect(within(padding).getByRole("button", { name: "0%" })).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
-    for (const value of [2, 4])
-      await userEvent.click(
-        within(padding).getByRole("button", { name: `${value}%` }),
-      );
+    const advanced = display.getByRole("button", { name: "Advanced display" });
+    // The accordion keeps its controls mounted while collapsed. Target their labels/text,
+    // then check visibility explicitly instead of recomputing all ancestor styles per role query.
+    const padding = display.getByLabelText("Screen-edge padding");
+    const scale = screen.getByLabelText("Interface scale");
+    const automatic = display.getByText("Automatic", { selector: "button" });
+    expect(advanced).toHaveAttribute("aria-expanded", "false");
+    expect(padding).not.toBeVisible();
+    await user.click(advanced);
+    expect(advanced).toHaveAttribute("aria-expanded", "true");
+    expect(padding).toHaveRole("group");
+    expect(padding).toHaveAccessibleName("Screen-edge padding");
+    expect(padding).toBeVisible();
+    const choices = within(padding);
+    const defaultPadding = choices.getByText("0%", { selector: "button" });
+    expect(defaultPadding).toHaveAccessibleName("0%");
+    expect(defaultPadding).toBeVisible();
+    expect(defaultPadding).toHaveAttribute("aria-pressed", "true");
+    for (const value of [2, 4]) {
+      const choice = choices.getByText(`${value}%`, { selector: "button" });
+      expect(choice).toHaveAccessibleName(`${value}%`);
+      expect(choice).toBeVisible();
+      await user.click(choice);
+    }
     expect(onScreenEdgePaddingChange.mock.calls).toEqual([[2], [4]]);
-    expect(
-      screen.getByRole("combobox", { name: "Interface scale" }),
-    ).toHaveValue("1");
-    expect(screen.getByRole("button", { name: "Automatic" })).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
+    expect(onInterfaceScaleChange).not.toHaveBeenCalled();
+    expect(onWorkspaceChange).not.toHaveBeenCalled();
+    expect(scale).toHaveRole("combobox");
+    expect(scale).toHaveAccessibleName("Interface scale");
+    expect(scale).toBeVisible();
+    expect(scale).toHaveValue("1");
+    expect(automatic).toBeVisible();
+    expect(automatic).toHaveAccessibleName("Automatic");
+    expect(automatic).toHaveAttribute("aria-pressed", "true");
   });
 
   it("displays an exact migrated intermediate scale", () => {

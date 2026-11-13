@@ -19,6 +19,7 @@ function cpuSuites(cores = os.availableParallelism()) {
         "--coverageDirectory=test-results/jest-unit-1",
         "--json",
         "--outputFile=test-results/jest-unit-1/results.json",
+        "--testResultsProcessor=./scripts/ci/jest-timings.js",
       ],
     },
     {

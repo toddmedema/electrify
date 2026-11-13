@@ -274,6 +274,11 @@ test("one test plan retains every suite, full browser coverage and all static ch
     assert(suite.args.includes("--filter=./scripts/ci/jest-filter.js"));
     assert(suite.args.includes("--maxWorkers=4"));
   }
+  assert(
+    plan.cpu
+      .find(({ script }) => script === "test:ci")
+      .args.includes("--testResultsProcessor=./scripts/ci/jest-timings.js"),
+  );
   const { scripts } = require("../../package.json");
   assert.equal(
     scripts["test:ci-coverage"],
