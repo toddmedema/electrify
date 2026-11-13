@@ -7,6 +7,7 @@ import {
   Button,
   Divider,
   Paper,
+  Select,
   Slider,
   Stack,
   Switch,
@@ -17,11 +18,21 @@ import {
 import { ChevronDownGlyph } from "../base/Glyphs";
 import {
   SettingsType,
-  TextSizeType,
+  ScreenEdgePaddingType,
   ThemeChoiceType,
   UnitSystemType,
+  WorkspaceType,
 } from "../../Types";
-import { TEXT_SIZES, TEXT_SIZE_LABELS } from "../../TextSize";
+import {
+  INTERFACE_SCALES,
+  interfaceScaleLabel,
+  normalizeInterfaceScale,
+} from "../../InterfaceScale";
+import { normalizeWorkspace } from "../../WorkspaceLayout";
+import {
+  SCREEN_EDGE_PADDINGS,
+  normalizeScreenEdgePadding,
+} from "../../ScreenEdgePadding";
 import { useControllerInput } from "../../desktop/InputPresentation";
 import { UNIT_SYSTEMS, UNIT_SYSTEM_LABELS } from "../../helpers/Units";
 import { THEME_CHOICES, THEME_LABELS } from "../../Theme";
@@ -37,10 +48,6 @@ import type { SignInOptions } from "../../Globals";
 import GoogleSignIn from "../base/GoogleSignIn";
 import ConfirmDialog from "../base/ConfirmDialog";
 const CreditsDialog = React.lazy(() => import("../base/CreditsDialog"));
-const TvLayoutSettings =
-  process.env.REACT_APP_DESKTOP === "true"
-    ? React.lazy(() => import("../base/TvLayoutSettings"))
-    : () => null;
 const DesktopDisplaySettings =
   process.env.REACT_APP_DESKTOP === "true"
     ? React.lazy(() => import("../base/DesktopDisplaySettings"))
@@ -66,7 +73,9 @@ export interface DispatchProps {
   onSoundEffectsVolumeChange: (change: number) => void;
   onUnitsChange: (change: UnitSystemType) => void;
   onThemeChange: (change: ThemeChoiceType) => void;
-  onTextSizeChange: (change: TextSizeType) => void;
+  onInterfaceScaleChange: (change: number) => void;
+  onWorkspaceChange: (change: WorkspaceType) => void;
+  onScreenEdgePaddingChange: (change: ScreenEdgePaddingType) => void;
   onBack: () => void;
 }
 
@@ -290,35 +299,32 @@ export default function Settings(props: Props): React.JSX.Element {
               </SettingRow>
 
               <SettingRow
-                label="Text size"
-                description="Enlarge text, chart labels and controls on this device."
+                label="Interface scale"
+                description="Scale text, chart labels, icons and controls on this device."
                 stackOnMobile
               >
-                <ToggleButtonGroup
-                  exclusive
-                  size="small"
-                  value={props.settings.textSize ?? "standard"}
-                  aria-label="Text size"
-                  onChange={(
-                    _e: React.MouseEvent<HTMLElement>,
-                    value: TextSizeType | null,
-                  ) => value && props.onTextSizeChange(value)}
-                  sx={{
-                    width: { xs: "100%", sm: "auto" },
-                    "& .MuiToggleButton-root": {
-                      flex: { xs: 1, sm: "0 0 auto" },
-                      minWidth: { sm: 76 },
-                      px: { xs: 1, sm: 1.5 },
-                      textTransform: "none",
-                    },
-                  }}
+                <Select
+                  native
+                  value={normalizeInterfaceScale(props.settings.interfaceScale)}
+                  inputProps={{ "aria-label": "Interface scale" }}
+                  onChange={(event) =>
+                    props.onInterfaceScaleChange(Number(event.target.value))
+                  }
+                  sx={{ width: { xs: "100%", sm: "auto" }, minWidth: "7rem" }}
                 >
-                  {TEXT_SIZES.map((size) => (
-                    <ToggleButton value={size} key={size}>
-                      {TEXT_SIZE_LABELS[size]}
-                    </ToggleButton>
-                  ))}
-                </ToggleButtonGroup>
+                  {[
+                    ...new Set<number>([
+                      ...INTERFACE_SCALES,
+                      normalizeInterfaceScale(props.settings.interfaceScale),
+                    ]),
+                  ]
+                    .sort((a, b) => a - b)
+                    .map((scale) => (
+                      <option value={scale} key={scale}>
+                        {interfaceScaleLabel(scale)}
+                      </option>
+                    ))}
+                </Select>
               </SettingRow>
 
               <SettingRow label="Sound" description="Music and effects">
@@ -390,8 +396,74 @@ export default function Settings(props: Props): React.JSX.Element {
             </Stack>
           </SettingsGroup>
 
-          {desktopApp && (
-            <SettingsGroup id="display-settings" title="Display">
+          <SettingsGroup id="display-settings" title="Display">
+            <SettingRow
+              label="Workspace"
+              description="Automatic fits tools beside Fleet when there is room. Single tool gives the active tool the main area."
+              stackOnMobile
+            >
+              <ToggleButtonGroup
+                exclusive
+                size="small"
+                value={normalizeWorkspace(props.settings.workspace)}
+                aria-label="Workspace"
+                onChange={(_event, value: WorkspaceType | null) =>
+                  value && props.onWorkspaceChange(value)
+                }
+                sx={{
+                  width: { xs: "100%", sm: "auto" },
+                  "& .MuiToggleButton-root": { flex: 1, textTransform: "none" },
+                }}
+              >
+                <ToggleButton value="automatic">Automatic</ToggleButton>
+                <ToggleButton value="single">Single tool</ToggleButton>
+              </ToggleButtonGroup>
+            </SettingRow>
+            <Accordion
+              disableGutters
+              elevation={0}
+              sx={{ "&:before": { display: "none" } }}
+            >
+              <AccordionSummary
+                expandIcon={<ChevronDownGlyph />}
+                aria-controls="advanced-display-settings"
+                id="advanced-display-toggle"
+              >
+                <Typography sx={{ fontWeight: 600 }}>
+                  Advanced display
+                </Typography>
+              </AccordionSummary>
+              <AccordionDetails id="advanced-display-settings" sx={{ p: 0 }}>
+                <SettingRow
+                  label="Screen-edge padding"
+                  description="Moves the interface away from screen edges if your display crops them. Saved on this device."
+                  stackOnMobile
+                >
+                  <ToggleButtonGroup
+                    exclusive
+                    size="small"
+                    value={normalizeScreenEdgePadding(
+                      props.settings.screenEdgePadding,
+                    )}
+                    aria-label="Screen-edge padding"
+                    onChange={(_event, value: ScreenEdgePaddingType | null) =>
+                      value !== null && props.onScreenEdgePaddingChange(value)
+                    }
+                    sx={{
+                      width: { xs: "100%", sm: "auto" },
+                      "& .MuiToggleButton-root": { flex: 1 },
+                    }}
+                  >
+                    {SCREEN_EDGE_PADDINGS.map((padding) => (
+                      <ToggleButton key={padding} value={padding}>
+                        {padding}%
+                      </ToggleButton>
+                    ))}
+                  </ToggleButtonGroup>
+                </SettingRow>
+              </AccordionDetails>
+            </Accordion>
+            {desktopApp && (
               <React.Suspense
                 fallback={
                   <Typography sx={{ p: 2 }}>
@@ -399,11 +471,10 @@ export default function Settings(props: Props): React.JSX.Element {
                   </Typography>
                 }
               >
-                <TvLayoutSettings />
                 <DesktopDisplaySettings />
               </React.Suspense>
-            </SettingsGroup>
-          )}
+            )}
+          </SettingsGroup>
           <SettingsGroup
             id="leaderboard-settings"
             title={desktopApp ? "Steam" : "Leaderboard"}

@@ -61,7 +61,7 @@ function props(overrides: Partial<Props> = {}): Props {
   };
 }
 
-// The desktop title includes the connected TV preference control, as it does in the app.
+// Connected menu actions share the app store.
 function renderMainMenu(element: React.ReactElement) {
   const store = configureStore({
     reducer: { settings: settingsReducer, card: cardReducer },
@@ -75,8 +75,8 @@ function renderMainMenu(element: React.ReactElement) {
 describe("MainMenu", () => {
   afterEach(() => {
     delete window.electrifyDesktop;
-    localStorage.removeItem("tvMode");
     act(() => resetInputPresentation());
+
     jest.restoreAllMocks();
   });
 
@@ -119,27 +119,6 @@ describe("MainMenu", () => {
       ).not.toBeInTheDocument();
     },
   );
-  it("lets a desktop player enable and reverse TV layout before starting a game", async () => {
-    window.electrifyDesktop = desktopBridge();
-    const user = userEvent.setup();
-    const { store } = renderMainMenu(<MainMenu {...props()} />);
-    expect(screen.getByRole("button", { name: "Play" })).toBeVisible();
-    const enableTv = await screen.findByRole("button", {
-      name: "Playing on a TV? Use TV layout",
-    });
-    expect(enableTv).toHaveAttribute("aria-pressed", "false");
-    await user.click(enableTv);
-    expect(store.getState().settings.tvMode).toBe(true);
-    expect(localStorage.getItem("tvMode")).toBe("true");
-    const returnToDesktop = screen.getByRole("button", {
-      name: "TV layout on · switch to desktop",
-    });
-    expect(returnToDesktop).toHaveAttribute("aria-pressed", "true");
-    await user.click(returnToDesktop);
-    expect(store.getState().settings.tvMode).toBe(false);
-    expect(localStorage.getItem("tvMode")).toBe("false");
-  });
-
   it("opens browser achievements from the footer", async () => {
     const onAchievements = jest.fn();
     renderMainMenu(<MainMenu {...props({ onAchievements })} />);

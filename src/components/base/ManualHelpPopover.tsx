@@ -7,7 +7,8 @@ import {
   ManualSectionType,
 } from "./ManualEntries";
 import { ManualEntryNavigation } from "./ManualEntryLink";
-import { useTvLayout } from "../../TvLayout";
+import { useControllerInput } from "../../desktop/InputPresentation";
+import { useScreenEdgeMargin } from "../../ScreenEdgePadding";
 
 // The (?) the player tapped. A DOM node has no place in the store, so it lives here beside the
 // popover that reads it; ManualLink records it just before asking for the entry
@@ -94,7 +95,8 @@ export default function ManualHelpPopover(
   props: Props,
 ): React.JSX.Element | null {
   const { onClose, onRelated } = props;
-  const tvMode = useTvLayout();
+  const controllerInput = useControllerInput();
+  const edgeMargin = useScreenEdgeMargin();
   // Kept through the exit transition, so the content doesn't blank out as it fades
   const [shown, setShown] = React.useState(props.entry);
   if (props.entry && props.entry !== shown) {
@@ -112,7 +114,7 @@ export default function ManualHelpPopover(
   const open = !!props.entry && !!entry;
   // A row can re-render its (?) away while the entry is open. Without a node still on the page
   // to point at, the popover centres itself instead of flying to the corner
-  const anchored = !tvMode && !!helpAnchor?.isConnected;
+  const anchored = !controllerInput && !!helpAnchor?.isConnected;
 
   return (
     <Popover
@@ -134,7 +136,7 @@ export default function ManualHelpPopover(
           ? { vertical: "top", horizontal: "center" }
           : { vertical: "center", horizontal: "center" }
       }
-      marginThreshold={8}
+      marginThreshold={edgeMargin}
       data-manual-help="true"
       slotProps={{
         paper: {

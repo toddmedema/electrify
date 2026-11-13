@@ -31,7 +31,6 @@ beforeEach(() => {
     .mockReturnValue([{}] as unknown as DOMRectList);
 });
 afterEach(() => {
-  delete document.documentElement.dataset.tvLayout;
   delete document.documentElement.dataset.controllerInput;
   jest.restoreAllMocks();
 });
@@ -232,22 +231,26 @@ it("keeps the main menu at the top when a screen requests focus on its old trigg
   }
 });
 
-it("lets TV controller directions follow rendered rows while physical keyboard menu keys stay linear", () => {
-  document.documentElement.dataset.tvLayout = "true";
-  document.documentElement.dataset.controllerInput = "true";
-  render(
-    <Menu>
-      <button>Play</button>
-      <button>Settings</button>
-    </Menu>,
-  );
-  const play = screen.getByRole("button", { name: "Play" });
-  fireEvent.keyDown(play, { key: "ArrowRight" });
-  expect(play).toHaveFocus();
-  delete document.documentElement.dataset.controllerInput;
-  fireEvent.keyDown(play, { key: "ArrowRight" });
-  expect(screen.getByRole("button", { name: "Settings" })).toHaveFocus();
-});
+it.each([false, true])(
+  "lets controller directions follow rendered rows in menus and settings (%s) while physical keyboard keys stay linear",
+  (settings) => {
+    document.documentElement.dataset.controllerInput = "true";
+    render(
+      <Menu settings={settings}>
+        <div className="settingsRow">
+          <button>Play</button>
+          <button>Settings</button>
+        </div>
+      </Menu>,
+    );
+    const play = screen.getByRole("button", { name: "Play" });
+    fireEvent.keyDown(play, { key: "ArrowRight" });
+    expect(play).toHaveFocus();
+    delete document.documentElement.dataset.controllerInput;
+    fireEvent.keyDown(play, { key: "ArrowRight" });
+    expect(screen.getByRole("button", { name: "Settings" })).toHaveFocus();
+  },
+);
 
 it("restores the first home action after background blur and window/page return", async () => {
   render(
@@ -306,8 +309,7 @@ it("recovers home focus after a child removes the selected action, while leaving
   dialog.remove();
 });
 
-it("keeps TV home controller traversal linear through footer links and wraps both ways", async () => {
-  document.documentElement.dataset.tvLayout = "true";
+it("keeps home controller traversal linear through footer links and wraps both ways", async () => {
   document.documentElement.dataset.controllerInput = "true";
   render(
     <Menu home>
@@ -336,12 +338,12 @@ it("always starts and recovers home at the first action even when a saved prefer
   render(
     <Menu home>
       <button>Continue</button>
-      <button aria-pressed="true">TV layout on</button>
+      <button aria-pressed="true">Saved preference</button>
     </Menu>,
   );
   const first = screen.getByRole("button", { name: "Continue" });
   expect(first).toHaveFocus();
-  const tv = screen.getByRole("button", { name: "TV layout on" });
+  const tv = screen.getByRole("button", { name: "Saved preference" });
   tv.focus();
   act(() => tv.blur());
   await waitFor(() => expect(first).toHaveFocus());

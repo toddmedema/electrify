@@ -1,0 +1,563 @@
+// Larger interfaces use the same rem measure for controls, reading columns and charts.
+:root {
+  --screen-edge-inset: 0px;
+  --screen-edge-margin: max(16px, var(--screen-edge-inset));
+}
+.appFrame {
+  box-sizing: border-box;
+  padding: var(--screen-edge-inset);
+}
+.MuiDialog-container {
+  padding: var(--screen-edge-inset);
+  box-sizing: border-box;
+}
+.MuiPopover-paper {
+  max-width: calc(100vw - 2 * var(--screen-edge-margin));
+  max-height: calc(100dvh - 2 * var(--screen-edge-margin));
+}
+.MuiSnackbar-root:not(.achievementToast) {
+  --toast-edge-gap: 8px;
+  max-width: calc(
+    100vw - 2 * (var(--screen-edge-inset) + var(--toast-edge-gap))
+  );
+  &:is(
+    .MuiSnackbar-anchorOriginBottomLeft,
+    .MuiSnackbar-anchorOriginBottomRight,
+    .MuiSnackbar-anchorOriginBottomCenter
+  ) {
+    bottom: calc(var(--screen-edge-inset) + var(--toast-edge-gap));
+  }
+  &:is(
+    .MuiSnackbar-anchorOriginTopLeft,
+    .MuiSnackbar-anchorOriginTopRight,
+    .MuiSnackbar-anchorOriginTopCenter
+  ) {
+    top: calc(var(--screen-edge-inset) + var(--toast-edge-gap));
+  }
+  &:is(.MuiSnackbar-anchorOriginBottomLeft, .MuiSnackbar-anchorOriginTopLeft) {
+    left: calc(var(--screen-edge-inset) + var(--toast-edge-gap));
+  }
+  &:is(
+    .MuiSnackbar-anchorOriginBottomRight,
+    .MuiSnackbar-anchorOriginTopRight
+  ) {
+    right: calc(var(--screen-edge-inset) + var(--toast-edge-gap));
+  }
+  &:is(
+    .MuiSnackbar-anchorOriginBottomCenter,
+    .MuiSnackbar-anchorOriginTopCenter
+  ) {
+    left: 50%;
+    right: auto;
+    width: max-content;
+    transform: translateX(-50%);
+  }
+  @media (min-width: 600px) {
+    --toast-edge-gap: 24px;
+  }
+}
+html[data-interface-scale]:not([data-interface-scale="1"]) {
+  .app_container {
+    max-width: none;
+  }
+  body {
+    max-width: none;
+  }
+  .MuiDialog-paper {
+    max-height: calc(100% - 2rem);
+  }
+  .MuiDialog-paperWidthSm {
+    max-width: 44rem;
+  }
+  .gameToolHeader {
+    min-height: 2.75rem;
+    padding: 0 0.5rem 0 1rem;
+    h2 {
+      font-size: 1.125rem;
+    }
+  }
+  .gameFleet {
+    max-width: 75rem;
+  }
+  .facilityDisclosure .MuiListItemText-secondary {
+    font-size: 0.875rem;
+  }
+  .chartLegend {
+    font-size: 0.875rem;
+    gap: 0.5rem 1rem;
+  }
+  .chartLegend:not(.chartLegend-inline) {
+    padding-block: 0.25rem 0.5rem;
+  }
+  .insightsHeader {
+    --insights-control-size: 2.75rem;
+  }
+  .insightsHeaderControls {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    .insightsPresetControls {
+      width: min(100%, 24rem);
+      flex: 0 1 24rem;
+      gap: 0.25rem;
+    }
+    .insightsPreset {
+      width: auto;
+      flex: 1 1 auto;
+    }
+    .insightsLayerControls {
+      width: auto;
+      min-width: 5rem !important;
+    }
+  }
+  :is(
+    .insightsNavigation,
+    .insightsHeader,
+    .insightsTracks,
+    .insightsViewportToolbar
+  ) {
+    max-width: 64rem;
+    width: 100%;
+    box-sizing: border-box;
+    margin-inline: auto;
+  }
+  .insightsViewportToolbar {
+    height: auto;
+    min-height: 3rem;
+    padding-block: 0.25rem;
+    flex-wrap: wrap;
+  }
+  .insightsViewportButtons {
+    gap: 0.125rem;
+    align-items: center;
+    :is(.insightsViewportButton, .MuiIconButton-root) {
+      width: 2.75rem;
+      height: 2.75rem;
+      flex: 0 0 2.75rem;
+    }
+  }
+  .insightEventRail {
+    max-width: 64rem;
+    min-height: 0;
+  }
+  .insightEventList {
+    gap: 0.5rem;
+    padding-right: 1rem;
+  }
+  .insightEventCopy {
+    gap: 0.125rem;
+  }
+  .insightEventTitle,
+  .insightEventDate {
+    line-height: 1.4;
+  }
+  .insightsTrackHeader {
+    gap: 0.5rem;
+  }
+  .insights .insightsTrackHeader {
+    padding-block: 0;
+  }
+  .purchaseReviewControls {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    padding: 1rem;
+  }
+  .purchaseReviewContent .decisionImpact {
+    padding-inline: 1rem;
+  }
+}
+
+// Share the time/view controls when the player's text scale leaves room for both.
+@container insights (min-width: 54rem) {
+  html[data-interface-scale]:not([data-interface-scale="1"])
+    .insightsNavigation {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: center;
+    border-bottom: 1px solid var(--border-subtle);
+    .insightsHeader {
+      grid-area: 1 / 2;
+    }
+    .insightsViewportToolbar {
+      grid-area: 1 / 1;
+      height: 100%;
+      border-bottom: 0;
+    }
+  }
+}
+
+// Shared enlarged surfaces use the same type-derived measure, from setup through the final decision.
+html[data-interface-scale]:not([data-interface-scale="1"]) {
+  .menu-layout #menuCard,
+  .screenHeaderBar,
+  .screenCatalog > .cardList,
+  .screenCatalog > .constructionHeader,
+  .screenCatalog > .generatorComparison {
+    max-width: 64rem;
+  }
+  .screenPage > .scrollable > *,
+  .savedGames,
+  .modsScreen,
+  .achievementGallery > *,
+  .manual-search,
+  #manual,
+  .missionList,
+  .customSetupColumns {
+    max-width: 64rem;
+    box-sizing: border-box;
+    margin-inline: auto;
+  }
+  // Match the reading column to type scale, including the scroll owner's padding.
+  .screenPage > .scrollable {
+    max-width: none;
+    margin-inline: 0;
+    padding-inline: max(1rem, calc((100% - 64rem) / 2 + 1rem));
+  }
+  #topbar .screenHeaderBar {
+    min-height: 3.5rem;
+    gap: 0.75rem;
+    padding-inline: 0.75rem;
+    .MuiIconButton-edgeStart {
+      margin-left: 0;
+    }
+  }
+  .MuiDialog-paper {
+    margin: 1rem;
+  }
+  .MuiDialogActions-root {
+    padding: 0.75rem;
+  }
+  :is(.MuiMenuItem-root, .MuiTab-root) {
+    white-space: normal;
+  }
+  .MuiListItemIcon-root {
+    min-width: 2.5rem;
+  }
+  .MuiToggleButtonGroup-root {
+    flex-wrap: wrap;
+  }
+  :is(.settingsRow, .settingsKeyboardRow, .saveEntry, .modEntry) {
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+  }
+  .settingsRow {
+    column-gap: 1.5rem;
+    > :first-child {
+      max-width: 48rem;
+    }
+  }
+  .facilityStats {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+  }
+  .facilityDetailHeading,
+  .facilityStat dt,
+  .facilityStatValue,
+  .facilityStatNote {
+    line-height: 1.4;
+  }
+  .base_main .customSetupColumns {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1rem;
+  }
+  .screenPage:has(.locationPicker) > .scrollable {
+    container: location-picker / inline-size;
+  }
+  .locationPicker {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "heading" "details" "map";
+    margin-block: 1rem;
+    &.locationPickerWithoutHeading {
+      grid-template-areas: "details" "map";
+    }
+  }
+  .locationPickerCount {
+    line-height: 1.5;
+  }
+  .worldMap {
+    max-width: none;
+  }
+  .worldMapMarker {
+    border-width: 0.125rem;
+    font-size: 0.625rem;
+    &.selected {
+      font-size: 0.875rem;
+    }
+  }
+  .worldMapControls {
+    right: 0.25rem;
+    bottom: 0.25rem;
+    .MuiIconButton-root {
+      padding: 0.25rem;
+    }
+  }
+  #gameSetupTable {
+    width: 100%;
+  }
+  .base_main .customSetupSettings #gameSetupTable {
+    table-layout: fixed;
+    td {
+      font-size: 0.9375rem;
+      padding: 0.75rem 0;
+      &:first-child {
+        width: 35%;
+      }
+      + td {
+        padding-left: 1rem;
+      }
+    }
+    .MuiInputBase-root {
+      max-width: 100%;
+    }
+  }
+  .manual-popover.MuiPaper-root {
+    width: min(40rem, calc(100vw - 2 * var(--screen-edge-margin)));
+    max-width: none;
+    max-height: min(
+      32rem,
+      calc(100dvh - 2 * var(--screen-edge-margin) - min(8rem, 20dvh))
+    );
+  }
+  .manual-popover-header {
+    flex: 0 0 auto;
+    padding: 0.5rem 0.5rem 0.5rem 1rem;
+  }
+  .manual-popover-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: 0.75rem 1rem;
+  }
+  #appbar #topbar .MuiToolbar-root {
+    min-height: 2.75rem !important;
+    gap: 0.5rem;
+  }
+  #topbar .gameStatus {
+    flex: 1 1 auto;
+    flex-wrap: wrap;
+    gap: 0.25rem 0.5rem;
+  }
+  #topbar .gameStatus .weak {
+    font-size: 0.875rem;
+  }
+  #appbar #speedChangeButtons {
+    flex: 0 0 auto;
+    margin-left: auto;
+  }
+  .speedToggles {
+    --speed-segment: 3.25rem;
+    --speed-inset: 0.25rem;
+  }
+  .gameStatusBar .gridHealth {
+    min-height: 2.5rem;
+    padding: 0.25rem 0.75rem;
+  }
+  .gameStatusBar .missionSummary {
+    padding: 0.25rem 0.75rem;
+  }
+  .facilityDragHandle svg {
+    width: 1rem;
+    height: 1rem;
+  }
+  .facilityRow .MuiBadge-badge {
+    font-size: 0.625rem;
+  }
+  .generatorComparisonChoices {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+  }
+  .generatorComparisonChoice img {
+    width: 2.5rem;
+    height: 2.5rem;
+  }
+  .buildOption {
+    padding: 0.75rem;
+  }
+  .buildOption .buildOptionMetrics {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr));
+    gap: 0.75rem 1rem;
+    padding: 0 0.5rem 0.5rem;
+  }
+  .buildOptionMetric {
+    overflow-wrap: anywhere;
+  }
+  .buildOptionSparkline {
+    min-height: 2rem;
+  }
+  :is(.customerProgramsEmbedded, .eventLog, .scenarioDetails) {
+    max-width: 64rem;
+    margin-inline: auto;
+    width: 100%;
+  }
+  .operationsPriorities {
+    max-width: none;
+    padding-bottom: 0.75rem;
+  }
+  .eventLogItem {
+    grid-template-columns: 1.5rem minmax(0, 1fr);
+  }
+  :is(.eventLogSectionHeader, .operationsSectionHeader) {
+    padding-inline: 1rem;
+  }
+  .scenarioOutlookFigures {
+    gap: 0.75rem 2rem;
+    dd {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.125rem;
+    }
+  }
+  .scenarioOutlookChange {
+    line-height: 1.4;
+  }
+  .tutorialHud {
+    max-height: 35dvh;
+    padding: 0.75rem 1rem;
+    column-gap: 0.5rem;
+  }
+  .tutorialHudContent {
+    padding-top: 0.5rem;
+    margin-inline: 0.5rem;
+  }
+  .tutorialHudAction {
+    line-height: 1.4;
+  }
+  .tutorialHud .tutorialPrompt {
+    margin-top: 0.25rem;
+    padding-left: 0;
+    line-height: 1.4;
+  }
+  .tutorialHudAction:has(svg) + .tutorialPrompt {
+    padding-left: 1.75rem;
+  }
+}
+
+html[data-interface-scale]:not([data-interface-scale="1"]) {
+  .homeLogo {
+    max-width: 28rem;
+  }
+  .scrollable {
+    scroll-padding-block: 0.5rem;
+  }
+  .gameToolBody > .insights {
+    width: 100%;
+  }
+  .gameStatusBar .missionSummary {
+    gap: 0.5rem;
+  }
+  .buildFacilities {
+    max-width: 72rem;
+    margin-inline: auto;
+  }
+}
+
+// Single-tool and enlarged layouts share the same wrapping status contract.
+.gameWorkspace[data-workspace-layout="single"],
+html[data-interface-scale]:not([data-interface-scale="1"]) {
+  .gameStatusBar {
+    display: flex;
+    flex-wrap: wrap;
+    min-height: 2.5rem;
+  }
+  .gameStatusBar .missionSummary {
+    min-width: 0;
+    flex: 1 1 24rem;
+  }
+  .missionSummaryHeadline,
+  .missionRiskText {
+    white-space: normal;
+    overflow: visible;
+  }
+}
+
+html[data-interface-scale]:not([data-interface-scale="1"])
+  #menuCard
+  #centeredMenu {
+  :is(.mainActions, .resourceActions, .discoveryActions) .MuiButton-root {
+    width: min(100%, 24rem);
+  }
+}
+
+.buildGridEvidence {
+  flex: 0 0 auto;
+  min-width: 0;
+  padding: 0.5rem 1rem;
+  border-bottom: 1px solid var(--border-subtle);
+  summary {
+    min-height: 2.75rem;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    color: var(--interactive-blue);
+    font-weight: 600;
+  }
+  .chartLegend {
+    margin: 0;
+  }
+}
+
+.buildComparisonItem {
+  list-style: none;
+  grid-column: 1 / -1;
+}
+
+html[data-interface-scale]:not([data-interface-scale="1"]) {
+  .gameToolBody:has(> .buildFacilities) {
+    overflow-y: auto;
+    display: block;
+  }
+  .gameToolBody > .buildFacilities {
+    height: auto;
+    min-height: 100%;
+  }
+  .buildFacilities > .constructionPanel {
+    flex: 0 0 auto;
+    max-width: 64rem;
+  }
+  .buildFacilities .constructionPanel > .screenCatalog {
+    height: auto;
+  }
+  .buildFacilities .cardList {
+    flex: 0 0 auto;
+    height: auto;
+    overflow: visible;
+  }
+}
+
+// Reserve room for evidence at the largest interface scale.
+html[data-interface-scale]:not([data-interface-scale="1"]) {
+  --control-size: 2.75rem;
+}
+
+html[data-interface-scale]:not([data-interface-scale="1"]) {
+  .facilities .facilitiesBody {
+    display: block;
+    overflow-y: auto;
+  }
+  .facilities .facilitiesBody > .unifiedFacilitiesList {
+    overflow: visible;
+    height: auto;
+  }
+  .buildFacilities .cardList {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 24rem), 1fr));
+    align-content: start;
+    gap: 1rem;
+  }
+  .chartTooltip,
+  .chartEventTooltip {
+    max-width: min(30rem, 100%);
+    padding: 0.25rem;
+    font-size: 0.75rem;
+  }
+  .chartTooltip-breakdown {
+    width: 30rem;
+  }
+}
+
+// A readable map, details column and gap must all fit at the player's chosen scale.
+@container location-picker (min-width: 41rem) {
+  html[data-interface-scale]:not([data-interface-scale="1"]) .locationPicker {
+    grid-template-columns: minmax(0, 1.5fr) minmax(16rem, 1fr);
+    grid-template-areas: "heading heading" "map details";
+    &.locationPickerWithoutHeading {
+      grid-template-areas: "map details";
+    }
+  }
+}

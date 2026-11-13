@@ -12,7 +12,7 @@ import { initFuelPrices } from "../data/FuelPrices";
 import { initWeather } from "../data/Weather";
 import { waitForLoad } from "../helpers/WaitForLoad";
 import { multiplayerSnapshot } from "../reducers/GameActions";
-import { change } from "../reducers/Settings";
+import { applyPresentation } from "../reducers/Settings";
 import { layoutChanged } from "../reducers/UI";
 import { registerMultiplayerRuntime } from "../multiplayer/Registry";
 import { CouchClient } from "./Client";
@@ -21,7 +21,6 @@ import type { SettingsType } from "../Types";
 import type { GameType } from "../Types";
 import type { EvidenceTargetType } from "../Types";
 import { openEvidence } from "../helpers/Evidence";
-import "../TvLayout.scss";
 import "./couch.scss";
 
 /** A seat deliberately boots no save leases, account observers, music or solo clock. */
@@ -35,7 +34,13 @@ export default function CouchSeat() {
   const [loadError, setLoadError] = useState("");
   useEffect(() => {
     document.documentElement.dataset.couchSeat = bridge.seatId;
-    store.dispatch(change({ tvMode: true, tvInset: 0, audioEnabled: false }));
+    store.dispatch(
+      applyPresentation({
+        workspace: "single",
+        screenEdgePadding: 0,
+        audioEnabled: false,
+      }),
+    );
     registerMultiplayerRuntime(client);
     let previous: GameType | undefined;
     const stopStore = client.subscribe(() => {
@@ -57,7 +62,7 @@ export default function CouchSeat() {
         event.generation === client.generation &&
         event.settings
       ) {
-        store.dispatch(change(seatPresentation(event.settings)));
+        store.dispatch(applyPresentation(seatPresentation(event.settings)));
       } else if (
         event.kind === "evidence" &&
         event.generation === client.generation &&

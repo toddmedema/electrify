@@ -5,7 +5,7 @@ import type { GameType } from "../../Types";
 import { signature } from "./DeferredProjection";
 import type { BuildForecast } from "./OutlookForecast";
 import { useOutlookWorker } from "./useOutlookWorker";
-import { useTvLayout } from "../../TvLayout";
+import { useGameWorkspaceLayout } from "./GameWorkspaceContext";
 import { formatWatts } from "../../helpers/Format";
 import ChartSupplyDemand from "./ChartSupplyDemand";
 
@@ -29,10 +29,11 @@ function buildForecastKey(game: GameType): string | undefined {
 export function BuildForecastProvider(props: { children: React.ReactNode }) {
   const game = useAppSelector((state) => state.game);
   const forecast = useOutlookWorker("build", buildForecastKey(game), game);
-  const tvMode = useTvLayout();
+  const workspace = useGameWorkspaceLayout();
+  const showGridEvidence = workspace?.fleetVisible === false;
   const gridEvidence = React.useMemo(
-    () => (tvMode ? <BuildGridEvidence game={game} /> : null),
-    [tvMode, game],
+    () => (showGridEvidence ? <BuildGridEvidence game={game} /> : null),
+    [showGridEvidence, game],
   );
   const value = React.useMemo(
     () => ({ forecast, gridEvidence }),
@@ -61,7 +62,7 @@ function BuildGridEvidence({ game }: { game: GameType }) {
   const now = currentTick(game);
   if (!now) return null;
   return (
-    <details className="tvBuildContext">
+    <details className="buildGridEvidence">
       <summary>
         Current grid · {formatWatts(now.supplyW)} supply ·{" "}
         {formatWatts(now.demandW)} demand

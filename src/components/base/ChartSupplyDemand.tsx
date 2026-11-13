@@ -20,7 +20,7 @@ import {
   dayNightRibbonPlugin,
   formatClockTime,
 } from "./DayNightRibbon";
-import { getTextScale } from "../../TextSize";
+import { getInterfaceScale } from "../../InterfaceScale";
 import ChartLegend, { LegendItemType } from "./ChartLegend";
 import {
   anchoredForecastPaths,
@@ -293,7 +293,8 @@ function buildOptions({
     width: 0, // set by UPlotChart
     height: 0,
     pxAlign: 1,
-    padding: [18 * scale, 16, 24 * getTextScale(), 0],
+    // Caption space follows the interface font, independently of plot width.
+    padding: [14 * getInterfaceScale(), 16, 24 * getInterfaceScale(), 0],
     cursor: {
       x: true,
       y: false,
@@ -305,7 +306,7 @@ function buildOptions({
       y: { range: () => getState().domain },
     },
     axes: [
-      xAxis(scale, {
+      xAxis(getInterfaceScale(), {
         size: 27,
         splits: () => getState().hourTicks,
         values: (_u, splits) => splits.map(formatMinuteOfDayChartAxis),
