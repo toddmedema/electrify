@@ -3,6 +3,7 @@ import {
   act,
   cleanup,
   fireEvent,
+  isInaccessible,
   render,
   screen,
   waitFor,
@@ -164,6 +165,25 @@ function rows(): HTMLElement[] {
   return Array.from(
     document.querySelectorAll<HTMLElement>(".facilityRow .facilityDisclosure"),
   );
+}
+
+// Dense fleet panes make a global role/name search expensive; inspect the labelled target.
+function fleetButton(name: string | RegExp) {
+  const button = screen.getByLabelText(name, { selector: "button" });
+  expect(button).toHaveRole("button");
+  expect(button).toHaveAccessibleName(name);
+  expect(isInaccessible(button)).toBe(false);
+  return button;
+}
+
+function selectionCheckbox(name: string) {
+  const checkbox = screen.getByLabelText(name, {
+    selector: 'input[type="checkbox"]',
+  });
+  expect(checkbox).toHaveRole("checkbox");
+  expect(checkbox).toHaveAccessibleName(name);
+  expect(isInaccessible(checkbox)).toBe(false);
+  return checkbox;
 }
 
 describe("the fleet list", () => {
@@ -965,15 +985,22 @@ describe("the interties view", () => {
       renderProjects(game);
       const first = () => screen.getAllByTestId(/^transmission-project-/)[0];
       expect(first()).toHaveAttribute("data-corridor-id", "california-south");
+      const sort = fleetButton("Sort interties: Build cost");
       const select = async (label: string) => {
-        await user.click(
-          screen.getByRole("button", { name: /^Sort interties:/ }),
+        expect(sort).toHaveRole("button");
+        expect(sort).toHaveAccessibleName(/^Sort interties:/);
+        expect(isInaccessible(sort)).toBe(false);
+        await user.click(sort);
+        const item = screen.getByText(
+          (_text, element) => element?.textContent === label,
+          { selector: '[role="menuitem"]' },
         );
-        await user.click(screen.getByRole("menuitem", { name: label }));
+        expect(item).toHaveRole("menuitem");
+        expect(item).toHaveAccessibleName(label);
+        expect(isInaccessible(item)).toBe(false);
+        await user.click(item);
       };
-      expect(
-        screen.getByRole("button", { name: "Sort interties: Build cost" }),
-      ).toBeInTheDocument();
+      expect(sort).toBeInTheDocument();
       await select("Build time");
       expect(first()).toHaveAttribute("data-corridor-id", "california-north");
       await select("Build cost");
@@ -1299,14 +1326,13 @@ it.each([false, true])(
     expect(
       screen.queryByRole("button", { name: "Acquire Ridge Electric" }),
     ).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: /^Inspect Ridge/ }));
-    expect(
-      screen.getByRole("button", { name: "Acquire Ridge Electric" }),
-    ).toBeVisible();
+    const inspect = fleetButton(/^Inspect Ridge/);
+    await user.click(inspect);
+    expect(fleetButton("Acquire Ridge Electric")).toBeVisible();
     expect(
       screen.queryByText(/Review the company terms/),
     ).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: /^Inspect Ridge/ }));
+    await user.click(inspect);
     expect(
       screen.queryByRole("button", { name: "Acquire Ridge Electric" }),
     ).not.toBeInTheDocument();
@@ -1386,16 +1412,12 @@ describe("the intertie upgrade control", () => {
         exact: false,
       }),
     );
-    await user.click(
-      screen.getByRole("button", { name: /^Review upgrade of / }),
-    );
+    await user.click(fleetButton(/^Review upgrade of /));
     await user.click(
       within(screen.getByRole("dialog")).getByRole("button", { name: "close" }),
     );
     expect(handleUpgrade).not.toHaveBeenCalled();
-    await user.click(
-      screen.getByRole("button", { name: /^Review upgrade of / }),
-    );
+    await user.click(fleetButton(/^Review upgrade of /));
     await user.click(
       within(screen.getByRole("dialog")).getByRole("button", {
         name: "Pay cash",
@@ -1415,9 +1437,7 @@ describe("the intertie upgrade control", () => {
         exact: false,
       }),
     );
-    await user.click(
-      screen.getByRole("button", { name: /^Review upgrade of / }),
-    );
+    await user.click(fleetButton(/^Review upgrade of /));
     const dialog = screen.getByRole("dialog");
     expect(dialog).toHaveTextContent("Import capacity25MW → 30MW");
     expect(dialog).toHaveTextContent("Export capacity70MW → 100MW");
@@ -1434,9 +1454,7 @@ describe("the intertie upgrade control", () => {
         exact: false,
       }),
     );
-    await user.click(
-      screen.getByRole("button", { name: /^Review upgrade of / }),
-    );
+    await user.click(fleetButton(/^Review upgrade of /));
     const dialog = screen.getByRole("dialog");
     expect(dialog).toHaveTextContent("Import capacity500MW → 750MW");
     expect(dialog).toHaveTextContent("Export capacity500MW → 750MW");
@@ -1527,18 +1545,14 @@ describe("mouse facility selection", () => {
     fireEvent.click(rows()[2], { metaKey: true });
     fireEvent.keyUp(document.body, { key: "Meta" });
     expect(screen.getAllByRole("checkbox")).toHaveLength(5);
-    expect(
-      screen.getByRole("checkbox", { name: "Select Plant 1" }),
-    ).toBeChecked();
-    await user.click(screen.getByRole("checkbox", { name: "Select Plant 2" }));
+    expect(selectionCheckbox("Select Plant 1")).toBeChecked();
+    await user.click(selectionCheckbox("Select Plant 2"));
     expect(
       screen.getByRole("status", { name: "Facility selection" }),
     ).toHaveTextContent("3 facilities selected");
     fireEvent.click(rows()[4]);
     expect(rows()[4]).toHaveAttribute("aria-expanded", "true");
-    expect(
-      screen.getByRole("checkbox", { name: "Select Plant 5" }),
-    ).not.toBeChecked();
+    expect(selectionCheckbox("Select Plant 5")).not.toBeChecked();
     expect(
       screen.getByRole("status", { name: "Facility selection" }),
     ).toHaveTextContent("3 facilities selected");
@@ -1573,7 +1587,7 @@ describe("mouse facility selection", () => {
     fireEvent.keyDown(document.body, { key: "Escape" });
     expect(screen.queryByRole("checkbox")).toBeNull();
     fireEvent.click(rows()[0], { metaKey: true });
-    await user.click(screen.getByRole("checkbox", { name: "Select Plant 1" }));
+    await user.click(selectionCheckbox("Select Plant 1"));
     expect(screen.getAllByRole("checkbox")).toHaveLength(5);
     expect(screen.getByRole("button", { name: "Actions" })).toBeDisabled();
     fireEvent.keyDown(document.body, { key: "Escape" });
@@ -1626,7 +1640,7 @@ describe("mouse facility selection", () => {
   it("returns focus to inspection when releasing a modifier hides a focused preview checkbox", () => {
     renderFacilities(fleet(), null);
     fireEvent.keyDown(document.body, { key: "Shift", shiftKey: true });
-    const checkbox = screen.getByRole("checkbox", { name: "Select Plant 2" });
+    const checkbox = selectionCheckbox("Select Plant 2");
     act(() => checkbox.focus());
     fireEvent.keyUp(checkbox, { key: "Shift" });
     expect(screen.queryByRole("checkbox")).toBeNull();
@@ -1636,13 +1650,14 @@ describe("mouse facility selection", () => {
   it("restores preview focus when returning to the window without stealing a later focus choice", () => {
     renderFacilities(fleet(), null);
     fireEvent.keyDown(document.body, { key: "Shift", shiftKey: true });
-    act(() => screen.getByRole("checkbox", { name: "Select Plant 2" }).focus());
+    const checkbox = selectionCheckbox("Select Plant 2");
+    act(() => checkbox.focus());
     fireEvent.blur(window);
     expect(screen.queryByRole("checkbox")).toBeNull();
     fireEvent.focus(window);
     expect(rows()[1]).toHaveFocus();
     fireEvent.keyDown(document.body, { key: "Shift", shiftKey: true });
-    act(() => screen.getByRole("checkbox", { name: "Select Plant 2" }).focus());
+    act(() => selectionCheckbox("Select Plant 2").focus());
     fireEvent.blur(window);
     act(() => rows()[3].focus());
     fireEvent.focus(window);
@@ -1653,7 +1668,7 @@ describe("mouse facility selection", () => {
     renderFacilities(fleet(), null);
     fireEvent.click(rows()[1], { metaKey: true });
     await user.keyboard("{Shift>}");
-    await user.click(screen.getByRole("checkbox", { name: "Select Plant 4" }));
+    await user.click(selectionCheckbox("Select Plant 4"));
     await user.keyboard("{/Shift}");
     expect(rows().map((row) => row.getAttribute("aria-pressed"))).toEqual([
       "false",
