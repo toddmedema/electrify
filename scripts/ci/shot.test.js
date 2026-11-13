@@ -400,12 +400,16 @@ test("the screenshot runner is never part of an ordinary browser suite", () => {
 });
 
 test("marketing exports select seven scenes without running ordinary captures", () => {
-  const listing = listTests("shot.playwright.config.ts", "marketing\\.run", {
-    ELECTRIFY_SHOT: JSON.stringify({
-      ...parse("--marketing"),
-      baseURL: "http://127.0.0.1:1",
-    }),
-  });
+  const listing = listTests(
+    "shot.playwright.config.ts",
+    "(shot|marketing)\\.run",
+    {
+      ELECTRIFY_SHOT: JSON.stringify({
+        ...parse("--marketing"),
+        baseURL: "http://127.0.0.1:1",
+      }),
+    },
+  );
   assert.equal(listing.status, 0);
   assert.deepEqual(
     listing.suites.flatMap((suite) =>
