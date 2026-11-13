@@ -9,6 +9,7 @@ import userEvent from "@testing-library/user-event";
 import * as React from "react";
 import {
   MANUAL_ENTRY,
+  MANUAL_SECTION,
   MANUAL_ENTRIES,
   ManualEntryTitleType,
 } from "../base/ManualEntries";
@@ -200,6 +201,79 @@ describe("Manual", () => {
     );
   });
 
+  it("keeps chart subsections in one searchable parent page", () => {
+    renderManual(MANUAL_ENTRY.FORECASTS);
+    expect(
+      screen.getByRole("heading", { name: MANUAL_ENTRY.FORECASTS, level: 3 }),
+    ).toBeVisible();
+    const page = screen.getByRole("region", { name: MANUAL_ENTRY.FORECASTS });
+    const sections = MANUAL_ENTRIES.find(
+      (entry) => entry.title === MANUAL_ENTRY.FORECASTS,
+    )!.sections!;
+    expect(
+      within(page)
+        .getAllByRole("heading", { level: 4 })
+        .map((heading) => heading.textContent),
+    ).toEqual(sections.map((section) => section.title));
+    search("dwindling reserves");
+    expect(listedTitles()).toEqual([MANUAL_ENTRY.FORECASTS]);
+    expect(within(page).getByText("dwindling reserves").tagName).toBe("MARK");
+  });
+
+  it("opens a subsection's parent and focuses its heading on a deep link", () => {
+    renderManual(MANUAL_SECTION.WATER);
+    expect(entryHeader(MANUAL_ENTRY.FORECASTS)).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
+    expect(screen.getByRole("heading", { name: "Water" })).toHaveFocus();
+    expect(entryHeader(MANUAL_ENTRY.BLACKOUTS)).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
+  });
+
+  it.each([
+    [MANUAL_ENTRY.HYDROPOWER, "Water chart"],
+    [MANUAL_SECTION.STORED_ENERGY, "Water"],
+  ])("opens and focuses Water from %s", async (from, linkName) => {
+    renderManual(from);
+    await userEvent.click(screen.getByRole("link", { name: linkName }));
+    expect(entryHeader(MANUAL_ENTRY.FORECASTS)).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
+    expect(screen.getByRole("heading", { name: "Water" })).toHaveFocus();
+  });
+
+  it("refocuses the subsection when revisiting a collapsed parent", async () => {
+    const props = {
+      focusEntry: MANUAL_SECTION.WATER,
+      onBack: () => undefined,
+      onFollowLink: () => undefined,
+    };
+    const view = render(<Manual {...props} focusKey={0} />);
+    await userEvent.click(entryHeader(MANUAL_ENTRY.FORECASTS));
+    await waitFor(() =>
+      expect(screen.queryByRole("heading", { name: "Water" })).toBeNull(),
+    );
+    view.rerender(<Manual {...props} focusKey={1} />);
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { name: "Water" })).toHaveFocus(),
+    );
+  });
+
+  it("records the subsection when following one of its related links", async () => {
+    const onFollowLink = jest.fn();
+    renderManual(MANUAL_SECTION.WATER, onFollowLink);
+    await userEvent.click(screen.getByRole("link", { name: "hydropower" }));
+    expect(onFollowLink).toHaveBeenCalledWith(
+      MANUAL_ENTRY.HYDROPOWER,
+      MANUAL_SECTION.WATER,
+    );
+    expect(entryHeader(MANUAL_ENTRY.HYDROPOWER)).toHaveFocus();
+  });
+
   it("gives every entry a keyboard-reachable, labelled control", () => {
     renderManual();
     const header = entryHeader(MANUAL_ENTRY.SCORE);
@@ -228,8 +302,13 @@ describe("Manual", () => {
 });
 
 it("links each entry to others inline, once per target and never to itself", () => {
-  const titles = new Set<string>(MANUAL_ENTRIES.map((entry) => entry.title));
-  for (const entry of MANUAL_ENTRIES) {
+  const entries = MANUAL_ENTRIES.flatMap((entry) => [
+    entry,
+    ...(entry.sections || []),
+  ]);
+  const titles = new Set<string>(entries.map((entry) => entry.title));
+  expect(titles.size).toBe(entries.length);
+  for (const entry of entries) {
     const targets = linkTargets(entry.entry);
     targets.forEach((target) => expect(titles.has(target)).toBe(true));
     expect(targets).not.toContain(entry.title);

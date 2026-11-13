@@ -382,12 +382,12 @@ test("every chart header keeps its help button beside the expand control, even w
     .getByRole("button", { name: "Expand Fuel Prices chart" })
     .click();
   const dialog = page.getByRole("dialog", { name: "Fuel Prices", exact: true });
-  const help = dialog.getByRole("button", { name: "What is Fuel costs?" });
+  const help = dialog.getByRole("button", { name: "What is Fuel Prices?" });
   await expect(help).toBeVisible();
   await help.click();
   const manual = page.getByRole("dialog", { name: "Manual help" });
   await expect(
-    manual.getByRole("heading", { name: "Fuel costs", exact: true }),
+    manual.getByRole("heading", { name: "Fuel Prices", exact: true }),
   ).toBeVisible();
   await manual.getByRole("button", { name: "close", exact: true }).click();
   await expect(manual).toBeHidden();
