@@ -2988,7 +2988,6 @@ $pane_header_height: 48px;
   color: $interactive_blue;
   font-size: var(--font-size-subtitle);
   line-height: 1;
-  cursor: pointer;
   vertical-align: middle;
 
   &:focus-visible {
@@ -3008,11 +3007,6 @@ $pane_header_height: 48px;
 .manual-help-region {
   position: relative;
   min-height: var(--control-size);
-  cursor: pointer;
-
-  &:hover {
-    background: var(--bg-raised);
-  }
 }
 .manual-link.manual-link-region {
   min-width: 0;
@@ -3030,6 +3024,33 @@ $pane_header_height: 48px;
   &:focus-visible::after {
     outline: 2px solid var(--interactive-blue);
     outline-offset: -2px;
+  }
+}
+
+// One quiet affordance for any control that opens a manual entry. A neutral wash preserves
+// status colors, and a help cursor distinguishes lookups from actions that change the game.
+.manual-link,
+.manual-help-region,
+.manual-help-action.MuiButton-root {
+  cursor: help;
+}
+.manual-link,
+.manual-help-action.MuiButton-root {
+  border-radius: var(--radius-sm);
+}
+@media (hover: hover) and (pointer: fine) {
+  .manual-link:not(.manual-link-region):hover,
+  .manual-help-region:hover,
+  .manual-help-action.MuiButton-root:hover {
+    --manual-help-wash: color-mix(
+      in srgb,
+      var(--font-color-primary) 6%,
+      transparent
+    );
+    background-image: linear-gradient(
+      var(--manual-help-wash),
+      var(--manual-help-wash)
+    );
   }
 }
 
@@ -5501,9 +5522,8 @@ $homeSmokeCycle: 5.6s;
   text-align: left;
   text-transform: none;
 }
-// A term's manual entry, pinned beside it (base/ManualHelpPopover) or previewed on mouse hover
-// (base/ManualLink). At most half the screen tall so the decision underneath stays in view;
-// the body scrolls, the title and close stay put
+// A term's manual entry, opened beside it (base/ManualHelpPopover). At most half the screen
+// tall so the decision underneath stays in view; the body scrolls, the title and close stay put
 .manual-popover.MuiPaper-root {
   display: flex;
   flex-direction: column;
