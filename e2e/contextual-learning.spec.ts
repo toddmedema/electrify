@@ -56,7 +56,7 @@ for (const theme of ["light", "dark"] as const) {
         const color = await stat
           .locator("dd")
           .evaluate((element) => getComputedStyle(element).color);
-        await stat.locator("dd").hover();
+        await stat.hover();
         await expect(stat).not.toHaveCSS("background-image", "none");
         await expect(stat.locator("dd")).toHaveCSS("color", color);
         await page.waitForTimeout(600);
