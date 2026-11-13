@@ -1,6 +1,7 @@
 import { DerivedHistoryType, UnitSystemType } from "../Types";
 import {
   formatAbbreviatedNumber,
+  formatCount,
   formatNumber,
   formatMoneyConcise,
   formatPercent,
@@ -175,10 +176,7 @@ export function formatCustomerChange(
   change: number,
   customers: number,
 ): string {
-  const formattedChange = formatAbbreviatedNumber(
-    Number(Math.round(Math.abs(change)).toPrecision(2)),
-    { totalDigits: 2 },
-  );
+  const formattedChange = formatCount(Math.abs(change), 2);
   const sign = change >= 0 ? "+" : "-";
   const percent =
     customers > 0

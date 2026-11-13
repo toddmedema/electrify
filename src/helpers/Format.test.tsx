@@ -40,6 +40,21 @@ describe("formatCount", () => {
     expect(formatCount(1234567.4)).toBe("1.23M");
     expect(formatCount(7)).toBe("7");
   });
+
+  it.each<[number, string]>([
+    [12349.6, "12.3k"],
+    [-12349.6, "-12.3k"],
+    [7.49, "7"],
+    [7.5, "8"],
+    [-7.5, "-7"],
+    [0.49, "0"],
+  ])(
+    "rounds %s once at the coarser whole-number precision",
+    (value, expected) => {
+      expect(formatCount(value)).toBe(expected);
+      expect(formatScore(value)).toBe(expected);
+    },
+  );
 });
 
 describe("formatPricePerMWh", () => {

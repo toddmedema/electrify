@@ -921,6 +921,43 @@ it("draws each generator's typical year against one shared scale", () => {
 });
 
 it.each(["weather", "water-inflow"] as const)(
+  "rounds low and over-nameplate %s output once in captions and summaries",
+  (kind) => {
+    const game = createGame({ scenarioId: 100, difficulty: "Employee" });
+    const generator = GENERATORS(game, 1000000, [], [500]).find(
+      (candidate) => candidate.name === "Solar",
+    )!;
+    render(
+      <GeneratorBuildItem
+        cash={1e9}
+        date={game.date}
+        interestRate={game.interestRate}
+        generator={generator}
+        location={game.location}
+        seed={game.seed}
+        outputShape={{
+          kind,
+          monthly: [1.449, ...Array(11).fill(0.0449)],
+          lowMonth: 1,
+          mean: 0.16,
+        }}
+        onBuild={jest.fn()}
+      />,
+    );
+    const metric = screen.getByRole("group", { name: /Typical monthly/ });
+    const unit = kind === "weather" ? "capacity" : "of typical water";
+    expect(metric).toHaveTextContent(`Feb: 4.5% ${unit}`);
+    expect(
+      screen.getByRole("img", { name: /^Typical year/ }),
+    ).toHaveAccessibleName(
+      /highest in January at 140%, lowest in February at 4.5%/,
+    );
+    fireEvent.keyDown(metric, { key: "Home" });
+    expect(metric).toHaveTextContent(`Jan: 140% ${unit}`);
+  },
+);
+
+it.each(["weather", "water-inflow"] as const)(
   "inspects each %s month and restores the low month after leaving",
   (kind) => {
     const game = createGame({ scenarioId: 100, difficulty: "Employee" });

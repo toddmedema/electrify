@@ -389,9 +389,14 @@ function percentWithPrecision(
   return `${Math.abs(Number(amount)) >= 1000 ? formatNumber(Number(amount), { maximumSignificantDigits: significantDigits }) : amount}%`;
 }
 
-/** A rounded count, compacted to at most three significant digits. */
-export function formatCount(n: number): string {
-  return formatNumber(Math.round(n));
+/** Round once to whole numbers or the significant-digit cap, whichever is coarser. */
+export function formatCount(n: number, significantDigits: 2 | 3 = 3): string {
+  return formatNumber(
+    Number(
+      formatSignificantDecimal(n, significantDigits, { digits: 0, trim: true }),
+    ),
+    { maximumSignificantDigits: significantDigits },
+  );
 }
 
 /** A dollar amount per megawatt-hour, in the concise money style: "$42.5/MWh". */
@@ -421,7 +426,7 @@ export function formatBuildMonths(
 
 /** A game score as a compact amount with at most three significant digits. */
 export function formatScore(score: number): string {
-  return formatNumber(Math.round(score));
+  return formatCount(score);
 }
 
 /** Compact customer counts, with separate precision for chart axes and inspection. */

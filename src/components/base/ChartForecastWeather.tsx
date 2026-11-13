@@ -10,7 +10,7 @@ import {
 } from "./UPlotHelpers";
 import { TickPresentFutureType, UnitSystemType } from "../../Types";
 import { sampleTimeline } from "../../helpers/ForecastSampling";
-import { formatForecastNumber } from "../../helpers/Format";
+import { formatCount, formatForecastNumber } from "../../helpers/Format";
 import { formatMinuteAsTooltipHeader } from "../../helpers/DateTime";
 import { chartPalette } from "../../Theme";
 import {
@@ -110,7 +110,7 @@ export default class ChartForecastWeather extends React.PureComponent<
         id="chartForecastWeather"
         ariaLabel="Chart of predicted temperature"
         formatSummaryValue={(value) =>
-          `${formatForecastNumber(value)}${temperatureUnit(units)}`
+          `${formatCount(value, 2)}${temperatureUnit(units)}`
         }
         height={height}
         state={{ data, domain, startingYear, multiyear, units }}

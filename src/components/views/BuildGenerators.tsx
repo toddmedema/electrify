@@ -106,7 +106,7 @@ import { getLegacyBuildBounds } from "../../data/LegacyEra";
 import Sparkline from "../base/Sparkline";
 
 function percent(fraction: number): string {
-  return formatForecastPercent(Math.round(fraction * 100) / 100);
+  return formatForecastPercent(fraction);
 }
 
 /**

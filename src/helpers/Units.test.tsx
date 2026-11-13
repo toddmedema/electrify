@@ -7,12 +7,25 @@ import {
   formatMass,
   formatPricePerLargeMass,
   formatTemperature,
+  formatForecastTemperature,
   toDisplayLargeMass,
   toDisplayMass,
   toDisplayTemperature,
 } from "./Units";
 
 describe("Units", () => {
+  it.each<[number, "metric" | "imperial", string]>([
+    [40.4, "imperial", "100°F"],
+    [21.49, "metric", "21°C"],
+    [2.49, "metric", "2°C"],
+    [2.5, "metric", "3°C"],
+    [-2.5, "metric", "-2°C"],
+    [0, "metric", "0°C"],
+    [0, "imperial", "32°F"],
+  ])("rounds forecast %s°C once in %s units", (value, units, expected) => {
+    expect(formatForecastTemperature(value, units)).toBe(expected);
+  });
+
   describe("metric", () => {
     // Metric is what everything upstream is already in, so it has to come back untouched -
     // a rounding factor of 1.0000001 here would drift every number in the game

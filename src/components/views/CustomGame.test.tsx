@@ -213,6 +213,7 @@ it.each(["startup", "postMessage"])(
 it.each<[number, string]>([
   [3, "300%"],
   [1.294, "130%"],
+  [1.045, "100%"],
   [0.9991, "<100%"],
 ])(
   "ignores an older forecast result and caps the current coverage %s",

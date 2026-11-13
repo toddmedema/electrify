@@ -219,7 +219,7 @@ function demandServedLabel(outlook: YearOneOutlook): string {
   if (percent >= 99 && percent < 100) {
     return "<100%";
   }
-  return `${formatForecastNumber(Math.round(percent))}%`;
+  return `${formatForecastNumber(percent)}%`;
 }
 
 /**

@@ -2,6 +2,7 @@ import * as React from "react";
 import { render, screen } from "@testing-library/react";
 import { TickPresentFutureType } from "../../Types";
 import ChartForecastWeather from "./ChartForecastWeather";
+import { UnitsContext } from "./UnitsContext";
 
 function tick(minute: number): TickPresentFutureType {
   return {
@@ -27,6 +28,26 @@ describe("ChartForecastWeather", () => {
       }),
     ).toBeInTheDocument();
   });
+
+  it.each<[number, "metric" | "imperial", string]>([
+    [40.4, "imperial", "100°F"],
+    [2.49, "metric", "2°C"],
+  ])(
+    "summarizes forecast %s°C with whole-degree precision in %s",
+    (temperatureC, units, label) => {
+      render(
+        <UnitsContext.Provider value={units}>
+          <ChartForecastWeather
+            {...common}
+            timeline={[{ ...tick(0), temperatureC }]}
+          />
+        </UnitsContext.Provider>,
+      );
+      expect(
+        screen.getByRole("img", { name: /Chart of predicted temperature/ }),
+      ).toHaveAccessibleName(new RegExp(`Temperature: latest ${label}`));
+    },
+  );
 
   it.each([0, 15, 30, 45])(
     "keeps seasonal highs and lows in an hourly forecast starting at minute %i",

@@ -51,7 +51,7 @@ export function formatForecastTemperature(
   celsius: number,
   units: UnitSystemType,
 ): string {
-  return `${formatForecastNumber(Math.round(toDisplayTemperature(celsius, units)))}${temperatureUnit(units)}`;
+  return `${formatCount(toDisplayTemperature(celsius, units), 2)}${temperatureUnit(units)}`;
 }
 
 /** The unit a generator's emissions per MWh are quoted in - small enough to read in whole units */
