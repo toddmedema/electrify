@@ -99,7 +99,7 @@ import ChartForecastDemandByType, {
 import ChartFinances from "../base/ChartFinances";
 import ManualLink from "../base/ManualLink";
 import ConceptIcon from "../base/ConceptIcon";
-import { MANUAL_ENTRY, ManualEntryTitleType } from "../base/ManualEntries";
+import { MANUAL_SECTION, ManualSectionTitleType } from "../base/ManualEntries";
 import FuelFilter from "../base/FuelFilter";
 import { ExpandedChartPresentation } from "../base/ChartPresentationContext";
 import ChartForecastFuelPrices from "../base/ChartForecastFuelPrices";
@@ -235,28 +235,26 @@ export function isChartLayer(id: InsightLayerId): id is ChartLayerId {
   return !(TABLE_LAYERS as readonly InsightLayerId[]).includes(id);
 }
 
-/**
- * The manual page behind each chart's (?). Keyed by layer, so adding a chart without choosing a
- * page fails to compile. Where a quantity has its own entry the chart opens it; the rest open
- * Insights & data layers, which describes them.
- */
-export const INSIGHT_LAYER_MANUAL: Record<ChartLayerId, ManualEntryTitleType> =
-  {
-    supplyDemand: MANUAL_ENTRY.FORECASTS,
-    spareCapacity: MANUAL_ENTRY.RESERVE_CAPACITY,
-    powerExchange: MANUAL_ENTRY.INTERTIES,
-    demandByType: MANUAL_ENTRY.CUSTOMERS,
-    supplyByFuel: MANUAL_ENTRY.FORECASTS,
-    storage: MANUAL_ENTRY.POWER_AND_ENERGY,
-    customers: MANUAL_ENTRY.CUSTOMERS,
-    profit: MANUAL_ENTRY.FORECASTS,
-    cash: MANUAL_ENTRY.FORECASTS,
-    fuelPrices: MANUAL_ENTRY.FUEL_COSTS,
-    inflationInterest: MANUAL_ENTRY.INTEREST_RATES,
-    emissions: MANUAL_ENTRY.EMISSIONS,
-    weather: MANUAL_ENTRY.FORECASTS,
-    water: MANUAL_ENTRY.HYDROPOWER,
-  };
+/** Every chart opens only its own subsection of Insights & data layers. */
+export const INSIGHT_LAYER_MANUAL: Record<
+  ChartLayerId,
+  ManualSectionTitleType
+> = {
+  supplyDemand: MANUAL_SECTION.SUPPLY_DEMAND,
+  spareCapacity: MANUAL_SECTION.LOWEST_RESERVE,
+  powerExchange: MANUAL_SECTION.POWER_EXCHANGE,
+  demandByType: MANUAL_SECTION.DEMAND_BY_USE,
+  supplyByFuel: MANUAL_SECTION.SUPPLY_BY_FUEL,
+  storage: MANUAL_SECTION.STORED_ENERGY,
+  customers: MANUAL_SECTION.CUSTOMERS,
+  profit: MANUAL_SECTION.PROFIT,
+  cash: MANUAL_SECTION.CASH,
+  fuelPrices: MANUAL_SECTION.FUEL_PRICES,
+  inflationInterest: MANUAL_SECTION.INFLATION_INTEREST,
+  emissions: MANUAL_SECTION.EMISSIONS,
+  weather: MANUAL_SECTION.TEMPERATURE,
+  water: MANUAL_SECTION.WATER,
+};
 
 export type DefaultInsightPresetId =
   "overview" | "reliability" | "profitability" | "growth" | "decarbonization";

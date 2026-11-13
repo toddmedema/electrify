@@ -1,5 +1,4 @@
 import { revealControl } from "../components/base/RevealControl";
-import { isTvLayout } from "../TvLayout";
 
 const controlSelector =
   "button,a[href],input,select,textarea,summary,[role=button],[tabindex]";
@@ -24,15 +23,6 @@ function visible(element: HTMLElement): boolean {
     if (!details.querySelector(":scope > summary")?.contains(element))
       return false;
   }
-  // Compact tools cover the fleet without unmounting it or changing pointer/keyboard access.
-  // Controller focus must stay on the exposed surface, including when a resize covers focus.
-  if (
-    element.closest(".gameFleet") &&
-    element
-      .closest('.gameStage[data-layout="sheet"]')
-      ?.querySelector(".gameToolPanel:not([hidden])")
-  )
-    return false;
   return (
     !element.closest("[hidden],[inert],[aria-hidden=true]") &&
     !!element.getClientRects().length &&
@@ -52,8 +42,10 @@ export function inputScope(): HTMLElement {
   const screen = screens[screens.length - 1];
   const container = screen?.closest<HTMLElement>(".app_container");
   const tutorial = container?.querySelector<HTMLElement>(".tutorialHud");
-  if (isTvLayout())
-    return screen?.closest<HTMLElement>(".appFrame") ?? screen ?? document.body;
+  // Shared controller help and tutorial actions are siblings of the current screen.
+  // Popups above still own input, and inert outgoing screens stay unavailable.
+  const frame = screen?.closest<HTMLElement>(".appFrame");
+  if (frame) return frame;
   return tutorial && visible(tutorial) ? container! : (screen ?? document.body);
 }
 
@@ -149,10 +141,14 @@ function spatialDestination(
     return undefined;
   };
   const scrolling = vertical ? scrollParent(target) : undefined;
+  const pane = target.closest("[data-game-tool],.gameFleet");
   const cx = (from.left + from.right) / 2;
   const cy = (from.top + from.bottom) / 2;
   const candidates = controls.flatMap((element) => {
     if (element === target) return [];
+    // Up/Down follows this pane to its boundary; Left/Right crosses columns.
+    const otherPane = element.closest("[data-game-tool],.gameFleet");
+    if (vertical && pane && otherPane && pane !== otherPane) return [];
     const rect = element.getBoundingClientRect();
     if (!rect.width || !rect.height) return [];
     const dx = (rect.left + rect.right) / 2 - cx;
@@ -164,11 +160,19 @@ function spatialDestination(
       : Math.min(from.bottom, rect.bottom) - Math.max(from.top, rect.top);
     // Horizontal navigation follows the current row; Down/Up leaves that row.
     if (!vertical && overlap <= 0) return [];
-    const cross = Math.abs(vertical ? dx : dy);
+    // Overlapping rows are aligned even when one spans the entire settings pane.
+    // Its distant center must not make a wide disclosure lose to a later narrow control.
+    const cross = Math.max(0, -overlap);
     return [
       {
         element,
         advance,
+        rowGap: vertical
+          ? Math.max(
+              0,
+              forward > 0 ? rect.top - from.bottom : from.top - rect.bottom,
+            )
+          : 0,
         cross,
         aligned: overlap > 0,
         sameScroll: !!scrolling && scrollParent(element) === scrolling,
@@ -178,6 +182,9 @@ function spatialDestination(
   candidates.sort(
     (a, b) =>
       Number(b.sameScroll) - Number(a.sameScroll) ||
+      // Follow intervening rows before aligning columns. Otherwise a right-hand
+      // clock row can be skipped forever between two left-hand global controls.
+      a.rowGap - b.rowGap ||
       Number(b.aligned) - Number(a.aligned) ||
       a.advance + a.cross * 0.25 - (b.advance + b.cross * 0.25),
   );
@@ -230,27 +237,23 @@ export function moveInputFocus(
   const controls = visibleControls(scope);
   if (!controls.length) return;
   const index = controls.indexOf(target);
-  if (isTvLayout() && index >= 0) {
+  if (index >= 0) {
     const next = spatialDestination(target, controls, direction);
     if (next) focus(next);
     return;
   }
-  if (index >= 0) {
-    focus(controls[(index + step + controls.length) % controls.length]);
-  } else {
-    // A tool heading receives initial focus; continue immediately after that heading.
-    const candidates = controls.filter(
-      (element) =>
-        target.compareDocumentPosition(element) &
-        (step > 0
-          ? Node.DOCUMENT_POSITION_FOLLOWING
-          : Node.DOCUMENT_POSITION_PRECEDING),
-    );
-    focus(
-      (step > 0 ? candidates[0] : candidates[candidates.length - 1]) ??
-        controls[step > 0 ? 0 : controls.length - 1],
-    );
-  }
+  // A tool heading receives initial focus; continue immediately after that heading.
+  const candidates = controls.filter(
+    (element) =>
+      target.compareDocumentPosition(element) &
+      (step > 0
+        ? Node.DOCUMENT_POSITION_FOLLOWING
+        : Node.DOCUMENT_POSITION_PRECEDING),
+  );
+  focus(
+    (step > 0 ? candidates[0] : candidates[candidates.length - 1]) ??
+      controls[step > 0 ? 0 : controls.length - 1],
+  );
 }
 
 export function confirmInput(): void {

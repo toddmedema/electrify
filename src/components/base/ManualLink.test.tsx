@@ -1,17 +1,21 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { Provider } from "react-redux";
 import { store } from "../../Store";
 import { manualHelpClose } from "../../reducers/UI";
-import { MANUAL_ENTRY } from "./ManualEntries";
+import { MANUAL_ENTRY, MANUAL_SECTION } from "./ManualEntries";
 import ManualLink from "./ManualLink";
 
-function showLink() {
+function showLink(
+  entry: React.ComponentProps<
+    typeof ManualLink
+  >["entry"] = MANUAL_ENTRY.POWER_AND_ENERGY,
+) {
   render(
     <Provider store={store}>
-      <ManualLink entry={MANUAL_ENTRY.POWER_AND_ENERGY} />
+      <ManualLink entry={entry} />
     </Provider>,
   );
-  return screen.getByRole("button", { name: "What is Power and energy?" });
+  return screen.getByRole("button", { name: `What is ${entry}?` });
 }
 
 // Runs the hover delay, then the fade the preview leaves on
@@ -48,7 +52,9 @@ describe("ManualLink", () => {
   beforeEach(() => jest.useFakeTimers());
   afterEach(() => {
     jest.useRealTimers();
-    store.dispatch(manualHelpClose());
+    act(() => {
+      store.dispatch(manualHelpClose());
+    });
   });
 
   it("previews its entry while a mouse rests on it and hides it on leaving", () => {
@@ -69,6 +75,21 @@ describe("ManualLink", () => {
     fireEvent.pointerLeave(preview()!, { pointerType: "mouse" });
     settle();
     expect(preview()).toBeNull();
+  });
+
+  it("previews only the requested chart subsection and follows its related entry", () => {
+    const link = showLink(MANUAL_SECTION.SUPPLY_DEMAND);
+    hover(link);
+    settle();
+    const help = preview()!;
+    expect(
+      within(help).getByRole("heading", { name: "Supply & Demand" }),
+    ).toBeVisible();
+    expect(help).toHaveTextContent("missing energy");
+    expect(within(help).queryByRole("heading", { name: "Cash" })).toBeNull();
+    expect(help).not.toHaveTextContent("Choose a preset");
+    fireEvent.click(within(help).getByRole("link", { name: "blackouts" }));
+    expect(store.getState().ui.manualHelpEntry).toBe(MANUAL_ENTRY.BLACKOUTS);
   });
 
   it("ignores a (?) that arrives beneath a mouse that hasn't moved", () => {

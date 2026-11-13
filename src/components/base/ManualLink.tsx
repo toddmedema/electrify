@@ -5,6 +5,7 @@ import HelpOutlineIcon from "@mui/icons-material/HelpOutlineOutlined";
 import type { AppDispatch, RootState } from "../../Store";
 import { manualHelpOpen } from "../../reducers/UI";
 import type { ManualEntryTitleType } from "./ManualEntries";
+import { useScreenEdgeMargin } from "../../ScreenEdgePadding";
 import {
   ManualHelpContent,
   manualEntryByTitle,
@@ -36,6 +37,7 @@ function isMouse(event: React.PointerEvent): boolean {
 // usable; clicking (or tapping, where there is no hover) pins the entry open instead.
 export default function ManualLink(props: Props): React.JSX.Element {
   const dispatch = useDispatch<AppDispatch>();
+  const edgeMargin = useScreenEdgeMargin();
   const pinned = useSelector((state: RootState) => !!state.ui.manualHelpEntry);
   const label = props.label || props.entry;
   const anchorRef = React.useRef<HTMLButtonElement>(null);
@@ -125,8 +127,8 @@ export default function ManualLink(props: Props): React.JSX.Element {
           sx={{ zIndex: (theme) => theme.zIndex.tooltip }}
           modifiers={[
             { name: "offset", options: { offset: [0, 4] } },
-            { name: "preventOverflow", options: { padding: 8 } },
-            { name: "flip", options: { padding: 8 } },
+            { name: "preventOverflow", options: { padding: edgeMargin } },
+            { name: "flip", options: { padding: edgeMargin } },
           ]}
         >
           {({ TransitionProps }) => (

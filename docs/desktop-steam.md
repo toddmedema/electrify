@@ -410,43 +410,45 @@ player resumes it; closing a purchase, help, or other blocking screen cannot res
 running speed. Multiplayer sleep also preserves the shared save and requires consent to continue.
 A wake checkpoint failure uses the existing visible save error and retry path.
 
-### TV layout
+### Couch display settings and controllers
 
-The desktop title screen offers an explicit TV layout before starting a game. The same
-preference is available in Settings, where players can return to the desktop layout, adjust
-TV scale, and add a screen-edge inset. These preferences stay on this device; connecting a
-controller does not select TV layout automatically.
+Settings offers one Interface scale for text, charts, icons and controls (100–250%), and
+Workspace: Automatic or Single tool. Automatic uses the available space at the chosen scale;
+Single tool gives the active tool the main area while keeping essential status and navigation
+visible. Advanced display contains independent Screen-edge padding (0%, 2% or 4%) for displays
+that crop their edges. These preferences stay on this device. Existing text and TV preferences
+migrate once into the independent scale, workspace and padding choices; display resolution
+does not add an automatic scale factor. Split-screen companies retain their native zoom and
+single-tool workspace without applying scale twice.
 
-Before a layout has been chosen, Big Picture on a PC or a Remote Play TV client offers a
-title-screen suggestion. Accepting enables TV layout; declining or dismissing keeps desktop
-layout. Both choices are remembered across launches and take precedence over later detection.
-Big Picture alone never prompts on a Steam Deck (or when its hardware identity is unavailable),
-so handheld play keeps the desktop layout. Docked Deck players can select TV layout manually;
-a Deck streaming to a Remote Play TV can receive the same suggestion as a PC. The optional
-native queries use SteamUtils010 and SteamRemotePlay002 from the bundled SDK and fail without
-affecting local play. No detection path changes the layout without player approval.
+The first qualifying title-screen launch offers a small bottom prompt in Steam Big Picture,
+with a connected controller, or through a Remote Play TV client. Steam Deck uses the same
+signals. The prompt takes no focus and leaves Play available. Use couch settings applies 150%
+Interface scale and Single tool, retaining Screen-edge padding; Dismiss keeps current choices.
+The prompt is remembered as soon as it is shown, including across restarts without an answer.
+A valid previous TV-layout answer also counts as answered. Detection never changes preferences
+without acceptance, and signals arriving after leaving the title wait until a later title visit.
 
-TV layout keeps one active tool and the essential game status visible. Its shared scale covers
-text, charts, controls and controller glyphs. Build keeps comparison and forecast information
-inside the active view, and controller hints follow the current control with full controls help
-available separately. Existing chart, slider, text-entry and reorder controls retain their own
-navigation, nested Back and confirmation behavior.
+Controller navigation, contextual hints and full controls help work independently of display
+preferences. Build keeps comparison and forecast information inside constrained views. Charts,
+sliders, text entry and reorder controls retain their own navigation, nested Back and confirmation
+behavior. The optional native presentation queries use SteamUtils010 and SteamRemotePlay002
+from the bundled SDK and fail without affecting local play.
 
 Headless controller checks exercise the renderer and native bridge mock. They do not establish
 couch-distance readability, overscan behavior, physical-controller compatibility or Steam binding
 delivery. Before release, test a private build on real 1080p and 4K TVs in both themes:
 
-- Enable TV layout from the title screen using only a controller. Adjust scale and inset,
-  relaunch, and verify device-local persistence and the option to return to desktop layout.
-- With no saved layout choice, launch through Big Picture on a PC and stream to a Remote Play
-  TV. Check that the suggestion is readable before TV scaling, waits for a choice, and remembers
-  either answer after relaunch. Handheld Deck play must keep desktop layout without a Big Picture
-  suggestion; verify manual TV selection still works when docked.
+- Use the bottom prompt and Settings with only a controller. Adjust scale, workspace and padding,
+  relaunch, and verify device-local persistence and the ability to change each choice independently.
+- Start with no prompt receipt in Big Picture, with a connected but inactive controller, and through
+  Remote Play TV. Verify Play retains focus, the notice covers no controls, and the notice stays gone
+  after relaunch whether accepted, dismissed or left unanswered. Include Steam Deck Big Picture.
 - Complete tutorial → build/resize → pricing/programs → charts/events → save/reload. Check
   chart values and explanatory details without hover, directional destinations, and focus and
   scroll position when returning to a tool.
 - Verify cash, clock/speed, grid state and goals remain readable at couch distance. Repeat
-  with the largest text and TV scale, the largest inset, long event choices and text entry.
+  with the largest Interface scale and padding, long event choices and text entry.
 - Test remapped glyphs, nested Back, a held Confirm across purchase review, disconnect/reconnect,
   and recovery through the Steam overlay. Disconnect must leave the game paused until resumed.
 

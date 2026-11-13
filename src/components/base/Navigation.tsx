@@ -66,9 +66,11 @@ export function gameToolForCard(card: CardNameType): GameTool | undefined {
 export default function Navigation({
   openTools,
   onToggle,
+  destination,
 }: {
   openTools?: GameTool[];
   onToggle?: (tool: GameTool) => void;
+  destination?: (tool: GameTool) => CardNameType;
 }) {
   const dispatch = useAppDispatch();
   const controllerInput = useControllerInput();
@@ -142,6 +144,7 @@ export default function Navigation({
                   : undefined
               }
               aria-controls={open ? `tool-${tool.id}` : undefined}
+              data-game-destination={destination?.(tool.id)}
               onClick={() =>
                 onToggle
                   ? onToggle(tool.id)

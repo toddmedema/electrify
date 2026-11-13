@@ -141,7 +141,7 @@ for (const theme of ["light", "dark"]) {
     }, theme);
     await page.goto("/");
     await page.getByRole("button", { name: "Settings", exact: true }).click();
-    for (const name of ["Appearance", "Text size", "Units"]) {
+    for (const name of ["Appearance", "Units"]) {
       const group = page.getByRole("group", { name, exact: true });
       for (const button of await group.getByRole("button").all()) {
         await button.click();

@@ -103,11 +103,38 @@ export const MANUAL_ENTRY = {
   WEATHER_DAMAGE: "Weather damage",
 } as const;
 
-export type ManualEntryTitleType =
+// Subsections share their parent's manual page, but can be opened alone in contextual help.
+export const MANUAL_SECTION = {
+  SUPPLY_DEMAND: "Supply & Demand",
+  LOWEST_RESERVE: "Lowest reserve",
+  POWER_EXCHANGE: "Power exchange",
+  DEMAND_BY_USE: "Demand by use",
+  SUPPLY_BY_FUEL: "Supply by Fuel",
+  STORED_ENERGY: "Stored Energy",
+  CUSTOMERS: "Customers",
+  PROFIT: "Profit",
+  CASH: "Cash",
+  FUEL_PRICES: "Fuel Prices",
+  INFLATION_INTEREST: "Inflation & interest rate",
+  EMISSIONS: "Emissions (CO₂e)",
+  TEMPERATURE: "Temperature",
+  WATER: "Water",
+} as const;
+
+export type ManualSectionTitleType =
+  (typeof MANUAL_SECTION)[keyof typeof MANUAL_SECTION];
+export type ManualPageTitleType =
   (typeof MANUAL_ENTRY)[keyof typeof MANUAL_ENTRY];
+export type ManualEntryTitleType = ManualPageTitleType | ManualSectionTitleType;
+
+export interface ManualSectionType {
+  title: ManualSectionTitleType;
+  entry: React.JSX.Element;
+}
 
 export interface ManualEntryType {
-  title: ManualEntryTitleType;
+  title: ManualPageTitleType;
+  sections?: ManualSectionType[];
   group: ManualGroupType;
   entry: React.JSX.Element;
   // Terms a player would plausibly search for that aren't spelled out in the body, plus the
@@ -506,7 +533,7 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
         </p>
         <p>
           Once you own hydro, the{" "}
-          <EntryLink to={MANUAL_ENTRY.FORECASTS}>
+          <EntryLink to={MANUAL_SECTION.WATER}>
             <strong>Water</strong> chart
           </EntryLink>{" "}
           shows precipitation, snow and reservoir levels. Select a dam to see
@@ -650,60 +677,6 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           before running the clock. Choose a preset, or select Layers to compare
           charts over the same dates.
         </p>
-        <ul>
-          <li>
-            <strong>Supply &amp; Demand:</strong> Shading marks predicted{" "}
-            <EntryLink to={MANUAL_ENTRY.BLACKOUTS}>blackouts</EntryLink>, with
-            the missing{" "}
-            <EntryLink to={MANUAL_ENTRY.POWER_AND_ENERGY}>
-              energy and the largest power shortage
-            </EntryLink>
-            . Check when gaps happen, and your{" "}
-            <EntryLink to={MANUAL_ENTRY.RESERVE_CAPACITY}>reserve</EntryLink>,
-            before choosing what to build. Missing energy is scaled to a month.
-          </li>
-          <li>
-            <strong>Supply by Fuel:</strong> Local generation in{" "}
-            <EntryLink to={MANUAL_ENTRY.PRIORITIZING_GENERATORS}>
-              dispatch order
-            </EntryLink>{" "}
-            (merit order). Supply also includes storage discharge and{" "}
-            <EntryLink to={MANUAL_ENTRY.INTERTIES}>imports</EntryLink>, minus
-            charging and exports.
-          </li>
-          <li>
-            <strong>Power exchange:</strong> Imports plot above zero and exports
-            below. Quiet stretches mean you neither fell short nor had extra to
-            sell.
-          </li>
-          <li>
-            <strong>Stored Energy:</strong> What's left in batteries and{" "}
-            <EntryLink to={MANUAL_ENTRY.HYDROPOWER}>reservoirs</EntryLink>.
-            Power ratings limit how quickly you can use it.
-          </li>
-          <li>
-            <strong>Fuel Prices:</strong> History and estimates. Prices can
-            jump, so check before building fuel-burning plants.
-          </li>
-          <li>
-            <strong>Profit and Cash:</strong> Recorded months, then estimates.
-            Your <EntryLink to={MANUAL_ENTRY.RATES}>rate</EntryLink> sets
-            revenue;{" "}
-            <EntryLink to={MANUAL_ENTRY.OPERATING_COSTS}>
-              operating costs
-            </EntryLink>
-            , <EntryLink to={MANUAL_ENTRY.FUEL_COSTS}>fuel</EntryLink>,{" "}
-            <EntryLink to={MANUAL_ENTRY.CARBON_FEE}>carbon fees</EntryLink> and{" "}
-            <EntryLink to={MANUAL_ENTRY.INTEREST_RATES}>
-              loan payments
-            </EntryLink>{" "}
-            make up expenses.
-          </li>
-          <li>
-            <strong>Temperature:</strong> Weather forecasts. Hydro owners also
-            get a <strong>Water</strong> chart.
-          </li>
-        </ul>
         <p>
           Forecasts use one day per month (see{" "}
           <EntryLink to={MANUAL_ENTRY.HOW_TO_PLAY}>How to play</EntryLink>), so
@@ -711,6 +684,180 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
         </p>
       </div>
     ),
+    sections: [
+      {
+        title: MANUAL_SECTION.SUPPLY_DEMAND,
+        entry: (
+          <p>
+            Compares electricity supplied with demand. Shading marks predicted{" "}
+            <EntryLink to={MANUAL_ENTRY.BLACKOUTS}>blackouts</EntryLink>, with
+            missing energy scaled to a month and the largest power shortage.
+            Check when gaps happen before choosing what to build.
+          </p>
+        ),
+      },
+      {
+        title: MANUAL_SECTION.LOWEST_RESERVE,
+        entry: (
+          <p>
+            The lowest{" "}
+            <EntryLink to={MANUAL_ENTRY.RESERVE_CAPACITY}>reserve</EntryLink> in
+            each month, including recorded months and forecasts. Below zero
+            means a shortage. Use it to find the months when your grid is most
+            stretched.
+          </p>
+        ),
+      },
+      {
+        title: MANUAL_SECTION.POWER_EXCHANGE,
+        entry: (
+          <p>
+            Power bought through{" "}
+            <EntryLink to={MANUAL_ENTRY.INTERTIES}>interties</EntryLink> plots
+            above zero; power sold plots below. Quiet stretches mean no trade.
+            Compare with demand to see when you rely on neighbors.
+          </p>
+        ),
+      },
+      {
+        title: MANUAL_SECTION.DEMAND_BY_USE,
+        entry: (
+          <p>
+            Splits demand into uses such as homes, industry, heating and
+            cooling. Look for what drives your peak before choosing{" "}
+            <EntryLink to={MANUAL_ENTRY.CUSTOMER_PROGRAMS}>
+              customer programs
+            </EntryLink>{" "}
+            or new supply.
+          </p>
+        ),
+      },
+      {
+        title: MANUAL_SECTION.SUPPLY_BY_FUEL,
+        entry: (
+          <p>
+            Local generation by fuel in{" "}
+            <EntryLink to={MANUAL_ENTRY.PRIORITIZING_GENERATORS}>
+              dispatch order
+            </EntryLink>{" "}
+            (merit order), compared with demand. Select a fuel to inspect its
+            contribution. Storage discharge and imports also help meet demand;
+            charging and exports use power.
+          </p>
+        ),
+      },
+      {
+        title: MANUAL_SECTION.STORED_ENERGY,
+        entry: (
+          <p>
+            Energy left in batteries and pumped-hydro storage, measured in{" "}
+            <EntryLink to={MANUAL_ENTRY.POWER_AND_ENERGY}>MWh</EntryLink>. Watch
+            for storage running empty before a demand peak. Power ratings limit
+            how quickly you can charge or discharge it. Conventional-hydro
+            reservoirs appear in{" "}
+            <EntryLink to={MANUAL_SECTION.WATER}>Water</EntryLink>.
+          </p>
+        ),
+      },
+      {
+        title: MANUAL_SECTION.CUSTOMERS,
+        entry: (
+          <p>
+            Recorded and projected total customer counts. Growth raises future
+            electricity needs;{" "}
+            <EntryLink to={MANUAL_ENTRY.CUSTOMERS}>
+              pricing and reliability
+            </EntryLink>{" "}
+            affect how many customers stay.
+          </p>
+        ),
+      },
+      {
+        title: MANUAL_SECTION.PROFIT,
+        entry: (
+          <p>
+            Monthly profit or loss, followed by estimates: revenue minus
+            expenses. Your <EntryLink to={MANUAL_ENTRY.RATES}>rate</EntryLink>{" "}
+            affects revenue. Fuel, imports, upkeep, customer programs, carbon
+            fees and loan interest add to expenses. Finance details breaks down
+            the totals.
+          </p>
+        ),
+      },
+      {
+        title: MANUAL_SECTION.CASH,
+        entry: (
+          <p>
+            Your cash balance through recorded months and forecasts. A falling
+            line means spending exceeds income. Check that you can afford new
+            projects while covering future losses. Negative balances are marked
+            below the chart.
+          </p>
+        ),
+      },
+      {
+        title: MANUAL_SECTION.FUEL_PRICES,
+        entry: (
+          <p>
+            Historical and estimated fuel prices. Select a fuel to inspect its
+            trend before building a plant that burns it. A plant's{" "}
+            <EntryLink to={MANUAL_ENTRY.FUEL_COSTS}>
+              fuel cost per MWh
+            </EntryLink>{" "}
+            also depends on its efficiency; prices can jump unexpectedly.
+          </p>
+        ),
+      },
+      {
+        title: MANUAL_SECTION.INFLATION_INTEREST,
+        entry: (
+          <p>
+            Compares inflation with your borrowing rate over time. Inflation
+            raises costs; your borrowing rate includes the prime rate and a
+            credit risk premium. Existing loans keep their agreed rates. See{" "}
+            <EntryLink to={MANUAL_ENTRY.INTEREST_RATES}>
+              interest rates &amp; inflation
+            </EntryLink>{" "}
+            for how payments work.
+          </p>
+        ),
+      },
+      {
+        title: MANUAL_SECTION.EMISSIONS,
+        entry: (
+          <p>
+            Monthly{" "}
+            <EntryLink to={MANUAL_ENTRY.EMISSIONS}>
+              greenhouse gas emissions
+            </EntryLink>{" "}
+            from your grid, including imports and construction. Compare the
+            forecast before and after changing your generation or building
+            plans.
+          </p>
+        ),
+      },
+      {
+        title: MANUAL_SECTION.TEMPERATURE,
+        entry: (
+          <p>
+            Forecast temperature over the selected dates. Hot and cold months
+            raise cooling and heating demand. Compare with demand and reserve to
+            spot weather-driven pressure on your grid.
+          </p>
+        ),
+      },
+      {
+        title: MANUAL_SECTION.WATER,
+        entry: (
+          <p>
+            Precipitation and snowpack use the left axis; reservoir energy uses
+            the right. Watch for dry months or dwindling reserves before relying
+            on <EntryLink to={MANUAL_ENTRY.HYDROPOWER}>hydropower</EntryLink> to
+            cover demand peaks.
+          </p>
+        ),
+      },
+    ],
   },
   {
     title: MANUAL_ENTRY.KEYBOARD_SHORTCUTS,

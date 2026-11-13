@@ -1,7 +1,8 @@
-import { act, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { Provider } from "react-redux";
 import { store } from "../Store";
 import InputHints, { ControlsLegend } from "./InputHints";
+import { dialogClose } from "../reducers/UI";
 import {
   resetInputPresentation,
   updateInputPresentation,
@@ -10,6 +11,41 @@ import {
 afterEach(() => {
   delete window.electrifyCouch;
   resetInputPresentation();
+  store.dispatch(dialogClose());
+});
+
+it("shows contextual hints and complete help without a layout preference", () => {
+  updateInputPresentation({
+    active: true,
+    connected: true,
+    context: "Gameplay",
+    glyphs: {
+      left: { label: "D-pad left" },
+      down: { label: "D-pad down" },
+      confirm: { label: "A" },
+    },
+  });
+  render(
+    <Provider store={store}>
+      <input type="range" aria-label="Volume" />
+      <InputHints />
+    </Provider>,
+  );
+  act(() => screen.getByRole("slider").focus());
+  expect(screen.getByText("Adjust value")).toBeVisible();
+  expect(screen.getByText("Next control")).toBeVisible();
+  expect(screen.queryByText("Previous pane")).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "All controls" }));
+  expect(store.getState().ui.dialog).toMatchObject({
+    open: true,
+    title: "Controller controls",
+  });
+  render(
+    <Provider store={store}>{store.getState().ui.dialog.message}</Provider>,
+  );
+  expect(screen.getByText("Previous pane")).toBeVisible();
+  expect(screen.getByText("Pause / back")).toBeVisible();
+  expect(screen.getAllByText("Unbound").length).toBeGreaterThan(0);
 });
 
 it("keeps connected couch hints present when pointer input becomes active", () => {
@@ -52,6 +88,7 @@ it("keeps the existing solo behavior when pointer input becomes active", () => {
 });
 
 it("shows the complete shared menu legend with the requesting controller bindings", () => {
+  // The shared shell owns the legend without a company-seat bridge.
   render(
     <ControlsLegend
       glyphs={{
@@ -63,6 +100,7 @@ it("shows the complete shared menu legend with the requesting controller binding
   );
   expect(screen.getByLabelText("Controller controls")).toBeVisible();
   expect(screen.getByText("Controls")).toBeVisible();
+  expect(screen.getByText("Game menu")).toBeVisible();
   expect(screen.getByRole("img", { name: "Options" })).toBeVisible();
   expect(screen.getByText("Remapped faster")).toBeVisible();
   expect(screen.getByText("Build")).toBeVisible();

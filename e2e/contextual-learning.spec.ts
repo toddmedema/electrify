@@ -3,6 +3,75 @@ import { expect, test } from "./fixtures";
 import { openBuild, openPane } from "./layout";
 
 for (const theme of ["light", "dark"] as const) {
+  test(`enlarged manual help keeps its header and scroll body in a short viewport in ${theme}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({
+      width: page.viewportSize()!.width,
+      height: 1080,
+    });
+    await page.addInitScript((mode) => {
+      localStorage.clear();
+      localStorage.setItem("interfaceScale", "2.5");
+      localStorage.setItem("theme", mode);
+      localStorage.setItem("audioEnabled", "false");
+    }, theme);
+    await page.goto("/?scenario=111");
+    await page.getByRole("button", { name: "Start game", exact: true }).click();
+    const build = await openBuild(page);
+    const option = build.locator(".buildOption").first();
+    await option.getByRole("button", { name: /^Show .* details$/ }).click();
+    await option
+      .getByRole("button", { name: /^What is / })
+      .first()
+      .click();
+    const manual = page.getByRole("dialog", { name: "Manual help" });
+    await expect(manual).toBeVisible();
+    await page.setViewportSize({
+      width: page.viewportSize()!.width,
+      height: 360,
+    });
+    const close = manual.getByRole("button", { name: "close", exact: true });
+    await expect(close).toBeInViewport({ ratio: 1 });
+    await expect
+      .poll(async () => {
+        const box = (await manual.boundingBox())!;
+        return box.y + box.height;
+      })
+      .toBeLessThanOrEqual(353);
+    const body = manual.locator(".manual-popover-body");
+    const geometry = await manual.evaluate((element) => {
+      const box = element.getBoundingClientRect();
+      const header = element
+        .querySelector(".manual-popover-header")!
+        .getBoundingClientRect();
+      const body = element.querySelector(".manual-popover-body")!;
+      return {
+        top: box.top,
+        bottom: box.bottom,
+        headerBottom: header.bottom,
+        bodyHeight: body.clientHeight,
+        scrollHeight: body.scrollHeight,
+      };
+    });
+    expect(geometry.top).toBeGreaterThanOrEqual(8);
+    expect(geometry.bottom).toBeLessThanOrEqual(353);
+    expect(geometry.headerBottom).toBeLessThan(geometry.bottom);
+    expect(geometry.bodyHeight).toBeGreaterThanOrEqual(40);
+    expect(geometry.scrollHeight).toBeGreaterThan(geometry.bodyHeight);
+    await body.evaluate((element) => {
+      element.scrollTop = element.scrollHeight;
+    });
+    expect(await body.evaluate((element) => element.scrollTop)).toBeGreaterThan(
+      0,
+    );
+    await expect(close).toBeInViewport({ ratio: 1 });
+    await close.click();
+    await expect(manual).not.toBeVisible();
+  });
+}
+
+for (const theme of ["light", "dark"] as const) {
   test(`contextual learning preserves a storage decision in ${theme}`, async ({
     page,
   }, testInfo) => {
@@ -183,3 +252,148 @@ test("reading help preserves the current tutorial objective", async ({
   await expect(objective).toHaveText(before, { useInnerText: true });
   await expect(help).toBeFocused();
 });
+
+for (const theme of ["light", "dark"] as const) {
+  test(`insights help shows only its chart subsection in ${theme}`, async ({
+    page,
+  }, info) => {
+    await page.addInitScript((mode) => {
+      localStorage.clear();
+      localStorage.setItem("theme", mode);
+      localStorage.setItem("audioEnabled", "false");
+      localStorage.setItem(
+        "insightsLayers",
+        JSON.stringify(["supplyDemand", "cash"]),
+      );
+    }, theme);
+    await page.goto("/?scenario=108");
+    await page.getByRole("button", { name: "Start game", exact: true }).click();
+    const insights = page.getByRole("region", {
+      name: "Insights",
+      exact: true,
+    });
+    await openPane(
+      insights,
+      page.getByRole("button", { name: "Insights", exact: true }),
+    );
+    const supplyHelp = insights.getByRole("button", {
+      name: "What is Supply & Demand?",
+      exact: true,
+    });
+    const pinned = page.getByRole("dialog", {
+      name: "Manual help",
+      exact: true,
+    });
+    const shots = process.env.REVIEW_SCREENSHOT_DIR;
+    if (!info.project.use.hasTouch) {
+      await supplyHelp.hover();
+      const preview = page.getByRole("dialog", {
+        name: "Manual preview",
+        exact: true,
+      });
+      await expect(preview.getByRole("heading")).toHaveText([
+        "Supply & Demand",
+      ]);
+      await expect(preview).toContainText("missing energy");
+      await expect(preview).not.toContainText("Choose a preset");
+      if (shots && theme === "light") {
+        await page.screenshot({
+          path: path.join(shots, "insights-subsection-desktop-light.png"),
+          animations: "disabled",
+        });
+      }
+    }
+    await supplyHelp.click();
+    await expect(pinned.getByRole("heading")).toHaveText(["Supply & Demand"]);
+    await pinned.getByRole("link", { name: "blackouts", exact: true }).click();
+    await expect(pinned.getByRole("heading")).toHaveText(["Blackouts"]);
+    await pinned.getByRole("button", { name: "close", exact: true }).click();
+    await expect(supplyHelp).toBeFocused();
+    await insights
+      .getByRole("button", { name: "What is Cash?", exact: true })
+      .click();
+    await expect(pinned.getByRole("heading")).toHaveText(["Cash"]);
+    await expect(pinned).toContainText("cash balance");
+    const bounds = (await pinned.boundingBox())!;
+    expect(bounds.x).toBeGreaterThanOrEqual(0);
+    expect(bounds.x + bounds.width).toBeLessThanOrEqual(
+      page.viewportSize()!.width,
+    );
+    expect(
+      await pinned.evaluate(
+        (element) => element.scrollWidth - element.clientWidth,
+      ),
+    ).toBeLessThanOrEqual(1);
+    if (shots && theme === "dark" && info.project.name === "mobile-390px") {
+      await page.screenshot({
+        path: path.join(shots, "insights-subsection-mobile-dark.png"),
+        animations: "disabled",
+      });
+    }
+    await page.keyboard.press("Escape");
+    await expect(pinned).toBeHidden();
+    await expect(insights).toBeVisible();
+  });
+}
+
+test("manual search keeps chart subsections inside the insights page", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Manual", exact: true }).click();
+  await page
+    .getByRole("textbox", { name: "Search the manual" })
+    .fill("dwindling reserves");
+  const entry = page.locator("#manual-insights-data-layers-content");
+  await expect(page.locator(".manual-entry")).toHaveCount(1);
+  await expect(
+    page.locator("#manual-insights-data-layers-header"),
+  ).toHaveAttribute("aria-expanded", "true");
+  await expect(
+    entry.getByRole("heading", { name: "Water", exact: true }),
+  ).toBeVisible();
+  await expect(entry.locator("mark")).toHaveText(["dwindling reserves"]);
+});
+
+for (const theme of ["light", "dark"] as const) {
+  test(`hydro and storage help link directly to Water in ${theme}`, async ({
+    page,
+  }, info) => {
+    await page.addInitScript((mode) => {
+      localStorage.setItem("theme", mode);
+      localStorage.setItem("audioEnabled", "false");
+    }, theme);
+    await page.goto("/");
+    await page.getByRole("button", { name: "Manual", exact: true }).click();
+    await page.locator("#manual-insights-data-layers-header").click();
+    const storage = page.locator("section:has(> #manual-stored-energy)");
+    const shots = process.env.REVIEW_SCREENSHOT_DIR;
+    if (
+      shots &&
+      ((theme === "light" && info.project.name === "desktop-chromium") ||
+        (theme === "dark" && info.project.name === "mobile-390px"))
+    ) {
+      await storage.screenshot({
+        path: path.join(
+          shots,
+          `storage-water-${info.project.name}-${theme}.png`,
+        ),
+        animations: "disabled",
+      });
+    }
+    await storage.getByRole("link", { name: "Water", exact: true }).click();
+    const water = page.getByRole("heading", { name: "Water", exact: true });
+    await expect(water).toBeVisible();
+    await expect(water).toBeFocused();
+    await page
+      .locator("section:has(> #manual-water)")
+      .getByRole("link", { name: "hydropower", exact: true })
+      .click();
+    await page.getByRole("link", { name: "Water chart", exact: true }).click();
+    await expect(water).toBeVisible();
+    await expect(water).toBeFocused();
+    await expect(
+      page.locator("#manual-insights-data-layers-header"),
+    ).toHaveAttribute("aria-expanded", "true");
+  });
+}

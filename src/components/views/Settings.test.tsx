@@ -36,7 +36,9 @@ function renderSettings(overrides: Partial<Props> = {}) {
     onSoundEffectsVolumeChange: () => undefined,
     onUnitsChange: () => undefined,
     onThemeChange: () => undefined,
-    onTextSizeChange: () => undefined,
+    onInterfaceScaleChange: () => undefined,
+    onWorkspaceChange: () => undefined,
+    onScreenEdgePaddingChange: () => undefined,
     onBack: () => undefined,
     ...overrides,
   };
@@ -66,10 +68,15 @@ describe("Settings", () => {
   it("passes only the current mailing-list choice to Google sign-in", async () => {
     const onLogin = jest.fn();
     const view = renderSettings({ onLogin });
-    const checkbox = screen.getByRole("checkbox", {
+    const leaderboard = within(
+      screen.getByRole("region", { name: "Leaderboard" }),
+    );
+    const checkbox = leaderboard.getByRole("checkbox", {
       name: "Join the Electrify mailing list",
     });
-    const signIn = screen.getByRole("button", { name: "Sign in with Google" });
+    const signIn = leaderboard.getByRole("button", {
+      name: "Sign in with Google",
+    });
     expect(checkbox).not.toBeChecked();
     await userEvent.click(signIn);
     expect(onLogin).toHaveBeenLastCalledWith({ mailingList: false });
@@ -82,9 +89,12 @@ describe("Settings", () => {
     view.unmount();
     renderSettings();
     expect(
-      screen.getByRole("checkbox", {
-        name: "Join the Electrify mailing list",
-      }),
+      within(screen.getByRole("region", { name: "Leaderboard" })).getByRole(
+        "checkbox",
+        {
+          name: "Join the Electrify mailing list",
+        },
+      ),
     ).not.toBeChecked();
   });
 
@@ -182,27 +192,87 @@ describe("Settings", () => {
     const onUnitsChange = jest.fn();
     renderSettings({ onThemeChange, onUnitsChange });
 
-    await userEvent.click(screen.getByRole("button", { name: "Dark" }));
-    await userEvent.click(screen.getByRole("button", { name: "Imperial" }));
+    await userEvent.click(
+      within(screen.getByRole("group", { name: "Appearance" })).getByRole(
+        "button",
+        { name: "Dark" },
+      ),
+    );
+    await userEvent.click(
+      within(screen.getByRole("group", { name: "Units" })).getByRole("button", {
+        name: "Imperial",
+      }),
+    );
 
     expect(onThemeChange).toHaveBeenCalledWith("dark");
     expect(onUnitsChange).toHaveBeenCalledWith("imperial");
   });
 
-  it("offers a standard default and explicit larger text sizes", async () => {
-    const onTextSizeChange = jest.fn();
-    renderSettings({ onTextSizeChange });
-    const sizes = screen.getByRole("group", { name: "Text size" });
+  it("offers explicit interface scales from 100% through 250%", async () => {
+    const onInterfaceScaleChange = jest.fn();
+    renderSettings({ onInterfaceScaleChange });
+    const scale = screen.getByRole("combobox", { name: "Interface scale" });
+    expect(scale).toHaveValue("1");
+    await userEvent.selectOptions(scale, "1.5");
+    await userEvent.selectOptions(scale, "2.5");
+    expect(onInterfaceScaleChange.mock.calls).toEqual([[1.5], [2.5]]);
+  });
+
+  it("offers Automatic and Single tool workspaces outside the desktop app", async () => {
+    const onWorkspaceChange = jest.fn();
+    renderSettings({ onWorkspaceChange });
+    expect(screen.getByRole("button", { name: "Automatic" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Single tool" }));
+    expect(onWorkspaceChange).toHaveBeenCalledWith("single");
+  });
+
+  it("offers independent screen-edge padding in advanced Display settings outside the desktop app", async () => {
+    const onScreenEdgePaddingChange = jest.fn();
+    renderSettings({ onScreenEdgePaddingChange });
+    const display = within(screen.getByRole("region", { name: "Display" }));
     expect(
-      within(sizes).getByRole("button", { name: "Standard" }),
-    ).toHaveAttribute("aria-pressed", "true");
+      display.queryByRole("group", { name: "Screen-edge padding" }),
+    ).not.toBeInTheDocument();
     await userEvent.click(
-      within(sizes).getByRole("button", { name: /^Large$/ }),
+      display.getByRole("button", { name: "Advanced display" }),
     );
-    await userEvent.click(
-      within(sizes).getByRole("button", { name: /^Larger$/ }),
+    const padding = display.getByRole("group", { name: "Screen-edge padding" });
+    expect(within(padding).getByRole("button", { name: "0%" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
     );
-    expect(onTextSizeChange.mock.calls).toEqual([["large"], ["larger"]]);
+    for (const value of [2, 4])
+      await userEvent.click(
+        within(padding).getByRole("button", { name: `${value}%` }),
+      );
+    expect(onScreenEdgePaddingChange.mock.calls).toEqual([[2], [4]]);
+    expect(
+      screen.getByRole("combobox", { name: "Interface scale" }),
+    ).toHaveValue("1");
+    expect(screen.getByRole("button", { name: "Automatic" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+  });
+
+  it("displays an exact migrated intermediate scale", () => {
+    renderSettings({
+      settings: {
+        theme: "system",
+        units: "metric",
+        musicVolume: 1,
+        soundEffectsVolume: 1,
+        interfaceScale: 1.96875,
+      },
+    });
+    const scale = screen.getByRole("combobox", { name: "Interface scale" });
+    expect(scale).toHaveValue("1.96875");
+    expect(
+      within(scale).getByRole("option", { name: "196.875%" }),
+    ).toBeInTheDocument();
   });
 
   it("keeps physical keyboard shortcuts out of active controller help", () => {
@@ -214,7 +284,9 @@ describe("Settings", () => {
     expect(
       screen.queryByRole("heading", { name: "Keyboard shortcuts" }),
     ).not.toBeInTheDocument();
-    expect(screen.getByRole("group", { name: "Text size" })).toBeVisible();
+    expect(
+      screen.getByRole("combobox", { name: "Interface scale" }),
+    ).toBeVisible();
     act(() => updateInputPresentation({ active: false }));
     expect(
       screen.getByRole("heading", { name: "Keyboard shortcuts" }),

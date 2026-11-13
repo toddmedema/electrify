@@ -1,6 +1,6 @@
-import { isTvLayout } from "../../TvLayout";
 import { KeyboardEvent, useLayoutEffect, useRef } from "react";
 import { CARD_TRANSITION_ANIMATION_MS } from "../../Constants";
+import { revealControl } from "./RevealControl";
 
 const selector = "button,a[href],input,select,textarea,[role=button]";
 const popup = "[role=dialog],[role=menu],[role=listbox]";
@@ -21,6 +21,11 @@ function controls(root: Element): HTMLElement[] {
 }
 const preferred = (items: HTMLElement[]) =>
   items.find((item) => item.matches("[aria-pressed=true]")) || items[0];
+function focus(element?: HTMLElement) {
+  if (!element) return;
+  element.focus({ preventScroll: true });
+  revealControl(element);
+}
 
 /** Returning to a menu must not undo navigation begun during the card transition. */
 export function restoreMenuFocus(returnSelector: string): void {
@@ -46,12 +51,8 @@ export function restoreMenuFocus(returnSelector: string): void {
     // Home always starts at the top. Its own menu hook may already have focused that
     // action (or the player may have moved on), so never overwrite focus within it.
     if (home?.contains(document.activeElement)) return;
-    // A TV workspace restores the control and scroll position inside its previous tool.
-    if (
-      isTvLayout() &&
-      document.activeElement?.closest("[data-game-tool],.gameFleet")
-    )
-      return;
+    // The workspace restores the control and scroll position inside its previous tool.
+    if (document.activeElement?.closest("[data-game-tool],.gameFleet")) return;
     const target = home
       ? home.querySelector<HTMLElement>("[data-main-action]")
       : trigger;
@@ -62,7 +63,7 @@ export function restoreMenuFocus(returnSelector: string): void {
         (surface) => !surface.closest(unavailable),
       )
     )
-      target.focus();
+      focus(target);
   }, CARD_TRANSITION_ANIMATION_MS + 50);
   // Early keys can land on the body while the menu is still entering.
   // Controller navigation emits the same keyboard events as physical keys.
@@ -95,7 +96,7 @@ export function useMenuKeys(settings = false, onBack?: () => void) {
         !interaction.current ||
         (interaction.current === 1 && ref.current?.contains(active)))
     ) {
-      preferred(rows()[0] || [])?.focus();
+      focus(preferred(rows()[0] || []));
     }
     if (!interaction.current) interaction.current = 1;
   });
@@ -132,12 +133,7 @@ export function useMenuKeys(settings = false, onBack?: () => void) {
       event.preventDefault();
       target.click();
     } else if (!native && event.key.startsWith("Arrow")) {
-      if (
-        !settings &&
-        isTvLayout() &&
-        document.documentElement.dataset.controllerInput === "true"
-      )
-        return;
+      if (document.documentElement.dataset.controllerInput === "true") return;
       const groups = rows();
       const row = groups.findIndex((items) => items.includes(target));
       if (row < 0) return;
@@ -157,7 +153,7 @@ export function useMenuKeys(settings = false, onBack?: () => void) {
             ];
       event.preventDefault();
       event.stopPropagation();
-      next?.focus();
+      focus(next);
     }
   };
   return {

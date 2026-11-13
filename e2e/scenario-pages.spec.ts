@@ -50,6 +50,12 @@ test.describe("scenario pages without JavaScript", () => {
           scenario.name,
         );
         await expect(page.getByRole("main")).toContainText(scenario.setup[0]);
+        await expect(
+          page.getByRole("contentinfo").getByRole("link", {
+            name: "How to play",
+            exact: true,
+          }),
+        ).toBeVisible();
         await expect(page.locator("link[rel='canonical']")).toHaveAttribute(
           "href",
           `https://electrifygame.com/scenarios/${scenario.slug}.html`,

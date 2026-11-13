@@ -1,4 +1,4 @@
-.couchSharedToolbar {
+#appbar.couchSharedToolbar {
   width: 100%;
   min-width: 0;
 
@@ -13,7 +13,7 @@
     min-width: 0;
   }
   // Match the player's grid status after native zoom, while retaining the shell's
-  // shared type ramp and its independently applied TV presentation scale.
+  // shared interface scale.
   #topbar .couchCalendar .gameStatusValue.weak,
   .couchSharedMission .missionRiskText,
   .couchSharedMission .missionSummaryMonths.MuiButton-root {

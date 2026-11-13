@@ -1,5 +1,7 @@
-import { useTvLayout } from "../../TvLayout";
-import { GameBuildCompleteContext } from "../base/GameWorkspaceContext";
+import {
+  GameBuildCompleteContext,
+  useGameWorkspaceLayout,
+} from "../base/GameWorkspaceContext";
 import * as React from "react";
 import { useToolState, useToolScroll } from "../base/GameToolMemory";
 import {
@@ -998,7 +1000,9 @@ export type Props = StateProps & DispatchProps;
 
 function BuildGenerators(props: Props): React.JSX.Element {
   const completeBuild = React.useContext(GameBuildCompleteContext);
-  const tvMode = useTvLayout();
+  const workspace = useGameWorkspaceLayout();
+  const comparisonInList =
+    workspace?.constrained || workspace?.fleetVisible === false;
   const { evidenceRequest, facilityDragActive, onEvidenceReady } = props;
   const evidenceAnchor = React.useRef<HTMLDivElement>(null);
   const { game, onBack } = props;
@@ -1257,10 +1261,15 @@ function BuildGenerators(props: Props): React.JSX.Element {
           Calculating output and energy costs…
         </Typography>
       )}
-      {!tvMode && comparison}
-      <List ref={listRef} dense className="scrollable cardList">
-        {tvMode && comparedGenerators.length > 0 && (
-          <li className="tvComparisonItem">{comparison}</li>
+      {!comparisonInList && comparison}
+      <List
+        ref={listRef}
+        dense
+        className="scrollable cardList"
+        aria-label="Generator options"
+      >
+        {comparisonInList && comparedGenerators.length > 0 && (
+          <li className="buildComparisonItem">{comparison}</li>
         )}
         {generators.map((g: GeneratorShoppingType) => {
           const advantages = [

@@ -11,14 +11,38 @@ import {
   visibleControls,
 } from "./InputNavigation";
 
+let positions = new WeakMap<HTMLElement, DOMRect>();
 beforeEach(() => {
+  positions = new WeakMap();
   jest
     .spyOn(HTMLElement.prototype, "getClientRects")
     .mockReturnValue([{}] as unknown as DOMRectList);
+  // JSDOM has no layout. Give ordinary fixtures a rendered vertical control list;
+  // spatial tests below override this with the actual row/column arrangement.
+  jest
+    .spyOn(HTMLElement.prototype, "getBoundingClientRect")
+    .mockImplementation(function (this: HTMLElement) {
+      const placed = positions.get(this);
+      if (placed) return placed;
+      const index = Array.from(
+        // eslint-disable-next-line testing-library/no-node-access -- JSDOM geometry follows document order.
+        document.querySelectorAll(
+          "button,input,select,textarea,summary,[tabindex]",
+        ),
+      ).indexOf(this);
+      return {
+        left: 0,
+        right: 80,
+        top: index * 60,
+        bottom: index * 60 + 40,
+        width: 80,
+        height: 40,
+      } as DOMRect;
+    });
 });
 afterEach(() => jest.restoreAllMocks());
 
-it("uses real focus, skips unavailable controls, wraps and continues after a tool heading", () => {
+it("uses real focus, skips unavailable controls, stops at boundaries and continues after a tool heading", () => {
   render(
     <main className="base_main">
       <button>Pause</button>
@@ -36,12 +60,12 @@ it("uses real focus, skips unavailable controls, wraps and continues after a too
   screen.getByText("Build").focus();
   moveInputFocus("down");
   expect(screen.getByText("Close Build")).toHaveFocus();
-  moveInputFocus("right");
+  moveInputFocus("down");
   expect(screen.getByText("Build solar")).toHaveFocus();
   moveInputFocus("down");
-  expect(screen.getByText("Pause")).toHaveFocus();
-  moveInputFocus("up");
   expect(screen.getByText("Build solar")).toHaveFocus();
+  moveInputFocus("up");
+  expect(screen.getByText("Close Build")).toHaveFocus();
   expect(visibleControls(inputScope())).toHaveLength(3);
 });
 
@@ -71,13 +95,13 @@ it("keeps movement and confirmation within the top popup, even when it has no ac
 it("keeps the covered compact fleet out of controller navigation and confirmation", () => {
   const pauseCoal = jest.fn();
   const inspect = jest.fn();
-  const workspace = (layout: "sheet" | "side", toolOpen = true) => (
+  const workspace = (layout: "single" | "side", toolOpen = true) => (
     <main className="base_main">
       <header>
         <button>Game menu</button>
       </header>
       <div className="gameStage" data-layout={layout}>
-        <div className="gameFleet">
+        <div className="gameFleet" hidden={layout === "single" && toolOpen}>
           <button onClick={pauseCoal}>Pause coal</button>
           <div
             role="img"
@@ -101,7 +125,7 @@ it("keeps the covered compact fleet out of controller navigation and confirmatio
       </nav>
     </main>
   );
-  const view = render(workspace("sheet"));
+  const view = render(workspace("single"));
   screen.getByRole("button", { name: "Game menu" }).focus();
   moveInputFocus("down");
   expect(screen.getByRole("button", { name: "Close Build" })).toHaveFocus();
@@ -110,11 +134,11 @@ it("keeps the covered compact fleet out of controller navigation and confirmatio
   moveInputFocus("down");
   expect(screen.getByRole("button", { name: /^Build$/ })).toHaveFocus();
   moveInputFocus("down");
-  expect(screen.getByRole("button", { name: "Game menu" })).toHaveFocus();
-  screen.getByRole("button", { name: "Pause coal" }).focus();
+  expect(screen.getByRole("button", { name: /^Build$/ })).toHaveFocus();
+  screen.getByRole("button", { name: "Pause coal", hidden: true }).focus();
   confirmInput();
   expect(pauseCoal).not.toHaveBeenCalled();
-  screen.getByRole("img").focus();
+  screen.getByRole("img", { hidden: true }).focus();
   moveInputFocus("right");
   expect(inspect).not.toHaveBeenCalled();
   expect(screen.getByRole("button", { name: "Game menu" })).toHaveFocus();
@@ -126,7 +150,7 @@ it("keeps the covered compact fleet out of controller navigation and confirmatio
   confirmInput();
   expect(pauseCoal).toHaveBeenCalledTimes(1);
 
-  view.rerender(workspace("sheet", false));
+  view.rerender(workspace("single", false));
   screen.getByRole("button", { name: "Game menu" }).focus();
   moveInputFocus("down");
   expect(screen.getByRole("button", { name: "Pause coal" })).toHaveFocus();
@@ -162,7 +186,7 @@ it("includes the tutorial's sibling actions while skipping an outgoing inert scr
   confirmInput();
   expect(next).toHaveBeenCalledTimes(1);
   moveInputFocus("down");
-  expect(screen.getByText("Close Build")).toHaveFocus();
+  expect(screen.getByText("Next step")).toHaveFocus();
 });
 
 it("routes portaled listbox keys through its combobox owner", () => {
@@ -428,11 +452,7 @@ it.each(["cancel", "drop"] as const)(
   },
 );
 
-afterEach(() => {
-  delete document.documentElement.dataset.tvLayout;
-});
-it("TV directions follow visible rows while widget handlers retain first refusal", () => {
-  document.documentElement.dataset.tvLayout = "true";
+it("directions follow visible rows without a layout preference while widgets retain first refusal", () => {
   render(
     <main className="base_main">
       <button>Top left</button>
@@ -449,16 +469,14 @@ it("TV directions follow visible rows while widget handlers retain first refusal
     </main>,
   );
   const place = (name: string, x: number, y: number) => {
-    jest
-      .spyOn(screen.getByRole("button", { name }), "getBoundingClientRect")
-      .mockReturnValue({
-        left: x,
-        right: x + 80,
-        top: y,
-        bottom: y + 40,
-        width: 80,
-        height: 40,
-      } as DOMRect);
+    positions.set(screen.getByRole("button", { name }), {
+      left: x,
+      right: x + 80,
+      top: y,
+      bottom: y + 40,
+      width: 80,
+      height: 40,
+    } as DOMRect);
   };
   place("Top left", 0, 0);
   place("Bottom left", 0, 80);
@@ -471,11 +489,169 @@ it("TV directions follow visible rows while widget handlers retain first refusal
   expect(screen.getByRole("button", { name: "Bottom right" })).toHaveFocus();
   moveInputFocus("left");
   expect(screen.getByRole("button", { name: "Bottom left" })).toHaveFocus();
+  moveInputFocus("left");
+  expect(screen.getByRole("button", { name: "Bottom left" })).toHaveFocus();
   const range = screen.getByRole("slider", { name: "Output" });
   range.focus();
   moveInputFocus("right");
   expect(range).toHaveFocus();
   expect(range).toHaveValue("6");
+});
+
+it("includes sibling controller help in the frame while popups retain their scope", () => {
+  render(
+    <div className="appFrame">
+      <main className="base_main">
+        <button>Play</button>
+      </main>
+      <aside>
+        <button>All controls</button>
+      </aside>
+    </div>,
+  );
+  screen.getByRole("button", { name: "Play" }).focus();
+  moveInputFocus("down");
+  expect(screen.getByRole("button", { name: "All controls" })).toHaveFocus();
+  moveInputFocus("up");
+  expect(screen.getByRole("button", { name: "Play" })).toHaveFocus();
+});
+
+it("reaches a wide overlapping row before a farther control with a nearer center", () => {
+  render(
+    <main className="base_main">
+      <button>Workspace</button>
+      <button>Advanced display</button>
+      <button>Fullscreen</button>
+    </main>,
+  );
+  for (const [name, left, top, width] of [
+    ["Workspace", 2800, 0, 200],
+    ["Advanced display", 0, 100, 3000],
+    ["Fullscreen", 2800, 200, 200],
+  ] as const) {
+    positions.set(screen.getByRole("button", { name }), {
+      left,
+      right: left + width,
+      top,
+      bottom: top + 40,
+      width,
+      height: 40,
+    } as DOMRect);
+  }
+  screen.getByRole("button", { name: "Workspace" }).focus();
+  moveInputFocus("down");
+  expect(
+    screen.getByRole("button", { name: "Advanced display" }),
+  ).toHaveFocus();
+  moveInputFocus("down");
+  expect(screen.getByRole("button", { name: "Fullscreen" })).toHaveFocus();
+  moveInputFocus("up");
+  expect(
+    screen.getByRole("button", { name: "Advanced display" }),
+  ).toHaveFocus();
+});
+
+it("visits an intervening global row before a farther aligned control", () => {
+  render(
+    <main className="base_main">
+      <button>Exit tutorial</button>
+      <button>Pause</button>
+      <button>Reserve</button>
+    </main>,
+  );
+  for (const [name, left, top] of [
+    ["Exit tutorial", 16, 8],
+    ["Pause", 1080, 85],
+    ["Reserve", 16, 134],
+  ] as const) {
+    positions.set(screen.getByRole("button", { name }), {
+      left,
+      right: left + 40,
+      top,
+      bottom: top + 40,
+      width: 40,
+      height: 40,
+    } as DOMRect);
+  }
+  screen.getByRole("button", { name: "Reserve" }).focus();
+  moveInputFocus("up");
+  expect(screen.getByRole("button", { name: "Pause" })).toHaveFocus();
+  moveInputFocus("up");
+  expect(screen.getByRole("button", { name: "Exit tutorial" })).toHaveFocus();
+  moveInputFocus("down");
+  expect(screen.getByRole("button", { name: "Pause" })).toHaveFocus();
+  moveInputFocus("down");
+  expect(screen.getByRole("button", { name: "Reserve" })).toHaveFocus();
+});
+
+it("finishes the scrolling list before leaving for intervening fixed chrome", () => {
+  render(
+    <main className="base_main">
+      <section aria-label="Fleet" style={{ overflowY: "auto" }}>
+        <button>First facility</button>
+        <button>Last facility</button>
+      </section>
+      <button>Fixed dock</button>
+    </main>,
+  );
+  Object.defineProperties(screen.getByRole("region", { name: "Fleet" }), {
+    scrollHeight: { value: 400 },
+    clientHeight: { value: 200 },
+  });
+  for (const [name, top] of [
+    ["First facility", 0],
+    ["Last facility", 200],
+    ["Fixed dock", 100],
+  ] as const) {
+    positions.set(screen.getByRole("button", { name }), {
+      left: 0,
+      right: 80,
+      top,
+      bottom: top + 40,
+      width: 80,
+      height: 40,
+    } as DOMRect);
+  }
+  screen.getByRole("button", { name: "First facility" }).focus();
+  moveInputFocus("down");
+  expect(screen.getByRole("button", { name: "Last facility" })).toHaveFocus();
+});
+
+it("keeps vertical navigation in its pane and uses horizontal navigation across panels", () => {
+  render(
+    <main className="base_main">
+      <section data-game-tool="BUILD_GENERATORS">
+        <button>Build solar</button>
+      </section>
+      <section data-game-tool="INSIGHTS">
+        <button>Demand</button>
+        <button>Emissions</button>
+      </section>
+      <button>Dock</button>
+    </main>,
+  );
+  for (const [name, left, top] of [
+    ["Build solar", 0, 0],
+    ["Demand", 100, 0],
+    ["Emissions", 100, 80],
+    ["Dock", 0, 160],
+  ] as const) {
+    positions.set(screen.getByRole("button", { name }), {
+      left,
+      right: left + 80,
+      top,
+      bottom: top + 40,
+      width: 80,
+      height: 40,
+    } as DOMRect);
+  }
+  screen.getByRole("button", { name: "Build solar" }).focus();
+  moveInputFocus("right");
+  expect(screen.getByRole("button", { name: "Demand" })).toHaveFocus();
+  moveInputFocus("left");
+  expect(screen.getByRole("button", { name: "Build solar" })).toHaveFocus();
+  moveInputFocus("down");
+  expect(screen.getByRole("button", { name: "Dock" })).toHaveFocus();
 });
 
 it("excludes closed disclosure content even when the browser retains its layout boxes", () => {

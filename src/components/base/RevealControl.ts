@@ -1,14 +1,8 @@
-import { isTvLayout } from "../../TvLayout";
-
-/** Reveal in intentional scroll surfaces; hidden TV shell tracks must never scroll their chrome away. */
+/** Reveal only in intentional scroll surfaces, keeping fixed shell chrome in place. */
 export function revealControl(
   element: HTMLElement,
   block: "nearest" | "start" = "nearest",
 ) {
-  if (!isTvLayout()) {
-    element.scrollIntoView?.({ block, inline: "nearest", behavior: "instant" });
-    return;
-  }
   for (
     let parent = element.parentElement;
     parent;

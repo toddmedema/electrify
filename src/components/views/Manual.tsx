@@ -70,7 +70,7 @@ const SORTED_ENTRIES = [...MANUAL_ENTRIES].sort((a, b) => {
 const SEARCH_TEXT: Record<string, string> = {};
 SORTED_ENTRIES.forEach((entry: ManualEntryType) => {
   SEARCH_TEXT[entry.title] =
-    `${entry.title} ${entry.keywords || ""} ${manualEntryText(entry.entry)}`.toLowerCase();
+    `${entry.title} ${entry.keywords || ""} ${manualEntryText(entry.entry)} ${entry.sections?.map((section) => `${section.title} ${manualEntryText(section.entry)}`).join(" ") || ""}`.toLowerCase();
 });
 
 // The manual unmounts whenever the player leaves it, so "where was I" has to live outside the
@@ -206,6 +206,28 @@ function ManualItem(props: ManualItemProps): React.JSX.Element {
       <AccordionDetails id={`${id}-content`}>
         <ManualEntryNavigation.Provider value={followLink}>
           {highlight(entry.entry, searchTerm, id)}
+          {entry.sections?.map((section) => (
+            <section key={section.title}>
+              <Typography
+                component="h4"
+                variant="subtitle1"
+                id={manualEntryId(section.title)}
+                tabIndex={-1}
+                sx={{ mt: 2, fontWeight: 600 }}
+              >
+                {highlight(section.title, searchTerm, `${id}-${section.title}`)}
+              </Typography>
+              <ManualEntryNavigation.Provider
+                value={(to) => onFollowLink(to, section.title)}
+              >
+                {highlight(
+                  section.entry,
+                  searchTerm,
+                  `${id}-${section.title}-body`,
+                )}
+              </ManualEntryNavigation.Provider>
+            </section>
+          ))}
         </ManualEntryNavigation.Provider>
       </AccordionDetails>
     </Accordion>
@@ -214,6 +236,13 @@ function ManualItem(props: ManualItemProps): React.JSX.Element {
 
 export default function Manual(props: Props): React.JSX.Element {
   const { onBack, onFollowLink, focusEntry, focusKey } = props;
+  const focusPage = SORTED_ENTRIES.find(
+    (entry) =>
+      entry.title === focusEntry ||
+      entry.sections?.some((section) => section.title === focusEntry),
+  )?.title;
+  const focusSection =
+    focusPage && focusPage !== focusEntry ? focusEntry : undefined;
   // A deep link is a fresh question, so it ignores (and clears) whatever the last visit left
   const [searchTerm, setSearchTerm] = React.useState<string>(
     focusEntry ? "" : lastSearchTerm,
@@ -225,34 +254,44 @@ export default function Manual(props: Props): React.JSX.Element {
   const focusRef = React.useRef<HTMLDivElement>(null);
   // 0: idle, 1: focus the destination, 2: wait for its layout to settle.
   const revealRequested = React.useRef<0 | 1 | 2>(0);
-  const revealFocusedEntry = React.useCallback(function reveal() {
-    requestAnimationFrame(() => {
-      const focused = focusRef.current;
-      if (!revealRequested.current || !focused) return;
-      if (
-        listRef.current?.querySelector(
-          ".MuiCollapse-root:not(.MuiCollapse-entered):not(.MuiCollapse-hidden)",
-        )
-      ) {
-        reveal();
-        return;
-      }
-      revealRequested.current = 0;
-      if (listRef.current) {
-        const scroller = scrollContainerOf(listRef.current);
-        const top =
-          scroller === document.documentElement
+  const revealFocusedEntry = React.useCallback(
+    function reveal() {
+      requestAnimationFrame(() => {
+        const focused = focusSection
+          ? document.getElementById(manualEntryId(focusSection))
+          : focusRef.current;
+        if (!revealRequested.current || !focused) return;
+        if (
+          listRef.current?.querySelector(
+            ".MuiCollapse-root:not(.MuiCollapse-entered):not(.MuiCollapse-hidden)",
+          )
+        ) {
+          reveal();
+          return;
+        }
+        revealRequested.current = 0;
+        if (listRef.current) {
+          const scroller = scrollContainerOf(listRef.current);
+          const top =
+            scroller === document.documentElement
+              ? 0
+              : scroller.getBoundingClientRect().top;
+          const header = focused.classList.contains("manual-pinned")
             ? 0
-            : scroller.getBoundingClientRect().top;
-        const header = focused.classList.contains("manual-pinned")
-          ? 0
-          : GROUP_HEADER_HEIGHT;
-        // Apply the header offset before the browser clamps at the end of the list.
-        scroller.scrollTop +=
-          focused.getBoundingClientRect().top - top - header;
-      }
-    });
-  }, []);
+            : GROUP_HEADER_HEIGHT +
+              (focusSection
+                ? focusRef.current
+                    ?.querySelector(".MuiAccordionSummary-root")
+                    ?.getBoundingClientRect().height || 0
+                : 0);
+          // Apply the header offset before the browser clamps at the end of the list.
+          scroller.scrollTop +=
+            focused.getBoundingClientRect().top - top - header;
+        }
+      });
+    },
+    [focusSection],
+  );
 
   const term = searchTerm.trim().toLowerCase();
   const searching = term.length > 0;
@@ -268,11 +307,11 @@ export default function Manual(props: Props): React.JSX.Element {
   React.useLayoutEffect(() => {
     if (focusEntry) {
       setSearchTerm("");
-      setToggled({ [focusEntry]: true });
+      setToggled(focusPage ? { [focusPage]: true } : {});
       // focusKey also requests a revisit when search has hidden the same entry.
       revealRequested.current = 1;
     }
-  }, [focusEntry, focusKey]);
+  }, [focusEntry, focusKey, focusPage]);
 
   React.useEffect(() => {
     lastSearchTerm = searchTerm;
@@ -288,11 +327,16 @@ export default function Manual(props: Props): React.JSX.Element {
 
   React.useLayoutEffect(() => {
     if (revealRequested.current === 1 && focusRef.current) {
-      revealRequested.current = 2;
       // Focus without the browser scrolling to an intermediate accordion height.
-      focusRef.current
-        .querySelector<HTMLButtonElement>(".MuiAccordionSummary-root")
-        ?.focus({ preventScroll: true });
+      const target = focusSection
+        ? document.getElementById(manualEntryId(focusSection))
+        : focusRef.current.querySelector<HTMLButtonElement>(
+            ".MuiAccordionSummary-root",
+          );
+      // Reopening a collapsed parent mounts its subsections on the next render.
+      if (!target) return;
+      revealRequested.current = 2;
+      target.focus({ preventScroll: true });
       // A link can both collapse earlier entries and expand its target. Align only once
       // all those transitions finish, or the closing content moves the target again.
       revealFocusedEntry();
@@ -317,7 +361,7 @@ export default function Manual(props: Props): React.JSX.Element {
   }, []);
 
   const renderEntry = (entry: ManualEntryType) => {
-    const isFocused = entry.title === focusEntry;
+    const isFocused = entry.title === focusPage;
     return (
       <ManualItem
         key={entry.title}

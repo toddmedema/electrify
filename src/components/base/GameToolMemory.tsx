@@ -1,4 +1,5 @@
 import * as React from "react";
+import { revealControl } from "./RevealControl";
 
 // View preferences belong to this workspace, not to saves or simulation state.
 // Unmounted tools release workers and decision pauses without losing their place.
@@ -124,15 +125,26 @@ interface FocusMemory {
   tag: string;
 }
 
+/** Track intent for the memory owner's lifetime, including while Settings replaces the workspace. */
+export function rememberToolInput(memory: () => Map<string, unknown>) {
+  const keyboard = () => memory().set("focus.keyboard", true);
+  const pointer = () => memory().set("focus.keyboard", false);
+  document.addEventListener("keydown", keyboard, true);
+  document.addEventListener("pointerdown", pointer, true);
+  return () => {
+    document.removeEventListener("keydown", keyboard, true);
+    document.removeEventListener("pointerdown", pointer, true);
+  };
+}
+
 /** Focus shares the workspace lifetime and scroll memory; no DOM nodes enter a game save. */
 export function useToolFocusMemory(
   ref: React.RefObject<HTMLElement | null>,
   memory: Map<string, unknown>,
   active: string,
-  enabled: boolean,
+  layout?: string,
 ) {
   React.useEffect(() => {
-    if (!enabled) return;
     const root = ref.current;
     if (!root) return;
     const remember = (event: FocusEvent) => {
@@ -154,12 +166,18 @@ export function useToolFocusMemory(
       } satisfies FocusMemory);
     };
     root.addEventListener("focusin", remember);
-    return () => root.removeEventListener("focusin", remember);
-  }, [enabled, memory, ref]);
+    return () => {
+      root.removeEventListener("focusin", remember);
+    };
+  }, [memory, ref]);
   React.useEffect(() => {
-    if (!enabled) return;
+    if (
+      document.documentElement.dataset.controllerInput !== "true" &&
+      !memory.get("focus.keyboard")
+    )
+      return;
     const saved = memory.get(`focus.${active}`) as FocusMemory | undefined;
-    if (!saved) return;
+    if (!saved && active !== "fleet") return;
     let frame: number | undefined;
     let cancelled = false;
     const cancel = () => {
@@ -168,29 +186,49 @@ export function useToolFocusMemory(
     };
     const restore = (attempt: number) => {
       if (cancelled) return;
+      const focused = document.activeElement;
+      // Closing a tool, chart shortcuts and native focus restoration choose explicit destinations.
+      // Only replace an unfocused document or the workspace's initial tool heading.
+      if (
+        focused instanceof HTMLElement &&
+        focused !== document.body &&
+        !focused.matches("h1,h2,h3,h4,h5,h6") &&
+        !focused.closest("[hidden],[inert],[aria-hidden=true]")
+      )
+        return;
       const root = ref.current?.querySelector<HTMLElement>(
         active === "fleet" ? ".gameFleet" : `[data-game-tool="${active}"]`,
       );
       const target =
         root && !root.hidden
-          ? root.contains(saved.element)
-            ? saved.element
-            : Array.from(
-                root.querySelectorAll<HTMLElement>(
-                  "button,input,select,textarea,summary,a[href],[tabindex]",
-                ),
-              ).find((element) =>
-                saved.id
-                  ? element.id === saved.id
-                  : saved.label
-                    ? element.getAttribute("aria-label") === saved.label
-                    : element.tagName === saved.tag &&
-                      element.textContent === saved.text,
+          ? !saved
+            ? root.querySelector<HTMLElement>(
+                "button:not(:disabled),input:not(:disabled),select:not(:disabled),textarea:not(:disabled),summary,a[href],[tabindex='0']",
               )
+            : root.contains(saved.element)
+              ? saved.element
+              : Array.from(
+                  root.querySelectorAll<HTMLElement>(
+                    "button,input,select,textarea,summary,a[href],[tabindex]",
+                  ),
+                ).find((element) =>
+                  saved.id
+                    ? element.id === saved.id
+                    : saved.label
+                      ? element.getAttribute("aria-label") === saved.label
+                      : element.tagName === saved.tag &&
+                        element.textContent === saved.text,
+                )
           : undefined;
-      if (target && !target.matches(":disabled,[aria-disabled=true]"))
+      if (
+        target &&
+        !target.matches(":disabled,[aria-disabled=true]") &&
+        !target.closest("[hidden],[inert],[aria-hidden=true]") &&
+        getComputedStyle(target).visibility !== "hidden"
+      ) {
         target.focus({ preventScroll: true });
-      else if (attempt < RESTORE_FRAMES)
+        revealControl(target);
+      } else if (attempt < RESTORE_FRAMES)
         frame = requestAnimationFrame(() => restore(attempt + 1));
     };
     frame = requestAnimationFrame(() => restore(0));
@@ -201,5 +239,5 @@ export function useToolFocusMemory(
       document.removeEventListener("keydown", cancel, true);
       document.removeEventListener("pointerdown", cancel, true);
     };
-  }, [active, enabled, memory, ref]);
+  }, [active, layout, memory, ref]);
 }

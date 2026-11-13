@@ -72,7 +72,7 @@ html[data-couch-shell-active="true"]
     }
   }
 }
-html[data-tv-layout="true"] {
+html[data-interface-scale]:not([data-interface-scale="1"]) {
   .couchPauseDialog .MuiDialog-paper {
     max-width: calc(24rem + 48px);
   }

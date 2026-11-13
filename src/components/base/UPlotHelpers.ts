@@ -1,6 +1,6 @@
 import uPlot from "uplot";
 import { chartPalette, INTERFACE_FONT_FAMILY, withAlpha } from "../../Theme";
-import { getTextScale } from "../../TextSize";
+import { getInterfaceScale } from "../../InterfaceScale";
 import { ChartEventMarker } from "./ChartAnnotationsContext";
 import {
   axisTicksAreYearly,
@@ -35,7 +35,7 @@ export const MAX_CHART_SCALE = 1.4;
 
 /** Design units to CSS pixels for a chart of `width`. */
 export function chartScale(width: number): number {
-  return Math.min(width / DESIGN_WIDTH, MAX_CHART_SCALE) * getTextScale();
+  return Math.min(width / DESIGN_WIDTH, MAX_CHART_SCALE) * getInterfaceScale();
 }
 
 export const CHART_FONT_FAMILY = INTERFACE_FONT_FAMILY;
@@ -92,7 +92,7 @@ export const CHART_LABEL_PX = 12;
  * rewriting the ".9" of "43.9px" and handing the canvas a font it can't parse.
  */
 export function chartFont(pxRatio = 1, sizePx = CHART_TICK_PX): string {
-  return `${Math.max(1, Math.round(sizePx * getTextScale() * pxRatio))}px ${CHART_FONT_FAMILY}`;
+  return `${Math.max(1, Math.round(sizePx * getInterfaceScale() * pxRatio))}px ${CHART_FONT_FAMILY}`;
 }
 
 /**
@@ -124,62 +124,116 @@ function textWidth(text: string, font: string, sizePx: number): number {
   return measureCtx.measureText(text).width;
 }
 
-/** Enlarge rendered options and measure the final font, without changing compact charts. */
+/** Fit final axis labels to the plot; expanded inspection may also emphasize its lines. */
 export function expandedChartOptions(
   options: uPlot.Options,
   fontScale: number,
+  emphasize = true,
 ): uPlot.Options {
   const enlargeFont = (font: string | undefined) =>
     (font || chartFont()).replace(
       /(\d+)px/,
       (_match, size) => `${Math.round(Number(size) * fontScale)}px`,
     );
-  const padding: uPlot.Padding = options.padding
-    ? [...options.padding]
-    : [null, null, null, null];
-  const xAxisIndex =
-    options.axes?.findIndex((axis) => axis.scale === "x") ?? -1;
-  if (xAxisIndex >= 0 && !options.axes?.some((axis) => axis.side === 1)) {
-    const axis = options.axes![xAxisIndex];
-    const originalRight = padding[1];
-    padding[1] = (plot, side, sides, cycle) => {
-      const reserve =
-        typeof originalRight === "function"
-          ? originalRight(plot, side, sides, cycle)
-          : (originalRight ?? 0);
-      const range = plot.scales.x;
-      const splits =
-        typeof axis.splits === "function"
-          ? axis.splits(plot, xAxisIndex, range.min ?? 0, range.max ?? 0, 0, 0)
-          : (axis.splits ?? []);
-      const labels =
-        typeof axis.values === "function"
-          ? axis.values(plot, splits, xAxisIndex, 0, 0)
-          : [];
-      const finalLabel = labels[labels.length - 1];
-      if (finalLabel == null) return reserve;
-      const font = enlargeFont(axis.font);
-      // Endpoint dates are centered on the plot edge; enlarged labels need room beyond it.
-      return Math.ceil(
-        Math.max(
-          reserve,
-          textWidth(String(finalLabel), font, Number.parseFloat(font)) / 2 +
-            4 * getTextScale(),
-        ),
-      );
-    };
-  }
+  const endpoints = new Map<
+    number,
+    { split: number; label: string; font: string }[]
+  >();
+  const labelPosition = (
+    position: number,
+    width: number,
+    canvasWidth: number,
+  ) => Math.max(width / 2 + 2, Math.min(canvasWidth - width / 2 - 2, position));
   return {
     ...options,
-    padding,
+    plugins: [
+      ...(options.plugins ?? []),
+      {
+        hooks: {
+          drawAxes: (plot) => {
+            const ratio = uPlot.pxRatio || 1;
+            const { ctx, bbox } = plot;
+            ctx.save();
+            ctx.textAlign = "center";
+            ctx.textBaseline = "top";
+            endpoints.forEach((labels, axisIndex) => {
+              const axis = plot.axes[axisIndex];
+              ctx.fillStyle =
+                typeof axis.stroke === "function"
+                  ? axis.stroke(plot, axisIndex)
+                  : (axis.stroke ?? tickLabelFill());
+              const y =
+                bbox.top +
+                bbox.height +
+                ((axis.ticks?.show === false ? 0 : (axis.ticks?.size ?? 5)) +
+                  (axis.gap ?? 5)) *
+                  ratio;
+              labels.forEach(({ split, label, font }) => {
+                ctx.font = font.replace(
+                  /(\d+)px/,
+                  (_match, size) => `${Number(size) * ratio}px`,
+                );
+                const lines = label.split("\n");
+                // Keep dates readable without moving the aligned data edge or its ticks.
+                const x = labelPosition(
+                  plot.valToPos(split, "x", true) / ratio,
+                  Math.max(
+                    ...lines.map((line) => ctx.measureText(line).width),
+                  ) / ratio,
+                  plot.width,
+                );
+                lines.forEach((line, index) =>
+                  ctx.fillText(
+                    line,
+                    x * ratio,
+                    y +
+                      index *
+                        Number.parseFloat(ctx.font) *
+                        (axis.lineGap ?? 1.5),
+                  ),
+                );
+              });
+            });
+            ctx.restore();
+          },
+        },
+      },
+    ],
     axes: options.axes?.map((axis) => {
       const font = enlargeFont(axis.font);
       const originalSize = axis.size;
       const vertical = axis.side === 1 || axis.side === 3 || axis.scale === "y";
+      const clampEndpoints =
+        axis.scale === "x" && (axis.side ?? 2) === 2 && !axis.rotate;
       return {
         ...axis,
         font,
         labelFont: enlargeFont(axis.labelFont),
+        values:
+          clampEndpoints && typeof axis.values === "function"
+            ? (plot, splits, axisIndex, space, increment) => {
+                const labels = (axis.values as uPlot.Axis.DynamicValues)(
+                  plot,
+                  splits,
+                  axisIndex,
+                  space,
+                  increment,
+                );
+                endpoints.set(axisIndex, []);
+                return labels.map((label, index) => {
+                  if (
+                    label == null ||
+                    label === "" ||
+                    (index !== 0 && index !== labels.length - 1)
+                  )
+                    return label;
+                  endpoints
+                    .get(axisIndex)!
+                    .push({ split: splits[index], label: String(label), font });
+                  return null;
+                });
+              }
+            : axis.values,
         splits:
           vertical || !axis.splits
             ? axis.splits
@@ -200,16 +254,29 @@ export function expandedChartOptions(
                 const widths = labels.map((label) =>
                   label == null
                     ? 0
-                    : textWidth(String(label), font, Number.parseFloat(font)),
+                    : Math.max(
+                        ...String(label)
+                          .split("\n")
+                          .map((line) =>
+                            textWidth(line, font, Number.parseFloat(font)),
+                          ),
+                      ),
                 );
                 const ratio = uPlot.pxRatio || 1;
                 const plotWidth =
                   (plot.bbox?.width ?? plot.width * ratio) / ratio;
-                const position = (index: number) =>
-                  ((splits[index] - min) / Math.max(1, max - min)) * plotWidth;
+                const position = (index: number) => {
+                  const x =
+                    (plot.bbox?.left ?? 0) / ratio +
+                    ((splits[index] - min) / Math.max(1, max - min)) *
+                      plotWidth;
+                  return clampEndpoints
+                    ? labelPosition(x, widths[index], plot.width)
+                    : x;
+                };
                 const fits = (left: number, right: number) =>
                   position(right) - position(left) >=
-                  (widths[left] + widths[right]) / 2 + 12 * getTextScale();
+                  (widths[left] + widths[right]) / 2 + 12 * getInterfaceScale();
                 const last = splits.length - 1;
                 const kept = [0];
                 // Reserve the last date before accepting an interior label. Index rounding alone
@@ -229,7 +296,33 @@ export function expandedChartOptions(
             typeof originalSize === "function"
               ? originalSize(plot, values, axisIndex, cycle)
               : (originalSize ?? (vertical ? 50 : 25));
-          if (!vertical) return natural * fontScale;
+          if (!vertical) {
+            // Endpoint labels are painted by the plugin, so uPlot's values omit them.
+            const lines = Math.max(
+              0,
+              ...[
+                ...(values || []),
+                ...(endpoints.get(axisIndex) || []).map(({ label }) => label),
+              ].map((value) =>
+                value == null || value === ""
+                  ? 0
+                  : String(value).split("\n").length,
+              ),
+            );
+            if (lines <= 1) return natural * fontScale;
+            return Math.ceil(
+              Math.max(
+                natural * fontScale,
+                (axis.ticks?.show === false
+                  ? 0
+                  : (axis.ticks?.size ?? TICK_SIZE)) +
+                  (axis.gap ?? LABEL_GAP) +
+                  Number.parseFloat(font) *
+                    (1 + (lines - 1) * (axis.lineGap ?? 1.5)) +
+                  LABEL_EDGE_PAD * getInterfaceScale(),
+              ),
+            );
+          }
           // Includes fixed right axes: their old reserve may be narrower than the final label.
           const sizePx = Number.parseFloat(font);
           const widest = Math.max(
@@ -238,12 +331,22 @@ export function expandedChartOptions(
               value == null ? 0 : textWidth(String(value), font, sizePx),
             ),
           );
-          return Math.ceil(Math.max(natural, widest + 20 * getTextScale()));
+          return Math.ceil(
+            Math.max(
+              natural,
+              widest +
+                (axis.ticks?.show === false
+                  ? 0
+                  : (axis.ticks?.size ?? TICK_SIZE)) +
+                (axis.gap ?? LABEL_GAP) +
+                LABEL_EDGE_PAD * getInterfaceScale(),
+            ),
+          );
         },
       };
     }),
     series: options.series.map((series, index) =>
-      index === 0
+      index === 0 || !emphasize
         ? series
         : {
             ...series,
@@ -387,7 +490,7 @@ export function forecastMonthAxis(
  */
 export function yAxis(scale: number, o: AxisOptions): uPlot.Axis {
   const font = chartFont();
-  const fontSize = CHART_TICK_PX * getTextScale();
+  const fontSize = CHART_TICK_PX * getInterfaceScale();
   const fixed = (TICK_SIZE + LABEL_GAP + LABEL_EDGE_PAD) * scale;
   return {
     ...axisCommon(scale, o),
@@ -970,7 +1073,7 @@ export function eventMarkersPlugin(
             ? originalTop(plot, side, sides, cycle)
             : (originalTop ?? 0);
         return (
-          top + (getMarkers().length ? 24 * getTextScale() * fontScale : 0)
+          top + (getMarkers().length ? 24 * getInterfaceScale() * fontScale : 0)
         );
       };
       options.padding = padding;
@@ -1036,7 +1139,7 @@ export function eventMarkersPlugin(
           return;
         }
         const scale = canvasScale(u);
-        const markerScale = uPlot.pxRatio * getTextScale() * fontScale;
+        const markerScale = uPlot.pxRatio * getInterfaceScale() * fontScale;
         const palette = chartPalette();
         const activeKey = getActiveKey();
         u.ctx.save();
@@ -1059,7 +1162,7 @@ export function eventMarkersPlugin(
         const badgeY = u.bbox.top - 12 * markerScale;
         // Match the rail's numbers without letting close event dates paint over one another.
         // A compact range shares one badge; the onset guides below retain every real date.
-        u.ctx.font = chartFont(1, (12 * markerScale) / getTextScale());
+        u.ctx.font = chartFont(1, (12 * markerScale) / getInterfaceScale());
         const groupBadge = (events: ChartEventMarker[]) => {
           const numbers = events.map((event) => event.number);
           const consecutive = numbers.every(

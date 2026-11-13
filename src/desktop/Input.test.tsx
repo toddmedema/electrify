@@ -84,7 +84,6 @@ function Game() {
 it.each(["pointerdown", "keydown"] as const)(
   "keeps controller help mounted through trusted %s activation and hands off outside the footer",
   async (eventType) => {
-    document.documentElement.dataset.tvLayout = "true";
     const listeners = jest.spyOn(document, "addEventListener");
     render(
       <Provider store={store}>
@@ -117,9 +116,59 @@ it.each(["pointerdown", "keydown"] as const)(
     act(() =>
       trustedPointer(screen.getByRole("button", { name: "Other action" })),
     );
+    expect(getInputPresentation().active).toBe(eventType === "pointerdown");
+    if (eventType === "pointerdown") {
+      const click = listeners.mock.calls.find(
+        ([type]) => type === "click",
+      )![1] as EventListener;
+      act(() =>
+        click({
+          isTrusted: true,
+          target: screen.getByRole("button", { name: "Other action" }),
+        } as unknown as Event),
+      );
+    }
     expect(getInputPresentation().active).toBe(false);
     store.dispatch(dialogClose());
-    delete document.documentElement.dataset.tvLayout;
+  },
+);
+
+it.each(["click", "pointerup", "pointercancel"] as const)(
+  "retains the hints through pointer-down and hands off after %s",
+  async (completion) => {
+    const listeners = jest.spyOn(document, "addEventListener");
+    render(
+      <Provider store={store}>
+        <button>Settings</button>
+        <InputHints />
+      </Provider>,
+    );
+    const f = bridge();
+    stop = startDesktopInput(store, f.desktop);
+    await act(async () => {
+      await Promise.resolve();
+    });
+    f.emit({ actions: ["down"] });
+    const target = screen.getByRole("button", { name: "Settings" });
+    const trusted = (eventType: string, eventTarget: Element = target) => {
+      const listener = listeners.mock.calls.find(
+        ([type]) => type === eventType,
+      )![1] as EventListener;
+      act(() =>
+        listener({ isTrusted: true, target: eventTarget } as unknown as Event),
+      );
+    };
+    trusted("pointerdown");
+    expect(screen.getByRole("button", { name: "All controls" })).toBeVisible();
+    expect(getInputPresentation().active).toBe(true);
+    if (completion === "click") trusted("pointerup");
+    expect(getInputPresentation().active).toBe(true);
+    trusted(completion, document.body);
+    if (completion === "pointerup") act(() => jest.advanceTimersByTime(0));
+    expect(getInputPresentation().active).toBe(false);
+    expect(
+      screen.queryByRole("button", { name: "All controls" }),
+    ).not.toBeInTheDocument();
   },
 );
 
@@ -163,6 +212,19 @@ it.each(["submitted", "cancelled", "unavailable"] as const)(
       await Promise.resolve();
     });
     const field = screen.getByRole("textbox", { name: "Save name" });
+    for (const [index, control] of [
+      field,
+      screen.getByRole("button", { name: "Rename" }),
+    ].entries()) {
+      jest.spyOn(control, "getBoundingClientRect").mockReturnValue({
+        left: 0,
+        right: 160,
+        top: index * 60,
+        bottom: index * 60 + 40,
+        width: 160,
+        height: 40,
+      } as DOMRect);
+    }
     field.focus();
     f.emit({ actions: ["confirm"] });
     expect(showTextInput).toHaveBeenCalledWith({
@@ -440,45 +502,87 @@ it("waits for context activation and leaves older/native-unavailable editions us
   expect(getInputPresentation().active).toBe(false);
 });
 
-it("reveals fleet charts before focusing them when a compact tool covers the fleet", async () => {
-  store.dispatch(delta({ inGame: true }));
-  store.dispatch(navigate("PROGRAMS"));
-  function Surface() {
-    const card = useAppSelector((state) => state.card.name);
-    return (
+it.each([
+  ["PROGRAMS", "nextChart"],
+  ["PROGRAMS", "previousChart"],
+  ["EVENTS", "nextChart"],
+  ["EVENTS", "previousChart"],
+] as const)(
+  "%s %s reveals hidden fleet charts before focusing them in a single-tool workspace",
+  async (tool, action) => {
+    store.dispatch(delta({ inGame: true }));
+    store.dispatch(navigate(tool));
+    function Surface() {
+      const card = useAppSelector((state) => state.card.name);
+      return (
+        <main className="base_main">
+          <div className="gameWorkspace">
+            <div className="gameStage" data-layout="single">
+              <div className="gameFleet" hidden={card !== "FACILITIES"}>
+                <div className="accessibleChart">
+                  <div role="img" aria-label="Supply chart" tabIndex={0} />
+                  <div role="img" aria-label="Demand chart" tabIndex={0} />
+                </div>
+              </div>
+              <section
+                className="gameToolPanel"
+                data-game-tool={tool}
+                hidden={card === "FACILITIES"}
+              >
+                <button>Close tool</button>
+              </section>
+            </div>
+          </div>
+        </main>
+      );
+    }
+    render(
+      <Provider store={store}>
+        <Surface />
+      </Provider>,
+    );
+    const f = bridge();
+    stop = startDesktopInput(store, f.desktop);
+    await Promise.resolve();
+    expect(screen.queryByRole("img")).not.toBeInTheDocument();
+    f.emit({ actions: [action] });
+    expect(store.getState().card.name).toBe("FACILITIES");
+    act(() => jest.advanceTimersByTime(20));
+    expect(
+      screen.getByRole("img", {
+        name: action === "nextChart" ? "Supply chart" : "Demand chart",
+      }),
+    ).toHaveFocus();
+  },
+);
+
+it.each(["BUILD_STORAGE", "BUILD_INTERTIES"] as const)(
+  "pane cycling retains %s in an already open Build pane",
+  async (category) => {
+    store.dispatch(delta({ inGame: true }));
+    store.dispatch(navigate("PROGRAMS"));
+    render(
       <main className="base_main">
         <div className="gameWorkspace">
-          <div className="gameStage" data-layout="sheet">
-            <div className="gameFleet">
-              <div className="accessibleChart">
-                <div role="img" aria-label="Supply chart" tabIndex={0} />
-              </div>
-            </div>
-            <section
-              className="gameToolPanel"
-              data-game-tool="PROGRAMS"
-              hidden={card === "FACILITIES"}
+          <nav className="gameActionDock">
+            <button
+              aria-controls="tool-BUILD_GENERATORS"
+              data-game-destination={category}
             >
-              <button>Close Programs</button>
-            </section>
-          </div>
+              Build
+            </button>
+            <button aria-controls="tool-PROGRAMS">Programs</button>
+          </nav>
         </div>
-      </main>
+      </main>,
     );
-  }
-  render(
-    <Provider store={store}>
-      <Surface />
-    </Provider>,
-  );
-  const f = bridge();
-  stop = startDesktopInput(store, f.desktop);
-  await Promise.resolve();
-  f.emit({ actions: ["nextChart"] });
-  expect(store.getState().card.name).toBe("FACILITIES");
-  act(() => jest.advanceTimersByTime(20));
-  expect(screen.getByRole("img", { name: "Supply chart" })).toHaveFocus();
-});
+    const f = bridge();
+    stop = startDesktopInput(store, f.desktop);
+    await Promise.resolve();
+    f.emit({ actions: ["previousPane"] });
+    expect(store.getState().card.name).toBe(category);
+  },
+);
 
 it.each(["seat", "online"])(
   "routes %s speed and readiness through the shared clock",

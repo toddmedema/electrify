@@ -15,6 +15,7 @@ import WarningRoundedIcon from "@mui/icons-material/WarningRounded";
 import { useAppSelector } from "../../Store";
 import { retryCloudSync } from "../../CloudSaves";
 import { isDesktopApp } from "../../Desktop";
+import { useScreenEdgeMargin } from "../../ScreenEdgePadding";
 
 type IndicatorState = "synced" | "syncing" | "offline" | "failed";
 
@@ -68,6 +69,7 @@ function isMouse(event: React.PointerEvent): boolean {
  * Signed out, or before sign-in is known, it shows nothing.
  */
 export default function CloudSyncIndicator(): React.JSX.Element | null {
+  const edgeMargin = useScreenEdgeMargin();
   const {
     cloudState,
     cloudError,
@@ -239,7 +241,8 @@ export default function CloudSyncIndicator(): React.JSX.Element | null {
         sx={{ zIndex: (theme) => theme.zIndex.tooltip }}
         modifiers={[
           { name: "offset", options: { offset: [0, 4] } },
-          { name: "preventOverflow", options: { padding: 8 } },
+          { name: "preventOverflow", options: { padding: edgeMargin } },
+          { name: "flip", options: { padding: edgeMargin } },
         ]}
       >
         {({ TransitionProps }) => (
@@ -265,7 +268,7 @@ export default function CloudSyncIndicator(): React.JSX.Element | null {
         onClose={close}
         anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
         transformOrigin={{ vertical: "top", horizontal: "center" }}
-        marginThreshold={8}
+        marginThreshold={edgeMargin}
         slotProps={{
           paper: {
             className: "cloudSyncCard cloudSyncCardPinned",
