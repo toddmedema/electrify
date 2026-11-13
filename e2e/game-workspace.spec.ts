@@ -1,5 +1,5 @@
 import { reviewScreenshot } from "./review-screenshot";
-import { openBuild } from "./layout";
+import { openBuild, openPane } from "./layout";
 import { expect, Page, test } from "./fixtures";
 import path from "node:path";
 import { editSavedGame } from "./save-fixture";
@@ -10,14 +10,19 @@ async function startGame(
   page: Page,
   theme: "light" | "dark",
   scenarioId = 100,
+  scale = 1,
 ) {
-  await page.addInitScript((mode) => {
-    localStorage.clear();
-    localStorage.setItem("theme", mode);
-    localStorage.setItem("audioEnabled", "false");
-    // Layout assertions need the same weather and risk headline on every visit.
-    Math.random = () => 0.25;
-  }, theme);
+  await page.addInitScript(
+    ({ mode, scale }) => {
+      localStorage.clear();
+      localStorage.setItem("theme", mode);
+      localStorage.setItem("audioEnabled", "false");
+      localStorage.setItem("interfaceScale", String(scale));
+      // Layout assertions need the same weather and risk headline on every visit.
+      Math.random = () => 0.25;
+    },
+    { mode: theme, scale },
+  );
   await page.goto(`/?scenario=${scenarioId}`);
   await page.getByRole("button", { name: "Start game", exact: true }).click();
   await expect(page.locator(".gameStage .facilities")).toBeVisible();
@@ -37,6 +42,36 @@ async function settleSheets(page: Page) {
     );
   });
 }
+
+test("snackbars clear medium and large floating docks", async ({
+  page,
+}, info) => {
+  test.skip(info.project.name !== "desktop-chromium");
+  await startGame(page, "light", 111);
+  for (const width of [1600, 2200]) {
+    await page.setViewportSize({ width, height: 1080 });
+    await expect(page.locator(".gameWorkspace")).toHaveAttribute(
+      "data-dock-size",
+      width === 2200 ? "large" : "medium",
+    );
+    await page.keyboard.press("Shift+1");
+    const snackbar = page.locator(".snackbar-above-nav");
+    await expect(snackbar).toBeVisible();
+    await expect
+      .poll(async () => {
+        const [toast, dock] = await Promise.all([
+          snackbar.boundingBox(),
+          page.locator("#navfooter").boundingBox(),
+        ]);
+        return toast!.y + toast!.height - dock!.y;
+      })
+      .toBeLessThanOrEqual(-8);
+    await snackbar
+      .getByRole("button", { name: "Dismiss notification", exact: true })
+      .click();
+    await expect(snackbar).not.toBeVisible();
+  }
+});
 
 for (const side of [false, true]) {
   test(`purchases ${side ? "keep Build open in a side panel" : "close Build in an overlay"}`, async ({
@@ -518,12 +553,12 @@ test("Insights and Events reopen at the scroll position the player left", async 
   }
 });
 
-async function expectFloatingDock(page: Page) {
+async function expectWorkspaceDock(page: Page) {
   await expect(async () => {
     // Read one layout snapshot after navigation instead of mixing animation frames
     // across separate boundingBox requests.
-    const { stage, facilities, fleet, dock, width } = await page.evaluate(
-      () => {
+    const { stage, facilities, fleet, dock, width, single } =
+      await page.evaluate(() => {
         const box = (selector: string) => {
           const element = document.querySelector(selector);
           if (!element) throw new Error(`Missing layout element: ${selector}`);
@@ -536,11 +571,24 @@ async function expectFloatingDock(page: Page) {
           fleet: box(".gameFleet"),
           dock: box("#navfooter"),
           width: window.innerWidth,
+          single:
+            document
+              .querySelector(".gameWorkspace")
+              ?.getAttribute("data-workspace-layout") === "single",
         };
-      },
-    );
-    expect(facilities.height).toBeGreaterThan(0);
+      });
     expect(dock.height).toBeGreaterThan(0);
+    if (single) {
+      // The active tool gets the whole stage, with navigation reserved beneath it.
+      expect(dock.y).toBeGreaterThanOrEqual(stage.y + stage.height - 1);
+      expect(dock.y + dock.height).toBeLessThanOrEqual(
+        page.viewportSize()!.height,
+      );
+      expect(dock.x).toBeGreaterThanOrEqual(0);
+      expect(dock.x + dock.width).toBeLessThanOrEqual(width);
+      return;
+    }
+    expect(facilities.height).toBeGreaterThan(0);
     // The dock overlays the full-height fleet instead of reserving a blank footer band.
     expect(
       Math.abs(facilities.y + facilities.height - stage.y - stage.height),
@@ -580,11 +628,11 @@ async function expectSideRails(page: Page) {
       panel.right <= fleet.x + 1 || panel.left >= fleet.x + fleet.width - 1,
     ).toBe(true);
   }
-  await expectFloatingDock(page);
+  await expectWorkspaceDock(page);
 }
 
 for (const theme of ["light", "dark"] as const) {
-  test(`game dock and sheets stay usable in ${theme}`, async ({
+  test(`game dock and tools stay usable in ${theme}`, async ({
     page,
   }, testInfo) => {
     await startGame(page, theme);
@@ -600,7 +648,7 @@ for (const theme of ["light", "dark"] as const) {
         testInfo.project.use.hasTouch ? 44 : 40,
       );
     }
-    await expectFloatingDock(page);
+    await expectWorkspaceDock(page);
     await reviewScreenshot(page, {
       path: testInfo.outputPath(`workspace-facilities-${theme}.png`),
       animations: "disabled",
@@ -632,12 +680,26 @@ for (const theme of ["light", "dark"] as const) {
     await expect(
       insights.getByRole("heading", { name: "Insights", exact: true }),
     ).toHaveCount(1);
-    // The daily fleet chart has keyboard detail inspection. Its Escape owns the tooltip
-    // even while a tool is open above the fleet.
+    // The daily Fleet chart has keyboard detail inspection. Single tool deliberately
+    // returns to Fleet first; opening Insights again must preserve the selected plant.
+    const single =
+      (await page.locator(".gameStage").getAttribute("data-layout")) ===
+      "single";
+    if (single) {
+      await expect(fleet).toBeHidden();
+      await openPane(
+        fleet,
+        dock.getByRole("button", { name: "Insights", exact: true }),
+      );
+    }
     const chart = page.locator("#chartSupplyDemand").getByRole("img");
     await chart.focus();
     await chart.press("Enter");
+    await expect(page.locator(".chartTooltip:visible")).toHaveCount(1);
     await chart.press("Escape");
+    await expect(page.locator(".chartTooltip:visible")).toHaveCount(0);
+    if (single)
+      await dock.getByRole("button", { name: "Insights", exact: true }).click();
     await expect(insights).toBeVisible();
     await insights
       .getByRole("heading", { name: "Insights", exact: true })
@@ -652,7 +714,8 @@ for (const theme of ["light", "dark"] as const) {
       Math.abs(sheetBox!.y + sheetBox!.height - stageBox!.y - stageBox!.height),
     ).toBeLessThanOrEqual(1);
     if (
-      (await page.locator(".gameStage").getAttribute("data-layout")) !== "sheet"
+      (await page.locator(".gameStage").getAttribute("data-layout")) !==
+      "single"
     ) {
       await expectSideRails(page);
     }
@@ -692,7 +755,7 @@ for (const theme of ["light", "dark"] as const) {
   });
 }
 
-test("icon labels support hover, keyboard focus, and touch hold-and-slide without opening tools", async ({
+test("dock labels support pointer, keyboard and touch without accidental tool activation", async ({
   page,
 }, testInfo) => {
   await startGame(page, "light");
@@ -748,6 +811,51 @@ test("icon labels support hover, keyboard focus, and touch hold-and-slide withou
   const session = await page.context().newCDPSession(page);
   const dockBox = (await dock.boundingBox())!;
   const y = dockBox.y + dockBox.height / 2;
+  if (
+    (await page.locator(".gameStage").getAttribute("data-layout")) === "single"
+  ) {
+    // Holding owns the slide preview; a quick swipe still scrolls the compact rail.
+    const actions = ["Build", "Programs", "Insights", "Events"];
+    for (const label of actions) {
+      const action = dock.getByRole("button", { name: label, exact: true });
+      await expect(action.locator(".gameDockLabel")).toHaveText(label);
+      await expect(action.locator(".gameDockLabel")).toBeVisible();
+    }
+    const build = (await page.locator("#buildNav").boundingBox())!;
+    await session.send("Input.dispatchTouchEvent", {
+      type: "touchStart",
+      touchPoints: [{ x: build.x + build.width / 2, y }],
+    });
+    await page.waitForTimeout(600);
+    await expect(
+      page.getByRole("tooltip", { name: "Build", exact: true }),
+    ).toBeVisible();
+    for (const label of actions.slice(1)) {
+      const action = dock.getByRole("button", { name: label, exact: true });
+      const box = (await action.boundingBox())!;
+      await session.send("Input.dispatchTouchEvent", {
+        type: "touchMove",
+        touchPoints: [{ x: box.x + box.width / 2, y }],
+      });
+      await expect(
+        page.getByRole("tooltip", { name: label, exact: true }),
+      ).toBeVisible();
+      await expect(action.locator(".gameDockLabel")).toBeVisible();
+      await expect(page.locator(".gameToolPanel")).toHaveCount(0);
+    }
+    await session.send("Input.dispatchTouchEvent", {
+      type: "touchEnd",
+      touchPoints: [],
+    });
+    await expect(page.getByRole("tooltip")).toHaveCount(0);
+    await expect(page.locator(".gameToolPanel")).toHaveCount(0);
+    await dock.getByRole("button", { name: "Build", exact: true }).tap();
+    await expect(
+      page.getByRole("region", { name: "Build", exact: true }),
+    ).toBeVisible();
+    await session.detach();
+    return;
+  }
   // Start on the bar's padding, then move across every icon while holding the same finger.
   await session.send("Input.dispatchTouchEvent", {
     type: "touchStart",
@@ -813,6 +921,80 @@ test("icon labels support hover, keyboard focus, and touch hold-and-slide withou
   await expect(
     page.getByRole("region", { name: "Build", exact: true }),
   ).toBeVisible();
+  await session.detach();
+});
+
+test("comparison controls keep keyboard focus when the Build layout changes", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await startGame(page, "light");
+  await openBuild(page);
+  await page.getByRole("button", { name: "Compare Coal", exact: true }).click();
+  const clear = page.getByRole("button", { name: "Clear", exact: true });
+  await clear.focus();
+  await clear.press("Tab");
+  const remove = page.getByRole("button", {
+    name: "Remove Coal from comparison",
+  });
+  await expect(remove).toBeFocused();
+  for (const width of [390, 1280, 360, 1280]) {
+    await page.setViewportSize({ width, height: 900 });
+    await expect(page.locator(".gameStage")).toHaveAttribute(
+      "data-layout",
+      width < 700 ? "single" : "side",
+    );
+    await expect(remove).toBeFocused();
+    await expect(
+      page.getByRole("region", { name: "Generator comparison" }),
+    ).toContainText("Comparing 1/3");
+  }
+  await clear.focus();
+  await page.setViewportSize({ width: 390, height: 900 });
+  await expect(clear).toBeFocused();
+  await clear.press("Enter");
+  await expect(
+    page.getByRole("region", { name: "Generator comparison" }),
+  ).toHaveCount(0);
+});
+
+test("quick touch swipes scroll the enlarged dock without opening a tool", async ({
+  page,
+}, info) => {
+  test.skip(!info.project.use.hasTouch);
+  await page.setViewportSize({
+    width: page.viewportSize()!.width,
+    height: 1080,
+  });
+  await startGame(page, "light", 100, 2.5);
+  const dock = page.locator("#navfooter");
+  const box = (await dock.boundingBox())!;
+  expect(
+    await dock.evaluate((element) => element.scrollWidth - element.clientWidth),
+  ).toBeGreaterThan(100);
+  const session = await page.context().newCDPSession(page);
+  const y = box.y + box.height / 2;
+  await session.send("Input.dispatchTouchEvent", {
+    type: "touchStart",
+    touchPoints: [{ x: box.x + box.width - 24, y }],
+  });
+  for (let step = 1; step <= 5; step++) {
+    await session.send("Input.dispatchTouchEvent", {
+      type: "touchMove",
+      touchPoints: [
+        { x: box.x + box.width - 24 - (step * (box.width - 48)) / 5, y },
+      ],
+    });
+  }
+  await session.send("Input.dispatchTouchEvent", {
+    type: "touchEnd",
+    touchPoints: [],
+  });
+  await expect
+    .poll(() => dock.evaluate((element) => element.scrollLeft))
+    .toBeGreaterThan(20);
+  await expect(page.locator(".gameToolPanel")).toHaveCount(0);
+  await expect(page.getByRole("tooltip")).toHaveCount(0);
   await session.detach();
 });
 
@@ -971,7 +1153,7 @@ test("Programs owns pricing and Build keeps purchase dialogs above its sheet", a
   await expect(build).toBeVisible();
   // A sheet shows one tool at a time; side columns keep Programs open beside Build.
   if (
-    (await page.locator(".gameStage").getAttribute("data-layout")) === "sheet"
+    (await page.locator(".gameStage").getAttribute("data-layout")) === "single"
   )
     await expect(programs).toHaveCount(0);
   else await expect(programs).toBeVisible();
@@ -1001,7 +1183,7 @@ test("wide screens keep several tools beside the fleet and remember them across 
   await page.setViewportSize({ width: 2240, height: 1100 });
   await startGame(page, "light");
   await page.locator("#buildNav").click();
-  await expectFloatingDock(page);
+  await expectWorkspaceDock(page);
   await page.locator("#insightsNav").click();
   await expect(page.locator(".gameToolPanel")).toHaveCount(2);
   await expect
@@ -1079,10 +1261,10 @@ test("wide screens keep several tools beside the fleet and remember them across 
   await page.setViewportSize({ width: 1023, height: 900 });
   await expect(page.locator(".gameStage")).toHaveAttribute(
     "data-layout",
-    "sheet",
+    "single",
   );
   await expect(page.locator(".gameToolPanel:visible")).toHaveCount(1);
-  await expectFloatingDock(page);
+  await expectWorkspaceDock(page);
   await page.locator("#eventsNav").click();
   await expect(
     page.getByRole("region", { name: "Events", exact: true }),
@@ -1205,6 +1387,83 @@ for (const theme of ["light", "dark"] as const) {
 }
 
 for (const theme of ["light", "dark"] as const) {
+  test(`enlarged phone status and edge-padded tooltip remain readable in ${theme}`, async ({
+    page,
+  }, info) => {
+    test.skip(!info.project.use.hasTouch, "Phone status reflow");
+    await startGame(page, theme, 111);
+    for (const scale of ["1.25", "1.5", "2.5"]) {
+      await page.getByRole("button", { name: "menu", exact: true }).click();
+      await page
+        .getByRole("menuitem", { name: "Settings", exact: true })
+        .click();
+      await page
+        .getByRole("combobox", { name: "Interface scale", exact: true })
+        .selectOption(scale);
+      const advanced = page.getByRole("button", {
+        name: "Advanced display",
+        exact: true,
+      });
+      if ((await advanced.getAttribute("aria-expanded")) !== "true")
+        await advanced.click();
+      await page.getByRole("button", { name: "4%", exact: true }).click();
+      await page.getByRole("button", { name: "Back", exact: true }).click();
+      const appbar = page.locator("#appbar");
+      await expect(appbar).toBeVisible();
+      const geometry = await appbar
+        .locator(".gameStatus")
+        .evaluate((status) => {
+          const box = status.getBoundingClientRect();
+          return {
+            overflow: status.scrollWidth - status.clientWidth,
+            clipped: Array.from(
+              status.querySelectorAll(".gameStatusValue, .gameMonthlyProfit"),
+            ).map((value) => {
+              const rect = value.getBoundingClientRect();
+              return Math.max(
+                box.left - rect.left,
+                rect.right - box.right,
+                box.top - rect.top,
+                rect.bottom - box.bottom,
+              );
+            }),
+          };
+        });
+      expect(geometry.overflow, `status width at ${scale}`).toBeLessThanOrEqual(
+        1,
+      );
+      expect(
+        Math.max(...geometry.clipped),
+        `cash, profit and date at ${scale}`,
+      ).toBeLessThanOrEqual(1);
+      expect(
+        await appbar.evaluate(
+          (element) => element.scrollWidth - element.clientWidth,
+        ),
+      ).toBeLessThanOrEqual(1);
+      await expect(page.locator("#navfooter")).toBeInViewport();
+      await expect(
+        page.getByRole("button", { name: "menu", exact: true }),
+      ).toBeInViewport();
+      const status = appbar.getByRole("button", {
+        name: /^Current grid status:/,
+      });
+      await status.tap();
+      const tooltip = page.getByRole("tooltip");
+      await expect(tooltip).toBeVisible();
+      const edge = await tooltip.evaluate((element) => {
+        const rect = element.getBoundingClientRect();
+        return {
+          minimum: Math.ceil(Math.min(innerWidth, innerHeight) * 0.04),
+          left: rect.left,
+          right: innerWidth - rect.right,
+        };
+      });
+      expect(edge.left).toBeGreaterThanOrEqual(edge.minimum - 1);
+      expect(edge.right).toBeGreaterThanOrEqual(edge.minimum - 1);
+    }
+  });
+
   test(`phone profit stacks beneath cash and opens finances in ${theme}`, async ({
     page,
   }, info) => {
@@ -1331,16 +1590,16 @@ test("short desktop rails keep their heading, scroll body, and floating dock rea
 });
 
 for (const width of [360, 390]) {
-  test(`compact ${width}px sheets and final actions remain usable behind the floating dock`, async ({
+  test(`compact ${width}px tools and final actions stay above the dock`, async ({
     page,
   }, testInfo) => {
     await page.setViewportSize({ width, height: 640 });
     await startGame(page, "dark");
     await expect(page.locator(".gameStage")).toHaveAttribute(
       "data-layout",
-      "sheet",
+      "single",
     );
-    await expectFloatingDock(page);
+    await expectWorkspaceDock(page);
     await page
       .getByRole("button", { name: "Inspect Coal", exact: true })
       .click();

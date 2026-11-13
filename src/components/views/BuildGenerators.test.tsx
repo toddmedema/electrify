@@ -1,4 +1,6 @@
 import { GameToolMemoryContext } from "../base/GameToolMemory";
+import { GameWorkspaceLayoutContext } from "../base/GameWorkspaceContext";
+import { workspaceLayout } from "../../WorkspaceLayout";
 import { getHydroAvailability, HYDRO_SITES } from "../../data/HydroSites";
 import { LOCATIONS } from "../../Constants";
 import * as React from "react";
@@ -1028,6 +1030,42 @@ it("pins up to three current-grid choices into a comparison tray", () => {
   expect(
     screen.getByRole("region", { name: "Generator comparison" }),
   ).toHaveTextContent("Comparing 2/3");
+});
+
+it("keeps comparison with the scrolling catalog when Fleet is hidden or space is constrained", () => {
+  const game = createGame({ scenarioId: 100, difficulty: "Employee" });
+  const workspace = (fleetVisible: boolean, constrained = false) => (
+    <GameWorkspaceLayoutContext.Provider
+      value={{
+        ...workspaceLayout(1920, 1, "automatic"),
+        fleetVisible,
+        constrained,
+      }}
+    >
+      <BuildGenerators
+        game={game}
+        onBack={jest.fn()}
+        onBuildGenerator={jest.fn()}
+      />
+    </GameWorkspaceLayoutContext.Provider>
+  );
+  const view = render(workspace(false));
+  fireEvent.click(screen.getAllByRole("button", { name: /^Compare / })[0]);
+  const options = screen.getByRole("list", { name: "Generator options" });
+  expect(
+    within(options).getByRole("region", { name: "Generator comparison" }),
+  ).toBeVisible();
+  view.rerender(workspace(true));
+  expect(
+    within(options).queryByRole("region", { name: "Generator comparison" }),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.getByRole("region", { name: "Generator comparison" }),
+  ).toBeVisible();
+  view.rerender(workspace(true, true));
+  expect(
+    within(options).getByRole("region", { name: "Generator comparison" }),
+  ).toBeVisible();
 });
 
 it("keeps expanded details with their generator when tutorial choices expand", () => {

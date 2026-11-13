@@ -47,6 +47,22 @@ afterEach(() => {
 });
 
 describe("Navigation", () => {
+  it("publishes the workspace's remembered build category for semantic pane cycling", () => {
+    render(
+      <Provider store={store}>
+        <Navigation
+          openTools={["BUILD_GENERATORS"]}
+          destination={(tool) =>
+            tool === "BUILD_GENERATORS" ? "BUILD_STORAGE" : tool
+          }
+        />
+      </Provider>,
+    );
+    expect(screen.getByRole("button", { name: "Build" })).toHaveAttribute(
+      "data-game-destination",
+      "BUILD_STORAGE",
+    );
+  });
   it("keeps accessible icon-only actions in a couch company", () => {
     window.electrifyCouch = {
       role: "seat",

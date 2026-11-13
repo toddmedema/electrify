@@ -2,7 +2,6 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import { Button } from "@mui/material";
 import { useAppDispatch } from "../Store";
 import { dialogOpen } from "../reducers/GameActions";
-import { useTvLayout } from "../TvLayout";
 import type { DesktopInputAction, DesktopInputFrame } from "../Desktop";
 import {
   getInputPresentation,
@@ -12,11 +11,6 @@ import { editableTextControl } from "./InputText";
 import ControllerGlyph from "./ControllerGlyph";
 import "./Input.scss";
 
-const menuHints: [DesktopInputAction, string][] = [
-  ["down", "Navigate"],
-  ["confirm", "Select"],
-  ["back", "Back"],
-];
 const gameHints: [DesktopInputAction, string][] = [
   ["down", "Navigate"],
   ["confirm", "Select"],
@@ -31,8 +25,16 @@ const gameHints: [DesktopInputAction, string][] = [
   ["nextChart", "Next chart"],
 ];
 type Hint = [DesktopInputAction, string];
+const menuHint = (): Hint => [
+  "menu",
+  window.electrifyCouch ? "Game menu" : "Pause / back",
+];
 function contextualHints(target: Element | null, gameplay: boolean): Hint[] {
-  if (target?.matches('input[type="range"],[role="slider"]'))
+  if (
+    target?.matches(
+      'input[type="range"],[role="slider"],select,[role="combobox"]:not(input)',
+    )
+  )
     return [
       ["left", "Adjust value"],
       ["down", "Next control"],
@@ -65,7 +67,6 @@ export default function InputHints() {
     subscribeInputPresentation,
     getInputPresentation,
   );
-  const tvMode = useTvLayout();
   const dispatch = useAppDispatch();
   const [focused, setFocused] = useState<Element | null>(
     document.activeElement,
@@ -78,11 +79,7 @@ export default function InputHints() {
   const showActions =
     state.connected && (state.active || !!window.electrifyCouch);
   if (!showActions && !state.pausedAfterDisconnect) return null;
-  const hints = tvMode
-    ? contextualHints(focused, state.context === "Gameplay")
-    : state.context === "Gameplay"
-      ? gameHints
-      : menuHints;
+  const hints = contextualHints(focused, state.context === "Gameplay");
   return (
     <>
       <aside className="controllerHints" aria-label="Controller controls">
@@ -97,24 +94,22 @@ export default function InputHints() {
         {showActions && (
           <div className="controllerHintActions">
             {hints.map((hint) => glyphHint(hint, state.glyphs))}
-            {tvMode && (
-              <Button
-                className="controllerHelpButton"
-                onClick={() =>
-                  dispatch(
-                    dialogOpen({
-                      open: true,
-                      title: "Controller controls",
-                      message: <FullControlsHelp />,
-                      closeText: "Close controls",
-                      focusCancel: true,
-                    }),
-                  )
-                }
-              >
-                All controls
-              </Button>
-            )}
+            <Button
+              className="controllerHelpButton"
+              onClick={() =>
+                dispatch(
+                  dialogOpen({
+                    open: true,
+                    title: "Controller controls",
+                    message: <FullControlsHelp />,
+                    closeText: "Close controls",
+                    focusCancel: true,
+                  }),
+                )
+              }
+            >
+              All controls
+            </Button>
           </div>
         )}
       </aside>
@@ -180,6 +175,7 @@ function FullControlsHelp() {
     ["down", "Move down"],
     ["left", "Move left"],
     ["right", "Move right"],
+    menuHint(),
     ...gameHints.slice(1),
   ];
   return (
@@ -191,7 +187,7 @@ function FullControlsHelp() {
       <div className="controllerHelpGrid">
         {allHints.map((hint) => (
           <div key={hint[0]} tabIndex={0} className="controllerHelpRow">
-            {glyphHint(hint, state.glyphs)}
+            {glyphHint(hint, state.glyphs, true)}
           </div>
         ))}
       </div>

@@ -25,6 +25,7 @@ import {
 } from "../Types";
 import AudioContainer from "./base/AudioContainer";
 import GameWorkspace from "./base/GameWorkspace";
+import { rememberToolInput } from "./base/GameToolMemory";
 import { GAME_TOOLS, GameTool } from "./base/Navigation";
 import { restoreMenuFocus } from "./base/useMenuKeys";
 import DeferredSnackbar from "./base/DeferredSnackbar";
@@ -359,6 +360,7 @@ const tutorialCompletionSx = {
 export default class Compositor extends React.Component<Props, {}> {
   private workspaceMemory = { run: -1, values: new Map<string, unknown>() };
   private removeShortcuts?: () => void;
+  private removeToolInput?: () => void;
   private resizeTimeout: ReturnType<typeof setTimeout> | undefined;
   private snackbarContentRef = React.createRef<HTMLDivElement>();
   private dialogCancelRef = React.createRef<HTMLButtonElement>();
@@ -390,6 +392,7 @@ export default class Compositor extends React.Component<Props, {}> {
   };
 
   public componentDidMount() {
+    this.removeToolInput = rememberToolInput(() => this.workspaceMemory.values);
     this.removeShortcuts = listenForShortcuts(keyMap, shortcutHandlers);
     window.addEventListener("resize", this.handleResize);
   }
@@ -416,6 +419,7 @@ export default class Compositor extends React.Component<Props, {}> {
   }
 
   public componentWillUnmount() {
+    this.removeToolInput?.();
     this.removeShortcuts?.();
     window.removeEventListener("resize", this.handleResize);
     clearTimeout(this.resizeTimeout);

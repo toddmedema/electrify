@@ -461,16 +461,16 @@ for (const theme of ["light", "dark"] as const) {
       }
     });
 
-    test(`Insights right gutters match the title inset with Larger text in ${theme}`, async ({
+    test(`Insights right gutters match the title inset at 125% interface scale in ${theme}`, async ({
       page,
     }) => {
       await page.addInitScript(() =>
-        localStorage.setItem("textSize", "larger"),
+        localStorage.setItem("interfaceScale", "1.25"),
       );
       await page.goto("/?scenario=106");
       await expect(page.locator("html")).toHaveAttribute(
-        "data-text-size",
-        "larger",
+        "data-interface-scale",
+        "1.25",
       );
       await page
         .getByRole("button", { name: "Start game", exact: true })

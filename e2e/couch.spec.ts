@@ -306,8 +306,14 @@ async function expectSharedCaptionSize(
   await expect
     .poll(
       async () => {
+        const status = seat.locator(".gridHealth").first();
+        const namedStatus = status.locator(
+          ".gridHealthStatusWord, .gridHealthMetric",
+        );
         const reserveFont = await renderedFontSize(
-          seat.locator(".gridHealthStatusWord, .gridHealthMetric").first(),
+          // Stable compact status intentionally uses only an icon. Its visible
+          // status wrapper still owns the shared caption font for named risks.
+          (await namedStatus.count()) ? namedStatus.first() : status,
         );
         const fonts = await Promise.all([
           renderedFontSize(page.locator(".couchCalendar .gameStatusValue")),
@@ -427,7 +433,7 @@ test("TV couch companies keep independent dialogs and purchases through atomic s
     await expect(seat.locator("#appbar:visible")).toBeVisible();
     await expect(seat.locator(".gameStage")).toHaveAttribute(
       "data-layout",
-      "tv",
+      "single",
     );
   }
   await expect(page.locator(".appFrameBody")).toBeHidden();
@@ -639,6 +645,29 @@ test("TV couch companies keep independent dialogs and purchases through atomic s
   ).toEqual(complete.grids.map((grid) => grid.facilities.length));
 });
 
+test("TV couch player toolbars match named warning captions after a plant pause", async ({
+  context,
+  page,
+}, info) => {
+  test.skip(
+    !["tv-1080-light", "tv-1080-dark"].includes(info.project.name),
+    "Physical split-screen caption sizing in both palettes",
+  );
+  const couch = await createCouchFixture(context, page, { embedded: true });
+  await startCouch(page, couch);
+  const seat = couch.seats.get("local-p1")!.page;
+  await seat.getByRole("button", { name: "Inspect Coal", exact: true }).click();
+  await seat.getByRole("button", { name: "Pause Coal", exact: true }).click();
+  await expect(seat.locator(".gridHealth")).toHaveClass(/gridHealth-blackout/);
+  const warning = seat.locator(".gridHealthStatusWord");
+  await expect(warning).toHaveText("Short");
+  await expect(warning).toBeVisible();
+  expect(await renderedFontSize(warning)).toBe(
+    await renderedFontSize(seat.locator(".gridHealth:visible")),
+  );
+  await expectSharedCaptionSize(page, seat, couch.layout()!.zoom);
+});
+
 test("TV couch player toolbars own speed with edge-to-edge panes and global pause", async ({
   context,
   page,
@@ -744,20 +773,56 @@ test("TV couch player toolbars own speed with edge-to-edge panes and global paus
     }),
   ).toHaveAttribute("aria-pressed", "true");
   await runNormally(p1, p2);
-  // The couch daily plot uses 176 design px, 20% below solo's 220. Larger
-  // text is already enabled by the real fixture, making its visible height 220 px.
+  // Adaptive charts use the actual seat allocation. Keep the data and axes
+  // readable and inside that allocation as the two company clocks run.
   for (const seat of [p1, p2]) {
     await expect(seat.locator("html")).toHaveAttribute(
-      "data-text-size",
-      "larger",
+      "data-interface-scale",
+      "1.25",
     );
     const dailyChart = seat.locator(".facilitySupplyChart .accessibleChart");
     await expect(dailyChart).toBeVisible();
-    await expect
-      .poll(() =>
-        dailyChart.evaluate((chart) => chart.getBoundingClientRect().height),
-      )
-      .toBe(220);
+    const allocation = await dailyChart.evaluate((chart) => {
+      const rect = chart.getBoundingClientRect();
+      const viewport = chart
+        .closest(".facilitiesBody")!
+        .getBoundingClientRect();
+      const plot = chart.querySelector(".u-over")!.getBoundingClientRect();
+      const axes = Array.from(chart.querySelectorAll(".u-axis"));
+      return {
+        dataHeight:
+          plot.height /
+          parseFloat(getComputedStyle(document.documentElement).fontSize),
+        viewportOverflow: Math.max(
+          viewport.top - rect.top,
+          rect.bottom - viewport.bottom,
+        ),
+        axisOverflow: Math.max(
+          0,
+          ...axes.map((axis) => {
+            const box = axis.getBoundingClientRect();
+            return Math.max(
+              rect.left - box.left,
+              box.right - rect.right,
+              rect.top - box.top,
+              box.bottom - rect.bottom,
+            );
+          }),
+        ),
+      };
+    });
+    expect(
+      allocation.dataHeight,
+      "daily data plot stays readable",
+    ).toBeGreaterThanOrEqual(3);
+    expect(
+      allocation.viewportOverflow,
+      "whole daily chart fits the company pane",
+    ).toBeLessThanOrEqual(1);
+    expect(
+      allocation.axisOverflow,
+      "daily axes fit their chart",
+    ).toBeLessThanOrEqual(1);
   }
   await p2.getByRole("button", { name: "Insights", exact: true }).click();
   await expect(p2.locator(".insights:visible .uplot").first()).toBeVisible();
@@ -1006,14 +1071,15 @@ test("TV couch player toolbars own speed with edge-to-edge panes and global paus
       .digest("hex");
   const desktopBackdrop = couch.backdropRevision();
   const desktopGeometry = JSON.stringify(couch.layout());
-  const interfaceLayout = globalSettings.getByRole("group", {
-    name: "Interface layout",
+  const interfaceScale = globalSettings.getByRole("combobox", {
+    name: "Interface scale",
     exact: true,
   });
-  await interfaceLayout
-    .getByRole("button", { name: "TV", exact: true })
-    .click();
-  await expect(page.locator("html")).toHaveAttribute("data-tv-layout", "true");
+  await interfaceScale.selectOption("1.5");
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-interface-scale",
+    "1.5",
+  );
   await expectSharedSettings(globalSettings);
   await expectSettingsClearance(globalSettings);
   await expectSharedCaptionSize(page, p1, couch.layout()!.zoom);
@@ -1024,17 +1090,18 @@ test("TV couch player toolbars own speed with edge-to-edge panes and global paus
       })
       .toBeGreaterThan(desktopBackdrop);
   await expectPlayersPainted(page);
-  const tvBackdrop = couch.backdropRevision();
-  const tvGeometry = JSON.stringify(couch.layout());
-  await interfaceLayout
-    .getByRole("button", { name: "Desktop", exact: true })
-    .click();
-  await expect(page.locator("html")).toHaveAttribute("data-tv-layout", "false");
+  const scaledBackdrop = couch.backdropRevision();
+  const scaledGeometry = JSON.stringify(couch.layout());
+  await interfaceScale.selectOption("1");
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-interface-scale",
+    "1",
+  );
   await expectSharedSettings(globalSettings);
   await expectSettingsClearance(globalSettings);
   await expectSharedCaptionSize(page, p1, couch.layout()!.zoom);
-  if (JSON.stringify(couch.layout()) !== tvGeometry)
-    await expect.poll(couch.backdropRevision).toBeGreaterThan(tvBackdrop);
+  if (JSON.stringify(couch.layout()) !== scaledGeometry)
+    await expect.poll(couch.backdropRevision).toBeGreaterThan(scaledBackdrop);
   await expectPlayersPainted(page);
   const previousBackdrop = await backdropHash();
   const originalTheme =
@@ -1286,13 +1353,20 @@ test("TV couch coalesces visual preferences without capturing audio changes", as
       // A burst traverses all visual fields before one paint. Later nonvisual
       // updates must neither trigger screenshots nor cancel the pending visual one.
       click("Appearance", choices.finalThemeLabel);
-      click("Text size", "Standard");
+      const scale = (value: string) => {
+        const select = dialog.querySelector<HTMLSelectElement>(
+          'select[aria-label="Interface scale"]',
+        )!;
+        select.value = value;
+        select.dispatchEvent(new Event("change", { bubbles: true }));
+      };
+      scale("1");
       click("Units", "Imperial");
       click("Appearance", choices.otherThemeLabel);
-      click("Text size", "Larger");
+      scale("1.25");
       click("Units", "Metric");
       click("Appearance", choices.finalThemeLabel);
-      click("Text size", "Large");
+      scale("1.125");
       click("Units", "Imperial");
       const audio = dialog.querySelector<HTMLInputElement>(
         'input[aria-label="Sound"]',
@@ -1308,8 +1382,8 @@ test("TV couch coalesces visual preferences without capturing audio changes", as
       finalTheme,
     );
     await expect(seat.locator("html")).toHaveAttribute(
-      "data-text-size",
-      "large",
+      "data-interface-scale",
+      "1.125",
     );
   }
   await expect.poll(couch.refreshRequests).toBeGreaterThan(beforeVisual);
@@ -1321,7 +1395,7 @@ test("TV couch coalesces visual preferences without capturing audio changes", as
   expect
     .soft(
       couch.refreshRequests(),
-      "one refresh captures the latest burst, including its final theme and text size",
+      "one refresh captures the latest burst, including its final theme and interface scale",
     )
     .toBe(beforeVisual + 1);
 

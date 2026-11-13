@@ -10,6 +10,7 @@ import userEvent from "@testing-library/user-event";
 import { CityType } from "../../data/Cities";
 import LocationPicker from "./LocationPicker";
 import { updateInputPresentation } from "../../desktop/InputPresentation";
+import { applyInterfaceScale } from "../../InterfaceScale";
 
 const cities: CityType[] = [
   {
@@ -67,6 +68,16 @@ it("combines the selected city and search in one field on an aligned detailed ma
   expect(
     locationControls.filter((button) => button.tabIndex === 0),
   ).toHaveLength(1);
+});
+
+it("scales visible map targets and their clustering footprint without a layout preset", () => {
+  render(<LocationPicker locations={cities} onChange={jest.fn()} />);
+  const map = screen.getByRole("group", { name: "Playable locations map" });
+  expect(map).toHaveStyle({ "--map-marker-size": "40px" });
+  act(() => applyInterfaceScale(2.5));
+  expect(map).toHaveStyle({ "--map-marker-size": "100px" });
+  act(() => applyInterfaceScale(1));
+  expect(map).toHaveStyle({ "--map-marker-size": "40px" });
 });
 
 it("selects the same city from the map and searchable list", async () => {

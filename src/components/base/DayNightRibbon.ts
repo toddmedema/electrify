@@ -5,7 +5,7 @@ import {
   SunriseSunsetType,
 } from "../../helpers/DateTime";
 import { LocationType } from "../../Types";
-import { getTextScale } from "../../TextSize";
+import { getInterfaceScale } from "../../InterfaceScale";
 
 export interface DayNightSegment {
   start: number;
@@ -151,7 +151,7 @@ export function dayNightRibbonPlugin(
 ): uPlot.Plugin {
   let ribbon: HTMLDivElement;
   let previousKey = "";
-  const textScale = getTextScale();
+  const textScale = getInterfaceScale();
   return {
     hooks: {
       init: (u) => {
