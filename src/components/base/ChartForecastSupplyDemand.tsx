@@ -20,9 +20,9 @@ import {
 import { TickPresentFutureType } from "../../Types";
 import { formatMinuteAsTooltipHeader } from "../../helpers/DateTime";
 import {
-  formatReserveLine,
-  formatWatts,
-  formatWattsAxis,
+  formatForecastReserveLine as formatReserveLine,
+  formatForecastWatts as formatWatts,
+  formatForecastWattsAxis as formatWattsAxis,
 } from "../../helpers/Format";
 import { chartPalette } from "../../Theme";
 

@@ -5,10 +5,14 @@ import type { ObjectiveResult } from "../data/ScenarioObjectives";
 import { MONTHS } from "../Constants";
 import { objectiveTarget } from "./ScenarioObjectives";
 
-const number = (value: number, percent = false): string =>
-  formatNumber(roundToSignificantDigits(value, 3), {
+const number = (
+  value: number,
+  percent = false,
+  significantDigits = 3,
+): string =>
+  formatNumber(roundToSignificantDigits(value, significantDigits), {
     notation: "compact",
-    maximumSignificantDigits: 3,
+    maximumSignificantDigits: significantDigits,
     useGrouping: false,
     ...(percent ? { style: "percent" as const } : {}),
   }).replace(/K\b/g, "k");
@@ -18,11 +22,12 @@ export function objectiveValueText(
   objective: CompiledRuleObjective,
   value: number,
   comparison?: number,
+  significantDigits = 3,
 ): string {
-  const text = objectiveAmountText(objective, value);
+  const text = objectiveAmountText(objective, value, significantDigits);
   return comparison !== undefined &&
     value !== comparison &&
-    text === objectiveAmountText(objective, comparison)
+    text === objectiveAmountText(objective, comparison, significantDigits)
     ? `${text} (${value < comparison ? "below" : "above"} goal)`
     : text;
 }
@@ -30,35 +35,42 @@ export function objectiveValueText(
 function objectiveAmountText(
   objective: CompiledRuleObjective,
   value: number,
+  significantDigits: number,
 ): string {
+  const amount = (n: number, percent = false) =>
+    number(n, percent, significantDigits);
   switch (objective.metric) {
     case "customerRetention":
     case "localFuelShare":
     case "efficiencySavings":
     case "demandServedShare":
-      return number(value, true);
+      return amount(value, true);
     case "financialCoverage":
-      return `${number(value)}× operating costs`;
+      return `${amount(value)}× operating costs`;
     case "customerCount":
-      return `${number(value)} customers`;
+      return `${amount(value)} customers`;
     case "reserveMargin": {
-      const unit = getWattUnit(roundToSignificantDigits(value, 3));
-      return `${number(value / unit.divisor)}${unit.suffix}W reserve`;
+      const unit = getWattUnit(
+        roundToSignificantDigits(value, significantDigits),
+      );
+      return `${amount(value / unit.divisor)}${unit.suffix}W reserve`;
     }
     case "emissionsBudget":
-      return `${number(value / 1000)} tonnes CO₂e`;
+      return `${amount(value / 1000)} tonnes CO₂e`;
     case "emissionsPerDeliveredMWh":
-      return `${number(value)} kg CO₂e/MWh`;
+      return `${amount(value)} kg CO₂e/MWh`;
     case "monthlyBilledRate":
-      return `${formatRateCompact(value)}/kWh`;
+      return significantDigits === 2
+        ? `${amount(value * 100)}¢/kWh`
+        : `${formatRateCompact(value)}/kWh`;
     case "monthEndDebt":
-      return `$${number(value)}`;
+      return `$${amount(value)}`;
     case "utilityOwnership":
-      return `${number(value)} acquired ${value === 1 ? "utility" : "utilities"}`;
+      return `${amount(value)} acquired ${value === 1 ? "utility" : "utilities"}`;
     case "assetRetirement":
-      return `${number(value)} original oil ${value === 1 ? "asset" : "assets"}`;
+      return `${amount(value)} original oil ${value === 1 ? "asset" : "assets"}`;
     case "fuelRetirement":
-      return `${number(value)} owned ${objective.fuel} ${value === 1 ? "asset" : "assets"}${objective.commissionedBeforeYear === undefined ? "" : ` commissioned before ${objective.commissionedBeforeYear}`}`;
+      return `${amount(value)} owned ${objective.fuel} ${value === 1 ? "asset" : "assets"}${objective.commissionedBeforeYear === undefined ? "" : ` commissioned before ${objective.commissionedBeforeYear}`}`;
   }
 }
 

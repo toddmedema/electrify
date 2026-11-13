@@ -1,6 +1,6 @@
 import uPlot from "uplot";
 import { chartPalette, withAlpha } from "../../Theme";
-import { formatWatts } from "../../helpers/Format";
+import { formatForecastWatts as formatWatts } from "../../helpers/Format";
 import {
   ShortfallBar,
   shortfallHeight,

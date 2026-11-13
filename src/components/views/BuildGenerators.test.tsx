@@ -572,7 +572,7 @@ it("shows natural-gas base, per-start, and daily-start estimated O&M", async () 
   ).toBeInTheDocument();
   expect(
     screen.getByRole("row", {
-      name: /Estimated annual upkeep.*\$11\.9M\/yr/,
+      name: /Estimated annual upkeep.*\$12M\/yr/,
     }),
   ).toBeInTheDocument();
 
@@ -709,12 +709,12 @@ it("shows Oil's fixed, variable, and expected-output O&M", () => {
   ).toBeInTheDocument();
   expect(
     screen.getByRole("row", {
-      name: /Variable upkeep.*\$25\.71\/MWh/,
+      name: /Variable upkeep.*\$25\.7\/MWh/,
     }),
   ).toBeInTheDocument();
   expect(
     screen.getByRole("row", {
-      name: /Estimated annual upkeep.*\$7\.59M\/yr/,
+      name: /Estimated annual upkeep.*\$7\.6M\/yr/,
     }),
   ).toBeInTheDocument();
   expect(screen.queryByText("Non-fuel start cost")).toBeNull();

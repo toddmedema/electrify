@@ -22,7 +22,7 @@ describe("Units", () => {
       expect(toDisplayLargeMass(2500, "metric")).toBe(2.5);
       expect(formatTemperature(21.5, "metric")).toBe("22°C");
       expect(formatMass(450, "metric")).toBe("450kg");
-      expect(formatLargeMass(2500000, "metric")).toBe("2,500 tonnes");
+      expect(formatLargeMass(2500000, "metric")).toBe("2.5k tonnes");
     });
   });
 
@@ -35,7 +35,7 @@ describe("Units", () => {
       expect(formatMass(450, "imperial")).toBe("992lb");
       // Short tons, not tonnes: 10% apart, which is why the metric one is spelled "tonnes"
       expect(toDisplayLargeMass(907.18474, "imperial")).toBeCloseTo(1, 9);
-      expect(formatLargeMass(907184.74, "imperial")).toBe("1,000 tons");
+      expect(formatLargeMass(907184.74, "imperial")).toBe("1k tons");
     });
   });
 
@@ -61,7 +61,7 @@ it("does not show negative zero for a per-ton price rounded to zero", () => {
   expect(formatPricePerLargeMass(-0.001, "metric")).toBe("$-1/tonne");
 });
 
-it("rounds a headline mass to three significant digits with k/M/G", () => {
+it("rounds a headline mass to three significant digits with k/M/B", () => {
   expect(formatLargeMassSignificant(0, "metric")).toBe("0 tonnes");
   expect(formatLargeMassSignificant(523000, "metric")).toBe("523 tonnes");
   expect(formatLargeMassSignificant(5234000, "metric")).toBe("5.23k tonnes");
@@ -69,17 +69,17 @@ it("rounds a headline mass to three significant digits with k/M/G", () => {
   expect(formatLargeMassSignificant(123456000, "metric")).toBe("123k tonnes");
   expect(formatLargeMassSignificant(1234567000, "metric")).toBe("1.23M tonnes");
   expect(formatLargeMassSignificant(1200000000, "metric")).toBe("1.2M tonnes");
-  expect(formatLargeMassSignificant(1.234e12, "metric")).toBe("1.23G tonnes");
+  expect(formatLargeMassSignificant(1.234e12, "metric")).toBe("1.23B tonnes");
   // Rounding up past a prefix boundary promotes it instead of printing 1000k
   expect(formatLargeMassSignificant(999600000, "metric")).toBe("1M tonnes");
   expect(formatLargeMassSignificant(907184740, "imperial")).toBe("1M tons");
-  expect(formatLargeMassSignificant(1.5e15, "metric")).toBe("1500G tonnes");
+  expect(formatLargeMassSignificant(1.5e15, "metric")).toBe("1.5T tonnes");
 });
 
 it("preserves mass precision and compact unit thresholds in both systems", () => {
-  expect(formatLargeMassValue(1234500, "metric", 2)).toBe("1,234.50");
-  expect(formatLargeMassValue(-1005, "metric", 2)).toBe("-1.00");
+  expect(formatLargeMassValue(1234500, "metric", 2)).toBe("1.23k");
+  expect(formatLargeMassValue(-1005, "metric", 2)).toBe("-1.01");
   expect(formatLargeMassValueConcise(499000, "metric")).toBe("499");
-  expect(formatLargeMassValueConcise(500000, "metric")).toBe("0.5K");
+  expect(formatLargeMassValueConcise(500000, "metric")).toBe("500");
   expect(formatLargeMassValueConcise(1111111111, "imperial")).toBe("1.22M");
 });

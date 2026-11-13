@@ -40,11 +40,14 @@ for (const theme of ["light", "dark"]) {
     await slider.press("Home");
     await expect(pricing.locator(".insightsRateScore")).toHaveClass(/good/);
     await expect(slider).toHaveAttribute("aria-valuetext", /rate score \+/);
-    expect(
-      await programs
-        .locator(".customerProgramsBody")
-        .evaluate((el) => el.scrollWidth - el.clientWidth),
-    ).toBeLessThanOrEqual(1);
+    // The keyboard-controlled thumb animates between ends; inspect the settled layout.
+    await expect
+      .poll(() =>
+        programs
+          .locator(".customerProgramsBody")
+          .evaluate((el) => el.scrollWidth - el.clientWidth),
+      )
+      .toBeLessThanOrEqual(1);
     // Persist a negative cash fixture so both the clipped chart and its textual alternative
     // can be inspected without relying on a particular scenario's path to insolvency.
     await editSavedGame(page, (save) => {

@@ -20,6 +20,8 @@ import {
 import { projectedShortfall } from "../../helpers/MissionStatus";
 import {
   formatMoneyStable,
+  formatForecastMoney,
+  formatForecastWatts,
   formatWatts,
   formatNumber,
 } from "../../helpers/Format";
@@ -159,7 +161,7 @@ export function getGridHealth(
     return {
       state: "blackout-ahead",
       label: sameDay ? `Blackout ${day} at ${at}` : `Blackout ahead at ${at}`,
-      metric: `${formatWatts(ahead.demandW - ahead.supplyW)} short`,
+      metric: `${formatForecastWatts(ahead.demandW - ahead.supplyW)} short`,
       announcement: `Blackout expected at ${at}. Demand will be higher than supply.`,
     };
   }
@@ -614,10 +616,10 @@ export function GameAppBar(props: Props) {
                         ? "success"
                         : "textSecondary"
                   }
-                  aria-label={`Monthly profit forecast ${formatMoneyStable(monthlyProfit)}`}
+                  aria-label={`Monthly profit forecast ${formatForecastMoney(monthlyProfit)}`}
                 >
                   {monthlyProfit > 0 ? "+" : ""}
-                  {formatMoneyStable(monthlyProfit)}/mo
+                  {formatForecastMoney(monthlyProfit)}/mo
                 </Typography>
               </Tooltip>
             </span>

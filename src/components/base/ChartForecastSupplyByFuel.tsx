@@ -12,7 +12,10 @@ import {
   getDateFromMinute,
   MINUTES_PER_MONTH,
 } from "../../helpers/DateTime";
-import { formatWatts, formatWattsAxis } from "../../helpers/Format";
+import {
+  formatForecastWatts as formatWatts,
+  formatForecastWattsAxis as formatWattsAxis,
+} from "../../helpers/Format";
 import { FuelNameType, TickPresentFutureType } from "../../Types";
 import { chartPalette, fuelColors, withAlpha } from "../../Theme";
 

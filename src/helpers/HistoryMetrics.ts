@@ -1,10 +1,10 @@
 import { DerivedHistoryType, UnitSystemType } from "../Types";
 import {
   formatAbbreviatedNumber,
-  formatDecimalNumber,
+  formatNumber,
   formatMoneyConcise,
   formatPercent,
-  formatFixed,
+  formatForecastPercent,
   withoutNegativeZero,
   formatMoneyStable,
   formatWattHours,
@@ -149,7 +149,7 @@ export function historyMetrics(
     kgco2ePerMWh: {
       label: "Emissions per MWh",
       higherIsBetter: false,
-      format: (n: number) => formatDecimalNumber(toDisplayMass(n, units)),
+      format: (n: number) => formatNumber(toDisplayMass(n, units)),
       suffix: `${massUnit(units)}/MWh`,
       nesting: 2,
     },
@@ -176,13 +176,13 @@ export function formatCustomerChange(
   customers: number,
 ): string {
   const formattedChange = formatAbbreviatedNumber(
-    Number(Math.abs(change).toPrecision(2)),
+    Number(Math.round(Math.abs(change)).toPrecision(2)),
     { totalDigits: 2 },
   );
   const sign = change >= 0 ? "+" : "-";
   const percent =
     customers > 0
-      ? ` (${withoutNegativeZero(`${sign}${formatFixed((Math.abs(change) / customers) * 100, 1)}`)}%)`
+      ? ` (${withoutNegativeZero(`${sign}${formatForecastPercent(Math.abs(change) / customers)}`)})`
       : "";
   return `${withoutNegativeZero(`${sign}${formattedChange}`)}${percent}`;
 }

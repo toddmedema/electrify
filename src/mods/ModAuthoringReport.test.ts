@@ -228,7 +228,7 @@ test("the common author report has all difficulty values, actual peak and additi
       "Natural Gas Peaker construction cost: ×1.8",
     );
     expect(monthly[1].value).toContain("Temperature: 1 °C");
-    expect(monthly[1].value).toContain("Operating expense: $1,000/month");
+    expect(monthly[1].value).toContain("Operating expense: $1k/month");
   }
 });
 

@@ -5,7 +5,7 @@ import type {
 } from "../data/ScenarioObjectives";
 import type { GameType, MonthlyHistoryType } from "../Types";
 import { getTimeFromTimeline, MINUTES_PER_MONTH } from "./DateTime";
-import { formatMoneyConcise } from "./Format";
+import { formatForecastMoney as formatMoneyConcise } from "./Format";
 import { activeScenario, currentTick } from "./GameSelectors";
 import { completedMissionHistory } from "./MissionStatus";
 import {
@@ -171,14 +171,7 @@ function objectiveDetail(result: ObjectiveResult, game: GameType): string {
         : result.metric === "monthEndDebt"
           ? "Highest debt"
           : "Projected value";
-  // An hourly estimate needs little precision, except when rounding would conceal a miss.
-  const rounded = Number(result.observed.toPrecision(3));
-  const shown =
-    objectiveTargetMet(result.objective, rounded) ===
-    objectiveTargetMet(result.objective, result.observed)
-      ? rounded
-      : result.observed;
-  return `${prefix}: ${objectiveValueText(result.objective, shown, result.target)} · ${objectiveWindowText(result.objective, game.startingYear, activeScenario(game)!.durationMonths, legacyMonthOffset(game))}.`;
+  return `${prefix}: ${objectiveValueText(result.objective, result.observed, result.target, 2)} · ${objectiveWindowText(result.objective, game.startingYear, activeScenario(game)!.durationMonths, legacyMonthOffset(game))}.`;
 }
 
 /** All required goals plus month-end bankruptcy and the rolling three-month blackout rule. */

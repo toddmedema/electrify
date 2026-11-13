@@ -1,9 +1,5 @@
 import { UnitSystemType } from "../Types";
-import {
-  formatAbbreviatedNumber,
-  formatCount,
-  formatDecimalNumber,
-} from "./Format";
+import { formatCount, formatNumber, formatForecastNumber } from "./Format";
 
 /**
  * Everything the player reads is converted from metric at the last moment; nothing upstream of
@@ -48,7 +44,14 @@ export function formatTemperature(
   celsius: number,
   units: UnitSystemType,
 ): string {
-  return `${Math.round(toDisplayTemperature(celsius, units))}${temperatureUnit(units)}`;
+  return `${formatCount(toDisplayTemperature(celsius, units))}${temperatureUnit(units)}`;
+}
+
+export function formatForecastTemperature(
+  celsius: number,
+  units: UnitSystemType,
+): string {
+  return `${formatForecastNumber(Math.round(toDisplayTemperature(celsius, units)))}${temperatureUnit(units)}`;
 }
 
 /** The unit a generator's emissions per MWh are quoted in - small enough to read in whole units */
@@ -85,52 +88,37 @@ export function toDisplayLargeMass(kg: number, units: UnitSystemType): number {
 export function formatLargeMassValue(
   kg: number,
   units: UnitSystemType,
-  mantissa = 0,
+  _mantissa = 0,
 ): string {
-  return formatDecimalNumber(toDisplayLargeMass(kg, units), {
-    digits: mantissa,
-  });
+  return formatNumber(toDisplayLargeMass(kg, units));
 }
 
 /**
- * The same value as formatLargeMassValue, but rounded to K/M/etc rather than spelled out to the
- * kilogram - for the chart and its sparkline tile, which have room for three or four characters
+ * The same value as formatLargeMassValue, but rounded to k/M/B rather than spelled out to the
+ * kilogram - for the chart and its sparkline tile, which have room for a compact amount
  * and not the seven a full tonne count runs to.
  */
 export function formatLargeMassValueConcise(
   kg: number,
   units: UnitSystemType,
 ): string {
-  return formatAbbreviatedNumber(toDisplayLargeMass(kg, units), {
-    totalDigits: 3,
-  }).toUpperCase();
+  return formatLargeMassValue(kg, units);
 }
 
 export function formatLargeMass(kg: number, units: UnitSystemType): string {
   return `${formatLargeMassValue(kg, units)} ${largeMassUnit(units)}`;
 }
 
-const SI_PREFIXES = [
-  { divisor: 1e9, prefix: "G" },
-  { divisor: 1e6, prefix: "M" },
-  { divisor: 1e3, prefix: "k" },
-];
-
 /**
- * A total in k/M/G of the player's ton, rounded to three significant digits ("12.3k tonnes",
- * "1.23G tonnes"), for a headline figure whose last few digits are noise. Rounding comes first so
+ * A total in k/M/B of the player's ton, rounded to three significant digits ("12.3k tonnes",
+ * "1.23B tonnes"), for a headline figure whose last few digits are noise. Rounding comes first so
  * 999,600 reads "1M" rather than "1000k".
  */
 export function formatLargeMassSignificant(
   kg: number,
   units: UnitSystemType,
 ): string {
-  const value = toDisplayLargeMass(kg, units);
-  if (!Number.isFinite(value)) return `${value} ${largeMassUnit(units)}`;
-  const rounded = Number(value.toPrecision(3));
-  const si = SI_PREFIXES.find(({ divisor }) => Math.abs(rounded) >= divisor);
-  const scaled = si ? Number((rounded / si.divisor).toPrecision(3)) : rounded;
-  return `${scaled}${si?.prefix ?? ""} ${largeMassUnit(units)}`;
+  return formatLargeMass(kg, units);
 }
 
 /**
@@ -143,7 +131,7 @@ export function formatLargeMassApprox(
   units: UnitSystemType,
 ): string {
   const value = toDisplayLargeMass(kg, units);
-  return `${formatAbbreviatedNumber(value, { totalDigits: 2 }).toUpperCase()} ${largeMassUnit(units)}`;
+  return `${formatForecastNumber(value)} ${largeMassUnit(units)}`;
 }
 
 /**

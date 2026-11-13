@@ -25,7 +25,7 @@ it("preserves negative savings and the requested horizon without competing metri
       horizon="over 5 years"
     />,
   );
-  expect(screen.getByRole("status")).toHaveTextContent("-$1.25M over 5 years");
+  expect(screen.getByRole("status")).toHaveTextContent("-$1.3M over 5 years");
   expect(screen.getByText("Based on current supply and demand")).toBeVisible();
   expect(screen.queryByRole("heading")).not.toBeInTheDocument();
 });

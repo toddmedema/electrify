@@ -394,7 +394,11 @@ export default function UPlotChart<S>(
   const exactHeightRef = React.useRef(props.exactHeight);
   exactHeightRef.current = props.exactHeight;
   const number = React.useMemo(
-    () => new Intl.NumberFormat(undefined, { maximumSignificantDigits: 4 }),
+    () =>
+      new Intl.NumberFormat(undefined, {
+        maximumSignificantDigits: 3,
+        notation: "compact",
+      }),
     [],
   );
   const summaryFormatter =

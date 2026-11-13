@@ -26,6 +26,8 @@ import {
   floorToTwoSignificantDigits,
   formatBuildMonths,
   formatMoneyConcise,
+  formatForecastMoney,
+  formatForecastPercent,
   formatWatts,
 } from "../../helpers/Format";
 import { getFuelPricesPerMBTU } from "../../data/FuelPrices";
@@ -104,7 +106,7 @@ import { getLegacyBuildBounds } from "../../data/LegacyEra";
 import Sparkline from "../base/Sparkline";
 
 function percent(fraction: number): string {
-  return `${Math.round(fraction * 100)}%`;
+  return formatForecastPercent(Math.round(fraction * 100) / 100);
 }
 
 /**
@@ -603,7 +605,7 @@ export function GeneratorBuildItem(
           {props.secondaryMetric === "lcWh" && (
             <BuildMetric
               label="Cost per MWh"
-              value={`${fuelPrices[generator.fuel] ? "~" : ""}${outputPending ? "Calculating…" : formatMoneyConcise(generator.lcWh * 1000000)}`}
+              value={`${fuelPrices[generator.fuel] ? "~" : ""}${outputPending ? "Calculating…" : formatForecastMoney(generator.lcWh * 1000000)}`}
             />
           )}
         </>
@@ -641,7 +643,7 @@ export function GeneratorBuildItem(
                 value={
                   (outputPending
                     ? "Calculating…"
-                    : formatMoneyConcise(generator.lcWh * 1000000)) +
+                    : formatForecastMoney(generator.lcWh * 1000000)) +
                   (outputPending ? "" : "/MWh")
                 }
                 entry={MANUAL_ENTRY.TOTAL_COST_OF_ENERGY}
@@ -682,15 +684,15 @@ export function GeneratorBuildItem(
                 <BuildDetailRow
                   label="Variable upkeep"
                   value={
-                    "$" +
-                    (generator.variableOperatingCostPerMWh || 0).toFixed(2) +
-                    "/MWh"
+                    formatMoneyConcise(
+                      generator.variableOperatingCostPerMWh || 0,
+                    ) + "/MWh"
                   }
                   entry={MANUAL_ENTRY.OPERATING_COSTS}
                 />
                 <BuildDetailRow
                   label="Expected variable upkeep"
-                  value={formatMoneyConcise(estimatedVariableOM) + "/yr"}
+                  value={formatForecastMoney(estimatedVariableOM) + "/yr"}
                   entry={MANUAL_ENTRY.OPERATING_COSTS}
                 />
               </>
@@ -706,7 +708,7 @@ export function GeneratorBuildItem(
               <BuildDetailRow
                 label="Estimated annual upkeep"
                 value={
-                  formatMoneyConcise(estimatedAnnualOperatingCost(generator)) +
+                  formatForecastMoney(estimatedAnnualOperatingCost(generator)) +
                   "/yr"
                 }
                 entry={MANUAL_ENTRY.OPERATING_COSTS}
@@ -947,7 +949,7 @@ function GeneratorComparison(props: {
                   )}{" "}
                   typical{"\u00a0·"}{" "}
                   <span className="nowrap">
-                    {formatMoneyConcise(generator.lcWh * 1000000)}/MWh
+                    {formatForecastMoney(generator.lcWh * 1000000)}/MWh
                   </span>
                 </>
               )}

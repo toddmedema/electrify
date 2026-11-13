@@ -11,7 +11,10 @@ import {
 } from "./UPlotHelpers";
 import { TickPresentFutureType } from "../../Types";
 import { formatMinuteAsTooltipHeader } from "../../helpers/DateTime";
-import { formatWattHours } from "../../helpers/Format";
+import {
+  formatForecastWattHours as formatWattHours,
+  formatForecastNumber,
+} from "../../helpers/Format";
 import { waterDashArrays, chartPalette } from "../../Theme";
 
 export interface Props {
@@ -60,7 +63,7 @@ function buildOptions(showXLabels: boolean) {
       yAxis(scale, {
         grid: true,
         label: "Water (mm)",
-        values: (_u, splits) => splits.map((v) => String(Math.round(v))),
+        values: (_u, splits) => splits.map((v) => formatForecastNumber(v)),
       }),
       yAxis(scale, {
         scale: RESERVOIR_SCALE,
@@ -99,7 +102,7 @@ function buildOptions(showXLabels: boolean) {
 
 function tooltip(idx: number, state: State): string {
   const d = state.timeline[idx];
-  return `${formatMinuteAsTooltipHeader(d.minute, state.startingYear)}\nPrecipitation: ${d.precipitationMm.toFixed(0)} mm\nSnowpack: ${d.snowpackMm.toFixed(0)} mm SWE\nReservoir: ${formatWattHours(d.hydroReservoirWh)} of ${formatWattHours(d.hydroReservoirCapacityWh)}`;
+  return `${formatMinuteAsTooltipHeader(d.minute, state.startingYear)}\nPrecipitation: ${formatForecastNumber(d.precipitationMm)} mm\nSnowpack: ${formatForecastNumber(d.snowpackMm)} mm SWE\nReservoir: ${formatWattHours(d.hydroReservoirWh)} of ${formatWattHours(d.hydroReservoirCapacityWh)}`;
 }
 
 export default class ChartForecastWater extends React.PureComponent<Props, {}> {
@@ -128,7 +131,9 @@ export default class ChartForecastWater extends React.PureComponent<Props, {}> {
         id="chartForecastWater"
         ariaLabel="Chart of watershed precipitation, snowpack, and hydro reservoir level"
         formatSummaryValue={(value, seriesIndex) =>
-          seriesIndex < 2 ? `${Math.round(value)} mm` : formatWattHours(value)
+          seriesIndex < 2
+            ? `${formatForecastNumber(value)} mm`
+            : formatWattHours(value)
         }
         height={height}
         state={{ timeline, domain, startingYear, multiyear }}

@@ -60,10 +60,14 @@ import { getDispatchOrderedFuels } from "../../helpers/Energy";
 import { facilityLifetime } from "../../helpers/Financials";
 import {
   formatMoneyConcise,
+  formatForecastMoney,
+  formatForecastNumber,
+  formatForecastPercent,
+  formatForecastWatts,
+  formatForecastWattHours,
   formatCustomerCount,
   formatPercent,
   formatWattHours,
-  formatWatts,
 } from "../../helpers/Format";
 import {
   getStorageJson,
@@ -113,7 +117,11 @@ import {
   firstShortfallMinute,
   forecastShortfalls,
 } from "../../helpers/ForecastShortfalls";
-import { largeMassUnit, temperatureUnit } from "../../helpers/Units";
+import {
+  largeMassUnit,
+  temperatureUnit,
+  toDisplayLargeMass,
+} from "../../helpers/Units";
 import { UnitsContext } from "../base/UnitsContext";
 import {
   HISTORY_METRIC_KEYS,
@@ -649,6 +657,7 @@ function financeMetadata(
   key: DerivedHistoryKeysType;
   label: string;
   format: (value: number) => string;
+  formatProjected: (value: number) => string;
 } | null {
   const key = FINANCE_LAYER_METRICS[id];
   if (!key) {
@@ -659,6 +668,12 @@ function financeMetadata(
     key,
     label: metric.suffix ? `${metric.label} (${metric.suffix})` : metric.label,
     format: metric.format,
+    formatProjected:
+      key === "kgco2e"
+        ? (value) => formatForecastNumber(toDisplayLargeMass(value, units))
+        : key === "customers"
+          ? formatForecastNumber
+          : formatForecastMoney,
   };
 }
 
@@ -1624,6 +1639,7 @@ export default class Insights extends React.Component<Props, State> {
             )}
             title={finance.label}
             format={id === "customers" ? formatCustomerCount : finance.format}
+            formatProjected={finance.formatProjected}
             formatAxis={
               id === "customers"
                 ? (value) => formatCustomerCount(value, 2)
@@ -1665,6 +1681,7 @@ export default class Insights extends React.Component<Props, State> {
                     key === "inflationRate" ? "Inflation" : "Interest rate"
                   }
                   format={(value) => formatPercent(value, 2)}
+                  formatProjected={formatForecastPercent}
                   startingYear={game.startingYear}
                   domain={projection.domain.x}
                   syncKey={syncKey}
@@ -1761,7 +1778,7 @@ export default class Insights extends React.Component<Props, State> {
                   className="insightsWarning"
                   variant="body2"
                   role="note"
-                  aria-label={`Forecast shortfalls start ${projection.shortfall.startYear}: about ${formatWattHours(Number(projection.shortfall.wh.toPrecision(2)))} of demand unmet, about ${formatWatts(Number(projection.shortfall.peakW.toPrecision(2)))} peak`}
+                  aria-label={`Forecast shortfalls start ${projection.shortfall.startYear}: about ${formatForecastWattHours(projection.shortfall.wh)} of demand unmet, about ${formatForecastWatts(projection.shortfall.peakW)} peak`}
                 >
                   <ConceptIcon
                     concept="danger"
@@ -1773,15 +1790,8 @@ export default class Insights extends React.Component<Props, State> {
                     <strong>
                       Shortfalls start {projection.shortfall.startYear}:
                     </strong>{" "}
-                    ~
-                    {formatWattHours(
-                      Number(projection.shortfall.wh.toPrecision(2)),
-                    )}{" "}
-                    unmet · ~
-                    {formatWatts(
-                      Number(projection.shortfall.peakW.toPrecision(2)),
-                    )}{" "}
-                    peak
+                    ~{formatForecastWattHours(projection.shortfall.wh)} unmet ·
+                    ~{formatForecastWatts(projection.shortfall.peakW)} peak
                   </span>
                 </Typography>
               )}

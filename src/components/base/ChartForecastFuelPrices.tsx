@@ -10,7 +10,10 @@ import {
   yAxis,
 } from "./UPlotHelpers";
 import { formatMinuteAsTooltipHeader } from "../../helpers/DateTime";
-import { formatMoneyConcise, formatMoneyStable } from "../../helpers/Format";
+import {
+  formatForecastMoney as formatMoneyConcise,
+  formatForecastMoney as formatMoneyStable,
+} from "../../helpers/Format";
 import { PRICED_FUELS } from "../../Constants";
 import { TickPresentFutureType, PricedFuelNameType } from "../../Types";
 import { fuelColors, fuelDashArrays } from "../../Theme";

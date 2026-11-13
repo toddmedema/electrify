@@ -48,7 +48,7 @@ describe("ChartForecastWeather", () => {
 
       expect(
         screen.getByRole("img", { name: /Chart of predicted temperature/ }),
-      ).toHaveAccessibleName(/range -10 to 30/);
+      ).toHaveAccessibleName(/range -10°C to 30°C/);
     },
   );
 });

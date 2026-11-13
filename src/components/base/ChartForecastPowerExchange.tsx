@@ -19,9 +19,9 @@ import {
   MINUTES_PER_MONTH,
 } from "../../helpers/DateTime";
 import {
-  formatMoneyConcise,
-  formatWatts,
-  formatWattsAxis,
+  formatForecastMoney as formatMoneyConcise,
+  formatForecastWatts as formatWatts,
+  formatForecastWattsAxis as formatWattsAxis,
 } from "../../helpers/Format";
 import { chartPalette, getThemeVersion, subscribeThemeMode } from "../../Theme";
 

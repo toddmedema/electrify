@@ -7,7 +7,7 @@ export function scenarioEffectsSummary(
   exact = false,
 ): string[] {
   const rounded = (value: number) =>
-    exact ? Number(value.toPrecision(12)) : Math.round(value);
+    formatNumber(exact ? value : Math.round(value));
   const changes: string[] = [];
   for (const [corridor, limitW] of Object.entries(
     effects.transmissionCapacityLimitsWByCorridor ?? {},
@@ -19,7 +19,7 @@ export function scenarioEffectsSummary(
     );
   if (effects.temperatureOffsetC)
     changes.push(
-      `Temperature: ${effects.temperatureOffsetC > 0 ? "+" : ""}${effects.temperatureOffsetC}°C`,
+      `Temperature: ${effects.temperatureOffsetC > 0 ? "+" : ""}${formatNumber(effects.temperatureOffsetC)}°C`,
     );
   if (effects.hydroRunoffMultiplier !== undefined)
     changes.push(
@@ -27,7 +27,7 @@ export function scenarioEffectsSummary(
     );
   if (effects.operatingExpensePerMonth)
     changes.push(
-      `${exact ? "Operating expense" : "Restoration"}: $${formatNumber(rounded(effects.operatingExpensePerMonth), exact ? { maximumSignificantDigits: 12 } : undefined)}/month`,
+      `${exact ? "Operating expense" : "Restoration"}: $${rounded(effects.operatingExpensePerMonth)}/month`,
     );
   for (const [label, values] of [
     ["fuel price", effects.fuelPriceMultipliers],

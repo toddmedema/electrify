@@ -22,7 +22,11 @@ import {
   publicRateCap,
   publicTargetRate,
 } from "../../helpers/Customers";
-import { formatMoneyConcise, formatRateCompact } from "../../helpers/Format";
+import {
+  formatMoneyConcise,
+  formatRateCompact,
+  formatForecastNumber,
+} from "../../helpers/Format";
 import { formatCustomerChange } from "../../helpers/HistoryMetrics";
 import {
   PUBLIC_RATE_POINTS_PER_CENT,
@@ -55,7 +59,7 @@ function rateMarkLabel(
 }
 
 function formatRateScore(points: number): string {
-  return `${points > 0 ? "+" : points < 0 ? "−" : "±"}${Math.abs(points).toLocaleString("en-US")} pts`;
+  return `${points > 0 ? "+" : points < 0 ? "−" : "±"}${formatForecastNumber(Math.abs(points))} pts`;
 }
 
 /**

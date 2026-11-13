@@ -65,10 +65,10 @@ import {
   isOperatingPolicy,
 } from "../../helpers/Policies";
 import {
-  formatPercent,
+  formatForecastPercent as formatPercent,
   formatMoneyConcise,
-  formatWatts,
-  formatWattHours,
+  formatForecastWatts as formatWatts,
+  formatForecastWattHours as formatWattHours,
 } from "../../helpers/Format";
 import { createPolicyPreviewWorker } from "../../helpers/PolicyPreviewClient";
 import { useWorkerRequest } from "../base/useWorkerRequest";

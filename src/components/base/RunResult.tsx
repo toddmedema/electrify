@@ -6,6 +6,7 @@ import {
   formatCustomerCount,
   formatMoneyConcise,
   formatScore,
+  formatPercent,
 } from "../../helpers/Format";
 import { scoreLabel } from "../../helpers/Scoring";
 import { formatLargeMassSignificant } from "../../helpers/Units";
@@ -86,7 +87,7 @@ export function RunDebrief({
   // scenario isn't recorded with the result, so it keeps the month count.
   const scenario =
     scenarioId === undefined ? undefined : getScenario(scenarioId);
-  const reliability = `${(debrief.reliability * 100).toFixed(debrief.reliability >= 0.999 ? 2 : 1)}%`;
+  const reliability = formatPercent(debrief.reliability, 2);
   const metrics = [
     { concept: "supply" as const, label: "served", value: reliability },
     {

@@ -3,7 +3,7 @@ import { Box } from "@mui/material";
 import UPlotChart from "./UPlotChart";
 import ChartLegend from "./ChartLegend";
 import { chartPalette, getThemeVersion, subscribeThemeMode } from "../../Theme";
-import { formatWatts } from "../../helpers/Format";
+import { formatForecastWatts as formatWatts } from "../../helpers/Format";
 import { DESIGN_WIDTH, MAX_CHART_SCALE } from "./UPlotHelpers";
 
 const CHART_HEIGHT = 140;

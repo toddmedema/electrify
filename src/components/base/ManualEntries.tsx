@@ -563,7 +563,7 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
         </p>
         <Figure
           src="/images/manual-demand.webp"
-          alt="Hourly electricity load across a week in the PJM Mid-Atlantic region, plotted for a hot week, a cold week and a mild week of 2009. All three rise and fall once a day and drop over the weekend; the hot week peaks around 50,000 MW, roughly 20,000 MW above the mild week's overnight low."
+          alt="Hourly electricity load across a week in the PJM Mid-Atlantic region, plotted for a hot week, a cold week and a mild week of 2009. All three rise and fall once a day and drop over the weekend; the hot week peaks around 50 GW, roughly 20 GW above the mild week's overnight low."
           width={834}
           height={560}
           source={{
@@ -894,9 +894,9 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           you've made 1 megawatt-hour (MWh).
         </p>
         <p>
-          Your power bill uses kilowatt-hours (kWh); 1,000 kWh make 1 MWh. A
-          typical US home uses about 10 MWh a year. A terawatt-hour (TWh) is a
-          million MWh.
+          Your power bill uses kilowatt-hours (kWh); a megawatt-hour (MWh) is a
+          thousand kWh. A typical US home uses about 10 MWh a year. A
+          terawatt-hour (TWh) is a million MWh.
         </p>
         <p>
           A full 20 MW battery holding 80 MWh can supply 20 MW for about four

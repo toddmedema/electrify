@@ -41,7 +41,11 @@ import {
   getDateFromMinute,
   getHourTicks,
 } from "../../helpers/DateTime";
-import { formatWatts, formatWattsAxis } from "../../helpers/Format";
+import {
+  formatForecastWatts as formatWatts,
+  formatForecastNumber,
+  formatForecastWattsAxis as formatWattsAxis,
+} from "../../helpers/Format";
 import { getIntersectionX } from "../../helpers/Math";
 import { WEATHER_DEPENDENT_FUELS } from "../../Constants";
 import { chartPalette, getThemeVersion, subscribeThemeMode } from "../../Theme";
@@ -53,7 +57,7 @@ import {
   UnitSystemType,
 } from "../../Types";
 
-import { formatTemperature } from "../../helpers/Units";
+import { formatForecastTemperature as formatTemperature } from "../../helpers/Units";
 import { useUnits } from "./UnitsContext";
 
 type ChartData = Pick<
@@ -426,7 +430,7 @@ export function productionWeather(
   if (tick.windKph !== undefined) {
     const speed = units === "imperial" ? tick.windKph / 1.609344 : tick.windKph;
     conditions.push(
-      `${tick.windKph >= 30 ? "Windy" : "Wind"} ${Math.round(speed)} ${units === "imperial" ? "mph" : "km/h"}`,
+      `${tick.windKph >= 30 ? "Windy" : "Wind"} ${formatForecastNumber(speed)} ${units === "imperial" ? "mph" : "km/h"}`,
     );
   }
   return conditions;
