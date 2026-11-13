@@ -201,7 +201,7 @@ for (const theme of ["light", "dark"] as const) {
           const chart = output.locator("svg");
           await chart.hover({ position: { x: 0, y: 12 } });
           await expect(caption).toHaveText(/^Jan: \d+%/);
-          const chartBox = (await chart.boundingBox())!;
+          const { width, height } = (await chart.boundingBox())!;
           const layout = () =>
             output.evaluate((element) => {
               const parent = element.getBoundingClientRect();
@@ -236,8 +236,8 @@ for (const theme of ["light", "dark"] as const) {
             // Recheck the live target after scrolling and each React caption update.
             await chart.hover({
               position: {
-                x: (index / 11) * (chartBox.width - 0.1),
-                y: chartBox.height / 2,
+                x: (index / 11) * (width - 0.1),
+                y: height / 2,
               },
             });
             await expect(caption).toHaveText(
@@ -259,10 +259,7 @@ for (const theme of ["light", "dark"] as const) {
           expect(textLayout.height).toBeLessThanOrEqual(textLayout.lineHeight);
           expect(textLayout.whiteSpace).toBe("nowrap");
           if (testInfo.project.use.hasTouch) {
-            await page.touchscreen.tap(
-              chartBox.x,
-              chartBox.y + chartBox.height / 2,
-            );
+            await chart.tap({ position: { x: 1, y: height / 2 } });
           } else {
             await output.focus();
             await output.press("Home");
