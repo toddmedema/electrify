@@ -43,6 +43,8 @@ One line per file is printed: absolute path, pixel size, file size.
   --delay <ms>          Wait this long before capturing (default 300).
   --base-url <url>      App to photograph. Otherwise E2E_BASE_URL, BASE_URL, or the dev server
                         that "npm start" is running in this checkout. Must use the origin root.
+  --marketing          Capture the seven SEO and Steam scenes into --out (default .tmp/marketing).
+                        Uses fixed sizes, themes and gameplay; only --out and --base-url apply.
 
 Files are named <name>-<viewport>-<theme>.png. The game is paused while it is captured. Each new
 game draws random weather, so figures such as reserve and income differ between runs: compare
@@ -70,7 +72,7 @@ const VALUE_OPTIONS = new Set([
   "base-url",
   "delay",
 ]);
-const FLAG_OPTIONS = new Set(["full-page", "help"]);
+const FLAG_OPTIONS = new Set(["full-page", "help", "marketing"]);
 const ALIASES = { viewport: "viewports", themes: "theme" };
 
 function integer(name, value, min, max) {
@@ -173,6 +175,20 @@ function parseShotArgs(argv, { cwd = process.cwd() } = {}) {
     } else throw new UsageError(`unknown option --${match[1]}`);
   }
   if (raw.help) return { help: true };
+
+  if (raw.marketing) {
+    const conflict = Object.keys(raw).find(
+      (key) => !["marketing", "out", "base-url"].includes(key),
+    );
+    if (conflict)
+      throw new UsageError(`--marketing cannot be combined with --${conflict}`);
+    return {
+      help: false,
+      marketing: true,
+      outDir: path.resolve(cwd, raw.out ?? ".tmp/marketing"),
+      baseUrl: raw["base-url"],
+    };
+  }
 
   const hasUrl = raw.url !== undefined;
   if (hasUrl && raw.scenario !== undefined)

@@ -27,9 +27,16 @@ intentionally cropped at the edge. The small capsule is legible at 120 × 45 and
 
 Upload screenshot 01 first. The six images show the grid overview, generator
 comparisons, storage choices, customer programs, interties and weather forecasts.
-They are unretouched captures of the real game at a 1280 × 720 logical viewport
-with a 1.5 device scale factor. Refresh them from real gameplay at 1920 × 1080,
-without marketing overlays or debug UI.
+They are unretouched captures of the current game at a 1440 × 810 logical viewport
+with a 4/3 device scale factor, producing 1920 × 1080 PNGs with readable controls.
+They show the dock, side-by-side tools, generator comparison, lithium battery
+details, pricing and demand programs, an operating intertie, and temperature and
+water forecasts. There are no marketing overlays or debug UI.
+
+Run `npm start`, then `npm run shot -- --marketing` in another terminal to refresh
+all six screenshots and the shared SEO/social preview. Review the staged images
+before copying them into the tracked paths; see
+[marketing screenshots](../../docs/marketing-screenshots.md) for the full workflow.
 
 ## Updating artwork
 

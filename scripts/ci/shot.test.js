@@ -118,6 +118,35 @@ test("help short-circuits validation", () => {
   assert.deepEqual(parse("--help"), { help: true });
 });
 
+test("marketing captures use their authored sizes and allow a staging directory", () => {
+  assert.deepEqual(parse("--marketing"), {
+    help: false,
+    marketing: true,
+    outDir: path.join(cwd, ".tmp/marketing"),
+    baseUrl: undefined,
+  });
+  assert.equal(
+    parse("--marketing", "--out", "review").outDir,
+    path.join(cwd, "review"),
+  );
+  assert.equal(
+    parse("--marketing", "--base-url", "http://localhost:3000").baseUrl,
+    "http://localhost:3000",
+  );
+  for (const argv of [
+    ["--theme", "dark"],
+    ["--viewports", "390"],
+    ["--clip", ".facilities"],
+    ["--url", "/"],
+    ["--full-page"],
+  ]) {
+    assert.throws(
+      () => parse("--marketing", ...argv),
+      /--marketing cannot be combined/,
+    );
+  }
+});
+
 test("mistakes name the option and are usage errors", () => {
   const rejected = [
     [["--view", "nowhere"], /--view must be one of/],
@@ -363,9 +392,37 @@ test("the screenshot runner is never part of an ordinary browser suite", () => {
     "multiplayer.playwright.config.ts",
     "steam-input.playwright.config.ts",
   ]) {
-    const listing = listTests(config, "shot\\.run");
+    const listing = listTests(config, "(shot|marketing)\\.run");
     assert.equal(listing.status, 1, config);
     assert.deepEqual(listing.suites, [], config);
     assert.match(listing.errors[0].message, /No tests found/, config);
   }
+});
+
+test("marketing exports select seven scenes without running ordinary captures", () => {
+  const listing = listTests("shot.playwright.config.ts", "marketing\\.run", {
+    ELECTRIFY_SHOT: JSON.stringify({
+      ...parse("--marketing"),
+      baseURL: "http://127.0.0.1:1",
+    }),
+  });
+  assert.equal(listing.status, 0);
+  assert.deepEqual(
+    listing.suites.flatMap((suite) =>
+      suite.specs.flatMap((spec) => spec.tests.map((t) => t.projectName)),
+    ),
+    [
+      "gameplay-preview",
+      "01-grid-overview-dark",
+      "02-generator-comparison-light",
+      "03-storage-planning-dark",
+      "04-customer-programs-light",
+      "05-intertie-trading-dark",
+      "06-weather-forecast-light",
+    ],
+  );
+  assert.deepEqual(
+    [...new Set(listing.suites.map((suite) => suite.file))],
+    ["marketing.run.ts"],
+  );
 });

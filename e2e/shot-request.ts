@@ -3,6 +3,8 @@
  * script owns parsing and validation; this file only describes and reads its result.
  */
 export interface ShotRequest {
+  /** Capture the maintained SEO/Steam scenes instead of a single configurable view. */
+  marketing?: boolean;
   /** Origin of the app to photograph. */
   baseURL: string;
   /** Route to open, such as "/?scenario=108" or "/manual". */
