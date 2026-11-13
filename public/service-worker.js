@@ -248,6 +248,13 @@ async function syncOfflineData() {
 }
 
 self.addEventListener("install", (event) => {
+  // Analytics is optional: fetching or storing it must not block a playable offline build.
+  event.waitUntil(
+    caches
+      .open(CACHE_VERSION)
+      .then((cache) => fetchAndCache(cache, "/analytics.js"))
+      .catch(() => undefined),
+  );
   event.waitUntil(
     caches
       .open(CACHE_VERSION)

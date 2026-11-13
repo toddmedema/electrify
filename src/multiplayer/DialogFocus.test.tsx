@@ -112,6 +112,23 @@ test("returning from Mods cannot interrupt controller invite entry when both tra
   jest
     .spyOn(HTMLElement.prototype, "getClientRects")
     .mockReturnValue([{}] as unknown as DOMRectList);
+  // JSDOM needs rendered geometry for the controller's spatial traversal.
+  jest
+    .spyOn(HTMLElement.prototype, "getBoundingClientRect")
+    .mockImplementation(function (this: HTMLElement) {
+      const index = Array.from(
+        // eslint-disable-next-line testing-library/no-node-access -- Model the dialog's vertical control order.
+        document.querySelectorAll("button,input,[tabindex]"),
+      ).indexOf(this);
+      return {
+        left: 0,
+        right: 80,
+        top: index * 60,
+        bottom: index * 60 + 40,
+        width: 80,
+        height: 40,
+      } as DOMRect;
+    });
   render(<button data-mods-trigger>Mods</button>);
   // Back schedules menu restoration before the player opens the real invitation dialog.
   restoreMenuFocus("[data-mods-trigger]");

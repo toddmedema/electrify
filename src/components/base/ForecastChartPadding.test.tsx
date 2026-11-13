@@ -340,23 +340,37 @@ describe("insight forecast charts", () => {
         />
       ),
     ],
-  ])("%s keeps the title's 16px inset at every width", (_name, makeChart) => {
-    for (const width of [350, 700]) {
-      jest.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue({
-        width,
-        height: 200,
-        top: 0,
-        right: width,
-        bottom: 200,
-        left: 0,
-        x: 0,
-        y: 0,
-        toJSON: () => undefined,
-      });
-      const options = buildOptions(makeChart());
-      expect(options.padding?.[1]).toBe(16);
-    }
-  });
+  ])(
+    "%s preserves the title's 16px minimum inset while fitting axis labels",
+    (_name, makeChart) => {
+      for (const width of [350, 700]) {
+        jest.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue({
+          width,
+          height: 200,
+          top: 0,
+          right: width,
+          bottom: 200,
+          left: 0,
+          x: 0,
+          y: 0,
+          toJSON: () => undefined,
+        });
+        const options = buildOptions(makeChart());
+        const right = options.padding?.[1];
+        const plot = {
+          width,
+          bbox: { width },
+          scales: { x: { min: domain.x[0], max: domain.x[1] } },
+        } as unknown as uPlot;
+        const inset =
+          typeof right === "function"
+            ? right(plot, 1, [false, false, true, true], 0)
+            : right;
+        expect(inset).toBeGreaterThanOrEqual(16);
+        expect(inset).toBeLessThan(width / 2);
+      }
+    },
+  );
 
   it("gives water its right axis instead of the shared padding", () => {
     const options = buildOptions(

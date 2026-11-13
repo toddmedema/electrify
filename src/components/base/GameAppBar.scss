@@ -3,6 +3,37 @@
   margin-left: auto;
 }
 
+#topbar {
+  container: game-topbar / inline-size;
+}
+
+// Enlarged status and speed controls get separate rows before either loses text.
+@container game-topbar (max-width: 24rem) {
+  html[data-interface-scale]:not([data-interface-scale="1"])
+    #topbar
+    .MuiToolbar-root:has(> .gameStatus) {
+    flex-wrap: wrap !important;
+    row-gap: 4px;
+    padding-bottom: 4px;
+
+    .gameStatus {
+      flex: 1 1 calc(100% - 4rem);
+      overflow: visible;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0;
+    }
+
+    #speedChangeButtons {
+      max-width: 100%;
+    }
+
+    .speedToggles {
+      --speed-segment: clamp(44px, calc((100cqw - 1.5rem) / 4), 3.25rem);
+    }
+  }
+}
+
 html[data-couch-seat] #appbar #topbar {
   .MuiToolbar-root {
     // Keep both money figures together; a narrow player pane can put speeds below.

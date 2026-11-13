@@ -1,9 +1,15 @@
 import * as React from "react";
-import { act, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { configureStore } from "@reduxjs/toolkit";
 import { Provider } from "react-redux";
 import { createGame } from "../../testing/Simulator";
-import { BuildForecastProvider, useBuildForecast } from "./BuildForecast";
+import {
+  BuildForecastProvider,
+  useBuildForecast,
+  useBuildGridEvidence,
+} from "./BuildForecast";
+import { GameWorkspaceLayoutContext } from "./GameWorkspaceContext";
+import { workspaceLayout } from "../../WorkspaceLayout";
 import type { GameType } from "../../Types";
 import type { BuildForecast } from "./OutlookForecast";
 
@@ -26,6 +32,36 @@ function Catalog(props: { game: GameType }) {
   const forecast = useBuildForecast(props.game);
   return <div>{forecast ? `Wind ${forecast.windSpeeds[0]}` : "Pending"}</div>;
 }
+
+function GridEvidence() {
+  return <>{useBuildGridEvidence()}</>;
+}
+
+it("offers expandable grid evidence only while Fleet is outside the active view", () => {
+  const game = createGame({ scenarioId: 103, seed: 12345 });
+  const store = configureStore({ reducer: { game: () => game } });
+  const workspace = (fleetVisible: boolean) => (
+    <Provider store={store}>
+      <GameWorkspaceLayoutContext.Provider
+        value={{ ...workspaceLayout(1920, 1, "single"), fleetVisible }}
+      >
+        <BuildForecastProvider>
+          <GridEvidence />
+        </BuildForecastProvider>
+      </GameWorkspaceLayoutContext.Provider>
+    </Provider>
+  );
+  const view = render(workspace(false));
+  const summary = screen.getByText(/^Current grid ·/);
+  fireEvent.click(summary);
+  expect(
+    screen.getByRole("img", { name: /electricity supply and demand/ }),
+  ).toBeVisible();
+  view.rerender(workspace(true));
+  expect(screen.queryByText(/^Current grid ·/)).not.toBeInTheDocument();
+  view.rerender(workspace(false));
+  expect(screen.getByText(/^Current grid ·/)).toBeVisible();
+});
 
 beforeEach(() => {
   jest.useFakeTimers();

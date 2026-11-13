@@ -4,10 +4,11 @@ import CloseIcon from "@mui/icons-material/Close";
 import {
   MANUAL_ENTRIES,
   ManualEntryTitleType,
-  ManualEntryType,
+  ManualSectionType,
 } from "./ManualEntries";
 import { ManualEntryNavigation } from "./ManualEntryLink";
-import { useTvLayout } from "../../TvLayout";
+import { useControllerInput } from "../../desktop/InputPresentation";
+import { useScreenEdgeMargin } from "../../ScreenEdgePadding";
 
 // The (?) the player tapped. A DOM node has no place in the store, so it lives here beside the
 // popover that reads it; ManualLink records it just before asking for the entry
@@ -17,17 +18,35 @@ export function setManualHelpAnchor(el: HTMLElement | null) {
   helpAnchor = el;
 }
 
-const ENTRIES_BY_TITLE: Record<string, ManualEntryType> = {};
-MANUAL_ENTRIES.forEach((entry: ManualEntryType) => {
-  ENTRIES_BY_TITLE[entry.title] = entry;
+type HelpEntry = { title: ManualEntryTitleType; entry: React.JSX.Element };
+
+const ENTRIES_BY_TITLE: Record<string, HelpEntry> = {};
+MANUAL_ENTRIES.forEach((entry) => {
+  ENTRIES_BY_TITLE[entry.title] = {
+    title: entry.title,
+    entry: (
+      <>
+        {entry.entry}
+        {entry.sections?.map((section) => (
+          <section key={section.title}>
+            <h3>{section.title}</h3>
+            {section.entry}
+          </section>
+        ))}
+      </>
+    ),
+  };
+  entry.sections?.forEach((section: ManualSectionType) => {
+    ENTRIES_BY_TITLE[section.title] = section;
+  });
 });
 
-export function manualEntryByTitle(title: string): ManualEntryType | undefined {
+export function manualEntryByTitle(title: string): HelpEntry | undefined {
   return ENTRIES_BY_TITLE[title];
 }
 
 interface ContentProps {
-  entry: ManualEntryType;
+  entry: HelpEntry;
   onClose: () => void;
   // Opens an entry the body links to, in place of this one
   onRelated: (title: ManualEntryTitleType) => void;
@@ -76,7 +95,8 @@ export default function ManualHelpPopover(
   props: Props,
 ): React.JSX.Element | null {
   const { onClose, onRelated } = props;
-  const tvMode = useTvLayout();
+  const controllerInput = useControllerInput();
+  const edgeMargin = useScreenEdgeMargin();
   // Kept through the exit transition, so the content doesn't blank out as it fades
   const [shown, setShown] = React.useState(props.entry);
   if (props.entry && props.entry !== shown) {
@@ -94,7 +114,7 @@ export default function ManualHelpPopover(
   const open = !!props.entry && !!entry;
   // A row can re-render its (?) away while the entry is open. Without a node still on the page
   // to point at, the popover centres itself instead of flying to the corner
-  const anchored = !tvMode && !!helpAnchor?.isConnected;
+  const anchored = !controllerInput && !!helpAnchor?.isConnected;
 
   return (
     <Popover
@@ -116,7 +136,7 @@ export default function ManualHelpPopover(
           ? { vertical: "top", horizontal: "center" }
           : { vertical: "center", horizontal: "center" }
       }
-      marginThreshold={8}
+      marginThreshold={edgeMargin}
       data-manual-help="true"
       slotProps={{
         paper: {

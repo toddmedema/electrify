@@ -1,4 +1,4 @@
-import { test as base } from "@playwright/test";
+import { test as base } from "./fixtures";
 import fs from "node:fs/promises";
 import path from "node:path";
 import type { World } from "../src/multiplayer/Types";

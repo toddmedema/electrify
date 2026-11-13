@@ -12,7 +12,7 @@ import "./Toolbar.scss";
 
 export interface CouchToolbarProps {
   game: GameType;
-  /** Native seat zoom relative to the shell's applied TV display scale. */
+  /** Native seat zoom; shell and seats already share the explicit interface scale. */
   statusScale?: number;
   menuOpen: boolean;
   menuFooter?: ReactNode;

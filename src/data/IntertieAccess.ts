@@ -386,6 +386,9 @@ export function corridorsForGame(
     ];
   }
   return corridorsForLocation(game.location)
-    .filter(({ id }) => corridorOpenInYear(id, game.date.year))
+    .filter(
+      ({ id, buildCost }) =>
+        buildCost > 0 && corridorOpenInYear(id, game.date.year),
+    )
     .map((c) => effectiveCorridor(c.id, accessContextForGame(game))!);
 }

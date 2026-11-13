@@ -171,26 +171,25 @@ export async function openPane(
   pane: Locator,
   navButton: Locator,
 ): Promise<boolean> {
+  // Fleet remains mounted for state/scroll memory, but Single tool hides it entirely.
+  if (
+    (await pane.count()) > 0 &&
+    (await pane
+      .first()
+      .evaluate((element) => element.classList.contains("facilities")))
+  ) {
+    const closes = pane
+      .page()
+      .locator(".gameToolHeader button[aria-label^='Close ']")
+      .filter({ visible: true });
+    const changed = (await closes.count()) > 0;
+    while ((await closes.count()) > 0) await closes.first().click();
+    await expect(pane.first()).toBeVisible();
+    return changed;
+  }
   await waitForPaneOrNav(pane, navButton);
   const visiblePane = pane.filter({ visible: true });
-  if ((await visiblePane.count()) > 0) {
-    // Facilities stays mounted behind the tools. Returning to the fleet means closing the
-    // sheets covering it, including pinned tools, before a caller tries its row actions.
-    if (
-      await visiblePane
-        .first()
-        .evaluate((element) => element.classList.contains("facilities"))
-    ) {
-      // A phone keeps a tool it switched away from mounted but hidden; only visible
-      // sheets cover the fleet.
-      const closes = pane
-        .page()
-        .locator(".gameToolHeader button[aria-label^='Close ']")
-        .filter({ visible: true });
-      while ((await closes.count()) > 0) await closes.first().click();
-    }
-    return false;
-  }
+  if ((await visiblePane.count()) > 0) return false;
   await navButton.filter({ visible: true }).first().click();
   await expect(visiblePane.first()).toBeVisible();
   return true;

@@ -17,8 +17,6 @@ async function openInsights(page: Page) {
   }
 }
 async function openBuildGenerators(page: Page) {
-  const fleet = page.locator(".facilities:visible");
-  await openPane(fleet, page.locator("#faciltiesNav"));
   await openBuild(page);
   await page.locator(".button-buildGenerator").click();
   await expect(page.locator(".buildOption").first()).toBeVisible();

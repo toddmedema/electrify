@@ -25,6 +25,7 @@ import {
 } from "../Types";
 import AudioContainer from "./base/AudioContainer";
 import GameWorkspace from "./base/GameWorkspace";
+import { rememberToolInput } from "./base/GameToolMemory";
 import { GAME_TOOLS, GameTool } from "./base/Navigation";
 import { restoreMenuFocus } from "./base/useMenuKeys";
 import DeferredSnackbar from "./base/DeferredSnackbar";
@@ -112,7 +113,7 @@ export const keyMap = {
   ...Object.fromEntries(
     GAME_TOOLS.map((tool) => [
       `TOOL_${tool.id}`,
-      TOOL_SHORTCUTS[tool.id].toLowerCase(),
+      TOOL_SHORTCUTS[tool.id].map((key) => key.toLowerCase()),
     ]),
   ),
   BUILD_GENERATOR: "g",
@@ -334,7 +335,8 @@ const tutorialCompletionSx = {
   "& .MuiDialogContent-root": { padding: "0 24px 24px" },
   "& .MuiDialogActions-root": {
     padding: "16px 24px",
-    flexWrap: "nowrap",
+    flexWrap: "wrap",
+    gap: "8px",
     borderTop: "1px solid var(--border-subtle)",
     "& .MuiButton-root": {
       minHeight: 40,
@@ -342,6 +344,8 @@ const tutorialCompletionSx = {
     },
     "@media (max-width: 599px)": {
       paddingBottom: "max(16px, env(safe-area-inset-bottom))",
+      "& .MuiButton-root": { flex: "1 1 auto", margin: 0 },
+      "& .MuiButton-contained": { flexBasis: "100%", order: 1 },
     },
   },
   "& .tutorialCompleteContent": {
@@ -356,6 +360,7 @@ const tutorialCompletionSx = {
 export default class Compositor extends React.Component<Props, {}> {
   private workspaceMemory = { run: -1, values: new Map<string, unknown>() };
   private removeShortcuts?: () => void;
+  private removeToolInput?: () => void;
   private resizeTimeout: ReturnType<typeof setTimeout> | undefined;
   private snackbarContentRef = React.createRef<HTMLDivElement>();
   private dialogCancelRef = React.createRef<HTMLButtonElement>();
@@ -387,6 +392,7 @@ export default class Compositor extends React.Component<Props, {}> {
   };
 
   public componentDidMount() {
+    this.removeToolInput = rememberToolInput(() => this.workspaceMemory.values);
     this.removeShortcuts = listenForShortcuts(keyMap, shortcutHandlers);
     window.addEventListener("resize", this.handleResize);
   }
@@ -413,6 +419,7 @@ export default class Compositor extends React.Component<Props, {}> {
   }
 
   public componentWillUnmount() {
+    this.removeToolInput?.();
     this.removeShortcuts?.();
     window.removeEventListener("resize", this.handleResize);
     clearTimeout(this.resizeTimeout);

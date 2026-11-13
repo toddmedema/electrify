@@ -73,7 +73,9 @@ it("keeps a disappeared offer visible and cancellable so its pause token can clo
       }),
     ),
   );
-  game.transmission!.lines[0].yearsToBuildLeft = 0;
+  game.transmission!.lines.find(
+    (line) => line.corridorId === "vt-champlain-valley",
+  )!.yearsToBuildLeft = 0;
   const quote = acquisitionQuote(game, "valley-electric")!;
   game.speed = "NORMAL";
   const store = configureStore({

@@ -370,6 +370,20 @@ export function summarizeTimelineByMonth(
       byMonth.set(month, summary);
     }
     accumulateTick(summary, t, startingYear, tickScale, campaignMeters);
+    // A boundary frame pays the preceding month's minimum. Its physical flows belong to its
+    // timestamp, but this closing payment and its cash effect belong to the month it closes.
+    for (const [closedMonth, expense] of Object.entries(
+      t.agreementClosingExpenses ?? {},
+    )) {
+      if (Number(closedMonth) === month) continue;
+      summary.expensesImports = (summary.expensesImports ?? 0) - expense;
+      const closed = byMonth.get(Number(closedMonth));
+      if (closed) {
+        closed.expensesImports = (closed.expensesImports ?? 0) + expense;
+        closed.cash -= expense;
+        closed.netWorth -= expense;
+      }
+    }
   }
   return [...byMonth.keys()]
     .sort((a, b) => a - b)

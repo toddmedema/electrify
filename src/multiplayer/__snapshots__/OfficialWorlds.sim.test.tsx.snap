@@ -2,8 +2,8 @@
 
 exports[`two real official companies keep their exact World state in scenario 110 1`] = `
 Object {
-  "final": "82add705e13f2d601566560ce6ac1fae064b0067421baa48ff391f4631b6c722",
-  "initial": "293ae5162a729022aca68a5400732eb8ce7b28abaef674bafb4f7790264fc5bb",
+  "final": "a5a0df19d8563484c4578c01bb533f0268d61ccd6c9671ac41da2fe558e5d603",
+  "initial": "0ceff2e5805c286ab93c057f38f51d697d2b1e38b40ba01441773f9897fe933f",
   "outcomes": Object {
     "0": Object {
       "month": 60,
@@ -21,8 +21,8 @@ Object {
 
 exports[`two real official companies keep their exact World state in scenario 111 1`] = `
 Object {
-  "final": "2f775c8b0e88c7b42ea6b0b65fee544aa25cf3264a1d2db8c7a508609a983aac",
-  "initial": "290911be3141adec699aca8d6ced014070b7e9b5782b0018b30271d8e0b065de",
+  "final": "cc13d80c02f50637853cb5dabed59cc5381da0e9411b81abe23ce9cae1862b43",
+  "initial": "37cb015eadd6de79cceeb407420173abc950eaf7cfbe74e09e5ca01feba1e3bd",
   "outcomes": Object {
     "0": Object {
       "month": 60,
@@ -40,8 +40,8 @@ Object {
 
 exports[`two real official companies keep their exact World state in scenario 113 1`] = `
 Object {
-  "final": "e21306e08c23fa9bc4547630235b1c13f9fbb6c30e2263dcb137ca885dfcd709",
-  "initial": "baa3829bc6055177dcc301a1fe1aebe1ae1502f463a3615c0f0d3167ab85f115",
+  "final": "b066d3f28ad7148993004d128f8949ce2e0fb1a1505781bfd31b398bf5e0636f",
+  "initial": "56a8eae9424052e34aa0b38d45ac91261c65dcc7cbe38fd2cf0871d03d615f3b",
   "outcomes": Object {
     "0": Object {
       "month": 84,

@@ -57,8 +57,12 @@ import {
 import { ThemeChoiceType } from "./Types";
 import { InstallPromptProvider } from "./components/base/InstallAppButton";
 import type { DesktopPowerState } from "./Desktop";
-import { applyTextSize } from "./TextSize";
-import { normalizeTvInset, tvDisplayScale, tvLayoutEnabled } from "./TvLayout";
+import { applyInterfaceScale } from "./InterfaceScale";
+import "./InterfaceLayout.scss";
+import {
+  ScreenEdgePaddingProvider,
+  screenEdgePaddingPixels,
+} from "./ScreenEdgePadding";
 import { getDesktop, isDesktopApp } from "./Desktop";
 
 const AchievementNotifications = lazy(
@@ -71,6 +75,10 @@ const MultiplayerRoot =
   process.env.REACT_APP_DESKTOP === "true"
     ? lazy(() => import("./multiplayer/Root"))
     : undefined;
+const CouchSettingsPrompt =
+  process.env.REACT_APP_DESKTOP === "true"
+    ? lazy(() => import("./components/base/CouchSettingsPrompt"))
+    : null;
 const DesktopInputHints =
   process.env.REACT_APP_DESKTOP === "true"
     ? lazy(() => import("./desktop/InputHints"))
@@ -143,28 +151,25 @@ export function ThemedApp(props: {
     (state) => state.settings.theme,
   );
   const settings = useAppSelector((state) => state.settings);
-  const { textSize, tvScale, tvInset } = settings;
-  const tvMode = tvLayoutEnabled(settings);
+  const { interfaceScale, screenEdgePadding } = settings;
   const [viewport, setViewport] = useState(() => ({
     width: window.innerWidth,
     height: window.innerHeight,
   }));
+  const edgePadding = screenEdgePaddingPixels(screenEdgePadding, viewport);
   useLayoutEffect(() => {
-    /** Apply shared text preferences once; native seat zoom already supplies TV magnification.
-     * Keeping seat display scale at one prevents multiplying the same presentation twice. */
+    // The explicit preference applies equally to the shell and seats. Native seat zoom
+    // remains independent; display resolution contributes no automatic multiplier.
     const apply = () => {
       const root = document.documentElement;
-      root.dataset.tvLayout = String(tvMode);
       root.style.setProperty(
-        "--tv-inset",
-        tvMode ? `${normalizeTvInset(tvInset)}vmin` : "0px",
+        "--screen-edge-inset",
+        `${screenEdgePaddingPixels(screenEdgePadding, {
+          width: window.innerWidth,
+          height: window.innerHeight,
+        })}px`,
       );
-      applyTextSize(
-        textSize,
-        tvMode && !window.electrifyCouch
-          ? tvDisplayScale(tvScale, window.innerHeight)
-          : 1,
-      );
+      applyInterfaceScale(interfaceScale);
     };
     apply();
     const resize = () => {
@@ -173,7 +178,7 @@ export function ThemedApp(props: {
     };
     window.addEventListener("resize", resize);
     return () => window.removeEventListener("resize", resize);
-  }, [textSize, tvMode, tvScale, tvInset]);
+  }, [interfaceScale, screenEdgePadding]);
   // "System" is a standing instruction rather than a value, and the system can change its mind
   // while the game is open - at sunset, on a schedule, or because the player just flipped it
   const [systemDark, setSystemDark] = useState(prefersDarkMode);
@@ -234,33 +239,41 @@ export function ThemedApp(props: {
 
   const theme = useMemo(
     () =>
-      tvMode
-        ? createTheme(createAppTheme(mode), {
-            components: {
-              MuiPopover: {
-                defaultProps: {
-                  marginThreshold: Math.ceil(
-                    (Math.min(viewport.width, viewport.height) *
-                      normalizeTvInset(tvInset)) /
-                      100,
-                  ),
-                },
-              },
-              MuiMenu: {
-                defaultProps: {
-                  marginThreshold: Math.ceil(
-                    (Math.min(viewport.width, viewport.height) *
-                      normalizeTvInset(tvInset)) /
-                      100,
-                  ),
-                },
-              },
+      createTheme(createAppTheme(mode), {
+        components: {
+          MuiPopover: {
+            defaultProps: {
+              marginThreshold: Math.max(16, edgePadding),
             },
-          })
-        : createAppTheme(mode),
-    [mode, tvMode, tvInset, viewport],
+          },
+          MuiMenu: {
+            defaultProps: {
+              marginThreshold: Math.max(16, edgePadding),
+            },
+          },
+          MuiPopper: {
+            defaultProps: {
+              modifiers: [
+                {
+                  name: "preventOverflow",
+                  options: { padding: Math.max(8, edgePadding) },
+                },
+                {
+                  name: "flip",
+                  options: { padding: Math.max(8, edgePadding) },
+                },
+              ],
+            },
+          },
+        },
+      }),
+    [mode, edgePadding],
   );
-  return <ThemeProvider theme={theme}>{props.children}</ThemeProvider>;
+  return (
+    <ScreenEdgePaddingProvider value={edgePadding}>
+      <ThemeProvider theme={theme}>{props.children}</ThemeProvider>
+    </ScreenEdgePaddingProvider>
+  );
 }
 
 /**
@@ -593,6 +606,11 @@ export default function App() {
               <div className="appFrameBody">
                 <CompositorContainer store={store} />
               </div>
+              {CouchSettingsPrompt && isDesktopApp() && (
+                <Suspense fallback={null}>
+                  <CouchSettingsPrompt />
+                </Suspense>
+              )}
               {DesktopInputHints && isDesktopApp() && (
                 <Suspense fallback={null}>
                   <DesktopInputHints />

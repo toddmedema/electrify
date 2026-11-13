@@ -1,6 +1,6 @@
 import { store } from "../Store";
 import { getPlayedScenarioIds } from "../LocalStorage";
-import { delta } from "../reducers/Game";
+import { tutorialCompleteDialog, delta } from "../reducers/Game";
 import { TUTORIALS } from "../data/Scenarios";
 import { UnknownAction } from "@reduxjs/toolkit";
 import { SCENARIOS } from "../data/Scenarios";
@@ -289,4 +289,26 @@ it("exiting an unfinished tutorial does not mark it complete", () => {
   mapDispatchToProps(store.dispatch).onTutorialEnd(TUTORIALS[0].tutorialSteps);
   expect(store.getState().game.inGame).toBe(false);
   expect(getPlayedScenarioIds()).not.toContain(TUTORIALS[0].id);
+});
+
+it.each(TUTORIALS)("keeps the completed $name setup playable", (scenario) => {
+  store.dispatch(
+    delta({
+      inGame: true,
+      scenarioId: scenario.id,
+      tutorialStep: scenario.tutorialSteps!.length,
+      speed: "PAUSED",
+    }),
+  );
+  store.dispatch(
+    tutorialCompleteDialog({ scenarioId: scenario.id, title: "Complete" }),
+  );
+  const before = store.getState().game;
+  const completion = store.getState().ui.dialog;
+  expect(completion.tertiaryLabel).toBe("Keep playing");
+  expect(completion.tertiaryAction).toEqual(expect.any(Function));
+  completion.tertiaryAction!({} as React.MouseEvent<HTMLElement>);
+  expect(store.getState().ui.dialog.open).toBe(false);
+  expect(store.getState().game).toEqual(before);
+  expect(store.getState().game.inGame).toBe(true);
 });

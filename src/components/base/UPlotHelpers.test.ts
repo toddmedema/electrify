@@ -4,6 +4,7 @@ import {
   baselinePlugin,
   eventBadgeText,
   eventMarkersPlugin,
+  expandedChartOptions,
   hoverPoints,
   spansBelow,
   splitPastProjected,
@@ -17,17 +18,17 @@ import {
   shortfallBarsPlugin,
   zeroLinePlugin,
 } from "./UPlotHelpers";
-import { applyTextSize } from "../../TextSize";
+import { applyInterfaceScale } from "../../InterfaceScale";
 import { chartPalette } from "../../Theme";
 
 it("enlarges canvas labels and their reserved chart space with the text preference", () => {
   const values = () => ["100MW"];
   try {
-    applyTextSize("standard");
+    applyInterfaceScale(1);
     const standardScale = chartScale(350);
     const standardAxis = xAxis(standardScale, { values });
     expect(chartFont()).toMatch(/^12px /);
-    applyTextSize("larger");
+    applyInterfaceScale(1.25);
     const largerScale = chartScale(350);
     expect(chartFont()).toMatch(/^15px /);
     expect(chartFont(2)).toMatch(/^30px /);
@@ -37,7 +38,145 @@ it("enlarges canvas labels and their reserved chart space with the text preferen
     );
     expect(yAxis(largerScale, { values, size: 60 }).size).toBe(75);
   } finally {
-    applyTextSize("standard");
+    applyInterfaceScale(1);
+  }
+});
+
+it.each([
+  [1, 1, 1],
+  [1.25, 2, 1],
+  [2.5, 2, 1.3],
+])(
+  "keeps multiline endpoint dates inside the canvas at scale %s, pixel ratio %s, inspection scale %s",
+  (scale, ratio, fontScale) => {
+    const originalRatio = uPlot.pxRatio;
+    try {
+      uPlot.pxRatio = ratio;
+      applyInterfaceScale(scale);
+      const topValues = () => ["2010", "2020"];
+      const options = expandedChartOptions(
+        {
+          width: 350,
+          height: 150,
+          padding: [0, 16, 0, 0],
+          axes: [
+            xAxis(scale, {
+              splits: [0, 1, 2],
+              values: () => ["Jan\n2020", "Jan\n2030", "Jan\n2040"],
+            }),
+            { scale: "x", side: 0, values: topValues },
+          ],
+          series: [{}, { width: 1 }],
+        },
+        fontScale,
+        fontScale > 1,
+      );
+      const fillText = jest.fn();
+      const ctx = {
+        save: jest.fn(),
+        restore: jest.fn(),
+        measureText: () => ({ width: 96 * ratio }),
+        fillText,
+      } as unknown as CanvasRenderingContext2D;
+      const plot = {
+        axes: options.axes,
+        ctx,
+        bbox: {
+          left: 60 * ratio,
+          top: 10 * ratio,
+          width: 274 * ratio,
+          height: 80 * ratio,
+        },
+        width: 350,
+        height: 150,
+        valToPos: (value: number) => (60 + value * 137) * ratio,
+      } as unknown as uPlot;
+      const labels = (options.axes![0].values as uPlot.Axis.DynamicValues)(
+        plot,
+        [0, 1, 2],
+        0,
+        0,
+        0,
+      );
+      expect(labels).toEqual([null, "Jan\n2030", null]);
+      // uPlot subtracts the measured axis reserve from the canvas before drawing labels.
+      const axisSize = (
+        options.axes![0].size as Exclude<uPlot.Axis.Size, number>
+      )(
+        plot,
+        labels.map((label) => (label == null ? "" : String(label))),
+        0,
+        1,
+      );
+      expect(
+        (options.axes![0].size as Exclude<uPlot.Axis.Size, number>)(
+          plot,
+          ["", ""],
+          0,
+          1,
+        ),
+      ).toBe(axisSize);
+      plot.bbox.height = (plot.height - 10 - axisSize) * ratio;
+      (options.plugins!.at(-1)!.hooks.drawAxes as (plot: uPlot) => void)(plot);
+      expect(fillText.mock.calls.map(([text]) => text)).toEqual([
+        "Jan",
+        "2020",
+        "Jan",
+        "2040",
+      ]);
+      const fontPx = Math.round(Math.round(12 * scale) * fontScale) * ratio;
+      expect(ctx.font).toMatch(new RegExp(`^${fontPx}px `));
+      expect(fillText.mock.calls[1][2] - fillText.mock.calls[0][2]).toBe(
+        fontPx * 1.5,
+      );
+      for (const [, x, y] of fillText.mock.calls) {
+        expect(x / ratio - 48).toBeGreaterThanOrEqual(0);
+        expect(x / ratio + 48).toBeLessThanOrEqual(plot.width);
+        expect(y).toBeGreaterThan(plot.bbox.top + plot.bbox.height);
+        expect(y + fontPx).toBeLessThanOrEqual(plot.height * ratio);
+      }
+      expect(options.padding![1]).toBe(16);
+      expect(options.axes![1].values).toBe(topValues);
+      expect(options.series[1].width).toBe(fontScale > 1 ? 2.5 : 1);
+    } finally {
+      uPlot.pxRatio = originalRatio;
+      applyInterfaceScale(1);
+    }
+  },
+);
+
+it("retains an ordinary axis's measured native tick, gap and edge reserve", () => {
+  const context = jest
+    .spyOn(HTMLCanvasElement.prototype, "getContext")
+    .mockReturnValue(null);
+  try {
+    const axis = yAxis(1, { values: () => ["100MW"] });
+    const options = expandedChartOptions(
+      {
+        width: 350,
+        height: 150,
+        axes: [axis],
+        series: [{}],
+      },
+      1,
+      false,
+    );
+    const plot = {} as uPlot;
+    const natural = (axis.size as Exclude<uPlot.Axis.Size, number>)(
+      plot,
+      ["100MW"],
+      0,
+      0,
+    );
+    const fitted = (options.axes![0].size as Exclude<uPlot.Axis.Size, number>)(
+      plot,
+      ["100MW"],
+      0,
+      0,
+    );
+    expect(fitted).toBe(natural);
+  } finally {
+    context.mockRestore();
   }
 });
 

@@ -1,3 +1,9 @@
+import {
+  shortfallIntervals,
+  shortfallHoverPlugin,
+  shortfallTooltip,
+  ShortfallInterval,
+} from "./ShortfallHover";
 import * as React from "react";
 import uPlot from "uplot";
 import UPlotChart, { BuildContext } from "./UPlotChart";
@@ -14,7 +20,7 @@ import {
   dayNightRibbonPlugin,
   formatClockTime,
 } from "./DayNightRibbon";
-import { getTextScale } from "../../TextSize";
+import { getInterfaceScale } from "../../InterfaceScale";
 import ChartLegend, { LegendItemType } from "./ChartLegend";
 import {
   anchoredForecastPaths,
@@ -93,6 +99,7 @@ interface State {
   dayNight: DayNightSegment[];
   location: LocationType;
   blackoutSpans: Array<[number, number]>;
+  shortfalls: ShortfallInterval[];
   currentMinute: number | null;
   minute: number;
   speed: SpeedType;
@@ -286,7 +293,8 @@ function buildOptions({
     width: 0, // set by UPlotChart
     height: 0,
     pxAlign: 1,
-    padding: [18 * scale, 16, 24 * getTextScale(), 0],
+    // Caption space follows the interface font, independently of plot width.
+    padding: [14 * getInterfaceScale(), 16, 24 * getInterfaceScale(), 0],
     cursor: {
       x: true,
       y: false,
@@ -298,7 +306,7 @@ function buildOptions({
       y: { range: () => getState().domain },
     },
     axes: [
-      xAxis(scale, {
+      xAxis(getInterfaceScale(), {
         size: 27,
         splits: () => getState().hourTicks,
         values: (_u, splits) => splits.map(formatMinuteOfDayChartAxis),
@@ -360,6 +368,7 @@ function buildOptions({
     plugins: [
       dayNightRibbonPlugin(getState),
       bandsPlugin(() => getState().blackoutSpans, chartPalette().blackout),
+      shortfallHoverPlugin(() => getState().shortfalls),
       baselinePlugin(chartPalette().axis),
       surplus.plugin,
       cache.plugin,
@@ -434,18 +443,24 @@ export function formatProductionTooltip(
     | "supply"
     | "totalDemand"
     | "startingYear"
-  > & { units?: UnitSystemType },
+  > & { units?: UnitSystemType; shortfalls?: ShortfallInterval[] },
+  minute = state.timeline[idx].minute,
 ): string {
   const d = state.timeline[idx];
-  const date = getDateFromMinute(d.minute, state.startingYear);
+  const date = getDateFromMinute(minute, state.startingYear);
   const time = formatClockTime(date.minuteOfDay);
   const weather = productionWeather(d, state.units ?? "metric");
   const loads: Array<[string, number | undefined]> = [
     ["Storage charging", storageChargingW(d)],
     ["Interties", d.exportedW],
   ];
+  const shortfall = shortfallTooltip(
+    state.timeline,
+    state.shortfalls || [],
+    minute,
+  );
   return [
-    time,
+    time + shortfall,
     `Total supply: ${formatWatts(state.supply[idx])}`,
     ...state.sources.map(
       (source, i) => `${source}: ${formatWatts(state.bySource[i][idx])}`,
@@ -456,9 +471,6 @@ export function formatProductionTooltip(
     ...loads
       .filter(([_label, value]) => value && value > 0)
       .map(([label, value]) => `${label}: ${formatWatts(value!)}`),
-    ...(d.demandW > d.supplyW
-      ? [`Blackout: ${formatWatts(d.demandW - d.supplyW)} unmet`]
-      : []),
     ...(weather.length ? ["", `Weather: ${weather.join(" · ")}`] : []),
   ].join("\n");
 }
@@ -601,6 +613,7 @@ const ChartSupplyDemand = (props: Props): React.JSX.Element => {
     dayNight,
     location,
     blackoutSpans: spansFromEdges(blackouts),
+    shortfalls: shortfallIntervals(timeline, spansFromEdges(blackouts)),
     currentMinute:
       currentMinute <= rangeMin || currentMinute >= rangeMax
         ? null

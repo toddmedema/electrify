@@ -14,7 +14,7 @@
 // ===============================================
 
 :root {
-  --control-size: 40px;
+  --control-size: 2.5rem;
   --font-family: "Inter", "Segoe UI", Arial, sans-serif;
   // One corner scale for the whole app. Chips, badges and inline marks take sm; buttons, inputs,
   // rows and cards take md (MUI's theme.shape.borderRadius); grouped lists, dialogs and sheets
@@ -24,12 +24,12 @@
   --radius-lg: 12px;
   --radius-pill: 999px;
   // The 4px spacing rhythm, exposed so sx props can share it with the Sass $space-* aliases
-  --space-1: 4px;
-  --space-2: 8px;
-  --space-3: 12px;
-  --space-4: 16px;
-  --space-5: 24px;
-  --space-6: 32px;
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
   // The Theme.tsx type ramp. Chart ticks and captions share --font-size-caption-sm.
   --font-size-caption-sm: 0.75rem; /* 12px */
   --font-size-caption: 0.8125rem; /* 13px */
@@ -381,6 +381,12 @@ button,
   outline-offset: 2px;
 }
 
+// These controls retain their outer ring even when controller focus uses a scaled offset.
+.gameActionDock .gameDockAction.MuiButton-root:focus-visible,
+.build-list-item.buildOption .buildOptionOutput[role="group"]:focus-visible {
+  outline-offset: 2px;
+}
+
 // Material inputs already draw their focus indicator on their border or underline. An outline
 // on the inner input adds a second, square border inside the rounded control.
 :is(.MuiOutlinedInput-root, .MuiInput-root, .MuiFilledInput-root)
@@ -408,17 +414,15 @@ html[data-touch-input="true"]:not([data-controller-input="true"])
   }
 }
 
-.keyboardMenu :focus-visible {
-  outline: 2px solid var(--focus-ring);
-  outline-offset: 2px;
-}
 .keyboardMenu .MuiTouchRipple-ripplePulsate {
   display: none;
 }
 // The home menu shares one selection between mouse, keyboard and controller. Touch has
 // transient press feedback instead: focus restored after navigation must not look selected.
-#centeredMenu
-  :is(.mainActions, .resourceActions, .discoveryActions)
+:is(
+    #centeredMenu :is(.mainActions, .resourceActions, .discoveryActions),
+    .couchSettingsPromptActions
+  )
   .MuiButton-root {
   // Selection changes immediately; cross-fading leaves the previous cursor painted.
   transition: none;
@@ -428,8 +432,10 @@ html[data-touch-input="true"]:not([data-controller-input="true"])
   }
 }
 html:is(:not([data-touch-input="true"]), [data-controller-input="true"])
-  #centeredMenu
-  :is(.mainActions, .resourceActions, .discoveryActions)
+  :is(
+    #centeredMenu :is(.mainActions, .resourceActions, .discoveryActions),
+    .couchSettingsPromptActions
+  )
   .MuiButton-root:focus {
   background-color: var(--interactive-blue);
   color: var(--interactive-contrast);
@@ -697,14 +703,18 @@ html:is(:not([data-touch-input="true"]), [data-controller-input="true"])
 }
 .achievementToast.MuiSnackbar-root {
   left: auto;
-  right: max(16px, env(safe-area-inset-right));
+  right: max(16px, var(--screen-edge-inset), env(safe-area-inset-right));
   // The measured tab bar already includes the safe area it pads for.
   --achievement-bottom: calc(
     16px +
-      max(var(--achievement-nav-clearance, 0px), env(safe-area-inset-bottom))
+      max(
+        var(--achievement-nav-clearance, 0px),
+        var(--screen-edge-inset),
+        env(safe-area-inset-bottom)
+      )
   );
   bottom: var(--achievement-bottom);
-  width: min(384px, calc(100vw - 32px));
+  width: min(384px, calc(100vw - 2 * max(16px, var(--screen-edge-inset))));
   max-width: none;
 }
 .achievementToastStack {
@@ -713,7 +723,11 @@ html:is(:not([data-touch-input="true"]), [data-controller-input="true"])
   gap: 8px;
   width: 100%;
   max-height: calc(
-    100dvh - var(--achievement-bottom) - max(16px, env(safe-area-inset-top))
+    100dvh - var(--achievement-bottom) - max(
+        16px,
+        var(--screen-edge-inset),
+        env(safe-area-inset-top)
+      )
   );
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -806,7 +820,9 @@ table,
 }
 
 .srOnly,
-.visuallyHidden {
+.visuallyHidden,
+.tutorialHudVisuallyHidden,
+.insightsCompact .insightsPresetEdited {
   position: absolute !important;
   width: 1px !important;
   height: 1px !important;
@@ -1074,6 +1090,34 @@ $topbar_height: 56px;
   display: grid;
   grid-template-rows: minmax(0, 1fr);
   grid-template-columns: minmax(0, 1fr);
+}
+
+.couchSettingsPrompt {
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px 16px;
+  padding: 12px 16px;
+  max-height: 40%;
+  overflow: auto;
+  box-sizing: border-box;
+  background: var(--bg-raised);
+  border-top: 1px solid var(--border-subtle);
+  color: var(--font-color-primary);
+  p {
+    flex: 0 1 36rem;
+    margin: 0;
+  }
+}
+.couchSettingsPromptActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  .MuiButton-root {
+    min-height: 44px;
+  }
 }
 
 .offlineBanner {
@@ -1927,7 +1971,7 @@ $pane_header_height: 48px;
   min-height: 60px;
   align-items: center;
   gap: 12px;
-  padding: 8px 0 8px 16px;
+  padding: 0.5rem 0 0.5rem 1rem;
   margin: 0 auto;
   border-bottom: $border_accent;
 }
@@ -1956,11 +2000,11 @@ $pane_header_height: 48px;
 .insightEventChip {
   display: inline-flex;
   min-width: 0;
-  min-height: 44px;
+  min-height: 2.75rem;
   max-width: calc(100cqw - 32px);
   align-items: center;
-  gap: 8px;
-  padding: 4px 8px;
+  gap: 0.5rem;
+  padding: 0.25rem 0.5rem;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   background: var(--bg-raised);
@@ -1985,9 +2029,9 @@ $pane_header_height: 48px;
 
 .insightEventNumber {
   display: inline-flex;
-  width: 20px;
-  height: 20px;
-  flex: 0 0 20px;
+  width: 1.25rem;
+  height: 1.25rem;
+  flex: 0 0 1.25rem;
   align-items: center;
   justify-content: center;
   border-radius: 50%;
@@ -2006,7 +2050,7 @@ $pane_header_height: 48px;
 .insightEventCopy {
   display: flex;
   min-width: 0;
-  max-width: 256px;
+  max-width: 16rem;
   flex-direction: column;
   align-items: flex-start;
   text-align: left;
@@ -2127,18 +2171,6 @@ $pane_header_height: 48px;
       width: 64px;
       height: var(--insights-control-size);
     }
-  }
-
-  .insightsPresetEdited {
-    position: absolute !important;
-    width: 1px !important;
-    height: 1px !important;
-    padding: 0 !important;
-    margin: -1px !important;
-    overflow: hidden !important;
-    clip: rect(0, 0, 0, 0) !important;
-    white-space: nowrap !important;
-    border: 0 !important;
   }
 
   .insightsPresetDialog {
@@ -2545,8 +2577,7 @@ $pane_header_height: 48px;
 
 // Insights keys share the heading's content edge. Keep each sample with its label,
 // with more space between series than within a pair, even when a dense key wraps.
-.insightsTrackBody,
-.expandedChartBody {
+:is(.insightsTrackBody, .expandedChartBody) {
   .chartLegend {
     gap: 8px 16px;
     padding: 0 16px 8px;
@@ -3511,7 +3542,7 @@ $pane_header_height: 48px;
   }
 
   .customSetupActions {
-    padding: 12px;
+    padding: 0.75rem;
     text-align: center;
   }
 
@@ -3851,7 +3882,7 @@ $pane_header_height: 48px;
     display: grid;
     // Add columns as space allows, retaining empty slots in incomplete rows.
     grid-template-columns: repeat(auto-fill, minmax(min(100%, 132px), 1fr));
-    gap: 12px 16px;
+    gap: 0.75rem 1rem;
     margin: 0;
   }
 
@@ -4122,9 +4153,9 @@ $pane_header_height: 48px;
   .eventLogItem {
     display: grid;
     grid-template-columns: 20px 1fr;
-    gap: 0 12px;
+    gap: 0 0.75rem;
     align-items: start;
-    padding: 12px 16px;
+    padding: 0.75rem 1rem;
     border: 0;
     border-top: 1px solid var(--border-subtle);
     border-radius: 0;
@@ -4174,7 +4205,7 @@ $pane_header_height: 48px;
 
   .eventLogCopy {
     display: grid;
-    gap: 4px;
+    gap: 0.25rem;
 
     > strong {
       line-height: 1.3;
@@ -4398,18 +4429,6 @@ $pane_header_height: 48px;
   line-height: 1.4;
 }
 
-// Spoken-only text, such as the step counter's "2 of 5" behind its visible "2/5"
-.tutorialHudVisuallyHidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  white-space: nowrap;
-  border: 0;
-}
-
 .tutorialHudBody {
   display: contents;
 }
@@ -4424,7 +4443,7 @@ $pane_header_height: 48px;
 .tutorialHudAction {
   display: flex;
   align-items: flex-start;
-  gap: 8px;
+  gap: 0.5rem;
   margin: 0;
   color: $font_color_primary;
   font-size: var(--font-size-subtitle);
@@ -4433,8 +4452,8 @@ $pane_header_height: 48px;
 
   svg {
     flex: none;
-    width: 20px;
-    height: 20px;
+    width: 1.25rem;
+    height: 1.25rem;
     color: $font_color_faded;
   }
 }
@@ -5332,11 +5351,6 @@ $homeSmokeCycle: 5.6s;
     min-height: 40px;
     touch-action: pan-y;
 
-    &:focus-visible {
-      outline: 2px solid var(--interactive-blue);
-      outline-offset: 2px;
-    }
-
     @media (pointer: coarse) {
       min-height: 44px;
     }
@@ -5429,7 +5443,7 @@ $homeSmokeCycle: 5.6s;
 .manual-popover.MuiPaper-root {
   display: flex;
   flex-direction: column;
-  width: min(420px, calc(100vw - 16px));
+  width: min(420px, calc(100vw - 2 * max(8px, var(--screen-edge-inset))));
   max-height: 50vh;
   overflow: hidden;
 }
@@ -5437,7 +5451,7 @@ $homeSmokeCycle: 5.6s;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: $space-2;
+  gap: 0.5rem;
   padding: $space-1 $space-2 $space-1 $space-4;
   border-bottom: 1px solid var(--border-subtle);
 
@@ -5640,7 +5654,7 @@ $homeSmokeCycle: 5.6s;
 }
 @media (pointer: coarse) {
   :root {
-    --control-size: 44px;
+    --control-size: 2.75rem;
   }
   .base_main .MuiToolbar-root.paneHeader,
   .base_main .MuiToolbar-root.insightsHeader {
@@ -5741,7 +5755,7 @@ $homeSmokeCycle: 5.6s;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  min-height: 40px;
+  min-height: 2.5rem;
   box-sizing: border-box;
   padding: 8px 16px;
   font-size: var(--font-size-body2);
@@ -5790,7 +5804,7 @@ $homeSmokeCycle: 5.6s;
   flex: 1;
   width: 100%;
   min-width: 0;
-  min-height: 64px;
+  min-height: 4rem;
   padding: 0;
   border: 0;
   background: transparent;
@@ -5817,7 +5831,11 @@ $homeSmokeCycle: 5.6s;
   padding-left: 8px;
 }
 .facilityRowIcon.MuiListItemAvatar-root {
-  min-width: 48px;
+  min-width: 3rem;
+  .MuiAvatar-root {
+    width: 2.5rem;
+    height: 2.5rem;
+  }
 }
 .facilityRowIcon .facilityIconIdle {
   // Only quiet the illustration; reserve levels and state labels stay legible. The ring keeps
@@ -5985,7 +6003,7 @@ $homeSmokeCycle: 5.6s;
   align-items: center;
   gap: 4px;
   align-self: stretch;
-  width: 72px;
+  width: 4.5rem;
   min-height: var(--control-size);
   margin: 0;
   padding: 12px 0 12px 4px;
@@ -6428,7 +6446,7 @@ $programs_column: 800px;
   flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;
-  gap: $space-2;
+  gap: 0.5rem;
   padding-top: $space-3;
   padding-bottom: max($space-3, env(safe-area-inset-bottom));
   border-top: $border_accent;
@@ -7456,17 +7474,6 @@ img[src$="/transmission.svg"] {
     white-space: normal;
     overflow-wrap: anywhere;
   }
-
-  .insights .MuiToolbar-root.insightsTrackHeader {
-    flex-flow: row nowrap !important;
-
-    > h3 {
-      min-width: 0;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-  }
 }
 
 @media #{$single_pane_media} {
@@ -7849,7 +7856,7 @@ img[src$="/transmission.svg"] {
   grid-template-areas:
     "heading heading"
     "map details";
-  gap: 12px 16px;
+  gap: 0.75rem 1rem;
   width: 100%;
   margin: 16px 0 8px;
 
@@ -7869,14 +7876,14 @@ img[src$="/transmission.svg"] {
 
 .locationPickerCount {
   display: block;
-  margin-top: 8px;
+  margin-top: 0.5rem;
   color: $font_color_faded;
 }
 
 .locationPickerSearchRow {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 0.5rem;
 
   .MuiAutocomplete-root {
     flex: 1;
@@ -7964,9 +7971,9 @@ img[src$="/transmission.svg"] {
 
     &:after {
       content: "";
-      width: 12px;
-      height: 12px;
-      border: 3px solid var(--bg-primary);
+      width: 0.75rem;
+      height: 0.75rem;
+      border: 0.1875rem solid var(--bg-primary);
       border-radius: 50%;
       background: $interactive_blue;
       box-shadow: 0 1px 3px var(--shadow-ring);
@@ -7991,8 +7998,8 @@ img[src$="/transmission.svg"] {
   right: 8px;
   bottom: 8px;
   display: flex;
-  gap: 2px;
-  padding: 2px;
+  gap: 0.125rem;
+  padding: 0.125rem;
   border: 1px solid var(--border-tile);
   border-radius: var(--radius-md);
   background: var(--bg-primary);
@@ -8625,6 +8632,70 @@ option {
       min-width: 0;
       min-height: 44px;
       white-space: nowrap;
+    }
+  }
+}
+
+.powerAgreementSummary {
+  display: block;
+  margin-top: 4px;
+  white-space: normal;
+}
+
+.powerAgreementTerms .buildDetails {
+  width: 100%;
+  table-layout: fixed;
+  th,
+  td {
+    padding: 8px;
+    overflow-wrap: normal;
+    font-variant-numeric: tabular-nums;
+  }
+  .buildDetailLabel {
+    width: 40%;
+  }
+  .buildDetailHelp {
+    display: none;
+  }
+}
+
+.powerAgreementDuration {
+  display: grid;
+  grid-template-columns: max-content minmax(80px, 1fr);
+  align-items: center;
+  gap: 12px;
+  min-height: 50px;
+  padding-inline: 16px;
+  margin-bottom: 8px;
+  > .MuiTypography-root {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    strong {
+      min-width: 7ch;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+  }
+}
+
+.powerAgreements {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-subtle);
+  overflow-wrap: anywhere;
+  .powerAgreement {
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border-subtle);
+    margin-bottom: 12px;
+    button {
+      min-height: 40px;
+      margin-top: 8px;
+    }
+  }
+  @media (pointer: coarse) {
+    .powerAgreement button {
+      min-height: 44px;
     }
   }
 }

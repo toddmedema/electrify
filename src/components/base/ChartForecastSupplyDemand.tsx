@@ -1,3 +1,9 @@
+import {
+  shortfallIntervals,
+  shortfallHoverPlugin,
+  shortfallTooltip,
+  ShortfallInterval,
+} from "./ShortfallHover";
 import * as React from "react";
 import uPlot from "uplot";
 import UPlotChart, { BuildContext } from "./UPlotChart";
@@ -47,6 +53,7 @@ interface State {
   timeline: TickPresentFutureType[];
   domain: Props["domain"];
   blackoutSpans: Array<[number, number]>;
+  shortfalls: ShortfallInterval[];
   startingYear: number;
   multiyear: boolean;
 }
@@ -110,18 +117,23 @@ function buildOptions(showXLabels: boolean) {
     ],
     plugins: [
       bandsPlugin(() => getState().blackoutSpans, chartPalette().blackout),
+      shortfallHoverPlugin(() => getState().shortfalls),
     ],
   });
 }
 
-function tooltip(idx: number, state: State): string {
+function tooltip(
+  idx: number,
+  state: State,
+  minute = state.timeline[idx].minute,
+): string {
   const d = state.timeline[idx];
-  const header = formatMinuteAsTooltipHeader(d.minute, state.startingYear);
+  const header = formatMinuteAsTooltipHeader(minute, state.startingYear);
   const reserve =
     d.reserveW === undefined
       ? ""
       : `\n${formatReserveLine(d.reserveW, "Reserve margin")}`;
-  return `${header}\nSupply: ${formatWatts(d.supplyW)}\nDemand: ${formatWatts(d.demandW)}${reserve}`;
+  return `${header}${shortfallTooltip(state.timeline, state.shortfalls, minute)}\nSupply: ${formatWatts(d.supplyW)}\nDemand: ${formatWatts(d.demandW)}${reserve}`;
 }
 
 // This is a pureComponent because its props should change much less frequently than it renders
@@ -164,6 +176,7 @@ export default class chartForecastSupplyDemand extends React.PureComponent<
       timeline,
       domain,
       blackoutSpans: spansFromEdges(blackouts),
+      shortfalls: shortfallIntervals(timeline, spansFromEdges(blackouts)),
       startingYear,
       multiyear,
     };

@@ -184,7 +184,7 @@ test("Mission 7 teaches limited two-way interties without trapping recovery", as
     exchange.getByRole("button", { name: "Expand Power exchange chart" }),
   ).toBeVisible();
   await expect(
-    exchange.getByRole("button", { name: "What is Interties?" }),
+    exchange.getByRole("button", { name: "What is Power exchange?" }),
   ).toBeVisible();
   await expect(
     exchange.getByText("How interties work", { exact: true }),
@@ -215,10 +215,12 @@ test("Mission 7 teaches limited two-way interties without trapping recovery", as
     path: testInfo.outputPath("interties-help.png"),
     animations: "disabled",
   });
-  await exchange.getByRole("button", { name: "What is Interties?" }).click();
+  await exchange
+    .getByRole("button", { name: "What is Power exchange?" })
+    .click();
   const help = page.getByRole("dialog", { name: "Manual help" });
   await expect(
-    help.getByRole("heading", { name: "Interties", exact: true }),
+    help.getByRole("heading", { name: "Power exchange", exact: true }),
   ).toBeVisible();
   await help.getByRole("button", { name: "close", exact: true }).click();
   await expect(help).toBeHidden();

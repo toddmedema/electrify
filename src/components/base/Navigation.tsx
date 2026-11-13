@@ -66,9 +66,11 @@ export function gameToolForCard(card: CardNameType): GameTool | undefined {
 export default function Navigation({
   openTools,
   onToggle,
+  destination,
 }: {
   openTools?: GameTool[];
   onToggle?: (tool: GameTool) => void;
+  destination?: (tool: GameTool) => CardNameType;
 }) {
   const dispatch = useAppDispatch();
   const controllerInput = useControllerInput();
@@ -115,7 +117,7 @@ export default function Navigation({
             title={
               fromTouch || controllerInput
                 ? tool.label
-                : `${tool.label} (${TOOL_SHORTCUTS[tool.id]})`
+                : `${tool.label} (${TOOL_SHORTCUTS[tool.id].join(", ")})`
             }
             placement="top"
             open={labelId === tool.triggerId}
@@ -130,7 +132,7 @@ export default function Navigation({
               className={`gameDockAction ${tool.id === "BUILD_GENERATORS" ? "button-buildFacility gameDockBuild" : ""}${open ? " gameDockActionOpen" : ""}`}
               aria-expanded={open}
               aria-label={tool.label}
-              aria-keyshortcuts={TOOL_SHORTCUTS[tool.id]}
+              aria-keyshortcuts={TOOL_SHORTCUTS[tool.id].join(" ")}
               aria-describedby={
                 tool.id === "EVENTS"
                   ? [
@@ -142,6 +144,7 @@ export default function Navigation({
                   : undefined
               }
               aria-controls={open ? `tool-${tool.id}` : undefined}
+              data-game-destination={destination?.(tool.id)}
               onClick={() =>
                 onToggle
                   ? onToggle(tool.id)

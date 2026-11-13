@@ -745,12 +745,6 @@ describe("the interties view", () => {
           buildCost: args[2] === 1 ? (north ? 2e6 : 1e6) : north ? 10e6 : 20e6,
         };
       });
-    const scroll = jest.fn(function (this: HTMLElement) {
-      // The effect must run after sorting has committed, on the same named card.
-      expect(screen.getAllByTestId(/^transmission-project-/)[1]).toBe(this);
-    });
-    const priorScroll = HTMLElement.prototype.scrollIntoView;
-    HTMLElement.prototype.scrollIntoView = scroll;
     try {
       const game = createGame({ scenarioId: 100 });
       game.transmission!.lines = [];
@@ -758,16 +752,34 @@ describe("the interties view", () => {
       renderProjects(game);
       fireEvent.change(screen.getByRole("slider"), { target: { value: 2 } });
       const north = screen.getByTestId("transmission-project-california-north");
+      const viewport = screen.getByRole("list");
+      viewport.style.overflowY = "auto";
+      Object.defineProperty(viewport, "clientHeight", { value: 100 });
+      jest.spyOn(viewport, "getBoundingClientRect").mockReturnValue({
+        top: 0,
+        bottom: 100,
+        left: 0,
+        right: 400,
+        width: 400,
+        height: 100,
+      } as DOMRect);
+      jest.spyOn(north, "getBoundingClientRect").mockImplementation(() => {
+        const index = screen
+          .getAllByTestId(/^transmission-project-/)
+          .indexOf(north);
+        const top = index * 160 - viewport.scrollTop;
+        return { top, bottom: top + 140 } as DOMRect;
+      });
       expect(screen.getAllByTestId(/^transmission-project-/)[0]).toBe(north);
+      expect(viewport.scrollTop).toBe(0);
       fireEvent.click(
         within(north).getByRole("button", { name: "Use max size" }),
       );
       expect(screen.getAllByTestId(/^transmission-project-/)[1]).toBe(north);
-      expect(scroll).toHaveBeenCalledTimes(1);
-      expect(scroll.mock.instances[0]).toBe(north);
+      expect(viewport.scrollTop).toBe(160);
     } finally {
       quotes.mockRestore();
-      HTMLElement.prototype.scrollIntoView = priorScroll;
+      jest.restoreAllMocks();
     }
   });
   it("uses the largest affordable tier and hides the shortcut when even tier one is too expensive", () => {
@@ -1269,7 +1281,9 @@ it.each([false, true])(
         }),
       ),
     );
-    game.transmission!.lines[0].yearsToBuildLeft = 0;
+    game.transmission!.lines.find(
+      (line) => line.corridorId === "vt-champlain-ridge",
+    )!.yearsToBuildLeft = 0;
     render(
       <Provider store={configureStore({ reducer: { ui: uiReducer } })}>
         <TransmissionPanel

@@ -499,7 +499,37 @@ export function intertieOfferLimits(
     exportLimitW: Math.min(rating, accessExportLimitW),
   };
 }
+/** A fixed-block product buys firm access, still inside the same physical source budget. */
+export function firmIntertieOfferLimits(
+  line: Pick<
+    TransmissionLineOperatingType,
+    "corridorId" | "capacityW" | "paused"
+  >,
+  context: IntertieContext,
+  minute: number,
+  conditions: TransmissionConditions,
+): Omit<IntertieOffer, "pricePerMWh"> {
+  const limits = intertieOfferLimits(line, context, minute, conditions);
+  const accessImportLimitW =
+    effectiveMarket(line.corridorId, context, line.capacityW)
+      ?.availableSupplyW ?? 0;
+  return {
+    ...limits,
+    accessImportLimitW,
+    importLimitW: Math.min(
+      transmissionRatingW(line, conditions),
+      accessImportLimitW,
+    ),
+  };
+}
+
+export interface IntertieReservation {
+  offer: IntertieOffer;
+  watts: number;
+}
 export interface IntertieOffer {
+  lineId?: string;
+  lineImportLimitW?: number;
   marketId?: string;
   marketImportLimitW?: number;
   marketExportLimitW?: number;
@@ -519,6 +549,7 @@ export function allocateIntertieFlows(
   offers: readonly IntertieOffer[],
   importedW: number,
   exportedW: number,
+  reserved: readonly IntertieReservation[] = [],
 ): { importedW: number[]; exportedW: number[] } {
   const imports = offers.map(() => 0);
   const exports = offers.map(() => 0);
@@ -527,12 +558,32 @@ export function allocateIntertieFlows(
   const exportUsed = new Map<string, number>();
   const accessImportsUsed = new Map<string, number>();
   const accessExportsUsed = new Map<string, number>();
+  const lineUsed = new Map<string, number>();
+  for (const { offer, watts } of reserved) {
+    if (offer.marketId)
+      importUsed.set(
+        offer.marketId,
+        (importUsed.get(offer.marketId) || 0) + watts,
+      );
+    if (offer.accessId)
+      accessImportsUsed.set(
+        offer.accessId,
+        (accessImportsUsed.get(offer.accessId) || 0) + watts,
+      );
+    if (offer.lineId)
+      lineUsed.set(offer.lineId, (lineUsed.get(offer.lineId) || 0) + watts);
+  }
   let remaining = importedW;
   for (const { offer, index } of indexed) {
     if (remaining <= 0) break;
     imports[index] = Math.min(
       remaining,
       Math.max(0, offer.importLimitW),
+      Math.max(
+        0,
+        (offer.lineImportLimitW ?? Infinity) -
+          (offer.lineId ? lineUsed.get(offer.lineId) || 0 : 0),
+      ),
       Math.max(
         0,
         (offer.accessImportLimitW ?? Infinity) -
@@ -550,6 +601,11 @@ export function allocateIntertieFlows(
         (importUsed.get(offer.marketId) || 0) + imports[index],
       );
     remaining -= imports[index];
+    if (offer.lineId)
+      lineUsed.set(
+        offer.lineId,
+        (lineUsed.get(offer.lineId) || 0) + imports[index],
+      );
     if (offer.accessId)
       accessImportsUsed.set(
         offer.accessId,
@@ -832,7 +888,10 @@ export function intertieUpgradeQuote(
   buildTimeMultiplier = 1,
   context?: IntertieAccessContext,
 ): IntertieUpgradeQuote | undefined {
-  if (context?.ownedUtilityCorridors?.includes(line.corridorId))
+  if (
+    effectiveCorridor(line.corridorId, context)?.buildCost === 0 ||
+    context?.ownedUtilityCorridors?.includes(line.corridorId)
+  )
     return undefined;
   const corridor = effectiveCorridor(line.corridorId, context);
   if (!corridor) return undefined;
@@ -875,6 +934,7 @@ export function intertieBuildQuote(
   | undefined {
   const corridor = effectiveCorridor(corridorId, context);
   if (
+    corridor?.buildCost === 0 ||
     !corridor ||
     !Number.isInteger(tier) ||
     tier < 1 ||

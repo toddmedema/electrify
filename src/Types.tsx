@@ -119,10 +119,73 @@ export interface IntertieUpgradeType {
   constructionKgco2eEmitted?: number;
 }
 
+export type PowerAgreementTermsVersion = 1 | 2 | 3;
+
+export interface PowerAgreementMonth {
+  month: number;
+  availableMWh: number;
+  usefulMWh: number;
+  /** Version 3 meters retain actual interval prices for monthly energy settlement. */
+  availableValue?: number;
+  usefulValue?: number;
+  payment: number;
+}
+
+export interface PowerAgreementAccount {
+  agreementId: string;
+  termsVersion: PowerAgreementTermsVersion;
+  accountingStartMinute: number;
+  accountedThroughMinute: number;
+  months: PowerAgreementMonth[];
+}
+
+export interface PowerAgreementSettlement {
+  agreementId: string;
+  availableMWh: number;
+  usefulMWh: number;
+  /** Version 3 meters retain actual interval prices for monthly energy settlement. */
+  availableValue?: number;
+  usefulValue?: number;
+  payment: number;
+}
+
+interface PowerAgreementReceiptDates {
+  blockId: string;
+  cycle: number;
+  acceptedMinute: number;
+  startMinute: number;
+  endMinute: number;
+}
+export type PowerAgreementReceipt = PowerAgreementReceiptDates &
+  (
+    | {
+        termsVersion: 1 | 2;
+        durationYears?: never;
+        signingMarketPricePerMWh?: never;
+        signingTemperatureC?: never;
+      }
+    | {
+        termsVersion: 3;
+        durationYears: number;
+        /** Undiscounted regional spot; the indexed ceiling starts at this signing price. */
+        signingMarketPricePerMWh: number;
+        /** Conditions needed to reproduce the seeded signing spot without old hourly weather. */
+        signingTemperatureC: number;
+      }
+  );
+export interface AcceptPowerAgreementAction {
+  blockId: string;
+  quoteKey: string;
+  durationYears?: number;
+}
+
 export interface TransmissionStateType {
   buyingRule: BuyingRuleType;
   sellingRule: SellingRuleType;
   lines: TransmissionLineOperatingType[];
+  acceptedAgreements?: PowerAgreementReceipt[];
+  inheritedAgreementTerms?: PowerAgreementTermsVersion;
+  agreementAccounts?: PowerAgreementAccount[];
 }
 
 // Deliberately open rather than a union of the places that happen to ship today: a custom game
@@ -377,6 +440,15 @@ export interface RawWeatherType {
 // All amounts are the average across the time window
 export type TickPresentFutureType = Partial<FuelPricesType> &
   HistoryForecastShared & {
+    /** Interval settlements, separate from physical imports. */
+    agreementAvailableMWh?: Record<string, number>;
+    agreementUsefulMWh?: Record<string, number>;
+    agreementPayments?: Record<string, number>;
+    agreementUsefulValues?: Record<string, number>;
+    /** This frame's payment for committed energy that was not imported. */
+    agreementUnusedExpenses?: number;
+    /** Closing minimum payments keyed by the elapsed month they settle. */
+    agreementClosingExpenses?: Record<string, number>;
     minute: number;
     supplyW: number; // Watts
     availableSupplyW?: number; // Supply plus unused fuel-burning generation capacity
@@ -1490,7 +1562,8 @@ export type ThemeModeType = "light" | "dark";
 // follow the OS rather than a palette of its own, and it can change while the game is open
 export type ThemeChoiceType = ThemeModeType | "system";
 
-export type TextSizeType = "standard" | "large" | "larger";
+export type WorkspaceType = "automatic" | "single";
+export type ScreenEdgePaddingType = 0 | 2 | 4;
 
 export interface SettingsType {
   audioEnabled?: boolean;
@@ -1502,12 +1575,12 @@ export interface SettingsType {
   steamTimelineEnabled?: boolean;
   units: UnitSystemType;
   theme: ThemeChoiceType;
-  // Device preference: old settings and saved fixtures use the standard size.
-  textSize?: TextSizeType;
-  // TV presentation belongs to this device, independently of saved campaigns.
-  tvMode?: boolean;
-  tvScale?: number;
-  tvInset?: number;
+  // Explicit device multiplier; absent in older fixtures means 100%.
+  interfaceScale?: number;
+  // Device workspace preference; Automatic adapts to the space remaining at this scale.
+  workspace?: WorkspaceType;
+  // Percent of the shorter screen edge, shared by the app frame and overlays.
+  screenEdgePadding?: ScreenEdgePaddingType;
 }
 
 export interface DialogType {

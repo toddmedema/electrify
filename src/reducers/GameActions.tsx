@@ -94,6 +94,9 @@ export const prepareStorageReorder = createAction("game/prepareStorageReorder");
 export const beginIntertieStress = createAction("game/beginIntertieStress");
 
 /** A dated acquisition quote, revalidated atomically at the host's tick boundary. */
+export const acceptPowerAgreement = createAction<
+  import("../Types").AcceptPowerAgreementAction
+>("game/acceptPowerAgreement");
 export const acquireUtility = createAction<
   import("../Types").AcquireUtilityAction
 >("game/acquireUtility");

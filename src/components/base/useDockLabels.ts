@@ -22,7 +22,19 @@ export default function useDockLabels() {
   const suppressClick = React.useRef(false);
 
   const clearTimer = () => clearTimeout(timer.current);
-  React.useEffect(() => () => clearTimeout(timer.current), []);
+  React.useEffect(() => {
+    // Pointer capture does not stop native pan-x. Once a hold becomes a preview,
+    // claim touch moves before the browser starts scrolling and sends pointercancel.
+    const dock = dockRef.current;
+    const holdPreview = (event: TouchEvent) => {
+      if (gesture.current?.preview) event.preventDefault();
+    };
+    dock?.addEventListener("touchmove", holdPreview, { passive: false });
+    return () => {
+      clearTimeout(timer.current);
+      dock?.removeEventListener("touchmove", holdPreview);
+    };
+  }, []);
 
   const labelAt = (x: number, y: number) => {
     const button = document

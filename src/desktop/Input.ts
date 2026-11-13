@@ -1,5 +1,4 @@
 import { revealControl } from "../components/base/RevealControl";
-import { isTvLayout } from "../TvLayout";
 import type { AppStore } from "../Store";
 import type {
   DesktopBridge,
@@ -8,6 +7,7 @@ import type {
   DesktopInputFrame,
 } from "../Desktop";
 import type { MenuCue } from "../audio/MenuFeedback";
+import type { CardNameType } from "../Types";
 import { setSpeed } from "../reducers/Game";
 import { navigate } from "../reducers/Card";
 import {
@@ -172,31 +172,28 @@ export function startDesktopInput(
     const buttons = controls().filter((button) =>
       button.matches(".gameActionDock button"),
     );
+    const card = store.getState().card.name;
     const active =
       document.activeElement?.closest<HTMLElement>("[data-game-tool]")?.dataset
-        .gameTool ??
-      (isTvLayout()
-        ? document.querySelector<HTMLElement>(".gameToolPanel:not([hidden])")
-            ?.dataset.gameTool
-        : undefined);
+        .gameTool ?? (card.startsWith("BUILD_") ? "BUILD_GENERATORS" : card);
     const opened = buttons.findIndex(
       (button) => button.getAttribute("aria-controls") === `tool-${active}`,
     );
-    const current = active ? opened + 1 : 0;
+    const current = opened + 1;
     const next = (current + delta + buttons.length + 1) % (buttons.length + 1);
     if (next === 0) {
       store.dispatch(navigate("FACILITIES"));
-      const fleet = document.querySelector<HTMLElement>(
-        ".base_main:not([inert]) .gameFleet",
-      );
-      if (fleet && !isTvLayout()) visibleControls(fleet)[0]?.focus();
     } else {
       const button = buttons[next - 1];
       const panelId = button.getAttribute("aria-controls");
       if (!panelId) button.click();
-      const id = panelId ?? button.getAttribute("aria-controls");
-      const panel = id ? document.getElementById(id) : null;
-      if (panel && !isTvLayout()) visibleControls(panel)[0]?.focus();
+      else
+        store.dispatch(
+          navigate(
+            (button.dataset.gameDestination ??
+              panelId.slice("tool-".length)) as CardNameType,
+          ),
+        );
     }
   };
   const chart = (delta: number) => {
@@ -206,7 +203,7 @@ export function startDesktopInput(
     if (!charts.length) {
       if (
         document.querySelector(
-          '.gameStage[data-layout="sheet"] .gameToolPanel:not([hidden])',
+          '.gameStage[data-layout="single"] .gameToolPanel:not([hidden])',
         )
       ) {
         store.dispatch(navigate("FACILITIES"));
@@ -389,7 +386,6 @@ export function startDesktopInput(
     "[role=dialog],[role=menu],[role=listbox],.MuiModal-root,.base_main,.gameWorkspace";
   const observer = new MutationObserver((mutations) => {
     if (
-      isTvLayout() &&
       getInputPresentation().active &&
       mutations.some(
         (mutation) =>
@@ -421,7 +417,7 @@ export function startDesktopInput(
     attributes: true,
     attributeFilter: ["aria-hidden", "hidden", "inert"],
   });
-  // TV text, disclosure and chart layout can settle after focus moves. Keep that actual
+  // Text, disclosure and chart layout can settle after focus moves. Keep that actual
   // control exposed as its ancestors resize, without changing focus or a remembered scroll.
   let revealFrame: number | undefined;
   function scheduleReveal() {
@@ -430,7 +426,6 @@ export function startDesktopInput(
       revealFrame = undefined;
       const target = document.activeElement;
       if (
-        isTvLayout() &&
         getInputPresentation().active &&
         target instanceof HTMLElement &&
         inputScope().contains(target)
@@ -445,7 +440,7 @@ export function startDesktopInput(
   const trackFocus = () => {
     revealObserver?.disconnect();
     const target = document.activeElement;
-    if (!isTvLayout() || !(target instanceof HTMLElement)) return;
+    if (!(target instanceof HTMLElement)) return;
     for (
       let element: HTMLElement | null = target;
       element;
@@ -454,21 +449,45 @@ export function startDesktopInput(
       revealObserver?.observe(element);
   };
   document.addEventListener("focusin", trackFocus);
-  const pointer = (event: Event) => {
-    if (!event.isTrusted) return;
-    // The hints own an explicit help action. Keep its trigger mounted through activation.
-    if (
-      event.target instanceof Element &&
-      event.target.closest(".controllerHints")
-    )
-      return;
+  let pointerPending = false;
+  let pointerHandoff: number | undefined;
+  const clearPointer = () => {
+    pointerPending = false;
+    window.clearTimeout(pointerHandoff);
+    pointerHandoff = undefined;
+  };
+  const handoff = () => {
+    clearPointer();
     choosingTextOption = null;
     delete document.documentElement.dataset.controllerInput;
     present({ active: false });
   };
+  const inHints = (event: Event) =>
+    event.target instanceof Element &&
+    !!event.target.closest(".controllerHints");
+  const pointer = (event: Event) => {
+    if (!event.isTrusted) return;
+    // The hints own an explicit help action. Keep its trigger mounted through activation.
+    clearPointer();
+    if (inHints(event)) return;
+    choosingTextOption = null;
+    delete document.documentElement.dataset.controllerInput;
+    // The footer participates in layout. Removing it on pointer-down moves the
+    // pressed control before pointer-up, so preserve it until the click is dispatched.
+    pointerPending = true;
+  };
+  const pointerUp = (event: Event) => {
+    if (!event.isTrusted || !pointerPending) return;
+    // A drag or release outside the control may not produce a click. Its fallback
+    // runs after the browser's click synthesis, never between pointer-up and click.
+    pointerHandoff = window.setTimeout(handoff, 0);
+  };
+  const pointerCancel = (event: Event) => {
+    if (event.isTrusted && pointerPending) handoff();
+  };
   const keyboard = (event: KeyboardEvent) => {
     if (!event.isTrusted) return;
-    pointer(event);
+    if (!inHints(event)) handoff();
     if (
       !overlay(inputScope()) &&
       gameplay() &&
@@ -480,6 +499,7 @@ export function startDesktopInput(
       releasePause();
   };
   const click = (event: MouseEvent) => {
+    if (event.isTrusted && pointerPending) handoff();
     if (
       event.isTrusted &&
       (event.target as HTMLElement)?.closest(".speedToggles button")
@@ -487,11 +507,14 @@ export function startDesktopInput(
       releasePause();
   };
   document.addEventListener("pointerdown", pointer, true);
+  document.addEventListener("pointerup", pointerUp, true);
+  document.addEventListener("pointercancel", pointerCancel, true);
   document.addEventListener("keydown", keyboard, true);
   document.addEventListener("click", click, true);
   sync();
   return () => {
     live = false;
+    clearPointer();
     if (chartFrame !== undefined) cancelAnimationFrame(chartFrame);
     observer.disconnect();
     revealObserver?.disconnect();
@@ -502,6 +525,8 @@ export function startDesktopInput(
     stopQuit();
     stopStore();
     document.removeEventListener("pointerdown", pointer, true);
+    document.removeEventListener("pointerup", pointerUp, true);
+    document.removeEventListener("pointercancel", pointerCancel, true);
     document.removeEventListener("keydown", keyboard, true);
     document.removeEventListener("click", click, true);
     delete document.documentElement.dataset.controllerInput;

@@ -73,6 +73,12 @@ export function expansionBalanceActions(
   const prepared = fixture.portfolio !== "unprepared";
   // Cash buyers save through 2013 so the company purchase preserves a generation down payment.
   const purchaseMonth = fixture.financed ? 96 : 108;
+  // Fund Valley's equity purchase before adding wind; the planned peaker arrives early
+  // enough to bridge the expanded load while that wind is under construction.
+  const cashValleyMixed =
+    fixture.targetId === "valley-electric" &&
+    fixture.portfolio === "mixed" &&
+    !fixture.financed;
   if (prepared)
     actions.push(
       {
@@ -81,7 +87,7 @@ export function expansionBalanceActions(
         build: { name: "Natural Gas CC", peakW: 100e6, financed: true },
       },
       {
-        month: 60,
+        month: cashValleyMixed ? 120 : 60,
         type: "build",
         build: {
           name: fixture.portfolio === "mixed" ? "Wind" : "Natural Gas CC",
@@ -117,7 +123,7 @@ export function expansionBalanceActions(
     if (prepared)
       actions.push(
         {
-          month: fixture.financed ? purchaseMonth : 84,
+          month: fixture.financed ? purchaseMonth : cashValleyMixed ? 72 : 84,
           type: "build",
           build: {
             name: fixture.financed ? "Natural Gas CC" : "Natural Gas Peaker",

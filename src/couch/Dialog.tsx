@@ -14,15 +14,24 @@ export default function CouchDialog({
   useLayoutEffect(() => {
     const legend = root?.querySelector<HTMLElement>(".couchControlsLegend");
     if (!root || !legend || !props.open) return;
-    const measure = () =>
-      root.style.setProperty(
-        "--couch-controls-height",
-        `${Math.ceil(legend.getBoundingClientRect().height)}px`,
-      );
+    let frame: number | undefined;
+    const measure = () => {
+      frame = undefined;
+      const height = `${Math.ceil(legend.getBoundingClientRect().height)}px`;
+      if (root.style.getPropertyValue("--couch-controls-height") !== height)
+        root.style.setProperty("--couch-controls-height", height);
+    };
     measure();
-    const observer = new ResizeObserver(measure);
+    // The legend is inside the dialog whose allocation this changes. Write on
+    // the next frame so an ancestor resize cannot re-enter the same delivery.
+    const observer = new ResizeObserver(() => {
+      if (frame === undefined) frame = requestAnimationFrame(measure);
+    });
     observer.observe(legend);
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      if (frame !== undefined) cancelAnimationFrame(frame);
+    };
   }, [root, props.open]);
   const paper = root?.querySelector<HTMLElement>('[role="dialog"]');
   return (

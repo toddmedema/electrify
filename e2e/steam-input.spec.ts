@@ -1,6 +1,6 @@
 import { expect, test, Page, Locator, TestInfo } from "./fixtures";
 import path from "node:path";
-import { waitForDesktopTvEntry } from "./menu-keyboard";
+import { waitForDesktopInput } from "./menu-keyboard";
 import { foregroundContrast } from "./contrast";
 import { decodeSave } from "../src/SaveEncoding";
 import type { SaveGameType } from "../src/Types";
@@ -68,10 +68,10 @@ async function select(
   await expect(control).toBeVisible();
   await expect(control).toBeEnabled();
   const group = control.locator("..");
-  if (
+  const roving =
     (await control.getAttribute("tabindex")) === "-1" &&
-    ["group", "tablist"].includes((await group.getAttribute("role")) ?? "")
-  ) {
+    ["group", "tablist"].includes((await group.getAttribute("role")) ?? "");
+  if (roving) {
     // Roving groups expose one vertical tab stop. Enter it before moving within
     // the group, just as a player does with the D-pad.
     const entry = group.locator('button[tabindex="0"]');
@@ -88,53 +88,6 @@ async function select(
       (await group.getAttribute("aria-orientation")) === "vertical";
     action = vertical ? (forward ? "down" : "up") : forward ? "right" : "left";
   }
-  if ((await page.locator("html").getAttribute("data-tv-layout")) === "true") {
-    const visited = new Map<string, number>();
-    for (let attempt = 0; attempt < limit; attempt++) {
-      if (
-        await control.evaluate((element) => element === document.activeElement)
-      )
-        return;
-      const movement = await control.evaluate((element) => {
-        const target = element.getBoundingClientRect();
-        const active = document.activeElement as HTMLElement | null;
-        if (!active || active === document.body)
-          return { direction: "down", key: "body" };
-        const from = active.getBoundingClientRect();
-        const sameRow =
-          Math.min(from.bottom, target.bottom) >
-          Math.max(from.top, target.top) +
-            Math.min(from.height, target.height) / 2;
-        const horizontal =
-          sameRow &&
-          !active.matches(
-            'input[type="range"],select,[role="combobox"],.accessibleChart > [role="img"]',
-          );
-        return {
-          direction: horizontal
-            ? target.left > from.left
-              ? "right"
-              : "left"
-            : target.top > from.top
-              ? "down"
-              : "up",
-          key: `${active.tagName}/${active.id}/${active.getAttribute("aria-label")}/${active.textContent?.slice(0, 50)}/${active.parentElement?.textContent?.slice(0, 60)}`,
-        };
-      });
-      const count = visited.get(movement.key) ?? 0;
-      visited.set(movement.key, count + 1);
-      const direction =
-        count < 2
-          ? movement.direction
-          : ["down", "right", "up", "left"][count % 4];
-      await input(page, direction as InputAction);
-    }
-    await expect(
-      control,
-      "reachable through the visible TV rows",
-    ).toBeFocused();
-    return;
-  }
   const popupSurfaces = () =>
     page
       .locator('[role="dialog"],[role="menu"],[role="listbox"]')
@@ -147,29 +100,80 @@ async function select(
         })),
       );
   const expectedSurfaces = await popupSurfaces();
-  for (let index = 0; index < limit; index++) {
+  const visited = new Map<string, number>();
+  for (let attempt = 0; attempt < limit; attempt++) {
     if (await control.evaluate((element) => element === document.activeElement))
       return;
     expect(
-      expectedSurfaces,
-      "directional focus traversal must not open an unexpected popup",
-    ).toEqual(expect.arrayContaining(await popupSurfaces()));
+      await popupSurfaces(),
+      "directional focus traversal must not open or dismiss a popup",
+    ).toEqual(expectedSurfaces);
     expect(
       await control.count(),
       "the target must remain available during navigation",
     ).toBe(1);
-    await input(page, action);
+    const movement = await control.evaluate((element) => {
+      const target = element.getBoundingClientRect();
+      const active = document.activeElement as HTMLElement | null;
+      if (!active || active === document.body)
+        return { direction: "down", key: "body" };
+      if (
+        active.matches(".worldMapMarker") &&
+        !element.matches(".worldMapMarker")
+      ) {
+        // Every arrow belongs to map geography. Back returns to its zoom controls
+        // before the player can navigate to another form control.
+        return { direction: "back", key: "map" };
+      }
+      const from = active.getBoundingClientRect();
+      const sameRow =
+        Math.min(from.bottom, target.bottom) >
+        Math.max(from.top, target.top) +
+          Math.min(from.height, target.height) / 2;
+      const horizontal =
+        sameRow &&
+        !active.matches(
+          'input[type="range"],select,[role="combobox"],.accessibleChart > [role="img"]',
+        );
+      return {
+        direction: horizontal
+          ? target.left > from.left
+            ? "right"
+            : "left"
+          : target.top > from.top
+            ? "down"
+            : "up",
+        key: `${active.tagName}/${active.id}/${active.getAttribute("aria-label")}/${active.textContent?.slice(0, 50)}/${active.parentElement?.textContent?.slice(0, 60)}`,
+      };
+    });
+    const count = visited.get(movement.key) ?? 0;
+    visited.set(movement.key, count + 1);
+    const direction =
+      count < 2
+        ? roving
+          ? action
+          : movement.direction
+        : ["down", "right", "up", "left"][count % 4];
+    await input(page, direction as InputAction);
   }
   await expect(
     control,
-    "reachable with semantic controller navigation",
+    "reachable through the rendered control positions",
   ).toBeFocused();
 }
 
-test.beforeEach(async ({ page }) => {
-  await page.addInitScript((glyphs) => {
+test.beforeEach(async ({ page }, info) => {
+  const showPrompt = info.title.startsWith("TV first launch");
+  const setup = {
+    glyphs,
+    showPrompt,
+    connected: !showPrompt || info.title.includes("connected-controller"),
+  };
+  await page.addInitScript((setup) => {
+    const { glyphs, showPrompt, connected } = setup;
     if (sessionStorage.getItem("mockKeepPreferencesOnReload") !== "true")
       localStorage.clear();
+    if (!showPrompt) localStorage.setItem("couchPromptShown", "true");
     // Keep game hazards independent of retries, wall time and worker scheduling.
     Math.random = () => 0.25;
     localStorage.setItem("audioEnabled", "false");
@@ -188,7 +192,7 @@ test.beforeEach(async ({ page }) => {
       resolutions: [{ width: 1280, height: 800 }],
     };
     const frame = {
-      connected: true,
+      connected,
       actions: [],
       glyphs,
     };
@@ -314,7 +318,7 @@ test.beforeEach(async ({ page }) => {
         });
       },
     };
-  }, glyphs);
+  }, setup);
 });
 
 test("desktop home buttons share a width and Escape returns from menu pages", async ({
@@ -322,7 +326,7 @@ test("desktop home buttons share a width and Escape returns from menu pages", as
 }, testInfo) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/");
-  await waitForDesktopTvEntry(page);
+  await waitForDesktopInput(page);
   const play = page.getByRole("button", { name: "Play", exact: true });
   await expect(play).toBeVisible();
   await expect(
@@ -377,14 +381,12 @@ test("menu movement under a stationary pointer preserves keyboard navigation", a
     exact: true,
   });
   const manual = page.getByRole("button", { name: "Manual", exact: true });
-  const tv = await waitForDesktopTvEntry(page);
+  await waitForDesktopInput(page);
   await friends.hover();
   await expect(friends).toBeFocused();
   await play.focus();
   await page.keyboard.press("ArrowDown");
   await expect(friends).toBeFocused();
-  await page.keyboard.press("ArrowDown");
-  await expect(tv).toBeFocused();
   await page.keyboard.press("ArrowDown");
   await expect(manual).toBeFocused();
 
@@ -416,8 +418,6 @@ test("menu movement under a stationary pointer preserves keyboard navigation", a
   });
   await expect(friends).toHaveAttribute("data-pointer-boundary", "returned");
   await expect(manual).toBeFocused();
-  await page.keyboard.press("ArrowUp");
-  await expect(tv).toBeFocused();
   await page.keyboard.press("ArrowUp");
   await expect(friends).toBeFocused();
 
@@ -481,10 +481,12 @@ test("controller text entry searches the manual, cancels and restores field focu
   await expect(search).not.toBeFocused();
 });
 
-test("semantic actions play, build, adjust pricing, inspect charts and save at Larger text size", async ({
+test("semantic actions play, build, adjust pricing, inspect charts and save at 125% interface scale", async ({
   page,
 }, testInfo) => {
-  await page.addInitScript(() => localStorage.setItem("textSize", "larger"));
+  await page.addInitScript(() =>
+    localStorage.setItem("interfaceScale", "1.25"),
+  );
   await page.goto("/");
   await expect(page.locator("html")).toHaveAttribute(
     "data-mock-input-context",
@@ -567,6 +569,14 @@ test("semantic actions play, build, adjust pricing, inspect charts and save at L
 
   // From the fleet the pane ring reaches Build, then Programs at every viewport width.
   await input(page, "nextPane");
+  for (const category of ["Storage", "Interties"]) {
+    await page.getByRole("tab", { name: category, exact: true }).click();
+    await input(page, "nextPane");
+    await input(page, "previousPane");
+    await expect(
+      page.getByRole("tab", { name: category, exact: true }),
+    ).toHaveAttribute("aria-selected", "true");
+  }
   await input(page, "nextPane");
   const programs = page.getByRole("region", { name: "Programs", exact: true });
   await expect(programs).toBeVisible();
@@ -786,7 +796,7 @@ test("controller chooses an autocomplete city and starts a custom game", async (
   expect(save.game.location.name).toBe("Paris, France");
 });
 
-test("controller changes text size, keeps settings reachable and persists it", async ({
+test("controller changes interface scale, keeps settings reachable and persists it", async ({
   page,
 }, testInfo) => {
   await page.goto("/");
@@ -799,16 +809,15 @@ test("controller changes text size, keeps settings reachable and persists it", a
     page.getByRole("button", { name: "Settings", exact: true }),
   );
   await input(page, "confirm");
-  const larger = page.getByRole("button", { name: "Larger", exact: true });
-  await select(
-    page,
-    page.getByRole("button", { name: "Standard", exact: true }),
-  );
+  const scale = page.getByRole("combobox", {
+    name: "Interface scale",
+    exact: true,
+  });
+  await select(page, scale);
   await input(page, "right");
   await input(page, "right");
-  await expect(larger).toBeFocused();
-  await input(page, "confirm");
-  await expect(larger).toHaveAttribute("aria-pressed", "true");
+  await expect(scale).toBeFocused();
+  await expect(scale).toHaveValue("1.25");
   await expect(page.locator("html")).toHaveCSS("font-size", "20px");
   await expect(page.getByText(/F11 or Alt\+Enter/)).toHaveCount(0);
   await expect(
@@ -836,10 +845,10 @@ test("controller changes text size, keeps settings reachable and persists it", a
     page.getByRole("button", { name: "Settings", exact: true }),
   );
   await input(page, "confirm");
-  await expect(larger).toHaveAttribute("aria-pressed", "true");
-  expect(await page.evaluate(() => localStorage.getItem("textSize"))).toBe(
-    "larger",
-  );
+  await expect(scale).toHaveValue("1.25");
+  expect(
+    await page.evaluate(() => localStorage.getItem("interfaceScale")),
+  ).toBe("1.25");
 });
 
 test("controller opens Workshop and enters a multiplayer invite with Steam text entry", async ({
@@ -986,7 +995,9 @@ test("controller reviews, cancels and confirms a utility acquisition", async ({
   await expect(dialog).toHaveCount(0);
   // Fixture advances only construction; the acquisition still uses its real owning action.
   await editSavedGame(page, ({ game }) => {
-    game.transmission!.lines[0].yearsToBuildLeft = 0;
+    game.transmission!.lines.find(
+      (line) => line.corridorId === "vt-champlain-ridge",
+    )!.yearsToBuildLeft = 0;
     for (const tick of game.timeline) tick.cash = 1e9;
   });
   await page.goto("/");
@@ -995,9 +1006,9 @@ test("controller reviews, cancels and confirms a utility acquisition", async ({
     page.getByRole("button", { name: "Continue", exact: true }),
   );
   await input(page, "confirm");
-  const line = page
-    .locator(".facilities:visible .transmissionLine")
-    .filter({ hasText: "Ridge Electric" });
+  const line = page.locator(
+    '.facilities:visible .transmissionLine[data-corridor-id="vt-champlain-ridge"]',
+  );
   await select(page, line.getByRole("button", { name: /^Inspect / }));
   await input(page, "confirm");
   const acquire = line.getByRole("button", {
@@ -1017,7 +1028,7 @@ test("controller reviews, cancels and confirms a utility acquisition", async ({
   );
   await input(page, "confirm");
   await expect(dialog).toHaveCount(0);
-  await expect(line).toContainText("Owned · Ridge Electric");
+  await expect(line).toContainText("Ridge expansion connection · Owned");
   const saved = await readSavedGame(page);
   expect(
     saved?.utilityExpansion?.acquisitions.some(
@@ -1026,25 +1037,24 @@ test("controller reviews, cancels and confirms a utility acquisition", async ({
   ).toBe(true);
 });
 
-test("TV layout keeps gameplay and controls readable with explicit device setup", async ({
+test("TV couch settings keep gameplay and controls readable with explicit device setup", async ({
   page,
 }, info) => {
   await tvJourney(page, info, false);
 });
-test("TV maximum scale, Larger text and screen inset keep focused controls clear", async ({
+test("TV maximum interface scale and screen-edge padding keep focused controls clear", async ({
   page,
 }, info) => {
   await tvJourney(page, info, true);
 });
 
-test("TV controller help accepts pointer and physical keyboard activation", async ({
+test("controller help accepts pointer and physical keyboard activation without a layout preference", async ({
   page,
-}, info) => {
-  skipNonTv(info);
-  await setupTv(
-    page,
-    false,
-    info.project.use.colorScheme === "dark" ? "dark" : "light",
+}) => {
+  await page.goto("/");
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-mock-input-context",
+    "Menu",
   );
   const help = page.getByRole("button", { name: "All controls", exact: true });
   const dialog = page.getByRole("dialog", {
@@ -1070,30 +1080,38 @@ test("TV controller help accepts pointer and physical keyboard activation", asyn
 async function setupTv(page: Page, maximum: boolean, theme: "light" | "dark") {
   await page.emulateMedia({ colorScheme: theme });
   await page.goto("/");
-  await expect(page.locator("html")).toHaveAttribute("data-tv-layout", "false");
-  const tv = page.getByRole("button", {
-    name: "Playing on a TV? Use TV layout",
-  });
-  await select(page, tv);
+  await waitForDesktopInput(page);
+  await select(
+    page,
+    page.getByRole("button", { name: "Settings", exact: true }),
+  );
   await input(page, "confirm");
-  await expect(page.locator("html")).toHaveAttribute("data-tv-layout", "true");
+  await page
+    .getByRole("combobox", { name: "Interface scale", exact: true })
+    .selectOption(maximum ? "2.5" : "1.5");
+  await select(
+    page,
+    page.getByRole("button", { name: "Single tool", exact: true }),
+  );
+  await input(page, "confirm");
   if (maximum) {
     await select(
       page,
-      page.getByRole("button", { name: "Settings", exact: true }),
-    );
-    await input(page, "confirm");
-    await select(page, page.getByRole("button", { name: "200%", exact: true }));
-    await input(page, "confirm");
-    await select(
-      page,
-      page.getByRole("button", { name: "Larger", exact: true }),
+      page.getByRole("button", { name: "Advanced display", exact: true }),
     );
     await input(page, "confirm");
     await select(page, page.getByRole("button", { name: "4%", exact: true }));
     await input(page, "confirm");
-    await input(page, "back");
   }
+  if (process.env.REVIEW_SCREENSHOT_DIR)
+    await page.screenshot({
+      path: path.join(
+        process.env.REVIEW_SCREENSHOT_DIR,
+        `couch-settings-${theme}-${maximum ? "maximum" : "standard"}.png`,
+      ),
+      animations: "disabled",
+    });
+  await input(page, "back");
 }
 
 function skipNonTv(info: TestInfo) {
@@ -1160,17 +1178,23 @@ test("TV saved preferences style direct scenario links before play", async ({
   await page.goto("/?scenario=116");
   const start = page.getByRole("button", { name: "Start game", exact: true });
   await expect(start).toBeVisible();
-  await expect(page.locator("html")).toHaveAttribute("data-tv-layout", "true");
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-interface-scale",
+    "2.5",
+  );
   const edge = await page.locator(".appFrame").evaluate((element) => ({
     actual: parseFloat(getComputedStyle(element).paddingTop),
-    expected: Math.min(innerWidth, innerHeight) * 0.04,
+    expected: Math.ceil(Math.min(innerWidth, innerHeight) * 0.04),
   }));
   expect(
     edge.actual,
     "TV geometry must be loaded on the first direct-link screen",
   ).toBeCloseTo(edge.expected, 1);
   await start.press("Enter");
-  await expect(page.locator(".gameStage")).toHaveAttribute("data-layout", "tv");
+  await expect(page.locator(".gameStage")).toHaveAttribute(
+    "data-layout",
+    "single",
+  );
   await expect(page.locator("#appbar:visible")).toBeVisible();
   const warning = page.locator(".missionSummary.statusWarning");
   await expect(warning).toBeVisible();
@@ -1206,19 +1230,38 @@ test("TV saved preferences style direct scenario links before play", async ({
   await expect(
     help.getByRole("button", { name: "close", exact: true }),
   ).toBeVisible();
+  // Visibility precedes the end of the popover's opening scale transition.
+  await help.evaluate(async (element) => {
+    await Promise.all(
+      element.getAnimations().map((animation) => animation.finished),
+    );
+  });
   const helpBounds = await help.boundingBox();
+  const articleWidth = await help.evaluate(() =>
+    Math.min(
+      40 * parseFloat(getComputedStyle(document.documentElement).fontSize),
+      innerWidth,
+    ),
+  );
   expect(
     helpBounds!.width,
-    "TV help uses a readable article width",
-  ).toBeGreaterThan(page.viewportSize()!.width / 2);
+    "help uses the chosen scale's article width within the screen inset",
+  ).toBeGreaterThan(
+    Math.min(articleWidth, page.viewportSize()!.width - 2 * edge.actual) * 0.9,
+  );
+  expect(helpBounds!.width).toBeLessThanOrEqual(articleWidth + 1);
   expect(
     helpBounds!.y,
     "help stays inside the screen inset",
   ).toBeGreaterThanOrEqual(edge.actual);
+  const footer = page.locator(".controllerHints:visible");
+  const bottomLimit = (await footer.count())
+    ? (await footer.boundingBox())!.y
+    : page.viewportSize()!.height - edge.actual;
   expect(
     helpBounds!.y + helpBounds!.height,
-    "help clears the controller footer",
-  ).toBeLessThan(page.viewportSize()!.height - edge.actual - 80);
+    "help clears the visible controller footer or screen inset",
+  ).toBeLessThanOrEqual(bottomLimit + 1);
   await help.getByRole("button", { name: "close", exact: true }).click();
 });
 
@@ -1313,7 +1356,9 @@ test("TV maximum custom setup gives location and select values enough room", asy
       countLines:
         count.getBoundingClientRect().height /
         parseFloat(countStyle.lineHeight),
-      widthShare: element.getBoundingClientRect().width / innerWidth,
+      widthShare:
+        element.getBoundingClientRect().width /
+        element.closest(".coopFieldset")!.getBoundingClientRect().width,
     };
   });
   expect(
@@ -1334,7 +1379,7 @@ test("TV maximum custom setup gives location and select values enough room", asy
   ).toBeLessThanOrEqual(1.1);
   expect(
     geometry.widthShare,
-    "custom setup must use the shared TV reading width",
+    "custom setup must use the shared reading column at the chosen scale",
   ).toBeGreaterThan(0.8);
   await input(page);
   await captureTvPage(page, info, "custom");
@@ -1399,7 +1444,7 @@ async function tvJourney(page: Page, testInfo: TestInfo, maximum: boolean) {
     await expect(page.locator("#appbar:visible")).toBeVisible();
     await expect(page.locator(".gameStage")).toHaveAttribute(
       "data-layout",
-      "tv",
+      "single",
     );
     const capture = async (view: string) => {
       await expect(page.locator(".base_main")).toHaveCount(1);
@@ -1511,6 +1556,35 @@ async function tvJourney(page: Page, testInfo: TestInfo, maximum: boolean) {
     });
     await select(page, gridChart);
     await input(page, "confirm");
+    await expect
+      .poll(
+        () =>
+          gridChart.locator(".u-over").evaluate((plot) => {
+            const rect = plot.getBoundingClientRect();
+            let top = rect.top,
+              bottom = rect.bottom;
+            for (
+              let parent = plot.parentElement;
+              parent;
+              parent = parent.parentElement
+            ) {
+              if (getComputedStyle(parent).overflowY !== "visible") {
+                const bounds = parent.getBoundingClientRect();
+                top = Math.max(top, bounds.top);
+                bottom = Math.min(bottom, bounds.bottom);
+              }
+            }
+            return (
+              (bottom - top) /
+              parseFloat(getComputedStyle(document.documentElement).fontSize)
+            );
+          }),
+        {
+          message:
+            "focused Build forecast exposes at least three lines of plotted data",
+        },
+      )
+      .toBeGreaterThanOrEqual(3);
     await capture("build-forecast");
     await input(page, "back");
     await select(page, gridContext);
@@ -1637,7 +1711,6 @@ async function tvJourney(page: Page, testInfo: TestInfo, maximum: boolean) {
         const control = bounds(".insightsViewportButtons button");
         const title = bounds(".insightEventTitle");
         const eventDate = bounds(".insightEventDate");
-        const legend = bounds(".insightsTrack .chartLegend");
         const chart = bounds(".insightsTrack .accessibleChart > [role=img]");
         return {
           dateControlAlignment: Math.abs(
@@ -1645,7 +1718,6 @@ async function tvJourney(page: Page, testInfo: TestInfo, maximum: boolean) {
           ),
           controlOverflow: control.bottom - buttons.bottom,
           eventLineGap: eventDate.top - title.bottom,
-          legendChartGap: chart.top - legend.bottom,
           chartBottom: chart.bottom,
           paneBottom: view.closest(".gameToolBody")!.getBoundingClientRect()
             .bottom,
@@ -1666,10 +1738,6 @@ async function tvJourney(page: Page, testInfo: TestInfo, maximum: boolean) {
       insightRows.eventLineGap,
       "event title and date have separate readable lines",
     ).toBeGreaterThanOrEqual(insightRows.textScale / 8);
-    expect(
-      insightRows.legendChartGap,
-      "the focused chart clears its legend",
-    ).toBeGreaterThanOrEqual(insightRows.textScale / 4);
     if (!maximum)
       expect(
         insightRows.chartBottom,
@@ -1680,6 +1748,39 @@ async function tvJourney(page: Page, testInfo: TestInfo, maximum: boolean) {
       .locator('.accessibleChart > [role="img"][tabindex="0"]:visible')
       .first();
     await select(page, chart);
+    await expect(chart).toBeFocused();
+    const legendClearance = await chart.evaluate((element) => {
+      const legend = element
+        .closest(".insightsTrack")!
+        .querySelector(".chartLegend")!;
+      const contentBoxes = Array.from(legend.children)
+        .filter((child) => child.textContent?.trim())
+        .flatMap((child) => Array.from(child.getClientRects()))
+        .filter((bounds) => bounds.width > 0 && bounds.height > 0);
+      const contentBottom = Math.max(
+        ...contentBoxes.map((bounds) => bounds.bottom),
+      );
+      const style = getComputedStyle(element);
+      return {
+        contentLines: contentBoxes.length,
+        gap: element.getBoundingClientRect().top - contentBottom,
+        outlineStyle: style.outlineStyle,
+        outlineWidth: parseFloat(style.outlineWidth),
+        outlineOffset: parseFloat(style.outlineOffset),
+      };
+    });
+    expect(legendClearance.contentLines).toBeGreaterThan(0);
+    expect(Number.isFinite(legendClearance.gap)).toBe(true);
+    expect(legendClearance.outlineStyle).not.toBe("none");
+    expect(legendClearance.outlineWidth).toBeGreaterThan(0);
+    expect(
+      legendClearance.gap,
+      "legend content clears the focused chart's visible outline",
+    ).toBeGreaterThanOrEqual(
+      legendClearance.outlineWidth +
+        Math.max(legendClearance.outlineOffset, 0) +
+        1,
+    );
     await input(page, "confirm");
     await input(page, "right");
     await expect(
@@ -1827,8 +1928,101 @@ async function tvJourney(page: Page, testInfo: TestInfo, maximum: boolean) {
   }
 }
 
-for (const source of ["big-picture", "remote-play-tv"] as const) {
-  test(`TV first launch suggests ${source} and remembers the player's choice`, async ({
+test("TV first launch shares one focus selection with keyboard and controller", async ({
+  page,
+}, info) => {
+  test.skip(!["tv-1080-light", "tv-1080-dark"].includes(info.project.name));
+  await page.addInitScript(() =>
+    sessionStorage.setItem(
+      "mockSteamPresentation",
+      JSON.stringify({ bigPicture: true }),
+    ),
+  );
+  await page.goto("/");
+  await waitForDesktopInput(page);
+  const prompt = page.getByRole("complementary", {
+    name: "Couch settings suggestion",
+    exact: true,
+  });
+  const play = page.getByRole("button", { name: "Play", exact: true });
+  const accept = prompt.getByRole("button", {
+    name: "Use couch settings",
+    exact: true,
+  });
+  const dismiss = prompt.getByRole("button", { name: "Dismiss", exact: true });
+  const transparent = "rgba(0, 0, 0, 0)";
+  await expect(prompt).toBeVisible();
+  await expect(play).toBeFocused();
+  await expect(accept).not.toBeFocused();
+  await expect(dismiss).not.toBeFocused();
+  await expect(accept).toHaveCSS("background-color", transparent);
+  await expect(dismiss).toHaveCSS("background-color", transparent);
+  await expect(accept).toHaveCSS(
+    "color",
+    await dismiss.evaluate((element) => getComputedStyle(element).color),
+  );
+  const selectedFill = await play.evaluate(
+    (element) => getComputedStyle(element).backgroundColor,
+  );
+  expect(selectedFill).not.toBe(transparent);
+  for (const device of ["keyboard", "controller"] as const) {
+    const direction = async (action: "up" | "down" | "left" | "right") => {
+      if (device === "keyboard")
+        await page.keyboard.press(
+          `Arrow${action[0].toUpperCase()}${action.slice(1)}`,
+        );
+      else await input(page, action);
+    };
+    const reach = async (target: Locator, action: "up" | "down") => {
+      for (let attempt = 0; attempt < 20; attempt++) {
+        if (
+          await target.evaluate((element) => document.activeElement === element)
+        )
+          break;
+        await direction(action);
+      }
+      await expect(
+        target,
+        `${device} arrows reach the rendered action`,
+      ).toBeFocused();
+    };
+    const oneSelection = async () => {
+      expect(
+        await page
+          .locator("#centeredMenu button, .couchSettingsPrompt button")
+          .evaluateAll(
+            (buttons, fill) =>
+              buttons.filter(
+                (button) => getComputedStyle(button).backgroundColor === fill,
+              ).length,
+            selectedFill,
+          ),
+      ).toBe(1);
+    };
+    await reach(accept, "down");
+    await expect(accept).toHaveCSS("background-color", selectedFill);
+    await expect(dismiss).toHaveCSS("background-color", transparent);
+    await oneSelection();
+    await direction("right");
+    await expect(dismiss).toBeFocused();
+    await expect(dismiss).toHaveCSS("background-color", selectedFill);
+    await expect(accept).toHaveCSS("background-color", transparent);
+    await oneSelection();
+    await direction("left");
+    await expect(accept).toBeFocused();
+    await reach(play, "up");
+    await expect(accept).toHaveCSS("background-color", transparent);
+    await expect(dismiss).toHaveCSS("background-color", transparent);
+  }
+});
+
+for (const source of [
+  "big-picture",
+  "remote-play-tv",
+  "connected-controller",
+  "steam-deck",
+] as const) {
+  test(`TV first launch offers nonblocking couch settings for ${source} once`, async ({
     page,
   }, info) => {
     test.skip(info.project.name !== "tv-1080-dark");
@@ -1836,82 +2030,94 @@ for (const source of ["big-picture", "remote-play-tv"] as const) {
       sessionStorage.setItem(
         "mockSteamPresentation",
         JSON.stringify({
-          bigPicture: source === "big-picture",
+          bigPicture: source === "big-picture" || source === "steam-deck",
           remotePlayTv: source === "remote-play-tv",
-          steamDeck: false,
+          steamDeck: source === "steam-deck",
         }),
       );
     }, source);
     await page.goto("/");
-    const suggestion = page.getByRole("dialog", { name: "Playing on a TV?" });
-    await expect(suggestion).toBeVisible();
-    await expect(page.locator("#appStartup")).toHaveCount(0);
+    await waitForDesktopInput(page);
+    const prompt = page.getByRole("complementary", {
+      name: "Couch settings suggestion",
+      exact: true,
+    });
+    const play = page.getByRole("button", { name: "Play", exact: true });
+    await expect(prompt).toBeVisible();
+    await expect(play).toBeFocused();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
     await expect(page.locator("html")).toHaveAttribute(
-      "data-mock-input-context",
-      "Menu",
+      "data-interface-scale",
+      "1",
     );
+    expect(
+      await page.evaluate(() => localStorage.getItem("couchPromptShown")),
+    ).toBe("true");
+    await input(page, "down");
     await expect(
-      suggestion.getByRole("button", { name: "Use TV layout", exact: true }),
-    ).toBeFocused();
+      page.getByRole("complementary", {
+        name: "Controller controls",
+        exact: true,
+      }),
+    ).toBeVisible();
+    const geometry = await prompt.evaluate((element) => {
+      const prompt = element.getBoundingClientRect();
+      const body = document
+        .querySelector(".appFrameBody")!
+        .getBoundingClientRect();
+      const hints = document
+        .querySelector(".controllerHints")
+        ?.getBoundingClientRect();
+      return {
+        promptTop: prompt.top,
+        promptBottom: prompt.bottom,
+        bodyBottom: body.bottom,
+        hintsTop: hints?.top,
+        viewport: innerHeight,
+      };
+    });
+    expect(geometry.promptTop).toBeGreaterThanOrEqual(geometry.bodyBottom - 1);
+    expect(geometry.promptBottom).toBeLessThanOrEqual(
+      geometry.hintsTop ?? geometry.viewport,
+    );
+    if (process.env.REVIEW_SCREENSHOT_DIR && source === "big-picture")
+      await page.screenshot({
+        path: path.join(
+          process.env.REVIEW_SCREENSHOT_DIR,
+          "couch-prompt-1080-dark.png",
+        ),
+        animations: "disabled",
+      });
+    const accept = source === "big-picture" || source === "steam-deck";
+    await select(
+      page,
+      prompt.getByRole("button", {
+        name: accept ? "Use couch settings" : "Dismiss",
+        exact: true,
+      }),
+    );
+    await input(page, "confirm");
+    await expect(prompt).toHaveCount(0);
+    await expect(play).toBeFocused();
     await expect(page.locator("html")).toHaveAttribute(
-      "data-tv-layout",
-      "false",
+      "data-interface-scale",
+      accept ? "1.5" : "1",
     );
-    const useTv = source === "big-picture";
-    if (useTv) await input(page, "confirm");
-    else
-      await suggestion
-        .getByRole("button", { name: "Keep desktop layout", exact: true })
-        .press("Enter");
-    await expect(suggestion).not.toBeVisible();
-    await expect(page.locator("html")).toHaveAttribute(
-      "data-tv-layout",
-      String(useTv),
+    expect(await page.evaluate(() => localStorage.getItem("workspace"))).toBe(
+      accept ? "single" : "automatic",
     );
-    expect(await page.evaluate(() => localStorage.getItem("tvMode"))).toBe(
-      String(useTv),
-    );
-    // Retain the actual device storage instead of resetting this fresh-page fixture.
+    expect(
+      await page.evaluate(() => localStorage.getItem("screenEdgePadding")),
+    ).toBe("0");
     await page.evaluate(() =>
       sessionStorage.setItem("mockKeepPreferencesOnReload", "true"),
     );
     await page.reload();
-    await waitForDesktopTvEntry(page);
-    await expect(suggestion).toHaveCount(0);
+    await waitForDesktopInput(page);
+    await expect(prompt).toHaveCount(0);
     await expect(page.locator("html")).toHaveAttribute(
-      "data-tv-layout",
-      String(useTv),
+      "data-interface-scale",
+      accept ? "1.5" : "1",
     );
   });
 }
-
-test("TV first launch leaves handheld Steam Deck layout unchanged in Big Picture", async ({
-  page,
-}, info) => {
-  test.skip(info.project.name !== "deck-800-dark");
-  await page.addInitScript(() => {
-    sessionStorage.setItem(
-      "mockSteamPresentation",
-      JSON.stringify({
-        bigPicture: true,
-        steamDeck: true,
-        remotePlayTv: false,
-      }),
-    );
-  });
-  await page.goto("/");
-  await waitForDesktopTvEntry(page);
-  await expect(
-    page.getByRole("dialog", { name: "Playing on a TV?" }),
-  ).toHaveCount(0);
-  await expect(page.locator("html")).toHaveAttribute("data-tv-layout", "false");
-  expect(await page.evaluate(() => localStorage.getItem("tvMode"))).toBeNull();
-  // Handheld protection does not prevent a player explicitly choosing TV for a dock.
-  await page
-    .getByRole("button", {
-      name: "Playing on a TV? Use TV layout",
-      exact: true,
-    })
-    .press("Enter");
-  await expect(page.locator("html")).toHaveAttribute("data-tv-layout", "true");
-});

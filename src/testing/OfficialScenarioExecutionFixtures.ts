@@ -1,3 +1,5 @@
+import { powerAgreementQuote } from "../helpers/PowerAgreements";
+import { acceptPowerAgreement } from "../reducers/GameActions";
 import cloneDeep from "lodash.clonedeep";
 import type { UnknownAction } from "@reduxjs/toolkit";
 import { TICK_MINUTES } from "../Constants";
@@ -87,6 +89,17 @@ function applyScheduled(
   action: ScheduledSimActionType,
 ): GameType {
   switch (action.type) {
+    case "agreement": {
+      const quote = powerAgreementQuote(game, action.blockId);
+      if (!quote) throw new Error(`Unavailable agreement: ${action.blockId}`);
+      return officialCommand(
+        game,
+        acceptPowerAgreement({
+          blockId: action.blockId,
+          quoteKey: quote.quoteKey,
+        }),
+      );
+    }
     case "acquire": {
       const quote = acquisitionQuote(game, action.targetId);
       if (!quote) throw new Error(`Unavailable utility: ${action.targetId}`);

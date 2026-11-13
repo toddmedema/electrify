@@ -65,6 +65,48 @@ for (const theme of ["light", "dark"] as const) {
       /^Forecast shortfalls start \d{4}: about .* of demand unmet, about .* peak$/,
     );
     await expect.poll(() => shortfallCapPixels(chart)).toBeGreaterThan(0);
+    await chart.scrollIntoViewIfNeeded();
+    const over = chart.locator(".u-over");
+    // Find an actual marked month without assuming a seeded scenario's peak or plot width.
+    const shortfallX = await over.evaluate((element) => {
+      const bounds = element.getBoundingClientRect();
+      for (let x = 1; x < bounds.width; x++) {
+        element.dispatchEvent(
+          new MouseEvent("mousemove", {
+            bubbles: true,
+            clientX: bounds.left + x,
+            clientY: bounds.top + bounds.height * 0.9,
+          }),
+        );
+        const highlight = element.querySelector<HTMLElement>(
+          ".chartShortfallHighlight",
+        );
+        if (highlight && !highlight.hidden) return x;
+      }
+      return undefined;
+    });
+    expect(shortfallX).toBeDefined();
+    const bounds = (await over.boundingBox())!;
+    const highlight = chart.locator(".chartShortfallHighlight");
+    let previousBounds: {
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+    } | null = null;
+    for (const height of [0.05, 0.95]) {
+      await page.mouse.move(
+        bounds.x + shortfallX!,
+        bounds.y + bounds.height * height,
+      );
+      await expect(highlight).toBeVisible();
+      const highlighted = (await highlight.boundingBox())!;
+      expect(highlighted.height).toBeLessThanOrEqual(bounds.height);
+      if (previousBounds) expect(highlighted).toEqual(previousBounds);
+      previousBounds = highlighted;
+      await expect(chart.locator(".chartTooltip")).toContainText("avg unmet");
+      await expect(chart.locator(".chartTooltip")).toContainText("peak");
+    }
     for (const container of [insights, track, track.locator(".chartLegend")]) {
       expect(
         await container.evaluate(

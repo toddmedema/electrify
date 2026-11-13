@@ -9,7 +9,7 @@ import { ChartPresentationContext } from "./ChartPresentationContext";
 import { ChartViewportContext } from "./ChartViewportContext";
 import { ChartAxisAlignment } from "./ChartAxisAlignment";
 import { setThemeMode } from "../../Theme";
-import { applyTextSize } from "../../TextSize";
+import { applyInterfaceScale } from "../../InterfaceScale";
 import TutorialHud from "./TutorialHud";
 
 jest.mock("uplot", () => {
@@ -51,10 +51,13 @@ describe("UPlotChart resizing", () => {
     jest.useFakeTimers();
     jest.clearAllMocks();
     resetInputPresentation();
-    (uPlot as unknown as jest.Mock).mockImplementation(() =>
-      Object.assign(Object.create(uPlotPrototype), {
-        over: document.createElement("div"),
-      }),
+    (uPlot as unknown as jest.Mock).mockImplementation(
+      (_options: uPlot.Options, data: uPlot.AlignedData) =>
+        Object.assign(Object.create(uPlotPrototype), {
+          over: document.createElement("div"),
+          data,
+          posToVal: jest.fn((position: number) => position),
+        }),
     );
     width = 400;
     setThemeMode("light");
@@ -90,9 +93,8 @@ describe("UPlotChart resizing", () => {
 
   afterEach(() => {
     act(() => {
-      delete document.documentElement.dataset.tvLayout;
       resetInputPresentation();
-      applyTextSize("standard");
+      applyInterfaceScale(1);
     });
     jest.restoreAllMocks();
     jest.useRealTimers();
@@ -162,6 +164,9 @@ describe("UPlotChart resizing", () => {
   });
 
   it("refreshes the visible tooltip through setCursor after a retained numeric edit without pointer movement", () => {
+    const label = jest.fn(
+      (_index: number, state: { value: number }) => `Output ${state.value}`,
+    );
     const options = ({
       registerDataUpdate,
     }: BuildContext<{ value: number }>): uPlot.Options => {
@@ -179,7 +184,7 @@ describe("UPlotChart resizing", () => {
           [value, value],
         ]}
         buildOptions={options}
-        tooltip={(_index, state) => `Output ${state.value}`}
+        tooltip={label}
       />
     );
     const view = render(ui(1));
@@ -198,6 +203,7 @@ describe("UPlotChart resizing", () => {
         [1, 1],
       ]);
     plot.cursor = { idx: 0, left: 0, top: 0 };
+    plot.posToVal = jest.fn(() => 0.25);
     plot.setCursor = jest.fn((position: { left: number; top: number }) => {
       plot.cursor = { ...position, idx: 0 };
       const cursor = tooltip.hooks!.setCursor;
@@ -209,6 +215,7 @@ describe("UPlotChart resizing", () => {
     expect(plot.setData).not.toHaveBeenCalled();
     expect(plot.cursor).toEqual({ idx: 0, left: 0, top: 0 });
     expect(screen.getByText("Output 1.4", { exact: true })).toBeVisible();
+    expect(label).toHaveBeenLastCalledWith(0, { value: 1.4 }, 0.25);
   });
 
   it("keeps solar context visible after the supply and load breakdown", () => {
@@ -423,7 +430,7 @@ describe("UPlotChart resizing", () => {
       />,
     );
     expect(uPlot).toHaveBeenCalledTimes(1);
-    act(() => applyTextSize("larger"));
+    act(() => applyInterfaceScale(1.25));
     expect(uPlotPrototype.destroy).toHaveBeenCalledTimes(1);
     expect(uPlot).toHaveBeenCalledTimes(2);
     expect(screen.getByRole("img", { name: /Text size chart/ })).toBeVisible();
@@ -511,8 +518,7 @@ describe("UPlotChart resizing", () => {
     expect(fireEvent.keyDown(chart, { key: "Escape" })).toBe(true);
   });
 
-  it("uses the full TV chart for keyboard values and restores the plot host for pointer inspection", () => {
-    document.documentElement.dataset.tvLayout = "true";
+  it("uses the full chart when keyboard values exceed the plot and restores pointer inspection", () => {
     const { chart } = renderInteractiveChart();
     const plot = currentPlot();
     plot.root = document.createElement("div");
@@ -520,27 +526,30 @@ describe("UPlotChart resizing", () => {
     chart.appendChild(plot.root);
     Object.defineProperty(plot.root, "clientHeight", { value: 300 });
     Object.defineProperty(plot.over, "clientHeight", { value: 160 });
+    Object.defineProperty(plot.root, "clientWidth", { value: 400 });
+    Object.defineProperty(plot.over, "clientWidth", { value: 320 });
     const built = (uPlot as unknown as jest.Mock).mock.calls.at(
       -1,
     )[0] as uPlot.Options;
     const plugin = built.plugins!.at(-1)!;
     const init = plugin.hooks.init;
     if (typeof init === "function") init(plot, built, []);
+    const values = within(chart).getByText(
+      (_content, element) =>
+        element?.classList.contains("chartTooltip") ?? false,
+    );
+    Object.defineProperty(values, "scrollHeight", { value: 220 });
     const moveCursor = plugin.hooks.setCursor;
     plot.setCursor = jest.fn((position: { left: number; top: number }) => {
       plot.cursor = { ...position, idx: 0 };
       if (typeof moveCursor === "function") moveCursor(plot);
     });
     fireEvent.keyDown(chart, { key: "Enter" });
-    // uPlot owns this non-semantic container; query its rendered subtree through RTL.
-    const values = within(chart).getByText(
-      (_content, element) =>
-        element?.classList.contains("chartTooltip") ?? false,
-    );
     expect(values).toHaveTextContent("Point 0");
     expect(plot.root).toContainElement(values);
     expect(plot.over).not.toContainElement(values);
     expect(values).toHaveStyle({ maxHeight: "300px" });
+    expect(values).toHaveStyle({ maxWidth: "304px" });
     fireEvent.pointerDown(values);
     fireEvent.pointerMove(values);
     expect(screen.getByRole("status")).toHaveTextContent("Point 0");
@@ -718,6 +727,96 @@ describe("UPlotChart resizing", () => {
     act(() => jest.advanceTimersByTime(1));
     expect(uPlotPrototype.destroy).toHaveBeenCalledTimes(1);
     expect(uPlot).toHaveBeenCalledTimes(2);
+  });
+
+  it("reserves a readable chart when supporting chrome must scroll and stays stable across resizing and reopening", () => {
+    applyInterfaceScale(2.5);
+    const viewport = document.createElement("div");
+    viewport.setAttribute("data-chart-viewport", "");
+    let availableHeight = 360;
+    Object.defineProperty(viewport, "clientHeight", {
+      get: () => availableHeight,
+    });
+    const block = document.createElement("section");
+    block.className = "insightsTrack";
+    // The mocked plot has no DOM height; the real title/legend still occupy their own space.
+    Object.defineProperty(block, "clientHeight", { value: 80 });
+    viewport.appendChild(block);
+    document.body.appendChild(viewport);
+    const ui = (open: boolean) => (
+      <details open={open} style={{ overflowY: "auto" }}>
+        <summary>Forecast</summary>
+        <UPlotChart
+          ariaLabel="Allocated chart"
+          height={300}
+          state={{}}
+          data={[
+            [0, 1],
+            [2, 3],
+          ]}
+          buildOptions={() => ({ width: 0, height: 0, series: [{}, {}] })}
+        />
+      </details>
+    );
+    const view = render(ui(true), { container: block });
+    const initialOptions = (uPlot as unknown as jest.Mock).mock.calls.at(-1)[0];
+    expect(initialOptions.height).toBe(320);
+    const notifyResize = () =>
+      act(() => {
+        resize([], {} as ResizeObserver);
+        jest.advanceTimersByTime(16);
+      });
+    availableHeight = 300;
+    notifyResize();
+    expect(uPlotPrototype.setSize).toHaveBeenLastCalledWith({
+      width: 400,
+      height: 260,
+    });
+    const calls = uPlotPrototype.setSize.mock.calls.length;
+    notifyResize();
+    notifyResize();
+    expect(uPlotPrototype.setSize).toHaveBeenCalledTimes(calls);
+    view.rerender(ui(false));
+    availableHeight = 600;
+    view.rerender(ui(true));
+    notifyResize();
+    expect(uPlotPrototype.setSize).toHaveBeenLastCalledWith({
+      width: 400,
+      height: 343,
+    });
+    view.unmount();
+    viewport.remove();
+  });
+
+  it("preserves natural plot height inside intrinsically sized scrolling content", () => {
+    const scroll = document.createElement("div");
+    scroll.style.overflowY = "auto";
+    Object.defineProperty(scroll, "clientHeight", { value: 180 });
+    document.body.appendChild(scroll);
+    const view = render(
+      <UPlotChart
+        ariaLabel="Natural chart"
+        height={300}
+        state={{}}
+        data={[
+          [0, 1],
+          [2, 3],
+        ]}
+        buildOptions={() => ({ width: 0, height: 0, series: [{}, {}] })}
+      />,
+      { container: scroll },
+    );
+    expect((uPlot as unknown as jest.Mock).mock.calls.at(-1)[0].height).toBe(
+      343,
+    );
+    act(() => {
+      resize([], {} as ResizeObserver);
+      jest.advanceTimersByTime(16);
+      resize([], {} as ResizeObserver);
+    });
+    expect(uPlotPrototype.setSize).not.toHaveBeenCalled();
+    view.unmount();
+    scroll.remove();
   });
 
   it("applies a shared viewport and reserves Ctrl-wheel for anchored zoom", () => {

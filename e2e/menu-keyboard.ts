@@ -1,13 +1,11 @@
 import { expect, Page } from "@playwright/test";
 
-/** The desktop preference is lazy, but it is a real stop in the title's keyboard order. */
-export async function waitForDesktopTvEntry(page: Page) {
-  const tv = page.getByRole("button", {
-    name: /^(Playing on a TV\? Use TV layout|TV layout on · switch to desktop)$/,
-  });
-  if (await page.evaluate(() => !!window.electrifyDesktop))
-    await expect(tv).toBeVisible();
-  return tv;
+/** Wait for the lazy desktop input runtime before dispatching its first native frame. */
+export async function waitForDesktopInput(page: Page): Promise<void> {
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-mock-input-context",
+    "Menu",
+  );
 }
 
 /** The caller installs the clock before loading; keep return focus pending for a body key. */
@@ -37,7 +35,6 @@ export async function exitSettingsWithBodyArrow(page: Page): Promise<void> {
 }
 
 export async function openSettingsWithKeyboard(page: Page): Promise<void> {
-  const tv = await waitForDesktopTvEntry(page);
   const start = page.getByRole("button", {
     name: "Play",
     exact: true,
@@ -58,10 +55,6 @@ export async function openSettingsWithKeyboard(page: Page): Promise<void> {
   });
   if (await achievements.isVisible()) {
     await expect(achievements).toBeFocused();
-    await page.keyboard.press("ArrowDown");
-  }
-  if (await tv.isVisible()) {
-    await expect(tv).toBeFocused();
     await page.keyboard.press("ArrowDown");
   }
   await expect(
@@ -103,23 +96,23 @@ export async function verifyMenuKeyboard(page: Page): Promise<void> {
   await expect(light).toHaveAttribute("aria-pressed", "true");
 
   await page.keyboard.press("ArrowDown");
-  const sizes = page.getByRole("group", { name: "Text size", exact: true });
-  const standard = sizes.getByRole("button", { name: "Standard", exact: true });
-  const large = sizes.getByRole("button", { name: "Large", exact: true });
-  await expect(standard).toBeFocused();
-  await expect(standard).toHaveAttribute("aria-pressed", "true");
-  await page.keyboard.press("ArrowRight");
-  await expect(large).toBeFocused();
-  await expect(standard).toHaveAttribute("aria-pressed", "true");
-  await page.keyboard.press("Enter");
-  await expect(large).toHaveAttribute("aria-pressed", "true");
+  const scale = page.getByRole("combobox", {
+    name: "Interface scale",
+    exact: true,
+  });
+  await expect(scale).toBeFocused();
+  await expect(scale).toHaveValue("1");
+  // Native typeahead works with both desktop popups and mobile pickers; Tab commits the choice.
+  await page.keyboard.type("112.5%");
+  await page.keyboard.press("Tab");
+  await expect(scale).toHaveValue("1.125");
   await expect(page.locator("html")).toHaveCSS("font-size", "18px");
-  await page.keyboard.press("ArrowLeft");
-  await expect(standard).toBeFocused();
-  await page.keyboard.press("Enter");
-  await expect(standard).toHaveAttribute("aria-pressed", "true");
+  await page.keyboard.press("Shift+Tab");
+  await expect(scale).toBeFocused();
+  await page.keyboard.type("100%");
+  await page.keyboard.press("Tab");
+  await expect(scale).toHaveValue("1");
   await expect(page.locator("html")).toHaveCSS("font-size", "16px");
-  await page.keyboard.press("ArrowDown");
   const sound = page.getByRole("switch", { name: "Sound", exact: true });
   await expect(sound).toBeFocused();
   await expect(sound).not.toBeChecked();
@@ -137,7 +130,6 @@ export async function verifyMenuKeyboard(page: Page): Promise<void> {
     page.getByRole("slider", { name: "Effects volume", exact: true }),
   ).toBeFocused();
   await page.keyboard.press("Escape");
-  const tv = await waitForDesktopTvEntry(page);
   const start = page.getByRole("button", {
     name: "Play",
     exact: true,
@@ -161,18 +153,10 @@ export async function verifyMenuKeyboard(page: Page): Promise<void> {
     await expect(achievements).toBeFocused();
     await page.keyboard.press("ArrowDown");
   }
-  if (await tv.isVisible()) {
-    await expect(tv).toBeFocused();
-    await page.keyboard.press("ArrowDown");
-  }
   await expect(
     page.getByRole("button", { name: "Manual", exact: true }),
   ).toBeFocused();
   await page.keyboard.press("ArrowUp");
-  if (await tv.isVisible()) {
-    await expect(tv).toBeFocused();
-    await page.keyboard.press("ArrowUp");
-  }
   if (await achievements.isVisible()) {
     await expect(achievements).toBeFocused();
     await page.keyboard.press("ArrowUp");

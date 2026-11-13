@@ -23,6 +23,7 @@ function footer() {
         <p>Electrify. Take charge of the power markets.</p>
         <nav aria-label="Footer navigation">
           <a href="/scenarios.html">All scenarios</a>
+          <a href="/power-grid-simulator.html">How to play</a>
           <a href="/about.html">About</a>
           <a href="/privacy.html">Privacy</a>
           <a href="https://github.com/toddmedema/electrify">Source code</a>
@@ -37,6 +38,7 @@ function documentShell(metadata, body, schema, context, isIndex = false) {
 <html lang="en">
   <head>
     <meta charset="utf-8" />
+    <script async src="/analytics.js"></script>
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>${e(metadata.title)}</title>
     <meta name="description" content="${e(metadata.description)}" />

@@ -1,3 +1,9 @@
+import {
+  agreementDate,
+  connectionAgreements,
+  INHERITED_CONNECTIONS,
+} from "../../helpers/PowerAgreements";
+import type { UtilityId } from "../../Types";
 import * as React from "react";
 import { Box, Typography } from "@mui/material";
 import type { GameType, UtilityTargetId } from "../../Types";
@@ -43,6 +49,34 @@ export default function UtilityContractSchedule({
           </Box>
         </>
       )}
+      {(Object.keys(INHERITED_CONNECTIONS) as UtilityId[])
+        .filter(
+          (id) =>
+            id === "champlain" ||
+            game.utilityExpansion?.acquisitions.some(
+              (receipt) => receipt.targetId === id,
+            ),
+        )
+        .flatMap((id) =>
+          connectionAgreements(game, id)
+            .filter(
+              (source) =>
+                !source.inherited && source.endMinute > game.date.minute,
+            )
+            .map((source) => (
+              <Typography key={source.id} variant="body2" sx={{ mb: 1 }}>
+                {source.name}: signed replacement covers{" "}
+                {formatWatts(source.nominalW * source.deliverability)},{" "}
+                {agreementDate(source.startMinute)}–
+                {agreementDate(source.endMinute, true)}. Delivery shares the
+                inherited regional connection.
+              </Typography>
+            )),
+        )}
+      <Typography variant="body2" color="textSecondary" sx={{ mb: 1 }}>
+        Inherited regional connections remain available for market purchases
+        after agreement coverage changes.
+      </Typography>
       <Typography component="h4" variant="subtitle2" sx={{ mt: 2 }}>
         Network upkeep
       </Typography>

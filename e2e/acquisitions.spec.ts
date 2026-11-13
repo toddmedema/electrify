@@ -139,14 +139,23 @@ for (const theme of ["light", "dark"] as const) {
       facilities.getByRole("button", { name: /^Acquire / }),
     ).toHaveCount(0);
     const unfinished = await readSavedGame(page);
-    expect(unfinished?.transmission?.lines).toHaveLength(2);
     expect(
-      unfinished?.transmission?.lines.every(
-        (line) => line.yearsToBuildLeft > 0,
+      unfinished?.transmission?.lines.filter(
+        (line) =>
+          line.corridorId === "vt-champlain-valley" ||
+          line.corridorId === "vt-champlain-ridge",
       ),
+    ).toHaveLength(2);
+    expect(
+      unfinished?.transmission?.lines
+        .filter((line) => line.buildCost > 0)
+        .every((line) => line.yearsToBuildLeft > 0),
     ).toBe(true);
     await editSavedGame(page, ({ game }) => {
-      for (const line of game.transmission!.lines) line.yearsToBuildLeft = 0;
+      for (const line of game.transmission!.lines.filter(
+        (line) => line.buildCost > 0,
+      ))
+        line.yearsToBuildLeft = 0;
       // UI fixture: exercise cash as well as financed acquisition without running years of economics.
       for (const tick of game.timeline) tick.cash = 1e9;
     });
@@ -161,9 +170,9 @@ for (const theme of ["light", "dark"] as const) {
       "Valley Electric",
       "Ridge Electric",
     ].entries()) {
-      const line = facilities
-        .locator(".transmissionLine")
-        .filter({ hasText: target });
+      const line = facilities.locator(
+        `.transmissionLine[data-corridor-id="vt-champlain-${index === 0 ? "valley" : "ridge"}"]`,
+      );
       const acquire = line.getByRole("button", {
         name: `Acquire ${target}`,
         exact: true,
@@ -173,13 +182,28 @@ for (const theme of ["light", "dark"] as const) {
       await inspect.click();
       await expect(acquire).toBeVisible();
       await expect(line).not.toContainText("Review the company terms");
-      const upgrade = line.getByRole("button", { name: /^Review upgrade/ });
+      // New expansion routes have reached their corridor limit at Tier 1.
+      // Keep the acquisition action aligned with the available capacity status.
+      const capacityStatus = line.getByText(
+        "Corridor full. More capacity needs a new route.",
+        { exact: true },
+      );
+      await expect(capacityStatus).toBeVisible();
+      await expect(
+        line.getByRole("button", { name: /^Review upgrade/ }),
+      ).toHaveCount(0);
       if ((testInfo.project.use.viewport?.width ?? 1280) >= 600) {
-        const [acquireBox, upgradeBox] = await Promise.all([
+        const [acquireBox, capacityBox] = await Promise.all([
           acquire.boundingBox(),
-          upgrade.boundingBox(),
+          capacityStatus.boundingBox(),
         ]);
-        expect(Math.abs(acquireBox!.y - upgradeBox!.y)).toBeLessThanOrEqual(1);
+        expect(
+          Math.abs(
+            acquireBox!.y +
+              acquireBox!.height -
+              (capacityBox!.y + capacityBox!.height),
+          ),
+        ).toBeLessThanOrEqual(1);
       }
       expect((await acquire.boundingBox())!.height).toBeGreaterThanOrEqual(
         testInfo.project.use.hasTouch ? 44 : 40,
@@ -203,7 +227,7 @@ for (const theme of ["light", "dark"] as const) {
           .locator(".decisionImpactFact")
           .filter({ hasText: /^Supply margin/ })
           .locator(".decisionImpactFactValue"),
-      ).toHaveText(/^[\d.]+[kMG]?W → [\d.]+[kMG]?W spare$/);
+      ).toHaveText(/^-?[\d.]+[kMG]?W → [\d.]+[kMG]?W (spare|shortfall)$/);
       await expect(
         dialog.getByRole("region", { name: "Acquisition obligations" }),
       ).toBeVisible();
@@ -245,8 +269,12 @@ for (const theme of ["light", "dark"] as const) {
         assets.getByRole("heading", { name: "Purchased power", exact: true }),
       ).toBeVisible();
       if (target === "Valley Electric") {
-        await expect(assets).toContainText("Up to 50MW delivered");
-        await expect(assets).toContainText("not firm reserve");
+        await expect(assets).toContainText("114MW delivered");
+        await expect(assets).toContainText("Regional nuclear");
+        await expect(assets).toContainText("Québec hydro");
+        await expect(assets).not.toContainText("New England balancing");
+        await expect(assets).toContainText("January 2017");
+        await expect(dialog).not.toContainText("Plan replacement supply");
       }
       await assets.locator("summary").click();
       const finance = dialog
@@ -352,7 +380,8 @@ for (const theme of ["light", "dark"] as const) {
       await purchase.focus();
       await page.keyboard.press("Enter");
       await expect(dialog).toHaveCount(0);
-      await expect(line).toContainText(`Owned · ${target}`);
+      await expect(line).toContainText("· Owned");
+      await expect(line).toContainText("Acquired utility");
       const afterPurchase = (await readSavedGame(page))!;
       const receipt = afterPurchase.utilityExpansion!.acquisitions.find(
         (entry) =>
@@ -437,9 +466,10 @@ for (const theme of ["light", "dark"] as const) {
         ),
       ).toBeLessThanOrEqual(1);
     }
+    // The inherited regional connections remain external market access after acquisition.
     await expect(
-      facilities.getByRole("combobox", { name: "Buying", exact: true }),
-    ).toHaveCount(0);
+      facilities.getByRole("combobox", { name: "Market buying", exact: true }),
+    ).toBeVisible();
     // Acquired plants and customers use the ordinary shared company controls.
     await openBuild(page);
     await page.getByRole("tab", { name: "Generators", exact: true }).click();
@@ -509,8 +539,12 @@ for (const theme of ["light", "dark"] as const) {
       facilities,
       page.getByRole("button", { name: "Facilities", exact: true }),
     );
-    await expect(facilities).toContainText("Owned · Valley Electric");
-    await expect(facilities).toContainText("Owned · Ridge Electric");
+    for (const target of ["Valley", "Ridge"])
+      await expect(
+        facilities
+          .locator(".transmissionLine")
+          .filter({ hasText: `${target} expansion connection` }),
+      ).toContainText("· Owned");
     const resumed = await readSavedGame(page);
     expect(resumed?.utilityExpansion).toEqual(acquired?.utilityExpansion);
     expect(errors).toEqual([]);
@@ -526,6 +560,7 @@ test("normal valley play saves across the first year and resumes from IndexedDB"
   await page.getByRole("button", { name: "Start game", exact: true }).click();
   await openBuild(page);
   await page.getByRole("tab", { name: "Interties", exact: true }).click();
+  await page.getByRole("slider", { name: /Construction tier/ }).press("Home");
   await page
     .getByRole("button", { name: /Review purchase of .*Valley Electric/ })
     .click();

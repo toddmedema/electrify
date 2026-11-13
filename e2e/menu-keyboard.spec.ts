@@ -1,5 +1,6 @@
 import path from "node:path";
 import { expect, test } from "./fixtures";
+import { reviewScreenshot } from "./review-screenshot";
 import {
   exitSettingsWithBodyArrow,
   openSettingsWithKeyboard,
@@ -18,7 +19,7 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
-test("main menu and settings work entirely with arrows, Enter and Escape", async ({
+test("main menu and settings work entirely with the keyboard", async ({
   page,
 }) => {
   await page.goto("/");
@@ -51,6 +52,105 @@ test("Space opens Settings", async ({ page }) => {
   ).toBeVisible();
 });
 
+test("interface scale persists and scales controls with text at every display height", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  const scale = page.getByRole("combobox", {
+    name: "Interface scale",
+    exact: true,
+  });
+  const standardHeight = await scale.evaluate(
+    (element) => element.getBoundingClientRect().height,
+  );
+  await scale.selectOption("1.5");
+  await expect(page.locator("html")).toHaveCSS("font-size", "24px");
+  const enlargedHeight = await scale.evaluate(
+    (element) => element.getBoundingClientRect().height,
+  );
+  expect(enlargedHeight / standardHeight).toBeCloseTo(1.5, 1);
+  const originalViewport = page.viewportSize()!;
+  for (const height of [1080, 2160]) {
+    await page.setViewportSize({ ...originalViewport, height });
+    await expect(page.locator("html")).toHaveCSS("font-size", "24px");
+  }
+  await page.reload();
+  await expect(page.locator("html")).toHaveCSS("font-size", "24px");
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await expect(scale).toHaveValue("1.5");
+  await scale.selectOption("2.5");
+  await expect(page.locator("html")).toHaveCSS("font-size", "40px");
+  await page.setViewportSize(originalViewport);
+  await expect(scale).toBeVisible();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth - window.innerWidth,
+    ),
+  ).toBeLessThanOrEqual(1);
+});
+
+for (const theme of ["light", "dark"] as const) {
+  test(`scaled location picker stacks until both columns fit in ${theme}`, async ({
+    page,
+  }) => {
+    await page.addInitScript((mode) => {
+      localStorage.setItem("interfaceScale", "2.5");
+      localStorage.setItem("theme", mode);
+      localStorage.setItem(
+        "plays",
+        JSON.stringify({
+          plays: [
+            { scenarioId: 0, timesPlayed: 1, date: new Date().toString() },
+          ],
+        }),
+      );
+    }, theme);
+    await page.goto("/");
+    await page.getByRole("button", { name: "Play", exact: true }).click();
+    await page
+      .getByRole("button", { name: "View Custom Game details" })
+      .click();
+    const picker = page.locator(".locationPicker");
+    await expect(picker).toBeVisible();
+    const geometry = () =>
+      picker.evaluate((element) => {
+        const box = element.getBoundingClientRect();
+        const map = element.querySelector(".worldMap")!.getBoundingClientRect();
+        const details = element
+          .querySelector(".locationPickerDetails")!
+          .getBoundingClientRect();
+        return {
+          width: box.width,
+          map: { x: map.x, y: map.y, width: map.width },
+          details: { x: details.x, y: details.y, width: details.width },
+        };
+      });
+    const originalViewport = page.viewportSize()!;
+    for (const width of [originalViewport.width, 700, 1280]) {
+      await page.setViewportSize({ width, height: originalViewport.height });
+      await expect
+        .poll(async () => (await geometry()).map.width)
+        .toBeGreaterThanOrEqual(width - 100);
+      const current = await geometry();
+      expect(current.map.width).toBeCloseTo(current.width, 0);
+      expect(current.details.width).toBeCloseTo(current.width, 0);
+      expect(current.map.y).toBeGreaterThan(current.details.y);
+    }
+    await page.setViewportSize({ width: 1920, height: 1080 });
+    await expect
+      .poll(async () => {
+        const current = await geometry();
+        return current.details.x - current.map.x - current.map.width;
+      })
+      .toBeGreaterThanOrEqual(39);
+    const wide = await geometry();
+    expect(wide.map.width).toBeGreaterThanOrEqual(960);
+    expect(wide.details.width).toBeGreaterThanOrEqual(640);
+    await expect(page.locator("html")).toHaveCSS("font-size", "40px");
+  });
+}
+
 test("Space toggles Sound", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Settings", exact: true }).click();
@@ -62,6 +162,76 @@ test("Space toggles Sound", async ({ page }) => {
   await expect(sound).toBeChecked();
   await page.keyboard.press("Space");
   await expect(sound).not.toBeChecked();
+});
+
+test("screen-edge padding persists independently and reaches dialogs at every scale", async ({
+  page,
+}, info) => {
+  await page.goto("/");
+  const frame = page.locator(".appFrame");
+  await expect(frame).toHaveCSS("padding-left", "0px");
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Advanced display", exact: true })
+    .click();
+  const padding = page.getByRole("group", {
+    name: "Screen-edge padding",
+    exact: true,
+  });
+  await expect(
+    padding.getByRole("button", { name: "0%", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await padding.getByRole("button", { name: "4%", exact: true }).click();
+  const viewport = page.viewportSize()!;
+  const margin = Math.ceil(Math.min(viewport.width, viewport.height) * 0.04);
+  await expect(frame).toHaveCSS("padding-left", `${margin}px`);
+  await expect(frame).toHaveCSS("padding-top", `${margin}px`);
+  await page.reload();
+  await expect(frame).toHaveCSS("padding-left", `${margin}px`);
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Advanced display", exact: true })
+    .click();
+  await expect(
+    padding.getByRole("button", { name: "4%", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  const scale = page.getByRole("combobox", {
+    name: "Interface scale",
+    exact: true,
+  });
+  await expect(scale).toHaveValue("1");
+  await page.getByRole("button", { name: "Single tool", exact: true }).click();
+  await scale.selectOption("1.5");
+  await expect(frame).toHaveCSS("padding-left", `${margin}px`);
+  await page
+    .getByRole("region", { name: "Display", exact: true })
+    .scrollIntoViewIfNeeded();
+  await reviewScreenshot(page, {
+    path: info.outputPath("display-padding.png"),
+    animations: "disabled",
+  });
+  await scale.selectOption("2.5");
+  await expect(frame).toHaveCSS("padding-left", `${margin}px`);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth - window.innerWidth,
+    ),
+  ).toBeLessThanOrEqual(1);
+  await page.getByRole("button", { name: "Clear cache", exact: true }).click();
+  const dialog = page.getByRole("dialog", {
+    name: "Clear cache and reload?",
+    exact: true,
+  });
+  await expect(dialog).toBeVisible();
+  const bounds = (await dialog.boundingBox())!;
+  expect(bounds.x).toBeGreaterThanOrEqual(margin);
+  expect(bounds.y).toBeGreaterThanOrEqual(margin);
+  expect(bounds.x + bounds.width).toBeLessThanOrEqual(
+    viewport.width - margin + 1,
+  );
+  expect(bounds.y + bounds.height).toBeLessThanOrEqual(
+    viewport.height - margin + 1,
+  );
 });
 
 for (const { pointerTarget, deferPlayFocus } of [
@@ -252,10 +422,28 @@ test("touch hides button focus rings while inputs and keyboard navigation retain
   await expect(system).toBeFocused();
   await expect(system).toHaveCSS("outline-style", "none");
   await page.keyboard.press("Tab");
-  await expect(page.locator(":focus")).toHaveCSS("outline-style", "solid");
-  await expect(page.locator(":focus")).toHaveCSS("outline-width", "2px");
+  const scale = page.getByRole("combobox", {
+    name: "Interface scale",
+    exact: true,
+  });
+  await expect(scale).toBeFocused();
+  await expect(scale.locator("..").locator("fieldset")).toHaveCSS(
+    "border-width",
+    "2px",
+  );
+  // The outlined native select carries its focus on the fieldset. Continue by Tab
+  // to test the separate button ring without replacing normal keyboard navigation.
+  for (
+    let i = 0;
+    i < 8 && (await page.locator("button:focus").count()) === 0;
+    i++
+  ) {
+    await page.keyboard.press("Tab");
+  }
   const focusedButton = page.locator("button:focus");
   await expect(focusedButton).toHaveCount(1);
+  await expect(focusedButton).toHaveCSS("outline-style", "solid");
+  await expect(focusedButton).toHaveCSS("outline-width", "2px");
   await focusedButton.tap();
   await expect(focusedButton).toHaveCSS("outline-style", "none");
   await page.goto("/?dataCenters=1");

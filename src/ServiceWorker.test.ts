@@ -471,7 +471,7 @@ describe("cacheBuild", () => {
     },
   );
 
-  it("adds the fonts and logos the first screen needs on install", async () => {
+  it("adds the local analytics runtime, fonts and logos on install", async () => {
     const sw = buildWorker();
     await Promise.all(sw.install());
     const shell = sw.addAll.mock.calls[0][0];
@@ -483,8 +483,45 @@ describe("cacheBuild", () => {
         "/images/logo-home-dark.svg",
       ]),
     );
+    expect(shell).not.toContain("/analytics.js");
     expect(shell).not.toContain("/");
+    expect(shell.every((url: string) => url.startsWith("/"))).toBe(true);
+    expect(await sw.entries.get("/analytics.js")!.text()).toBe("/analytics.js");
   });
+
+  it.each(["network", "HTTP", "cache write"])(
+    "keeps analytics failures from blocking installation: %s",
+    async (failure) => {
+      const sw = buildWorker();
+      const fetch = sw.fetch.getMockImplementation()!;
+      const put = sw.put.getMockImplementation()!;
+      sw.fetch.mockImplementation(async (request, options) => {
+        if (sw.path(request) === "/analytics.js") {
+          if (failure === "network") throw new Error("analytics unavailable");
+          if (failure === "HTTP") return response(false);
+        }
+        return fetch(request, options);
+      });
+      sw.put.mockImplementation(
+        async (request: FetchRequest, value: WorkerResponse) => {
+          if (sw.path(request) === "/analytics.js" && failure === "cache write")
+            throw new Error("analytics cache write failed");
+          return put(request, value);
+        },
+      );
+      // Cache.addAll rejects atomically when any included asset cannot be cached.
+      sw.addAll.mockImplementation(async (urls: string[]) => {
+        if (urls.includes("/analytics.js"))
+          throw new Error("required asset unavailable");
+      });
+
+      await Promise.all(sw.install());
+
+      expect(await sw.entries.get("/")!.text()).toBe(newPage);
+      expect([css, js, chunk].every((path) => sw.entries.has(path))).toBe(true);
+      expect(sw.entries.has("/analytics.js")).toBe(false);
+    },
+  );
 
   it("downloads only bundles it does not already have", async () => {
     const sw = buildWorker();

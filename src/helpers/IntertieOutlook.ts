@@ -194,6 +194,7 @@ export function intertieForecastKey(game: GameType): string {
     game.storyEffectsDisabled,
     game.policies,
     game.tutorialIntertieStress?.active,
+    game.transmission?.acceptedAgreements,
     game.transmission?.buyingRule,
     game.transmission?.sellingRule,
     game.facilities.map((f) => [
@@ -205,6 +206,7 @@ export function intertieForecastKey(game: GameType): string {
     ]),
     game.transmission?.lines.map((l) => [
       l.id,
+      l.paused,
       l.capacityW,
       l.yearsToBuildLeft > 0,
     ]),

@@ -47,6 +47,22 @@ afterEach(() => {
 });
 
 describe("Navigation", () => {
+  it("publishes the workspace's remembered build category for semantic pane cycling", () => {
+    render(
+      <Provider store={store}>
+        <Navigation
+          openTools={["BUILD_GENERATORS"]}
+          destination={(tool) =>
+            tool === "BUILD_GENERATORS" ? "BUILD_STORAGE" : tool
+          }
+        />
+      </Provider>,
+    );
+    expect(screen.getByRole("button", { name: "Build" })).toHaveAttribute(
+      "data-game-destination",
+      "BUILD_STORAGE",
+    );
+  });
   it("keeps accessible icon-only actions in a couch company", () => {
     window.electrifyCouch = {
       role: "seat",
@@ -227,9 +243,9 @@ describe("Navigation", () => {
     const onToggle = jest.fn();
     renderNavigation(onToggle);
     const build = screen.getByRole("button", { name: "Build" });
-    expect(build).toHaveAttribute("aria-keyshortcuts", "Q");
+    expect(build).toHaveAttribute("aria-keyshortcuts", "Q B");
     fireEvent.pointerEnter(build, { pointerType: "mouse" });
-    expect(screen.getByRole("tooltip")).toHaveTextContent(/^Build \(Q\)$/);
+    expect(screen.getByRole("tooltip")).toHaveTextContent(/^Build \(Q, B\)$/);
     fireEvent.pointerLeave(build, { pointerType: "mouse" });
     const programs = screen.getByRole("button", { name: "Programs" });
     await act(async () => programs.focus());
@@ -244,7 +260,7 @@ describe("Navigation", () => {
     await act(async () => build.focus());
     expect(screen.getByRole("tooltip")).toHaveTextContent(/^Build$/);
     act(() => updateInputPresentation({ active: false }));
-    expect(screen.getByRole("tooltip")).toHaveTextContent(/^Build \(Q\)$/);
+    expect(screen.getByRole("tooltip")).toHaveTextContent(/^Build \(Q, B\)$/);
   });
 
   it("previews labels after holding the dock padding and scrubbing, without activating on release", () => {
