@@ -418,11 +418,11 @@ test("marketing exports select seven scenes without running ordinary captures", 
     [
       "gameplay-preview",
       "01-grid-overview-dark",
-      "02-generator-comparison-light",
+      "02-generator-planning-light",
       "03-storage-planning-dark",
       "04-customer-programs-light",
-      "05-intertie-trading-dark",
-      "06-weather-forecast-light",
+      "05-intertie-planning-dark",
+      "06-reliability-forecast-light",
     ],
   );
   assert.deepEqual(

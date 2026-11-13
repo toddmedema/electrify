@@ -7,12 +7,14 @@ Seven gameplay captures cover the repository's marketing and SEO uses:
   and structured data on the home and generated scenario pages.
 - `steamworks/artwork/screenshots/01-grid-overview-dark.png` through `06-*.png`
   are the six 1920 × 1080 Steam uploads, in order: fleet and forecasts, generator
-  comparison, storage planning, customer programs, intertie trading, and weather.
+  planning, storage planning, customer programs, intertie planning, and reliability forecasts.
 
 These are real, paused game views. Steam captures use a 1440 × 810 logical
 viewport at 4/3 device scale; the SEO image uses 1200 × 630 at device scale 1.
-The scenes include both themes and use normal player controls. The intertie
-scene starts Wildfire Emergency with its existing operating link. The manual
+The scenes include both themes, show one main tool at a time and use normal player
+controls. Insights uses the standard Overview or Reliability preset. Captures
+require a stable grid, no top-bar warnings and no generator comparison. The intertie
+scene shows connection choices on Carbon Fee’s stable opening grid. The manual
 illustrations, app icons, Steam capsule illustrations and achievement artwork
 are separate assets, not UI screenshots.
 

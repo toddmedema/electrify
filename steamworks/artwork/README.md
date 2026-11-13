@@ -26,12 +26,13 @@ intentionally cropped at the edge. The small capsule is legible at 120 × 45 and
 184 × 69.
 
 Upload screenshot 01 first. The six images show the grid overview, generator
-comparisons, storage choices, customer programs, interties and weather forecasts.
+planning, storage choices, customer programs, interties and reliability forecasts.
 They are unretouched captures of the current game at a 1440 × 810 logical viewport
 with a 4/3 device scale factor, producing 1920 × 1080 PNGs with readable controls.
-They show the dock, side-by-side tools, generator comparison, lithium battery
-details, pricing and demand programs, an operating intertie, and temperature and
-water forecasts. There are no marketing overlays or debug UI.
+They show the dock with one main tool at a time: generator and storage choices,
+pricing and demand programs, intertie choices, and forecasts with standard
+Insights presets. The top bar shows a stable grid without warnings. There are no
+marketing overlays or debug UI.
 
 Run `npm start`, then `npm run shot -- --marketing` in another terminal to refresh
 all six screenshots and the shared SEO/social preview. Review the staged images

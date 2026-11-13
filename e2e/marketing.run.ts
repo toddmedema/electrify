@@ -1,7 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { expect, Page, test } from "./fixtures";
-import { openBuild, openPane, sortBuildCatalog } from "./layout";
+import { openBuild, openPane } from "./layout";
 import { MARKETING_SCENES } from "./marketing-scenes";
 import { readShotRequest } from "./shot-request";
 
@@ -18,16 +18,10 @@ test("capture marketing scene", async ({ page }, info) => {
   )!;
   const file = path.join(readShotRequest().outDir, scene.file);
   await fs.rm(file, { force: true });
-  await page.addInitScript(({ theme, view }) => {
+  await page.addInitScript(({ theme }) => {
     localStorage.setItem("theme", theme);
     localStorage.setItem("audioEnabled", "false");
     localStorage.setItem("units", "metric");
-    localStorage.setItem(
-      "insightsLayers",
-      JSON.stringify(
-        view === "weather" ? ["weather", "water"] : ["supplyDemand", "cash"],
-      ),
-    );
   }, scene);
   await page.goto(`/?scenario=${scene.scenario}`);
   await page.getByRole("button", { name: "Start game", exact: true }).click();
@@ -39,17 +33,19 @@ test("capture marketing scene", async ({ page }, info) => {
   ).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator(".facilities .facilityRow").first()).toBeVisible();
 
-  if (scene.view === "overview" || scene.view === "weather") {
+  if (scene.view === "overview" || scene.view === "reliability") {
     await openTool(page, "Insights");
+    if (scene.view === "reliability") {
+      await page
+        .getByRole("combobox", { name: "Insight preset", exact: true })
+        .click();
+      await page
+        .getByRole("option", { name: "Reliability", exact: true })
+        .click();
+    }
     await expect(
-      page.locator(
-        scene.view === "weather"
-          ? "#chartForecastWeather canvas"
-          : "#chartForecastSupplyDemand canvas",
-      ),
+      page.locator("#chartForecastSupplyDemand canvas"),
     ).toBeVisible();
-    if (scene.view === "overview" && scene.viewport.width > 1200)
-      await openTool(page, "Events");
   } else if (scene.view === "generators" || scene.view === "storage") {
     const build = await openBuild(page);
     await build
@@ -58,53 +54,18 @@ test("capture marketing scene", async ({ page }, info) => {
         exact: true,
       })
       .click();
-    if (scene.view === "generators") {
-      await sortBuildCatalog(page, "Build cost");
-      for (const name of ["Natural Gas CC", "Solar"]) {
-        const card = build.locator(".buildOption").filter({
-          has: page.getByRole("button", {
-            name: `Review purchase of ${name}`,
-            exact: true,
-          }),
-        });
-        await card.getByRole("button", { name: /^Compare/ }).click();
-      }
-      await expect(
-        page.getByRole("region", { name: "Generator comparison" }),
-      ).toContainText("Comparing 2/3");
-      await build.locator(".buildOption").first().scrollIntoViewIfNeeded();
-      await openTool(page, "Insights");
-      await expect(
-        page.locator("#chartForecastSupplyDemand canvas"),
-      ).toBeVisible();
-    } else {
-      const battery = build.locator(".buildOption").filter({
-        has: page.getByRole("button", {
-          name: "Review purchase of Lithium Battery",
-          exact: true,
-        }),
-      });
-      await battery.getByRole("button", { name: /Show.*details/ }).click();
-      await expect(
-        battery.getByRole("button", { name: /Hide.*details/ }),
-      ).toBeVisible();
-    }
+    await expect(build.locator(".buildOption").first()).toBeVisible();
   } else if (scene.view === "programs") {
     await openTool(page, "Programs");
     await expect(page.locator("#rateSlider input")).toBeVisible();
-    await openTool(page, "Insights");
-    await expect(
-      page.locator("#chartForecastSupplyDemand canvas"),
-    ).toBeVisible();
   } else {
-    const intertie = page.locator(".transmissionLine").first();
-    await intertie.locator(".facilityDisclosure").click();
-    await expect(intertie.locator(".facilityDisclosure")).toHaveAttribute(
-      "aria-expanded",
-      "true",
-    );
-    await expect(intertie).not.toContainText("Building");
-    await intertie.scrollIntoViewIfNeeded();
+    const build = await openBuild(page);
+    await build.getByRole("tab", { name: "Interties", exact: true }).click();
+    await expect(
+      build
+        .getByRole("button", { name: /Review purchase of.*intertie/ })
+        .first(),
+    ).toBeVisible();
   }
   await page.mouse.move(0, 0);
   // Wait for real fonts, chart workers and tool transitions before recording the UI.
@@ -112,6 +73,26 @@ test("capture marketing scene", async ({ page }, info) => {
   await expect(page.locator(".MuiCircularProgress-root")).toHaveCount(0);
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await page.waitForTimeout(500);
+  await expect(page.locator("#appbar .gridHealth:visible")).toHaveClass(
+    /gridHealth-stable/,
+  );
+  await expect(
+    page.locator(
+      "#appbar .statusWarning:visible, #appbar .blackout-pulsing:visible",
+    ),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("region", { name: "Generator comparison" }),
+  ).toHaveCount(0);
+  await expect(page.locator(".gameToolPanel:visible")).toHaveCount(1);
+  if (scene.view === "overview" || scene.view === "reliability") {
+    await expect(page.locator("#insightsPreset")).toHaveText(
+      scene.view === "reliability" ? "Reliability" : "Overview",
+    );
+    await expect(
+      page.getByRole("status", { name: "Unsaved changes" }),
+    ).toHaveCount(0);
+  }
   await fs.mkdir(path.dirname(file), { recursive: true });
   const png = await page.screenshot({ animations: "disabled" });
   const scale = info.project.use.deviceScaleFactor ?? 1;
