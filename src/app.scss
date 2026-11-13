@@ -8463,31 +8463,48 @@ option {
   flex-wrap: wrap !important;
 }
 
-// Mouse selection remains separate from the one expanded inspection row.
-.facilitySelectionBar {
-  display: none;
-}
-@media (any-pointer: fine) {
-  .facilitySelectionBar {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: 4px 8px;
-    padding: 0 16px;
-    min-height: 40px;
-    color: var(--font-color-faded);
-    font-size: var(--font-size-caption);
-    .MuiButton-root {
-      min-height: 40px;
-      text-transform: none;
-    }
+// Bulk actions share the generation status slot without moving the chart or fleet.
+.facilities .facilityDispatchHeader {
+  min-height: 48px;
+  padding-block: 4px;
+  .facilitySectionTitle {
+    flex-shrink: 0;
+    font-size: var(--font-size-body2);
+    font-weight: 600;
+    color: var(--font-color-primary);
   }
 }
-.facilitySelectionTitle {
-  color: var(--font-color-primary);
-  font-size: var(--font-size-body2);
-  font-weight: 600;
+.facilitySelectionBar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: var(--font-size-caption);
+  font-weight: 400;
+  color: var(--font-color-faded);
+  white-space: nowrap;
+  .MuiButton-root {
+    min-height: 40px;
+    text-transform: none;
+  }
+}
+// Prioritize the selection count and actions in narrow panes, including mouse windows.
+.facilityClearFullLabel {
+  margin-inline-start: 4px;
+}
+@container facilities (max-width: 560px) {
+  .facilityDispatchSelecting {
+    .facilitySectionTitle {
+      display: none;
+    }
+    .facilityClearFullLabel {
+      display: none;
+    }
+    .facilitySelectionBar {
+      flex: 1;
+      justify-content: space-between;
+    }
+  }
 }
 .base_main .facilityRow.bulkSelected {
   background: var(--bg-selected);
@@ -8525,7 +8542,7 @@ option {
 
 .facilitySelectionActions {
   display: flex;
-  flex-wrap: wrap;
+  flex-shrink: 0;
   gap: 4px;
 }
 .facilitySelectionSlot {
@@ -8561,6 +8578,9 @@ option {
     width: 44px;
     height: 44px;
     right: 42px;
+  }
+  .facilities .facilityDispatchHeader {
+    min-height: 52px;
   }
   .facilitySelectionBar .MuiButton-root,
   .facilityContextMenu .MuiMenuItem-root {
