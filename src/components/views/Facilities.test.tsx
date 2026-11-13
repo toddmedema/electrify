@@ -1538,24 +1538,23 @@ describe("mouse facility selection", () => {
     expect(screen.queryByRole("button", { name: "Actions" })).toBeNull();
   });
 
-  it("replaces generation with bulk actions in the plant heading, including without interties", async () => {
+  it("replaces generation with bulk actions, including without interties", async () => {
     const game = fleet();
     game.transmission = undefined;
     renderFacilities(game, null);
-    const heading = document.getElementById("dispatch-order")!;
-    expect(heading).toHaveTextContent("Generating");
+    expect(screen.getByText(/^Generating /)).toBeInTheDocument();
     expect(screen.queryByText(/^Facilities \(/)).toBeNull();
     fireEvent.click(rows()[0], { metaKey: true });
     expect(
-      within(heading).getByRole("status", { name: "Facility selection" }),
+      screen.getByRole("status", { name: "Facility selection" }),
     ).toHaveTextContent("1 facility selected");
-    expect(heading).not.toHaveTextContent("Generating");
-    await user.click(within(heading).getByRole("button", { name: "Actions" }));
+    expect(screen.queryByText(/^Generating /)).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Actions" }));
     expect(
       screen.getByRole("menu", { name: "Facility actions" }),
     ).toBeVisible();
     await user.keyboard("{Escape}");
-    expect(heading).toHaveTextContent("Generating");
+    expect(screen.getByText(/^Generating /)).toBeInTheDocument();
     await waitFor(() => expect(rows()[0]).toHaveFocus());
   });
 

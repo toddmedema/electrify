@@ -80,6 +80,7 @@ for (const theme of ["light", "dark"]) {
     }
     const checkboxes = pane.getByRole("checkbox", { name: /^Select / });
     await expect(checkboxes).toHaveCount(0);
+    await disclosure(0).click({ trial: true });
     const idleLayout = await fleetLayout();
     await disclosure(0).click({ modifiers: ["Meta"] });
     await expect(heading.getByRole("status")).toHaveText("1 facility selected");
@@ -330,6 +331,9 @@ for (const theme of ["light", "dark"]) {
       await page.setViewportSize({ width, height: 800 });
       await page.keyboard.press("Escape");
       await expect(heading).toContainText("Generating");
+      // The responsive chrome and ResizeObserver-driven chart must settle before
+      // recording the baseline; selection itself must still preserve it exactly.
+      await disclosure(0).click({ trial: true });
       const narrowLayout = await fleetLayout();
       await disclosure(0).click({ modifiers: ["Meta"] });
       await disclosure(1).click({ modifiers: ["Meta"] });
