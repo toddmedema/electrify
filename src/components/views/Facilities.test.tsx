@@ -33,10 +33,125 @@ import {
   HAIL_DEFINITION_ID,
   retrofitCost,
 } from "../../helpers/Hazards";
-import { formatMoneyConcise } from "../../helpers/Format";
+import { formatCount, formatMoneyConcise } from "../../helpers/Format";
 import { GAME_TO_REAL_YEARS, TICKS_PER_HOUR } from "../../Constants";
 import { purchaseTerms } from "../../helpers/Financials";
 import { modScenario } from "../../mods/ModScenario";
+import { acquireUtility } from "../../reducers/GameActions";
+import { acquisitionQuote } from "../../helpers/Expansion";
+import { currentTick } from "../../helpers/GameSelectors";
+
+describe("acquired utilities", () => {
+  function expansionGame(acquire = true) {
+    let game = createGame({ scenarioId: 116, seed: 12345 });
+    for (const targetId of ["valley-electric", "ridge-electric"] as const) {
+      currentTick(game)!.cash = 2e9;
+      game = cloneDeep(
+        gameReducer(
+          game,
+          buildTransmissionLine({
+            corridorId: `vt-champlain-${targetId === "valley-electric" ? "valley" : "ridge"}`,
+            financed: true,
+          }),
+        ),
+      );
+      game.transmission!.lines.at(-1)!.yearsToBuildLeft = 0;
+      if (acquire) {
+        const quote = acquisitionQuote(game, targetId)!;
+        game = cloneDeep(
+          gameReducer(
+            game,
+            acquireUtility({
+              targetId,
+              financed: targetId === "valley-electric",
+              quoteKey: quote.quoteKey,
+            }),
+          ),
+        );
+      }
+    }
+    return game;
+  }
+
+  function show(game: GameType) {
+    render(
+      <Provider store={configureStore({ reducer: { ui: uiReducer } })}>
+        <TransmissionPanel
+          game={game}
+          onBuild={jest.fn()}
+          onUpgrade={jest.fn()}
+          onBuyingRule={jest.fn()}
+          onSellingRule={jest.fn()}
+        />
+      </Provider>,
+    );
+  }
+
+  it("does not show an ownership disclosure for independent utilities", () => {
+    show(expansionGame(false));
+    expect(screen.queryByText(/Acquired utilities/)).not.toBeInTheDocument();
+    expect(screen.getByRole("list", { name: "Interties" })).toHaveTextContent(
+      "Valley expansion connection",
+    );
+  });
+
+  it("moves acquired corridors out of Interties and keeps regional connections operable", async () => {
+    show(expansionGame());
+    const interties = screen.getByRole("list", { name: "Interties" });
+    expect(interties).not.toHaveTextContent("expansion connection");
+    for (const name of ["Champlain", "Valley", "Ridge"])
+      expect(
+        within(interties).getByRole("button", {
+          name: new RegExp(`^Inspect ${name} regional connection`),
+        }),
+      ).toBeVisible();
+    const disclosure = screen.getByText("Acquired utilities (2)", {
+      selector: "summary",
+    });
+    expect(screen.getByText("Valley Electric")).not.toBeVisible();
+    await user.click(disclosure);
+    expect(screen.getByText("Valley Electric")).toBeVisible();
+    expect(screen.getByText("Ridge Electric")).toBeVisible();
+    expect(
+      screen.getAllByText("Customers transferred at acquisition"),
+    ).toHaveLength(2);
+    await user.click(disclosure);
+    expect(screen.getByText("Valley Electric")).not.toBeVisible();
+  });
+
+  it("keeps transfer receipts historical and distinguishes paid-off connection loans from acquisition debt", async () => {
+    const game = expansionGame();
+    const valley = game.transmission!.lines.find(
+      (line) => line.corridorId === "vt-champlain-valley",
+    )!;
+    valley.loanAmountLeft = 0;
+    valley.annualOperatingCost = 0;
+    for (const loan of game.utilityExpansion!.loans)
+      loan.loanAmountLeft =
+        loan.targetId === "valley-electric"
+          ? loan.kind === "assumed"
+            ? 4e6
+            : 8e6
+          : 17e6;
+    const transferred =
+      game.utilityExpansion!.acquisitions[0].transferredCustomers;
+    currentTick(game)!.customers = 1;
+    show(game);
+    await user.click(
+      screen.getByText("Acquired utilities (2)", { selector: "summary" }),
+    );
+    const entries = within(
+      screen.getByRole("list", { name: "Acquired utilities" }),
+    ).getAllByRole("listitem");
+    expect(entries[0]).toHaveTextContent("Acquired Jan 2005");
+    expect(entries[0]).toHaveTextContent(formatCount(transferred));
+    expect(entries[0]).toHaveTextContent("Connection upkeep$0/mo");
+    expect(entries[0]).toHaveTextContent("Connection loan remaining$0");
+    expect(entries[0]).toHaveTextContent("Acquisition debt remaining$12M");
+    expect(entries[1]).toHaveTextContent("Acquisition debt remaining$17M");
+    expect(within(entries[0]).queryByRole("button")).not.toBeInTheDocument();
+  });
+});
 
 test("intertie flow distinguishes customer purchases from storage charging", () => {
   const initial = createGame({ scenarioId: 100, seed: 61 });

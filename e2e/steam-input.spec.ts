@@ -1136,7 +1136,16 @@ test("controller reviews, cancels and confirms a utility acquisition", async ({
   );
   await input(page, "confirm");
   await expect(dialog).toHaveCount(0);
-  await expect(line).toContainText("Ridge expansion connection · Owned");
+  await expect(line).toHaveCount(0);
+  const ownership = page.locator(".facilities:visible .acquiredUtilities");
+  await expect(ownership.locator("summary")).toBeFocused();
+  await expect(ownership).not.toHaveAttribute("open");
+  await input(page, "confirm");
+  await expect(
+    ownership.getByRole("heading", { name: "Ridge Electric", exact: true }),
+  ).toBeVisible();
+  await input(page, "confirm");
+  await expect(ownership).not.toHaveAttribute("open");
   const saved = await readSavedGame(page);
   expect(
     saved?.utilityExpansion?.acquisitions.some(
