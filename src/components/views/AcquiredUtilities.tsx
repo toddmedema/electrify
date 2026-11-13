@@ -3,6 +3,7 @@ import { UTILITY_AREAS, UTILITY_TARGETS } from "../../data/UtilityExpansion";
 import { getCostTableIndex } from "../../data/Economy";
 import { getDateFromMinute } from "../../helpers/DateTime";
 import { formatCount, formatMoneyConcise } from "../../helpers/Format";
+import { getTotalDebt } from "../../helpers/Financials";
 import type { GameType } from "../../Types";
 import { ChevronDownGlyph } from "../base/Glyphs";
 
@@ -33,9 +34,16 @@ export default function AcquiredUtilities({
             (line) => line.corridorId === target.corridorId,
           );
           const acquired = getDateFromMinute(receipt.minute, game.startingYear);
-          const acquisitionDebt = expansion.loans
-            .filter((loan) => loan.targetId === receipt.targetId)
-            .reduce((sum, loan) => sum + loan.loanAmountLeft, 0);
+          const outstandingLoans = [
+            ...(line ? [line] : []),
+            ...expansion.loans.filter(
+              (loan) => loan.targetId === receipt.targetId,
+            ),
+          ].filter((loan) => loan.loanAmountLeft > 0);
+          const monthlyDebtPayment = outstandingLoans.reduce(
+            (sum, loan) => sum + loan.loanMonthlyPayment,
+            0,
+          );
           return (
             <li key={receipt.targetId}>
               <h3 className="facilityDetailHeading">{utility.name}</h3>
@@ -44,7 +52,7 @@ export default function AcquiredUtilities({
               </p>
               <dl className="facilityStats">
                 <div className="facilityStat">
-                  <dt>Customers transferred at acquisition</dt>
+                  <dt>Customers acquired</dt>
                   <dd className="facilityStatValue">
                     {formatCount(receipt.transferredCustomers)}
                   </dd>
@@ -59,15 +67,15 @@ export default function AcquiredUtilities({
                   </dd>
                 </div>
                 <div className="facilityStat">
-                  <dt>Connection loan remaining</dt>
+                  <dt>Debt payment</dt>
                   <dd className="facilityStatValue">
-                    {formatMoneyConcise(line?.loanAmountLeft ?? 0)}
+                    {formatMoneyConcise(monthlyDebtPayment)}/mo
                   </dd>
                 </div>
                 <div className="facilityStat">
-                  <dt>Acquisition debt remaining</dt>
+                  <dt>Debt remaining</dt>
                   <dd className="facilityStatValue">
-                    {formatMoneyConcise(acquisitionDebt)}
+                    {formatMoneyConcise(getTotalDebt(outstandingLoans))}
                   </dd>
                 </div>
               </dl>

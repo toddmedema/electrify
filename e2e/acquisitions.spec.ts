@@ -398,10 +398,18 @@ for (const theme of ["light", "dark"] as const) {
       ).toBeVisible();
       const entry = ownership.getByRole("listitem").nth(index);
       await expect(entry).toContainText("Acquired Jan 2005");
-      await expect(entry).toContainText("Customers transferred at acquisition");
-      await expect(entry).toContainText("Connection upkeep");
-      await expect(entry).toContainText("Connection loan remaining");
-      await expect(entry).toContainText("Acquisition debt remaining");
+      await expect(entry.locator("dt")).toHaveText([
+        "Customers acquired",
+        "Connection upkeep",
+        "Debt payment",
+        "Debt remaining",
+      ]);
+      await expect(
+        entry
+          .locator(".facilityStat")
+          .filter({ hasText: "Debt payment" })
+          .locator("dd"),
+      ).toHaveText(/^\$[\d.,]+[kMBT]?\/mo$/);
       const valueTops = await entry
         .locator("dd")
         .evaluateAll((values) =>

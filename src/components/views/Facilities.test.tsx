@@ -112,27 +112,38 @@ describe("acquired utilities", () => {
     await user.click(disclosure);
     expect(screen.getByText("Valley Electric")).toBeVisible();
     expect(screen.getByText("Ridge Electric")).toBeVisible();
-    expect(
-      screen.getAllByText("Customers transferred at acquisition"),
-    ).toHaveLength(2);
+    expect(screen.getAllByText("Customers acquired")).toHaveLength(2);
     await user.click(disclosure);
     expect(screen.getByText("Valley Electric")).not.toBeVisible();
   });
 
-  it("keeps transfer receipts historical and distinguishes paid-off connection loans from acquisition debt", async () => {
+  it("keeps transfer receipts historical and totals each utility's outstanding loans and payments", async () => {
     const game = expansionGame();
     const valley = game.transmission!.lines.find(
       (line) => line.corridorId === "vt-champlain-valley",
     )!;
     valley.loanAmountLeft = 0;
+    valley.loanMonthlyPayment = 10e3;
     valley.annualOperatingCost = 0;
-    for (const loan of game.utilityExpansion!.loans)
+    const ridge = game.transmission!.lines.find(
+      (line) => line.corridorId === "vt-champlain-ridge",
+    )!;
+    ridge.loanAmountLeft = 2e6;
+    ridge.loanMonthlyPayment = 40e3;
+    for (const loan of game.utilityExpansion!.loans) {
       loan.loanAmountLeft =
         loan.targetId === "valley-electric"
           ? loan.kind === "assumed"
             ? 4e6
             : 8e6
           : 17e6;
+      loan.loanMonthlyPayment =
+        loan.targetId === "valley-electric"
+          ? loan.kind === "assumed"
+            ? 20e3
+            : 30e3
+          : 50e3;
+    }
     const transferred =
       game.utilityExpansion!.acquisitions[0].transferredCustomers;
     currentTick(game)!.customers = 1;
@@ -146,10 +157,42 @@ describe("acquired utilities", () => {
     expect(entries[0]).toHaveTextContent("Acquired Jan 2005");
     expect(entries[0]).toHaveTextContent(formatCount(transferred));
     expect(entries[0]).toHaveTextContent("Connection upkeep$0/mo");
-    expect(entries[0]).toHaveTextContent("Connection loan remaining$0");
-    expect(entries[0]).toHaveTextContent("Acquisition debt remaining$12M");
-    expect(entries[1]).toHaveTextContent("Acquisition debt remaining$17M");
+    expect(entries[0]).toHaveTextContent("Debt payment$50k/mo");
+    expect(entries[0]).toHaveTextContent("Debt remaining$12M");
+    expect(entries[1]).toHaveTextContent("Debt payment$90k/mo");
+    expect(entries[1]).toHaveTextContent("Debt remaining$19M");
+    expect(
+      within(entries[0])
+        .getAllByRole("term")
+        .map((term) => term.textContent),
+    ).toEqual([
+      "Customers acquired",
+      "Connection upkeep",
+      "Debt payment",
+      "Debt remaining",
+    ]);
     expect(within(entries[0]).queryByRole("button")).not.toBeInTheDocument();
+  });
+
+  it("shows no debt payment after all connection and acquisition loans are paid off", async () => {
+    const game = expansionGame();
+    for (const loan of [
+      ...game.transmission!.lines,
+      ...game.utilityExpansion!.loans,
+    ]) {
+      loan.loanAmountLeft = 0;
+      loan.loanMonthlyPayment = 10e3;
+    }
+    show(game);
+    await user.click(
+      screen.getByText("Acquired utilities (2)", { selector: "summary" }),
+    );
+    for (const entry of within(
+      screen.getByRole("list", { name: "Acquired utilities" }),
+    ).getAllByRole("listitem")) {
+      expect(entry).toHaveTextContent("Debt remaining$0");
+      expect(entry).toHaveTextContent("Debt payment$0/mo");
+    }
   });
 });
 
