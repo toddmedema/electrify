@@ -89,11 +89,11 @@ export default function UtilityOfferDialog({
           value={money(offer.financedCashDue)}
         />
         <BuildDetailRow
-          label="Monthly cost · cash"
+          label="Debt & upkeep · cash"
           value={`${money(offer.cashMonthlyDebtService + offer.networkOMPerMonth)}/mo`}
         />
         <BuildDetailRow
-          label="Monthly cost · loan"
+          label="Debt & upkeep · loan"
           value={`${money(offer.monthlyDebtService + offer.networkOMPerMonth)}/mo`}
         />
       </BuildDetails>
@@ -102,8 +102,9 @@ export default function UtilityOfferDialog({
         option.
       </Typography>
       <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
-        Monthly costs include debt payments and {money(offer.networkOMPerMonth)}
-        /mo in network upkeep. Upkeep rises with customer growth and inflation.
+        Includes {money(offer.networkOMPerMonth)}/mo in network upkeep, which
+        rises with customer growth and inflation. Plant operations and power
+        purchases cost extra.
       </Typography>
       <details className="acquisitionDisclosure">
         <summary>Plants &amp; purchased power</summary>

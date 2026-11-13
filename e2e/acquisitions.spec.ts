@@ -108,8 +108,8 @@ for (const theme of ["light", "dark"] as const) {
         "Assumed debt",
         "Customers",
         "Loan down payment",
-        "Monthly cost · cash",
-        "Monthly cost · loan",
+        "Debt & upkeep · cash",
+        "Debt & upkeep · loan",
       ]);
       const insets = await table.getByRole("row").evaluateAll((rows) =>
         rows.map((row) => {

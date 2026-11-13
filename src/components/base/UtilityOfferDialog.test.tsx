@@ -16,7 +16,7 @@ import UtilityOfferDialog from "./UtilityOfferDialog";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "../../helpers/DateTime";
 
 it.each(["valley-electric", "ridge-electric"])(
-  "quotes the fee-inclusive price and complete monthly costs for %s",
+  "quotes the fee-inclusive price and monthly debt plus upkeep for %s",
   (targetId) => {
     const game = createGame({
       scenarioId: 116,
@@ -43,14 +43,14 @@ it.each(["valley-electric", "ridge-electric"])(
     );
     expect(
       within(
-        screen.getByRole("row", { name: /^Monthly cost · cash / }),
+        screen.getByRole("row", { name: /^Debt & upkeep · cash / }),
       ).getByRole("cell"),
     ).toHaveTextContent(
       `${formatMoneyConcise(offer.cashMonthlyDebtService + offer.networkOMPerMonth)}/mo`,
     );
     expect(
       within(
-        screen.getByRole("row", { name: /^Monthly cost · loan / }),
+        screen.getByRole("row", { name: /^Debt & upkeep · loan / }),
       ).getByRole("cell"),
     ).toHaveTextContent(
       `${formatMoneyConcise(offer.monthlyDebtService + offer.networkOMPerMonth)}/mo`,
