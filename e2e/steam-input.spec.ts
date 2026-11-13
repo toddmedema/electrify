@@ -432,13 +432,18 @@ test("menu movement under a stationary pointer preserves keyboard navigation", a
 test("TV home controller navigation includes every footer icon and wraps", async ({
   page,
 }) => {
+  await page.addInitScript(() => localStorage.setItem("tvMode", "false"));
   await page.goto("/");
-  await waitForDesktopTvEntry(page);
+  const tv = await waitForDesktopTvEntry(page);
   await expect(page.locator("html")).toHaveAttribute(
     "data-mock-input-context",
     "Menu",
   );
+  await select(page, tv);
+  await input(page, "confirm");
+  await expect(page.locator("html")).toHaveAttribute("data-tv-layout", "true");
   const actions = page.locator("#menuCard button,#menuCard a[href]");
+  await select(page, actions.first(), "up");
   const count = await actions.count();
   await expect(actions.first()).toBeFocused();
   for (const direction of ["down", "right"] as const) {

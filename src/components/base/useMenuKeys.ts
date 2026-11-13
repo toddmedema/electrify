@@ -95,7 +95,10 @@ export function useMenuKeys(settings = false, onBack?: () => void) {
         !interaction.current ||
         (interaction.current === 1 && ref.current?.contains(active)))
     ) {
-      preferred(rows()[0] || [])?.focus();
+      const items = rows()[0] || [];
+      const target =
+        ref.current?.id === "menuCard" ? items[0] : preferred(items);
+      target?.focus();
     }
     if (!interaction.current) interaction.current = 1;
   });
@@ -112,7 +115,7 @@ export function useMenuKeys(settings = false, onBack?: () => void) {
         !document.querySelector(popup) &&
         (active === document.body || active === document.documentElement)
       )
-        preferred(controls(root))?.focus();
+        controls(root)[0]?.focus();
     };
     // Let a click finish transferring focus before deciding that selection was lost.
     const scheduleRecovery = () => {

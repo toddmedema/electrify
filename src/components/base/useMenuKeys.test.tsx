@@ -257,8 +257,9 @@ it("restores the first home action after background blur and window/page return"
     </Menu>,
   );
   const first = screen.getByRole("button", { name: "Continue" });
-  screen.getByRole("button", { name: "New game" }).focus();
-  act(() => (document.activeElement as HTMLElement).blur());
+  const newGame = screen.getByRole("button", { name: "New game" });
+  newGame.focus();
+  act(() => newGame.blur());
   await waitFor(() => expect(first).toHaveFocus());
   act(() => {
     first.blur();
@@ -329,4 +330,19 @@ it("keeps TV home controller traversal linear through footer links and wraps bot
   expect(screen.getByRole("link", { name: "Community" })).toHaveFocus();
   await user.keyboard("{ArrowLeft}");
   expect(screen.getByRole("button", { name: "Manual" })).toHaveFocus();
+});
+
+it("always starts and recovers home at the first action even when a saved preference is pressed", async () => {
+  render(
+    <Menu home>
+      <button>Continue</button>
+      <button aria-pressed="true">TV layout on</button>
+    </Menu>,
+  );
+  const first = screen.getByRole("button", { name: "Continue" });
+  expect(first).toHaveFocus();
+  const tv = screen.getByRole("button", { name: "TV layout on" });
+  tv.focus();
+  act(() => tv.blur());
+  await waitFor(() => expect(first).toHaveFocus());
 });
