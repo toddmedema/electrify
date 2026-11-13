@@ -417,13 +417,23 @@ html[data-touch-input="true"]:not([data-controller-input="true"])
 .keyboardMenu .MuiTouchRipple-ripplePulsate {
   display: none;
 }
+.MuiTooltip-tooltip.mainMenuTooltip {
+  max-width: min(20rem, calc(100vw - 16px));
+  padding: 8px 12px;
+  border: 1px solid var(--tooltip-border);
+  border-radius: var(--radius-md);
+  color: var(--font-color-primary);
+  background: var(--tooltip-bg);
+  box-shadow: 0 4px 12px var(--tooltip-shadow);
+  font-size: var(--font-size-body2);
+  font-weight: 600;
+  line-height: 1.4;
+  overflow-wrap: break-word;
+}
 // The home menu shares one selection between mouse, keyboard and controller. Touch has
 // transient press feedback instead: focus restored after navigation must not look selected.
-:is(
-    #centeredMenu :is(.mainActions, .resourceActions, .discoveryActions),
-    .couchSettingsPromptActions
-  )
-  .MuiButton-root {
+#menuCard .MuiButtonBase-root,
+.couchSettingsPromptActions .MuiButton-root {
   // Selection changes immediately; cross-fading leaves the previous cursor painted.
   transition: none;
 
@@ -431,16 +441,18 @@ html[data-touch-input="true"]:not([data-controller-input="true"])
     background-color: transparent;
   }
 }
-html:is(:not([data-touch-input="true"]), [data-controller-input="true"])
-  :is(
-    #centeredMenu :is(.mainActions, .resourceActions, .discoveryActions),
-    .couchSettingsPromptActions
-  )
-  .MuiButton-root:focus {
-  background-color: var(--interactive-blue);
-  color: var(--interactive-contrast);
-  // The fill carries selection, including when a controller moves real focus.
-  outline: none !important;
+html:is(:not([data-touch-input="true"]), [data-controller-input="true"]) {
+  #menuCard .MuiButtonBase-root:focus,
+  .couchSettingsPromptActions .MuiButton-root:focus,
+  &:not(:has(.couchSettingsPrompt :focus))
+    #menuCard:not(:focus-within)
+    .mainActions
+    .MuiButton-root:first-child {
+    background-color: var(--interactive-blue);
+    color: var(--interactive-contrast);
+    // The fill carries selection, including when a controller moves real focus.
+    outline: none !important;
+  }
 }
 
 // A single, quiet surface response replaces the expanding Material ripple on the home menu.
@@ -3292,10 +3304,20 @@ $pane_header_height: 48px;
   // Keep secondary actions quiet through placement while retaining their blue affordance.
   .mainMenuFooter {
     flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
 
     .MuiIconButton-root,
     .MuiButton-root {
       color: var(--interactive-blue);
+    }
+
+    .MuiIconButton-root {
+      width: 44px;
+      height: 44px;
+      padding: 10px;
     }
 
     box-sizing: border-box;

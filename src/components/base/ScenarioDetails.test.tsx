@@ -238,7 +238,7 @@ it.each([-198, 198])(
       </ThemeProvider>,
     );
     const outlook = screen.getByRole("region", { name: "Score outlook" });
-    const delta = within(outlook).getByText(`${change < 0 ? "−" : "+"}198`);
+    const delta = within(outlook).getByText(`${change < 0 ? "−" : "+"}200`);
     expect(delta).toHaveStyle({
       color: change < 0 ? theme.palette.error.main : theme.palette.success.main,
     });

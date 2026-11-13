@@ -9,7 +9,10 @@ import {
 } from "./UPlotHelpers";
 import { TickPresentFutureType } from "../../Types";
 import { formatMinuteAsTooltipHeader } from "../../helpers/DateTime";
-import { formatWattHours, formatWattHoursAxis } from "../../helpers/Format";
+import {
+  formatForecastWattHours as formatWattHours,
+  formatForecastWattHoursAxis as formatWattHoursAxis,
+} from "../../helpers/Format";
 import { chartPalette } from "../../Theme";
 
 export interface Props {

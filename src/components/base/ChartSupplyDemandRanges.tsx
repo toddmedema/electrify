@@ -2,8 +2,13 @@ import * as React from "react";
 import uPlot from "uplot";
 import { TickPresentFutureType } from "../../Types";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "../../helpers/DateTime";
-import { formatWatts, formatWattsAxis } from "../../helpers/Format";
-import { formatRequiredShare } from "../../helpers/ObjectiveRules";
+import {
+  formatForecastWatts as formatWatts,
+  formatWatts as formatObservedWatts,
+  formatForecastWattsAxis as formatWattsAxis,
+  formatForecastNumber,
+  formatForecastPercent,
+} from "../../helpers/Format";
 import { chartPalette, withAlpha } from "../../Theme";
 import UPlotChart, { BuildContext } from "./UPlotChart";
 import {
@@ -91,7 +96,7 @@ export function unmetShare(range: MonthlyRange): number {
 
 /** A share as a percentage, "<0.1%" where it would round to nothing but is not zero. */
 function formatUnmet(share: number): string {
-  return share < 0.0005 ? "<0.1%" : formatRequiredShare(share);
+  return share < 0.0005 ? "<0.1%" : formatForecastPercent(share);
 }
 
 export interface MonthlyShortfall extends ShortfallBar {
@@ -222,12 +227,15 @@ function tooltip(index: number, state: State): string {
   const date = getDateFromMinute(range.minute, state.startingYear);
   const period = `${date.month} ${date.year}`;
   if (!range.projected) {
-    return `${period} · recorded average\nSupply: ${formatWatts(range.supplyMin)}\nDemand: ${formatWatts(range.demandMin)}`;
+    return `${period} · recorded average\nSupply: ${formatObservedWatts(range.supplyMin)}\nDemand: ${formatObservedWatts(range.demandMin)}`;
   }
   const share = unmetShare(range);
+  const served = formatForecastPercent(1 - share);
+  const servedText =
+    share < 0.0005 ? ">99%" : served === "100%" && share > 0 ? "<100%" : served;
   const shortfall =
     range.peakShortfall > 0
-      ? `Demand unmet: ${formatUnmet(share)} (${share < 0.0005 ? ">99.9%" : formatRequiredShare(1 - share)} served)`
+      ? `Demand unmet: ${formatUnmet(share)} (${servedText} served)`
       : "No shortfall";
   const magnitude =
     range.peakShortfall > 0
@@ -271,8 +279,10 @@ export default function ChartSupplyDemandRanges(
   return (
     <UPlotChart<State>
       id="chartForecastSupplyDemand"
-      ariaLabel={`Monthly ranges of estimated electricity supply and demand. ${worst && worstDate ? `${marked} forecast ${marked === 1 ? "month" : "months"} with unmet demand marked; the largest peak shortfall is ${formatWatts(worst.peakShortfall)} in ${worstDate.month} ${worstDate.year}` : "No forecast months with unmet demand"}`}
-      formatSummaryValue={formatWatts}
+      ariaLabel={`Monthly ranges of estimated electricity supply and demand. ${worst && worstDate ? `${formatForecastNumber(marked)} forecast ${marked === 1 ? "month" : "months"} with unmet demand marked; the largest peak shortfall is ${formatWatts(worst.peakShortfall)} in ${worstDate.month} ${worstDate.year}` : "No forecast months with unmet demand"}`}
+      formatSummaryValue={(value, series) =>
+        (series % 2 === 0 ? formatObservedWatts : formatWatts)(value)
+      }
       height={props.height}
       state={{
         ranges,

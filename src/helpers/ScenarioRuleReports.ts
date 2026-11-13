@@ -14,7 +14,7 @@ import {
   formatMoneyConcise,
   formatWatts,
   formatWattHours,
-  formatFixed,
+  formatNumber,
   formatRateCompact,
 } from "./Format";
 import { customerSalesRevenue } from "./Scoring";
@@ -237,18 +237,16 @@ function observed(
 
 /** Keep a displayed share on the same side of a supplied threshold as the recorded fact. */
 function percent(value: number, threshold?: number): string {
-  for (let digits = 0; digits <= 6; digits++) {
-    const display = Number((value * 100).toFixed(digits));
-    const rounded = display / 100;
-    if ((value > 0 && rounded === 0) || (value < 1 && rounded === 1)) continue;
-    if (
-      threshold !== undefined &&
-      Math.sign(value - threshold) !== Math.sign(rounded - threshold)
-    )
-      continue;
-    return `${display}%`;
-  }
-  return `${value * 100}%`;
+  const text = formatNumber(value * 100);
+  const rounded = Number(text) / 100;
+  if (
+    threshold !== undefined &&
+    Math.sign(value - threshold) !== Math.sign(rounded - threshold)
+  )
+    return `${text}% (${value === threshold ? "at" : value < threshold ? "below" : "above"} threshold)`;
+  if (value > 0 && rounded === 0) return ">0%";
+  if (value < 1 && rounded === 1) return "<100%";
+  return `${text}%`;
 }
 
 function validWindow(
@@ -648,7 +646,7 @@ export function interpretRuleReport(
     const storageHoursAtPeak = snapshot.storagePeakWh / peakDemandW;
     return observed(
       report,
-      `Storage power covers ${percent(storageCoverage)} of recorded peak demand, with ${formatFixed(storageHoursAtPeak, 1)} hours of energy at that demand.`,
+      `Storage power covers ${percent(storageCoverage)} of recorded peak demand, with ${formatNumber(storageHoursAtPeak)} hours of energy at that demand.`,
       [
         metric(
           "storageCoverage",

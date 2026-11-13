@@ -160,12 +160,18 @@ describe("Settings", () => {
         theme: "system",
       },
     });
-    const vibration = await screen.findByRole("switch", {
-      name: "Controller vibration",
-    });
-    const recording = await screen.findByRole("switch", {
-      name: "Recorded highlights",
-    });
+    // Let the lazy desktop controls load without repeatedly computing every switch's name.
+    const vibration = await screen.findByLabelText("Controller vibration");
+    const recording = await screen.findByLabelText("Recorded highlights");
+    expect(vibration).toHaveRole("switch");
+    expect(recording).toHaveRole("switch");
+    // MUI's native switch inputs are transparent; their labels carry the visible choice.
+    expect(
+      screen.getByText("Controller vibration", { selector: "label" }),
+    ).toBeVisible();
+    expect(
+      screen.getByText("Recorded highlights", { selector: "label" }),
+    ).toBeVisible();
     expect(vibration).not.toBeChecked();
     expect(recording).not.toBeChecked();
     expect(screen.getByRole("switch", { name: /^Sound$/ })).not.toBeChecked();

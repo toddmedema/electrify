@@ -19,9 +19,11 @@ import {
   MINUTES_PER_MONTH,
 } from "../../helpers/DateTime";
 import {
+  formatForecastMoney,
   formatMoneyConcise,
+  formatForecastWatts,
   formatWatts,
-  formatWattsAxis,
+  formatForecastWattsAxis as formatWattsAxis,
 } from "../../helpers/Format";
 import { chartPalette, getThemeVersion, subscribeThemeMode } from "../../Theme";
 
@@ -206,23 +208,25 @@ function buildOptions(showXLabels: boolean) {
 
 function tooltip(idx: number, state: State): string {
   const point = state.points[idx];
+  const projected =
+    state.nowMinute !== undefined && point.minute >= state.nowMinute;
+  const watts = projected ? formatForecastWatts : formatWatts;
   let header: string;
   if (state.monthly) {
     const date = getDateFromMinute(point.minute, state.startingYear);
-    // A month that starts after now is the forecast's average, not a recorded one.
-    header =
-      state.nowMinute !== undefined && point.minute > state.nowMinute
-        ? `${date.month} ${date.year} · forecast average`
-        : `${date.month} ${date.year} average`;
+    // A month starting at or after now is a forecast average.
+    header = projected
+      ? `${date.month} ${date.year} · forecast average`
+      : `${date.month} ${date.year} average`;
   } else {
     header = formatMinuteAsTooltipHeader(point.minute, state.startingYear);
   }
   return [
     header,
-    `Imports: ${formatWatts(point.importedW)}`,
-    `Exports: ${formatWatts(point.exportedW)}`,
-    `Neighbor price: ${formatMoneyConcise(point.pricePerMWh)}/MWh`,
-    `Line capacity: ${formatWatts(point.capacityW)}`,
+    `Imports: ${watts(point.importedW)}`,
+    `Exports: ${watts(point.exportedW)}`,
+    `Neighbor price: ${(projected ? formatForecastMoney : formatMoneyConcise)(point.pricePerMWh)}/MWh`,
+    `Line capacity: ${watts(point.capacityW)}`,
   ].join("\n");
 }
 
@@ -338,7 +342,16 @@ export default class ChartForecastPowerExchange extends React.PureComponent<
         <UPlotChart<State>
           id="chartForecastPowerExchange"
           ariaLabel="Chart of predicted imports and exports over your interties. Imports plot above zero and exports below zero"
-          formatSummaryValue={formatWatts}
+          formatSummaryValue={(value, _series, point) =>
+            (currentMinute !== undefined && minutes[point] >= currentMinute
+              ? formatForecastWatts
+              : formatWatts)(value)
+          }
+          summaryRangeGroup={(_series, point) =>
+            currentMinute !== undefined && minutes[point] >= currentMinute
+              ? "forecast"
+              : "recorded"
+          }
           height={height}
           state={state}
           data={[minutes, importRow, exportRow]}

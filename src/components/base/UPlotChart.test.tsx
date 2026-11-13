@@ -11,6 +11,7 @@ import { ChartAxisAlignment } from "./ChartAxisAlignment";
 import { setThemeMode } from "../../Theme";
 import { applyInterfaceScale } from "../../InterfaceScale";
 import TutorialHud from "./TutorialHud";
+import { formatForecastWatts, formatWatts } from "../../helpers/Format";
 
 jest.mock("uplot", () => {
   const MockUPlot = jest.fn();
@@ -98,6 +99,69 @@ describe("UPlotChart resizing", () => {
     });
     jest.restoreAllMocks();
     jest.useRealTimers();
+  });
+
+  it("formats summary extrema using their original point indices", () => {
+    render(
+      <UPlotChart
+        ariaLabel="Mixed precision"
+        state={{}}
+        data={[
+          [0, 1, 2, 3],
+          [null, 123, 124, 122],
+        ]}
+        formatSummaryValue={(value, _series, point) => `${value} at ${point}`}
+        buildOptions={() => ({ width: 0, height: 0, series: [{}, {}] })}
+      />,
+    );
+    expect(screen.getByRole("img")).toHaveAccessibleName(
+      /latest 122 at 3, range 122 at 3 to 124 at 2/,
+    );
+  });
+
+  it("keeps signed recorded and forecast ranges separate using finite unstacked points", () => {
+    const minutes = [0, 1, 2, 3, 4, 5, 6];
+    render(
+      <UPlotChart
+        ariaLabel="Signed mixed precision"
+        state={{}}
+        data={[minutes, [1, 2, 3, 4, 5, 6, 7]]}
+        summaryData={[
+          minutes,
+          [null, NaN, -123e6, -124e6, Infinity, -125e6, -126e6],
+        ]}
+        formatSummaryValue={(value, _series, point) =>
+          (point < 4 ? formatWatts : formatForecastWatts)(value)
+        }
+        summaryRangeGroup={(_series, point) =>
+          point < 4 ? "recorded" : "forecast"
+        }
+        buildOptions={() => ({ width: 0, height: 0, series: [{}, {}] })}
+      />,
+    );
+    expect(screen.getByRole("img")).toHaveAccessibleName(
+      "Signed mixed precision. Series 1: latest -130MW, recorded range -124MW to -123MW, forecast range -130MW to -120MW, trend down",
+    );
+  });
+
+  it("preserves an empty series and a single-meaning range", () => {
+    render(
+      <UPlotChart
+        ariaLabel="Sparse mixed precision"
+        state={{}}
+        data={[
+          [0, 1, 2],
+          [null, NaN, Infinity],
+          [null, 123e6, 124e6],
+        ]}
+        summaryRangeGroup={() => "recorded"}
+        formatSummaryValue={(value) => formatWatts(value)}
+        buildOptions={() => ({ width: 0, height: 0, series: [{}, {}, {}] })}
+      />,
+    );
+    expect(screen.getByRole("img")).toHaveAccessibleName(
+      "Sparse mixed precision. Series 1: latest 0W, range 0W to 0W, trend flat. Series 2: latest 124MW, range 123MW to 124MW, trend up",
+    );
   });
 
   it("never announces negative zero in a chart summary", () => {

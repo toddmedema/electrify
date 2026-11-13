@@ -5,8 +5,10 @@ import { MINUTES_PER_MONTH, getDateFromMinute } from "../../helpers/DateTime";
 import { monthMinute } from "../../helpers/Projection";
 import {
   formatReserveLine,
+  formatForecastReserveLine,
+  formatForecastWatts,
   formatWatts,
-  formatWattsAxis,
+  formatForecastWattsAxis as formatWattsAxis,
 } from "../../helpers/Format";
 import { chartPalette } from "../../Theme";
 import UPlotChart, { BuildContext } from "./UPlotChart";
@@ -115,7 +117,7 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
 function tooltip(index: number, state: State): string {
   const point = state.points[index];
   const date = getDateFromMinute(point.minute, state.startingYear);
-  return `${date.month} ${date.year} · ${point.projected ? "Projected" : "Recorded"} monthly minimum\n${point.value === null ? "Lowest reserve: Not recorded" : formatReserveLine(point.value, "Lowest reserve")}`;
+  return `${date.month} ${date.year} · ${point.projected ? "Projected" : "Recorded"} monthly minimum\n${point.value === null ? "Lowest reserve: Not recorded" : (point.projected ? formatForecastReserveLine : formatReserveLine)(point.value, "Lowest reserve")}`;
 }
 
 export default function ChartMonthlySpareCapacity(props: Props) {
@@ -138,7 +140,9 @@ export default function ChartMonthlySpareCapacity(props: Props) {
     <UPlotChart<State>
       id="chartMonthlySpareCapacity"
       ariaLabel="Monthly lowest reserve. Values below zero are a shortage; positive reserve does not rule out a blackout"
-      formatSummaryValue={formatWatts}
+      formatSummaryValue={(value, seriesIndex) =>
+        (seriesIndex === 1 ? formatForecastWatts : formatWatts)(value)
+      }
       interactiveTooltip
       height={props.height}
       state={{

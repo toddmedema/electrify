@@ -20,7 +20,7 @@ import { formatLargeMassApprox, KG_PER_MEGATONNE } from "../../helpers/Units";
 import CustomerGrowthChallenge from "./CustomerGrowthChallenge";
 import ConceptIcon from "./ConceptIcon";
 import UtilitySupplyPlan from "./UtilitySupplyPlan";
-import { formatScore } from "../../helpers/Format";
+import { formatScore, formatForecastNumber } from "../../helpers/Format";
 import { getMissionStatus } from "../../helpers/MissionStatus";
 import { scenarioObjectiveDefinitions } from "../../helpers/ObjectiveRules";
 import { objectiveGoalGroups } from "../../helpers/ObjectivePresentation";
@@ -159,7 +159,7 @@ function ScoreOutlook({
                 : "Projected final"}
             </dt>
             <dd>
-              {projection ? formatScore(projection.final) : "—"}
+              {projection ? formatForecastNumber(projection.final) : "—"}
               {change !== 0 && (
                 <Box
                   component="span"
@@ -168,7 +168,7 @@ function ScoreOutlook({
                   sx={{ color: change > 0 ? "success.main" : "error.main" }}
                 >
                   {change > 0 ? "+" : "−"}
-                  {formatScore(Math.abs(change))}
+                  {formatForecastNumber(Math.abs(change))}
                 </Box>
               )}
             </dd>
@@ -182,6 +182,7 @@ function ScoreOutlook({
         timeline={timeline}
         title="score"
         format={formatScore}
+        formatProjected={formatForecastNumber}
         projectedNote="Projected"
         startingYear={game.startingYear}
         domain={domain}

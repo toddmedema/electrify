@@ -548,7 +548,7 @@ it("shows natural-gas base, per-start, and daily-start estimated O&M", async () 
   expect(
     screen.queryByText("Est. operations & maintenance"),
   ).not.toBeInTheDocument();
-  expect(screen.queryByText("$11.9M/yr")).not.toBeInTheDocument();
+  expect(screen.queryByText("$12M/yr")).not.toBeInTheDocument();
   expect(screen.queryByText("Flexible power")).toBeNull();
   expect(
     screen.queryByText(/Average output over a year/),
@@ -557,26 +557,18 @@ it("shows natural-gas base, per-start, and daily-start estimated O&M", async () 
     screen.getByRole("button", { name: "Show Natural Gas Peaker details" }),
   );
 
-  expect(
-    screen.getByRole("row", {
-      name: /Fixed upkeep.*\$2\.88M/,
-    }),
-  ).toBeInTheDocument();
-  expect(
-    screen.getByRole("row", {
-      name: /Variable upkeep.*\$1\.24\/MWh/,
-    }),
-  ).toBeInTheDocument();
-  expect(
-    screen.getByRole("row", {
-      name: /Non-fuel start cost.*\$23\.1k\/start/,
-    }),
-  ).toBeInTheDocument();
-  expect(
-    screen.getByRole("row", {
-      name: /Estimated annual upkeep.*\$11\.9M\/yr/,
-    }),
-  ).toBeInTheDocument();
+  const rows = screen.getAllByRole("row");
+  for (const name of [
+    /Fixed upkeep.*\$2\.88M/,
+    /Variable upkeep.*\$1\.24\/MWh/,
+    /Non-fuel start cost.*\$23\.1k\/start/,
+    /Estimated annual upkeep.*\$12M\/yr/,
+  ]) {
+    const matches = rows.filter((row) => name.test(row.textContent || ""));
+    expect(matches).toHaveLength(1);
+    expect(matches[0]).toHaveAccessibleName(name);
+    expect(matches[0]).toBeInTheDocument();
+  }
 
   fireEvent.click(
     screen.getByRole("button", {
@@ -711,12 +703,12 @@ it("shows Oil's fixed, variable, and expected-output O&M", () => {
   ).toBeInTheDocument();
   expect(
     screen.getByRole("row", {
-      name: /Variable upkeep.*\$25\.71\/MWh/,
+      name: /Variable upkeep.*\$25\.7\/MWh/,
     }),
   ).toBeInTheDocument();
   expect(
     screen.getByRole("row", {
-      name: /Estimated annual upkeep.*\$7\.59M\/yr/,
+      name: /Estimated annual upkeep.*\$7\.6M\/yr/,
     }),
   ).toBeInTheDocument();
   expect(screen.queryByText("Non-fuel start cost")).toBeNull();
@@ -921,6 +913,43 @@ it("draws each generator's typical year against one shared scale", () => {
     screen.getByRole("img", { name: /^Typical year of water inflow: / }),
   ).toBeInTheDocument();
 });
+
+it.each(["weather", "water-inflow"] as const)(
+  "rounds low and over-nameplate %s output once in captions and summaries",
+  (kind) => {
+    const game = createGame({ scenarioId: 100, difficulty: "Employee" });
+    const generator = GENERATORS(game, 1000000, [], [500]).find(
+      (candidate) => candidate.name === "Solar",
+    )!;
+    render(
+      <GeneratorBuildItem
+        cash={1e9}
+        date={game.date}
+        interestRate={game.interestRate}
+        generator={generator}
+        location={game.location}
+        seed={game.seed}
+        outputShape={{
+          kind,
+          monthly: [1.449, ...Array(11).fill(0.0449)],
+          lowMonth: 1,
+          mean: 0.16,
+        }}
+        onBuild={jest.fn()}
+      />,
+    );
+    const metric = screen.getByRole("group", { name: /Typical monthly/ });
+    const unit = kind === "weather" ? "capacity" : "of typical water";
+    expect(metric).toHaveTextContent(`Feb: 4.5% ${unit}`);
+    expect(
+      screen.getByRole("img", { name: /^Typical year/ }),
+    ).toHaveAccessibleName(
+      /highest in January at 140%, lowest in February at 4.5%/,
+    );
+    fireEvent.keyDown(metric, { key: "Home" });
+    expect(metric).toHaveTextContent(`Jan: 140% ${unit}`);
+  },
+);
 
 it.each(["weather", "water-inflow"] as const)(
   "inspects each %s month and restores the low month after leaving",
@@ -1523,10 +1552,15 @@ it.each([undefined, "Natural Gas"] as const)(
     const choicesInOrder = screen.getAllByRole("button", {
       name: /^Review purchase of /,
     });
-    const index = (name: string) =>
-      choicesInOrder.indexOf(
-        screen.getByRole("button", { name: `Review purchase of ${name}` }),
+    const index = (name: string) => {
+      const label = `Review purchase of ${name}`;
+      const matches = choicesInOrder.filter(
+        (button) => button.getAttribute("aria-label") === label,
       );
+      expect(matches).toHaveLength(1);
+      expect(matches[0]).toHaveAccessibleName(label);
+      return choicesInOrder.indexOf(matches[0]);
+    };
     expect(index("Solar")).toBeLessThan(index("Natural Gas CC"));
     expect(index("Natural Gas CC")).toBeLessThan(index("Natural Gas Peaker"));
     expect(index("Natural Gas Peaker")).toBeLessThan(index("Coal"));

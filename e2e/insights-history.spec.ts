@@ -100,7 +100,7 @@ test("public pricing shows the rate score and the customer retention objective",
 });
 
 for (const theme of ["light", "dark"]) {
-  test(`customer inspection preserves three significant digits in ${theme}`, async ({
+  test(`customer forecast inspection uses two significant digits in ${theme}`, async ({
     page,
   }, testInfo) => {
     await page.addInitScript((mode) => {
@@ -133,7 +133,7 @@ for (const theme of ["light", "dark"]) {
     await expect(chart).toBeVisible();
     await chart.locator(".u-over").hover({ position: { x: 1, y: 20 } });
     await expect(chart.locator(".chartTooltip")).toBeVisible();
-    await expect(chart.locator(".chartTooltip")).toContainText("16.5K");
+    await expect(chart.locator(".chartTooltip")).toContainText("17k");
     await expect
       .poll(() =>
         page.evaluate(

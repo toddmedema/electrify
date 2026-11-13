@@ -96,10 +96,46 @@ export function useMenuKeys(settings = false, onBack?: () => void) {
         !interaction.current ||
         (interaction.current === 1 && ref.current?.contains(active)))
     ) {
-      focus(preferred(rows()[0] || []));
+      const items = rows()[0] || [];
+      focus(ref.current?.id === "menuCard" ? items[0] : preferred(items));
     }
     if (!interaction.current) interaction.current = 1;
   });
+
+  useLayoutEffect(() => {
+    const root = ref.current;
+    if (root?.id !== "menuCard") return;
+    let frame = 0;
+    const recover = () => {
+      const active = document.activeElement;
+      if (
+        document.visibilityState !== "hidden" &&
+        !root.closest(unavailable) &&
+        !document.querySelector(popup) &&
+        (active === document.body || active === document.documentElement)
+      )
+        focus(controls(root)[0]);
+    };
+    // Let a click finish transferring focus before deciding that selection was lost.
+    const scheduleRecovery = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(recover);
+    };
+    root.addEventListener("focusout", scheduleRecovery);
+    window.addEventListener("focus", recover);
+    document.addEventListener("visibilitychange", recover);
+    // A child can remove its selected action without rerendering the home menu
+    // (for example, Install app disappearing after installation).
+    const observer = new MutationObserver(scheduleRecovery);
+    observer.observe(root, { childList: true, subtree: true });
+    return () => {
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+      root.removeEventListener("focusout", scheduleRecovery);
+      window.removeEventListener("focus", recover);
+      document.removeEventListener("visibilitychange", recover);
+    };
+  }, []);
 
   const onKeyDown = (event: KeyboardEvent) => {
     const target = event.target as HTMLElement;
@@ -133,7 +169,12 @@ export function useMenuKeys(settings = false, onBack?: () => void) {
       event.preventDefault();
       target.click();
     } else if (!native && event.key.startsWith("Arrow")) {
-      if (document.documentElement.dataset.controllerInput === "true") return;
+      if (
+        ref.current.id !== "menuCard" &&
+        document.documentElement.dataset.controllerInput === "true"
+      )
+        return;
+
       const groups = rows();
       const row = groups.findIndex((items) => items.includes(target));
       if (row < 0) return;

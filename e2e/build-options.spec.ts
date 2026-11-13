@@ -200,7 +200,7 @@ for (const theme of ["light", "dark"] as const) {
           const lowCaption = await caption.textContent();
           const chart = output.locator("svg");
           await chart.hover({ position: { x: 0, y: 12 } });
-          await expect(caption).toHaveText(/^Jan: \d+%/);
+          await expect(caption).toHaveText(/^Jan: \d+(?:\.\d+)?%/);
           const { width, height } = (await chart.boundingBox())!;
           const layout = () =>
             output.evaluate((element) => {
@@ -242,9 +242,13 @@ for (const theme of ["light", "dark"] as const) {
             });
             await expect(caption).toHaveText(
               new RegExp(
-                `^${month}: \\d+% ${name === "Hydro" ? "of typical water" : "capacity"}$`,
+                `^${month}: \\d+(?:\\.\\d+)?% ${name === "Hydro" ? "of typical water" : "capacity"}$`,
               ),
             );
+            const percentage = Number(
+              (await caption.innerText()).match(/: (\d+(?:\.\d+)?)%/)![1],
+            );
+            expect(percentage).toBe(Number(percentage.toPrecision(2)));
             expect(await layout()).toEqual(initialLayout);
           }
           const textLayout = await caption.evaluate((element) => {
@@ -264,7 +268,7 @@ for (const theme of ["light", "dark"] as const) {
             await output.focus();
             await output.press("Home");
           }
-          await expect(caption).toHaveText(/^Jan: \d+%/);
+          await expect(caption).toHaveText(/^Jan: \d+(?:\.\d+)?%/);
           await reviewScreenshot(card, {
             path: testInfo.outputPath(`${name}-monthly-${theme}.png`),
             animations: "disabled",

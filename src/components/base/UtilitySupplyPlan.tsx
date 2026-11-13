@@ -4,7 +4,10 @@ import type { GameType } from "../../Types";
 import type { ProjectionView } from "../../helpers/Projection";
 import { utilityPlanning } from "../../helpers/UtilityPlanning";
 import { MONTHS } from "../../Constants";
-import { formatWatts } from "../../helpers/Format";
+import {
+  formatForecastWatts as formatWatts,
+  formatForecastNumber,
+} from "../../helpers/Format";
 import UtilityContractSchedule from "./UtilityContractSchedule";
 import { facilityDisplayName } from "./FacilityLabels";
 import { formatRequiredShare } from "../../helpers/ObjectiveRules";
@@ -29,7 +32,7 @@ export default function UtilitySupplyPlan({
       <Typography variant="body2" sx={{ mt: 1 }}>
         {plan.nextCustomers === undefined || plan.nextPeakW === undefined
           ? "Updating demand forecast…"
-          : `Next year at current rates and policies: ${Math.round(plan.nextCustomers).toLocaleString()} customers · ${formatWatts(plan.nextPeakW)} peak demand.`}
+          : `Next year at current rates and policies: ${formatForecastNumber(plan.nextCustomers)} customers · ${formatWatts(plan.nextPeakW)} peak demand.`}
       </Typography>
       <Box component="ul" sx={{ pl: 2.5, my: 1, "& li + li": { mt: 1 } }}>
         {plan.gap && (

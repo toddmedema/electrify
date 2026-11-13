@@ -297,7 +297,7 @@ for (const theme of ["light", "dark"] as const) {
     await gridSummary.focus();
     await gridSummary.press("Enter");
     await accounts.fill("100000000");
-    await expect(gridSummary).toContainText("100,000,000 accounts");
+    await expect(gridSummary).toContainText("100M accounts");
     // Check this last: calibrating the maximum grid can delay subsequent requests.
     expect(
       await gridSummary.evaluate((el) => el.scrollWidth - el.clientWidth),
@@ -681,9 +681,9 @@ test("baseline comparison keeps the same starting assumptions and protects an ex
 });
 
 for (const [city, accounts, energy, territory] of [
-  ["Austin", 575087, "14.50", "Austin Energy"],
+  ["Austin", 575087, "14.5", "Austin Energy"],
   ["Seattle", 513504, "8.94", "Seattle City Light"],
-  ["Dallas", 4111000, "172.78", "Oncor"],
+  ["Dallas", 4111000, "173", "Oncor"],
 ] as const) {
   test(`landing-page defaults preserve researched ${city} background and a marginal campus`, async ({
     page,

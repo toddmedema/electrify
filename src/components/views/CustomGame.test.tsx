@@ -1,5 +1,11 @@
 import * as React from "react";
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  isInaccessible,
+  render,
+  screen,
+} from "@testing-library/react";
 import {
   CUSTOM_SCENARIO_ID,
   DEFAULT_CUSTOM_SCENARIO,
@@ -43,6 +49,15 @@ afterEach(() => {
   mockCreateForecastWorker.mockReset();
 });
 
+// Check one labelled control instead of recomputing names for every setup select.
+function setupCombobox(name: string) {
+  const control = screen.getByLabelText(name);
+  expect(control).toHaveRole("combobox");
+  expect(control).toHaveAccessibleName(name);
+  expect(isInaccessible(control)).toBe(false);
+  return control;
+}
+
 it("opens after economic data is loaded and names every setup control", () => {
   // createGame loads the economy, matching the path that used to make this screen crash after
   // quitting an active game.
@@ -78,7 +93,7 @@ it("opens after economic data is loaded and names every setup control", () => {
     "Facility type",
     "Facility size",
   ].forEach((name) => {
-    expect(screen.getByRole("combobox", { name })).toBeInTheDocument();
+    expect(setupCombobox(name)).toBeInTheDocument();
   });
   expect(screen.getByRole("textbox", { name: "Seed" })).toBeInTheDocument();
   expect(
@@ -210,46 +225,57 @@ it.each(["startup", "postMessage"])(
   },
 );
 
-it("ignores an older forecast result after the setup changes", () => {
-  jest.useFakeTimers();
-  const worker = forecastWorkerStub();
-  mockCreateForecastWorker.mockReturnValue(worker);
-  render(
-    <CustomGame
-      game={createGame({ scenarioId: 100 })}
-      scenario={{ ...DEFAULT_CUSTOM_SCENARIO }}
-      onBack={jest.fn()}
-      onDelta={jest.fn()}
-      onStart={jest.fn()}
-    />,
-  );
+it.each<[number, string]>([
+  [3, "300%"],
+  [1.294, "130%"],
+  [1.045, "100%"],
+  [0.9991, "<100%"],
+])(
+  "ignores an older forecast result and caps the current coverage %s",
+  (demandServed, label) => {
+    jest.useFakeTimers();
+    const worker = forecastWorkerStub();
+    mockCreateForecastWorker.mockReturnValue(worker);
+    render(
+      <CustomGame
+        game={createGame({ scenarioId: 100 })}
+        scenario={{ ...DEFAULT_CUSTOM_SCENARIO }}
+        onBack={jest.fn()}
+        onDelta={jest.fn()}
+        onStart={jest.fn()}
+      />,
+    );
 
-  act(() => jest.advanceTimersByTime(250));
-  const firstRequest = (worker.postMessage as jest.Mock).mock.calls[0][0];
-  fireEvent.change(screen.getByRole("slider", { name: "Starting customers" }), {
-    target: { value: 2_000_000 },
-  });
-  act(() => jest.advanceTimersByTime(250));
-  const secondRequest = (worker.postMessage as jest.Mock).mock.calls[1][0];
-  act(() => {
-    worker.onmessage?.({
-      data: {
-        requestId: secondRequest.requestId,
-        outlook: { demandServed: 3, worstShortfallW: 0 },
+    act(() => jest.advanceTimersByTime(250));
+    const firstRequest = (worker.postMessage as jest.Mock).mock.calls[0][0];
+    fireEvent.change(
+      screen.getByRole("slider", { name: "Starting customers" }),
+      {
+        target: { value: 2_000_000 },
       },
-    } as MessageEvent);
-    worker.onmessage?.({
-      data: {
-        requestId: firstRequest.requestId,
-        outlook: { demandServed: 0.5, worstShortfallW: 50_000_000 },
-      },
-    } as MessageEvent);
-  });
+    );
+    act(() => jest.advanceTimersByTime(250));
+    const secondRequest = (worker.postMessage as jest.Mock).mock.calls[1][0];
+    act(() => {
+      worker.onmessage?.({
+        data: {
+          requestId: secondRequest.requestId,
+          outlook: { demandServed, worstShortfallW: 0 },
+        },
+      } as MessageEvent);
+      worker.onmessage?.({
+        data: {
+          requestId: firstRequest.requestId,
+          outlook: { demandServed: 0.5, worstShortfallW: 50_000_000 },
+        },
+      } as MessageEvent);
+    });
 
-  expect(screen.getByText("Demand covered")).toBeInTheDocument();
-  expect(screen.getByText("300%")).toBeInTheDocument();
-  expect(screen.queryByText("Deficit forecast")).not.toBeInTheDocument();
-});
+    expect(screen.getByText("Demand covered")).toBeInTheDocument();
+    expect(screen.getByText(label)).toBeInTheDocument();
+    expect(screen.queryByText("Deficit forecast")).not.toBeInTheDocument();
+  },
+);
 
 it("does not forecast a facility that is unavailable in the selected year", () => {
   render(
@@ -460,9 +486,9 @@ it("offers researched Hydro maxima below 100MW and rejects oversized starting fl
       onStart={onStart}
     />,
   );
-  fireEvent.mouseDown(screen.getByRole("combobox", { name: "Facility type" }));
+  fireEvent.mouseDown(setupCombobox("Facility type"));
   fireEvent.click(screen.getByRole("option", { name: "Hydro" }));
-  fireEvent.mouseDown(screen.getByRole("combobox", { name: "Facility size" }));
+  fireEvent.mouseDown(setupCombobox("Facility size"));
   const options = screen.getAllByRole("option");
   expect(
     options.some((option) =>

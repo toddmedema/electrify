@@ -9,12 +9,46 @@ export function withoutNegativeZero(formatted: string): string {
   );
 }
 
-/** Locale-formatted UI numbers share the same zero-sign rule after rounding. */
+const numberFormats = new Map<string, Intl.NumberFormat>();
+
+/** Player-facing amounts are compact and never imply more than three significant digits. */
 export function formatNumber(
-  value: number,
+  value: number | bigint,
   options?: Intl.NumberFormatOptions,
 ): string {
-  return withoutNegativeZero(value.toLocaleString("en-US", options));
+  const maximumSignificantDigits = Math.min(
+    options?.maximumSignificantDigits ?? 3,
+    3,
+  );
+  const displayOptions: Intl.NumberFormatOptions = {
+    notation: "compact",
+    ...options,
+    minimumSignificantDigits: Math.min(
+      options?.minimumSignificantDigits ?? 1,
+      maximumSignificantDigits,
+    ),
+    maximumSignificantDigits,
+  };
+  const key = JSON.stringify(displayOptions);
+  let formatter = numberFormats.get(key);
+  if (!formatter) {
+    formatter = new Intl.NumberFormat("en-US", displayOptions);
+    numberFormats.set(key, formatter);
+  }
+  return withoutNegativeZero(formatter.format(value)).replace(/K\b/g, "k");
+}
+
+/** Estimates use the same presentation rules, with a stricter two-digit ceiling. */
+export function formatForecastNumber(value: number): string {
+  return formatNumber(value, { maximumSignificantDigits: 2 });
+}
+
+/** Shift decimal text so ties retain the display formatter's Math.round convention. */
+function roundDisplaySignificant(value: number, digits: 2 | 3): number {
+  if (!Number.isFinite(value) || value === 0) return value;
+  const [coefficient, exponent] = value.toExponential().split("e");
+  const rounded = Math.round(Number(`${coefficient}e${digits - 1}`));
+  return Number(`${rounded}e${Number(exponent) - digits + 1}`);
 }
 
 const decimalFormats = new Map<string, Intl.NumberFormat>();
@@ -47,32 +81,47 @@ export function formatDecimalNumber(
   return withoutNegativeZero(formatter.format(rounded));
 }
 
-const ABBREVIATIONS = [
-  { divisor: 1e12, suffix: "t" },
-  { divisor: 1e9, suffix: "b" },
-  { divisor: 1e6, suffix: "m" },
-  { divisor: 1e3, suffix: "k" },
-];
-
-/** Compact historical quantities promote a unit from its halfway point, as before. */
-export function formatAbbreviatedNumber(
+/** Choose the coarser limit before rounding, then remove only excess decimal zeroes. */
+function formatSignificantDecimal(
   value: number,
-  { digits = 0, totalDigits = 0 } = {},
+  significantDigits: 2 | 3,
+  {
+    digits,
+    trim,
+    fixed = false,
+  }: { digits: number; trim: boolean; fixed?: boolean },
 ): string {
   if (!Number.isFinite(value)) return String(value);
-  const unit = ABBREVIATIONS.find(
-    ({ divisor }) => Math.abs(value) >= divisor / 2,
-  );
-  const scaled = unit ? value / unit.divisor : value;
-  const integerDigits =
-    Math.abs(scaled) < 1 ? 0 : Math.abs(scaled).toString().split(".")[0].length;
-  return (
-    formatDecimalNumber(scaled, {
-      digits: totalDigits ? Math.max(totalDigits - integerDigits, 0) : digits,
-      trim: true,
-      group: false,
-    }) + (unit?.suffix ?? "")
-  );
+  const exponent =
+    value === 0 ? 0 : Number(value.toExponential().split("e")[1]);
+  const places = Math.min(digits, significantDigits - 1 - exponent);
+  const rounded =
+    places < 0 ? roundDisplaySignificant(value, significantDigits) : value;
+  let amount = fixed
+    ? formatFixed(rounded, Math.max(0, places))
+    : formatDecimalNumber(rounded, {
+        digits: Math.max(0, places),
+        trim,
+        group: false,
+      });
+  while (
+    amount.includes(".") &&
+    amount.endsWith("0") &&
+    (trim ||
+      amount.replace(/^[^1-9]*/, "").replace(/\D/g, "").length >
+        significantDigits)
+  ) {
+    amount = amount.slice(0, -1).replace(/\.$/, "");
+  }
+  return amount;
+}
+
+/** Compact quantities share the precision and suffixes used by cards and tables. */
+export function formatAbbreviatedNumber(
+  value: number,
+  { totalDigits = 3 } = {},
+): string {
+  return formatNumber(value, { maximumSignificantDigits: totalDigits });
 }
 
 /** Fixed decimals for display, preserving genuine negative values and trailing zeroes. */
@@ -82,16 +131,49 @@ export function formatFixed(value: number, digits: number): string {
 
 /** Electricity prices in cents per kWh, with at most one decimal place. */
 export function formatRateCompact(dollarsPerKWh: number): string {
-  return `${Number(formatFixed(dollarsPerKWh * 100, 1))}¢`;
+  return `${formatNumber(Number(formatSignificantDecimal(dollarsPerKWh * 100, 3, { digits: 1, trim: true, fixed: true })))}¢`;
 }
 
 /**
  * Format power using its actual magnitude, without promoting sub-GW values to GW. Values of 10 or
  * more in their unit are always whole numbers ("541MW"); smaller ones keep one decimal ("9.8GW")
- * or the requested mantissa ("1.521kW").
+ * or the requested mantissa capped at three significant digits ("1.52kW").
  */
 export function formatWatts(i: number, mantissa?: number): string {
   return formatWattsInUnit(i, getWattUnit(i), mantissa);
+}
+
+export function formatForecastWatts(i: number): string {
+  return formatWattsInUnit(
+    i,
+    getWattUnit(roundDisplaySignificant(i, 2)),
+    undefined,
+    2,
+  );
+}
+
+export function formatForecastWattHours(i: number): string {
+  return formatForecastWatts(i) + "h";
+}
+
+export function formatForecastWattsAxis(i: number, _ticks: number[]): string {
+  return formatForecastWatts(i);
+}
+
+export function formatForecastWattHoursAxis(
+  i: number,
+  _ticks: number[],
+): string {
+  return formatForecastWattHours(i);
+}
+
+export function formatForecastReserveLine(
+  reserveW: number,
+  label: string,
+): string {
+  return reserveW < 0
+    ? `Shortage: ${formatForecastWatts(-reserveW)}`
+    : `${label}: ${formatForecastWatts(reserveW)}`;
 }
 
 /**
@@ -140,9 +222,21 @@ export function formatMoneyConcise(i: number): string {
   return signedMoney(i, true);
 }
 
+export function formatForecastMoney(i: number): string {
+  return Number.isFinite(i) ? signedMoney(i, true, 2) : NO_ESTIMATE;
+}
+
 /** "-$63.8k": the sign leads the currency, and an amount that rounds to zero carries none. */
-function signedMoney(i: number, trimMantissa: boolean): string {
-  const amount = formatMoneyAmount(Math.abs(i), trimMantissa);
+function signedMoney(
+  i: number,
+  trimMantissa: boolean,
+  significantDigits: 2 | 3 = 3,
+): string {
+  const amount = formatMoneyAmount(
+    Math.abs(i),
+    trimMantissa,
+    significantDigits,
+  );
   return (i < 0 && /[1-9]/.test(amount) ? "-$" : "$") + amount;
 }
 
@@ -164,7 +258,11 @@ const MONEY_UNITS: MoneyUnitType[] = [
  * keeps $700M as $700M instead of promoting it to $0.70B; a suffix only changes once the amount
  * actually reaches one of the next unit.
  */
-function formatMoneyAmount(i: number, trimMantissa: boolean): string {
+function formatMoneyAmount(
+  i: number,
+  trimMantissa: boolean,
+  significantDigits: 2 | 3,
+): string {
   const abs = Math.abs(i);
   const unit =
     MONEY_UNITS.find((candidate) => abs >= candidate.divisor) ||
@@ -173,16 +271,25 @@ function formatMoneyAmount(i: number, trimMantissa: boolean): string {
   const scaledAbs = Math.abs(scaled);
   // Rounding 999.9M to 1,000M would violate the chosen tier even though the source value is still
   // below $1B. At that narrow boundary, truncate to the largest valid whole value for the tier.
-  if (scaledAbs >= 999.5 && unit.divisor > 1) {
-    scaled = Math.sign(scaled) * 999;
+  if (
+    scaledAbs >= (significantDigits === 2 ? 995 : 999.5) &&
+    scaledAbs < 1000
+  ) {
+    scaled = Math.sign(scaled) * (significantDigits === 2 ? 990 : 999);
   }
   const displayAbs = Math.abs(scaled);
-  const mantissa = displayAbs < 10 ? 2 : displayAbs < 100 ? 1 : 0;
+  const mantissa =
+    displayAbs < 1
+      ? 2
+      : displayAbs < 10
+        ? significantDigits - 1
+        : displayAbs < 100
+          ? significantDigits - 2
+          : 0;
   return (
-    formatDecimalNumber(scaled, {
+    formatSignificantDecimal(scaled, significantDigits, {
       digits: mantissa,
       trim: trimMantissa,
-      group: false,
     }) + unit.suffix
   );
 }
@@ -217,6 +324,7 @@ export function formatWattsInUnit(
   i: number,
   unit: WattUnitType,
   mantissa?: number,
+  significantDigits: 2 | 3 = 3,
 ): string {
   const scaled = i / unit.divisor;
   const requested = mantissa ?? 1;
@@ -224,7 +332,7 @@ export function formatWattsInUnit(
   // asks for; the rounding check uses that precision so 9.96 at one decimal becomes "10", not "10.0"
   const whole = Math.abs(Number(scaled.toFixed(requested))) >= 10;
   return (
-    formatDecimalNumber(scaled, {
+    formatSignificantDecimal(scaled, significantDigits, {
       digits: whole ? 0 : requested,
       trim: true,
     }) +
@@ -261,14 +369,34 @@ export function formatWattHoursOfPeak(current: number, peak: number): string {
 
 /** A 0-1 fraction as a whole (or `digits`-decimal) percentage: 0.456 → "46%". */
 export function formatPercent(fraction: number, digits = 0): string {
-  return digits > 0
-    ? `${formatFixed(fraction * 100, digits)}%`
-    : `${Math.round(fraction * 100)}%`;
+  return percentWithPrecision(fraction, digits, 3);
 }
 
-/** A whole count with thousands separators, independent of the browser's locale. */
-export function formatCount(n: number): string {
-  return formatNumber(Math.round(n));
+export function formatForecastPercent(fraction: number): string {
+  return percentWithPrecision(fraction, 1, 2).replace(/\.0%$/, "%");
+}
+
+function percentWithPrecision(
+  fraction: number,
+  digits: number,
+  significantDigits: 2 | 3,
+): string {
+  const amount = formatSignificantDecimal(fraction * 100, significantDigits, {
+    digits,
+    trim: false,
+    fixed: digits > 0,
+  });
+  return `${Math.abs(Number(amount)) >= 1000 ? formatNumber(Number(amount), { maximumSignificantDigits: significantDigits }) : amount}%`;
+}
+
+/** Round once to whole numbers or the significant-digit cap, whichever is coarser. */
+export function formatCount(n: number, significantDigits: 2 | 3 = 3): string {
+  return formatNumber(
+    Number(
+      formatSignificantDecimal(n, significantDigits, { digits: 0, trim: true }),
+    ),
+    { maximumSignificantDigits: significantDigits },
+  );
 }
 
 /** A dollar amount per megawatt-hour, in the concise money style: "$42.5/MWh". */
@@ -296,9 +424,9 @@ export function formatBuildMonths(
   return `${months} ${style === "short" ? "mo" : "months"}`;
 }
 
-/** A game score as a whole number with thousands separators. */
+/** A game score as a compact amount with at most three significant digits. */
 export function formatScore(score: number): string {
-  return formatDecimalNumber(score);
+  return formatCount(score);
 }
 
 /** Compact customer counts, with separate precision for chart axes and inspection. */

@@ -27,7 +27,7 @@ import {
   DataCenterSetupResponse,
 } from "../../helpers/DataCenterSetup";
 import { createDataCenterSetupWorker } from "../../helpers/DataCenterSetupClient";
-import { formatCount, formatWatts } from "../../helpers/Format";
+import { formatCount, formatWatts, formatNumber } from "../../helpers/Format";
 import { prefetchScenarioData } from "../../helpers/OfflineData";
 import { ScenarioType } from "../../Types";
 import ScreenPage from "../base/ScreenPage";
@@ -388,7 +388,7 @@ export default function DataCenterSetup({ onBack, onStart, onResume }: Props) {
                         helperText={
                           validAccounts
                             ? "Customer accounts, not population."
-                            : "Enter a whole number from 1 to 100,000,000."
+                            : "Enter a whole number from 1 to 100M."
                         }
                         onChange={(event) => {
                           const digits = event.target.value.replace(/,/g, "");
@@ -428,9 +428,9 @@ export default function DataCenterSetup({ onBack, onStart, onResume }: Props) {
                               {customerProfile?.annualMWh ? (
                                 <>
                                   Background electricity use is sized to{" "}
-                                  {(
-                                    customerProfile.annualMWh / 1000000
-                                  ).toFixed(2)}{" "}
+                                  {formatNumber(
+                                    customerProfile.annualMWh / 1000000,
+                                  )}{" "}
                                   TWh per year for {customerProfile.serviceArea}
                                   , using{" "}
                                   <a

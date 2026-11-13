@@ -17,7 +17,7 @@ import {
 } from "./ObjectiveRules";
 import type { UpcomingStoryEventType } from "../components/views/StoryEventSelectors";
 import { TICK_MINUTES } from "../Constants";
-import { formatMoneyStable } from "./Format";
+import { formatMoneyStable, formatForecastNumber } from "./Format";
 import { selectProjection } from "./Projection";
 import { isUtilityExpansionGame } from "./ExpansionContext";
 import { MONTHS } from "../Constants";
@@ -346,8 +346,8 @@ export function selectMissionRisk(
     const months = Math.max(1, Math.round(runway));
     return {
       id: "cash-runway",
-      label: `Projected cash runs out in about ${months} ${months === 1 ? "month" : "months"} · Check finances`,
-      shortLabel: `Cash out in ~${months} mo`,
+      label: `Projected cash runs out in about ${formatForecastNumber(months)} ${months === 1 ? "month" : "months"} · Check finances`,
+      shortLabel: `Cash out in ~${formatForecastNumber(months)} mo`,
       target: "finances",
     };
   }

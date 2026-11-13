@@ -66,8 +66,7 @@ export interface ModAuthorReport extends ModRuleFacts {
   difficulties: Partial<Record<DifficultyType, ModRuleFacts>>;
   inheritedObjectives: RuleObjective[];
 }
-const number = (value: number) =>
-  formatNumber(value, { maximumSignificantDigits: 12 });
+const number = (value: number) => formatNumber(value);
 const money = (value: number) => `$${number(value)}`;
 const range = (min: number, max: number) =>
   min === max ? number(min) : `${number(min)}–${number(max)}`;

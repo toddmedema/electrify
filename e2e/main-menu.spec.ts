@@ -1,5 +1,20 @@
-import { expect, test } from "./fixtures";
+import { expect, test, Locator, Page } from "./fixtures";
+import { foregroundContrast } from "./contrast";
 import { readSavedGame } from "./save-fixture";
+
+async function expectFooterTooltip(page: Page, action: Locator) {
+  const footerAction = await action.evaluate(
+    (element) => !!element.closest(".mainMenuFooter"),
+  );
+  const tooltip = page.getByRole("tooltip");
+  if (footerAction) {
+    await expect(tooltip).toHaveText(
+      (await action.getAttribute("aria-label"))!,
+    );
+  } else {
+    await expect(tooltip).toHaveCount(0);
+  }
+}
 
 // The bundle delays must control repeat visits even when production caching is available.
 test.use({ serviceWorkers: "block" });
@@ -156,7 +171,7 @@ test("keyboard and pointer actions work during the entrance", async ({
   await expect(page.locator("#appStartup")).toHaveCount(0);
   await page.keyboard.press("ArrowDown");
   await expect(
-    page.getByRole("button", { name: "Achievements", exact: true }),
+    page.getByRole("button", { name: "Settings", exact: true }),
   ).toBeFocused();
   await expect(
     page.getByRole("button", { name: "Settings", exact: true }),
@@ -173,13 +188,13 @@ test("hovering a home control makes it the active button, and keyboard continues
   await page.emulateMedia({ reducedMotion: "reduce" }); // skip the entrance stagger
   await page.goto("/");
   const play = page.getByRole("button", { name: "Play", exact: true });
-  const achievements = page.getByRole("button", {
-    name: "Achievements",
+  const settings = page.getByRole("button", {
+    name: "Settings",
     exact: true,
   });
   await expect(page.locator("#appStartup")).toHaveCount(0); // the menu is revealed
-  await achievements.hover();
-  await expect(achievements).toBeFocused(); // the pointer moved the active button to Achievements
+  await settings.hover();
+  await expect(settings).toBeFocused(); // the pointer moved the active button to Settings
   await page.keyboard.press("ArrowUp");
   await expect(play).toBeFocused(); // keyboard continues from the hovered control
 });
@@ -202,39 +217,38 @@ for (const theme of ["light", "dark"]) {
         animation.finish();
       await new Promise(requestAnimationFrame);
     });
-    const frames = await page
-      .locator("#centeredMenu")
-      .evaluate(async (menu) => {
-        const buttons = Array.from(menu.querySelectorAll("button"));
-        const frames: { selected: string; painted: string[] }[] = [];
-        for (const key of [
-          "ArrowDown",
-          "ArrowDown",
-          "ArrowUp",
-          "ArrowUp",
-          "ArrowDown",
-        ]) {
-          document.activeElement!.dispatchEvent(
-            new KeyboardEvent("keydown", {
-              key,
-              bubbles: true,
-              cancelable: true,
-            }),
-          );
-          await new Promise(requestAnimationFrame);
-          frames.push({
-            selected: document.activeElement!.textContent!,
-            painted: buttons
-              .filter(
-                (button) =>
-                  getComputedStyle(button).backgroundColor !==
-                  "rgba(0, 0, 0, 0)",
-              )
-              .map((button) => button.textContent!),
-          });
-        }
-        return frames;
-      });
+    const frames = await page.locator("#menuCard").evaluate(async (menu) => {
+      const buttons = Array.from(menu.querySelectorAll("button,a[href]"));
+      const label = (element: Element) =>
+        element.getAttribute("aria-label") || element.textContent!;
+      const frames: { selected: string; painted: string[] }[] = [];
+      for (const key of [
+        "ArrowDown",
+        "ArrowDown",
+        "ArrowUp",
+        "ArrowUp",
+        "ArrowDown",
+      ]) {
+        document.activeElement!.dispatchEvent(
+          new KeyboardEvent("keydown", {
+            key,
+            bubbles: true,
+            cancelable: true,
+          }),
+        );
+        await new Promise(requestAnimationFrame);
+        frames.push({
+          selected: label(document.activeElement!),
+          painted: buttons
+            .filter(
+              (button) =>
+                getComputedStyle(button).backgroundColor !== "rgba(0, 0, 0, 0)",
+            )
+            .map(label),
+        });
+      }
+      return frames;
+    });
     for (const frame of frames) expect(frame.painted).toEqual([frame.selected]);
   });
 }
@@ -263,7 +277,7 @@ for (const exit of ["Back", "Escape"]) {
       // A fresh return must also leave subsequent navigation alone.
       await page.keyboard.press("ArrowDown");
       const firstResource = page.getByRole("button", {
-        name: "Achievements",
+        name: "Settings",
         exact: true,
       });
       await expect(firstResource).toBeFocused();
@@ -296,18 +310,23 @@ test("loading and returning from Saved games select Continue at the top", async 
 test("footer icons have equal optical gaps beside Share", async ({ page }) => {
   await page.goto("/");
   await expect(page.locator("#appStartup")).toHaveCount(0);
-  const edges = await page.locator(".mainMenuFooter svg").evaluateAll((icons) =>
-    icons.slice(1).map((icon) => {
-      const svg = icon as SVGSVGElement;
-      const bounds = svg.getBBox();
-      const matrix = svg.getScreenCTM()!;
-      return {
-        left: new DOMPoint(bounds.x, 0).matrixTransform(matrix).x,
-        right: new DOMPoint(bounds.x + bounds.width, 0).matrixTransform(matrix)
-          .x,
-      };
-    }),
-  );
+  const edges = await page
+    .locator(
+      '.mainMenuFooter :is([aria-label="Send feedback"],[aria-label="About Electrify"],[aria-label="Share Electrify"]) svg',
+    )
+    .evaluateAll((icons) =>
+      icons.map((icon) => {
+        const svg = icon as SVGSVGElement;
+        const bounds = svg.getBBox();
+        const matrix = svg.getScreenCTM()!;
+        return {
+          left: new DOMPoint(bounds.x, 0).matrixTransform(matrix).x,
+          right: new DOMPoint(bounds.x + bounds.width, 0).matrixTransform(
+            matrix,
+          ).x,
+        };
+      }),
+    );
   expect(edges).toHaveLength(3);
   expect(edges[2].left - edges[1].right).toBeCloseTo(
     edges[1].left - edges[0].right,
@@ -404,7 +423,12 @@ for (const theme of ["light", "dark"]) {
       );
     });
     await expect(install).toBeVisible();
-    await expect(install.locator("svg")).toHaveCount(0);
+    await expect(install.locator("svg")).toHaveCount(1);
+    await expect(
+      page
+        .locator(".mainMenuFooter")
+        .getByRole("button", { name: "Install app" }),
+    ).toBeVisible();
     await expect(sound.locator("svg")).toHaveCount(0);
     await sound.click();
     await expect(sound).toBeHidden();
@@ -614,11 +638,17 @@ for (const theme of ["light", "dark"]) {
 
       // A physical keyboard on a touch device immediately restores selection feedback.
       await page.keyboard.press("ArrowDown");
+      await expect(settings).toBeFocused();
+      await page.keyboard.press("ArrowDown");
+      await expect(sound).toBeFocused();
       await page.keyboard.press("ArrowDown");
       await expect(manual).toBeFocused();
       await expect(manual).not.toHaveCSS("background-color", clear);
       await expect(play).toHaveCSS("background-color", clear);
-      await page.keyboard.press("ArrowDown");
+      await page.keyboard.press("ArrowUp");
+      await expect(sound).toBeFocused();
+      await page.keyboard.press("ArrowUp");
+      await expect(settings).toBeFocused();
       await page.keyboard.press("Enter");
       await expect(
         page.getByRole("heading", { name: "Settings", exact: true }),
@@ -681,3 +711,206 @@ test("catalog and manual preserve spacing across responsive scales", async ({
     );
   }
 });
+
+for (const theme of ["light", "dark"]) {
+  test(`footer icons join the arrow-key loop with visible selection in ${theme}`, async ({
+    page,
+  }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.addInitScript(
+      (value) => localStorage.setItem("theme", value),
+      theme,
+    );
+    await page.goto("/");
+    await expect(page.locator("#appStartup")).toHaveCount(0);
+    await page.evaluate(() =>
+      window.dispatchEvent(
+        new Event("beforeinstallprompt", { cancelable: true }),
+      ),
+    );
+    const footer = page.locator(".mainMenuFooter");
+    await expect(
+      footer.getByRole("button", { name: "Install app" }),
+    ).toBeVisible();
+    const actions = page.locator("#menuCard button, #menuCard a[href]");
+    const count = await actions.count();
+    const footerActions = footer.locator("button,a[href]");
+    await expect(footerActions).toHaveCount(7);
+    for (const action of await footerActions.all()) {
+      const bounds = (await action.boundingBox())!;
+      expect(bounds.width).toBeGreaterThanOrEqual(44);
+      expect(bounds.height).toBeGreaterThanOrEqual(44);
+      expect(bounds.x).toBeGreaterThanOrEqual(0);
+      expect(bounds.x + bounds.width).toBeLessThanOrEqual(
+        page.viewportSize()!.width,
+      );
+    }
+    await expect(actions.first()).toBeFocused();
+    for (const key of ["ArrowDown", "ArrowRight"]) {
+      for (let index = 1; index <= count; index++) {
+        await page.keyboard.press(key);
+        const selected = actions.nth(index % count);
+        await expect(selected).toBeFocused();
+        await expectFooterTooltip(page, selected);
+        await expect(selected).not.toHaveCSS(
+          "background-color",
+          "rgba(0, 0, 0, 0)",
+        );
+      }
+    }
+    for (const key of ["ArrowUp", "ArrowLeft"]) {
+      for (let index = count - 1; index >= 0; index--) {
+        await page.keyboard.press(key);
+        await expect(actions.nth(index)).toBeFocused();
+        await expectFooterTooltip(page, actions.nth(index));
+      }
+    }
+    await footer.getByRole("button", { name: "Achievements" }).hover();
+    await expect(
+      footer.getByRole("button", { name: "Achievements" }),
+    ).toBeFocused();
+    await page.keyboard.press("ArrowUp");
+    await expect(
+      footer.getByRole("button", { name: "Install app" }),
+    ).toBeFocused();
+    await page.evaluate(() => window.dispatchEvent(new Event("appinstalled")));
+    await expect(actions.first()).toBeFocused();
+    await expect(page.getByRole("tooltip")).toHaveCount(0);
+  });
+}
+
+test("background clicks and returning to the page restore the first home action", async ({
+  page,
+  context,
+}) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/");
+  const first = page.getByRole("button", { name: "Play", exact: true });
+  await expect(first).toBeFocused();
+  // The first action stays visibly selected even before focus recovery gets a frame.
+  const fallback = await first.evaluate((button) => {
+    (document.activeElement as HTMLElement)?.blur();
+    return getComputedStyle(button).backgroundColor;
+  });
+  expect(fallback).not.toBe("rgba(0, 0, 0, 0)");
+  await expect(first).toBeFocused();
+  await page.getByRole("button", { name: "Settings", exact: true }).hover();
+  await page.locator("#logo").click();
+  await expect(first).toBeFocused();
+  const other = await context.newPage();
+  await other.goto("about:blank");
+  await page.evaluate(() => (document.activeElement as HTMLElement)?.blur());
+  await page.bringToFront();
+  await expect(first).toBeFocused();
+  await other.close();
+});
+
+for (const theme of ["light", "dark"]) {
+  test(`every footer icon has a consistent readable tooltip in ${theme}`, async ({
+    page,
+  }, info) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.addInitScript(
+      (value) => localStorage.setItem("theme", value),
+      theme,
+    );
+    await page.goto("/");
+    await expect(page.locator("#appStartup")).toHaveCount(0);
+    await page.evaluate(() =>
+      window.dispatchEvent(
+        new Event("beforeinstallprompt", { cancelable: true }),
+      ),
+    );
+    const footer = page.locator(".mainMenuFooter");
+    const actions = footer.locator("button,a[href]");
+    await expect(actions).toHaveCount(7);
+    const styles: Record<string, string>[] = [];
+    for (const action of await actions.all()) {
+      const name = (await action.getAttribute("aria-label"))!;
+      await action.hover();
+      const tooltip = page.getByRole("tooltip");
+      await expect(tooltip).toHaveText(name);
+      await expect(tooltip).toHaveAttribute("data-popper-placement", "top");
+      await expect(tooltip).toHaveCSS("pointer-events", "none");
+      const surface = tooltip.locator(".mainMenuTooltip");
+      expect(await foregroundContrast(surface), name).toBeGreaterThanOrEqual(
+        4.5,
+      );
+      const bounds = (await tooltip.boundingBox())!;
+      const icon = (await action.boundingBox())!;
+      expect(bounds.x, name).toBeGreaterThanOrEqual(7);
+      expect(bounds.x + bounds.width, name).toBeLessThanOrEqual(
+        page.viewportSize()!.width - 7,
+      );
+      expect(bounds.y, name).toBeGreaterThanOrEqual(0);
+      expect(icon.y - bounds.y - bounds.height, name).toBeGreaterThanOrEqual(7);
+      expect(icon.y - bounds.y - bounds.height, name).toBeLessThanOrEqual(9);
+      styles.push(
+        await surface.evaluate((element) => {
+          const style = getComputedStyle(element);
+          return {
+            fontFamily: style.fontFamily,
+            fontSize: style.fontSize,
+            fontWeight: style.fontWeight,
+            lineHeight: style.lineHeight,
+            padding: style.padding,
+            border: style.border,
+            borderRadius: style.borderRadius,
+            background: style.backgroundColor,
+            color: style.color,
+            shadow: style.boxShadow,
+          };
+        }),
+      );
+      const capture =
+        process.env.REVIEW_SCREENSHOT_DIR &&
+        ((theme === "light" &&
+          info.project.name === "desktop-chromium" &&
+          name === "Join the Electrify Discord") ||
+          (theme === "light" &&
+            info.project.name === "mobile-360px" &&
+            name === "Manual") ||
+          (theme === "dark" &&
+            info.project.name === "mobile-390px" &&
+            name === "Share Electrify"));
+      if (capture) {
+        const first = (await actions.first().boundingBox())!;
+        const last = (await actions.last().boundingBox())!;
+        const left = Math.max(0, Math.floor(Math.min(first.x, bounds.x) - 8));
+        const top = Math.max(0, Math.floor(bounds.y - 8));
+        const right = Math.min(
+          page.viewportSize()!.width,
+          Math.ceil(Math.max(last.x + last.width, bounds.x + bounds.width) + 8),
+        );
+        const bottom = Math.min(
+          page.viewportSize()!.height,
+          Math.ceil(last.y + last.height),
+        );
+        await page.screenshot({
+          path: `${process.env.REVIEW_SCREENSHOT_DIR}/tooltip-${theme}-${info.project.name}.png`,
+          ...(info.project.name === "desktop-chromium"
+            ? {}
+            : {
+                clip: {
+                  x: left,
+                  y: top,
+                  width: right - left,
+                  height: bottom - top,
+                },
+              }),
+          animations: "disabled",
+        });
+      }
+    }
+    for (const style of styles) expect(style).toEqual(styles[0]);
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("tooltip")).toHaveCount(0);
+    await page.keyboard.press("ArrowDown");
+    await expect(
+      page.getByRole("button", { name: "Play", exact: true }),
+    ).toBeFocused();
+    await expect(page.getByRole("tooltip")).toHaveCount(0);
+    await page.keyboard.press("ArrowUp");
+    await expectFooterTooltip(page, actions.last());
+  });
+}

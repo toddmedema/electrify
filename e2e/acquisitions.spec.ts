@@ -1,3 +1,4 @@
+import { formatCount } from "../src/helpers/Format";
 import path from "path";
 import { expect, test } from "./fixtures";
 import { openBuild, openPane } from "./layout";
@@ -390,7 +391,7 @@ for (const theme of ["light", "dark"] as const) {
       )!;
       expect(receipt).toBeDefined();
       expect(customerPreview).toBe(
-        `${Math.round(customersBefore).toLocaleString("en-US")} → ${Math.round(customersBefore + receipt.transferredCustomers).toLocaleString("en-US")} (+${Math.round((receipt.transferredCustomers / customersBefore) * 100)}%)`,
+        `${formatCount(customersBefore)} → ${formatCount(customersBefore + receipt.transferredCustomers)} (+${Math.round((receipt.transferredCustomers / customersBefore) * 100)}%)`,
       );
       const inspectOwned = line.getByRole("button", { name: /^Inspect / });
       if ((await inspectOwned.getAttribute("aria-expanded")) !== "true")

@@ -200,7 +200,7 @@ it("compares signed local scores only for matching conditions", () => {
       score: 2,
       challenge: { ...invitation, target: Number.MIN_SAFE_INTEGER },
     }),
-  ).toContain("9,007,199,254,740,993");
+  ).toContain("9010T");
 });
 it.each(["bankrupt", "fired"] as const)(
   "shares a %s result without creating or winning a challenge",

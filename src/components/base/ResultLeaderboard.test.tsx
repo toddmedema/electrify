@@ -46,7 +46,7 @@ it("loads the public top three current completed scores for the played scenario 
   await screen.findByText("Grid planner");
   const table = screen.getByRole("table", { name: "Leaderboard · Expert" });
   expect(within(table).getByText("Anonymous")).toBeInTheDocument();
-  expect(within(table).getByText("9,999")).toBeInTheDocument();
+  expect(within(table).getByText("10k")).toBeInTheDocument();
   expect(mockGetDocs).toHaveBeenCalledWith([
     "scores",
     ["scoreVersion", "==", 2],

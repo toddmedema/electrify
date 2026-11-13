@@ -90,7 +90,7 @@ it("flags a future billed-rate miss without changing recorded progress, then cle
   expect(projectMission(game, risky).status).toBe("loss");
   const approximate = cloneDeep(projection);
   approximate.financeProjected[1].revenue = 765.824;
-  expect(goal(game, approximate, "bills").detail).toContain("76.6¢/kWh");
+  expect(goal(game, approximate, "bills").detail).toContain("77¢/kWh");
   expect(game.objectiveProgress).toEqual(recorded);
   expect(projectMission(game, projection).status).toBe("win");
 });

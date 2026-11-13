@@ -20,6 +20,7 @@ import {
 import {
   formatPercent,
   formatMoneyConcise,
+  formatNumber,
   formatWattHours,
   formatWattHoursOfPeak,
   formatWatts,
@@ -421,7 +422,7 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
             )}
             <Stat
               label="Age"
-              value={`${ageYears.toFixed(1)} / ${facility.lifespanYears} yr`}
+              value={`${formatNumber(ageYears)} / ${facility.lifespanYears} yr`}
             />
             <Stat
               // Capacity factor is the generator's word for it; a battery isn't producing
@@ -446,9 +447,9 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
                 label="Cycles used"
                 value={
                   <>
-                    {formatCount(equivalentCycles)} / 7,300
+                    {formatCount(equivalentCycles)} / 7.3k
                     <span className="facilityStatNote">
-                      Rated for 7,300 full cycles to 80% capacity. Continues
+                      Rated for 7.3k full cycles to 80% capacity. Continues
                       operating after that.
                     </span>
                   </>
@@ -544,7 +545,7 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
               facilityMaintenanceCost(facility, date.minute) === undefined && (
                 <Stat
                   label="Variable upkeep"
-                  value={`$${variableOperatingCostPerMWh.toFixed(2)}/MWh`}
+                  value={`$${formatNumber(variableOperatingCostPerMWh)}/MWh`}
                 />
               )}
             {facility.costPerStart !== undefined &&
@@ -588,7 +589,7 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
                   <Sparkline
                     values={trend}
                     color={accentColor}
-                    ariaLabel={`${fuel} price over the last ${trend.length} months, ${trendChange === 0 ? "unchanged" : `${trendChange > 0 ? "up" : "down"} ${Math.abs(Math.round(trendChange * 100))} percent`}`}
+                    ariaLabel={`${fuel} price over the last ${trend.length} months, ${trendChange === 0 ? "unchanged" : `${trendChange > 0 ? "up" : "down"} ${formatNumber(Math.abs(Math.round(trendChange * 100)))} percent`}`}
                   />
                   <Typography
                     variant="body2"
@@ -596,7 +597,7 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
                     className={`facilityStatValue${trendChange > 0 ? " bad" : trendChange < 0 ? " good" : ""}`}
                   >
                     {trendChange > 0 ? "+" : ""}
-                    {Math.round(trendChange * 100)}%
+                    {formatPercent(trendChange)}
                   </Typography>
                 </dd>
               </div>

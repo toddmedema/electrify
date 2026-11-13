@@ -1,7 +1,11 @@
 import { Button, Typography } from "@mui/material";
 import type { PowerAgreementAccount } from "../../Types";
 import { agreementDate } from "../../helpers/PowerAgreements";
-import { formatMoneyConcise, formatNumber } from "../../helpers/Format";
+import {
+  formatMoneyConcise,
+  formatForecastMoney,
+  formatNumber,
+} from "../../helpers/Format";
 import type { useAgreementForecast } from "./useAgreementForecast";
 import BuildDetails, { BuildDetailRow } from "./BuildDetails";
 
@@ -30,7 +34,7 @@ export default function AgreementForecastDetails({
       <span role="status" aria-live="polite">
         {unavailable ??
           (forecast.result
-            ? `${formatMoneyConcise(forecast.result.cashDifference)} ${horizon}`
+            ? `${formatForecastMoney(forecast.result.cashDifference)} ${horizon}`
             : forecast.error
               ? "Forecast unavailable"
               : forecast.updating

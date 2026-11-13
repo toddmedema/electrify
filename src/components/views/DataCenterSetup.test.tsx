@@ -2,6 +2,7 @@ import * as React from "react";
 import {
   act,
   fireEvent,
+  isInaccessible,
   render,
   screen,
   waitFor,
@@ -104,13 +105,18 @@ function preparedScenario(): ScenarioType {
 
 async function chooseCity(name: string) {
   const callsBefore = (worker.postMessage as jest.Mock).mock.calls.length;
-  const clear = screen.queryByRole("button", { name: "Clear" });
-  if (clear) fireEvent.click(clear);
+  const clear = screen.queryByLabelText("Clear", { selector: "button" });
+  if (clear && !isInaccessible(clear)) {
+    expect(clear).toHaveRole("button");
+    expect(clear).toHaveAccessibleName("Clear");
+    fireEvent.click(clear);
+  }
   const input = screen.getByLabelText("Select a city");
   fireEvent.focus(input);
   fireEvent.change(input, { target: { value: name } });
+  const cities = within(await screen.findByRole("listbox"));
   fireEvent.click(
-    await screen.findByRole("option", { name: new RegExp(name) }),
+    await cities.findByRole("option", { name: new RegExp(name) }),
   );
   await waitFor(() =>
     expect(worker.postMessage).toHaveBeenCalledTimes(callsBefore + 1),
@@ -139,6 +145,14 @@ const expectStartHidden = () =>
     screen.queryByText("Start exploring", { selector: "button" }),
   ).not.toBeInTheDocument();
 
+function setupControl(name: string, role: string) {
+  const control = screen.getByLabelText(name);
+  expect(control).toHaveRole(role);
+  expect(control).toHaveAccessibleName(name);
+  expect(isInaccessible(control)).toBe(false);
+  return control;
+}
+
 it("waits for an explicit location and a prepared grid, then starts paired scenarios with the same seed", async () => {
   // The start year defaults to the current year; pin the clock so the test cannot age out.
   jest.setSystemTime(new Date(2026, 5, 1));
@@ -152,10 +166,8 @@ it("waits for an explicit location and a prepared grid, then starts paired scena
     screen.queryByRole("combobox", { name: "Data centers open" }),
   ).not.toBeInTheDocument();
   await chooseCity("San Francisco");
-  expect(screen.getByRole("combobox", { name: "Start year" })).toBeVisible();
-  expect(
-    screen.getByRole("combobox", { name: "Data centers open" }),
-  ).toBeVisible();
+  expect(setupControl("Start year", "combobox")).toBeVisible();
+  expect(setupControl("Data centers open", "combobox")).toBeVisible();
   expectStartHidden();
   expect(request.startingYear).toBe(2026);
   const growth = preparedScenario();
@@ -172,7 +184,7 @@ it("waits for an explicit location and a prepared grid, then starts paired scena
   fireEvent.click(startButton());
   const configured: ScenarioType = onStart.mock.calls[0][0];
   expect(configured.loadAdditions?.[0].peakW).toBe(100000000);
-  fireEvent.change(screen.getByRole("slider", { name: "Power needed" }), {
+  fireEvent.change(setupControl("Power needed", "slider"), {
     target: { value: "8" },
   });
   fireEvent.click(startButton());
@@ -269,13 +281,12 @@ it("recalibrates edited account counts, preserving demand and resetting accounts
   await renderSetup(onStart);
   await chooseCity("San Francisco");
   reply(preparedScenario());
-  fireEvent.change(screen.getByRole("slider", { name: "Power needed" }), {
+  const demand = setupControl("Power needed", "slider");
+  fireEvent.change(demand, {
     target: { value: "19" },
   });
   fireEvent.click(screen.getByText("Grid size"));
-  const accounts = screen.getByRole("textbox", {
-    name: "Homes and businesses served",
-  });
+  const accounts = setupControl("Homes and businesses served", "textbox");
   fireEvent.change(accounts, { target: { value: "" } });
   expect(accounts).toHaveValue("");
   expectStartHidden();
@@ -290,9 +301,7 @@ it("recalibrates edited account counts, preserving demand and resetting accounts
   await waitFor(() => expect(worker.postMessage).toHaveBeenCalledTimes(2));
   expect(request.startingCustomers).toBe(123456);
   reply(preparedScenario());
-  expect(screen.getByRole("slider", { name: "Power needed" })).toHaveValue(
-    "19",
-  );
+  expect(setupControl("Power needed", "slider")).toHaveValue("19");
   fireEvent.click(startButton());
   expect(onStart.mock.calls[0][0].startingCustomers).toBe(123456);
   await chooseCity("Los Angeles");
@@ -304,9 +313,9 @@ it("recalibrates edited account counts, preserving demand and resetting accounts
     ).customers,
   );
   reply(preparedScenario());
-  expect(
-    screen.getByRole("textbox", { name: "Homes and businesses served" }),
-  ).toHaveValue(request.startingCustomers!.toLocaleString("en-US"));
+  expect(setupControl("Homes and businesses served", "textbox")).toHaveValue(
+    request.startingCustomers!.toLocaleString("en-US"),
+  );
 });
 
 it("blocks starting and offers retry after a worker error", async () => {

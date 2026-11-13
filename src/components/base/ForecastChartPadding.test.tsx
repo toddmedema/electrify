@@ -334,6 +334,7 @@ describe("insight forecast charts", () => {
             value: 1_000 + i * 100,
             projected: i >= 3,
           }))}
+          formatProjected={String}
           format={(value) => String(value)}
           startingYear={STARTING_YEAR}
           domain={[0, 5 * MINUTES_PER_MONTH]}

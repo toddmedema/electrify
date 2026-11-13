@@ -36,10 +36,25 @@ describe("formatPercent", () => {
 });
 
 describe("formatCount", () => {
-  it("rounds and separates thousands in every locale", () => {
-    expect(formatCount(1234567.4)).toBe("1,234,567");
+  it("rounds and compacts counts in every locale", () => {
+    expect(formatCount(1234567.4)).toBe("1.23M");
     expect(formatCount(7)).toBe("7");
   });
+
+  it.each<[number, string]>([
+    [12349.6, "12.3k"],
+    [-12349.6, "-12.3k"],
+    [7.49, "7"],
+    [7.5, "8"],
+    [-7.5, "-7"],
+    [0.49, "0"],
+  ])(
+    "rounds %s once at the coarser whole-number precision",
+    (value, expected) => {
+      expect(formatCount(value)).toBe(expected);
+      expect(formatScore(value)).toBe(expected);
+    },
+  );
 });
 
 describe("formatPricePerMWh", () => {
@@ -64,8 +79,8 @@ describe("formatBuildMonths", () => {
 });
 
 describe("formatScore", () => {
-  it("rounds and separates thousands", () => {
-    expect(formatScore(12345.6)).toBe("12,346");
+  it("rounds and compacts scores", () => {
+    expect(formatScore(12345.6)).toBe("12.3k");
   });
 });
 
@@ -86,10 +101,10 @@ describe("formatWatts", () => {
     });
   });
 
-  it("honours the requested precision", () => {
+  it("caps requested precision at three significant digits", () => {
     expect(formatWatts(1001, 0)).toEqual("1kW");
-    expect(formatWatts(1521, 3)).toEqual("1.521kW");
-    expect(formatWatts(1521, 4)).toEqual("1.521kW");
+    expect(formatWatts(1521, 3)).toEqual("1.52kW");
+    expect(formatWatts(1521, 4)).toEqual("1.52kW");
   });
 
   it("rounds to whole numbers from 10 up even when more precision is requested", () => {
@@ -205,8 +220,8 @@ test("energy uses the same magnitude thresholds as power", () => {
 
 describe("formatCustomerCount", () => {
   it.each([
-    [1234, "1.2K", "1.23K"],
-    [123456, "120K", "123K"],
+    [1234, "1.2k", "1.23k"],
+    [123456, "120k", "123k"],
     [1234567, "1.2M", "1.23M"],
     [9876543, "9.9M", "9.88M"],
     [0, "0", "0"],
@@ -254,7 +269,7 @@ describe("displayed negative zero", () => {
     expect(formatFixed(-0.4, 0)).toBe("0");
     expect(formatFixed(-0.5, 0)).toBe("-1");
     expect(formatNumber(-0)).toBe("0");
-    expect(formatNumber(-0.00001)).toBe("0");
+    expect(formatNumber(-0.00001)).toBe("-0.00001");
     expect(formatNumber(-0.00001, { maximumSignificantDigits: 3 })).toBe(
       "-0.00001",
     );
@@ -298,36 +313,39 @@ describe("decimal display precision", () => {
 describe("historical quantity abbreviations", () => {
   it.each([
     [499, "499"],
-    [500, "1k"],
-    [999, "1k"],
+    [500, "500"],
+    [999, "999"],
     [499999, "500k"],
-    [500000, "1m"],
-    [-500000, "0m"],
-    [1e9, "1b"],
-    [1e12, "1t"],
-  ])("preserves whole-number abbreviations for %s", (value, expected) => {
+    [500000, "500k"],
+    [-500000, "-500k"],
+    [1e9, "1B"],
+    [1e12, "1T"],
+  ])("uses compact three-digit abbreviations for %s", (value, expected) => {
     expect(formatAbbreviatedNumber(value)).toBe(expected);
   });
 
   it("keeps useful decimals for changes and short mass labels", () => {
-    expect(formatAbbreviatedNumber(9900, { digits: 1 })).toBe("9.9k");
-    expect(formatAbbreviatedNumber(549, { totalDigits: 3 })).toBe("0.549k");
+    expect(formatAbbreviatedNumber(9900, { totalDigits: 2 })).toBe("9.9k");
+    expect(formatAbbreviatedNumber(549, { totalDigits: 3 })).toBe("549");
     expect(formatAbbreviatedNumber(1234, { totalDigits: 3 })).toBe("1.23k");
     expect(formatAbbreviatedNumber(12340, { totalDigits: 3 })).toBe("12.3k");
     expect(formatAbbreviatedNumber(123400, { totalDigits: 3 })).toBe("123k");
-    expect(formatAbbreviatedNumber(999999, { totalDigits: 3 })).toBe("1m");
+    expect(formatAbbreviatedNumber(999999, { totalDigits: 3 })).toBe("1M");
   });
 
   it.each<[number, string]>([
-    [500, "0.5k"],
-    [549, "0.55k"],
-    [-549, "-0.55k"],
-    [550, "0.55k"],
-    [549000, "0.55m"],
-    [-549000, "-0.55m"],
-    [549000000, "0.55b"],
-    [549000000000, "0.55t"],
-  ])("preserves two digits below one unit for %s", (value, expected) => {
-    expect(formatAbbreviatedNumber(value, { totalDigits: 2 })).toBe(expected);
-  });
+    [500, "500"],
+    [549, "550"],
+    [-549, "-550"],
+    [550, "550"],
+    [549000, "550k"],
+    [-549000, "-550k"],
+    [549000000, "550M"],
+    [549000000000, "550B"],
+  ])(
+    "keeps two significant digits without premature unit promotion for %s",
+    (value, expected) => {
+      expect(formatAbbreviatedNumber(value, { totalDigits: 2 })).toBe(expected);
+    },
+  );
 });

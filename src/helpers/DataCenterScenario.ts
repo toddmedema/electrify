@@ -77,7 +77,7 @@ export function createDataCenterScenario(
     startingCustomers < 1 ||
     startingCustomers > 100000000
   ) {
-    throw new RangeError("Choose between 1 and 100,000,000 customer accounts.");
+    throw new RangeError("Choose between 1 and 100M customer accounts.");
   }
   const startingDemandScale = researched?.startingDemandScale || 1;
   const scale = startingCustomers * startingDemandScale;

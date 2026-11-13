@@ -12,8 +12,10 @@ import { acquisitionQuote } from "../../helpers/Expansion";
 import {
   formatCount,
   formatMoneyConcise,
+  formatNumber,
   formatPercent,
   formatWatts,
+  formatForecastWatts,
 } from "../../helpers/Format";
 import { currentTick } from "../../helpers/GameSelectors";
 import PurchaseReviewDialog from "./PurchaseReviewDialog";
@@ -32,8 +34,8 @@ interface Props {
 
 function marginText(marginW: number): string {
   return marginW < 0
-    ? `${formatWatts(-marginW)} shortfall`
-    : `${formatWatts(marginW)} spare`;
+    ? `${formatForecastWatts(-marginW)} shortfall`
+    : `${formatForecastWatts(marginW)} spare`;
 }
 
 /** Reviews the same dated seller snapshot that the owning purchase API validates. */
@@ -120,7 +122,7 @@ export default function AcquisitionReviewDialog({
           concept: "supply",
           label: "Supply margin",
           value: preview
-            ? `${formatWatts(preview.beforeMarginW)} → ${marginText(preview.afterMarginW)}`
+            ? `${formatForecastWatts(preview.beforeMarginW)} → ${marginText(preview.afterMarginW)}`
             : "Forecast unavailable",
         },
       ]}
@@ -176,7 +178,7 @@ export default function AcquisitionReviewDialog({
                     concept: "supply",
                     label: facilityDisplayName(facility),
                     value: formatWatts(facility.peakW),
-                    detail: `${facility.ageYears.toFixed(1)} years old`,
+                    detail: `${formatNumber(facility.ageYears)} years old`,
                   }))}
               />
               <Typography component="h3" variant="subtitle2">
@@ -232,7 +234,7 @@ export default function AcquisitionReviewDialog({
                     concept: "finances",
                     label: "New loan",
                     value: formatMoneyConcise(quote.newLoan),
-                    detail: `${(game.interestRate * 100).toFixed(2)}% over ${LOAN_MONTHS / 12} years · ${formatMoneyConcise(quote.monthlyDebtService - quote.cashMonthlyDebtService)}/mo`,
+                    detail: `${formatNumber(game.interestRate * 100)}% over ${LOAN_MONTHS / 12} years · ${formatMoneyConcise(quote.monthlyDebtService - quote.cashMonthlyDebtService)}/mo`,
                   },
                   {
                     concept: "money",

@@ -2,6 +2,7 @@ import { defineConfig } from "@playwright/test";
 import path from "node:path";
 import base from "./playwright.config";
 import { readShotRequest } from "./shot-request";
+import { MARKETING_SCENES } from "./marketing-scenes";
 
 // Driven by `npm run shot` (scripts/dev/shot.js). Not part of any suite: the runner file is
 // not a *.spec.ts, so ordinary discovery never selects it. One project per viewport and theme.
@@ -28,7 +29,7 @@ function viewportOptions({
 
 export default defineConfig({
   testDir: ".",
-  testMatch: "shot.run.ts",
+  testMatch: request.marketing ? "marketing.run.ts" : "shot.run.ts",
   timeout: 120_000,
   expect: { timeout: 15_000 },
   fullyParallel: true,
@@ -45,14 +46,24 @@ export default defineConfig({
     trace: "off",
     video: "off",
   },
-  projects: request.viewports.flatMap((viewport) =>
-    request.themes.map((theme) => ({
-      name: `${viewport.label}-${theme}`,
-      use: {
-        ...viewportOptions(viewport),
-        colorScheme: theme,
-        deviceScaleFactor: 1,
-      },
-    })),
-  ),
+  projects: request.marketing
+    ? MARKETING_SCENES.map((scene) => ({
+        name: scene.name,
+        use: {
+          browserName: "chromium" as const,
+          viewport: scene.viewport,
+          colorScheme: scene.theme,
+          deviceScaleFactor: scene.name === "gameplay-preview" ? 1 : 4 / 3,
+        },
+      }))
+    : request.viewports.flatMap((viewport) =>
+        request.themes.map((theme) => ({
+          name: `${viewport.label}-${theme}`,
+          use: {
+            ...viewportOptions(viewport),
+            colorScheme: theme,
+            deviceScaleFactor: 1,
+          },
+        })),
+      ),
 });

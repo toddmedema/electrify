@@ -12,7 +12,11 @@ import {
   getDateFromMinute,
   MINUTES_PER_MONTH,
 } from "../../helpers/DateTime";
-import { formatWatts, formatWattsAxis } from "../../helpers/Format";
+import {
+  formatForecastWatts,
+  formatWatts,
+  formatForecastWattsAxis as formatWattsAxis,
+} from "../../helpers/Format";
 import { FuelNameType, TickPresentFutureType } from "../../Types";
 import { chartPalette, fuelColors, withAlpha } from "../../Theme";
 
@@ -212,14 +216,16 @@ function buildOptions(
 }
 
 function tooltip(idx: number, state: State): string {
+  const projected =
+    state.nowMinute !== undefined && state.minutes[idx] >= state.nowMinute;
+  const watts = projected ? formatForecastWatts : formatWatts;
   let header: string;
   if (state.monthly) {
     const date = getDateFromMinute(state.minutes[idx], state.startingYear);
-    // A month that starts after now is the forecast's average, not a recorded one.
-    header =
-      state.nowMinute !== undefined && state.minutes[idx] > state.nowMinute
-        ? `${date.month} ${date.year} · forecast average`
-        : `${date.month} ${date.year} average`;
+    // A month starting at or after now is a forecast average.
+    header = projected
+      ? `${date.month} ${date.year} · forecast average`
+      : `${date.month} ${date.year} average`;
   } else {
     header = formatMinuteAsTooltipHeader(
       state.minutes[idx],
@@ -230,11 +236,10 @@ function tooltip(idx: number, state: State): string {
     header,
     ...state.fuels
       .map(
-        (f: FuelNameType, i: number) =>
-          f + ": " + formatWatts(state.byFuel[i][idx]),
+        (f: FuelNameType, i: number) => f + ": " + watts(state.byFuel[i][idx]),
       )
       .reverse(),
-    "Demand: " + formatWatts(state.demand[idx]),
+    "Demand: " + watts(state.demand[idx]),
   ].join("\n");
 }
 
@@ -315,7 +320,16 @@ export default class ChartForecastSupplyByFuel extends React.PureComponent<
       <div id="chartForecastSupplyByFuel">
         <UPlotChart<State>
           ariaLabel="Chart of predicted electricity supply by fuel type"
-          formatSummaryValue={formatWatts}
+          formatSummaryValue={(value, _series, point) =>
+            (currentMinute !== undefined && minutes[point] >= currentMinute
+              ? formatForecastWatts
+              : formatWatts)(value)
+          }
+          summaryRangeGroup={(_series, point) =>
+            currentMinute !== undefined && minutes[point] >= currentMinute
+              ? "forecast"
+              : "recorded"
+          }
           height={height}
           state={state}
           data={[minutes, ...stacked, demand]}

@@ -13,7 +13,7 @@ import {
   formatWatts,
   formatWattHours,
   formatMoneyConcise,
-  formatFixed,
+  formatNumber,
 } from "./Format";
 import { scenarioRules } from "./ScenarioRules";
 import { interpretScenarioRuleReport } from "./ScenarioRuleRuntime";
@@ -193,7 +193,7 @@ function reportMetricValue(metric: RuleReportMetric): string {
   if (typeof metric.value === "string") return metric.value;
   switch (metric.unit) {
     case "share":
-      return `${formatFixed(metric.value * 100, 1)}%`;
+      return `${formatNumber(metric.value * 100)}%`;
     case "Wh":
       return formatWattHours(metric.value);
     case "W":
@@ -201,9 +201,9 @@ function reportMetricValue(metric: RuleReportMetric): string {
     case "dollars":
       return formatMoneyConcise(metric.value);
     case "hours":
-      return `${formatFixed(metric.value, 1)} hours`;
+      return `${formatNumber(metric.value)} hours`;
     default:
-      return String(metric.value);
+      return formatNumber(metric.value);
   }
 }
 

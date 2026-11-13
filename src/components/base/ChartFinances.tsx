@@ -35,6 +35,7 @@ export interface Props {
   hideTitle?: boolean;
   timeline: ChartData[];
   format: (n: number) => number | string;
+  formatProjected: (n: number) => number | string;
   /** Axis labels can use less precision than inspected values. */
   formatAxis?: (n: number) => number | string;
   /**
@@ -68,6 +69,7 @@ export interface Props {
 interface State {
   timeline: ChartData[];
   format: Props["format"];
+  formatProjected: Props["format"];
   formatAxis: Props["format"];
   range: [number, number];
   domain: [number, number];
@@ -197,7 +199,7 @@ function tooltip(idx: number, state: State): string {
     )
       ? `\n${state.warningNote}`
       : "";
-  return `${monthName} ${d.year}\n${state.format(d.value)}${note}${projected}${warning}`;
+  return `${monthName} ${d.year}\n${(d.projected ? state.formatProjected : state.format)(d.value)}${note}${projected}${warning}`;
 }
 
 const ChartFinances = (props: Props): React.JSX.Element => {
@@ -239,7 +241,12 @@ const ChartFinances = (props: Props): React.JSX.Element => {
   const state: State = {
     timeline: props.timeline,
     format: props.format,
-    formatAxis: props.formatAxis || props.format,
+    formatProjected: props.formatProjected,
+    formatAxis:
+      props.formatAxis ||
+      (props.timeline.some((point) => point.projected)
+        ? props.formatProjected
+        : props.format),
     range: [rangeMin, rangeMax],
     domain,
     multiyear,
@@ -262,7 +269,11 @@ const ChartFinances = (props: Props): React.JSX.Element => {
       {!props.hideTitle && <div className="chartCaption">{props.title}</div>}
       <UPlotChart<State>
         ariaLabel={`Chart of ${props.title} over time${props.warningSpans?.length ? `. ${props.warningNote ?? "Warning"} periods shaded` : ""}`}
-        formatSummaryValue={(value) => String(state.format(value))}
+        formatSummaryValue={(value, seriesIndex) =>
+          String(
+            (seriesIndex === 1 ? state.formatProjected : state.format)(value),
+          )
+        }
         id={props.id || "chartFinances"}
         height={props.height}
         state={state}
