@@ -89,6 +89,11 @@ export interface UPlotChartProps<S> {
     seriesIndex: number,
     pointIndex: number,
   ) => string;
+  /** Keep ranges with different recorded/forecast precision separate. Match the value formatter. */
+  summaryRangeGroup?: (
+    seriesIndex: number,
+    pointIndex: number,
+  ) => "recorded" | "forecast";
 }
 
 const TOOLTIP_OFFSET = 8;
@@ -419,12 +424,17 @@ export default function UPlotChart<S>(
       // into Math.min/Math.max for every series.
       let first = 0;
       let latest = 0;
-      let minimum = Number.POSITIVE_INFINITY;
-      let maximum = Number.NEGATIVE_INFINITY;
       let found = false;
       let latestIndex = 0;
-      let minimumIndex = 0;
-      let maximumIndex = 0;
+      const ranges = new Map<
+        string,
+        {
+          minimum: number;
+          maximum: number;
+          minimumIndex: number;
+          maximumIndex: number;
+        }
+      >();
       for (let i = 0; i < series.length; i++) {
         const value = series[i];
         if (typeof value !== "number" || !isFinite(value)) {
@@ -436,31 +446,57 @@ export default function UPlotChart<S>(
         }
         latest = value;
         latestIndex = i;
-        if (value < minimum) {
-          minimum = value;
-          minimumIndex = i;
-        }
-        if (value > maximum) {
-          maximum = value;
-          maximumIndex = i;
+        const group = props.summaryRangeGroup?.(index, i) || "";
+        const range = ranges.get(group);
+        if (!range) {
+          ranges.set(group, {
+            minimum: value,
+            maximum: value,
+            minimumIndex: i,
+            maximumIndex: i,
+          });
+        } else {
+          if (value < range.minimum) {
+            range.minimum = value;
+            range.minimumIndex = i;
+          }
+          if (value > range.maximum) {
+            range.maximum = value;
+            range.maximumIndex = i;
+          }
         }
       }
       if (!found) {
-        minimum = 0;
-        maximum = 0;
+        ranges.set("", {
+          minimum: 0,
+          maximum: 0,
+          minimumIndex: 0,
+          maximumIndex: 0,
+        });
       }
       return {
         label: props.seriesLabels?.[index] || `Series ${index + 1}`,
         latest: formatSummaryValue(latest, index, latestIndex),
-        minimum: formatSummaryValue(minimum, index, minimumIndex),
-        maximum: formatSummaryValue(maximum, index, maximumIndex),
+        range: Array.from(ranges, ([group, range]) => {
+          const minimum = formatSummaryValue(
+            range.minimum,
+            index,
+            range.minimumIndex,
+          );
+          const maximum = formatSummaryValue(
+            range.maximum,
+            index,
+            range.maximumIndex,
+          );
+          return `${ranges.size > 1 ? `${group} ` : ""}range ${minimum} to ${maximum}`;
+        }).join(", "),
         trend: latest > first ? "up" : latest < first ? "down" : "flat",
       };
     });
   const accessibleLabel = `${ariaLabel}. ${seriesSummary
     .map(
       (series) =>
-        `${series.label}: latest ${series.latest}, range ${series.minimum} to ${series.maximum}, trend ${series.trend}`,
+        `${series.label}: latest ${series.latest}, ${series.range}, trend ${series.trend}`,
     )
     .join(". ")}`;
 

@@ -1,4 +1,4 @@
-import { render } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { LOCATIONS } from "../../Constants";
 import { TickPresentFutureType } from "../../Types";
 import { MINUTES_PER_MONTH } from "../../helpers/DateTime";
@@ -93,6 +93,44 @@ it("uses each point's meaning for mixed stacked and exchange summaries", () => {
     expect(format(123e6, 0, 1)).toBe("120MW");
   }
 });
+
+it.each([false, true])(
+  "separates stacked fuel and exchange ranges across the forecast boundary (monthly=%s)",
+  (monthly) => {
+    const mixed = timeline.map((tick, index) => ({
+      ...tick,
+      supplyByFuel: { Coal: (123 + index) * 1e6 },
+      importedW: (127 - index) * 1e6,
+    }));
+    const props = {
+      ...common,
+      timeline: mixed,
+      domain: {
+        x: [0, (monthly ? 24 : 2) * MINUTES_PER_MONTH] as [number, number],
+      },
+    };
+    const ActualUPlotChart =
+      jest.requireActual<typeof import("./UPlotChart")>("./UPlotChart").default;
+    for (const [component, label] of [
+      [
+        <ChartForecastSupplyByFuel {...props} fuels={["Coal"]} />,
+        "Coal cumulative supply: latest 130MW, recorded range 123MW to 123MW, forecast range 120MW to 130MW, trend up",
+      ],
+      [
+        <ChartForecastPowerExchange {...props} />,
+        "Imports: latest 130MW, recorded range 127MW to 127MW, forecast range 130MW to 130MW, trend down",
+      ],
+    ] as const) {
+      const view = render(component);
+      const utils = render(<ActualUPlotChart {...chartProps()} />);
+      expect(screen.getByRole("img").getAttribute("aria-label")).toContain(
+        label,
+      );
+      utils.unmount();
+      view.unmount();
+    }
+  },
+);
 
 it("keeps the split historical and forecast summary series at their own precision", () => {
   for (const component of [

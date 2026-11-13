@@ -347,6 +347,11 @@ export default class ChartForecastPowerExchange extends React.PureComponent<
               ? formatForecastWatts
               : formatWatts)(value)
           }
+          summaryRangeGroup={(_series, point) =>
+            currentMinute !== undefined && minutes[point] >= currentMinute
+              ? "forecast"
+              : "recorded"
+          }
           height={height}
           state={state}
           data={[minutes, importRow, exportRow]}

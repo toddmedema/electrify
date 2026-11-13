@@ -673,6 +673,9 @@ const ChartSupplyDemand = (props: Props): React.JSX.Element => {
         formatSummaryValue={(value, _series, point) =>
           (isForecast[point] ? formatForecastWatts : formatWatts)(value)
         }
+        summaryRangeGroup={(_series, point) =>
+          isForecast[point] ? "forecast" : "recorded"
+        }
         height={height}
         state={state}
         data={[

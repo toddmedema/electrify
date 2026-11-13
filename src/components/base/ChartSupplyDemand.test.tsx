@@ -191,8 +191,12 @@ it("makes unstacked fuel output and blackout meaning readable without the canvas
   const chart = screen.getByRole("img", {
     name: /electricity supply and demand over the day/i,
   });
-  expect(chart).toHaveAccessibleName(/Coal: latest 80W, range 80W to 100W/);
-  expect(chart).toHaveAccessibleName(/Sun: latest 40W, range 0W to 40W/);
+  expect(chart).toHaveAccessibleName(
+    /Coal: latest 80W, recorded range 100W to 100W, forecast range 80W to 80W/,
+  );
+  expect(chart).toHaveAccessibleName(
+    /Sun: latest 40W, recorded range 0W to 0W, forecast range 40W to 40W/,
+  );
   expect(chart).toHaveAccessibleName(/Total supply: latest 130W/);
   expect(chart).toHaveAccessibleName(/Total load: latest 140W/);
   expect(chart).toHaveAttribute("tabindex", "0");
@@ -202,6 +206,32 @@ it("makes unstacked fuel output and blackout meaning readable without the canvas
   expect(screen.queryByText(/Bands: fuel output/)).not.toBeInTheDocument();
   expect(screen.queryByText("Wind")).not.toBeInTheDocument();
 });
+
+it.each([
+  [123e6, 124e6, "123MW", "120MW", "up"],
+  [127e6, 126e6, "127MW", "130MW", "down"],
+  [999e3, 1001e3, "999kW", "1MW", "up"],
+])(
+  "separates recorded %sW and forecast %sW ranges without reversing rounded bounds",
+  (recorded, forecast, recordedLabel, forecastLabel, trend) => {
+    render(
+      <ChartSupplyDemand
+        timeline={[recorded, forecast].map((value, index) => ({
+          minute: index * 60,
+          supplyW: value,
+          demandW: value,
+          supplyByFuel: { Coal: value },
+        }))}
+        currentMinute={60}
+        location={LOCATIONS.SF}
+        startingYear={2020}
+      />,
+    );
+    expect(screen.getByRole("img").getAttribute("aria-label")).toContain(
+      `Total supply: latest ${forecastLabel}, recorded range ${recordedLabel} to ${recordedLabel}, forecast range ${forecastLabel} to ${forecastLabel}, trend ${trend}`,
+    );
+  },
+);
 
 it("shows imported supply when no generators are producing", () => {
   render(
