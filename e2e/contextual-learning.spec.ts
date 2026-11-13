@@ -7,14 +7,17 @@ import { reviewScreenshot } from "./review-screenshot";
 
 async function clickValue(region: Locator, value: Locator) {
   await value.scrollIntoViewIfNeeded();
-  const box = (await region.boundingBox())!;
-  const target = (await value.boundingBox())!;
-  await region.click({
-    position: {
+  // Read both rectangles in one frame so catalog layout changes between browser
+  // calls cannot leave the click aimed at a neighboring row.
+  const position = await value.evaluate((element) => {
+    const box = element.closest(".manual-help-region")!.getBoundingClientRect();
+    const target = element.getBoundingClientRect();
+    return {
       x: target.x - box.x + target.width / 2,
       y: target.y - box.y + target.height / 2,
-    },
+    };
   });
+  await region.click({ position });
 }
 
 for (const theme of ["light", "dark"] as const) {

@@ -119,7 +119,11 @@ export default function HydroWaterSection(props: {
             <Typography variant="caption" color="textSecondary" component="dt">
               <ManualLink
                 entry={MANUAL_ENTRY.HYDROPOWER}
-                label="reservoir forecast"
+                label={
+                  emptyAllYear && fleet
+                    ? "reservoir forecast for all your dams, next 12 months: no refill expected"
+                    : "reservoir forecast"
+                }
                 region
               >
                 {fleet ? "All your dams, next 12 months" : "Next 12 months"}
