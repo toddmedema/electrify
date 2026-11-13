@@ -16,7 +16,8 @@ import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 import ScreenPage from "../components/base/ScreenPage";
 import { useAppDispatch, useAppSelector } from "../Store";
 import { navigate, navigateBack } from "../reducers/Card";
-import { firebaseAppAuth, login, SignInOptions } from "../Globals";
+import { firebaseAppAuth } from "../Globals";
+import SignInButtons from "../components/base/SignInButtons";
 import { catalog } from "./Progress";
 import { achievementJournal } from "./Journal";
 import { useAchievements } from "./useAchievements";
@@ -24,7 +25,6 @@ import { retryAchievementSync } from "./Runtime";
 import { useOnline } from "../components/base/OnlineStatus";
 import { restoreMenuFocus, useMenuKeys } from "../components/base/useMenuKeys";
 import { useSwipeToDismiss } from "../components/base/SwipeDismiss";
-import GoogleSignIn from "../components/base/GoogleSignIn";
 
 /** Long enough to read the name and requirement; hover or focus holds it on screen. */
 export const ACHIEVEMENT_TOAST_MS = 10_000;
@@ -35,8 +35,6 @@ export function AchievementGallery(): React.JSX.Element {
   const dispatch = useAppDispatch();
   const online = useOnline();
   const [filter, setFilter] = React.useState<Filter>("all");
-  const [signingIn, setSigningIn] = React.useState(false);
-  const [signInError, setSignInError] = React.useState(false);
   const onBack = () => {
     if (document.activeElement instanceof HTMLElement)
       document.activeElement.blur();
@@ -87,17 +85,6 @@ export function AchievementGallery(): React.JSX.Element {
                 : state.sync === "failed"
                   ? "Saved on this device. Account sync couldn't finish."
                   : "Saved on this device. Syncing to your account…";
-  const signIn = async (options: SignInOptions) => {
-    setSigningIn(true);
-    setSignInError(false);
-    try {
-      if (!(await login(options))) setSignInError(true);
-    } catch {
-      setSignInError(true);
-    } finally {
-      setSigningIn(false);
-    }
-  };
   return (
     <ScreenPage
       title="Achievements"
@@ -128,18 +115,9 @@ export function AchievementGallery(): React.JSX.Element {
                     : "Sign in when you're online to keep achievements across devices."}
                 </Typography>
               )}
-              {signInError && (
-                <Typography color="error" role="alert">
-                  Couldn't finish sign-in. Try again.
-                </Typography>
-              )}
             </div>
             {!state.uid && firebaseAppAuth && (
-              <GoogleSignIn
-                label={signingIn ? "Signing in…" : "Sign in with Google"}
-                disabled={signingIn || !online}
-                onSignIn={signIn}
-              />
+              <SignInButtons disabled={!online} />
             )}
             {account && state.sync === "failed" && online && (
               <Button variant="outlined" onClick={retryAchievementSync}>

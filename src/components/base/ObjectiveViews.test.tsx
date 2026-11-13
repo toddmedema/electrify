@@ -199,7 +199,6 @@ for (const view of ["live", "saved"] as const) {
             onClose={() => undefined}
             onQuit={() => undefined}
             onRetry={() => undefined}
-            onLogin={() => undefined}
             onShared={() => undefined}
             onShareFailed={() => undefined}
           />

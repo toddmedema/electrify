@@ -1,6 +1,6 @@
 # Cloud saves and share links
 
-IndexedDB remains the source for loading and saving games. After Google sign-in, the
+IndexedDB remains the source for loading and saving games. After Google or Apple sign-in, the
 app backs up device saves to `users/{uid}/cloudSaves/{id}` and restores missing or
 newer backups to IndexedDB. Automatic sync attempts are spaced at least five minutes
 apart. After a game's first backup, automatic uploads require both five wall-clock

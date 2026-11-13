@@ -38,14 +38,13 @@ import { UNIT_SYSTEMS, UNIT_SYSTEM_LABELS } from "../../helpers/Units";
 import { THEME_CHOICES, THEME_LABELS } from "../../Theme";
 import KeyboardShortcuts, { SHORTCUTS } from "../base/KeyboardShortcuts";
 import ScreenPage from "../base/ScreenPage";
+import SignInButtons from "../base/SignInButtons";
 import InstallAppButton, { useCanInstallApp } from "../base/InstallAppButton";
 import { APP_VERSION } from "../../AppVersion";
 import { clearAppCache } from "../../helpers/Cache";
 import { getDesktop, isDesktopApp } from "../../Desktop";
 import { useDesktopState } from "../../DesktopState";
 import { restoreMenuFocus, useMenuKeys } from "../base/useMenuKeys";
-import type { SignInOptions } from "../../Globals";
-import GoogleSignIn from "../base/GoogleSignIn";
 import ConfirmDialog from "../base/ConfirmDialog";
 const CreditsDialog = React.lazy(() => import("../base/CreditsDialog"));
 const DesktopDisplaySettings =
@@ -65,7 +64,6 @@ export interface StateProps {
 }
 
 export interface DispatchProps {
-  onLogin: (options?: SignInOptions) => void;
   onLogout: () => void;
   onChangeName: () => void;
   onAudioChange: (change: boolean) => void;
@@ -548,7 +546,7 @@ export default function Settings(props: Props): React.JSX.Element {
                         </Button>
                       </>
                     ) : (
-                      <GoogleSignIn onSignIn={props.onLogin} />
+                      <SignInButtons />
                     )}
                   </Stack>
                 </SettingRow>

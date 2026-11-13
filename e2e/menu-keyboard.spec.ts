@@ -171,13 +171,30 @@ test("screen-edge padding persists independently and reaches dialogs at every sc
   const frame = page.locator(".appFrame");
   await expect(frame).toHaveCSS("padding-left", "0px");
   await page.getByRole("button", { name: "Settings", exact: true }).click();
-  await page
-    .getByRole("button", { name: "Advanced display", exact: true })
-    .click();
+  const advanced = page.getByRole("button", {
+    name: "Advanced display",
+    exact: true,
+  });
   const padding = page.getByRole("group", {
     name: "Screen-edge padding",
     exact: true,
   });
+  await expect(advanced).toHaveAttribute("aria-expanded", "false");
+  // The accordion keeps the controls mounted. Check the element itself while it is
+  // excluded from role queries, then locate it by its accessible role after opening.
+  const collapsedPadding = page.getByLabel("Screen-edge padding", {
+    exact: true,
+  });
+  await expect(collapsedPadding).toBeAttached();
+  await expect(collapsedPadding).toBeHidden();
+  await advanced.click();
+  await expect(advanced).toHaveAttribute("aria-expanded", "true");
+  await expect(padding).toBeVisible();
+  for (const name of ["0%", "2%", "4%"]) {
+    await expect(
+      padding.getByRole("button", { name, exact: true }),
+    ).toBeVisible();
+  }
   await expect(
     padding.getByRole("button", { name: "0%", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
@@ -199,6 +216,10 @@ test("screen-edge padding persists independently and reaches dialogs at every sc
     name: "Interface scale",
     exact: true,
   });
+  await expect(
+    page.getByRole("button", { name: "Automatic", exact: true }),
+  ).toBeVisible();
+  await expect(scale).toBeVisible();
   await expect(scale).toHaveValue("1");
   await page.getByRole("button", { name: "Single tool", exact: true }).click();
   await scale.selectOption("1.5");

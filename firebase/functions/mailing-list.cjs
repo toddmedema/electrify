@@ -17,7 +17,7 @@ async function subscribe(request, { apiKey, fetch: send = fetch }) {
   const token = auth.token;
   if (
     token.email_verified !== true ||
-    token.firebase?.sign_in_provider !== "google.com" ||
+    !["google.com", "apple.com"].includes(token.firebase?.sign_in_provider) ||
     typeof token.email !== "string" ||
     !token.email.includes("@")
   )

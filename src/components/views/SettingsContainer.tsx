@@ -4,7 +4,6 @@ import { connect } from "react-redux";
 import { navigateBack } from "../../reducers/Card";
 import { change as changeSettings } from "../../reducers/Settings";
 import { delta as userDelta, logout } from "../../reducers/User";
-import { login } from "../../Globals";
 import { AppStateType, ThemeChoiceType, UnitSystemType } from "../../Types";
 import Settings, { DispatchProps, StateProps } from "./Settings";
 
@@ -21,9 +20,6 @@ const mapDispatchToProps = (
   ownProps?: { onBack?: () => void },
 ): DispatchProps => {
   return {
-    onLogin: (options) => {
-      void login(options);
-    },
     onLogout: () => {
       dispatch(logout());
     },
