@@ -1,3 +1,4 @@
+import { reviewScreenshot } from "./review-screenshot";
 import { expect, test } from "./fixtures";
 import { openPane, openBuild } from "./layout";
 import path from "node:path";
@@ -258,6 +259,18 @@ test("reduced output stays inline beside capacity and fuel history shares the gr
   ).toBe(1);
   const economics = row.getByRole("region", { name: "Economics" });
   await expect(economics.locator(".facilityFuelTrend")).toBeVisible();
+  const history = economics.getByRole("group", {
+    name: "Natural Gas monthly fuel price",
+  });
+  const historySummary = (await history.textContent())!;
+  await history.getByRole("img").hover({ position: { x: 1, y: 10 } });
+  await expect(history).toContainText(/^Jan 2023: \$[\d.]+\/MMBtu$/);
+  await history.focus();
+  await history.press("End");
+  await expect(history).toContainText(/^Feb 2023: \$[\d.]+\/MMBtu$/);
+  await history.evaluate((element: HTMLElement) => element.blur());
+  await page.mouse.move(0, 0);
+  await expect(history).toHaveText(historySummary);
   if (info.project.name === "desktop-chromium") {
     const positions = await economics
       .locator(".facilityStat")
@@ -392,5 +405,69 @@ for (const theme of ["light", "dark"]) {
     await page.screenshot({
       path: testInfo.outputPath("facility-construction.png"),
     });
+  });
+}
+
+for (const theme of ["light", "dark"]) {
+  test(`reservoir sparklines inspect fleet months in ${theme}`, async ({
+    page,
+  }, info) => {
+    await page.addInitScript((mode) => {
+      localStorage.clear();
+      localStorage.setItem("theme", mode);
+    }, theme);
+    await page.goto("/?scenario=108");
+    await page.getByRole("button", { name: "Start game", exact: true }).click();
+    await editSavedGame(page, ({ game }) => {
+      const dam = game.facilities.find(
+        (facility) => facility.fuel === "Hydro",
+      )!;
+      game.facilities.push({
+        ...dam,
+        id: Math.max(...game.facilities.map((facility) => facility.id)) + 1,
+      });
+    });
+    await page.reload();
+    await page.getByRole("button", { name: "Continue", exact: true }).click();
+    const facilities = page.locator(".facilities:visible");
+    await openPane(
+      facilities,
+      page.getByRole("button", { name: "Facilities", exact: true }),
+    );
+    const row = facilities.locator('.facilityRow[data-fuel="Hydro"]').first();
+    await row.locator(".facilityDisclosure").click();
+    const group = row.getByRole("group", {
+      name: "Monthly reservoir forecast for all your dams",
+    });
+    await expect(group).toBeVisible();
+    const summary = (await group.textContent())!;
+    const chart = group.getByRole("img");
+    await chart.hover({ position: { x: 1, y: 14 } });
+    await expect(group).toContainText("Now · Jan 2023");
+    await expect(group).toContainText(/\d+% full/);
+    const bounds = (await chart.boundingBox())!;
+    await chart.hover({ position: { x: bounds.width - 1, y: 14 } });
+    await expect(group).toContainText("month end");
+    if (info.project.use.hasTouch) {
+      await chart.tap({ position: { x: 1, y: 14 } });
+      await expect(group).toContainText("Now · Jan 2023");
+      await expect(page.locator(".manual-popover")).toHaveCount(0);
+    } else {
+      await group.focus();
+      await group.press("Home");
+      await expect(group).toContainText("Now · Jan 2023");
+    }
+    expect(
+      await row.evaluate(
+        (element) => element.scrollWidth - element.clientWidth,
+      ),
+    ).toBeLessThanOrEqual(1);
+    await reviewScreenshot(row, {
+      path: info.outputPath(`hydro-fleet-${theme}.png`),
+      animations: "disabled",
+    });
+    await page.mouse.move(0, 0);
+    await group.evaluate((element: HTMLElement) => element.blur());
+    await expect(group).toHaveText(summary);
   });
 }

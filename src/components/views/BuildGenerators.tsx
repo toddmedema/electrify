@@ -106,6 +106,7 @@ import ConstructionBuildHeader from "../base/ConstructionBuildHeader";
 import useBuildRowReveal from "../base/useBuildRowReveal";
 import { getLegacyBuildBounds } from "../../data/LegacyEra";
 import Sparkline from "../base/Sparkline";
+import InteractiveSparkline from "../base/InteractiveSparkline";
 
 function percent(fraction: number): string {
   return formatForecastPercent(fraction);
@@ -143,26 +144,6 @@ function ExpectedOutputMetric(props: {
   ceiling: number;
 }): React.JSX.Element {
   const { shape, ceiling } = props;
-  const [inspectedMonth, setInspectedMonth] = React.useState<number | null>(
-    null,
-  );
-  const chartRef = React.useRef<HTMLDivElement>(null);
-  const captionId = React.useId();
-  const variable = shape && shape.kind !== "on-demand";
-  const month = inspectedMonth ?? shape?.lowMonth ?? 0;
-  const inspectPointer = (event: React.PointerEvent<HTMLDivElement>) => {
-    const bounds = chartRef.current?.getBoundingClientRect();
-    if (!variable || !bounds?.width) return;
-    setInspectedMonth(
-      Math.max(
-        0,
-        Math.min(
-          11,
-          Math.round(((event.clientX - bounds.left) / bounds.width) * 11),
-        ),
-      ),
-    );
-  };
   let caption = shape ? "" : "Calculating output…";
   let chart: React.ReactNode = null;
   if (shape && shape.kind === "on-demand") {
@@ -186,9 +167,17 @@ function ExpectedOutputMetric(props: {
     );
     const low = shape.monthly[shape.lowMonth];
     const water = shape.kind === "water-inflow";
-    caption = `${MONTHS[month]}: ${percent(shape.monthly[month])} ${water ? "of typical water" : "capacity"}`;
-    chart = (
-      <Sparkline
+    return (
+      <InteractiveSparkline
+        className="buildOptionMetric buildOptionOutput"
+        chartClassName="buildOptionSparkline"
+        captionClassName="buildOptionOutputCaption"
+        captionFirst
+        label={`Typical monthly ${water ? "water inflow" : "output"}`}
+        defaultIndex={shape.lowMonth}
+        caption={(month) =>
+          `${MONTHS[month]}: ${percent(shape.monthly[month])} ${water ? "of typical water" : "capacity"}`
+        }
         values={shape.monthly}
         domain={[0, ceiling]}
         width={96}
@@ -197,65 +186,21 @@ function ExpectedOutputMetric(props: {
         baseline
         fill
         lowMarker
-        markerIndex={month}
         ariaLabel={`Typical year${water ? " of water inflow" : ""}: highest in ${MONTH_NAMES[highMonth]} at ${percent(shape.monthly[highMonth])}, lowest in ${MONTH_NAMES[shape.lowMonth]} at ${percent(low)}.`}
       />
     );
   }
   return (
-    <div
-      className="buildOptionMetric buildOptionOutput"
-      role={variable ? "group" : undefined}
-      tabIndex={variable ? 0 : undefined}
-      aria-label={
-        variable
-          ? `Typical monthly ${shape.kind === "water-inflow" ? "water inflow" : "output"}`
-          : undefined
-      }
-      aria-describedby={variable ? captionId : undefined}
-      aria-keyshortcuts={variable ? "ArrowLeft ArrowRight Home End" : undefined}
-      onPointerMove={inspectPointer}
-      onPointerDown={inspectPointer}
-      onPointerLeave={() => setInspectedMonth(null)}
-      onPointerCancel={() => setInspectedMonth(null)}
-      onBlur={() => setInspectedMonth(null)}
-      onKeyDown={(event) => {
-        if (!variable) return;
-        let nextMonth: number;
-        switch (event.key) {
-          case "ArrowLeft":
-            nextMonth = Math.max(0, month - 1);
-            break;
-          case "ArrowRight":
-            nextMonth = Math.min(11, month + 1);
-            break;
-          case "Home":
-            nextMonth = 0;
-            break;
-          case "End":
-            nextMonth = 11;
-            break;
-          default:
-            return;
-        }
-        event.preventDefault();
-        setInspectedMonth(nextMonth);
-      }}
-    >
+    <div className="buildOptionMetric buildOptionOutput">
       <Typography
         className="buildOptionOutputCaption"
-        id={captionId}
         variant="caption"
         color="textSecondary"
         component="div"
-        // A native title tooltip can cover the chart while the player is inspecting months.
-        title={inspectedMonth === null ? caption : undefined}
       >
         {caption}
       </Typography>
-      <div className="buildOptionSparkline" ref={chartRef}>
-        {chart}
-      </div>
+      <div className="buildOptionSparkline">{chart}</div>
     </div>
   );
 }

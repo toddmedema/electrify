@@ -1662,6 +1662,36 @@ $pane_header_height: 48px;
   gap: 4px;
 }
 
+.interactiveSparkline {
+  min-width: 0;
+  min-height: 40px;
+  touch-action: pan-y;
+
+  @media (pointer: coarse) {
+    min-height: 44px;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--interactive-blue);
+    outline-offset: 4px;
+  }
+
+  .interactiveSparklineChart {
+    width: 100%;
+  }
+
+  .sparkline {
+    display: block;
+    overflow: visible;
+  }
+}
+
+// Inspection stays above the manual link's expanded hit area.
+.manual-help-region .interactiveSparkline {
+  position: relative;
+  z-index: 1;
+}
+
 .intertieYear {
   display: flex;
   align-items: center;
@@ -1688,6 +1718,17 @@ $pane_header_height: 48px;
   }
 }
 
+.intertieYearTrend {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  > div:first-child {
+    width: 96px;
+    flex: 0 0 96px;
+  }
+}
+
 .intertieYear.intertieAvailability {
   display: grid;
   gap: 4px;
@@ -1697,6 +1738,14 @@ $pane_header_height: 48px;
     height: 80px;
     @media (max-width: ($phone_width - 1px)) {
       height: 64px;
+    }
+  }
+  .intertieYearTrend {
+    display: grid;
+    gap: 4px;
+
+    > div:first-child {
+      width: 100%;
     }
   }
   .intertieAvailabilityLimit {
@@ -4087,6 +4136,11 @@ $pane_header_height: 48px;
     display: grid;
     line-height: 16px;
     white-space: nowrap;
+  }
+
+  .facilityFuelTrendChart > div:first-child {
+    width: 72px;
+    flex: 0 0 72px;
   }
 
   // The one-sentence reason a dam is producing what it is. Only the verdict takes the warning

@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { Provider } from "react-redux";
 import { store } from "../../Store";
 import { manualHelpClose } from "../../reducers/UI";
+import { ReservoirOutlookPoint } from "../../helpers/HydroOutlook";
 import { createGame } from "../../testing/Simulator";
 import HydroWaterSection from "./HydroWaterSection";
 import { MANUAL_ENTRY } from "./ManualEntries";
@@ -9,16 +10,25 @@ import { useOutlookWorker } from "./useOutlookWorker";
 
 jest.mock("./useOutlookWorker");
 
-function showWater(fraction: number, fleet: boolean) {
+function showWater(
+  fraction: number,
+  fleet: boolean,
+  points?: ReservoirOutlookPoint[],
+) {
   const game = createGame({ scenarioId: 108 });
+  if (points) {
+    game.date.year = 2025;
+    game.date.monthNumber = points[0].monthNumber;
+  }
   const dam = game.facilities.find((facility) => facility.fuel === "Hydro")!;
   if (fleet) game.facilities.push({ ...dam, id: dam.id + 100 });
   jest.mocked(useOutlookWorker).mockReturnValue(
-    Array.from({ length: 13 }, (_, month) => ({
-      monthNumber: (month % 12) + 1,
-      fraction,
-      snowpackMm: 0,
-    })),
+    points ??
+      Array.from({ length: 13 }, (_, month) => ({
+        monthNumber: (month % 12) + 1,
+        fraction,
+        snowpackMm: 0,
+      })),
   );
   render(
     <Provider store={store}>
@@ -61,5 +71,33 @@ it.each([false, true])(
     expect(
       water.getByRole("img", { name: /Reservoir forecast/ }),
     ).toBeInTheDocument();
+  },
+);
+
+it.each([false, true])(
+  "inspects reservoir month ends across a year boundary (fleet: %s)",
+  (fleet) => {
+    const points = Array.from({ length: 13 }, (_, index) => ({
+      monthNumber: index < 2 ? 12 : index - 1,
+      fraction: index === 2 ? 0.2 : 0.5,
+      snowpackMm: 0,
+    }));
+    const water = within(showWater(0.5, fleet, points));
+    const group = water.getByRole("group", {
+      name: fleet
+        ? "Monthly reservoir forecast for all your dams"
+        : "Monthly reservoir forecast",
+    });
+    expect(group).toHaveAccessibleDescription(/Low Jan 20%/);
+    fireEvent.keyDown(group, { key: "Home" });
+    expect(group).toHaveAccessibleDescription("Now · Dec 2025 50% full");
+    fireEvent.keyDown(group, { key: "ArrowRight" });
+    expect(group).toHaveAccessibleDescription("Dec 2025 50% full · month end");
+    fireEvent.keyDown(group, { key: "ArrowRight" });
+    expect(group).toHaveAccessibleDescription("Jan 2026 20% full · month end");
+    fireEvent.keyDown(group, { key: "End" });
+    expect(group).toHaveAccessibleDescription("Nov 2026 50% full · month end");
+    fireEvent.pointerLeave(group);
+    expect(group).toHaveAccessibleDescription(/Low Jan 20%/);
   },
 );

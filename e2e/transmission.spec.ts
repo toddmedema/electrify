@@ -44,6 +44,19 @@ test("California players can build and understand an intertie", async ({
     northernProject.getByText("Down payment", { exact: true }),
   ).toHaveCount(0);
   await expect(northernProject.locator(".intertieAvailability")).toBeVisible();
+  const availability = northernProject.getByRole("group", {
+    name: "Typical monthly import availability",
+  });
+  const summary = (await availability.textContent())!;
+  const availabilityChart = availability.getByRole("img");
+  await availabilityChart.hover({ position: { x: 1, y: 12 } });
+  await expect(availability).toContainText(/Jan: .*% · .*MW/);
+  await availability.focus();
+  await availability.press("End");
+  await expect(availability).toContainText(/Dec: .*% · .*MW/);
+  await page.mouse.move(0, 0);
+  await availability.evaluate((element: HTMLElement) => element.blur());
+  await expect(availability).toHaveText(summary);
   if (testInfo.project.name === "mobile-360px") {
     const firstBuild = projects
       .getByRole("button", {
