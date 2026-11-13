@@ -55,7 +55,7 @@ service cloud.firestore {
             && data.keys().hasAll(['version', 'earned', 'tutorials', 'wins'])
             && data.keys().hasOnly(['version', 'earned', 'tutorials', 'wins'])
             && data.version == 1
-            && data.earned is list && data.earned.size() <= 37
+            && data.earned is list && data.earned.size() <= 38
             && data.earned.toSet().size() == data.earned.size()
             && data.earned.hasOnly([
             "FIRST_SPARK",
@@ -74,6 +74,7 @@ service cloud.firestore {
             "NIGHT_SHIFT",
             "GRID_CONNECTED",
             "GOOD_NEIGHBOR",
+            "POWER_PLAY",
             "WASTE_NOT",
             "A_WATT_SAVED",
             "POWER_TO_THE_PEOPLE",

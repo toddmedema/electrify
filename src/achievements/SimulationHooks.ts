@@ -7,6 +7,7 @@ export interface SimulationHooks {
   month(game: GameType, continuing: boolean): void;
   finish(game: GameType, outcome: string): void;
   converted(game: GameType, facilityId: number): void;
+  acquired(game: GameType): void;
   tutorial(game: GameType): void;
   validate(value: unknown): boolean;
 }

@@ -384,6 +384,41 @@ for (const theme of ["light", "dark"] as const) {
       await expect(line).toContainText("· Owned");
       await expect(line).toContainText("Acquired utility");
       const afterPurchase = (await readSavedGame(page))!;
+      expect(
+        afterPurchase.desktopAchievements?.earned.filter(
+          (id) => id === "POWER_PLAY",
+        ),
+      ).toEqual(["POWER_PLAY"]);
+      if (index === 0) {
+        const notification = page
+          .locator(".achievementToastPanel")
+          .filter({ hasText: "Power Play" });
+        await expect(notification).toBeVisible();
+        await expect(notification).toContainText(
+          "Acquire your first competing utility.",
+        );
+        if (
+          process.env.REVIEW_SCREENSHOT_DIR &&
+          ((testInfo.project.name === "desktop-chromium" &&
+            theme === "light") ||
+            (testInfo.project.name === "mobile-390px" && theme === "dark"))
+        ) {
+          await page.mouse.move(0, 0);
+          await notification.screenshot({
+            path: path.join(
+              process.env.REVIEW_SCREENSHOT_DIR,
+              `power-play-${testInfo.project.name}-${theme}.png`,
+            ),
+            animations: "disabled",
+          });
+        }
+        await notification
+          .getByRole("button", {
+            name: "Dismiss Power Play achievement notification",
+            exact: true,
+          })
+          .click();
+      }
       const receipt = afterPurchase.utilityExpansion!.acquisitions.find(
         (entry) =>
           entry.targetId ===
