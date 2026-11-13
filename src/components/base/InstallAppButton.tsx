@@ -2,6 +2,7 @@ import * as React from "react";
 import { Button, Typography } from "@mui/material";
 import InstallMobileIcon from "@mui/icons-material/InstallMobile";
 import InfoDialog from "./InfoDialog";
+import MenuIconButton from "./MenuIconButton";
 import { isInstalledWebApp } from "../../InstalledApp";
 import {
   getPlayedScenarioIds,
@@ -151,6 +152,7 @@ export default function InstallAppButton(props: {
   label?: string;
   afterMilestone?: boolean;
   showIcon?: boolean;
+  iconOnly?: boolean;
 }): React.JSX.Element | null {
   const install = React.useContext(InstallContext);
   const [instructionsOpen, setInstructionsOpen] = React.useState(false);
@@ -170,14 +172,23 @@ export default function InstallAppButton(props: {
 
   return (
     <>
-      <Button
-        variant="text"
-        color="primary"
-        startIcon={props.showIcon !== false && <InstallMobileIcon />}
-        onClick={onInstall}
-      >
-        {props.label || "Install app"}
-      </Button>
+      {props.iconOnly ? (
+        <MenuIconButton
+          label={props.label || "Install app"}
+          onClick={onInstall}
+        >
+          <InstallMobileIcon />
+        </MenuIconButton>
+      ) : (
+        <Button
+          variant="text"
+          color="primary"
+          startIcon={props.showIcon !== false && <InstallMobileIcon />}
+          onClick={onInstall}
+        >
+          {props.label || "Install app"}
+        </Button>
+      )}
       <InfoDialog
         open={instructionsOpen}
         onClose={() => setInstructionsOpen(false)}

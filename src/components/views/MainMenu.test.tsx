@@ -1,4 +1,11 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  within,
+  waitFor,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import MainMenu, { Props } from "./MainMenu";
 import type { DesktopBridge, DesktopState } from "../../Desktop";
@@ -6,6 +13,10 @@ import { configureStore } from "@reduxjs/toolkit";
 import { Provider } from "react-redux";
 import settingsReducer from "../../reducers/Settings";
 import cardReducer from "../../reducers/Card";
+import {
+  resetInputPresentation,
+  updateInputPresentation,
+} from "../../desktop/InputPresentation";
 
 function desktopBridge(available = false): DesktopBridge {
   const state: DesktopState = {
@@ -64,6 +75,8 @@ function renderMainMenu(element: React.ReactElement) {
 describe("MainMenu", () => {
   afterEach(() => {
     delete window.electrifyDesktop;
+    act(() => resetInputPresentation());
+
     jest.restoreAllMocks();
   });
 
@@ -85,7 +98,6 @@ describe("MainMenu", () => {
     );
     const buttons = resources.getAllByRole("button");
     expect(buttons.map((button) => button.textContent)).toEqual([
-      "Manual",
       "Mods",
       "Settings",
       "Quit",
@@ -107,14 +119,14 @@ describe("MainMenu", () => {
       ).not.toBeInTheDocument();
     },
   );
-  it("offers the gallery before Manual in the browser", async () => {
+  it("opens browser achievements from the footer", async () => {
     const onAchievements = jest.fn();
     renderMainMenu(<MainMenu {...props({ onAchievements })} />);
     expect(
       within(screen.getByRole("navigation", { name: "Game resources" }))
         .getAllByRole("button")
         .map((button) => button.textContent),
-    ).toEqual(["Achievements", "Manual", "Settings"]);
+    ).toEqual(["Settings"]);
     await userEvent.click(screen.getByRole("button", { name: "Achievements" }));
     expect(onAchievements).toHaveBeenCalledTimes(1);
   });
@@ -198,7 +210,7 @@ describe("MainMenu", () => {
     await user.hover(screen.getByRole("button", { name: "Manual" }));
     expect(screen.getByRole("button", { name: "Manual" })).toHaveFocus();
     await user.keyboard("{ArrowUp}");
-    expect(screen.getByRole("button", { name: "Achievements" })).toHaveFocus();
+    expect(screen.getByRole("button", { name: "Settings" })).toHaveFocus();
     clientRects.mockRestore();
   });
 
@@ -209,13 +221,13 @@ describe("MainMenu", () => {
     const user = userEvent.setup();
     renderMainMenu(<MainMenu {...props()} />);
     const play = screen.getByRole("button", { name: "Play" });
-    const achievements = screen.getByRole("button", { name: "Achievements" });
+    const settings = screen.getByRole("button", { name: "Settings" });
     await user.keyboard("{ArrowDown}");
-    expect(achievements).toHaveFocus();
+    expect(settings).toHaveFocus();
 
     // Animated layout can send a boundary event without the player moving the pointer.
     fireEvent.pointerOver(play);
-    expect(achievements).toHaveFocus();
+    expect(settings).toHaveFocus();
 
     // Deliberate pointer movement still selects the button under the pointer.
     await user.hover(play);
@@ -223,7 +235,49 @@ describe("MainMenu", () => {
     clientRects.mockRestore();
   });
 
-  it("links to Discord first in the footer", () => {
+  it("keeps Manual and browser Achievements in the footer and out of the central resources", async () => {
+    const onManual = jest.fn();
+    renderMainMenu(<MainMenu {...props({ onManual })} />);
+    const footer = within(screen.getByRole("contentinfo"));
+    expect(footer.getByRole("button", { name: "Manual" })).toBeVisible();
+    expect(footer.getByRole("button", { name: "Achievements" })).toBeVisible();
+    const resources = within(
+      screen.getByRole("navigation", { name: "Game resources" }),
+    );
+    expect(resources.queryByRole("button", { name: "Manual" })).toBeNull();
+    expect(
+      resources.queryByRole("button", { name: "Achievements" }),
+    ).toBeNull();
+    await userEvent.click(footer.getByRole("button", { name: "Manual" }));
+    expect(onManual).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(["Manual", "Join the Electrify Discord"])(
+    "shows the %s tooltip for controller focus without native focus-visible",
+    async (name) => {
+      const matches = Element.prototype.matches;
+      jest.spyOn(Element.prototype, "matches").mockImplementation(function (
+        this: Element,
+        selector,
+      ) {
+        return selector === ":focus-visible"
+          ? false
+          : matches.call(this, selector);
+      });
+      renderMainMenu(<MainMenu {...props()} />);
+      act(() => updateInputPresentation({ active: true, connected: true }));
+      const control = screen.getByLabelText(name);
+      act(() => control.focus());
+      expect(await screen.findByRole("tooltip")).toHaveTextContent(name);
+      await userEvent.keyboard("{Escape}");
+      await waitFor(() =>
+        expect(screen.queryByRole("tooltip")).not.toBeInTheDocument(),
+      );
+      expect(control).toHaveFocus();
+    },
+  );
+
+  it("links to Discord first among the external footer links", () => {
     renderMainMenu(<MainMenu {...props()} />);
 
     const discord = screen.getByRole("link", {

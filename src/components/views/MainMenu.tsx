@@ -3,7 +3,6 @@ import * as React from "react";
 import {
   Box,
   Button,
-  IconButton,
   Stack,
   SvgIcon,
   Typography,
@@ -12,12 +11,15 @@ import {
 import EmailIcon from "@mui/icons-material/Email";
 import InfoIcon from "@mui/icons-material/Info";
 import ShareIcon from "@mui/icons-material/Share";
+import MenuBookIcon from "@mui/icons-material/MenuBook";
+import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
 import {
   buildGameShareContent,
   canShare,
   shareText,
 } from "../../helpers/Share";
 import InstallAppButton from "../base/InstallAppButton";
+import MenuIconButton from "../base/MenuIconButton";
 import { getDesktop, isDesktopApp } from "../../Desktop";
 import { useMenuKeys } from "../base/useMenuKeys";
 // Keep Steam's co-op UI and authoritative worker out of the browser edition entirely.
@@ -55,8 +57,7 @@ const DiscordIcon = () => (
 // Mouse movement shares selection with keyboard/controller focus. A touch drag is scrolling,
 // not hover selection. Boundary events alone can also come from the entrance moving beneath
 // a stationary pointer.
-const HOME_MENU_BUTTONS =
-  ".mainActions button, .resourceActions button, .discoveryActions button";
+const HOME_MENU_BUTTONS = "button,a[href]";
 function focusHomeButton(event: React.PointerEvent) {
   if (event.pointerType !== "mouse") return;
   const target = event.target as HTMLElement;
@@ -128,8 +129,22 @@ const MainMenu = (props: Props): React.JSX.Element => {
   return (
     <div
       id="menuCard"
+      className="keyboardMenu"
+      {...menuKeys}
+      onKeyDown={(event) => {
+        // Keep the first-launch couch suggestion reachable in the shared frame.
+        if (
+          event.key.startsWith("Arrow") &&
+          document.querySelector(".couchSettingsPrompt")
+        )
+          return;
+        menuKeys.onKeyDown(event);
+      }}
       onPointerDown={onTouchPress}
-      onPointerMove={onTouchMove}
+      onPointerMove={(event) => {
+        onTouchMove(event);
+        focusHomeButton(event);
+      }}
       onPointerUp={clearTouchPress}
       onPointerCancel={clearTouchPress}
       onPointerLeave={clearTouchPress}
@@ -171,22 +186,7 @@ const MainMenu = (props: Props): React.JSX.Element => {
       <Typography component="h1" className="srOnly">
         Electrify
       </Typography>
-      <Box
-        id="centeredMenu"
-        className="keyboardMenu"
-        {...menuKeys}
-        onKeyDown={(event) => {
-          // The title-screen prompt shares spatial arrows with the full menu frame.
-          if (
-            event.key.startsWith("Arrow") &&
-            document.querySelector(".couchSettingsPrompt")
-          )
-            return;
-          menuKeys.onKeyDown(event);
-        }}
-        onPointerMove={focusHomeButton}
-        sx={{ px: 3 }}
-      >
+      <Box id="centeredMenu" sx={{ px: 3 }}>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
           An electricity strategy game.
         </Typography>
@@ -243,24 +243,6 @@ const MainMenu = (props: Props): React.JSX.Element => {
             justifyContent: "center",
           }}
         >
-          {!desktopApp && (
-            <Button
-              data-achievements-trigger
-              variant="text"
-              color="primary"
-              onClick={props.onAchievements}
-            >
-              Achievements
-            </Button>
-          )}
-          <Button
-            data-manual-trigger
-            variant="text"
-            color="primary"
-            onClick={props.onManual}
-          >
-            Manual
-          </Button>
           {desktopApp && getDesktop()?.mods && (
             <Button
               data-mods-trigger
@@ -302,7 +284,6 @@ const MainMenu = (props: Props): React.JSX.Element => {
               justifyContent: "center",
             }}
           >
-            {!desktopApp && <InstallAppButton showIcon={false} />}
             {props.audioEnabled === undefined && !desktopApp && (
               <Button color="primary" onClick={() => props.onAudioChange(true)}>
                 Turn on sound
@@ -315,44 +296,47 @@ const MainMenu = (props: Props): React.JSX.Element => {
         </Typography>
       </Box>
       <footer className="mainMenuFooter">
-        <IconButton
-          color="primary"
+        <MenuIconButton
+          data-manual-trigger
+          label="Manual"
+          onClick={props.onManual}
+        >
+          <MenuBookIcon />
+        </MenuIconButton>
+        {!desktopApp && <InstallAppButton iconOnly />}
+        {!desktopApp && (
+          <MenuIconButton
+            data-achievements-trigger
+            label="Achievements"
+            onClick={props.onAchievements}
+          >
+            <EmojiEventsIcon />
+          </MenuIconButton>
+        )}
+        <MenuIconButton
           href={DISCORD_URL}
           target="_blank"
           rel="noopener noreferrer"
-          aria-label="Join the Electrify Discord"
-          size="large"
+          label="Join the Electrify Discord"
         >
           <DiscordIcon />
-        </IconButton>
-        <IconButton
-          color="primary"
+        </MenuIconButton>
+        <MenuIconButton
           href={FEEDBACK_URL}
           target="_blank"
           rel="noopener noreferrer"
-          aria-label="Send feedback"
-          size="large"
+          label="Send feedback"
         >
           <EmailIcon />
-        </IconButton>
-        <IconButton
-          color="primary"
-          {...sitePage("/about.html")}
-          aria-label="About Electrify"
-          size="large"
-        >
+        </MenuIconButton>
+        <MenuIconButton {...sitePage("/about.html")} label="About Electrify">
           <InfoIcon />
-        </IconButton>
+        </MenuIconButton>
         {canShare() && (
-          <IconButton
-            color="primary"
-            onClick={onShare}
-            aria-label="Share Electrify"
-            size="large"
-          >
+          <MenuIconButton onClick={onShare} label="Share Electrify">
             {/* Share has one extra pixel of leading whitespace beside the other footer glyphs. */}
             <ShareIcon sx={{ transform: "translateX(-1px)" }} />
-          </IconButton>
+          </MenuIconButton>
         )}
       </footer>
     </div>

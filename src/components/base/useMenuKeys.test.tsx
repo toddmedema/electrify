@@ -6,16 +6,23 @@ import {
   waitFor,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import * as React from "react";
 import { ReactNode, useLayoutEffect } from "react";
 import { restoreMenuFocus, useMenuKeys } from "./useMenuKeys";
 
 function Menu(props: {
   children: ReactNode;
+  home?: boolean;
   settings?: boolean;
   onBack?: () => void;
 }) {
   return (
-    <div {...useMenuKeys(props.settings, props.onBack)}>{props.children}</div>
+    <div
+      id={props.home ? "menuCard" : undefined}
+      {...useMenuKeys(props.settings, props.onBack)}
+    >
+      {props.children}
+    </div>
   );
 }
 beforeEach(() => {
@@ -244,3 +251,100 @@ it.each([false, true])(
     expect(screen.getByRole("button", { name: "Settings" })).toHaveFocus();
   },
 );
+
+it("restores the first home action after background blur and window/page return", async () => {
+  render(
+    <Menu home>
+      <button>Continue</button>
+      <button>New game</button>
+    </Menu>,
+  );
+  const first = screen.getByRole("button", { name: "Continue" });
+  const newGame = screen.getByRole("button", { name: "New game" });
+  newGame.focus();
+  act(() => newGame.blur());
+  await waitFor(() => expect(first).toHaveFocus());
+  act(() => {
+    first.blur();
+    window.dispatchEvent(new Event("focus"));
+  });
+  expect(first).toHaveFocus();
+  act(() => {
+    first.blur();
+    document.dispatchEvent(new Event("visibilitychange"));
+  });
+  expect(first).toHaveFocus();
+});
+
+it("recovers home focus after a child removes the selected action, while leaving popups and deliberate focus alone", async () => {
+  function Removable() {
+    const [visible, setVisible] = React.useState(true);
+    return visible ? (
+      <button onClick={() => setVisible(false)}>Install</button>
+    ) : null;
+  }
+  render(
+    <>
+      <Menu home>
+        <button>Play</button>
+        <Removable />
+      </Menu>
+      <button>Outside</button>
+    </>,
+  );
+  await userEvent.click(screen.getByRole("button", { name: "Install" }));
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "Play" })).toHaveFocus(),
+  );
+  const outside = screen.getByRole("button", { name: "Outside" });
+  await userEvent.click(outside);
+  fireEvent(window, new Event("focus"));
+  expect(outside).toHaveFocus();
+  const dialog = document.createElement("div");
+  dialog.setAttribute("role", "dialog");
+  document.body.appendChild(dialog);
+  outside.blur();
+  fireEvent(window, new Event("focus"));
+  expect(document.body).toHaveFocus();
+  dialog.remove();
+});
+
+it("keeps home controller traversal linear through footer links and wraps both ways", async () => {
+  document.documentElement.dataset.controllerInput = "true";
+  render(
+    <Menu home>
+      <button>Play</button>
+      <button>Settings</button>
+      <footer>
+        <button>Manual</button>
+        <a href="https://example.com">Community</a>
+      </footer>
+    </Menu>,
+  );
+  const user = userEvent.setup();
+  await user.keyboard("{ArrowDown}{ArrowDown}");
+  expect(screen.getByRole("button", { name: "Manual" })).toHaveFocus();
+  await user.keyboard("{ArrowDown}");
+  expect(screen.getByRole("link", { name: "Community" })).toHaveFocus();
+  await user.keyboard("{ArrowRight}");
+  expect(screen.getByRole("button", { name: "Play" })).toHaveFocus();
+  await user.keyboard("{ArrowUp}");
+  expect(screen.getByRole("link", { name: "Community" })).toHaveFocus();
+  await user.keyboard("{ArrowLeft}");
+  expect(screen.getByRole("button", { name: "Manual" })).toHaveFocus();
+});
+
+it("always starts and recovers home at the first action even when a saved preference is pressed", async () => {
+  render(
+    <Menu home>
+      <button>Continue</button>
+      <button aria-pressed="true">Saved preference</button>
+    </Menu>,
+  );
+  const first = screen.getByRole("button", { name: "Continue" });
+  expect(first).toHaveFocus();
+  const tv = screen.getByRole("button", { name: "Saved preference" });
+  tv.focus();
+  act(() => tv.blur());
+  await waitFor(() => expect(first).toHaveFocus());
+});
