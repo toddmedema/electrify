@@ -22,6 +22,8 @@ interface DecisionDialogProps {
   contentClassName?: string;
   fullWidth?: boolean;
   maxWidth?: DialogProps["maxWidth"];
+  disableRestoreFocus?: boolean;
+  onExited?: () => void;
 }
 
 /** Shared accessible frame for a short explanation or decision. */
@@ -36,6 +38,7 @@ export default function DecisionDialog({
   closeDisabled,
   isolateClicks,
   contentClassName,
+  onExited,
   ...props
 }: DecisionDialogProps): React.JSX.Element {
   const generatedTitleId = React.useId();
@@ -43,6 +46,7 @@ export default function DecisionDialog({
   return (
     <Dialog
       {...props}
+      slotProps={{ transition: { onExited } }}
       onClose={() => {
         if (!closeDisabled) onClose();
       }}

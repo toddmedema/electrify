@@ -269,3 +269,15 @@ it("refreshes changed-rule future forecasts on resume while preserving recorded 
     jest.useRealTimers();
   }
 });
+
+it.each([{ valueOf: null, toString: null }, "1", null, -1, 1.5])(
+  "rejects schema 9 regional line ID %p without coercion or throwing",
+  (id) => {
+    const grid = createGame({ scenarioId: 116, seed: 61 });
+    const raw = JSON.parse(JSON.stringify(serializeSave(grid)));
+    raw.schemaVersion = 9;
+    raw.game.transmission.lines = [{ id }];
+    expect(() => parseSave(raw)).not.toThrow();
+    expect(parseSave(raw)).toBeNull();
+  },
+);

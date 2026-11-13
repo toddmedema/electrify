@@ -11,6 +11,7 @@ import { createGame } from "../../testing/Simulator";
 import {
   buildTransmissionLine,
   generateForecastTimeline,
+  previewUtilityAcquisition,
 } from "../../reducers/Game";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "../../helpers/DateTime";
 import reducer from "../../reducers/Game";
@@ -20,6 +21,9 @@ import AcquisitionReviewDialog from "./AcquisitionReviewDialog";
 import { facilityDisplayName } from "./FacilityLabels";
 
 function review(targetId: UtilityTargetId, year = 2005, customers = 90000) {
+  const corridorId = UTILITY_TARGETS.find(
+    (target) => target.id === targetId,
+  )!.corridorId;
   const initial = createGame({
     scenarioId: 116,
     seed: 12345,
@@ -31,13 +35,14 @@ function review(targetId: UtilityTargetId, year = 2005, customers = 90000) {
     reducer(
       initial,
       buildTransmissionLine({
-        corridorId: UTILITY_TARGETS.find((target) => target.id === targetId)!
-          .corridorId,
+        corridorId,
         financed: false,
       }),
     ),
   );
-  game.transmission!.lines[0].yearsToBuildLeft = 0;
+  game.transmission!.lines.find(
+    (line) => line.corridorId === corridorId,
+  )!.yearsToBuildLeft = 0;
   if (year !== 2005) {
     game.date = getDateFromMinute(
       (year - game.startingYear) * 12 * MINUTES_PER_MONTH,
@@ -59,18 +64,24 @@ function review(targetId: UtilityTargetId, year = 2005, customers = 90000) {
       />
     </Provider>,
   );
-  return quote;
+  return { quote, preview: previewUtilityAcquisition(game, targetId, true)! };
 }
 
 function disclosure(label: string) {
   return screen.getByText(label, { selector: "summary" }).closest("details")!;
 }
 
+function expectedMargin(
+  preview: NonNullable<ReturnType<typeof previewUtilityAcquisition>>,
+) {
+  return `${formatWatts(preview.beforeMarginW)} → ${formatWatts(Math.abs(preview.afterMarginW))} ${preview.afterMarginW < 0 ? "shortfall" : "spare"}`;
+}
+
 it.each(["valley-electric", "ridge-electric"] as const)(
   "shows %s pricing first in the shared purchase table and keeps full terms discoverable",
   async (targetId) => {
     const user = userEvent.setup();
-    const quote = review(targetId);
+    const { quote, preview } = review(targetId);
     expect(
       screen.getByText(
         targetId === "valley-electric"
@@ -81,9 +92,7 @@ it.each(["valley-electric", "ridge-electric"] as const)(
     expect(screen.getByText(/Retain 90%/)).toBeVisible();
     expect(screen.getByText(/Retire the acquired oil/)).toBeVisible();
     const payments = screen.getByRole("region", { name: "Expected impact" });
-    expect(
-      within(payments).getByText(/^[\d.]+[kMG]?W → [\d.]+[kMG]?W spare$/),
-    ).toBeVisible();
+    expect(within(payments).getByText(expectedMargin(preview))).toBeVisible();
     expect(payments).toHaveTextContent(
       `${formatMoneyConcise(quote.cashDue)} now + ${formatMoneyConcise(quote.cashMonthlyDebtService + quote.networkOMPerMonth)}/mo`,
     );
@@ -145,7 +154,7 @@ it.each(["valley-electric", "ridge-electric"] as const)(
   },
 );
 
-it("keeps Valley’s future reduction and variable-power warning discoverable", async () => {
+it("keeps Valley’s inherited supply and future reduction discoverable", async () => {
   review("valley-electric");
   const assets = disclosure("Plants & purchased power");
   const schedule = disclosure("Supply & network changes");
@@ -153,7 +162,13 @@ it("keeps Valley’s future reduction and variable-power warning discoverable", 
   await userEvent.click(within(schedule).getByText("Supply & network changes"));
   expect(schedule).toHaveTextContent("Jan 2017");
   expect(schedule).toHaveTextContent("76MW deliverable");
-  expect(assets).toHaveTextContent("not firm reserve");
+  expect(within(assets).getByText(/January 2017/)).toHaveTextContent(
+    "152 to 76 MW",
+  );
+  expect(assets).toHaveTextContent("Regional nuclear");
+  expect(assets).toHaveTextContent("Québec hydro");
+  expect(assets).not.toHaveTextContent("New England balancing");
+  expect(screen.queryByText(/Plan replacement supply/)).not.toBeInTheDocument();
 });
 
 it.each([2017, 2024])(
@@ -164,15 +179,15 @@ it.each([2017, 2024])(
     await userEvent.click(within(assets).getByText("Plants & purchased power"));
     expect(
       within(assets).getByText(/nuclear purchase is now/),
-    ).toHaveTextContent("80MW (76MW deliverable)");
+    ).toHaveTextContent("76MW");
     expect(assets).toHaveTextContent("January 2017");
   },
 );
 
 it("excludes expired power rights and past oil retirement commitments from a 2025 purchase", async () => {
-  const quote = review("valley-electric", 2025);
+  const { quote, preview } = review("valley-electric", 2025);
   expect(quote.contracts).toEqual([]);
-  expect(screen.getByText(/^-.*W → .*W shortfall$/)).toBeVisible();
+  expect(screen.getByText(expectedMargin(preview))).toBeVisible();
   const assets = disclosure("Plants & purchased power");
   await userEvent.click(within(assets).getByText("Plants & purchased power"));
   expect(

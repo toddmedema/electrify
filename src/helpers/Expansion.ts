@@ -1,4 +1,19 @@
 import {
+  connectionAgreements,
+  compareAgreementDispatchPriority,
+  agreementRate,
+  inheritedConnection,
+  INHERITED_CONNECTIONS,
+  utilityOwnedAt,
+} from "./PowerAgreements";
+import {
+  allocateIntertieFlows,
+  intertieOfferLimits,
+  firmIntertieOfferLimits,
+  transmissionRatingW,
+  type IntertieReservation,
+} from "./Transmission";
+import {
   isStorage,
   type AcquireUtilityAction,
   type AcquisitionLoan,
@@ -9,12 +24,7 @@ import {
   type UtilityNetworkAsset,
 } from "../Types";
 import { isUtilityExpansionGame } from "./ExpansionContext";
-import {
-  intertieContextForGame,
-  importAvailabilityFraction,
-  adjacentMarketPricePerMWh,
-} from "./Transmission";
-import { importEmissionsKgco2ePerMWh } from "../data/ImportEmissions";
+import { intertieContextForGame } from "./Transmission";
 import { DAYS_PER_YEAR, DIFFICULTIES, LOAN_MONTHS } from "../Constants";
 import { getInflationIndex, hasEconomy } from "../data/Economy";
 import {
@@ -397,6 +407,14 @@ export function transferUtility(game: GameType, value: unknown): boolean {
     game.utilityExpansion.loans.push(
       loan("purchase", quote.newLoan, game.interestRate, LOAN_MONTHS),
     );
+  if (game.transmission)
+    game.transmission.lines.push(
+      inheritedConnection(
+        value.targetId,
+        Math.max(0, ...game.transmission.lines.map((line) => line.id)) + 1,
+        game.date.minute,
+      ),
+    );
   game.facilities.push(...assets);
   for (const asset of assets)
     if (
@@ -432,64 +450,95 @@ export function transferUtility(game: GameType, value: unknown): boolean {
   return true;
 }
 
-/** Owned source rights serve one company load, with each package's own finite interface. */
+/** Agreement slices are delivered through their one owned operating physical interface. */
 export function entitlementSources(
   game: GameType,
   now: import("../Types").TickPresentFutureType,
-): {
-  id: string;
-  utilityId: UtilityId;
-  capacityW: number;
-  pricePerMWh: number;
-  emissionsKgPerMWh: number;
-}[] {
+  reserved: readonly IntertieReservation[] = [],
+  supplierReady = false,
+  legacyOnly = false,
+  excludedAgreementId?: string,
+  agreementMinute = now.minute,
+) {
   if (!game.utilityExpansion) return [];
-  const date = getDateFromMinute(now.minute, 2005);
-  const index = hasEconomy() ? getInflationIndex(date, 2005, game.seed) : 1;
-  const active = new Set(
-    game.utilityExpansion.acquisitions
-      .filter((receipt) => receipt.minute <= now.minute)
-      .map((receipt) => receipt.targetId),
-  );
-  const ids: UtilityId[] = [
-    "champlain",
-    ...UTILITY_TARGETS.filter((target) => active.has(target.id)).map(
-      (target) => target.id,
-    ),
-  ];
-  return ids
-    .flatMap((id) => {
-      let interfaceLeft = UTILITY_AREAS[id].sourceInterfaceW;
-      return utilityEntitlementsAt(id, date.year).map((source) => {
-        const context = intertieContextForGame(game);
-        const corridor = "vt-champlain-valley";
-        const availability = source.balancing
-          ? importAvailabilityFraction(corridor, context, now.minute, now)
-          : source.deliverability;
-        const capacityW = Math.min(
-          interfaceLeft,
-          source.nominalW * availability,
-        );
-        interfaceLeft -= capacityW;
-        return {
-          id: source.id,
-          utilityId: id,
-          capacityW,
-          pricePerMWh: source.balancing
-            ? adjacentMarketPricePerMWh(corridor, context, now.minute, now) *
-              (source.pricePerMWh / 60)
-            : source.pricePerMWh * index,
-          emissionsKgPerMWh:
-            source.emissionsKgPerMWh ??
-            (source.marketId
-              ? importEmissionsKgco2ePerMWh(source.marketId, date.year)
-              : 0),
-        };
-      });
+  const context = intertieContextForGame(game);
+  const sources = (Object.keys(INHERITED_CONNECTIONS) as UtilityId[])
+    .flatMap((utilityId) => {
+      if (!utilityOwnedAt(game, utilityId, agreementMinute)) return [];
+      const line = game.transmission?.lines.find(
+        (entry) =>
+          entry.corridorId === INHERITED_CONNECTIONS[utilityId] &&
+          entry.yearsToBuildLeft === 0,
+      );
+      if (!line) return [];
+      const availableLine = supplierReady ? { ...line, paused: false } : line;
+      const limits = intertieOfferLimits(
+        availableLine,
+        context,
+        now.minute,
+        now,
+      );
+      const firmLimits = firmIntertieOfferLimits(
+        availableLine,
+        context,
+        now.minute,
+        now,
+      );
+      return connectionAgreements(game, utilityId, agreementMinute)
+        .filter(
+          (source) =>
+            source.id !== excludedAgreementId &&
+            source.active &&
+            source.nominalW > 0 &&
+            (!supplierReady || source.termsVersion >= 2) &&
+            (!legacyOnly || source.termsVersion === 1),
+        )
+        .map((source) => {
+          const pricePerMWh =
+            source.termsVersion === 3
+              ? agreementRate(
+                  game,
+                  source.pricePerMWh,
+                  source.durationYears,
+                  line.corridorId,
+                  agreementMinute,
+                  now,
+                  now.minute,
+                )
+              : source.priceToday;
+          return {
+            id: source.id,
+            termsVersion: source.termsVersion,
+            startMinute: source.startMinute,
+            endMinute: source.endMinute,
+            paused: !!line.paused,
+            utilityId,
+            lineId: line.id,
+            capacityW: source.nominalW * source.deliverability,
+            pricePerMWh,
+            emissionsKgPerMWh: source.emissionsKgPerMWh,
+            offer: {
+              ...(source.termsVersion >= 2 ? firmLimits : limits),
+              lineId: `${game.multiplayer?.seat ?? "local"}:${line.id}`,
+              lineImportLimitW: transmissionRatingW(availableLine, now),
+              importLimitW: Math.min(
+                (source.termsVersion >= 2 ? firmLimits : limits).importLimitW,
+                source.nominalW * source.deliverability,
+              ),
+              pricePerMWh,
+            },
+          };
+        });
     })
-    .sort(
-      (a, b) =>
-        a.pricePerMWh - b.pricePerMWh ||
-        (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
-    );
+    .sort(compareAgreementDispatchPriority);
+  const allocated = allocateIntertieFlows(
+    sources.map((source) => source.offer),
+    Infinity,
+    0,
+    reserved,
+  ).importedW;
+  return sources.map((source, index) => ({
+    ...source,
+    capacityW: allocated[index],
+  }));
 }

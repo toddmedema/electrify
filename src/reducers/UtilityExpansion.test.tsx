@@ -49,7 +49,11 @@ function ready(targetId: UtilityTargetId = "valley-electric") {
       }),
     ),
   );
-  game.transmission!.lines[0].yearsToBuildLeft = 0;
+  game.transmission!.lines.find(
+    (line) =>
+      line.corridorId ===
+      UTILITY_TARGETS.find((target) => target.id === targetId)!.corridorId,
+  )!.yearsToBuildLeft = 0;
   return game;
 }
 function buy(
@@ -70,9 +74,13 @@ function buy(
 it("requires the correct completed connection, current quote and enough cash before changing any state", () => {
   const game = ready();
   expect(acquisitionQuote(game, "ridge-electric")).toBeUndefined();
-  game.transmission!.lines[0].yearsToBuildLeft = 1;
+  game.transmission!.lines.find(
+    (line) => line.corridorId.startsWith("vt-champlain-") && line.buildCost > 0,
+  )!.yearsToBuildLeft = 1;
   expect(acquisitionQuote(game, "valley-electric")).toBeUndefined();
-  game.transmission!.lines[0].yearsToBuildLeft = 0;
+  game.transmission!.lines.find(
+    (line) => line.corridorId.startsWith("vt-champlain-") && line.buildCost > 0,
+  )!.yearsToBuildLeft = 0;
   const quote = acquisitionQuote(game, "valley-electric")!;
   expect(
     reducer(
@@ -102,7 +110,10 @@ it.each(["valley-electric", "ridge-electric"] as const)(
   "folds %s into one customer count, pool, shared fleet and policy ledger",
   (targetId) => {
     const game = ready(targetId);
-    game.transmission!.lines[0].paused = true;
+    game.transmission!.lines.find(
+      (line) =>
+        line.corridorId.startsWith("vt-champlain-") && line.buildCost > 0,
+    )!.paused = true;
     const quote = acquisitionQuote(game, targetId)!;
     const before = cloneDeep(currentTick(game)!);
     const bought = buy(game, targetId);
@@ -132,7 +143,9 @@ it.each(["valley-electric", "ridge-electric"] as const)(
         (t) => !Object.prototype.hasOwnProperty.call(t, "areaTicks"),
       ),
     ).toBe(true);
-    expect(bought.transmission!.lines[0]).toMatchObject({
+    expect(
+      bought.transmission!.lines.find((line) => line.buildCost > 0)!,
+    ).toMatchObject({
       paused: false,
       currentFlowW: 0,
     });
@@ -158,7 +171,7 @@ it("retains original seller age and identities without booking new construction 
   );
 });
 
-it("uses one shared dispatch and retains ownership even when the old wire record cannot carry power", () => {
+it("requires inherited operating wires for supply while retaining acquisition ownership", () => {
   const game = buy(ready("ridge-electric"), "ridge-electric");
   const now = currentTick(game)!;
   const before = generateForecastTimeline(game, now.cash, now.customers);
@@ -167,9 +180,10 @@ it("uses one shared dispatch and retains ownership even when the old wire record
   const after = generateForecastTimeline(noWire, now.cash, now.customers);
   expect(
     after.map((t) => [t.supplyW, t.demandW, t.entitlementImportCapacityW]),
-  ).toEqual(
+  ).not.toEqual(
     before.map((t) => [t.supplyW, t.demandW, t.entitlementImportCapacityW]),
   );
+  expect(after.every((tick) => tick.entitlementImportedW === 0)).toBe(true);
   expect(ownedUtility(noWire, "ridge-electric")).toBe(true);
 });
 
@@ -179,7 +193,7 @@ it("removes the acquired external pool and cannot resell unused source rights", 
   currentTick(game)!.customers = 1;
   const forecast = generateForecastTimeline(game, currentTick(game)!.cash, 1);
   expect(
-    forecast.every((t) => t.transmissionCapacityW === 0 && t.exportedW === 0),
+    forecast.every((t) => t.transmissionCapacityW! > 0 && t.exportedW === 0),
   ).toBe(true);
   expect(
     forecast.every(
@@ -210,7 +224,9 @@ it("keeps corporate debt after plant sales and never writes impaired network val
 
 it("rejects no-op spending and operation controls on an acquired connection", () => {
   const opening = ready();
-  const openingLine = opening.transmission!.lines[0];
+  const openingLine = opening.transmission!.lines.find(
+    (line) => line.buildCost > 0,
+  )!;
   expect(
     intertieUpgradeQuote(
       openingLine,
@@ -221,7 +237,9 @@ it("rejects no-op spending and operation controls on an acquired connection", ()
     ),
   ).toBeDefined();
   const game = buy(opening);
-  const line = game.transmission!.lines[0];
+  const line = game.transmission!.lines.find(
+    (line) => line.corridorId.startsWith("vt-champlain-") && line.buildCost > 0,
+  )!;
   expect(
     intertieUpgradeQuote(
       line,
@@ -282,35 +300,47 @@ it("keeps Valley's 2017 reduction dated and notices once, without resetting it o
   ).toHaveLength(2);
 });
 
-it("buys cheaper acquired nuclear rights before expensive native hydro for a partial company load", () => {
-  const game = buy(ready());
-  for (const facility of game.facilities) facility.paused = true;
-  const next = game.timeline[1];
-  next.demandW = 200e6;
-  for (const type of DEMAND_TYPES)
-    next.demandByType[type] = type === "Residential" ? next.demandW : 0;
-  const offers = entitlementSources(game, next);
-  expect(
-    offers
-      .filter((source) => source.utilityId === "champlain")
-      .reduce((sum, source) => sum + source.capacityW, 0),
-  ).toBeLessThanOrEqual(300e6);
-  expect(
-    offers
-      .filter((source) => source.utilityId === "valley-electric")
-      .reduce((sum, source) => sum + source.capacityW, 0),
-  ).toBeLessThanOrEqual(350e6);
-  tickState(game);
-  const now = currentTick(game)!;
-  expect(now.entitlementImportedW).toBe(200e6);
-  expect(now.expensesImports).toBeCloseTo(
-    (((200e6 / TICKS_PER_HOUR) * GAME_TO_REAL_YEARS) / 1e6) * 40,
-    4,
-  );
-  expect(now.importedKgco2e).toBe(0);
-  expect(offers.slice(0, 2).map((source) => source.id)).toEqual([
-    "champlain-nuclear",
-    "valley-nuclear",
-  ]);
-  expect(offers[0].capacityW + offers[1].capacityW).toBe(247e6);
-});
+it.each([1, 2] as const)(
+  "uses cheaper acquired nuclear rights first and bills version %s terms for a partial company load",
+  (termsVersion) => {
+    const readyGame = ready();
+    readyGame.transmission!.inheritedAgreementTerms = termsVersion;
+    const game = buy(readyGame);
+    for (const facility of game.facilities) facility.paused = true;
+    const next = game.timeline[1];
+    next.demandW = 200e6;
+    for (const type of DEMAND_TYPES)
+      next.demandByType[type] = type === "Residential" ? next.demandW : 0;
+    const offers = entitlementSources(game, next);
+    expect(
+      offers
+        .filter((source) => source.utilityId === "champlain")
+        .reduce((sum, source) => sum + source.capacityW, 0),
+    ).toBeLessThanOrEqual(300e6);
+    expect(
+      offers
+        .filter((source) => source.utilityId === "valley-electric")
+        .reduce((sum, source) => sum + source.capacityW, 0),
+    ).toBeLessThanOrEqual(350e6);
+    tickState(game);
+    const now = currentTick(game)!;
+    expect(now.entitlementImportedW).toBe(200e6);
+    const purchaseCostPerHour =
+      termsVersion === 1
+        ? 200e6 * 40
+        : offers.reduce(
+            (sum, source) => sum + source.capacityW * source.pricePerMWh,
+            0,
+          );
+    expect(now.expensesImports).toBeCloseTo(
+      ((purchaseCostPerHour / TICKS_PER_HOUR) * GAME_TO_REAL_YEARS) / 1e6,
+      4,
+    );
+    expect(now.importedKgco2e).toBe(0);
+    expect(offers.slice(0, 2).map((source) => source.id)).toEqual([
+      "champlain-nuclear",
+      "valley-nuclear",
+    ]);
+    expect(offers[0].capacityW + offers[1].capacityW).toBe(247e6);
+  },
+);
