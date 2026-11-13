@@ -144,6 +144,15 @@
     "unachieved": "uploads/GOOD_NEIGHBOR_UNACHIEVED.png"
   },
   {
+    "apiName": "POWER_PLAY",
+    "name": "Power Play",
+    "description": "Acquire your first competing utility.",
+    "source": "public/images/achievement-power-play.svg",
+    "sourceSha256": "42a1d0ea26aa2c12f37852bdc3f5596fcffa0509a4d88d1d1986bfc91ecd7946",
+    "achieved": "uploads/POWER_PLAY_ACHIEVED.png",
+    "unachieved": "uploads/POWER_PLAY_UNACHIEVED.png"
+  },
+  {
     "apiName": "WASTE_NOT",
     "name": "Waste Not",
     "description": "Complete a peaker's combined-cycle retrofit and deliver 1 GWh from that plant afterwards.",

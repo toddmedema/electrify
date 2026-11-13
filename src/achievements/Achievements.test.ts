@@ -12,7 +12,16 @@ import { createGame } from "../testing/Simulator";
 import { runMonths } from "../testing/SimulationTestHelpers";
 import { SCENARIOS } from "../data/Scenarios";
 import { STORAGE } from "../data/Facilities";
-import gameReducer, { togglePauseFacility, tickState } from "../reducers/Game";
+import { UTILITY_TARGETS } from "../data/UtilityExpansion";
+import gameReducer, {
+  buildTransmissionLine,
+  previewUtilityAcquisition,
+  togglePauseFacility,
+  tickState,
+} from "../reducers/Game";
+import { acquireUtility } from "../reducers/GameActions";
+import { acquisitionQuote } from "../helpers/Expansion";
+import { currentTick } from "../helpers/GameSelectors";
 import {
   EMPTY_HISTORY,
   getDateFromMinute,
@@ -26,6 +35,7 @@ import type {
   MonthlyHistoryType,
   StorageOperatingType,
   TickPresentFutureType,
+  UtilityTargetId,
 } from "../Types";
 
 const month = (
@@ -60,6 +70,25 @@ function finished(patch: Partial<MonthlyHistoryType> = {}, id = 101): GameType {
   return state;
 }
 const earned = (state: GameType) => state.desktopAchievements!.earned;
+function connectedUtility(targetIds: UtilityTargetId[]): GameType {
+  let state = game(116);
+  currentTick(state)!.cash = 2e9;
+  for (const targetId of targetIds) {
+    const corridorId = UTILITY_TARGETS.find(
+      ({ id }) => id === targetId,
+    )!.corridorId;
+    state = cloneDeep(
+      gameReducer(
+        state,
+        buildTransmissionLine({ corridorId, financed: false }),
+      ),
+    );
+    state.transmission!.lines.find(
+      (line) => line.corridorId === corridorId,
+    )!.yearsToBuildLeft = 0;
+  }
+  return state;
+}
 beforeAll(() => installSimulationHooks(hooks));
 beforeEach(() => jest.useFakeTimers());
 afterEach(() => {
@@ -74,6 +103,87 @@ test("catalog IDs are unique and cover the official non-tutorial scenarios", () 
       .map(({ id }) => id)
       .sort(),
   );
+});
+test.each([
+  ["valley-electric", false],
+  ["valley-electric", true],
+  ["ridge-electric", false],
+  ["ridge-electric", true],
+] as const)(
+  "Power Play unlocks immediately on acquiring %s (financed: %s), and survives reload",
+  (targetId, financed) => {
+    const state = connectedUtility([targetId]);
+    expect(earned(state)).not.toContain("POWER_PLAY");
+    expect(previewUtilityAcquisition(state, targetId, financed)).toBeDefined();
+    expect(earned(state)).not.toContain("POWER_PLAY");
+    const quote = acquisitionQuote(state, targetId)!;
+    const action = acquireUtility({
+      targetId,
+      financed,
+      quoteKey: quote.quoteKey,
+    });
+    const bought = gameReducer(state, action);
+    expect(bought.utilityExpansion!.acquisitions).toHaveLength(1);
+    expect(earned(bought)).toEqual(["POWER_PLAY"]);
+    const restored = parseSave(serializeSave(bought))!.game;
+    expect(earned(restored)).toEqual(["POWER_PLAY"]);
+    expect(earned(gameReducer(restored, action))).toEqual(["POWER_PLAY"]);
+  },
+);
+test("a connection, a rejected purchase and a second acquisition cannot award an extra Power Play", () => {
+  let state = connectedUtility(["valley-electric", "ridge-electric"]);
+  expect(earned(state)).toEqual([]);
+  const quote = acquisitionQuote(state, "valley-electric")!;
+  const action = acquireUtility({
+    targetId: quote.targetId,
+    financed: false,
+    quoteKey: quote.quoteKey,
+  });
+  expect(
+    earned(
+      gameReducer(
+        state,
+        acquireUtility({ ...action.payload, quoteKey: "stale" }),
+      ),
+    ),
+  ).toEqual([]);
+  const poor = cloneDeep(state);
+  currentTick(poor)!.cash = 0;
+  expect(earned(gameReducer(poor, action))).toEqual([]);
+  for (const targetId of ["valley-electric", "ridge-electric"] as const) {
+    const quote = acquisitionQuote(state, targetId)!;
+    state = cloneDeep(
+      gameReducer(
+        state,
+        acquireUtility({ targetId, financed: true, quoteKey: quote.quoteKey }),
+      ),
+    );
+    expect(earned(state)).toEqual(["POWER_PLAY"]);
+  }
+  expect(state.utilityExpansion!.acquisitions).toHaveLength(2);
+});
+test("custom and simulation-override runs cannot earn Power Play", () => {
+  const connected = connectedUtility(["valley-electric"]);
+  for (const patch of [
+    { customScenario: SCENARIOS.find(({ id }) => id === 116)! },
+    { meaningfulDecisionGateWaived: true },
+    { storyEffectsDisabled: true },
+    { weatherHazardsDisabled: true },
+  ]) {
+    const state = Object.assign(cloneDeep(connected), patch);
+    const quote = acquisitionQuote(state, "valley-electric")!;
+    expect(quote).toBeDefined();
+    const bought = gameReducer(
+      state,
+      acquireUtility({
+        targetId: quote.targetId,
+        financed: true,
+        quoteKey: quote.quoteKey,
+      }),
+    );
+    expect(bought.utilityExpansion!.acquisitions).toHaveLength(1);
+    expect(earned(bought)).toEqual([]);
+  }
 });
 test.each(OFFICIAL_IDS)(
   "scenario %i unlocks solely on a successful full-duration finish, including CEO",
