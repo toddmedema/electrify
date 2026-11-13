@@ -182,6 +182,9 @@ const MainMenu = (props: Props): React.JSX.Element => {
         onPointerMove={focusHomeButton}
         sx={{ px: 3 }}
       >
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          An electricity strategy game.
+        </Typography>
         <Stack
           component="section"
           aria-label="Primary actions"

@@ -21,6 +21,92 @@ const { ORIGIN, STATIC_PAGES } = require("../site/registry");
 
 const ROOT = path.resolve(__dirname, "../..");
 
+function readStaticPage(pathname, t) {
+  const source = fs.readFileSync(
+    path.join(ROOT, "public", pathname === "/" ? "index.html" : pathname),
+    "utf8",
+  );
+  const dom = new JSDOM(source.replaceAll("%PUBLIC_URL%", ""), {
+    url: ORIGIN + pathname,
+  });
+  t.after(() => dom.window.close());
+  return dom.window.document;
+}
+
+test("entry pages identify their canonical URL and keep search and share metadata consistent", (t) => {
+  const titles = new Set();
+  for (const { path: pathname } of STATIC_PAGES) {
+    const document = readStaticPage(pathname, t);
+    assert.ok(document.title.trim(), pathname);
+    assert.ok(!titles.has(document.title), `duplicate title: ${pathname}`);
+    titles.add(document.title);
+    const description = document.querySelector('meta[name="description"]');
+    assert.ok(description?.content.trim(), pathname);
+    const canonical = document.querySelectorAll('link[rel="canonical"]');
+    assert.equal(canonical.length, 1, pathname);
+    assert.equal(canonical[0].href, ORIGIN + pathname, pathname);
+    for (const [selector, expected] of [
+      ['meta[property="og:title"]', document.title],
+      ['meta[name="twitter:title"]', document.title],
+      ['meta[property="og:description"]', description.content],
+      ['meta[name="twitter:description"]', description.content],
+      ['meta[property="og:url"]', ORIGIN + pathname],
+    ])
+      assert.equal(
+        document.querySelector(selector)?.content,
+        expected,
+        `${pathname}: ${selector}`,
+      );
+  }
+});
+
+test("the homepage and learning resources expose crawlable paths to play and learn", (t) => {
+  const home = readStaticPage("/", t);
+  for (const pathname of [
+    "/about.html",
+    "/power-grid-simulator.html",
+    "/classroom.html",
+    "/scenarios.html",
+  ]) {
+    assert.ok(home.querySelector(`main a[href="${pathname}"]`), pathname);
+    assert.ok(fs.existsSync(path.join(ROOT, "public", pathname)), pathname);
+  }
+  for (const pathname of [
+    "/power-grid-simulator.html",
+    "/classroom.html",
+    "/energy-simulators.html",
+  ]) {
+    const document = readStaticPage(pathname, t);
+    assert.ok(
+      document.querySelector('main a[href="/scenarios.html"]'),
+      pathname,
+    );
+    assert.ok(document.querySelector('a[href="/"]'), pathname);
+  }
+});
+
+test("the About page describes the same website and game as the homepage", (t) => {
+  const home = readStaticPage("/", t);
+  const about = readStaticPage("/about.html", t);
+  const homeEntities = JSON.parse(
+    home.querySelector('script[type="application/ld+json"]').textContent,
+  )["@graph"];
+  const schema = JSON.parse(
+    about.querySelector('script[type="application/ld+json"]').textContent,
+  );
+  assert.equal(schema["@type"], "AboutPage");
+  assert.equal(schema.url, about.querySelector('link[rel="canonical"]').href);
+  assert.equal(schema.name, about.title);
+  for (const [relationship, type] of [
+    ["isPartOf", "WebSite"],
+    ["about", "VideoGame"],
+  ])
+    assert.equal(
+      schema[relationship]["@id"],
+      homeEntities.find((entity) => entity["@type"] === type)["@id"],
+    );
+});
+
 function scenario(scenarioId, overrides = {}) {
   return {
     scenarioId,
@@ -193,6 +279,9 @@ test("every scenario has a crawlable directory link, canonical URL, structured d
     );
     assert.ok(document.querySelector(`a[href="${playUrl(page)}"]`));
     assert.ok(document.querySelector('a[href="/scenarios.html"]'));
+    assert.ok(
+      document.querySelector('footer a[href="/power-grid-simulator.html"]'),
+    );
     for (const related of page.related) {
       const relatedPage = pages.find(
         (candidate) => candidate.scenarioId === related,
