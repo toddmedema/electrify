@@ -111,6 +111,12 @@ module.exports = [
     icon: "transmission",
   },
   {
+    id: "POWER_PLAY",
+    name: "Power Play",
+    description: "Acquire your first competing utility.",
+    icon: "achievement-power-play",
+  },
+  {
     id: "WASTE_NOT",
     name: "Waste Not",
     description:

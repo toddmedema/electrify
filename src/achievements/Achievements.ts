@@ -245,6 +245,10 @@ export const achievementHooks: SimulationHooks = {
     const facility = game.facilities.find(({ id }) => id === facilityId);
     if (facility) progressFor(game).convertedWh[assetKey(facility)] = 0;
   },
+  acquired(game) {
+    if (eligible(game) && game.utilityExpansion?.acquisitions.length)
+      award(progressFor(game), "POWER_PLAY");
+  },
   tutorial(game) {
     const scenario = SCENARIOS.find(({ id }) => id === game.scenarioId);
     if (

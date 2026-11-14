@@ -2683,6 +2683,7 @@ export function applyAcquireUtility(
     before: "Independent utility",
     after: "Owned utility",
   });
+  desktopSimulationHooks()?.acquired(state);
   return true;
 }
 export interface UtilityAcquisitionPreview {

@@ -49,6 +49,9 @@ async function start(page: Page, theme: string, interfaceScale = 1) {
   );
   await page.locator("#chartSupplyDemand .u-wrap > canvas").waitFor();
   await page.evaluate(() => document.fonts.ready);
+  // Scenario 103's first forecast replaces its pending mission headline with an announced
+  // event. The worker runs outside the test clock and can still change the mobile row height.
+  await expect(page.getByRole("button", { name: /^Upcoming:/ })).toBeVisible();
   await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 200);
   await page.evaluate(() => {
     const probe = {
