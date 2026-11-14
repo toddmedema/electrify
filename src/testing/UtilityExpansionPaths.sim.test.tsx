@@ -350,8 +350,9 @@ it("a legal 2013 company battery after acquisition stays bounded through play, s
       type: "build",
       build: {
         name: "Solar",
-        peakW: 500e6,
+        peakW: 150e6,
         financed: true,
+        territoryId: "champlain",
       },
     },
     {
@@ -359,8 +360,9 @@ it("a legal 2013 company battery after acquisition stays bounded through play, s
       type: "build",
       build: {
         name: "Solar",
-        peakW: 500e6,
+        peakW: 150e6,
         financed: true,
+        territoryId: "champlain",
       },
     },
     {
@@ -370,6 +372,7 @@ it("a legal 2013 company battery after acquisition stays bounded through play, s
         name: "Battery",
         peakWh: 64e6,
         financed: true,
+        territoryId: "champlain",
       },
     },
   ];
@@ -400,7 +403,17 @@ it("a legal 2013 company battery after acquisition stays bounded through play, s
   expect(observedTicks).toBeGreaterThan(96);
   expect(
     game.facilities.filter((facility) => facility.name === "Solar"),
-  ).toHaveLength(2);
+  ).toEqual([
+    expect.objectContaining({ peakW: 150e6, territoryId: "champlain" }),
+    expect.objectContaining({ peakW: 150e6, territoryId: "champlain" }),
+  ]);
+  expect(game.facilities.filter(isStorage)).toEqual([
+    expect.objectContaining({
+      name: "Battery",
+      peakWh: 64e6,
+      territoryId: "champlain",
+    }),
+  ]);
   expect(maximumStoredWh).toBeGreaterThan(0);
   const restored = parseSave(JSON.parse(JSON.stringify(serializeSave(game))));
   expect(restored).not.toBeNull();

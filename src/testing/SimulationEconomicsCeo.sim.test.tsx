@@ -38,7 +38,7 @@ describe("simulation economics on CEO", () => {
     116: ["asset", "rate", "sale"],
   };
   ECONOMICS_SCENARIOS.forEach((scenario) => {
-    it(`validates the ${scenario.id === 116 ? "eleven" : "ten"}-decision balance playbook in "${scenario.name}" on CEO`, () => {
+    it(`validates the ${scenario.id === 116 ? "twelve" : "ten"}-decision balance playbook in "${scenario.name}" on CEO`, () => {
       const passive = runSimulation({
         scenarioId: scenario.id,
         difficulty: "CEO",
@@ -64,9 +64,9 @@ describe("simulation economics on CEO", () => {
         active.outcome,
         active.meaningfulDecisionLabels,
       ]).toEqual([
-        scenario.id === 116 ? 11 : 10,
+        scenario.id === 116 ? 12 : 10,
         true,
-        scenario.id === 116 ? 11 : 10,
+        scenario.id === 116 ? 12 : 10,
         "completed",
         expect.any(Array),
       ]);
