@@ -200,6 +200,13 @@ function applyScheduled(
         },
       });
       break;
+    case "intertie-upgrade":
+      command(world, seat, {
+        kind: "action",
+        name: "upgradeTransmissionLine",
+        payload: { corridorId: action.corridorId, financed: action.financed },
+      });
+      break;
     case "acquire": {
       const quote = acquisitionQuote(game, action.targetId);
       if (!quote)
