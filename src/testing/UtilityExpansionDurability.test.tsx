@@ -14,6 +14,7 @@ import reducer, {
   buildFacility,
   delta,
   upgradeTransmissionLine,
+  togglePauseTransmissionLine,
 } from "../reducers/Game";
 import { acquireUtility } from "../reducers/GameActions";
 import { validUtilityExpansion } from "../helpers/ExpansionValidation";
@@ -25,8 +26,13 @@ import { initialIntertieBuildTier } from "../helpers/BuildSizing";
 import {
   intertieUpgradeQuote,
   intertieContextForGame,
+  transmissionRatingW,
 } from "../helpers/Transmission";
-import type { GameType, UtilityTargetId } from "../Types";
+import type {
+  GameType,
+  TransmissionLineOperatingType,
+  UtilityTargetId,
+} from "../Types";
 import { copyOfficialGame } from "./OfficialScenarioExecutionFixtures";
 import { gameObjectiveResults } from "../helpers/ObjectiveRules";
 import { getMissionStatus } from "../helpers/MissionStatus";
@@ -50,13 +56,15 @@ function ready(targetId: UtilityTargetId): GameType {
     ),
   );
   // The boundary fixture starts at completed construction; long scenarios exercise actual elapsed construction.
-  game.transmission!.lines.find(
+  const line = game.transmission!.lines.find(
     (line) =>
       line.corridorId ===
       (targetId === "valley-electric"
         ? "vt-champlain-valley"
         : "vt-champlain-ridge"),
-  )!.yearsToBuildLeft = 0;
+  )!;
+  line.yearsToBuildLeft = 0;
+  line.paused = false;
   currentTick(game)!.cash = 1e9;
   return game;
 }
@@ -91,6 +99,26 @@ function persisted(game: GameType): GameType {
   return parseSave(JSON.parse(JSON.stringify(encodeSave(save))))!.game;
 }
 
+function expectRetainedInvestment(
+  game: GameType,
+  investment: TransmissionLineOperatingType,
+): TransmissionLineOperatingType {
+  const retained = game.transmission!.lines.find(
+    (line) => line.id === investment.id,
+  )!;
+  expect(retained).toBeDefined();
+  // Acquisition refreshes dispatch immediately without changing the paid project's terms.
+  const { currentFlowW: previousFlow, ...terms } = investment;
+  const { currentFlowW, ...retainedTerms } = retained;
+  expect(retainedTerms).toEqual(terms);
+  expect(Number.isFinite(previousFlow)).toBe(true);
+  expect(Number.isFinite(currentFlowW)).toBe(true);
+  expect(Math.abs(currentFlowW)).toBeLessThanOrEqual(
+    transmissionRatingW(retained, currentTick(game)!),
+  );
+  return retained;
+}
+
 it.each([1, 2, 3, 4])(
   "retains Tier %i corridor investments when both utilities are acquired after reload",
   (tier) => {
@@ -112,7 +140,10 @@ it.each([1, 2, 3, 4])(
     );
     expect(projects).toHaveLength(2);
     // Match the browser fixture: complete the paid corridors, then resume the saved company.
-    for (const line of projects) line.yearsToBuildLeft = 0;
+    for (const line of projects) {
+      line.yearsToBuildLeft = 0;
+      line.paused = false;
+    }
     for (const frame of game.timeline) frame.cash = 1e9;
     game = persisted(game);
     const investments = cloneDeep(game.transmission!.lines);
@@ -123,6 +154,7 @@ it.each([1, 2, 3, 4])(
       const cash = currentTick(game)!.cash;
       const customers = currentTick(game)!.customers;
       const financed = index === 0;
+      const minute = game.date.minute;
       game = copyOfficialGame(
         reducer(
           game,
@@ -137,15 +169,12 @@ it.each([1, 2, 3, 4])(
         customers + quote.customers,
         6,
       );
+      expect(game.date.minute).toBe(minute);
+      expect(
+        currentTick(game)!.territories![targetId]!.demandW,
+      ).toBeGreaterThan(0);
       for (const investment of investments)
-        expect(
-          game.transmission!.lines.find((line) => line.id === investment.id),
-        ).toEqual(
-          investment.buildCost > 0 &&
-            (investment.corridorId === "vt-champlain-valley" || index === 1)
-            ? { ...investment, paused: false, currentFlowW: 0 }
-            : investment,
-        );
+        expectRetainedInvestment(game, investment);
       expect(
         game.transmission!.lines.find(
           (line) =>
@@ -171,18 +200,43 @@ it.each([1, 2, 3, 4])(
       const ownedLine = game.transmission!.lines.find(
         (line) => line.corridorId === corridorId,
       )!;
+      const upgradeQuote = intertieUpgradeQuote(
+        ownedLine,
+        game.date.year,
+        1,
+        1,
+        intertieContextForGame(game),
+      );
+      const upgraded = reducer(
+        game,
+        upgradeTransmissionLine({ corridorId, financed: true }),
+      );
+      expect(Boolean(upgradeQuote)).toBe(tier < 4);
       expect(
-        intertieUpgradeQuote(
-          ownedLine,
-          game.date.year,
-          1,
-          1,
-          intertieContextForGame(game),
+        upgraded.transmission!.lines.find((line) => line.id === ownedLine.id)
+          ?.upgrade?.targetCapacityW,
+      ).toBe(upgradeQuote?.targetCapacityW);
+      expect(upgraded === game).toBe(tier === 4);
+      expect(upgraded.utilityExpansion!.acquisitions).toEqual(
+        game.utilityExpansion!.acquisitions,
+      );
+      const paused = copyOfficialGame(
+        reducer(game, togglePauseTransmissionLine(ownedLine.id)),
+      );
+      expect(
+        paused.transmission!.lines.find((line) => line.id === ownedLine.id),
+      ).toMatchObject({ paused: true, currentFlowW: 0 });
+      const resumedPaused = persisted(paused);
+      expect(resumedPaused.utilityExpansion).toEqual(game.utilityExpansion);
+      tickState(resumedPaused);
+      expect(
+        resumedPaused.transmission!.lines.find(
+          (line) => line.id === ownedLine.id,
         ),
-      ).toBeUndefined();
-      expect(
-        reducer(game, upgradeTransmissionLine({ corridorId, financed: true })),
-      ).toBe(game);
+      ).toMatchObject({ paused: true, currentFlowW: 0 });
+      expect(resumedPaused.utilityExpansion!.acquisitions).toEqual(
+        game.utilityExpansion!.acquisitions,
+      );
       for (const field of [
         "capacityW",
         "buildCost",
@@ -219,9 +273,7 @@ it.each([0, 1])(
     expect(line.upgrade).toBeDefined();
     const investment = cloneDeep(line);
     game = buy(game, "valley-electric");
-    expect(
-      game.transmission!.lines.find((line) => line.id === investment.id),
-    ).toEqual({ ...investment, paused: false, currentFlowW: 0 });
+    expectRetainedInvestment(game, investment);
     game = persisted(game);
     const resumed = persisted(game);
     for (let tick = 0; tick < 3; tick++) {
@@ -379,12 +431,13 @@ it("rejects inconsistent or forged acquisition import ledgers", () => {
     (g) => {
       g.transmission!.lines.find(
         (line) => line.corridorId === "vt-champlain-ridge",
-      )!.paused = true;
+      )!.paused = "paused" as unknown as boolean;
     },
     (g) => {
-      g.transmission!.lines.find(
+      const line = g.transmission!.lines.find(
         (line) => line.corridorId === "vt-champlain-ridge",
-      )!.currentFlowW = 1;
+      )!;
+      line.currentFlowW = line.capacityW + 1;
     },
     (g) => {
       currentTick(g)!.customers = g.customerMarketSize * 1e6;

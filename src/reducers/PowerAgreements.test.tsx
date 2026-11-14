@@ -1135,10 +1135,27 @@ it.each(["NONE", "SHORTAGES"] as const)(
     game.facilities = [generator, battery];
     tickState(game);
     const now = currentTick(game)!;
-    expect(now.storageChargeW).toBeGreaterThan(0);
-    expect(now.supplyW).toBeGreaterThanOrEqual(now.demandW);
-    expect(now.entitlementImportedW).toBeCloseTo(100e6, 0);
+    // The paid agreements serve both local load and storage before the more expensive gas plant.
+    expect(now.storageChargeW).toBeCloseTo(100e6, 0);
+    expect(now.supplyW).toBeCloseTo(now.demandW, 0);
+    expect(
+      game.facilities.find((facility) => facility.id === generator.id)!
+        .currentW,
+    ).toBe(0);
+    expect(now.entitlementImportedW).toBeCloseTo(
+      now.demandW + now.storageChargeW,
+      0,
+    );
     expect(now.importedW).toBe(now.entitlementImportedW);
+    expect(now.entitlementImportedW).toBeLessThanOrEqual(
+      now.entitlementImportCapacityW!,
+    );
+    const interfaceLine = game.transmission!.lines[0];
+    expect(interfaceLine.currentFlowW).toBe(now.importedW);
+    expect(interfaceLine.currentFlowW).toBeLessThanOrEqual(
+      Transmission.transmissionRatingW(interfaceLine, now),
+    );
+    expect(now.exportedW).toBe(0);
   },
 );
 
