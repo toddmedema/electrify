@@ -91,7 +91,7 @@ describe("acquired utilities", () => {
     show(expansionGame(false));
     expect(screen.queryByText(/Acquired utilities/)).not.toBeInTheDocument();
     expect(screen.getByRole("list", { name: "Interties" })).toHaveTextContent(
-      "Valley expansion connection",
+      "Champlain ↔ Valley",
     );
   });
 
@@ -102,7 +102,9 @@ describe("acquired utilities", () => {
     for (const name of ["Champlain", "Valley", "Ridge"])
       expect(
         within(interties).getByRole("button", {
-          name: new RegExp(`^Inspect ${name} regional connection`),
+          name: new RegExp(
+            `^Inspect ${name}( Electric)? (regional connection|↔ Regional grid)`,
+          ),
         }),
       ).toBeVisible();
     const disclosure = screen.getByText("Acquired utilities (2)", {
@@ -312,7 +314,7 @@ function renderFacilities(
     wrapper: ({ children }) => <Provider store={store}>{children}</Provider>,
   });
   if (game.territoryNetwork)
-    fireEvent.click(screen.getByRole("tab", { name: "Fleet", exact: true }));
+    fireEvent.click(screen.getByRole("tab", { name: "Fleet" }));
   return {
     ...handlers,
     rerenderGame: (next) => view.rerender(<ControlledFacilities game={next} />),
@@ -1486,7 +1488,7 @@ it.each([false, true])(
     expect(
       screen.queryByRole("button", { name: "Acquire Ridge Electric" }),
     ).not.toBeInTheDocument();
-    const inspect = fleetButton(/^Inspect Ridge/);
+    const inspect = fleetButton(/^Inspect Champlain ↔ Ridge/);
     await user.click(inspect);
     expect(fleetButton("Acquire Ridge Electric")).toBeVisible();
     expect(

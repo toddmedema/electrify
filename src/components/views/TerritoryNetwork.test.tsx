@@ -119,9 +119,7 @@ it("passes the selected owned territory on purchases and blocks oversized or exh
   fireEvent.mouseDown(
     screen.getByRole("combobox", { name: "Build destination" }),
   );
-  fireEvent.click(
-    screen.getByRole("option", { name: "Valley Electric", exact: true }),
-  );
+  fireEvent.click(screen.getByRole("option", { name: "Valley Electric" }));
   const slider = screen.getByRole("slider");
   fireEvent.change(slider, { target: { value: wToSliderTick(400e6) } });
   const review = () =>
