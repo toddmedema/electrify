@@ -1,6 +1,8 @@
-import { Box, Switch, Typography } from "@mui/material";
+import { Typography } from "@mui/material";
 import { useAppDispatch, useAppSelector } from "../../Store";
 import { change } from "../../reducers/Settings";
+import SettingRow from "./SettingRow";
+import SettingsSwitch from "./SettingsSwitch";
 
 export default function DesktopFeedbackSettings(props: {
   kind: "vibration" | "timeline";
@@ -19,42 +21,27 @@ export default function DesktopFeedbackSettings(props: {
       ? "Brief feedback for confirmations and milestones on supported controllers. Respects your device's reduced motion setting."
       : "Adds markers to Steam Game Recording; it does not start video recording.";
   return (
-    <Box
-      className="settingsRow"
-      sx={{
-        display: "grid",
-        gridTemplateColumns: "minmax(0, 1fr) auto",
-        alignItems: "center",
-        gap: 2,
-        px: 2,
-        py: 1.5,
-      }}
-    >
-      <Box sx={{ minWidth: 0 }}>
-        <Typography component="label" htmlFor={key} sx={{ fontWeight: 600 }}>
-          {label}
-        </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
+    <SettingRow
+      label={label}
+      htmlFor={key}
+      description={
+        <>
           {description}
-        </Typography>
-        {props.kind === "timeline" && props.timelineSupported === false && (
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-            Steam Game Recording is unavailable right now. Your preference is
-            saved.
-          </Typography>
-        )}
-      </Box>
-      <Switch
+          {props.kind === "timeline" && props.timelineSupported === false && (
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+              Steam Game Recording is unavailable right now. Your preference is
+              saved.
+            </Typography>
+          )}
+        </>
+      }
+    >
+      <SettingsSwitch
         id={key}
         checked={enabled}
         slotProps={{ input: { "aria-label": label } }}
         onChange={(_event, checked) => dispatch(change({ [key]: checked }))}
-        sx={{
-          height: 44,
-          padding: "15px 12px",
-          "& .MuiSwitch-switchBase": { padding: "12px 9px" },
-        }}
       />
-    </Box>
+    </SettingRow>
   );
 }
