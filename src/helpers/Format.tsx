@@ -250,6 +250,8 @@ export function formatForecastMoney(
     : NO_ESTIMATE;
 }
 
+const exactMoneyFormats = new Map<number, Intl.NumberFormat>();
+
 /** Exact major-unit prices without abbreviation or the compact significant-digit ceiling. */
 export function formatMoneyFull(
   value: number,
@@ -257,10 +259,16 @@ export function formatMoneyFull(
   fractionDigits = 2,
 ): string {
   if (!Number.isFinite(value)) return NO_ESTIMATE;
-  const amount = formatDecimalNumber(
-    Math.abs(value * currency.unitsPerDollar),
-    { digits: fractionDigits },
-  );
+  let formatter = exactMoneyFormats.get(fractionDigits);
+  if (!formatter) {
+    formatter = new Intl.NumberFormat("en-US", {
+      minimumFractionDigits: fractionDigits,
+      maximumFractionDigits: fractionDigits,
+    });
+    exactMoneyFormats.set(fractionDigits, formatter);
+  }
+  // Intl rounds the converted amount even when its number representation is exponential.
+  const amount = formatter.format(Math.abs(value * currency.unitsPerDollar));
   return (
     (value < 0 && /[1-9]/.test(amount) ? "-" : "") + currency.symbol + amount
   );

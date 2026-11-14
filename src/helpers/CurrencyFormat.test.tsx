@@ -1,6 +1,7 @@
 import { currencyByCode, USD_CURRENCY } from "./Currency";
 import {
   currencyFormatters,
+  formatDecimalNumber,
   formatForecastMoney,
   formatMoneyConcise,
   formatMoneyFull,
@@ -29,6 +30,16 @@ describe("local currency display", () => {
     expect(formatRateCompact(0.1, currencyByCode("ZAR"))).toBe("R1.65");
     expect(formatRateCompact(0.1, currencyByCode("JPY"))).toBe("¥15.7");
     expect(formatRateCompact(0.01, currencyByCode("KWD"))).toBe("KWD 0.00308");
+  });
+
+  it("rounds tiny exact prices at the requested precision without changing legacy decimal truncation", () => {
+    expect(formatMoneyFull(0.000001, eur, 6)).toBe("€0.000001");
+    expect(formatMoneyFull(-0.000001, eur, 6)).toBe("-€0.000001");
+    expect(formatMoneyFull(1.25e-7, USD_CURRENCY, 8)).toBe("$0.00000013");
+    expect(formatMoneyFull(0.0000001, eur, 6)).toBe("€0.000000");
+    expect(formatMoneyFull(-0.0000001, eur, 6)).toBe("€0.000000");
+    expect(formatMoneyFull(1.005)).toBe("$1.01");
+    expect(formatDecimalNumber(8.51e-7, { digits: 6 })).toBe("0.000000");
   });
 
   it("preserves leading signs, rounded zero and missing estimates", () => {

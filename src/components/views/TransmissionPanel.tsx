@@ -347,7 +347,7 @@ function IntertieBuildItem(props: {
       }
       warning={
         !buildable
-          ? financingShortfallText(cash || 0, loan.downpayment)
+          ? financingShortfallText(cash || 0, loan.downpayment, currency)
           : undefined
       }
       metrics={
@@ -463,6 +463,7 @@ function IntertieUpgradeControl(props: {
   onUpgrade: (corridorId: string, financed: boolean) => void;
   context: IntertieAccessContext;
 }): React.JSX.Element | null {
+  const { currency } = useMoney();
   const { line, cash, year, interestRate, units, onUpgrade, context } = props;
   const [reviewing, setReviewing] = React.useState(false);
   if (line.upgrade) {
@@ -494,7 +495,7 @@ function IntertieUpgradeControl(props: {
     );
   }
   const { downpayment } = purchaseTerms(quote.buildCost, true, interestRate);
-  const shortfall = financingShortfallText(cash ?? 0, downpayment);
+  const shortfall = financingShortfallText(cash ?? 0, downpayment, currency);
   const months = Math.max(1, Math.round(quote.yearsToBuild * 12));
   const capacityBefore = intertieDirectionalCapacities(
     line.corridorId,

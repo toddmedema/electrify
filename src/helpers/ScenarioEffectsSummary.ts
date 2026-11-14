@@ -29,7 +29,7 @@ export function scenarioEffectsSummary(
     );
   if (effects.operatingExpensePerMonth)
     changes.push(
-      `${exact ? "Operating expense" : "Restoration"}: ${currency.symbol}${rounded(effects.operatingExpensePerMonth * currency.unitsPerDollar)}/month`,
+      `${exact ? "Operating expense" : "Restoration"}: ${currency.symbol}${formatNumber(effects.operatingExpensePerMonth * currency.unitsPerDollar)}/month`,
     );
   for (const [label, values] of [
     ["fuel price", effects.fuelPriceMultipliers],
@@ -49,7 +49,7 @@ export function scenarioEffectsSummary(
     changes.push("Affected generators have reduced output");
   if (effects.carbonFeePerKgCO2e !== undefined)
     changes.push(
-      `Carbon fee: ${currency.symbol}${rounded(effects.carbonFeePerKgCO2e * 1000 * currency.unitsPerDollar)}/tonne`,
+      `Carbon fee: ${currency.symbol}${formatNumber(effects.carbonFeePerKgCO2e * 1000 * currency.unitsPerDollar)}/tonne`,
     );
   return changes;
 }

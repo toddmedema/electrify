@@ -24,6 +24,8 @@ import { createGame } from "../../testing/Simulator";
 import { FacilityOperatingType, GameType } from "../../Types";
 import Facilities, { fleetChartHeight } from "./Facilities";
 import TransmissionPanel from "./TransmissionPanel";
+import { CurrencyContext } from "../base/CurrencyContext";
+import { currencyByCode } from "../../helpers/Currency";
 
 import * as transmission from "../../helpers/Transmission";
 import { TRANSMISSION_CORRIDORS } from "../../data/AdjacentMarkets";
@@ -910,6 +912,37 @@ describe("weather hazards in the fleet", () => {
 });
 
 describe("the interties view", () => {
+  it("shows the active local currency in an unaffordable intertie build warning", () => {
+    const game = createGame({ scenarioId: 115 });
+    game.transmission!.lines = [];
+    game.timeline = game.timeline.map((tick) => ({ ...tick, cash: 1 }));
+    render(
+      <CurrencyContext.Provider value={currencyByCode("INR")}>
+        <Provider store={configureStore({ reducer: { ui: uiReducer } })}>
+          <TransmissionPanel
+            game={game}
+            projectsOnly
+            onBuild={jest.fn()}
+            onUpgrade={jest.fn()}
+            onBuyingRule={jest.fn()}
+            onSellingRule={jest.fn()}
+          />
+        </Provider>
+      </CurrencyContext.Provider>,
+    );
+    const warnings = screen.getAllByText(/^Need .* down payment · you have/);
+    expect(warnings.length).toBeGreaterThan(0);
+    for (const warning of warnings) {
+      expect(warning).toHaveTextContent(
+        /^Need ₹[\d.]+[kMBT]? down payment · you have ₹89.9$/,
+      );
+      expect(warning).not.toHaveTextContent("$");
+    }
+    expect(
+      screen.getAllByRole("button", { name: /Review purchase of .* intertie/ }),
+    ).not.toHaveLength(0);
+  });
+
   it("reveals the resized intertie after its new cost moves it to a different row", () => {
     const original = transmission.intertieBuildQuote;
     const quotes = jest
@@ -1531,6 +1564,36 @@ describe("the intertie upgrade control", () => {
       </Provider>,
     );
   }
+
+  it("shows the active local currency in an unaffordable intertie upgrade warning", async () => {
+    const game = gameWithOpenIntertie(115, "india-bangladesh-upgrade");
+    game.timeline = game.timeline.map((tick) => ({ ...tick, cash: 1 }));
+    render(
+      <CurrencyContext.Provider value={currencyByCode("INR")}>
+        <Provider store={configureStore({ reducer: { ui: uiReducer } })}>
+          <TransmissionPanel
+            game={game}
+            onBuild={jest.fn()}
+            onUpgrade={jest.fn()}
+            onBuyingRule={jest.fn()}
+            onSellingRule={jest.fn()}
+          />
+        </Provider>
+      </CurrencyContext.Provider>,
+    );
+    const line = game.transmission!.lines[0];
+    await user.click(
+      screen.getByLabelText(`Inspect ${line.name}`, { exact: false }),
+    );
+    const warning = screen.getByText(/^Need .* down payment · you have/);
+    expect(warning).toHaveTextContent(
+      /^Need ₹[\d.]+[kMBT]? down payment · you have ₹89.9$/,
+    );
+    expect(warning).not.toHaveTextContent("$");
+    expect(
+      screen.getByLabelText(`Review upgrade of ${line.name}`),
+    ).toBeDisabled();
+  });
 
   it("offers to widen an open line, and says what the work emits", async () => {
     const user = userEvent.setup();
