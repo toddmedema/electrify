@@ -726,7 +726,7 @@ html:is(:not([data-touch-input="true"]), [data-controller-input="true"])
       )
   );
   bottom: var(--achievement-bottom);
-  width: min(384px, calc(100vw - 2 * max(16px, var(--screen-edge-inset))));
+  width: min(352px, calc(100vw - 2 * max(16px, var(--screen-edge-inset))));
   max-width: none;
 }
 .achievementToastStack {
@@ -756,12 +756,12 @@ html:is(:not([data-touch-input="true"]), [data-controller-input="true"])
   touch-action: none;
   transition: transform 120ms ease-out;
   gap: 12px;
-  padding: 16px 48px 8px 16px;
+  padding: 12px;
   width: 100%;
   box-sizing: border-box;
-  .MuiButton-root {
-    min-height: 44px;
-    margin-left: -8px;
+  cursor: pointer;
+  &:focus-visible {
+    outline-offset: -2px;
   }
   .MuiTypography-overline {
     line-height: 1.5;
@@ -775,13 +775,6 @@ html:is(:not([data-touch-input="true"]), [data-controller-input="true"])
 .achievementToastText {
   flex: 1;
   min-width: 0;
-}
-.achievementToastClose.MuiIconButton-root {
-  position: absolute;
-  right: 4px;
-  top: 4px;
-  width: 44px;
-  height: 44px;
 }
 @media screen and (max-width: ($phone_width - 1px)) {
   .achievementGallery {

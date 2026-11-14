@@ -1,21 +1,13 @@
 import * as React from "react";
-import {
-  Button,
-  IconButton,
-  Paper,
-  Portal,
-  Snackbar,
-  Typography,
-} from "@mui/material";
+import { Button, Paper, Portal, Snackbar, Typography } from "@mui/material";
 import LinearProgress from "@mui/material/LinearProgress";
 import Tab from "@mui/material/Tab";
 import Tabs from "@mui/material/Tabs";
-import CloseIcon from "@mui/icons-material/Close";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutlineRounded";
 import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 import ScreenPage from "../components/base/ScreenPage";
 import { useAppDispatch, useAppSelector } from "../Store";
-import { navigate, navigateBack } from "../reducers/Card";
+import { navigateBack } from "../reducers/Card";
 import { firebaseAppAuth } from "../Globals";
 import SignInButtons from "../components/base/SignInButtons";
 import { catalog } from "./Progress";
@@ -26,7 +18,7 @@ import { useOnline } from "../components/base/OnlineStatus";
 import { restoreMenuFocus, useMenuKeys } from "../components/base/useMenuKeys";
 import { useSwipeToDismiss } from "../components/base/SwipeDismiss";
 
-/** Long enough to read the name and requirement; hover or focus holds it on screen. */
+/** Each visible card gets ten seconds, including while hovered or focused. */
 export const ACHIEVEMENT_TOAST_MS = 10_000;
 
 type Filter = "all" | "unlocked" | "locked";
@@ -224,39 +216,43 @@ export function AchievementGallery(): React.JSX.Element {
 function AchievementToast({
   entry,
   active,
-  onView,
 }: {
   entry: (typeof catalog)[number];
   active: boolean;
-  onView?: () => void;
 }): React.JSX.Element {
   const panel = React.useRef<HTMLDivElement>(null);
-  const dismiss = () => {
+  const dismiss = React.useCallback(() => {
     // Keep keyboard focus in the stack when its focused card is dismissed.
     if (panel.current?.contains(document.activeElement)) {
       const neighbor =
         panel.current.nextElementSibling ||
         panel.current.previousElementSibling;
-      neighbor
-        ?.querySelector<HTMLButtonElement>(".achievementToastClose")
-        ?.focus();
+      if (neighbor instanceof HTMLElement) neighbor.focus();
     }
     achievementJournal.dismiss(entry.id);
-  };
+  }, [entry.id]);
   const swipe = useSwipeToDismiss(panel, dismiss);
   React.useEffect(() => {
     if (!active) return;
-    const timer = setTimeout(
-      () => achievementJournal.dismiss(entry.id),
-      ACHIEVEMENT_TOAST_MS,
-    );
+    const timer = setTimeout(dismiss, ACHIEVEMENT_TOAST_MS);
     return () => clearTimeout(timer);
-  }, [active, entry.id]);
+  }, [active, dismiss]);
   return (
     <Paper
       ref={panel}
       variant="outlined"
       className="achievementToastPanel"
+      role="button"
+      tabIndex={0}
+      aria-label={`Dismiss ${entry.name} achievement notification`}
+      onClick={dismiss}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          event.stopPropagation();
+          dismiss();
+        }
+      }}
       {...swipe.handlers}
     >
       <div className="achievementArt">
@@ -276,19 +272,7 @@ function AchievementToast({
         >
           {entry.description}
         </Typography>
-        {onView && (
-          <Button size="small" onClick={onView}>
-            View achievements
-          </Button>
-        )}
       </div>
-      <IconButton
-        aria-label={`Dismiss ${entry.name} achievement notification`}
-        onClick={dismiss}
-        className="achievementToastClose"
-      >
-        <CloseIcon />
-      </IconButton>
     </Paper>
   );
 }
@@ -296,12 +280,9 @@ function AchievementToast({
 /** Announce awards over the game and its result dialogs without stealing focus. */
 export default function AchievementNotifications(): React.JSX.Element {
   const state = useAchievements();
-  const dispatch = useAppDispatch();
   const snackbarOpen = useAppSelector((root) => root.ui.snackbar.open);
   const [pageHidden, setPageHidden] = React.useState(() => document.hidden);
   const [container, setContainer] = React.useState<HTMLElement | null>(null);
-  const [hovered, setHovered] = React.useState(false);
-  const [focused, setFocused] = React.useState(false);
   const stack = React.useRef<HTMLDivElement>(null);
   const [scrollable, setScrollable] = React.useState(false);
   const entries = state.notifications.flatMap((id) => {
@@ -354,17 +335,6 @@ export default function AchievementNotifications(): React.JSX.Element {
   }, [hasNotifications]);
   const open =
     hasNotifications && !state.steamAvailable && !pageHidden && !snackbarOpen;
-  React.useEffect(() => {
-    setHovered(!!open && !!stack.current?.matches(":hover"));
-    setFocused(!!open && !!stack.current?.contains(document.activeElement));
-  }, [state.notifications, open, container]);
-  const onView =
-    container === document.body
-      ? () => {
-          achievementJournal.clearNotifications();
-          dispatch(navigate("ACHIEVEMENTS"));
-        }
-      : undefined;
   return (
     <Portal container={container}>
       <>
@@ -397,21 +367,9 @@ export default function AchievementNotifications(): React.JSX.Element {
             <div
               ref={stack}
               className={`achievementToastStack${scrollable ? " isScrollable" : ""}`}
-              onMouseEnter={() => setHovered(true)}
-              onMouseLeave={() => setHovered(false)}
-              onFocus={() => setFocused(true)}
-              onBlur={(event) => {
-                if (!event.currentTarget.contains(event.relatedTarget))
-                  setFocused(false);
-              }}
             >
               {entries.map((entry) => (
-                <AchievementToast
-                  key={entry.id}
-                  entry={entry}
-                  active={open && !hovered && !focused}
-                  onView={onView}
-                />
+                <AchievementToast key={entry.id} entry={entry} active={open} />
               ))}
             </div>
           </Snackbar>

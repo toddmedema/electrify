@@ -169,6 +169,7 @@ test("a real mission stacks simultaneous awards and persists them without repeat
         }),
       );
   }, STORAGE_KEY);
+  await page.clock.install();
   await page.goto("/");
   await page.getByRole("button", { name: "Play", exact: true }).click();
   await page.getByRole("button", { name: "Next", exact: true }).click();
@@ -194,7 +195,7 @@ test("a real mission stacks simultaneous awards and persists them without repeat
     page.viewportSize()!.height,
   );
   await expect(graduate).toContainText("Complete all seven tutorial missions.");
-  await popup.hover();
+  await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 1000);
   await expect(popup).toContainText("First Spark");
   await expect(page.getByRole("dialog")).toBeVisible();
   await expect(
@@ -234,9 +235,10 @@ test("a real mission stacks simultaneous awards and persists them without repeat
   // clearance and the popup's entrance transition, rather than sampling an intermediate frame.
   await expect.poll(gap).toBeGreaterThanOrEqual(8);
   await expect.poll(gap).toBeLessThanOrEqual(24);
-  const close = popup.getByRole("button", { name: /Dismiss First Spark/ });
+  await expect(popup).toHaveRole("button");
+  await expect(popup.locator("button")).toHaveCount(0);
   await expect
-    .poll(async () => (await close.boundingBox())?.height ?? 0)
+    .poll(async () => (await popup.boundingBox())?.height ?? 0)
     .toBeGreaterThanOrEqual(44);
   await screenshot(page, info, "stacked-popups");
   await page.emulateMedia({ colorScheme: "dark", reducedMotion: "reduce" });
@@ -247,27 +249,26 @@ test("a real mission stacks simultaneous awards and persists them without repeat
     width: viewportBeforeResize.width,
     height: 180,
   });
+  // The clock also owns the toast's periodic clearance/scrollability measurement.
+  await page.clock.runFor(250);
   const stack = page.locator(".achievementToastStack");
   await expect(stack).toHaveClass(/isScrollable/);
   await expect(popup).toHaveCSS("touch-action", "pan-y");
   const stackBounds = (await stack.boundingBox())!;
   expect(stackBounds.y).toBeGreaterThanOrEqual(0);
   expect(stackBounds.y + stackBounds.height).toBeLessThanOrEqual(180);
-  await graduate.getByRole("button", { name: /Dismiss Grid Graduate/ }).click();
+  await graduate.getByText("Grid Graduate", { exact: true }).click();
   await expect(popups).toHaveCount(1);
   await expect(popup).toBeVisible();
   await page.setViewportSize(viewportBeforeResize);
   await page
     .getByRole("button", { name: "Next tutorial", exact: true })
     .click();
+  await page.clock.runFor(1000);
   await expect(page.getByRole("dialog")).toBeHidden();
-  await popup
-    .getByRole("button", { name: "View achievements", exact: true })
-    .click();
-  await expect(
-    page.getByText(`2 of ${catalog.length} unlocked`, { exact: true }),
-  ).toBeVisible();
-  await page.keyboard.press("Escape");
+  await popup.getByText("First Spark", { exact: true }).click();
+  await expect(popups).toHaveCount(0);
+  await page.clock.resume();
   await expect(
     page.getByRole("heading", { name: "Achievements", exact: true }),
   ).toBeHidden();
