@@ -18,14 +18,12 @@ function fixture(count: number): TerritoryDispatchInput {
       "ridge-electric": 200e6,
       "green-uplands": 0,
     },
-    edges: ids
-      .slice(1)
-      .map((to, i) => ({
-        id: i,
-        from: ids[0],
-        to,
-        capacityW: [100e6, 60e6, 120e6][i],
-      })),
+    edges: ids.slice(1).map((to, i) => ({
+      id: i,
+      from: ids[0],
+      to,
+      capacityW: [100e6, 60e6, 120e6][i],
+    })),
     sources: Array.from({ length: count }, (_, i) => ({
       id: `source:${i}`,
       territoryId: ids[i % (i < count / 2 ? 4 : 3)],
