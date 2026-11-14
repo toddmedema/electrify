@@ -242,7 +242,17 @@ function validOfficialOccurrence(
           ? `${customNames[0]} is offline for the rest of this event. Replace its output with generation, storage or imports.`
           : "Your grid has no operating nuclear reactor, so this shutdown causes no loss of supply."
         : `${game.location.name}: ${changes.length ? changes.join("; ") + "." : "Review your supply and reserves before the upcoming scenario event."}`;
-    return event.message === message && typeof event.importance === "string";
+    // Older saves retain their already-recorded USD text. Only the exact old presentation
+    // is accepted; the effects and receipt structure above still have to match the rule.
+    const legacyChanges = scenarioEffectsSummary(effects);
+    const legacyMessage =
+      review === "nuclearTrip"
+        ? message
+        : `${game.location.name}: ${legacyChanges.length ? legacyChanges.join("; ") + "." : "Review your supply and reserves before the upcoming scenario event."}`;
+    return (
+      (event.message === message || event.message === legacyMessage) &&
+      typeof event.importance === "string"
+    );
   }
   if (!review || ["hurricaneOutlook", "nuclearContingency"].includes(review))
     return (

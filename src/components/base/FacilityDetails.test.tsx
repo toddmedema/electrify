@@ -489,15 +489,18 @@ describe("fixed upkeep", () => {
   });
 
   it("still lists the variable part beside it for a fuel plant", () => {
-    const game = carbonFee();
-    const gas = game.facilities[0];
+    const game = createGame({ scenarioId: 108 });
+    const gas = game.facilities.find(
+      (facility) => facility.fuel === "Natural Gas",
+    )!;
     expect(gas.variableOperatingCostPerMWh).toBeDefined();
     showDetails(game, gas);
     const economics = screen.getByRole("region", { name: "Economics" });
     expect(economics).toHaveTextContent(
-      `Fixed upkeep${formatMoneyConcise(gas.annualOperatingCost)}/yr`,
+      `Fixed upkeep${formatMoneyConcise(gas.annualOperatingCost, currencyForLocation(game.location, game.startingYear))}/yr`,
     );
-    expect(economics).toHaveTextContent("Variable upkeep");
+    expect(economics).toHaveTextContent("Variable upkeep€");
+    expect(economics).not.toHaveTextContent("$");
   });
 });
 

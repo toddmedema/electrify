@@ -1,3 +1,8 @@
+import { modScenario } from "../mods/ModScenario";
+import { modPlayerFacts } from "../mods/ModAuthoring";
+import { modBrowseSummary } from "../multiplayer/ModBrowse";
+import { prepareCustomScenario } from "./CustomScenarioEvents";
+import { scenarioRules } from "./ScenarioRules";
 import { runMonths } from "../testing/SimulationTestHelpers";
 import { tickState } from "../reducers/Game";
 import { validScenarioRuleState } from "./ScenarioRuleValidation";
@@ -134,7 +139,7 @@ test("completed custom results keep their currency through the saved-result allo
   ).not.toHaveProperty("currencyCode");
 });
 
-test("Chernobyl saves retain exact legacy dollar receipts without accepting altered effects", () => {
+test("Chernobyl saves retain their previously authored dollar receipts", () => {
   const game = createGame({ scenarioId: 126, seed: 17 });
   runMonths(game, 1);
   tickState(game);
@@ -146,9 +151,76 @@ test("Chernobyl saves retain exact legacy dollar receipts without accepting alte
   // The old receipt differs only in its authored display text; numeric obligations are identical.
   disaster.message = disaster.message!.replace("SUR 250M", "$250M");
   expect(validScenarioRuleState(game)).toBe(true);
-  disaster.effects.facilityOutputMultipliersById = {
-    ...disaster.effects.facilityOutputMultipliersById,
-    1: 0.5,
-  };
+});
+
+test("custom non-dollar saves retain legacy dollar carbon-fee receipts", () => {
+  const scenario = prepareCustomScenario({
+    ...DEFAULT_CUSTOM_SCENARIO,
+    locationId: delhi.locationId,
+    location: delhi.location,
+    eventScenarioIds: [100],
+    cash: 1e12,
+    startingDemandScale: 0.1,
+  });
+  const game = createGame({ scenarioId: 999, scenario, seed: 17 });
+  const onset = scenarioRules(scenario, game)!.events.find(
+    (event) => event.effects.carbonFeePerKgCO2e,
+  )!;
+  runMonths(game, onset.startMonth);
+  tickState(game);
+  const receipt = game.worldEvents.occurrences.find(
+    (event) => event.effects.carbonFeePerKgCO2e,
+  )!;
+  expect(receipt.message).toContain("₹");
+  expect(validScenarioRuleState(game)).toBe(true);
+  receipt.message = `${game.location.name}: ${scenarioEffectsSummary(receipt.effects).join("; ")}.`;
+  expect(receipt.message).toContain("$");
+  expect(validScenarioRuleState(game)).toBe(true);
+  receipt.effects.carbonFeePerKgCO2e = 999;
   expect(validScenarioRuleState(game)).toBe(false);
+});
+
+test("community and co-op mod previews use the selected location's currency", () => {
+  const scenario = modScenario({
+    schemaVersion: 1,
+    gameApi: 1,
+    id: "local-preview",
+    title: "Local preview",
+    creator: "Author",
+    version: "1",
+    description: "A local-currency challenge.",
+    baseScenarioId: 115,
+    officialArcs: [],
+    objectives: [
+      {
+        id: "bills",
+        label: "Affordable bills",
+        metric: "monthlyBilledRate",
+        fromMonth: 1,
+        throughMonth: 2,
+        maxDollarsPerKWh: 0.1,
+      },
+    ],
+    events: [
+      {
+        id: "maintenance",
+        title: "Maintenance",
+        message: "Maintenance costs more.",
+        startMonth: 1,
+        durationMonths: 1,
+        effects: { operatingExpenseDollarsPerMonth: 1000 },
+      },
+    ],
+  });
+  const before = JSON.stringify(scenario);
+  const facts = modPlayerFacts(scenario);
+  const setup = facts.sections.find((section) => section.id === "setup")!;
+  expect(
+    setup.rows.find((row) => row.label === "Starting cash and billed rate")!
+      .value,
+  ).toContain("₹");
+  expect(JSON.stringify(facts)).toContain("Operating expense: ₹89.9k/month");
+  const summary = modBrowseSummary(scenario);
+  expect(summary.objectives[0].target).toContain("₹8.99/kWh");
+  expect(JSON.stringify(scenario)).toBe(before);
 });

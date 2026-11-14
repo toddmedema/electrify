@@ -538,7 +538,7 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
                 <Stat
                   label="Variable upkeep"
                   entry={MANUAL_ENTRY.OPERATING_COSTS}
-                  value={`$${formatNumber(variableOperatingCostPerMWh)}/MWh`}
+                  value={formatPricePerMWh(variableOperatingCostPerMWh)}
                 />
               )}
             {facility.costPerStart !== undefined &&
