@@ -285,9 +285,8 @@ it("shows build options and focuses evidence before background quotes arrive", (
         onEvidenceReady={ready}
       />,
     );
-    expect(screen.getByRole("status")).toHaveTextContent(
-      "Calculating output and energy costs",
-    );
+    const loading = screen.getByRole("status");
+    expect(loading).toHaveTextContent("Calculating output and energy costs");
     expect(screen.getByRole("slider")).toBeInTheDocument();
     expect(
       screen.getByRole("button", {
@@ -313,7 +312,7 @@ it("shows build options and focuses evidence before background quotes arrive", (
       request,
       screen.getByLabelText("Generator build options"),
     );
-    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    expect(loading).not.toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Review purchase of Solar" }),
     ).toBeEnabled();

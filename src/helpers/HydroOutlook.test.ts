@@ -1,10 +1,37 @@
-import { describeHydroStatus, ReservoirOutlookPoint } from "./HydroOutlook";
+import {
+  describeHydroStatus,
+  reservoirOutlook,
+  ReservoirOutlookPoint,
+} from "./HydroOutlook";
+import { MINUTES_PER_MONTH } from "./DateTime";
+import { TickPresentFutureType } from "../Types";
+
+it("keeps the snapshot calendar year on current and month-end forecast points", () => {
+  const tick = (minute: number) =>
+    ({
+      minute,
+      hydroReservoirWh: 50,
+      hydroReservoirCapacityWh: 100,
+      snowpackMm: 0,
+    }) as TickPresentFutureType;
+  const now = tick(11 * MINUTES_PER_MONTH);
+  const forecast = [
+    tick(12 * MINUTES_PER_MONTH - 1),
+    tick(12 * MINUTES_PER_MONTH),
+  ];
+  expect(reservoirOutlook(now, forecast, 2025)).toEqual([
+    expect.objectContaining({ monthNumber: 12, year: 2025 }),
+    expect.objectContaining({ monthNumber: 12, year: 2025 }),
+    expect.objectContaining({ monthNumber: 1, year: 2026 }),
+  ]);
+});
 
 function outlook(
   points: Array<[number, number, number]>,
 ): ReservoirOutlookPoint[] {
   return points.map(([monthNumber, fraction, snowpackMm]) => ({
     monthNumber,
+    year: 2025,
     fraction,
     snowpackMm,
   }));
@@ -120,9 +147,9 @@ test("a forecast that reaches the minimum level warns with the month", () => {
     latitude: 40,
     fraction: 0.47,
     outlook: [
-      { monthNumber: 1, fraction: 0.47, snowpackMm: 0 },
-      { monthNumber: 2, fraction: 0.3, snowpackMm: 0 },
-      { monthNumber: 3, fraction: 0.12, snowpackMm: 0 },
+      { year: 2025, monthNumber: 1, fraction: 0.47, snowpackMm: 0 },
+      { year: 2025, monthNumber: 2, fraction: 0.3, snowpackMm: 0 },
+      { year: 2025, monthNumber: 3, fraction: 0.12, snowpackMm: 0 },
     ],
   });
   expect(status.tone).toBe("warn");
@@ -135,8 +162,8 @@ test("a forecast that reaches the minimum level warns with the month", () => {
       fraction: 0.47,
       fleet: true,
       outlook: [
-        { monthNumber: 1, fraction: 0.47, snowpackMm: 0 },
-        { monthNumber: 2, fraction: 0.12, snowpackMm: 0 },
+        { year: 2025, monthNumber: 1, fraction: 0.47, snowpackMm: 0 },
+        { year: 2025, monthNumber: 2, fraction: 0.12, snowpackMm: 0 },
       ],
     }),
   ).toMatchObject({
@@ -156,9 +183,9 @@ test("a nearly empty lone dam names when it refills, or says it won't", () => {
     describeHydroStatus({
       ...input,
       outlook: [
-        { monthNumber: 8, fraction: 0.05, snowpackMm: 0 },
-        { monthNumber: 9, fraction: 0.05, snowpackMm: 0 },
-        { monthNumber: 10, fraction: 0.2, snowpackMm: 0 },
+        { year: 2025, monthNumber: 8, fraction: 0.05, snowpackMm: 0 },
+        { year: 2025, monthNumber: 9, fraction: 0.05, snowpackMm: 0 },
+        { year: 2025, monthNumber: 10, fraction: 0.2, snowpackMm: 0 },
       ],
     }).detail,
   ).toMatch(/likely in October/);
@@ -166,8 +193,8 @@ test("a nearly empty lone dam names when it refills, or says it won't", () => {
     describeHydroStatus({
       ...input,
       outlook: [
-        { monthNumber: 8, fraction: 0.05, snowpackMm: 0 },
-        { monthNumber: 9, fraction: 0.04, snowpackMm: 0 },
+        { year: 2025, monthNumber: 8, fraction: 0.05, snowpackMm: 0 },
+        { year: 2025, monthNumber: 9, fraction: 0.04, snowpackMm: 0 },
       ],
     }).detail,
   ).toMatch(/no refill is expected/);
@@ -183,9 +210,9 @@ test.each([false, true])(
       fraction: 0.32,
       fleet,
       outlook: [
-        { monthNumber: 4, fraction: 0.32, snowpackMm: 0 },
-        { monthNumber: 5, fraction: 0.4, snowpackMm: 0 },
-        { monthNumber: 6, fraction: 0.05, snowpackMm: 0 },
+        { year: 2025, monthNumber: 4, fraction: 0.32, snowpackMm: 0 },
+        { year: 2025, monthNumber: 5, fraction: 0.4, snowpackMm: 0 },
+        { year: 2025, monthNumber: 6, fraction: 0.05, snowpackMm: 0 },
       ],
     });
     expect(status).toMatchObject({
@@ -202,8 +229,8 @@ test("running low before the month ends says so", () => {
     monthNumber: 1,
     fraction: 0.4,
     outlook: [
-      { monthNumber: 1, fraction: 0.4, snowpackMm: 0 },
-      { monthNumber: 1, fraction: 0.1, snowpackMm: 0 },
+      { year: 2025, monthNumber: 1, fraction: 0.4, snowpackMm: 0 },
+      { year: 2025, monthNumber: 1, fraction: 0.1, snowpackMm: 0 },
     ],
   });
   expect(status.detail).toMatch(/will run low this month/);

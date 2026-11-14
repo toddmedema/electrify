@@ -63,6 +63,7 @@ import {
   formatMoneyConcise,
   formatNumber,
   formatForecastMoney,
+  formatForecastPercent,
   formatForecastWatts,
   formatWatts,
   formatWattsOfPeak,
@@ -107,7 +108,7 @@ import BuildOptionCard from "../base/BuildOptionCard";
 import PurchaseReviewDialog, {
   financingShortfallText,
 } from "../base/PurchaseReviewDialog";
-import Sparkline from "../base/Sparkline";
+import InteractiveSparkline from "../base/InteractiveSparkline";
 import { useOutlookWorker } from "../base/useOutlookWorker";
 import {
   forecastCutoffIndex,
@@ -207,7 +208,31 @@ function IntertieYear({
         </Typography>
       )}
       {prominent && <span className="intertieAvailabilityLimit">100%</span>}
-      <Sparkline
+      <InteractiveSparkline
+        className="intertieYearTrend"
+        captionClassName={prominent ? "intertieAvailabilityLabels" : undefined}
+        label="Typical monthly import availability"
+        defaultIndex={lowMonth}
+        caption={(month) =>
+          `${MONTHS[month]}: ${formatForecastPercent(monthly[month])} · ${formatForecastWatts(monthly[month] * importCapacityW)}`
+        }
+        defaultCaption={
+          prominent ? (
+            <>
+              <span>Jan</span>
+              <span>
+                Low {MONTHS[lowMonth]}{" "}
+                {formatForecastWatts(monthly[lowMonth] * importCapacityW)}
+              </span>
+              <span>Dec</span>
+            </>
+          ) : (
+            `Typical year · Low ${MONTHS[lowMonth]} ${formatForecastWatts(monthly[lowMonth] * importCapacityW)}`
+          )
+        }
+        chartFooter={
+          prominent && <span className="intertieAvailabilityLimit">0%</span>
+        }
         values={monthly}
         domain={[0, 1]}
         width={prominent ? 480 : 96}
@@ -218,26 +243,6 @@ function IntertieYear({
         lowMarker={!prominent}
         ariaLabel={`Typical year of import room: most in ${MONTH_NAMES[highMonth]} at ${formatForecastWatts(monthly[highMonth] * importCapacityW)}, least in ${MONTH_NAMES[lowMonth]} at ${formatForecastWatts(monthly[lowMonth] * importCapacityW)}.`}
       />
-      {prominent && <span className="intertieAvailabilityLimit">0%</span>}
-      {prominent ? (
-        <div className="intertieAvailabilityLabels">
-          <span>Jan</span>
-          <span>
-            Low {MONTHS[lowMonth]}{" "}
-            {formatForecastWatts(monthly[lowMonth] * importCapacityW)}
-          </span>
-          <span>Dec</span>
-        </div>
-      ) : (
-        <Typography
-          variant="caption"
-          color="textSecondary"
-          component="figcaption"
-        >
-          Typical year · Low {MONTHS[lowMonth]}{" "}
-          {formatForecastWatts(monthly[lowMonth] * importCapacityW)}
-        </Typography>
-      )}
     </figure>
   );
 }

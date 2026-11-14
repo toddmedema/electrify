@@ -20,6 +20,7 @@ import {
 import {
   formatPercent,
   formatMoneyConcise,
+  formatMoneyStable,
   formatNumber,
   formatWattHours,
   formatWattHoursOfPeak,
@@ -56,7 +57,7 @@ import {
   RetrofitFacilityAction,
 } from "../../Types";
 import HydroWaterSection from "./HydroWaterSection";
-import Sparkline from "./Sparkline";
+import InteractiveSparkline from "./InteractiveSparkline";
 import Stat from "./FacilityStat";
 import ManualLink from "./ManualLink";
 import { MANUAL_ENTRY, MANUAL_SECTION } from "./ManualEntries";
@@ -579,20 +580,31 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
                     {fuel} price, {trend.length}mo
                   </ManualLink>
                 </Typography>
-                <dd className="facilityTrend">
-                  <Sparkline
+                <dd>
+                  <InteractiveSparkline
+                    className="facilityTrend facilityFuelTrendChart"
+                    label={`${fuel} monthly fuel price`}
+                    defaultIndex={trend.length - 1}
+                    caption={(index) => {
+                      const absolute =
+                        date.year * 12 +
+                        date.monthNumber -
+                        1 -
+                        (trend.length - 1 - index);
+                      return `${MONTHS[absolute % 12]} ${Math.floor(absolute / 12)}: ${formatMoneyStable(trend[index])}/MMBtu`;
+                    }}
+                    defaultCaption={
+                      <span
+                        className={`facilityStatValue${trendChange > 0 ? " bad" : trendChange < 0 ? " good" : ""}`}
+                      >
+                        {trendChange > 0 ? "+" : ""}
+                        {formatPercent(trendChange)}
+                      </span>
+                    }
                     values={trend}
                     color={accentColor}
                     ariaLabel={`${fuel} price over the last ${trend.length} months, ${trendChange === 0 ? "unchanged" : `${trendChange > 0 ? "up" : "down"} ${formatNumber(Math.abs(Math.round(trendChange * 100)))} percent`}`}
                   />
-                  <Typography
-                    variant="body2"
-                    component="span"
-                    className={`facilityStatValue${trendChange > 0 ? " bad" : trendChange < 0 ? " good" : ""}`}
-                  >
-                    {trendChange > 0 ? "+" : ""}
-                    {formatPercent(trendChange)}
-                  </Typography>
                 </dd>
               </div>
             )}

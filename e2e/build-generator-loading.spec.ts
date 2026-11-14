@@ -57,9 +57,10 @@ for (const theme of ["light", "dark"] as const) {
       )
       .toBeGreaterThan(0);
     const build = await openBuild(page);
-    await expect(build.getByRole("status")).toHaveText(
-      "Calculating output and energy costs…",
-    );
+    const loading = build
+      .getByRole("status")
+      .filter({ hasText: "Calculating output and energy costs…" });
+    await expect(loading).toHaveText("Calculating output and energy costs…");
     const solar = build.locator('[data-build-option="Solar"]');
     const gas = build.locator('[data-build-option="Natural Gas Peaker"]');
     await expect(solar).toBeVisible();
@@ -91,7 +92,7 @@ for (const theme of ["light", "dark"] as const) {
         window as unknown as { releaseBuildQuotes: () => void }
       ).releaseBuildQuotes(),
     );
-    await expect(build.getByRole("status")).toHaveCount(0);
+    await expect(loading).toHaveCount(0);
     await expect(
       solar.getByRole("button", { name: "Review purchase of Solar" }),
     ).toBeEnabled();
@@ -109,7 +110,7 @@ for (const theme of ["light", "dark"] as const) {
     await expect(
       solar.getByRole("img", { name: /^Typical year/ }),
     ).toBeVisible();
-    await expect(build.getByRole("status")).toHaveCount(0);
+    await expect(loading).toHaveCount(0);
     await reviewScreenshot(page, {
       path: info.outputPath(`ready-${theme}.png`),
       animations: "disabled",
