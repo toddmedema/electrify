@@ -261,7 +261,9 @@ for (const { theme, native, currentRank } of [
     await expect(
       dialog.getByRole("region", { name: "Mission results" }),
     ).toContainText("final net worth");
-    const popup = page.locator(".achievementToastPanel").first();
+    const popup = page
+      .getByRole("button", { name: /^Dismiss .+ achievement notification$/ })
+      .first();
     if (!nativeBoard) {
       await expect(popup).toBeVisible();
       // Prerequisite wins already earned Staying Power; this run earns Four Nines.
@@ -279,7 +281,7 @@ for (const { theme, native, currentRank } of [
     }
     // Dismiss queued awards so the remaining result-action checks can use the whole dialog.
     while (await popup.isVisible()) {
-      await popup.getByRole("button", { name: /^Dismiss/ }).click();
+      await popup.click();
     }
     await leaderboard.scrollIntoViewIfNeeded();
     await expect(leaderboard).toBeVisible();
@@ -506,9 +508,10 @@ for (const theme of ["light", "dark"] as const) {
     expect(
       parseFloat((await lifetime.locator("strong").textContent())!),
     ).toBeLessThan(9.9);
-    const popup = page.locator(".achievementToastPanel").first();
-    while (await popup.isVisible())
-      await popup.getByRole("button", { name: /^Dismiss/ }).click();
+    const popup = page
+      .getByRole("button", { name: /^Dismiss .+ achievement notification$/ })
+      .first();
+    while (await popup.isVisible()) await popup.click();
     await expectDialogToFit(dialog);
     await metrics.last().scrollIntoViewIfNeeded();
     if (process.env.REVIEW_SCREENSHOT_DIR) {

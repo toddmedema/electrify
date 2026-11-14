@@ -51,7 +51,25 @@ for (const theme of ["light", "dark"] as const) {
           exact: true,
         }),
       });
-      await expect(stat).toHaveCSS("cursor", "pointer");
+      await expect(stat).toHaveCSS("cursor", "help");
+      if (label === "Capacity" && !info.project.use.hasTouch) {
+        const color = await stat
+          .locator("dd")
+          .evaluate((element) => getComputedStyle(element).color);
+        await stat.hover();
+        await expect(stat).not.toHaveCSS("background-image", "none");
+        await expect(stat.locator("dd")).toHaveCSS("color", color);
+        await page.waitForTimeout(600);
+        await expect(
+          page.getByRole("dialog", { name: "Manual preview" }),
+        ).toHaveCount(0);
+        await expect(manual).toHaveCount(0);
+        if (theme === "dark") {
+          await reviewScreenshot(details, {
+            path: info.outputPath("facility-hover-dark.png"),
+          });
+        }
+      }
       await clickValue(stat, stat.locator("dd"));
       await expect(
         manual.getByRole("heading", { name: title, exact: true }),
@@ -73,11 +91,6 @@ for (const theme of ["light", "dark"] as const) {
     await expect(
       page.getByRole("dialog", { name: "Manual preview" }),
     ).toHaveCount(0);
-    if (theme === "dark" && info.project.name === "desktop-chromium") {
-      await reviewScreenshot(details, {
-        path: info.outputPath("facility-details-dark.png"),
-      });
-    }
     const build = await openBuild(page);
     const gas = build
       .locator(".buildOption")
@@ -88,7 +101,7 @@ for (const theme of ["light", "dark"] as const) {
       ["Non-fuel start cost", "Operating costs"],
     ]) {
       const row = gas.getByRole("row", { name: new RegExp(label, "i") });
-      await expect(row).toHaveCSS("cursor", "pointer");
+      await expect(row).toHaveCSS("cursor", "help");
       await clickValue(row, row.locator("td").last());
       await expect(
         manual.getByRole("heading", { name: title, exact: true }),
@@ -400,26 +413,30 @@ for (const theme of ["light", "dark"] as const) {
       exact: true,
     });
     const shots = process.env.REVIEW_SCREENSHOT_DIR;
+    await expect(supplyHelp).toHaveCSS("cursor", "help");
     if (!info.project.use.hasTouch) {
+      const color = await supplyHelp.evaluate(
+        (element) => getComputedStyle(element).color,
+      );
       await supplyHelp.hover();
-      const preview = page.getByRole("dialog", {
-        name: "Manual preview",
-        exact: true,
-      });
-      await expect(preview.getByRole("heading")).toHaveText([
-        "Supply & Demand",
-      ]);
-      await expect(preview).toContainText("missing energy");
-      await expect(preview).not.toContainText("Choose a preset");
-      if (shots && theme === "light") {
-        await page.screenshot({
-          path: path.join(shots, "insights-subsection-desktop-light.png"),
-          animations: "disabled",
-        });
-      }
+      await expect(supplyHelp).toHaveCSS("color", color);
+      await expect(supplyHelp).not.toHaveCSS("background-image", "none");
+      await page.waitForTimeout(600);
+      await expect(
+        page.getByRole("dialog", { name: "Manual preview" }),
+      ).toHaveCount(0);
+      await expect(pinned).toHaveCount(0);
     }
     await supplyHelp.click();
     await expect(pinned.getByRole("heading")).toHaveText(["Supply & Demand"]);
+    await expect(pinned).toContainText("missing energy");
+    await expect(pinned).not.toContainText("Choose a preset");
+    if (shots && theme === "light" && !info.project.use.hasTouch) {
+      await page.screenshot({
+        path: path.join(shots, "insights-subsection-desktop-light.png"),
+        animations: "disabled",
+      });
+    }
     await pinned.getByRole("link", { name: "blackouts", exact: true }).click();
     await expect(pinned.getByRole("heading")).toHaveText(["Blackouts"]);
     await pinned.getByRole("button", { name: "close", exact: true }).click();

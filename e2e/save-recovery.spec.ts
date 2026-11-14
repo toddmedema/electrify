@@ -593,7 +593,7 @@ test("completed saves remain writable and historical results leave the current r
   const notification = page.locator(".achievementToastPanel").first();
   await expect(notification).toBeVisible();
   while (await notification.isVisible()) {
-    await notification.getByRole("button", { name: /^Dismiss/ }).click();
+    await notification.click();
   }
   await victory
     .getByRole("button", { name: "Keep playing", exact: true })

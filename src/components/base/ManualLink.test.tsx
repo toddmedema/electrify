@@ -1,8 +1,8 @@
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { Provider } from "react-redux";
 import { store } from "../../Store";
 import { manualHelpClose } from "../../reducers/UI";
-import { MANUAL_ENTRY, MANUAL_SECTION } from "./ManualEntries";
+import { MANUAL_ENTRY } from "./ManualEntries";
 import ManualLink from "./ManualLink";
 
 function showLink(
@@ -18,7 +18,7 @@ function showLink(
   return screen.getByRole("button", { name: `What is ${entry}?` });
 }
 
-// Runs the hover delay, then the fade the preview leaves on
+// Wait beyond the former hover delay and fade.
 function settle() {
   act(() => jest.advanceTimersByTime(500));
   act(() => jest.advanceTimersByTime(500));
@@ -57,89 +57,21 @@ describe("ManualLink", () => {
     });
   });
 
-  it("previews its entry while a mouse rests on it and hides it on leaving", () => {
+  it("keeps help closed while a mouse rests on a term or it receives focus", () => {
     const link = showLink();
     hover(link);
+    settle();
     expect(preview()).toBeNull();
-    act(() => jest.advanceTimersByTime(300));
-    expect(preview()).toHaveTextContent("how fast electricity is produced");
-    // Hovering doesn't pin the entry, so the game keeps running
     expect(store.getState().ui.manualHelpEntry).toBeUndefined();
-
-    // Crossing from the (?) onto the preview keeps it open
     fireEvent.pointerLeave(link, { pointerType: "mouse" });
-    fireEvent.pointerEnter(preview()!, { pointerType: "mouse" });
-    settle();
-    expect(preview()).not.toBeNull();
-
-    fireEvent.pointerLeave(preview()!, { pointerType: "mouse" });
+    act(() => link.focus());
     settle();
     expect(preview()).toBeNull();
+    expect(store.getState().ui.manualHelpEntry).toBeUndefined();
   });
 
-  it("previews only the requested chart subsection and follows its related entry", () => {
-    const link = showLink(MANUAL_SECTION.SUPPLY_DEMAND);
-    hover(link);
-    settle();
-    const help = preview()!;
-    expect(
-      within(help).getByRole("heading", { name: "Supply & Demand" }),
-    ).toBeVisible();
-    expect(help).toHaveTextContent("missing energy");
-    expect(within(help).queryByRole("heading", { name: "Cash" })).toBeNull();
-    expect(help).not.toHaveTextContent("Choose a preset");
-    fireEvent.click(within(help).getByRole("link", { name: "blackouts" }));
-    expect(store.getState().ui.manualHelpEntry).toBe(MANUAL_ENTRY.BLACKOUTS);
-  });
-
-  it("ignores a (?) that arrives beneath a mouse that hasn't moved", () => {
+  it("opens the requested entry only when clicked", () => {
     const link = showLink();
-    fireEvent.pointerEnter(link, { pointerType: "mouse" });
-    settle();
-    expect(preview()).toBeNull();
-    fireEvent.pointerMove(link, { pointerType: "mouse" });
-    settle();
-    expect(preview()).not.toBeNull();
-  });
-
-  it("keeps its open delay running while the mouse keeps moving", () => {
-    const link = showLink();
-    hover(link);
-    act(() => jest.advanceTimersByTime(200));
-    fireEvent.pointerMove(link, { pointerType: "mouse" });
-    act(() => jest.advanceTimersByTime(100));
-    expect(preview()).not.toBeNull();
-  });
-
-  it("consumes Escape before workspace navigation and suppresses hover until leaving", () => {
-    const link = showLink();
-    const workspaceEscape = jest.fn();
-    document.addEventListener("keydown", workspaceEscape);
-    try {
-      hover(link);
-      settle();
-      expect(preview()).not.toBeNull();
-      fireEvent.keyDown(document.body, { key: "Escape" });
-      settle();
-      expect(preview()).toBeNull();
-      expect(workspaceEscape).not.toHaveBeenCalled();
-      hover(link);
-      settle();
-      expect(preview()).toBeNull();
-      fireEvent.pointerLeave(link, { pointerType: "mouse" });
-      hover(link);
-      settle();
-      expect(preview()).not.toBeNull();
-    } finally {
-      document.removeEventListener("keydown", workspaceEscape);
-    }
-  });
-
-  it("leaves touch to the tap, which pins the entry open", () => {
-    const link = showLink();
-    fireEvent.pointerMove(link, { pointerType: "touch" });
-    settle();
-    expect(preview()).toBeNull();
     fireEvent.click(link);
     expect(store.getState().ui.manualHelpEntry).toBe(
       MANUAL_ENTRY.POWER_AND_ENERGY,
@@ -167,25 +99,19 @@ describe("ManualLink", () => {
     );
   });
 
-  it("gives way to the pinned entry when clicked mid-hover", () => {
+  it("keeps help closed after dismissal until another click", () => {
     const link = showLink();
-    hover(link);
     fireEvent.click(link);
-    settle();
-    expect(preview()).toBeNull();
-    // Closing the pinned entry with the mouse still on the (?) doesn't bring the preview back,
-    // though the browser reports the mouse entering it again as the backdrop goes
-    fireEvent.pointerLeave(link, { pointerType: "mouse" });
     act(() => {
       store.dispatch(manualHelpClose());
     });
     hover(link);
     settle();
     expect(preview()).toBeNull();
-    // Once the mouse has really left, hovering previews again
-    fireEvent.pointerLeave(link, { pointerType: "mouse" });
-    hover(link);
-    settle();
-    expect(preview()).not.toBeNull();
+    expect(store.getState().ui.manualHelpEntry).toBeUndefined();
+    fireEvent.click(link);
+    expect(store.getState().ui.manualHelpEntry).toBe(
+      MANUAL_ENTRY.POWER_AND_ENERGY,
+    );
   });
 });

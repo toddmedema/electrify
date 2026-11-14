@@ -376,7 +376,7 @@ for (const theme of ["light", "dark"] as const) {
         if (await help.count()) {
           const cells = await row.locator(":scope > *").all();
           await expect(cells[0].getByRole("button")).toBeVisible();
-          await expect(row).toHaveCSS("cursor", "pointer");
+          await expect(row).toHaveCSS("cursor", "help");
         }
       }
       if (kind === "Storage") {
@@ -447,7 +447,7 @@ for (const theme of ["light", "dark"] as const) {
         help.boundingBox(),
       ]);
       expect(helpBox!.x).toBeCloseTo(labelBox!.x, 0);
-      await expect(loanFact).toHaveCSS("cursor", "pointer");
+      await expect(loanFact).toHaveCSS("cursor", "help");
       expect((await loanFact.boundingBox())!.height).toBeGreaterThanOrEqual(
         testInfo.project.use.hasTouch ? 44 : 40,
       );
@@ -499,12 +499,12 @@ for (const theme of ["light", "dark"] as const) {
           });
         }
       }
-      // Keep the hover preview open while closing the purchase review. Both
-      // expose role=dialog, including during their independent exit transitions.
+      // Looking up loan help is an explicit action; hovering keeps the purchase review clear.
       await help.hover();
+      await page.waitForTimeout(600);
       await expect(
         page.getByRole("dialog", { name: "Manual preview", exact: true }),
-      ).toBeVisible();
+      ).toHaveCount(0);
       await dialog.getByRole("button", { name: "close", exact: true }).click();
       await expect(dialog).not.toBeVisible();
       await page
