@@ -449,6 +449,7 @@ export type TickPresentFutureType = Partial<FuelPricesType> &
     agreementUnusedExpenses?: number;
     /** Closing minimum payments keyed by the elapsed month they settle. */
     agreementClosingExpenses?: Record<string, number>;
+    territories?: Partial<Record<TerritoryId, TerritoryTick>>;
     minute: number;
     supplyW: number; // Watts
     availableSupplyW?: number; // Supply plus unused fuel-burning generation capacity
@@ -623,6 +624,7 @@ export interface FacilityMaintenanceObligationType {
 interface SharedOperatingType
   extends LoanInfo, LifetimeTotals, ConstructionEmissions {
   startingAssetId?: string;
+  territoryId?: TerritoryId;
   /** Transfer restrictions on inherited assets; absent means ordinary resale value. */
   cashBackMultiplier?: number;
   saleRestricted?: boolean;
@@ -1351,6 +1353,17 @@ export interface PeerSettlement {
 }
 export type UtilityId = "champlain" | "valley-electric" | "ridge-electric";
 export type UtilityTargetId = Exclude<UtilityId, "champlain">;
+export type TerritoryId = UtilityId | "green-uplands";
+/** Derived physical balance for one territory during a tick. Internal transfers are separate. */
+export interface TerritoryTick {
+  demandW: number;
+  supplyW: number;
+  generationW: number;
+  importedW: number;
+  exportedW: number;
+  unservedW: number;
+  curtailedW: number;
+}
 export interface AcquisitionLoan {
   id: string;
   targetId: UtilityTargetId;
@@ -1427,6 +1440,7 @@ export interface LegacyCampaignType {
 }
 
 export interface GameType {
+  territoryNetwork?: { version: 1 };
   utilityExpansion?: UtilityExpansionState;
   /** Isolated co-op grid; never publish its score or run the single-player clock/effects. */
   multiplayer?: {

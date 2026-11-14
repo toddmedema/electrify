@@ -65,14 +65,16 @@ export const TRANSMISSION_PROFILE_DATA = {
   "us-vermont-expansion": [
     [
       ["vt-valley-pool","Valley Electric","Connect to Valley Electric near Rutland. A completed connection unlocks acquisition.",60,600000000,600000000,"PEAK_SHARING"],
-      ["vt-ridge-pool","Ridge Electric","Connect to Ridge Electric near White River Junction. A completed connection unlocks acquisition.",60,600000000,600000000,"PEAK_SHARING"]
+      ["vt-ridge-pool","Ridge Electric","Connect to Ridge Electric near White River Junction. A completed connection unlocks acquisition.",60,600000000,600000000,"PEAK_SHARING"],
+      ["vt-uplands-development","Green Uplands","Undeveloped land for wind, solar and storage. This connection carries your own power, with no external market supply.",0,0,0,"PEAK_SHARING"]
     ],
     [
-      ["vt-champlain-regional","vt-valley-pool","Champlain regional connection","EXISTING",300000000,0,0,0,28,0.01,0.03],
-      ["vt-valley-regional","vt-valley-pool","Valley regional connection","EXISTING",350000000,0,0,0,28,0.01,0.03],
-      ["vt-ridge-regional","vt-valley-pool","Ridge regional connection","EXISTING",60000000,0,0,0,28,0.01,0.03],
-      ["vt-champlain-valley","vt-valley-pool","Valley expansion connection","NEW",100000000,60000000,1200000,2,28,0.01,0.03],
-      ["vt-champlain-ridge","vt-ridge-pool","Ridge expansion connection","NEW",100000000,70000000,1400000,2.5,28,0.01,0.03]
+      ["vt-champlain-regional","vt-valley-pool","Champlain ↔ Regional grid","EXISTING",300000000,0,0,0,28,0.01,0.03],
+      ["vt-valley-regional","vt-valley-pool","Valley ↔ Regional grid","EXISTING",350000000,0,0,0,28,0.01,0.03],
+      ["vt-ridge-regional","vt-valley-pool","Ridge ↔ Regional grid","EXISTING",60000000,0,0,0,28,0.01,0.03],
+      ["vt-champlain-valley","vt-valley-pool","Champlain ↔ Valley","NEW",100000000,60000000,1200000,2,28,0.01,0.03],
+      ["vt-champlain-ridge","vt-ridge-pool","Champlain ↔ Ridge","NEW",100000000,70000000,1400000,2.5,28,0.01,0.03],
+      ["vt-champlain-uplands","vt-uplands-development","Champlain ↔ Green Uplands","NEW",120000000,48000000,960000,2,28,0.01,0.03]
     ]
   ],
   "us-isone": [
