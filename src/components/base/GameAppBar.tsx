@@ -562,7 +562,7 @@ export function GameAppBar(props: Props) {
           aria-label={`Current grid status: ${gridHealth.label}, ${gridHealth.metric}`}
         >
           <StatusReadout
-            className="gridHealthSummary"
+            className="gridHealthSummary manual-help-action"
             textClassName="gridHealthMetric"
             concept={
               inBlackout

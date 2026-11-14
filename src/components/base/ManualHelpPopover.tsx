@@ -53,8 +53,7 @@ interface ContentProps {
   scrollRef?: React.Ref<HTMLDivElement>;
 }
 
-// One entry's title, close button and scrolling body. Shared by the popover a tap pins open and
-// the preview a mouse opens on hover (see ManualLink)
+// One entry's title, close button and scrolling body.
 export function ManualHelpContent(props: ContentProps): React.JSX.Element {
   const { entry, onClose, onRelated } = props;
   return (
