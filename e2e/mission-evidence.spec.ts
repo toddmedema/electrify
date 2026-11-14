@@ -405,10 +405,6 @@ test("projected sample evidence and a deliberate purchase retain the bounded inv
   // A shortfall later in the sampled day replaces the reassuring reserve reading.
   const grid = page.locator(".gridHealth:visible");
   await expect(grid).toHaveClass(/gridHealth-blackout-ahead/);
-  await reviewScreenshot(page.locator("#appbar:visible"), {
-    path: info.outputPath("blackout-copy.png"),
-    animations: "disabled",
-  });
   if (info.project.name === "mobile-390px") {
     const warning = grid.getByRole("button", {
       name: /^Current grid status: Blackout at \d+ [AP]M, .+ short$/,
@@ -424,6 +420,15 @@ test("projected sample evidence and a deliberate purchase retain the bounded inv
     await expect(grid).toContainText(/Blackout at/);
     await expect(grid).toHaveClass(/statusWarning/);
   }
+  await reviewScreenshot(
+    info.project.name === "mobile-390px"
+      ? page
+      : page.locator("#appbar:visible"),
+    {
+      path: info.outputPath("blackout-copy.png"),
+      animations: "disabled",
+    },
+  );
   await expect(page.locator(".missionRiskButton:visible")).not.toContainText(
     /shortfall/i,
   );
