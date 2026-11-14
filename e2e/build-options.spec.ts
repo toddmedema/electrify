@@ -141,6 +141,7 @@ for (const theme of ["light", "dark"] as const) {
         });
         expect(gap).toBeCloseTo(8, 0);
       }
+      await expect(page.locator(".buildGridEvidence")).toHaveCount(0);
       const first = cards.first();
       await expect(first).toBeVisible();
       await expect(first).not.toContainText("Construction emissions");
@@ -419,6 +420,40 @@ for (const theme of ["light", "dark"] as const) {
       await expect(page.getByRole("dialog", { name: /^Build / })).toBeVisible();
       const dialog = page.getByRole("dialog", { name: /^Build / });
       await expectContinuousDialogSurface(dialog);
+      for (const row of await dialog
+        .getByRole("region", { name: "Expected impact", exact: true })
+        .locator(".decisionImpactFact")
+        .all()) {
+        await expect(row.locator(":scope > .conceptIcon")).toBeVisible();
+      }
+      const impact = dialog.locator(".buildImpact");
+      await impact.locator("summary").click();
+      await expect(
+        impact.getByRole("region", { name: "Next-year grid impact" }),
+      ).toContainText("→");
+      await expect(
+        impact.getByRole("img", { name: /Estimated monthly supply margin/ }),
+      ).toBeVisible();
+      await expect(impact).toContainText("Before building");
+      await expect(impact).toContainText("After building");
+      await expect(impact).not.toContainText("Infinity");
+      if (
+        kind === "Generator" &&
+        ((theme === "light" && testInfo.project.name === "desktop-chromium") ||
+          (theme === "dark" && testInfo.project.name === "mobile-390px"))
+      ) {
+        if (testInfo.project.name === "mobile-390px") {
+          await impact
+            .getByRole("img", { name: /Estimated monthly supply margin/ })
+            .scrollIntoViewIfNeeded();
+        }
+        await reviewScreenshot(dialog, {
+          path: testInfo.outputPath("build-grid-impact.png"),
+          animations: "disabled",
+        });
+      }
+      await impact.locator("summary").click();
+
       const cashValue = dialog
         .locator(".decisionImpactFact")
         // Generators call it the cash option; storage still calls it a cash purchase

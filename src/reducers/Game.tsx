@@ -2730,6 +2730,32 @@ export function previewUtilityAcquisition(
   };
 }
 
+/** Compare physical grid outcomes using the same construction and dispatch owners as a purchase. */
+export function previewFacilityBuild(
+  game: GameType,
+  facility: FacilityShoppingType,
+) {
+  const snapshot = cloneDeep(isDraft(game) ? current(game) : game);
+  const now = getTimeFromTimeline(snapshot.date.minute, snapshot.timeline);
+  if (!now) throw new Error("No current simulation tick");
+  const cash = now.cash;
+  const customers = now.customers;
+  // Hourly samples retain each month's representative day without blocking the purchase review.
+  const ticks = (TICKS_PER_YEAR * TICK_MINUTES) / 60;
+  const before = generateForecastTimeline(snapshot, cash, customers, ticks, 60);
+  const hydroSite = isConventionalHydro(facility)
+    ? getHydroAvailability(snapshot, facility.peakW).selected
+    : undefined;
+  buildFacilityHelper(
+    snapshot,
+    { ...facility, ...(hydroSite ? { hydroSiteId: hydroSite.id } : {}) },
+    false,
+  );
+  // Compare the grid at the same starting balance: financing is a separate payment choice.
+  const after = generateForecastTimeline(snapshot, cash, customers, ticks, 60);
+  return { before, after };
+}
+
 function refreshInterestRate(
   state: GameType,
   cash: number,

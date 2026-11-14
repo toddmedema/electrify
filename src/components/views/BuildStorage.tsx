@@ -36,6 +36,7 @@ import {
   getSiteInventory,
   siteCountLabel,
 } from "../base/BuildAvailability";
+import BuildImpact from "../base/BuildImpact";
 import BuildMetric from "../base/BuildMetric";
 import {
   formatLargeMassValueConcise,
@@ -60,6 +61,7 @@ function storageBuildSummary(storage: StorageShoppingType): string {
 }
 
 interface StorageBuildItemProps {
+  game: GameType;
   cash: number;
   interestRate: number;
   location?: LocationType;
@@ -222,6 +224,9 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
         loanMonths={facilityLoanMonths(storage.lifespanYears)}
         cashDisabled={!buildable}
         loanDisabled={!buildable}
+        afterFacts={
+          open && <BuildImpact game={props.game} facility={storage} />
+        }
         upkeepPerMonth={storage.annualOperatingCost / 12}
         upkeepDetail="Plus charging and loan payments."
         onlineInMonths={Math.round(storage.yearsToBuild * 12)}
@@ -348,6 +353,7 @@ function StorageBuildDialog(props: Props): React.JSX.Element {
       <List ref={listRef} dense className="scrollable cardList">
         {storage.map((g: StorageShoppingType) => (
           <StorageBuildItem
+            game={game}
             storage={g}
             key={g.name}
             cash={cash}

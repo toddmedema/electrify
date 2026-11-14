@@ -1,4 +1,3 @@
-import { useBuildGridEvidence } from "../base/BuildForecast";
 import { intertieApprovedMessage } from "../../helpers/BuildConsequences";
 import * as React from "react";
 import { useToolScroll } from "../base/GameToolMemory";
@@ -41,7 +40,6 @@ export default function BuildFacilities({
   category?: string;
 }): React.JSX.Element {
   const dispatch = useAppDispatch();
-  const gridEvidence = useBuildGridEvidence();
   const closeTool = React.useContext(GameToolCloseContext);
   const completeBuild = React.useContext(GameBuildCompleteContext);
   const game = useAppSelector((state) => state.game);
@@ -80,7 +78,6 @@ export default function BuildFacilities({
       id={embedded ? undefined : "topbar"}
       className="flexContainer screenCatalog buildFacilities"
     >
-      {gridEvidence}
       <header className="constructionHeader">
         {!embedded && (
           <CatalogTitleBar

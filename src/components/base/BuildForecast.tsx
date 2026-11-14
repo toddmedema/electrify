@@ -5,13 +5,9 @@ import type { GameType } from "../../Types";
 import { signature } from "./DeferredProjection";
 import type { BuildForecast } from "./OutlookForecast";
 import { useOutlookWorker } from "./useOutlookWorker";
-import { useGameWorkspaceLayout } from "./GameWorkspaceContext";
-import { formatWatts } from "../../helpers/Format";
-import ChartSupplyDemand from "./ChartSupplyDemand";
 
 const BuildForecastContext = React.createContext<
-  | { forecast: BuildForecast | undefined; gridEvidence: React.ReactNode }
-  | undefined
+  { forecast: BuildForecast | undefined } | undefined
 >(undefined);
 
 function buildForecastKey(game: GameType): string | undefined {
@@ -29,16 +25,7 @@ function buildForecastKey(game: GameType): string | undefined {
 export function BuildForecastProvider(props: { children: React.ReactNode }) {
   const game = useAppSelector((state) => state.game);
   const forecast = useOutlookWorker("build", buildForecastKey(game), game);
-  const workspace = useGameWorkspaceLayout();
-  const showGridEvidence = workspace?.fleetVisible === false;
-  const gridEvidence = React.useMemo(
-    () => (showGridEvidence ? <BuildGridEvidence game={game} /> : null),
-    [showGridEvidence, game],
-  );
-  const value = React.useMemo(
-    () => ({ forecast, gridEvidence }),
-    [forecast, gridEvidence],
-  );
+  const value = React.useMemo(() => ({ forecast }), [forecast]);
   return (
     <BuildForecastContext.Provider value={value}>
       {props.children}
@@ -55,30 +42,4 @@ export function useBuildForecast(game: GameType): BuildForecast | undefined {
     game,
   );
   return shared ? shared.forecast : local;
-}
-
-/** Reuse the live grid's forecast and accessible chart when Fleet is outside the active view. */
-function BuildGridEvidence({ game }: { game: GameType }) {
-  const now = currentTick(game);
-  if (!now) return null;
-  return (
-    <details className="buildGridEvidence">
-      <summary>
-        Current grid · {formatWatts(now.supplyW)} supply ·{" "}
-        {formatWatts(now.demandW)} demand
-      </summary>
-      <p>Supply and demand forecast</p>
-      <ChartSupplyDemand
-        timeline={game.timeline}
-        currentMinute={game.date.minute}
-        location={game.location}
-        startingYear={game.startingYear}
-        height={160}
-        legend
-      />
-    </details>
-  );
-}
-export function useBuildGridEvidence(): React.ReactNode {
-  return React.useContext(BuildForecastContext)?.gridEvidence ?? null;
 }

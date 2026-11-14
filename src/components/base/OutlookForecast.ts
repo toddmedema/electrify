@@ -7,8 +7,15 @@ import {
 import {
   generateForecastTimeline,
   generateResourceForecast,
+  previewFacilityBuild,
 } from "../../reducers/Game";
-import type { GameType, TickPresentFutureType } from "../../Types";
+import type {
+  FacilityShoppingType,
+  GameType,
+  TickPresentFutureType,
+} from "../../Types";
+import { MINUTES_PER_MONTH } from "../../helpers/DateTime";
+import { forecastShortfalls } from "../../helpers/ForecastShortfalls";
 import type { OutputWeatherTick } from "../../helpers/ExpectedOutput";
 
 export interface BuildForecast {
@@ -47,7 +54,13 @@ export function forecastCutoffIndex(
   return first;
 }
 
+export interface BuildImpactForecast {
+  before: { monthlyMarginW: number[]; unservedWh: number };
+  after: { monthlyMarginW: number[]; unservedWh: number };
+}
+
 export interface OutlookResults {
+  buildImpact: BuildImpactForecast | undefined;
   build: BuildForecast | undefined;
   hydro: ReservoirOutlookPoint[] | undefined;
   intertie: IntertieForecastTick[] | undefined;
@@ -57,6 +70,7 @@ export interface OutlookRequest {
   requestId: number;
   kind: OutlookKind;
   game: GameType;
+  facility?: FacilityShoppingType;
 }
 export type OutlookReply = {
   requestId: number;
@@ -67,9 +81,34 @@ export type OutlookReply = {
 export function computeOutlook<K extends OutlookKind>(
   kind: K,
   game: GameType,
+  facility?: FacilityShoppingType,
 ): OutlookResults[K] {
   const now = currentTick(game);
   if (!now) return undefined;
+  if (kind === "buildImpact") {
+    if (!facility) return undefined;
+    const { before, after } = previewFacilityBuild(game, facility);
+    const summarize = (timeline: TickPresentFutureType[]) => {
+      const monthlyMarginW = Array<number>(12).fill(Infinity);
+      for (const tick of timeline) {
+        const month = Math.floor(
+          (tick.minute - game.date.minute) / MINUTES_PER_MONTH,
+        );
+        monthlyMarginW[month] = Math.min(
+          monthlyMarginW[month],
+          tick.reserveW ?? tick.supplyW - tick.demandW,
+        );
+      }
+      return {
+        monthlyMarginW,
+        unservedWh: forecastShortfalls(timeline, 60, 0).blackoutTotalWh,
+      };
+    };
+    return {
+      before: summarize(before),
+      after: summarize(after),
+    } as OutlookResults[K];
+  }
   if (kind === "build") {
     let result = buildForecasts.get(game);
     if (!result) {

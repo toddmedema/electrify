@@ -6402,9 +6402,6 @@ $homeSmokeCycle: 5.6s;
   gap: 12px;
   grid-template-columns: 20px minmax(0, 1fr);
 }
-.decisionImpactFactMoney .decisionImpactFactContent {
-  grid-column: 2;
-}
 .decisionImpactFactContent {
   display: grid;
   grid-template-columns: minmax(100px, 0.7fr) minmax(0, 1.3fr);

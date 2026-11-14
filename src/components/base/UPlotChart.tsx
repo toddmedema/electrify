@@ -353,7 +353,7 @@ function containerChartHeight(
   // would make each ResizeObserver notification shrink it again.
   const viewport = root?.closest<HTMLElement>("[data-chart-viewport]");
   const block = root?.closest<HTMLElement>(
-    ".insightsTrack, .facilitySupplyChart, .buildGridEvidence",
+    ".insightsTrack, .facilitySupplyChart, .buildImpact",
   );
   const charts = block?.querySelectorAll<HTMLElement>(".accessibleChart");
   const plotHeight = charts
@@ -1211,6 +1211,7 @@ export default function UPlotChart<S>(
                     (plotRef.current?.cursor.left ?? -1) >= 0)
                 ) {
                   event.preventDefault();
+                  event.stopPropagation();
                   closeDetails();
                 } else if (event.key in points) {
                   event.preventDefault();

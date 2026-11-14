@@ -105,6 +105,7 @@ import BuildMetric from "../base/BuildMetric";
 import ConstructionBuildHeader from "../base/ConstructionBuildHeader";
 import useBuildRowReveal from "../base/useBuildRowReveal";
 import { getLegacyBuildBounds } from "../../data/LegacyEra";
+import BuildImpact from "../base/BuildImpact";
 import Sparkline from "../base/Sparkline";
 import InteractiveSparkline from "../base/InteractiveSparkline";
 
@@ -217,6 +218,7 @@ function typicalCapacityFactor(
 }
 
 interface GeneratorBuildItemProps {
+  game?: GameType;
   hydroAvailability?: ReturnType<typeof getHydroAvailability>;
   onDismissHydroPrimer?: () => void;
   onUseSiteMaximum?: (peakW: number) => void;
@@ -728,6 +730,10 @@ export function GeneratorBuildItem(
         loanMonths={facilityLoanMonths(quote.lifespanYears)}
         cashDisabled={!buildable}
         loanDisabled={!buildable}
+        afterFacts={
+          open &&
+          props.game && <BuildImpact game={props.game} facility={quote} />
+        }
         cashLabel="Cash option"
         upkeepLabel="Maintenance"
         upkeepPerMonth={estimatedAnnualOperatingCost(quote) / 12}
@@ -1232,6 +1238,7 @@ function BuildGenerators(props: Props): React.JSX.Element {
           return (
             <React.Fragment key={g.name}>
               <GeneratorBuildItem
+                game={game}
                 onDismissHydroPrimer={
                   showPrimer && g.name === "Hydro" ? dismissPrimer : undefined
                 }
