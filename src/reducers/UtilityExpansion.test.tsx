@@ -344,3 +344,25 @@ it.each([1, 2] as const)(
     expect(offers[0].capacityW + offers[1].capacityW).toBe(247e6);
   },
 );
+
+it("records each network renewal once at its effective month", () => {
+  const game = createGame({ scenarioId: 116, seed: 12345 });
+  for (const month of [119, 120, 120, 121, 179, 180, 180]) {
+    game.date = getDateFromMinute(month * MINUTES_PER_MONTH, 2005);
+    recordExpansionMilestones(game);
+  }
+  const renewals = game.eventLog.filter(
+    (event) => event.title === "Network upkeep increased",
+  );
+  expect(renewals).toHaveLength(2);
+  expect(renewals).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        message: expect.stringContaining("1.5× opening upkeep"),
+      }),
+      expect.objectContaining({
+        message: expect.stringContaining("2× opening upkeep"),
+      }),
+    ]),
+  );
+});

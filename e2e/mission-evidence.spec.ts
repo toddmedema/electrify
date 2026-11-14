@@ -133,7 +133,10 @@ for (const theme of ["light", "dark"]) {
     await risk.focus();
     await page.keyboard.press("Enter");
     await expect(
-      page.getByRole("region", { name: "Scenario", exact: true }),
+      page.getByRole("region", { name: "Insights", exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.locator('.insights:visible [data-layer="supplyDemand"]'),
     ).toBeVisible();
   });
 

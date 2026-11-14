@@ -156,7 +156,7 @@ export default function EventLog(props: Props): React.JSX.Element {
   const { evidenceRequest, facilityDragActive, onEvidenceReady } = props;
   const openedForEvidence = React.useRef(!!evidenceRequest);
   const evidenceAnchor = React.useRef<HTMLDivElement>(null);
-  const historyAnchor = React.useRef<HTMLDivElement>(null);
+  const historyAnchor = React.useRef<HTMLElement>(null);
   React.useEffect(() => {
     const request = evidenceRequest;
     if (
@@ -172,6 +172,7 @@ export default function EventLog(props: Props): React.JSX.Element {
     }
   }, [evidenceRequest, facilityDragActive, onEvidenceReady, operations]);
   const { events, onOpen, onSelect, upcoming = [], ongoing = [] } = props;
+  const laterUpcoming = operations ? upcoming.slice(1) : upcoming;
   const [historyFilters, setHistoryFilters] = React.useState<
     EventHistoryFilterType[]
   >(() => {
@@ -274,12 +275,8 @@ export default function EventLog(props: Props): React.JSX.Element {
             onEvidence={props.onEvidence}
           />
         )}
-        <div
-          id={operations ? "operationsHistory" : undefined}
-          ref={historyAnchor}
-          tabIndex={operations ? -1 : undefined}
-        >
-          {!operations && upcoming.length > 0 && (
+        <div>
+          {laterUpcoming.length > 0 && (
             <section
               className="eventLogSection upcomingEvents"
               aria-labelledby="upcomingEventsTitle"
@@ -290,7 +287,7 @@ export default function EventLog(props: Props): React.JSX.Element {
                   component="h3"
                   variant="subtitle2"
                 >
-                  Upcoming events
+                  {operations ? "More upcoming events" : "Upcoming events"}
                 </Typography>
               </header>
               {props.game?.multiplayer && (
@@ -303,7 +300,7 @@ export default function EventLog(props: Props): React.JSX.Element {
                 </Typography>
               )}
               <ul className="eventLogList">
-                {upcoming.map((event) => (
+                {laterUpcoming.map((event) => (
                   <StoryEventCard
                     className="upcoming"
                     event={event}
@@ -319,6 +316,9 @@ export default function EventLog(props: Props): React.JSX.Element {
             </section>
           )}
           <section
+            id={operations ? "operationsHistory" : undefined}
+            ref={historyAnchor}
+            tabIndex={operations ? -1 : undefined}
             className="eventLogSection eventHistory"
             aria-labelledby="eventHistoryTitle"
           >

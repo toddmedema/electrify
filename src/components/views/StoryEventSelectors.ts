@@ -1,6 +1,18 @@
+import {
+  UTILITY_AREAS,
+  UTILITY_NETWORK_RENEWAL_STAGES,
+} from "../../data/UtilityExpansion";
+import { utilityPlanning } from "../../helpers/UtilityPlanning";
+import {
+  connectionAgreements,
+  utilityOwnedAt,
+} from "../../helpers/PowerAgreements";
+import { formatWatts } from "../../helpers/Format";
 import { customEventContext } from "../../helpers/CustomScenarioEvents";
 import {
   AppStateType,
+  GameType,
+  UtilityId,
   ConceptNameType,
   GameEventImportanceType,
   StoryActionTargetType,
@@ -48,6 +60,73 @@ export function selectUpcomingStoryEvents(
   const events = computeUpcomingStoryEvents(state);
   lastGame = game;
   lastEvents = events;
+  return events;
+}
+
+/** Calendar changes formerly listed in scenario details use the shared event timeline. */
+function upcomingUtilityEvents(game: GameType): UpcomingStoryEventType[] {
+  const plan = utilityPlanning(game);
+  if (!plan) return [];
+  const dated = (startsMinute: number) => {
+    const date = getDateFromMinute(startsMinute, game.startingYear);
+    return { startsMinute, label: `Expected ${date.month} ${date.year}` };
+  };
+  const events: UpcomingStoryEventType[] = plan.supplyChanges.map((change) => ({
+    key: `utility:purchase:${change.utility}:${change.year}`,
+    ...dated((change.year - game.startingYear) * 12 * MINUTES_PER_MONTH),
+    title: `${change.utility} power purchases change`,
+    message: `${change.contracts
+      .map((source) =>
+        source.nominalW === 0
+          ? `${source.name} will end`
+          : `${source.name} will fall to ${formatWatts(source.nominalW * source.deliverability)} deliverable`,
+      )
+      .join(
+        "; ",
+      )}. Regional connections will remain available for market purchases.`,
+    concept: "forecast",
+    importance: "NOTABLE",
+    actionTarget: { card: "INSIGHTS", layer: "SUPPLY_DEMAND" },
+  }));
+  for (const stage of UTILITY_NETWORK_RENEWAL_STAGES) {
+    const startsMinute =
+      (stage.year - game.startingYear) * 12 * MINUTES_PER_MONTH;
+    if (startsMinute <= game.date.minute) continue;
+    events.push({
+      key: `utility:network:${stage.year}`,
+      ...dated(startsMinute),
+      title: "Network upkeep increasing",
+      message: `Network upkeep will rise to ${stage.multiplier}× opening upkeep, excluding customer growth and inflation.`,
+      concept: "finances",
+      importance: "NOTABLE",
+      actionTarget: { card: "INSIGHTS", layer: "FINANCES" },
+    });
+  }
+  for (const id of Object.keys(UTILITY_AREAS) as UtilityId[]) {
+    if (!utilityOwnedAt(game, id, game.date.minute)) continue;
+    for (const source of connectionAgreements(game, id).filter(
+      (agreement) => !agreement.inherited,
+    )) {
+      for (const [phase, startsMinute] of [
+        ["start", source.startMinute],
+        ["end", source.endMinute],
+      ] as const) {
+        if (startsMinute <= game.date.minute) continue;
+        events.push({
+          key: `utility:agreement:${source.id}:${phase}`,
+          ...dated(startsMinute),
+          title: `${UTILITY_AREAS[id].name}: ${source.name} ${phase === "start" ? "begins" : "ends"}`,
+          message:
+            phase === "start"
+              ? `Signed replacement coverage of ${formatWatts(source.nominalW * source.deliverability)} will begin on the existing regional connection.`
+              : `Signed replacement coverage of ${formatWatts(source.nominalW * source.deliverability)} will end. The regional connection will remain available for market purchases.`,
+          concept: phase === "start" ? "supply" : "forecast",
+          importance: "NOTABLE",
+          actionTarget: { card: "INSIGHTS", layer: "SUPPLY_DEMAND" },
+        });
+      }
+    }
+  }
   return events;
 }
 
@@ -108,6 +187,8 @@ function computeUpcomingStoryEvents(
     game.startingYear,
     game.location.id,
     JSON.stringify(game.loadAdditions),
+    JSON.stringify(game.utilityExpansion?.acquisitions),
+    JSON.stringify(game.transmission?.acceptedAgreements),
     JSON.stringify(customEvents),
     JSON.stringify(
       game.worldEvents.occurrences.map((event) => [
@@ -208,6 +289,7 @@ function computeUpcomingStoryEvents(
       actionTarget: { card: "INSIGHTS", layer: "SUPPLY_DEMAND" },
     });
   }
+  events.push(...upcomingUtilityEvents(game));
   events.sort((a, b) => (a.startsMinute ?? 0) - (b.startsMinute ?? 0));
   upcomingCache = { key, events };
   return events;
