@@ -311,6 +311,8 @@ function renderFacilities(
   const view = render(<ControlledFacilities game={game} />, {
     wrapper: ({ children }) => <Provider store={store}>{children}</Provider>,
   });
+  if (game.territoryNetwork)
+    fireEvent.click(screen.getByRole("tab", { name: "Fleet", exact: true }));
   return {
     ...handlers,
     rerenderGame: (next) => view.rerender(<ControlledFacilities game={next} />),

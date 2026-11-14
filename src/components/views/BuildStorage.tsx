@@ -1,3 +1,12 @@
+import TerritoryBuildDestination, {
+  useTerritoryBuildDestination,
+  territoryName,
+} from "../base/TerritoryBuildDestination";
+import {
+  hasTerritoryNetwork,
+  territoryBuildAvailability,
+} from "../../helpers/Territories";
+import type { TerritoryId } from "../../Types";
 import { GameBuildCompleteContext } from "../base/GameWorkspaceContext";
 import * as React from "react";
 import {
@@ -65,6 +74,8 @@ interface StorageBuildItemProps {
   location?: LocationType;
   storage: StorageShoppingType;
   minimumBuildCost: number;
+  territoryAvailability?: ReturnType<typeof territoryBuildAvailability>;
+  territoryId?: TerritoryId;
   onUseMaxSize: (peakWh: number) => void;
   onBuild: (financed: boolean) => void;
 }
@@ -88,8 +99,16 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
       .downpayment,
   );
   const sizeBuildable = props.storage.peakWh <= props.storage.maxPeakWh;
-  const maxSizeWh = floorToTwoSignificantDigits(storage.maxPeakWh);
-  const { buildable, secondaryText, offerMaxSize } = getBuildAvailability({
+  const maxSizeWh = floorToTwoSignificantDigits(
+    Math.min(
+      storage.maxPeakWh,
+      props.territoryAvailability
+        ? (props.territoryAvailability.maxPeakW * storage.peakWh) /
+            storage.peakW
+        : Infinity,
+    ),
+  );
+  const generalAvailability = getBuildAvailability({
     name: storage.name,
     description: storage.description,
     available: storage.available,
@@ -98,6 +117,18 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
     location: props.location,
     viableLocationsRemaining: storage.viableLocationsRemaining,
   });
+  const buildable =
+    generalAvailability.buildable &&
+    (props.territoryAvailability?.buildable ?? true);
+  const secondaryText =
+    props.territoryAvailability && !props.territoryAvailability.buildable
+      ? props.territoryAvailability.reason
+      : generalAvailability.secondaryText;
+  const offerMaxSize =
+    generalAvailability.offerMaxSize ||
+    (props.territoryAvailability &&
+      storage.peakWh > maxSizeWh &&
+      maxSizeWh > 0);
   const sites = getSiteInventory(
     storage.name,
     props.location,
@@ -132,7 +163,13 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
           </Button>
         )
       }
-      context={buildable && sites ? siteCountLabel(sites) : undefined}
+      context={
+        props.territoryAvailability
+          ? `${props.territoryAvailability.remaining} open-land sites left · ${formatWatts(props.territoryAvailability.maxPeakW)} max power per project`
+          : buildable && sites
+            ? siteCountLabel(sites)
+            : undefined
+      }
       summary={
         <Typography
           className="buildOptionDescription"
@@ -216,6 +253,14 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
         open={open}
         onClose={() => setOpen(false)}
         title={`Build ${formatWattHours(storage.peakWh)} ${displayName}?`}
+        preface={
+          props.territoryId && (
+            <Typography sx={{ px: 2, mb: 2 }}>
+              Build in {territoryName(props.territoryId)}. Storage charges and
+              supplies customers in its territory.
+            </Typography>
+          )
+        }
         cash={cash}
         buildCost={storage.buildCost}
         interestRate={props.interestRate}
@@ -280,7 +325,11 @@ export interface StateProps {
 }
 
 export interface DispatchProps {
-  onBuildStorage: (storage: StorageShoppingType, financed: boolean) => void;
+  onBuildStorage: (
+    storage: StorageShoppingType,
+    financed: boolean,
+    territoryId?: TerritoryId,
+  ) => void;
   onBack: () => void;
 }
 
@@ -289,6 +338,8 @@ export type Props = StateProps & DispatchProps;
 function StorageBuildDialog(props: Props): React.JSX.Element {
   const completeBuild = React.useContext(GameBuildCompleteContext);
   const { game, onBack } = props;
+  const [territoryId, setTerritoryId] = useTerritoryBuildDestination();
+  const territoryNetwork = hasTerritoryNetwork(game);
   const now = getTimeFromTimeline(game.date.minute, game.timeline);
   const readCash = useBuildCashReader(now?.cash ?? 0);
   const listRef = useToolScroll<HTMLUListElement>("storage.scroll");
@@ -326,6 +377,13 @@ function StorageBuildDialog(props: Props): React.JSX.Element {
 
   return (
     <div className="flexContainer screenCatalog">
+      {territoryNetwork && (
+        <TerritoryBuildDestination
+          game={game}
+          value={territoryId}
+          onChange={setTerritoryId}
+        />
+      )}
       <ConstructionBuildHeader
         capacity={`${valueLabelFormat(sliderTick)}h`}
         sliderValue={sliderTick}
@@ -349,6 +407,12 @@ function StorageBuildDialog(props: Props): React.JSX.Element {
         {storage.map((g: StorageShoppingType) => (
           <StorageBuildItem
             storage={g}
+            territoryId={territoryNetwork ? territoryId : undefined}
+            territoryAvailability={
+              territoryNetwork
+                ? territoryBuildAvailability(game, g, territoryId)
+                : undefined
+            }
             key={g.name}
             cash={cash}
             minimumBuildCost={
@@ -373,7 +437,9 @@ function StorageBuildDialog(props: Props): React.JSX.Element {
             interestRate={game.interestRate}
             location={game.location}
             onBuild={(financed: boolean) => {
-              props.onBuildStorage(g, financed);
+              if (territoryNetwork)
+                props.onBuildStorage(g, financed, territoryId);
+              else props.onBuildStorage(g, financed);
               (completeBuild ?? onBack)();
             }}
           />

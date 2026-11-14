@@ -46,6 +46,10 @@ for (const theme of ["light", "dark"] as const) {
     const facilities = page.locator(".facilities:visible");
     await expect(facilities.locator(".acquiredUtilities")).toHaveCount(0);
     await expect(
+      facilities.getByRole("region", { name: "Territory network" }),
+    ).toBeVisible();
+    await facilities.getByRole("tab", { name: "Fleet", exact: true }).click();
+    await expect(
       facilities.getByRole("button", {
         name: "Inspect Oil A",
         exact: true,
@@ -243,6 +247,15 @@ for (const theme of ["light", "dark"] as const) {
       "Valley Electric",
       "Ridge Electric",
     ].entries()) {
+      await facilities
+        .getByRole("tab", { name: "Network", exact: true })
+        .click();
+      await facilities
+        .getByRole("button", {
+          name: `Inspect ${target} territory`,
+          exact: true,
+        })
+        .click();
       const line = facilities.locator(
         `.transmissionLine[data-corridor-id="vt-champlain-${index === 0 ? "valley" : "ridge"}"]`,
       );
@@ -454,6 +467,9 @@ for (const theme of ["light", "dark"] as const) {
       await page.keyboard.press("Enter");
       await expect(dialog).toHaveCount(0);
       await expect(line).toHaveCount(0);
+      await facilities
+        .getByRole("tab", { name: "Network", exact: true })
+        .click();
       const ownership = facilities.locator(".acquiredUtilities");
       const summary = ownership.locator("summary");
       await expect(summary).toHaveText(`Acquired utilities (${index + 1})`);
@@ -584,6 +600,7 @@ for (const theme of ["light", "dark"] as const) {
         facilities,
         page.getByRole("button", { name: "Facilities", exact: true }),
       );
+      await facilities.getByRole("tab", { name: "Fleet", exact: true }).click();
       await expect(
         facilities.getByRole("button", {
           name: `Inspect ${index === 0 ? "Valley" : "Ridge"} Oil`,
@@ -611,6 +628,9 @@ for (const theme of ["light", "dark"] as const) {
       ).toBeLessThanOrEqual(1);
     }
     // The inherited regional connections remain external market access after acquisition.
+    await facilities
+      .getByRole("tab", { name: "Agreements", exact: true })
+      .click();
     await expect(
       facilities.getByRole("combobox", { name: "Market buying", exact: true }),
     ).toBeVisible();
@@ -666,12 +686,20 @@ for (const theme of ["light", "dark"] as const) {
       });
     }
     await summary.click();
-    // Acquired plants and customers use the ordinary shared company controls.
+    // Acquired plants use the existing purchase controls with an explicit local destination.
     await openBuild(page);
     await page.getByRole("tab", { name: "Generators", exact: true }).click();
     await expect(
       page.getByRole("combobox", { name: "Operating area", exact: true }),
     ).toHaveCount(0);
+    const destination = page.getByRole("combobox", {
+      name: "Build destination",
+      exact: true,
+    });
+    await destination.click();
+    await page
+      .getByRole("option", { name: "Valley Electric", exact: true })
+      .click();
     await page.getByRole("slider").first().press("Home");
     await page
       .getByRole("button", { name: "Review purchase of Solar", exact: true })
@@ -682,7 +710,9 @@ for (const theme of ["light", "dark"] as const) {
       .click();
     expect(
       (await readSavedGame(page))?.facilities.some(
-        (facility) => facility.name === "Solar",
+        (facility) =>
+          facility.name === "Solar" &&
+          facility.territoryId === "valley-electric",
       ),
     ).toBe(true);
     await openBuild(page);
@@ -751,9 +781,14 @@ for (const theme of ["light", "dark"] as const) {
           exact: true,
         }),
       ).toBeVisible();
+    }
+    await facilities
+      .getByRole("tab", { name: "Agreements", exact: true })
+      .click();
+    for (const target of ["Valley Electric", "Ridge Electric"]) {
       await expect(
         facilities.getByRole("button", {
-          name: new RegExp(`^Inspect ${target} regional connection`),
+          name: new RegExp(`^Inspect ${target} ↔ Regional grid`),
         }),
       ).toBeVisible();
     }

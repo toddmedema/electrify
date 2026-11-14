@@ -1934,7 +1934,7 @@ export const SCENARIOS: ScenarioType[] = [
     locationId: "BurlingtonVT",
     location: UTILITY_AREAS.champlain.location,
     summary:
-      "Connect to your neighbors, acquire a utility, and keep your larger company supplied.",
+      "Connect across the valley, acquire a utility, and build a network that can deliver power to every territory.",
     threat:
       "Network upkeep rises in 2015 and 2020, and the power purchase limit shrinks in 2017.",
     themes: ["Rapid growth"],

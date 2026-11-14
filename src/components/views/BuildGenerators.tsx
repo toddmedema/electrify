@@ -1,3 +1,12 @@
+import TerritoryBuildDestination, {
+  useTerritoryBuildDestination,
+  territoryName,
+} from "../base/TerritoryBuildDestination";
+import {
+  hasTerritoryNetwork,
+  territoryBuildAvailability,
+} from "../../helpers/Territories";
+import type { TerritoryId } from "../../Types";
 import {
   GameBuildCompleteContext,
   useGameWorkspaceLayout,
@@ -234,6 +243,8 @@ interface GeneratorBuildItemProps {
   outputShape?: ExpectedOutputShape;
   outputCeiling?: number;
   forecastPending?: boolean;
+  territoryAvailability?: ReturnType<typeof territoryBuildAvailability>;
+  territoryId?: TerritoryId;
   compared?: boolean;
   compareDisabled?: boolean;
   onCompare?: () => void;
@@ -284,8 +295,13 @@ export function GeneratorBuildItem(
   );
   const includedOptions = resilienceOptions.filter((option) => option.selected);
   const sizeBuildable = props.generator.peakW <= props.generator.maxPeakW;
-  const maxSizeW = floorToTwoSignificantDigits(generator.maxPeakW);
-  const { buildable, secondaryText, offerMaxSize } = getBuildAvailability({
+  const maxSizeW = floorToTwoSignificantDigits(
+    Math.min(
+      generator.maxPeakW,
+      props.territoryAvailability?.maxPeakW ?? Infinity,
+    ),
+  );
+  const generalAvailability = getBuildAvailability({
     hydroAvailability: props.hydroAvailability,
     name: generator.name,
     description: generator.description,
@@ -295,6 +311,16 @@ export function GeneratorBuildItem(
     location: props.location,
     viableLocationsRemaining: generator.viableLocationsRemaining,
   });
+  const buildable =
+    generalAvailability.buildable &&
+    (props.territoryAvailability?.buildable ?? true);
+  const secondaryText =
+    props.territoryAvailability && !props.territoryAvailability.buildable
+      ? props.territoryAvailability.reason
+      : generalAvailability.secondaryText;
+  const offerMaxSize =
+    generalAvailability.offerMaxSize ||
+    (props.territoryAvailability && generator.peakW > maxSizeW && maxSizeW > 0);
   const sites = props.hydroAvailability
     ? undefined
     : getSiteInventory(
@@ -457,8 +483,10 @@ export function GeneratorBuildItem(
     : useSiteMaximumAction || useMaxSizeAction;
   const context = (
     <>
-      {role}
-      {sites && sites.remaining > 0 && (
+      {props.territoryAvailability
+        ? `${props.territoryAvailability.remaining} local sites left · ${formatWatts(maxSizeW)} max per project`
+        : role}
+      {!props.territoryAvailability && sites && sites.remaining > 0 && (
         <>
           {" · "}
           <span className="nowrap">{siteCountLabel(sites)}</span>
@@ -738,6 +766,12 @@ export function GeneratorBuildItem(
         }}
         preface={
           <>
+            {props.territoryId && (
+              <Typography variant="body2" sx={{ px: 2, mb: 2 }}>
+                Build in {territoryName(props.territoryId)}. Output serves local
+                customers first; transfers share the territory connection.
+              </Typography>
+            )}
             {props.hydroAvailability?.selected && (
               <Typography variant="body2" sx={{ px: 2, mb: 2 }}>
                 {props.hydroAvailability.selected.name} ·{" "}
@@ -940,6 +974,7 @@ export interface DispatchProps {
   onBuildGenerator: (
     generator: GeneratorShoppingType,
     financed: boolean,
+    territoryId?: TerritoryId,
   ) => void;
   onBack: () => void;
   onSizeChange?: () => void;
@@ -955,6 +990,8 @@ function BuildGenerators(props: Props): React.JSX.Element {
   const { evidenceRequest, facilityDragActive, onEvidenceReady } = props;
   const evidenceAnchor = React.useRef<HTMLDivElement>(null);
   const { game, onBack } = props;
+  const [territoryId, setTerritoryId] = useTerritoryBuildDestination();
+  const territoryNetwork = hasTerritoryNetwork(game);
   const legacyBounds = getLegacyBuildBounds(game);
   const minTick = legacyBounds ? wToSliderTick(legacyBounds.minW) : 0;
   const maxTick = legacyBounds ? wToSliderTick(legacyBounds.maxW) : 34;
@@ -1189,6 +1226,13 @@ function BuildGenerators(props: Props): React.JSX.Element {
             No generator matches this fuel and size. Showing other options.
           </Typography>
         )}
+      {territoryNetwork && (
+        <TerritoryBuildDestination
+          game={game}
+          value={territoryId}
+          onChange={setTerritoryId}
+        />
+      )}
       <ConstructionBuildHeader
         capacity={valueLabelFormat(shownSliderTick)}
         sliderValue={shownSliderTick}
@@ -1288,6 +1332,12 @@ function BuildGenerators(props: Props): React.JSX.Element {
                 location={game.location}
                 interestRate={game.interestRate}
                 generator={g}
+                territoryId={territoryNetwork ? territoryId : undefined}
+                territoryAvailability={
+                  territoryNetwork
+                    ? territoryBuildAvailability(game, g, territoryId)
+                    : undefined
+                }
                 minimumBuildCost={
                   withResilienceOptions(
                     minimumGenerators.find((item) => item.name === g.name)!,
@@ -1313,7 +1363,9 @@ function BuildGenerators(props: Props): React.JSX.Element {
                     selection === undefined
                       ? g
                       : withResilienceOptions(g, game, selection);
-                  props.onBuildGenerator(selected, financed);
+                  if (territoryNetwork)
+                    props.onBuildGenerator(selected, financed, territoryId);
+                  else props.onBuildGenerator(selected, financed);
                   (completeBuild ?? onBack)();
                 }}
               />

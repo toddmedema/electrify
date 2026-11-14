@@ -1,3 +1,10 @@
+import TerritoryNetwork from "./TerritoryNetwork";
+import {
+  hasTerritoryNetwork,
+  facilityTerritoryId,
+} from "../../helpers/Territories";
+import { territoryName } from "../base/TerritoryBuildDestination";
+import type { TerritoryId } from "../../Types";
 import {
   getInterfaceScale,
   subscribeInterfaceScale,
@@ -14,6 +21,8 @@ import {
   ListItemAvatar,
   Tooltip,
   Typography,
+  Tab,
+  Tabs,
 } from "@mui/material";
 import CheckIcon from "@mui/icons-material/Check";
 import ConfirmDialog from "../base/ConfirmDialog";
@@ -673,6 +682,11 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                       <span className="facilityName">
                         {facilityDisplayName(facility)}
                       </span>
+                      {hasTerritoryNetwork(game) && (
+                        <span className="facilityTerritoryLabel">
+                          {territoryName(facilityTerritoryId(facility))}
+                        </span>
+                      )}
                       {ready && (
                         <span className="facilityReadyLabel">Ready</span>
                       )}
@@ -935,7 +949,12 @@ export interface DispatchProps {
   ) => void;
   onSelect: (id: FacilityOperatingType["id"] | null) => void;
   onStorageBuild: () => void;
-  onTransmissionBuild: (corridorId: string, financed: boolean) => void;
+  onBuildForTerritory?: (id: TerritoryId, storage: boolean) => void;
+  onTransmissionBuild: (
+    corridorId: string,
+    financed: boolean,
+    tier?: number,
+  ) => void;
   onTransmissionCancel?: (id: number) => void;
   onTransmissionPause?: (id: number, name: string, paused: boolean) => void;
   onTransmissionUpgrade: (corridorId: string, financed: boolean) => void;
@@ -949,6 +968,7 @@ export interface DispatchProps {
 export interface Props extends StateProps, DispatchProps {}
 
 interface SelectionState {
+  territoryView: "network" | "fleet" | "agreements";
   ids: number[];
   anchor: number | null;
   menu: FacilityMenuTarget | null;
@@ -959,6 +979,7 @@ interface SelectionState {
 
 export default class Facilities extends React.Component<Props, SelectionState> {
   public state: SelectionState = {
+    territoryView: "network",
     ids: [],
     anchor: null,
     menu: null,
@@ -1202,6 +1223,11 @@ export default class Facilities extends React.Component<Props, SelectionState> {
   };
   constructor(props: Props) {
     super(props);
+    if (
+      props.arrivingFacilityId !== undefined ||
+      props.selectedFacilityId !== null
+    )
+      this.state.territoryView = "fleet";
     this.onBeforeDragStart = this.onBeforeDragStart.bind(this);
     this.onDragEnd = this.onDragEnd.bind(this);
   }
@@ -1298,7 +1324,16 @@ export default class Facilities extends React.Component<Props, SelectionState> {
     return this.throttle.due(nextProps.game.date.minute, 4);
   }
 
-  public componentDidUpdate() {
+  public componentDidUpdate(previous: Props) {
+    if (
+      (this.props.arrivingFacilityId !== previous.arrivingFacilityId &&
+        this.props.arrivingFacilityId !== undefined) ||
+      (this.props.selectedFacilityId !== previous.selectedFacilityId &&
+        this.props.selectedFacilityId !== null)
+    ) {
+      if (this.state.territoryView !== "fleet")
+        this.setState({ territoryView: "fleet" });
+    }
     this.resolveEvidence();
     this.throttle.rendered(this.props.game.date.minute);
   }
@@ -1336,6 +1371,13 @@ export default class Facilities extends React.Component<Props, SelectionState> {
       )
     )
       return;
+    if (
+      hasTerritoryNetwork(this.props.game) &&
+      this.state.territoryView !== "fleet"
+    ) {
+      this.setState({ territoryView: "fleet" });
+      return;
+    }
     this.props.onEvidenceReady?.(request, this.evidenceAnchor.current);
   }
 
@@ -1409,6 +1451,8 @@ export default class Facilities extends React.Component<Props, SelectionState> {
     const showCheckboxes =
       selectionEnabled && (this.state.modifierHeld || selectionMode);
     const facilitiesCount = game.facilities.length;
+    const territoryNetwork = hasTerritoryNetwork(game);
+    const showFleet = !territoryNetwork || this.state.territoryView === "fleet";
     const intertiesAvailable = !!(
       game.transmission &&
       (game.multiplayer || corridorsForLocation(game.location).length)
@@ -1424,135 +1468,25 @@ export default class Facilities extends React.Component<Props, SelectionState> {
     return (
       <GameCard className="facilities" id="facilitiesPane">
         <>
-          <div className="scrollable facilitiesBody" ref={this.setScrollBody}>
-            <FacilitySupplyChart game={game} anchor={this.evidenceAnchor} />
-            {/* The scroller holds section labels and the intertie fleet as well as rows, so the
-              lists are the drag-and-drop containers inside it rather than the scroller itself. */}
-            <List
-              dense
-              component="div"
-              className="scrollable unifiedFacilitiesList"
-              data-group-dragging={this.state.groupDragging || undefined}
-              onKeyDown={this.onSelectionKeyDown}
+          {territoryNetwork && (
+            <Tabs
+              className="territoryViewTabs"
+              value={this.state.territoryView}
+              variant="fullWidth"
+              aria-label="Network views"
+              onChange={(_event, territoryView) =>
+                this.setState({ territoryView })
+              }
             >
-              <Typography
-                component="div"
-                id="dispatch-order"
-                className={`facilitySectionLabel facilityDispatchHeader${selectionMode || selection.length > 1 ? " facilityDispatchSelecting" : ""}`}
-                variant="overline"
-              >
-                <span className="facilitySectionTitle">Plants & storage</span>
-                {selectionEnabled && (selectionMode || selection.length > 1) ? (
-                  <div className="facilitySelectionBar">
-                    <span role="status" aria-label="Facility selection">
-                      {selection.length}{" "}
-                      {selection.length === 1 ? "facility" : "facilities"}{" "}
-                      selected
-                    </span>
-                    <div className="facilitySelectionActions">
-                      <Button
-                        size="small"
-                        endIcon={<ChevronDownGlyph />}
-                        aria-haspopup="menu"
-                        aria-expanded={!!this.state.menu}
-                        disabled={!selection.length}
-                        onClick={this.openActions}
-                      >
-                        Actions
-                      </Button>
-                      <Button
-                        size="small"
-                        aria-label="Clear selection"
-                        onClick={this.clearSelection}
-                      >
-                        Clear
-                        <span className="facilityClearFullLabel">
-                          selection
-                        </span>
-                      </Button>
-                    </div>
-                  </div>
-                ) : (
-                  <span className="facilitySectionFlow">
-                    {"Generating " + formatWatts(currentGenerationW(game))}
-                  </span>
-                )}
-              </Typography>
-              <DragDropContext
-                onBeforeDragStart={this.onBeforeDragStart}
-                onDragEnd={this.onDragEnd}
-              >
-                <Droppable droppableId="droppable">
-                  {(provided) => (
-                    <div
-                      {...provided.droppableProps}
-                      ref={provided.innerRef}
-                      role="list"
-                      aria-label="Plants and storage"
-                    >
-                      {game.facilities.map(
-                        (g: FacilityOperatingType, i: number) => (
-                          <FacilityListItem
-                            arriving={this.props.arrivingFacilityId === g.id}
-                            onArrivalShown={this.props.onArrivalShown}
-                            facility={g}
-                            game={game}
-                            key={g.id}
-                            onSell={onSell}
-                            onTogglePause={onTogglePause}
-                            onPause={onPause}
-                            onRetrofit={this.props.onRetrofit}
-                            onCancelRetrofit={this.props.onCancelRetrofit}
-                            onRowClick={this.onRowClick}
-                            onContextMenu={this.onContextMenu}
-                            bulkSelected={selection.some((f) => f.id === g.id)}
-                            selectionEnabled={selectionEnabled}
-                            showCheckboxes={showCheckboxes}
-                            onToggleSelection={this.onToggleSelection}
-                            selectionCount={selection.length}
-                            selected={selectedFacilityId === g.id}
-                            storyOutputMultiplier={storyOutputMultiplier(
-                              g,
-                              storyEffects,
-                              game.date.minute,
-                            )}
-                            limitReason={(() => {
-                              const reasons = activeStoryEvents
-                                .filter(
-                                  (event) =>
-                                    storyOutputMultiplier(
-                                      g,
-                                      event.effects,
-                                      game.date.minute,
-                                    ) < 1,
-                                )
-                                .map((event) => event.title || event.message)
-                                .filter(Boolean);
-                              return reasons.length
-                                ? `Limited due to ${Array.from(new Set(reasons)).join("; ")}`
-                                : "Limited by an active event";
-                            })()}
-                            hazardStatus={facilityHazardStatus(game, g)}
-                            spotInList={i}
-                          />
-                        ),
-                      )}
-                      {provided.placeholder}
-                    </div>
-                  )}
-                </Droppable>
-              </DragDropContext>
-              {facilitiesCount < 2 && (
-                <Typography
-                  color="textSecondary"
-                  variant="body2"
-                  style={{ textAlign: "center", marginTop: "12px" }}
-                >
-                  Choose Build to add a generator or storage.
-                </Typography>
-              )}
-              {intertiesAvailable && !!game.transmission?.lines.length && (
-                <TransmissionPanel
+              <Tab value="network" label="Network" />
+              <Tab value="fleet" label="Fleet" />
+              <Tab value="agreements" label="Agreements" />
+            </Tabs>
+          )}
+          {territoryNetwork && !showFleet && (
+            <div className="scrollable territoryWorkspace">
+              {this.state.territoryView === "network" ? (
+                <TerritoryNetwork
                   game={game}
                   onBuild={onTransmissionBuild}
                   onUpgrade={onTransmissionUpgrade}
@@ -1561,12 +1495,184 @@ export default class Facilities extends React.Component<Props, SelectionState> {
                   onPause={this.props.onTransmissionPause}
                   onBuyingRule={onBuyingRule}
                   onSellingRule={onSellingRule}
+                  onBuildFacility={this.props.onBuildForTerritory}
+                />
+              ) : (
+                <div className="territoryAgreements">
+                  <Typography component="h2" variant="h6">
+                    Supply agreements
+                  </Typography>
+                  <Typography variant="body2" color="textSecondary">
+                    Buy power for a named territory through its regional
+                    interface. Contract capacity and delivered power differ when
+                    a connection is full or unavailable.
+                  </Typography>
+                  <TransmissionPanel
+                    game={game}
+                    onBuild={onTransmissionBuild}
+                    onUpgrade={onTransmissionUpgrade}
+                    onCancel={this.props.onTransmissionCancel}
+                    onPause={this.props.onTransmissionPause}
+                    onBuyingRule={onBuyingRule}
+                    onSellingRule={onSellingRule}
+                    agreementsOnly
+                    hideOwnership
+                    heading="Regional delivery interfaces"
+                  />
+                </div>
+              )}
+            </div>
+          )}
+          {showFleet && (
+            <div className="scrollable facilitiesBody" ref={this.setScrollBody}>
+              <FacilitySupplyChart game={game} anchor={this.evidenceAnchor} />
+              {/* The scroller holds section labels and the intertie fleet as well as rows, so the
+              lists are the drag-and-drop containers inside it rather than the scroller itself. */}
+              <List
+                dense
+                component="div"
+                className="scrollable unifiedFacilitiesList"
+                data-group-dragging={this.state.groupDragging || undefined}
+                onKeyDown={this.onSelectionKeyDown}
+              >
+                <Typography
+                  component="div"
+                  id="dispatch-order"
+                  className={`facilitySectionLabel facilityDispatchHeader${selectionMode || selection.length > 1 ? " facilityDispatchSelecting" : ""}`}
+                  variant="overline"
+                >
+                  <span className="facilitySectionTitle">Plants & storage</span>
+                  {selectionEnabled &&
+                  (selectionMode || selection.length > 1) ? (
+                    <div className="facilitySelectionBar">
+                      <span role="status" aria-label="Facility selection">
+                        {selection.length}{" "}
+                        {selection.length === 1 ? "facility" : "facilities"}{" "}
+                        selected
+                      </span>
+                      <div className="facilitySelectionActions">
+                        <Button
+                          size="small"
+                          endIcon={<ChevronDownGlyph />}
+                          aria-haspopup="menu"
+                          aria-expanded={!!this.state.menu}
+                          disabled={!selection.length}
+                          onClick={this.openActions}
+                        >
+                          Actions
+                        </Button>
+                        <Button
+                          size="small"
+                          aria-label="Clear selection"
+                          onClick={this.clearSelection}
+                        >
+                          Clear
+                          <span className="facilityClearFullLabel">
+                            selection
+                          </span>
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <span className="facilitySectionFlow">
+                      {"Generating " + formatWatts(currentGenerationW(game))}
+                    </span>
+                  )}
+                </Typography>
+                <DragDropContext
                   onBeforeDragStart={this.onBeforeDragStart}
                   onDragEnd={this.onDragEnd}
-                />
-              )}
-            </List>
-          </div>
+                >
+                  <Droppable droppableId="droppable">
+                    {(provided) => (
+                      <div
+                        {...provided.droppableProps}
+                        ref={provided.innerRef}
+                        role="list"
+                        aria-label="Plants and storage"
+                      >
+                        {game.facilities.map(
+                          (g: FacilityOperatingType, i: number) => (
+                            <FacilityListItem
+                              arriving={this.props.arrivingFacilityId === g.id}
+                              onArrivalShown={this.props.onArrivalShown}
+                              facility={g}
+                              game={game}
+                              key={g.id}
+                              onSell={onSell}
+                              onTogglePause={onTogglePause}
+                              onPause={onPause}
+                              onRetrofit={this.props.onRetrofit}
+                              onCancelRetrofit={this.props.onCancelRetrofit}
+                              onRowClick={this.onRowClick}
+                              onContextMenu={this.onContextMenu}
+                              bulkSelected={selection.some(
+                                (f) => f.id === g.id,
+                              )}
+                              selectionEnabled={selectionEnabled}
+                              showCheckboxes={showCheckboxes}
+                              onToggleSelection={this.onToggleSelection}
+                              selectionCount={selection.length}
+                              selected={selectedFacilityId === g.id}
+                              storyOutputMultiplier={storyOutputMultiplier(
+                                g,
+                                storyEffects,
+                                game.date.minute,
+                              )}
+                              limitReason={(() => {
+                                const reasons = activeStoryEvents
+                                  .filter(
+                                    (event) =>
+                                      storyOutputMultiplier(
+                                        g,
+                                        event.effects,
+                                        game.date.minute,
+                                      ) < 1,
+                                  )
+                                  .map((event) => event.title || event.message)
+                                  .filter(Boolean);
+                                return reasons.length
+                                  ? `Limited due to ${Array.from(new Set(reasons)).join("; ")}`
+                                  : "Limited by an active event";
+                              })()}
+                              hazardStatus={facilityHazardStatus(game, g)}
+                              spotInList={i}
+                            />
+                          ),
+                        )}
+                        {provided.placeholder}
+                      </div>
+                    )}
+                  </Droppable>
+                </DragDropContext>
+                {facilitiesCount < 2 && (
+                  <Typography
+                    color="textSecondary"
+                    variant="body2"
+                    style={{ textAlign: "center", marginTop: "12px" }}
+                  >
+                    Choose Build to add a generator or storage.
+                  </Typography>
+                )}
+                {!territoryNetwork &&
+                  intertiesAvailable &&
+                  !!game.transmission?.lines.length && (
+                    <TransmissionPanel
+                      game={game}
+                      onBuild={onTransmissionBuild}
+                      onUpgrade={onTransmissionUpgrade}
+                      onAcquire={this.props.onUtilityAcquire}
+                      onCancel={this.props.onTransmissionCancel}
+                      onPause={this.props.onTransmissionPause}
+                      onBuyingRule={onBuyingRule}
+                      onSellingRule={onSellingRule}
+                      onBeforeDragStart={this.onBeforeDragStart}
+                      onDragEnd={this.onDragEnd}
+                    />
+                  )}
+              </List>
+            </div>
+          )}
           <FacilityContextMenu
             game={game}
             target={this.state.menu}

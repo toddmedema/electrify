@@ -24,9 +24,12 @@ for (const theme of ["light", "dark"] as const) {
       facilities,
       page.getByRole("button", { name: "Facilities", exact: true }),
     );
+    await facilities
+      .getByRole("tab", { name: "Agreements", exact: true })
+      .click();
     let line = facilities
       .locator(".transmissionLine")
-      .filter({ hasText: "Champlain regional connection" });
+      .filter({ hasText: "Champlain ↔ Regional grid" });
     await expect(line).toContainText("209MW under agreement");
     await expect(
       line.getByRole("button", { name: /^Review upgrade/ }),
@@ -38,7 +41,7 @@ for (const theme of ["light", "dark"] as const) {
       ),
     ).toMatchObject({ capacityW: 300e6, buildCost: 0, yearsToBuildLeft: 0 });
     const openingInspect = line.getByRole("button", {
-      name: /^Inspect Champlain regional connection/,
+      name: /^Inspect Champlain ↔ Regional grid/,
     });
     await openingInspect.click();
     await expect(
@@ -97,11 +100,14 @@ for (const theme of ["light", "dark"] as const) {
       facilities,
       page.getByRole("button", { name: "Facilities", exact: true }),
     );
+    await facilities
+      .getByRole("tab", { name: "Agreements", exact: true })
+      .click();
     line = facilities
       .locator(".transmissionLine")
-      .filter({ hasText: "Champlain regional connection" });
+      .filter({ hasText: "Champlain ↔ Regional grid" });
     const inspect = line.getByRole("button", {
-      name: /^Inspect Champlain regional connection/,
+      name: /^Inspect Champlain ↔ Regional grid/,
     });
     await inspect.click();
     await expect(inspect).toHaveAttribute("aria-expanded", "true");
@@ -330,6 +336,9 @@ for (const theme of ["light", "dark"] as const) {
       facilities,
       page.getByRole("button", { name: "Facilities", exact: true }),
     );
+    await facilities
+      .getByRole("tab", { name: "Agreements", exact: true })
+      .click();
     await inspect.click();
     await expect(line).toContainText("Scheduled · starts 1 Jan 2020");
     await expect(line).toContainText("1 Jan 2020–31 Dec 2024");
@@ -350,6 +359,9 @@ for (const theme of ["light", "dark"] as const) {
       facilities,
       page.getByRole("button", { name: "Facilities", exact: true }),
     );
+    await facilities
+      .getByRole("tab", { name: "Agreements", exact: true })
+      .click();
     await inspect.click();
     await expect(line).toContainText("Regional nuclear · Expired 1 Jan 2020");
     await expect(line).toContainText(

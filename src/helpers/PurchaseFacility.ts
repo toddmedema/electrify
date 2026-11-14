@@ -1,5 +1,5 @@
 import type { AppThunk } from "../Store";
-import type { FacilityShoppingType } from "../Types";
+import type { FacilityShoppingType, TerritoryId } from "../Types";
 import { buildFacility } from "../reducers/Game";
 import { navigate } from "../reducers/Card";
 import { facilityPurchased, snackbarOpen } from "../reducers/UI";
@@ -8,7 +8,11 @@ import { multiplayerRuntime } from "../multiplayer/Registry";
 
 /** Acknowledge only purchases accepted by the dispatching store. */
 export const purchaseFacility =
-  (facility: FacilityShoppingType, financed: boolean): AppThunk =>
+  (
+    facility: FacilityShoppingType,
+    financed: boolean,
+    territoryId?: TerritoryId,
+  ): AppThunk =>
   (dispatch, getState) => {
     const beforeIds = new Set(
       getState().game.facilities.map((candidate) => candidate.id),
@@ -38,6 +42,7 @@ export const purchaseFacility =
           payload: {
             facility,
             financed,
+            territoryId,
           },
         })
         .then(acknowledge)
@@ -47,6 +52,7 @@ export const purchaseFacility =
         buildFacility({
           facility,
           financed,
+          territoryId,
         }),
       );
       acknowledge();

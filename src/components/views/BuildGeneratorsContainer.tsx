@@ -3,7 +3,7 @@ import { connectToStore } from "../base/ConnectToStore";
 import { generatorSizeChanged } from "../../reducers/GameActions";
 import { navigate } from "../../reducers/Card";
 import { purchaseFacility } from "../../helpers/PurchaseFacility";
-import { AppStateType, GeneratorShoppingType } from "../../Types";
+import { AppStateType, GeneratorShoppingType, TerritoryId } from "../../Types";
 import BuildGenerators, { DispatchProps, StateProps } from "./BuildGenerators";
 import { focusEvidence } from "../../helpers/Evidence";
 
@@ -28,8 +28,12 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
     onBack: () => {
       dispatch(navigate("FACILITIES"));
     },
-    onBuildGenerator: (facility: GeneratorShoppingType, financed: boolean) => {
-      dispatch(purchaseFacility(facility, financed));
+    onBuildGenerator: (
+      facility: GeneratorShoppingType,
+      financed: boolean,
+      territoryId?: TerritoryId,
+    ) => {
+      dispatch(purchaseFacility(facility, financed, territoryId));
     },
   };
 };

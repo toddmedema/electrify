@@ -1114,6 +1114,14 @@ test("controller reviews, cancels and confirms a utility acquisition", async ({
     page.getByRole("button", { name: "Continue", exact: true }),
   );
   await input(page, "confirm");
+  await select(
+    page,
+    page.getByRole("button", {
+      name: "Inspect Ridge Electric territory",
+      exact: true,
+    }),
+  );
+  await input(page, "confirm");
   const line = page.locator(
     '.facilities:visible .transmissionLine[data-corridor-id="vt-champlain-ridge"]',
   );
@@ -1136,7 +1144,9 @@ test("controller reviews, cancels and confirms a utility acquisition", async ({
   );
   await input(page, "confirm");
   await expect(dialog).toHaveCount(0);
-  await expect(line).toHaveCount(0);
+  await expect(
+    line.getByRole("button", { name: "Acquire Ridge Electric", exact: true }),
+  ).toHaveCount(0);
   const ownership = page.locator(".facilities:visible .acquiredUtilities");
   await expect(ownership.locator("summary")).toBeFocused();
   await expect(ownership).not.toHaveAttribute("open");
