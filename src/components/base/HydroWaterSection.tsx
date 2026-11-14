@@ -145,23 +145,12 @@ export default function HydroWaterSection(props: {
                     <span key={label}>{label}</span>
                   ))}
                   caption={(index) => {
-                    const year =
-                      game.date.year +
-                      outlook!
-                        .slice(1, index + 1)
-                        .reduce(
-                          (years, point, offset) =>
-                            years +
-                            Number(
-                              point.monthNumber < outlook![offset].monthNumber,
-                            ),
-                          0,
-                        );
+                    const point = outlook![index];
                     return (
                       <>
                         <span>
                           {index === 0 ? "Now · " : ""}
-                          {MONTHS[outlook![index].monthNumber - 1]} {year}
+                          {MONTHS[point.monthNumber - 1]} {point.year}
                         </span>{" "}
                         <span>
                           {formatForecastPercent(values[index])} full

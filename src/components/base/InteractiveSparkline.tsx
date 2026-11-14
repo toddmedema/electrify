@@ -51,6 +51,9 @@ export default function InteractiveSparkline({
   const readout = (
     <Typography
       id={captionId}
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
       variant="caption"
       color="textSecondary"
       component="div"
