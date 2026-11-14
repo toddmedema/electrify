@@ -1,6 +1,8 @@
 # Achievements
 
-The same 35 achievements, including bankruptcy's **Out of Juice**, work on web and Electron.
+Achievements work on web and Electron. **Power Play** unlocks immediately after acquiring a
+competing utility; completing its intertie or previewing a purchase does not qualify.
+Bankruptcy unlocks **Out of Juice**.
 `src/achievements/AchievementCatalog.json` supplies stable IDs, requirements and each award's
 `public/images/` icon, which must be a dedicated design that follows the icon rules in `AGENTS.md`.
 The shared evaluator observes committed simulation evidence. Official scenarios qualify on any

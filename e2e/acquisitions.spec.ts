@@ -44,6 +44,7 @@ for (const theme of ["light", "dark"] as const) {
     await expect(goalsDialog).toHaveCount(0);
     await page.getByRole("button", { name: "Start game", exact: true }).click();
     const facilities = page.locator(".facilities:visible");
+    await expect(facilities.locator(".acquiredUtilities")).toHaveCount(0);
     await expect(
       facilities.getByRole("button", {
         name: "Inspect Oil A",
@@ -381,28 +382,103 @@ for (const theme of ["light", "dark"] as const) {
       await purchase.focus();
       await page.keyboard.press("Enter");
       await expect(dialog).toHaveCount(0);
-      await expect(line).toContainText("· Owned");
-      await expect(line).toContainText("Acquired utility");
+      await expect(line).toHaveCount(0);
+      const ownership = facilities.locator(".acquiredUtilities");
+      const summary = ownership.locator("summary");
+      await expect(summary).toHaveText(`Acquired utilities (${index + 1})`);
+      await expect(summary).toBeFocused();
+      await expect(ownership).not.toHaveAttribute("open");
+      expect((await summary.boundingBox())!.height).toBeGreaterThanOrEqual(
+        testInfo.project.use.hasTouch ? 44 : 40,
+      );
+      await summary.press("Enter");
+      await expect(ownership).toHaveAttribute("open");
+      await expect(
+        ownership.getByRole("heading", { name: target, exact: true }),
+      ).toBeVisible();
+      const entry = ownership.getByRole("listitem").nth(index);
+      await expect(entry).toContainText("Acquired Jan 2005");
+      await expect(entry.locator("dt")).toHaveText([
+        "Customers acquired",
+        "Connection upkeep",
+        "Debt payment",
+        "Debt remaining",
+      ]);
+      await expect(
+        entry
+          .locator(".facilityStat")
+          .filter({ hasText: "Debt payment" })
+          .locator("dd"),
+      ).toHaveText(/^\$[\d.,]+[kMBT]?\/mo$/);
+      const valueTops = await entry
+        .locator("dd")
+        .evaluateAll((values) =>
+          values.map((value) => value.getBoundingClientRect().top),
+        );
+      // Wrapped labels share a row height, so the figures remain aligned at phone widths too.
+      expect(Math.abs(valueTops[0] - valueTops[1])).toBeLessThanOrEqual(1);
+      expect(Math.abs(valueTops[2] - valueTops[3])).toBeLessThanOrEqual(1);
+      await expect(ownership.getByRole("list").getByRole("button")).toHaveCount(
+        0,
+      );
+      expect(
+        await ownership.evaluate(
+          (element) => element.scrollWidth - element.clientWidth,
+        ),
+      ).toBeLessThanOrEqual(1);
       const afterPurchase = (await readSavedGame(page))!;
+      expect(
+        afterPurchase.desktopAchievements?.earned.filter(
+          (id) => id === "POWER_PLAY",
+        ),
+      ).toEqual(["POWER_PLAY"]);
+      if (index === 0) {
+        const notification = page
+          .locator(".achievementToastPanel")
+          .filter({ hasText: "Power Play" });
+        await expect(notification).toBeVisible();
+        await expect(notification).toContainText(
+          "Acquire your first competing utility.",
+        );
+        if (
+          process.env.REVIEW_SCREENSHOT_DIR &&
+          ((testInfo.project.name === "desktop-chromium" &&
+            theme === "light") ||
+            (testInfo.project.name === "mobile-390px" && theme === "dark"))
+        ) {
+          await page.mouse.move(0, 0);
+          await notification.screenshot({
+            path: path.join(
+              process.env.REVIEW_SCREENSHOT_DIR,
+              `power-play-${testInfo.project.name}-${theme}.png`,
+            ),
+            animations: "disabled",
+          });
+        }
+        await notification
+          .getByRole("button", {
+            name: "Dismiss Power Play achievement notification",
+            exact: true,
+          })
+          .click();
+      }
       const receipt = afterPurchase.utilityExpansion!.acquisitions.find(
         (entry) =>
           entry.targetId ===
           (index === 0 ? "valley-electric" : "ridge-electric"),
       )!;
       expect(receipt).toBeDefined();
+      await expect(entry).toContainText(
+        formatCount(receipt.transferredCustomers),
+      );
       expect(customerPreview).toBe(
         `${formatCount(customersBefore)} → ${formatCount(customersBefore + receipt.transferredCustomers)} (+${Math.round((receipt.transferredCustomers / customersBefore) * 100)}%)`,
       );
-      const inspectOwned = line.getByRole("button", { name: /^Inspect / });
-      if ((await inspectOwned.getAttribute("aria-expanded")) !== "true")
-        await inspectOwned.click();
-      await expect(line).toContainText("Connection upkeep");
+      await summary.press("Space");
+      await expect(ownership).not.toHaveAttribute("open");
       await expect(
-        line.getByRole("button", {
-          name: /^Review upgrade|^Pause|^Resume|^Reorder/,
-        }),
-      ).toHaveCount(0);
-      await expect(line).not.toContainText("Transfer capacity");
+        ownership.getByRole("heading", { name: target, exact: true }),
+      ).toBeHidden();
       const scenario = page.getByRole("region", {
         name: "Scenario",
         exact: true,
@@ -471,6 +547,58 @@ for (const theme of ["light", "dark"] as const) {
     await expect(
       facilities.getByRole("combobox", { name: "Market buying", exact: true }),
     ).toBeVisible();
+    const interties = facilities.getByRole("list", {
+      name: "Interties",
+      exact: true,
+    });
+    const connections = interties.getByRole("listitem");
+    await expect(connections).toHaveCount(3);
+    await expect(interties).not.toContainText("expansion connection");
+    // Hidden acquisition corridors must not shift the reducer indices used by visible drag handles.
+    await interties
+      .getByRole("button", {
+        name: "Reorder Ridge regional connection",
+        exact: true,
+      })
+      .focus();
+    await page.keyboard.press("Space");
+    await page.keyboard.press("ArrowUp");
+    await page.keyboard.press("ArrowUp");
+    await page.keyboard.press("Space");
+    await expect(connections.first()).toHaveAttribute(
+      "data-corridor-id",
+      "vt-ridge-regional",
+    );
+    const ownership = facilities.locator(".acquiredUtilities");
+    const summary = ownership.locator("summary");
+    const captureOwnership =
+      process.env.REVIEW_SCREENSHOT_DIR &&
+      ((testInfo.project.name === "desktop-chromium" && theme === "light") ||
+        (testInfo.project.name === "mobile-390px" && theme === "dark"));
+    if (captureOwnership) {
+      await summary.focus();
+      await summary.scrollIntoViewIfNeeded();
+      await page.mouse.move(0, 0);
+      await facilities.screenshot({
+        path: path.join(
+          process.env.REVIEW_SCREENSHOT_DIR!,
+          `acquired-collapsed-${testInfo.project.name}-${theme}.png`,
+        ),
+        animations: "disabled",
+      });
+    }
+    await summary.click();
+    await expect(ownership.getByRole("heading")).toHaveCount(2);
+    if (captureOwnership) {
+      await ownership.screenshot({
+        path: path.join(
+          process.env.REVIEW_SCREENSHOT_DIR!,
+          `acquired-expanded-${testInfo.project.name}-${theme}.png`,
+        ),
+        animations: "disabled",
+      });
+    }
+    await summary.click();
     // Acquired plants and customers use the ordinary shared company controls.
     await openBuild(page);
     await page.getByRole("tab", { name: "Generators", exact: true }).click();
@@ -540,12 +668,25 @@ for (const theme of ["light", "dark"] as const) {
       facilities,
       page.getByRole("button", { name: "Facilities", exact: true }),
     );
-    for (const target of ["Valley", "Ridge"])
+    const restoredOwnership = facilities.locator(".acquiredUtilities");
+    await expect(restoredOwnership).not.toHaveAttribute("open");
+    await expect(restoredOwnership.locator("summary")).toHaveText(
+      "Acquired utilities (2)",
+    );
+    await restoredOwnership.locator("summary").click();
+    for (const target of ["Valley", "Ridge"]) {
       await expect(
-        facilities
-          .locator(".transmissionLine")
-          .filter({ hasText: `${target} expansion connection` }),
-      ).toContainText("· Owned");
+        restoredOwnership.getByRole("heading", {
+          name: `${target} Electric`,
+          exact: true,
+        }),
+      ).toBeVisible();
+      await expect(
+        facilities.getByRole("button", {
+          name: new RegExp(`^Inspect ${target} regional connection`),
+        }),
+      ).toBeVisible();
+    }
     const resumed = await readSavedGame(page);
     expect(resumed?.utilityExpansion).toEqual(acquired?.utilityExpansion);
     expect(errors).toEqual([]);

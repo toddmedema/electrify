@@ -5672,6 +5672,83 @@ $homeSmokeCycle: 5.6s;
   border-top: 1px solid var(--border-subtle);
   margin-top: 12px;
 }
+.acquiredUtilities {
+  border-top: 1px solid var(--border-subtle);
+  margin-top: 12px;
+
+  > summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    min-height: 40px;
+    box-sizing: border-box;
+    padding: 8px 16px;
+    color: var(--font-color-primary);
+    font-size: var(--font-size-body2);
+    font-weight: 500;
+    list-style: none;
+    cursor: pointer;
+
+    &::-webkit-details-marker {
+      display: none;
+    }
+    &:focus-visible {
+      outline: 2px solid var(--focus-ring);
+      outline-offset: -2px;
+    }
+    @media (hover: hover) and (pointer: fine) {
+      &:hover {
+        background: var(--bg-raised);
+      }
+    }
+    @media (pointer: coarse) {
+      min-height: 44px;
+    }
+    .rowChevron {
+      flex-shrink: 0;
+      color: var(--font-color-faded);
+      transform: rotate(-90deg);
+    }
+  }
+  &[open] > summary .rowChevron {
+    transform: none;
+  }
+  > ul {
+    list-style: none;
+    margin: 0;
+    padding: 0 16px;
+    > li {
+      padding: 16px 0 8px;
+      + li {
+        border-top: 1px solid var(--border-subtle);
+      }
+    }
+  }
+  .facilityDetailHeading {
+    margin-bottom: 4px;
+  }
+  .facilityStats {
+    row-gap: 4px;
+  }
+  .facilityStat {
+    display: grid;
+    grid-row: span 2;
+    grid-template-rows: subgrid;
+    dt {
+      margin: 0;
+    }
+    dd {
+      padding-bottom: 8px;
+    }
+  }
+}
+.acquiredUtilityDate {
+  margin: 0 0 12px;
+  color: var(--font-color-faded);
+  font-size: var(--font-size-caption);
+  line-height: 20px;
+}
 .tradingControls {
   padding: 0 16px 12px;
   display: grid;
@@ -8456,31 +8533,48 @@ option {
   flex-wrap: wrap !important;
 }
 
-// Mouse selection remains separate from the one expanded inspection row.
-.facilitySelectionBar {
-  display: none;
-}
-@media (any-pointer: fine) {
-  .facilitySelectionBar {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: 4px 8px;
-    padding: 0 16px;
-    min-height: 40px;
-    color: var(--font-color-faded);
-    font-size: var(--font-size-caption);
-    .MuiButton-root {
-      min-height: 40px;
-      text-transform: none;
-    }
+// Bulk actions share the generation status slot without moving the chart or fleet.
+.facilities .facilityDispatchHeader {
+  min-height: 48px;
+  padding-block: 4px;
+  .facilitySectionTitle {
+    flex-shrink: 0;
+    font-size: var(--font-size-body2);
+    font-weight: 600;
+    color: var(--font-color-primary);
   }
 }
-.facilitySelectionTitle {
-  color: var(--font-color-primary);
-  font-size: var(--font-size-body2);
-  font-weight: 600;
+.facilitySelectionBar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: var(--font-size-caption);
+  font-weight: 400;
+  color: var(--font-color-faded);
+  white-space: nowrap;
+  .MuiButton-root {
+    min-height: 40px;
+    text-transform: none;
+  }
+}
+// Prioritize the selection count and actions in narrow panes, including mouse windows.
+.facilityClearFullLabel {
+  margin-inline-start: 4px;
+}
+@container facilities (max-width: 560px) {
+  .facilityDispatchSelecting {
+    .facilitySectionTitle {
+      display: none;
+    }
+    .facilityClearFullLabel {
+      display: none;
+    }
+    .facilitySelectionBar {
+      flex: 1;
+      justify-content: space-between;
+    }
+  }
 }
 .base_main .facilityRow.bulkSelected {
   background: var(--bg-selected);
@@ -8518,7 +8612,7 @@ option {
 
 .facilitySelectionActions {
   display: flex;
-  flex-wrap: wrap;
+  flex-shrink: 0;
   gap: 4px;
 }
 .facilitySelectionSlot {
@@ -8554,6 +8648,9 @@ option {
     width: 44px;
     height: 44px;
     right: 42px;
+  }
+  .facilities .facilityDispatchHeader {
+    min-height: 52px;
   }
   .facilitySelectionBar .MuiButton-root,
   .facilityContextMenu .MuiMenuItem-root {
