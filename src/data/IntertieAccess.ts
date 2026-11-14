@@ -13,6 +13,7 @@ import {
 } from "./AdjacentMarkets";
 import { corridorOpenInYear } from "./IntertieTrends";
 import { log } from "../helpers/Libm";
+import { GREEN_UPLANDS_CORRIDOR_ID } from "./Territories";
 
 export interface IntertieAccessContext {
   peers?: NonNullable<GameType["multiplayer"]>["peers"];
@@ -20,6 +21,7 @@ export interface IntertieAccessContext {
   frozenStartingIntertieAccess?: FrozenStartingIntertieAccessType;
   locationId?: string;
   ownedUtilityCorridors?: readonly string[];
+  territoryNetwork?: boolean;
 }
 export interface ScenarioIntertieAccess {
   scenarioId: number;
@@ -280,11 +282,15 @@ export const SCENARIO_INTERTIE_ACCESS: readonly ScenarioIntertieAccess[] = [
 ];
 export function accessContextForGame(
   game: Pick<GameType, "scenarioId" | "location" | "customScenario"> &
-    Partial<Pick<GameType, "multiplayer" | "utilityExpansion">>,
+    Partial<
+      Pick<GameType, "multiplayer" | "utilityExpansion" | "territoryNetwork">
+    >,
 ): IntertieAccessContext {
   const custom = game.customScenario;
   return {
     peers: game.multiplayer?.peers,
+    territoryNetwork:
+      isUtilityExpansionGame(game) && game.territoryNetwork?.version === 1,
     ownedUtilityCorridors: ["vt-champlain-valley", "vt-champlain-ridge"].filter(
       (id) => ownedUtilityConnection(game, id),
     ),
@@ -318,6 +324,8 @@ export function effectiveCorridor(
   corridorId: string,
   context?: IntertieAccessContext,
 ) {
+  if (corridorId === GREEN_UPLANDS_CORRIDOR_ID && !context?.territoryNetwork)
+    return undefined;
   const corridor =
     context?.peers?.find((p) => p.corridor.id === corridorId)?.corridor ??
     corridorById(corridorId);
@@ -365,7 +373,9 @@ export function effectiveMarket(
 /** Corridors that can be ordered this year: their path exists and has not been cut off. */
 export function corridorsForGame(
   game: Pick<GameType, "scenarioId" | "location" | "customScenario"> &
-    Partial<Pick<GameType, "multiplayer" | "utilityExpansion">> & {
+    Partial<
+      Pick<GameType, "multiplayer" | "utilityExpansion" | "territoryNetwork">
+    > & {
       date: Pick<GameType["date"], "year">;
     },
 ) {
@@ -380,7 +390,9 @@ export function corridorsForGame(
           (c) =>
             starting.includes(c.id) ||
             (isUtilityExpansionGame(game) &&
-              ["vt-champlain-valley", "vt-champlain-ridge"].includes(c.id)),
+              (["vt-champlain-valley", "vt-champlain-ridge"].includes(c.id) ||
+                (game.territoryNetwork?.version === 1 &&
+                  c.id === GREEN_UPLANDS_CORRIDOR_ID))),
         )
         .map((c) => effectiveCorridor(c.id, accessContextForGame(game))!),
     ];
@@ -388,7 +400,11 @@ export function corridorsForGame(
   return corridorsForLocation(game.location)
     .filter(
       ({ id, buildCost }) =>
-        buildCost > 0 && corridorOpenInYear(id, game.date.year),
+        buildCost > 0 &&
+        corridorOpenInYear(id, game.date.year) &&
+        (id !== GREEN_UPLANDS_CORRIDOR_ID ||
+          (isUtilityExpansionGame(game) &&
+            game.territoryNetwork?.version === 1)),
     )
     .map((c) => effectiveCorridor(c.id, accessContextForGame(game))!);
 }

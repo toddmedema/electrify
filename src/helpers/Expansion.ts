@@ -153,6 +153,7 @@ export function acquisitionAssets(
     const age = search.initialAgeYears ?? 0;
     result.push({
       ...technology,
+      territoryId: targetId,
       startingAssetId: search.assetId,
       hydroSiteId: search.hydroSiteId ?? quote.hydroSiteId,
       ...(quote.fuel === "Wind"

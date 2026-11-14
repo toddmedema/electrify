@@ -20,6 +20,25 @@ import {
 } from "../helpers/TradingRules";
 import { combinedUtilityDemandProfile } from "../helpers/CombinedUtilityDemand";
 import {
+  facilityTerritoryId,
+  hasTerritoryNetwork,
+  internalTerritoryEdges,
+  isInternalTerritoryCorridor,
+  ownedTerritories,
+  territoryBuildAvailability,
+  territoryDemandShares,
+  territoryForCorridor,
+} from "../helpers/Territories";
+import {
+  routeTerritoryPower,
+  clearTerritoryMarket,
+  territoryAdditionalDemandW,
+  type TerritoryDispatchInput,
+  type TerritoryDispatchSource,
+} from "../helpers/TerritoryDispatch";
+import { TERRITORIES, isTerritoryId } from "../data/Territories";
+import type { TerritoryId } from "../Types";
+import {
   isUtilityExpansionGame,
   ownedUtilityConnection,
 } from "../helpers/ExpansionContext";
@@ -406,6 +425,7 @@ import {
 interface BuildFacilityAction {
   facility: FacilityShoppingType;
   financed: boolean;
+  territoryId?: TerritoryId;
 }
 
 interface ReprioritizeAction {
@@ -1668,6 +1688,7 @@ export const gameSlice = createSlice({
       }
     },
     initGame: (state, action: PayloadAction<NewGameAction>) => {
+      delete state.territoryNetwork;
       delete state.campaign;
       delete state.desktopAchievements;
       delete state.lowCashWarningMonth;
@@ -1980,6 +2001,10 @@ export const gameSlice = createSlice({
       }
 
       if (isUtilityExpansionGame(state)) {
+        state.territoryNetwork = { version: 1 };
+        state.facilities.forEach((facility) => {
+          facility.territoryId = "champlain";
+        });
         state.transmission!.inheritedAgreementTerms = 3;
         state.utilityExpansion = {
           networkAssets: [],
@@ -2757,10 +2782,20 @@ function applyBuildFacility(
 ): boolean {
   if (
     !validBuildFacility(payload) ||
+    (payload.territoryId !== undefined &&
+      !isTerritoryId(payload.territoryId)) ||
     Object.prototype.hasOwnProperty.call(payload, "operatingAreaId")
   )
     return false;
   const requested = payload.facility;
+  const territoryId = payload.territoryId ?? "champlain";
+  if (
+    hasTerritoryNetwork(state) &&
+    !territoryBuildAvailability(state, requested, territoryId).buildable
+  )
+    return false;
+  if (!hasTerritoryNetwork(state) && payload.territoryId !== undefined)
+    return false;
   if (isLegacyCampaignScenario(state.scenarioId) && !state.customScenario) {
     // Era/date limits belong to the command owner as well as the shopping UI.
     if (isStorage(requested)) {
@@ -2844,6 +2879,7 @@ function applyBuildFacility(
   state = buildFacilityHelper(state, built, payload.financed);
   const added = state.facilities.find(({ id }) => !existingIds.has(id));
   if (!added) return false;
+  if (hasTerritoryNetwork(state)) added.territoryId = territoryId;
   // Book this loan at the quoted rate, then price the next one against the new debt and cash.
   if (payload.financed) refreshInterestRate(state, now.cash);
   if (isMaterialCapacityDecision(state, added.peakW)) {
@@ -3094,7 +3130,8 @@ function applyCancelTransmissionLine(state: GameType, id: number): boolean {
   const now = getTimeFromTimeline(state.date.minute, state.timeline);
   if (
     !line ||
-    ownedUtilityConnection(state, line.corridorId) ||
+    (ownedUtilityConnection(state, line.corridorId) &&
+      !hasTerritoryNetwork(state)) ||
     line.yearsToBuildLeft <= 0 ||
     !now ||
     !state.transmission
@@ -3119,7 +3156,8 @@ function applyTogglePauseTransmissionLine(
   const line = state.transmission?.lines.find((item) => item.id === id);
   if (
     !line ||
-    ownedUtilityConnection(state, line.corridorId) ||
+    (ownedUtilityConnection(state, line.corridorId) &&
+      !hasTerritoryNetwork(state)) ||
     line.yearsToBuildLeft > 0
   )
     return false;
@@ -3153,7 +3191,8 @@ function applyUpgradeTransmissionLine(
   // Only a finished line can be widened, and only one job at a time.
   if (
     !line ||
-    ownedUtilityConnection(state, line.corridorId) ||
+    (ownedUtilityConnection(state, line.corridorId) &&
+      !hasTerritoryNetwork(state)) ||
     !now ||
     line.yearsToBuildLeft > 0 ||
     line.upgrade
@@ -5369,11 +5408,57 @@ function* supplyFacilitiesFinancesPhases(
     (sum, offer) => sum + offer.capacityW,
     0,
   );
-  let entitlementDeliveredW = Math.min(now.demandW, entitlementCapacityW);
+  const territoryDemand = hasTerritoryNetwork(state)
+    ? territoryDemandShares(state, now)
+    : undefined;
+  const territoryEdges = territoryDemand
+    ? internalTerritoryEdges(state, now)
+    : [];
+  const nativeSources: TerritoryDispatchSource[] = [];
+  const agreementSources: TerritoryDispatchSource[] = entitlementOffers.map(
+    (source) => ({
+      id: source.id,
+      territoryId: source.utilityId,
+      capacityW: source.capacityW,
+      kind: "agreement",
+    }),
+  );
+  const territoryInput = (
+    sinks: TerritoryDispatchInput["sinks"] = [],
+    extraSources: TerritoryDispatchSource[] = [],
+  ): TerritoryDispatchInput => ({
+    demandW: territoryDemand!,
+    edges: territoryEdges,
+    sources: [...nativeSources, ...agreementSources, ...extraSources],
+    sinks,
+  });
+  const territoryChargeRequests = (afterIndex = -1) =>
+    facilities.flatMap((facility, index) => {
+      const capacityW = chargeRequests.get(facility.id) ?? 0;
+      return index > afterIndex && capacityW > 0
+        ? [
+            {
+              id: `charge:${facility.id}`,
+              territoryId: facilityTerritoryId(facility),
+              capacityW,
+            },
+          ]
+        : [];
+    });
+  let territoryResult = territoryDemand
+    ? routeTerritoryPower(territoryInput())
+    : undefined;
+  let entitlementWatts = entitlementOffers.map(
+    (source, i) => territoryResult?.sourceW[i] ?? 0,
+  );
+  let entitlementDeliveredW = territoryResult
+    ? entitlementWatts.reduce((sum, watts) => sum + watts, 0)
+    : Math.min(now.demandW, entitlementCapacityW);
   let supply = entitlementDeliveredW;
   let spareGenerationW = 0;
   let reachableHeadroomW = 0;
   const storageHeadroom = new Map<number, { peakW: number; watts: number }>();
+  const territoryHeadroom: TerritoryDispatchSource[] = [];
   const supplyByFuel: FuelProductionType = {};
   let charge = 0;
   let dischargedW = 0;
@@ -5501,7 +5586,9 @@ function* supplyFacilitiesFinancesPhases(
     if (g.yearsToBuildLeft === 0) {
       if (g.fuel) {
         // Capable of generating electricity
-        const targetW = Math.max(0, now.demandW - (supply - charge));
+        const targetW = territoryDemand
+          ? territoryAdditionalDemandW(territoryInput(), facilityTerritoryId(g))
+          : Math.max(0, now.demandW - (supply - charge));
         const requiredTargetW = Math.max(targetW, mandatedW);
         switch (g.fuel) {
           case "Sun":
@@ -5533,7 +5620,12 @@ function* supplyFacilitiesFinancesPhases(
                 i < indexOfLastUnchargedBattery
                 ? Math.max(
                     mandatedW,
-                    now.demandW + totalChargeNeeded - (supply - charge),
+                    territoryDemand
+                      ? territoryAdditionalDemandW(
+                          territoryInput(territoryChargeRequests(i)),
+                          facilityTerritoryId(g),
+                        )
+                      : now.demandW + totalChargeNeeded - (supply - charge),
                   )
                 : requiredTargetW,
             );
@@ -5624,6 +5716,13 @@ function* supplyFacilitiesFinancesPhases(
           });
         }
         supply += g.currentW;
+        if (territoryDemand)
+          nativeSources.push({
+            id: `facility:${g.id}`,
+            territoryId: facilityTerritoryId(g),
+            capacityW: g.currentW,
+            kind: "native",
+          });
         supplyByFuel[g.fuel] = (supplyByFuel[g.fuel] || 0) + g.currentW;
         if (hydro) {
           const generatedWh = (g.currentW / ticksPerHour) * GAME_TO_REAL_YEARS;
@@ -5646,7 +5745,9 @@ function* supplyFacilitiesFinancesPhases(
       }
       if (g.peakWh) {
         // Capable of storing electricity
-        const targetW = Math.max(0, now.demandW - (supply - charge));
+        const targetW = territoryDemand
+          ? territoryAdditionalDemandW(territoryInput(), facilityTerritoryId(g))
+          : Math.max(0, now.demandW - (supply - charge));
         if (g.currentWh > 0 && targetW > 0) {
           // If there's a need and we have charge, discharge
           g.currentW = Math.min(
@@ -5657,7 +5758,15 @@ function* supplyFacilitiesFinancesPhases(
           g.currentWh = Math.max(0, g.currentWh - g.currentW / ticksPerHour);
           supply += g.currentW;
           dischargedW += g.currentW;
+          if (territoryDemand)
+            nativeSources.push({
+              id: `facility:${g.id}`,
+              territoryId: facilityTerritoryId(g),
+              capacityW: g.currentW,
+              kind: "native",
+            });
         } else if (
+          !territoryDemand &&
           !peerSettlement &&
           g.currentWh < g.peakWh &&
           supply - charge > now.demandW
@@ -5695,6 +5804,13 @@ function* supplyFacilitiesFinancesPhases(
           g.currentW < 0 ? g.currentW / g.roundTripEfficiency : g.currentW;
         const watts = Math.max(0, dischargeW - currentGridW);
         reachableHeadroomW += watts;
+        if (territoryDemand)
+          territoryHeadroom.push({
+            id: `headroom:${g.id}`,
+            territoryId: facilityTerritoryId(g),
+            capacityW: watts,
+            kind: "native",
+          });
         storageHeadroom.set(g.id, { peakW: availablePeakW, watts });
       } else if (!WEATHER_DEPENDENT_FUELS.includes(g.fuel)) {
         const energyLimitedPeakW = hydro
@@ -5709,13 +5825,21 @@ function* supplyFacilitiesFinancesPhases(
                 GAME_TO_REAL_YEARS,
             )
           : availablePeakW;
-        reachableHeadroomW += Math.max(
+        const headroomW = Math.max(
           0,
           Math.min(
             energyLimitedPeakW - g.currentW,
             (g.peakW * TICK_MINUTES) / g.spinMinutes,
           ),
         );
+        reachableHeadroomW += headroomW;
+        if (territoryDemand)
+          territoryHeadroom.push({
+            id: `headroom:${g.id}`,
+            territoryId: facilityTerritoryId(g),
+            capacityW: headroomW,
+            kind: "native",
+          });
       }
       if (hydro) {
         hydroReservoirWh += g.reservoirWh || 0;
@@ -5724,15 +5848,26 @@ function* supplyFacilitiesFinancesPhases(
     }
   });
   // Weather generation serves load first; never buy an entitlement merely to export it.
-  const redundantEntitlementW = Math.min(
-    entitlementDeliveredW,
-    Math.max(0, supply - charge - now.demandW),
-  );
+  if (territoryDemand) {
+    territoryResult = routeTerritoryPower(territoryInput());
+    entitlementWatts = entitlementOffers.map(
+      (_, i) => territoryResult!.sourceW[nativeSources.length + i],
+    );
+  }
+  const redundantEntitlementW = territoryDemand
+    ? entitlementDeliveredW -
+      entitlementWatts.reduce((sum, watts) => sum + watts, 0)
+    : Math.min(
+        entitlementDeliveredW,
+        Math.max(0, supply - charge - now.demandW),
+      );
   entitlementDeliveredW -= redundantEntitlementW;
   supply -= redundantEntitlementW;
   let coveredLeft = entitlementDeliveredW;
-  const coveredReservations = entitlementOffers.map((source) => {
-    const watts = Math.min(coveredLeft, source.capacityW);
+  const coveredReservations = entitlementOffers.map((source, i) => {
+    const watts = territoryDemand
+      ? entitlementWatts[i]
+      : Math.min(coveredLeft, source.capacityW);
     coveredLeft -= watts;
     return { offer: source.offer, watts };
   });
@@ -5766,7 +5901,10 @@ function* supplyFacilitiesFinancesPhases(
             )
           );
         }, 0);
-  const chargeStorage = (availableW: number) => {
+  const chargeStorage = (
+    availableW: number,
+    territoryDraws?: ReadonlyMap<number, number>,
+  ) => {
     if (dischargedW > 0) return;
     let remaining = availableW;
     for (const battery of facilities) {
@@ -5785,6 +5923,7 @@ function* supplyFacilitiesFinancesPhases(
         0,
         Math.min(
           remaining,
+          territoryDraws?.get(battery.id) ?? Infinity,
           battery.peakW - alreadyChargingW,
           ((battery.peakWh - battery.currentWh) * ticksPerHour) /
             battery.roundTripEfficiency,
@@ -5812,24 +5951,56 @@ function* supplyFacilitiesFinancesPhases(
       remaining -= draw;
     }
   };
-  if (peerSettlement && transmission.buyingRule === "SHORTAGES_AND_STORAGE")
+  if (
+    !territoryDemand &&
+    peerSettlement &&
+    transmission.buyingRule === "SHORTAGES_AND_STORAGE"
+  )
     chargeStorage(Math.max(0, supply - charge - now.demandW));
   let peer: PeerSettlement | undefined;
   if (peerSettlement) {
     const peerExportHeadroom = peerHeadroom.filter(
-      (item) => peerTradePrice(state, now) > item.costPerMWh,
+      (item) =>
+        !territoryDemand && peerTradePrice(state, now) > item.costPerMWh,
     );
     const storageChargeW =
       transmission.buyingRule === "SHORTAGES_AND_STORAGE"
-        ? chargeCapacityW()
+        ? territoryDemand
+          ? territoryAdditionalDemandW(
+              territoryInput(territoryChargeRequests()),
+              "champlain",
+            ) - territoryAdditionalDemandW(territoryInput(), "champlain")
+          : chargeCapacityW()
         : 0;
     const reserveW = now.demandW * PEER_TRADE_RESERVE_FRACTION;
     const intensity = (g: GeneratorOperatingType) =>
       (g.btuPerWh || 0) * (FUELS[g.fuel]?.kgCO2ePerBtu || 0) * 1e6;
     peer = yield {
       storageChargeW,
-      offerW:
-        storageChargeW > 0
+      offerW: territoryDemand
+        ? (() => {
+            const sinks = [
+              ...territoryChargeRequests(),
+              {
+                id: "peer-export",
+                territoryId: "champlain" as TerritoryId,
+                capacityW: Math.max(
+                  0,
+                  nativeSources.reduce(
+                    (sum, source) => sum + source.capacityW,
+                    0,
+                  ) -
+                    now.demandW -
+                    reserveW,
+                ),
+                priority: 2,
+              },
+            ];
+            return routeTerritoryPower(territoryInput(sinks)).sinkW[
+              sinks.length - 1
+            ];
+          })()
+        : storageChargeW > 0
           ? 0
           : Math.max(0, supply - charge - now.demandW - reserveW) +
             Math.max(
@@ -5837,7 +6008,9 @@ function* supplyFacilitiesFinancesPhases(
               peerExportHeadroom.reduce((sum, item) => sum + item.watts, 0) -
                 Math.max(0, now.demandW + reserveW + charge - supply),
             ),
-      shortageW: Math.max(0, now.demandW + charge - supply),
+      shortageW: territoryDemand
+        ? territoryAdditionalDemandW(territoryInput(), "champlain")
+        : Math.max(0, now.demandW + charge - supply),
       pricePerMWh: peerTradePrice(state, now),
       temperatureC: now.temperatureC,
       solarIrradianceWM2: now.solarIrradianceWM2,
@@ -5923,7 +6096,7 @@ function* supplyFacilitiesFinancesPhases(
       extra -= delivered;
     }
     supply += (peer?.importedW || 0) - (peer?.exportedW || 0);
-    if (transmission.buyingRule !== "SHORTAGES_AND_STORAGE")
+    if (!territoryDemand && transmission.buyingRule !== "SHORTAGES_AND_STORAGE")
       chargeStorage(
         Math.max(0, supply - charge - now.demandW - (peer?.importedW || 0)),
       );
@@ -5935,6 +6108,7 @@ function* supplyFacilitiesFinancesPhases(
     ({ yearsToBuildLeft, corridorId }) =>
       yearsToBuildLeft <= 0 &&
       !isPeerCorridorId(corridorId) &&
+      !isInternalTerritoryCorridor(state, corridorId) &&
       !ownedUtilityConnection(state, corridorId),
   );
   const intertieContext = intertieContextForGame(state);
@@ -5974,15 +6148,62 @@ function* supplyFacilitiesFinancesPhases(
     0,
     Infinity,
   ).exportedW.reduce((sum, w) => sum + w, 0);
+  const peerSources: TerritoryDispatchSource[] =
+    territoryDemand && (peer?.importedW ?? 0) > 0
+      ? [
+          {
+            id: "peer-import",
+            territoryId: "champlain",
+            capacityW: peer!.importedW,
+            kind: "import",
+          },
+        ]
+      : [];
+  const peerSinks =
+    territoryDemand && (peer?.exportedW ?? 0) > 0
+      ? [
+          {
+            id: "peer-export",
+            territoryId: "champlain" as TerritoryId,
+            capacityW: peer!.exportedW,
+            priority: -1,
+          },
+        ]
+      : [];
+  const utilityChargeSinks =
+    territoryDemand && dischargedW === 0 ? territoryChargeRequests() : [];
+  const customerBatterySinks =
+    territoryDemand && trackCustomerBattery
+      ? TERRITORIES.filter(({ id }) => territoryDemand[id] > 0).map(
+          ({ id }) => ({
+            id: `customer-battery:${id}`,
+            territoryId: id,
+            capacityW:
+              (batteryFleet.powerW * territoryDemand[id]) / now.demandW,
+            priority: 1,
+          }),
+        )
+      : [];
+  const customerBatterySurplus =
+    territoryDemand && customerBatterySinks.length
+      ? routeTerritoryPower(
+          territoryInput(
+            [...utilityChargeSinks, ...customerBatterySinks, ...peerSinks],
+            peerSources,
+          ),
+        ).sinkW.slice(
+          utilityChargeSinks.length,
+          utilityChargeSinks.length + customerBatterySinks.length,
+        )
+      : [];
   // Export already-produced surplus; unused dispatchable capacity remains ready without
   // burning fuel or pretending that a reserve is electricity supplied to customers.
   const batteryAfter = trackCustomerBattery
     ? dispatchCustomerBattery(batteryFleet, batteryBefore.storedWh, {
         rooftopSurplusW: now.rooftopSurplusW ?? 0,
-        gridSurplusW: Math.max(
-          0,
-          supply - charge - now.demandW - (peer?.importedW ?? 0),
-        ),
+        gridSurplusW: territoryDemand
+          ? customerBatterySurplus.reduce((sum, watts) => sum + watts, 0)
+          : Math.max(0, supply - charge - now.demandW - (peer?.importedW ?? 0)),
         stepMinutes,
         enabled: batteryEnabled && batteryBefore.dischargeW === 0,
         peak: batteryPeak,
@@ -5999,7 +6220,7 @@ function* supplyFacilitiesFinancesPhases(
   const peerStorageImportedW = peer?.storageImportedW || 0;
   const localSupplyW =
     supply - charge - peerStorageImportedW - batteryAfter.gridChargeW;
-  const clearing = clearTransmissionMarket({
+  let clearing = clearTransmissionMarket({
     // Contract/load arithmetic may leave a few ULPs at the served-load boundary.
     localSupplyW: state.utilityExpansion
       ? supplyAtDemandBoundary(localSupplyW, now.demandW)
@@ -6012,17 +6233,103 @@ function* supplyFacilitiesFinancesPhases(
     sellingRule: (peer?.importedW || 0) > 0 ? "NONE" : transmission.sellingRule,
     storageChargeW: Math.max(0, chargeCapacityW() - peerStorageImportedW),
   });
-  const importedW =
+  let importedW =
     clearing.importedW + (peer?.importedW || 0) + entitlementDeliveredW;
-  const storageImportedW = clearing.storageImportedW + peerStorageImportedW;
-  const flows = allocateIntertieFlows(
+  let storageImportedW = clearing.storageImportedW + peerStorageImportedW;
+  let flows = allocateIntertieFlows(
     offers,
     clearing.importedW,
     clearing.exportedW,
     importReservations,
   );
+  let territoryMarket: ReturnType<typeof clearTerritoryMarket> | undefined;
+  if (territoryDemand) {
+    const customerChargeSinks = customerBatterySinks.map((sink, i) => ({
+      ...sink,
+      capacityW:
+        customerBatterySurplus.reduce((sum, watts) => sum + watts, 0) > 0
+          ? (batteryAfter.gridChargeW * customerBatterySurplus[i]) /
+            customerBatterySurplus.reduce((sum, watts) => sum + watts, 0)
+          : 0,
+    }));
+    const input = territoryInput(
+      [...utilityChargeSinks, ...customerChargeSinks, ...peerSinks],
+      peerSources,
+    );
+    // Agreements were already dispatched before co-op clearing. Spot purchases cannot expand
+    // their reserved delivery or turn a paid contract into energy for storage/export.
+    input.sources = input.sources.map((source, i) =>
+      source.kind === "agreement"
+        ? { ...source, capacityW: entitlementWatts[i - nativeSources.length] }
+        : source,
+    );
+    territoryMarket = clearTerritoryMarket({
+      input,
+      interfaces: offers.map((offer, i) => ({
+        offer,
+        territoryId:
+          operatingLines[i].corridorId === "vt-champlain-valley" ||
+          operatingLines[i].corridorId === "vt-champlain-ridge"
+            ? "champlain"
+            : territoryForCorridor(operatingLines[i].corridorId),
+      })),
+      reservations: importReservations,
+      buyingRule: (peer?.exportedW ?? 0) > 0 ? "NONE" : transmission.buyingRule,
+      sellingRule:
+        (peer?.importedW ?? 0) > 0 ? "NONE" : transmission.sellingRule,
+    });
+    territoryResult = territoryMarket.result;
+    entitlementWatts = entitlementOffers.map(
+      (_, i) => territoryResult!.sourceW[nativeSources.length + i],
+    );
+    entitlementDeliveredW = entitlementWatts.reduce(
+      (sum, watts) => sum + watts,
+      0,
+    );
+    coveredReservations.forEach((reservation, i) => {
+      reservation.watts = entitlementWatts[i];
+    });
+    flows = {
+      importedW: territoryMarket.importedW,
+      exportedW: territoryMarket.exportedW,
+    };
+    const spotImportedW = flows.importedW.reduce(
+      (sum, watts) => sum + watts,
+      0,
+    );
+    const spotExportedW = flows.exportedW.reduce(
+      (sum, watts) => sum + watts,
+      0,
+    );
+    storageImportedW = territoryMarket.storageImportedW;
+    clearing = {
+      importedW: spotImportedW,
+      storageImportedW: Math.max(0, storageImportedW - peerStorageImportedW),
+      exportedW: spotExportedW,
+      localAvailableSupplyW: supplyAtDemandBoundary(
+        territoryResult.totalServedW,
+        now.demandW,
+      ),
+    };
+    importedW = spotImportedW + (peer?.importedW ?? 0) + entitlementDeliveredW;
+    const chargeDraws = new Map(
+      utilityChargeSinks.map((sink, i) => [
+        Number(sink.id.slice(7)),
+        territoryResult!.sinkW[i],
+      ]),
+    );
+    chargeStorage(
+      [...chargeDraws.values()].reduce((sum, watts) => sum + watts, 0),
+      chargeDraws,
+    );
+    for (const edge of territoryResult.flows) {
+      const line = transmission.lines.find(({ id }) => id === edge.id);
+      if (line) line.currentFlowW = edge.watts;
+    }
+  }
   let additionalExportW = 0;
   if (
+    !territoryDemand &&
     transmission.sellingRule === "PROFITABLE" &&
     importedW === 0 &&
     localSupplyW >= now.demandW
@@ -6046,7 +6353,7 @@ function* supplyFacilitiesFinancesPhases(
   }
   const exportedW =
     clearing.exportedW + additionalExportW + (peer?.exportedW || 0);
-  chargeStorage(storageImportedW);
+  if (!territoryDemand) chargeStorage(storageImportedW);
   if (
     transmission.buyingRule === "SHORTAGES_AND_STORAGE" ||
     storageImportedW > 0
@@ -6092,8 +6399,10 @@ function* supplyFacilitiesFinancesPhases(
   const agreementSettlements: import("../Types").PowerAgreementSettlement[] =
     [];
   let entitlementLeftW = entitlementDeliveredW;
-  for (const offer of entitlementOffers) {
-    const delivered = Math.min(entitlementLeftW, offer.capacityW);
+  for (const [index, offer] of entitlementOffers.entries()) {
+    const delivered = territoryDemand
+      ? entitlementWatts[index]
+      : Math.min(entitlementLeftW, offer.capacityW);
     entitlementLeftW -= delivered;
     importCostPerHour += delivered * offer.pricePerMWh;
     const availableW = (
@@ -6152,8 +6461,10 @@ function* supplyFacilitiesFinancesPhases(
   now.supplyW = supply;
   // Firm agreement headroom uses its own access limits, including when spot buying is off.
   let usedCoveredW = entitlementDeliveredW;
-  const agreementHeadroomOffers = entitlementOffers.map((source) => {
-    const used = Math.min(usedCoveredW, source.capacityW);
+  const agreementHeadroomOffers = entitlementOffers.map((source, i) => {
+    const used = territoryDemand
+      ? entitlementWatts[i]
+      : Math.min(usedCoveredW, source.capacityW);
     usedCoveredW -= used;
     return { ...source.offer, importLimitW: source.capacityW - used };
   });
@@ -6176,6 +6487,114 @@ function* supplyFacilitiesFinancesPhases(
     reachableHeadroomW +
     exportedW +
     remainingImportHeadroomW;
+  if (territoryDemand && territoryMarket) {
+    const regionSources = territoryMarket.sources;
+    const regionSinks = territoryMarket.sinks;
+    now.territories = Object.fromEntries(
+      TERRITORIES.filter(({ id }) => ownedTerritories(state).includes(id)).map(
+        ({ id }) => {
+          const generationW = facilities.reduce(
+            (sum, facility) =>
+              sum +
+              (!isStorage(facility) &&
+              !facility.paused &&
+              facility.yearsToBuildLeft === 0 &&
+              facilityTerritoryId(facility) === id
+                ? facility.currentW
+                : 0),
+            0,
+          );
+          const importedW = regionSources.reduce(
+            (sum, source, i) =>
+              sum +
+              (source.territoryId === id && source.kind !== "native"
+                ? territoryMarket!.result.sourceW[i]
+                : 0),
+            0,
+          );
+          const exportedW = regionSinks.reduce(
+            (sum, sink, i) =>
+              sum +
+              (sink.territoryId === id &&
+              (sink.id.startsWith("export:") || sink.id === "peer-export")
+                ? territoryMarket!.result.sinkW[i]
+                : 0),
+            0,
+          );
+          const storageChargeW = regionSinks.reduce(
+            (sum, sink, i) =>
+              sum +
+              (sink.territoryId === id &&
+              (sink.id.startsWith("charge:") ||
+                sink.id.startsWith("customer-battery:"))
+                ? territoryMarket!.result.sinkW[i]
+                : 0),
+            0,
+          );
+          const storageDischargeW = facilities.reduce(
+            (sum, facility) =>
+              sum +
+              (isStorage(facility) &&
+              !facility.paused &&
+              facility.yearsToBuildLeft === 0 &&
+              facilityTerritoryId(facility) === id
+                ? Math.max(0, facility.currentW)
+                : 0),
+            0,
+          );
+          const curtailedW = regionSources.reduce(
+            (sum, source, i) =>
+              sum +
+              (source.territoryId === id && source.kind === "native"
+                ? Math.max(
+                    0,
+                    source.capacityW - territoryMarket!.result.sourceW[i],
+                  )
+                : 0),
+            0,
+          );
+          const supplyW = supplyAtDemandBoundary(
+            territoryMarket!.result.servedW[id],
+            territoryDemand[id],
+          );
+          return [
+            id,
+            {
+              demandW: territoryDemand[id],
+              supplyW,
+              generationW,
+              importedW,
+              exportedW,
+              storageChargeW,
+              storageDischargeW,
+              unservedW: Math.max(0, territoryDemand[id] - supplyW),
+              curtailedW,
+            },
+          ];
+        },
+      ),
+    );
+    // Only customer-bearing territory nodes can absorb additional reserves. Empty land has
+    // to carry its spare generation through its real connection before it counts.
+    const reserveDemand = Object.fromEntries(
+      TERRITORIES.map(({ id }) => [id, territoryDemand[id] > 0 ? 1e12 : 0]),
+    ) as Record<TerritoryId, number>;
+    const reserveSources = [
+      ...nativeSources,
+      ...territoryHeadroom,
+      ...agreementSources,
+    ];
+    const reserveSupply = routeTerritoryPower({
+      demandW: reserveDemand,
+      edges: territoryEdges,
+      sources: reserveSources,
+    }).totalServedW;
+    now.availableSupplyW = Math.max(now.supplyW, reserveSupply);
+    now.reserveW =
+      now.supplyW < now.demandW
+        ? now.supplyW - now.demandW
+        : Math.max(0, reserveSupply - now.demandW);
+  } else delete now.territories;
   if (sharedClearing) {
     // Actual purchases across every company have priority over anybody's unused headroom.
     // Keep native generation reserves here; the host assigns the remaining regional budget
@@ -7256,10 +7675,12 @@ function buildFacilityHelper(
       resilienceExtraBuildCost: _resilienceExtraBuildCost,
       startingAssetId: _startingAssetId,
       assetId: _assetId,
+      territoryId: _territoryId,
       ...facilitySnapshot
     } = g as FacilityShoppingType & {
       startingAssetId?: string;
       assetId?: string;
+      territoryId?: TerritoryId;
     };
     const facility = {
       ...facilitySnapshot,

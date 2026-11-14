@@ -53,7 +53,7 @@ export function inheritedConnection(
   return {
     id: lineId,
     corridorId: INHERITED_CONNECTIONS[id],
-    name: `${id === "champlain" ? "Champlain" : id === "valley-electric" ? "Valley" : "Ridge"} regional connection`,
+    name: `${id === "champlain" ? "Champlain" : id === "valley-electric" ? "Valley" : "Ridge"} ↔ Regional grid`,
     capacityW: UTILITY_AREAS[id].sourceInterfaceW,
     buildCost: 0,
     annualOperatingCost: 0,
