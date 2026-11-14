@@ -677,6 +677,8 @@ describe("Insights layers", () => {
   let overviewProjection: ProjectionView;
   let exchangeGame: GameType;
   let exchangeProjection: ProjectionView;
+  let tutorialGame: GameType;
+  let tutorialProjection: ProjectionView;
   beforeAll(() => {
     // Layer/preset controls share immutable real inputs and a real forecast. Cache
     // regression cases still create independent games with distinct history identities.
@@ -701,6 +703,15 @@ describe("Insights layers", () => {
       () => {},
     );
   }, 60_000);
+  beforeAll(() => {
+    // Mission 4 also forecasts twenty years. Prepare its real immutable inputs
+    // before the preset-interaction test's deadline, just like Overview above.
+    tutorialGame = createNextState(createGame({ scenarioId: 4 }), () => {});
+    tutorialProjection = createNextState(
+      selectProjection(tutorialGame, tutorialGame.timeline[0]),
+      () => {},
+    );
+  });
   beforeEach(() => {
     localStorage.clear();
     // Other cases play different seeds and locations. Reusing the immutable game
@@ -1047,19 +1058,30 @@ describe("Insights layers", () => {
   });
 
   it("checks required tutorial layers when the selected preset omits them", async () => {
-    renderInsights(4);
+    loadSimData(tutorialGame.location);
+    cacheProjection(tutorialGame, tutorialProjection);
+    renderInsights(4, tutorialGame);
     await user.click(labelledButton(/Layers/));
 
     const expectRequiredLayers = () => {
+      // Scope label lookup to the editor, avoiding repeated scans of the finance table.
+      const panel = screen.getByLabelText("Data layers");
+      expect(panel).toHaveRole("region");
+      expect(isInaccessible(panel)).toBe(false);
       for (const name of ["Profit", "Finance details"]) {
-        const checkbox = labelledCheckbox(name);
+        const checkbox = labelledCheckbox(name, panel);
         expect(checkbox).toBeChecked();
         expect(checkbox).toBeDisabled();
-        expect(screen.getByRole("heading", { name })).toBeVisible();
+        const heading = screen.getByLabelText(name, { selector: "h3" });
+        expect(heading).toHaveRole("heading");
+        expect(heading).toHaveAccessibleName(name);
+        expect(heading).toBeVisible();
+        expect(isInaccessible(heading)).toBe(false);
       }
-      expect(labelledCheckbox("Supply & Demand")).toBeChecked();
-      expect(labelledCheckbox("Supply & Demand")).toBeEnabled();
-      expect(labelledCheckbox("Fuel Prices")).not.toBeChecked();
+      const supplyDemand = labelledCheckbox("Supply & Demand", panel);
+      expect(supplyDemand).toBeChecked();
+      expect(supplyDemand).toBeEnabled();
+      expect(labelledCheckbox("Fuel Prices", panel)).not.toBeChecked();
     };
     expectRequiredLayers();
     await choosePreset("Profitability");
@@ -2238,8 +2260,8 @@ function gameWithOpenIntertie(): GameType {
 
 // Label queries avoid repeatedly computing every MUI checkbox's accessible name.
 // Check accessibility explicitly so a hidden labelled input still fails the contract.
-function labelledCheckbox(label: string): HTMLElement {
-  const checkbox = screen.getByLabelText(label, {
+function labelledCheckbox(label: string, scope?: HTMLElement): HTMLElement {
+  const checkbox = (scope ? within(scope) : screen).getByLabelText(label, {
     selector: 'input[type="checkbox"]',
   });
   expect(checkbox).toHaveRole("checkbox");

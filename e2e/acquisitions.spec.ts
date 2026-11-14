@@ -81,30 +81,86 @@ for (const theme of ["light", "dark"] as const) {
       await openBuild(page);
       await page.getByRole("tab", { name: "Interties", exact: true }).click();
       await page
-        .getByRole("button", { name: `Review ${target} company`, exact: true })
+        .getByRole("button", {
+          name: `Acquisition terms for ${target}`,
+          exact: true,
+        })
         .click();
       const terms = page.getByRole("dialog", {
-        name: `${target} company terms`,
+        name: "Acquisition terms",
         exact: true,
       });
       await expectDialogToFit(terms);
+      const card = page.locator(
+        `.transmissionProject[data-corridor-id="vt-champlain-${target === "Valley Electric" ? "valley" : "ridge"}"]`,
+      );
       for (const text of [
-        "Equity price + fee",
+        "Company equity price",
         "Assumed debt",
-        "Customers joining today",
-        "Seller load reference · January 2005",
-        "Cash purchase",
-        "Financed cash due",
-        "Your cash",
-        "Debt payments with financing",
-        "Debt payments after cash purchase",
+        "Company customers",
+      ]) {
+        await expect(card).not.toContainText(text);
+      }
+      const table = terms.getByRole("table", {
+        name: `${target} acquisition terms`,
+      });
+      await expect(table.getByRole("rowheader")).toHaveText([
+        "Price",
+        "Assumed debt",
+        "Customers",
+        "Loan down payment",
+        "Debt & upkeep · cash",
+        "Debt & upkeep · loan",
+      ]);
+      const insets = await table.getByRole("row").evaluateAll((rows) =>
+        rows.map((row) => {
+          const label = row.querySelector("th")!;
+          const value = row.querySelector("td")!;
+          return {
+            left: getComputedStyle(label).paddingLeft,
+            right: getComputedStyle(value).paddingRight,
+          };
+        }),
+      );
+      for (const inset of insets) expect(inset.right).toBe(inset.left);
+      await expect(terms).not.toContainText("Your cash");
+      await expect(terms).not.toContainText("Cash purchase");
+      await expect(terms).not.toContainText("Cash covers today’s offer");
+      await expect(terms).toContainText("Price and down payment include fees");
+      if (
+        process.env.REVIEW_SCREENSHOT_DIR &&
+        target === "Valley Electric" &&
+        ((testInfo.project.name === "desktop-chromium" && theme === "light") ||
+          (testInfo.project.name === "mobile-360px" && theme === "dark"))
+      ) {
+        await page.mouse.move(0, 0);
+        await terms.screenshot({
+          path: path.join(
+            process.env.REVIEW_SCREENSHOT_DIR,
+            `terms-${testInfo.project.name}-${theme}.png`,
+          ),
+          animations: "disabled",
+        });
+      }
+      for (const title of [
+        "Plants & purchased power",
+        "Demand reference · January 2005",
+        "Supply & network changes",
+        "Scenario goals",
+      ]) {
+        await terms.locator("summary").filter({ hasText: title }).click();
+        await expectDialogToFit(terms);
+      }
+      for (const text of [
         "Operating plants",
         "Purchased power",
-        "Scenario obligations",
         "Jan 2020 · Champlain Electric",
         "Jan 2015: 1.5× opening upkeep",
-      ])
-        await expect(terms).toContainText(text);
+      ]) {
+        await expect(
+          terms.getByText(text, { exact: false }).first(),
+        ).toBeVisible();
+      }
       if (target === "Valley Electric")
         await expect(terms).toContainText("Jan 2017");
       await expect(terms).toContainText(
@@ -124,6 +180,21 @@ for (const theme of ["light", "dark"] as const) {
         testInfo.project.use.hasTouch ? 44 : 40,
       );
       await back.click();
+      if (
+        process.env.REVIEW_SCREENSHOT_DIR &&
+        target === "Valley Electric" &&
+        testInfo.project.name === "desktop-chromium" &&
+        theme === "light"
+      ) {
+        await page.mouse.move(0, 0);
+        await card.screenshot({
+          path: path.join(
+            process.env.REVIEW_SCREENSHOT_DIR,
+            "intertie-build-desktop-light.png",
+          ),
+          animations: "disabled",
+        });
+      }
       const review = page.getByRole("button", {
         name: new RegExp(`Review purchase of .*${target}`),
       });

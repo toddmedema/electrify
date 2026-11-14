@@ -61,7 +61,6 @@ import {
 import {
   formatBuildMonths,
   formatMoneyConcise,
-  formatCount,
   formatNumber,
   formatForecastMoney,
   formatForecastPercent,
@@ -285,7 +284,6 @@ function IntertieBuildItem(props: {
   exportCapacityW: number;
   constructionKgco2eTotal: number;
   year: number;
-  company?: ReturnType<typeof utilityOffer>;
   onCompanyReview?: () => void;
 }): React.JSX.Element {
   const { cash, corridor, outlook, units } = props;
@@ -375,25 +373,6 @@ function IntertieBuildItem(props: {
               value={`${formatMass(importEmissionsKgco2ePerMWh(market.id, props.year), units)}/MWh`}
             />
           )}
-          {props.company && (
-            <>
-              <BuildMetric
-                label="Company equity price"
-                entry={MANUAL_ENTRY.INTERTIES}
-                value={formatMoneyConcise(props.company.equityPrice)}
-              />
-              <BuildMetric
-                label="Assumed debt"
-                entry={MANUAL_ENTRY.INTEREST_RATES}
-                value={formatMoneyConcise(props.company.assumedDebt)}
-              />
-              <BuildMetric
-                label="Company customers"
-                entry={MANUAL_ENTRY.CUSTOMERS}
-                value={formatCount(props.company.customers)}
-              />
-            </>
-          )}
         </>
       }
       footerActions={
@@ -401,9 +380,9 @@ function IntertieBuildItem(props: {
           <Button
             size="small"
             onClick={props.onCompanyReview}
-            aria-label={`Review ${name} company`}
+            aria-label={`Acquisition terms for ${name}`}
           >
-            Company terms
+            Acquisition terms
           </Button>
         )
       }
@@ -1533,7 +1512,6 @@ export default function TransmissionPanel({
                   interestRate={game.interestRate}
                   outlook={outlookFor(corridor.id, corridor.capacityW)}
                   units={units}
-                  company={offer}
                   onCompanyReview={
                     offer ? () => setCompanyTargetId(offer.targetId) : undefined
                   }

@@ -2,7 +2,7 @@ import * as React from "react";
 import { Box, Button, Typography } from "@mui/material";
 import type { GameType } from "../../Types";
 import { utilityOffer } from "../../helpers/Expansion";
-import { activeScenario, currentTick } from "../../helpers/GameSelectors";
+import { activeScenario } from "../../helpers/GameSelectors";
 import { scenarioObjectiveDefinitions } from "../../helpers/ObjectiveRules";
 import { objectiveGoalGroups } from "../../helpers/ObjectivePresentation";
 import {
@@ -46,7 +46,7 @@ export default function UtilityOfferDialog({
       <DecisionDialog
         open
         closable
-        title="Company terms unavailable"
+        title="Acquisition terms unavailable"
         onClose={onClose}
         actions={<Button onClick={onClose}>Back to connections</Button>}
       >
@@ -56,7 +56,6 @@ export default function UtilityOfferDialog({
         </Typography>
       </DecisionDialog>
     );
-  const cash = currentTick(game)?.cash ?? 0;
   const money = formatMoneyConcise;
   const scenario = activeScenario(game);
   const seller = UTILITY_AREAS[offer.targetId];
@@ -69,113 +68,141 @@ export default function UtilityOfferDialog({
       fullWidth
       maxWidth="sm"
       closable
-      title={`${offer.name} company terms`}
+      title="Acquisition terms"
+      contentClassName="acquisitionTermsContent"
       onClose={onClose}
       actions={<Button onClick={onClose}>Back to connections</Button>}
     >
       <Typography variant="body2" sx={{ mb: 2 }}>
-        Connect first, then review and acquire the company separately. These are
-        today’s terms; prices and customer counts change before you buy.
+        Connect to {offer.name} first, then acquire it separately. Terms may
+        change before purchase.
       </Typography>
-      <BuildDetails label={`${offer.name} company terms`}>
-        <BuildDetailRow
-          label="Equity price + fee"
-          value={`${money(offer.equityPrice)} + ${money(offer.fee)}`}
-        />
+      <BuildDetails label={`${offer.name} acquisition terms`}>
+        <BuildDetailRow label="Price" value={money(offer.cashDue)} />
         <BuildDetailRow label="Assumed debt" value={money(offer.assumedDebt)} />
         <BuildDetailRow
-          label="Customers joining today"
+          label="Customers"
           value={formatCount(offer.customers)}
         />
-        <BuildDetailRow label="Cash purchase" value={money(offer.cashDue)} />
         <BuildDetailRow
-          label="Financed cash due"
+          label="Loan down payment"
           value={money(offer.financedCashDue)}
         />
-        <BuildDetailRow label="Your cash" value={money(cash)} />
         <BuildDetailRow
-          label="Cash covers today’s offer"
-          value={`Cash purchase: ${cash >= offer.cashDue ? "yes" : "no"} · Financed down payment: ${cash >= offer.financedCashDue ? "yes" : "no"}`}
+          label="Debt & upkeep · cash"
+          value={`${money(offer.cashMonthlyDebtService + offer.networkOMPerMonth)}/mo`}
         />
         <BuildDetailRow
-          label="Debt payments with financing"
-          value={`${money(offer.monthlyDebtService)}/mo`}
-        />
-        <BuildDetailRow
-          label="Debt payments after cash purchase"
-          value={`${money(offer.cashMonthlyDebtService)}/mo`}
-        />
-        <BuildDetailRow
-          label="Added service-network costs"
-          value={`${money(offer.networkOMPerMonth)}/mo today; rises with customer growth`}
-        />
-        <BuildDetailRow
-          label="Operating plants"
-          value={offer.facilities
-            .map(
-              (facility) =>
-                `${facilityDisplayName(facility)} ${formatWatts(facility.peakW)} (${facility.ageYears.toFixed(0)} years old)`,
-            )
-            .join(" · ")}
-        />
-        <BuildDetailRow
-          label="Purchased power"
-          value={
-            offer.contracts
-              .map(
-                (contract) =>
-                  `${contract.name}: ${contract.balancing ? "up to " : ""}${formatWatts(contract.deliverableW)} at ${money(contract.pricePerMWh)}/MWh${contract.balancing ? " (variable, not firm reserve)" : ""}`,
-              )
-              .join(" · ") || "No inherited purchased-power rights remain."
-          }
+          label="Debt & upkeep · loan"
+          value={`${money(offer.monthlyDebtService + offer.networkOMPerMonth)}/mo`}
         />
       </BuildDetails>
-      <Typography component="h3" variant="subtitle2" sx={{ mt: 2 }}>
-        Seller load reference · January 2005
+      <Typography variant="body2" color="textSecondary" sx={{ mb: 1 }}>
+        Price and down payment include fees. Assumed debt transfers with either
+        option.
       </Typography>
-      <Typography variant="body2" sx={{ mt: 1 }}>
-        {formatCount(seller.customers)} opening accounts ·{" "}
-        {formatWattHours(seller.annualEnergyMWh * 1e6)} annual delivered energy
-        · {formatWatts(seller.peakDemandW)} peak demand.
+      <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
+        Includes {money(offer.networkOMPerMonth)}/mo in network upkeep, which
+        rises with customer growth and inflation. Plant operations and power
+        purchases cost extra.
       </Typography>
-      <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
-        These are the seller’s fixed-account opening load figures. Today’s
-        customers appear above; tariffs, growth and the combined demand profile
-        change the load after acquisition. Individual utility peaks do not add
-        to a combined-company peak.
-      </Typography>
-      <UtilityContractSchedule game={game} targetId={offer.targetId} />
-      <Typography variant="body2" color="warning.main" sx={{ mt: 2 }}>
-        {targetId === "valley-electric"
-          ? !nuclear
-            ? "Valley’s inherited nuclear purchase has expired."
-            : game.date.year >= 2017
-              ? `Valley’s nuclear purchase is now ${formatWatts(nuclear.deliverableW)} deliverable, reduced in January 2017.`
-              : `Valley’s nuclear purchase falls from ${formatWatts(152e6)} to ${formatWatts(76e6)} deliverable in January 2017.`
-          : "Ridge has steadier industrial demand, with greater exposure to gas prices and wind."}
-      </Typography>
-      <Typography component="h3" variant="subtitle2" sx={{ mt: 2 }}>
-        Scenario obligations
-      </Typography>
-      {objectiveGoalGroups(
-        scenarioObjectiveDefinitions(scenario, game),
-        game.startingYear,
-        scenario?.durationMonths ?? 240,
-      ).map((objective) => (
-        <Box key={objective.id} sx={{ mt: 1 }}>
-          {objective.goals.length > 1 && (
-            <Typography variant="body2" sx={{ fontWeight: 600 }}>
-              {objective.label}
+      <details className="acquisitionDisclosure">
+        <summary>Plants &amp; purchased power</summary>
+        <div>
+          <Typography component="h3" variant="subtitle2">
+            Operating plants
+          </Typography>
+          <Box component="ul" sx={{ pl: 2.5, my: 1, "& li + li": { mt: 1 } }}>
+            {offer.facilities.map((facility) => (
+              <Typography
+                component="li"
+                variant="body2"
+                key={facility.startingAssetId}
+              >
+                {facilityDisplayName(facility)} · {formatWatts(facility.peakW)}{" "}
+                · {facility.ageYears.toFixed(0)} years old
+              </Typography>
+            ))}
+          </Box>
+          <Typography component="h3" variant="subtitle2">
+            Purchased power
+          </Typography>
+          {offer.contracts.length ? (
+            <Box component="ul" sx={{ pl: 2.5, my: 1, "& li + li": { mt: 1 } }}>
+              {offer.contracts.map((contract) => (
+                <Typography component="li" variant="body2" key={contract.name}>
+                  {contract.name}: {contract.balancing ? "up to " : ""}
+                  {formatWatts(contract.deliverableW)} at{" "}
+                  {money(contract.pricePerMWh)}/MWh
+                  {contract.balancing ? " (variable, not firm reserve)" : ""}
+                </Typography>
+              ))}
+            </Box>
+          ) : (
+            <Typography variant="body2">
+              No inherited purchased-power rights remain.
             </Typography>
           )}
-          {objective.goals.map((goal) => (
-            <Typography key={goal} variant="body2">
-              {goal}
-              {objective.required ? "" : " (optional)"}
+          {targetId === "valley-electric" &&
+            (!nuclear || game.date.year >= 2017) && (
+              <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
+                {!nuclear
+                  ? "Valley’s inherited nuclear purchase has expired."
+                  : `Valley’s nuclear purchase is now ${formatWatts(nuclear.deliverableW)} deliverable, reduced in January 2017.`}
+              </Typography>
+            )}
+        </div>
+      </details>
+      <details className="acquisitionDisclosure">
+        <summary>Demand reference · January 2005</summary>
+        <div>
+          <Typography variant="body2">
+            {formatCount(seller.customers)} accounts ·{" "}
+            {formatWattHours(seller.annualEnergyMWh * 1e6)} annual delivered
+            energy · {formatWatts(seller.peakDemandW)} peak demand.
+          </Typography>
+          <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
+            Historical baseline; today’s customers are shown above. Tariffs and
+            growth change demand. Utility peaks do not add to a combined peak.
+          </Typography>
+          {targetId === "ridge-electric" && (
+            <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
+              Ridge has steadier industrial demand, with greater exposure to gas
+              prices and wind.
             </Typography>
+          )}
+        </div>
+      </details>
+      <details className="acquisitionDisclosure">
+        <summary>Supply &amp; network changes</summary>
+        <div>
+          <UtilityContractSchedule game={game} targetId={offer.targetId} />
+        </div>
+      </details>
+      <details className="acquisitionDisclosure">
+        <summary>Scenario goals</summary>
+        <div>
+          {objectiveGoalGroups(
+            scenarioObjectiveDefinitions(scenario, game),
+            game.startingYear,
+            scenario?.durationMonths ?? 240,
+          ).map((objective) => (
+            <Box key={objective.id} sx={{ mt: 1 }}>
+              {objective.goals.length > 1 && (
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                  {objective.label}
+                </Typography>
+              )}
+              {objective.goals.map((goal) => (
+                <Typography key={goal} variant="body2">
+                  {goal}
+                  {objective.required ? "" : " (optional)"}
+                </Typography>
+              ))}
+            </Box>
           ))}
-        </Box>
-      ))}
+        </div>
+      </details>
     </DecisionDialog>
   );
 }
