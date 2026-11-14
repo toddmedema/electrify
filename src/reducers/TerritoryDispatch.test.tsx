@@ -1,6 +1,7 @@
 import { GENERATORS, STORAGE } from "../data/Facilities";
+import { GAME_TO_REAL_YEARS, TICKS_PER_HOUR } from "../Constants";
 import { GREEN_UPLANDS_CORRIDOR_ID } from "../data/Territories";
-import { acquisitionQuote } from "../helpers/Expansion";
+import { acquisitionQuote, entitlementSources } from "../helpers/Expansion";
 import { currentTick } from "../helpers/GameSelectors";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "../helpers/DateTime";
 import { transmissionRatingW } from "../helpers/Transmission";
@@ -251,6 +252,92 @@ it("serves local PPA customers across a paused acquisition link without buying u
     5,
   );
   expectConserved(game);
+});
+
+it("never forecasts agreement delivery above its capacity or phantom spot delivery", () => {
+  const game = copyOfficialGame(opening);
+  game.facilities = [];
+  currentTick(game)!.customers = 1;
+  const forecast = generateForecastTimeline(game, currentTick(game)!.cash, 1);
+  expect(
+    forecast
+      .filter(
+        (tick) =>
+          tick.entitlementImportedW! > tick.entitlementImportCapacityW! ||
+          tick.importedW !== tick.entitlementImportedW,
+      )
+      .map((tick) => ({
+        minute: tick.minute,
+        deliveredW: tick.entitlementImportedW,
+        capacityW: tick.entitlementImportCapacityW,
+        spotW: tick.importedW! - tick.entitlementImportedW!,
+      })),
+  ).toEqual([]);
+});
+
+it.each([1, 2] as const)(
+  "serves a partial company load with nuclear agreements without phantom dirty delivery under version %s terms",
+  (termsVersion) => {
+    const game = copyOfficialGame(opening);
+    game.transmission!.inheritedAgreementTerms = termsVersion;
+    for (const facility of game.facilities) facility.paused = true;
+    const next = request(game, 200e6);
+    const dirtyAgreements = entitlementSources(game, next).filter(
+      (source) => source.emissionsKgPerMWh > 0,
+    );
+    expect(dirtyAgreements.length).toBeGreaterThan(0);
+    tickState(game);
+    const now = currentTick(game)!;
+    expect(now.entitlementImportedW).toBe(next.demandW);
+    expect(now.importedW).toBe(now.entitlementImportedW);
+    expect(
+      dirtyAgreements.map((source) => ({
+        agreementId: source.id,
+        usefulMWh: now.agreementUsefulMWh![source.id],
+        usefulValue: now.agreementUsefulValues![source.id],
+        ...(termsVersion === 1
+          ? { payment: now.agreementPayments![source.id] }
+          : {}),
+      })),
+    ).toEqual(
+      dirtyAgreements.map((source) => ({
+        agreementId: source.id,
+        usefulMWh: 0,
+        usefulValue: 0,
+        ...(termsVersion === 1 ? { payment: 0 } : {}),
+      })),
+    );
+    expect(now.importedKgco2e).toBe(0);
+    expect(now.marketPricePerMWh).toBe(40);
+    expectConserved(game);
+  },
+);
+
+it("retains a real one-watt dirty agreement delivery after nuclear supply is exhausted", () => {
+  const game = createGame({
+    scenarioId: 116,
+    seed: 12345,
+    difficulty: "Employee",
+  });
+  game.transmission!.inheritedAgreementTerms = 1;
+  game.transmission!.buyingRule = "NONE";
+  for (const facility of game.facilities) facility.paused = true;
+  const next = request(game, 95e6 + 1);
+  const dirtyAgreements = entitlementSources(game, next).filter(
+    (source) => source.emissionsKgPerMWh > 0,
+  );
+  tickState(game);
+  const now = currentTick(game)!;
+  const dirtyMWh = dirtyAgreements.reduce(
+    (sum, source) => sum + now.agreementUsefulMWh![source.id],
+    0,
+  );
+  expect((dirtyMWh * 1e6 * TICKS_PER_HOUR) / GAME_TO_REAL_YEARS).toBeCloseTo(
+    1,
+    6,
+  );
+  expect(now.importedKgco2e).toBeGreaterThan(0);
+  expect(now.supplyW).toBe(now.demandW);
 });
 
 it("prioritizes reachable customers over charging and stores stranded local surplus locally", () => {

@@ -1,6 +1,7 @@
 import type { BuyingRuleType, SellingRuleType, TerritoryId } from "../Types";
 import {
   allocateIntertieFlows,
+  supplyAtDemandBoundary,
   type IntertieOffer,
   type IntertieReservation,
 } from "./Transmission";
@@ -64,7 +65,12 @@ export function routeTerritoryPower({
   };
   const push = (path: number[], watts: number) => {
     for (let i = 1; i < path.length; i++) {
-      residual[path[i - 1]][path[i]] -= watts;
+      const remainingW = residual[path[i - 1]][path[i]];
+      // A fully served path must not leave a few ULPs for a later, dirtier source to buy.
+      residual[path[i - 1]][path[i]] = Math.max(
+        0,
+        remainingW - supplyAtDemandBoundary(watts, remainingW),
+      );
       residual[path[i]][path[i - 1]] += watts;
     }
   };
@@ -136,7 +142,10 @@ export function routeTerritoryPower({
     augment();
   }
   const servedW = Object.fromEntries(
-    IDS.map((id, i) => [id, demandW[id] - residual[i][sinkNode]]),
+    IDS.map((id, i) => [
+      id,
+      Math.max(0, Math.min(demandW[id], demandW[id] - residual[i][sinkNode])),
+    ]),
   ) as Record<TerritoryId, number>;
   // Freeze customer delivery. Lower-priority sinks can reroute existing deliveries, but cannot
   // take watts from an already-served customer or buy an agreement just to fill storage.
@@ -199,13 +208,24 @@ export function routeTerritoryPower({
         residual[6 + sources.length + i][sinkNode] = 0;
     });
   }
-  const sourceW = sources.map(
-    (source, i) =>
-      residual[6 + i][
-        source.kind === "agreement" ? agreementGateway : sourceNode
-      ],
+  // Reverse residuals accumulate several paths and can round above the original capacity.
+  const sourceW = sources.map((source, i) =>
+    Math.max(
+      0,
+      Math.min(
+        source.capacityW,
+        residual[6 + i][
+          source.kind === "agreement" ? agreementGateway : sourceNode
+        ],
+      ),
+    ),
   );
-  const sinkW = sinks.map((_, i) => residual[sinkNode][6 + sources.length + i]);
+  const sinkW = sinks.map((sink, i) =>
+    Math.max(
+      0,
+      Math.min(sink.capacityW, residual[sinkNode][6 + sources.length + i]),
+    ),
+  );
   return {
     servedW,
     sourceW,
@@ -215,7 +235,13 @@ export function routeTerritoryPower({
     // Positive means the neighbor is sending power toward Champlain (edge.from).
     flows: edges.map((edge) => ({
       id: edge.id,
-      watts: residual[index(edge.from)][index(edge.to)] - edge.capacityW,
+      watts: Math.max(
+        -edge.capacityW,
+        Math.min(
+          edge.capacityW,
+          residual[index(edge.from)][index(edge.to)] - edge.capacityW,
+        ),
+      ),
     })),
   };
 }
