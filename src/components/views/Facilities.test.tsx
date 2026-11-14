@@ -33,10 +33,168 @@ import {
   HAIL_DEFINITION_ID,
   retrofitCost,
 } from "../../helpers/Hazards";
-import { formatMoneyConcise } from "../../helpers/Format";
+import { formatCount, formatMoneyConcise } from "../../helpers/Format";
 import { GAME_TO_REAL_YEARS, TICKS_PER_HOUR } from "../../Constants";
 import { purchaseTerms } from "../../helpers/Financials";
 import { modScenario } from "../../mods/ModScenario";
+import { acquireUtility } from "../../reducers/GameActions";
+import { acquisitionQuote } from "../../helpers/Expansion";
+import { currentTick } from "../../helpers/GameSelectors";
+
+describe("acquired utilities", () => {
+  function expansionGame(acquire = true) {
+    let game = createGame({ scenarioId: 116, seed: 12345 });
+    for (const targetId of ["valley-electric", "ridge-electric"] as const) {
+      currentTick(game)!.cash = 2e9;
+      game = cloneDeep(
+        gameReducer(
+          game,
+          buildTransmissionLine({
+            corridorId: `vt-champlain-${targetId === "valley-electric" ? "valley" : "ridge"}`,
+            financed: true,
+          }),
+        ),
+      );
+      game.transmission!.lines.at(-1)!.yearsToBuildLeft = 0;
+      if (acquire) {
+        const quote = acquisitionQuote(game, targetId)!;
+        game = cloneDeep(
+          gameReducer(
+            game,
+            acquireUtility({
+              targetId,
+              financed: targetId === "valley-electric",
+              quoteKey: quote.quoteKey,
+            }),
+          ),
+        );
+      }
+    }
+    return game;
+  }
+
+  function show(game: GameType) {
+    render(
+      <Provider store={configureStore({ reducer: { ui: uiReducer } })}>
+        <TransmissionPanel
+          game={game}
+          onBuild={jest.fn()}
+          onUpgrade={jest.fn()}
+          onBuyingRule={jest.fn()}
+          onSellingRule={jest.fn()}
+        />
+      </Provider>,
+    );
+  }
+
+  it("does not show an ownership disclosure for independent utilities", () => {
+    show(expansionGame(false));
+    expect(screen.queryByText(/Acquired utilities/)).not.toBeInTheDocument();
+    expect(screen.getByRole("list", { name: "Interties" })).toHaveTextContent(
+      "Valley expansion connection",
+    );
+  });
+
+  it("moves acquired corridors out of Interties and keeps regional connections operable", async () => {
+    show(expansionGame());
+    const interties = screen.getByRole("list", { name: "Interties" });
+    expect(interties).not.toHaveTextContent("expansion connection");
+    for (const name of ["Champlain", "Valley", "Ridge"])
+      expect(
+        within(interties).getByRole("button", {
+          name: new RegExp(`^Inspect ${name} regional connection`),
+        }),
+      ).toBeVisible();
+    const disclosure = screen.getByText("Acquired utilities (2)", {
+      selector: "summary",
+    });
+    expect(screen.getByText("Valley Electric")).not.toBeVisible();
+    await user.click(disclosure);
+    expect(screen.getByText("Valley Electric")).toBeVisible();
+    expect(screen.getByText("Ridge Electric")).toBeVisible();
+    expect(screen.getAllByText("Customers acquired")).toHaveLength(2);
+    await user.click(disclosure);
+    expect(screen.getByText("Valley Electric")).not.toBeVisible();
+  });
+
+  it("keeps transfer receipts historical and totals each utility's outstanding loans and payments", async () => {
+    const game = expansionGame();
+    const valley = game.transmission!.lines.find(
+      (line) => line.corridorId === "vt-champlain-valley",
+    )!;
+    valley.loanAmountLeft = 0;
+    valley.loanMonthlyPayment = 10e3;
+    valley.annualOperatingCost = 0;
+    const ridge = game.transmission!.lines.find(
+      (line) => line.corridorId === "vt-champlain-ridge",
+    )!;
+    ridge.loanAmountLeft = 2e6;
+    ridge.loanMonthlyPayment = 40e3;
+    for (const loan of game.utilityExpansion!.loans) {
+      loan.loanAmountLeft =
+        loan.targetId === "valley-electric"
+          ? loan.kind === "assumed"
+            ? 4e6
+            : 8e6
+          : 17e6;
+      loan.loanMonthlyPayment =
+        loan.targetId === "valley-electric"
+          ? loan.kind === "assumed"
+            ? 20e3
+            : 30e3
+          : 50e3;
+    }
+    const transferred =
+      game.utilityExpansion!.acquisitions[0].transferredCustomers;
+    currentTick(game)!.customers = 1;
+    show(game);
+    await user.click(
+      screen.getByText("Acquired utilities (2)", { selector: "summary" }),
+    );
+    const entries = within(
+      screen.getByRole("list", { name: "Acquired utilities" }),
+    ).getAllByRole("listitem");
+    expect(entries[0]).toHaveTextContent("Acquired Jan 2005");
+    expect(entries[0]).toHaveTextContent(formatCount(transferred));
+    expect(entries[0]).toHaveTextContent("Connection upkeep$0/mo");
+    expect(entries[0]).toHaveTextContent("Debt payment$50k/mo");
+    expect(entries[0]).toHaveTextContent("Debt remaining$12M");
+    expect(entries[1]).toHaveTextContent("Debt payment$90k/mo");
+    expect(entries[1]).toHaveTextContent("Debt remaining$19M");
+    expect(
+      within(entries[0])
+        .getAllByRole("term")
+        .map((term) => term.textContent),
+    ).toEqual([
+      "Customers acquired",
+      "Connection upkeep",
+      "Debt payment",
+      "Debt remaining",
+    ]);
+    expect(within(entries[0]).queryByRole("button")).not.toBeInTheDocument();
+  });
+
+  it("shows no debt payment after all connection and acquisition loans are paid off", async () => {
+    const game = expansionGame();
+    for (const loan of [
+      ...game.transmission!.lines,
+      ...game.utilityExpansion!.loans,
+    ]) {
+      loan.loanAmountLeft = 0;
+      loan.loanMonthlyPayment = 10e3;
+    }
+    show(game);
+    await user.click(
+      screen.getByText("Acquired utilities (2)", { selector: "summary" }),
+    );
+    for (const entry of within(
+      screen.getByRole("list", { name: "Acquired utilities" }),
+    ).getAllByRole("listitem")) {
+      expect(entry).toHaveTextContent("Debt remaining$0");
+      expect(entry).toHaveTextContent("Debt payment$0/mo");
+    }
+  });
+});
 
 test("intertie flow distinguishes customer purchases from storage charging", () => {
   const initial = createGame({ scenarioId: 100, seed: 61 });
@@ -919,7 +1077,7 @@ describe("the interties view", () => {
     renderFacilities(createGame({ scenarioId: 112 }), null);
     expect(screen.queryByRole("tablist")).toBeNull();
     expect(screen.queryByRole("button", { name: "Build" })).toBeNull();
-    expect(screen.queryByText(/Plants & storage/)).toBeNull();
+    expect(screen.getByText("Plants & storage")).toBeInTheDocument();
     expect(screen.queryByText(/Interties/)).toBeNull();
   });
 
@@ -1536,6 +1694,26 @@ describe("mouse facility selection", () => {
     fireEvent.keyUp(document.body, { key });
     expect(screen.queryByRole("checkbox")).toBeNull();
     expect(screen.queryByRole("button", { name: "Actions" })).toBeNull();
+  });
+
+  it("replaces generation with bulk actions, including without interties", async () => {
+    const game = fleet();
+    game.transmission = undefined;
+    renderFacilities(game, null);
+    expect(screen.getByText(/^Generating /)).toBeInTheDocument();
+    expect(screen.queryByText(/^Facilities \(/)).toBeNull();
+    fireEvent.click(rows()[0], { metaKey: true });
+    expect(
+      screen.getByRole("status", { name: "Facility selection" }),
+    ).toHaveTextContent("1 facility selected");
+    expect(screen.queryByText(/^Generating /)).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Actions" }));
+    expect(
+      screen.getByRole("menu", { name: "Facility actions" }),
+    ).toBeVisible();
+    await user.keyboard("{Escape}");
+    expect(screen.getByText(/^Generating /)).toBeInTheDocument();
+    await waitFor(() => expect(rows()[0]).toHaveFocus());
   });
 
   it("keeps checkboxes after a deliberate selection and separates toggling from inspection", async () => {

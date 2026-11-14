@@ -69,7 +69,6 @@ import { getDispatchOrderedFuels } from "../../helpers/Energy";
 import FlowBar from "../base/FlowBar";
 import FacilityRowText from "../base/FacilityRowText";
 import { constructionStatus } from "../base/ConstructionProgress";
-import { getStorageBoolean, setStorageKeyValue } from "../../LocalStorage";
 import { SIDE_LAYOUT_MIN_WIDTH } from "../../Globals";
 import FacilityDetails from "../base/FacilityDetails";
 import GameCard from "../base/GameCard";
@@ -855,9 +854,6 @@ function FacilitySupplyChart({
   );
 }
 
-const HINT_MIN_FACILITIES = 4;
-const BULK_HINT_SEEN_KEY = "facilityBulkHintSeen";
-
 /** The fleet chart grows with its pane; narrow panes keep it 15% shorter. */
 export function fleetChartHeight(width: number, height: number): number {
   const fit = (min: number, share: number, max: number) =>
@@ -975,8 +971,7 @@ export default class Facilities extends React.Component<Props, SelectionState> {
   private previewFocus: HTMLButtonElement | null = null;
   private menuFocus: HTMLButtonElement | null = null;
 
-  // Read once: the hint flag only ever flips to true, and one query list tracks the pointer
-  private bulkHintSeen = getStorageBoolean(BULK_HINT_SEEN_KEY, false);
+  // One query list tracks whether this device supports mouse selection.
   private finePointer: MediaQueryList | null = null;
 
   private mouseEnabled = () =>
@@ -1304,10 +1299,6 @@ export default class Facilities extends React.Component<Props, SelectionState> {
   }
 
   public componentDidUpdate() {
-    if (this.state.ids.length > 1 && !this.bulkHintSeen) {
-      this.bulkHintSeen = true;
-      setStorageKeyValue(BULK_HINT_SEEN_KEY, true);
-    }
     this.resolveEvidence();
     this.throttle.rendered(this.props.game.date.minute);
   }
@@ -1435,18 +1426,24 @@ export default class Facilities extends React.Component<Props, SelectionState> {
         <>
           <div className="scrollable facilitiesBody" ref={this.setScrollBody}>
             <FacilitySupplyChart game={game} anchor={this.evidenceAnchor} />
-            {!(
-              game.inGame &&
-              activeScenario(game)?.tutorialSteps?.[
-                game.tutorialStep
-              ]?.hideUi?.includes("facilityActions")
-            ) && (
-              <div
-                className="facilitySelectionBar"
-                onKeyDown={this.onSelectionKeyDown}
+            {/* The scroller holds section labels and the intertie fleet as well as rows, so the
+              lists are the drag-and-drop containers inside it rather than the scroller itself. */}
+            <List
+              dense
+              component="div"
+              className="scrollable unifiedFacilitiesList"
+              data-group-dragging={this.state.groupDragging || undefined}
+              onKeyDown={this.onSelectionKeyDown}
+            >
+              <Typography
+                component="div"
+                id="dispatch-order"
+                className={`facilitySectionLabel facilityDispatchHeader${selectionMode || selection.length > 1 ? " facilityDispatchSelecting" : ""}`}
+                variant="overline"
               >
-                {selectionMode || selection.length > 1 ? (
-                  <>
+                <span className="facilitySectionTitle">Plants & storage</span>
+                {selectionEnabled && (selectionMode || selection.length > 1) ? (
+                  <div className="facilitySelectionBar">
                     <span role="status" aria-label="Facility selection">
                       {selection.length}{" "}
                       {selection.length === 1 ? "facility" : "facilities"}{" "}
@@ -1463,49 +1460,24 @@ export default class Facilities extends React.Component<Props, SelectionState> {
                       >
                         Actions
                       </Button>
-                      <Button size="small" onClick={this.clearSelection}>
-                        Clear selection
+                      <Button
+                        size="small"
+                        aria-label="Clear selection"
+                        onClick={this.clearSelection}
+                      >
+                        Clear
+                        <span className="facilityClearFullLabel">
+                          selection
+                        </span>
                       </Button>
                     </div>
-                  </>
+                  </div>
                 ) : (
-                  <>
-                    <span className="facilitySelectionTitle">
-                      Facilities ({game.facilities.length})
-                    </span>
-                    {game.facilities.length >= HINT_MIN_FACILITIES &&
-                      !activeScenario(game)?.tutorialSteps &&
-                      !this.bulkHintSeen && (
-                        <span>
-                          Shift-click a range · Ctrl/⌘-click to add ·
-                          Right-click for actions
-                        </span>
-                      )}
-                  </>
-                )}
-              </div>
-            )}
-            {/* The scroller holds section labels and the intertie fleet as well as rows, so the
-              lists are the drag-and-drop containers inside it rather than the scroller itself. */}
-            <List
-              dense
-              component="div"
-              className="scrollable unifiedFacilitiesList"
-              data-group-dragging={this.state.groupDragging || undefined}
-              onKeyDown={this.onSelectionKeyDown}
-            >
-              {intertiesAvailable && !!game.transmission?.lines.length && (
-                <Typography
-                  id="dispatch-order"
-                  className="facilitySectionLabel"
-                  variant="overline"
-                >
-                  Plants & storage
                   <span className="facilitySectionFlow">
                     {"Generating " + formatWatts(currentGenerationW(game))}
                   </span>
-                </Typography>
-              )}
+                )}
+              </Typography>
               <DragDropContext
                 onBeforeDragStart={this.onBeforeDragStart}
                 onDragEnd={this.onDragEnd}

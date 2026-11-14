@@ -1186,8 +1186,7 @@ function BuildGenerators(props: Props): React.JSX.Element {
           (generator) => generator.fuel === props.focusFuel,
         ) && (
           <Typography role="status" sx={{ px: 2, py: 1 }}>
-            The requested fuel has no available generator at this size. Showing
-            generator options.
+            No generator matches this fuel and size. Showing other options.
           </Typography>
         )}
       <ConstructionBuildHeader

@@ -49,6 +49,24 @@ for (const theme of ["light", "dark"] as const) {
     await expect(pane.locator("#dispatch-order")).toHaveText(
       /^Plants & storage\s*Generating \d/,
     );
+    if (!testInfo.project.use.hasTouch) {
+      const heading = pane.locator("#dispatch-order");
+      const plant = pane.locator(".facilityRow").first();
+      const layout = async () => ({
+        heading: await heading.boundingBox(),
+        plant: await plant.boundingBox(),
+      });
+      const before = await layout();
+      await plant.locator(".facilityDisclosure").click({ modifiers: ["Meta"] });
+      await expect(heading.getByRole("status")).toHaveText(
+        "1 facility selected",
+      );
+      await expect(heading).not.toContainText("Generating");
+      expect(await layout()).toEqual(before);
+      await heading.getByRole("button", { name: "Clear selection" }).click();
+      await expect(heading).toContainText("Generating");
+      expect(await layout()).toEqual(before);
+    }
     const originalFirstId = await rows
       .first()
       .getAttribute("data-rfd-draggable-id");

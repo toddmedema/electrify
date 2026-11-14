@@ -45,6 +45,17 @@ const base = {
 };
 
 describe("describeHydroStatus", () => {
+  test.each([
+    [0, "Empty."],
+    [0.019999, "Empty."],
+    [0.02, "Nearly empty."],
+  ])("labels a reservoir at %s fullness", (fraction, lead) => {
+    expect(describeHydroStatus({ ...base, fraction })).toMatchObject({
+      lead,
+      tone: "bad",
+    });
+  });
+
   test("a reservoir near its minimum level says output is limited", () => {
     const status = describeHydroStatus({ ...base, fraction: 0.12 });
     expect(status.tone).toBe("bad");
@@ -189,20 +200,28 @@ test("a nearly empty lone dam names when it refills, or says it won't", () => {
   ).toMatch(/no refill is expected/);
 });
 
-test("a reservoir rising before a dry spell says the rise is temporary", () => {
-  const status = describeHydroStatus({
-    spilling: false,
-    monthNumber: 4,
-    latitude: 40,
-    fraction: 0.32,
-    outlook: [
-      { year: 2025, monthNumber: 4, fraction: 0.32, snowpackMm: 0 },
-      { year: 2025, monthNumber: 5, fraction: 0.4, snowpackMm: 0 },
-      { year: 2025, monthNumber: 6, fraction: 0.05, snowpackMm: 0 },
-    ],
-  });
-  expect(status).toMatchObject({ lead: "Filling for now.", tone: "warn" });
-});
+test.each([false, true])(
+  "a reservoir rising before a dry spell says the rise is temporary (fleet: %s)",
+  (fleet) => {
+    const status = describeHydroStatus({
+      spilling: false,
+      monthNumber: 4,
+      latitude: 40,
+      fraction: 0.32,
+      fleet,
+      outlook: [
+        { year: 2025, monthNumber: 4, fraction: 0.32, snowpackMm: 0 },
+        { year: 2025, monthNumber: 5, fraction: 0.4, snowpackMm: 0 },
+        { year: 2025, monthNumber: 6, fraction: 0.05, snowpackMm: 0 },
+      ],
+    });
+    expect(status).toMatchObject({
+      lead: "Filling for now",
+      detail: expect.stringMatching(/^but will run low around June\./),
+      tone: "warn",
+    });
+  },
+);
 
 test("running low before the month ends says so", () => {
   const status = describeHydroStatus({

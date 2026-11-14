@@ -383,7 +383,7 @@ test("reduced motion skips the logo movement and stagger", async ({ page }) => {
 });
 
 for (const theme of ["light", "dark"]) {
-  test(`the home menu describes the game in ${theme}`, async ({ page }) => {
+  test(`the home menu leads directly to play in ${theme}`, async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.addInitScript(
       (value) => localStorage.setItem("theme", value),
@@ -393,16 +393,16 @@ for (const theme of ["light", "dark"]) {
     const description = page
       .locator("#centeredMenu")
       .getByText("An electricity strategy game.", { exact: true });
-    await expect(description).toBeVisible();
+    await expect(description).toHaveCount(0);
     const logo = (await page.locator("#logo").boundingBox())!;
-    const copy = (await description.boundingBox())!;
     const primary = (await page
       .getByRole("button", { name: "Play", exact: true })
       .boundingBox())!;
-    expect(copy.y).toBeGreaterThanOrEqual(logo.y + logo.height);
-    expect(primary.y).toBeGreaterThanOrEqual(copy.y + copy.height);
-    expect(copy.x).toBeGreaterThanOrEqual(0);
-    expect(copy.x + copy.width).toBeLessThanOrEqual(page.viewportSize()!.width);
+    expect(primary.y).toBeGreaterThanOrEqual(logo.y + logo.height);
+    expect(primary.x).toBeGreaterThanOrEqual(0);
+    expect(primary.x + primary.width).toBeLessThanOrEqual(
+      page.viewportSize()!.width,
+    );
   });
 
   test(`home install and sound prompts update independently in ${theme}`, async ({
@@ -465,11 +465,8 @@ test("home actions and resources remain reachable at low height with and without
       }),
     ).toBeVisible();
     await expect(page.locator("#menuCard")).toHaveCSS("overflow-y", "auto");
-    const description = page
-      .locator("#centeredMenu")
-      .getByText("An electricity strategy game.", { exact: true });
-    await description.scrollIntoViewIfNeeded();
-    await expect(description).toBeInViewport();
+    await primary.getByRole("button").first().scrollIntoViewIfNeeded();
+    await expect(primary.getByRole("button").first()).toBeInViewport();
     const logo = (await page.locator("#logo").boundingBox())!;
     const menu = (await page.locator("#centeredMenu").boundingBox())!;
     const footer = (await page.locator(".mainMenuFooter").boundingBox())!;

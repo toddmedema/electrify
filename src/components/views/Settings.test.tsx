@@ -438,8 +438,10 @@ describe("Settings", () => {
     const dialog = await screen.findByRole("dialog", {
       name: "Clear cache and reload?",
     });
+    // Resolve the control before starting the exit deadline: role queries inspect styles.
+    const cancel = within(dialog).getByRole("button", { name: "Cancel" });
     const closed = waitForElementToBeRemoved(dialog);
-    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    fireEvent.click(cancel);
     await closed;
 
     expect(mockedClearAppCache).not.toHaveBeenCalled();
@@ -468,18 +470,20 @@ describe("Settings", () => {
   });
 
   it("opens credits and restores the Settings footer after closing", async () => {
+    const user = userEvent.setup();
     renderSettings();
-    const button = screen.getByRole("button", {
-      name: "Credits and licenses",
+    const button = screen.getByText("Credits and licenses", {
+      selector: "button",
     });
-    await userEvent.click(button);
+    expect(button).toHaveRole("button");
+    expect(button).toHaveAccessibleName("Credits and licenses");
+    expect(button).toBeVisible();
+    await user.click(button);
     const dialog = await screen.findByRole("dialog", {
       name: "Credits and licenses",
     });
     expect(within(dialog).getByText("Todd Medema")).toBeInTheDocument();
-    await userEvent.click(
-      within(dialog).getByRole("button", { name: "Close" }),
-    );
+    await user.click(within(dialog).getByRole("button", { name: "Close" }));
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(button).toHaveFocus();
   });
