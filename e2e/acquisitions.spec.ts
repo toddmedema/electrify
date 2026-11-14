@@ -433,9 +433,10 @@ for (const theme of ["light", "dark"] as const) {
         ),
       ).toEqual(["POWER_PLAY"]);
       if (index === 0) {
-        const notification = page
-          .locator(".achievementToastPanel")
-          .filter({ hasText: "Power Play" });
+        const notification = page.getByRole("button", {
+          name: "Dismiss Power Play achievement notification",
+          exact: true,
+        });
         await expect(notification).toBeVisible();
         await expect(notification).toContainText(
           "Acquire your first competing utility.",
@@ -455,12 +456,7 @@ for (const theme of ["light", "dark"] as const) {
             animations: "disabled",
           });
         }
-        await notification
-          .getByRole("button", {
-            name: "Dismiss Power Play achievement notification",
-            exact: true,
-          })
-          .click();
+        await notification.click();
       }
       const receipt = afterPurchase.utilityExpansion!.acquisitions.find(
         (entry) =>
