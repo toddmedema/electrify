@@ -1064,15 +1064,24 @@ describe("Insights layers", () => {
     await user.click(labelledButton(/Layers/));
 
     const expectRequiredLayers = () => {
+      // Scope label lookup to the editor, avoiding repeated scans of the finance table.
+      const panel = screen.getByLabelText("Data layers");
+      expect(panel).toHaveRole("region");
+      expect(isInaccessible(panel)).toBe(false);
       for (const name of ["Profit", "Finance details"]) {
-        const checkbox = labelledCheckbox(name);
+        const checkbox = labelledCheckbox(name, panel);
         expect(checkbox).toBeChecked();
         expect(checkbox).toBeDisabled();
-        expect(screen.getByRole("heading", { name })).toBeVisible();
+        const heading = screen.getByLabelText(name, { selector: "h3" });
+        expect(heading).toHaveRole("heading");
+        expect(heading).toHaveAccessibleName(name);
+        expect(heading).toBeVisible();
+        expect(isInaccessible(heading)).toBe(false);
       }
-      expect(labelledCheckbox("Supply & Demand")).toBeChecked();
-      expect(labelledCheckbox("Supply & Demand")).toBeEnabled();
-      expect(labelledCheckbox("Fuel Prices")).not.toBeChecked();
+      const supplyDemand = labelledCheckbox("Supply & Demand", panel);
+      expect(supplyDemand).toBeChecked();
+      expect(supplyDemand).toBeEnabled();
+      expect(labelledCheckbox("Fuel Prices", panel)).not.toBeChecked();
     };
     expectRequiredLayers();
     await choosePreset("Profitability");
@@ -2251,8 +2260,8 @@ function gameWithOpenIntertie(): GameType {
 
 // Label queries avoid repeatedly computing every MUI checkbox's accessible name.
 // Check accessibility explicitly so a hidden labelled input still fails the contract.
-function labelledCheckbox(label: string): HTMLElement {
-  const checkbox = screen.getByLabelText(label, {
+function labelledCheckbox(label: string, scope?: HTMLElement): HTMLElement {
+  const checkbox = (scope ? within(scope) : screen).getByLabelText(label, {
     selector: 'input[type="checkbox"]',
   });
   expect(checkbox).toHaveRole("checkbox");
