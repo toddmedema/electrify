@@ -341,7 +341,8 @@ function StorageBuildDialog(props: Props): React.JSX.Element {
       />
       {storage.length === 0 && (
         <Typography role="status" sx={{ px: 2, py: 2 }}>
-          No storage projects are available in {game.date.year}.
+          No storage projects available in {game.date.year} in{" "}
+          {game.location.name}.
         </Typography>
       )}
       <List ref={listRef} dense className="scrollable cardList">

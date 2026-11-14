@@ -2600,7 +2600,7 @@ export default class Insights extends React.Component<Props, State> {
                   )}
                   {!visible.length && (
                     <Typography className="insightsEmpty" color="textSecondary">
-                      Choose Layers to customize this view.
+                      Choose Layers to add charts.
                     </Typography>
                   )}
                 </div>
