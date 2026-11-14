@@ -143,12 +143,15 @@ it.each(["valley-electric", "ridge-electric"] as const)(
         (t) => !Object.prototype.hasOwnProperty.call(t, "areaTicks"),
       ),
     ).toBe(true);
-    expect(
-      bought.transmission!.lines.find((line) => line.buildCost > 0)!,
-    ).toMatchObject({
-      paused: false,
-      currentFlowW: 0,
-    });
+    const internal = bought.transmission!.lines.find(
+      (line) => line.buildCost > 0,
+    )!;
+    expect(internal.paused).toBe(false);
+    expect(Number.isFinite(internal.currentFlowW)).toBe(true);
+    expect(Math.abs(internal.currentFlowW)).toBeLessThanOrEqual(
+      internal.capacityW,
+    );
+    expect(now.territories?.[targetId]?.demandW).toBeGreaterThan(0);
     expect(ownedUtility(bought, targetId)).toBe(true);
     expect(acquisitionQuote(bought, targetId)).toBeUndefined();
   },
@@ -222,7 +225,7 @@ it("keeps corporate debt after plant sales and never writes impaired network val
   ).toBeCloseTo(network.initialValue * 0.75 * 0.8, 4);
 });
 
-it("rejects no-op spending and operation controls on an acquired connection", () => {
+it("retains meaningful operation and reinforcement controls after a connection becomes internal", () => {
   const opening = ready();
   const openingLine = opening.transmission!.lines.find(
     (line) => line.buildCost > 0,
@@ -248,14 +251,22 @@ it("rejects no-op spending and operation controls on an acquired connection", ()
       1,
       intertieContextForGame(game),
     ),
-  ).toBeUndefined();
-  expect(reducer(game, togglePauseTransmissionLine(line.id))).toEqual(game);
+  ).toBeDefined();
+  const paused = reducer(game, togglePauseTransmissionLine(line.id));
   expect(
-    reducer(
-      game,
-      upgradeTransmissionLine({ corridorId: line.corridorId, financed: true }),
-    ),
-  ).toEqual(game);
+    paused.transmission!.lines.find((entry) => entry.id === line.id)?.paused,
+  ).toBe(true);
+  expect(paused.utilityExpansion?.acquisitions).toEqual(
+    game.utilityExpansion?.acquisitions,
+  );
+  const upgraded = reducer(
+    game,
+    upgradeTransmissionLine({ corridorId: line.corridorId, financed: true }),
+  );
+  expect(
+    upgraded.transmission!.lines.find((entry) => entry.id === line.id)?.upgrade
+      ?.targetCapacityW,
+  ).toBeGreaterThan(line.capacityW);
 });
 
 it("ordinary builds join the common fleet and forecasts leave the live company untouched", () => {

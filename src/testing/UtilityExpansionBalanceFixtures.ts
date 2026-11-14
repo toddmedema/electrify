@@ -71,6 +71,27 @@ export function expansionBalanceActions(
     { month: 180, type: "retire", assetId: "scenario-116-champlain-oil-a" },
   ];
   const prepared = fixture.portfolio !== "unprepared";
+  // Valley's inherited supply cannot cover every winter peak while its first local
+  // replacement is under construction. Reinforce the link before taking on that load.
+  if (
+    prepared &&
+    fixture.portfolio !== "line-only" &&
+    target.id === "valley-electric"
+  )
+    actions.push(
+      {
+        month: 36,
+        type: "intertie-upgrade",
+        corridorId: target.corridorId,
+        financed: true,
+      },
+      {
+        month: 60,
+        type: "intertie-upgrade",
+        corridorId: target.corridorId,
+        financed: true,
+      },
+    );
   // Cash buyers save through 2013 so the company purchase preserves a generation down payment.
   const purchaseMonth = fixture.financed ? 96 : 108;
   // Fund Valley's equity purchase before adding wind; the planned peaker arrives early
@@ -181,5 +202,35 @@ export function expansionBalanceActions(
       },
       { month: 216, type: "retire", assetId: "scenario-116-ridge-oil" },
     );
-  return actions.sort((left, right) => left.month - right.month);
+  // New capacity is sited where the expanded company needs it. The home fleet remains
+  // responsible for Champlain; the acquired territory receives its own replacement plants.
+  // Split wind projects at the authored 150 MW site limit instead of bypassing site budgets.
+  const territorialActions = actions.flatMap(
+    (action): ScheduledSimActionType[] => {
+      if (action.type !== "build") return [action];
+      const territoryId =
+        fixture.portfolio === "both" &&
+        (action.month === 108 || action.month === 168)
+          ? "ridge-electric"
+          : action.month < purchaseMonth ||
+              action.month === 144 ||
+              (cashValleyMixed && action.month === 156)
+            ? "champlain"
+            : fixture.targetId;
+      const build = action.build;
+      if (build.peakW === undefined)
+        return [{ ...action, build: { ...build, territoryId } }];
+      const peakW = build.peakW;
+      const projects = build.name === "Wind" ? Math.ceil(peakW / 150e6) : 1;
+      return Array.from({ length: projects }, () => ({
+        ...action,
+        build: {
+          ...build,
+          peakW: peakW / projects,
+          territoryId,
+        },
+      }));
+    },
+  );
+  return territorialActions.sort((left, right) => left.month - right.month);
 }

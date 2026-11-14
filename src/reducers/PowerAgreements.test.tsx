@@ -1,4 +1,8 @@
-import type { GeneratorOperatingType, StorageOperatingType } from "../Types";
+import type {
+  GameType,
+  GeneratorOperatingType,
+  StorageOperatingType,
+} from "../Types";
 import { STORAGE } from "../data/Facilities";
 import { runMonths } from "../testing/SimulationTestHelpers";
 import { validUtilityExpansion } from "../helpers/ExpansionValidation";
@@ -48,6 +52,12 @@ import reducer, {
   togglePauseTransmissionLine,
 } from "./Game";
 import { acceptPowerAgreement, loaded, resume } from "./GameActions";
+
+function stripTerritoryStateForLegacySave(game: GameType) {
+  delete game.territoryNetwork;
+  game.facilities.forEach((facility) => delete facility.territoryId);
+  game.timeline.forEach((tick) => delete tick.territories);
+}
 
 function at(month = 156) {
   const game = createGame({
@@ -343,6 +353,7 @@ it("rejects impossible saved receipts and inherited provenance through the real 
   }
   const legacy = JSON.parse(JSON.stringify(serializeSave(at(0))));
   legacy.schemaVersion = 9;
+  stripTerritoryStateForLegacySave(legacy.game);
   delete legacy.game.transmission.inheritedAgreementTerms;
   legacy.game.transmission.lines = [];
   const upgraded = parseSave(legacy)!;
@@ -558,6 +569,7 @@ it("preserves existing delivered-energy promises while future offers bind monthl
   ];
   const raw = JSON.parse(JSON.stringify(serializeSave(game)));
   raw.schemaVersion = 10;
+  stripTerritoryStateForLegacySave(raw.game);
   delete raw.game.transmission.inheritedAgreementTerms;
   for (const receipt of raw.game.transmission.acceptedAgreements)
     delete receipt.termsVersion;
@@ -1012,6 +1024,7 @@ it("bills the real v3 month once after pause, preserves schema11 promises, and r
   tickState(legacy);
   const raw = JSON.parse(JSON.stringify(serializeSave(legacy)));
   raw.schemaVersion = 11;
+  stripTerritoryStateForLegacySave(raw.game);
   expect(parseSave(raw)?.game.transmission).toEqual(legacy.transmission);
 });
 
