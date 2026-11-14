@@ -1,3 +1,5 @@
+import { currencyForLocation, CurrencyType } from "../../helpers/Currency";
+import { currencyFormatters } from "../../helpers/Format";
 import { activeScenario, currentTick } from "../../helpers/GameSelectors";
 import * as React from "react";
 import {
@@ -59,8 +61,6 @@ import {
 import { getDispatchOrderedFuels } from "../../helpers/Energy";
 import { facilityLifetime } from "../../helpers/Financials";
 import {
-  formatMoneyConcise,
-  formatForecastMoney,
   formatForecastNumber,
   formatForecastPercent,
   formatForecastWatts,
@@ -651,6 +651,7 @@ const FINANCE_LAYER_METRICS: Partial<
 function financeMetadata(
   id: InsightLayerId,
   units: UnitSystemType,
+  currency: CurrencyType,
 ): {
   key: DerivedHistoryKeysType;
   label: string;
@@ -661,7 +662,7 @@ function financeMetadata(
   if (!key) {
     return null;
   }
-  const metric = historyMetrics(units)[key];
+  const metric = historyMetrics(units, currency)[key];
   return {
     key,
     label: metric.suffix ? `${metric.label} (${metric.suffix})` : metric.label,
@@ -671,7 +672,7 @@ function financeMetadata(
         ? (value) => formatForecastNumber(toDisplayLargeMass(value, units))
         : key === "customers"
           ? formatForecastNumber
-          : formatForecastMoney,
+          : currencyFormatters(currency).formatForecastMoney,
   };
 }
 
@@ -1383,7 +1384,9 @@ export default class Insights extends React.Component<Props, State> {
     const summary = deriveExpandedSummary(
       summaryMonths.reduce(reduceHistories, { ...EMPTY_HISTORY }),
     );
-    const metrics = historyMetrics(this.context as UnitSystemType);
+    const currency = currencyForLocation(game.location, game.startingYear);
+    const { formatMoneyConcise } = currencyFormatters(currency);
+    const metrics = historyMetrics(this.context as UnitSystemType, currency);
     const selected = game.facilities.find(
       (facility) => facility.id === selectedFacilityId,
     );
@@ -1617,7 +1620,11 @@ export default class Insights extends React.Component<Props, State> {
       selected?.fuel && fuels.includes(selected.fuel)
         ? selected.fuel
         : undefined;
-    const finance = financeMetadata(id, this.context as UnitSystemType);
+    const finance = financeMetadata(
+      id,
+      this.context as UnitSystemType,
+      currencyForLocation(game.location, game.startingYear),
+    );
     const chartId = `chartInsights${id[0].toUpperCase()}${id.slice(1)}Plot`;
 
     let body: React.ReactNode;

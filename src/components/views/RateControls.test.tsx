@@ -1,3 +1,5 @@
+import { currencyForLocation } from "../../helpers/Currency";
+import { formatMoneyFull, formatRateCompact } from "../../helpers/Format";
 import * as React from "react";
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import {
@@ -374,3 +376,35 @@ it("keeps keyboard focus on the slider across committed rate steps", () => {
     committed[1],
   );
 });
+
+test.each(["India", "France"])(
+  "%s rates and scoring increments preserve the dollar-valued pricing control",
+  (country) => {
+    const original = createGame({ scenarioId: 107 });
+    const game = {
+      ...original,
+      location: { ...original.location, country },
+    };
+    const currency = currencyForLocation(game.location, game.startingYear);
+    const onDelta = jest.fn();
+    render(<RateControls game={game} onDelta={onDelta} />);
+    const pricing = screen.getByRole("region", { name: "Electricity pricing" });
+    expect(pricing).toHaveTextContent(
+      `${formatRateCompact(game.dollarsPerkWh, currency)}/kWh`,
+    );
+    expect(pricing).toHaveAccessibleDescription(
+      expect.stringContaining(
+        `for each ${formatMoneyFull(0.01, currency, 6)} per kWh below the target`,
+      ),
+    );
+    expect(pricing).not.toHaveAccessibleDescription(
+      expect.stringContaining("for each cent"),
+    );
+    const slider = screen.getByRole("slider");
+    expect(slider).toHaveAttribute("aria-valuenow", String(game.dollarsPerkWh));
+    fireEvent.keyDown(slider, { key: "ArrowRight" });
+    expect(onDelta).toHaveBeenCalledWith({ dollarsPerkWh: expect.any(Number) });
+    expect(onDelta.mock.calls[0][0].dollarsPerkWh).toBeLessThan(1);
+    expect(game.dollarsPerkWh).toBe(original.dollarsPerkWh);
+  },
+);

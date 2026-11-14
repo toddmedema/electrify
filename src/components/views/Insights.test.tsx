@@ -1,3 +1,5 @@
+import { currencyForLocation } from "../../helpers/Currency";
+import { formatMoneyConcise, formatForecastMoney } from "../../helpers/Format";
 import { configureStore, createNextState } from "@reduxjs/toolkit";
 import {
   act,
@@ -60,6 +62,7 @@ interface ChartMockProps {
   hideTitle?: boolean;
   format?: (value: number) => number | string;
   formatAxis?: (value: number) => number | string;
+  formatProjected?: (value: number) => number | string;
   id?: string;
   syncKey?: string;
   timeline?: unknown[];
@@ -241,6 +244,7 @@ jest.mock("../base/ChartFinances", () => ({
     hideTitle,
     format,
     formatAxis,
+    formatProjected,
   }: ChartMockProps) => (
     <div
       role="img"
@@ -258,6 +262,7 @@ jest.mock("../base/ChartFinances", () => ({
         ).length
       }
       data-inspected-value={format?.(123456)}
+      data-projected-value={formatProjected?.(123456)}
       data-axis-value={(formatAxis || format)?.(123456)}
       data-sync-key={syncKey}
       data-points={timeline?.length}
@@ -2309,4 +2314,27 @@ it("does not relabel cached simulated samples as recorded history as time advanc
     "data-forecast-start",
     "0",
   );
+});
+
+it("binds finance table and chart metadata to the game's local currency", () => {
+  localStorage.setItem(
+    "insightsLayers",
+    JSON.stringify(["cash", "financeDetails"]),
+  );
+  const base = createGame({ scenarioId: 100 });
+  const game = { ...base, location: { ...base.location, country: "France" } };
+  const currency = currencyForLocation(game.location, game.startingYear);
+  renderInsights(100, game);
+  const chart = screen.getByTestId("chartInsightsCashPlot");
+  expect(chart).toHaveAttribute(
+    "data-inspected-value",
+    formatMoneyConcise(123456, currency),
+  );
+  expect(chart).toHaveAttribute(
+    "data-projected-value",
+    formatForecastMoney(123456, currency),
+  );
+  const cash = screen.getByRole("row", { name: /^Cash / });
+  expect(cash).toHaveTextContent("€");
+  expect(cash).not.toHaveTextContent("$");
 });

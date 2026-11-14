@@ -526,3 +526,35 @@ it("offers researched Hydro maxima below 100MW and rejects oversized starting fl
   );
   expect(screen.getByRole("button", { name: "Start game" })).toBeDisabled();
 });
+
+it("updates setup cash and carbon fees from the selected city's currency", () => {
+  const location = {
+    ...LOCATIONS.SF,
+    id: "currency-paris",
+    name: "Paris",
+    country: "France",
+  };
+  render(
+    <CustomGame
+      game={createGame({ scenarioId: 100 })}
+      scenario={{
+        ...DEFAULT_CUSTOM_SCENARIO,
+        locationId: location.id,
+        location,
+      }}
+      onBack={jest.fn()}
+      onDelta={jest.fn()}
+      onStart={jest.fn()}
+    />,
+  );
+  expect(setupCombobox("Starting cash")).toHaveTextContent(/^€/);
+  fireEvent.mouseDown(setupCombobox("Carbon fee"));
+  expect(
+    screen
+      .getAllByRole("option")
+      .some((option) => option.textContent?.startsWith("€")),
+  ).toBe(true);
+  fireEvent.keyDown(screen.getByRole("listbox"), { key: "Escape" });
+  fireEvent.click(screen.getByRole("button", { name: /Select Honolulu, HI/ }));
+  expect(setupCombobox("Starting cash")).toHaveTextContent(/^\$/);
+});

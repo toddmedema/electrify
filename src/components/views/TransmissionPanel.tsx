@@ -1,3 +1,6 @@
+import { CurrencyType } from "../../helpers/Currency";
+import { currencyFormatters } from "../../helpers/Format";
+import { useMoney } from "../base/CurrencyContext";
 import PowerAgreements, { agreementSummary } from "../base/PowerAgreements";
 import { inheritedUtilityForCorridor } from "../../helpers/PowerAgreements";
 import { BUYING_LABELS, SELLING_LABELS } from "../../helpers/TradingRules";
@@ -60,9 +63,7 @@ import {
 } from "../../data/IntertieTrends";
 import {
   formatBuildMonths,
-  formatMoneyConcise,
   formatNumber,
-  formatForecastMoney,
   formatForecastPercent,
   formatForecastWatts,
   formatWatts,
@@ -153,11 +154,14 @@ const DIRECTION_WORDS: Record<IntertieDirection, string> = {
   IDLE: "Idle",
 };
 
-function priceRange(outlook: IntertieOutlook): string {
-  // Whole dollars: a typical range is an estimate, and cents would suggest otherwise
+function priceRange(outlook: IntertieOutlook, currency: CurrencyType): string {
+  const { formatForecastMoney } = currencyFormatters(currency);
+  // Typical ranges are estimates, so use the forecast formatter.
   const low = formatForecastMoney(outlook.priceLow);
   const high = formatForecastMoney(outlook.priceHigh);
-  return low === high ? `${low}/MWh` : `${low}–${high.replace("$", "")}/MWh`;
+  return low === high
+    ? `${low}/MWh`
+    : `${low}–${high.replace(currency.symbol, "")}/MWh`;
 }
 
 function limitChangeText(before: number, after: number): string {
@@ -254,12 +258,13 @@ function PriceMetric({
   outlook: IntertieOutlook;
   marketOnly?: boolean;
 }) {
+  const { currency } = useMoney();
   const periods = pricePeriodCaption(outlook);
   return (
     <div className="facilityStat">
       <dt>{marketOnly ? "Typical market price" : "Typical price"}</dt>
       <dd className="facilityStatValue">
-        {priceRange(outlook)}
+        {priceRange(outlook, currency)}
         {periods && <span className="facilityStatNote">{periods}</span>}
       </dd>
     </div>
@@ -286,6 +291,7 @@ function IntertieBuildItem(props: {
   year: number;
   onCompanyReview?: () => void;
 }): React.JSX.Element {
+  const { currency, formatMoneyConcise } = useMoney();
   const { cash, corridor, outlook, units } = props;
   const market = adjacentMarketForCorridor(corridor.id);
   const name = market?.name || corridor.name;
@@ -414,7 +420,7 @@ function IntertieBuildItem(props: {
                   label="Typical import price"
                   value={
                     <>
-                      {priceRange(outlook)}
+                      {priceRange(outlook, currency)}
                       {pricePeriodCaption(outlook) && (
                         <Typography
                           variant="caption"
@@ -673,6 +679,7 @@ export default function TransmissionPanel({
   onDragEnd,
   projectsOnly = false,
 }: TransmissionPanelProps) {
+  const { formatMoneyConcise } = useMoney();
   const units = useUnits();
   const acquiredSummaryRef = React.useRef<HTMLElement>(null);
   const focusAcquiredSummary = React.useRef(false);
