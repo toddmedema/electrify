@@ -1,3 +1,5 @@
+import { currencyForLocation } from "../../helpers/Currency";
+import { useMoney } from "../base/CurrencyContext";
 import * as React from "react";
 import {
   FormControlLabel,
@@ -22,11 +24,7 @@ import {
   publicRateCap,
   publicTargetRate,
 } from "../../helpers/Customers";
-import {
-  formatMoneyConcise,
-  formatRateCompact,
-  formatForecastNumber,
-} from "../../helpers/Format";
+import { formatForecastNumber } from "../../helpers/Format";
 import { formatCustomerChange } from "../../helpers/HistoryMetrics";
 import {
   PUBLIC_RATE_POINTS_PER_CENT,
@@ -40,16 +38,7 @@ import {
 } from "../base/DeferredProjection";
 import "./Programs.scss";
 
-/** Axis labels read in cents below a dollar, so they fit beneath the slider. */
-function formatRateAxis(rate: number): string {
-  return rate < 1 ? formatRateCompact(rate) : formatMoneyConcise(rate);
-}
-
-function rateMarkLabel(
-  rate: number,
-  desktopLabel = formatRateAxis(rate),
-  mobileLabel = "",
-) {
+function rateMarkLabel(desktopLabel: string, mobileLabel = "") {
   return (
     <>
       <span className="insightsRateMarkDesktop">{desktopLabel}</span>
@@ -104,6 +93,16 @@ export interface RateControlsProps {
 
 /** Pricing reads the same deferred forecast as Insights and the global status bar. */
 export default function RateControls({ game, onDelta }: RateControlsProps) {
+  const { currency, formatMoneyConcise, formatRateCompact, formatMoneyFull } =
+    useMoney(currencyForLocation(game.location, game.startingYear));
+  const formatRateAxis = (rate: number): string =>
+    rate < 1 ? formatRateCompact(rate) : formatMoneyConcise(rate);
+  const formatRateSpoken = (rate: number): string =>
+    currency.code === "USD"
+      ? formatMoneyConcise(rate)
+      : formatRateCompact(rate);
+  const scoringIncrement =
+    currency.code === "USD" ? "cent" : `${formatMoneyFull(0.01, 6)} per kWh`;
   const now = currentTick(game);
   // Announce only the change a drag makes, not a state the panel opened in.
   const followSetting = !!game.rateFollowsInflation;
@@ -232,30 +231,30 @@ export default function RateControls({ game, onDelta }: RateControlsProps) {
     : "Calculating…";
   const marks = investor
     ? [
-        { value: 0, label: rateMarkLabel(0, "0¢", "0¢") },
+        {
+          value: 0,
+          label: rateMarkLabel(formatRateCompact(0), formatRateCompact(0)),
+        },
         {
           value: marketRate,
           label: rateMarkLabel(
-            marketRate,
             `${formatRateAxis(marketRate)} market`,
             `${formatRateCompact(marketRate)} market`,
           ),
         },
         {
           value: max,
-          label: rateMarkLabel(
-            max,
-            formatRateAxis(max),
-            formatRateCompact(max),
-          ),
+          label: rateMarkLabel(formatRateAxis(max), formatRateCompact(max)),
         },
       ]
     : [
-        { value: 0, label: rateMarkLabel(0, "0¢", "0¢") },
+        {
+          value: 0,
+          label: rateMarkLabel(formatRateCompact(0), formatRateCompact(0)),
+        },
         {
           value: targetRate,
           label: rateMarkLabel(
-            targetRate,
             `${formatRateAxis(targetRate)} target`,
             `target ${formatRateCompact(targetRate)}`,
           ),
@@ -263,7 +262,6 @@ export default function RateControls({ game, onDelta }: RateControlsProps) {
         {
           value: max,
           label: rateMarkLabel(
-            max,
             `${formatRateAxis(max)} cap`,
             `cap ${formatRateCompact(max)}`,
           ),
@@ -274,8 +272,8 @@ export default function RateControls({ game, onDelta }: RateControlsProps) {
     now.customers,
   );
   const rateSummary = investor
-    ? `Rate ${formatMoneyConcise(game.dollarsPerkWh)} per kilowatt-hour; market rate ${formatMoneyConcise(marketRate)}; projected customers ${formattedCustomerChange} next month.`
-    : `Rate ${formatMoneyConcise(game.dollarsPerkWh)} per kilowatt-hour; target ${formatMoneyConcise(targetRate)}; ${following ? "adjusting with inflation each January; " : ""}${hasEstimate ? `estimated rate score ${formattedRateScore} over the next year at this rate` : "calculating the rate score"}. You earn ${PUBLIC_RATE_POINTS_PER_CENT} points for each cent below the target and lose ${PUBLIC_RATE_POINTS_PER_CENT} for each cent above it, weighted by the coming year's share of lifetime sales.`;
+    ? `Rate ${formatRateSpoken(game.dollarsPerkWh)} per kilowatt-hour; market rate ${formatRateSpoken(marketRate)}; projected customers ${formattedCustomerChange} next month.`
+    : `Rate ${formatRateSpoken(game.dollarsPerkWh)} per kilowatt-hour; target ${formatRateSpoken(targetRate)}; ${following ? "adjusting with inflation each January; " : ""}${hasEstimate ? `estimated rate score ${formattedRateScore} over the next year at this rate` : "calculating the rate score"}. You earn ${PUBLIC_RATE_POINTS_PER_CENT} points for each ${scoringIncrement} below the target and lose ${PUBLIC_RATE_POINTS_PER_CENT} for each ${scoringIncrement} above it, weighted by the coming year's share of lifetime sales.`;
   const rateScoreClass = `insightsRateScore ${
     rateScore(game.dollarsPerkWh) > 0
       ? "good"
@@ -382,8 +380,8 @@ export default function RateControls({ game, onDelta }: RateControlsProps) {
           }
           getAriaValueText={(rate) =>
             investor || !hasEstimate
-              ? `${formatMoneyConcise(rate)} per kilowatt-hour`
-              : `${formatMoneyConcise(rate)} per kilowatt-hour${following && rate === targetRate ? ", matches target" : ""}, rate score ${formatRateScore(rateScore(rate))} over the next year`
+              ? `${formatRateSpoken(rate)} per kilowatt-hour`
+              : `${formatRateSpoken(rate)} per kilowatt-hour${following && rate === targetRate ? ", matches target" : ""}, rate score ${formatRateScore(rateScore(rate))} over the next year`
           }
           marks={marks}
           min={0}

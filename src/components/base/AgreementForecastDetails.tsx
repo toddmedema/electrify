@@ -1,11 +1,9 @@
+import type { CurrencyType } from "../../helpers/Currency";
+import { useMoney } from "./CurrencyContext";
 import { Button, Typography } from "@mui/material";
 import type { PowerAgreementAccount } from "../../Types";
 import { agreementDate } from "../../helpers/PowerAgreements";
-import {
-  formatMoneyConcise,
-  formatForecastMoney,
-  formatNumber,
-} from "../../helpers/Format";
+import { formatNumber } from "../../helpers/Format";
 import type { useAgreementForecast } from "./useAgreementForecast";
 import BuildDetails, { BuildDetailRow } from "./BuildDetails";
 
@@ -13,10 +11,13 @@ import BuildDetails, { BuildDetailRow } from "./BuildDetails";
 export default function AgreementForecastDetails({
   forecast,
   horizon,
+  currency,
 }: {
   forecast: ReturnType<typeof useAgreementForecast>;
   horizon: string;
+  currency?: CurrencyType;
 }) {
+  const { formatForecastMoney } = useMoney(currency);
   const unavailable =
     forecast.blocked === "coop"
       ? "Unavailable in co-op"
@@ -56,10 +57,13 @@ export default function AgreementForecastDetails({
 export function RecordedAgreementHistory({
   account,
   startMinute = 0,
+  currency,
 }: {
   account?: PowerAgreementAccount;
   startMinute?: number;
+  currency?: CurrencyType;
 }) {
+  const { formatMoneyConcise } = useMoney(currency);
   if (!account)
     return (
       <Typography color="textSecondary">Earlier history unavailable</Typography>

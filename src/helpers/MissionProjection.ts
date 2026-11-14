@@ -1,3 +1,4 @@
+import { CurrencyType, USD_CURRENCY, currencyForLocation } from "./Currency";
 import { MONTHS } from "../Constants";
 import type {
   ObjectiveProgress,
@@ -91,8 +92,10 @@ function firstFailureMonth(
     })?.[0];
 }
 
-const cashText = (value: number) =>
-  value < 0 ? `−${formatMoneyConcise(-value)}` : formatMoneyConcise(value);
+const cashText = (value: number, currency: CurrencyType = USD_CURRENCY) =>
+  value < 0
+    ? `−${formatMoneyConcise(-value, currency)}`
+    : formatMoneyConcise(value, currency);
 
 const objectiveCache = new WeakMap<
   ProjectionView,
@@ -171,7 +174,7 @@ function objectiveDetail(result: ObjectiveResult, game: GameType): string {
         : result.metric === "monthEndDebt"
           ? "Highest debt"
           : "Projected value";
-  return `${prefix}: ${objectiveValueText(result.objective, result.observed, result.target, 2)} · ${objectiveWindowText(result.objective, game.startingYear, activeScenario(game)!.durationMonths, legacyMonthOffset(game))}.`;
+  return `${prefix}: ${objectiveValueText(result.objective, result.observed, result.target, 2, currencyForLocation(game.location, game.startingYear))} · ${objectiveWindowText(result.objective, game.startingYear, activeScenario(game)!.durationMonths, legacyMonthOffset(game))}.`;
 }
 
 /** All required goals plus month-end bankruptcy and the rolling three-month blackout rule. */
@@ -179,6 +182,7 @@ export function projectMission(
   game: GameType,
   projection: ProjectionView,
 ): MissionProjection {
+  const currency = currencyForLocation(game.location, game.startingYear);
   const scenario = activeScenario(game)!;
   const elapsed = game.date.monthsElapsed;
   const end = scenario.durationMonths + legacyMonthOffset(game);
@@ -250,9 +254,9 @@ export function projectMission(
         ? "on-track"
         : "unavailable",
     detail: bankrupt
-      ? `Cash below $0 at ${monthLabel(monthIndex(bankrupt, game), game)} month-end (${cashText(bankrupt.cash + cashAnchor)}).`
+      ? `Cash below ${currency.symbol}0 at ${monthLabel(monthIndex(bankrupt, game), game)} month-end (${cashText(bankrupt.cash + cashAnchor, currency)}).`
       : fullTerm && cashKnown
-        ? `Lowest month-end cash: ${cashText(lowestCash)}.`
+        ? `Lowest month-end cash: ${cashText(lowestCash, currency)}.`
         : "Forecast does not cover every remaining month-end.",
   });
   const history = completedMissionHistory(game);

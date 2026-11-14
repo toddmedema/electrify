@@ -1,10 +1,16 @@
+import {
+  currencyByCode,
+  currencyForLocation,
+  USD_CURRENCY,
+} from "../../helpers/Currency";
+import { getScenarioLocation } from "../../helpers/Locations";
+import { useMoney } from "./CurrencyContext";
 import { getScenario } from "../../data/Scenarios";
 import { Box, Typography } from "@mui/material";
 import { VictoryDebriefType, VictoryType } from "../../Types";
 import ConceptIcon from "./ConceptIcon";
 import {
   formatCustomerCount,
-  formatMoneyConcise,
   formatScore,
   formatPercent,
 } from "../../helpers/Format";
@@ -87,6 +93,15 @@ export function RunDebrief({
   // scenario isn't recorded with the result, so it keeps the month count.
   const scenario =
     scenarioId === undefined ? undefined : getScenario(scenarioId);
+  const currency = debrief.currencyCode
+    ? currencyByCode(debrief.currencyCode)
+    : scenario
+      ? currencyForLocation(
+          getScenarioLocation(scenario),
+          scenario.startingYear,
+        )
+      : USD_CURRENCY;
+  const { formatMoneyConcise } = useMoney(currency);
   const roundedReliability = formatPercent(debrief.reliability, 2);
   const reliability =
     debrief.reliability < 1 && roundedReliability === "100%"
@@ -181,12 +196,13 @@ export function RunDebrief({
                       scenario.startingYear,
                       scenario.durationMonths,
                       (scenario.startingMonth ?? 1) - 1,
+                      currency,
                     )
                   ) : result.objective.checkpoint ? (
-                    objectiveTargetText(result.objective)
+                    objectiveTargetText(result.objective, currency)
                   ) : (
                     <>
-                      {objectiveTargetText(result.objective)} ·{" "}
+                      {objectiveTargetText(result.objective, currency)} ·{" "}
                       {first === last
                         ? `Month ${first + 1}`
                         : `Months ${first + 1}–${last + 1}`}
@@ -194,7 +210,7 @@ export function RunDebrief({
                   )}
                 </Typography>
                 <Typography component="p" variant="body2">
-                  {objectiveObservedText(result)}
+                  {objectiveObservedText(result, currency)}
                 </Typography>
                 {result.reason &&
                   !(repeatsLead && leadMessage?.includes(result.reason)) && (

@@ -1,3 +1,5 @@
+import { CurrencyContext } from "./CurrencyContext";
+import type { CurrencyType } from "../../helpers/Currency";
 import * as React from "react";
 import uPlot from "uplot";
 import { Typography } from "@mui/material";
@@ -141,6 +143,7 @@ export function exchangePoints(
 }
 
 interface State {
+  currency: CurrencyType;
   points: ExchangePoint[];
   domain: Props["domain"];
   yRange: [number, number];
@@ -225,7 +228,7 @@ function tooltip(idx: number, state: State): string {
     header,
     `Imports: ${watts(point.importedW)}`,
     `Exports: ${watts(point.exportedW)}`,
-    `Neighbor price: ${(projected ? formatForecastMoney : formatMoneyConcise)(point.pricePerMWh)}/MWh`,
+    `Neighbor price: ${(projected ? formatForecastMoney : formatMoneyConcise)(point.pricePerMWh, state.currency)}/MWh`,
     `Line capacity: ${watts(point.capacityW)}`,
   ].join("\n");
 }
@@ -264,6 +267,8 @@ export default class ChartForecastPowerExchange extends React.PureComponent<
   Props,
   {}
 > {
+  static contextType = CurrencyContext;
+
   public render() {
     const {
       domain,
@@ -320,6 +325,7 @@ export default class ChartForecastPowerExchange extends React.PureComponent<
     );
 
     const state: State = {
+      currency: this.context as CurrencyType,
       points,
       domain,
       yRange,

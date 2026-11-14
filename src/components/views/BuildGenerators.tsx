@@ -1,3 +1,4 @@
+import { useMoney } from "../base/CurrencyContext";
 import {
   GameBuildCompleteContext,
   useGameWorkspaceLayout,
@@ -27,8 +28,6 @@ import {
 import {
   floorToTwoSignificantDigits,
   formatBuildMonths,
-  formatMoneyConcise,
-  formatForecastMoney,
   formatForecastPercent,
   formatWatts,
 } from "../../helpers/Format";
@@ -249,6 +248,7 @@ interface GeneratorBuildItemProps {
 export function GeneratorBuildItem(
   props: GeneratorBuildItemProps,
 ): React.JSX.Element {
+  const { formatMoneyConcise, formatForecastMoney } = useMoney();
   const { generator, cash } = props;
   const units = useUnits();
   const kgCO2ePerBtu = FUELS[generator.fuel]?.kgCO2ePerBtu ?? 0;
@@ -843,6 +843,7 @@ function GeneratorComparison(props: {
   onClear: () => void;
   onRemove: (name: string) => void;
 }): React.JSX.Element | null {
+  const { formatMoneyConcise, formatForecastMoney } = useMoney();
   if (props.generators.length === 0) {
     return null;
   }

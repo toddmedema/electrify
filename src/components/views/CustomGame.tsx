@@ -1,3 +1,5 @@
+import { currencyForLocation } from "../../helpers/Currency";
+import { useMoney } from "../base/CurrencyContext";
 import {
   getHydroAvailability,
   resolveStartingHydroSites,
@@ -58,7 +60,6 @@ import {
 import { getDateFromMinute } from "../../helpers/DateTime";
 import { getScenarioLocation } from "../../helpers/Locations";
 import {
-  formatMoneyConcise,
   formatWattHours,
   formatWatts,
   formatForecastWatts,
@@ -252,6 +253,11 @@ export default function CustomGame(props: Props): React.JSX.Element {
   const [scenario, setScenario] = React.useState<ScenarioType>(() =>
     prepareCustomScenario(props.scenario),
   );
+  const currency = currencyForLocation(
+    getScenarioLocation(scenario),
+    scenario.startingYear,
+  );
+  const { formatMoneyConcise } = useMoney(currency);
   const [victoryDialogOpen, setVictoryDialogOpen] = React.useState(false);
   const [feeDialogOpen, setFeeDialogOpen] = React.useState(false);
   const [addName, setAddName] = React.useState("");
@@ -749,7 +755,11 @@ export default function CustomGame(props: Props): React.JSX.Element {
                             <MenuItem value={f / 1000} key={f}>
                               {/* The options are set per tonne, and the value stays per kilogram
                             whichever way it is quoted - only the label moves */}
-                              {formatPricePerLargeMass(f / 1000, units)}
+                              {formatPricePerLargeMass(
+                                f / 1000,
+                                units,
+                                currency,
+                              )}
                             </MenuItem>
                           );
                         })}

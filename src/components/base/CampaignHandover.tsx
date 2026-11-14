@@ -1,3 +1,4 @@
+import { useCurrency } from "./CurrencyContext";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import HighlightOffIcon from "@mui/icons-material/HighlightOff";
 import RadioButtonUncheckedIcon from "@mui/icons-material/RadioButtonUnchecked";
@@ -21,9 +22,6 @@ import {
 import type { CompiledRuleObjective } from "../../data/ScenarioRules";
 import { LegacyCampaignTermType } from "../../Types";
 
-const goalText = (objective: CompiledRuleObjective, startingYear: number) =>
-  objectiveGoalText(objective, startingYear, 240);
-
 export interface CampaignHandoverProps {
   term: LegacyCampaignTermType;
   nextObjectives: CompiledRuleObjective[];
@@ -39,6 +37,9 @@ export default function CampaignHandover({
   onContinue,
   onExit,
 }: CampaignHandoverProps): React.JSX.Element {
+  const currency = useCurrency();
+  const goalText = (objective: CompiledRuleObjective, startingYear: number) =>
+    objectiveGoalText(objective, startingYear, 240, 0, currency);
   const next = LEGACY_GENERATIONS[term.generationIndex + 1];
   return (
     <Dialog

@@ -1,3 +1,5 @@
+import { currencyForLocation } from "../../helpers/Currency";
+import { useMoney } from "./CurrencyContext";
 import * as React from "react";
 import { Typography } from "@mui/material";
 import {
@@ -7,11 +9,7 @@ import {
 } from "../../Types";
 import { gasConversionQuote } from "../../helpers/GasConversion";
 import { currentCash } from "../../helpers/GameSelectors";
-import {
-  formatMoneyConcise,
-  formatPercent,
-  formatNumber,
-} from "../../helpers/Format";
+import { formatPercent, formatNumber } from "../../helpers/Format";
 import ConfirmDialog from "./ConfirmDialog";
 import FacilityUpgradeAction from "./FacilityUpgradeAction";
 import DecisionImpactPreview from "./DecisionImpactPreview";
@@ -23,6 +21,9 @@ export default function GasConversion(props: {
   onRetrofit?: (payload: RetrofitFacilityAction) => void;
 }) {
   const [confirming, setConfirming] = React.useState(false);
+  const { formatMoneyConcise } = useMoney(
+    currencyForLocation(props.game.location, props.game.startingYear),
+  );
   const quote = gasConversionQuote(props.facility, props.game);
   if (!quote || !props.onRetrofit) return null;
   const { facility, game } = props;

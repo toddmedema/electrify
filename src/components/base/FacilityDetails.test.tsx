@@ -1,3 +1,4 @@
+import { currencyForLocation } from "../../helpers/Currency";
 import * as React from "react";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import cloneDeep from "lodash.clonedeep";
@@ -465,7 +466,7 @@ describe("fixed upkeep", () => {
     showDetails(game, facility);
     const economics = screen.getByRole("region", { name: "Economics" });
     expect(economics).toHaveTextContent(
-      `Fixed upkeep${formatMoneyConcise(facility.annualOperatingCost)}/yr`,
+      `Fixed upkeep${formatMoneyConcise(facility.annualOperatingCost, currencyForLocation(game.location, game.startingYear))}/yr`,
     );
     expect(economics).not.toHaveTextContent("Variable upkeep");
     expect(economics).not.toHaveTextContent("while paused");
@@ -480,23 +481,26 @@ describe("fixed upkeep", () => {
     showDetails(game, solar);
     const economics = screen.getByRole("region", { name: "Economics" });
     expect(economics).toHaveTextContent(
-      `Fixed upkeep${formatMoneyConcise(solar.annualOperatingCost / 2)}/yr · half rate while paused`,
+      `Fixed upkeep${formatMoneyConcise(solar.annualOperatingCost / 2, currencyForLocation(game.location, game.startingYear))}/yr · half rate while paused`,
     );
     expect(economics).not.toHaveTextContent(
-      `${formatMoneyConcise(solar.annualOperatingCost)}/yr`,
+      `${formatMoneyConcise(solar.annualOperatingCost, currencyForLocation(game.location, game.startingYear))}/yr`,
     );
   });
 
   it("still lists the variable part beside it for a fuel plant", () => {
-    const game = carbonFee();
-    const gas = game.facilities[0];
+    const game = createGame({ scenarioId: 108 });
+    const gas = game.facilities.find(
+      (facility) => facility.fuel === "Natural Gas",
+    )!;
     expect(gas.variableOperatingCostPerMWh).toBeDefined();
     showDetails(game, gas);
     const economics = screen.getByRole("region", { name: "Economics" });
     expect(economics).toHaveTextContent(
-      `Fixed upkeep${formatMoneyConcise(gas.annualOperatingCost)}/yr`,
+      `Fixed upkeep${formatMoneyConcise(gas.annualOperatingCost, currencyForLocation(game.location, game.startingYear))}/yr`,
     );
-    expect(economics).toHaveTextContent("Variable upkeep");
+    expect(economics).toHaveTextContent("Variable upkeep€");
+    expect(economics).not.toHaveTextContent("$");
   });
 });
 
@@ -530,7 +534,7 @@ it("dates a cleanup charge before it begins", () => {
   )!;
   showDetails(game, unit);
   expect(
-    screen.getByText("$250M/mo · $3B/yr from Apr 1986", { exact: false }),
+    screen.getByText("SUR 250M/mo · SUR 3B/yr from Apr 1986", { exact: false }),
   ).toBeInTheDocument();
 });
 
