@@ -151,3 +151,22 @@ it("does not call a decline bankruptcy when current rates cover costs", () => {
   expect(dialog.message).toContain("Current rates cover this month's costs.");
   expect(dialog.secondaryLabel).toBe("Keep current rates");
 });
+
+it("quotes a local major-unit price while accepting the original USD rate", () => {
+  const game = createGame({ scenarioId: 100, seed: 123 });
+  game.location = { ...game.location, country: "India" };
+  start(game);
+  store.dispatch(offerLowCashWarning());
+  const { dialog } = store.getState().ui;
+  const localRate = Number(
+    String(dialog.message)
+      .match(/to ₹([\d.,]+)\/kWh/)![1]
+      .replace(/,/g, ""),
+  );
+  expect(dialog.message).not.toContain("¢");
+  dialog.action!({} as React.MouseEvent<HTMLElement>);
+  expect(localRate / 89.854).toBeCloseTo(
+    store.getState().game.dollarsPerkWh,
+    10,
+  );
+});

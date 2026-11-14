@@ -1,3 +1,5 @@
+import { CurrencyType, USD_CURRENCY } from "../../helpers/Currency";
+import { useCurrency, useMoney } from "./CurrencyContext";
 import { useBuildGridEvidence } from "./BuildForecast";
 import * as React from "react";
 import { Button, Typography } from "@mui/material";
@@ -19,10 +21,11 @@ import { useBuildCash } from "./useBuildCash";
 export function financingShortfallText(
   cash: number,
   downpayment: number,
+  currency: CurrencyType = USD_CURRENCY,
 ): string | undefined {
   return cash >= downpayment
     ? undefined
-    : `Need ${formatMoneyConcise(downpayment)} down payment · you have ${formatMoneyConcise(cash)}`;
+    : `Need ${formatMoneyConcise(downpayment, currency)} down payment · you have ${formatMoneyConcise(cash, currency)}`;
 }
 
 /** Keep balance changes local to this text instead of redrawing the quote's metrics and chart. */
@@ -33,7 +36,10 @@ export function BuildCashWarning({
   cash: number;
   downpayment: number;
 }): React.JSX.Element {
-  return <>{financingShortfallText(useBuildCash(cash), downpayment)}</>;
+  const currency = useCurrency();
+  return (
+    <>{financingShortfallText(useBuildCash(cash), downpayment, currency)}</>
+  );
 }
 
 export interface PurchaseReviewDialogProps {
@@ -99,6 +105,7 @@ export function LivePurchaseReviewDialog(
 export default function PurchaseReviewDialog(
   props: PurchaseReviewDialogProps,
 ): React.JSX.Element {
+  const { formatMoneyConcise } = useMoney();
   const gridEvidence = useBuildGridEvidence();
   const {
     open,

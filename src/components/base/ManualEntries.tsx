@@ -1,3 +1,4 @@
+import { useCurrency, useMoney } from "./CurrencyContext";
 import * as React from "react";
 import KeyboardShortcuts, { SHORTCUTS_SEARCH_TEXT } from "./KeyboardShortcuts";
 import ConceptLegend from "./ConceptLegend";
@@ -47,7 +48,19 @@ function LargeMassUnit(): React.JSX.Element {
 const EXAMPLE_FEE_PER_KG = 0.05;
 
 function ExampleCarbonFee(): React.JSX.Element {
-  return <>{formatPricePerLargeMass(EXAMPLE_FEE_PER_KG, useUnits())}</>;
+  return (
+    <>
+      {formatPricePerLargeMass(EXAMPLE_FEE_PER_KG, useUnits(), useCurrency())}
+    </>
+  );
+}
+
+function NetWorthPerPoint(): React.JSX.Element {
+  return <>{useMoney().formatMoneyConcise(100e6)}</>;
+}
+
+function RatePerPoint(): React.JSX.Element {
+  return <>{useMoney().formatRateCompact(0.01)}/kWh</>;
 }
 
 function EmissionsPerPoint(): React.JSX.Element {
@@ -1255,7 +1268,10 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           <tbody>
             <tr>
               <td>+4</td>
-              <td>Financial performance: per $100M of net worth at the end</td>
+              <td>
+                Financial performance: per <NetWorthPerPoint /> of net worth at
+                the end
+              </td>
             </tr>
             <tr>
               <td>+1</td>
@@ -1279,8 +1295,8 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
             <tr>
               <td>±80</td>
               <td>
-                Financial performance: per $0.01/kWh your lifetime average{" "}
-                <EntryLink to={MANUAL_ENTRY.RATES}>rate</EntryLink> is
+                Financial performance: per <RatePerPoint /> your lifetime
+                average <EntryLink to={MANUAL_ENTRY.RATES}>rate</EntryLink> is
                 below/above the target rate (adjusted for inflation)
               </td>
             </tr>

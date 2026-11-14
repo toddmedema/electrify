@@ -1,3 +1,4 @@
+import { currencyForLocation } from "../../helpers/Currency";
 import { activeScenario, currentTick } from "../../helpers/GameSelectors";
 import * as React from "react";
 import { Box, Typography, useMediaQuery } from "@mui/material";
@@ -266,6 +267,7 @@ export function ScenarioDetailsContent({
   scenario: ScenarioType;
 }): React.JSX.Element {
   const units = useUnits();
+  const currency = currencyForLocation(game.location, game.startingYear);
   const location = getScenarioLocation(scenario);
   const mission = getMissionStatus(game);
   const objectives = scenarioObjectiveDefinitions(scenario, game);
@@ -276,6 +278,7 @@ export function ScenarioDetailsContent({
       game.startingYear,
       scenario.durationMonths,
       legacyMonthOffset(game),
+      currency,
     ),
     ...mission.requirements
       .filter((requirement) => !objectiveIds.has(requirement.id))
@@ -328,6 +331,7 @@ export function ScenarioDetailsContent({
     scenario.ownership,
     scenario.dollarsPerkWh,
     formatLargeMassApprox(KG_PER_MEGATONNE, units),
+    currency,
   );
   const facts = [
     {

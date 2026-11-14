@@ -1,3 +1,4 @@
+import { useMoney } from "./CurrencyContext";
 import { useGameWorkspaceLayout } from "./GameWorkspaceContext";
 import { FEEDBACK_URL } from "../../CommunityLinks";
 import type { AppDispatch } from "../../Store";
@@ -19,8 +20,6 @@ import {
 } from "../../helpers/DateTime";
 import { projectedShortfall } from "../../helpers/MissionStatus";
 import {
-  formatMoneyStable,
-  formatForecastMoney,
   formatForecastWatts,
   formatWatts,
   formatNumber,
@@ -332,6 +331,7 @@ export function monthProfit(
  * Couch seats leave common calendar/menu chrome to the shell; memoized controls avoid tick churn. */
 
 export function GameAppBar(props: Props) {
+  const { formatMoneyStable, formatForecastMoney } = useMoney();
   const steamAvailable = useDesktopState()?.steam.available;
   const {
     evidenceRequest,

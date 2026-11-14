@@ -1,3 +1,5 @@
+import { currencyForLocation } from "../../helpers/Currency";
+import { useMoney } from "./CurrencyContext";
 import { facilityDisplayName } from "./FacilityLabels";
 import GasConversion from "./GasConversion";
 import FacilityUpgradeAction from "./FacilityUpgradeAction";
@@ -19,14 +21,11 @@ import {
 } from "../../helpers/Financials";
 import {
   formatPercent,
-  formatMoneyConcise,
-  formatMoneyStable,
   formatNumber,
   formatWattHours,
   formatWattHoursOfPeak,
   formatWatts,
   formatCount,
-  formatPricePerMWh,
 } from "../../helpers/Format";
 import { facilityColor } from "../../Theme";
 import {
@@ -138,6 +137,9 @@ function WeatherResilienceSection(props: {
   onRetrofit?: Props["onRetrofit"];
 }): React.JSX.Element {
   const { facility, game, summary, onRetrofit } = props;
+  const { formatMoneyConcise } = useMoney(
+    currencyForLocation(game.location, game.startingYear),
+  );
   const units = useUnits();
   const [confirming, setConfirming] = React.useState(false);
   // Paying removes the offer button, so focus moves to the section heading instead of the page
@@ -271,6 +273,9 @@ function WeatherResilienceSection(props: {
  */
 export default function FacilityDetails(props: Props): React.JSX.Element {
   const { facility, date, seed, location } = props;
+  const { formatMoneyConcise, formatMoneyStable, formatPricePerMWh } = useMoney(
+    currencyForLocation(location, props.game?.startingYear),
+  );
   const lifetime = facilityLifetime(facility);
   const { fuel, variableOperatingCostPerMWh, minimumStableOutput } = facility;
   const storage = isStorage(facility) ? facility : undefined;

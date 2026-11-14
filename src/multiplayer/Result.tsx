@@ -1,3 +1,4 @@
+import { useMoney } from "../components/base/CurrencyContext";
 import {
   Box,
   Button,
@@ -13,7 +14,7 @@ import {
   Typography,
 } from "@mui/material";
 import { useAppSelector } from "../Store";
-import { formatMoneyConcise, formatPercent } from "../helpers/Format";
+import { formatPercent } from "../helpers/Format";
 import { formatLargeMassValueConcise, largeMassUnit } from "../helpers/Units";
 import {
   finishedObjectiveStatusText,
@@ -56,6 +57,7 @@ export default function CoopResult({
   onBackToLobby: () => void;
   onLeave: () => void;
 }) {
+  const { currency, formatMoneyConcise } = useMoney();
   const results = useAppSelector(
     (state) => state.game.multiplayer?.results ?? [],
   );
@@ -153,7 +155,7 @@ export default function CoopResult({
                     {result.definition}
                   </Typography>
                   <Typography variant="body2">
-                    {objectiveTargetText(result.objective)} ·{" "}
+                    {objectiveTargetText(result.objective, currency)} ·{" "}
                     {objectiveWindowText(
                       result.objective,
                       startingYear,
@@ -166,7 +168,7 @@ export default function CoopResult({
                     )}
                   </Typography>
                   <Typography variant="body2">
-                    {objectiveObservedText(result)}
+                    {objectiveObservedText(result, currency)}
                   </Typography>
                   {result.reason && (
                     <Typography variant="body2" color="text.secondary">
