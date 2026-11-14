@@ -56,22 +56,45 @@ export function routeTerritoryPower({
   const sinkNode = 5;
   const size = 7 + sources.length + sinks.length;
   const agreementGateway = size - 1;
-  const residual = Array.from({ length: size }, () =>
-    Array<number>(size).fill(0),
+  const residual = Array.from(
+    { length: size },
+    () => new Map<number, number>(),
   );
   const index = (id: TerritoryId) => IDS.indexOf(id);
+  const remaining = (from: number, to: number) => residual[from].get(to) ?? 0;
   const add = (from: number, to: number, capacity: number) => {
-    residual[from][to] += Math.max(0, capacity);
+    residual[from].set(to, remaining(from, to) + Math.max(0, capacity));
+    if (!residual[to].has(from)) residual[to].set(from, 0);
   };
+  // Register every possible forward/reverse edge once. Capacities still become available in
+  // dispatch order below; pre-registration lets BFS visit numeric neighbors without a matrix.
+  IDS.forEach((_, i) => add(i, sinkNode, 0));
+  add(sourceNode, agreementGateway, 0);
+  edges.forEach((edge) => add(index(edge.from), index(edge.to), 0));
+  sources.forEach((source, i) => {
+    add(source.kind === "agreement" ? agreementGateway : sourceNode, 6 + i, 0);
+    add(6 + i, index(source.territoryId), 0);
+  });
+  sinks.forEach((sink, i) => {
+    const node = 6 + sources.length + i;
+    add(index(sink.territoryId), node, 0);
+    add(node, sinkNode, 0);
+  });
+  const neighbors = residual.map((row) =>
+    [...row.keys()].sort((a, b) => a - b),
+  );
   const push = (path: number[], watts: number) => {
     for (let i = 1; i < path.length; i++) {
-      const remainingW = residual[path[i - 1]][path[i]];
+      const remainingW = remaining(path[i - 1], path[i]);
       // A fully served path must not leave a few ULPs for a later, dirtier source to buy.
-      residual[path[i - 1]][path[i]] = Math.max(
-        0,
-        remainingW - supplyAtDemandBoundary(watts, remainingW),
+      residual[path[i - 1]].set(
+        path[i],
+        Math.max(0, remainingW - supplyAtDemandBoundary(watts, remainingW)),
       );
-      residual[path[i]][path[i - 1]] += watts;
+      residual[path[i]].set(
+        path[i - 1],
+        remaining(path[i], path[i - 1]) + watts,
+      );
     }
   };
   const augment = () => {
@@ -85,8 +108,8 @@ export function routeTerritoryPower({
         head++
       ) {
         const from = queue[head];
-        for (let to = 0; to < size; to++) {
-          if (previous[to] >= 0 || !(residual[from][to] > 0)) continue;
+        for (const to of neighbors[from]) {
+          if (previous[to] >= 0 || !(remaining(from, to) > 0)) continue;
           previous[to] = from;
           queue.push(to);
         }
@@ -96,7 +119,7 @@ export function routeTerritoryPower({
       let watts = Infinity;
       while (path[0] !== sourceNode) {
         const from = previous[path[0]];
-        watts = Math.min(watts, residual[from][path[0]]);
+        watts = Math.min(watts, remaining(from, path[0]));
         path.unshift(from);
       }
       push(path, watts);
@@ -127,11 +150,11 @@ export function routeTerritoryPower({
       // Native fleets claim local load before sharing it. Agreements retain their caller's
       // dispatch priority, so a later local purchase cannot displace a reachable cheaper one.
       const localW = Math.min(
-        residual[origin][node],
+        remaining(origin, node),
         origin === agreementGateway
-          ? residual[sourceNode][agreementGateway]
+          ? remaining(sourceNode, agreementGateway)
           : Infinity,
-        residual[territory][sinkNode],
+        remaining(territory, sinkNode),
       );
       push(
         origin === agreementGateway
@@ -146,26 +169,26 @@ export function routeTerritoryPower({
   const servedW = Object.fromEntries(
     IDS.map((id, i) => [
       id,
-      Math.max(0, Math.min(demandW[id], demandW[id] - residual[i][sinkNode])),
+      Math.max(0, Math.min(demandW[id], demandW[id] - remaining(i, sinkNode))),
     ]),
   ) as Record<TerritoryId, number>;
   // Freeze customer delivery. Lower-priority sinks can reroute existing deliveries, but cannot
   // take watts from an already-served customer or buy an agreement just to fill storage.
   IDS.forEach((_, i) => {
-    residual[sinkNode][i] = 0;
-    residual[i][sinkNode] = 0;
+    residual[sinkNode].set(i, 0);
+    residual[i].set(sinkNode, 0);
   });
   const agreementRemaining = sources.map((source, i) =>
-    source.kind === "agreement" ? residual[agreementGateway][6 + i] : 0,
+    source.kind === "agreement" ? remaining(agreementGateway, 6 + i) : 0,
   );
   sources.forEach((source, i) => {
-    if (source.kind === "agreement") residual[agreementGateway][6 + i] = 0;
+    if (source.kind === "agreement") residual[agreementGateway].set(6 + i, 0);
     if (
       source.kind !== "native" &&
       source.kind !== "spare" &&
       !(importToSinks && source.kind === "import")
     )
-      residual[sourceNode][6 + i] = 0;
+      residual[sourceNode].set(6 + i, 0);
   });
   for (const priority of [
     ...new Set(sinks.map((sink) => sink.priority ?? 0)),
@@ -178,10 +201,10 @@ export function routeTerritoryPower({
     });
     // Use already-produced surplus before burning additional fuel for a secondary sink.
     const spareRemaining = sources.map((source, i) =>
-      source.kind === "spare" ? residual[sourceNode][6 + i] : 0,
+      source.kind === "spare" ? remaining(sourceNode, 6 + i) : 0,
     );
     sources.forEach((source, i) => {
-      if (source.kind === "spare") residual[sourceNode][6 + i] = 0;
+      if (source.kind === "spare") residual[sourceNode].set(6 + i, 0);
     });
     augment();
     const allowAgreements = sinks.some(
@@ -190,25 +213,25 @@ export function routeTerritoryPower({
     if (allowAgreements) {
       sources.forEach((source, i) => {
         if (source.kind === "agreement") {
-          residual[agreementGateway][6 + i] = agreementRemaining[i];
+          residual[agreementGateway].set(6 + i, agreementRemaining[i]);
           augment();
         }
       });
       sources.forEach((source, i) => {
         if (source.kind === "agreement") {
-          agreementRemaining[i] = residual[agreementGateway][6 + i];
-          residual[agreementGateway][6 + i] = 0;
+          agreementRemaining[i] = remaining(agreementGateway, 6 + i);
+          residual[agreementGateway].set(6 + i, 0);
         }
       });
     }
     sources.forEach((source, i) => {
       if (source.kind === "spare")
-        residual[sourceNode][6 + i] = spareRemaining[i];
+        residual[sourceNode].set(6 + i, spareRemaining[i]);
     });
     augment();
     sinks.forEach((sink, i) => {
       if ((sink.priority ?? 0) === priority)
-        residual[6 + sources.length + i][sinkNode] = 0;
+        residual[6 + sources.length + i].set(sinkNode, 0);
     });
   }
   // Reverse residuals accumulate several paths and can round above the original capacity.
@@ -217,16 +240,17 @@ export function routeTerritoryPower({
       0,
       Math.min(
         source.capacityW,
-        residual[6 + i][
-          source.kind === "agreement" ? agreementGateway : sourceNode
-        ],
+        remaining(
+          6 + i,
+          source.kind === "agreement" ? agreementGateway : sourceNode,
+        ),
       ),
     ),
   );
   const sinkW = sinks.map((sink, i) =>
     Math.max(
       0,
-      Math.min(sink.capacityW, residual[sinkNode][6 + sources.length + i]),
+      Math.min(sink.capacityW, remaining(sinkNode, 6 + sources.length + i)),
     ),
   );
   return {
@@ -242,7 +266,7 @@ export function routeTerritoryPower({
         -edge.capacityW,
         Math.min(
           edge.capacityW,
-          residual[index(edge.from)][index(edge.to)] - edge.capacityW,
+          remaining(index(edge.from), index(edge.to)) - edge.capacityW,
         ),
       ),
     })),
