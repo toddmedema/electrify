@@ -1,5 +1,9 @@
 import { CurrencyType, USD_CURRENCY } from "./Currency";
-import { formatMoneyConcise, formatMoneyFull } from "./Format";
+import {
+  formatMoneyConcise,
+  formatMoneyFull,
+  formatRateCompact,
+} from "./Format";
 import { getRateInflationIndex } from "../data/Economy";
 import {
   MonthlyHistoryType,
@@ -149,7 +153,7 @@ export const SCORE_RULES: Record<ScenarioType["ownership"], ScoreRuleType[]> = {
       score: ({ targetRate, effectiveRate }) =>
         publicRateScore(targetRate, effectiveRate),
       text: ({ dollarsPerkWh, currency }, rule) =>
-        `Earn ${pointsText(rule.points)} for each ${currency.code === "USD" ? formatMoneyConcise(0.01, currency) : formatMoneyFull(0.01, currency, 6)}/kWh your lifetime average rate is below the ${currency.code === "USD" ? `$${dollarsPerkWh}` : formatMoneyConcise(dollarsPerkWh, currency)}/kWh target; lose the same above it. Rates are measured in starting-year ${currency.code === "USD" ? "dollars" : currency.code}.`,
+        `Earn ${pointsText(rule.points)} for each ${currency.code === "USD" ? formatMoneyConcise(0.01, currency) : formatMoneyFull(0.01, currency, 6)}/kWh your lifetime average rate is below the ${currency.code === "USD" ? `$${dollarsPerkWh}` : formatRateCompact(dollarsPerkWh, currency)}/kWh target; lose the same above it. Rates are measured in starting-year ${currency.code === "USD" ? "dollars" : currency.code}.`,
     },
     emissionsRule(-5),
   ],

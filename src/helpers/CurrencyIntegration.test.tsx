@@ -224,3 +224,10 @@ test("community and co-op mod previews use the selected location's currency", ()
   expect(summary.objectives[0].target).toContain("₹8.99/kWh");
   expect(JSON.stringify(scenario)).toBe(before);
 });
+
+test("small converted scoring targets remain legible instead of rounding to zero", () => {
+  const dinar = currencyByCode("KWD");
+  expect(
+    scoreRuleText("Public", 0.01, "1 megatonne", dinar).financial,
+  ).toContain("KWD 0.00308/kWh target");
+});
