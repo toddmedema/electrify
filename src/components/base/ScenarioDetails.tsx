@@ -19,7 +19,6 @@ import { useUnits } from "./UnitsContext";
 import { formatLargeMassApprox, KG_PER_MEGATONNE } from "../../helpers/Units";
 import CustomerGrowthChallenge from "./CustomerGrowthChallenge";
 import ConceptIcon from "./ConceptIcon";
-import UtilitySupplyPlan from "./UtilitySupplyPlan";
 import { formatScore, formatForecastNumber } from "../../helpers/Format";
 import { getMissionStatus } from "../../helpers/MissionStatus";
 import { scenarioObjectiveDefinitions } from "../../helpers/ObjectiveRules";
@@ -357,7 +356,6 @@ export function ScenarioDetailsContent({
         game={game}
         outlook={missionProjection}
       />
-      <UtilitySupplyPlan game={game} forecast={forecast} />
       <Box component="dl" className="scenarioFacts">
         {facts.map(({ label, value }) => (
           <div key={label}>

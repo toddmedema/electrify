@@ -24,7 +24,10 @@ import {
   ownedUtilityConnection,
 } from "../helpers/ExpansionContext";
 import { areaBaselineDemand } from "../helpers/AreaDemand";
-import { utilityNetworkAnnualOM } from "../data/UtilityExpansion";
+import {
+  UTILITY_NETWORK_RENEWAL_STAGES,
+  utilityNetworkAnnualOM,
+} from "../data/UtilityExpansion";
 import { acquireUtility, acceptPowerAgreement } from "./GameActions";
 import {
   acceptAgreement,
@@ -2597,6 +2600,20 @@ export default gameSlice.reducer;
 /** Calendar-owned notices; cap changes themselves remain a pure dated entitlement lookup. */
 export function recordExpansionMilestones(state: GameType): void {
   if (!isUtilityExpansionGame(state) || state.date.monthNumber !== 1) return;
+  for (const stage of UTILITY_NETWORK_RENEWAL_STAGES) {
+    if (state.date.year !== stage.year) continue;
+    logGameEvent(
+      state,
+      "WORLD_EVENT",
+      `Network upkeep is now ${stage.multiplier}× opening upkeep, excluding customer growth and inflation.`,
+      {
+        title: "Network upkeep increased",
+        importance: "NOTABLE",
+        reportedKey: `scenario-116-network-renewal-${stage.year}`,
+        actionTarget: { card: "INSIGHTS", layer: "FINANCES" },
+      },
+    );
+  }
   if (state.date.year === 2013 && ownedUtility(state, "valley-electric"))
     logGameEvent(
       state,
