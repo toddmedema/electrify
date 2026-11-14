@@ -637,7 +637,7 @@ for (const theme of ["light", "dark"] as const) {
     // Hidden acquisition corridors must not shift the reducer indices used by visible drag handles.
     await interties
       .getByRole("button", {
-        name: "Reorder Ridge regional connection",
+        name: "Reorder Ridge ↔ Regional grid",
         exact: true,
       })
       .focus();
