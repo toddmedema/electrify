@@ -1,3 +1,4 @@
+import { useMoney } from "../base/CurrencyContext";
 import { GameBuildCompleteContext } from "../base/GameWorkspaceContext";
 import * as React from "react";
 import {
@@ -11,7 +12,6 @@ import { getTimeFromTimeline } from "../../helpers/DateTime";
 import { facilityLoanMonths, purchaseTerms } from "../../helpers/Financials";
 import {
   floorToTwoSignificantDigits,
-  formatMoneyConcise,
   formatNumber,
   formatWattHours,
   formatWatts,
@@ -69,6 +69,7 @@ interface StorageBuildItemProps {
 }
 
 function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
+  const { formatMoneyConcise } = useMoney();
   const { storage, cash } = props;
   // The catalog key also identifies facilities in saves and mods.
   const displayName =

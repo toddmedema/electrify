@@ -1,3 +1,5 @@
+import { CurrencyContext } from "../base/CurrencyContext";
+import { currencyByCode } from "../../helpers/Currency";
 import { GameToolMemoryContext } from "../base/GameToolMemory";
 import { GameWorkspaceLayoutContext } from "../base/GameWorkspaceContext";
 import { workspaceLayout } from "../../WorkspaceLayout";
@@ -1569,3 +1571,35 @@ it.each([undefined, "Natural Gas"] as const)(
     expect(index("Coal")).toBeLessThan(index("Oil"));
   },
 );
+
+it("updates quoted build costs when the local currency context changes", () => {
+  const game = createGame({ scenarioId: 100 });
+  const generator = GENERATORS(game, 100e6, [], []).find(
+    (candidate) => candidate.name === "Natural Gas Peaker",
+  )!;
+  const quote = (code: string) => (
+    <CurrencyContext.Provider value={currencyByCode(code)}>
+      <GeneratorBuildItem
+        cash={1e9}
+        date={game.date}
+        interestRate={game.interestRate}
+        generator={generator}
+        location={game.location}
+        seed={game.seed}
+        onBuild={jest.fn()}
+      />
+    </CurrencyContext.Provider>
+  );
+  const view = render(quote("JPY"));
+  expect(
+    screen.getByText(
+      formatMoneyConcise(generator.buildCost, currencyByCode("JPY")),
+    ),
+  ).toBeInTheDocument();
+  view.rerender(quote("ZMW"));
+  expect(
+    screen.getByText(
+      formatMoneyConcise(generator.buildCost, currencyByCode("ZMW")),
+    ),
+  ).toBeInTheDocument();
+});

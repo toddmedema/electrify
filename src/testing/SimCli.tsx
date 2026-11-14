@@ -1,3 +1,6 @@
+import { currencyForLocation } from "../helpers/Currency";
+import { formatMoneyConcise } from "../helpers/Format";
+import { getScenarioLocation } from "../helpers/Locations";
 /**
  * Entry point for `npm run sim`. Deliberately named so that CRA's default testMatch ignores it --
  * scripts/sim.js points jest at this file explicitly, so it never runs as part of `npm test`.
@@ -108,7 +111,13 @@ function runSweep() {
         scenario.name.slice(0, 25).padEnd(26) +
         String(result.options.months).padEnd(9) +
         outcome.padEnd(21) +
-        `$${Math.round(cash / 1000000).toLocaleString("en-US")}M`.padEnd(10) +
+        formatMoneyConcise(
+          cash,
+          currencyForLocation(
+            getScenarioLocation(result.scenario),
+            result.scenario.startingYear,
+          ),
+        ).padEnd(10) +
         (demandWh
           ? `${((100 * (demandWh - supplyWh)) / demandWh).toFixed(1)}%`
           : "-"

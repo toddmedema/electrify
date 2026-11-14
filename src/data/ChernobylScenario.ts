@@ -1,3 +1,4 @@
+import { currencyForLocation } from "../helpers/Currency";
 import type { ScenarioType } from "../Types";
 import type { OfficialScenarioRuleDefinition } from "./OfficialScenarioRules";
 import { formatMoneyConcise } from "../helpers/Format";
@@ -90,7 +91,7 @@ const phases = [
     id: "disaster",
     title: "The Chernobyl disaster",
     previewTitle: "The Chernobyl disaster",
-    message: `Chernobyl's four units are offline after the 26 April 1986 disaster. Unit 4 is permanently lost. Cleanup costs on Unit 4 are ${formatMoneyConcise(CHERNOBYL_RECOVERY_MONTHLY_COST)} a month.`,
+    message: `Chernobyl's four units are offline after the 26 April 1986 disaster. Unit 4 is permanently lost. Cleanup costs on Unit 4 are ${formatMoneyConcise(CHERNOBYL_RECOVERY_MONTHLY_COST, currencyForLocation(CHERNOBYL_SCENARIO.location, CHERNOBYL_SCENARIO.startingYear))} a month.`,
     preview:
       "The disaster will destroy a reactor and shut down the site's surviving units.",
     startMonth: 4,

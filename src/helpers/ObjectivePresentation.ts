@@ -1,3 +1,4 @@
+import { CurrencyType, USD_CURRENCY } from "./Currency";
 import { formatNumber, formatRateCompact, getWattUnit } from "./Format";
 import { roundToSignificantDigits } from "./Math";
 import type { CompiledRuleObjective } from "../data/ScenarioRules";
@@ -23,11 +24,18 @@ export function objectiveValueText(
   value: number,
   comparison?: number,
   significantDigits = 3,
+  currency: CurrencyType = USD_CURRENCY,
 ): string {
-  const text = objectiveAmountText(objective, value, significantDigits);
+  const text = objectiveAmountText(
+    objective,
+    value,
+    significantDigits,
+    currency,
+  );
   return comparison !== undefined &&
     value !== comparison &&
-    text === objectiveAmountText(objective, comparison, significantDigits)
+    text ===
+      objectiveAmountText(objective, comparison, significantDigits, currency)
     ? `${text} (${value < comparison ? "below" : "above"} goal)`
     : text;
 }
@@ -36,6 +44,7 @@ function objectiveAmountText(
   objective: CompiledRuleObjective,
   value: number,
   significantDigits: number,
+  currency: CurrencyType,
 ): string {
   const amount = (n: number, percent = false) =>
     number(n, percent, significantDigits);
@@ -60,11 +69,11 @@ function objectiveAmountText(
     case "emissionsPerDeliveredMWh":
       return `${amount(value)} kg CO₂e/MWh`;
     case "monthlyBilledRate":
-      return significantDigits === 2
+      return currency.code === "USD" && significantDigits === 2
         ? `${amount(value * 100)}¢/kWh`
-        : `${formatRateCompact(value)}/kWh`;
+        : `${formatRateCompact(value, currency)}/kWh`;
     case "monthEndDebt":
-      return `$${amount(value)}`;
+      return `${currency.symbol}${amount(value * currency.unitsPerDollar)}`;
     case "utilityOwnership":
       return `${amount(value)} acquired ${value === 1 ? "utility" : "utilities"}`;
     case "assetRetirement":
@@ -103,8 +112,17 @@ export function objectiveWindowText(
   return `${monthText(first, startingYear)}–${monthText(last, startingYear)}`;
 }
 
-export function objectiveTargetText(objective: CompiledRuleObjective): string {
-  const target = objectiveValueText(objective, objectiveTarget(objective));
+export function objectiveTargetText(
+  objective: CompiledRuleObjective,
+  currency: CurrencyType = USD_CURRENCY,
+): string {
+  const target = objectiveValueText(
+    objective,
+    objectiveTarget(objective),
+    undefined,
+    3,
+    currency,
+  );
   if (objective.checkpoint) {
     switch (objective.metric) {
       case "customerRetention":
@@ -181,6 +199,7 @@ export function objectiveGoalText(
   startingYear: number,
   durationMonths: number,
   monthOffset = 0,
+  currency: CurrencyType = USD_CURRENCY,
 ): string {
   if (objective.checkpoint) {
     const last =
@@ -188,7 +207,7 @@ export function objectiveGoalText(
         ? objective.deadlineMonth
         : objective.throughMonth;
     return (
-      objectiveTargetText(objective) +
+      objectiveTargetText(objective, currency) +
       (last === durationMonths - 1
         ? ""
         : ` by ${(last + monthOffset) % 12 === 11 ? startingYear + Math.floor((last + monthOffset) / 12) : monthText(last + monthOffset, startingYear)}`)
@@ -202,8 +221,8 @@ export function objectiveGoalText(
   );
   return objective.metric === "customerRetention" ||
     objective.metric === "customerCount"
-    ? `${objectiveTargetText(objective)} by ${window}`
-    : `${objectiveTargetText(objective)} · ${window}`;
+    ? `${objectiveTargetText(objective, currency)} by ${window}`
+    : `${objectiveTargetText(objective, currency)} · ${window}`;
 }
 
 /** A short heading names the goal; its target carries quantities, conditions and dates. */
@@ -251,6 +270,7 @@ export function objectiveGoalGroups(
   startingYear: number,
   durationMonths: number,
   monthOffset = 0,
+  currency: CurrencyType = USD_CURRENCY,
 ): { id: string; label: string; required: boolean; goals: string[] }[] {
   const champlain = objectives.find(
     (objective) =>
@@ -289,6 +309,7 @@ export function objectiveGoalGroups(
             startingYear,
             durationMonths,
             monthOffset,
+            currency,
           ),
         ],
       },
@@ -326,7 +347,10 @@ export function objectiveDefinitionText(
       : result.definition;
 }
 
-export function objectiveObservedText(result: ObjectiveResult): string {
+export function objectiveObservedText(
+  result: ObjectiveResult,
+  currency: CurrencyType = USD_CURRENCY,
+): string {
   if (result.metric === "utilityOwnership")
     return result.observed === 1
       ? "Utility acquired"
@@ -342,6 +366,8 @@ export function objectiveObservedText(result: ObjectiveResult): string {
     result.objective,
     result.observed,
     result.target,
+    3,
+    currency,
   );
   const live = result.status === "pending" || result.status === "inProgress";
   if (result.objective.checkpoint) return `${value}${live ? " now" : ""}`;

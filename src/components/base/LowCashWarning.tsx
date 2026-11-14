@@ -6,7 +6,8 @@ import {
   LOW_CASH_THRESHOLD,
   lowCashRateQuote,
 } from "../../helpers/LowCashRate";
-import { formatNumber } from "../../helpers/Format";
+import { currencyForLocation } from "../../helpers/Currency";
+import { formatNumber, formatDecimalNumber } from "../../helpers/Format";
 import { pendingScenarioChoice } from "../../helpers/ScenarioChoices";
 import { delta } from "../../reducers/Game";
 import { dialogClose, dialogOpen } from "../../reducers/UI";
@@ -42,7 +43,13 @@ export const offerLowCashWarning = (): AppThunk => (dispatch, getState) => {
     rate !== null && game.dollarsPerkWh > 0
       ? `+${formatNumber((rate / game.dollarsPerkWh - 1) * 100)}%`
       : undefined;
-  const price = rate !== null ? `${formatNumber(rate * 100)}¢/kWh` : "";
+  const currency = currencyForLocation(game.location, game.startingYear);
+  const price =
+    rate === null
+      ? ""
+      : currency.code === "USD"
+        ? `${formatNumber(rate * 100)}¢/kWh`
+        : `${currency.symbol}${formatDecimalNumber(rate * currency.unitsPerDollar, { digits: 8, trim: true })}/kWh`;
   const message =
     rate === null
       ? quote.projectedCash >= 0

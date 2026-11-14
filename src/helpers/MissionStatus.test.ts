@@ -533,3 +533,18 @@ test.each([
     }
   },
 );
+
+test("supply risk opens the demand forecast after scenario supply planning moves to Events", () => {
+  const game = createGame({
+    scenarioId: 116,
+    seed: 12345,
+    dollarsPerkWh: 0.08,
+  });
+  for (const tick of game.timeline) {
+    tick.cash = 1e12;
+    tick.supplyW = tick.demandW;
+  }
+  const risk = selectMissionRisk(game, []);
+  expect(risk?.id).toMatch(/^supply-plan:/);
+  expect(risk?.target).toEqual({ card: "INSIGHTS", layer: "SUPPLY_DEMAND" });
+});

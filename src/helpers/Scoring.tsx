@@ -1,3 +1,9 @@
+import { CurrencyType, USD_CURRENCY } from "./Currency";
+import {
+  formatMoneyConcise,
+  formatMoneyFull,
+  formatRateCompact,
+} from "./Format";
 import { getRateInflationIndex } from "../data/Economy";
 import {
   MonthlyHistoryType,
@@ -53,6 +59,7 @@ interface ScoreInputsType {
 }
 
 interface ScoreTextContextType {
+  currency: CurrencyType;
   dollarsPerkWh: number;
   // The emissions unit the player reads in, such as "1 megatonne"
   perEmissions: string;
@@ -130,8 +137,8 @@ export const SCORE_RULES: Record<ScenarioType["ownership"], ScoreRuleType[]> = {
       points: 40,
       per: BILLION,
       measure: ({ summary }) => summary.netWorth,
-      text: (_context, rule) =>
-        `${earnOrLose(rule)} per $1 billion of net worth at the end.`,
+      text: ({ currency }, rule) =>
+        `${earnOrLose(rule)} per ${currency.code === "USD" ? "$1 billion" : formatMoneyConcise(BILLION, currency)} of net worth at the end.`,
     },
     emissionsRule(-2),
   ],
@@ -145,8 +152,8 @@ export const SCORE_RULES: Record<ScenarioType["ownership"], ScoreRuleType[]> = {
       measure: ({ targetRate, effectiveRate }) => targetRate - effectiveRate,
       score: ({ targetRate, effectiveRate }) =>
         publicRateScore(targetRate, effectiveRate),
-      text: ({ dollarsPerkWh }, rule) =>
-        `Earn ${pointsText(rule.points)} for each $0.01/kWh your lifetime average rate is below the $${dollarsPerkWh}/kWh target; lose the same above it. Rates are measured in starting-year dollars.`,
+      text: ({ dollarsPerkWh, currency }, rule) =>
+        `Earn ${pointsText(rule.points)} for each ${currency.code === "USD" ? formatMoneyConcise(0.01, currency) : formatMoneyFull(0.01, currency, 6)}/kWh your lifetime average rate is below the ${currency.code === "USD" ? `$${dollarsPerkWh}` : formatRateCompact(dollarsPerkWh, currency)}/kWh target; lose the same above it. Rates are measured in starting-year ${currency.code === "USD" ? "dollars" : currency.code}.`,
     },
     emissionsRule(-5),
   ],
@@ -164,12 +171,13 @@ export function scoreRuleText(
   ownership: ScenarioType["ownership"],
   dollarsPerkWh: number,
   perEmissions: string,
+  currency: CurrencyType = USD_CURRENCY,
 ): ScoreBreakdownText {
   const text: ScoreBreakdownText = {};
   for (const category of RULE_TEXT_ORDER) {
     text[category] = SCORE_RULES[ownership]
       .filter((rule) => rule.category === category)
-      .map((rule) => rule.text({ dollarsPerkWh, perEmissions }, rule))
+      .map((rule) => rule.text({ dollarsPerkWh, perEmissions, currency }, rule))
       .join(" ");
   }
   return text;

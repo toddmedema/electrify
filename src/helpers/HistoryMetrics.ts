@@ -1,3 +1,4 @@
+import { CurrencyType, USD_CURRENCY } from "./Currency";
 import { DerivedHistoryType, UnitSystemType } from "../Types";
 import {
   formatAbbreviatedNumber,
@@ -59,15 +60,15 @@ export interface HistoryMetricType {
   higherIsBetter?: boolean;
 }
 
-const money = {
-  format: formatMoneyConcise,
-  formatTable: formatMoneyStable,
-};
-
 // Only the two emissions rows care which unit system they are read in
 export function historyMetrics(
   units: UnitSystemType,
+  currency: CurrencyType = USD_CURRENCY,
 ): Record<HistoryMetricKeyType, HistoryMetricType> {
+  const money = {
+    format: (value: number) => formatMoneyConcise(value, currency),
+    formatTable: (value: number) => formatMoneyStable(value, currency),
+  };
   return {
     profit: { label: "Profit", higherIsBetter: true, ...money },
     profitPerkWh: {

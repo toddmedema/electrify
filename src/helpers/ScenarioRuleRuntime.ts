@@ -1,3 +1,4 @@
+import { currencyForLocation } from "./Currency";
 import {
   LEGACY_GENERATIONS,
   LEGACY_GENERATION_MONTHS,
@@ -245,6 +246,7 @@ function reportDescription(
   if (!report || !context.rules) return undefined;
   return interpretScenarioRuleReport(report, context.rules, {
     startingYear: context.rules.startingYear,
+    currency: currencyForLocation(context.location, context.rules.startingYear),
     completedMonths: context.completedMonths ?? context.date.monthsElapsed,
     monthlyHistory: context.monthlyHistory ?? [],
     occurrences: context.occurrences,
@@ -427,7 +429,11 @@ function resolveEvent(
     event.source &&
     (event.protection || event.effects.operatingExpensePerMonth !== undefined)
   ) {
-    const summary = scenarioEffectsSummary(occurrence.effects);
+    const summary = scenarioEffectsSummary(
+      occurrence.effects,
+      false,
+      currencyForLocation(context.location, context.rules?.startingYear),
+    );
     occurrence.message = [
       `${context.location.name}: ${preview ? "Expected conditions: " : ""}${summary.join("; ")}.`,
       noMatch

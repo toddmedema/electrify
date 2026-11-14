@@ -1,3 +1,5 @@
+import { CurrencyType, currencyForLocation } from "./Currency";
+import { getScenarioLocation } from "./Locations";
 import {
   catalogChoiceKey,
   SCENARIO_CHOICE_RULES,
@@ -83,12 +85,15 @@ function relocateYears(text: string, years: number): string {
   );
 }
 
-function description(option: CompiledRuleOption): CompiledRuleOption {
+function description(
+  option: CompiledRuleOption,
+  currency: CurrencyType,
+): CompiledRuleOption {
   return {
     ...option,
     description: option.description
-      .replaceAll("{grant}", formatMoneyConcise(option.grant))
-      .replaceAll("{cost}", formatMoneyConcise(option.cost)),
+      .replaceAll("{grant}", formatMoneyConcise(option.grant, currency))
+      .replaceAll("{cost}", formatMoneyConcise(option.cost, currency)),
   };
 }
 
@@ -98,6 +103,10 @@ function connectionCopy(
   receiving: ScenarioType,
   sourceLoadId: string | undefined,
 ): CompiledRuleOption | undefined {
+  const currency = currencyForLocation(
+    getScenarioLocation(receiving),
+    receiving.startingYear,
+  );
   const campus = source.loadAdditions?.find((load) => load.id === sourceLoadId);
   if (!campus) return undefined;
   const month = relocateOfficialArcMonth(
@@ -114,7 +123,7 @@ function connectionCopy(
   if (!option.replaceLoad && option.grant > 0)
     return {
       ...option,
-      description: `Receive ${formatMoneyConcise(option.grant)} to connect all ${peak} in ${date}.`,
+      description: `Receive ${formatMoneyConcise(option.grant, currency)} to connect all ${peak} in ${date}.`,
       message: `Funding received. Connect ${peak} in ${date}.`,
     };
   if (option.replaceLoad?.with.length === 2) {
@@ -326,9 +335,22 @@ export function compileOfficialArcChoices(
                 entry.scenarioId,
                 `Choice ${definition.id}/${option.id} cannot describe its relocated connection faithfully.`,
               );
-            else return description(copied);
+            else
+              return description(
+                copied,
+                currencyForLocation(
+                  getScenarioLocation(params.receivingScenario),
+                  params.startingYear,
+                ),
+              );
           }
-          return description(result);
+          return description(
+            result,
+            currencyForLocation(
+              getScenarioLocation(params.receivingScenario),
+              params.startingYear,
+            ),
+          );
         });
       const freeOptionId = options.find((option) => option.cost === 0)?.id;
       if (!freeOptionId) {

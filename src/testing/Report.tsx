@@ -1,3 +1,8 @@
+import {
+  CurrencyType,
+  USD_CURRENCY,
+  currencyForLocation,
+} from "../helpers/Currency";
 import { getScenarioLocation } from "../helpers/Locations";
 import { deriveExpandedSummary, summarizeHistory } from "../helpers/DateTime";
 import {
@@ -56,7 +61,7 @@ function sampleRows<T>(
 const COLUMNS: Array<{
   header: string;
   width: number;
-  value: (m: MonthlyHistoryType) => string;
+  value: (m: MonthlyHistoryType, currency: CurrencyType) => string;
 }> = [
   {
     header: "MONTH",
@@ -71,16 +76,21 @@ const COLUMNS: Array<{
     width: 9,
     value: (m) => percent(m.demandWh - m.supplyWh, m.demandWh),
   },
-  { header: "CASH", width: 9, value: (m) => formatMoneyConcise(m.cash) },
+  {
+    header: "CASH",
+    width: 9,
+    value: (m, currency) => formatMoneyConcise(m.cash, currency),
+  },
   {
     header: "NET WORTH",
     width: 10,
-    value: (m) => formatMoneyConcise(m.netWorth),
+    value: (m, currency) => formatMoneyConcise(m.netWorth, currency),
   },
   {
     header: "PROFIT",
     width: 10,
-    value: (m) => formatMoneyConcise(deriveExpandedSummary(m).profit),
+    value: (m, currency) =>
+      formatMoneyConcise(deriveExpandedSummary(m).profit, currency),
   },
   {
     header: "CO2/MWh",
@@ -92,13 +102,16 @@ const COLUMNS: Array<{
 function formatMonthTable(
   months: MonthlyHistoryType[],
   maxRows: number,
+  currency: CurrencyType = USD_CURRENCY,
 ): string[] {
   const lines = [
     "  " + COLUMNS.map((c) => pad(c.header, c.width)).join(""),
     "  " + COLUMNS.map((c) => "-".repeat(c.width - 1) + " ").join(""),
   ];
   sampleRows(months, maxRows).forEach(({ row }) => {
-    lines.push("  " + COLUMNS.map((c) => pad(c.value(row), c.width)).join(""));
+    lines.push(
+      "  " + COLUMNS.map((c) => pad(c.value(row, currency), c.width)).join(""),
+    );
   });
   if (months.length > maxRows) {
     lines.push(
@@ -108,7 +121,10 @@ function formatMonthTable(
   return lines;
 }
 
-function formatFacilities(facilities: FacilityOperatingType[]): string[] {
+function formatFacilities(
+  facilities: FacilityOperatingType[],
+  currency: CurrencyType = USD_CURRENCY,
+): string[] {
   if (facilities.length === 0) {
     return ["  (none)"];
   }
@@ -122,7 +138,7 @@ function formatFacilities(facilities: FacilityOperatingType[]): string[] {
         : "";
     const loan =
       f.loanAmountLeft > 0
-        ? ` -- ${formatMoneyConcise(f.loanAmountLeft)} owed`
+        ? ` -- ${formatMoneyConcise(f.loanAmountLeft, currency)} owed`
         : "";
     return `  ${pad(f.name, 16)}${pad(size, 22)}${building}${loan}`;
   });
@@ -136,6 +152,7 @@ export function formatReport(
   const maxRows = options.maxRows || DEFAULT_MAX_ROWS;
   const { scenario, months, options: opts } = result;
   const location = getScenarioLocation(scenario);
+  const currency = currencyForLocation(location, scenario.startingYear);
   const summary = summarizeHistory(result.months);
   const derived = deriveExpandedSummary(summary);
   const first = months[0];
@@ -153,7 +170,7 @@ export function formatReport(
       (options.elapsedMs === undefined ? "" : ` · ${options.elapsedMs}ms`),
   );
   lines.push("");
-  lines.push(...formatMonthTable(months, maxRows));
+  lines.push(...formatMonthTable(months, maxRows, currency));
 
   lines.push("");
   lines.push("TOTALS");
@@ -168,24 +185,26 @@ export function formatReport(
   );
   if (first && last) {
     lines.push(
-      `  Cash             ${formatMoneyConcise(first.cash)} -> ${formatMoneyConcise(last.cash)}`,
+      `  Cash             ${formatMoneyConcise(first.cash, currency)} -> ${formatMoneyConcise(last.cash, currency)}`,
     );
     lines.push(
-      `  Net worth        ${formatMoneyConcise(first.netWorth)} -> ${formatMoneyConcise(last.netWorth)}`,
+      `  Net worth        ${formatMoneyConcise(first.netWorth, currency)} -> ${formatMoneyConcise(last.netWorth, currency)}`,
     );
     lines.push(
       `  Customers        ${count(first.customers)} -> ${count(last.customers)}`,
     );
   }
   lines.push(
-    `  Revenue          ${formatMoneyConcise(summary.revenue)} (${formatMoneyConcise(derived.revenuePerkWh)}/kWh)`,
+    `  Revenue          ${formatMoneyConcise(summary.revenue, currency)} (${formatMoneyConcise(derived.revenuePerkWh, currency)}/kWh)`,
   );
   lines.push(
-    `  Expenses         ${formatMoneyConcise(derived.expenses)}  ` +
-      `[fuel ${formatMoneyConcise(summary.expensesFuel)} · O&M ${formatMoneyConcise(summary.expensesOM)} · ` +
-      `interest ${formatMoneyConcise(summary.expensesInterest)} · carbon ${formatMoneyConcise(summary.expensesCarbonFee)}]`,
+    `  Expenses         ${formatMoneyConcise(derived.expenses, currency)}  ` +
+      `[fuel ${formatMoneyConcise(summary.expensesFuel, currency)} · O&M ${formatMoneyConcise(summary.expensesOM, currency)} · ` +
+      `interest ${formatMoneyConcise(summary.expensesInterest, currency)} · carbon ${formatMoneyConcise(summary.expensesCarbonFee, currency)}]`,
   );
-  lines.push(`  Profit           ${formatMoneyConcise(derived.profit)}`);
+  lines.push(
+    `  Profit           ${formatMoneyConcise(derived.profit, currency)}`,
+  );
   lines.push(
     `  Supplied         ${formatWattHours(summary.supplyWh)} of ${formatWattHours(summary.demandWh)} demanded ` +
       `(${percent(summary.demandWh - summary.supplyWh, summary.demandWh)} unserved)`,
@@ -207,14 +226,14 @@ export function formatReport(
   } else if (hazards && (hazards.hailEvents || hazards.coldEvents)) {
     lines.push(
       `  Weather hazards  ${hazards.hailEvents} hailstorms (${hazards.hailFacilityHits} facility hits, ` +
-        `${formatMoneyConcise(hazards.hailRepairCosts)} repairs); ${hazards.coldEvents} cold snaps ` +
+        `${formatMoneyConcise(hazards.hailRepairCosts, currency)} repairs); ${hazards.coldEvents} cold snaps ` +
         `(${hazards.coldRegionalEvents} regional, ${hazards.coldDerates} plant-month derates)`,
     );
   }
 
   lines.push("");
   lines.push("FINAL FLEET");
-  lines.push(...formatFacilities(result.finalFacilities));
+  lines.push(...formatFacilities(result.finalFacilities, currency));
 
   lines.push("");
   if (result.violationCount === 0) {
