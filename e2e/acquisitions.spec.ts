@@ -8,6 +8,71 @@ import { expectContinuousDialogSurface } from "./dialog-surface";
 import { editSavedGame, readSavedGame, readSaveRecords } from "./save-fixture";
 
 for (const theme of ["light", "dark"] as const) {
+  test(`territory map has separate usable targets in ${theme}`, async ({
+    page,
+  }) => {
+    await page.addInitScript((mode) => {
+      localStorage.setItem("theme", mode);
+      localStorage.setItem("audioEnabled", "false");
+    }, theme);
+    await page.goto("/?scenario=116");
+    await page.getByRole("button", { name: "Start game", exact: true }).click();
+    const facilities = page.locator(".facilities:visible");
+    await openPane(
+      facilities,
+      page.getByRole("button", { name: "Facilities", exact: true }),
+    );
+    const network = facilities.getByRole("region", {
+      name: "Territory network",
+    });
+    const nodes = network.locator(".territoryMapNode");
+    await expect(nodes).toHaveCount(4);
+    const rectangles = await nodes.evaluateAll((buttons) =>
+      buttons.map((button) => {
+        const { x, y, width, height } = button.getBoundingClientRect();
+        return { name: button.getAttribute("aria-label"), x, y, width, height };
+      }),
+    );
+    for (const [index, rectangle] of rectangles.entries()) {
+      expect(
+        rectangle.height,
+        `${rectangle.name} target height`,
+      ).toBeGreaterThanOrEqual(44);
+      expect(
+        rectangle.width,
+        `${rectangle.name} target width`,
+      ).toBeGreaterThanOrEqual(44);
+      for (const other of rectangles.slice(index + 1)) {
+        const intersects =
+          rectangle.x < other.x + other.width &&
+          rectangle.x + rectangle.width > other.x &&
+          rectangle.y < other.y + other.height &&
+          rectangle.y + rectangle.height > other.y;
+        expect(intersects, `${rectangle.name} overlaps ${other.name}`).toBe(
+          false,
+        );
+      }
+    }
+    for (const name of [
+      "Champlain",
+      "Ridge Electric",
+      "Valley Electric",
+      "Green Uplands",
+    ]) {
+      const node = network.getByRole("button", {
+        name: `Inspect ${name} territory`,
+        exact: true,
+      });
+      await node.click();
+      await expect(node).toHaveAttribute("aria-pressed", "true");
+      await expect(
+        network
+          .getByRole("region", { name: "Selected territory" })
+          .getByRole("heading", { name, exact: true, level: 3 }),
+      ).toBeVisible();
+    }
+  });
+
   test(`completed Tier 1 connections acquire either utility in ${theme}`, async ({
     page,
   }, testInfo) => {

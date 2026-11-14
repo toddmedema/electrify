@@ -28,7 +28,7 @@ const geography: Record<TerritoryId, { path: string; x: number; y: number }> = {
   },
   "valley-electric": {
     path: "M289 223 330 145 427 202 522 247 581 344 527 449 380 463 285 392 251 305Z",
-    x: 61,
+    x: 74,
     y: 72,
   },
   "green-uplands": {
