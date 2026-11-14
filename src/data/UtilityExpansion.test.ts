@@ -12,7 +12,10 @@ import { getDateFromMinute } from "../helpers/DateTime";
 import { weatherLocationIds } from "../helpers/WeatherLocations";
 import { loadSimData } from "../testing/SimData";
 import { climateLoadArchetype, demandByTypeAt } from "./DemandProfiles";
-import { corridorsForLocation } from "./AdjacentMarkets";
+import {
+  adjacentMarketForCorridor,
+  corridorsForLocation,
+} from "./AdjacentMarkets";
 import { getHydroAvailability, resolveStartingHydroSites } from "./HydroSites";
 import { getViableLocationCount } from "./FacilitySites";
 import { importEmissionsKgco2ePerMWh } from "./ImportEmissions";
@@ -166,6 +169,11 @@ describe("Across the Valley catalog", () => {
         corridor.id === GREEN_UPLANDS_CORRIDOR_ID ? 120e6 : 100e6,
       );
       expect(corridor.routeType).toBe("NEW");
+    });
+    expect(adjacentMarketForCorridor(GREEN_UPLANDS_CORRIDOR_ID)).toMatchObject({
+      basePricePerMWh: 0,
+      availableSupplyW: 0,
+      availableDemandW: 0,
     });
     const assets = Object.values(UTILITY_AREAS).flatMap(({ facilities }) =>
       facilities.map(({ assetId }) => assetId),
