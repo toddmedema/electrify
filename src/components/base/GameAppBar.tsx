@@ -109,8 +109,6 @@ export interface Props extends StateProps, DispatchProps {}
 
 const LOW_RESERVE_RATIO = 0.1;
 const MINUTES_PER_DAY = 1440;
-/** From 6 PM a same-day blackout reads as "tonight". */
-const EVENING_MINUTE = 18 * 60;
 const NO_ACTIVE_EVENTS: ActiveEventGroupType[] = [];
 /** Status row controls that keep keyboard focus when the row moves into or out of the top bar. */
 const RESTORABLE_STATUS_FOCUS = [
@@ -162,10 +160,9 @@ export function getGridHealth(
     const sameDay =
       Math.floor(ahead.minute / MINUTES_PER_DAY) ===
       Math.floor(game.date.minute / MINUTES_PER_DAY);
-    const day = when.minuteOfDay >= EVENING_MINUTE ? "tonight" : "today";
     return {
       state: "blackout-ahead",
-      label: sameDay ? `Blackout ${day} at ${at}` : `Blackout ahead at ${at}`,
+      label: sameDay ? `Blackout at ${at}` : `Blackout ahead at ${at}`,
       metric: `${formatForecastWatts(ahead.demandW - ahead.supplyW)} short`,
       announcement: `Blackout expected at ${at}. Demand will be higher than supply.`,
     };

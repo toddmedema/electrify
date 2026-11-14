@@ -2,6 +2,7 @@ import { editSavedGame, readSavedGame } from "./save-fixture";
 import path from "path";
 import { expect, test, type Page } from "./fixtures";
 import { openPane, openBuild } from "./layout";
+import { reviewScreenshot } from "./review-screenshot";
 
 const reviewProjects = new Set([
   "desktop-chromium",
@@ -406,19 +407,28 @@ test("projected sample evidence and a deliberate purchase retain the bounded inv
   await expect(grid).toHaveClass(/gridHealth-blackout-ahead/);
   if (info.project.name === "mobile-390px") {
     const warning = grid.getByRole("button", {
-      name: /^Current grid status: Blackout (today|tonight) at \d+ [AP]M, .+ short$/,
+      name: /^Current grid status: Blackout at \d+ [AP]M, .+ short$/,
     });
     await expect(warning).toBeVisible();
     await warning.tap();
     await expect(
       page.getByRole("tooltip", {
-        name: /^Blackout (today|tonight) at \d+ [AP]M, .+ short$/,
+        name: /^Blackout at \d+ [AP]M, .+ short$/,
       }),
     ).toBeVisible();
   } else {
-    await expect(grid).toContainText(/Blackout (today|tonight) at/);
+    await expect(grid).toContainText(/Blackout at/);
     await expect(grid).toHaveClass(/statusWarning/);
   }
+  await reviewScreenshot(
+    info.project.name === "mobile-390px"
+      ? page
+      : page.locator("#appbar:visible"),
+    {
+      path: info.outputPath("blackout-copy.png"),
+      animations: "disabled",
+    },
+  );
   await expect(page.locator(".missionRiskButton:visible")).not.toContainText(
     /shortfall/i,
   );

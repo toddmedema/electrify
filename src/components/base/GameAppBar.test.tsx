@@ -642,7 +642,7 @@ describe("GameAppBar", () => {
     later.demandW = later.supplyW + 120_000_000;
     expect(getGridHealth(game, now)).toMatchObject({
       state: "blackout-ahead",
-      label: expect.stringMatching(/^Blackout (today|tonight) at \d+ [AP]M$/),
+      label: expect.stringMatching(/^Blackout at \d+ [AP]M$/),
       metric: "120MW short",
     });
     // A blackout happening now still outranks the one expected later.
@@ -654,7 +654,7 @@ describe("GameAppBar", () => {
     ).toBe("blackout");
     renderAppBar({ game: { ...game, inGame: true } });
     const readout = screen.getByLabelText(
-      /Current grid status: Blackout (today|tonight) at \d+ [AP]M, 120MW short/,
+      /Current grid status: Blackout at \d+ [AP]M, 120MW short/,
     );
     expect(readout).toHaveClass("statusWarning");
     expect(screen.queryByText(/^Stable/)).toBeNull();

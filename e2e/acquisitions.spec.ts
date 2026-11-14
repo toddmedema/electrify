@@ -625,9 +625,12 @@ for (const theme of ["light", "dark"] as const) {
       page.getByRole("combobox", { name: "Operating area", exact: true }),
     ).toHaveCount(0);
     await expect(
-      page.getByText("No storage projects are available in 2005.", {
-        exact: true,
-      }),
+      page.getByText(
+        "No storage projects available in 2005 in Burlington, VT.",
+        {
+          exact: true,
+        },
+      ),
     ).toBeVisible();
     const programs = page.getByRole("region", {
       name: "Programs",
