@@ -717,7 +717,10 @@ export default function TransmissionPanel({
   const [selectedLine, setSelectedLine] = React.useState<number | null>(null);
   const [tier, setTier] = useToolState(
     projectsOnly ? "interties.tier" : undefined,
-    () => (corridorIds ? 1 : initialIntertieBuildTier(game)),
+    () =>
+      corridorIds || hasTerritoryNetwork(game)
+        ? 1
+        : initialIntertieBuildTier(game),
   );
   const theme = useTheme();
   const [sort, setSort] = useToolState<IntertieSortKey>(
@@ -972,11 +975,16 @@ export default function TransmissionPanel({
                       (p) => p.corridor.id === line.corridorId,
                     );
                     const market = adjacentMarketForCorridor(line.corridorId);
-                    const capacities = intertieDirectionalCapacities(
-                      line.corridorId,
-                      intertieContext,
-                      line.capacityW,
-                    );
+                    const capacities = internal
+                      ? {
+                          importCapacityW: line.capacityW,
+                          exportCapacityW: line.capacityW,
+                        }
+                      : intertieDirectionalCapacities(
+                          line.corridorId,
+                          intertieContext,
+                          line.capacityW,
+                        );
                     const rating =
                       peer?.ratingW ??
                       (now ? transmissionRatingW(line, now) : line.capacityW);

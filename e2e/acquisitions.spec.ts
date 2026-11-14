@@ -268,16 +268,11 @@ for (const theme of ["light", "dark"] as const) {
       await inspect.click();
       await expect(acquire).toBeVisible();
       await expect(line).not.toContainText("Review the company terms");
-      // New expansion routes have reached their corridor limit at Tier 1.
-      // Keep the acquisition action aligned with the available capacity status.
-      const capacityStatus = line.getByText(
-        "Corridor full. More capacity needs a new route.",
-        { exact: true },
-      );
+      // Physical capacity can grow without adding a supply agreement or transferring ownership.
+      const capacityStatus = line.getByRole("button", {
+        name: /^Review upgrade/,
+      });
       await expect(capacityStatus).toBeVisible();
-      await expect(
-        line.getByRole("button", { name: /^Review upgrade/ }),
-      ).toHaveCount(0);
       if ((testInfo.project.use.viewport?.width ?? 1280) >= 600) {
         const [acquireBox, capacityBox] = await Promise.all([
           acquire.boundingBox(),
@@ -466,10 +461,8 @@ for (const theme of ["light", "dark"] as const) {
       await purchase.focus();
       await page.keyboard.press("Enter");
       await expect(dialog).toHaveCount(0);
-      await expect(line).toHaveCount(0);
-      await facilities
-        .getByRole("tab", { name: "Network", exact: true })
-        .click();
+      await expect(line).toHaveCount(1);
+      await expect(acquire).toHaveCount(0);
       const ownership = facilities.locator(".acquiredUtilities");
       const summary = ownership.locator("summary");
       await expect(summary).toHaveText(`Acquired utilities (${index + 1})`);
@@ -656,6 +649,7 @@ for (const theme of ["light", "dark"] as const) {
       "data-corridor-id",
       "vt-ridge-regional",
     );
+    await facilities.getByRole("tab", { name: "Network", exact: true }).click();
     const ownership = facilities.locator(".acquiredUtilities");
     const summary = ownership.locator("summary");
     const captureOwnership =
@@ -839,4 +833,94 @@ test("normal valley play saves across the first year and resumes from IndexedDB"
   expect(after.transmission?.lines).toEqual(before.transmission?.lines);
   await expect(state).toHaveAttribute("data-save-state", "saved");
   await expect(page.getByText("Save failed", { exact: true })).toHaveCount(0);
+});
+
+test("Green Uplands connects empty land and builds a generator in its own territory", async ({
+  page,
+}) => {
+  test.setTimeout(120000);
+  await page.addInitScript(() => localStorage.setItem("audioEnabled", "false"));
+  await page.goto("/?scenario=116");
+  await page.getByRole("button", { name: "Start game", exact: true }).click();
+  const facilities = page.locator(".facilities:visible");
+  await openPane(
+    facilities,
+    page.getByRole("button", { name: "Facilities", exact: true }),
+  );
+  const opening = (await readSavedGame(page))!;
+  const customers = opening.timeline.find(
+    (tick) => tick.minute === opening.date.minute,
+  )!.customers;
+  await facilities
+    .getByRole("button", {
+      name: "Inspect Green Uplands territory",
+      exact: true,
+    })
+    .click();
+  await expect(
+    facilities.getByRole("region", { name: "Selected territory" }),
+  ).toContainText("No customers transfer");
+  await facilities
+    .getByRole("button", { name: /Review purchase of .*Green Uplands/ })
+    .click();
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "Pay cash", exact: true })
+    .click();
+  const building = (await readSavedGame(page))!;
+  expect(
+    building.transmission!.lines.find(
+      (line) => line.corridorId === "vt-champlain-uplands",
+    ),
+  ).toMatchObject({ capacityW: 120e6, yearsToBuildLeft: 2 });
+  await editSavedGame(page, ({ game }) => {
+    game.transmission!.lines.find(
+      (line) => line.corridorId === "vt-champlain-uplands",
+    )!.yearsToBuildLeft = 0;
+  });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
+  await openPane(
+    facilities,
+    page.getByRole("button", { name: "Facilities", exact: true }),
+  );
+  await facilities
+    .getByRole("button", {
+      name: "Inspect Green Uplands territory",
+      exact: true,
+    })
+    .click();
+  await facilities
+    .getByRole("button", { name: "Build in Green Uplands", exact: true })
+    .click();
+  await expect(
+    page.getByRole("combobox", { name: "Build destination", exact: true }),
+  ).toHaveText("Green Uplands");
+  await page.getByRole("slider").first().press("Home");
+  const wind = page.getByRole("button", {
+    name: "Review purchase of Wind",
+    exact: true,
+  });
+  await expect(wind).toBeEnabled({ timeout: 30000 });
+  await wind.click();
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "Pay cash", exact: true })
+    .click();
+  const built = (await readSavedGame(page))!;
+  expect(
+    built.facilities.some(
+      (facility) =>
+        facility.name === "Wind" && facility.territoryId === "green-uplands",
+    ),
+  ).toBe(true);
+  expect(built.utilityExpansion!.acquisitions).toHaveLength(0);
+  expect(
+    built.timeline.find((tick) => tick.minute === built.date.minute)!.customers,
+  ).toBe(customers);
+  expect(
+    await facilities.evaluate(
+      (element) => element.scrollWidth - element.clientWidth,
+    ),
+  ).toBeLessThanOrEqual(1);
 });

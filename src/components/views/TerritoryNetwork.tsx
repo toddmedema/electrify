@@ -199,41 +199,52 @@ export default function TerritoryNetwork(props: Props) {
           </header>
           {isOwned && (
             <>
-              <dl
-                className="territoryBalance"
-                aria-label={`${territory.name} live balance`}
-              >
-                <div>
-                  <dt>Local demand</dt>
-                  <dd>{formatWatts(balance?.demandW ?? 0)}</dd>
-                </div>
-                <div>
-                  <dt>Plants producing</dt>
-                  <dd>{formatWatts(balance?.generationW ?? 0)}</dd>
-                </div>
-                <div>
-                  <dt>External power arriving</dt>
-                  <dd>{formatWatts(balance?.importedW ?? 0)}</dd>
-                </div>
-                {(balance?.storageChargeW ?? 0) > 0 && (
+              {balance ? (
+                <dl
+                  className="territoryBalance"
+                  aria-label={`${territory.name} live balance`}
+                >
                   <div>
-                    <dt>Storage charging</dt>
-                    <dd>{formatWatts(balance!.storageChargeW)}</dd>
+                    <dt>Local demand</dt>
+                    <dd>{formatWatts(balance?.demandW ?? 0)}</dd>
                   </div>
-                )}
-                {(balance?.storageDischargeW ?? 0) > 0 && (
                   <div>
-                    <dt>Storage supplying</dt>
-                    <dd>{formatWatts(balance!.storageDischargeW)}</dd>
+                    <dt>Plants producing</dt>
+                    <dd>{formatWatts(balance?.generationW ?? 0)}</dd>
                   </div>
-                )}
-                {(balance?.unservedW ?? 0) > 0 && (
-                  <div className="territoryShortage">
-                    <dt>Unserved demand</dt>
-                    <dd>{formatWatts(balance!.unservedW)}</dd>
+                  <div>
+                    <dt>External power arriving</dt>
+                    <dd>{formatWatts(balance?.importedW ?? 0)}</dd>
                   </div>
-                )}
-              </dl>
+                  {(balance?.storageChargeW ?? 0) > 0 && (
+                    <div>
+                      <dt>Storage charging</dt>
+                      <dd>{formatWatts(balance!.storageChargeW)}</dd>
+                    </div>
+                  )}
+                  {(balance?.storageDischargeW ?? 0) > 0 && (
+                    <div>
+                      <dt>Storage supplying</dt>
+                      <dd>{formatWatts(balance!.storageDischargeW)}</dd>
+                    </div>
+                  )}
+                  {(balance?.unservedW ?? 0) > 0 && (
+                    <div className="territoryShortage">
+                      <dt>Unserved demand</dt>
+                      <dd>{formatWatts(balance!.unservedW)}</dd>
+                    </div>
+                  )}
+                </dl>
+              ) : (
+                <Typography
+                  role="status"
+                  variant="body2"
+                  color="textSecondary"
+                  sx={{ p: 2 }}
+                >
+                  Local readings update with the next simulation tick.
+                </Typography>
+              )}
               {line && (
                 <div className="territoryLineReading">
                   <strong>

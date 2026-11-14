@@ -95,6 +95,11 @@ it("shows directed internal flow, local sites, and carries its build destination
   const detail = screen.getByRole("region", { name: "Selected territory" });
   expect(detail).toHaveTextContent("Champlain → Valley Electric");
   expect(
+    within(detail).getByRole("button", {
+      name: /^Inspect Champlain ↔ Valley,/,
+    }),
+  ).toHaveAccessibleName(/50MW of 100MW/);
+  expect(
     within(detail).getByRole("meter", {
       name: "Valley Electric connection utilization",
     }),
