@@ -677,6 +677,8 @@ describe("Insights layers", () => {
   let overviewProjection: ProjectionView;
   let exchangeGame: GameType;
   let exchangeProjection: ProjectionView;
+  let tutorialGame: GameType;
+  let tutorialProjection: ProjectionView;
   beforeAll(() => {
     // Layer/preset controls share immutable real inputs and a real forecast. Cache
     // regression cases still create independent games with distinct history identities.
@@ -701,6 +703,15 @@ describe("Insights layers", () => {
       () => {},
     );
   }, 60_000);
+  beforeAll(() => {
+    // Mission 4 also forecasts twenty years. Prepare its real immutable inputs
+    // before the preset-interaction test's deadline, just like Overview above.
+    tutorialGame = createNextState(createGame({ scenarioId: 4 }), () => {});
+    tutorialProjection = createNextState(
+      selectProjection(tutorialGame, tutorialGame.timeline[0]),
+      () => {},
+    );
+  });
   beforeEach(() => {
     localStorage.clear();
     // Other cases play different seeds and locations. Reusing the immutable game
@@ -1047,7 +1058,9 @@ describe("Insights layers", () => {
   });
 
   it("checks required tutorial layers when the selected preset omits them", async () => {
-    renderInsights(4);
+    loadSimData(tutorialGame.location);
+    cacheProjection(tutorialGame, tutorialProjection);
+    renderInsights(4, tutorialGame);
     await user.click(labelledButton(/Layers/));
 
     const expectRequiredLayers = () => {
