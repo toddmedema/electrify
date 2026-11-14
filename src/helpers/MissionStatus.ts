@@ -357,8 +357,8 @@ export function selectMissionRisk(
     return {
       id: `supply-plan:${month}`,
       shortLabel: `Supply risk: ${when}`,
-      label: `Monthly service is projected below ${formatRequiredShare(reliabilityThreshold(game.difficulty))} from ${when} at current rates and policies. Review customer growth, contract changes and project lead times in Scenario.`,
-      target: "mission-details",
+      label: `Monthly service is projected below ${formatRequiredShare(reliabilityThreshold(game.difficulty))} from ${when} at current rates and policies. Review projected demand in Insights and scheduled changes in Events.`,
+      target: { card: "INSIGHTS", layer: "SUPPLY_DEMAND" },
     };
   }
   const event = upcoming

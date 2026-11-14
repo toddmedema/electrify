@@ -84,7 +84,7 @@ function upcomingUtilityEvents(game: GameType): UpcomingStoryEventType[] {
       .join(
         "; ",
       )}. Regional connections will remain available for market purchases.`,
-    concept: "supply",
+    concept: "forecast",
     importance: "NOTABLE",
     actionTarget: { card: "INSIGHTS", layer: "SUPPLY_DEMAND" },
   }));
@@ -120,7 +120,7 @@ function upcomingUtilityEvents(game: GameType): UpcomingStoryEventType[] {
             phase === "start"
               ? `Signed replacement coverage of ${formatWatts(source.nominalW * source.deliverability)} will begin on the existing regional connection.`
               : `Signed replacement coverage of ${formatWatts(source.nominalW * source.deliverability)} will end. The regional connection will remain available for market purchases.`,
-          concept: "supply",
+          concept: phase === "start" ? "supply" : "forecast",
           importance: "NOTABLE",
           actionTarget: { card: "INSIGHTS", layer: "SUPPLY_DEMAND" },
         });

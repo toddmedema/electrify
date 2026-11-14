@@ -587,6 +587,9 @@ for (const theme of ["light", "dark"] as const) {
         await expect(events).toContainText(
           "Regional firm purchase will fall to 19MW deliverable",
         );
+      await page
+        .getByRole("button", { name: "Close Events", exact: true })
+        .click();
       await openPane(
         facilities,
         page.getByRole("button", { name: "Facilities", exact: true }),
