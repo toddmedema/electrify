@@ -126,12 +126,16 @@ export function routeTerritoryPower({
     }
   };
   IDS.forEach((id, i) => add(i, sinkNode, demandW[id]));
-  // Contract purchases may free native generation for utility storage, but cannot exceed
-  // customer load merely because storage or an export buyer can absorb more power.
+  // Paid contracts can serve customers and eligible owned storage; export sinks never
+  // increase the purchase budget for unused rights.
   add(
     sourceNode,
     agreementGateway,
-    IDS.reduce((sum, id) => sum + demandW[id], 0),
+    IDS.reduce((sum, id) => sum + demandW[id], 0) +
+      sinks.reduce(
+        (sum, sink) => sum + (sink.agreements ? sink.capacityW : 0),
+        0,
+      ),
   );
   edges.forEach((edge) => {
     add(index(edge.from), index(edge.to), edge.capacityW);
@@ -173,7 +177,7 @@ export function routeTerritoryPower({
     ]),
   ) as Record<TerritoryId, number>;
   // Freeze customer delivery. Lower-priority sinks can reroute existing deliveries, but cannot
-  // take watts from an already-served customer or buy an agreement just to fill storage.
+  // take watts from an already-served customer.
   IDS.forEach((_, i) => {
     residual[sinkNode].set(i, 0);
     residual[i].set(sinkNode, 0);

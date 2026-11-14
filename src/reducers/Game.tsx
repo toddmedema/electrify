@@ -5236,6 +5236,7 @@ function* supplyFacilitiesFinancesPhases(
   // Private forecasts continue to estimate peer supply as zero.
   const peerSettlement =
     !!state.multiplayer && (!simulated || !!sharedClearing);
+  const territoryNetwork = hasTerritoryNetwork(state);
 
   // Everything being built right now emits while it is being built, spread evenly across each
   // project's schedule. Derived from how far each clock actually moved rather than from elapsed
@@ -5366,19 +5367,23 @@ function* supplyFacilitiesFinancesPhases(
   const chargeRequests = new Map<number, number>();
   facilities.forEach((g: FacilityOperatingType, i: number) => {
     if (
-      !peerSettlement &&
+      (!peerSettlement || territoryNetwork) &&
       g.peakWh &&
       g.currentWh < g.peakWh &&
       g.yearsToBuildLeft === 0 &&
       !g.paused
     ) {
-      indexOfLastUnchargedBattery = i;
       const requestedW = Math.min(
         g.peakW,
         ((g.peakWh - g.currentWh) * ticksPerHour) / g.roundTripEfficiency,
       );
       chargeRequests.set(g.id, requestedW);
-      totalChargeNeeded += requestedW;
+      // Territory settlement needs the sinks even when peers own the charging supply.
+      // Keep native generation targets unchanged until that shared market has cleared.
+      if (!peerSettlement) {
+        indexOfLastUnchargedBattery = i;
+        totalChargeNeeded += requestedW;
+      }
     }
   });
 
@@ -5449,7 +5454,7 @@ function* supplyFacilitiesFinancesPhases(
     (sum, offer) => sum + offer.capacityW,
     0,
   );
-  const territoryDemand = hasTerritoryNetwork(state)
+  const territoryDemand = territoryNetwork
     ? territoryDemandShares(state, now)
     : undefined;
   const territoryEdges = territoryDemand
@@ -5831,7 +5836,7 @@ function* supplyFacilitiesFinancesPhases(
           // Otherwise, don't charge or discharge: reset to 0
           g.currentW = 0;
         }
-        totalChargeNeeded -= chargeRequests.get(g.id) || 0;
+        if (!peerSettlement) totalChargeNeeded -= chargeRequests.get(g.id) || 0;
         storedWh += g.currentWh;
       }
       // Report capacity that automatic dispatch can actually add within the next 15 minutes.
@@ -6366,8 +6371,8 @@ function* supplyFacilitiesFinancesPhases(
       [...utilityChargeSinks, ...customerChargeSinks, ...peerSinks],
       peerSources,
     );
-    // Agreements were already dispatched before co-op clearing. Spot purchases cannot expand
-    // their reserved delivery or turn a paid contract into energy for storage/export.
+    // Agreements, including owned-storage charging, were dispatched before co-op clearing.
+    // Spot purchases cannot expand their reserved delivery; unused rights cannot be exported.
     input.sources = input.sources.map((source, i) =>
       source.kind === "agreement"
         ? { ...source, capacityW: entitlementWatts[i - nativeSources.length] }
