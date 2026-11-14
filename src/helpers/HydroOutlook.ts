@@ -12,6 +12,8 @@ import { HYDRO_DEADPOOL_FRACTION, mandatedReleaseFraction } from "./Hydro";
 export interface ReservoirOutlookPoint {
   /** Calendar month 1-12 the point closes */
   monthNumber: number;
+  /** Calendar year from the forecast snapshot, even while a newer outlook is pending */
+  year: number;
   /** Combined fullness of every operating dam, 0-1 */
   fraction: number;
   snowpackMm: number;
@@ -32,7 +34,7 @@ export function reservoirOutlook(
   }
   const points: ReservoirOutlookPoint[] = [
     {
-      monthNumber: monthOf(now.minute, startingYear).monthNumber,
+      ...monthOf(now.minute, startingYear),
       fraction: now.hydroReservoirWh / now.hydroReservoirCapacityWh,
       snowpackMm: now.snowpackMm,
     },
@@ -42,7 +44,7 @@ export function reservoirOutlook(
   const close = () => {
     if (last && last.hydroReservoirCapacityWh > 0) {
       points.push({
-        monthNumber: monthOf(last.minute, startingYear).monthNumber,
+        ...monthOf(last.minute, startingYear),
         fraction: last.hydroReservoirWh / last.hydroReservoirCapacityWh,
         snowpackMm: last.snowpackMm,
       });

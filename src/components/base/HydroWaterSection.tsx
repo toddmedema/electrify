@@ -18,7 +18,7 @@ import ManualLink from "./ManualLink";
 import Stat from "./FacilityStat";
 import { useOutlookWorker } from "./useOutlookWorker";
 import { signature } from "./DeferredProjection";
-import Sparkline from "./Sparkline";
+import InteractiveSparkline from "./InteractiveSparkline";
 
 /**
  * The year ahead only changes meaningfully when the month or the operating fleet does, so the
@@ -130,33 +130,45 @@ export default function HydroWaterSection(props: {
                 {emptyAllYear && fleet && ": no refill expected"}
               </ManualLink>
             </Typography>
-            <dd className="facilityTrend">
+            <dd>
               {!emptyAllYear && (
-                <>
-                  <Sparkline
-                    values={values}
-                    domain={[0, 1]}
-                    width={144}
-                    height={28}
-                    fill
-                    baseline
-                    lowMarker
-                    stretch
-                    ariaLabel={`Reservoir forecast for the next ${values.length - 1} months: now ${formatPercent(values[0])}, lowest in ${MONTH_NAMES[lowPoint.monthNumber - 1]} at ${formatForecastPercent(lowPoint.fraction)}.`}
-                  />
-                  {outlookLabels.length > 0 && (
-                    <Typography
-                      variant="caption"
-                      color="textSecondary"
-                      component="div"
-                      className="facilityWaterOutlookLabels"
-                    >
-                      {outlookLabels.map((label) => (
-                        <span key={label}>{label}</span>
-                      ))}
-                    </Typography>
-                  )}
-                </>
+                <InteractiveSparkline
+                  className="facilityTrend"
+                  captionClassName="facilityWaterOutlookLabels"
+                  label={
+                    fleet
+                      ? "Monthly reservoir forecast for all your dams"
+                      : "Monthly reservoir forecast"
+                  }
+                  defaultIndex={lowIndex}
+                  defaultCaption={outlookLabels.map((label) => (
+                    <span key={label}>{label}</span>
+                  ))}
+                  caption={(index) => {
+                    const point = outlook![index];
+                    return (
+                      <>
+                        <span>
+                          {index === 0 ? "Now · " : ""}
+                          {MONTHS[point.monthNumber - 1]} {point.year}
+                        </span>{" "}
+                        <span>
+                          {formatForecastPercent(values[index])} full
+                          {index > 0 ? " · month end" : ""}
+                        </span>
+                      </>
+                    );
+                  }}
+                  values={values}
+                  domain={[0, 1]}
+                  width={144}
+                  height={28}
+                  fill
+                  baseline
+                  lowMarker
+                  stretch
+                  ariaLabel={`Reservoir forecast for the next ${values.length - 1} months: now ${formatPercent(values[0])}, lowest in ${MONTH_NAMES[lowPoint.monthNumber - 1]} at ${formatForecastPercent(lowPoint.fraction)}.`}
+                />
               )}
             </dd>
           </div>
