@@ -1143,7 +1143,7 @@ it.each(["NONE", "SHORTAGES"] as const)(
         .currentW,
     ).toBe(0);
     expect(now.entitlementImportedW).toBeCloseTo(
-      now.demandW + now.storageChargeW,
+      now.demandW + now.storageChargeW!,
       0,
     );
     expect(now.importedW).toBe(now.entitlementImportedW);
