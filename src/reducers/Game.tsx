@@ -2730,19 +2730,21 @@ export function previewUtilityAcquisition(
   };
 }
 
-/** Compare physical grid outcomes using the same construction and dispatch owners as a purchase. */
+/** Forecast the year on either side of the selected project's actual commissioning tick. */
 export function previewFacilityBuild(
   game: GameType,
   facility: FacilityShoppingType,
-) {
+): {
+  commissionedMinute: number;
+  before: TickPresentFutureType[];
+  after: TickPresentFutureType[];
+} {
   const snapshot = cloneDeep(isDraft(game) ? current(game) : game);
   const now = getTimeFromTimeline(snapshot.date.minute, snapshot.timeline);
   if (!now) throw new Error("No current simulation tick");
   const cash = now.cash;
   const customers = now.customers;
-  // Hourly samples retain each month's representative day without blocking the purchase review.
-  const ticks = (TICKS_PER_YEAR * TICK_MINUTES) / 60;
-  const before = generateForecastTimeline(snapshot, cash, customers, ticks, 60);
+  const existingIds = new Set(snapshot.facilities.map(({ id }) => id));
   const hydroSite = isConventionalHydro(facility)
     ? getHydroAvailability(snapshot, facility.peakW).selected
     : undefined;
@@ -2751,9 +2753,42 @@ export function previewFacilityBuild(
     { ...facility, ...(hydroSite ? { hydroSiteId: hydroSite.id } : {}) },
     false,
   );
-  // Compare the grid at the same starting balance: financing is a separate payment choice.
-  const after = generateForecastTimeline(snapshot, cash, customers, ticks, 60);
-  return { before, after };
+  const added = snapshot.facilities.find(({ id }) => !existingIds.has(id));
+  if (!added) throw new Error("No facility added to the forecast");
+  const year = TICKS_PER_YEAR * TICK_MINUTES;
+  const step = 60;
+  let commissionedMinute: number | undefined;
+  // The extra two samples cover rounding at commissioning and the end of its first year.
+  const ticks =
+    Math.ceil((facility.yearsToBuild * year) / step) + year / step + 2;
+  const timeline = generateForecastTimeline(
+    snapshot,
+    cash,
+    customers,
+    ticks,
+    step,
+    (state, tick) => {
+      if (
+        commissionedMinute === undefined &&
+        state.facilities.find(({ id }) => id === added.id)?.yearsToBuildLeft ===
+          0
+      ) {
+        commissionedMinute = tick.minute;
+      }
+    },
+  );
+  if (commissionedMinute === undefined)
+    throw new Error("Project did not commission");
+  const opening = commissionedMinute;
+  return {
+    commissionedMinute: opening,
+    before: timeline.filter(
+      (tick) => tick.minute >= opening - year && tick.minute < opening,
+    ),
+    after: timeline.filter(
+      (tick) => tick.minute >= opening && tick.minute < opening + year,
+    ),
+  };
 }
 
 function refreshInterestRate(

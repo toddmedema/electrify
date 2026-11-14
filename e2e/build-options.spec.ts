@@ -427,15 +427,16 @@ for (const theme of ["light", "dark"] as const) {
         await expect(row.locator(":scope > .conceptIcon")).toBeVisible();
       }
       const impact = dialog.locator(".buildImpact");
+      await expect(impact.locator("summary")).toHaveText("Impact");
       await impact.locator("summary").click();
       await expect(
-        impact.getByRole("region", { name: "Next-year grid impact" }),
+        impact.getByRole("region", { name: "Impact" }),
       ).toContainText("→");
       await expect(
         impact.getByRole("img", { name: /Estimated monthly supply margin/ }),
       ).toBeVisible();
-      await expect(impact).toContainText("Before building");
-      await expect(impact).toContainText("After building");
+      await expect(impact).toContainText("Before opening");
+      await expect(impact).toContainText("After opening");
       await expect(impact).not.toContainText("Infinity");
       if (
         kind === "Generator" &&

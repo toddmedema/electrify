@@ -1763,7 +1763,7 @@ async function tvJourney(page: Page, testInfo: TestInfo, maximum: boolean) {
     await select(page, gridContext);
     await input(page, "confirm");
     const gridChart = purchase.getByRole("img", {
-      name: /Estimated monthly supply margin before and after building/,
+      name: /Estimated monthly supply margin before and after commissioning/,
     });
     await select(page, gridChart);
     await input(page, "confirm");

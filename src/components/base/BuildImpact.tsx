@@ -5,6 +5,7 @@ import {
   formatForecastWatts,
   formatForecastWattHours,
 } from "../../helpers/Format";
+import { getDateFromMinute, MINUTES_PER_MONTH } from "../../helpers/DateTime";
 import { chartPalette } from "../../Theme";
 import { signature } from "./DeferredProjection";
 import { forecastWorkerSnapshot } from "./ForecastWorkerSnapshot";
@@ -21,9 +22,17 @@ import { xAxis, yAxis, zeroLinePlugin } from "./UPlotHelpers";
 import { PolicyDemandLegend } from "./PolicyDemandChart";
 import DecisionImpactPreview from "./DecisionImpactPreview";
 
-const LABELS: [string, string] = ["Before building", "After building"];
+const LABELS: [string, string] = ["Before opening", "After opening"];
+const watts = (value: number | null) =>
+  value === null ? "—" : formatForecastWatts(value);
+const energy = (value: number | null) =>
+  value === null ? "—" : formatForecastWattHours(value);
+function minimum(values: Array<number | null>): number | null {
+  const known = values.filter((value): value is number => value !== null);
+  return known.length === values.length ? Math.min(...known) : null;
+}
 
-/** A selected quote's next-year effect, including time spent under construction. */
+/** Compare the twelve-month periods immediately before and after commissioning. */
 export default function BuildImpact({
   game,
   facility,
@@ -67,32 +76,23 @@ export default function BuildImpact({
       className="buildImpact"
       onToggle={(event) => setExpanded(event.currentTarget.open)}
     >
-      <summary>Grid impact · next 12 months</summary>
+      <summary>Impact</summary>
       {expanded && (
         <>
-          <Typography variant="body2" color="textSecondary">
-            Before and after this project, including construction time. Positive
-            supply margin means spare power; negative means a shortage.
-          </Typography>
-          {facility.yearsToBuild >= 1 && (
-            <Typography variant="body2" sx={{ mt: 1 }}>
-              This project is still under construction throughout this forecast.
-            </Typography>
-          )}
           {result ? (
             <>
               <DecisionImpactPreview
-                label="Next-year grid impact"
+                label="Impact"
                 facts={[
                   {
                     concept: "supply",
                     label: "Lowest supply margin",
-                    value: `${formatForecastWatts(Math.min(...result.before.monthlyMarginW))} → ${formatForecastWatts(Math.min(...result.after.monthlyMarginW))}`,
+                    value: `${watts(minimum(result.before.monthlyMarginW))} → ${watts(minimum(result.after.monthlyMarginW))}`,
                   },
                   {
                     concept: "blackout",
                     label: "Unserved energy",
-                    value: `${formatForecastWattHours(result.before.unservedWh)} → ${formatForecastWattHours(result.after.unservedWh)}`,
+                    value: `${energy(result.before.unservedWh)} → ${energy(result.after.unservedWh)}`,
                   },
                 ]}
               />
@@ -101,38 +101,50 @@ export default function BuildImpact({
               </Typography>
               <PolicyDemandLegend labels={LABELS} />
               <UPlotChart
-                ariaLabel="Estimated monthly supply margin before and after building, over the next 12 months"
+                ariaLabel="Estimated monthly supply margin before and after commissioning, twelve months each"
                 height={160}
                 state={result}
                 interactiveTooltip
-                tooltip={(index, forecast) =>
-                  [
-                    `Month ${index + 1} · lowest supply margin`,
-                    `Before building: ${formatForecastWatts(forecast.before.monthlyMarginW[index])}`,
+                tooltip={(index, forecast) => {
+                  const date = getDateFromMinute(
+                    Math.round(
+                      forecast.after.startMinute +
+                        forecast.months[index] * MINUTES_PER_MONTH,
+                    ),
+                    game.startingYear,
+                  );
+                  return [
+                    `${date.month} ${date.year - 1} → ${date.month} ${date.year}`,
+                    `${LABELS[0]}: ${watts(forecast.before.monthlyMarginW[index])}`,
                     "",
-                    `After building: ${formatForecastWatts(forecast.after.monthlyMarginW[index])}`,
-                  ].join("\n")
-                }
+                    `${LABELS[1]}: ${watts(forecast.after.monthlyMarginW[index])}`,
+                  ].join("\n");
+                }}
                 data={[
-                  result.before.monthlyMarginW.map((_, index) => index + 1),
+                  result.months,
                   result.before.monthlyMarginW,
                   result.after.monthlyMarginW,
                 ]}
-                seriesLabels={[
-                  "Before building (solid)",
-                  "After building (dashed)",
-                ]}
+                seriesLabels={[`${LABELS[0]} (solid)`, `${LABELS[1]} (dashed)`]}
                 formatSummaryValue={formatForecastWatts}
                 buildOptions={({ scale }) => ({
                   width: 0,
                   height: 0,
                   legend: { show: false },
                   plugins: [zeroLinePlugin(chartPalette().tick)],
-                  scales: { x: { time: false, range: [1, 12] } },
+                  scales: { x: { time: false, range: [0, 12] } },
                   axes: [
                     xAxis(scale, {
-                      splits: () => [1, 3, 6, 9, 12],
-                      values: (_u, ticks) => ticks.map((tick) => `+${tick} mo`),
+                      splits: () => [0, 3, 6, 9, 12],
+                      values: (_u, ticks) =>
+                        ticks.map(
+                          (tick) =>
+                            getDateFromMinute(
+                              result.after.startMinute +
+                                tick * MINUTES_PER_MONTH,
+                              game.startingYear,
+                            ).month,
+                        ),
                     }),
                     yAxis(scale, {
                       values: (_u, ticks) => ticks.map(formatForecastWatts),
