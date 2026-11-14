@@ -1,3 +1,5 @@
+import { CurrencyType, currencyForLocation } from "./Currency";
+import { getScenarioLocation } from "./Locations";
 import {
   FacilityShoppingType,
   FuelNameType,
@@ -102,6 +104,10 @@ export function buildVictoryDebrief(
       ? Math.max(0, Math.min(1, summary.supplyWh / summary.demandWh))
       : 1;
   return {
+    currencyCode: currencyForLocation(
+      getScenarioLocation(scenario),
+      scenario.startingYear,
+    ).code,
     demandWh: summary.demandWh,
     startingFleet: fleetCapacity(scenario.facilities),
     finalFleet: fleetCapacity(facilities, true),
@@ -134,6 +140,10 @@ function scenarioMetrics(
           (report.kind === "dataCenter" || report.kind === "deepFreeze");
         const result = interpretScenarioRuleReport(report, rules, {
           startingYear: rules.startingYear,
+          currency: currencyForLocation(
+            getScenarioLocation(scenario),
+            scenario.startingYear,
+          ),
           completedMonths: Math.max(
             0,
             ...months.map(
@@ -161,7 +171,13 @@ function scenarioMetrics(
                 value:
                   catalogDebrief && !metric.available
                     ? "Not reached"
-                    : reportMetricValue(metric),
+                    : reportMetricValue(
+                        metric,
+                        currencyForLocation(
+                          getScenarioLocation(scenario),
+                          scenario.startingYear,
+                        ),
+                      ),
                 concept: reportMetricConcept(metric),
               }))
           : [
@@ -187,7 +203,10 @@ function scenarioMetrics(
   return undefined;
 }
 
-function reportMetricValue(metric: RuleReportMetric): string {
+function reportMetricValue(
+  metric: RuleReportMetric,
+  currency: CurrencyType,
+): string {
   if (!metric.available || metric.value === undefined) return "Unavailable";
   if (typeof metric.value === "boolean") return metric.value ? "Yes" : "No";
   if (typeof metric.value === "string") return metric.value;
@@ -199,7 +218,7 @@ function reportMetricValue(metric: RuleReportMetric): string {
     case "W":
       return formatWatts(metric.value);
     case "dollars":
-      return formatMoneyConcise(metric.value);
+      return formatMoneyConcise(metric.value, currency);
     case "hours":
       return `${formatNumber(metric.value)} hours`;
     default:

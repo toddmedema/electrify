@@ -1,3 +1,4 @@
+import { currencyForLocation } from "./Currency";
 import type { GameType, ActiveWorldEventType } from "../Types";
 import type { StoryPhaseDescriptionType } from "../data/WorldEvents";
 import type {
@@ -230,7 +231,11 @@ function validOfficialOccurrence(
   if (canonicalRuleJson(event.effects) !== canonicalRuleJson(effects))
     return false;
   if (custom) {
-    const changes = scenarioEffectsSummary(effects);
+    const changes = scenarioEffectsSummary(
+      effects,
+      false,
+      currencyForLocation(game.location, game.startingYear),
+    );
     const message =
       review === "nuclearTrip"
         ? customNames?.length

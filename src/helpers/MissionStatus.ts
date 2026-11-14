@@ -1,3 +1,4 @@
+import { CurrencyType, USD_CURRENCY, currencyForLocation } from "./Currency";
 import { activeScenario, currentTick } from "./GameSelectors";
 import {
   EvidenceTargetType,
@@ -69,6 +70,7 @@ function objectiveRequirement(
   startingYear: number,
   durationMonths: number,
   monthOffset = 0,
+  currency: CurrencyType = USD_CURRENCY,
 ): MissionRequirement {
   const objective = result.objective;
   const last =
@@ -89,13 +91,25 @@ function objectiveRequirement(
     unverifiable: "unknown",
   } as const;
   const target = objective.checkpoint
-    ? objectiveGoalText(objective, startingYear, durationMonths, monthOffset)
-    : objectiveTargetText(objective);
-  const current = objectiveObservedText(result);
+    ? objectiveGoalText(
+        objective,
+        startingYear,
+        durationMonths,
+        monthOffset,
+        currency,
+      )
+    : objectiveTargetText(objective, currency);
+  const current = objectiveObservedText(result, currency);
   const observed =
     result.observed === undefined
       ? "pending"
-      : objectiveValueText(objective, result.observed, result.target);
+      : objectiveValueText(
+          objective,
+          result.observed,
+          result.target,
+          3,
+          currency,
+        );
   const compact = `${target} (${observed})`;
   return {
     id: result.id,
@@ -109,6 +123,7 @@ function objectiveRequirement(
       startingYear,
       durationMonths,
       monthOffset,
+      currency,
     ),
     compact: `${result.required ? "" : "Optional · "}${compact}${result.status === "unverifiable" ? " · incomplete history" : ""}`,
     timing: objective.checkpoint
@@ -123,6 +138,7 @@ function objectiveRequirement(
 
 /** Objectives render the same completed-month verdict used by live and headless termination. */
 export function getMissionStatus(game: GameType) {
+  const currency = currencyForLocation(game.location, game.startingYear);
   const scenario = activeScenario(game);
   const duration = scenario?.durationMonths || 240;
   const monthsRemaining = Math.max(0, duration - legacyCompletedMonths(game));
@@ -137,16 +153,17 @@ export function getMissionStatus(game: GameType) {
         game.startingYear,
         duration,
         termMonthOffset,
+        currency,
       ),
   );
   requirements.push({
     id: "cash",
     label: "Stay solvent",
-    compact: `Cash ≥ $0 (${now ? formatMoneyStable(now.cash) : "unavailable"})`,
+    compact: `Cash ≥ ${currency.symbol}0 (${now ? formatMoneyStable(now.cash, currency) : "unavailable"})`,
     current: now
-      ? `${formatMoneyStable(now.cash)} now`
+      ? `${formatMoneyStable(now.cash, currency)} now`
       : "Current cash unavailable",
-    target: "Cash ≥ $0 at each month-end",
+    target: `Cash ≥ ${currency.symbol}0 at each month-end`,
     timing:
       "Checked at month end; negative cash now is a warning, not a final outcome",
     status: "in-progress",

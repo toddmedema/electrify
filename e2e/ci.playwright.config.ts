@@ -28,6 +28,7 @@ const smoke = [
   "offline-launch.spec.ts",
 ];
 const layout = [
+  "currency.spec.ts",
   "chernobyl-recovery.spec.ts",
   "difficulty-unlocks.spec.ts",
   "toggle-borders.spec.ts",

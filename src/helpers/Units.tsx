@@ -1,3 +1,4 @@
+import { CurrencyType, USD_CURRENCY } from "./Currency";
 import { UnitSystemType } from "../Types";
 import { formatCount, formatNumber, formatForecastNumber } from "./Format";
 
@@ -148,6 +149,7 @@ export function toDisplayPricePerLargeMass(
 export function formatPricePerLargeMass(
   dollarsPerKg: number,
   units: UnitSystemType,
+  currency: CurrencyType = USD_CURRENCY,
 ): string {
-  return `$${formatCount(toDisplayPricePerLargeMass(dollarsPerKg, units))}/${isImperial(units) ? "ton" : "tonne"}`;
+  return `${currency.symbol}${formatCount(toDisplayPricePerLargeMass(dollarsPerKg, units) * currency.unitsPerDollar)}/${isImperial(units) ? "ton" : "tonne"}`;
 }
