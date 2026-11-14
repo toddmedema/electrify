@@ -72,7 +72,10 @@ export default function InteractiveSparkline({
       aria-keyshortcuts="ArrowLeft ArrowRight Home End"
       onPointerMove={inspectPointer}
       onPointerDown={inspectPointer}
-      onPointerLeave={reset}
+      onPointerLeave={(event) => {
+        // Touch leaves when the finger lifts; keep the tapped month readable.
+        if (event.pointerType !== "touch") reset();
+      }}
       onPointerCancel={reset}
       onBlur={reset}
       onKeyDown={(event) => {

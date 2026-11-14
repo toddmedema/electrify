@@ -2,6 +2,41 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import InteractiveSparkline from "./InteractiveSparkline";
 
+it("retains a tapped month after touch contact ends, and resets on cancellation or blur", () => {
+  render(
+    <InteractiveSparkline
+      label="Monthly water"
+      ariaLabel="Water trend"
+      values={[0.5, 0.1, 0.3]}
+      defaultIndex={1}
+      caption={(index) => `Month ${index + 1}`}
+      defaultCaption="Low month"
+    />,
+  );
+  const group = screen.getByRole("group", { name: "Monthly water" });
+  const bounds = jest
+    .spyOn(HTMLElement.prototype, "getBoundingClientRect")
+    .mockReturnValue({ left: 10, width: 72 } as DOMRect);
+  const touch = (type: string) =>
+    fireEvent(
+      group,
+      Object.assign(new MouseEvent(type, { bubbles: true, clientX: 10 }), {
+        pointerType: "touch",
+      }),
+    );
+  touch("pointerdown");
+  expect(group).toHaveAccessibleDescription("Month 1");
+  touch("pointerup");
+  touch("pointerout");
+  expect(group).toHaveAccessibleDescription("Month 1");
+  fireEvent.pointerCancel(group);
+  expect(group).toHaveAccessibleDescription("Low month");
+  touch("pointerdown");
+  fireEvent.blur(group);
+  expect(group).toHaveAccessibleDescription("Low month");
+  bounds.mockRestore();
+});
+
 it("announces keyboard selections through the single caption while focus stays on the chart", () => {
   render(
     <InteractiveSparkline
