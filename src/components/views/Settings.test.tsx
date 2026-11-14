@@ -197,8 +197,12 @@ describe("Settings", () => {
     expect(
       screen.getByText(/does not start video recording/),
     ).toBeInTheDocument();
-    fireEvent.click(vibration);
-    fireEvent.click(recording);
+    fireEvent.click(
+      screen.getByText("Controller vibration", { selector: "label" }),
+    );
+    fireEvent.click(
+      screen.getByText("Recorded highlights", { selector: "label" }),
+    );
     expect(vibration).toBeChecked();
     expect(recording).toBeChecked();
     expect(localStorage.getItem("controllerVibrationEnabled")).toBe("true");

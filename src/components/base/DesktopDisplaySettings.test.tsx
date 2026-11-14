@@ -70,7 +70,12 @@ it("describes native fullscreen and saves a window size through the preload brid
   await waitFor(() =>
     expect(screen.getByRole("combobox", { name: "Resolution" })).toBeEnabled(),
   );
-  fireEvent.change(screen.getByRole("combobox", { name: "Resolution" }), {
+  const resolution = screen.getByRole("combobox", { name: "Resolution" });
+  expect(screen.getByLabelText("Window resolution")).toBe(resolution);
+  expect(resolution).toHaveAccessibleDescription(
+    "Display choices are saved for your next launch.",
+  );
+  fireEvent.change(resolution, {
     target: { value: "800x600" },
   });
   await waitFor(() =>

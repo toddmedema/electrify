@@ -46,6 +46,7 @@ import { getDesktop, isDesktopApp } from "../../Desktop";
 import { useDesktopState } from "../../DesktopState";
 import { restoreMenuFocus, useMenuKeys } from "../base/useMenuKeys";
 import ConfirmDialog from "../base/ConfirmDialog";
+import SettingRow from "../base/SettingRow";
 const CreditsDialog = React.lazy(() => import("../base/CreditsDialog"));
 const DesktopDisplaySettings =
   process.env.REACT_APP_DESKTOP === "true"
@@ -103,61 +104,6 @@ function SettingsGroup({
       <Paper variant="outlined" className="groupedList">
         {children}
       </Paper>
-    </Box>
-  );
-}
-
-interface SettingRowProps {
-  label: string;
-  description?: React.ReactNode;
-  children: React.ReactNode;
-  stackOnMobile?: boolean;
-}
-
-function SettingRow({
-  label,
-  description,
-  children,
-  stackOnMobile = false,
-}: SettingRowProps): React.JSX.Element {
-  return (
-    <Box
-      className="settingsRow"
-      sx={{
-        display: "grid",
-        gridTemplateColumns: {
-          xs: stackOnMobile ? "minmax(0, 1fr)" : "minmax(0, 1fr) auto",
-          sm: "minmax(180px, 1fr) auto",
-        },
-        alignItems: "center",
-        gap: { xs: stackOnMobile ? 1.5 : 1, sm: 3 },
-        minHeight: 56,
-        px: 2,
-        py: 1.5,
-      }}
-    >
-      <Box sx={{ minWidth: 0 }}>
-        <Typography sx={{ fontWeight: 600 }}>{label}</Typography>
-        {description && (
-          <Typography
-            component="div"
-            variant="body2"
-            color="text.secondary"
-            sx={{ mt: 0.25, lineHeight: 1.45 }}
-          >
-            {description}
-          </Typography>
-        )}
-      </Box>
-      <Box
-        sx={{
-          minWidth: 0,
-          // Controls hug their content at the row's right edge; stacked phone rows stretch instead
-          justifySelf: { xs: stackOnMobile ? "stretch" : "end", sm: "end" },
-        }}
-      >
-        {children}
-      </Box>
     </Box>
   );
 }

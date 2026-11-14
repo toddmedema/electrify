@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { Alert, Box, Switch, Typography } from "@mui/material";
+import { Alert } from "@mui/material";
 import { DesktopDisplay, getDesktop } from "../../Desktop";
 import { useDesktopState } from "../../DesktopState";
 import { useControllerInput } from "../../desktop/InputPresentation";
+import SettingRow from "./SettingRow";
+import SettingsSwitch from "./SettingsSwitch";
 
 const sameDisplay = (left: DesktopDisplay, right: DesktopDisplay) =>
   left.fullscreen === right.fullscreen &&
@@ -78,29 +80,16 @@ export default function DesktopDisplaySettings(): React.JSX.Element {
   };
   return (
     <>
-      <Box
-        className="settingsRow"
-        sx={{
-          display: "grid",
-          gridTemplateColumns: "minmax(0, 1fr) auto",
-          gap: 2,
-          alignItems: "center",
-          p: 2,
-        }}
-      >
-        <Box>
-          <Typography sx={{ fontWeight: 600 }}>Fullscreen</Typography>
-          <Typography variant="body2" color="text.secondary">
+      <SettingRow
+        label="Fullscreen"
+        description={
+          <>
             Use the monitor's native resolution.
             {!controllerInput && " F11 or Alt+Enter also toggles fullscreen."}
-          </Typography>
-        </Box>
-        <Switch
-          sx={{
-            height: 44,
-            padding: "15px 12px",
-            "& .MuiSwitch-switchBase": { padding: "12px 9px" },
-          }}
+          </>
+        }
+      >
+        <SettingsSwitch
           checked={display?.fullscreen || false}
           disabled={!display}
           slotProps={{
@@ -108,39 +97,17 @@ export default function DesktopDisplaySettings(): React.JSX.Element {
           }}
           onChange={(_event, fullscreen) => void change({ fullscreen })}
         />
-      </Box>
+      </SettingRow>
       {/* Fullscreen always uses the monitor's native resolution, so the window size only
           matters (and only appears) in windowed mode. */}
       {display && !display.fullscreen && (
-        <Box
-          className="settingsRow"
-          sx={{
-            display: "grid",
-            gridTemplateColumns: {
-              xs: "minmax(0, 1fr)",
-              sm: "minmax(0, 1fr) auto",
-            },
-            gap: 1.5,
-            alignItems: "center",
-            p: 2,
-          }}
+        <SettingRow
+          label="Window resolution"
+          htmlFor="desktop-resolution"
+          description="Display choices are saved for your next launch."
+          descriptionId="desktop-resolution-help"
+          stackOnMobile
         >
-          <Box>
-            <Typography
-              component="label"
-              htmlFor="desktop-resolution"
-              sx={{ fontWeight: 600 }}
-            >
-              Window resolution
-            </Typography>
-            <Typography
-              id="desktop-resolution-help"
-              variant="body2"
-              color="text.secondary"
-            >
-              Display choices are saved for your next launch.
-            </Typography>
-          </Box>
           <select
             id="desktop-resolution"
             aria-label="Resolution"
@@ -168,7 +135,7 @@ export default function DesktopDisplaySettings(): React.JSX.Element {
               </option>
             ))}
           </select>
-        </Box>
+        </SettingRow>
       )}
       {error && (
         <Alert severity="error" role="alert" sx={{ m: 2 }}>
