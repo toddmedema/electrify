@@ -236,6 +236,7 @@ function applyScheduled(
         payload: {
           facility: officialQuote(game, action.build),
           financed: action.build.financed,
+          territoryId: action.build.territoryId,
         },
       });
       break;

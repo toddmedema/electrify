@@ -74,6 +74,7 @@ interface InitialBuildBaseType {
   name: string;
   financed: boolean;
   priority?: "default" | "reserve";
+  territoryId?: import("../Types").TerritoryId;
 }
 
 export type InitialBuildType = InitialBuildBaseType &
@@ -360,6 +361,7 @@ function setUpGame(
       buildFacility({
         facility: build,
         financed: options.initialBuild.financed,
+        territoryId: options.initialBuild.territoryId,
       }),
     );
     state = applyBuildPriority(
@@ -580,6 +582,7 @@ export function runSimulation(options: SimOptionsType): SimResultType {
                   buildFacility({
                     facility,
                     financed: action.build.financed,
+                    territoryId: action.build.territoryId,
                   }),
                 ),
                 action.build.priority,

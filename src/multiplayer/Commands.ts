@@ -3,6 +3,11 @@ import { isBuyingRule, isSellingRule } from "../helpers/TradingRules";
 import { isUtilityExpansionGame } from "../helpers/ExpansionContext";
 import { acquisitionQuote, validAcquisitionAction } from "../helpers/Expansion";
 import { UTILITY_TARGETS } from "../data/UtilityExpansion";
+import { GREEN_UPLANDS_CORRIDOR_ID, isTerritoryId } from "../data/Territories";
+import {
+  hasTerritoryNetwork,
+  territoryBuildAvailability,
+} from "../helpers/Territories";
 import { currentTick } from "../helpers/GameSelectors";
 import { GENERATORS, STORAGE } from "../data/Facilities";
 import {
@@ -57,7 +62,8 @@ const peerLine: Validator = (game, payload) => {
         (p) => p.corridor.id === target.corridorId,
       ) ||
       (isUtilityExpansionGame(game) &&
-        UTILITY_TARGETS.some((t) => t.corridorId === target.corridorId))
+        (UTILITY_TARGETS.some((t) => t.corridorId === target.corridorId) ||
+          target.corridorId === GREEN_UPLANDS_CORRIDOR_ID))
     ) ||
     typeof target.financed !== "boolean"
     ? { error: "Choose another player's intertie" }
@@ -84,6 +90,7 @@ const buildFacility: Validator = (game, payload) => {
   const build = payload as {
     facility?: Partial<FacilityShoppingType>;
     financed?: boolean;
+    territoryId?: unknown;
   };
   if (!build || !build.facility || typeof build.financed !== "boolean")
     return { error: "That build is unavailable" };
@@ -91,6 +98,14 @@ const buildFacility: Validator = (game, payload) => {
     return {
       error: "Build for the company without an operating-area destination",
     };
+  if (
+    build.territoryId !== undefined &&
+    (!hasTerritoryNetwork(game) || !isTerritoryId(build.territoryId))
+  )
+    return { error: "Choose a valid territory for this build" };
+  const territoryId = isTerritoryId(build.territoryId)
+    ? build.territoryId
+    : "champlain";
   const requested = build.facility;
   const size = requested.peakWh ?? requested.peakW;
   if (
@@ -122,10 +137,18 @@ const buildFacility: Validator = (game, payload) => {
     return { error: "Choose valid facility options" };
   if (!isStorage(quote) && requested.resilience)
     quote = withResilienceOptions(quote, game, requested.resilience);
+  if (hasTerritoryNetwork(game)) {
+    const availability = territoryBuildAvailability(game, quote, territoryId);
+    if (!availability.buildable)
+      return {
+        error: availability.reason ?? "That territory cannot host this build",
+      };
+  }
   return {
     payload: {
       facility: quote,
       financed: build.financed,
+      ...(hasTerritoryNetwork(game) ? { territoryId } : {}),
     },
   };
 };

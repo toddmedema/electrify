@@ -129,6 +129,7 @@ function applyScheduled(
         buildFacility({
           facility: officialQuote(game, action.build),
           financed: action.build.financed,
+          territoryId: action.build.territoryId,
         }),
       );
     case "retrofit":
