@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { configureStore } from "@reduxjs/toolkit";
 import { Provider } from "react-redux";
 import { createGame } from "../../testing/Simulator";
@@ -7,12 +7,69 @@ import reducer, {
   buildTransmissionLine,
   generateForecastTimeline,
 } from "../../reducers/Game";
-import { acquisitionQuote } from "../../helpers/Expansion";
+import { acquisitionQuote, utilityOffer } from "../../helpers/Expansion";
+import { formatMoneyConcise } from "../../helpers/Format";
 import { currentTick } from "../../helpers/GameSelectors";
 import { copyOfficialGame } from "../../testing/OfficialScenarioExecutionFixtures";
 import { UTILITY_TARGETS } from "../../data/UtilityExpansion";
 import UtilityOfferDialog from "./UtilityOfferDialog";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "../../helpers/DateTime";
+
+it.each(["valley-electric", "ridge-electric"])(
+  "quotes the fee-inclusive price and monthly debt plus upkeep for %s",
+  (targetId) => {
+    const game = createGame({
+      scenarioId: 116,
+      difficulty: "Employee",
+      seed: 12345,
+    });
+    const offer = utilityOffer(game, targetId)!;
+    const store = configureStore({
+      reducer: { game: reducer },
+      preloadedState: { game },
+    });
+    render(
+      <Provider store={store}>
+        <UtilityOfferDialog
+          game={game}
+          targetId={targetId}
+          onClose={jest.fn()}
+        />
+      </Provider>,
+    );
+    const price = screen.getByRole("row", { name: /^Price / });
+    expect(within(price).getByRole("cell")).toHaveTextContent(
+      formatMoneyConcise(offer.cashDue),
+    );
+    expect(
+      within(
+        screen.getByRole("row", { name: /^Debt & upkeep · cash / }),
+      ).getByRole("cell"),
+    ).toHaveTextContent(
+      `${formatMoneyConcise(offer.cashMonthlyDebtService + offer.networkOMPerMonth)}/mo`,
+    );
+    expect(
+      within(
+        screen.getByRole("row", { name: /^Debt & upkeep · loan / }),
+      ).getByRole("cell"),
+    ).toHaveTextContent(
+      `${formatMoneyConcise(offer.monthlyDebtService + offer.networkOMPerMonth)}/mo`,
+    );
+    expect(
+      within(
+        screen.getByRole("row", { name: /^Loan down payment / }),
+      ).getByRole("cell"),
+    ).toHaveTextContent(formatMoneyConcise(offer.financedCashDue));
+    for (const name of [
+      "Equity price + fee",
+      "Cash purchase",
+      "Your cash",
+      "Cash covers today’s offer",
+    ]) {
+      expect(screen.queryByRole("rowheader", { name })).not.toBeInTheDocument();
+    }
+  },
+);
 
 it.each([
   ["valley-electric", "2.2TWh", "406MW"],
@@ -38,19 +95,15 @@ it.each([
         />
       </Provider>,
     );
-    expect(
-      screen.getByRole("heading", {
-        name: "Seller load reference · January 2005",
-      }),
-    ).toBeInTheDocument();
+    fireEvent.click(screen.getByText("Demand reference · January 2005"));
     expect(
       screen.getByText(
         new RegExp(`${energy} annual delivered energy · ${peak} peak demand`),
       ),
     ).toBeInTheDocument();
-    expect(
-      screen.getByText(/fixed-account opening load figures/),
-    ).toHaveTextContent("Individual utility peaks do not add");
+    expect(screen.getByText(/Historical baseline/)).toHaveTextContent(
+      "Utility peaks do not add",
+    );
     expect(
       screen.queryByRole("button", { name: /Pay cash|Take loan/ }),
     ).not.toBeInTheDocument();
@@ -113,7 +166,7 @@ it("keeps a disappeared offer visible and cancellable so its pause token can clo
     </Provider>,
   );
   expect(
-    screen.getByRole("dialog", { name: "Company terms unavailable" }),
+    screen.getByRole("dialog", { name: "Acquisition terms unavailable" }),
   ).toBeVisible();
   expect(store.getState().game.policyPause?.token).toBe(
     "company-terms:valley-electric",
