@@ -27,16 +27,13 @@ import {
   sliderTickToW,
   wToSliderTick,
 } from "../../helpers/BuildSizing";
-import {
-  LivePurchaseReviewDialog as PurchaseReviewDialog,
-  BuildCashWarning,
-} from "../base/PurchaseReviewDialog";
+import { BuildCashWarning } from "../base/PurchaseReviewDialog";
 import {
   getBuildAvailability,
   getSiteInventory,
   siteCountLabel,
 } from "../base/BuildAvailability";
-import BuildImpact from "../base/BuildImpact";
+import BuildPurchaseReviewDialog from "../base/BuildPurchaseReviewDialog";
 import BuildMetric from "../base/BuildMetric";
 import {
   formatLargeMassValueConcise,
@@ -214,7 +211,9 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
         </BuildDetails>
       }
     >
-      <PurchaseReviewDialog
+      <BuildPurchaseReviewDialog
+        game={props.game}
+        facility={storage}
         open={open}
         onClose={() => setOpen(false)}
         title={`Build ${formatWattHours(storage.peakWh)} ${displayName}?`}
@@ -224,9 +223,6 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
         loanMonths={facilityLoanMonths(storage.lifespanYears)}
         cashDisabled={!buildable}
         loanDisabled={!buildable}
-        afterFacts={
-          open && <BuildImpact game={props.game} facility={storage} />
-        }
         upkeepPerMonth={storage.annualOperatingCost / 12}
         upkeepDetail="Plus charging and loan payments."
         onlineInMonths={Math.round(storage.yearsToBuild * 12)}

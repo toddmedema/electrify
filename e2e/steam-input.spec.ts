@@ -1759,9 +1759,6 @@ async function tvJourney(page: Page, testInfo: TestInfo, maximum: boolean) {
     await input(page, "confirm");
     const purchase = page.getByRole("dialog");
     await expect(purchase).toBeVisible();
-    const gridContext = purchase.locator(".buildImpact summary");
-    await select(page, gridContext);
-    await input(page, "confirm");
     const gridChart = purchase.getByRole("img", {
       name: /Estimated monthly supply margin before and after commissioning/,
     });
@@ -1798,8 +1795,7 @@ async function tvJourney(page: Page, testInfo: TestInfo, maximum: boolean) {
       .toBeGreaterThanOrEqual(3);
     await capture("build-impact-forecast");
     await input(page, "back");
-    await select(page, gridContext);
-    await input(page, "confirm");
+    await expect(purchase).toBeVisible();
 
     await select(
       page,
