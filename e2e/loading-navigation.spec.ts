@@ -8,6 +8,7 @@ test("dismissing an achievement notification during loading leaves the next miss
   await page.addInitScript(() => {
     localStorage.setItem("audioEnabled", "false");
   });
+  await page.clock.install();
   await page.goto("/");
   await page.getByRole("button", { name: "Play", exact: true }).click();
   await page.getByRole("button", { name: "Next", exact: true }).click();
@@ -17,7 +18,6 @@ test("dismissing an achievement notification during loading leaves the next miss
   await expect(
     page.getByRole("heading", { name: /Mission complete!/ }),
   ).toBeVisible({ timeout: 60000 });
-  await page.clock.install();
   await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 1000);
   // Hold the next mission's data so card dismissal definitely precedes loaded().
   let release!: () => void;

@@ -169,6 +169,7 @@ test("a real mission stacks simultaneous awards and persists them without repeat
         }),
       );
   }, STORAGE_KEY);
+  await page.clock.install();
   await page.goto("/");
   await page.getByRole("button", { name: "Play", exact: true }).click();
   await page.getByRole("button", { name: "Next", exact: true }).click();
@@ -194,7 +195,6 @@ test("a real mission stacks simultaneous awards and persists them without repeat
     page.viewportSize()!.height,
   );
   await expect(graduate).toContainText("Complete all seven tutorial missions.");
-  await page.clock.install();
   await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 1000);
   await expect(popup).toContainText("First Spark");
   await expect(page.getByRole("dialog")).toBeVisible();
@@ -249,6 +249,8 @@ test("a real mission stacks simultaneous awards and persists them without repeat
     width: viewportBeforeResize.width,
     height: 180,
   });
+  // The clock also owns the toast's periodic clearance/scrollability measurement.
+  await page.clock.runFor(250);
   const stack = page.locator(".achievementToastStack");
   await expect(stack).toHaveClass(/isScrollable/);
   await expect(popup).toHaveCSS("touch-action", "pan-y");

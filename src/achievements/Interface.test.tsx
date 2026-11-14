@@ -174,7 +174,7 @@ test("Steam keeps notification ownership and the fallback returns when Steam is 
   view.unmount();
 });
 
-test("an award arriving during the stack gets its own reading time", () => {
+test("a focused card expiring moves focus to the newer award without resetting its reading time", () => {
   jest.useFakeTimers();
   achievementJournal.merge(recordIntent({ earned: ["FIRST_SPARK"] }), true);
   const view = render(
@@ -182,6 +182,8 @@ test("an award arriving during the stack gets its own reading time", () => {
       <AchievementNotifications />
     </Provider>,
   );
+  const first = screen.getByRole("button", { name: /Dismiss First Spark/ });
+  act(() => first.focus());
   act(() => jest.advanceTimersByTime(ACHIEVEMENT_TOAST_MS - 1000));
   act(() => {
     achievementJournal.merge(recordIntent({ earned: ["OUT_OF_JUICE"] }), true);
@@ -196,6 +198,7 @@ test("an award arriving during the stack gets its own reading time", () => {
     screen.queryByRole("button", { name: /Dismiss First Spark/ }),
   ).not.toBeInTheDocument();
   expect(later).toBeVisible();
+  expect(later).toHaveFocus();
   act(() => jest.advanceTimersByTime(ACHIEVEMENT_TOAST_MS - 1000));
   expect(later).not.toBeInTheDocument();
   view.unmount();

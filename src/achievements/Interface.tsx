@@ -221,7 +221,7 @@ function AchievementToast({
   active: boolean;
 }): React.JSX.Element {
   const panel = React.useRef<HTMLDivElement>(null);
-  const dismiss = () => {
+  const dismiss = React.useCallback(() => {
     // Keep keyboard focus in the stack when its focused card is dismissed.
     if (panel.current?.contains(document.activeElement)) {
       const neighbor =
@@ -230,16 +230,13 @@ function AchievementToast({
       if (neighbor instanceof HTMLElement) neighbor.focus();
     }
     achievementJournal.dismiss(entry.id);
-  };
+  }, [entry.id]);
   const swipe = useSwipeToDismiss(panel, dismiss);
   React.useEffect(() => {
     if (!active) return;
-    const timer = setTimeout(
-      () => achievementJournal.dismiss(entry.id),
-      ACHIEVEMENT_TOAST_MS,
-    );
+    const timer = setTimeout(dismiss, ACHIEVEMENT_TOAST_MS);
     return () => clearTimeout(timer);
-  }, [active, entry.id]);
+  }, [active, dismiss]);
   return (
     <Paper
       ref={panel}
