@@ -223,7 +223,7 @@ for (const theme of ["light", "dark"] as const) {
     await expect(dialog.locator(".powerAgreementDuration")).toHaveText(
       "5 years",
     );
-    await expect(discount).toHaveText("Discount9.4%");
+    await expect(discount).toHaveText("Discount9.44%");
     await expect(dialog.getByRole("row", { name: /Duration/ })).toContainText(
       "5 yearsEnds Dec 2024",
     );
@@ -369,7 +369,7 @@ for (const theme of ["light", "dark"] as const) {
     );
     await expect(
       line.getByRole("button", {
-        name: "Pause Champlain regional connection",
+        name: "Pause Champlain ↔ Regional grid",
         exact: true,
       }),
     ).toBeVisible();
