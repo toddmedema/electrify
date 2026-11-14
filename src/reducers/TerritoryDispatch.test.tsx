@@ -4,6 +4,7 @@ import { acquisitionQuote } from "../helpers/Expansion";
 import { currentTick } from "../helpers/GameSelectors";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "../helpers/DateTime";
 import { transmissionRatingW } from "../helpers/Transmission";
+import { inheritedConnection } from "../helpers/PowerAgreements";
 import { territoryBuildAvailability } from "../helpers/Territories";
 import { createGame } from "../testing/Simulator";
 import { copyOfficialGame } from "../testing/OfficialScenarioExecutionFixtures";
@@ -154,6 +155,58 @@ it("serves an acquired plant's local load before limiting its remaining power to
   expect(link.currentFlowW).toBeCloseTo(transmissionRatingW(link, now), 5);
   expectConserved(game);
 });
+
+it("refreshes newly acquired customer demand immediately without advancing asset or agreement balances", () => {
+  const now = currentTick(opening)!;
+  expect(now.territories!["valley-electric"]!.demandW).toBeGreaterThan(0);
+  expect(now.territories!["valley-electric"]!.generationW).toBeGreaterThan(0);
+  expect(now.demandW).toBeGreaterThan(
+    createGame({ scenarioId: 116, seed: 12345, difficulty: "Employee" })
+      .timeline[0].demandW,
+  );
+  expect(
+    opening.facilities.every((facility) => facility.lifetimeWh === 0),
+  ).toBe(true);
+  expect(
+    opening.utilityExpansion!.loans.every(
+      (loan) => loan.loanAmountLeft === loan.principal,
+    ),
+  ).toBe(true);
+  expect(opening.transmission!.agreementAccounts).toBeUndefined();
+});
+
+it.each(["champlain", "valley-electric"] as const)(
+  "generates profitable exports only when the %s plant can physically reach the buyer",
+  (territoryId) => {
+    const game = isolated();
+    const generator = plant(game, territoryId, 600e6);
+    generator.btuPerWh = 0;
+    generator.variableOperatingCostPerMWh = 0;
+    const link = game.transmission!.lines[0];
+    link.paused = true;
+    game.transmission!.lines.push({
+      ...inheritedConnection("champlain", 90),
+      corridorId: "vt-champlain-ridge",
+      capacityW: 100e6,
+    });
+    game.transmission!.sellingRule = "PROFITABLE";
+    request(game, 300e6);
+    const surplusOnly = copyOfficialGame(game);
+    surplusOnly.transmission!.sellingRule = "SURPLUS";
+    tickState(surplusOnly);
+    tickState(game);
+    const now = currentTick(game)!;
+    const extraGenerationW =
+      generator.currentW - surplusOnly.facilities[0].currentW;
+    expect(now.exportedW! > 0).toBe(territoryId === "champlain");
+    expect(extraGenerationW).toBeCloseTo(now.exportedW!, 4);
+    expect(now.entitlementImportedW).toBe(0);
+    expect(now.territories!["valley-electric"]!.supplyW).toBe(
+      surplusOnly.timeline[1].territories!["valley-electric"]!.supplyW,
+    );
+    expectConserved(game);
+  },
+);
 
 it("keeps ownership when a link is paused and cannot teleport acquired generation", () => {
   const game = isolated();

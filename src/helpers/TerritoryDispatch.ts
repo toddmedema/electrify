@@ -9,13 +9,14 @@ export interface TerritoryDispatchSource {
   id: string;
   territoryId: TerritoryId;
   capacityW: number;
-  kind: "native" | "agreement" | "import";
+  kind: "native" | "agreement" | "import" | "spare";
 }
 export interface TerritoryDispatchSink {
   id: string;
   territoryId: TerritoryId;
   capacityW: number;
   priority?: number;
+  agreements?: boolean;
 }
 export interface TerritoryDispatchEdge {
   id: number;
@@ -27,7 +28,7 @@ export interface TerritoryDispatchInput {
   demandW: Record<TerritoryId, number>;
   edges: readonly TerritoryDispatchEdge[];
   sources: readonly TerritoryDispatchSource[];
-  /** Lower priority than every reachable customer, and never supplied by agreements. */
+  /** Lower priority than every reachable customer. Agreements cannot supply export sinks. */
   sinks?: readonly TerritoryDispatchSink[];
   importToSinks?: boolean;
 }
@@ -52,7 +53,8 @@ export function routeTerritoryPower({
 }: TerritoryDispatchInput) {
   const sourceNode = 4;
   const sinkNode = 5;
-  const size = 6 + sources.length + sinks.length;
+  const size = 7 + sources.length + sinks.length;
+  const agreementGateway = size - 1;
   const residual = Array.from({ length: size }, () =>
     Array<number>(size).fill(0),
   );
@@ -95,24 +97,41 @@ export function routeTerritoryPower({
     }
   };
   IDS.forEach((id, i) => add(i, sinkNode, demandW[id]));
+  // Contract purchases may free native generation for utility storage, but cannot exceed
+  // customer load merely because storage or an export buyer can absorb more power.
+  add(
+    sourceNode,
+    agreementGateway,
+    IDS.reduce((sum, id) => sum + demandW[id], 0),
+  );
   edges.forEach((edge) => {
     add(index(edge.from), index(edge.to), edge.capacityW);
     add(index(edge.to), index(edge.from), edge.capacityW);
   });
-  const kinds = ["native", "agreement", "import"] as const;
+  const kinds = ["native", "agreement", "import", "spare"] as const;
   for (const kind of kinds) {
     sources.forEach((source, i) => {
       if (source.kind !== kind) return;
       const node = 6 + i;
       const territory = index(source.territoryId);
-      add(sourceNode, node, source.capacityW);
+      const origin =
+        source.kind === "agreement" ? agreementGateway : sourceNode;
+      add(origin, node, source.capacityW);
       add(node, territory, source.capacityW);
       // Claim local load before allowing any source in this class to leave its territory.
       const localW = Math.min(
-        residual[sourceNode][node],
+        residual[origin][node],
+        origin === agreementGateway
+          ? residual[sourceNode][agreementGateway]
+          : Infinity,
         residual[territory][sinkNode],
       );
-      push([sourceNode, node, territory, sinkNode], localW);
+      push(
+        origin === agreementGateway
+          ? [sourceNode, origin, node, territory, sinkNode]
+          : [sourceNode, node, territory, sinkNode],
+        localW,
+      );
     });
     augment();
   }
@@ -125,9 +144,14 @@ export function routeTerritoryPower({
     residual[sinkNode][i] = 0;
     residual[i][sinkNode] = 0;
   });
+  const agreementRemaining = sources.map((source, i) =>
+    source.kind === "agreement" ? residual[agreementGateway][6 + i] : 0,
+  );
   sources.forEach((source, i) => {
+    if (source.kind === "agreement") residual[agreementGateway][6 + i] = 0;
     if (
       source.kind !== "native" &&
+      source.kind !== "spare" &&
       !(importToSinks && source.kind === "import")
     )
       residual[sourceNode][6 + i] = 0;
@@ -141,9 +165,46 @@ export function routeTerritoryPower({
       add(index(sink.territoryId), node, sink.capacityW);
       add(node, sinkNode, sink.capacityW);
     });
+    // Use already-produced surplus before burning additional fuel for a secondary sink.
+    const spareRemaining = sources.map((source, i) =>
+      source.kind === "spare" ? residual[sourceNode][6 + i] : 0,
+    );
+    sources.forEach((source, i) => {
+      if (source.kind === "spare") residual[sourceNode][6 + i] = 0;
+    });
     augment();
+    const allowAgreements = sinks.some(
+      (sink) => (sink.priority ?? 0) === priority && sink.agreements,
+    );
+    if (allowAgreements) {
+      sources.forEach((source, i) => {
+        if (source.kind === "agreement")
+          residual[agreementGateway][6 + i] = agreementRemaining[i];
+      });
+      augment();
+      sources.forEach((source, i) => {
+        if (source.kind === "agreement") {
+          agreementRemaining[i] = residual[agreementGateway][6 + i];
+          residual[agreementGateway][6 + i] = 0;
+        }
+      });
+    }
+    sources.forEach((source, i) => {
+      if (source.kind === "spare")
+        residual[sourceNode][6 + i] = spareRemaining[i];
+    });
+    augment();
+    sinks.forEach((sink, i) => {
+      if ((sink.priority ?? 0) === priority)
+        residual[6 + sources.length + i][sinkNode] = 0;
+    });
   }
-  const sourceW = sources.map((_, i) => residual[6 + i][sourceNode]);
+  const sourceW = sources.map(
+    (source, i) =>
+      residual[6 + i][
+        source.kind === "agreement" ? agreementGateway : sourceNode
+      ],
+  );
   const sinkW = sinks.map((_, i) => residual[sinkNode][6 + sources.length + i]);
   return {
     servedW,
@@ -166,17 +227,20 @@ export function clearTerritoryMarket({
   reservations,
   buyingRule,
   sellingRule,
+  spareSources = [],
 }: {
   input: TerritoryDispatchInput;
   interfaces: readonly { territoryId: TerritoryId; offer: IntertieOffer }[];
   reservations: readonly IntertieReservation[];
   buyingRule: BuyingRuleType;
   sellingRule: SellingRuleType;
+  spareSources?: readonly (TerritoryDispatchSource & { costPerMWh: number })[];
 }) {
   const sources = [...input.sources];
   const sinks = [...(input.sinks ?? [])];
   const importSourceIndex = interfaces.map(() => -1);
   const exportSinkIndex = interfaces.map(() => -1);
+  const spareSourceIndex = spareSources.map(() => -1);
   const route = (importToSinks = false) =>
     routeTerritoryPower({ ...input, sources, sinks, importToSinks });
   let result = route();
@@ -223,7 +287,9 @@ export function clearTerritoryMarket({
     importSourceIndex[i] < 0 ? 0 : result.sourceW[importSourceIndex[i]],
   );
   const anyImports = result.sourceW.some(
-    (watts, i) => sources[i].kind !== "native" && watts > 0,
+    (watts, i) =>
+      (sources[i].kind === "agreement" || sources[i].kind === "import") &&
+      watts > 0,
   );
   if (!anyImports && sellingRule !== "NONE") {
     interfaces.forEach(({ territoryId, offer }, i) => {
@@ -252,14 +318,39 @@ export function clearTerritoryMarket({
         ),
       );
       exportSinkIndex[i] = sinks.length;
-      sinks.push({ id: `export:${i}`, territoryId, capacityW, priority: 1 });
+      sinks.push({
+        id: `export:${i}`,
+        territoryId,
+        capacityW,
+        priority: 10 + i,
+      });
       result = route();
+      if (sellingRule === "PROFITABLE") {
+        spareSources.forEach((source, j) => {
+          if (!(offer.pricePerMWh > source.costPerMWh)) return;
+          let sourceIndex = spareSourceIndex[j];
+          if (sourceIndex < 0) {
+            sourceIndex = sources.length;
+            spareSourceIndex[j] = sourceIndex;
+            sources.push({ ...source, kind: "spare" });
+          } else sources[sourceIndex].capacityW = source.capacityW;
+        });
+        result = route();
+        // A later cheap interface cannot unlock more of an expensive generator.
+        for (const sourceIndex of spareSourceIndex)
+          if (sourceIndex >= 0)
+            sources[sourceIndex].capacityW = result.sourceW[sourceIndex];
+        sinks[exportSinkIndex[i]].capacityW = result.sinkW[exportSinkIndex[i]];
+      }
     });
   }
   return {
     result,
     sources,
     sinks,
+    extraGenerationW: spareSources.map((_, i) =>
+      spareSourceIndex[i] < 0 ? 0 : result.sourceW[spareSourceIndex[i]],
+    ),
     importedW,
     exportedW: interfaces.map((_, i) =>
       exportSinkIndex[i] < 0 ? 0 : result.sinkW[exportSinkIndex[i]],
