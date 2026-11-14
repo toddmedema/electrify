@@ -27,8 +27,8 @@ import {
   isUtilityExpansionGame,
   validUtilityExpansionSetup,
   validUtilityExpansionHeader,
-  ownedUtilityConnection,
 } from "./ExpansionContext";
+import { validTerritoryNetwork } from "./TerritoryValidation";
 
 const nonnegative = (value: unknown): value is number =>
   typeof value === "number" && Number.isFinite(value) && value >= 0;
@@ -54,7 +54,8 @@ const obsoleteAreaState = (game: GameType) =>
 export function validUtilityExpansion(game: GameType): boolean {
   if (obsoleteAreaState(game)) return false;
   const state = game.utilityExpansion;
-  if (!isUtilityExpansionGame(game)) return state === undefined;
+  if (!isUtilityExpansionGame(game))
+    return state === undefined && validTerritoryNetwork(game);
   if (
     !state ||
     !record(state) ||
@@ -71,6 +72,7 @@ export function validUtilityExpansion(game: GameType): boolean {
     (game.customScenario && !validUtilityExpansionSetup(game.customScenario))
   )
     return false;
+  if (!validTerritoryNetwork(game)) return false;
   const targets = new Set<UtilityTargetId>();
   for (const receipt of state.acquisitions) {
     if (
@@ -101,14 +103,6 @@ export function validUtilityExpansion(game: GameType): boolean {
     !nonnegative(current.customers) ||
     current.customers >
       customerMarketSizeAt(pool, game.date.minute) * (1 + 1e-9)
-  )
-    return false;
-  if (
-    game.transmission?.lines.some(
-      (line) =>
-        ownedUtilityConnection(game, line.corridorId) &&
-        (line.paused || line.currentFlowW !== 0),
-    )
   )
     return false;
   const networks = new Set<UtilityTargetId>();

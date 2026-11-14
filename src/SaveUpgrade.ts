@@ -1,5 +1,6 @@
 import type { BuyingRuleType, SellingRuleType, GameType } from "./Types";
 import { inheritedConnection } from "./helpers/PowerAgreements";
+import { facilityTerritoryId } from "./helpers/Territories";
 
 type DecodedSave = Record<string, unknown>;
 type Migration = (save: DecodedSave) => DecodedSave | null;
@@ -136,6 +137,40 @@ const migrations: readonly Migration[] = [
   // 11 -> 12: variable-duration monthly-energy terms are opt-in new promises only.
   // Preserve every existing v1/v2 receipt, inherited term, meter and recorded dollar.
   (save) => save,
+  // 12 -> 13: locate existing scenario116 assets without rewriting recorded history or accounts.
+  (save) => {
+    if (!object(save.game)) return null;
+    const game = save.game;
+    const custom = game.customScenario;
+    const base116 =
+      (game.scenarioId === 116 && custom === undefined) ||
+      (game.scenarioId === 999 &&
+        object(custom) &&
+        custom.id === 999 &&
+        object(custom.mod) &&
+        object(custom.mod.parameters) &&
+        custom.mod.parameters.baseScenarioId === 116);
+    if (!base116) return save;
+    if (
+      game.territoryNetwork !== undefined ||
+      !Array.isArray(game.facilities) ||
+      game.facilities.some(
+        (facility) => !object(facility) || facility.territoryId !== undefined,
+      )
+    )
+      return null;
+    return {
+      ...save,
+      game: {
+        ...game,
+        territoryNetwork: { version: 1 },
+        facilities: game.facilities.map((facility) => ({
+          ...facility,
+          territoryId: facilityTerritoryId(facility),
+        })),
+      },
+    };
+  },
 ];
 
 /** Structure versions are independent of app releases and simulation compatibility. */

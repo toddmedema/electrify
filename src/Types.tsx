@@ -1359,6 +1359,8 @@ export interface TerritoryTick {
   demandW: number;
   supplyW: number;
   generationW: number;
+  storageChargeW: number;
+  storageDischargeW: number;
   importedW: number;
   exportedW: number;
   unservedW: number;

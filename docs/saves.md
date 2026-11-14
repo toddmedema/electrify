@@ -54,3 +54,13 @@ individual grids are never imported as solo saves. Solo migrations do not imply
 that peers with different simulation or message formats can play together.
 
 See [cloud saves](cloud-saves.md) for synchronization and immutable shared snapshots.
+
+Schema 13 enables the territory network for Across the Valley (scenario 116 and
+mods based on it). Inherited facility provenance assigns Champlain, Valley Electric
+or Ridge Electric; existing player projects stay in Champlain. Cash, recorded
+history, debt, construction progress, acquisitions, accepted power agreements and
+their meters remain unchanged. Existing projects retain their size and site
+reservations, including projects larger than today's site limit. Territory limits
+apply when ordering future projects. Historical ticks need no territory summary;
+new summaries are validated as finite physical balances. A current-format save
+must carry the network version and valid, owned facility destinations.
