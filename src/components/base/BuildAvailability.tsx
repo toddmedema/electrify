@@ -65,7 +65,7 @@ export function getBuildAvailability(options: {
     const messages: Record<string, string> = {
       prohibited: "New Hydro is prohibited here.",
       unavailable: "Hydro site data unavailable.",
-      empty: "No qualifying Hydro sites found.",
+      empty: "No suitable Hydro sites.",
       exhausted: "All Hydro sites are used or reserved.",
       "too-large": "Too large for any remaining site.",
     };

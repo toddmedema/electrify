@@ -117,7 +117,7 @@ export function describeHydroStatus(input: HydroStatusInput): HydroStatus {
     // The combined forecast can rise while this dam stays empty, so only a lone dam gets a month
     const refill = fleet ? undefined : firstRise(outlook);
     return {
-      lead: "Nearly empty.",
+      lead: fraction < 0.02 ? "Empty." : "Nearly empty.",
       detail: refill
         ? `Output stays low until it refills, likely in ${MONTH_NAMES[refill - 1]}.`
         : outlook && !fleet
@@ -174,8 +174,8 @@ export function describeHydroStatus(input: HydroStatusInput): HydroStatus {
     return {
       // A reservoir rising now and running dry later needs both halves said, or they read as a
       // contradiction
-      lead: change > TREND_THRESHOLD ? trend("Filling for now") : lead,
-      detail: `${fleet ? "They" : "It"} will run low ${runsLowWhen}. Moving ${fleet ? "a dam" : "it"} later in the dispatch order saves water for when you need it.`,
+      lead: change > TREND_THRESHOLD ? "Filling for now" : lead,
+      detail: `${change > TREND_THRESHOLD ? "but" : fleet ? "They" : "It"} will run low ${runsLowWhen}. Moving ${fleet ? "a dam" : "it"} later in the dispatch order saves water for when you need it.`,
       tone: "warn",
     };
   } else if (

@@ -36,7 +36,7 @@ describe("getBuildAvailability", () => {
   test.each([
     ["prohibited", "prohibited"],
     ["unavailable", "data unavailable"],
-    ["empty", "No qualifying"],
+    ["empty", "No suitable"],
     ["exhausted", "used or reserved"],
     ["too-large", "Too large"],
   ] as const)("distinguishes Hydro %s", (status, message) => {
