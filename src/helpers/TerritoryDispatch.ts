@@ -124,7 +124,8 @@ export function routeTerritoryPower({
         source.kind === "agreement" ? agreementGateway : sourceNode;
       add(origin, node, source.capacityW);
       add(node, territory, source.capacityW);
-      // Claim local load before allowing any source in this class to leave its territory.
+      // Native fleets claim local load before sharing it. Agreements retain their caller's
+      // dispatch priority, so a later local purchase cannot displace a reachable cheaper one.
       const localW = Math.min(
         residual[origin][node],
         origin === agreementGateway
@@ -138,8 +139,9 @@ export function routeTerritoryPower({
           : [sourceNode, node, territory, sinkNode],
         localW,
       );
+      if (kind === "agreement") augment();
     });
-    augment();
+    if (kind !== "agreement") augment();
   }
   const servedW = Object.fromEntries(
     IDS.map((id, i) => [
@@ -187,10 +189,11 @@ export function routeTerritoryPower({
     );
     if (allowAgreements) {
       sources.forEach((source, i) => {
-        if (source.kind === "agreement")
+        if (source.kind === "agreement") {
           residual[agreementGateway][6 + i] = agreementRemaining[i];
+          augment();
+        }
       });
-      augment();
       sources.forEach((source, i) => {
         if (source.kind === "agreement") {
           agreementRemaining[i] = residual[agreementGateway][6 + i];

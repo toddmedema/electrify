@@ -340,6 +340,58 @@ it("retains a real one-watt dirty agreement delivery after nuclear supply is exh
   expect(now.supplyW).toBe(now.demandW);
 });
 
+it.each([
+  ["uncongested", 100e6],
+  ["congested", 1e6],
+] as const)(
+  "dispatches acquired nuclear before local hydro on the %s link",
+  (_, capacityW) => {
+    const game = copyOfficialGame(opening);
+    game.transmission!.inheritedAgreementTerms = 1;
+    game.transmission!.buyingRule = "NONE";
+    game.transmission!.sellingRule = "NONE";
+    for (const facility of game.facilities) facility.paused = true;
+    const line = game.transmission!.lines.find(
+      ({ corridorId }) => corridorId === "vt-champlain-valley",
+    )!;
+    line.capacityW = capacityW;
+    const next = request(game, 247e6);
+    const sources = entitlementSources(game, next);
+    const nuclear = sources.filter(
+      ({ id }) => id === "champlain-nuclear" || id === "valley-nuclear",
+    );
+    expect(nuclear.map(({ capacityW }) => capacityW)).toEqual([95e6, 152e6]);
+    tickState(game);
+    const now = currentTick(game)!;
+    const ratingW = transmissionRatingW(line, now);
+    const homeDeficitW = now.territories!.champlain!.demandW - 95e6;
+    const nuclearTransferW = Math.min(ratingW, homeDeficitW);
+    const deliveredW = (id: string) =>
+      (now.agreementUsefulMWh![id] * 1e6 * TICKS_PER_HOUR) / GAME_TO_REAL_YEARS;
+    expect(now.supplyW).toBe(now.demandW);
+    expect(line.currentFlowW).toBeCloseTo(nuclearTransferW, 5);
+    expect(now.agreementUsefulMWh!["champlain-nuclear"]).toBe(
+      now.agreementAvailableMWh!["champlain-nuclear"],
+    );
+    const dirtyW = sources
+      .filter(({ emissionsKgPerMWh }) => emissionsKgPerMWh > 0)
+      .reduce((sum, source) => sum + deliveredW(source.id), 0);
+    const expectedDirtyW = homeDeficitW - nuclearTransferW;
+    expect(deliveredW("valley-nuclear")).toBeCloseTo(
+      now.territories!["valley-electric"]!.demandW + nuclearTransferW,
+      5,
+    );
+    expect(
+      now.agreementUsefulMWh!["valley-nuclear"] ===
+        now.agreementAvailableMWh!["valley-nuclear"],
+    ).toBe(expectedDirtyW === 0);
+    expect(dirtyW).toBeCloseTo(expectedDirtyW, 5);
+    expect(now.importedKgco2e === 0).toBe(expectedDirtyW === 0);
+    expect(now.marketPricePerMWh === 40).toBe(expectedDirtyW === 0);
+    expectConserved(game);
+  },
+);
+
 it("prioritizes reachable customers over charging and stores stranded local surplus locally", () => {
   for (const source of ["champlain", "valley-electric"] as const) {
     let game = isolated();
