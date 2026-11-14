@@ -44,6 +44,8 @@ function fixture() {
           exportedW: 10,
           unservedW: 0,
           curtailedW: -0,
+          storageChargeW: 0,
+          storageDischargeW: 0,
         },
         "green-uplands": undefined,
       },
