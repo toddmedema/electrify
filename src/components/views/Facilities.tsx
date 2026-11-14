@@ -1515,6 +1515,8 @@ export default class Facilities extends React.Component<Props, SelectionState> {
                     onPause={this.props.onTransmissionPause}
                     onBuyingRule={onBuyingRule}
                     onSellingRule={onSellingRule}
+                    onBeforeDragStart={this.onBeforeDragStart}
+                    onDragEnd={this.onDragEnd}
                     agreementsOnly
                     hideOwnership
                     heading="Regional delivery interfaces"
