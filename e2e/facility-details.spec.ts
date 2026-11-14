@@ -3,6 +3,7 @@ import { expect, test } from "./fixtures";
 import { openPane, openBuild } from "./layout";
 import path from "node:path";
 import { editSavedGame } from "./save-fixture";
+import { getHydroAvailability, validHydroClaims } from "../src/data/HydroSites";
 import { MINUTES_PER_MONTH } from "../src/helpers/DateTime";
 
 // Exercise pane width rather than assuming a viewport implies a column count.
@@ -422,10 +423,16 @@ for (const theme of ["light", "dark"]) {
       const dam = game.facilities.find(
         (facility) => facility.fuel === "Hydro",
       )!;
+      const site = getHydroAvailability(game, dam.peakW).selected!;
+      expect(site).toBeDefined();
       game.facilities.push({
         ...dam,
         id: Math.max(...game.facilities.map((facility) => facility.id)) + 1,
+        startingAssetId: undefined,
+        hydroSiteId: site.id,
       });
+      game.commissionedHydroSiteIds.push(site.id);
+      expect(validHydroClaims(game)).toBe(true);
     });
     await page.reload();
     await page.getByRole("button", { name: "Continue", exact: true }).click();
@@ -462,7 +469,12 @@ for (const theme of ["light", "dark"]) {
         (element) => element.scrollWidth - element.clientWidth,
       ),
     ).toBeLessThanOrEqual(1);
-    await reviewScreenshot(row, {
+    const water = row.getByRole("region", { name: "Water", exact: true });
+    await water.scrollIntoViewIfNeeded();
+    await group.focus();
+    await group.press("Home");
+    await group.evaluate(() => window.getSelection()?.removeAllRanges());
+    await reviewScreenshot(water, {
       path: info.outputPath(`hydro-fleet-${theme}.png`),
       animations: "disabled",
     });
