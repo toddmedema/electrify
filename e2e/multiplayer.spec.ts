@@ -3301,7 +3301,11 @@ for (const width of [1280, 390, 360]) {
       .poll(() => room.views.get(guestId)?.game?.date)
       .toEqual(checkpoint.grids[1].date);
     await expect
-      .poll(() => room.views.get(guestId)?.scenarioDigest)
+      .poll(() =>
+        replication
+          ? room.views.get(guestId)?.game?.customScenario?.mod?.runtimeDigest
+          : room.views.get(guestId)?.scenarioDigest,
+      )
       .toBe(digest);
     expect(room.modEntries.get(hostId)).toEqual([]);
     unchangedGuest();
