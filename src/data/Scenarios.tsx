@@ -1936,7 +1936,7 @@ export const SCENARIOS: ScenarioType[] = [
     summary:
       "Connect to your neighbors, acquire a utility, and keep your larger company supplied.",
     threat:
-      "Network upkeep rises in 2015 and 2020, and the power purchase limit shrinks in 2017.",
+      "Purchased-power coverage shrinks in 2017 and 2020. Plan replacement supply as you expand.",
     themes: ["Rapid growth"],
     ownership: "Investor",
     startingYear: 2005,

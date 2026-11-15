@@ -9,7 +9,6 @@ import { Box, Typography } from "@mui/material";
 import type { GameType, UtilityTargetId } from "../../Types";
 import { utilityPlanning } from "../../helpers/UtilityPlanning";
 import { formatWatts } from "../../helpers/Format";
-import { UTILITY_NETWORK_RENEWAL_STAGES } from "../../data/UtilityExpansion";
 
 /** Both company reviews include inherited base-company changes, not only the seller's risks. */
 export default function UtilityContractSchedule({
@@ -80,18 +79,9 @@ export default function UtilityContractSchedule({
       <Typography component="h4" variant="subtitle2" sx={{ mt: 2 }}>
         Network upkeep
       </Typography>
-      <Box component="ul" sx={{ pl: 2.5, my: 1, "& li + li": { mt: 1 } }}>
-        {UTILITY_NETWORK_RENEWAL_STAGES.map((stage) => (
-          <li key={stage.year}>
-            <Typography variant="body2">
-              <strong>Jan {stage.year}:</strong> {stage.multiplier}× opening
-              upkeep.
-            </Typography>
-          </li>
-        ))}
-      </Box>
       <Typography variant="body2" color="textSecondary">
-        Excludes customer growth and inflation.
+        Network upkeep includes routine maintenance and renewal. It rises with
+        customer growth and inflation.
       </Typography>
     </Box>
   );

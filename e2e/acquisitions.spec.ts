@@ -127,21 +127,6 @@ for (const theme of ["light", "dark"] as const) {
       await expect(terms).not.toContainText("Cash purchase");
       await expect(terms).not.toContainText("Cash covers today’s offer");
       await expect(terms).toContainText("Price and down payment include fees");
-      if (
-        process.env.REVIEW_SCREENSHOT_DIR &&
-        target === "Valley Electric" &&
-        ((testInfo.project.name === "desktop-chromium" && theme === "light") ||
-          (testInfo.project.name === "mobile-360px" && theme === "dark"))
-      ) {
-        await page.mouse.move(0, 0);
-        await terms.screenshot({
-          path: path.join(
-            process.env.REVIEW_SCREENSHOT_DIR,
-            `terms-${testInfo.project.name}-${theme}.png`,
-          ),
-          animations: "disabled",
-        });
-      }
       for (const title of [
         "Plants & purchased power",
         "Demand reference · January 2005",
@@ -155,7 +140,7 @@ for (const theme of ["light", "dark"] as const) {
         "Operating plants",
         "Purchased power",
         "Jan 2020 · Champlain Electric",
-        "Jan 2015: 1.5× opening upkeep",
+        "Network upkeep includes routine maintenance and renewal.",
       ]) {
         await expect(
           terms.getByText(text, { exact: false }).first(),
@@ -377,9 +362,26 @@ for (const theme of ["light", "dark"] as const) {
         .filter({ hasText: "Supply & network changes" });
       await schedule.locator("summary").click();
       await expect(schedule).toContainText("Jan 2020");
-      await expect(schedule).toContainText("Jan 2015: 1.5× opening upkeep");
+      await expect(schedule).toContainText(
+        "Network upkeep includes routine maintenance and renewal.",
+      );
       if (target === "Valley Electric")
         await expect(schedule).toContainText("Jan 2017");
+      if (
+        process.env.REVIEW_SCREENSHOT_DIR &&
+        target === "Valley Electric" &&
+        ((testInfo.project.name === "desktop-chromium" && theme === "light") ||
+          (testInfo.project.name === "mobile-390px" && theme === "dark"))
+      ) {
+        await page.mouse.move(0, 0);
+        await dialog.screenshot({
+          path: path.join(
+            process.env.REVIEW_SCREENSHOT_DIR,
+            `network-upkeep-${testInfo.project.name}-${theme}.png`,
+          ),
+          animations: "disabled",
+        });
+      }
       await schedule.locator("summary").click();
       const help = dialog.getByRole("button", {
         name: "What is interest rate?",
@@ -578,8 +580,7 @@ for (const theme of ["light", "dark"] as const) {
         events,
         page.getByRole("button", { name: "Events", exact: true }),
       );
-      await expect(events).toContainText("1.5× opening upkeep");
-      await expect(events).toContainText("2× opening upkeep");
+      await expect(events).not.toContainText("Network upkeep increased");
       await expect(events).toContainText(
         "Regional nuclear will fall to 76MW deliverable",
       );

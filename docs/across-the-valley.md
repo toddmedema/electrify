@@ -131,9 +131,9 @@ retrofits continue to use current dated quotes.
 
 The service network has an inherited cost floor. Its annual operating cost scales
 with the combined customer's count relative to the acquired portfolios' authored
-opening accounts, with no discount below that opening cost. A fictional renewal
-plan increases opening upkeep to 1.5× in January 2015 and 2× in January 2020;
-normal customer growth and monetary inflation apply separately. These are authored
+opening accounts, with no discount below that opening cost. Routine maintenance
+and renewal are included in this operating budget and follow ordinary monetary
+inflation; there are no dated renewal-cost jumps. The opening costs are authored
 game assumptions, not estimates of historical Vermont utility spending. The live
 simulation, forecasts and company offers use the same `utilityNetworkAnnualOM`
 owner. Offers show the incremental combined-company cost, which can differ from
@@ -191,7 +191,8 @@ later events. Current-format saves persist the aggregate customer and market
 totals, transaction and financial ledgers, and one forecast timeline.
 
 The pre-PPA renewal revision passed all 195 cases in the full matrix, including
-135 prepared plans, plus 24 pressure and acquisition-window cases. A frozen
+135 prepared plans, plus 24 pressure and acquisition-window cases. Those historical
+results included the since-removed 2015 and 2020 upkeep multipliers. A frozen
 baseline confirmed that its inherited-only Employee routes were fired in month
 183 on all three seeds. That result depended on withdrawn agreements also removing
 effective import access. With explicit retained regional connections, those

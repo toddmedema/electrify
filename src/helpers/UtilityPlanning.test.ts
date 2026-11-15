@@ -101,12 +101,16 @@ it("bases customer and peak-demand guidance on the real tariff-sensitive forecas
   expect(cheapPlan.gap).toBeDefined();
 });
 
-it("funds recurring renewal stages and additional customer service without erasing inherited costs", () => {
-  expect(utilityNetworkAnnualOM(["champlain"], 90000, 2014)).toBe(40e6);
-  expect(utilityNetworkAnnualOM(["champlain"], 90000, 2015)).toBe(60e6);
-  expect(utilityNetworkAnnualOM(["champlain"], 90000, 2020)).toBe(80e6);
-  expect(utilityNetworkAnnualOM(["champlain"], 180000, 2020)).toBe(160e6);
-  expect(utilityNetworkAnnualOM(["champlain"], 45000, 2020)).toBe(80e6);
+it("funds routine network maintenance, renewal and customer growth without erasing inherited costs", () => {
+  expect(utilityNetworkAnnualOM(["champlain"], 90000)).toBe(40e6);
+  expect(utilityNetworkAnnualOM(["champlain"], 180000)).toBe(80e6);
+  expect(utilityNetworkAnnualOM(["champlain"], 45000)).toBe(40e6);
+  expect(utilityNetworkAnnualOM(["champlain", "valley-electric"], 249000)).toBe(
+    85e6,
+  );
+  expect(utilityNetworkAnnualOM(["champlain", "ridge-electric"], 140000)).toBe(
+    55e6,
+  );
 });
 
 it("warns through the scored term and includes later supply risks only after Keep playing", () => {

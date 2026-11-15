@@ -152,9 +152,13 @@ it.each(["valley-electric", "ridge-electric"] as const)(
     expect(within(financing).getByText(/over 30 years/)).toBeVisible();
 
     const schedule = disclosure("Supply & network changes");
-    expect(within(schedule).getByText(/1.5× opening upkeep/)).not.toBeVisible();
+    expect(
+      within(schedule).getByText(/routine maintenance and renewal/),
+    ).not.toBeVisible();
     await user.click(within(schedule).getByText("Supply & network changes"));
-    expect(within(schedule).getByText(/1.5× opening upkeep/)).toBeVisible();
+    expect(
+      within(schedule).getByText(/routine maintenance and renewal/),
+    ).toBeVisible();
     expect(schedule).toHaveTextContent("Jan 2020");
   },
 );

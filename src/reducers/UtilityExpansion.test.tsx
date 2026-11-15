@@ -1,4 +1,10 @@
-import { GAME_TO_REAL_YEARS, TICKS_PER_HOUR } from "../Constants";
+import {
+  DIFFICULTIES,
+  GAME_TO_REAL_YEARS,
+  TICKS_PER_HOUR,
+  TICKS_PER_YEAR,
+} from "../Constants";
+import { getInflationIndex } from "../data/Economy";
 import { DEMAND_TYPES } from "../data/DemandProfiles";
 import cloneDeep from "lodash.clonedeep";
 import { createGame } from "../testing/Simulator";
@@ -24,6 +30,7 @@ import reducer, {
   buildTransmissionLine,
   buildFacility,
   generateForecastTimeline,
+  generateNewTimeline,
   sellFacility,
   togglePauseTransmissionLine,
   upgradeTransmissionLine,
@@ -345,24 +352,44 @@ it.each([1, 2] as const)(
   },
 );
 
-it("records each network renewal once at its effective month", () => {
+it.each([
+  { targetId: undefined, annualOM: 40e6 },
+  { targetId: "valley-electric" as const, annualOM: 85e6 },
+  { targetId: "ridge-electric" as const, annualOM: 55e6 },
+])(
+  "indexes $targetId network upkeep to inflation without dated jumps",
+  ({ targetId, annualOM }) => {
+    const game = targetId
+      ? buy(ready(targetId), targetId)
+      : createGame({ scenarioId: 116, difficulty: "Employee", seed: 12345 });
+    // Stay below the inherited cost floor so customer switching cannot change the bill.
+    const customers = currentTick(game)!.customers / 2;
+    // Isolate service-network upkeep from generator and connection operating costs.
+    game.facilities = [];
+    game.transmission!.lines = [];
+    for (const month of [119, 120, 179, 180]) {
+      game.date = getDateFromMinute(month * MINUTES_PER_MONTH, 2005);
+      const index = getInflationIndex(game.date, game.startingYear, game.seed);
+      expect(index).toBeGreaterThan(1);
+      const expected =
+        (annualOM * index * DIFFICULTIES[game.difficulty].expensesOM) /
+        TICKS_PER_YEAR;
+      const forecast = generateForecastTimeline(game, 1e10, customers, 2);
+      expect(forecast[1].expensesOM).toBeCloseTo(expected, 6);
+      game.timeline = generateNewTimeline(game, 1e10, customers, 2);
+      tickState(game);
+      expect(currentTick(game)!.expensesOM).toBeCloseTo(expected, 6);
+    }
+  },
+);
+
+it("does not announce ordinary network upkeep as a dated event", () => {
   const game = createGame({ scenarioId: 116, seed: 12345 });
   for (const month of [119, 120, 120, 121, 179, 180, 180]) {
     game.date = getDateFromMinute(month * MINUTES_PER_MONTH, 2005);
     recordExpansionMilestones(game);
   }
-  const renewals = game.eventLog.filter(
-    (event) => event.title === "Network upkeep increased",
-  );
-  expect(renewals).toHaveLength(2);
-  expect(renewals).toEqual(
-    expect.arrayContaining([
-      expect.objectContaining({
-        message: expect.stringContaining("1.5× opening upkeep"),
-      }),
-      expect.objectContaining({
-        message: expect.stringContaining("2× opening upkeep"),
-      }),
-    ]),
-  );
+  expect(
+    game.eventLog.some((event) => event.title === "Network upkeep increased"),
+  ).toBe(false);
 });
