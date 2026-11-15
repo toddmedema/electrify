@@ -46,11 +46,12 @@ export default function BuildPurchaseReviewDialog({
   facility: FacilityShoppingType;
 }) {
   const gameKey = purchase.open && game ? signature(game) : undefined;
-  // Keep the estimate steady while the live clock advances, and refresh on a planning change.
+  const runScope = game?.runIdentity ?? game?.location ?? game?.monthlyHistory;
+  // Keep ordinary ticks steady; planning changes and imported runs refresh the estimate.
   const snapshot = React.useMemo(
     () =>
       gameKey !== undefined && game ? forecastWorkerSnapshot(game) : undefined,
-    [gameKey], // eslint-disable-line react-hooks/exhaustive-deps
+    [gameKey, runScope], // eslint-disable-line react-hooks/exhaustive-deps
   );
   const state = useWorkerRequest(
     snapshot
