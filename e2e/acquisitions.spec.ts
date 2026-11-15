@@ -71,6 +71,8 @@ for (const theme of ["light", "dark"] as const) {
       "Online in",
       "Average output over a year",
       "Direct emissions",
+      "Lowest supply margin",
+      "Unserved energy",
     ]);
     await buildDialog
       .getByRole("button", { name: "close", exact: true })
