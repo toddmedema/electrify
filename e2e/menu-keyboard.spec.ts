@@ -61,6 +61,14 @@ test("interface scale persists and scales controls with text at every display he
     name: "Interface scale",
     exact: true,
   });
+  await expect(scale.getByRole("option")).toHaveText([
+    "100%",
+    "125%",
+    "150%",
+    "175%",
+    "200%",
+    "250%",
+  ]);
   const standardHeight = await scale.evaluate(
     (element) => element.getBoundingClientRect().height,
   );
@@ -238,7 +246,9 @@ test("screen-edge padding persists independently and reaches dialogs at every sc
       () => document.documentElement.scrollWidth - window.innerWidth,
     ),
   ).toBeLessThanOrEqual(1);
-  await page.getByRole("button", { name: "Clear cache", exact: true }).click();
+  await page
+    .getByRole("button", { name: /^\d{2}[a-z]{3,4}\d{2}-\d{4}$/ })
+    .click();
   const dialog = page.getByRole("dialog", {
     name: "Clear cache and reload?",
     exact: true,

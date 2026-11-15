@@ -92,10 +92,10 @@ export async function verifyMenuKeyboard(page: Page): Promise<void> {
   await expect(scale).toBeFocused();
   await expect(scale).toHaveValue("1");
   // Native typeahead works with both desktop popups and mobile pickers; Tab commits the choice.
-  await page.keyboard.type("112.5%");
+  await page.keyboard.type("125%");
   await page.keyboard.press("Tab");
-  await expect(scale).toHaveValue("1.125");
-  await expect(page.locator("html")).toHaveCSS("font-size", "18px");
+  await expect(scale).toHaveValue("1.25");
+  await expect(page.locator("html")).toHaveCSS("font-size", "20px");
   await page.keyboard.press("Shift+Tab");
   await expect(scale).toBeFocused();
   await page.keyboard.type("100%");

@@ -11,56 +11,116 @@ import {
 } from "../src/helpers/Transmission";
 
 for (const theme of ["light", "dark"] as const) {
-  test(`Across the Valley keeps unavailable geothermal at the bottom in ${theme}`, async ({
+  test(`biomass emissions use explicit mass units in ${theme}`, async ({
     page,
-  }) => {
+  }, info) => {
     await page.addInitScript((mode) => {
       localStorage.setItem("theme", mode);
+      localStorage.setItem("units", "metric");
       localStorage.setItem("audioEnabled", "false");
     }, theme);
-    await page.goto("/?scenario=116");
+    await page.goto("/?scenario=100");
     await page.getByRole("button", { name: "Start game", exact: true }).click();
     await openBuild(page);
-    await page.getByRole("tab", { name: "Generators", exact: true }).click();
-    const options = page.getByRole("list", { name: "Generator options" });
-    const geothermal = options.locator('[data-build-option="Geothermal"]');
-    await expect(geothermal).toContainText(
-      /No geothermal sites near .+ in this game\./,
+    await page.getByRole("slider").press("Home");
+    const card = page.locator(".buildOption").filter({
+      has: page.getByRole("button", {
+        name: "Review purchase of Biomass",
+        exact: true,
+      }),
+    });
+    await card.getByRole("button", { name: "Show Biomass details" }).click();
+    await expect(card.locator(".MuiCollapse-root")).toHaveClass(
+      /MuiCollapse-entered/,
     );
+    await reviewScreenshot(card.locator(".buildOptionDescription"), {
+      path: info.outputPath(`biomass-description-${theme}.png`),
+      animations: "disabled",
+    });
+    const emissions = card.getByRole("row", {
+      name: /Direct emissions.*1,180kg\/MWh/,
+    });
+    await emissions.scrollIntoViewIfNeeded();
+    await expect(emissions).toBeInViewport();
+    await reviewScreenshot(emissions, {
+      path: info.outputPath(`biomass-emissions-${theme}.png`),
+      animations: "disabled",
+    });
+    await card
+      .getByRole("button", { name: "Review purchase of Biomass" })
+      .click();
     await expect(
-      geothermal.getByRole("button", {
-        name: "Review purchase of Geothermal",
-        exact: true,
-      }),
-    ).toBeDisabled();
-    await expect(
-      geothermal.getByRole("button", {
-        name: "Compare Geothermal",
-        exact: true,
-      }),
-    ).toHaveCount(0);
-    for (const order of [
-      "Build cost",
-      "Build time",
-      "Cost per MWh",
-      "Emissions",
-    ]) {
-      await sortBuildCatalog(page, order);
-      await expect(
-        options.locator("[data-build-option]").nth(-2),
-      ).toHaveAttribute("data-build-option", /^(Hydro|Geothermal)$/);
-      await expect(
-        options.locator("[data-build-option]").last(),
-      ).toHaveAttribute("data-build-option", /^(Hydro|Geothermal)$/);
-    }
-    await geothermal.scrollIntoViewIfNeeded();
-    await expect(geothermal).toBeVisible();
-    expect(
-      await geothermal.evaluate(
-        (element) => element.scrollWidth - element.clientWidth,
-      ),
-    ).toBeLessThanOrEqual(1);
+      page.getByRole("region", { name: "Expected impact" }),
+    ).toContainText(/Direct emissions\s*1,180kg\/MWh/);
   });
+}
+
+for (const theme of ["light", "dark"] as const) {
+  for (const [scenarioId, place] of [
+    [103, "Pittsburgh"],
+    [108, "Madrid"],
+    [116, "Burlington"],
+  ] as const) {
+    test(`geothermal stays disabled without sites in ${place} in ${theme}`, async ({
+      page,
+    }) => {
+      await page.addInitScript((mode) => {
+        localStorage.setItem("theme", mode);
+        localStorage.setItem("audioEnabled", "false");
+      }, theme);
+      await page.goto(`/?scenario=${scenarioId}`);
+      await page
+        .getByRole("button", { name: "Start game", exact: true })
+        .click();
+      await openBuild(page);
+      await page.getByRole("tab", { name: "Generators", exact: true }).click();
+      const options = page.getByRole("list", { name: "Generator options" });
+      const geothermal = options.locator('[data-build-option="Geothermal"]');
+      await expect(geothermal).toContainText(
+        `No geothermal sites near ${place}.`,
+      );
+      await expect(
+        geothermal.getByRole("button", {
+          name: "Review purchase of Geothermal",
+          exact: true,
+        }),
+      ).toBeDisabled();
+      await expect(
+        geothermal.getByRole("button", {
+          name: "Compare Geothermal",
+          exact: true,
+        }),
+      ).toHaveCount(0);
+      for (const order of [
+        "Build cost",
+        "Build time",
+        "Cost per MWh",
+        "Emissions",
+      ]) {
+        await sortBuildCatalog(page, order);
+        const ordered = await options
+          .locator("[data-build-option]")
+          .evaluateAll((cards) =>
+            cards.map((card) => ({
+              name: card.getAttribute("data-build-option"),
+              detailed: !!card.querySelector(".buildOptionMetrics"),
+            })),
+          );
+        const index = ordered.findIndex((card) => card.name === "Geothermal");
+        expect(index).toBeGreaterThanOrEqual(0);
+        expect(ordered.slice(index).filter((card) => card.detailed)).toEqual(
+          [],
+        );
+      }
+      await geothermal.scrollIntoViewIfNeeded();
+      await expect(geothermal).toBeVisible();
+      expect(
+        await geothermal.evaluate(
+          (element) => element.scrollWidth - element.clientWidth,
+        ),
+      ).toBeLessThanOrEqual(1);
+    });
+  }
 
   for (const [category, name] of [
     ["Generators", "Solar"],
@@ -192,6 +252,7 @@ for (const theme of ["light", "dark"] as const) {
         });
         expect(gap).toBeCloseTo(8, 0);
       }
+      await expect(page.locator(".buildGridEvidence")).toHaveCount(0);
       const first = cards.first();
       await expect(first).toBeVisible();
       await expect(first).not.toContainText("Construction emissions");
@@ -481,6 +542,53 @@ for (const theme of ["light", "dark"] as const) {
       await expect(page.getByRole("dialog", { name: /^Build / })).toBeVisible();
       const dialog = page.getByRole("dialog", { name: /^Build / });
       await expectContinuousDialogSurface(dialog);
+      const facts = dialog.getByRole("region", {
+        name: "Expected impact",
+        exact: true,
+      });
+      for (const label of ["Lowest supply margin", "Unserved energy"]) {
+        const row = facts
+          .locator(".decisionImpactFact")
+          .filter({ hasText: label });
+        await expect(row.locator(".decisionImpactFactValue")).toContainText(
+          "→",
+        );
+        await expect(row.locator(".decisionImpactFactDetail")).toHaveText(
+          "1 year before vs after opening",
+        );
+      }
+      for (const row of await dialog
+        .getByRole("region", { name: "Expected impact", exact: true })
+        .locator(".decisionImpactFact")
+        .all()) {
+        await expect(row.locator(":scope > .conceptIcon")).toBeVisible();
+      }
+      const impact = dialog.locator(".buildImpact");
+      await expect(
+        dialog.locator("summary", { hasText: /^Impact$/ }),
+      ).toHaveCount(0);
+      await expect(impact.locator(".chartCaption")).toHaveText(
+        "Lowest supply margin",
+      );
+      await expect(
+        impact.getByRole("img", { name: /Estimated monthly supply margin/ }),
+      ).toBeVisible();
+      await expect(impact).toContainText("Before opening");
+      await expect(impact).toContainText("After opening");
+      await expect(impact).not.toContainText("Infinity");
+      if (
+        kind === "Generator" &&
+        ((theme === "light" && testInfo.project.name === "desktop-chromium") ||
+          (theme === "dark" && testInfo.project.name === "mobile-390px"))
+      ) {
+        await impact
+          .getByRole("img", { name: /Estimated monthly supply margin/ })
+          .scrollIntoViewIfNeeded();
+        await reviewScreenshot(dialog, {
+          path: testInfo.outputPath("build-grid-impact.png"),
+          animations: "disabled",
+        });
+      }
       const cashValue = dialog
         .locator(".decisionImpactFact")
         // Generators call it the cash option; storage still calls it a cash purchase

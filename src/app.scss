@@ -6402,9 +6402,6 @@ $homeSmokeCycle: 5.6s;
   gap: 12px;
   grid-template-columns: 20px minmax(0, 1fr);
 }
-.decisionImpactFactMoney .decisionImpactFactContent {
-  grid-column: 2;
-}
 .decisionImpactFactContent {
   display: grid;
   grid-template-columns: minmax(100px, 0.7fr) minmax(0, 1.3fr);
@@ -6508,6 +6505,9 @@ $homeSmokeCycle: 5.6s;
 }
 .MuiDialog-paper .noPadding > .decisionImpact {
   margin: 0;
+}
+.purchaseReviewContent > .decisionImpact {
+  padding-bottom: 0;
 }
 .buildOption .MuiCardHeader-title {
   font-size: var(--font-size-subtitle);
@@ -7076,6 +7076,22 @@ $programs_column: 800px;
   --chart-surface: var(--bg-raised);
 }
 
+// The refresh label shares the title's line without replacing any completed forecast content.
+.scenarioOutlookHeading {
+  display: flex;
+  align-items: center;
+  gap: $space-2;
+  white-space: nowrap;
+}
+
+.scenarioOutlookUpdating {
+  display: inline-flex;
+  align-items: center;
+  gap: $space-1;
+  color: $font_color_faded;
+  font-size: var(--font-size-caption);
+}
+
 .scenarioOutlookFigures {
   display: flex;
   flex-wrap: wrap;
@@ -7547,7 +7563,7 @@ img[src$="/transmission.svg"] {
   .scenarioOutlook > [aria-label="Scenario forecast"] {
     order: -1;
   }
-  .scenarioOutlook > h3 {
+  .scenarioOutlook > .scenarioOutlookHeading {
     order: -2;
   }
 }

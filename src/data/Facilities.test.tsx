@@ -314,8 +314,25 @@ describe("location-aware facilities", () => {
     expect(storage).not.toContain("Pumped Hydro");
   });
 
-  it("retains conventional geothermal as an unavailable catalog entry without local sites", () => {
-    expect(generatorAt(2005, "Geothermal", 100000000)).toMatchObject({
+  it.each([
+    france,
+    LOCATIONS.PIT,
+    { ...LOCATIONS.SF, resources: { geothermal: false } },
+    {
+      id: "CustomNoHeat",
+      name: "Custom location",
+      lat: 40,
+      long: -3,
+      region: "Europe",
+    },
+  ])("retains unavailable geothermal at $name", (location) => {
+    const geothermal = GENERATORS(
+      stateAt(location, 2005),
+      100000000,
+      [],
+      [],
+    ).find((generator) => generator.name === "Geothermal");
+    expect(geothermal).toMatchObject({
       available: false,
       viableLocationsRemaining: 0,
     });

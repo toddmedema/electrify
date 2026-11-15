@@ -2774,6 +2774,67 @@ export function previewUtilityAcquisition(
   };
 }
 
+/** Forecast the year on either side of the selected project's actual commissioning tick. */
+export function previewFacilityBuild(
+  game: GameType,
+  facility: FacilityShoppingType,
+): {
+  commissionedMinute: number;
+  before: TickPresentFutureType[];
+  after: TickPresentFutureType[];
+} {
+  const snapshot = cloneDeep(isDraft(game) ? current(game) : game);
+  const now = getTimeFromTimeline(snapshot.date.minute, snapshot.timeline);
+  if (!now) throw new Error("No current simulation tick");
+  const cash = now.cash;
+  const customers = now.customers;
+  const existingIds = new Set(snapshot.facilities.map(({ id }) => id));
+  const hydroSite = isConventionalHydro(facility)
+    ? getHydroAvailability(snapshot, facility.peakW).selected
+    : undefined;
+  buildFacilityHelper(
+    snapshot,
+    { ...facility, ...(hydroSite ? { hydroSiteId: hydroSite.id } : {}) },
+    false,
+  );
+  const added = snapshot.facilities.find(({ id }) => !existingIds.has(id));
+  if (!added) throw new Error("No facility added to the forecast");
+  const year = TICKS_PER_YEAR * TICK_MINUTES;
+  const step = 60;
+  let commissionedMinute: number | undefined;
+  // The extra two samples cover rounding at commissioning and the end of its first year.
+  const ticks =
+    Math.ceil((facility.yearsToBuild * year) / step) + year / step + 2;
+  const timeline = generateForecastTimeline(
+    snapshot,
+    cash,
+    customers,
+    ticks,
+    step,
+    (state, tick) => {
+      if (
+        commissionedMinute === undefined &&
+        state.facilities.find(({ id }) => id === added.id)?.yearsToBuildLeft ===
+          0
+      ) {
+        commissionedMinute = tick.minute;
+      }
+    },
+  );
+  if (commissionedMinute === undefined)
+    throw new Error("Project did not commission");
+  const opening = commissionedMinute;
+  return {
+    commissionedMinute: opening,
+    before: timeline.filter(
+      (tick) => tick.minute >= opening - year && tick.minute < opening,
+    ),
+    after: timeline.filter(
+      (tick) => tick.minute >= opening && tick.minute < opening + year,
+    ),
+  };
+}
+
 function refreshInterestRate(
   state: GameType,
   cash: number,

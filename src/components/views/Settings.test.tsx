@@ -228,6 +228,8 @@ describe("Settings", () => {
     expect(screen.queryByRole("region", { name: "Mods" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Quit" })).toBeNull();
     expect(window.electrifyDesktop.mods).not.toHaveBeenCalled();
+    expect(screen.getByText("26sept26-1507")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "26sept26-1507" })).toBeNull();
   });
 
   it("changes appearance and units with direct choices", () => {
@@ -251,6 +253,11 @@ describe("Settings", () => {
     renderSettings({ onInterfaceScaleChange });
     const scale = screen.getByRole("combobox", { name: "Interface scale" });
     expect(scale).toHaveValue("1");
+    expect(
+      within(scale)
+        .getAllByRole("option")
+        .map((option) => option.textContent),
+    ).toEqual(["100%", "125%", "150%", "175%", "200%", "250%"]);
     await userEvent.selectOptions(scale, "1.5");
     await userEvent.selectOptions(scale, "2.5");
     expect(onInterfaceScaleChange.mock.calls).toEqual([[1.5], [2.5]]);
@@ -409,16 +416,17 @@ describe("Settings", () => {
     expect(screen.getByText("Choose a name")).toBeInTheDocument();
   });
 
-  it("offers a subtle cache reset at the bottom", async () => {
+  it("uses the version button for a confirmed cache reset", async () => {
     renderSettings();
 
     expect(screen.getByText("26sept26-1507")).toBeInTheDocument();
-    const button = screen.getByText("Clear cache", { selector: "button" });
+    const button = screen.getByRole("button", { name: "26sept26-1507" });
     expect(
       within(screen.getByRole("contentinfo")).getByRole("button", {
-        name: "Clear cache",
+        name: "26sept26-1507",
       }),
     ).toBe(button);
+    expect(screen.queryByRole("button", { name: "Clear cache" })).toBeNull();
     await userEvent.click(button);
 
     expect(mockedClearAppCache).not.toHaveBeenCalled();
@@ -438,7 +446,7 @@ describe("Settings", () => {
   it("does not clear the cache when the confirmation is cancelled", async () => {
     renderSettings();
     const footer = within(screen.getByRole("contentinfo"));
-    fireEvent.click(footer.getByRole("button", { name: "Clear cache" }));
+    fireEvent.click(footer.getByRole("button", { name: "26sept26-1507" }));
     const dialog = await screen.findByRole("dialog", {
       name: "Clear cache and reload?",
     });
@@ -457,7 +465,7 @@ describe("Settings", () => {
     try {
       renderSettings();
       await userEvent.click(
-        screen.getByRole("button", { name: "Clear cache" }),
+        screen.getByRole("button", { name: "26sept26-1507" }),
       );
       const dialog = await screen.findByRole("dialog", {
         name: "Clear cache and reload?",

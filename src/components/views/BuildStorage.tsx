@@ -36,15 +36,13 @@ import {
   sliderTickToW,
   wToSliderTick,
 } from "../../helpers/BuildSizing";
-import {
-  LivePurchaseReviewDialog as PurchaseReviewDialog,
-  BuildCashWarning,
-} from "../base/PurchaseReviewDialog";
+import { BuildCashWarning } from "../base/PurchaseReviewDialog";
 import {
   getBuildAvailability,
   getSiteInventory,
   siteCountLabel,
 } from "../base/BuildAvailability";
+import BuildPurchaseReviewDialog from "../base/BuildPurchaseReviewDialog";
 import BuildMetric from "../base/BuildMetric";
 import {
   formatLargeMassValueConcise,
@@ -69,6 +67,7 @@ function storageBuildSummary(storage: StorageShoppingType): string {
 }
 
 interface StorageBuildItemProps {
+  game: GameType;
   cash: number;
   interestRate: number;
   location?: LocationType;
@@ -250,7 +249,9 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
         </BuildDetails>
       }
     >
-      <PurchaseReviewDialog
+      <BuildPurchaseReviewDialog
+        game={props.game}
+        facility={storage}
         open={open}
         onClose={() => setOpen(false)}
         title={`Build ${formatWattHours(storage.peakWh)} ${displayName}?`}
@@ -407,6 +408,7 @@ function StorageBuildDialog(props: Props): React.JSX.Element {
       <List ref={listRef} dense className="scrollable cardList">
         {storage.map((g: StorageShoppingType) => (
           <StorageBuildItem
+            game={game}
             storage={g}
             territoryId={territoryNetwork ? territoryId : undefined}
             territoryAvailability={

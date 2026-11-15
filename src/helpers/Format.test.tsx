@@ -41,6 +41,13 @@ describe("formatCount", () => {
     expect(formatCount(7)).toBe("7");
   });
 
+  it("can keep explicit units while preserving whole-number and significant-digit rounding", () => {
+    expect(formatCount(1180, 3, "standard")).toBe("1,180");
+    expect(formatCount(12349.6, 3, "standard")).toBe("12,300");
+    expect(formatCount(-1005, 3, "standard")).toBe("-1,000");
+    expect(formatCount(7.5, 3, "standard")).toBe("8");
+  });
+
   it.each<[number, string]>([
     [12349.6, "12.3k"],
     [-12349.6, "-12.3k"],

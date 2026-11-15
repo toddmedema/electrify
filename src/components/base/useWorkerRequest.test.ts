@@ -87,7 +87,7 @@ it("falls back to the page when the worker fails, and handles the error event", 
 it("reports a startup failure without a fallback", () => {
   const { result } = renderHook(() =>
     useWorkerRequest(
-      job("a", { fallback: () => 3 }),
+      job("a"),
       options(() => {
         throw new Error("blocked");
       }),
@@ -95,6 +95,72 @@ it("reports a startup failure without a fallback", () => {
   );
   act(() => jest.advanceTimersByTime(100));
   expect(result.current).toEqual({ status: "error", reason: "startup" });
+});
+
+it("uses the fallback when worker startup fails", () => {
+  const fallback = jest.fn(() => 3);
+  const { result } = renderHook(() =>
+    useWorkerRequest(
+      job("a", { fallback }),
+      options(() => {
+        throw new Error("blocked");
+      }),
+    ),
+  );
+  act(() => jest.advanceTimersByTime(100));
+  expect(fallback).toHaveBeenCalledTimes(1);
+  expect(result.current).toEqual({ status: "ready", result: 3 });
+});
+
+it("reports a failed fallback after a startup error", () => {
+  const { result } = renderHook(() =>
+    useWorkerRequest(
+      job("a", {
+        fallback: () => {
+          throw new Error("forecast failed");
+        },
+      }),
+      options(() => {
+        throw new Error("blocked");
+      }),
+    ),
+  );
+  act(() => jest.advanceTimersByTime(100));
+  expect(result.current).toEqual({ status: "error", reason: "failed" });
+});
+
+it("retires a worker when posting fails and uses the supplied fallback", () => {
+  const worker = stubWorker();
+  worker.postMessage.mockImplementation(() => {
+    throw new Error("could not clone request");
+  });
+  const { result } = renderHook(() =>
+    useWorkerRequest(
+      job("a", { fallback: () => 3 }),
+      options(() => worker, true),
+    ),
+  );
+  act(() => jest.advanceTimersByTime(100));
+  expect(worker.terminate).toHaveBeenCalledTimes(1);
+  expect(worker.onmessage).toBeNull();
+  expect(worker.onerror).toBeNull();
+  expect(result.current).toEqual({ status: "ready", result: 3 });
+});
+
+it("does not compute a fallback for a cancelled request", () => {
+  const worker = stubWorker();
+  const fallback = jest.fn(() => 3);
+  const { unmount } = renderHook(() =>
+    useWorkerRequest(
+      job("a", { fallback }),
+      options(() => worker),
+    ),
+  );
+  act(() => jest.advanceTimersByTime(100));
+  const onerror = worker.onerror!;
+  unmount();
+  act(() => onerror({ preventDefault: jest.fn() } as unknown as ErrorEvent));
+  expect(fallback).not.toHaveBeenCalled();
 });
 
 it("terminates a per-request worker when the request changes", () => {

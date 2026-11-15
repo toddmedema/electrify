@@ -105,24 +105,27 @@ it("migrates a legacy couch setup into independent preferences without runtime T
   expect(initialSettings).not.toHaveProperty("tvScale");
 });
 
-it("restores explicit scale independently of old preferences and persists changes", () => {
-  localStorage.setItem("interfaceScale", "1.75");
-  localStorage.setItem("textSize", "larger");
-  localStorage.setItem("tvMode", "true");
-  const { default: reducer, initialSettings, change } = settings();
-  expect(initialSettings.interfaceScale).toBe(1.75);
-  const large = reducer(initialSettings, change({ interfaceScale: 2.25 }));
-  expect(large.interfaceScale).toBe(2.25);
-  expect(settings().initialSettings.interfaceScale).toBe(2.25);
-  const invalid = reducer(
-    large,
-    change({ interfaceScale: "300%" } as unknown as Parameters<
-      typeof change
-    >[0]),
-  );
-  expect(invalid.interfaceScale).toBe(1);
-  expect(localStorage.getItem("interfaceScale")).toBe("1");
-});
+it.each([2, 2.25])(
+  "restores explicit scale independently of old preferences and persists changes to %p",
+  (scale) => {
+    localStorage.setItem("interfaceScale", "1.75");
+    localStorage.setItem("textSize", "larger");
+    localStorage.setItem("tvMode", "true");
+    const { default: reducer, initialSettings, change } = settings();
+    expect(initialSettings.interfaceScale).toBe(1.75);
+    const large = reducer(initialSettings, change({ interfaceScale: scale }));
+    expect(large.interfaceScale).toBe(scale);
+    expect(settings().initialSettings.interfaceScale).toBe(scale);
+    const invalid = reducer(
+      large,
+      change({ interfaceScale: "300%" } as unknown as Parameters<
+        typeof change
+      >[0]),
+    );
+    expect(invalid.interfaceScale).toBe(1);
+    expect(localStorage.getItem("interfaceScale")).toBe("1");
+  },
+);
 
 it.each([
   "",

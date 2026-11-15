@@ -23,7 +23,7 @@ import * as ExpectedOutput from "../../helpers/ExpectedOutput";
 import * as GameReducer from "../../reducers/Game";
 import * as Facilities from "../../data/Facilities";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "../../helpers/DateTime";
-import { SCENARIOS } from "../../data/Scenarios";
+import { DEFAULT_CUSTOM_SCENARIO, SCENARIOS } from "../../data/Scenarios";
 import { formatMoneyConcise } from "../../helpers/Format";
 import {
   resilienceBuildOptions,
@@ -611,11 +611,12 @@ it.each([
   ["Solar", /Direct emissions\s*None/],
   ["Wind", /Direct emissions\s*None/],
   ["Natural Gas Peaker", /Direct emissions\s*[\d.,]+\s*\w+\/MWh/],
+  ["Biomass", /Direct emissions\s*1,180kg\/MWh/],
 ])(
   "reports %s direct emissions as a rate, or None when it burns nothing",
   (name, emissions) => {
     const game = createGame({ scenarioId: 111, difficulty: "CEO" });
-    const generator = GENERATORS(game, 100e6, [], []).find(
+    const generator = GENERATORS(game, 50e6, [], []).find(
       (candidate) => candidate.name === name,
     )!;
     render(
@@ -1194,10 +1195,24 @@ it("quotes a Hydro site maximum and updates the shared slider", () => {
   );
 });
 
-it.each(["no local sites", "exhausted sites"])(
+it.each([103, 108, 110, 113, 115, 116, "custom", "exhausted sites"] as const)(
   "keeps geothermal disabled at the bottom with an explanation for %s",
   (inventory) => {
-    const game = createGame({ scenarioId: 116 });
+    const game =
+      inventory === "custom"
+        ? createGame({
+            scenarioId: DEFAULT_CUSTOM_SCENARIO.id,
+            scenario: {
+              ...DEFAULT_CUSTOM_SCENARIO,
+              location: {
+                ...LOCATIONS.SF,
+                resources: { geothermal: false },
+              },
+            },
+          })
+        : createGame({
+            scenarioId: typeof inventory === "number" ? inventory : 103,
+          });
     if (inventory === "exhausted sites") {
       game.location = {
         ...game.location,
@@ -1231,10 +1246,11 @@ it.each(["no local sites", "exhausted sites"])(
       }),
     )!;
     expect(card).toHaveTextContent(
-      inventory === "no local sites"
-        ? /No geothermal sites near/
-        : /used all 4 sites/,
+      inventory === "exhausted sites"
+        ? /used all 4 sites/
+        : /No geothermal sites near/,
     );
+    expect(card).not.toHaveTextContent("in this game");
     expect(
       within(card).queryByRole("button", {
         name: "Compare Geothermal",
@@ -1245,6 +1261,12 @@ it.each(["no local sites", "exhausted sites"])(
         name: "Show Geothermal details",
       }),
     ).not.toBeInTheDocument();
+    const unavailable = [review];
+    if (getHydroAvailability(game, 1000000).remaining.length === 0) {
+      unavailable.push(
+        screen.getByRole("button", { name: "Review purchase of Hydro" }),
+      );
+    }
     for (const order of [
       "Build cost",
       "Build time",
@@ -1258,17 +1280,33 @@ it.each(["no local sites", "exhausted sites"])(
       const reviews = screen.getAllByRole("button", {
         name: /^Review purchase of/,
       });
-      expect(reviews.slice(-2)).toEqual(
-        expect.arrayContaining([
-          review,
-          screen.getByRole("button", {
-            name: "Review purchase of Hydro",
-          }),
-        ]),
+      expect(reviews.slice(-unavailable.length)).toEqual(
+        expect.arrayContaining(unavailable),
       );
     }
   },
 );
+
+it("keeps geothermal build controls available where the resource exists", () => {
+  const game = createGame({ scenarioId: 100 });
+  game.timeline = game.timeline.map((tick) => ({ ...tick, cash: 1e12 }));
+  render(
+    <BuildGenerators
+      game={game}
+      onBack={jest.fn()}
+      onBuildGenerator={jest.fn()}
+    />,
+  );
+  expect(
+    screen.getByRole("button", { name: "Review purchase of Geothermal" }),
+  ).toBeEnabled();
+  expect(
+    screen.getByRole("button", { name: "Show Geothermal details" }),
+  ).toBeVisible();
+  expect(
+    screen.getByRole("button", { name: "Compare Geothermal" }),
+  ).toBeVisible();
+});
 
 it("updates fit counts and distinguishes exhausted and unavailable Hydro inventories", () => {
   const game = createGame({ scenarioId: 103 });

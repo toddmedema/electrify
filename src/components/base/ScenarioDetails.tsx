@@ -1,7 +1,12 @@
 import { currencyForLocation } from "../../helpers/Currency";
 import { activeScenario, currentTick } from "../../helpers/GameSelectors";
 import * as React from "react";
-import { Box, Typography, useMediaQuery } from "@mui/material";
+import {
+  Box,
+  CircularProgress,
+  Typography,
+  useMediaQuery,
+} from "@mui/material";
 import { GameType, ScenarioType, ScoreCategoryType } from "../../Types";
 import { DIFFICULTY_LABELS, MONTHS } from "../../Constants";
 import { getScenarioLocation } from "../../helpers/Locations";
@@ -68,17 +73,20 @@ function useScenarioForecast(game: GameType): ProjectionView | undefined {
  * holds: one solid line for the record, one fainter dashed one for the projection, meeting at
  * today.
  */
-function ScoreOutlook({
-  projection,
-  history,
-  game,
-  outlook,
-}: {
+function ScoreOutlook(props: {
   projection: ScoreProjectionType | null;
   history: GameType["monthlyHistory"];
   game: GameType;
   outlook: MissionProjection | undefined;
+  updating: boolean;
 }): React.JSX.Element {
+  // Keep the completed chart, figures and outcome together while the worker refreshes them.
+  const completed = React.useRef<typeof props>();
+  React.useEffect(() => {
+    if (!props.updating) completed.current = props;
+  }, [props]);
+  const { projection, history, game, outlook } =
+    props.updating && completed.current ? completed.current : props;
   const offset = legacyMonthOffset(game);
   const timeline = React.useMemo(() => {
     if (!projection)
@@ -137,14 +145,31 @@ function ScoreOutlook({
       aria-labelledby="scenario-outlook-title"
       className="scenarioOutlook"
     >
-      <Typography
-        id="scenario-outlook-title"
-        variant="subtitle1"
-        component="h3"
-        sx={{ fontWeight: 600 }}
-      >
-        Score outlook
-      </Typography>
+      <Box className="scenarioOutlookHeading">
+        <Typography
+          id="scenario-outlook-title"
+          variant="subtitle1"
+          component="h3"
+          sx={{ fontWeight: 600 }}
+        >
+          Score outlook
+        </Typography>
+        {props.updating && (
+          <Box
+            component="span"
+            role="status"
+            aria-label="Updating score outlook"
+            className="scenarioOutlookUpdating"
+          >
+            Updating...
+            <CircularProgress
+              size="0.75rem"
+              color="inherit"
+              aria-hidden="true"
+            />
+          </Box>
+        )}
+      </Box>
       <Box component="dl" className="scenarioOutlookFigures">
         <div>
           <dt>{ended ? "Final score" : "Score now"}</dt>
@@ -189,7 +214,7 @@ function ScoreOutlook({
         warningSpans={warningSpans}
         warningNote="Projected loss"
       />
-      {!ended && (
+      {!ended && outlook && (
         <Typography
           component="div"
           variant="body2"
@@ -355,6 +380,10 @@ export function ScenarioDetailsContent({
         {scenario.name}
       </Typography>
       <ScoreOutlook
+        key={`${game.seed}:${scenario.id}:${game.startingYear}:${offset}`}
+        updating={
+          !forecast && legacyCompletedMonths(game) < scenario.durationMonths
+        }
         projection={projection}
         history={history}
         game={game}

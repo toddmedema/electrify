@@ -30,12 +30,10 @@ export default function DecisionImpactPreview({
       <div className="decisionImpactFacts">
         {facts.map((fact) => (
           <div
-            className={`decisionImpactFact${fact.entry ? " manual-help-region" : ""}${fact.concept === "money" ? " decisionImpactFactMoney" : ""}`}
+            className={`decisionImpactFact${fact.entry ? " manual-help-region" : ""}`}
             key={fact.label}
           >
-            {fact.concept !== "money" && (
-              <ConceptIcon concept={fact.concept} fontSize="small" />
-            )}
+            <ConceptIcon concept={fact.concept} fontSize="small" />
             <div className="decisionImpactFactContent">
               <Typography
                 className="decisionImpactFactLabel"

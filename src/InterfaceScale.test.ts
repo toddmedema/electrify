@@ -40,8 +40,8 @@ it("shares one explicit multiplier between the root UI and chart subscriptions",
     expect(changed).toHaveBeenCalledTimes(1);
     applyInterfaceScale(2.5);
     expect(changed).toHaveBeenCalledTimes(1);
-    applyInterfaceScale(1.125);
-    expect(document.documentElement.style.fontSize).toBe("112.5%");
+    applyInterfaceScale(1.25);
+    expect(document.documentElement.style.fontSize).toBe("125%");
     expect([window.innerWidth, window.innerHeight]).toEqual(viewport);
   } finally {
     stop();

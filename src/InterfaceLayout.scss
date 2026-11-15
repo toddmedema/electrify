@@ -474,13 +474,10 @@ html[data-interface-scale]:not([data-interface-scale="1"])
   }
 }
 
-.buildGridEvidence {
-  flex: 0 0 auto;
-  min-width: 0;
-  padding: 0.5rem 1rem;
-  border-bottom: 1px solid var(--border-subtle);
+.buildImpact {
+  padding: 12px 16px;
   summary {
-    min-height: 2.75rem;
+    min-height: 44px;
     display: flex;
     align-items: center;
     cursor: pointer;
