@@ -67,14 +67,14 @@ export default function UtilityContractSchedule({
                 {source.name}: signed replacement covers{" "}
                 {formatWatts(source.nominalW * source.deliverability)},{" "}
                 {agreementDate(source.startMinute)}–
-                {agreementDate(source.endMinute, true)}. Delivery shares the
-                inherited regional connection.
+                {agreementDate(source.endMinute, true)}. Delivery feeds your
+                company power pool.
               </Typography>
             )),
         )}
       <Typography variant="body2" color="textSecondary" sx={{ mb: 1 }}>
-        Inherited regional connections remain available for market purchases
-        after agreement coverage changes.
+        Inherited agreements keep their original expiry dates. Review
+        replacement supplies before coverage ends.
       </Typography>
       <Typography component="h4" variant="subtitle2" sx={{ mt: 2 }}>
         Network upkeep

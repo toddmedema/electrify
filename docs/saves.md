@@ -55,12 +55,18 @@ that peers with different simulation or message formats can play together.
 
 See [cloud saves](cloud-saves.md) for synchronization and immutable shared snapshots.
 
-Schema 13 enables the territory network for Across the Valley (scenario 116 and
-mods based on it). Inherited facility provenance assigns Champlain, Valley Electric
-or Ridge Electric; existing player projects stay in Champlain. Cash, recorded
-history, debt, construction progress, acquisitions, accepted power agreements and
-their meters remain unchanged. Existing projects retain their size and site
-reservations, including projects larger than today's site limit. Territory limits
-apply when ordering future projects. Historical ticks need no territory summary;
-new summaries are validated as finite physical balances. A current-format save
-must carry the network version and valid, owned facility destinations.
+Schema 13 located Across the Valley facilities by provenance. Schema 14 replaces
+its physical routing with a company pool and a dated cash land receipt. Existing
+paid land projects grant rights immediately; their original invested capital,
+construction/upgrade progress, debts and financing terms remain in a frozen legacy
+ledger. No refund or new fee is booked. Historical readings, PPAs, acquisitions,
+facilities and oversized existing projects remain. Loan payments continue, while
+wire construction, upkeep and congestion cease. Land value is counted once.
+Current saves validate owned locations, canonical land prices and bounded legacy
+investments; version 1 physical markers cannot enter the current runtime.
+
+The recognized prior schema 13 co-op identity has the same ordered transition.
+It preserves the run's original scoring provenance. Existing company-local land
+rights are retained, including old duplicate ownership; new claims are exclusive
+and checked in host command order. Other incompatible co-op identities retain
+their existing rejection behavior. See [territories](territories.md).

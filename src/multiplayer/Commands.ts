@@ -1,10 +1,10 @@
 import { validPowerAgreementAction } from "../helpers/PowerAgreements";
 import { isBuyingRule, isSellingRule } from "../helpers/TradingRules";
-import { isUtilityExpansionGame } from "../helpers/ExpansionContext";
 import { acquisitionQuote, validAcquisitionAction } from "../helpers/Expansion";
-import { UTILITY_TARGETS } from "../data/UtilityExpansion";
-import { GREEN_UPLANDS_CORRIDOR_ID, isTerritoryId } from "../data/Territories";
+import { isTerritoryId } from "../data/Territories";
 import {
+  validLandPurchaseAction,
+  landPurchaseQuote,
   hasTerritoryNetwork,
   territoryBuildAvailability,
 } from "../helpers/Territories";
@@ -33,6 +33,7 @@ const facility: Validator = (game, payload) =>
     : { error: "Plant not found" };
 
 const line: Validator = (game, payload) =>
+  !hasTerritoryNetwork(game) &&
   Number.isSafeInteger(payload) &&
   game.transmission?.lines.some((l) => l.id === payload)
     ? { payload }
@@ -56,14 +57,10 @@ const dispatchPosition =
 /** Co-op players can only build or upgrade their links to each other. */
 const peerLine: Validator = (game, payload) => {
   const target = payload as { corridorId?: string; financed?: boolean };
-  return !target ||
-    !(
-      game.multiplayer?.peers?.some(
-        (p) => p.corridor.id === target.corridorId,
-      ) ||
-      (isUtilityExpansionGame(game) &&
-        (UTILITY_TARGETS.some((t) => t.corridorId === target.corridorId) ||
-          target.corridorId === GREEN_UPLANDS_CORRIDOR_ID))
+  return hasTerritoryNetwork(game) ||
+    !target ||
+    !game.multiplayer?.peers?.some(
+      (p) => p.corridor.id === target.corridorId,
     ) ||
     typeof target.financed !== "boolean"
     ? { error: "Choose another player's intertie" }
@@ -73,7 +70,8 @@ const peerLine: Validator = (game, payload) => {
 /** Existing outside assets belong to one company; shared links still require both owners. */
 const upgradeLine: Validator = (game, payload) => {
   const target = payload as { corridorId?: string; financed?: boolean } | null;
-  return target &&
+  return !hasTerritoryNetwork(game) &&
+    target &&
     typeof target.financed === "boolean" &&
     game.transmission?.lines.some(
       (line) => line.corridorId === target.corridorId,
@@ -155,6 +153,11 @@ const buildFacility: Validator = (game, payload) => {
 
 /** The co-op allowlist: every game action a player may send, with its payload check. */
 const GAME_COMMAND_VALIDATORS = {
+  acquireLand: (game, payload) =>
+    validLandPurchaseAction(game, payload) &&
+    (currentTick(game)?.cash ?? -1) >= landPurchaseQuote(game)!.price
+      ? { payload }
+      : { error: "This land purchase is unavailable or unaffordable" },
   acceptPowerAgreement: (game, payload) =>
     validPowerAgreementAction(game, payload)
       ? { payload }

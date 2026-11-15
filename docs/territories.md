@@ -1,50 +1,52 @@
 # Across the Valley territories
 
-Scenario 116 and mods based on it use a small radial network centered on Champlain.
-Territories own their facilities, storage and customers. Local supply serves local
-demand first; only a net surplus or deficit crosses an internal connection. This
-is a bounded transport model, with shared regional weather, rather than an AC
-power-flow or geographic model.
+Scenario 116 and mods based on it share one company power pool. Facilities and
+storage serve every owned customer's demand automatically. Territory location
+controls suitable finite sites and inherited customer sectors. It never limits
+power transfers, requires a connection purchase, or adds a parallel connection fee.
+The four territories and 19 map hexes are schematic; individual hexes have no
+simulation or build slots. Weather remains the existing shared regional model.
 
-Champlain is the home territory. Valley Electric and Ridge Electric require a
-completed connection and an acquisition. Their existing plants, customers, debt
-and dated supply contracts transfer together. The inherited regional interfaces
-remain separate from the internal connections: Valley's 350 MW regional interface
-does not widen the 100 MW Champlain–Valley connection. Power agreements purchase
-energy rights through their delivery interface; a wire upgrade adds physical
-headroom without creating a supply contract.
+Valley Electric and Ridge Electric can each be inspected and acquired directly.
+Their plants, customers, sites, corporate debt and dated third-party obligations
+transfer together. A purchase agreement with the acquired seller ends as an
+external supply/charge; its owned fleet replaces that promise. Buying an inefficient
+fleet can increase operating costs. Acquiring it does not improve its plants.
 
-Green Uplands has no customers or inherited fleet. Its 120 MW connection costs
-$48 million in 2005 dollars, takes two years and adds $960,000 annual operating
-costs before inflation. Completion grants development access to wind, solar and
-storage sites. This line never provides a regional-market supply source.
+Neighbor agreements use the existing supplier availability, market pricing and
+monthly minimum accounting. Each has a finite quantity and duration. Neighbor
+blocks cannot overlap or queue before the active term expires. Supplier limits,
+weather, expiry and minimum bills remain; no line is built or upgraded to sign.
+Inherited third-party contracts retain their own dates and replacement windows.
 
-## Building sites
+Green Uplands is an immediate cash land purchase: $18 million in 2005 dollars,
+indexed by the existing seeded CPI. This is 15% of the $120 million opening cash.
+It supplies four wind and three solar/storage sites, with no customers, plants,
+energy, construction clock or recurring land upkeep. The dated receipt records
+its price. Land remains a non-depreciating capital asset, so exchanging cash for
+land preserves net worth while reducing cash available for facilities.
 
-The catalogue in `src/data/Territories.ts` owns finite project budgets. Thermal
-plants use industrial sites, wind technologies use wind sites, and solar and utility
-storage use open-land sites. Industrial projects are capped at 300 MW per site;
-wind and open-land projects are capped at 150 MW per site. Storage caps apply to
-power, with energy duration governed by the existing technology quote. Inherited
-hydro keeps its named site provenance and does not consume an ordinary site; no
-new hydro sites are available.
+Thermal projects use industrial sites; wind technologies use wind sites; solar
+and storage use open-land sites. Industrial projects are capped at 300 MW per
+site and wind/open-land projects at 150 MW. Storage uses its power rating for the
+site limit and the existing technology quote for energy duration. Paused and
+unfinished facilities reserve sites; selling an ordinary project frees one.
+Inherited hydro retains named provenance; there are no new hydro sites.
 
-Paused and unfinished projects reserve their sites. Selling an ordinary project
-frees its reservation. A completed, enabled internal connection and ownership are
-required when ordering a remote project. Pausing a line retains ownership and the
-fleet. Its current capacity becomes zero, while local facilities can still serve
-local customers. Construction and upgrades use the existing debt, time, emissions
-and weather-rating machinery.
+Schema 14 converts schema 13 physical projects into frozen legacy capital records.
+Every paid Green Uplands project grants immediate land rights, including paused,
+unfinished or upgraded projects. The original investment, construction progress,
+financing schedule and outstanding debt remain recorded. Cash, acquired assets,
+locations, agreements and historical readings are retained. No refund or extra
+fee is booked; no future wire construction, upkeep or congestion runs. Land is
+counted once rather than in both its receipt and legacy project. Original loan
+payments continue to move cash into equity. Existing oversized facility projects
+remain; future purchases use the current site limits.
 
-Company-wide policies and the evolving customer count keep their current model.
-The actual net demand of each sector is apportioned using the owned utilities'
-authored customer counts, demand scales and sector weights; the territory totals
-sum to the company demand. Green Uplands adds no demand. Tick summaries show local
-served load, generation, storage charging and discharging, external imports and
-exports, shortages and curtailment. Internal line readings are positive toward
-Champlain and negative toward the neighboring territory.
-
-Schema 13 locates old facilities by asset provenance and assigns old player projects
-to Champlain without rewriting history or finances. Existing projects remain in
-place even if they exceed a current limit; future orders use remaining sites and
-the new limits. See [save formats](saves.md).
+In co-op, the host serializes new land purchases: the first valid accepted claim
+owns it, and another company keeps its cash and cannot build there. Room views
+and restored worlds derive ownership from company receipts. The recognized prior
+schema 13 rules identity has an ordered migration; existing duplicate land rights
+are grandfathered because those maps were company-local. All newly purchased land
+is exclusive. Utility acquisitions remain separate company choices. Automatic peer
+market quantities remain bounded, without player wire controls or new wire fees.

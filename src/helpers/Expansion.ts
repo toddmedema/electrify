@@ -2,9 +2,10 @@ import {
   connectionAgreements,
   compareAgreementDispatchPriority,
   agreementRate,
-  inheritedConnection,
   INHERITED_CONNECTIONS,
   utilityOwnedAt,
+  inheritedConnection,
+  agreementCorridorId,
 } from "./PowerAgreements";
 import {
   allocateIntertieFlows,
@@ -306,17 +307,11 @@ export function utilityOffer(
     ),
   };
 }
-/** Only a completed connection can turn public terms into an executable quote. */
+/** A dated seller snapshot becomes an executable quote without a connection prerequisite. */
 export function acquisitionQuote(
   game: GameType,
   targetId: string,
 ): AcquisitionQuote | undefined {
-  const target = UTILITY_TARGETS.find((entry) => entry.id === targetId);
-  const line = game.transmission?.lines.find(
-    (entry) =>
-      entry.corridorId === target?.corridorId && entry.yearsToBuildLeft <= 0,
-  );
-  if (!line) return undefined;
   const offer = utilityOffer(game, targetId);
   if (!offer) return undefined;
   return {
@@ -324,7 +319,6 @@ export function acquisitionQuote(
     quoteKey: JSON.stringify([
       offer.targetId,
       game.date.minute,
-      line.id,
       game.interestRate,
       offer.equityPrice,
       offer.fee,
@@ -407,14 +401,6 @@ export function transferUtility(game: GameType, value: unknown): boolean {
     game.utilityExpansion.loans.push(
       loan("purchase", quote.newLoan, game.interestRate, LOAN_MONTHS),
     );
-  if (game.transmission)
-    game.transmission.lines.push(
-      inheritedConnection(
-        value.targetId,
-        Math.max(0, ...game.transmission.lines.map((line) => line.id)) + 1,
-        game.date.minute,
-      ),
-    );
   game.facilities.push(...assets);
   for (const asset of assets)
     if (
@@ -433,16 +419,6 @@ export function transferUtility(game: GameType, value: unknown): boolean {
       ]);
     if (!buildoutComplete(program.adoption)) delete program.completedMonth;
   }
-  const target = UTILITY_TARGETS.find(
-    (target) => target.id === value.targetId,
-  )!;
-  const line = game.transmission?.lines.find(
-    (line) => line.corridorId === target.corridorId,
-  );
-  if (line) {
-    line.paused = false;
-    line.currentFlowW = 0;
-  }
   now.netWorth +=
     networkCarryingValue(network, game.date.minute) -
     network.initialValue -
@@ -450,7 +426,7 @@ export function transferUtility(game: GameType, value: unknown): boolean {
   return true;
 }
 
-/** Agreement slices are delivered through their one owned operating physical interface. */
+/** Finite supplier commitments feed the company pool; no connection is purchased or required. */
 export function entitlementSources(
   game: GameType,
   now: import("../Types").TickPresentFutureType,
@@ -465,24 +441,9 @@ export function entitlementSources(
   const sources = (Object.keys(INHERITED_CONNECTIONS) as UtilityId[])
     .flatMap((utilityId) => {
       if (!utilityOwnedAt(game, utilityId, agreementMinute)) return [];
-      const line = game.transmission?.lines.find(
-        (entry) =>
-          entry.corridorId === INHERITED_CONNECTIONS[utilityId] &&
-          entry.yearsToBuildLeft === 0,
-      );
-      if (!line) return [];
-      const availableLine = supplierReady ? { ...line, paused: false } : line;
-      const limits = intertieOfferLimits(
-        availableLine,
-        context,
-        now.minute,
-        now,
-      );
-      const firmLimits = firmIntertieOfferLimits(
-        availableLine,
-        context,
-        now.minute,
-        now,
+      const line = inheritedConnection(
+        utilityId,
+        Object.keys(INHERITED_CONNECTIONS).indexOf(utilityId) + 100000,
       );
       return connectionAgreements(game, utilityId, agreementMinute)
         .filter(
@@ -494,13 +455,30 @@ export function entitlementSources(
             (!legacyOnly || source.termsVersion === 1),
         )
         .map((source) => {
+          const availableLine = {
+            ...line,
+            corridorId: agreementCorridorId(source.id, utilityId),
+            capacityW: UTILITY_AREAS[utilityId].sourceInterfaceW,
+          };
+          const limits = intertieOfferLimits(
+            availableLine,
+            context,
+            now.minute,
+            now,
+          );
+          const firmLimits = firmIntertieOfferLimits(
+            availableLine,
+            context,
+            now.minute,
+            now,
+          );
           const pricePerMWh =
             source.termsVersion === 3
               ? agreementRate(
                   game,
                   source.pricePerMWh,
                   source.durationYears,
-                  line.corridorId,
+                  availableLine.corridorId,
                   agreementMinute,
                   now,
                   now.minute,
@@ -511,7 +489,7 @@ export function entitlementSources(
             termsVersion: source.termsVersion,
             startMinute: source.startMinute,
             endMinute: source.endMinute,
-            paused: !!line.paused,
+            paused: false,
             utilityId,
             lineId: line.id,
             capacityW: source.nominalW * source.deliverability,
@@ -519,7 +497,7 @@ export function entitlementSources(
             emissionsKgPerMWh: source.emissionsKgPerMWh,
             offer: {
               ...(source.termsVersion >= 2 ? firmLimits : limits),
-              lineId: `${game.multiplayer?.seat ?? "local"}:${line.id}`,
+              lineId: `${game.multiplayer?.seat ?? "local"}:supplier:${availableLine.corridorId}`,
               lineImportLimitW: transmissionRatingW(availableLine, now),
               importLimitW: Math.min(
                 (source.termsVersion >= 2 ? firmLimits : limits).importLimitW,

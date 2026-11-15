@@ -2,7 +2,6 @@ import cloneDeep from "lodash.clonedeep";
 import { TICKS_PER_MONTH, TICK_MINUTES, YEARS_PER_TICK } from "../Constants";
 import { GENERATORS } from "../data/Facilities";
 import { POLICIES } from "../data/Policies";
-import { UTILITY_TARGETS } from "../data/UtilityExpansion";
 import { customerBatteryFleet } from "../helpers/CustomerBatteries";
 import { acquisitionQuote } from "../helpers/Expansion";
 import { currentTick } from "../helpers/GameSelectors";
@@ -15,7 +14,6 @@ import { createGame } from "../testing/Simulator";
 import type { GameType, UtilityTargetId } from "../Types";
 import reducer, {
   buildFacility,
-  buildTransmissionLine,
   delta,
   generateForecastTimeline,
   tickState,
@@ -37,17 +35,8 @@ function preparedCompany(): GameType {
   )!.yearsToBuildLeft = YEARS_PER_TICK / 2;
   return game;
 }
-function connection(game: GameType, targetId: UtilityTargetId): GameType {
-  const corridorId = UTILITY_TARGETS.find(
-    (target) => target.id === targetId,
-  )!.corridorId;
-  const connected = copyOfficialGame(
-    reducer(game, buildTransmissionLine({ corridorId, financed: false })),
-  );
-  connected.transmission!.lines.find(
-    (line) => line.corridorId === corridorId,
-  )!.yearsToBuildLeft = 0;
-  return connected;
+function connection(game: GameType, _targetId: UtilityTargetId): GameType {
+  return copyOfficialGame(game);
 }
 function buy(game: GameType, targetId: UtilityTargetId): GameType {
   const quote = acquisitionQuote(game, targetId)!;

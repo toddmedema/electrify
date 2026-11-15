@@ -1,9 +1,3 @@
-import {
-  hasTerritoryNetwork,
-  territoryForCorridor,
-  isInternalTerritoryCorridor,
-} from "../../helpers/Territories";
-import { territoryName } from "../base/TerritoryBuildDestination";
 import { CurrencyType } from "../../helpers/Currency";
 import { currencyFormatters } from "../../helpers/Format";
 import { useMoney } from "../base/CurrencyContext";
@@ -296,11 +290,9 @@ function IntertieBuildItem(props: {
   constructionKgco2eTotal: number;
   year: number;
   onCompanyReview?: () => void;
-  development?: boolean;
 }): React.JSX.Element {
   const { currency, formatMoneyConcise } = useMoney();
   const { cash, corridor, outlook, units } = props;
-  const internal = props.development;
   const market = adjacentMarketForCorridor(corridor.id);
   const name = market?.name || corridor.name;
   const loan = purchaseTerms(corridor.buildCost, true, props.interestRate);
@@ -343,7 +335,7 @@ function IntertieBuildItem(props: {
               ? "Existing corridor"
               : "New corridor"}
           </span>
-          {market && !internal && (
+          {market && (
             <>
               {" · "}
               <span className="nowrap">
@@ -361,12 +353,12 @@ function IntertieBuildItem(props: {
       metrics={
         <>
           <BuildMetric
-            label={internal ? "Power to Champlain" : "Import capacity"}
+            label="Import capacity"
             entry={MANUAL_ENTRY.INTERTIES}
             value={formatWatts(props.importCapacityW)}
           />
           <BuildMetric
-            label={internal ? "Power from Champlain" : "Export capacity"}
+            label="Export capacity"
             entry={MANUAL_ENTRY.INTERTIES}
             value={formatWatts(props.exportCapacityW)}
           />
@@ -380,7 +372,7 @@ function IntertieBuildItem(props: {
             entry={MANUAL_ENTRY.INTERTIES}
             value={formatMoneyConcise(corridor.buildCost)}
           />
-          {market && !internal && (
+          {market && (
             <BuildMetric
               label="Emissions"
               entry={MANUAL_ENTRY.EMISSIONS}
@@ -407,7 +399,7 @@ function IntertieBuildItem(props: {
               <IntertieYear outlook={outlook} prominent />
             </Box>
           )}
-          {market && !internal && (
+          {market && (
             <Typography
               className="buildOptionDescription"
               variant="body2"
@@ -463,7 +455,6 @@ function IntertieBuildItem(props: {
  */
 function IntertieUpgradeControl(props: {
   costIndex: number;
-  internal: boolean;
   line: TransmissionLineOperatingType;
   cash?: number;
   year: number;
@@ -473,16 +464,7 @@ function IntertieUpgradeControl(props: {
   context: IntertieAccessContext;
 }): React.JSX.Element | null {
   const { currency } = useMoney();
-  const {
-    line,
-    cash,
-    year,
-    interestRate,
-    units,
-    onUpgrade,
-    context,
-    internal,
-  } = props;
+  const { line, cash, year, interestRate, units, onUpgrade, context } = props;
   const [reviewing, setReviewing] = React.useState(false);
   if (line.upgrade) {
     const years = line.upgrade.yearsToBuildLeft;
@@ -515,19 +497,16 @@ function IntertieUpgradeControl(props: {
   const { downpayment } = purchaseTerms(quote.buildCost, true, interestRate);
   const shortfall = financingShortfallText(cash ?? 0, downpayment, currency);
   const months = Math.max(1, Math.round(quote.yearsToBuild * 12));
-  const capacityBefore = internal
-    ? { importCapacityW: line.capacityW, exportCapacityW: line.capacityW }
-    : intertieDirectionalCapacities(line.corridorId, context, line.capacityW);
-  const capacityAfter = internal
-    ? {
-        importCapacityW: quote.targetCapacityW,
-        exportCapacityW: quote.targetCapacityW,
-      }
-    : intertieDirectionalCapacities(
-        line.corridorId,
-        context,
-        quote.targetCapacityW,
-      );
+  const capacityBefore = intertieDirectionalCapacities(
+    line.corridorId,
+    context,
+    line.capacityW,
+  );
+  const capacityAfter = intertieDirectionalCapacities(
+    line.corridorId,
+    context,
+    quote.targetCapacityW,
+  );
   return (
     <div className="transmissionUpgrade">
       {shortfall && (
@@ -566,7 +545,7 @@ function IntertieUpgradeControl(props: {
           extraFacts={[
             {
               concept: "supply",
-              label: internal ? "Power to Champlain" : "Import capacity",
+              label: "Import capacity",
               value: limitChangeText(
                 capacityBefore.importCapacityW,
                 capacityAfter.importCapacityW,
@@ -575,7 +554,7 @@ function IntertieUpgradeControl(props: {
             },
             {
               concept: "supply",
-              label: internal ? "Power from Champlain" : "Export capacity",
+              label: "Export capacity",
               value: limitChangeText(
                 capacityBefore.exportCapacityW,
                 capacityAfter.exportCapacityW,
@@ -604,12 +583,6 @@ export interface TransmissionPanelProps {
   onPause?: (id: number, name: string, paused: boolean) => void;
   game: GameType;
   projectsOnly?: boolean;
-  /** Restrict the existing purchase and line controls to a territory route. */
-  corridorIds?: string[];
-  agreementsOnly?: boolean;
-  heading?: string;
-  hideOwnership?: boolean;
-  ownershipSummaryRef?: React.RefObject<HTMLElement>;
   onBuild: (corridorId: string, financed: boolean, tier?: number) => void;
   onUpgrade: (corridorId: string, financed: boolean) => void;
   onBuyingRule: (rule: BuyingRuleType) => void;
@@ -619,9 +592,7 @@ export interface TransmissionPanelProps {
 
 function hasTradingConnection(game: GameType): boolean {
   return !!game.transmission?.lines.some(
-    (line) =>
-      !ownedUtilityConnection(game, line.corridorId) &&
-      !isInternalTerritoryCorridor(game, line.corridorId),
+    (line) => !ownedUtilityConnection(game, line.corridorId),
   );
 }
 
@@ -708,16 +679,10 @@ export default function TransmissionPanel({
   onBeforeDragStart,
   onDragEnd,
   projectsOnly = false,
-  corridorIds,
-  agreementsOnly = false,
-  heading = "Interties",
-  hideOwnership = false,
-  ownershipSummaryRef,
 }: TransmissionPanelProps) {
   const { formatMoneyConcise } = useMoney();
   const units = useUnits();
-  const localAcquiredSummaryRef = React.useRef<HTMLElement>(null);
-  const acquiredSummaryRef = ownershipSummaryRef ?? localAcquiredSummaryRef;
+  const acquiredSummaryRef = React.useRef<HTMLElement>(null);
   const focusAcquiredSummary = React.useRef(false);
   const projectsRef = React.useRef<HTMLUListElement>(null);
   const revealResizedRow = useBuildRowReveal(projectsRef);
@@ -729,19 +694,16 @@ export default function TransmissionPanel({
       focusAcquiredSummary.current = false;
       acquiredSummaryRef.current?.focus();
     }
-  }, [acquisitionTargetId, acquiredSummaryRef]);
+  }, [acquisitionTargetId]);
   const [companyTargetId, setCompanyTargetId] = React.useState<string | null>(
     null,
   );
   const [cancelLine, setCancelLine] =
     React.useState<TransmissionLineOperatingType | null>(null);
   const [selectedLine, setSelectedLine] = React.useState<number | null>(null);
-  const [preferredTier, setTier] = useToolState(
+  const [tier, setTier] = useToolState(
     projectsOnly ? "interties.tier" : undefined,
-    () =>
-      corridorIds || hasTerritoryNetwork(game)
-        ? 1
-        : initialIntertieBuildTier(game),
+    () => initialIntertieBuildTier(game),
   );
   const theme = useTheme();
   const [sort, setSort] = useToolState<IntertieSortKey>(
@@ -755,27 +717,19 @@ export default function TransmissionPanel({
     lines: [],
   };
   const tradingLines = state.lines.filter(
-    (line) =>
-      (corridorIds
-        ? corridorIds.includes(line.corridorId)
-        : !ownedUtilityConnection(game, line.corridorId)) &&
-      (!agreementsOnly || !!inheritedUtilityForCorridor(line.corridorId)),
+    (line) => !ownedUtilityConnection(game, line.corridorId),
   );
   // Drag indices describe the visible list; the reducer retains acquired connections for costs.
   const lineIndex = (visibleIndex: number) =>
     state.lines.indexOf(tradingLines[visibleIndex]);
-  const availableCorridors = corridorsForGame(game).filter(
-    ({ id }) => !corridorIds || corridorIds.includes(id),
-  );
+  const availableCorridors = corridorsForGame(game);
   const now = currentTick(game);
-  const reorderDisabled =
-    !!corridorIds ||
-    !!(
-      game.inGame &&
-      activeScenario(game)?.tutorialSteps?.[
-        game.tutorialStep
-      ]?.hideUi?.includes("facilityActions")
-    );
+  const reorderDisabled = !!(
+    game.inGame &&
+    activeScenario(game)?.tutorialSteps?.[game.tutorialStep]?.hideUi?.includes(
+      "facilityActions",
+    )
+  );
   const intertieContext = intertieContextForGame(game);
   const forecast = useIntertieForecast(
     game,
@@ -802,7 +756,7 @@ export default function TransmissionPanel({
     outlookCache.set(key, outlook);
     return outlook;
   };
-  const flowText = corridorIds ? null : tradingFlowText(game);
+  const flowText = tradingFlowText(game);
   // The guided mission names the northern project. Showing only that choice until it is approved
   // makes an exploratory tap recoverable instead of letting a much dearer three-year project
   // consume the cash and time needed by the lesson.
@@ -815,19 +769,6 @@ export default function TransmissionPanel({
     (corridor) =>
       !state.lines.some(({ corridorId }) => corridorId === corridor.id),
   );
-  const maxTier = Math.max(
-    1,
-    ...unbuiltCorridors.map(
-      ({ id }) =>
-        Array.from(
-          { length: MAX_INTERTIE_UPGRADES + 1 },
-          (_, index) => index + 1,
-        ).filter((candidate) =>
-          intertieBuildQuote(id, game.date.year, candidate, intertieContext),
-        ).length,
-    ),
-  );
-  const tier = Math.max(1, Math.min(preferredTier, maxTier));
   const buildQuote = (corridorId: string, selectedTier = tier) =>
     intertieBuildQuote(
       corridorId,
@@ -850,17 +791,24 @@ export default function TransmissionPanel({
         ? a.emissions - b.emissions
         : a.quote[sort] - b.quote[sort],
     );
+  const maxTier = Math.max(
+    1,
+    ...unbuiltCorridors.map(
+      ({ id }) =>
+        Array.from(
+          { length: MAX_INTERTIE_UPGRADES + 1 },
+          (_, index) => index + 1,
+        ).filter((candidate) => buildQuote(id, candidate)).length,
+    ),
+  );
   const review =
     reviewId && unbuiltCorridors.some(({ id }) => id === reviewId)
       ? buildQuote(reviewId)
       : undefined;
   const reviewMarket = review && adjacentMarketForCorridor(review.id);
-  const constructionCapacities = (corridorId: string, capacityW: number) =>
-    isInternalTerritoryCorridor(game, corridorId)
-      ? { importCapacityW: capacityW, exportCapacityW: capacityW }
-      : intertieDirectionalCapacities(corridorId, intertieContext, capacityW);
   const reviewCapacity =
-    review && constructionCapacities(review.id, review.capacityW);
+    review &&
+    intertieDirectionalCapacities(review.id, intertieContext, review.capacityW);
   const approve = (financed: boolean) => {
     if (!review) return;
     onBuild(review.id, financed, tier);
@@ -909,18 +857,16 @@ export default function TransmissionPanel({
             className="facilitySectionLabel"
             variant="subtitle2"
           >
-            {heading}
+            Interties
             {flowText && (
               <span className="facilitySectionFlow">{flowText}</span>
             )}
           </Typography>
-          {!corridorIds && (
-            <TradingControls
-              game={game}
-              onBuyingRule={onBuyingRule}
-              onSellingRule={onSellingRule}
-            />
-          )}
+          <TradingControls
+            game={game}
+            onBuyingRule={onBuyingRule}
+            onSellingRule={onSellingRule}
+          />
           {(now?.storageImportedW || 0) > 0 && (
             <Typography
               variant="caption"
@@ -975,15 +921,6 @@ export default function TransmissionPanel({
                   aria-label="Interties"
                 >
                   {tradingLines.map((line, index) => {
-                    const internal = isInternalTerritoryCorridor(
-                      game,
-                      line.corridorId,
-                    );
-                    const name =
-                      hasTerritoryNetwork(game) &&
-                      inheritedUtilityForCorridor(line.corridorId)
-                        ? `${territoryName(territoryForCorridor(line.corridorId))} ↔ Regional grid`
-                        : line.name;
                     const inherited = inheritedUtilityForCorridor(
                       line.corridorId,
                     );
@@ -995,23 +932,16 @@ export default function TransmissionPanel({
                       ? acquisitionTargetForCorridor(line.corridorId)
                       : undefined;
                     const availableAcquisition =
-                      acquisitionTarget &&
-                      !ownedUtilityConnection(game, line.corridorId) &&
-                      line.yearsToBuildLeft <= 0;
+                      acquisitionTarget && line.yearsToBuildLeft <= 0;
                     const peer = game.multiplayer?.peers?.find(
                       (p) => p.corridor.id === line.corridorId,
                     );
                     const market = adjacentMarketForCorridor(line.corridorId);
-                    const capacities = internal
-                      ? {
-                          importCapacityW: line.capacityW,
-                          exportCapacityW: line.capacityW,
-                        }
-                      : intertieDirectionalCapacities(
-                          line.corridorId,
-                          intertieContext,
-                          line.capacityW,
-                        );
+                    const capacities = intertieDirectionalCapacities(
+                      line.corridorId,
+                      intertieContext,
+                      line.capacityW,
+                    );
                     const rating =
                       peer?.ratingW ??
                       (now ? transmissionRatingW(line, now) : line.capacityW);
@@ -1051,7 +981,7 @@ export default function TransmissionPanel({
                           )
                         : rating;
                     const outlook =
-                      !internal && selectedLine === line.id
+                      selectedLine === line.id
                         ? outlookFor(line.corridorId, line.capacityW)
                         : undefined;
                     // Signed against capacity in the direction of flow, so the row reads the same way a
@@ -1076,18 +1006,13 @@ export default function TransmissionPanel({
                     // aria-label replaces a button's descendant content for its accessible name, so a
                     // visually hidden span inside the row would never be announced. The label repeats
                     // the visible direction word, so speech input can name what the screen shows.
-                    const endpoints = internal
-                      ? flowW > 0
-                        ? `${territoryName(territoryForCorridor(line.corridorId))} → Champlain`
-                        : `Champlain → ${territoryName(territoryForCorridor(line.corridorId))}`
-                      : undefined;
                     const flowDescription = construction
                       ? construction.label
                       : line.paused
                         ? "paused"
                         : direction === "IDLE"
                           ? `idle, ${formatWatts(flowCapacityW)} available`
-                          : `${endpoints ?? word.toLowerCase()} ${formatWatts(Math.abs(flowW))} of ${formatWatts(flowCapacityW)}`;
+                          : `${word.toLowerCase()} ${formatWatts(Math.abs(flowW))} of ${formatWatts(flowCapacityW)}`;
                     // Badged like a storage row's activity, but on the left/right axis the exchange
                     // summary uses, so exporting never borrows a battery's up/down "charging" arrow.
                     // Decorative: the reading and the button's name already say it.
@@ -1154,7 +1079,7 @@ export default function TransmissionPanel({
                                 type="button"
                                 id={`intertie-disclosure-${line.id}`}
                                 className="facilityDisclosure"
-                                aria-label={`Inspect ${name}, ${flowDescription}`}
+                                aria-label={`Inspect ${line.name}, ${flowDescription}`}
                                 aria-expanded={selectedLine === line.id}
                                 onClick={() =>
                                   setSelectedLine(
@@ -1169,7 +1094,7 @@ export default function TransmissionPanel({
                                     name={
                                       <>
                                         <span className="facilityName">
-                                          {name}
+                                          {line.name}
                                         </span>
                                         {restricted && !building && (
                                           <Chip
@@ -1187,11 +1112,9 @@ export default function TransmissionPanel({
                                         ? construction.reading
                                         : line.paused
                                           ? "Paused"
-                                          : internal && direction !== "IDLE"
-                                            ? `${endpoints} · ${formatWattsOfPeak(Math.abs(flowW), flowCapacityW)}`
-                                            : inherited && direction === "IDLE"
-                                              ? `Idle · ${formatWatts(flowCapacityW)}`
-                                              : `${word} ${flowReading}`
+                                          : inherited && direction === "IDLE"
+                                            ? `Idle · ${formatWatts(flowCapacityW)}`
+                                            : `${word} ${flowReading}`
                                     }
                                     detail={construction?.detail}
                                     progress={
@@ -1261,11 +1184,7 @@ export default function TransmissionPanel({
                                 )}
                                 <dl className="transmissionMetrics facilityStats">
                                   <div className="facilityStat">
-                                    <dt>
-                                      {internal
-                                        ? "Capacity toward Champlain"
-                                        : "Import capacity"}
-                                    </dt>
+                                    <dt>Import capacity</dt>
                                     <dd className="facilityStatValue">
                                       {formatWatts(
                                         capacities.importCapacityW,
@@ -1274,11 +1193,7 @@ export default function TransmissionPanel({
                                     </dd>
                                   </div>
                                   <div className="facilityStat">
-                                    <dt>
-                                      {internal
-                                        ? "Capacity from Champlain"
-                                        : "Export capacity"}
-                                    </dt>
+                                    <dt>Export capacity</dt>
                                     <dd className="facilityStatValue">
                                       {formatWatts(
                                         capacities.exportCapacityW,
@@ -1301,7 +1216,7 @@ export default function TransmissionPanel({
                                       </dd>
                                     </div>
                                   )}
-                                  {!building && now && !internal && (
+                                  {!building && now && (
                                     <>
                                       <div className="facilityStat">
                                         <dt>
@@ -1336,7 +1251,7 @@ export default function TransmissionPanel({
                                       </div>
                                     </>
                                   )}
-                                  {market && !internal && (
+                                  {market && (
                                     <div className="facilityStat">
                                       <dt>
                                         {inherited
@@ -1394,49 +1309,45 @@ export default function TransmissionPanel({
                                       continue.
                                     </Typography>
                                   )}
-                                {!building &&
-                                  now &&
-                                  !inherited &&
-                                  !internal && (
-                                    <Typography
-                                      variant="body2"
-                                      color="textSecondary"
-                                    >
-                                      Flow limited by:{" "}
-                                      {game.multiplayer
-                                        ? "Player generation, demand, and shared line capacity"
-                                        : line.paused
-                                          ? "Paused"
-                                          : (state.buyingRule === "NONE" &&
-                                                flowW >= 0) ||
-                                              (state.sellingRule === "NONE" &&
-                                                flowW < 0)
-                                            ? "Trading rule"
-                                            : flowW < 0
-                                              ? Math.abs(flowW) >=
-                                                capacities.exportCapacityW - 1
-                                                ? "Export capacity"
-                                                : Math.abs(flowW) >= rating - 1
+                                {!building && now && !inherited && (
+                                  <Typography
+                                    variant="body2"
+                                    color="textSecondary"
+                                  >
+                                    Flow limited by:{" "}
+                                    {game.multiplayer
+                                      ? "Player generation, demand, and shared line capacity"
+                                      : line.paused
+                                        ? "Paused"
+                                        : (state.buyingRule === "NONE" &&
+                                              flowW >= 0) ||
+                                            (state.sellingRule === "NONE" &&
+                                              flowW < 0)
+                                          ? "Trading rule"
+                                          : flowW < 0
+                                            ? Math.abs(flowW) >=
+                                              capacities.exportCapacityW - 1
+                                              ? "Export capacity"
+                                              : Math.abs(flowW) >= rating - 1
+                                                ? "Weather"
+                                                : "Local surplus"
+                                            : Math.abs(flowW) < importableW - 1
+                                              ? "Local demand or trading rule"
+                                              : neighborImportSupplyW(
+                                                    line.corridorId,
+                                                    intertieContext,
+                                                    now.minute,
+                                                    now,
+                                                    line.capacityW,
+                                                  ) < rating
+                                                ? "Neighbor supply"
+                                                : rating <
+                                                    capacities.importCapacityW
                                                   ? "Weather"
-                                                  : "Local surplus"
-                                              : Math.abs(flowW) <
-                                                  importableW - 1
-                                                ? "Local demand or trading rule"
-                                                : neighborImportSupplyW(
-                                                      line.corridorId,
-                                                      intertieContext,
-                                                      now.minute,
-                                                      now,
-                                                      line.capacityW,
-                                                    ) < rating
-                                                  ? "Neighbor supply"
-                                                  : rating <
-                                                      capacities.importCapacityW
-                                                    ? "Weather"
-                                                    : "Import capacity"}
-                                      .
-                                    </Typography>
-                                  )}
+                                                  : "Import capacity"}
+                                    .
+                                  </Typography>
+                                )}
                                 {outlook && !inherited && (
                                   <IntertieYear outlook={outlook} />
                                 )}
@@ -1470,7 +1381,6 @@ export default function TransmissionPanel({
                                         </Button>
                                       )}
                                       <IntertieUpgradeControl
-                                        internal={internal}
                                         costIndex={getCostTableIndex(
                                           game.date,
                                           game.startingYear,
@@ -1544,7 +1454,7 @@ export default function TransmissionPanel({
         </section>
       )}
 
-      {!projectsOnly && !hideOwnership && (
+      {!projectsOnly && (
         <AcquiredUtilities game={game} summaryRef={acquiredSummaryRef} />
       )}
 
@@ -1593,8 +1503,9 @@ export default function TransmissionPanel({
                         Infinity,
                     )
                   : undefined;
-              const capacities = constructionCapacities(
+              const capacities = intertieDirectionalCapacities(
                 corridor.id,
+                intertieContext,
                 corridor.capacityW,
               );
               return (
@@ -1607,12 +1518,7 @@ export default function TransmissionPanel({
                   year={game.date.year}
                   cash={now?.cash}
                   interestRate={game.interestRate}
-                  development={isInternalTerritoryCorridor(game, corridor.id)}
-                  outlook={
-                    isInternalTerritoryCorridor(game, corridor.id)
-                      ? undefined
-                      : outlookFor(corridor.id, corridor.capacityW)
-                  }
+                  outlook={outlookFor(corridor.id, corridor.capacityW)}
                   units={units}
                   onCompanyReview={
                     offer ? () => setCompanyTargetId(offer.targetId) : undefined
@@ -1670,23 +1576,15 @@ export default function TransmissionPanel({
           extraFacts={[
             {
               concept: "supply",
-              label: isInternalTerritoryCorridor(game, review.id)
-                ? "Power to Champlain"
-                : "Import capacity",
+              label: "Import capacity",
               value: formatWatts(reviewCapacity?.importCapacityW || 0),
-              detail: isInternalTerritoryCorridor(game, review.id)
-                ? "Shared physical connection. No purchased power is included."
-                : "Maximum power you can buy.",
+              detail: "Maximum power you can buy.",
             },
             {
               concept: "supply",
-              label: isInternalTerritoryCorridor(game, review.id)
-                ? "Power from Champlain"
-                : "Export capacity",
+              label: "Export capacity",
               value: formatWatts(reviewCapacity?.exportCapacityW || 0),
-              detail: isInternalTerritoryCorridor(game, review.id)
-                ? "No customers transfer when this connection opens."
-                : "Maximum surplus power you can sell.",
+              detail: "Maximum surplus power you can sell.",
             },
           ]}
           preface={

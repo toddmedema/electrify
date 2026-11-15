@@ -100,3 +100,6 @@ export const acceptPowerAgreement = createAction<
 export const acquireUtility = createAction<
   import("../Types").AcquireUtilityAction
 >("game/acquireUtility");
+
+export const acquireLand =
+  createAction<import("../Types").AcquireLandAction>("game/acquireLand");

@@ -75,7 +75,7 @@ export default function AcquisitionReviewDialog({
       >
         <Typography role="alert">
           This utility is no longer available to acquire. Review your
-          connections and current ownership.
+          territories and current ownership.
         </Typography>
       </DecisionDialog>
     );

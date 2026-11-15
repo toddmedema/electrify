@@ -777,8 +777,8 @@ export function GeneratorBuildItem(
           <>
             {props.territoryId && (
               <Typography variant="body2" sx={{ px: 2, mb: 2 }}>
-                Build in {territoryName(props.territoryId)}. Output serves local
-                customers first; transfers share the territory connection.
+                Build in {territoryName(props.territoryId)}. Output serves your
+                company power pool.
               </Typography>
             )}
             {props.hydroAvailability?.selected && (

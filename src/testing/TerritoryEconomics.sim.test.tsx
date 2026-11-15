@@ -1,4 +1,3 @@
-import { GREEN_UPLANDS_CORRIDOR_ID } from "../data/Territories";
 import { DIFFICULTY_IDS } from "../Constants";
 import {
   EXPANSION_BALANCE_CASES,
@@ -19,9 +18,7 @@ it.each(DIFFICULTY_IDS)(
       ...expansionBalanceActions(fixture, 12345),
       {
         month: 0,
-        type: "intertie",
-        corridorId: GREEN_UPLANDS_CORRIDOR_ID,
-        financed: true,
+        type: "land",
       },
       {
         month: 48,
@@ -57,10 +54,6 @@ it.each(DIFFICULTY_IDS)(
       yearsToBuildLeft: 0,
     });
     expect(wind!.lifetimeWh).toBeGreaterThan(0);
-    expect(
-      result.finalTransmissionLines.find(
-        (line) => line.corridorId === GREEN_UPLANDS_CORRIDOR_ID,
-      ),
-    ).toMatchObject({ capacityW: 120e6, yearsToBuildLeft: 0 });
+    expect(result.finalTransmissionLines).toEqual([]);
   },
 );

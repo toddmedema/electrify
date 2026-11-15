@@ -333,6 +333,26 @@ export function utilityNetworkAnnualOM(
 /** Fixed replacement blocks and delivered-energy prices, authored in 2005 dollars. */
 export const POWER_AGREEMENT_BLOCKS = [
   {
+    id: "valley-purchase",
+    utilityId: "champlain",
+    sellerUtilityId: "valley-electric",
+    name: "Valley Electric supply",
+    lossYear: 2005,
+    nominalW: 40e6,
+    years: 3,
+    pricePerMWh: 70,
+  },
+  {
+    id: "ridge-purchase",
+    utilityId: "champlain",
+    sellerUtilityId: "ridge-electric",
+    name: "Ridge Electric supply",
+    lossYear: 2005,
+    nominalW: 30e6,
+    years: 3,
+    pricePerMWh: 70,
+  },
+  {
     id: "champlain-nuclear",
     utilityId: "champlain",
     name: "Regional firm",

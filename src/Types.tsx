@@ -1354,7 +1354,7 @@ export interface PeerSettlement {
 export type UtilityId = "champlain" | "valley-electric" | "ridge-electric";
 export type UtilityTargetId = Exclude<UtilityId, "champlain">;
 export type TerritoryId = UtilityId | "green-uplands";
-/** Derived physical balance for one territory during a tick. Internal transfers are separate. */
+/** Legacy recorded territory readings retained for save history. */
 export interface TerritoryTick {
   demandW: number;
   supplyW: number;
@@ -1393,6 +1393,10 @@ export interface UtilityExpansionState {
     /** Immutable seller accounts transferred, not a separately simulated customer population. */
     transferredCustomers: number;
   }[];
+}
+export interface AcquireLandAction {
+  territoryId: "green-uplands";
+  quoteKey: string;
 }
 export interface AcquireUtilityAction {
   targetId: UtilityTargetId;
@@ -1442,11 +1446,23 @@ export interface LegacyCampaignType {
 }
 
 export interface GameType {
-  territoryNetwork?: { version: 1 };
+  territoryNetwork?: {
+    version: 2;
+    landPurchases: {
+      territoryId: "green-uplands";
+      minute: number;
+      price: number;
+      legacy?: true;
+    }[];
+    /** Frozen legacy projects: capital and debt remain; routing/construction/upkeep are retired. */
+    legacyConnections: TransmissionLineOperatingType[];
+  };
   utilityExpansion?: UtilityExpansionState;
   /** Isolated co-op grid; never publish its score or run the single-player clock/effects. */
   multiplayer?: {
     seat: string;
+    /** Shared finite land claim, projected by the host from all company receipts. */
+    landOwner?: { seat: string; name: string };
     pricePerMWh?: number;
     /** Set by the host at the rollover where this company's run ends. */
     ending?: CompanyOutcomeType;

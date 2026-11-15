@@ -1081,30 +1081,7 @@ test("controller reviews, cancels and confirms a utility acquisition", async ({
   await select(page, start);
   await input(page, "confirm");
   await expect(page.locator("#appbar:visible")).toBeVisible();
-  await input(page, "build");
-  const build = page.getByRole("region", { name: "Build", exact: true });
-  await select(
-    page,
-    build.getByRole("tab", { name: "Interties", exact: true }),
-  );
-  await input(page, "confirm");
-  await select(
-    page,
-    build.getByRole("button", { name: /Review purchase of .*Ridge Electric/ }),
-  );
-  await input(page, "confirm");
-  const dialog = page.getByRole("dialog");
-  await select(
-    page,
-    dialog.getByRole("button", { name: "Take loan", exact: true }),
-  );
-  await input(page, "confirm");
-  await expect(dialog).toHaveCount(0);
-  // Fixture advances only construction; the acquisition still uses its real owning action.
   await editSavedGame(page, ({ game }) => {
-    game.transmission!.lines.find(
-      (line) => line.corridorId === "vt-champlain-ridge",
-    )!.yearsToBuildLeft = 0;
     for (const tick of game.timeline) tick.cash = 1e9;
   });
   await page.goto("/");
@@ -1121,11 +1098,10 @@ test("controller reviews, cancels and confirms a utility acquisition", async ({
     }),
   );
   await input(page, "confirm");
-  const line = page.locator(
-    '.facilities:visible .transmissionLine[data-corridor-id="vt-champlain-ridge"]',
-  );
-  await select(page, line.getByRole("button", { name: /^Inspect / }));
-  await input(page, "confirm");
+  const dialog = page.getByRole("dialog");
+  const line = page
+    .locator(".facilities:visible")
+    .getByRole("region", { name: "Selected territory" });
   const acquire = line.getByRole("button", {
     name: "Acquire Ridge Electric",
     exact: true,

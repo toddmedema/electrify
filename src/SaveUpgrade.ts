@@ -171,6 +171,56 @@ const migrations: readonly Migration[] = [
       },
     };
   },
+  // 13 -> 14: pool company power and convert every paid land project to immediate rights.
+  // Freeze retired project terms/capital/debt; refund nothing and preserve recorded history.
+  (save) => {
+    if (!object(save.game)) return null;
+    const game = save.game;
+    if (game.territoryNetwork === undefined) return save;
+    if (
+      !object(game.territoryNetwork) ||
+      game.territoryNetwork.version !== 1 ||
+      Object.keys(game.territoryNetwork).length !== 1 ||
+      !object(game.transmission) ||
+      !Array.isArray(game.transmission.lines) ||
+      !object(game.date)
+    )
+      return null;
+    const lines = game.transmission.lines;
+    if (lines.some((line) => !object(line))) return null;
+    const uplands = lines.find(
+      (line) => line.corridorId === "vt-champlain-uplands",
+    );
+    const legacyConnections = lines.filter(
+      (line) =>
+        typeof line.corridorId === "string" &&
+        !line.corridorId.startsWith("peer:"),
+    );
+    return {
+      ...save,
+      game: {
+        ...game,
+        territoryNetwork: {
+          version: 2,
+          landPurchases: uplands
+            ? [
+                {
+                  territoryId: "green-uplands",
+                  minute: uplands.minuteCreated,
+                  price: uplands.buildCost,
+                  legacy: true,
+                },
+              ]
+            : [],
+          legacyConnections,
+        },
+        transmission: {
+          ...game.transmission,
+          lines: lines.filter((line) => !legacyConnections.includes(line)),
+        },
+      },
+    };
+  },
 ];
 
 /** Structure versions are independent of app releases and simulation compatibility. */

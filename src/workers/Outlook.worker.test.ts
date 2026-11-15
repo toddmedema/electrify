@@ -1,6 +1,4 @@
 import { GENERATORS, STORAGE } from "../data/Facilities";
-import { GREEN_UPLANDS_CORRIDOR_ID } from "../data/Territories";
-import { inheritedConnection } from "../helpers/PowerAgreements";
 import { createGame } from "../testing/Simulator";
 import { forecastWorkerSnapshot } from "../components/base/ForecastWorkerSnapshot";
 import {
@@ -34,13 +32,12 @@ it.each(["generator", "storage"] as const)(
   "keeps the selected territory in a %s worker forecast and matches the page fallback",
   async (kind) => {
     const game = createGame({ scenarioId: 116, seed: 188 });
-    game.territoryNetwork = { version: 1 };
+    game.territoryNetwork = {
+      version: 2,
+      landPurchases: [{ territoryId: "green-uplands", minute: 0, price: 18e6 }],
+      legacyConnections: [],
+    };
     game.date.year = 2020;
-    game.transmission!.lines.push({
-      ...inheritedConnection("champlain", 99),
-      corridorId: GREEN_UPLANDS_CORRIDOR_ID,
-      capacityW: 1e6,
-    });
     const facility =
       kind === "generator"
         ? GENERATORS(game, 100e6, [], []).find(
@@ -54,9 +51,7 @@ it.each(["generator", "storage"] as const)(
       facility,
       "green-uplands",
     );
-    expect(expected).not.toEqual(
-      computeOutlook("buildImpact", snapshot, facility),
-    );
+    expect(expected).toEqual(computeOutlook("buildImpact", snapshot, facility));
     const result = await new Promise<OutlookReply>((resolve) => {
       postMessage.mockImplementationOnce(resolve);
       const request: OutlookRequest = {

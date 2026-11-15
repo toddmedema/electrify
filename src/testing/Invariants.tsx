@@ -1,3 +1,4 @@
+import { legacyTerritoryConnections } from "../helpers/Territories";
 import { connectionAgreements } from "../helpers/PowerAgreements";
 import { UTILITY_AREAS, UTILITY_TARGETS } from "../data/UtilityExpansion";
 import {
@@ -28,12 +29,6 @@ import {
   isWeatherHazardEligible,
 } from "../helpers/Hazards";
 import { MINUTES_PER_MONTH } from "../helpers/DateTime";
-import {
-  hasTerritoryNetwork,
-  internalTerritoryEdges,
-  ownedTerritories,
-  isInternalTerritoryCorridor,
-} from "../helpers/Territories";
 import { POLICIES } from "../data/Policies";
 import { getSolarOutputFactor } from "../helpers/Energy";
 import { programCustomers } from "../helpers/Policies";
@@ -411,13 +406,7 @@ export function checkTick(
     storageGridW +
     -(now.customerBatteryGridChargeW || 0) +
     (now.importedW || 0) -
-    (now.exportedW || 0) -
-    (hasTerritoryNetwork(state)
-      ? Object.values(now.territories ?? {}).reduce(
-          (sum, territory) => sum + (territory?.curtailedW ?? 0),
-          0,
-        )
-      : 0);
+    (now.exportedW || 0);
   if (
     isFinite_(now.supplyW) &&
     Math.abs(expectedSupplyW - now.supplyW) >
@@ -433,7 +422,6 @@ export function checkTick(
   }
 
   checkTrade(collector, state, now, when);
-  checkTerritories(collector, state, now, when);
 
   if (now.customerBillingRate !== undefined) {
     const billedRevenue =
@@ -462,6 +450,7 @@ export function checkTick(
   const principal = getTotalDebt([
     ...state.facilities,
     ...(state.transmission?.lines ?? []),
+    ...legacyTerritoryConnections(state),
     ...(state.utilityExpansion?.loans ?? []),
   ]);
   const previousLoan = collector.observeLoanBalance(now.minute, principal);
@@ -480,7 +469,10 @@ export function checkTick(
           (f.loanAmountLeft > 0 ? f.loanMonthlyPayment / TICKS_PER_MONTH : 0),
         0,
       ) +
-      (state.transmission?.lines || []).reduce(
+      [
+        ...(state.transmission?.lines || []),
+        ...legacyTerritoryConnections(state),
+      ].reduce(
         (acc, line) =>
           acc +
           (line.loanAmountLeft > 0
@@ -777,7 +769,6 @@ function checkTrade(
     for (const line of state.transmission.lines.filter(
       (l) => l.yearsToBuildLeft <= 0,
     )) {
-      if (isInternalTerritoryCorridor(state, line.corridorId)) continue;
       const ownedTarget = acquisitionTargetForCorridor(line.corridorId);
       if (
         ownedTarget &&
@@ -850,7 +841,6 @@ function checkTrade(
       .filter(
         ({ yearsToBuildLeft, corridorId }) =>
           yearsToBuildLeft <= 0 &&
-          !isInternalTerritoryCorridor(state, corridorId) &&
           !ownedUtility(
             state,
             acquisitionTargetForCorridor(corridorId)?.id ?? "",
@@ -874,103 +864,6 @@ function checkTrade(
       );
     }
   }
-}
-
-/** Local balances cannot conceal an overloaded wire or electricity created by acquisition. */
-function checkTerritories(
-  collector: InvariantCollector,
-  state: GameType,
-  now: TickPresentFutureType,
-  when: string,
-) {
-  if (!hasTerritoryNetwork(state)) return;
-  const regions = now.territories;
-  const ids = ownedTerritories(state);
-  if (!regions || ids.some((id) => !regions[id])) {
-    collector.add(
-      "owned territories have physical balances",
-      when,
-      "Missing territory balance",
-    );
-    return;
-  }
-  const netTransfers = new Map<string, number>();
-  for (const edge of internalTerritoryEdges(state, now)) {
-    const flow = state.transmission!.lines.find(
-      (line) => line.id === edge.id,
-    )!.currentFlowW;
-    if (
-      !Number.isFinite(flow) ||
-      Math.abs(flow) > edge.capacityW * (1 + RELATIVE_TOLERANCE) + 1
-    )
-      collector.add(
-        "internal transfers respect available wire capacity",
-        when,
-        `${edge.corridorId}: ${flow}/${edge.capacityW}W`,
-      );
-    netTransfers.set(edge.from, (netTransfers.get(edge.from) ?? 0) + flow);
-    netTransfers.set(edge.to, (netTransfers.get(edge.to) ?? 0) - flow);
-  }
-  const close = (a: number, b: number) =>
-    Math.abs(a - b) <=
-    Math.max(1, Math.abs(a), Math.abs(b)) * RELATIVE_TOLERANCE + 1;
-  let demandW = 0,
-    supplyW = 0,
-    importedW = 0,
-    exportedW = 0;
-  for (const [id, region] of Object.entries(regions)) {
-    if (!region) continue;
-    if (!ids.includes(id as (typeof ids)[number])) {
-      collector.add("only owned territories serve company load", when, id);
-      continue;
-    }
-    const fields = [
-      region.demandW,
-      region.supplyW,
-      region.generationW,
-      region.importedW,
-      region.exportedW,
-      region.unservedW,
-      region.curtailedW,
-      region.storageChargeW,
-      region.storageDischargeW,
-    ];
-    if (fields.some((value) => !Number.isFinite(value) || value < -1))
-      collector.add("territory balances are finite and non-negative", when, id);
-    const incomingW =
-      region.generationW +
-      region.storageDischargeW +
-      region.importedW +
-      (netTransfers.get(id) ?? 0);
-    const outgoingW =
-      region.supplyW +
-      region.storageChargeW +
-      region.exportedW +
-      region.curtailedW;
-    if (!close(incomingW, outgoingW))
-      collector.add(
-        "territory energy is conserved",
-        when,
-        `${id}: ${incomingW}W in, ${outgoingW}W out`,
-      );
-    if (!close(region.demandW, region.supplyW + region.unservedW))
-      collector.add("territory shortages match unmet local demand", when, id);
-    demandW += region.demandW;
-    supplyW += region.supplyW;
-    importedW += region.importedW;
-    exportedW += region.exportedW;
-  }
-  if (
-    !close(demandW, now.demandW) ||
-    !close(supplyW, now.supplyW) ||
-    !close(importedW, now.importedW ?? 0) ||
-    !close(exportedW, now.exportedW ?? 0)
-  )
-    collector.add(
-      "territory balances sum to company totals",
-      when,
-      `load ${demandW}/${now.demandW}, served ${supplyW}/${now.supplyW}, imports ${importedW}/${now.importedW}, exports ${exportedW}/${now.exportedW}`,
-    );
 }
 
 export function checkMonth(

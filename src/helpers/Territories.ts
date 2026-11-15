@@ -1,5 +1,6 @@
 import {
   isStorage,
+  type AcquireLandAction,
   type FacilityOperatingType,
   type FacilityShoppingType,
   type GameType,
@@ -13,23 +14,24 @@ import {
 } from "../data/Territories";
 import { UTILITY_AREAS } from "../data/UtilityExpansion";
 import { isUtilityExpansionGame } from "./ExpansionContext";
-import { transmissionRatingW } from "./Transmission";
+import { getInflationIndex, hasEconomy } from "../data/Economy";
+import { getDateFromMinute } from "./DateTime";
+import { currentTick } from "./GameSelectors";
 
 export function hasTerritoryNetwork(
   game: Pick<GameType, "scenarioId" | "customScenario" | "territoryNetwork">,
 ): boolean {
-  return isUtilityExpansionGame(game) && game.territoryNetwork?.version === 1;
+  return isUtilityExpansionGame(game) && game.territoryNetwork?.version === 2;
 }
 
 export function ownedTerritories(game: GameType): TerritoryId[] {
   if (!hasTerritoryNetwork(game)) return ["champlain"];
   return TERRITORIES.filter(
-    ({ id, corridorId }) =>
+    ({ id }) =>
       id === "champlain" ||
       (id === "green-uplands"
-        ? game.transmission?.lines.some(
-            (line) =>
-              line.corridorId === corridorId && line.yearsToBuildLeft <= 0,
+        ? game.territoryNetwork?.landPurchases.some(
+            (receipt) => receipt.territoryId === id,
           )
         : game.utilityExpansion?.acquisitions.some(
             ({ targetId }) => targetId === id,
@@ -112,19 +114,7 @@ export function territoryBuildAvailability(
   });
   if (!territory) return reject("Choose a valid territory.");
   if (!ownedTerritories(game).includes(id))
-    return reject("Connect and own this territory before building.");
-  if (
-    id !== "champlain" &&
-    !game.transmission?.lines.some(
-      (line) =>
-        line.corridorId === territory.corridorId &&
-        line.yearsToBuildLeft <= 0 &&
-        !line.paused,
-    )
-  )
-    return reject(
-      "Complete and enable this territory’s connection before building.",
-    );
+    return reject("Acquire this territory before building.");
   if (!kind)
     return reject("No new hydro sites are available in these territories.");
   if (!remaining)
@@ -206,41 +196,67 @@ export function territoryForCorridor(corridorId: string): TerritoryId {
   return "champlain";
 }
 
-export function isInternalTerritoryCorridor(
-  game: GameType,
-  corridorId: string,
-): boolean {
+/** Legacy investments retain their exact financed balances, without operating as wires. */
+export function legacyTerritoryConnections(
+  game: Pick<GameType, "territoryNetwork">,
+) {
+  return game.territoryNetwork?.legacyConnections ?? [];
+}
+export const LAND_PRICE_2005 = 18e6;
+export function landPrice(
+  game: Pick<GameType, "seed" | "startingYear">,
+  minute: number,
+): number {
   return (
-    hasTerritoryNetwork(game) &&
-    (corridorId === GREEN_UPLANDS_CORRIDOR_ID ||
-      TERRITORIES.some(
-        ({ id, corridorId: internalId }) =>
-          internalId === corridorId &&
-          game.utilityExpansion?.acquisitions.some(
-            ({ targetId }) => targetId === id,
-          ),
-      ))
+    LAND_PRICE_2005 *
+    (hasEconomy()
+      ? getInflationIndex(
+          getDateFromMinute(minute, game.startingYear),
+          2005,
+          game.seed,
+        )
+      : 1)
   );
 }
-
-export function internalTerritoryEdges(
+export function landPurchaseQuote(game: GameType) {
+  if (
+    !hasTerritoryNetwork(game) ||
+    ownedTerritories(game).includes("green-uplands") ||
+    game.multiplayer?.landOwner
+  )
+    return undefined;
+  const price = landPrice(game, game.date.minute);
+  return {
+    territoryId: "green-uplands" as const,
+    price,
+    quoteKey: JSON.stringify(["green-uplands", game.date.minute, price]),
+  };
+}
+export function validLandPurchaseAction(
   game: GameType,
-  tick: Pick<
-    TickPresentFutureType,
-    | "temperatureC"
-    | "solarIrradianceWM2"
-    | "transmissionCapacityLimitsWByCorridor"
-  >,
-) {
-  if (!hasTerritoryNetwork(game)) return [];
-  return (game.transmission?.lines ?? [])
-    .filter((line) => isInternalTerritoryCorridor(game, line.corridorId))
-    .map((line) => ({
-      id: line.id,
-      corridorId: line.corridorId,
-      from: "champlain" as TerritoryId,
-      to: territoryForCorridor(line.corridorId),
-      capacityW:
-        line.yearsToBuildLeft > 0 ? 0 : transmissionRatingW(line, tick),
-    }));
+  value: unknown,
+): value is AcquireLandAction {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const action = value as Partial<AcquireLandAction>;
+  const quote = landPurchaseQuote(game);
+  return (
+    Object.keys(value).length === 2 &&
+    action.territoryId === "green-uplands" &&
+    !!quote &&
+    quote.quoteKey === action.quoteKey
+  );
+}
+export function purchaseLand(game: GameType, value: unknown): boolean {
+  if (!validLandPurchaseAction(game, value)) return false;
+  const quote = landPurchaseQuote(game)!;
+  const now = currentTick(game);
+  if (!now || now.cash < quote.price || !game.territoryNetwork) return false;
+  now.cash -= quote.price;
+  game.territoryNetwork.landPurchases.push({
+    territoryId: quote.territoryId,
+    minute: game.date.minute,
+    price: quote.price,
+  });
+  // Land is a non-depreciating capital asset; exchanging cash for it preserves net worth.
+  return true;
 }

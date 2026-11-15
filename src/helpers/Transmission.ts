@@ -42,7 +42,6 @@ import {
 } from "../Types";
 import { pow } from "./Pow";
 import { log } from "./Libm";
-import { GREEN_UPLANDS_CORRIDOR_ID } from "../data/Territories";
 
 export interface TransmissionConditions {
   transmissionCapacityLimitsWByCorridor?: Record<string, number>;
@@ -148,7 +147,6 @@ export function intertieContextForGame(
         | "startingYear"
         | "multiplayer"
         | "utilityExpansion"
-        | "territoryNetwork"
       >
     >,
 ): IntertieContext {
@@ -160,7 +158,6 @@ export function intertieContextForGame(
       customScenario: game.customScenario,
       multiplayer: game.multiplayer,
       utilityExpansion: game.utilityExpansion,
-      territoryNetwork: game.territoryNetwork,
     }),
     tutorialSupplyLimitW: game.tutorialIntertieStress?.active
       ? 150e6
@@ -893,8 +890,7 @@ export function intertieUpgradeQuote(
 ): IntertieUpgradeQuote | undefined {
   if (
     effectiveCorridor(line.corridorId, context)?.buildCost === 0 ||
-    (context?.ownedUtilityCorridors?.includes(line.corridorId) &&
-      !context.territoryNetwork)
+    context?.ownedUtilityCorridors?.includes(line.corridorId)
   )
     return undefined;
   const corridor = effectiveCorridor(line.corridorId, context);
@@ -942,7 +938,6 @@ export function intertieBuildQuote(
     !corridor ||
     !Number.isInteger(tier) ||
     tier < 1 ||
-    (corridorId === GREEN_UPLANDS_CORRIDOR_ID && tier !== 1) ||
     tier > MAX_INTERTIE_UPGRADES + 1
   )
     return undefined;

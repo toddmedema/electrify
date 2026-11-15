@@ -4,8 +4,6 @@ import { Provider } from "react-redux";
 import { GENERATORS } from "../../data/Facilities";
 import { createGame } from "../../testing/Simulator";
 import type { GameType, TerritoryId } from "../../Types";
-import { GREEN_UPLANDS_CORRIDOR_ID } from "../../data/Territories";
-import { inheritedConnection } from "../../helpers/PowerAgreements";
 import BuildPurchaseReviewDialog from "./BuildPurchaseReviewDialog";
 import { signature } from "./DeferredProjection";
 import {
@@ -32,12 +30,11 @@ function fixture(territoryNetwork = false) {
     seed: 12345,
   });
   if (territoryNetwork) {
-    game.territoryNetwork = { version: 1 };
-    game.transmission!.lines.push({
-      ...inheritedConnection("champlain", 99),
-      corridorId: GREEN_UPLANDS_CORRIDOR_ID,
-      capacityW: 1e6,
-    });
+    game.territoryNetwork = {
+      version: 2,
+      landPurchases: [{ territoryId: "green-uplands", minute: 0, price: 18e6 }],
+      legacyConnections: [],
+    };
   }
   const facility = GENERATORS(game, 50e6, [], []).find(
     (quote) =>
@@ -194,6 +191,6 @@ it("refreshes the same quote when its build destination changes and ignores the 
   reply(0);
   expect(screen.getByRole("status")).toBeInTheDocument();
   const refreshed = reply(1);
-  expect(refreshed).not.toEqual(initial);
+  expect(refreshed).toEqual(initial);
   expect(chartState()).toEqual(refreshed);
 });

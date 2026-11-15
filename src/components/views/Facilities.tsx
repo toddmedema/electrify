@@ -1,4 +1,11 @@
 import TerritoryNetwork from "./TerritoryNetwork";
+import PowerAgreements from "../base/PowerAgreements";
+import {
+  INHERITED_CONNECTIONS,
+  inheritedConnection,
+  utilityOwnedAt,
+} from "../../helpers/PowerAgreements";
+import { UtilityId } from "../../Types";
 import {
   hasTerritoryNetwork,
   facilityTerritoryId,
@@ -1477,12 +1484,12 @@ export default class Facilities extends React.Component<Props, SelectionState> {
               className="territoryViewTabs"
               value={this.state.territoryView}
               variant="fullWidth"
-              aria-label="Network views"
+              aria-label="Facility views"
               onChange={(_event, territoryView) =>
                 this.setState({ territoryView })
               }
             >
-              <Tab value="network" label="Network" />
+              <Tab value="network" label="Territories" />
               <Tab value="fleet" label="Fleet" />
               <Tab value="agreements" label="Agreements" />
             </Tabs>
@@ -1507,24 +1514,22 @@ export default class Facilities extends React.Component<Props, SelectionState> {
                     Supply agreements
                   </Typography>
                   <Typography variant="body2" color="textSecondary">
-                    Buy power for a named territory through its regional
-                    interface. Contract capacity and delivered power differ when
-                    a connection is full or unavailable.
+                    Purchase finite supplies for your company pool.
+                    Availability, weather and expiry still matter.
                   </Typography>
-                  <TransmissionPanel
-                    game={game}
-                    onBuild={onTransmissionBuild}
-                    onUpgrade={onTransmissionUpgrade}
-                    onCancel={this.props.onTransmissionCancel}
-                    onPause={this.props.onTransmissionPause}
-                    onBuyingRule={onBuyingRule}
-                    onSellingRule={onSellingRule}
-                    onBeforeDragStart={this.onBeforeDragStart}
-                    onDragEnd={this.onDragEnd}
-                    agreementsOnly
-                    hideOwnership
-                    heading="Regional delivery interfaces"
-                  />
+                  {(Object.keys(INHERITED_CONNECTIONS) as UtilityId[])
+                    .filter((id) => utilityOwnedAt(game, id, game.date.minute))
+                    .map((id, index) => (
+                      <section key={id}>
+                        <Typography component="h3" variant="subtitle1">
+                          {territoryName(id)} agreements
+                        </Typography>
+                        <PowerAgreements
+                          game={game}
+                          line={inheritedConnection(id, index + 1)}
+                        />
+                      </section>
+                    ))}
                 </div>
               )}
             </div>

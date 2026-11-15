@@ -1,3 +1,4 @@
+import { landPurchaseQuote } from "../helpers/Territories";
 import { powerAgreementQuote } from "../helpers/PowerAgreements";
 import { acceptPowerAgreement } from "../reducers/GameActions";
 import cloneDeep from "lodash.clonedeep";
@@ -27,6 +28,7 @@ import gameReducer, {
 import {
   chooseScenarioResponse,
   acquireUtility,
+  acquireLand,
   schedulePolicy,
 } from "../reducers/GameActions";
 import type { DifficultyType, GameType } from "../Types";
@@ -89,6 +91,17 @@ function applyScheduled(
   action: ScheduledSimActionType,
 ): GameType {
   switch (action.type) {
+    case "land": {
+      const quote = landPurchaseQuote(game);
+      if (!quote) throw new Error("No land available");
+      return officialCommand(
+        game,
+        acquireLand({
+          territoryId: quote.territoryId,
+          quoteKey: quote.quoteKey,
+        }),
+      );
+    }
     case "agreement": {
       const quote = powerAgreementQuote(game, action.blockId);
       if (!quote) throw new Error(`Unavailable agreement: ${action.blockId}`);

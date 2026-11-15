@@ -26,7 +26,7 @@ export const TERRITORIES: readonly TerritoryDefinition[] = [
     id: "champlain",
     name: "Champlain",
     description:
-      "Your home service territory and connection to the regional grid.",
+      "Your home service territory. All owned facilities serve one company power pool.",
     kind: "home",
     sites: sites(7, 3, 3),
   },
@@ -34,7 +34,7 @@ export const TERRITORIES: readonly TerritoryDefinition[] = [
     id: "valley-electric",
     name: "Valley Electric",
     description:
-      "Connect and acquire a residential and commercial service territory.",
+      "Acquire a residential and commercial utility with plants and dated power agreements.",
     kind: "utility",
     corridorId: "vt-champlain-valley",
     sites: sites(5, 3, 3),
@@ -43,7 +43,7 @@ export const TERRITORIES: readonly TerritoryDefinition[] = [
     id: "ridge-electric",
     name: "Ridge Electric",
     description:
-      "Connect and acquire an industrial service territory with inherited wind.",
+      "Acquire an industrial utility with inherited wind and thermal plants.",
     kind: "utility",
     corridorId: "vt-champlain-ridge",
     sites: sites(5, 3, 3),
@@ -52,7 +52,7 @@ export const TERRITORIES: readonly TerritoryDefinition[] = [
     id: "green-uplands",
     name: "Green Uplands",
     description:
-      "Connect undeveloped land for wind, solar and storage. No customers transfer.",
+      "Buy undeveloped land for wind, solar and storage. No customers or plants transfer.",
     kind: "greenfield",
     corridorId: GREEN_UPLANDS_CORRIDOR_ID,
     sites: sites(0, 4, 3),

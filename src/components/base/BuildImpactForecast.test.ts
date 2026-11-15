@@ -14,8 +14,6 @@ import {
 import { computeOutlook } from "./OutlookForecast";
 import { forecastShortfalls } from "../../helpers/ForecastShortfalls";
 import { forecastWorkerSnapshot } from "./ForecastWorkerSnapshot";
-import { GREEN_UPLANDS_CORRIDOR_ID } from "../../data/Territories";
-import { inheritedConnection } from "../../helpers/PowerAgreements";
 
 function fixture() {
   const game = createGame({ scenarioId: 100, seed: 12345 });
@@ -29,18 +27,17 @@ function fixture() {
 }
 
 it.each(["generator", "storage"] as const)(
-  "forecasts a remote %s exactly as the purchased fleet behind its territory link",
+  "forecasts a remote %s exactly as the purchased fleet in the shared company pool",
   (kind) => {
     const game = createGame({ scenarioId: 116, seed: 188 });
-    game.territoryNetwork = { version: 1 };
+    game.territoryNetwork = {
+      version: 2,
+      landPurchases: [{ territoryId: "green-uplands", minute: 0, price: 18e6 }],
+      legacyConnections: [],
+    };
     game.date.year = 2020;
     game.timeline.forEach((tick) => {
       tick.cash = 1e12;
-    });
-    game.transmission!.lines.push({
-      ...inheritedConnection("champlain", 99),
-      corridorId: GREEN_UPLANDS_CORRIDOR_ID,
-      capacityW: 1e6,
     });
     const facility = {
       ...(kind === "generator"
@@ -97,7 +94,7 @@ it.each(["generator", "storage"] as const)(
         "green-uplands",
       ),
     );
-    expect(remote).not.toEqual(computeOutlook("buildImpact", game, facility));
+    expect(remote).toEqual(computeOutlook("buildImpact", game, facility));
     expect(computeOutlook("buildImpact", game, facility, "champlain")).toEqual(
       computeOutlook("buildImpact", game, facility),
     );

@@ -1,3 +1,4 @@
+import { legacyTerritoryConnections } from "./Territories";
 import { needsObjectiveEnergyMeters } from "./ScenarioRules";
 import { GAME_TO_REAL_YEARS, TICK_MINUTES, TICKS_PER_YEAR } from "../Constants";
 import { getScenario } from "../data/Scenarios";
@@ -199,6 +200,7 @@ export function projectionSignature(game: GameType): string {
         ),
       },
     ),
+    JSON.stringify(game.territoryNetwork),
     game.creditPremium,
     JSON.stringify(game.loadAdditions),
     game.storyEffectsDisabled,
@@ -271,6 +273,7 @@ function buildProjection(
             debtPrincipal: getTotalDebt([
               ...state.facilities,
               ...(state.transmission?.lines ?? []),
+              ...legacyTerritoryConnections(state),
               ...(state.utilityExpansion?.loans ?? []),
             ]),
             ...(state.utilityExpansion

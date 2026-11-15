@@ -1,3 +1,4 @@
+import { upgradeSave } from "../SaveUpgrade";
 import { currencyForLocation } from "../helpers/Currency";
 import { formatMoneyFull } from "../helpers/Format";
 import { isUtilityExpansionGame } from "../helpers/ExpansionContext";
@@ -320,7 +321,9 @@ export function createWorld(
         a: a.id,
         b: b.id,
         capacityW,
-        annualOperatingCost: capacityW * MULTIPLAYER_LINK_OPERATING_COST_PER_W,
+        annualOperatingCost: isUtilityExpansionGame(grids[i])
+          ? 0
+          : capacityW * MULTIPLAYER_LINK_OPERATING_COST_PER_W,
         ratingW: capacityW,
         flowW: 0,
       });
@@ -340,8 +343,12 @@ export function createWorld(
           name: seat.name,
           routeType: "EXISTING" as const,
           capacityW: edge.capacityW,
-          buildCost: (edge.capacityW * EDGE_COST_PER_W) / 2,
-          annualOperatingCost: edge.annualOperatingCost / 2,
+          buildCost: isUtilityExpansionGame(game)
+            ? 0
+            : (edge.capacityW * EDGE_COST_PER_W) / 2,
+          annualOperatingCost: isUtilityExpansionGame(game)
+            ? 0
+            : edge.annualOperatingCost / 2,
           yearsToBuild: 0.5,
           ...PEER_CORRIDOR_DERATE,
         };
@@ -468,6 +475,11 @@ function applyCommandOnce(
   if (command.kind === "action") {
     const name = command.name;
     if (!isGameCommand(name)) return "That game action is unavailable";
+    if (
+      name === "acquireLand" &&
+      world.grids.some((grid) => grid.territoryNetwork?.landPurchases.length)
+    )
+      return "Green Uplands is already owned by another company";
     const validation = validateGameCommand(game, name, command.payload);
     if ("error" in validation) return validation.error;
     if (
@@ -822,6 +834,14 @@ export function roomView(world: World, seatId: string): RoomView {
     results: Object.keys(world.outcomes).length
       ? companyResults(world)
       : undefined,
+    landOwner: (() => {
+      const owner = world.grids.findIndex(
+        (grid) => grid.territoryNetwork?.landPurchases.length,
+      );
+      return owner < 0
+        ? undefined
+        : { seat: world.seats[owner].id, name: world.seats[owner].name };
+    })(),
     clock: {
       activeSpeed: world.speed,
       selectedSpeed: world.selectedSpeeds[seatId],
@@ -1205,7 +1225,7 @@ export function restoreWorld(
   seats?: Seat[],
 ): World {
   savedMatchSpec(value);
-  const world = value as World;
+  const world = upgradeTerritoryWorld(value) as World;
   const ids = new Set(world?.seats?.map?.((s) => s?.id));
   if (
     !validRoster(world) ||
@@ -1229,7 +1249,8 @@ export function restoreWorld(
   );
   if (
     !world.grids.every((_grid, i) => validGrid(world, initial, i)) ||
-    !validEdges(world, ids, initial)
+    !validEdges(world, ids, initial) ||
+    !validSharedLand(world)
   )
     throw new Error(INVALID_GRIDS);
   restoreCommitments(world, result);
@@ -1246,9 +1267,45 @@ export function restoreWorld(
   return result;
 }
 
+/** Only the shipped schema13 valley rules have a defined pooled-world transition. */
+function upgradeTerritoryWorld(value: unknown): unknown {
+  const old = value as Partial<World> | null;
+  if (
+    !old ||
+    old.schema !== 3 ||
+    old.gameSchema !== 13 ||
+    old.rules !==
+      "coop-2-34d99333d49691071b390dc49bfe6c73e43562c61b9fcbf7974f5996b10deaca" ||
+    !Array.isArray(old.grids) ||
+    !old.grids.every(
+      (grid) =>
+        !!grid && typeof grid === "object" && isUtilityExpansionGame(grid),
+    )
+  )
+    return value;
+  const result = cloneDeep(old) as World;
+  for (let i = 0; i < result.grids.length; i++) {
+    const upgraded = upgradeSave({ schemaVersion: 13, game: result.grids[i] });
+    if (!upgraded) return value;
+    result.grids[i] = upgraded.game as GameType;
+  }
+  result.gameSchema = SAVE_SCHEMA_VERSION;
+  result.rules = RULES;
+  return result;
+}
+function validSharedLand(world: World): boolean {
+  const owners = world.grids.flatMap(
+    (grid) => grid.territoryNetwork?.landPurchases ?? [],
+  );
+  // Pre-pooling maps were company-local. Keep every migrated right; all new claims are exclusive.
+  return (
+    owners.length <= 1 || owners.every((receipt) => receipt.legacy === true)
+  );
+}
+
 /** Check the envelope before the worker attempts to load another version's scenario data. */
 export function savedMatchSpec(value: unknown): MatchSpec {
-  const raw = value as {
+  const raw = upgradeTerritoryWorld(value) as {
     schema?: number;
     gameSchema?: number;
     spec?: MatchSpec;

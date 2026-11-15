@@ -5,7 +5,7 @@ import { expectDialogToFit } from "./dialog-layout";
 import { reviewScreenshot } from "./review-screenshot";
 
 for (const theme of ["light", "dark"] as const) {
-  test(`inherited connection reviews and retains a signed agreement in ${theme}`, async ({
+  test(`company supply reviews and retains a signed agreement in ${theme}`, async ({
     page,
   }, testInfo) => {
     test.setTimeout(120000);
@@ -27,52 +27,10 @@ for (const theme of ["light", "dark"] as const) {
     await facilities
       .getByRole("tab", { name: "Agreements", exact: true })
       .click();
-    let line = facilities
-      .locator(".transmissionLine")
-      .filter({ hasText: "Champlain ↔ Regional grid" });
-    await expect(line).toContainText("209MW under agreement");
-    await expect(
-      line.getByRole("button", { name: /^Review upgrade/ }),
-    ).toHaveCount(0);
+    let line = facilities.locator(".territoryAgreements");
+    await expect(line).toContainText("Regional nuclear · Inherited");
     const opening = await readSavedGame(page);
-    expect(
-      opening!.transmission!.lines.find(
-        (entry) => entry.corridorId === "vt-champlain-regional",
-      ),
-    ).toMatchObject({ capacityW: 300e6, buildCost: 0, yearsToBuildLeft: 0 });
-    const openingInspect = line.getByRole("button", {
-      name: /^Inspect Champlain ↔ Regional grid/,
-    });
-    await openingInspect.click();
-    await expect(
-      line.getByText("Market price now", { exact: true }),
-    ).toBeVisible();
-    await expect(
-      line.getByText("Total import limit", { exact: true }),
-    ).toBeVisible();
-    await expect(
-      line.getByText("Market emissions (CO₂e)", { exact: true }),
-    ).toBeVisible();
-    const marketBuying = facilities.getByRole("combobox", {
-      name: "Market buying",
-      exact: true,
-    });
-    await marketBuying.click();
-    await page.getByRole("option", { name: "None", exact: true }).click();
-    await expect(line).toContainText(
-      "Market buying is off. Existing agreements continue.",
-    );
-    await expect(line).not.toContainText("Flow limited by: Trading rule");
-    const contractedOnly = await readSavedGame(page);
-    const current = contractedOnly!.timeline.find(
-      (tick) => tick.minute === contractedOnly!.date.minute,
-    )!;
-    expect(current.importedW).toBeGreaterThan(0);
-    expect(current.importedW).toBe(current.entitlementImportedW);
-    await marketBuying.click();
-    await page
-      .getByRole("option", { name: "Shortages only", exact: true })
-      .click();
+    expect(opening!.transmission!.lines).toEqual([]);
     await editSavedGame(page, ({ game }) => {
       // A paused continuation fixture enters the authored 24-month offer window. Historic
       // readings remain untouched; the continuation owner recalculates future prices/supply.
@@ -103,28 +61,10 @@ for (const theme of ["light", "dark"] as const) {
     await facilities
       .getByRole("tab", { name: "Agreements", exact: true })
       .click();
-    line = facilities
-      .locator(".transmissionLine")
-      .filter({ hasText: "Champlain ↔ Regional grid" });
-    const inspect = line.getByRole("button", {
-      name: /^Inspect Champlain ↔ Regional grid/,
-    });
-    await inspect.click();
-    await expect(inspect).toHaveAttribute("aria-expanded", "true");
-    await expect(line).toContainText("Power purchase agreements");
+    line = facilities.locator(".territoryAgreements");
     await expect(line).toContainText("Regional nuclear · Inherited");
     await expect(line).toContainText("Through 31 Dec 2019");
     await expect(line).toContainText("114MW → 57MW on 1 Jan 2020");
-    const summary = line.locator(".powerAgreementSummary");
-    await expect(summary).toContainText("Replacement available");
-    expect(
-      await line
-        .locator(".facilityStatus")
-        .evaluate((element) => element.scrollWidth <= element.clientWidth + 1),
-    ).toBe(true);
-    expect(
-      await summary.evaluate((element) => getComputedStyle(element).whiteSpace),
-    ).toBe("normal");
     const review = line.getByRole("button", {
       name: "Review Québec hydro replacement",
       exact: true,
@@ -134,14 +74,6 @@ for (const theme of ["light", "dark"] as const) {
     await reviewScreenshot(line, {
       path: testInfo.outputPath(`ppa-agreements-${theme}.png`),
       animations: "disabled",
-    });
-    const header = line.locator(".facilityRowHeader");
-    await header.scrollIntoViewIfNeeded();
-    const headerBounds = (await header.boundingBox())!;
-    await reviewScreenshot(page, {
-      path: testInfo.outputPath(`ppa-connection-${theme}.png`),
-      animations: "disabled",
-      clip: { ...headerBounds, width: Math.min(560, headerBounds.width) },
     });
     await review.click();
     const dialog = page.getByRole("dialog", {
@@ -268,7 +200,6 @@ for (const theme of ["light", "dark"] as const) {
     await expect(dialog).toHaveCount(0);
     await expect(line).toContainText("Scheduled · starts 1 Jan 2020");
     await expect(line).toContainText("1 Jan 2020–31 Dec 2024");
-    await expect(inspect).toBeFocused();
     await expect(review).toHaveCount(0);
     const signedAgreement = line
       .locator(".powerAgreement")
@@ -339,7 +270,6 @@ for (const theme of ["light", "dark"] as const) {
     await facilities
       .getByRole("tab", { name: "Agreements", exact: true })
       .click();
-    await inspect.click();
     await expect(line).toContainText("Scheduled · starts 1 Jan 2020");
     await expect(line).toContainText("1 Jan 2020–31 Dec 2024");
     expect(
@@ -362,26 +292,10 @@ for (const theme of ["light", "dark"] as const) {
     await facilities
       .getByRole("tab", { name: "Agreements", exact: true })
       .click();
-    await inspect.click();
     await expect(line).toContainText("Regional nuclear · Expired 1 Jan 2020");
     await expect(line).toContainText(
-      "Uncovered purchases use regional market prices and availability",
+      "each contract has a quantity limit and an expiry date",
     );
-    await expect(
-      line.getByRole("button", {
-        name: "Pause Champlain ↔ Regional grid",
-        exact: true,
-      }),
-    ).toBeVisible();
-    expect(
-      (await readSavedGame(page))!.transmission!.lines.find(
-        (entry) => entry.corridorId === "vt-champlain-regional",
-      )!.capacityW,
-    ).toBe(300e6);
-    expect(
-      await page.evaluate(
-        () => document.documentElement.scrollWidth <= window.innerWidth,
-      ),
-    ).toBe(true);
+    expect((await readSavedGame(page))!.transmission!.lines).toEqual([]);
   });
 }

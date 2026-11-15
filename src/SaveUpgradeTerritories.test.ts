@@ -1,255 +1,260 @@
+import { validUtilityExpansion } from "./helpers/ExpansionValidation";
+import { validPowerAgreements } from "./helpers/PowerAgreements";
+import { validTerritoryNetwork } from "./helpers/TerritoryValidation";
+import type { GameType } from "./Types";
 import cloneDeep from "lodash.clonedeep";
 import { SAVE_SCHEMA_VERSION } from "./SaveSchema";
-import { parseSave, serializeSave } from "./SaveGame";
+import { validTransmissionLine, parseSave, serializeSave } from "./SaveGame";
 import { upgradeSave } from "./SaveUpgrade";
 import { createGame } from "./testing/Simulator";
-import { copyOfficialGame } from "./testing/OfficialScenarioExecutionFixtures";
-import { acquisitionQuote } from "./helpers/Expansion";
 import { currentTick } from "./helpers/GameSelectors";
 import {
-  facilityTerritoryId,
-  territoryBuildAvailability,
+  ownedTerritories,
+  landPurchaseQuote,
+  purchaseLand,
 } from "./helpers/Territories";
-import { GENERATORS } from "./data/Facilities";
+import { accessContextForGame } from "./data/IntertieAccess";
+import {
+  intertieBuildQuote,
+  intertieUpgradeQuote,
+} from "./helpers/Transmission";
+import { inheritedConnection } from "./helpers/PowerAgreements";
+import { acquisitionQuote } from "./helpers/Expansion";
+import { applyAcquireUtility, tickState } from "./reducers/Game";
 import { modScenario } from "./mods/ModScenario";
 import { modPackage } from "./testing/ModFixtures";
-import reducer, {
-  buildFacility,
-  buildTransmissionLine,
-  tickState,
-} from "./reducers/Game";
-import { acquireUtility } from "./reducers/GameActions";
 
-function legacyPortfolio() {
-  let game = createGame({ scenarioId: 116, seed: 61 });
-  delete game.territoryNetwork;
+function legacyPortfolio(
+  state: "building" | "paused" | "upgrade" = "building",
+) {
+  const game = createGame({ scenarioId: 116, seed: 61 });
   currentTick(game)!.cash = 3e9;
-  const wind = GENERATORS(game, 200e6, [20], [500]).find(
-    (facility) => facility.fuel === "Wind",
+  const acquisition = acquisitionQuote(game, "valley-electric")!;
+  applyAcquireUtility(game, {
+    targetId: "valley-electric",
+    financed: true,
+    quoteKey: acquisition.quoteKey,
+  });
+  const quote = intertieBuildQuote(
+    "vt-champlain-uplands",
+    2005,
+    1,
+    accessContextForGame(game),
   )!;
-  game = copyOfficialGame(
-    reducer(game, buildFacility({ facility: wind, financed: true })),
-  );
-  const gas = GENERATORS(game, 100e6, [20], [500]).find(
-    (facility) => facility.fuel === "Natural Gas",
-  )!;
-  for (let project = 0; project < 4; project++)
-    game = copyOfficialGame(
-      reducer(game, buildFacility({ facility: gas, financed: true })),
-    );
-  game = copyOfficialGame(
-    reducer(
-      game,
-      buildTransmissionLine({
-        corridorId: "vt-champlain-valley",
-        financed: true,
-      }),
-    ),
-  );
-  game.transmission!.lines.find(
-    (line) => line.corridorId === "vt-champlain-valley",
-  )!.yearsToBuildLeft = 0;
-  const quote = acquisitionQuote(game, "valley-electric")!;
-  expect(quote).toBeDefined();
-  game = copyOfficialGame(
-    reducer(
-      game,
-      acquireUtility({
-        targetId: "valley-electric",
-        financed: true,
-        quoteKey: quote.quoteKey,
-      }),
-    ),
-  );
+  const line = {
+    ...quote,
+    id: 4,
+    corridorId: "vt-champlain-uplands",
+    name: "Green Uplands",
+    yearsToBuildLeft: state === "building" ? quote.yearsToBuild / 2 : 0,
+    minuteCreated: 0,
+    financed: true,
+    loanAmountLeft: quote.buildCost * 0.8,
+    loanMonthlyPayment: quote.buildCost * 0.01,
+    interestRate: 0.05,
+    currentFlowW: 0,
+    paused: state === "paused",
+  };
+  if (state === "upgrade") {
+    const upgrade = intertieUpgradeQuote(
+      line,
+      2005,
+      1,
+      1,
+      accessContextForGame(game),
+    )!;
+    Object.assign(line, {
+      buildCost: line.buildCost + upgrade.buildCost,
+      upgrade: { ...upgrade, yearsToBuildLeft: upgrade.yearsToBuild / 2 },
+    });
+  }
+  game.transmission!.lines = [
+    inheritedConnection("champlain", 1),
+    inheritedConnection("valley-electric", 2),
+    line,
+  ];
   const raw = JSON.parse(JSON.stringify(serializeSave(game)));
-  raw.schemaVersion = 12;
-  delete raw.game.territoryNetwork;
-  raw.game.facilities.forEach(
-    (facility: { territoryId?: unknown }) => delete facility.territoryId,
-  );
-  raw.game.timeline.forEach(
-    (tick: { territories?: unknown }) => delete tick.territories,
-  );
+  raw.schemaVersion = 13;
+  raw.game.territoryNetwork = { version: 1 };
   return raw;
 }
-
-it("migrates scenario116 by provenance while retaining player projects, contracts, cash, history, debt and progress", () => {
-  const raw = legacyPortfolio();
-  const original = cloneDeep(raw);
-  const upgraded = upgradeSave(raw)!;
-  expect(upgraded).not.toBeNull();
-  expect(raw).toEqual(original);
-  expect(upgraded.schemaVersion).toBe(SAVE_SCHEMA_VERSION);
-  const migrated = parseSave(raw);
-  expect(migrated).not.toBeNull();
-  const game = migrated!.game;
-  expect(game.territoryNetwork).toEqual({ version: 1 });
-  expect(
-    game.facilities
-      .filter((facility) => facility.startingAssetId?.includes("-valley-"))
-      .map(facilityTerritoryId),
-  ).toEqual(["valley-electric", "valley-electric", "valley-electric"]);
-  expect(
-    game.facilities
-      .filter((facility) => !facility.startingAssetId)
-      .map(facilityTerritoryId),
-  ).toEqual(Array(5).fill("champlain"));
-  expect(
-    game.facilities.find((facility) => !facility.startingAssetId)?.peakW,
-  ).toBe(200e6);
-  const gas = GENERATORS(game, 100e6, [20], [500]).find(
-    (facility) => facility.fuel === "Natural Gas",
-  )!;
-  expect(territoryBuildAvailability(game, gas, "champlain")).toMatchObject({
-    buildable: false,
-    remaining: 0,
+it.each(["building", "paused", "upgrade"] as const)(
+  "converts a %s land project to immediate rights without changing cash, history, debts or paid investment",
+  (state) => {
+    const raw = legacyPortfolio(state);
+    const original = cloneDeep(raw);
+    const upgraded = upgradeSave(raw)!;
+    expect(raw).toEqual(original);
+    expect(upgraded.schemaVersion).toBe(SAVE_SCHEMA_VERSION);
+    for (const line of raw.game.transmission.lines)
+      expect({
+        corridor: line.corridorId,
+        valid: validTransmissionLine(
+          line,
+          2005,
+          accessContextForGame(raw.game),
+        ),
+      }).toEqual({ corridor: line.corridorId, valid: true });
+    expect({
+      territory: validTerritoryNetwork(upgraded.game as GameType),
+      expansion: validUtilityExpansion(upgraded.game as GameType),
+      agreements: validPowerAgreements(upgraded.game as GameType),
+    }).toEqual({ territory: true, expansion: true, agreements: true });
+    const parsed = parseSave(raw);
+    expect(parsed).not.toBeNull();
+    const game = parsed!.game;
+    expect(game.transmission!.lines).toEqual([]);
+    expect(game.territoryNetwork!.legacyConnections).toEqual(
+      raw.game.transmission.lines,
+    );
+    expect(ownedTerritories(game)).toContain("green-uplands");
+    const oldCapital = raw.game.transmission.lines.reduce(
+      (sum: number, line: { buildCost: number; loanAmountLeft: number }) =>
+        sum + line.buildCost - line.loanAmountLeft,
+      0,
+    );
+    const newCapital =
+      game.territoryNetwork!.legacyConnections.reduce(
+        (sum, line) =>
+          sum +
+          (line.corridorId === "vt-champlain-uplands" ? 0 : line.buildCost) -
+          line.loanAmountLeft,
+        0,
+      ) +
+      game.territoryNetwork!.landPurchases.reduce(
+        (sum, receipt) => sum + receipt.price,
+        0,
+      );
+    expect(newCapital).toBe(oldCapital);
+    expect(currentTick(game)!.cash).toBe(
+      raw.game.timeline.find(
+        (tick: { minute: number }) => tick.minute === raw.game.date.minute,
+      ).cash,
+    );
+    expect(currentTick(game)!.netWorth).toBe(
+      raw.game.timeline.find(
+        (tick: { minute: number }) => tick.minute === raw.game.date.minute,
+      ).netWorth,
+    );
+    expect(
+      game.territoryNetwork!.legacyConnections.reduce(
+        (sum, line) => sum + line.loanAmountLeft,
+        0,
+      ),
+    ).toBe(
+      raw.game.transmission.lines.reduce(
+        (sum: number, line: { loanAmountLeft: number }) =>
+          sum + line.loanAmountLeft,
+        0,
+      ),
+    );
+    for (const key of [
+      "timeline",
+      "monthlyHistory",
+      "date",
+      "utilityExpansion",
+      "facilities",
+      "meaningfulDecisions",
+    ] as const)
+      expect(game[key]).toEqual(raw.game[key]);
+    expect(game.territoryNetwork!.landPurchases).toEqual([
+      {
+        territoryId: "green-uplands",
+        minute: 0,
+        price: raw.game.transmission.lines[2].buildCost,
+        legacy: true,
+      },
+    ]);
+    expect(parseSave(serializeSave(game))?.game).toEqual(game);
+  },
+);
+it("keeps legacy projects frozen while servicing their debt and retaining capital", () => {
+  const game = parseSave(legacyPortfolio())!.game;
+  const before = cloneDeep(game.territoryNetwork!.legacyConnections.at(-1)!);
+  const netWorth = currentTick(game)!.netWorth;
+  tickState(game);
+  const after = game.territoryNetwork!.legacyConnections.at(-1)!;
+  expect(after.yearsToBuildLeft).toBe(before.yearsToBuildLeft);
+  expect(after.loanAmountLeft).toBeLessThan(before.loanAmountLeft);
+  expect(after.buildCost).toBe(before.buildCost);
+  expect(currentTick(game)!.netWorth).toBeGreaterThan(netWorth - 1e7);
+  expect(parseSave(serializeSave(game))).not.toBeNull();
+});
+it("retains seeded resume and roundtrip behavior for a current land owner", () => {
+  const game = createGame({ scenarioId: 116, seed: 61 });
+  const quote = landPurchaseQuote(game)!;
+  purchaseLand(game, {
+    territoryId: quote.territoryId,
+    quoteKey: quote.quoteKey,
   });
-  for (const key of [
-    "timeline",
-    "monthlyHistory",
-    "date",
-    "transmission",
-    "utilityExpansion",
-    "meaningfulDecisions",
-  ] as const)
-    expect(game[key]).toEqual(raw.game[key]);
-  expect(parseSave(serializeSave(game))?.game).toEqual(game);
-});
-
-it("accepts a paused acquired connection and nonzero internal readings without losing ownership", () => {
-  const game = parseSave(legacyPortfolio())!.game;
-  const line = game.transmission!.lines.find(
-    (line) => line.corridorId === "vt-champlain-valley",
-  )!;
-  line.paused = true;
-  line.currentFlowW = 0;
-  expect(parseSave(serializeSave(game))).not.toBeNull();
-  line.paused = false;
-  line.currentFlowW = -20e6;
-  expect(parseSave(serializeSave(game))).not.toBeNull();
-});
-
-it("keeps current-format roundtrips and resumed seeded operations deterministic", () => {
-  const game = parseSave(legacyPortfolio())!.game;
   const resumed = parseSave(
     JSON.parse(JSON.stringify(serializeSave(game))),
   )!.game;
-  for (let tick = 0; tick < 5; tick++) {
+  for (let i = 0; i < 5; i++) {
     tickState(game);
     tickState(resumed);
   }
-  expect(game).toEqual(resumed);
+  expect(JSON.parse(JSON.stringify(resumed))).toEqual(
+    JSON.parse(JSON.stringify(game)),
+  );
   expect(parseSave(serializeSave(game))).not.toBeNull();
 });
-
-it("does not enable territory rules in another scenario", () => {
-  const game = createGame({ scenarioId: 100, seed: 61 });
-  const raw = JSON.parse(JSON.stringify(serializeSave(game)));
-  raw.schemaVersion = 12;
-  expect(parseSave(raw)).toEqual(
-    parseSave({ ...raw, schemaVersion: SAVE_SCHEMA_VERSION }),
-  );
-  raw.game.territoryNetwork = { version: 1 };
-  expect(parseSave(raw)).toBeNull();
-});
-
-it.each(["bad-id", null, 6, {}, "ridge-electric", "green-uplands"])(
-  "rejects a current save that moves a home asset to %p",
-  (territoryId) => {
-    const raw = JSON.parse(
-      JSON.stringify(serializeSave(parseSave(legacyPortfolio())!.game)),
-    );
-    raw.game.facilities[0].territoryId = territoryId;
-    expect(parseSave(raw)).toBeNull();
-  },
-);
-
 it.each([
-  undefined,
   null,
-  { version: 2 },
-  { version: 1, ownership: ["ridge-electric"] },
-])("rejects malformed or missing current network marker %p", (marker) => {
+  undefined,
+  { version: 1 },
+  { version: 2, landPurchases: [], legacyConnections: [], extra: true },
+])("rejects a malformed current territory marker %p", (marker) => {
   const raw = JSON.parse(
-    JSON.stringify(serializeSave(parseSave(legacyPortfolio())!.game)),
+    JSON.stringify(serializeSave(createGame({ scenarioId: 116, seed: 61 }))),
   );
   raw.game.territoryNetwork = marker;
   expect(parseSave(raw)).toBeNull();
 });
-
-it("validates derived balances while retaining legacy history without a summary", () => {
-  const raw = JSON.parse(
-    JSON.stringify(serializeSave(parseSave(legacyPortfolio())!.game)),
-  );
-  const tick = raw.game.timeline[0];
-  const balance = {
-    demandW: tick.demandW,
-    supplyW: tick.supplyW,
-    generationW: tick.supplyW,
-    storageChargeW: 0,
-    storageDischargeW: 0,
-    importedW: tick.importedW ?? 0,
-    exportedW: tick.exportedW ?? 0,
-    unservedW: Math.max(0, tick.demandW - tick.supplyW),
-    curtailedW: 0,
-  };
-  tick.territories = { champlain: balance };
-  expect(parseSave(raw)).not.toBeNull();
-  balance.unservedW = -1;
-  expect(parseSave(raw)).toBeNull();
-  balance.unservedW = Math.max(0, tick.demandW - tick.supplyW);
-  tick.territories = { "made-up": balance };
-  expect(parseSave(raw)).toBeNull();
-});
-
-it("rejects malformed legacy facilities instead of repairing a hybrid network", () => {
-  const raw = legacyPortfolio();
-  raw.game.facilities[0].territoryId = "ridge-electric";
-  expect(parseSave(raw)).toBeNull();
-  delete raw.game.facilities[0].territoryId;
-  raw.game.facilities[0] = null;
-  expect(() => parseSave(raw)).not.toThrow();
-  expect(parseSave(raw)).toBeNull();
-});
-
-it("enables the same network when a supported save uses a mod based on scenario116", () => {
-  const scenario = modScenario(
-    modPackage({ id: "valley-migration", baseScenarioId: 116, seed: 61 }),
-  );
-  const game = createGame({
-    scenarioId: 999,
-    scenario,
-    seed: 61,
-    difficulty: "Employee",
+it("rejects spoofed prices, duplicate receipts, unknown locations and forged legacy capital", () => {
+  const game = createGame({ scenarioId: 116, seed: 61 });
+  const quote = landPurchaseQuote(game)!;
+  purchaseLand(game, {
+    territoryId: quote.territoryId,
+    quoteKey: quote.quoteKey,
   });
   const raw = JSON.parse(JSON.stringify(serializeSave(game)));
+  expect(parseSave(raw)).not.toBeNull();
+  raw.game.territoryNetwork.landPurchases[0].price = 0;
+  expect(parseSave(raw)).toBeNull();
+  raw.game.territoryNetwork.landPurchases[0].price = quote.price;
+  raw.game.territoryNetwork.landPurchases.push({
+    ...raw.game.territoryNetwork.landPurchases[0],
+  });
+  expect(parseSave(raw)).toBeNull();
+  const legacy = legacyPortfolio();
+  legacy.game.transmission.lines[2].buildCost = 1;
+  expect(parseSave(legacy)).toBeNull();
+});
+it("migrates supported older versions by asset provenance and rejects future saves", () => {
+  const raw = legacyPortfolio();
   raw.schemaVersion = 12;
   delete raw.game.territoryNetwork;
   raw.game.facilities.forEach(
-    (facility: { territoryId?: unknown }) => delete facility.territoryId,
+    (f: { territoryId?: unknown }) => delete f.territoryId,
   );
-  raw.game.timeline.forEach(
-    (tick: { territories?: unknown }) => delete tick.territories,
-  );
-  const migrated = parseSave(raw);
-  expect(migrated).not.toBeNull();
-  expect(migrated!.game.territoryNetwork).toEqual({ version: 1 });
-  expect(migrated!.game.customScenario).toEqual(raw.game.customScenario);
+  const result = parseSave(raw);
+  expect(result).not.toBeNull();
+  expect(
+    result!.game.facilities.some((f) => f.territoryId === "valley-electric"),
+  ).toBe(true);
+  raw.schemaVersion = SAVE_SCHEMA_VERSION + 1;
+  expect(parseSave(raw)).toBeNull();
 });
-
-it.each(["supplyW", "importedW", "exportedW"] as const)(
-  "rejects a save whose territory %s total disagrees with its tick",
-  (field) => {
-    const game = createGame({ scenarioId: 116, seed: 61 });
-    tickState(game);
-    const raw = JSON.parse(JSON.stringify(serializeSave(game)));
-    const tick = raw.game.timeline.find(
-      (entry: { minute: number }) => entry.minute === game.date.minute,
-    );
-    expect(parseSave(raw)).not.toBeNull();
-    tick[field] += 1e6;
-    expect(parseSave(raw)).toBeNull();
-    delete tick.territories;
-    expect(parseSave(raw)).not.toBeNull();
-  },
-);
+it("uses the same territory model for a scenario116 mod and leaves other scenarios unchanged", () => {
+  const scenario = modScenario(
+    modPackage({ id: "valley-migration", baseScenarioId: 116, seed: 61 }),
+  );
+  const game = createGame({ scenarioId: 999, scenario, seed: 61 });
+  const raw = JSON.parse(JSON.stringify(serializeSave(game)));
+  raw.schemaVersion = 13;
+  raw.game.territoryNetwork = { version: 1 };
+  expect(parseSave(raw)?.game.territoryNetwork?.version).toBe(2);
+  const other = createGame({ scenarioId: 100, seed: 61 });
+  expect(parseSave(serializeSave(other))?.game).toEqual(other);
+});

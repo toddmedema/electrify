@@ -18,6 +18,7 @@ import {
 } from "../helpers/DateTime";
 import { currentTick } from "../helpers/GameSelectors";
 import {
+  INHERITED_CONNECTIONS,
   agreementDate,
   agreementIntervalMinutes,
   validPowerAgreements,
@@ -36,7 +37,6 @@ import {
   adjacentMarketPricePerMWh,
   intertieContextForGame,
   intertieBuildQuote,
-  intertieUpgradeQuote,
   physicalNeighborImportSupplyW,
 } from "../helpers/Transmission";
 import { facilitySignature, selectProjection } from "../helpers/Projection";
@@ -49,7 +49,6 @@ import reducer, {
   generateNewTimeline,
   forecastMonthClosingCashAtCustomerRate,
   tickState,
-  buildTransmissionLine,
   togglePauseTransmissionLine,
 } from "./Game";
 import {
@@ -113,24 +112,11 @@ function playedAgreement() {
   return copyOfficialGame(playedSignedGame);
 }
 
-it("opens with a real inherited operating interface that cannot be built, financed or upgraded", () => {
+it("opens with inherited finite power commitments and no owned wire", () => {
   const game = at(0);
-  expect(game.transmission!.lines).toEqual([
-    expect.objectContaining({
-      corridorId: "vt-champlain-regional",
-      capacityW: 300e6,
-      buildCost: 0,
-      yearsToBuildLeft: 0,
-    }),
-  ]);
+  expect(game.transmission!.lines).toEqual([]);
   expect(currentTick(game)!.importedW).toBeGreaterThan(0);
-  expect(game.transmission!.lines[0].currentFlowW).toBe(
-    currentTick(game)!.importedW,
-  );
   expect(intertieBuildQuote("vt-champlain-regional", 2005)).toBeUndefined();
-  expect(
-    intertieUpgradeQuote(game.transmission!.lines[0], 2005),
-  ).toBeUndefined();
 });
 it("rejects a forged public quote, accepts its valid neighbor once and invalidates both forecast caches", () => {
   const game = at();
@@ -152,12 +138,9 @@ it("rejects a forged public quote, accepts its valid neighbor once and invalidat
   ).toEqual(signed);
   expect(facilitySignature(signed)).not.toBe(facilitySignature(game));
   expect(intertieForecastKey(signed)).not.toBe(intertieForecastKey(game));
-  const paused = reducer(
-    signed,
-    togglePauseTransmissionLine(signed.transmission!.lines[0].id),
-  );
-  expect(facilitySignature(paused)).not.toBe(facilitySignature(signed));
-  expect(intertieForecastKey(paused)).not.toBe(intertieForecastKey(signed));
+  const paused = reducer(signed, togglePauseTransmissionLine(100000));
+  expect(facilitySignature(paused)).toBe(facilitySignature(signed));
+  expect(intertieForecastKey(paused)).toBe(intertieForecastKey(signed));
 });
 it("refreshes v3 reviews when the signing market changes and rejects a changed delivery month", () => {
   const game = at();
@@ -252,21 +235,15 @@ it("owns exact inherited dates and calendar terms, including late signing and re
   valleySigned.date = getDateFromMinute(240 * MINUTES_PER_MONTH, 2005);
   expect(powerAgreementQuote(valleySigned, "valley-nuclear")).toBeUndefined();
 });
-it("permits signing a paused owned interface while delivering no agreement or market energy", () => {
-  const game = at();
-  game.transmission!.lines[0].paused = true;
-  const signed = sign(game);
-  expect(signed.transmission!.lines[0].paused).toBe(true);
+it("signs and delivers finite agreements without a physical interface", () => {
+  const signed = sign(at());
+  expect(signed.transmission!.lines).toEqual([]);
   request(signed, 500e6);
   tickState(signed);
-  expect(currentTick(signed)!.importedW).toBe(0);
-  expect(signed.transmission!.lines[0].currentFlowW).toBe(0);
-  signed.transmission!.lines[0].paused = false;
-  signed.transmission!.lines[0].yearsToBuildLeft = 1;
-  expect(entitlementSources(signed, currentTick(signed)!)).toEqual([]);
+  expect(currentTick(signed)!.entitlementImportedW).toBeGreaterThan(0);
 });
 it.each(["NONE", "SHORTAGES", "SHORTAGES_AND_STORAGE"] as const)(
-  "keeps contracts available under %s and uses only the residual physical room for spot",
+  "keeps contracts available under %s without implicit spot purchases",
   (buyingRule) => {
     const game = at(0);
     game.transmission!.buyingRule = buyingRule;
@@ -277,11 +254,9 @@ it.each(["NONE", "SHORTAGES", "SHORTAGES_AND_STORAGE"] as const)(
     tickState(game);
     const now = currentTick(game)!;
     expect(now.entitlementImportedW).toBe(covered);
-    expect(now.importedW).toBeLessThanOrEqual(now.transmissionCapacityW!);
-    expect(game.transmission!.lines[0].currentFlowW).toBe(now.importedW);
-    expect(now.importedW! > covered).toBe(buyingRule !== "NONE");
+    expect(now.importedW).toBe(covered);
     const spot = adjacentMarketPricePerMWh(
-      game.transmission!.lines[0].corridorId,
+      INHERITED_CONNECTIONS.champlain,
       intertieContextForGame(game),
       now.minute,
       now,
@@ -298,18 +273,13 @@ it.each(["NONE", "SHORTAGES", "SHORTAGES_AND_STORAGE"] as const)(
     );
   },
 );
-it("retains usable wires after expiry; None stops uncovered purchases", () => {
+it("does not invent uncovered market purchases after every agreement expires", () => {
   const game = at(240);
   request(game, 100e6);
   tickState(game);
   expect(currentTick(game)!.entitlementImportedW).toBe(0);
-  expect(currentTick(game)!.importedW).toBeGreaterThan(0);
-  expect(game.transmission!.lines[0].capacityW).toBe(300e6);
-  const closed = at(240);
-  closed.transmission!.buyingRule = "NONE";
-  request(closed, 100e6);
-  tickState(closed);
-  expect(currentTick(closed)!.importedW).toBe(0);
+  expect(currentTick(game)!.importedW).toBe(0);
+  expect(game.transmission!.lines).toEqual([]);
 });
 it("rejects impossible saved receipts and inherited provenance through the real parser; valid neighbors round trip", () => {
   const signed = sign(at());
@@ -332,7 +302,7 @@ it("rejects impossible saved receipts and inherited provenance through the real 
       save.game.transmission.acceptedAgreements[0].blockId = "seller-forgery";
     },
     (save: typeof raw) => {
-      save.game.transmission.lines[0].capacityW += 1;
+      save.game.territoryNetwork.version = 1;
     },
     (save: typeof raw) => {
       save.game.transmission.acceptedAgreements[0].signingMarketPricePerMWh += 0.1;
@@ -364,7 +334,8 @@ it("rejects impossible saved receipts and inherited provenance through the real 
   legacy.game.transmission.lines = [];
   const upgraded = parseSave(legacy)!;
   expect(upgraded).not.toBeNull();
-  expect(upgraded.game.transmission!.lines).toEqual([
+  expect(upgraded.game.transmission!.lines).toEqual([]);
+  expect(upgraded.game.territoryNetwork!.legacyConnections).toEqual([
     inheritedConnection("champlain", 1),
   ]);
   expect(upgraded.game.transmission!.acceptedAgreements).toEqual([]);
@@ -408,7 +379,7 @@ it.each([20, -40])(
     const sources = entitlementSources(game, next);
     const covered = sources.reduce((sum, source) => sum + source.capacityW, 0);
     const spot = adjacentMarketPricePerMWh(
-      game.transmission!.lines[0].corridorId,
+      INHERITED_CONNECTIONS.champlain,
       intertieContextForGame(game),
       next.minute,
       next,
@@ -420,7 +391,7 @@ it.each([20, -40])(
     tickState(game);
     const now = currentTick(game)!;
     expect(now.entitlementImportedW).toBe(covered);
-    expect(now.importedW).toBeGreaterThan(covered);
+    expect(now.importedW).toBe(covered);
     const weighted =
       sources.reduce(
         (sum, source) => sum + source.capacityW * source.pricePerMWh,
@@ -434,11 +405,9 @@ it.each([20, -40])(
     expect(agreed.emissionsKgPerMWh).toBeGreaterThan(0);
   },
 );
-it("keeps real played saves deterministic after signing and after a pause decision", () => {
+it("keeps real played saves deterministic after signing and a rejected legacy line command", () => {
   let live = playedAgreement();
-  live = copyOfficialGame(
-    reducer(live, togglePauseTransmissionLine(live.transmission!.lines[0].id)),
-  );
+  live = copyOfficialGame(reducer(live, togglePauseTransmissionLine(100000)));
   const saved = parseSave(JSON.parse(JSON.stringify(serializeSave(live))));
   expect(saved).not.toBeNull();
   const restored = copyOfficialGame(
@@ -456,11 +425,11 @@ it("formats calendar month ends accurately across a leap year without inventing 
   expect(agreementDate(194 * MINUTES_PER_MONTH, true)).toBe("28 Feb 2021");
 });
 
-it("charges supplier-ready minimums with zero demand and buyer pause, without phantom energy", () => {
-  for (const paused of [false, true]) {
+it("charges supplier-ready minimums with zero demand, without phantom energy", () => {
+  for (const _paused of [false, true]) {
     const game = at(0);
     game.transmission!.buyingRule = "NONE";
-    game.transmission!.lines[0].paused = paused;
+
     request(game, 0);
     tickState(game);
     const now = currentTick(game)!;
@@ -587,18 +556,28 @@ it("preserves existing delivered-energy promises while future offers bind monthl
   );
   expect(migrated.game.timeline).toEqual(raw.game.timeline);
   const live = copyOfficialGame(migrated.game);
-  live.transmission!.lines[0].paused = true;
-  request(live, 0);
-  tickState(live);
-  expect(currentTick(live)!.expensesImports).toBe(0);
+  const forecast = generateForecastTimeline(
+    live,
+    currentTick(live)!.cash,
+    0,
+    2,
+  );
+  expect(forecast[1].entitlementImportedW).toBe(0);
+  expect(forecast[1].expensesImports).toBe(0);
   const nextOffer = powerAgreementQuote(live, "champlain-quebec")!;
   expect(nextOffer.receipt.termsVersion).toBe(3);
 });
 
-it("reduces the payable minimum to zero when the physical route is unavailable", () => {
+it("reduces the payable minimum to zero when the supplier has no available power", () => {
   const game = at(0);
   request(game, 0);
-  game.transmission!.lines[0].capacityW = 0;
+  const availability = Transmission.firmIntertieOfferLimits;
+  jest
+    .spyOn(Transmission, "firmIntertieOfferLimits")
+    .mockImplementation((...args) => ({
+      ...availability(...args),
+      importLimitW: 0,
+    }));
   tickState(game);
   expect(currentTick(game)!.expensesImports).toBe(0);
   expect(Object.values(currentTick(game)!.agreementAvailableMWh!)).toEqual([
@@ -635,7 +614,7 @@ it("uses the dispatch timestamp's shared physical supply when an agreement inter
   const now = currentTick(game)!;
   expect(now.minute % MINUTES_PER_MONTH).toBe(17 * 60);
   const pool = physicalNeighborImportSupplyW(
-    game.transmission!.lines[0].corridorId,
+    INHERITED_CONNECTIONS.champlain,
     intertieContextForGame(game),
     now.minute,
     now,
@@ -755,7 +734,7 @@ it.each([20, -40])(
     const game = at();
     currentTick(game)!.temperatureC = temperatureC;
     const spot = adjacentMarketPricePerMWh(
-      game.transmission!.lines[0].corridorId,
+      INHERITED_CONNECTIONS.champlain,
       intertieContextForGame(game),
       game.date.minute,
       currentTick(game)!,
@@ -964,11 +943,16 @@ it("credits shifted monthly MWh and closes one prorated weighted-rate minimum, w
   ).toBe(0);
 });
 
-it("bills the real v3 month once after pause, preserves schema11 promises, and rejects forged weighted meters", () => {
+it("bills the real v3 month once with zero demand, preserves schema11 promises, and rejects forged weighted meters", () => {
   const game = at(0);
   game.transmission!.inheritedAgreementTerms = 3;
-  game.transmission!.lines[0].paused = true;
+
   game.facilities = [];
+  game.timeline.forEach((tick) => {
+    tick.customers = 0;
+    tick.demandW = 0;
+    for (const type of DEMAND_TYPES) tick.demandByType[type] = 0;
+  });
   for (let i = 0; i < 48; i++) {
     tickState(game);
     expect(
@@ -1156,11 +1140,7 @@ it.each(["NONE", "SHORTAGES"] as const)(
     expect(now.entitlementImportedW).toBeLessThanOrEqual(
       now.entitlementImportCapacityW!,
     );
-    const interfaceLine = game.transmission!.lines[0];
-    expect(interfaceLine.currentFlowW).toBe(now.importedW);
-    expect(interfaceLine.currentFlowW).toBeLessThanOrEqual(
-      Transmission.transmissionRatingW(interfaceLine, now),
-    );
+    expect(game.transmission!.lines).toEqual([]);
     expect(now.exportedW).toBe(0);
   },
 );
@@ -1170,8 +1150,13 @@ it.each([0, 15])(
   (offset) => {
     const game = at(0);
     game.transmission!.inheritedAgreementTerms = 3;
-    game.transmission!.lines[0].paused = true;
+
     game.facilities = [];
+    game.timeline.forEach((tick) => {
+      tick.customers = 0;
+      tick.demandW = 0;
+      for (const type of DEMAND_TYPES) tick.demandByType[type] = 0;
+    });
     const now = currentTick(game)!;
     game.timeline = generateNewTimeline(game, now.cash, now.customers);
     const expected = summarizeTimeline(game.timeline, game.startingYear);
@@ -1223,8 +1208,13 @@ it.each([0, 15])(
 it("keeps the closing minimum in the finance projection when the current frame is the last in the month", () => {
   const game = at(0);
   game.transmission!.inheritedAgreementTerms = 3;
-  game.transmission!.lines[0].paused = true;
+
   game.facilities = [];
+  game.timeline.forEach((tick) => {
+    tick.customers = 0;
+    tick.demandW = 0;
+    for (const type of DEMAND_TYPES) tick.demandByType[type] = 0;
+  });
   for (let i = 0; i < 95; i++) tickState(game);
   const closingCash = forecastMonthClosingCashAtCustomerRate(
     game,
@@ -1239,21 +1229,14 @@ it("keeps the closing minimum in the finance projection when the current frame i
 it("retains settled agreement accounts and the closing month when acquiring a territory", () => {
   let game = at(0);
   currentTick(game)!.cash = 10e9;
-  game = copyOfficialGame(
-    reducer(
-      game,
-      buildTransmissionLine({
-        corridorId: "vt-champlain-valley",
-        financed: false,
-      }),
-    ),
-  );
-  game.transmission!.lines.find(
-    ({ corridorId }) => corridorId === "vt-champlain-valley",
-  )!.yearsToBuildLeft = 0;
   game.transmission!.inheritedAgreementTerms = 3;
-  game.transmission!.lines[0].paused = true;
+
   game.facilities = [];
+  game.timeline.forEach((tick) => {
+    tick.customers = 0;
+    tick.demandW = 0;
+    for (const type of DEMAND_TYPES) tick.demandByType[type] = 0;
+  });
   let settled: GameType | undefined;
   const timeline = generateForecastTimeline(
     game,

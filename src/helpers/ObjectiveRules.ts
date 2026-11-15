@@ -1,3 +1,4 @@
+import { legacyTerritoryConnections } from "./Territories";
 import { legacyMonthOffset, legacyCompletedMonths } from "./LegacyCampaign";
 import { isLegacyCampaignScenario } from "../data/LegacyCampaign";
 import {
@@ -736,6 +737,7 @@ export function recordGameObjectiveMonth(
             debtPrincipal: getTotalDebt([
               ...game.facilities,
               ...(game.transmission?.lines ?? []),
+              ...legacyTerritoryConnections(game),
               ...(game.utilityExpansion?.loans ?? []),
             ]),
           }

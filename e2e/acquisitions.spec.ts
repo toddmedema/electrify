@@ -1,12 +1,8 @@
-import { formatCount } from "../src/helpers/Format";
-import path from "path";
 import { expect, test } from "./fixtures";
 import { openBuild, openPane } from "./layout";
 import { reviewScreenshot } from "./review-screenshot";
-import { expectPurchaseFactTable } from "./purchase-review-layout";
 import { expectDialogToFit } from "./dialog-layout";
-import { expectContinuousDialogSurface } from "./dialog-surface";
-import { editSavedGame, readSavedGame, readSaveRecords } from "./save-fixture";
+import { readSavedGame, readSaveRecords } from "./save-fixture";
 
 for (const theme of ["light", "dark"] as const) {
   test(`territory map has separate usable targets in ${theme}`, async ({
@@ -24,7 +20,7 @@ for (const theme of ["light", "dark"] as const) {
       page.getByRole("button", { name: "Facilities", exact: true }),
     );
     const network = facilities.getByRole("region", {
-      name: "Territory network",
+      name: "Territories",
     });
     const nodes = network.locator(".territoryMapNode");
     await expect(nodes).toHaveCount(4);
@@ -108,800 +104,88 @@ for (const theme of ["light", "dark"] as const) {
     ).toBe(true);
   });
 
-  test(`completed Tier 1 connections acquire either utility in ${theme}`, async ({
+  test(`acquires a neighboring utility directly in ${theme}`, async ({
     page,
   }, testInfo) => {
-    test.setTimeout(120000);
-    const errors: string[] = [];
-    page.on("pageerror", (error) => errors.push(error.message));
     await page.addInitScript((mode) => {
-      if (!sessionStorage.getItem("acquisition-fixture")) {
-        localStorage.clear();
-        localStorage.setItem("theme", mode);
-        localStorage.setItem("audioEnabled", "false");
-        sessionStorage.setItem("acquisition-fixture", "1");
-      }
+      localStorage.setItem("theme", mode);
+      localStorage.setItem("audioEnabled", "false");
     }, theme);
     await page.goto("/?scenario=116");
-    await expect(
-      page.getByRole("heading", { name: "Across the Valley", exact: true }),
-    ).toBeVisible();
-    // The dossier carries one description; the dated acquisition goal lives behind the labelled
-    // goals button rather than in a second paragraph of near-identical copy.
-    await expect(page.locator(".scenarioDossier")).toContainText(
-      "acquire a utility",
-    );
-    await page
-      .getByRole("button", { name: "Goals and scoring", exact: true })
-      .click();
-    const goalsDialog = page.getByRole("dialog");
-    await expect(
-      goalsDialog.getByRole("region", { name: "Requirements" }),
-    ).toContainText("Acquire Valley Electric or Ridge Electric · Dec 2014");
-    await goalsDialog
-      .getByRole("button", { name: "Close", exact: true })
-      .click();
-    await expect(goalsDialog).toHaveCount(0);
     await page.getByRole("button", { name: "Start game", exact: true }).click();
     const facilities = page.locator(".facilities:visible");
-    await expect(facilities.locator(".acquiredUtilities")).toHaveCount(0);
-    await expect(
-      facilities.getByRole("region", { name: "Territory network" }),
-    ).toBeVisible();
-    await facilities.getByRole("tab", { name: "Fleet", exact: true }).click();
-    await expect(
-      facilities.getByRole("button", {
-        name: "Inspect Oil A, Champlain",
-        exact: true,
-      }),
-    ).toBeVisible();
-    await expect(
-      facilities.getByRole("button", {
-        name: "Inspect Oil B, Champlain",
-        exact: true,
-      }),
-    ).toBeVisible();
-    await openBuild(page);
-    await page.getByRole("tab", { name: "Generators", exact: true }).click();
-    await page.getByRole("slider").first().press("Home");
-    await page
-      .getByRole("button", { name: "Review purchase of Wind", exact: true })
-      .click();
-    const buildDialog = page.getByRole("dialog");
-    const facilityStyle = await expectPurchaseFactTable(buildDialog, [
-      "Cash option",
-      "Loan option",
-      "Maintenance",
-      "Online in",
-      "Average output over a year",
-      "Direct emissions",
-      "Lowest supply margin",
-      "Unserved energy",
-    ]);
-    await buildDialog
-      .getByRole("button", { name: "close", exact: true })
-      .click();
-    await openBuild(page);
-    await page.getByRole("tab", { name: "Interties", exact: true }).click();
-    for (const target of ["Valley Electric", "Ridge Electric"]) {
-      await openBuild(page);
-      await page.getByRole("tab", { name: "Interties", exact: true }).click();
-      await page
-        .getByRole("button", {
-          name: `Acquisition terms for ${target}`,
-          exact: true,
-        })
-        .click();
-      const terms = page.getByRole("dialog", {
-        name: "Acquisition terms",
-        exact: true,
-      });
-      await expectDialogToFit(terms);
-      const card = page.locator(
-        `.transmissionProject[data-corridor-id="vt-champlain-${target === "Valley Electric" ? "valley" : "ridge"}"]`,
-      );
-      for (const text of [
-        "Company equity price",
-        "Assumed debt",
-        "Company customers",
-      ]) {
-        await expect(card).not.toContainText(text);
-      }
-      const table = terms.getByRole("table", {
-        name: `${target} acquisition terms`,
-      });
-      await expect(table.getByRole("rowheader")).toHaveText([
-        "Price",
-        "Assumed debt",
-        "Customers",
-        "Loan down payment",
-        "Debt & upkeep · cash",
-        "Debt & upkeep · loan",
-      ]);
-      const insets = await table.getByRole("row").evaluateAll((rows) =>
-        rows.map((row) => {
-          const label = row.querySelector("th")!;
-          const value = row.querySelector("td")!;
-          return {
-            left: getComputedStyle(label).paddingLeft,
-            right: getComputedStyle(value).paddingRight,
-          };
-        }),
-      );
-      for (const inset of insets) expect(inset.right).toBe(inset.left);
-      await expect(terms).not.toContainText("Your cash");
-      await expect(terms).not.toContainText("Cash purchase");
-      await expect(terms).not.toContainText("Cash covers today’s offer");
-      await expect(terms).toContainText("Price and down payment include fees");
-      for (const title of [
-        "Plants & purchased power",
-        "Demand reference · January 2005",
-        "Supply & network changes",
-        "Scenario goals",
-      ]) {
-        await terms.locator("summary").filter({ hasText: title }).click();
-        await expectDialogToFit(terms);
-      }
-      for (const text of [
-        "Operating plants",
-        "Purchased power",
-        "Jan 2020 · Champlain Electric",
-        "Network upkeep includes routine maintenance and renewal.",
-      ]) {
-        await expect(
-          terms.getByText(text, { exact: false }).first(),
-        ).toBeVisible();
-      }
-      if (target === "Valley Electric")
-        await expect(terms).toContainText("Jan 2017");
-      await expect(terms).toContainText(
-        target === "Valley Electric"
-          ? "2.2TWh annual delivered energy · 406MW peak demand"
-          : "1TWh annual delivered energy · 160MW peak demand",
-      );
-      await expect(
-        terms.getByRole("button", { name: /Pay cash|Take loan|Acquire / }),
-      ).toHaveCount(0);
-      const back = terms.getByRole("button", {
-        name: "Back to connections",
-        exact: true,
-      });
-      await expect(back).toBeInViewport();
-      expect((await back.boundingBox())!.height).toBeGreaterThanOrEqual(
-        testInfo.project.use.hasTouch ? 44 : 40,
-      );
-      await back.click();
-      if (
-        process.env.REVIEW_SCREENSHOT_DIR &&
-        target === "Valley Electric" &&
-        testInfo.project.name === "desktop-chromium" &&
-        theme === "light"
-      ) {
-        await page.mouse.move(0, 0);
-        await card.screenshot({
-          path: path.join(
-            process.env.REVIEW_SCREENSHOT_DIR,
-            "intertie-build-desktop-light.png",
-          ),
-          animations: "disabled",
-        });
-      }
-      const review = page.getByRole("button", {
-        name: new RegExp(`Review purchase of .*${target}`),
-      });
-      await review.click();
-      await page
-        .getByRole("dialog")
-        .getByRole("button", { name: "Take loan", exact: true })
-        .click();
-    }
     await openPane(
       facilities,
       page.getByRole("button", { name: "Facilities", exact: true }),
     );
-    await expect(
-      facilities.getByRole("button", { name: /^Acquire / }),
-    ).toHaveCount(0);
-    const unfinished = await readSavedGame(page);
-    expect(
-      unfinished?.transmission?.lines.filter(
-        (line) =>
-          line.corridorId === "vt-champlain-valley" ||
-          line.corridorId === "vt-champlain-ridge",
-      ),
-    ).toHaveLength(2);
-    expect(
-      unfinished?.transmission?.lines
-        .filter((line) => line.buildCost > 0)
-        .every((line) => line.yearsToBuildLeft > 0),
-    ).toBe(true);
-    await editSavedGame(page, ({ game }) => {
-      for (const line of game.transmission!.lines.filter(
-        (line) => line.buildCost > 0,
-      ))
-        line.yearsToBuildLeft = 0;
-      // UI fixture: exercise cash as well as financed acquisition without running years of economics.
-      for (const tick of game.timeline) tick.cash = 1e9;
-    });
-    await page.goto("/");
-    await page.getByRole("button", { name: "Continue", exact: true }).click();
-    await openPane(
-      facilities,
-      page.getByRole("button", { name: "Facilities", exact: true }),
-    );
-
-    for (const [index, target] of [
-      "Valley Electric",
-      "Ridge Electric",
-    ].entries()) {
-      await facilities
-        .getByRole("tab", { name: "Network", exact: true })
-        .click();
-      await facilities
-        .getByRole("button", {
-          name: `Inspect ${target} territory`,
-          exact: true,
-        })
-        .click();
-      const line = facilities.locator(
-        `.transmissionLine[data-corridor-id="vt-champlain-${index === 0 ? "valley" : "ridge"}"]`,
-      );
-      const acquire = line.getByRole("button", {
-        name: `Acquire ${target}`,
-        exact: true,
-      });
-      await expect(acquire).toHaveCount(0);
-      const inspect = line.getByRole("button", { name: /^Inspect / });
-      await inspect.click();
-      await expect(acquire).toBeVisible();
-      await expect(line).not.toContainText("Review the company terms");
-      // Physical capacity can grow without adding a supply agreement or transferring ownership.
-      const capacityStatus = line.getByRole("button", {
-        name: /^Review upgrade/,
-      });
-      await expect(capacityStatus).toBeVisible();
-      if ((testInfo.project.use.viewport?.width ?? 1280) >= 600) {
-        const [acquireBox, capacityBox] = await Promise.all([
-          acquire.boundingBox(),
-          capacityStatus.boundingBox(),
-        ]);
-        expect(
-          Math.abs(
-            acquireBox!.y +
-              acquireBox!.height -
-              (capacityBox!.y + capacityBox!.height),
-          ),
-        ).toBeLessThanOrEqual(1);
-      }
-      expect((await acquire.boundingBox())!.height).toBeGreaterThanOrEqual(
-        testInfo.project.use.hasTouch ? 44 : 40,
-      );
-      await inspect.click();
-      await expect(acquire).toHaveCount(0);
-      await inspect.click();
-      await acquire.click();
-      const dialog = page.getByRole("dialog", {
-        name: `Acquire ${target}?`,
-        exact: true,
-      });
-      await expect(dialog).toHaveAccessibleName(`Acquire ${target}?`);
-      await expectContinuousDialogSurface(dialog);
-      await expectDialogToFit(dialog);
-      await expect(
-        dialog.getByText("Customers", { exact: true }),
-      ).toBeVisible();
-      await expect(
-        dialog
-          .locator(".decisionImpactFact")
-          .filter({ hasText: /^Supply margin/ })
-          .locator(".decisionImpactFactValue"),
-      ).toHaveText(/^-?[\d.]+[kMG]?W → [\d.]+[kMG]?W (spare|shortfall)$/);
-      await expect(
-        dialog.getByRole("region", { name: "Acquisition obligations" }),
-      ).toBeVisible();
-      await expect(dialog).not.toContainText(
-        /Plant operating costs|cash-only transaction fee/,
-      );
-      await expectPurchaseFactTable(
-        dialog,
-        ["Cash option", "Loan option", "Customers", "Supply margin"],
-        facilityStyle,
-      );
-      for (const label of ["Cash option", "Loan option"]) {
-        const payment = dialog
-          .locator(".decisionImpactFact")
-          .filter({ hasText: new RegExp(`^${label}`) });
-        await expect(payment.locator(".decisionImpactFactValue")).toContainText(
-          /now \+ .*\/mo/,
-        );
-      }
-      for (const details of await dialog.locator("details").all())
-        await expect(details).not.toHaveAttribute("open");
-      const assets = dialog
-        .locator("details")
-        .filter({ hasText: "Plants & purchased power" });
-      await assets.locator("summary").click();
-      const plants = assets.getByRole("region", {
-        name: "Operating plants",
-        exact: true,
-      });
-      const plantLines = await plants
-        .locator(".decisionImpactFactValue")
-        .allInnerTexts();
-      expect(plantLines).toHaveLength(3);
-      const capacities = plantLines.map((text) =>
-        Number(text.match(/([\d.]+)MW/)![1]),
-      );
-      expect(capacities).toEqual([...capacities].sort((a, b) => b - a));
-      await expect(
-        assets.getByRole("heading", { name: "Purchased power", exact: true }),
-      ).toBeVisible();
-      if (target === "Valley Electric") {
-        await expect(assets).toContainText("114MW delivered");
-        await expect(assets).toContainText("Regional nuclear");
-        await expect(assets).toContainText("Québec hydro");
-        await expect(assets).not.toContainText("New England balancing");
-        await expect(assets).toContainText("January 2017");
-        await expect(dialog).not.toContainText("Plan replacement supply");
-      }
-      await assets.locator("summary").click();
-      const finance = dialog
-        .locator("details")
-        .filter({ hasText: "Financing breakdown" });
-      await finance.locator("summary").focus();
-      await page.keyboard.press("Enter");
-      await expect(finance).toHaveAttribute("open");
-      await expectPurchaseFactTable(
-        dialog,
-        [
-          "Purchase price",
-          "Transaction fee",
-          "Inherited debt",
-          "New loan",
-          "Added network upkeep",
-        ],
-        facilityStyle,
-        "Financing breakdown",
-      );
-      await expect(finance).toContainText("5% over 20 years");
-      await expect(finance).toContainText("over 30 years");
-      await expect(finance).toContainText("Paid in cash with either option");
-      await finance.locator("summary").click();
-      const schedule = dialog
-        .locator("details")
-        .filter({ hasText: "Supply & network changes" });
-      await schedule.locator("summary").click();
-      await expect(schedule).toContainText("Jan 2020");
-      await expect(schedule).toContainText(
-        "Network upkeep includes routine maintenance and renewal.",
-      );
-      if (target === "Valley Electric")
-        await expect(schedule).toContainText("Jan 2017");
-      if (
-        process.env.REVIEW_SCREENSHOT_DIR &&
-        target === "Valley Electric" &&
-        ((testInfo.project.name === "desktop-chromium" && theme === "light") ||
-          (testInfo.project.name === "mobile-390px" && theme === "dark"))
-      ) {
-        await page.mouse.move(0, 0);
-        await dialog.screenshot({
-          path: path.join(
-            process.env.REVIEW_SCREENSHOT_DIR,
-            `network-upkeep-${testInfo.project.name}-${theme}.png`,
-          ),
-          animations: "disabled",
-        });
-      }
-      await schedule.locator("summary").click();
-      const help = dialog.getByRole("button", {
-        name: "What is interest rate?",
-        exact: true,
-      });
-      await help.focus();
-      await page.keyboard.press("Enter");
-      const manual = page.getByRole("dialog", {
-        name: "Manual help",
-        exact: true,
-      });
-      await expect(
-        manual.getByRole("heading", {
-          name: "Interest rates & inflation",
-          exact: true,
-        }),
-      ).toBeVisible();
-      await page.keyboard.press("Escape");
-      await expect(manual).toBeHidden();
-      await expect(help).toBeFocused();
-      await expect(dialog).toBeVisible();
-      const beforeCancel = await readSavedGame(page);
-      await dialog.getByRole("button", { name: "close", exact: true }).click();
-      await expect(dialog).toHaveCount(0);
-      const afterCancel = await readSavedGame(page);
-      expect(afterCancel?.utilityExpansion).toEqual(
-        beforeCancel?.utilityExpansion,
-      );
-      await acquire.click();
-      for (const button of await dialog
-        .locator(".MuiDialogActions-root button")
-        .all()) {
-        await expect(button).toBeInViewport();
-        expect((await button.boundingBox())!.height).toBeGreaterThanOrEqual(
-          testInfo.project.use.hasTouch ? 44 : 40,
-        );
-      }
-      if (
-        process.env.REVIEW_SCREENSHOT_DIR &&
-        index === 0 &&
-        testInfo.project.name !== "mobile-390px" &&
-        theme ===
-          (testInfo.project.name === "desktop-chromium" ? "light" : "dark")
-      ) {
-        await dialog.locator(".MuiDialogContent-root").evaluate((element) => {
-          element.scrollTop = 0;
-        });
-        await page.mouse.move(0, 0);
-        await dialog.screenshot({
-          path: path.join(
-            process.env.REVIEW_SCREENSHOT_DIR,
-            `acquisition-${testInfo.project.name}-${theme}.png`,
-          ),
-          animations: "disabled",
-        });
-      }
-      // Enter uses the same semantic button action as keyboard/controller confirmation.
-      const purchase = dialog.getByRole("button", {
-        name: index === 0 ? "Take loan" : "Pay cash",
-        exact: true,
-      });
-      const beforePurchase = (await readSavedGame(page))!;
-      const customersBefore = beforePurchase.timeline
-        .filter((tick) => tick.minute <= beforePurchase.date.minute)
-        .at(-1)!.customers;
-      const customerPreview = await dialog
-        .locator(".decisionImpactFact")
-        .filter({ hasText: /^Customers/ })
-        .locator(".decisionImpactFactValue")
-        .textContent();
-      await purchase.focus();
-      await page.keyboard.press("Enter");
-      await expect(dialog).toHaveCount(0);
-      await expect(line).toHaveCount(1);
-      await expect(acquire).toHaveCount(0);
-      const ownership = facilities.locator(".acquiredUtilities");
-      const summary = ownership.locator("summary");
-      await expect(summary).toHaveText(`Acquired utilities (${index + 1})`);
-      await expect(summary).toBeFocused();
-      await expect(ownership).not.toHaveAttribute("open");
-      expect((await summary.boundingBox())!.height).toBeGreaterThanOrEqual(
-        testInfo.project.use.hasTouch ? 44 : 40,
-      );
-      await summary.press("Enter");
-      await expect(ownership).toHaveAttribute("open");
-      await expect(
-        ownership.getByRole("heading", { name: target, exact: true }),
-      ).toBeVisible();
-      const entry = ownership.getByRole("listitem").nth(index);
-      await expect(entry).toContainText("Acquired Jan 2005");
-      await expect(entry.locator("dt")).toHaveText([
-        "Customers acquired",
-        "Connection upkeep",
-        "Debt payment",
-        "Debt remaining",
-      ]);
-      await expect(
-        entry
-          .locator(".facilityStat")
-          .filter({ hasText: "Debt payment" })
-          .locator("dd"),
-      ).toHaveText(/^\$[\d.,]+[kMBT]?\/mo$/);
-      const valueTops = await entry
-        .locator("dd")
-        .evaluateAll((values) =>
-          values.map((value) => value.getBoundingClientRect().top),
-        );
-      // Wrapped labels share a row height, so the figures remain aligned at phone widths too.
-      expect(Math.abs(valueTops[0] - valueTops[1])).toBeLessThanOrEqual(1);
-      expect(Math.abs(valueTops[2] - valueTops[3])).toBeLessThanOrEqual(1);
-      await expect(ownership.getByRole("list").getByRole("button")).toHaveCount(
-        0,
-      );
-      expect(
-        await ownership.evaluate(
-          (element) => element.scrollWidth - element.clientWidth,
-        ),
-      ).toBeLessThanOrEqual(1);
-      const afterPurchase = (await readSavedGame(page))!;
-      expect(
-        afterPurchase.desktopAchievements?.earned.filter(
-          (id) => id === "POWER_PLAY",
-        ),
-      ).toEqual(["POWER_PLAY"]);
-      if (index === 0) {
-        const notification = page.getByRole("button", {
-          name: "Dismiss Power Play achievement notification",
-          exact: true,
-        });
-        await expect(notification).toBeVisible();
-        await expect(notification).toContainText(
-          "Acquire your first competing utility.",
-        );
-        if (
-          process.env.REVIEW_SCREENSHOT_DIR &&
-          ((testInfo.project.name === "desktop-chromium" &&
-            theme === "light") ||
-            (testInfo.project.name === "mobile-390px" && theme === "dark"))
-        ) {
-          await page.mouse.move(0, 0);
-          await notification.screenshot({
-            path: path.join(
-              process.env.REVIEW_SCREENSHOT_DIR,
-              `power-play-${testInfo.project.name}-${theme}.png`,
-            ),
-            animations: "disabled",
-          });
-        }
-        await notification.click();
-      }
-      const receipt = afterPurchase.utilityExpansion!.acquisitions.find(
-        (entry) =>
-          entry.targetId ===
-          (index === 0 ? "valley-electric" : "ridge-electric"),
-      )!;
-      expect(receipt).toBeDefined();
-      await expect(entry).toContainText(
-        formatCount(receipt.transferredCustomers),
-      );
-      expect(customerPreview).toBe(
-        `${formatCount(customersBefore)} → ${formatCount(customersBefore + receipt.transferredCustomers)} (+${Math.round((receipt.transferredCustomers / customersBefore) * 100)}%)`,
-      );
-      await summary.press("Space");
-      await expect(ownership).not.toHaveAttribute("open");
-      await expect(
-        ownership.getByRole("heading", { name: target, exact: true }),
-      ).toBeHidden();
-      const scenario = page.getByRole("region", {
-        name: "Scenario",
-        exact: true,
-      });
-      await openPane(
-        scenario,
-        page.getByRole("button", { name: "Scenario", exact: true }),
-      );
-      const goals = scenario.locator(".missionRequirements");
-      await expect(
-        goals.getByText("Retire original oil plants", { exact: true }),
-      ).toBeVisible();
-      await expect(
-        goals.getByText("Acquire a utility", {
-          exact: true,
-        }),
-      ).toBeVisible();
-      await expect(goals).toContainText("Champlain’s Oil A by Dec 2020");
-      await expect(goals).toContainText(
-        "Acquired original oil plants by Dec 2023",
-      );
-      await expect(
-        scenario.getByRole("region", { name: "Supply plan", exact: true }),
-      ).toHaveCount(0);
-      await scenario
-        .getByRole("button", { name: "Close Scenario", exact: true })
-        .click();
-      const events = page.locator(".eventLog:visible");
-      await openPane(
-        events,
-        page.getByRole("button", { name: "Events", exact: true }),
-      );
-      await expect(events).not.toContainText("Network upkeep increased");
-      await expect(events).toContainText(
-        "Regional nuclear will fall to 76MW deliverable",
-      );
-      if (index === 1)
-        await expect(events).toContainText(
-          "Regional firm purchase will fall to 19MW deliverable",
-        );
-      await page
-        .getByRole("button", { name: "Close Events", exact: true })
-        .click();
-      await openPane(
-        facilities,
-        page.getByRole("button", { name: "Facilities", exact: true }),
-      );
-      await facilities.getByRole("tab", { name: "Fleet", exact: true }).click();
-      await expect(
-        facilities.getByRole("button", {
-          name: `Inspect ${index === 0 ? "Valley" : "Ridge"} Oil, ${target}`,
-          exact: true,
-        }),
-      ).toBeVisible();
-      await expect(
-        line.getByRole("button", { name: `Acquire ${target}`, exact: true }),
-      ).toHaveCount(0);
-      const purchased = await readSavedGame(page);
-      expect(purchased!.facilities.length).toBeGreaterThan(
-        beforeCancel!.facilities.length,
-      );
-      expect(
-        purchased!.utilityExpansion!.acquisitions.some(
-          (receipt) =>
-            receipt.targetId ===
-            (index === 0 ? "valley-electric" : "ridge-electric"),
-        ),
-      ).toBe(true);
-      expect(
-        await facilities.evaluate(
-          (element) => element.scrollWidth - element.clientWidth,
-        ),
-      ).toBeLessThanOrEqual(1);
-    }
-    // The inherited regional connections remain external market access after acquisition.
     await facilities
-      .getByRole("tab", { name: "Agreements", exact: true })
-      .click();
-    await expect(
-      facilities.getByRole("combobox", { name: "Market buying", exact: true }),
-    ).toBeVisible();
-    const interties = facilities.getByRole("list", {
-      name: "Interties",
-      exact: true,
-    });
-    const connections = interties.getByRole("listitem");
-    await expect(connections).toHaveCount(3);
-    await expect(interties).not.toContainText("expansion connection");
-    // Hidden acquisition corridors must not shift the reducer indices used by visible drag handles.
-    await interties
       .getByRole("button", {
-        name: "Reorder Ridge ↔ Regional grid",
+        name: "Inspect Ridge Electric territory",
         exact: true,
       })
-      .focus();
-    await page.keyboard.press("Space");
-    await page.keyboard.press("ArrowUp");
-    await page.keyboard.press("ArrowUp");
-    await page.keyboard.press("Space");
-    await expect(connections.first()).toHaveAttribute(
-      "data-corridor-id",
-      "vt-ridge-regional",
-    );
-    await facilities.getByRole("tab", { name: "Network", exact: true }).click();
-    const ownership = facilities.locator(".acquiredUtilities");
-    const summary = ownership.locator("summary");
-    const captureOwnership =
-      process.env.REVIEW_SCREENSHOT_DIR &&
-      ((testInfo.project.name === "desktop-chromium" && theme === "light") ||
-        (testInfo.project.name === "mobile-390px" && theme === "dark"));
-    if (captureOwnership) {
-      await summary.focus();
-      await summary.scrollIntoViewIfNeeded();
-      await page.mouse.move(0, 0);
-      await facilities.screenshot({
-        path: path.join(
-          process.env.REVIEW_SCREENSHOT_DIR!,
-          `acquired-collapsed-${testInfo.project.name}-${theme}.png`,
-        ),
-        animations: "disabled",
-      });
-    }
-    await summary.click();
-    await expect(ownership.getByRole("heading")).toHaveCount(2);
-    if (captureOwnership) {
-      await ownership.screenshot({
-        path: path.join(
-          process.env.REVIEW_SCREENSHOT_DIR!,
-          `acquired-expanded-${testInfo.project.name}-${theme}.png`,
-        ),
-        animations: "disabled",
-      });
-    }
-    await summary.click();
-    // Acquired plants use the existing purchase controls with an explicit local destination.
-    await openBuild(page);
-    await page.getByRole("tab", { name: "Generators", exact: true }).click();
-    await expect(
-      page.getByRole("combobox", { name: "Operating area", exact: true }),
-    ).toHaveCount(0);
-    const destination = page.getByRole("combobox", {
-      name: "Build destination",
+      .click();
+    const detail = facilities.getByRole("region", {
+      name: "Selected territory",
+    });
+    await detail
+      .getByRole("button", { name: "Inspect Ridge Electric", exact: true })
+      .click();
+    const terms = page.getByRole("dialog", {
+      name: "Acquisition terms",
       exact: true,
     });
-    await destination.click();
-    await page
-      .getByRole("option", { name: "Valley Electric", exact: true })
+    await expectDialogToFit(terms);
+    await expect(terms).toContainText("Assumed debt");
+    await terms
+      .getByRole("button", { name: "Back to territories", exact: true })
       .click();
-    await page.getByRole("slider").first().press("Home");
-    await page
-      .getByRole("button", { name: "Review purchase of Solar", exact: true })
+    await detail
+      .getByRole("button", { name: "Acquire Ridge Electric", exact: true })
       .click();
-    await page
-      .getByRole("dialog")
+    let review = page.getByRole("dialog", {
+      name: "Acquire Ridge Electric?",
+      exact: true,
+    });
+    await expectDialogToFit(review);
+    await expect(review).toContainText("Assumed debt");
+    await review.getByRole("button", { name: "Cancel", exact: true }).click();
+    await expect(review).toHaveCount(0);
+    await detail
+      .getByRole("button", { name: "Acquire Ridge Electric", exact: true })
+      .click();
+    review = page.getByRole("dialog", {
+      name: "Acquire Ridge Electric?",
+      exact: true,
+    });
+    await reviewScreenshot(review, {
+      path: testInfo.outputPath(`acquisition-${theme}.png`),
+      animations: "disabled",
+      scale: "css",
+    });
+    await review
       .getByRole("button", { name: "Take loan", exact: true })
       .click();
-    expect(
-      (await readSavedGame(page))?.facilities.some(
-        (facility) =>
-          facility.name === "Solar" &&
-          facility.territoryId === "valley-electric",
-      ),
-    ).toBe(true);
-    await openBuild(page);
-    await page.getByRole("tab", { name: "Storage", exact: true }).click();
-    await page.getByRole("slider").first().press("Home");
+    await expect(review).toHaveCount(0);
     await expect(
-      page.getByRole("combobox", { name: "Operating area", exact: true }),
-    ).toHaveCount(0);
-    await expect(
-      page.getByText(
-        "No storage projects available in 2005 in Burlington, VT.",
-        {
-          exact: true,
-        },
-      ),
-    ).toBeVisible();
-    const programs = page.getByRole("region", {
-      name: "Programs",
-      exact: true,
-    });
-    await openPane(
-      programs,
-      page.getByRole("button", { name: "Programs", exact: true }),
-    );
-    await expect(
-      programs.getByRole("combobox", {
-        name: "Program operating area",
+      detail.getByRole("button", {
+        name: "Build in Ridge Electric",
         exact: true,
       }),
-    ).toHaveCount(0);
+    ).toBeEnabled();
+    const saved = (await readSavedGame(page))!;
+    expect(
+      saved.utilityExpansion!.acquisitions.map((receipt) => receipt.targetId),
+    ).toContain("ridge-electric");
+    expect(
+      saved.facilities.some(
+        (facility) => facility.territoryId === "ridge-electric",
+      ),
+    ).toBe(true);
+    expect(saved.transmission!.lines).toEqual([]);
+    await openBuild(page);
     await expect(
-      programs.getByRole("button", { name: /^Efficiency rebates ·/ }),
-    ).toBeVisible();
-    if (
-      process.env.REVIEW_SCREENSHOT_DIR &&
-      testInfo.project.name === "mobile-390px" &&
-      theme === "light"
-    ) {
-      await expect(page.locator(".MuiSnackbar-root")).toHaveCount(0);
-      await page.mouse.move(0, 0);
-      await page.screenshot({
-        path: path.join(
-          process.env.REVIEW_SCREENSHOT_DIR,
-          `programs-${testInfo.project.name}-${theme}.png`,
-        ),
-        animations: "disabled",
-      });
-    }
-    const acquired = await readSavedGame(page);
-    await page.goto("/");
-    await page.getByRole("button", { name: "Continue", exact: true }).click();
-    await openPane(
-      facilities,
-      page.getByRole("button", { name: "Facilities", exact: true }),
-    );
-    const restoredOwnership = facilities.locator(".acquiredUtilities");
-    await expect(restoredOwnership).not.toHaveAttribute("open");
-    await expect(restoredOwnership.locator("summary")).toHaveText(
-      "Acquired utilities (2)",
-    );
-    await restoredOwnership.locator("summary").click();
-    for (const target of ["Valley", "Ridge"]) {
-      await expect(
-        restoredOwnership.getByRole("heading", {
-          name: `${target} Electric`,
-          exact: true,
-        }),
-      ).toBeVisible();
-    }
-    await facilities
-      .getByRole("tab", { name: "Agreements", exact: true })
-      .click();
-    for (const target of ["Valley Electric", "Ridge Electric"]) {
-      await expect(
-        facilities.getByRole("button", {
-          name: new RegExp(`^Inspect ${target} ↔ Regional grid`),
-        }),
-      ).toBeVisible();
-    }
-    const resumed = await readSavedGame(page);
-    expect(resumed?.utilityExpansion).toEqual(acquired?.utilityExpansion);
-    expect(errors).toEqual([]);
+      page.getByRole("tab", { name: "Interties", exact: true }),
+    ).toHaveCount(0);
   });
 }
 
@@ -912,16 +196,6 @@ test("normal valley play saves across the first year and resumes from IndexedDB"
   await page.addInitScript(() => localStorage.setItem("audioEnabled", "false"));
   await page.goto("/?scenario=116");
   await page.getByRole("button", { name: "Start game", exact: true }).click();
-  await openBuild(page);
-  await page.getByRole("tab", { name: "Interties", exact: true }).click();
-  await page.getByRole("slider", { name: /Construction tier/ }).press("Home");
-  await page
-    .getByRole("button", { name: /Review purchase of .*Valley Electric/ })
-    .click();
-  await page
-    .getByRole("dialog")
-    .getByRole("button", { name: "Pay cash", exact: true })
-    .click();
   for (const close of await page
     .locator('.gameToolHeader button[aria-label^="Close "]')
     .all())
@@ -948,121 +222,99 @@ test("normal valley play saves across the first year and resumes from IndexedDB"
   await expect(page.getByText("Save failed", { exact: true })).toHaveCount(0);
 });
 
-test("Green Uplands connects empty land and builds a generator in its own territory", async ({
-  page,
-}, testInfo) => {
-  test.setTimeout(120000);
-  await page.addInitScript(() => localStorage.setItem("audioEnabled", "false"));
-  await page.goto("/?scenario=116");
-  await page.getByRole("button", { name: "Start game", exact: true }).click();
-  const facilities = page.locator(".facilities:visible");
-  await openPane(
-    facilities,
-    page.getByRole("button", { name: "Facilities", exact: true }),
-  );
-  const opening = (await readSavedGame(page))!;
-  const customers = opening.timeline.find(
-    (tick) => tick.minute === opening.date.minute,
-  )!.customers;
-  await openBuild(page);
-  await page.getByRole("tab", { name: "Interties", exact: true }).click();
-  const tier = page.getByRole("slider", { name: /Construction tier/ });
-  await tier.press("Home");
-  await tier.press("ArrowRight");
-  await expect(tier).toHaveAttribute("aria-valuetext", "Tier II");
-  await openPane(
-    page.locator(".facilities"),
-    page.getByRole("button", { name: "Facilities", exact: true }),
-  );
-  await facilities
-    .getByRole("button", {
-      name: "Inspect Green Uplands territory",
+for (const theme of ["light", "dark"] as const) {
+  test(`Green Uplands cash purchase owns land immediately and reserves a wind site in ${theme}`, async ({
+    page,
+  }, testInfo) => {
+    await page.addInitScript((mode) => {
+      localStorage.setItem("theme", mode);
+      localStorage.setItem("audioEnabled", "false");
+    }, theme);
+    await page.goto("/?scenario=116");
+    await page.getByRole("button", { name: "Start game", exact: true }).click();
+    const facilities = page.locator(".facilities:visible");
+    await openPane(
+      facilities,
+      page.getByRole("button", { name: "Facilities", exact: true }),
+    );
+    await facilities
+      .getByRole("button", {
+        name: "Inspect Green Uplands territory",
+        exact: true,
+      })
+      .click();
+    const detail = facilities.getByRole("region", {
+      name: "Selected territory",
+    });
+    const before = (await readSavedGame(page))!;
+    await detail.getByRole("button", { name: /Buy Green Uplands/ }).click();
+    const review = page.getByRole("dialog", {
+      name: "Buy Green Uplands",
       exact: true,
-    })
-    .click();
-  await expect(
-    facilities.getByRole("region", { name: "Selected territory" }),
-  ).toContainText("No customers transfer");
-  await expect(
-    facilities.getByRole("slider", { name: /Construction tier/ }),
-  ).toHaveAttribute("aria-valuetext", "Tier I");
-  const constructionFacts = facilities.getByRole("region", {
-    name: "Selected territory",
+    });
+    await expectDialogToFit(review);
+    await expect(review).toContainText(
+      "No customers, plants or power transfer",
+    );
+    await expect(review.getByRole("button", { name: /loan/i })).toHaveCount(0);
+    await reviewScreenshot(review, {
+      path: testInfo.outputPath(`land-cash-review-${theme}.png`),
+      scale: "css",
+      animations: "disabled",
+    });
+    await review.getByRole("button", { name: /Buy land/ }).click();
+    await expect(review).toHaveCount(0);
+    await expect(
+      detail.getByRole("button", {
+        name: "Build in Green Uplands",
+        exact: true,
+      }),
+    ).toBeEnabled();
+    const owned = (await readSavedGame(page))!;
+    const previous = before.timeline.find(
+      (tick) => tick.minute === before.date.minute,
+    )!;
+    const current = owned.timeline.find(
+      (tick) => tick.minute === owned.date.minute,
+    )!;
+    expect(current.cash).toBeCloseTo(previous.cash - 18e6, 1);
+    expect(current.customers).toBe(previous.customers);
+    expect(owned.facilities).toHaveLength(before.facilities.length);
+    expect(owned.transmission!.lines).toEqual([]);
+    expect(owned.territoryNetwork!.landPurchases).toEqual([
+      { territoryId: "green-uplands", minute: owned.date.minute, price: 18e6 },
+    ]);
+    await reviewScreenshot(detail, {
+      path: testInfo.outputPath(`land-owned-${theme}.png`),
+      scale: "css",
+      animations: "disabled",
+    });
+    await page.goto("/");
+    await page.getByRole("button", { name: "Continue", exact: true }).click();
+    await openPane(
+      facilities,
+      page.getByRole("button", { name: "Facilities", exact: true }),
+    );
+    await facilities
+      .getByRole("button", {
+        name: "Inspect Green Uplands territory",
+        exact: true,
+      })
+      .click();
+    await detail
+      .getByRole("button", { name: "Build in Green Uplands", exact: true })
+      .click();
+    await expect(
+      page.getByRole("combobox", { name: "Build destination", exact: true }),
+    ).toHaveText("Green Uplands");
+    const wind = page.locator(".buildOption").filter({
+      has: page.getByRole("heading", { name: "Wind", exact: true }),
+    });
+    await expect(wind).toBeVisible();
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth,
+      ),
+    ).toBe(true);
   });
-  await expect(constructionFacts).toContainText("Power to Champlain120MW");
-  await expect(constructionFacts).toContainText("Power from Champlain120MW");
-  await reviewScreenshot(
-    facilities.getByRole("region", { name: "Selected territory" }),
-    { path: testInfo.outputPath("green-uplands-tier.png") },
-  );
-  await facilities
-    .getByRole("button", { name: /Review purchase of .*Green Uplands/ })
-    .click();
-  const constructionReview = page.getByRole("dialog");
-  await expect(constructionReview).toContainText("Power to Champlain120MW");
-  await expect(constructionReview).toContainText("Power from Champlain120MW");
-  await reviewScreenshot(constructionReview, {
-    path: testInfo.outputPath("green-uplands-purchase.png"),
-    animations: "disabled",
-  });
-  await page
-    .getByRole("dialog")
-    .getByRole("button", { name: "Pay cash", exact: true })
-    .click();
-  const building = (await readSavedGame(page))!;
-  expect(
-    building.transmission!.lines.find(
-      (line) => line.corridorId === "vt-champlain-uplands",
-    ),
-  ).toMatchObject({ capacityW: 120e6, yearsToBuildLeft: 2 });
-  await editSavedGame(page, ({ game }) => {
-    game.transmission!.lines.find(
-      (line) => line.corridorId === "vt-champlain-uplands",
-    )!.yearsToBuildLeft = 0;
-  });
-  await page.goto("/");
-  await page.getByRole("button", { name: "Continue", exact: true }).click();
-  await openPane(
-    facilities,
-    page.getByRole("button", { name: "Facilities", exact: true }),
-  );
-  await facilities
-    .getByRole("button", {
-      name: "Inspect Green Uplands territory",
-      exact: true,
-    })
-    .click();
-  await facilities
-    .getByRole("button", { name: "Build in Green Uplands", exact: true })
-    .click();
-  await expect(
-    page.getByRole("combobox", { name: "Build destination", exact: true }),
-  ).toHaveText("Green Uplands");
-  await page.getByRole("slider").first().press("Home");
-  const wind = page.getByRole("button", {
-    name: "Review purchase of Wind",
-    exact: true,
-  });
-  await expect(wind).toBeEnabled({ timeout: 30000 });
-  await wind.click();
-  await page
-    .getByRole("dialog")
-    .getByRole("button", { name: "Pay cash", exact: true })
-    .click();
-  const built = (await readSavedGame(page))!;
-  expect(
-    built.facilities.some(
-      (facility) =>
-        facility.name === "Wind" && facility.territoryId === "green-uplands",
-    ),
-  ).toBe(true);
-  expect(built.utilityExpansion!.acquisitions).toHaveLength(0);
-  expect(
-    built.timeline.find((tick) => tick.minute === built.date.minute)!.customers,
-  ).toBe(customers);
-  expect(
-    await facilities.evaluate(
-      (element) => element.scrollWidth - element.clientWidth,
-    ),
-  ).toBeLessThanOrEqual(1);
-});
+}

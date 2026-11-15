@@ -55,8 +55,8 @@ export default function TerritoryBuildDestination({
         </Select>
       </FormControl>
       <Typography variant="caption" color="textSecondary">
-        Each project reserves a local site. Output serves local demand first;
-        transfers share the territory connection.
+        Each project reserves a local site. All owned facilities serve your
+        company power pool.
       </Typography>
     </div>
   );

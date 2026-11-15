@@ -190,6 +190,34 @@ export default function PowerAgreements({
       <Typography component="h3" variant="subtitle2">
         Power purchase agreements
       </Typography>
+      {POWER_AGREEMENT_BLOCKS.filter(
+        (block) =>
+          "sellerUtilityId" in block &&
+          block.utilityId === utility &&
+          !sources.some((source) => source.id.startsWith(`${block.id}:`)),
+      ).map((block) => {
+        const quote = powerAgreementQuote(game, block.id);
+        return (
+          quote && (
+            <Box key={block.id} className="powerAgreement">
+              <Typography variant="body2">
+                {quote.name} · up to {formatWatts(quote.deliverableW)}
+              </Typography>
+              <Button
+                variant="outlined"
+                onClick={(event) => {
+                  restore.current = event.currentTarget;
+                  setForecastCommitted(true);
+                  setAcceptanceError(undefined);
+                  setReview(quote);
+                }}
+              >
+                Review {quote.name} agreement
+              </Button>
+            </Box>
+          )
+        );
+      })}
       {sources.map((source) => {
         const expired = game.date.minute >= source.endMinute;
         const account = game.transmission?.agreementAccounts?.find(
@@ -313,8 +341,8 @@ export default function PowerAgreements({
         );
       })}
       <Typography variant="body2" color="textSecondary">
-        Agreements and market purchases share this connection. Uncovered
-        purchases use regional market prices and availability.
+        Agreements supply your company power pool. Delivery follows supplier
+        availability; each contract has a quantity limit and an expiry date.
       </Typography>
       <DecisionDialog
         open={!!review || !!assessment}

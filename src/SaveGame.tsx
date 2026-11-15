@@ -818,6 +818,26 @@ export function parseSave(raw: unknown): SaveGameType | null {
   )
     return null;
   if (!transmissionEnabled && transmission?.lines.length) return null;
+  if (game.territoryNetwork?.version === 2) {
+    const legacy = game.territoryNetwork.legacyConnections;
+    if (
+      !Array.isArray(legacy) ||
+      legacy.some(
+        (line) =>
+          !validTransmissionLine(line, game.date!.year, {
+            ...accessContextForGame(game as GameType),
+            territoryNetwork: true,
+          }),
+      ) ||
+      new Set(legacy.map((line) => line.id)).size !== legacy.length ||
+      new Set(legacy.map((line) => line.corridorId)).size !== legacy.length
+    )
+      return null;
+    if (
+      transmission?.lines.some((line) => !line.corridorId.startsWith("peer:"))
+    )
+      return null;
+  }
   const locationCorridors = game.location
     ? corridorsForLocation(game.location)
     : [];

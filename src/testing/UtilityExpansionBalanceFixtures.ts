@@ -52,12 +52,6 @@ export function expansionBalanceActions(
   loadSimData(UTILITY_AREAS.champlain.location);
   const target = UTILITY_TARGETS.find(({ id }) => id === fixture.targetId)!;
   const actions: ScheduledSimActionType[] = [
-    {
-      month: 0,
-      type: "intertie",
-      corridorId: target.corridorId,
-      financed: true,
-    },
     ...Array.from({ length: 19 }, (_, index): ScheduledSimActionType => ({
       month: (index + 1) * 12,
       type: "rate",
@@ -71,27 +65,6 @@ export function expansionBalanceActions(
     { month: 180, type: "retire", assetId: "scenario-116-champlain-oil-a" },
   ];
   const prepared = fixture.portfolio !== "unprepared";
-  // Valley's inherited supply cannot cover every winter peak while its first local
-  // replacement is under construction. Reinforce the link before taking on that load.
-  if (
-    prepared &&
-    fixture.portfolio !== "line-only" &&
-    target.id === "valley-electric"
-  )
-    actions.push(
-      {
-        month: 36,
-        type: "intertie-upgrade",
-        corridorId: target.corridorId,
-        financed: true,
-      },
-      {
-        month: 60,
-        type: "intertie-upgrade",
-        corridorId: target.corridorId,
-        financed: true,
-      },
-    );
   // Cash buyers save through 2013 so the company purchase preserves a generation down payment.
   const purchaseMonth = fixture.financed ? 96 : 108;
   // Fund Valley's equity purchase before adding wind; the planned peaker arrives early
@@ -170,12 +143,6 @@ export function expansionBalanceActions(
   }
   if (fixture.portfolio === "both")
     actions.push(
-      {
-        month: 0,
-        type: "intertie",
-        corridorId: "vt-champlain-ridge",
-        financed: true,
-      },
       {
         month: 108,
         type: "acquire",

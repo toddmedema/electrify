@@ -1,8 +1,13 @@
+import { TICK_MINUTES } from "../Constants";
 import type { GameType } from "../Types";
 import { isTerritoryId } from "../data/Territories";
 import { UTILITY_AREAS } from "../data/UtilityExpansion";
 import { isUtilityExpansionGame } from "./ExpansionContext";
-import { facilityTerritoryId, ownedTerritories } from "./Territories";
+import {
+  facilityTerritoryId,
+  ownedTerritories,
+  landPrice,
+} from "./Territories";
 
 const record = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === "object" && !Array.isArray(value);
@@ -36,8 +41,51 @@ export function validTerritoryNetwork(game: GameType): boolean {
     );
   if (
     !record(game.territoryNetwork) ||
-    game.territoryNetwork.version !== 1 ||
-    Object.keys(game.territoryNetwork).length !== 1
+    game.territoryNetwork.version !== 2 ||
+    Object.keys(game.territoryNetwork).length !== 3
+  )
+    return false;
+  const state = game.territoryNetwork;
+  if (
+    !Array.isArray(state.landPurchases) ||
+    state.landPurchases.length > 1 ||
+    !Array.isArray(state.legacyConnections) ||
+    state.legacyConnections.length > 16
+  )
+    return false;
+  for (const receipt of state.landPurchases) {
+    if (
+      !record(receipt) ||
+      receipt.territoryId !== "green-uplands" ||
+      !Number.isSafeInteger(receipt.minute) ||
+      receipt.minute < 0 ||
+      receipt.minute > game.date.minute ||
+      receipt.minute % TICK_MINUTES !== 0 ||
+      !nonnegative(receipt.price)
+    )
+      return false;
+    if (receipt.legacy === true) {
+      const line = state.legacyConnections.find(
+        (line) => line.corridorId === "vt-champlain-uplands",
+      );
+      if (
+        !line ||
+        line.minuteCreated !== receipt.minute ||
+        line.buildCost !== receipt.price ||
+        Object.keys(receipt).length !== 4
+      )
+        return false;
+    } else if (
+      receipt.legacy !== undefined ||
+      Object.keys(receipt).length !== 3 ||
+      !close(receipt.price, landPrice(game, receipt.minute))
+    )
+      return false;
+  }
+  if (
+    state.legacyConnections.some(
+      (line) => line.corridorId === "vt-champlain-uplands",
+    ) !== state.landPurchases.some((receipt) => receipt.legacy === true)
   )
     return false;
   const owned = ownedTerritories(game);

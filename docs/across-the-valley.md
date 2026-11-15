@@ -1,18 +1,19 @@
 # Across the Valley
 
 Scenario 116 is a fictional Vermont Investor utility, January 2005–December 2024.
-A completed Tier-1 connection to Valley Electric or Ridge Electric unlocks that
-utility's acquisition. Optional upgrades buy transfer capacity, not permission to
-acquire. Human co-op companies remain independent.
+Acquire Valley Electric or Ridge Electric directly, sign finite power agreements,
+build facilities and buy Green Uplands land. All owned customers and facilities
+share one company power pool. Location controls finite suitable sites; no line
+purchase, transfer bottleneck or connection fee is involved. Human co-op companies
+remain independent, with new empty-land claims accepted once in host command order.
 
-Champlain starts with an operating 300 MW regional connection carrying its
-inherited nuclear and Québec hydro power purchase agreements. Buying Valley or
-Ridge adds that company's operating regional connection and original agreements.
-These inherited interfaces are separate from the expansion projects needed for
-acquisition. Contracts, replacement offers, shared capacity and market fallback
-are documented in [Physical interties and power purchase agreements](power-agreements.md).
+Inherited nuclear and Québec hydro commitments retain their original dates.
+Acquisition transfers plants, customers, sites, debts and third-party obligations;
+a PPA with the acquired seller ends as an external delivery/charge. Green Uplands
+costs $18 million in 2005 dollars, indexed by CPI, for land alone. See
+[territories](territories.md) for site budgets, accounting and legacy-save conversion.
 
-The Network view uses an isometric hex schematic, following the visual direction in
+The Territories view uses an isometric hex schematic, following the visual direction in
 [issue 603](https://github.com/toddmedema/electrify/issues/603). Towns and factories indicate
 customers, lakes and dams existing hydro, plains solar/storage sites, and hills wind sites.
 Equipment appears when a completed plant exists; independent utilities show their authored
@@ -22,7 +23,7 @@ territory key provides the same selection through keyboard and touch controls.
 
 ## Authored portfolios and historical references
 
-The three utilities, their ownership, acquisition prerequisite, fleet capacities,
+The three utilities, their ownership, fleet capacities,
 asset ages, source entitlements, network costs, prices, deadlines and geographic
 service areas are game assumptions from [issue 683](https://github.com/toddmedema/electrify/issues/683).
 They are not a reconstruction of Green Mountain Power, Central Vermont Public
