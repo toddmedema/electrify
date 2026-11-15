@@ -80,15 +80,13 @@ export class ReplicaRecovery {
     this.blockers();
   }
   private blockers() {
-    const reasons = Array.from(
-      this.peers,
-      ([id, peer]) =>
-        peer.stopped ||
-        (peer.connected &&
-        peer.heldAt !== undefined &&
-        !this.host.world.outcomes[id]
-          ? `Waiting for ${this.name(id)} to catch up`
-          : ""),
+    const reasons = Array.from(this.peers, ([id, peer]) =>
+      peer.connected && !this.host.world.outcomes[id]
+        ? peer.stopped ||
+          (peer.heldAt !== undefined
+            ? `Waiting for ${this.name(id)} to catch up`
+            : "")
+        : "",
     ).filter(Boolean);
     const merged = [...this.shell, ...reasons];
     if (
@@ -114,7 +112,7 @@ export class ReplicaRecovery {
     if (peer.attempts.length >= 2) {
       peer.baseline = undefined;
       peer.stopped = `${this.name(to)} could not stay in sync. Save and resume the match.`;
-      this.host.pause(peer.stopped);
+      if (!this.host.world.outcomes[to]) this.host.pause(peer.stopped);
       this.blockers();
       this.options.changed();
       return false;

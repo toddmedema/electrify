@@ -273,6 +273,80 @@ test("disconnected and retired peers cannot hold time, and a third baseline stop
   await settle();
 });
 
+test("retired recovery exhaustion never pauses active companies and stays stopped after disconnect", async () => {
+  const f = fixture(digest, 3);
+  f.host.world.outcomes["1"] = {
+    outcome: "bankrupt",
+    title: "Bankrupt",
+    month: 0,
+  };
+  f.command("0", { kind: "speed", speed: "NORMAL" });
+  f.command("2", { kind: "speed", speed: "NORMAL" });
+  expect(f.host.world.paused).toBe(false);
+  expect(f.recovery.baseline("1")).toBe(true);
+  f.time(10000);
+  expect(f.recovery.baseline("1")).toBe(true);
+  f.time(20000);
+  expect(f.recovery.baseline("1")).toBe(false);
+  expect(f.baselines()).toHaveLength(2);
+  expect(f.host.world.readyRequired).toBe(false);
+  expect(worldBlockers(f.host.world)).toEqual([]);
+  expect(f.host.world.paused).toBe(false);
+  expect(f.host.step()).toBe(true);
+  const retiredMinute = f.host.world.grids[1].date.minute;
+  for (const connected of [["2"], ["1", "2"]]) {
+    f.recovery.connected(connected);
+    f.time(61000);
+    f.recovery.pulse();
+    expect(f.recovery.baseline("1")).toBe(false);
+    expect(f.baselines()).toHaveLength(2);
+    expect(worldBlockers(f.host.world)).toEqual([]);
+    expect(f.host.world.readyRequired).toBe(false);
+    expect(f.host.step()).toBe(true);
+  }
+  expect(f.host.world.grids[0].date.minute).toBeGreaterThan(retiredMinute);
+  expect(f.host.world.grids[2].date.minute).toBeGreaterThan(retiredMinute);
+  expect(f.host.world.grids[1].date.minute).toBe(retiredMinute);
+  await settle();
+});
+
+test.each(["disconnect", "retire"])(
+  "an active company's exhausted recovery blocker clears after %s",
+  async (ending) => {
+    const f = fixture();
+    f.command("0", { kind: "speed", speed: "NORMAL" });
+    f.command("1", { kind: "speed", speed: "NORMAL" });
+    expect(f.recovery.baseline("1")).toBe(true);
+    f.time(10000);
+    expect(f.recovery.baseline("1")).toBe(true);
+    f.command("0", { kind: "ready" });
+    f.command("1", { kind: "ready" });
+    expect(f.host.world.readyRequired).toBe(false);
+    expect(f.host.step()).toBe(true);
+    f.time(20000);
+    expect(f.recovery.baseline("1")).toBe(false);
+    const reason =
+      "Player 1 could not stay in sync. Save and resume the match.";
+    expect(worldBlockers(f.host.world)).toEqual([reason]);
+    expect(f.host.world.readyRequired).toBe(true);
+    f.command("0", { kind: "ready" });
+    f.command("1", { kind: "ready" });
+    expect(f.host.step()).toBe(false);
+    if (ending === "retire")
+      f.host.world.outcomes["1"] = {
+        outcome: "bankrupt",
+        title: "Bankrupt",
+        month: 0,
+      };
+    f.recovery.connected(ending === "disconnect" ? [] : ["1"]);
+    expect(worldBlockers(f.host.world)).toEqual([]);
+    expect(f.host.world.paused).toBe(false);
+    expect(f.host.step()).toBe(true);
+    expect(f.recovery.baseline("1")).toBe(false);
+    await settle();
+  },
+);
+
 test("only changed worlds verify once per second, with two digest slots and synchronous boundary capture", async () => {
   const pending: {
     bytes: Uint8Array<ArrayBuffer>;
