@@ -1733,15 +1733,17 @@ test("replication repairs a mismatched hash with a pending purchase exactly once
     target.holdReplicaViews = true;
     target.holdReplicaBaseline = true;
   });
-  room.corruptNextVerified.set(
-    guestId,
-    room.progress.get(guestId)!.verified!.index,
-  );
   const started = Date.now();
   await guest.getByRole("button", { name: "Take loan", exact: true }).click();
   await expect(
     guest.getByRole("status").filter({ hasText: "Submitting…" }),
   ).toBeVisible();
+  room.corruptNextVerified.set(
+    guestId,
+    room.progress.get(guestId)!.verified!.index,
+  );
+  // Establish the pending receipt before the next verify can open its synchronization notice.
+  await ready(host);
   await expect
     .poll(() => room.baselines.get(guestId), { timeout: 30000 })
     .toBe(2);
