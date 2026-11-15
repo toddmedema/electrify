@@ -296,6 +296,7 @@ class SteamRoom {
   wireViews = new Map<string, number>();
   corruptNextVerified = new Map<string, number>();
   corruptedProgress = 0;
+  purchases = new Map<string, { sequence: number; attempts: number }>();
   heldReplication = new Set<string>();
   progress = new Map<string, Extract<WireMessage, { kind: "progress" }>>();
   pendingReplication = new Map<string, NativeEvent[]>();
@@ -447,6 +448,18 @@ class SteamRoom {
     }
     if (input.kind === "unlock") return this.state(id);
     if (input.kind === "send") {
+      if (
+        input.payload.kind === "command" &&
+        input.payload.envelope.command.kind === "action" &&
+        input.payload.envelope.command.name === "buildFacility"
+      ) {
+        const sequence = input.payload.envelope.sequence;
+        const previous = this.purchases.get(id);
+        this.purchases.set(id, {
+          sequence,
+          attempts: previous?.sequence === sequence ? previous.attempts + 1 : 1,
+        });
+      }
       if (input.payload.kind === "view") {
         this.views.set(input.to, input.payload.view);
         this.wireViews.set(input.to, (this.wireViews.get(input.to) ?? 0) + 1);
@@ -1735,9 +1748,11 @@ test("replication repairs a mismatched hash with a pending purchase exactly once
   });
   const started = Date.now();
   await guest.getByRole("button", { name: "Take loan", exact: true }).click();
-  await expect(
-    guest.getByRole("status").filter({ hasText: "Submitting…" }),
-  ).toBeVisible();
+  // The catalog closes immediately on touch layouts. A repeated identical command proves the
+  // Session still awaits its receipt while the replica's local publication is deliberately held.
+  await expect
+    .poll(() => room.purchases.get(guestId)?.attempts ?? 0)
+    .toBeGreaterThan(1);
   room.corruptNextVerified.set(
     guestId,
     room.progress.get(guestId)!.verified!.index,
@@ -1753,6 +1768,21 @@ test("replication repairs a mismatched hash with a pending purchase exactly once
     exact: true,
   });
   await expect(syncing).toContainText("Synchronizing with host…");
+  if (process.env.REVIEW_SCREENSHOT_DIR) {
+    await guest.emulateMedia({ colorScheme: "light" });
+    await expect(guest.locator("html")).toHaveAttribute("data-theme", "light");
+    await test.info().attach("synchronization notice light colors", {
+      body: JSON.stringify(
+        await syncing.evaluate((element) => ({
+          text: getComputedStyle(element).color,
+          background: getComputedStyle(element).backgroundColor,
+        })),
+      ),
+      contentType: "application/json",
+    });
+    await guest.emulateMedia({ colorScheme: "dark" });
+    await expect(guest.locator("html")).toHaveAttribute("data-theme", "dark");
+  }
   await reviewScreenshot(guest, {
     path: test
       .info()
@@ -1797,12 +1827,24 @@ test("replication reconnects while a recovery baseline is installing", async ({
   browser,
 }) => {
   test.skip(!replication, "Opt-in replication journey");
-  test.setTimeout(60000);
+  // The successful bootstrap must age out of the real 60-second retry budget first.
+  test.setTimeout(120000);
   const { room, pages, errors } = await startSharedGame(browser, 2);
   const [host, guest] = pages;
   const guestId = room.members[1].id;
   await expect(guest.locator(".facilities:visible")).toBeVisible();
   await expect.poll(() => room.progress.get(guestId)?.verified).toBeDefined();
+  const initialDate = { ...room.views.get(guestId)!.game!.date };
+  for (const idleMs of [31000, 31000]) {
+    await guest.waitForTimeout(idleMs);
+    expect(room.baselines.get(guestId)).toBe(1);
+    expect(room.views.get(guestId)!.game!.date).toEqual(initialDate);
+    for (const page of pages)
+      await expect(clock(page)).toHaveAttribute("data-active-speed", "PAUSED");
+    await expect(
+      guest.getByRole("dialog", { name: "Multiplayer", exact: true }),
+    ).toBeHidden();
+  }
   await guest.evaluate(() => {
     (window as SteamTestWindow).holdReplicaBaseline = true;
   });
@@ -1824,11 +1866,24 @@ test("replication reconnects while a recovery baseline is installing", async ({
   await guest.evaluate(() =>
     (window as SteamTestWindow).releaseReplicaBaseline?.(),
   );
+  await expect.poll(() => room.baselines.get(guestId)).toBe(3);
   await expect(notice).toBeHidden();
   await expect.poll(() => room.state(guestId).connected).toEqual([room.host]);
-  for (const page of pages) await ready(page);
-  for (const page of pages)
-    await expect(clock(page)).toHaveAttribute("data-active-speed", "SLOW");
+  try {
+    for (const page of pages) await ready(page);
+    for (const page of pages)
+      await expect(clock(page)).toHaveAttribute("data-active-speed", "SLOW");
+  } finally {
+    await test.info().attach("replication recovery state", {
+      body: JSON.stringify({
+        baselines: room.baselines.get(guestId),
+        hostReason: room.hostView?.reason,
+        guestReason: room.views.get(guestId)?.reason,
+        progress: room.progress.get(guestId),
+      }),
+      contentType: "application/json",
+    });
+  }
   expect(errors).toEqual([]);
   expect(room.transportErrors).toEqual([]);
 });
