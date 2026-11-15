@@ -457,6 +457,7 @@ function IntertieBuildItem(props: {
  */
 function IntertieUpgradeControl(props: {
   costIndex: number;
+  internal: boolean;
   line: TransmissionLineOperatingType;
   cash?: number;
   year: number;
@@ -465,7 +466,16 @@ function IntertieUpgradeControl(props: {
   onUpgrade: (corridorId: string, financed: boolean) => void;
   context: IntertieAccessContext;
 }): React.JSX.Element | null {
-  const { line, cash, year, interestRate, units, onUpgrade, context } = props;
+  const {
+    line,
+    cash,
+    year,
+    interestRate,
+    units,
+    onUpgrade,
+    context,
+    internal,
+  } = props;
   const [reviewing, setReviewing] = React.useState(false);
   if (line.upgrade) {
     const years = line.upgrade.yearsToBuildLeft;
@@ -498,16 +508,19 @@ function IntertieUpgradeControl(props: {
   const { downpayment } = purchaseTerms(quote.buildCost, true, interestRate);
   const shortfall = financingShortfallText(cash ?? 0, downpayment);
   const months = Math.max(1, Math.round(quote.yearsToBuild * 12));
-  const capacityBefore = intertieDirectionalCapacities(
-    line.corridorId,
-    context,
-    line.capacityW,
-  );
-  const capacityAfter = intertieDirectionalCapacities(
-    line.corridorId,
-    context,
-    quote.targetCapacityW,
-  );
+  const capacityBefore = internal
+    ? { importCapacityW: line.capacityW, exportCapacityW: line.capacityW }
+    : intertieDirectionalCapacities(line.corridorId, context, line.capacityW);
+  const capacityAfter = internal
+    ? {
+        importCapacityW: quote.targetCapacityW,
+        exportCapacityW: quote.targetCapacityW,
+      }
+    : intertieDirectionalCapacities(
+        line.corridorId,
+        context,
+        quote.targetCapacityW,
+      );
   return (
     <div className="transmissionUpgrade">
       {shortfall && (
@@ -546,7 +559,7 @@ function IntertieUpgradeControl(props: {
           extraFacts={[
             {
               concept: "supply",
-              label: "Import capacity",
+              label: internal ? "Power to Champlain" : "Import capacity",
               value: limitChangeText(
                 capacityBefore.importCapacityW,
                 capacityAfter.importCapacityW,
@@ -555,7 +568,7 @@ function IntertieUpgradeControl(props: {
             },
             {
               concept: "supply",
-              label: "Export capacity",
+              label: internal ? "Power from Champlain" : "Export capacity",
               value: limitChangeText(
                 capacityBefore.exportCapacityW,
                 capacityAfter.exportCapacityW,
@@ -715,7 +728,7 @@ export default function TransmissionPanel({
   const [cancelLine, setCancelLine] =
     React.useState<TransmissionLineOperatingType | null>(null);
   const [selectedLine, setSelectedLine] = React.useState<number | null>(null);
-  const [tier, setTier] = useToolState(
+  const [preferredTier, setTier] = useToolState(
     projectsOnly ? "interties.tier" : undefined,
     () =>
       corridorIds || hasTerritoryNetwork(game)
@@ -794,6 +807,19 @@ export default function TransmissionPanel({
     (corridor) =>
       !state.lines.some(({ corridorId }) => corridorId === corridor.id),
   );
+  const maxTier = Math.max(
+    1,
+    ...unbuiltCorridors.map(
+      ({ id }) =>
+        Array.from(
+          { length: MAX_INTERTIE_UPGRADES + 1 },
+          (_, index) => index + 1,
+        ).filter((candidate) =>
+          intertieBuildQuote(id, game.date.year, candidate, intertieContext),
+        ).length,
+    ),
+  );
+  const tier = Math.max(1, Math.min(preferredTier, maxTier));
   const buildQuote = (corridorId: string, selectedTier = tier) =>
     intertieBuildQuote(
       corridorId,
@@ -816,16 +842,6 @@ export default function TransmissionPanel({
         ? a.emissions - b.emissions
         : a.quote[sort] - b.quote[sort],
     );
-  const maxTier = Math.max(
-    1,
-    ...unbuiltCorridors.map(
-      ({ id }) =>
-        Array.from(
-          { length: MAX_INTERTIE_UPGRADES + 1 },
-          (_, index) => index + 1,
-        ).filter((candidate) => buildQuote(id, candidate)).length,
-    ),
-  );
   const review =
     reviewId && unbuiltCorridors.some(({ id }) => id === reviewId)
       ? buildQuote(reviewId)
@@ -1443,6 +1459,7 @@ export default function TransmissionPanel({
                                         </Button>
                                       )}
                                       <IntertieUpgradeControl
+                                        internal={internal}
                                         costIndex={getCostTableIndex(
                                           game.date,
                                           game.startingYear,

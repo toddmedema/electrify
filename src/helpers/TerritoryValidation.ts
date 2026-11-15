@@ -63,6 +63,9 @@ export function validTerritoryNetwork(game: GameType): boolean {
     if (!record(tick.territories) || Object.keys(tick.territories).length === 0)
       return false;
     let demandW = 0;
+    let supplyW = 0;
+    let importedW = 0;
+    let exportedW = 0;
     for (const [id, balance] of Object.entries(tick.territories)) {
       if (
         !isTerritoryId(id) ||
@@ -78,7 +81,15 @@ export function validTerritoryNetwork(game: GameType): boolean {
       )
         return false;
       demandW += balance.demandW;
+      supplyW += balance.supplyW;
+      importedW += balance.importedW;
+      exportedW += balance.exportedW;
     }
-    return close(demandW, tick.demandW);
+    return (
+      close(demandW, tick.demandW) &&
+      close(supplyW, tick.supplyW) &&
+      close(importedW, tick.importedW ?? 0) &&
+      close(exportedW, tick.exportedW ?? 0)
+    );
   });
 }

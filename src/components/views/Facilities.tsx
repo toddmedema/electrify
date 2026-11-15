@@ -665,6 +665,9 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
               className="facilityDisclosure"
               aria-label={
                 `Inspect ${facilityDisplayName(facility)}` +
+                (hasTerritoryNetwork(game)
+                  ? `, ${territoryName(facilityTerritoryId(facility))}`
+                  : "") +
                 (hazardStatus && !underConstruction
                   ? `, ${hazardStatusText(hazardStatus).spoken}`
                   : "") +

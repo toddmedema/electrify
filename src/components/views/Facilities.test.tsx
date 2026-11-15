@@ -2225,3 +2225,30 @@ it("removes an already-paused reactor's resume control when its permanent shutdo
   expect(screen.getByText("This plant can't be sold.")).toBeInTheDocument();
   expect(view.onTogglePause).not.toHaveBeenCalled();
 });
+
+it("distinguishes facility inspection actions by territory and opens them from the keyboard", async () => {
+  const game = createGame({ scenarioId: 116, seed: 188 });
+  const wind = game.facilities.find(({ fuel }) => fuel === "Wind")!;
+  game.utilityExpansion!.acquisitions.push({
+    targetId: "valley-electric",
+    minute: 0,
+    financed: false,
+    transferredCustomers: 159000,
+  });
+  game.facilities = [
+    { ...wind, territoryId: "champlain" },
+    { ...wind, id: 999, territoryId: "valley-electric" },
+  ];
+  renderFacilities(game, null);
+  const home = screen.getByRole("button", { name: "Inspect Wind, Champlain" });
+  const valley = screen.getByRole("button", {
+    name: "Inspect Wind, Valley Electric",
+  });
+  home.focus();
+  await user.keyboard("{Enter}");
+  expect(home).toHaveAttribute("aria-expanded", "true");
+  valley.focus();
+  await user.keyboard("{Enter}");
+  expect(valley).toHaveAttribute("aria-expanded", "true");
+  expect(home).toHaveAttribute("aria-expanded", "false");
+});

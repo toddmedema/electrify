@@ -5972,7 +5972,7 @@ function* supplyFacilitiesFinancesPhases(
         0,
         Math.min(
           remaining,
-          territoryDraws?.get(battery.id) ?? Infinity,
+          territoryDraws ? (territoryDraws.get(battery.id) ?? 0) : Infinity,
           battery.peakW - alreadyChargingW,
           ((battery.peakWh - battery.currentWh) * ticksPerHour) /
             battery.roundTripEfficiency,
@@ -6023,11 +6023,20 @@ function* supplyFacilitiesFinancesPhases(
     const reserveW = now.demandW * PEER_TRADE_RESERVE_FRACTION;
     const intensity = (g: GeneratorOperatingType) =>
       (g.btuPerWh || 0) * (FUELS[g.fuel]?.kgCO2ePerBtu || 0) * 1e6;
+    // Storage keeps the draw already supplied by native generation and agreements.
+    // Spare generation is offered only for an actual peer export, never a new charging draw.
+    const peerChargeRequests = territoryChargeRequests();
+    const peerChargeDraws = territoryDemand
+      ? routeTerritoryPower(territoryInput(peerChargeRequests)).sinkW
+      : [];
     const territoryPeerExport = (capacityW: number) =>
       routeTerritoryPower(
         territoryInput(
           [
-            ...territoryChargeRequests(),
+            ...peerChargeRequests.map((sink, i) => ({
+              ...sink,
+              capacityW: peerChargeDraws[i],
+            })),
             {
               id: "peer-export",
               territoryId: "champlain",

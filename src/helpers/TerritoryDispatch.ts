@@ -331,7 +331,11 @@ export function clearTerritoryMarket({
             kind: "import",
           });
         }
-        sources[index].capacityW += capacityW;
+        const headroomW = Math.max(
+          0,
+          offer.importLimitW - sources[index].capacityW,
+        );
+        sources[index].capacityW += Math.min(capacityW, headroomW);
         result = route(storage);
         // Unreachable headroom is neither purchased nor reserved against another interface.
         for (let j = baseSourceCount; j < sources.length; j++)

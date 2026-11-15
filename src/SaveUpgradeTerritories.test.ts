@@ -184,20 +184,20 @@ it("validates derived balances while retaining legacy history without a summary"
   const tick = raw.game.timeline[0];
   const balance = {
     demandW: tick.demandW,
-    supplyW: tick.demandW,
-    generationW: tick.demandW,
+    supplyW: tick.supplyW,
+    generationW: tick.supplyW,
     storageChargeW: 0,
     storageDischargeW: 0,
-    importedW: 0,
-    exportedW: 0,
-    unservedW: 0,
+    importedW: tick.importedW ?? 0,
+    exportedW: tick.exportedW ?? 0,
+    unservedW: Math.max(0, tick.demandW - tick.supplyW),
     curtailedW: 0,
   };
   tick.territories = { champlain: balance };
   expect(parseSave(raw)).not.toBeNull();
   balance.unservedW = -1;
   expect(parseSave(raw)).toBeNull();
-  balance.unservedW = 0;
+  balance.unservedW = Math.max(0, tick.demandW - tick.supplyW);
   tick.territories = { "made-up": balance };
   expect(parseSave(raw)).toBeNull();
 });
@@ -236,3 +236,20 @@ it("enables the same network when a supported save uses a mod based on scenario1
   expect(migrated!.game.territoryNetwork).toEqual({ version: 1 });
   expect(migrated!.game.customScenario).toEqual(raw.game.customScenario);
 });
+
+it.each(["supplyW", "importedW", "exportedW"] as const)(
+  "rejects a save whose territory %s total disagrees with its tick",
+  (field) => {
+    const game = createGame({ scenarioId: 116, seed: 61 });
+    tickState(game);
+    const raw = JSON.parse(JSON.stringify(serializeSave(game)));
+    const tick = raw.game.timeline.find(
+      (entry: { minute: number }) => entry.minute === game.date.minute,
+    );
+    expect(parseSave(raw)).not.toBeNull();
+    tick[field] += 1e6;
+    expect(parseSave(raw)).toBeNull();
+    delete tick.territories;
+    expect(parseSave(raw)).not.toBeNull();
+  },
+);
