@@ -259,8 +259,8 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
         preface={
           props.territoryId && (
             <Typography sx={{ px: 2, mb: 2 }}>
-              Build in {territoryName(props.territoryId)}. Storage charges and
-              supplies customers in its territory.
+              Build in {territoryName(props.territoryId)}. Storage charges from
+              and supplies your company power pool.
             </Typography>
           )
         }

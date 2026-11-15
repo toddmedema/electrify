@@ -3,15 +3,10 @@ import { configureStore } from "@reduxjs/toolkit";
 import { Provider } from "react-redux";
 import { createGame } from "../../testing/Simulator";
 import { acquireUtility } from "../../reducers/GameActions";
-import reducer, {
-  buildTransmissionLine,
-  generateForecastTimeline,
-} from "../../reducers/Game";
+import reducer, { generateForecastTimeline } from "../../reducers/Game";
 import { acquisitionQuote, utilityOffer } from "../../helpers/Expansion";
 import { formatMoneyConcise } from "../../helpers/Format";
 import { currentTick } from "../../helpers/GameSelectors";
-import { copyOfficialGame } from "../../testing/OfficialScenarioExecutionFixtures";
-import { UTILITY_TARGETS } from "../../data/UtilityExpansion";
 import UtilityOfferDialog from "./UtilityOfferDialog";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "../../helpers/DateTime";
 
@@ -111,24 +106,12 @@ it.each([
 );
 
 it("keeps a disappeared offer visible and cancellable so its pause token can close", () => {
-  let game = createGame({
+  const game = createGame({
     scenarioId: 116,
     difficulty: "Employee",
     seed: 12345,
   });
   currentTick(game)!.cash = 2e9;
-  game = copyOfficialGame(
-    reducer(
-      game,
-      buildTransmissionLine({
-        corridorId: UTILITY_TARGETS[0].corridorId,
-        financed: false,
-      }),
-    ),
-  );
-  game.transmission!.lines.find(
-    (line) => line.corridorId === "vt-champlain-valley",
-  )!.yearsToBuildLeft = 0;
   const quote = acquisitionQuote(game, "valley-electric")!;
   game.speed = "NORMAL";
   const store = configureStore({
@@ -171,7 +154,7 @@ it("keeps a disappeared offer visible and cancellable so its pause token can clo
   expect(store.getState().game.policyPause?.token).toBe(
     "company-terms:valley-electric",
   );
-  fireEvent.click(screen.getByRole("button", { name: "Back to connections" }));
+  fireEvent.click(screen.getByRole("button", { name: "Back to territories" }));
   expect(onClose).toHaveBeenCalledTimes(1);
   view.unmount();
   expect(store.getState().game.policyPause).toBeUndefined();

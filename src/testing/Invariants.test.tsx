@@ -1,3 +1,4 @@
+import * as Energy from "../helpers/Energy";
 import cloneDeep from "lodash.clonedeep";
 import { getTimeFromTimeline, summarizeTimeline } from "../helpers/DateTime";
 import { tickState, generateNewTimeline } from "../reducers/Game";
@@ -46,7 +47,13 @@ it.each([2, 3] as const)(
   (termsVersion) => {
     const game = createGame({ scenarioId: 116, seed: 12345 });
     game.transmission!.inheritedAgreementTerms = termsVersion;
-    game.transmission!.lines[0].paused = true;
+    jest.spyOn(Energy, "getWindOutputFactor").mockReturnValue(1);
+    game.facilities = game.facilities.filter(
+      (facility) => facility.fuel === "Wind",
+    );
+    game.facilities.forEach((facility) => {
+      facility.peakW = 1e9;
+    });
     tickState(game);
     let now = getTimeFromTimeline(game.date.minute, game.timeline)!;
     expect(now.expensesImports === 0).toBe(termsVersion === 3);
@@ -336,12 +343,12 @@ it.each([0, 5.960464477539063e-8, 1])(
   },
 );
 
-it("reports total imports in a transmission-capacity violation that includes agreement power", () => {
+it("bounds uncovered imports separately from finite agreement power", () => {
   const game = createGame({ scenarioId: 116, seed: 12345 });
   tickState(game);
   const now = {
     ...getTimeFromTimeline(game.date.minute, game.timeline)!,
-    importedW: 400e6,
+    importedW: 500e6,
     entitlementImportedW: 100e6,
     entitlementImportCapacityW: 200e6,
     exportedW: 0,
@@ -353,8 +360,10 @@ it("reports total imports in a transmission-capacity violation that includes agr
     expect.arrayContaining([
       expect.objectContaining({
         rule: "trade stays within transmission capacity",
-        detail: "imported 400000000W + exported 0W vs 300000000W",
+        detail: "external imports 400000000W + exported 0W vs 300000000W",
       }),
     ]),
   );
 });
+
+afterEach(() => jest.restoreAllMocks());

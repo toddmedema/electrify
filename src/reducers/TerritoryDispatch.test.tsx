@@ -1,4 +1,5 @@
 import { STORAGE } from "../data/Facilities";
+import { isStorage } from "../Types";
 import { currentTick } from "../helpers/GameSelectors";
 import { createGame } from "../testing/Simulator";
 import { copyOfficialGame } from "../testing/OfficialScenarioExecutionFixtures";
@@ -148,4 +149,53 @@ it("neighbor contracts are finite, nonstacking and terminate as external supply 
   );
   expect(powerAgreementQuote(game, "ridge-purchase")).toBeUndefined();
   expect(game.transmission!.lines).toEqual([]);
+});
+
+it("does not buy redundant agreement power after native wind has charged storage", () => {
+  const game = isolated();
+  const wind = createGame({ scenarioId: 116, seed: 61 }).facilities.find(
+    (facility): facility is GeneratorOperatingType =>
+      !isStorage(facility) && facility.fuel === "Wind",
+  )!;
+  const battery = STORAGE(
+    { ...game, date: { ...game.date, year: 2025 } },
+    100e6,
+  ).find((facility) => facility.name === "Battery")!;
+  game.facilities = [
+    {
+      ...wind,
+      id: 900,
+      peakW: 100e6,
+      territoryId: "champlain",
+      annualOutputDegradation: 0,
+    },
+    {
+      ...battery,
+      id: 901,
+      peakW: 50e6,
+      roundTripEfficiency: 1,
+      territoryId: "ridge-electric",
+      currentW: 0,
+      currentWh: 0,
+      yearsToBuildLeft: 0,
+      minuteCreated: 0,
+      loanAmountTotal: 0,
+      loanAmountLeft: 0,
+      loanMonthlyPayment: 0,
+      interestRate: 0,
+      lifetimeWh: 0,
+      lifetimePotentialWh: 0,
+      lifetimeRevenue: 0,
+      lifetimeExpenses: 0,
+      hourlyLoss: 0,
+    },
+  ];
+  demand(game, 50e6);
+  game.timeline[1].windKph = 45;
+  tickState(game);
+  const now = currentTick(game)!;
+  expect(now.supplyByFuel.Wind).toBe(100e6);
+  expect(now.storageChargeW).toBe(50e6);
+  expect(now.importedW).toBe(0);
+  expect(now.exportedW).toBe(0);
 });

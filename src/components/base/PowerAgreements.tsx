@@ -502,7 +502,7 @@ export default function PowerAgreements({
                     }
                   />
                   <BuildDetailRow
-                    label="Market price"
+                    label="Reference price"
                     value={
                       marketPrice === undefined
                         ? "Unavailable"
@@ -551,7 +551,7 @@ export default function PowerAgreements({
                     }
                   />
                   <BuildDetailRow
-                    label="Forecasted savings"
+                    label="Forecasted cash impact"
                     value={
                       <AgreementForecastDetails
                         currency={currency}

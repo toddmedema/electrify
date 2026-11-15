@@ -44,7 +44,7 @@ converts these to approximately $410M and $200M in 2005 dollars, using
 195.3/224.939. These are valuation references, not exact adjusted closing cash.
 All acquisition prices, assumed debt, fees and service-network O&M are authored
 2005-dollar values; the transaction indexes once to its purchase month's nominal
-money. Plant quotes and intertie costs retain their existing owners.
+money. Plant quotes retain their existing pricing owner.
 
 The $0.105/kWh retail-style rate accompanies explicit service-network O&M; no
 additional generation-share discount applies. Assumed loans use 5% fixed interest
@@ -148,23 +148,20 @@ simulation, forecasts and company offers use the same `utilityNetworkAnnualOM`
 owner. Offers show the incremental combined-company cost, which can differ from
 the seller's standalone cost.
 
-The fictional purchased-power changes are visible before buying a connection:
+The dated purchased-power changes are visible before acquiring a utility.
 Valley's nuclear right falls from 160 to 80 MW in January 2017 (152 to 76 MW
 deliverable). In January 2020, Champlain's 100 MW nuclear right ends, both Québec
 rights fall from 120 to 60 MW (114 to 57 MW deliverable), and Ridge's firm pool
-falls from 40 to 20 MW (38 to 19 MW deliverable). The remaining agreements keep
-their existing real prices. These changes reduce contracted coverage; the
-physical connections remain available for uncovered purchases at regional market
-prices and availability. Players can review replacement agreements on the
-connection, use the market or build their own supply. Contracted and market
-purchases share the same wire and source limits. The Valley reminder arrives in
+falls from 40 to 20 MW (38 to 19 MW deliverable). Remaining agreements retain
+their existing real prices. Players must sign finite replacements or build supply;
+there is no unlimited regional-market fallback. The Valley reminder arrives in
 2013, and the common 2020 change is announced in 2016.
 
-Both companies' read-only terms can be inspected before the connection purchase.
-They show a dated offer, the existing company's and seller's future contract
-changes, and the separate acquisition obligation. Finishing the connection makes
-the acquisition review action directly visible. Only the existing owning purchase
-API can transfer a company, with a completed line and a fresh executable quote.
+Both companies' offers can be inspected directly from the territory map. They
+show dated terms, future contract changes, and the separate acquisition obligation.
+The owning purchase API requires a fresh executable quote and funds, with no
+connection prerequisite. Agreements display forecasted cash impact against
+omitting the agreement rather than assuming unlimited substitute purchases.
 
 Scenario's Supply plan shares the existing tariff-sensitive projection. It shows
 the next year's customer count and peak demand, the first projected month below
@@ -185,7 +182,7 @@ utility ownership and dated seller contracts belong to the expansion base.
 The reusable fixture is `src/testing/UtilityExpansionBalanceFixtures.ts`; the
 runner is `src/testing/UtilityExpansionBalance.sim.test.tsx`. Full authoring
 coverage uses seeds 12345, 1 and 7 at every difficulty: each target with cash and
-financed purchases, firm and mixed portfolios, line-only and unprepared controls,
+financed purchases, firm and mixed portfolios, independent-generation and unprepared controls,
 and an optional purchase of both targets.
 
 ```sh
@@ -199,34 +196,20 @@ transactions, timed obligations and outcomes. Early losses are not evidence abou
 later events. Current-format saves persist the aggregate customer and market
 totals, transaction and financial ledgers, and one forecast timeline.
 
-The pre-PPA renewal revision passed all 195 cases in the full matrix, including
-135 prepared plans, plus 24 pressure and acquisition-window cases. Those historical
-results included the since-removed 2015 and 2020 upkeep multipliers. A frozen
-baseline confirmed that its inherited-only Employee routes were fired in month
-183 on all three seeds. That result depended on withdrawn agreements also removing
-effective import access. With explicit retained regional connections, those
-routes can purchase uncovered energy from the market. The pressure suite now
-checks falling contracted delivery, increasing market purchases and retained
-physical capacity across complete 2019 and 2020 years. Its prepared CEO cases
-continue to check acquisitions in January, March and May 2014.
+The current land-development playbook buys Green Uplands at the opening $18M
+cash price, builds 100 MW of wind there, and completes the 240-month scenario
+alongside a prepared Valley acquisition at every difficulty. The land purchase
+reduces cash available for facilities while its non-depreciating value preserves
+net worth. Separate controls check that unused finite agreements still charge
+their minimum and that signing a neighbor PPA cannot create duplicate power
+after buying its seller.
 
-The following seed-12345 figures record the earlier renewal revision, before
-explicit regional connections and generic PPA market fallback. They include an
-additional investment and a later cash acquisition, so they are complete strategy
-outcomes rather than an isolated cost sensitivity.
-
-| CEO prepared route     | Original ending cash | Revised ending cash | Original / revised builds |
-| ---------------------- | -------------------: | ------------------: | ------------------------: |
-| Valley, firm, financed |              $3.531B |             $2.121B |                     5 / 6 |
-| Valley, mixed, cash    |              $2.860B |             $1.391B |                     5 / 6 |
-| Ridge, mixed, cash     |              $2.488B |             $1.391B |                     5 / 6 |
-| Both, firm, financed   |              $3.873B |             $2.225B |                     7 / 8 |
-
-In that pre-PPA revision, the two CEO mixed cash plans added $124–184M annually
-during 2020–24. The design does not impose a terminal cash cap or a universal
-construction quota. Current pressure checks exercise retained-wire market
-fallback and viable neighboring cash purchase dates, rather than treating lower
-final cash or the former forced shortage date as the balance criterion.
+Prepared cash and financed portfolios retain their full-term service, retirement,
+retention and financial-invariant checks. Unprepared acquisition controls must
+expose the 2020 loss of contracted coverage instead of receiving free replacement
+market access. CEO cash plans also exercise neighboring acquisition dates in
+January, March and May 2014. Report current integrated outcomes with the PR;
+historical physical-routing results do not establish this revision's balance.
 
 The save regression uses a normal first-year rollover with inactive optional
 customer-battery meters, raw validation before JSON normalization, and a full

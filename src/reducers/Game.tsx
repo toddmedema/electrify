@@ -2650,7 +2650,7 @@ export function recordExpansionMilestones(state: GameType): void {
     logGameEvent(
       state,
       "WORLD_EVENT",
-      "On 1 Jan 2020, 100 MW of nuclear agreement coverage ends. The 300 MW connection remains available for regional market purchases. Québec and Ridge agreement coverage also falls; review replacements on their connections.",
+      "On 1 Jan 2020, 100 MW of nuclear agreement coverage will end. Québec and Ridge coverage will also fall; sign replacements or build new supply.",
       {
         title: "Legacy power contracts change in 2020",
         importance: "NOTABLE",
@@ -2662,7 +2662,7 @@ export function recordExpansionMilestones(state: GameType): void {
     logGameEvent(
       state,
       "WORLD_EVENT",
-      "Champlain’s 100 MW nuclear agreement coverage has ended. Its 300 MW connection remains available for regional market purchases. Inherited Québec coverage is now 60 MW; Ridge’s inherited firm coverage is 20 MW if acquired.",
+      "Champlain’s 100 MW nuclear agreement has ended. Inherited Québec coverage is now 60 MW; Ridge’s inherited firm coverage is 20 MW if acquired.",
       {
         title: "Legacy power purchases reduced",
         importance: "CRITICAL",
@@ -3974,17 +3974,26 @@ function tickWorkingState(state: GameType): GameType {
     timeline: [...state.timeline],
     facilities: state.facilities.map((facility) => ({ ...facility })),
     ...(state.transmission && {
-      transmission: {
-        ...state.transmission,
-        agreementAccounts: cloneDeep(state.transmission.agreementAccounts),
-        acceptedAgreements: state.transmission.acceptedAgreements?.map(
-          (receipt) => ({ ...receipt }),
-        ),
-        lines: state.transmission.lines.map((line) => ({
-          ...line,
-          ...(line.upgrade && { upgrade: { ...line.upgrade } }),
-        })),
-      },
+      transmission:
+        state.transmission.lines.length || state.utilityExpansion
+          ? {
+              ...state.transmission,
+              ...(state.transmission.agreementAccounts !== undefined && {
+                agreementAccounts: cloneDeep(
+                  state.transmission.agreementAccounts,
+                ),
+              }),
+              ...(state.transmission.acceptedAgreements !== undefined && {
+                acceptedAgreements: state.transmission.acceptedAgreements.map(
+                  (receipt) => ({ ...receipt }),
+                ),
+              }),
+              lines: state.transmission.lines.map((line) => ({
+                ...line,
+                ...(line.upgrade && { upgrade: { ...line.upgrade } }),
+              })),
+            }
+          : state.transmission,
     }),
     eventLog: [...state.eventLog],
     reportedEventKeys: [...state.reportedEventKeys],
@@ -5851,7 +5860,8 @@ function* supplyFacilitiesFinancesPhases(
       supply -
         charge -
         now.demandW -
-        (dischargedW === 0 ? agreementStorageDemandW : 0),
+        // Co-op charging is deferred; single-player charging is already included in charge.
+        (peerSettlement && dischargedW === 0 ? agreementStorageDemandW : 0),
     ),
   );
   entitlementDeliveredW -= redundantEntitlementW;

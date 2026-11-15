@@ -90,12 +90,12 @@ for (const theme of ["light", "dark"] as const) {
     });
     await expect(table.getByRole("rowheader")).toHaveText([
       "Agreement price",
-      "Market price",
+      "Reference price",
       "Discount",
       "Minimum supply",
       "Maximum supply",
       "Duration",
-      "Forecasted savings",
+      "Forecasted cash impact",
     ]);
     await expect(
       dialog.getByRole("row", { name: /Minimum supply/ }),
@@ -119,7 +119,7 @@ for (const theme of ["light", "dark"] as const) {
           .replaceAll(",", ""),
       );
     const marketRate = Number(
-      (await dialog.getByRole("row", { name: /Market price/ }).innerText())
+      (await dialog.getByRole("row", { name: /Reference price/ }).innerText())
         .match(/\$([\d,.]+)\/MWh/)![1]
         .replaceAll(",", ""),
     );
@@ -161,7 +161,7 @@ for (const theme of ["light", "dark"] as const) {
     );
     expect(await agreementRate()).toBeGreaterThan(tenYearRate);
     expect(await agreementRate()).toBeLessThan(oneYearRate);
-    const savings = dialog.getByRole("row", { name: /Forecasted savings/ });
+    const savings = dialog.getByRole("row", { name: /Forecasted cash impact/ });
     await expect(savings).toContainText(/-?\$[\d.,]+[kMBT]? over 5 years/, {
       timeout: 45000,
     });
@@ -236,7 +236,7 @@ for (const theme of ["light", "dark"] as const) {
     });
     await expect(remaining.getByRole("slider")).toHaveCount(0);
     await expect(
-      remaining.getByRole("row", { name: /Forecasted savings/ }),
+      remaining.getByRole("row", { name: /Forecasted cash impact/ }),
     ).toContainText(/-?\$[\d.,]+[kMBT]? over 5 years remaining/, {
       timeout: 45000,
     });

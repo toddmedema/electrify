@@ -124,12 +124,12 @@ it("shows the direct discount alongside monthly energy and deliverable power", (
       .map((cell) => cell.textContent),
   ).toEqual([
     "Agreement price",
-    "Market price",
+    "Reference price",
     "Discount",
     "Minimum supply",
     "Maximum supply",
     "Duration",
-    "Forecasted savings",
+    "Forecasted cash impact",
   ]);
   const max = within(table).getByRole("row", { name: /Maximum supply/ });
   expect(max).toHaveTextContent("57 MW");
@@ -168,7 +168,7 @@ it.each([20, -40])(
       within(dialog).getByRole("row", { name: /Agreement price/ }),
     ).toHaveTextContent(`${rate(quote.priceToday)}Follows inflation`);
     const comparison = within(dialog).getByRole("row", {
-      name: /Market price/,
+      name: /Reference price/,
     });
     expect(comparison).toHaveTextContent(rate(marketPrice));
     expect(comparison).not.toHaveTextContent("higher");
@@ -383,9 +383,11 @@ it.each([1, 2, 3] as PowerAgreementTermsVersion[])(
     game.transmission!.inheritedAgreementTerms = version;
     mockForecast.mockReturnValue({
       blocked: undefined,
-      result: { cashDifference: -1234 } as NonNullable<
-        ReturnType<typeof useAgreementForecast>["result"]
-      >,
+      result: {
+        cashDifference: -1234,
+        withAgreement: { demandMWh: 100, servedMWh: 100 },
+        withoutAgreement: { demandMWh: 100, servedMWh: 60 },
+      } as NonNullable<ReturnType<typeof useAgreementForecast>["result"]>,
       error: false,
       updating: false,
       retry: jest.fn(),
@@ -407,9 +409,9 @@ it.each([1, 2, 3] as PowerAgreementTermsVersion[])(
           : "MWh/monthPaid for even if you don't use it",
     );
     expect(
-      within(dialog).getByRole("row", { name: /Forecasted savings/ }),
+      within(dialog).getByRole("row", { name: /Forecasted cash impact/ }),
     ).toHaveTextContent(
-      "-$1.2k over 2 years remainingBased on current supply and demand",
+      "-$1.2k over 2 years remainingCompared with omitting this agreement",
     );
     expect(dialog).not.toHaveTextContent("The price follows inflation");
   },

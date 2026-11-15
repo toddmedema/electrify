@@ -24,6 +24,9 @@ import { createGame } from "../../testing/Simulator";
 import { FacilityOperatingType, GameType } from "../../Types";
 import Facilities, { fleetChartHeight } from "./Facilities";
 import TransmissionPanel from "./TransmissionPanel";
+import AcquiredUtilities from "./AcquiredUtilities";
+import TerritoryNetwork from "./TerritoryNetwork";
+import { inheritedConnection } from "../../helpers/PowerAgreements";
 import { CurrencyContext } from "../base/CurrencyContext";
 import { currencyByCode } from "../../helpers/Currency";
 
@@ -48,16 +51,6 @@ describe("acquired utilities", () => {
     let game = createGame({ scenarioId: 116, seed: 12345 });
     for (const targetId of ["valley-electric", "ridge-electric"] as const) {
       currentTick(game)!.cash = 2e9;
-      game = cloneDeep(
-        gameReducer(
-          game,
-          buildTransmissionLine({
-            corridorId: `vt-champlain-${targetId === "valley-electric" ? "valley" : "ridge"}`,
-            financed: true,
-          }),
-        ),
-      );
-      game.transmission!.lines.at(-1)!.yearsToBuildLeft = 0;
       if (acquire) {
         const quote = acquisitionQuote(game, targetId)!;
         game = cloneDeep(
@@ -78,12 +71,9 @@ describe("acquired utilities", () => {
   function show(game: GameType) {
     render(
       <Provider store={configureStore({ reducer: { ui: uiReducer } })}>
-        <TransmissionPanel
+        <AcquiredUtilities
           game={game}
-          onBuild={jest.fn()}
-          onUpgrade={jest.fn()}
-          onBuyingRule={jest.fn()}
-          onSellingRule={jest.fn()}
+          summaryRef={React.createRef<HTMLElement>()}
         />
       </Provider>,
     );
@@ -92,23 +82,13 @@ describe("acquired utilities", () => {
   it("does not show an ownership disclosure for independent utilities", () => {
     show(expansionGame(false));
     expect(screen.queryByText(/Acquired utilities/)).not.toBeInTheDocument();
-    expect(screen.getByRole("list", { name: "Interties" })).toHaveTextContent(
-      "Champlain ↔ Valley",
-    );
+    expect(
+      screen.queryByRole("list", { name: "Acquired utilities" }),
+    ).not.toBeInTheDocument();
   });
 
-  it("moves acquired corridors out of Interties and keeps regional connections operable", async () => {
+  it("shows acquired utility receipts in their own collapsible disclosure", async () => {
     show(expansionGame());
-    const interties = screen.getByRole("list", { name: "Interties" });
-    expect(interties).not.toHaveTextContent("expansion connection");
-    for (const name of ["Champlain", "Valley", "Ridge"])
-      expect(
-        within(interties).getByRole("button", {
-          name: new RegExp(
-            `^Inspect ${name}( Electric)? (regional connection|↔ Regional grid)`,
-          ),
-        }),
-      ).toBeVisible();
     const disclosure = screen.getByText("Acquired utilities (2)", {
       selector: "summary",
     });
@@ -123,17 +103,19 @@ describe("acquired utilities", () => {
 
   it("keeps transfer receipts historical and totals each utility's outstanding loans and payments", async () => {
     const game = expansionGame();
-    const valley = game.transmission!.lines.find(
-      (line) => line.corridorId === "vt-champlain-valley",
-    )!;
+    const valley = {
+      ...inheritedConnection("champlain", 900),
+      corridorId: "vt-champlain-valley",
+    };
+    const ridge = {
+      ...inheritedConnection("champlain", 901),
+      corridorId: "vt-champlain-ridge",
+    };
     valley.loanAmountLeft = 0;
     valley.loanMonthlyPayment = 10e3;
-    valley.annualOperatingCost = 0;
-    const ridge = game.transmission!.lines.find(
-      (line) => line.corridorId === "vt-champlain-ridge",
-    )!;
     ridge.loanAmountLeft = 2e6;
     ridge.loanMonthlyPayment = 40e3;
+    game.territoryNetwork!.legacyConnections.push(valley, ridge);
     for (const loan of game.utilityExpansion!.loans) {
       loan.loanAmountLeft =
         loan.targetId === "valley-electric"
@@ -160,7 +142,7 @@ describe("acquired utilities", () => {
     ).getAllByRole("listitem");
     expect(entries[0]).toHaveTextContent("Acquired Jan 2005");
     expect(entries[0]).toHaveTextContent(formatCount(transferred));
-    expect(entries[0]).toHaveTextContent("Connection upkeep$0/mo");
+    expect(entries[0]).not.toHaveTextContent("Connection upkeep");
     expect(entries[0]).toHaveTextContent("Debt payment$50k/mo");
     expect(entries[0]).toHaveTextContent("Debt remaining$12M");
     expect(entries[1]).toHaveTextContent("Debt payment$90k/mo");
@@ -169,16 +151,11 @@ describe("acquired utilities", () => {
       within(entries[0])
         .getAllByRole("term")
         .map((term) => term.textContent),
-    ).toEqual([
-      "Customers acquired",
-      "Connection upkeep",
-      "Debt payment",
-      "Debt remaining",
-    ]);
+    ).toEqual(["Customers acquired", "Debt payment", "Debt remaining"]);
     expect(within(entries[0]).queryByRole("button")).not.toBeInTheDocument();
   });
 
-  it("shows no debt payment after all connection and acquisition loans are paid off", async () => {
+  it("shows no debt payment after acquisition loans are paid off", async () => {
     const game = expansionGame();
     for (const loan of [
       ...game.transmission!.lines,
@@ -1474,7 +1451,7 @@ describe("unified connections", () => {
 });
 
 it.each([false, true])(
-  "offers completed connection acquisition in a native or validated base-116 mod (mod: %s)",
+  "offers direct utility acquisition in a native or validated base-116 mod (mod: %s)",
   async (mod) => {
     const customScenario = mod
       ? modScenario({
@@ -1494,21 +1471,12 @@ it.each([false, true])(
       scenario: customScenario,
       seed: 12345,
     });
-    const game = cloneDeep(
-      gameReducer(
-        state,
-        buildTransmissionLine({
-          corridorId: "vt-champlain-ridge",
-          financed: true,
-        }),
-      ),
-    );
-    game.transmission!.lines.find(
-      (line) => line.corridorId === "vt-champlain-ridge",
-    )!.yearsToBuildLeft = 0;
+    const game = cloneDeep(state);
     render(
-      <Provider store={configureStore({ reducer: { ui: uiReducer } })}>
-        <TransmissionPanel
+      <Provider
+        store={configureStore({ reducer: { ui: uiReducer, game: () => game } })}
+      >
+        <TerritoryNetwork
           game={game}
           onBuild={jest.fn()}
           onUpgrade={jest.fn()}
@@ -1518,18 +1486,21 @@ it.each([false, true])(
         />
       </Provider>,
     );
+    await user.click(
+      screen.getByRole("button", { name: "Inspect Ridge Electric territory" }),
+    );
+    const acquire = screen.getByRole("button", {
+      name: "Acquire Ridge Electric",
+    });
+    expect(acquire).toBeEnabled();
+    expect(game.transmission!.lines).toEqual([]);
+    await user.click(acquire);
     expect(
-      screen.queryByRole("button", { name: "Acquire Ridge Electric" }),
-    ).not.toBeInTheDocument();
-    const inspect = fleetButton(/^Inspect Champlain ↔ Ridge/);
-    await user.click(inspect);
-    expect(fleetButton("Acquire Ridge Electric")).toBeVisible();
+      screen.getByRole("dialog", { name: "Acquire Ridge Electric?" }),
+    ).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
     expect(
-      screen.queryByText(/Review the company terms/),
-    ).not.toBeInTheDocument();
-    await user.click(inspect);
-    expect(
-      screen.queryByRole("button", { name: "Acquire Ridge Electric" }),
+      screen.queryByRole("dialog", { name: "Acquire Ridge Electric?" }),
     ).not.toBeInTheDocument();
   },
 );

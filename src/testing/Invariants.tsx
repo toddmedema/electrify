@@ -708,11 +708,12 @@ function checkTrade(
         `${entitlementW}/${entitlementCapacityW}W, maximum ${maximum}W`,
       );
   }
-  if (importedW + exportedW > capacityW * (1 + RELATIVE_TOLERANCE) + 1) {
+  // Agreements are bounded by supplier rights above; only additional exchange uses wire capacity.
+  if (externalImportW + exportedW > capacityW * (1 + RELATIVE_TOLERANCE) + 1) {
     collector.add(
       "trade stays within transmission capacity",
       when,
-      `imported ${Math.round(importedW)}W + exported ${Math.round(exportedW)}W vs ${Math.round(capacityW)}W`,
+      `external imports ${Math.round(externalImportW)}W + exported ${Math.round(exportedW)}W vs ${Math.round(capacityW)}W`,
     );
   }
   // Bounded source rights can serve local load while native generation supplies a

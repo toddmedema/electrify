@@ -105,9 +105,9 @@ export default function UtilityOfferDialog({
         option.
       </Typography>
       <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
-        Includes {money(offer.networkOMPerMonth)}/mo in network upkeep, which
-        rises with customer growth and inflation. Plant operations and power
-        purchases cost extra.
+        Includes {money(offer.networkOMPerMonth)}/mo in utility operations,
+        which rises with customer growth and inflation. Plant operations and
+        power purchases cost extra.
       </Typography>
       <details className="acquisitionDisclosure">
         <summary>Plants &amp; purchased power</summary>
@@ -177,7 +177,7 @@ export default function UtilityOfferDialog({
         </div>
       </details>
       <details className="acquisitionDisclosure">
-        <summary>Supply &amp; network changes</summary>
+        <summary>Supply &amp; operating changes</summary>
         <div>
           <UtilityContractSchedule game={game} targetId={offer.targetId} />
         </div>

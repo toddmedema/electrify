@@ -100,6 +100,7 @@ export default function AcquisitionReviewDialog({
   return (
     <PurchaseReviewDialog
       open
+      cancelLabel="Cancel"
       title={`Acquire ${quote.name}?`}
       titleId="utility-acquisition-title"
       cash={cash}
@@ -150,7 +151,7 @@ export default function AcquisitionReviewDialog({
       afterFacts={
         <div className="acquisitionReviewDetails">
           <Typography variant="caption" color="textSecondary" component="p">
-            Monthly figures include debt and network upkeep.
+            Monthly figures include debt and utility operations.
           </Typography>
           <section
             className="acquisitionObligations"
@@ -242,7 +243,7 @@ export default function AcquisitionReviewDialog({
                   },
                   {
                     concept: "money",
-                    label: "Added network upkeep",
+                    label: "Added utility operations",
                     value: `${formatMoneyConcise(quote.networkOMPerMonth)}/mo`,
                     detail: "At today’s costs",
                   },
@@ -251,7 +252,7 @@ export default function AcquisitionReviewDialog({
             </div>
           </details>
           <details className="acquisitionDisclosure">
-            <summary>Supply &amp; network changes</summary>
+            <summary>Supply &amp; operating changes</summary>
             <div>
               <UtilityContractSchedule game={game} targetId={quote.targetId} />
             </div>
