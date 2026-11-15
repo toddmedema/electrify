@@ -1,6 +1,6 @@
 import type { ScenarioType } from "../Types";
 import type { BrowseState } from "./Browse";
-import type { CommandEnvelope, RoomView, Seat, World } from "./Types";
+import type { CommandEnvelope, Seat, World } from "./Types";
 import type { ReplicaBaseline, ReplicaRecord } from "./Replication";
 import type { ReplicaProgress } from "./ReplicaProtocol";
 /** A lobby member, with the selection they last marked Ready for (see selectionKey). */
@@ -72,7 +72,6 @@ export type WireMessage =
       applied: number;
       reason: string;
     }
-  | { kind: "view"; view: RoomView }
   | { kind: "save-request"; requestId: string; suspended?: boolean }
   | { kind: "save-result"; requestId: string; error?: string }
   | { kind: "command"; envelope: CommandEnvelope }

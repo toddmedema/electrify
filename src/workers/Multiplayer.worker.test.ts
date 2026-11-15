@@ -85,6 +85,7 @@ test("the host worker schedules every tick at the shared speed and reschedules s
       scope.onmessage!({ data } as MessageEvent<WorkerRequest>);
     await send({
       kind: "create",
+      hostSeat: "host",
       spec: { scenarioId: 101, difficulty: "Employee" },
       seats: [{ id: "host", name: "Host" }],
       matchId: "match",
@@ -168,6 +169,11 @@ test("idle paused workers send small host pulses, suppress unchanged views, and 
     revision: 0,
     speed: "PAUSED",
     paused: true,
+    grids: [{ date: { minute: 0 } }],
+    outcomes: {},
+    ready: [],
+    selectedSpeeds: {},
+    activities: {},
     seats: [{ id: "host" }, { id: "guest" }],
   });
   globalThis.fetch = jest.fn().mockResolvedValue({
@@ -180,6 +186,7 @@ test("idle paused workers send small host pulses, suppress unchanged views, and 
       scope.onmessage!({ data } as MessageEvent<WorkerRequest>);
     await send({
       kind: "create",
+      local: true,
       spec: { scenarioId: 101, difficulty: "Employee" },
       seats: [{ id: "host", name: "Host" }],
       matchId: "match",
@@ -227,7 +234,9 @@ test("idle paused workers send small host pulses, suppress unchanged views, and 
     expect(roomView).toHaveBeenCalledTimes(4);
     jest.advanceTimersByTime(1);
     expect(roomView).toHaveBeenCalledTimes(6);
-    expect(post).toHaveBeenLastCalledWith({
+    expect(
+      post.mock.calls.filter(([event]) => event.kind === "views").at(-1)?.[0],
+    ).toEqual({
       kind: "views",
       views: {
         host: { receipt: { sequence: 2, error: undefined } },
@@ -260,6 +269,11 @@ test("a fresh worker loads the saved match's location before validating and rest
     speed: "PAUSED",
     paused: true,
     spec,
+    grids: [{ date: { minute: 0 } }],
+    outcomes: {},
+    ready: [],
+    selectedSpeeds: {},
+    activities: {},
     seats: [
       { id: "host", name: "Host" },
       { id: "guest", name: "Guest" },
@@ -285,7 +299,13 @@ test("a fresh worker loads the saved match's location before validating and rest
   try {
     require("./Multiplayer.worker");
     await scope.onmessage!({
-      data: { kind: "restore", world: saved, epoch: "restored", seats },
+      data: {
+        kind: "restore",
+        local: true,
+        world: saved,
+        epoch: "restored",
+        seats,
+      },
     } as MessageEvent<WorkerRequest>);
     expect(restoreWorld).toHaveBeenCalledWith(saved, "restored", seats);
     expect(post).toHaveBeenCalledWith({ kind: "checkpoint", world: saved });
@@ -321,7 +341,7 @@ test.each([
     try {
       require("./Multiplayer.worker");
       await scope.onmessage!({
-        data: { kind: "restore", world: saved, epoch: "future" },
+        data: { kind: "restore", local: true, world: saved, epoch: "future" },
       } as MessageEvent<WorkerRequest>);
       expect(matchScenario).not.toHaveBeenCalled();
       expect(initWeather).not.toHaveBeenCalled();
@@ -359,6 +379,11 @@ test("a command that throws mid-match stops the shared clock for everyone and re
     speed: "NORMAL",
     paused: false,
     reason: "",
+    grids: [{ date: { minute: 0 } }],
+    outcomes: {},
+    ready: [],
+    selectedSpeeds: {},
+    activities: {},
     seats: [{ id: "host" }, { id: "guest" }],
   } as unknown as World;
   createWorld.mockReturnValue(world);
@@ -389,6 +414,7 @@ test("a command that throws mid-match stops the shared clock for everyone and re
     });
     await send({
       kind: "create",
+      local: true,
       spec: { scenarioId: 101, difficulty: "Employee" },
       seats: [{ id: "host", name: "Host" }],
       matchId: "match",
@@ -404,7 +430,9 @@ test("a command that throws mid-match stops the shared clock for everyone and re
     expect(world.paused).toBe(true);
     expect(world.reason).toMatch(/simulation stopped/);
     // Every player sees the stop immediately rather than a clock that silently freezes.
-    expect(post.mock.calls.at(-1)?.[0].kind).toBe("views");
+    expect(post.mock.calls.some(([event]) => event.kind === "views")).toBe(
+      true,
+    );
     const stopped = ticks;
     post.mockClear();
     jest.advanceTimersByTime(5000);
@@ -511,7 +539,11 @@ test("a slow shell bounds cloned views while ticks, receipts, checkpoints and sa
     speed: "FAST",
     paused: false,
     reason: "",
+    grids: [{ date: { minute: 0 } }],
     outcomes: {},
+    ready: [],
+    selectedSpeeds: {},
+    activities: {},
     seats: [{ id: "host" }, { id: "guest" }],
   } as World;
   createWorld.mockReturnValue(world);
@@ -534,6 +566,7 @@ test("a slow shell bounds cloned views while ticks, receipts, checkpoints and sa
       scope.onmessage!({ data } as MessageEvent<WorkerRequest>);
     await send({
       kind: "create",
+      local: true,
       spec: { scenarioId: 101, difficulty: "Employee" },
       seats: [
         { id: "host", name: "Host" },
@@ -574,7 +607,9 @@ test("a slow shell bounds cloned views while ticks, receipts, checkpoints and sa
     expect(roomView).toHaveBeenCalledTimes(2);
     await send({ kind: "views-applied" });
     expect(roomView).toHaveBeenCalledTimes(4);
-    expect(post).toHaveBeenLastCalledWith({
+    expect(
+      post.mock.calls.filter(([event]) => event.kind === "views").at(-1)?.[0],
+    ).toEqual({
       kind: "views",
       views: {
         host: {
@@ -607,7 +642,9 @@ test("a slow shell bounds cloned views while ticks, receipts, checkpoints and sa
     });
     expect(roomView).toHaveBeenCalledTimes(4);
     await send({ kind: "views-applied" });
-    expect(post).toHaveBeenLastCalledWith({
+    expect(
+      post.mock.calls.filter(([event]) => event.kind === "views").at(-1)?.[0],
+    ).toEqual({
       kind: "views",
       views: {
         host: expect.objectContaining({
@@ -631,7 +668,7 @@ test("a slow shell bounds cloned views while ticks, receipts, checkpoints and sa
   }
 });
 
-test("replication projects only the host seat, orders baselines and coalesces command records", async () => {
+test("online play projects only the host seat, orders baselines and coalesces command records", async () => {
   jest.useFakeTimers();
   const scope = globalThis as unknown as Worker;
   const previousMessage = scope.onmessage;
@@ -676,7 +713,6 @@ test("replication projects only the host seat, orders baselines and coalesces co
       seats: world.seats,
       matchId: "match",
       epoch: "epoch",
-      replication: true,
       hostSeat: "host",
     });
     expect(roomView.mock.calls.map((call: [World, string]) => call[1])).toEqual(
@@ -801,7 +837,6 @@ test("replication splits batches by record count and tagged UTF-8 wire bytes wit
       seats: world.seats,
       matchId: "match",
       epoch: "epoch",
-      replication: true,
       hostSeat: "host",
     });
     jest.advanceTimersByTime(0);
@@ -912,7 +947,6 @@ test("the worker verifies changed records, routes authenticated recovery reports
       seats: world.seats,
       matchId: "match",
       epoch: "epoch",
-      replication: true,
       hostSeat: "host",
     });
     await send({ kind: "replica-peers", connected: ["guest"] });

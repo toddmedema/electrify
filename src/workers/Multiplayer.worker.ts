@@ -30,7 +30,6 @@ const worker = globalThis as unknown as Worker;
 let world: World | undefined;
 let local = false;
 let replicated: ReplicatedWorld | undefined;
-let replication = false;
 let hostSeat: string | undefined;
 let recovery: ReplicaRecovery | undefined;
 let recoveryTimer: ReturnType<typeof setInterval> | undefined;
@@ -79,7 +78,7 @@ function flushRecords() {
   const batch = replicated.drain();
   if (!batch) return;
   flushedIndex = replicated.index;
-  if (!replication) return;
+  if (local) return;
   let from = batch.from;
   let records: ReplicaRecord[] = [];
   const message = (items: ReplicaRecord[]) => ({
@@ -108,8 +107,8 @@ function flushRecords() {
 }
 function requestRecords(urgent = false) {
   if (!replicated || replicated.index <= flushedIndex) return;
-  // Snapshot and couch modes exercise the same mutations without retaining an unused log.
-  if (!replication) return flushRecords();
+  // Couch play shares the worker and does not need a network record log.
+  if (local) return flushRecords();
   const delay = urgent ? 0 : 100;
   const due = performance.now() + delay;
   if (recordDue <= due) return;
@@ -136,7 +135,7 @@ function publish() {
   const views = publication.take(
     world,
     performance.now(),
-    replication && hostSeat ? [hostSeat] : undefined,
+    !local && hostSeat ? [hostSeat] : undefined,
   );
   if (Object.keys(views).length) {
     viewPending = true;
@@ -266,11 +265,10 @@ async function startMatch(
     world = restoreWorld(request.world, request.epoch, request.seats);
   }
   replicated = new ReplicatedWorld(world);
-  replication = !local && request.replication === true;
   hostSeat = request.hostSeat || world.seats[0].id;
-  if (replication && !world.seats.some((seat) => seat.id === hostSeat))
+  if (!local && !world.seats.some((seat) => seat.id === hostSeat))
     throw new Error("The host company is missing from the match");
-  if (replication) {
+  if (!local) {
     recovery = new ReplicaRecovery(replicated, hostSeat, {
       flush: flushRecords,
       send: (to, baseline) => post({ kind: "baseline", to, baseline }),
@@ -290,7 +288,7 @@ async function startMatch(
   }
   busy = false;
   requestViews({ force: true });
-  if (replication) for (const seat of world.seats) sendBaseline(seat.id);
+  if (!local) for (const seat of world.seats) sendBaseline(seat.id);
   post({ kind: "checkpoint", world: checkpointWorld(world) });
   lastSave = performance.now();
   keepaliveTimer = setInterval(() => {
@@ -326,7 +324,7 @@ function handle(request: WorkerRequest, running: World) {
       request.allowReady,
     );
     requestRecords(true);
-    if (replication && error && !recorded)
+    if (!local && error && !recorded)
       post({
         kind: "rejected",
         to: request.sender,

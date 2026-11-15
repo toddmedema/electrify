@@ -7,32 +7,29 @@ import type {
   Seat,
   World,
 } from "./Types";
+/** Couch play projects every seat locally; online play projects only the host's company. */
+type WorkerMode =
+  { local: true; hostSeat?: never } | { local?: false; hostSeat: string };
 export type WorkerRequest =
   | HostReplicationRequest
   | { kind: "replica-peers"; connected: string[] }
   | { kind: "heartbeat" }
   /** The shell consumed the previous view bundle; allow the newest projection to follow. */
   | { kind: "views-applied" }
-  | {
+  | (WorkerMode & {
       kind: "create";
-      local?: boolean;
-      replication?: boolean;
-      hostSeat?: string;
       spec: MatchSpec;
       seats: Seat[];
       matchId: string;
       epoch: string;
-    }
+    })
   /** seats hands each saved company, in saved order, to the player resuming it. */
-  | {
+  | (WorkerMode & {
       kind: "restore";
       world: unknown;
       epoch: string;
       seats?: Seat[];
-      local?: boolean;
-      replication?: boolean;
-      hostSeat?: string;
-    }
+    })
   | {
       kind: "command";
       sender: string;

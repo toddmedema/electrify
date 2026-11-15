@@ -56,7 +56,7 @@ async function sessionFixture() {
           ? { ...lobby, lobbyId: request.lobbyId, hostId: "host" }
           : lobby,
   };
-  const session = new MultiplayerSession(bridge, jest.fn());
+  const session = new MultiplayerSession(bridge, jest.fn(), jest.fn());
   sessions.push(session);
   await session.initialize();
   return { session, bridge };

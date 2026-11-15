@@ -25,7 +25,7 @@ afterEach(() => {
   jest.clearAllTimers();
   jest.useRealTimers();
 });
-function fixture({ replication = true, recover = false } = {}) {
+function fixture({ recover = false } = {}) {
   const events = new Map<string, (event: NativeEvent) => void>();
   const requests: { sender: string; request: NativeRequest }[] = [];
   const posts: WorkerRequest[] = [];
@@ -92,7 +92,7 @@ function fixture({ replication = true, recover = false } = {}) {
           kind: "views",
           views: { host: roomView(source.world, "host") },
         });
-        if (request.replication) {
+        {
           if (recover)
             recovery = new ReplicaRecovery(source, "host", {
               flush: sendRecords,
@@ -113,11 +113,7 @@ function fixture({ replication = true, recover = false } = {}) {
               digest: (bytes) => webcrypto.subtle.digest("SHA-256", bytes),
             });
           sendBaseline();
-        } else
-          respond({
-            kind: "views",
-            views: { guest: roomView(source.world, "guest") },
-          });
+        }
       } else if (request.kind === "baseline") sendBaseline();
       else if (request.kind === "replica-peers")
         recovery?.connected(request.connected);
@@ -127,7 +123,6 @@ function fixture({ replication = true, recover = false } = {}) {
           kind: "views",
           views: {
             host: roomView(source.world, "host"),
-            ...(!replication && { guest: roomView(source.world, "guest") }),
           },
         });
       } else if (request.kind === "command") {
@@ -205,8 +200,7 @@ function fixture({ replication = true, recover = false } = {}) {
   const host = new MultiplayerSession(
     bridge("host"),
     async () => hostWorker as unknown as Worker,
-    undefined,
-    () => replication,
+    replicaFactory,
   );
   const createGuest = () =>
     new MultiplayerSession(bridge("guest"), jest.fn(), replicaFactory);
@@ -275,7 +269,6 @@ test("replica views settle guest commands and errors through existing receipts w
   try {
     await f.start();
     expect(f.posts.find((request) => request.kind === "create")).toMatchObject({
-      replication: true,
       hostSeat: "host",
     });
     expect(f.guest.getSnapshot()).toMatchObject({
@@ -286,7 +279,8 @@ test("replica views settle guest commands and errors through existing receipts w
     expect(
       f.requests.some(
         ({ request }) =>
-          request.kind === "send" && request.payload.kind === "view",
+          request.kind === "send" &&
+          (request.payload as { kind: string }).kind === "view",
       ),
     ).toBe(false);
     const accepted = f.guest.submit({ kind: "rate", value: 0.1 });
@@ -323,7 +317,7 @@ test("replica views settle guest commands and errors through existing receipts w
   }
 });
 
-test("the first received view or baseline selects one mode for its epoch, and leave terminates the replica", async () => {
+test("retired remote views cannot replace the local replica, and leave terminates it", async () => {
   const f = fixture();
   try {
     await f.start();
@@ -332,27 +326,12 @@ test("the first received view or baseline selects one mode for its epoch, and le
       kind: "message",
       sender: "host",
       payload: { kind: "view", view: { ...initial, revision: 999 } },
-    });
+    } as unknown as NativeEvent);
     expect(f.guest.getSnapshot().view!.revision).toBe(initial.revision);
     await f.guest.leave({ skipSave: true });
     expect(f.replicaWorker.terminate).toHaveBeenCalledTimes(1);
   } finally {
     f.dispose();
-  }
-  const snapshot = fixture({ replication: false });
-  try {
-    await snapshot.start();
-    const initial = snapshot.guest.getSnapshot().view!;
-    snapshot.event("guest", {
-      kind: "message",
-      sender: "host",
-      payload: { kind: "baseline", ...snapshot.source().baseline() },
-    });
-    await flush();
-    expect(snapshot.replicaFactory).not.toHaveBeenCalled();
-    expect(snapshot.guest.getSnapshot().view).toBe(initial);
-  } finally {
-    snapshot.dispose();
   }
 });
 
