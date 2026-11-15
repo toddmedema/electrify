@@ -2687,8 +2687,9 @@ for (const count of [2, 4]) {
       await expect
         .poll(() =>
           replication
-            ? room.hostView?.grids.find((grid) => grid.seat.id === buyerId)
-                ?.selectedSpeed
+            ? room.hostView?.grids.find(
+                (grid) => grid.seat.id === room.members[1].id,
+              )?.selectedSpeed
             : room.views.get(room.members[1].id)?.game?.multiplayer?.clock
                 ?.selectedSpeed,
         )
