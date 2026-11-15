@@ -11,6 +11,57 @@ import {
 } from "../src/helpers/Transmission";
 
 for (const theme of ["light", "dark"] as const) {
+  test(`Across the Valley keeps unavailable geothermal at the bottom in ${theme}`, async ({
+    page,
+  }) => {
+    await page.addInitScript((mode) => {
+      localStorage.setItem("theme", mode);
+      localStorage.setItem("audioEnabled", "false");
+    }, theme);
+    await page.goto("/?scenario=116");
+    await page.getByRole("button", { name: "Start game", exact: true }).click();
+    await openBuild(page);
+    await page.getByRole("tab", { name: "Generators", exact: true }).click();
+    const options = page.getByRole("list", { name: "Generator options" });
+    const geothermal = options.locator('[data-build-option="Geothermal"]');
+    await expect(geothermal).toContainText(
+      /No geothermal sites near .+ in this game\./,
+    );
+    await expect(
+      geothermal.getByRole("button", {
+        name: "Review purchase of Geothermal",
+        exact: true,
+      }),
+    ).toBeDisabled();
+    await expect(
+      geothermal.getByRole("button", {
+        name: "Compare Geothermal",
+        exact: true,
+      }),
+    ).toHaveCount(0);
+    for (const order of [
+      "Build cost",
+      "Build time",
+      "Cost per MWh",
+      "Emissions",
+    ]) {
+      await sortBuildCatalog(page, order);
+      await expect(
+        options.locator("[data-build-option]").nth(-2),
+      ).toHaveAttribute("data-build-option", /^(Hydro|Geothermal)$/);
+      await expect(
+        options.locator("[data-build-option]").last(),
+      ).toHaveAttribute("data-build-option", /^(Hydro|Geothermal)$/);
+    }
+    await geothermal.scrollIntoViewIfNeeded();
+    await expect(geothermal).toBeVisible();
+    expect(
+      await geothermal.evaluate(
+        (element) => element.scrollWidth - element.clientWidth,
+      ),
+    ).toBeLessThanOrEqual(1);
+  });
+
   for (const [category, name] of [
     ["Generators", "Solar"],
     ["Storage", "Pumped Hydro"],
@@ -176,7 +227,18 @@ for (const theme of ["light", "dark"] as const) {
       } else {
         await expect(metrics).not.toContainText("Average output over a year");
         const sparklines = page.locator(".buildOptionSparkline svg");
-        await expect(sparklines).toHaveCount(await cards.count());
+        const detailedCards = cards.filter({
+          has: page.locator(".buildOptionMetrics"),
+        });
+        await expect(sparklines).toHaveCount(await detailedCards.count());
+        for (const card of await cards
+          .filter({ hasNot: page.locator(".buildOptionMetrics") })
+          .all()) {
+          await expect(
+            card.getByRole("button", { name: /Review purchase of/ }),
+          ).toBeDisabled();
+          await expect(card.locator(".buildOptionSparkline")).toHaveCount(0);
+        }
         const strokes = await sparklines.evaluateAll((lines) =>
           lines.map(
             (line) => getComputedStyle(line.querySelector("polyline")!).stroke,
