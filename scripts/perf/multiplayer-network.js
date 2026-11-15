@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Real room views through the shipping Steam codec; timings are reported, not gated.
+// Standard records, baselines and checkpoints through the shipping Steam codec; timings are diagnostic.
 const { spawnSync } = require("node:child_process");
 const fs = require("node:fs");
 const os = require("node:os");

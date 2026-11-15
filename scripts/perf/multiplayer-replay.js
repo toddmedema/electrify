@@ -1,4 +1,5 @@
 // Replay the actual guest runtime, including local view projection, in its own V8 isolate.
+const assert = require("node:assert/strict");
 const { parentPort, workerData } = require("node:worker_threads");
 require("../testing/replication-runtime")();
 const { ReplicaRuntime } = require("../../src/multiplayer/ReplicaRuntime");
@@ -7,6 +8,7 @@ const { parse } = require("../../electron/coop-codec.cjs");
 const baseline = parse(workerData.baseline);
 const bootstrap = parse(workerData.bootstrap);
 const batches = parse(workerData.batches);
+const seat = baseline.world.seats[1].id;
 loadSimData(baseline.world.grids[0].location.id);
 const median = (values) =>
   values.sort((a, b) => a - b)[Math.floor(values.length / 2)];
@@ -28,6 +30,7 @@ const median = (values) =>
           process.memoryUsage().heapUsed,
         );
         if (event.kind === "views") {
+          assert.deepEqual(Object.keys(event.views), [seat]);
           views++;
           void runtime.receive({ kind: "views-applied" });
         } else if (event.kind === "progress" && event.verified) {
@@ -63,7 +66,7 @@ const median = (values) =>
     await runtime.receive({
       kind: "baseline",
       baseline,
-      seat: baseline.world.seats[1].id,
+      seat,
     });
     await runtime.receive({
       kind: "records",

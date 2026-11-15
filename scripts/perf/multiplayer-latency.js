@@ -6,7 +6,6 @@ const { parentPort, workerData } = require("node:worker_threads");
 require("../testing/replication-runtime")();
 const { ReplicatedWorld } = require("../../src/multiplayer/Replication");
 const { ReplicaRuntime } = require("../../src/multiplayer/ReplicaRuntime");
-const { ViewPublication } = require("../../src/multiplayer/ViewPublication");
 const { hydrateWorld } = require("../../src/multiplayer/World");
 const { loadSimData } = require("../../src/testing/SimData");
 const {
@@ -22,9 +21,8 @@ const seat = world.seats[1].id;
 const percentile95 = (values) =>
   values.sort((a, b) => a - b)[Math.ceil(values.length * 0.95) - 1];
 async function wire(payload) {
-  const message = ["view", "baseline"].includes(payload.kind)
-    ? await encodeAsync(payload)
-    : encode(payload);
+  const message =
+    payload.kind === "baseline" ? await encodeAsync(payload) : encode(payload);
   const incoming = new Map();
   let decoded;
   while (message.offset * 32768 < message.bytes.length) {
@@ -43,35 +41,13 @@ function command(host, trial) {
   assert.equal(host.command(seat, envelope).error, undefined);
   return envelope.sequence;
 }
-async function snapshotLatency() {
-  const host = new ReplicatedWorld(hydrateWorld(world));
-  const publication = new ViewPublication();
-  publication.request(host.world, performance.now(), { force: true });
-  publication.take(host.world, performance.now(), [seat]);
-  const samples = [];
-  for (let trial = 0; trial < 24; trial++) {
-    await delay((trial % 5) * 20);
-    const started = performance.now();
-    const sequence = command(host, trial);
-    const wait = publication.request(host.world, started, {
-      urgent: true,
-      receipt: { sender: seat, sequence },
-    });
-    if (wait) await delay(Math.ceil(wait));
-    const view = publication.take(host.world, performance.now(), [seat])[seat];
-    const received = await wire({ kind: "view", view });
-    assert.equal(received.view.lastSequence, sequence);
-    if (trial >= 4) samples.push(performance.now() - started);
-    host.drain();
-  }
-  return percentile95(samples);
-}
 async function replicaLatency() {
   const host = new ReplicatedWorld(hydrateWorld(world));
   let pending;
   const runtime = new ReplicaRuntime(
     (event) => {
       if (event.kind === "views") {
+        assert.deepEqual(Object.keys(event.views), [seat]);
         const view = event.views[seat];
         void runtime.receive({ kind: "views-applied" });
         if (pending && view?.lastSequence >= pending.sequence) {
@@ -134,16 +110,12 @@ async function replicaLatency() {
   return percentile95(samples);
 }
 (async () => {
-  const snapshotP95Ms = await snapshotLatency();
-  const replicaP95Ms = await replicaLatency();
+  const p95Ms = await replicaLatency();
   parentPort.postMessage({
-    samplesPerMode: 20,
-    snapshotP95Ms,
-    replicaP95Ms,
-    addedP95Ms: replicaP95Ms - snapshotP95Ms,
-    within50Ms: replicaP95Ms <= snapshotP95Ms + 50,
+    samples: 20,
+    p95Ms,
     scope:
-      "Zero-transit in-process mock with shipping async view/baseline compression, record decoding, real ReplicaRuntime and ViewPublication. Paused command stream; IPC, sustained clock/video load and Steam are excluded.",
+      "Zero-transit in-process mock with shipping async baseline compression, record decoding, real ReplicaRuntime and ViewPublication. Paused command stream; IPC, sustained clock/video load and Steam are excluded.",
   });
 })().catch((error) => {
   throw error;
