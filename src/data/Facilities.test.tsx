@@ -314,6 +314,13 @@ describe("location-aware facilities", () => {
     expect(storage).not.toContain("Pumped Hydro");
   });
 
+  it("retains conventional geothermal as an unavailable catalog entry without local sites", () => {
+    expect(generatorAt(2005, "Geothermal", 100000000)).toMatchObject({
+      available: false,
+      viableLocationsRemaining: 0,
+    });
+  });
+
   it("uses an explicit conventional hydro site limit without changing its benchmark cost", () => {
     const baseline = GENERATORS(
       stateAt(LOCATIONS.PIT, 2024),
@@ -359,7 +366,7 @@ describe("enhanced geothermal", () => {
 
   it("unlocks in 2030 in locations without conventional geothermal", () => {
     expect(generatorAt(france, 2029, "Enhanced Geothermal")).toBeUndefined();
-    expect(generatorAt(france, 2030, "Geothermal")).toBeUndefined();
+    expect(generatorAt(france, 2030, "Geothermal")?.available).toBe(false);
     expect(generatorAt(france, 2030, "Enhanced Geothermal")).toBeDefined();
   });
 

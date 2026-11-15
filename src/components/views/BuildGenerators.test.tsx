@@ -33,7 +33,7 @@ import { DOWNPAYMENT_PERCENT, TICKS_PER_YEAR } from "../../Constants";
 import BuildGenerators, { GeneratorBuildItem } from "./BuildGenerators";
 import { purchaseTerms } from "../../helpers/Financials";
 import { computeOutlook } from "../base/OutlookForecast";
-import type { EvidenceRequestType } from "../../Types";
+import { isStorage, type EvidenceRequestType } from "../../Types";
 import { LEGACY_SCENARIOS } from "../../data/LegacyCampaign";
 
 jest.mock(
@@ -1194,6 +1194,82 @@ it("quotes a Hydro site maximum and updates the shared slider", () => {
   );
 });
 
+it.each(["no local sites", "exhausted sites"])(
+  "keeps geothermal disabled at the bottom with an explanation for %s",
+  (inventory) => {
+    const game = createGame({ scenarioId: 116 });
+    if (inventory === "exhausted sites") {
+      game.location = {
+        ...game.location,
+        resources: { ...game.location.resources, geothermal: true },
+      };
+      const template = game.facilities.find(
+        (facility) => !isStorage(facility),
+      )!;
+      game.facilities = Array.from({ length: 4 }, (_, id) => ({
+        ...template,
+        id,
+        name: "Geothermal",
+        fuel: "Geothermal",
+      }));
+    }
+    render(
+      <BuildGenerators
+        game={game}
+        focusFuel="Geothermal"
+        onBack={jest.fn()}
+        onBuildGenerator={jest.fn()}
+      />,
+    );
+    const review = screen.getByRole("button", {
+      name: "Review purchase of Geothermal",
+    });
+    expect(review).toBeDisabled();
+    const card = screen.getAllByRole("listitem").find((item) =>
+      within(item).queryByRole("button", {
+        name: "Review purchase of Geothermal",
+      }),
+    )!;
+    expect(card).toHaveTextContent(
+      inventory === "no local sites"
+        ? /No geothermal sites near/
+        : /used all 4 sites/,
+    );
+    expect(
+      within(card).queryByRole("button", {
+        name: "Compare Geothermal",
+      }),
+    ).not.toBeInTheDocument();
+    expect(
+      within(card).queryByRole("button", {
+        name: "Show Geothermal details",
+      }),
+    ).not.toBeInTheDocument();
+    for (const order of [
+      "Build cost",
+      "Build time",
+      "Cost per MWh",
+      "Emissions",
+    ]) {
+      fireEvent.click(
+        screen.getByRole("button", { name: /^Sort facilities:/ }),
+      );
+      fireEvent.click(screen.getByRole("menuitem", { name: order }));
+      const reviews = screen.getAllByRole("button", {
+        name: /^Review purchase of/,
+      });
+      expect(reviews.slice(-2)).toEqual(
+        expect.arrayContaining([
+          review,
+          screen.getByRole("button", {
+            name: "Review purchase of Hydro",
+          }),
+        ]),
+      );
+    }
+  },
+);
+
 it("updates fit counts and distinguishes exhausted and unavailable Hydro inventories", () => {
   const game = createGame({ scenarioId: 103 });
   game.facilities = [];
@@ -1221,8 +1297,10 @@ it("updates fit counts and distinguishes exhausted and unavailable Hydro invento
     screen.getByText("No remaining buildable locations"),
   ).toBeInTheDocument();
   const reviews = screen.getAllByRole("button", { name: /Review purchase of/ });
-  expect(reviews[reviews.length - 1]).toHaveAccessibleName(
-    "Review purchase of Hydro",
+  expect(reviews.slice(-2)).toContain(
+    screen.getByRole("button", {
+      name: "Review purchase of Hydro",
+    }),
   );
   expect(
     screen.getByRole("button", { name: "Review purchase of Hydro" }),

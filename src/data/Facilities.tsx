@@ -863,7 +863,12 @@ export function GENERATORS(
             : DEFAULT_LCOE_DISCOUNT_RATE,
         )
       : Infinity;
-    return g.available || (g.name === "Hydro" && year > 1882);
+    // Keep site-limited generators visible so the build catalog can explain missing sites.
+    return (
+      g.available ||
+      (g.name === "Hydro" && year > 1882) ||
+      g.name === "Geothermal"
+    );
   });
 
   return generators;
