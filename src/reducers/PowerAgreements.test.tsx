@@ -86,6 +86,78 @@ function sign(game: ReturnType<typeof at>, blockId = "champlain-nuclear") {
     reducer(game, acceptPowerAgreement({ blockId, quoteKey: quote.quoteKey })),
   );
 }
+it.each([
+  ["valley-purchase", "valley-electric"],
+  ["ridge-purchase", "ridge-electric"],
+] as const)(
+  "keeps a purchased neighbor %s contract honest across acquisition and save/resume",
+  (blockId, targetId) => {
+    let game = createGame({
+      scenarioId: 116,
+      seed: 61,
+      difficulty: "Employee",
+    });
+    game.timeline.forEach((tick) => {
+      tick.cash = 1e9;
+    });
+    game = sign(game, blockId);
+    tickState(game);
+    expect(entitlementSources(game, currentTick(game)!)).toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: `${blockId}:0` })]),
+    );
+    expect(powerAgreementQuote(game, blockId)).toBeUndefined();
+    const settled = cloneDeep(
+      game.transmission!.agreementAccounts!.find(
+        (account) => account.agreementId === `${blockId}:0`,
+      ),
+    );
+    const quote = acquisitionQuote(game, targetId)!;
+    game = copyOfficialGame(
+      reducer(
+        game,
+        acquireUtility({ targetId, financed: false, quoteKey: quote.quoteKey }),
+      ),
+    );
+    expect(
+      game.facilities.some((facility) => facility.territoryId === targetId),
+    ).toBe(true);
+    expect(
+      entitlementSources(game, currentTick(game)!).some(
+        (source) => source.id === `${blockId}:0`,
+      ),
+    ).toBe(false);
+    expect(game.transmission!.acceptedAgreements).toHaveLength(1);
+    expect(game.transmission!.lines).toEqual([]);
+    expect(validPowerAgreements(game)).toBe(true);
+    expect(
+      game.transmission!.agreementAccounts!.find(
+        (account) => account.agreementId === `${blockId}:0`,
+      ),
+    ).toEqual(settled);
+    const saved = serializeSave(game);
+    const reopened = parseSave(saved);
+    expect(reopened).not.toBeNull();
+    const resumed = copyOfficialGame(reopened!.game);
+    tickState(game);
+    tickState(resumed);
+    expect(currentTick(resumed)).toEqual(currentTick(game));
+    expect(resumed.transmission!.agreementAccounts).toEqual(
+      game.transmission!.agreementAccounts,
+    );
+    expect(resumed.facilities).toEqual(game.facilities);
+    expect(
+      resumed.transmission!.agreementAccounts!.find(
+        (account) => account.agreementId === `${blockId}:0`,
+      ),
+    ).toEqual(settled);
+    expect(
+      entitlementSources(resumed, currentTick(resumed)!).some(
+        (source) => source.id === `${blockId}:0`,
+      ),
+    ).toBe(false);
+    expect(parseSave(serializeSave(resumed))).not.toBeNull();
+  },
+);
 function request(game: ReturnType<typeof at>, watts: number) {
   game.facilities = [];
   const next = game.timeline.find((tick) => tick.minute > game.date.minute)!;

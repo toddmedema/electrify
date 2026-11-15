@@ -395,6 +395,9 @@ export function connectionAgreements(
               termsVersion: receipt.termsVersion,
               durationYears: receipt.durationYears ?? block.years,
               startMinute: receipt.startMinute,
+              // Acquisition internalizes the contract. An unfinished monthly minimum is
+              // no longer an external bill, while previously settled payments stay recorded.
+              billingEndMinute: receipt.endMinute,
               endMinute:
                 "sellerUtilityId" in block
                   ? Math.min(
@@ -411,6 +414,8 @@ export function connectionAgreements(
   );
   return [...records, ...replacements].map((source) => ({
     ...source,
+    billingEndMinute:
+      "billingEndMinute" in source ? source.billingEndMinute : source.endMinute,
     active: minute >= source.startMinute && minute < source.endMinute,
     durationDiscount:
       source.termsVersion === 3
@@ -598,7 +603,7 @@ export function recordAgreementSettlements(
         row.usefulValue! += settlement.usefulValue! * fraction;
         const topUp =
           boundary ===
-          Math.min((month + 1) * MINUTES_PER_MONTH, source.endMinute)
+          Math.min((month + 1) * MINUTES_PER_MONTH, source.billingEndMinute)
             ? agreementMonthTopUp(row)
             : 0;
         row.payment = row.usefulValue! + topUp;
@@ -709,7 +714,7 @@ function validAgreementAccounts(game: GameType): boolean {
         )
           return false;
         const closed =
-          end >= Math.min(minute + MINUTES_PER_MONTH, source.endMinute);
+          end >= Math.min(minute + MINUTES_PER_MONTH, source.billingEndMinute);
         const payment =
           row.usefulValue! + (closed ? agreementMonthTopUp(row) : 0);
         const tolerance = Math.max(1e-5, payment * 1e-10);
