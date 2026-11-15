@@ -52,6 +52,19 @@ describe("Units", () => {
     });
   });
 
+  it.each<[number, "metric" | "imperial", string]>([
+    [1180, "metric", "1,180kg"],
+    [999, "metric", "999kg"],
+    [999.6, "metric", "1,000kg"],
+    [1180000, "metric", "1,180,000kg"],
+    [1180, "imperial", "2,600lb"],
+    [-1005, "metric", "-1,000kg"],
+    [2.5, "metric", "3kg"],
+    [-0.1, "metric", "0kg"],
+  ])("keeps %s kg in explicit %s mass units", (kg, units, expected) => {
+    expect(formatMass(kg, units)).toBe(expected);
+  });
+
   // A round number of one is a lopsided number of the other, and the score's megatonne is
   // exactly that: a yardstick, not a measurement
   it("rounds a yardstick quantity to something readable", () => {

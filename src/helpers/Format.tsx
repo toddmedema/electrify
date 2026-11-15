@@ -454,12 +454,16 @@ function percentWithPrecision(
 }
 
 /** Round once to whole numbers or the significant-digit cap, whichever is coarser. */
-export function formatCount(n: number, significantDigits: 2 | 3 = 3): string {
+export function formatCount(
+  n: number,
+  significantDigits: 2 | 3 = 3,
+  notation: "compact" | "standard" = "compact",
+): string {
   return formatNumber(
     Number(
       formatSignificantDecimal(n, significantDigits, { digits: 0, trim: true }),
     ),
-    { maximumSignificantDigits: significantDigits },
+    { maximumSignificantDigits: significantDigits, notation },
   );
 }
 

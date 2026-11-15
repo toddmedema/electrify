@@ -565,7 +565,7 @@ export function GENERATORS(
       name: "Biomass",
       fuel: FACILITY_FUELS.Biomass,
       description:
-        "Runs on demand using renewable fuel, with large fuel volumes and direct CO2 emissions",
+        "Runs on demand by burning plant material, with high direct CO2 emissions",
       available: true,
       // EIA's 50 MW fluidized-bed reference plant costs $4,843/kW in 2025 dollars. Converted
       // to the table's 2023 base with CPI-U (304.702 / 321.943 = 0.94645), then split into the
