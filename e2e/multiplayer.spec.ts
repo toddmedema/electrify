@@ -19,8 +19,6 @@ import type { RoomView, World } from "../src/multiplayer/Types";
 import { verifyMenuKeyboard } from "./menu-keyboard";
 import { reviewScreenshot } from "./review-screenshot";
 
-const replication = process.env.E2E_COOP_REPLICATION === "1";
-
 type SteamTestWindow = typeof window & {
   mockSteamDeliveries?: Set<Promise<void>>;
   mockSteamDeliveryTail?: Promise<void>;
@@ -173,7 +171,7 @@ async function createSteamTransport(page: Page) {
       }
     },
     async send(event: NativeEvent) {
-      // Mirror the native compressed transport and keep full snapshots out of traces.
+      // Mirror the native compressed transport and keep payloads out of traces.
       const compressed = gzipSync(
         JSON.stringify(event, function (_key, value) {
           if (typeof value === "number") {
@@ -193,7 +191,7 @@ async function createSteamTransport(page: Page) {
       try {
         await Promise.all([
           // Background IPC must not trigger Playwright's before/after DOM snapshots on
-          // every heartbeat and view. UI actions still retain their ordinary trace snapshots.
+          // every heartbeat and record. UI actions still retain their ordinary trace snapshots.
           session
             .send("Runtime.evaluate", {
               expression: `(${receive})(${JSON.stringify({ id, compressed, generation })})`,
@@ -293,16 +291,15 @@ class SteamRoom {
   hostView?: RoomView;
   baselines = new Map<string, number>();
   baselineIndex = new Map<string, number>();
-  wireViews = new Map<string, number>();
+  recordMessages = new Map<string, Extract<WireMessage, { kind: "records" }>>();
   corruptNextVerified = new Map<string, number>();
   corruptedProgress = 0;
   purchases = new Map<string, { sequence: number; attempts: number }>();
   heldReplication = new Set<string>();
   progress = new Map<string, Extract<WireMessage, { kind: "progress" }>>();
   pendingReplication = new Map<string, NativeEvent[]>();
-  pendingViews = new Map<string, NativeEvent>();
-  deliveringViews = new Set<string>();
-  heldViews = new Set<string>();
+  deliveringReplication = new Set<string>();
+  heldHostUpdates = new Set<string>();
   dropped = new Set<string>();
   host = "76561198000000001";
   lobbyId = "109775242999999999";
@@ -357,7 +354,7 @@ class SteamRoom {
     if (
       event.kind === "message" &&
       event.payload.kind === "keepalive" &&
-      this.heldViews.has(id)
+      this.heldHostUpdates.has(id)
     )
       return;
     if (
@@ -370,43 +367,27 @@ class SteamRoom {
       await this.releaseReplication(id);
       return;
     }
-    if (event.kind !== "message" || event.payload.kind !== "view") {
-      await this.deliver(id, event);
-      return;
-    }
-    // Like the native queue, replace an unsent snapshot rather than building a tick backlog.
-    this.pendingViews.set(id, event);
-    if (this.heldViews.has(id) || this.deliveringViews.has(id)) return;
-    this.deliveringViews.add(id);
-    try {
-      while (this.pendingViews.has(id) && !this.heldViews.has(id)) {
-        const next = this.pendingViews.get(id)!;
-        this.pendingViews.delete(id);
-        await this.deliver(id, next);
-      }
-    } finally {
-      this.deliveringViews.delete(id);
-    }
+    await this.deliver(id, event);
   }
   async releaseReplication(id: string) {
     const queue = this.pendingReplication.get(id);
     if (
       !queue ||
-      this.heldViews.has(id) ||
+      this.heldHostUpdates.has(id) ||
       this.heldReplication.has(id) ||
-      this.deliveringViews.has(id)
+      this.deliveringReplication.has(id)
     )
       return;
-    this.deliveringViews.add(id);
+    this.deliveringReplication.add(id);
     try {
       while (
         queue.length &&
-        !this.heldViews.has(id) &&
+        !this.heldHostUpdates.has(id) &&
         !this.heldReplication.has(id)
       )
         await this.deliver(id, queue.shift()!);
     } finally {
-      this.deliveringViews.delete(id);
+      this.deliveringReplication.delete(id);
     }
   }
   async deliver(id: string, event: NativeEvent) {
@@ -460,10 +441,8 @@ class SteamRoom {
           attempts: previous?.sequence === sequence ? previous.attempts + 1 : 1,
         });
       }
-      if (input.payload.kind === "view") {
-        this.views.set(input.to, input.payload.view);
-        this.wireViews.set(input.to, (this.wireViews.get(input.to) ?? 0) + 1);
-      }
+      if (input.payload.kind === "records")
+        this.recordMessages.set(input.to, structuredClone(input.payload));
       if (input.payload.kind === "baseline") {
         this.baselines.set(input.to, (this.baselines.get(input.to) ?? 0) + 1);
         this.baselineIndex.set(input.to, input.payload.index);
@@ -548,10 +527,9 @@ class SteamRoom {
     }
     if (input.kind === "leave") {
       this.members = this.members.filter((m) => m.id !== id);
-      this.pendingViews.delete(id);
       this.pendingReplication.get(id)?.splice(0);
       this.pendingReplication.delete(id);
-      this.heldViews.delete(id);
+      this.heldHostUpdates.delete(id);
       this.pendingScenarios.delete(id);
       this.heldScenarios.delete(id);
       await this.transports.get(id)!.reset();
@@ -608,85 +586,83 @@ class SteamRoom {
     await page.exposeBinding("mockModsRequest", (_source, input: ModRequest) =>
       this.mods(id, input),
     );
-    if (replication) {
-      await page.exposeBinding("mockWorkerView", (_source, view: RoomView) => {
-        this.views.set(id, view);
-        if (id === this.host) this.hostView = view;
-      });
-      await page.addInitScript(
-        ({ id }) => {
-          const NativeWorker = window.Worker;
-          window.Worker = class extends NativeWorker {
-            private multiplayer = false;
-            private heldMessages: {
-              message: unknown;
-              options?: Transferable[] | StructuredSerializeOptions;
-            }[] = [];
-            constructor(url: string | URL, options?: WorkerOptions) {
-              super(url, options);
-              this.addEventListener("message", (event) => {
-                if (this.multiplayer && event.data.kind === "views") {
-                  const view = event.data.views[id];
-                  if (view)
-                    void (window as SteamTestWindow).mockWorkerView!(view);
-                  const target = window as SteamTestWindow;
-                  if (target.holdReplicaViews) {
-                    event.stopImmediatePropagation();
-                    target.releaseReplicaViews = () => {
-                      target.holdReplicaViews = false;
-                      delete target.releaseReplicaViews;
-                      this.dispatchEvent(
-                        new MessageEvent("message", { data: event.data }),
-                      );
-                    };
-                  }
+    await page.exposeBinding("mockWorkerView", (_source, view: RoomView) => {
+      this.views.set(id, view);
+      if (id === this.host) this.hostView = view;
+    });
+    await page.addInitScript(
+      ({ id }) => {
+        const NativeWorker = window.Worker;
+        window.Worker = class extends NativeWorker {
+          private multiplayer = false;
+          private heldMessages: {
+            message: unknown;
+            options?: Transferable[] | StructuredSerializeOptions;
+          }[] = [];
+          constructor(url: string | URL, options?: WorkerOptions) {
+            super(url, options);
+            this.addEventListener("message", (event) => {
+              if (this.multiplayer && event.data.kind === "views") {
+                const view = event.data.views[id];
+                if (view)
+                  void (window as SteamTestWindow).mockWorkerView!(view);
+                const target = window as SteamTestWindow;
+                if (target.holdReplicaViews) {
+                  event.stopImmediatePropagation();
+                  target.releaseReplicaViews = () => {
+                    target.holdReplicaViews = false;
+                    delete target.releaseReplicaViews;
+                    this.dispatchEvent(
+                      new MessageEvent("message", { data: event.data }),
+                    );
+                  };
                 }
-              });
+              }
+            });
+          }
+          postMessage(
+            message: unknown,
+            options?: Transferable[] | StructuredSerializeOptions,
+          ) {
+            if (
+              message &&
+              typeof message === "object" &&
+              "kind" in message &&
+              ["create", "restore", "baseline"].includes(String(message.kind))
+            )
+              this.multiplayer = true;
+            const target = window as SteamTestWindow;
+            if (this.heldMessages.length) {
+              this.heldMessages.push({ message, options });
+              return;
             }
-            postMessage(
-              message: unknown,
-              options?: Transferable[] | StructuredSerializeOptions,
+            if (
+              message &&
+              typeof message === "object" &&
+              "kind" in message &&
+              message.kind === "baseline" &&
+              "seat" in message &&
+              target.holdReplicaBaseline
             ) {
-              if (
-                message &&
-                typeof message === "object" &&
-                "kind" in message &&
-                ["create", "restore", "baseline"].includes(String(message.kind))
-              )
-                this.multiplayer = true;
-              const target = window as SteamTestWindow;
-              if (this.heldMessages.length) {
-                this.heldMessages.push({ message, options });
-                return;
-              }
-              if (
-                message &&
-                typeof message === "object" &&
-                "kind" in message &&
-                message.kind === "baseline" &&
-                "seat" in message &&
-                target.holdReplicaBaseline
-              ) {
-                this.heldMessages.push({ message, options });
-                target.releaseReplicaBaseline = () => {
-                  target.holdReplicaBaseline = false;
-                  delete target.releaseReplicaBaseline;
-                  for (const held of this.heldMessages.splice(0)) {
-                    if (Array.isArray(held.options))
-                      super.postMessage(held.message, held.options);
-                    else super.postMessage(held.message, held.options);
-                  }
-                };
-                return;
-              }
-              if (Array.isArray(options)) super.postMessage(message, options);
-              else super.postMessage(message, options);
+              this.heldMessages.push({ message, options });
+              target.releaseReplicaBaseline = () => {
+                target.holdReplicaBaseline = false;
+                delete target.releaseReplicaBaseline;
+                for (const held of this.heldMessages.splice(0)) {
+                  if (Array.isArray(held.options))
+                    super.postMessage(held.message, held.options);
+                  else super.postMessage(held.message, held.options);
+                }
+              };
+              return;
             }
-          };
-        },
-        { id },
-      );
-    }
+            if (Array.isArray(options)) super.postMessage(message, options);
+            else super.postMessage(message, options);
+          }
+        };
+      },
+      { id },
+    );
     await page.addInitScript(
       ({ id }) => {
         // Multiplayer flow tests do not exercise sound. Avoid four headless audio engines.
@@ -774,7 +750,7 @@ class SteamRoom {
       },
       { id },
     );
-    await page.goto(replication && index === 0 ? "/?coopReplication=1" : "/");
+    await page.goto("/");
     if (openLobby)
       await page
         .getByRole("button", { name: "Play with friends", exact: true })
@@ -1596,144 +1572,149 @@ test("multiplayer speed controls stay at the right edge in desktop and touch lay
   expect(room.transportErrors).toEqual([]);
 });
 
-test("12x multiplayer speed controls respond while video chat is encoding", async ({
-  browser,
-}) => {
-  const { room, pages, errors } = await startSharedGame(browser, 2);
-  const host = pages[0];
-  const cdp = await host.context().newCDPSession(host);
-  // Reserve CPU headroom for the competing call, on a production desktop renderer too.
-  await cdp.send("Emulation.setCPUThrottlingRate", { rate: 6 });
-  await host.evaluate(async () => {
-    const canvas = document.createElement("canvas");
-    canvas.width = 640;
-    canvas.height = 360;
-    const context = canvas.getContext("2d")!;
-    let frame = 0;
-    const draw = () => {
-      for (let x = 0; x < 640; x += 20) {
-        context.fillStyle = `hsl(${(frame * 7 + x) % 360} 50% 50%)`;
-        context.fillRect(x, 0, 20, 360);
-      }
-      frame++;
-    };
-    draw();
-    const timer = window.setInterval(draw, 1000 / 30);
-    const stream = canvas.captureStream(30);
-    const sender = new RTCPeerConnection();
-    const receiver = new RTCPeerConnection();
-    const video = document.createElement("video");
-    video.muted = true;
-    video.autoplay = true;
-    // Exercise encoding, decoding and video presentation without covering the game controls.
-    Object.assign(video.style, {
-      position: "fixed",
-      width: "160px",
-      height: "90px",
-      bottom: "0",
-      right: "0",
-      pointerEvents: "none",
-    });
-    document.body.append(video);
-    receiver.ontrack = (event) => {
-      video.srcObject = event.streams[0];
-    };
-    sender.onicecandidate = (event) => {
-      if (event.candidate) void receiver.addIceCandidate(event.candidate);
-    };
-    receiver.onicecandidate = (event) => {
-      if (event.candidate) void sender.addIceCandidate(event.candidate);
-    };
-    stream.getTracks().forEach((track) => sender.addTrack(track, stream));
-    await sender.setLocalDescription(await sender.createOffer());
-    await receiver.setRemoteDescription(sender.localDescription!);
-    await receiver.setLocalDescription(await receiver.createAnswer());
-    await sender.setRemoteDescription(receiver.localDescription!);
-    (window as SteamTestWindow).videoWorkload = {
-      frames: async () => {
-        let encoded = 0;
-        (await sender.getStats()).forEach((report) => {
-          if (report.type === "outbound-rtp" && report.kind === "video")
-            encoded += report.framesEncoded ?? 0;
-        });
-        return encoded;
-      },
-      stop: () => {
-        clearInterval(timer);
-        stream.getTracks().forEach((track) => track.stop());
-        sender.close();
-        receiver.close();
-        video.remove();
-      },
-    };
-  });
-  const responses: { input: string; ms: number }[] = [];
-  const frames = () =>
-    host.evaluate(() => (window as SteamTestWindow).videoWorkload!.frames());
-  try {
-    await expect.poll(frames).toBeGreaterThan(10);
-    for (const page of pages) await ready(page);
-    for (const page of pages)
-      await clock(page)
-        .getByRole("button", { name: "fast speed", exact: true })
-        .click();
-    await expect(clock(host)).toHaveAttribute("data-active-speed", "FAST");
-    await expect
-      .poll(
-        () => room.views.get("76561198000000002")?.game?.date.monthsElapsed,
-        {
-          timeout: 60000,
+test(
+  "12x multiplayer speed controls respond while video chat is encoding",
+  { tag: "@mobile" },
+  async ({ browser }) => {
+    const { room, pages, errors } = await startSharedGame(browser, 2);
+    const host = pages[0];
+    const cdp = await host.context().newCDPSession(host);
+    // Reserve CPU headroom for the competing call, on a production desktop renderer too.
+    await cdp.send("Emulation.setCPUThrottlingRate", { rate: 6 });
+    await host.evaluate(async () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = 640;
+      canvas.height = 360;
+      const context = canvas.getContext("2d")!;
+      let frame = 0;
+      const draw = () => {
+        for (let x = 0; x < 640; x += 20) {
+          context.fillStyle = `hsl(${(frame * 7 + x) % 360} 50% 50%)`;
+          context.fillRect(x, 0, 20, 360);
+        }
+        frame++;
+      };
+      draw();
+      const timer = window.setInterval(draw, 1000 / 30);
+      const stream = canvas.captureStream(30);
+      const sender = new RTCPeerConnection();
+      const receiver = new RTCPeerConnection();
+      const video = document.createElement("video");
+      video.muted = true;
+      video.autoplay = true;
+      // Exercise encoding, decoding and video presentation without covering the game controls.
+      Object.assign(video.style, {
+        position: "fixed",
+        width: "160px",
+        height: "90px",
+        bottom: "0",
+        right: "0",
+        pointerEvents: "none",
+      });
+      document.body.append(video);
+      receiver.ontrack = (event) => {
+        video.srcObject = event.streams[0];
+      };
+      sender.onicecandidate = (event) => {
+        if (event.candidate) void receiver.addIceCandidate(event.candidate);
+      };
+      receiver.onicecandidate = (event) => {
+        if (event.candidate) void sender.addIceCandidate(event.candidate);
+      };
+      stream.getTracks().forEach((track) => sender.addTrack(track, stream));
+      await sender.setLocalDescription(await sender.createOffer());
+      await receiver.setRemoteDescription(sender.localDescription!);
+      await receiver.setLocalDescription(await receiver.createAnswer());
+      await sender.setRemoteDescription(receiver.localDescription!);
+      (window as SteamTestWindow).videoWorkload = {
+        frames: async () => {
+          let encoded = 0;
+          (await sender.getStats()).forEach((report) => {
+            if (report.type === "outbound-rtp" && report.kind === "video")
+              encoded += report.framesEncoded ?? 0;
+          });
+          return encoded;
         },
-      )
-      .toBeGreaterThanOrEqual(12);
-    const encodedBefore = await frames();
-    for (const page of pages) {
-      for (const [key, speed] of [
-        ["1", "SLOW"],
-        ["3", "FAST"],
-        ["0", "PAUSED"],
-        ["3", "FAST"],
-      ]) {
+        stop: () => {
+          clearInterval(timer);
+          stream.getTracks().forEach((track) => track.stop());
+          sender.close();
+          receiver.close();
+          video.remove();
+        },
+      };
+    });
+    const responses: { input: string; ms: number }[] = [];
+    const frames = () =>
+      host.evaluate(() => (window as SteamTestWindow).videoWorkload!.frames());
+    try {
+      await expect.poll(frames).toBeGreaterThan(10);
+      for (const page of pages) await ready(page);
+      for (const page of pages)
+        await clock(page)
+          .getByRole("button", { name: "fast speed", exact: true })
+          .click();
+      await expect(clock(host)).toHaveAttribute("data-active-speed", "FAST");
+      await expect
+        .poll(
+          () => room.views.get("76561198000000002")?.game?.date.monthsElapsed,
+          {
+            timeout: 60000,
+          },
+        )
+        .toBeGreaterThanOrEqual(12);
+      const encodedBefore = await frames();
+      for (const page of pages) {
+        for (const [key, speed] of [
+          ["1", "SLOW"],
+          ["3", "FAST"],
+          ["0", "PAUSED"],
+          ["3", "FAST"],
+        ]) {
+          const started = Date.now();
+          await page.keyboard.press(key);
+          for (const peer of pages)
+            await expect(clock(peer)).toHaveAttribute(
+              "data-active-speed",
+              speed,
+              { timeout: 3000 },
+            );
+          responses.push({ input: `key ${key}`, ms: Date.now() - started });
+        }
         const started = Date.now();
-        await page.keyboard.press(key);
+        await clock(page)
+          .getByRole("button", { name: "normal speed", exact: true })
+          .click({ timeout: 3000 });
         for (const peer of pages)
           await expect(clock(peer)).toHaveAttribute(
             "data-active-speed",
-            speed,
+            "NORMAL",
             { timeout: 3000 },
           );
-        responses.push({ input: `key ${key}`, ms: Date.now() - started });
+        responses.push({ input: "click 3x", ms: Date.now() - started });
+        await page.keyboard.press("3");
+        for (const peer of pages)
+          await expect(clock(peer)).toHaveAttribute(
+            "data-active-speed",
+            "FAST",
+          );
       }
-      const started = Date.now();
-      await clock(page)
-        .getByRole("button", { name: "normal speed", exact: true })
-        .click({ timeout: 3000 });
-      for (const peer of pages)
-        await expect(clock(peer)).toHaveAttribute(
-          "data-active-speed",
-          "NORMAL",
-          { timeout: 3000 },
-        );
-      responses.push({ input: "click 3x", ms: Date.now() - started });
-      await page.keyboard.press("3");
-      for (const peer of pages)
-        await expect(clock(peer)).toHaveAttribute("data-active-speed", "FAST");
+      await expect.poll(frames).toBeGreaterThan(encodedBefore);
+      expect(errors).toEqual([]);
+      expect(room.transportErrors).toEqual([]);
+      await test.info().attach("speed-response-under-video-load", {
+        body: JSON.stringify(responses),
+        contentType: "application/json",
+      });
+    } finally {
+      await host.evaluate(() =>
+        (window as SteamTestWindow).videoWorkload!.stop(),
+      );
+      await cdp.send("Emulation.setCPUThrottlingRate", { rate: 1 });
+      await cdp.detach();
     }
-    await expect.poll(frames).toBeGreaterThan(encodedBefore);
-    expect(errors).toEqual([]);
-    expect(room.transportErrors).toEqual([]);
-    await test.info().attach("speed-response-under-video-load", {
-      body: JSON.stringify(responses),
-      contentType: "application/json",
-    });
-  } finally {
-    await host.evaluate(() =>
-      (window as SteamTestWindow).videoWorkload!.stop(),
-    );
-    await cdp.send("Emulation.setCPUThrottlingRate", { rate: 1 });
-    await cdp.detach();
-  }
-});
+  },
+);
 
 async function ready(page: Page) {
   await clock(page)
@@ -1783,207 +1764,218 @@ async function startSharedGame(browser: Browser, count: number) {
   return { room, pages, errors };
 }
 
-test("replication repairs a mismatched hash with a pending purchase exactly once", async ({
-  browser,
-}) => {
-  test.skip(!replication, "Opt-in replication journey");
-  test.setTimeout(60000);
-  const { room, pages, errors } = await startSharedGame(browser, 2);
-  const [host, guest] = pages;
-  const guestId = room.members[1].id;
-  await expect(guest.locator(".facilities:visible")).toBeVisible();
-  await expect.poll(() => room.progress.get(guestId)?.verified).toBeDefined();
-  const fleetBefore = room.views.get(guestId)!.game!.facilities.length;
-  await guest.locator(".button-buildFacility").click();
-  await guest
-    .getByRole("button", { name: "Review purchase of Wind", exact: true })
-    .click();
-  await guest.evaluate(() => {
-    const target = window as SteamTestWindow;
-    target.holdReplicaViews = true;
-    target.holdReplicaBaseline = true;
-  });
-  const started = Date.now();
-  await guest.getByRole("button", { name: "Take loan", exact: true }).click();
-  // The catalog closes immediately on touch layouts. A repeated identical command proves the
-  // Session still awaits its receipt while the replica's local publication is deliberately held.
-  await expect
-    .poll(() => room.purchases.get(guestId)?.attempts ?? 0)
-    .toBeGreaterThan(1);
-  room.corruptNextVerified.set(
-    guestId,
-    room.progress.get(guestId)!.verified!.index,
-  );
-  // Establish the pending receipt before the next verify can open its synchronization notice.
-  await ready(host);
-  await expect
-    .poll(() => room.baselines.get(guestId), { timeout: 30000 })
-    .toBe(2);
-  expect(room.corruptedProgress).toBe(1);
-  const syncing = guest.getByRole("dialog", {
-    name: "Multiplayer",
-    exact: true,
-  });
-  await expect(syncing).toContainText("Synchronizing with host…");
-  if (process.env.REVIEW_SCREENSHOT_DIR) {
-    await guest.emulateMedia({ colorScheme: "light" });
-    await expect(guest.locator("html")).toHaveAttribute("data-theme", "light");
-    await test.info().attach("synchronization notice light colors", {
-      body: JSON.stringify(
-        await syncing.evaluate((element) => ({
-          text: getComputedStyle(element).color,
-          background: getComputedStyle(element).backgroundColor,
-        })),
-      ),
-      contentType: "application/json",
+test(
+  "replication repairs a mismatched hash with a pending purchase exactly once",
+  { tag: "@mobile" },
+  async ({ browser }) => {
+    test.setTimeout(60000);
+    const { room, pages, errors } = await startSharedGame(browser, 2);
+    const [host, guest] = pages;
+    const guestId = room.members[1].id;
+    await expect(guest.locator(".facilities:visible")).toBeVisible();
+    await expect.poll(() => room.progress.get(guestId)?.verified).toBeDefined();
+    const fleetBefore = room.views.get(guestId)!.game!.facilities.length;
+    await guest.locator(".button-buildFacility").click();
+    await guest
+      .getByRole("button", { name: "Review purchase of Wind", exact: true })
+      .click();
+    await guest.evaluate(() => {
+      const target = window as SteamTestWindow;
+      target.holdReplicaViews = true;
+      target.holdReplicaBaseline = true;
     });
-    await guest.emulateMedia({ colorScheme: "dark" });
-    await expect(guest.locator("html")).toHaveAttribute("data-theme", "dark");
-  }
-  await reviewScreenshot(guest, {
-    path: test
-      .info()
-      .outputPath(`replica-syncing-${guest.viewportSize()!.width}.png`),
-    animations: "disabled",
-  });
-  await guest.evaluate(() =>
-    (window as SteamTestWindow).releaseReplicaBaseline!(),
-  );
-  await expect
-    .poll(() => room.progress.get(guestId)?.applied)
-    .toBeGreaterThanOrEqual(room.baselineIndex.get(guestId)!);
-  await expect
-    .poll(() =>
-      guest.evaluate(
-        () => typeof (window as SteamTestWindow).releaseReplicaViews,
-      ),
-    )
-    .toBe("function");
-  await guest.evaluate(() =>
-    (window as SteamTestWindow).releaseReplicaViews!(),
-  );
-  await expect(syncing).toBeHidden();
-  await expect(
-    guest.getByRole("status").filter({ hasText: "Submitting…" }),
-  ).toBeHidden();
-  expect(Date.now() - started).toBeLessThan(30000);
-  await expect
-    .poll(() => room.views.get(guestId)?.game?.facilities.length)
-    .toBe(fleetBefore + 1);
-  await room.saveCheckpoint(guestId);
-  expect(room.checkpoint!.grids[1].facilities).toHaveLength(fleetBefore + 1);
-  await expect(syncing).toBeHidden();
-  for (const page of pages) await ready(page);
-  await expect(clock(host)).toHaveAttribute("data-active-speed", "SLOW");
-  expect(room.wireViews.get(guestId) ?? 0).toBe(0);
-  expect(errors).toEqual([]);
-  expect(room.transportErrors).toEqual([]);
-});
-
-test("replication reconnects while a recovery baseline is installing", async ({
-  browser,
-}) => {
-  test.skip(!replication, "Opt-in replication journey");
-  // The successful bootstrap must age out of the real 60-second retry budget first.
-  test.setTimeout(120000);
-  const { room, pages, errors } = await startSharedGame(browser, 2);
-  const [host, guest] = pages;
-  const guestId = room.members[1].id;
-  await expect(guest.locator(".facilities:visible")).toBeVisible();
-  await expect.poll(() => room.progress.get(guestId)?.verified).toBeDefined();
-  const initialDate = { ...room.views.get(guestId)!.game!.date };
-  for (const idleMs of [31000, 31000]) {
-    await guest.waitForTimeout(idleMs);
-    expect(room.baselines.get(guestId)).toBe(1);
-    expect(room.views.get(guestId)!.game!.date).toEqual(initialDate);
-    for (const page of pages)
-      await expect(clock(page)).toHaveAttribute("data-active-speed", "PAUSED");
+    const started = Date.now();
+    await guest.getByRole("button", { name: "Take loan", exact: true }).click();
+    // The catalog closes immediately on touch layouts. A repeated identical command proves the
+    // Session still awaits its receipt while the replica's local publication is deliberately held.
+    await expect
+      .poll(() => room.purchases.get(guestId)?.attempts ?? 0)
+      .toBeGreaterThan(1);
+    room.corruptNextVerified.set(
+      guestId,
+      room.progress.get(guestId)!.verified!.index,
+    );
+    // Establish the pending receipt before the next verify can open its synchronization notice.
+    await ready(host);
+    await expect
+      .poll(() => room.baselines.get(guestId), { timeout: 30000 })
+      .toBe(2);
+    expect(room.corruptedProgress).toBe(1);
+    const syncing = guest.getByRole("dialog", {
+      name: "Multiplayer",
+      exact: true,
+    });
+    await expect(syncing).toContainText("Synchronizing with host…");
+    if (process.env.REVIEW_SCREENSHOT_DIR) {
+      await guest.emulateMedia({ colorScheme: "light" });
+      await expect(guest.locator("html")).toHaveAttribute(
+        "data-theme",
+        "light",
+      );
+      await test.info().attach("synchronization notice light colors", {
+        body: JSON.stringify(
+          await syncing.evaluate((element) => ({
+            text: getComputedStyle(element).color,
+            background: getComputedStyle(element).backgroundColor,
+          })),
+        ),
+        contentType: "application/json",
+      });
+      await guest.emulateMedia({ colorScheme: "dark" });
+      await expect(guest.locator("html")).toHaveAttribute("data-theme", "dark");
+    }
+    await reviewScreenshot(guest, {
+      path: test
+        .info()
+        .outputPath(`replica-syncing-${guest.viewportSize()!.width}.png`),
+      animations: "disabled",
+    });
+    await guest.evaluate(() =>
+      (window as SteamTestWindow).releaseReplicaBaseline!(),
+    );
+    await expect
+      .poll(() => room.progress.get(guestId)?.applied)
+      .toBeGreaterThanOrEqual(room.baselineIndex.get(guestId)!);
+    await expect
+      .poll(() =>
+        guest.evaluate(
+          () => typeof (window as SteamTestWindow).releaseReplicaViews,
+        ),
+      )
+      .toBe("function");
+    await guest.evaluate(() =>
+      (window as SteamTestWindow).releaseReplicaViews!(),
+    );
+    await expect(syncing).toBeHidden();
     await expect(
-      guest.getByRole("dialog", { name: "Multiplayer", exact: true }),
+      guest.getByRole("status").filter({ hasText: "Submitting…" }),
     ).toBeHidden();
-  }
-  await guest.evaluate(() => {
-    (window as SteamTestWindow).holdReplicaBaseline = true;
-  });
-  room.corruptNextVerified.set(
-    guestId,
-    room.progress.get(guestId)!.verified!.index,
-  );
-  await ready(host);
-  const notice = guest.getByRole("dialog", {
-    name: "Multiplayer",
-    exact: true,
-  });
-  await expect(notice).toContainText("Synchronizing with host…");
-  room.dropped.add(guestId);
-  await room.event(room.host, { kind: "disconnected", sender: guestId });
-  await room.publish();
-  await room.event(guestId, { kind: "disconnected", sender: room.host });
-  await notice.getByRole("button", { name: "Reconnect", exact: true }).click();
-  await guest.evaluate(() =>
-    (window as SteamTestWindow).releaseReplicaBaseline?.(),
-  );
-  await expect.poll(() => room.baselines.get(guestId)).toBe(3);
-  await expect(notice).toBeHidden();
-  await expect.poll(() => room.state(guestId).connected).toEqual([room.host]);
-  try {
+    expect(Date.now() - started).toBeLessThan(30000);
+    await expect
+      .poll(() => room.views.get(guestId)?.game?.facilities.length)
+      .toBe(fleetBefore + 1);
+    await room.saveCheckpoint(guestId);
+    expect(room.checkpoint!.grids[1].facilities).toHaveLength(fleetBefore + 1);
+    await expect(syncing).toBeHidden();
+    for (const page of pages) await ready(page);
+    await expect(clock(host)).toHaveAttribute("data-active-speed", "SLOW");
+    expect(errors).toEqual([]);
+    expect(room.transportErrors).toEqual([]);
+  },
+);
+
+test(
+  "replication reconnects while a recovery baseline is installing",
+  { tag: "@mobile" },
+  async ({ browser }) => {
+    // The successful bootstrap must age out of the real 60-second retry budget first.
+    test.setTimeout(120000);
+    const { room, pages, errors } = await startSharedGame(browser, 2);
+    const [host, guest] = pages;
+    const guestId = room.members[1].id;
+    await expect(guest.locator(".facilities:visible")).toBeVisible();
+    await expect.poll(() => room.progress.get(guestId)?.verified).toBeDefined();
+    const initialDate = { ...room.views.get(guestId)!.game!.date };
+    for (const idleMs of [31000, 31000]) {
+      await guest.waitForTimeout(idleMs);
+      expect(room.baselines.get(guestId)).toBe(1);
+      expect(room.views.get(guestId)!.game!.date).toEqual(initialDate);
+      for (const page of pages)
+        await expect(clock(page)).toHaveAttribute(
+          "data-active-speed",
+          "PAUSED",
+        );
+      await expect(
+        guest.getByRole("dialog", { name: "Multiplayer", exact: true }),
+      ).toBeHidden();
+    }
+    await guest.evaluate(() => {
+      (window as SteamTestWindow).holdReplicaBaseline = true;
+    });
+    room.corruptNextVerified.set(
+      guestId,
+      room.progress.get(guestId)!.verified!.index,
+    );
+    await ready(host);
+    const notice = guest.getByRole("dialog", {
+      name: "Multiplayer",
+      exact: true,
+    });
+    await expect(notice).toContainText("Synchronizing with host…");
+    room.dropped.add(guestId);
+    await room.event(room.host, { kind: "disconnected", sender: guestId });
+    await room.publish();
+    await room.event(guestId, { kind: "disconnected", sender: room.host });
+    await notice
+      .getByRole("button", { name: "Reconnect", exact: true })
+      .click();
+    await guest.evaluate(() =>
+      (window as SteamTestWindow).releaseReplicaBaseline?.(),
+    );
+    await expect.poll(() => room.baselines.get(guestId)).toBe(3);
+    await expect(notice).toBeHidden();
+    await expect.poll(() => room.state(guestId).connected).toEqual([room.host]);
+    try {
+      for (const page of pages) await ready(page);
+      for (const page of pages)
+        await expect(clock(page)).toHaveAttribute("data-active-speed", "SLOW");
+    } finally {
+      await test.info().attach("replication recovery state", {
+        body: JSON.stringify({
+          baselines: room.baselines.get(guestId),
+          hostReason: room.hostView?.reason,
+          guestReason: room.views.get(guestId)?.reason,
+          progress: room.progress.get(guestId),
+        }),
+        contentType: "application/json",
+      });
+    }
+    expect(errors).toEqual([]);
+    expect(room.transportErrors).toEqual([]);
+  },
+);
+
+test(
+  "replication holds a slow guest then resumes without Ready and stays healthy while paused",
+  { tag: "@mobile" },
+  async ({ browser }) => {
+    test.setTimeout(60000);
+    const { room, pages, errors } = await startSharedGame(browser, 2);
+    const [host, guest] = pages;
+    const guestId = room.members[1].id;
+    await expect(guest.locator(".facilities:visible")).toBeVisible();
     for (const page of pages) await ready(page);
     for (const page of pages)
       await expect(clock(page)).toHaveAttribute("data-active-speed", "SLOW");
-  } finally {
-    await test.info().attach("replication recovery state", {
-      body: JSON.stringify({
-        baselines: room.baselines.get(guestId),
-        hostReason: room.hostView?.reason,
-        guestReason: room.views.get(guestId)?.reason,
-        progress: room.progress.get(guestId),
-      }),
-      contentType: "application/json",
-    });
-  }
-  expect(errors).toEqual([]);
-  expect(room.transportErrors).toEqual([]);
-});
-
-test("replication holds a slow guest then resumes without Ready and stays healthy while paused", async ({
-  browser,
-}) => {
-  test.skip(!replication, "Opt-in replication journey");
-  test.setTimeout(60000);
-  const { room, pages, errors } = await startSharedGame(browser, 2);
-  const [host, guest] = pages;
-  const guestId = room.members[1].id;
-  await expect(guest.locator(".facilities:visible")).toBeVisible();
-  for (const page of pages) await ready(page);
-  for (const page of pages)
-    await expect(clock(page)).toHaveAttribute("data-active-speed", "SLOW");
-  const baselines = room.baselines.get(guestId);
-  room.heldReplication.add(guestId);
-  await expect
-    .poll(() => room.hostView?.reason, { timeout: 8000 })
-    .toContain("Waiting for WindyWren to catch up");
-  await expect(clock(host)).toHaveAttribute("data-active-speed", "PAUSED");
-  expect(room.hostView?.readyRequired).toBe(false);
-  room.heldReplication.delete(guestId);
-  await room.releaseReplication(guestId);
-  for (const page of pages)
-    await expect(clock(page)).toHaveAttribute("data-active-speed", "SLOW");
-  expect(room.baselines.get(guestId)).toBe(baselines);
-  await clock(host).getByRole("button", { name: "pause", exact: true }).click();
-  for (const page of pages)
-    await expect(clock(page)).toHaveAttribute("data-active-speed", "PAUSED");
-  const date = { ...room.views.get(guestId)!.game!.date };
-  // A healthy idle pause exceeds the recovery timeout without creating a baseline or notice.
-  await guest.waitForTimeout(11000);
-  expect(room.baselines.get(guestId)).toBe(baselines);
-  expect(room.views.get(guestId)!.game!.date).toEqual(date);
-  await expect(
-    guest.getByRole("dialog", { name: "Multiplayer", exact: true }),
-  ).toBeHidden();
-  expect(room.wireViews.get(guestId) ?? 0).toBe(0);
-  expect(errors).toEqual([]);
-  expect(room.transportErrors).toEqual([]);
-});
+    const baselines = room.baselines.get(guestId);
+    room.heldReplication.add(guestId);
+    await expect
+      .poll(() => room.hostView?.reason, { timeout: 8000 })
+      .toContain("Waiting for WindyWren to catch up");
+    await expect(clock(host)).toHaveAttribute("data-active-speed", "PAUSED");
+    expect(room.hostView?.readyRequired).toBe(false);
+    room.heldReplication.delete(guestId);
+    await room.releaseReplication(guestId);
+    for (const page of pages)
+      await expect(clock(page)).toHaveAttribute("data-active-speed", "SLOW");
+    expect(room.baselines.get(guestId)).toBe(baselines);
+    await clock(host)
+      .getByRole("button", { name: "pause", exact: true })
+      .click();
+    for (const page of pages)
+      await expect(clock(page)).toHaveAttribute("data-active-speed", "PAUSED");
+    const date = { ...room.views.get(guestId)!.game!.date };
+    // A healthy idle pause exceeds the recovery timeout without creating a baseline or notice.
+    await guest.waitForTimeout(11000);
+    expect(room.baselines.get(guestId)).toBe(baselines);
+    expect(room.views.get(guestId)!.game!.date).toEqual(date);
+    await expect(
+      guest.getByRole("dialog", { name: "Multiplayer", exact: true }),
+    ).toBeHidden();
+    expect(errors).toEqual([]);
+    expect(room.transportErrors).toEqual([]);
+  },
+);
 
 async function expectClockInViewport(page: Page) {
   await expect(
@@ -2370,108 +2362,117 @@ async function reviewConnectionNotice(page: Page, state: string) {
   }
 }
 
-test("save failures, refused commands and native host errors never offer checkpoint-skipping Disconnect", async ({
-  browser,
-}) => {
-  const { room, pages, errors } = await startSharedGame(browser, 2);
-  const host = pages[0];
-  const guestId = room.members[1].id;
-  await expect(host.locator(".facilities:visible")).toBeVisible();
-  // Exercise the real host worker's save failure through the native persistence boundary.
-  room.checkpointError = "Disk full";
-  await room.request(guestId, {
-    kind: "send",
-    to: room.host,
-    payload: { kind: "save-request", requestId: "failed-checkpoint" },
-  });
-  const notice = host.getByRole("dialog", { name: "Multiplayer", exact: true });
-  await expect(notice).toContainText("Multiplayer save failed: Disk full");
-  await expect(
-    notice.getByRole("button", { name: "Disconnect", exact: true }),
-  ).toHaveCount(0);
-  await expect(
-    notice.getByRole("button", { name: "Reconnect", exact: true }),
-  ).toBeVisible();
-  await reviewConnectionNotice(host, "save-failed");
-  await notice.getByRole("button", { name: "OK", exact: true }).click();
-  await expect(notice).toBeHidden();
-  room.checkpointError = undefined;
+test(
+  "save failures, refused commands and native host errors never offer checkpoint-skipping Disconnect",
+  { tag: "@mobile" },
+  async ({ browser }) => {
+    const { room, pages, errors } = await startSharedGame(browser, 2);
+    const host = pages[0];
+    const guestId = room.members[1].id;
+    await expect(host.locator(".facilities:visible")).toBeVisible();
+    // Exercise the real host worker's save failure through the native persistence boundary.
+    room.checkpointError = "Disk full";
+    await room.request(guestId, {
+      kind: "send",
+      to: room.host,
+      payload: { kind: "save-request", requestId: "failed-checkpoint" },
+    });
+    const notice = host.getByRole("dialog", {
+      name: "Multiplayer",
+      exact: true,
+    });
+    await expect(notice).toContainText("Multiplayer save failed: Disk full");
+    await expect(
+      notice.getByRole("button", { name: "Disconnect", exact: true }),
+    ).toHaveCount(0);
+    await expect(
+      notice.getByRole("button", { name: "Reconnect", exact: true }),
+    ).toBeVisible();
+    await reviewConnectionNotice(host, "save-failed");
+    await notice.getByRole("button", { name: "OK", exact: true }).click();
+    await expect(notice).toBeHidden();
+    room.checkpointError = undefined;
 
-  // A native transport failure does not stop the host's local simulation or its ability to save.
-  await room.event(room.host, {
-    kind: "state",
-    state: {
-      ...room.state(room.host),
-      error: "Steam connection interrupted. Reconnect to continue.",
-    },
-  });
-  await expect(notice).toContainText("Steam connection interrupted");
-  await expect(
-    notice.getByRole("button", { name: "Disconnect", exact: true }),
-  ).toHaveCount(0);
-  await notice.getByRole("button", { name: "OK", exact: true }).click();
-  await expect(notice).toBeHidden();
-  await room.saveCheckpoint(guestId);
-  expect(room.checkpoint).toBeDefined();
-  // Refusals also reach the guest through the host worker's normal command receipt.
-  const view = room.views.get(guestId)!;
-  await room.request(guestId, {
-    kind: "send",
-    to: room.host,
-    payload: {
-      kind: "command",
-      envelope: {
-        matchId: view.matchId,
-        epoch: view.epoch,
-        sequence: view.lastSequence + 1,
-        command: { kind: "rate", value: -1 },
+    // A native transport failure does not stop the host's local simulation or its ability to save.
+    await room.event(room.host, {
+      kind: "state",
+      state: {
+        ...room.state(room.host),
+        error: "Steam connection interrupted. Reconnect to continue.",
       },
-    },
-  });
-  const refused = pages[1].getByRole("dialog", {
-    name: "Multiplayer",
-    exact: true,
-  });
-  await expect(refused).toContainText("Choose a rate between");
-  await expect(
-    refused.getByRole("button", { name: "Disconnect", exact: true }),
-  ).toHaveCount(0);
-  expect(room.members).toHaveLength(2);
-  expect(errors).toEqual([]);
-  expect(room.transportErrors).toEqual([]);
-});
+    });
+    await expect(notice).toContainText("Steam connection interrupted");
+    await expect(
+      notice.getByRole("button", { name: "Disconnect", exact: true }),
+    ).toHaveCount(0);
+    await notice.getByRole("button", { name: "OK", exact: true }).click();
+    await expect(notice).toBeHidden();
+    await room.saveCheckpoint(guestId);
+    expect(room.checkpoint).toBeDefined();
+    // Refusals also reach the guest through the host worker's normal command receipt.
+    const view = room.views.get(guestId)!;
+    await room.request(guestId, {
+      kind: "send",
+      to: room.host,
+      payload: {
+        kind: "command",
+        envelope: {
+          matchId: view.matchId,
+          epoch: view.epoch,
+          sequence: view.lastSequence + 1,
+          command: { kind: "rate", value: -1 },
+        },
+      },
+    });
+    const refused = pages[1].getByRole("dialog", {
+      name: "Multiplayer",
+      exact: true,
+    });
+    await expect(refused).toContainText("Choose a rate between");
+    await expect(
+      refused.getByRole("button", { name: "Disconnect", exact: true }),
+    ).toHaveCount(0);
+    expect(room.members).toHaveLength(2);
+    expect(errors).toEqual([]);
+    expect(room.transportErrors).toEqual([]);
+  },
+);
 
-test("a guest who lost the host can disconnect from the connection notice", async ({
-  browser,
-}) => {
-  const { room, pages, errors } = await startSharedGame(browser, 2);
-  const guest = pages[1];
-  const guestId = room.members[1].id;
-  await expect(guest.locator(".facilities:visible")).toBeVisible();
-  // The native layer tells both endpoints that their channel closed.
-  room.dropped.add(guestId);
-  await room.event(room.host, { kind: "disconnected", sender: guestId });
-  await room.publish();
-  await room.event(guestId, { kind: "disconnected", sender: room.host });
-  const notice = guest.getByRole("dialog", {
-    name: "Multiplayer",
-    exact: true,
-  });
-  await expect(notice).toContainText("Connection lost");
-  await expect(
-    notice.getByRole("button", { name: "Reconnect", exact: true }),
-  ).toBeVisible();
-  await reviewConnectionNotice(guest, "connection-lost");
-  await notice.getByRole("button", { name: "Disconnect", exact: true }).click();
-  await expect(
-    guest.getByRole("button", { name: "Play with friends", exact: true }),
-  ).toBeVisible();
-  await expect(notice).toBeHidden();
-  await expect
-    .poll(() => room.members.some((member) => member.id === guestId))
-    .toBe(false);
-  expect(errors).toEqual([]);
-});
+test(
+  "a guest who lost the host can disconnect from the connection notice",
+  { tag: "@mobile" },
+  async ({ browser }) => {
+    const { room, pages, errors } = await startSharedGame(browser, 2);
+    const guest = pages[1];
+    const guestId = room.members[1].id;
+    await expect(guest.locator(".facilities:visible")).toBeVisible();
+    // The native layer tells both endpoints that their channel closed.
+    room.dropped.add(guestId);
+    await room.event(room.host, { kind: "disconnected", sender: guestId });
+    await room.publish();
+    await room.event(guestId, { kind: "disconnected", sender: room.host });
+    const notice = guest.getByRole("dialog", {
+      name: "Multiplayer",
+      exact: true,
+    });
+    await expect(notice).toContainText("Connection lost");
+    await expect(
+      notice.getByRole("button", { name: "Reconnect", exact: true }),
+    ).toBeVisible();
+    await reviewConnectionNotice(guest, "connection-lost");
+    await notice
+      .getByRole("button", { name: "Disconnect", exact: true })
+      .click();
+    await expect(
+      guest.getByRole("button", { name: "Play with friends", exact: true }),
+    ).toBeVisible();
+    await expect(notice).toBeHidden();
+    await expect
+      .poll(() => room.members.some((member) => member.id === guestId))
+      .toBe(false);
+    expect(errors).toEqual([]);
+  },
+);
 
 test("custom setup waits for host settings before a guest can mark Ready", async ({
   browser,
@@ -2684,6 +2685,7 @@ for (const count of [2, 4]) {
   test(
     count +
       " players use the normal game, shared speeds, player interties, and menu saves",
+    { tag: "@mobile" },
     async ({ browser }) => {
       const { room, pages, errors } = await startSharedGame(browser, count);
       for (const page of pages) {
@@ -2711,8 +2713,8 @@ for (const count of [2, 4]) {
         ),
       ).toBe(true);
       if (count === 2) {
-        // Keep the exact heartbeat deadline: a real >5s snapshot gap shows a warning, and
-        // a healthy authoritative view must release that notice before players can resume.
+        // Keep the exact heartbeat deadline: a real >5s host-update gap shows a warning, and
+        // a healthy authenticated keepalive must release that notice before players can resume.
         const warning = buyer.getByRole("dialog", {
           name: "Multiplayer",
           exact: true,
@@ -2720,14 +2722,14 @@ for (const count of [2, 4]) {
         // Unchanged paused games still receive compact authenticated keepalives.
         await buyer.waitForTimeout(5500);
         await expect(warning).toBeHidden();
-        room.heldViews.add(buyerId);
+        room.heldHostUpdates.add(buyerId);
         await expect(
           warning.getByText(
             "Waiting for the host. Reconnect if the connection was lost.",
             { exact: true },
           ),
         ).toBeVisible();
-        room.heldViews.delete(buyerId);
+        room.heldHostUpdates.delete(buyerId);
         await expect(warning).toBeHidden();
       }
       for (const page of pages) await ready(page);
@@ -2782,7 +2784,7 @@ for (const count of [2, 4]) {
         .getByRole("button", { name: "pause", exact: true })
         .click();
       // Delay the guest's acknowledgment so its next click reverses an in-flight choice,
-      // even though its last host snapshot still shows SLOW selected.
+      // even though its last local publication still shows SLOW selected.
       if (count === 2) {
         await expect(clock(buyer)).toHaveAttribute(
           "data-active-speed",
@@ -2791,21 +2793,19 @@ for (const count of [2, 4]) {
         await expect(
           clock(buyer).getByRole("button", { name: "slow speed", exact: true }),
         ).toHaveAttribute("aria-pressed", "true");
-        room.heldViews.add(buyerId);
+        room.heldHostUpdates.add(buyerId);
       }
       await pages[1]
         .getByRole("button", { name: "normal speed", exact: true })
         .click();
-      // Verify host acceptance while the guest's snapshots are deliberately held.
+      // Verify host acceptance while the guest's host updates are deliberately held.
       // Waiting for its selected button would deadlock the stale-selection reversal.
       await expect
-        .poll(() =>
-          replication
-            ? room.hostView?.grids.find(
-                (grid) => grid.seat.id === room.members[1].id,
-              )?.selectedSpeed
-            : room.views.get(room.members[1].id)?.game?.multiplayer?.clock
-                ?.selectedSpeed,
+        .poll(
+          () =>
+            room.hostView?.grids.find(
+              (grid) => grid.seat.id === room.members[1].id,
+            )?.selectedSpeed,
         )
         .toBe("NORMAL");
       if (count === 2)
@@ -2825,7 +2825,7 @@ for (const count of [2, 4]) {
           .getByRole("button", { name: "slow speed", exact: true })
           .click();
       if (count === 2) {
-        room.heldViews.delete(buyerId);
+        room.heldHostUpdates.delete(buyerId);
         await room.releaseReplication(buyerId);
       }
       for (const page of pages)
@@ -2917,13 +2917,14 @@ for (const count of [2, 4]) {
       }
       // Guest Save & Quit requests a fresh whole-world checkpoint before it disconnects.
       await saveAndQuit(buyer);
-      const oldView = room.views.get(buyerId)!;
-      const deliverOldView = async () => {
+      const oldRecords = room.recordMessages.get(buyerId)!;
+      expect(oldRecords).toBeDefined();
+      const deliverOldRecords = async () => {
         // A frame decoded after native leave must not reinstall the departed match.
         await room.deliver(buyerId, {
           kind: "message",
           sender: room.host,
-          payload: { kind: "view", view: oldView },
+          payload: oldRecords,
         });
         await expect(
           buyer.getByRole("button", { name: "Play with friends", exact: true }),
@@ -2935,7 +2936,7 @@ for (const count of [2, 4]) {
           connected: [],
         });
       };
-      await deliverOldView();
+      await deliverOldRecords();
       expect(room.checkpoint!.grids[count - 1].facilities).toHaveLength(
         fleetBefore + 1,
       );
@@ -2954,7 +2955,7 @@ for (const count of [2, 4]) {
       await room.deliver(buyerId, {
         kind: "message",
         sender: room.host,
-        payload: { kind: "view", view: oldView },
+        payload: oldRecords,
       });
       await expect(buyer.locator(".facilities:visible")).toHaveCount(0);
       await expect(
@@ -3416,10 +3417,8 @@ for (const width of [1280, 390, 360]) {
       .poll(() => room.views.get(guestId)?.game?.date)
       .toEqual(checkpoint.grids[1].date);
     await expect
-      .poll(() =>
-        replication
-          ? room.views.get(guestId)?.game?.customScenario?.mod?.runtimeDigest
-          : room.views.get(guestId)?.scenarioDigest,
+      .poll(
+        () => room.views.get(guestId)?.game?.customScenario?.mod?.runtimeDigest,
       )
       .toBe(digest);
     expect(room.modEntries.get(hostId)).toEqual([]);
@@ -3660,7 +3659,6 @@ for (const scenarioId of [106, 107] as const) {
         .toBe(scenarioId);
       expect(room.views.get(guestId)!.game!.customScenario).toBeUndefined();
       expect(room.views.get(guestId)!.game!.difficulty).toBe("Employee");
-      expect(room.views.get(guestId)!.scenarioDigest).toBeUndefined();
       const seed = room.views.get(guestId)!.game!.seed;
       if (scenarioId === 107) expect(seed).toBe(268107);
       await test.info().attach("Native shared seed and paid route", {
@@ -3965,7 +3963,6 @@ for (const scenarioId of [106, 107] as const) {
         difficulty: "Employee",
       });
       expect(room.views.get(guestId)!.game!.customScenario).toBeUndefined();
-      expect(room.views.get(guestId)!.scenarioDigest).toBeUndefined();
       expect(errors).toEqual([]);
       expect(room.transportErrors).toEqual([]);
     });

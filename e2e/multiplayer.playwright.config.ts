@@ -47,21 +47,19 @@ export default defineConfig({
       },
     ],
   ],
-  // Opt-in replica journeys can be selected by viewport without doubling snapshot CI.
-  projects:
-    process.env.E2E_COOP_REPLICATION === "1"
-      ? [
-          { name: "desktop-chromium" },
-          {
-            name: "mobile-390px",
-            use: {
-              isMobile: true,
-              hasTouch: true,
-              viewport: { width: 390, height: 844 },
-            },
-          },
-        ]
-      : undefined,
+  // Width-specific layouts run once on desktop; repeat core online journeys on touch.
+  projects: [
+    { name: "desktop-chromium" },
+    {
+      name: "mobile-390px",
+      grep: /@mobile/,
+      use: {
+        isMobile: true,
+        hasTouch: true,
+        viewport: { width: 390, height: 844 },
+      },
+    },
+  ],
   use: {
     launchOptions:
       require("../scripts/ci/browser-launch").browserLaunchOptions(),
