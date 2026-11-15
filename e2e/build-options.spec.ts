@@ -56,6 +56,72 @@ for (const theme of ["light", "dark"] as const) {
 }
 
 for (const theme of ["light", "dark"] as const) {
+  for (const [scenarioId, place] of [
+    [103, "Pittsburgh"],
+    [108, "Madrid"],
+    [116, "Burlington"],
+  ] as const) {
+    test(`geothermal stays disabled without sites in ${place} in ${theme}`, async ({
+      page,
+    }) => {
+      await page.addInitScript((mode) => {
+        localStorage.setItem("theme", mode);
+        localStorage.setItem("audioEnabled", "false");
+      }, theme);
+      await page.goto(`/?scenario=${scenarioId}`);
+      await page
+        .getByRole("button", { name: "Start game", exact: true })
+        .click();
+      await openBuild(page);
+      await page.getByRole("tab", { name: "Generators", exact: true }).click();
+      const options = page.getByRole("list", { name: "Generator options" });
+      const geothermal = options.locator('[data-build-option="Geothermal"]');
+      await expect(geothermal).toContainText(
+        `No geothermal sites near ${place}.`,
+      );
+      await expect(
+        geothermal.getByRole("button", {
+          name: "Review purchase of Geothermal",
+          exact: true,
+        }),
+      ).toBeDisabled();
+      await expect(
+        geothermal.getByRole("button", {
+          name: "Compare Geothermal",
+          exact: true,
+        }),
+      ).toHaveCount(0);
+      for (const order of [
+        "Build cost",
+        "Build time",
+        "Cost per MWh",
+        "Emissions",
+      ]) {
+        await sortBuildCatalog(page, order);
+        const ordered = await options
+          .locator("[data-build-option]")
+          .evaluateAll((cards) =>
+            cards.map((card) => ({
+              name: card.getAttribute("data-build-option"),
+              detailed: !!card.querySelector(".buildOptionMetrics"),
+            })),
+          );
+        const index = ordered.findIndex((card) => card.name === "Geothermal");
+        expect(index).toBeGreaterThanOrEqual(0);
+        expect(ordered.slice(index).filter((card) => card.detailed)).toEqual(
+          [],
+        );
+      }
+      await geothermal.scrollIntoViewIfNeeded();
+      await expect(geothermal).toBeVisible();
+      expect(
+        await geothermal.evaluate(
+          (element) => element.scrollWidth - element.clientWidth,
+        ),
+      ).toBeLessThanOrEqual(1);
+    });
+  }
+
   for (const [category, name] of [
     ["Generators", "Solar"],
     ["Storage", "Pumped Hydro"],
@@ -222,7 +288,18 @@ for (const theme of ["light", "dark"] as const) {
       } else {
         await expect(metrics).not.toContainText("Average output over a year");
         const sparklines = page.locator(".buildOptionSparkline svg");
-        await expect(sparklines).toHaveCount(await cards.count());
+        const detailedCards = cards.filter({
+          has: page.locator(".buildOptionMetrics"),
+        });
+        await expect(sparklines).toHaveCount(await detailedCards.count());
+        for (const card of await cards
+          .filter({ hasNot: page.locator(".buildOptionMetrics") })
+          .all()) {
+          await expect(
+            card.getByRole("button", { name: /Review purchase of/ }),
+          ).toBeDisabled();
+          await expect(card.locator(".buildOptionSparkline")).toHaveCount(0);
+        }
         const strokes = await sparklines.evaluateAll((lines) =>
           lines.map(
             (line) => getComputedStyle(line.querySelector("polyline")!).stroke,

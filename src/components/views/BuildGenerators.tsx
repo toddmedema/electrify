@@ -468,7 +468,10 @@ export function GeneratorBuildItem(
 
   const iconSrc = `/images/${generator.name.toLowerCase()}.svg`;
   // Nothing left to build: keep the card as a quiet one-line entry rather than a full pitch
-  if (props.hydroAvailability?.remaining.length === 0) {
+  if (
+    props.hydroAvailability?.remaining.length === 0 ||
+    sites?.remaining === 0
+  ) {
     return (
       <BuildOptionCard
         name={generator.name}
@@ -478,7 +481,11 @@ export function GeneratorBuildItem(
           disabled: true,
           onClick: () => undefined,
         }}
-        context="No remaining buildable locations"
+        context={
+          props.hydroAvailability
+            ? "No remaining buildable locations"
+            : secondaryText
+        }
       />
     );
   }
@@ -1096,11 +1103,9 @@ function BuildGenerators(props: Props): React.JSX.Element {
     ),
   );
   const generators = shownGenerators.sort((a, b) => {
-    // Hydro with no sites left always sinks to the bottom
-    const spentA =
-      a.name === "Hydro" && hydroAvailability.remaining.length === 0;
-    const spentB =
-      b.name === "Hydro" && hydroAvailability.remaining.length === 0;
+    // Generators with no sites left always sink to the bottom.
+    const spentA = a.viableLocationsRemaining === 0;
+    const spentB = b.viableLocationsRemaining === 0;
     if (spentA !== spentB) {
       return spentA ? 1 : -1;
     }

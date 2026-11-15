@@ -41,8 +41,7 @@ export function siteCountLabel(sites: SiteInventory): string {
   return `${sites.remaining} of ${sites.total} ${sites.total === 1 ? "site" : "sites"} left`;
 }
 
-// Site counts are a game limit built from coarse national and survey data, not a map of every
-// river or hillside, so the reason says what this game allows rather than what the land lacks.
+// Site counts are game limits built from coarse national and survey data.
 const SITE_NOUNS: Record<string, string> = {
   Hydro: "hydro",
   "Pumped Hydro": "pumped hydro",
@@ -88,7 +87,7 @@ export function getBuildAvailability(options: {
     const noun = SITE_NOUNS[options.name] || options.name.toLowerCase();
     return {
       buildable: false,
-      secondaryText: `No ${noun} sites near ${place} in this game.`,
+      secondaryText: `No ${noun} sites near ${place}.`,
     };
   }
   if (sites && sites.remaining === 0) {
