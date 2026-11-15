@@ -36,6 +36,7 @@ function minimum(values: Array<number | null>): number | null {
   return known.length === values.length ? Math.min(...known) : null;
 }
 
+/** Compare the twelve-month periods immediately before and after commissioning. */
 export default function BuildPurchaseReviewDialog({
   game,
   facility,
@@ -44,45 +45,29 @@ export default function BuildPurchaseReviewDialog({
   game?: GameType;
   facility: FacilityShoppingType;
 }) {
-  return purchase.open && game ? (
-    <BuildPurchaseForecast
-      game={game}
-      facility={facility}
-      purchase={purchase}
-    />
-  ) : (
-    <PurchaseReviewDialog {...purchase} />
-  );
-}
-
-/** Compare the twelve-month periods immediately before and after commissioning. */
-function BuildPurchaseForecast({
-  game,
-  facility,
-  purchase,
-}: {
-  game: GameType;
-  facility: FacilityShoppingType;
-  purchase: PurchaseReviewDialogProps;
-}) {
-  const gameKey = signature(game);
+  const gameKey = purchase.open && game ? signature(game) : undefined;
   // Keep the estimate steady while the live clock advances, and refresh on a planning change.
-  const snapshot = React.useMemo(() => forecastWorkerSnapshot(game), [gameKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  const snapshot = React.useMemo(
+    () =>
+      gameKey !== undefined && game ? forecastWorkerSnapshot(game) : undefined,
+    [gameKey], // eslint-disable-line react-hooks/exhaustive-deps
+  );
   const state = useWorkerRequest(
-    {
-      key: JSON.stringify(facility),
-      scope: snapshot,
-      message: (requestId: number): OutlookRequest => ({
-        requestId,
-        kind: "buildImpact",
-        game: snapshot,
-        facility,
-      }),
-      fallback: () => computeOutlook("buildImpact", snapshot, facility),
-    },
+    snapshot
+      ? {
+          key: JSON.stringify(facility),
+          scope: snapshot,
+          message: (requestId: number): OutlookRequest => ({
+            requestId,
+            kind: "buildImpact",
+            game: snapshot,
+            facility,
+          }),
+          fallback: () => computeOutlook("buildImpact", snapshot, facility),
+        }
+      : undefined,
     {
       createWorker: createOutlookWorker,
-      reuseWorker: true,
       debounceMs: 100,
       read: (reply: OutlookReply) =>
         !reply.error && reply.result
@@ -115,93 +100,99 @@ function BuildPurchaseForecast({
   return (
     <PurchaseReviewDialog
       {...purchase}
-      extraFacts={[...(purchase.extraFacts ?? []), ...impactFacts]}
+      extraFacts={
+        game
+          ? [...(purchase.extraFacts ?? []), ...impactFacts]
+          : purchase.extraFacts
+      }
       afterFacts={
         <>
           {purchase.afterFacts}
-          <div className="buildImpact">
-            <div className="chartCaption">Lowest supply margin</div>
-            {result ? (
-              <>
-                <PolicyDemandLegend labels={LABELS} />
-                <UPlotChart
-                  ariaLabel="Estimated monthly supply margin before and after commissioning, twelve months each"
-                  height={160}
-                  state={result}
-                  interactiveTooltip
-                  tooltip={(index, forecast) => {
-                    const date = getDateFromMinute(
-                      Math.round(
-                        forecast.after.startMinute +
-                          forecast.months[index] * MINUTES_PER_MONTH,
-                      ),
-                      game.startingYear,
-                    );
-                    return [
-                      `${date.month} ${date.year - 1} → ${date.month} ${date.year}`,
-                      `${LABELS[0]}: ${watts(forecast.before.monthlyMarginW[index])}`,
-                      "",
-                      `${LABELS[1]}: ${watts(forecast.after.monthlyMarginW[index])}`,
-                    ].join("\n");
-                  }}
-                  data={[
-                    result.months,
-                    result.before.monthlyMarginW,
-                    result.after.monthlyMarginW,
-                  ]}
-                  seriesLabels={[
-                    `${LABELS[0]} (solid)`,
-                    `${LABELS[1]} (dashed)`,
-                  ]}
-                  formatSummaryValue={formatForecastWatts}
-                  buildOptions={({ scale }) => ({
-                    width: 0,
-                    height: 0,
-                    legend: { show: false },
-                    plugins: [zeroLinePlugin(chartPalette().tick)],
-                    scales: { x: { time: false, range: [0, 12] } },
-                    axes: [
-                      xAxis(scale, {
-                        splits: () => [0, 3, 6, 9, 12],
-                        values: (_u, ticks) =>
-                          ticks.map(
-                            (tick) =>
-                              getDateFromMinute(
-                                result.after.startMinute +
-                                  tick * MINUTES_PER_MONTH,
-                                game.startingYear,
-                              ).month,
-                          ),
-                      }),
-                      yAxis(scale, {
-                        values: (_u, ticks) => ticks.map(formatForecastWatts),
-                      }),
-                    ],
-                    series: [
-                      {},
-                      {
-                        label: LABELS[0],
-                        stroke: chartPalette().demand,
-                        width: 2,
-                      },
-                      {
-                        label: LABELS[1],
-                        stroke: chartPalette().supply,
-                        width: 2,
-                        dash: [6, 4],
-                      },
-                    ],
-                  })}
-                />
-              </>
-            ) : (
-              <Typography role="status" sx={{ py: 2 }}>
-                {state.status === "error"
-                  ? "Couldn’t estimate this project. Reopen the review to retry."
-                  : "Estimating grid impact…"}
-              </Typography>
-            )}
-          </div>
+          {snapshot && (
+            <div className="buildImpact">
+              <div className="chartCaption">Lowest supply margin</div>
+              {result ? (
+                <>
+                  <PolicyDemandLegend labels={LABELS} />
+                  <UPlotChart
+                    ariaLabel="Estimated monthly supply margin before and after commissioning, twelve months each"
+                    height={160}
+                    state={result}
+                    interactiveTooltip
+                    tooltip={(index, forecast) => {
+                      const date = getDateFromMinute(
+                        Math.round(
+                          forecast.after.startMinute +
+                            forecast.months[index] * MINUTES_PER_MONTH,
+                        ),
+                        snapshot.startingYear,
+                      );
+                      return [
+                        `${date.month} ${date.year - 1} → ${date.month} ${date.year}`,
+                        `${LABELS[0]}: ${watts(forecast.before.monthlyMarginW[index])}`,
+                        "",
+                        `${LABELS[1]}: ${watts(forecast.after.monthlyMarginW[index])}`,
+                      ].join("\n");
+                    }}
+                    data={[
+                      result.months,
+                      result.before.monthlyMarginW,
+                      result.after.monthlyMarginW,
+                    ]}
+                    seriesLabels={[
+                      `${LABELS[0]} (solid)`,
+                      `${LABELS[1]} (dashed)`,
+                    ]}
+                    formatSummaryValue={formatForecastWatts}
+                    buildOptions={({ scale }) => ({
+                      width: 0,
+                      height: 0,
+                      legend: { show: false },
+                      plugins: [zeroLinePlugin(chartPalette().tick)],
+                      scales: { x: { time: false, range: [0, 12] } },
+                      axes: [
+                        xAxis(scale, {
+                          splits: () => [0, 3, 6, 9, 12],
+                          values: (_u, ticks) =>
+                            ticks.map(
+                              (tick) =>
+                                getDateFromMinute(
+                                  result.after.startMinute +
+                                    tick * MINUTES_PER_MONTH,
+                                  snapshot.startingYear,
+                                ).month,
+                            ),
+                        }),
+                        yAxis(scale, {
+                          values: (_u, ticks) => ticks.map(formatForecastWatts),
+                        }),
+                      ],
+                      series: [
+                        {},
+                        {
+                          label: LABELS[0],
+                          stroke: chartPalette().demand,
+                          width: 2,
+                        },
+                        {
+                          label: LABELS[1],
+                          stroke: chartPalette().supply,
+                          width: 2,
+                          dash: [6, 4],
+                        },
+                      ],
+                    })}
+                  />
+                </>
+              ) : (
+                <Typography role="status" sx={{ py: 2 }}>
+                  {state.status === "error"
+                    ? "Couldn’t estimate this project. Reopen the review to retry."
+                    : "Estimating grid impact…"}
+                </Typography>
+              )}
+            </div>
+          )}
         </>
       }
     />
