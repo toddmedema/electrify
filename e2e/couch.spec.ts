@@ -1366,7 +1366,7 @@ test("TV couch coalesces visual preferences without capturing audio changes", as
       scale("1.25");
       click("Units", "Metric");
       click("Appearance", choices.finalThemeLabel);
-      scale("1.125");
+      scale("1.5");
       click("Units", "Imperial");
       const audio = dialog.querySelector<HTMLInputElement>(
         'input[aria-label="Sound"]',
@@ -1383,7 +1383,7 @@ test("TV couch coalesces visual preferences without capturing audio changes", as
     );
     await expect(seat.locator("html")).toHaveAttribute(
       "data-interface-scale",
-      "1.125",
+      "1.5",
     );
   }
   await expect.poll(couch.refreshRequests).toBeGreaterThan(beforeVisual);

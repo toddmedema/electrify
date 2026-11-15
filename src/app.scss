@@ -7076,6 +7076,22 @@ $programs_column: 800px;
   --chart-surface: var(--bg-raised);
 }
 
+// The refresh label shares the title's line without replacing any completed forecast content.
+.scenarioOutlookHeading {
+  display: flex;
+  align-items: center;
+  gap: $space-2;
+  white-space: nowrap;
+}
+
+.scenarioOutlookUpdating {
+  display: inline-flex;
+  align-items: center;
+  gap: $space-1;
+  color: $font_color_faded;
+  font-size: var(--font-size-caption);
+}
+
 .scenarioOutlookFigures {
   display: flex;
   flex-wrap: wrap;
@@ -7547,7 +7563,7 @@ img[src$="/transmission.svg"] {
   .scenarioOutlook > [aria-label="Scenario forecast"] {
     order: -1;
   }
-  .scenarioOutlook > h3 {
+  .scenarioOutlook > .scenarioOutlookHeading {
     order: -2;
   }
 }

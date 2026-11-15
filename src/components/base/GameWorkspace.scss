@@ -145,6 +145,32 @@
   }
 }
 
+// Floating navigation uses the same recessed capsule and inset pills as the speed controls.
+.gameWorkspace:not([data-workspace-layout="single"]) {
+  #navfooter.gameActionDock {
+    gap: 0;
+    border: 0;
+    border-radius: var(--radius-pill);
+    background: var(--speed-track);
+    box-shadow: inset 0 0 0 1px var(--border-tile);
+  }
+  .gameDockAction.MuiButton-root {
+    border: 0;
+    border-radius: var(--radius-pill);
+    color: var(--interactive-strong);
+    @media (hover: hover) and (pointer: fine) {
+      &:hover {
+        color: var(--interactive-strong);
+        background: var(--interactive-tint);
+      }
+    }
+    &.gameDockActionOpen {
+      color: var(--interactive-contrast);
+      background: var(--speed-thumb);
+    }
+  }
+}
+
 .gameToolTray {
   position: absolute;
   z-index: 5;

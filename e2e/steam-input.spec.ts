@@ -923,7 +923,6 @@ test("controller changes interface scale, keeps settings reachable and persists 
   });
   await select(page, scale);
   await input(page, "right");
-  await input(page, "right");
   await expect(scale).toBeFocused();
   await expect(scale).toHaveValue("1.25");
   await expect(page.locator("html")).toHaveCSS("font-size", "20px");

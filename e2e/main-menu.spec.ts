@@ -833,6 +833,16 @@ for (const theme of ["light", "dark"]) {
       expect(await foregroundContrast(surface), name).toBeGreaterThanOrEqual(
         4.5,
       );
+      // An immediate label can be visible before Popper's first position update.
+      await expect
+        .poll(async () => {
+          const [tip, button] = await Promise.all([
+            tooltip.boundingBox(),
+            action.boundingBox(),
+          ]);
+          return tip && button ? button.y - tip.y - tip.height : -1;
+        }, `${name} tooltip clears its icon`)
+        .toBeGreaterThanOrEqual(7);
       const bounds = (await tooltip.boundingBox())!;
       const icon = (await action.boundingBox())!;
       expect(bounds.x, name).toBeGreaterThanOrEqual(7);

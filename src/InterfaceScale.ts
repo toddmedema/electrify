@@ -1,7 +1,5 @@
 /** Common choices; migrated explicit preferences may retain any value in this range. */
-export const INTERFACE_SCALES = [
-  1, 1.125, 1.25, 1.5, 1.75, 2, 2.25, 2.5,
-] as const;
+export const INTERFACE_SCALES = [1, 1.25, 1.5, 1.75, 2, 2.5] as const;
 
 export function normalizeInterfaceScale(value: unknown): number {
   return typeof value === "number" &&
