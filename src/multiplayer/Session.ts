@@ -163,6 +163,7 @@ export class MultiplayerSession {
     { kind: "records" }
   >[] = [];
   private replicaLive = false;
+  private replicaStopped?: string;
   private lastReplicaResync = -Infinity;
   private stopEvents?: () => void;
   private pending?: CommandEnvelope;
@@ -273,6 +274,7 @@ export class MultiplayerSession {
         (!!this.state.view || !!this.state.synchronizing) &&
         !this.worker &&
         !this.closing &&
+        !this.replicaStopped &&
         Date.now() - this.lastHostMessage > HOST_SILENCE_MS;
       if (waitingForHost !== this.state.waitingForHost)
         this.update({ waitingForHost });
@@ -316,15 +318,16 @@ export class MultiplayerSession {
           if (!now.has(id)) this.post({ kind: "disconnect", sender: id });
         const joined = [...now].filter((id) => !this.connected.has(id));
         this.connected = now;
+        // Recovery refuses baselines for disconnected peers, so membership must arrive first.
+        if (this.hostReplication) this.sendMembership();
         // A reconnected client needs a fresh complete view, including paused command receipts.
         if (joined.length) {
-          if (this.hostReplication)
+          if (this.hostReplication) {
             for (const id of joined)
               if (id !== this.state.lobby.selfId)
                 this.post({ kind: "baseline", to: id });
-              else this.post({ kind: "checkpoint" });
+          } else this.post({ kind: "checkpoint" });
         }
-        if (this.hostReplication) this.sendMembership();
       }
     } else if (event.kind === "disconnected") {
       if (this.worker) this.post({ kind: "disconnect", sender: event.sender });
@@ -569,6 +572,7 @@ export class MultiplayerSession {
         view = { ...input, game: { ...game, customScenario: pinned } };
       }
     }
+    const terminalError = trustedWorker ? this.replicaStopped : undefined;
     const previous = this.state.view;
     if (
       previous &&
@@ -600,6 +604,15 @@ export class MultiplayerSession {
       this.completion = undefined;
       this.pending = undefined;
     }
+    if (terminalError) {
+      // The final projection can acknowledge work recorded before the fault. Everything else
+      // must settle without resending into a terminal stream.
+      this.completion?.reject(new Error(terminalError));
+      this.queued.forEach((queued) => queued.reject(new Error(terminalError)));
+      this.completion = undefined;
+      this.pending = undefined;
+      this.queued = [];
+    }
     const newReceipt =
       view.receipt && view.receipt.sequence > this.receiptSequence;
     if (newReceipt) this.receiptSequence = view.receipt!.sequence;
@@ -608,15 +621,19 @@ export class MultiplayerSession {
     else this.sequence = Math.max(this.sequence, view.lastSequence);
     this.update({
       view,
-      ...(trustedWorker && this.replicaLive ? { synchronizing: false } : {}),
+      ...(trustedWorker && (this.replicaLive || this.replicaStopped)
+        ? { synchronizing: false }
+        : {}),
       pendingCampaign: undefined,
       waitingForHost: false,
       busy: false,
       pending: !!this.pending,
       error:
-        newReceipt && (view.receipt?.error || acknowledged?.kind !== "activity")
+        terminalError ??
+        (newReceipt &&
+        (view.receipt?.error || acknowledged?.kind !== "activity")
           ? view.receipt?.error
-          : this.state.error,
+          : this.state.error),
     });
     this.flushActivity();
     this.flushQueued();
@@ -631,6 +648,7 @@ export class MultiplayerSession {
       !this.pending &&
       !this.closing &&
       !this.state.synchronizing &&
+      !this.replicaStopped &&
       this.queued.length
     ) {
       const queued = this.queued.shift()!;
@@ -660,6 +678,7 @@ export class MultiplayerSession {
     this.pendingScenarioBaseline = undefined;
     this.pendingScenarioRecords = [];
     this.replicaLive = false;
+    this.replicaStopped = undefined;
     this.replicaDisconnected = [];
   }
   private acceptBaseline(baseline: ReplicaBaseline) {
@@ -670,6 +689,7 @@ export class MultiplayerSession {
       mode.mode === "snapshot"
     )
       return;
+    const stopped = this.replicaStopped;
     if (!this.replicationStream(baseline)) this.stopReplica();
     this.streamMode = {
       matchId: baseline.matchId,
@@ -680,8 +700,12 @@ export class MultiplayerSession {
     this.pendingScenarioRecords = [];
     this.hostActivity();
     this.replicaLive = false;
+    this.replicaStopped = undefined;
     this.replicaProgress = undefined;
-    this.update({ synchronizing: true });
+    this.update({
+      synchronizing: true,
+      ...(stopped ? { error: undefined } : {}),
+    });
     const pinned =
       this.state.scenarioSnapshot ??
       (!this.state.browse?.mod ? this.receivedScenario?.scenario : undefined);
@@ -739,7 +763,11 @@ export class MultiplayerSession {
                 return;
               if (data.kind === "views") {
                 const view = data.views[this.state.lobby.selfId!];
-                if (view && this.replicaLive && this.replicationStream(view)) {
+                if (
+                  view &&
+                  (this.replicaLive || this.replicaStopped) &&
+                  this.replicationStream(view)
+                ) {
                   view.disconnected = [...this.replicaDisconnected];
                   this.acceptView(view, true);
                 }
@@ -754,10 +782,19 @@ export class MultiplayerSession {
                     ? { matchId, epoch, applied, verified }
                     : undefined;
                 this.replicaLive = data.state === "live";
+                if (data.state === "stopped")
+                  this.replicaStopped =
+                    data.error || "The shared simulation stopped";
                 this.update({
                   synchronizing:
-                    data.state !== "live" || !!this.state.synchronizing,
-                  ...(data.error ? { error: data.error } : {}),
+                    data.state === "stopped"
+                      ? false
+                      : data.state !== "live" || !!this.state.synchronizing,
+                  ...(this.replicaStopped
+                    ? { error: this.replicaStopped, waitingForHost: false }
+                    : data.error
+                      ? { error: data.error }
+                      : {}),
                 });
               } else {
                 this.replicaLive = false;
@@ -898,6 +935,7 @@ export class MultiplayerSession {
       (own.pauseReason ?? null) !== this.activity &&
       !this.pending &&
       !this.state.synchronizing &&
+      !this.replicaStopped &&
       !this.closing
     )
       this.sendCommand({ kind: "activity", reason: this.activity });
@@ -912,7 +950,7 @@ export class MultiplayerSession {
     );
   }
   private transmit() {
-    if (!this.pending) return;
+    if (!this.pending || this.replicaStopped) return;
     // A guest whose host link is down cannot deliver anything. The command stays pending and the
     // pump resends it once the link returns; the lost connection is already reported once, so
     // each retry must not raise another error.
@@ -958,6 +996,8 @@ export class MultiplayerSession {
         },
       };
     }
+    if (this.replicaStopped)
+      return Promise.reject(new Error(this.replicaStopped));
     if (this.state.synchronizing)
       return Promise.reject(new Error("Synchronizing with host…"));
     if (!this.state.view || this.closing)
@@ -976,7 +1016,13 @@ export class MultiplayerSession {
   }
   private sendCommand(command: Command) {
     const { view } = this.state;
-    if (!view || this.pending || this.closing || this.state.synchronizing)
+    if (
+      !view ||
+      this.pending ||
+      this.closing ||
+      this.state.synchronizing ||
+      this.replicaStopped
+    )
       return;
     if (command.kind === "ready" && view.disconnected.length) {
       const error = new Error("Wait for every player to reconnect");

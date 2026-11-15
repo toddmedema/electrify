@@ -3,6 +3,7 @@ import { TextEncoder } from "util";
 import { webcrypto } from "crypto";
 import { MultiplayerSession } from "./Session";
 import { ReplicaRuntime } from "./ReplicaRuntime";
+import { ReplicaRecovery } from "./ReplicaRecovery";
 import { ReplicatedWorld } from "./Replication";
 import type { ReplicaBaseline } from "./Replication";
 import type { ReplicaRequest, ReplicaResponse } from "./ReplicaProtocol";
@@ -24,15 +25,20 @@ afterEach(() => {
   jest.clearAllTimers();
   jest.useRealTimers();
 });
-function fixture(replication = true) {
+function fixture({ replication = true, recover = false } = {}) {
   const events = new Map<string, (event: NativeEvent) => void>();
   const requests: { sender: string; request: NativeRequest }[] = [];
   const posts: WorkerRequest[] = [];
   const replicaPosts: ReplicaRequest[] = [];
+  const replicaResponses: ReplicaResponse[] = [];
+  let holdViewCredit = false;
+  let heldViewCredit = false;
   const replicaFactory = jest.fn();
   let source!: ReplicatedWorld;
   let baseline!: ReplicaBaseline;
   let failRecords = false;
+  let holdCommands = false;
+  let recovery: ReplicaRecovery | undefined;
   const seats = [
     { id: "host", name: "Host" },
     { id: "guest", name: "Guest" },
@@ -55,6 +61,7 @@ function fixture(replication = true) {
         requests.push({ sender, request });
         if (request.kind === "state") return state(sender);
         if (request.kind === "send") {
+          if (holdCommands && request.payload.kind === "command") return;
           if (request.payload.kind === "records" && failRecords) {
             failRecords = false;
             throw new Error("Send failed");
@@ -85,14 +92,45 @@ function fixture(replication = true) {
           kind: "views",
           views: { host: roomView(source.world, "host") },
         });
-        if (request.replication) sendBaseline();
-        else
+        if (request.replication) {
+          if (recover)
+            recovery = new ReplicaRecovery(source, "host", {
+              flush: sendRecords,
+              send: (to, value) => {
+                baseline = value;
+                respond({ kind: "baseline", to, baseline });
+              },
+              changed: () => {
+                sendRecords();
+                respond({
+                  kind: "views",
+                  views: { host: roomView(source.world, "host") },
+                });
+              },
+              error: (error) => {
+                throw error;
+              },
+              digest: (bytes) => webcrypto.subtle.digest("SHA-256", bytes),
+            });
+          sendBaseline();
+        } else
           respond({
             kind: "views",
             views: { guest: roomView(source.world, "guest") },
           });
       } else if (request.kind === "baseline") sendBaseline();
-      else if (request.kind === "command") {
+      else if (request.kind === "replica-peers")
+        recovery?.connected(request.connected);
+      else if (request.kind === "progress") recovery?.progress(request);
+      else if (request.kind === "checkpoint") {
+        respond({
+          kind: "views",
+          views: {
+            host: roomView(source.world, "host"),
+            ...(!replication && { guest: roomView(source.world, "guest") }),
+          },
+        });
+      } else if (request.kind === "command") {
         const result = source.command(
           request.sender,
           request.envelope,
@@ -130,6 +168,10 @@ function fixture(replication = true) {
       });
   };
   const sendBaseline = () => {
+    if (recovery) {
+      recovery.baseline("guest");
+      return;
+    }
     sendRecords();
     baseline = source.baseline();
     respond({ kind: "baseline", to: "guest", baseline });
@@ -140,14 +182,20 @@ function fixture(replication = true) {
     terminate: jest.fn(),
     postMessage(request: ReplicaRequest) {
       replicaPosts.push(request);
+      if (holdViewCredit && request.kind === "views-applied") {
+        heldViewCredit = true;
+        return;
+      }
       void runtime.receive(request);
     },
   };
   const runtime = new ReplicaRuntime(
-    (data) =>
+    (data) => {
+      replicaResponses.push(data);
       void Promise.resolve().then(() =>
         replicaWorker.onmessage?.({ data } as MessageEvent<ReplicaResponse>),
-      ),
+      );
+    },
     async () => {},
     undefined,
     (bytes) => webcrypto.subtle.digest("SHA-256", bytes),
@@ -159,11 +207,9 @@ function fixture(replication = true) {
     undefined,
     () => replication,
   );
-  const guest = new MultiplayerSession(
-    bridge("guest"),
-    jest.fn(),
-    replicaFactory,
-  );
+  const createGuest = () =>
+    new MultiplayerSession(bridge("guest"), jest.fn(), replicaFactory);
+  let guest = createGuest();
   const start = async () => {
     await host.initialize();
     await guest.initialize();
@@ -172,10 +218,23 @@ function fixture(replication = true) {
   };
   return {
     host,
-    guest,
+    get guest() {
+      return guest;
+    },
     start,
     posts,
     replicaPosts,
+    replicaResponses,
+    holdViewCredit: () => {
+      holdViewCredit = true;
+    },
+    releaseViewCredit: async () => {
+      holdViewCredit = false;
+      if (heldViewCredit) {
+        heldViewCredit = false;
+        await runtime.receive({ kind: "views-applied" });
+      }
+    },
     requests,
     replicaFactory,
     replicaWorker,
@@ -183,6 +242,19 @@ function fixture(replication = true) {
     baseline: () => baseline,
     state,
     respond,
+    holdCommands: () => {
+      holdCommands = true;
+    },
+    reloadGuest: async () => {
+      guest.dispose();
+      guest = createGuest();
+      await guest.initialize();
+    },
+    fault: (message: string) => {
+      source.pause(message);
+      source.fault(message);
+      sendRecords();
+    },
     event: (id: string, event: NativeEvent) => events.get(id)?.(event),
     failRecordSend: () => {
       failRecords = true;
@@ -263,7 +335,7 @@ test("the first received view or baseline selects one mode for its epoch, and le
   } finally {
     f.dispose();
   }
-  const snapshot = fixture(false);
+  const snapshot = fixture({ replication: false });
   try {
     await snapshot.start();
     const initial = snapshot.guest.getSnapshot().view!;
@@ -357,6 +429,177 @@ test("a pre-consumption rejection resets the pending sequence and a failed recor
     expect(
       f.posts.filter((request) => request.kind === "baseline").length,
     ).toBeGreaterThan(0);
+  } finally {
+    f.dispose();
+  }
+});
+
+test("a paused snapshot reconnect receives the current company and command receipt", async () => {
+  const f = fixture({ replication: false });
+  try {
+    await f.start();
+    const initial = f.guest.getSnapshot().view!;
+    f.event("host", {
+      kind: "state",
+      state: { ...f.state("host"), connected: [] },
+    });
+    expect(
+      f.source().command("guest", {
+        matchId: initial.matchId,
+        epoch: initial.epoch,
+        sequence: 1,
+        command: { kind: "rate", value: 0.11 },
+      }).recorded,
+    ).toBe(true);
+    f.event("host", { kind: "state", state: f.state("host") });
+    await flush();
+    expect(f.guest.getSnapshot().view).toMatchObject({
+      speed: "PAUSED",
+      lastSequence: 1,
+      receipt: { sequence: 1 },
+      game: { dollarsPerkWh: 0.11 },
+    });
+  } finally {
+    f.dispose();
+  }
+});
+
+test("a reloaded replica reconnect receives a baseline after real recovery membership is restored", async () => {
+  const f = fixture({ recover: true });
+  try {
+    await f.start();
+    expect(f.guest.getSnapshot().view).toBeDefined();
+    f.event("host", {
+      kind: "state",
+      state: { ...f.state("host"), connected: [] },
+    });
+    await flush();
+    await f.reloadGuest();
+    expect(f.guest.getSnapshot().view).toBeUndefined();
+    f.event("host", { kind: "state", state: f.state("host") });
+    await flush();
+    expect(f.guest.getSnapshot()).toMatchObject({
+      synchronizing: false,
+      view: { matchId: f.source().world.matchId, speed: "PAUSED" },
+    });
+    expect(f.replicaFactory).toHaveBeenCalledTimes(2);
+  } finally {
+    f.dispose();
+  }
+});
+
+test.each([true, false])(
+  "a terminal replica publishes its stopped clock, settles consumed=%s work, and rejects further commands",
+  async (consumed) => {
+    const f = fixture();
+    try {
+      await f.start();
+      const hostReady = f.host.submit({ kind: "ready" });
+      const guestReady = f.guest.submit({ kind: "ready" });
+      await flush();
+      jest.advanceTimersByTime(100);
+      await flush();
+      await Promise.all([hostReady, guestReady]);
+      expect(f.guest.getSnapshot().view).toMatchObject({
+        speed: "NORMAL",
+        readyRequired: false,
+      });
+      if (!consumed) f.holdCommands();
+      const pending = f.guest
+        .submit({ kind: "rate", value: 0.12 })
+        .catch((error: Error) => error);
+      const queued = f.guest
+        .submit({ kind: "rate", value: 0.13 })
+        .catch((error: Error) => error);
+      await flush();
+      expect(f.guest.getSnapshot().pending).toBe(true);
+      f.fault("Simulation stopped");
+      await flush();
+      jest.advanceTimersByTime(100);
+      await flush();
+      expect(f.guest.getSnapshot()).toMatchObject({
+        synchronizing: false,
+        waitingForHost: false,
+        pending: false,
+        error: "Simulation stopped",
+        view: {
+          speed: "PAUSED",
+          readyRequired: true,
+          ready: [],
+          reason: "Simulation stopped",
+        },
+      });
+      expect(await pending).toEqual(
+        consumed ? undefined : new Error("Simulation stopped"),
+      );
+      expect(await queued).toEqual(new Error("Simulation stopped"));
+      const commands = () =>
+        f.requests.filter(
+          ({ request }) =>
+            request.kind === "send" && request.payload.kind === "command",
+        ).length;
+      const sent = commands();
+      await expect(f.guest.submit({ kind: "ready" })).rejects.toThrow(
+        "Simulation stopped",
+      );
+      f.guest.setActivity("menu");
+      jest.advanceTimersByTime(11000);
+      await flush();
+      expect(commands()).toBe(sent);
+      expect(f.guest.getSnapshot()).toMatchObject({
+        synchronizing: false,
+        waitingForHost: false,
+      });
+    } finally {
+      f.dispose();
+    }
+  },
+);
+
+test("a terminal projection waits for the previous view credit and a new match clears the terminal state", async () => {
+  const f = fixture();
+  try {
+    await f.start();
+    f.holdViewCredit();
+    const ready = f.guest.submit({ kind: "ready" });
+    await flush();
+    jest.advanceTimersByTime(100);
+    await flush();
+    await ready;
+    expect(f.guest.getSnapshot().view!.ready).toEqual(["guest"]);
+    const projections = () =>
+      f.replicaResponses.filter((response) => response.kind === "views").length;
+    const sent = projections();
+    f.fault("Simulation stopped");
+    await flush();
+    jest.advanceTimersByTime(100);
+    await flush();
+    expect(projections()).toBe(sent);
+    expect(f.guest.getSnapshot()).toMatchObject({
+      synchronizing: false,
+      error: "Simulation stopped",
+    });
+    await f.releaseViewCredit();
+    await flush();
+    expect(projections()).toBe(sent + 1);
+    expect(f.guest.getSnapshot().view).toMatchObject({
+      ready: [],
+      speed: "PAUSED",
+      reason: "Simulation stopped",
+    });
+    await f.host.start({ spec: COOP_TEST_SPEC });
+    await flush();
+    expect(f.guest.getSnapshot().error).toBeUndefined();
+    expect(f.guest.getSnapshot().synchronizing).toBe(false);
+    const accepted = f.guest.submit({ kind: "rate", value: 0.1 });
+    await flush();
+    jest.advanceTimersByTime(100);
+    await flush();
+    await accepted;
+    expect(f.guest.getSnapshot().view).toMatchObject({
+      lastSequence: 1,
+      game: { dollarsPerkWh: 0.1 },
+    });
   } finally {
     f.dispose();
   }
