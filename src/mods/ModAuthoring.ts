@@ -1,3 +1,8 @@
+import {
+  CurrencyType,
+  USD_CURRENCY,
+  currencyForLocation,
+} from "../helpers/Currency";
 import { DIFFICULTY_IDS, MONTHS, difficultyLabel } from "../Constants";
 import { formatNumber, formatWatts } from "../helpers/Format";
 import { getScenario } from "../data/Scenarios";
@@ -67,7 +72,8 @@ export interface ModAuthorReport extends ModRuleFacts {
   inheritedObjectives: RuleObjective[];
 }
 const number = (value: number) => formatNumber(value);
-const money = (value: number) => `$${number(value)}`;
+const money = (value: number, currency: CurrencyType = USD_CURRENCY) =>
+  `${currency.symbol}${number(value * currency.unitsPerDollar)}`;
 const range = (min: number, max: number) =>
   min === max ? number(min) : `${number(min)}–${number(max)}`;
 const sortedEvents = (rules: CompiledScenarioRules) =>
@@ -157,16 +163,20 @@ function reportText(report: RuleReport, year: number, author: boolean): string {
   const wording = PLAYER_REPORTS[report.kind];
   return `${report.label ?? wording.label}${author ? ` (${report.kind})` : ""}${"fromMonth" in report ? ` · ${window(report.fromMonth, report.throughMonth, year)}` : ""} · ${wording.definition}${author && "eventId" in report ? ` Event: ${report.eventId}.` : ""}`;
 }
-function eventEffects(event: CompiledRuleEvent, author = false): string[] {
+function eventEffects(
+  event: CompiledRuleEvent,
+  author = false,
+  currency: CurrencyType = USD_CURRENCY,
+): string[] {
   return [
-    ...scenarioEffectsSummary(event.effects, true),
+    ...scenarioEffectsSummary(event.effects, true, currency),
     ...(author ? [] : event.targets).map(
       (target) =>
         `${modSelectorDescription(target.target)} Output multiplier ×${number(target.outputMultiplier)}.`,
     ),
     ...event.transactions.map(
       (transaction) =>
-        `One-time ${transaction.kind}: ${money(transaction.amount)} per company.`,
+        `One-time ${transaction.kind}: ${money(transaction.amount, currency)} per company.`,
     ),
   ];
 }
@@ -344,6 +354,10 @@ function facts(
     throw new Error("Only a validated mod snapshot can describe its rules.");
   const rules = mod.rules;
   const location = getScenarioLocation(scenario);
+  const currency = author
+    ? USD_CURRENCY
+    : currencyForLocation(location, scenario.startingYear);
+  const displayMoney = (value: number) => money(value, currency);
   const mode = mod.source.objectiveMode;
   // A guest uses the host's validated snapshot without loading simulation data or forecasting.
   const peak = rules.startingPeakW > 0 ? rules.startingPeakW : undefined;
@@ -383,7 +397,7 @@ function facts(
         },
         {
           label: "Starting cash and billed rate",
-          value: `${money(scenario.cash)} · ${money(scenario.dollarsPerkWh)}/kWh`,
+          value: `${displayMoney(scenario.cash)} · ${displayMoney(scenario.dollarsPerkWh)}/kWh`,
         },
         { label: "Eligibility", value: "Modded · Unranked · No achievements" },
       ],
@@ -406,7 +420,7 @@ function facts(
       },
       ...scenarioObjectiveDefinitions(scenario).map((objective) => ({
         label: objective.label,
-        value: `${objective.required === false ? "Optional" : "Required"}${objective.inherited ? " · Inherited" : ""} · ${objectiveTargetText(objective)}`,
+        value: `${objective.required === false ? "Optional" : "Required"}${objective.inherited ? " · Inherited" : ""} · ${objectiveTargetText(objective, currency)}`,
         details: [
           objectiveDefinition(objective.metric),
           objectiveWindowText(
@@ -461,7 +475,7 @@ function facts(
       })),
       {
         label: "Initial carbon fee",
-        value: `${money(scenario.feePerKgCO2e * 1000)}/tonne CO₂e`,
+        value: `${displayMoney(scenario.feePerKgCO2e * 1000)}/tonne CO₂e`,
       },
     ],
   });
@@ -495,7 +509,7 @@ function facts(
           ...(conditionText(rules, event.requiresChoice)
             ? [conditionText(rules, event.requiresChoice)!]
             : []),
-          ...eventEffects(event, author),
+          ...eventEffects(event, author, currency),
           ...(author ? [] : rules.loads)
             .filter((load) => load.eventId === event.id)
             .map(
@@ -556,8 +570,10 @@ function facts(
             (option) =>
               `${option.label}${author ? ` [${option.id}]` : ""}: ${author ? "" : `${option.description} `}${
                 [
-                  ...(option.cost ? [`Pay ${money(option.cost)}`] : []),
-                  ...(option.grant ? [`Receive ${money(option.grant)}`] : []),
+                  ...(option.cost ? [`Pay ${displayMoney(option.cost)}`] : []),
+                  ...(option.grant
+                    ? [`Receive ${displayMoney(option.grant)}`]
+                    : []),
                 ].join("; ") || "No payment"
               } per company.${option.replaceLoad ? ` Replaces ${option.replaceLoad.arc === undefined ? "" : `arc ${option.replaceLoad.arc} / `}${option.replaceLoad.loadId} with ${option.replaceLoad.with.map((load) => `${number(load.peakW / 1e6)} MW from month ${load.startMonth + 1}`).join(", ")}.` : ""}`,
           ),
@@ -655,7 +671,7 @@ function facts(
         .filter((event) => event.effects.carbonFeePerKgCO2e !== undefined)
         .map((event) => ({
           label: event.id,
-          value: `${window(event.possibleStartMonths.from, Math.min(rules.durationMonths - 1, event.possibleStartMonths.to + event.durationMonths - 1), rules.startingYear)} · ${money(event.effects.carbonFeePerKgCO2e! * 1000)}/tonne CO₂e`,
+          value: `${window(event.possibleStartMonths.from, Math.min(rules.durationMonths - 1, event.possibleStartMonths.to + event.durationMonths - 1), rules.startingYear)} · ${displayMoney(event.effects.carbonFeePerKgCO2e! * 1000)}/tonne CO₂e`,
           details: [
             "Absolute override while active; it does not add to the initial fee.",
             ...(conditionText(rules, event.requiresChoice)

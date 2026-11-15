@@ -1,3 +1,5 @@
+import { currencyForLocation } from "../../helpers/Currency";
+import { getScenarioLocation } from "../../helpers/Locations";
 import * as React from "react";
 import { DifficultyType, ScenarioType } from "../../Types";
 import { Box, Typography } from "@mui/material";
@@ -22,10 +24,15 @@ export default function VictoryConditions({
 }: Props): React.JSX.Element {
   const objectives = scenarioObjectiveDefinitions(scenario);
   const units = useUnits();
+  const currency = currencyForLocation(
+    getScenarioLocation(scenario),
+    scenario.startingYear,
+  );
   const rules = scoreRuleText(
     scenario.ownership,
     scenario.dollarsPerkWh,
     formatLargeMassApprox(KG_PER_MEGATONNE, units),
+    currency,
   );
   const requirementsId = React.useId();
   const optionalId = React.useId();
@@ -39,6 +46,7 @@ export default function VictoryConditions({
         scenario.startingYear,
         scenario.durationMonths,
         (scenario.startingMonth ?? 1) - 1,
+        currency,
       ).map((objective) => (
         <li key={objective.id}>
           <Typography component="p" variant="body2" sx={{ fontWeight: 600 }}>

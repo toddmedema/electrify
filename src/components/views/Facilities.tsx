@@ -5,6 +5,7 @@ import {
 } from "../../helpers/Territories";
 import { territoryName } from "../base/TerritoryBuildDestination";
 import type { TerritoryId } from "../../Types";
+import { useMoney } from "../base/CurrencyContext";
 import {
   getInterfaceScale,
   subscribeInterfaceScale,
@@ -65,7 +66,6 @@ import {
 } from "../../helpers/Financials";
 import { storyOutputMultiplier } from "../../helpers/Story";
 import {
-  formatMoneyConcise,
   formatWattHoursOfPeak,
   formatWatts,
   formatWattsOfPeak,
@@ -363,6 +363,7 @@ const MemoizedFacilityActions = React.memo(
 );
 
 function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
+  const { formatMoneyConcise } = useMoney();
   const [open, setOpen] = React.useState(false);
   const toggleDialog = React.useCallback(() => {
     setOpen((value) => !value);

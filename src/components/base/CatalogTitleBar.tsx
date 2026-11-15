@@ -1,9 +1,9 @@
+import { useMoney } from "./CurrencyContext";
 import * as React from "react";
 import { IconButton, Toolbar, Typography } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import { useAppDispatch, useAppSelector } from "../../Store";
 import { setSpeed } from "../../reducers/Game";
-import { formatMoneyStable } from "../../helpers/Format";
 import { isDesktopScreen } from "../../Globals";
 import { buildSpeedOptions, sharedClockSpeedProps } from "./SpeedControls";
 
@@ -36,6 +36,7 @@ export default function CatalogTitleBar(
   props: CatalogTitleBarProps,
 ): React.JSX.Element {
   const dispatch = useAppDispatch();
+  const { formatMoneyStable } = useMoney();
   const inGame = useAppSelector((state) => state.game.inGame);
   const speed = useAppSelector((state) => state.game.speed);
   const multiplayer = useAppSelector((state) => state.game.multiplayer);

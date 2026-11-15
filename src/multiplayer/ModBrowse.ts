@@ -1,3 +1,5 @@
+import { currencyForLocation } from "../helpers/Currency";
+import { getScenarioLocation } from "../helpers/Locations";
 import type { DifficultyType, ScenarioType } from "../Types";
 import { scenarioObjectiveDefinitions } from "../helpers/ObjectiveRules";
 import { objectiveDefinition } from "../helpers/ScenarioObjectives";
@@ -53,7 +55,13 @@ export function modBrowseSummary(scenario: ScenarioType): ModBrowseSummary {
       id: objective.id,
       label: objective.label,
       definition: objectiveDefinition(objective.metric),
-      target: objectiveTargetText(objective),
+      target: objectiveTargetText(
+        objective,
+        currencyForLocation(
+          getScenarioLocation(scenario),
+          scenario.startingYear,
+        ),
+      ),
       window: objectiveWindowText(
         objective,
         scenario.startingYear,

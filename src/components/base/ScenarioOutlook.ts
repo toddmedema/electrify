@@ -1,3 +1,5 @@
+import { currencyForLocation } from "../../helpers/Currency";
+import { formatMoneyConcise } from "../../helpers/Format";
 import { MONTHS } from "../../Constants";
 import { GameType, ScenarioType } from "../../Types";
 import { MissionProjection } from "../../helpers/MissionProjection";
@@ -50,6 +52,7 @@ export function scenarioLossSummary(
   firstMonth?: number;
 } {
   if (!outlook) return { text: "Updating forecast…", failures: [] };
+  const currency = currencyForLocation(game.location, game.startingYear);
   const risks = outlook.requirements
     .filter(
       (row) =>
@@ -72,12 +75,19 @@ export function scenarioLossSummary(
   const descriptions = risks.map((risk) => {
     let phrase: string;
     const result = objectives.get(risk.id);
-    if (risk.id === "cash") phrase = "Cash below $0";
+    if (risk.id === "cash")
+      phrase = `Cash below ${formatMoneyConcise(0, currency)}`;
     else if (risk.id === "survival")
       phrase = `Under ${formatRequiredShare(reliabilityThreshold(game.difficulty))} of demand served for 3 months`;
     else if (result) {
       const objective = result.objective;
-      const target = objectiveValueText(objective, result.target);
+      const target = objectiveValueText(
+        objective,
+        result.target,
+        undefined,
+        3,
+        currency,
+      );
       switch (objective.metric) {
         case "customerRetention":
           phrase = `Under ${target} of customers kept`;

@@ -6,6 +6,11 @@ import {
   selectActiveEventGroups,
   selectUpcomingStoryEvents,
 } from "./StoryEventSelectors";
+import {
+  acceptAgreement,
+  powerAgreementQuote,
+} from "../../helpers/PowerAgreements";
+import type { GameType, UtilityTargetId } from "../../Types";
 import { modScenario } from "../../mods/ModScenario";
 import type { ModPackage } from "../../mods/ModSchema";
 
@@ -235,4 +240,126 @@ test("custom story forecasts appear without scheduled load additions", () => {
   expect(
     selectUpcomingStoryEvents({ game: without } as unknown as AppStateType),
   ).toEqual([]);
+});
+
+function withUtility(game: GameType, targetId: UtilityTargetId): GameType {
+  return {
+    ...game,
+    utilityExpansion: {
+      ...game.utilityExpansion!,
+      acquisitions: [
+        ...game.utilityExpansion!.acquisitions,
+        {
+          targetId,
+          minute: game.date.minute,
+          financed: false,
+          transferredCustomers: 0,
+        },
+      ],
+    },
+  };
+}
+
+test("announces inherited contract and network changes and refreshes after either acquisition", () => {
+  const game = createGame({ scenarioId: 116, seed: 12345 });
+  const before = JSON.stringify(game);
+  const events = (value: GameType) =>
+    selectUpcomingStoryEvents({ game: value } as AppStateType);
+  const opening = events(game);
+  expect(events(game)).toBe(opening);
+  expect(opening).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        label: "Expected Jan 2015",
+        message: expect.stringContaining("1.5× opening upkeep"),
+      }),
+      expect.objectContaining({
+        label: "Expected Jan 2020",
+        message: expect.stringContaining("2× opening upkeep"),
+      }),
+      expect.objectContaining({
+        label: "Expected Jan 2020",
+        title: "Champlain Electric power purchases change",
+        message: expect.stringContaining("Regional nuclear will end"),
+      }),
+    ]),
+  );
+  expect(
+    opening.some((event) => event.title?.includes("Valley Electric")),
+  ).toBe(false);
+  for (const [id, year, supply] of [
+    ["valley-electric", 2017, "76MW"],
+    ["ridge-electric", 2020, "19MW"],
+  ] as const) {
+    const acquired = withUtility(game, id);
+    expect(events(acquired)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          label: `Expected Jan ${year}`,
+          message: expect.stringContaining(supply),
+        }),
+      ]),
+    );
+    const after = {
+      ...acquired,
+      date: getDateFromMinute(180 * MINUTES_PER_MONTH, 2005),
+    };
+    expect(
+      events(after).some((event) => event.key.startsWith("utility:")),
+    ).toBe(false);
+    expect(events(game)).toEqual(opening);
+  }
+  expect(JSON.stringify(game)).toBe(before);
+});
+
+test("refreshes replacement start and expiry announcements when an agreement is signed", () => {
+  const game = createGame({ scenarioId: 116, seed: 12345 });
+  game.date = getDateFromMinute(156 * MINUTES_PER_MONTH, 2005);
+  const upcoming = (value: GameType) =>
+    selectUpcomingStoryEvents({ game: value } as AppStateType);
+  const before = upcoming(game);
+  const signed = { ...game, transmission: { ...game.transmission! } };
+  const quote = powerAgreementQuote(signed, "champlain-nuclear", 3, 2)!;
+  expect(
+    acceptAgreement(signed, {
+      blockId: quote.id,
+      quoteKey: quote.quoteKey,
+      durationYears: 2,
+    }),
+  ).toBe(true);
+  expect(
+    upcoming(signed).filter((event) =>
+      event.key.startsWith("utility:agreement:"),
+    ),
+  ).toEqual([
+    expect.objectContaining({
+      label: "Expected Jan 2020",
+      title: expect.stringContaining("Regional firm begins"),
+      message: expect.stringContaining("95MW"),
+    }),
+    expect.objectContaining({
+      label: "Expected Jan 2022",
+      title: expect.stringContaining("Regional firm ends"),
+      message: expect.stringContaining("95MW"),
+    }),
+  ]);
+  const started = {
+    ...signed,
+    date: getDateFromMinute(180 * MINUTES_PER_MONTH, 2005),
+  };
+  expect(
+    upcoming(started).filter((event) =>
+      event.key.startsWith("utility:agreement:"),
+    ),
+  ).toHaveLength(1);
+  const expired = {
+    ...signed,
+    date: getDateFromMinute(204 * MINUTES_PER_MONTH, 2005),
+  };
+  expect(
+    upcoming(expired).filter((event) =>
+      event.key.startsWith("utility:agreement:"),
+    ),
+  ).toEqual([]);
+  expect(upcoming(game)).toEqual(before);
 });

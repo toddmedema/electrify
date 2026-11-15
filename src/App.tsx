@@ -19,6 +19,7 @@ import {
 import type { User } from "firebase/auth";
 import CompositorContainer from "./components/CompositorContainer";
 import UnitsProvider from "./components/base/UnitsContext";
+import CurrencyProvider from "./components/base/CurrencyContext";
 import { navigate, navigateBack } from "./reducers/Card";
 import { pageHidden, pageVisible, systemSuspend } from "./reducers/GameActions";
 import { pauseAudio, resumeAudio } from "./reducers/Settings";
@@ -603,30 +604,32 @@ export default function App() {
           <div className="appFrame">
             <OfflineNotice />
             <UnitsProvider>
-              <div className="appFrameBody">
-                <CompositorContainer store={store} />
-              </div>
-              {CouchSettingsPrompt && isDesktopApp() && (
+              <CurrencyProvider>
+                <div className="appFrameBody">
+                  <CompositorContainer store={store} />
+                </div>
+                {CouchSettingsPrompt && isDesktopApp() && (
+                  <Suspense fallback={null}>
+                    <CouchSettingsPrompt />
+                  </Suspense>
+                )}
+                {DesktopInputHints && isDesktopApp() && (
+                  <Suspense fallback={null}>
+                    <DesktopInputHints />
+                  </Suspense>
+                )}
+                <ScenarioChoiceDialog />
+                <CloudSavePrompt />
+                <SharedGameDialog />
+                {MultiplayerRoot && isDesktopApp() && (
+                  <Suspense fallback={null}>
+                    <MultiplayerRoot />
+                  </Suspense>
+                )}
                 <Suspense fallback={null}>
-                  <CouchSettingsPrompt />
+                  <AchievementNotifications />
                 </Suspense>
-              )}
-              {DesktopInputHints && isDesktopApp() && (
-                <Suspense fallback={null}>
-                  <DesktopInputHints />
-                </Suspense>
-              )}
-              <ScenarioChoiceDialog />
-              <CloudSavePrompt />
-              <SharedGameDialog />
-              {MultiplayerRoot && isDesktopApp() && (
-                <Suspense fallback={null}>
-                  <MultiplayerRoot />
-                </Suspense>
-              )}
-              <Suspense fallback={null}>
-                <AchievementNotifications />
-              </Suspense>
+              </CurrencyProvider>
             </UnitsProvider>
           </div>
         </InstallPromptProvider>

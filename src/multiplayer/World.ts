@@ -1,3 +1,5 @@
+import { currencyForLocation } from "../helpers/Currency";
+import { formatMoneyFull } from "../helpers/Format";
 import { isUtilityExpansionGame } from "../helpers/ExpansionContext";
 import {
   MULTIPLAYER_LINK_BUDGET_FRACTION,
@@ -505,7 +507,7 @@ function applyCommandOnce(
       command.value < 0 ||
       command.value > max
     )
-      return `Choose a rate between $0.00 and ${max.toFixed(2)}/kWh`;
+      return `Choose a rate between ${formatMoneyFull(0, currencyForLocation(game.location, game.startingYear))} and ${formatMoneyFull(max, currencyForLocation(game.location, game.startingYear))}/kWh`;
     world.grids[index] = commandResult(
       game,
       reducer(game, delta({ dollarsPerkWh: command.value })),

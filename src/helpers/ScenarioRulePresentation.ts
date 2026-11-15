@@ -1,3 +1,4 @@
+import { currencyForLocation } from "./Currency";
 import { formatPercent } from "./Format";
 import type {
   CompiledRuleEvent,
@@ -266,7 +267,11 @@ export function presentOfficialRuleOccurrence(
     effects,
   };
   if (context?.scenarioId === 999) {
-    const changes = scenarioEffectsSummary(occurrence.effects);
+    const changes = scenarioEffectsSummary(
+      occurrence.effects,
+      false,
+      currencyForLocation(context.location, rules.startingYear),
+    );
     if (!preview)
       occurrence.message = `${context.location.name}: ${changes.length ? changes.join("; ") + "." : "Review your supply and reserves before the upcoming scenario event."}`;
     occurrence.actionTarget = { card: "FACILITIES", view: "FLEET" };

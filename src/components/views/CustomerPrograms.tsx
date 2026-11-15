@@ -1,3 +1,4 @@
+import { useMoney } from "../base/CurrencyContext";
 import {
   activeScenario,
   currentCash,
@@ -66,7 +67,6 @@ import {
 } from "../../helpers/Policies";
 import {
   formatForecastPercent as formatPercent,
-  formatMoneyConcise,
   formatForecastWatts as formatWatts,
   formatForecastWattHours as formatWattHours,
 } from "../../helpers/Format";
@@ -184,6 +184,7 @@ function FlexibilitySummary({
   program: PolicyProgramType;
   month: number;
 }) {
+  const { formatMoneyConcise } = useMoney();
   const year = game.startingYear + Math.floor(month / 12);
   const available = flexibilityAvailable(game, id, month);
   const fullRollout: GameType = {
@@ -275,6 +276,7 @@ function BuildoutSummary({
   effective: number;
   end: number;
 }) {
+  const { formatMoneyConcise } = useMoney();
   const snapshot = useEstimateSnapshot(game);
   const solar = React.useMemo(() => {
     const now = currentTick(snapshot);
@@ -310,7 +312,7 @@ function BuildoutSummary({
       label: `Facility comparable (${formatWatts(peakW)}/${energy(annualWh)})`,
       cost: `${formatMoneyConcise(facility.buildCost)} upfront + ${formatMoneyConcise(facility.annualOperatingCost / 12)}/mo`,
     };
-  }, [snapshot, id]);
+  }, [snapshot, id, formatMoneyConcise]);
   const impact = solar?.impact ?? buildoutImpact(game, id);
   const months = buildoutMonths(id);
   const complete = buildoutComplete(program.adoption);

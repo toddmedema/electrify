@@ -642,18 +642,28 @@ for (const theme of ["light", "dark"] as const) {
       await expect(goals).toContainText(
         "Acquired original oil plants by Dec 2023",
       );
-      const plan = scenario.getByRole("region", {
-        name: "Supply plan",
-        exact: true,
-      });
-      await expect(plan).not.toContainText(
-        /Budget for|Build-time example|Gas example|Lower rates|before selling|order by/i,
-      );
-      await expect(plan).toContainText("Valley Oil: retirement due Dec 2023");
-      if (index === 1)
-        await expect(plan).toContainText("Ridge Oil: retirement due Dec 2023");
+      await expect(
+        scenario.getByRole("region", { name: "Supply plan", exact: true }),
+      ).toHaveCount(0);
       await scenario
         .getByRole("button", { name: "Close Scenario", exact: true })
+        .click();
+      const events = page.locator(".eventLog:visible");
+      await openPane(
+        events,
+        page.getByRole("button", { name: "Events", exact: true }),
+      );
+      await expect(events).toContainText("1.5× opening upkeep");
+      await expect(events).toContainText("2× opening upkeep");
+      await expect(events).toContainText(
+        "Regional nuclear will fall to 76MW deliverable",
+      );
+      if (index === 1)
+        await expect(events).toContainText(
+          "Regional firm purchase will fall to 19MW deliverable",
+        );
+      await page
+        .getByRole("button", { name: "Close Events", exact: true })
         .click();
       await openPane(
         facilities,

@@ -1,3 +1,5 @@
+import { currencyForLocation } from "../../helpers/Currency";
+import { useMoney } from "./CurrencyContext";
 import * as React from "react";
 import { Box, Button, Typography } from "@mui/material";
 import type { GameType } from "../../Types";
@@ -6,7 +8,6 @@ import { activeScenario } from "../../helpers/GameSelectors";
 import { scenarioObjectiveDefinitions } from "../../helpers/ObjectiveRules";
 import { objectiveGoalGroups } from "../../helpers/ObjectivePresentation";
 import {
-  formatMoneyConcise,
   formatCount,
   formatWatts,
   formatWattHours,
@@ -32,6 +33,9 @@ export default function UtilityOfferDialog({
   targetId: string;
   onClose: () => void;
 }) {
+  const { currency, formatMoneyConcise: money } = useMoney(
+    currencyForLocation(game.location, game.startingYear),
+  );
   const dispatch = useAppDispatch();
   React.useEffect(() => {
     const token = `company-terms:${targetId}`;
@@ -56,7 +60,6 @@ export default function UtilityOfferDialog({
         </Typography>
       </DecisionDialog>
     );
-  const money = formatMoneyConcise;
   const scenario = activeScenario(game);
   const seller = UTILITY_AREAS[offer.targetId];
   const nuclear = offer.contracts.find(
@@ -186,6 +189,8 @@ export default function UtilityOfferDialog({
             scenarioObjectiveDefinitions(scenario, game),
             game.startingYear,
             scenario?.durationMonths ?? 240,
+            (scenario?.startingMonth ?? 1) - 1,
+            currency,
           ).map((objective) => (
             <Box key={objective.id} sx={{ mt: 1 }}>
               {objective.goals.length > 1 && (

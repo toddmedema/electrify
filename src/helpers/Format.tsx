@@ -1,3 +1,4 @@
+import { CurrencyType, USD_CURRENCY } from "./Currency";
 import { pow } from "./Pow";
 import { log10 } from "./Libm";
 
@@ -129,8 +130,20 @@ export function formatFixed(value: number, digits: number): string {
   return withoutNegativeZero(value.toFixed(digits));
 }
 
-/** Electricity prices in cents per kWh, with at most one decimal place. */
-export function formatRateCompact(dollarsPerKWh: number): string {
+/** USD retail prices use cents; other currencies use local major units per kWh. */
+export function formatRateCompact(
+  dollarsPerKWh: number,
+  currency: CurrencyType = USD_CURRENCY,
+): string {
+  if (currency.code !== "USD") {
+    if (!Number.isFinite(dollarsPerKWh)) return NO_ESTIMATE;
+    const localRate = dollarsPerKWh * currency.unitsPerDollar;
+    return (
+      (localRate < 0 ? "-" : "") +
+      currency.symbol +
+      formatNumber(Math.abs(localRate))
+    );
+  }
   return `${formatNumber(Number(formatSignificantDecimal(dollarsPerKWh * 100, 3, { digits: 1, trim: true, fixed: true })))}¢`;
 }
 
@@ -208,27 +221,78 @@ export function formatWattHours(i: number, mantissa?: number): string {
 const NO_ESTIMATE = "—";
 
 // used for numbers that flicker rapidly to preserve length / visual stability
-export function formatMoneyStable(i: number): string {
+export function formatMoneyStable(
+  i: number,
+  currency: CurrencyType = USD_CURRENCY,
+): string {
   if (!Number.isFinite(i)) {
     return NO_ESTIMATE;
   }
-  return signedMoney(i, false);
+  return signedMoney(i * currency.unitsPerDollar, currency.symbol, false);
 }
 
-export function formatMoneyConcise(i: number): string {
+export function formatMoneyConcise(
+  i: number,
+  currency: CurrencyType = USD_CURRENCY,
+): string {
   if (!Number.isFinite(i)) {
     return NO_ESTIMATE;
   }
-  return signedMoney(i, true);
+  return signedMoney(i * currency.unitsPerDollar, currency.symbol, true);
 }
 
-export function formatForecastMoney(i: number): string {
-  return Number.isFinite(i) ? signedMoney(i, true, 2) : NO_ESTIMATE;
+export function formatForecastMoney(
+  i: number,
+  currency: CurrencyType = USD_CURRENCY,
+): string {
+  return Number.isFinite(i)
+    ? signedMoney(i * currency.unitsPerDollar, currency.symbol, true, 2)
+    : NO_ESTIMATE;
+}
+
+const exactMoneyFormats = new Map<number, Intl.NumberFormat>();
+
+/** Exact major-unit prices without abbreviation or the compact significant-digit ceiling. */
+export function formatMoneyFull(
+  value: number,
+  currency: CurrencyType = USD_CURRENCY,
+  fractionDigits = 2,
+): string {
+  if (!Number.isFinite(value)) return NO_ESTIMATE;
+  let formatter = exactMoneyFormats.get(fractionDigits);
+  if (!formatter) {
+    formatter = new Intl.NumberFormat("en-US", {
+      minimumFractionDigits: fractionDigits,
+      maximumFractionDigits: fractionDigits,
+    });
+    exactMoneyFormats.set(fractionDigits, formatter);
+  }
+  // Intl rounds the converted amount even when its number representation is exponential.
+  const amount = formatter.format(Math.abs(value * currency.unitsPerDollar));
+  return (
+    (value < 0 && /[1-9]/.test(amount) ? "-" : "") + currency.symbol + amount
+  );
+}
+
+/** Bind a currency once for chart callbacks and components. Inputs always remain USD. */
+export function currencyFormatters(currency: CurrencyType) {
+  return {
+    currency,
+    formatMoneyConcise: (value: number) => formatMoneyConcise(value, currency),
+    formatMoneyStable: (value: number) => formatMoneyStable(value, currency),
+    formatForecastMoney: (value: number) =>
+      formatForecastMoney(value, currency),
+    formatRateCompact: (value: number) => formatRateCompact(value, currency),
+    formatPricePerMWh: (value: number) => formatPricePerMWh(value, currency),
+    formatMoneyFull: (value: number, fractionDigits = 2) =>
+      formatMoneyFull(value, currency, fractionDigits),
+  };
 }
 
 /** "-$63.8k": the sign leads the currency, and an amount that rounds to zero carries none. */
 function signedMoney(
   i: number,
+  symbol: string,
   trimMantissa: boolean,
   significantDigits: 2 | 3 = 3,
 ): string {
@@ -237,7 +301,7 @@ function signedMoney(
     trimMantissa,
     significantDigits,
   );
-  return (i < 0 && /[1-9]/.test(amount) ? "-$" : "$") + amount;
+  return (i < 0 && /[1-9]/.test(amount) ? "-" : "") + symbol + amount;
 }
 
 interface MoneyUnitType {
@@ -400,8 +464,11 @@ export function formatCount(n: number, significantDigits: 2 | 3 = 3): string {
 }
 
 /** A dollar amount per megawatt-hour, in the concise money style: "$42.5/MWh". */
-export function formatPricePerMWh(dollarsPerMWh: number): string {
-  return `${formatMoneyConcise(dollarsPerMWh)}/MWh`;
+export function formatPricePerMWh(
+  dollarsPerMWh: number,
+  currency: CurrencyType = USD_CURRENCY,
+): string {
+  return `${formatMoneyConcise(dollarsPerMWh, currency)}/MWh`;
 }
 
 /** A facility's size: energy capacity for storage, rated output for a generator. */

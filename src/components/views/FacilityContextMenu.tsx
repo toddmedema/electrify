@@ -1,3 +1,4 @@
+import { useMoney } from "../base/CurrencyContext";
 import { facilityDisplayName } from "../base/FacilityLabels";
 import * as React from "react";
 import {
@@ -26,7 +27,7 @@ import {
   facilityCashBack,
   facilityPermanentlyShutdown,
 } from "../../helpers/Financials";
-import { formatFacilitySize, formatMoneyConcise } from "../../helpers/Format";
+import { formatFacilitySize } from "../../helpers/Format";
 import ConfirmDialog from "../base/ConfirmDialog";
 import type { DispatchProps } from "./Facilities";
 
@@ -169,6 +170,7 @@ export default function FacilityContextMenu(props: {
   onRetrofit?: DispatchProps["onRetrofit"];
   onCancelRetrofit?: DispatchProps["onCancelRetrofit"];
 }) {
+  const { formatMoneyConcise } = useMoney();
   const [pending, setPending] = React.useState<{
     key: ActionKey;
     ids: number[];

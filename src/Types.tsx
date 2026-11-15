@@ -1741,6 +1741,8 @@ export interface SaveLease {
 
 /** A compact, serializable story of the run captured before the reducer's Immer draft expires. */
 export interface VictoryDebriefType {
+  /** Display currency captured for custom/historical results; all numeric amounts stay USD. */
+  currencyCode?: string;
   objectiveResults?: ObjectiveResult[];
   demandWh?: number;
   startingFleet: VictoryFleetCapacityType[];

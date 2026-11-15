@@ -1,4 +1,5 @@
 import { scenarioEffectsSummary } from "./ScenarioEffectsSummary";
+import { currencyByCode } from "./Currency";
 
 test("authored monthly expenses cap fractional dollars at three significant digits and a general expense label", () => {
   expect(
@@ -15,11 +16,31 @@ test("regional restoration summaries compact large costs", () => {
   ).toEqual(["Restoration: $123k/month"]);
 });
 
-test("a small credit rounds without a negative zero and retains precision in the authored summary", () => {
+test("a small credit retains precision in runtime and authored summaries", () => {
   expect(scenarioEffectsSummary({ operatingExpensePerMonth: -0.01 })).toEqual([
-    "Restoration: $0/month",
+    "Restoration: $-0.01/month",
   ]);
   expect(
     scenarioEffectsSummary({ operatingExpensePerMonth: -0.01 }, true),
   ).toEqual(["Operating expense: $-0.01/month"]);
 });
+
+test.each([false, true])(
+  "fractional local fees and upkeep stay nonzero with exact=%s without changing their USD amounts",
+  (exact) => {
+    const effects = {
+      carbonFeePerKgCO2e: 0.001,
+      operatingExpensePerMonth: 0.001,
+    };
+    expect(
+      scenarioEffectsSummary(effects, exact, currencyByCode("KWD")),
+    ).toEqual([
+      `${exact ? "Operating expense" : "Restoration"}: KWD 0.000308/month`,
+      "Carbon fee: KWD 0.308/tonne",
+    ]);
+    expect(effects).toEqual({
+      carbonFeePerKgCO2e: 0.001,
+      operatingExpensePerMonth: 0.001,
+    });
+  },
+);

@@ -1,3 +1,4 @@
+import { currencyForLocation } from "../helpers/Currency";
 import { getLegacyBuildBounds, isLegacyEraGame } from "../data/LegacyEra";
 import {
   LEGACY_CAMPAIGN_ID,
@@ -43,7 +44,10 @@ import {
   ownedUtilityConnection,
 } from "../helpers/ExpansionContext";
 import { areaBaselineDemand } from "../helpers/AreaDemand";
-import { utilityNetworkAnnualOM } from "../data/UtilityExpansion";
+import {
+  UTILITY_NETWORK_RENEWAL_STAGES,
+  utilityNetworkAnnualOM,
+} from "../data/UtilityExpansion";
 import { acquireUtility, acceptPowerAgreement } from "./GameActions";
 import {
   acceptAgreement,
@@ -622,7 +626,7 @@ function logFuelPriceMoves(
     logGameEvent(
       state,
       "FUEL_PRICE",
-      `${fuel} ${change > 0 ? "up" : "down"} ${Math.round(Math.abs(change) * 100)}% to ${formatMoneyConcise(after)}/MMBtu`,
+      `${fuel} ${change > 0 ? "up" : "down"} ${Math.round(Math.abs(change) * 100)}% to ${formatMoneyConcise(after, currencyForLocation(state.location, state.startingYear))}/MMBtu`,
     );
   });
 }
@@ -732,7 +736,7 @@ export function logFuelCrossovers(state: GameType) {
       logGameEvent(
         state,
         "FUEL_CROSSOVER",
-        `${fuel} is now more expensive than ${otherFuel}: ${formatMoneyConcise(cost)}/MWh vs ${formatMoneyConcise(crossed[1])}/MWh`,
+        `${fuel} is now more expensive than ${otherFuel}: ${formatMoneyConcise(cost, currencyForLocation(state.location, state.startingYear))}/MWh vs ${formatMoneyConcise(crossed[1], currencyForLocation(state.location, state.startingYear))}/MWh`,
         {
           importance: "NOTABLE",
           actionTarget: { card: "FACILITIES", view: "FLEET" },
@@ -1027,7 +1031,7 @@ function recordHailStorm(state: GameType, key: string, startsMinute: number) {
   const repairCost = impacts.reduce((total, i) => total + i.repairCost, 0);
   const repairDays = Math.max(...impacts.map((i) => i.repairDays));
   const percent = Math.max(1, Math.round(share * 100));
-  const terms = `Repairs cost ${formatMoneyConcise(repairCost)} and take about ${formatDays(repairDays)}.`;
+  const terms = `Repairs cost ${formatMoneyConcise(repairCost, currencyForLocation(state.location, state.startingYear))} and take about ${formatDays(repairDays)}.`;
   const message = `Hail damaged ${percent}% of your solar fleet. ${terms}`;
   logGameEvent(state, "WORLD_EVENT", message, {
     importance: "CRITICAL",
@@ -2622,6 +2626,20 @@ export default gameSlice.reducer;
 /** Calendar-owned notices; cap changes themselves remain a pure dated entitlement lookup. */
 export function recordExpansionMilestones(state: GameType): void {
   if (!isUtilityExpansionGame(state) || state.date.monthNumber !== 1) return;
+  for (const stage of UTILITY_NETWORK_RENEWAL_STAGES) {
+    if (state.date.year !== stage.year) continue;
+    logGameEvent(
+      state,
+      "WORLD_EVENT",
+      `Network upkeep is now ${stage.multiplier}× opening upkeep, excluding customer growth and inflation.`,
+      {
+        title: "Network upkeep increased",
+        importance: "NOTABLE",
+        reportedKey: `scenario-116-network-renewal-${stage.year}`,
+        actionTarget: { card: "INSIGHTS", layer: "FINANCES" },
+      },
+    );
+  }
   if (state.date.year === 2013 && ownedUtility(state, "valley-electric"))
     logGameEvent(
       state,
@@ -2922,7 +2940,7 @@ function applySellFacility(state: GameType, id: number): boolean {
     sold.yearsToBuildLeft > 0 ? "BUILD" : "SELL",
     sold.yearsToBuildLeft > 0
       ? `Canceled construction of ${sold.name}`
-      : `Sold ${sold.name}, ${sold.peakWh ? formatWattHours(sold.peakWh) : formatWatts(sold.peakW)} for ${formatMoneyConcise(facilityCashBack(sold, state.date.minute))}`,
+      : `Sold ${sold.name}, ${sold.peakWh ? formatWattHours(sold.peakWh) : formatWatts(sold.peakW)} for ${formatMoneyConcise(facilityCashBack(sold, state.date.minute), currencyForLocation(state.location, state.startingYear))}`,
   );
   const ownedState = `${sold.name}:${sold.peakWh ?? sold.peakW}:${sold.loanAmountTotal > 0 ? "financed" : "cash"}`;
   endWeatherHazardsForFacility(state, id);
@@ -3351,7 +3369,7 @@ function applyRetrofitFacility(
   logGameEvent(
     state,
     "BUILD",
-    `Installing ${label} on ${facility.name} for ${formatMoneyConcise(cost)}. ${payload.upgrade === "coldWeatherPackage" ? "Staged work keeps 90% of capacity available for a month." : `Offline for ${conversion ? "six months" : "a month"}.`}`,
+    `Installing ${label} on ${facility.name} for ${formatMoneyConcise(cost, currencyForLocation(state.location, state.startingYear))}. ${payload.upgrade === "coldWeatherPackage" ? "Staged work keeps 90% of capacity available for a month." : `Offline for ${conversion ? "six months" : "a month"}.`}`,
     {
       importance: "NOTABLE",
       actionTarget: { card: "FACILITIES", view: "FLEET" },
@@ -3410,7 +3428,7 @@ function applyCancelRetrofit(state: GameType, payload: unknown): boolean {
   logGameEvent(
     state,
     "BUILD",
-    `Canceled ${retrofitLabel(upgrade.upgrade)} on ${facility.name}; refunded ${formatMoneyConcise(refund)}.`,
+    `Canceled ${retrofitLabel(upgrade.upgrade)} on ${facility.name}; refunded ${formatMoneyConcise(refund, currencyForLocation(state.location, state.startingYear))}.`,
     {
       importance: "NOTABLE",
       actionTarget: { card: "FACILITIES", view: "FLEET" },
@@ -4375,12 +4393,15 @@ export function* tickStatePhases(
             label:
               scenario.ownership === "Investor"
                 ? "final net worth"
-                : `lifetime rate · ${state.startingYear} dollars`,
+                : `lifetime rate · ${state.startingYear} ${currencyForLocation(state.location, state.startingYear).code === "USD" ? "dollars" : currencyForLocation(state.location, state.startingYear).code}`,
             value:
               scenario.ownership === "Investor"
-                ? formatMoneyConcise(summary.netWorth)
+                ? formatMoneyConcise(
+                    summary.netWorth,
+                    currencyForLocation(state.location, state.startingYear),
+                  )
                 : summary.supplyWh > 0
-                  ? `${formatRateCompact(startingDollarRevenue(history, state.startingYear, state.seed) / (summary.supplyWh / 1000))}/kWh`
+                  ? `${formatRateCompact(startingDollarRevenue(history, state.startingYear, state.seed) / (summary.supplyWh / 1000), currencyForLocation(state.location, state.startingYear))}/kWh`
                   : "No electricity supplied",
           },
           ...(outcome === "completed"

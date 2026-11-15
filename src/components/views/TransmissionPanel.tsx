@@ -4,6 +4,9 @@ import {
   isInternalTerritoryCorridor,
 } from "../../helpers/Territories";
 import { territoryName } from "../base/TerritoryBuildDestination";
+import { CurrencyType } from "../../helpers/Currency";
+import { currencyFormatters } from "../../helpers/Format";
+import { useMoney } from "../base/CurrencyContext";
 import PowerAgreements, { agreementSummary } from "../base/PowerAgreements";
 import { inheritedUtilityForCorridor } from "../../helpers/PowerAgreements";
 import { BUYING_LABELS, SELLING_LABELS } from "../../helpers/TradingRules";
@@ -66,9 +69,7 @@ import {
 } from "../../data/IntertieTrends";
 import {
   formatBuildMonths,
-  formatMoneyConcise,
   formatNumber,
-  formatForecastMoney,
   formatForecastPercent,
   formatForecastWatts,
   formatWatts,
@@ -159,11 +160,14 @@ const DIRECTION_WORDS: Record<IntertieDirection, string> = {
   IDLE: "Idle",
 };
 
-function priceRange(outlook: IntertieOutlook): string {
-  // Whole dollars: a typical range is an estimate, and cents would suggest otherwise
+function priceRange(outlook: IntertieOutlook, currency: CurrencyType): string {
+  const { formatForecastMoney } = currencyFormatters(currency);
+  // Typical ranges are estimates, so use the forecast formatter.
   const low = formatForecastMoney(outlook.priceLow);
   const high = formatForecastMoney(outlook.priceHigh);
-  return low === high ? `${low}/MWh` : `${low}–${high.replace("$", "")}/MWh`;
+  return low === high
+    ? `${low}/MWh`
+    : `${low}–${high.replace(currency.symbol, "")}/MWh`;
 }
 
 function limitChangeText(before: number, after: number): string {
@@ -260,12 +264,13 @@ function PriceMetric({
   outlook: IntertieOutlook;
   marketOnly?: boolean;
 }) {
+  const { currency } = useMoney();
   const periods = pricePeriodCaption(outlook);
   return (
     <div className="facilityStat">
       <dt>{marketOnly ? "Typical market price" : "Typical price"}</dt>
       <dd className="facilityStatValue">
-        {priceRange(outlook)}
+        {priceRange(outlook, currency)}
         {periods && <span className="facilityStatNote">{periods}</span>}
       </dd>
     </div>
@@ -293,6 +298,7 @@ function IntertieBuildItem(props: {
   onCompanyReview?: () => void;
   development?: boolean;
 }): React.JSX.Element {
+  const { currency, formatMoneyConcise } = useMoney();
   const { cash, corridor, outlook, units } = props;
   const internal = props.development;
   const market = adjacentMarketForCorridor(corridor.id);
@@ -349,7 +355,7 @@ function IntertieBuildItem(props: {
       }
       warning={
         !buildable
-          ? financingShortfallText(cash || 0, loan.downpayment)
+          ? financingShortfallText(cash || 0, loan.downpayment, currency)
           : undefined
       }
       metrics={
@@ -422,7 +428,7 @@ function IntertieBuildItem(props: {
                   label="Typical import price"
                   value={
                     <>
-                      {priceRange(outlook)}
+                      {priceRange(outlook, currency)}
                       {pricePeriodCaption(outlook) && (
                         <Typography
                           variant="caption"
@@ -466,6 +472,7 @@ function IntertieUpgradeControl(props: {
   onUpgrade: (corridorId: string, financed: boolean) => void;
   context: IntertieAccessContext;
 }): React.JSX.Element | null {
+  const { currency } = useMoney();
   const {
     line,
     cash,
@@ -506,7 +513,7 @@ function IntertieUpgradeControl(props: {
     );
   }
   const { downpayment } = purchaseTerms(quote.buildCost, true, interestRate);
-  const shortfall = financingShortfallText(cash ?? 0, downpayment);
+  const shortfall = financingShortfallText(cash ?? 0, downpayment, currency);
   const months = Math.max(1, Math.round(quote.yearsToBuild * 12));
   const capacityBefore = internal
     ? { importCapacityW: line.capacityW, exportCapacityW: line.capacityW }
@@ -707,6 +714,7 @@ export default function TransmissionPanel({
   hideOwnership = false,
   ownershipSummaryRef,
 }: TransmissionPanelProps) {
+  const { formatMoneyConcise } = useMoney();
   const units = useUnits();
   const localAcquiredSummaryRef = React.useRef<HTMLElement>(null);
   const acquiredSummaryRef = ownershipSummaryRef ?? localAcquiredSummaryRef;

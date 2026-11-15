@@ -12,7 +12,7 @@ jest.mock("../base/GameCard", () => (props: { children: React.ReactNode }) => (
 describe("EventLog", () => {
   beforeEach(() => localStorage.clear());
   afterEach(() => jest.restoreAllMocks());
-  it("keeps history below priorities without duplicate announcements and targets it for evidence", () => {
+  it("keeps all announcements above history without duplicates and targets it for evidence", () => {
     jest.spyOn(Globals, "isPaneLayout").mockReturnValue(true);
     const onEvidenceReady = jest.fn();
     const passed = {
@@ -48,7 +48,10 @@ describe("EventLog", () => {
     expect(screen.getByText("A recorded build.")).toBeVisible();
     const history = screen.getByRole("region", { name: "Event history" });
     expect(within(history).queryByText(/Future announcement/)).toBeNull();
-    expect(screen.getAllByText(/Future announcement/)).toHaveLength(1);
+    expect(screen.getAllByText(/Future announcement/)).toHaveLength(4);
+    expect(
+      screen.getByRole("region", { name: "More upcoming events" }),
+    ).toBeVisible();
     // The top bar owns the live grid state; the rail keeps only what it adds.
     expect(screen.queryByRole("heading", { name: "Right now" })).toBeNull();
     expect(screen.queryByText(/Projects & outcomes/)).toBeNull();
@@ -67,10 +70,7 @@ describe("EventLog", () => {
       request,
       expect.any(HTMLElement),
     );
-    expect(onEvidenceReady.mock.calls[0][1]).toHaveAttribute(
-      "id",
-      "operationsHistory",
-    );
+    expect(onEvidenceReady.mock.calls[0][1]).toBe(history);
     expect(passed.onOpen).toHaveBeenCalledTimes(1);
   });
   it("retains an empty selection across remounts and restores all on request", async () => {

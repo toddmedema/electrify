@@ -1,3 +1,4 @@
+import { CurrencyType, USD_CURRENCY } from "./Currency";
 import type { RuleReport } from "../data/ScenarioRules";
 import type {
   ActiveWorldEventType,
@@ -28,6 +29,7 @@ export interface RuleReportSnapshot {
 }
 
 export interface RuleReportContext {
+  currency?: CurrencyType;
   startingYear: number;
   /** A count: at the opening of zero-based month m, exactly m months have closed. */
   completedMonths: number;
@@ -319,8 +321,8 @@ function billedRate(month: MonthlyHistoryType): number | undefined {
   return nonnegative(rate) ? rate : undefined;
 }
 
-function rateText(rate: number): string {
-  return `${formatRateCompact(rate)}/kWh`;
+function rateText(rate: number, currency: CurrencyType = USD_CURRENCY): string {
+  return `${formatRateCompact(rate, currency)}/kWh`;
 }
 
 function dataCenterMetrics(
@@ -347,7 +349,7 @@ function dataCenterMetrics(
           "electricityRate",
           "Electricity rate",
           "text",
-          `${rateText(before)} → ${rateText(after)}`,
+          `${rateText(before, context.currency)} → ${rateText(after, context.currency)}`,
         )
       : missingMetric("electricityRate", "Electricity rate", "text"),
   ];
@@ -376,10 +378,11 @@ function freezeFacts(
 
 function freezeMetrics(
   facts: ReturnType<typeof freezeFacts>,
+  currency: CurrencyType = USD_CURRENCY,
   labels = {
     unserved: "Demand not met during the freeze",
     shortage: "Largest shortage during the freeze",
-    cash: "Cash stayed above $0 through the recovery month",
+    cash: `Cash stayed above ${currency.symbol}0 through the recovery month`,
     rate: "Electricity rate · before → after",
   },
 ): RuleReportMetric[] {
@@ -395,7 +398,7 @@ function freezeMetrics(
           "electricityRate",
           labels.rate,
           "text",
-          `${rateText(facts.beforeRate)} → ${rateText(facts.afterRate)}`,
+          `${rateText(facts.beforeRate, currency)} → ${rateText(facts.afterRate, currency)}`,
         )
       : missingMetric("electricityRate", labels.rate, "text"),
     facts.cashStayedPositive !== undefined
@@ -459,10 +462,10 @@ function catalogDebriefReport(
     month(impactMonth),
     month(report.throughMonth),
   );
-  const metrics = freezeMetrics(facts, {
+  const metrics = freezeMetrics(facts, context.currency, {
     unserved: `Demand not met during ${name}`,
     shortage: `Largest shortage during ${name}`,
-    cash: `Cash stayed above $0 through ${calendar(report.throughMonth)}`,
+    cash: `Cash stayed above ${(context.currency ?? USD_CURRENCY).symbol}0 through ${calendar(report.throughMonth)}`,
     rate: `Billed rate · ${calendar(report.fromMonth)} → ${calendar(report.throughMonth)}`,
   });
   if (metrics.some((item) => !item.available))
@@ -694,7 +697,7 @@ export function interpretRuleReport(
       report,
       netIncome === 0
         ? "The grid broke even during the recorded window."
-        : `The grid recorded ${formatMoneyConcise(Math.abs(netIncome))} in ${netIncome > 0 ? "profit" : "loss"} during the recorded window.`,
+        : `The grid recorded ${formatMoneyConcise(Math.abs(netIncome), context.currency)} in ${netIncome > 0 ? "profit" : "loss"} during the recorded window.`,
       [metric("netIncome", "Net income", "dollars", netIncome)],
       { netIncome },
       netIncome < 0 ? "NOTABLE" : "ROUTINE",
@@ -723,7 +726,7 @@ export function interpretRuleReport(
       );
     return observed(
       report,
-      `The grid recorded ${blackoutMonths} ${blackoutMonths === 1 ? "month" : "months"} with blackouts after the connection. Electricity rate: ${rateText(before)} → ${rateText(after)}.`,
+      `The grid recorded ${blackoutMonths} ${blackoutMonths === 1 ? "month" : "months"} with blackouts after the connection. Electricity rate: ${rateText(before, context.currency)} → ${rateText(after, context.currency)}.`,
       metrics,
       { ...facts, blackoutMonths, startingRate: before, endingRate: after },
       blackoutMonths > 0 ? "NOTABLE" : "ROUTINE",
@@ -752,8 +755,8 @@ export function interpretRuleReport(
     );
   return observed(
     report,
-    `Demand not met during the freeze: ${formatWattHours(facts.unservedWh)}. Largest shortage: ${formatWatts(maximumDeficitW)}. Billed electricity rate: ${rateText(beforeRate)} → ${rateText(afterRate)}. Cash stayed above $0: ${cashStayedPositive ? "Yes" : "No"}.`,
-    freezeMetrics(review),
+    `Demand not met during the freeze: ${formatWattHours(facts.unservedWh)}. Largest shortage: ${formatWatts(maximumDeficitW)}. Billed electricity rate: ${rateText(beforeRate, context.currency)} → ${rateText(afterRate, context.currency)}. Cash stayed above ${(context.currency ?? USD_CURRENCY).symbol}0: ${cashStayedPositive ? "Yes" : "No"}.`,
+    freezeMetrics(review, context.currency),
     { ...facts, maximumDeficitW, beforeRate, afterRate, cashStayedPositive },
     facts.reliability < 0.999 || !cashStayedPositive ? "NOTABLE" : "ROUTINE",
   );
