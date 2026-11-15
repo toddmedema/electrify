@@ -147,7 +147,7 @@ for (const theme of ["light", "dark"] as const) {
       exact: true,
     });
     await expectDialogToFit(review);
-    await expect(review).toContainText("Assumed debt");
+    await expect(review).toContainText("Inherited debt");
     await review.getByRole("button", { name: "Cancel", exact: true }).click();
     await expect(review).toHaveCount(0);
     await detail
@@ -307,10 +307,37 @@ for (const theme of ["light", "dark"] as const) {
     await expect(
       page.getByRole("combobox", { name: "Build destination", exact: true }),
     ).toHaveText("Green Uplands");
-    const wind = page.locator(".buildOption").filter({
-      has: page.getByRole("heading", { name: "Wind", exact: true }),
+    const wind = page.getByRole("listitem").filter({
+      has: page.getByRole("button", {
+        name: "Review purchase of Wind",
+        exact: true,
+      }),
     });
-    await expect(wind).toBeVisible();
+    await expect(wind).toContainText("4 local sites left");
+    await wind
+      .getByRole("button", { name: "Review purchase of Wind", exact: true })
+      .click();
+    const buildReview = page.getByRole("dialog", { name: /^Build .* Wind\?/ });
+    await expectDialogToFit(buildReview);
+    await buildReview
+      .getByRole("button", { name: "Pay cash", exact: true })
+      .click();
+    await expect(buildReview).toHaveCount(0);
+    await openBuild(page);
+    await expect(
+      page.getByRole("combobox", { name: "Build destination", exact: true }),
+    ).toHaveText("Green Uplands");
+    await expect(wind).toContainText("3 local sites left");
+    const built = (await readSavedGame(page))!;
+    expect(built.facilities).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          fuel: "Wind",
+          territoryId: "green-uplands",
+          peakW: 20e6,
+        }),
+      ]),
+    );
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= window.innerWidth,

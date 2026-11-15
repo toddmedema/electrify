@@ -165,7 +165,9 @@ for (const theme of ["light", "dark"] as const) {
     await expect(savings).toContainText(/-?\$[\d.,]+[kMBT]? over 5 years/, {
       timeout: 45000,
     });
-    await expect(savings).toContainText("Based on current supply and demand");
+    await expect(savings).toContainText(
+      "Compared with omitting this agreement",
+    );
     await expect(
       dialog.getByRole("heading", { name: "Demand served" }),
     ).toHaveCount(0);

@@ -15,7 +15,7 @@ jest.setTimeout(120000);
 describe("simulation economics on CEO across seeds", () => {
   for (const seed of [1, 7, 20])
     ECONOMICS_SCENARIOS.forEach((scenario) =>
-      it(`wins the ${scenario.id === 116 ? "twelve" : "ten"}-decision playbook in "${scenario.name}" on representative seed ${seed}`, () => {
+      it(`wins the ten-decision playbook in "${scenario.name}" on representative seed ${seed}`, () => {
         const active = runSimulation({
           scenarioId: scenario.id,
           difficulty: "CEO",
@@ -31,12 +31,7 @@ describe("simulation economics on CEO across seeds", () => {
           active.meaningfulDecisionCategoryCount >=
             (scenario.id === 116 ? 3 : 4),
           active.outcome,
-        ]).toEqual([
-          scenario.id,
-          scenario.id === 116 ? 12 : 10,
-          true,
-          "completed",
-        ]);
+        ]).toEqual([scenario.id, 10, true, "completed"]);
       }),
     );
 });

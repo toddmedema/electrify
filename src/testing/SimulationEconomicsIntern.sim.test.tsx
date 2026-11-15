@@ -30,7 +30,7 @@ describe("simulation economics", () => {
       expectNoViolations(active);
       expect(active.meaningfulDecisionCount).toBe(
         scenario.id === 116
-          ? 12
+          ? 10
           : 1 + baselineMeaningfulChoices(scenario.id, active),
       );
       expect(active.builds).toHaveLength(scenario.id === 116 ? 6 : 1);

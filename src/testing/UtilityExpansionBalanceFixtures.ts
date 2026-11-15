@@ -6,7 +6,7 @@ import { loadSimData } from "./SimData";
 import type { ScheduledSimActionType } from "./Simulator";
 
 export type ExpansionPortfolio =
-  "line-only" | "unprepared" | "firm" | "mixed" | "both";
+  "standalone" | "unprepared" | "firm" | "mixed" | "both";
 export interface ExpansionBalanceCase {
   id: string;
   targetId: UtilityTargetId;
@@ -16,10 +16,10 @@ export interface ExpansionBalanceCase {
 export const EXPANSION_BALANCE_CASES: readonly ExpansionBalanceCase[] = [
   ...UTILITY_TARGETS.flatMap((target) => [
     {
-      id: `${target.id}-line-only`,
+      id: `${target.id}-standalone`,
       targetId: target.id,
       financed: true,
-      portfolio: "line-only" as const,
+      portfolio: "standalone" as const,
     },
     {
       id: `${target.id}-unprepared`,
@@ -107,7 +107,7 @@ export function expansionBalanceActions(
       type: "build",
       build: { name: "Natural Gas CC", peakW: 100e6, financed: true },
     });
-  if (fixture.portfolio !== "line-only") {
+  if (fixture.portfolio !== "standalone") {
     actions.push({
       month: purchaseMonth,
       type: "acquire",

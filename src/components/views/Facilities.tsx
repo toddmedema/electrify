@@ -868,6 +868,7 @@ function FacilitySupplyChart({
         height={height}
         exactHeight
         timeline={game.timeline}
+        exchangeLabel={hasTerritoryNetwork(game) ? "External power" : undefined}
         fuelOrder={fuelOrder}
         currentMinute={game.date.minute}
         speed={game.speed}

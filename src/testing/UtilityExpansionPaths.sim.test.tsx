@@ -447,16 +447,7 @@ it("a late purchase rebases one customer goal before the deadline and preserves 
   const fixture = EXPANSION_BALANCE_CASES.find(
     ({ id }) => id === "valley-electric-firm-loan",
   )!;
-  const scheduledActions: ScheduledSimActionType[] = [
-    ...expansionBalanceActions(fixture, 12345),
-    {
-      month: 0,
-      type: "intertie",
-      corridorId: "vt-champlain-ridge",
-      financed: true,
-    },
-  ];
-  scheduledActions.sort((a, b) => a.month - b.month);
+  const scheduledActions = expansionBalanceActions(fixture, 12345);
   let beforeDeadline: GameType | undefined;
   const { game } = playOfficialExecution(
     116,

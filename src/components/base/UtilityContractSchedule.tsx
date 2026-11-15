@@ -77,11 +77,11 @@ export default function UtilityContractSchedule({
         replacement supplies before coverage ends.
       </Typography>
       <Typography component="h4" variant="subtitle2" sx={{ mt: 2 }}>
-        Network upkeep
+        Utility operations
       </Typography>
       <Typography variant="body2" color="textSecondary">
-        Network upkeep includes routine maintenance and renewal. It rises with
-        customer growth and inflation.
+        Utility operations include routine maintenance and renewal. It rises
+        with customer growth and inflation.
       </Typography>
     </Box>
   );
