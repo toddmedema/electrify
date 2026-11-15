@@ -8963,6 +8963,7 @@ option {
   --territory-art-water: #78acb7;
 }
 .territoryMap {
+  container: territory-map / inline-size;
   min-width: 0;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
@@ -9012,6 +9013,14 @@ option {
 .territoryHexArt {
   pointer-events: none;
 }
+.territoryHexTerrain {
+  fill: none;
+  stroke: var(--territory-outline);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  pointer-events: none;
+  vector-effect: non-scaling-stroke;
+}
 .territoryTileArt {
   display: block;
   width: 100%;
@@ -9054,7 +9063,7 @@ option {
   fill: var(--bg-primary);
   stroke: var(--font-color-faded);
   stroke-width: 1.5;
-  pointer-events: none;
+  pointer-events: all;
   circle {
     vector-effect: non-scaling-stroke;
   }
@@ -9066,7 +9075,7 @@ option {
 .territoryHexHubLabel {
   fill: var(--font-color-primary);
   stroke: none;
-  font-size: 17px;
+  font-size: 24px;
   font-weight: 600;
   text-anchor: middle;
   dominant-baseline: central;
@@ -9105,8 +9114,7 @@ option {
     font-weight: 600;
     line-height: 1.3;
   }
-  .territoryMapStatus,
-  .territoryMapCue {
+  .territoryMapStatus {
     grid-column: 2;
     display: block;
     margin-top: 4px;
@@ -9128,7 +9136,7 @@ option {
 }
 .territoryMapNumber {
   grid-column: 1;
-  grid-row: 1 / 4;
+  grid-row: 1 / 3;
   display: grid;
   place-items: center;
   width: 24px;
@@ -9173,7 +9181,7 @@ option {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px 12px;
-  padding: 12px 0;
+  padding: 8px 12px;
   border-bottom: 1px solid var(--border-subtle);
   color: var(--font-color-faded);
   font-size: 11px;
@@ -9185,17 +9193,16 @@ option {
     min-width: 0;
   }
   .territoryTileArt {
-    flex: 0 0 28px;
-    width: 28px;
-    height: 28px;
+    flex: 0 0 24px;
+    width: 24px;
+    height: 24px;
   }
 }
-.territoryResourceNote {
-  grid-column: 1 / -1;
-  margin: 0;
-  color: var(--font-color-faded);
-  font-size: 11px;
-  line-height: 1.4;
+@container territory-map (min-width: 600px) {
+  .territoryMapKey,
+  .territoryResourceLegend {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }
 .territoryNetworkNote {
   margin-top: 8px;
@@ -9333,6 +9340,9 @@ option {
   }
 }
 @media (max-width: 599px) {
+  .territoryNetworkHeading {
+    display: none;
+  }
   .territoryNetwork,
   .territoryAgreements {
     padding: 12px;

@@ -132,16 +132,16 @@ const resourceLegend: readonly {
   kind: TerritoryTileArtKind;
   label: string;
 }[] = [
-  { kind: "town", label: "Town / industry · customers" },
-  { kind: "lake", label: "Lake · existing hydro" },
-  { kind: "plains", label: "Plains · solar / storage sites" },
-  { kind: "hills", label: "Hills · wind sites" },
+  { kind: "town", label: "Customers" },
+  { kind: "lake", label: "Existing hydro" },
+  { kind: "plains", label: "Solar / storage sites" },
+  { kind: "hills", label: "Wind sites" },
 ];
 
 interface Props {
   game: GameType;
   selected: TerritoryId;
-  status: (id: TerritoryId) => string;
+  status: (id: TerritoryId, compact?: boolean) => string;
   onSelect: (id: TerritoryId) => void;
 }
 
@@ -185,7 +185,8 @@ export default function TerritoryHexMap({
           className="territoryHexGrid"
           viewBox="0 0 720 400"
           role="img"
-          aria-labelledby={`${mapId}-title ${mapId}-description`}
+          aria-labelledby={`${mapId}-title`}
+          aria-describedby={`${mapId}-description`}
           focusable="false"
         >
           <title id={`${mapId}-title`}>Four-territory hex map</title>
@@ -211,6 +212,16 @@ export default function TerritoryHexMap({
                 >
                   <path className="territoryHexRim" d={hexRim} />
                   <path className="territoryHexFace" d={hexFace} />
+                  {!tile.landmark && (
+                    <path
+                      className="territoryHexTerrain"
+                      d={
+                        tile.kind === "hills"
+                          ? "M-38 12Q-22-14-4 8Q16-16 38 12"
+                          : "M-34 5H-10M6 5H30M-22 16H18"
+                      }
+                    />
+                  )}
                 </g>
               );
             })}
@@ -273,8 +284,8 @@ export default function TerritoryHexMap({
                   transform={`translate(${x} ${y})`}
                   onPointerUp={() => onSelect(territory.id)}
                 >
-                  <circle r="17" />
-                  <text className="territoryHexHubLabel" dy="0.35em">
+                  <circle r="21" />
+                  <text className="territoryHexHubLabel">
                     {territory.number}
                   </text>
                 </g>
@@ -282,11 +293,28 @@ export default function TerritoryHexMap({
             })}
           </g>
         </svg>
+        <div
+          className="territoryResourceLegend"
+          role="note"
+          aria-label="Landscape cues"
+        >
+          {resourceLegend.map(({ kind, label }) => (
+            <span key={kind}>
+              <TerritoryTileArt kind={kind} built={kind === "lake"} />
+              <span>{label}</span>
+            </span>
+          ))}
+        </div>
         <div className="territoryMapKey">
           {mapTerritories.map(({ id, number, cue }) => {
             const { name } = TERRITORIES.find(
               (territory) => territory.id === id,
             )!;
+            const currentCue =
+              (id === "champlain" || id === "valley-electric") &&
+              !built(id, "lake")
+                ? "Town · wind / solar sites"
+                : cue;
             return (
               <button
                 key={id}
@@ -294,14 +322,22 @@ export default function TerritoryHexMap({
                 className="territoryMapNode"
                 aria-pressed={selected === id}
                 aria-label={`Inspect ${name} territory`}
+                aria-describedby={`${mapId}-status-${id} ${mapId}-cue-${id}`}
                 onClick={() => onSelect(id)}
               >
                 <span className="territoryMapNumber" aria-hidden="true">
                   {number}
                 </span>
                 <strong>{name}</strong>
-                <span className="territoryMapStatus">{status(id)}</span>
-                <span className="territoryMapCue">{cue}</span>
+                <span
+                  className="territoryMapStatus"
+                  id={`${mapId}-status-${id}`}
+                >
+                  {status(id, true)}
+                </span>
+                <span className="srOnly" id={`${mapId}-cue-${id}`}>
+                  {currentCue}
+                </span>
               </button>
             );
           })}
@@ -314,22 +350,17 @@ export default function TerritoryHexMap({
         <span>
           <i className="planned" /> Planned or unavailable
         </span>
-        <span>Territory schematic</span>
-      </div>
-      <div
-        className="territoryResourceLegend"
-        role="note"
-        aria-label="Landscape cues"
-      >
-        {resourceLegend.map(({ kind, label }) => (
-          <span key={kind}>
-            <TerritoryTileArt kind={kind} />
-            <span>{label}</span>
+        {game.transmission?.lines.some(
+          (line) =>
+            TERRITORIES.some(
+              (territory) => territory.corridorId === line.corridorId,
+            ) &&
+            (line.paused || line.yearsToBuildLeft > 0),
+        ) && (
+          <span>
+            <i className="paused" /> Paused / building line
           </span>
-        ))}
-        <span className="territoryResourceNote">
-          Landscape cues only; site limits are shown in territory details.
-        </span>
+        )}
       </div>
     </>
   );

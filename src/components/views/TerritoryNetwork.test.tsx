@@ -55,6 +55,46 @@ const controls = {
   onSellingRule: jest.fn(),
 };
 
+it("selects a territory from its terrain and describes unpopulated land without hydro access", () => {
+  const { container } = render(
+    <TerritoryNetwork game={network()} {...controls} />,
+  );
+  const uplands = container.querySelectorAll(
+    '.territoryHex[data-territory="green-uplands"]',
+  );
+  expect(uplands.length).toBeGreaterThan(0);
+  expect(
+    Array.from(uplands).map((tile) => tile.getAttribute("data-kind")),
+  ).toEqual(expect.arrayContaining(["hills", "plains"]));
+  expect(
+    Array.from(uplands).some((tile) =>
+      ["town", "industry", "lake"].includes(tile.getAttribute("data-kind")!),
+    ),
+  ).toBe(false);
+  fireEvent.pointerUp(uplands[0]);
+  expect(
+    screen.getByRole("button", { name: "Inspect Green Uplands territory" }),
+  ).toHaveAttribute("aria-pressed", "true");
+  expect(
+    within(
+      screen.getByRole("region", { name: "Selected territory" }),
+    ).getByRole("heading", { name: "Green Uplands", level: 3 }),
+  ).toBeVisible();
+});
+
+it("removes the existing-hydro claim when the owned hydro plant is sold", () => {
+  const game = network();
+  game.facilities = game.facilities.filter(
+    (facility) => facility.fuel !== "Hydro",
+  );
+  render(<TerritoryNetwork game={game} {...controls} />);
+  const home = screen.getByRole("button", {
+    name: "Inspect Champlain territory",
+  });
+  expect(home).toHaveTextContent("wind / solar sites");
+  expect(home).not.toHaveTextContent("existing hydro");
+});
+
 it("inspects all four territories and sends a real connection purchase through the existing dialog", () => {
   const onBuild = jest.fn();
   render(<TerritoryNetwork game={network()} {...controls} onBuild={onBuild} />);

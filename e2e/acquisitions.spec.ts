@@ -72,6 +72,30 @@ for (const theme of ["light", "dark"] as const) {
           .getByRole("heading", { name, exact: true, level: 3 }),
       ).toBeVisible();
     }
+    await network
+      .locator(
+        '.territoryHex[data-territory="green-uplands"] .territoryHexFace',
+      )
+      .first()
+      .click();
+    await expect(
+      network.getByRole("button", {
+        name: "Inspect Green Uplands territory",
+        exact: true,
+      }),
+    ).toHaveAttribute("aria-pressed", "true");
+    const home = network.getByRole("button", {
+      name: "Inspect Champlain territory",
+      exact: true,
+    });
+    await home.focus();
+    await home.press("Space");
+    await expect(home).toHaveAttribute("aria-pressed", "true");
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
   });
 
   test(`completed Tier 1 connections acquire either utility in ${theme}`, async ({

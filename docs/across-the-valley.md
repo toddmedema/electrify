@@ -12,6 +12,14 @@ These inherited interfaces are separate from the expansion projects needed for
 acquisition. Contracts, replacement offers, shared capacity and market fallback
 are documented in [Physical interties and power purchase agreements](power-agreements.md).
 
+The Network view uses an isometric hex schematic, following the visual direction in
+[issue 603](https://github.com/toddmedema/electrify/issues/603). Towns and factories indicate
+customers, lakes and dams existing hydro, plains solar/storage sites, and hills wind sites.
+Equipment appears when a completed plant exists; independent utilities show their authored
+starting fleet. Each group selects a territory, rather than an individual build slot. Its
+actual site counts and operating controls remain in the territory details. The numbered
+territory key provides the same selection through keyboard and touch controls.
+
 ## Authored portfolios and historical references
 
 The three utilities, their ownership, acquisition prerequisite, fleet capacities,
