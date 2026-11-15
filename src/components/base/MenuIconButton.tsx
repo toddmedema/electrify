@@ -1,5 +1,5 @@
 import { IconButton, IconButtonProps, Tooltip } from "@mui/material";
-import { AnchorHTMLAttributes, useEffect, useRef, useState } from "react";
+import { AnchorHTMLAttributes, useRef, useState } from "react";
 import { useControllerInput } from "../../desktop/InputPresentation";
 
 type Props = Omit<IconButtonProps, "aria-label" | "title"> &
@@ -26,20 +26,7 @@ export default function MenuIconButton({
   const hovered = useRef(false);
   const newHover = useRef(false);
   const pointerFocus = useRef(false);
-  const hoverTimer = useRef<number>();
-  const clearHover = () => {
-    window.clearTimeout(hoverTimer.current);
-    hoverTimer.current = undefined;
-    setHoverReady(false);
-  };
-  const startHover = () => {
-    clearHover();
-    hoverTimer.current = window.setTimeout(() => {
-      hoverTimer.current = undefined;
-      setHoverReady(true);
-    }, 300);
-  };
-  useEffect(() => () => window.clearTimeout(hoverTimer.current), []);
+  const clearHover = () => setHoverReady(false);
   const open =
     !dismissed && (hoverReady || (focused && (keyboardFocus || controller)));
 
@@ -74,8 +61,8 @@ export default function MenuIconButton({
         {...props}
         aria-label={label}
         onFocus={(event) => {
-          // Hover selection calls focus() too; its inherited :focus-visible must not
-          // turn a passing mouse movement into an immediate keyboard label.
+          // Hover selection calls focus() too; keep pointer and keyboard focus distinct
+          // so leaving the button closes its mouse label.
           const visible =
             !pointerFocus.current &&
             event.currentTarget.matches(":focus-visible");
@@ -84,7 +71,7 @@ export default function MenuIconButton({
           setKeyboardFocus(visible);
           setDismissed(false);
           if (visible || controller) clearHover();
-          else if (hovered.current) startHover();
+          else if (hovered.current) setHoverReady(true);
           onFocus?.(event);
         }}
         onBlur={(event) => {
@@ -118,13 +105,8 @@ export default function MenuIconButton({
               if (dismissed) setKeyboardFocus(false);
             }
             // A layout shift can create pointer boundary events without player intent.
-            if (
-              hovered.current &&
-              (entering || !dismissed) &&
-              !hoverReady &&
-              hoverTimer.current === undefined
-            )
-              startHover();
+            if (hovered.current && (entering || !dismissed) && !hoverReady)
+              setHoverReady(true);
           }
           onPointerMove?.(event);
         }}

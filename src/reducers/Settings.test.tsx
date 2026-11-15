@@ -111,9 +111,9 @@ it("restores explicit scale independently of old preferences and persists change
   localStorage.setItem("tvMode", "true");
   const { default: reducer, initialSettings, change } = settings();
   expect(initialSettings.interfaceScale).toBe(1.75);
-  const large = reducer(initialSettings, change({ interfaceScale: 2.25 }));
-  expect(large.interfaceScale).toBe(2.25);
-  expect(settings().initialSettings.interfaceScale).toBe(2.25);
+  const large = reducer(initialSettings, change({ interfaceScale: 2 }));
+  expect(large.interfaceScale).toBe(2);
+  expect(settings().initialSettings.interfaceScale).toBe(2);
   const invalid = reducer(
     large,
     change({ interfaceScale: "300%" } as unknown as Parameters<

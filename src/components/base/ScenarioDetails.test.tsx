@@ -39,8 +39,8 @@ it("keeps the successor's scenario forecast open after the first 240 months", ()
     expect(outlook).toHaveTextContent("Score now");
     expect(outlook).toHaveTextContent("Projected final");
     expect(
-      screen.getByRole("status", { name: "Scenario forecast" }),
-    ).toHaveTextContent("Updating forecast");
+      screen.getByRole("status", { name: "Updating score outlook" }),
+    ).toHaveTextContent("Updating...");
     expect(screen.getByRole("region", { name: "Goals" })).not.toHaveTextContent(
       "1921",
     );
@@ -160,7 +160,7 @@ it("lists each projected failure separately and removes redundant goal forecasts
   ).toBeTruthy();
 });
 
-it("clears a stale win while an edited plan is being forecast", () => {
+it("keeps the completed outlook while updating and replaces it when ready", () => {
   const game = createGame({ scenarioId: 111 });
   jest.spyOn(MissionProjection, "projectMission").mockReturnValue({
     status: "win",
@@ -174,7 +174,12 @@ it("clears a stale win while an edited plan is being forecast", () => {
   jest
     .spyOn(DeferredProjection, "requestProjection")
     .mockImplementation(() => undefined);
+  const scoreProjection = jest
+    .spyOn(ScenarioOutlook, "scenarioScoreProjection")
+    .mockReturnValue({ actual: [200], projected: [400], final: 400 });
   const view = renderDetails(game);
+  const outlook = screen.getByRole("region", { name: "Score outlook" });
+  const chart = within(outlook).getByRole("img", { name: /Chart of score/ });
   expect(
     screen.getByRole("status", { name: "Scenario forecast" }),
   ).toHaveTextContent("Projected win.");
@@ -186,6 +191,11 @@ it("clears a stale win while an edited plan is being forecast", () => {
   });
   try {
     ready.mockReturnValue(false);
+    scoreProjection.mockReturnValue({
+      actual: [200],
+      projected: [],
+      final: 200,
+    });
     view.rerender(
       <ScenarioDetailsContent
         game={{ ...game, dollarsPerkWh: 0 }}
@@ -194,8 +204,51 @@ it("clears a stale win while an edited plan is being forecast", () => {
     );
     expect(
       screen.getByRole("status", { name: "Scenario forecast" }),
-    ).toHaveTextContent("Updating forecast…");
-    expect(screen.queryByText("Projected win.")).toBeNull();
+    ).toHaveTextContent("Projected win.");
+    expect(within(outlook).getByText("400")).toBeInTheDocument();
+    expect(within(outlook).getByRole("img", { name: /Chart of score/ })).toBe(
+      chart,
+    );
+    const updating = within(outlook).getByRole("status", {
+      name: "Updating score outlook",
+    });
+    expect(updating).toHaveTextContent("Updating...");
+    expect(
+      within(updating).getByRole("progressbar", { hidden: true }),
+    ).toBeInTheDocument();
+    ready.mockReturnValue(true);
+    scoreProjection.mockReturnValue({
+      actual: [200],
+      projected: [600],
+      final: 600,
+    });
+    view.rerender(
+      <ScenarioDetailsContent
+        game={{ ...game, dollarsPerkWh: 0 }}
+        scenario={activeScenario(game)!}
+      />,
+    );
+    expect(within(outlook).getByText("600")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("status", { name: "Updating score outlook" }),
+    ).not.toBeInTheDocument();
+    // A different run must not inherit this run's completed forecast.
+    ready.mockReturnValue(false);
+    scoreProjection.mockReturnValue(null);
+    const nextRun = { ...game, seed: game.seed + 1 };
+    view.rerender(
+      <ScenarioDetailsContent
+        game={nextRun}
+        scenario={activeScenario(nextRun)!}
+      />,
+    );
+    expect(screen.queryByText("600")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("status", { name: "Scenario forecast" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("status", { name: "Updating score outlook" }),
+    ).toBeInTheDocument();
   } finally {
     Object.defineProperty(global, "Worker", {
       configurable: true,

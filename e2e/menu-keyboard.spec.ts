@@ -61,6 +61,14 @@ test("interface scale persists and scales controls with text at every display he
     name: "Interface scale",
     exact: true,
   });
+  await expect(scale.getByRole("option")).toHaveText([
+    "100%",
+    "125%",
+    "150%",
+    "175%",
+    "200%",
+    "250%",
+  ]);
   const standardHeight = await scale.evaluate(
     (element) => element.getBoundingClientRect().height,
   );

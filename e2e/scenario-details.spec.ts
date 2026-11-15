@@ -1,3 +1,4 @@
+import { reviewScreenshot } from "./review-screenshot";
 import { openPane } from "./layout";
 import { expectDialogToFit } from "./dialog-layout";
 import { expect, test } from "./fixtures";
@@ -164,4 +165,88 @@ test("scenario outlook flags insolvency with the first projected month-end", asy
         : "scenario-score-sidepanel-desktop.png",
     ),
   });
+});
+
+test("score outlook keeps its prediction and height while refreshing", async ({
+  page,
+}, info) => {
+  await page.addInitScript(() => {
+    localStorage.clear();
+    localStorage.setItem("audioEnabled", "false");
+    const controls = window as typeof window & {
+      holdScenarioForecast: boolean;
+      releaseScenarioForecast: () => void;
+    };
+    controls.holdScenarioForecast = false;
+    const replies: Array<() => void> = [];
+    controls.releaseScenarioForecast = () => {
+      controls.holdScenarioForecast = false;
+      replies.splice(0).forEach((reply) => reply());
+    };
+    // Hold real worker replies so the intermediate layout can be inspected deterministically.
+    window.Worker = class extends Worker {
+      constructor(url: string | URL, options?: WorkerOptions) {
+        super(url, options);
+        this.addEventListener("message", (event) => {
+          if (!controls.holdScenarioForecast || !event.data?.transport) return;
+          event.stopImmediatePropagation();
+          replies.push(() =>
+            this.dispatchEvent(
+              new MessageEvent("message", { data: event.data }),
+            ),
+          );
+        });
+      }
+    };
+  });
+  await page.goto("/?scenario=111");
+  await page.getByRole("button", { name: "Start game", exact: true }).click();
+  const panel = page.getByRole("region", { name: "Scenario", exact: true });
+  await openPane(
+    panel,
+    page
+      .locator("#navfooter")
+      .getByRole("button", { name: "Scenario", exact: true }),
+  );
+  const outlook = panel.getByRole("region", { name: "Score outlook" });
+  const outcome = outlook.getByRole("status", { name: "Scenario forecast" });
+  await expect(outcome).toHaveAttribute("data-status", /^(win|loss|unknown)$/);
+  const before = await outlook.boundingBox();
+  const figures = await outlook.locator("dl").innerText();
+  const prediction = await outcome.innerText();
+  await page.evaluate(() =>
+    Object.assign(window, { holdScenarioForecast: true }),
+  );
+  const bar = page.locator("#appbar:visible");
+  await bar.getByRole("button", { name: "fast speed", exact: true }).click();
+  await expect(bar).toContainText(/Feb \d{4}/);
+  await bar.getByRole("button", { name: "pause", exact: true }).click();
+  const updating = outlook.getByRole("status", {
+    name: "Updating score outlook",
+  });
+  await expect(updating).toBeVisible();
+  await expect(outlook.locator("dl")).toHaveText(figures, {
+    useInnerText: true,
+  });
+  await expect(outcome).toHaveText(prediction, { useInnerText: true });
+  expect((await outlook.boundingBox())!.height).toBeCloseTo(before!.height, 0);
+  const title = await outlook
+    .getByRole("heading", { name: "Score outlook", exact: true })
+    .boundingBox();
+  const label = await updating.boundingBox();
+  expect(label!.x).toBeGreaterThan(title!.x + title!.width);
+  expect(
+    Math.abs(label!.y + label!.height / 2 - title!.y - title!.height / 2),
+  ).toBeLessThanOrEqual(1);
+  await reviewScreenshot(page, {
+    path: info.outputPath("score-outlook-updating.png"),
+    animations: "disabled",
+  });
+  await page.evaluate(() =>
+    (
+      window as typeof window & { releaseScenarioForecast: () => void }
+    ).releaseScenarioForecast(),
+  );
+  await expect(updating).toHaveCount(0);
+  await expect(outcome).toHaveAttribute("data-status", /^(win|loss|unknown)$/);
 });

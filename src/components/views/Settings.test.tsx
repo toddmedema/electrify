@@ -251,6 +251,11 @@ describe("Settings", () => {
     renderSettings({ onInterfaceScaleChange });
     const scale = screen.getByRole("combobox", { name: "Interface scale" });
     expect(scale).toHaveValue("1");
+    expect(
+      within(scale)
+        .getAllByRole("option")
+        .map((option) => option.textContent),
+    ).toEqual(["100%", "125%", "150%", "175%", "200%", "250%"]);
     await userEvent.selectOptions(scale, "1.5");
     await userEvent.selectOptions(scale, "2.5");
     expect(onInterfaceScaleChange.mock.calls).toEqual([[1.5], [2.5]]);

@@ -31,7 +31,7 @@ beforeEach(() => {
   });
 });
 
-it("distinguishes hover selection from keyboard focus even when focus-visible is inherited", async () => {
+it("shows mouse and keyboard labels immediately even when focus-visible is inherited", async () => {
   jest.spyOn(Element.prototype, "matches").mockImplementation(function (
     this: Element,
     selector,
@@ -50,8 +50,6 @@ it("distinguishes hover selection from keyboard focus even when focus-visible is
   const manual = screen.getByRole("button", { name: "Manual" });
   await user.hover(manual);
   act(() => manual.focus());
-  expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
-  act(() => jest.advanceTimersByTime(300));
   expect(screen.getByRole("tooltip")).toHaveTextContent("Manual");
   await user.unhover(manual);
   expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
@@ -69,18 +67,15 @@ afterEach(() => {
   jest.restoreAllMocks();
 });
 
-it("waits for deliberate mouse hover, cancels passing hover, and ignores touch long-press", async () => {
+it("shows deliberate mouse hover instantly, clears on exit, and ignores touch long-press", async () => {
   const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
   render(<MenuIconButton label="Manual">Book</MenuIconButton>);
   const button = screen.getByRole("button", { name: "Manual" });
   await user.hover(button);
-  act(() => jest.advanceTimersByTime(200));
-  expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+  expect(screen.getByRole("tooltip")).toHaveTextContent("Manual");
   await user.unhover(button);
-  act(() => jest.advanceTimersByTime(300));
   expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
   await user.hover(button);
-  act(() => jest.advanceTimersByTime(300));
   expect(screen.getByRole("tooltip")).toHaveTextContent("Manual");
   await user.unhover(button);
   expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
@@ -117,14 +112,12 @@ it("allows deliberate rehover after Escape without reopening under the resting p
   const manual = screen.getByRole("button", { name: "Manual" });
   await user.hover(manual);
   act(() => manual.focus());
-  act(() => jest.advanceTimersByTime(300));
   expect(screen.getByRole("tooltip")).toHaveTextContent("Manual");
   await user.keyboard("{Escape}");
   act(() => jest.advanceTimersByTime(500));
   expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
   await user.unhover(manual);
   await user.hover(manual);
-  act(() => jest.advanceTimersByTime(300));
   expect(screen.getByRole("tooltip")).toHaveTextContent("Manual");
 });
 
