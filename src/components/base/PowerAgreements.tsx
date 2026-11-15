@@ -1,3 +1,5 @@
+import { currencyForLocation } from "../../helpers/Currency";
+import { useMoney } from "./CurrencyContext";
 import * as React from "react";
 import { Box, Button, Slider, Typography } from "@mui/material";
 import type { GameType, TransmissionLineOperatingType } from "../../Types";
@@ -45,10 +47,6 @@ export function agreementSummary(game: GameType, corridorId: string) {
   );
   return `${formatWatts(coverage)} under agreement${replacement ? " · Replacement available" : ""}`;
 }
-const rate = (value: number) =>
-  Number.isFinite(value)
-    ? `$${formatNumber(value, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/MWh`
-    : "Unavailable";
 const monthlyEnergy = (value: number) =>
   `${formatNumber(value, { maximumFractionDigits: 0 })} MWh/month`;
 const years = (value: number) => {
@@ -106,6 +104,11 @@ export default function PowerAgreements({
   game: GameType;
   line: TransmissionLineOperatingType;
 }) {
+  const { currency, formatMoneyFull } = useMoney(
+    currencyForLocation(game.location, game.startingYear),
+  );
+  const rate = (value: number) =>
+    Number.isFinite(value) ? `${formatMoneyFull(value)}/MWh` : "Unavailable";
   const dispatch = useAppDispatch();
   const [review, setReview] =
     React.useState<ReturnType<typeof powerAgreementQuote>>();
@@ -424,6 +427,7 @@ export default function PowerAgreements({
         )}
         {expiredAssessment ? (
           <RecordedAgreementHistory
+            currency={currency}
             startMinute={assessment?.startMinute}
             account={game.transmission?.agreementAccounts?.find(
               (entry) => entry.agreementId === assessmentId,
@@ -522,6 +526,7 @@ export default function PowerAgreements({
                     label="Forecasted savings"
                     value={
                       <AgreementForecastDetails
+                        currency={currency}
                         forecast={forecast}
                         horizon={
                           review

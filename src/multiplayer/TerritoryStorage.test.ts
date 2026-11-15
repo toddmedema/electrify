@@ -275,11 +275,16 @@ it("keeps native generation at customer demand when peers sell the charging ener
   battery(buyer);
   seller.transmission!.sellingRule = "PROFITABLE";
   buyer.transmission!.buyingRule = "SHORTAGES_AND_STORAGE";
+  buyer.transmission!.sellingRule = "PROFITABLE";
   for (const grid of world.grids)
     grid.transmission!.lines[0].capacityW = 1000e6;
   advance(world);
   const now = currentTick(buyer)!;
   expect(now.supplyByFuel["Natural Gas"]).toBe(now.demandW);
+  expect(
+    buyer.facilities.find(({ fuel }) => fuel === "Natural Gas")!.currentW,
+  ).toBe(now.demandW);
+  expect(now.exportedW).toBe(0);
   expect(now.territories!.champlain!.curtailedW).toBe(0);
   expect(now.importedW).toBeCloseTo(100e6, 4);
   expect(now.storageImportedW).toBeCloseTo(100e6, 4);

@@ -1,5 +1,6 @@
 import type { TerritoryId } from "../Types";
 import {
+  clearTerritoryMarket,
   routeTerritoryPower,
   type TerritoryDispatchInput,
 } from "./TerritoryDispatch";
@@ -83,3 +84,40 @@ it("retains source order, customer delivery and secondary-sink priorities for a 
   );
   expect(input).toEqual(before);
 });
+
+it.each([100e6, 125e6, 150e6])(
+  "shares the %s-watt import rating between customer demand and storage",
+  (importLimitW) => {
+    const offer = {
+      importLimitW,
+      exportLimitW: 0,
+      accessId: "regional",
+      accessImportLimitW: 200e6,
+      pricePerMWh: 50,
+    };
+    const cleared = clearTerritoryMarket({
+      input: {
+        demandW: {
+          champlain: 100e6,
+          "valley-electric": 0,
+          "ridge-electric": 0,
+          "green-uplands": 0,
+        },
+        edges: [],
+        sources: [],
+        sinks: [{ id: "charge", territoryId: "champlain", capacityW: 50e6 }],
+      },
+      interfaces: [{ territoryId: "champlain", offer }],
+      reservations: [],
+      buyingRule: "SHORTAGES_AND_STORAGE",
+      sellingRule: "NONE",
+    });
+    expect(cleared.importedW).toEqual([importLimitW]);
+    expect(cleared.result.totalServedW).toBe(100e6);
+    expect(cleared.result.totalSinkW).toBe(importLimitW - 100e6);
+    expect(cleared.storageImportedW).toBe(importLimitW - 100e6);
+    expect(cleared.result.sourceW.reduce((sum, watts) => sum + watts, 0)).toBe(
+      cleared.result.totalServedW + cleared.result.totalSinkW,
+    );
+  },
+);

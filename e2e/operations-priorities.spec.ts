@@ -117,7 +117,7 @@ for (const layout of [
   });
 }
 
-test("history stays below priorities in a short pane without duplicate upcoming events", async ({
+test("all upcoming events stay accessible above history in a short pane", async ({
   page,
 }, testInfo) => {
   test.setTimeout(120000);
@@ -164,9 +164,16 @@ test("history stays below priorities in a short pane without duplicate upcoming 
       flex: "0 0 210px",
     });
   });
-  await expect(page.locator("#operationsHistory .upcomingEvents")).toHaveCount(
-    0,
-  );
+  const more = page.getByRole("region", { name: "More upcoming events" });
+  await expect(more).toBeVisible();
+  const nextTitle = await page
+    .locator(".operationsPriorities .operationsSection")
+    .last()
+    .locator(".eventLogItem strong")
+    .textContent();
+  expect(nextTitle).toBeTruthy();
+  await expect(more.getByText(nextTitle!, { exact: true })).toHaveCount(0);
+  expect(await more.locator(".eventLogItem").count()).toBeGreaterThan(0);
   await page.locator(".eventHistory").scrollIntoViewIfNeeded();
   await expect(
     page.getByRole("button", { name: "Filter event history, All events" }),

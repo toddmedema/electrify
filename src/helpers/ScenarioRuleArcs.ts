@@ -1,3 +1,4 @@
+import { currencyForLocation } from "./Currency";
 import { officialScenarioRules } from "./ScenarioRules";
 import { scenarioEffectsSummary } from "./ScenarioEffectsSummary";
 import type {
@@ -121,7 +122,11 @@ export function compileOfficialArcEvents(
           source,
           params.receivingScenario,
         );
-      const changes = scenarioEffectsSummary(effects);
+      const changes = scenarioEffectsSummary(
+        effects,
+        false,
+        currencyForLocation(location, params.startingYear),
+      );
       const event: CompiledOfficialArcEvent = {
         ...base,
         effects,

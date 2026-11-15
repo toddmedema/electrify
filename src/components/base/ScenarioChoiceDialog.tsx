@@ -1,3 +1,4 @@
+import { useMoney } from "./CurrencyContext";
 import { currentCash } from "../../helpers/GameSelectors";
 import {
   Box,
@@ -13,10 +14,10 @@ import {
   scenarioChoiceDescription,
 } from "../../helpers/ScenarioChoices";
 import { chooseScenarioResponse } from "../../reducers/GameActions";
-import { formatMoneyConcise } from "../../helpers/Format";
 import ConceptIcon from "./ConceptIcon";
 
 export default function ScenarioChoiceDialog() {
+  const { currency, formatMoneyConcise } = useMoney();
   const game = useAppSelector((state) => state.game);
   const dispatch = useAppDispatch();
   const decision = game.inGame ? pendingScenarioChoice(game) : undefined;
@@ -158,7 +159,7 @@ export default function ScenarioChoiceDialog() {
                     overflowWrap: "anywhere",
                   }}
                 >
-                  {scenarioChoiceDescription(option, game.difficulty)}
+                  {scenarioChoiceDescription(option, game.difficulty, currency)}
                   {!affordable && " · Insufficient cash"}
                 </Typography>
                 {grant > 0 && (

@@ -10,7 +10,7 @@ import {
 import { Provider, useSelector } from "react-redux";
 import type { GameType, PowerAgreementTermsVersion } from "../../Types";
 import { getDateFromMinute } from "../../helpers/DateTime";
-import { formatNumber } from "../../helpers/Format";
+import { formatMoneyFull, formatNumber } from "../../helpers/Format";
 import { currentTick } from "../../helpers/GameSelectors";
 import {
   agreementYearMinute,
@@ -49,8 +49,7 @@ beforeEach(() =>
     retry: jest.fn(),
   }),
 );
-const rate = (value: number) =>
-  `$${formatNumber(value, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/MWh`;
+const rate = (value: number) => `${formatMoneyFull(value)}/MWh`;
 function fixture() {
   const game = createGame({
     scenarioId: 116,
@@ -414,3 +413,25 @@ it.each([1, 2, 3] as PowerAgreementTermsVersion[])(
     expect(dialog).not.toHaveTextContent("The price follows inflation");
   },
 );
+
+it("displays exact converted agreement prices without changing the quoted terms", () => {
+  const game = fixture();
+  game.location = { ...game.location, country: "France" };
+  const quote = powerAgreementQuote(game, "champlain-quebec")!;
+  const before = JSON.stringify(quote.receipt);
+  mount(game);
+  fireEvent.click(
+    screen.getByRole("button", { name: "Review Québec hydro replacement" }),
+  );
+  const dialog = screen.getByRole("dialog", {
+    name: "Review Québec hydro replacement",
+  });
+  const localPrice = new Intl.NumberFormat("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(quote.priceToday * 0.851);
+  expect(within(dialog).getByText(`€${localPrice}/MWh`)).toBeInTheDocument();
+  expect(
+    JSON.stringify(powerAgreementQuote(game, "champlain-quebec")!.receipt),
+  ).toBe(before);
+});

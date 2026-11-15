@@ -1,3 +1,5 @@
+import { currencyForLocation } from "../../helpers/Currency";
+import { useMoney } from "./CurrencyContext";
 import * as React from "react";
 import { Button, Typography } from "@mui/material";
 import DecisionDialog from "./DecisionDialog";
@@ -11,7 +13,6 @@ import { previewUtilityAcquisition } from "../../reducers/Game";
 import { acquisitionQuote } from "../../helpers/Expansion";
 import {
   formatCount,
-  formatMoneyConcise,
   formatNumber,
   formatPercent,
   formatWatts,
@@ -46,6 +47,9 @@ export default function AcquisitionReviewDialog({
   onAcquire,
 }: Props): React.JSX.Element | null {
   const dispatch = useAppDispatch();
+  const { formatMoneyConcise } = useMoney(
+    currencyForLocation(game.location, game.startingYear),
+  );
   const [error, setError] = React.useState<string>();
   React.useEffect(() => {
     const token = `acquisition:${targetId}`;

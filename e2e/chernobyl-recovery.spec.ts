@@ -81,7 +81,7 @@ for (const theme of ["light", "dark"] as const) {
       }),
     ).toBeVisible();
     await expect(unitFour).toContainText("Cleanup and recovery");
-    await expect(unitFour).toContainText("$250M/mo · $3B/yr");
+    await expect(unitFour).toContainText("SUR 250M/mo · SUR 3B/yr");
     await expect(unitFour).toContainText("from Apr 1986");
     const events = page.locator(".eventLog");
     await openPane(
@@ -147,7 +147,7 @@ for (const theme of ["light", "dark"] as const) {
       }),
     ).toHaveCount(0);
     await expect(unitFour).toContainText("Cleanup and recovery");
-    await expect(unitFour).toContainText("$250M/mo · $3B/yr");
+    await expect(unitFour).toContainText("SUR 250M/mo · SUR 3B/yr");
     await expect(unitFour).not.toContainText("from Apr 1986");
     if (
       screenshots &&

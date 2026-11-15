@@ -1,3 +1,4 @@
+import { CurrencyType, USD_CURRENCY } from "./Currency";
 import { DifficultyType, GameType, ScenarioChoiceType } from "../Types";
 import { SCENARIO_CHOICES } from "../data/ScenarioChoices";
 import { bulkWinterizationQuote } from "./Hazards";
@@ -27,7 +28,7 @@ export function scenarioChoicesForGame(game: GameType): {
     !SCENARIO_CHOICES.some((choice) => choice.scenarioId === game.scenarioId)
   )
     return { choices: [] };
-  const key = `${game.scenarioId}:${game.difficulty}:${game.seed}:${game.startingYear}`;
+  const key = `${game.scenarioId}:${game.difficulty}:${game.seed}:${game.startingYear}:${game.location.country ?? ""}`;
   let choices = catalogChoices.get(key);
   if (!choices) {
     choices = compileOfficialArcChoices(
@@ -167,6 +168,7 @@ export function isBulkWinterizationChoice(choice: CompiledRuleChoice): boolean {
 export function scenarioChoiceDescription(
   option: ScenarioChoiceType["options"][number],
   difficulty: DifficultyType,
+  currency: CurrencyType = USD_CURRENCY,
 ) {
   const cost = option.cost(difficulty);
   const grant = option.upfrontGrant?.(difficulty) ?? 0;
@@ -178,8 +180,8 @@ export function scenarioChoiceDescription(
         ? "One-time upfront cost."
         : "No upfront cost.");
   return description
-    .replaceAll("{cost}", formatMoneyConcise(cost))
-    .replaceAll("{grant}", formatMoneyConcise(grant));
+    .replaceAll("{cost}", formatMoneyConcise(cost, currency))
+    .replaceAll("{grant}", formatMoneyConcise(grant, currency));
 }
 /** Due choices remain pending until explicitly answered, including after loading a save.
  * Array order breaks ties so simultaneous choices appear sequentially. */

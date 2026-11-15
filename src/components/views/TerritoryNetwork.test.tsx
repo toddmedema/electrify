@@ -13,6 +13,7 @@ import { territorySiteInventory } from "../../helpers/Territories";
 import TerritoryNetwork from "./TerritoryNetwork";
 import BuildGenerators from "./BuildGenerators";
 import BuildStorage from "./BuildStorage";
+import TransmissionPanel from "./TransmissionPanel";
 import { GameToolMemoryContext } from "../base/GameToolMemory";
 import { TERRITORY_BUILD_MEMORY_KEY } from "../base/TerritoryBuildDestination";
 
@@ -213,4 +214,71 @@ it("caps storage by local power and sends its selected destination to the purcha
     false,
     "valley-electric",
   );
+});
+
+it("restores a supported tier when switching from another connection catalogue to Green Uplands", () => {
+  const game = network();
+  const memory = new Map<string, unknown>();
+  const view = render(
+    <GameToolMemoryContext.Provider value={memory}>
+      <TransmissionPanel
+        game={game}
+        {...controls}
+        projectsOnly
+        corridorIds={["vt-champlain-valley"]}
+      />
+    </GameToolMemoryContext.Provider>,
+  );
+  fireEvent.change(screen.getByRole("slider", { name: /Construction tier/ }), {
+    target: { value: 2 },
+  });
+  expect(
+    screen.getByRole("slider", { name: /Construction tier/ }),
+  ).toHaveAttribute("aria-valuenow", "2");
+  view.unmount();
+  const onBuild = jest.fn();
+  render(
+    <GameToolMemoryContext.Provider value={memory}>
+      <TerritoryNetwork game={game} {...controls} onBuild={onBuild} />
+    </GameToolMemoryContext.Provider>,
+  );
+  fireEvent.click(
+    screen.getByRole("button", { name: "Inspect Green Uplands territory" }),
+  );
+  const detail = screen.getByRole("region", { name: "Selected territory" });
+  expect(
+    within(detail).getByRole("slider", { name: /Construction tier/ }),
+  ).toHaveAttribute("aria-valuenow", "1");
+  const review = within(detail).getByRole("button", {
+    name: /Review purchase of .*Green Uplands/,
+  });
+  expect(review).toBeEnabled();
+  fireEvent.click(review);
+  fireEvent.click(
+    within(screen.getByRole("dialog")).getByRole("button", {
+      name: "Pay cash",
+    }),
+  );
+  expect(onBuild).toHaveBeenCalledWith("vt-champlain-uplands", false, 1);
+});
+
+it("reviews an acquired corridor upgrade using physical capacity in both directions", () => {
+  render(<TerritoryNetwork game={ownedValley()} {...controls} />);
+  fireEvent.click(
+    screen.getByRole("button", { name: "Inspect Valley Electric territory" }),
+  );
+  const detail = screen.getByRole("region", { name: "Selected territory" });
+  fireEvent.click(
+    within(detail).getByRole("button", {
+      name: /^Inspect Champlain ↔ Valley,/,
+    }),
+  );
+  fireEvent.click(
+    within(detail).getByRole("button", {
+      name: "Review upgrade of Champlain ↔ Valley",
+    }),
+  );
+  const dialog = screen.getByRole("dialog");
+  expect(dialog).toHaveTextContent("Power to Champlain100MW → 150MW");
+  expect(dialog).toHaveTextContent("Power from Champlain100MW → 150MW");
 });

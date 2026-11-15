@@ -2,6 +2,7 @@ import { formatCount } from "../src/helpers/Format";
 import path from "path";
 import { expect, test } from "./fixtures";
 import { openBuild, openPane } from "./layout";
+import { reviewScreenshot } from "./review-screenshot";
 import { expectPurchaseFactTable } from "./purchase-review-layout";
 import { expectDialogToFit } from "./dialog-layout";
 import { expectContinuousDialogSurface } from "./dialog-surface";
@@ -116,13 +117,13 @@ for (const theme of ["light", "dark"] as const) {
     await facilities.getByRole("tab", { name: "Fleet", exact: true }).click();
     await expect(
       facilities.getByRole("button", {
-        name: "Inspect Oil A",
+        name: "Inspect Oil A, Champlain",
         exact: true,
       }),
     ).toBeVisible();
     await expect(
       facilities.getByRole("button", {
-        name: "Inspect Oil B",
+        name: "Inspect Oil B, Champlain",
         exact: true,
       }),
     ).toBeVisible();
@@ -641,18 +642,28 @@ for (const theme of ["light", "dark"] as const) {
       await expect(goals).toContainText(
         "Acquired original oil plants by Dec 2023",
       );
-      const plan = scenario.getByRole("region", {
-        name: "Supply plan",
-        exact: true,
-      });
-      await expect(plan).not.toContainText(
-        /Budget for|Build-time example|Gas example|Lower rates|before selling|order by/i,
-      );
-      await expect(plan).toContainText("Valley Oil: retirement due Dec 2023");
-      if (index === 1)
-        await expect(plan).toContainText("Ridge Oil: retirement due Dec 2023");
+      await expect(
+        scenario.getByRole("region", { name: "Supply plan", exact: true }),
+      ).toHaveCount(0);
       await scenario
         .getByRole("button", { name: "Close Scenario", exact: true })
+        .click();
+      const events = page.locator(".eventLog:visible");
+      await openPane(
+        events,
+        page.getByRole("button", { name: "Events", exact: true }),
+      );
+      await expect(events).toContainText("1.5× opening upkeep");
+      await expect(events).toContainText("2× opening upkeep");
+      await expect(events).toContainText(
+        "Regional nuclear will fall to 76MW deliverable",
+      );
+      if (index === 1)
+        await expect(events).toContainText(
+          "Regional firm purchase will fall to 19MW deliverable",
+        );
+      await page
+        .getByRole("button", { name: "Close Events", exact: true })
         .click();
       await openPane(
         facilities,
@@ -661,7 +672,7 @@ for (const theme of ["light", "dark"] as const) {
       await facilities.getByRole("tab", { name: "Fleet", exact: true }).click();
       await expect(
         facilities.getByRole("button", {
-          name: `Inspect ${index === 0 ? "Valley" : "Ridge"} Oil`,
+          name: `Inspect ${index === 0 ? "Valley" : "Ridge"} Oil, ${target}`,
           exact: true,
         }),
       ).toBeVisible();
@@ -902,7 +913,7 @@ test("normal valley play saves across the first year and resumes from IndexedDB"
 
 test("Green Uplands connects empty land and builds a generator in its own territory", async ({
   page,
-}) => {
+}, testInfo) => {
   test.setTimeout(120000);
   await page.addInitScript(() => localStorage.setItem("audioEnabled", "false"));
   await page.goto("/?scenario=116");
@@ -916,6 +927,16 @@ test("Green Uplands connects empty land and builds a generator in its own territ
   const customers = opening.timeline.find(
     (tick) => tick.minute === opening.date.minute,
   )!.customers;
+  await openBuild(page);
+  await page.getByRole("tab", { name: "Interties", exact: true }).click();
+  const tier = page.getByRole("slider", { name: /Construction tier/ });
+  await tier.press("Home");
+  await tier.press("ArrowRight");
+  await expect(tier).toHaveAttribute("aria-valuetext", "Tier II");
+  await openPane(
+    page.locator(".facilities"),
+    page.getByRole("button", { name: "Facilities", exact: true }),
+  );
   await facilities
     .getByRole("button", {
       name: "Inspect Green Uplands territory",
@@ -925,6 +946,13 @@ test("Green Uplands connects empty land and builds a generator in its own territ
   await expect(
     facilities.getByRole("region", { name: "Selected territory" }),
   ).toContainText("No customers transfer");
+  await expect(
+    facilities.getByRole("slider", { name: /Construction tier/ }),
+  ).toHaveAttribute("aria-valuetext", "Tier I");
+  await reviewScreenshot(
+    facilities.getByRole("region", { name: "Selected territory" }),
+    { path: testInfo.outputPath("green-uplands-tier.png") },
+  );
   await facilities
     .getByRole("button", { name: /Review purchase of .*Green Uplands/ })
     .click();

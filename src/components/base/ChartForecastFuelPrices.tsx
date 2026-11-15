@@ -1,3 +1,5 @@
+import { CurrencyContext } from "./CurrencyContext";
+import type { CurrencyType } from "../../helpers/Currency";
 import * as React from "react";
 import uPlot from "uplot";
 import UPlotChart, { BuildContext } from "./UPlotChart";
@@ -33,6 +35,7 @@ export interface Props {
 }
 
 interface State {
+  currency: CurrencyType;
   prices: number[][];
   fuels: readonly PricedFuelNameType[];
   minutes: number[];
@@ -43,11 +46,12 @@ interface State {
 
 // A forecast axis must use positions the two-digit, cent-limited money labels can
 // represent. Widen a narrow padded range to those steps instead of repeating labels.
-function priceStep(min: number, max: number): number {
-  const magnitude = Math.max(Math.abs(min), Math.abs(max));
+function priceStep(min: number, max: number, currency: CurrencyType): number {
+  const magnitude =
+    Math.max(Math.abs(min), Math.abs(max)) * currency.unitsPerDollar;
   const exponent =
     magnitude === 0 ? 0 : Number(magnitude.toExponential().split("e")[1]);
-  return Math.max(0.01, Number(`1e${exponent - 1}`));
+  return Math.max(0.01, Number(`1e${exponent - 1}`)) / currency.unitsPerDollar;
 }
 
 function buildOptions(
@@ -69,7 +73,7 @@ function buildOptions(
       y: {
         range: (_u, min, max) => {
           const [low, high] = padRange(min, max);
-          const step = priceStep(low, high);
+          const step = priceStep(low, high, getState().currency);
           return [Math.floor(low / step) * step, Math.ceil(high / step) * step];
         },
       },
@@ -78,10 +82,11 @@ function buildOptions(
       forecastMonthAxis(scale, getState, showXLabels),
       yAxis(scale, {
         grid: true,
-        label: "Price per MMBtu",
+        label: `Price per MMBtu (${getState().currency.code})`,
         splits: (_u, _axis, min, max) =>
-          stepTicks(min, max, priceStep(min, max)),
-        values: (_u, splits) => splits.map((t) => formatMoneyConcise(t)),
+          stepTicks(min, max, priceStep(min, max, getState().currency)),
+        values: (_u, splits) =>
+          splits.map((t) => formatMoneyConcise(t, getState().currency)),
       }),
     ],
     series: [
@@ -107,7 +112,8 @@ function tooltip(idx: number, state: State): string {
   return [
     header,
     ...state.fuels.map(
-      (f, i) => `${f}: ${formatMoneyStable(state.prices[i][idx])}`,
+      (f, i) =>
+        `${f}: ${formatMoneyStable(state.prices[i][idx], state.currency)}`,
     ),
   ].join("\n");
 }
@@ -117,6 +123,8 @@ export default class ChartForecastFuelPrices extends React.PureComponent<
   Props,
   {}
 > {
+  static contextType = CurrencyContext;
+
   public render() {
     const {
       domain,
@@ -128,6 +136,7 @@ export default class ChartForecastFuelPrices extends React.PureComponent<
       syncKey,
       selectedFuel,
     } = this.props;
+    const currency = this.context as CurrencyType;
     const fuels = selectedFuel ? [selectedFuel] : PRICED_FUELS;
 
     const minutes = new Array<number>(timeline.length);
@@ -145,13 +154,21 @@ export default class ChartForecastFuelPrices extends React.PureComponent<
       <div id="chartForecastFuelPrices">
         <UPlotChart<State>
           ariaLabel="Chart of predicted fuel prices"
-          formatSummaryValue={formatMoneyStable}
+          formatSummaryValue={(value) => formatMoneyStable(value, currency)}
           height={height}
-          state={{ prices, fuels, minutes, domain, startingYear, multiyear }}
+          state={{
+            prices,
+            fuels,
+            minutes,
+            domain,
+            startingYear,
+            multiyear,
+            currency,
+          }}
           data={[minutes, ...prices]}
           seriesLabels={fuels}
           buildOptions={buildOptions(showXLabels !== false, fuels)}
-          structureKey={`${String(showXLabels !== false)}:${fuels.join(",")}`}
+          structureKey={`${String(showXLabels !== false)}:${fuels.join(",")}:${currency.code}`}
           syncKey={syncKey}
           tooltip={tooltip}
         />

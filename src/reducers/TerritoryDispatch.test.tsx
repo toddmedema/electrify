@@ -562,3 +562,50 @@ it("connects empty land at its authored size without adding customers or market 
     ),
   ).toEqual(game);
 });
+
+it("does not redirect a remote battery's routed draw into self-discharge room across a paused link", () => {
+  let game = isolated();
+  const quote = storageQuote(game);
+  const offset = game.date.minute;
+  game.startingYear = game.date.year;
+  game.date = getDateFromMinute(0, game.startingYear);
+  game.timeline.forEach((tick) => {
+    tick.minute -= offset;
+  });
+  for (const territoryId of ["valley-electric", "champlain"] as const)
+    game = copyOfficialGame(
+      reducer(
+        game,
+        buildFacility({ facility: quote, financed: false, territoryId }),
+      ),
+    );
+  const home = game.facilities.find(
+    ({ territoryId }) => territoryId === "champlain",
+  )!;
+  const remote = game.facilities.find(
+    ({ territoryId }) => territoryId === "valley-electric",
+  )!;
+  home.yearsToBuildLeft = remote.yearsToBuildLeft = 0;
+  home.currentWh = home.peakWh!;
+  home.hourlyLoss = 0.1;
+  remote.currentWh = 0;
+  remote.hourlyLoss = 0;
+  const homeSource = plant(game, "champlain", 1000e6);
+  const source = plant(game, "valley-electric", 1000e6);
+  game.facilities = [homeSource, home, source, remote];
+  game.transmission!.lines[0].paused = true;
+  request(game);
+  tickState(game);
+  expect(home.currentW).toBe(0);
+  expect(home.currentWh).toBeLessThan(home.peakWh!);
+  expect(remote.currentW).toBeLessThan(0);
+  expect(currentTick(game)!.territories!.champlain!.storageChargeW).toBe(0);
+  expect(
+    currentTick(game)!.territories!["valley-electric"]!.storageChargeW,
+  ).toBeCloseTo(
+    source.currentW -
+      currentTick(game)!.territories!["valley-electric"]!.supplyW,
+    4,
+  );
+  expectConserved(game);
+});

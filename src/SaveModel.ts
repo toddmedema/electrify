@@ -1,3 +1,4 @@
+import { isCurrencyCode } from "./helpers/Currency";
 import type {
   GameType,
   ScoreBreakdownType,
@@ -222,6 +223,8 @@ export function parseSavedRunResult(raw: unknown): SavedRunResult | null {
     const summary = raw.debrief;
     if (
       !object(summary) ||
+      (summary.currencyCode !== undefined &&
+        !isCurrencyCode(summary.currencyCode)) ||
       !validFleet(summary.startingFleet) ||
       !validFleet(summary.finalFleet) ||
       ![
@@ -264,6 +267,9 @@ export function parseSavedRunResult(raw: unknown): SavedRunResult | null {
       return null;
     // JSON round-tripping selects plain immutable data and drops no valid optional values.
     debrief = {
+      ...(summary.currencyCode === undefined
+        ? {}
+        : { currencyCode: summary.currencyCode as string }),
       ...(summary.demandWh === undefined
         ? {}
         : { demandWh: summary.demandWh as number }),

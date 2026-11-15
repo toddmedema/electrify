@@ -1,10 +1,12 @@
+import { currencyForLocation } from "../../helpers/Currency";
+import { useMoney } from "./CurrencyContext";
 import * as React from "react";
 import { Typography } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import RemoveIcon from "@mui/icons-material/Remove";
 import { GameType, TickPresentFutureType } from "../../Types";
-import { formatMoneyConcise, formatWatts } from "../../helpers/Format";
+import { formatWatts } from "../../helpers/Format";
 import { useAppSelector } from "../../Store";
 import { currentTick } from "../../helpers/GameSelectors";
 
@@ -23,6 +25,9 @@ export default function PowerExchangeSummary({
   now: TickPresentFutureType;
 }) {
   const flow = (now.importedW || 0) - (now.exportedW || 0);
+  const { formatMoneyConcise } = useMoney(
+    currencyForLocation(game.location, game.startingYear),
+  );
   const direction =
     flow > 0 ? "Importing" : flow < 0 ? "Exporting" : "Standing by";
   const previousDirection = React.useRef(direction);

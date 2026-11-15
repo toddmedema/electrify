@@ -1,3 +1,4 @@
+import { currencyForLocation } from "./Currency";
 import type { GameType, ActiveWorldEventType } from "../Types";
 import type { StoryPhaseDescriptionType } from "../data/WorldEvents";
 import type {
@@ -230,14 +231,28 @@ function validOfficialOccurrence(
   if (canonicalRuleJson(event.effects) !== canonicalRuleJson(effects))
     return false;
   if (custom) {
-    const changes = scenarioEffectsSummary(effects);
+    const changes = scenarioEffectsSummary(
+      effects,
+      false,
+      currencyForLocation(game.location, game.startingYear),
+    );
     const message =
       review === "nuclearTrip"
         ? customNames?.length
           ? `${customNames[0]} is offline for the rest of this event. Replace its output with generation, storage or imports.`
           : "Your grid has no operating nuclear reactor, so this shutdown causes no loss of supply."
         : `${game.location.name}: ${changes.length ? changes.join("; ") + "." : "Review your supply and reserves before the upcoming scenario event."}`;
-    return event.message === message && typeof event.importance === "string";
+    // Older saves retain their already-recorded USD text. Only the exact old presentation
+    // is accepted; the effects and receipt structure above still have to match the rule.
+    const legacyChanges = scenarioEffectsSummary(effects);
+    const legacyMessage =
+      review === "nuclearTrip"
+        ? message
+        : `${game.location.name}: ${legacyChanges.length ? legacyChanges.join("; ") + "." : "Review your supply and reserves before the upcoming scenario event."}`;
+    return (
+      (event.message === message || event.message === legacyMessage) &&
+      typeof event.importance === "string"
+    );
   }
   if (!review || ["hurricaneOutlook", "nuclearContingency"].includes(review))
     return (

@@ -1,6 +1,9 @@
 import { createTheme, ThemeProvider } from "@mui/material/styles";
 import { render, screen, within } from "@testing-library/react";
 import * as DateTime from "../../helpers/DateTime";
+import { configureStore } from "@reduxjs/toolkit";
+import { Provider } from "react-redux";
+import { SCENARIOS } from "../../data/Scenarios";
 import { createGame } from "../../testing/Simulator";
 import { activeScenario } from "../../helpers/GameSelectors";
 import { ScenarioDetailsContent } from "./ScenarioDetails";
@@ -246,16 +249,35 @@ it.each([-198, 198])(
   },
 );
 
-it("presents supply facts and concise goal headings without coaching the player", () => {
+it.each(SCENARIOS)("omits the supply plan from $name details", (scenario) => {
+  const originalWorker = global.Worker;
+  global.Worker = jest.fn() as unknown as typeof Worker;
+  jest.spyOn(DeferredProjection, "projectionReady").mockReturnValue(false);
+  jest
+    .spyOn(DeferredProjection, "requestProjection")
+    .mockImplementation(() => undefined);
+  try {
+    const game = createGame({ scenarioId: scenario.id });
+    const store = configureStore({ reducer: () => ({ game }) });
+    render(
+      <Provider store={store}>
+        <ScenarioDetailsContent game={game} scenario={scenario} />
+      </Provider>,
+    );
+    expect(
+      screen.queryByRole("region", { name: "Supply plan" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/Next year at current rates and policies/),
+    ).not.toBeInTheDocument();
+  } finally {
+    global.Worker = originalWorker;
+  }
+});
+
+it("keeps acquisition and retirement goals in scenario details", () => {
   const game = createGame({ scenarioId: 116 });
   renderDetails(game);
-  const plan = screen.getByRole("region", { name: "Supply plan" });
-  expect(plan).toHaveTextContent("1.5× opening upkeep");
-  expect(plan).toHaveTextContent("2× opening upkeep");
-  expect(plan).toHaveTextContent("Regional nuclear ends");
-  expect(plan).not.toHaveTextContent(
-    /Budget for|Build-time example|Gas example|Lower rates|before selling|order by/i,
-  );
   const goals = screen.getByRole("region", { name: "Goals" });
   expect(
     within(goals).getByText("Acquire a utility", { exact: true }),

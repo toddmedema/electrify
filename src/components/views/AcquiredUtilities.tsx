@@ -1,8 +1,9 @@
+import { useMoney } from "../base/CurrencyContext";
 import * as React from "react";
 import { UTILITY_AREAS, UTILITY_TARGETS } from "../../data/UtilityExpansion";
 import { getCostTableIndex } from "../../data/Economy";
 import { getDateFromMinute } from "../../helpers/DateTime";
-import { formatCount, formatMoneyConcise } from "../../helpers/Format";
+import { formatCount } from "../../helpers/Format";
 import { getTotalDebt } from "../../helpers/Financials";
 import type { GameType } from "../../Types";
 import { ChevronDownGlyph } from "../base/Glyphs";
@@ -15,6 +16,7 @@ export default function AcquiredUtilities({
   game: GameType;
   summaryRef: React.RefObject<HTMLElement>;
 }) {
+  const { formatMoneyConcise } = useMoney();
   const expansion = game.utilityExpansion;
   if (!expansion?.acquisitions.length) return null;
   const costIndex = getCostTableIndex(game.date, game.startingYear, game.seed);

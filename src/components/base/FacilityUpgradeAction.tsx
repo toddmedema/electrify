@@ -1,6 +1,6 @@
+import { useMoney } from "./CurrencyContext";
 import * as React from "react";
 import { Button, Typography } from "@mui/material";
-import { formatMoneyConcise } from "../../helpers/Format";
 
 export default function FacilityUpgradeAction(props: {
   label: string;
@@ -9,6 +9,7 @@ export default function FacilityUpgradeAction(props: {
   onClick: () => void;
 }) {
   const shortfallId = React.useId();
+  const { formatMoneyConcise } = useMoney();
   return (
     <div className="facilityRetrofit">
       <Button
