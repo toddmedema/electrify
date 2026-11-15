@@ -917,6 +917,7 @@ export class MultiplayerSession {
               );
           return;
         }
+        if (data.kind !== "views") return;
         for (const [id, view] of Object.entries(data.views)) {
           view.disconnected = view.grids
             .filter(

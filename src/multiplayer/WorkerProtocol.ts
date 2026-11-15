@@ -1,3 +1,4 @@
+import type { ReplicaBaseline, ReplicaRecord } from "./Replication";
 import type {
   CommandEnvelope,
   MatchSpec,
@@ -12,6 +13,8 @@ export type WorkerRequest =
   | {
       kind: "create";
       local?: boolean;
+      replication?: boolean;
+      hostSeat?: string;
       spec: MatchSpec;
       seats: Seat[];
       matchId: string;
@@ -24,6 +27,8 @@ export type WorkerRequest =
       epoch: string;
       seats?: Seat[];
       local?: boolean;
+      replication?: boolean;
+      hostSeat?: string;
     }
   | {
       kind: "command";
@@ -32,6 +37,7 @@ export type WorkerRequest =
       allowReady?: boolean;
     }
   | { kind: "disconnect"; sender: string }
+  | { kind: "baseline"; to: string }
   /** Shell-only lifecycle state; never exposed through a seat port. */
   | {
       kind: "blockers";
@@ -46,6 +52,22 @@ export type WorkerRequest =
       suspended?: boolean;
     };
 export type WorkerResponse =
+  | {
+      kind: "records";
+      matchId: string;
+      epoch: string;
+      from: number;
+      records: ReplicaRecord[];
+    }
+  | { kind: "baseline"; to: string; baseline: ReplicaBaseline }
+  | {
+      kind: "rejected";
+      to: string;
+      matchId: string;
+      epoch: string;
+      sequence: number;
+      error: string;
+    }
   | { kind: "summary"; summary: import("../couch/Protocol").CouchSummary }
   | { kind: "views"; views: Record<string, RoomView> }
   | { kind: "keepalive"; matchId: string; epoch: string; revision: number }

@@ -1,3 +1,4 @@
+import { TextEncoder } from "util";
 import manifest from "../data/RunCompatibility.json";
 import { TICK_MS } from "../Constants";
 import type { SpeedType } from "../Types";
@@ -23,6 +24,7 @@ jest.mock("../multiplayer/World", () => ({
   stepWorld: jest.fn(),
   roomView: jest.fn(() => ({})),
   checkpointWorld: (world: World) => world,
+  worldBlockers: () => [],
   pauseWorld: (world: World, reason: string) => {
     world.speed = "PAUSED";
     world.paused = true;
@@ -613,6 +615,235 @@ test("a slow shell bounds cloned views while ticks, receipts, checkpoints and sa
     await send({ kind: "views-applied" });
     await send({ kind: "views-applied" });
     expect(roomView).toHaveBeenCalledTimes(6);
+  } finally {
+    jest.clearAllTimers();
+    post.mockRestore();
+    scope.onmessage = previousMessage;
+    jest.useRealTimers();
+  }
+});
+
+test("replication projects only the host seat, orders baselines and coalesces command records", async () => {
+  jest.useFakeTimers();
+  const scope = globalThis as unknown as Worker;
+  const previousMessage = scope.onmessage;
+  const post = jest.spyOn(scope, "postMessage").mockImplementation(() => {});
+  Object.assign(globalThis, { TextEncoder });
+  const { createWorld, roomView, applyCommand } = jest.requireMock(
+    "../multiplayer/World",
+  );
+  const world = {
+    matchId: "match",
+    epoch: "epoch",
+    revision: 0,
+    speed: "PAUSED",
+    paused: true,
+    readyRequired: true,
+    ready: [],
+    reason: "Paused",
+    outcomes: {},
+    sequences: {},
+    receipts: {},
+    seats: [
+      { id: "host", name: "Host" },
+      { id: "guest", name: "Guest" },
+    ],
+  } as unknown as World;
+  createWorld.mockReturnValue(world);
+  applyCommand.mockImplementation(
+    (target: World, sender: string, envelope: { sequence: number }) => {
+      if (envelope.sequence !== (target.sequences[sender] || 0) + 1)
+        return "A command is missing";
+      target.sequences[sender] = envelope.sequence;
+      target.revision++;
+    },
+  );
+  try {
+    require("./Multiplayer.worker");
+    const send = async (data: WorkerRequest) =>
+      scope.onmessage!({ data } as MessageEvent<WorkerRequest>);
+    await send({
+      kind: "create",
+      spec: { scenarioId: 101, difficulty: "Employee" },
+      seats: world.seats,
+      matchId: "match",
+      epoch: "epoch",
+      replication: true,
+      hostSeat: "host",
+    });
+    expect(roomView.mock.calls.map((call: [World, string]) => call[1])).toEqual(
+      ["host"],
+    );
+    const first = post.mock.calls.map(([event]) => event);
+    const baselineIndex = first.findIndex((event) => event.kind === "baseline");
+    expect(first[baselineIndex - 1]).toMatchObject({
+      kind: "records",
+      from: 1,
+      records: [{ t: "pause", reason: "Synchronizing Guest" }],
+    });
+    expect(first[baselineIndex]).toMatchObject({
+      kind: "baseline",
+      to: "guest",
+      baseline: { index: 1, epoch: "epoch" },
+    });
+    jest.advanceTimersByTime(0);
+    expect(post).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        kind: "records",
+        from: 2,
+        records: [{ t: "verify" }],
+      }),
+    );
+    post.mockClear();
+    for (const sequence of [1, 2])
+      await send({
+        kind: "command",
+        sender: "guest",
+        envelope: {
+          matchId: "match",
+          epoch: "epoch",
+          sequence,
+          command: { kind: "rate", value: 0.2 },
+        },
+      });
+    expect(
+      post.mock.calls.filter(([event]) => event.kind === "records"),
+    ).toHaveLength(0);
+    jest.advanceTimersByTime(0);
+    expect(
+      post.mock.calls.filter(([event]) => event.kind === "records"),
+    ).toHaveLength(1);
+    expect(post).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        kind: "records",
+        from: 3,
+        records: [
+          expect.objectContaining({ t: "command", revision: 1 }),
+          expect.objectContaining({ t: "command", revision: 2 }),
+        ],
+      }),
+    );
+    await send({
+      kind: "command",
+      sender: "guest",
+      envelope: {
+        matchId: "match",
+        epoch: "epoch",
+        sequence: 4,
+        command: { kind: "ready" },
+      },
+    });
+    expect(post).toHaveBeenLastCalledWith({
+      kind: "rejected",
+      to: "guest",
+      matchId: "match",
+      epoch: "epoch",
+      sequence: 4,
+      error: "A command is missing",
+    });
+  } finally {
+    jest.clearAllTimers();
+    post.mockRestore();
+    scope.onmessage = previousMessage;
+    jest.useRealTimers();
+  }
+});
+
+test("replication splits batches by record count and tagged UTF-8 wire bytes without index gaps", async () => {
+  jest.useFakeTimers();
+  const scope = globalThis as unknown as Worker;
+  const previousMessage = scope.onmessage;
+  const post = jest.spyOn(scope, "postMessage").mockImplementation(() => {});
+  Object.assign(globalThis, { TextEncoder });
+  const { stringify } = require("../../electron/coop-codec.cjs");
+  const { createWorld, applyCommand } = jest.requireMock(
+    "../multiplayer/World",
+  );
+  const world = {
+    matchId: "match",
+    epoch: "epoch",
+    revision: 0,
+    speed: "PAUSED",
+    paused: true,
+    readyRequired: true,
+    ready: [],
+    reason: "Paused",
+    outcomes: {},
+    sequences: {},
+    receipts: {},
+    seats: [
+      { id: "host", name: "Host" },
+      { id: "guest", name: "Guest" },
+    ],
+  } as unknown as World;
+  createWorld.mockReturnValue(world);
+  applyCommand.mockImplementation(
+    (target: World, sender: string, envelope: { sequence: number }) => {
+      target.sequences[sender] = envelope.sequence;
+      target.revision++;
+    },
+  );
+  try {
+    require("./Multiplayer.worker");
+    const send = async (data: WorkerRequest) =>
+      scope.onmessage!({ data } as MessageEvent<WorkerRequest>);
+    await send({
+      kind: "create",
+      spec: { scenarioId: 101, difficulty: "Employee" },
+      seats: world.seats,
+      matchId: "match",
+      epoch: "epoch",
+      replication: true,
+      hostSeat: "host",
+    });
+    jest.advanceTimersByTime(0);
+    post.mockClear();
+    for (let sequence = 1; sequence <= 300; sequence++)
+      await send({
+        kind: "command",
+        sender: "host",
+        envelope: {
+          matchId: "match",
+          epoch: "epoch",
+          sequence,
+          command: { kind: "rate", value: 0.2 },
+        },
+      });
+    jest.advanceTimersByTime(0);
+    let batches = post.mock.calls
+      .map(([event]) => event)
+      .filter((event) => event.kind === "records");
+    expect(batches.map((batch) => batch.records.length)).toEqual([256, 44]);
+    expect(batches.map((batch) => batch.from)).toEqual([3, 259]);
+    post.mockClear();
+    for (let sequence = 301; sequence <= 330; sequence++)
+      await send({
+        kind: "command",
+        sender: "host",
+        envelope: {
+          matchId: "match",
+          epoch: "epoch",
+          sequence,
+          command: {
+            kind: "action",
+            name: "invalid",
+            payload: { text: "λ".repeat(1000), values: Array(50).fill(-0) },
+          },
+        },
+      });
+    jest.advanceTimersByTime(0);
+    batches = post.mock.calls
+      .map(([event]) => event)
+      .filter((event) => event.kind === "records");
+    expect(batches.length).toBeGreaterThan(1);
+    let next = 303;
+    for (const batch of batches) {
+      expect(batch.from).toBe(next);
+      next += batch.records.length;
+      expect(batch.records.length).toBeLessThanOrEqual(256);
+      expect(Buffer.byteLength(stringify(batch))).toBeLessThanOrEqual(65536);
+    }
+    expect(next).toBe(333);
   } finally {
     jest.clearAllTimers();
     post.mockRestore();

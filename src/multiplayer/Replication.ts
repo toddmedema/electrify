@@ -260,6 +260,7 @@ export class Replica {
     this.index = baseline.index;
     this.terminal = false;
   }
+  /** Hashing callers split batches at each verify and capture bytes before replaying later records. */
   apply(from: number, records: ReplicaRecord[]): number[] {
     if (!this.current || this.terminal)
       throw new ReplicaMismatch("The replica is not live");

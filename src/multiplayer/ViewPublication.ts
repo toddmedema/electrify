@@ -58,12 +58,14 @@ export class ViewPublication {
         );
   }
 
-  take(world: World, now: number) {
+  take(world: World, now: number, seatIds?: readonly string[]) {
     const key = this.key(world);
     const all = this.force || this.published !== key;
-    const seats = all
-      ? world.seats
-      : world.seats.filter((seat) => this.receipts.has(seat.id));
+    const seats = world.seats.filter(
+      (seat) =>
+        (!seatIds || seatIds.includes(seat.id)) &&
+        (all || this.receipts.has(seat.id)),
+    );
     const views = Object.fromEntries(
       seats.map((seat) => {
         const view = this.build(world, seat.id);
