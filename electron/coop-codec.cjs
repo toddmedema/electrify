@@ -4,16 +4,29 @@ const REFERENCE = "$electrifyScenario";
 const DIGEST = /^sha256-[a-f0-9]{64}$/;
 const record = (value) =>
   value && typeof value === "object" && !Array.isArray(value);
-const numberEncoding = (_key, item) =>
-  typeof item === "number" && !Number.isFinite(item)
-    ? { $electrifyNumber: String(item) }
-    : item;
-const numberDecoding = (_key, item) =>
-  record(item) &&
-  Object.keys(item).length === 1 &&
-  ["Infinity", "-Infinity", "NaN"].includes(item.$electrifyNumber)
-    ? Number(item.$electrifyNumber)
-    : item;
+const ARRAY_UNDEFINED = Symbol("array undefined");
+function numberEncoding(_key, item) {
+  if (typeof item === "number") {
+    if (Object.is(item, -0)) return { $electrifyNumber: "-0" };
+    if (!Number.isFinite(item)) return { $electrifyNumber: String(item) };
+  }
+  if (item === undefined && Array.isArray(this))
+    return { $electrifyNumber: "undefined" };
+  return item;
+}
+function numberDecoding(_key, item) {
+  // Returning undefined from a JSON reviver deletes the array element. Restore it when the
+  // containing array is visited instead, retaining an explicit undefined rather than a hole.
+  if (Array.isArray(item))
+    return item.map((value) => (value === ARRAY_UNDEFINED ? undefined : value));
+  if (record(item) && Object.keys(item).length === 1) {
+    if (item.$electrifyNumber === "undefined")
+      return Array.isArray(this) ? ARRAY_UNDEFINED : undefined;
+    if (["Infinity", "-Infinity", "NaN", "-0"].includes(item.$electrifyNumber))
+      return Number(item.$electrifyNumber);
+  }
+  return item;
+}
 const plainJson = (value) => JSON.stringify(value, numberEncoding);
 
 function worldShape(value) {
@@ -89,8 +102,12 @@ function unpackWorld(value) {
 }
 
 const stringify = (value) =>
-  JSON.stringify(value, (key, item) => numberEncoding(key, packWorld(item)));
+  JSON.stringify(value, function (key, item) {
+    return numberEncoding.call(this, key, packWorld(item));
+  });
 const parse = (value) =>
-  JSON.parse(value, (key, item) => unpackWorld(numberDecoding(key, item)));
+  JSON.parse(value, function (key, item) {
+    return unpackWorld(numberDecoding.call(this, key, item));
+  });
 
 module.exports = { stringify, parse };

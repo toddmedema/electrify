@@ -79,8 +79,25 @@ test("full JSON, official worlds, unknown world versions and nonfinite values re
   }
   assert.deepEqual(
     parse(stringify({ values: [Infinity, -Infinity, NaN, -0] })).values,
-    [Infinity, -Infinity, NaN, 0],
+    [Infinity, -Infinity, NaN, -0],
   );
+});
+
+test("array undefined and negative zero survive nested baselines without retaining undefined properties", () => {
+  const source = {
+    omitted: undefined,
+    values: [undefined, null, -0, 0, [undefined, -0]],
+    nested: { omitted: undefined, zero: -0 },
+  };
+  const decoded = parse(stringify(source));
+  assert.deepEqual(decoded, {
+    values: [undefined, null, -0, 0, [undefined, -0]],
+    nested: { zero: -0 },
+  });
+  assert.equal(Object.hasOwn(decoded.values, 0), true);
+  assert.equal(Object.hasOwn(decoded, "omitted"), false);
+  assert.equal(Object.is(decoded.values[2], -0), true);
+  assert.equal(Object.is(decoded.values[3], 0), true);
 });
 
 test("nested native library and checkpoint-message containers expand before simulation validation", () => {

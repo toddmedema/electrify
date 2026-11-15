@@ -5,12 +5,15 @@ import { currentTick } from "../helpers/GameSelectors";
 import {
   applyCommand,
   checkpointWorld,
+  hydrateWorld,
   matchScenario,
   createWorld,
   pauseWorld,
   restoreWorld,
   roomView,
   stepWorld,
+  setWorldBlockers,
+  worldBlockers,
 } from "./World";
 import type { Command, World } from "./Types";
 import { corridorsForGame } from "../data/IntertieAccess";
@@ -466,6 +469,58 @@ test("resume restores the entire match and drops prior-session purchase IDs", ()
   expect(restored.grids.map((g) => currentTick(g)?.cash)).toEqual(
     world.grids.map((g) => currentTick(g)?.cash),
   );
+});
+
+test("live hydration preserves session state and dispatch plans without resume resets", () => {
+  const world = create(2);
+  command(world, 0, { kind: "speed", speed: "ULTRA" });
+  command(world, 1, { kind: "speed", speed: "FAST" });
+  for (let i = 0; i < 10; i++) stepWorld(world);
+  command(world, 0, { kind: "activity", reason: "Reading settings" });
+  pauseWorld(world, "Synchronizing Player 1");
+  command(world, 0, { kind: "ready" });
+  const { stringify, parse } = require("../../electron/coop-codec.cjs");
+  const saved = parse(stringify(checkpointWorld(world)));
+  const before = stringify(saved);
+  const hydrated = hydrateWorld(saved);
+  expect(hydrated).not.toBe(saved);
+  expect(stringify(checkpointWorld(hydrated))).toBe(before);
+  expect(hydrated).toMatchObject({
+    epoch: "epoch",
+    activities: { 0: "Reading settings" },
+    selectedSpeeds: { 0: "ULTRA", 1: "FAST" },
+    ready: ["0"],
+    readyRequired: true,
+    sequences: world.sequences,
+    receipts: saved.receipts,
+  });
+  expect(stringify(saved)).toBe(before);
+  hydrated.grids[0].dollarsPerkWh += 0.01;
+  expect(saved.grids[0].dollarsPerkWh).toBe(world.grids[0].dollarsPerkWh);
+  expect(() =>
+    hydrateWorld({ ...saved, receipts: { outsider: { sequence: 1 } } }),
+  ).toThrow(/invalid command receipts/);
+  const noCommitments = { ...saved };
+  delete noCommitments.commitments;
+  expect(() => hydrateWorld(noCommitments)).toThrow(/dispatch plans/);
+  expect(stringify(saved)).toBe(before);
+});
+
+test("world blockers are detached live state and resume still discards them", () => {
+  const world = create(2);
+  command(world, 0, { kind: "speed", speed: "NORMAL" });
+  command(world, 1, { kind: "speed", speed: "NORMAL" });
+  const reasons = ["Waiting for Player 1 to catch up"];
+  setWorldBlockers(world, reasons);
+  reasons.push("Unrelated");
+  expect(worldBlockers(world)).toEqual(["Waiting for Player 1 to catch up"]);
+  expect(world.paused).toBe(true);
+  const exposed = worldBlockers(world);
+  exposed.length = 0;
+  expect(worldBlockers(world)).toHaveLength(1);
+  const restored = restoreWorld(checkpointWorld(world), "new");
+  expect(worldBlockers(restored)).toEqual([]);
+  expect(restored.readyRequired).toBe(true);
 });
 
 test("future and unsupported shared schemas are rejected without mutating the checkpoint", () => {
