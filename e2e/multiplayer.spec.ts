@@ -549,6 +549,7 @@ class SteamRoom {
     if (input.kind === "leave") {
       this.members = this.members.filter((m) => m.id !== id);
       this.pendingViews.delete(id);
+      this.pendingReplication.get(id)?.splice(0);
       this.pendingReplication.delete(id);
       this.heldViews.delete(id);
       this.pendingScenarios.delete(id);
@@ -1213,6 +1214,62 @@ test("mock Steam publishes only to players with an initialized transport", async
   expect(room.pages.size).toBe(1);
   await expect(room.publish()).resolves.toBeUndefined();
   expect(room.transportErrors).toEqual([]);
+});
+
+test("mock Steam cancels queued replication when leave releases an active delivery", async ({
+  browser,
+}) => {
+  let release!: () => void;
+  let started!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const sending = new Promise<void>((resolve) => {
+    started = resolve;
+  });
+  const delivered: NativeEvent[] = [];
+  const room = new SteamRoom(async (page) => {
+    const transport = await createSteamTransport(page);
+    return {
+      ...transport,
+      async send(event) {
+        if (event.kind === "message" && event.payload.kind === "records") {
+          delivered.push(event);
+          started();
+          await gate;
+        } else await transport.send(event);
+      },
+      async reset() {
+        await transport.reset();
+        release();
+      },
+    };
+  });
+  await room.player(browser, 0, false, false);
+  await room.request(room.host, { kind: "create", rules: "" });
+  const event: NativeEvent = {
+    kind: "message",
+    sender: "host",
+    payload: {
+      kind: "records",
+      matchId: "old",
+      epoch: "old",
+      from: 1,
+      records: [{ t: "verify" }],
+    },
+  };
+  const draining = room.event(room.host, event);
+  try {
+    await sending;
+    await room.event(room.host, event);
+    await room.request(room.host, { kind: "leave" });
+    await draining;
+    expect(delivered).toEqual([event]);
+    expect(room.transportErrors).toEqual([]);
+  } finally {
+    release();
+    await draining;
+  }
 });
 
 test("mock Steam lobby publication skips registered players who have not joined", async ({

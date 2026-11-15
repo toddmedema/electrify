@@ -804,8 +804,7 @@ export class MultiplayerSession {
             };
             worker.onerror = () => {
               if (generation !== this.replicaGeneration) return;
-              this.replicaLive = false;
-              this.replicaProgress = undefined;
+              this.stopReplica();
               this.update({
                 synchronizing: true,
                 error: "The replica worker stopped. Reconnect to synchronize.",

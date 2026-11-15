@@ -178,6 +178,7 @@ function fixture({ replication = true, recover = false } = {}) {
     sendRecords();
   };
   const replicaWorker = {
+    onerror: null as (() => void) | null,
     onmessage: null as ((event: MessageEvent<ReplicaResponse>) => void) | null,
     terminate: jest.fn(),
     postMessage(request: ReplicaRequest) {
@@ -244,6 +245,9 @@ function fixture({ replication = true, recover = false } = {}) {
     respond,
     holdCommands: () => {
       holdCommands = true;
+    },
+    releaseCommands: () => {
+      holdCommands = false;
     },
     reloadGuest: async () => {
       guest.dispose();
@@ -401,6 +405,7 @@ test("a pre-consumption rejection resets the pending sequence and a failed recor
   const f = fixture();
   try {
     await f.start();
+    f.holdCommands();
     const pending = f.guest.submit({ kind: "rate", value: 0.1 });
     const rejected = pending.catch((reason: Error) => reason);
     const view = f.guest.getSnapshot().view!;
@@ -418,17 +423,84 @@ test("a pre-consumption rejection resets the pending sequence and a failed recor
     expect(await rejected).toEqual(new Error("Wrong epoch"));
     expect(f.guest.getSnapshot().pending).toBe(false);
     await flush();
-    jest.advanceTimersByTime(100);
-    await flush();
+    expect(
+      f.posts.filter((request) => request.kind === "command"),
+    ).toHaveLength(0);
+    f.releaseCommands();
     f.failRecordSend();
-    const next = f.guest.submit({ kind: "rate", value: 0.11 });
+    const next = f.guest
+      .submit({ kind: "rate", value: 0.11 })
+      .catch((error: Error) => error);
+    const command = f.requests
+      .filter(
+        ({ request }) =>
+          request.kind === "send" && request.payload.kind === "command",
+      )
+      .at(-1)!.request;
+    expect(command).toMatchObject({ payload: { envelope: { sequence: 1 } } });
     await flush();
     jest.advanceTimersByTime(100);
     await flush();
-    await next;
+    expect(await next).toBeUndefined();
     expect(
       f.posts.filter((request) => request.kind === "baseline").length,
     ).toBeGreaterThan(0);
+  } finally {
+    f.dispose();
+  }
+});
+
+test("a failed replica worker is replaced for a same-stream recovery baseline", async () => {
+  const f = fixture();
+  const replacementPosts: ReplicaRequest[] = [];
+  const replacement = {
+    onmessage: null as ((event: MessageEvent<ReplicaResponse>) => void) | null,
+    terminate: jest.fn(),
+    postMessage(request: ReplicaRequest) {
+      replacementPosts.push(request);
+      void runtime.receive(request);
+    },
+  };
+  const runtime = new ReplicaRuntime(
+    (data) =>
+      replacement.onmessage?.({ data } as MessageEvent<ReplicaResponse>),
+    async () => {},
+    undefined,
+    (bytes) => webcrypto.subtle.digest("SHA-256", bytes),
+  );
+  try {
+    await f.start();
+    f.replicaFactory.mockResolvedValueOnce(replacement as unknown as Worker);
+    const obsoleteError = f.replicaWorker.onerror!;
+    expect(obsoleteError).toEqual(expect.any(Function));
+    obsoleteError();
+    expect(f.replicaWorker.terminate).toHaveBeenCalledTimes(1);
+    expect(f.guest.getSnapshot().synchronizing).toBe(true);
+    const baseline = f.source().baseline();
+    f.event("guest", {
+      kind: "message",
+      sender: "host",
+      payload: { kind: "baseline", ...baseline },
+    });
+    await flush();
+    expect(f.replicaFactory).toHaveBeenCalledTimes(2);
+    expect(replacementPosts).toContainEqual(
+      expect.objectContaining({
+        kind: "baseline",
+        baseline: expect.objectContaining({
+          matchId: baseline.matchId,
+          epoch: baseline.epoch,
+          index: baseline.index,
+        }),
+      }),
+    );
+    expect(f.guest.getSnapshot()).toMatchObject({
+      synchronizing: false,
+      view: { matchId: baseline.matchId, epoch: baseline.epoch },
+    });
+    obsoleteError();
+    expect(f.guest.getSnapshot().synchronizing).toBe(false);
+    expect(replacement.terminate).not.toHaveBeenCalled();
   } finally {
     f.dispose();
   }

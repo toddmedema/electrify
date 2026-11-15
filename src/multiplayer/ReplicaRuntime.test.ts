@@ -167,6 +167,39 @@ test.each(["gap", "epoch", "record", "empty"])(
   },
 );
 
+test("a superseded baseline load failure cannot discard the newer baseline or its records", async () => {
+  let reject!: (reason: Error) => void;
+  const load = jest.fn(async () => {});
+  load.mockImplementationOnce(
+    () =>
+      new Promise<void>((_resolve, fail) => {
+        reject = fail;
+      }),
+  );
+  const f = fixture(load);
+  const obsolete = f.install();
+  await Promise.resolve();
+  expect(load).toHaveBeenCalledTimes(1);
+  command(f.source, "1", { kind: "rate", value: 0.1 });
+  f.source.drain();
+  const baseline = f.source.baseline();
+  const current = f.runtime.receive({ kind: "baseline", baseline, seat: "1" });
+  command(f.source, "1", { kind: "rate", value: 0.11 });
+  const replay = f.replay();
+  reject(new Error("Obsolete data load failed"));
+  await Promise.all([obsolete, current, replay]);
+  await f.runtime.receive({ kind: "views-applied" });
+  jest.advanceTimersByTime(100);
+  expect(load).toHaveBeenCalledTimes(2);
+  expect(f.responses.some((response) => response.kind === "resync")).toBe(
+    false,
+  );
+  expect(f.responses.at(-1)).toMatchObject({
+    kind: "views",
+    views: { "1": { lastSequence: 2, game: { dollarsPerkWh: 0.11 } } },
+  });
+});
+
 test("an acknowledged old projection releases credit when a newer baseline supersedes its queued acknowledgement", async () => {
   const f = fixture();
   await f.install();

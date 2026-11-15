@@ -38,6 +38,7 @@ export class ReplicaRecovery {
   private terminal = false;
   private lastVerify = -Infinity;
   private verifiedIndex = 0;
+  private verifyPending = false;
   private shell: string[];
   private now: () => number;
   constructor(
@@ -179,8 +180,13 @@ export class ReplicaRecovery {
   /** Called synchronously at the verify boundary, before any further world mutation. */
   private capture() {
     this.lastVerify = this.now();
+    if (this.terminal) return;
+    if (this.pending >= 2) {
+      this.verifyPending = true;
+      return;
+    }
+    this.verifyPending = false;
     this.verifiedIndex = this.host.index;
-    if (this.pending >= 2 || this.terminal) return;
     const index = this.host.index;
     const bytes = canonicalWorldBytes(this.host.world);
     const capture: { hash?: string } = {};
@@ -192,15 +198,24 @@ export class ReplicaRecovery {
     void worldDigest(bytes, this.options.digest).then(
       (hash) => {
         this.pending--;
-        if (this.terminal || !this.captures.has(index)) return;
-        capture.hash = hash;
-        for (const [id, peer] of this.peers) this.compare(id, peer);
+        if (!this.terminal && this.captures.has(index)) {
+          capture.hash = hash;
+          for (const [id, peer] of this.peers) this.compare(id, peer);
+        }
+        this.retryVerification();
       },
       (error) => {
         this.pending--;
         if (!this.terminal) this.options.error(error);
+        this.retryVerification();
       },
     );
+  }
+  private retryVerification() {
+    if (this.terminal || !this.verifyPending || this.pending >= 2) return;
+    this.host.verify();
+    this.capture();
+    this.options.changed();
   }
   private lag() {
     const now = this.now();

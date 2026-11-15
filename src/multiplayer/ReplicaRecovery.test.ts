@@ -303,21 +303,123 @@ test("only changed worlds verify once per second, with two digest slots and sync
   pending[1].resolve(await digest(pending[1].bytes));
   pending[0].resolve(await digest(pending[0].bytes));
   await settle();
+  expect(hash).toHaveBeenCalledTimes(3);
   f.command("0", { kind: "rate", value: 0.16 });
   f.time(1999);
   f.recovery.pulse();
-  expect(hash).toHaveBeenCalledTimes(2);
+  expect(hash).toHaveBeenCalledTimes(3);
   f.time(2000);
   f.recovery.pulse();
-  expect(hash).toHaveBeenCalledTimes(3);
+  expect(hash).toHaveBeenCalledTimes(4);
   f.recovery.stop();
   pending[2].resolve(await digest(pending[2].bytes));
+  pending[3].resolve(await digest(pending[3].bytes));
   await settle();
   f.time(20000);
   f.recovery.pulse();
-  expect(hash).toHaveBeenCalledTimes(3);
+  expect(hash).toHaveBeenCalledTimes(4);
   expect(f.error).not.toHaveBeenCalled();
 });
+
+test.each([0, 17])(
+  "digest backpressure retries the final paused world after %i captures and detects its divergence",
+  async (completed) => {
+    const pending: {
+      bytes: Uint8Array<ArrayBuffer>;
+      resolve: (hash: ArrayBuffer) => void;
+    }[] = [];
+    const hash = jest.fn(
+      (bytes: Uint8Array<ArrayBuffer>) =>
+        new Promise<ArrayBuffer>((resolve) => pending.push({ bytes, resolve })),
+    );
+    const f = fixture(hash);
+    f.recovery.baseline("1");
+    f.progress();
+    // Keep the first digest pending while enough later captures evict its comparison entry.
+    for (let i = 0; i < completed; i++) {
+      f.command("0", { kind: "rate", value: 0.1 + i / 1000 });
+      f.time((i + 1) * 1000);
+      f.recovery.pulse();
+      f.progress();
+      pending.at(-1)!.resolve(await digest(pending.at(-1)!.bytes));
+      await settle();
+    }
+    f.command("0", { kind: "rate", value: 0.15 });
+    f.time((completed + 1) * 1000);
+    f.recovery.pulse();
+    f.progress();
+    f.command("0", { kind: "rate", value: 0.16 });
+    f.time((completed + 2) * 1000);
+    f.recovery.pulse();
+    f.progress();
+    expect(f.host.world.paused).toBe(true);
+    expect(hash).toHaveBeenCalledTimes(completed + 2);
+    const skipped = f.host.index;
+    const finalBytes = canonicalWorldBytes(f.host.world);
+    const released = pending[completed ? 0 : 1];
+    released.resolve(await digest(released.bytes));
+    await settle();
+    expect(hash).toHaveBeenCalledTimes(completed + 3);
+    expect(f.host.index).toBe(skipped + 1);
+    const retried = pending.at(-1)!;
+    expect(retried.bytes).toEqual(finalBytes);
+    const verified = f.host.index;
+    f.progress(verified, { index: verified, hash: "0".repeat(64) });
+    expect(f.baselines()).toHaveLength(1);
+    retried.resolve(await digest(retried.bytes));
+    await settle();
+    expect(f.baselines()).toHaveLength(2);
+    f.recovery.stop();
+    for (const entry of pending) entry.resolve(await digest(entry.bytes));
+    await settle();
+    expect(f.error).not.toHaveBeenCalled();
+  },
+);
+
+test.each([false, true])(
+  "a rejected digest retries skipped verification only while live, stopped=%s",
+  async (stopped) => {
+    const pending: {
+      bytes: Uint8Array<ArrayBuffer>;
+      resolve: (hash: ArrayBuffer) => void;
+      reject: (error: Error) => void;
+    }[] = [];
+    const hash = jest.fn(
+      (bytes: Uint8Array<ArrayBuffer>) =>
+        new Promise<ArrayBuffer>((resolve, reject) =>
+          pending.push({ bytes, resolve, reject }),
+        ),
+    );
+    const f = fixture(hash);
+    f.recovery.baseline("1");
+    f.progress();
+    for (const time of [1000, 2000]) {
+      f.command("0", { kind: "rate", value: 0.1 + time / 100000 });
+      f.time(time);
+      f.recovery.pulse();
+      f.progress();
+    }
+    expect(hash).toHaveBeenCalledTimes(2);
+    if (stopped) f.recovery.stop();
+    const error = new Error("Digest failed");
+    pending[0].reject(error);
+    await settle();
+    expect(hash).toHaveBeenCalledTimes(stopped ? 2 : 3);
+    expect(f.error.mock.calls).toEqual(stopped ? [] : [[error]]);
+    const index = f.host.index;
+    f.progress();
+    for (const time of [3000, 4000, 5000]) {
+      f.time(time);
+      f.recovery.pulse();
+    }
+    expect(f.host.index).toBe(index);
+    expect(hash).toHaveBeenCalledTimes(stopped ? 2 : 3);
+    f.recovery.stop();
+    for (const entry of pending) entry.resolve(await digest(entry.bytes));
+    await settle();
+    expect(hash).toHaveBeenCalledTimes(stopped ? 2 : 3);
+  },
+);
 
 test("reports arriving before the captured digest compare later; unmatched, stale and old epoch reports are ignored", async () => {
   let finish!: (hash: ArrayBuffer) => void;

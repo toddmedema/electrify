@@ -88,6 +88,7 @@ export class ReplicaRuntime {
           this.requestViews();
         } else if (this.state === "live") this.apply(request);
       } catch (error) {
+        if (generation !== this.generation) return;
         this.fail(
           error instanceof Error ? error.message : "Replica failed",
           request,
