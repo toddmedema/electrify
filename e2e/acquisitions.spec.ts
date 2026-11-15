@@ -72,6 +72,16 @@ for (const theme of ["light", "dark"] as const) {
           .getByRole("heading", { name, exact: true, level: 3 }),
       ).toBeVisible();
     }
+    const uplandsTiles = network.locator(
+      '.territoryHex[data-territory="green-uplands"]',
+    );
+    const terrain = await uplandsTiles.evaluateAll((tiles) =>
+      tiles.map((tile) => tile.getAttribute("data-kind")),
+    );
+    expect(terrain).toEqual(expect.arrayContaining(["hills", "plains"]));
+    expect(
+      terrain.some((kind) => ["town", "industry", "lake"].includes(kind!)),
+    ).toBe(false);
     await network
       .locator(
         '.territoryHex[data-territory="green-uplands"] .territoryHexFace',
@@ -93,7 +103,7 @@ for (const theme of ["light", "dark"] as const) {
     await expect(home).toHaveAttribute("aria-pressed", "true");
     expect(
       await page.evaluate(
-        () => document.documentElement.scrollWidth <= innerWidth,
+        () => document.documentElement.scrollWidth <= window.innerWidth,
       ),
     ).toBe(true);
   });

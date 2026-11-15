@@ -55,26 +55,17 @@ const controls = {
   onSellingRule: jest.fn(),
 };
 
-it("selects a territory from its terrain and describes unpopulated land without hydro access", () => {
-  const { container } = render(
-    <TerritoryNetwork game={network()} {...controls} />,
+it("describes undeveloped land without customers or hydro access and selects it from the key", () => {
+  render(<TerritoryNetwork game={network()} {...controls} />);
+  const uplands = screen.getByRole("button", {
+    name: "Inspect Green Uplands territory",
+  });
+  expect(uplands).toHaveAccessibleDescription(
+    /No customers.*wind.*solar sites/,
   );
-  const uplands = container.querySelectorAll(
-    '.territoryHex[data-territory="green-uplands"]',
-  );
-  expect(uplands.length).toBeGreaterThan(0);
-  expect(
-    Array.from(uplands).map((tile) => tile.getAttribute("data-kind")),
-  ).toEqual(expect.arrayContaining(["hills", "plains"]));
-  expect(
-    Array.from(uplands).some((tile) =>
-      ["town", "industry", "lake"].includes(tile.getAttribute("data-kind")!),
-    ),
-  ).toBe(false);
-  fireEvent.pointerUp(uplands[0]);
-  expect(
-    screen.getByRole("button", { name: "Inspect Green Uplands territory" }),
-  ).toHaveAttribute("aria-pressed", "true");
+  expect(uplands).not.toHaveAccessibleDescription(/hydro/);
+  fireEvent.click(uplands);
+  expect(uplands).toHaveAttribute("aria-pressed", "true");
   expect(
     within(
       screen.getByRole("region", { name: "Selected territory" }),
