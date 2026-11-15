@@ -9,11 +9,6 @@ import type {
 export const EXPANSION_SCENARIO_ID = 116;
 /** Authored legacy-contract renewal date, announced from the opening briefing. */
 export const UTILITY_CONTRACT_RENEWAL_YEAR = 2020;
-/** Fictional renewal work, separate from customer growth and inflation. */
-export const UTILITY_NETWORK_RENEWAL_STAGES = [
-  { year: 2015, multiplier: 1.5 },
-  { year: 2020, multiplier: 2 },
-] as const;
 /** Existing Ridge package, quoted by winterizationPrice for 100 MW in January 2005 dollars.
  * Freeze inherited book cost so import validation does not depend on economy loading.
  * New construction continues to use the dated winterization owner.
@@ -318,11 +313,10 @@ export function utilityEntitlementsAt(
     }));
 }
 
-/** One pooled company funds the service network for its actual customer count. */
+/** Routine maintenance and renewal are included; callers index these 2005 dollars to inflation. */
 export function utilityNetworkAnnualOM(
   utilities: readonly UtilityId[],
   customers: number,
-  year = 2005,
 ): number {
   const base = utilities.reduce(
     (sum, id) => sum + UTILITY_AREAS[id].annualNetworkOM,
@@ -333,11 +327,7 @@ export function utilityNetworkAnnualOM(
     0,
   );
   // The inherited network remains in service when customers leave. Growth adds operating work.
-  const renewal =
-    [...UTILITY_NETWORK_RENEWAL_STAGES]
-      .reverse()
-      .find((stage) => year >= stage.year)?.multiplier ?? 1;
-  return base * Math.max(1, customers / accounts) * renewal;
+  return base * Math.max(1, customers / accounts);
 }
 
 /** Fixed replacement blocks and delivered-energy prices, authored in 2005 dollars. */

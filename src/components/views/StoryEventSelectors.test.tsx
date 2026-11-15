@@ -260,23 +260,16 @@ function withUtility(game: GameType, targetId: UtilityTargetId): GameType {
   };
 }
 
-test("announces inherited contract and network changes and refreshes after either acquisition", () => {
+test("announces inherited contract changes without routine-upkeep events and refreshes after either acquisition", () => {
   const game = createGame({ scenarioId: 116, seed: 12345 });
   const before = JSON.stringify(game);
   const events = (value: GameType) =>
     selectUpcomingStoryEvents({ game: value } as AppStateType);
   const opening = events(game);
   expect(events(game)).toBe(opening);
+  expect(opening.some((event) => event.concept === "finances")).toBe(false);
   expect(opening).toEqual(
     expect.arrayContaining([
-      expect.objectContaining({
-        label: "Expected Jan 2015",
-        message: expect.stringContaining("1.5× opening upkeep"),
-      }),
-      expect.objectContaining({
-        label: "Expected Jan 2020",
-        message: expect.stringContaining("2× opening upkeep"),
-      }),
       expect.objectContaining({
         label: "Expected Jan 2020",
         title: "Champlain Electric power purchases change",

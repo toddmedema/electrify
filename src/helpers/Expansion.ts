@@ -266,8 +266,7 @@ export function utilityOffer(
     utilityNetworkAnnualOM(
       [...owned, target.id],
       currentCustomers + acquiredCustomers,
-      game.date.year,
-    ) - utilityNetworkAnnualOM(owned, currentCustomers, game.date.year);
+    ) - utilityNetworkAnnualOM(owned, currentCustomers);
   return {
     targetId: target.id,
     name: target.name,
