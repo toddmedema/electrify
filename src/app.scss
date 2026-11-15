@@ -8914,7 +8914,7 @@ option {
   }
 }
 
-// Across the Valley: the physical network and its commercial supply remain separate choices.
+// Across the Valley: territory ownership, finite sites, and purchase agreements.
 .territoryViewTabs {
   flex: 0 0 auto;
   border-bottom: 1px solid var(--border-subtle);
@@ -9058,23 +9058,6 @@ option {
     stroke-width: 3;
   }
 }
-.territoryRoute {
-  fill: none;
-  stroke: var(--interactive-blue);
-  stroke-width: 2.5;
-  stroke-linecap: round;
-  pointer-events: none;
-  vector-effect: non-scaling-stroke;
-  &.planned {
-    stroke: var(--font-color-faded);
-    stroke-dasharray: 5 5;
-  }
-  &.paused,
-  &.constructing {
-    stroke: var(--warning-icon);
-    stroke-dasharray: 5 5;
-  }
-}
 .territoryHexHub {
   fill: var(--bg-primary);
   stroke: var(--font-color-faded);
@@ -9113,6 +9096,7 @@ option {
   grid-template-columns: 24px minmax(0, 1fr);
   column-gap: 8px;
   align-content: start;
+  grid-template-rows: auto 1fr;
   min-width: 0;
   min-height: 44px;
   padding: 8px;
@@ -9126,17 +9110,19 @@ option {
   strong {
     grid-column: 2;
     display: block;
-    font-size: 13px;
+    font-size: 14px;
     font-weight: 600;
-    line-height: 1.3;
+    line-height: 1.4;
+    overflow-wrap: anywhere;
   }
   .territoryMapStatus {
     grid-column: 2;
     display: block;
     margin-top: 4px;
-    font-size: 11px;
+    font-size: 12px;
     line-height: 1.4;
     color: var(--font-color-faded);
+    overflow-wrap: anywhere;
   }
   &:hover {
     background: var(--bg-raised);
@@ -9168,39 +9154,15 @@ option {
     background: var(--interactive-blue);
   }
 }
-.territoryMapLegend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 12px;
-  padding: 8px 0;
-  color: var(--font-color-faded);
-  font-size: 11px;
-  span {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-  }
-  i {
-    flex: 0 0 16px;
-    width: 16px;
-    border-top: 2px solid var(--interactive-blue);
-  }
-  i.planned {
-    border-top: 2px dashed var(--font-color-faded);
-  }
-  i.paused,
-  i.constructing {
-    border-top: 2px dashed var(--warning-icon);
-  }
-}
 .territoryResourceLegend {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px 12px;
   padding: 8px 12px;
-  border-bottom: 1px solid var(--border-subtle);
+  border-top: 1px solid var(--border-subtle);
+  background: var(--bg-raised);
   color: var(--font-color-faded);
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.4;
   > span {
     display: flex;
@@ -9368,8 +9330,10 @@ option {
     gap: 12px;
   }
   .territoryMapNode {
-    min-height: 44px;
-    padding: 8px;
+    padding: 4px 8px;
+    .territoryMapStatus {
+      margin-top: 0;
+    }
   }
   .territoryNetworkNote {
     font-size: 12px;
