@@ -1,3 +1,4 @@
+import { measureFirestoreRead, recordFirestoreRead } from "./FirestoreReads";
 import {
   collection,
   doc,
@@ -139,7 +140,13 @@ function parseHead(id: string, raw: Record<string, unknown>): CloudSaveHead {
 
 async function readFile(chunks: string[]): Promise<SaveFileType> {
   const snapshots = await Promise.all(
-    chunks.map((id) => getDocFromServer(doc(getDb(), "saveBlobs", id))),
+    chunks.map((id) =>
+      measureFirestoreRead(
+        "save.blob",
+        () => getDocFromServer(doc(getDb(), "saveBlobs", id)),
+        (snapshot) => (snapshot.exists() ? 1 : 0),
+      ),
+    ),
   );
   let json = "";
   for (const snapshot of snapshots) {
@@ -177,6 +184,7 @@ export class FirebaseSaveTransport implements CloudSaveTransport {
     // An error can arrive before reconciliation starts waiting for the first snapshot.
     void this.ready.catch(() => undefined);
     let initialized = false;
+    recordFirestoreRead("save.listener", "starts");
     const unsubscribe = onSnapshot(
       collection(getDb(), "users", uid, "cloudSaves"),
       { includeMetadataChanges: true },
@@ -188,6 +196,8 @@ export class FirebaseSaveTransport implements CloudSaveTransport {
         const changes = initialized
           ? snapshot.docChanges()
           : snapshot.docs.map((doc) => ({ type: "added", doc }));
+        recordFirestoreRead("save.listener", "snapshots");
+        recordFirestoreRead("save.listener", "documents", changes.length);
         initialized = true;
         for (const change of changes) {
           updated = true;
@@ -206,6 +216,7 @@ export class FirebaseSaveTransport implements CloudSaveTransport {
       },
       (error) => {
         if (epoch !== this.epoch) return;
+        recordFirestoreRead("save.listener", "failures");
         reject(error);
         failed(error);
       },
@@ -238,8 +249,10 @@ export class FirebaseSaveTransport implements CloudSaveTransport {
       return [...this.heads.values()];
     }
     // One-shot callers (including tools) do not own a foreground subscription.
-    const result = await getDocsFromServer(
-      collection(getDb(), "users", uid, "cloudSaves"),
+    const result = await measureFirestoreRead(
+      "save.list",
+      () => getDocsFromServer(collection(getDb(), "users", uid, "cloudSaves")),
+      (snapshot) => snapshot.docs.length,
     );
     const heads = result.docs.map((snapshot) =>
       this.parse(snapshot.id, snapshot.data()),
@@ -308,7 +321,11 @@ export class FirebaseSaveTransport implements CloudSaveTransport {
     const ids = chunks.map(() => newSaveId());
     const version = newSaveId();
     const garbage = await runTransaction(getDb(), async (transaction) => {
-      const previous = await transaction.get(ref);
+      const previous = await measureFirestoreRead(
+        "save.transaction",
+        () => transaction.get(ref),
+        (snapshot) => (snapshot.exists() ? 1 : 0),
+      );
       if (previous.data()?.version !== expected)
         throw new CloudConflict("This save changed on another device.");
       const garbage: string[] = [
@@ -412,7 +429,11 @@ export class FirebaseSaveTransport implements CloudSaveTransport {
     if (!garbage.length) return;
     const ref = doc(getDb(), "users", uid, "cloudSaves", id);
     await runTransaction(getDb(), async (transaction) => {
-      const latest = await transaction.get(ref);
+      const latest = await measureFirestoreRead(
+        "save.transaction",
+        () => transaction.get(ref),
+        (snapshot) => (snapshot.exists() ? 1 : 0),
+      );
       if (latest.data()?.version === version)
         transaction.update(ref, { garbage: [] });
     });
@@ -430,7 +451,16 @@ export async function createSharedSave(
     const id = newShareId();
     const ref = doc(getDb(), "sharedGames", id);
     const created = await runTransaction(getDb(), async (transaction) => {
-      if ((await transaction.get(ref)).exists()) return false;
+      if (
+        (
+          await measureFirestoreRead(
+            "share.transaction",
+            () => transaction.get(ref),
+            (snapshot) => (snapshot.exists() ? 1 : 0),
+          )
+        ).exists()
+      )
+        return false;
       const expiresAt = Timestamp.fromMillis(Date.now() + SHARE_LIFETIME_MS);
       chunks.forEach((data, index) =>
         transaction.set(doc(getDb(), "saveBlobs", ids[index]), {
@@ -457,7 +487,11 @@ export async function loadSharedSave(id: string): Promise<SaveFileType> {
   if (!SHARE_ID_PATTERN.test(id))
     throw new Error("This share link is invalid.");
   const ref = doc(getDb(), "sharedGames", id);
-  const snapshot = await getDocFromServer(ref).catch((error: unknown) => {
+  const snapshot = await measureFirestoreRead(
+    "share.load",
+    () => getDocFromServer(ref),
+    (snapshot) => (snapshot.exists() ? 1 : 0),
+  ).catch((error: unknown) => {
     const code =
       error && typeof error === "object" && "code" in error
         ? error.code
@@ -488,7 +522,11 @@ export async function loadSharedSave(id: string): Promise<SaveFileType> {
   const file = await readFile(data.chunks);
   // Extend retention only after the whole snapshot has loaded and passed domain validation.
   await runTransaction(getDb(), async (transaction) => {
-    const latest = await transaction.get(ref);
+    const latest = await measureFirestoreRead(
+      "share.transaction",
+      () => transaction.get(ref),
+      (snapshot) => (snapshot.exists() ? 1 : 0),
+    );
     if (!latest.exists())
       throw new Error("This shared game is no longer available.");
     const expiresAt = Timestamp.fromMillis(Date.now() + SHARE_LIFETIME_MS);

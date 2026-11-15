@@ -65,3 +65,12 @@ it("isolates accounts/difficulties, retries failures and never resurrects invali
   expect(await loadLeaderboard(110, "CEO")).toEqual([]);
   expect(getDocs).toHaveBeenCalledTimes(6);
 });
+
+it("uses at most one query for ten visits a minute apart", async () => {
+  (getDocs as jest.Mock).mockResolvedValue({ docs: [] });
+  for (let visit = 0; visit < 10; visit++) {
+    await loadLeaderboard(101, "CEO");
+    jest.advanceTimersByTime(60_000);
+  }
+  expect(getDocs).toHaveBeenCalledTimes(1);
+});
