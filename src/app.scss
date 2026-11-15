@@ -6402,9 +6402,6 @@ $homeSmokeCycle: 5.6s;
   gap: 12px;
   grid-template-columns: 20px minmax(0, 1fr);
 }
-.decisionImpactFactMoney .decisionImpactFactContent {
-  grid-column: 2;
-}
 .decisionImpactFactContent {
   display: grid;
   grid-template-columns: minmax(100px, 0.7fr) minmax(0, 1.3fr);
@@ -6508,6 +6505,9 @@ $homeSmokeCycle: 5.6s;
 }
 .MuiDialog-paper .noPadding > .decisionImpact {
   margin: 0;
+}
+.purchaseReviewContent > .decisionImpact {
+  padding-bottom: 0;
 }
 .buildOption .MuiCardHeader-title {
   font-size: var(--font-size-subtitle);

@@ -1664,47 +1664,7 @@ async function tvJourney(page: Page, testInfo: TestInfo, maximum: boolean) {
     await input(page, "build");
     const build = page.getByRole("region", { name: "Build", exact: true });
     await expect(page.locator(".gameFleet")).toBeHidden();
-    const gridContext = build.locator("summary");
-    await select(page, gridContext);
-    await input(page, "confirm");
-    const gridChart = build.getByRole("img", {
-      name: /Chart of electricity supply and demand over the day/,
-    });
-    await select(page, gridChart);
-    await input(page, "confirm");
-    await expect
-      .poll(
-        () =>
-          gridChart.locator(".u-over").evaluate((plot) => {
-            const rect = plot.getBoundingClientRect();
-            let top = rect.top,
-              bottom = rect.bottom;
-            for (
-              let parent = plot.parentElement;
-              parent;
-              parent = parent.parentElement
-            ) {
-              if (getComputedStyle(parent).overflowY !== "visible") {
-                const bounds = parent.getBoundingClientRect();
-                top = Math.max(top, bounds.top);
-                bottom = Math.min(bottom, bounds.bottom);
-              }
-            }
-            return (
-              (bottom - top) /
-              parseFloat(getComputedStyle(document.documentElement).fontSize)
-            );
-          }),
-        {
-          message:
-            "focused Build forecast exposes at least three lines of plotted data",
-        },
-      )
-      .toBeGreaterThanOrEqual(3);
-    await capture("build-forecast");
-    await input(page, "back");
-    await select(page, gridContext);
-    await input(page, "confirm");
+    await expect(build.locator("summary")).toHaveCount(0);
     const compareSolar = build.getByRole("button", {
       name: "Compare Solar",
       exact: true,
@@ -1798,6 +1758,44 @@ async function tvJourney(page: Page, testInfo: TestInfo, maximum: boolean) {
     await input(page, "confirm");
     const purchase = page.getByRole("dialog");
     await expect(purchase).toBeVisible();
+    const gridChart = purchase.getByRole("img", {
+      name: /Estimated monthly supply margin before and after commissioning/,
+    });
+    await select(page, gridChart);
+    await input(page, "confirm");
+    await expect
+      .poll(
+        () =>
+          gridChart.locator(".u-over").evaluate((plot) => {
+            const rect = plot.getBoundingClientRect();
+            let top = rect.top,
+              bottom = rect.bottom;
+            for (
+              let parent = plot.parentElement;
+              parent;
+              parent = parent.parentElement
+            ) {
+              if (getComputedStyle(parent).overflowY !== "visible") {
+                const bounds = parent.getBoundingClientRect();
+                top = Math.max(top, bounds.top);
+                bottom = Math.min(bottom, bounds.bottom);
+              }
+            }
+            return (
+              (bottom - top) /
+              parseFloat(getComputedStyle(document.documentElement).fontSize)
+            );
+          }),
+        {
+          message:
+            "focused build-impact forecast exposes at least three lines of plotted data",
+        },
+      )
+      .toBeGreaterThanOrEqual(3);
+    await capture("build-impact-forecast");
+    await input(page, "back");
+    await expect(purchase).toBeVisible();
+
     await select(
       page,
       purchase.getByRole("button", { name: "Take loan", exact: true }),

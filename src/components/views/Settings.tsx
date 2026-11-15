@@ -544,7 +544,7 @@ export default function Settings(props: Props): React.JSX.Element {
           <Stack
             component="footer"
             direction="row"
-            spacing={0.5}
+            spacing={0}
             useFlexGap
             sx={{
               alignItems: "center",
@@ -553,20 +553,27 @@ export default function Settings(props: Props): React.JSX.Element {
               color: "text.secondary",
               "& .MuiButton-root": {
                 color: "text.secondary",
-                fontSize: "0.8125rem",
+                fontSize: "0.75rem",
+                px: 0.5,
+                minWidth: 0,
+                whiteSpace: "nowrap",
               },
             }}
           >
-            <Typography
-              variant="caption"
-              sx={{
-                px: 1,
-                width: { xs: "100%", sm: "auto" },
-                textAlign: "center",
-              }}
-            >
-              {APP_VERSION}
-            </Typography>
+            {desktopApp ? (
+              <Typography variant="caption" sx={{ px: 0.5 }}>
+                {APP_VERSION}
+              </Typography>
+            ) : (
+              <Button
+                variant="text"
+                size="small"
+                title="Clear cache and reload"
+                onClick={() => setClearCacheOpen(true)}
+              >
+                {APP_VERSION}
+              </Button>
+            )}
             <Button
               variant="text"
               size="small"
@@ -584,15 +591,6 @@ export default function Settings(props: Props): React.JSX.Element {
             >
               GitHub
             </Button>
-            {!desktopApp && (
-              <Button
-                variant="text"
-                size="small"
-                onClick={() => setClearCacheOpen(true)}
-              >
-                Clear cache
-              </Button>
-            )}
           </Stack>
           <ConfirmDialog
             open={clearCacheOpen}

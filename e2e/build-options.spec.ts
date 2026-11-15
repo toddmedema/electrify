@@ -186,6 +186,7 @@ for (const theme of ["light", "dark"] as const) {
         });
         expect(gap).toBeCloseTo(8, 0);
       }
+      await expect(page.locator(".buildGridEvidence")).toHaveCount(0);
       const first = cards.first();
       await expect(first).toBeVisible();
       await expect(first).not.toContainText("Construction emissions");
@@ -464,6 +465,53 @@ for (const theme of ["light", "dark"] as const) {
       await expect(page.getByRole("dialog", { name: /^Build / })).toBeVisible();
       const dialog = page.getByRole("dialog", { name: /^Build / });
       await expectContinuousDialogSurface(dialog);
+      const facts = dialog.getByRole("region", {
+        name: "Expected impact",
+        exact: true,
+      });
+      for (const label of ["Lowest supply margin", "Unserved energy"]) {
+        const row = facts
+          .locator(".decisionImpactFact")
+          .filter({ hasText: label });
+        await expect(row.locator(".decisionImpactFactValue")).toContainText(
+          "→",
+        );
+        await expect(row.locator(".decisionImpactFactDetail")).toHaveText(
+          "1 year before vs after opening",
+        );
+      }
+      for (const row of await dialog
+        .getByRole("region", { name: "Expected impact", exact: true })
+        .locator(".decisionImpactFact")
+        .all()) {
+        await expect(row.locator(":scope > .conceptIcon")).toBeVisible();
+      }
+      const impact = dialog.locator(".buildImpact");
+      await expect(
+        dialog.locator("summary", { hasText: /^Impact$/ }),
+      ).toHaveCount(0);
+      await expect(impact.locator(".chartCaption")).toHaveText(
+        "Lowest supply margin",
+      );
+      await expect(
+        impact.getByRole("img", { name: /Estimated monthly supply margin/ }),
+      ).toBeVisible();
+      await expect(impact).toContainText("Before opening");
+      await expect(impact).toContainText("After opening");
+      await expect(impact).not.toContainText("Infinity");
+      if (
+        kind === "Generator" &&
+        ((theme === "light" && testInfo.project.name === "desktop-chromium") ||
+          (theme === "dark" && testInfo.project.name === "mobile-390px"))
+      ) {
+        await impact
+          .getByRole("img", { name: /Estimated monthly supply margin/ })
+          .scrollIntoViewIfNeeded();
+        await reviewScreenshot(dialog, {
+          path: testInfo.outputPath("build-grid-impact.png"),
+          animations: "disabled",
+        });
+      }
       const cashValue = dialog
         .locator(".decisionImpactFact")
         // Generators call it the cash option; storage still calls it a cash purchase

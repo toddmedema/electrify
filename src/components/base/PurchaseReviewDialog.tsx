@@ -1,6 +1,5 @@
 import { CurrencyType, USD_CURRENCY } from "../../helpers/Currency";
 import { useCurrency, useMoney } from "./CurrencyContext";
-import { useBuildGridEvidence } from "./BuildForecast";
 import * as React from "react";
 import { Button, Typography } from "@mui/material";
 import DecisionDialog from "./DecisionDialog";
@@ -106,7 +105,6 @@ export default function PurchaseReviewDialog(
   props: PurchaseReviewDialogProps,
 ): React.JSX.Element {
   const { formatMoneyConcise } = useMoney();
-  const gridEvidence = useBuildGridEvidence();
   const {
     open,
     cash,
@@ -282,7 +280,6 @@ export default function PurchaseReviewDialog(
       {props.preface}
       <DecisionImpactPreview facts={facts} />
       {props.afterFacts}
-      {gridEvidence}
     </DecisionDialog>
   );
 }

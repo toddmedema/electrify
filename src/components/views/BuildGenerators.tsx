@@ -88,10 +88,7 @@ import {
   sliderTickToW,
   wToSliderTick,
 } from "../../helpers/BuildSizing";
-import {
-  LivePurchaseReviewDialog as PurchaseReviewDialog,
-  BuildCashWarning,
-} from "../base/PurchaseReviewDialog";
+import { BuildCashWarning } from "../base/PurchaseReviewDialog";
 import {
   getBuildAvailability,
   getSiteInventory,
@@ -104,6 +101,7 @@ import BuildMetric from "../base/BuildMetric";
 import ConstructionBuildHeader from "../base/ConstructionBuildHeader";
 import useBuildRowReveal from "../base/useBuildRowReveal";
 import { getLegacyBuildBounds } from "../../data/LegacyEra";
+import BuildPurchaseReviewDialog from "../base/BuildPurchaseReviewDialog";
 import Sparkline from "../base/Sparkline";
 import InteractiveSparkline from "../base/InteractiveSparkline";
 
@@ -216,6 +214,7 @@ function typicalCapacityFactor(
 }
 
 interface GeneratorBuildItemProps {
+  game?: GameType;
   hydroAvailability?: ReturnType<typeof getHydroAvailability>;
   onDismissHydroPrimer?: () => void;
   onUseSiteMaximum?: (peakW: number) => void;
@@ -712,7 +711,9 @@ export function GeneratorBuildItem(
         </>
       }
     >
-      <PurchaseReviewDialog
+      <BuildPurchaseReviewDialog
+        game={props.game}
+        facility={quote}
         open={open}
         onClose={() => setOpen(false)}
         title={
@@ -1233,6 +1234,7 @@ function BuildGenerators(props: Props): React.JSX.Element {
           return (
             <React.Fragment key={g.name}>
               <GeneratorBuildItem
+                game={game}
                 onDismissHydroPrimer={
                   showPrimer && g.name === "Hydro" ? dismissPrimer : undefined
                 }

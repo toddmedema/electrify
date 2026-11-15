@@ -1,4 +1,5 @@
 import { expect, test } from "./fixtures";
+import { reviewScreenshot } from "./review-screenshot";
 
 async function openSettings(page: import("@playwright/test").Page) {
   await page.goto("/");
@@ -6,12 +7,14 @@ async function openSettings(page: import("@playwright/test").Page) {
   await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
 }
 
-test("settings footer shows the complete version and clear cache in both themes", async ({
+test("settings footer fits one row and the version opens cache reset in both themes", async ({
   page,
 }, testInfo) => {
   await openSettings(page);
   const footer = page.locator(".screenPage footer");
-  const version = footer.getByText(/^Electrify v/);
+  const version = footer.getByRole("button", {
+    name: /^\d{2}[a-z]{3,4}\d{2}-\d{4}$/,
+  });
   const response = await page.request.get("/package.json");
   const metadata = response
     .headers()
@@ -21,17 +24,37 @@ test("settings footer shows the complete version and clear cache in both themes"
   for (const theme of ["Light", "Dark"]) {
     await page.getByRole("button", { name: theme, exact: true }).click();
     await footer.scrollIntoViewIfNeeded();
-    await expect(version).toHaveText(/^Electrify v\d{2}[a-z]{3,4}\d{2}-\d{4}$/);
-    if (metadata)
-      await expect(version).toHaveText(`Electrify v${metadata.version}`);
+    await expect(version).toHaveText(/^\d{2}[a-z]{3,4}\d{2}-\d{4}$/);
+    if (metadata) await expect(version).toHaveText(metadata.version);
     await expect(
       footer.getByRole("button", { name: "Clear cache", exact: true }),
-    ).toBeVisible();
+    ).toHaveCount(0);
+    const rows = await footer
+      .locator(":scope > *")
+      .evaluateAll((elements) =>
+        elements.map((element) =>
+          Math.round(element.getBoundingClientRect().top),
+        ),
+      );
+    expect(new Set(rows).size).toBe(1);
+    await version.click();
+    const reset = page.getByRole("dialog", { name: "Clear cache and reload?" });
+    await expect(
+      reset.getByRole("button", { name: "Clear and reload" }),
+    ).toBeEnabled();
+    await reset.getByRole("button", { name: "Cancel", exact: true }).click();
+    await expect(reset).toBeHidden();
     const bounds = (await version.boundingBox())!;
     expect(bounds.x).toBeGreaterThanOrEqual(0);
     expect(bounds.x + bounds.width).toBeLessThanOrEqual(
       page.viewportSize()!.width,
     );
+    if (theme === "Dark" && testInfo.project.name === "mobile-360px") {
+      await reviewScreenshot(footer, {
+        path: testInfo.outputPath("settings-footer.png"),
+        animations: "disabled",
+      });
+    }
     if (
       process.env.PR_SCREENSHOTS &&
       ((testInfo.project.name === "desktop-chromium" && theme === "Light") ||
@@ -75,6 +98,10 @@ test("settings controls are flush with each row's right edge", async ({
 }) => {
   await openSettings(page);
 
+  await page
+    .getByRole("button", { name: "Advanced display", exact: true })
+    .click();
+
   // Turn sound on so the volume sliders render too
   await page.getByRole("switch", { name: "Sound" }).check();
   await expect(
@@ -88,7 +115,7 @@ test("settings controls are flush with each row's right edge", async ({
         row.getBoundingClientRect().right -
         parseFloat(getComputedStyle(row).paddingRight);
       const controls = row.lastElementChild!.querySelectorAll<HTMLElement>(
-        "button, .MuiSwitch-root",
+        "button, .MuiSwitch-root, select",
       );
       const controlRight = Math.max(
         ...Array.from(controls).map((el) => el.getBoundingClientRect().right),
@@ -113,9 +140,8 @@ test("settings controls are flush with each row's right edge", async ({
     return out;
   });
 
-  // Five rows (Appearance, Sound, Units, Leaderboard, Saved game) plus two volume sliders; an empty
-  // result would otherwise pass without checking anything
-  expect(offsets).toHaveLength(7);
+  // Seven settings rows plus both volume sliders must be measured.
+  expect(offsets).toHaveLength(9);
   for (const { control, offset } of offsets) {
     expect(Math.abs(offset), control).toBeLessThanOrEqual(2);
   }

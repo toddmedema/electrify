@@ -7,8 +7,16 @@ import {
 import {
   generateForecastTimeline,
   generateResourceForecast,
+  previewFacilityBuild,
 } from "../../reducers/Game";
-import type { GameType, TickPresentFutureType } from "../../Types";
+import type {
+  FacilityShoppingType,
+  GameType,
+  TickPresentFutureType,
+} from "../../Types";
+import { MINUTES_PER_MONTH } from "../../helpers/DateTime";
+import { forecastShortfalls } from "../../helpers/ForecastShortfalls";
+import { monthMinute } from "../../helpers/Projection";
 import type { OutputWeatherTick } from "../../helpers/ExpectedOutput";
 
 export interface BuildForecast {
@@ -47,7 +55,104 @@ export function forecastCutoffIndex(
   return first;
 }
 
+interface BuildImpactPeriod {
+  startMinute: number;
+  monthlyMarginW: Array<number | null>;
+  unservedWh: number | null;
+}
+export interface BuildImpactForecast {
+  months: number[];
+  before: BuildImpactPeriod;
+  after: BuildImpactPeriod;
+}
+
+function sampledBuildImpact(
+  timeline: readonly TickPresentFutureType[],
+  step: number,
+  start: number,
+  end: number,
+): { marginW: number | null; unservedWh: number | null } {
+  let covered = 0;
+  let marginW = Infinity;
+  let unservedWh = 0;
+  for (const tick of timeline) {
+    const minutes =
+      Math.min(end, tick.minute + step) - Math.max(start, tick.minute);
+    if (minutes <= 0) continue;
+    covered += minutes;
+    marginW = Math.min(marginW, tick.reserveW ?? tick.supplyW - tick.demandW);
+    unservedWh += forecastShortfalls([tick], minutes, 0).blackoutTotalWh;
+  }
+  return covered === end - start
+    ? { marginW, unservedWh }
+    : { marginW: null, unservedWh: null };
+}
+
+function buildImpactPeriod(
+  game: GameType,
+  forecast: TickPresentFutureType[],
+  startMinute: number,
+): BuildImpactPeriod {
+  const end = startMinute + 12 * MINUTES_PER_MONTH;
+  const recorded = game.timeline.filter(
+    (tick) => tick.minute < game.date.minute,
+  );
+  const history = new Map(
+    game.monthlyHistory.map((month) => [
+      monthMinute(month, game.startingYear),
+      month,
+    ]),
+  );
+  const monthlyMarginW: Array<number | null> = [];
+  let unservedWh: number | null = 0;
+  for (
+    let month = Math.floor(startMinute / MINUTES_PER_MONTH) * MINUTES_PER_MONTH;
+    month < end;
+    month += MINUTES_PER_MONTH
+  ) {
+    const start = Math.max(startMinute, month);
+    const finish = Math.min(end, month + MINUTES_PER_MONTH);
+    const parts: Array<{ marginW: number | null; unservedWh: number | null }> =
+      [];
+    const pastEnd = Math.min(finish, game.date.minute);
+    if (start < pastEnd) {
+      let past = sampledBuildImpact(recorded, TICK_MINUTES, start, pastEnd);
+      const saved = history.get(month);
+      // Compact history retains exact extrema and energy for complete calendar months only.
+      if (
+        past.marginW === null &&
+        saved &&
+        start === month &&
+        pastEnd === month + MINUTES_PER_MONTH
+      ) {
+        past = {
+          marginW: saved.minimumSupplyMarginW ?? null,
+          unservedWh: Math.max(0, saved.demandWh - saved.supplyWh),
+        };
+      }
+      parts.push(past);
+    }
+    const futureStart = Math.max(start, game.date.minute);
+    if (futureStart < finish)
+      parts.push(sampledBuildImpact(forecast, 60, futureStart, finish));
+    const margins = parts.flatMap((part) =>
+      part.marginW === null ? [] : [part.marginW],
+    );
+    monthlyMarginW.push(
+      margins.length === parts.length ? Math.min(...margins) : null,
+    );
+    for (const part of parts) {
+      unservedWh =
+        unservedWh === null || part.unservedWh === null
+          ? null
+          : unservedWh + part.unservedWh;
+    }
+  }
+  return { startMinute, monthlyMarginW, unservedWh };
+}
+
 export interface OutlookResults {
+  buildImpact: BuildImpactForecast | undefined;
   build: BuildForecast | undefined;
   hydro: ReservoirOutlookPoint[] | undefined;
   intertie: IntertieForecastTick[] | undefined;
@@ -57,6 +162,7 @@ export interface OutlookRequest {
   requestId: number;
   kind: OutlookKind;
   game: GameType;
+  facility?: FacilityShoppingType;
 }
 export type OutlookReply = {
   requestId: number;
@@ -67,9 +173,36 @@ export type OutlookReply = {
 export function computeOutlook<K extends OutlookKind>(
   kind: K,
   game: GameType,
+  facility?: FacilityShoppingType,
 ): OutlookResults[K] {
   const now = currentTick(game);
   if (!now) return undefined;
+  if (kind === "buildImpact") {
+    if (!facility) return undefined;
+    const { before, after, commissionedMinute } = previewFacilityBuild(
+      game,
+      facility,
+    );
+    const beforePeriod = buildImpactPeriod(
+      game,
+      before,
+      commissionedMinute - 12 * MINUTES_PER_MONTH,
+    );
+    const afterPeriod = buildImpactPeriod(game, after, commissionedMinute);
+    return {
+      months: afterPeriod.monthlyMarginW.map((_, index) =>
+        Math.max(
+          0,
+          Math.floor(commissionedMinute / MINUTES_PER_MONTH) +
+            index -
+            commissionedMinute / MINUTES_PER_MONTH,
+        ),
+      ),
+      before: beforePeriod,
+      after: afterPeriod,
+    } as OutlookResults[K];
+  }
+
   if (kind === "build") {
     let result = buildForecasts.get(game);
     if (!result) {

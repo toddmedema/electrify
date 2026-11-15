@@ -79,9 +79,9 @@ export function useWorkerRequest<Req, Reply, Res>(
         setSettled({ key, scope, state });
       }
     };
-    const failed = () => {
+    const failed = (reason: "startup" | "failed" = "failed") => {
       if (!current.fallback) {
-        settle({ status: "error", reason: "failed" });
+        settle({ status: "error", reason });
         return;
       }
       if (cancelled) return;
@@ -134,7 +134,7 @@ export function useWorkerRequest<Req, Reply, Res>(
           broken.onerror = null;
           broken.terminate();
         }
-        settle({ status: "error", reason: "startup" });
+        failed("startup");
       }
     }, debounceMs);
     return () => {

@@ -4,6 +4,7 @@ import {
 } from "../../desktop/InputPresentation";
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import uPlot from "uplot";
+import { Dialog } from "@mui/material";
 import UPlotChart, { BuildContext } from "./UPlotChart";
 import { ChartPresentationContext } from "./ChartPresentationContext";
 import { ChartViewportContext } from "./ChartViewportContext";
@@ -546,8 +547,8 @@ describe("UPlotChart resizing", () => {
     expect(gutter(axes[1])).toBe(36);
   });
 
-  function renderInteractiveChart() {
-    render(
+  function renderInteractiveChart(onClose?: () => void) {
+    const content = (
       <UPlotChart
         ariaLabel="Demand chart"
         state={{}}
@@ -558,7 +559,16 @@ describe("UPlotChart resizing", () => {
           [2, 3],
         ]}
         buildOptions={() => ({ width: 0, height: 0, series: [{}, {}] })}
-      />,
+      />
+    );
+    render(
+      onClose ? (
+        <Dialog open onClose={onClose}>
+          {content}
+        </Dialog>
+      ) : (
+        content
+      ),
     );
     const plot = currentPlot();
     plot.cursor = { left: -10, idx: null };
@@ -580,6 +590,18 @@ describe("UPlotChart resizing", () => {
     expect(fireEvent.keyDown(chart, { key: "Escape" })).toBe(false);
     expect(screen.getByRole("status")).toBeEmptyDOMElement();
     expect(fireEvent.keyDown(chart, { key: "Escape" })).toBe(true);
+  });
+
+  it("closes chart details before a surrounding dialog on Escape", () => {
+    const onClose = jest.fn();
+    const { chart } = renderInteractiveChart(onClose);
+    fireEvent.keyDown(chart, { key: "Enter" });
+    expect(screen.getByRole("status")).toHaveTextContent("Point 0");
+    fireEvent.keyDown(chart, { key: "Escape" });
+    expect(screen.getByRole("status")).toBeEmptyDOMElement();
+    expect(onClose).not.toHaveBeenCalled();
+    fireEvent.keyDown(chart, { key: "Escape" });
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 
   it("uses the full chart when keyboard values exceed the plot and restores pointer inspection", () => {
