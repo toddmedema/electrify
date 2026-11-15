@@ -154,7 +154,7 @@ test("the host worker schedules every tick at the shared speed and reschedules s
   }
 });
 
-test("idle paused workers send small host pulses, suppress unchanged views, and force reconnect baselines", async () => {
+test("idle paused couch workers send small pulses, suppress unchanged views, and force checkpoint projections", async () => {
   jest.useFakeTimers();
   const scope = globalThis as unknown as Worker;
   const previousMessage = scope.onmessage;
@@ -208,7 +208,7 @@ test("idle paused workers send small host pulses, suppress unchanged views, and 
       epoch: "epoch",
       revision: 0,
     });
-    // Full saves retain their existing cadence; reconnect gets a complete view immediately.
+    // Full saves retain their cadence; an explicit checkpoint forces a complete local projection.
     expect(
       post.mock.calls.filter(([event]) => event.kind === "checkpoint"),
     ).toHaveLength(2);
@@ -524,7 +524,7 @@ test("local shell summaries follow an active company's calendar after P1 retires
   }
 });
 
-test("a slow shell bounds cloned views while ticks, receipts, checkpoints and safety stops continue", async () => {
+test("a slow couch shell bounds cloned views while ticks, receipts, checkpoints and safety stops continue", async () => {
   jest.useFakeTimers();
   const scope = globalThis as unknown as Worker;
   const previousMessage = scope.onmessage;
@@ -545,7 +545,7 @@ test("a slow shell bounds cloned views while ticks, receipts, checkpoints and sa
     selectedSpeeds: {},
     activities: {},
     seats: [{ id: "host" }, { id: "guest" }],
-  } as World;
+  } as unknown as World;
   createWorld.mockReturnValue(world);
   roomView.mockImplementation((value: World) => ({
     revision: value.revision,

@@ -92,28 +92,26 @@ function fixture({ recover = false } = {}) {
           kind: "views",
           views: { host: roomView(source.world, "host") },
         });
-        {
-          if (recover)
-            recovery = new ReplicaRecovery(source, "host", {
-              flush: sendRecords,
-              send: (to, value) => {
-                baseline = value;
-                respond({ kind: "baseline", to, baseline });
-              },
-              changed: () => {
-                sendRecords();
-                respond({
-                  kind: "views",
-                  views: { host: roomView(source.world, "host") },
-                });
-              },
-              error: (error) => {
-                throw error;
-              },
-              digest: (bytes) => webcrypto.subtle.digest("SHA-256", bytes),
-            });
-          sendBaseline();
-        }
+        if (recover)
+          recovery = new ReplicaRecovery(source, "host", {
+            flush: sendRecords,
+            send: (to, value) => {
+              baseline = value;
+              respond({ kind: "baseline", to, baseline });
+            },
+            changed: () => {
+              sendRecords();
+              respond({
+                kind: "views",
+                views: { host: roomView(source.world, "host") },
+              });
+            },
+            error: (error) => {
+              throw error;
+            },
+            digest: (bytes) => webcrypto.subtle.digest("SHA-256", bytes),
+          });
+        sendBaseline();
       } else if (request.kind === "baseline") sendBaseline();
       else if (request.kind === "replica-peers")
         recovery?.connected(request.connected);
@@ -317,9 +315,32 @@ test("replica views settle guest commands and errors through existing receipts w
   }
 });
 
-test("retired remote views cannot replace the local replica, and leave terminates it", async () => {
+test("a guest requires a baseline, ignores retired remote views, and terminates its replica on leave", async () => {
   const f = fixture();
   try {
+    await f.guest.initialize();
+    f.event("guest", {
+      kind: "message",
+      sender: "host",
+      payload: {
+        kind: "view",
+        view: { matchId: "old", epoch: "old", revision: 999 },
+      },
+    } as unknown as NativeEvent);
+    f.event("guest", {
+      kind: "message",
+      sender: "host",
+      payload: {
+        kind: "records",
+        matchId: "old",
+        epoch: "old",
+        from: 1,
+        records: [{ t: "verify" }],
+      },
+    });
+    await flush();
+    expect(f.guest.getSnapshot().view).toBeUndefined();
+    expect(f.replicaFactory).not.toHaveBeenCalled();
     await f.start();
     const initial = f.guest.getSnapshot().view!;
     f.event("guest", {
@@ -485,8 +506,8 @@ test("a failed replica worker is replaced for a same-stream recovery baseline", 
   }
 });
 
-test("a paused snapshot reconnect receives the current company and command receipt", async () => {
-  const f = fixture({ replication: false });
+test("a paused reconnect baseline includes the current company and command receipt", async () => {
+  const f = fixture();
   try {
     await f.start();
     const initial = f.guest.getSnapshot().view!;

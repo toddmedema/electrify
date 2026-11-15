@@ -557,7 +557,6 @@ export class MultiplayerSession {
       if (view.receipt?.error) completed.reject(new Error(view.receipt.error));
       else completed.resolve();
     }
-    return true;
   }
   private flushQueued() {
     while (
@@ -1271,24 +1270,23 @@ export class MultiplayerSession {
           return;
         }
         if (data.kind !== "views") return;
-        for (const [id, view] of Object.entries(data.views)) {
+        const view = data.views[this.state.lobby.selfId!];
+        if (view) {
           view.disconnected = view.grids
             .filter(
-              (g) =>
-                !g.retired &&
-                g.seat.id !== this.state.lobby.selfId &&
-                !this.state.lobby.connected.includes(g.seat.id),
+              (grid) =>
+                !grid.retired &&
+                grid.seat.id !== this.state.lobby.selfId &&
+                !this.state.lobby.connected.includes(grid.seat.id),
             )
-            .map((g) => g.seat.id);
-          if (id === this.state.lobby.selfId) {
-            receivedView = true;
-            this.acceptView(view);
-            if (current() && this.worker === worker)
-              this.post({
-                kind: "replica-peers",
-                connected: [...this.state.lobby.connected],
-              });
-          }
+            .map((grid) => grid.seat.id);
+          receivedView = true;
+          this.acceptView(view);
+          if (current() && this.worker === worker)
+            this.post({
+              kind: "replica-peers",
+              connected: [...this.state.lobby.connected],
+            });
         }
         // Subscribers apply the host grid synchronously. Only then may the worker clone
         // another bundle; small clock/liveness messages remain independent of this credit.

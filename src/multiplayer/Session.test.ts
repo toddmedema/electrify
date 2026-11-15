@@ -1,3 +1,12 @@
+import "../Store";
+import { TextEncoder } from "util";
+import { webcrypto } from "crypto";
+import { ReplicaRuntime } from "./ReplicaRuntime";
+import type { ReplicaRequest, ReplicaResponse } from "./ReplicaProtocol";
+import type { ReplicaBaseline } from "./Replication";
+import { ReplicatedWorld } from "./Replication";
+import { createWorld } from "./World";
+import { loadSimData } from "../testing/SimData";
 import { modScenario } from "../mods/ModScenario";
 import { modBrowseSummary } from "./ModBrowse";
 import { selectionKey, validBrowseState } from "./Browse";
@@ -135,15 +144,103 @@ function fixture(isHost = false, deferLeave = false) {
         };
     },
   } as unknown as DesktopBridge;
-  const session = new MultiplayerSession(bridge, async () => {
-    if (failFactory) throw new Error("Factory failed");
-    return worker as unknown as Worker;
-  });
+  let projection: RoomView | undefined;
+  let replicaIdentity = "";
+  const replicaPosts: ReplicaRequest[] = [];
+  const replica = {
+    onmessage: null as ((event: MessageEvent<ReplicaResponse>) => void) | null,
+    terminate: jest.fn(() => {
+      replicaIdentity = "";
+    }),
+    postMessage(request: ReplicaRequest) {
+      replicaPosts.push(request);
+      if (request.kind === "baseline" && projection) {
+        const current = projection;
+        projection = undefined;
+        replicaIdentity = `${current.matchId}/${current.epoch}`;
+        respond({
+          kind: "progress",
+          matchId: current.matchId,
+          epoch: current.epoch,
+          applied: 0,
+          state: "live",
+        });
+        membership(current);
+        respond({ kind: "views", views: { [guest]: current } });
+      } else if (request.kind !== "views-applied" || useRuntime)
+        void runtime.receive(request);
+    },
+  };
+  let useRuntime = false;
+  const respond = (data: ReplicaResponse) =>
+    replica.onmessage?.({ data } as MessageEvent<ReplicaResponse>);
+  const membership = (current: RoomView) => {
+    if (
+      current.disconnected.length ||
+      session.getSnapshot().view?.disconnected.length
+    )
+      event({
+        kind: "message",
+        sender: host,
+        payload: {
+          kind: "keepalive",
+          matchId: current.matchId,
+          epoch: current.epoch,
+          revision: current.revision,
+          disconnected: current.disconnected,
+        },
+      });
+  };
+  const runtime = new ReplicaRuntime(
+    respond,
+    async () => {},
+    undefined,
+    (bytes) => webcrypto.subtle.digest("SHA-256", bytes),
+  );
+  const session = new MultiplayerSession(
+    bridge,
+    async () => {
+      if (failFactory) throw new Error("Factory failed");
+      return worker as unknown as Worker;
+    },
+    async () => replica as unknown as Worker,
+  );
   return {
     session,
     worker,
     requests,
     posts,
+    replicaPosts,
+    baseline: async (baseline: ReplicaBaseline) => {
+      useRuntime = true;
+      event({
+        kind: "message",
+        sender: host,
+        payload: { kind: "baseline", ...baseline },
+      });
+      await flushReplica();
+    },
+    project: async (current: RoomView) => {
+      if (replicaIdentity !== `${current.matchId}/${current.epoch}`) {
+        projection = current;
+        event({
+          kind: "message",
+          sender: host,
+          payload: {
+            kind: "baseline",
+            matchId: current.matchId,
+            epoch: current.epoch,
+            index: 0,
+            blockers: [],
+            world: { spec: COOP_TEST_SPEC } as World,
+          },
+        });
+        await flushReplica();
+      } else {
+        membership(current);
+        respond({ kind: "views", views: { [guest]: current } });
+      }
+    },
     event: (value: NativeEvent) => event(value),
     releaseLeave: () => releaseLeave(),
     checkpoint: (value: World | null, hold = false) => {
@@ -171,6 +268,11 @@ function fixture(isHost = false, deferLeave = false) {
     },
   };
 }
+const flushReplica = async () => {
+  for (let n = 0; n < 30; n++) await Promise.resolve();
+};
+Object.assign(globalThis, { TextEncoder });
+beforeAll(() => loadSimData("SF"));
 beforeEach(() => {
   jest.useFakeTimers();
   let id = 0;
@@ -451,15 +553,11 @@ test("a guest accepts only a valid saved-campaign roster from its host and follo
 test("late host frames cannot restore a guest game during leave or before rejoining", async () => {
   const f = fixture(false, true);
   await f.session.initialize();
-  const frame = (revision: number): NativeEvent => ({
-    kind: "message",
-    sender: host,
-    payload: { kind: "view", view: view({ revision }) },
-  });
-  f.event(frame(1));
+  const frame = (revision: number) => f.project(view({ revision }));
+  await frame(1);
   // Skip the host save so the test holds the session inside the native lobby exit.
   const leaving = f.session.leave({ skipSave: true });
-  f.event(frame(2));
+  await frame(2);
   expect(f.session.getSnapshot().view?.revision).toBe(1);
   f.releaseLeave();
   await leaving;
@@ -469,7 +567,7 @@ test("late host frames cannot restore a guest game during leave or before rejoin
     members: [],
     connected: [],
   });
-  f.event(frame(3));
+  await frame(3);
   f.event({
     kind: "message",
     sender: host,
@@ -486,7 +584,7 @@ test("late host frames cannot restore a guest game during leave or before rejoin
     kind: "state",
     state: { available: true, selfId: guest, members: [], connected: [] },
   });
-  f.event(frame(4));
+  await frame(4);
   expect(f.session.getSnapshot().view).toBeUndefined();
   f.event({
     kind: "state",
@@ -502,28 +600,16 @@ test("late host frames cannot restore a guest game during leave or before rejoin
       connected: [host],
     },
   });
-  f.event({
-    kind: "message",
-    sender: host,
-    payload: { kind: "view", view: view({ revision: 5 }) },
-  });
+  await f.project(view({ revision: 5 }));
   expect(f.session.getSnapshot().view?.epoch).toBe("epoch");
-  f.event({
-    kind: "message",
-    sender: host,
-    payload: { kind: "view", view: view({ epoch: "restored", revision: 0 }) },
-  });
+  await f.project(view({ epoch: "restored", revision: 0 }));
   expect(f.session.getSnapshot().view?.epoch).toBe("restored");
   f.session.dispose();
 });
 test("retry retains the same purchase sequence, acknowledgements stop retry, and stale views cannot rewind", async () => {
   const f = fixture();
   await f.session.initialize();
-  f.event({
-    kind: "message",
-    sender: host,
-    payload: { kind: "view", view: view() },
-  });
+  await f.project(view());
   f.session.command({
     kind: "action" as const,
     name: "buildFacility",
@@ -535,20 +621,11 @@ test("retry retains the same purchase sequence, acknowledgements stop retry, and
   );
   expect(sends).toHaveLength(2);
   expect(sends[0]).toEqual(sends[1]);
-  f.event({
-    kind: "message",
-    sender: host,
-    payload: {
-      kind: "view",
-      view: view({ revision: 2, lastSequence: 1, receipt: { sequence: 1 } }),
-    },
-  });
+  await f.project(
+    view({ revision: 2, lastSequence: 1, receipt: { sequence: 1 } }),
+  );
   expect(f.session.getSnapshot().pending).toBe(false);
-  f.event({
-    kind: "message",
-    sender: host,
-    payload: { kind: "view", view: view() },
-  });
+  await f.project(view());
   expect(f.session.getSnapshot().view?.revision).toBe(2);
   jest.advanceTimersByTime(2000);
   expect(
@@ -576,7 +653,7 @@ const lobbyWith = (connected: string[]): NativeEvent => ({
 test("a guest's command waits out a lost host link instead of raising an error on every retry", async () => {
   const f = fixture();
   await f.session.initialize();
-  deliver(f, {});
+  await deliver(f, {});
   f.event(lobbyWith([]));
   f.session.command({ kind: "speed", speed: "SLOW" });
   jest.advanceTimersByTime(10_000);
@@ -594,7 +671,7 @@ test("a guest's command waits out a lost host link instead of raising an error o
 test("a command that loses a race with the host link drops is not a new failure", async () => {
   const f = fixture();
   await f.session.initialize();
-  deliver(f, {});
+  await deliver(f, {});
   f.failSends("Player is disconnected");
   f.session.command({ kind: "speed", speed: "SLOW" });
   jest.advanceTimersByTime(5000);
@@ -606,7 +683,7 @@ test("a command that loses a race with the host link drops is not a new failure"
 test("only a lost connection counts as one, so other errors never offer a way out that skips the save", async () => {
   const f = fixture();
   await f.session.initialize();
-  deliver(f, {});
+  await deliver(f, {});
   f.event({ kind: "disconnected", sender: host });
   expect(f.session.getSnapshot().error).toBe(CONNECTION_LOST);
   expect(isConnectionLoss(f.session.getSnapshot().error)).toBe(true);
@@ -643,7 +720,7 @@ test("only a guest's lost connection offers Disconnect, never a host that can st
 test("players read the transport's message, never Electron's invoke wrapper", async () => {
   const f = fixture();
   await f.session.initialize();
-  deliver(f, {});
+  await deliver(f, {});
   f.failSends("Co-op connection is catching up");
   f.session.command({ kind: "speed", speed: "SLOW" });
   await settle();
@@ -653,21 +730,13 @@ test("players read the transport's message, never Electron's invoke wrapper", as
 test("a fresh epoch discards the pending old purchase and starts command numbering again", async () => {
   const f = fixture();
   await f.session.initialize();
-  f.event({
-    kind: "message",
-    sender: host,
-    payload: { kind: "view", view: view() },
-  });
+  await f.project(view());
   f.session.command({
     kind: "action" as const,
     name: "buildFacility",
     payload: { facility: { name: "Wind", peakW: 50e6 }, financed: true },
   });
-  f.event({
-    kind: "message",
-    sender: host,
-    payload: { kind: "view", view: view({ epoch: "restored", revision: 0 }) },
-  });
+  await f.project(view({ epoch: "restored", revision: 0 }));
   jest.advanceTimersByTime(2000);
   expect(
     f.requests.filter((r) => r.kind === "send" && r.payload.kind === "command"),
@@ -735,12 +804,11 @@ const ownGrid = (pauseReason?: string) =>
       pauseReason,
     },
   ] as RoomView["grids"];
-function deliver(f: ReturnType<typeof fixture>, update: Partial<RoomView>) {
-  f.event({
-    kind: "message",
-    sender: host,
-    payload: { kind: "view", view: view(update) },
-  });
+async function deliver(
+  f: ReturnType<typeof fixture>,
+  update: Partial<RoomView>,
+) {
+  await f.project(view(update));
 }
 function sentCommands(f: ReturnType<typeof fixture>) {
   return f.requests.flatMap((r) =>
@@ -753,7 +821,7 @@ function sentCommands(f: ReturnType<typeof fixture>) {
 test("host silence is transient, updates once, and only a current authoritative view clears it", async () => {
   const f = fixture();
   await f.session.initialize();
-  deliver(f, { revision: 2 });
+  await deliver(f, { revision: 2 });
   const changed = jest.fn();
   const stop = f.session.subscribe(changed);
   jest.advanceTimersByTime(5000);
@@ -764,10 +832,10 @@ test("host silence is transient, updates once, and only a current authoritative 
   expect(changed).toHaveBeenCalledTimes(1);
   jest.advanceTimersByTime(2000);
   expect(changed).toHaveBeenCalledTimes(1);
-  deliver(f, { revision: 1 });
+  await deliver(f, { revision: 1 });
   expect(f.session.getSnapshot().waitingForHost).toBe(true);
   // Paused matches legitimately keep publishing the same revision.
-  deliver(f, { revision: 2 });
+  await deliver(f, { revision: 2 });
   expect(f.session.getSnapshot().waitingForHost).toBe(false);
   expect(f.session.getSnapshot().error).toBeUndefined();
   jest.advanceTimersByTime(5000);
@@ -793,7 +861,7 @@ function pulse(f: ReturnType<typeof fixture>, update = {}, sender = host) {
 test("authenticated host pulses keep an unchanged paused view healthy without state updates or acknowledging commands", async () => {
   const f = fixture();
   await f.session.initialize();
-  deliver(f, { revision: 2 });
+  await deliver(f, { revision: 2 });
   f.session.command({ kind: "speed", speed: "SLOW" });
   const previous = f.session.getSnapshot();
   const changed = jest.fn();
@@ -813,7 +881,7 @@ test("authenticated host pulses keep an unchanged paused view healthy without st
 test("only a current well-formed host pulse clears a transient warning and preserves command errors", async () => {
   const f = fixture();
   await f.session.initialize();
-  deliver(f, {
+  await deliver(f, {
     revision: 2,
     lastSequence: 1,
     receipt: { sequence: 1, error: "Not enough cash" },
@@ -859,7 +927,11 @@ test("worker keepalives relay only to connected guests without replacing the hos
     revision: 1,
   };
   f.worker.onmessage?.({ data } as unknown as MessageEvent<WorkerResponse>);
-  expect(f.requests.at(-1)).toEqual({ kind: "send", to: guest, payload: data });
+  expect(f.requests.at(-1)).toEqual({
+    kind: "send",
+    to: guest,
+    payload: { ...data, disconnected: [] },
+  });
   expect(f.session.getSnapshot()).toBe(previous);
   f.session.dispose();
 });
@@ -886,12 +958,17 @@ test("worker view credit follows synchronous host consumption and cannot outlive
   publish();
   expect(consumed).toHaveBeenCalledTimes(1);
   expect(f.session.getSnapshot().view?.revision).toBe(2);
-  expect(f.requests.at(-1)).toMatchObject({
-    kind: "send",
-    to: guest,
-    payload: { kind: "view" },
-  });
-  expect(f.posts).toEqual([{ kind: "views-applied" }]);
+  expect(
+    f.requests.some(
+      (request) =>
+        request.kind === "send" &&
+        (request.payload as { kind: string }).kind === "view",
+    ),
+  ).toBe(false);
+  expect(f.posts).toEqual([
+    { kind: "replica-peers", connected: [guest] },
+    { kind: "views-applied" },
+  ]);
   stop();
   f.posts.length = 0;
   f.session.subscribe(() => f.session.dispose());
@@ -905,7 +982,7 @@ test.each(["command", "disconnect"])(
   async (source) => {
     const f = fixture();
     await f.session.initialize();
-    deliver(
+    await deliver(
       f,
       source === "command"
         ? {
@@ -921,7 +998,7 @@ test.each(["command", "disconnect"])(
     jest.advanceTimersByTime(5500);
     expect(f.session.getSnapshot().waitingForHost).toBe(true);
     expect(f.session.getSnapshot().error).toBe(error);
-    deliver(f, { revision: 2 });
+    await deliver(f, { revision: 2 });
     expect(f.session.getSnapshot().waitingForHost).toBe(false);
     expect(f.session.getSnapshot().error).toBe(error);
     f.session.dispose();
@@ -931,7 +1008,7 @@ test.each(["command", "disconnect"])(
 test("menu pauses queue behind purchases and rapid closing cannot strand everyone paused", async () => {
   const f = fixture();
   await f.session.initialize();
-  deliver(f, { grids: ownGrid() });
+  await deliver(f, { grids: ownGrid() });
   f.session.command({
     kind: "action" as const,
     name: "buildFacility",
@@ -939,7 +1016,7 @@ test("menu pauses queue behind purchases and rapid closing cannot strand everyon
   });
   f.session.setActivity("Building power plants");
   expect(sentCommands(f)).toHaveLength(1);
-  deliver(f, {
+  await deliver(f, {
     revision: 2,
     lastSequence: 1,
     receipt: { sequence: 1 },
@@ -950,14 +1027,14 @@ test("menu pauses queue behind purchases and rapid closing cannot strand everyon
     reason: "Building power plants",
   });
   f.session.setActivity(null);
-  deliver(f, {
+  await deliver(f, {
     revision: 3,
     lastSequence: 2,
     receipt: { sequence: 2 },
     grids: ownGrid("Building power plants"),
   });
   expect(sentCommands(f).at(-1)).toEqual({ kind: "activity", reason: null });
-  deliver(f, {
+  await deliver(f, {
     revision: 4,
     lastSequence: 3,
     receipt: { sequence: 3 },
@@ -970,11 +1047,11 @@ test("menu pauses queue behind purchases and rapid closing cannot strand everyon
 test("overlapping activity changes coalesce and remain applied across a new epoch", async () => {
   const f = fixture();
   await f.session.initialize();
-  deliver(f, { grids: ownGrid() });
+  await deliver(f, { grids: ownGrid() });
   f.session.setActivity("Building power plants");
   f.session.setActivity("Leaving match");
   f.session.setActivity("Reading notification");
-  deliver(f, {
+  await deliver(f, {
     revision: 2,
     lastSequence: 1,
     receipt: { sequence: 1 },
@@ -984,7 +1061,7 @@ test("overlapping activity changes coalesce and remain applied across a new epoc
     { kind: "activity", reason: "Building power plants" },
     { kind: "activity", reason: "Reading notification" },
   ]);
-  deliver(f, { epoch: "new", revision: 0, grids: ownGrid() });
+  await deliver(f, { epoch: "new", revision: 0, grids: ownGrid() });
   expect(sentCommands(f).at(-1)).toEqual({
     kind: "activity",
     reason: "Reading notification",
@@ -995,14 +1072,14 @@ test("overlapping activity changes coalesce and remain applied across a new epoc
 test("acknowledging an automatic pause does not dismiss its notification", async () => {
   const f = fixture();
   await f.session.initialize();
-  deliver(f, {
+  await deliver(f, {
     lastSequence: 1,
     receipt: { sequence: 1, error: "Not enough cash" },
     grids: ownGrid(),
   });
   f.session.setActivity("Reading notification");
   expect(f.session.getSnapshot().error).toBe("Not enough cash");
-  deliver(f, {
+  await deliver(f, {
     revision: 2,
     lastSequence: 2,
     receipt: { sequence: 2 },
@@ -1017,7 +1094,7 @@ test("acknowledging an automatic pause does not dismiss its notification", async
 test("queued normal actions settle only after their authoritative view reaches subscribers", async () => {
   const f = fixture();
   await f.session.initialize();
-  deliver(f, { grids: ownGrid() });
+  await deliver(f, { grids: ownGrid() });
   let observed = 0;
   const stop = f.session.subscribe(() => {
     observed = f.session.getSnapshot().view!.lastSequence;
@@ -1025,7 +1102,7 @@ test("queued normal actions settle only after their authoritative view reaches s
   const first = f.session.submit({ kind: "rate", value: 0.2 });
   const second = f.session.submit({ kind: "speed", speed: "SLOW" });
   expect(sentCommands(f)).toHaveLength(1);
-  deliver(f, {
+  await deliver(f, {
     revision: 2,
     lastSequence: 1,
     receipt: { sequence: 1 },
@@ -1034,7 +1111,7 @@ test("queued normal actions settle only after their authoritative view reaches s
   await first;
   expect(observed).toBe(1);
   expect(sentCommands(f).at(-1)).toEqual({ kind: "speed", speed: "SLOW" });
-  deliver(f, {
+  await deliver(f, {
     revision: 3,
     lastSequence: 2,
     receipt: { sequence: 2, error: "Rejected" },
@@ -1048,12 +1125,12 @@ test("queued normal actions settle only after their authoritative view reaches s
 test("a locally rejected queued Ready does not strand the next command", async () => {
   const f = fixture();
   await f.session.initialize();
-  deliver(f, { grids: ownGrid() });
+  await deliver(f, { grids: ownGrid() });
   const first = f.session.submit({ kind: "rate", value: 0.2 });
   const ready = f.session.submit({ kind: "ready" });
   const rejected = ready.catch((error: Error) => error.message);
   const last = f.session.submit({ kind: "speed", speed: "SLOW" });
-  deliver(f, {
+  await deliver(f, {
     revision: 2,
     lastSequence: 1,
     receipt: { sequence: 1 },
@@ -1066,7 +1143,7 @@ test("a locally rejected queued Ready does not strand the next command", async (
     { kind: "rate", value: 0.2 },
     { kind: "speed", speed: "SLOW" },
   ]);
-  deliver(f, {
+  await deliver(f, {
     revision: 3,
     lastSequence: 2,
     receipt: { sequence: 2 },
@@ -1164,7 +1241,7 @@ test("a worker error after its first view preserves the established match", asyn
 test("a guest menu save waits for the host's checkpoint acknowledgement", async () => {
   const f = fixture();
   await f.session.initialize();
-  deliver(f, {});
+  await deliver(f, {});
   const saving = f.session.save();
   const request = f.requests.at(-1);
   expect(request).toMatchObject({
@@ -1189,12 +1266,12 @@ test("a guest menu save waits for the host's checkpoint acknowledgement", async 
 test("a local ready while disconnected rejects its promise without blocking later commands", async () => {
   const f = fixture();
   await f.session.initialize();
-  deliver(f, { disconnected: [host] });
+  await deliver(f, { disconnected: [host] });
   await expect(f.session.submit({ kind: "ready" })).rejects.toThrow(
     "reconnect",
   );
   const next = f.session.submit({ kind: "speed", speed: "SLOW" });
-  deliver(f, { revision: 2, lastSequence: 1, receipt: { sequence: 1 } });
+  await deliver(f, { revision: 2, lastSequence: 1, receipt: { sequence: 1 } });
   await next;
   f.session.dispose();
 });
@@ -1202,7 +1279,7 @@ test("a local ready while disconnected rejects its promise without blocking late
 test("a guest whose host cannot save stays in the match and can leave without saving", async () => {
   const f = fixture();
   await f.session.initialize();
-  deliver(f, {});
+  await deliver(f, {});
   const leaving = f.session.leave();
   jest.advanceTimersByTime(5000);
   await expect(leaving).rejects.toThrow("host could not finish the save");
@@ -1232,7 +1309,7 @@ test("a failed lobby exit still ends the local match and accepts the next one", 
   const f = fixture();
   f.failLeave();
   await f.session.initialize();
-  deliver(f, {});
+  await deliver(f, {});
   await expect(f.session.leave({ skipSave: true })).resolves.toBeUndefined();
   expect(f.requests.at(-1)).toEqual({ kind: "leave" });
   expect(f.session.getSnapshot().view).toBeUndefined();
@@ -1252,10 +1329,10 @@ test("a failed lobby exit still ends the local match and accepts the next one", 
       connected: [host],
     },
   });
-  deliver(f, { epoch: "next" });
+  await deliver(f, { epoch: "next" });
   const next = f.session.submit({ kind: "speed", speed: "SLOW" });
   expect(sentCommands(f)).toEqual([{ kind: "speed", speed: "SLOW" }]);
-  deliver(f, {
+  await deliver(f, {
     epoch: "next",
     revision: 2,
     lastSequence: 1,
@@ -1376,7 +1453,7 @@ test("custom setup waits for the host's settings before offering Ready", async (
 test("a guest's finished match closes when the host goes back to choosing, and Ready names the selection", async () => {
   const f = fixture();
   await f.session.initialize();
-  deliver(f, {});
+  await deliver(f, {});
   expect(f.session.getSnapshot().view).toBeDefined();
   f.event({
     kind: "message",
@@ -1600,60 +1677,50 @@ test("a snapshot arriving before browse is held privately until the advertised s
   f.session.dispose();
 });
 
-function communityView(
+function communityBaseline(
   scenario: import("../Types").ScenarioType,
-  update: Partial<RoomView> = {},
-): Partial<RoomView> {
-  return {
-    scenarioDigest: scenario.mod!.runtimeDigest,
-    game: {
-      scenarioId: 999,
-      seed: scenario.seed,
-      difficulty: scenario.mod!.parameters.difficulty,
-      startingYear: scenario.startingYear,
-    } as import("../Types").GameType,
-    ...update,
-  };
+  matchId = "match",
+  epoch = "epoch",
+): ReplicaBaseline {
+  return new ReplicatedWorld(
+    createWorld(
+      {
+        scenarioId: 999,
+        difficulty: scenario.mod!.parameters.difficulty,
+        customScenario: scenario,
+      },
+      [
+        { id: host, name: "Host" },
+        { id: guest, name: "Guest" },
+      ],
+      matchId,
+      epoch,
+    ),
+  ).baseline();
 }
-test("wire views hydrate only pinned definitions and reject smuggled or different mod snapshots", async () => {
+test("replica baselines keep pinned definitions and reject different mod identities or setup", async () => {
   const f = fixture();
   await f.session.initialize();
   const scenario = communityScenario();
   sendBrowse(f, communityBrowse(scenario));
   sendScenario(f, scenario);
-  deliver(f, communityView(scenario));
-  expect(f.session.getSnapshot().view?.game?.customScenario).toBe(
-    f.session.getSnapshot().scenarioSnapshot,
-  );
+  await f.baseline(communityBaseline(scenario));
+  expect(f.session.getSnapshot().view?.game?.customScenario).toEqual(scenario);
   const accepted = f.session.getSnapshot().view;
-  const changed = JSON.parse(JSON.stringify(scenario));
-  changed.mod.rules.events[0].message = "Forged contents";
-  deliver(
-    f,
-    communityView(scenario, {
-      revision: 2,
-      game: { ...accepted!.game!, customScenario: changed },
-    }),
-  );
+  const forged = communityBaseline(scenario);
+  forged.world.spec.customScenario!.mod!.rules.events[0].message =
+    "Forged contents";
+  await f.baseline(forged);
   expect(f.session.getSnapshot().view).toBe(accepted);
-  deliver(
-    f,
-    communityView(scenario, {
-      revision: 3,
-      scenarioDigest: communityScenario(9).mod!.runtimeDigest,
-    }),
-  );
+  expect(f.session.getSnapshot().synchronizing).toBe(true);
+  await f.baseline(communityBaseline(communityScenario(9)));
   expect(f.session.getSnapshot().view).toBe(accepted);
-  deliver(
-    f,
-    communityView(scenario, {
-      revision: 4,
-      game: { ...accepted!.game!, customScenario: undefined, seed: 111 },
-    }),
-  );
+  const wrongSeed = communityBaseline(scenario);
+  wrongSeed.world.grids[1].seed++;
+  await f.baseline(wrongSeed);
   expect(f.session.getSnapshot().view).toBe(accepted);
-  deliver(f, communityView(scenario, { revision: 5 }));
-  expect(f.session.getSnapshot().view?.revision).toBe(5);
+  await f.baseline(communityBaseline(scenario));
+  expect(f.session.getSnapshot().synchronizing).toBe(false);
   expect(
     f.session.getSnapshot().view?.game?.customScenario?.mod?.rules.events[0]
       .message,
@@ -1661,13 +1728,15 @@ test("wire views hydrate only pinned definitions and reject smuggled or differen
   f.session.dispose();
 });
 
-test("a resumed mod view waits for its separately validated snapshot without any library lookup", async () => {
+test("a resumed mod baseline waits for its separately validated scenario without any library lookup", async () => {
   const f = fixture();
   await f.session.initialize();
   const scenario = communityScenario();
-  deliver(f, communityView(scenario));
+  await f.baseline(communityBaseline(scenario));
   expect(f.session.getSnapshot().view).toBeUndefined();
+  expect(f.replicaPosts).toEqual([]);
   sendScenario(f, scenario);
+  await flushReplica();
   expect(f.session.getSnapshot().view?.game?.customScenario).toEqual(scenario);
   expect(
     f.requests.some(
@@ -1692,23 +1761,17 @@ test.each([2468, 1357])(
       payload: { kind: "campaign", campaign },
     });
     const resumed = communityScenario(seed);
-    deliver(
-      f,
-      communityView(resumed, {
-        matchId: "resumed",
-        epoch: "resumed-epoch",
-        revision: 7,
-      }),
-    );
+    await f.baseline(communityBaseline(resumed, "resumed", "resumed-epoch"));
     expect(f.session.getSnapshot().view).toBeUndefined();
     sendScenario(f, resumed);
+    await flushReplica();
     expect(f.session.getSnapshot().view?.matchId).toBe("resumed");
     expect(f.session.getSnapshot().view?.game?.customScenario?.seed).toBe(seed);
     f.session.dispose();
   },
 );
 
-test("new matches and reconnects resend a frozen mod while ordinary views carry only its digest", async () => {
+test("new matches and reconnect baselines send frozen mod definitions before the ordered stream", async () => {
   const f = fixture(true);
   await f.session.initialize();
   const scenario = communityScenario();
@@ -1719,15 +1782,12 @@ test("new matches and reconnects resend a frozen mod while ordinary views carry 
   } = communityBrowse(scenario);
   f.session.publishBrowse({ ...selected, scenarioSnapshot: scenario });
   const key = selectionKey(f.session.getSnapshot().browse!);
-  await expect(
-    f.session.start({
-      spec: {
-        scenarioId: 999,
-        difficulty: "Employee",
-        customScenario: scenario,
-      },
-    }),
-  ).rejects.toThrow(/mark Ready/);
+  const spec = {
+    scenarioId: 999,
+    difficulty: "Employee" as const,
+    customScenario: scenario,
+  };
+  await expect(f.session.start({ spec })).rejects.toThrow(/mark Ready/);
   f.event({
     kind: "state",
     state: {
@@ -1745,44 +1805,29 @@ test("new matches and reconnects resend a frozen mod while ordinary views carry 
         request.to === guest &&
         request.payload.kind === "scenario",
     ).length;
-  const publish = async (revision: number) => {
+  const publish = async () => {
     f.worker.onmessage?.({
       data: {
-        kind: "views",
-        views: {
-          [guest]: view({
-            ...communityView(scenario),
-            game: {
-              ...communityView(scenario).game!,
-              customScenario: scenario,
-            },
-            revision,
-          }),
-        },
+        kind: "baseline",
+        to: guest,
+        baseline: communityBaseline(scenario),
       },
-    } as unknown as MessageEvent<WorkerResponse>);
-    await Promise.resolve();
-    await Promise.resolve();
+    } as MessageEvent<WorkerResponse>);
+    await flushReplica();
   };
-  await f.session.start({
-    spec: { scenarioId: 999, difficulty: "Employee", customScenario: scenario },
-  });
+  await f.session.start({ spec });
   const before = sentSnapshots();
-  await publish(2);
+  const initial = f.requests.length;
+  await publish();
   expect(sentSnapshots()).toBe(before + 1);
-  const sent = f.requests.at(-1);
-  expect(sent).toMatchObject({
-    kind: "send",
-    to: guest,
-    payload: {
-      kind: "view",
-      view: { scenarioDigest: scenario.mod!.runtimeDigest },
-    },
-  });
-  if (sent?.kind !== "send" || sent.payload.kind !== "view")
-    throw new Error("Expected a wire view");
-  expect(sent.payload.view.game?.customScenario).toBeUndefined();
-  await publish(3);
+  expect(
+    f.requests
+      .slice(initial)
+      .map((request) =>
+        request.kind === "send" ? request.payload.kind : request.kind,
+      ),
+  ).toEqual(["scenario", "baseline"]);
+  await publish();
   expect(sentSnapshots()).toBe(before + 1);
   f.event({
     kind: "state",
@@ -1792,16 +1837,15 @@ test("new matches and reconnects resend a frozen mod while ordinary views carry 
     kind: "state",
     state: { ...f.session.getSnapshot().lobby, connected: [guest] },
   });
+  expect(f.posts.at(-1)).toEqual({ kind: "baseline", to: guest });
   const reconnect = sentSnapshots();
-  await publish(4);
+  await publish();
   expect(sentSnapshots()).toBe(reconnect + 1);
   await f.session.backToLobby();
   f.session.publishBrowse({ ...selected, scenarioSnapshot: scenario });
-  await f.session.start({
-    spec: { scenarioId: 999, difficulty: "Employee", customScenario: scenario },
-  });
+  await f.session.start({ spec });
   const resumed = sentSnapshots();
-  await publish(5);
+  await publish();
   expect(sentSnapshots()).toBe(resumed + 1);
   f.session.dispose();
 });
@@ -1870,7 +1914,7 @@ test("a sleep checkpoint discards unsent readiness while retaining an in-flight 
 test("a guest sleep requests an immediate authoritative pause even with an economic command in flight", async () => {
   const f = fixture();
   await f.session.initialize();
-  deliver(f, {});
+  await deliver(f, {});
   f.session.command({ kind: "rate", value: 0.2 });
   const sleeping = f.session.save(true, true);
   const request = f.requests.at(-1);
@@ -1910,7 +1954,7 @@ test("a host treats a guest sleep save request as a safety stop requiring fresh 
 test("build submission uses the company fleet in its authoritative wire command", async () => {
   const f = fixture();
   await f.session.initialize();
-  deliver(f, { grids: ownGrid() });
+  await deliver(f, { grids: ownGrid() });
   const submitted = f.session.submit({
     kind: "action",
     name: "buildFacility",
@@ -1935,7 +1979,7 @@ test("build submission uses the company fleet in its authoritative wire command"
       },
     },
   ]);
-  deliver(f, {
+  await deliver(f, {
     revision: 2,
     lastSequence: 1,
     receipt: { sequence: 1 },
