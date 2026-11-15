@@ -41,6 +41,24 @@ function show(game: ReturnType<typeof ready>, onBuildFacility = jest.fn()) {
     ),
   };
 }
+it("describes undeveloped land without customers or hydro access", () => {
+  show(ready());
+  const land = screen.getByRole("button", {
+    name: "Inspect Green Uplands territory",
+  });
+  expect(land).toHaveAccessibleDescription(/No customers.*wind.*solar sites/);
+  expect(land).not.toHaveAccessibleDescription(/hydro/);
+});
+it("removes the existing-hydro claim when the owned hydro plant is sold", () => {
+  const game = ready();
+  game.facilities = game.facilities.filter(
+    (facility) => facility.fuel !== "Hydro",
+  );
+  show(game);
+  expect(
+    screen.getByRole("button", { name: "Inspect Champlain territory" }),
+  ).not.toHaveAccessibleDescription(/existing hydro/);
+});
 it("has directly inspectable utility and land decisions without route controls", () => {
   show(ready());
   const territories = screen.getByRole("region", { name: "Territories" });

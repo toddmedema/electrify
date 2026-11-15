@@ -14,6 +14,7 @@ import { formatMoneyFull, formatNumber } from "../../helpers/Format";
 import { currentTick } from "../../helpers/GameSelectors";
 import {
   agreementYearMinute,
+  inheritedConnection,
   powerAgreementQuote,
 } from "../../helpers/PowerAgreements";
 import {
@@ -62,7 +63,7 @@ function fixture() {
   return game;
 }
 function mount(game = fixture()) {
-  const line = game.transmission!.lines[0];
+  const line = inheritedConnection("champlain", 1);
   const store = configureStore({
     reducer: {
       game: gameReducer,
@@ -77,7 +78,7 @@ function mount(game = fixture()) {
   const dispatch = jest.spyOn(store, "dispatch");
   function ConnectedAgreements() {
     const state = useSelector((state: { game: GameType }) => state.game);
-    return <PowerAgreements game={state} line={state.transmission!.lines[0]} />;
+    return <PowerAgreements game={state} line={line} />;
   }
   render(
     <Provider store={store}>
