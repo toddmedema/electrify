@@ -98,15 +98,23 @@ function feature(kind: TerritoryTileArtKind, built: boolean) {
                 d="M220 400L235 170H260L280 400Q250 420 220 400Z"
                 fill={cream}
               />
-              <path d="M245 170Q205 100 220 50L260 165Z" fill={mint} />
-              <path d="M250 170L370 280Q295 260 240 190Z" fill={mint} />
-              <path d="M240 180Q200 250 120 235L235 160Z" fill={mint} />
+              <path d="M225 175C180 140 170 80 195 40L265 155Z" fill={mint} />
+              <path
+                d="M225 175C180 140 170 80 195 40L265 155Z"
+                transform="rotate(120 245 175)"
+                fill={mint}
+              />
+              <path
+                d="M225 175C180 140 170 80 195 40L265 155Z"
+                transform="rotate(240 245 175)"
+                fill={mint}
+              />
               <ellipse cx="245" cy="175" rx="24" ry="30" fill={mint} />
             </>
           ) : (
             <>
-              <path d="M100 170H300Q360 170 360 120Q360 80 320 80" />
-              <path d="M70 240H350Q410 240 410 190" />
+              <path d="M150 350H235Q260 350 260 330Q260 310 240 310" />
+              <path d="M210 390H340Q370 390 370 365" />
             </>
           )}
         </>
