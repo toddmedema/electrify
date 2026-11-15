@@ -749,6 +749,7 @@ export function GeneratorBuildItem(
       <BuildPurchaseReviewDialog
         game={props.game}
         facility={quote}
+        territoryId={props.territoryId}
         open={open}
         onClose={() => setOpen(false)}
         title={

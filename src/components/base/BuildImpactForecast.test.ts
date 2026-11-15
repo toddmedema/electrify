@@ -14,6 +14,8 @@ import {
 import { computeOutlook } from "./OutlookForecast";
 import { forecastShortfalls } from "../../helpers/ForecastShortfalls";
 import { forecastWorkerSnapshot } from "./ForecastWorkerSnapshot";
+import { GREEN_UPLANDS_CORRIDOR_ID } from "../../data/Territories";
+import { inheritedConnection } from "../../helpers/PowerAgreements";
 
 function fixture() {
   const game = createGame({ scenarioId: 100, seed: 12345 });
@@ -25,6 +27,82 @@ function fixture() {
   )!;
   return { game, generator };
 }
+
+it.each(["generator", "storage"] as const)(
+  "forecasts a remote %s exactly as the purchased fleet behind its territory link",
+  (kind) => {
+    const game = createGame({ scenarioId: 116, seed: 188 });
+    game.territoryNetwork = { version: 1 };
+    game.date.year = 2020;
+    game.timeline.forEach((tick) => {
+      tick.cash = 1e12;
+    });
+    game.transmission!.lines.push({
+      ...inheritedConnection("champlain", 99),
+      corridorId: GREEN_UPLANDS_CORRIDOR_ID,
+      capacityW: 1e6,
+    });
+    const facility = {
+      ...(kind === "generator"
+        ? GENERATORS(game, 100e6, [], []).find(
+            (quote) => quote.name === "Wind",
+          )!
+        : STORAGE(game, 100e6).find((quote) => quote.name === "Battery")!),
+      yearsToBuild: 0,
+    };
+    const result = previewFacilityBuild(game, facility, "green-uplands");
+    const purchased = reducer(
+      game,
+      buildFacility({
+        facility,
+        financed: false,
+        territoryId: "green-uplands",
+      }),
+    );
+    expect(purchased.facilities).toHaveLength(game.facilities.length + 1);
+    expect(
+      purchased.facilities.find(
+        (facility) => !game.facilities.some(({ id }) => id === facility.id),
+      )?.territoryId,
+    ).toBe("green-uplands");
+    const now = game.timeline[0];
+    const actual = generateForecastTimeline(
+      purchased,
+      now.cash,
+      now.customers,
+      (TICKS_PER_YEAR * TICK_MINUTES) / 60 + 2,
+      60,
+    ).slice(0, result.after.length);
+    const grid = (tick: (typeof actual)[number]) => ({
+      minute: tick.minute,
+      reserveW: tick.reserveW,
+      storageChargeW: tick.storageChargeW,
+      storageDischargeW: tick.storageDischargeW,
+      territories: tick.territories,
+    });
+    result.after.forEach((tick, index) =>
+      expect(grid(tick)).toEqual(grid(actual[index])),
+    );
+    const remote = computeOutlook(
+      "buildImpact",
+      game,
+      facility,
+      "green-uplands",
+    )!;
+    expect(remote).toEqual(
+      computeOutlook(
+        "buildImpact",
+        forecastWorkerSnapshot(game),
+        facility,
+        "green-uplands",
+      ),
+    );
+    expect(remote).not.toEqual(computeOutlook("buildImpact", game, facility));
+    expect(computeOutlook("buildImpact", game, facility, "champlain")).toEqual(
+      computeOutlook("buildImpact", game, facility),
+    );
+  },
+);
 
 it("uses the actual purchased fleet around commissioning without changing the live game", () => {
   const { game, generator: quote } = fixture();

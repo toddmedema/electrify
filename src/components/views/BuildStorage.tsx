@@ -252,6 +252,7 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
       <BuildPurchaseReviewDialog
         game={props.game}
         facility={storage}
+        territoryId={props.territoryId}
         open={open}
         onClose={() => setOpen(false)}
         title={`Build ${formatWattHours(storage.peakWh)} ${displayName}?`}

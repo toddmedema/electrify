@@ -4,6 +4,7 @@ import {
   render,
   screen,
   within,
+  waitFor,
   waitForElementToBeRemoved,
 } from "@testing-library/react";
 import { createGame } from "../../testing/Simulator";
@@ -16,6 +17,7 @@ import BuildStorage from "./BuildStorage";
 import TransmissionPanel from "./TransmissionPanel";
 import { GameToolMemoryContext } from "../base/GameToolMemory";
 import { TERRITORY_BUILD_MEMORY_KEY } from "../base/TerritoryBuildDestination";
+import { createOutlookWorker } from "../base/OutlookWorkerClient";
 
 jest.mock("../base/useOutlookWorker", () => ({
   useOutlookWorker: () => undefined,
@@ -54,6 +56,22 @@ const controls = {
   onBuyingRule: jest.fn(),
   onSellingRule: jest.fn(),
 };
+
+afterEach(() => jest.restoreAllMocks());
+
+function forecastRequests() {
+  const postMessage = jest.fn();
+  jest
+    .spyOn(
+      jest.requireMock("../base/OutlookWorkerClient"),
+      "createOutlookWorker",
+    )
+    .mockReturnValue({
+      postMessage,
+      terminate: jest.fn(),
+    } as unknown as ReturnType<typeof createOutlookWorker>);
+  return postMessage;
+}
 
 it("describes undeveloped land without customers or hydro access and selects it from the key", () => {
   render(<TerritoryNetwork game={network()} {...controls} />);
@@ -144,6 +162,7 @@ it("shows directed internal flow, local sites, and carries its build destination
 });
 
 it("passes the selected owned territory on purchases and blocks oversized or exhausted projects", async () => {
+  const forecast = forecastRequests();
   let game = ownedValley();
   const onBuildGenerator = jest.fn();
   const view = render(
@@ -171,6 +190,15 @@ it("passes the selected owned territory on purchases and blocks oversized or exh
   fireEvent.click(review());
   expect(screen.getByRole("dialog")).toHaveTextContent(
     "Build in Valley Electric",
+  );
+  await waitFor(() =>
+    expect(forecast).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: "buildImpact",
+        territoryId: "valley-electric",
+        facility: expect.objectContaining({ name: "Natural Gas CC" }),
+      }),
+    ),
   );
   fireEvent.click(screen.getByRole("button", { name: "Pay cash" }));
   expect(onBuildGenerator).toHaveBeenCalledWith(
@@ -212,7 +240,8 @@ it("passes the selected owned territory on purchases and blocks oversized or exh
   ).toBeGreaterThan(0);
 });
 
-it("caps storage by local power and sends its selected destination to the purchase action", () => {
+it("caps storage by local power and sends its selected destination to the purchase action", async () => {
+  const forecast = forecastRequests();
   const game = ownedValley();
   game.date.year = 2020;
   const memory = new Map<string, unknown>([
@@ -238,6 +267,15 @@ it("caps storage by local power and sends its selected destination to the purcha
   fireEvent.click(review);
   expect(screen.getByRole("dialog")).toHaveTextContent(
     "Storage charges and supplies customers in its territory.",
+  );
+  await waitFor(() =>
+    expect(forecast).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: "buildImpact",
+        territoryId: "valley-electric",
+        facility: expect.objectContaining({ name: "Battery" }),
+      }),
+    ),
   );
   fireEvent.click(screen.getByRole("button", { name: "Pay cash" }));
   expect(onBuildStorage).toHaveBeenCalledWith(

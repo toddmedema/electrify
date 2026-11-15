@@ -1,6 +1,6 @@
 import * as React from "react";
 import { Typography } from "@mui/material";
-import type { FacilityShoppingType, GameType } from "../../Types";
+import type { FacilityShoppingType, GameType, TerritoryId } from "../../Types";
 import {
   formatForecastWatts,
   formatForecastWattHours,
@@ -40,10 +40,12 @@ function minimum(values: Array<number | null>): number | null {
 export default function BuildPurchaseReviewDialog({
   game,
   facility,
+  territoryId,
   ...purchase
 }: PurchaseReviewDialogProps & {
   game?: GameType;
   facility: FacilityShoppingType;
+  territoryId?: TerritoryId;
 }) {
   const gameKey = purchase.open && game ? signature(game) : undefined;
   const runScope = game?.runIdentity ?? game?.location ?? game?.monthlyHistory;
@@ -56,15 +58,17 @@ export default function BuildPurchaseReviewDialog({
   const state = useWorkerRequest(
     snapshot
       ? {
-          key: JSON.stringify(facility),
+          key: JSON.stringify([facility, territoryId]),
           scope: snapshot,
           message: (requestId: number): OutlookRequest => ({
             requestId,
             kind: "buildImpact",
             game: snapshot,
             facility,
+            territoryId,
           }),
-          fallback: () => computeOutlook("buildImpact", snapshot, facility),
+          fallback: () =>
+            computeOutlook("buildImpact", snapshot, facility, territoryId),
         }
       : undefined,
     {

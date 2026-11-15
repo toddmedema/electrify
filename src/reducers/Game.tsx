@@ -2778,6 +2778,7 @@ export function previewUtilityAcquisition(
 export function previewFacilityBuild(
   game: GameType,
   facility: FacilityShoppingType,
+  territoryId: TerritoryId = "champlain",
 ): {
   commissionedMinute: number;
   before: TickPresentFutureType[];
@@ -2799,6 +2800,7 @@ export function previewFacilityBuild(
   );
   const added = snapshot.facilities.find(({ id }) => !existingIds.has(id));
   if (!added) throw new Error("No facility added to the forecast");
+  if (hasTerritoryNetwork(snapshot)) added.territoryId = territoryId;
   const year = TICKS_PER_YEAR * TICK_MINUTES;
   const step = 60;
   let commissionedMinute: number | undefined;
