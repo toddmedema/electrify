@@ -133,7 +133,6 @@ const MESSAGE_KINDS = new Set([
   "browse",
   "campaign",
   "keepalive",
-  "view",
   "scenario",
   "records",
   "baseline",
@@ -202,7 +201,7 @@ function encode(payload) {
     payload.kind,
   );
 }
-/** Large live views must leave Steam's callback/IPC pump free to accept speed commands. */
+/** Large worlds must leave Steam's callback/IPC pump free to accept control messages. */
 function encodeAsync(payload) {
   return new Promise((resolve, reject) => {
     const json = messageJSON(payload);
@@ -798,6 +797,8 @@ class SteamMultiplayer {
     }
   }
   send(to, payload, encoded) {
+    if (!MESSAGE_KINDS.has(payload?.kind))
+      throw new Error("Invalid co-op message kind");
     const connection = [...this.connections.values()].find(
       (c) => c.id === to && c.connected,
     );
@@ -820,15 +821,9 @@ class SteamMultiplayer {
       message.kind === "scenario"
     ) {
       // Lobby/definition changes must not be followed by a late encode of the old game.
-      connection.viewGeneration = (connection.viewGeneration || 0) + 1;
-      connection.pendingView?.resolve();
-      connection.pendingView = undefined;
+      connection.transportGeneration =
+        (connection.transportGeneration || 0) + 1;
     }
-    // Views are self-contained: keep the latest unsent view, never an unbounded tick backlog.
-    if (message.kind === "view")
-      connection.queue = connection.queue.filter(
-        (m) => m.kind !== "view" || m.offset > 0,
-      );
     if (
       connection.queue.length + (connection.checkpointQueue?.length || 0) >=
       64
@@ -853,14 +848,14 @@ class SteamMultiplayer {
     )
       throw new Error("Co-op connection is catching up");
     validReplicationMessage(payload);
-    const generation = connection.viewGeneration || 0;
+    const generation = connection.transportGeneration || 0;
     connection.encodingCount = (connection.encodingCount || 0) + 1;
     const result = (connection.encodeChain || Promise.resolve())
       .then(async () => {
         const current = () =>
           connection.connected &&
           [...this.connections.values()].includes(connection) &&
-          generation === (connection.viewGeneration || 0);
+          generation === (connection.transportGeneration || 0);
         if (!current()) throw new Error("Player is disconnected");
         const encoded =
           payload.kind === "baseline"
@@ -875,55 +870,6 @@ class SteamMultiplayer {
     // One failed submission must not poison later recovery, or reject unobserved on teardown.
     connection.encodeChain = result.catch(() => {});
     return result;
-  }
-  encodeView(payload) {
-    return encodeAsync(payload);
-  }
-  /** One compression per peer, plus the newest waiting view. Coalesce before serialization;
-   * a slow peer must not build an encoding backlog or delay small control messages. */
-  sendView(to, payload) {
-    const connection = [...this.connections.values()].find(
-      (c) => c.id === to && c.connected,
-    );
-    if (!connection || this.hostId !== this.service.identity.steamId)
-      throw new Error("Player is disconnected");
-    return new Promise((resolve, reject) => {
-      connection.pendingView?.resolve();
-      connection.pendingView = {
-        payload,
-        resolve,
-        reject,
-        generation: connection.viewGeneration || 0,
-      };
-      this.flushView(connection);
-    });
-  }
-  async flushView(connection) {
-    if (connection.encodingView || !connection.pendingView) return;
-    const request = connection.pendingView;
-    connection.pendingView = undefined;
-    connection.encodingView = true;
-    const current = () =>
-      connection.connected &&
-      [...this.connections.values()].includes(connection) &&
-      request.generation === (connection.viewGeneration || 0);
-    try {
-      const encoded = await this.encodeView(request.payload);
-      // A completed encode cannot enter a new connection with the same Steam ID.
-      if (current()) this.send(connection.id, request.payload, encoded);
-      request.resolve();
-    } catch (error) {
-      if (current()) request.reject(error);
-      else request.resolve();
-    } finally {
-      connection.encodingView = false;
-      if ([...this.connections.values()].includes(connection))
-        void this.flushView(connection);
-      else {
-        connection.pendingView?.resolve();
-        connection.pendingView = undefined;
-      }
-    }
   }
   refresh() {
     if (!this.lobby) return;
@@ -1364,9 +1310,7 @@ class SteamMultiplayer {
         this.allowed = new Set(input.ids);
         return;
       case "send":
-        return input.payload?.kind === "view"
-          ? this.sendView(input.to, input.payload)
-          : this.send(input.to, input.payload);
+        return this.send(input.to, input.payload);
       case "checkpoint":
         return this.checkpoint(input.world);
       case "read-checkpoint": {

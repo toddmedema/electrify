@@ -65,8 +65,8 @@ test("shared bundles round-trip through bounded chunks in any order and validate
 });
 test("asynchronous compression uses the shipping frame format and preserves special numbers", async () => {
   const source = {
-    kind: "view",
-    view: { cash: Infinity, rate: NaN, text: "grid".repeat(10000) },
+    kind: "checkpoint",
+    world: { cash: Infinity, rate: NaN, text: "grid".repeat(10000) },
   };
   const message = await encodeAsync(source);
   assert.deepEqual(message.bytes, encode(source).bytes);
@@ -80,8 +80,33 @@ test("asynchronous compression uses the shipping frame format and preserves spec
     /message kind/,
   );
 });
+test("retired remote views are rejected by the codec and native send/receive guards", async (t) => {
+  const { mp, events } = fixture();
+  clearInterval(mp.timer);
+  t.after(() => mp.dispose());
+  const peer = connectedPeer(mp);
+  const payload = { kind: "view", view: { revision: 1 } };
+  assert.throws(() => encode(payload), /message kind/);
+  await assert.rejects(encodeAsync(payload), /message kind/);
+  assert.throws(() => mp.send(peer.id, payload), /message kind/);
+  const retired = rawMessage(JSON.stringify(payload), "ELM2");
+  assert.throws(() => mp.send(peer.id, payload, retired), /message kind/);
+  await assert.rejects(
+    mp.request({ kind: "send", to: peer.id, payload }),
+    /message kind/,
+  );
+  await assert.rejects(mp.receive(peer.id, payload), /Invalid message/);
+  mp.hostId = peer.id;
+  await assert.rejects(mp.receive(peer.id, payload), /Invalid message/);
+  await assert.rejects(assemble(new Map(), chunk(retired)), /frame kind/);
+  assert.deepEqual(peer.queue, []);
+  assert.equal(
+    events.some((event) => event.kind === "message"),
+    false,
+  );
+});
 test("malformed frame lengths and incomplete message floods are rejected before allocation", () => {
-  const message = encode({ kind: "view", view: { revision: 1 } }),
+  const message = encode(replicationRecords()),
     frame = chunk(message);
   const oversized = Buffer.from(frame);
   oversized.writeUInt32LE(0xffffffff, 16);
@@ -158,10 +183,10 @@ test("scenario transfers have an exact 512KiB snapshot ceiling and bounded envel
   assert.equal(
     (
       await roundTrip({
-        kind: "view",
-        view: { text: "x".repeat(SCENARIO_BYTES * 2) },
+        ...replicationBaseline(),
+        world: { ...replicationIdentity, text: "x".repeat(SCENARIO_BYTES * 2) },
       })
-    ).view.text.length,
+    ).world.text.length,
     SCENARIO_BYTES * 2,
   );
 });
@@ -188,13 +213,13 @@ test("scenario bombs stop at the streaming limit and generic-frame relabelling i
     relabelled = assemble(generic, frame) || relabelled;
   await assert.rejects(relabelled, /frame.*kind|kind.*frame/i);
   assert.equal(generic.size, 0);
-  const wrongKind = rawMessage(JSON.stringify({ kind: "view", view: {} }));
+  const wrongKind = rawMessage(JSON.stringify({ kind: "heartbeat" }));
   await assert.rejects(
     assemble(new Map(), chunk(wrongKind)),
     /frame.*kind|kind.*frame/i,
   );
   const duplicateKind = rawMessage(
-    '{"kind":"view","view":{},"kind":"scenario","scenario":{},"selectionKey":"ready"}',
+    '{"kind":"heartbeat","kind":"scenario","scenario":{},"selectionKey":"ready"}',
     "ELM2",
   );
   await assert.rejects(
@@ -414,155 +439,103 @@ function lobbyFixture(t) {
   };
 }
 
-test("view overload coalesces before encoding and leaves control messages available", async (t) => {
+test("baseline compression leaves control messages available and playing selections preserve it", async (t) => {
   const { mp } = fixture();
   clearInterval(mp.timer);
   t.after(() => mp.dispose());
-  const peer = { id: "76561198000000002", connected: true, queue: [] };
-  mp.connections.set(100, peer);
-  const encoding = [];
-  t.mock.method(
-    mp,
-    "encodeView",
-    (payload) =>
-      new Promise((resolve, reject) => {
-        encoding.push({
-          payload,
-          resolve: () => resolve(encode(payload)),
-          reject,
-        });
-      }),
-  );
-  const send = (revision) =>
-    mp.request({
-      kind: "send",
-      to: peer.id,
-      payload: { kind: "view", view: { revision } },
-    });
-  const first = send(1);
-  const obsolete = send(2);
-  const latest = send(3);
-  await obsolete;
-  assert.deepEqual(
-    encoding.map((request) => request.payload.view.revision),
-    [1],
-  );
+  const peer = connectedPeer(mp);
+  const encoding = Promise.withResolvers();
+  const started = Promise.withResolvers();
+  t.mock.method(mp, "encodeBaseline", () => {
+    started.resolve();
+    return encoding.promise;
+  });
+  const baseline = mp.request({
+    kind: "send",
+    to: peer.id,
+    payload: replicationBaseline(),
+  });
+  const records = mp.request({
+    kind: "send",
+    to: peer.id,
+    payload: replicationRecords(),
+  });
+  await started.promise;
   await mp.request({
     kind: "send",
     to: peer.id,
     payload: { kind: "heartbeat" },
   });
-  assert.equal(peer.queue[0].kind, "heartbeat");
-  // The host periodically resends its playing selection; it must not cancel live views.
+  // The host periodically resends its playing selection without starting a new game.
   await mp.request({
     kind: "send",
     to: peer.id,
     payload: { kind: "browse", browse: { phase: "playing" } },
   });
-  encoding[0].resolve();
-  await first;
-  assert.deepEqual(
-    encoding.map((request) => request.payload.view.revision),
-    [1, 3],
-  );
-  encoding[1].resolve();
-  await latest;
   assert.deepEqual(
     peer.queue.map((message) => message.kind),
-    ["heartbeat", "browse", "view"],
+    ["heartbeat", "browse"],
   );
-  assert.deepEqual(await assemble(new Map(), chunk(peer.queue[2])), {
-    kind: "view",
-    view: { revision: 3 },
-  });
-});
-
-test("late view compression cannot revive a replaced connection and failures reject the sender", async (t) => {
-  const { mp } = fixture();
-  clearInterval(mp.timer);
-  t.after(() => mp.dispose());
-  const peer = { id: "76561198000000002", connected: true, queue: [] };
-  mp.connections.set(100, peer);
-  let finish, fail;
-  t.mock.method(
-    mp,
-    "encodeView",
-    () =>
-      new Promise((resolve, reject) => {
-        finish = resolve;
-        fail = reject;
-      }),
+  encoding.resolve(encode(replicationBaseline()));
+  await Promise.all([baseline, records]);
+  assert.deepEqual(
+    peer.queue.map((message) => message.kind),
+    ["heartbeat", "browse", "baseline", "records"],
   );
-  const send = () =>
-    mp.request({
-      kind: "send",
-      to: peer.id,
-      payload: { kind: "view", view: {} },
-    });
-  const old = send();
-  const waiting = send();
-  const replacement = { ...peer, queue: [] };
-  delete replacement.pendingView;
-  delete replacement.encodingView;
-  mp.connections.set(100, replacement);
-  finish(encode({ kind: "view", view: {} }));
-  await Promise.all([old, waiting]);
-  assert.deepEqual(replacement.queue, []);
-  const broken = send();
-  fail(new Error("Compression failed"));
-  await assert.rejects(broken, /Compression failed/);
-  assert.deepEqual(replacement.queue, []);
+  assert.deepEqual(
+    await assemble(new Map(), chunk(peer.queue[2])),
+    replicationBaseline(),
+  );
 });
 
 for (const kind of ["browse", "campaign", "scenario"]) {
-  test(`${kind} fences old view encodes before the next game can start`, async (t) => {
+  test(`${kind} fences old baseline and record encodes before the next game can start`, async (t) => {
     const { mp } = fixture();
     clearInterval(mp.timer);
     t.after(() => mp.dispose());
-    const peer = { id: "76561198000000002", connected: true, queue: [] };
-    mp.connections.set(100, peer);
+    const peer = connectedPeer(mp);
     const encoding = [];
+    const started = [Promise.withResolvers(), Promise.withResolvers()];
     t.mock.method(
       mp,
-      "encodeView",
+      "encodeBaseline",
       (payload) =>
         new Promise((resolve) => {
           encoding.push(() => resolve(encode(payload)));
+          started[encoding.length - 1].resolve();
         }),
     );
-    const send = (revision) =>
-      mp.request({
-        kind: "send",
-        to: peer.id,
-        payload: { kind: "view", view: { revision } },
-      });
-    const old = send(1);
-    const obsolete = send(2);
+    const send = (payload) =>
+      mp.request({ kind: "send", to: peer.id, payload });
+    const old = send(replicationBaseline());
+    const obsolete = send(replicationRecords());
+    const failures = Promise.all([
+      assert.rejects(old, /disconnected/),
+      assert.rejects(obsolete, /disconnected/),
+    ]);
+    await started[0].promise;
     const transition =
       kind === "scenario"
         ? { kind, selectionKey: "match", scenario: { id: 999 } }
         : kind === "browse"
           ? { kind, browse: { phase: "browsing" } }
           : { kind };
-    await mp.request({ kind: "send", to: peer.id, payload: transition });
-    await obsolete;
-    const next = send(3);
+    await send(transition);
+    const next = send(replicationBaseline(2));
+    const nextRecords = send(replicationRecords());
     encoding[0]();
-    await old;
+    await Promise.all([failures, started[1].promise]);
     assert.deepEqual(
       peer.queue.map((message) => message.kind),
       [kind],
     );
     encoding[1]();
-    await next;
+    await Promise.all([next, nextRecords]);
     assert.deepEqual(
       peer.queue.map((message) => message.kind),
-      [kind, "view"],
+      [kind, "baseline", "records"],
     );
-    assert.deepEqual(await assemble(new Map(), chunk(peer.queue[1])), {
-      kind: "view",
-      view: { revision: 3 },
-    });
+    assert.equal((await assemble(new Map(), chunk(peer.queue[1]))).index, 2);
   });
 }
 
@@ -685,8 +658,8 @@ test(
     const { mp, api, events } = fixture();
     mp.hostId = "76561198000000002";
     const first = {
-      kind: "view",
-      view: { revision: 1, text: "x".repeat(SCENARIO_BYTES * 2) },
+      ...replicationBaseline(),
+      world: { ...replicationIdentity, text: "x".repeat(SCENARIO_BYTES * 2) },
     };
     const second = { kind: "browse", browse: { revision: 2 } };
     const { released } = pumpFrames(mp, api, [
@@ -705,7 +678,7 @@ test(
       await delivered;
       assert.deepEqual(
         events.filter((e) => e.kind === "message").map((e) => e.payload.kind),
-        ["view", "browse"],
+        ["baseline", "browse"],
       );
       assert.equal(released.length, 2);
     } finally {
@@ -816,12 +789,12 @@ test("incoming connections use authenticated Steam identity and locked membershi
     mp.dispose();
   }
 });
-test("guests can send only commands to the host, never another player's view", async () => {
+test("guests send commands to the host and cannot inject host messages", async () => {
   const { mp, events } = fixture();
   try {
     await assert.rejects(
-      mp.receive("76561198000000002", { kind: "view", view: {} }),
-      /guest message/,
+      mp.receive("76561198000000002", replicationBaseline()),
+      /replication sender/,
     );
     await assert.rejects(
       mp.receive("76561198000000002", {
@@ -849,6 +822,27 @@ test("guests can send only commands to the host, never another player's view", a
   } finally {
     mp.dispose();
   }
+});
+test("guest heartbeats keep lobby and loading connections alive before any baseline", async (t) => {
+  const { mp, api, calls, events } = fixture();
+  clearInterval(mp.timer);
+  t.after(() => mp.dispose());
+  const peer = connectedPeer(mp);
+  peer.lastHeartbeat = performance.now() - 6000;
+  mp.lastRefresh = Date.now();
+  api.receive = () => 0;
+  await mp.receive(peer.id, await roundTrip({ kind: "heartbeat" }));
+  mp.pump();
+  assert(peer.lastHeartbeat > performance.now() - 1000);
+  assert.equal(mp.connections.get(100), peer);
+  assert.equal(
+    calls.some(([kind]) => kind === "close"),
+    false,
+  );
+  assert.equal(
+    events.some((event) => event.kind === "message"),
+    false,
+  );
 });
 test("a stalled renderer expires its authenticated connection and pauses the party", () => {
   const { mp, calls, events } = fixture();
