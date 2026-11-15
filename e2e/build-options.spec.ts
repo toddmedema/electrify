@@ -11,6 +11,51 @@ import {
 } from "../src/helpers/Transmission";
 
 for (const theme of ["light", "dark"] as const) {
+  test(`biomass emissions use explicit mass units in ${theme}`, async ({
+    page,
+  }, info) => {
+    await page.addInitScript((mode) => {
+      localStorage.setItem("theme", mode);
+      localStorage.setItem("units", "metric");
+      localStorage.setItem("audioEnabled", "false");
+    }, theme);
+    await page.goto("/?scenario=100");
+    await page.getByRole("button", { name: "Start game", exact: true }).click();
+    await openBuild(page);
+    await page.getByRole("slider").press("Home");
+    const card = page.locator(".buildOption").filter({
+      has: page.getByRole("button", {
+        name: "Review purchase of Biomass",
+        exact: true,
+      }),
+    });
+    await card.getByRole("button", { name: "Show Biomass details" }).click();
+    await expect(card.locator(".MuiCollapse-root")).toHaveClass(
+      /MuiCollapse-entered/,
+    );
+    await reviewScreenshot(card.locator(".buildOptionDescription"), {
+      path: info.outputPath(`biomass-description-${theme}.png`),
+      animations: "disabled",
+    });
+    const emissions = card.getByRole("row", {
+      name: /Direct emissions.*1,180kg\/MWh/,
+    });
+    await emissions.scrollIntoViewIfNeeded();
+    await expect(emissions).toBeInViewport();
+    await reviewScreenshot(emissions, {
+      path: info.outputPath(`biomass-emissions-${theme}.png`),
+      animations: "disabled",
+    });
+    await card
+      .getByRole("button", { name: "Review purchase of Biomass" })
+      .click();
+    await expect(
+      page.getByRole("region", { name: "Expected impact" }),
+    ).toContainText(/Direct emissions\s*1,180kg\/MWh/);
+  });
+}
+
+for (const theme of ["light", "dark"] as const) {
   for (const [category, name] of [
     ["Generators", "Solar"],
     ["Storage", "Pumped Hydro"],

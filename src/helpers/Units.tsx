@@ -70,7 +70,8 @@ export function toDisplayMass(kg: number, units: UnitSystemType): number {
 }
 
 export function formatMass(kg: number, units: UnitSystemType): string {
-  return `${formatCount(toDisplayMass(kg, units))}${massUnit(units)}`;
+  // Keep the stated unit explicit: compact numbers would turn 1,180 kg into "1.18kkg".
+  return `${formatCount(toDisplayMass(kg, units), 3, "standard")}${massUnit(units)}`;
 }
 
 /**

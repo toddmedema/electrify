@@ -611,11 +611,12 @@ it.each([
   ["Solar", /Direct emissions\s*None/],
   ["Wind", /Direct emissions\s*None/],
   ["Natural Gas Peaker", /Direct emissions\s*[\d.,]+\s*\w+\/MWh/],
+  ["Biomass", /Direct emissions\s*1,180kg\/MWh/],
 ])(
   "reports %s direct emissions as a rate, or None when it burns nothing",
   (name, emissions) => {
     const game = createGame({ scenarioId: 111, difficulty: "CEO" });
-    const generator = GENERATORS(game, 100e6, [], []).find(
+    const generator = GENERATORS(game, 50e6, [], []).find(
       (candidate) => candidate.name === name,
     )!;
     render(
