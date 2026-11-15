@@ -8928,87 +8928,220 @@ option {
 .territoryDetail {
   min-width: 0;
 }
+.territoryMap,
+.territoryResourceLegend {
+  --territory-grass: #dfe9d5;
+  --territory-grass-rim: #a1b5a1;
+  --territory-hill: #e7e0d3;
+  --territory-hill-rim: #b9ad97;
+  --territory-water: #d6e4e7;
+  --territory-water-rim: #9eb8bf;
+  --territory-built: #dfe4ea;
+  --territory-built-rim: #a5b0bb;
+  --territory-outline: #536157;
+  --territory-art-mint: #64dfc5;
+  --territory-art-cream: #fff8e1;
+  --territory-art-steel: #cfd8dc;
+  --territory-art-grass: #b8d9c3;
+  --territory-art-water: #7fc8ce;
+}
+[data-theme="dark"] .territoryMap,
+[data-theme="dark"] .territoryResourceLegend {
+  --territory-grass: #29382d;
+  --territory-grass-rim: #1d2921;
+  --territory-hill: #3a352d;
+  --territory-hill-rim: #28251f;
+  --territory-water: #23373e;
+  --territory-water-rim: #17272d;
+  --territory-built: #303944;
+  --territory-built-rim: #202934;
+  --territory-outline: #78877b;
+  --territory-art-mint: #67cbb8;
+  --territory-art-cream: #ddd7c0;
+  --territory-art-steel: #aebec7;
+  --territory-art-grass: #88af96;
+  --territory-art-water: #78acb7;
+}
 .territoryMap {
-  position: relative;
-  height: 320px;
+  min-width: 0;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   background: var(--bg-sunken);
   overflow: hidden;
-  > svg {
-    position: absolute;
-    width: 100%;
-    height: 100%;
+}
+.territoryHexGrid {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 720 / 400;
+}
+.territoryHex {
+  --territory-tile-fill: var(--territory-grass);
+  --territory-tile-rim: var(--territory-grass-rim);
+  cursor: pointer;
+  &[data-kind="hills"] {
+    --territory-tile-fill: var(--territory-hill);
+    --territory-tile-rim: var(--territory-hill-rim);
+  }
+  &[data-kind="lake"] {
+    --territory-tile-fill: var(--territory-water);
+    --territory-tile-rim: var(--territory-water-rim);
+  }
+  &[data-kind="town"],
+  &[data-kind="industry"] {
+    --territory-tile-fill: var(--territory-built);
+    --territory-tile-rim: var(--territory-built-rim);
+  }
+  &:hover .territoryHexFace {
+    stroke: var(--interactive-blue);
   }
 }
-.territoryLand {
-  fill: var(--bg-raised);
-  stroke: var(--border-strong);
+.territoryHexFace,
+.territoryHexRim {
+  stroke: var(--territory-outline);
+  stroke-width: 1;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+.territoryHexFace {
+  fill: var(--territory-tile-fill);
+}
+.territoryHexRim {
+  fill: var(--territory-tile-rim);
+}
+.territoryHexArt {
+  pointer-events: none;
+}
+.territoryTileArt {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.territoryHexBoundary {
+  fill: none;
+  stroke: var(--territory-outline);
   stroke-width: 1.5;
-  &.owned {
-    fill: var(--bg-selected);
+  stroke-linejoin: round;
+  pointer-events: none;
+  vector-effect: non-scaling-stroke;
+  &[data-owned="true"] {
+    stroke: var(--font-color-faded);
+    stroke-width: 2;
   }
-  &.selected {
+  &[data-selected="true"] {
     stroke: var(--interactive-blue);
     stroke-width: 3;
   }
 }
-.territoryWater {
-  fill: var(--border-selected);
-}
-.territoryRiver {
-  fill: none;
-  stroke: var(--border-selected);
-  stroke-width: 7;
-}
-.territoryContours {
-  fill: none;
-  stroke: var(--border-subtle);
-  stroke-width: 2;
-}
 .territoryRoute {
   fill: none;
   stroke: var(--interactive-blue);
-  stroke-width: 4;
+  stroke-width: 2.5;
   stroke-linecap: round;
+  pointer-events: none;
+  vector-effect: non-scaling-stroke;
   &.planned {
     stroke: var(--font-color-faded);
-    stroke-dasharray: 7 6;
+    stroke-dasharray: 5 5;
+  }
+  &.paused,
+  &.constructing {
+    stroke: var(--warning-icon);
+    stroke-dasharray: 5 5;
   }
 }
-.territoryMapNode {
-  position: absolute;
-  transform: translate(-50%, -50%);
-  width: 42%;
-  max-width: 190px;
-  min-height: 52px;
+.territoryHexHub {
+  fill: var(--bg-primary);
+  stroke: var(--font-color-faded);
+  stroke-width: 1.5;
+  pointer-events: none;
+  circle {
+    vector-effect: non-scaling-stroke;
+  }
+  &[data-selected="true"] {
+    fill: var(--interactive-blue);
+    stroke: var(--interactive-blue);
+  }
+}
+.territoryHexHubLabel {
+  fill: var(--font-color-primary);
+  stroke: none;
+  font-size: 17px;
+  font-weight: 600;
+  text-anchor: middle;
+  dominant-baseline: central;
+  pointer-events: none;
+  .territoryHexHub[data-selected="true"] & {
+    fill: var(--interactive-contrast);
+  }
+}
+.territoryMapKey {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
   padding: 8px;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  color: var(--font-color-primary);
+  border-top: 1px solid var(--border-subtle);
   background: var(--bg-primary);
+}
+.territoryMapNode {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  column-gap: 8px;
+  align-content: start;
+  min-width: 0;
+  min-height: 44px;
+  padding: 8px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--font-color-primary);
+  background: transparent;
   cursor: pointer;
   text-align: left;
   font: inherit;
   strong {
+    grid-column: 2;
     display: block;
     font-size: 13px;
+    font-weight: 600;
     line-height: 1.3;
   }
-  span {
+  .territoryMapStatus,
+  .territoryMapCue {
+    grid-column: 2;
     display: block;
     margin-top: 4px;
     font-size: 11px;
-    line-height: 1.3;
+    line-height: 1.4;
     color: var(--font-color-faded);
+  }
+  &:hover {
+    background: var(--bg-raised);
   }
   &[aria-pressed="true"] {
     border-color: var(--interactive-blue);
-    box-shadow: 0 0 0 1px var(--interactive-blue);
+    background: var(--bg-selected);
   }
   &:focus-visible {
-    outline: 3px solid var(--interactive-blue);
-    outline-offset: 3px;
+    outline: 3px solid var(--focus-ring);
+    outline-offset: 2px;
+  }
+}
+.territoryMapNumber {
+  grid-column: 1;
+  grid-row: 1 / 4;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  color: var(--font-color-faded);
+  font-size: 12px;
+  font-weight: 600;
+  .territoryMapNode[aria-pressed="true"] & {
+    border-color: var(--interactive-blue);
+    color: var(--interactive-contrast);
+    background: var(--interactive-blue);
   }
 }
 .territoryMapLegend {
@@ -9024,12 +9157,45 @@ option {
     gap: 4px;
   }
   i {
+    flex: 0 0 16px;
     width: 16px;
     border-top: 2px solid var(--interactive-blue);
   }
   i.planned {
     border-top: 2px dashed var(--font-color-faded);
   }
+  i.paused,
+  i.constructing {
+    border-top: 2px dashed var(--warning-icon);
+  }
+}
+.territoryResourceLegend {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--font-color-faded);
+  font-size: 11px;
+  line-height: 1.4;
+  > span {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+  .territoryTileArt {
+    flex: 0 0 28px;
+    width: 28px;
+    height: 28px;
+  }
+}
+.territoryResourceNote {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--font-color-faded);
+  font-size: 11px;
+  line-height: 1.4;
 }
 .territoryNetworkNote {
   margin-top: 8px;
@@ -9162,9 +9328,6 @@ option {
   .territoryNetworkLayout {
     grid-template-columns: minmax(0, 1fr);
   }
-  .territoryMap {
-    height: 270px;
-  }
   .territoryMapColumn > .acquiredUtilities {
     margin-bottom: 8px;
   }
@@ -9178,11 +9341,8 @@ option {
     grid-template-columns: minmax(0, 1fr);
     gap: 12px;
   }
-  .territoryMap {
-    height: 248px;
-  }
   .territoryMapNode {
-    min-height: 56px;
+    min-height: 44px;
     padding: 8px;
   }
   .territoryNetworkNote {
