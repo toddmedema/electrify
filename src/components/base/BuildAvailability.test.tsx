@@ -54,17 +54,19 @@ describe("getBuildAvailability", () => {
     expect(result.secondaryText).toContain(message);
   });
 
-  test("pumped hydro names itself in the reason", () => {
+  test.each([
+    ["Pumped Hydro", "No pumped hydro sites near Madrid."],
+    ["Geothermal", "No geothermal sites near Madrid."],
+  ])("%s explains missing sites directly", (name, message) => {
     const result = getBuildAvailability({
       ...hydroOption,
-      name: "Pumped Hydro",
+      name,
       available: false,
       location: withHydro,
       viableLocationsRemaining: 0,
     });
-    expect(result.secondaryText).toBe(
-      "No pumped hydro sites near Madrid in this game.",
-    );
+    expect(result.buildable).toBe(false);
+    expect(result.secondaryText).toBe(message);
   });
 
   test("a buildable option shows its description", () => {
