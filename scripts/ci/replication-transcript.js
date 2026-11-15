@@ -21,8 +21,8 @@ fixedReplicationTranscript()
         transcript,
         JSON.parse(fs.readFileSync(destination, "utf8")),
       );
-      console.log(
-        `Replica transcript passed: ${process.platform} ${process.arch}, Node ${process.versions.node}`,
+      process.stdout.write(
+        `Replica transcript passed: ${process.platform} ${process.arch}, Node ${process.versions.node}\n`,
       );
     }
   })

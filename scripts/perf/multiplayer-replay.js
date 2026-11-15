@@ -14,9 +14,8 @@ const median = (values) =>
   const cpuSamples = [],
     processCpuSamples = [],
     wallSamples = [];
-  let peakHeapBytes = 0,
-    finalHash,
-    localViewPublications;
+  const memory = { peakHeapBytes: 0 };
+  let finalHash, localViewPublications;
   for (let run = 0; run < 4; run++) {
     let now = 0,
       views = 0,
@@ -24,7 +23,10 @@ const median = (values) =>
       waiter;
     const runtime = new ReplicaRuntime(
       (event) => {
-        peakHeapBytes = Math.max(peakHeapBytes, process.memoryUsage().heapUsed);
+        memory.peakHeapBytes = Math.max(
+          memory.peakHeapBytes,
+          process.memoryUsage().heapUsed,
+        );
         if (event.kind === "views") {
           views++;
           void runtime.receive({ kind: "views-applied" });
@@ -103,7 +105,7 @@ const median = (values) =>
     cpuScope:
       "Actual ReplicaRuntime replay, local-seat view publication and canonical capture. replayCpuMs counts its thread; processCpuMs also counts SHA-256 and any otherwise-idle parent/GC work.",
     localViewPublications,
-    peakHeapBytes,
+    peakHeapBytes: memory.peakHeapBytes,
     peakRssBytes: process.resourceUsage().maxRSS * 1024,
     finalHash,
   });

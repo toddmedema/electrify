@@ -98,12 +98,8 @@ async function replicaLatency() {
       ...bootstrap,
     }),
   );
-  const samples = [];
-  for (let trial = 0; trial < 24; trial++) {
-    await delay((trial % 5) * 20);
-    const started = performance.now();
-    const sequence = command(host, trial);
-    const view = new Promise((resolve, reject) => {
+  function waitForView(started, sequence) {
+    return new Promise((resolve, reject) => {
       pending = {
         resolve,
         reject,
@@ -115,6 +111,13 @@ async function replicaLatency() {
         ),
       };
     });
+  }
+  const samples = [];
+  for (let trial = 0; trial < 24; trial++) {
+    await delay((trial % 5) * 20);
+    const started = performance.now();
+    const sequence = command(host, trial);
+    const view = waitForView(started, sequence);
     // The host coalesces non-step records within the current macrotask.
     await delay(0);
     await runtime.receive(

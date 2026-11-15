@@ -6,7 +6,7 @@ if (isMainThread) {
   require("../run-compatibility");
   const worker = new Worker(__filename);
   worker.once("message", (measurement) =>
-    console.log(JSON.stringify(measurement, null, 2)),
+    process.stdout.write(JSON.stringify(measurement, null, 2) + "\n"),
   );
   worker.once("error", (error) => {
     console.error(error);
