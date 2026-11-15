@@ -146,3 +146,30 @@ identity. The headless multiplayer journey runs at 12× with sixfold renderer CP
 640×360, 30 fps local WebRTC stream, verifies that frames are actually encoded, and checks keyboard
 and pointer speed changes on both peers after the first year. It uses synthetic local video;
 real calls also depend on the device, call software and network.
+
+## Replica determinism and hash capture (November 2026)
+
+`src/multiplayer/Replication.sim.test.tsx` drives the real host recorder and replica reducer for
+five game years with two and four companies in an official scenario, a custom game and the
+checked-in funded-or-phased mod example. Replicas install shipping-codec baselines at launch,
+mid-month, immediately before and after rollover, and after a scenario choice. Every verify
+record compares the complete canonical world, including shell blockers and generator commitment
+metadata. Record removal, duplication, reordering, alteration and missing baseline metadata are
+negative controls. A prerequisite mutation proof restored the old fuel-history module global and
+lost the expected spike in both a resumed solo game and later co-op companies.
+
+Run the focused equivalence check with `npm run test:once -- Replication.sim.test --runInBand`.
+`node scripts/ci/replication-transcript.js` also checks a committed bit-exact four-company
+transcript through month 60. The Linux x64, Windows x64 and macOS arm64 packaging jobs run that
+same transcript. Only its fixture build-compatibility label is pinned; production state hashes
+retain the actual rules ID and all simulation values without rounding. Rewriting the transcript
+requires an intentional simulation change and explanation; `--write` is the explicit authoring
+command, not a recovery step for a failure.
+
+`node scripts/perf/replica-hash.js` initializes and advances a four-company custom world to month
+48, then measures synchronous canonical capture and asynchronous WebCrypto SHA-256 inside a Node
+worker. It discards one warmup and reports the median of five samples. On macOS arm64, Node
+26.13.0, Apple M5 Max, the canonical payload was 1,297,892 bytes; capture took 7.00 ms and SHA-256
+0.48 ms. Peak process RSS was 531 MB, including fixture simulation and the worker; it is not an
+isolated memory cost of hashing. These are local diagnostics, not a slow-device performance gate
+or a claim about observed Steam traffic.
