@@ -13,6 +13,7 @@ import {
 } from "../multiplayer/World";
 import { ReplicatedWorld } from "../multiplayer/Replication";
 import type { ReplicaRecord } from "../multiplayer/Replication";
+import { ReplicaRecovery } from "../multiplayer/ReplicaRecovery";
 import { ViewPublication } from "../multiplayer/ViewPublication";
 import {
   CHECKPOINT_INTERVAL_MS,
@@ -31,6 +32,8 @@ let local = false;
 let replicated: ReplicatedWorld | undefined;
 let replication = false;
 let hostSeat: string | undefined;
+let recovery: ReplicaRecovery | undefined;
+let recoveryTimer: ReturnType<typeof setInterval> | undefined;
 let recordTimer: ReturnType<typeof setTimeout> | undefined;
 let recordDue = Infinity;
 let flushedIndex = 0;
@@ -121,15 +124,7 @@ function requestRecords(urgent = false) {
   }, delay);
 }
 function sendBaseline(to: string) {
-  if (!replication || !replicated || !world || to === hostSeat) return;
-  const seat = world.seats.find((seat) => seat.id === to);
-  if (!seat) return;
-  if (!world.outcomes[to]) replicated.pause(`Synchronizing ${seat.name}`);
-  // Earlier records must precede the baseline; its following verify confirms installation.
-  flushRecords();
-  post({ kind: "baseline", to, baseline: replicated.baseline() });
-  requestRecords(true);
-  requestViews({ force: true });
+  if (recovery?.baseline(to)) requestViews({ force: true });
 }
 /** Flush due seat projections and report a local summary from the same authoritative world.
  * Its date follows an active company, or the latest retired grid once the whole match has ended. */
@@ -194,8 +189,10 @@ function requestViews(options?: Parameters<ViewPublication["request"]>[2]) {
 /** A running match that throws stops for everyone with an explanation, never silently. */
 function fault(error: unknown) {
   faulted = true;
+  recovery?.stop();
   clearTimeout(timer);
   clearInterval(keepaliveTimer);
+  clearInterval(recoveryTimer);
   post({
     kind: "error",
     message: error instanceof Error ? error.message : "Simulation error",
@@ -273,6 +270,24 @@ async function startMatch(
   hostSeat = request.hostSeat || world.seats[0].id;
   if (replication && !world.seats.some((seat) => seat.id === hostSeat))
     throw new Error("The host company is missing from the match");
+  if (replication) {
+    recovery = new ReplicaRecovery(replicated, hostSeat, {
+      flush: flushRecords,
+      send: (to, baseline) => post({ kind: "baseline", to, baseline }),
+      changed: () => {
+        requestRecords(true);
+        requestViews();
+      },
+      error: fault,
+    });
+    recoveryTimer = setInterval(() => {
+      try {
+        recovery!.pulse();
+      } catch (error) {
+        fault(error);
+      }
+    }, 100);
+  }
   busy = false;
   requestViews({ force: true });
   if (replication) for (const seat of world.seats) sendBaseline(seat.id);
@@ -299,7 +314,8 @@ function handle(request: WorkerRequest, running: World) {
           request.reasons.join(" · ") ||
           "Ready up before resuming",
       );
-    replicated!.setBlockers(request.reasons);
+    if (recovery) recovery.setShellBlockers(request.reasons);
+    else replicated!.setBlockers(request.reasons);
     requestRecords(true);
     requestViews({ force: true });
   } else if (request.kind === "command") {
@@ -342,6 +358,13 @@ function handle(request: WorkerRequest, running: World) {
     requestViews({ force: true });
   } else if (request.kind === "baseline") {
     sendBaseline(request.to);
+  } else if (request.kind === "replica-peers") {
+    recovery?.connected(request.connected);
+  } else if (request.kind === "progress") {
+    recovery?.progress(request);
+  } else if (request.kind === "resync") {
+    if (request.matchId === running.matchId && request.epoch === running.epoch)
+      sendBaseline(request.sender);
   } else if (request.kind === "checkpoint") {
     if (request.pause) {
       replicated!.pause(
@@ -386,6 +409,7 @@ worker.onmessage = async ({ data: request }: MessageEvent<WorkerRequest>) => {
       clearTimeout(viewTimer);
       clearTimeout(recordTimer);
       clearInterval(keepaliveTimer);
+      clearInterval(recoveryTimer);
       post({
         kind: "error",
         message:

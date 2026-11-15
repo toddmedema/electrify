@@ -1,4 +1,5 @@
 import { TextEncoder } from "util";
+import { webcrypto } from "crypto";
 import manifest from "../data/RunCompatibility.json";
 import { TICK_MS } from "../Constants";
 import type { SpeedType } from "../Types";
@@ -15,26 +16,33 @@ jest.mock("../data/FuelPrices", () => ({
 jest.mock("../data/Weather", () => ({
   initWeather: jest.fn((_location: unknown, done: () => void) => done()),
 }));
-jest.mock("../multiplayer/World", () => ({
-  createWorld: jest.fn(),
-  matchScenario: jest.fn(() => ({ location: { id: "SF" } })),
-  restoreWorld: jest.fn(),
-  savedMatchSpec: jest.requireActual("../multiplayer/World").savedMatchSpec,
-  applyCommand: jest.fn(),
-  stepWorld: jest.fn(),
-  roomView: jest.fn(() => ({})),
-  checkpointWorld: (world: World) => world,
-  worldBlockers: () => [],
-  pauseWorld: (world: World, reason: string) => {
-    world.speed = "PAUSED";
-    world.paused = true;
-    world.reason = reason;
-  },
-}));
+jest.mock("../multiplayer/World", () => {
+  const blockers = new WeakMap<World, string[]>();
+  return {
+    createWorld: jest.fn(),
+    matchScenario: jest.fn(() => ({ location: { id: "SF" } })),
+    restoreWorld: jest.fn(),
+    savedMatchSpec: jest.requireActual("../multiplayer/World").savedMatchSpec,
+    applyCommand: jest.fn(),
+    stepWorld: jest.fn(),
+    roomView: jest.fn(() => ({})),
+    checkpointWorld: (world: World) => world,
+    worldBlockers: (world: World) => blockers.get(world) || [],
+    setWorldBlockers: (world: World, reasons: string[]) => {
+      blockers.set(world, [...reasons]);
+    },
+    pauseWorld: (world: World, reason: string) => {
+      world.speed = "PAUSED";
+      world.paused = true;
+      world.reason = reason;
+    },
+  };
+});
 
 beforeEach(() => {
   jest.resetModules();
   jest.clearAllMocks();
+  Object.assign(globalThis, { TextEncoder, crypto: webcrypto });
 });
 
 test("the host worker schedules every tick at the shared speed and reschedules speed changes", async () => {
@@ -846,6 +854,131 @@ test("replication splits batches by record count and tagged UTF-8 wire bytes wit
     expect(next).toBe(333);
   } finally {
     jest.clearAllTimers();
+    post.mockRestore();
+    scope.onmessage = previousMessage;
+    jest.useRealTimers();
+  }
+});
+
+test("the worker verifies changed records, routes authenticated recovery reports and retains a permanent failure blocker", async () => {
+  jest.useFakeTimers();
+  const scope = globalThis as unknown as Worker;
+  const previousMessage = scope.onmessage;
+  const post = jest.spyOn(scope, "postMessage").mockImplementation(() => {});
+  const hash = jest
+    .spyOn(webcrypto.subtle, "digest")
+    .mockResolvedValue(new Uint8Array(32).fill(1).buffer);
+  const { createWorld, applyCommand, worldBlockers } = jest.requireMock(
+    "../multiplayer/World",
+  );
+  const world = {
+    matchId: "match",
+    epoch: "epoch",
+    revision: 0,
+    speed: "PAUSED",
+    paused: true,
+    readyRequired: true,
+    ready: [],
+    reason: "Paused",
+    outcomes: {},
+    sequences: {},
+    receipts: {},
+    seats: [
+      { id: "host", name: "Host" },
+      { id: "guest", name: "Guest" },
+    ],
+  } as unknown as World;
+  createWorld.mockReturnValue(world);
+  applyCommand.mockImplementation(
+    (target: World, sender: string, envelope: { sequence: number }) => {
+      target.sequences[sender] = envelope.sequence;
+      target.revision++;
+    },
+  );
+  try {
+    require("./Multiplayer.worker");
+    const send = async (data: WorkerRequest) =>
+      scope.onmessage!({ data } as MessageEvent<WorkerRequest>);
+    const events = () => post.mock.calls.map(([event]) => event);
+    const baselines = () =>
+      events().filter((event) => event.kind === "baseline");
+    const records = () =>
+      events()
+        .filter((event) => event.kind === "records")
+        .flatMap((event) => event.records);
+    await send({
+      kind: "create",
+      spec: { scenarioId: 101, difficulty: "Employee" },
+      seats: world.seats,
+      matchId: "match",
+      epoch: "epoch",
+      replication: true,
+      hostSeat: "host",
+    });
+    await send({ kind: "replica-peers", connected: ["guest"] });
+    await send({
+      kind: "progress",
+      sender: "guest",
+      matchId: "match",
+      epoch: "epoch",
+      applied: 2,
+      verified: { index: 2, hash: "01".repeat(32) },
+    });
+    await send({
+      kind: "command",
+      sender: "host",
+      envelope: {
+        matchId: "match",
+        epoch: "epoch",
+        sequence: 1,
+        command: { kind: "rate", value: 0.15 },
+      },
+    });
+    jest.advanceTimersByTime(999);
+    expect(records().filter((record) => record.t === "verify")).toHaveLength(1);
+    jest.advanceTimersByTime(2);
+    expect(records().filter((record) => record.t === "verify")).toHaveLength(2);
+    jest.advanceTimersByTime(1000);
+    expect(records().filter((record) => record.t === "verify")).toHaveLength(2);
+    await send({
+      kind: "resync",
+      sender: "guest",
+      matchId: "match",
+      epoch: "old",
+      applied: 2,
+      reason: "old",
+    });
+    expect(baselines()).toHaveLength(1);
+    await send({
+      kind: "progress",
+      sender: "guest",
+      matchId: "match",
+      epoch: "epoch",
+      applied: 4,
+      verified: { index: 4, hash: "00".repeat(32) },
+    });
+    expect(baselines()).toHaveLength(2);
+    await send({
+      kind: "resync",
+      sender: "guest",
+      matchId: "match",
+      epoch: "epoch",
+      applied: 4,
+      reason: "retry",
+    });
+    expect(baselines()).toHaveLength(2);
+    jest.advanceTimersByTime(10100);
+    expect(baselines()).toHaveLength(2);
+    const failure = "Guest could not stay in sync. Save and resume the match.";
+    expect(world.reason).toBe(failure);
+    await send({ kind: "blockers", reasons: ["System dialog"] });
+    expect(worldBlockers(world)).toEqual(["System dialog", failure]);
+    await send({ kind: "blockers", reasons: [] });
+    expect(worldBlockers(world)).toEqual([failure]);
+    expect(records()).toContainEqual({ t: "pause", reason: failure });
+  } finally {
+    jest.clearAllTimers();
+    hash.mockRestore();
     post.mockRestore();
     scope.onmessage = previousMessage;
     jest.useRealTimers();
