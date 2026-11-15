@@ -187,23 +187,29 @@ interface ReplayMeasurement {
   peakRssBytes: number;
   finalHash: string;
   measuredInWorker: true;
+  localViewPublications: number;
 }
-function replayWorker(input: unknown): Promise<ReplayMeasurement> {
+interface CommandLatency {
+  samplesPerMode: number;
+  snapshotP95Ms: number;
+  replicaP95Ms: number;
+  addedP95Ms: number;
+  within50Ms: boolean;
+  scope: string;
+}
+function benchmarkWorker<T>(script: string, input: unknown): Promise<T> {
   return new Promise((resolve, reject) => {
-    const worker = new Worker(
-      path.resolve("scripts/perf/multiplayer-replay.js"),
-      { workerData: input },
-    );
-    let result: ReplayMeasurement | undefined;
+    const worker = new Worker(path.resolve("scripts/perf", script), {
+      workerData: input,
+    });
+    let result: T | undefined;
     worker.once("message", (value) => {
       result = value;
     });
     worker.once("error", reject);
     worker.once("exit", (code) => {
       if (code !== 0 || !result)
-        reject(
-          new Error(`Replica benchmark worker exited ${code} without a result`),
-        );
+        reject(new Error(`${script} worker exited ${code} without a result`));
       else resolve(result);
     });
   });
@@ -237,6 +243,7 @@ async function replicationSample(
     const baseline: ReplicaBaseline = host.baseline();
     const bootstrap: ReplicaBatch = host.drain()!;
     const batches: ReplicaBatch[] = [];
+    const batchTimes: number[] = [];
     let nextTick = TICK_MS[speed];
     for (now = 100; now <= 1000; now += 100) {
       while (nextTick <= now + 1e-8) {
@@ -245,7 +252,10 @@ async function replicationSample(
       }
       if (now === 1000) host.verify();
       const batch = host.drain();
-      if (batch) batches.push(batch);
+      if (batch) {
+        batches.push(batch);
+        batchTimes.push(now);
+      }
     }
     const baselinePayload = { kind: "baseline", ...baseline };
     const baselineMeasurement = await measure(baselinePayload);
@@ -261,16 +271,21 @@ async function replicationSample(
       );
     const sum = (key: "wireBytes" | "encodeMs") =>
       recordMeasurements.reduce((n, value) => n + value[key], 0);
-    const replay = await replayWorker({
-      baseline: stringify(baseline),
-      bootstrap: stringify(bootstrap),
-      batches: stringify(batches),
-      virtualDurationMs: 1000,
-    });
+    const replay = await benchmarkWorker<ReplayMeasurement>(
+      "multiplayer-replay.js",
+      {
+        baseline: stringify(baseline),
+        bootstrap: stringify(bootstrap),
+        batches: stringify(batches),
+        batchTimes,
+        virtualDurationMs: 1000,
+      },
+    );
     const hash = await worldDigest(canonicalWorldBytes(host.world), (bytes) =>
       webcrypto.subtle.digest("SHA-256", bytes),
     );
     expect(replay.finalHash).toBe(hash);
+    expect(replay.localViewPublications).toBe(5);
     const recordsPerGuest = sum("wireBytes");
     const checkpointPerGuest = checkpointBytes / 10;
     const totalPerGuest = recordsPerGuest + checkpointPerGuest + pulseBytes;
@@ -317,11 +332,17 @@ async function replicationSample(
         replayCorePercent: replay.processCpuMs / 10,
         replayThreadCorePercent: replay.replayCpuMs / 10,
         memoryScope:
-          "Heap belongs to the Node replay worker and includes its TypeScript loader, decoded baseline and setup; peak RSS is whole-process. These are diagnostic upper bounds, not browser-worker memory. Baseline install is excluded from replay CPU.",
+          "Heap belongs to the Node replay worker and includes its TypeScript loader, decoded baseline and setup; peak RSS is the whole-process lifetime high-water mark, including earlier fixture workers. These are diagnostic upper bounds, not browser-worker memory. Baseline install is excluded from replay CPU.",
       },
     });
   }
-  return { speeds };
+  return {
+    speeds,
+    commandLatency: await benchmarkWorker<CommandLatency>(
+      "multiplayer-latency.js",
+      { world: stringify(checkpointWorld(world)) },
+    ),
+  };
 }
 async function sample(world: World) {
   const cloneTimes: number[] = [];
@@ -444,7 +465,7 @@ test("measure real early and late two/four-player payloads with the shipping cod
         "The slowest reference-device CPU floor and replication-mode journey suite must be verified separately before enabling the flag.",
     },
     method:
-      "Real initialized grids at months 0 and 48; shipping deflate/chunk/reassembly codec; median of three warmed runs. Cadence fields retain the prior publication-rate comparison, including complete checkpoints every ten seconds. acknowledgedPausedWireBytesPerSecond compares a successful complete-checkpoint policy with acknowledgement-based suppression: the previous native schema-1 guard rejected current schema-2 worlds, so the before rate is a policy model, not deployed traffic. Real native checkpoint/send/receive paths encode, chunk and reconstruct initial, retry and reconnect copies; disk writes are stubbed and counted, not timed. Rates exclude incoming guest heartbeats and small save acknowledgements. Replication uses real one-second record traces, shipping codec bytes, worker-thread replay CPU/heap samples. Steady rates exclude initial/recovery baselines (reported separately); complete durable checkpoints are included at ten-second cadence. These are payload measurements and a cadence model, not observed Steam traffic.",
+      "Real initialized grids at months 0 and 48; shipping deflate/chunk/reassembly codec; median of three warmed runs. Cadence fields retain the prior publication-rate comparison, including complete checkpoints every ten seconds. acknowledgedPausedWireBytesPerSecond compares a successful complete-checkpoint policy with acknowledgement-based suppression: the previous native schema-1 guard rejected current schema-2 worlds, so the before rate is a policy model, not deployed traffic. Real native checkpoint/send/receive paths encode, chunk and reconstruct initial, retry and reconnect copies; disk writes are stubbed and counted, not timed. Rates exclude incoming guest heartbeats and small save acknowledgements. Replication uses real one-second record traces, shipping codec bytes, worker-thread replay CPU/heap samples, and actual ReplicaRuntime/ViewPublication commands over an in-process shipping-codec mock transport. The mock latency excludes IPC, continuously running simulation/video load and network transit. Steady rates exclude initial/recovery baselines (reported separately); complete durable checkpoints are included at ten-second cadence. These are payload measurements and a cadence model, not observed Steam traffic.",
     samples,
   };
   if (!process.env.MP_NETWORK_RESULT)

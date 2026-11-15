@@ -102,7 +102,7 @@ exclude initial copies, reconnects, changed contents and incoming guest traffic.
 
 Running-state complete-view payloads and changed-checkpoint traffic are unchanged by this step.
 
-## Remaining opportunities
+## Remaining opportunities in snapshot mode
 
 - Completed history, current-month timeline rows and static portfolio/context data still travel
   in every changed view. Versioned blocks could reduce late-match bandwidth further, but require
@@ -173,3 +173,73 @@ worker. It discards one warmup and reports the median of five samples. On macOS 
 0.48 ms. Peak process RSS was 531 MB, including fixture simulation and the worker; it is not an
 isolated memory cost of hashing. These are local diagnostics, not a slow-device performance gate
 or a claim about observed Steam traffic.
+
+## Replica traffic, replay cost and default decision (November 2026)
+
+Replication is opt-in at match start or restore with the host's hidden `?coopReplication=1`
+flag. Snapshot mode remains the default and the fallback. A guest follows the first view or
+baseline it receives for an epoch. Every peer still runs the same compatible build; the host
+validates commands, orders all transitions and owns durable saves. No relay, prediction or host
+migration is introduced.
+
+Reproduce the complete report with Node 26 and the lockfile installation:
+
+```sh
+node scripts/perf/multiplayer-network.js > network-results.json
+```
+
+The existing snapshot payload and acknowledged-checkpoint fields remain in the report. Each
+sample also measures a real one-second host record trace at 1×, 12× and 24× for two and four
+companies, at months 0 and 48. It batches steps at 100 ms, captures one verify boundary, and
+round-trips every payload through the shipping codec, including asynchronous reassembly. The
+one-second trace is a virtual-time traffic model, not a timed Steam session. It does not add
+purchases or grow the fleet. Steady upload includes records, a keepalive each second and one
+complete durable checkpoint every ten seconds. Initial and recovery baselines are reported
+separately as one-time wire bytes, rather than hidden in a steady-state rate.
+
+Each trace runs the actual `ReplicaRuntime` in a separate Node worker, acknowledges view credit,
+and asserts five local-seat view publications per virtual second. Its final canonical SHA-256
+must equal the host's. Timings discard one warmup and use the median of three samples.
+`replayCpuMs` counts the replay thread, local view projection and synchronous canonical capture.
+Renderer reconciliation and cross-process view delivery are excluded. `processCpuMs` counts all process threads,
+including SHA-256 and otherwise-idle parent or garbage-collector work; its one-core percentage is
+therefore a conservative local diagnostic. Baseline hydration and TypeScript loading happen
+before CPU timing. Heap peaks include the Node TypeScript loader, decoded baseline and setup;
+peak RSS covers the whole process. These memory figures are not browser-worker footprint claims.
+
+Command latency uses the real `ReplicaRuntime` and `ViewPublication` over an in-process mock
+transport with the shipping codec. Both modes issue the same 24 rate changes; four warmups are
+discarded and the remaining twenty form the 95th percentile. Snapshot views and baselines use
+asynchronous compression. The replica consumes view credit after each delivered view. The
+command stream is paused and network transit is zero; IPC, continuously ticking simulation,
+competing video load and Steam are excluded. Use replication-mode browser journeys to cover UI
+flows and competing load separately; this diagnostic cannot establish a slow-device service guarantee.
+
+Recorded locally on macOS arm64, Node 26.13.0, Apple M5 Max, with decimal KB:
+the four-company month-48 sample at 24× modeled 857.36 KB/s of snapshot host
+upload versus 67.76 KB/s with records, a 92.10% reduction including durable checkpoints.
+Per guest, records contributed 1.508 KB/s, checkpoints 20.954 KB/s and keepalives
+0.123 KB/s. Each initial or recovery baseline cost another 209.49 KB per guest plus a small
+verification batch. That one-time cost is excluded from the stated steady rate.
+
+The same late-match sample used 1.30% at 1×, 2.42% at 12×, and 6.64% at 24× of one core when all process
+threads were counted. At 24×, the replay thread itself used 4.29%, the three warmed wall-time
+samples had a median of 44.48 ms per virtual second, and loader-inclusive peak worker heap was
+170.8 MB (whole-process peak RSS 697.8 MB). Snapshot remote-seat projections cost a median
+2.67 ms to clone and 10.70 ms to encode per publication; records encoded for all three
+guests cost 0.47 ms per virtual second. New hash capture remains an additional host cost,
+measured separately above. Compression timing uses the synchronous shipping encoder for CPU
+comparison; native live-view compression already runs asynchronously.
+
+The late-match mock command latency was 105.81 ms at the 95th percentile with snapshots and
+102.77 ms with replication (-3.04 ms). All four two/four-company early/late samples stayed within
++50 ms in this local mock. These values are measurements of the documented mock, not Steam
+latency or the minimum supported hardware.
+
+The default stays **off**. Local bandwidth and command-latency measurements do not establish
+sustained 24× replay at no more than half a core on the slowest reference device. A Node worker
+on an Apple M5 Max is not that reference, and its loader-inclusive memory is not a packaged
+browser measurement. Before changing the default, retain zero mismatches across equivalence,
+recovery and replication-mode browser suites, repeat the replay measurement on the recorded
+slowest reference device, and require the issue's 80% upload and +50 ms mock-latency gates.
+Snapshot mode must remain available for one release after any default change.
