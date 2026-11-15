@@ -1,3 +1,4 @@
+import { territoryBalances } from "../helpers/TerritoryBalances";
 import { currencyForLocation } from "../helpers/Currency";
 import { getLegacyBuildBounds, isLegacyEraGame } from "../data/LegacyEra";
 import {
@@ -44,10 +45,7 @@ import {
   ownedUtilityConnection,
 } from "../helpers/ExpansionContext";
 import { areaBaselineDemand } from "../helpers/AreaDemand";
-import {
-  UTILITY_NETWORK_RENEWAL_STAGES,
-  utilityNetworkAnnualOM,
-} from "../data/UtilityExpansion";
+import { utilityNetworkAnnualOM } from "../data/UtilityExpansion";
 import { acquireUtility, acceptPowerAgreement } from "./GameActions";
 import {
   acceptAgreement,
@@ -2626,20 +2624,6 @@ export default gameSlice.reducer;
 /** Calendar-owned notices; cap changes themselves remain a pure dated entitlement lookup. */
 export function recordExpansionMilestones(state: GameType): void {
   if (!isUtilityExpansionGame(state) || state.date.monthNumber !== 1) return;
-  for (const stage of UTILITY_NETWORK_RENEWAL_STAGES) {
-    if (state.date.year !== stage.year) continue;
-    logGameEvent(
-      state,
-      "WORLD_EVENT",
-      `Network upkeep is now ${stage.multiplier}× opening upkeep, excluding customer growth and inflation.`,
-      {
-        title: "Network upkeep increased",
-        importance: "NOTABLE",
-        reportedKey: `scenario-116-network-renewal-${stage.year}`,
-        actionTarget: { card: "INSIGHTS", layer: "FINANCES" },
-      },
-    );
-  }
   if (state.date.year === 2013 && ownedUtility(state, "valley-electric"))
     logGameEvent(
       state,
@@ -6013,6 +5997,16 @@ function* supplyFacilitiesFinancesPhases(
         );
         reachableHeadroomW += watts - headroom.watts;
         headroom.watts = watts;
+        const regionalHeadroom = territoryHeadroom.find(
+          (source) => source.id === `headroom:${battery.id}`,
+        );
+        // The routed generation/import sources already include the interruptible charge.
+        // Add only discharge from the energy now stored, so interruption is counted once.
+        if (regionalHeadroom)
+          regionalHeadroom.capacityW = Math.min(
+            headroom.peakW,
+            battery.currentWh * TICKS_PER_HOUR,
+          );
       }
       storedWh += (draw * battery.roundTripEfficiency) / ticksPerHour;
       charge += draw;
@@ -6657,92 +6651,11 @@ function* supplyFacilitiesFinancesPhases(
     exportedW +
     remainingImportHeadroomW;
   if (territoryDemand && territoryMarket) {
-    const regionSources = territoryMarket.sources;
-    const regionSinks = territoryMarket.sinks;
-    now.territories = Object.fromEntries(
-      TERRITORIES.filter(({ id }) => ownedTerritories(state).includes(id)).map(
-        ({ id }) => {
-          const generationW = facilities.reduce(
-            (sum, facility) =>
-              sum +
-              (!isStorage(facility) &&
-              !facility.paused &&
-              facility.yearsToBuildLeft === 0 &&
-              facilityTerritoryId(facility) === id
-                ? facility.currentW
-                : 0),
-            0,
-          );
-          const importedW = regionSources.reduce(
-            (sum, source, i) =>
-              sum +
-              (source.territoryId === id &&
-              (source.kind === "agreement" || source.kind === "import")
-                ? territoryMarket!.result.sourceW[i]
-                : 0),
-            0,
-          );
-          const exportedW = regionSinks.reduce(
-            (sum, sink, i) =>
-              sum +
-              (sink.territoryId === id &&
-              (sink.id.startsWith("export:") || sink.id === "peer-export")
-                ? territoryMarket!.result.sinkW[i]
-                : 0),
-            0,
-          );
-          const storageChargeW = regionSinks.reduce(
-            (sum, sink, i) =>
-              sum +
-              (sink.territoryId === id &&
-              (sink.id.startsWith("charge:") ||
-                sink.id.startsWith("customer-battery:"))
-                ? territoryMarket!.result.sinkW[i]
-                : 0),
-            0,
-          );
-          const storageDischargeW = facilities.reduce(
-            (sum, facility) =>
-              sum +
-              (isStorage(facility) &&
-              !facility.paused &&
-              facility.yearsToBuildLeft === 0 &&
-              facilityTerritoryId(facility) === id
-                ? Math.max(0, facility.currentW)
-                : 0),
-            0,
-          );
-          const curtailedW = regionSources.reduce(
-            (sum, source, i) =>
-              sum +
-              (source.territoryId === id && source.kind === "native"
-                ? Math.max(
-                    0,
-                    source.capacityW - territoryMarket!.result.sourceW[i],
-                  )
-                : 0),
-            0,
-          );
-          const supplyW = supplyAtDemandBoundary(
-            territoryMarket!.result.servedW[id],
-            territoryDemand[id],
-          );
-          return [
-            id,
-            {
-              demandW: territoryDemand[id],
-              supplyW,
-              generationW,
-              importedW,
-              exportedW,
-              storageChargeW,
-              storageDischargeW,
-              unservedW: Math.max(0, territoryDemand[id] - supplyW),
-              curtailedW,
-            },
-          ];
-        },
-      ),
+    now.territories = territoryBalances(
+      ownedTerritories(state),
+      facilities,
+      territoryDemand,
+      territoryMarket,
     );
     // Only customer-bearing territory nodes can absorb additional reserves. Empty land has
     // to carry its spare generation through its real connection before it counts.
@@ -7170,7 +7083,6 @@ function* supplyFacilitiesFinancesPhases(
           .map((receipt) => receipt.targetId),
       ],
       prev.customers,
-      tickDate.year,
     );
     expensesOM +=
       (annualNetworkOM * costIndexNow * difficulty.expensesOM) /
@@ -7402,6 +7314,16 @@ function supplyForecastPass(
       if (t.minute === state.date.minute) {
         // A player's action changes the forecast, not emissions already recorded this tick.
         t.constructionKgco2e = current?.constructionKgco2e || 0;
+        if (current && state.utilityExpansion) {
+          // Payments and their booked import expense belong to the settled current frame.
+          t.agreementAvailableMWh = current.agreementAvailableMWh;
+          t.agreementUsefulMWh = current.agreementUsefulMWh;
+          t.agreementPayments = current.agreementPayments;
+          t.agreementUsefulValues = current.agreementUsefulValues;
+          t.agreementClosingExpenses = current.agreementClosingExpenses;
+          t.agreementUnusedExpenses = current.agreementUnusedExpenses;
+          t.expensesImports = current.expensesImports;
+        }
         t.kgco2e =
           (t.localKgco2e || 0) + (t.importedKgco2e || 0) + t.constructionKgco2e;
         if (currentCash !== undefined) {

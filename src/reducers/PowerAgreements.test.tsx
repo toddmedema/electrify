@@ -31,7 +31,7 @@ import {
   validPowerAgreementAction,
 } from "../helpers/PowerAgreements";
 import * as Transmission from "../helpers/Transmission";
-import { entitlementSources } from "../helpers/Expansion";
+import { acquisitionQuote, entitlementSources } from "../helpers/Expansion";
 import {
   adjacentMarketPricePerMWh,
   intertieContextForGame,
@@ -49,9 +49,15 @@ import reducer, {
   generateNewTimeline,
   forecastMonthClosingCashAtCustomerRate,
   tickState,
+  buildTransmissionLine,
   togglePauseTransmissionLine,
 } from "./Game";
-import { acceptPowerAgreement, loaded, resume } from "./GameActions";
+import {
+  acceptPowerAgreement,
+  acquireUtility,
+  loaded,
+  resume,
+} from "./GameActions";
 
 function stripTerritoryStateForLegacySave(game: GameType) {
   delete game.territoryNetwork;
@@ -1228,4 +1234,81 @@ it("keeps the closing minimum in the finance projection when the current frame i
   expect(
     selectProjection(game, currentTick(game)!).financeProjected[0].cash,
   ).toBeCloseTo(closingCash, 6);
+});
+
+it("retains settled agreement accounts and the closing month when acquiring a territory", () => {
+  let game = at(0);
+  currentTick(game)!.cash = 10e9;
+  game = copyOfficialGame(
+    reducer(
+      game,
+      buildTransmissionLine({
+        corridorId: "vt-champlain-valley",
+        financed: false,
+      }),
+    ),
+  );
+  game.transmission!.lines.find(
+    ({ corridorId }) => corridorId === "vt-champlain-valley",
+  )!.yearsToBuildLeft = 0;
+  game.transmission!.inheritedAgreementTerms = 3;
+  game.transmission!.lines[0].paused = true;
+  game.facilities = [];
+  let settled: GameType | undefined;
+  const timeline = generateForecastTimeline(
+    game,
+    currentTick(game)!.cash,
+    currentTick(game)!.customers,
+    97,
+    TICK_MINUTES,
+    (state, tick) => {
+      if (tick.minute === MINUTES_PER_MONTH) settled = copyOfficialGame(state);
+    },
+  );
+  expect(settled).toBeDefined();
+  game = settled!;
+  game.timeline = timeline;
+  game.date = getDateFromMinute(MINUTES_PER_MONTH, game.startingYear);
+  const before = cloneDeep(currentTick(game)!);
+  expect(before.agreementClosingExpenses!["0"]).toBeGreaterThan(0);
+  expect(
+    Object.values(before.agreementPayments!).some((payment) => payment > 0),
+  ).toBe(true);
+  const closedBefore = summarizeTimelineByMonth(
+    game.timeline,
+    game.startingYear,
+  )[0];
+  const quote = acquisitionQuote(game, "valley-electric")!;
+  expect(quote).toBeDefined();
+  game = copyOfficialGame(
+    reducer(
+      game,
+      acquireUtility({
+        targetId: "valley-electric",
+        financed: false,
+        quoteKey: quote.quoteKey,
+      }),
+    ),
+  );
+  const after = currentTick(game)!;
+  for (const field of [
+    "agreementAvailableMWh",
+    "agreementUsefulMWh",
+    "agreementPayments",
+    "agreementUsefulValues",
+    "agreementClosingExpenses",
+    "agreementUnusedExpenses",
+    "expensesImports",
+  ] as const)
+    expect(after[field]).toEqual(before[field]);
+  const closedAfter = summarizeTimelineByMonth(
+    game.timeline,
+    game.startingYear,
+  )[0];
+  expect(closedAfter.expensesImports).toBeCloseTo(
+    closedBefore.expensesImports!,
+    6,
+  );
+  expect(closedAfter.cash).toBeCloseTo(closedBefore.cash, 6);
+  expect(closedAfter.netWorth).toBeCloseTo(closedBefore.netWorth, 6);
 });

@@ -855,9 +855,12 @@ export default function TransmissionPanel({
       ? buildQuote(reviewId)
       : undefined;
   const reviewMarket = review && adjacentMarketForCorridor(review.id);
+  const constructionCapacities = (corridorId: string, capacityW: number) =>
+    isInternalTerritoryCorridor(game, corridorId)
+      ? { importCapacityW: capacityW, exportCapacityW: capacityW }
+      : intertieDirectionalCapacities(corridorId, intertieContext, capacityW);
   const reviewCapacity =
-    review &&
-    intertieDirectionalCapacities(review.id, intertieContext, review.capacityW);
+    review && constructionCapacities(review.id, review.capacityW);
   const approve = (financed: boolean) => {
     if (!review) return;
     onBuild(review.id, financed, tier);
@@ -1590,9 +1593,8 @@ export default function TransmissionPanel({
                         Infinity,
                     )
                   : undefined;
-              const capacities = intertieDirectionalCapacities(
+              const capacities = constructionCapacities(
                 corridor.id,
-                intertieContext,
                 corridor.capacityW,
               );
               return (

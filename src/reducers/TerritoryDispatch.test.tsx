@@ -609,3 +609,79 @@ it("does not redirect a remote battery's routed draw into self-discharge room ac
   );
   expectConserved(game);
 });
+
+function chargingGrid() {
+  let game = createGame({
+    scenarioId: 116,
+    seed: 12345,
+    difficulty: "Employee",
+  });
+  currentTick(game)!.cash = 10e9;
+  game.facilities = [];
+  const quote = storageQuote(game);
+  const offset = game.date.minute;
+  game.startingYear = game.date.year;
+  game.date = getDateFromMinute(0, game.startingYear);
+  game.timeline.forEach((tick) => {
+    tick.minute -= offset;
+  });
+  game = copyOfficialGame(
+    reducer(
+      game,
+      buildFacility({
+        facility: quote,
+        financed: false,
+        territoryId: "champlain",
+      }),
+    ),
+  );
+  const battery = game.facilities[0];
+  battery.yearsToBuildLeft = 0;
+  battery.currentWh = 0;
+  battery.roundTripEfficiency = 0.9;
+  battery.hourlyLoss = 0;
+  game.transmission!.buyingRule = "NONE";
+  game.transmission!.sellingRule = "NONE";
+  return { game, battery };
+}
+
+it("counts settled stored energy and charging interruption once in territory reserve", () => {
+  const { game, battery } = chargingGrid();
+  game.transmission!.lines = [];
+  const source = plant(game, "champlain", 100e6);
+  game.facilities = [source, battery];
+  request(game, 50e6);
+  tickState(game);
+  const now = currentTick(game)!;
+  expect(battery.currentWh).toBeCloseTo(11.25e6, 4);
+  expect(battery.currentW).toBeCloseTo(-45e6, 4);
+  expect(now.storageChargeW).toBeCloseTo(50e6, 4);
+  expect(now.supplyW).toBeCloseTo(50e6, 4);
+  expect(now.availableSupplyW).toBeCloseTo(145e6, 4);
+  expect(now.reserveW).toBeCloseTo(95e6, 4);
+  expectConserved(game);
+});
+
+it("does not consume extra fuel for storage through a paused profitable export interface", () => {
+  const { game, battery } = chargingGrid();
+  game.transmission!.lines.forEach((line) => {
+    line.paused = true;
+  });
+  game.transmission!.sellingRule = "PROFITABLE";
+  const source = plant(game, "champlain", 200e6);
+  source.btuPerWh = 1;
+  source.variableOperatingCostPerMWh = 0;
+  game.facilities = [battery, source];
+  request(game, 100e6);
+  const control = copyOfficialGame(game);
+  control.transmission!.sellingRule = "SURPLUS";
+  tickState(control);
+  tickState(game);
+  const now = currentTick(game)!;
+  expect(source.currentW).toBeCloseTo(100e6, 4);
+  expect(battery.currentWh).toBe(0);
+  expect(now.exportedW).toBe(0);
+  expect(now.expensesFuel).toBeGreaterThan(0);
+  expect(now.expensesFuel).toBe(currentTick(control)!.expensesFuel);
+  expectConserved(game);
+});

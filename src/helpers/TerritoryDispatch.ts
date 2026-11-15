@@ -353,6 +353,10 @@ export function clearTerritoryMarket({
       watts > 0,
   );
   if (!anyImports && sellingRule !== "NONE") {
+    // Export offers cannot expand charging that was not supplied by existing generation.
+    sinks.forEach((sink, i) => {
+      sinks[i] = { ...sink, capacityW: result.sinkW[i] };
+    });
     interfaces.forEach(({ territoryId, offer }, i) => {
       const marketUsedW = interfaces.reduce(
         (sum, entry, j) =>
@@ -386,7 +390,7 @@ export function clearTerritoryMarket({
         priority: 10 + i,
       });
       result = route();
-      if (sellingRule === "PROFITABLE") {
+      if (sellingRule === "PROFITABLE" && capacityW > 0) {
         spareSources.forEach((source, j) => {
           if (!(offer.pricePerMWh > source.costPerMWh)) return;
           let sourceIndex = spareSourceIndex[j];
@@ -431,6 +435,13 @@ export function territoryAdditionalDemandW(
   territoryId: TerritoryId,
 ): number {
   const before = routeTerritoryPower(input);
+  // A saturated customer/storage request cannot use any additional generation. Avoid a
+  // second graph for later plants once the existing fleet already meets every request.
+  if (
+    IDS.every((id) => before.servedW[id] === input.demandW[id]) &&
+    (input.sinks ?? []).every((sink, i) => before.sinkW[i] === sink.capacityW)
+  )
+    return 0;
   const after = routeTerritoryPower({
     ...input,
     sources: [

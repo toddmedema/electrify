@@ -2,6 +2,7 @@ import type { TerritoryId } from "../Types";
 import {
   clearTerritoryMarket,
   routeTerritoryPower,
+  territoryAdditionalDemandW,
   type TerritoryDispatchInput,
 } from "./TerritoryDispatch";
 
@@ -55,6 +56,58 @@ function fixture(count: number): TerritoryDispatchInput {
     importToSinks: true,
   };
 }
+
+it.each([
+  [150e6, "champlain", 0],
+  [100e6, "champlain", 50e6],
+  [50e6, "champlain", 100e6],
+  [50e6, "green-uplands", 0],
+] as const)(
+  "requests only reachable unmet load and storage with %s W from %s",
+  (capacityW, territoryId, expectedW) => {
+    expect(
+      territoryAdditionalDemandW(
+        {
+          demandW: {
+            champlain: 100e6,
+            "valley-electric": 0,
+            "ridge-electric": 0,
+            "green-uplands": 0,
+          },
+          edges: [],
+          sources: [
+            {
+              id: "plant",
+              territoryId: "champlain",
+              capacityW,
+              kind: "native",
+            },
+          ],
+          sinks: [{ id: "charge", territoryId: "champlain", capacityW: 50e6 }],
+        },
+        territoryId,
+      ),
+    ).toBe(expectedW);
+  },
+);
+
+it("needs no additional generation for an empty grid", () => {
+  expect(
+    territoryAdditionalDemandW(
+      {
+        demandW: {
+          champlain: 0,
+          "valley-electric": 0,
+          "ridge-electric": 0,
+          "green-uplands": 0,
+        },
+        edges: [],
+        sources: [],
+      },
+      "champlain",
+    ),
+  ).toBe(0);
+});
 
 it("retains source order, customer delivery and secondary-sink priorities for a legacy-sized fleet", () => {
   // Existing saves may contain more plants than the new site budgets permit building.
@@ -121,3 +174,114 @@ it.each([100e6, 125e6, 150e6])(
     );
   },
 );
+
+it.each([
+  ["export disabled", 0, 100e6, 100e6, 0],
+  ["market disabled", 100e6, 0, 100e6, 0],
+  ["access disabled", 100e6, 100e6, 0, 0],
+  ["bounded", 100e6, 40e6, 30e6, 30e6],
+] as const)(
+  "does not burn export generation for charging when %s",
+  (_, exportLimitW, marketExportLimitW, accessExportLimitW, expectedW) => {
+    const cleared = clearTerritoryMarket({
+      input: {
+        demandW: {
+          champlain: 100e6,
+          "valley-electric": 0,
+          "ridge-electric": 0,
+          "green-uplands": 0,
+        },
+        edges: [],
+        sources: [
+          {
+            id: "plant",
+            territoryId: "champlain",
+            capacityW: 100e6,
+            kind: "native",
+          },
+        ],
+        sinks: [{ id: "charge:1", territoryId: "champlain", capacityW: 50e6 }],
+      },
+      interfaces: [
+        {
+          territoryId: "champlain",
+          offer: {
+            importLimitW: 0,
+            exportLimitW,
+            marketId: "market",
+            marketExportLimitW,
+            accessId: "access",
+            accessExportLimitW,
+            pricePerMWh: 100,
+          },
+        },
+      ],
+      reservations: [],
+      buyingRule: "NONE",
+      sellingRule: "PROFITABLE",
+      spareSources: [
+        {
+          id: "extra",
+          territoryId: "champlain",
+          capacityW: 100e6,
+          kind: "spare",
+          costPerMWh: 1,
+        },
+      ],
+    });
+    expect(cleared.result.sinkW[0]).toBe(0);
+    expect(cleared.extraGenerationW).toEqual([expectedW]);
+    expect(cleared.exportedW).toEqual([expectedW]);
+    expect(cleared.result.totalServedW).toBe(100e6);
+  },
+);
+
+it("shares export access without letting spare generation expand a charging allocation", () => {
+  const cleared = clearTerritoryMarket({
+    input: {
+      demandW: {
+        champlain: 100e6,
+        "valley-electric": 0,
+        "ridge-electric": 0,
+        "green-uplands": 0,
+      },
+      edges: [],
+      sources: [
+        {
+          id: "plant",
+          territoryId: "champlain",
+          capacityW: 100e6,
+          kind: "native",
+        },
+      ],
+      sinks: [{ id: "charge:1", territoryId: "champlain", capacityW: 50e6 }],
+    },
+    interfaces: [0, 1].map(() => ({
+      territoryId: "champlain" as const,
+      offer: {
+        importLimitW: 0,
+        exportLimitW: 50e6,
+        accessId: "access",
+        accessExportLimitW: 60e6,
+        marketId: "market",
+        marketExportLimitW: 80e6,
+        pricePerMWh: 100,
+      },
+    })),
+    reservations: [],
+    buyingRule: "NONE",
+    sellingRule: "PROFITABLE",
+    spareSources: [
+      {
+        id: "extra",
+        territoryId: "champlain",
+        capacityW: 100e6,
+        kind: "spare",
+        costPerMWh: 1,
+      },
+    ],
+  });
+  expect(cleared.result.sinkW[0]).toBe(0);
+  expect(cleared.extraGenerationW).toEqual([60e6]);
+  expect(cleared.exportedW).toEqual([50e6, 10e6]);
+});

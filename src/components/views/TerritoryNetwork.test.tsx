@@ -282,3 +282,24 @@ it("reviews an acquired corridor upgrade using physical capacity in both directi
   expect(dialog).toHaveTextContent("Power to Champlain100MW → 150MW");
   expect(dialog).toHaveTextContent("Power from Champlain100MW → 150MW");
 });
+
+it.each(["project", "review"] as const)(
+  "shows the Green Uplands physical capacity in the %s facts",
+  (surface) => {
+    render(<TerritoryNetwork game={network()} {...controls} />);
+    fireEvent.click(
+      screen.getByRole("button", { name: "Inspect Green Uplands territory" }),
+    );
+    let facts = screen.getByRole("region", { name: "Selected territory" });
+    if (surface === "review") {
+      fireEvent.click(
+        within(facts).getByRole("button", {
+          name: /Review purchase of .*Green Uplands/,
+        }),
+      );
+      facts = screen.getByRole("dialog");
+    }
+    expect(facts).toHaveTextContent("Power to Champlain120MW");
+    expect(facts).toHaveTextContent("Power from Champlain120MW");
+  },
+);

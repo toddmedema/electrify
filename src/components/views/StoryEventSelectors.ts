@@ -1,7 +1,4 @@
-import {
-  UTILITY_AREAS,
-  UTILITY_NETWORK_RENEWAL_STAGES,
-} from "../../data/UtilityExpansion";
+import { UTILITY_AREAS } from "../../data/UtilityExpansion";
 import { utilityPlanning } from "../../helpers/UtilityPlanning";
 import {
   connectionAgreements,
@@ -88,20 +85,6 @@ function upcomingUtilityEvents(game: GameType): UpcomingStoryEventType[] {
     importance: "NOTABLE",
     actionTarget: { card: "INSIGHTS", layer: "SUPPLY_DEMAND" },
   }));
-  for (const stage of UTILITY_NETWORK_RENEWAL_STAGES) {
-    const startsMinute =
-      (stage.year - game.startingYear) * 12 * MINUTES_PER_MONTH;
-    if (startsMinute <= game.date.minute) continue;
-    events.push({
-      key: `utility:network:${stage.year}`,
-      ...dated(startsMinute),
-      title: "Network upkeep increasing",
-      message: `Network upkeep will rise to ${stage.multiplier}× opening upkeep, excluding customer growth and inflation.`,
-      concept: "finances",
-      importance: "NOTABLE",
-      actionTarget: { card: "INSIGHTS", layer: "FINANCES" },
-    });
-  }
   for (const id of Object.keys(UTILITY_AREAS) as UtilityId[]) {
     if (!utilityOwnedAt(game, id, game.date.minute)) continue;
     for (const source of connectionAgreements(game, id).filter(
