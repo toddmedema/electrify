@@ -19,6 +19,8 @@ import type { RoomView, World } from "../src/multiplayer/Types";
 import { verifyMenuKeyboard } from "./menu-keyboard";
 import { reviewScreenshot } from "./review-screenshot";
 
+const replication = process.env.E2E_COOP_REPLICATION === "1";
+
 type SteamTestWindow = typeof window & {
   mockSteamDeliveries?: Set<Promise<void>>;
   mockSteamDeliveryTail?: Promise<void>;
@@ -27,6 +29,11 @@ type SteamTestWindow = typeof window & {
   receivedMockSteamEvent?: unknown;
   receivedMockSteamEvents?: NativeEvent[];
   mockSteamGeneration?: number;
+  mockWorkerView?: (view: RoomView) => Promise<void>;
+  holdReplicaBaseline?: boolean;
+  releaseReplicaBaseline?: () => void;
+  holdReplicaViews?: boolean;
+  releaseReplicaViews?: () => void;
   mockSharedSaveRequests?: number;
   mockScoreSubmissions?: number;
   mockAchievementSubmissions?: number;
@@ -74,14 +81,28 @@ function receiveSteamEvent({
         new Blob([bytes]).stream().pipeThrough(new DecompressionStream("gzip")),
       ).text();
       if (generation !== (target.mockSteamGeneration ?? 0)) return;
-      const event = JSON.parse(json, (_key, value) =>
-        value &&
-        typeof value === "object" &&
-        Object.keys(value).length === 1 &&
-        ["Infinity", "-Infinity", "NaN"].includes(value.$electrifyNumber)
-          ? Number(value.$electrifyNumber)
-          : value,
-      );
+      const arrayUndefined = Symbol("array undefined");
+      const event = JSON.parse(json, function (_key, value) {
+        if (Array.isArray(value))
+          return value.map((item) =>
+            item === arrayUndefined ? undefined : item,
+          );
+        if (
+          value &&
+          typeof value === "object" &&
+          Object.keys(value).length === 1
+        ) {
+          if (value.$electrifyNumber === "undefined")
+            return Array.isArray(this) ? arrayUndefined : undefined;
+          if (
+            ["Infinity", "-Infinity", "NaN", "-0"].includes(
+              value.$electrifyNumber,
+            )
+          )
+            return Number(value.$electrifyNumber);
+        }
+        return value;
+      });
       window.dispatchEvent(
         new CustomEvent("mockSteamEvent", { detail: event }),
       );
@@ -154,11 +175,16 @@ async function createSteamTransport(page: Page) {
     async send(event: NativeEvent) {
       // Mirror the native compressed transport and keep full snapshots out of traces.
       const compressed = gzipSync(
-        JSON.stringify(event, (_key, value) =>
-          typeof value === "number" && !Number.isFinite(value)
-            ? { $electrifyNumber: String(value) }
-            : value,
-        ),
+        JSON.stringify(event, function (_key, value) {
+          if (typeof value === "number") {
+            if (Object.is(value, -0)) return { $electrifyNumber: "-0" };
+            if (!Number.isFinite(value))
+              return { $electrifyNumber: String(value) };
+          }
+          if (value === undefined && Array.isArray(this))
+            return { $electrifyNumber: "undefined" };
+          return value;
+        }),
       ).toString("base64");
       const id = ++sequence;
       const acknowledged = new Promise<void>((resolve, reject) =>
@@ -264,6 +290,15 @@ class SteamRoom {
   campaignListHold?: Promise<void>;
   invites: string[] = [];
   views = new Map<string, RoomView>();
+  hostView?: RoomView;
+  baselines = new Map<string, number>();
+  baselineIndex = new Map<string, number>();
+  wireViews = new Map<string, number>();
+  corruptNextVerified = new Map<string, number>();
+  corruptedProgress = 0;
+  heldReplication = new Set<string>();
+  progress = new Map<string, Extract<WireMessage, { kind: "progress" }>>();
+  pendingReplication = new Map<string, NativeEvent[]>();
   pendingViews = new Map<string, NativeEvent>();
   deliveringViews = new Set<string>();
   heldViews = new Set<string>();
@@ -324,6 +359,16 @@ class SteamRoom {
       this.heldViews.has(id)
     )
       return;
+    if (
+      event.kind === "message" &&
+      ["baseline", "records"].includes(event.payload.kind)
+    ) {
+      const queue = this.pendingReplication.get(id) ?? [];
+      queue.push(event);
+      this.pendingReplication.set(id, queue);
+      await this.releaseReplication(id);
+      return;
+    }
     if (event.kind !== "message" || event.payload.kind !== "view") {
       await this.deliver(id, event);
       return;
@@ -338,6 +383,27 @@ class SteamRoom {
         this.pendingViews.delete(id);
         await this.deliver(id, next);
       }
+    } finally {
+      this.deliveringViews.delete(id);
+    }
+  }
+  async releaseReplication(id: string) {
+    const queue = this.pendingReplication.get(id);
+    if (
+      !queue ||
+      this.heldViews.has(id) ||
+      this.heldReplication.has(id) ||
+      this.deliveringViews.has(id)
+    )
+      return;
+    this.deliveringViews.add(id);
+    try {
+      while (
+        queue.length &&
+        !this.heldViews.has(id) &&
+        !this.heldReplication.has(id)
+      )
+        await this.deliver(id, queue.shift()!);
     } finally {
       this.deliveringViews.delete(id);
     }
@@ -381,13 +447,38 @@ class SteamRoom {
     }
     if (input.kind === "unlock") return this.state(id);
     if (input.kind === "send") {
-      if (input.payload.kind === "view")
+      if (input.payload.kind === "view") {
         this.views.set(input.to, input.payload.view);
+        this.wireViews.set(input.to, (this.wireViews.get(input.to) ?? 0) + 1);
+      }
+      if (input.payload.kind === "baseline") {
+        this.baselines.set(input.to, (this.baselines.get(input.to) ?? 0) + 1);
+        this.baselineIndex.set(input.to, input.payload.index);
+      }
+      if (input.payload.kind === "progress") {
+        this.progress.set(id, input.payload);
+        if (
+          input.payload.verified &&
+          input.payload.verified.index >
+            (this.corruptNextVerified.get(id) ?? Infinity)
+        ) {
+          this.corruptNextVerified.delete(id);
+          this.corruptedProgress++;
+          input = {
+            ...input,
+            payload: {
+              ...input.payload,
+              verified: { ...input.payload.verified, hash: "0".repeat(64) },
+            },
+          };
+        }
+      }
+      const to = input.to;
       if (
         this.dropped.has(id) ||
         this.dropped.has(input.to) ||
         !this.members.some((member) => member.id === id) ||
-        !this.members.some((member) => member.id === input.to)
+        !this.members.some((member) => member.id === to)
       )
         // The wording of the native transport, so the renderer is tested against what it really sees.
         throw new Error("Player is disconnected");
@@ -445,6 +536,7 @@ class SteamRoom {
     if (input.kind === "leave") {
       this.members = this.members.filter((m) => m.id !== id);
       this.pendingViews.delete(id);
+      this.pendingReplication.delete(id);
       this.heldViews.delete(id);
       this.pendingScenarios.delete(id);
       this.heldScenarios.delete(id);
@@ -502,6 +594,85 @@ class SteamRoom {
     await page.exposeBinding("mockModsRequest", (_source, input: ModRequest) =>
       this.mods(id, input),
     );
+    if (replication) {
+      await page.exposeBinding("mockWorkerView", (_source, view: RoomView) => {
+        this.views.set(id, view);
+        if (id === this.host) this.hostView = view;
+      });
+      await page.addInitScript(
+        ({ id }) => {
+          const NativeWorker = window.Worker;
+          window.Worker = class extends NativeWorker {
+            private multiplayer = false;
+            private heldMessages: {
+              message: unknown;
+              options?: Transferable[] | StructuredSerializeOptions;
+            }[] = [];
+            constructor(url: string | URL, options?: WorkerOptions) {
+              super(url, options);
+              this.addEventListener("message", (event) => {
+                if (this.multiplayer && event.data.kind === "views") {
+                  const view = event.data.views[id];
+                  if (view)
+                    void (window as SteamTestWindow).mockWorkerView!(view);
+                  const target = window as SteamTestWindow;
+                  if (target.holdReplicaViews) {
+                    event.stopImmediatePropagation();
+                    target.releaseReplicaViews = () => {
+                      target.holdReplicaViews = false;
+                      delete target.releaseReplicaViews;
+                      this.dispatchEvent(
+                        new MessageEvent("message", { data: event.data }),
+                      );
+                    };
+                  }
+                }
+              });
+            }
+            postMessage(
+              message: unknown,
+              options?: Transferable[] | StructuredSerializeOptions,
+            ) {
+              if (
+                message &&
+                typeof message === "object" &&
+                "kind" in message &&
+                ["create", "restore", "baseline"].includes(String(message.kind))
+              )
+                this.multiplayer = true;
+              const target = window as SteamTestWindow;
+              if (this.heldMessages.length) {
+                this.heldMessages.push({ message, options });
+                return;
+              }
+              if (
+                message &&
+                typeof message === "object" &&
+                "kind" in message &&
+                message.kind === "baseline" &&
+                "seat" in message &&
+                target.holdReplicaBaseline
+              ) {
+                this.heldMessages.push({ message, options });
+                target.releaseReplicaBaseline = () => {
+                  target.holdReplicaBaseline = false;
+                  delete target.releaseReplicaBaseline;
+                  for (const held of this.heldMessages.splice(0)) {
+                    if (Array.isArray(held.options))
+                      super.postMessage(held.message, held.options);
+                    else super.postMessage(held.message, held.options);
+                  }
+                };
+                return;
+              }
+              if (Array.isArray(options)) super.postMessage(message, options);
+              else super.postMessage(message, options);
+            }
+          };
+        },
+        { id },
+      );
+    }
     await page.addInitScript(
       ({ id }) => {
         // Multiplayer flow tests do not exercise sound. Avoid four headless audio engines.
@@ -589,7 +760,7 @@ class SteamRoom {
       },
       { id },
     );
-    await page.goto("/");
+    await page.goto(replication && index === 0 ? "/?coopReplication=1" : "/");
     if (openLobby)
       await page
         .getByRole("button", { name: "Play with friends", exact: true })
@@ -1130,6 +1301,50 @@ test("mock Steam preserves lobby update order while an earlier decode is pending
   ).toEqual(events);
 });
 
+test("mock Steam preserves replica numbers and explicit undefined array entries", async ({
+  page,
+}) => {
+  const transport = await createSteamTransport(page);
+  await page.evaluate(() => {
+    window.addEventListener("mockSteamEvent", (event) => {
+      (window as SteamTestWindow).receivedMockSteamEvent = (
+        event as CustomEvent
+      ).detail;
+    });
+  });
+  const event = {
+    kind: "codec-probe",
+    values: [-0, Infinity, -Infinity, NaN, undefined, null, 0],
+    omitted: undefined,
+  } as unknown as NativeEvent;
+  await transport.send(event);
+  expect(
+    await page.evaluate(
+      () => (window as SteamTestWindow).receivedMockSteamEvent,
+    ),
+  ).toEqual(event);
+  expect(
+    await page.evaluate(() => {
+      const event = (window as SteamTestWindow).receivedMockSteamEvent as {
+        values: unknown[];
+      };
+      return {
+        negativeZero: Object.is(event.values[0], -0),
+        explicitUndefined: Object.hasOwn(event.values, 4),
+        undefinedValue: event.values[4] === undefined,
+        nullValue: event.values[5] === null,
+        positiveZero: Object.is(event.values[6], 0),
+      };
+    }),
+  ).toEqual({
+    negativeZero: true,
+    explicitUndefined: true,
+    undefinedValue: true,
+    nullValue: true,
+    positiveZero: true,
+  });
+});
+
 test("mock Steam delivery survives garbage collection while decompression is pending", async ({
   page,
 }) => {
@@ -1464,7 +1679,8 @@ async function startSharedGame(browser: Browser, count: number) {
     const page = await room.player(
       browser,
       index,
-      count === 4 && index === count - 1,
+      (count === 4 && index === count - 1) ||
+        !!test.info().project.use.isMobile,
     );
     page.on("pageerror", (error) => errors.push(error.message));
     pages.push(page);
@@ -1496,6 +1712,164 @@ async function startSharedGame(browser: Browser, count: number) {
     .click();
   return { room, pages, errors };
 }
+
+test("replication repairs a mismatched hash with a pending purchase exactly once", async ({
+  browser,
+}) => {
+  test.skip(!replication, "Opt-in replication journey");
+  test.setTimeout(60000);
+  const { room, pages, errors } = await startSharedGame(browser, 2);
+  const [host, guest] = pages;
+  const guestId = room.members[1].id;
+  await expect(guest.locator(".facilities:visible")).toBeVisible();
+  await expect.poll(() => room.progress.get(guestId)?.verified).toBeDefined();
+  const fleetBefore = room.views.get(guestId)!.game!.facilities.length;
+  await guest.locator(".button-buildFacility").click();
+  await guest
+    .getByRole("button", { name: "Review purchase of Wind", exact: true })
+    .click();
+  await guest.evaluate(() => {
+    const target = window as SteamTestWindow;
+    target.holdReplicaViews = true;
+    target.holdReplicaBaseline = true;
+  });
+  room.corruptNextVerified.set(
+    guestId,
+    room.progress.get(guestId)!.verified!.index,
+  );
+  const started = Date.now();
+  await guest.getByRole("button", { name: "Take loan", exact: true }).click();
+  await expect(
+    guest.getByRole("status").filter({ hasText: "Submitting…" }),
+  ).toBeVisible();
+  await expect
+    .poll(() => room.baselines.get(guestId), { timeout: 30000 })
+    .toBe(2);
+  expect(room.corruptedProgress).toBe(1);
+  const syncing = guest.getByRole("dialog", {
+    name: "Multiplayer",
+    exact: true,
+  });
+  await expect(syncing).toContainText("Synchronizing with host…");
+  await reviewScreenshot(guest, {
+    path: test
+      .info()
+      .outputPath(`replica-syncing-${guest.viewportSize()!.width}.png`),
+    animations: "disabled",
+  });
+  await guest.evaluate(() =>
+    (window as SteamTestWindow).releaseReplicaBaseline!(),
+  );
+  await expect
+    .poll(() => room.progress.get(guestId)?.applied)
+    .toBeGreaterThanOrEqual(room.baselineIndex.get(guestId)!);
+  await expect
+    .poll(() =>
+      guest.evaluate(
+        () => typeof (window as SteamTestWindow).releaseReplicaViews,
+      ),
+    )
+    .toBe("function");
+  await guest.evaluate(() =>
+    (window as SteamTestWindow).releaseReplicaViews!(),
+  );
+  await expect(syncing).toBeHidden();
+  await expect(
+    guest.getByRole("status").filter({ hasText: "Submitting…" }),
+  ).toBeHidden();
+  expect(Date.now() - started).toBeLessThan(30000);
+  await expect
+    .poll(() => room.views.get(guestId)?.game?.facilities.length)
+    .toBe(fleetBefore + 1);
+  await room.saveCheckpoint(guestId);
+  expect(room.checkpoint!.grids[1].facilities).toHaveLength(fleetBefore + 1);
+  await expect(syncing).toBeHidden();
+  for (const page of pages) await ready(page);
+  await expect(clock(host)).toHaveAttribute("data-active-speed", "SLOW");
+  expect(room.wireViews.get(guestId) ?? 0).toBe(0);
+  expect(errors).toEqual([]);
+  expect(room.transportErrors).toEqual([]);
+});
+
+test("replication reconnects while a recovery baseline is installing", async ({
+  browser,
+}) => {
+  test.skip(!replication, "Opt-in replication journey");
+  test.setTimeout(60000);
+  const { room, pages, errors } = await startSharedGame(browser, 2);
+  const [host, guest] = pages;
+  const guestId = room.members[1].id;
+  await expect(guest.locator(".facilities:visible")).toBeVisible();
+  await expect.poll(() => room.progress.get(guestId)?.verified).toBeDefined();
+  await guest.evaluate(() => {
+    (window as SteamTestWindow).holdReplicaBaseline = true;
+  });
+  room.corruptNextVerified.set(
+    guestId,
+    room.progress.get(guestId)!.verified!.index,
+  );
+  await ready(host);
+  const notice = guest.getByRole("dialog", {
+    name: "Multiplayer",
+    exact: true,
+  });
+  await expect(notice).toContainText("Synchronizing with host…");
+  room.dropped.add(guestId);
+  await room.event(room.host, { kind: "disconnected", sender: guestId });
+  await room.publish();
+  await room.event(guestId, { kind: "disconnected", sender: room.host });
+  await notice.getByRole("button", { name: "Reconnect", exact: true }).click();
+  await guest.evaluate(() =>
+    (window as SteamTestWindow).releaseReplicaBaseline?.(),
+  );
+  await expect(notice).toBeHidden();
+  await expect.poll(() => room.state(guestId).connected).toEqual([room.host]);
+  for (const page of pages) await ready(page);
+  for (const page of pages)
+    await expect(clock(page)).toHaveAttribute("data-active-speed", "SLOW");
+  expect(errors).toEqual([]);
+  expect(room.transportErrors).toEqual([]);
+});
+
+test("replication holds a slow guest then resumes without Ready and stays healthy while paused", async ({
+  browser,
+}) => {
+  test.skip(!replication, "Opt-in replication journey");
+  test.setTimeout(60000);
+  const { room, pages, errors } = await startSharedGame(browser, 2);
+  const [host, guest] = pages;
+  const guestId = room.members[1].id;
+  await expect(guest.locator(".facilities:visible")).toBeVisible();
+  for (const page of pages) await ready(page);
+  for (const page of pages)
+    await expect(clock(page)).toHaveAttribute("data-active-speed", "SLOW");
+  const baselines = room.baselines.get(guestId);
+  room.heldReplication.add(guestId);
+  await expect
+    .poll(() => room.hostView?.reason, { timeout: 8000 })
+    .toContain("Waiting for WindyWren to catch up");
+  await expect(clock(host)).toHaveAttribute("data-active-speed", "PAUSED");
+  expect(room.hostView?.readyRequired).toBe(false);
+  room.heldReplication.delete(guestId);
+  await room.releaseReplication(guestId);
+  for (const page of pages)
+    await expect(clock(page)).toHaveAttribute("data-active-speed", "SLOW");
+  expect(room.baselines.get(guestId)).toBe(baselines);
+  await clock(host).getByRole("button", { name: "pause", exact: true }).click();
+  for (const page of pages)
+    await expect(clock(page)).toHaveAttribute("data-active-speed", "PAUSED");
+  const date = { ...room.views.get(guestId)!.game!.date };
+  // A healthy idle pause exceeds the recovery timeout without creating a baseline or notice.
+  await guest.waitForTimeout(11000);
+  expect(room.baselines.get(guestId)).toBe(baselines);
+  expect(room.views.get(guestId)!.game!.date).toEqual(date);
+  await expect(
+    guest.getByRole("dialog", { name: "Multiplayer", exact: true }),
+  ).toBeHidden();
+  expect(room.wireViews.get(guestId) ?? 0).toBe(0);
+  expect(errors).toEqual([]);
+  expect(room.transportErrors).toEqual([]);
+});
 
 async function expectClockInViewport(page: Page) {
   await expect(
@@ -2311,10 +2685,12 @@ for (const count of [2, 4]) {
       // Verify host acceptance while the guest's snapshots are deliberately held.
       // Waiting for its selected button would deadlock the stale-selection reversal.
       await expect
-        .poll(
-          () =>
-            room.views.get(room.members[1].id)?.game?.multiplayer?.clock
-              ?.selectedSpeed,
+        .poll(() =>
+          replication
+            ? room.hostView?.grids.find((grid) => grid.seat.id === buyerId)
+                ?.selectedSpeed
+            : room.views.get(room.members[1].id)?.game?.multiplayer?.clock
+                ?.selectedSpeed,
         )
         .toBe("NORMAL");
       if (count === 2)
@@ -2333,7 +2709,10 @@ for (const count of [2, 4]) {
         await pages[1]
           .getByRole("button", { name: "slow speed", exact: true })
           .click();
-      if (count === 2) room.heldViews.delete(buyerId);
+      if (count === 2) {
+        room.heldViews.delete(buyerId);
+        await room.releaseReplication(buyerId);
+      }
       for (const page of pages)
         await expect(clock(page)).toHaveAttribute("data-active-speed", "SLOW");
       // Normal settings navigation is another local pause that freezes every player.

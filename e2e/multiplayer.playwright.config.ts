@@ -47,6 +47,21 @@ export default defineConfig({
       },
     ],
   ],
+  // Opt-in replica journeys can be selected by viewport without doubling snapshot CI.
+  projects:
+    process.env.E2E_COOP_REPLICATION === "1"
+      ? [
+          { name: "desktop-chromium" },
+          {
+            name: "mobile-390px",
+            use: {
+              isMobile: true,
+              hasTouch: true,
+              viewport: { width: 390, height: 844 },
+            },
+          },
+        ]
+      : undefined,
   use: {
     launchOptions:
       require("../scripts/ci/browser-launch").browserLaunchOptions(),
