@@ -4,14 +4,17 @@ import { dialogClose, dialogOpen } from "../reducers/UI";
 
 export const HOST_WAITING_MESSAGE =
   "Waiting for the host. Reconnect if the connection was lost.";
+export const HOST_SYNCHRONIZING_MESSAGE = "Synchronizing with host…";
 
 /** A recovered connection releases only its own transient notice, never another game dialog. */
 export default function HostConnectionWarning({
   waiting,
+  synchronizing = false,
   onReconnect,
   onDisconnect,
 }: {
   waiting: boolean;
+  synchronizing?: boolean;
   onReconnect: () => void;
   /** Leaves the match, for a host that is not coming back. */
   onDisconnect: () => void;
@@ -19,7 +22,7 @@ export default function HostConnectionWarning({
   const dialog = useAppSelector((state) => state.ui.dialog);
   const ownedAction = useRef<() => void>();
   useEffect(() => {
-    if (!waiting) {
+    if (!waiting && !synchronizing) {
       if (
         ownedAction.current &&
         dialog.open &&
@@ -27,6 +30,16 @@ export default function HostConnectionWarning({
       )
         store.dispatch(dialogClose());
       ownedAction.current = undefined;
+      return;
+    }
+    const message = waiting ? HOST_WAITING_MESSAGE : HOST_SYNCHRONIZING_MESSAGE;
+    if (
+      ownedAction.current &&
+      dialog.open &&
+      dialog.action === ownedAction.current &&
+      dialog.message !== message
+    ) {
+      store.dispatch(dialogOpen({ ...dialog, message }));
       return;
     }
     // Do not replace another notification or reopen after the player dismissed this episode.
@@ -39,7 +52,7 @@ export default function HostConnectionWarning({
       dialogOpen({
         open: true,
         title: "Multiplayer",
-        message: HOST_WAITING_MESSAGE,
+        message,
         closeText: "OK",
         actionLabel: "Reconnect",
         action: ownedAction.current,
@@ -47,6 +60,6 @@ export default function HostConnectionWarning({
         secondaryAction: onDisconnect,
       }),
     );
-  }, [waiting, dialog, onReconnect, onDisconnect]);
+  }, [waiting, synchronizing, dialog, onReconnect, onDisconnect]);
   return null;
 }

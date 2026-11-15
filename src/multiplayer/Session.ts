@@ -14,7 +14,14 @@ import type {
   NativeRequest,
   PendingCampaign,
   SharedSaveLibrary,
+  WireMessage,
 } from "./Native";
+import type { ReplicaBaseline } from "./Replication";
+import type {
+  ReplicaProgress,
+  ReplicaRequest,
+  ReplicaResponse,
+} from "./ReplicaProtocol";
 import type { WorkerRequest, WorkerResponse } from "./WorkerProtocol";
 import {
   selectionKey,
@@ -112,6 +119,8 @@ export interface SessionState {
   pending: boolean;
   busy: boolean;
   waitingForHost: boolean;
+  /** A replica is receiving data or recovering; commands wait for a live local world. */
+  synchronizing?: boolean;
   error?: string;
   /** The scenario selection the lobby is browsing; the host authors it, guests follow it. */
   browse?: BrowseState;
@@ -133,6 +142,28 @@ export class MultiplayerSession {
   private libraryRequest = 0;
   private listeners = new Set<() => void>();
   private worker?: Worker;
+  private replica?: Worker;
+  private replicaOpening?: Promise<Worker | undefined>;
+  private replicaGeneration = 0;
+  private replicaQueue = Promise.resolve();
+  private replicaQueuedRecords = 0;
+  private replicaQueuedBytes = 0;
+  private replicaProgress?: ReplicaProgress;
+  private streamMode?: {
+    matchId: string;
+    epoch: string;
+    mode: "snapshot" | "replication";
+  };
+  private hostReplication = false;
+  private replicaDisconnected: string[] = [];
+  private replicationSends = new Map<string, Promise<unknown>>();
+  private pendingScenarioBaseline?: ReplicaBaseline;
+  private pendingScenarioRecords: Extract<
+    ReplicaRequest,
+    { kind: "records" }
+  >[] = [];
+  private replicaLive = false;
+  private lastReplicaResync = -Infinity;
   private stopEvents?: () => void;
   private pending?: CommandEnvelope;
   private completion?: { resolve: () => void; reject: (error: Error) => void };
@@ -170,6 +201,11 @@ export class MultiplayerSession {
   constructor(
     private bridge: DesktopBridge,
     private workerFactory: () => Promise<Worker>,
+    private replicaFactory?: () => Promise<Worker>,
+    private replicationEnabled = () =>
+      new URLSearchParams(globalThis.location?.search).get(
+        "coopReplication",
+      ) === "1",
   ) {}
   getSnapshot = () => this.state;
   subscribe = (listener: () => void) => {
@@ -213,7 +249,9 @@ export class MultiplayerSession {
         void this.request({
           kind: "send",
           to: this.state.lobby.hostId,
-          payload: { kind: "heartbeat" },
+          payload: this.replicaProgress
+            ? { kind: "progress", ...this.replicaProgress }
+            : { kind: "heartbeat" },
         }).catch(() => {});
       }
       if (this.pending && Date.now() - this.lastSend > COMMAND_RESEND_MS)
@@ -232,7 +270,7 @@ export class MultiplayerSession {
       )
         this.sendCampaign();
       const waitingForHost =
-        !!this.state.view &&
+        (!!this.state.view || !!this.state.synchronizing) &&
         !this.worker &&
         !this.closing &&
         Date.now() - this.lastHostMessage > HOST_SILENCE_MS;
@@ -276,10 +314,17 @@ export class MultiplayerSession {
         const now = new Set(event.state.connected);
         for (const id of this.connected)
           if (!now.has(id)) this.post({ kind: "disconnect", sender: id });
-        const joined = [...now].some((id) => !this.connected.has(id));
+        const joined = [...now].filter((id) => !this.connected.has(id));
         this.connected = now;
         // A reconnected client needs a fresh complete view, including paused command receipts.
-        if (joined) this.post({ kind: "checkpoint" });
+        if (joined.length) {
+          if (this.hostReplication)
+            for (const id of joined)
+              if (id !== this.state.lobby.selfId)
+                this.post({ kind: "baseline", to: id });
+              else this.post({ kind: "checkpoint" });
+        }
+        if (this.hostReplication) this.sendMembership();
       }
     } else if (event.kind === "disconnected") {
       if (this.worker) this.post({ kind: "disconnect", sender: event.sender });
@@ -292,6 +337,63 @@ export class MultiplayerSession {
           error: CONNECTION_LOST,
         });
     } else if (event.kind === "message") {
+      if (
+        this.worker &&
+        this.hostReplication &&
+        this.state.lobby.connected.includes(event.sender) &&
+        (event.payload.kind === "progress" || event.payload.kind === "resync")
+      ) {
+        this.post({ ...event.payload, sender: event.sender });
+        return;
+      }
+      if (
+        !this.worker &&
+        !this.closing &&
+        !!this.state.lobby.lobbyId &&
+        event.sender === this.state.lobby.hostId
+      ) {
+        const payload = event.payload;
+        if (payload.kind === "baseline") {
+          this.acceptBaseline(payload);
+          return;
+        }
+        if (payload.kind === "records") {
+          if (this.replicationStream(payload)) {
+            this.hostActivity();
+            if (this.pendingScenarioBaseline) {
+              this.pendingScenarioRecords.push(payload);
+              if (
+                this.pendingScenarioRecords.reduce(
+                  (sum, batch) => sum + batch.records.length,
+                  0,
+                ) > 1024 ||
+                new TextEncoder().encode(
+                  JSON.stringify(this.pendingScenarioRecords),
+                ).length >
+                  4 * 1024 * 1024
+              ) {
+                this.pendingScenarioRecords = [];
+                this.requestReplicaResync("Scenario loading buffer overflow");
+              }
+            } else this.toReplica(payload);
+          }
+          return;
+        }
+        if (payload.kind === "rejected") {
+          if (
+            this.replicationStream(payload) &&
+            this.pending?.sequence === payload.sequence
+          ) {
+            this.completion?.reject(new Error(payload.error));
+            this.completion = undefined;
+            this.pending = undefined;
+            this.sequence = this.state.view?.lastSequence ?? 0;
+            this.update({ pending: false, error: payload.error });
+            this.flushQueued();
+          }
+          return;
+        }
+      }
       if (this.worker && event.payload.kind === "save-request") {
         const requestId = event.payload.requestId;
         const respond = (error?: string) =>
@@ -372,9 +474,24 @@ export class MultiplayerSession {
         !!this.state.lobby.lobbyId &&
         event.sender === this.state.lobby.hostId &&
         event.payload.kind === "view"
-      )
-        this.acceptView(event.payload.view);
-      else if (
+      ) {
+        const view = event.payload.view;
+        if (
+          this.streamMode?.epoch === view.epoch &&
+          this.streamMode.matchId === view.matchId &&
+          this.streamMode.mode === "replication"
+        )
+          return;
+        if (this.acceptView(view)) {
+          this.stopReplica();
+          this.streamMode = {
+            matchId: view.matchId,
+            epoch: view.epoch,
+            mode: "snapshot",
+          };
+          this.update({ synchronizing: false });
+        }
+      } else if (
         !this.worker &&
         !this.closing &&
         !!this.state.lobby.lobbyId &&
@@ -384,14 +501,20 @@ export class MultiplayerSession {
         const { view } = this.state;
         const pulse = event.payload;
         if (
-          view &&
-          pulse.matchId === view.matchId &&
-          pulse.epoch === view.epoch &&
+          (view || this.replicationStream(pulse)) &&
+          pulse.matchId === (view?.matchId ?? this.streamMode?.matchId) &&
+          pulse.epoch === (view?.epoch ?? this.streamMode?.epoch) &&
           Number.isSafeInteger(pulse.revision) &&
-          pulse.revision >= view.revision
+          pulse.revision >= (view?.revision ?? 0)
         ) {
-          this.lastHostMessage = Date.now();
-          if (this.state.waitingForHost) this.update({ waitingForHost: false });
+          this.hostActivity();
+          if (pulse.disconnected) {
+            this.replicaDisconnected = [...pulse.disconnected];
+            if (view && this.streamMode?.mode === "replication")
+              this.update({
+                view: { ...view, disconnected: this.replicaDisconnected },
+              });
+          }
         }
       }
     }
@@ -485,6 +608,7 @@ export class MultiplayerSession {
     else this.sequence = Math.max(this.sequence, view.lastSequence);
     this.update({
       view,
+      ...(trustedWorker && this.replicaLive ? { synchronizing: false } : {}),
       pendingCampaign: undefined,
       waitingForHost: false,
       busy: false,
@@ -495,15 +619,264 @@ export class MultiplayerSession {
           : this.state.error,
     });
     this.flushActivity();
-    while (!this.pending && !this.closing && this.queued.length) {
-      const queued = this.queued.shift()!;
-      this.completion = queued;
-      this.sendCommand(queued.command);
-    }
+    this.flushQueued();
     if (completed) {
       if (view.receipt?.error) completed.reject(new Error(view.receipt.error));
       else completed.resolve();
     }
+    return true;
+  }
+  private flushQueued() {
+    while (
+      !this.pending &&
+      !this.closing &&
+      !this.state.synchronizing &&
+      this.queued.length
+    ) {
+      const queued = this.queued.shift()!;
+      this.completion = queued;
+      this.sendCommand(queued.command);
+    }
+  }
+  private hostActivity() {
+    this.lastHostMessage = Date.now();
+    if (this.state.waitingForHost) this.update({ waitingForHost: false });
+  }
+  private replicationStream(value: { matchId: string; epoch: string }) {
+    return (
+      this.streamMode?.mode === "replication" &&
+      this.streamMode.matchId === value.matchId &&
+      this.streamMode.epoch === value.epoch
+    );
+  }
+  private stopReplica() {
+    this.replicaGeneration++;
+    this.replica?.terminate();
+    this.replica = undefined;
+    this.replicaOpening = undefined;
+    this.replicaProgress = undefined;
+    this.replicaQueue = Promise.resolve();
+    this.replicaQueuedRecords = this.replicaQueuedBytes = 0;
+    this.pendingScenarioBaseline = undefined;
+    this.pendingScenarioRecords = [];
+    this.replicaLive = false;
+    this.replicaDisconnected = [];
+  }
+  private acceptBaseline(baseline: ReplicaBaseline) {
+    const mode = this.streamMode;
+    if (
+      mode?.epoch === baseline.epoch &&
+      mode.matchId === baseline.matchId &&
+      mode.mode === "snapshot"
+    )
+      return;
+    if (!this.replicationStream(baseline)) this.stopReplica();
+    this.streamMode = {
+      matchId: baseline.matchId,
+      epoch: baseline.epoch,
+      mode: "replication",
+    };
+    this.pendingScenarioBaseline = undefined;
+    this.pendingScenarioRecords = [];
+    this.hostActivity();
+    this.replicaLive = false;
+    this.replicaProgress = undefined;
+    this.update({ synchronizing: true });
+    const pinned =
+      this.state.scenarioSnapshot ??
+      (!this.state.browse?.mod ? this.receivedScenario?.scenario : undefined);
+    if (
+      (baseline.world.spec.customScenario?.mod || this.state.browse?.mod) &&
+      !pinned
+    ) {
+      this.pendingScenarioBaseline = baseline;
+      return;
+    }
+    this.toReplica({
+      kind: "baseline",
+      baseline,
+      seat: this.state.lobby.selfId!,
+      scenario: pinned,
+    });
+  }
+  private toReplica(request: ReplicaRequest) {
+    const generation = this.replicaGeneration;
+    const records = request.kind === "records" ? request.records.length : 0;
+    const bytes =
+      request.kind === "records"
+        ? new TextEncoder().encode(JSON.stringify(request)).length
+        : 0;
+    if (
+      !this.replica &&
+      (this.replicaQueuedRecords + records > 1024 ||
+        this.replicaQueuedBytes + bytes > 4 * 1024 * 1024)
+    ) {
+      this.requestReplicaResync("Replica loading buffer overflow");
+      return;
+    }
+    this.replicaQueuedRecords += records;
+    this.replicaQueuedBytes += bytes;
+    this.replicaQueue = this.replicaQueue
+      .then(async () => {
+        if (generation !== this.replicaGeneration) return;
+        if (!this.replicaOpening) {
+          this.replicaOpening = (async () => {
+            if (!this.replicaFactory)
+              throw new Error(
+                "Update the desktop game to synchronize this match",
+              );
+            const worker = await this.replicaFactory();
+            if (generation !== this.replicaGeneration) {
+              worker.terminate();
+              return;
+            }
+            this.replica = worker;
+            worker.onmessage = ({ data }: MessageEvent<ReplicaResponse>) => {
+              if (
+                generation !== this.replicaGeneration ||
+                this.replica !== worker
+              )
+                return;
+              if (data.kind === "views") {
+                const view = data.views[this.state.lobby.selfId!];
+                if (view && this.replicaLive && this.replicationStream(view)) {
+                  view.disconnected = [...this.replicaDisconnected];
+                  this.acceptView(view, true);
+                }
+                worker.postMessage({
+                  kind: "views-applied",
+                } satisfies ReplicaRequest);
+              } else if (data.kind === "progress") {
+                if (!this.replicationStream(data)) return;
+                const { matchId, epoch, applied, verified } = data;
+                this.replicaProgress =
+                  data.state === "live"
+                    ? { matchId, epoch, applied, verified }
+                    : undefined;
+                this.replicaLive = data.state === "live";
+                this.update({
+                  synchronizing:
+                    data.state !== "live" || !!this.state.synchronizing,
+                  ...(data.error ? { error: data.error } : {}),
+                });
+              } else {
+                this.replicaLive = false;
+                this.update({ synchronizing: true });
+                this.requestReplicaResync(data.reason);
+              }
+            };
+            worker.onerror = () => {
+              if (generation !== this.replicaGeneration) return;
+              this.replicaLive = false;
+              this.replicaProgress = undefined;
+              this.update({
+                synchronizing: true,
+                error: "The replica worker stopped. Reconnect to synchronize.",
+              });
+            };
+            return worker;
+          })();
+        }
+        const worker = await this.replicaOpening;
+        if (generation === this.replicaGeneration) {
+          this.replicaQueuedRecords -= records;
+          this.replicaQueuedBytes -= bytes;
+          worker?.postMessage(request);
+        }
+      })
+      .catch((error: Error) => {
+        if (generation === this.replicaGeneration)
+          this.update({ synchronizing: true, error: error.message });
+      });
+  }
+  private requestReplicaResync(reason: string) {
+    if (!this.streamMode || Date.now() - this.lastReplicaResync < 2000) return;
+    this.lastReplicaResync = Date.now();
+    void this.request({
+      kind: "send",
+      to: this.state.lobby.hostId!,
+      payload: {
+        kind: "resync",
+        matchId: this.streamMode.matchId,
+        epoch: this.streamMode.epoch,
+        applied: this.replicaProgress?.applied ?? 0,
+        reason,
+      },
+    }).catch(() => undefined);
+  }
+  private disconnectedSeats() {
+    return (
+      this.state.view?.grids
+        .filter(
+          (grid) =>
+            !grid.retired &&
+            grid.seat.id !== this.state.lobby.selfId &&
+            !this.state.lobby.connected.includes(grid.seat.id),
+        )
+        .map((grid) => grid.seat.id) ?? []
+    );
+  }
+  private sendMembership() {
+    if (!this.hostReplication || !this.state.view) return;
+    this.post({
+      kind: "replica-peers",
+      connected: [...this.state.lobby.connected],
+    });
+    const { matchId, epoch, revision } = this.state.view;
+    for (const id of this.state.lobby.connected)
+      if (id !== this.state.lobby.selfId)
+        this.sendReplication(id, {
+          kind: "keepalive",
+          matchId,
+          epoch,
+          revision,
+          disconnected: this.disconnectedSeats(),
+        });
+  }
+  /** The shell's scenario send participates in the same order as all subsequent replica traffic. */
+  private sendReplication(to: string, payload: WireMessage) {
+    const generation = this.startGeneration;
+    const send = (this.replicationSends.get(to) ?? Promise.resolve())
+      .catch(() => undefined)
+      .then(async () => {
+        if (
+          generation !== this.startGeneration ||
+          !this.hostReplication ||
+          !this.state.lobby.connected.includes(to)
+        )
+          return;
+        if (payload.kind === "baseline") {
+          const scenario = payload.world.spec.customScenario;
+          const digest = scenario?.mod?.runtimeDigest;
+          if (digest && scenario && this.outboundScenario.get(to) !== digest) {
+            const summary = modBrowseSummary(scenario);
+            const key = selectionKey({
+              session: "match",
+              revision: 0,
+              phase: "playing",
+              card: "MODS",
+              difficulty: summary.difficulty,
+              mod: summary,
+            });
+            await this.request({
+              kind: "send",
+              to,
+              payload: { kind: "scenario", selectionKey: key, scenario },
+            });
+            this.outboundScenario.set(to, digest);
+          }
+        }
+        await this.request({ kind: "send", to, payload });
+      });
+    this.replicationSends.set(to, send);
+    void send.catch(() => {
+      if (
+        generation === this.startGeneration &&
+        this.hostReplication &&
+        this.state.lobby.connected.includes(to)
+      )
+        this.post({ kind: "baseline", to });
+    });
   }
   /** Menu transitions cannot be dropped while a purchase or another command is in flight. */
   setActivity(reason: string | null) {
@@ -524,6 +897,7 @@ export class MultiplayerSession {
       own &&
       (own.pauseReason ?? null) !== this.activity &&
       !this.pending &&
+      !this.state.synchronizing &&
       !this.closing
     )
       this.sendCommand({ kind: "activity", reason: this.activity });
@@ -584,6 +958,8 @@ export class MultiplayerSession {
         },
       };
     }
+    if (this.state.synchronizing)
+      return Promise.reject(new Error("Synchronizing with host…"));
     if (!this.state.view || this.closing)
       return Promise.reject(new Error("No shared game is running"));
     if (this.queued.length >= MAX_QUEUED_COMMANDS)
@@ -600,7 +976,8 @@ export class MultiplayerSession {
   }
   private sendCommand(command: Command) {
     const { view } = this.state;
-    if (!view || this.pending || this.closing) return;
+    if (!view || this.pending || this.closing || this.state.synchronizing)
+      return;
     if (command.kind === "ready" && view.disconnected.length) {
       const error = new Error("Wait for every player to reconnect");
       this.completion?.reject(error);
@@ -881,6 +1258,7 @@ export class MultiplayerSession {
         return;
       }
       this.worker = worker;
+      this.hostReplication = this.replicationEnabled();
       this.connected = new Set(this.state.lobby.connected);
       this.worker.onmessage = ({ data }: MessageEvent<WorkerResponse>) => {
         if (!current() || this.worker !== worker) return;
@@ -909,12 +1287,40 @@ export class MultiplayerSession {
           return;
         }
         if (data.kind === "summary") return;
+        if (data.kind === "records") {
+          for (const id of this.state.lobby.connected)
+            if (id !== this.state.lobby.selfId) this.sendReplication(id, data);
+          return;
+        }
+        if (data.kind === "baseline") {
+          this.sendReplication(data.to, { kind: "baseline", ...data.baseline });
+          return;
+        }
+        if (data.kind === "rejected") {
+          const { to, ...payload } = data;
+          if (
+            to === this.state.lobby.selfId &&
+            this.pending?.sequence === payload.sequence
+          ) {
+            this.completion?.reject(new Error(payload.error));
+            this.completion = undefined;
+            this.pending = undefined;
+            this.sequence = this.state.view?.lastSequence ?? 0;
+            this.update({ pending: false, error: payload.error });
+            this.flushQueued();
+          } else this.sendReplication(to, payload);
+          return;
+        }
         if (data.kind === "keepalive") {
           for (const id of this.state.lobby.connected)
             if (id !== this.state.lobby.selfId)
-              void this.request({ kind: "send", to: id, payload: data }).catch(
-                () => this.post({ kind: "disconnect", sender: id }),
-              );
+              void this.request({
+                kind: "send",
+                to: id,
+                payload: this.hostReplication
+                  ? { ...data, disconnected: this.disconnectedSeats() }
+                  : data,
+              }).catch(() => this.post({ kind: "disconnect", sender: id }));
           return;
         }
         if (data.kind !== "views") return;
@@ -930,6 +1336,11 @@ export class MultiplayerSession {
           if (id === this.state.lobby.selfId) {
             receivedView = true;
             this.acceptView(view, true);
+            if (this.hostReplication)
+              this.post({
+                kind: "replica-peers",
+                connected: [...this.state.lobby.connected],
+              });
           } else if (this.state.lobby.connected.includes(id)) {
             const scenario = view.game?.customScenario;
             const digest = scenario?.mod?.runtimeDigest;
@@ -994,13 +1405,24 @@ export class MultiplayerSession {
       const epoch = crypto.randomUUID();
       this.post(
         world
-          ? { kind: "restore", world, epoch, seats }
+          ? {
+              kind: "restore",
+              world,
+              epoch,
+              seats,
+              ...(this.hostReplication
+                ? { replication: true, hostSeat: this.state.lobby.selfId }
+                : {}),
+            }
           : {
               kind: "create",
               spec: (choice as { spec: MatchSpec }).spec,
               seats,
               matchId: crypto.randomUUID(),
               epoch,
+              ...(this.hostReplication
+                ? { replication: true, hostSeat: this.state.lobby.selfId }
+                : {}),
             },
       );
     } catch (error) {
@@ -1097,6 +1519,10 @@ export class MultiplayerSession {
     this.startGeneration++;
     this.worker?.terminate();
     this.worker = undefined;
+    this.stopReplica();
+    this.streamMode = undefined;
+    this.hostReplication = false;
+    this.replicationSends.clear();
     this.pending = undefined;
     this.completion?.reject(new Error("You left the shared game"));
     this.queued.forEach((q) => q.reject(new Error("You left the shared game")));
@@ -1138,6 +1564,7 @@ export class MultiplayerSession {
         pending: false,
         busy: false,
         waitingForHost: false,
+        synchronizing: false,
       });
       this.closing = false;
     }
@@ -1319,6 +1746,18 @@ export class MultiplayerSession {
       this.pendingScenarioView = undefined;
       this.acceptView(pending);
     }
+    const baseline = this.pendingScenarioBaseline;
+    if (
+      baseline &&
+      baseline.world.spec.customScenario?.mod?.runtimeDigest ===
+        detached.mod?.runtimeDigest
+    ) {
+      const records = this.pendingScenarioRecords;
+      this.pendingScenarioBaseline = undefined;
+      this.pendingScenarioRecords = [];
+      this.acceptBaseline(baseline);
+      records.forEach((batch) => this.toReplica(batch));
+    }
   }
   /** Marks Ready for exactly this selection; any later change by the host clears it. */
   async setReady(key: string) {
@@ -1352,6 +1791,10 @@ export class MultiplayerSession {
     }
   }
   private endLocalMatch() {
+    this.stopReplica();
+    this.streamMode = undefined;
+    this.hostReplication = false;
+    this.replicationSends.clear();
     this.receivedScenario = undefined;
     this.pendingScenarioView = undefined;
     this.outboundScenario.clear();
@@ -1371,9 +1814,14 @@ export class MultiplayerSession {
       pending: false,
       busy: false,
       waitingForHost: false,
+      synchronizing: false,
     });
   }
   dispose() {
+    this.stopReplica();
+    this.streamMode = undefined;
+    this.hostReplication = false;
+    this.replicationSends.clear();
     this.receivedScenario = undefined;
     this.pendingScenarioView = undefined;
     this.outboundScenario.clear();

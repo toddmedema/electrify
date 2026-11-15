@@ -1,4 +1,5 @@
 import type { ReplicaBaseline, ReplicaRecord } from "./Replication";
+import type { HostReplicationRequest } from "./ReplicaProtocol";
 import type {
   CommandEnvelope,
   MatchSpec,
@@ -7,6 +8,8 @@ import type {
   World,
 } from "./Types";
 export type WorkerRequest =
+  | HostReplicationRequest
+  | { kind: "replica-peers"; connected: string[] }
   | { kind: "heartbeat" }
   /** The shell consumed the previous view bundle; allow the newest projection to follow. */
   | { kind: "views-applied" }

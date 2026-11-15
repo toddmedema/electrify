@@ -1,6 +1,8 @@
 import type { ScenarioType } from "../Types";
 import type { BrowseState } from "./Browse";
 import type { CommandEnvelope, RoomView, Seat, World } from "./Types";
+import type { ReplicaBaseline, ReplicaRecord } from "./Replication";
+import type { ReplicaProgress } from "./ReplicaProtocol";
 /** A lobby member, with the selection they last marked Ready for (see selectionKey). */
 export interface LobbyMember extends Seat {
   ready?: string;
@@ -40,7 +42,36 @@ export interface PendingCampaign {
 }
 export type WireMessage =
   | { kind: "heartbeat" }
-  | { kind: "keepalive"; matchId: string; epoch: string; revision: number }
+  | {
+      kind: "keepalive";
+      matchId: string;
+      epoch: string;
+      revision: number;
+      disconnected?: string[];
+    }
+  | ({ kind: "baseline" } & ReplicaBaseline)
+  | {
+      kind: "records";
+      matchId: string;
+      epoch: string;
+      from: number;
+      records: ReplicaRecord[];
+    }
+  | {
+      kind: "rejected";
+      matchId: string;
+      epoch: string;
+      sequence: number;
+      error: string;
+    }
+  | ({ kind: "progress" } & ReplicaProgress)
+  | {
+      kind: "resync";
+      matchId: string;
+      epoch: string;
+      applied: number;
+      reason: string;
+    }
   | { kind: "view"; view: RoomView }
   | { kind: "save-request"; requestId: string; suspended?: boolean }
   | { kind: "save-result"; requestId: string; error?: string }
