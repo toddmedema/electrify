@@ -961,19 +961,23 @@ test("unchanged checkpoints skip only connected peers that confirmed their queue
     await mp.checkpoint(world);
     await mp.receive(first.id, { kind: "saved", digest: "first" });
     const confirmedAt = mp.sharedAt;
-    first.queue = [];
-    second.queue = [];
+    first.checkpointQueue = [];
+    second.checkpointQueue = [];
     await mp.checkpoint(world);
     assert.equal(writes, 2, "host still persists every request");
-    assert.equal(first.queue.length, 0);
-    assert.equal(second.queue.length, 1, "unacknowledged peers retry");
+    assert.equal(first.checkpointQueue.length, 0);
+    assert.equal(
+      second.checkpointQueue.length,
+      1,
+      "unacknowledged peers retry",
+    );
     assert.equal(mp.sharedAt, confirmedAt, "no invented remote save time");
 
-    first.queue = [];
-    second.queue = [];
+    first.checkpointQueue = [];
+    second.checkpointQueue = [];
     await mp.checkpoint({ digest: "changed" });
-    assert.equal(first.queue.length, 1);
-    assert.equal(second.queue.length, 1);
+    assert.equal(first.checkpointQueue.length, 1);
+    assert.equal(second.checkpointQueue.length, 1);
     assert.equal(first.savedDigest, undefined);
     await mp.receive(first.id, { kind: "saved", digest: "first" });
     assert.equal(
@@ -994,12 +998,12 @@ test("unchanged checkpoints skip only connected peers that confirmed their queue
     mp.connections.set(100, { id: first.id, connected: true, queue: [] });
     await mp.checkpoint({ digest: "changed" });
     assert.equal(
-      mp.connections.get(100).queue.length,
+      mp.connections.get(100).checkpointQueue?.length || 0,
       1,
       "reconnect needs its own copy",
     );
 
-    const queued = second.queue.length;
+    const queued = second.checkpointQueue.length;
     mp.persist = async () => {
       throw new Error("disk unavailable");
     };
@@ -1008,7 +1012,7 @@ test("unchanged checkpoints skip only connected peers that confirmed their queue
       /disk unavailable/,
     );
     assert.equal(
-      second.queue.length,
+      second.checkpointQueue.length,
       queued,
       "failed host writes never publish",
     );
@@ -1058,9 +1062,15 @@ test("checkpoints persist real files and discard older compression that finishes
     encoding[0].finish();
     await first;
     compression.mock.restore();
-    assert.equal(guest.queue.length, 1, "obsolete compression cannot enqueue");
+    assert.equal(
+      guest.checkpointQueue?.length || 0,
+      1,
+      "obsolete compression cannot enqueue",
+    );
     const messages = await Promise.all(
-      guest.queue.map((message) => assemble(new Map(), chunk(message))),
+      guest.checkpointQueue.map((message) =>
+        assemble(new Map(), chunk(message)),
+      ),
     );
     assert.deepEqual(
       messages.map((message) => message.world.revision),
@@ -1074,15 +1084,16 @@ test("checkpoints persist real files and discard older compression that finishes
     await mp.receive(guest.id, { kind: "saved", digest: messages[0].digest });
     assert.equal(guest.savedDigest, messages[0].digest);
     assert.equal(mp.sharedAt, mp.checkpointAt);
-    guest.queue = [];
+    guest.checkpointQueue = [];
     await mp.checkpoint({ ...world, revision: 2 });
-    assert.equal(guest.queue.length, 0);
+    assert.equal(guest.checkpointQueue?.length || 0, 0);
 
     // Exercise the actual guest persistence path, including a failed write and retry.
     mp.hostId = guest.id;
     const savedFilename = mp.saves.filename;
     mp.saves.filename = directory; // Writing a library over this directory must fail.
-    await assert.rejects(mp.receive(guest.id, messages[0]));
+    await mp.receive(guest.id, messages[0]);
+    await mp.checkpointWrite;
     assert.equal(
       guest.queue.length,
       0,
@@ -1090,6 +1101,7 @@ test("checkpoints persist real files and discard older compression that finishes
     );
     mp.saves.filename = savedFilename;
     await mp.receive(guest.id, messages[0]);
+    await mp.checkpointWrite;
     assert.equal(
       stringify(await mp.saves.select()),
       stringify(messages[0].world),
@@ -1269,4 +1281,535 @@ test("guest sleep checkpoint requests carry only a validated boolean safety flag
   } finally {
     mp.dispose();
   }
+});
+
+const replicationIdentity = { matchId: "match", epoch: "epoch" };
+function replicationBaseline(index = 0) {
+  return {
+    kind: "baseline",
+    ...replicationIdentity,
+    index,
+    world: { ...replicationIdentity },
+    blockers: [],
+  };
+}
+function replicationRecords(records = [{ t: "verify" }]) {
+  return { kind: "records", ...replicationIdentity, from: 1, records };
+}
+function connectedPeer(mp, id = "76561198000000002") {
+  const peer = {
+    id,
+    connected: true,
+    lastHeartbeat: performance.now(),
+    queue: [],
+    incoming: new Map(),
+  };
+  mp.connections.set(100, peer);
+  return peer;
+}
+
+test("replication baseline compression cannot be overtaken by records or rejections", async (t) => {
+  const { mp } = fixture();
+  clearInterval(mp.timer);
+  t.after(() => mp.dispose());
+  const peer = connectedPeer(mp);
+  const encoding = [];
+  const started = [Promise.withResolvers(), Promise.withResolvers()];
+  t.mock.method(
+    mp,
+    "encodeBaseline",
+    (payload) =>
+      new Promise((resolve) => {
+        encoding.push(() => resolve(encode(payload)));
+        started[encoding.length - 1].resolve();
+      }),
+  );
+  const baseline = mp.send(peer.id, replicationBaseline());
+  const records = mp.send(peer.id, replicationRecords());
+  const rejected = mp.send(peer.id, {
+    kind: "rejected",
+    ...replicationIdentity,
+    sequence: 3,
+    error: "Sequence gap",
+  });
+  const nextBaseline = mp.send(peer.id, replicationBaseline(1));
+  await started[0].promise;
+  assert.deepEqual(peer.queue, []);
+  assert.equal(encoding.length, 1);
+  encoding[0]();
+  await Promise.all([baseline, records, rejected, started[1].promise]);
+  assert.deepEqual(
+    peer.queue.map((message) => message.kind),
+    ["baseline", "records", "rejected"],
+  );
+  encoding[1]();
+  await nextBaseline;
+  assert.deepEqual(
+    peer.queue.map((message) => message.kind),
+    ["baseline", "records", "rejected", "baseline"],
+  );
+  const decoded = await Promise.all(
+    peer.queue.map((message) => assemble(new Map(), chunk(message))),
+  );
+  assert.equal(decoded[0].index, 0);
+  assert.equal(decoded[3].index, 1);
+});
+
+test("replication encoding failures allow recovery and cannot enter a replacement connection", async (t) => {
+  const { mp } = fixture();
+  clearInterval(mp.timer);
+  t.after(() => mp.dispose());
+  const peer = connectedPeer(mp);
+  const encoding = Promise.withResolvers();
+  const started = Promise.withResolvers();
+  t.mock.method(mp, "encodeBaseline", () => {
+    started.resolve();
+    return encoding.promise;
+  });
+  const pending = mp.send(peer.id, replicationBaseline());
+  const failure = assert.rejects(pending, /disconnected/);
+  await started.promise;
+  const replacement = {
+    ...peer,
+    queue: [],
+    encodeChain: undefined,
+    encodingCount: 0,
+  };
+  mp.connections.set(100, replacement);
+  encoding.resolve(encode(replicationBaseline()));
+  await failure;
+  assert.deepEqual(replacement.queue, []);
+  mp.encodeBaseline = async () => {
+    throw new Error("compression failed");
+  };
+  await assert.rejects(
+    mp.send(peer.id, replicationBaseline()),
+    /compression failed/,
+  );
+  await mp.send(peer.id, replicationRecords());
+  assert.deepEqual(
+    replacement.queue.map((message) => message.kind),
+    ["records"],
+  );
+});
+
+test("pending replication encodes share the 64-message backpressure budget", async (t) => {
+  const { mp } = fixture();
+  clearInterval(mp.timer);
+  t.after(() => mp.dispose());
+  const peer = connectedPeer(mp);
+  const encoding = Promise.withResolvers();
+  t.mock.method(mp, "encodeBaseline", () => encoding.promise);
+  const requests = [mp.send(peer.id, replicationBaseline())];
+  for (let i = 1; i < 64; i++)
+    requests.push(mp.send(peer.id, replicationRecords()));
+  assert.throws(() => mp.send(peer.id, replicationRecords()), /catching up/);
+  encoding.resolve(encode(replicationBaseline()));
+  await Promise.all(requests);
+  assert.equal(peer.queue.length, 64);
+  assert.equal(peer.encodingCount, 0);
+});
+
+test("checkpoint chunks yield to records and each pump sends at most eight frames", async (t) => {
+  const { mp, api } = fixture();
+  clearInterval(mp.timer);
+  t.after(() => mp.dispose());
+  mp.lastRefresh = Date.now();
+  const peer = connectedPeer(mp);
+  const sent = [];
+  api.receive = () => 0;
+  api.send = (_sockets, _handle, bytes) => {
+    sent.push(bytes);
+    return 1;
+  };
+  const checkpoint = {
+    kind: "checkpoint",
+    world: {
+      data: require("node:crypto").randomBytes(400000).toString("base64"),
+    },
+  };
+  mp.send(peer.id, checkpoint);
+  mp.pump();
+  assert.equal(sent.length, 8);
+  assert.equal(peer.checkpointQueue[0].offset, 8);
+  await mp.send(peer.id, replicationRecords());
+  const recordId = peer.queue[0].id;
+  mp.pump();
+  assert(
+    sent[8].subarray(4, 12).equals(recordId),
+    "records pass a partially sent checkpoint",
+  );
+  assert(sent.length <= 16);
+  assert.equal(peer.queue.length, 0);
+});
+
+test("native send backpressure stops a pump without advancing or dropping the connection", (t) => {
+  const { mp, api, calls } = fixture();
+  clearInterval(mp.timer);
+  t.after(() => mp.dispose());
+  mp.lastRefresh = Date.now();
+  const peer = connectedPeer(mp);
+  api.receive = () => 0;
+  let attempts = 0;
+  api.send = () => {
+    attempts++;
+    return 25;
+  };
+  mp.send(peer.id, { kind: "heartbeat" });
+  mp.pump();
+  assert.equal(attempts, 1);
+  assert.equal(peer.queue[0].offset, 0);
+  assert(!calls.some(([name]) => name === "close"));
+  api.send = () => 1;
+  mp.pump();
+  assert.equal(peer.queue.length, 0);
+});
+
+test("slow checkpoint storage does not delay ordered records and only keeps the newest pending write", async (t) => {
+  const { mp, api, events } = fixture();
+  clearInterval(mp.timer);
+  t.after(() => mp.dispose());
+  mp.hostId = "76561198000000002";
+  const checkpoints = [1, 2, 3].map((revision) => {
+    const world = { ...replicationIdentity, revision };
+    return {
+      kind: "checkpoint",
+      world,
+      digest: require("node:crypto")
+        .createHash("sha256")
+        .update(stringify(world))
+        .digest("hex"),
+    };
+  });
+  const firstWrite = Promise.withResolvers();
+  const started = Promise.withResolvers();
+  const writes = [];
+  t.mock.method(mp, "persist", async (world) => {
+    writes.push(world.revision);
+    if (world.revision === 1) {
+      started.resolve();
+      await firstWrite.promise;
+    }
+    mp.savedAt = world.revision;
+    return checkpoints[world.revision - 1].digest;
+  });
+  const frames = [
+    ...framesFor(encode(checkpoints[0])),
+    ...framesFor(encode(replicationRecords())),
+  ];
+  const { connection } = pumpFrames(mp, api, frames);
+  const delivered = Promise.withResolvers();
+  mp.emit = (event) => {
+    events.push(event);
+    if (event.payload?.kind === "records") delivered.resolve();
+  };
+  mp.pump();
+  await started.promise;
+  await delivered.promise;
+  assert.deepEqual(writes, [1]);
+  assert.equal(
+    connection.queue.length,
+    0,
+    "an unfinished disk write has no saved receipt",
+  );
+  await mp.receive(mp.hostId, checkpoints[1]);
+  await mp.receive(mp.hostId, checkpoints[2]);
+  firstWrite.resolve();
+  await mp.checkpointWrite;
+  assert.deepEqual(writes, [1, 3]);
+  const receipts = await Promise.all(
+    connection.queue.map((message) => assemble(new Map(), chunk(message))),
+  );
+  assert.deepEqual(
+    receipts.map((message) => message.digest),
+    [checkpoints[0].digest, checkpoints[2].digest],
+  );
+});
+
+test("checkpoint completion never acknowledges a departed connection or a failed disk write", async (t) => {
+  const { mp } = fixture();
+  clearInterval(mp.timer);
+  t.after(() => mp.dispose());
+  mp.hostId = "76561198000000002";
+  const peer = connectedPeer(mp, mp.hostId);
+  const world = { revision: 1 };
+  const payload = {
+    kind: "checkpoint",
+    world,
+    digest: require("node:crypto")
+      .createHash("sha256")
+      .update(stringify(world))
+      .digest("hex"),
+  };
+  const disk = Promise.withResolvers();
+  t.mock.method(mp, "persist", () => disk.promise);
+  await mp.receive(mp.hostId, payload);
+  const replacement = { ...peer, queue: [] };
+  mp.connections.set(100, replacement);
+  disk.resolve(payload.digest);
+  await mp.checkpointWrite;
+  assert.deepEqual(replacement.queue, []);
+  assert.equal(mp.sharedAt, null);
+  mp.persist = async () => {
+    throw new Error("disk unavailable");
+  };
+  await mp.receive(mp.hostId, payload);
+  await mp.checkpointWrite;
+  assert.deepEqual(replacement.queue, []);
+  await assert.rejects(
+    mp.receive(mp.hostId, { ...payload, digest: "wrong" }),
+    /checksum/,
+  );
+});
+
+test("progress updates native liveness and is delivered only from a connected guest", async (t) => {
+  const { mp, events } = fixture();
+  clearInterval(mp.timer);
+  t.after(() => mp.dispose());
+  const peer = connectedPeer(mp);
+  peer.lastHeartbeat = 0;
+  const payload = {
+    kind: "progress",
+    ...replicationIdentity,
+    applied: 3,
+    verified: { index: 2, hash: "a".repeat(64) },
+  };
+  await mp.receive(peer.id, payload);
+  assert(peer.lastHeartbeat > 0);
+  assert.deepEqual(events.at(-1), {
+    kind: "message",
+    sender: peer.id,
+    payload,
+  });
+  peer.connected = false;
+  await assert.rejects(mp.receive(peer.id, payload), /sender/);
+  peer.connected = true;
+  const resync = {
+    kind: "resync",
+    ...replicationIdentity,
+    applied: 3,
+    reason: "Gap",
+  };
+  await mp.receive(peer.id, resync);
+  assert.equal(events.at(-1).payload.kind, "resync");
+  mp.hostId = peer.id;
+  await assert.rejects(mp.receive(peer.id, payload), /sender/);
+  await assert.rejects(mp.receive(peer.id, resync), /sender/);
+});
+
+test("replication host messages enforce direction and round-trip each valid record shape", async (t) => {
+  const { mp, events } = fixture();
+  clearInterval(mp.timer);
+  t.after(() => mp.dispose());
+  const peer = connectedPeer(mp);
+  const records = replicationRecords([
+    {
+      t: "command",
+      seat: peer.id,
+      envelope: {
+        ...replicationIdentity,
+        sequence: 1,
+        command: { kind: "rate", value: 0.2 },
+      },
+      allowReady: true,
+      revision: 1,
+    },
+    { t: "step", n: 10000, revision: 10001 },
+    { t: "pause", reason: "Synchronizing Player" },
+    { t: "blockers", reasons: ["Waiting for Player to catch up"] },
+    { t: "verify" },
+    { t: "fault", message: "Stopped" },
+  ]);
+  const rejected = {
+    kind: "rejected",
+    ...replicationIdentity,
+    sequence: 1,
+    error: "Sequence gap",
+  };
+  for (const payload of [records, replicationBaseline(), rejected]) {
+    await assert.rejects(mp.receive(peer.id, payload), /sender/);
+    mp.hostId = peer.id;
+    await assert.rejects(mp.receive("76561198000000003", payload), /sender/);
+    const decoded = await roundTrip(payload);
+    await mp.receive(peer.id, decoded);
+    assert.deepEqual(events.at(-1).payload, payload);
+    mp.hostId = mp.service.identity.steamId;
+  }
+  mp.hostId = peer.id;
+  const keepalive = {
+    kind: "keepalive",
+    ...replicationIdentity,
+    revision: 1,
+    disconnected: [mp.service.identity.steamId],
+  };
+  await mp.receive(peer.id, keepalive);
+  assert.deepEqual(events.at(-1).payload.disconnected, [
+    mp.service.identity.steamId,
+  ]);
+  await assert.rejects(
+    mp.receive(peer.id, { ...keepalive, disconnected: ["not-a-seat"] }),
+    /disconnected/,
+  );
+});
+
+test("replication message bounds reject malformed neighbors before encoding and delivery", async (t) => {
+  const { mp, events } = fixture();
+  clearInterval(mp.timer);
+  t.after(() => mp.dispose());
+  const peer = connectedPeer(mp);
+  const invalid = [
+    { ...replicationRecords(), from: 0 },
+    { ...replicationRecords(), from: Number.MAX_SAFE_INTEGER + 1 },
+    replicationRecords([]),
+    replicationRecords(Array(1)),
+    replicationRecords(Array.from({ length: 257 }, () => ({ t: "verify" }))),
+    replicationRecords([{ t: "step", n: 0, revision: 1 }]),
+    replicationRecords([{ t: "step", n: 10001, revision: 1 }]),
+    replicationRecords([{ t: "step", n: 1, revision: NaN }]),
+    replicationRecords([
+      {
+        t: "command",
+        seat: peer.id,
+        envelope: {
+          ...replicationIdentity,
+          sequence: 1,
+          command: { kind: "pause" },
+        },
+        revision: 1,
+      },
+    ]),
+    replicationRecords([
+      {
+        t: "command",
+        seat: peer.id,
+        envelope: {
+          ...replicationIdentity,
+          sequence: 0,
+          command: { kind: "pause" },
+        },
+        allowReady: false,
+        revision: 1,
+      },
+    ]),
+    replicationRecords([{ t: "blockers", reasons: [3] }]),
+    replicationRecords([{ t: "unknown" }]),
+    replicationRecords(
+      Array.from({ length: 40 }, () => ({
+        t: "pause",
+        reason: "x".repeat(2048),
+      })),
+    ),
+    { ...replicationBaseline(), index: -1 },
+    { ...replicationBaseline(), epoch: "other" },
+    { ...replicationBaseline(), blockers: "blocked" },
+    { kind: "rejected", ...replicationIdentity, sequence: 0, error: "No" },
+    { kind: "rejected", ...replicationIdentity, sequence: 1, error: "" },
+    { kind: "progress", ...replicationIdentity, applied: -1 },
+    {
+      kind: "progress",
+      ...replicationIdentity,
+      applied: 1,
+      verified: { index: 2, hash: "a".repeat(64) },
+    },
+    {
+      kind: "progress",
+      ...replicationIdentity,
+      applied: 1,
+      verified: { index: 1, hash: "bad" },
+    },
+    {
+      kind: "progress",
+      ...replicationIdentity,
+      applied: 1,
+      extra: "x".repeat(4096),
+    },
+    { kind: "resync", ...replicationIdentity, applied: 0, reason: "" },
+  ];
+  for (const payload of invalid) {
+    assert.throws(() => encode(payload), /Invalid co-op/);
+    await assert.rejects(mp.receive(peer.id, payload), /Invalid co-op/);
+  }
+  assert.equal(events.length, 0);
+  const boundary = replicationRecords(
+    Array.from({ length: 256 }, () => ({ t: "verify" })),
+  );
+  assert.deepEqual(await roundTrip(boundary), boundary);
+});
+
+test("oversized record inflation fails before delivering a message", async () => {
+  const json = JSON.stringify(
+    replicationRecords(
+      Array.from({ length: 40 }, () => ({
+        t: "pause",
+        reason: "x".repeat(2048),
+      })),
+    ),
+  );
+  const forged = rawMessage(json, "ELM2");
+  let completion;
+  const incoming = new Map();
+  for (const frame of framesFor(forged))
+    completion = assemble(incoming, frame) || completion;
+  await assert.rejects(completion, /decompression limit/);
+});
+
+test("an eight-message pump burst stays within the four-transfer inflate budget", async (t) => {
+  const { mp, api, events } = fixture();
+  clearInterval(mp.timer);
+  t.after(() => mp.dispose());
+  mp.hostId = "76561198000000002";
+  const payloads = Array.from({ length: 8 }, (_, i) => ({
+    ...replicationRecords(),
+    from: i + 1,
+  }));
+  const { connection, released } = pumpFrames(
+    mp,
+    api,
+    payloads.flatMap((payload) => framesFor(encode(payload))),
+  );
+  const delivered = Promise.withResolvers();
+  mp.emit = (event) => {
+    events.push(event);
+    if (events.filter((event) => event.kind === "message").length === 8)
+      delivered.resolve();
+  };
+  mp.pump();
+  assert.equal(connection.incoming.size, 4);
+  assert.equal(connection.pendingFrames.length, 4);
+  assert.equal(released.length, 8);
+  await delivered.promise;
+  assert.equal(mp.connections.get(100), connection);
+  assert.deepEqual(
+    events
+      .filter((event) => event.kind === "message")
+      .map((event) => event.payload.from),
+    [1, 2, 3, 4, 5, 6, 7, 8],
+  );
+});
+
+test("a receive burst exceeding the bounded deferred-frame backlog drops the connection", async (t) => {
+  const { mp, api } = fixture();
+  clearInterval(mp.timer);
+  t.after(() => mp.dispose());
+  mp.hostId = "76561198000000002";
+  const frames = Array.from(
+    { length: 16 },
+    (_, i) => framesFor(encode({ ...replicationRecords(), from: i + 1 }))[0],
+  );
+  const { connection, released } = pumpFrames(mp, api, frames);
+  api.receive = (_sockets, _handle, pointers) => {
+    frames.forEach((_frame, i) =>
+      pointers.writeBigUInt64LE(BigInt(i + 1), i * 8),
+    );
+    return frames.length;
+  };
+  // Stay in this macrotask so active inflaters cannot complete between synthetic polls.
+  for (let i = 0; i < 4; i++) mp.pump();
+  assert.equal(mp.connections.get(100), connection);
+  assert.equal(connection.pendingFrames.length, 60);
+  mp.pump();
+  assert.equal(mp.connections.has(100), false);
+  assert.equal(connection.pendingFrames.length, 0);
+  assert.equal(released.length, 80);
+  await connection.delivery;
 });

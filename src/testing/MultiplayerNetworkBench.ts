@@ -122,14 +122,14 @@ async function checkpointTraffic(world: World) {
     await host.checkpoint(saved);
     let wireBytes = 0;
     for (const connection of host.connections.values()) {
-      for (const message of connection.queue) {
+      for (const message of connection.checkpointQueue || []) {
         const incoming = new Map();
         let decoded: { world: World; digest: string } | undefined;
         while (message.offset * 32768 < message.bytes.length) {
           const frame = chunk(message);
           message.offset++;
           wireBytes += frame.length;
-          decoded = assemble(incoming, frame) || decoded;
+          decoded = (await assemble(incoming, frame)) || decoded;
         }
         expect(stringify(decoded!.world)).toBe(stringify(saved));
         if (acknowledge)
@@ -138,7 +138,7 @@ async function checkpointTraffic(world: World) {
             digest: decoded!.digest,
           });
       }
-      connection.queue = [];
+      connection.checkpointQueue = [];
     }
     return wireBytes;
   }
