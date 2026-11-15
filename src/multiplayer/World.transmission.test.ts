@@ -10,11 +10,13 @@ import {
 } from "../helpers/PowerAgreements";
 import { getDateFromMinute } from "../helpers/DateTime";
 import { currentTick } from "../helpers/GameSelectors";
+import { entitlementSources } from "../helpers/Expansion";
 import * as Transmission from "../helpers/Transmission";
 import {
   intertieContextForGame,
   intertieOfferLimits,
   physicalNeighborImportSupplyW,
+  type IntertieReservation,
 } from "../helpers/Transmission";
 import { customerMarketSizeAt } from "../helpers/Customers";
 import { loadSimData } from "../testing/SimData";
@@ -28,10 +30,10 @@ import {
 } from "./World";
 import { ViewPublication } from "./ViewPublication";
 
-function ready(keepNative = false) {
-  loadSimData(UTILITY_AREAS.champlain.location);
+function ready(keepNative = false, physical = false) {
+  loadSimData(physical ? "LA" : UTILITY_AREAS.champlain.location);
   const world = createWorld(
-    { scenarioId: 116, difficulty: "Employee" },
+    { scenarioId: physical ? 111 : 116, difficulty: "Employee" },
     coopSeats(4),
     "regional-budget",
     "epoch",
@@ -53,9 +55,9 @@ function ready(keepNative = false) {
 }
 function setNextDemand(world: ReturnType<typeof ready>, watts: number) {
   for (const grid of world.grids) {
-    const tick = grid.timeline.find(
-      (t) => t.minute === grid.date.minute + TICK_MINUTES,
-    )!;
+    const tick =
+      grid.timeline.find((t) => t.minute === grid.date.minute + TICK_MINUTES) ??
+      grid.timeline.at(-1)!;
     tick.demandW = watts;
     DEMAND_TYPES.forEach((type) => {
       tick.demandByType[type] = type === "Residential" ? watts : 0;
@@ -76,27 +78,50 @@ function assertFeasible(world: ReturnType<typeof ready>) {
   let totalImportsW = 0,
     totalReserveW = 0,
     totalAvailableW = 0;
+  const reserved: IntertieReservation[] = [];
   for (const grid of world.grids) {
     const tick = currentTick(grid)!;
-    const line = grid.transmission!.lines.find(
-      (l) => l.corridorId === "vt-champlain-regional",
-    )!;
-    const limits =
-      line.yearsToBuildLeft > 0
-        ? { importLimitW: 0 }
-        : intertieOfferLimits(
-            line,
-            intertieContextForGame(grid),
-            tick.minute,
-            tick,
-          );
+    // The refreshed month-opening frame has supply readiness, but no elapsed delivery yet.
+    const opening = tick.minute === grid.timeline[0].minute;
+    const sources = entitlementSources(grid, tick, reserved, true);
+    reserved.push(
+      ...sources.map((source) => ({
+        offer: source.offer,
+        watts: source.capacityW,
+      })),
+    );
+    const capacityW = sources.reduce(
+      (sum, source) => sum + source.capacityW,
+      0,
+    );
+    expect(tick.entitlementImportCapacityW).toBeCloseTo(capacityW, 5);
+    expect(tick.entitlementImportedW).toBe(tick.importedW);
+    expect(tick.importedW).toBeGreaterThanOrEqual(0);
+    expect(tick.importedW).toBeLessThanOrEqual(tick.demandW);
+    expect(tick.supplyW).toBeCloseTo(tick.importedW!, 5);
+    expect(tick.exportedW).toBe(0);
+    expect(
+      grid.transmission!.lines.every((line) =>
+        line.corridorId.startsWith("peer:"),
+      ),
+    ).toBe(true);
     expect(tick.importedW! + Math.max(0, tick.reserveW!)).toBeLessThanOrEqual(
-      limits.importLimitW + 1e-5,
+      capacityW + 1e-5,
     );
-    expect(tick.availableSupplyW).toBeLessThanOrEqual(
-      limits.importLimitW + 1e-5,
-    );
-    expect(line.currentFlowW).toBeCloseTo(tick.importedW!, 5);
+    expect(tick.availableSupplyW).toBeLessThanOrEqual(capacityW + 1e-5);
+    expect(tick.availableSupplyW).toBeGreaterThanOrEqual(tick.supplyW);
+    for (const source of sources) {
+      const available = tick.agreementAvailableMWh?.[source.id] ?? 0;
+      const useful = tick.agreementUsefulMWh?.[source.id] ?? 0;
+      expect(available).toBeCloseTo(
+        opening
+          ? 0
+          : ((source.capacityW / TICKS_PER_HOUR) * GAME_TO_REAL_YEARS) / 1e6,
+        6,
+      );
+      expect(useful).toBeGreaterThanOrEqual(0);
+      expect(useful).toBeLessThanOrEqual(available);
+    }
     const unusedCost = Object.entries(tick.agreementAvailableMWh ?? {}).reduce(
       (sum, [id, available]) => {
         const source = connectionAgreements(grid, "champlain").find(
@@ -109,7 +134,11 @@ function assertFeasible(world: ReturnType<typeof ready>) {
       },
       0,
     );
-    expect(tick.expensesImports - unusedCost).toBeCloseTo(
+    if (!opening)
+      expect(tick.agreementUnusedExpenses).toBeCloseTo(unusedCost, 5);
+    expect(
+      tick.expensesImports - (tick.agreementUnusedExpenses ?? 0),
+    ).toBeCloseTo(
       (((tick.importedW! / TICKS_PER_HOUR) * GAME_TO_REAL_YEARS) / 1e6) *
         tick.marketPricePerMWh!,
       5,
@@ -131,7 +160,7 @@ function assertFeasible(world: ReturnType<typeof ready>) {
 }
 
 it.each(["NONE", "SHORTAGES", "SHORTAGES_AND_STORAGE"] as const)(
-  "allocates unused regional reserve once across four companies buying %s",
+  "allocates finite supplier commitments once across four companies buying %s",
   (buyingRule) => {
     const world = ready();
     world.grids.forEach((grid) => {
@@ -139,29 +168,31 @@ it.each(["NONE", "SHORTAGES", "SHORTAGES_AND_STORAGE"] as const)(
     });
     setNextDemand(world, 100e6);
     stepWorld(world);
-    expect(world.grids.map((g) => currentTick(g)!.importedW)).toEqual(
-      buyingRule === "NONE"
-        ? [100e6, 100e6, 0, 0]
-        : [100e6, 100e6, 100e6, 100e6],
-    );
+    for (const grid of world.grids)
+      expect(currentTick(grid)!.importedW).toBe(
+        Math.min(100e6, currentTick(grid)!.entitlementImportCapacityW!),
+      );
+    expect(currentTick(world.grids[0])!.importedW).toBe(100e6);
+    expect(currentTick(world.grids.at(-1)!)!.supplyW).toBeLessThan(100e6);
     assertFeasible(world);
     const available = world.grids.reduce(
       (sum, grid) => sum + currentTick(grid)!.availableSupplyW!,
       0,
     );
     expect(available).toBeLessThanOrEqual(regionalBudget(world) + 1e-5);
-    expect(available / regionalBudget(world)).toBeGreaterThan(
-      buyingRule === "NONE" ? 0 : 0.99999,
-    );
+    expect(available).toBeGreaterThan(0);
   },
 );
 
 it.each(["paused", "unbuilt"] as const)(
-  "gives a %s connection no imports or reserve",
+  "gives a %s physical connection no imports or reserve in an intertie scenario",
   (status) => {
-    const world = ready();
+    const world = ready(false, true);
+    for (const grid of world.grids)
+      for (const line of grid.transmission!.lines)
+        if (line.corridorId.startsWith("peer:")) line.paused = true;
     const line = world.grids[0].transmission!.lines.find(
-      (entry) => entry.corridorId === "vt-champlain-regional",
+      (entry) => entry.corridorId === "california-north",
     )!;
     line.currentFlowW = 0;
     if (status === "paused") line.paused = true;
@@ -171,18 +202,75 @@ it.each(["paused", "unbuilt"] as const)(
     expect(currentTick(world.grids[0])!.importedW).toBe(0);
     expect(currentTick(world.grids[0])!.availableSupplyW).toBe(0);
     expect(currentTick(world.grids[0])!.reserveW).toBe(-100e6);
-    assertFeasible(world);
+    expect(currentTick(world.grids[1])!.importedW).toBeGreaterThan(0);
+    for (const grid of world.grids) {
+      const tick = currentTick(grid)!;
+      const limitsW = grid.transmission!.lines.reduce((sum, connection) => {
+        const limits = intertieOfferLimits(
+          connection,
+          intertieContextForGame(grid),
+          tick.minute,
+          tick,
+        );
+        expect(Math.abs(connection.currentFlowW)).toBeLessThanOrEqual(
+          connection.yearsToBuildLeft > 0 ? 0 : limits.importLimitW + 1e-5,
+        );
+        return (
+          sum + (connection.yearsToBuildLeft > 0 ? 0 : limits.importLimitW)
+        );
+      }, 0);
+      expect(tick.importedW).toBeGreaterThanOrEqual(0);
+      expect(tick.importedW! + Math.max(0, tick.reserveW!)).toBeLessThanOrEqual(
+        limitsW + 1e-5,
+      );
+      expect(tick.availableSupplyW).toBeLessThanOrEqual(limitsW + 1e-5);
+    }
   },
 );
 
-it("preserves native generator reserves when regional connections have no headroom", () => {
-  const world = ready(true);
+it("rejects valley wire commands without changing supplier deliveries or cash", () => {
+  const world = ready();
+  const comparison = cloneDeep(world);
+  const line = world.grids[0].transmission!.lines[0];
+  for (const [index, action] of [
+    {
+      name: "buildTransmissionLine",
+      payload: { corridorId: "vt-champlain-regional", financed: true },
+    },
+    {
+      name: "upgradeTransmissionLine",
+      payload: { corridorId: line.corridorId, financed: true },
+    },
+    { name: "togglePauseTransmissionLine", payload: line.id },
+  ].entries()) {
+    expect(
+      applyCommand(world, "0", {
+        matchId: world.matchId,
+        epoch: world.epoch,
+        sequence: index + 2,
+        command: { kind: "action", ...action },
+      }),
+    ).toBeDefined();
+  }
+  expect(JSON.stringify(world.grids)).toBe(JSON.stringify(comparison.grids));
+  setNextDemand(world, 100e6);
+  setNextDemand(comparison, 100e6);
+  stepWorld(world);
+  stepWorld(comparison);
+  expect(JSON.stringify(world.grids.map(currentTick))).toBe(
+    JSON.stringify(comparison.grids.map(currentTick)),
+  );
+  assertFeasible(world);
+});
+
+it("preserves native generator reserves when physical connections have no headroom", () => {
+  const world = ready(true, true);
   for (const grid of world.grids)
     for (const line of grid.transmission!.lines) line.paused = true;
   setNextDemand(world, 1e6);
   const native = cloneDeep(world);
   native.grids.forEach((grid) => {
-    delete grid.utilityExpansion;
+    delete grid.transmission;
   });
   stepWorld(world);
   stepWorld(native);
@@ -225,19 +313,19 @@ it("keeps the refreshed month-opening imports within the shared regional budget"
   });
 });
 
-it("assigns supplier-ready commitments once independently from pause and consumption", () => {
+it("assigns finite supplier-ready commitments once independently from consumption", () => {
   const world = ready();
   setNextDemand(world, 0);
-  const paused = cloneDeep(world);
-  paused.grids[0].transmission!.lines[0].paused = true;
+  const consuming = cloneDeep(world);
+  setNextDemand(consuming, 100e6);
   stepWorld(world);
-  stepWorld(paused);
+  stepWorld(consuming);
   const available = (grid: (typeof world.grids)[number]) =>
     Object.values(currentTick(grid)!.agreementAvailableMWh ?? {}).reduce(
       (sum, value) => sum + value,
       0,
     );
-  expect(paused.grids.map(available)).toEqual(world.grids.map(available));
+  expect(consuming.grids.map(available)).toEqual(world.grids.map(available));
   const totalMWh = world.grids.reduce((sum, grid) => sum + available(grid), 0);
   expect(totalMWh).toBeCloseTo(
     ((regionalBudget(world) / TICKS_PER_HOUR) * GAME_TO_REAL_YEARS) / 1e6,
@@ -247,6 +335,9 @@ it("assigns supplier-ready commitments once independently from pause and consump
     expect(currentTick(grid)!.importedW).toBe(0);
     expect(currentTick(grid)!.exportedW).toBe(0);
   });
+  expect(currentTick(consuming.grids[0])!.importedW).toBeGreaterThan(0);
+  assertFeasible(world);
+  assertFeasible(consuming);
 });
 
 it("allocates scarce supplier readiness to paid v2 before cheaper v3 within each company", () => {
@@ -389,10 +480,16 @@ it("closes shared v3 monthly minima once and restores a midmonth checkpoint iden
   const world = ready();
   for (const grid of world.grids) {
     grid.transmission!.inheritedAgreementTerms = 3;
-    grid.transmission!.lines[0].paused = true;
     grid.transmission!.buyingRule = "NONE";
   }
-  for (let i = 0; i < 48; i++) stepWorld(world);
+  for (let i = 0; i < 48; i++) {
+    setNextDemand(world, 0);
+    stepWorld(world);
+    world.grids.forEach((grid) => {
+      expect(currentTick(grid)!.importedW).toBe(0);
+      expect(currentTick(grid)!.importedKgco2e).toBe(0);
+    });
+  }
   const checkpoint = JSON.parse(JSON.stringify(checkpointWorld(world)));
   const restored = restoreWorld(checkpoint, "monthly-resume");
   for (const seat of restored.seats) {
@@ -405,9 +502,20 @@ it("closes shared v3 monthly minima once and restores a midmonth checkpoint iden
       }),
     ).toBeUndefined();
   }
-  for (let i = 0; i < 48; i++) {
+  for (let i = 0; i < 47; i++) {
+    setNextDemand(world, 0);
+    setNextDemand(restored, 0);
     stepWorld(world);
     stepWorld(restored);
+    for (const match of [world, restored])
+      match.grids.forEach((grid) => {
+        expect(currentTick(grid)!.importedW).toBe(0);
+        expect(currentTick(grid)!.importedKgco2e).toBe(0);
+      });
+  }
+  for (const match of [world, restored]) {
+    setNextDemand(match, 0);
+    stepWorld(match);
   }
   expect(world.grids[0].date.minute).toBe(1440);
   for (const [index, grid] of world.grids.entries()) {
@@ -427,8 +535,6 @@ it("closes shared v3 monthly minima once and restores a midmonth checkpoint iden
       );
       expect(account.months[0].usefulMWh).toBe(0);
     }
-    expect(currentTick(grid)!.importedW).toBe(0);
-    expect(currentTick(grid)!.importedKgco2e).toBe(0);
   }
   const closed = cloneDeep(
     world.grids.map((grid) =>
