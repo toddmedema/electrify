@@ -6,6 +6,7 @@ const os = require("node:os");
 const path = require("node:path");
 
 const root = path.resolve(__dirname, "../..");
+require("../run-compatibility");
 const directory = fs.mkdtempSync(path.join(os.tmpdir(), "electrify-network-"));
 const resultFile = path.join(directory, "result.json");
 try {
