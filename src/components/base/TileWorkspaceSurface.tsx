@@ -6,12 +6,15 @@ import "./TileWorkspaceSurface.scss";
 /** A nonmodal inspector: the map remains interactive behind the same desktop panel/phone sheet. */
 export default function TileWorkspaceSurface({
   title,
+  focusKey,
   subtitle,
   building,
   onClose,
   children,
 }: {
   title: string;
+  /** Changes only for explicit activation or a new kind of tile content. */
+  focusKey: React.Key;
   subtitle?: string;
   building?: boolean;
   onClose: () => void;
@@ -22,7 +25,6 @@ export default function TileWorkspaceSurface({
   React.useLayoutEffect(() => {
     const origin = document.activeElement;
     const map = heading.current?.closest(".territoryNetwork");
-    heading.current?.focus({ preventScroll: true });
     return () => {
       const selected = map?.querySelector<HTMLElement>(
         '.territoryTileTarget[tabindex="0"]',
@@ -32,6 +34,9 @@ export default function TileWorkspaceSurface({
         origin.focus({ preventScroll: true });
     };
   }, []);
+  React.useLayoutEffect(() => {
+    heading.current?.focus({ preventScroll: true });
+  }, [focusKey]);
   return (
     <section
       role="dialog"

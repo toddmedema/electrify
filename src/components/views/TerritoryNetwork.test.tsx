@@ -150,10 +150,46 @@ it("keeps inspection on its activated tile while map focus moves", () => {
   expect(
     within(surface()).queryByRole("tab", { name: "Generators" }),
   ).not.toBeInTheDocument();
+  expect(other).toHaveFocus();
   fireEvent.click(other);
   expect(
     within(surface()).getByRole("tab", { name: "Generators" }),
   ).toHaveAttribute("aria-selected", "true");
+  expect(within(surface()).getByRole("heading", { level: 3 })).toHaveFocus();
+});
+
+it("focuses every explicit activation, including another tile with the same heading", () => {
+  const game = ready();
+  const sites = territoryTileViews(game).filter(
+    ({ tile, owned, facility }) => !owned && !tile.city && !facility,
+  );
+  const first = sites.find(({ tile }) =>
+    sites.some(
+      ({ tile: other }) =>
+        other.id !== tile.id && other.terrain === tile.terrain,
+    ),
+  )!.tile;
+  const second = sites.find(
+    ({ tile }) => tile.id !== first.id && tile.terrain === first.terrain,
+  )!.tile;
+  show(game);
+  inspect(first.id);
+  const heading = within(surface()).getByRole("heading", { level: 3 });
+  const title = heading.textContent;
+  const other = screen.getByRole("button", { name: `Inspect ${second.id}` });
+  act(() => other.focus());
+  expect(other).toHaveFocus();
+  fireEvent.click(other);
+  expect(heading).toHaveTextContent(title!);
+  expect(heading).toHaveFocus();
+  act(() => other.focus());
+  fireEvent.click(other);
+  expect(heading).toHaveFocus();
+  inspect(freeTile(game).id);
+  const slider = within(surface()).getByRole("slider");
+  act(() => slider.focus());
+  fireEvent.change(slider, { target: { value: 9 } });
+  expect(slider).toHaveFocus();
 });
 
 it("opens the actual locked catalogue immediately and switches between generators and storage", () => {
@@ -200,6 +236,7 @@ it("builds on the activated tile and replaces the catalogue with the shared faci
     store.getState().game.facilities.find((item) => item.tileId === tile.id),
   ).toMatchObject({ name: "Wind" });
   expect(screen.getAllByRole("dialog")).toHaveLength(1);
+  expect(within(surface()).getByRole("heading", { level: 3 })).toHaveFocus();
   expect(
     within(surface()).getByRole("button", {
       name: /Cancel construction of Wind/,
@@ -258,13 +295,16 @@ it("buys exactly the inspected tile in one action and shows its build catalogue"
   const { store } = show(game);
   inspect(tile.id);
   expect(surface()).toHaveTextContent("Cash after purchase");
-  fireEvent.click(within(surface()).getByRole("button", { name: /Buy tile/ }));
+  const buy = within(surface()).getByRole("button", { name: /Buy tile/ });
+  act(() => buy.focus());
+  fireEvent.click(buy);
   expect(currentTick(store.getState().game)!.cash).toBe(before - quote.price);
   expect(ownsTerritoryTile(store.getState().game, tile.id)).toBe(true);
   expect(screen.getAllByRole("dialog")).toHaveLength(1);
   expect(
     within(surface()).getByRole("tab", { name: "Generators" }),
   ).toHaveAttribute("aria-selected", "true");
+  expect(within(surface()).getByRole("heading", { level: 3 })).toHaveFocus();
   expect(store.getState().game.territoryNetwork!.tilePurchases).toHaveLength(1);
 });
 

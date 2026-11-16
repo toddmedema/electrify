@@ -23,6 +23,7 @@
 
   .tileWorkspaceHeading {
     display: flex;
+    flex: 0 0 auto;
     align-items: flex-start;
     justify-content: space-between;
     gap: 8px;
@@ -108,7 +109,30 @@
       var(--radius-md);
   }
   .tileWorkspaceSurface.tileWorkspaceBuilding {
-    height: 62%;
+    // Leave a strip of the map above the builder and keep it clear of the dock.
+    height: calc(100% - var(--game-dock-clearance, 80px) - 32px);
+    max-height: calc(100% - var(--game-dock-clearance, 80px) - 32px);
+
+    .tileWorkspaceBody {
+      display: block;
+      overflow: auto;
+    }
+    .screenCatalog {
+      flex: none;
+    }
+    .screenCatalog > .cardList {
+      flex: none !important;
+      overflow: visible;
+    }
+    // Capacity stays with the decision as the tabs and projects scroll together.
+    .constructionHeader {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+    .buildOption {
+      scroll-margin-top: 52px;
+    }
   }
   .tileWorkspaceSurface .tileWorkspaceHeading {
     padding: 8px 8px 8px 12px;

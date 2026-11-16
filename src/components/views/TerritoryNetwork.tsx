@@ -77,6 +77,7 @@ function TileNetwork(props: Props) {
     "champlain:city",
   );
   const [inspected, setInspected] = React.useState<TerritoryTileId>();
+  const [activation, setActivation] = React.useState(0);
   const [category, setCategory] = React.useState("generators");
   const [review, setReview] = React.useState(false);
   const [terms, setTerms] = React.useState(false);
@@ -135,6 +136,7 @@ function TileNetwork(props: Props) {
   const inspect = (id: TerritoryTileId, activate = false) => {
     setSelected(id);
     if (activate) {
+      setActivation((value) => value + 1);
       setCategory("generators");
       setInspected(id);
     }
@@ -166,6 +168,7 @@ function TileNetwork(props: Props) {
       {view && tile && territory && (
         <TileWorkspaceSurface
           title={title}
+          focusKey={`${tile.id}:${activation}:${view.ownerKey ?? "unowned"}:${operatingFacility?.id ?? (view.facility ? "facility" : "empty")}`}
           subtitle={`${territoryMapLabel(territory.id)} · ${view.ownerName}`}
           building={building}
           onClose={close}

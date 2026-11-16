@@ -2,12 +2,13 @@ import type { Locator, Page } from "@playwright/test";
 import type { GameType } from "../src/Types";
 import { TERRITORY_TILES } from "../src/data/TerritoryTiles";
 import type { TerritoryTileDefinition } from "../src/data/TerritoryTiles";
-import { getBuildFacilityQuote } from "../src/data/Facilities";
+import { GENERATORS, getBuildFacilityQuote } from "../src/data/Facilities";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "../src/helpers/DateTime";
 import { currentTick } from "../src/helpers/GameSelectors";
 import { formatMoneyConcise } from "../src/helpers/Format";
 import { tilePurchaseQuote } from "../src/helpers/Territories";
 import {
+  availableTerritoryTiles,
   getTerritoryTile,
   ownsTerritoryTile,
 } from "../src/helpers/TerritoryTiles";
@@ -135,31 +136,65 @@ async function revealTile(page: Page, tile: TerritoryTileDefinition) {
 /** Every mounted tile is a truthful subset of the discovered map; offscreen cells are culled. */
 async function expectPhysicalMap(network: Locator, game: GameType) {
   const views = territoryTileViews(game);
-  const targets = await network
-    .locator("button[data-map-target]")
-    .evaluateAll((buttons) =>
-      buttons.map((button) => ({
-        id: button.getAttribute("data-map-target")!,
-        territoryId: button.getAttribute("data-territory"),
-        terrain: button.getAttribute("data-terrain"),
-        owned: button.getAttribute("data-owned"),
-        width: button.getBoundingClientRect().width,
-        height: button.getBoundingClientRect().height,
-        x:
-          button.getBoundingClientRect().x +
-          button.getBoundingClientRect().width / 2,
-        y:
-          button.getBoundingClientRect().y +
-          button.getBoundingClientRect().height / 2,
-        selected: button.getAttribute("aria-pressed") === "true",
-      })),
-    );
+  // Resize/focus can move the camera between awaits. Compare one physical render.
+  const { targets, viewport, artworkCount, occupants, wires } =
+    await network.evaluate((element) => {
+      const viewport = element
+        .querySelector(".territoryMapViewport")!
+        .getBoundingClientRect();
+      return {
+        viewport: {
+          x: viewport.x,
+          y: viewport.y,
+          width: viewport.width,
+          height: viewport.height,
+        },
+        artworkCount: element.querySelectorAll(".territoryTerrainArtwork")
+          .length,
+        targets: Array.from(
+          element.querySelectorAll("button[data-map-target]"),
+        ).map((button) => ({
+          id: button.getAttribute("data-map-target")!,
+          territoryId: button.getAttribute("data-territory"),
+          terrain: button.getAttribute("data-terrain"),
+          owned: button.getAttribute("data-owned"),
+          width: button.getBoundingClientRect().width,
+          height: button.getBoundingClientRect().height,
+          x:
+            button.getBoundingClientRect().x +
+            button.getBoundingClientRect().width / 2,
+          y:
+            button.getBoundingClientRect().y +
+            button.getBoundingClientRect().height / 2,
+          selected: button.getAttribute("aria-pressed") === "true",
+          distance: element
+            .querySelector(
+              `[data-tile="${button.getAttribute("data-map-target")}"]`,
+            )
+            ?.getAttribute("data-visibility-distance"),
+        })),
+        occupants: Array.from(
+          element.querySelectorAll(".territoryTileOccupant"),
+        ).map((occupant) => ({
+          id: occupant.getAttribute("data-occupant-tile"),
+          kind: occupant.getAttribute("data-occupant"),
+          distance: occupant.getAttribute("data-visibility-distance"),
+        })),
+        wires: Array.from(
+          element.querySelectorAll("[data-wire-from][data-wire-to]"),
+        ).map((wire) =>
+          [
+            wire.getAttribute("data-wire-from"),
+            wire.getAttribute("data-wire-to"),
+          ]
+            .sort()
+            .join("|"),
+        ),
+      };
+    });
   expect(targets.length).toBeGreaterThan(0);
   expect(targets.length).toBeLessThanOrEqual(views.length);
   expect(new Set(targets.map(({ id }) => id)).size).toBe(targets.length);
-  const viewport = (await network
-    .locator(".territoryMapViewport")
-    .boundingBox())!;
   const rendered = new Set(targets.map(({ id }) => id));
   for (const target of targets) {
     const view = views.find(({ tile }) => tile.id === target.id)!;
@@ -179,23 +214,9 @@ async function expectPhysicalMap(network: Locator, game: GameType) {
         viewport.y + viewport.height + target.width + 1,
       );
     }
-    await expect(network.locator(`[data-tile="${target.id}"]`)).toHaveAttribute(
-      "data-visibility-distance",
-      String(view.visibilityDistance),
-    );
+    expect(target.distance).toBe(String(view.visibilityDistance));
   }
-  await expect(network.locator(".territoryTerrainArtwork")).toHaveCount(
-    targets.length,
-  );
-  const occupants = await network
-    .locator(".territoryTileOccupant")
-    .evaluateAll((elements) =>
-      elements.map((element) => ({
-        id: element.getAttribute("data-occupant-tile"),
-        kind: element.getAttribute("data-occupant"),
-        distance: element.getAttribute("data-visibility-distance"),
-      })),
-    );
+  expect(artworkCount).toBe(targets.length);
   expect(occupants.sort((a, b) => a.id!.localeCompare(b.id!))).toEqual(
     views
       .filter(
@@ -215,18 +236,6 @@ async function expectPhysicalMap(network: Locator, game: GameType) {
       }))
       .sort((a, b) => a.id.localeCompare(b.id)),
   );
-  const wires = await network
-    .locator("[data-wire-from][data-wire-to]")
-    .evaluateAll((elements) =>
-      elements.map((element) =>
-        [
-          element.getAttribute("data-wire-from"),
-          element.getAttribute("data-wire-to"),
-        ]
-          .sort()
-          .join("|"),
-      ),
-    );
   const mounted = views.filter((view) => rendered.has(view.tile.id));
   const expectedWires = mounted.flatMap((from, index) =>
     mounted
@@ -477,6 +486,103 @@ for (const theme of ["light", "dark"] as const) {
     ).toHaveCount(0);
   });
 
+  test(`tile builder keeps project decisions together in ${theme}`, async ({
+    page,
+  }, info) => {
+    const network = await startMap(page, theme);
+    const game = (await readSavedGame(page))!;
+    loadSimData(game.location);
+    const wind = GENERATORS(game, 20e6, [], []).find(
+      (item) => item.name === "Wind",
+    )!;
+    const tile = availableTerritoryTiles(game, wind, "champlain")[0];
+    const surface = await inspectTile(page, tile);
+    await expectLockedBuild(surface);
+    const review = surface.getByRole("button", {
+      name: "Review purchase of Wind",
+      exact: true,
+    });
+    await expect(review).toBeEnabled();
+    const project = surface.locator('[data-build-option="Wind"]');
+    await project.evaluate((element) => {
+      let scroll = element.parentElement;
+      while (
+        scroll &&
+        !["auto", "scroll"].includes(getComputedStyle(scroll).overflowY)
+      )
+        scroll = scroll.parentElement;
+      if (!scroll) throw new Error("No project scroll container");
+      const capacity = element
+        .closest(".tileWorkspaceSurface")!
+        .querySelector(".constructionHeader")!;
+      const inset = scroll.contains(capacity)
+        ? capacity.getBoundingClientRect().height
+        : 0;
+      scroll.scrollTop +=
+        element.getBoundingClientRect().top -
+        scroll.getBoundingClientRect().top -
+        inset;
+    });
+    await expect(surface.locator(".constructionHeader")).toBeInViewport({
+      ratio: 1,
+    });
+    await expect(project.locator(".MuiCardHeader-root")).toBeInViewport({
+      ratio: 1,
+    });
+    await expect(
+      project.locator(".buildOptionMetric").filter({ hasText: "Build cost" }),
+    ).toBeInViewport({ ratio: 1 });
+    await expect(review).toBeInViewport({ ratio: 1 });
+    await expect(
+      surface.getByRole("button", { name: "Close tile", exact: true }),
+    ).toBeInViewport({ ratio: 1 });
+    await expect(
+      page.getByRole("button", { name: "pause", exact: true }),
+    ).toBeInViewport({ ratio: 1 });
+    const geometry = await surface.evaluate((element) => {
+      const surface = element.getBoundingClientRect();
+      const workspace = element
+        .closest(".territoryNetwork")!
+        .getBoundingClientRect();
+      const dock = document
+        .querySelector("#navfooter")!
+        .getBoundingClientRect();
+      return {
+        top: surface.top,
+        bottom: surface.bottom,
+        height: surface.height,
+        bodyHeight: element.querySelector(".tileWorkspaceBody")!.clientHeight,
+        mapTop: workspace.top,
+        dockTop: dock.top,
+        overflow: document.documentElement.scrollHeight - innerHeight,
+      };
+    });
+    expect(geometry.top).toBeGreaterThanOrEqual(geometry.mapTop + 16);
+    if ((page.viewportSize()?.width ?? 0) <= 740)
+      expect(geometry.bottom).toBeLessThanOrEqual(geometry.dockTop);
+    expect(geometry.overflow).toBeLessThanOrEqual(1);
+    await info.attach("tile-builder-geometry", {
+      body: JSON.stringify(geometry),
+      contentType: "application/json",
+    });
+    await reviewScreenshot(page, {
+      path: info.outputPath(`tile-project-decision-${theme}.png`),
+      animations: "disabled",
+      scale: "css",
+    });
+    await review.click();
+    const confirmation = page.getByRole("dialog", { name: /^Build .* Wind\?/ });
+    await expectDialogToFit(confirmation);
+    await confirmation.press("Escape");
+    await expect(confirmation).toHaveCount(0);
+    await surface
+      .getByRole("button", { name: "Close tile", exact: true })
+      .click();
+    await expect(
+      network.locator(`[data-map-target="${tile.id}"]`),
+    ).toBeFocused();
+  });
+
   test(`cash buys one tile and its locked generator survives resume in ${theme}`, async ({
     page,
   }, info) => {
@@ -501,6 +607,7 @@ for (const theme of ["light", "dark"] as const) {
     ).toBeEnabled();
     await surface.getByRole("button", { name: /^Buy tile ·/ }).click();
     await expectLockedBuild(surface);
+    await expect(surface.locator(".tileWorkspaceHeading h3")).toBeFocused();
     const owned = (await readSavedGame(page))!;
     expect(currentTick(owned)!.cash).toBeCloseTo(
       currentTick(before)!.cash - quote.price,
@@ -557,6 +664,7 @@ for (const theme of ["light", "dark"] as const) {
       1,
     );
     await expect(surface.locator(".facilityDetails")).toBeVisible();
+    await expect(surface.locator(".tileWorkspaceHeading h3")).toBeFocused();
     await expect(
       surface.getByRole("button", { name: /^Cancel construction of / }),
     ).toBeEnabled();

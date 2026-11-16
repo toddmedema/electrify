@@ -42,7 +42,11 @@ function TileFeedback({
     <>
       <main>
         {tileOpen && (
-          <TileWorkspaceSurface title="Natural Gas CC" onClose={() => {}}>
+          <TileWorkspaceSurface
+            title="Natural Gas CC"
+            focusKey="gas-cc"
+            onClose={() => {}}
+          >
             <button type="button">Resume</button>
             <button type="button">Sell</button>
           </TileWorkspaceSurface>
