@@ -11,6 +11,7 @@ import ConceptIcon from "./ConceptIcon";
 import useDockLabels from "./useDockLabels";
 import { TOOL_SHORTCUTS } from "./KeyboardShortcuts";
 import { useControllerInput } from "../../desktop/InputPresentation";
+import { hasTerritoryNetwork } from "../../helpers/Territories";
 import { selectTutorialActions } from "../../reducers/Tutorial";
 
 export interface StateProps {
@@ -96,9 +97,13 @@ export default function Navigation({
   const opened = openTools ?? [gameToolForCard(cardName)];
   const tutorialActions = useAppSelector(selectTutorialActions);
   const { labelId, fromTouch, buttonLabels, dockLabels } = useDockLabels();
+  const mapWorkspace = useAppSelector((state) =>
+    hasTerritoryNetwork(state.game),
+  );
   const tools = GAME_TOOLS.filter(
     (tool) =>
       (hasScenarioDetails || tool.id !== "SCENARIO") &&
+      (!mapWorkspace || tool.id !== "BUILD_GENERATORS") &&
       (!tutorialActions || tutorialActions.includes(tool.id)),
   );
   if (!tools.length) return null;

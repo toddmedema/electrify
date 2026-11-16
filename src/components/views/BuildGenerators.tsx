@@ -1,4 +1,4 @@
-import { TERRITORIES } from "../../data/Territories";
+import { getTerritoryDefinition } from "../../data/Territories";
 import TerritoryBuildDestination, {
   useTerritoryBuildDestination,
   useTerritoryBuildTile,
@@ -251,6 +251,7 @@ interface GeneratorBuildItemProps {
   territoryAvailability?: ReturnType<typeof territoryBuildAvailability>;
   territoryId?: TerritoryId;
   tileId?: TerritoryTileId;
+  lockedTile?: boolean;
   compared?: boolean;
   compareDisabled?: boolean;
   onCompare?: () => void;
@@ -512,7 +513,9 @@ export function GeneratorBuildItem(
     <>
       {props.territoryAvailability
         ? props.tileId
-          ? `One building slot · ${formatWatts(maxSizeW)} max per project`
+          ? props.lockedTile
+            ? `${formatWatts(maxSizeW)} max`
+            : `One building slot · ${formatWatts(maxSizeW)} max per project`
           : `${props.territoryAvailability.remaining} local sites left · ${formatWatts(maxSizeW)} max per project`
         : role}
       {!props.territoryAvailability && sites && sites.remaining > 0 && (
@@ -812,7 +815,8 @@ export function GeneratorBuildItem(
                 {buildTileId
                   ? ` · ${territoryBuildTileName(buildTileId, props.game)}`
                   : ""}
-                . Output serves your company power pool.
+                .
+                {!props.lockedTile && " Output serves your company power pool."}
               </Typography>
             )}
             {props.hydroAvailability?.selected && (
@@ -1025,7 +1029,8 @@ export interface DispatchProps {
   onSizeChange?: () => void;
 }
 
-export type Props = StateProps & DispatchProps;
+export type Props = StateProps &
+  DispatchProps & { lockedTileId?: TerritoryTileId };
 
 function BuildGenerators(props: Props): React.JSX.Element {
   const completeBuild = React.useContext(GameBuildCompleteContext);
@@ -1035,11 +1040,17 @@ function BuildGenerators(props: Props): React.JSX.Element {
   const { evidenceRequest, facilityDragActive, onEvidenceReady } = props;
   const evidenceAnchor = React.useRef<HTMLDivElement>(null);
   const { game, onBack } = props;
-  const [territoryId, setTerritoryId] = useTerritoryBuildDestination();
-  const [tileId, setTileId] = useTerritoryBuildTile();
+  const [rememberedTerritoryId, setTerritoryId] =
+    useTerritoryBuildDestination();
+  const [rememberedTileId, setTileId] = useTerritoryBuildTile();
+  const tileId = props.lockedTileId ?? rememberedTileId;
+  const territoryId =
+    (props.lockedTileId
+      ? getTerritoryTile(props.lockedTileId, game)?.territoryId
+      : undefined) ?? rememberedTerritoryId;
   const territoryNetwork = hasTerritoryNetwork(game);
   const specialSite = territoryNetwork
-    ? TERRITORIES.find((territory) => territory.id === territoryId)?.benefit
+    ? getTerritoryDefinition(territoryId)?.benefit
     : undefined;
   const legacyBounds = getLegacyBuildBounds(game);
   const minTick = legacyBounds ? wToSliderTick(legacyBounds.minW) : 0;
@@ -1310,7 +1321,7 @@ function BuildGenerators(props: Props): React.JSX.Element {
             No generator matches this fuel and size. Showing other options.
           </Typography>
         )}
-      {territoryNetwork && (
+      {territoryNetwork && !props.lockedTileId && (
         <TerritoryBuildDestination
           game={game}
           value={territoryId}
@@ -1362,6 +1373,7 @@ function BuildGenerators(props: Props): React.JSX.Element {
           return (
             <React.Fragment key={g.name}>
               <GeneratorBuildItem
+                lockedTile={!!props.lockedTileId}
                 game={game}
                 onDismissHydroPrimer={
                   showPrimer && g.name === "Hydro" ? dismissPrimer : undefined

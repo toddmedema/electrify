@@ -11,8 +11,6 @@ import {
   facilityTerritoryId,
 } from "../../helpers/Territories";
 import { territoryName } from "../base/TerritoryBuildDestination";
-import type { TerritoryId } from "../../Types";
-import { useMoney } from "../base/CurrencyContext";
 import {
   getInterfaceScale,
   subscribeInterfaceScale,
@@ -23,7 +21,6 @@ import {
   Button,
   Checkbox,
   Chip,
-  DialogContentText,
   List,
   ListItem,
   ListItemAvatar,
@@ -33,7 +30,6 @@ import {
   Tabs,
 } from "@mui/material";
 import CheckIcon from "@mui/icons-material/Check";
-import ConfirmDialog from "../base/ConfirmDialog";
 import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
 import RemoveIcon from "@mui/icons-material/Remove";
 import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
@@ -48,10 +44,7 @@ import {
   DragStart,
   NotDraggingStyle,
 } from "@hello-pangea/dnd";
-import FacilityContextMenu, {
-  FacilityMenuTarget,
-  facilityActionIcon,
-} from "./FacilityContextMenu";
+import FacilityContextMenu, { FacilityMenuTarget } from "./FacilityContextMenu";
 import { facilityGroupMoves } from "./FacilitySelection";
 import { TickThrottle } from "../../helpers/RenderThrottle";
 import {
@@ -67,16 +60,12 @@ import {
   RetrofitFacilityAction,
   EvidenceRequestType,
 } from "../../Types";
-import {
-  facilityCashBack,
-  facilityPermanentlyShutdown,
-} from "../../helpers/Financials";
+import { facilityPermanentlyShutdown } from "../../helpers/Financials";
 import { storyOutputMultiplier } from "../../helpers/Story";
 import {
   formatWattHoursOfPeak,
   formatWatts,
   formatWattsOfPeak,
-  formatFacilitySize,
   formatWattsInUnit,
   getWattUnit,
 } from "../../helpers/Format";
@@ -86,7 +75,7 @@ import FlowBar from "../base/FlowBar";
 import FacilityRowText from "../base/FacilityRowText";
 import { constructionStatus } from "../base/ConstructionProgress";
 import { SIDE_LAYOUT_MIN_WIDTH } from "../../Globals";
-import FacilityDetails from "../base/FacilityDetails";
+import ExpandedFacilityDetails from "../base/ExpandedFacilityDetails";
 import GameCard from "../base/GameCard";
 import ConceptIcon from "../base/ConceptIcon";
 import { combineStoryEffects } from "../../data/WorldEvents";
@@ -251,131 +240,7 @@ const ACTIVITY_LABELS: { [k in FacilityActivityType]: string } = {
 // "Nearly empty." forecast lead -- the row warns before that bites.
 const RESERVOIR_WARNING_FRACTION = 0.2;
 
-function FacilityActions(props: {
-  facility: FacilityOperatingType;
-  upgrading: boolean;
-  permanentlyShutdown: boolean;
-  onPause: DispatchProps["onPause"];
-  onTogglePause: DispatchProps["onTogglePause"];
-  onCancelRetrofit?: DispatchProps["onCancelRetrofit"];
-  onOpenSell: () => void;
-}) {
-  const {
-    facility,
-    onOpenSell,
-    onPause,
-    onTogglePause,
-    upgrading,
-    permanentlyShutdown,
-    onCancelRetrofit,
-  } = props;
-  const underConstruction = facility.yearsToBuildLeft > 0;
-  if (permanentlyShutdown && facility.saleRestricted)
-    return (
-      <div className="facilityActions">
-        <Typography
-          variant="caption"
-          color="textSecondary"
-          className="facilityActionNote"
-        >
-          This plant can't be sold.
-        </Typography>
-      </div>
-    );
-  return (
-    <div className="facilityActions">
-      {upgrading && !permanentlyShutdown && onCancelRetrofit && (
-        // Refunds in full and returns the plant to service at once, so it needs no confirmation
-        <Button
-          className="facilityCancelConstruction"
-          variant="outlined"
-          startIcon={facilityActionIcon("cancelUpgrade")}
-          aria-label={"Cancel upgrade of " + facilityDisplayName(facility)}
-          onClick={() => onCancelRetrofit(facility.id)}
-        >
-          <span className="facilityActionLabel">Cancel upgrade</span>
-        </Button>
-      )}
-      {!underConstruction && !upgrading && !permanentlyShutdown && (
-        <Button
-          variant="outlined"
-          startIcon={facilityActionIcon(facility.paused ? "resume" : "pause")}
-          aria-label={
-            facility.paused
-              ? "Resume " + facilityDisplayName(facility)
-              : "Pause " + facilityDisplayName(facility)
-          }
-          onClick={() =>
-            facility.paused
-              ? onTogglePause(facility.id)
-              : onPause(facility.id, facilityDisplayName(facility))
-          }
-        >
-          <span className="facilityActionLabel">
-            {facility.paused ? "Resume" : "Pause"}
-          </span>
-        </Button>
-      )}
-      {facility.saleRestricted ? (
-        <Typography
-          variant="caption"
-          color="textSecondary"
-          className="facilityActionNote"
-        >
-          This plant can't be sold.
-        </Typography>
-      ) : (
-        <Button
-          className={
-            underConstruction ? "facilityCancelConstruction" : undefined
-          }
-          variant="outlined"
-          startIcon={facilityActionIcon(
-            underConstruction ? "cancelConstruction" : "sell",
-          )}
-          aria-label={
-            (underConstruction ? "Cancel construction of " : "Sell ") +
-            facilityDisplayName(facility)
-          }
-          onClick={onOpenSell}
-        >
-          <span className="facilityActionLabel">
-            {underConstruction ? "Cancel construction" : "Sell"}
-          </span>
-        </Button>
-      )}
-    </div>
-  );
-}
-
-const MemoizedFacilityActions = React.memo(
-  FacilityActions,
-  (previous, next) => {
-    const previousUnderConstruction = previous.facility.yearsToBuildLeft > 0;
-    const nextUnderConstruction = next.facility.yearsToBuildLeft > 0;
-    return (
-      previous.facility.id === next.facility.id &&
-      previous.facility.name === next.facility.name &&
-      previous.facility.paused === next.facility.paused &&
-      previous.facility.saleRestricted === next.facility.saleRestricted &&
-      previousUnderConstruction === nextUnderConstruction &&
-      previous.upgrading === next.upgrading &&
-      previous.permanentlyShutdown === next.permanentlyShutdown &&
-      previous.onCancelRetrofit === next.onCancelRetrofit &&
-      previous.onPause === next.onPause &&
-      previous.onTogglePause === next.onTogglePause &&
-      previous.onOpenSell === next.onOpenSell
-    );
-  },
-);
-
 function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
-  const { formatMoneyConcise } = useMoney();
-  const [open, setOpen] = React.useState(false);
-  const toggleDialog = React.useCallback(() => {
-    setOpen((value) => !value);
-  }, []);
-
   const {
     facility,
     game,
@@ -755,69 +620,15 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
               />
             )}
           </div>
-          {open && (
-            // Inside the row, so isolateClicks keeps every click in the confirmation dialog
-            // from also landing on the row behind it and toggling the selection
-            <ConfirmDialog
-              open
-              destructive
-              isolateClicks
-              title={
-                <>
-                  {underConstruction ? "Cancel construction of" : "Sell"}{" "}
-                  {formatFacilitySize(facility)}{" "}
-                  {facilityDisplayName(facility) === facility.name
-                    ? facility.name.toLowerCase()
-                    : facilityDisplayName(facility)}{" "}
-                  facility?
-                </>
-              }
-              cancelLabel="Never mind"
-              confirmLabel={underConstruction ? "Cancel construction" : "Sell"}
-              onCancel={toggleDialog}
-              onConfirm={() => {
-                props.onSell(facility.id);
-                toggleDialog();
-              }}
-            >
-              {facility.hydroSiteId && (
-                <DialogContentText>
-                  {underConstruction
-                    ? "Canceling frees this site."
-                    : "Selling won't free this site."}
-                </DialogContentText>
-              )}
-              <DialogContentText>
-                You will receive{" "}
-                {formatMoneyConcise(
-                  facilityCashBack(facility, game.date.minute),
-                )}
-                {facility.loanAmountLeft > 0
-                  ? ` and the rest will go towards paying off the remaining loan balance of ${formatMoneyConcise(facility.loanAmountLeft)}`
-                  : ""}
-                .
-              </DialogContentText>
-            </ConfirmDialog>
-          )}
           {selected && (
-            <FacilityDetails
+            <ExpandedFacilityDetails
               facility={facility}
-              date={game.date}
-              seed={game.seed}
-              location={game.location}
               game={game}
-              onRetrofit={props.onRetrofit}
-            />
-          )}
-          {selected && (
-            <MemoizedFacilityActions
-              facility={facility}
-              upgrading={upgrading}
-              permanentlyShutdown={permanentlyShutdown}
+              onSell={props.onSell}
               onPause={onPause}
               onTogglePause={onTogglePause}
+              onRetrofit={props.onRetrofit}
               onCancelRetrofit={props.onCancelRetrofit}
-              onOpenSell={toggleDialog}
             />
           )}
         </div>
@@ -961,7 +772,6 @@ export interface DispatchProps {
   ) => void;
   onSelect: (id: FacilityOperatingType["id"] | null) => void;
   onStorageBuild: () => void;
-  onBuildForTerritory?: (id: TerritoryId, storage: boolean) => void;
   onTransmissionBuild: (
     corridorId: string,
     financed: boolean,
@@ -1507,10 +1317,12 @@ export default class Facilities extends React.Component<Props, SelectionState> {
                   onPause={this.props.onTransmissionPause}
                   onBuyingRule={onBuyingRule}
                   onSellingRule={onSellingRule}
-                  onBuildFacility={this.props.onBuildForTerritory}
-                  onInspectFacility={(id) => {
-                    this.setState({ territoryView: "fleet" });
-                    this.props.onSelect(id);
+                  facilityActions={{
+                    onSell,
+                    onPause,
+                    onTogglePause,
+                    onRetrofit: this.props.onRetrofit,
+                    onCancelRetrofit: this.props.onCancelRetrofit,
                   }}
                 />
               ) : (

@@ -5,6 +5,7 @@ import { store } from "../../Store";
 import { delta, markEventsRead } from "../../reducers/Game";
 import { ActiveWorldEventType } from "../../Types";
 import Navigation from "./Navigation";
+import { createGame } from "../../testing/Simulator";
 import {
   resetInputPresentation,
   updateInputPresentation,
@@ -89,6 +90,26 @@ describe("Navigation", () => {
         eventLogReadThroughId: 0,
       }),
     );
+  });
+
+  it("keeps Build out of map games and restores it for other scenarios", () => {
+    store.dispatch(
+      delta({
+        scenarioId: 116,
+        territoryNetwork: createGame({ scenarioId: 116, seed: 188 })
+          .territoryNetwork,
+      }),
+    );
+    const view = renderNavigation();
+    expect(
+      screen.queryByRole("button", { name: "Build" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Programs" })).toBeEnabled();
+    act(() => {
+      store.dispatch(delta({ scenarioId: 103 }));
+    });
+    expect(screen.getByRole("button", { name: "Build" })).toBeEnabled();
+    view.unmount();
   });
 
   it("keeps an emergency alert after reading events and resuming until the last emergency ends", () => {

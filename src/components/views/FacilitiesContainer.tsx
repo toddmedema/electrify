@@ -109,14 +109,6 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
     onSelect: (id) => {
       dispatch(selectFacility(id));
     },
-    onBuildForTerritory: (_id, storage) => {
-      dispatch(
-        navigate({
-          name: storage ? "BUILD_STORAGE" : "BUILD_GENERATORS",
-          dontRemember: true,
-        }),
-      );
-    },
     onStorageBuild: () => {
       dispatch(navigate({ name: "BUILD_STORAGE", dontRemember: true }));
     },

@@ -1,3 +1,4 @@
+import { hasTerritoryNetwork } from "../helpers/Territories";
 import ChallengeLanding from "./views/ChallengeLanding";
 import {
   Button,
@@ -209,6 +210,7 @@ function canBuild(): boolean {
   const actions = selectTutorialActions(store.getState());
   return (
     canPlay() &&
+    !hasTerritoryNetwork(store.getState().game) &&
     !uiHidden("build") &&
     (!actions || actions.includes("BUILD_GENERATORS"))
   );

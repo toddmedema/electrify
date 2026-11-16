@@ -331,3 +331,48 @@ it("shows lithium and iron-air efficiency before opening details", () => {
   );
   expect(screen.getByRole("dialog")).toHaveAccessibleName(/Lithium Battery/);
 });
+
+it("locks storage to its activated tile without destination pickers", () => {
+  const game = createGame({ scenarioId: 116, seed: 611 });
+  game.date.year = 2020;
+  game.timeline[0].cash = 1e12;
+  const battery = STORAGE(game, 100e6).find(
+    (candidate) => candidate.name === "Battery",
+  )!;
+  const tile = availableTerritoryTiles(game, battery, "champlain")[0];
+  const memory = new Map<string, unknown>([
+    [TERRITORY_BUILD_MEMORY_KEY, "green-uplands"],
+    [TERRITORY_TILE_BUILD_MEMORY_KEY, "green-uplands:site-0"],
+    ["storage.size", wToSliderTick(100e6)],
+  ]);
+  const onBuild = jest.fn();
+  render(
+    <GameToolMemoryContext.Provider value={memory}>
+      <BuildStorage
+        game={game}
+        lockedTileId={tile.id}
+        onBack={jest.fn()}
+        onBuildStorage={onBuild}
+      />
+    </GameToolMemoryContext.Provider>,
+  );
+  expect(
+    screen.queryByRole("combobox", { name: "Build destination" }),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole("combobox", { name: "Build tile" }),
+  ).not.toBeInTheDocument();
+  fireEvent.click(
+    screen.getByRole("button", { name: "Review purchase of Lithium Battery" }),
+  );
+  expect(screen.getByRole("dialog")).toHaveTextContent(
+    territoryBuildTileName(tile.id, game),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Pay cash" }));
+  expect(onBuild).toHaveBeenCalledWith(
+    expect.objectContaining({ name: "Battery", peakWh: 100e6 }),
+    false,
+    "champlain",
+    tile.id,
+  );
+});

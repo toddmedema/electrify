@@ -1,63 +1,51 @@
 import * as React from "react";
-import {
-  act,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-  within,
-} from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { configureStore } from "@reduxjs/toolkit";
-import { Provider } from "react-redux";
+import { Provider, useSelector } from "react-redux";
 import { createGame } from "../../testing/Simulator";
 import {
-  landPurchaseQuote,
-  purchaseLand,
+  tilePurchaseQuote,
   territoryDemandShares,
 } from "../../helpers/Territories";
 import {
-  facilityOnTile,
-  getTerritoryTiles,
+  availableTerritoryTiles,
+  ownsTerritoryTile,
 } from "../../helpers/TerritoryTiles";
+import { territoryTileViews } from "../../helpers/TerritoryMapState";
 import { currentTick } from "../../helpers/GameSelectors";
-import { LAND_TERRITORIES } from "../../data/Territories";
-import { formatFacilitySize, formatWatts } from "../../helpers/Format";
-import type { GameType, TerritoryId, TerritoryTileId } from "../../Types";
+import { formatWatts } from "../../helpers/Format";
+import type { GameType, TerritoryTileId } from "../../Types";
 import { GameToolMemoryContext } from "../base/GameToolMemory";
-import {
-  TERRITORY_BUILD_MEMORY_KEY,
-  TERRITORY_TILE_BUILD_MEMORY_KEY,
-} from "../base/TerritoryBuildDestination";
-import { territoryMapLabel } from "../base/TerritoryMapLayout";
 import TerritoryNetwork from "./TerritoryNetwork";
+import gameReducer from "../../reducers/Game";
+import uiReducer from "../../reducers/UI";
+import { GENERATORS } from "../../data/Facilities";
+import { wToSliderTick } from "../../helpers/BuildSizing";
 import { acquisitionQuote, transferUtility } from "../../helpers/Expansion";
 
-jest.mock("../base/useOutlookWorker", () => ({
-  useOutlookWorker: () => undefined,
-}));
 jest.mock(
   "../base/ManualLink",
   () => (props: { children?: React.ReactNode }) => <>{props.children}</>,
 );
-// Map geometry and artwork have their own suite. Exercise the detail pane through its
-// public tile selection callback, including the distinction between navigation and inspection.
+// Keep this suite on the public selection/activation boundary; map geometry owns its own tests.
 jest.mock("./TerritoryHexMap", () => ({
   __esModule: true,
   default: (props: {
     game: GameType;
     selected: TerritoryTileId;
-    onSelect: (id: TerritoryTileId, inspect?: boolean) => void;
+    onSelect: (id: TerritoryTileId, activate?: boolean) => void;
   }) => {
-    const { getTerritoryTiles } = jest.requireActual<
-      typeof import("../../helpers/TerritoryTiles")
-    >("../../helpers/TerritoryTiles");
+    const { territoryTileViews } = jest.requireActual<
+      typeof import("../../helpers/TerritoryMapState")
+    >("../../helpers/TerritoryMapState");
     return (
       <div aria-label="Tile map">
-        {getTerritoryTiles(props.game).map((tile) => (
+        {territoryTileViews(props.game).map(({ tile }) => (
           <button
+            className="territoryTileTarget"
+            tabIndex={props.selected === tile.id ? 0 : -1}
             key={tile.id}
             aria-label={`Inspect ${tile.id}`}
-            aria-pressed={props.selected === tile.id}
             onFocus={() => props.onSelect(tile.id)}
             onClick={() => props.onSelect(tile.id, true)}
           >
@@ -74,231 +62,244 @@ function ready() {
   currentTick(game)!.cash = 1e9;
   return game;
 }
-const controls = {
-  onBuild: jest.fn(),
-  onUpgrade: jest.fn(),
-  onBuyingRule: jest.fn(),
-  onSellingRule: jest.fn(),
-};
-function show(
-  game: ReturnType<typeof ready>,
-  initialTile: TerritoryTileId = "champlain:city",
-) {
-  const store = configureStore({ reducer: { game: () => game } });
-  const onBuildFacility = jest.fn();
-  const onInspectFacility = jest.fn();
-  const memory = new Map<string, unknown>([["network.tile", initialTile]]);
+function show(game = ready()) {
+  const store = configureStore({
+    reducer: { game: gameReducer, ui: uiReducer },
+    preloadedState: { game },
+    middleware: (getDefaultMiddleware) =>
+      getDefaultMiddleware({ serializableCheck: false }),
+  });
+  const facilityActions = {
+    onSell: jest.fn(),
+    onTogglePause: jest.fn(),
+    onPause: jest.fn(),
+    onRetrofit: jest.fn(),
+    onCancelRetrofit: jest.fn(),
+  };
+  const memory = new Map<string, unknown>([
+    ["generators.size", wToSliderTick(30e6)],
+    ["storage.size", wToSliderTick(100e6)],
+  ]);
+  const onAcquire = jest.fn();
+  function Connected() {
+    const state = useSelector((state: { game: GameType }) => state.game);
+    return (
+      <TerritoryNetwork
+        game={state}
+        facilityActions={facilityActions}
+        onBuild={jest.fn()}
+        onUpgrade={jest.fn()}
+        onAcquire={onAcquire}
+        onBuyingRule={jest.fn()}
+        onSellingRule={jest.fn()}
+      />
+    );
+  }
   return {
-    onBuildFacility,
-    onInspectFacility,
-    memory,
+    store,
+    facilityActions,
+    onAcquire,
     ...render(
       <Provider store={store}>
         <GameToolMemoryContext.Provider value={memory}>
-          <TerritoryNetwork
-            game={game}
-            {...controls}
-            onAcquire={jest.fn()}
-            onBuildFacility={onBuildFacility}
-            onInspectFacility={onInspectFacility}
-          />
+          <Connected />
         </GameToolMemoryContext.Provider>
       </Provider>,
     ),
   };
 }
-const detail = () => screen.getByRole("region", { name: "Selected territory" });
 const inspect = (id: TerritoryTileId) =>
   fireEvent.click(screen.getByRole("button", { name: `Inspect ${id}` }));
-const firstTile = (game: GameType, id: TerritoryId) =>
-  getTerritoryTiles(game).find((tile) => tile.territoryId === id)!;
-function buy(game: GameType, id: Parameters<typeof landPurchaseQuote>[1]) {
-  const quote = landPurchaseQuote(game, id)!;
-  expect(
-    purchaseLand(game, { territoryId: id, quoteKey: quote.quoteKey }),
-  ).toBe(true);
+const surface = () => screen.getByRole("dialog");
+function freeTile(game: GameType) {
+  const wind = GENERATORS(game, 30e6, [], []).find(
+    (item) => item.name === "Wind",
+  )!;
+  return availableTerritoryTiles(game, wind, "champlain")[0];
 }
 
-it("shows one residential city with its existing company demand and no building slot", () => {
+it("keeps the map clear until activation, and closes to the same map tile with Escape", () => {
   const game = ready();
   show(game);
-  expect(within(detail()).getByRole("heading", { level: 3 })).toHaveTextContent(
-    "Plains · Residential city",
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  const tile = screen.getByRole("button", { name: "Inspect champlain:city" });
+  act(() => tile.focus());
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  fireEvent.click(tile);
+  expect(surface()).not.toHaveAttribute("aria-modal", "true");
+  expect(within(surface()).getByRole("heading", { level: 3 })).toHaveFocus();
+  fireEvent.keyDown(surface(), { key: "Escape" });
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  expect(tile).toHaveFocus();
+  expect(
+    screen.queryByText(/company power pool|one project per tile|Territories$/i),
+  ).not.toBeInTheDocument();
+});
+
+it("keeps inspection on its activated tile while map focus moves", () => {
+  const game = ready();
+  show(game);
+  inspect("champlain:city");
+  const other = screen.getByRole("button", {
+    name: `Inspect ${freeTile(game).id}`,
+  });
+  act(() => other.focus());
+  expect(
+    within(surface()).getByRole("heading", { level: 3 }),
+  ).toHaveTextContent("Residential city");
+  expect(
+    within(surface()).queryByRole("tab", { name: "Generators" }),
+  ).not.toBeInTheDocument();
+  fireEvent.click(other);
+  expect(
+    within(surface()).getByRole("tab", { name: "Generators" }),
+  ).toHaveAttribute("aria-selected", "true");
+});
+
+it("opens the actual locked catalogue immediately and switches between generators and storage", () => {
+  const game = ready();
+  const solar = GENERATORS(game, 30e6, [], []).find(
+    (item) => item.name === "Solar",
+  )!;
+  const tile = availableTerritoryTiles(game, solar, "champlain")[0];
+  show(game);
+  inspect(tile.id);
+  expect(
+    within(surface()).getByRole("tab", { name: "Generators" }),
+  ).toHaveAttribute("aria-selected", "true");
+  expect(
+    within(surface()).queryByRole("combobox", {
+      name: /Build destination|Build tile/,
+    }),
+  ).not.toBeInTheDocument();
+  expect(
+    within(surface()).getByRole("button", { name: "Review purchase of Solar" }),
+  ).toBeEnabled();
+  fireEvent.click(within(surface()).getByRole("tab", { name: "Storage" }));
+  expect(
+    within(surface()).getByRole("tab", { name: "Storage" }),
+  ).toHaveAttribute("aria-selected", "true");
+  expect(within(surface()).getByRole("slider")).toBeInTheDocument();
+  expect(
+    within(surface()).queryByRole("combobox", {
+      name: /Build destination|Build tile/,
+    }),
+  ).not.toBeInTheDocument();
+});
+
+it("builds on the activated tile and replaces the catalogue with the shared facility controls", () => {
+  const game = ready();
+  const tile = freeTile(game);
+  const { store } = show(game);
+  inspect(tile.id);
+  fireEvent.click(
+    within(surface()).getByRole("button", { name: "Review purchase of Wind" }),
   );
-  expect(detail()).toHaveTextContent("Current demand");
-  expect(detail()).toHaveTextContent(
+  fireEvent.click(screen.getByRole("button", { name: "Pay cash" }));
+  expect(
+    store.getState().game.facilities.find((item) => item.tileId === tile.id),
+  ).toMatchObject({ name: "Wind" });
+  expect(screen.getAllByRole("dialog")).toHaveLength(1);
+  expect(
+    within(surface()).getByRole("button", {
+      name: /Cancel construction of Wind/,
+    }),
+  ).toBeEnabled();
+  expect(
+    within(surface()).queryByRole("tab", { name: "Generators" }),
+  ).not.toBeInTheDocument();
+});
+
+it("shows the same expanded plant controls and sale review used by fleet rows", () => {
+  const game = ready();
+  const plant = game.facilities[0];
+  const { facilityActions } = show(game);
+  inspect(plant.tileId!);
+  expect(
+    within(surface()).queryByRole("button", { name: "Inspect plant" }),
+  ).not.toBeInTheDocument();
+  fireEvent.click(
+    within(surface()).getByRole("button", { name: `Pause ${plant.name}` }),
+  );
+  expect(facilityActions.onPause).toHaveBeenCalledWith(plant.id, plant.name);
+  fireEvent.click(
+    within(surface()).getByRole("button", { name: `Sell ${plant.name}` }),
+  );
+  expect(screen.getByRole("button", { name: "Sell" })).toBeEnabled();
+  fireEvent.click(screen.getByRole("button", { name: "Sell" }));
+  expect(facilityActions.onSell).toHaveBeenCalledWith(plant.id);
+});
+
+it("shows the city's real sector demand in the existing demand-by-use chart", () => {
+  const game = ready();
+  show(game);
+  inspect("champlain:city");
+  expect(surface()).toHaveTextContent("Connected customers");
+  expect(surface()).toHaveTextContent(
     formatWatts(territoryDemandShares(game, currentTick(game)!)["champlain"]),
   );
-  expect(detail()).toHaveTextContent("No building slot");
   expect(
-    within(detail()).queryByRole("button", { name: /Build|Storage/ }),
+    within(surface()).getByRole("img", {
+      name: /predicted electricity demand by customer or use type/,
+    }),
+  ).toBeInTheDocument();
+  expect(
+    within(surface()).queryByRole("tab", { name: "Generators" }),
   ).not.toBeInTheDocument();
 });
 
-it.each(LAND_TERRITORIES)(
-  "reviews unowned $benefit parcel $id as a cash purchase from its tile",
-  ({ id, benefit }) => {
-    const game = ready();
-    show(game, firstTile(game, id).id);
-    fireEvent.click(
-      within(detail()).getByRole("button", { name: /Buy territory/ }),
-    );
-    const dialog = screen.getByRole("dialog", { name: "Buy territory" });
-    expect(
-      within(dialog).getByRole("button", { name: /Buy territory/ }),
-    ).toBeEnabled();
-    expect(
-      within(dialog).queryByRole("button", { name: /loan/i }),
-    ).not.toBeInTheDocument();
-    expect(dialog).toHaveTextContent(
-      benefit === "residential"
-        ? "residential customers"
-        : benefit === "industrial"
-          ? "industrial customers"
-          : benefit === "general"
-            ? "shared building sites"
-            : `${benefit} development site`,
-    );
-  },
-);
-
-it("quotes both tiles in a neutral parcel as the same purchase with all its rights", () => {
+it("buys exactly the inspected tile in one action and shows its build catalogue", () => {
   const game = ready();
-  const tiles = getTerritoryTiles(game).filter(
-    (tile) => tile.territoryId === "parcel-0",
-  );
-  show(game, tiles[0].id);
-  const firstPrice = within(detail()).getByRole("button", {
-    name: /Buy territory/,
-  }).textContent;
-  inspect(tiles[1].id);
+  const tile = territoryTileViews(game).find(
+    ({ tile }) => !tile.city && tilePurchaseQuote(game, tile.id),
+  )!.tile;
+  const quote = tilePurchaseQuote(game, tile.id)!;
+  const before = currentTick(game)!.cash;
+  const { store } = show(game);
+  inspect(tile.id);
+  expect(surface()).toHaveTextContent("Cash after purchase");
+  fireEvent.click(within(surface()).getByRole("button", { name: /Buy tile/ }));
+  expect(currentTick(store.getState().game)!.cash).toBe(before - quote.price);
+  expect(ownsTerritoryTile(store.getState().game, tile.id)).toBe(true);
+  expect(screen.getAllByRole("dialog")).toHaveLength(1);
   expect(
-    within(detail()).getByRole("button", { name: /Buy territory/ }),
-  ).toHaveTextContent(firstPrice!);
-  fireEvent.click(
-    within(detail()).getByRole("button", { name: /Buy territory/ }),
-  );
-  expect(
-    screen.getByRole("dialog", { name: "Buy territory" }),
-  ).toHaveTextContent("2 shared building sites");
+    within(surface()).getByRole("tab", { name: "Generators" }),
+  ).toHaveAttribute("aria-selected", "true");
+  expect(store.getState().game.territoryNetwork!.tilePurchases).toHaveLength(1);
 });
 
-it("reviews an unaffordable parcel with its benefits and cash shortfall", () => {
+it("keeps unaffordable tiles inspectable without spending", () => {
   const game = ready();
+  const tile = territoryTileViews(game).find(({ tile }) =>
+    tilePurchaseQuote(game, tile.id),
+  )!.tile;
   currentTick(game)!.cash = 1;
-  show(game, "parcel-1:city");
-  fireEvent.click(
-    within(detail()).getByRole("button", { name: /Buy territory/ }),
-  );
-  const dialog = screen.getByRole("dialog", { name: "Buy territory" });
+  const { store } = show(game);
+  inspect(tile.id);
   expect(
-    within(dialog).getByRole("button", { name: /Buy territory/ }),
+    within(surface()).getByRole("button", { name: /Buy tile/ }),
   ).toBeDisabled();
-  expect(within(dialog).getByRole("status")).toHaveTextContent(
+  expect(within(surface()).getByRole("status")).toHaveTextContent(
     "more cash needed",
   );
-  expect(dialog).toHaveTextContent("residential customers");
+  expect(store.getState().game.territoryNetwork!.tilePurchases).toHaveLength(0);
 });
 
-it.each(["green-uplands", "parcel-0", "parcel-7", "parcel-3"] as const)(
-  "remembers the exact free tile and parent destination when building in %s",
-  (id) => {
-    const game = ready();
-    buy(game, id);
-    const tile = firstTile(game, id);
-    const { onBuildFacility, memory } = show(game, tile.id);
-    expect(detail()).toHaveTextContent("1 / 1 available");
-    expect(detail()).toHaveTextContent(
-      `${formatWatts(tile.maxPeakW!)} / project`,
-    );
-    fireEvent.click(within(detail()).getByRole("button", { name: /^Build/ }));
-    expect(onBuildFacility).toHaveBeenCalledWith(id, false);
-    expect(memory.get(TERRITORY_BUILD_MEMORY_KEY)).toBe(id);
-    expect(memory.get(TERRITORY_TILE_BUILD_MEMORY_KEY)).toBe(tile.id);
-    expect(game.transmission!.lines).toEqual([]);
-  },
-);
-
-it("selects storage for a single compatible slot and preserves its exact tile", () => {
+it("reveals purchased cities as customers rather than build destinations", () => {
   const game = ready();
-  buy(game, "parcel-0");
-  const tile = getTerritoryTiles(game).filter(
-    (item) => item.territoryId === "parcel-0",
-  )[1];
-  const { onBuildFacility, memory } = show(game, tile.id);
-  fireEvent.click(within(detail()).getByRole("button", { name: "Storage" }));
-  expect(onBuildFacility).toHaveBeenCalledWith("parcel-0", true);
-  expect(memory.get(TERRITORY_TILE_BUILD_MEMORY_KEY)).toBe(tile.id);
-});
-
-it("shows an acquired industrial city without offering plant sites", () => {
-  const game = ready();
-  buy(game, "parcel-5");
-  show(game, "parcel-5:city");
-  expect(detail()).toHaveTextContent("Connected customersIndustrial400");
-  expect(detail()).toHaveTextContent("Current demand");
+  const target = territoryTileViews(game).find(
+    ({ tile }) => !!tile.city && !!tilePurchaseQuote(game, tile.id),
+  )!.tile;
+  show(game);
+  inspect(target.id);
+  fireEvent.click(within(surface()).getByRole("button", { name: /Buy tile/ }));
+  expect(surface()).toHaveTextContent("Connected customers");
   expect(
-    within(detail()).queryByRole("button", { name: /Build|Storage/ }),
+    within(surface()).queryByRole("tab", { name: "Generators" }),
   ).not.toBeInTheDocument();
 });
 
-it("shows a single occupied plant and opens its fleet inspection instead of another build", () => {
-  const game = ready();
-  const plant = game.facilities[0];
-  const { onInspectFacility } = show(game, plant.tileId!);
-  expect(detail()).toHaveTextContent(formatFacilitySize(plant));
-  expect(detail()).toHaveTextContent("Building slot occupied");
-  expect(
-    within(detail()).queryByRole("button", { name: /Build|Storage/ }),
-  ).not.toBeInTheDocument();
-  fireEvent.click(
-    within(detail()).getByRole("button", { name: "Inspect plant" }),
-  );
-  expect(onInspectFacility).toHaveBeenCalledWith(plant.id);
-});
-
-it("keeps paused construction on its occupied tile with its remaining build time", () => {
-  const game = ready();
-  const plant = game.facilities[0];
-  plant.yearsToBuildLeft = 0.5;
-  plant.paused = true;
-  show(game, plant.tileId!);
-  expect(detail()).toHaveTextContent("Construction paused · 6 months left");
-  expect(
-    within(detail()).queryByRole("button", { name: /^Build/ }),
-  ).not.toBeInTheDocument();
-});
-
-it.each(["ridge-electric", "valley-electric"] as const)(
-  "offers the unchanged %s acquisition and terms from an occupied utility tile",
-  (id) => {
-    const game = ready();
-    const tile = getTerritoryTiles(game).find(
-      (item) => item.territoryId === id && item.startingAssetId,
-    )!;
-    show(game, tile.id);
-    expect(detail()).toHaveTextContent("Building slot occupied");
-    fireEvent.click(
-      within(detail()).getByRole("button", {
-        name: `Acquire ${territoryMapLabel(id)}`,
-      }),
-    );
-    expect(
-      screen.getByRole("dialog", { name: `Acquire ${territoryMapLabel(id)}?` }),
-    ).toBeVisible();
-    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
-    fireEvent.click(
-      within(detail()).getByRole("button", {
-        name: `Inspect ${territoryMapLabel(id)}`,
-      }),
-    );
-    expect(
-      screen.getByRole("dialog", { name: "Acquisition terms" }),
-    ).toBeVisible();
-  },
-);
-
-it("shows only the acquired utility tile's facility after ownership transfers", () => {
+it("keeps acquisition receipts and fleet controls reachable after buying a utility", () => {
   const game = ready();
   const quote = acquisitionQuote(game, "ridge-electric")!;
   transferUtility(game, {
@@ -309,141 +310,10 @@ it("shows only the acquired utility tile's facility after ownership transfers", 
   const plant = game.facilities.find(
     (item) => item.territoryId === "ridge-electric",
   )!;
-  show(game, plant.tileId!);
-  expect(detail()).toHaveTextContent("Your territory");
+  show(game);
+  inspect(plant.tileId!);
   expect(
-    within(detail()).getByRole("button", { name: "Inspect plant" }),
+    within(surface()).getByRole("button", { name: `Pause ${plant.name}` }),
   ).toBeEnabled();
-  expect(
-    within(detail()).queryByRole("button", { name: /^Acquire|^Build/ }),
-  ).not.toBeInTheDocument();
-});
-
-it("disables only the parcel owned by another co-op company", () => {
-  const game = ready();
-  game.multiplayer = {
-    seat: "0",
-    landOwners: { "parcel-7": { seat: "1", name: "North Electric" } },
-  };
-  show(game, "parcel-7:site-0");
-  expect(detail()).toHaveTextContent("Owned by North Electric");
-  expect(
-    within(detail()).getByRole("button", { name: /Buy territory/ }),
-  ).toBeDisabled();
-  inspect("parcel-3:site-0");
-  expect(
-    within(detail()).getByRole("button", { name: /Buy territory/ }),
-  ).toBeEnabled();
-});
-
-it("shows terrain wind and construction facts only when they affect the selected site", () => {
-  const game = ready();
-  buy(game, "green-uplands");
-  const tiles = getTerritoryTiles(game).filter(
-    (tile) => tile.territoryId === "green-uplands",
-  );
-  show(game, tiles.find((tile) => tile.terrain === "hills")!.id);
-  expect(detail()).toHaveTextContent("Onshore wind speed+10%");
-  expect(detail()).toHaveTextContent("Wind / solar build cost+10%");
-  inspect(tiles.find((tile) => tile.terrain === "plains")!.id);
-  expect(detail()).not.toHaveTextContent("Onshore wind speed");
-  expect(detail()).not.toHaveTextContent("build cost");
-});
-
-it("shows a peer storage occupant without applying wind or solar terrain modifiers", () => {
-  const game = ready();
-  const tile = getTerritoryTiles(game).find(
-    (item) => item.territoryId === "green-uplands" && item.terrain === "hills",
-  )!;
-  game.multiplayer = {
-    seat: "0",
-    landOwners: { "green-uplands": { seat: "1", name: "North Electric" } },
-    tileFacilities: {
-      [tile.id]: {
-        seat: "1",
-        name: "Battery",
-        peakW: 20e6,
-        peakWh: 80e6,
-        yearsToBuildLeft: 0,
-      },
-    },
-  };
-  show(game, tile.id);
-  expect(within(detail()).getByRole("heading", { level: 3 })).toHaveTextContent(
-    "Hills · Battery",
-  );
-  expect(detail()).toHaveTextContent("80MWh");
-  expect(detail()).toHaveTextContent("Power20MW");
-  expect(detail()).not.toHaveTextContent("wind speed");
-  expect(detail()).not.toHaveTextContent(/build cost/i);
-  expect(
-    within(detail()).queryByRole("button", {
-      name: /Build|Storage|Inspect plant/,
-    }),
-  ).not.toBeInTheDocument();
-});
-
-it("restricts the ocean tile to offshore wind and offers no storage", () => {
-  const game = ready();
-  const tile = getTerritoryTiles(game).find(
-    (item) => item.terrain === "ocean" && item.territoryId === "champlain",
-  )!;
-  expect(facilityOnTile(game, tile.id)).toBeUndefined();
-  show(game, tile.id);
-  expect(detail()).toHaveTextContent("Accepts offshore wind");
-  expect(
-    within(detail()).getByRole("button", { name: /^Build/ }),
-  ).toBeEnabled();
-  expect(
-    within(detail()).queryByRole("button", { name: "Storage" }),
-  ).not.toBeInTheDocument();
-});
-
-it.each([false, true])(
-  "remembers tile navigation and hands inspection focus to the detail (narrow: %s)",
-  async (narrow) => {
-    const media = jest.spyOn(window, "matchMedia").mockReturnValue({
-      ...window.matchMedia("(max-width: 740px)"),
-      matches: narrow,
-    });
-    try {
-      const { memory } = show(ready());
-      const scroll = jest.fn();
-      Object.defineProperty(detail(), "scrollIntoView", { value: scroll });
-      const target = screen.getByRole("button", {
-        name: "Inspect parcel-0:site-1",
-      });
-      act(() => target.focus());
-      expect(memory.get("network.tile")).toBe("parcel-0:site-1");
-      expect(target).toHaveFocus();
-      expect(scroll).not.toHaveBeenCalled();
-      fireEvent.click(target);
-      await waitFor(() =>
-        expect(
-          within(detail()).getByRole("heading", { level: 3 }),
-        ).toHaveFocus(),
-      );
-      expect(scroll.mock.calls).toEqual(narrow ? [[{ block: "start" }]] : []);
-    } finally {
-      media.mockRestore();
-    }
-  },
-);
-
-it("keeps later tile navigation focused when an inspection frame is pending", () => {
-  jest.useFakeTimers();
-  try {
-    show(ready());
-    fireEvent.click(
-      screen.getByRole("button", { name: "Inspect champlain:city" }),
-    );
-    const next = screen.getByRole("button", {
-      name: "Inspect champlain:site-0",
-    });
-    act(() => next.focus());
-    act(() => jest.advanceTimersByTime(32));
-    expect(next).toHaveFocus();
-  } finally {
-    jest.useRealTimers();
-  }
+  expect(screen.getByText("Acquired utilities (1)")).toBeInTheDocument();
 });

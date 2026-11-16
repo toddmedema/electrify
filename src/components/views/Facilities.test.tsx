@@ -312,24 +312,22 @@ function renderFacilities(
   };
 }
 
-it("opens the selected territory plant in the fleet", async () => {
+it("opens the shared plant controls on the map without switching to the fleet", async () => {
   const game = createGame({ scenarioId: 116, seed: 188 });
   const plant = game.facilities.find((facility) => facility.fuel === "Hydro")!;
-  const { onSelect } = renderFacilities(game, null);
+  const { onSelect, onPause } = renderFacilities(game, null);
   await user.click(screen.getByRole("tab", { name: "Territories" }));
   await user.click(screen.getByTitle(`Lake · ${plant.name}`));
-  const detail = screen.getByRole("region", { name: "Selected territory" });
+  const detail = screen.getByRole("dialog", { name: plant.name });
   await user.click(
-    within(detail).getByRole("button", { name: "Inspect plant" }),
+    within(detail).getByRole("button", { name: `Pause ${plant.name}` }),
   );
-  expect(onSelect).toHaveBeenCalledWith(plant.id);
-  expect(screen.getByRole("tab", { name: "Fleet" })).toHaveAttribute(
+  expect(onPause).toHaveBeenCalledWith(plant.id, plant.name);
+  expect(onSelect).not.toHaveBeenCalled();
+  expect(screen.getByRole("tab", { name: "Territories" })).toHaveAttribute(
     "aria-selected",
     "true",
   );
-  expect(
-    screen.queryByRole("button", { name: "Inspect plant" }),
-  ).not.toBeInTheDocument();
 });
 
 // Address inspection targets by their class; asking for a role by name computes an accessible
@@ -1510,6 +1508,11 @@ it.each([false, true])(
       >
         <TerritoryNetwork
           game={game}
+          facilityActions={{
+            onSell: jest.fn(),
+            onPause: jest.fn(),
+            onTogglePause: jest.fn(),
+          }}
           onBuild={jest.fn()}
           onUpgrade={jest.fn()}
           onBuyingRule={jest.fn()}

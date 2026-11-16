@@ -1780,3 +1780,47 @@ it("updates quoted build costs when the local currency context changes", () => {
     ),
   ).toBeInTheDocument();
 });
+
+it("locks the tile catalogue to its activated tile without destination pickers", () => {
+  const game = createGame({ scenarioId: 116, seed: 611 });
+  game.timeline[0].cash = 1e12;
+  const wind = GENERATORS(game, 30e6, [], []).find(
+    (candidate) => candidate.name === "Wind",
+  )!;
+  const tile = availableTerritoryTiles(game, wind, "champlain")[0];
+  const memory = new Map<string, unknown>([
+    [TERRITORY_BUILD_MEMORY_KEY, "green-uplands"],
+    [TERRITORY_TILE_BUILD_MEMORY_KEY, "green-uplands:site-0"],
+    ["generators.size", wToSliderTick(30e6)],
+  ]);
+  const onBuild = jest.fn();
+  render(
+    <GameToolMemoryContext.Provider value={memory}>
+      <BuildGenerators
+        game={game}
+        lockedTileId={tile.id}
+        onBack={jest.fn()}
+        onBuildGenerator={onBuild}
+      />
+    </GameToolMemoryContext.Provider>,
+  );
+  expect(
+    screen.queryByRole("combobox", { name: "Build destination" }),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole("combobox", { name: "Build tile" }),
+  ).not.toBeInTheDocument();
+  fireEvent.click(
+    screen.getByRole("button", { name: "Review purchase of Wind" }),
+  );
+  expect(screen.getByRole("dialog")).toHaveTextContent(
+    territoryBuildTileName(tile.id, game),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Pay cash" }));
+  expect(onBuild).toHaveBeenCalledWith(
+    expect.objectContaining({ name: "Wind", peakW: 30e6 }),
+    false,
+    "champlain",
+    tile.id,
+  );
+});

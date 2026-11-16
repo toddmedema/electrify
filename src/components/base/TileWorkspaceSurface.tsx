@@ -1,0 +1,72 @@
+import * as React from "react";
+import { IconButton, Typography } from "@mui/material";
+import CloseIcon from "@mui/icons-material/Close";
+import "./TileWorkspaceSurface.scss";
+
+/** A nonmodal inspector: the map remains interactive behind the same desktop panel/phone sheet. */
+export default function TileWorkspaceSurface({
+  title,
+  subtitle,
+  building,
+  onClose,
+  children,
+}: {
+  title: string;
+  subtitle?: string;
+  building?: boolean;
+  onClose: () => void;
+  children: React.ReactNode;
+}) {
+  const titleId = React.useId();
+  const heading = React.useRef<HTMLHeadingElement>(null);
+  React.useLayoutEffect(() => {
+    const origin = document.activeElement;
+    const map = heading.current?.closest(".territoryNetwork");
+    heading.current?.focus({ preventScroll: true });
+    return () => {
+      const selected = map?.querySelector<HTMLElement>(
+        '.territoryTileTarget[tabindex="0"]',
+      );
+      if (selected) selected.focus({ preventScroll: true });
+      else if (origin instanceof HTMLElement && origin.isConnected)
+        origin.focus({ preventScroll: true });
+    };
+  }, []);
+  return (
+    <section
+      role="dialog"
+      aria-labelledby={titleId}
+      className={`tileWorkspaceSurface${building ? " tileWorkspaceBuilding" : ""}`}
+      onKeyDown={(event) => {
+        if (event.key === "Escape" && !event.defaultPrevented) {
+          event.preventDefault();
+          event.stopPropagation();
+          onClose();
+        }
+      }}
+    >
+      <header className="tileWorkspaceHeading">
+        <div>
+          {subtitle && (
+            <Typography variant="overline" color="textSecondary">
+              {subtitle}
+            </Typography>
+          )}
+          <Typography
+            id={titleId}
+            component="h3"
+            variant="h6"
+            tabIndex={-1}
+            ref={heading}
+          >
+            {title}
+          </Typography>
+        </div>
+        <IconButton aria-label="Close tile" onClick={onClose}>
+          <CloseIcon />
+        </IconButton>
+      </header>
+      <div className="tileWorkspaceBody">{children}</div>
+    </section>
+  );
+}
