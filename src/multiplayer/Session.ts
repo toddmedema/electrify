@@ -155,6 +155,7 @@ export class MultiplayerSession {
   };
   private replicaDisconnected: string[] = [];
   private replicationSends = new Map<string, Promise<unknown>>();
+  private replicationConnections = new Map<string, object>();
   private pendingScenarioBaseline?: ReplicaBaseline;
   private pendingScenarioRecords: Extract<
     ReplicaRequest,
@@ -308,7 +309,10 @@ export class MultiplayerSession {
       if (this.worker) {
         const now = new Set(event.state.connected);
         for (const id of this.connected)
-          if (!now.has(id)) this.post({ kind: "disconnect", sender: id });
+          if (!now.has(id)) {
+            this.forgetReplicationConnection(id);
+            this.post({ kind: "disconnect", sender: id });
+          }
         const joined = [...now].filter((id) => !this.connected.has(id));
         this.connected = now;
         // Recovery refuses baselines for disconnected peers, so membership must arrive first.
@@ -319,7 +323,22 @@ export class MultiplayerSession {
             this.post({ kind: "baseline", to: id });
       }
     } else if (event.kind === "disconnected") {
-      if (this.worker) this.post({ kind: "disconnect", sender: event.sender });
+      if (this.worker) {
+        this.forgetReplicationConnection(event.sender);
+        this.connected.delete(event.sender);
+        this.update({
+          lobby: {
+            ...this.state.lobby,
+            connected: this.state.lobby.connected.filter(
+              (id) => id !== event.sender,
+            ),
+          },
+        });
+        // Native disconnect arrives before the next lobby state. Retire the old channel
+        // before the worker's pause records can trigger recovery on that dead connection.
+        this.sendMembership();
+        this.post({ kind: "disconnect", sender: event.sender });
+      }
       // A friend leaving before the match begins is routine; only a guest loses its game.
       else if (this.isHost() || event.sender !== this.state.lobby.hostId)
         return;
@@ -779,14 +798,22 @@ export class MultiplayerSession {
           disconnected: this.disconnectedSeats(),
         });
   }
+  private forgetReplicationConnection(to: string) {
+    this.replicationConnections.delete(to);
+    this.replicationSends.delete(to);
+  }
   /** The shell's scenario send participates in the same order as all subsequent replica traffic. */
   private sendReplication(to: string, payload: WireMessage) {
+    if (!this.state.lobby.connected.includes(to)) return;
     const generation = this.startGeneration;
+    const connection = this.replicationConnections.get(to) ?? {};
+    this.replicationConnections.set(to, connection);
     const send = (this.replicationSends.get(to) ?? Promise.resolve())
       .catch(() => undefined)
       .then(async () => {
         if (
           generation !== this.startGeneration ||
+          connection !== this.replicationConnections.get(to) ||
           !this.worker ||
           !this.state.lobby.connected.includes(to)
         )
@@ -818,6 +845,7 @@ export class MultiplayerSession {
     void send.catch(() => {
       if (
         generation === this.startGeneration &&
+        connection === this.replicationConnections.get(to) &&
         !!this.worker &&
         this.state.lobby.connected.includes(to)
       )
@@ -1422,6 +1450,7 @@ export class MultiplayerSession {
     this.stopReplica();
     this.replicaStream = undefined;
     this.replicationSends.clear();
+    this.replicationConnections.clear();
     this.pending = undefined;
     this.completion?.reject(new Error("You left the shared game"));
     this.queued.forEach((q) => q.reject(new Error("You left the shared game")));
@@ -1686,6 +1715,7 @@ export class MultiplayerSession {
     this.stopReplica();
     this.replicaStream = undefined;
     this.replicationSends.clear();
+    this.replicationConnections.clear();
     this.receivedScenario = undefined;
     this.outboundScenario.clear();
     this.startGeneration++;
@@ -1711,6 +1741,7 @@ export class MultiplayerSession {
     this.stopReplica();
     this.replicaStream = undefined;
     this.replicationSends.clear();
+    this.replicationConnections.clear();
     this.receivedScenario = undefined;
     this.outboundScenario.clear();
     clearTimeout(this.browseTimer);

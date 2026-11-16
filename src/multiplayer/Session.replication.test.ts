@@ -37,6 +37,8 @@ function fixture({ recover = false } = {}) {
   let source!: ReplicatedWorld;
   let baseline!: ReplicaBaseline;
   let failRecords = false;
+  let heldRecordSend: Promise<void> | undefined;
+  let guestDisconnected = false;
   let holdCommands = false;
   let recovery: ReplicaRecovery | undefined;
   const seats = [
@@ -61,10 +63,17 @@ function fixture({ recover = false } = {}) {
         requests.push({ sender, request });
         if (request.kind === "state") return state(sender);
         if (request.kind === "send") {
+          if (guestDisconnected && request.to === "guest")
+            throw new Error("Player is disconnected");
           if (holdCommands && request.payload.kind === "command") return;
           if (request.payload.kind === "records" && failRecords) {
             failRecords = false;
             throw new Error("Send failed");
+          }
+          if (request.payload.kind === "records" && heldRecordSend) {
+            const held = heldRecordSend;
+            heldRecordSend = undefined;
+            await held;
           }
           events.get(request.to)?.(
             parse(
@@ -112,6 +121,9 @@ function fixture({ recover = false } = {}) {
             digest: (bytes) => webcrypto.subtle.digest("SHA-256", bytes),
           });
         sendBaseline();
+      } else if (request.kind === "disconnect") {
+        source.pause("Player disconnected");
+        sendRecords();
       } else if (request.kind === "baseline") sendBaseline();
       else if (request.kind === "replica-peers")
         recovery?.connected(request.connected);
@@ -254,6 +266,16 @@ function fixture({ recover = false } = {}) {
     event: (id: string, event: NativeEvent) => events.get(id)?.(event),
     failRecordSend: () => {
       failRecords = true;
+    },
+    holdRecordSend: () => {
+      let reject!: (error: Error) => void;
+      heldRecordSend = new Promise<void>((_resolve, fail) => {
+        reject = fail;
+      });
+      return reject;
+    },
+    setGuestDisconnected: (disconnected: boolean) => {
+      guestDisconnected = disconnected;
     },
     dispose: () => {
       host.dispose();
@@ -445,6 +467,71 @@ test("a pre-consumption rejection resets the pending sequence and a failed recor
     expect(
       f.posts.filter((request) => request.kind === "baseline").length,
     ).toBeGreaterThan(0);
+  } finally {
+    f.dispose();
+  }
+});
+
+test("a disconnected peer cannot spend recovery attempts before its next state notification", async () => {
+  const f = fixture({ recover: true });
+  try {
+    await f.start();
+    jest.advanceTimersByTime(1000);
+    await flush();
+    const baseline = f.baseline();
+    f.setGuestDisconnected(true);
+    f.event("host", { kind: "disconnected", sender: "guest" });
+    await flush();
+    expect(f.baseline()).toBe(baseline);
+    expect(f.host.getSnapshot().lobby.connected).toEqual([]);
+    expect(
+      f.posts.filter((request) => request.kind === "baseline"),
+    ).toHaveLength(0);
+    f.setGuestDisconnected(false);
+    f.event("host", { kind: "state", state: f.state("host") });
+    await flush();
+    expect(
+      f.posts.filter((request) => request.kind === "baseline"),
+    ).toHaveLength(1);
+    expect(f.guest.getSnapshot()).toMatchObject({ synchronizing: false });
+    expect(f.guest.getSnapshot().view?.reason).not.toContain(
+      "could not stay in sync",
+    );
+  } finally {
+    f.dispose();
+  }
+});
+
+test("a reconnected peer receives its baseline without waiting for an obsolete send failure", async () => {
+  const f = fixture({ recover: true });
+  try {
+    await f.start();
+    const reject = f.holdRecordSend();
+    const command = f.host.submit({ kind: "rate", value: 0.11 });
+    await flush();
+    await command;
+    f.event("host", { kind: "disconnected", sender: "guest" });
+    f.event("host", {
+      kind: "state",
+      state: { ...f.state("host"), connected: [] },
+    });
+    f.event("host", { kind: "state", state: f.state("host") });
+    await flush();
+    expect(
+      f.posts.filter((request) => request.kind === "baseline"),
+    ).toHaveLength(1);
+    expect(f.guest.getSnapshot()).toMatchObject({ synchronizing: false });
+    expect(
+      f.replicaPosts.filter((request) => request.kind === "baseline"),
+    ).toHaveLength(2);
+    reject(new Error("Old connection closed"));
+    await flush();
+    expect(
+      f.posts.filter((request) => request.kind === "baseline"),
+    ).toHaveLength(1);
+    expect(f.guest.getSnapshot().view?.reason).not.toContain(
+      "could not stay in sync",
+    );
   } finally {
     f.dispose();
   }
