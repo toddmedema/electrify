@@ -445,6 +445,9 @@ html:is(:not([data-touch-input="true"]), [data-controller-input="true"]) {
   #menuCard .MuiButtonBase-root:focus,
   .couchSettingsPromptActions .MuiButton-root:focus,
   &:not(:has(.couchSettingsPrompt :focus))
+    // An exiting screen is inert and its focus has already moved to the body; painting a
+    // selection there reads as the active button jumping while the page fades.
+    main:not([inert])
     #menuCard:not(:focus-within)
     .mainActions
     .MuiButton-root:first-child {

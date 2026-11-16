@@ -802,6 +802,37 @@ test("background clicks and returning to the page restore the first home action"
   await other.close();
 });
 
+// Touch keeps the first action highlighted at all times, so only pointer projects can show the jump.
+test("leaving home does not light up the top action while the menu fades out", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    !["desktop-chromium", "desktop-1440px"].includes(testInfo.project.name),
+  );
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/");
+  const play = page.getByRole("button", { name: "Play", exact: true });
+  const settings = page.getByRole("button", { name: "Settings", exact: true });
+  await expect(page.locator("#appStartup")).toHaveCount(0);
+  await expect(play).toBeFocused();
+  await settings.hover();
+  await expect(settings).toBeFocused(); // the pointer moved the active button to Settings
+  await settings.click();
+  // The home screen stays mounted and inert while it fades out.
+  await page.waitForFunction(() => {
+    const menu = document.querySelector<HTMLElement>("#menuCard");
+    return !!menu && !!menu.closest<HTMLElement>("main")?.inert;
+  });
+  // The selection must not jump to the top action while the menu is leaving.
+  const background = await play.evaluate(
+    (button) => getComputedStyle(button).backgroundColor,
+  );
+  expect(background).toBe("rgba(0, 0, 0, 0)");
+  await expect(
+    page.getByRole("heading", { name: "Settings", exact: true }),
+  ).toBeVisible();
+});
+
 for (const theme of ["light", "dark"]) {
   test(`every footer icon has a consistent readable tooltip in ${theme}`, async ({
     page,
