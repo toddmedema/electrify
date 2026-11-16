@@ -9,12 +9,13 @@ import {
 import { TERRITORIES } from "../../data/Territories";
 import { ownedTerritories } from "../../helpers/Territories";
 import type { GameType, TerritoryId } from "../../Types";
+import { territoryMapLabel } from "./TerritoryMapLayout";
 import { useToolState } from "./GameToolMemory";
 
 export const TERRITORY_BUILD_MEMORY_KEY = "build.territory";
 
 export function territoryName(id: TerritoryId): string {
-  return TERRITORIES.find((territory) => territory.id === id)?.name ?? id;
+  return territoryMapLabel(id);
 }
 
 export function useTerritoryBuildDestination() {
@@ -42,13 +43,18 @@ export default function TerritoryBuildDestination({
           value={value}
           onChange={(event) => onChange(event.target.value as TerritoryId)}
         >
-          {TERRITORIES.map((territory) => (
+          {TERRITORIES.filter(
+            (territory) =>
+              territory.id === value ||
+              (owned.includes(territory.id) &&
+                Object.values(territory.sites).some((site) => site.count > 0)),
+          ).map((territory) => (
             <MenuItem
               key={territory.id}
               value={territory.id}
               disabled={!owned.includes(territory.id)}
             >
-              {territory.name}
+              {territoryName(territory.id)}
               {!owned.includes(territory.id) ? " · not owned" : ""}
             </MenuItem>
           ))}

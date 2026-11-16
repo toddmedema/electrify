@@ -1,20 +1,26 @@
 import * as React from "react";
 import { Button, Typography } from "@mui/material";
-import { TERRITORIES, TerritorySiteKind } from "../../data/Territories";
+import {
+  TERRITORIES,
+  isLandTerritoryId,
+  TerritorySiteKind,
+} from "../../data/Territories";
 import {
   facilityTerritoryId,
   ownedTerritories,
   territorySiteInventory,
   landPurchaseQuote,
+  landTransferredCustomers,
 } from "../../helpers/Territories";
 import { currentTick } from "../../helpers/GameSelectors";
-import { formatWatts } from "../../helpers/Format";
-import type { TerritoryId } from "../../Types";
+import { formatCount, formatWatts } from "../../helpers/Format";
+import type { LandTerritoryId, TerritoryId } from "../../Types";
 import { TransmissionPanelProps } from "./TransmissionPanel";
 import { GameToolMemoryContext, useToolState } from "../base/GameToolMemory";
 import { TERRITORY_BUILD_MEMORY_KEY } from "../base/TerritoryBuildDestination";
 import AcquiredUtilities from "./AcquiredUtilities";
 import TerritoryHexMap from "./TerritoryHexMap";
+import { territoryMapLabel } from "../base/TerritoryMapLayout";
 import AcquisitionReviewDialog from "../base/AcquisitionReviewDialog";
 import UtilityOfferDialog from "../base/UtilityOfferDialog";
 import DecisionDialog from "../base/DecisionDialog";
@@ -26,12 +32,14 @@ import { multiplayerRuntime } from "../../multiplayer/Registry";
 const siteLabels: Record<TerritorySiteKind, string> = {
   industrial: "Industrial",
   wind: "Wind",
-  "open-land": "Open land · solar / storage",
+  "open-land": "Solar / storage",
+  general: "General building sites",
+  hydro: "Hydro site",
+  geothermal: "Geothermal site",
 };
 type Props = TransmissionPanelProps & {
   onBuildFacility?: (id: TerritoryId, storage: boolean) => void;
 };
-
 export default function TerritoryNetwork(props: Props) {
   const { game } = props;
   const [selected, setSelected] = useToolState<TerritoryId>(
@@ -40,121 +48,203 @@ export default function TerritoryNetwork(props: Props) {
   );
   const [review, setReview] = React.useState(false);
   const [terms, setTerms] = React.useState(false);
-  const [landReview, setLandReview] = React.useState(false);
+  const [reviewLandId, setReviewLandId] = React.useState<LandTerritoryId>();
   const [error, setError] = React.useState<string>();
   const dispatch = useAppDispatch();
   const { formatMoneyConcise: money } = useMoney();
   const memory = React.useContext(GameToolMemoryContext);
   const summaryRef = React.useRef<HTMLElement>(null);
+  const detailRef = React.useRef<HTMLElement>(null);
+  const headingRef = React.useRef<HTMLHeadingElement>(null);
   const acquired = React.useRef(false);
+  const boughtLand = React.useRef(false);
   React.useEffect(() => {
     if (!review && acquired.current && summaryRef.current) {
       acquired.current = false;
       summaryRef.current.focus();
     }
   }, [review, game.utilityExpansion?.acquisitions.length]);
+  React.useEffect(() => {
+    if (!reviewLandId && boughtLand.current) {
+      boughtLand.current = false;
+      headingRef.current?.focus();
+    }
+  }, [reviewLandId, game.territoryNetwork?.landPurchases.length]);
   const owned = ownedTerritories(game);
-  const territory = TERRITORIES.find(({ id }) => id === selected)!;
-  const isOwned = owned.includes(selected);
+  const territory =
+    TERRITORIES.find(({ id }) => id === selected) ?? TERRITORIES[0];
+  const isOwned = owned.includes(territory.id);
   const plants = game.facilities.filter(
-    (facility) => facilityTerritoryId(facility) === selected,
+    (facility) => facilityTerritoryId(facility) === territory.id,
   );
-  const land = landPurchaseQuote(game);
+  const land = isLandTerritoryId(territory.id)
+    ? landPurchaseQuote(game, territory.id)
+    : undefined;
+  const reviewLand = reviewLandId
+    ? landPurchaseQuote(game, reviewLandId)
+    : undefined;
+  const reviewedTerritory = TERRITORIES.find(({ id }) => id === reviewLandId);
+  const isCustomer =
+    territory.benefit === "residential" || territory.benefit === "industrial";
+  const customers = isOwned
+    ? landTransferredCustomers(game, territory.id)
+    : (land?.customers ?? 0);
+  const inventories = (Object.keys(siteLabels) as TerritorySiteKind[])
+    .map((kind) => ({
+      kind,
+      ...territorySiteInventory(game, territory.id, kind),
+    }))
+    .filter((inventory) => inventory.total > 0);
+  const hasRoom = inventories.some((inventory) => inventory.remaining > 0);
+  const storageRoom = inventories.some(
+    (inventory) =>
+      (inventory.kind === "general" || inventory.kind === "open-land") &&
+      inventory.remaining > 0,
+  );
   const build = (storage: boolean) => {
-    memory?.set(TERRITORY_BUILD_MEMORY_KEY, selected);
-    props.onBuildFacility?.(selected, storage);
+    memory?.set(TERRITORY_BUILD_MEMORY_KEY, territory.id);
+    props.onBuildFacility?.(territory.id, storage);
   };
-  const status = (id: TerritoryId, compact = false) =>
-    id === "champlain"
-      ? compact
-        ? "Home"
-        : "Your home territory"
-      : owned.includes(id)
-        ? compact
-          ? "Owned"
-          : "Your territory"
-        : id === "green-uplands"
-          ? game.multiplayer?.landOwner
-            ? `Owned by ${game.multiplayer.landOwner.name}`
-            : compact
-              ? "Available land"
-              : "Land available to buy"
-          : "Independent utility";
+  const status = (id: TerritoryId) => {
+    if (owned.includes(id)) return "Your territory";
+    if (!isLandTerritoryId(id)) return "Independent utility";
+    const other = game.multiplayer?.landOwners?.[id];
+    return other ? `Owned by ${other.name}` : "Available to buy";
+  };
+  const inspect = (id: TerritoryId, focusDetails = false) => {
+    setSelected(id);
+    if (focusDetails)
+      requestAnimationFrame(() => {
+        const narrow = window.matchMedia("(max-width: 740px)").matches;
+        if (narrow) detailRef.current?.scrollIntoView({ block: "start" });
+        headingRef.current?.focus({ preventScroll: !narrow });
+      });
+  };
+  const description =
+    territory.benefit === "residential"
+      ? "Connect residential customers to your company."
+      : territory.benefit === "industrial"
+        ? "Connect industrial customers, with higher electricity demand per account."
+        : territory.benefit === "hydro"
+          ? "Develop a hydro plant here. Its output depends on the available water."
+          : territory.benefit === "geothermal"
+            ? "Develop a geothermal plant here."
+            : territory.benefit === "general"
+              ? "Build general generators or storage here."
+              : territory.description;
   return (
     <section className="territoryNetwork" aria-label="Territories">
       <header className="territoryNetworkHeading">
         <Typography component="h2" variant="h6">
-          Your territories
+          Territories
         </Typography>
       </header>
       <div className="territoryNetworkLayout">
         <div className="territoryMapColumn">
           <TerritoryHexMap
             game={game}
-            selected={selected}
+            selected={territory.id}
             status={status}
-            onSelect={setSelected}
+            onSelect={inspect}
           />
           <div className="territoryNetworkNote">
-            <p>
-              All your facilities and customers share one power pool. Place
-              projects where suitable sites remain.
-            </p>
+            <p>All your facilities and customers share one power pool.</p>
           </div>
           <AcquiredUtilities game={game} summaryRef={summaryRef} />
         </div>
-        <section className="territoryDetail" aria-label="Selected territory">
+        <section
+          className="territoryDetail"
+          aria-label="Selected territory"
+          ref={detailRef}
+        >
           <header>
             <Typography variant="overline" color="textSecondary">
-              {status(selected)}
+              {status(territory.id)}
             </Typography>
-            <Typography component="h3" variant="h6">
-              {territory.name}
+            <Typography
+              component="h3"
+              variant="h6"
+              tabIndex={-1}
+              ref={headingRef}
+            >
+              {territoryMapLabel(territory.id)}
             </Typography>
             <Typography variant="body2" color="textSecondary">
-              {territory.description}
+              {description}
             </Typography>
           </header>
           <div className="territorySites">
-            <Typography component="h4" variant="subtitle2">
-              {isOwned ? "Building sites" : "Sites included"}
-            </Typography>
-            {(Object.keys(siteLabels) as TerritorySiteKind[]).map((kind) => {
-              const inventory = territorySiteInventory(game, selected, kind);
-              return (
-                <div key={kind}>
-                  <span>{siteLabels[kind]}</span>
-                  <strong>
-                    {inventory.remaining} / {inventory.total} left
-                    <small>{formatWatts(inventory.maxPeakW)} / project</small>
-                  </strong>
+            {isCustomer ? (
+              <>
+                <Typography component="h4" variant="subtitle2">
+                  {isOwned ? "Customers added" : "Customers to connect"}
+                </Typography>
+                <div>
+                  <span>
+                    {territory.benefit === "residential"
+                      ? "Residential"
+                      : "Industrial"}
+                  </span>
+                  <strong>{formatCount(customers)}</strong>
                 </div>
-              );
-            })}
-            <Typography variant="caption" color="textSecondary">
-              {isOwned
-                ? `${plants.length} plants and storage · construction reserves a site. `
-                : ""}
-              No new hydro sites.
-            </Typography>
+                <Typography variant="caption" color="textSecondary">
+                  Adds customer demand. No plants or power agreements transfer.
+                </Typography>
+              </>
+            ) : (
+              <>
+                <Typography component="h4" variant="subtitle2">
+                  {isOwned ? "Building sites" : "Sites included"}
+                </Typography>
+                {inventories.map((inventory) => (
+                  <div key={inventory.kind}>
+                    <span>{siteLabels[inventory.kind]}</span>
+                    <strong>
+                      {inventory.remaining} / {inventory.total} left
+                      <small>{formatWatts(inventory.maxPeakW)} / project</small>
+                    </strong>
+                  </div>
+                ))}
+                <Typography variant="caption" color="textSecondary">
+                  {isOwned ? `${plants.length} plants and storage · ` : ""}
+                  Construction reserves a site.{" "}
+                  {territory.benefit === "general"
+                    ? "Shared sites accept thermal, wind, solar or storage."
+                    : ""}
+                </Typography>
+              </>
+            )}
           </div>
           {isOwned ? (
-            <div className="territoryBuildActions">
-              <Button
-                variant="contained"
-                disabled={!props.onBuildFacility}
-                onClick={() => build(false)}
-              >
-                Build in {territory.name}
-              </Button>
-              <Button
-                variant="outlined"
-                disabled={!props.onBuildFacility}
-                onClick={() => build(true)}
-              >
-                Storage
-              </Button>
-            </div>
+            inventories.length > 0 && (
+              <div className="territoryBuildActions">
+                <Button
+                  variant="contained"
+                  disabled={!props.onBuildFacility || !hasRoom}
+                  onClick={() => build(false)}
+                >
+                  {territory.benefit === "hydro"
+                    ? "Build hydro"
+                    : territory.benefit === "geothermal"
+                      ? "Build geothermal"
+                      : `Build in ${territoryMapLabel(territory.id)}`}
+                </Button>
+                {storageRoom && (
+                  <Button
+                    variant="outlined"
+                    disabled={!props.onBuildFacility}
+                    onClick={() => build(true)}
+                  >
+                    Storage
+                  </Button>
+                )}
+                {!hasRoom && (
+                  <Typography variant="body2" color="textSecondary">
+                    All local sites are reserved.
+                  </Typography>
+                )}
+              </div>
+            )
           ) : territory.kind === "utility" ? (
             <div className="territoryBuildActions">
               <Button
@@ -172,16 +262,20 @@ export default function TerritoryNetwork(props: Props) {
             <div className="territoryBuildActions">
               <Button
                 variant="contained"
-                disabled={!land || (currentTick(game)?.cash ?? 0) < land.price}
-                onClick={() => setLandReview(true)}
+                disabled={!land}
+                onClick={() => {
+                  if (isLandTerritoryId(territory.id)) {
+                    setError(undefined);
+                    setReviewLandId(territory.id);
+                  }
+                }}
               >
-                Buy Green Uplands{land ? ` · ${money(land.price)}` : ""}
+                Buy territory{land ? ` · ${money(land.price)}` : ""}
               </Button>
               <Typography variant="body2" color="textSecondary">
-                One cash purchase. Land supplies sites, with no customers,
-                plants or power.{" "}
+                One cash payment. Ownership is immediate.
                 {game.multiplayer
-                  ? "The first accepted purchase owns this shared land."
+                  ? " The first accepted purchase owns this parcel."
                   : ""}
               </Typography>
             </div>
@@ -191,7 +285,7 @@ export default function TerritoryNetwork(props: Props) {
       {review && props.onAcquire && (
         <AcquisitionReviewDialog
           game={game}
-          targetId={selected}
+          targetId={territory.id}
           onClose={() => setReview(false)}
           onAcquire={async (payload) => {
             const accepted = await props.onAcquire!(payload);
@@ -203,26 +297,30 @@ export default function TerritoryNetwork(props: Props) {
       {terms && (
         <UtilityOfferDialog
           game={game}
-          targetId={selected}
+          targetId={territory.id}
           onClose={() => setTerms(false)}
         />
       )}
-      {landReview && land && (
+      {reviewLandId && reviewedTerritory && (
         <DecisionDialog
           open
-          title="Buy Green Uplands"
-          onClose={() => setLandReview(false)}
+          title="Buy territory"
+          onClose={() => setReviewLandId(undefined)}
           actions={
             <>
-              <Button onClick={() => setLandReview(false)}>Cancel</Button>
+              <Button onClick={() => setReviewLandId(undefined)}>Cancel</Button>
               <Button
                 variant="contained"
-                disabled={(currentTick(game)?.cash ?? 0) < land.price}
+                disabled={
+                  !reviewLand ||
+                  (currentTick(game)?.cash ?? 0) < reviewLand.price
+                }
                 onClick={async () => {
+                  if (!reviewLand) return;
                   try {
                     const payload = {
-                      territoryId: land.territoryId,
-                      quoteKey: land.quoteKey,
+                      territoryId: reviewLand.territoryId,
+                      quoteKey: reviewLand.quoteKey,
                     };
                     const runtime = multiplayerRuntime();
                     if (runtime)
@@ -232,25 +330,49 @@ export default function TerritoryNetwork(props: Props) {
                         payload,
                       });
                     else dispatch(acquireLand(payload));
-                    setLandReview(false);
+                    boughtLand.current = true;
+                    setReviewLandId(undefined);
                   } catch (cause) {
                     setError(
                       cause instanceof Error
                         ? cause.message
-                        : "Land purchase unavailable",
+                        : "Territory purchase unavailable",
                     );
                   }
                 }}
               >
-                Buy land · {money(land.price)}
+                Buy territory{reviewLand ? ` · ${money(reviewLand.price)}` : ""}
               </Button>
             </>
           }
         >
-          <Typography>
-            One cash payment buys 4 wind sites and 3 solar or storage sites.
-            Ownership is immediate. No customers, plants or power transfer.
+          <Typography component="p" variant="subtitle1">
+            {territoryMapLabel(reviewLandId)}
           </Typography>
+          {reviewLand ? (
+            <>
+              <Typography sx={{ mt: 1 }}>
+                {reviewLand.customers > 0
+                  ? `Connect ${formatCount(reviewLand.customers)} ${reviewLand.benefit === "industrial" ? "industrial" : "residential"} customers and add their electricity demand. No plants or power agreements transfer.`
+                  : reviewedTerritory.benefit === "general"
+                    ? `${reviewedTerritory.sites.general.count} shared building sites for general generators or storage. No customers or plants transfer.`
+                    : `One ${reviewedTerritory.benefit} development site. Build the plant separately; its normal costs and construction time apply.`}
+              </Typography>
+              <Typography sx={{ mt: 1 }}>
+                One cash payment. Ownership is immediate.
+              </Typography>
+              {(currentTick(game)?.cash ?? 0) < reviewLand.price && (
+                <Typography role="status" sx={{ mt: 1 }}>
+                  {money(reviewLand.price - (currentTick(game)?.cash ?? 0))}{" "}
+                  more cash needed.
+                </Typography>
+              )}
+            </>
+          ) : (
+            <Typography role="alert">
+              This territory is no longer available.
+            </Typography>
+          )}
           {error && <Typography role="alert">{error}</Typography>}
         </DecisionDialog>
       )}

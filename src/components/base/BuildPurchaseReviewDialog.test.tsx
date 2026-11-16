@@ -31,7 +31,7 @@ function fixture(territoryNetwork = false) {
   });
   if (territoryNetwork) {
     game.territoryNetwork = {
-      version: 2,
+      version: 3,
       landPurchases: [{ territoryId: "green-uplands", minute: 0, price: 18e6 }],
       legacyConnections: [],
     };

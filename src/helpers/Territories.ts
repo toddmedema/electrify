@@ -112,10 +112,16 @@ export function territoryBuildAvailability(
   buildable: boolean;
   reason?: string;
   remaining: number;
+  total: number;
   maxPeakW: number;
 } {
   if (!hasTerritoryNetwork(game))
-    return { buildable: true, remaining: Infinity, maxPeakW: Infinity };
+    return {
+      buildable: true,
+      remaining: Infinity,
+      total: Infinity,
+      maxPeakW: Infinity,
+    };
   const territory = TERRITORIES.find((territory) => territory.id === id);
   const specific = territorySiteKind(facility);
   const kind =
@@ -124,13 +130,14 @@ export function territoryBuildAvailability(
     (territory?.sites.general.count ?? 0) > 0
       ? "general"
       : specific;
-  const { remaining, maxPeakW } = kind
+  const { remaining, total, maxPeakW } = kind
     ? territorySiteInventory(game, id, kind)
-    : { remaining: 0, maxPeakW: 0 };
+    : { remaining: 0, total: 0, maxPeakW: 0 };
   const reject = (reason: string) => ({
     buildable: false,
     reason,
     remaining,
+    total,
     maxPeakW,
   });
   if (!territory) return reject("Choose a valid territory.");
@@ -146,7 +153,7 @@ export function territoryBuildAvailability(
     facility.peakW <= maxPeakW
   ))
     return reject("This project exceeds the territory’s per-site power limit.");
-  return { buildable: true, remaining, maxPeakW };
+  return { buildable: true, remaining, total, maxPeakW };
 }
 
 /** Apportion actual sector demand by inherited customer/load weights; never add another load. */

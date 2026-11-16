@@ -1,7 +1,7 @@
 import * as React from "react";
 
 export type TerritoryTileArtKind =
-  "town" | "industry" | "lake" | "plains" | "hills";
+  "town" | "industry" | "lake" | "plains" | "hills" | "land" | "geothermal";
 
 type Props = {
   kind: TerritoryTileArtKind;
@@ -17,6 +17,24 @@ const water = "var(--territory-art-water, #7fc8ce)";
 
 function feature(kind: TerritoryTileArtKind, built: boolean) {
   switch (kind) {
+    case "land":
+      return (
+        <>
+          <path d="M60 380L150 290H440L350 380Z" fill={grass} />
+          <path d="M145 325H260M240 350H360" strokeWidth={10} />
+        </>
+      );
+    case "geothermal":
+      return (
+        <>
+          <path d="M70 390L150 320H350L430 390Z" fill={steel} />
+          <path
+            d="M155 270C105 220 205 180 155 130M250 260C200 205 300 155 250 95M345 270C295 220 395 180 345 130"
+            fill="none"
+          />
+          {built && <path d="M190 390V295H310V390M250 295V245" fill={mint} />}
+        </>
+      );
     case "town":
       return (
         <>

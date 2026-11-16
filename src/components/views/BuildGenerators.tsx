@@ -1,3 +1,4 @@
+import { TERRITORIES } from "../../data/Territories";
 import TerritoryBuildDestination, {
   useTerritoryBuildDestination,
   territoryName,
@@ -300,6 +301,12 @@ export function GeneratorBuildItem(
       props.territoryAvailability?.maxPeakW ?? Infinity,
     ),
   );
+  const territorialSites = props.territoryAvailability
+    ? {
+        total: props.territoryAvailability.total,
+        remaining: props.territoryAvailability.remaining,
+      }
+    : undefined;
   const generalAvailability = getBuildAvailability({
     hydroAvailability: props.hydroAvailability,
     name: generator.name,
@@ -309,6 +316,7 @@ export function GeneratorBuildItem(
     maxSizeLabel: formatWatts(maxSizeW),
     location: props.location,
     viableLocationsRemaining: generator.viableLocationsRemaining,
+    siteInventory: territorialSites,
   });
   const buildable =
     generalAvailability.buildable &&
@@ -322,11 +330,12 @@ export function GeneratorBuildItem(
     (props.territoryAvailability && generator.peakW > maxSizeW && maxSizeW > 0);
   const sites = props.hydroAvailability
     ? undefined
-    : getSiteInventory(
+    : (territorialSites ??
+      getSiteInventory(
         generator.name,
         props.location,
         generator.viableLocationsRemaining,
-      );
+      ));
   const shortfall = !affordable ? (
     <BuildCashWarning cash={cash} downpayment={downpayment} />
   ) : undefined;
@@ -1002,6 +1011,9 @@ function BuildGenerators(props: Props): React.JSX.Element {
   const { game, onBack } = props;
   const [territoryId, setTerritoryId] = useTerritoryBuildDestination();
   const territoryNetwork = hasTerritoryNetwork(game);
+  const specialSite = territoryNetwork
+    ? TERRITORIES.find((territory) => territory.id === territoryId)?.benefit
+    : undefined;
   const legacyBounds = getLegacyBuildBounds(game);
   const minTick = legacyBounds ? wToSliderTick(legacyBounds.minW) : 0;
   const maxTick = legacyBounds ? wToSliderTick(legacyBounds.maxW) : 34;
@@ -1084,6 +1096,7 @@ function BuildGenerators(props: Props): React.JSX.Element {
   const hydroAvailability = getHydroAvailability(
     game,
     shownExactSizes.Hydro ?? sliderTickToW(shownSliderTick),
+    territoryNetwork ? territoryId : undefined,
   );
   const hydroSiteMaximum =
     hydroAvailability.selected ?? hydroAvailability.largest;
@@ -1098,6 +1111,7 @@ function BuildGenerators(props: Props): React.JSX.Element {
     solarIrradiances,
     offshoreWindSpeeds,
     airborneWindSpeeds,
+    territoryNetwork ? territoryId : undefined,
   );
   const shownGenerators = GENERATORS(
     game,
@@ -1106,6 +1120,7 @@ function BuildGenerators(props: Props): React.JSX.Element {
     solarIrradiances,
     offshoreWindSpeeds,
     airborneWindSpeeds,
+    territoryNetwork ? territoryId : undefined,
   )
     .map((generator) =>
       shownExactSizes[generator.name] !== undefined
@@ -1116,8 +1131,16 @@ function BuildGenerators(props: Props): React.JSX.Element {
             solarIrradiances,
             offshoreWindSpeeds,
             airborneWindSpeeds,
+            territoryNetwork ? territoryId : undefined,
           ).find((candidate) => candidate.name === generator.name) || generator
         : generator,
+    )
+    .filter((generator) =>
+      specialSite === "hydro"
+        ? generator.name === "Hydro"
+        : specialSite === "geothermal"
+          ? generator.fuel === "Geothermal"
+          : true,
     )
     .filter(
       (generator) =>
@@ -1323,6 +1346,7 @@ function BuildGenerators(props: Props): React.JSX.Element {
                                 solarIrradiances,
                                 offshoreWindSpeeds,
                                 airborneWindSpeeds,
+                                territoryNetwork ? territoryId : undefined,
                               ).find((item) => item.name === g.name)!;
                               return withResilienceOptions(candidate, game, {})
                                 .buildCost;

@@ -1,3 +1,5 @@
+import { TERRITORIES, LAND_TERRITORIES } from "../src/data/Territories";
+import { territoryMapLabel } from "../src/components/base/TerritoryMapLayout";
 import { expect, test } from "./fixtures";
 import { openBuild, openPane } from "./layout";
 import { reviewScreenshot } from "./review-screenshot";
@@ -5,7 +7,7 @@ import { expectDialogToFit } from "./dialog-layout";
 import { readSavedGame, readSaveRecords } from "./save-fixture";
 
 for (const theme of ["light", "dark"] as const) {
-  test(`territory map has separate usable targets in ${theme}`, async ({
+  test(`territory map uses named borders and purchasable parcels in ${theme}`, async ({
     page,
   }) => {
     await page.addInitScript((mode) => {
@@ -19,87 +21,70 @@ for (const theme of ["light", "dark"] as const) {
       facilities,
       page.getByRole("button", { name: "Facilities", exact: true }),
     );
-    const network = facilities.getByRole("region", {
-      name: "Territories",
-    });
-    const nodes = network.locator(".territoryMapNode");
-    await expect(nodes).toHaveCount(4);
-    const rectangles = await nodes.evaluateAll((buttons) =>
-      buttons.map((button) => {
-        const { x, y, width, height } = button.getBoundingClientRect();
-        return { name: button.getAttribute("aria-label"), x, y, width, height };
-      }),
+    const network = facilities.getByRole("region", { name: "Territories" });
+    await expect(network.locator("[data-map-target]")).toHaveCount(
+      TERRITORIES.length,
     );
-    for (const [index, rectangle] of rectangles.entries()) {
-      expect(
-        rectangle.height,
-        `${rectangle.name} target height`,
-      ).toBeGreaterThanOrEqual(44);
-      expect(
-        rectangle.width,
-        `${rectangle.name} target width`,
-      ).toBeGreaterThanOrEqual(44);
-      for (const other of rectangles.slice(index + 1)) {
-        const intersects =
-          rectangle.x < other.x + other.width &&
-          rectangle.x + rectangle.width > other.x &&
-          rectangle.y < other.y + other.height &&
-          rectangle.y + rectangle.height > other.y;
-        expect(intersects, `${rectangle.name} overlaps ${other.name}`).toBe(
-          false,
-        );
-      }
-    }
-    for (const name of [
-      "Champlain",
-      "Ridge Electric",
+    await expect(
+      network.locator(".territoryMapKey,.territoryHexHub"),
+    ).toHaveCount(0);
+    await expect(network.locator(".territoryUtilityLabel strong")).toHaveText([
+      "You",
       "Valley Electric",
-      "Green Uplands",
-    ]) {
-      const node = network.getByRole("button", {
-        name: `Inspect ${name} territory`,
-        exact: true,
-      });
+      "Ridge Electric",
+    ]);
+    await expect(network.locator(".territoryParcel")).toHaveCount(
+      LAND_TERRITORIES.length,
+    );
+    const colors = await network
+      .locator(".territoryHexBoundary")
+      .evaluateAll((paths) =>
+        paths.map((path) => getComputedStyle(path).stroke),
+      );
+    expect(new Set(colors).size).toBe(3);
+    for (const territory of TERRITORIES) {
+      const node = network.locator(`[data-map-target="${territory.id}"]`);
+      const box = await node.boundingBox();
+      expect(
+        box!.height,
+        `${territory.id} target height`,
+      ).toBeGreaterThanOrEqual(44);
+      expect(box!.width, `${territory.id} target width`).toBeGreaterThanOrEqual(
+        44,
+      );
       await node.click();
       await expect(node).toHaveAttribute("aria-pressed", "true");
-      await expect(
-        network
-          .getByRole("region", { name: "Selected territory" })
-          .getByRole("heading", { name, exact: true, level: 3 }),
-      ).toBeVisible();
+      const detail = network.getByRole("region", {
+        name: "Selected territory",
+      });
+      await expect(detail.getByRole("heading", { level: 3 })).toHaveText(
+        territoryMapLabel(territory.id),
+      );
+      if (territory.kind === "greenfield")
+        await expect(
+          detail.getByRole("button", { name: /Buy territory/ }),
+        ).toBeEnabled();
     }
-    const uplandsTiles = network.locator(
-      '.territoryHex[data-territory="green-uplands"]',
-    );
-    const terrain = await uplandsTiles.evaluateAll((tiles) =>
-      tiles.map((tile) => tile.getAttribute("data-kind")),
-    );
-    expect(terrain).toEqual(expect.arrayContaining(["hills", "plains"]));
-    expect(
-      terrain.some((kind) => ["town", "industry", "lake"].includes(kind!)),
-    ).toBe(false);
-    await network
-      .locator(
-        '.territoryHex[data-territory="green-uplands"] .territoryHexFace',
-      )
-      .first()
-      .click();
-    await expect(
-      network.getByRole("button", {
-        name: "Inspect Green Uplands territory",
-        exact: true,
-      }),
-    ).toHaveAttribute("aria-pressed", "true");
     const home = network.getByRole("button", {
-      name: "Inspect Champlain territory",
+      name: "Inspect You territory",
       exact: true,
     });
     await home.focus();
-    await home.press("Space");
-    await expect(home).toHaveAttribute("aria-pressed", "true");
+    await home.press("ArrowRight");
+    const active = await page.evaluate(() =>
+      document.activeElement?.getAttribute("data-map-target"),
+    );
+    expect(active).toBeTruthy();
+    expect(active).not.toBe("champlain");
+    await network.locator(`[data-map-target="${active}"]`).press("Enter");
+    await expect(
+      network
+        .getByRole("region", { name: "Selected territory" })
+        .getByRole("heading", { level: 3 }),
+    ).toBeFocused();
     expect(
       await page.evaluate(
-        () => document.documentElement.scrollWidth <= window.innerWidth,
+        () => document.documentElement.scrollWidth <= innerWidth,
       ),
     ).toBe(true);
   });
@@ -223,7 +208,7 @@ test("normal valley play saves across the first year and resumes from IndexedDB"
 });
 
 for (const theme of ["light", "dark"] as const) {
-  test(`Green Uplands cash purchase owns land immediately and reserves a wind site in ${theme}`, async ({
+  test(`open land cash purchase owns land immediately and reserves a shared site in ${theme}`, async ({
     page,
   }, testInfo) => {
     await page.addInitScript((mode) => {
@@ -239,7 +224,7 @@ for (const theme of ["light", "dark"] as const) {
     );
     await facilities
       .getByRole("button", {
-        name: "Inspect Green Uplands territory",
+        name: `Inspect ${territoryMapLabel("green-uplands")} territory`,
         exact: true,
       })
       .click();
@@ -247,26 +232,24 @@ for (const theme of ["light", "dark"] as const) {
       name: "Selected territory",
     });
     const before = (await readSavedGame(page))!;
-    await detail.getByRole("button", { name: /Buy Green Uplands/ }).click();
+    await detail.getByRole("button", { name: /Buy territory/ }).click();
     const review = page.getByRole("dialog", {
-      name: "Buy Green Uplands",
+      name: "Buy territory",
       exact: true,
     });
     await expectDialogToFit(review);
-    await expect(review).toContainText(
-      "No customers, plants or power transfer",
-    );
+    await expect(review).toContainText("No customers or plants transfer");
     await expect(review.getByRole("button", { name: /loan/i })).toHaveCount(0);
     await reviewScreenshot(review, {
       path: testInfo.outputPath(`land-cash-review-${theme}.png`),
       scale: "css",
       animations: "disabled",
     });
-    await review.getByRole("button", { name: /Buy land/ }).click();
+    await review.getByRole("button", { name: /Buy territory/ }).click();
     await expect(review).toHaveCount(0);
     await expect(
       detail.getByRole("button", {
-        name: "Build in Green Uplands",
+        name: `Build in ${territoryMapLabel("green-uplands")}`,
         exact: true,
       }),
     ).toBeEnabled();
@@ -297,23 +280,26 @@ for (const theme of ["light", "dark"] as const) {
     );
     await facilities
       .getByRole("button", {
-        name: "Inspect Green Uplands territory",
+        name: `Inspect ${territoryMapLabel("green-uplands")} territory`,
         exact: true,
       })
       .click();
     await detail
-      .getByRole("button", { name: "Build in Green Uplands", exact: true })
+      .getByRole("button", {
+        name: `Build in ${territoryMapLabel("green-uplands")}`,
+        exact: true,
+      })
       .click();
     await expect(
       page.getByRole("combobox", { name: "Build destination", exact: true }),
-    ).toHaveText("Green Uplands");
+    ).toHaveText(territoryMapLabel("green-uplands"));
     const wind = page.getByRole("listitem").filter({
       has: page.getByRole("button", {
         name: "Review purchase of Wind",
         exact: true,
       }),
     });
-    await expect(wind).toContainText("4 local sites left");
+    await expect(wind).toContainText("7 local sites left");
     await wind
       .getByRole("button", { name: "Review purchase of Wind", exact: true })
       .click();
@@ -326,8 +312,8 @@ for (const theme of ["light", "dark"] as const) {
     await openBuild(page);
     await expect(
       page.getByRole("combobox", { name: "Build destination", exact: true }),
-    ).toHaveText("Green Uplands");
-    await expect(wind).toContainText("3 local sites left");
+    ).toHaveText(territoryMapLabel("green-uplands"));
+    await expect(wind).toContainText("6 local sites left");
     const built = (await readSavedGame(page))!;
     expect(built.facilities).toEqual(
       expect.arrayContaining([
@@ -344,4 +330,121 @@ for (const theme of ["light", "dark"] as const) {
       ),
     ).toBe(true);
   });
+}
+
+for (const theme of ["light", "dark"] as const) {
+  for (const customer of [
+    { id: "parcel-1", kind: "residential", count: 16000 },
+    { id: "parcel-5", kind: "industrial", count: 400 },
+  ] as const) {
+    test(`${customer.kind} territory adds customers without plants in ${theme}`, async ({
+      page,
+    }) => {
+      await page.addInitScript((mode) => {
+        localStorage.setItem("theme", mode);
+        localStorage.setItem("audioEnabled", "false");
+      }, theme);
+      await page.goto("/?scenario=116");
+      await page
+        .getByRole("button", { name: "Start game", exact: true })
+        .click();
+      const facilities = page.locator(".facilities:visible");
+      await openPane(
+        facilities,
+        page.getByRole("button", { name: "Facilities", exact: true }),
+      );
+      await facilities.locator(`[data-map-target="${customer.id}"]`).click();
+      const before = (await readSavedGame(page))!,
+        beforeTick = before.timeline.find(
+          (tick) => tick.minute === before.date.minute,
+        )!;
+      const detail = facilities.getByRole("region", {
+        name: "Selected territory",
+      });
+      await detail.getByRole("button", { name: /Buy territory/ }).click();
+      const dialog = page.getByRole("dialog", {
+        name: "Buy territory",
+        exact: true,
+      });
+      await expectDialogToFit(dialog);
+      await expect(dialog).toContainText(`${customer.kind} customers`);
+      await dialog.getByRole("button", { name: /Buy territory/ }).click();
+      await expect(dialog).toHaveCount(0);
+      const saved = (await readSavedGame(page))!,
+        now = saved.timeline.find((tick) => tick.minute === saved.date.minute)!;
+      expect(now.customers - beforeTick.customers).toBe(customer.count);
+      expect(saved.facilities).toHaveLength(before.facilities.length);
+      expect(
+        saved.territoryNetwork!.landPurchases.map(
+          (receipt) => receipt.territoryId,
+        ),
+      ).toContain(customer.id);
+      await expect(detail).toContainText("Customers added");
+      await expect(detail.getByRole("button", { name: /Build/ })).toHaveCount(
+        0,
+      );
+    });
+  }
+  for (const resource of [
+    { id: "parcel-7", name: "Hydro", fuel: "Hydro" },
+    { id: "parcel-3", name: "Geothermal", fuel: "Geothermal" },
+  ] as const) {
+    test(`${resource.name} territory unlocks a working plant purchase in ${theme}`, async ({
+      page,
+    }) => {
+      await page.addInitScript((mode) => {
+        localStorage.setItem("theme", mode);
+        localStorage.setItem("audioEnabled", "false");
+      }, theme);
+      await page.goto("/?scenario=116");
+      await page
+        .getByRole("button", { name: "Start game", exact: true })
+        .click();
+      const facilities = page.locator(".facilities:visible");
+      await openPane(
+        facilities,
+        page.getByRole("button", { name: "Facilities", exact: true }),
+      );
+      await facilities.locator(`[data-map-target="${resource.id}"]`).click();
+      const detail = facilities.getByRole("region", {
+        name: "Selected territory",
+      });
+      await detail.getByRole("button", { name: /Buy territory/ }).click();
+      const dialog = page.getByRole("dialog", {
+        name: "Buy territory",
+        exact: true,
+      });
+      await dialog.getByRole("button", { name: /Buy territory/ }).click();
+      await detail
+        .getByRole("button", {
+          name: `Build ${resource.name.toLowerCase()}`,
+          exact: true,
+        })
+        .click();
+      await expect(
+        page.getByRole("combobox", { name: "Build destination", exact: true }),
+      ).toHaveText(territoryMapLabel(resource.id));
+      const review = page.getByRole("button", {
+        name: `Review purchase of ${resource.name}`,
+        exact: true,
+      });
+      await expect(review).toBeEnabled();
+      await review.click();
+      const plant = page.getByRole("dialog", { name: /^Build / });
+      await expectDialogToFit(plant);
+      await plant
+        .getByRole("button", { name: "Take loan", exact: true })
+        .click();
+      await expect(plant).toHaveCount(0);
+      const saved = (await readSavedGame(page))!;
+      expect(saved.facilities).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            fuel: resource.fuel,
+            territoryId: resource.id,
+          }),
+        ]),
+      );
+    });
+  }
 }

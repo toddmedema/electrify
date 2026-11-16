@@ -1310,7 +1310,7 @@ test("TV saved preferences style direct scenario links before play", async ({
   ).toHaveCount(0);
   await expect(
     page.getByRole("combobox", { name: "Build destination", exact: true }),
-  ).toHaveText("Champlain");
+  ).toHaveText("You");
   const metrics = page
     .getByRole("list", { name: "Generator options" })
     .locator(".buildOptionMetric");

@@ -5,6 +5,8 @@ import { Provider } from "react-redux";
 import { createGame } from "../../testing/Simulator";
 import { landPurchaseQuote, purchaseLand } from "../../helpers/Territories";
 import { currentTick } from "../../helpers/GameSelectors";
+import { LAND_TERRITORIES } from "../../data/Territories";
+import { territoryMapLabel } from "../base/TerritoryMapLayout";
 import TerritoryNetwork from "./TerritoryNetwork";
 import { acquisitionQuote, transferUtility } from "../../helpers/Expansion";
 jest.mock("../base/useOutlookWorker", () => ({
@@ -41,92 +43,149 @@ function show(game: ReturnType<typeof ready>, onBuildFacility = jest.fn()) {
     ),
   };
 }
-it("describes undeveloped land without customers or hydro access", () => {
-  show(ready());
-  const land = screen.getByRole("button", {
-    name: "Inspect Green Uplands territory",
-  });
-  expect(land).toHaveAccessibleDescription(/No customers.*wind.*solar sites/);
-  expect(land).not.toHaveAccessibleDescription(/hydro/);
-});
-it("removes the existing-hydro claim when the owned hydro plant is sold", () => {
-  const game = ready();
-  game.facilities = game.facilities.filter(
-    (facility) => facility.fuel !== "Hydro",
-  );
-  show(game);
-  expect(
-    screen.getByRole("button", { name: "Inspect Champlain territory" }),
-  ).not.toHaveAccessibleDescription(/existing hydro/);
-});
-it("has directly inspectable utility and land decisions without route controls", () => {
-  show(ready());
-  const territories = screen.getByRole("region", { name: "Territories" });
-  expect(
-    within(territories).getAllByRole("button", {
-      name: /Inspect .* territory/,
+const inspect = (id: Parameters<typeof territoryMapLabel>[0]) =>
+  fireEvent.click(
+    screen.getByRole("button", {
+      name: `Inspect ${territoryMapLabel(id)} territory`,
     }),
-  ).toHaveLength(4);
-  fireEvent.click(
+  );
+it("floats utility names on the map and removes the numbered key", () => {
+  const { container } = show(ready());
+  expect(
+    screen.getByRole("button", { name: "Inspect You territory" }),
+  ).toHaveTextContent("You");
+  expect(
     screen.getByRole("button", { name: "Inspect Ridge Electric territory" }),
+  ).toHaveTextContent("Ridge Electric");
+  expect(
+    screen.getByRole("button", { name: "Inspect Valley Electric territory" }),
+  ).toHaveTextContent("Valley Electric");
+  expect(container.querySelector(".territoryMapKey")).toBeNull();
+  expect(container.querySelector(".territoryHexHub")).toBeNull();
+  expect(container.querySelectorAll(".territoryParcel")).toHaveLength(
+    LAND_TERRITORIES.length,
   );
-  expect(
-    screen.getByRole("button", { name: "Acquire Ridge Electric" }),
-  ).toBeEnabled();
-  expect(
-    screen.getByRole("button", { name: "Inspect Ridge Electric" }),
-  ).toBeEnabled();
-  fireEvent.click(
-    screen.getByRole("button", { name: "Inspect Green Uplands territory" }),
-  );
-  expect(
-    screen.getByRole("button", { name: /Buy Green Uplands/ }),
-  ).toBeEnabled();
-  expect(
-    within(
-      screen.getByRole("region", { name: "Selected territory" }),
-    ).queryByText(/connection|line utilization|upgrade/i),
-  ).not.toBeInTheDocument();
+  expect(screen.queryByText("Green Uplands")).not.toBeInTheDocument();
 });
-it("reviews a single cash land purchase with no supplied plants or customers", () => {
-  show(ready());
-  fireEvent.click(
-    screen.getByRole("button", { name: "Inspect Green Uplands territory" }),
-  );
-  fireEvent.click(screen.getByRole("button", { name: /Buy Green Uplands/ }));
-  const dialog = screen.getByRole("dialog", { name: "Buy Green Uplands" });
-  expect(
-    within(dialog).getByRole("button", { name: /Buy land/ }),
-  ).toBeEnabled();
-  expect(
-    within(dialog).getByText(/No customers, plants or power transfer/),
-  ).toBeVisible();
-  expect(
-    within(dialog).queryByRole("button", { name: /loan/i }),
-  ).not.toBeInTheDocument();
-});
-it.each(["green-uplands", "ridge-electric"] as const)(
-  "builds immediately in owned %s without a connection",
-  (id) => {
-    const game = ready();
-    if (id === "green-uplands") {
-      const q = landPurchaseQuote(game)!;
-      purchaseLand(game, { territoryId: q.territoryId, quoteKey: q.quoteKey });
-    } else {
-      const q = acquisitionQuote(game, id)!;
-      transferUtility(game, {
-        targetId: id,
-        financed: false,
-        quoteKey: q.quoteKey,
-      });
-    }
-    const { onBuildFacility } = show(game);
-    const name = id === "green-uplands" ? "Green Uplands" : "Ridge Electric";
-    fireEvent.click(
-      screen.getByRole("button", { name: `Inspect ${name} territory` }),
+it.each(LAND_TERRITORIES)(
+  "inspects every unowned $benefit parcel $id as a cash purchase",
+  ({ id, benefit }) => {
+    show(ready());
+    inspect(id);
+    const detail = screen.getByRole("region", { name: "Selected territory" });
+    expect(within(detail).getByRole("heading", { level: 3 })).toHaveTextContent(
+      territoryMapLabel(id),
     );
-    fireEvent.click(screen.getByRole("button", { name: `Build in ${name}` }));
+    fireEvent.click(
+      within(detail).getByRole("button", { name: /Buy territory/ }),
+    );
+    const dialog = screen.getByRole("dialog", {
+      name: "Buy territory",
+    });
+    expect(
+      within(dialog).getByRole("button", { name: /Buy territory/ }),
+    ).toBeEnabled();
+    expect(
+      within(dialog).queryByRole("button", { name: /loan/i }),
+    ).not.toBeInTheDocument();
+    expect(dialog).toHaveTextContent(
+      benefit === "residential"
+        ? "residential customers"
+        : benefit === "industrial"
+          ? "industrial customers"
+          : benefit === "general"
+            ? "shared building sites"
+            : `${benefit} development site`,
+    );
+  },
+);
+it("reviews an unaffordable parcel with a cash shortfall rather than hiding its benefits", () => {
+  const game = ready();
+  currentTick(game)!.cash = 1;
+  show(game);
+  inspect("parcel-1");
+  fireEvent.click(screen.getByRole("button", { name: /Buy territory/ }));
+  const dialog = screen.getByRole("dialog", {
+    name: "Buy territory",
+  });
+  expect(
+    within(dialog).getByRole("button", { name: /Buy territory/ }),
+  ).toBeDisabled();
+  expect(within(dialog).getByRole("status")).toHaveTextContent(
+    "more cash needed",
+  );
+  expect(dialog).toHaveTextContent("residential customers");
+});
+it.each(["green-uplands", "parcel-0", "parcel-7", "parcel-3"] as const)(
+  "opens the correct build destination for owned %s",
+  (id) => {
+    const game = ready(),
+      quote = landPurchaseQuote(game, id)!;
+    expect(
+      purchaseLand(game, { territoryId: id, quoteKey: quote.quoteKey }),
+    ).toBe(true);
+    const { onBuildFacility } = show(game);
+    inspect(id);
+    const name =
+      id === "parcel-7"
+        ? "Build hydro"
+        : id === "parcel-3"
+          ? "Build geothermal"
+          : `Build in ${territoryMapLabel(id)}`;
+    fireEvent.click(screen.getByRole("button", { name }));
     expect(onBuildFacility).toHaveBeenCalledWith(id, false);
     expect(game.transmission!.lines).toEqual([]);
   },
 );
+it("shows added industrial customers without offering nonexistent plant sites", () => {
+  const game = ready(),
+    quote = landPurchaseQuote(game, "parcel-5")!;
+  purchaseLand(game, {
+    territoryId: quote.territoryId,
+    quoteKey: quote.quoteKey,
+  });
+  show(game);
+  inspect("parcel-5");
+  const detail = screen.getByRole("region", { name: "Selected territory" });
+  expect(detail).toHaveTextContent("Customers addedIndustrial400");
+  expect(
+    within(detail).queryByRole("button", { name: /Build/ }),
+  ).not.toBeInTheDocument();
+});
+it("keeps utility offers directly inspectable and turns acquired borders into your ownership", () => {
+  const game = ready();
+  const quote = acquisitionQuote(game, "ridge-electric")!;
+  transferUtility(game, {
+    targetId: "ridge-electric",
+    financed: false,
+    quoteKey: quote.quoteKey,
+  });
+  const { container, onBuildFacility } = show(game);
+  inspect("ridge-electric");
+  expect(
+    screen.getByRole("button", { name: "Inspect Ridge Electric territory" }),
+  ).toHaveTextContent("You");
+  expect(container.querySelector('[data-owner="ridge-electric"]')).toBeNull();
+  fireEvent.click(
+    screen.getByRole("button", { name: "Build in Ridge Electric" }),
+  );
+  expect(onBuildFacility).toHaveBeenCalledWith("ridge-electric", false);
+});
+it("disables only the parcel owned by another co-op company", () => {
+  const game = ready();
+  game.multiplayer = {
+    seat: "0",
+    landOwners: { "parcel-7": { seat: "1", name: "North Electric" } },
+  };
+  show(game);
+  inspect("parcel-7");
+  const detail = screen.getByRole("region", { name: "Selected territory" });
+  expect(detail).toHaveTextContent("Owned by North Electric");
+  expect(
+    within(detail).getByRole("button", { name: /Buy territory/ }),
+  ).toBeDisabled();
+  inspect("parcel-3");
+  expect(
+    within(detail).getByRole("button", { name: /Buy territory/ }),
+  ).toBeEnabled();
+});

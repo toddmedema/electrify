@@ -31,7 +31,7 @@ it.each(["generator", "storage"] as const)(
   (kind) => {
     const game = createGame({ scenarioId: 116, seed: 188 });
     game.territoryNetwork = {
-      version: 2,
+      version: 3,
       landPurchases: [{ territoryId: "green-uplands", minute: 0, price: 18e6 }],
       legacyConnections: [],
     };
