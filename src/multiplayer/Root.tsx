@@ -58,8 +58,11 @@ export default function MultiplayerRoot() {
   const [watching, setWatching] = useState<string>();
   const [session] = useState(
     () =>
-      new MultiplayerSession(getDesktop()!, async () =>
-        (await import("./WorkerClient")).createMultiplayerWorker(),
+      new MultiplayerSession(
+        getDesktop()!,
+        async () => (await import("./WorkerClient")).createMultiplayerWorker(),
+        async () =>
+          (await import("./WorkerClient")).createMultiplayerReplicaWorker(),
       ),
   );
   const state = useSyncExternalStore(session.subscribe, session.getSnapshot);
@@ -473,6 +476,7 @@ export default function MultiplayerRoot() {
       )}
       <HostConnectionWarning
         waiting={hasView && state.waitingForHost}
+        synchronizing={state.synchronizing}
         onReconnect={reconnect}
         onDisconnect={disconnect}
       />

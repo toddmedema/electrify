@@ -5,3 +5,9 @@ export function createMultiplayerWorker(): Worker {
     { type: "module" },
   );
 }
+export function createMultiplayerReplicaWorker(): Worker {
+  return new Worker(
+    new URL("../workers/MultiplayerReplica.worker.ts", import.meta.url),
+    { type: "module" },
+  );
+}

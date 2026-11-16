@@ -1,17 +1,28 @@
-# Multiplayer publication measurements
+# Online replication and measurements
 
-The first network reduction keeps complete snapshots and the shipping Steam compression/framing
-codec. It suppresses unchanged views, batches command-triggered publications before cloning grids,
-and bounds ordinary updates to 5 Hz. Commands, pause activity and readiness changes use a 100 ms
-publication bound. Bootstrap, disconnect, reconnect and explicit checkpoint requests force an
-immediate complete baseline. Duplicate/rejected commands still receive their receipt, without
-cloning other seats when the world is unchanged.
+Online co-op uses ordered records and complete baselines for every match and restored game.
+The host validates commands, orders simulation transitions and owns durable saves. Its worker
+projects the host's local seat; each guest replays the ordered stream in its own worker and
+projects its own seat. Couch co-op continues to project all local seats from its shared worker.
+Every peer runs the same compatible build. No relay, prediction or host migration is introduced.
+
+A guest installs a complete baseline before applying records. Verification records compare its
+canonical world hash with the host's, and recovery installs a fresh baseline after a gap, mismatch
+or reconnect. Baselines and durable save checkpoints contain complete worlds for their respective
+recovery and persistence purposes.
+
+Local view publication suppresses unchanged state and coalesces changes before cloning a grid.
+Ordinary updates are bounded to 5 Hz; command and readiness changes use a 100 ms publication bound.
+Bootstrap and recovery force an immediate local view. One outstanding view waits for renderer
+credit before another is delivered. Command receipts, pending commands and errors remain part of
+the session flow.
 
 A 1 Hz host keepalive carries only match, epoch and revision. Guests accept it only from their
 authenticated current host, for the installed match/epoch and a safe non-stale revision. It updates
 connection liveness without replacing a view, clearing pending commands or dismissing command/save
-errors. Guest heartbeats, five-second safety deadlines, ordered command retries, native backpressure
-and complete ten-second checkpoint persistence remain in place.
+errors. Guest heartbeats, five-second safety deadlines, ordered command retries, native
+backpressure and complete ten-second checkpoint persistence remain in place. Guest heartbeats
+also preserve liveness while a baseline is still loading.
 
 ## Reproduce
 
@@ -21,128 +32,132 @@ Use Node 26 with the lockfile dependencies installed:
 node scripts/perf/multiplayer-network.js > network-results.json
 ```
 
-The benchmark initializes the real two- and four-player worlds in San Francisco, Honolulu,
-San Juan and Pittsburgh, then advances the normal simulation to month 48 without purchasing
-additional facilities. It measures complete remote-seat views and the complete shared checkpoint
-through the shipping stringify/deflate/chunk/reassembly codec. Each measurement discards a warmup
-and reports the median of three runs; timings are diagnostic, not gates.
+The benchmark initializes real two- and four-company San Francisco custom worlds, then advances
+the normal simulation to month 48 without purchasing additional facilities. It measures only
+the shipping records, baseline, keepalive and checkpoint protocol. Every payload round-trips
+through the shipping stringify/deflate/chunk/reassembly codec, including asynchronous reassembly,
+and must retain the same contents. Each codec measurement discards a warmup and reports the
+median of three runs. Wire bytes include application chunk headers, compression and checksum
+framing, and exclude Steam/IP overhead.
 
-Traffic rates below combine these measured payload sizes with a deterministic ten-second timer
-model. The model runs the actual new publication queue alongside the previous loop's 100 ms check,
-with browser timer flooring and no simulation/transport execution time. The old loop publishes at
-different rates for each speed: 4 Hz paused, 5 Hz at 1×, 8.3 Hz at 3×, 8.9 Hz at 12× and 9.6 Hz at
-24× in this model. The new queue publishes zero unchanged paused views and up to 5 Hz while running.
-These estimates do not claim observed Steam traffic or measured frame performance.
+Each sample records one virtual second of real host transitions at 1×, 12× and 24×, batching
+steps at 100 ms and capturing a verification boundary. Steady upload includes records, one
+keepalive per second and one complete durable checkpoint every ten seconds. Initial and recovery
+baselines are reported separately as one-time wire bytes. These rates model payload traffic;
+they do not time a Steam session or claim observed network throughput.
 
-## Recorded result
+The report includes host-local projection CPU, checkpoint codec timings and actual native
+checkpoint send/receipt behavior. `replication.speeds` contains startup baseline and verification
+bytes, steady per-guest traffic by message purpose, total host egress and record encoding CPU.
+The codec CPU measurements use the synchronous encoder; native baseline and checkpoint
+compression use asynchronous zlib to keep the main-process callback pump available.
 
-Recorded on Windows x64, Node 24.14.0. All sizes use decimal KB. Host egress sums every remote
-recipient, excluding the host's local view. Wire bytes include the application's chunk headers,
-compression and checksum framing, but exclude Steam/IP overhead.
+## Guest replay and command latency
 
-| Players | Month | Raw complete publication | Wire complete publication | Clone all seats | Encode remote seats | Decode remote seats |
-| ------: | ----: | -----------------------: | ------------------------: | --------------: | ------------------: | ------------------: |
-|       2 |     0 |                 165.1 KB |                   19.9 KB |         1.55 ms |             2.00 ms |             2.40 ms |
-|       2 |    48 |                 298.5 KB |                   53.2 KB |         3.34 ms |             4.22 ms |             4.75 ms |
-|       4 |     0 |                 499.5 KB |                   65.1 KB |         3.43 ms |             6.37 ms |             8.05 ms |
-|       4 |    48 |                 901.3 KB |                  162.7 KB |         8.01 ms |            13.81 ms |            15.21 ms |
+Each trace runs the actual `ReplicaRuntime` in a separate Node worker and acknowledges view
+credit. Every publication must contain only the guest's local seat, there must be five local
+views per virtual second, and the final canonical SHA-256 must equal the host's. Replay timings
+discard one warmup and use the median of three samples.
 
-The steady-state estimates include the unchanged complete checkpoint sent to every guest every
-ten seconds, plus the new keepalive. They exclude bootstrap, command bursts, reconnects, manual
-saves, incoming guest heartbeats and small save acknowledgements.
+`replayCpuMs` counts the replay thread, local view projection and synchronous canonical capture.
+Renderer reconciliation and cross-process view delivery are excluded. `processCpuMs` counts all
+process threads, including SHA-256 and otherwise-idle parent or garbage-collector work; its
+one-core percentage is a conservative local diagnostic. Baseline hydration and TypeScript loading
+happen before CPU timing. Heap peaks include the Node TypeScript loader, decoded baseline and
+setup; peak RSS covers the whole process. These memory figures describe the benchmark process.
 
-| Players | Month | Paused before → after | Paused reduction |   24× before → after | 24× reduction |
-| ------: | ----: | --------------------: | ---------------: | -------------------: | ------------: |
-|       2 |     0 |       83.8 → 4.4 KB/s |            94.8% |   195.2 → 103.8 KB/s |         46.8% |
-|       2 |    48 |     223.6 → 11.0 KB/s |            95.1% |   521.5 → 276.9 KB/s |         46.9% |
-|       4 |     0 |     286.5 → 26.6 KB/s |            90.7% |   650.8 → 351.9 KB/s |         45.9% |
-|       4 |    48 |     716.1 → 65.8 KB/s |            90.8% | 1,626.9 → 879.1 KB/s |         46.0% |
+`replication.commandLatency.p95Ms` reports absolute command-to-local-view latency over an
+in-process mock transport. The host accepts 24 rate changes; four warmups are discarded and the
+remaining twenty form the 95th percentile. The baseline uses asynchronous compression, records
+pass through the shipping codec, and the actual `ReplicaRuntime` and `ViewPublication` deliver
+and acknowledge local views. The command stream is paused and network transit is zero. IPC,
+continuously ticking simulation, competing video load and Steam are excluded.
 
-At 3×, estimated savings are about 38–39%; at 12×, about 42–43%. At 1× the existing loop already
-publishes 5 Hz, so full-view traffic stays the same and the keepalive adds 122–125 bytes/second
-per guest (under 0.2% in these samples). Ordinary running publications halve relative to an ideal
-10 Hz stream, but that is a rate comparison rather than a claim of 50% savings at every speed.
+Run the ordinary headless multiplayer journeys with no mode flag:
 
-Deterministic tests additionally verify that ten seconds of unchanged paused polling creates no
-views, rapid commands share a single clone batch and retain each sender's latest receipt, rejected
-retries receive acknowledgements, and reconnects force a baseline. Worker/session/native tests
-cover keepalives and authenticated membership; browser journeys cover more than five seconds
-paused without a false warning and recovery after a deliberately interrupted host stream.
+```sh
+npm run test:multiplayer
+```
+
+Those journeys cover gameplay, recovery, reconnects and controls under competing video load.
+The load case runs at 12× with sixfold renderer CPU throttling and a 640×360, 30 fps local WebRTC
+stream. It verifies that frames are encoded and checks keyboard and pointer speed changes on
+both peers after the first year. Synthetic local video and the Node mock measure separate parts
+of the system; real calls also depend on the device, call software and network.
 
 ## Acknowledged checkpoint reuse
 
-The host still persists every requested checkpoint. It now skips sending an identical checkpoint
-to a connected peer only after that peer has acknowledged successfully writing that exact digest.
-The proof belongs to the connection: a reconnect needs a complete copy, changed contents invalidate
-the old proof, and an unacknowledged or failed send is retried on the next checkpoint. Only a receipt
-for the current checkpoint queued on that connection counts. Repeated local saves do not advance
-the displayed remote confirmation time without a new receipt. No delta format is introduced.
+The host persists every requested checkpoint. It skips sending an identical checkpoint to a
+connected peer only after that peer acknowledges successfully writing that exact digest. The
+proof belongs to the connection: a reconnect needs a complete copy, changed contents invalidate
+the old proof, and an unacknowledged or failed send is retried on the next checkpoint. Only a
+receipt for the current checkpoint queued on that connection counts. Repeated local saves do not
+advance the displayed remote confirmation time without a new receipt.
 
-The native persistence guard now accepts the current world schema, version 2. Real filesystem tests
-cover host and guest writes, overlapping checkpoints, failed guest writes and subsequent retry.
-The bandwidth benchmark calls the native checkpoint, send and receive methods, then chunks and
-reassembles the actual compressed payloads. It checks initial copies, unacknowledged retries, zero
-bytes for acknowledged repeats, and a full copy after one peer reconnects. Disk writes are counted
-but stubbed in that wire benchmark; filesystem behavior is tested separately. Its
-`acknowledgedPausedWireBytesPerSecond` field compares successful complete-checkpoint transmission
-with acknowledged reuse. The previous native schema-1 guard rejected schema-2 worlds, so the
-comparison models the intended complete-checkpoint policy; it is not a claim about observed
-deployed traffic. The older `cadence` fields retain the historical publication-rate comparison.
+The benchmark calls native checkpoint, send and receive methods, then chunks and reassembles the
+actual compressed payloads. It checks initial copies, unacknowledged retries, zero bytes for
+acknowledged repeats and a full copy after one peer reconnects. Disk writes are counted and stubbed
+in the wire benchmark. Filesystem tests separately cover host and guest writes, overlapping
+checkpoints, failed guest writes and subsequent retry.
 
-Windows x64, Node 24.14.0, real initialized worlds at months 0 and 48, decimal KB/s. These steady
-paused rates include the existing 1 Hz keepalive after each guest has confirmed its copy; they
-exclude initial copies, reconnects, changed contents and incoming guest traffic.
+`checkpointPublications` reports those actual message sizes and the four local write requests.
+`acknowledgedPausedHostWireBytesPerSecond` reports steady host keepalive traffic after every guest
+has confirmed its unchanged checkpoint. Initial copies, reconnects, changed contents, incoming
+guest heartbeats and small save acknowledgements are excluded from that paused rate.
 
-| Players | Month | Complete-checkpoint policy | Acknowledged reuse | Reduction |
-| ------: | ----: | -------------------------: | -----------------: | --------: |
-|       2 |     0 |                 4.555 KB/s |         0.122 KB/s |     97.3% |
-|       2 |    48 |                10.433 KB/s |         0.125 KB/s |     98.8% |
-|       4 |     0 |                26.253 KB/s |         0.366 KB/s |     98.6% |
-|       4 |    48 |                61.498 KB/s |         0.375 KB/s |     99.4% |
+## Determinism and hash capture
 
-Running-state complete-view payloads and changed-checkpoint traffic are unchanged by this step.
+`src/multiplayer/Replication.sim.test.tsx` drives the real host recorder and replica reducer for
+five game years with two and four companies in an official scenario, a custom game and the
+checked-in funded-or-phased mod example. Replicas install shipping-codec baselines at launch,
+mid-month, immediately before and after rollover, and after a scenario choice. Every verify
+record compares the complete canonical world, including shell blockers and generator commitment
+metadata. Record removal, duplication, reordering, alteration and missing baseline metadata are
+negative controls. A prerequisite mutation proof restored the old fuel-history module global and
+lost the expected spike in both a resumed solo game and later co-op companies.
 
-## Remaining opportunities
+Run the focused equivalence check with `npm run test:once -- Replication.sim.test --runInBand`.
+`node scripts/ci/replication-transcript.js` also checks a committed bit-exact four-company
+transcript through month 60. The Linux x64, Windows x64 and macOS arm64 packaging jobs run that
+same transcript. Only its fixture build-compatibility label is pinned; production state hashes
+retain the actual rules ID and all simulation values without rounding. Rewriting the transcript
+requires an intentional simulation change and explanation; `--write` is the explicit authoring
+command.
 
-- Completed history, current-month timeline rows and static portfolio/context data still travel
-  in every changed view. Versioned blocks could reduce late-match bandwidth further, but require
-  explicit per-recipient baselines, schema validation and reconnect recovery tests. Measure that
-  separately before adding a delta protocol.
-- Changed checkpoints still travel in full. Local checkpoint writes also remain in place, even
-  when all guests have confirmed identical contents, to preserve each explicit save request's
-  persistence and failure reporting.
-- Views and changed checkpoints still serialize their JSON on the main process. Compression now
-  runs asynchronously, and a peer keeps only one encoding plus its newest waiting view. A future
-  worker codec could also move JSON serialization off the main process if measurements justify it.
+`node scripts/perf/replica-hash.js` initializes and advances a four-company custom world to month
+48, then measures synchronous canonical capture and asynchronous WebCrypto SHA-256 inside a Node
+worker. It discards one warmup and reports the median of five samples.
 
-No relay, cross-play transport or developer-operated server is introduced by this change.
+## Historical measurements (November 2026)
 
-## Controls under competing video load (November 2026)
+These recorded local results describe the hardware and benchmark version used at the time. The
+current benchmark measures the shipping record stream directly; it contains no snapshot-view
+runtime or comparison path.
 
-Live-view and checkpoint deflate compression now use Node's asynchronous zlib API so Steam
-callbacks and renderer requests can proceed during compression. Waiting views coalesce before
-serialization; an encoding already in progress can finish, so sustained overload still makes
-progress. Encoded unsent views retain the existing queue coalescing. Completions check connection
-identity before enqueueing, including a reconnect with the same Steam ID. Compression errors still
-reach the caller. Lobby and scenario-definition transitions also discard older pending encodes so
-an old grid cannot reappear after returning to the lobby. The framing, compression settings, size
-limits, numeric encoding and full-view protocol stay the same.
+On macOS arm64, Node 26.13.0, Apple M5 Max, the four-company month-48 sample at 24× modeled
+67.76 KB/s of record-stream host upload, including durable checkpoints. The earlier snapshot
+comparison modeled 857.36 KB/s, giving a 92.10% reduction in that model. Per guest, records
+contributed 1.508 KB/s, checkpoints 20.954 KB/s and keepalives 0.123 KB/s. Each initial or recovery
+baseline cost another 209.49 KB per guest plus a small verification batch. All sizes use decimal KB.
 
-The renderer also stops reapplying an unchanged game on session-only notifications, including the
-pending-command notification that runs before a command is transmitted. Ordinary cloned snapshots
-retain the shared clock's object identity while its values agree, so the speed buttons do not
-re-render on each five-Hz update. Changed player speeds, readiness and pause reasons still update.
+That sample used 1.30% at 1×, 2.42% at 12× and 6.64% at 24× of one core when all process threads
+were counted. At 24×, the replay thread used 4.29%, warmed wall time had a median of 44.48 ms per
+virtual second, and loader-inclusive peak worker heap was 170.8 MB with whole-process peak RSS
+697.8 MB. Records encoded for all three guests cost 0.47 ms per virtual second. The local command
+mock measured an absolute p95 of 102.77 ms for the record path. The earlier snapshot comparison
+measured 105.81 ms. These are diagnostics for the documented mock and hardware.
 
-A local Node 26.13.0 arm64 measurement alternated six synchronous/asynchronous pairs, each encoding
-the same real 60-month grid payload three times. A queued event-loop callback ran after a median
-11.65 ms with synchronous deflate and 2.53 ms with asynchronous deflate (78% less blockage). The
-compressed payload was identical at 51,909 bytes. This isolates codec scheduling; it is not an
-end-to-end latency or physical-device guarantee. JSON serialization still takes main-process time.
+The separate hash benchmark on that machine measured a canonical payload of 1,297,892 bytes,
+7.00 ms capture and 0.48 ms SHA-256. Peak process RSS was 531 MB, including fixture simulation
+and the worker.
 
-Native tests hold compression open while newer views and small messages arrive, verify bounded
-coalescing, failure propagation and reconnect cleanup, and round-trip the asynchronous output
-through the shipping decoder. Renderer tests protect the eliminated snapshot replays and clock
-identity. The headless multiplayer journey runs at 12× with sixfold renderer CPU throttling and a
-640×360, 30 fps local WebRTC stream, verifies that frames are actually encoded, and checks keyboard
-and pointer speed changes on both peers after the first year. It uses synthetic local video;
-real calls also depend on the device, call software and network.
+An earlier Node 26.13.0 arm64 codec experiment alternated six synchronous/asynchronous pairs,
+encoding the same real 60-month grid payload three times per pair. A queued event-loop callback
+ran after a median 11.65 ms with synchronous deflate and 2.53 ms with asynchronous deflate
+(78% less blockage). The compressed payload was identical at 51,909 bytes. This isolated codec
+scheduling; JSON serialization still takes main-process time.
+
+Earlier Windows x64, Node 24.14.0 checkpoint measurements modeled four-company month-48 paused
+host upload at 61.498 KB/s with complete-checkpoint sends and 0.375 KB/s after acknowledged reuse.
+The complete-checkpoint figure modeled the intended policy: the native schema-1 guard then
+rejected schema-2 worlds, so it was not observed deployed traffic.

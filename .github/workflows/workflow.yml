@@ -128,6 +128,8 @@ jobs:
           sudo "$(command -v node)" scripts/ci/ubuntu-apt.js
           sudo apt-get update
           sudo apt-get install -y libnss3 libnspr4 libsqlite3-0
+      - name: Verify the bit-exact replica transcript on this architecture
+        run: node scripts/ci/replication-transcript.js
       - name: Package and verify native depot
         timeout-minutes: 15
         run: npm run desktop:pack:offline -- --skip-build --platform ${{ matrix.platform }} --arch ${{ matrix.arch }}

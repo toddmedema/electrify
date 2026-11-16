@@ -5,16 +5,15 @@ import { initWeather } from "../data/Weather";
 import { TICK_MS } from "../Constants";
 import { waitForLoad } from "../helpers/WaitForLoad";
 import {
-  applyCommand,
   checkpointWorld,
   createWorld,
   matchScenario,
-  pauseWorld,
   restoreWorld,
   savedMatchSpec,
-  setWorldBlockers,
-  stepWorld,
 } from "../multiplayer/World";
+import { ReplicatedWorld } from "../multiplayer/Replication";
+import type { ReplicaRecord } from "../multiplayer/Replication";
+import { ReplicaRecovery } from "../multiplayer/ReplicaRecovery";
 import { ViewPublication } from "../multiplayer/ViewPublication";
 import {
   CHECKPOINT_INTERVAL_MS,
@@ -30,6 +29,13 @@ import type {
 const worker = globalThis as unknown as Worker;
 let world: World | undefined;
 let local = false;
+let replicated: ReplicatedWorld | undefined;
+let hostSeat: string | undefined;
+let recovery: ReplicaRecovery | undefined;
+let recoveryTimer: ReturnType<typeof setInterval> | undefined;
+let recordTimer: ReturnType<typeof setTimeout> | undefined;
+let recordDue = Infinity;
+let flushedIndex = 0;
 let busy = false;
 let faulted = false;
 let lastControlHeartbeat = performance.now();
@@ -50,6 +56,75 @@ async function data(spec: MatchSpec) {
     waitForLoad((done) => initWeather(location, done)),
   ]);
 }
+/** Exact numeric-tag overhead matters to the native 64 KiB records limit. World packing never
+ * applies to ordinary command records, whose envelopes are separately size-limited natively. */
+function recordJson(value: unknown) {
+  return JSON.stringify(value, function (_key, item) {
+    if (
+      typeof item === "number" &&
+      (Object.is(item, -0) || !Number.isFinite(item))
+    )
+      return { $electrifyNumber: Object.is(item, -0) ? "-0" : String(item) };
+    if (item === undefined && Array.isArray(this))
+      return { $electrifyNumber: "undefined" };
+    return item;
+  });
+}
+function flushRecords() {
+  clearTimeout(recordTimer);
+  recordTimer = undefined;
+  recordDue = Infinity;
+  if (!replicated || !world) return;
+  const batch = replicated.drain();
+  if (!batch) return;
+  flushedIndex = replicated.index;
+  if (local) return;
+  let from = batch.from;
+  let records: ReplicaRecord[] = [];
+  const message = (items: ReplicaRecord[]) => ({
+    kind: "records" as const,
+    matchId: world!.matchId,
+    epoch: world!.epoch,
+    from,
+    records: items,
+  });
+  const bytes = (items: ReplicaRecord[]) =>
+    new TextEncoder().encode(recordJson(message(items))).byteLength;
+  for (const record of batch.records) {
+    if (
+      records.length &&
+      (records.length === 256 || bytes([...records, record]) > 65536)
+    ) {
+      post(message(records));
+      from += records.length;
+      records = [];
+    }
+    if (!records.length && bytes([record]) > 65536)
+      throw new Error("A multiplayer record exceeds the network limit");
+    records.push(record);
+  }
+  if (records.length) post(message(records));
+}
+function requestRecords(urgent = false) {
+  if (!replicated || replicated.index <= flushedIndex) return;
+  // Couch play shares the worker and does not need a network record log.
+  if (local) return flushRecords();
+  const delay = urgent ? 0 : 100;
+  const due = performance.now() + delay;
+  if (recordDue <= due) return;
+  clearTimeout(recordTimer);
+  recordDue = due;
+  recordTimer = setTimeout(() => {
+    try {
+      flushRecords();
+    } catch (error) {
+      fault(error);
+    }
+  }, delay);
+}
+function sendBaseline(to: string) {
+  if (recovery?.baseline(to)) requestViews({ force: true });
+}
 /** Flush due seat projections and report a local summary from the same authoritative world.
  * Its date follows an active company, or the latest retired grid once the whole match has ended. */
 function publish() {
@@ -57,7 +132,11 @@ function publish() {
   viewTimer = undefined;
   viewDue = Infinity;
   if (!world) return;
-  const views = publication.take(world, performance.now());
+  const views = publication.take(
+    world,
+    performance.now(),
+    !local && hostSeat ? [hostSeat] : undefined,
+  );
   if (Object.keys(views).length) {
     viewPending = true;
     post({ kind: "views", views });
@@ -109,18 +188,23 @@ function requestViews(options?: Parameters<ViewPublication["request"]>[2]) {
 /** A running match that throws stops for everyone with an explanation, never silently. */
 function fault(error: unknown) {
   faulted = true;
+  recovery?.stop();
   clearTimeout(timer);
   clearInterval(keepaliveTimer);
+  clearInterval(recoveryTimer);
   post({
     kind: "error",
     message: error instanceof Error ? error.message : "Simulation error",
   });
   if (!world) return;
-  pauseWorld(
-    world,
+  replicated!.pause(
     "The simulation stopped. Resume the last saved match in a new lobby.",
   );
+  replicated!.fault(
+    error instanceof Error ? error.message : "Simulation error",
+  );
   try {
+    flushRecords();
     requestViews({ force: true });
   } catch {
     // The host already has the error; a world that cannot render has nothing to publish.
@@ -134,12 +218,13 @@ function loop() {
       !world.paused &&
       started - lastControlHeartbeat > CONTROL_HEARTBEAT_TIMEOUT_MS
     ) {
-      pauseWorld(
-        world,
+      replicated!.pause(
         "The host stopped responding. Everyone must be ready before resuming.",
       );
+      requestRecords(true);
     }
-    stepWorld(world);
+    replicated!.step();
+    requestRecords();
     requestViews();
     if (started - lastSave >= CHECKPOINT_INTERVAL_MS) {
       post({ kind: "checkpoint", world: checkpointWorld(world) });
@@ -179,8 +264,31 @@ async function startMatch(
     await data(spec);
     world = restoreWorld(request.world, request.epoch, request.seats);
   }
+  replicated = new ReplicatedWorld(world);
+  hostSeat = request.hostSeat || world.seats[0].id;
+  if (!local && !world.seats.some((seat) => seat.id === hostSeat))
+    throw new Error("The host company is missing from the match");
+  if (!local) {
+    recovery = new ReplicaRecovery(replicated, hostSeat, {
+      flush: flushRecords,
+      send: (to, baseline) => post({ kind: "baseline", to, baseline }),
+      changed: () => {
+        requestRecords(true);
+        requestViews();
+      },
+      error: fault,
+    });
+    recoveryTimer = setInterval(() => {
+      try {
+        recovery!.pulse();
+      } catch (error) {
+        fault(error);
+      }
+    }, 100);
+  }
   busy = false;
   requestViews({ force: true });
+  if (!local) for (const seat of world.seats) sendBaseline(seat.id);
   post({ kind: "checkpoint", world: checkpointWorld(world) });
   lastSave = performance.now();
   keepaliveTimer = setInterval(() => {
@@ -199,22 +307,32 @@ async function startMatch(
 function handle(request: WorkerRequest, running: World) {
   if (request.kind === "blockers") {
     if (request.requireReady)
-      pauseWorld(
-        running,
+      replicated!.pause(
         request.readyReason ||
           request.reasons.join(" · ") ||
           "Ready up before resuming",
       );
-    setWorldBlockers(running, request.reasons);
+    if (recovery) recovery.setShellBlockers(request.reasons);
+    else replicated!.setBlockers(request.reasons);
+    requestRecords(true);
     requestViews({ force: true });
   } else if (request.kind === "command") {
     const previousSpeed = running.speed;
-    const error = applyCommand(
-      running,
+    const { error, recorded } = replicated!.command(
       request.sender,
       request.envelope,
       request.allowReady,
     );
+    requestRecords(true);
+    if (!local && error && !recorded)
+      post({
+        kind: "rejected",
+        to: request.sender,
+        matchId: running.matchId,
+        epoch: running.epoch,
+        sequence: request.envelope.sequence,
+        error,
+      });
     if (previousSpeed !== running.speed) {
       clearTimeout(timer);
       timer = setTimeout(loop, TICK_MS[running.speed]);
@@ -230,21 +348,30 @@ function handle(request: WorkerRequest, running: World) {
   } else if (request.kind === "disconnect") {
     // A retired company no longer holds the clock, so its player may leave without a pause.
     if (!running.outcomes[request.sender])
-      pauseWorld(
-        running,
+      replicated!.pause(
         `${running.seats.find((s) => s.id === request.sender)?.name || "A player"} disconnected. Reconnect before resuming.`,
       );
+    requestRecords(true);
     // Connection membership is attached by the renderer, outside the world revision/key.
     requestViews({ force: true });
+  } else if (request.kind === "baseline") {
+    sendBaseline(request.to);
+  } else if (request.kind === "replica-peers") {
+    recovery?.connected(request.connected);
+  } else if (request.kind === "progress") {
+    recovery?.progress(request);
+  } else if (request.kind === "resync") {
+    if (request.matchId === running.matchId && request.epoch === running.epoch)
+      sendBaseline(request.sender);
   } else if (request.kind === "checkpoint") {
     if (request.pause) {
-      pauseWorld(
-        running,
+      replicated!.pause(
         request.suspended
           ? "A device went to sleep. Ready up before resuming."
           : "Host saved and stopped the match",
       );
     }
+    requestRecords(true);
     // Reconnects need a full baseline even when a paused revision is unchanged.
     requestViews({ force: true });
     post({
@@ -278,7 +405,9 @@ worker.onmessage = async ({ data: request }: MessageEvent<WorkerRequest>) => {
       if (world) return fault(error);
       clearTimeout(timer);
       clearTimeout(viewTimer);
+      clearTimeout(recordTimer);
       clearInterval(keepaliveTimer);
+      clearInterval(recoveryTimer);
       post({
         kind: "error",
         message:

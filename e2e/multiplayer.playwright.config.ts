@@ -47,6 +47,19 @@ export default defineConfig({
       },
     ],
   ],
+  // Width-specific layouts run once on desktop; repeat core online journeys on touch.
+  projects: [
+    { name: "desktop-chromium" },
+    {
+      name: "mobile-390px",
+      grep: /@mobile/,
+      use: {
+        isMobile: true,
+        hasTouch: true,
+        viewport: { width: 390, height: 844 },
+      },
+    },
+  ],
   use: {
     launchOptions:
       require("../scripts/ci/browser-launch").browserLaunchOptions(),

@@ -1,11 +1,12 @@
 #!/usr/bin/env node
-// Real room views through the shipping Steam codec; timings are reported, not gated.
+// Standard records, baselines and checkpoints through the shipping Steam codec; timings are diagnostic.
 const { spawnSync } = require("node:child_process");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 
 const root = path.resolve(__dirname, "../..");
+require("../run-compatibility");
 const directory = fs.mkdtempSync(path.join(os.tmpdir(), "electrify-network-"));
 const resultFile = path.join(directory, "result.json");
 try {
