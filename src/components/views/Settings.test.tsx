@@ -417,17 +417,20 @@ describe("Settings", () => {
   });
 
   it("uses the version button for a confirmed cache reset", async () => {
+    const user = userEvent.setup();
     renderSettings();
 
-    expect(screen.getByText("26sept26-1507")).toBeInTheDocument();
-    const button = screen.getByRole("button", { name: "26sept26-1507" });
+    // Scope the version lookup to the footer, then inspect only this button's accessibility.
+    const footer = within(screen.getByRole("contentinfo"));
+    const button = footer.getByText("26sept26-1507", { selector: "button" });
+    expect(button).toHaveRole("button");
+    expect(button).toHaveAccessibleName("26sept26-1507");
+    expect(button).toBeVisible();
+    expect(screen.getByText("26sept26-1507")).toBe(button);
     expect(
-      within(screen.getByRole("contentinfo")).getByRole("button", {
-        name: "26sept26-1507",
-      }),
-    ).toBe(button);
-    expect(screen.queryByRole("button", { name: "Clear cache" })).toBeNull();
-    await userEvent.click(button);
+      screen.queryByText("Clear cache", { selector: "button" }),
+    ).toBeNull();
+    await user.click(button);
 
     expect(mockedClearAppCache).not.toHaveBeenCalled();
     const dialog = await screen.findByRole("dialog", {
@@ -436,7 +439,7 @@ describe("Settings", () => {
     expect(
       within(dialog).getByText(/Saved games are kept/),
     ).toBeInTheDocument();
-    await userEvent.click(
+    await user.click(
       within(dialog).getByRole("button", { name: "Clear and reload" }),
     );
 

@@ -1,3 +1,4 @@
+import { measureFirestoreRead } from "../FirestoreReads";
 import { doc, runTransaction } from "firebase/firestore";
 import { getDb } from "../Globals";
 import { emptyRecord, mergeRecords, validRecord } from "./Progress";
@@ -14,7 +15,11 @@ export class FirebaseAchievementTransport implements AchievementTransport {
   async merge(uid: string, local: AchievementRecord, current: () => boolean) {
     const ref = doc(getDb(), "users", uid, "achievementProgress", "current");
     return runTransaction(getDb(), async (transaction) => {
-      const snapshot = await transaction.get(ref);
+      const snapshot = await measureFirestoreRead(
+        "achievement.transaction",
+        () => transaction.get(ref),
+        (snapshot) => (snapshot.exists() ? 1 : 0),
+      );
       if (!current()) throw new Error("Achievement account changed");
       const remote: unknown = snapshot.exists()
         ? snapshot.data()

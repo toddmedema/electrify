@@ -1,3 +1,4 @@
+import { measureFirestoreRead } from "./FirestoreReads";
 import {
   collection,
   getCountFromServer,
@@ -12,8 +13,8 @@ import { isDesktopApp } from "./Desktop";
 import { SCORE_VERSION } from "./helpers/Scoring";
 import type { DifficultyType, ScoreType } from "./Types";
 
-/** A short visit-to-visit cache, including successful empty boards. */
-export const LEADERBOARD_FRESH_MS = 60_000;
+/** A ten-minute visit-to-visit cache, including successful empty boards. */
+export const LEADERBOARD_FRESH_MS = 10 * 60_000;
 export const BOARD_ROWS = 10;
 interface Entry<T> {
   expires: number;
@@ -80,17 +81,22 @@ export function loadLeaderboard(
         difficulty ? (scope === "player" ? 1 : BOARD_ROWS) : 50,
       );
     }
-    const snapshot = await getDocs(
-      query(
-        collection(getDb(), "scores"),
-        where("scoreVersion", "==", SCORE_VERSION),
-        where("outcome", "==", "completed"),
-        where("scenarioId", "==", scenarioId),
-        ...(difficulty ? [where("difficulty", "==", difficulty)] : []),
-        ...(scope === "player" ? [where("uid", "==", uid)] : []),
-        orderBy("score", "desc"),
-        limit(difficulty ? (scope === "player" ? 1 : BOARD_ROWS) : 50),
-      ),
+    const snapshot = await measureFirestoreRead(
+      "leaderboard.rows",
+      () =>
+        getDocs(
+          query(
+            collection(getDb(), "scores"),
+            where("scoreVersion", "==", SCORE_VERSION),
+            where("outcome", "==", "completed"),
+            where("scenarioId", "==", scenarioId),
+            ...(difficulty ? [where("difficulty", "==", difficulty)] : []),
+            ...(scope === "player" ? [where("uid", "==", uid)] : []),
+            orderBy("score", "desc"),
+            limit(difficulty ? (scope === "player" ? 1 : BOARD_ROWS) : 50),
+          ),
+        ),
+      (snapshot) => snapshot.docs.length,
     );
     return snapshot.docs.map((doc) => doc.data() as ScoreType);
   });
@@ -114,15 +120,17 @@ export function loadLeaderboardRank(
         const { desktopScoreRank } = await import("./DesktopScores");
         return desktopScoreRank(scenarioId, difficulty, score);
       }
-      const result = await getCountFromServer(
-        query(
-          collection(getDb(), "scores"),
-          where("scoreVersion", "==", SCORE_VERSION),
-          where("outcome", "==", "completed"),
-          where("scenarioId", "==", scenarioId),
-          where("difficulty", "==", difficulty),
-          where("score", ">", score),
-          orderBy("score", "desc"),
+      const result = await measureFirestoreRead("leaderboard.rank", () =>
+        getCountFromServer(
+          query(
+            collection(getDb(), "scores"),
+            where("scoreVersion", "==", SCORE_VERSION),
+            where("outcome", "==", "completed"),
+            where("scenarioId", "==", scenarioId),
+            where("difficulty", "==", difficulty),
+            where("score", ">", score),
+            orderBy("score", "desc"),
+          ),
         ),
       );
       return result.data().count + 1;
