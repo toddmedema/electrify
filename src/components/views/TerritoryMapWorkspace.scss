@@ -1,0 +1,381 @@
+.territoryMap,
+.territoryResourceLegend {
+  --territory-owner-you: #006bbb;
+  --territory-owner-valley: #955b22;
+  --territory-owner-ridge: #7951a6;
+  --territory-owner-peer-0: #32766a;
+  --territory-owner-peer-1: #96516c;
+  --territory-owner-peer-2: #926817;
+  --territory-grass: #dfe9d5;
+  --territory-grass-rim: #a1b5a1;
+  --territory-hill: #e7e0d3;
+  --territory-hill-rim: #b9ad97;
+  --territory-water: #d6e4e7;
+  --territory-water-rim: #9eb8bf;
+  --territory-built: #dfe4ea;
+  --territory-built-rim: #a5b0bb;
+  --territory-outline: #536157;
+  --territory-art-mint: #64dfc5;
+  --territory-art-cream: #fff8e1;
+  --territory-art-steel: #cfd8dc;
+  --territory-art-grass: #b8d9c3;
+  --territory-art-water: #7fc8ce;
+}
+[data-theme="dark"] .territoryMap,
+[data-theme="dark"] .territoryResourceLegend {
+  --territory-owner-you: #62acfa;
+  --territory-owner-valley: #d2a469;
+  --territory-owner-ridge: #b69bdf;
+  --territory-owner-peer-0: #7dc9bf;
+  --territory-owner-peer-1: #d9a0bc;
+  --territory-owner-peer-2: #d5be7c;
+  --territory-grass: #29382d;
+  --territory-grass-rim: #1d2921;
+  --territory-hill: #3a352d;
+  --territory-hill-rim: #28251f;
+  --territory-water: #23373e;
+  --territory-water-rim: #17272d;
+  --territory-built: #303944;
+  --territory-built-rim: #202934;
+  --territory-outline: #78877b;
+  --territory-art-mint: #67cbb8;
+  --territory-art-cream: #ddd7c0;
+  --territory-art-steel: #aebec7;
+  --territory-art-grass: #88af96;
+  --territory-art-water: #78acb7;
+}
+
+.territoryHex {
+  --territory-tile-rim: #92ad99;
+}
+.territoryHex[data-terrain="forest"] {
+  --territory-tile-rim: #486e59;
+}
+.territoryHex[data-terrain="hills"] {
+  --territory-tile-rim: #9c8c70;
+}
+.territoryHex[data-terrain="mountain"] {
+  --territory-tile-rim: #7d898d;
+}
+.territoryHex[data-terrain="river"],
+.territoryHex[data-terrain="lake"] {
+  --territory-tile-rim: #7ca6ac;
+}
+.territoryHex[data-terrain="ocean"] {
+  --territory-tile-rim: #356c78;
+}
+.territoryHexRim,
+.territoryHexSeam {
+  stroke: #52645d;
+  stroke-width: 1;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+.territoryHexRim {
+  fill: var(--territory-tile-rim);
+}
+.territoryHexSeam {
+  fill: none;
+}
+.territoryTerrainArtwork,
+.territoryOccupantArtwork {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.territoryTileOccupant {
+  pointer-events: none;
+}
+.territoryTileOccupant[data-building="true"] {
+  opacity: 0.68;
+}
+.territoryWires {
+  pointer-events: none;
+}
+.territoryWire,
+.territoryWireBacking {
+  fill: none;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+.territoryWireBacking {
+  stroke: #fff8e1;
+  stroke-width: 4;
+  opacity: 0.86;
+}
+.territoryWire {
+  stroke: #25393d;
+  stroke-width: 1.5;
+}
+.territoryHexBorderBacking,
+.territoryHexBoundary,
+.territoryHexSelection,
+.territoryHexSelectionBacking {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  pointer-events: none;
+  vector-effect: non-scaling-stroke;
+}
+.territoryHexBorderBacking {
+  stroke: var(--bg-primary);
+  stroke-width: 6;
+}
+.territoryHexBoundary {
+  stroke: var(--territory-owner-color);
+  stroke-width: 3;
+}
+.territoryHexSelectionBacking {
+  stroke: #17252c;
+  stroke-width: 5;
+  stroke-dasharray: 4 4;
+}
+.territoryHexSelection {
+  stroke: #fff8e1;
+  stroke-width: 2;
+  stroke-dasharray: 4 4;
+}
+.territoryTileTarget {
+  pointer-events: none;
+  position: absolute;
+  transform: translate(-50%, -50%);
+  padding: 0;
+  border: 0;
+  min-width: 44px;
+  min-height: 44px;
+  background: transparent;
+  color: var(--font-color-primary);
+  font: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  .territoryTileHitArea {
+    pointer-events: auto;
+    position: absolute;
+    inset: 0;
+    clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+  }
+  &:hover .territoryTileHitArea {
+    background: color-mix(in srgb, var(--interactive-blue) 14%, transparent);
+  }
+  &:focus-visible {
+    outline: none;
+  }
+  &:focus-visible .territoryTileHitArea {
+    background: color-mix(in srgb, var(--interactive-blue) 10%, transparent);
+  }
+}
+.territoryUtilityLabel {
+  z-index: 2;
+  strong {
+    position: absolute;
+    left: 50%;
+    bottom: calc(100% + 4px);
+    transform: translateX(-50%);
+    padding: 4px 8px;
+    border: 2px solid var(--territory-owner-color);
+    border-radius: var(--radius-sm);
+    background: var(--bg-primary);
+    font-size: 14px;
+    line-height: 20px;
+    font-weight: 600;
+    pointer-events: auto;
+    width: max-content;
+    max-width: calc(100% - 8px);
+    white-space: normal;
+    text-align: center;
+  }
+  &:hover strong,
+  &[aria-pressed="true"] strong {
+    background: var(--bg-selected);
+  }
+  &:focus-visible strong {
+    outline: 3px solid var(--focus-ring);
+    outline-offset: 2px;
+  }
+}
+
+.territoryWorkspace:has(.territoryNetwork) {
+  display: flex;
+  overflow: hidden;
+}
+.territoryNetwork {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+.territoryMap {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--bg-sunken);
+}
+.territoryMapViewport,
+.territoryMapStage,
+.territoryHexGrid {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.territoryMapViewport {
+  overflow: hidden;
+  overscroll-behavior: contain;
+  touch-action: none;
+  user-select: none;
+  cursor: grab;
+  &:active {
+    cursor: grabbing;
+  }
+}
+.territoryHexGrid {
+  pointer-events: none;
+}
+.territoryFog[data-visibility-distance="1"] {
+  opacity: 0.85;
+  filter: saturate(0.8);
+}
+.territoryFog[data-visibility-distance="2"] {
+  opacity: 0.65;
+  filter: saturate(0.45);
+}
+.territoryFog[data-visibility-distance="3"] {
+  opacity: 0.4;
+  filter: saturate(0.15);
+}
+.territoryTileTarget {
+  &:focus-visible .territoryTileHitArea {
+    outline: 3px solid var(--focus-ring);
+    outline-offset: -4px;
+  }
+  .territoryTilePrice {
+    position: absolute;
+    pointer-events: auto;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    width: 104px;
+    min-height: 44px;
+    padding: 4px;
+    box-sizing: border-box;
+    border: 1px solid var(--interactive-blue);
+    border-radius: var(--radius-sm);
+    background: var(--bg-primary);
+    color: var(--font-color-primary);
+    font-size: 11px;
+    line-height: 14px;
+    b {
+      font-size: 13px;
+      line-height: 18px;
+      color: var(--interactive-blue);
+    }
+    em {
+      font-style: normal;
+      color: var(--font-color-faded);
+    }
+  }
+  &[data-unaffordable="true"] .territoryTilePrice {
+    border-color: var(--border-subtle);
+    b {
+      color: var(--font-color-faded);
+    }
+  }
+}
+.territoryMapBuying {
+  position: absolute;
+  z-index: 4;
+  right: 16px;
+  bottom: 16px;
+  display: grid;
+  grid-template-columns: auto auto;
+  align-items: center;
+  gap: 8px 12px;
+  max-width: calc(100% - 32px);
+  padding: 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-primary);
+  box-shadow: 0 2px 8px #0002;
+  .territoryMapCash {
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+  }
+}
+.territoryMapBuyToggle {
+  min-height: 44px;
+  min-width: 104px;
+  border: 1px solid var(--interactive-blue);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  background: var(--bg-primary);
+  color: var(--interactive-blue);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  &[aria-pressed="true"] {
+    background: var(--interactive-blue);
+    color: var(--bg-primary);
+  }
+  &:focus-visible {
+    outline: 3px solid var(--focus-ring);
+    outline-offset: 2px;
+  }
+}
+.territoryMapPurchaseStatus {
+  grid-column: 1 / -1;
+  max-width: 280px;
+  font-size: 12px;
+  line-height: 18px;
+  &:empty {
+    display: none;
+  }
+}
+@media (max-width: 599px) {
+  .territoryMapBuying {
+    right: 8px;
+    bottom: 8px;
+    padding: 8px;
+    gap: 4px 8px;
+    max-width: calc(100% - 16px);
+  }
+  .territoryUtilityLabel strong {
+    font-size: 12px;
+    line-height: 16px;
+  }
+}
+.territoryNetwork > .acquiredUtilities {
+  position: absolute;
+  z-index: 3;
+  top: 8px;
+  left: 8px;
+  margin: 0;
+  max-width: min(360px, calc(100% - 16px));
+  max-height: calc(100% - 144px);
+  overflow: auto;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  > summary {
+    min-height: 44px;
+    box-sizing: border-box;
+    padding: 12px;
+  }
+}
+@media (max-width: 599px) {
+  .territoryTileTarget .territoryTilePrice {
+    width: 88px;
+    font-size: 10px;
+    line-height: 12px;
+    b {
+      font-size: 12px;
+      line-height: 16px;
+    }
+  }
+}

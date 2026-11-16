@@ -1,0 +1,396 @@
+import * as React from "react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
+import { configureStore } from "@reduxjs/toolkit";
+import { Provider } from "react-redux";
+import { useAppSelector } from "../../Store";
+import { createGame } from "../../testing/Simulator";
+import reducer, { delta } from "../../reducers/Game";
+import { acquireTile } from "../../reducers/GameActions";
+import { currentTick } from "../../helpers/GameSelectors";
+import { getDateFromMinute, MINUTES_PER_MONTH } from "../../helpers/DateTime";
+import { tilePurchaseQuote } from "../../helpers/Territories";
+import { territoryTileViews } from "../../helpers/TerritoryMapState";
+import { ownsTerritoryTile } from "../../helpers/TerritoryTiles";
+import { registerMultiplayerRuntime } from "../../multiplayer/Registry";
+import type { TerritoryTileId } from "../../Types";
+import {
+  TerritoryTilePurchasesProvider,
+  useTerritoryTilePurchases,
+} from "../base/TerritoryTilePurchases";
+import TerritoryHexMap from "./TerritoryHexMap";
+
+// jsdom has no PointerEvent; preserve the identity and coordinates used by map panning.
+class TestPointerEvent extends MouseEvent {
+  pointerId: number;
+  constructor(type: string, init: PointerEventInit = {}) {
+    super(type, init);
+    this.pointerId = init.pointerId ?? 1;
+  }
+}
+const originalPointerEvent = window.PointerEvent;
+beforeAll(() => {
+  window.PointerEvent = TestPointerEvent as typeof PointerEvent;
+});
+afterAll(() => {
+  window.PointerEvent = originalPointerEvent;
+});
+beforeEach(() => {
+  jest.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(1280);
+  jest.spyOn(HTMLElement.prototype, "clientHeight", "get").mockReturnValue(900);
+});
+afterEach(() => {
+  registerMultiplayerRuntime(undefined);
+  jest.restoreAllMocks();
+});
+
+function show(cash = 1e9, inspectionInitiallyOpen = false) {
+  const game = createGame({ scenarioId: 116, seed: 188 });
+  currentTick(game)!.cash = cash;
+  const store = configureStore({
+    reducer: {
+      game: reducer,
+      ui: (
+        state: { evidenceRunId: number } = { evidenceRunId: 1 },
+        action: { type: string },
+      ) =>
+        action.type === "test/load"
+          ? { evidenceRunId: state.evidenceRunId + 1 }
+          : state,
+    },
+    preloadedState: { game, ui: { evidenceRunId: 1 } },
+  });
+  const onSelect = jest.fn();
+  const closeInspection = jest.fn();
+  function OtherPurchaseControl() {
+    const { purchase, pendingCost } = useTerritoryTilePurchases();
+    return (
+      <button onClick={() => void purchase(otherTile!)} data-testid="other-buy">
+        Surface buy · committed {pendingCost}
+      </button>
+    );
+  }
+  let otherTile: TerritoryTileId | undefined;
+  function Workspace() {
+    const activeGame = useAppSelector((state) => state.game);
+    const [inspectionOpen, setInspectionOpen] = React.useState(
+      inspectionInitiallyOpen,
+    );
+    const [selected, select] =
+      React.useState<TerritoryTileId>("champlain:city");
+    return (
+      <TerritoryTilePurchasesProvider game={activeGame}>
+        <OtherPurchaseControl />
+        <TerritoryHexMap
+          game={activeGame}
+          selected={selected}
+          onCloseInspection={
+            inspectionOpen
+              ? () => {
+                  closeInspection();
+                  setInspectionOpen(false);
+                }
+              : undefined
+          }
+          status={() => "Land status"}
+          onSelect={(id, activate) => {
+            select(id);
+            onSelect(id, activate);
+          }}
+        />
+      </TerritoryTilePurchasesProvider>
+    );
+  }
+  const utils = render(
+    <Provider store={store}>
+      <Workspace />
+    </Provider>,
+  );
+  const viewport = screen.getByRole("region", { name: "Territory map" });
+  const stage = viewport;
+  const target = (id: TerritoryTileId) =>
+    screen
+      .getAllByRole<HTMLButtonElement>("button")
+      .find((button) => button.dataset.mapTarget === id)!;
+  const candidates = () =>
+    screen
+      .getAllByRole<HTMLButtonElement>("button")
+      .filter((button) => button.dataset.purchasable === "true");
+  const buyMode = () =>
+    fireEvent.click(screen.getByRole("button", { name: "Buy land" }));
+  return {
+    ...utils,
+    store,
+    stage,
+    viewport,
+    target,
+    candidates,
+    buyMode,
+    onSelect,
+    closeInspection,
+    setOtherTile: (id: TerritoryTileId) => {
+      otherTile = id;
+    },
+  };
+}
+function idOf(button: HTMLButtonElement) {
+  return button.dataset.mapTarget as TerritoryTileId;
+}
+function tap(button: HTMLButtonElement) {
+  fireEvent.pointerDown(button, { pointerId: 1, clientX: 100, clientY: 100 });
+  fireEvent.pointerUp(button, { pointerId: 1, clientX: 100, clientY: 100 });
+  fireEvent.click(button, { detail: 1 });
+}
+function fakeHost() {
+  let complete!: () => void;
+  let reject!: (error: Error) => void;
+  const submit = jest.fn(
+    () =>
+      new Promise<void>((resolve, fail) => {
+        complete = resolve;
+        reject = fail;
+      }),
+  );
+  registerMultiplayerRuntime({
+    submit,
+    command: jest.fn(),
+    activity: jest.fn(),
+    leave: async () => undefined,
+  });
+  return {
+    submit,
+    complete: () => complete(),
+    reject: () => reject(new Error("Another utility claimed this tile.")),
+  };
+}
+
+it("inspects normally, then buys exactly one physical tile without shifting the camera or leaving buying mode", () => {
+  const map = show();
+  map.buyMode();
+  const candidate = map
+    .candidates()
+    .find(
+      (button) =>
+        territoryTileViews(map.store.getState().game).find(
+          ({ tile }) => tile.id === idOf(button),
+        )?.visibilityDistance === 3,
+    )!;
+  const id = idOf(candidate);
+  fireEvent.click(screen.getByRole("button", { name: "Done buying" }));
+  tap(candidate);
+  expect(map.onSelect).toHaveBeenLastCalledWith(id, true);
+  expect(ownsTerritoryTile(map.store.getState().game, id)).toBe(false);
+  map.buyMode();
+  const initialCount = territoryTileViews(map.store.getState().game).length;
+  const position = { left: candidate.style.left, top: candidate.style.top };
+  const camera = { ...map.stage.dataset };
+  tap(candidate);
+  expect(ownsTerritoryTile(map.store.getState().game, id)).toBe(true);
+  expect(
+    map.store.getState().game.territoryNetwork!.tilePurchases,
+  ).toHaveLength(1);
+  expect(map.target(id)).toHaveAttribute("aria-pressed", "true");
+  expect(map.target(id).style.left).toBe(position.left);
+  expect(map.target(id).style.top).toBe(position.top);
+  expect({ ...map.stage.dataset }).toEqual(camera);
+  expect(territoryTileViews(map.store.getState().game).length).toBeGreaterThan(
+    initialCount,
+  );
+  expect(screen.getByRole("button", { name: "Done buying" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  expect(screen.getByRole("status")).toHaveTextContent("Tile purchased");
+});
+
+it("keeps focus, arrows and repeated activation keys free of purchases", () => {
+  const map = show();
+  map.buyMode();
+  const tile = map.candidates()[0];
+  act(() => tile.focus());
+  expect(fireEvent.keyDown(tile, { key: "Enter", repeat: true })).toBe(false);
+  expect(fireEvent.keyDown(tile, { key: " ", repeat: true })).toBe(false);
+  fireEvent.keyDown(tile, { key: "ArrowRight" });
+  const selectedId =
+    map.onSelect.mock.calls[map.onSelect.mock.calls.length - 1][0];
+  expect(map.target(selectedId)).toHaveFocus();
+  expect(map.target(selectedId)).not.toBe(tile);
+  expect(
+    map.store.getState().game.territoryNetwork!.tilePurchases,
+  ).toHaveLength(0);
+  expect(map.onSelect.mock.calls.some((call) => call[1] === true)).toBe(false);
+  expect(
+    screen
+      .getAllByRole("button")
+      .filter(
+        (button) =>
+          button.tabIndex === 0 && button.hasAttribute("data-map-target"),
+      ),
+  ).toHaveLength(1);
+  fireEvent.keyDown(map.target(selectedId), { key: "Escape" });
+  expect(screen.getByRole("button", { name: "Buy land" })).toHaveAttribute(
+    "aria-pressed",
+    "false",
+  );
+});
+
+it("suppresses clicks after panning and a second touch, and allows the next deliberate tap", () => {
+  const map = show();
+  map.buyMode();
+  const tile = map.candidates()[0];
+  fireEvent.pointerDown(tile, { pointerId: 1, clientX: 100, clientY: 100 });
+  fireEvent.pointerMove(tile, { pointerId: 1, clientX: 130, clientY: 120 });
+  fireEvent.pointerUp(tile, { pointerId: 1, clientX: 130, clientY: 120 });
+  fireEvent.click(tile, { detail: 1 });
+  expect(
+    map.store.getState().game.territoryNetwork!.tilePurchases,
+  ).toHaveLength(0);
+  fireEvent.pointerDown(tile, { pointerId: 1 });
+  fireEvent.pointerDown(tile, { pointerId: 2 });
+  fireEvent.pointerUp(tile, { pointerId: 2 });
+  fireEvent.pointerUp(tile, { pointerId: 1 });
+  fireEvent.click(tile, { detail: 1 });
+  expect(
+    map.store.getState().game.territoryNetwork!.tilePurchases,
+  ).toHaveLength(0);
+  tap(tile);
+  expect(
+    map.store.getState().game.territoryNetwork!.tilePurchases,
+  ).toHaveLength(1);
+});
+
+it("shares pending cash with surface purchases, prevents duplicates, and waits for authoritative ownership after the receipt", async () => {
+  const map = show(5e6);
+  const host = fakeHost();
+  map.buyMode();
+  const choices = map
+    .candidates()
+    .filter(
+      (button) =>
+        (tilePurchaseQuote(map.store.getState().game, idOf(button))?.price ??
+          Infinity) < 3.1e6,
+    );
+  const tile = choices[0],
+    id = idOf(tile);
+  const otherId = idOf(choices[1]);
+  map.setOtherTile(otherId);
+  tap(tile);
+  tap(tile);
+  fireEvent.click(screen.getByTestId("other-buy"));
+  expect(host.submit).toHaveBeenCalledTimes(1);
+  expect(screen.getByRole("status")).toHaveTextContent(
+    "Not enough available cash",
+  );
+  expect(tile).toHaveAttribute("aria-busy", "true");
+  await act(async () => host.complete());
+  expect(tile).toHaveAttribute("aria-busy", "true");
+  expect(ownsTerritoryTile(map.store.getState().game, id)).toBe(false);
+  const quote = tilePurchaseQuote(map.store.getState().game, id)!;
+  act(() => {
+    map.store.dispatch(acquireTile({ tileId: id, quoteKey: quote.quoteKey }));
+  });
+  expect(map.target(id)).not.toHaveAttribute("aria-busy");
+  expect(screen.getByRole("status")).toHaveTextContent("Tile purchased");
+  expect(screen.getByTestId("other-buy")).toHaveTextContent("committed 0");
+});
+
+it("keeps buying mode and releases commitments when the host rejects, then resets the mode on loading another run", async () => {
+  const map = show();
+  const host = fakeHost();
+  map.buyMode();
+  const tile = map.candidates()[0];
+  tap(tile);
+  await act(async () => host.reject());
+  expect(screen.getByRole("status")).toHaveTextContent(
+    "Another utility claimed this tile",
+  );
+  expect(tile).not.toHaveAttribute("aria-busy");
+  expect(screen.getByTestId("other-buy")).toHaveTextContent("committed 0");
+  expect(screen.getByRole("button", { name: "Done buying" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  act(() => {
+    map.store.dispatch({ type: "test/load" });
+  });
+  expect(screen.getByRole("button", { name: "Buy land" })).toHaveAttribute(
+    "aria-pressed",
+    "false",
+  );
+});
+
+it("closes an open inspection before leaving buying mode when Escape is pressed on the map", () => {
+  const map = show(1e9, true);
+  map.buyMode();
+  const tile = map.candidates()[0];
+  fireEvent.keyDown(tile, { key: "Escape" });
+  expect(map.closeInspection).toHaveBeenCalledTimes(1);
+  expect(screen.getByRole("button", { name: "Done buying" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  fireEvent.keyDown(tile, { key: "Escape" });
+  expect(screen.getByRole("button", { name: "Buy land" })).toHaveAttribute(
+    "aria-pressed",
+    "false",
+  );
+});
+
+it("requires a fresh activation if a displayed quote changes during a pointer gesture", () => {
+  const map = show();
+  const host = fakeHost();
+  map.buyMode();
+  const tile = map.candidates()[0];
+  const id = idOf(tile);
+  fireEvent.pointerDown(tile, { pointerId: 1, clientX: 100, clientY: 100 });
+  const before = map.store.getState().game;
+  const quotedPrice = tilePurchaseQuote(before, id)!.price;
+  act(() => {
+    map.store.dispatch(
+      delta({
+        date: getDateFromMinute(
+          before.date.minute + MINUTES_PER_MONTH,
+          before.startingYear,
+        ),
+        timeline: before.timeline.map((tick) => ({
+          ...tick,
+          minute: tick.minute + MINUTES_PER_MONTH,
+        })),
+      }),
+    );
+  });
+  expect(tilePurchaseQuote(map.store.getState().game, id)!.price).not.toBe(
+    quotedPrice,
+  );
+  fireEvent.pointerUp(map.target(id), {
+    pointerId: 1,
+    clientX: 100,
+    clientY: 100,
+  });
+  fireEvent.click(map.target(id), { detail: 1 });
+  expect(host.submit).not.toHaveBeenCalled();
+  expect(screen.getByRole("status")).toHaveTextContent("price changed");
+  tap(map.target(id));
+  expect(host.submit).toHaveBeenCalledTimes(1);
+});
+
+it("keeps phone targets large and unaffordable land inspectable with its currency, benefit and reason", () => {
+  jest.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(360);
+  const map = show(1e6);
+  map.buyMode();
+  const tile = screen.getAllByRole<HTMLButtonElement>("button", {
+    name: /Inspect.*\$.*General site; not enough available cash/,
+  })[0];
+  expect(Number.parseFloat(tile.style.width)).toBe(96);
+  expect(Number.parseFloat(tile.style.height)).toBeGreaterThanOrEqual(44);
+  expect(map.viewport).toHaveAttribute("data-camera-scale", "0.75");
+  tap(tile);
+  expect(map.onSelect).toHaveBeenLastCalledWith(idOf(tile), true);
+  // The shared phone sheet occupies at most 62%; leave the selected hex above it.
+  expect(
+    Number.parseFloat(tile.style.top) +
+      Number.parseFloat(tile.style.height) / 2,
+  ).toBeLessThan(900 * 0.38);
+  expect(
+    map.store.getState().game.territoryNetwork!.tilePurchases,
+  ).toHaveLength(0);
+});

@@ -1,9 +1,13 @@
 import * as React from "react";
 import type { GameType, TerritoryId, TerritoryTileId } from "../../Types";
-import { TERRITORIES, isLandTerritoryId } from "../../data/Territories";
+import { getTerritoryDefinition } from "../../data/Territories";
 import { TERRAIN_LABELS } from "../../data/TerrainLabels";
 import { territoryTileViews } from "../../helpers/TerritoryMapState";
+import { tilePurchaseQuotes } from "../../helpers/Territories";
+import { useAppSelector } from "../../Store";
 import { terrainDetailsLabel } from "../base/TerritoryTileFacts";
+import { useMoney } from "../base/CurrencyContext";
+import { useTerritoryTilePurchases } from "../base/TerritoryTilePurchases";
 import {
   HEX_WIDTH,
   HEX_HEIGHT,
@@ -22,10 +26,11 @@ import {
   TowerArtwork,
 } from "../base/TerritoryTileArtwork";
 import {
-  territoryMapLabel,
   territoryTileLabel,
+  tilePurchaseBenefitLabel,
   territoryPeerColors,
 } from "../base/TerritoryMapLayout";
+import "./TerritoryMapWorkspace.scss";
 
 type MapStyle = React.CSSProperties & { "--territory-owner-color"?: string };
 interface Props {
@@ -33,67 +38,133 @@ interface Props {
   selected: TerritoryTileId;
   status: (id: TerritoryId, compact?: boolean) => string;
   onSelect: (id: TerritoryTileId, inspect?: boolean) => void;
+  onCloseInspection?: () => void;
 }
 export default function TerritoryHexMap({
   game,
   selected,
   status,
   onSelect,
+  onCloseInspection,
 }: Props) {
   const mapId = React.useId();
   const viewport = React.useRef<HTMLDivElement>(null);
   const stage = React.useRef<HTMLDivElement>(null);
-  const [labelPadding, setLabelPadding] = React.useState(96);
-  const views = territoryTileViews(game);
-  const tiles = views.map((view) => view.tile);
-  const byId = new Map(views.map((view) => [view.tile.id, view]));
-  const centers = tiles.map(hexCenter);
-  const minX = Math.min(...centers.map((p) => p.x)) - HEX_WIDTH / 2 - 24;
-  const minY =
-    Math.min(...centers.map((p) => p.y)) -
-    HEX_HEIGHT / 2 -
-    Math.max(56, labelPadding);
-  const width =
-    Math.max(...centers.map((p) => p.x)) + HEX_WIDTH / 2 + 24 - minX;
-  const height =
-    Math.max(...centers.map((p) => p.y)) + HEX_HEIGHT / 2 + 20 - minY;
+  const runId = useAppSelector((state) => state.ui?.evidenceRunId);
+  const { formatMoneyConcise: money } = useMoney();
+  const { pendingIds, availableCash, message, purchase } =
+    useTerritoryTilePurchases();
+  const [buyMode, setBuyMode] = React.useState(false);
+  const views = React.useMemo(() => territoryTileViews(game), [game]);
+  const tiles = React.useMemo(() => views.map((view) => view.tile), [views]);
+  const byId = React.useMemo(
+    () => new Map(views.map((view) => [view.tile.id, view])),
+    [views],
+  );
+  const purchaseQuotes = React.useMemo(
+    () => (buyMode ? tilePurchaseQuotes(game) : undefined),
+    [buyMode, game],
+  );
+  const activeSelected = byId.has(selected)
+    ? selected
+    : (views.find((view) => view.owned)?.tile.id ?? tiles[0]?.id);
+  const [camera, setCamera] = React.useState(() =>
+    hexCenter(byId.get(selected)?.tile ?? tiles[0] ?? { q: 0, r: 0 }),
+  );
+  const [size, setSize] = React.useState({ width: 0, height: 0 });
+  const scale = size.width > 0 && size.width < 600 ? 0.75 : 0.875;
+  const worldWidth = size.width / scale;
+  const worldHeight = size.height / scale;
+  const focusAfterNavigation = React.useRef<TerritoryTileId>();
+  const pointer = React.useRef<{
+    id: number;
+    x: number;
+    y: number;
+    dragging: boolean;
+  }>();
+  const touches = React.useRef(new Set<number>());
+  const suppressClick = React.useRef(false);
+  const activationQuote = React.useRef<{
+    tileId: TerritoryTileId;
+    quoteKey: string;
+  }>();
+  const initialPoint = React.useRef(
+    hexCenter(byId.get(activeSelected!)?.tile ?? { q: 0, r: 0 }),
+  );
+  initialPoint.current = hexCenter(
+    byId.get(activeSelected!)?.tile ?? { q: 0, r: 0 },
+  );
+  React.useEffect(() => {
+    setBuyMode(false);
+    setCamera(initialPoint.current);
+  }, [runId, game.seed, game.scenarioId]);
+  React.useEffect(() => {
+    if (activeSelected && activeSelected !== selected) {
+      onSelect(activeSelected);
+      const tile = byId.get(activeSelected)?.tile;
+      if (tile) setCamera(hexCenter(tile));
+    }
+  }, [activeSelected, selected, onSelect, byId]);
   React.useLayoutEffect(() => {
-    const sheet = stage.current;
-    if (!sheet) return;
-    const labels = Array.from(
-      sheet.querySelectorAll<HTMLElement>(
-        ".territoryUtilityLabel:not(.territoryUtilityLabelPerimeter) strong",
-      ),
-    );
-    const measure = () => {
-      const scale = sheet.getBoundingClientRect().width / width;
-      if (!scale) return;
-      // Label typography stays in CSS pixels even when the SVG board is scaled.
-      const clearance = Math.max(
-        ...labels.map(
-          (label) =>
-            label.parentElement!.getBoundingClientRect().top -
-            label.getBoundingClientRect().top +
-            8,
-        ),
-      );
-      setLabelPadding((padding) =>
-        Math.abs(padding - clearance / scale) > 0.1
-          ? clearance / scale
-          : padding,
-      );
-    };
+    const element = viewport.current;
+    if (!element) return;
+    const measure = () =>
+      setSize({ width: element.clientWidth, height: element.clientHeight });
     measure();
     const observer = new ResizeObserver(measure);
-    observer.observe(sheet);
-    labels.forEach((label) => observer.observe(label));
+    observer.observe(element);
     return () => observer.disconnect();
-  }, [width]);
+  }, []);
+  React.useEffect(() => {
+    const element = viewport.current;
+    if (!element) return;
+    const wheel = (event: WheelEvent) => {
+      event.preventDefault();
+      if (event.ctrlKey) return;
+      const unit =
+        event.deltaMode === 1
+          ? 16
+          : event.deltaMode === 2
+            ? element.clientHeight
+            : 1;
+      setCamera((point) => ({
+        x:
+          point.x +
+          ((event.shiftKey && !event.deltaX ? event.deltaY : event.deltaX) *
+            unit) /
+            scale,
+        y:
+          point.y +
+          ((event.shiftKey && !event.deltaX ? 0 : event.deltaY) * unit) / scale,
+      }));
+    };
+    element.addEventListener("wheel", wheel, { passive: false });
+    return () => element.removeEventListener("wheel", wheel);
+  }, [scale]);
+  React.useLayoutEffect(() => {
+    if (!focusAfterNavigation.current) return;
+    const target = stage.current?.querySelector<HTMLButtonElement>(
+      `[data-map-target="${focusAfterNavigation.current}"]`,
+    );
+    target?.focus({ preventScroll: true });
+    if (target) focusAfterNavigation.current = undefined;
+  }, [selected, camera]);
+  const minX = camera.x - worldWidth / 2;
+  const minY = camera.y - worldHeight / 2;
+  const renderedViews = views.filter(({ tile }) => {
+    const point = hexCenter(tile);
+    return (
+      tile.id === activeSelected ||
+      (Math.abs(point.x - camera.x) < worldWidth / 2 + HEX_WIDTH &&
+        Math.abs(point.y - camera.y) < worldHeight / 2 + HEX_WIDTH)
+    );
+  });
+  const renderedTiles = renderedViews.map(({ tile }) => tile);
   const peerColors = territoryPeerColors(
     [
       ...(game.multiplayer?.peers?.map((peer) => peer.id) ?? []),
-      ...Object.values(game.multiplayer?.landOwners ?? {}).flatMap((claim) =>
-        claim ? [claim.seat] : [],
+      ...views.flatMap((view) =>
+        view.ownerKey?.startsWith("peer:") ? [view.ownerKey.slice(5)] : [],
       ),
     ].filter((id) => id !== game.multiplayer?.seat),
   );
@@ -104,60 +175,64 @@ export default function TerritoryHexMap({
         ? "var(--territory-owner-valley)"
         : id === "ridge-electric"
           ? "var(--territory-owner-ridge)"
-          : peerColors[id.slice("peer:".length)];
+          : peerColors[id.slice(5)];
   const owners = [
     ...new Set(views.flatMap((view) => (view.ownerKey ? [view.ownerKey] : []))),
   ];
-  const wires = hexWires(
+  const ownerBoundaries = owners.map((owner) => ({
+    owner,
+    path: hexBoundary(tiles, (tile) => byId.get(tile.id)?.ownerKey === owner),
+  }));
+  const selectedBoundary = hexBoundary(
     tiles,
+    (tile) => tile.id === activeSelected,
+  );
+  const wires = hexWires(
+    renderedTiles,
     (tile) => !!byId.get(tile.id)?.developed,
     (a, b) => byId.get(a.id)?.ownerKey === byId.get(b.id)?.ownerKey,
   );
-  const selectedBoundary = hexBoundary(tiles, (tile) => tile.id === selected);
-  const ridgeCity = tiles.find(
-    (tile) => tile.territoryId === "ridge-electric" && tile.city,
-  );
-  const ridgeEast = ridgeCity
-    ? Math.max(
-        ...tiles
-          .filter(
-            (tile) =>
-              tile.territoryId === ridgeCity.territoryId &&
-              tile.r === ridgeCity.r,
-          )
-          .map((tile) => hexCenter(tile).x),
-      ) +
-      HEX_WIDTH / 2
-    : 0;
-  // The empty northeast perimeter notch keeps the tag clear of the dense city row.
-  const ridgeLabel = ridgeCity
-    ? {
-        x: ridgeEast - HEX_WIDTH,
-        y: hexCenter(ridgeCity).y - (7 * HEX_HEIGHT) / 8,
-      }
-    : undefined;
-  const initialSelected = React.useRef(selected);
-  React.useEffect(() => {
-    const element = viewport.current,
-      sheet = stage.current;
-    const tile = tiles.find((tile) => tile.id === initialSelected.current);
-    if (!element || !sheet || !tile) return;
-    const point = hexCenter(tile),
-      scale = sheet.clientWidth / width;
-    element.scrollLeft = Math.max(
-      0,
-      (point.x - minX) * scale - element.clientWidth / 2,
-    );
-    element.scrollTop = Math.max(
-      0,
-      (point.y - minY) * scale - element.clientHeight / 2,
-    );
-    // Later pointer selections stay still; keyboard navigation scrolls only the next cell into view.
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const revealTile = (tile: { q: number; r: number }) => {
+    const target = hexCenter(tile);
+    setCamera((current) => ({
+      x:
+        current.x +
+        Math.max(
+          0,
+          target.x - current.x - Math.max(0, worldWidth / 2 - HEX_WIDTH),
+        ) +
+        Math.min(
+          0,
+          target.x - current.x + Math.max(0, worldWidth / 2 - HEX_WIDTH),
+        ),
+      y:
+        current.y +
+        Math.max(
+          0,
+          target.y - current.y - Math.max(0, worldHeight / 2 - 160 / scale),
+        ) +
+        Math.min(
+          0,
+          target.y - current.y + Math.max(0, worldHeight / 2 - 160 / scale),
+        ),
+    }));
+  };
+  const inspectTile = (tile: { id: TerritoryTileId; q: number; r: number }) => {
+    if (size.width <= 740) {
+      const point = hexCenter(tile);
+      // Leave the selected ground and occupant above the phone's inspection sheet.
+      setCamera({ x: point.x, y: point.y + worldHeight * 0.22 });
+    }
+    onSelect(tile.id, true);
+  };
   const navigate = (
     event: React.KeyboardEvent<HTMLButtonElement>,
     id: TerritoryTileId,
   ) => {
+    if ((event.key === "Enter" || event.key === " ") && event.repeat) {
+      event.preventDefault();
+      return;
+    }
     const direction =
       event.key === "ArrowLeft"
         ? [-1, 0]
@@ -170,6 +245,7 @@ export default function TerritoryHexMap({
               : undefined;
     const tile = byId.get(id)?.tile;
     if (!direction || !tile) return;
+    event.preventDefault();
     const point = hexCenter(tile);
     const next = tiles
       .filter((other) => other.id !== id)
@@ -178,7 +254,7 @@ export default function TerritoryHexMap({
           dx = target.x - point.x,
           dy = target.y - point.y;
         return {
-          id: other.id,
+          tile: other,
           forward: dx * direction[0] + dy * direction[1],
           distance:
             dx * dx * (direction[0] ? 1 : 4) + dy * dy * (direction[1] ? 1 : 4),
@@ -187,59 +263,142 @@ export default function TerritoryHexMap({
       .filter((other) => other.forward > 1)
       .sort((a, b) => a.distance - b.distance)[0];
     if (!next) return;
-    event.preventDefault();
-    onSelect(next.id);
-    const target = stage.current?.querySelector<HTMLButtonElement>(
-      `[data-map-target="${next.id}"]`,
-    );
-    target?.focus({ preventScroll: true });
-    target?.scrollIntoView({ block: "nearest", inline: "nearest" });
+    focusAfterNavigation.current = next.tile.id;
+    onSelect(next.tile.id);
+    revealTile(next.tile);
   };
   return (
     <div
       className="territoryMap"
+      data-buy-mode={buyMode}
       aria-label="Terrain, structures and utility ownership"
+      onKeyDown={(event) => {
+        if (event.key === "Escape" && (onCloseInspection || buyMode)) {
+          event.preventDefault();
+          event.stopPropagation();
+          if (onCloseInspection) onCloseInspection();
+          else setBuyMode(false);
+        }
+      }}
     >
-      <div className="territoryMapViewport" ref={viewport}>
+      <div className="territoryMapBuying">
+        <span className="territoryMapCash">
+          {money(availableCash)} available
+        </span>
+        <button
+          type="button"
+          className="territoryMapBuyToggle"
+          aria-pressed={buyMode}
+          onClick={() => setBuyMode((value) => !value)}
+        >
+          {buyMode ? "Done buying" : "Buy land"}
+        </button>
+        <span
+          className="territoryMapPurchaseStatus"
+          role="status"
+          aria-live="polite"
+        >
+          {message || (buyMode ? "Activate a priced tile to buy it." : "")}
+        </span>
+      </div>
+      <div
+        className="territoryMapViewport"
+        role="region"
+        aria-label="Territory map"
+        data-camera-x={camera.x}
+        data-camera-y={camera.y}
+        data-camera-scale={scale}
+        ref={viewport}
+        onPointerDown={(event) => {
+          if (event.button !== 0) return;
+          touches.current.add(event.pointerId);
+          if (touches.current.size > 1) {
+            suppressClick.current = true;
+            pointer.current = undefined;
+            return;
+          }
+          suppressClick.current = false;
+          pointer.current = {
+            id: event.pointerId,
+            x: event.clientX,
+            y: event.clientY,
+            dragging: false,
+          };
+        }}
+        onPointerMove={(event) => {
+          const drag = pointer.current;
+          if (
+            !drag ||
+            drag.id !== event.pointerId ||
+            touches.current.size !== 1
+          )
+            return;
+          const dx = event.clientX - drag.x,
+            dy = event.clientY - drag.y;
+          if (!drag.dragging && dx * dx + dy * dy < 36) return;
+          if (!drag.dragging)
+            event.currentTarget.setPointerCapture?.(event.pointerId);
+          drag.dragging = true;
+          suppressClick.current = true;
+          drag.x = event.clientX;
+          drag.y = event.clientY;
+          event.preventDefault();
+          setCamera((point) => ({
+            x: point.x - dx / scale,
+            y: point.y - dy / scale,
+          }));
+        }}
+        onPointerUp={(event) => {
+          touches.current.delete(event.pointerId);
+          if (pointer.current?.id === event.pointerId)
+            pointer.current = undefined;
+          if (event.currentTarget.hasPointerCapture?.(event.pointerId))
+            event.currentTarget.releasePointerCapture(event.pointerId);
+        }}
+        onPointerCancel={(event) => {
+          touches.current.delete(event.pointerId);
+          pointer.current = undefined;
+          suppressClick.current = true;
+        }}
+        onClickCapture={(event) => {
+          if (suppressClick.current && event.detail !== 0) {
+            event.preventDefault();
+            event.stopPropagation();
+          }
+        }}
+      >
         <div
           className="territoryMapStage"
           ref={stage}
-          style={{
-            minWidth: `${(width * 88) / HEX_WIDTH}px`,
-            aspectRatio: `${width}/${height}`,
-          }}
+          data-camera-x={camera.x}
+          data-camera-y={camera.y}
+          data-camera-scale={scale}
         >
           <svg
             className="territoryHexGrid"
-            viewBox={`${minX} ${minY} ${width} ${height}`}
+            viewBox={`${minX} ${minY} ${Math.max(1, worldWidth)} ${Math.max(1, worldHeight)}`}
             role="img"
             aria-labelledby={`${mapId}-title`}
-            aria-describedby={`${mapId}-description`}
           >
             <title id={`${mapId}-title`}>
               Terrain and one structure per hex
             </title>
-            <desc id={`${mapId}-description`}>
-              Each hex contains a city or one building site. Developed empty
-              sites show transmission towers. Lines automatically join adjacent
-              developed cells within a utility. Your utility is labeled You.
-            </desc>
             <defs>
               <clipPath id={`${mapId}-terrain-clip`}>
                 <path d={hexFacePath} />
               </clipPath>
             </defs>
             <g aria-hidden="true">
-              {views.map((view) => {
-                const { tile } = view,
-                  point = hexCenter(tile);
+              {renderedViews.map(({ tile, owned, visibilityDistance }) => {
+                const point = hexCenter(tile);
                 return (
                   <g
                     key={tile.id}
-                    className="territoryHex"
+                    className="territoryHex territoryFog"
+                    data-visibility-distance={visibilityDistance}
                     data-terrain={tile.terrain}
                     data-tile={tile.id}
-                    data-owned={view.owned}
+                    data-owned={owned}
                     transform={`translate(${point.x} ${point.y})`}
                   >
                     <path className="territoryHexRim" d={hexRimPath} />
@@ -279,7 +438,7 @@ export default function TerritoryHexMap({
                   </g>
                 ))}
               </g>
-              {[...views]
+              {[...renderedViews]
                 .sort((a, b) => hexCenter(a.tile).y - hexCenter(b.tile).y)
                 .map((view) => {
                   const { tile, facility } = view,
@@ -288,7 +447,8 @@ export default function TerritoryHexMap({
                   return (
                     <svg
                       key={tile.id}
-                      className="territoryTileOccupant"
+                      className="territoryTileOccupant territoryFog"
+                      data-visibility-distance={view.visibilityDistance}
                       data-building={
                         !!facility && facility.yearsToBuildLeft > 0
                       }
@@ -332,7 +492,7 @@ export default function TerritoryHexMap({
                     </svg>
                   );
                 })}
-              {owners.map((owner) => (
+              {ownerBoundaries.map(({ owner, path }) => (
                 <g
                   key={owner}
                   data-owner={owner}
@@ -340,20 +500,8 @@ export default function TerritoryHexMap({
                     { "--territory-owner-color": color(owner) } as MapStyle
                   }
                 >
-                  <path
-                    className="territoryHexBorderBacking"
-                    d={hexBoundary(
-                      tiles,
-                      (tile) => byId.get(tile.id)?.ownerKey === owner,
-                    )}
-                  />
-                  <path
-                    className="territoryHexBoundary"
-                    d={hexBoundary(
-                      tiles,
-                      (tile) => byId.get(tile.id)?.ownerKey === owner,
-                    )}
-                  />
+                  <path className="territoryHexBorderBacking" d={path} />
+                  <path className="territoryHexBoundary" d={path} />
                 </g>
               ))}
               <path
@@ -361,46 +509,22 @@ export default function TerritoryHexMap({
                 d={selectedBoundary}
               />
               <path className="territoryHexSelection" d={selectedBoundary} />
-              {ridgeCity && ridgeLabel && (
-                <path
-                  className="territoryUtilityLeader"
-                  style={
-                    {
-                      "--territory-owner-color": color(
-                        byId.get(ridgeCity.id)!.ownerKey!,
-                      ),
-                    } as MapStyle
-                  }
-                  d={`M${ridgeEast - HEX_WIDTH / 2} ${hexCenter(ridgeCity).y - HEX_HEIGHT / 2}L${ridgeLabel.x} ${ridgeLabel.y}`}
-                />
-              )}
             </g>
           </svg>
-          {views.map((view) => {
+          {renderedViews.map((view) => {
             const { tile, facility } = view,
               point = hexCenter(tile);
-            const territory = TERRITORIES.find(
-              (territory) => territory.id === tile.territoryId,
-            )!;
-            const utility = !!tile.city && territory.kind !== "greenfield";
-            const perimeterLabel = utility && tile.id === ridgeCity?.id;
-            const first =
-              tiles.find((other) => other.territoryId === tile.territoryId)
-                ?.id === tile.id;
-            const oldSelectionLabel =
-              utility || (isLandTerritoryId(tile.territoryId) && first);
-            const label = oldSelectionLabel
-              ? `Inspect ${territoryMapLabel(tile.territoryId)} territory`
-              : `Inspect ${territoryTileLabel(tile)} in ${territoryMapLabel(tile.territoryId)}`;
-            const style: MapStyle = {
-              left: `${((point.x - minX) / width) * 100}%`,
-              top: `${((point.y - minY) / height) * 100}%`,
-              width: `${(HEX_WIDTH / width) * 100}%`,
-              height: `${(HEX_HEIGHT / height) * 100}%`,
-              ...(view.ownerKey
-                ? { "--territory-owner-color": color(view.ownerKey) }
-                : {}),
-            };
+            const territory = getTerritoryDefinition(tile.territoryId);
+            const utility = !!tile.city && territory?.kind !== "greenfield";
+            const quote = purchaseQuotes?.get(tile.id);
+            const pending = pendingIds.has(tile.id);
+            const unaffordable = !!quote && quote.price > availableCash;
+            const label = utility
+              ? `Inspect ${view.owned ? "You" : view.ownerName} territory`
+              : `Inspect ${territoryTileLabel(tile)}`;
+            const priceLabel = quote
+              ? `${money(quote.price)} · ${tilePurchaseBenefitLabel(quote)}`
+              : "";
             return (
               <button
                 key={tile.id}
@@ -410,31 +534,73 @@ export default function TerritoryHexMap({
                 data-owner={view.ownerKey}
                 data-owned={view.owned}
                 data-terrain={tile.terrain}
-                className={`territoryTileTarget${utility ? " territoryUtilityLabel" : ""}${perimeterLabel ? " territoryUtilityLabelPerimeter" : ""}`}
-                style={style}
-                tabIndex={tile.id === selected ? 0 : -1}
-                aria-label={label}
-                aria-pressed={tile.id === selected}
+                data-purchasable={!!quote}
+                data-unaffordable={unaffordable}
+                aria-busy={pending || undefined}
+                className={`territoryTileTarget${utility ? " territoryUtilityLabel" : ""}`}
+                style={
+                  {
+                    left: `${(point.x - minX) * scale}px`,
+                    top: `${(point.y - minY) * scale}px`,
+                    width: HEX_WIDTH * scale,
+                    height: HEX_HEIGHT * scale,
+                    ...(view.ownerKey
+                      ? { "--territory-owner-color": color(view.ownerKey) }
+                      : {}),
+                  } as MapStyle
+                }
+                tabIndex={tile.id === activeSelected ? 0 : -1}
+                aria-label={
+                  quote
+                    ? `${unaffordable ? "Inspect" : "Buy"} ${territoryTileLabel(tile)} · ${priceLabel}${unaffordable ? "; not enough available cash" : ""}`
+                    : label
+                }
+                aria-pressed={tile.id === activeSelected}
                 aria-describedby={`${mapId}-${tile.id}-status`}
-                onFocus={() => onSelect(tile.id)}
-                onClick={() => onSelect(tile.id, true)}
-                onKeyDown={(event) => navigate(event, tile.id)}
+                onFocus={() => {
+                  onSelect(tile.id);
+                  if (!pointer.current && !touches.current.size)
+                    revealTile(tile);
+                }}
+                onPointerDown={() => {
+                  activationQuote.current = quote
+                    ? { tileId: tile.id, quoteKey: quote.quoteKey }
+                    : undefined;
+                }}
+                onClick={() => {
+                  const expectedQuote =
+                    activationQuote.current?.tileId === tile.id
+                      ? activationQuote.current.quoteKey
+                      : quote?.quoteKey;
+                  activationQuote.current = undefined;
+                  onSelect(tile.id);
+                  if (pending) return;
+                  if (quote && !unaffordable)
+                    void purchase(tile.id, expectedQuote);
+                  else inspectTile(tile);
+                }}
+                onKeyDown={(event) => {
+                  if (
+                    (event.key === "Enter" || event.key === " ") &&
+                    !event.repeat
+                  )
+                    activationQuote.current = quote
+                      ? { tileId: tile.id, quoteKey: quote.quoteKey }
+                      : undefined;
+                  navigate(event, tile.id);
+                }}
                 title={`${TERRAIN_LABELS[tile.terrain]} · ${facility?.name ?? (tile.city ? `${tile.city.sector} city` : view.developed ? "Open site · transmission tower" : "Undeveloped site")}`}
               >
                 <span className="territoryTileHitArea" aria-hidden="true" />
                 {utility && (
-                  <strong
-                    style={
-                      perimeterLabel && ridgeLabel
-                        ? {
-                            left: `${50 + ((ridgeLabel.x - point.x) / HEX_WIDTH) * 100}%`,
-                            top: `${50 + ((ridgeLabel.y - point.y) / HEX_HEIGHT) * 100}%`,
-                          }
-                        : undefined
-                    }
-                  >
-                    {view.owned ? "You" : territory.name}
-                  </strong>
+                  <strong>{view.owned ? "You" : view.ownerName}</strong>
+                )}
+                {quote && (
+                  <span className="territoryTilePrice" aria-hidden="true">
+                    <b>{pending ? "Buying…" : money(quote.price)}</b>
+                    <span>{tilePurchaseBenefitLabel(quote)}</span>
+                    {unaffordable && <em>Not enough cash</em>}
+                  </span>
                 )}
                 <span className="srOnly" id={`${mapId}-${tile.id}-status`}>
                   {status(tile.territoryId)}.{" "}
@@ -445,7 +611,7 @@ export default function TerritoryHexMap({
                       ? `${tile.city.sector} customers; no building slot`
                       : view.developed
                         ? "One building site; transmission tower"
-                        : "One site available with this land"}
+                        : "One building site"}
                   .
                 </span>
               </button>
@@ -453,10 +619,6 @@ export default function TerritoryHexMap({
           })}
         </div>
       </div>
-      <p className="territoryMapHint">
-        Select a hex to inspect or build. Scroll to explore. Lines connect
-        developed land automatically.
-      </p>
     </div>
   );
 }
