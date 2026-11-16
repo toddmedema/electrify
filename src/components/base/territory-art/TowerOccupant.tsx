@@ -21,10 +21,9 @@ export default function TowerOccupant({ className, platform = false }: Props) {
       strokeLinecap="round"
       strokeLinejoin="round"
     >
-      <path d="M240 115H260L325 365H300L250 165L200 365H175Z" />
-      <path d="M190 165H310V185H190Z" />
-      <path d="M170 225H330V245H170Z" />
-      <path d="M218 295L292 335" fill="none" strokeWidth={10} />
+      <path d="M220 115H280L325 365H300L270 145H230L200 365H175Z" />
+      <path d="M190 200H310M170 270H330" fill="none" />
+      <path d="M215 300L285 325" fill="none" strokeWidth={10} />
       {platform && <path d="M175 345H325V365H175Z" />}
       <path d="M225 330H275V365H225Z" />
     </svg>

@@ -61,19 +61,41 @@ export default function StorageOccupant({
         )}
         {variant === "pumped-hydro" && (
           <>
-            <path d="M235 210V275H190V330H255" fill="none" strokeWidth="20" />
             <path
-              d="M235 210V275H190V330H255"
+              d="M265 170H310V245H185V320M210 335H250"
+              fill="none"
+              strokeWidth="20"
+            />
+            <path
+              d="M265 170H310V245H185V320M210 335H250"
               fill="none"
               stroke="#CFD8DC"
               strokeWidth="10"
             />
-            <path d="M135 115H270V230H135Z" fill="#FFF8E1" strokeWidth="20" />
-            <path d="M155 135H250V185H155Z" fill="#7FC8CE" strokeWidth="10" />
-            <path d="M230 250H365V365H230Z" fill="#FFF8E1" strokeWidth="20" />
-            <path d="M250 270H345V320H250Z" fill="#7FC8CE" strokeWidth="10" />
-            <path d="M135 275H225V365H135Z" fill="#CFD8DC" strokeWidth="20" />
-            <circle cx="180" cy="320" r="20" fill="#64DFC5" strokeWidth="10" />
+            <path d="M135 155H240V210H135Z" fill="#FFF8E1" strokeWidth="20" />
+            <path
+              d="M240 155L265 115V170L240 210Z"
+              fill="#CFD8DC"
+              strokeWidth="20"
+            />
+            <path
+              d="M135 155L160 115H265L240 155Z"
+              fill="#7FC8CE"
+              strokeWidth="20"
+            />
+            <path d="M240 310H340V365H240Z" fill="#FFF8E1" strokeWidth="20" />
+            <path
+              d="M340 310L365 270V325L340 365Z"
+              fill="#CFD8DC"
+              strokeWidth="20"
+            />
+            <path
+              d="M240 310L265 270H365L340 310Z"
+              fill="#7FC8CE"
+              strokeWidth="20"
+            />
+            <path d="M135 285H215V365H135Z" fill="#CFD8DC" strokeWidth="20" />
+            <circle cx="175" cy="325" r="20" fill="#64DFC5" strokeWidth="10" />
           </>
         )}
       </g>
