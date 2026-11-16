@@ -1,3 +1,4 @@
+import { SAVE_SCHEMA_VERSION } from "../SaveSchema";
 import { LAND_TERRITORIES } from "../data/Territories";
 import { UTILITY_AREAS } from "../data/UtilityExpansion";
 import { currentTick } from "../helpers/GameSelectors";
@@ -68,7 +69,7 @@ it("migrates only recognized published schema14 co-op rules and keeps paid claim
     "coop-2-b4c8f4641c919057a7b569242464c24e26bcec444ef68954be2796b7734bbbb8";
   for (const grid of raw.grids) grid.territoryNetwork.version = 2;
   const restored = restoreWorld(raw, "migrated");
-  expect(restored.gameSchema).toBe(15);
+  expect(restored.gameSchema).toBe(SAVE_SCHEMA_VERSION);
   expect(currentTick(restored.grids[0])!.cash).toBe(
     currentTick(world.grids[0])!.cash,
   );

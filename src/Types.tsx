@@ -625,6 +625,8 @@ interface SharedOperatingType
   extends LoanInfo, LifetimeTotals, ConstructionEmissions {
   startingAssetId?: string;
   territoryId?: TerritoryId;
+  /** Exactly one developed map cell; absent outside the territory scenario. */
+  tileId?: TerritoryTileId;
   /** Transfer restrictions on inherited assets; absent means ordinary resale value. */
   cashBackMultiplier?: number;
   saleRestricted?: boolean;
@@ -1357,6 +1359,12 @@ export type LandTerritoryId =
   | "green-uplands"
   | `parcel-${0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 17}`;
 export type TerritoryId = UtilityId | LandTerritoryId;
+export type TerrainType =
+  "plains" | "forest" | "hills" | "mountain" | "river" | "lake" | "ocean";
+export type TerritoryTileId =
+  | `${TerritoryId}:city`
+  | `${TerritoryId}:site-${number}`
+  | `${TerritoryId}:legacy-${number}`;
 /** Legacy recorded territory readings retained for save history. */
 export interface TerritoryTick {
   demandW: number;

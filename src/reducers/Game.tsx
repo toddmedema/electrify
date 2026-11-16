@@ -1,3 +1,4 @@
+import { assignTerritoryTiles } from "../helpers/TerritoryTiles";
 import {
   hasTerritoryNetwork,
   territoryBuildAvailability,
@@ -419,6 +420,7 @@ interface BuildFacilityAction {
   facility: FacilityShoppingType;
   financed: boolean;
   territoryId?: TerritoryId;
+  tileId?: import("../Types").TerritoryTileId;
 }
 
 interface ReprioritizeAction {
@@ -1998,6 +2000,8 @@ export const gameSlice = createSlice({
         state.facilities.forEach((facility) => {
           facility.territoryId = "champlain";
         });
+        if (!assignTerritoryTiles(state))
+          throw new Error("Invalid starting tile placement");
         state.transmission!.inheritedAgreementTerms = 3;
         state.utilityExpansion = {
           networkAssets: [],
@@ -2764,6 +2768,7 @@ export function previewFacilityBuild(
   game: GameType,
   facility: FacilityShoppingType,
   territoryId: TerritoryId = "champlain",
+  tileId?: import("../Types").TerritoryTileId,
 ): {
   commissionedMinute: number;
   before: TickPresentFutureType[];
@@ -2775,6 +2780,10 @@ export function previewFacilityBuild(
   const cash = now.cash;
   const customers = now.customers;
   const existingIds = new Set(snapshot.facilities.map(({ id }) => id));
+  const placement = hasTerritoryNetwork(snapshot)
+    ? territoryBuildAvailability(snapshot, facility, territoryId, tileId)
+    : undefined;
+  if (placement && !placement.buildable) throw new Error(placement.reason);
   const hydroSite = isConventionalHydro(facility)
     ? getHydroAvailability(snapshot, facility.peakW, territoryId).selected
     : undefined;
@@ -2785,7 +2794,10 @@ export function previewFacilityBuild(
   );
   const added = snapshot.facilities.find(({ id }) => !existingIds.has(id));
   if (!added) throw new Error("No facility added to the forecast");
-  if (hasTerritoryNetwork(snapshot)) added.territoryId = territoryId;
+  if (hasTerritoryNetwork(snapshot)) {
+    added.territoryId = territoryId;
+    added.tileId = placement?.tileId;
+  }
   const year = TICKS_PER_YEAR * TICK_MINUTES;
   const step = 60;
   let commissionedMinute: number | undefined;
@@ -2860,11 +2872,11 @@ function applyBuildFacility(
     (!hasTerritoryNetwork(state) || !isTerritoryId(payload.territoryId))
   )
     return false;
-  if (
-    hasTerritoryNetwork(state) &&
-    !territoryBuildAvailability(state, requested, territoryId).buildable
-  )
-    return false;
+  if (payload.tileId !== undefined && !hasTerritoryNetwork(state)) return false;
+  const placement = hasTerritoryNetwork(state)
+    ? territoryBuildAvailability(state, requested, territoryId, payload.tileId)
+    : undefined;
+  if (placement && !placement.buildable) return false;
   if (isLegacyCampaignScenario(state.scenarioId) && !state.customScenario) {
     // Era/date limits belong to the command owner as well as the shopping UI.
     if (isStorage(requested)) {
@@ -2955,7 +2967,10 @@ function applyBuildFacility(
   state = buildFacilityHelper(state, built, payload.financed);
   const added = state.facilities.find(({ id }) => !existingIds.has(id));
   if (!added) return false;
-  if (hasTerritoryNetwork(state)) added.territoryId = territoryId;
+  if (hasTerritoryNetwork(state)) {
+    added.territoryId = territoryId;
+    added.tileId = placement?.tileId;
+  }
   // Book this loan at the quoted rate, then price the next one against the new debt and cash.
   if (payload.financed) refreshInterestRate(state, now.cash);
   if (isMaterialCapacityDecision(state, added.peakW)) {

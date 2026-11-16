@@ -1,3 +1,4 @@
+import { assignTerritoryTiles } from "./helpers/TerritoryTiles";
 import type { BuyingRuleType, SellingRuleType, GameType } from "./Types";
 import { inheritedConnection } from "./helpers/PowerAgreements";
 import { facilityTerritoryId } from "./helpers/Territories";
@@ -260,6 +261,30 @@ const migrations: readonly Migration[] = [
           : {}),
       },
     };
+  },
+  // 15 -> 16: split retained territory budgets into one city or one facility per hex.
+  (save) => {
+    if (!object(save.game)) return null;
+    if (save.game.territoryNetwork === undefined) return save;
+    if (
+      !object(save.game.territoryNetwork) ||
+      save.game.territoryNetwork.version !== 3 ||
+      !Array.isArray(save.game.facilities) ||
+      save.game.facilities.some(
+        (facility) =>
+          !object(facility) ||
+          !Number.isSafeInteger(facility.id) ||
+          typeof facility.fuel !== "string" ||
+          typeof facility.peakW !== "number",
+      )
+    )
+      return null;
+    const game = {
+      ...save.game,
+      facilities: save.game.facilities.map((facility) => ({ ...facility })),
+    } as unknown as GameType;
+    if (!assignTerritoryTiles(game)) return null;
+    return { ...save, game };
   },
 ];
 

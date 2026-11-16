@@ -1283,7 +1283,7 @@ export function restoreWorld(
   return result;
 }
 
-/** Only the shipped schema13 valley rules have a defined pooled-world transition. */
+/** Recognized published worlds follow ordered migrations; arbitrary runtime identities never do. */
 function upgradeTerritoryWorld(value: unknown): unknown {
   const old = value as Partial<World> | null;
   if (
@@ -1295,12 +1295,17 @@ function upgradeTerritoryWorld(value: unknown): unknown {
           "coop-2-34d99333d49691071b390dc49bfe6c73e43562c61b9fcbf7974f5996b10deaca") ||
       (old.gameSchema === 14 &&
         old.rules ===
-          "coop-2-b4c8f4641c919057a7b569242464c24e26bcec444ef68954be2796b7734bbbb8")
+          "coop-2-b4c8f4641c919057a7b569242464c24e26bcec444ef68954be2796b7734bbbb8") ||
+      (old.gameSchema === 15 &&
+        old.rules ===
+          "coop-2-c12bab1ee04886f40ff0274d35e968e07cf7c3306f9e5ea006140bb973163fe4")
     ) ||
     !Array.isArray(old.grids) ||
     !old.grids.every(
       (grid) =>
-        !!grid && typeof grid === "object" && isUtilityExpansionGame(grid),
+        !!grid &&
+        typeof grid === "object" &&
+        (old.gameSchema === 15 || isUtilityExpansionGame(grid)),
     )
   )
     return value;

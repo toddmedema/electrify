@@ -1,3 +1,4 @@
+import { isTerritoryTileId } from "../helpers/TerritoryTiles";
 import { validPowerAgreementAction } from "../helpers/PowerAgreements";
 import { isBuyingRule, isSellingRule } from "../helpers/TradingRules";
 import { acquisitionQuote, validAcquisitionAction } from "../helpers/Expansion";
@@ -89,6 +90,7 @@ const buildFacility: Validator = (game, payload) => {
     facility?: Partial<FacilityShoppingType>;
     financed?: boolean;
     territoryId?: unknown;
+    tileId?: unknown;
   };
   if (!build || !build.facility || typeof build.financed !== "boolean")
     return { error: "That build is unavailable" };
@@ -104,6 +106,14 @@ const buildFacility: Validator = (game, payload) => {
   const territoryId = isTerritoryId(build.territoryId)
     ? build.territoryId
     : "champlain";
+  if (
+    build.tileId !== undefined &&
+    (!hasTerritoryNetwork(game) || !isTerritoryTileId(build.tileId, game))
+  )
+    return { error: "Choose a valid tile for this build" };
+  const tileId = isTerritoryTileId(build.tileId, game)
+    ? build.tileId
+    : undefined;
   const requested = build.facility;
   const size = requested.peakWh ?? requested.peakW;
   if (
@@ -136,18 +146,27 @@ const buildFacility: Validator = (game, payload) => {
     return { error: "Choose valid facility options" };
   if (!isStorage(quote) && requested.resilience)
     quote = withResilienceOptions(quote, game, requested.resilience);
+  let selectedTileId = tileId;
   if (hasTerritoryNetwork(game)) {
-    const availability = territoryBuildAvailability(game, quote, territoryId);
+    const availability = territoryBuildAvailability(
+      game,
+      quote,
+      territoryId,
+      tileId,
+    );
     if (!availability.buildable)
       return {
         error: availability.reason ?? "That territory cannot host this build",
       };
+    selectedTileId = availability.tileId;
   }
   return {
     payload: {
       facility: quote,
       financed: build.financed,
-      ...(hasTerritoryNetwork(game) ? { territoryId } : {}),
+      ...(hasTerritoryNetwork(game)
+        ? { territoryId, tileId: selectedTileId }
+        : {}),
     },
   };
 };

@@ -1,5 +1,9 @@
 import type { AppThunk } from "../Store";
-import type { FacilityShoppingType, TerritoryId } from "../Types";
+import type {
+  FacilityShoppingType,
+  TerritoryId,
+  TerritoryTileId,
+} from "../Types";
 import { buildFacility } from "../reducers/Game";
 import { navigate } from "../reducers/Card";
 import { facilityPurchased, snackbarOpen } from "../reducers/UI";
@@ -12,6 +16,7 @@ export const purchaseFacility =
     facility: FacilityShoppingType,
     financed: boolean,
     territoryId?: TerritoryId,
+    tileId?: TerritoryTileId,
   ): AppThunk =>
   (dispatch, getState) => {
     const beforeIds = new Set(
@@ -43,6 +48,7 @@ export const purchaseFacility =
             facility,
             financed,
             territoryId,
+            ...(tileId !== undefined ? { tileId } : {}),
           },
         })
         .then(acknowledge)
@@ -53,6 +59,7 @@ export const purchaseFacility =
           facility,
           financed,
           territoryId,
+          ...(tileId !== undefined ? { tileId } : {}),
         }),
       );
       acknowledge();

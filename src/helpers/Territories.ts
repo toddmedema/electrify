@@ -1,8 +1,6 @@
 import {
-  isStorage,
   type AcquireLandAction,
   type LandTerritoryId,
-  type FacilityOperatingType,
   type FacilityShoppingType,
   type GameType,
   type TerritoryId,
@@ -14,10 +12,8 @@ import {
   LAND_TERRITORIES,
   isLandTerritoryId,
   territoryHydroSiteId,
-  type TerritorySiteKind,
 } from "../data/Territories";
 import { UTILITY_AREAS } from "../data/UtilityExpansion";
-import { isUtilityExpansionGame } from "./ExpansionContext";
 import { getInflationIndex, hasEconomy } from "../data/Economy";
 import { getDateFromMinute } from "./DateTime";
 import { currentTick } from "./GameSelectors";
@@ -29,102 +25,37 @@ import {
   isOperatingPolicy,
 } from "./Policies";
 
-export function hasTerritoryNetwork(
-  game: Pick<GameType, "scenarioId" | "customScenario" | "territoryNetwork">,
-): boolean {
-  return isUtilityExpansionGame(game) && game.territoryNetwork?.version === 3;
-}
-
-export function ownedTerritories(game: GameType): TerritoryId[] {
-  if (!hasTerritoryNetwork(game)) return ["champlain"];
-  return TERRITORIES.filter(
-    ({ id }) =>
-      id === "champlain" ||
-      (isLandTerritoryId(id)
-        ? game.territoryNetwork?.landPurchases.some(
-            (receipt) => receipt.territoryId === id,
-          )
-        : game.utilityExpansion?.acquisitions.some(
-            ({ targetId }) => targetId === id,
-          )),
-  ).map(({ id }) => id);
-}
-
-/** Explicit placement wins; old inherited assets retain their authored provenance. */
-export function facilityTerritoryId(
-  facility: Pick<FacilityOperatingType, "territoryId" | "startingAssetId">,
-): TerritoryId {
-  if (facility.territoryId) return facility.territoryId;
-  return (
-    Object.values(UTILITY_AREAS).find((area) =>
-      area.facilities.some(
-        ({ assetId }) => assetId === facility.startingAssetId,
-      ),
-    )?.id ?? "champlain"
-  );
-}
-
-export function territorySiteKind(
-  facility: Pick<FacilityShoppingType, "fuel" | "peakWh">,
-): TerritorySiteKind | undefined {
-  if (isStorage(facility)) return "open-land";
-  if (facility.fuel === "Hydro") return "hydro";
-  if (facility.fuel === "Geothermal") return "geothermal";
-  if (
-    facility.fuel === "Wind" ||
-    facility.fuel === "Offshore Wind" ||
-    facility.fuel === "Airborne Wind"
-  )
-    return "wind";
-  if (facility.fuel === "Sun") return "open-land";
-  return "industrial";
-}
-
-/** Reservations include paused and unfinished projects; selling removes the reservation. */
-export function territorySiteInventory(
-  game: Pick<GameType, "facilities"> &
-    Partial<Pick<GameType, "commissionedHydroSiteIds">>,
-  id: TerritoryId,
-  kind: TerritorySiteKind,
-): { remaining: number; total: number; maxPeakW: number } {
-  const territory = TERRITORIES.find((territory) => territory.id === id);
-  const budget = territory?.sites[kind];
-  const total = budget?.count ?? 0;
-  const used = game.facilities.filter((owned) => {
-    if (facilityTerritoryId(owned) !== id) return false;
-    const actual = territorySiteKind(owned);
-    return (
-      actual === kind ||
-      (kind === "general" && actual !== "hydro" && actual !== "geothermal")
-    );
-  }).length;
-  return {
-    remaining: Math.max(
-      0,
-      total -
-        Math.max(
-          used,
-          kind === "hydro" &&
-            game.commissionedHydroSiteIds?.includes(territoryHydroSiteId(id))
-            ? 1
-            : 0,
-        ),
-    ),
-    total,
-    maxPeakW: budget?.maxPeakW ?? 0,
-  };
-}
+import {
+  hasTerritoryNetwork,
+  ownedTerritories,
+  facilityTerritoryId,
+  territorySiteKind,
+  territorySiteInventory,
+  availableTerritoryTiles,
+  getTerritoryTile,
+  tileFitsFacility,
+  facilityOnTile,
+} from "./TerritoryTiles";
+export {
+  hasTerritoryNetwork,
+  ownedTerritories,
+  facilityTerritoryId,
+  territorySiteKind,
+  territorySiteInventory,
+} from "./TerritoryTiles";
 
 export function territoryBuildAvailability(
   game: GameType,
   facility: FacilityShoppingType,
   id: TerritoryId,
+  tileId?: import("../Types").TerritoryTileId,
 ): {
   buildable: boolean;
   reason?: string;
   remaining: number;
   total: number;
   maxPeakW: number;
+  tileId?: import("../Types").TerritoryTileId;
 } {
   if (!hasTerritoryNetwork(game))
     return {
@@ -141,30 +72,53 @@ export function territoryBuildAvailability(
     (territory?.sites.general.count ?? 0) > 0
       ? "general"
       : specific;
-  const { remaining, total, maxPeakW } = kind
-    ? territorySiteInventory(game, id, kind)
-    : { remaining: 0, total: 0, maxPeakW: 0 };
+  const inventory = territorySiteInventory(game, id, kind);
+  const free = availableTerritoryTiles(game, facility, id);
+  const requested =
+    tileId === undefined ? undefined : getTerritoryTile(tileId, game);
   const reject = (reason: string) => ({
     buildable: false,
     reason,
-    remaining,
-    total,
-    maxPeakW,
+    ...inventory,
   });
   if (!territory) return reject("Choose a valid territory.");
   if (!ownedTerritories(game).includes(id))
     return reject("Acquire this territory before building.");
-  if (!kind)
-    return reject("No new hydro sites are available in these territories.");
-  if (!remaining)
-    return reject("No sites of this type remain in this territory.");
-  if (!(
-    Number.isFinite(facility.peakW) &&
-    facility.peakW > 0 &&
-    facility.peakW <= maxPeakW
-  ))
-    return reject("This project exceeds the territory’s per-site power limit.");
-  return { buildable: true, remaining, total, maxPeakW };
+  if (tileId !== undefined) {
+    if (!requested || requested.territoryId !== id)
+      return reject("Choose a valid tile in this territory.");
+    if (requested.city)
+      return reject("Cities add demand and have no building slot.");
+    if (facilityOnTile(game, requested.id))
+      return reject(
+        "This tile already has a facility or construction project.",
+      );
+    if (!tileFitsFacility(requested, facility))
+      return reject("This technology or project size does not fit this tile.");
+    if (!free.some((tile) => tile.id === requested.id))
+      return reject("This named site has already been used.");
+  }
+  const selected = requested ?? free[0];
+  if (!selected) {
+    if (!inventory.remaining)
+      return reject("No sites of this type remain in this territory.");
+    if (
+      !Number.isFinite(facility.peakW) ||
+      facility.peakW <= 0 ||
+      facility.peakW > inventory.maxPeakW
+    )
+      return reject(
+        "This project exceeds the territory’s per-site power limit.",
+      );
+    return reject("No free tile supports this technology.");
+  }
+  return {
+    buildable: true,
+    remaining: free.length,
+    total: inventory.total,
+    maxPeakW: selected.maxPeakW ?? 0,
+    tileId: selected.id,
+  };
 }
 
 /** Apportion actual sector demand by inherited customer/load weights; never add another load. */

@@ -1,3 +1,4 @@
+import { getTerritoryTile, tileFitsFacility } from "./TerritoryTiles";
 import { TICK_MINUTES } from "../Constants";
 import type { GameType } from "../Types";
 import {
@@ -42,6 +43,7 @@ export function validTerritoryNetwork(game: GameType): boolean {
           facility.territoryId === undefined ||
           facility.territoryId === "champlain",
       ) &&
+      game.facilities.every((facility) => facility.tileId === undefined) &&
       game.timeline.every((tick) => tick.territories === undefined)
     );
   if (
@@ -103,6 +105,30 @@ export function validTerritoryNetwork(game: GameType): boolean {
   )
     return false;
   const owned = ownedTerritories(game);
+  const placements = new Set<string>();
+  if (
+    game.facilities.some((facility) => {
+      if (
+        typeof facility.tileId !== "string" ||
+        placements.has(facility.tileId)
+      )
+        return true;
+      const tile = getTerritoryTile(facility.tileId, game);
+      if (
+        !tile ||
+        tile.territoryId !== facilityTerritoryId(facility) ||
+        !tileFitsFacility(
+          tile,
+          facility,
+          !tile.territoryId.startsWith("parcel-"),
+        )
+      )
+        return true;
+      placements.add(tile.id);
+      return false;
+    })
+  )
+    return false;
   if (
     game.facilities.some((facility) => {
       if (

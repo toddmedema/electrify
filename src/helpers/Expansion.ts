@@ -1,3 +1,4 @@
+import { getFacilityTile } from "./TerritoryTiles";
 import {
   landTransferredCustomerTotal,
   landCustomerMarket,
@@ -160,6 +161,7 @@ export function acquisitionAssets(
     result.push({
       ...technology,
       territoryId: targetId,
+      tileId: getFacilityTile({ startingAssetId: search.assetId })?.id,
       startingAssetId: search.assetId,
       hydroSiteId: search.hydroSiteId ?? quote.hydroSiteId,
       ...(quote.fuel === "Wind"
