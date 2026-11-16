@@ -197,7 +197,13 @@ it("migrates schema15 placements without changing finances, progress or resumed 
   const restored = parseSave(cloneDeep(serializeSave(migrated.game)))!.game;
   tickState(migrated.game);
   tickState(restored);
-  expect(serializeSave(restored)).toEqual(serializeSave(migrated.game));
+  // Hydration rebuilds non-enumerable forecast caches; persisted state and dispatch metadata must agree.
+  expect(JSON.parse(JSON.stringify(restored))).toEqual(
+    JSON.parse(JSON.stringify(migrated.game)),
+  );
+  expect(serializeSave(restored).commitmentForecast).toEqual(
+    serializeSave(migrated.game).commitmentForecast,
+  );
 });
 it("gives retained pre-map overflow projects their own cells while rejecting malformed current placements", () => {
   const game = ready();
@@ -217,8 +223,11 @@ it("gives retained pre-map overflow projects their own cells while rejecting mal
   ).toBe(raw.game.facilities.length);
   expect(getTerritoryTiles(restored.game).length).toBeGreaterThan(76);
   const current = JSON.parse(JSON.stringify(serializeSave(game)));
-  current.game.facilities[1].tileId = current.game.facilities[0].tileId;
+  const oils = current.game.facilities.filter(
+    (facility: { fuel: string }) => facility.fuel === "Oil",
+  );
+  oils[0].tileId = oils[1].tileId;
   expect(parseSave(current)).toBeNull();
-  current.game.facilities[1].tileId = "champlain:city";
+  oils[0].tileId = "champlain:city";
   expect(parseSave(current)).toBeNull();
 });

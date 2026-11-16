@@ -172,10 +172,11 @@ for (const territory of TERRITORIES) {
 }
 /** Fictional siting cells; exactly one city OR one construction reservation per cell. */
 export const TERRITORY_TILES: readonly TerritoryTileDefinition[] = tiles;
+const tilesById: ReadonlyMap<string, TerritoryTileDefinition> = new Map(
+  TERRITORY_TILES.map((tile) => [tile.id, tile]),
+);
 export function getAuthoredTerritoryTile(
   id: unknown,
 ): TerritoryTileDefinition | undefined {
-  return typeof id === "string"
-    ? TERRITORY_TILES.find((tile) => tile.id === id)
-    : undefined;
+  return typeof id === "string" ? tilesById.get(id) : undefined;
 }
