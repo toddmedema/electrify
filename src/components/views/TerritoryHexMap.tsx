@@ -48,6 +48,7 @@ export default function TerritoryHexMap({
   const mapId = React.useId();
   const viewport = React.useRef<HTMLDivElement>(null);
   const stage = React.useRef<HTMLDivElement>(null);
+  const buyingControl = React.useRef<HTMLButtonElement>(null);
   const runId = useAppSelector((state) => state.ui?.evidenceRunId);
   const { formatMoneyConcise: money } = useMoney();
   const { pendingIds, availableCash, message, purchase } =
@@ -317,11 +318,18 @@ export default function TerritoryHexMap({
       data-buy-mode={buyMode}
       aria-label="Terrain, structures and utility ownership"
       onKeyDown={(event) => {
-        if (event.key === "Escape" && (onCloseInspection || buyMode)) {
+        const leavingGeography =
+          event.target instanceof HTMLElement &&
+          !!event.target.closest("[data-map-target]");
+        if (
+          event.key === "Escape" &&
+          (onCloseInspection || buyMode || leavingGeography)
+        ) {
           event.preventDefault();
           event.stopPropagation();
           if (onCloseInspection) onCloseInspection();
-          else setBuyMode(false);
+          else if (buyMode) setBuyMode(false);
+          else buyingControl.current?.focus({ preventScroll: true });
         }
       }}
     >
@@ -332,6 +340,7 @@ export default function TerritoryHexMap({
         <button
           type="button"
           className="territoryMapBuyToggle"
+          ref={buyingControl}
           aria-pressed={buyMode}
           onClick={() => setBuyMode((value) => !value)}
         >

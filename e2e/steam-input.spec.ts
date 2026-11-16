@@ -3,7 +3,9 @@ import path from "node:path";
 import { waitForDesktopInput } from "./menu-keyboard";
 import { foregroundContrast } from "./contrast";
 import { decodeSave } from "../src/SaveEncoding";
-import type { SaveGameType } from "../src/Types";
+import type { SaveGameType, TerritoryTileId } from "../src/Types";
+import { territoryTileViews } from "../src/helpers/TerritoryMapState";
+import { hexCenter } from "../src/components/base/TerritoryHexGeometry";
 import type {
   DesktopInputAction as InputAction,
   DesktopInputFrame as InputFrame,
@@ -133,10 +135,10 @@ async function select(
       if (!active || active === document.body)
         return { direction: "down", key: "body" };
       if (
-        active.matches(".worldMapMarker") &&
-        !element.matches(".worldMapMarker")
+        active.matches(".worldMapMarker,.territoryTileTarget") &&
+        !element.matches(".worldMapMarker,.territoryTileTarget")
       ) {
-        // Every arrow belongs to map geography. Back returns to its zoom controls
+        // Every arrow belongs to map geography. Back returns to its toolbar
         // before the player can navigate to another form control.
         return { direction: "back", key: "map" };
       }
@@ -175,6 +177,55 @@ async function select(
     control,
     "reachable through the rendered control positions",
   ).toBeFocused();
+}
+
+/** Enter the roving map stop, then let D-pad movement reveal virtualized cells. */
+async function selectMapTile(page: Page, id: TerritoryTileId) {
+  const target = page.locator(`[data-map-target="${id}"]`);
+  await select(page, page.locator('[data-map-target][tabindex="0"]'));
+  const currentId = (await page
+    .locator("[data-map-target]:focus")
+    .getAttribute("data-map-target")) as TerritoryTileId;
+  const game = await readSavedGame(page);
+  expect(game).toBeDefined();
+  // Plan over revealed geography, including cells outside the mounted viewport.
+  // The map's flattened hexes can make vertical movement skip a staggered row.
+  const points = territoryTileViews(game!).map(({ tile }) => ({
+    id: tile.id,
+    ...hexCenter(tile),
+  }));
+  const directions = [
+    ["left", -1, 0],
+    ["right", 1, 0],
+    ["up", 0, -1],
+    ["down", 0, 1],
+  ] as const;
+  const routes = new Map<TerritoryTileId, InputAction[]>([[currentId, []]]);
+  const queue = [currentId];
+  for (const fromId of queue) {
+    if (routes.has(id)) break;
+    const from = points.find((point) => point.id === fromId)!;
+    for (const [action, x, y] of directions) {
+      const next = points
+        .filter((point) => (point.x - from.x) * x + (point.y - from.y) * y > 1)
+        .sort(
+          (a, b) =>
+            (a.x - from.x) * (a.x - from.x) * (x ? 1 : 4) +
+            (a.y - from.y) * (a.y - from.y) * (y ? 1 : 4) -
+            ((b.x - from.x) * (b.x - from.x) * (x ? 1 : 4) +
+              (b.y - from.y) * (b.y - from.y) * (y ? 1 : 4)),
+        )[0];
+      if (!next || routes.has(next.id)) continue;
+      routes.set(next.id, [...routes.get(fromId)!, action]);
+      queue.push(next.id);
+    }
+  }
+  expect(routes.has(id), "tile is reachable through the D-pad map graph").toBe(
+    true,
+  );
+  for (const action of routes.get(id)!) await input(page, action);
+  await expect(target, "reachable through map geography").toBeFocused();
+  return target;
 }
 
 test.beforeEach(async ({ page }, info) => {
@@ -1090,13 +1141,7 @@ test("controller reviews, cancels and confirms a utility acquisition", async ({
     page.getByRole("button", { name: "Continue", exact: true }),
   );
   await input(page, "confirm");
-  await select(
-    page,
-    page.getByRole("button", {
-      name: "Inspect Ridge Electric territory",
-      exact: true,
-    }),
-  );
+  await selectMapTile(page, "ridge-electric:city");
   await input(page, "confirm");
   const dialog = page.getByRole("dialog", {
     name: "Acquire Ridge Electric?",
@@ -1126,6 +1171,11 @@ test("controller reviews, cancels and confirms a utility acquisition", async ({
   const ownership = page.locator(".facilities:visible .acquiredUtilities");
   await expect(ownership.locator("summary")).toBeFocused();
   await expect(ownership).not.toHaveAttribute("open");
+  // The acquired city's inspector stays open. Close that input surface before
+  // traversing to the ownership disclosure behind it.
+  await input(page, "back");
+  await expect(line).toHaveCount(0);
+  await select(page, ownership.locator("summary"));
   await input(page, "confirm");
   await expect(
     ownership.getByRole("heading", { name: "Ridge Electric", exact: true }),
@@ -1138,6 +1188,56 @@ test("controller reviews, cancels and confirms a utility acquisition", async ({
       (receipt) => receipt.targetId === "ridge-electric",
     ),
   ).toBe(true);
+});
+
+test("controller buys one map tile and returns from map geography to navigation", async ({
+  page,
+}) => {
+  await page.goto("/?scenario=116");
+  await select(
+    page,
+    page.getByRole("button", { name: "Start game", exact: true }),
+  );
+  await input(page, "confirm");
+  await expect(page.locator("#appbar:visible")).toBeVisible();
+  const pause = page.getByRole("button", { name: "pause", exact: true });
+  if ((await pause.getAttribute("aria-pressed")) !== "true")
+    await input(page, "pause");
+  await selectMapTile(page, "champlain:city");
+  await input(page, "back");
+  const buy = page.getByRole("button", { name: "Buy land", exact: true });
+  await expect(buy).toBeFocused();
+  await input(page, "confirm");
+  const done = page.getByRole("button", { name: "Done buying", exact: true });
+  await expect(done).toHaveAttribute("aria-pressed", "true");
+  await expect(done).toBeFocused();
+  await input(page, "confirm");
+  await expect(buy).toHaveAttribute("aria-pressed", "false");
+  await input(page, "confirm");
+  const tile = await selectMapTile(page, "green-uplands:site-0");
+  const before = await readSavedGame(page);
+  expect(before?.territoryNetwork?.tilePurchases).toHaveLength(0);
+  await expect(tile).toHaveAttribute("data-purchasable", "true");
+  await input(page, "confirm");
+  await expect(tile).toHaveAttribute("data-owned", "true");
+  await expect(tile).toBeFocused();
+  await expect(done).toHaveAttribute("aria-pressed", "true");
+  expect((await readSavedGame(page))?.territoryNetwork?.tilePurchases).toEqual([
+    expect.objectContaining({ tileId: "green-uplands:site-0" }),
+  ]);
+  await input(page, "back");
+  await expect(buy).toHaveAttribute("aria-pressed", "false");
+  await expect(tile).toBeFocused();
+  await input(page, "back");
+  await expect(buy).toBeFocused();
+  await select(
+    page,
+    page.getByRole("button", { name: "Programs", exact: true }),
+  );
+  await input(page, "confirm");
+  await expect(
+    page.getByRole("region", { name: "Programs", exact: true }),
+  ).toBeVisible();
 });
 
 test("TV couch settings keep gameplay and controls readable with explicit device setup", async ({

@@ -432,6 +432,27 @@ it("closes an open inspection before leaving buying mode when Escape is pressed 
   );
 });
 
+it("returns from map geography to its buying control after closing inspection and buying mode, then releases Escape", () => {
+  const map = show(1e9, true);
+  map.buyMode();
+  const tile = map.target("champlain:city");
+  act(() => tile.focus());
+  expect(fireEvent.keyDown(tile, { key: "Escape" })).toBe(false);
+  expect(map.closeInspection).toHaveBeenCalledTimes(1);
+  expect(screen.getByRole("button", { name: "Done buying" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  expect(tile).toHaveFocus();
+  expect(fireEvent.keyDown(tile, { key: "Escape" })).toBe(false);
+  expect(tile).toHaveFocus();
+  const buy = screen.getByRole("button", { name: "Buy land" });
+  expect(fireEvent.keyDown(tile, { key: "Escape" })).toBe(false);
+  expect(buy).toHaveFocus();
+  // The next Back belongs to the game's global navigation again.
+  expect(fireEvent.keyDown(buy, { key: "Escape" })).toBe(true);
+});
+
 it("requires a fresh activation if a displayed quote changes during a pointer gesture", () => {
   const map = show();
   const host = fakeHost();
