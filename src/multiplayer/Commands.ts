@@ -168,13 +168,13 @@ const GAME_COMMAND_VALIDATORS = {
     (currentTick(game)?.cash ?? -1) >=
       tilePurchaseQuote(game, payload.tileId)!.price
       ? { payload }
-      : { error: "This land tile is unavailable or unaffordable" },
+      : { error: "This land tile is owned, unavailable or unaffordable" },
   acquireLand: (game, payload) =>
     validLandPurchaseAction(game, payload) &&
     (currentTick(game)?.cash ?? -1) >=
       landPurchaseQuote(game, payload.territoryId)!.price
       ? { payload }
-      : { error: "This land purchase is unavailable or unaffordable" },
+      : { error: "This land purchase is owned, unavailable or unaffordable" },
   acceptPowerAgreement: (game, payload) =>
     validPowerAgreementAction(game, payload)
       ? { payload }

@@ -220,11 +220,11 @@ it("rejects spoofed prices, duplicate receipts, unknown locations and forged leg
   });
   const raw = JSON.parse(JSON.stringify(serializeSave(game)));
   expect(parseSave(raw)).not.toBeNull();
-  raw.game.territoryNetwork.landPurchases[0].price = 0;
+  raw.game.territoryNetwork.tilePurchases[0].price = 0;
   expect(parseSave(raw)).toBeNull();
-  raw.game.territoryNetwork.landPurchases[0].price = quote.price;
-  raw.game.territoryNetwork.landPurchases.push({
-    ...raw.game.territoryNetwork.landPurchases[0],
+  raw.game.territoryNetwork.tilePurchases[0].price = quote.price;
+  raw.game.territoryNetwork.tilePurchases.push({
+    ...raw.game.territoryNetwork.tilePurchases[0],
   });
   expect(parseSave(raw)).toBeNull();
   const legacy = legacyPortfolio();

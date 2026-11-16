@@ -43,6 +43,8 @@ import {
   ownsTerritoryTile,
   getTerritoryTiles,
   territoryVisibilityDistance,
+  visibleTerritoryTiles,
+  createTerritoryTileOwnership,
 } from "./TerritoryTiles";
 export {
   hasTerritoryNetwork,
@@ -171,7 +173,13 @@ export function territoryDemandByType(
       const total = areas.reduce((sum, entry) => sum + weight(entry), 0);
       return [
         sector,
-        area && total > 0 ? (Math.max(0, load) * weight(area)) / total : 0,
+        area && total > 0
+          ? (Math.max(0, load) *
+              area.customers *
+              area.demandScale *
+              (key ? area.energyShares[key] : 1)) /
+            total
+          : 0,
       ];
     }),
   ) as DemandByTypeType;
@@ -181,27 +189,53 @@ export function territoryDemandShares(
   game: GameType,
   tick: Pick<TickPresentFutureType, "demandW" | "demandByType" | "minute">,
 ): Record<TerritoryId, number> {
-  const areas = territoryDemandAreas(game, tick.minute);
   const result = Object.fromEntries(
     [...TERRITORIES, ...purchasedLandTerritories(game)].map(({ id }) => [
       id,
       0,
     ]),
   ) as Record<TerritoryId, number>;
-  for (const area of areas)
-    result[area.id] = Object.values(
-      territoryDemandByType(game, tick, area.id),
-    ).reduce((sum, value) => sum + value, 0);
-  const total = Object.values(result).reduce((sum, load) => sum + load, 0);
+  const utilityAreas = Object.values(UTILITY_AREAS).filter(
+    ({ id }) =>
+      id === "champlain" ||
+      (hasTerritoryNetwork(game) &&
+        game.utilityExpansion?.acquisitions.some(
+          (receipt) => receipt.targetId === id && receipt.minute <= tick.minute,
+        )),
+  );
+  const areas = [...utilityAreas, ...landCustomerProfiles(game, tick.minute)];
   const totalWeight = areas.reduce(
     (sum, area) => sum + area.customers * area.demandScale,
     0,
   );
+  for (const [sector, load] of Object.entries(tick.demandByType)) {
+    const key =
+      sector === "Residential" ||
+      sector === "Commercial" ||
+      sector === "Industrial"
+        ? sector
+        : undefined;
+    const sectorWeight = areas.reduce(
+      (sum, area) =>
+        sum +
+        area.customers * area.demandScale * (key ? area.energyShares[key] : 1),
+      0,
+    );
+    for (const area of areas)
+      result[area.id] +=
+        (Math.max(0, load) *
+          area.customers *
+          area.demandScale *
+          (key ? area.energyShares[key] : 1)) /
+        sectorWeight;
+  }
+  const total = Object.values(result).reduce((sum, load) => sum + load, 0);
   for (const area of areas)
     result[area.id] =
       total > 0
         ? (result[area.id] / total) * tick.demandW
         : ((area.customers * area.demandScale) / totalWeight) * tick.demandW;
+  // Keep the company total exact despite division roundoff.
   result.champlain +=
     tick.demandW - Object.values(result).reduce((sum, load) => sum + load, 0);
   return result;
@@ -257,16 +291,17 @@ export function tilePrice(
       : 1;
   return landPrice(game, minute, tile.territoryId) / count;
 }
-export function tilePurchaseQuote(game: GameType, tileId: TerritoryTileId) {
-  const tile = getTerritoryTile(tileId, game);
+function purchaseQuote(
+  game: GameType,
+  tile: NonNullable<ReturnType<typeof getTerritoryTile>>,
+  owns = createTerritoryTileOwnership(game),
+) {
   if (
     !hasTerritoryNetwork(game) ||
-    !tile ||
     !isLandTerritoryId(tile.territoryId) ||
-    ownsTerritoryTile(game, tile) ||
+    owns(tile) ||
     game.multiplayer?.tileOwners?.[tile.id] ||
-    game.multiplayer?.landOwners?.[tile.territoryId] ||
-    territoryVisibilityDistance(game, tile) === undefined
+    game.multiplayer?.landOwners?.[tile.territoryId]
   )
     return undefined;
   const territory = getTerritoryDefinition(tile.territoryId)!;
@@ -281,6 +316,22 @@ export function tilePurchaseQuote(game: GameType, tileId: TerritoryTileId) {
       : 0,
     quoteKey: JSON.stringify([tile.id, game.date.minute, price]),
   };
+}
+export function tilePurchaseQuote(game: GameType, tileId: TerritoryTileId) {
+  const tile = getTerritoryTile(tileId, game);
+  return tile && territoryVisibilityDistance(game, tile) !== undefined
+    ? purchaseQuote(game, tile)
+    : undefined;
+}
+/** Batch map quotes share the finite discovery pass instead of rebuilding sight per tile. */
+export function tilePurchaseQuotes(game: GameType) {
+  const owns = createTerritoryTileOwnership(game);
+  return new Map(
+    visibleTerritoryTiles(game).flatMap(({ tile }) => {
+      const quote = purchaseQuote(game, tile, owns);
+      return quote ? [[tile.id, quote] as const] : [];
+    }),
+  );
 }
 /** Compatibility entry point selects ONE still-available visible cell; it never grants a region. */
 export function landPurchaseQuote(

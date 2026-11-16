@@ -102,7 +102,11 @@ function historicalTile(
   index: number,
 ): TerritoryTileDefinition | undefined {
   const territoryId = facilityTerritoryId(facility);
-  if (facility.tileId !== `${territoryId}:legacy-${facility.id}`)
+  if (
+    territoryId.startsWith("frontier:") ||
+    territoryId.startsWith("parcel-") ||
+    facility.tileId !== `${territoryId}:legacy-${facility.id}`
+  )
     return undefined;
   const kind = territorySiteKind(facility);
   return {
@@ -155,32 +159,45 @@ export function getTerritoryTile(
   id: unknown,
   game?: Pick<GameType, "facilities">,
 ): TerritoryTileDefinition | undefined {
-  return (
-    getAuthoredTerritoryTile(id) ??
-    getGeneratedTerritoryTile(id) ??
-    legacyTiles(game).find((tile) => tile.id === id)
+  const authored = getAuthoredTerritoryTile(id);
+  if (authored) return authored;
+  const retained = legacyTiles(game);
+  const legacy = retained.find((tile) => tile.id === id);
+  if (legacy) return legacy;
+  const generated = getGeneratedTerritoryTile(id);
+  return generated &&
+    !retained.some((tile) => tile.q === generated.q && tile.r === generated.r)
+    ? generated
+    : undefined;
+}
+
+type OwnershipGame = Pick<GameType, "territoryNetwork" | "utilityExpansion"> &
+  Partial<Pick<GameType, "facilities">>;
+/** Short-lived lookup for one view/quote pass; never cached across mutable game updates. */
+export function createTerritoryTileOwnership(game: OwnershipGame) {
+  const regions = new Set<TerritoryId>([
+    "champlain",
+    ...(game.utilityExpansion?.acquisitions.map(({ targetId }) => targetId) ??
+      []),
+    ...(game.territoryNetwork?.landPurchases.map(
+      ({ territoryId }) => territoryId,
+    ) ?? []),
+  ]);
+  const cells = new Set(
+    game.territoryNetwork?.tilePurchases?.map(({ tileId }) => tileId) ?? [],
   );
+  return (tile: TerritoryTileDefinition) =>
+    regions.has(tile.territoryId) || cells.has(tile.id);
 }
 export function ownsTerritoryTile(
-  game: Pick<GameType, "territoryNetwork" | "utilityExpansion">,
+  game: OwnershipGame,
   tileOrId: TerritoryTileDefinition | TerritoryTileId,
 ): boolean {
   const tile =
-    typeof tileOrId === "string" ? getTerritoryTile(tileOrId) : tileOrId;
-  if (!tile) return false;
-  return (
-    tile.territoryId === "champlain" ||
-    (!isLandTerritoryId(tile.territoryId) &&
-      !!game.utilityExpansion?.acquisitions.some(
-        ({ targetId }) => targetId === tile.territoryId,
-      )) ||
-    !!game.territoryNetwork?.landPurchases.some(
-      ({ territoryId }) => territoryId === tile.territoryId,
-    ) ||
-    !!game.territoryNetwork?.tilePurchases?.some(
-      ({ tileId }) => tileId === tile.id,
-    )
-  );
+    typeof tileOrId === "string"
+      ? getTerritoryTile(tileOrId, { facilities: game.facilities ?? [] })
+      : tileOrId;
+  return !!tile && createTerritoryTileOwnership(game)(tile);
 }
 export const territoryHexDistance = (
   a: { q: number; r: number },
@@ -195,7 +212,7 @@ export const territoryHexDistance = (
 export function territoryVisibilityAnchors(
   game: TileGame,
 ): TerritoryTileDefinition[] {
-  const remote = new Set(
+  const remote = new Set<TerritoryId>(
     (game.transmission?.acceptedAgreements ?? []).flatMap((receipt) => {
       const block = POWER_AGREEMENT_BLOCKS.find(
         ({ id }) => id === receipt.blockId,
@@ -212,6 +229,7 @@ export function territoryVisibilityAnchors(
         : [];
     }),
   );
+  const owns = createTerritoryTileOwnership(game);
   const retained = [
     ...TERRITORY_TILES,
     ...legacyTiles(game),
@@ -220,10 +238,13 @@ export function territoryVisibilityAnchors(
       return tile ? [tile] : [];
     }),
   ];
-  return retained.filter(
-    (tile) =>
-      ownsTerritoryTile(game, tile) || remote.has(tile.territoryId as never),
-  );
+  return [
+    ...new Map(
+      retained
+        .filter((tile) => owns(tile) || remote.has(tile.territoryId))
+        .map((tile) => [tile.id, tile]),
+    ).values(),
+  ];
 }
 export function territoryVisibilityDistance(
   game: TileGame,
@@ -237,27 +258,50 @@ export function territoryVisibilityDistance(
   );
   return distance <= 3 ? (distance as 0 | 1 | 2 | 3) : undefined;
 }
-/** Finite discovered frontier only: at most 37 cells per owned/active-PPA anchor. */
-export function getTerritoryTiles(
-  game?: TileGame,
-): readonly TerritoryTileDefinition[] {
-  if (!game) return TERRITORY_TILES;
-  const result = new Map(
-    [...TERRITORY_TILES, ...legacyTiles(game)].map((tile) => [tile.id, tile]),
-  );
-  const legacyAt = new Map(
+export interface VisibleTerritoryTile {
+  tile: TerritoryTileDefinition;
+  visibilityDistance: 0 | 1 | 2 | 3;
+}
+/** Work grows by 37 cells per anchor, without comparing every tile to every anchor. */
+export function visibleTerritoryTiles(game: TileGame): VisibleTerritoryTile[] {
+  const result = new Map<string, VisibleTerritoryTile>();
+  const retainedAt = new Map(
     legacyTiles(game).map((tile) => [`${tile.q},${tile.r}`, tile]),
   );
   for (const anchor of territoryVisibilityAnchors(game)) {
     for (let dq = -3; dq <= 3; dq++)
       for (let dr = Math.max(-3, -dq - 3); dr <= Math.min(3, -dq + 3); dr++) {
-        const tile =
-          legacyAt.get(`${anchor.q + dq},${anchor.r + dr}`) ??
-          territoryTileAt(anchor.q + dq, anchor.r + dr);
-        if (tile) result.set(tile.id, tile);
+        const q = anchor.q + dq,
+          r = anchor.r + dr;
+        const key = `${q},${r}`;
+        const visibilityDistance = Math.max(
+          Math.abs(dq),
+          Math.abs(dr),
+          Math.abs(dq + dr),
+        ) as 0 | 1 | 2 | 3;
+        const existing = result.get(key);
+        if (existing && existing.visibilityDistance <= visibilityDistance)
+          continue;
+        const tile = retainedAt.get(key) ?? territoryTileAt(q, r);
+        if (tile) result.set(key, { tile, visibilityDistance });
       }
   }
   return [...result.values()];
+}
+/** Finite catalogue: authored cells, retained placements and the currently discovered frontier. */
+export function getTerritoryTiles(
+  game?: TileGame,
+): readonly TerritoryTileDefinition[] {
+  if (!game) return TERRITORY_TILES;
+  return [
+    ...new Map(
+      [
+        ...TERRITORY_TILES,
+        ...legacyTiles(game),
+        ...visibleTerritoryTiles(game).map(({ tile }) => tile),
+      ].map((tile) => [tile.id, tile]),
+    ).values(),
+  ];
 }
 export function isTerritoryTileId(
   value: unknown,
@@ -337,7 +381,11 @@ export function assignTerritoryTiles(game: GameType): boolean {
   );
   for (const facility of ordered) {
     const territoryId = facilityTerritoryId(facility);
-    const historicalSize = !territoryId.startsWith("parcel-");
+    const historicalSize =
+      !isLandTerritoryId(territoryId) ||
+      !!game.territoryNetwork?.landPurchases.some(
+        ({ territoryId: id }) => id === territoryId,
+      );
     if (facility.tileId !== undefined) {
       const tile = getTerritoryTile(facility.tileId, game);
       if (
@@ -368,13 +416,15 @@ export function assignTerritoryTiles(game: GameType): boolean {
   return true;
 }
 export function territorySiteInventory(
-  game: Pick<GameType, "facilities"> &
-    Partial<Pick<GameType, "commissionedHydroSiteIds">>,
+  game: TileGame & Partial<Pick<GameType, "commissionedHydroSiteIds">>,
   id: TerritoryId,
   kind: TerritorySiteKind,
 ): { remaining: number; total: number; maxPeakW: number } {
   const tiles = getTerritoryTiles(game).filter(
-    (tile) => tile.territoryId === id && tile.siteKind === kind,
+    (tile) =>
+      tile.territoryId === id &&
+      tile.siteKind === kind &&
+      ownsTerritoryTile(game, tile),
   );
   return {
     total: tiles.length,

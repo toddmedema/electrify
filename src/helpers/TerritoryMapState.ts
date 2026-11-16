@@ -4,10 +4,8 @@ import { isLandTerritoryId } from "../data/Territories";
 import type { TerritoryTileDefinition } from "../data/TerritoryTiles";
 import {
   facilityOnTile,
-  getTerritoryTiles,
-  ownsTerritoryTile,
-  territoryVisibilityAnchors,
-  territoryHexDistance,
+  visibleTerritoryTiles,
+  createTerritoryTileOwnership,
 } from "./TerritoryTiles";
 export interface TileFacilityView {
   name: FacilityOperatingType["name"];
@@ -28,17 +26,12 @@ export interface TerritoryTileView {
 }
 /** One truthful foreground per cell; peer structures are projected by the shared world. */
 export function territoryTileViews(game: GameType): TerritoryTileView[] {
-  const anchors = territoryVisibilityAnchors(game);
+  const owns = createTerritoryTileOwnership(game);
   const inherited = Object.values(UTILITY_AREAS).flatMap(
     (area) => area.facilities,
   );
-  return getTerritoryTiles(game).flatMap((tile) => {
-    const distance = Math.min(
-      Infinity,
-      ...anchors.map((anchor) => territoryHexDistance(anchor, tile)),
-    );
-    if (distance > 3) return [];
-    const isOwned = ownsTerritoryTile(game, tile);
+  return visibleTerritoryTiles(game).map(({ tile, visibilityDistance }) => {
+    const isOwned = owns(tile);
     const claim = isLandTerritoryId(tile.territoryId)
       ? (game.multiplayer?.tileOwners?.[tile.id] ??
         game.multiplayer?.landOwners?.[tile.territoryId])
@@ -82,17 +75,15 @@ export function territoryTileViews(game: GameType): TerritoryTileView[] {
             yearsToBuildLeft: 0,
           }
         : undefined);
-    return [
-      {
-        tile,
-        visibilityDistance: distance as 0 | 1 | 2 | 3,
-        ownerKey,
-        ownerName,
-        owned: isOwned,
-        developed: !!ownerKey,
-        facility,
-        operatingFacility,
-      },
-    ];
+    return {
+      tile,
+      visibilityDistance,
+      ownerKey,
+      ownerName,
+      owned: isOwned,
+      developed: !!ownerKey,
+      facility,
+      operatingFacility,
+    };
   });
 }

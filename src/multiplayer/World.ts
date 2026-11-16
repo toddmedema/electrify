@@ -2,7 +2,12 @@ import { upgradeSave } from "../SaveUpgrade";
 import {
   getFacilityTile,
   hasTerritoryNetwork,
+  getTerritoryTiles,
+  ownsTerritoryTile,
+  createTerritoryTileOwnership,
 } from "../helpers/TerritoryTiles";
+import { landPurchaseQuote } from "../helpers/Territories";
+import { territoryTileViews } from "../helpers/TerritoryMapState";
 import { isLandTerritoryId } from "../data/Territories";
 import { currencyForLocation } from "../helpers/Currency";
 import { formatMoneyFull } from "../helpers/Format";
@@ -186,8 +191,9 @@ function commandResult(before: GameType, after: GameType): GameType {
   if (recorded && updated) {
     const { cash, netWorth } = updated;
     const ownership =
+      before.customerMarketSize !== after.customerMarketSize ||
       before.utilityExpansion?.acquisitions.length !==
-      after.utilityExpansion?.acquisitions.length
+        after.utilityExpansion?.acquisitions.length
         ? {
             entitlementImportCapacityW: updated.entitlementImportCapacityW,
             customers: updated.customers,
@@ -482,21 +488,34 @@ function applyCommandOnce(
   const game = world.grids[index];
   selectWeatherLocation(game.location.id);
   if (command.kind === "action") {
-    const name = command.name;
-    if (!isGameCommand(name)) return "That game action is unavailable";
-    if (
-      name === "acquireLand" &&
-      world.grids.some((grid) =>
-        grid.territoryNetwork?.landPurchases.some(
-          (receipt) =>
-            receipt.territoryId ===
-            (command.payload as { territoryId?: unknown })?.territoryId,
-        ),
-      )
-    )
-      return "This territory is already owned by another company";
-    const validation = validateGameCommand(game, name, command.payload);
+    if (!isGameCommand(command.name)) return "That game action is unavailable";
+    let name: GameCommandName = command.name;
+    const buying = name === "acquireLand" || name === "acquireTile";
+    // Quotes see the current host ledger, including claims made since the sender's last view.
+    const quotingGame = buying
+      ? {
+          ...game,
+          multiplayer: {
+            ...game.multiplayer!,
+            tileOwners: sharedTileOwners(world),
+            landOwners: sharedLandOwners(world),
+          },
+        }
+      : game;
+    const validation = validateGameCommand(quotingGame, name, command.payload);
     if ("error" in validation) return validation.error;
+    if (name === "acquireLand") {
+      const quote = landPurchaseQuote(
+        quotingGame,
+        (
+          validation.payload as {
+            territoryId: import("../Types").LandTerritoryId;
+          }
+        ).territoryId,
+      )!;
+      name = "acquireTile";
+      validation.payload = { tileId: quote.tileId, quoteKey: quote.quoteKey };
+    }
     if (
       name === "upgradeTransmissionLine" &&
       isPeerCorridorId(
@@ -518,6 +537,12 @@ function applyCommandOnce(
       world.grids[index].facilities.length === before
     )
       return "Not enough cash or no site available";
+    if (
+      name === "acquireTile" &&
+      world.grids[index].territoryNetwork?.tilePurchases?.length ===
+        game.territoryNetwork?.tilePurchases?.length
+    )
+      return "This land tile is unavailable or unaffordable";
     return;
   }
   if (command.kind === "rate") {
@@ -824,6 +849,9 @@ export function roomView(world: World, seatId: string): RoomView {
   const index = world.seats.findIndex((s) => s.id === seatId);
   if (index < 0) throw new Error("Player is not in this match");
   const game = cloneGrid(world.grids[index]);
+  const visible = territoryTileViews(game);
+  const visibleIds = new Set(visible.map(({ tile }) => tile.id));
+  const visibleRegions = new Set(visible.map(({ tile }) => tile.territoryId));
   game.multiplayer = {
     ...game.multiplayer!,
     peers: game.multiplayer!.peers?.map((peer) => {
@@ -850,11 +878,13 @@ export function roomView(world: World, seatId: string): RoomView {
       ? companyResults(world)
       : undefined,
     landOwners: Object.fromEntries(
-      world.grids.flatMap((grid, index) =>
-        (grid.territoryNetwork?.landPurchases ?? []).map((receipt) => [
-          receipt.territoryId,
-          { seat: world.seats[index].id, name: world.seats[index].name },
-        ]),
+      Object.entries(sharedLandOwners(world) ?? {}).filter(([id]) =>
+        visibleRegions.has(id as import("../Types").TerritoryId),
+      ),
+    ),
+    tileOwners: Object.fromEntries(
+      Object.entries(sharedTileOwners(world) ?? {}).filter(([id]) =>
+        visibleIds.has(id as import("../Types").TerritoryTileId),
       ),
     ),
     ...(hasTerritoryNetwork(game)
@@ -866,9 +896,8 @@ export function roomView(world: World, seatId: string): RoomView {
                 if (
                   !tile ||
                   !isLandTerritoryId(tile.territoryId) ||
-                  !grid.territoryNetwork?.landPurchases.some(
-                    (receipt) => receipt.territoryId === tile.territoryId,
-                  )
+                  !ownsTerritoryTile(grid, tile) ||
+                  !visibleIds.has(tile.id)
                 )
                   return [];
                 return [
@@ -1324,6 +1353,35 @@ export function restoreWorld(
   return result;
 }
 
+/** Host-only projection; physical ownership comes from validated receipts, never the renderer. */
+function sharedTileOwners(
+  world: World,
+): NonNullable<GameType["multiplayer"]>["tileOwners"] {
+  return Object.fromEntries(
+    world.grids.flatMap((grid, index) => {
+      const owns = createTerritoryTileOwnership(grid);
+      return getTerritoryTiles(grid)
+        .filter((tile) => isLandTerritoryId(tile.territoryId) && owns(tile))
+        .map((tile) => [
+          tile.id,
+          { seat: world.seats[index].id, name: world.seats[index].name },
+        ]);
+    }),
+  );
+}
+function sharedLandOwners(
+  world: World,
+): NonNullable<GameType["multiplayer"]>["landOwners"] {
+  return Object.fromEntries(
+    world.grids.flatMap((grid, index) =>
+      (grid.territoryNetwork?.landPurchases ?? []).map((receipt) => [
+        receipt.territoryId,
+        { seat: world.seats[index].id, name: world.seats[index].name },
+      ]),
+    ),
+  );
+}
+
 /** Recognized published worlds follow ordered migrations; arbitrary runtime identities never do. */
 function upgradeTerritoryWorld(value: unknown): unknown {
   const old = value as Partial<World> | null;
@@ -1339,14 +1397,19 @@ function upgradeTerritoryWorld(value: unknown): unknown {
           "coop-2-b4c8f4641c919057a7b569242464c24e26bcec444ef68954be2796b7734bbbb8") ||
       (old.gameSchema === 15 &&
         old.rules ===
-          "coop-2-c12bab1ee04886f40ff0274d35e968e07cf7c3306f9e5ea006140bb973163fe4")
+          "coop-2-c12bab1ee04886f40ff0274d35e968e07cf7c3306f9e5ea006140bb973163fe4") ||
+      (old.gameSchema === 16 &&
+        old.rules ===
+          "coop-2-06e4afd05778c47de20788acd02787291d3f09456465a0a89ace5fbeadd2d018")
     ) ||
     !Array.isArray(old.grids) ||
     !old.grids.every(
       (grid) =>
         !!grid &&
         typeof grid === "object" &&
-        (old.gameSchema === 15 || isUtilityExpansionGame(grid)),
+        (old.gameSchema === 15 ||
+          old.gameSchema === 16 ||
+          isUtilityExpansionGame(grid)),
     )
   )
     return value;
@@ -1364,20 +1427,35 @@ function upgradeTerritoryWorld(value: unknown): unknown {
   return result;
 }
 function validSharedLand(world: World): boolean {
-  const owners = world.grids.flatMap(
+  const retained = world.grids.flatMap(
     (grid) => grid.territoryNetwork?.landPurchases ?? [],
   );
-  // Preserve old paid duplicate development rights, while every new parcel is exclusive.
-  return [...new Set(owners.map((receipt) => receipt.territoryId))].every(
-    (id) => {
-      const claims = owners.filter((receipt) => receipt.territoryId === id);
-      return (
-        claims.length <= 1 ||
-        (id === "green-uplands" &&
-          claims.every((receipt) => receipt.legacy === true))
-      );
-    },
-  );
+  if (
+    ![...new Set(retained.map((receipt) => receipt.territoryId))].every(
+      (id) => {
+        const claims = retained.filter((receipt) => receipt.territoryId === id);
+        return (
+          claims.length <= 1 ||
+          (id === "green-uplands" &&
+            claims.every((receipt) => receipt.legacy === true))
+        );
+      },
+    )
+  )
+    return false;
+  const seen = new Set<string>();
+  for (const grid of world.grids)
+    for (const receipt of grid.territoryNetwork?.tilePurchases ?? []) {
+      const tile = getFacilityTile({ tileId: receipt.tileId }, grid);
+      if (
+        !tile ||
+        seen.has(tile.id) ||
+        retained.some(({ territoryId }) => territoryId === tile.territoryId)
+      )
+        return false;
+      seen.add(tile.id);
+    }
+  return true;
 }
 
 /** Check the envelope before the worker attempts to load another version's scenario data. */

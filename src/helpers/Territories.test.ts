@@ -33,7 +33,7 @@ it("enables site budgets only in the expansion scenario", () => {
   expect(hasTerritoryNetwork({ ...game, scenarioId: 100 })).toBe(false);
   expect(ownedTerritories(game)).toEqual(["champlain"]);
 });
-it("exchanges exactly 15% of opening cash for immediate land, with no plants, customers or line", () => {
+it("exchanges one seventh of the old land price for a single immediate tile, with no plants, customers or line", () => {
   const game = createGame({ scenarioId: 116, seed: 61 });
   const before = {
     cash: currentTick(game)!.cash,
@@ -42,7 +42,7 @@ it("exchanges exactly 15% of opening cash for immediate land, with no plants, cu
     facilities: game.facilities.length,
   };
   const quote = landPurchaseQuote(game)!;
-  expect(quote.price).toBeCloseTo(before.cash * 0.15, 5);
+  expect(quote.price).toBeCloseTo((before.cash * 0.15) / 7, 5);
   buyLand(game);
   expect(currentTick(game)!.cash).toBeCloseTo(before.cash - quote.price, 5);
   expect(currentTick(game)!.cash).toBeGreaterThan(100e6);
@@ -51,7 +51,7 @@ it("exchanges exactly 15% of opening cash for immediate land, with no plants, cu
   expect(game.facilities).toHaveLength(before.facilities);
   expect(game.transmission!.lines).toEqual([]);
   expect(ownedTerritories(game)).toContain("green-uplands");
-  expect(landPurchaseQuote(game)).toBeUndefined();
+  expect(landPurchaseQuote(game)?.tileId).not.toBe(quote.tileId);
 });
 it.each([
   null,
@@ -88,7 +88,8 @@ it("reserves shared general sites through construction and pause; selling frees 
     territoryBuildAvailability(game, wind, "green-uplands").buildable,
   ).toBe(false);
   buyLand(game);
-  for (let i = 0; i < 7; i++)
+  for (let i = 0; i < 7; i++) {
+    if (i > 0) buyLand(game);
     game = JSON.parse(
       JSON.stringify(
         reducer(
@@ -101,6 +102,7 @@ it("reserves shared general sites through construction and pause; selling frees 
         ),
       ),
     );
+  }
   expect(
     territorySiteInventory(game, "green-uplands", "general").remaining,
   ).toBe(0);

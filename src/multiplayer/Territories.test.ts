@@ -86,7 +86,8 @@ it("first accepted claim owns finite shared land; the loser keeps cash and canno
   expect(ownedTerritories(world.grids[0])).toContain("green-uplands");
   expect(ownedTerritories(world.grids[1])).not.toContain("green-uplands");
   expect(
-    roomView(world, "1").game!.multiplayer!.landOwners?.["green-uplands"]?.seat,
+    roomView(world, "1").game!.multiplayer!.tileOwners?.["green-uplands:site-0"]
+      ?.seat,
   ).toBe("0");
   expect(command(world, "1", wind("green-uplands"))).toBeDefined();
   const restored = restoreWorld(
@@ -133,16 +134,17 @@ it("host rejects cheap quotes, duplicates, and unaffordable purchases before any
 it("host uses its own facility price and reserves each land site", () => {
   const world = ready();
   currentTick(world.grids[0])!.cash = 1e9;
-  const quote = landPurchaseQuote(world.grids[0])!;
-  expect(
-    command(world, "0", {
-      kind: "action",
-      name: "acquireLand",
-      payload: { territoryId: quote.territoryId, quoteKey: quote.quoteKey },
-    }),
-  ).toBeUndefined();
-  for (let i = 0; i < 7; i++)
+  for (let i = 0; i < 7; i++) {
+    const next = landPurchaseQuote(world.grids[0])!;
+    expect(
+      command(world, "0", {
+        kind: "action",
+        name: "acquireLand",
+        payload: { territoryId: next.territoryId, quoteKey: next.quoteKey },
+      }),
+    ).toBeUndefined();
     expect(command(world, "0", wind("green-uplands"))).toBeUndefined();
+  }
   const built = world.grids[0].facilities.find(
     (f) => f.territoryId === "green-uplands",
   )!;

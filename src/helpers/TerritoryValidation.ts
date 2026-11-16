@@ -2,6 +2,7 @@ import {
   getTerritoryTile,
   tileFitsFacility,
   ownsTerritoryTile,
+  territoryVisibilityDistance,
 } from "./TerritoryTiles";
 import { TICK_MINUTES } from "../Constants";
 import type { GameType } from "../Types";
@@ -73,7 +74,7 @@ export function validTerritoryNetwork(game: GameType): boolean {
   for (const receipt of state.landPurchases) {
     if (
       !record(receipt) ||
-      !isLandTerritoryId(receipt.territoryId) ||
+      !LAND_TERRITORIES.some(({ id }) => id === receipt.territoryId) ||
       !Number.isSafeInteger(receipt.minute) ||
       receipt.minute < 0 ||
       receipt.minute > game.date.minute ||
@@ -123,6 +124,42 @@ export function validTerritoryNetwork(game: GameType): boolean {
       !close(receipt.price, tilePrice(game, receipt.minute, tile.id))
     )
       return false;
+    const earlier = (state.tilePurchases ?? []).slice(0, purchased.size);
+    if (
+      earlier.some((entry) => entry.minute > receipt.minute) ||
+      territoryVisibilityDistance(
+        {
+          ...game,
+          date: { ...game.date, minute: receipt.minute },
+          territoryNetwork: {
+            ...state,
+            landPurchases: state.landPurchases.filter(
+              (entry) => entry.minute <= receipt.minute,
+            ),
+            tilePurchases: earlier,
+          },
+          utilityExpansion: game.utilityExpansion
+            ? {
+                ...game.utilityExpansion,
+                acquisitions: game.utilityExpansion.acquisitions.filter(
+                  (entry) => entry.minute <= receipt.minute,
+                ),
+              }
+            : undefined,
+          transmission: game.transmission
+            ? {
+                ...game.transmission,
+                acceptedAgreements:
+                  game.transmission.acceptedAgreements?.filter(
+                    (entry) => entry.acceptedMinute <= receipt.minute,
+                  ),
+              }
+            : undefined,
+        },
+        tile,
+      ) === undefined
+    )
+      return false;
     purchased.add(tile.id);
   }
   if (
@@ -147,7 +184,10 @@ export function validTerritoryNetwork(game: GameType): boolean {
         !tileFitsFacility(
           tile,
           facility,
-          !tile.territoryId.startsWith("parcel-"),
+          !isLandTerritoryId(tile.territoryId) ||
+            !!state.landPurchases.some(
+              ({ territoryId }) => territoryId === tile.territoryId,
+            ),
         )
       )
         return true;

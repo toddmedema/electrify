@@ -405,7 +405,8 @@ export function validHydroClaims(state: HydroState): boolean {
     if (
       state.facilities.some(
         (facility) =>
-          facility.hydroSiteId?.startsWith("scenario-116-") &&
+          (facility.hydroSiteId?.startsWith("scenario-116-parcel-") ||
+            facility.hydroSiteId?.startsWith("scenario-116-frontier:")) &&
           facility.hydroSiteId !==
             territoryHydroSiteId(facility.territoryId ?? "champlain"),
       )

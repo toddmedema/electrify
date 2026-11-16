@@ -529,8 +529,8 @@ export function runSimulation(options: SimOptionsType): SimResultType {
               ),
             );
             if (
-              !state.territoryNetwork?.landPurchases.some(
-                ({ territoryId }) => territoryId === quote.territoryId,
+              !state.territoryNetwork?.tilePurchases?.some(
+                ({ tileId }) => tileId === quote.tileId,
               )
             )
               throw new Error("Land purchase rejected");

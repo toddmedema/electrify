@@ -220,7 +220,10 @@ export function purchasedLandTerritories(
       ({ territoryId }) => territoryId,
     ) ?? [],
   );
-  for (const receipt of game.territoryNetwork?.tilePurchases ?? []) {
+  for (const receipt of Array.isArray(game.territoryNetwork?.tilePurchases)
+    ? game.territoryNetwork.tilePurchases
+    : []) {
+    if (!receipt || typeof receipt.tileId !== "string") continue;
     const territoryId = receipt.tileId.startsWith("frontier:")
       ? receipt.tileId
       : receipt.tileId.split(":")[0];

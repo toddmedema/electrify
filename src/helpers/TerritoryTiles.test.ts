@@ -23,6 +23,7 @@ import {
   facilityOnTile,
   getFacilityTile,
   getTerritoryTiles,
+  ownsTerritoryTile,
 } from "./TerritoryTiles";
 import { acquisitionQuote, transferUtility } from "./Expansion";
 import type { GameType, StorageOperatingType, TerritoryTileId } from "../Types";
@@ -188,16 +189,16 @@ it("reserves one selected slot during construction and pause; selling makes that
     territoryBuildAvailability(game, quote, "champlain", tile.id),
   ).toMatchObject({ buildable: true, tileId: tile.id });
 });
-it("retains the old territory API by choosing a different free cell for each build", () => {
+it("retains the territory build API while requiring each new physical cell to be bought", () => {
   let game = ready();
-  const land = landPurchaseQuote(game)!;
-  expect(
-    purchaseLand(game, {
-      territoryId: land.territoryId,
-      quoteKey: land.quoteKey,
-    }),
-  ).toBe(true);
-  for (let index = 0; index < 7; index++)
+  for (let index = 0; index < 7; index++) {
+    const next = landPurchaseQuote(game)!;
+    expect(
+      purchaseLand(game, {
+        territoryId: next.territoryId,
+        quoteKey: next.quoteKey,
+      }),
+    ).toBe(true);
     game = cloneDeep(
       reducer(
         game,
@@ -208,6 +209,7 @@ it("retains the old territory API by choosing a different free cell for each bui
         }),
       ),
     );
+  }
   const projects = game.facilities.filter(
     ({ territoryId }) => territoryId === "green-uplands",
   );
@@ -291,6 +293,11 @@ it("gives retained pre-map overflow projects their own cells while rejecting mal
     new Set(restored.game.facilities.map(({ tileId }) => tileId)).size,
   ).toBe(raw.game.facilities.length);
   expect(getTerritoryTiles(restored.game).length).toBeGreaterThan(76);
+  expect(
+    restored.game.facilities.every(({ tileId }) =>
+      ownsTerritoryTile(restored.game, tileId!),
+    ),
+  ).toBe(true);
   const current = JSON.parse(JSON.stringify(serializeSave(game)));
   const oils = current.game.facilities.filter(
     (facility: { fuel: string }) => facility.fuel === "Oil",

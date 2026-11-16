@@ -1,7 +1,12 @@
 import cloneDeep from "lodash.clonedeep";
 import { GENERATORS, STORAGE } from "../data/Facilities";
-import { LAND_TERRITORIES, territoryHydroSiteId } from "../data/Territories";
+import {
+  LAND_TERRITORIES,
+  territoryHydroSiteId,
+  getTerritoryDefinition,
+} from "../data/Territories";
 import { createGame } from "../testing/Simulator";
+import { customerMarketSizeAt } from "./Customers";
 import { currentTick } from "./GameSelectors";
 import {
   landPurchaseQuote,
@@ -9,6 +14,8 @@ import {
   ownedTerritories,
   territoryBuildAvailability,
   territorySiteInventory,
+  tilePurchaseQuotes,
+  landPrice,
 } from "./Territories";
 import { combinedUtilityDemandProfile } from "./CombinedUtilityDemand";
 import { expansionRetentionBaseline } from "./Expansion";
@@ -23,6 +30,11 @@ import reducer, {
 import { runMonths } from "../testing/SimulationTestHelpers";
 import { programCustomers } from "./Policies";
 import { acquireLand, schedulePolicy } from "../reducers/GameActions";
+import {
+  getTerritoryTile,
+  getTerritoryTiles,
+  territoryHexDistance,
+} from "./TerritoryTiles";
 import type { GameType, LandTerritoryId, FacilityShoppingType } from "../Types";
 function game() {
   const result = createGame({ scenarioId: 116, seed: 12345 });
@@ -30,13 +42,37 @@ function game() {
   return result;
 }
 function buy(state: GameType, id: LandTerritoryId) {
-  const quote = landPurchaseQuote(state, id)!;
-  expect(quote).toBeDefined();
+  state = cloneDeep(state);
+  const target = getTerritoryTiles(state).find(
+    (tile) => tile.territoryId === id,
+  )!;
+  for (let step = 0; !landPurchaseQuote(state, id) && step < 20; step++) {
+    const current = state;
+    const nearest = [...tilePurchaseQuotes(current).keys()]
+      .map((tileId) => getTerritoryTile(tileId, current)!)
+      .sort(
+        (a, b) =>
+          territoryHexDistance(a, target) - territoryHexDistance(b, target),
+      )[0];
+    const pathQuote = tilePurchaseQuotes(state).get(nearest.id)!;
+    state = cloneDeep(
+      reducer(
+        state,
+        acquireLand({
+          territoryId: pathQuote.territoryId,
+          quoteKey: pathQuote.quoteKey,
+        }),
+      ),
+    );
+  }
+  const offer = landPurchaseQuote(state, id)!;
+  expect(offer).toBeDefined();
   return reducer(
     state,
-    acquireLand({ territoryId: id, quoteKey: quote.quoteKey }),
+    acquireLand({ territoryId: id, quoteKey: offer.quoteKey }),
   );
 }
+
 function quote(
   state: GameType,
   name: string,
@@ -63,13 +99,11 @@ function build(
     buildFacility({ facility, financed: false, territoryId: id }),
   );
 }
-it("quotes every neutral parcel and allows independent purchases without duplicate grants", () => {
+it("quotes visible neutral cells and allows independent purchases without duplicate grants", () => {
   const state = game();
   expect(LAND_TERRITORIES).toHaveLength(19);
-  for (const territory of LAND_TERRITORIES)
-    expect(
-      landPurchaseQuote(state, territory.id as LandTerritoryId)?.price,
-    ).toBeGreaterThan(0);
+  expect(tilePurchaseQuotes(state).size).toBeGreaterThan(0);
+  expect(landPurchaseQuote(state, "parcel-17")).toBeUndefined();
   const first = landPurchaseQuote(state, "parcel-0")!;
   expect(
     purchaseLand(state, {
@@ -103,7 +137,12 @@ it.each(["parcel-1", "parcel-5"] as LandTerritoryId[])(
     const before = currentTick(state)!.customers;
     const originalMarket = state.customerMarketSize;
     const originalBaseline = expansionRetentionBaseline(state);
-    const offer = landPurchaseQuote(state, id)!;
+    const offer = {
+      customers: customerMarketSizeAt(
+        getTerritoryDefinition(id)!.customers ?? 0,
+        state.date.minute,
+      ),
+    };
     state = buy(state, id);
     expect(currentTick(state)!.customers).toBe(before + offer.customers);
     expect(state.customerMarketSize).toBeGreaterThan(originalMarket);
@@ -163,6 +202,7 @@ it("general land shares its two reservations across gas, wind, solar and storage
     ).buildable,
   ).toBe(false);
   state = build(state, quote(state, "Wind", "parcel-0"), "parcel-0");
+  state = buy(state, "parcel-0");
   state = build(state, quote(state, "Natural Gas CC", "parcel-0"), "parcel-0");
   expect(territorySiteInventory(state, "parcel-0", "general").remaining).toBe(
     0,
@@ -230,10 +270,16 @@ it.each([
   },
 );
 it("upgrades schema14 paid land without changing cash, receipts, assets or provenance", () => {
-  const state = buy(game(), "green-uplands");
+  const state = game();
+  state.territoryNetwork!.landPurchases.push({
+    territoryId: "green-uplands",
+    minute: 0,
+    price: landPrice(state, 0),
+  });
   const raw = JSON.parse(JSON.stringify(serializeSave(state)));
   raw.schemaVersion = 14;
   raw.game.territoryNetwork.version = 2;
+  delete raw.game.territoryNetwork.tilePurchases;
   const restored = parseSave(raw);
   expect(restored).not.toBeNull();
   expect(restored!.game.territoryNetwork!.version).toBe(3);

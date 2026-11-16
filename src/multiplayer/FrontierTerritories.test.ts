@@ -2,7 +2,11 @@ import { SAVE_SCHEMA_VERSION } from "../SaveSchema";
 import { LAND_TERRITORIES } from "../data/Territories";
 import { UTILITY_AREAS } from "../data/UtilityExpansion";
 import { currentTick } from "../helpers/GameSelectors";
-import { landPurchaseQuote, ownedTerritories } from "../helpers/Territories";
+import {
+  landPurchaseQuote,
+  ownedTerritories,
+  landPrice,
+} from "../helpers/Territories";
 import { loadSimData } from "../testing/SimData";
 import { coopSeats } from "../testing/MultiplayerFixtures";
 import {
@@ -45,10 +49,10 @@ it("serializes each parcel's claim while independent claims coexist through save
   expect(currentTick(world.grids[1])!.cash).toBe(losingCash);
   expect(buy(world, "1", "parcel-2")).toBeUndefined();
   expect(buy(world, "0", "parcel-1")).toBeUndefined();
-  expect(roomView(world, "1").game!.multiplayer!.landOwners).toMatchObject({
-    "parcel-0": { seat: "0" },
-    "parcel-1": { seat: "0" },
-    "parcel-2": { seat: "1" },
+  expect(roomView(world, "1").game!.multiplayer!.tileOwners).toMatchObject({
+    "parcel-0:site-0": { seat: "0" },
+    "parcel-1:city": { seat: "0" },
+    "parcel-2:site-0": { seat: "1" },
   });
   const restored = restoreWorld(
     JSON.parse(JSON.stringify(checkpointWorld(world))),
@@ -62,12 +66,19 @@ it("serializes each parcel's claim while independent claims coexist through save
 });
 it("migrates only recognized published schema14 co-op rules and keeps paid claims and cash", () => {
   const world = ready();
-  expect(buy(world, "0", "green-uplands")).toBeUndefined();
+  world.grids[0].territoryNetwork!.landPurchases.push({
+    territoryId: "green-uplands",
+    minute: 0,
+    price: landPrice(world.grids[0], 0),
+  });
   const raw = JSON.parse(JSON.stringify(checkpointWorld(world)));
   raw.gameSchema = 14;
   raw.rules =
     "coop-2-b4c8f4641c919057a7b569242464c24e26bcec444ef68954be2796b7734bbbb8";
-  for (const grid of raw.grids) grid.territoryNetwork.version = 2;
+  for (const grid of raw.grids) {
+    grid.territoryNetwork.version = 2;
+    delete grid.territoryNetwork.tilePurchases;
+  }
   const restored = restoreWorld(raw, "migrated");
   expect(restored.gameSchema).toBe(SAVE_SCHEMA_VERSION);
   expect(currentTick(restored.grids[0])!.cash).toBe(
