@@ -1248,7 +1248,9 @@ it.each([103, 108, 110, 113, 115, 116, "custom", "exhausted sites"] as const)(
     expect(card).toHaveTextContent(
       inventory === "exhausted sites"
         ? /used all 4 sites/
-        : /No geothermal sites near/,
+        : inventory === 116
+          ? /No sites of this type remain in this territory/
+          : /No geothermal sites near/,
     );
     expect(card).not.toHaveTextContent("in this game");
     expect(
