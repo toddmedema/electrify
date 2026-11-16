@@ -180,7 +180,8 @@ it("stores local wind surplus during host settlement", () => {
     peakW: 300e6,
     territoryId: "champlain",
   });
-  grid.timeline.find((tick) => tick.minute === TICK_MINUTES)!.windKph = 50;
+  // This exposed hill is at rated output, below the locally scaled storm cut-out.
+  grid.timeline.find((tick) => tick.minute === TICK_MINUTES)!.windKph = 40;
   battery(grid);
   advance(world);
   const now = currentTick(grid)!;

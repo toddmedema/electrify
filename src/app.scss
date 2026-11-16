@@ -9105,6 +9105,7 @@ option {
   stroke-dasharray: 4 4;
 }
 .territoryTileTarget {
+  pointer-events: none;
   position: absolute;
   transform: translate(-50%, -50%);
   padding: 0;
@@ -9116,19 +9117,19 @@ option {
   font: inherit;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
-  &::after {
-    content: "";
+  .territoryTileHitArea {
+    pointer-events: auto;
     position: absolute;
     inset: 0;
     clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
   }
-  &:hover::after {
+  &:hover .territoryTileHitArea {
     background: color-mix(in srgb, var(--interactive-blue) 14%, transparent);
   }
   &:focus-visible {
     outline: none;
   }
-  &:focus-visible::after {
+  &:focus-visible .territoryTileHitArea {
     background: color-mix(in srgb, var(--interactive-blue) 10%, transparent);
   }
 }
@@ -9146,7 +9147,11 @@ option {
     font-size: 14px;
     line-height: 20px;
     font-weight: 600;
-    white-space: nowrap;
+    pointer-events: auto;
+    width: max-content;
+    max-width: calc(100% - 8px);
+    white-space: normal;
+    text-align: center;
   }
   &:hover strong,
   &[aria-pressed="true"] strong {

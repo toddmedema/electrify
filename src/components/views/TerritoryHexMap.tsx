@@ -347,6 +347,7 @@ export default function TerritoryHexMap({
                 onKeyDown={(event) => navigate(event, tile.id)}
                 title={`${TERRAIN_LABELS[tile.terrain]} · ${facility?.name ?? (tile.city ? `${tile.city.sector} city` : view.developed ? "Open site · transmission tower" : "Undeveloped site")}`}
               >
+                <span className="territoryTileHitArea" aria-hidden="true" />
                 {utility && (
                   <strong>{view.owned ? "You" : territory.name}</strong>
                 )}
