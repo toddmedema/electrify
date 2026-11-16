@@ -1,4 +1,9 @@
-import { configureStore, ThunkAction, Action } from "@reduxjs/toolkit";
+import {
+  configureStore,
+  ThunkAction,
+  Action,
+  Middleware,
+} from "@reduxjs/toolkit";
 import { TypedUseSelectorHook, useDispatch, useSelector } from "react-redux";
 import savesReducer from "./SaveLibrary";
 import { saveSessionMiddleware } from "./SaveSession";
@@ -12,6 +17,15 @@ import userReducer, { submitHighscore } from "./reducers/User";
 import { logEvent } from "./Globals";
 import { recordScenarioPlayed } from "./LocalStorage";
 import { multiplayerMiddleware } from "./multiplayer/Registry";
+import { invalidateLeaderboards } from "./Leaderboard";
+import { victoryOpen } from "./reducers/GameActions";
+
+// Refresh before result subscribers read standings, including losses and guest/custom runs.
+// Successful score writes still invalidate again after the remote board changes.
+const leaderboardCacheMiddleware: Middleware = () => (next) => (action) => {
+  if (victoryOpen.match(action)) invalidateLeaderboards();
+  return next(action);
+};
 
 export const store = configureStore({
   reducer: {
@@ -56,6 +70,7 @@ export const store = configureStore({
       multiplayerMiddleware,
       tutorialGateMiddleware,
       navigationDestinationMiddleware,
+      leaderboardCacheMiddleware,
       saveSessionMiddleware,
     ),
 });

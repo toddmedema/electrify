@@ -24,7 +24,10 @@ scenario-wide board is a separate, user-requested query capped at 50.
 This change extends successful leaderboard/rank results to ten minutes. In-flight
 requests remain deduplicated, errors remain immediately retryable, account and
 scope keys remain isolated, and score submissions/name changes still invalidate
-cached results immediately. Another player's scores can take up to ten minutes
+cached results immediately. Opening a scenario result also clears rows and ranks
+before result subscribers read them, including completed, bankrupt and fired
+runs without an account or competitive score submission. A successful remote
+score write invalidates again afterward. Another player's scores can take up to ten minutes
 to appear when revisiting a previously loaded board. This does not change save
 freshness or achievement synchronization.
 
@@ -53,19 +56,19 @@ The opt-in counters are memory-only, per page, and make no network calls. There
 are no user IDs, document paths, names, scores, save contents or error messages.
 Normal play does not expose the diagnostic API or accumulate counts.
 
-| Source | What it identifies |
-| --- | --- |
-| `leaderboard.rows` | Board queries, including private bests |
-| `leaderboard.rank` | Aggregate rank requests |
-| `profile.load` | Login profile reads |
-| `profile.rename` | Bounded score-name backfill queries |
-| `save.list` | One-shot cloud manifest queries (subscription bypass) |
-| `save.listener` | Subscription starts and authoritative snapshot deliveries |
-| `save.blob` | Save payload chunk document reads |
-| `save.transaction` | Reads inside upload/cleanup transactions, including retries |
-| `share.load` | Shared-game manifest reads |
-| `share.transaction` | Collision checks and retention transaction reads |
-| `achievement.transaction` | Achievement merge reads, including retries |
+| Source                    | What it identifies                                          |
+| ------------------------- | ----------------------------------------------------------- |
+| `leaderboard.rows`        | Board queries, including private bests                      |
+| `leaderboard.rank`        | Aggregate rank requests                                     |
+| `profile.load`            | Login profile reads                                         |
+| `profile.rename`          | Bounded score-name backfill queries                         |
+| `save.list`               | One-shot cloud manifest queries (subscription bypass)       |
+| `save.listener`           | Subscription starts and authoritative snapshot deliveries   |
+| `save.blob`               | Save payload chunk document reads                           |
+| `save.transaction`        | Reads inside upload/cleanup transactions, including retries |
+| `share.load`              | Shared-game manifest reads                                  |
+| `share.transaction`       | Collision checks and retention transaction reads            |
+| `achievement.transaction` | Achievement merge reads, including retries                  |
 
 `requests` counts attempted SDK reads, `failures` their rejections, and
 `documents` successful returned documents. Aggregates count requests separately
@@ -85,6 +88,42 @@ starts points at ownership/reconnection churn; `save.list` while subscribed
 suggests an unexpected one-shot caller. A high production total with low local
 counts requires investigating other clients/version distribution and server-side
 request attribution rather than extending the cache again.
+
+## Independent local QA — 2026-11-16
+
+Headless Chromium at 1280 px and 390 px exercised the real local app against the
+public Firestore boards for Wildfire Emergency (scenario 111), signed out. Each visit left the
+detail screen completely before reopening it; the browser's `Date` advanced one
+minute between visits without reloading the page. All five difficulties were
+checked. Network evidence counted score-query `addTarget` and `removeTarget`
+messages, independently of the diagnostic API. HTTP channel requests are a
+different unit and were not treated as document reads.
+
+- With the original 60-second TTL restored temporarily, visits at minutes 0–9
+  made **50 queries and returned 300 documents**. The ten-minute candidate made
+  **5 queries and returned 30 documents**, a **90% reduction in this replay**.
+- Candidate runs with `?firestoreReads=1` and `?firestoreReads=0` had identical
+  query traffic: 5 queries through minute 9, then 10 cumulative queries at
+  minute 10. The enabled counters agreed with the network trace (30, then 60
+  returned documents; zero failures). The disabled page exposed no diagnostic
+  API. Both runs rendered the same selected-board row count without page errors.
+- Quick Back/reopen navigation can reuse the still-mounted detail screen during
+  its exit transition. Waiting for the old screen to unmount was necessary to
+  exercise the shared cache and its expiry, rather than the component's own data.
+- Review found that successful score writes were the only run-end invalidation
+  path. Guest wins, unranked runs and losses therefore retained old boards.
+  Store middleware now invalidates before delivering the result action to
+  subscribers. Regression tests failed for all three outcomes before the fix
+  and passed afterward; closing a result keeps the new cache intact.
+- Regression coverage also checks empty/populated board and rank reuse, expiry
+  at exactly ten minutes, explicit diagnostic opt-out, preserved errors/results,
+  and no document-count callback work while diagnostics are disabled.
+
+These are controlled client observations, not project-wide billing measurements.
+The live audit did not sign into a player account, change scores or names, or
+write cloud saves. Profile, save/share and achievement transport behavior is
+covered by the focused unit suites; authenticated production sync and the
+seven-day production acceptance window remain separate measurements.
 
 ## Production acceptance and approval boundary
 

@@ -1,12 +1,14 @@
-import { getDocs } from "firebase/firestore";
+import { getCountFromServer, getDocs } from "firebase/firestore";
 import {
   invalidateLeaderboards,
   LEADERBOARD_FRESH_MS,
   loadLeaderboard,
+  loadLeaderboardRank,
 } from "./Leaderboard";
 jest.mock("./Globals", () => ({ getDb: () => ({}) }));
 jest.mock("firebase/firestore", () => ({
   getDocs: jest.fn(),
+  getCountFromServer: jest.fn(),
   collection: () => "scores",
   query: (...args: unknown[]) => args,
   where: (...args: unknown[]) => args,
@@ -66,11 +68,28 @@ it("isolates accounts/difficulties, retries failures and never resurrects invali
   expect(getDocs).toHaveBeenCalledTimes(6);
 });
 
-it("uses at most one query for ten visits a minute apart", async () => {
-  (getDocs as jest.Mock).mockResolvedValue({ docs: [] });
-  for (let visit = 0; visit < 10; visit++) {
+it.each([
+  { name: "empty", docs: [] },
+  { name: "populated", docs: [{ data: () => ({ score: 999 }) }] },
+])(
+  "reuses $name rows and ranks for ten visits a minute apart, then expires at ten minutes",
+  async ({ docs }) => {
+    (getDocs as jest.Mock).mockResolvedValue({ docs });
+    (getCountFromServer as jest.Mock).mockResolvedValue({
+      data: () => ({ count: 3 }),
+    });
+    for (let visit = 0; visit < 10; visit++) {
+      expect(await loadLeaderboard(101, "CEO")).toEqual(
+        docs.map((doc) => doc.data()),
+      );
+      expect(await loadLeaderboardRank(101, "CEO", 100)).toBe(4);
+      jest.advanceTimersByTime(60_000);
+    }
+    expect(getDocs).toHaveBeenCalledTimes(1);
+    expect(getCountFromServer).toHaveBeenCalledTimes(1);
     await loadLeaderboard(101, "CEO");
-    jest.advanceTimersByTime(60_000);
-  }
-  expect(getDocs).toHaveBeenCalledTimes(1);
-});
+    await loadLeaderboardRank(101, "CEO", 100);
+    expect(getDocs).toHaveBeenCalledTimes(2);
+    expect(getCountFromServer).toHaveBeenCalledTimes(2);
+  },
+);
