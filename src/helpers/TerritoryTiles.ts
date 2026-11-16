@@ -208,7 +208,55 @@ export const territoryHexDistance = (
     Math.abs(a.r - b.r),
     Math.abs(a.q + a.r - b.q - b.r),
   );
-/** Only in-force, accepted utility PPAs extend sight; scheduled and expired agreements do not. */
+/** Peer claims only extend sight through a real, operating link, projected by the host. */
+export function connectedPeerTerritoryTiles(
+  game: TileGame,
+): TerritoryTileDefinition[] {
+  const connected = new Set(
+    (game.multiplayer?.peers ?? [])
+      .filter(
+        (peer) =>
+          !peer.retired &&
+          peer.connected !== false &&
+          game.transmission?.lines.some(
+            (line) =>
+              line.corridorId === peer.corridor.id &&
+              !line.paused &&
+              line.yearsToBuildLeft <= 0 &&
+              line.capacityW > 0 &&
+              line.minuteCreated <= (game.date?.minute ?? 0),
+          ),
+      )
+      .map((peer) => peer.id),
+  );
+  return [
+    ...new Map([
+      ...(game.multiplayer?.peers ?? []).flatMap((peer) =>
+        connected.has(peer.id)
+          ? (peer.territoryTileIds ?? []).flatMap((id) => {
+              const tile = getTerritoryTile(id, game);
+              return tile ? [[tile.id, tile] as const] : [];
+            })
+          : [],
+      ),
+      ...Object.entries(game.multiplayer?.tileOwners ?? {}).flatMap(
+        ([id, owner]) => {
+          const tile = getTerritoryTile(id, game);
+          return tile && owner && connected.has(owner.seat)
+            ? [[tile.id, tile] as const]
+            : [];
+        },
+      ),
+      ...TERRITORY_TILES.filter((tile) => {
+        const owner = isLandTerritoryId(tile.territoryId)
+          ? game.multiplayer?.landOwners?.[tile.territoryId]
+          : undefined;
+        return owner && connected.has(owner.seat);
+      }).map((tile) => [tile.id, tile] as const),
+    ]).values(),
+  ];
+}
+/** Owned cells, connected peer land and in-force utility PPAs anchor sight. */
 export function territoryVisibilityAnchors(
   game: TileGame,
 ): TerritoryTileDefinition[] {
@@ -238,11 +286,15 @@ export function territoryVisibilityAnchors(
       return tile ? [tile] : [];
     }),
   ];
+  const peers = connectedPeerTerritoryTiles(game);
   return [
     ...new Map(
-      retained
-        .filter((tile) => owns(tile) || remote.has(tile.territoryId))
-        .map((tile) => [tile.id, tile]),
+      [
+        ...retained.filter(
+          (tile) => owns(tile) || remote.has(tile.territoryId),
+        ),
+        ...peers,
+      ].map((tile) => [tile.id, tile]),
     ).values(),
   ];
 }

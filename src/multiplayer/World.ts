@@ -5,7 +5,15 @@ import {
   getTerritoryTiles,
   ownsTerritoryTile,
   createTerritoryTileOwnership,
+  connectedPeerTerritoryTiles,
+  getTerritoryTile,
+  territoryVisibilityDistance,
+  territoryHexDistance,
 } from "../helpers/TerritoryTiles";
+import {
+  territoryGameAtPurchase,
+  type TerritoryPurchaseContext,
+} from "../helpers/TerritoryValidation";
 import { landPurchaseQuote } from "../helpers/Territories";
 import { territoryTileViews } from "../helpers/TerritoryMapState";
 import { isLandTerritoryId } from "../data/Territories";
@@ -492,16 +500,7 @@ function applyCommandOnce(
     let name: GameCommandName = command.name;
     const buying = name === "acquireLand" || name === "acquireTile";
     // Quotes see the current host ledger, including claims made since the sender's last view.
-    const quotingGame = buying
-      ? {
-          ...game,
-          multiplayer: {
-            ...game.multiplayer!,
-            tileOwners: sharedTileOwners(world),
-            landOwners: sharedLandOwners(world),
-          },
-        }
-      : game;
+    const quotingGame = buying ? territoryGameForWorld(world, index) : game;
     const validation = validateGameCommand(quotingGame, name, command.payload);
     if ("error" in validation) return validation.error;
     if (name === "acquireLand") {
@@ -528,10 +527,14 @@ function applyCommandOnce(
         validation.payload as { corridorId: string; financed: boolean },
       );
     const before = game.facilities.length;
-    world.grids[index] = commandResult(
+    const updated = commandResult(
       game,
-      reducer(game, commandAction(name, validation.payload)),
+      reducer(quotingGame, commandAction(name, validation.payload)),
     );
+    // Projection data is for the quote/reducer pass, never another persisted source of claims.
+    world.grids[index] = buying
+      ? { ...updated, multiplayer: game.multiplayer }
+      : updated;
     if (
       name === "buildFacility" &&
       world.grids[index].facilities.length === before
@@ -848,7 +851,7 @@ function companyResults(world: World): CompanyResultType[] {
 export function roomView(world: World, seatId: string): RoomView {
   const index = world.seats.findIndex((s) => s.id === seatId);
   if (index < 0) throw new Error("Player is not in this match");
-  const game = cloneGrid(world.grids[index]);
+  const game = cloneGrid(territoryGameForWorld(world, index));
   const visible = territoryTileViews(game);
   const visibleIds = new Set(visible.map(({ tile }) => tile.id));
   const visibleRegions = new Set(visible.map(({ tile }) => tile.territoryId));
@@ -1104,7 +1107,12 @@ function validReceipts(world: World, ids: Set<string>) {
 }
 
 /** A saved grid is a valid single-player save plus exactly this match's peer links. */
-function validGrid(world: World, initial: World, i: number) {
+function validGrid(
+  world: World,
+  initial: World,
+  i: number,
+  peers?: TerritoryPurchaseContext,
+) {
   const g = world.grids[i];
   const scenario = getScenario(g.scenarioId, g.customScenario)!;
   const expectedConnections = initial.grids[i].transmission!.lines;
@@ -1139,6 +1147,7 @@ function validGrid(world: World, initial: World, i: number) {
             }
           : undefined,
       }),
+      peers,
     ) &&
     g.multiplayer?.peers?.length === world.seats.length - 1 &&
     g.transmission?.lines.length === lineCount &&
@@ -1173,6 +1182,11 @@ function validGrid(world: World, initial: World, i: number) {
     }) &&
     g.transmission.lines.every(
       (line) =>
+        (!hasTerritoryNetwork(g) ||
+          !isPeerCorridorId(line.corridorId) ||
+          (!line.paused &&
+            line.minuteCreated === 0 &&
+            line.yearsToBuildLeft === 0)) &&
         (expectedConnections.some(
           (expected) => expected.corridorId === line.corridorId,
         ) ||
@@ -1324,14 +1338,132 @@ export function hydrateWorld(value: unknown): World {
     world.matchId,
     world.epoch,
   );
+  const history = territoryPurchaseHistory(world);
   if (
-    !world.grids.every((_grid, i) => validGrid(world, initial, i)) ||
+    !history ||
+    !world.grids.every((_grid, i) =>
+      validGrid(world, initial, i, history[i]),
+    ) ||
     !validEdges(world, ids, initial) ||
     !validSharedLand(world)
   )
     throw new Error(INVALID_GRIDS);
   restoreCommitments(world, result);
   return result;
+}
+
+/** Both endpoints must really exist and operate; renderer projections never grant sight. */
+function territoryGameForWorld(
+  world: World,
+  index: number,
+  grids = world.grids,
+  minute?: number,
+): GameType {
+  const game = grids[index];
+  const active = (seat: string) => {
+    const owner = world.seats.findIndex((entry) => entry.id === seat);
+    return (
+      owner >= 0 &&
+      (!world.outcomes[seat] ||
+        (minute !== undefined && minute < world.grids[owner].date.minute))
+    );
+  };
+  return {
+    ...game,
+    multiplayer: {
+      ...world.grids[index].multiplayer!,
+      tileOwners: sharedTileOwners({ ...world, grids }),
+      landOwners: sharedLandOwners({ ...world, grids }),
+      peers: world.grids[index].multiplayer?.peers?.map((peer) => {
+        const other = world.seats.findIndex((seat) => seat.id === peer.id);
+        const connected =
+          other >= 0 &&
+          active(world.seats[index].id) &&
+          active(peer.id) &&
+          [index, other].every((owner) =>
+            grids[owner].transmission?.lines.some(
+              (line) =>
+                line.corridorId === peer.corridor.id &&
+                !line.paused &&
+                line.yearsToBuildLeft <= 0 &&
+                line.capacityW > 0 &&
+                line.minuteCreated <= (minute ?? game.date.minute),
+            ),
+          );
+        return {
+          ...peer,
+          retired: !active(peer.id),
+          connected,
+          territoryTileIds:
+            connected && hasTerritoryNetwork(grids[other])
+              ? worldOwnedTerritoryTiles(grids[other]).map((tile) => tile.id)
+              : [],
+        };
+      }),
+    },
+  };
+}
+
+/** Admit only reachable receipts, preserving each ledger's order across shared clock instants.
+ * Same-minute decisions may interleave; a circular or future claim cannot bootstrap discovery. */
+function territoryPurchaseHistory(
+  world: World,
+): TerritoryPurchaseContext[] | undefined {
+  const contexts: Map<
+    import("../Types").TerritoryTileId,
+    ReturnType<typeof connectedPeerTerritoryTiles>
+  >[] = world.grids.map(() => new Map());
+  if (!world.grids.some(hasTerritoryNetwork)) return contexts;
+  const ledgers = world.grids.map(
+    (grid) => grid.territoryNetwork?.tilePurchases,
+  );
+  if (
+    ledgers.some(
+      (entries, i) =>
+        !Array.isArray(entries) ||
+        entries.some(
+          (receipt) =>
+            !receipt ||
+            !getTerritoryTile(receipt.tileId, world.grids[i]) ||
+            !Number.isSafeInteger(receipt.minute) ||
+            receipt.minute < 0 ||
+            receipt.minute > world.grids[i].date.minute ||
+            receipt.minute % TICK_MINUTES !== 0,
+        ),
+    )
+  )
+    return undefined;
+  const admitted = ledgers.map(
+    () => [] as NonNullable<(typeof ledgers)[number]>,
+  );
+  const positions = ledgers.map(() => 0);
+  while (ledgers.some((entries, i) => positions[i] < entries!.length)) {
+    const minute = Math.min(
+      ...ledgers.map(
+        (entries, i) => entries![positions[i]]?.minute ?? Infinity,
+      ),
+    );
+    let progress = false;
+    for (let i = 0; i < ledgers.length; i++) {
+      const receipt = ledgers[i]![positions[i]];
+      if (!receipt || receipt.minute !== minute) continue;
+      const historical = world.grids.map((grid, owner) =>
+        territoryGameAtPurchase(grid, minute, admitted[owner]),
+      );
+      const game = territoryGameForWorld(world, i, historical, minute);
+      const tile = getTerritoryTile(receipt.tileId, game)!;
+      if (territoryVisibilityDistance(game, tile) === undefined) continue;
+      const anchor = connectedPeerTerritoryTiles(game).find(
+        (peerTile) => territoryHexDistance(peerTile, tile) <= 3,
+      );
+      if (anchor) contexts[i].set(tile.id, [anchor]);
+      admitted[i].push(receipt);
+      positions[i]++;
+      progress = true;
+    }
+    if (!progress) return undefined;
+  }
+  return contexts;
 }
 
 export function restoreWorld(
@@ -1353,15 +1485,26 @@ export function restoreWorld(
   return result;
 }
 
+function worldOwnedTerritoryTiles(grid: GameType) {
+  const owns = createTerritoryTileOwnership(grid);
+  const tiles = new Map([
+    ...getTerritoryTiles().map((tile) => [tile.id, tile] as const),
+    ...(grid.territoryNetwork?.tilePurchases ?? []).flatMap(({ tileId }) => {
+      const tile = getTerritoryTile(tileId, grid);
+      return tile ? [[tile.id, tile] as const] : [];
+    }),
+  ]);
+  return [...tiles.values()].filter(owns);
+}
+
 /** Host-only projection; physical ownership comes from validated receipts, never the renderer. */
 function sharedTileOwners(
   world: World,
 ): NonNullable<GameType["multiplayer"]>["tileOwners"] {
   return Object.fromEntries(
     world.grids.flatMap((grid, index) => {
-      const owns = createTerritoryTileOwnership(grid);
-      return getTerritoryTiles(grid)
-        .filter((tile) => isLandTerritoryId(tile.territoryId) && owns(tile))
+      return worldOwnedTerritoryTiles(grid)
+        .filter((tile) => isLandTerritoryId(tile.territoryId))
         .map((tile) => [
           tile.id,
           { seat: world.seats[index].id, name: world.seats[index].name },

@@ -29,7 +29,10 @@ import {
   validUtilityExpansionSetup,
   validUtilityExpansionHeader,
 } from "./ExpansionContext";
-import { validTerritoryNetwork } from "./TerritoryValidation";
+import {
+  validTerritoryNetwork,
+  type TerritoryPurchaseContext,
+} from "./TerritoryValidation";
 
 const nonnegative = (value: unknown): value is number =>
   typeof value === "number" && Number.isFinite(value) && value >= 0;
@@ -52,11 +55,14 @@ const obsoleteAreaState = (game: GameType) =>
   );
 
 /** Current saves contain one company and one bounded, receipt-owned acquisition ledger. */
-export function validUtilityExpansion(game: GameType): boolean {
+export function validUtilityExpansion(
+  game: GameType,
+  peers?: TerritoryPurchaseContext,
+): boolean {
   if (obsoleteAreaState(game)) return false;
   const state = game.utilityExpansion;
   if (!isUtilityExpansionGame(game))
-    return state === undefined && validTerritoryNetwork(game);
+    return state === undefined && validTerritoryNetwork(game, peers);
   if (
     !state ||
     !record(state) ||
@@ -73,7 +79,7 @@ export function validUtilityExpansion(game: GameType): boolean {
     (game.customScenario && !validUtilityExpansionSetup(game.customScenario))
   )
     return false;
-  if (!validTerritoryNetwork(game)) return false;
+  if (!validTerritoryNetwork(game, peers)) return false;
   const targets = new Set<UtilityTargetId>();
   for (const receipt of state.acquisitions) {
     if (

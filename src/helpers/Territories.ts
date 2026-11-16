@@ -306,15 +306,22 @@ function purchaseQuote(
     return undefined;
   const territory = getTerritoryDefinition(tile.territoryId)!;
   const price = tilePrice(game, game.date.minute, tile.id);
+  const customers = tile.city
+    ? customerMarketSizeAt(territory.customers ?? 0, game.date.minute)
+    : 0;
   return {
     tileId: tile.id,
     territoryId: tile.territoryId,
     price,
     benefit: territory.benefit!,
-    customers: tile.city
-      ? customerMarketSizeAt(territory.customers ?? 0, game.date.minute)
-      : 0,
-    quoteKey: JSON.stringify([tile.id, game.date.minute, price]),
+    customers,
+    // Organic account growth improves the same purchase; it does not invalidate its price.
+    quoteKey: JSON.stringify([
+      tile.id,
+      price,
+      territory.benefit,
+      territory.customers ?? 0,
+    ]),
   };
 }
 export function tilePurchaseQuote(game: GameType, tileId: TerritoryTileId) {

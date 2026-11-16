@@ -3,9 +3,11 @@ import {
   tileFitsFacility,
   ownsTerritoryTile,
   territoryVisibilityDistance,
+  territoryHexDistance,
 } from "./TerritoryTiles";
 import { TICK_MINUTES } from "../Constants";
-import type { GameType } from "../Types";
+import type { GameType, TerritoryTileId } from "../Types";
+import type { TerritoryTileDefinition } from "../data/TerritoryTiles";
 import {
   isTerritoryId,
   isLandTerritoryId,
@@ -38,8 +40,54 @@ const tickFields = [
   "curtailedW",
 ] as const;
 
+/** Only the whole-world parser supplies peer claims already admitted in chronological order. */
+export type TerritoryPurchaseContext = ReadonlyMap<
+  TerritoryTileId,
+  readonly TerritoryTileDefinition[]
+>;
+
+/** Rebuild a receipt's own anchors without granting later purchases, PPAs or acquisitions. */
+export function territoryGameAtPurchase(
+  game: GameType,
+  minute: number,
+  tilePurchases: NonNullable<GameType["territoryNetwork"]>["tilePurchases"],
+): GameType {
+  return {
+    ...game,
+    date: { ...game.date, minute },
+    multiplayer: undefined,
+    territoryNetwork: game.territoryNetwork
+      ? {
+          ...game.territoryNetwork,
+          landPurchases: game.territoryNetwork.landPurchases.filter(
+            (entry) => entry.minute <= minute,
+          ),
+          tilePurchases,
+        }
+      : undefined,
+    utilityExpansion: game.utilityExpansion
+      ? {
+          ...game.utilityExpansion,
+          acquisitions: game.utilityExpansion.acquisitions.filter(
+            (entry) => entry.minute <= minute,
+          ),
+        }
+      : undefined,
+    transmission: game.transmission
+      ? {
+          ...game.transmission,
+          acceptedAgreements: game.transmission.acceptedAgreements?.filter(
+            (entry) => entry.acceptedMinute <= minute,
+          ),
+        }
+      : undefined,
+  };
+}
 /** Derived balances may be absent in historical frames; they are never migration inputs. */
-export function validTerritoryNetwork(game: GameType): boolean {
+export function validTerritoryNetwork(
+  game: GameType,
+  peers?: TerritoryPurchaseContext,
+): boolean {
   if (!isUtilityExpansionGame(game))
     return (
       game.territoryNetwork === undefined &&
@@ -127,37 +175,13 @@ export function validTerritoryNetwork(game: GameType): boolean {
     const earlier = (state.tilePurchases ?? []).slice(0, purchased.size);
     if (
       earlier.some((entry) => entry.minute > receipt.minute) ||
-      territoryVisibilityDistance(
-        {
-          ...game,
-          date: { ...game.date, minute: receipt.minute },
-          territoryNetwork: {
-            ...state,
-            landPurchases: state.landPurchases.filter(
-              (entry) => entry.minute <= receipt.minute,
-            ),
-            tilePurchases: earlier,
-          },
-          utilityExpansion: game.utilityExpansion
-            ? {
-                ...game.utilityExpansion,
-                acquisitions: game.utilityExpansion.acquisitions.filter(
-                  (entry) => entry.minute <= receipt.minute,
-                ),
-              }
-            : undefined,
-          transmission: game.transmission
-            ? {
-                ...game.transmission,
-                acceptedAgreements:
-                  game.transmission.acceptedAgreements?.filter(
-                    (entry) => entry.acceptedMinute <= receipt.minute,
-                  ),
-              }
-            : undefined,
-        },
+      (territoryVisibilityDistance(
+        territoryGameAtPurchase(game, receipt.minute, earlier),
         tile,
-      ) === undefined
+      ) === undefined &&
+        !peers
+          ?.get(tile.id)
+          ?.some((anchor) => territoryHexDistance(anchor, tile) <= 3))
     )
       return false;
     purchased.add(tile.id);

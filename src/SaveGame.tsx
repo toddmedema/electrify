@@ -4,6 +4,7 @@ import { validLegacyCampaign } from "./helpers/LegacyCampaign";
 import { validLegacyCampaignEvidence } from "./helpers/ObjectiveRules";
 import { isBuyingRule, isSellingRule } from "./helpers/TradingRules";
 import { validUtilityExpansion } from "./helpers/ExpansionValidation";
+import type { TerritoryPurchaseContext } from "./helpers/TerritoryValidation";
 import { validScenarioMod } from "./helpers/ScenarioMod";
 import { validCustomEventScenario } from "./helpers/CustomScenarioEvents";
 import {
@@ -344,8 +345,12 @@ export function serializeSave(game: GameType): SaveGameType {
  * Validates an untrusted blob and returns it as a save, or null if it isn't one. Takes unknown
  * rather than reading storage itself so that the same checks cover an imported file, where a
  * malformed facility would otherwise crash the sim mid-tick.
+ * Only the whole-world validator supplies chronological peer context; it is never decoded from raw.
  */
-export function parseSave(raw: unknown): SaveGameType | null {
+export function parseSave(
+  raw: unknown,
+  peers?: TerritoryPurchaseContext,
+): SaveGameType | null {
   raw = upgradeSave(decodeSave(raw));
   if (typeof raw !== "object" || raw === null) {
     return null;
@@ -799,7 +804,7 @@ export function parseSave(raw: unknown): SaveGameType | null {
     if (
       !validLegacyCampaign(game as GameType) ||
       !validLegacyCampaignEvidence(game as GameType) ||
-      !validUtilityExpansion(game as GameType) ||
+      !validUtilityExpansion(game as GameType, peers) ||
       !validPowerAgreements(game as GameType) ||
       !validScenarioRuleState(game as GameType) ||
       !validGameObjectiveProgress(game as GameType)

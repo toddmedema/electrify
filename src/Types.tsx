@@ -1519,6 +1519,10 @@ export interface GameType {
       corridor: TransmissionCorridorDefinitionType;
       availableSupplyW?: number;
       ratingW?: number;
+      /** Host projection of both completed, operating endpoints of this peer link. */
+      connected?: boolean;
+      /** Host-owned visibility anchors; includes this peer's acquired utility cells. */
+      territoryTileIds?: TerritoryTileId[];
       upgradeRequestedBy?: string;
       /** This player asked for the pending upgrade and waits on the other owner. */
       upgradeRequestedBySelf?: boolean;
