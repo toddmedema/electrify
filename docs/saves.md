@@ -71,7 +71,12 @@ stored energy, construction, financing and history. Cities have no building slot
 Older over-budget fleets get separate legacy overflow cells rather than losing
 facilities; current saves reject invalid or duplicate placements.
 
-Recognized published schema 13, 14 and 15 co-op identities have ordered transitions.
+Schema 17 adds individual tile purchase receipts while retaining earlier paid
+whole-area rights and their exact capital value. Coordinate-derived frontier
+geography needs no stored infinite board; receipts and active connections determine
+the visible three-hex frontier.
+
+Recognized published schema 13, 14, 15 and 16 co-op identities have ordered transitions.
 It preserves the run's original scoring provenance. Existing company-local land
 rights are retained, including old duplicate ownership; new claims are exclusive
 and checked in host command order. Other incompatible co-op identities retain

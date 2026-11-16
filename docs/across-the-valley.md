@@ -2,7 +2,7 @@
 
 Scenario 116 is a fictional Vermont Investor utility, January 2005–December 2024.
 Acquire Valley Electric or Ridge Electric directly, sign finite power agreements,
-build facilities and buy unowned land for customers or new building sites. All owned customers and facilities
+build facilities and buy individual tiles for customers or new building sites. All owned customers and facilities
 share one company power pool. Location controls finite suitable sites; no line
 purchase, transfer bottleneck or connection fee is involved. Human co-op companies
 remain independent, with new empty-land claims accepted once in host command order.
@@ -10,7 +10,7 @@ remain independent, with new empty-land claims accepted once in host command ord
 Inherited nuclear and Québec hydro commitments retain their original dates.
 Acquisition transfers plants, customers, sites, debts and third-party obligations;
 a PPA with the acquired seller ends as an external delivery/charge. Every unowned
-parcel is purchasable. General land, residential or industrial customers, and
+visible unowned tile is purchasable. General land, residential or industrial customers, and
 special hydro or geothermal sites have distinct cash prices and benefits. See
 [territories](territories.md) for site budgets, accounting and legacy-save conversion.
 
@@ -21,8 +21,12 @@ terrain backgrounds, with separate upright cities, generators, storage and tower
 Each hex holds one facility or a city; construction reserves its slot immediately.
 Independent utilities show their authored starting fleet. Empty developed hexes
 show towers and automatic wires to adjacent developed cells of the same utility.
-Selecting an individual hex exposes its occupant, available construction and site
-limits. The wires are visual and add no transmission management. Utility names
+Selecting an individual hex opens its floating facility, city or construction
+surface. Empty owned tiles select their build destination automatically. A Buy land
+layer supports repeated single-tile purchases with visible prices. Acquiring land
+or connecting to a utility reveals three further hexes, with progressively faded
+terrain and structures. Coordinate-based generation extends the map as players
+expand. The wires are visual and add no transmission management. Utility names
 float above their land, with the player labeled “You” and distinct ownership borders.
 Neutral land has no proper name; symbols show its benefit. Native map buttons support
 keyboard, touch and controller selection without a numbered key.
