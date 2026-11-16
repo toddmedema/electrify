@@ -91,3 +91,6 @@ builds, hydro/geothermal eligibility, inherited pricing, legacy neutrality and
 custom base-116 packages. Multiplayer tests submit edited costs/timings and check
 the canonical purchased asset. Expected-output tests retain authored override
 precedence. The integrating task owns the full simulation and CI gates.
+Temporary mutations confirmed that applying speed after the curve fails the
+cut-in assertion and trusting a client-supplied price fails both cash and financed
+purchase assertions; both mutations were removed before verification.

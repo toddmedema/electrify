@@ -7,6 +7,7 @@ import reducer, {
   buildFacility,
   generateForecastTimeline,
   generateNewTimeline,
+  previewFacilityBuild,
   tickState,
 } from "../reducers/Game";
 import { modScenario } from "../mods/ModScenario";
@@ -277,6 +278,30 @@ it("retains deterministic free-tile fallback and rejects insufficient cash befor
   ).toBe(before);
 });
 
+it("reprices build-impact preview economics while retaining its explicit commissioning-duration override", () => {
+  const game = fixture();
+  const canonical = { ...quote(game, "mountain"), yearsToBuild: 0 };
+  const before = JSON.stringify(game);
+  const expected = previewFacilityBuild(
+    game,
+    canonical,
+    "green-uplands",
+    tile("mountain"),
+  );
+  const edited = previewFacilityBuild(
+    game,
+    { ...canonical, buildCost: 1 },
+    "green-uplands",
+    tile("mountain"),
+  );
+  expect(edited).toEqual(expected);
+  expect(edited.commissionedMinute).toBe(game.date.minute);
+  expect(edited.after.map((tick) => tick.netWorth)).toEqual(
+    expected.after.map((tick) => tick.netWorth),
+  );
+  expect(JSON.stringify(game)).toBe(before);
+});
+
 it("uses the same local wind owner in live ticks, simulated output and estimated-weather forecasts without changing demand", () => {
   const game = fixture();
   const source = game.facilities.find((facility) => facility.fuel === "Wind")!;
@@ -371,6 +396,27 @@ it("offers the mapped ocean's offshore technology despite inland weather, with e
   expect(
     result.facilities.find((candidate) => candidate.tileId === ocean)?.fuel,
   ).toBe("Offshore Wind");
+  const operating = cloneDeep(result);
+  const offshore = operating.facilities.find(
+    (candidate) => candidate.tileId === ocean,
+  )!;
+  offshore.yearsToBuildLeft = 0;
+  operating.facilities = [offshore];
+  const now = currentTick(operating)!;
+  const forecast = generateForecastTimeline(
+    operating,
+    now.cash,
+    now.customers,
+    12,
+    60,
+  );
+  expect(
+    forecast.some((tick) => (tick.supplyByFuel["Offshore Wind"] ?? 0) > 0),
+  ).toBe(true);
+  for (const tick of forecast)
+    expect(tick.supplyByFuel["Offshore Wind"]).toBe(
+      offshore.peakW * getOffshoreWindOutputFactor(tick.windKph),
+    );
   const tooEarly = { ...game, date: { ...game.date, year: 1991 } };
   expect(
     getBuildFacilityQuote(tooEarly, local, "champlain", ocean),
