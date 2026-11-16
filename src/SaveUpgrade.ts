@@ -274,7 +274,8 @@ const migrations: readonly Migration[] = [
         (facility) =>
           !object(facility) ||
           !Number.isSafeInteger(facility.id) ||
-          typeof facility.fuel !== "string" ||
+          (typeof facility.fuel !== "string" &&
+            typeof facility.peakWh !== "number") ||
           typeof facility.peakW !== "number",
       )
     )
