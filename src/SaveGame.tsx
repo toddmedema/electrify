@@ -59,6 +59,7 @@ import {
   INTERTIE_UPGRADE_STEP,
   MAX_INTERTIE_UPGRADES,
   MONTHS,
+  PRICED_FUELS,
 } from "./Constants";
 import {
   corridorConstructionKgco2e,
@@ -363,6 +364,21 @@ export function parseSave(raw: unknown): SaveGameType | null {
   }
   // Shared grids are restored only as a validated whole world, never as a solo import.
   if (game.multiplayer) return null;
+  // Older saves have no comparison month; a present baseline must be complete before ticking.
+  if (
+    game.fuelPriceBaseline !== undefined &&
+    (typeof game.fuelPriceBaseline !== "object" ||
+      game.fuelPriceBaseline === null ||
+      Array.isArray(game.fuelPriceBaseline) ||
+      Object.keys(game.fuelPriceBaseline).length !== PRICED_FUELS.length ||
+      PRICED_FUELS.some((fuel) => {
+        const price = game.fuelPriceBaseline![fuel];
+        return (
+          typeof price !== "number" || !Number.isFinite(price) || price <= 0
+        );
+      }))
+  )
+    return null;
   if (
     !isValidDifficulty(game.difficulty) ||
     typeof game.scenarioId !== "number" ||

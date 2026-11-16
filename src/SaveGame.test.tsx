@@ -1,4 +1,4 @@
-import { DIFFICULTIES } from "./Constants";
+import { DIFFICULTIES, PRICED_FUELS } from "./Constants";
 import gameReducer, {
   buildTransmissionLine,
   delta,
@@ -29,6 +29,43 @@ describe("SaveGame", () => {
     expect(save!.appVersion).toBe("26sept26-1507");
     expect(save!.game).not.toBe(game);
     expect(save!.game).toEqual(JSON.parse(JSON.stringify(game)));
+  });
+
+  it("accepts older absent fuel baselines and preserves a current baseline across repeated loads", () => {
+    expect(game.fuelPriceBaseline).toBeUndefined();
+    expect(parseSave(serializeSave(game))).not.toBeNull();
+    const fuelPriceBaseline = Object.fromEntries(
+      PRICED_FUELS.map((fuel, i) => [fuel, i + 1]),
+    );
+    const raw = {
+      ...serializeSave(game),
+      game: { ...game, fuelPriceBaseline },
+    };
+    const parsed = parseSave(raw)!;
+    expect(parsed.game.fuelPriceBaseline).toEqual(fuelPriceBaseline);
+    expect(parseSave(serializeSave(parsed.game))!.game).toEqual(parsed.game);
+  });
+
+  it.each([
+    null,
+    [],
+    {},
+    "prices",
+    { Biomass: 1, Coal: 1, "Natural Gas": 1, Oil: 1 },
+    ...[0, -1, Infinity, NaN, "1", undefined].map((price) => ({
+      Biomass: 1,
+      Coal: price,
+      "Natural Gas": 1,
+      Oil: 1,
+      Uranium: 1,
+    })),
+  ])("rejects malformed fuel comparison baseline %p", (fuelPriceBaseline) => {
+    expect(
+      parseSave({
+        ...serializeSave(game),
+        game: { ...game, fuelPriceBaseline },
+      }),
+    ).toBeNull();
   });
 
   it.each(["0", "1", "180", String(Number.MAX_SAFE_INTEGER)])(

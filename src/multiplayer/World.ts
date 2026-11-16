@@ -112,6 +112,10 @@ export function pauseWorld(world: World, reason: string) {
 
 // Shell lifecycle blockers are ephemeral; restoring a checkpoint requires fresh consent.
 const shellBlockers = new WeakMap<World, readonly string[]>();
+/** A detached snapshot of live shell blockers for replication baselines and state hashes. */
+export function worldBlockers(world: World): string[] {
+  return [...(shellBlockers.get(world) || [])];
+}
 /**
  * Copy ephemeral shell blockers into this world's clock calculation.
  * They remain outside persisted checkpoints so resume always obtains fresh consent.
@@ -1225,11 +1229,8 @@ function reassignSeats(world: World, seats: Seat[]) {
   });
 }
 
-export function restoreWorld(
-  value: unknown,
-  epoch: string,
-  seats?: Seat[],
-): World {
+/** Validate and detach a live checkpoint without changing its epoch or player state. */
+export function hydrateWorld(value: unknown): World {
   savedMatchSpec(value);
   const world = upgradeTerritoryWorld(value) as World;
   const ids = new Set(world?.seats?.map?.((s) => s?.id));
@@ -1260,6 +1261,15 @@ export function restoreWorld(
   )
     throw new Error(INVALID_GRIDS);
   restoreCommitments(world, result);
+  return result;
+}
+
+export function restoreWorld(
+  value: unknown,
+  epoch: string,
+  seats?: Seat[],
+): World {
+  const result = hydrateWorld(value);
   if (seats) reassignSeats(result, seats);
   result.epoch = epoch;
   // A restored renderer starts on the grid view, so prior menus cannot keep it stuck paused.

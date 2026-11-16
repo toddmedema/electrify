@@ -119,6 +119,8 @@ const SCENARIO_SELECTION = /^[a-zA-Z0-9:|._-]{1,256}$/;
 
 const MAX_BYTES = 16 * 1024 * 1024;
 const MAX_COMPRESSED = 4 * 1024 * 1024;
+const MAX_RECORD_BYTES = 64 * 1024;
+const MAX_RECORDS = 256;
 const CHUNK = 32 * 1024;
 const HEADER = 52;
 const MESSAGE_KINDS = new Set([
@@ -131,9 +133,15 @@ const MESSAGE_KINDS = new Set([
   "browse",
   "campaign",
   "keepalive",
-  "view",
   "scenario",
+  "records",
+  "baseline",
+  "rejected",
+  "progress",
+  "resync",
 ]);
+const REPLICATION_HOST_KINDS = new Set(["records", "baseline", "rejected"]);
+const REPLICATION_GUEST_KINDS = new Set(["progress", "resync"]);
 const MESSAGE_MAGIC = "ELM2";
 const SCENARIO_MAGIC = "ELS1";
 const ID = /^[0-9]{17}$/;
@@ -163,6 +171,7 @@ function messageJSON(payload) {
   if (!payload || !MESSAGE_KINDS.has(payload.kind))
     throw new Error("Invalid co-op message kind");
   if (payload.kind === "scenario") validScenarioMessage(payload);
+  validReplicationMessage(payload);
   // The kind is always the first, literal key. The receiver checks it on the first
   // decompressed chunk, before allowing the larger world-message budget.
   const { kind, ...body } = payload;
@@ -192,7 +201,7 @@ function encode(payload) {
     payload.kind,
   );
 }
-/** Large live views must leave Steam's callback/IPC pump free to accept speed commands. */
+/** Large worlds must leave Steam's callback/IPC pump free to accept control messages. */
 function encodeAsync(payload) {
   return new Promise((resolve, reject) => {
     const json = messageJSON(payload);
@@ -299,6 +308,114 @@ function validScenarioMessage(payload) {
     throw new Error("Co-op scenario envelope is too large");
 }
 
+const boundedText = (value, maximum = 64) =>
+  typeof value === "string" && value.length > 0 && value.length <= maximum;
+const indexValue = (value) => Number.isSafeInteger(value) && value >= 0;
+const reasonsValue = (value) =>
+  Array.isArray(value) &&
+  value.length <= 64 &&
+  Array.from(value).every((s) => boundedText(s, 2048));
+function validEnvelope(envelope) {
+  return (
+    envelope &&
+    boundedText(envelope.matchId) &&
+    boundedText(envelope.epoch) &&
+    Number.isSafeInteger(envelope.sequence) &&
+    envelope.sequence >= 1 &&
+    envelope.command &&
+    boundedText(envelope.command.kind) &&
+    Buffer.byteLength(stringify(envelope)) <= 2048
+  );
+}
+function validRecord(record) {
+  if (!record || typeof record !== "object" || Array.isArray(record))
+    return false;
+  switch (record.t) {
+    case "command":
+      return (
+        boundedText(record.seat) &&
+        validEnvelope(record.envelope) &&
+        typeof record.allowReady === "boolean" &&
+        (record.error === undefined || boundedText(record.error, 2048)) &&
+        indexValue(record.revision)
+      );
+    case "step":
+      return (
+        Number.isSafeInteger(record.n) &&
+        record.n >= 1 &&
+        record.n <= 10000 &&
+        indexValue(record.revision)
+      );
+    case "pause":
+      return boundedText(record.reason, 2048);
+    case "blockers":
+      return reasonsValue(record.reasons);
+    case "verify":
+      return true;
+    case "fault":
+      return boundedText(record.message, 2048);
+    default:
+      return false;
+  }
+}
+/** The worker owns semantic world validation; native code bounds and authenticates the wire. */
+function validReplicationMessage(payload) {
+  const { kind } = payload;
+  if (
+    kind === "keepalive" &&
+    payload.disconnected !== undefined &&
+    (!Array.isArray(payload.disconnected) ||
+      payload.disconnected.length > 4 ||
+      !Array.from(payload.disconnected).every(
+        (id) => typeof id === "string" && ID.test(id),
+      ))
+  )
+    throw new Error("Invalid disconnected seats");
+  if (!REPLICATION_HOST_KINDS.has(kind) && !REPLICATION_GUEST_KINDS.has(kind))
+    return;
+  let valid = boundedText(payload.matchId) && boundedText(payload.epoch);
+  if (REPLICATION_GUEST_KINDS.has(kind) || kind === "rejected")
+    valid &&= Buffer.byteLength(stringify(payload)) <= 4096;
+  if (kind === "records") {
+    valid &&=
+      Number.isSafeInteger(payload.from) &&
+      payload.from >= 1 &&
+      Array.isArray(payload.records) &&
+      payload.records.length >= 1 &&
+      payload.records.length <= MAX_RECORDS &&
+      Array.from(payload.records).every(validRecord) &&
+      Number.isSafeInteger(payload.from + payload.records.length - 1) &&
+      Buffer.byteLength(stringify(payload)) <= MAX_RECORD_BYTES;
+  } else if (kind === "baseline") {
+    valid &&=
+      indexValue(payload.index) &&
+      reasonsValue(payload.blockers) &&
+      payload.world &&
+      typeof payload.world === "object" &&
+      !Array.isArray(payload.world) &&
+      payload.world.matchId === payload.matchId &&
+      payload.world.epoch === payload.epoch &&
+      Buffer.byteLength(stringify(payload)) <= MAX_BYTES;
+  } else if (kind === "rejected") {
+    valid &&=
+      Number.isSafeInteger(payload.sequence) &&
+      payload.sequence >= 1 &&
+      boundedText(payload.error, 2048);
+  } else if (kind === "progress") {
+    valid &&=
+      indexValue(payload.applied) &&
+      (payload.verified === undefined ||
+        (payload.verified &&
+          indexValue(payload.verified.index) &&
+          payload.verified.index <= payload.applied &&
+          typeof payload.verified.hash === "string" &&
+          /^[a-f0-9]{64}$/.test(payload.verified.hash)));
+  } else if (kind === "resync") {
+    valid &&= indexValue(payload.applied) && boundedText(payload.reason, 2048);
+  }
+  if (!valid) throw new Error(`Invalid co-op ${kind} message`);
+}
+
 function inflateMessage(compressed, transfer) {
   const scenario = transfer.magic === SCENARIO_MAGIC;
   let limit = scenario
@@ -322,6 +439,9 @@ function inflateMessage(compressed, transfer) {
         const match = /^\{"kind":"([a-z-]{1,32})"(?=[,}])/.exec(prefix);
         if (match) {
           kind = match[1];
+          if (kind === "records") limit = MAX_RECORD_BYTES;
+          if (REPLICATION_GUEST_KINDS.has(kind) || kind === "rejected")
+            limit = 4096;
           if (!MESSAGE_KINDS.has(kind) || (kind === "scenario") !== scenario) {
             inflater.destroy(
               new Error("Co-op frame kind does not match its message"),
@@ -365,6 +485,7 @@ function inflateMessage(compressed, transfer) {
         if (!kind || payload?.kind !== kind || (scenario && !scenarioPrefix))
           throw new Error("Co-op frame kind does not match its message");
         if (scenario) validScenarioMessage(payload);
+        validReplicationMessage(payload);
         resolve(payload);
       } catch (error) {
         reject(error);
@@ -659,6 +780,7 @@ class SteamMultiplayer {
     for (const transfer of connection?.incoming?.values() ?? [])
       transfer.inflater?.destroy(new Error("Co-op connection closed"));
     connection?.incoming?.clear();
+    if (connection) connection.pendingFrames = [];
     this.api.close(
       this.sockets,
       handle,
@@ -668,11 +790,15 @@ class SteamMultiplayer {
     );
     this.connections.delete(handle);
     if (connection) {
+      if (this.pendingCheckpoint?.connection === connection)
+        this.pendingCheckpoint = undefined;
       this.emit({ kind: "disconnected", sender: connection.id });
       this.publish();
     }
   }
   send(to, payload, encoded) {
+    if (!MESSAGE_KINDS.has(payload?.kind))
+      throw new Error("Invalid co-op message kind");
     const connection = [...this.connections.values()].find(
       (c) => c.id === to && c.connected,
     );
@@ -681,6 +807,8 @@ class SteamMultiplayer {
       (this.hostId !== this.service.identity.steamId && to !== this.hostId)
     )
       throw new Error("Player is disconnected");
+    if (REPLICATION_HOST_KINDS.has(payload?.kind) && !encoded)
+      return this.sendOrdered(connection, payload);
     // Each connection tracks its own progress through bytes that may be shared with others.
     const message = {
       ...(encoded || encode(payload)),
@@ -693,67 +821,55 @@ class SteamMultiplayer {
       message.kind === "scenario"
     ) {
       // Lobby/definition changes must not be followed by a late encode of the old game.
-      connection.viewGeneration = (connection.viewGeneration || 0) + 1;
-      connection.pendingView?.resolve();
-      connection.pendingView = undefined;
+      connection.transportGeneration =
+        (connection.transportGeneration || 0) + 1;
     }
-    // Views are self-contained: keep the latest unsent view, never an unbounded tick backlog.
-    if (message.kind === "view")
-      connection.queue = connection.queue.filter(
-        (m) => m.kind !== "view" || m.offset > 0,
-      );
-    if (connection.queue.length >= 64)
+    if (
+      connection.queue.length + (connection.checkpointQueue?.length || 0) >=
+      64
+    )
       throw new Error("Co-op connection is catching up");
-    connection.queue.push(message);
+    const queue =
+      message.kind === "checkpoint"
+        ? (connection.checkpointQueue ||= [])
+        : connection.queue;
+    queue.push(message);
   }
-  encodeView(payload) {
+  encodeBaseline(payload) {
     return encodeAsync(payload);
   }
-  /** One compression per peer, plus the newest waiting view. Coalesce before serialization;
-   * a slow peer must not build an encoding backlog or delay small control messages. */
-  sendView(to, payload) {
-    const connection = [...this.connections.values()].find(
-      (c) => c.id === to && c.connected,
-    );
-    if (!connection || this.hostId !== this.service.identity.steamId)
-      throw new Error("Player is disconnected");
-    return new Promise((resolve, reject) => {
-      connection.pendingView?.resolve();
-      connection.pendingView = {
-        payload,
-        resolve,
-        reject,
-        generation: connection.viewGeneration || 0,
-      };
-      this.flushView(connection);
-    });
-  }
-  async flushView(connection) {
-    if (connection.encodingView || !connection.pendingView) return;
-    const request = connection.pendingView;
-    connection.pendingView = undefined;
-    connection.encodingView = true;
-    const current = () =>
-      connection.connected &&
-      [...this.connections.values()].includes(connection) &&
-      request.generation === (connection.viewGeneration || 0);
-    try {
-      const encoded = await this.encodeView(request.payload);
-      // A completed encode cannot enter a new connection with the same Steam ID.
-      if (current()) this.send(connection.id, request.payload, encoded);
-      request.resolve();
-    } catch (error) {
-      if (current()) request.reject(error);
-      else request.resolve();
-    } finally {
-      connection.encodingView = false;
-      if ([...this.connections.values()].includes(connection))
-        void this.flushView(connection);
-      else {
-        connection.pendingView?.resolve();
-        connection.pendingView = undefined;
-      }
-    }
+  /** A baseline's asynchronous encoding may never be overtaken by subsequent records. */
+  sendOrdered(connection, payload) {
+    if (
+      connection.queue.length +
+        (connection.checkpointQueue?.length || 0) +
+        (connection.encodingCount || 0) >=
+      64
+    )
+      throw new Error("Co-op connection is catching up");
+    validReplicationMessage(payload);
+    const generation = connection.transportGeneration || 0;
+    connection.encodingCount = (connection.encodingCount || 0) + 1;
+    const result = (connection.encodeChain || Promise.resolve())
+      .then(async () => {
+        const current = () =>
+          connection.connected &&
+          [...this.connections.values()].includes(connection) &&
+          generation === (connection.transportGeneration || 0);
+        if (!current()) throw new Error("Player is disconnected");
+        const encoded =
+          payload.kind === "baseline"
+            ? await this.encodeBaseline(payload)
+            : encode(payload);
+        if (!current()) throw new Error("Player is disconnected");
+        this.send(connection.id, payload, encoded);
+      })
+      .finally(() => {
+        connection.encodingCount--;
+      });
+    // One failed submission must not poison later recovery, or reject unobserved on teardown.
+    connection.encodeChain = result.catch(() => {});
+    return result;
   }
   refresh() {
     if (!this.lobby) return;
@@ -818,7 +934,65 @@ class SteamMultiplayer {
         }
     return this.state();
   }
+  /** At most one disk write and the newest pending checkpoint; records never await storage. */
+  queueCheckpoint(sender, payload, connection) {
+    this.pendingCheckpoint = { sender, payload, connection };
+    if (this.checkpointWrite) return;
+    const current = (request) =>
+      this.hostId === request.sender &&
+      this.hostId !== this.service.identity.steamId &&
+      request.connection.connected &&
+      [...this.connections.values()].includes(request.connection);
+    this.checkpointWrite = (async () => {
+      while (this.pendingCheckpoint) {
+        const request = this.pendingCheckpoint;
+        this.pendingCheckpoint = undefined;
+        if (!current(request)) continue;
+        try {
+          const digest = await this.persist(request.payload.world);
+          if (digest !== request.payload.digest || !current(request)) continue;
+          this.sharedAt = this.savedAt;
+          this.publish();
+          this.send(request.sender, { kind: "saved", digest });
+        } catch {
+          // No receipt: the next periodic checkpoint retries failed writes.
+        }
+      }
+    })().finally(() => {
+      this.checkpointWrite = undefined;
+      if (this.pendingCheckpoint) {
+        const request = this.pendingCheckpoint;
+        this.queueCheckpoint(
+          request.sender,
+          request.payload,
+          request.connection,
+        );
+      }
+    });
+  }
   async receive(sender, payload) {
+    if (
+      !payload ||
+      typeof payload !== "object" ||
+      !MESSAGE_KINDS.has(payload.kind)
+    )
+      throw new Error("Invalid message");
+    validReplicationMessage(payload);
+    const senderConnection = [...this.connections.values()].find(
+      (c) => c.id === sender && c.connected,
+    );
+    if (
+      REPLICATION_HOST_KINDS.has(payload.kind) &&
+      (sender !== this.hostId || this.hostId === this.service.identity.steamId)
+    )
+      throw new Error("Invalid replication sender");
+    if (
+      REPLICATION_GUEST_KINDS.has(payload.kind) &&
+      (this.hostId !== this.service.identity.steamId || !senderConnection)
+    )
+      throw new Error("Invalid replication sender");
+    if (payload.kind === "progress")
+      senderConnection.lastHeartbeat = performance.now();
     if (payload?.kind === "heartbeat") {
       const connection = [...this.connections.values()].find(
         (c) => c.id === sender,
@@ -834,13 +1008,15 @@ class SteamMultiplayer {
         this.hostId === this.service.identity.steamId
       )
         throw new Error("Invalid save sender");
-      const digest = await this.persist(payload.world);
-      if (digest !== payload.digest)
+      if (!senderConnection) throw new Error("Invalid save sender");
+      if (
+        crypto
+          .createHash("sha256")
+          .update(stringify(payload.world))
+          .digest("hex") !== payload.digest
+      )
         throw new Error("Multiplayer save checksum failed");
-      // The host persists before sending; this complete local write establishes two copies.
-      this.sharedAt = this.savedAt;
-      this.publish();
-      this.send(sender, { kind: "saved", digest });
+      this.queueCheckpoint(sender, payload, senderConnection);
       return;
     }
     if (
@@ -869,7 +1045,8 @@ class SteamMultiplayer {
     if (
       this.hostId === this.service.identity.steamId &&
       payload.kind !== "command" &&
-      payload.kind !== "save-request"
+      payload.kind !== "save-request" &&
+      !REPLICATION_GUEST_KINDS.has(payload.kind)
     )
       throw new Error("Invalid guest message");
     if (
@@ -931,8 +1108,11 @@ class SteamMultiplayer {
         this.drop(handle);
         continue;
       }
-      const outgoing = c.queue[0];
-      if (outgoing) {
+      let sendFailed = false;
+      for (let sent = 0; sent < 8; sent++) {
+        const queue = c.queue.length ? c.queue : c.checkpointQueue;
+        const outgoing = queue?.[0];
+        if (!outgoing) break;
         const frame = chunk(outgoing),
           result = this.api.send(
             this.sockets,
@@ -944,12 +1124,16 @@ class SteamMultiplayer {
           );
         if (result === RESULT_OK) {
           outgoing.offset++;
-          if (outgoing.offset * CHUNK >= outgoing.bytes.length) c.queue.shift();
-        } else if (result !== RESULT_LIMIT_EXCEEDED) {
-          this.drop(handle);
-          continue;
+          if (outgoing.offset * CHUNK >= outgoing.bytes.length) queue.shift();
+        } else {
+          if (result !== RESULT_LIMIT_EXCEEDED) {
+            this.drop(handle);
+            sendFailed = true;
+          }
+          break;
         }
       }
+      if (sendFailed) continue;
       const pointers = Buffer.alloc(8 * MESSAGES_PER_RECEIVE),
         count = this.api.receive(
           this.sockets,
@@ -974,39 +1158,70 @@ class SteamMultiplayer {
           const bytes = Buffer.from(
             this.koffi.decode(prefix.readBigUInt64LE(0), "uint8_t", length),
           );
-          const completion = assemble(c.incoming, bytes);
-          if (completion) {
-            // Inflation finishes asynchronously, sometimes out of order. Keep reliable
-            // delivery ordered, including an awaited checkpoint write, and observe errors
-            // immediately so a later failed decode never becomes an unhandled rejection.
-            const decoded = completion.then(
-              (payload) => ({ payload }),
-              (error) => ({ error }),
-            );
-            if ((c.deliveryCount ?? 0) >= 64)
-              throw new Error("Too many pending co-op messages");
-            c.deliveryCount = (c.deliveryCount ?? 0) + 1;
-            c.delivery = (c.delivery ?? Promise.resolve())
-              .then(async () => {
-                const result = await decoded;
-                // A completed inflate must not revive a departed or replaced connection.
-                if (this.connections.get(handle) !== c || !c.connected) return;
-                if (result.error) throw result.error;
-                await this.receive(c.id, result.payload);
-              })
-              .catch(() => {
-                if (this.connections.get(handle) === c) this.drop(handle);
-              })
-              .finally(() => {
-                c.deliveryCount--;
-              });
-          }
+          if ((c.pendingFrames?.length || 0) >= 64)
+            throw new Error("Too many pending co-op frames");
+          (c.pendingFrames ||= []).push(bytes);
+          this.drainFrames(handle, c);
         } catch {
           this.drop(handle);
         } finally {
           this.api.release(pointer);
         }
       }
+    }
+  }
+  /** A pump can complete eight tiny messages before any inflate callback runs. Defer new
+   * transfers while the four-transfer budget is occupied, keeping native pointers released. */
+  drainFrames(handle, connection) {
+    try {
+      while (
+        connection.pendingFrames?.length &&
+        this.connections.get(handle) === connection &&
+        connection.connected
+      ) {
+        const bytes = connection.pendingFrames[0];
+        const key = bytes.subarray(4, 12).toString("hex");
+        if (
+          connection.incoming.size >= 4 &&
+          !connection.incoming.has(key) &&
+          [...connection.incoming.values()].some(
+            (transfer) => transfer.inflater,
+          )
+        )
+          return;
+        connection.pendingFrames.shift();
+        const completion = assemble(connection.incoming, bytes);
+        if (!completion) continue;
+        // Decode order is transport order, independent of asynchronous inflate completion.
+        const decoded = completion.then(
+          (payload) => ({ payload }),
+          (error) => ({ error }),
+        );
+        if ((connection.deliveryCount || 0) >= 64)
+          throw new Error("Too many pending co-op messages");
+        connection.deliveryCount = (connection.deliveryCount || 0) + 1;
+        connection.delivery = (connection.delivery || Promise.resolve())
+          .then(async () => {
+            const result = await decoded;
+            if (
+              this.connections.get(handle) !== connection ||
+              !connection.connected
+            )
+              return;
+            if (result.error) throw result.error;
+            await this.receive(connection.id, result.payload);
+          })
+          .catch(() => {
+            if (this.connections.get(handle) === connection) this.drop(handle);
+          })
+          .finally(() => {
+            connection.deliveryCount--;
+            if (this.connections.get(handle) === connection)
+              this.drainFrames(handle, connection);
+          });
+      }
+    } catch {
+      if (this.connections.get(handle) === connection) this.drop(handle);
     }
   }
   fail(error) {
@@ -1027,6 +1242,7 @@ class SteamMultiplayer {
     this.error = undefined;
     this.sharedAt = null;
     this.pendingInvite = undefined;
+    this.pendingCheckpoint = undefined;
     this.publish();
   }
   async request(input) {
@@ -1094,9 +1310,7 @@ class SteamMultiplayer {
         this.allowed = new Set(input.ids);
         return;
       case "send":
-        return input.payload?.kind === "view"
-          ? this.sendView(input.to, input.payload)
-          : this.send(input.to, input.payload);
+        return this.send(input.to, input.payload);
       case "checkpoint":
         return this.checkpoint(input.world);
       case "read-checkpoint": {

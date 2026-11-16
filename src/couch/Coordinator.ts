@@ -450,6 +450,7 @@ export class CouchCoordinator {
       if (lifecycle === this.lifecycle) this.post({ kind: "views-applied" });
       return;
     }
+    if (data.kind !== "checkpoint") return;
     const generation = this.lifecycle;
     const request = data.requestId
       ? this.requests.get(data.requestId)

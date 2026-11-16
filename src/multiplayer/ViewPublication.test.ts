@@ -102,3 +102,15 @@ test("safety stops without a new tick publish promptly and reconnects force a co
   expect(Object.keys(publication.take(world, 101))).toEqual(["host", "guest"]);
   expect(build).toHaveBeenCalledTimes(4);
 });
+
+test("a seat filter avoids building remote-seat grids while preserving local receipts", () => {
+  const { world, publication, build } = fixture();
+  publication.request(world, 0, { force: true });
+  expect(Object.keys(publication.take(world, 0, ["host"]))).toEqual(["host"]);
+  expect(build).toHaveBeenCalledTimes(1);
+  expect(build).toHaveBeenCalledWith(world, "host");
+  publication.request(world, 50, { receipt: { sender: "host", sequence: 7 } });
+  expect(publication.take(world, 100, ["host"]).host.receipt).toEqual({
+    sequence: 7,
+  });
+});

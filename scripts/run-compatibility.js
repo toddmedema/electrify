@@ -301,6 +301,7 @@ multiplayerDigest.update(`${sourceId}\n${compatibilityId}\n${modRuntimeId}\n`);
 for (const file of [
   ...filesUnder("src/multiplayer").filter(productionSource),
   "src/workers/Multiplayer.worker.ts",
+  "src/workers/MultiplayerReplica.worker.ts",
   "electron/steam-multiplayer.cjs",
   "electron/coop-codec.cjs",
 ].sort()) {

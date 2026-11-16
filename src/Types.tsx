@@ -1571,6 +1571,8 @@ export interface GameType {
   blackout?: { startMinute: number; unservedWh: number };
   // All-in $/MWh by fuel at the last monthly rollover, used to edge-detect cost-order changes.
   fuelCostSnapshot?: Partial<Record<FuelNameType, number>>;
+  /** Fuel prices at the last rollover; absent before it and in older saves. */
+  fuelPriceBaseline?: FuelPricesType;
   worldEvents: WorldEventStateType;
   // Headless balance harness only: baseline matrix cells run the identical strategy with authored
   // effects disabled. Undefined means enabled and is what every browser save uses.

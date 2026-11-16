@@ -4,10 +4,31 @@ import { store } from "../Store";
 import { dialogClose, dialogOpen } from "../reducers/UI";
 import HostConnectionWarning, {
   HOST_WAITING_MESSAGE,
+  HOST_SYNCHRONIZING_MESSAGE,
 } from "./HostConnectionWarning";
 
 beforeEach(() => store.dispatch(dialogClose()));
 afterEach(() => store.dispatch(dialogClose()));
+
+test("replica synchronization uses the existing notice and releases it when the replica is live", () => {
+  const ui = (synchronizing: boolean) => (
+    <Provider store={store}>
+      <HostConnectionWarning
+        waiting={false}
+        synchronizing={synchronizing}
+        onReconnect={jest.fn()}
+        onDisconnect={jest.fn()}
+      />
+    </Provider>
+  );
+  const view = render(ui(true));
+  expect(store.getState().ui.dialog).toMatchObject({
+    open: true,
+    message: HOST_SYNCHRONIZING_MESSAGE,
+  });
+  view.rerender(ui(false));
+  expect(store.getState().ui.dialog.open).toBe(false);
+});
 
 function warning(waiting = true) {
   const onReconnect = jest.fn();

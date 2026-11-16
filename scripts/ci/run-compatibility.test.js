@@ -29,6 +29,7 @@ function fixture(t) {
     "src/mods/ModSchema.js",
     "src/multiplayer/World.ts",
     "src/workers/Multiplayer.worker.ts",
+    "src/workers/MultiplayerReplica.worker.ts",
     "electron/mods.cjs",
     "electron/steam-workshop.cjs",
     "electron/steam-multiplayer.cjs",
@@ -133,7 +134,11 @@ for (const file of [
   });
 }
 
-for (const file of ["src/multiplayer/World.ts", "electron/coop-codec.cjs"])
+for (const file of [
+  "src/multiplayer/World.ts",
+  "electron/coop-codec.cjs",
+  "src/workers/MultiplayerReplica.worker.ts",
+])
   test(`transport changes in ${file} move only multiplayer compatibility`, (t) => {
     const f = fixture(t);
     const before = f.manifest();

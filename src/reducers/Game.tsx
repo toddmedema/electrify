@@ -494,10 +494,6 @@ const BLOCKING_CARDS = new Set([
 // Tracks whether the self-rescheduling tick() loop is currently alive, so that any transition
 // out of PAUSED (manual speed click, tutorial script, dialog closing) reliably restarts it.
 let tickLoopRunning = false;
-// Last month's fuel prices, to compare this month's against. Undefined before the first
-// rollover of a run, and after resuming a save - the first month back reports no move rather
-// than inventing one against prices from whenever the game was last open
-let previousFuelPrices: FuelPricesType | undefined;
 // How much history the log keeps. Long enough to cover the run a player is likely to scroll
 // back through, short enough that it never becomes the biggest thing in a save file
 const MAX_EVENTS = 100;
@@ -586,8 +582,8 @@ function logFuelPriceMoves(
   storyPriceFuels: ReadonlySet<FuelNameType> = new Set(),
 ) {
   const prices = getEffectiveFuelPrices(state.date, state);
-  const previous = previousFuelPrices;
-  previousFuelPrices = prices;
+  const previous = state.fuelPriceBaseline;
+  state.fuelPriceBaseline = prices;
   if (!previous) {
     return;
   }
@@ -1692,7 +1688,7 @@ export const gameSlice = createSlice({
       delete state.policyPause;
       const a = action.payload;
       delete state.blackout;
-      previousFuelPrices = undefined;
+      delete state.fuelPriceBaseline;
       state.eventLog = [];
       state.reportedEventKeys = [];
       state.eventLogReadThroughId = 0;
@@ -2359,7 +2355,6 @@ export const gameSlice = createSlice({
         copyCommitmentMetadata(tick, restored.timeline[i]),
       );
       // The tick loop's remaining module-level locals have to line up with restored state.
-      previousFuelPrices = undefined;
       speedBeforeDialog = "PAUSED";
       dialogBlocksSpeed = false;
       speedBeforeBlockingCard = undefined;
