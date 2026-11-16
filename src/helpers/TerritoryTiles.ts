@@ -4,6 +4,7 @@ import {
   type FacilityShoppingType,
   type GameType,
   type TerrainType,
+  type LegacyTerritoryTile,
   type TerritoryId,
   type TerritoryTileId,
 } from "../Types";
@@ -60,7 +61,7 @@ export function facilityTerritoryId(
 }
 export function territorySiteKind(
   facility: Pick<FacilityShoppingType, "fuel" | "peakWh">,
-): TerritorySiteKind {
+): Exclude<TerritorySiteKind, "general"> {
   if (isStorage(facility)) return "open-land";
   if (facility.fuel === "Hydro") return "hydro";
   if (facility.fuel === "Geothermal") return "geothermal";
@@ -100,7 +101,7 @@ export function tileFitsFacility(
 function historicalTile(
   facility: FacilityOperatingType,
   index: number,
-): TerritoryTileDefinition | undefined {
+): LegacyTerritoryTile | undefined {
   const territoryId = facilityTerritoryId(facility);
   if (
     territoryId.startsWith("frontier:") ||
@@ -140,29 +141,44 @@ type TileGame = Pick<GameType, "facilities"> &
       | "multiplayer"
     >
   >;
-function legacyTiles(
-  game?: Pick<GameType, "facilities">,
-): TerritoryTileDefinition[] {
-  return (game?.facilities ?? [])
-    .filter(
-      (facility) =>
-        typeof facility.tileId === "string" &&
-        facility.tileId.includes(":legacy-"),
-    )
-    .sort((a, b) => a.id - b.id)
-    .flatMap((facility, index) => {
-      const tile = historicalTile(facility, index);
-      return tile ? [tile] : [];
-    });
+type RetainedTileGame = Pick<GameType, "facilities"> &
+  Partial<Pick<GameType, "territoryNetwork" | "multiplayer">>;
+/** The fallback exists only while upgrading a pre-17 save, before footprints are frozen. */
+export function legacyTerritoryTiles(
+  game?: RetainedTileGame,
+): LegacyTerritoryTile[] {
+  return (
+    game?.territoryNetwork?.legacyTiles ??
+    (game?.facilities ?? [])
+      .filter(
+        (facility) =>
+          typeof facility.tileId === "string" &&
+          facility.tileId.includes(":legacy-"),
+      )
+      .sort((a, b) => a.id - b.id)
+      .flatMap((facility, index) => {
+        const tile = historicalTile(facility, index);
+        return tile ? [tile] : [];
+      })
+  );
+}
+function retainedTerritoryTiles(
+  game?: RetainedTileGame,
+): LegacyTerritoryTile[] {
+  // Existing duplicate paid rights survive; the local property wins the foreground at its coordinate.
+  return [
+    ...(game?.multiplayer?.legacyTiles ?? []).map(({ tile }) => tile),
+    ...legacyTerritoryTiles(game),
+  ];
 }
 export function getTerritoryTile(
   id: unknown,
-  game?: Pick<GameType, "facilities">,
+  game?: RetainedTileGame,
 ): TerritoryTileDefinition | undefined {
   const authored = getAuthoredTerritoryTile(id);
   if (authored) return authored;
-  const retained = legacyTiles(game);
-  const legacy = retained.find((tile) => tile.id === id);
+  const retained = retainedTerritoryTiles(game);
+  const legacy = [...retained].reverse().find((tile) => tile.id === id);
   if (legacy) return legacy;
   const generated = getGeneratedTerritoryTile(id);
   return generated &&
@@ -186,8 +202,16 @@ export function createTerritoryTileOwnership(game: OwnershipGame) {
   const cells = new Set(
     game.territoryNetwork?.tilePurchases?.map(({ tileId }) => tileId) ?? [],
   );
+  const retained = new Set(
+    legacyTerritoryTiles({ ...game, facilities: game.facilities ?? [] }).map(
+      (tile) => `${tile.id}:${tile.q}:${tile.r}`,
+    ),
+  );
   return (tile: TerritoryTileDefinition) =>
-    regions.has(tile.territoryId) || cells.has(tile.id);
+    tile.id.includes(":legacy-")
+      ? retained.has(`${tile.id}:${tile.q}:${tile.r}`) &&
+        regions.has(tile.territoryId)
+      : regions.has(tile.territoryId) || cells.has(tile.id);
 }
 export function ownsTerritoryTile(
   game: OwnershipGame,
@@ -195,7 +219,10 @@ export function ownsTerritoryTile(
 ): boolean {
   const tile =
     typeof tileOrId === "string"
-      ? getTerritoryTile(tileOrId, { facilities: game.facilities ?? [] })
+      ? getTerritoryTile(tileOrId, {
+          ...game,
+          facilities: game.facilities ?? [],
+        })
       : tileOrId;
   return !!tile && createTerritoryTileOwnership(game)(tile);
 }
@@ -239,6 +266,9 @@ export function connectedPeerTerritoryTiles(
             })
           : [],
       ),
+      ...(game.multiplayer?.legacyTiles ?? []).flatMap(({ tile, seat }) =>
+        connected.has(seat) ? [[`${tile.q},${tile.r}`, tile] as const] : [],
+      ),
       ...Object.entries(game.multiplayer?.tileOwners ?? {}).flatMap(
         ([id, owner]) => {
           const tile = getTerritoryTile(id, game);
@@ -280,7 +310,7 @@ export function territoryVisibilityAnchors(
   const owns = createTerritoryTileOwnership(game);
   const retained = [
     ...TERRITORY_TILES,
-    ...legacyTiles(game),
+    ...legacyTerritoryTiles(game),
     ...(game.territoryNetwork?.tilePurchases ?? []).flatMap(({ tileId }) => {
       const tile = getTerritoryTile(tileId, game);
       return tile ? [tile] : [];
@@ -294,7 +324,7 @@ export function territoryVisibilityAnchors(
           (tile) => owns(tile) || remote.has(tile.territoryId),
         ),
         ...peers,
-      ].map((tile) => [tile.id, tile]),
+      ].map((tile) => [`${tile.q},${tile.r}`, tile]),
     ).values(),
   ];
 }
@@ -318,7 +348,7 @@ export interface VisibleTerritoryTile {
 export function visibleTerritoryTiles(game: TileGame): VisibleTerritoryTile[] {
   const result = new Map<string, VisibleTerritoryTile>();
   const retainedAt = new Map(
-    legacyTiles(game).map((tile) => [`${tile.q},${tile.r}`, tile]),
+    retainedTerritoryTiles(game).map((tile) => [`${tile.q},${tile.r}`, tile]),
   );
   for (const anchor of territoryVisibilityAnchors(game)) {
     for (let dq = -3; dq <= 3; dq++)
@@ -349,7 +379,7 @@ export function getTerritoryTiles(
     ...new Map(
       [
         ...TERRITORY_TILES,
-        ...legacyTiles(game),
+        ...legacyTerritoryTiles(game),
         ...visibleTerritoryTiles(game).map(({ tile }) => tile),
       ].map((tile) => [tile.id, tile]),
     ).values(),
@@ -357,13 +387,13 @@ export function getTerritoryTiles(
 }
 export function isTerritoryTileId(
   value: unknown,
-  game?: Pick<GameType, "facilities">,
+  game?: RetainedTileGame,
 ): value is TerritoryTileId {
   return !!getTerritoryTile(value, game);
 }
 export function getFacilityTile(
   facility: Pick<FacilityOperatingType, "tileId" | "startingAssetId">,
-  game?: Pick<GameType, "facilities">,
+  game?: RetainedTileGame,
 ): TerritoryTileDefinition | undefined {
   return facility.tileId
     ? getTerritoryTile(facility.tileId, game)
@@ -463,6 +493,14 @@ export function assignTerritoryTiles(game: GameType): boolean {
           tile.startingAssetId === facility.startingAssetId,
       ) ?? candidates[0];
     facility.tileId = tile?.id ?? `${territoryId}:legacy-${facility.id}`;
+    if (!tile && game.territoryNetwork?.legacyTiles) {
+      const retained = historicalTile(
+        facility,
+        game.territoryNetwork.legacyTiles.length,
+      );
+      if (!retained) return false;
+      game.territoryNetwork.legacyTiles.push(retained);
+    }
     occupied.add(facility.tileId);
   }
   return true;

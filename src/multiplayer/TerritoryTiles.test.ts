@@ -70,6 +70,8 @@ function retainedStorageWorld() {
 function legacyCheckpoint(world: World) {
   const raw = JSON.parse(JSON.stringify(checkpointWorld(world)));
   raw.gameSchema = 15;
+  for (const grid of raw.grids)
+    if (grid.territoryNetwork) delete grid.territoryNetwork.legacyTiles;
   raw.rules =
     "coop-2-c12bab1ee04886f40ff0274d35e968e07cf7c3306f9e5ea006140bb973163fe4";
   for (const grid of raw.grids)

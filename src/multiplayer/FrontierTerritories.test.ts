@@ -78,6 +78,7 @@ it("migrates only recognized published schema14 co-op rules and keeps paid claim
   for (const grid of raw.grids) {
     grid.territoryNetwork.version = 2;
     delete grid.territoryNetwork.tilePurchases;
+    delete grid.territoryNetwork.legacyTiles;
   }
   const restored = restoreWorld(raw, "migrated");
   expect(restored.gameSchema).toBe(SAVE_SCHEMA_VERSION);

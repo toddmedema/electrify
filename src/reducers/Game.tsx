@@ -1998,6 +1998,7 @@ export const gameSlice = createSlice({
           version: 3,
           landPurchases: [],
           tilePurchases: [],
+          legacyTiles: [],
           legacyConnections: [],
         };
         state.facilities.forEach((facility) => {

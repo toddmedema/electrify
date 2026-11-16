@@ -284,6 +284,7 @@ it("schema16 whole parcels keep every paid cell, capital, facilities and financi
   });
   const raw = JSON.parse(JSON.stringify(serializeSave(game)));
   raw.schemaVersion = 16;
+  delete raw.game.territoryNetwork.legacyTiles;
   delete raw.game.territoryNetwork.tilePurchases;
   const restored = parseSave(raw)!.game;
   expect(restored.territoryNetwork!.landPurchases).toEqual(

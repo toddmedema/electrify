@@ -280,6 +280,7 @@ it("upgrades schema14 paid land without changing cash, receipts, assets or prove
   raw.schemaVersion = 14;
   raw.game.territoryNetwork.version = 2;
   delete raw.game.territoryNetwork.tilePurchases;
+  delete raw.game.territoryNetwork.legacyTiles;
   const restored = parseSave(raw);
   expect(restored).not.toBeNull();
   expect(restored!.game.territoryNetwork!.version).toBe(3);

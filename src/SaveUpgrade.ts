@@ -1,4 +1,7 @@
-import { assignTerritoryTiles } from "./helpers/TerritoryTiles";
+import {
+  legacyTerritoryTiles,
+  assignTerritoryTiles,
+} from "./helpers/TerritoryTiles";
 import type { BuyingRuleType, SellingRuleType, GameType } from "./Types";
 import { inheritedConnection } from "./helpers/PowerAgreements";
 import { facilityTerritoryId } from "./helpers/Territories";
@@ -288,7 +291,7 @@ const migrations: readonly Migration[] = [
     return { ...save, game };
   },
   // 16 -> 17: paid region receipts retain every original tile and exact finances.
-  // New purchases record only one physical cell in a separate ledger.
+  // Freeze retained overflow footprints; new purchases record one cell in a separate ledger.
   (save) => {
     if (!object(save.game)) return null;
     if (save.game.territoryNetwork === undefined) return save;
@@ -313,7 +316,16 @@ const migrations: readonly Migration[] = [
       return null;
     return {
       ...save,
-      game: { ...save.game, territoryNetwork: { ...state, tilePurchases: [] } },
+      game: {
+        ...save.game,
+        territoryNetwork: {
+          ...state,
+          tilePurchases: [],
+          legacyTiles: legacyTerritoryTiles({
+            facilities: (save.game as unknown as GameType).facilities,
+          }),
+        },
+      },
     };
   },
 ];

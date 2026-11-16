@@ -86,7 +86,6 @@ export function territoryBuildAvailability(
     tileId === undefined
       ? territorySiteInventory(game, id, kind)
       : territoryTileInventory(game, tileId);
-  const free = availableTerritoryTiles(game, facility, id);
   const requested =
     tileId === undefined ? undefined : getTerritoryTile(tileId, game);
   const reject = (reason: string) => ({
@@ -96,8 +95,9 @@ export function territoryBuildAvailability(
   });
   if (!territory) return reject("Choose a valid territory.");
   if (
-    !ownedTerritories(game).includes(id) ||
-    (requested && !ownsTerritoryTile(game, requested))
+    tileId === undefined
+      ? !ownedTerritories(game).includes(id)
+      : requested && !ownsTerritoryTile(game, requested)
   )
     return reject("Acquire this tile before building.");
   if (tileId !== undefined) {
@@ -111,9 +111,10 @@ export function territoryBuildAvailability(
       );
     if (!tileFitsFacility(requested, facility))
       return reject("This technology or project size does not fit this tile.");
-    if (!free.some((tile) => tile.id === requested.id))
+    if (!inventory.remaining)
       return reject("This named site has already been used.");
   }
+  const free = requested ? [] : availableTerritoryTiles(game, facility, id);
   const selected = requested ?? free[0];
   if (!selected) {
     if (!inventory.remaining)

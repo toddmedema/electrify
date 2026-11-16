@@ -30,12 +30,21 @@ export function territoryTileViews(game: GameType): TerritoryTileView[] {
   const inherited = Object.values(UTILITY_AREAS).flatMap(
     (area) => area.facilities,
   );
+  const retainedClaims = new Map(
+    game.multiplayer?.legacyTiles?.map((claim) => [
+      `${claim.tile.q},${claim.tile.r}`,
+      claim,
+    ]),
+  );
   return visibleTerritoryTiles(game).map(({ tile, visibilityDistance }) => {
     const isOwned = owns(tile);
-    const claim = isLandTerritoryId(tile.territoryId)
-      ? (game.multiplayer?.tileOwners?.[tile.id] ??
-        game.multiplayer?.landOwners?.[tile.territoryId])
-      : undefined;
+    const retainedClaim = retainedClaims.get(`${tile.q},${tile.r}`);
+    const claim =
+      retainedClaim ??
+      (isLandTerritoryId(tile.territoryId)
+        ? (game.multiplayer?.tileOwners?.[tile.id] ??
+          game.multiplayer?.landOwners?.[tile.territoryId])
+        : undefined);
     const ownerKey = isOwned
       ? "you"
       : claim
@@ -57,7 +66,9 @@ export function territoryTileViews(game: GameType): TerritoryTileView[] {
       : undefined;
     const peerFacility =
       !isOwned && claim
-        ? game.multiplayer?.tileFacilities?.[tile.id]
+        ? retainedClaim
+          ? retainedClaim.facility
+          : game.multiplayer?.tileFacilities?.[tile.id]
         : undefined;
     const asset =
       !isOwned && !claim && tile.startingAssetId

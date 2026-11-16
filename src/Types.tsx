@@ -1368,6 +1368,17 @@ export type TerritoryTileId =
   | `${TerritoryId}:city`
   | `${TerritoryId}:site-${number}`
   | `${TerritoryId}:legacy-${number}`;
+/** Frozen overflow property from pre-map saves; persists after its plant is retired. */
+export interface LegacyTerritoryTile {
+  id: TerritoryTileId;
+  territoryId: TerritoryId;
+  q: number;
+  r: number;
+  terrain: TerrainType;
+  siteKind: "industrial" | "wind" | "open-land" | "hydro" | "geothermal";
+  maxPeakW: number;
+  hydroSiteId?: string;
+}
 /** Legacy recorded territory readings retained for save history. */
 export interface TerritoryTick {
   demandW: number;
@@ -1472,6 +1483,8 @@ export interface GameType {
       price: number;
       legacy?: true;
     }[];
+    /** Immutable physical footprints, including empty retained property. */
+    legacyTiles?: LegacyTerritoryTile[];
     /** Physical purchases since schema 17; older land receipts retain every original cell. */
     tilePurchases?: {
       tileId: TerritoryTileId;
@@ -1490,6 +1503,19 @@ export interface GameType {
     landOwners?: Partial<
       Record<LandTerritoryId, { seat: string; name: string }>
     >;
+    /** Host-owned retained geometry; peer IDs alone cannot reconstruct another fleet. */
+    legacyTiles?: {
+      tile: LegacyTerritoryTile;
+      seat: string;
+      name: string;
+      facility?: {
+        name: FacilityOperatingType["name"];
+        fuel?: FuelNameType;
+        peakW: number;
+        peakWh?: number;
+        yearsToBuildLeft: number;
+      };
+    }[];
     tileOwners?: Partial<
       Record<TerritoryTileId, { seat: string; name: string }>
     >;

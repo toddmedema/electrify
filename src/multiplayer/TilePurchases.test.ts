@@ -339,8 +339,12 @@ it("restores only the published schema16 identity, preserving old whole-parcel r
   raw.rules =
     "coop-2-06e4afd05778c47de20788acd02787291d3f09456465a0a89ace5fbeadd2d018";
   raw.grids.forEach(
-    (grid: { territoryNetwork: { tilePurchases?: unknown } }) =>
-      delete grid.territoryNetwork.tilePurchases,
+    (grid: {
+      territoryNetwork: { tilePurchases?: unknown; legacyTiles?: unknown };
+    }) => {
+      delete grid.territoryNetwork.tilePurchases;
+      delete grid.territoryNetwork.legacyTiles;
+    },
   );
   const unchanged = JSON.stringify(raw);
   const restored = restoreWorld(raw, "schema17");

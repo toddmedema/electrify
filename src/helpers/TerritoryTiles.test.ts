@@ -16,6 +16,7 @@ import {
   landPurchaseQuote,
   purchaseLand,
   territoryBuildAvailability,
+  tilePurchaseQuote,
 } from "./Territories";
 import {
   assignTerritoryTiles,
@@ -23,8 +24,11 @@ import {
   facilityOnTile,
   getFacilityTile,
   getTerritoryTiles,
+  getTerritoryTile,
   ownsTerritoryTile,
 } from "./TerritoryTiles";
+import * as tileCatalogue from "./TerritoryTiles";
+import { territoryTileViews } from "./TerritoryMapState";
 import { acquisitionQuote, transferUtility } from "./Expansion";
 import type { GameType, StorageOperatingType, TerritoryTileId } from "../Types";
 
@@ -77,6 +81,7 @@ function retainedStorageSave() {
   expect(assignTerritoryTiles(game)).toBe(true);
   const raw = JSON.parse(JSON.stringify(serializeSave(game)));
   raw.schemaVersion = 15;
+  delete raw.game.territoryNetwork.legacyTiles;
   for (const facility of raw.game.facilities) delete facility.tileId;
   return { game, raw };
 }
@@ -280,6 +285,7 @@ it("gives retained pre-map overflow projects their own cells while rejecting mal
   const game = ready();
   const raw = JSON.parse(JSON.stringify(serializeSave(game)));
   raw.schemaVersion = 15;
+  delete raw.game.territoryNetwork.legacyTiles;
   for (const facility of raw.game.facilities) delete facility.tileId;
   const oil = raw.game.facilities.find(
     (facility: { fuel: string }) => facility.fuel === "Oil",
@@ -355,3 +361,125 @@ it("reports the selected tile's physical inventory and resize limit independentl
     maxPeakW: tile.maxPeakW,
   });
 });
+
+it("retains stable legacy property and its empty tower after an earlier plant is sold", () => {
+  const raw = JSON.parse(JSON.stringify(serializeSave(ready())));
+  raw.schemaVersion = 16;
+  delete raw.game.territoryNetwork.legacyTiles;
+  delete raw.game.territoryNetwork.tilePurchases;
+  const oil = raw.game.facilities.find(
+    (plant: { fuel: string }) => plant.fuel === "Oil",
+  );
+  for (const id of [100, 101])
+    raw.game.facilities.push({
+      ...oil,
+      id,
+      startingAssetId: undefined,
+      tileId: `champlain:legacy-${id}`,
+    });
+  let game = parseSave(raw)!.game;
+  const first = getTerritoryTile("champlain:legacy-100", game)!;
+  const second = getTerritoryTile("champlain:legacy-101", game)!;
+  expect(first).toMatchObject({ q: 6, r: -4 });
+  expect(second).toMatchObject({ q: 7, r: -4 });
+  game = cloneDeep(reducer(game, sellFacility(100)));
+  expect(getTerritoryTile(second.id, game)).toEqual(second);
+  expect(
+    territoryTileViews(game).find(({ tile }) => tile.id === first.id),
+  ).toMatchObject({ owned: true, developed: true, facility: undefined });
+  expect(tilePurchaseQuote(game, "frontier:6:-4")).toBeUndefined();
+  const resumed = parseSave(
+    JSON.parse(JSON.stringify(serializeSave(game))),
+  )!.game;
+  expect(getTerritoryTile(first.id, resumed)).toEqual(first);
+  expect(getTerritoryTile(second.id, resumed)).toEqual(second);
+  const replacement = GENERATORS(resumed, 20e6, [20], [500]).find(
+    ({ name }) => name === "Natural Gas CC",
+  )!;
+  const rebuilt = reducer(
+    resumed,
+    buildFacility({
+      facility: replacement,
+      financed: false,
+      territoryId: first.territoryId,
+      tileId: first.id,
+    }),
+  );
+  expect(facilityOnTile(rebuilt, first.id)?.name).toBe("Natural Gas CC");
+  expect(getTerritoryTile(second.id, rebuilt)).toEqual(second);
+  expect(
+    parseSave(JSON.parse(JSON.stringify(serializeSave(rebuilt)))),
+  ).not.toBeNull();
+  const forged = JSON.parse(JSON.stringify(serializeSave(resumed)));
+  forged.game.territoryNetwork.tilePurchases.push({
+    tileId: "frontier:6:-4",
+    minute: 0,
+    price: 3e6,
+  });
+  expect(parseSave(forged)).toBeNull();
+});
+
+it("checks locked catalogue tiles directly without enumerating the frontier", () => {
+  const game = ready();
+  const quote = wind(game);
+  const tile = availableTerritoryTiles(game, quote, "champlain")[0];
+  const catalogue = jest
+    .spyOn(tileCatalogue, "availableTerritoryTiles")
+    .mockImplementation(() => {
+      throw new Error("explicit tile must not enumerate the frontier");
+    });
+  try {
+    expect(
+      territoryBuildAvailability(game, quote, "champlain", tile.id),
+    ).toMatchObject({ buildable: true, tileId: tile.id, remaining: 1 });
+  } finally {
+    catalogue.mockRestore();
+  }
+});
+
+it("freezes overflow footprints while assigning a current starting fleet", () => {
+  const game = ready();
+  const oil = game.facilities.find((plant) => plant.fuel === "Oil")!;
+  for (let id = 100; id < 112; id++)
+    game.facilities.push({
+      ...oil,
+      id,
+      startingAssetId: undefined,
+      tileId: undefined,
+    });
+  expect(assignTerritoryTiles(game)).toBe(true);
+  expect(game.territoryNetwork!.legacyTiles!.length).toBeGreaterThan(0);
+  expect(
+    parseSave(JSON.parse(JSON.stringify(serializeSave(game)))),
+  ).not.toBeNull();
+});
+
+it.each(["missing", "empty", "moved", "duplicate", "invalid capacity"])(
+  "rejects %s retained property descriptors in a current save",
+  (change) => {
+    const raw = JSON.parse(JSON.stringify(serializeSave(ready())));
+    raw.schemaVersion = 16;
+    delete raw.game.territoryNetwork.legacyTiles;
+    delete raw.game.territoryNetwork.tilePurchases;
+    const oil = raw.game.facilities.find(
+      (plant: { fuel: string }) => plant.fuel === "Oil",
+    );
+    raw.game.facilities.push({
+      ...oil,
+      id: 100,
+      startingAssetId: undefined,
+      tileId: "champlain:legacy-100",
+    });
+    const migrated = parseSave(raw)!;
+    expect(migrated).not.toBeNull();
+    const current = JSON.parse(JSON.stringify(serializeSave(migrated.game)));
+    const state = current.game.territoryNetwork;
+    if (change === "missing") delete state.legacyTiles;
+    if (change === "empty") state.legacyTiles = [];
+    if (change === "moved") state.legacyTiles[0].q = -4;
+    if (change === "duplicate")
+      state.legacyTiles.push({ ...state.legacyTiles[0] });
+    if (change === "invalid capacity") state.legacyTiles[0].maxPeakW = -1;
+    expect(parseSave(current)).toBeNull();
+  },
+);

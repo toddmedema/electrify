@@ -3,6 +3,7 @@ import {
   getFacilityTile,
   hasTerritoryNetwork,
   getTerritoryTiles,
+  legacyTerritoryTiles,
   ownsTerritoryTile,
   createTerritoryTileOwnership,
   connectedPeerTerritoryTiles,
@@ -898,7 +899,8 @@ export function roomView(world: World, seatId: string): RoomView {
                 const tile = getFacilityTile(facility, grid);
                 if (
                   !tile ||
-                  !isLandTerritoryId(tile.territoryId) ||
+                  (!isLandTerritoryId(tile.territoryId) &&
+                    !tile.id.includes(":legacy-")) ||
                   !ownsTerritoryTile(grid, tile) ||
                   !visibleIds.has(tile.id)
                 )
@@ -1373,6 +1375,35 @@ function territoryGameForWorld(
     multiplayer: {
       ...world.grids[index].multiplayer!,
       tileOwners: sharedTileOwners({ ...world, grids }),
+      legacyTiles: grids.flatMap((grid, owner) =>
+        owner === index
+          ? []
+          : legacyTerritoryTiles(grid).map((tile) => {
+              const facility = grid.facilities.find(
+                (plant) => plant.tileId === tile.id,
+              );
+              return {
+                tile,
+                seat: world.seats[owner].id,
+                name: world.seats[owner].name,
+                ...(facility
+                  ? {
+                      facility: {
+                        name: facility.name,
+                        peakW: facility.peakW,
+                        yearsToBuildLeft: facility.yearsToBuildLeft,
+                        ...(facility.fuel !== undefined
+                          ? { fuel: facility.fuel }
+                          : {}),
+                        ...(facility.peakWh !== undefined
+                          ? { peakWh: facility.peakWh }
+                          : {}),
+                      },
+                    }
+                  : {}),
+              };
+            }),
+      ),
       landOwners: sharedLandOwners({ ...world, grids }),
       peers: world.grids[index].multiplayer?.peers?.map((peer) => {
         const other = world.seats.findIndex((seat) => seat.id === peer.id);
@@ -1489,6 +1520,7 @@ function worldOwnedTerritoryTiles(grid: GameType) {
   const owns = createTerritoryTileOwnership(grid);
   const tiles = new Map([
     ...getTerritoryTiles().map((tile) => [tile.id, tile] as const),
+    ...legacyTerritoryTiles(grid).map((tile) => [tile.id, tile] as const),
     ...(grid.territoryNetwork?.tilePurchases ?? []).flatMap(({ tileId }) => {
       const tile = getTerritoryTile(tileId, grid);
       return tile ? [[tile.id, tile] as const] : [];
@@ -1504,7 +1536,10 @@ function sharedTileOwners(
   return Object.fromEntries(
     world.grids.flatMap((grid, index) => {
       return worldOwnedTerritoryTiles(grid)
-        .filter((tile) => isLandTerritoryId(tile.territoryId))
+        .filter(
+          (tile) =>
+            isLandTerritoryId(tile.territoryId) || tile.id.includes(":legacy-"),
+        )
         .map((tile) => [
           tile.id,
           { seat: world.seats[index].id, name: world.seats[index].name },
@@ -1586,17 +1621,29 @@ function validSharedLand(world: World): boolean {
     )
   )
     return false;
+  // Grandfathered retained rights may overlap each other, but no new purchase may alias them.
+  const retainedCoordinates = new Set(
+    world.grids.flatMap((grid) => {
+      const purchases = new Set(
+        grid.territoryNetwork?.tilePurchases?.map(({ tileId }) => tileId),
+      );
+      return worldOwnedTerritoryTiles(grid)
+        .filter((tile) => !purchases.has(tile.id))
+        .map((tile) => `${tile.q},${tile.r}`);
+    }),
+  );
   const seen = new Set<string>();
   for (const grid of world.grids)
     for (const receipt of grid.territoryNetwork?.tilePurchases ?? []) {
       const tile = getFacilityTile({ tileId: receipt.tileId }, grid);
       if (
         !tile ||
-        seen.has(tile.id) ||
+        seen.has(`${tile.q},${tile.r}`) ||
+        retainedCoordinates.has(`${tile.q},${tile.r}`) ||
         retained.some(({ territoryId }) => territoryId === tile.territoryId)
       )
         return false;
-      seen.add(tile.id);
+      seen.add(`${tile.q},${tile.r}`);
     }
   return true;
 }

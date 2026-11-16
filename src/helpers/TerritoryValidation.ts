@@ -102,11 +102,12 @@ export function validTerritoryNetwork(
   if (
     !record(game.territoryNetwork) ||
     game.territoryNetwork.version !== 3 ||
-    Object.keys(game.territoryNetwork).length !== 4
+    Object.keys(game.territoryNetwork).length !== 5
   )
     return false;
   const state = game.territoryNetwork;
   if (
+    !Array.isArray(state.legacyTiles) ||
     !Array.isArray(state.tilePurchases) ||
     !Array.isArray(state.landPurchases) ||
     state.landPurchases.length > LAND_TERRITORIES.length ||
@@ -151,6 +152,61 @@ export function validTerritoryNetwork(
       )
     )
       return false;
+  }
+  const legacyIds = new Set<string>();
+  for (const [index, tile] of (state.legacyTiles ?? []).entries()) {
+    const suffix =
+      typeof tile?.id === "string" ? tile.id.split(":legacy-")[1] : undefined;
+    const identity = Number(suffix);
+    if (
+      !record(tile) ||
+      ![
+        "id",
+        "territoryId",
+        "q",
+        "r",
+        "terrain",
+        "siteKind",
+        "maxPeakW",
+        "hydroSiteId",
+      ].every((key) => key in tile || key === "hydroSiteId") ||
+      Object.keys(tile).some(
+        (key) =>
+          ![
+            "id",
+            "territoryId",
+            "q",
+            "r",
+            "terrain",
+            "siteKind",
+            "maxPeakW",
+            "hydroSiteId",
+          ].includes(key),
+      ) ||
+      ![
+        "champlain",
+        "valley-electric",
+        "ridge-electric",
+        "green-uplands",
+      ].includes(tile.territoryId) ||
+      !Number.isSafeInteger(identity) ||
+      identity < 0 ||
+      suffix !== String(identity) ||
+      tile.id !== `${tile.territoryId}:legacy-${identity}` ||
+      legacyIds.has(tile.id) ||
+      tile.q !== 6 + (index % 4) ||
+      tile.r !== -4 + Math.floor(index / 4) ||
+      !["industrial", "wind", "open-land", "hydro", "geothermal"].includes(
+        tile.siteKind,
+      ) ||
+      !["plains", "lake", "mountain", "ocean"].includes(tile.terrain) ||
+      !Number.isFinite(tile.maxPeakW) ||
+      tile.maxPeakW <= 0 ||
+      (tile.hydroSiteId !== undefined &&
+        (typeof tile.hydroSiteId !== "string" || !tile.hydroSiteId))
+    )
+      return false;
+    legacyIds.add(tile.id);
   }
   const purchased = new Set<string>();
   for (const receipt of state.tilePurchases ?? []) {
