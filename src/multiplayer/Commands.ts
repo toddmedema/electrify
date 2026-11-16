@@ -122,6 +122,7 @@ const buildFacility: Validator = (game, payload) => {
           game.timeline.map((t) => t.solarIrradianceWM2),
           game.timeline.map((t) => t.windOffshoreKph || 0),
           game.timeline.map((t) => t.windAirborneKph || 0),
+          territoryId,
         )
       : STORAGE(game, requested.peakWh);
   let quote = options.find(
@@ -155,7 +156,8 @@ const buildFacility: Validator = (game, payload) => {
 const GAME_COMMAND_VALIDATORS = {
   acquireLand: (game, payload) =>
     validLandPurchaseAction(game, payload) &&
-    (currentTick(game)?.cash ?? -1) >= landPurchaseQuote(game)!.price
+    (currentTick(game)?.cash ?? -1) >=
+      landPurchaseQuote(game, payload.territoryId)!.price
       ? { payload }
       : { error: "This land purchase is unavailable or unaffordable" },
   acceptPowerAgreement: (game, payload) =>

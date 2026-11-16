@@ -221,6 +221,46 @@ const migrations: readonly Migration[] = [
       },
     };
   },
+  // 14 -> 15: retain paid rights and their exact capital while allowing independent parcels.
+  (save) => {
+    if (!object(save.game)) return null;
+    const game = save.game;
+    if (game.territoryNetwork === undefined) return save;
+    if (
+      !object(game.territoryNetwork) ||
+      game.territoryNetwork.version !== 2 ||
+      Object.keys(game.territoryNetwork).length !== 3
+    )
+      return null;
+    if (
+      !Array.isArray(game.territoryNetwork.landPurchases) ||
+      game.territoryNetwork.landPurchases.length > 1 ||
+      game.territoryNetwork.landPurchases.some(
+        (receipt) =>
+          !object(receipt) || receipt.territoryId !== "green-uplands",
+      )
+    )
+      return null;
+    const multiplayer = object(game.multiplayer) ? game.multiplayer : undefined;
+    const { landOwner, ...retainedMultiplayer } = multiplayer ?? {};
+    return {
+      ...save,
+      game: {
+        ...game,
+        territoryNetwork: { ...game.territoryNetwork, version: 3 },
+        ...(multiplayer
+          ? {
+              multiplayer: {
+                ...retainedMultiplayer,
+                ...(landOwner !== undefined
+                  ? { landOwners: { "green-uplands": landOwner } }
+                  : {}),
+              },
+            }
+          : {}),
+      },
+    };
+  },
 ];
 
 /** Structure versions are independent of app releases and simulation compatibility. */

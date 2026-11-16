@@ -1995,7 +1995,7 @@ export const gameSlice = createSlice({
 
       if (isUtilityExpansionGame(state)) {
         state.territoryNetwork = {
-          version: 2,
+          version: 3,
           landPurchases: [],
           legacyConnections: [],
         };
@@ -2529,7 +2529,16 @@ export const gameSlice = createSlice({
         state,
         getTimeFromTimeline(state.date.minute, state.timeline)!.cash,
       );
-      logGameEvent(state, "BUILD", "Acquired Green Uplands land");
+      rebaseGameRetentionBaseline(state, expansionRetentionBaseline(state));
+      state.timeline = reforecastDemand(state, 1, [], [], [], undefined, true);
+      state.timeline = reforecastSupply(
+        state,
+        true,
+        TICK_MINUTES,
+        undefined,
+        true,
+      );
+      logGameEvent(state, "BUILD", "Acquired territory");
     });
     builder.addCase(acquireUtility, (state, action) => {
       applyAcquireUtility(state, action.payload);
@@ -2772,7 +2781,7 @@ export function previewFacilityBuild(
   const customers = now.customers;
   const existingIds = new Set(snapshot.facilities.map(({ id }) => id));
   const hydroSite = isConventionalHydro(facility)
-    ? getHydroAvailability(snapshot, facility.peakW).selected
+    ? getHydroAvailability(snapshot, facility.peakW, territoryId).selected
     : undefined;
   buildFacilityHelper(
     snapshot,
@@ -2902,9 +2911,15 @@ function applyBuildFacility(
     (state.date.year < IRON_AIR_AVAILABLE_YEAR || !isStorage(requested))
   )
     return false;
+  if (
+    hasTerritoryNetwork(state) &&
+    requested.name === "Enhanced Geothermal" &&
+    state.date.year < 2030
+  )
+    return false;
   const hydro = isConventionalHydro(requested);
   const hydroSite = hydro
-    ? getHydroAvailability(state, requested.peakW)
+    ? getHydroAvailability(state, requested.peakW, territoryId)
     : undefined;
   if (hydro && (state.date.year <= 1882 || hydroSite?.status !== "available"))
     return false;
@@ -2930,6 +2945,7 @@ function applyBuildFacility(
   // Recheck current state instead of trusting the shopping-card snapshot in the action. It keeps
   // a stale dialog action from claiming one more site after the last one was used.
   if (
+    !(hasTerritoryNetwork(state) && built.name === "Geothermal") &&
     !hydro &&
     viableLocationsRemaining !== undefined &&
     viableLocationsRemaining <= 0

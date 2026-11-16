@@ -1,12 +1,17 @@
 import { TICK_MINUTES } from "../Constants";
 import type { GameType } from "../Types";
-import { isTerritoryId } from "../data/Territories";
+import {
+  isTerritoryId,
+  isLandTerritoryId,
+  LAND_TERRITORIES,
+} from "../data/Territories";
 import { UTILITY_AREAS } from "../data/UtilityExpansion";
 import { isUtilityExpansionGame } from "./ExpansionContext";
 import {
   facilityTerritoryId,
   ownedTerritories,
   landPrice,
+  territorySiteKind,
 } from "./Territories";
 
 const record = (value: unknown): value is Record<string, unknown> =>
@@ -41,22 +46,27 @@ export function validTerritoryNetwork(game: GameType): boolean {
     );
   if (
     !record(game.territoryNetwork) ||
-    game.territoryNetwork.version !== 2 ||
+    game.territoryNetwork.version !== 3 ||
     Object.keys(game.territoryNetwork).length !== 3
   )
     return false;
   const state = game.territoryNetwork;
   if (
     !Array.isArray(state.landPurchases) ||
-    state.landPurchases.length > 1 ||
+    state.landPurchases.length > LAND_TERRITORIES.length ||
     !Array.isArray(state.legacyConnections) ||
     state.legacyConnections.length > 16
+  )
+    return false;
+  if (
+    new Set(state.landPurchases.map((receipt) => receipt.territoryId)).size !==
+    state.landPurchases.length
   )
     return false;
   for (const receipt of state.landPurchases) {
     if (
       !record(receipt) ||
-      receipt.territoryId !== "green-uplands" ||
+      !isLandTerritoryId(receipt.territoryId) ||
       !Number.isSafeInteger(receipt.minute) ||
       receipt.minute < 0 ||
       receipt.minute > game.date.minute ||
@@ -69,6 +79,7 @@ export function validTerritoryNetwork(game: GameType): boolean {
         (line) => line.corridorId === "vt-champlain-uplands",
       );
       if (
+        receipt.territoryId !== "green-uplands" ||
         !line ||
         line.minuteCreated !== receipt.minute ||
         line.buildCost !== receipt.price ||
@@ -78,7 +89,10 @@ export function validTerritoryNetwork(game: GameType): boolean {
     } else if (
       receipt.legacy !== undefined ||
       Object.keys(receipt).length !== 3 ||
-      !close(receipt.price, landPrice(game, receipt.minute))
+      !close(
+        receipt.price,
+        landPrice(game, receipt.minute, receipt.territoryId),
+      )
     )
       return false;
   }
@@ -97,6 +111,30 @@ export function validTerritoryNetwork(game: GameType): boolean {
       )
         return true;
       const id = facilityTerritoryId(facility);
+      // These parcels did not exist in earlier saves; every plant must fit its purchased rights.
+      if (id.startsWith("parcel-")) {
+        const territory = LAND_TERRITORIES.find((entry) => entry.id === id)!;
+        const purchase = state.landPurchases.find(
+          (receipt) => receipt.territoryId === id,
+        );
+        const specific = territorySiteKind(facility);
+        const kind =
+          territory.benefit === "general" &&
+          specific !== "hydro" &&
+          specific !== "geothermal"
+            ? "general"
+            : specific;
+        if (
+          !purchase ||
+          facility.minuteCreated < purchase.minute ||
+          !kind ||
+          territory.sites[kind].count === 0 ||
+          facility.peakW > territory.sites[kind].maxPeakW ||
+          game.facilities.filter((candidate) => candidate.territoryId === id)
+            .length > territory.sites[kind].count
+        )
+          return true;
+      }
       const provenance = Object.values(UTILITY_AREAS).find((area) =>
         area.facilities.some(
           ({ assetId }) => assetId === facility.startingAssetId,

@@ -1,3 +1,4 @@
+import { landCustomerMarket } from "./TerritoryCustomers";
 import {
   isStorage,
   type GameType,
@@ -92,6 +93,7 @@ export function validUtilityExpansion(game: GameType): boolean {
   }
   const pool =
     UTILITY_AREAS.champlain.addressablePool +
+    landCustomerMarket(game) +
     state.acquisitions.reduce(
       (sum, receipt) => sum + UTILITY_AREAS[receipt.targetId].addressablePool,
       0,

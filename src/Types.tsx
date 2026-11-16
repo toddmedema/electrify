@@ -1353,7 +1353,10 @@ export interface PeerSettlement {
 }
 export type UtilityId = "champlain" | "valley-electric" | "ridge-electric";
 export type UtilityTargetId = Exclude<UtilityId, "champlain">;
-export type TerritoryId = UtilityId | "green-uplands";
+export type LandTerritoryId =
+  | "green-uplands"
+  | `parcel-${0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 17}`;
+export type TerritoryId = UtilityId | LandTerritoryId;
 /** Legacy recorded territory readings retained for save history. */
 export interface TerritoryTick {
   demandW: number;
@@ -1395,7 +1398,7 @@ export interface UtilityExpansionState {
   }[];
 }
 export interface AcquireLandAction {
-  territoryId: "green-uplands";
+  territoryId: LandTerritoryId;
   quoteKey: string;
 }
 export interface AcquireUtilityAction {
@@ -1447,9 +1450,9 @@ export interface LegacyCampaignType {
 
 export interface GameType {
   territoryNetwork?: {
-    version: 2;
+    version: 3;
     landPurchases: {
-      territoryId: "green-uplands";
+      territoryId: LandTerritoryId;
       minute: number;
       price: number;
       legacy?: true;
@@ -1463,6 +1466,9 @@ export interface GameType {
     seat: string;
     /** Shared finite land claim, projected by the host from all company receipts. */
     landOwner?: { seat: string; name: string };
+    landOwners?: Partial<
+      Record<LandTerritoryId, { seat: string; name: string }>
+    >;
     pricePerMWh?: number;
     /** Set by the host at the rollover where this company's run ends. */
     ending?: CompanyOutcomeType;

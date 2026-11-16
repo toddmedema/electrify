@@ -1,3 +1,4 @@
+import { landCustomerProfiles } from "./TerritoryCustomers";
 import type { GameType } from "../Types";
 import {
   UTILITY_AREAS,
@@ -18,12 +19,13 @@ export interface CombinedUtilityDemandProfile {
  * The single evolving customer count and Burlington weather are applied by the demand owner.
  */
 export function combinedUtilityDemandProfile(
-  game: Pick<GameType, "utilityExpansion">,
+  game: Pick<GameType, "utilityExpansion" | "territoryNetwork">,
 ): CombinedUtilityDemandProfile {
   const owned = new Set(
     game.utilityExpansion?.acquisitions.map(({ targetId }) => targetId),
   );
   const definitions = [
+    ...landCustomerProfiles(game),
     UTILITY_AREAS.champlain,
     ...UTILITY_TARGETS.filter(({ id }) => owned.has(id)).map(
       ({ id }) => UTILITY_AREAS[id],

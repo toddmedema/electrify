@@ -818,7 +818,7 @@ export function parseSave(raw: unknown): SaveGameType | null {
   )
     return null;
   if (!transmissionEnabled && transmission?.lines.length) return null;
-  if (game.territoryNetwork?.version === 2) {
+  if (game.territoryNetwork?.version === 3) {
     const legacy = game.territoryNetwork.legacyConnections;
     if (
       !Array.isArray(legacy) ||

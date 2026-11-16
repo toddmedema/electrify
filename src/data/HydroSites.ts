@@ -1,6 +1,16 @@
+import {
+  LAND_TERRITORIES,
+  availableTerritorySpecialSites,
+  territoryHydroSiteId,
+} from "./Territories";
 import { isUtilityExpansionGame } from "../helpers/ExpansionContext";
 import { UTILITY_AREAS, UTILITY_TARGETS } from "./UtilityExpansion";
-import type { GameType, LocationType, ScenarioFacilityType } from "../Types";
+import type {
+  GameType,
+  LocationType,
+  ScenarioFacilityType,
+  TerritoryId,
+} from "../Types";
 import { LOCATIONS } from "../Constants";
 import catalogue from "./HydroSiteCatalogue.json";
 import {
@@ -31,7 +41,19 @@ export interface HydroInventory {
 }
 export const HYDRO_SITES: Readonly<Record<string, HydroSite>> =
   Object.fromEntries(
-    [...catalogue.sites, ...LEGACY_HYDRO_SITES].map((site) => [site.id, site]),
+    [
+      ...catalogue.sites,
+      ...LEGACY_HYDRO_SITES,
+      ...LAND_TERRITORIES.filter(
+        (territory) => territory.benefit === "hydro",
+      ).map((territory) => ({
+        id: territoryHydroSiteId(territory.id),
+        name: "Fictional valley hydro development site",
+        maxPeakW: territory.sites.hydro.maxPeakW,
+        lat: 44.4759,
+        lon: -73.2121,
+      })),
+    ].map((site) => [site.id, site]),
   );
 export const HYDRO_INVENTORIES: Record<string, HydroInventory> = {
   ...(catalogue.inventories as Record<string, HydroInventory>),
@@ -54,6 +76,7 @@ type HydroState = Pick<
   | "scenarioId"
   | "customScenario"
   | "utilityExpansion"
+  | "territoryNetwork"
 > & { date?: Pick<GameType["date"], "year"> };
 /**
  * The most sites one location offers for new construction: its largest. A longer researched list
@@ -173,7 +196,11 @@ export function bestFitHydroSite(
     ? sites.filter((site) => site.maxPeakW >= peakW).sort(compareHydroSites)[0]
     : undefined;
 }
-export function getHydroAvailability(state: HydroState, peakW: number) {
+export function getHydroAvailability(
+  state: HydroState,
+  peakW: number,
+  territoryId?: TerritoryId,
+) {
   const inventory = resolveHydroInventory(
     state.location,
     getHydroInventoryKey(state),
@@ -182,10 +209,14 @@ export function getHydroAvailability(state: HydroState, peakW: number) {
   state.facilities.forEach((f) => {
     if (isConventionalHydro(f) && f.hydroSiteId) used.add(f.hydroSiteId);
   });
-  const sites =
-    (inventory && offeredHydroSiteIds(inventory))
-      ?.map((id) => HYDRO_SITES[id])
-      .filter(Boolean) || [];
+  const frontier = isUtilityExpansionGame(state) && !!state.utilityExpansion;
+  const sites = frontier
+    ? availableTerritorySpecialSites(state, "hydro", territoryId).map(
+        (territory) => HYDRO_SITES[territoryHydroSiteId(territory.id)],
+      )
+    : (inventory && offeredHydroSiteIds(inventory))
+        ?.map((id) => HYDRO_SITES[id])
+        .filter(Boolean) || [];
   const remaining = sites
     .filter(
       (site) =>
@@ -204,10 +235,11 @@ export function getHydroAvailability(state: HydroState, peakW: number) {
     | "empty"
     | "exhausted"
     | "too-large" =
-    state.location.resources?.hydro === false ||
-    inventory?.newConstructionAllowed === false
+    !frontier &&
+    (state.location.resources?.hydro === false ||
+      inventory?.newConstructionAllowed === false)
       ? "prohibited"
-      : !inventory || inventory.status === "unresearched"
+      : !frontier && (!inventory || inventory.status === "unresearched")
         ? "unavailable"
         : !sites.length
           ? "empty"
@@ -309,6 +341,11 @@ export function validHydroClaims(state: HydroState): boolean {
       !Array.isArray(state.commissionedHydroSiteIds)
     )
       return false;
+    if (
+      state.territoryNetwork &&
+      !Array.isArray(state.territoryNetwork.landPurchases)
+    )
+      return false;
     const owned = new Set(
       state.utilityExpansion.acquisitions.map(({ targetId }) => targetId),
     );
@@ -324,6 +361,23 @@ export function validHydroClaims(state: HydroState): boolean {
           resolveHydroInventory(definition.location)?.siteIds ?? [],
       ),
     );
+    for (const territory of LAND_TERRITORIES.filter(
+      (territory) =>
+        territory.benefit === "hydro" &&
+        state.territoryNetwork?.landPurchases.some(
+          (receipt) => receipt.territoryId === territory.id,
+        ),
+    ))
+      allowed.add(territoryHydroSiteId(territory.id));
+    if (
+      state.facilities.some(
+        (facility) =>
+          facility.hydroSiteId?.startsWith("scenario-116-parcel-") &&
+          facility.hydroSiteId !==
+            territoryHydroSiteId(facility.territoryId ?? "champlain"),
+      )
+    )
+      return false;
     return validHydroClaimSet(state, allowed);
   }
   if (

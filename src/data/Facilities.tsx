@@ -1,3 +1,5 @@
+import { availableTerritorySpecialSites } from "./Territories";
+import { isUtilityExpansionGame } from "../helpers/ExpansionContext";
 import { customEventContext } from "../helpers/CustomScenarioEvents";
 import { FACILITY_FUELS } from "./FacilityFuels";
 import { getHydroAvailability } from "./HydroSites";
@@ -15,7 +17,12 @@ import { DIFFICULTIES } from "../Constants";
 import { costBetween } from "../helpers/Math";
 import { facilityModifier, modScaledValue } from "../helpers/ScenarioMod";
 import { applyLegacyGeneratorEra, applyLegacyStorageEra } from "./LegacyEra";
-import { GameType, GeneratorShoppingType, StorageShoppingType } from "../Types";
+import {
+  GameType,
+  GeneratorShoppingType,
+  StorageShoppingType,
+  TerritoryId,
+} from "../Types";
 import {
   getAirborneWindCapacityFactor,
   getOffshoreWindCapacityFactor,
@@ -291,6 +298,7 @@ export function GENERATORS(
   irradiancesWM2: number[],
   offshoreWindSpeedsKph: number[] = [],
   airborneWindSpeedsKph: number[] = [],
+  territoryId?: TerritoryId,
 ) {
   const magnitude = log10(peakW) - 6; // 0 = 1MW, 4 = 10GW (+1 for each 10x)
   const year = state.date.year;
@@ -342,17 +350,17 @@ export function GENERATORS(
     return fee;
   };
 
-  const hydroAvailability = getHydroAvailability(state, peakW);
+  const hydroAvailability = getHydroAvailability(state, peakW, territoryId);
   const hydroLocationsRemaining = hydroAvailability.remaining.length;
-  const geothermalLocations = getViableLocationCount(
-    state.location,
-    "Geothermal",
-  );
-  const geothermalLocationsRemaining = getViableLocationsRemaining(
-    state.location,
-    state.facilities,
-    "Geothermal",
-  );
+  const frontierGeothermal =
+    state.utilityExpansion && isUtilityExpansionGame(state)
+      ? availableTerritorySpecialSites(state, "geothermal", territoryId).length
+      : undefined;
+  const geothermalLocations =
+    frontierGeothermal ?? getViableLocationCount(state.location, "Geothermal");
+  const geothermalLocationsRemaining =
+    frontierGeothermal ??
+    getViableLocationsRemaining(state.location, state.facilities, "Geothermal");
   const enhancedGeothermalCostPerW = Math.max(
     3,
     5.5 * pow(3 / 5.5, (year - 2028) / 7),
@@ -761,7 +769,7 @@ export function GENERATORS(
       // $4,015/kW in 2024, although its small project sample makes this series volatile.
       peakW,
       viableLocationsRemaining: geothermalLocationsRemaining,
-      maxPeakW: 800000000,
+      maxPeakW: frontierGeothermal !== undefined ? 25e6 : 800000000,
       // ~800MW, except for one outlier - https://en.wikipedia.org/wiki/List_of_largest_power_stations#Geothermal
       btuPerWh: 0,
       annualOperatingCost: fixedOperatingCost(peakW, 150.6),

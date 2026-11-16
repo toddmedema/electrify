@@ -1,4 +1,8 @@
 import {
+  landTransferredCustomerTotal,
+  landCustomerMarket,
+} from "./TerritoryCustomers";
+import {
   connectionAgreements,
   compareAgreementDispatchPriority,
   agreementRate,
@@ -73,11 +77,12 @@ export function ownedUtility(
 }
 /** Immutable transfer receipts extend the one company's retention benchmark. */
 export function expansionRetentionBaseline(
-  game: Pick<GameType, "utilityExpansion">,
+  game: Pick<GameType, "utilityExpansion" | "territoryNetwork">,
   beforeMinute = Infinity,
 ): number {
   return (
     UTILITY_AREAS.champlain.customers +
+    landTransferredCustomerTotal(game, beforeMinute) +
     (game.utilityExpansion?.acquisitions.reduce(
       (sum, receipt) =>
         sum +
@@ -380,6 +385,7 @@ export function transferUtility(game: GameType, value: unknown): boolean {
   });
   game.customerMarketSize =
     UTILITY_AREAS.champlain.addressablePool +
+    landCustomerMarket(game) +
     game.utilityExpansion.acquisitions.reduce(
       (sum, receipt) => sum + UTILITY_AREAS[receipt.targetId].addressablePool,
       0,

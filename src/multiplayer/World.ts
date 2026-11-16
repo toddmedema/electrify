@@ -477,9 +477,15 @@ function applyCommandOnce(
     if (!isGameCommand(name)) return "That game action is unavailable";
     if (
       name === "acquireLand" &&
-      world.grids.some((grid) => grid.territoryNetwork?.landPurchases.length)
+      world.grids.some((grid) =>
+        grid.territoryNetwork?.landPurchases.some(
+          (receipt) =>
+            receipt.territoryId ===
+            (command.payload as { territoryId?: unknown })?.territoryId,
+        ),
+      )
     )
-      return "Green Uplands is already owned by another company";
+      return "This territory is already owned by another company";
     const validation = validateGameCommand(game, name, command.payload);
     if ("error" in validation) return validation.error;
     if (
@@ -834,14 +840,14 @@ export function roomView(world: World, seatId: string): RoomView {
     results: Object.keys(world.outcomes).length
       ? companyResults(world)
       : undefined,
-    landOwner: (() => {
-      const owner = world.grids.findIndex(
-        (grid) => grid.territoryNetwork?.landPurchases.length,
-      );
-      return owner < 0
-        ? undefined
-        : { seat: world.seats[owner].id, name: world.seats[owner].name };
-    })(),
+    landOwners: Object.fromEntries(
+      world.grids.flatMap((grid, index) =>
+        (grid.territoryNetwork?.landPurchases ?? []).map((receipt) => [
+          receipt.territoryId,
+          { seat: world.seats[index].id, name: world.seats[index].name },
+        ]),
+      ),
+    ),
     clock: {
       activeSpeed: world.speed,
       selectedSpeed: world.selectedSpeeds[seatId],
@@ -1273,9 +1279,14 @@ function upgradeTerritoryWorld(value: unknown): unknown {
   if (
     !old ||
     old.schema !== 3 ||
-    old.gameSchema !== 13 ||
-    old.rules !==
-      "coop-2-34d99333d49691071b390dc49bfe6c73e43562c61b9fcbf7974f5996b10deaca" ||
+    !(
+      (old.gameSchema === 13 &&
+        old.rules ===
+          "coop-2-34d99333d49691071b390dc49bfe6c73e43562c61b9fcbf7974f5996b10deaca") ||
+      (old.gameSchema === 14 &&
+        old.rules ===
+          "coop-2-b4c8f4641c919057a7b569242464c24e26bcec444ef68954be2796b7734bbbb8")
+    ) ||
     !Array.isArray(old.grids) ||
     !old.grids.every(
       (grid) =>
@@ -1285,7 +1296,10 @@ function upgradeTerritoryWorld(value: unknown): unknown {
     return value;
   const result = cloneDeep(old) as World;
   for (let i = 0; i < result.grids.length; i++) {
-    const upgraded = upgradeSave({ schemaVersion: 13, game: result.grids[i] });
+    const upgraded = upgradeSave({
+      schemaVersion: old.gameSchema,
+      game: result.grids[i],
+    });
     if (!upgraded) return value;
     result.grids[i] = upgraded.game as GameType;
   }
@@ -1297,9 +1311,16 @@ function validSharedLand(world: World): boolean {
   const owners = world.grids.flatMap(
     (grid) => grid.territoryNetwork?.landPurchases ?? [],
   );
-  // Pre-pooling maps were company-local. Keep every migrated right; all new claims are exclusive.
-  return (
-    owners.length <= 1 || owners.every((receipt) => receipt.legacy === true)
+  // Preserve old paid duplicate development rights, while every new parcel is exclusive.
+  return [...new Set(owners.map((receipt) => receipt.territoryId))].every(
+    (id) => {
+      const claims = owners.filter((receipt) => receipt.territoryId === id);
+      return (
+        claims.length <= 1 ||
+        (id === "green-uplands" &&
+          claims.every((receipt) => receipt.legacy === true))
+      );
+    },
   );
 }
 

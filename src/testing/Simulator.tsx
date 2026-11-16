@@ -84,7 +84,11 @@ export type InitialBuildType = InitialBuildBaseType &
   ({ peakW: number; peakWh?: never } | { peakWh: number; peakW?: never });
 
 export type ScheduledSimActionType =
-  | { month: number; type: "land" }
+  | {
+      month: number;
+      type: "land";
+      territoryId?: import("../Types").LandTerritoryId;
+    }
   | { month: number; type: "agreement"; blockId: string }
   | {
       month: number;
@@ -513,7 +517,7 @@ export function runSimulation(options: SimOptionsType): SimResultType {
         const previousIds = new Set(state.facilities.map(({ id }) => id));
         switch (action.type) {
           case "land": {
-            const quote = landPurchaseQuote(state);
+            const quote = landPurchaseQuote(state, action.territoryId);
             if (!quote) throw new Error("No land available");
             state = cloneDeep(
               gameReducer(
