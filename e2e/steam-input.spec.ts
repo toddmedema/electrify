@@ -1098,10 +1098,11 @@ test("controller reviews, cancels and confirms a utility acquisition", async ({
     }),
   );
   await input(page, "confirm");
-  const dialog = page.getByRole("dialog");
-  const line = page
-    .locator(".facilities:visible")
-    .getByRole("region", { name: "Selected territory" });
+  const dialog = page.getByRole("dialog", {
+    name: "Acquire Ridge Electric?",
+    exact: true,
+  });
+  const line = page.locator(".tileWorkspaceSurface");
   const acquire = line.getByRole("button", {
     name: "Acquire Ridge Electric",
     exact: true,
