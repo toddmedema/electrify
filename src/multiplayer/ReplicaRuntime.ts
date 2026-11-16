@@ -15,6 +15,12 @@ import { ViewPublication } from "./ViewPublication";
 const MAX_BUFFERED_RECORDS = 1024;
 const MAX_BUFFERED_BYTES = 4 * 1024 * 1024;
 
+interface VerifyBoundary {
+  index: number;
+  bytes: ReturnType<typeof canonicalWorldBytes>;
+  generation: number;
+}
+
 /** Serial worker-owned replay, independent of transport and shell command state. */
 export class ReplicaRuntime {
   private replica = new Replica();
@@ -30,6 +36,7 @@ export class ReplicaRuntime {
   private earlyRecords = 0;
   private earlyBytes = 0;
   private pendingDigests = 0;
+  private skippedBoundary?: VerifyBoundary;
   private verified?: { index: number; hash: string };
   private lastResync = -Infinity;
   private publication = new ViewPublication();
@@ -53,6 +60,7 @@ export class ReplicaRuntime {
       this.installing = true;
       this.state = "waiting";
       this.generation++;
+      this.skippedBoundary = undefined;
       this.earlyRecords = this.earlyBytes = 0;
     }
     if (request.kind === "records" && this.state !== "live") {
@@ -160,6 +168,7 @@ export class ReplicaRuntime {
       if (record.t === "verify") this.capture();
       if (record.t === "fault") {
         this.state = "stopped";
+        this.skippedBoundary = undefined;
         this.report(record.message);
         break;
       }
@@ -173,10 +182,19 @@ export class ReplicaRuntime {
   }
 
   private capture() {
-    if (this.pendingDigests >= 2) return;
-    const bytes = canonicalWorldBytes(this.replica.world);
-    const index = this.replica.applied;
-    const generation = this.generation;
+    const boundary = {
+      bytes: canonicalWorldBytes(this.replica.world),
+      index: this.replica.applied,
+      generation: this.generation,
+    };
+    if (this.pendingDigests >= 2) {
+      this.skippedBoundary = boundary;
+      return;
+    }
+    this.hashBoundary(boundary);
+  }
+
+  private hashBoundary({ index, bytes, generation }: VerifyBoundary) {
     this.pendingDigests++;
     void worldDigest(bytes, this.digest)
       .then(
@@ -188,13 +206,20 @@ export class ReplicaRuntime {
           }
         },
         (error) => {
-          if (generation === this.generation)
+          if (generation === this.generation && this.state === "live")
             this.fail(
               error instanceof Error ? error.message : "Replica hash failed",
             );
         },
       )
-      .finally(() => this.pendingDigests--);
+      .finally(() => {
+        this.pendingDigests--;
+        const skipped = this.skippedBoundary;
+        if (!skipped || this.pendingDigests >= 2) return;
+        this.skippedBoundary = undefined;
+        if (skipped.generation === this.generation && this.state === "live")
+          this.hashBoundary(skipped);
+      });
   }
 
   private requestViews(options?: Parameters<ViewPublication["request"]>[2]) {
@@ -237,6 +262,7 @@ export class ReplicaRuntime {
     this.state = "waiting";
     this.installing = false;
     this.generation++;
+    this.skippedBoundary = undefined;
     clearTimeout(this.viewTimer);
     if (request?.kind === "records" && !this.matchId) {
       this.matchId = request.matchId;

@@ -450,6 +450,92 @@ test("a pre-consumption rejection resets the pending sequence and a failed recor
   }
 });
 
+test.each([false, true])(
+  "a failed replica startup can retry a same-stream baseline queued=%s",
+  async (queued) => {
+    const f = fixture();
+    try {
+      const error = new Error("Replica startup failed");
+      let reject!: (error: Error) => void;
+      if (queued)
+        f.replicaFactory.mockImplementationOnce(
+          () =>
+            new Promise<Worker>((_resolve, fail) => {
+              reject = fail;
+            }),
+        );
+      else f.replicaFactory.mockRejectedValueOnce(error);
+      await f.start();
+      expect(f.guest.getSnapshot().synchronizing).toBe(true);
+      if (!queued) expect(f.guest.getSnapshot().error).toBe(error.message);
+      if (queued) expect(f.replicaFactory).toHaveBeenCalledTimes(1);
+      const baseline = f.source().baseline();
+      f.event("guest", {
+        kind: "message",
+        sender: "host",
+        payload: { kind: "baseline", ...baseline },
+      });
+      if (queued) reject(error);
+      await flush();
+      expect(f.replicaFactory).toHaveBeenCalledTimes(2);
+      expect(f.guest.getSnapshot()).toMatchObject({
+        synchronizing: false,
+        view: { matchId: baseline.matchId, epoch: baseline.epoch },
+      });
+      const command = f.guest.submit({ kind: "rate", value: 0.12 });
+      await flush();
+      jest.advanceTimersByTime(100);
+      await flush();
+      await command;
+      expect(f.guest.getSnapshot().view?.game?.dollarsPerkWh).toBe(0.12);
+    } finally {
+      f.dispose();
+    }
+  },
+);
+
+test("a late obsolete startup rejection cannot clear a newer replica worker", async () => {
+  const f = fixture();
+  let reject!: (error: Error) => void;
+  try {
+    f.replicaFactory.mockImplementationOnce(
+      () =>
+        new Promise<Worker>((_resolve, fail) => {
+          reject = fail;
+        }),
+    );
+    await f.start();
+    expect(f.replicaFactory).toHaveBeenCalledTimes(1);
+    const previous = f.source().baseline();
+    const baseline = {
+      ...previous,
+      epoch: "new-epoch",
+      world: { ...previous.world, epoch: "new-epoch" },
+    };
+    f.event("guest", {
+      kind: "message",
+      sender: "host",
+      payload: { kind: "baseline", ...baseline },
+    });
+    await flush();
+    expect(f.replicaFactory).toHaveBeenCalledTimes(2);
+    expect(f.guest.getSnapshot()).toMatchObject({
+      synchronizing: false,
+      view: { epoch: "new-epoch" },
+    });
+    reject(new Error("Obsolete startup failed"));
+    await flush();
+    expect(f.guest.getSnapshot()).toMatchObject({
+      synchronizing: false,
+      error: undefined,
+      view: { epoch: "new-epoch" },
+    });
+    expect(f.replicaWorker.terminate).not.toHaveBeenCalled();
+  } finally {
+    f.dispose();
+  }
+});
+
 test("a failed replica worker is replaced for a same-stream recovery baseline", async () => {
   const f = fixture();
   const replacementPosts: ReplicaRequest[] = [];

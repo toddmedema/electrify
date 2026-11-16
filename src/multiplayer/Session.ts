@@ -724,8 +724,14 @@ export class MultiplayerSession {
         }
       })
       .catch((error: Error) => {
-        if (generation === this.replicaGeneration)
+        if (generation === this.replicaGeneration) {
+          if (!this.replica) {
+            this.replicaOpening = undefined;
+            this.replicaQueuedRecords -= records;
+            this.replicaQueuedBytes -= bytes;
+          }
           this.update({ synchronizing: true, error: error.message });
+        }
       });
   }
   private requestReplicaResync(reason: string) {

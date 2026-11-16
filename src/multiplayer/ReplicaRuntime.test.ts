@@ -131,6 +131,119 @@ test("verify bytes are captured before later records in the same batch and only 
   );
 });
 
+function deferredDigests() {
+  const captures: {
+    bytes: Uint8Array<ArrayBuffer>;
+    resolve: (hash: ArrayBuffer) => void;
+    reject: (error: Error) => void;
+  }[] = [];
+  const f = fixture(
+    undefined,
+    (bytes) =>
+      new Promise<ArrayBuffer>((resolve, reject) => {
+        captures.push({ bytes, resolve, reject });
+      }),
+  );
+  const settle = async () => {
+    for (let i = 0; i < 10; i++) await Promise.resolve();
+  };
+  return { ...f, captures, settle };
+}
+
+test("digest backpressure retains only the latest paused verify boundary before later mutations", async () => {
+  const f = deferredDigests();
+  await f.install();
+  for (const value of [0.1, 0.11, 0.12]) {
+    command(f.source, "1", { kind: "rate", value });
+    f.source.verify();
+  }
+  const index = f.source.index;
+  const bytes = canonicalWorldBytes(f.source.world);
+  command(f.source, "1", { kind: "rate", value: 0.13 });
+  await f.replay();
+  expect(f.source.world.paused).toBe(true);
+  expect(f.captures).toHaveLength(2);
+  f.captures[1].resolve(await digest(f.captures[1].bytes));
+  await f.settle();
+  expect(f.captures).toHaveLength(3);
+  expect(f.captures[2].bytes).toEqual(bytes);
+  expect(f.captures[2].bytes).not.toEqual(canonicalWorldBytes(f.source.world));
+  f.captures[2].resolve(await digest(f.captures[2].bytes));
+  await f.settle();
+  expect(f.responses.at(-1)).toMatchObject({
+    kind: "progress",
+    state: "live",
+    applied: f.source.index,
+    verified: { index, hash: await worldDigest(bytes, digest) },
+  });
+  f.captures[0].resolve(await digest(f.captures[0].bytes));
+  await f.settle();
+  expect(f.responses.at(-1)).toMatchObject({ verified: { index } });
+  expect(f.captures).toHaveLength(3);
+});
+
+test("an obsolete digest completion frees a slot for the current baseline's retained boundary", async () => {
+  const f = deferredDigests();
+  await f.install();
+  for (const value of [0.1, 0.11]) {
+    command(f.source, "1", { kind: "rate", value });
+    f.source.verify();
+  }
+  await f.replay();
+  command(f.source, "1", { kind: "rate", value: 0.12 });
+  f.source.drain();
+  const baseline = f.source.baseline();
+  await f.runtime.receive({ kind: "baseline", baseline, seat: "1" });
+  await f.replay();
+  const bytes = canonicalWorldBytes(f.source.world);
+  const index = f.source.index;
+  expect(f.captures).toHaveLength(2);
+  f.captures[0].resolve(await digest(f.captures[0].bytes));
+  await f.settle();
+  expect(f.captures).toHaveLength(3);
+  expect(f.captures[2].bytes).toEqual(bytes);
+  f.captures[1].reject(new Error("Obsolete digest failed"));
+  f.captures[2].resolve(await digest(f.captures[2].bytes));
+  await f.settle();
+  expect(f.responses.at(-1)).toMatchObject({
+    kind: "progress",
+    state: "live",
+    verified: { index, hash: await worldDigest(bytes, digest) },
+  });
+  expect(f.responses.some((r) => r.kind === "resync")).toBe(false);
+  expect(f.captures).toHaveLength(3);
+});
+
+test.each(["fault", "resync"])(
+  "a %s discards retained verify bytes and ignores late digest failures",
+  async (ending) => {
+    const f = deferredDigests();
+    await f.install();
+    for (const value of [0.1, 0.11]) {
+      command(f.source, "1", { kind: "rate", value });
+      f.source.verify();
+    }
+    await f.replay();
+    if (ending === "fault") {
+      f.source.fault("Simulation stopped");
+      await f.replay();
+    } else
+      await f.runtime.receive({
+        kind: "records",
+        matchId: "match",
+        epoch: "epoch",
+        from: f.source.index + 2,
+        records: [{ t: "verify" }],
+      });
+    const before = [...f.responses];
+    for (const capture of f.captures)
+      capture.reject(new Error("Late digest failed"));
+    await f.settle();
+    expect(f.responses).toEqual(before);
+    expect(f.captures).toHaveLength(2);
+  },
+);
+
 test.each(["gap", "epoch", "record", "empty"])(
   "a %s violation requests recovery, discards records, then accepts a new baseline",
   async (violation) => {
