@@ -52,8 +52,10 @@ it.each(["generator", "storage"] as const)(
       "green-uplands",
     );
     const home = computeOutlook("buildImpact", snapshot, facility);
-    if (kind === "generator") expect(expected).not.toEqual(home);
-    else expect(expected).toEqual(home);
+    expect(expected).toBeDefined();
+    expect(JSON.stringify(expected) === JSON.stringify(home)).toBe(
+      kind === "storage",
+    );
     const result = await new Promise<OutlookReply>((resolve) => {
       postMessage.mockImplementationOnce(resolve);
       const request: OutlookRequest = {
