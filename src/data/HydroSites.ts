@@ -5,11 +5,13 @@ import {
 } from "./Territories";
 import { isUtilityExpansionGame } from "../helpers/ExpansionContext";
 import { UTILITY_AREAS, UTILITY_TARGETS } from "./UtilityExpansion";
+import { getAuthoredTerritoryTile } from "./TerritoryTiles";
 import type {
   GameType,
   LocationType,
   ScenarioFacilityType,
   TerritoryId,
+  TerritoryTileId,
 } from "../Types";
 import { LOCATIONS } from "../Constants";
 import catalogue from "./HydroSiteCatalogue.json";
@@ -200,6 +202,7 @@ export function getHydroAvailability(
   state: HydroState,
   peakW: number,
   territoryId?: TerritoryId,
+  tileId?: TerritoryTileId,
 ) {
   const inventory = resolveHydroInventory(
     state.location,
@@ -210,10 +213,15 @@ export function getHydroAvailability(
     if (isConventionalHydro(f) && f.hydroSiteId) used.add(f.hydroSiteId);
   });
   const frontier = isUtilityExpansionGame(state) && !!state.utilityExpansion;
+  const frontierTile =
+    tileId === undefined ? undefined : getAuthoredTerritoryTile(tileId);
   const sites = frontier
-    ? availableTerritorySpecialSites(state, "hydro", territoryId).map(
-        (territory) => HYDRO_SITES[territoryHydroSiteId(territory.id)],
-      )
+    ? availableTerritorySpecialSites(state, "hydro", territoryId)
+        .map((territory) => HYDRO_SITES[territoryHydroSiteId(territory.id)])
+        .filter(
+          (site) =>
+            tileId === undefined || frontierTile?.hydroSiteId === site.id,
+        )
     : (inventory && offeredHydroSiteIds(inventory))
         ?.map((id) => HYDRO_SITES[id])
         .filter(Boolean) || [];

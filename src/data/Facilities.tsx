@@ -22,6 +22,7 @@ import {
   GeneratorShoppingType,
   StorageShoppingType,
   TerritoryId,
+  TerritoryTileId,
 } from "../Types";
 import {
   getAirborneWindCapacityFactor,
@@ -41,6 +42,14 @@ import { getScenario } from "./Scenarios";
 import { applyDefaultResilience } from "../helpers/Hazards";
 import { pow } from "../helpers/Pow";
 import { exp, log10 } from "../helpers/Libm";
+import {
+  availableTerritoryTiles,
+  hasTerritoryNetwork,
+} from "../helpers/TerritoryTiles";
+import {
+  getTerrainModifiers,
+  isOceanWindTile,
+} from "../helpers/TerrainModifiers";
 
 /**
  * What a dollar in the tables below is worth by the time the game reaches this month. The tables
@@ -299,6 +308,7 @@ export function GENERATORS(
   offshoreWindSpeedsKph: number[] = [],
   airborneWindSpeedsKph: number[] = [],
   territoryId?: TerritoryId,
+  tileId?: TerritoryTileId,
 ) {
   const magnitude = log10(peakW) - 6; // 0 = 1MW, 4 = 10GW (+1 for each 10x)
   const year = state.date.year;
@@ -350,7 +360,12 @@ export function GENERATORS(
     return fee;
   };
 
-  const hydroAvailability = getHydroAvailability(state, peakW, territoryId);
+  const hydroAvailability = getHydroAvailability(
+    state,
+    peakW,
+    territoryId,
+    tileId,
+  );
   const hydroLocationsRemaining = hydroAvailability.remaining.length;
   const frontierGeothermal =
     state.utilityExpansion && isUtilityExpansionGame(state)
@@ -818,6 +833,23 @@ export function GENERATORS(
   const difficulty = DIFFICULTIES[state.difficulty];
   const inflation = getCostInflation(state);
   generators = generators.filter((g: GeneratorShoppingType) => {
+    const selectedTileId =
+      tileId ??
+      (hasTerritoryNetwork(state) && state.utilityExpansion
+        ? availableTerritoryTiles(state, g, territoryId ?? "champlain")[0]?.id
+        : undefined);
+    const terrain = getTerrainModifiers(state, g.fuel, selectedTileId);
+    if (g.fuel === "Wind" && terrain.onshoreWindSpeed !== 1) {
+      g.capacityFactor = getWindCapacityFactor(
+        windSpeedsKph.map((windKph) => windKph * terrain.onshoreWindSpeed),
+      );
+    }
+    if (g.fuel === "Offshore Wind" && isOceanWindTile(state, selectedTileId)) {
+      g.available = year > 1991;
+      g.capacityFactor = getOffshoreWindCapacityFactor(
+        offshoreWindSpeedsKph.length ? offshoreWindSpeedsKph : windSpeedsKph,
+      );
+    }
     applyLegacyGeneratorEra(state, g);
     const mod = facilityModifier(state, g.name);
     g.buildCost = modScaledValue(
@@ -836,6 +868,7 @@ export function GENERATORS(
       `facilities.${g.name}.yearsToBuild`,
     );
     g.buildCost *= difficulty.buildCost * inflation;
+    g.buildCost *= terrain.buildCost;
     g.buildCost *=
       currentStoryEffects.buildCostMultipliersByFuel?.[g.fuel] || 1;
     g.annualOperatingCost *= difficulty.expensesOM * inflation;
