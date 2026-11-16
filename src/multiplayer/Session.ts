@@ -808,16 +808,15 @@ export class MultiplayerSession {
     const generation = this.startGeneration;
     const connection = this.replicationConnections.get(to) ?? {};
     this.replicationConnections.set(to, connection);
+    const current = () =>
+      generation === this.startGeneration &&
+      connection === this.replicationConnections.get(to) &&
+      !!this.worker &&
+      this.state.lobby.connected.includes(to);
     const send = (this.replicationSends.get(to) ?? Promise.resolve())
       .catch(() => undefined)
       .then(async () => {
-        if (
-          generation !== this.startGeneration ||
-          connection !== this.replicationConnections.get(to) ||
-          !this.worker ||
-          !this.state.lobby.connected.includes(to)
-        )
-          return;
+        if (!current()) return;
         if (payload.kind === "baseline") {
           const scenario = payload.world.spec.customScenario;
           const digest = scenario?.mod?.runtimeDigest;
@@ -836,6 +835,7 @@ export class MultiplayerSession {
               to,
               payload: { kind: "scenario", selectionKey: key, scenario },
             });
+            if (!current()) return;
             this.outboundScenario.set(to, digest);
           }
         }
@@ -843,13 +843,7 @@ export class MultiplayerSession {
       });
     this.replicationSends.set(to, send);
     void send.catch(() => {
-      if (
-        generation === this.startGeneration &&
-        connection === this.replicationConnections.get(to) &&
-        !!this.worker &&
-        this.state.lobby.connected.includes(to)
-      )
-        this.post({ kind: "baseline", to });
+      if (current()) this.post({ kind: "baseline", to });
     });
   }
   /** Menu transitions cannot be dropped while a purchase or another command is in flight. */
