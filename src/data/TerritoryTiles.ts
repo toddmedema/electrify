@@ -37,7 +37,14 @@ const utilityCoordinates: Record<
   "champlain" | "valley-electric" | "ridge-electric",
   { q: number; r: number }[]
 > = {
-  champlain: coordinates([-4, -3, -2, -1].map((r) => [r, [-4, -3, -2, -1]])),
+  // Reserve a boundary cell for the coast instead of putting open ocean inside the utility.
+  champlain: coordinates([
+    [-4, [-4, -3, -2, -1]],
+    [-3, [-4, -3, -2, -1]],
+    [-2, [-3, -2, -1]],
+    [-1, [-4, -3, -2, -1]],
+    [-2, [-4]],
+  ]),
   "valley-electric": coordinates([
     [-4, [0, 1, 2, 3, 4]],
     [-3, [0, 1, 2, 3, 4]],
@@ -62,7 +69,7 @@ const landTerrains: readonly TerrainType[] = [
   "mountain",
 ];
 function siteTerrain(kind: TerritorySiteKind, index: number): TerrainType {
-  if (kind === "hydro") return index % 2 ? "river" : "lake";
+  if (kind === "hydro") return "lake";
   if (kind === "geothermal") return "mountain";
   if (kind === "wind")
     return ["hills", "mountain", "plains"][index % 3] as TerrainType;
@@ -98,7 +105,8 @@ for (const territory of TERRITORIES) {
       id: `${territory.id}:city`,
       territoryId: territory.id,
       ...next(),
-      terrain: "plains",
+      // Valley's city and inherited river plant share reciprocal channel edges.
+      terrain: territory.id === "valley-electric" ? "river" : "plains",
       city: {
         sector:
           utility?.id === "ridge-electric" || territory.benefit === "industrial"
@@ -157,13 +165,7 @@ for (const territory of TERRITORIES) {
       addSite(
         siteKind,
         territory.sites[siteKind].maxPeakW,
-        siteTerrain(
-          siteKind,
-          slot +
-            (territory.benefit === "hydro" && territory.id === "parcel-7"
-              ? 1
-              : 0),
-        ),
+        siteTerrain(siteKind, slot),
         matching[slot],
       );
   }

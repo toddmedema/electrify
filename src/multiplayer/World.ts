@@ -1,4 +1,9 @@
 import { upgradeSave } from "../SaveUpgrade";
+import {
+  getFacilityTile,
+  hasTerritoryNetwork,
+} from "../helpers/TerritoryTiles";
+import { isLandTerritoryId } from "../data/Territories";
 import { currencyForLocation } from "../helpers/Currency";
 import { formatMoneyFull } from "../helpers/Format";
 import { isUtilityExpansionGame } from "../helpers/ExpansionContext";
@@ -852,6 +857,42 @@ export function roomView(world: World, seatId: string): RoomView {
         ]),
       ),
     ),
+    ...(hasTerritoryNetwork(game)
+      ? {
+          tileFacilities: Object.fromEntries(
+            world.grids.flatMap((grid, owner) =>
+              grid.facilities.flatMap((facility) => {
+                const tile = getFacilityTile(facility, grid);
+                if (
+                  !tile ||
+                  !isLandTerritoryId(tile.territoryId) ||
+                  !grid.territoryNetwork?.landPurchases.some(
+                    (receipt) => receipt.territoryId === tile.territoryId,
+                  )
+                )
+                  return [];
+                return [
+                  [
+                    tile.id,
+                    {
+                      seat: world.seats[owner].id,
+                      name: facility.name,
+                      peakW: facility.peakW,
+                      yearsToBuildLeft: facility.yearsToBuildLeft,
+                      ...(facility.fuel !== undefined
+                        ? { fuel: facility.fuel }
+                        : {}),
+                      ...(facility.peakWh !== undefined
+                        ? { peakWh: facility.peakWh }
+                        : {}),
+                    },
+                  ],
+                ];
+              }),
+            ),
+          ),
+        }
+      : {}),
     clock: {
       activeSpeed: world.speed,
       selectedSpeed: world.selectedSpeeds[seatId],

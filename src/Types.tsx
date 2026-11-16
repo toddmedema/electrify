@@ -1477,6 +1477,20 @@ export interface GameType {
     landOwners?: Partial<
       Record<LandTerritoryId, { seat: string; name: string }>
     >;
+    /** Read-only foregrounds on claimed land, derived from the shared world for the map. */
+    tileFacilities?: Partial<
+      Record<
+        TerritoryTileId,
+        {
+          seat: string;
+          name: FacilityOperatingType["name"];
+          fuel?: FuelNameType;
+          peakW: number;
+          peakWh?: number;
+          yearsToBuildLeft: number;
+        }
+      >
+    >;
     pricePerMWh?: number;
     /** Set by the host at the rollover where this company's run ends. */
     ending?: CompanyOutcomeType;
