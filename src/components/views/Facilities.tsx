@@ -1508,6 +1508,10 @@ export default class Facilities extends React.Component<Props, SelectionState> {
                   onBuyingRule={onBuyingRule}
                   onSellingRule={onSellingRule}
                   onBuildFacility={this.props.onBuildForTerritory}
+                  onInspectFacility={(id) => {
+                    this.setState({ territoryView: "fleet" });
+                    this.props.onSelect(id);
+                  }}
                 />
               ) : (
                 <div className="territoryAgreements">

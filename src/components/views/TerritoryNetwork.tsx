@@ -6,18 +6,41 @@ import {
   TerritorySiteKind,
 } from "../../data/Territories";
 import {
-  facilityTerritoryId,
   ownedTerritories,
-  territorySiteInventory,
+  territoryDemandShares,
   landPurchaseQuote,
   landTransferredCustomers,
 } from "../../helpers/Territories";
 import { currentTick } from "../../helpers/GameSelectors";
-import { formatCount, formatWatts } from "../../helpers/Format";
-import type { LandTerritoryId, TerritoryId } from "../../Types";
+import {
+  formatBuildMonths,
+  formatCount,
+  formatFacilitySize,
+  formatWatts,
+} from "../../helpers/Format";
+import type {
+  FacilityOperatingType,
+  LandTerritoryId,
+  TerritoryId,
+  TerritoryTileId,
+} from "../../Types";
+import { UTILITY_AREAS } from "../../data/UtilityExpansion";
+import { TERRAIN_LABELS } from "../../data/TerrainLabels";
+import {
+  getTerritoryTile,
+  getTerritoryTiles,
+  territoryTileInventory,
+  tileFitsFacility,
+} from "../../helpers/TerritoryTiles";
+import { territoryTileViews } from "../../helpers/TerritoryMapState";
+import { getTerrainModifiers } from "../../helpers/TerrainModifiers";
 import { TransmissionPanelProps } from "./TransmissionPanel";
 import { GameToolMemoryContext, useToolState } from "../base/GameToolMemory";
-import { TERRITORY_BUILD_MEMORY_KEY } from "../base/TerritoryBuildDestination";
+import {
+  TERRITORY_BUILD_MEMORY_KEY,
+  TERRITORY_TILE_BUILD_MEMORY_KEY,
+} from "../base/TerritoryBuildDestination";
+import { facilityDisplayName } from "../base/FacilityLabels";
 import AcquiredUtilities from "./AcquiredUtilities";
 import TerritoryHexMap from "./TerritoryHexMap";
 import { territoryMapLabel } from "../base/TerritoryMapLayout";
@@ -30,21 +53,22 @@ import { acquireLand } from "../../reducers/GameActions";
 import { multiplayerRuntime } from "../../multiplayer/Registry";
 
 const siteLabels: Record<TerritorySiteKind, string> = {
-  industrial: "Industrial",
+  industrial: "Thermal",
   wind: "Wind",
   "open-land": "Solar / storage",
-  general: "General building sites",
-  hydro: "Hydro site",
-  geothermal: "Geothermal site",
+  general: "General building",
+  hydro: "Hydro",
+  geothermal: "Geothermal",
 };
 type Props = TransmissionPanelProps & {
   onBuildFacility?: (id: TerritoryId, storage: boolean) => void;
+  onInspectFacility?: (id: FacilityOperatingType["id"]) => void;
 };
 export default function TerritoryNetwork(props: Props) {
   const { game } = props;
-  const [selected, setSelected] = useToolState<TerritoryId>(
-    "network.territory",
-    "champlain",
+  const [selected, setSelected] = useToolState<TerritoryTileId>(
+    "network.tile",
+    "champlain:city",
   );
   const [review, setReview] = React.useState(false);
   const [terms, setTerms] = React.useState(false);
@@ -71,12 +95,14 @@ export default function TerritoryNetwork(props: Props) {
     }
   }, [reviewLandId, game.territoryNetwork?.landPurchases.length]);
   const owned = ownedTerritories(game);
-  const territory =
-    TERRITORIES.find(({ id }) => id === selected) ?? TERRITORIES[0];
-  const isOwned = owned.includes(territory.id);
-  const plants = game.facilities.filter(
-    (facility) => facilityTerritoryId(facility) === territory.id,
-  );
+  const tile = getTerritoryTile(selected, game) ?? getTerritoryTiles(game)[0];
+  const view = territoryTileViews(game).find(
+    ({ tile: item }) => item.id === tile.id,
+  )!;
+  const territory = TERRITORIES.find(({ id }) => id === tile.territoryId)!;
+  const isOwned = view.owned;
+  const facility = view.facility;
+  const operatingFacility = view.operatingFacility;
   const land = isLandTerritoryId(territory.id)
     ? landPurchaseQuote(game, territory.id)
     : undefined;
@@ -84,25 +110,59 @@ export default function TerritoryNetwork(props: Props) {
     ? landPurchaseQuote(game, reviewLandId)
     : undefined;
   const reviewedTerritory = TERRITORIES.find(({ id }) => id === reviewLandId);
-  const isCustomer =
-    territory.benefit === "residential" || territory.benefit === "industrial";
-  const customers = isOwned
-    ? landTransferredCustomers(game, territory.id)
-    : (land?.customers ?? 0);
-  const inventories = (Object.keys(siteLabels) as TerritorySiteKind[])
-    .map((kind) => ({
-      kind,
-      ...territorySiteInventory(game, territory.id, kind),
-    }))
-    .filter((inventory) => inventory.total > 0);
-  const hasRoom = inventories.some((inventory) => inventory.remaining > 0);
-  const storageRoom = inventories.some(
-    (inventory) =>
-      (inventory.kind === "general" || inventory.kind === "open-land") &&
-      inventory.remaining > 0,
+  const utility = Object.values(UTILITY_AREAS).find(
+    ({ id }) => id === territory.id,
   );
+  const customers =
+    utility?.customers ??
+    (isOwned
+      ? landTransferredCustomers(game, territory.id)
+      : (land?.customers ?? territory.customers ?? 0));
+  const tick = currentTick(game);
+  const demandW = tick ? territoryDemandShares(game, tick)[territory.id] : 0;
+  const inventory = territoryTileInventory(game, tile.id);
+  const hasRoom = inventory.remaining > 0 && !facility;
+  const windRoom = tileFitsFacility(tile, { fuel: "Wind", peakW: 1 });
+  const solarRoom = tileFitsFacility(tile, { fuel: "Sun", peakW: 1 });
+  const storageRoom = tileFitsFacility(tile, { peakWh: 1, peakW: 1 });
+  const generatorRoom =
+    !tile.city && (tile.siteKind !== "open-land" || solarRoom);
+  const modifiers = getTerrainModifiers(
+    game,
+    facility
+      ? facility.fuel
+      : windRoom
+        ? "Wind"
+        : solarRoom
+          ? "Sun"
+          : undefined,
+    tile.id,
+  );
+  const terrain = TERRAIN_LABELS[tile.terrain];
+  const siteLabel = tile.city
+    ? `${tile.city.sector === "industrial" ? "Industrial" : "Residential"} city`
+    : tile.terrain === "ocean"
+      ? "Offshore wind site"
+      : `${siteLabels[tile.siteKind]} site`;
+  const facilityName = operatingFacility
+    ? facilityDisplayName(operatingFacility)
+    : facility?.name;
+  const facilityStatus = facility?.yearsToBuildLeft
+    ? `${operatingFacility?.paused ? "Construction paused" : "Under construction"} · ${formatBuildMonths(facility.yearsToBuildLeft, "long")} left`
+    : operatingFacility?.paused
+      ? "Paused"
+      : operatingFacility
+        ? operatingFacility.currentW < 0
+          ? "Charging"
+          : operatingFacility.currentW > 0
+            ? facility?.peakWh !== undefined
+              ? "Discharging"
+              : "Generating"
+            : "Idle"
+        : "Operating";
   const build = (storage: boolean) => {
     memory?.set(TERRITORY_BUILD_MEMORY_KEY, territory.id);
+    memory?.set(TERRITORY_TILE_BUILD_MEMORY_KEY, tile.id);
     props.onBuildFacility?.(territory.id, storage);
   };
   const status = (id: TerritoryId) => {
@@ -111,7 +171,7 @@ export default function TerritoryNetwork(props: Props) {
     const other = game.multiplayer?.landOwners?.[id];
     return other ? `Owned by ${other.name}` : "Available to buy";
   };
-  const inspect = (id: TerritoryId, focusDetails = false) => {
+  const inspect = (id: TerritoryTileId, focusDetails = false) => {
     setSelected(id);
     if (focusDetails)
       requestAnimationFrame(() => {
@@ -120,18 +180,11 @@ export default function TerritoryNetwork(props: Props) {
         headingRef.current?.focus({ preventScroll: !narrow });
       });
   };
-  const description =
-    territory.benefit === "residential"
-      ? "Connect residential customers to your company."
-      : territory.benefit === "industrial"
-        ? "Connect industrial customers, with higher electricity demand per account."
-        : territory.benefit === "hydro"
-          ? "Develop a hydro plant here. Its output depends on the available water."
-          : territory.benefit === "geothermal"
-            ? "Develop a geothermal plant here."
-            : territory.benefit === "general"
-              ? "Build general generators or storage here."
-              : territory.description;
+  const description = tile.city
+    ? "Customers add demand to your company power pool. Cities have no building slot."
+    : facility
+      ? "This facility occupies the tile's only building slot."
+      : "One construction project can occupy this tile. Construction reserves the slot.";
   return (
     <section className="territoryNetwork" aria-label="Territories">
       <header className="territoryNetworkHeading">
@@ -143,7 +196,7 @@ export default function TerritoryNetwork(props: Props) {
         <div className="territoryMapColumn">
           <TerritoryHexMap
             game={game}
-            selected={territory.id}
+            selected={tile.id}
             status={status}
             onSelect={inspect}
           />
@@ -159,7 +212,7 @@ export default function TerritoryNetwork(props: Props) {
         >
           <header>
             <Typography variant="overline" color="textSecondary">
-              {status(territory.id)}
+              {territoryMapLabel(territory.id)} · {status(territory.id)}
             </Typography>
             <Typography
               component="h3"
@@ -167,83 +220,155 @@ export default function TerritoryNetwork(props: Props) {
               tabIndex={-1}
               ref={headingRef}
             >
-              {territoryMapLabel(territory.id)}
+              {terrain} · {facilityName ?? siteLabel}
             </Typography>
             <Typography variant="body2" color="textSecondary">
               {description}
             </Typography>
           </header>
           <div className="territorySites">
-            {isCustomer ? (
+            {tile.city ? (
               <>
                 <Typography component="h4" variant="subtitle2">
-                  {isOwned ? "Customers added" : "Customers to connect"}
+                  {isOwned ? "Connected customers" : "Customers to connect"}
                 </Typography>
                 <div>
                   <span>
-                    {territory.benefit === "residential"
+                    {tile.city.sector === "residential"
                       ? "Residential"
                       : "Industrial"}
                   </span>
                   <strong>{formatCount(customers)}</strong>
                 </div>
+                {isOwned && (
+                  <div>
+                    <span>Current demand</span>
+                    <strong>{formatWatts(demandW)}</strong>
+                  </div>
+                )}
                 <Typography variant="caption" color="textSecondary">
-                  Adds customer demand. No plants or power agreements transfer.
+                  {isOwned
+                    ? "Demand is included in your company total."
+                    : "Adds customer demand when acquired."}{" "}
+                  No building slot.
+                </Typography>
+              </>
+            ) : facility ? (
+              <>
+                <Typography component="h4" variant="subtitle2">
+                  {facility.peakWh !== undefined ? "Storage" : "Generator"}
+                </Typography>
+                <div>
+                  <span>Size</span>
+                  <strong>{formatFacilitySize(facility)}</strong>
+                </div>
+                {facility.peakWh !== undefined && (
+                  <div>
+                    <span>Power</span>
+                    <strong>{formatWatts(facility.peakW)}</strong>
+                  </div>
+                )}
+                <div>
+                  <span>Status</span>
+                  <strong>{facilityStatus}</strong>
+                </div>
+                <Typography variant="caption" color="textSecondary">
+                  Building slot occupied. One project per tile.
                 </Typography>
               </>
             ) : (
               <>
                 <Typography component="h4" variant="subtitle2">
-                  {isOwned ? "Building sites" : "Sites included"}
+                  {isOwned ? "Building slot" : "Tile included"}
                 </Typography>
-                {inventories.map((inventory) => (
-                  <div key={inventory.kind}>
-                    <span>{siteLabels[inventory.kind]}</span>
-                    <strong>
-                      {inventory.remaining} / {inventory.total} left
-                      <small>{formatWatts(inventory.maxPeakW)} / project</small>
-                    </strong>
-                  </div>
-                ))}
+                <div>
+                  <span>{siteLabel}</span>
+                  <strong>
+                    {inventory.remaining} / {inventory.total} available
+                    <small>{formatWatts(inventory.maxPeakW)} / project</small>
+                  </strong>
+                </div>
                 <Typography variant="caption" color="textSecondary">
-                  {isOwned ? `${plants.length} plants and storage · ` : ""}
-                  Construction reserves a site.{" "}
-                  {territory.benefit === "general"
-                    ? "Shared sites accept thermal, wind, solar or storage."
-                    : ""}
+                  {storageRoom
+                    ? tile.siteKind === "open-land"
+                      ? "Accepts solar generation or storage."
+                      : "Accepts thermal, wind, solar or storage."
+                    : tile.terrain === "ocean"
+                      ? "Accepts offshore wind."
+                      : `Accepts ${siteLabels[tile.siteKind].toLowerCase()} generation.`}
                 </Typography>
               </>
             )}
+            {modifiers.onshoreWindSpeed !== 1 && (
+              <div>
+                <span>Onshore wind speed</span>
+                <strong>
+                  {modifiers.onshoreWindSpeed > 1 ? "+" : ""}
+                  {Math.round((modifiers.onshoreWindSpeed - 1) * 100)}%
+                </strong>
+              </div>
+            )}
+            {modifiers.buildCost !== 1 && (
+              <div>
+                <span>
+                  {facility
+                    ? "Build cost"
+                    : windRoom && solarRoom
+                      ? "Wind / solar build cost"
+                      : windRoom
+                        ? "Wind build cost"
+                        : "Solar build cost"}
+                </span>
+                <strong>+{Math.round((modifiers.buildCost - 1) * 100)}%</strong>
+              </div>
+            )}
           </div>
           {isOwned ? (
-            inventories.length > 0 && (
+            operatingFacility ? (
               <div className="territoryBuildActions">
                 <Button
                   variant="contained"
-                  disabled={!props.onBuildFacility || !hasRoom}
-                  onClick={() => build(false)}
+                  disabled={!props.onInspectFacility}
+                  onClick={() =>
+                    props.onInspectFacility?.(operatingFacility.id)
+                  }
                 >
-                  {territory.benefit === "hydro"
-                    ? "Build hydro"
-                    : territory.benefit === "geothermal"
-                      ? "Build geothermal"
-                      : `Build in ${territoryMapLabel(territory.id)}`}
+                  Inspect plant
                 </Button>
-                {storageRoom && (
-                  <Button
-                    variant="outlined"
-                    disabled={!props.onBuildFacility}
-                    onClick={() => build(true)}
-                  >
-                    Storage
-                  </Button>
-                )}
-                {!hasRoom && (
-                  <Typography variant="body2" color="textSecondary">
-                    All local sites are reserved.
-                  </Typography>
-                )}
               </div>
+            ) : (
+              !tile.city &&
+              !facility && (
+                <div className="territoryBuildActions">
+                  {generatorRoom && (
+                    <Button
+                      variant="contained"
+                      disabled={!props.onBuildFacility || !hasRoom}
+                      onClick={() => build(false)}
+                    >
+                      {tile.siteKind === "hydro"
+                        ? "Build hydro"
+                        : tile.siteKind === "geothermal"
+                          ? "Build geothermal"
+                          : `Build in ${territoryMapLabel(territory.id)}`}
+                    </Button>
+                  )}
+                  {storageRoom && (
+                    <Button
+                      variant={generatorRoom ? "outlined" : "contained"}
+                      disabled={!props.onBuildFacility || !hasRoom}
+                      onClick={() => build(true)}
+                    >
+                      Storage
+                    </Button>
+                  )}
+                  {!hasRoom && (
+                    <Typography variant="body2" color="textSecondary">
+                      This site has already been used.
+                    </Typography>
+                  )}
+                </div>
+              )
             )
           ) : territory.kind === "utility" ? (
             <div className="territoryBuildActions">

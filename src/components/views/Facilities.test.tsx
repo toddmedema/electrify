@@ -312,6 +312,26 @@ function renderFacilities(
   };
 }
 
+it("opens the selected territory plant in the fleet", async () => {
+  const game = createGame({ scenarioId: 116, seed: 188 });
+  const plant = game.facilities.find((facility) => facility.fuel === "Hydro")!;
+  const { onSelect } = renderFacilities(game, null);
+  await user.click(screen.getByRole("tab", { name: "Territories" }));
+  await user.click(screen.getByTitle(`Lake · ${plant.name}`));
+  const detail = screen.getByRole("region", { name: "Selected territory" });
+  await user.click(
+    within(detail).getByRole("button", { name: "Inspect plant" }),
+  );
+  expect(onSelect).toHaveBeenCalledWith(plant.id);
+  expect(screen.getByRole("tab", { name: "Fleet" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  expect(
+    screen.queryByRole("button", { name: "Inspect plant" }),
+  ).not.toBeInTheDocument();
+});
+
 // Address inspection targets by their class; asking for a role by name computes an accessible
 // name for every candidate, which over a rendered pane costs about a second a call.
 function rows(): HTMLElement[] {
