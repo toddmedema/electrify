@@ -49,7 +49,20 @@ async function startMap(page: Page, theme: "light" | "dark") {
   await expect(pause).toBeVisible();
   if ((await pause.getAttribute("aria-pressed")) !== "true")
     await pause.click();
-  return openMap(page);
+  const network = await openMap(page);
+  // The map can render before the asynchronous save session has its first snapshot.
+  const saveState = page.locator("#appbar:visible [data-save-state]").first();
+  await expect(saveState).toHaveAttribute("data-save-state", "saved");
+  await expect(saveState).toHaveAttribute("data-active-save-id", /\S+/);
+  const saveId = await saveState.getAttribute("data-active-save-id");
+  await expect
+    .poll(async () =>
+      (await readSaveRecords(page)).some(
+        (record) => record.metadata.id === saveId && record.save !== undefined,
+      ),
+    )
+    .toBe(true);
+  return network;
 }
 
 /** Pan the actual camera rather than scrolling a virtualized tile into existence. */
