@@ -1,11 +1,16 @@
 import {
   LAND_TERRITORIES,
+  purchasedLandTerritories,
+  getTerritoryDefinition,
   availableTerritorySpecialSites,
   territoryHydroSiteId,
 } from "./Territories";
 import { isUtilityExpansionGame } from "../helpers/ExpansionContext";
 import { UTILITY_AREAS, UTILITY_TARGETS } from "./UtilityExpansion";
-import { getAuthoredTerritoryTile } from "./TerritoryTiles";
+import {
+  getAuthoredTerritoryTile,
+  getGeneratedTerritoryTile,
+} from "./TerritoryTiles";
 import type {
   GameType,
   LocationType,
@@ -57,6 +62,22 @@ export const HYDRO_SITES: Readonly<Record<string, HydroSite>> =
       })),
     ].map((site) => [site.id, site]),
   );
+/** Generated named sites have the same bounded capacity as the authored fictional sites. */
+export function getHydroSite(id: string): HydroSite | undefined {
+  const authored = HYDRO_SITES[id];
+  if (authored) return authored;
+  const match = /^scenario-116-(frontier:[^:]+:[^:]+)-hydro$/.exec(id);
+  const territory = match ? getTerritoryDefinition(match[1]) : undefined;
+  return territory?.benefit === "hydro"
+    ? {
+        id,
+        name: "Fictional valley hydro development site",
+        maxPeakW: territory.sites.hydro.maxPeakW,
+        lat: 44.4759,
+        lon: -73.2121,
+      }
+    : undefined;
+}
 export const HYDRO_INVENTORIES: Record<string, HydroInventory> = {
   ...(catalogue.inventories as Record<string, HydroInventory>),
   [LEGACY_HYDRO_INVENTORY_KEY]: {
@@ -214,10 +235,15 @@ export function getHydroAvailability(
   });
   const frontier = isUtilityExpansionGame(state) && !!state.utilityExpansion;
   const frontierTile =
-    tileId === undefined ? undefined : getAuthoredTerritoryTile(tileId);
+    tileId === undefined
+      ? undefined
+      : (getAuthoredTerritoryTile(tileId) ?? getGeneratedTerritoryTile(tileId));
   const sites = frontier
     ? availableTerritorySpecialSites(state, "hydro", territoryId)
-        .map((territory) => HYDRO_SITES[territoryHydroSiteId(territory.id)])
+        .flatMap((territory) => {
+          const site = getHydroSite(territoryHydroSiteId(territory.id));
+          return site ? [site] : [];
+        })
         .filter(
           (site) =>
             tileId === undefined || frontierTile?.hydroSiteId === site.id,
@@ -372,18 +398,14 @@ export function validHydroClaims(state: HydroState): boolean {
           resolveHydroInventory(definition.location)?.siteIds ?? [],
       ),
     );
-    for (const territory of LAND_TERRITORIES.filter(
-      (territory) =>
-        territory.benefit === "hydro" &&
-        state.territoryNetwork?.landPurchases.some(
-          (receipt) => receipt.territoryId === territory.id,
-        ),
+    for (const territory of purchasedLandTerritories(state).filter(
+      (territory) => territory.benefit === "hydro",
     ))
       allowed.add(territoryHydroSiteId(territory.id));
     if (
       state.facilities.some(
         (facility) =>
-          facility.hydroSiteId?.startsWith("scenario-116-parcel-") &&
+          facility.hydroSiteId?.startsWith("scenario-116-") &&
           facility.hydroSiteId !==
             territoryHydroSiteId(facility.territoryId ?? "champlain"),
       )
@@ -419,7 +441,7 @@ function validHydroClaimSet(
       (id) =>
         typeof id !== "string" ||
         !ids.has(id) ||
-        (HYDRO_SITES[id].availableFromYear ?? -Infinity) >
+        (getHydroSite(id)?.availableFromYear ?? -Infinity) >
           (state.date?.year ?? Infinity),
     )
   )
@@ -435,11 +457,11 @@ function validHydroClaimSet(
     if (
       typeof id !== "string" ||
       !ids.has(id) ||
-      (HYDRO_SITES[id].availableFromYear ?? -Infinity) >
+      (getHydroSite(id)?.availableFromYear ?? -Infinity) >
         (state.date?.year ?? Infinity) ||
       current.has(id) ||
       !validHydroCapacity(f.peakW) ||
-      f.peakW > HYDRO_SITES[id].maxPeakW ||
+      f.peakW > (getHydroSite(id)?.maxPeakW ?? 0) ||
       typeof f.yearsToBuildLeft !== "number" ||
       !Number.isFinite(f.yearsToBuildLeft) ||
       f.yearsToBuildLeft < 0

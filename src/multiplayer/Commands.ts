@@ -5,6 +5,8 @@ import { acquisitionQuote, validAcquisitionAction } from "../helpers/Expansion";
 import { isTerritoryId } from "../data/Territories";
 import {
   validLandPurchaseAction,
+  validTilePurchaseAction,
+  tilePurchaseQuote,
   landPurchaseQuote,
   hasTerritoryNetwork,
   territoryBuildAvailability,
@@ -161,6 +163,12 @@ const buildFacility: Validator = (game, payload) => {
 
 /** The co-op allowlist: every game action a player may send, with its payload check. */
 const GAME_COMMAND_VALIDATORS = {
+  acquireTile: (game, payload) =>
+    validTilePurchaseAction(game, payload) &&
+    (currentTick(game)?.cash ?? -1) >=
+      tilePurchaseQuote(game, payload.tileId)!.price
+      ? { payload }
+      : { error: "This land tile is unavailable or unaffordable" },
   acquireLand: (game, payload) =>
     validLandPurchaseAction(game, payload) &&
     (currentTick(game)?.cash ?? -1) >=

@@ -101,5 +101,7 @@ export const acquireUtility = createAction<
   import("../Types").AcquireUtilityAction
 >("game/acquireUtility");
 
+export const acquireTile =
+  createAction<import("../Types").AcquireTileAction>("game/acquireTile");
 export const acquireLand =
   createAction<import("../Types").AcquireLandAction>("game/acquireLand");

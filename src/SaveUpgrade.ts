@@ -287,6 +287,35 @@ const migrations: readonly Migration[] = [
     if (!assignTerritoryTiles(game)) return null;
     return { ...save, game };
   },
+  // 16 -> 17: paid region receipts retain every original tile and exact finances.
+  // New purchases record only one physical cell in a separate ledger.
+  (save) => {
+    if (!object(save.game)) return null;
+    if (save.game.territoryNetwork === undefined) return save;
+    const state = save.game.territoryNetwork;
+    if (
+      !object(state) ||
+      state.version !== 3 ||
+      Object.keys(state).some(
+        (key) =>
+          ![
+            "version",
+            "landPurchases",
+            "legacyConnections",
+            "tilePurchases",
+          ].includes(key),
+      ) ||
+      !Array.isArray(state.landPurchases) ||
+      !Array.isArray(state.legacyConnections) ||
+      (state.tilePurchases !== undefined &&
+        (!Array.isArray(state.tilePurchases) || state.tilePurchases.length > 0))
+    )
+      return null;
+    return {
+      ...save,
+      game: { ...save.game, territoryNetwork: { ...state, tilePurchases: [] } },
+    };
+  },
 ];
 
 /** Structure versions are independent of app releases and simulation compatibility. */

@@ -5,7 +5,9 @@ import type { TerritoryTileDefinition } from "../data/TerritoryTiles";
 import {
   facilityOnTile,
   getTerritoryTiles,
-  ownedTerritories,
+  ownsTerritoryTile,
+  territoryVisibilityAnchors,
+  territoryHexDistance,
 } from "./TerritoryTiles";
 export interface TileFacilityView {
   name: FacilityOperatingType["name"];
@@ -22,17 +24,24 @@ export interface TerritoryTileView {
   developed: boolean;
   facility?: TileFacilityView;
   operatingFacility?: FacilityOperatingType;
+  visibilityDistance: 0 | 1 | 2 | 3;
 }
 /** One truthful foreground per cell; peer structures are projected by the shared world. */
 export function territoryTileViews(game: GameType): TerritoryTileView[] {
-  const owned = new Set(ownedTerritories(game));
+  const anchors = territoryVisibilityAnchors(game);
   const inherited = Object.values(UTILITY_AREAS).flatMap(
     (area) => area.facilities,
   );
-  return getTerritoryTiles(game).map((tile) => {
-    const isOwned = owned.has(tile.territoryId);
+  return getTerritoryTiles(game).flatMap((tile) => {
+    const distance = Math.min(
+      Infinity,
+      ...anchors.map((anchor) => territoryHexDistance(anchor, tile)),
+    );
+    if (distance > 3) return [];
+    const isOwned = ownsTerritoryTile(game, tile);
     const claim = isLandTerritoryId(tile.territoryId)
-      ? game.multiplayer?.landOwners?.[tile.territoryId]
+      ? (game.multiplayer?.tileOwners?.[tile.id] ??
+        game.multiplayer?.landOwners?.[tile.territoryId])
       : undefined;
     const ownerKey = isOwned
       ? "you"
@@ -73,14 +82,17 @@ export function territoryTileViews(game: GameType): TerritoryTileView[] {
             yearsToBuildLeft: 0,
           }
         : undefined);
-    return {
-      tile,
-      ownerKey,
-      ownerName,
-      owned: isOwned,
-      developed: !!ownerKey,
-      facility,
-      operatingFacility,
-    };
+    return [
+      {
+        tile,
+        visibilityDistance: distance as 0 | 1 | 2 | 3,
+        ownerKey,
+        ownerName,
+        owned: isOwned,
+        developed: !!ownerKey,
+        facility,
+        operatingFacility,
+      },
+    ];
   });
 }

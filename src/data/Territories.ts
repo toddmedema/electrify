@@ -1,4 +1,8 @@
-import type { LandTerritoryId, TerritoryId } from "../Types";
+import type {
+  FrontierTerritoryId,
+  LandTerritoryId,
+  TerritoryId,
+} from "../Types";
 
 export const GREEN_UPLANDS_CORRIDOR_ID = "vt-champlain-uplands";
 export type TerritorySiteKind =
@@ -128,14 +132,104 @@ export const TERRITORIES: readonly TerritoryDefinition[] = [
 export const LAND_TERRITORIES = TERRITORIES.filter(
   (territory) => territory.kind === "greenfield",
 );
+/** Enough headroom for neighboring axial arithmetic, without a fixed board boundary. */
+export const MAX_TERRITORY_COORDINATE = Math.floor(Number.MAX_SAFE_INTEGER / 4);
+export function frontierCoordinates(
+  value: unknown,
+): { q: number; r: number } | undefined {
+  if (typeof value !== "string") return undefined;
+  const match = /^frontier:(0|-?[1-9]\d*):(0|-?[1-9]\d*)$/.exec(value);
+  if (!match) return undefined;
+  const q = Number(match[1]),
+    r = Number(match[2]);
+  return Number.isSafeInteger(q) &&
+    Number.isSafeInteger(r) &&
+    Math.abs(q) <= MAX_TERRITORY_COORDINATE &&
+    Math.abs(r) <= MAX_TERRITORY_COORDINATE
+    ? { q, r }
+    : undefined;
+}
+export function frontierTerritoryId(
+  q: number,
+  r: number,
+): FrontierTerritoryId | undefined {
+  const id: FrontierTerritoryId = `frontier:${q}:${r}`;
+  return frontierCoordinates(id) ? id : undefined;
+}
+/** Versioned, integer-only geography shared by every company, independent of weather streams. */
+export function territoryCoordinateHash(
+  q: number,
+  r: number,
+  salt = "tile-world-v1",
+): number {
+  let hash = 2166136261;
+  for (const character of `${salt}:${q}:${r}`)
+    hash = Math.imul(hash ^ character.charCodeAt(0), 16777619);
+  return hash >>> 0;
+}
+export function getTerritoryDefinition(
+  value: unknown,
+): TerritoryDefinition | undefined {
+  const authored = TERRITORIES.find(({ id }) => id === value);
+  if (authored) return authored;
+  const coordinates = frontierCoordinates(value);
+  if (!coordinates) return undefined;
+  const { q, r } = coordinates;
+  const draw = territoryCoordinateHash(q, r) % 128;
+  // Sparse cities and bounded resources, using the same authored game-economic defaults.
+  const benefit =
+    draw === 0
+      ? "residential"
+      : draw === 1
+        ? "industrial"
+        : draw === 2
+          ? "hydro"
+          : draw === 3
+            ? "geothermal"
+            : "general";
+  const template = LAND_TERRITORIES.find(
+    (territory) => territory.benefit === benefit,
+  )!;
+  return {
+    ...template,
+    id: value as FrontierTerritoryId,
+    corridorId: undefined,
+    ...(benefit === "general"
+      ? {
+          price2005: 3e6,
+          description: "One building site for generators or storage.",
+          sites: { ...sites(0, 0, 0), general: { count: 1, maxPeakW: 300e6 } },
+        }
+      : {}),
+  };
+}
 export function isLandTerritoryId(value: unknown): value is LandTerritoryId {
-  return LAND_TERRITORIES.some(({ id }) => id === value);
+  return getTerritoryDefinition(value)?.kind === "greenfield";
 }
 export const territoryHydroSiteId = (id: TerritoryId) =>
   `scenario-116-${id}-hydro`;
-
 export function isTerritoryId(value: unknown): value is TerritoryId {
-  return TERRITORIES.some(({ id }) => id === value);
+  return !!getTerritoryDefinition(value);
+}
+/** Land regions with paid physical or retained whole-region rights, each listed once. */
+export function purchasedLandTerritories(
+  game: Pick<import("../Types").GameType, "territoryNetwork">,
+): TerritoryDefinition[] {
+  const ids = new Set<TerritoryId>(
+    game.territoryNetwork?.landPurchases.map(
+      ({ territoryId }) => territoryId,
+    ) ?? [],
+  );
+  for (const receipt of game.territoryNetwork?.tilePurchases ?? []) {
+    const territoryId = receipt.tileId.startsWith("frontier:")
+      ? receipt.tileId
+      : receipt.tileId.split(":")[0];
+    if (isLandTerritoryId(territoryId)) ids.add(territoryId);
+  }
+  return [...ids].flatMap((id) => {
+    const definition = getTerritoryDefinition(id);
+    return definition ? [definition] : [];
+  });
 }
 
 /** Catalogue access shared by quotes and purchase validation; construction reserves the site. */
@@ -147,14 +241,10 @@ export function availableTerritorySpecialSites(
   benefit: "hydro" | "geothermal",
   id?: TerritoryId,
 ) {
-  return LAND_TERRITORIES.filter(
+  return purchasedLandTerritories(game).filter(
     (territory) =>
       territory.benefit === benefit &&
       (!id || territory.id === id) &&
-      Array.isArray(game.territoryNetwork?.landPurchases) &&
-      game.territoryNetwork.landPurchases.some(
-        (receipt) => receipt.territoryId === territory.id,
-      ) &&
       !game.facilities.some(
         (facility) =>
           facility.territoryId === territory.id &&

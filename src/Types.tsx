@@ -1355,13 +1355,16 @@ export interface PeerSettlement {
 }
 export type UtilityId = "champlain" | "valley-electric" | "ridge-electric";
 export type UtilityTargetId = Exclude<UtilityId, "champlain">;
+export type FrontierTerritoryId = `frontier:${number}:${number}`;
 export type LandTerritoryId =
+  | FrontierTerritoryId
   | "green-uplands"
   | `parcel-${0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 17}`;
 export type TerritoryId = UtilityId | LandTerritoryId;
 export type TerrainType =
   "plains" | "forest" | "hills" | "mountain" | "river" | "lake" | "ocean";
 export type TerritoryTileId =
+  | FrontierTerritoryId
   | `${TerritoryId}:city`
   | `${TerritoryId}:site-${number}`
   | `${TerritoryId}:legacy-${number}`;
@@ -1404,6 +1407,10 @@ export interface UtilityExpansionState {
     /** Immutable seller accounts transferred, not a separately simulated customer population. */
     transferredCustomers: number;
   }[];
+}
+export interface AcquireTileAction {
+  tileId: TerritoryTileId;
+  quoteKey: string;
 }
 export interface AcquireLandAction {
   territoryId: LandTerritoryId;
@@ -1465,6 +1472,12 @@ export interface GameType {
       price: number;
       legacy?: true;
     }[];
+    /** Physical purchases since schema 17; older land receipts retain every original cell. */
+    tilePurchases?: {
+      tileId: TerritoryTileId;
+      minute: number;
+      price: number;
+    }[];
     /** Frozen legacy projects: capital and debt remain; routing/construction/upkeep are retired. */
     legacyConnections: TransmissionLineOperatingType[];
   };
@@ -1476,6 +1489,9 @@ export interface GameType {
     landOwner?: { seat: string; name: string };
     landOwners?: Partial<
       Record<LandTerritoryId, { seat: string; name: string }>
+    >;
+    tileOwners?: Partial<
+      Record<TerritoryTileId, { seat: string; name: string }>
     >;
     /** Read-only foregrounds on claimed land, derived from the shared world for the map. */
     tileFacilities?: Partial<

@@ -1,5 +1,8 @@
 import {
   type AcquireLandAction,
+  type AcquireTileAction,
+  type TerritoryTileId,
+  type DemandByTypeType,
   type LandTerritoryId,
   type FacilityShoppingType,
   type GameType,
@@ -9,9 +12,10 @@ import {
 import {
   GREEN_UPLANDS_CORRIDOR_ID,
   TERRITORIES,
-  LAND_TERRITORIES,
   isLandTerritoryId,
   territoryHydroSiteId,
+  getTerritoryDefinition,
+  purchasedLandTerritories,
 } from "../data/Territories";
 import { UTILITY_AREAS } from "../data/UtilityExpansion";
 import { getInflationIndex, hasEconomy } from "../data/Economy";
@@ -36,6 +40,9 @@ import {
   getTerritoryTile,
   tileFitsFacility,
   facilityOnTile,
+  ownsTerritoryTile,
+  getTerritoryTiles,
+  territoryVisibilityDistance,
 } from "./TerritoryTiles";
 export {
   hasTerritoryNetwork,
@@ -65,7 +72,7 @@ export function territoryBuildAvailability(
       total: Infinity,
       maxPeakW: Infinity,
     };
-  const territory = TERRITORIES.find((territory) => territory.id === id);
+  const territory = getTerritoryDefinition(id);
   const specific = territorySiteKind(facility);
   const kind =
     specific !== "hydro" &&
@@ -86,8 +93,11 @@ export function territoryBuildAvailability(
     ...inventory,
   });
   if (!territory) return reject("Choose a valid territory.");
-  if (!ownedTerritories(game).includes(id))
-    return reject("Acquire this territory before building.");
+  if (
+    !ownedTerritories(game).includes(id) ||
+    (requested && !ownsTerritoryTile(game, requested))
+  )
+    return reject("Acquire this tile before building.");
   if (tileId !== undefined) {
     if (!requested || requested.territoryId !== id)
       return reject("Choose a valid tile in this territory.");
@@ -125,55 +135,73 @@ export function territoryBuildAvailability(
   };
 }
 
+function territoryDemandAreas(game: GameType, minute: number) {
+  return [
+    ...Object.values(UTILITY_AREAS).filter(
+      ({ id }) =>
+        id === "champlain" ||
+        (hasTerritoryNetwork(game) &&
+          game.utilityExpansion?.acquisitions.some(
+            (receipt) => receipt.targetId === id && receipt.minute <= minute,
+          )),
+    ),
+    ...landCustomerProfiles(game, minute),
+  ];
+}
+/** Actual demand allocation shared by the map total and the city end-use chart. */
+export function territoryDemandByType(
+  game: GameType,
+  tick: Pick<TickPresentFutureType, "demandW" | "demandByType" | "minute">,
+  id: TerritoryId,
+): DemandByTypeType {
+  const areas = territoryDemandAreas(game, tick.minute);
+  const area = areas.find((entry) => entry.id === id);
+  return Object.fromEntries(
+    Object.entries(tick.demandByType).map(([sector, load]) => {
+      const key =
+        sector === "Residential" ||
+        sector === "Commercial" ||
+        sector === "Industrial"
+          ? sector
+          : undefined;
+      const weight = (entry: (typeof areas)[number]) =>
+        entry.customers *
+        entry.demandScale *
+        (key ? entry.energyShares[key] : 1);
+      const total = areas.reduce((sum, entry) => sum + weight(entry), 0);
+      return [
+        sector,
+        area && total > 0 ? (Math.max(0, load) * weight(area)) / total : 0,
+      ];
+    }),
+  ) as DemandByTypeType;
+}
 /** Apportion actual sector demand by inherited customer/load weights; never add another load. */
 export function territoryDemandShares(
   game: GameType,
   tick: Pick<TickPresentFutureType, "demandW" | "demandByType" | "minute">,
 ): Record<TerritoryId, number> {
+  const areas = territoryDemandAreas(game, tick.minute);
   const result = Object.fromEntries(
-    TERRITORIES.map(({ id }) => [id, 0]),
+    [...TERRITORIES, ...purchasedLandTerritories(game)].map(({ id }) => [
+      id,
+      0,
+    ]),
   ) as Record<TerritoryId, number>;
-  const utilityAreas = Object.values(UTILITY_AREAS).filter(
-    ({ id }) =>
-      id === "champlain" ||
-      (hasTerritoryNetwork(game) &&
-        game.utilityExpansion?.acquisitions.some(
-          (receipt) => receipt.targetId === id && receipt.minute <= tick.minute,
-        )),
-  );
-  const areas = [...utilityAreas, ...landCustomerProfiles(game, tick.minute)];
+  for (const area of areas)
+    result[area.id] = Object.values(
+      territoryDemandByType(game, tick, area.id),
+    ).reduce((sum, value) => sum + value, 0);
+  const total = Object.values(result).reduce((sum, load) => sum + load, 0);
   const totalWeight = areas.reduce(
     (sum, area) => sum + area.customers * area.demandScale,
     0,
   );
-  for (const [sector, load] of Object.entries(tick.demandByType)) {
-    const key =
-      sector === "Residential" ||
-      sector === "Commercial" ||
-      sector === "Industrial"
-        ? sector
-        : undefined;
-    const sectorWeight = areas.reduce(
-      (sum, area) =>
-        sum +
-        area.customers * area.demandScale * (key ? area.energyShares[key] : 1),
-      0,
-    );
-    for (const area of areas)
-      result[area.id] +=
-        (Math.max(0, load) *
-          area.customers *
-          area.demandScale *
-          (key ? area.energyShares[key] : 1)) /
-        sectorWeight;
-  }
-  const total = Object.values(result).reduce((sum, load) => sum + load, 0);
   for (const area of areas)
     result[area.id] =
       total > 0
         ? (result[area.id] / total) * tick.demandW
         : ((area.customers * area.demandScale) / totalWeight) * tick.demandW;
-  // Keep the company total exact despite division roundoff.
   result.champlain +=
     tick.demandW - Object.values(result).reduce((sum, load) => sum + load, 0);
   return result;
@@ -204,8 +232,7 @@ export function landPrice(
   id: LandTerritoryId = "green-uplands",
 ): number {
   return (
-    (TERRITORIES.find((territory) => territory.id === id)?.price2005 ??
-      LAND_PRICE_2005) *
+    (getTerritoryDefinition(id)?.price2005 ?? LAND_PRICE_2005) *
     (hasEconomy()
       ? getInflationIndex(
           getDateFromMinute(minute, game.startingYear),
@@ -215,26 +242,70 @@ export function landPrice(
       : 1)
   );
 }
+/** Historical whole-region pricing remains the validator for retained receipts only. */
+export function tilePrice(
+  game: Pick<GameType, "seed" | "startingYear">,
+  minute: number,
+  tileId: TerritoryTileId,
+): number {
+  const tile = getTerritoryTile(tileId);
+  if (!tile || !isLandTerritoryId(tile.territoryId)) return NaN;
+  const territory = getTerritoryDefinition(tile.territoryId)!;
+  const count =
+    territory.benefit === "general"
+      ? Math.max(1, territory.sites.general.count)
+      : 1;
+  return landPrice(game, minute, tile.territoryId) / count;
+}
+export function tilePurchaseQuote(game: GameType, tileId: TerritoryTileId) {
+  const tile = getTerritoryTile(tileId, game);
+  if (
+    !hasTerritoryNetwork(game) ||
+    !tile ||
+    !isLandTerritoryId(tile.territoryId) ||
+    ownsTerritoryTile(game, tile) ||
+    game.multiplayer?.tileOwners?.[tile.id] ||
+    game.multiplayer?.landOwners?.[tile.territoryId] ||
+    territoryVisibilityDistance(game, tile) === undefined
+  )
+    return undefined;
+  const territory = getTerritoryDefinition(tile.territoryId)!;
+  const price = tilePrice(game, game.date.minute, tile.id);
+  return {
+    tileId: tile.id,
+    territoryId: tile.territoryId,
+    price,
+    benefit: territory.benefit!,
+    customers: tile.city
+      ? customerMarketSizeAt(territory.customers ?? 0, game.date.minute)
+      : 0,
+    quoteKey: JSON.stringify([tile.id, game.date.minute, price]),
+  };
+}
+/** Compatibility entry point selects ONE still-available visible cell; it never grants a region. */
 export function landPurchaseQuote(
   game: GameType,
   id: LandTerritoryId = "green-uplands",
 ) {
-  if (
-    !hasTerritoryNetwork(game) ||
-    !isLandTerritoryId(id) ||
-    ownedTerritories(game).includes(id) ||
-    game.multiplayer?.landOwners?.[id]
-  )
-    return undefined;
-  const territory = LAND_TERRITORIES.find((territory) => territory.id === id)!;
-  const price = landPrice(game, game.date.minute, id);
-  return {
-    territoryId: id,
-    price,
-    benefit: territory.benefit!,
-    customers: customerMarketSizeAt(territory.customers ?? 0, game.date.minute),
-    quoteKey: JSON.stringify([id, game.date.minute, price]),
-  };
+  const tile = getTerritoryTiles(game).find(
+    (tile) => tile.territoryId === id && !!tilePurchaseQuote(game, tile.id),
+  );
+  return tile ? tilePurchaseQuote(game, tile.id) : undefined;
+}
+export function validTilePurchaseAction(
+  game: GameType,
+  value: unknown,
+): value is AcquireTileAction {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const action = value as Partial<AcquireTileAction>;
+  const quote = action.tileId
+    ? tilePurchaseQuote(game, action.tileId)
+    : undefined;
+  return (
+    Object.keys(value).length === 2 &&
+    !!quote &&
+    quote.quoteKey === action.quoteKey
+  );
 }
 export function validLandPurchaseAction(
   game: GameType,
@@ -247,7 +318,6 @@ export function validLandPurchaseAction(
     : undefined;
   return (
     Object.keys(value).length === 2 &&
-    isLandTerritoryId(action.territoryId) &&
     !!quote &&
     quote.quoteKey === action.quoteKey
   );
@@ -255,13 +325,18 @@ export function validLandPurchaseAction(
 export function purchaseLand(game: GameType, value: unknown): boolean {
   if (!validLandPurchaseAction(game, value)) return false;
   const quote = landPurchaseQuote(game, value.territoryId)!;
+  return purchaseTile(game, { tileId: quote.tileId, quoteKey: quote.quoteKey });
+}
+export function purchaseTile(game: GameType, value: unknown): boolean {
+  if (!validTilePurchaseAction(game, value)) return false;
+  const quote = tilePurchaseQuote(game, value.tileId)!;
   const now = currentTick(game);
   if (!now || now.cash < quote.price || !game.territoryNetwork) return false;
   const oldProgramCustomers = programCustomers(game);
   now.cash -= quote.price;
   now.customers += quote.customers;
-  game.territoryNetwork.landPurchases.push({
-    territoryId: quote.territoryId,
+  (game.territoryNetwork.tilePurchases ??= []).push({
+    tileId: quote.tileId,
     minute: game.date.minute,
     price: quote.price,
   });
@@ -298,13 +373,10 @@ export function territorySpecialSites(
   benefit: "hydro" | "geothermal",
   id?: TerritoryId,
 ) {
-  return LAND_TERRITORIES.filter(
+  return purchasedLandTerritories(game).filter(
     (territory) =>
       territory.benefit === benefit &&
       (!id || territory.id === id) &&
-      game.territoryNetwork?.landPurchases.some(
-        (receipt) => receipt.territoryId === territory.id,
-      ) &&
       !game.facilities.some(
         (facility) =>
           facilityTerritoryId(facility) === territory.id &&

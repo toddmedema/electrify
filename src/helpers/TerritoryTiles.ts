@@ -9,15 +9,21 @@ import {
 } from "../Types";
 import {
   TERRITORIES,
+  purchasedLandTerritories,
   isLandTerritoryId,
   type TerritorySiteKind,
 } from "../data/Territories";
 import {
   TERRITORY_TILES,
   getAuthoredTerritoryTile,
+  getGeneratedTerritoryTile,
+  territoryTileAt,
   type TerritoryTileDefinition,
 } from "../data/TerritoryTiles";
-import { UTILITY_AREAS } from "../data/UtilityExpansion";
+import {
+  POWER_AGREEMENT_BLOCKS,
+  UTILITY_AREAS,
+} from "../data/UtilityExpansion";
 import { isUtilityExpansionGame } from "./ExpansionContext";
 
 export function hasTerritoryNetwork(
@@ -27,17 +33,17 @@ export function hasTerritoryNetwork(
 }
 export function ownedTerritories(game: GameType): TerritoryId[] {
   if (!hasTerritoryNetwork(game)) return ["champlain"];
-  return TERRITORIES.filter(
-    ({ id }) =>
-      id === "champlain" ||
-      (isLandTerritoryId(id)
-        ? game.territoryNetwork?.landPurchases.some(
-            (receipt) => receipt.territoryId === id,
-          )
-        : game.utilityExpansion?.acquisitions.some(
+  return [
+    ...TERRITORIES.filter(
+      ({ id }) =>
+        id === "champlain" ||
+        (!isLandTerritoryId(id) &&
+          game.utilityExpansion?.acquisitions.some(
             ({ targetId }) => targetId === id,
           )),
-  ).map(({ id }) => id);
+    ),
+    ...purchasedLandTerritories(game),
+  ].map(({ id }) => id);
 }
 export function facilityTerritoryId(
   facility: Pick<FacilityOperatingType, "territoryId" | "startingAssetId">,
@@ -117,12 +123,23 @@ function historicalTile(
     ...(facility.hydroSiteId ? { hydroSiteId: facility.hydroSiteId } : {}),
   };
 }
-/** Legacy over-budget fleets get separate cells, never stacks or deleted assets. */
-export function getTerritoryTiles(
+type TileGame = Pick<GameType, "facilities"> &
+  Partial<
+    Pick<
+      GameType,
+      | "scenarioId"
+      | "customScenario"
+      | "territoryNetwork"
+      | "utilityExpansion"
+      | "date"
+      | "transmission"
+      | "multiplayer"
+    >
+  >;
+function legacyTiles(
   game?: Pick<GameType, "facilities">,
-): readonly TerritoryTileDefinition[] {
-  if (!game) return TERRITORY_TILES;
-  const overflow = game.facilities
+): TerritoryTileDefinition[] {
+  return (game?.facilities ?? [])
     .filter(
       (facility) =>
         typeof facility.tileId === "string" &&
@@ -133,7 +150,6 @@ export function getTerritoryTiles(
       const tile = historicalTile(facility, index);
       return tile ? [tile] : [];
     });
-  return overflow.length ? [...TERRITORY_TILES, ...overflow] : TERRITORY_TILES;
 }
 export function getTerritoryTile(
   id: unknown,
@@ -141,10 +157,107 @@ export function getTerritoryTile(
 ): TerritoryTileDefinition | undefined {
   return (
     getAuthoredTerritoryTile(id) ??
-    (typeof id === "string"
-      ? getTerritoryTiles(game).find((tile) => tile.id === id)
-      : undefined)
+    getGeneratedTerritoryTile(id) ??
+    legacyTiles(game).find((tile) => tile.id === id)
   );
+}
+export function ownsTerritoryTile(
+  game: Pick<GameType, "territoryNetwork" | "utilityExpansion">,
+  tileOrId: TerritoryTileDefinition | TerritoryTileId,
+): boolean {
+  const tile =
+    typeof tileOrId === "string" ? getTerritoryTile(tileOrId) : tileOrId;
+  if (!tile) return false;
+  return (
+    tile.territoryId === "champlain" ||
+    (!isLandTerritoryId(tile.territoryId) &&
+      !!game.utilityExpansion?.acquisitions.some(
+        ({ targetId }) => targetId === tile.territoryId,
+      )) ||
+    !!game.territoryNetwork?.landPurchases.some(
+      ({ territoryId }) => territoryId === tile.territoryId,
+    ) ||
+    !!game.territoryNetwork?.tilePurchases?.some(
+      ({ tileId }) => tileId === tile.id,
+    )
+  );
+}
+export const territoryHexDistance = (
+  a: { q: number; r: number },
+  b: { q: number; r: number },
+) =>
+  Math.max(
+    Math.abs(a.q - b.q),
+    Math.abs(a.r - b.r),
+    Math.abs(a.q + a.r - b.q - b.r),
+  );
+/** Only in-force, accepted utility PPAs extend sight; scheduled and expired agreements do not. */
+export function territoryVisibilityAnchors(
+  game: TileGame,
+): TerritoryTileDefinition[] {
+  const remote = new Set(
+    (game.transmission?.acceptedAgreements ?? []).flatMap((receipt) => {
+      const block = POWER_AGREEMENT_BLOCKS.find(
+        ({ id }) => id === receipt.blockId,
+      );
+      return block &&
+        "sellerUtilityId" in block &&
+        game.date &&
+        receipt.startMinute <= game.date.minute &&
+        game.date.minute < receipt.endMinute &&
+        !game.utilityExpansion?.acquisitions.some(
+          ({ targetId }) => targetId === block.sellerUtilityId,
+        )
+        ? [block.sellerUtilityId]
+        : [];
+    }),
+  );
+  const retained = [
+    ...TERRITORY_TILES,
+    ...legacyTiles(game),
+    ...(game.territoryNetwork?.tilePurchases ?? []).flatMap(({ tileId }) => {
+      const tile = getTerritoryTile(tileId, game);
+      return tile ? [tile] : [];
+    }),
+  ];
+  return retained.filter(
+    (tile) =>
+      ownsTerritoryTile(game, tile) || remote.has(tile.territoryId as never),
+  );
+}
+export function territoryVisibilityDistance(
+  game: TileGame,
+  tile: TerritoryTileDefinition,
+): 0 | 1 | 2 | 3 | undefined {
+  const distance = Math.min(
+    Infinity,
+    ...territoryVisibilityAnchors(game).map((anchor) =>
+      territoryHexDistance(anchor, tile),
+    ),
+  );
+  return distance <= 3 ? (distance as 0 | 1 | 2 | 3) : undefined;
+}
+/** Finite discovered frontier only: at most 37 cells per owned/active-PPA anchor. */
+export function getTerritoryTiles(
+  game?: TileGame,
+): readonly TerritoryTileDefinition[] {
+  if (!game) return TERRITORY_TILES;
+  const result = new Map(
+    [...TERRITORY_TILES, ...legacyTiles(game)].map((tile) => [tile.id, tile]),
+  );
+  const legacyAt = new Map(
+    legacyTiles(game).map((tile) => [`${tile.q},${tile.r}`, tile]),
+  );
+  for (const anchor of territoryVisibilityAnchors(game)) {
+    for (let dq = -3; dq <= 3; dq++)
+      for (let dr = Math.max(-3, -dq - 3); dr <= Math.min(3, -dq + 3); dr++) {
+        const tile =
+          legacyAt.get(`${anchor.q + dq},${anchor.r + dr}`) ??
+          territoryTileAt(anchor.q + dq, anchor.r + dr);
+        if (tile) result.set(tile.id, tile);
+      }
+  }
+  return [...result.values()];
 }
 export function isTerritoryTileId(
   value: unknown,
@@ -205,9 +318,10 @@ export function availableTerritoryTiles(
   id: TerritoryId,
 ): readonly TerritoryTileDefinition[] {
   if (!ownedTerritories(game).includes(id)) return [];
-  return TERRITORY_TILES.filter(
+  return getTerritoryTiles(game).filter(
     (tile) =>
       tile.territoryId === id &&
+      ownsTerritoryTile(game, tile) &&
       tileFitsFacility(tile, facility) &&
       !tileReserved(game, tile),
   );
@@ -236,7 +350,7 @@ export function assignTerritoryTiles(game: GameType): boolean {
       occupied.add(tile.id);
       continue;
     }
-    const candidates = TERRITORY_TILES.filter(
+    const candidates = getTerritoryTiles(game).filter(
       (tile) =>
         tile.territoryId === territoryId &&
         !occupied.has(tile.id) &&
@@ -259,7 +373,7 @@ export function territorySiteInventory(
   id: TerritoryId,
   kind: TerritorySiteKind,
 ): { remaining: number; total: number; maxPeakW: number } {
-  const tiles = TERRITORY_TILES.filter(
+  const tiles = getTerritoryTiles(game).filter(
     (tile) => tile.territoryId === id && tile.siteKind === kind,
   );
   return {

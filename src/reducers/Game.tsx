@@ -4,6 +4,7 @@ import {
   territoryBuildAvailability,
   legacyTerritoryConnections,
   purchaseLand,
+  purchaseTile,
 } from "../helpers/Territories";
 import { isTerritoryId } from "../data/Territories";
 import type { TerritoryId } from "../Types";
@@ -40,6 +41,7 @@ import {
   acquireUtility,
   acceptPowerAgreement,
   acquireLand,
+  acquireTile,
 } from "./GameActions";
 import {
   acceptAgreement,
@@ -1995,6 +1997,7 @@ export const gameSlice = createSlice({
         state.territoryNetwork = {
           version: 3,
           landPurchases: [],
+          tilePurchases: [],
           legacyConnections: [],
         };
         state.facilities.forEach((facility) => {
@@ -2538,6 +2541,23 @@ export const gameSlice = createSlice({
         true,
       );
       logGameEvent(state, "BUILD", "Acquired territory");
+    });
+    builder.addCase(acquireTile, (state, action) => {
+      if (!purchaseTile(state, action.payload)) return;
+      refreshInterestRate(
+        state,
+        getTimeFromTimeline(state.date.minute, state.timeline)!.cash,
+      );
+      rebaseGameRetentionBaseline(state, expansionRetentionBaseline(state));
+      state.timeline = reforecastDemand(state, 1, [], [], [], undefined, true);
+      state.timeline = reforecastSupply(
+        state,
+        true,
+        TICK_MINUTES,
+        undefined,
+        true,
+      );
+      logGameEvent(state, "BUILD", "Acquired land tile");
     });
     builder.addCase(acquireUtility, (state, action) => {
       applyAcquireUtility(state, action.payload);
@@ -7612,6 +7632,10 @@ function getNetWorth(
           0,
         ) +
         (game.territoryNetwork?.landPurchases.reduce(
+          (sum, receipt) => sum + receipt.price,
+          0,
+        ) ?? 0) +
+        (game.territoryNetwork?.tilePurchases?.reduce(
           (sum, receipt) => sum + receipt.price,
           0,
         ) ?? 0)

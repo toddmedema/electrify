@@ -2,6 +2,10 @@ import type { TerrainType, TerritoryId, TerritoryTileId } from "../Types";
 import {
   TERRITORIES,
   territoryHydroSiteId,
+  frontierCoordinates,
+  frontierTerritoryId,
+  getTerritoryDefinition,
+  territoryCoordinateHash,
   type TerritorySiteKind,
 } from "./Territories";
 import { UTILITY_AREAS } from "./UtilityExpansion";
@@ -181,4 +185,65 @@ export function getAuthoredTerritoryTile(
   id: unknown,
 ): TerritoryTileDefinition | undefined {
   return typeof id === "string" ? tilesById.get(id) : undefined;
+}
+
+const tilesByCoordinates = new Map(
+  TERRITORY_TILES.map((tile) => [`${tile.q},${tile.r}`, tile]),
+);
+export function territoryTileAt(
+  q: number,
+  r: number,
+): TerritoryTileDefinition | undefined {
+  const authored = tilesByCoordinates.get(`${q},${r}`);
+  if (authored) return authored;
+  const id = frontierTerritoryId(q, r);
+  const territory = getTerritoryDefinition(id);
+  if (!id || !territory) return undefined;
+  if (territory.benefit === "residential" || territory.benefit === "industrial")
+    return {
+      id,
+      territoryId: id,
+      q,
+      r,
+      terrain: "plains",
+      city: { sector: territory.benefit },
+    };
+  const siteKind =
+    territory.benefit === "hydro"
+      ? "hydro"
+      : territory.benefit === "geothermal"
+        ? "geothermal"
+        : "general";
+  // Three-cell terrain patches soften individual noise without platform-specific functions.
+  const terrain =
+    landTerrains[
+      territoryCoordinateHash(
+        Math.floor(q / 3),
+        Math.floor(r / 3),
+        "terrain-v1",
+      ) % landTerrains.length
+    ];
+  return {
+    id,
+    territoryId: id,
+    q,
+    r,
+    terrain:
+      siteKind === "hydro"
+        ? "lake"
+        : siteKind === "geothermal"
+          ? "mountain"
+          : terrain,
+    siteKind,
+    maxPeakW: territory.sites[siteKind].maxPeakW,
+    ...(siteKind === "hydro" ? { hydroSiteId: territoryHydroSiteId(id) } : {}),
+  };
+}
+export function getGeneratedTerritoryTile(
+  id: unknown,
+): TerritoryTileDefinition | undefined {
+  const coordinates = frontierCoordinates(id);
+  if (!coordinates) return undefined;
+  const tile = territoryTileAt(coordinates.q, coordinates.r);
+  return tile?.id === id ? tile : undefined;
 }

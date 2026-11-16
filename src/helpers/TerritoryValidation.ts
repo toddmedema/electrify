@@ -1,4 +1,8 @@
-import { getTerritoryTile, tileFitsFacility } from "./TerritoryTiles";
+import {
+  getTerritoryTile,
+  tileFitsFacility,
+  ownsTerritoryTile,
+} from "./TerritoryTiles";
 import { TICK_MINUTES } from "../Constants";
 import type { GameType } from "../Types";
 import {
@@ -12,7 +16,7 @@ import {
   facilityTerritoryId,
   ownedTerritories,
   landPrice,
-  territorySiteKind,
+  tilePrice,
 } from "./Territories";
 
 const record = (value: unknown): value is Record<string, unknown> =>
@@ -49,11 +53,12 @@ export function validTerritoryNetwork(game: GameType): boolean {
   if (
     !record(game.territoryNetwork) ||
     game.territoryNetwork.version !== 3 ||
-    Object.keys(game.territoryNetwork).length !== 3
+    Object.keys(game.territoryNetwork).length !== 4
   )
     return false;
   const state = game.territoryNetwork;
   if (
+    !Array.isArray(state.tilePurchases) ||
     !Array.isArray(state.landPurchases) ||
     state.landPurchases.length > LAND_TERRITORIES.length ||
     !Array.isArray(state.legacyConnections) ||
@@ -98,6 +103,28 @@ export function validTerritoryNetwork(game: GameType): boolean {
     )
       return false;
   }
+  const purchased = new Set<string>();
+  for (const receipt of state.tilePurchases ?? []) {
+    const tile = getTerritoryTile(receipt?.tileId, game);
+    if (
+      !record(receipt) ||
+      Object.keys(receipt).length !== 3 ||
+      !tile ||
+      !isLandTerritoryId(tile.territoryId) ||
+      purchased.has(tile.id) ||
+      state.landPurchases.some(
+        ({ territoryId }) => territoryId === tile.territoryId,
+      ) ||
+      !Number.isSafeInteger(receipt.minute) ||
+      receipt.minute < 0 ||
+      receipt.minute > game.date.minute ||
+      receipt.minute % TICK_MINUTES !== 0 ||
+      !nonnegative(receipt.price) ||
+      !close(receipt.price, tilePrice(game, receipt.minute, tile.id))
+    )
+      return false;
+    purchased.add(tile.id);
+  }
   if (
     state.legacyConnections.some(
       (line) => line.corridorId === "vt-champlain-uplands",
@@ -137,27 +164,21 @@ export function validTerritoryNetwork(game: GameType): boolean {
       )
         return true;
       const id = facilityTerritoryId(facility);
-      // These parcels did not exist in earlier saves; every plant must fit its purchased rights.
-      if (id.startsWith("parcel-")) {
-        const territory = LAND_TERRITORIES.find((entry) => entry.id === id)!;
-        const purchase = state.landPurchases.find(
+      if (isLandTerritoryId(id)) {
+        const tile = getTerritoryTile(facility.tileId, game);
+        const retained = state.landPurchases.find(
           (receipt) => receipt.territoryId === id,
         );
-        const specific = territorySiteKind(facility);
-        const kind =
-          territory.benefit === "general" &&
-          specific !== "hydro" &&
-          specific !== "geothermal"
-            ? "general"
-            : specific;
+        const purchase =
+          retained ??
+          state.tilePurchases?.find(
+            (receipt) => receipt.tileId === facility.tileId,
+          );
         if (
+          !tile ||
+          !ownsTerritoryTile(game, tile) ||
           !purchase ||
-          facility.minuteCreated < purchase.minute ||
-          !kind ||
-          territory.sites[kind].count === 0 ||
-          facility.peakW > territory.sites[kind].maxPeakW ||
-          game.facilities.filter((candidate) => candidate.territoryId === id)
-            .length > territory.sites[kind].count
+          facility.minuteCreated < purchase.minute
         )
           return true;
       }
