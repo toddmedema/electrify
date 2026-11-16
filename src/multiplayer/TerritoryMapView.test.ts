@@ -180,3 +180,96 @@ it("projects and reserves retained peer property, including after retirement of 
     ),
   ).toMatchObject({ ownerKey: "peer:0", owned: false });
 });
+
+it("withholds unknown retired-peer footprints while retaining host reservations and later discovery", () => {
+  loadSimData(UTILITY_AREAS.champlain.location);
+  const initial = createWorld(
+    { scenarioId: 116, difficulty: "Employee" },
+    coopSeats(2),
+    "hidden-retained-view",
+    "epoch",
+  );
+  const raw = JSON.parse(JSON.stringify(checkpointWorld(initial)));
+  raw.gameSchema = 16;
+  raw.rules =
+    "coop-2-06e4afd05778c47de20788acd02787291d3f09456465a0a89ace5fbeadd2d018";
+  for (const grid of raw.grids) {
+    delete grid.territoryNetwork.tilePurchases;
+    delete grid.territoryNetwork.legacyTiles;
+  }
+  const oil = raw.grids[0].facilities.find(
+    (plant: { fuel: string }) => plant.fuel === "Oil",
+  );
+  for (const id of [100, 101])
+    raw.grids[0].facilities.push({
+      ...oil,
+      id,
+      startingAssetId: undefined,
+      tileId: `champlain:legacy-${id}`,
+    });
+  const world = restoreWorld(raw, "retained");
+  const tile = getTerritoryTile("champlain:legacy-101", world.grids[0])!;
+  expect(tile).toMatchObject({ q: 7, r: -4, maxPeakW: 40e6 });
+  const connectedView = roomView(world, "1").game!;
+  expect(territoryVisibilityDistance(connectedView, tile)).toBe(0);
+  expect(connectedView.multiplayer!.legacyTiles).toContainEqual({
+    tile,
+    seat: "0",
+    name: world.seats[0].name,
+    facility: { name: "Oil", fuel: "Oil", peakW: 40e6, yearsToBuildLeft: 0 },
+  });
+  expect(
+    command(world, "0", { kind: "action", name: "sellFacility", payload: 100 }),
+  ).toBeUndefined();
+  expect(getTerritoryTile(tile.id, world.grids[0])).toEqual(tile);
+  world.outcomes["0"] = { outcome: "fired", title: "Retired", month: 0 };
+  const before = JSON.stringify(checkpointWorld(world));
+  const hiddenView = roomView(world, "1").game!;
+  expect(territoryVisibilityDistance(hiddenView, tile)).toBeUndefined();
+  expect(hiddenView.multiplayer!.legacyTiles).toEqual([]);
+  expect(hiddenView.multiplayer!.tileOwners?.[tile.id]).toBeUndefined();
+  expect(hiddenView.multiplayer!.tileFacilities?.[tile.id]).toBeUndefined();
+  expect(JSON.stringify(checkpointWorld(world))).toBe(before);
+
+  // A later utility contract reveals the retained cell without reviving peer sight.
+  currentTick(world.grids[1])!.cash = 3e9;
+  expect(
+    command(world, "1", {
+      kind: "action",
+      name: "acceptPowerAgreement",
+      payload: {
+        blockId: "valley-purchase",
+        quoteKey: powerAgreementQuote(world.grids[1], "valley-purchase")!
+          .quoteKey,
+      },
+    }),
+  ).toBeUndefined();
+  const discoveredView = roomView(world, "1").game!;
+  expect(territoryVisibilityDistance(discoveredView, tile)).toBe(3);
+  expect(discoveredView.multiplayer!.legacyTiles).toContainEqual({
+    tile,
+    seat: "0",
+    name: world.seats[0].name,
+    facility: { name: "Oil", fuel: "Oil", peakW: 40e6, yearsToBuildLeft: 0 },
+  });
+  expect(tilePurchaseQuote(discoveredView, "frontier:7:-4")).toBeUndefined();
+  const cash = currentTick(world.grids[1])!.cash;
+  expect(
+    command(world, "1", {
+      kind: "action",
+      name: "acquireTile",
+      payload: {
+        tileId: "frontier:7:-4",
+        quoteKey: JSON.stringify(["frontier:7:-4", 3e6, "general", 0]),
+      },
+    }),
+  ).toMatch(/owned|unavailable/i);
+  expect(currentTick(world.grids[1])!.cash).toBe(cash);
+  const forged = JSON.parse(JSON.stringify(checkpointWorld(world)));
+  forged.grids[1].territoryNetwork.tilePurchases.push({
+    tileId: "frontier:7:-4",
+    minute: 0,
+    price: 3e6,
+  });
+  expect(() => restoreWorld(forged, "overlap")).toThrow();
+});

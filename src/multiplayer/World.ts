@@ -855,9 +855,16 @@ export function roomView(world: World, seatId: string): RoomView {
   const game = cloneGrid(territoryGameForWorld(world, index));
   const visible = territoryTileViews(game);
   const visibleIds = new Set(visible.map(({ tile }) => tile.id));
+  const visibleCells = new Set(
+    visible.map(({ tile }) => `${tile.q},${tile.r}`),
+  );
   const visibleRegions = new Set(visible.map(({ tile }) => tile.territoryId));
   game.multiplayer = {
     ...game.multiplayer!,
+    // Compute sight with complete host footprints, then publish only discovered cells.
+    legacyTiles: game.multiplayer!.legacyTiles?.filter(({ tile }) =>
+      visibleCells.has(`${tile.q},${tile.r}`),
+    ),
     peers: game.multiplayer!.peers?.map((peer) => {
       const other =
         world.grids[world.seats.findIndex((seat) => seat.id === peer.id)];
