@@ -612,7 +612,7 @@ function tradingFlowText(game: GameType): string | null {
 }
 
 // The two directions are independent choices beside the connections they govern.
-function TradingControls({
+export function TradingControls({
   game,
   onBuyingRule,
   onSellingRule,

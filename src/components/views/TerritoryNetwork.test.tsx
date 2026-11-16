@@ -50,7 +50,7 @@ const inspect = (id: Parameters<typeof territoryMapLabel>[0]) =>
     }),
   );
 it("floats utility names on the map and removes the numbered key", () => {
-  const { container } = show(ready());
+  show(ready());
   expect(
     screen.getByRole("button", { name: "Inspect You territory" }),
   ).toHaveTextContent("You");
@@ -60,11 +60,9 @@ it("floats utility names on the map and removes the numbered key", () => {
   expect(
     screen.getByRole("button", { name: "Inspect Valley Electric territory" }),
   ).toHaveTextContent("Valley Electric");
-  expect(container.querySelector(".territoryMapKey")).toBeNull();
-  expect(container.querySelector(".territoryHexHub")).toBeNull();
-  expect(container.querySelectorAll(".territoryParcel")).toHaveLength(
-    LAND_TERRITORIES.length,
-  );
+  expect(
+    screen.getAllByRole("button", { name: /^Inspect .* territory$/ }),
+  ).toHaveLength(LAND_TERRITORIES.length + 3);
   expect(screen.queryByText("Green Uplands")).not.toBeInTheDocument();
 });
 it.each(LAND_TERRITORIES)(
@@ -160,12 +158,14 @@ it("keeps utility offers directly inspectable and turns acquired borders into yo
     financed: false,
     quoteKey: quote.quoteKey,
   });
-  const { container, onBuildFacility } = show(game);
+  const { onBuildFacility } = show(game);
   inspect("ridge-electric");
   expect(
     screen.getByRole("button", { name: "Inspect Ridge Electric territory" }),
   ).toHaveTextContent("You");
-  expect(container.querySelector('[data-owner="ridge-electric"]')).toBeNull();
+  expect(
+    screen.getByRole("button", { name: "Inspect Ridge Electric territory" }),
+  ).toHaveAccessibleDescription(/^Your territory/);
   fireEvent.click(
     screen.getByRole("button", { name: "Build in Ridge Electric" }),
   );

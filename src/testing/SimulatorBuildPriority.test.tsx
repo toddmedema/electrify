@@ -1,4 +1,5 @@
 import { createGame, runSimulation } from "./Simulator";
+import { LAND_TERRITORIES } from "../data/Territories";
 import type { InitialBuildType } from "./Simulator";
 
 const oil: InitialBuildType = { name: "Oil", peakW: 50e6, financed: true };
@@ -65,4 +66,18 @@ test("scheduled reserve orders use the same placement contract", () => {
   expect(result.violations).toEqual([]);
   expect(result.builds).toHaveLength(1);
   expect(result.finalFacilities.map(({ id }) => id)).toEqual([1, 2, 3]);
+});
+
+test("a rejected later land order cannot pass because an earlier parcel was purchased", () => {
+  expect(() =>
+    runSimulation({
+      scenarioId: 116,
+      months: 1,
+      scheduledActions: LAND_TERRITORIES.map(({ id }) => ({
+        month: 0,
+        type: "land",
+        territoryId: id,
+      })),
+    }),
+  ).toThrow("Land purchase rejected");
 });

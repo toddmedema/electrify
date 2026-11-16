@@ -102,7 +102,7 @@ import {
   upgradeProgress,
 } from "../../helpers/Hazards";
 import { dayCount, resilienceName } from "../base/WeatherResilienceText";
-import TransmissionPanel from "./TransmissionPanel";
+import TransmissionPanel, { TradingControls } from "./TransmissionPanel";
 import { facilityDisplayName } from "../base/FacilityLabels";
 import { BuyingRuleType, SellingRuleType } from "../../Types";
 import { corridorsForLocation } from "../../data/AdjacentMarkets";
@@ -1518,6 +1518,18 @@ export default class Facilities extends React.Component<Props, SelectionState> {
                     Purchase finite supplies for your company pool.
                     Availability, weather and expiry still matter.
                   </Typography>
+                  {game.multiplayer && (
+                    <section>
+                      <Typography component="h3" variant="subtitle1">
+                        Co-op power sharing
+                      </Typography>
+                      <TradingControls
+                        game={game}
+                        onBuyingRule={onBuyingRule}
+                        onSellingRule={onSellingRule}
+                      />
+                    </section>
+                  )}
                   {(Object.keys(INHERITED_CONNECTIONS) as UtilityId[])
                     .filter((id) => utilityOwnedAt(game, id, game.date.minute))
                     .map((id, index) => (

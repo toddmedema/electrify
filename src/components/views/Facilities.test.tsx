@@ -45,6 +45,14 @@ import { modScenario } from "../../mods/ModScenario";
 import { acquireUtility } from "../../reducers/GameActions";
 import { acquisitionQuote } from "../../helpers/Expansion";
 import { currentTick } from "../../helpers/GameSelectors";
+import {
+  createWorld,
+  checkpointWorld,
+  restoreWorld,
+} from "../../multiplayer/World";
+import { coopSeats } from "../../testing/MultiplayerFixtures";
+import { loadSimData } from "../../testing/SimData";
+import { UTILITY_AREAS } from "../../data/UtilityExpansion";
 
 describe("acquired utilities", () => {
   function expansionGame(acquire = true) {
@@ -238,6 +246,8 @@ function playedGame(ticks: number): GameType {
 }
 
 interface Handlers {
+  onBuyingRule: jest.Mock;
+  onSellingRule: jest.Mock;
   onTogglePause: jest.Mock;
   onPause: jest.Mock;
   onSelect: jest.Mock;
@@ -253,6 +263,8 @@ function renderFacilities(
   ref?: React.RefObject<Facilities>,
 ): Handlers & { rerenderGame: (game: GameType) => void } {
   const handlers: Handlers = {
+    onBuyingRule: jest.fn(),
+    onSellingRule: jest.fn(),
     onTogglePause: jest.fn(),
     onPause: jest.fn(),
     onSelect: jest.fn(),
@@ -272,8 +284,8 @@ function renderFacilities(
         onTransmissionUpgrade={() => undefined}
         onStorageBuild={() => undefined}
         onTransmissionBuild={() => undefined}
-        onBuyingRule={() => undefined}
-        onSellingRule={() => undefined}
+        onBuyingRule={handlers.onBuyingRule}
+        onSellingRule={handlers.onSellingRule}
         onSell={handlers.onSell}
         onTogglePause={handlers.onTogglePause}
         onPause={handlers.onPause}
@@ -2274,7 +2286,7 @@ it("distinguishes facility inspection actions by territory and opens them from t
     { ...wind, id: 999, territoryId: "valley-electric" },
   ];
   renderFacilities(game, null);
-  const home = screen.getByRole("button", { name: "Inspect Wind, Champlain" });
+  const home = screen.getByRole("button", { name: "Inspect Wind, You" });
   const valley = screen.getByRole("button", {
     name: "Inspect Wind, Valley Electric",
   });
@@ -2285,4 +2297,35 @@ it("distinguishes facility inspection actions by territory and opens them from t
   await user.keyboard("{Enter}");
   expect(valley).toHaveAttribute("aria-expanded", "true");
   expect(home).toHaveAttribute("aria-expanded", "false");
+});
+
+it("keeps restored co-op trading choices reachable through territory agreements", async () => {
+  loadSimData(UTILITY_AREAS.champlain.location);
+  const world = createWorld(
+    { scenarioId: 116, difficulty: "Employee" },
+    coopSeats(2),
+    "trading-controls",
+    "initial",
+  );
+  world.grids[0].transmission!.buyingRule = "NONE";
+  world.grids[0].transmission!.sellingRule = "NONE";
+  const game = restoreWorld(checkpointWorld(world), "restored").grids[0];
+  const handlers = renderFacilities(game, null);
+  await user.click(screen.getByRole("tab", { name: "Agreements" }));
+  expect(
+    screen.getByRole("heading", { name: "Co-op power sharing" }),
+  ).toBeVisible();
+  const buying = screen.getByRole("combobox", { name: "Buying", exact: true });
+  expect(buying).toHaveTextContent("None");
+  await user.click(buying);
+  await user.click(screen.getByRole("option", { name: "Shortages only" }));
+  const selling = screen.getByRole("combobox", {
+    name: "Selling",
+    exact: true,
+  });
+  expect(selling).toHaveTextContent("None");
+  await user.click(selling);
+  await user.click(screen.getByRole("option", { name: "All profitable" }));
+  expect(handlers.onBuyingRule).toHaveBeenCalledWith("SHORTAGES");
+  expect(handlers.onSellingRule).toHaveBeenCalledWith("PROFITABLE");
 });

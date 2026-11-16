@@ -150,3 +150,12 @@ export function territoryMapCenter(id: TerritoryId) {
     { x: 0, y: 0 },
   );
 }
+
+/** Stable colors for the room's at most three other companies, independent of arbitrary seat IDs. */
+export function territoryPeerColors(peerIds: readonly string[]) {
+  return Object.fromEntries(
+    [...new Set(peerIds)]
+      .sort()
+      .map((id, index) => [id, `var(--territory-owner-peer-${index})`]),
+  );
+}

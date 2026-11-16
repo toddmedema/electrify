@@ -254,7 +254,7 @@ it("uses the same territory model for a scenario116 mod and leaves other scenari
   const raw = JSON.parse(JSON.stringify(serializeSave(game)));
   raw.schemaVersion = 13;
   raw.game.territoryNetwork = { version: 1 };
-  expect(parseSave(raw)?.game.territoryNetwork?.version).toBe(2);
+  expect(parseSave(raw)?.game.territoryNetwork?.version).toBe(3);
   const other = createGame({ scenarioId: 100, seed: 61 });
   expect(parseSave(serializeSave(other))?.game).toEqual(other);
 });

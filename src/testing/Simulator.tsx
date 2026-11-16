@@ -528,7 +528,11 @@ export function runSimulation(options: SimOptionsType): SimResultType {
                 }),
               ),
             );
-            if (!state.territoryNetwork?.landPurchases.length)
+            if (
+              !state.territoryNetwork?.landPurchases.some(
+                ({ territoryId }) => territoryId === quote.territoryId,
+              )
+            )
               throw new Error("Land purchase rejected");
             break;
           }

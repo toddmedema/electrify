@@ -2,24 +2,28 @@
 
 Scenario 116 is a fictional Vermont Investor utility, January 2005–December 2024.
 Acquire Valley Electric or Ridge Electric directly, sign finite power agreements,
-build facilities and buy Green Uplands land. All owned customers and facilities
+build facilities and buy unowned land for customers or new building sites. All owned customers and facilities
 share one company power pool. Location controls finite suitable sites; no line
 purchase, transfer bottleneck or connection fee is involved. Human co-op companies
 remain independent, with new empty-land claims accepted once in host command order.
 
 Inherited nuclear and Québec hydro commitments retain their original dates.
 Acquisition transfers plants, customers, sites, debts and third-party obligations;
-a PPA with the acquired seller ends as an external delivery/charge. Green Uplands
-costs $18 million in 2005 dollars, indexed by CPI, for land alone. See
+a PPA with the acquired seller ends as an external delivery/charge. Every unowned
+parcel is purchasable. General land, residential or industrial customers, and
+special hydro or geothermal sites have distinct cash prices and benefits. See
 [territories](territories.md) for site budgets, accounting and legacy-save conversion.
 
 The Territories view uses an isometric hex schematic, following the visual direction in
 [issue 603](https://github.com/toddmedema/electrify/issues/603). Towns and factories indicate
-customers, lakes and dams existing hydro, plains solar/storage sites, and hills wind sites.
+customers, lakes hydro sites, steam geothermal sites, and field symbols general building land.
+Existing utility land also shows dams, plains and wind hills.
 Equipment appears when a completed plant exists; independent utilities show their authored
 starting fleet. Each group selects a territory, rather than an individual build slot. Its
-actual site counts and operating controls remain in the territory details. The numbered
-territory key provides the same selection through keyboard and touch controls.
+actual site counts and operating controls remain in the territory details. Utility names
+float above their land, with the player labeled “You” and distinct ownership borders.
+Neutral land has no proper name; symbols show its benefit. Native map buttons support
+keyboard, touch and controller selection without a numbered key.
 
 ## Authored portfolios and historical references
 
@@ -196,7 +200,7 @@ transactions, timed obligations and outcomes. Early losses are not evidence abou
 later events. Current-format saves persist the aggregate customer and market
 totals, transaction and financial ledgers, and one forecast timeline.
 
-The current land-development playbook buys Green Uplands at the opening $18M
+The land-development playbook buys the original large general-land parcel at the opening $18M
 cash price, builds 100 MW of wind there, and completes the 240-month scenario
 alongside a prepared Valley acquisition at every difficulty. The land purchase
 reduces cash available for facilities while its non-depreciating value preserves

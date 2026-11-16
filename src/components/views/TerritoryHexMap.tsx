@@ -17,6 +17,7 @@ import {
   mapBoundary,
   territoryMapCenter,
   territoryMapLabel,
+  territoryPeerColors,
 } from "../base/TerritoryMapLayout";
 
 const hexFace = "M0-38 64-19V19L0 38-64 19V-19Z";
@@ -52,6 +53,14 @@ export default function TerritoryHexMap({
     const claim = game.multiplayer?.landOwners?.[id];
     return claim ? `peer:${claim.seat}` : undefined;
   };
+  const peerColors = territoryPeerColors(
+    [
+      ...(game.multiplayer?.peers?.map(({ id }) => id) ?? []),
+      ...Object.values(game.multiplayer?.landOwners ?? {}).flatMap((claim) =>
+        claim ? [claim.seat] : [],
+      ),
+    ].filter((id) => id !== game.multiplayer?.seat),
+  );
   const color = (id: string) =>
     id === "you"
       ? "var(--territory-owner-you)"
@@ -59,7 +68,7 @@ export default function TerritoryHexMap({
         ? "var(--territory-owner-valley)"
         : id === "ridge-electric"
           ? "var(--territory-owner-ridge)"
-          : `var(--territory-owner-peer-${[...id].reduce((sum, char) => sum + char.charCodeAt(0), 0) % 3})`;
+          : peerColors[id.slice("peer:".length)];
   const ownerGroups = [
     ...new Set(
       TERRITORIES.map(({ id }) => owner(id)).filter((id): id is string => !!id),

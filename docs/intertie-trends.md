@@ -5,10 +5,11 @@ Every neighbouring market an intertie reaches carries researched time series in
 fixed 2020s snapshot. This replaces the six fixed proxies (and the 445 kg/MWh world-average
 fallback most neighbours used) from `ImportEmissions.ts`.
 
-Green Uplands is an internal development route, available from the fictional scenario's 2005
-opening. Its catalogue record reuses the ISO New England proxy already used by Valley and Ridge
-as fallback metadata. External supply, demand and the base price are all zero; this record does
-not provide a market or attribute regional-grid emissions to plants built in Green Uplands.
+The legacy Green Uplands catalogue record remains fallback metadata for old saves.
+Across the Valley now offers this land as an unnamed general-building parcel, with no
+transmission or market purchase. The catalogue record reuses the ISO New England proxy
+already used by Valley and Ridge. Its external supply, demand and base price are zero;
+it does not provide a market or attribute regional-grid emissions to plants built there.
 
 ## What each series means
 

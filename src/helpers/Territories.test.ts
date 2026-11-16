@@ -79,7 +79,7 @@ it("rejects unaffordable and duplicate purchases atomically", () => {
   expect(purchaseLand(game, payload)).toBe(false);
   expect(JSON.stringify(game)).toBe(after);
 });
-it("reserves finite typed sites through construction and pause; selling frees the site", () => {
+it("reserves shared general sites through construction and pause; selling frees the site", () => {
   let game = ready();
   const wind = GENERATORS(game, 50e6, [20], [500]).find(
     (f) => f.fuel === "Wind",
@@ -88,7 +88,7 @@ it("reserves finite typed sites through construction and pause; selling frees th
     territoryBuildAvailability(game, wind, "green-uplands").buildable,
   ).toBe(false);
   buyLand(game);
-  for (let i = 0; i < 4; i++)
+  for (let i = 0; i < 7; i++)
     game = JSON.parse(
       JSON.stringify(
         reducer(
@@ -101,9 +101,9 @@ it("reserves finite typed sites through construction and pause; selling frees th
         ),
       ),
     );
-  expect(territorySiteInventory(game, "green-uplands", "wind").remaining).toBe(
-    0,
-  );
+  expect(
+    territorySiteInventory(game, "green-uplands", "general").remaining,
+  ).toBe(0);
   const remote = game.facilities.find(
     (f) => f.territoryId === "green-uplands",
   )!;
@@ -112,11 +112,11 @@ it("reserves finite typed sites through construction and pause; selling frees th
     territoryBuildAvailability(game, wind, "green-uplands").buildable,
   ).toBe(false);
   game = JSON.parse(JSON.stringify(reducer(game, sellFacility(remote.id))));
-  expect(territorySiteInventory(game, "green-uplands", "wind").remaining).toBe(
-    1,
-  );
   expect(
-    territoryBuildAvailability(game, { ...wind, peakW: 151e6 }, "green-uplands")
+    territorySiteInventory(game, "green-uplands", "general").remaining,
+  ).toBe(1);
+  expect(
+    territoryBuildAvailability(game, { ...wind, peakW: 301e6 }, "green-uplands")
       .buildable,
   ).toBe(false);
   const battery = STORAGE(
