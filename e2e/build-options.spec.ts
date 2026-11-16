@@ -72,13 +72,34 @@ for (const theme of ["light", "dark"] as const) {
       await page
         .getByRole("button", { name: "Start game", exact: true })
         .click();
-      await openBuild(page);
+      if (scenarioId === 116) {
+        const facilities = page.locator(".facilities:visible");
+        await openPane(
+          facilities,
+          page.getByRole("button", { name: "Facilities", exact: true }),
+        );
+        await facilities
+          .getByRole("tab", { name: "Territories", exact: true })
+          .click();
+        const tile = page.locator(
+          '[data-map-target="champlain:site-5"][data-owned="true"]',
+        );
+        await expect(tile).toContainText(
+          "One building site; transmission tower",
+        );
+        await tile.click();
+        await expect(
+          page.getByRole("dialog", { name: "Build · Plains", exact: true }),
+        ).toBeVisible();
+      } else {
+        await openBuild(page);
+      }
       await page.getByRole("tab", { name: "Generators", exact: true }).click();
       const options = page.getByRole("list", { name: "Generator options" });
       const geothermal = options.locator('[data-build-option="Geothermal"]');
       await expect(geothermal).toContainText(
         scenarioId === 116
-          ? "No sites of this type remain in this territory."
+          ? "This technology or project size does not fit this tile."
           : `No geothermal sites near ${place}.`,
       );
       await expect(
@@ -106,13 +127,23 @@ for (const theme of ["light", "dark"] as const) {
             cards.map((card) => ({
               name: card.getAttribute("data-build-option"),
               detailed: !!card.querySelector(".buildOptionMetrics"),
+              buildable: !!card.querySelector(
+                'button[aria-label^="Review purchase of"]:not(:disabled)',
+              ),
             })),
           );
         const index = ordered.findIndex((card) => card.name === "Geothermal");
         expect(index).toBeGreaterThanOrEqual(0);
-        expect(ordered.slice(index).filter((card) => card.detailed)).toEqual(
-          [],
+        expect(ordered.slice(0, index).some((card) => card.buildable)).toBe(
+          true,
         );
+        expect(
+          ordered
+            .slice(index)
+            .filter((card) =>
+              scenarioId === 116 ? card.buildable : card.detailed,
+            ),
+        ).toEqual([]);
       }
       await geothermal.scrollIntoViewIfNeeded();
       await expect(geothermal).toBeVisible();

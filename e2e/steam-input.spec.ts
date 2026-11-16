@@ -1405,13 +1405,25 @@ test("TV saved preferences style direct scenario links before play", async ({
     await foregroundContrast(warning.locator(".missionRiskButton")),
     "mission warning text keeps contrast on its amber surface",
   ).toBeGreaterThanOrEqual(4.5);
-  await page.getByRole("button", { name: "Build", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Build", exact: true }),
+  ).toHaveCount(0);
+  const tile = await selectMapTile(page, "champlain:site-5");
+  await expect(tile).toHaveAttribute("data-owned", "true");
+  await expect(tile).toContainText("One building site; transmission tower");
+  await input(page, "confirm");
+  await expect(tile).toHaveAttribute("aria-pressed", "true");
+  const builder = page.getByRole("dialog", {
+    name: "Build · Plains",
+    exact: true,
+  });
+  await expect(builder).toBeVisible();
   await expect(
     page.getByRole("tab", { name: "Interties", exact: true }),
   ).toHaveCount(0);
   await expect(
-    page.getByRole("combobox", { name: "Build destination", exact: true }),
-  ).toHaveText("You");
+    builder.getByRole("combobox", { name: /^Build (destination|tile)$/ }),
+  ).toHaveCount(0);
   const metrics = page
     .getByRole("list", { name: "Generator options" })
     .locator(".buildOptionMetric");
@@ -1424,6 +1436,10 @@ test("TV saved preferences style direct scenario links before play", async ({
       "generator values stay within their own metric column",
     ).toBeLessThanOrEqual(1);
   }
+  await builder
+    .getByRole("button", { name: "Close tile", exact: true })
+    .click();
+  await expect(builder).toHaveCount(0);
   await page.getByRole("button", { name: "Events", exact: true }).click();
   const goalWidth = await page
     .locator(".operationsPriorities")
