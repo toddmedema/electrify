@@ -817,17 +817,27 @@ test("leaving home does not light up the top action while the menu fades out", a
   await expect(play).toBeFocused();
   await settings.hover();
   await expect(settings).toBeFocused(); // the pointer moved the active button to Settings
-  await settings.click();
-  // The home screen stays mounted and inert while it fades out.
-  await page.waitForFunction(() => {
-    const menu = document.querySelector<HTMLElement>("#menuCard");
-    return !!menu && !!menu.closest<HTMLElement>("main")?.inert;
+  // Capture the exit state in the browser before the outgoing menu can unmount.
+  const exitState = await play.evaluateHandle((button) => {
+    const screen = button.closest("main")!;
+    const state = { inert: false, background: "" };
+    const observer = new MutationObserver(() => {
+      if (!screen.inert) return;
+      state.inert = screen.inert;
+      state.background = getComputedStyle(button).backgroundColor;
+      observer.disconnect();
+    });
+    observer.observe(screen, { attributes: true, attributeFilter: ["inert"] });
+    return state;
   });
-  // The selection must not jump to the top action while the menu is leaving.
-  const background = await play.evaluate(
-    (button) => getComputedStyle(button).backgroundColor,
-  );
-  expect(background).toBe("rgba(0, 0, 0, 0)");
+  await settings.click();
+  // The snapshot remains available even when the test reads it after the fade.
+  await expect(page.locator("#menuCard")).toHaveCount(0);
+  expect(await exitState.jsonValue()).toEqual({
+    inert: true,
+    background: "rgba(0, 0, 0, 0)",
+  });
+  await exitState.dispose();
   await expect(
     page.getByRole("heading", { name: "Settings", exact: true }),
   ).toBeVisible();
