@@ -2,19 +2,20 @@
 
 Scenario 116 is a fictional Vermont Investor utility, January 2005–December 2024.
 Acquire Valley Electric or Ridge Electric directly, sign finite power agreements,
-build facilities and buy individual tiles for customers or new building sites. All owned customers and facilities
-share one company power pool. Location controls finite suitable sites; no line
+build facilities and buy individual tiles for customers or new building sites.
+All owned customers and facilities share one company power pool. Location controls
+finite suitable sites; no line
 purchase, transfer bottleneck or connection fee is involved. Human co-op companies
 remain independent, with new empty-land claims accepted once in host command order.
 
 Inherited nuclear and Québec hydro commitments retain their original dates.
 Acquisition transfers plants, customers, sites, debts and third-party obligations;
-a PPA with the acquired seller ends as an external delivery/charge. Every unowned
-visible unowned tile is purchasable. General land, residential or industrial customers, and
+a PPA with the acquired seller ends as an external delivery/charge. Every visible
+unowned tile is purchasable. General land, residential or industrial customers, and
 special hydro or geothermal sites have distinct cash prices and benefits. See
 [territories](territories.md) for site budgets, accounting and legacy-save conversion.
 
-The Territories view uses an isometric hex schematic, following the visual direction in
+The map uses an isometric hex schematic, following the visual direction in
 [issue 603](https://github.com/toddmedema/electrify/issues/603). Towns and factories indicate
 customers. Plains, forest, hills, mountain, river, lake and ocean are illustrated
 terrain backgrounds, with separate upright cities, generators, storage and towers.
