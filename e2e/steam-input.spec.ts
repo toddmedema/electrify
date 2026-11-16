@@ -1305,15 +1305,22 @@ test("TV saved preferences style direct scenario links before play", async ({
     "mission warning text keeps contrast on its amber surface",
   ).toBeGreaterThanOrEqual(4.5);
   await page.getByRole("button", { name: "Build", exact: true }).click();
-  await page.getByRole("tab", { name: "Interties", exact: true }).click();
-  const metrics = page.locator(".transmissionProject .buildOptionMetric");
+  await expect(
+    page.getByRole("tab", { name: "Interties", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("combobox", { name: "Build destination", exact: true }),
+  ).toHaveText("Champlain");
+  const metrics = page
+    .getByRole("list", { name: "Generator options" })
+    .locator(".buildOptionMetric");
   await expect(metrics.first()).toBeVisible();
   for (const metric of await metrics.all()) {
     expect(
       await metric.evaluate(
         (element) => element.scrollWidth - element.clientWidth,
       ),
-      "intertie values stay within their own metric column",
+      "generator values stay within their own metric column",
     ).toBeLessThanOrEqual(1);
   }
   await page.getByRole("button", { name: "Events", exact: true }).click();
