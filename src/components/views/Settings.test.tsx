@@ -428,7 +428,7 @@ describe("Settings", () => {
     expect(button).toBeVisible();
     expect(screen.getByText("26sept26-1507")).toBe(button);
     expect(
-      screen.queryByRole("button", { name: "Clear cache", hidden: true }),
+      screen.queryByText("Clear cache", { selector: "button" }),
     ).toBeNull();
     await user.click(button);
 
