@@ -59,7 +59,7 @@ export function validTerritoryNetwork(game: GameType): boolean {
   )
     return false;
   if (
-    new Set(state.landPurchases.map((receipt) => receipt.territoryId)).size !==
+    new Set(state.landPurchases.map((receipt) => receipt?.territoryId)).size !==
     state.landPurchases.length
   )
     return false;

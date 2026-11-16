@@ -343,7 +343,10 @@ export function validHydroClaims(state: HydroState): boolean {
       return false;
     if (
       state.territoryNetwork &&
-      !Array.isArray(state.territoryNetwork.landPurchases)
+      (!Array.isArray(state.territoryNetwork.landPurchases) ||
+        state.territoryNetwork.landPurchases.some(
+          (receipt) => !receipt || typeof receipt !== "object",
+        ))
     )
       return false;
     const owned = new Set(

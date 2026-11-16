@@ -82,7 +82,8 @@ export function territorySiteKind(
 
 /** Reservations include paused and unfinished projects; selling removes the reservation. */
 export function territorySiteInventory(
-  game: Pick<GameType, "facilities">,
+  game: Pick<GameType, "facilities"> &
+    Partial<Pick<GameType, "commissionedHydroSiteIds">>,
   id: TerritoryId,
   kind: TerritorySiteKind,
 ): { remaining: number; total: number; maxPeakW: number } {
@@ -98,7 +99,17 @@ export function territorySiteInventory(
     );
   }).length;
   return {
-    remaining: Math.max(0, total - used),
+    remaining: Math.max(
+      0,
+      total -
+        Math.max(
+          used,
+          kind === "hydro" &&
+            game.commissionedHydroSiteIds?.includes(territoryHydroSiteId(id))
+            ? 1
+            : 0,
+        ),
+    ),
     total,
     maxPeakW: budget?.maxPeakW ?? 0,
   };

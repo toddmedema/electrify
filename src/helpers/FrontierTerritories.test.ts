@@ -305,3 +305,27 @@ it("rejects new-parcel oversubscription and wrong special-resource claims on sav
   ).peakW = 100e6;
   expect(parseSave(forged)).toBeNull();
 });
+
+it.each([null, [null], [{}]])(
+  "rejects malformed land receipts %p without throwing",
+  (receipts) => {
+    const raw = JSON.parse(JSON.stringify(serializeSave(game())));
+    raw.game.territoryNetwork.landPurchases = receipts;
+    expect(() => parseSave(raw)).not.toThrow();
+    expect(parseSave(raw)).toBeNull();
+  },
+);
+
+it("retains a commissioned hydro site's claim after retirement", () => {
+  let state = buy(game(), "parcel-7");
+  state = build(state, quote(state, "Hydro", "parcel-7"), "parcel-7");
+  const working = cloneDeep(state);
+  const plant = working.facilities.find((f) => f.territoryId === "parcel-7")!;
+  plant.yearsToBuildLeft = 0.000001;
+  tickState(working);
+  state = reducer(working, sellFacility(plant.id));
+  expect(state.facilities.some((f) => f.id === plant.id)).toBe(false);
+  expect(territorySiteInventory(state, "parcel-7", "hydro").remaining).toBe(0);
+  expect(quote(state, "Hydro", "parcel-7").available).toBe(false);
+  expect(validHydroClaims(state)).toBe(true);
+});
