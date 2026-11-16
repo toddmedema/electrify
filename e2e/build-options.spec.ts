@@ -77,7 +77,9 @@ for (const theme of ["light", "dark"] as const) {
       const options = page.getByRole("list", { name: "Generator options" });
       const geothermal = options.locator('[data-build-option="Geothermal"]');
       await expect(geothermal).toContainText(
-        `No geothermal sites near ${place}.`,
+        scenarioId === 116
+          ? "No sites of this type remain in this territory."
+          : `No geothermal sites near ${place}.`,
       );
       await expect(
         geothermal.getByRole("button", {

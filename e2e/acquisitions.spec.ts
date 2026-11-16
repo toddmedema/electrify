@@ -57,9 +57,10 @@ for (const theme of ["light", "dark"] as const) {
       const detail = network.getByRole("region", {
         name: "Selected territory",
       });
-      await expect(detail.getByRole("heading", { level: 3 })).toHaveText(
-        territoryMapLabel(territory.id),
-      );
+      const heading = detail.getByRole("heading", { level: 3 });
+      await expect(heading).toHaveText(territoryMapLabel(territory.id));
+      // Inspection hands focus to the detail before another map navigation begins.
+      await expect(heading).toBeFocused();
       if (territory.kind === "greenfield")
         await expect(
           detail.getByRole("button", { name: /Buy territory/ }),
