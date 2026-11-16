@@ -1,22 +1,29 @@
-# Across the Valley territories
+# Across the Valley map
 
 Scenario 116 and mods based on it share one company power pool. Facilities and
 storage serve every owned customer's demand automatically. Territory location
 controls suitable finite sites and inherited customer sectors. It never limits
 power transfers, requires a connection purchase, or adds a parallel connection fee.
-The 22 territories and 76 physical map hexes are schematic. Each hex contains a
-city with no construction slot, or exactly one facility site. Territory budgets
-are represented by these individual sites; purchasing a two-site parcel buys
-both hexes together. Regional weather remains shared, with the small local
+The authored starting area extends into deterministic terrain as players acquire
+individual tiles. Each hex contains a city with no construction slot, or exactly
+one facility site. Regional weather remains shared, with the small local
 [terrain modifiers](terrain-modifiers.md) applied to wind speed and construction.
 
 The map labels the player's utility “You” and names neighboring utilities directly,
 with distinct ownership borders. Acquired utility land joins the player's border.
-Unowned parcels have no proper names. Terrain is a separate illustrated surface
+Unowned tiles have no proper names. Terrain is a separate illustrated surface
 beneath cities, generators, storage or transmission towers. Empty developed sites
 show towers, with automatic wires joining adjacent developed cells of the same
 company. Wires are visual: they add no transfer limit, price or upkeep. Selecting
-a hex shows its terrain, occupant, site limit and available action.
+a hex opens its floating inspection or construction surface. Empty owned sites
+open the generator/storage catalogue already locked to that tile; occupied sites
+show the actual facility controls. City tiles show customers and demand by use.
+
+The map reveals three hexes beyond owned land and active utility connections.
+Terrain and structures fade and desaturate with distance; undiscovered cells
+cannot be bought. Acquiring a visible frontier tile extends that frontier, so the
+map has no small fixed boundary. Geography comes from a versioned integer
+coordinate hash shared by every co-op company, independently of weather seeds.
 
 Valley Electric and Ridge Electric can each be inspected and acquired directly.
 Their plants, customers, sites, corporate debt and dated third-party obligations
@@ -30,20 +37,20 @@ blocks cannot overlap or queue before the active term expires. Supplier limits,
 weather, expiry and minimum bills remain; no line is built or upgraded to sign.
 Inherited third-party contracts retain their own dates and replacement windows.
 
-Every unowned parcel is an immediate cash purchase, without adjacency gating.
+Every visible unowned tile is an immediate cash purchase, without adjacency gating.
 Prices use 2005 dollars, indexed by the existing seeded CPI:
 
-- General building land costs $6 million for two shared sites. The original larger
-  parcel costs $18 million for seven shared sites, retaining its historical price
-  and internal `green-uplands` identifier. Any ordinary onshore generator or storage
-  technology can use these sites, subject to normal technology and quote limits.
-- Residential parcels cost $32 million and add 16,000 customer accounts at the
-  scenario's opening date. Industrial parcels cost $12 million and add 400 accounts,
+- General building tiles cost $3 million each. The original larger land area's
+  seven tiles cost one seventh of its former $18 million price each. Any ordinary
+  onshore generator or storage technology can use general sites, subject to
+  normal technology and quote limits.
+- Residential tiles cost $32 million and add 16,000 customer accounts at the
+  scenario's opening date. Industrial tiles cost $12 million and add 400 accounts,
   each with demand equivalent to 20 ordinary accounts. Account transfers scale with
   the existing dated market growth and update the company's demand sector mix.
-  These parcels have no building sites or inherited plants.
-- Hydro parcels cost $16 million and provide one fictional 20 MW hydro site.
-  Geothermal parcels cost $14 million and provide one fictional 25 MW site.
+  These city tiles have no building sites or inherited plants.
+- Hydro tiles cost $16 million and provide one fictional 20 MW hydro site.
+  Geothermal tiles cost $14 million and provide one fictional 25 MW site.
   Facility construction is a separate purchase using the existing technologies,
   construction schedules and operating models. A commissioned hydro site remains
   consumed after the plant is retired.
@@ -53,6 +60,12 @@ price, and land remains a non-depreciating capital asset. Exchanging cash for la
 preserves net worth while reducing cash available for facilities. Customer
 transfers are counted once and join the retention objective's baseline before
 its deadline; buying land does not replace a required utility acquisition.
+
+Ordinary inspection offers one clearly priced purchase action. The explicit
+**Buy land** layer labels opportunities and supports repeated purchases without
+opening construction after each one. The layer remains on until **Done buying**;
+dragging, focus changes and arrow navigation never purchase. Both entry points
+share pending commitments, and co-op ownership appears only after host acceptance.
 
 Home and utility territories retain their industrial, wind and solar/storage
 budgets: thermal projects use industrial sites, wind uses wind sites, and solar
@@ -75,12 +88,14 @@ the current site limits. Schema 16 assigns retained facilities to separate
 compatible hexes deterministically. Retained fleets exceeding today's authored
 budgets receive individual legacy overflow hexes rather than losing assets or
 stacking several facilities on one cell. Construction and paused projects reserve
-their cell immediately; cities cannot be built over.
+their cell immediately; cities cannot be built over. Schema 17 adds individual
+tile receipts. Earlier whole-area purchases retain every previously paid-for cell
+and their exact capital value, without extra charges or refunds.
 
-In co-op, the host serializes purchases independently for each parcel. The first
-valid accepted claim owns that parcel; another company keeps its cash and cannot
-build there. Companies can claim different parcels. Room views and restored worlds
-derive ownership from receipts. Recognized published schema 13, 14 and 15 rules
+In co-op, the host serializes purchases independently for each tile. The first
+valid accepted claim owns that tile; another company keeps its cash and cannot
+build there. Room views and restored worlds derive ownership from receipts.
+Recognized published schema 13, 14, 15 and 16 rules
 identities have ordered migrations; existing duplicate uplands rights are
 preserved because those maps were company-local. New land claims are exclusive.
 Utility acquisitions remain separate company choices. Automatic peer market
