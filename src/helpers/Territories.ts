@@ -31,6 +31,7 @@ import {
   facilityTerritoryId,
   territorySiteKind,
   territorySiteInventory,
+  territoryTileInventory,
   availableTerritoryTiles,
   getTerritoryTile,
   tileFitsFacility,
@@ -72,7 +73,10 @@ export function territoryBuildAvailability(
     (territory?.sites.general.count ?? 0) > 0
       ? "general"
       : specific;
-  const inventory = territorySiteInventory(game, id, kind);
+  const inventory =
+    tileId === undefined
+      ? territorySiteInventory(game, id, kind)
+      : territoryTileInventory(game, tileId);
   const free = availableTerritoryTiles(game, facility, id);
   const requested =
     tileId === undefined ? undefined : getTerritoryTile(tileId, game);
@@ -114,7 +118,7 @@ export function territoryBuildAvailability(
   }
   return {
     buildable: true,
-    remaining: free.length,
+    remaining: tileId === undefined ? free.length : inventory.remaining,
     total: inventory.total,
     maxPeakW: selected.maxPeakW ?? 0,
     tileId: selected.id,

@@ -231,3 +231,51 @@ it("gives retained pre-map overflow projects their own cells while rejecting mal
   oils[0].tileId = "champlain:city";
   expect(parseSave(current)).toBeNull();
 });
+
+it("reports the selected tile's physical inventory and resize limit independently of the requested technology size", () => {
+  const game = ready();
+  const quote = wind(game);
+  const tile = availableTerritoryTiles(game, quote, "champlain")[0];
+  expect(
+    territoryBuildAvailability(game, quote, "champlain", tile.id),
+  ).toMatchObject({
+    buildable: true,
+    total: 1,
+    remaining: 1,
+    maxPeakW: tile.maxPeakW,
+    tileId: tile.id,
+  });
+  expect(
+    territoryBuildAvailability(
+      game,
+      { ...quote, peakW: 200e6 },
+      "champlain",
+      tile.id,
+    ),
+  ).toMatchObject({
+    buildable: false,
+    total: 1,
+    remaining: 1,
+    maxPeakW: tile.maxPeakW,
+  });
+  expect(
+    territoryBuildAvailability(game, quote, "champlain", "champlain:city"),
+  ).toMatchObject({ buildable: false, total: 0, remaining: 0, maxPeakW: 0 });
+  const built = reducer(
+    game,
+    buildFacility({
+      facility: quote,
+      financed: false,
+      territoryId: "champlain",
+      tileId: tile.id,
+    }),
+  );
+  expect(
+    territoryBuildAvailability(built, quote, "champlain", tile.id),
+  ).toMatchObject({
+    buildable: false,
+    total: 1,
+    remaining: 0,
+    maxPeakW: tile.maxPeakW,
+  });
+});

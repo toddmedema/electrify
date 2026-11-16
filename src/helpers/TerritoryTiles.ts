@@ -185,6 +185,20 @@ function tileReserved(
       !!game.commissionedHydroSiteIds?.includes(tile.hydroSiteId))
   );
 }
+/** Physical inventory stays available for a too-large quote so the UI can offer a smaller size. */
+export function territoryTileInventory(
+  game: Pick<GameType, "facilities"> &
+    Partial<Pick<GameType, "commissionedHydroSiteIds">>,
+  id: unknown,
+): { remaining: number; total: number; maxPeakW: number } {
+  const tile = getTerritoryTile(id, game);
+  if (!tile || tile.city) return { remaining: 0, total: 0, maxPeakW: 0 };
+  return {
+    remaining: tileReserved(game, tile) ? 0 : 1,
+    total: 1,
+    maxPeakW: tile.maxPeakW,
+  };
+}
 export function availableTerritoryTiles(
   game: GameType,
   facility: FacilityShoppingType,
