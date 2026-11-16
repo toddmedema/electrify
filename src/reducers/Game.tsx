@@ -7,6 +7,7 @@ import {
 } from "../helpers/Territories";
 import { isTerritoryId } from "../data/Territories";
 import type { TerritoryId } from "../Types";
+import { getTerrainWindOutputFactor } from "../helpers/TerrainModifiers";
 import { currencyForLocation } from "../helpers/Currency";
 import { getLegacyBuildBounds, isLegacyEraGame } from "../data/LegacyEra";
 import {
@@ -257,9 +258,7 @@ import {
 import {
   getAirborneWindOutputFactor,
   getAirborneWindReferenceKph,
-  getOffshoreWindOutputFactor,
   getSolarOutputFactor,
-  getWindOutputFactor,
 } from "../helpers/Energy";
 import { getFuelPricesPerMBTU } from "../data/FuelPrices";
 import {
@@ -345,6 +344,7 @@ import {
 } from "../Constants";
 import {
   GENERATORS,
+  getBuildFacilityQuote,
   IRON_AIR_AVAILABLE_YEAR,
   STORAGE,
   windAnnualOutputDegradation,
@@ -2784,8 +2784,24 @@ export function previewFacilityBuild(
     ? territoryBuildAvailability(snapshot, facility, territoryId, tileId)
     : undefined;
   if (placement && !placement.buildable) throw new Error(placement.reason);
+  if (placement) {
+    const priced = priceTerritoryFacility(
+      snapshot,
+      facility,
+      territoryId,
+      placement.tileId,
+    );
+    if (!priced)
+      throw new Error("This facility is unavailable at the selected site");
+    facility = priced;
+  }
   const hydroSite = isConventionalHydro(facility)
-    ? getHydroAvailability(snapshot, facility.peakW, territoryId).selected
+    ? getHydroAvailability(
+        snapshot,
+        facility.peakW,
+        territoryId,
+        placement?.tileId,
+      ).selected
     : undefined;
   buildFacilityHelper(
     snapshot,
@@ -2856,6 +2872,26 @@ function refreshInterestRate(
     getPrimeRate(state.date, state.seed) * state.creditPremium;
 }
 
+/** Reprice network builds without changing preview-only construction timing overrides. */
+function priceTerritoryFacility(
+  game: GameType,
+  facility: FacilityShoppingType,
+  territoryId: TerritoryId,
+  tileId?: import("../Types").TerritoryTileId,
+): FacilityShoppingType | undefined {
+  const canonical = getBuildFacilityQuote(game, facility, territoryId, tileId);
+  if (
+    !canonical ||
+    canonical.fuel !== facility.fuel ||
+    canonical.peakW !== facility.peakW
+  )
+    return undefined;
+  return {
+    ...canonical,
+    yearsToBuild: facility.yearsToBuild,
+  };
+}
+
 function applyBuildFacility(
   state: GameType,
   payload: BuildFacilityAction,
@@ -2865,7 +2901,7 @@ function applyBuildFacility(
     Object.prototype.hasOwnProperty.call(payload, "operatingAreaId")
   )
     return false;
-  const requested = payload.facility;
+  let requested = payload.facility;
   const territoryId = payload.territoryId ?? "champlain";
   if (
     payload.territoryId !== undefined &&
@@ -2877,6 +2913,21 @@ function applyBuildFacility(
     ? territoryBuildAvailability(state, requested, territoryId, payload.tileId)
     : undefined;
   if (placement && !placement.buildable) return false;
+  if (placement) {
+    const priced = getBuildFacilityQuote(
+      state,
+      requested,
+      territoryId,
+      placement.tileId,
+    );
+    if (
+      !priced ||
+      priced.fuel !== requested.fuel ||
+      priced.peakW !== requested.peakW
+    )
+      return false;
+    requested = priced;
+  }
   if (isLegacyCampaignScenario(state.scenarioId) && !state.customScenario) {
     // Era/date limits belong to the command owner as well as the shopping UI.
     if (isStorage(requested)) {
@@ -2926,7 +2977,12 @@ function applyBuildFacility(
     return false;
   const hydro = isConventionalHydro(requested);
   const hydroSite = hydro
-    ? getHydroAvailability(state, requested.peakW, territoryId)
+    ? getHydroAvailability(
+        state,
+        requested.peakW,
+        territoryId,
+        placement?.tileId,
+      )
     : undefined;
   if (hydro && (state.date.year <= 1882 || hydroSite?.status !== "available"))
     return false;
@@ -5417,10 +5473,6 @@ function* supplyFacilitiesFinancesPhases(
     }
   });
 
-  const windOutputFactor = getWindOutputFactor(now.windKph);
-  const offshoreWindOutputFactor = getOffshoreWindOutputFactor(
-    now.windOffshoreKph || 0,
-  );
   const airborneWindOutputFactor = getAirborneWindOutputFactor(
     now.windAirborneKph || 0,
   );
@@ -5671,10 +5723,20 @@ function* supplyFacilitiesFinancesPhases(
               );
             break;
           case "Wind":
-            g.currentW = availablePeakW * outputFactor * windOutputFactor;
+            g.currentW =
+              availablePeakW *
+              outputFactor *
+              getTerrainWindOutputFactor(state, g, now.windKph);
             break;
           case "Offshore Wind":
-            g.currentW = availablePeakW * offshoreWindOutputFactor;
+            g.currentW =
+              availablePeakW *
+              getTerrainWindOutputFactor(
+                state,
+                g,
+                now.windKph,
+                now.windOffshoreKph,
+              );
             break;
           case "Airborne Wind":
             g.currentW = availablePeakW * airborneWindOutputFactor;

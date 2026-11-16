@@ -10,7 +10,7 @@ import {
   territoryBuildAvailability,
 } from "../helpers/Territories";
 import { currentTick } from "../helpers/GameSelectors";
-import { GENERATORS, STORAGE } from "../data/Facilities";
+import { getBuildFacilityQuote } from "../data/Facilities";
 import {
   validRetrofitFacility,
   validResilienceRecord,
@@ -123,23 +123,11 @@ const buildFacility: Validator = (game, payload) => {
     size > 1e12
   )
     return { error: "Choose a valid facility size" };
-  const options: FacilityShoppingType[] =
-    requested.peakWh === undefined
-      ? GENERATORS(
-          game,
-          size,
-          game.timeline.map((t) => t.windKph),
-          game.timeline.map((t) => t.solarIrradianceWM2),
-          game.timeline.map((t) => t.windOffshoreKph || 0),
-          game.timeline.map((t) => t.windAirborneKph || 0),
-          territoryId,
-        )
-      : STORAGE(game, requested.peakWh);
-  let quote = options.find(
-    (f) =>
-      f.available &&
-      f.name === requested.name &&
-      f.gasCycle === requested.gasCycle,
+  let quote = getBuildFacilityQuote(
+    game,
+    { ...requested, resilience: undefined },
+    territoryId,
+    tileId,
   );
   if (!quote) return { error: "That build is unavailable" };
   if (!validResilienceRecord(quote.fuel, requested.resilience))

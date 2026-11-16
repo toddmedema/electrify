@@ -27,7 +27,7 @@ function fixture() {
 }
 
 it.each(["generator", "storage"] as const)(
-  "forecasts a remote %s exactly as the purchased fleet in the shared company pool",
+  "forecasts a remote %s exactly as the selected territory's purchased fleet",
   (kind) => {
     const game = createGame({ scenarioId: 116, seed: 188 });
     game.territoryNetwork = {
@@ -45,7 +45,6 @@ it.each(["generator", "storage"] as const)(
             (quote) => quote.name === "Wind",
           )!
         : STORAGE(game, 100e6).find((quote) => quote.name === "Battery")!),
-      yearsToBuild: 0,
     };
     const result = previewFacilityBuild(game, facility, "green-uplands");
     const purchased = reducer(
@@ -67,9 +66,15 @@ it.each(["generator", "storage"] as const)(
       purchased,
       now.cash,
       now.customers,
-      (TICKS_PER_YEAR * TICK_MINUTES) / 60 + 2,
+      Math.ceil((facility.yearsToBuild * TICKS_PER_YEAR * TICK_MINUTES) / 60) +
+        (TICKS_PER_YEAR * TICK_MINUTES) / 60 +
+        2,
       60,
-    ).slice(0, result.after.length);
+    ).filter(
+      (tick) =>
+        tick.minute >= result.commissionedMinute &&
+        tick.minute < result.commissionedMinute + TICKS_PER_YEAR * TICK_MINUTES,
+    );
     const grid = (tick: (typeof actual)[number]) => ({
       minute: tick.minute,
       reserveW: tick.reserveW,
@@ -94,7 +99,10 @@ it.each(["generator", "storage"] as const)(
         "green-uplands",
       ),
     );
-    expect(remote).toEqual(computeOutlook("buildImpact", game, facility));
+    expect(
+      JSON.stringify(remote) ===
+        JSON.stringify(computeOutlook("buildImpact", game, facility)),
+    ).toBe(kind === "storage");
     expect(computeOutlook("buildImpact", game, facility, "champlain")).toEqual(
       computeOutlook("buildImpact", game, facility),
     );

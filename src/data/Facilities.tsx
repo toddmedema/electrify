@@ -19,10 +19,12 @@ import { facilityModifier, modScaledValue } from "../helpers/ScenarioMod";
 import { applyLegacyGeneratorEra, applyLegacyStorageEra } from "./LegacyEra";
 import {
   GameType,
+  FacilityShoppingType,
   GeneratorShoppingType,
   StorageShoppingType,
   TerritoryId,
   TerritoryTileId,
+  isStorage,
 } from "../Types";
 import {
   getAirborneWindCapacityFactor,
@@ -39,7 +41,11 @@ import {
 import { resolveStoryAtDate, combineStoryEffects } from "./WorldEvents";
 import { scenarioRules } from "../helpers/ScenarioRules";
 import { getScenario } from "./Scenarios";
-import { applyDefaultResilience } from "../helpers/Hazards";
+import {
+  applyDefaultResilience,
+  withResilienceOptions,
+} from "../helpers/Hazards";
+import { validResilienceRecord } from "../helpers/BuildValidation";
 import { pow } from "../helpers/Pow";
 import { exp, log10 } from "../helpers/Libm";
 import {
@@ -1058,4 +1064,46 @@ export function STORAGE(state: GameType, peakWh: number) {
   });
 
   return storage;
+}
+
+/** Resolve current catalog economics from identity/size/options, never a caller's price. */
+export function getBuildFacilityQuote(
+  game: GameType,
+  requested: Partial<FacilityShoppingType>,
+  territoryId?: TerritoryId,
+  tileId?: TerritoryTileId,
+): FacilityShoppingType | undefined {
+  const options: FacilityShoppingType[] =
+    requested.peakWh === undefined
+      ? GENERATORS(
+          game,
+          requested.peakW ?? 0,
+          game.timeline.map((tick) => tick.windKph),
+          game.timeline.map((tick) => tick.solarIrradianceWM2),
+          game.timeline.flatMap((tick) =>
+            tick.windOffshoreKph === undefined ? [] : [tick.windOffshoreKph],
+          ),
+          game.timeline.map((tick) => tick.windAirborneKph),
+          territoryId,
+          tileId,
+        )
+      : STORAGE(game, requested.peakWh);
+  let quote = options.find(
+    (candidate) =>
+      candidate.available &&
+      candidate.name === requested.name &&
+      candidate.gasCycle === requested.gasCycle,
+  );
+  if (
+    !quote ||
+    (hasTerritoryNetwork(game) &&
+      (isStorage(quote)
+        ? quote.peakWh > quote.maxPeakWh
+        : quote.peakW > quote.maxPeakW)) ||
+    !validResilienceRecord(quote.fuel, requested.resilience)
+  )
+    return undefined;
+  if (!isStorage(quote) && requested.resilience)
+    quote = withResilienceOptions(quote, game, requested.resilience);
+  return quote;
 }

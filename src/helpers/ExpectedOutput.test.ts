@@ -6,6 +6,8 @@ import { GameType, TickPresentFutureType } from "../Types";
 import { MINUTES_PER_MONTH } from "./DateTime";
 import { HYDRO_TARGET_CAPACITY_FACTOR } from "./Hydro";
 import { expectedMonthlyOutputShape } from "./ExpectedOutput";
+import { TERRITORY_TILES } from "../data/TerritoryTiles";
+import { getTerrainWindOutputFactor } from "./TerrainModifiers";
 
 function forecast(game: GameType): TickPresentFutureType[] {
   return generateNewTimeline(
@@ -119,4 +121,40 @@ describe("expectedMonthlyOutputShape", () => {
     expect(shape.mean).toBeGreaterThan(HYDRO_TARGET_CAPACITY_FACTOR / 2);
     expect(shape.mean).toBeLessThan(HYDRO_TARGET_CAPACITY_FACTOR * 2);
   });
+
+  it.each(["Wind", "Offshore Wind"] as const)(
+    "uses selected tile resources for the %s monthly build forecast",
+    (name) => {
+      const game = createGame({ scenarioId: 116, seed: 7 });
+      const tileId = TERRITORY_TILES.find((tile) =>
+        name === "Wind" ? tile.terrain === "hills" : tile.terrain === "ocean",
+      )!.id;
+      const technology = { name, fuel: name, peakW: 50e6 };
+      const timeline = Array.from({ length: 12 }, (_, month) => ({
+        ...solarTick(month * MINUTES_PER_MONTH, 500),
+        windKph: [6, 20, 40, 49][month % 4],
+      }));
+      const shape = expectedMonthlyOutputShape(technology, timeline, {
+        game,
+        tileId,
+      })!;
+      expect(shape.monthly).toEqual(
+        timeline.map((tick) =>
+          getTerrainWindOutputFactor(
+            game,
+            { fuel: name, tileId },
+            tick.windKph,
+          ),
+        ),
+      );
+      const authored = timeline.map((tick) => ({
+        ...tick,
+        renewableCapacityFactors: { [name]: 0.42 },
+      }));
+      expect(
+        expectedMonthlyOutputShape(technology, authored, { game, tileId })!
+          .monthly,
+      ).toEqual(Array(12).fill(0.42));
+    },
+  );
 });
