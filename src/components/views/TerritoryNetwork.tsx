@@ -132,15 +132,6 @@ function TileNetwork(props: Props) {
   const sizeChanged = React.useCallback(() => {
     dispatch(generatorSizeChanged());
   }, [dispatch]);
-  const status = (id: TerritoryId) => {
-    const tiles = views.filter(({ tile }) => tile.territoryId === id);
-    if (tiles.length && tiles.every((view) => view.owned))
-      return "Your territory";
-    const definition = getTerritoryDefinition(id);
-    return definition?.kind === "utility"
-      ? "Independent utility"
-      : "Available to buy";
-  };
   const inspect = (id: TerritoryTileId, activate = false) => {
     setSelected(id);
     if (activate) {
@@ -168,7 +159,6 @@ function TileNetwork(props: Props) {
           {...(view ? { onCloseInspection: close } : {})}
           game={game}
           selected={selectedView.tile.id}
-          status={status}
           onSelect={inspect}
         />
       )}

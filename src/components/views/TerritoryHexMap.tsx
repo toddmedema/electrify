@@ -1,5 +1,5 @@
 import * as React from "react";
-import type { GameType, TerritoryId, TerritoryTileId } from "../../Types";
+import type { GameType, TerritoryTileId } from "../../Types";
 import { getTerritoryDefinition } from "../../data/Territories";
 import { TERRAIN_LABELS } from "../../data/TerrainLabels";
 import { territoryTileViews } from "../../helpers/TerritoryMapState";
@@ -36,14 +36,12 @@ type MapStyle = React.CSSProperties & { "--territory-owner-color"?: string };
 interface Props {
   game: GameType;
   selected: TerritoryTileId;
-  status: (id: TerritoryId, compact?: boolean) => string;
   onSelect: (id: TerritoryTileId, inspect?: boolean) => void;
   onCloseInspection?: () => void;
 }
 export default function TerritoryHexMap({
   game,
   selected,
-  status,
   onSelect,
   onCloseInspection,
 }: Props) {
@@ -88,16 +86,62 @@ export default function TerritoryHexMap({
     tileId: TerritoryTileId;
     quoteKey: string;
   }>();
-  const initialPoint = React.useRef(
-    hexCenter(byId.get(activeSelected!)?.tile ?? { q: 0, r: 0 }),
-  );
-  initialPoint.current = hexCenter(
-    byId.get(activeSelected!)?.tile ?? { q: 0, r: 0 },
-  );
-  React.useEffect(() => {
+  const framedRun = React.useRef<{
+    runId?: number;
+    seed: number;
+    scenarioId: number;
+  }>();
+  React.useLayoutEffect(() => {
+    if (
+      !size.width ||
+      !size.height ||
+      (framedRun.current?.runId === runId &&
+        framedRun.current?.seed === game.seed &&
+        framedRun.current?.scenarioId === game.scenarioId)
+    )
+      return;
+    framedRun.current = { runId, seed: game.seed, scenarioId: game.scenarioId };
+    const focus = hexCenter(byId.get(activeSelected!)?.tile ?? { q: 0, r: 0 });
+    const bounds = views.reduce(
+      (bounds, { tile, owned }) => {
+        if (!owned) return bounds;
+        const point = hexCenter(tile);
+        return {
+          minX: Math.min(bounds.minX, point.x),
+          maxX: Math.max(bounds.maxX, point.x),
+          minY: Math.min(bounds.minY, point.y),
+          maxY: Math.max(bounds.maxY, point.y),
+        };
+      },
+      { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity },
+    );
+    const center = Number.isFinite(bounds.minX)
+      ? {
+          x: (bounds.minX + bounds.maxX) / 2,
+          y: (bounds.minY + bounds.maxY) / 2,
+        }
+      : focus;
+    const rangeX = Math.max(0, worldWidth / 2 - HEX_WIDTH);
+    const rangeY = Math.max(0, worldHeight / 2 - HEX_WIDTH);
+    // Start toward the useful land without clipping the capital or resumed selection.
+    // Frame once per run: purchases, frontier reveals and resize keep the player's camera.
+    setCamera({
+      x: Math.max(focus.x - rangeX, Math.min(center.x, focus.x + rangeX)),
+      y: Math.max(focus.y - rangeY, Math.min(center.y, focus.y + rangeY)),
+    });
     setBuyMode(false);
-    setCamera(initialPoint.current);
-  }, [runId, game.seed, game.scenarioId]);
+  }, [
+    runId,
+    game.seed,
+    game.scenarioId,
+    size.width,
+    size.height,
+    worldWidth,
+    worldHeight,
+    activeSelected,
+    byId,
+    views,
+  ]);
   React.useEffect(() => {
     if (activeSelected && activeSelected !== selected) {
       onSelect(activeSelected);
@@ -603,8 +647,12 @@ export default function TerritoryHexMap({
                   </span>
                 )}
                 <span className="srOnly" id={`${mapId}-${tile.id}-status`}>
-                  {status(tile.territoryId)}.{" "}
-                  {terrainDetailsLabel(tile.terrain)}.{" "}
+                  {view.owned
+                    ? "Your tile"
+                    : view.ownerKey
+                      ? `Owned by ${view.ownerName}`
+                      : "Available to buy"}
+                  . {terrainDetailsLabel(tile.terrain)}.{" "}
                   {facility
                     ? `${facility.name}${facility.yearsToBuildLeft > 0 ? ", under construction" : ""}`
                     : tile.city

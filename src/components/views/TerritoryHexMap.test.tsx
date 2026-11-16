@@ -43,7 +43,11 @@ afterEach(() => {
   jest.restoreAllMocks();
 });
 
-function show(cash = 1e9, inspectionInitiallyOpen = false) {
+function show(
+  cash = 1e9,
+  inspectionInitiallyOpen = false,
+  initialSelected: TerritoryTileId = "champlain:city",
+) {
   const game = createGame({ scenarioId: 116, seed: 188 });
   currentTick(game)!.cash = cash;
   const store = configureStore({
@@ -75,8 +79,7 @@ function show(cash = 1e9, inspectionInitiallyOpen = false) {
     const [inspectionOpen, setInspectionOpen] = React.useState(
       inspectionInitiallyOpen,
     );
-    const [selected, select] =
-      React.useState<TerritoryTileId>("champlain:city");
+    const [selected, select] = React.useState(initialSelected);
     return (
       <TerritoryTilePurchasesProvider game={activeGame}>
         <OtherPurchaseControl />
@@ -91,7 +94,6 @@ function show(cash = 1e9, inspectionInitiallyOpen = false) {
                 }
               : undefined
           }
-          status={() => "Land status"}
           onSelect={(id, activate) => {
             select(id);
             onSelect(id, activate);
@@ -135,6 +137,18 @@ function show(cash = 1e9, inspectionInitiallyOpen = false) {
 function idOf(button: HTMLButtonElement) {
   return button.dataset.mapTarget as TerritoryTileId;
 }
+function fullyVisible(tile: HTMLButtonElement, width: number, height = 900) {
+  const x = Number.parseFloat(tile.style.left),
+    y = Number.parseFloat(tile.style.top),
+    halfWidth = Number.parseFloat(tile.style.width) / 2,
+    halfHeight = Number.parseFloat(tile.style.height) / 2;
+  return (
+    x - halfWidth >= 0 &&
+    x + halfWidth <= width &&
+    y - halfHeight >= 0 &&
+    y + halfHeight <= height
+  );
+}
 function tap(button: HTMLButtonElement) {
   fireEvent.pointerDown(button, { pointerId: 1, clientX: 100, clientY: 100 });
   fireEvent.pointerUp(button, { pointerId: 1, clientX: 100, clientY: 100 });
@@ -163,43 +177,126 @@ function fakeHost() {
   };
 }
 
-it("inspects normally, then buys exactly one physical tile without shifting the camera or leaving buying mode", () => {
+it.each([1280, 360])(
+  "inspects normally, then buys exactly one physical tile without shifting the camera or leaving buying mode at %ipx",
+  (width) => {
+    jest
+      .spyOn(HTMLElement.prototype, "clientWidth", "get")
+      .mockReturnValue(width);
+    const map = show();
+    map.buyMode();
+    const candidate = map
+      .candidates()
+      .find(
+        (button) =>
+          territoryTileViews(map.store.getState().game).find(
+            ({ tile }) => tile.id === idOf(button),
+          )?.visibilityDistance === 3,
+      )!;
+    const id = idOf(candidate);
+    fireEvent.click(screen.getByRole("button", { name: "Done buying" }));
+    tap(candidate);
+    expect(map.onSelect).toHaveBeenLastCalledWith(id, true);
+    expect(ownsTerritoryTile(map.store.getState().game, id)).toBe(false);
+    map.buyMode();
+    const initialCount = territoryTileViews(map.store.getState().game).length;
+    const position = { left: candidate.style.left, top: candidate.style.top };
+    const camera = { ...map.stage.dataset };
+    tap(candidate);
+    expect(ownsTerritoryTile(map.store.getState().game, id)).toBe(true);
+    expect(
+      map.store.getState().game.territoryNetwork!.tilePurchases,
+    ).toHaveLength(1);
+    expect(map.target(id)).toHaveAttribute("aria-pressed", "true");
+    expect(map.target(id).style.left).toBe(position.left);
+    expect(map.target(id).style.top).toBe(position.top);
+    expect({ ...map.stage.dataset }).toEqual(camera);
+    expect(
+      territoryTileViews(map.store.getState().game).length,
+    ).toBeGreaterThan(initialCount);
+    expect(screen.getByRole("button", { name: "Done buying" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(screen.getByRole("status")).toHaveTextContent("Tile purchased");
+  },
+);
+
+it("describes ownership of each physical tile, including a partial purchase and a peer claim", () => {
   const map = show();
   map.buyMode();
-  const candidate = map
-    .candidates()
-    .find(
-      (button) =>
-        territoryTileViews(map.store.getState().game).find(
-          ({ tile }) => tile.id === idOf(button),
-        )?.visibilityDistance === 3,
-    )!;
-  const id = idOf(candidate);
-  fireEvent.click(screen.getByRole("button", { name: "Done buying" }));
-  tap(candidate);
-  expect(map.onSelect).toHaveBeenLastCalledWith(id, true);
-  expect(ownsTerritoryTile(map.store.getState().game, id)).toBe(false);
-  map.buyMode();
-  const initialCount = territoryTileViews(map.store.getState().game).length;
-  const position = { left: candidate.style.left, top: candidate.style.top };
-  const camera = { ...map.stage.dataset };
-  tap(candidate);
-  expect(ownsTerritoryTile(map.store.getState().game, id)).toBe(true);
-  expect(
-    map.store.getState().game.territoryNetwork!.tilePurchases,
-  ).toHaveLength(1);
-  expect(map.target(id)).toHaveAttribute("aria-pressed", "true");
-  expect(map.target(id).style.left).toBe(position.left);
-  expect(map.target(id).style.top).toBe(position.top);
-  expect({ ...map.stage.dataset }).toEqual(camera);
-  expect(territoryTileViews(map.store.getState().game).length).toBeGreaterThan(
-    initialCount,
+  tap(map.target("green-uplands:site-0"));
+  expect(map.target("green-uplands:site-0")).toHaveAccessibleDescription(
+    /^Your tile\./,
   );
-  expect(screen.getByRole("button", { name: "Done buying" })).toHaveAttribute(
-    "aria-pressed",
-    "true",
+  expect(map.target("green-uplands:site-1")).toHaveAccessibleDescription(
+    /^Available to buy\./,
   );
-  expect(screen.getByRole("status")).toHaveTextContent("Tile purchased");
+  act(() => {
+    map.store.dispatch(
+      delta({
+        multiplayer: {
+          seat: "0",
+          tileOwners: {
+            "green-uplands:site-2": { seat: "1", name: "Birch Utility" },
+          },
+        },
+      }),
+    );
+  });
+  expect(map.target("green-uplands:site-2")).toHaveAccessibleDescription(
+    /^Owned by Birch Utility\./,
+  );
+  expect(map.target("green-uplands:site-1")).toHaveAccessibleDescription(
+    /^Available to buy\./,
+  );
+});
+
+it.each([360, 390])(
+  "initially shows useful owned land while keeping the capital visible at %ipx",
+  (width) => {
+    jest
+      .spyOn(HTMLElement.prototype, "clientWidth", "get")
+      .mockReturnValue(width);
+    const map = show();
+    const owned = screen
+      .getAllByRole<HTMLButtonElement>("button")
+      .filter((tile) => tile.dataset.owned === "true");
+    expect(
+      owned.filter((tile) => fullyVisible(tile, width)).length,
+    ).toBeGreaterThanOrEqual(8);
+    const capital = map.target("champlain:city");
+    expect(fullyVisible(capital, width)).toBe(true);
+    // Keep a full cell from the edge to its center, including the city artwork.
+    expect(Number.parseFloat(capital.style.left)).toBeGreaterThanOrEqual(
+      Number.parseFloat(capital.style.width),
+    );
+    expect(Number.parseFloat(capital.style.width)).toBe(96);
+  },
+);
+
+it("initially shows the owned land and named utilities on desktop", () => {
+  const map = show();
+  const owned = screen
+    .getAllByRole<HTMLButtonElement>("button")
+    .filter((tile) => tile.dataset.owned === "true");
+  expect(owned.filter((tile) => fullyVisible(tile, 1280))).toHaveLength(16);
+  expect(fullyVisible(map.target("valley-electric:city"), 1280)).toBe(true);
+  expect(fullyVisible(map.target("ridge-electric:city"), 1280)).toBe(true);
+});
+
+it("keeps a resumed selected tile a full cell from the phone viewport edges", () => {
+  jest.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(360);
+  const map = show(1e9, false, "champlain:site-13");
+  const selected = map.target("champlain:site-13");
+  const cellWidth = Number.parseFloat(selected.style.width);
+  expect(selected).toHaveAttribute("aria-pressed", "true");
+  expect(Number.parseFloat(selected.style.left)).toBeGreaterThanOrEqual(
+    cellWidth,
+  );
+  expect(Number.parseFloat(selected.style.left)).toBeLessThanOrEqual(
+    360 - cellWidth,
+  );
 });
 
 it("keeps focus, arrows and repeated activation keys free of purchases", () => {
