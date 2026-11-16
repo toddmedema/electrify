@@ -145,11 +145,21 @@ async function expectPhysicalMap(network: Locator, game: GameType) {
         owned: button.getAttribute("data-owned"),
         width: button.getBoundingClientRect().width,
         height: button.getBoundingClientRect().height,
+        x:
+          button.getBoundingClientRect().x +
+          button.getBoundingClientRect().width / 2,
+        y:
+          button.getBoundingClientRect().y +
+          button.getBoundingClientRect().height / 2,
+        selected: button.getAttribute("aria-pressed") === "true",
       })),
     );
   expect(targets.length).toBeGreaterThan(0);
-  expect(targets.length).toBeLessThan(views.length);
+  expect(targets.length).toBeLessThanOrEqual(views.length);
   expect(new Set(targets.map(({ id }) => id)).size).toBe(targets.length);
+  const viewport = (await network
+    .locator(".territoryMapViewport")
+    .boundingBox())!;
   const rendered = new Set(targets.map(({ id }) => id));
   for (const target of targets) {
     const view = views.find(({ tile }) => tile.id === target.id)!;
@@ -159,6 +169,16 @@ async function expectPhysicalMap(network: Locator, game: GameType) {
     expect(target.owned).toBe(String(view.owned));
     expect(target.width).toBeGreaterThanOrEqual(44);
     expect(target.height).toBeGreaterThanOrEqual(44);
+    if (!target.selected) {
+      expect(target.x).toBeGreaterThanOrEqual(viewport.x - target.width - 1);
+      expect(target.x).toBeLessThanOrEqual(
+        viewport.x + viewport.width + target.width + 1,
+      );
+      expect(target.y).toBeGreaterThanOrEqual(viewport.y - target.width - 1);
+      expect(target.y).toBeLessThanOrEqual(
+        viewport.y + viewport.height + target.width + 1,
+      );
+    }
     await expect(network.locator(`[data-tile="${target.id}"]`)).toHaveAttribute(
       "data-visibility-distance",
       String(view.visibilityDistance),
@@ -310,6 +330,15 @@ for (const theme of ["light", "dark"] as const) {
       animations: "disabled",
       scale: "css",
     });
+    const discovered = territoryTileViews(before);
+    const westernEdge = discovered.reduce((edge, view) =>
+      hexCenter(view.tile).x < hexCenter(edge.tile).x ? view : edge,
+    );
+    await panToTile(page, westernEdge.tile);
+    await expectPhysicalMap(network, before);
+    expect(
+      await network.locator("button[data-map-target]").count(),
+    ).toBeLessThan(discovered.length);
     const city = getTerritoryTile("champlain:city", before)!;
     const surface = await inspectTile(page, city);
     await expect(surface).toContainText("Connected customers");
