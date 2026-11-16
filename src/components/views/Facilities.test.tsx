@@ -292,7 +292,9 @@ function renderFacilities(
   game: GameType,
   selectedFacilityId: number | null,
   ref?: React.RefObject<Facilities>,
-): Handlers & { rerenderGame: (game: GameType) => void } {
+): Handlers & {
+  rerenderGame: (game: GameType, arrivingFacilityId?: number) => void;
+} {
   const handlers: Handlers = {
     onBuyingRule: jest.fn(),
     onSellingRule: jest.fn(),
@@ -305,12 +307,19 @@ function renderFacilities(
     onCancelRetrofit: jest.fn(),
   };
   const store = configureStore({ reducer: { ui: uiReducer } });
-  function ControlledFacilities({ game }: { game: GameType }) {
+  function ControlledFacilities({
+    game,
+    arrivingFacilityId,
+  }: {
+    game: GameType;
+    arrivingFacilityId?: number;
+  }) {
     const [selected, setSelected] = React.useState(selectedFacilityId);
     return (
       <Facilities
         ref={ref}
         game={game}
+        arrivingFacilityId={arrivingFacilityId}
         selectedFacilityId={selected}
         onTransmissionUpgrade={() => undefined}
         onStorageBuild={() => undefined}
@@ -339,7 +348,13 @@ function renderFacilities(
     fireEvent.click(screen.getByRole("tab", { name: "Fleet" }));
   return {
     ...handlers,
-    rerenderGame: (next) => view.rerender(<ControlledFacilities game={next} />),
+    rerenderGame: (next, arrivingFacilityId) =>
+      view.rerender(
+        <ControlledFacilities
+          game={next}
+          arrivingFacilityId={arrivingFacilityId}
+        />,
+      ),
   };
 }
 
@@ -361,6 +376,22 @@ it("opens the shared plant controls on the map without switching to the fleet", 
     "aria-selected",
     "true",
   );
+});
+
+it("keeps the map inspector open when a purchased facility arrives", async () => {
+  const game = createGame({ scenarioId: 116, seed: 188 });
+  const plant = game.facilities.find((facility) => facility.fuel === "Hydro")!;
+  const { rerenderGame } = renderFacilities(game, null);
+  await user.click(screen.getByRole("tab", { name: "Territories" }));
+  await user.click(
+    screen.getByRole("button", { name: `Inspect ${plant.tileId!}` }),
+  );
+  rerenderGame(game, plant.id);
+  expect(screen.getByRole("tab", { name: "Territories" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  expect(screen.getByRole("dialog", { name: plant.name })).toBeVisible();
 });
 
 // Address inspection targets by their class; asking for a role by name computes an accessible

@@ -1149,7 +1149,8 @@ export default class Facilities extends React.Component<Props, SelectionState> {
   public componentDidUpdate(previous: Props) {
     if (
       (this.props.arrivingFacilityId !== previous.arrivingFacilityId &&
-        this.props.arrivingFacilityId !== undefined) ||
+        this.props.arrivingFacilityId !== undefined &&
+        !hasTerritoryNetwork(this.props.game)) ||
       (this.props.selectedFacilityId !== previous.selectedFacilityId &&
         this.props.selectedFacilityId !== null)
     ) {
