@@ -467,8 +467,10 @@ test.each([false, true])(
       else f.replicaFactory.mockRejectedValueOnce(error);
       await f.start();
       expect(f.guest.getSnapshot().synchronizing).toBe(true);
-      if (!queued) expect(f.guest.getSnapshot().error).toBe(error.message);
-      if (queued) expect(f.replicaFactory).toHaveBeenCalledTimes(1);
+      expect(f.guest.getSnapshot().error).toBe(
+        queued ? undefined : error.message,
+      );
+      expect(f.replicaFactory).toHaveBeenCalledTimes(queued ? 1 : 2);
       const baseline = f.source().baseline();
       f.event("guest", {
         kind: "message",
