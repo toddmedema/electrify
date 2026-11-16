@@ -13,11 +13,53 @@ import { STORAGE } from "../../data/Facilities";
 import { purchaseTerms } from "../../helpers/Financials";
 import { configureStore } from "@reduxjs/toolkit";
 import { Provider } from "react-redux";
+import { availableTerritoryTiles } from "../../helpers/TerritoryTiles";
+import { wToSliderTick } from "../../helpers/BuildSizing";
+import { GameToolMemoryContext } from "../base/GameToolMemory";
+import {
+  TERRITORY_BUILD_MEMORY_KEY,
+  TERRITORY_TILE_BUILD_MEMORY_KEY,
+  territoryBuildTileName,
+} from "../base/TerritoryBuildDestination";
 
 jest.mock(
   "../base/ManualLink",
   () => (props: { children?: React.ReactNode }) => <>{props.children}</>,
 );
+
+it("uses the selected physical tile for storage review and purchase", () => {
+  const game = createGame({ scenarioId: 116, seed: 611 });
+  game.date.year = 2020;
+  game.timeline[0].cash = 1e12;
+  const battery = STORAGE(game, 100e6).find(
+    (candidate) => candidate.name === "Battery",
+  )!;
+  const tile = availableTerritoryTiles(game, battery, "champlain")[0];
+  const memory = new Map<string, unknown>([
+    [TERRITORY_BUILD_MEMORY_KEY, "champlain"],
+    [TERRITORY_TILE_BUILD_MEMORY_KEY, tile.id],
+    ["storage.size", wToSliderTick(100e6)],
+  ]);
+  const onBuild = jest.fn();
+  render(
+    <GameToolMemoryContext.Provider value={memory}>
+      <BuildStorage game={game} onBack={jest.fn()} onBuildStorage={onBuild} />
+    </GameToolMemoryContext.Provider>,
+  );
+  fireEvent.click(
+    screen.getByRole("button", { name: "Review purchase of Lithium Battery" }),
+  );
+  expect(screen.getByRole("dialog")).toHaveTextContent(
+    territoryBuildTileName(tile.id, game),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Pay cash" }));
+  expect(onBuild).toHaveBeenCalledWith(
+    expect.objectContaining({ name: "Battery", peakWh: 100e6 }),
+    false,
+    "champlain",
+    tile.id,
+  );
+});
 
 it.each([false, true])(
   "resizes an unaffordable battery to the largest affordable slider size (live cash: %s)",

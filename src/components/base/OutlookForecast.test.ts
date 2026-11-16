@@ -12,6 +12,29 @@ import { forecastWorkerSnapshot } from "./ForecastWorkerSnapshot";
 import { computeOutlook, forecastCutoffIndex } from "./OutlookForecast";
 import { GENERATORS } from "../../data/Facilities";
 import { expectedMonthlyOutputShape } from "../../helpers/ExpectedOutput";
+import {
+  availableTerritoryTiles,
+  getTerritoryTiles,
+} from "../../helpers/TerritoryTiles";
+
+it("previews the selected physical build tile and rejects a city in the same territory", () => {
+  const game = createGame({ scenarioId: 116, seed: 12345 });
+  const facility = GENERATORS(game, 50e6, [], []).find(
+    (candidate) => candidate.name === "Wind",
+  )!;
+  const tile = availableTerritoryTiles(game, facility, "champlain")[0];
+  const city = getTerritoryTiles(game).find(
+    (candidate) => candidate.territoryId === "champlain" && candidate.city,
+  )!;
+  const before = JSON.stringify(game);
+  expect(
+    computeOutlook("buildImpact", game, facility, "champlain", tile.id),
+  ).toBeDefined();
+  expect(() =>
+    computeOutlook("buildImpact", game, facility, "champlain", city.id),
+  ).toThrow("Cities add demand and have no building slot.");
+  expect(JSON.stringify(game)).toBe(before);
+});
 
 it("preserves generator quotes and typical-year output with compact worker readings", () => {
   const game = createGame({ scenarioId: 108, seed: 12345 });

@@ -8,11 +8,19 @@ import {
 } from "@mui/material";
 import { TERRITORIES } from "../../data/Territories";
 import { ownedTerritories } from "../../helpers/Territories";
-import type { GameType, TerritoryId } from "../../Types";
+import {
+  facilityOnTile,
+  getTerritoryTile,
+  getTerritoryTiles,
+} from "../../helpers/TerritoryTiles";
+import { formatWatts } from "../../helpers/Format";
+import type { GameType, TerritoryId, TerritoryTileId } from "../../Types";
+import type { TerritorySiteKind } from "../../data/Territories";
 import { territoryMapLabel } from "./TerritoryMapLayout";
 import { useToolState } from "./GameToolMemory";
 
 export const TERRITORY_BUILD_MEMORY_KEY = "build.territory";
+export const TERRITORY_TILE_BUILD_MEMORY_KEY = "build.tile";
 
 export function territoryName(id: TerritoryId): string {
   return territoryMapLabel(id);
@@ -22,17 +30,77 @@ export function useTerritoryBuildDestination() {
   return useToolState<TerritoryId>(TERRITORY_BUILD_MEMORY_KEY, "champlain");
 }
 
+export function useTerritoryBuildTile() {
+  return useToolState<TerritoryTileId | undefined>(
+    TERRITORY_TILE_BUILD_MEMORY_KEY,
+    undefined,
+  );
+}
+
+const SITE_NAMES: Record<TerritorySiteKind, string> = {
+  industrial: "thermal generation",
+  wind: "wind",
+  "open-land": "solar and storage",
+  general: "general construction",
+  hydro: "hydropower",
+  geothermal: "geothermal",
+};
+
+/** Human-readable terrain and site identity; internal tile IDs stay out of player copy. */
+export function territoryBuildTileName(
+  tileId: TerritoryTileId,
+  game?: Pick<GameType, "facilities">,
+): string {
+  const tile = getTerritoryTile(tileId, game);
+  if (!tile || tile.city) return "Building site";
+  const peers = getTerritoryTiles(game).filter(
+    (other) =>
+      !other.city &&
+      other.territoryId === tile.territoryId &&
+      other.terrain === tile.terrain &&
+      other.siteKind === tile.siteKind,
+  );
+  const terrain = tile.terrain[0].toUpperCase() + tile.terrain.slice(1);
+  const number =
+    peers.length > 1
+      ? ` ${peers.findIndex((other) => other.id === tile.id) + 1}`
+      : "";
+  const site =
+    tile.terrain === "ocean" ? "offshore wind" : SITE_NAMES[tile.siteKind];
+  return `${terrain} site${number} · ${site} · ${formatWatts(tile.maxPeakW)} max`;
+}
+
 export default function TerritoryBuildDestination({
   game,
   value,
   onChange,
+  tileId,
+  onTileChange,
 }: {
   game: GameType;
   value: TerritoryId;
   onChange: (id: TerritoryId) => void;
+  tileId?: TerritoryTileId;
+  onTileChange: (id: TerritoryTileId | undefined) => void;
 }) {
   const id = React.useId();
   const owned = ownedTerritories(game);
+  const freeTiles = getTerritoryTiles(game).filter(
+    (tile) =>
+      !tile.city &&
+      tile.territoryId === value &&
+      owned.includes(value) &&
+      !facilityOnTile(game, tile.id) &&
+      (!tile.hydroSiteId ||
+        !game.commissionedHydroSiteIds?.includes(tile.hydroSiteId)),
+  );
+  const validTileId = freeTiles.some((tile) => tile.id === tileId)
+    ? tileId
+    : undefined;
+  React.useEffect(() => {
+    if (tileId !== undefined && validTileId === undefined)
+      onTileChange(undefined);
+  }, [tileId, validTileId, onTileChange]);
   return (
     <div className="territoryBuildDestination">
       <FormControl fullWidth size="small">
@@ -41,7 +109,10 @@ export default function TerritoryBuildDestination({
           labelId={`${id}-label`}
           label="Build destination"
           value={value}
-          onChange={(event) => onChange(event.target.value as TerritoryId)}
+          onChange={(event) => {
+            onTileChange(undefined);
+            onChange(event.target.value as TerritoryId);
+          }}
         >
           {TERRITORIES.filter(
             (territory) =>
@@ -60,9 +131,39 @@ export default function TerritoryBuildDestination({
           ))}
         </Select>
       </FormControl>
+      <FormControl fullWidth size="small" sx={{ mt: 2 }}>
+        <InputLabel id={`${id}-tile-label`} shrink>
+          Build tile
+        </InputLabel>
+        <Select
+          labelId={`${id}-tile-label`}
+          label="Build tile"
+          value={validTileId ?? ""}
+          displayEmpty
+          notched
+          onChange={(event) =>
+            onTileChange(
+              event.target.value
+                ? (event.target.value as TerritoryTileId)
+                : undefined,
+            )
+          }
+        >
+          <MenuItem value="">Choose a free tile automatically</MenuItem>
+          {freeTiles.map((tile) => (
+            <MenuItem
+              key={tile.id}
+              value={tile.id}
+              sx={{ whiteSpace: "normal" }}
+            >
+              {territoryBuildTileName(tile.id, game)}
+            </MenuItem>
+          ))}
+        </Select>
+      </FormControl>
       <Typography variant="caption" color="textSecondary">
-        Each project reserves a local site. All owned facilities serve your
-        company power pool.
+        One project per tile. Cities have no building slot. All owned facilities
+        serve your company power pool.
       </Typography>
     </div>
   );

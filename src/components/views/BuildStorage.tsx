@@ -1,12 +1,18 @@
 import TerritoryBuildDestination, {
   useTerritoryBuildDestination,
+  useTerritoryBuildTile,
+  territoryBuildTileName,
   territoryName,
 } from "../base/TerritoryBuildDestination";
 import {
   hasTerritoryNetwork,
   territoryBuildAvailability,
 } from "../../helpers/Territories";
-import type { TerritoryId } from "../../Types";
+import type { TerritoryId, TerritoryTileId } from "../../Types";
+import {
+  getTerritoryTile,
+  tileFitsFacility,
+} from "../../helpers/TerritoryTiles";
 import { useMoney } from "../base/CurrencyContext";
 import { GameBuildCompleteContext } from "../base/GameWorkspaceContext";
 import * as React from "react";
@@ -75,6 +81,7 @@ interface StorageBuildItemProps {
   minimumBuildCost: number;
   territoryAvailability?: ReturnType<typeof territoryBuildAvailability>;
   territoryId?: TerritoryId;
+  tileId?: TerritoryTileId;
   onUseMaxSize: (peakWh: number) => void;
   onBuild: (financed: boolean) => void;
 }
@@ -124,11 +131,15 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
     props.territoryAvailability && !props.territoryAvailability.buildable
       ? props.territoryAvailability.reason
       : generalAvailability.secondaryText;
+  const tile = props.tileId
+    ? getTerritoryTile(props.tileId, props.game)
+    : undefined;
   const offerMaxSize =
-    generalAvailability.offerMaxSize ||
-    (props.territoryAvailability &&
-      storage.peakWh > maxSizeWh &&
-      maxSizeWh > 0);
+    (!tile || tileFitsFacility(tile, storage, true)) &&
+    (generalAvailability.offerMaxSize ||
+      (props.territoryAvailability &&
+        storage.peakWh > maxSizeWh &&
+        maxSizeWh > 0));
   const sites = getSiteInventory(
     storage.name,
     props.location,
@@ -139,6 +150,7 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
   ) : undefined;
   const buildSubtitle = (buildable && shortfall) || secondaryText;
   const offerAffordableSize = buildable && !!shortfall && minimumAffordable;
+  const buildTileId = props.tileId ?? props.territoryAvailability?.tileId;
 
   const openReview = (e: React.SyntheticEvent) => {
     setOpen(true);
@@ -165,7 +177,9 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
       }
       context={
         props.territoryAvailability
-          ? `${props.territoryAvailability.remaining} open-land sites left · ${formatWatts(props.territoryAvailability.maxPeakW)} max power per project`
+          ? props.tileId
+            ? `One building slot · ${formatWatts(props.territoryAvailability.maxPeakW)} max power per project`
+            : `${props.territoryAvailability.remaining} open-land sites left · ${formatWatts(props.territoryAvailability.maxPeakW)} max power per project`
           : buildable && sites
             ? siteCountLabel(sites)
             : undefined
@@ -253,14 +267,18 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
         game={props.game}
         facility={storage}
         territoryId={props.territoryId}
+        tileId={buildTileId}
         open={open}
         onClose={() => setOpen(false)}
         title={`Build ${formatWattHours(storage.peakWh)} ${displayName}?`}
         preface={
           props.territoryId && (
             <Typography sx={{ px: 2, mb: 2 }}>
-              Build in {territoryName(props.territoryId)}. Storage charges from
-              and supplies your company power pool.
+              Build in {territoryName(props.territoryId)}
+              {buildTileId
+                ? ` · ${territoryBuildTileName(buildTileId, props.game)}`
+                : ""}
+              . Storage charges from and supplies your company power pool.
             </Typography>
           )
         }
@@ -332,6 +350,7 @@ export interface DispatchProps {
     storage: StorageShoppingType,
     financed: boolean,
     territoryId?: TerritoryId,
+    tileId?: TerritoryTileId,
   ) => void;
   onBack: () => void;
 }
@@ -342,6 +361,7 @@ function StorageBuildDialog(props: Props): React.JSX.Element {
   const completeBuild = React.useContext(GameBuildCompleteContext);
   const { game, onBack } = props;
   const [territoryId, setTerritoryId] = useTerritoryBuildDestination();
+  const [tileId, setTileId] = useTerritoryBuildTile();
   const territoryNetwork = hasTerritoryNetwork(game);
   const now = getTimeFromTimeline(game.date.minute, game.timeline);
   const readCash = useBuildCashReader(now?.cash ?? 0);
@@ -385,6 +405,8 @@ function StorageBuildDialog(props: Props): React.JSX.Element {
           game={game}
           value={territoryId}
           onChange={setTerritoryId}
+          tileId={tileId}
+          onTileChange={setTileId}
         />
       )}
       <ConstructionBuildHeader
@@ -412,9 +434,10 @@ function StorageBuildDialog(props: Props): React.JSX.Element {
             game={game}
             storage={g}
             territoryId={territoryNetwork ? territoryId : undefined}
+            tileId={territoryNetwork ? tileId : undefined}
             territoryAvailability={
               territoryNetwork
-                ? territoryBuildAvailability(game, g, territoryId)
+                ? territoryBuildAvailability(game, g, territoryId, tileId)
                 : undefined
             }
             key={g.name}
@@ -442,7 +465,7 @@ function StorageBuildDialog(props: Props): React.JSX.Element {
             location={game.location}
             onBuild={(financed: boolean) => {
               if (territoryNetwork)
-                props.onBuildStorage(g, financed, territoryId);
+                props.onBuildStorage(g, financed, territoryId, tileId);
               else props.onBuildStorage(g, financed);
               (completeBuild ?? onBack)();
             }}

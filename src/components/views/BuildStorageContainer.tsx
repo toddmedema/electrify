@@ -2,7 +2,12 @@ import type { AppDispatch } from "../../Store";
 import { connectToStore } from "../base/ConnectToStore";
 import { navigate } from "../../reducers/Card";
 import { purchaseFacility } from "../../helpers/PurchaseFacility";
-import { AppStateType, StorageShoppingType, TerritoryId } from "../../Types";
+import {
+  AppStateType,
+  StorageShoppingType,
+  TerritoryId,
+  TerritoryTileId,
+} from "../../Types";
 import BuildStorage, { DispatchProps, StateProps } from "./BuildStorage";
 
 const mapStateToProps = (state: AppStateType): StateProps => {
@@ -20,8 +25,9 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
       facility: StorageShoppingType,
       financed: boolean,
       territoryId?: TerritoryId,
+      tileId?: TerritoryTileId,
     ) => {
-      dispatch(purchaseFacility(facility, financed, territoryId));
+      dispatch(purchaseFacility(facility, financed, territoryId, tileId));
     },
   };
 };

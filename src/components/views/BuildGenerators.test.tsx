@@ -35,11 +35,70 @@ import { purchaseTerms } from "../../helpers/Financials";
 import { computeOutlook } from "../base/OutlookForecast";
 import { isStorage, type EvidenceRequestType } from "../../Types";
 import { LEGACY_SCENARIOS } from "../../data/LegacyCampaign";
+import { availableTerritoryTiles } from "../../helpers/TerritoryTiles";
+import { wToSliderTick } from "../../helpers/BuildSizing";
+import {
+  TERRITORY_BUILD_MEMORY_KEY,
+  TERRITORY_TILE_BUILD_MEMORY_KEY,
+  territoryBuildTileName,
+} from "../base/TerritoryBuildDestination";
 
 jest.mock(
   "../base/ManualLink",
   () => (props: { children?: React.ReactNode }) => <>{props.children}</>,
 );
+
+it("uses the map-selected physical tile for the generator review and purchase", () => {
+  const game = createGame({ scenarioId: 116, seed: 611 });
+  game.timeline[0].cash = 1e12;
+  const wind = GENERATORS(game, 50e6, [], []).find(
+    (candidate) => candidate.name === "Wind",
+  )!;
+  const tile = availableTerritoryTiles(game, wind, "champlain")[0];
+  const memory = new Map<string, unknown>([
+    [TERRITORY_BUILD_MEMORY_KEY, "champlain"],
+    [TERRITORY_TILE_BUILD_MEMORY_KEY, tile.id],
+    ["generators.size", wToSliderTick(500e6)],
+  ]);
+  const onBuild = jest.fn();
+  render(
+    <GameToolMemoryContext.Provider value={memory}>
+      <BuildGenerators
+        game={game}
+        onBack={jest.fn()}
+        onBuildGenerator={onBuild}
+      />
+    </GameToolMemoryContext.Provider>,
+  );
+  expect(
+    screen.getByRole("combobox", { name: "Build tile" }),
+  ).toHaveTextContent(territoryBuildTileName(tile.id, game));
+  expect(
+    screen.getByRole("button", { name: "Review purchase of Solar" }),
+  ).toBeDisabled();
+  const windCard = screen.getByText(
+    (_text, element) => element?.getAttribute("data-build-option") === "Wind",
+  );
+  expect(
+    within(windCard).getByRole("button", { name: "Review purchase of Wind" }),
+  ).toBeDisabled();
+  fireEvent.click(
+    within(windCard).getByRole("button", { name: "Use max size" }),
+  );
+  fireEvent.click(
+    screen.getByRole("button", { name: "Review purchase of Wind" }),
+  );
+  expect(screen.getByRole("dialog")).toHaveTextContent(
+    territoryBuildTileName(tile.id, game),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Pay cash" }));
+  expect(onBuild).toHaveBeenCalledWith(
+    expect.objectContaining({ name: "Wind", peakW: tile.maxPeakW }),
+    false,
+    "champlain",
+    tile.id,
+  );
+});
 
 it("buys a sub-megawatt generator through the campaign's ordinary size and loan controls", () => {
   const game = createGame({
