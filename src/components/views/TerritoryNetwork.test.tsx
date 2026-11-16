@@ -429,3 +429,21 @@ it.each([false, true])(
     }
   },
 );
+
+it("keeps later tile navigation focused when an inspection frame is pending", () => {
+  jest.useFakeTimers();
+  try {
+    show(ready());
+    fireEvent.click(
+      screen.getByRole("button", { name: "Inspect champlain:city" }),
+    );
+    const next = screen.getByRole("button", {
+      name: "Inspect champlain:site-0",
+    });
+    act(() => next.focus());
+    act(() => jest.advanceTimersByTime(32));
+    expect(next).toHaveFocus();
+  } finally {
+    jest.useRealTimers();
+  }
+});

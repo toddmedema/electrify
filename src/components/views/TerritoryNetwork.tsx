@@ -80,6 +80,14 @@ export default function TerritoryNetwork(props: Props) {
   const summaryRef = React.useRef<HTMLElement>(null);
   const detailRef = React.useRef<HTMLElement>(null);
   const headingRef = React.useRef<HTMLHeadingElement>(null);
+  const inspectionFrame = React.useRef<number>();
+  React.useEffect(
+    () => () => {
+      if (inspectionFrame.current !== undefined)
+        cancelAnimationFrame(inspectionFrame.current);
+    },
+    [],
+  );
   const acquired = React.useRef(false);
   const boughtLand = React.useRef(false);
   React.useEffect(() => {
@@ -172,9 +180,13 @@ export default function TerritoryNetwork(props: Props) {
     return other ? `Owned by ${other.name}` : "Available to buy";
   };
   const inspect = (id: TerritoryTileId, focusDetails = false) => {
+    if (inspectionFrame.current !== undefined)
+      cancelAnimationFrame(inspectionFrame.current);
+    inspectionFrame.current = undefined;
     setSelected(id);
     if (focusDetails)
-      requestAnimationFrame(() => {
+      inspectionFrame.current = requestAnimationFrame(() => {
+        inspectionFrame.current = undefined;
         const narrow = window.matchMedia("(max-width: 740px)").matches;
         if (narrow) detailRef.current?.scrollIntoView({ block: "start" });
         headingRef.current?.focus({ preventScroll: !narrow });
