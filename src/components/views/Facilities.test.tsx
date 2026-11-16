@@ -2310,22 +2310,21 @@ it("keeps restored co-op trading choices reachable through territory agreements"
   world.grids[0].transmission!.buyingRule = "NONE";
   world.grids[0].transmission!.sellingRule = "NONE";
   const game = restoreWorld(checkpointWorld(world), "restored").grids[0];
-  const handlers = renderFacilities(game, null);
+  const { onBuyingRule, onSellingRule } = renderFacilities(game, null);
   await user.click(screen.getByRole("tab", { name: "Agreements" }));
   expect(
     screen.getByRole("heading", { name: "Co-op power sharing" }),
   ).toBeVisible();
-  const buying = screen.getByRole("combobox", { name: "Buying", exact: true });
+  const buying = screen.getByRole("combobox", { name: "Buying" });
   expect(buying).toHaveTextContent("None");
   await user.click(buying);
   await user.click(screen.getByRole("option", { name: "Shortages only" }));
   const selling = screen.getByRole("combobox", {
     name: "Selling",
-    exact: true,
   });
   expect(selling).toHaveTextContent("None");
   await user.click(selling);
   await user.click(screen.getByRole("option", { name: "All profitable" }));
-  expect(handlers.onBuyingRule).toHaveBeenCalledWith("SHORTAGES");
-  expect(handlers.onSellingRule).toHaveBeenCalledWith("PROFITABLE");
+  expect(onBuyingRule).toHaveBeenCalledWith("SHORTAGES");
+  expect(onSellingRule).toHaveBeenCalledWith("PROFITABLE");
 });

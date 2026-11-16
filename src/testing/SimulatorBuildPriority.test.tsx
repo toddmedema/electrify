@@ -1,5 +1,5 @@
 import { createGame, runSimulation } from "./Simulator";
-import { LAND_TERRITORIES } from "../data/Territories";
+import { LAND_TERRITORIES, isLandTerritoryId } from "../data/Territories";
 import type { InitialBuildType } from "./Simulator";
 
 const oil: InitialBuildType = { name: "Oil", peakW: 50e6, financed: true };
@@ -73,11 +73,10 @@ test("a rejected later land order cannot pass because an earlier parcel was purc
     runSimulation({
       scenarioId: 116,
       months: 1,
-      scheduledActions: LAND_TERRITORIES.map(({ id }) => ({
-        month: 0,
-        type: "land",
-        territoryId: id,
-      })),
+      scheduledActions: LAND_TERRITORIES.map(({ id }) => {
+        if (!isLandTerritoryId(id)) throw new Error("Expected land territory");
+        return { month: 0, type: "land", territoryId: id };
+      }),
     }),
   ).toThrow("Land purchase rejected");
 });
