@@ -21,7 +21,7 @@ import gameReducer, {
 } from "../../reducers/Game";
 import uiReducer from "../../reducers/UI";
 import { createGame } from "../../testing/Simulator";
-import { FacilityOperatingType, GameType } from "../../Types";
+import { FacilityOperatingType, GameType, TerritoryTileId } from "../../Types";
 import Facilities, { fleetChartHeight } from "./Facilities";
 import TransmissionPanel from "./TransmissionPanel";
 import AcquiredUtilities from "./AcquiredUtilities";
@@ -53,6 +53,37 @@ import {
 import { coopSeats } from "../../testing/MultiplayerFixtures";
 import { loadSimData } from "../../testing/SimData";
 import { UTILITY_AREAS } from "../../data/UtilityExpansion";
+import { territoryTileViews } from "../../helpers/TerritoryMapState";
+
+// Exercise Facilities/Network's selection contract; the map owns viewport culling and geometry.
+jest.mock("./TerritoryHexMap", () => ({
+  __esModule: true,
+  default: (props: {
+    game: GameType;
+    selected: TerritoryTileId;
+    onSelect: (id: TerritoryTileId, activate?: boolean) => void;
+  }) => {
+    const { territoryTileViews } = jest.requireActual<
+      typeof import("../../helpers/TerritoryMapState")
+    >("../../helpers/TerritoryMapState");
+    return (
+      <div aria-label="Tile map">
+        {territoryTileViews(props.game).map(({ tile }) => (
+          <button
+            className="territoryTileTarget"
+            tabIndex={props.selected === tile.id ? 0 : -1}
+            key={tile.id}
+            aria-label={`Inspect ${tile.id}`}
+            onFocus={() => props.onSelect(tile.id)}
+            onClick={() => props.onSelect(tile.id, true)}
+          >
+            {tile.terrain}
+          </button>
+        ))}
+      </div>
+    );
+  },
+}));
 
 describe("acquired utilities", () => {
   function expansionGame(acquire = true) {
@@ -317,7 +348,9 @@ it("opens the shared plant controls on the map without switching to the fleet", 
   const plant = game.facilities.find((facility) => facility.fuel === "Hydro")!;
   const { onSelect, onPause } = renderFacilities(game, null);
   await user.click(screen.getByRole("tab", { name: "Territories" }));
-  await user.click(screen.getByTitle(`Lake · ${plant.name}`));
+  await user.click(
+    screen.getByRole("button", { name: `Inspect ${plant.tileId!}` }),
+  );
   const detail = screen.getByRole("dialog", { name: plant.name });
   await user.click(
     within(detail).getByRole("button", { name: `Pause ${plant.name}` }),
@@ -1502,6 +1535,10 @@ it.each([false, true])(
       seed: 12345,
     });
     const game = cloneDeep(state);
+    const target = territoryTileViews(game).find(
+      ({ tile }) => tile.territoryId === "ridge-electric",
+    )!.tile;
+    const onAcquire = jest.fn();
     render(
       <Provider
         store={configureStore({ reducer: { ui: uiReducer, game: () => game } })}
@@ -1517,12 +1554,12 @@ it.each([false, true])(
           onUpgrade={jest.fn()}
           onBuyingRule={jest.fn()}
           onSellingRule={jest.fn()}
-          onAcquire={jest.fn()}
+          onAcquire={onAcquire}
         />
       </Provider>,
     );
     await user.click(
-      screen.getByRole("button", { name: "Inspect Ridge Electric territory" }),
+      screen.getByRole("button", { name: `Inspect ${target.id}` }),
     );
     const acquire = screen.getByRole("button", {
       name: "Acquire Ridge Electric",
@@ -1533,10 +1570,12 @@ it.each([false, true])(
     expect(
       screen.getByRole("dialog", { name: "Acquire Ridge Electric?" }),
     ).toBeVisible();
+    expect(onAcquire).not.toHaveBeenCalled();
     await user.click(screen.getByRole("button", { name: "Cancel" }));
     expect(
       screen.queryByRole("dialog", { name: "Acquire Ridge Electric?" }),
     ).not.toBeInTheDocument();
+    expect(onAcquire).not.toHaveBeenCalled();
   },
 );
 
