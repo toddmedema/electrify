@@ -43,16 +43,52 @@ export default function TerritoryHexMap({
   const mapId = React.useId();
   const viewport = React.useRef<HTMLDivElement>(null);
   const stage = React.useRef<HTMLDivElement>(null);
+  const [labelPadding, setLabelPadding] = React.useState(96);
   const views = territoryTileViews(game);
   const tiles = views.map((view) => view.tile);
   const byId = new Map(views.map((view) => [view.tile.id, view]));
   const centers = tiles.map(hexCenter);
   const minX = Math.min(...centers.map((p) => p.x)) - HEX_WIDTH / 2 - 24;
-  const minY = Math.min(...centers.map((p) => p.y)) - HEX_HEIGHT / 2 - 56;
+  const minY =
+    Math.min(...centers.map((p) => p.y)) -
+    HEX_HEIGHT / 2 -
+    Math.max(56, labelPadding);
   const width =
     Math.max(...centers.map((p) => p.x)) + HEX_WIDTH / 2 + 24 - minX;
   const height =
     Math.max(...centers.map((p) => p.y)) + HEX_HEIGHT / 2 + 20 - minY;
+  React.useLayoutEffect(() => {
+    const sheet = stage.current;
+    if (!sheet) return;
+    const labels = Array.from(
+      sheet.querySelectorAll<HTMLElement>(
+        ".territoryUtilityLabel:not(.territoryUtilityLabelPerimeter) strong",
+      ),
+    );
+    const measure = () => {
+      const scale = sheet.getBoundingClientRect().width / width;
+      if (!scale) return;
+      // Label typography stays in CSS pixels even when the SVG board is scaled.
+      const clearance = Math.max(
+        ...labels.map(
+          (label) =>
+            label.parentElement!.getBoundingClientRect().top -
+            label.getBoundingClientRect().top +
+            8,
+        ),
+      );
+      setLabelPadding((padding) =>
+        Math.abs(padding - clearance / scale) > 0.1
+          ? clearance / scale
+          : padding,
+      );
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(sheet);
+    labels.forEach((label) => observer.observe(label));
+    return () => observer.disconnect();
+  }, [width]);
   const peerColors = territoryPeerColors(
     [
       ...(game.multiplayer?.peers?.map((peer) => peer.id) ?? []),
@@ -77,6 +113,29 @@ export default function TerritoryHexMap({
     (tile) => !!byId.get(tile.id)?.developed,
     (a, b) => byId.get(a.id)?.ownerKey === byId.get(b.id)?.ownerKey,
   );
+  const selectedBoundary = hexBoundary(tiles, (tile) => tile.id === selected);
+  const ridgeCity = tiles.find(
+    (tile) => tile.territoryId === "ridge-electric" && tile.city,
+  );
+  const ridgeEast = ridgeCity
+    ? Math.max(
+        ...tiles
+          .filter(
+            (tile) =>
+              tile.territoryId === ridgeCity.territoryId &&
+              tile.r === ridgeCity.r,
+          )
+          .map((tile) => hexCenter(tile).x),
+      ) +
+      HEX_WIDTH / 2
+    : 0;
+  // The empty northeast perimeter notch keeps the tag clear of the dense city row.
+  const ridgeLabel = ridgeCity
+    ? {
+        x: ridgeEast - HEX_WIDTH,
+        y: hexCenter(ridgeCity).y - (7 * HEX_HEIGHT) / 8,
+      }
+    : undefined;
   const initialSelected = React.useRef(selected);
   React.useEffect(() => {
     const element = viewport.current,
@@ -298,9 +357,23 @@ export default function TerritoryHexMap({
                 </g>
               ))}
               <path
-                className="territoryHexSelection"
-                d={hexBoundary(tiles, (tile) => tile.id === selected)}
+                className="territoryHexSelectionBacking"
+                d={selectedBoundary}
               />
+              <path className="territoryHexSelection" d={selectedBoundary} />
+              {ridgeCity && ridgeLabel && (
+                <path
+                  className="territoryUtilityLeader"
+                  style={
+                    {
+                      "--territory-owner-color": color(
+                        byId.get(ridgeCity.id)!.ownerKey!,
+                      ),
+                    } as MapStyle
+                  }
+                  d={`M${ridgeEast - HEX_WIDTH / 2} ${hexCenter(ridgeCity).y - HEX_HEIGHT / 2}L${ridgeLabel.x} ${ridgeLabel.y}`}
+                />
+              )}
             </g>
           </svg>
           {views.map((view) => {
@@ -310,6 +383,7 @@ export default function TerritoryHexMap({
               (territory) => territory.id === tile.territoryId,
             )!;
             const utility = !!tile.city && territory.kind !== "greenfield";
+            const perimeterLabel = utility && tile.id === ridgeCity?.id;
             const first =
               tiles.find((other) => other.territoryId === tile.territoryId)
                 ?.id === tile.id;
@@ -336,7 +410,7 @@ export default function TerritoryHexMap({
                 data-owner={view.ownerKey}
                 data-owned={view.owned}
                 data-terrain={tile.terrain}
-                className={`territoryTileTarget${utility ? " territoryUtilityLabel" : ""}`}
+                className={`territoryTileTarget${utility ? " territoryUtilityLabel" : ""}${perimeterLabel ? " territoryUtilityLabelPerimeter" : ""}`}
                 style={style}
                 tabIndex={tile.id === selected ? 0 : -1}
                 aria-label={label}
@@ -349,7 +423,18 @@ export default function TerritoryHexMap({
               >
                 <span className="territoryTileHitArea" aria-hidden="true" />
                 {utility && (
-                  <strong>{view.owned ? "You" : territory.name}</strong>
+                  <strong
+                    style={
+                      perimeterLabel && ridgeLabel
+                        ? {
+                            left: `${50 + ((ridgeLabel.x - point.x) / HEX_WIDTH) * 100}%`,
+                            top: `${50 + ((ridgeLabel.y - point.y) / HEX_HEIGHT) * 100}%`,
+                          }
+                        : undefined
+                    }
+                  >
+                    {view.owned ? "You" : territory.name}
+                  </strong>
                 )}
                 <span className="srOnly" id={`${mapId}-${tile.id}-status`}>
                   {status(tile.territoryId)}.{" "}

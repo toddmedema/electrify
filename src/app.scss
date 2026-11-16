@@ -9104,6 +9104,13 @@ option {
   stroke-width: 2;
   stroke-dasharray: 4 4;
 }
+.territoryUtilityLeader {
+  fill: none;
+  stroke: var(--territory-owner-color);
+  stroke-width: 2;
+  pointer-events: none;
+  vector-effect: non-scaling-stroke;
+}
 .territoryTileTarget {
   pointer-events: none;
   position: absolute;
@@ -9161,6 +9168,12 @@ option {
     outline: 3px solid var(--focus-ring);
     outline-offset: 2px;
   }
+}
+.territoryUtilityLabelPerimeter strong {
+  bottom: auto;
+  transform: translate(-50%, -50%);
+  max-width: none;
+  white-space: nowrap;
 }
 .territoryMapHint {
   margin: 0;
