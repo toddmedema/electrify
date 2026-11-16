@@ -801,6 +801,7 @@ export class MultiplayerSession {
   private forgetReplicationConnection(to: string) {
     this.replicationConnections.delete(to);
     this.replicationSends.delete(to);
+    this.outboundScenario.delete(to);
   }
   /** The shell's scenario send participates in the same order as all subsequent replica traffic. */
   private sendReplication(to: string, payload: WireMessage) {

@@ -7,12 +7,14 @@ import { ReplicaRecovery } from "./ReplicaRecovery";
 import { ReplicatedWorld } from "./Replication";
 import type { ReplicaBaseline } from "./Replication";
 import type { ReplicaRequest, ReplicaResponse } from "./ReplicaProtocol";
-import { createWorld, roomView } from "./World";
+import { checkpointWorld, createWorld, restoreWorld, roomView } from "./World";
+import type { World } from "./Types";
 import type { DesktopBridge } from "../Desktop";
 import type { LobbyState, NativeEvent, NativeRequest } from "./Native";
 import type { WorkerRequest, WorkerResponse } from "./WorkerProtocol";
 import { loadSimData } from "../testing/SimData";
 import { COOP_TEST_SPEC } from "../testing/MultiplayerFixtures";
+import { fixtureSpec } from "../testing/ReplicationFixtures";
 
 Object.assign(globalThis, { TextEncoder, crypto: webcrypto });
 const { parse, stringify } = require("../../electron/coop-codec.cjs");
@@ -25,7 +27,10 @@ afterEach(() => {
   jest.clearAllTimers();
   jest.useRealTimers();
 });
-function fixture({ recover = false } = {}) {
+function fixture({
+  recover = false,
+  savedWorld,
+}: { recover?: boolean; savedWorld?: World } = {}) {
   const events = new Map<string, (event: NativeEvent) => void>();
   const requests: { sender: string; request: NativeRequest }[] = [];
   const posts: WorkerRequest[] = [];
@@ -62,6 +67,7 @@ function fixture({ recover = false } = {}) {
       async multiplayerRequest(request: NativeRequest) {
         requests.push({ sender, request });
         if (request.kind === "state") return state(sender);
+        if (request.kind === "read-checkpoint") return savedWorld;
         if (request.kind === "send") {
           if (guestDisconnected && request.to === "guest")
             throw new Error("Player is disconnected");
@@ -88,14 +94,16 @@ function fixture({ recover = false } = {}) {
     terminate: jest.fn(),
     postMessage(request: WorkerRequest) {
       posts.push(request);
-      if (request.kind === "create") {
+      if (request.kind === "create" || request.kind === "restore") {
         source = new ReplicatedWorld(
-          createWorld(
-            request.spec,
-            request.seats,
-            request.matchId,
-            request.epoch,
-          ),
+          request.kind === "create"
+            ? createWorld(
+                request.spec,
+                request.seats,
+                request.matchId,
+                request.epoch,
+              )
+            : restoreWorld(request.world, request.epoch, request.seats),
         );
         respond({
           kind: "views",
@@ -218,7 +226,10 @@ function fixture({ recover = false } = {}) {
   const start = async () => {
     await host.initialize();
     await guest.initialize();
-    await host.start({ spec: COOP_TEST_SPEC });
+    if (savedWorld) {
+      await host.prepareResume("saved", "Saved campaign");
+      await host.start({ saved: true, id: "saved" });
+    } else await host.start({ spec: COOP_TEST_SPEC });
     await flush();
   };
   return {
@@ -732,6 +743,84 @@ test("a reloaded replica reconnect receives a baseline after real recovery membe
     expect(f.replicaFactory).toHaveBeenCalledTimes(2);
   } finally {
     f.dispose();
+  }
+});
+
+test("a replacement saved-mod guest receives the cached scenario again before its recovery baseline", async () => {
+  loadSimData("Manassas");
+  const spec = fixtureSpec("mod");
+  const f = fixture({
+    recover: true,
+    savedWorld: checkpointWorld(
+      createWorld(
+        spec,
+        [
+          { id: "host", name: "Host" },
+          { id: "guest", name: "Guest" },
+        ],
+        "saved-match",
+        "saved-epoch",
+      ),
+    ),
+  });
+  const scenarioSends = () =>
+    f.requests.filter(
+      ({ sender, request }) =>
+        sender === "host" &&
+        request.kind === "send" &&
+        request.to === "guest" &&
+        request.payload.kind === "scenario",
+    );
+  try {
+    await f.start();
+    expect(f.guest.getSnapshot()).toMatchObject({
+      synchronizing: false,
+      view: { game: { customScenario: spec.customScenario } },
+    });
+    expect(f.guest.getSnapshot().browse).toBeUndefined();
+    expect(scenarioSends()).toHaveLength(1);
+    // A baseline on the retained connection reuses the already validated definition.
+    f.respond({ kind: "baseline", to: "guest", baseline: f.baseline() });
+    await flush();
+    expect(scenarioSends()).toHaveLength(1);
+    f.event("host", { kind: "disconnected", sender: "guest" });
+    await flush();
+    await f.reloadGuest();
+    expect(f.guest.getSnapshot().view).toBeUndefined();
+    expect(f.guest.getSnapshot().browse).toBeUndefined();
+    expect(f.guest.getSnapshot().scenarioSnapshot).toBeUndefined();
+    const reconnect = f.requests.length;
+    const responses = f.replicaResponses.length;
+    // Native can announce the replacement connection without an intervening disconnected state.
+    f.event("host", { kind: "state", state: f.state("host") });
+    await flush();
+    expect(
+      f.requests
+        .slice(reconnect)
+        .flatMap(({ sender, request }) =>
+          sender === "host" &&
+          request.kind === "send" &&
+          request.to === "guest" &&
+          ["scenario", "baseline"].includes(request.payload.kind)
+            ? [request.payload.kind]
+            : [],
+        ),
+    ).toEqual(["scenario", "baseline"]);
+    expect(f.replicaResponses.slice(responses)).toContainEqual(
+      expect.objectContaining({ kind: "progress", state: "live" }),
+    );
+    expect(f.replicaFactory).toHaveBeenCalledTimes(2);
+    expect(f.guest.getSnapshot()).toMatchObject({
+      synchronizing: false,
+      view: {
+        matchId: "saved-match",
+        speed: "PAUSED",
+        game: { customScenario: spec.customScenario },
+      },
+    });
+  } finally {
+    f.dispose();
+    loadSimData("SF");
   }
 });
 
