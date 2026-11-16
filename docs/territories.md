@@ -4,14 +4,19 @@ Scenario 116 and mods based on it share one company power pool. Facilities and
 storage serve every owned customer's demand automatically. Territory location
 controls suitable finite sites and inherited customer sectors. It never limits
 power transfers, requires a connection purchase, or adds a parallel connection fee.
-The 22 territories and 37 map hexes are schematic. Each territory owns its site
-budget; individual hexes do not add build slots. Weather remains the existing
-shared regional model.
+The 22 territories and 76 physical map hexes are schematic. Each hex contains a
+city with no construction slot, or exactly one facility site. Territory budgets
+are represented by these individual sites; purchasing a two-site parcel buys
+both hexes together. Regional weather remains shared, with the small local
+[terrain modifiers](terrain-modifiers.md) applied to wind speed and construction.
 
 The map labels the player's utility “You” and names neighboring utilities directly,
 with distinct ownership borders. Acquired utility land joins the player's border.
-Unowned parcels have resource symbols rather than proper names. Compass directions
-in inspection and build controls distinguish parcels with the same benefit.
+Unowned parcels have no proper names. Terrain is a separate illustrated surface
+beneath cities, generators, storage or transmission towers. Empty developed sites
+show towers, with automatic wires joining adjacent developed cells of the same
+company. Wires are visual: they add no transfer limit, price or upkeep. Selecting
+a hex shows its terrain, occupant, site limit and available action.
 
 Valley Electric and Ridge Electric can each be inspected and acquired directly.
 Their plants, customers, sites, corporate debt and dated third-party obligations
@@ -66,12 +71,16 @@ wire construction, upkeep or congestion runs. Land is counted once rather than i
 both its receipt and legacy project. Original loan payments continue to move cash
 into equity. Schema 15 generalizes receipts and site budgets for all parcels while
 preserving this progress. Existing oversized projects remain; new purchases use
-the current site limits.
+the current site limits. Schema 16 assigns retained facilities to separate
+compatible hexes deterministically. Retained fleets exceeding today's authored
+budgets receive individual legacy overflow hexes rather than losing assets or
+stacking several facilities on one cell. Construction and paused projects reserve
+their cell immediately; cities cannot be built over.
 
 In co-op, the host serializes purchases independently for each parcel. The first
 valid accepted claim owns that parcel; another company keeps its cash and cannot
 build there. Companies can claim different parcels. Room views and restored worlds
-derive ownership from receipts. Recognized published schema 13 and 14 rules
+derive ownership from receipts. Recognized published schema 13, 14 and 15 rules
 identities have ordered migrations; existing duplicate uplands rights are
 preserved because those maps were company-local. New land claims are exclusive.
 Utility acquisitions remain separate company choices. Automatic peer market

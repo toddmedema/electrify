@@ -16,11 +16,13 @@ special hydro or geothermal sites have distinct cash prices and benefits. See
 
 The Territories view uses an isometric hex schematic, following the visual direction in
 [issue 603](https://github.com/toddmedema/electrify/issues/603). Towns and factories indicate
-customers, lakes hydro sites, steam geothermal sites, and field symbols general building land.
-Existing utility land also shows dams, plains and wind hills.
-Equipment appears when a completed plant exists; independent utilities show their authored
-starting fleet. Each group selects a territory, rather than an individual build slot. Its
-actual site counts and operating controls remain in the territory details. Utility names
+customers. Plains, forest, hills, mountain, river, lake and ocean are illustrated
+terrain backgrounds, with separate upright cities, generators, storage and towers.
+Each hex holds one facility or a city; construction reserves its slot immediately.
+Independent utilities show their authored starting fleet. Empty developed hexes
+show towers and automatic wires to adjacent developed cells of the same utility.
+Selecting an individual hex exposes its occupant, available construction and site
+limits. The wires are visual and add no transmission management. Utility names
 float above their land, with the player labeled “You” and distinct ownership borders.
 Neutral land has no proper name; symbols show its benefit. Native map buttons support
 keyboard, touch and controller selection without a numbered key.
@@ -97,7 +99,8 @@ mix; it does not keep its own customer population, weather or dispatch.
 Old callers retain their original demand calculation exactly. Later regional
 end-use trends continue normally; no data-center or mining block is scheduled.
 Acquired facilities join the existing fleet and use the same operating-area
-weather. Acquisitions do not add weather diversification.
+weather. Local [terrain modifiers](terrain-modifiers.md) adjust onshore wind speed
+and new Wind/Solar construction cost; acquisitions do not add separate climates.
 
 Existing Champlain and Valley hydro plants have bounded, explicitly fictional
 inherited inventory claims. The catalogue provenance names the issue rather than
