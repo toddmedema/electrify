@@ -386,6 +386,11 @@ export function startDesktopInput(
   });
   const surfaceSelector =
     "[role=dialog],[role=menu],[role=listbox],.MuiModal-root,.base_main,.gameWorkspace";
+  // MUI can reveal an already-mounted inspector by unhiding its ancestor.
+  // Sync before the next native intent, which must not become a context warm-up frame.
+  const containsSurface = (node: Node) =>
+    node instanceof Element &&
+    (node.matches(surfaceSelector) || !!node.querySelector(surfaceSelector));
   const observer = new MutationObserver((mutations) => {
     if (
       getInputPresentation().active &&
@@ -399,16 +404,11 @@ export function startDesktopInput(
     if (
       mutations.some((mutation) =>
         mutation.type === "attributes"
-          ? (mutation.target as Element).matches(surfaceSelector)
+          ? containsSurface(mutation.target)
           : [
               ...Array.from(mutation.addedNodes),
               ...Array.from(mutation.removedNodes),
-            ].some(
-              (node) =>
-                node instanceof Element &&
-                (node.matches(surfaceSelector) ||
-                  !!node.querySelector(surfaceSelector)),
-            ),
+            ].some(containsSurface),
       )
     )
       sync();
@@ -417,7 +417,7 @@ export function startDesktopInput(
     childList: true,
     subtree: true,
     attributes: true,
-    attributeFilter: ["aria-hidden", "hidden", "inert"],
+    attributeFilter: ["aria-hidden", "hidden", "inert", "class", "style"],
   });
   // Text, disclosure and chart layout can settle after focus moves. Keep that actual
   // control exposed as its ancestors resize, without changing focus or a remembered scroll.

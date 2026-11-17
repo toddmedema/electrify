@@ -72,6 +72,55 @@ export default function TerritoryHexMap({
     [buyMode, game],
   );
   const activeSelected = selected && byId.has(selected) ? selected : undefined;
+  React.useEffect(() => {
+    const escape = (event: KeyboardEvent) => {
+      if (
+        event.key !== "Escape" ||
+        event.defaultPrevented ||
+        !(onCloseInspection || activeSelected || buyMode) ||
+        hasVisibleEscapeOverlay()
+      )
+        return;
+      const map = viewport.current?.closest(".territoryMap");
+      if (!map || map.closest('[hidden], [inert], [aria-hidden="true"]'))
+        return;
+      const workspace =
+        map.closest(".gameWorkspace") ??
+        map.closest(".territoryNetwork") ??
+        map;
+      if (!(event.target instanceof Node) || !workspace.contains(event.target))
+        return;
+      if (
+        event.target instanceof Element &&
+        event.target.closest("[data-game-tool], .gameToolPanel") &&
+        !map.contains(event.target)
+      )
+        return;
+      for (
+        let element: Element | null = map;
+        element;
+        element = element.parentElement
+      ) {
+        const style = getComputedStyle(element);
+        if (
+          style.display === "none" ||
+          style.visibility === "hidden" ||
+          style.visibility === "collapse"
+        )
+          return;
+      }
+      // The nonmodal inspector permits focus in the map, receipts and workspace footer.
+      // Own one dismissal before the game's document-level navigation sees Escape.
+      event.preventDefault();
+      event.stopPropagation();
+      setBuyMode(false);
+      onCloseInspection?.();
+      onDeselect?.();
+      buyingControl.current?.focus({ preventScroll: true });
+    };
+    window.addEventListener("keydown", escape, true);
+    return () => window.removeEventListener("keydown", escape, true);
+  }, [activeSelected, buyMode, onCloseInspection, onDeselect]);
   const [rovingId, setRovingId] = React.useState(
     () =>
       activeSelected ??
@@ -332,26 +381,6 @@ export default function TerritoryHexMap({
       className="territoryMap"
       data-buy-mode={buyMode}
       aria-label="Terrain, structures and utility ownership"
-      onKeyDown={(event) => {
-        const leavingGeography =
-          event.target instanceof HTMLElement &&
-          !!event.target.closest("[data-map-target]");
-        if (
-          event.key === "Escape" &&
-          !event.defaultPrevented &&
-          !hasVisibleEscapeOverlay() &&
-          (onCloseInspection || activeSelected || buyMode || leavingGeography)
-        ) {
-          event.preventDefault();
-          event.stopPropagation();
-          if (onCloseInspection) onCloseInspection();
-          else {
-            if (buyMode) setBuyMode(false);
-            buyingControl.current?.focus({ preventScroll: true });
-          }
-          onDeselect?.();
-        }
-      }}
     >
       <Tooltip
         title={buyMode ? "Finish buying land" : "Buy land"}
