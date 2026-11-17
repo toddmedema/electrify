@@ -122,10 +122,24 @@ function structure(variant: GeneratorOccupantVariant): React.ReactNode {
     case "hydro":
       return (
         <>
-          <path d="M145 180H355L365 365H135Z" fill="#FFF8E1" />
-          <path d="M135 180L165 150H335L365 180Z" fill="#CFD8DC" />
-          <path d="M180 220H225L210 365H155Z" fill="#7FC8CE" />
-          <path d="M275 220H320L345 365H290Z" fill="#7FC8CE" />
+          <path d="M150 225Q250 165 350 225L330 245H170Z" fill="#7FC8CE" />
+          <path
+            d="M150 220Q250 190 350 220L365 345Q250 365 135 345Z"
+            fill="#FFF8E1"
+          />
+          <path
+            d="M150 205Q250 175 350 205V225Q250 195 150 225Z"
+            fill="#CFD8DC"
+          />
+          <path
+            d="M135 205H170V345L150 365H135ZM330 205H365V365H350L330 345Z"
+            fill="#CFD8DC"
+          />
+          <path d="M225 230H275L295 350H205Z" fill="#7FC8CE" strokeWidth={6} />
+          <path d="M222 210H278V235H222Z" fill="#CFD8DC" strokeWidth={6} />
+          <path d="M135 310L155 290H205V365H135Z" fill="#FFF8E1" />
+          <path d="M135 310L155 290H205V310Z" fill="#CFD8DC" strokeWidth={6} />
+          <path d="M153 328H187V350H153Z" fill="#64DFC5" strokeWidth={6} />
         </>
       );
     case "geothermal":
