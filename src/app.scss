@@ -8897,23 +8897,109 @@ option {
 }
 
 .powerAgreements {
-  margin-top: 16px;
-  padding-top: 16px;
-  border-top: 1px solid var(--border-subtle);
   overflow-wrap: anywhere;
   .powerAgreement {
-    padding: 12px 0;
+    padding: 16px 0;
     border-bottom: 1px solid var(--border-subtle);
-    margin-bottom: 12px;
-    button {
+    > p + p {
+      margin-top: 4px;
+    }
+    &:last-child {
+      border-bottom: 0;
+    }
+    button,
+    summary {
       min-height: 40px;
-      margin-top: 8px;
+    }
+  }
+  .powerAgreementHeading {
+    margin: 0 0 8px;
+    font-size: var(--font-size-body1);
+    font-weight: var(--font-weight-emphasis);
+    line-height: 1.5;
+  }
+  .powerAgreementStatus {
+    color: var(--font-color-faded);
+    font-size: var(--font-size-body2);
+    font-weight: var(--font-weight-regular);
+  }
+  .powerAgreementMetrics {
+    font-variant-numeric: tabular-nums;
+  }
+  .powerAgreementMinimum {
+    font-size: var(--font-size-caption);
+  }
+  .powerAgreementActions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 4px 8px;
+    margin-top: 8px;
+    > button {
+      flex: 0 1 auto;
+    }
+  }
+  .powerAgreementDetails {
+    flex: 1 1 auto;
+    min-width: 0;
+    summary {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: fit-content;
+      padding: 0 8px;
+      color: var(--interactive-strong);
+      font-size: var(--font-size-body2);
+      font-weight: var(--font-weight-emphasis);
+      cursor: pointer;
+      border-radius: var(--radius-md);
+      list-style: none;
+      &::-webkit-details-marker {
+        display: none;
+      }
+      &::after {
+        content: "+";
+      }
+      &:hover {
+        background: var(--interactive-tint);
+      }
+      &:focus-visible {
+        outline: 2px solid var(--focus-ring);
+        outline-offset: 2px;
+      }
+    }
+    &[open] {
+      flex-basis: 100%;
+      summary::after {
+        content: "−";
+      }
+    }
+  }
+  .powerAgreementDetailBody {
+    display: grid;
+    gap: 4px;
+    padding-top: 8px;
+    button {
+      justify-self: start;
+      padding-left: 0;
+      padding-right: 0;
     }
   }
   @media (pointer: coarse) {
-    .powerAgreement button {
+    .powerAgreement button,
+    .powerAgreement summary {
       min-height: 44px;
     }
+  }
+}
+.powerAgreementPortfolio {
+  & + & {
+    padding-top: 16px;
+    margin-top: 8px;
+    border-top: 1px solid var(--border-subtle);
+  }
+  > h3 {
+    color: var(--font-color-faded);
   }
 }
 

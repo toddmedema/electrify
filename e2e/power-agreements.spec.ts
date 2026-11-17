@@ -29,6 +29,36 @@ for (const theme of ["light", "dark"] as const) {
     );
     let line = agreements.locator(".territoryAgreements");
     await expect(line).toContainText("Regional nuclear · Inherited");
+    await expect(
+      agreements.getByRole("heading", { name: "Supply agreements" }),
+    ).toHaveCount(0);
+    await expect(
+      agreements.getByRole("heading", { name: "Power purchase agreements" }),
+    ).toHaveCount(0);
+    const inherited = line.locator(".powerAgreement").filter({
+      has: page.getByRole("heading", { name: "Regional nuclear · Inherited" }),
+    });
+    await expect(inherited.getByText(/Up to 95MW/)).toBeVisible();
+    await expect(
+      inherited.getByText(/Minimum payment: .*even if unused/),
+    ).toBeVisible();
+    await expect(inherited.getByText(/Market now/)).toBeHidden();
+    await inherited.locator("summary").click();
+    await expect(inherited.getByText(/Market now/)).toBeVisible();
+    await inherited.locator("summary").click();
+    for (const control of await line.locator("button, summary").all()) {
+      if (await control.isVisible()) {
+        const box = await control.boundingBox();
+        expect(box!.height).toBeGreaterThanOrEqual(
+          testInfo.project.name.includes("mobile") ? 44 : 40,
+        );
+      }
+    }
+    expect(
+      await agreements.evaluate(
+        (element) => element.scrollWidth <= element.clientWidth,
+      ),
+    ).toBe(true);
     const opening = await readSavedGame(page);
     expect(opening!.transmission!.lines).toEqual([]);
     await editSavedGame(page, ({ game }) => {
@@ -198,7 +228,7 @@ for (const theme of ["light", "dark"] as const) {
     await page.keyboard.press("Enter");
     await expect(dialog).toHaveCount(0);
     await expect(line).toContainText("Scheduled · starts 1 Jan 2020");
-    await expect(line).toContainText("1 Jan 2020–31 Dec 2024");
+    await expect(line).toContainText("Through 31 Dec 2024");
     await expect(review).toHaveCount(0);
     const signedAgreement = line
       .locator(".powerAgreement")
@@ -226,6 +256,8 @@ for (const theme of ["light", "dark"] as const) {
       path: testInfo.outputPath(`ppa-signed-${theme}.png`),
       animations: "disabled",
     });
+    await signedAgreement.locator("summary").click();
+    await expect(signedAgreement).toContainText("1 Jan 2020–31 Dec 2024");
     await signedAgreement
       .getByRole("button", { name: /^Forecast .* remaining term$/ })
       .click();
@@ -267,7 +299,7 @@ for (const theme of ["light", "dark"] as const) {
       page.getByRole("button", { name: "Agreements", exact: true }),
     );
     await expect(line).toContainText("Scheduled · starts 1 Jan 2020");
-    await expect(line).toContainText("1 Jan 2020–31 Dec 2024");
+    await expect(line).toContainText("Through 31 Dec 2024");
     expect(
       (await readSavedGame(page))!.transmission!.acceptedAgreements,
     ).toEqual(signed!.transmission!.acceptedAgreements);
@@ -276,6 +308,26 @@ for (const theme of ["light", "dark"] as const) {
       game.date.minute += offset;
       game.date.monthsElapsed = 180;
       game.date.year = 2020;
+      // The paused date jump records no accounting. Retain one valid, unused
+      // month so this journey also verifies the archived-history action.
+      game.transmission!.agreementAccounts = [
+        {
+          agreementId: "champlain-nuclear",
+          termsVersion: 3,
+          accountingStartMinute: 179 * 1440,
+          accountedThroughMinute: 180 * 1440,
+          months: [
+            {
+              month: 179,
+              availableMWh: 0,
+              usefulMWh: 0,
+              availableValue: 0,
+              usefulValue: 0,
+              payment: 0,
+            },
+          ],
+        },
+      ];
       game.objectiveProgress = undefined;
       for (const tick of game.timeline) tick.minute += offset;
     });
@@ -286,9 +338,29 @@ for (const theme of ["light", "dark"] as const) {
       page.getByRole("button", { name: "Agreements", exact: true }),
     );
     await expect(line).toContainText("Regional nuclear · Expired 1 Jan 2020");
-    await expect(line).toContainText(
-      "each contract has a quantity limit and an expiry date",
-    );
+    const expired = line.locator(".powerAgreement").filter({
+      has: page.getByRole("heading", {
+        name: "Regional nuclear · Expired 1 Jan 2020",
+      }),
+    });
+    await expect(expired.getByText(/Up to/)).toHaveCount(0);
+    await expect(
+      expired.getByRole("button", {
+        name: "Regional nuclear recorded history",
+      }),
+    ).toBeVisible();
+    await expired
+      .getByRole("button", { name: "Regional nuclear recorded history" })
+      .click();
+    const history = page.getByRole("dialog", {
+      name: "Regional nuclear recorded history",
+    });
+    await expect(
+      history.getByRole("table", { name: "Recorded agreement history" }),
+    ).toContainText("0 MWh used");
+    await expectDialogToFit(history);
+    await page.keyboard.press("Escape");
+    await expect(history).toHaveCount(0);
     expect((await readSavedGame(page))!.transmission!.lines).toEqual([]);
   });
 }

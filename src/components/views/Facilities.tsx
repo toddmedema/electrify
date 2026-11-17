@@ -1310,13 +1310,6 @@ export default class Facilities extends React.Component<Props, SelectionState> {
                 />
               ) : (
                 <div className="territoryAgreements">
-                  <Typography component="h2" variant="h6">
-                    Supply agreements
-                  </Typography>
-                  <Typography variant="body2" color="textSecondary">
-                    Purchase finite supplies for your company pool.
-                    Availability, weather and expiry still matter.
-                  </Typography>
                   {game.multiplayer && (
                     <section>
                       <Typography component="h3" variant="subtitle1">
@@ -1332,9 +1325,9 @@ export default class Facilities extends React.Component<Props, SelectionState> {
                   {(Object.keys(INHERITED_CONNECTIONS) as UtilityId[])
                     .filter((id) => utilityOwnedAt(game, id, game.date.minute))
                     .map((id, index) => (
-                      <section key={id}>
-                        <Typography component="h3" variant="subtitle1">
-                          {territoryName(id)} agreements
+                      <section key={id} className="powerAgreementPortfolio">
+                        <Typography component="h3" variant="subtitle2">
+                          {territoryName(id)}
                         </Typography>
                         <PowerAgreements
                           game={game}

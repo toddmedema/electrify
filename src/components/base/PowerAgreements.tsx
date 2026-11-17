@@ -187,9 +187,6 @@ export default function PowerAgreements({
       aria-label="Power purchase agreements"
       className="powerAgreements"
     >
-      <Typography component="h3" variant="subtitle2">
-        Power purchase agreements
-      </Typography>
       {POWER_AGREEMENT_BLOCKS.filter(
         (block) =>
           "sellerUtilityId" in block &&
@@ -199,12 +196,22 @@ export default function PowerAgreements({
         const quote = powerAgreementQuote(game, block.id);
         return (
           quote && (
-            <Box key={block.id} className="powerAgreement">
-              <Typography variant="body2">
-                {quote.name} · up to {formatWatts(quote.deliverableW)}
+            <Box
+              component="article"
+              aria-label={quote.name}
+              key={block.id}
+              className="powerAgreement"
+            >
+              <Typography component="h4" className="powerAgreementHeading">
+                {quote.name}
+              </Typography>
+              <Typography variant="body2" className="powerAgreementMetrics">
+                Up to <strong>{formatWatts(quote.deliverableW)}</strong> ·{" "}
+                <strong>{rate(quote.priceToday)}</strong>
               </Typography>
               <Button
                 variant="outlined"
+                aria-label={`Review ${quote.name} agreement`}
                 onClick={(event) => {
                   restore.current = event.currentTarget;
                   setForecastCommitted(true);
@@ -212,7 +219,7 @@ export default function PowerAgreements({
                   setReview(quote);
                 }}
               >
-                Review {quote.name} agreement
+                Review terms
               </Button>
             </Box>
           )
@@ -237,40 +244,35 @@ export default function PowerAgreements({
         const quote =
           block && !hasLater ? powerAgreementQuote(game, block.id) : undefined;
         return (
-          <Box key={source.id} className="powerAgreement">
-            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+          <Box
+            component="article"
+            aria-label={source.name}
+            key={source.id}
+            className="powerAgreement"
+          >
+            <Typography component="h4" className="powerAgreementHeading">
               {source.name} ·{" "}
-              {expired
-                ? `Expired ${agreementDate(source.endMinute)}`
-                : source.inherited
-                  ? "Inherited"
-                  : source.startMinute > game.date.minute
-                    ? `Scheduled · starts ${agreementDate(source.startMinute)}`
-                    : "Active"}
+              <span className="powerAgreementStatus">
+                {expired
+                  ? `Expired ${agreementDate(source.endMinute)}`
+                  : source.inherited
+                    ? "Inherited"
+                    : source.startMinute > game.date.minute
+                      ? `Scheduled · starts ${agreementDate(source.startMinute)}`
+                      : "Active"}
+              </span>
             </Typography>
             {!expired && (
               <>
-                <Typography variant="body2">
-                  {formatWatts(source.nominalW * source.deliverability)} covered
-                  · {rate(source.priceToday)}, follows inflation
+                <Typography variant="body2" className="powerAgreementMetrics">
+                  Up to{" "}
+                  <strong>
+                    {formatWatts(source.nominalW * source.deliverability)}
+                  </strong>{" "}
+                  · <strong>{rate(source.priceToday)}</strong>
                 </Typography>
-                {marketPrice !== undefined && marketPrice > 0 && (
-                  <Typography variant="body2" color="textSecondary">
-                    Market now {rate(marketPrice)} ·{" "}
-                    {marketComparison(source.priceToday, marketPrice)}
-                  </Typography>
-                )}
                 <Typography variant="body2" color="textSecondary">
-                  {source.termsVersion === 1
-                    ? "No minimum purchase"
-                    : source.termsVersion === 3
-                      ? `Minimum: ${monthlyEnergy(source.minimumMWhPerMonth)}`
-                      : `Minimum: pay for ${formatWatts(source.nominalW * source.deliverability)} whenever available`}
-                </Typography>
-                <Typography variant="body2">
-                  {source.inherited
-                    ? `Through ${agreementDate(source.endMinute, true)}`
-                    : `${agreementDate(source.startMinute)}–${agreementDate(source.endMinute, true)}`}
+                  Through {agreementDate(source.endMinute, true)}
                 </Typography>
                 {source.reductionYear !== undefined &&
                   game.date.minute <
@@ -284,66 +286,104 @@ export default function PowerAgreements({
                       on 1 Jan {source.reductionYear}
                     </Typography>
                   )}
+                <Typography
+                  variant="body2"
+                  color="textSecondary"
+                  className="powerAgreementMinimum"
+                >
+                  {source.termsVersion === 1
+                    ? "No minimum purchase"
+                    : source.termsVersion === 3
+                      ? `Minimum payment: ${monthlyEnergy(source.minimumMWhPerMonth)}, even if unused`
+                      : `Minimum payment: ${formatWatts(source.nominalW * source.deliverability)} whenever available, even if unused`}
+                </Typography>
               </>
             )}
-            {(() => {
-              if (!account) return null;
-              const available = account.months.reduce(
-                (sum, row) => sum + row.availableMWh,
-                0,
-              );
-              const useful = account.months.reduce(
-                (sum, row) => sum + row.usefulMWh,
-                0,
-              );
-              return (
-                <Typography variant="body2" color="textSecondary">
-                  Recorded since {agreementDate(account.accountingStartMinute)}{" "}
-                  ·{" "}
-                  {available > 0
-                    ? `${formatPercent(useful / available, 1)} used`
-                    : "No available minimum"}
-                </Typography>
-              );
-            })()}
-            {(!expired || account) && (
-              <Button
-                size="small"
-                onClick={(event) => {
-                  restore.current = event.currentTarget;
-                  setAssessmentId(source.id);
-                }}
-                aria-label={
-                  expired
-                    ? `${source.name} recorded history`
-                    : `Forecast ${source.name} remaining term`
-                }
-              >
-                {expired ? "View recorded history" : "Forecast remaining term"}
-              </Button>
-            )}
-            {quote && (
-              <Button
-                variant="outlined"
-                size="small"
-                aria-label={`Review ${quote.name} replacement`}
-                onClick={(event) => {
-                  restore.current = event.currentTarget;
-                  setForecastCommitted(true);
-                  setAcceptanceError(undefined);
-                  setReview(quote);
-                }}
-              >
-                Review replacement
-              </Button>
-            )}
+            <div className="powerAgreementActions">
+              {quote && (
+                <Button
+                  variant="outlined"
+                  size="small"
+                  aria-label={`Review ${quote.name} replacement`}
+                  onClick={(event) => {
+                    restore.current = event.currentTarget;
+                    setForecastCommitted(true);
+                    setAcceptanceError(undefined);
+                    setReview(quote);
+                  }}
+                >
+                  Review replacement
+                </Button>
+              )}
+              {!expired && (
+                <details
+                  className="powerAgreementDetails"
+                  aria-label={`${source.name} details`}
+                >
+                  <summary>Details</summary>
+                  <div className="powerAgreementDetailBody">
+                    <Typography variant="body2" color="textSecondary">
+                      {agreementDate(source.startMinute)}–
+                      {agreementDate(source.endMinute, true)}
+                    </Typography>
+                    <Typography variant="body2" color="textSecondary">
+                      Maximum: {monthlyEnergy(source.maximumMWhPerMonth)}
+                    </Typography>
+                    {marketPrice !== undefined && marketPrice > 0 && (
+                      <Typography variant="body2" color="textSecondary">
+                        Market now {rate(marketPrice)} ·{" "}
+                        {marketComparison(source.priceToday, marketPrice)}
+                      </Typography>
+                    )}
+                    {account &&
+                      (() => {
+                        const available = account.months.reduce(
+                          (sum, row) => sum + row.availableMWh,
+                          0,
+                        );
+                        const useful = account.months.reduce(
+                          (sum, row) => sum + row.usefulMWh,
+                          0,
+                        );
+                        return (
+                          <Typography variant="body2" color="textSecondary">
+                            Recorded since{" "}
+                            {agreementDate(account.accountingStartMinute)} ·{" "}
+                            {available > 0
+                              ? `${formatPercent(useful / available, 1)} used`
+                              : "No available minimum"}
+                          </Typography>
+                        );
+                      })()}
+                    <Button
+                      size="small"
+                      onClick={(event) => {
+                        restore.current = event.currentTarget;
+                        setAssessmentId(source.id);
+                      }}
+                      aria-label={`Forecast ${source.name} remaining term`}
+                    >
+                      Forecast remaining term
+                    </Button>
+                  </div>
+                </details>
+              )}
+              {expired && account && (
+                <Button
+                  size="small"
+                  onClick={(event) => {
+                    restore.current = event.currentTarget;
+                    setAssessmentId(source.id);
+                  }}
+                  aria-label={`${source.name} recorded history`}
+                >
+                  View recorded history
+                </Button>
+              )}
+            </div>
           </Box>
         );
       })}
-      <Typography variant="body2" color="textSecondary">
-        Agreements supply your company power pool. Delivery follows supplier
-        availability; each contract has a quantity limit and an expiry date.
-      </Typography>
       <DecisionDialog
         open={!!review || !!assessment}
         fullWidth
@@ -484,6 +524,10 @@ export default function PowerAgreements({
                   />
                 </Box>
               )}
+              <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
+                Delivery and emissions follow the supplier’s power mix and
+                availability.
+              </Typography>
               <Box className="powerAgreementTerms">
                 <BuildDetails
                   label={
