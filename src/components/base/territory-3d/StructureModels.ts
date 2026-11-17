@@ -282,6 +282,65 @@ function solar(): MapModel {
   ]);
 }
 
+/** A small solid loft: rounded +X leading edge, thin -X trailing edge. */
+function windBlade(): MapMesh {
+  const mesh = new MeshBuilder();
+  // Span, backward sweep, upwind prebend, chord, depth, pitch (radians).
+  // Sweep changes the front silhouette; prebend independently clears the tower.
+  const sections = [
+    [0.02, 0, 0, 0.026, 0.022, 0.3],
+    [0.06, -0.002, 0, 0.052, 0.016, 0.22],
+    [0.12, -0.004, 0.001, 0.042, 0.011, 0.14],
+    [0.2, -0.009, 0.003, 0.027, 0.006, 0.07],
+    [0.255, -0.016, 0.005, 0.012, 0.003, 0.03],
+    [0.28, -0.023, 0.006, 0.003, 0.0015, 0],
+  ] as const;
+  const profile = [
+    [-0.5, -0.03],
+    [-0.05, -0.5],
+    [0.4, -0.36],
+    [0.5, 0],
+    [0.4, 0.36],
+    [-0.05, 0.5],
+    [-0.5, 0.03],
+  ];
+  const rings = sections.map(([span, sweep, prebend, chord, depth, pitch]) =>
+    profile.map(([u, v]): Vec3 => [
+      sweep + u * chord * Math.cos(pitch) - v * depth * Math.sin(pitch),
+      span,
+      prebend + u * chord * Math.sin(pitch) + v * depth * Math.cos(pitch),
+    ]),
+  );
+  for (let span = 0; span < rings.length - 1; span++)
+    for (let edge = 0; edge < profile.length; edge++) {
+      const next = (edge + 1) % profile.length;
+      mesh.quad(
+        rings[span][edge],
+        rings[span + 1][edge],
+        rings[span + 1][next],
+        rings[span][next],
+        edge < 2 ? P.steel : edge < 4 ? P.mint : P.cream,
+      );
+    }
+  for (let edge = 0; edge < profile.length; edge++) {
+    const next = (edge + 1) % profile.length,
+      tip = sections.length - 1;
+    mesh.triangle(
+      [sections[0][1], sections[0][0], sections[0][2]],
+      rings[0][edge],
+      rings[0][next],
+      P.steel,
+    );
+    mesh.triangle(
+      [sections[tip][1], sections[tip][0], sections[tip][2]],
+      rings[tip][next],
+      rings[tip][edge],
+      P.cream,
+    );
+  }
+  return mesh.build();
+}
+
 function wind(kind: "wind" | "offshore-wind"): MapModel {
   const offshore = kind === "offshore-wind",
     body = new MeshBuilder();
@@ -298,39 +357,7 @@ function wind(kind: "wind" | "offshore-wind"): MapModel {
   const pivot: Vec3 = [0, deck + 0.475, 0.045];
   body.box([0, pivot[1], 0], [0.07, 0.045, 0.1], P.steel);
   const rotor = new MeshBuilder();
-  const bladeBuilder = new MeshBuilder();
-  const bladeFront: Vec3[] = [
-    [-0.013, 0.022, 0.008],
-    [0.016, 0.027, 0.008],
-    [0.034, 0.175, 0.004],
-    [0.01, 0.28, 0],
-  ];
-  const bladeBack: Vec3[] = bladeFront.map(([x, y, z]) => [x, y, z - 0.013]);
-  bladeBuilder.quad(
-    bladeFront[0],
-    bladeFront[1],
-    bladeFront[2],
-    bladeFront[3],
-    P.mint,
-  );
-  bladeBuilder.quad(
-    bladeBack[3],
-    bladeBack[2],
-    bladeBack[1],
-    bladeBack[0],
-    P.steel,
-  );
-  for (let i = 0; i < 4; i++) {
-    const next = (i + 1) % 4;
-    bladeBuilder.quad(
-      bladeFront[i],
-      bladeBack[i],
-      bladeBack[next],
-      bladeFront[next],
-      P.mint,
-    );
-  }
-  const blade = bladeBuilder.build();
+  const blade = windBlade();
   for (let i = 0; i < 3; i++)
     rotor.merge(blade, [0, 0, 0], [0, 0, (i * TAU) / 3]);
   rotor.merge(

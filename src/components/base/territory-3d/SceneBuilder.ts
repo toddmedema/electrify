@@ -11,6 +11,7 @@ import type { HexWire } from "../TerritoryHexGeometry";
 import { MeshBuilder } from "./MeshBuilder";
 import { PALETTE } from "./Palette";
 import { CAMERA_COS, CAMERA_SIN, tilePosition3D } from "./Projection";
+import { rotorAngle } from "./RotorPose";
 import { HEX_WIDTH } from "../TerritoryHexGeometry";
 import type {
   MapInstance,
@@ -392,7 +393,7 @@ export class SceneBuilder {
             (part.phaseOffset ?? 0) * Math.PI * 2,
           angle =
             part.motion === "rotor"
-              ? phase
+              ? rotorAngle(phase)
               : part.motion === "sway"
                 ? Math.sin(phase) * 0.045
                 : 0,

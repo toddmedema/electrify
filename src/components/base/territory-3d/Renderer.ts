@@ -1,6 +1,7 @@
 import { HEX_WIDTH } from "../TerritoryHexGeometry";
 import { FacilityMotionClock, MOTION_CYCLE } from "./MotionClock";
 import { projectPoint, projectionMatrix } from "./Projection";
+import { rotorAngle } from "./RotorPose";
 import type {
   MapCanvas,
   MapFrame,
@@ -575,7 +576,7 @@ export class MapRenderer {
       glow = 0;
     switch (part.motion) {
       case "rotor":
-        angle = phase;
+        angle = rotorAngle(phase);
         break;
       case "sway":
         angle = Math.sin(phase) * 0.045;

@@ -52,13 +52,57 @@ function upperSurfaceNormals(mesh: MapMesh, color: RGB): number[] {
   );
 }
 
+/** Intersect the actual triangles, so a uniformly extruded plate cannot pass as a loft. */
+function bladeSection(mesh: MapMesh, height: number) {
+  const points = vertices(mesh),
+    edges: Vec3[][] = [];
+  for (let i = 0; i < points.length; i += 3) {
+    const triangle = points.slice(i, i + 3),
+      intersections: Vec3[] = [];
+    for (let j = 0; j < 3; j++) {
+      const a = triangle[j],
+        b = triangle[(j + 1) % 3],
+        aBelow = a[1] < height,
+        bBelow = b[1] < height;
+      if (aBelow === bBelow) continue;
+      const t = (height - a[1]) / (b[1] - a[1]);
+      intersections.push([
+        a[0] + (b[0] - a[0]) * t,
+        height,
+        a[2] + (b[2] - a[2]) * t,
+      ]);
+    }
+    if (intersections.length === 2) edges.push(intersections);
+  }
+  const section = edges.flat(),
+    minX = Math.min(...section.map((p) => p[0])),
+    maxX = Math.max(...section.map((p) => p[0]));
+  return {
+    chord: maxX - minX,
+    centerX: (minX + maxX) / 2,
+    depth:
+      Math.max(...section.map((p) => p[2])) -
+      Math.min(...section.map((p) => p[2])),
+    thicknessAt(fraction: number) {
+      const x = minX + (maxX - minX) * fraction,
+        z = edges.flatMap(([a, b]) => {
+          const aBefore = a[0] < x,
+            bBefore = b[0] < x;
+          if (aBefore === bBefore) return [];
+          return [a[2] + ((b[2] - a[2]) * (x - a[0])) / (b[0] - a[0])];
+        });
+      return Math.max(...z) - Math.min(...z);
+    },
+  };
+}
+
 /** Contract poses sampled independently of factory metadata, including end-of-steam-cycle. */
 function posed(part: ModelPart, point: Vec3, cycle: number): Vec3 {
   let [x, y, z] = point;
   const phase = (cycle + (part.phaseOffset ?? 0)) * Math.PI * 2;
   const angle =
     part.motion === "rotor"
-      ? phase
+      ? -phase
       : part.motion === "sway"
         ? Math.sin(phase) * 0.045
         : 0;
@@ -165,6 +209,38 @@ it("keeps the empty-land tower small and quiet", () => {
   expect(model.height).toBeLessThan(0.32);
   expect(coloredVertices(model.parts[0].mesh, PALETTE.ink)).toHaveLength(0);
   expect(coloredVertices(model.parts[0].mesh, PALETTE.mint)).toHaveLength(0);
+});
+
+it.each(["wind", "offshore-wind"] as const)(
+  "gives %s a thick root, broad inner chord and swept, tapered airfoil sections",
+  (kind) => {
+    const rotor = getStructureModel(kind).parts.find(
+        (p) => p.motion === "rotor",
+      )!,
+      root = bladeSection(rotor.mesh, 0.035),
+      inner = bladeSection(rotor.mesh, 0.075),
+      middle = bladeSection(rotor.mesh, 0.16),
+      outer = bladeSection(rotor.mesh, 0.25);
+    expect(root.depth).toBeGreaterThan(outer.depth * 3);
+    expect(inner.chord).toBeGreaterThan(root.chord);
+    expect(inner.chord).toBeGreaterThan(middle.chord);
+    expect(middle.chord).toBeGreaterThan(outer.chord * 2);
+    expect(outer.centerX).toBeLessThan(root.centerX - 0.01);
+    // The upward blade travels +X: its leading edge is rounded and its -X edge is thin.
+    expect(inner.thicknessAt(0.9)).toBeGreaterThan(inner.thicknessAt(0.03) * 2);
+    expect(inner.thicknessAt(0.65)).toBeGreaterThan(inner.thicknessAt(0.9));
+    expect(inner.thicknessAt(0.99)).toBeLessThan(inner.thicknessAt(0.9) / 2);
+    expect(rotor.castsShadow).toBe(true);
+  },
+);
+
+it("shares the same blade and hub geometry between land and offshore wind", () => {
+  const rotor = (kind: "wind" | "offshore-wind") =>
+    getStructureModel(kind).parts.find((p) => p.motion === "rotor")!;
+  expect(rotor("offshore-wind").mesh).toEqual(rotor("wind").mesh);
+  expect(rotor("offshore-wind").position![1]).toBeGreaterThan(
+    rotor("wind").position![1],
+  );
 });
 
 it("lights the airborne wing's upper facets from above", () => {

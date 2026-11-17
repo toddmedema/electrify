@@ -1,6 +1,8 @@
 import { MeshBuilder } from "./MeshBuilder";
 import { MapRenderer } from "./Renderer";
-import type { MapCanvas, MapFrame, MapInstance, MapModel } from "./Types";
+import { projectPoint } from "./Projection";
+import { getStructureModel } from "./StructureModels";
+import type { MapCanvas, MapFrame, MapInstance, MapModel, Vec3 } from "./Types";
 
 function mockContext() {
   let identity = 0;
@@ -163,6 +165,79 @@ beforeEach(() => {
 afterEach(() => {
   jest.restoreAllMocks();
 });
+it.each(["wind", "offshore-wind"] as const)(
+  "turns the actual %s mesh clockwise from its upwind hub and shares its shadow pose",
+  (kind) => {
+    const { renderer, gl } = setup(),
+      wind = getStructureModel(kind),
+      rotor = wind.parts.find((part) => part.motion === "rotor")!,
+      drawn: { vao: unknown; shadow: boolean; vertices: number }[] = [];
+    let vao: unknown,
+      shadow = false;
+    gl.bindVertexArray.mockImplementation((value) => {
+      vao = value;
+    });
+    gl.uniform1i.mockImplementation((uniform, value) => {
+      if (uniform?.name === "uShadow") shadow = value === 1;
+    });
+    gl.drawArraysInstanced.mockImplementation((_mode, _start, vertices) => {
+      drawn.push({ vao, shadow, vertices });
+    });
+    renderer.update([{ ...scene()[0], model: wind }], frame);
+    flush(0);
+    gl.bufferSubData.mockClear();
+    drawn.length = 0;
+    const phase = 0.2;
+    flush((phase * 8000) / (Math.PI * 2));
+    expect(renderer.diagnostics().phases["facility-0"]).toBeCloseTo(phase);
+    // The opaque rotor and its shadow reuse one uploaded instance matrix.
+    expect(gl.bufferSubData).toHaveBeenCalledTimes(1);
+    const pose = gl.bufferSubData.mock.calls[0][2] as Float32Array;
+    expect(pose[1]).toBeCloseTo(-Math.sin(phase));
+    expect(pose[4]).toBeCloseTo(Math.sin(phase));
+    const rotorDraws = drawn.filter(
+      (draw) => draw.vertices === rotor.mesh.positions.length / 3,
+    );
+    expect(rotorDraws).toEqual([
+      {
+        vao: expect.anything(),
+        shadow: false,
+        vertices: rotor.mesh.positions.length / 3,
+      },
+      {
+        vao: rotorDraws[0].vao,
+        shadow: true,
+        vertices: rotor.mesh.positions.length / 3,
+      },
+    ]);
+    let tip: Vec3 = [0, 0, 0];
+    for (let i = 0; i < rotor.mesh.positions.length; i += 3)
+      if (rotor.mesh.positions[i + 1] > tip[1])
+        tip = [
+          rotor.mesh.positions[i],
+          rotor.mesh.positions[i + 1],
+          rotor.mesh.positions[i + 2],
+        ];
+    const initial = projectPoint(
+        [
+          tip[0] + rotor.position![0],
+          tip[1] + rotor.position![1],
+          tip[2] + rotor.position![2],
+        ],
+        frame,
+      ),
+      moved = projectPoint(
+        [
+          pose[0] * tip[0] + pose[4] * tip[1] + pose[12],
+          pose[1] * tip[0] + pose[5] * tip[1] + pose[13],
+          tip[2] + pose[14],
+        ],
+        frame,
+      );
+    expect(moved.x).toBeGreaterThan(initial.x + 4);
+    renderer.dispose();
+  },
+);
 it("batches actual geometry, caps physical resolution, reuses buffers and exposes read-only samples", () => {
   const { renderer, canvas, gl, state } = setup();
   expect(state).not.toHaveBeenCalled();

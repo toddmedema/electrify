@@ -2,7 +2,7 @@ import type { TerritoryTileView } from "../../../helpers/TerritoryMapState";
 import { hexWires } from "../TerritoryHexGeometry";
 import { MeshBuilder } from "./MeshBuilder";
 import { SceneBuilder, structureKind } from "./SceneBuilder";
-import type { MapModel } from "./Types";
+import type { MapModel, Vec3 } from "./Types";
 import { projectPoint } from "./Projection";
 import { getTerrainModel } from "./TerrainModels";
 import { getStructureModel } from "./StructureModels";
@@ -293,31 +293,53 @@ test("picking uses camera depth instead of tile iteration order", () => {
     front.tile.id,
   );
 });
-test("picking follows the actual retained rotor phase without a React animation loop", () => {
-  const rotor: MapModel = {
-    ...model,
-    key: "rotor",
-    parts: [
-      {
-        position: [0, 0.5, 0],
-        motion: "rotor",
-        mesh: new MeshBuilder()
-          .box([0, 0, 0], [0.6, 0.03, 0.03], [1, 1, 1])
-          .build(),
-      },
-    ],
-  };
-  const builder = new SceneBuilder({
-      terrain: () => flatGround,
-      structure: () => rotor,
-    }),
-    tile = view();
-  builder.build([tile], [tile.tile], [], 0, "run");
-  const point = projectPoint([0.25, 0.5, 0], pickFrame);
-  expect(builder.pick(point, pickFrame)).toBe(tile.tile.id);
-  expect(
-    builder.pick(point, pickFrame, {
-      [`structure:${tile.tile.id}`]: Math.PI / 2,
-    }),
-  ).toBeUndefined();
-});
+test.each(["wind", "offshore-wind"] as const)(
+  "picks the actual %s blade at signed retained phases and misses its mirrored pose",
+  (kind) => {
+    const wind = getStructureModel(kind),
+      rotor = wind.parts.find((part) => part.motion === "rotor")!,
+      builder = new SceneBuilder({
+        terrain: () => flatGround,
+        structure: () => wind,
+      }),
+      tile = view();
+    builder.build([tile], [tile.tile], [], 0, "run");
+    // Pick inside the uppermost front-facing real blade triangle, above the tower.
+    let blade: Vec3 = [0, 0, 0];
+    for (let i = 0; i < rotor.mesh.positions.length; i += 9) {
+      if (rotor.mesh.normals[i + 2] < 0.4) continue;
+      const coordinate = (axis: number) =>
+        (rotor.mesh.positions[i + axis] +
+          rotor.mesh.positions[i + 3 + axis] +
+          rotor.mesh.positions[i + 6 + axis]) /
+        3;
+      const center: Vec3 = [coordinate(0), coordinate(1), coordinate(2)];
+      if (center[1] > blade[1]) blade = center;
+    }
+    expect(blade[1]).toBeGreaterThan(0.15);
+    for (const phase of [0.2, -0.2]) {
+      // Independent clockwise expectation, deliberately not the production angle helper.
+      const point = projectPoint(
+          [
+            blade[0] * Math.cos(phase) +
+              blade[1] * Math.sin(phase) +
+              rotor.position![0],
+            -blade[0] * Math.sin(phase) +
+              blade[1] * Math.cos(phase) +
+              rotor.position![1],
+            blade[2] + rotor.position![2],
+          ],
+          pickFrame,
+        ),
+        phases = { [`structure:${tile.tile.id}`]: phase };
+      expect(builder.pick(point, pickFrame, phases)).toBe(tile.tile.id);
+      expect(
+        builder.pick(
+          { ...point, x: pickFrame.width - point.x },
+          pickFrame,
+          phases,
+        ),
+      ).toBeUndefined();
+    }
+  },
+);
