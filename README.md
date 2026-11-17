@@ -65,6 +65,7 @@ reproduction guide for an individual failure.
 - [Desktop and Steam](docs/desktop-steam.md): build an offline app or prepare a Steam release.
 - [Weather and assets](docs/weather-and-assets.md): add cities, update weather, and
   work with icons and manual figures.
+- [SEO and discovery](docs/seo-audit.md): deployment checks and owner follow-up.
 - [Releases](docs/releases.md): web deployment, version metadata, and account storage.
 
 ## License

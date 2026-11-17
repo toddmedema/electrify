@@ -25,6 +25,8 @@ jobs:
           # the runner gets 130-byte pointer files, the build still succeeds, and
           # every image and sound on the site ships as a stub.
           lfs: true
+          # Sitemap lastmod dates come from page source history.
+          fetch-depth: 0
 
       - name: Setup Node.js environment
         uses: actions/setup-node@v7
@@ -82,3 +84,6 @@ jobs:
           # Baked into the JS bundle at build time by create-react-app.
           REACT_APP_FIREBASE_API_KEY: ${{ secrets.REACT_APP_FIREBASE_API_KEY }}
         run: ./scripts/deploy.sh ci-prod
+
+      - name: Verify deployed SEO pages and hosting
+        run: python3 scripts/seo-check.py https://electrifygame.com --hosting
