@@ -1,0 +1,126 @@
+.projectCatalogue {
+  display: grid;
+  gap: 12px;
+}
+.projectSize {
+  display: grid;
+  gap: 8px;
+  padding: 8px 0;
+  strong {
+    font-size: 20px;
+  }
+  input {
+    width: 100%;
+    min-height: 44px;
+    accent-color: var(--interactive-blue);
+  }
+}
+.projectOptions {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  li {
+    display: grid;
+    gap: 8px;
+    padding: 12px 0;
+    border-top: 1px solid var(--border-subtle);
+  }
+  li > div {
+    display: grid;
+    gap: 4px;
+  }
+  span,
+  small {
+    color: var(--font-color-secondary);
+  }
+  button {
+    justify-self: start;
+  }
+}
+.projectCandidateContent {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+}
+.projectCandidateScroll {
+  overflow: auto;
+  min-height: 0;
+  padding: 0 16px 12px;
+}
+.projectLocation {
+  margin: 4px 0 12px;
+  font-size: 13px;
+  color: var(--font-color-secondary);
+}
+.projectFacts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin: 8px 0;
+  dt {
+    color: var(--font-color-secondary);
+    font-size: 12px;
+  }
+  dd {
+    margin: 4px 0 0;
+    font-weight: 600;
+    font-size: 14px;
+  }
+  .projectOutput {
+    grid-column: 1 / -1;
+  }
+}
+.projectLoanTerms {
+  font-size: 13px;
+  line-height: 1.5;
+}
+.projectCandidateActions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+  border-top: 1px solid var(--border-subtle);
+  padding: 8px 12px;
+  background: var(--bg-raised);
+  button {
+    min-height: 44px;
+  }
+}
+.projectSiteLegend {
+  display: grid;
+  gap: 8px;
+  font-size: 13px;
+  span {
+    border-left: 3px solid var(--interactive-blue);
+    padding-left: 8px;
+  }
+  span + span {
+    border-left-style: dashed;
+  }
+}
+.tileWorkspaceProject .tileWorkspaceBody {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 0;
+}
+@media (max-width: 740px) {
+  .tileWorkspaceSurface.tileWorkspaceProject {
+    max-height: min(55%, calc(100% - var(--game-dock-clearance, 80px) - 176px));
+  }
+  .tileWorkspaceProject .tileWorkspaceHeading h3 {
+    font-size: 16px;
+    line-height: 24px;
+  }
+  .tileWorkspaceProject .projectCandidateScroll {
+    padding: 0 12px 8px;
+  }
+  .projectFacts {
+    gap: 8px;
+  }
+  .projectCandidateActions button {
+    flex: 1;
+  }
+}

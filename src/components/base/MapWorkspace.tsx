@@ -93,8 +93,12 @@ export default function MapWorkspace({
     return () => document.removeEventListener("keydown", escape);
   }, [active, close]);
   const panel = React.useMemo(
-    () => ({ open: !!active, inspect: returnToMap }),
-    [active, returnToMap],
+    () => ({
+      open: !!active,
+      inspect: returnToMap,
+      projectRequested: candidate === "BUILD_GENERATORS",
+    }),
+    [active, returnToMap, candidate],
   );
   return (
     <GameToolMemoryContext.Provider value={memory}>

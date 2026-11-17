@@ -515,3 +515,60 @@
     }
   }
 }
+
+// The labeled project action shares the map entry rail with quick Connect.
+.territoryMapBuildToggle {
+  position: absolute;
+  z-index: 5;
+  right: 72px;
+  bottom: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 0 16px;
+  border: 1px solid var(--interactive-blue);
+  border-radius: var(--radius-lg);
+  background: var(--bg-raised);
+  color: var(--interactive-blue);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  &:focus-visible {
+    outline: 3px solid var(--focus-ring);
+    outline-offset: 2px;
+  }
+}
+.projectSiteOutline {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+  path {
+    fill: none;
+    stroke: var(--interactive-blue);
+    stroke-width: 3;
+    vector-effect: non-scaling-stroke;
+  }
+}
+.territoryTileTarget[data-project-site="connection"]
+  .projectSiteOutline
+  > path:first-child {
+  stroke-dasharray: 7 4;
+}
+.projectSiteInnerOutline {
+  stroke-width: 2;
+}
+@media (max-width: 599px) {
+  .territoryMapBuildToggle {
+    right: 64px;
+    bottom: 8px;
+  }
+}
+.gameWorkspace[data-map-workspace="true"][data-compact-dock="true"]
+  .territoryMapBuildToggle {
+  bottom: var(--game-dock-clearance);
+}

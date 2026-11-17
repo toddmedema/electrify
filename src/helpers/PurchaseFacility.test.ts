@@ -42,3 +42,71 @@ it("acknowledges a purchase in the dispatching store, but not a rejected build",
   expect(state.ui.snackbar.open).toBe(true);
   expect(state.ui.snackbar.message).toContain(facility.name.toLowerCase());
 });
+
+it("waits for the requested tile and project rather than acknowledging an unrelated host addition", async () => {
+  const { registerMultiplayerRuntime } =
+    await import("../multiplayer/Registry");
+  const { availableTerritoryTiles } = await import("./TerritoryTiles");
+  const { currentTick } = await import("./GameSelectors");
+  const { buildFacility } = await import("../reducers/Game");
+  const game = createGame({ scenarioId: 116, seed: 188 });
+  currentTick(game)!.cash = 1e9;
+  game.multiplayer = { seat: "0" };
+  const store = configureStore({
+    reducer: {
+      game: gameReducer,
+      card: cardReducer,
+      ui: uiReducer,
+      user: userReducer,
+      settings: settingsReducer,
+      saves: savesReducer,
+    },
+    preloadedState: { game },
+    middleware: (defaults) =>
+      defaults({ serializableCheck: false, immutableCheck: false }),
+  });
+  const facility = GENERATORS(game, 20e6, [], []).find(
+    (option) => option.name === "Wind",
+  )!;
+  const [target, other] = availableTerritoryTiles(game, facility, "champlain");
+  expect(other).toBeDefined();
+  registerMultiplayerRuntime({
+    submit: async () => undefined,
+    command: jest.fn(),
+    activity: jest.fn(),
+    leave: async () => undefined,
+  });
+  try {
+    const result = store.dispatch(
+      purchaseFacility(facility, false, target.territoryId, target.id),
+    );
+    store.dispatch(
+      buildFacility({
+        facility,
+        financed: false,
+        territoryId: other.territoryId,
+        tileId: other.id,
+      }),
+    );
+    await new Promise<void>((resolve) => setTimeout(resolve, 80));
+    expect(store.getState().ui.arrivingFacilityId).toBeUndefined();
+    store.dispatch(
+      buildFacility({
+        facility,
+        financed: false,
+        territoryId: target.territoryId,
+        tileId: target.id,
+      }),
+    );
+    const accepted = await result;
+    expect(accepted.status).toBe("accepted");
+    expect(store.getState().ui.arrivingFacilityId).toBe(
+      store
+        .getState()
+        .game.facilities.find((candidate) => candidate.tileId === target.id)!
+        .id,
+    );
+  } finally {
+    registerMultiplayerRuntime(undefined);
+  }
+});

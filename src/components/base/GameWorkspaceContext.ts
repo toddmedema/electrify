@@ -23,5 +23,5 @@ export const useGameWorkspaceLayout = () =>
 
 /** The persistent map and its single tool panel share one inspection destination. */
 export const MapWorkspacePanelContext = createContext<
-  { open: boolean; inspect: () => void } | undefined
+  { open: boolean; inspect: () => void; projectRequested?: boolean } | undefined
 >(undefined);

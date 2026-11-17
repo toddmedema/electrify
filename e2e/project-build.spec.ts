@@ -1,0 +1,164 @@
+import { expect, test } from "./fixtures";
+import type { Page } from "@playwright/test";
+import { readSavedGame } from "./save-fixture";
+import { returnToTerritoryMap } from "./layout";
+import { getTerritoryTile } from "../src/helpers/TerritoryTiles";
+import { hexCenter } from "../src/components/base/TerritoryHexGeometry";
+import { currentTick } from "../src/helpers/GameSelectors";
+import { reviewScreenshot } from "./review-screenshot";
+
+async function start(page: Page, theme: "light" | "dark") {
+  await page.addInitScript((mode) => {
+    localStorage.setItem("theme", mode);
+    localStorage.setItem("audioEnabled", "false");
+  }, theme);
+  await page.goto("/?scenario=116");
+  await page.getByRole("button", { name: "Start game", exact: true }).click();
+  const pause = page.getByRole("button", { name: "pause", exact: true });
+  await expect(pause).toBeVisible();
+  if ((await pause.getAttribute("aria-pressed")) !== "true")
+    await pause.click();
+  const network = await returnToTerritoryMap(page);
+  await expect(
+    page.locator("#appbar:visible [data-save-state]").first(),
+  ).toHaveAttribute("data-save-state", "saved");
+  return network;
+}
+async function chooseSite(page: Page, id: string) {
+  const tile = getTerritoryTile(id)!;
+  const point = hexCenter(tile);
+  const viewport = page.locator(".territoryMapViewport");
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const camera = await viewport.evaluate((element) => ({
+      x: Number(element.getAttribute("data-camera-x")),
+      y: Number(element.getAttribute("data-camera-y")),
+      scale: Number(element.getAttribute("data-camera-scale")),
+    }));
+    const dx = (camera.x - point.x) * camera.scale;
+    const dy = (camera.y - point.y) * camera.scale;
+    if (Math.abs(dx) < 1 && Math.abs(dy) < 1) break;
+    const box = (await viewport.boundingBox())!;
+    const step = Math.min(
+      1,
+      (box.width * 0.25) / Math.max(1, Math.abs(dx)),
+      (box.height * 0.2) / Math.max(1, Math.abs(dy)),
+    );
+    const x = box.x + box.width / 2,
+      y = box.y + 40;
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.mouse.move(x + 12, y);
+    await page.mouse.move(x + dx * step, y + dy * step, { steps: 4 });
+    await page.mouse.up();
+  }
+  const target = page.locator(`[data-map-target="${id}"]`);
+  // The public focus handler brings the physical tile into the camera before activation.
+  await target.focus();
+  await target.press("Enter");
+  await expect(target).toHaveAttribute("aria-pressed", "true");
+  return target;
+}
+for (const theme of ["light", "dark"] as const) {
+  test(`plans before connecting, retains size across sites, and builds the exact site · ${theme}`, async ({
+    page,
+  }, testInfo) => {
+    const network = await start(page, theme);
+    const before = (await readSavedGame(page))!;
+    const build = network.getByRole("button", { name: "Build", exact: true });
+    await expect(build.getByText("Build", { exact: true })).toBeVisible();
+    await network.getByRole("button", { name: "Connect", exact: true }).click();
+    await expect(network.locator(".territoryMap")).toHaveAttribute(
+      "data-buy-mode",
+      "true",
+    );
+    await build.click();
+    await expect(network.locator(".territoryMap")).toHaveAttribute(
+      "data-buy-mode",
+      "false",
+    );
+    const surface = page.locator(".tileWorkspaceSurface");
+    await expect(
+      surface.getByRole("heading", { name: "Plan a project" }),
+    ).toBeVisible();
+    const size = surface.getByRole("slider", { name: "Generator capacity" });
+    await size.fill("10");
+    await surface
+      .getByRole("button", { name: "Choose sites for Wind", exact: true })
+      .click();
+    await expect(
+      surface.getByText("Choose a highlighted site.", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      network.locator('[data-project-site="owned"]').first(),
+    ).toBeVisible();
+    await expect(
+      network.locator('[data-project-site="connection"]').first(),
+    ).toBeVisible();
+    await chooseSite(page, "champlain:site-13");
+    await expect(
+      surface.getByRole("heading", { name: "Wind · 20MW", exact: true }),
+    ).toBeVisible();
+    await expect(surface.getByText("Already connected · $0")).toBeVisible();
+    const target = await chooseSite(page, "green-uplands:site-1");
+    await expect(
+      surface.getByRole("heading", { name: "Wind · 20MW", exact: true }),
+    ).toBeVisible();
+    for (const label of [
+      "Connection cost",
+      "Project cost",
+      "Cash required now",
+      "Cash remaining",
+      "Expected output",
+      "Online",
+    ])
+      await expect(surface.getByText(label, { exact: true })).toBeVisible();
+    const explored = (await readSavedGame(page))!;
+    expect(currentTick(explored)!.cash).toBe(currentTick(before)!.cash);
+    expect(explored.territoryNetwork!.tilePurchases).toEqual(
+      before.territoryNetwork!.tilePurchases,
+    );
+    if (page.viewportSize()!.width < 741) {
+      const sheet = (await surface.boundingBox())!;
+      const map = (await network.locator(".territoryMap").boundingBox())!;
+      const tile = (await target.boundingBox())!;
+      expect(sheet.height).toBeLessThanOrEqual(map.height * 0.55 + 1);
+      expect(sheet.y - map.y).toBeGreaterThanOrEqual(160);
+      expect(tile.y + tile.height).toBeLessThanOrEqual(sheet.y + 1);
+    }
+    await reviewScreenshot(network, {
+      path: testInfo.outputPath(`project-candidate-${theme}.png`),
+    });
+    await surface
+      .getByRole("button", { name: "Review project", exact: true })
+      .click();
+    await expect(
+      surface.getByRole("heading", {
+        name: "Connect and build Wind?",
+        exact: true,
+      }),
+    ).toBeVisible();
+    await surface
+      .getByRole("radio", {
+        name: "Loan · connection paid in cash",
+        exact: true,
+      })
+      .check();
+    await expect(surface.getByText(/Down payment/)).toBeVisible();
+    const confirm = surface.getByRole("button", {
+      name: "Connect & build",
+      exact: true,
+    });
+    await expect(confirm).toBeEnabled();
+    await confirm.click();
+    await expect(surface).toHaveCount(0);
+    const built = (await readSavedGame(page))!;
+    expect(
+      built.facilities.find(
+        (facility) => facility.tileId === "green-uplands:site-1",
+      ),
+    ).toMatchObject({ name: "Wind", peakW: 20e6 });
+    expect(built.territoryNetwork!.tilePurchases).toHaveLength(
+      before.territoryNetwork!.tilePurchases!.length + 1,
+    );
+  });
+}

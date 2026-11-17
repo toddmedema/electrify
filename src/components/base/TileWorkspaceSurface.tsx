@@ -10,6 +10,8 @@ export default function TileWorkspaceSurface({
   focusKey,
   subtitle,
   building,
+  projectCandidate,
+  returnFocusSelector = ".territoryMapBuyToggle",
   onClose,
   children,
 }: {
@@ -18,6 +20,8 @@ export default function TileWorkspaceSurface({
   focusKey: React.Key;
   subtitle?: string;
   building?: boolean;
+  projectCandidate?: boolean;
+  returnFocusSelector?: string;
   onClose: () => void;
   children: React.ReactNode;
 }) {
@@ -27,14 +31,13 @@ export default function TileWorkspaceSurface({
     const origin = document.activeElement;
     const map = heading.current?.closest(".territoryNetwork");
     return () => {
-      const returnControl = map?.querySelector<HTMLElement>(
-        ".territoryMapBuyToggle",
-      );
+      const returnControl =
+        map?.querySelector<HTMLElement>(returnFocusSelector);
       if (returnControl) returnControl.focus({ preventScroll: true });
       else if (origin instanceof HTMLElement && origin.isConnected)
         origin.focus({ preventScroll: true });
     };
-  }, []);
+  }, [returnFocusSelector]);
   React.useLayoutEffect(() => {
     heading.current?.focus({ preventScroll: true });
   }, [focusKey]);
@@ -42,7 +45,7 @@ export default function TileWorkspaceSurface({
     <section
       role="dialog"
       aria-labelledby={titleId}
-      className={`tileWorkspaceSurface${building ? " tileWorkspaceBuilding" : ""}`}
+      className={`tileWorkspaceSurface${building ? " tileWorkspaceBuilding" : ""}${projectCandidate ? " tileWorkspaceProject" : ""}`}
       onKeyDown={(event) => {
         if (
           event.key === "Escape" &&

@@ -38,6 +38,13 @@ import TileWorkspaceSurface from "../base/TileWorkspaceSurface";
 import ExpandedFacilityDetails, {
   FacilityDetailActions,
 } from "../base/ExpandedFacilityDetails";
+import { signature } from "../base/DeferredProjection";
+import ProjectBuild from "../base/ProjectBuild";
+import {
+  projectSiteQuote,
+  type ProjectSelection,
+} from "../../helpers/ProjectBuild";
+import { tilePurchaseQuotes } from "../../helpers/Territories";
 import BuildGenerators from "./BuildGenerators";
 import BuildStorage from "./BuildStorage";
 import {
@@ -77,6 +84,14 @@ function TileNetwork(props: Props) {
     "network.tile",
     undefined,
   );
+  const [planning, setPlanning] = React.useState(false);
+  const [catalogue, setCatalogue] = React.useState(true);
+  const [project, setProject] = useToolState<ProjectSelection | undefined>(
+    "network.project",
+    undefined,
+  );
+  const [candidate, setCandidate] = React.useState<TerritoryTileId>();
+  const projectBusy = React.useRef(false);
   const [inspected, setInspected] = React.useState<TerritoryTileId>();
   const [activation, setActivation] = React.useState(0);
   const [category, setCategory] = React.useState("generators");
@@ -95,7 +110,7 @@ function TileNetwork(props: Props) {
   }, [review, game.utilityExpansion?.acquisitions.length]);
   const views = territoryTileViews(game);
   const view =
-    inspected && !panel?.open
+    inspected && !panel?.open && !planning
       ? views.find(({ tile }) => tile.id === inspected)
       : undefined;
   const tile = view?.tile;
@@ -121,12 +136,46 @@ function TileNetwork(props: Props) {
   const building = !!(view?.owned && tile && !tile.city && !view.facility);
   const storageFits = !!tile && tileFitsFacility(tile, { peakWh: 1, peakW: 1 });
   const close = React.useCallback(() => {
+    if (projectBusy.current) return;
+    setPlanning(false);
+    setCandidate(undefined);
     setInspected(undefined);
     setSelected(undefined);
   }, [setSelected]);
   React.useEffect(() => {
     if (panel?.open) close();
   }, [panel?.open, close]);
+  const startProject = React.useCallback(() => {
+    panel?.inspect();
+    setInspected(undefined);
+    setSelected(undefined);
+    setCandidate(undefined);
+    setCatalogue(true);
+    setPlanning(true);
+  }, [panel, setSelected]);
+  React.useEffect(() => {
+    if (panel?.projectRequested) startProject();
+  }, [panel?.projectRequested, startProject]);
+  const projectPricingKey = `${signature(game)}|${game.interestRate}|${JSON.stringify(game.multiplayer?.tileOwners)}|${JSON.stringify(game.multiplayer?.landOwners)}`;
+  const projectSites = React.useMemo(() => {
+    if (!planning || !project || catalogue) return undefined;
+    const connections = tilePurchaseQuotes(game);
+    return new Map(
+      views.flatMap(({ tile }) => {
+        const quote = projectSiteQuote(game, project, tile.id, connections);
+        return quote.facility
+          ? [
+              [
+                tile.id,
+                quote.owned ? ("owned" as const) : ("connection" as const),
+              ] as const,
+            ]
+          : [];
+      }),
+    );
+    // Reuse the shared economic/planning signature; map focus and clock ticks do not reprice every site.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [planning, project, catalogue, projectPricingKey]);
   const build = React.useCallback(
     (
       facility: FacilityShoppingType,
@@ -142,7 +191,12 @@ function TileNetwork(props: Props) {
     dispatch(generatorSizeChanged());
   }, [dispatch]);
   const inspect = (id: TerritoryTileId, activate = false) => {
+    if (projectBusy.current) return;
     setSelected(id);
+    if (planning && !catalogue) {
+      if (activate) setCandidate(id);
+      return;
+    }
     if (activate) {
       panel?.inspect();
       setActivation((value) => value + 1);
@@ -167,11 +221,36 @@ function TileNetwork(props: Props) {
     >
       {views.length > 0 && (
         <TerritoryHexMap
-          {...(view ? { onCloseInspection: close } : {})}
+          {...(view || planning ? { onCloseInspection: close } : {})}
+          onPlanProject={startProject}
+          projectPlanning={planning}
+          projectSites={projectSites}
           onDeselect={close}
           game={game}
           selected={selected}
           onSelect={inspect}
+        />
+      )}
+      {planning && !panel?.open && (
+        <ProjectBuild
+          game={game}
+          project={project}
+          candidate={candidate}
+          catalogue={catalogue}
+          onProject={(selection) => {
+            setProject(selection);
+            setCatalogue(false);
+            setCandidate(undefined);
+            setSelected(undefined);
+          }}
+          onChangeProject={() => {
+            setCatalogue(true);
+            setCandidate(undefined);
+          }}
+          onClose={close}
+          onBusy={(busy) => {
+            projectBusy.current = busy;
+          }}
         />
       )}
       <AcquiredUtilities game={game} summaryRef={summaryRef} />
@@ -290,11 +369,11 @@ function TileNetwork(props: Props) {
                     {quote && (
                       <div className="tilePurchaseMoney">
                         <div>
-                          <span>Tile price</span>
+                          <span>Connection cost</span>
                           <strong>{money(quote.price)}</strong>
                         </div>
                         <div>
-                          <span>Cash after purchase</span>
+                          <span>Cash after connection</span>
                           <strong>{money(availableCash - quote.price)}</strong>
                         </div>
                       </div>
@@ -309,10 +388,10 @@ function TileNetwork(props: Props) {
                       onClick={() => void purchase(tile.id, quote?.quoteKey)}
                     >
                       {pendingIds.has(tile.id)
-                        ? "Buying tile…"
+                        ? "Connecting…"
                         : quote
-                          ? `Buy tile · ${money(quote.price)}`
-                          : "Tile unavailable"}
+                          ? `Connect · ${money(quote.price)}`
+                          : "Connection unavailable"}
                     </Button>
                     {quote && availableCash < quote.price && (
                       <Typography role="status" variant="body2">

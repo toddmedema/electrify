@@ -1,5 +1,6 @@
 import * as React from "react";
 import { Tooltip } from "@mui/material";
+import ConstructionIcon from "@mui/icons-material/Construction";
 import AddLocationAltIcon from "@mui/icons-material/AddLocationAlt";
 import type { GameType, TerritoryTileId } from "../../Types";
 import { getTerritoryDefinition } from "../../data/Territories";
@@ -49,6 +50,9 @@ interface Props {
   onSelect: (id: TerritoryTileId, inspect?: boolean) => void;
   onCloseInspection?: () => void;
   onDeselect?: () => void;
+  onPlanProject?: () => void;
+  projectPlanning?: boolean;
+  projectSites?: ReadonlyMap<TerritoryTileId, "owned" | "connection">;
 }
 function wireStructure({
   tile,
@@ -73,6 +77,9 @@ export default function TerritoryHexMap({
   onSelect,
   onCloseInspection,
   onDeselect,
+  onPlanProject,
+  projectPlanning = false,
+  projectSites,
 }: Props) {
   const mapId = React.useId();
   const motion = useFacilityMapMotion(game.speed);
@@ -91,9 +98,12 @@ export default function TerritoryHexMap({
     [views],
   );
   const purchaseQuotes = React.useMemo(
-    () => (buyMode ? tilePurchaseQuotes(game) : undefined),
-    [buyMode, game],
+    () => (buyMode || projectPlanning ? tilePurchaseQuotes(game) : undefined),
+    [buyMode, projectPlanning, game],
   );
+  React.useEffect(() => {
+    if (projectPlanning) setBuyMode(false);
+  }, [projectPlanning]);
   const activeSelected = selected && byId.has(selected) ? selected : undefined;
   React.useEffect(() => {
     const escape = (event: KeyboardEvent) => {
@@ -354,7 +364,10 @@ export default function TerritoryHexMap({
     if (size.width <= 740) {
       const point = hexCenter(tile);
       // Leave the selected ground and occupant above the phone's inspection sheet.
-      setCamera({ x: point.x, y: point.y + worldHeight * 0.22 });
+      setCamera({
+        x: point.x,
+        y: point.y + worldHeight * (projectPlanning ? 0.3 : 0.22),
+      });
     }
     onSelect(tile.id, true);
   };
@@ -406,8 +419,20 @@ export default function TerritoryHexMap({
       data-buy-mode={buyMode}
       aria-label="Terrain, structures and utility ownership"
     >
+      {onPlanProject && (
+        <button
+          type="button"
+          className="territoryMapBuildToggle"
+          aria-label="Build"
+          aria-pressed={projectPlanning}
+          onClick={onPlanProject}
+        >
+          <ConstructionIcon aria-hidden="true" />
+          <span>Build</span>
+        </button>
+      )}
       <Tooltip
-        title={buyMode ? "Finish buying land" : "Buy land"}
+        title={buyMode ? "Finish connecting" : "Connect"}
         placement="top"
         arrow
       >
@@ -415,10 +440,13 @@ export default function TerritoryHexMap({
           type="button"
           className="territoryMapBuyToggle"
           ref={buyingControl}
-          aria-label="Buy land"
+          aria-label="Connect"
           aria-pressed={buyMode}
           aria-describedby={`${mapId}-buy-status`}
-          onClick={() => setBuyMode((value) => !value)}
+          onClick={() => {
+            if (projectPlanning) onDeselect?.();
+            setBuyMode((value) => !value);
+          }}
         >
           <AddLocationAltIcon aria-hidden="true" />
         </button>
@@ -430,7 +458,7 @@ export default function TerritoryHexMap({
         aria-live="polite"
         aria-atomic="true"
       >
-        {message || (buyMode ? "Activate a priced tile to buy it." : "")}
+        {message || (buyMode ? "Activate a priced site to connect it." : "")}
       </span>
       <div
         className="territoryMapViewport"
@@ -679,6 +707,7 @@ export default function TerritoryHexMap({
                 data-owner={view.ownerKey}
                 data-owned={view.owned}
                 data-terrain={tile.terrain}
+                data-project-site={projectSites?.get(tile.id)}
                 data-purchasable={!!quote}
                 data-unaffordable={unaffordable}
                 aria-busy={pending || undefined}
@@ -696,9 +725,11 @@ export default function TerritoryHexMap({
                 }
                 tabIndex={tile.id === activeRoving ? 0 : -1}
                 aria-label={
-                  quote
-                    ? `${unaffordable ? "Inspect" : "Buy"} ${territoryTileLabel(tile)} · ${priceLabel}${unaffordable ? "; not enough available cash" : ""}`
-                    : label
+                  projectPlanning
+                    ? `Inspect ${territoryTileLabel(tile)}${projectSites?.has(tile.id) ? ` · ${projectSites.get(tile.id) === "owned" ? "Connected · free site" : `Connection required · ${money(quote?.price ?? 0)}`}` : " · unavailable for this project"}`
+                    : quote
+                      ? `${unaffordable ? "Inspect" : "Connect"} ${territoryTileLabel(tile)} · ${priceLabel}${unaffordable ? "; not enough available cash" : ""}`
+                      : label
                 }
                 aria-pressed={tile.id === activeSelected}
                 aria-describedby={`${mapId}-${tile.id}-status`}
@@ -721,7 +752,7 @@ export default function TerritoryHexMap({
                   activationQuote.current = undefined;
                   onSelect(tile.id);
                   if (pending) return;
-                  if (quote && !unaffordable)
+                  if (quote && !unaffordable && !projectPlanning)
                     void purchase(tile.id, expectedQuote);
                   else inspectTile(tile);
                 }}
@@ -738,12 +769,33 @@ export default function TerritoryHexMap({
                 title={`${TERRAIN_LABELS[tile.terrain]} · ${facility?.name ?? (tile.city ? `${tile.city.sector} city` : view.developed ? (wireStructure(view) === "submerged" ? "Open water · submerged cable" : "Open site · transmission tower") : "Undeveloped site")}${status ? ` · ${status.label}` : ""}`}
               >
                 <span className="territoryTileHitArea" aria-hidden="true" />
+                {projectSites?.has(tile.id) && (
+                  <svg
+                    className="projectSiteOutline"
+                    aria-hidden="true"
+                    viewBox={`${-HEX_WIDTH / 2} ${-HEX_HEIGHT / 2} ${HEX_WIDTH} ${HEX_HEIGHT}`}
+                  >
+                    <path d={hexFacePath} />
+                    {tile.id === activeSelected && (
+                      <path
+                        className="projectSiteInnerOutline"
+                        d={hexFacePath}
+                        transform="scale(.85)"
+                      />
+                    )}
+                  </svg>
+                )}
                 {utility && (
                   <strong>{view.owned ? "You" : view.ownerName}</strong>
                 )}
-                {quote && (
+                {projectSites?.get(tile.id) === "owned" && (
                   <span className="territoryTilePrice" aria-hidden="true">
-                    <b>{pending ? "Buying…" : money(quote.price)}</b>
+                    <b>Connected · free site</b>
+                  </span>
+                )}
+                {quote && (!projectPlanning || projectSites?.has(tile.id)) && (
+                  <span className="territoryTilePrice" aria-hidden="true">
+                    <b>{pending ? "Connecting…" : money(quote.price)}</b>
                     {quote.benefit !== "general" && (
                       <span>{tilePurchaseBenefitLabel(quote)}</span>
                     )}
@@ -754,7 +806,7 @@ export default function TerritoryHexMap({
                     ? "Your tile"
                     : view.ownerKey
                       ? `Owned by ${view.ownerName}`
-                      : "Available to buy"}
+                      : "Connection available"}
                   . {terrainDetailsLabel(tile.terrain)}.{" "}
                   {facility
                     ? `${facility.name}${status ? ` · ${status.label}` : ""}`

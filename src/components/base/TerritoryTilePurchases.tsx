@@ -7,8 +7,13 @@ import { currentTick } from "../../helpers/GameSelectors";
 import { tilePurchaseQuote } from "../../helpers/Territories";
 import { ownsTerritoryTile } from "../../helpers/TerritoryTiles";
 import { acquireTile } from "../../reducers/GameActions";
+import { waitForPurchase } from "../../helpers/WaitForPurchase";
 import { multiplayerRuntime } from "../../multiplayer/Registry";
 import { useMoney } from "./CurrencyContext";
+
+export type TilePurchaseResult =
+  | { status: "connected" }
+  | { status: "rejected" | "cancelled"; message: string };
 
 interface Purchases {
   pendingIds: ReadonlySet<TerritoryTileId>;
@@ -18,7 +23,7 @@ interface Purchases {
   purchase: (
     tileId: TerritoryTileId,
     expectedQuoteKey?: string,
-  ) => Promise<void>;
+  ) => Promise<TilePurchaseResult>;
 }
 interface PendingPurchase {
   price: number;
@@ -59,7 +64,7 @@ export function TerritoryTilePurchasesProvider({
     if (!accepted.length) return;
     accepted.forEach((id) => pending.current.delete(id));
     setMessage(
-      `${accepted.length === 1 ? "Tile purchased" : `${accepted.length} tiles purchased`}. ${money(currentTick(game)?.cash ?? 0)} cash remaining.`,
+      `${accepted.length === 1 ? "Site connected" : `${accepted.length} sites connected`}. ${money(currentTick(game)?.cash ?? 0)} cash remaining.`,
     );
     refresh();
   }, [game, money]);
@@ -70,19 +75,27 @@ export function TerritoryTilePurchasesProvider({
   const purchase = async (
     tileId: TerritoryTileId,
     expectedQuoteKey?: string,
-  ) => {
-    if (pending.current.has(tileId)) return;
+  ): Promise<TilePurchaseResult> => {
+    if (pending.current.has(tileId))
+      return {
+        status: "rejected",
+        message: "This connection is already pending.",
+      };
     const latest = currentGame.current;
     const quote = tilePurchaseQuote(latest, tileId);
     if (!quote) {
-      setMessage("This tile is no longer available. Select it to inspect.");
-      return;
+      setMessage("This site is no longer available. Select it to inspect.");
+      return {
+        status: "rejected",
+        message: "This site is no longer available.",
+      };
     }
     if (expectedQuoteKey && quote.quoteKey !== expectedQuoteKey) {
-      setMessage(
-        "The tile price changed. Review its price and activate again.",
-      );
-      return;
+      setMessage("The connection cost changed. Review it and activate again.");
+      return {
+        status: "rejected",
+        message: "The connection cost changed. Review the updated details.",
+      };
     }
     const committed = [...pending.current].reduce(
       (sum, [id, entry]) =>
@@ -90,13 +103,16 @@ export function TerritoryTilePurchasesProvider({
       0,
     );
     if ((currentTick(latest)?.cash ?? 0) - committed < quote.price) {
-      setMessage("Not enough available cash to buy this tile.");
-      return;
+      setMessage("Not enough available cash to connect this site.");
+      return {
+        status: "rejected",
+        message: "Not enough available cash to connect this site.",
+      };
     }
     const entry = { price: quote.price };
     const operationSession = session.current;
     pending.current.set(tileId, entry);
-    setMessage(`Buying tile · ${money(quote.price)}…`);
+    setMessage(`Connecting · ${money(quote.price)}…`);
     refresh();
     try {
       const payload = { tileId, quoteKey: quote.quoteKey };
@@ -107,21 +123,38 @@ export function TerritoryTilePurchasesProvider({
         dispatch(acquireTile(payload));
         if (!ownsTerritoryTile(store.getState().game, tileId))
           throw new Error(
-            "Tile purchase unavailable. Review the tile and try again.",
+            "Connection unavailable. Review the site and try again.",
           );
       }
-      // A receipt may precede the host's projected state. Only ownership confirms success.
+      const connected = await waitForPurchase(
+        () => store.getState(),
+        (state) => (ownsTerritoryTile(state.game, tileId) ? true : undefined),
+      );
+      if (operationSession !== session.current)
+        return { status: "cancelled", message: "The run changed." };
+      if (!connected)
+        throw new Error(
+          "Connection is not confirmed. Review the site before trying again.",
+        );
+      pending.current.delete(tileId);
+      refresh();
+      return { status: "connected" };
     } catch (cause) {
-      if (
-        operationSession !== session.current ||
-        pending.current.get(tileId) !== entry
-      )
-        return;
+      if (operationSession !== session.current)
+        return { status: "cancelled", message: "The run changed." };
+      // Projected ownership is authoritative even if the receipt connection drops afterward.
+      if (ownsTerritoryTile(store.getState().game, tileId))
+        return { status: "connected" };
       pending.current.delete(tileId);
       setMessage(
-        cause instanceof Error ? cause.message : "Tile purchase unavailable.",
+        cause instanceof Error ? cause.message : "Connection unavailable.",
       );
       refresh();
+      return {
+        status: "rejected",
+        message:
+          cause instanceof Error ? cause.message : "Connection unavailable.",
+      };
     }
   };
   return (
