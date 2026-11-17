@@ -129,6 +129,10 @@ for (const theme of ["light", "dark"] as const) {
     await expect
       .poll(async () => (await sample(canvas)).phases[key])
       .not.toBe(stopped.phases[key]);
+    const resumedPhase = (await sample(canvas)).phases[key];
+    expect(
+      (resumedPhase - stopped.phases[key] + Math.PI * 2) % (Math.PI * 2),
+    ).toBeLessThan(0.5);
     await surface
       .getByRole("button", { name: "Close tile", exact: true })
       .click();
@@ -149,12 +153,16 @@ for (const theme of ["light", "dark"] as const) {
       ["fast speed", 1.2],
       ["pause", 0.25],
     ];
-    // The shared breakpoint chooses whether 24× is offered; assert its presence instead of skipping a speed test.
+    // Reach the existing 1300 px 24× breakpoint through the actual responsive UI.
+    const originalViewport = page.viewportSize()!;
+    if (originalViewport.width >= 700)
+      await page.setViewportSize({ ...originalViewport, width: 1440 });
     const ultra = page.getByRole("button", {
       name: "ultra speed",
       exact: true,
     });
-    if (await ultra.count())
+    await expect(ultra).toHaveCount(originalViewport.width >= 700 ? 1 : 0);
+    if (originalViewport.width >= 700)
       rates.splice(rates.length - 1, 0, ["ultra speed", 1.5]);
     for (const [label, rate] of rates) {
       await page.getByRole("button", { name: label, exact: true }).click();
@@ -163,6 +171,7 @@ for (const theme of ["light", "dark"] as const) {
         .toBe(rate);
       expect((await sample(canvas)).phases[key]).toBe(reduced.phases[key]);
     }
+    await page.setViewportSize(originalViewport);
     await page.emulateMedia({ reducedMotion: "no-preference" });
     await expect
       .poll(async () => (await sample(canvas)).motionAllowed)
@@ -417,16 +426,19 @@ test("production 3D frame evidence includes panning and real month rollovers", a
   expect(
     topology.filter((instance) => instance.id.startsWith("terrain:")).length,
   ).toBeGreaterThan(10);
-  const viewport = map.locator(".territoryMapViewport"),
-    box = (await viewport.boundingBox())!;
-  const ultra = page.getByRole("button", { name: "ultra speed", exact: true });
+  const viewport = map.locator(".territoryMapViewport");
+  const originalViewport = page.viewportSize()!;
+  const desktop = originalViewport.width >= 700;
   const speeds = [
     "slow speed",
     "fast speed",
-    ...((await ultra.count()) ? ["ultra speed"] : []),
+    ...(desktop ? ["ultra speed"] : []),
   ];
   const windows = [];
   for (const speed of speeds) {
+    if (speed === "ultra speed")
+      await page.setViewportSize({ ...originalViewport, width: 1440 });
+    const box = (await viewport.boundingBox())!;
     await beginWindow(page);
     await page.getByRole("button", { name: speed, exact: true }).click();
     await page.waitForTimeout(800);
@@ -468,6 +480,7 @@ test("production 3D frame evidence includes panning and real month rollovers", a
     expect(Math.min(...result.triangles)).toBeGreaterThan(100);
     windows.push({
       speed,
+      viewport: page.viewportSize(),
       boundaries: result.boundaries,
       ordinary: stats(result.gaps.slice(0, ordinary)),
       pan: stats(result.gaps.slice(ordinary, panned)),
@@ -483,11 +496,10 @@ test("production 3D frame evidence includes panning and real month rollovers", a
       raw: result,
     });
   }
-  const desktop = page.viewportSize()!.width >= 700;
   const report = {
     project: info.project.name,
     browser: page.context().browser()!.version(),
-    viewport: page.viewportSize(),
+    viewport: originalViewport,
     targetHz: desktop ? 120 : 60,
     frameBudgetMs: 1000 / (desktop ? 120 : 60),
     runtime,

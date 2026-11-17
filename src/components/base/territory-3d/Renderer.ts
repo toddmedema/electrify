@@ -9,6 +9,7 @@ import type {
   ModelPart,
   RendererDiagnostics,
   RendererSceneInstance,
+  RGB,
   Vec3,
 } from "./Types";
 
@@ -139,6 +140,7 @@ export class MapRenderer {
   private instanceCount = 0;
   private poseRevision = 0;
   private light: Vec3 = [0, 1, 0];
+  private lightColor: RGB = [0, 0, 0];
   // CPU preparation/submission duration; this does not measure GPU completion.
   private frameMs = 0;
   private sampleDiagnostics = (includeScene = false) =>
@@ -194,7 +196,7 @@ export class MapRenderer {
       cpuFrameMs: this.frameMs,
       phases: this.clock.snapshot(),
       light: [...this.light],
-      lightColor: [...(this.frame?.lighting.color ?? [0, 0, 0])],
+      lightColor: [...this.lightColor],
       state: this.state,
       playbackRate: this.frame?.playbackRate ?? 0,
       motionAllowed: this.frame?.motionAllowed ?? false,
@@ -218,8 +220,8 @@ export class MapRenderer {
         instances.set(item.instance, items);
       }
     return Array.from(instances, ([instance, items]) => {
-      const min = [Infinity, Infinity, Infinity],
-        max = [-Infinity, -Infinity, -Infinity];
+      const min: [number, number, number] = [Infinity, Infinity, Infinity],
+        max: [number, number, number] = [-Infinity, -Infinity, -Infinity];
       let triangles = 0;
       for (const { part, pose } of items) {
         const vertices = part.mesh.positions;
@@ -244,8 +246,8 @@ export class MapRenderer {
         active: instance.active,
         motionKey: instance.motionKey,
         triangles,
-        min: min as unknown as Vec3,
-        max: max as unknown as Vec3,
+        min,
+        max,
         ...(instance.model.connections
           ? {
               connections: instance.model.connections.map((wire) => ({
@@ -679,6 +681,7 @@ export class MapRenderer {
     gl.bindVertexArray(null);
     this.frames++;
     this.light = frame.lighting.direction;
+    this.lightColor = frame.lighting.color;
     this.instanceCount = this.sceneInstanceCount;
     this.frameMs = performance.now() - started;
     if (this.readyPending) {

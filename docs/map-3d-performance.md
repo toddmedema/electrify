@@ -58,7 +58,9 @@ E2E_BASE_URL=http://127.0.0.1:49889 npm run test:e2e -- \
 Use the port printed by the task-owned production server. The timing journey rejects
 a development entrypoint. It covers the 1280 px desktop and 390/360 px phone layouts,
 including actual camera drags and at least one real month rollover at each available
-1×, 12× and desktop 24× speed. Its `map-3d-performance.json` attachment retains raw
+1×, 12× and desktop 24× speed. The 24× control uses the existing 1300 px breakpoint;
+that desktop window resizes to 1440 px and records its own viewport separately from
+the 1280 px 1×/12× windows. Its `map-3d-performance.json` attachment retains raw
 samples, browser/build/backend identity, callback gaps, CPU submission, long tasks,
 draw/triangle counts and peak mesh/instance counts. Samples and pending GPU queries
 are bounded.
