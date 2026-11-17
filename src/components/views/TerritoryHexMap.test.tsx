@@ -101,6 +101,7 @@ function show(
   cash = 1e9,
   inspectionInitiallyOpen = false,
   initialSelected: TerritoryTileId = "champlain:city",
+  projectSites?: ReadonlyMap<TerritoryTileId, "owned" | "connection">,
 ) {
   const game = createGame({ scenarioId: 116, seed: 188 });
   currentTick(game)!.cash = cash;
@@ -141,6 +142,8 @@ function show(
         <OtherPurchaseControl />
         <TerritoryHexMap
           game={activeGame}
+          projectPlanning={!!projectSites}
+          projectSites={projectSites}
           selected={selected}
           onCloseInspection={
             inspectionOpen
@@ -194,6 +197,26 @@ function show(
 function idOf(button: HTMLButtonElement) {
   return button.dataset.mapTarget as TerritoryTileId;
 }
+it("keeps connected project markers compact with their full accessible meaning on hover", async () => {
+  const restore = enable3D();
+  try {
+    const map = show(
+      1e9,
+      false,
+      "champlain:city",
+      new Map([["champlain:site-13", "owned"]]),
+    );
+    await screen.findByTestId("map-scene");
+    const target = map.target("champlain:site-13");
+    expect(target).toHaveAccessibleName(/Connected · free site/);
+    const marker = within(target).getByTitle("Connected · free site");
+    expect(marker).toHaveTextContent(/^\$0$/);
+    fireEvent.pointerMove(marker, { pointerId: 1, clientX: 100, clientY: 100 });
+    expect(marker).toHaveAttribute("title", "Connected · free site");
+  } finally {
+    restore();
+  }
+});
 function fullyVisible(tile: HTMLButtonElement, width: number, height = 900) {
   const x = Number.parseFloat(tile.style.left),
     y = Number.parseFloat(tile.style.top),

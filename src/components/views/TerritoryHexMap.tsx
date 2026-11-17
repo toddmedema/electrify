@@ -536,7 +536,9 @@ export default function TerritoryHexMap({
         "color-mix(in srgb, var(--interactive-blue) 14%, transparent)";
     if (groundHit && ground !== target)
       groundHit.style.background = "transparent";
-    titleTarget.title = target.title;
+    titleTarget.title =
+      titleTarget.closest<HTMLElement>(".territoryTilePrice")?.title ||
+      target.title;
     pointerHover.current = () => {
       delete target.dataset.modelHovered;
       if (hit) hit.style.removeProperty("background");
@@ -1036,8 +1038,12 @@ export default function TerritoryHexMap({
                   <strong>{view.owned ? "You" : view.ownerName}</strong>
                 )}
                 {projectSites?.get(tile.id) === "owned" && (
-                  <span className="territoryTilePrice" aria-hidden="true">
-                    <b>{money(0)} · Connected</b>
+                  <span
+                    className="territoryTilePrice"
+                    aria-hidden="true"
+                    title="Connected · free site"
+                  >
+                    <b>{money(0)}</b>
                   </span>
                 )}
                 {quote && (!projectPlanning || projectSites?.has(tile.id)) && (

@@ -4,6 +4,8 @@ import { MeshBuilder } from "./MeshBuilder";
 import { SceneBuilder, structureKind } from "./SceneBuilder";
 import type { MapModel } from "./Types";
 import { projectPoint } from "./Projection";
+import { getTerrainModel } from "./TerrainModels";
+import { getStructureModel } from "./StructureModels";
 
 const model: MapModel = {
   key: "test-structure",
@@ -207,6 +209,36 @@ const flatGround: MapModel = {
     },
   ],
 };
+test("real mountain relief picks its own tile above the neighboring ground hex", () => {
+  const mountain = {
+    ...view(),
+    developed: false,
+    tile: { ...view().tile, terrain: "mountain" as const },
+  };
+  const north = {
+    ...view(1),
+    developed: false,
+    tile: { ...view(1).tile, q: 0.5, r: -1 },
+  };
+  const builder = new SceneBuilder({
+    terrain: getTerrainModel,
+    structure: getStructureModel,
+  });
+  const peak = projectPoint([-0.035, 0.34, -0.455], pickFrame);
+  for (const views of [
+    [mountain, north],
+    [north, mountain],
+  ]) {
+    builder.build(
+      views,
+      views.map((item) => item.tile),
+      [],
+      0,
+      "run",
+    );
+    expect(builder.pick(peak, pickFrame)).toBe(mountain.tile.id);
+  }
+});
 test("picking follows solid elevated triangles and leaves gaps in a silhouette to the ground", () => {
   const triangle: MapModel = {
     ...model,
@@ -231,8 +263,11 @@ test("picking follows solid elevated triangles and leaves gaps in a silhouette t
   expect(
     builder.pick(projectPoint([0.35, 0.45, 0], pickFrame), pickFrame),
   ).toBeUndefined();
+  expect(builder.pick(projectPoint([-0.3, 0, 0], pickFrame), pickFrame)).toBe(
+    tile.tile.id,
+  );
   expect(
-    builder.pick(projectPoint([-0.3, 0, 0], pickFrame), pickFrame),
+    builder.pick(projectPoint([-0.6, 0, 0], pickFrame), pickFrame),
   ).toBeUndefined();
 });
 test("picking uses camera depth instead of tile iteration order", () => {

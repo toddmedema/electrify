@@ -358,7 +358,7 @@ export class SceneBuilder {
     return this.instances;
   }
 
-  /** Test actual solid triangles in camera depth order; gaps and unoccupied ground stay clickable. */
+  /** Pick the nearest solid terrain or structure triangle; silhouette gaps retain the ground tile. */
   pick(
     point: { x: number; y: number },
     frame: PickFrame,
@@ -436,7 +436,7 @@ export class SceneBuilder {
             depth = hitDepth;
             tileId = instance.id.startsWith("structure:")
               ? (instance.id.slice(10) as TerritoryTileId)
-              : undefined;
+              : (instance.id.slice(8) as TerritoryTileId);
           }
         }
       }
