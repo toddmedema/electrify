@@ -1,12 +1,8 @@
 import * as React from "react";
 import type { CitySizeType } from "../../../Types";
 
-export type CityOccupantVariant = "residential" | "industrial";
-
 type Props = {
-  size?: CitySizeType;
-  /** Temporary compatibility while map callers move to the shared city-size contract. */
-  variant?: CityOccupantVariant;
+  size: CitySizeType;
   className?: string;
 };
 

@@ -97,10 +97,7 @@ const fuelModels: Record<FuelNameType, StructureKind> = {
 export function structureKind(
   view: TerritoryTileView,
 ): StructureKind | undefined {
-  if (view.tile.city)
-    return view.tile.city.sector === "industrial"
-      ? "industrial-city"
-      : "residential";
+  if (view.tile.city) return `city-${view.tile.city.size}`;
   const facility = view.facility;
   if (facility?.peakWh !== undefined)
     return facility.name === "Pumped Hydro"

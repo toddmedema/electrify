@@ -30,8 +30,8 @@ import {
 import CheckIcon from "@mui/icons-material/Check";
 import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
 import RemoveIcon from "@mui/icons-material/Remove";
+import AddIcon from "@mui/icons-material/Add";
 import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
-import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
 import { ChevronDownGlyph } from "../base/Glyphs";
 import {
   DragDropContext,
@@ -211,11 +211,12 @@ function activityIcon(activity: FacilityActivityType, color: string) {
     case "PAUSED":
       return <ConceptIcon concept="pause" style={style} />;
     case "IDLE":
-      return <RemoveIcon style={style} />;
+      return <RemoveIcon style={{ color: "var(--delta-bad)" }} />;
     case "CHARGING":
       return <ArrowUpwardIcon style={style} />;
     case "DISCHARGING":
-      return <ArrowDownwardIcon style={style} />;
+    case "RUNNING":
+      return <AddIcon style={{ color: "var(--delta-good)" }} />;
     default:
       return <ConceptIcon concept="supply" style={style} />;
   }

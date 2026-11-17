@@ -104,9 +104,7 @@ export function CityArtwork({
   size,
   className,
 }: {
-  size?: CitySizeType;
-  /** Temporary compatibility while map callers move to city sizes. */
-  sector?: "residential" | "industrial";
+  size: CitySizeType;
   className?: string;
 }) {
   return <CityOccupant size={size} className={className} />;

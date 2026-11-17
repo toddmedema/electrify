@@ -45,8 +45,6 @@ export type StructureKind =
   | "city-small"
   | "city-medium"
   | "city-large"
-  | "residential"
-  | "industrial-city"
   | "tower"
   | "solar"
   | "wind"

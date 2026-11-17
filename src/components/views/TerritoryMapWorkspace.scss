@@ -580,3 +580,35 @@
   .territoryMapBuildToggle {
   bottom: var(--game-dock-clearance);
 }
+
+.territoryMapLayerToggle {
+  bottom: 72px;
+}
+.mapStatusLayersPanel {
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  width: 248px;
+  box-sizing: border-box;
+  h3 {
+    font-size: 16px;
+    font-weight: 600;
+    margin: 0 0 8px;
+  }
+  .MuiFormControlLabel-root {
+    min-height: 44px;
+    margin: 0;
+    .MuiTypography-root {
+      font-size: 14px;
+    }
+  }
+}
+@media (max-width: 599px) {
+  .territoryMapLayerToggle {
+    bottom: 64px;
+  }
+}
+.gameWorkspace[data-map-workspace="true"][data-compact-dock="true"]
+  .territoryMapLayerToggle {
+  bottom: calc(var(--game-dock-clearance) + 56px);
+}

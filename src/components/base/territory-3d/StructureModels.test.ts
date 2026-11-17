@@ -7,8 +7,6 @@ const inventory: Record<StructureKind, true> = {
   "city-small": true,
   "city-medium": true,
   "city-large": true,
-  residential: true,
-  "industrial-city": true,
   tower: true,
   solar: true,
   wind: true,
@@ -253,15 +251,6 @@ it("grows one mixed city family through denser windows and a taller skyline", ()
   }
 });
 
-it("uses the same mixed city geometry for temporary legacy sector aliases", () => {
-  const city = getStructureModel("city-medium");
-  for (const kind of ["residential", "industrial-city"] as const) {
-    const legacy = getStructureModel(kind);
-    expect(legacy.parts).toEqual(city.parts);
-    expect(legacy.terminals).toEqual(city.terminals);
-  }
-});
-
 it.each(["wind", "offshore-wind"] as const)(
   "gives %s a thick root, broad inner chord and swept, tapered airfoil sections",
   (kind) => {
@@ -308,8 +297,7 @@ it("retains stopped rotors and wings, but hides production-only effects without 
   for (const kind of kinds) {
     const moving = getStructureModel(kind).parts.filter((part) => part.motion);
     expect(moving.length > 0).toBe(
-      !kind.startsWith("city-") &&
-        !["residential", "industrial-city", "tower"].includes(kind),
+      !kind.startsWith("city-") && kind !== "tower",
     );
     for (const part of moving) {
       expect(part.phaseOffset ?? 0).toBeGreaterThanOrEqual(0);
@@ -437,9 +425,7 @@ it("authors facade glazing separately without turning panels, rotors or cabinets
       expect(part.hideWhenInactive).toBeUndefined();
       expect(part.castsShadow).toBe(false);
     }
-    const quiet =
-      kind.startsWith("city-") ||
-      ["residential", "industrial-city", "tower"].includes(kind);
+    const quiet = kind.startsWith("city-") || kind === "tower";
     expect(parts.every((part) => part.material === undefined)).toBe(quiet);
   }
 });

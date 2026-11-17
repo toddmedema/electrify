@@ -45,3 +45,15 @@ it("gives each known state a distinct shape and removes the marker for unknown o
   );
   expect(container.querySelector("svg")).toBeEmptyDOMElement();
 });
+
+it.each([
+  ["producing", "var(--delta-good)"],
+  ["idle", "var(--delta-bad)"],
+] as const)("uses the semantic color for %s", (kind, color) => {
+  const { container } = render(
+    <svg>
+      <FacilityMapStatusArtwork kind={kind} />
+    </svg>,
+  );
+  expect(container.querySelector("g > path")).toHaveAttribute("fill", color);
+});

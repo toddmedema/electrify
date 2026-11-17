@@ -44,14 +44,3 @@ it("increases the fallback skyline and number of blocks with city size", () => {
     previousBlocks = blocks.length;
   }
 });
-
-it("maps temporary legacy sector callers to the same mixed city", () => {
-  const { container, rerender } = render(
-    <CityOccupant variant="residential" />,
-  );
-  const mixedCity = container.innerHTML;
-  rerender(<CityOccupant variant="industrial" />);
-  expect(container.innerHTML).toBe(mixedCity);
-  rerender(<CityOccupant size="medium" />);
-  expect(container.innerHTML).toBe(mixedCity);
-});

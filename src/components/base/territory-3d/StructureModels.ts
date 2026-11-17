@@ -170,7 +170,7 @@ function model(
 
 type FacilityStructureKind = Exclude<
   StructureKind,
-  `city-${CitySizeType}` | "residential" | "industrial-city" | "tower"
+  `city-${CitySizeType}` | "tower"
 >;
 
 function facilityModel(
@@ -829,8 +829,6 @@ const factories: Record<StructureKind, () => MapModel> = {
   "city-small": () => city("small"),
   "city-medium": () => city("medium"),
   "city-large": () => city("large"),
-  residential: () => city("medium", "residential"),
-  "industrial-city": () => city("medium", "industrial-city"),
   tower,
   solar,
   wind: () => wind("wind"),

@@ -25,6 +25,11 @@ import useFacilityMapMotion, {
   FacilityMapMotionContext,
 } from "../base/useFacilityMapMotion";
 import FacilityMapStatusArtwork from "../base/FacilityMapStatusArtwork";
+import MapStatusLayers, {
+  DEFAULT_MAP_STATUS_LAYERS,
+  showsMapStatus,
+} from "../base/MapStatusLayers";
+import { useToolState } from "../base/GameToolMemory";
 import { hasVisibleEscapeOverlay } from "../base/VisibleEscapeOverlay";
 import { useGameWorkspaceLayout } from "../base/GameWorkspaceContext";
 import { useMoney } from "../base/CurrencyContext";
@@ -93,7 +98,7 @@ function sameTile(a: TerritoryTileView["tile"], b: TerritoryTileView["tile"]) {
       a.r === b.r &&
       a.terrain === b.terrain &&
       (a.city
-        ? a.city.sector === b.city?.sector
+        ? a.city.size === b.city?.size
         : !b.city &&
           a.siteKind === b.siteKind &&
           a.maxPeakW === b.maxPeakW &&
@@ -163,6 +168,10 @@ export default function TerritoryHexMap({
   const { pendingIds, availableCash, message, purchase } =
     useTerritoryTilePurchases();
   const [buyMode, setBuyMode] = React.useState(false);
+  const [statusLayers, setStatusLayers] = useToolState(
+    "network.statusLayers",
+    DEFAULT_MAP_STATUS_LAYERS,
+  );
   const views = React.useMemo(() => territoryTileViews(game), [game]);
   const topology = useStableArray(
     views.map((view) => ({
@@ -700,6 +709,7 @@ export default function TerritoryHexMap({
           <RapidConnectionIcon aria-hidden="true" />
         </button>
       </Tooltip>
+      <MapStatusLayers value={statusLayers} onChange={setStatusLayers} />
       <span
         className="srOnly"
         id={`${mapId}-buy-status`}
@@ -946,6 +956,8 @@ export default function TerritoryHexMap({
                   const { tile, facility } = view,
                     origin = foregroundOrigin(tile),
                     status = facilityMapStatus(view, game.date.minute);
+                  const showStatus =
+                    status && showsMapStatus(status.kind, statusLayers);
                   if (
                     !facility &&
                     !tile.city &&
@@ -976,12 +988,12 @@ export default function TerritoryHexMap({
                       overflow="visible"
                     >
                       {threeDReady ? (
-                        status ? (
+                        showStatus ? (
                           <FacilityMapStatusArtwork kind={status.kind} />
                         ) : null
                       ) : tile.city ? (
                         <CityArtwork
-                          sector={tile.city.sector}
+                          size={tile.city.size}
                           className="territoryOccupantArtwork"
                         />
                       ) : facility ? (
@@ -995,7 +1007,7 @@ export default function TerritoryHexMap({
                               />
                             </FacilityMapMotionContext.Provider>
                           </g>
-                          {status && (
+                          {showStatus && (
                             <FacilityMapStatusArtwork kind={status.kind} />
                           )}
                         </>
@@ -1110,7 +1122,7 @@ export default function TerritoryHexMap({
                       : undefined;
                   navigate(event, tile.id);
                 }}
-                title={`${TERRAIN_LABELS[tile.terrain]} · ${facility?.name ?? (tile.city ? `${tile.city.sector} city` : view.developed ? (wireStructure(view) === "submerged" ? "Open water · submerged cable" : "Open site · transmission tower") : "Undeveloped site")}${status ? ` · ${status.label}` : ""} · ${hover.reason}`}
+                title={`${TERRAIN_LABELS[tile.terrain]} · ${facility?.name ?? (tile.city ? `${tile.city.size} city` : view.developed ? (wireStructure(view) === "submerged" ? "Open water · submerged cable" : "Open site · transmission tower") : "Undeveloped site")}${status ? ` · ${status.label}` : ""} · ${hover.reason}`}
               >
                 <span className="territoryTileHitArea" aria-hidden="true" />
                 {projectSites?.has(tile.id) && (
@@ -1161,7 +1173,7 @@ export default function TerritoryHexMap({
                   {facility
                     ? `${facility.name}${status ? ` · ${status.label}` : ""}`
                     : tile.city
-                      ? `${tile.city.sector} customers; no building slot`
+                      ? `${tile.city.size} city; no building slot`
                       : view.developed
                         ? wireStructure(view) === "submerged"
                           ? "One building site; submerged cable"
