@@ -81,3 +81,32 @@ simulation and tick-performance ceilings remain unchanged.
 
 The integrating task owns the fresh production build, full checks, final measurements
 and published evidence. A partial viewport/speed run establishes only that scope.
+
+## Production probe, November 17, 2026
+
+Build `2b71f0ed` (`main.960d1ed3.js`) passed all nine phase/lighting/timing journeys
+at 1280, 390 and 360 px. The separate physical-map/acquisition/state matrix passed
+18 cases across the same viewports and both themes. All measured speed windows
+included actual panning and a rendered month rollover. These runs used two headless
+browser workers on the shared development machine.
+
+The reported backend was ANGLE Vulkan **SwiftShader**, a software renderer. GPU
+timer queries were unsupported; there are no measured hardware-GPU durations.
+CPU draw submission p95 was approximately 0.1 ms in every window, at the browser's
+timer precision. Callback-gap p95 values were:
+
+- Desktop 1280 px: 25.1 ms at 1× and 25.8 ms at 12×; desktop 1440 px: 33.4 ms at 24×.
+- Phone viewport 390 px: 17.0 ms at 1× and 25.0 ms at 12×.
+- Phone viewport 360 px: 8.5 ms at 1× and 16.7 ms at 12×.
+
+The desktop scene reached 31,600 submitted triangles, 51 draw calls and 35 retained
+meshes. The 390 px scene reached 21,208 triangles, 45 draw calls and 45 retained
+meshes; 360 px reached 18,986 triangles, 43 draw calls and 38 meshes. Raw window,
+panning, long-task and counter samples are retained in the corresponding
+`map-3d-performance.json` output files. Exact saved near-noon minutes are retained
+in `daylight-map-time.json` beside each successful theme/viewport journey.
+
+This software-renderer run does **not** establish the hardware performance budget:
+desktop callback cadence misses 120 Hz, and the 390 px 12× window misses 60 Hz.
+Hardware-GPU and real-phone verification remain outstanding. No target, timing
+ceiling, simulation baseline or bundle ceiling was changed to accommodate this run.
