@@ -333,13 +333,11 @@ it("keeps acquisition and retirement goals in scenario details", () => {
   renderDetails(game);
   const goals = screen.getByRole("region", { name: "Goals" });
   expect(
-    within(goals).getByText("Acquire a utility", { exact: true }),
+    within(goals).getByText("Acquire a competitor", { exact: true }),
   ).toBeInTheDocument();
   expect(
     within(goals).getByText("Retain customers", { exact: true }),
   ).toBeInTheDocument();
-  expect(goals).toHaveTextContent(
-    "Acquire Valley Electric or Ridge Electric · Dec 2014",
-  );
+  expect(goals).toHaveTextContent("Acquire a competitor · Dec 2014");
   expect(goals).toHaveTextContent("Keep ≥90% of customer baseline by Dec 2024");
 });

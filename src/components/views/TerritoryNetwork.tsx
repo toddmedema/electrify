@@ -2,8 +2,6 @@ import * as React from "react";
 import { Button, Tab, Tabs, Typography } from "@mui/material";
 import { getTerritoryDefinition } from "../../data/Territories";
 import {
-  territoryDemandShares,
-  territoryDemandByType,
   tilePurchaseQuote,
   landTransferredCustomers,
 } from "../../helpers/Territories";
@@ -24,11 +22,11 @@ import { tileFitsFacility } from "../../helpers/TerritoryTiles";
 import { territoryTileViews } from "../../helpers/TerritoryMapState";
 import { TransmissionPanelProps } from "./TransmissionPanel";
 import { useToolState } from "../base/GameToolMemory";
-import { territoryBuildTileName } from "../base/TerritoryBuildDestination";
+import { getTerrainModifiers } from "../../helpers/TerrainModifiers";
+import { cityDemandByType } from "../../helpers/CityDemand";
 import { facilityDisplayName } from "../base/FacilityLabels";
 import AcquiredUtilities from "./AcquiredUtilities";
 import TerritoryHexMap from "./TerritoryHexMap";
-import { territoryMapLabel } from "../base/TerritoryMapLayout";
 import AcquisitionReviewDialog from "../base/AcquisitionReviewDialog";
 import UtilityOfferDialog from "../base/UtilityOfferDialog";
 import { useMoney } from "../base/CurrencyContext";
@@ -72,9 +70,9 @@ export default function TerritoryNetwork(props: Props) {
 
 function TileNetwork(props: Props) {
   const { game } = props;
-  const [selected, setSelected] = useToolState<TerritoryTileId>(
+  const [selected, setSelected] = useToolState<TerritoryTileId | undefined>(
     "network.tile",
-    "champlain:city",
+    undefined,
   );
   const [inspected, setInspected] = React.useState<TerritoryTileId>();
   const [activation, setActivation] = React.useState(0);
@@ -93,8 +91,6 @@ function TileNetwork(props: Props) {
     }
   }, [review, game.utilityExpansion?.acquisitions.length]);
   const views = territoryTileViews(game);
-  const selectedView =
-    views.find(({ tile }) => tile.id === selected) ?? views[0];
   const view = inspected
     ? views.find(({ tile }) => tile.id === inspected)
     : undefined;
@@ -114,11 +110,16 @@ function TileNetwork(props: Props) {
     : 0;
   const demandW =
     tick && tile
-      ? (territoryDemandShares(game, tick)[tile.territoryId] ?? 0)
+      ? Object.values(
+          cityDemandByType(game, tick, tile.territoryId, !!view?.owned),
+        ).reduce((sum, watts) => sum + watts, 0)
       : 0;
   const building = !!(view?.owned && tile && !tile.city && !view.facility);
   const storageFits = !!tile && tileFitsFacility(tile, { peakWh: 1, peakW: 1 });
-  const close = React.useCallback(() => setInspected(undefined), []);
+  const close = React.useCallback(() => {
+    setInspected(undefined);
+    setSelected(undefined);
+  }, [setSelected]);
   const build = React.useCallback(
     (
       facility: FacilityShoppingType,
@@ -156,11 +157,12 @@ function TileNetwork(props: Props) {
       data-tile-inspection={view ? "open" : undefined}
       aria-label="Territory map workspace"
     >
-      {selectedView && (
+      {views.length > 0 && (
         <TerritoryHexMap
           {...(view ? { onCloseInspection: close } : {})}
+          onDeselect={close}
           game={game}
-          selected={selectedView.tile.id}
+          selected={selected}
           onSelect={inspect}
         />
       )}
@@ -169,7 +171,13 @@ function TileNetwork(props: Props) {
         <TileWorkspaceSurface
           title={title}
           focusKey={`${tile.id}:${activation}:${view.ownerKey ?? "unowned"}:${operatingFacility?.id ?? (view.facility ? "facility" : "empty")}`}
-          subtitle={`${territoryMapLabel(territory.id)} · ${view.ownerName}`}
+          subtitle={
+            view.owned
+              ? view.ownerName
+              : territory.kind === "utility"
+                ? territory.name
+                : undefined
+          }
           building={building}
           onClose={close}
         >
@@ -221,16 +229,18 @@ function TileNetwork(props: Props) {
                       </span>
                       <strong>{formatCount(customers)}</strong>
                     </div>
-                    {view.owned && (
-                      <div>
-                        <span>Current demand</span>
-                        <strong>{formatWatts(demandW)}</strong>
-                      </div>
-                    )}
+                    <div>
+                      <span>
+                        {view.owned ? "Current demand" : "Estimated demand"}
+                      </span>
+                      <strong>{formatWatts(demandW)}</strong>
+                    </div>
                   </div>
-                  {view.owned && (
-                    <CityDemand game={game} territoryId={tile.territoryId} />
-                  )}
+                  <CityDemand
+                    game={game}
+                    territoryId={tile.territoryId}
+                    owned={view.owned}
+                  />
                 </>
               ) : operatingFacility ? (
                 <ExpandedFacilityDetails
@@ -246,10 +256,9 @@ function TileNetwork(props: Props) {
                     <strong>{formatFacilitySize(view.facility)}</strong>
                   </div>
                 </div>
-              ) : (
-                <Typography variant="body2">
-                  {territoryBuildTileName(tile.id, game)}
-                </Typography>
+              ) : null}
+              {!view.owned && !tile.city && (
+                <TileTerrainModifiers game={game} tileId={tile.id} />
               )}
               {!view.owned && territory.kind === "utility" ? (
                 <div className="territoryBuildActions">
@@ -267,15 +276,6 @@ function TileNetwork(props: Props) {
               ) : (
                 !view.owned && (
                   <div className="tilePurchaseSummary">
-                    <Typography variant="body2">
-                      {tile.city
-                        ? `Connect ${formatCount(customers)} ${tile.city.sector} customers and their electricity demand.`
-                        : tile.hydroSiteId
-                          ? "Hydropower site. Plant construction is purchased separately."
-                          : tile.siteKind === "geothermal"
-                            ? "Geothermal site. Plant construction is purchased separately."
-                            : "Build a generator or storage on this tile."}
-                    </Typography>
                     {quote && (
                       <div className="tilePurchaseMoney">
                         <div>
@@ -341,13 +341,15 @@ function TileNetwork(props: Props) {
 function CityDemand({
   game,
   territoryId,
+  owned,
 }: {
   game: Props["game"];
   territoryId: TerritoryId;
+  owned: boolean;
 }) {
   const timeline = game.timeline.map((tick) => ({
     ...tick,
-    demandByType: territoryDemandByType(game, tick, territoryId),
+    demandByType: cityDemandByType(game, tick, territoryId, owned),
   }));
   const first = timeline[0]?.minute ?? game.date.minute;
   const last = timeline[timeline.length - 1]?.minute ?? first + 1;
@@ -370,7 +372,44 @@ function CityDemand({
         displayTypes={types}
         startingYear={game.startingYear}
         multiyear={false}
+        xAxis="hour"
       />
+    </section>
+  );
+}
+
+function TileTerrainModifiers({
+  game,
+  tileId,
+}: {
+  game: Props["game"];
+  tileId: TerritoryTileId;
+}) {
+  const wind = getTerrainModifiers(game, "Wind", tileId);
+  const solar = getTerrainModifiers(game, "Sun", tileId);
+  const percentage = (factor: number) =>
+    `${factor >= 1 ? "+" : "−"}${Math.round(Math.abs(factor - 1) * 100)}%`;
+  const modifiers = [
+    { label: "Wind speed", value: wind.onshoreWindSpeed },
+    { label: "Wind build cost", value: wind.buildCost },
+    { label: "Solar build cost", value: solar.buildCost },
+  ].filter(({ value }) => value !== 1);
+  return (
+    <section aria-label="Terrain modifiers">
+      {modifiers.length ? (
+        <dl className="tileTerrainModifiers">
+          {modifiers.map(({ label, value }) => (
+            <div key={label}>
+              <dt>{label}</dt>
+              <dd>{percentage(value)}</dd>
+            </div>
+          ))}
+        </dl>
+      ) : (
+        <Typography variant="body2" color="textSecondary">
+          Standard wind and solar conditions
+        </Typography>
+      )}
     </section>
   );
 }

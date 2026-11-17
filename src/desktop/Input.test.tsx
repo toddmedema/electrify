@@ -584,6 +584,49 @@ it.each(["BUILD_STORAGE", "BUILD_INTERTIES"] as const)(
   },
 );
 
+it.each([
+  ["previousPane", "SCENARIO"],
+  ["nextPane", "FLEET"],
+] as const)(
+  "map pane cycling %s treats Map as a single destination",
+  async (action, expected) => {
+    store.dispatch(delta({ inGame: true }));
+    store.dispatch(navigate("FACILITIES"));
+    render(
+      <main className="base_main">
+        <div className="gameWorkspace">
+          <nav className="gameActionDock">
+            {(
+              [
+                "FACILITIES",
+                "FLEET",
+                "AGREEMENTS",
+                "PROGRAMS",
+                "INSIGHTS",
+                "EVENTS",
+                "SCENARIO",
+              ] as const
+            ).map((card) => (
+              <button
+                key={card}
+                aria-controls={`tool-${card}`}
+                data-game-destination={card}
+              >
+                {card}
+              </button>
+            ))}
+          </nav>
+        </div>
+      </main>,
+    );
+    const f = bridge();
+    stop = startDesktopInput(store, f.desktop);
+    await Promise.resolve();
+    f.emit({ actions: [action] });
+    expect(store.getState().card.name).toBe(expected);
+  },
+);
+
 it.each(["seat", "online"])(
   "routes %s speed and readiness through the shared clock",
   async (role) => {

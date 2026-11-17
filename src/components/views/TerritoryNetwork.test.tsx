@@ -22,6 +22,7 @@ import uiReducer from "../../reducers/UI";
 import { GENERATORS } from "../../data/Facilities";
 import { wToSliderTick } from "../../helpers/BuildSizing";
 import { acquisitionQuote, transferUtility } from "../../helpers/Expansion";
+import { acquireTile } from "../../reducers/GameActions";
 
 jest.mock(
   "../base/ManualLink",
@@ -32,7 +33,7 @@ jest.mock("./TerritoryHexMap", () => ({
   __esModule: true,
   default: (props: {
     game: GameType;
-    selected: TerritoryTileId;
+    selected?: TerritoryTileId;
     onSelect: (id: TerritoryTileId, activate?: boolean) => void;
   }) => {
     const { territoryTileViews } = jest.requireActual<
@@ -40,11 +41,13 @@ jest.mock("./TerritoryHexMap", () => ({
     >("../../helpers/TerritoryMapState");
     return (
       <div aria-label="Tile map">
+        <button className="territoryMapBuyToggle">Buy land</button>
         {territoryTileViews(props.game).map(({ tile }) => (
           <button
             className="territoryTileTarget"
             tabIndex={props.selected === tile.id ? 0 : -1}
             key={tile.id}
+            aria-pressed={props.selected === tile.id}
             aria-label={`Inspect ${tile.id}`}
             onFocus={() => props.onSelect(tile.id)}
             onClick={() => props.onSelect(tile.id, true)}
@@ -118,7 +121,7 @@ function freeTile(game: GameType) {
   return availableTerritoryTiles(game, wind, "champlain")[0];
 }
 
-it("keeps the map clear until activation, and closes to the same map tile with Escape", () => {
+it("keeps the map clear until activation, and deselects the tile when Escape closes inspection", () => {
   const game = ready();
   show(game);
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
@@ -130,7 +133,8 @@ it("keeps the map clear until activation, and closes to the same map tile with E
   expect(within(surface()).getByRole("heading", { level: 3 })).toHaveFocus();
   fireEvent.keyDown(surface(), { key: "Escape" });
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-  expect(tile).toHaveFocus();
+  expect(screen.getByRole("button", { name: "Buy land" })).toHaveFocus();
+  expect(tile).toHaveAttribute("aria-pressed", "false");
   expect(
     screen.queryByText(/company power pool|one project per tile|Territories$/i),
   ).not.toBeInTheDocument();
@@ -285,6 +289,43 @@ it("shows the city's real sector demand in the existing demand-by-use chart", ()
   ).not.toBeInTheDocument();
 });
 
+it.each([
+  "valley-electric:city",
+  "ridge-electric:city",
+  "parcel-1:city",
+] as const)("shows a demand profile before owning %s", (id) => {
+  const game = ready();
+  show(game);
+  inspect(id);
+  expect(surface()).toHaveTextContent("Estimated demand");
+  expect(
+    within(surface()).getByRole("img", {
+      name: /predicted electricity demand by customer or use type/,
+    }),
+  ).toHaveAccessibleName(/Residential:/);
+  expect(surface()).not.toHaveTextContent(
+    /Build a generator or storage|construction is purchased separately|general construction/,
+  );
+});
+
+it("shows researched terrain effects before purchase, with speed labelled separately from output", () => {
+  const game = ready();
+  const forest = territoryTileViews(game).find(
+    ({ tile, owned }) => !owned && !tile.city && tile.terrain === "forest",
+  )!.tile;
+  show(game);
+  inspect(forest.id);
+  const effects = within(surface()).getByRole("region", {
+    name: "Terrain modifiers",
+  });
+  expect(effects).toHaveTextContent("Wind speed−5%");
+  expect(effects).toHaveTextContent("Wind build cost+5%");
+  expect(effects).toHaveTextContent("Solar build cost+5%");
+  expect(surface()).not.toHaveTextContent(
+    /MW max|Build a generator or storage|general construction/,
+  );
+});
+
 it("buys exactly the inspected tile in one action and shows its build catalogue", () => {
   const game = ready();
   const tile = territoryTileViews(game).find(
@@ -326,10 +367,28 @@ it("keeps unaffordable tiles inspectable without spending", () => {
 });
 
 it("reveals purchased cities as customers rather than build destinations", () => {
-  const game = ready();
+  let game = ready();
   const target = territoryTileViews(game).find(
-    ({ tile }) => !!tile.city && !!tilePurchaseQuote(game, tile.id),
+    ({ tile, owned, ownerKey }) => !!tile.city && !owned && !ownerKey,
   )!.tile;
+  const distance = (tile: typeof target) =>
+    Math.max(
+      Math.abs(tile.q - target.q),
+      Math.abs(tile.r - target.r),
+      Math.abs(tile.q + tile.r - target.q - target.r),
+    );
+  for (let step = 0; step < 12 && !tilePurchaseQuote(game, target.id); step++) {
+    const current = game;
+    const next = territoryTileViews(current)
+      .filter(({ tile }) => !tile.city && !!tilePurchaseQuote(current, tile.id))
+      .sort((a, b) => distance(a.tile) - distance(b.tile))[0].tile;
+    const quote = tilePurchaseQuote(game, next.id)!;
+    game = gameReducer(
+      game,
+      acquireTile({ tileId: next.id, quoteKey: quote.quoteKey }),
+    );
+  }
+  expect(tilePurchaseQuote(game, target.id)).toBeDefined();
   show(game);
   inspect(target.id);
   fireEvent.click(within(surface()).getByRole("button", { name: /Buy tile/ }));

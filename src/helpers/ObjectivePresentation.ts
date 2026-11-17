@@ -116,6 +116,11 @@ export function objectiveTargetText(
   objective: CompiledRuleObjective,
   currency: CurrencyType = USD_CURRENCY,
 ): string {
+  if (
+    objective.metric === "utilityOwnership" &&
+    objective.id === "acquire-neighbor"
+  )
+    return "Acquire a competitor";
   const target = objectiveValueText(
     objective,
     objectiveTarget(objective),
@@ -227,6 +232,11 @@ export function objectiveGoalText(
 
 /** A short heading names the goal; its target carries quantities, conditions and dates. */
 export function objectiveHeadingText(objective: CompiledRuleObjective): string {
+  if (
+    objective.metric === "utilityOwnership" &&
+    objective.id === "acquire-neighbor"
+  )
+    return "Acquire a competitor";
   if (
     objective.label !== objectiveTargetText(objective) &&
     !/\d/.test(objective.label)

@@ -169,8 +169,10 @@ export function startDesktopInput(
     next?.click();
   };
   const pane = (delta: number) => {
-    const buttons = controls().filter((button) =>
-      button.matches(".gameActionDock button"),
+    const buttons = controls().filter(
+      (button) =>
+        button.matches(".gameActionDock button") &&
+        button.dataset.gameDestination !== "FACILITIES",
     );
     const card = store.getState().card.name;
     const active =
