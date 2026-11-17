@@ -843,8 +843,11 @@ export class MultiplayerSession {
         await this.request({ kind: "send", to, payload });
       });
     this.replicationSends.set(to, send);
-    void send.catch(() => {
-      if (current()) this.post({ kind: "baseline", to });
+    void send.catch((error: Error) => {
+      // Native owns membership; its disconnect notice can follow this rejected send.
+      // A baseline on that dead channel would only spend the replica's recovery budget.
+      if (current() && !PLAYER_DISCONNECTED.test(error.message))
+        this.post({ kind: "baseline", to });
     });
   }
   /** Menu transitions cannot be dropped while a purchase or another command is in flight. */
