@@ -12,7 +12,6 @@ import {
 import type { TerritoryId, TerritoryTileId } from "../../Types";
 import {
   getTerritoryTile,
-  tileFitsFacility,
   tileSupportsFacilityTechnology,
 } from "../../helpers/TerritoryTiles";
 import { useMoney } from "../base/CurrencyContext";
@@ -341,7 +340,7 @@ export function GeneratorBuildItem(
     ? getTerritoryTile(props.tileId, props.game)
     : undefined;
   const offerMaxSize =
-    (!tile || tileFitsFacility(tile, generator, true)) &&
+    (!tile || tileSupportsFacilityTechnology(tile, generator)) &&
     (generalAvailability.offerMaxSize ||
       (props.territoryAvailability &&
         generator.peakW > maxSizeW &&
@@ -835,7 +834,7 @@ export function GeneratorBuildItem(
               <Typography variant="body2" sx={{ px: 2, mb: 2 }}>
                 Build in {territoryName(props.territoryId)}
                 {buildTileId
-                  ? ` · ${territoryBuildTileName(buildTileId, props.game)}`
+                  ? ` · ${territoryBuildTileName(buildTileId, props.game, generator)}`
                   : ""}
                 .
                 {!props.lockedTile && " Output serves your company power pool."}

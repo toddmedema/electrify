@@ -21,6 +21,7 @@ import {
   tileFitsFacility,
   territoryVisibilityDistance,
   tileSupportsFacilityTechnology,
+  territoryTilePowerLimit,
 } from "./TerritoryTiles";
 
 function ready() {
@@ -220,7 +221,7 @@ it("bounds owned coordinate reads while quoting a long purchased frontier", () =
   }
 });
 
-it("leaves general sites uncapped while named sites keep their physical power limit", () => {
+it("caps general projects by terrain while named sites keep their physical power limit", () => {
   const game = ready();
   const tile = getTerritoryTile("green-uplands:site-0")!;
   game.territoryNetwork!.landPurchases.push({
@@ -230,7 +231,7 @@ it("leaves general sites uncapped while named sites keep their physical power li
   });
   const wind = GENERATORS(
     game,
-    500e6,
+    300e6,
     [20],
     [500],
     [],
@@ -241,7 +242,19 @@ it("leaves general sites uncapped while named sites keep their physical power li
   expect(tileFitsFacility(tile, wind)).toBe(true);
   expect(
     territoryBuildAvailability(game, wind, "green-uplands", tile.id),
-  ).toMatchObject({ buildable: true, maxPeakW: Infinity });
+  ).toMatchObject({
+    buildable: true,
+    maxPeakW: territoryTilePowerLimit(tile, wind),
+  });
+  expect(tileFitsFacility(tile, { ...wind, peakW: 300e6 + 1 })).toBe(false);
+  expect(
+    territoryBuildAvailability(
+      game,
+      { ...wind, peakW: 300e6 + 1 },
+      "green-uplands",
+      tile.id,
+    ),
+  ).toMatchObject({ buildable: false, maxPeakW: 300e6 });
   const named = TERRITORY_TILES.find((entry) => entry.siteKind === "hydro")!;
   expect(tileFitsFacility(named, wind)).toBe(false);
   expect(tileSupportsFacilityTechnology(named, wind)).toBe(false);
@@ -272,7 +285,7 @@ it("leaves general sites uncapped while named sites keep their physical power li
     }),
   );
   expect(built.facilities.find(({ tileId }) => tileId === tile.id)?.peakW).toBe(
-    500e6,
+    300e6,
   );
   const future = { ...game, date: { ...game.date, year: 2025 } };
   const battery = STORAGE(future, 2e9).find(({ name }) => name === "Battery")!;

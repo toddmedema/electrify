@@ -12,9 +12,16 @@ import {
   facilityOnTile,
   getTerritoryTile,
   getTerritoryTiles,
+  isGeneralBuildingLand,
+  territoryTilePowerLimit,
 } from "../../helpers/TerritoryTiles";
 import { formatWatts } from "../../helpers/Format";
-import type { GameType, TerritoryId, TerritoryTileId } from "../../Types";
+import type {
+  FacilityShoppingType,
+  GameType,
+  TerritoryId,
+  TerritoryTileId,
+} from "../../Types";
 import type { TerritorySiteKind } from "../../data/Territories";
 import { territoryMapLabel } from "./TerritoryMapLayout";
 import { useToolState } from "./GameToolMemory";
@@ -50,6 +57,7 @@ const SITE_NAMES: Record<TerritorySiteKind, string> = {
 export function territoryBuildTileName(
   tileId: TerritoryTileId,
   game?: Pick<GameType, "facilities">,
+  facility?: Pick<FacilityShoppingType, "fuel" | "peakWh">,
 ): string {
   const tile = getTerritoryTile(tileId, game);
   if (!tile || tile.city) return "Building site";
@@ -65,10 +73,13 @@ export function territoryBuildTileName(
     peers.length > 1
       ? ` ${peers.findIndex((other) => other.id === tile.id) + 1}`
       : "";
-  const site =
-    tile.terrain === "ocean" ? "offshore wind" : SITE_NAMES[tile.siteKind];
-  const limit =
-    tile.siteKind === "general" ? "" : ` · ${formatWatts(tile.maxPeakW)} max`;
+  const ordinary = isGeneralBuildingLand(tile);
+  const site = ordinary
+    ? "general construction"
+    : tile.terrain === "ocean"
+      ? "offshore wind"
+      : SITE_NAMES[tile.siteKind];
+  const limit = ` · ${formatWatts(territoryTilePowerLimit(tile, facility))} max${ordinary && !facility ? "; varies by technology" : ""}`;
   return `${terrain} site${number} · ${site}${limit}`;
 }
 

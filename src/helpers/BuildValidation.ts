@@ -187,6 +187,7 @@ export function validBuildFacility(raw: unknown): raw is {
       ) &&
       (facility.peakWh as number) > 0 &&
       (facility.maxPeakWh as number) > 0 &&
+      (facility.peakWh as number) <= (facility.maxPeakWh as number) &&
       (facility.roundTripEfficiency as number) > 0 &&
       (facility.roundTripEfficiency as number) <= 1 &&
       (facility.hourlyLoss as number) <= 1
@@ -210,6 +211,7 @@ export function validBuildFacility(raw: unknown): raw is {
       nonNegative(facility[key]),
     ) &&
     (facility.maxPeakW as number) > 0 &&
+    (facility.peakW as number) <= (facility.maxPeakW as number) &&
     (facility.capacityFactor as number) <= 1 &&
     (facility.spinMinutes as number) > 0
   );

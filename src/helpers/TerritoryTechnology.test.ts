@@ -52,7 +52,11 @@ it.each([
   expect(tileSupportsFacilityTechnology(tile, technology)).toBe(true);
   expect(
     territoryBuildAvailability(game, technology, tile.territoryId, tile.id),
-  ).toMatchObject({ buildable: true, maxPeakW: Infinity, tileId: tile.id });
+  ).toMatchObject({
+    buildable: true,
+    maxPeakW: territoryTilePowerLimit(tile, technology),
+    tileId: tile.id,
+  });
   const quote = getBuildFacilityQuote(
     game,
     technology,
@@ -76,9 +80,9 @@ it.each([
   );
 });
 
-it("treats every ordinary land category as general building land without a site power cap", () => {
+it("shares ordinary land across technologies while applying each terrain allowance", () => {
   const game = ready();
-  const wind = GENERATORS(game, 500e6, [20], [500]).find(
+  const wind = GENERATORS(game, 20e6, [20], [500]).find(
     ({ name }) => name === "Wind",
   )!;
   for (const siteKind of ["industrial", "wind", "open-land", "general"]) {
@@ -89,7 +93,10 @@ it("treats every ordinary land category as general building land without a site 
     )!;
     expect(tile).toBeDefined();
     expect(tileSupportsFacilityTechnology(tile, wind)).toBe(true);
-    expect(territoryTilePowerLimit(tile)).toBe(Infinity);
+    expect(Number.isFinite(territoryTilePowerLimit(tile))).toBe(true);
+    expect(territoryTilePowerLimit(tile, wind)).toBeLessThanOrEqual(
+      territoryTilePowerLimit(tile),
+    );
     expect(tileFitsFacility(tile, wind)).toBe(true);
   }
   const tile = getTerritoryTile(ordinaryId)!;

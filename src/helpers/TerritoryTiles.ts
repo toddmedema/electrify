@@ -26,6 +26,7 @@ import {
   UTILITY_AREAS,
 } from "../data/UtilityExpansion";
 import { isUtilityExpansionGame } from "./ExpansionContext";
+import { terrainBuildingPowerLimit } from "./TerritoryCapacity";
 
 export function hasTerritoryNetwork(
   game: Pick<GameType, "scenarioId" | "customScenario" | "territoryNetwork">,
@@ -59,12 +60,16 @@ export function facilityTerritoryId(
     "champlain"
   );
 }
+type SiteTechnology = Pick<FacilityShoppingType, "fuel" | "peakWh"> &
+  Partial<Pick<FacilityShoppingType, "name">>;
+
 export function territorySiteKind(
-  facility: Pick<FacilityShoppingType, "fuel" | "peakWh">,
+  facility: SiteTechnology,
 ): Exclude<TerritorySiteKind, "general"> {
   if (isStorage(facility)) return "open-land";
   if (facility.fuel === "Hydro") return "hydro";
-  if (facility.fuel === "Geothermal") return "geothermal";
+  if (facility.fuel === "Geothermal" && facility.name !== "Enhanced Geothermal")
+    return "geothermal";
   if (
     facility.fuel === "Wind" ||
     facility.fuel === "Offshore Wind" ||
@@ -76,7 +81,7 @@ export function territorySiteKind(
 const water = (terrain: TerrainType) =>
   terrain === "river" || terrain === "lake" || terrain === "ocean";
 /** Legacy industrial/wind/open-land labels describe ordinary land, not exclusive technologies. */
-function isGeneralBuildingLand(tile: TerritoryTileDefinition): boolean {
+export function isGeneralBuildingLand(tile: TerritoryTileDefinition): boolean {
   return (
     !tile.city &&
     !water(tile.terrain) &&
@@ -87,7 +92,7 @@ function isGeneralBuildingLand(tile: TerritoryTileDefinition): boolean {
 /** Catalogue compatibility ignores selected size, ownership, occupancy and affordability. */
 export function tileSupportsFacilityTechnology(
   tile: TerritoryTileDefinition,
-  facility: Pick<FacilityShoppingType, "fuel" | "peakWh">,
+  facility: SiteTechnology,
 ): boolean {
   if (tile.city) return false;
   if (tile.terrain === "ocean")
@@ -104,20 +109,30 @@ export function tileSupportsFacilityTechnology(
     (isGeneralBuildingLand(tile) && kind !== "hydro" && kind !== "geothermal")
   );
 }
-/** General land has no site power cap; the technology quote still owns its size limits. */
-export function territoryTilePowerLimit(tile: TerritoryTileDefinition): number {
-  return tile.city ? 0 : isGeneralBuildingLand(tile) ? Infinity : tile.maxPeakW;
+/** Technology-specific siting allowance; omitted technology reports physical inventory. */
+export function territoryTilePowerLimit(
+  tile: TerritoryTileDefinition,
+  facility?: Pick<FacilityShoppingType, "fuel" | "peakWh">,
+): number {
+  return tile.city
+    ? 0
+    : isGeneralBuildingLand(tile)
+      ? terrainBuildingPowerLimit(tile.terrain, facility)
+      : tile.maxPeakW;
 }
 /** Technology eligibility and one-site power limits are separate from ownership/occupancy. */
 export function tileFitsFacility(
   tile: TerritoryTileDefinition,
-  facility: Pick<FacilityShoppingType, "fuel" | "peakWh" | "peakW">,
+  facility: SiteTechnology & Pick<FacilityShoppingType, "peakW">,
   allowHistoricalSize = false,
 ): boolean {
   return (
     Number.isFinite(facility.peakW) &&
     facility.peakW > 0 &&
-    (allowHistoricalSize || facility.peakW <= territoryTilePowerLimit(tile)) &&
+    (facility.peakWh === undefined ||
+      (Number.isFinite(facility.peakWh) && facility.peakWh > 0)) &&
+    (allowHistoricalSize ||
+      facility.peakW <= territoryTilePowerLimit(tile, facility)) &&
     tileSupportsFacilityTechnology(tile, facility)
   );
 }
@@ -500,13 +515,14 @@ export function territoryTileInventory(
   game: Pick<GameType, "facilities"> &
     Partial<Pick<GameType, "commissionedHydroSiteIds">>,
   id: unknown,
+  facility?: Pick<FacilityShoppingType, "fuel" | "peakWh">,
 ): { remaining: number; total: number; maxPeakW: number } {
   const tile = getTerritoryTile(id, game);
   if (!tile || tile.city) return { remaining: 0, total: 0, maxPeakW: 0 };
   return {
     remaining: tileReserved(game, tile) ? 0 : 1,
     total: 1,
-    maxPeakW: territoryTilePowerLimit(tile),
+    maxPeakW: territoryTilePowerLimit(tile, facility),
   };
 }
 export function availableTerritoryTiles(
@@ -539,13 +555,20 @@ export function assignTerritoryTiles(game: GameType): boolean {
       !!game.territoryNetwork?.landPurchases.some(
         ({ territoryId: id }) => id === territoryId,
       );
+    // Retain paid ordinary-land plants when spatial allowances change, including frontier cells.
+    const fitsRetained = (tile: TerritoryTileDefinition) =>
+      tileFitsFacility(
+        tile,
+        facility,
+        historicalSize || isGeneralBuildingLand(tile),
+      );
     if (facility.tileId !== undefined) {
       const tile = getTerritoryTile(facility.tileId, game);
       if (
         !tile ||
         tile.territoryId !== territoryId ||
         occupied.has(tile.id) ||
-        (!tileFitsFacility(tile, facility, historicalSize) &&
+        (!fitsRetained(tile) &&
           !(
             facility.fuel === "Offshore Wind" && tile.id === "champlain:site-14"
           ))
@@ -558,7 +581,7 @@ export function assignTerritoryTiles(game: GameType): boolean {
       (tile) =>
         tile.territoryId === territoryId &&
         !occupied.has(tile.id) &&
-        tileFitsFacility(tile, facility, historicalSize),
+        fitsRetained(tile),
     );
     const tile =
       candidates.find(
@@ -583,6 +606,7 @@ export function territorySiteInventory(
   game: TileGame & Partial<Pick<GameType, "commissionedHydroSiteIds">>,
   id: TerritoryId,
   kind: TerritorySiteKind,
+  facility?: Pick<FacilityShoppingType, "fuel" | "peakWh">,
 ): { remaining: number; total: number; maxPeakW: number } {
   const tiles = getTerritoryTiles(game).filter(
     (tile) =>
@@ -593,6 +617,9 @@ export function territorySiteInventory(
   return {
     total: tiles.length,
     remaining: tiles.filter((tile) => !tileReserved(game, tile)).length,
-    maxPeakW: Math.max(0, ...tiles.map(territoryTilePowerLimit)),
+    maxPeakW: Math.max(
+      0,
+      ...tiles.map((tile) => territoryTilePowerLimit(tile, facility)),
+    ),
   };
 }

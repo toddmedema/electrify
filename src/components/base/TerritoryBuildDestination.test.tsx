@@ -10,6 +10,18 @@ import TerritoryBuildDestination, {
   territoryName,
 } from "./TerritoryBuildDestination";
 
+it("labels ordinary inventory separately from a selected technology's terrain allowance", () => {
+  expect(territoryBuildTileName("champlain:site-12")).toContain(
+    "1GW max; varies by technology",
+  );
+  expect(
+    territoryBuildTileName("champlain:site-12", undefined, { fuel: "Sun" }),
+  ).toContain("150MW max");
+  expect(
+    territoryBuildTileName("champlain:site-12", undefined, { fuel: "Wind" }),
+  ).toContain("300MW max");
+});
+
 it("offers free physical sites with terrain and power labels, excluding cities and occupied tiles", () => {
   const game = createGame({ scenarioId: 116, seed: 12 });
   const onTileChange = jest.fn();

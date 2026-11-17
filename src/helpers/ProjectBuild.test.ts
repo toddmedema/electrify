@@ -7,6 +7,7 @@ import {
   projectReview,
   projectSiteQuote,
   projectSiteCapitalCost,
+  projectCatalogue,
   selectProject,
 } from "./ProjectBuild";
 import { tilePurchaseQuotes } from "./Territories";
@@ -24,6 +25,31 @@ function fixture() {
   );
   return { game, project };
 }
+
+it("offers terrain-bounded map catalogue maxima while retaining lower technology limits and off-map sizes", () => {
+  const { game } = fixture();
+  game.date.year = 2035;
+  const generators = projectCatalogue(game, 2e9, false);
+  for (const [name, maxPeakW] of [
+    ["Solar", 150e6],
+    ["Wind", 450e6],
+    ["Natural Gas CC", 1000e6],
+    ["Biomass", 50e6],
+    ["Enhanced Geothermal", 500e6],
+  ] as const)
+    expect(
+      generators.find((facility) => facility.name === name)?.maxPeakW,
+    ).toBe(maxPeakW);
+  expect(
+    projectCatalogue(game, 20e9, true).find(({ name }) => name === "Battery")
+      ?.maxPeakWh,
+  ).toBe(4e9);
+  const offMap = createGame({ scenarioId: 108, seed: 188 });
+  expect(
+    projectCatalogue(offMap, 2e9, false).find(({ name }) => name === "Wind")
+      ?.maxPeakW,
+  ).toBe(1500e6);
+});
 it("quotes compatible connected and purchasable sites without spending or changing the project", () => {
   const { game, project } = fixture();
   const cash = currentTick(game)!.cash;

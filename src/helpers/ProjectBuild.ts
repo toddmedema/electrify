@@ -13,6 +13,10 @@ import {
   ownsTerritoryTile,
   tileFitsFacility,
   territoryTileInventory,
+  getTerritoryTiles,
+  hasTerritoryNetwork,
+  territoryTilePowerLimit,
+  tileSupportsFacilityTechnology,
 } from "./TerritoryTiles";
 import { currentTick } from "./GameSelectors";
 import { facilityLoanMonths, purchaseTerms } from "./Financials";
@@ -48,7 +52,38 @@ export function projectCatalogue(
   size: number,
   storage: boolean,
 ): FacilityShoppingType[] {
-  return storage ? STORAGE(game, size) : GENERATORS(game, size, [], []);
+  const options = storage
+    ? STORAGE(game, size)
+    : GENERATORS(game, size, [], []);
+  return withTerritoryCatalogueLimits(game, options);
+}
+
+/** Catalogue-only ceilings leave canonical economics and retained-facility expansion quotes intact. */
+export function withTerritoryCatalogueLimits(
+  game: GameType,
+  options: FacilityShoppingType[],
+): FacilityShoppingType[] {
+  if (!hasTerritoryNetwork(game)) return options;
+  const tiles = getTerritoryTiles(game);
+  return options.map((facility) => {
+    // A technology preview must offer a size that can fit a map tile. A selected site's
+    // quote applies its own (possibly lower) allowance, ownership and vacancy afterward.
+    const maxPowerW = Math.max(
+      0,
+      ...tiles
+        .filter((tile) => tileSupportsFacilityTechnology(tile, facility))
+        .map((tile) => territoryTilePowerLimit(tile, facility)),
+    );
+    return isStorage(facility)
+      ? {
+          ...facility,
+          maxPeakWh: Math.min(
+            facility.maxPeakWh,
+            (maxPowerW * facility.peakWh) / facility.peakW,
+          ),
+        }
+      : { ...facility, maxPeakW: Math.min(facility.maxPeakW, maxPowerW) };
+  });
 }
 
 /** A quote-only projection uses the same ownership and named-site validators as the command.

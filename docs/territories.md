@@ -46,7 +46,7 @@ Prices use 2005 dollars, indexed by the existing seeded CPI:
 - General building tiles cost $3 million each. The original larger land area's
   seven tiles cost one seventh of its former $18 million price each. Any ordinary
   onshore generator or storage technology can use general sites, subject to
-  normal technology and quote limits. General land has no additional site MW cap.
+  terrain siting allowances and normal technology and quote limits.
 - Residential tiles cost $32 million and add 16,000 customer accounts at the
   scenario's opening date. Industrial tiles cost $12 million and add 400 accounts,
   each with demand equivalent to 20 ordinary accounts. Account transfers scale with
@@ -74,13 +74,44 @@ share pending commitments, and co-op ownership appears only after host acceptanc
 
 The historical industrial, wind and open-land labels all describe ordinary
 building land. Any ordinary onshore generator or storage technology can use those
-cells, with no additional site MW cap; the technology's own calendar, size and
-resource limits still apply. Named hydro and geothermal sites retain their
+cells, within a finite terrain-and-technology power allowance. Limits in MW,
+in plains/forest/hills/mountain order, are:
+
+- Solar: **150 / 75 / 100 / 25**.
+- Onshore Wind and Airborne Wind: **300 / 200 / 450 / 450**.
+- Thermal plants, Enhanced Geothermal and storage: **1000 / 600 / 750 / 400**.
+
+These are fictional gameplay siting allowances, not surveyed hex areas or literal
+hectares-per-MW conversions. Solar receives the smallest ordinary-land allowance;
+mountain solar has little contiguous suitable ground. Wind shares its surrounding
+land with other uses, while thermal and battery plant footprints are compact.
+The technology's own calendar, size and resource limits also apply, and the lower
+ceiling wins. Named hydro and conventional geothermal sites retain their
 technology restrictions and physical power limits, and inland water does not
-permit new offshore construction. Storage retains the existing technology quote
-for power and energy duration. Paused
+permit new offshore construction. Ocean wind retains its site's resource ceiling.
+Storage retains the existing technology quote for power and energy duration:
+four-hour batteries on a 400 MW mountain site can hold at most 1600 MWh, provided
+their current technology energy ceiling also permits it. A smaller project still
+uses the whole slot; no unused allowance can be pooled with another tile. Paused
 and unfinished projects reserve sites; selling an ordinary project frees one.
+Existing plants retain their placement, capacity and finances when terrain
+allowances change, including plants on individually purchased frontier cells.
+New construction and capacity-expansion targets must fit today's allowances.
 Inherited hydro retains its named provenance.
+
+The relative allowances draw on primary-source mechanisms rather than equal-area
+engineering comparisons. [NREL's solar land-use study (2013)](https://docs.nlr.gov/docs/fy13osti/56290.pdf)
+describes extensive array cover. [NREL's wind land-use study (2009)](https://docs.nlr.gov/docs/fy09osti/45834.pdf)
+separates permanent disturbance from much larger turbine spacing, explaining why
+the game's shared-land allowance differs from total wind lease area.
+[BLM's solar-zone identification protocol](https://blmsolar.anl.gov/solar-peis/sez/identification/)
+considers slope and contiguous suitable area. [SMUD's proposed Dry Creek battery project](https://www.smud.org/Corporate/Environmental-Leadership/Power-Sources/Dry-Creek-Energy-Storage-Project)
+places 160 MW / 640 MWh on about 15 acres, illustrating compact storage without
+establishing a universal density. None of these sources specifies this game's
+rounded caps. `territoryTilePowerLimit(tile, facility)` owns the selected
+technology allowance; omitting the facility returns the greatest physical
+allowance for inventory displays. `tileFitsFacility` applies it at site selection
+and authoritative purchase validation.
 
 Schema 14 converts schema 13 physical projects into frozen legacy capital records.
 Every paid legacy uplands project grants immediate land rights, including paused,

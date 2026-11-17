@@ -88,8 +88,8 @@ export function territoryBuildAvailability(
       : specific;
   const inventory =
     tileId === undefined
-      ? territorySiteInventory(game, id, kind)
-      : territoryTileInventory(game, tileId);
+      ? territorySiteInventory(game, id, kind, facility)
+      : territoryTileInventory(game, tileId, facility);
   const requested =
     tileId === undefined ? undefined : getTerritoryTile(tileId, game);
   const reject = (reason: string) => ({
@@ -137,7 +137,7 @@ export function territoryBuildAvailability(
     buildable: true,
     remaining: tileId === undefined ? free.length : inventory.remaining,
     total: inventory.total,
-    maxPeakW: territoryTilePowerLimit(selected),
+    maxPeakW: territoryTilePowerLimit(selected, facility),
     tileId: selected.id,
   };
 }

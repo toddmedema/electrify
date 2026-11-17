@@ -51,7 +51,7 @@ it("uses the selected physical tile for storage review and purchase", () => {
     screen.getByRole("button", { name: "Review purchase of Lithium Battery" }),
   );
   expect(screen.getByRole("dialog")).toHaveTextContent(
-    territoryBuildTileName(tile.id, game),
+    territoryBuildTileName(tile.id, game, battery),
   );
   fireEvent.click(screen.getByRole("button", { name: "Pay cash" }));
   expect(onBuild).toHaveBeenCalledWith(
@@ -367,7 +367,7 @@ it("locks storage to its activated tile without destination pickers", () => {
     screen.getByRole("button", { name: "Review purchase of Lithium Battery" }),
   );
   expect(screen.getByRole("dialog")).toHaveTextContent(
-    territoryBuildTileName(tile.id, game),
+    territoryBuildTileName(tile.id, game, battery),
   );
   fireEvent.click(screen.getByRole("button", { name: "Pay cash" }));
   expect(onBuild).toHaveBeenCalledWith(

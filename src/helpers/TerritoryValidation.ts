@@ -6,6 +6,7 @@ import {
   territoryHexDistance,
   isAdjacentToOwnedTerritoryTile,
   isRetainedLakeOffshoreFacility,
+  isGeneralBuildingLand,
 } from "./TerritoryTiles";
 import { TICK_MINUTES } from "../Constants";
 import type { GameType, TerritoryTileId } from "../Types";
@@ -303,7 +304,8 @@ export function validTerritoryNetwork(
         (!tileFitsFacility(
           tile,
           facility,
-          !isLandTerritoryId(tile.territoryId) ||
+          isGeneralBuildingLand(tile) ||
+            !isLandTerritoryId(tile.territoryId) ||
             !!state.landPurchases.some(
               ({ territoryId }) => territoryId === tile.territoryId,
             ),

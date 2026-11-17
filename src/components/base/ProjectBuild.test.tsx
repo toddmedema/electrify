@@ -17,12 +17,16 @@ import {
   projectCatalogue,
   type ProjectSelection,
 } from "../../helpers/ProjectBuild";
-import { ownsTerritoryTile } from "../../helpers/TerritoryTiles";
+import {
+  getTerritoryTile,
+  ownsTerritoryTile,
+} from "../../helpers/TerritoryTiles";
+import { tilePurchaseQuotes } from "../../helpers/Territories";
 import { registerMultiplayerRuntime } from "../../multiplayer/Registry";
 import { acquireTile } from "../../reducers/GameActions";
 import gameReducer, { buildFacility } from "../../reducers/Game";
 import uiReducer from "../../reducers/UI";
-import type { GameType } from "../../Types";
+import type { GameType, TerritoryTileId } from "../../Types";
 import type { Command } from "../../multiplayer/Types";
 
 jest.mock("./BuildForecast", () => ({ useBuildForecast: () => undefined }));
@@ -56,9 +60,7 @@ function show(multiplayer = false, year?: number, compatibleSites = 2) {
   function Workspace() {
     const current = useSelector((state: { game: GameType }) => state.game);
     const [project, setProject] = React.useState<ProjectSelection>();
-    const [candidate, setCandidate] = React.useState<
-      "champlain:site-13" | "green-uplands:site-1"
-    >();
+    const [candidate, setCandidate] = React.useState<TerritoryTileId>();
     const [catalogue, setCatalogue] = React.useState(true);
     return (
       <TerritoryTilePurchasesProvider game={current}>
@@ -67,6 +69,20 @@ function show(multiplayer = false, year?: number, compatibleSites = 2) {
         </button>
         <button onClick={() => setCandidate("green-uplands:site-1")}>
           Adjacent site
+        </button>
+        <button
+          onClick={() =>
+            setCandidate(
+              [...tilePurchaseQuotes(current).keys()].find((id) => {
+                const tile = getTerritoryTile(id)!;
+                return (
+                  tile.terrain === "mountain" && tile.siteKind === "general"
+                );
+              }),
+            )
+          }
+        >
+          Ridge site
         </button>
         <ProjectBuild
           game={current}
@@ -289,18 +305,25 @@ it("cancels the pending project continuation when the run changes", async () => 
   expect(store.getState().game.facilities).toHaveLength(game.facilities.length);
 });
 
-it("corrects an oversized technology to its actual maximum before choosing sites", () => {
+it("corrects an oversized technology to the map's terrain maximum before choosing sites", () => {
   const { store, game } = show();
   fireEvent.change(screen.getByRole("slider", { name: "Generator capacity" }), {
     target: { value: "34" },
   });
   const choose = screen.getByRole("button", {
-    name: "Choose 1.5GW sites for Wind",
+    name: "Choose 450MW sites for Wind",
   });
-  expect(screen.getByText("Maximum available size: 1.5GW")).toBeVisible();
+  expect(screen.getByText("Maximum available size: 450MW")).toBeVisible();
   fireEvent.click(choose);
   fireEvent.click(screen.getByRole("button", { name: "Owned site" }));
-  expect(screen.getByRole("heading", { name: "Wind · 1.5GW" })).toBeVisible();
+  expect(screen.getByRole("heading", { name: "Wind · 450MW" })).toBeVisible();
+  expect(
+    screen.queryByRole("button", { name: "Review project" }),
+  ).not.toBeInTheDocument();
+  expect(screen.getByRole("alert")).toHaveTextContent(
+    /project size.*compatible site/,
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Ridge site" }));
   expect(screen.getByRole("button", { name: "Review project" })).toBeEnabled();
   expect(currentTick(store.getState().game)!.cash).toBe(
     currentTick(game)!.cash,

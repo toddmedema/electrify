@@ -1,7 +1,7 @@
 import * as React from "react";
 import { Button, IconButton } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
-import { GENERATORS } from "../../data/Facilities";
+import { GENERATORS, STORAGE } from "../../data/Facilities";
 import { getHydroAvailability } from "../../data/HydroSites";
 import {
   isStorage,
@@ -24,6 +24,7 @@ import {
   projectCatalogue,
   projectSiteQuote,
   selectProject,
+  withTerritoryCatalogueLimits,
   type ProjectSelection,
 } from "../../helpers/ProjectBuild";
 import { GeneratorBuildItem } from "../views/BuildGenerators";
@@ -68,18 +69,19 @@ export default function DesktopBuildRail({
   const sizingId = React.useId();
   const pricingKey = `${signature(game)}|${game.interestRate}|${JSON.stringify(game.multiplayer?.tileOwners)}|${JSON.stringify(game.multiplayer?.landOwners)}`;
   const options = React.useMemo<FacilityShoppingType[]>(
-    () => [
-      ...GENERATORS(
-        game,
-        sliderTickToW(generatorSize),
-        forecast?.windSpeeds ?? [],
-        forecast?.solarIrradiances ?? [],
-        forecast?.offshoreWindSpeeds ?? [],
-        forecast?.airborneWindSpeeds ?? [],
-      ),
-      ...projectCatalogue(game, sliderTickToW(storageSize), true),
-      // Planning inputs, rather than clock ticks or map focus, own catalogue pricing.
-    ],
+    () =>
+      withTerritoryCatalogueLimits(game, [
+        ...GENERATORS(
+          game,
+          sliderTickToW(generatorSize),
+          forecast?.windSpeeds ?? [],
+          forecast?.solarIrradiances ?? [],
+          forecast?.offshoreWindSpeeds ?? [],
+          forecast?.airborneWindSpeeds ?? [],
+        ),
+        ...STORAGE(game, sliderTickToW(storageSize)),
+        // Planning inputs, rather than clock ticks or map focus, own catalogue pricing.
+      ]),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [pricingKey, generatorSize, storageSize, forecast],
   );

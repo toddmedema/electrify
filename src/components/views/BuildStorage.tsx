@@ -11,7 +11,6 @@ import {
 import type { TerritoryId, TerritoryTileId } from "../../Types";
 import {
   getTerritoryTile,
-  tileFitsFacility,
   tileSupportsFacilityTechnology,
 } from "../../helpers/TerritoryTiles";
 import { useMoney } from "../base/CurrencyContext";
@@ -142,7 +141,7 @@ export function StorageBuildItem(
     ? getTerritoryTile(props.tileId, props.game)
     : undefined;
   const offerMaxSize =
-    (!tile || tileFitsFacility(tile, storage, true)) &&
+    (!tile || tileSupportsFacilityTechnology(tile, storage)) &&
     (generalAvailability.offerMaxSize ||
       (props.territoryAvailability &&
         storage.peakWh > maxSizeWh &&
@@ -179,7 +178,9 @@ export function StorageBuildItem(
     );
   }
 
-  const siteMaxPower = props.territoryAvailability?.maxPeakW;
+  const siteMaxPower = props.territoryAvailability
+    ? (maxSizeWh * storage.peakW) / storage.peakWh
+    : undefined;
   const siteMaxPowerLabel =
     siteMaxPower !== undefined && Number.isFinite(siteMaxPower)
       ? `${formatWatts(siteMaxPower)} max power`
@@ -321,7 +322,7 @@ export function StorageBuildItem(
             <Typography sx={{ px: 2, mb: 2 }}>
               Build in {territoryName(props.territoryId)}
               {buildTileId
-                ? ` · ${territoryBuildTileName(buildTileId, props.game)}`
+                ? ` · ${territoryBuildTileName(buildTileId, props.game, storage)}`
                 : ""}
               .
               {!props.lockedTile &&

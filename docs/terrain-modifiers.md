@@ -78,7 +78,9 @@ Cost multipliers apply only to **new onshore Wind and Solar**. They do not repri
 inherited or acquired assets, land, city demand, fuel, operating costs, retrofit
 footprints, thermal plants, batteries, hydro, conventional/enhanced geothermal,
 pumped storage, Offshore Wind or Airborne Wind. Terrain does not change pooled
-company dispatch or introduce transmission tariffs, upkeep or capacity rules.
+company dispatch or introduce transmission tariffs or upkeep. Separate
+[terrain siting allowances](territories.md) bound new facility and expansion
+capacity; these construction-cost multipliers do not change those allowances.
 Missing placement and other scenarios remain neutral. No new weather files or
 random streams are introduced.
 

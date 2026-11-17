@@ -35,7 +35,10 @@ import { purchaseTerms } from "../../helpers/Financials";
 import { computeOutlook } from "../base/OutlookForecast";
 import { isStorage, type EvidenceRequestType } from "../../Types";
 import { LEGACY_SCENARIOS } from "../../data/LegacyCampaign";
-import { availableTerritoryTiles } from "../../helpers/TerritoryTiles";
+import {
+  availableTerritoryTiles,
+  territoryTilePowerLimit,
+} from "../../helpers/TerritoryTiles";
 import * as TerritoryTileData from "../../data/TerritoryTiles";
 import { wToSliderTick } from "../../helpers/BuildSizing";
 import {
@@ -81,6 +84,9 @@ it("uses the map-selected physical tile for the generator review and purchase", 
     .find((item) => item.getAttribute("data-build-option") === "Solar")!;
   expect(
     within(solarCard).getByRole("button", { name: "Review purchase of Solar" }),
+  ).toBeDisabled();
+  expect(
+    within(solarCard).getByRole("button", { name: "Use max size" }),
   ).toBeEnabled();
   expect(within(solarCard).getByText("Build cost")).toBeVisible();
   const windCard = screen.getByText(
@@ -96,11 +102,14 @@ it("uses the map-selected physical tile for the generator review and purchase", 
     screen.getByRole("button", { name: "Review purchase of Wind" }),
   );
   expect(screen.getByRole("dialog")).toHaveTextContent(
-    territoryBuildTileName(tile.id, game),
+    territoryBuildTileName(tile.id, game, wind),
   );
   fireEvent.click(screen.getByRole("button", { name: "Pay cash" }));
   expect(onBuild).toHaveBeenCalledWith(
-    expect.objectContaining({ name: "Wind", peakW: wind.maxPeakW }),
+    expect.objectContaining({
+      name: "Wind",
+      peakW: territoryTilePowerLimit(tile, wind),
+    }),
     false,
     "champlain",
     tile.id,
@@ -1828,7 +1837,7 @@ it("locks the tile catalogue to its activated tile without destination pickers",
     screen.getByRole("button", { name: "Review purchase of Wind" }),
   );
   expect(screen.getByRole("dialog")).toHaveTextContent(
-    territoryBuildTileName(tile.id, game),
+    territoryBuildTileName(tile.id, game, wind),
   );
   fireEvent.click(screen.getByRole("button", { name: "Pay cash" }));
   expect(onBuild).toHaveBeenCalledWith(
