@@ -1,12 +1,12 @@
 import type { Auth, User } from "firebase/auth";
 
-/** Register account consumers without starting Firebase for a first-time title-screen visitor. */
-export function deferredWebAuth(
-  create: () => Auth,
-): Pick<Auth, "currentUser" | "onAuthStateChanged"> & {
+type DeferredWebAuth = Pick<Auth, "currentUser" | "onAuthStateChanged"> & {
   initialize(): Auth;
   confirmSignedOut(): void;
-} {
+};
+
+/** Register account consumers without starting Firebase for a first-time title-screen visitor. */
+export function deferredWebAuth(create: () => Auth): DeferredWebAuth {
   let auth: Auth | undefined;
   let signedOut = false;
   const listeners = new Set<{
