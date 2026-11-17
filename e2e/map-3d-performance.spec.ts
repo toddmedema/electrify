@@ -212,11 +212,17 @@ for (const theme of ["light", "dark"] as const) {
     await expect
       .poll(async () => (await sample(canvas)).light)
       .not.toEqual(light);
+    // Slow the actual simulation before choosing the review instant, so browser input latency
+    // cannot carry 12× game time several hours beyond the observed sunlight.
+    await page.getByRole("button", { name: "slow speed", exact: true }).click();
     await expect
-      .poll(async () => {
-        const current = await sample(canvas);
-        return current.light[1] > 0.9 && current.lightColor[0] > 0.99;
-      })
+      .poll(
+        async () => {
+          const current = await sample(canvas);
+          return current.light[1] > 0.92 && current.lightColor[0] > 0.99;
+        },
+        { timeout: 25000 },
+      )
       .toBe(true);
     await pause.click();
     await expect(pause).toHaveAttribute("aria-pressed", "true");
