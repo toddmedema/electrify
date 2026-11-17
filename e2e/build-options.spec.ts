@@ -173,7 +173,7 @@ for (const theme of ["light", "dark"] as const) {
       if (scenarioId === 116) {
         await returnToTerritoryMap(page);
         const tile = page.locator(
-          '[data-map-target="champlain:site-13"][data-owned="true"]',
+          '[data-map-target="champlain:site-12"][data-owned="true"]',
         );
         await expect(tile).toContainText(
           "One building site; transmission tower",
