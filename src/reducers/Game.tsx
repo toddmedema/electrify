@@ -3068,6 +3068,12 @@ function applyBuildFacility(
 function applySellFacility(state: GameType, id: number): boolean {
   const sold = state.facilities.find((g: FacilityOperatingType) => g.id === id);
   if (!sold || sold.saleRestricted) return false;
+  if (state.territoryNetwork?.legacyLakeOffshore) {
+    state.territoryNetwork.legacyLakeOffshore =
+      state.territoryNetwork.legacyLakeOffshore.filter(
+        ({ facilityId }) => facilityId !== id,
+      );
+  }
   logGameEvent(
     state,
     sold.yearsToBuildLeft > 0 ? "BUILD" : "SELL",

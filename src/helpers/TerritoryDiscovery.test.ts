@@ -31,6 +31,7 @@ import {
   territoryHexDistance,
 } from "./TerritoryTiles";
 import { validTerritoryNetwork } from "./TerritoryValidation";
+import { acquisitionQuote, transferUtility } from "./Expansion";
 
 function ready() {
   const game = createGame({ scenarioId: 116, seed: 61 });
@@ -101,12 +102,12 @@ it("purchases one visible frontier cell and reveals exactly three more rings wit
     }),
   ).toBe(false);
   expect(JSON.stringify(game)).toBe(before);
-  buy(game, "frontier:-7:-3");
+  buy(game, "frontier:-5:-3");
   expect(
-    territoryVisibilityDistance(game, getTerritoryTile("frontier:-10:-3")!),
+    territoryVisibilityDistance(game, getTerritoryTile("frontier:-8:-3")!),
   ).toBe(3);
   expect(
-    territoryVisibilityDistance(game, getTerritoryTile("frontier:-11:-3")!),
+    territoryVisibilityDistance(game, getTerritoryTile("frontier:-9:-3")!),
   ).toBeUndefined();
   expect(
     visibleTerritoryTiles(game).every(
@@ -128,12 +129,22 @@ it("uses active dated utility PPAs as anchors and removes them on expiry, while 
     acceptAgreement(game, { blockId: offer.id, quoteKey: offer.quoteKey }),
   ).toBe(true);
   expect(territoryVisibilityDistance(game, remote)).toBe(3);
+  expect(tilePurchaseQuote(game, remote.id)).toBeUndefined();
   const expired = cloneDeep(game);
   expired.date.minute = offer.receipt.endMinute;
   expect(territoryVisibilityDistance(expired, remote)).toBeUndefined();
-  buy(game, remote.id);
+  const acquisition = acquisitionQuote(game, "valley-electric")!;
+  expect(
+    transferUtility(game, {
+      targetId: "valley-electric",
+      financed: false,
+      quoteKey: acquisition.quoteKey,
+    }),
+  ).toBe(true);
+  const adjacent = getTerritoryTile("frontier:5:-4")!;
+  buy(game, adjacent.id);
   game.date.minute = offer.receipt.endMinute;
-  expect(territoryVisibilityDistance(game, remote)).toBe(0);
+  expect(territoryVisibilityDistance(game, adjacent)).toBe(0);
 });
 it("does not grant neighboring authored sites, duplicate cash or customer credit", () => {
   const game = ready();
@@ -254,7 +265,7 @@ it.each(["general", "hydro", "geothermal"] as const)(
     const forged = JSON.parse(JSON.stringify(serializeSave(game)));
     forged.game.facilities.find(
       (entry: { tileId?: string }) => entry.tileId === target.id,
-    ).peakW = 1e9;
+    ).peakW = benefit === "general" ? 0 : 1e9;
     expect(parseSave(forged)).toBeNull();
     expectDeterministicResume(game);
   },

@@ -120,7 +120,7 @@ it("reserves shared general sites through construction and pause; selling frees 
   expect(
     territoryBuildAvailability(game, { ...wind, peakW: 301e6 }, "green-uplands")
       .buildable,
-  ).toBe(false);
+  ).toBe(true);
   const battery = STORAGE(
     { ...game, date: { ...game.date, year: 2025 } },
     50e6,

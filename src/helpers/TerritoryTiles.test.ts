@@ -90,15 +90,7 @@ it("authors distinct terrain cells with exactly one city or construction site ea
   expect(new Set(TERRITORY_TILES.map(({ id }) => id)).size).toBe(76);
   expect(new Set(TERRITORY_TILES.map(({ q, r }) => `${q},${r}`)).size).toBe(76);
   expect(new Set(TERRITORY_TILES.map(({ terrain }) => terrain))).toEqual(
-    new Set([
-      "plains",
-      "forest",
-      "hills",
-      "mountain",
-      "river",
-      "lake",
-      "ocean",
-    ]),
+    new Set(["plains", "forest", "hills", "mountain", "river", "lake"]),
   );
   expect(TERRITORY_TILES.every((tile) => !!tile.city !== !!tile.siteKind)).toBe(
     true,

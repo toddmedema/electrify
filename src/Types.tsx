@@ -1489,11 +1489,18 @@ export interface GameType {
     }[];
     /** Immutable physical footprints, including empty retained property. */
     legacyTiles?: LegacyTerritoryTile[];
+    /** Existing inland offshore plants keep their installation, never replacement rights. */
+    legacyLakeOffshore?: {
+      facilityId: number;
+      tileId: TerritoryTileId;
+    }[];
     /** Physical purchases since schema 17; older land receipts retain every original cell. */
     tilePurchases?: {
       tileId: TerritoryTileId;
       minute: number;
       price: number;
+      /** Paid under the pre-adjacency visibility rule; new actions never create this marker. */
+      legacy?: true;
     }[];
     /** Frozen legacy projects: capital and debt remain; routing/construction/upkeep are retired. */
     legacyConnections: TransmissionLineOperatingType[];

@@ -41,7 +41,7 @@ const utilityCoordinates: Record<
   "champlain" | "valley-electric" | "ridge-electric",
   { q: number; r: number }[]
 > = {
-  // Reserve a boundary cell for the coast instead of putting open ocean inside the utility.
+  // Retain the existing inland water cell's physical identity.
   champlain: coordinates([
     [-4, [-4, -3, -2, -1]],
     [-3, [-4, -3, -2, -1]],
@@ -173,8 +173,8 @@ for (const territory of TERRITORIES) {
         matching[slot],
       );
   }
-  // An extra ocean site preserves all three existing onshore wind rights.
-  if (territory.id === "champlain") addSite("wind", 150e6, "ocean");
+  // This landlocked water is a lake. Old offshore installations retain their own siting record.
+  if (territory.id === "champlain") addSite("wind", 150e6, "lake");
 }
 /** Fictional siting cells; exactly one city OR one construction reservation per cell. */
 export const TERRITORY_TILES: readonly TerritoryTileDefinition[] = tiles;

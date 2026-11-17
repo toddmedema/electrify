@@ -75,15 +75,12 @@ export function territorySiteKind(
 }
 const water = (terrain: TerrainType) =>
   terrain === "river" || terrain === "lake" || terrain === "ocean";
-/** Technology eligibility and one-site power limits are separate from ownership/occupancy. */
-export function tileFitsFacility(
+/** Catalogue compatibility ignores selected size, ownership, occupancy and affordability. */
+export function tileSupportsFacilityTechnology(
   tile: TerritoryTileDefinition,
-  facility: Pick<FacilityShoppingType, "fuel" | "peakWh" | "peakW">,
-  allowHistoricalSize = false,
+  facility: Pick<FacilityShoppingType, "fuel" | "peakWh">,
 ): boolean {
-  if (tile.city || !Number.isFinite(facility.peakW) || facility.peakW <= 0)
-    return false;
-  if (!allowHistoricalSize && facility.peakW > tile.maxPeakW) return false;
+  if (tile.city) return false;
   if (tile.terrain === "ocean")
     return (
       !isStorage(facility) &&
@@ -96,6 +93,37 @@ export function tileFitsFacility(
   return (
     tile.siteKind === kind ||
     (tile.siteKind === "general" && kind !== "hydro" && kind !== "geothermal")
+  );
+}
+/** General land has no site power cap; the technology quote still owns its size limits. */
+export function territoryTilePowerLimit(tile: TerritoryTileDefinition): number {
+  return tile.city ? 0 : tile.siteKind === "general" ? Infinity : tile.maxPeakW;
+}
+/** Technology eligibility and one-site power limits are separate from ownership/occupancy. */
+export function tileFitsFacility(
+  tile: TerritoryTileDefinition,
+  facility: Pick<FacilityShoppingType, "fuel" | "peakWh" | "peakW">,
+  allowHistoricalSize = false,
+): boolean {
+  return (
+    Number.isFinite(facility.peakW) &&
+    facility.peakW > 0 &&
+    (allowHistoricalSize || facility.peakW <= territoryTilePowerLimit(tile)) &&
+    tileSupportsFacilityTechnology(tile, facility)
+  );
+}
+/** A retained installation is tied to its original plant ID, not a reusable offshore site. */
+export function isRetainedLakeOffshoreFacility(
+  game: Pick<GameType, "territoryNetwork">,
+  facility: Pick<FacilityOperatingType, "fuel" | "tileId"> &
+    Partial<Pick<FacilityOperatingType, "id">>,
+): boolean {
+  return (
+    facility.fuel === "Offshore Wind" &&
+    !!game.territoryNetwork?.legacyLakeOffshore?.some(
+      ({ facilityId, tileId }) =>
+        facilityId === facility.id && tileId === facility.tileId,
+    )
   );
 }
 function historicalTile(
@@ -235,6 +263,25 @@ export const territoryHexDistance = (
     Math.abs(a.r - b.r),
     Math.abs(a.q + a.r - b.q - b.r),
   );
+/** Purchase frontiers use physical company property; remote visibility never grants adjacency. */
+export function ownedTerritoryTiles(game: TileGame): TerritoryTileDefinition[] {
+  const owns = createTerritoryTileOwnership(game);
+  return [
+    ...TERRITORY_TILES,
+    ...legacyTerritoryTiles(game),
+    ...(game.territoryNetwork?.tilePurchases ?? []).flatMap(({ tileId }) => {
+      const tile = getTerritoryTile(tileId, game);
+      return tile ? [tile] : [];
+    }),
+  ].filter(owns);
+}
+export function isAdjacentToOwnedTerritoryTile(
+  game: TileGame,
+  tile: TerritoryTileDefinition,
+  owned = ownedTerritoryTiles(game),
+): boolean {
+  return owned.some((anchor) => territoryHexDistance(anchor, tile) === 1);
+}
 /** Peer claims only extend sight through a real, operating link, projected by the host. */
 export function connectedPeerTerritoryTiles(
   game: TileGame,
@@ -435,7 +482,7 @@ export function territoryTileInventory(
   return {
     remaining: tileReserved(game, tile) ? 0 : 1,
     total: 1,
-    maxPeakW: tile.maxPeakW,
+    maxPeakW: territoryTilePowerLimit(tile),
   };
 }
 export function availableTerritoryTiles(
@@ -474,7 +521,10 @@ export function assignTerritoryTiles(game: GameType): boolean {
         !tile ||
         tile.territoryId !== territoryId ||
         occupied.has(tile.id) ||
-        !tileFitsFacility(tile, facility, historicalSize)
+        (!tileFitsFacility(tile, facility, historicalSize) &&
+          !(
+            facility.fuel === "Offshore Wind" && tile.id === "champlain:site-14"
+          ))
       )
         return false;
       occupied.add(tile.id);
@@ -519,6 +569,6 @@ export function territorySiteInventory(
   return {
     total: tiles.length,
     remaining: tiles.filter((tile) => !tileReserved(game, tile)).length,
-    maxPeakW: Math.max(0, ...tiles.map((tile) => tile.maxPeakW ?? 0)),
+    maxPeakW: Math.max(0, ...tiles.map(territoryTilePowerLimit)),
   };
 }

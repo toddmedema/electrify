@@ -1,6 +1,7 @@
 import {
   legacyTerritoryTiles,
   assignTerritoryTiles,
+  getTerritoryTile,
 } from "./helpers/TerritoryTiles";
 import type { BuyingRuleType, SellingRuleType, GameType } from "./Types";
 import { inheritedConnection } from "./helpers/PowerAgreements";
@@ -324,6 +325,58 @@ const migrations: readonly Migration[] = [
           legacyTiles: legacyTerritoryTiles({
             facilities: (save.game as unknown as GameType).facilities,
           }),
+        },
+      },
+    };
+  },
+  // 17 -> 18: purchases now require owned physical adjacency. Retain prior paid rights and
+  // installed offshore plants when the landlocked authored water is corrected to a lake.
+  (save) => {
+    if (!object(save.game)) return null;
+    if (save.game.territoryNetwork === undefined) return save;
+    const state = save.game.territoryNetwork;
+    if (
+      !object(state) ||
+      state.version !== 3 ||
+      Object.keys(state).length !== 5 ||
+      !Array.isArray(state.tilePurchases) ||
+      !Array.isArray(state.legacyTiles) ||
+      !Array.isArray(save.game.facilities) ||
+      state.tilePurchases.some(
+        (entry) =>
+          !object(entry) ||
+          Object.keys(entry).length !== 3 ||
+          !("tileId" in entry) ||
+          !("minute" in entry) ||
+          !("price" in entry),
+      ) ||
+      state.legacyTiles.some((entry) => !object(entry)) ||
+      save.game.facilities.some((entry) => !object(entry))
+    )
+      return null;
+    const game = save.game as unknown as GameType;
+    const legacyLakeOffshore = game.facilities.flatMap((facility) => {
+      const tile = getTerritoryTile(facility.tileId, game);
+      return facility.fuel === "Offshore Wind" &&
+        tile &&
+        (tile.id === "champlain:site-14" || tile.terrain === "ocean")
+        ? [{ facilityId: facility.id, tileId: tile.id }]
+        : [];
+    });
+    return {
+      ...save,
+      game: {
+        ...save.game,
+        territoryNetwork: {
+          ...state,
+          tilePurchases: state.tilePurchases.map((receipt) => ({
+            ...receipt,
+            legacy: true,
+          })),
+          legacyTiles: state.legacyTiles.map((tile) =>
+            tile.terrain === "ocean" ? { ...tile, terrain: "lake" } : tile,
+          ),
+          ...(legacyLakeOffshore.length ? { legacyLakeOffshore } : {}),
         },
       },
     };

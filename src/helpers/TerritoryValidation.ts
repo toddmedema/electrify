@@ -4,6 +4,8 @@ import {
   ownsTerritoryTile,
   territoryVisibilityDistance,
   territoryHexDistance,
+  isAdjacentToOwnedTerritoryTile,
+  isRetainedLakeOffshoreFacility,
 } from "./TerritoryTiles";
 import { TICK_MINUTES } from "../Constants";
 import type { GameType, TerritoryTileId } from "../Types";
@@ -102,7 +104,17 @@ export function validTerritoryNetwork(
   if (
     !record(game.territoryNetwork) ||
     game.territoryNetwork.version !== 3 ||
-    Object.keys(game.territoryNetwork).length !== 5
+    Object.keys(game.territoryNetwork).some(
+      (key) =>
+        ![
+          "version",
+          "landPurchases",
+          "legacyConnections",
+          "tilePurchases",
+          "legacyTiles",
+          "legacyLakeOffshore",
+        ].includes(key),
+    )
   )
     return false;
   const state = game.territoryNetwork;
@@ -213,7 +225,9 @@ export function validTerritoryNetwork(
     const tile = getTerritoryTile(receipt?.tileId, game);
     if (
       !record(receipt) ||
-      Object.keys(receipt).length !== 3 ||
+      (receipt.legacy === true
+        ? Object.keys(receipt).length !== 4
+        : receipt.legacy !== undefined || Object.keys(receipt).length !== 3) ||
       !tile ||
       !isLandTerritoryId(tile.territoryId) ||
       purchased.has(tile.id) ||
@@ -229,15 +243,15 @@ export function validTerritoryNetwork(
     )
       return false;
     const earlier = (state.tilePurchases ?? []).slice(0, purchased.size);
+    const historical = territoryGameAtPurchase(game, receipt.minute, earlier);
     if (
       earlier.some((entry) => entry.minute > receipt.minute) ||
-      (territoryVisibilityDistance(
-        territoryGameAtPurchase(game, receipt.minute, earlier),
-        tile,
-      ) === undefined &&
-        !peers
-          ?.get(tile.id)
-          ?.some((anchor) => territoryHexDistance(anchor, tile) <= 3))
+      (receipt.legacy === true
+        ? territoryVisibilityDistance(historical, tile) === undefined &&
+          !peers
+            ?.get(tile.id)
+            ?.some((anchor) => territoryHexDistance(anchor, tile) <= 3)
+        : !isAdjacentToOwnedTerritoryTile(historical, tile))
     )
       return false;
     purchased.add(tile.id);
@@ -251,6 +265,31 @@ export function validTerritoryNetwork(
   const owned = ownedTerritories(game);
   const placements = new Set<string>();
   if (
+    state.legacyLakeOffshore !== undefined &&
+    (!Array.isArray(state.legacyLakeOffshore) ||
+      new Set(state.legacyLakeOffshore.map((entry) => entry?.facilityId))
+        .size !== state.legacyLakeOffshore.length ||
+      state.legacyLakeOffshore.some((entry) => {
+        const tile = getTerritoryTile(entry?.tileId, game);
+        const plant = game.facilities.find(
+          ({ id }) => id === entry?.facilityId,
+        );
+        return (
+          !record(entry) ||
+          Object.keys(entry).length !== 2 ||
+          !Number.isSafeInteger(entry.facilityId) ||
+          entry.facilityId < 0 ||
+          !tile ||
+          tile.terrain !== "lake" ||
+          tile.siteKind !== "wind" ||
+          !(tile.id === "champlain:site-14" || tile.id.includes(":legacy-")) ||
+          (!!plant &&
+            (plant.tileId !== entry.tileId || plant.fuel !== "Offshore Wind"))
+        );
+      }))
+  )
+    return false;
+  if (
     game.facilities.some((facility) => {
       if (
         typeof facility.tileId !== "string" ||
@@ -261,14 +300,15 @@ export function validTerritoryNetwork(
       if (
         !tile ||
         tile.territoryId !== facilityTerritoryId(facility) ||
-        !tileFitsFacility(
+        (!tileFitsFacility(
           tile,
           facility,
           !isLandTerritoryId(tile.territoryId) ||
             !!state.landPurchases.some(
               ({ territoryId }) => territoryId === tile.territoryId,
             ),
-        )
+        ) &&
+          !isRetainedLakeOffshoreFacility(game, facility))
       )
         return true;
       placements.add(tile.id);

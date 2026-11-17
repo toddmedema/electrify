@@ -5,7 +5,11 @@ import type {
   TerritoryTileId,
 } from "../Types";
 import { getOffshoreWindOutputFactor, getWindOutputFactor } from "./Energy";
-import { getTerritoryTile, hasTerritoryNetwork } from "./TerritoryTiles";
+import {
+  getTerritoryTile,
+  hasTerritoryNetwork,
+  isRetainedLakeOffshoreFacility,
+} from "./TerritoryTiles";
 
 /** Rounded residual siting assumptions, not universal measured terrain averages.
  * The existing wind reference already includes height/siting; see docs/terrain-modifiers.md.
@@ -54,14 +58,18 @@ export function isOceanWindTile(
 /** Apply local speed before the turbine curve, never to generated watts. */
 export function getTerrainWindOutputFactor(
   game: GameType,
-  facility: Pick<FacilityOperatingType, "fuel" | "tileId">,
+  facility: Pick<FacilityOperatingType, "fuel" | "tileId"> &
+    Partial<Pick<FacilityOperatingType, "id">>,
   regionalWindKph: number,
   offshoreWindKph?: number,
 ): number {
   if (facility.fuel === "Offshore Wind") {
     return getOffshoreWindOutputFactor(
       offshoreWindKph ??
-        (isOceanWindTile(game, facility.tileId) ? regionalWindKph : 0),
+        (isOceanWindTile(game, facility.tileId) ||
+        isRetainedLakeOffshoreFacility(game, facility)
+          ? regionalWindKph
+          : 0),
     );
   }
   return getWindOutputFactor(

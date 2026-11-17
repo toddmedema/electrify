@@ -10,6 +10,7 @@ import {
   getTerritoryTile,
   territoryVisibilityDistance,
   territoryHexDistance,
+  isAdjacentToOwnedTerritoryTile,
 } from "../helpers/TerritoryTiles";
 import {
   territoryGameAtPurchase,
@@ -1490,7 +1491,12 @@ function territoryPurchaseHistory(
       );
       const game = territoryGameForWorld(world, i, historical, minute);
       const tile = getTerritoryTile(receipt.tileId, game)!;
-      if (territoryVisibilityDistance(game, tile) === undefined) continue;
+      if (
+        receipt.legacy === true
+          ? territoryVisibilityDistance(game, tile) === undefined
+          : !isAdjacentToOwnedTerritoryTile(game, tile)
+      )
+        continue;
       const anchor = connectedPeerTerritoryTiles(game).find(
         (peerTile) => territoryHexDistance(peerTile, tile) <= 3,
       );
@@ -1585,7 +1591,10 @@ function upgradeTerritoryWorld(value: unknown): unknown {
           "coop-2-c12bab1ee04886f40ff0274d35e968e07cf7c3306f9e5ea006140bb973163fe4") ||
       (old.gameSchema === 16 &&
         old.rules ===
-          "coop-2-06e4afd05778c47de20788acd02787291d3f09456465a0a89ace5fbeadd2d018")
+          "coop-2-06e4afd05778c47de20788acd02787291d3f09456465a0a89ace5fbeadd2d018") ||
+      (old.gameSchema === 17 &&
+        old.rules ===
+          "coop-2-b590dfc2a358c3d4fd7c14330f8a5e92181b38944a04098dc416dcfbbf904907")
     ) ||
     !Array.isArray(old.grids) ||
     !old.grids.every(
@@ -1594,6 +1603,7 @@ function upgradeTerritoryWorld(value: unknown): unknown {
         typeof grid === "object" &&
         (old.gameSchema === 15 ||
           old.gameSchema === 16 ||
+          old.gameSchema === 17 ||
           isUtilityExpansionGame(grid)),
     )
   )

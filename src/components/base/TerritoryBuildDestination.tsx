@@ -67,7 +67,9 @@ export function territoryBuildTileName(
       : "";
   const site =
     tile.terrain === "ocean" ? "offshore wind" : SITE_NAMES[tile.siteKind];
-  return `${terrain} site${number} · ${site} · ${formatWatts(tile.maxPeakW)} max`;
+  const limit =
+    tile.siteKind === "general" ? "" : ` · ${formatWatts(tile.maxPeakW)} max`;
+  return `${terrain} site${number} · ${site}${limit}`;
 }
 
 export default function TerritoryBuildDestination({
