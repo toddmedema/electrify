@@ -10,7 +10,6 @@ import {
   getScenario,
 } from "../../data/Scenarios";
 import NewGameDetails, { Props } from "./NewGameDetails";
-import { login } from "../../Globals";
 import { DesktopBridge } from "../../Desktop";
 import { DIFFICULTY_IDS } from "../../Constants";
 import { DifficultyType, ScoreType } from "../../Types";
@@ -143,24 +142,19 @@ describe("NewGameDetails briefing", () => {
 });
 
 describe("NewGameDetails leaderboard", () => {
-  it.each([false, true])(
-    "passes mailing-list choice %s to Google sign-in",
-    async (mailingList) => {
-      render(<NewGameDetails {...props()} />);
-      const checkbox = screen.getByRole("checkbox", {
+  it("shows public high scores without a sign-in prompt", async () => {
+    render(<NewGameDetails {...props()} />);
+    await screen.findByText("Complete this mission to join the leaderboard");
+    expect(screen.getByRole("table")).toBeVisible();
+    expect(
+      screen.queryByRole("group", { name: "Sign in" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("checkbox", {
         name: "Join the Electrify mailing list",
-      });
-      expect(checkbox).not.toBeChecked();
-      if (mailingList) await userEvent.click(checkbox);
-      await userEvent.click(
-        screen.getByRole("button", { name: "Sign in with Google" }),
-      );
-      expect(login).toHaveBeenLastCalledWith({
-        provider: "google",
-        mailingList,
-      });
-    },
-  );
+      }),
+    ).not.toBeInTheDocument();
+  });
 
   afterEach(() => {
     delete window.electrifyDesktop;
