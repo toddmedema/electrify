@@ -106,3 +106,34 @@ test("sound unlocks within the gesture while game chunks are still held", async 
   release();
   await expect(sound).toHaveCount(0);
 });
+
+test("a stalled logo cannot block the title actions", async ({ page }) => {
+  test.skip(
+    !process.env.E2E_BASE_URL && !process.env.E2E_BUILD_DIR,
+    "Production entry delivery.",
+  );
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route("**/images/logo-home*.svg", async (route) => {
+    await held;
+    await route.continue();
+  });
+  try {
+    await page.goto("/", { waitUntil: "domcontentloaded" });
+    await expect(
+      page.getByRole("button", { name: "Play", exact: true }),
+    ).toBeVisible();
+    await expect(page.locator("#appStartup")).toHaveCount(0);
+  } finally {
+    release();
+  }
+  await expect
+    .poll(() =>
+      page
+        .locator("#logo img")
+        .evaluate((image: HTMLImageElement) => image.naturalWidth),
+    )
+    .toBeGreaterThan(0);
+});
