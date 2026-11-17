@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { Provider } from "react-redux";
+import { useLayoutEffect } from "react";
 import { store } from "../Store";
 import { dialogClose, dialogOpen } from "../reducers/UI";
 import HostConnectionWarning, {
@@ -9,6 +10,66 @@ import HostConnectionWarning, {
 
 beforeEach(() => store.dispatch(dialogClose()));
 afterEach(() => store.dispatch(dialogClose()));
+
+test("recovery preserves a notification committed after the warning rendered", () => {
+  function NewNotification({ open }: { open: boolean }) {
+    useLayoutEffect(() => {
+      if (open)
+        store.dispatch(
+          dialogOpen({
+            open: true,
+            title: "Construction",
+            message: "Not enough cash",
+          }),
+        );
+    }, [open]);
+    return null;
+  }
+  const ui = (waiting: boolean) => (
+    <Provider store={store}>
+      <HostConnectionWarning
+        waiting={waiting}
+        onReconnect={jest.fn()}
+        onDisconnect={jest.fn()}
+      />
+      <NewNotification open={!waiting} />
+    </Provider>
+  );
+  const view = render(ui(true));
+  view.rerender(ui(false));
+  expect(store.getState().ui.dialog).toMatchObject({
+    open: true,
+    title: "Construction",
+  });
+});
+
+test("recovery closes its notice even when it is committed after the recovery render", () => {
+  let notice = store.getState().ui.dialog;
+  function QueuedNotice({ open }: { open: boolean }) {
+    useLayoutEffect(() => {
+      if (open) store.dispatch(dialogOpen(notice));
+    }, [open]);
+    return null;
+  }
+  const ui = (synchronizing: boolean) => (
+    <Provider store={store}>
+      <HostConnectionWarning
+        waiting={false}
+        synchronizing={synchronizing}
+        onReconnect={jest.fn()}
+        onDisconnect={jest.fn()}
+      />
+      <QueuedNotice open={!synchronizing} />
+    </Provider>
+  );
+  const view = render(ui(true));
+  notice = store.getState().ui.dialog;
+  act(() => {
+    store.dispatch(dialogClose());
+  });
+  view.rerender(ui(false));
+  expect(store.getState().ui.dialog.open).toBe(false);
+});
 
 test("replica synchronization uses the existing notice and releases it when the replica is live", () => {
   const ui = (synchronizing: boolean) => (
