@@ -196,36 +196,43 @@ it("returns keyboard focus to the trigger after explicit sizing and preview dism
   expect(onProject).not.toHaveBeenCalled();
 });
 
-it("keeps an offscreen technology preview through focus scrolling and Right Arrow, but dismisses on wheel", async () => {
-  show();
-  const rail = screen.getByRole("complementary", { name: "Build facilities" });
-  const technologies = within(rail).getByRole("group", {
-    name: "Construction technology list",
-  });
-  const last = within(technologies).getAllByRole("button").at(-1)!;
-  // jsdom has no layout or native focus scrolling. Model the offscreen button's
-  // reveal and then deliver the browser's queued scroll event separately.
-  last.scrollIntoView = () => {
-    technologies.scrollTop = 500;
-  };
-  const buttons = within(rail).getAllByRole("button");
-  for (let index = 0; index <= buttons.indexOf(last); index++)
-    await userEvent.tab();
-  expect(last).toHaveFocus();
-  const name = last
-    .getAttribute("aria-label")!
-    .replace("Choose sites for ", "");
-  const previewName = `${name} technology preview`;
-  expect(screen.getByLabelText(previewName)).toBeInTheDocument();
-  fireEvent.scroll(technologies, { target: { scrollTop: 500 } });
-  const preview = screen.getByLabelText(previewName);
-  await userEvent.keyboard("{ArrowRight}");
-  expect(
-    within(preview).getByRole("button", { name: "Close technology preview" }),
-  ).toHaveFocus();
-  fireEvent.wheel(technologies, { deltaY: -100 });
-  expect(screen.queryByLabelText(previewName)).not.toBeInTheDocument();
-});
+it.each(["before", "after"] as const)(
+  "keeps an offscreen technology preview when native scrolling occurs %s its focus event, but dismisses on wheel",
+  async (nativeScrollOrder) => {
+    show();
+    const rail = screen.getByRole("complementary", {
+      name: "Build facilities",
+    });
+    const technologies = within(rail).getByRole("group", {
+      name: "Construction technology list",
+    });
+    const last = within(technologies).getAllByRole("button").at(-1)!;
+    // jsdom has no layout or native focus scrolling. Model the offscreen button's
+    // reveal and then deliver the browser's queued scroll event separately.
+    if (nativeScrollOrder === "before") technologies.scrollTop = 500;
+    else
+      last.scrollIntoView = () => {
+        technologies.scrollTop = 500;
+      };
+    const buttons = within(rail).getAllByRole("button");
+    for (let index = 0; index <= buttons.indexOf(last); index++)
+      await userEvent.tab();
+    expect(last).toHaveFocus();
+    const name = last
+      .getAttribute("aria-label")!
+      .replace("Choose sites for ", "");
+    const previewName = `${name} technology preview`;
+    expect(screen.getByLabelText(previewName)).toBeInTheDocument();
+    fireEvent.scroll(technologies, { target: { scrollTop: 500 } });
+    const preview = screen.getByLabelText(previewName);
+    await userEvent.keyboard("{ArrowRight}");
+    expect(
+      within(preview).getByRole("button", { name: "Close technology preview" }),
+    ).toHaveFocus();
+    fireEvent.wheel(technologies, { deltaY: -100 });
+    expect(screen.queryByLabelText(previewName)).not.toBeInTheDocument();
+  },
+);
 
 it.each([
   ["Hydro", "parcel-7:site-0", "Use site maximum"],

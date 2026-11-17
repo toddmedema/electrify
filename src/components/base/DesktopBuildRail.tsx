@@ -276,15 +276,13 @@ export default function DesktopBuildRail({
                   onFocus={(event) => {
                     if (busy || suppressFocus.current) return;
                     const list = technologies.current!;
-                    const before = list.scrollTop;
-                    // Reveal before the browser's native focus scroll. Only its
-                    // resulting position is exempt from normal scroll dismissal.
+                    // Native focus may reveal the button before or after this
+                    // handler. Exempt only the final revealed scroll position.
                     event.currentTarget.scrollIntoView({
                       block: "nearest",
                       inline: "nearest",
                     });
-                    if (list.scrollTop !== before)
-                      focusScroll.current = list.scrollTop;
+                    focusScroll.current = list.scrollTop;
                     show(item, event.currentTarget);
                   }}
                   onKeyDown={(event) => {
