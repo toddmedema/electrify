@@ -802,7 +802,17 @@ for (const theme of ["light", "dark"] as const) {
     await expect(
       page.getByRole("tab", { name: /^(Territories|Fleet|Agreements)$/ }),
     ).toHaveCount(0);
-    for (const name of ["Map", "Fleet", "Agreements"])
+    await expect(
+      page.getByRole("button", { name: "Map", exact: true }),
+    ).toHaveCount(0);
+    for (const name of [
+      "Fleet",
+      "Agreements",
+      "Programs",
+      "Insights",
+      "Events",
+      "Scenario",
+    ])
       await expect(
         page.getByRole("button", { name, exact: true }),
       ).toBeVisible();
