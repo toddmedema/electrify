@@ -64,22 +64,26 @@ describe("Navigation", () => {
       "BUILD_STORAGE",
     );
   });
-  it("keeps accessible icon-only actions in a couch company", () => {
-    window.electrifyCouch = {
-      role: "seat",
-      seatId: "local-p1",
-      getGeneration: () => 1,
-      ready: async () => {},
-      onMessage: () => () => {},
-      post: () => {},
-    };
-    renderNavigation();
-    for (const name of ["Build", "Programs", "Insights"]) {
-      const button = screen.getByRole("button", { name });
-      expect(button).toHaveAccessibleName(name);
-      expect(button).not.toHaveTextContent(name);
-    }
-  });
+  it.each([false, true])(
+    "keeps accessible icon-only actions (couch: %s)",
+    (couch) => {
+      if (couch)
+        window.electrifyCouch = {
+          role: "seat",
+          seatId: "local-p1",
+          getGeneration: () => 1,
+          ready: async () => {},
+          onMessage: () => () => {},
+          post: () => {},
+        };
+      renderNavigation();
+      for (const name of ["Build", "Programs", "Insights"]) {
+        const button = screen.getByRole("button", { name });
+        expect(button).toHaveAccessibleName(name);
+        expect(button).not.toHaveTextContent(name);
+      }
+    },
+  );
   beforeEach(() => {
     store.dispatch(
       delta({
@@ -216,7 +220,7 @@ describe("Navigation", () => {
     for (const name of ["Build", "Programs", "Insights", "Events"]) {
       const button = screen.getByRole("button", { name });
       expect(button).toBeVisible();
-      expect(button).toHaveTextContent(name);
+      expect(button).not.toHaveTextContent(name);
     }
     expect(screen.queryByRole("button", { name: "Facilities" })).toBeNull();
   });

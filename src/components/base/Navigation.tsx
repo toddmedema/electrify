@@ -169,11 +169,6 @@ export default function Navigation({
                 }
               >
                 <Badge>{view.icon}</Badge>
-                {!window.electrifyCouch && (
-                  <span className="gameDockLabel" aria-hidden="true">
-                    {view.label}
-                  </span>
-                )}
               </Button>
             </Tooltip>
           );
@@ -238,11 +233,6 @@ export default function Navigation({
               >
                 {tool.icon}
               </Badge>
-              {!window.electrifyCouch && (
-                <span className="gameDockLabel" aria-hidden="true">
-                  {tool.label}
-                </span>
-              )}
               {tool.id === "EVENTS" && emergency && (
                 <span className="srOnly" id="eventsEmergency">
                   Ongoing emergency

@@ -50,13 +50,7 @@ export {
 
 /** The dock's button width at this window width; keep in step with GameWorkspace.scss. */
 function dockButtonWidth(width: number, map = false): number {
-  return map && width < 700
-    ? 44
-    : width >= 2200
-      ? 104
-      : width >= 1600
-        ? 88
-        : 72;
+  return map && width < 700 ? 44 : width >= 2200 ? 80 : width >= 1600 ? 64 : 48;
 }
 
 /** Actions, their gaps, the dock's padding and border, and a margin each side. */

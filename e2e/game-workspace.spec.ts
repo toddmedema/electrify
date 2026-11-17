@@ -761,6 +761,11 @@ test("dock labels support pointer, keyboard and touch without accidental tool ac
   await startGame(page, "light");
   const dock = page.locator("#navfooter");
   const status = page.locator(".gridHealth");
+  for (const name of ["Build", "Programs", "Insights", "Events"]) {
+    const action = dock.getByRole("button", { name, exact: true });
+    await expect(action).toBeVisible();
+    await expect(action).not.toContainText(name);
+  }
   if (page.viewportSize()!.width < 700) {
     // Phones shrink a stable grid to a checked bolt; the readout is a tap away.
     const summary =
@@ -818,8 +823,7 @@ test("dock labels support pointer, keyboard and touch without accidental tool ac
     const actions = ["Build", "Programs", "Insights", "Events"];
     for (const label of actions) {
       const action = dock.getByRole("button", { name: label, exact: true });
-      await expect(action.locator(".gameDockLabel")).toHaveText(label);
-      await expect(action.locator(".gameDockLabel")).toBeVisible();
+      await expect(action).not.toContainText(label);
     }
     const build = (await page.locator("#buildNav").boundingBox())!;
     await session.send("Input.dispatchTouchEvent", {
@@ -840,7 +844,7 @@ test("dock labels support pointer, keyboard and touch without accidental tool ac
       await expect(
         page.getByRole("tooltip", { name: label, exact: true }),
       ).toBeVisible();
-      await expect(action.locator(".gameDockLabel")).toBeVisible();
+      await expect(action).not.toContainText(label);
       await expect(page.locator(".gameToolPanel")).toHaveCount(0);
     }
     await session.send("Input.dispatchTouchEvent", {
