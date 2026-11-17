@@ -1,5 +1,7 @@
 import { useRef, useState } from "react";
 import { Box, Button, Typography } from "@mui/material";
+import AppleIcon from "@mui/icons-material/Apple";
+import GoogleIcon from "@mui/icons-material/Google";
 import { login, SignInOptions, SignInProvider } from "../../Globals";
 import MailingListCheckbox from "./MailingListCheckbox";
 
@@ -7,11 +9,9 @@ import MailingListCheckbox from "./MailingListCheckbox";
 export default function SignInButtons({
   disabled = false,
   onSignIn = login,
-  variant = "outlined",
 }: {
   disabled?: boolean;
   onSignIn?: (options: SignInOptions) => Promise<boolean>;
-  variant?: "outlined" | "contained";
 }): React.JSX.Element {
   const pending = useRef(false);
   const [mailingList, setMailingList] = useState(false);
@@ -54,33 +54,22 @@ export default function SignInButtons({
           return (
             <Button
               key={provider}
-              variant={variant}
-              color={provider === "apple" ? "inherit" : "primary"}
+              variant="outlined"
+              color="primary"
+              startIcon={provider === "google" ? <GoogleIcon /> : <AppleIcon />}
               disabled={disabled || !!busy}
               aria-label={label}
               onClick={() => void signIn(provider)}
-              sx={[
-                { minWidth: 0, minHeight: 44, lineHeight: 1.4 },
-                provider === "apple" &&
-                  ((theme) => {
-                    // Apple's custom sign-in controls use black and white in both palettes.
-                    const dark = theme.palette.mode === "dark";
-                    const whiteBackground =
-                      variant === "contained" ? dark : !dark;
-                    const backgroundColor = whiteBackground ? "#fff" : "#000";
-                    const borderColor = dark ? "#fff" : "#000";
-                    return {
-                      "&:not(.Mui-disabled)": {
-                        color: whiteBackground ? "#000" : "#fff",
-                        backgroundColor,
-                        borderColor,
-                        "&:hover": { backgroundColor, borderColor },
-                      },
-                    };
-                  }),
-              ]}
+              sx={{
+                minWidth: 0,
+                minHeight: 44,
+                lineHeight: 1.4,
+                "& .MuiButton-startIcon": { flexShrink: 0 },
+              }}
             >
-              {busy === provider ? "Signing in…" : label}
+              <span className="signInLabel">
+                {busy === provider ? "Signing in…" : label}
+              </span>
             </Button>
           );
         })}

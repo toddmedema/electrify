@@ -16,17 +16,33 @@ export async function expectSignInButtonsToFit(scope: Page | Locator) {
   await expect(apple).toHaveCount(1);
   await expect(google).toBeVisible();
   await expect(apple).toBeVisible();
-  // Apple requires a black or white title and background for custom sign-in controls.
-  // Sharing enables sign-in after preparing its snapshot; allow its color transition to settle.
+  // Sharing enables sign-in after preparing its snapshot; allow transitions to settle.
   await expect(apple).toBeEnabled();
-  const blackOrWhite = /^rgb\((0, 0, 0|255, 255, 255)\)$/;
-  await expect(apple).toHaveCSS("color", blackOrWhite);
-  await expect(apple).toHaveCSS("background-color", blackOrWhite);
-  const appleColors = await apple.evaluate((button) => {
-    const style = getComputedStyle(button);
-    return [style.color, style.backgroundColor];
-  });
-  expect(appleColors[0]).not.toBe(appleColors[1]);
+  for (const button of [google, apple]) {
+    await expect(button).toHaveClass(/MuiButton-outlined\b/);
+    await expect(button).toHaveClass(/MuiButton-colorPrimary\b/);
+    await expect(button.locator("svg")).toHaveAttribute("aria-hidden", "true");
+    await expect(button.locator("svg")).toBeVisible();
+  }
+  await expect
+    .poll(() =>
+      scope
+        .getByRole("group", { name: "Sign in", exact: true })
+        .evaluate((group) => {
+          const colors = Array.from(group.querySelectorAll("button")).map(
+            (button) => {
+              const style = getComputedStyle(button);
+              return [
+                style.color,
+                style.backgroundColor,
+                style.borderColor,
+              ].join(";");
+            },
+          );
+          return new Set(colors).size;
+        }),
+    )
+    .toBe(1);
   // A leaderboard response can move the entire row between protocol calls. Read both
   // controls in one browser task so their geometry describes the same layout state.
   const layout = await scope
@@ -34,6 +50,10 @@ export async function expectSignInButtonsToFit(scope: Page | Locator) {
     .evaluate((group) => ({
       buttons: Array.from(group.querySelectorAll("button")).map((button) => {
         const { x, y, width, height } = button.getBoundingClientRect();
+        const icon = button.querySelector("svg")!.getBoundingClientRect();
+        const label = button
+          .querySelector(".signInLabel")!
+          .getBoundingClientRect();
         return {
           name: button.getAttribute("aria-label"),
           x,
@@ -41,6 +61,8 @@ export async function expectSignInButtonsToFit(scope: Page | Locator) {
           width,
           height,
           overflow: button.scrollWidth - button.clientWidth,
+          iconRight: icon.right,
+          labelLeft: label.left,
         };
       }),
       viewportWidth: window.innerWidth,
@@ -58,8 +80,10 @@ export async function expectSignInButtonsToFit(scope: Page | Locator) {
   expect(a.height).toBeGreaterThanOrEqual(layout.minimumHeight);
   expect(a.x).toBeGreaterThanOrEqual(0);
   expect(b.x + b.width).toBeLessThanOrEqual(layout.viewportWidth + 1);
-  for (const button of layout.buttons)
+  for (const button of layout.buttons) {
     expect(button.overflow).toBeLessThanOrEqual(1);
+    expect(button.iconRight).toBeLessThanOrEqual(button.labelLeft);
+  }
 }
 
 /** Optional consent remains unchecked, aligned and usable beside either provider. */

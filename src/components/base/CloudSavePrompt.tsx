@@ -81,7 +81,6 @@ export default function CloudSavePrompt(): React.JSX.Element {
         sx={{ flexDirection: "column", alignItems: "stretch", pt: 1, gap: 1 }}
       >
         <SignInButtons
-          variant="contained"
           onSignIn={async (options) => {
             setBusy(true);
             try {

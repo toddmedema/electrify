@@ -12,7 +12,13 @@ for (const theme of ["light", "dark"]) {
       localStorage.setItem("audioEnabled", "false");
     }, theme);
     await page.goto("/?scenario=101");
-    await expectSignInButtonsToFit(page);
+    await expect(page.getByRole("table")).toBeVisible();
+    await expect(
+      page.getByRole("group", { name: "Sign in", exact: true }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole("checkbox", { name: "Join the Electrify mailing list" }),
+    ).toHaveCount(0);
     await page.goto("/");
     await page.getByRole("button", { name: "Settings", exact: true }).click();
     await expectSignInButtonsToFit(page);

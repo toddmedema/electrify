@@ -19,7 +19,6 @@ import { DifficultyType, ScoreType } from "../../Types";
 import { BOARD_ROWS, loadLeaderboard } from "../../Leaderboard";
 import { formatScore } from "../../helpers/Format";
 import { isDesktopApp } from "../../Desktop";
-import SignInButtons from "./SignInButtons";
 
 interface Props {
   scenarioId: number;
@@ -456,23 +455,6 @@ export default class ScenarioLeaderboard extends React.Component<Props, State> {
             </div>
           )}
         </div>
-        {/* Below the board rather than in place of it: the board is the reason to log in */}
-        {!uid && !desktopApp && (
-          <div
-            style={{
-              textAlign: "center",
-              margin: "12px 0 24px",
-              display: "grid",
-              justifyItems: "center",
-              gap: 8,
-            }}
-          >
-            <SignInButtons />
-            <Typography variant="body2" color="textSecondary">
-              To set a high score under your own name
-            </Typography>
-          </div>
-        )}
       </>
     );
   }
