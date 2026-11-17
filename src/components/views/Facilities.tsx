@@ -26,8 +26,6 @@ import {
   ListItemAvatar,
   Tooltip,
   Typography,
-  Tab,
-  Tabs,
 } from "@mui/material";
 import CheckIcon from "@mui/icons-material/Check";
 import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
@@ -59,6 +57,7 @@ import {
   GameType,
   RetrofitFacilityAction,
   EvidenceRequestType,
+  MapWorkspaceView,
 } from "../../Types";
 import { facilityPermanentlyShutdown } from "../../helpers/Financials";
 import { storyOutputMultiplier } from "../../helpers/Story";
@@ -787,10 +786,12 @@ export interface DispatchProps {
   onSellingRule: (rule: SellingRuleType) => void;
 }
 
-export interface Props extends StateProps, DispatchProps {}
+export interface Props extends StateProps, DispatchProps {
+  territoryView?: MapWorkspaceView;
+  onTerritoryView?: (view: MapWorkspaceView) => void;
+}
 
 interface SelectionState {
-  territoryView: "network" | "fleet" | "agreements";
   ids: number[];
   anchor: number | null;
   menu: FacilityMenuTarget | null;
@@ -801,7 +802,6 @@ interface SelectionState {
 
 export default class Facilities extends React.Component<Props, SelectionState> {
   public state: SelectionState = {
-    territoryView: "network",
     ids: [],
     anchor: null,
     menu: null,
@@ -1045,11 +1045,6 @@ export default class Facilities extends React.Component<Props, SelectionState> {
   };
   constructor(props: Props) {
     super(props);
-    if (
-      props.arrivingFacilityId !== undefined ||
-      props.selectedFacilityId !== null
-    )
-      this.state.territoryView = "fleet";
     this.onBeforeDragStart = this.onBeforeDragStart.bind(this);
     this.onDragEnd = this.onDragEnd.bind(this);
   }
@@ -1134,6 +1129,7 @@ export default class Facilities extends React.Component<Props, SelectionState> {
     if (
       nextProps.game.speed !== this.props.game.speed ||
       nextProps.evidenceRequest !== this.props.evidenceRequest ||
+      nextProps.territoryView !== this.props.territoryView ||
       nextProps.arrivingFacilityId !== this.props.arrivingFacilityId ||
       nextProps.facilityDragActive !== this.props.facilityDragActive ||
       (nextProps.game.speed !== "FAST" && nextProps.game.speed !== "ULTRA") ||
@@ -1148,15 +1144,12 @@ export default class Facilities extends React.Component<Props, SelectionState> {
 
   public componentDidUpdate(previous: Props) {
     if (
-      (this.props.arrivingFacilityId !== previous.arrivingFacilityId &&
-        this.props.arrivingFacilityId !== undefined &&
-        !hasTerritoryNetwork(this.props.game)) ||
-      (this.props.selectedFacilityId !== previous.selectedFacilityId &&
-        this.props.selectedFacilityId !== null)
-    ) {
-      if (this.state.territoryView !== "fleet")
-        this.setState({ territoryView: "fleet" });
-    }
+      hasTerritoryNetwork(this.props.game) &&
+      this.props.selectedFacilityId !== previous.selectedFacilityId &&
+      this.props.selectedFacilityId !== null &&
+      this.props.territoryView !== "FLEET"
+    )
+      this.props.onTerritoryView?.("FLEET");
     this.resolveEvidence();
     this.throttle.rendered(this.props.game.date.minute);
   }
@@ -1196,9 +1189,9 @@ export default class Facilities extends React.Component<Props, SelectionState> {
       return;
     if (
       hasTerritoryNetwork(this.props.game) &&
-      this.state.territoryView !== "fleet"
+      this.props.territoryView !== "FLEET"
     ) {
-      this.setState({ territoryView: "fleet" });
+      this.props.onTerritoryView?.("FLEET");
       return;
     }
     this.props.onEvidenceReady?.(request, this.evidenceAnchor.current);
@@ -1275,7 +1268,7 @@ export default class Facilities extends React.Component<Props, SelectionState> {
       selectionEnabled && (this.state.modifierHeld || selectionMode);
     const facilitiesCount = game.facilities.length;
     const territoryNetwork = hasTerritoryNetwork(game);
-    const showFleet = !territoryNetwork || this.state.territoryView === "fleet";
+    const showFleet = !territoryNetwork || this.props.territoryView === "FLEET";
     const intertiesAvailable = !!(
       game.transmission &&
       (game.multiplayer || corridorsForLocation(game.location).length)
@@ -1291,24 +1284,9 @@ export default class Facilities extends React.Component<Props, SelectionState> {
     return (
       <GameCard className="facilities" id="facilitiesPane">
         <>
-          {territoryNetwork && (
-            <Tabs
-              className="territoryViewTabs"
-              value={this.state.territoryView}
-              variant="fullWidth"
-              aria-label="Facility views"
-              onChange={(_event, territoryView) =>
-                this.setState({ territoryView })
-              }
-            >
-              <Tab value="network" label="Territories" />
-              <Tab value="fleet" label="Fleet" />
-              <Tab value="agreements" label="Agreements" />
-            </Tabs>
-          )}
           {territoryNetwork && !showFleet && (
             <div className="scrollable territoryWorkspace">
-              {this.state.territoryView === "network" ? (
+              {this.props.territoryView !== "AGREEMENTS" ? (
                 <TerritoryNetwork
                   game={game}
                   onBuild={onTransmissionBuild}

@@ -270,6 +270,8 @@ export type CardNameType =
   | "BUILD_STORAGE"
   | "BUILD_INTERTIES"
   | "FACILITIES"
+  | "FLEET"
+  | "AGREEMENTS"
   | "INSIGHTS"
   | "EVENTS"
   | "SCENARIO"
@@ -286,6 +288,8 @@ export type CardNameType =
   | "CUSTOM_GAME"
   | "DATA_CENTER_SETUP"
   | "CHALLENGE";
+
+export type MapWorkspaceView = "FACILITIES" | "FLEET" | "AGREEMENTS";
 
 export type ConceptNameType =
   | "money"

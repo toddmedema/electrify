@@ -1,4 +1,6 @@
 import * as React from "react";
+import { Tooltip } from "@mui/material";
+import AddLocationAltIcon from "@mui/icons-material/AddLocationAlt";
 import type { GameType, TerritoryTileId } from "../../Types";
 import { getTerritoryDefinition } from "../../data/Territories";
 import { TERRAIN_LABELS } from "../../data/TerrainLabels";
@@ -35,15 +37,17 @@ import "./TerritoryMapWorkspace.scss";
 type MapStyle = React.CSSProperties & { "--territory-owner-color"?: string };
 interface Props {
   game: GameType;
-  selected: TerritoryTileId;
+  selected?: TerritoryTileId;
   onSelect: (id: TerritoryTileId, inspect?: boolean) => void;
   onCloseInspection?: () => void;
+  onDeselect?: () => void;
 }
 export default function TerritoryHexMap({
   game,
   selected,
   onSelect,
   onCloseInspection,
+  onDeselect,
 }: Props) {
   const mapId = React.useId();
   const viewport = React.useRef<HTMLDivElement>(null);
@@ -64,11 +68,23 @@ export default function TerritoryHexMap({
     () => (buyMode ? tilePurchaseQuotes(game) : undefined),
     [buyMode, game],
   );
-  const activeSelected = byId.has(selected)
-    ? selected
-    : (views.find((view) => view.owned)?.tile.id ?? tiles[0]?.id);
+  const activeSelected = selected && byId.has(selected) ? selected : undefined;
+  const [rovingId, setRovingId] = React.useState(
+    () =>
+      activeSelected ??
+      views.find((view) => view.owned)?.tile.id ??
+      tiles[0]?.id,
+  );
+  const activeRoving =
+    activeSelected ??
+    (rovingId && byId.has(rovingId)
+      ? rovingId
+      : (views.find((view) => view.owned)?.tile.id ?? tiles[0]?.id));
   const [camera, setCamera] = React.useState(() =>
-    hexCenter(byId.get(selected)?.tile ?? tiles[0] ?? { q: 0, r: 0 }),
+    hexCenter(
+      (selected ? byId.get(selected)?.tile : undefined) ??
+        tiles[0] ?? { q: 0, r: 0 },
+    ),
   );
   const [size, setSize] = React.useState({ width: 0, height: 0 });
   const scale = size.width > 0 && size.width < 600 ? 0.75 : 0.875;
@@ -102,7 +118,9 @@ export default function TerritoryHexMap({
     )
       return;
     framedRun.current = { runId, seed: game.seed, scenarioId: game.scenarioId };
-    const focus = hexCenter(byId.get(activeSelected!)?.tile ?? { q: 0, r: 0 });
+    const focus = hexCenter(
+      byId.get(activeSelected ?? activeRoving!)?.tile ?? { q: 0, r: 0 },
+    );
     const bounds = views.reduce(
       (bounds, { tile, owned }) => {
         if (!owned) return bounds;
@@ -140,16 +158,10 @@ export default function TerritoryHexMap({
     worldWidth,
     worldHeight,
     activeSelected,
+    activeRoving,
     byId,
     views,
   ]);
-  React.useEffect(() => {
-    if (activeSelected && activeSelected !== selected) {
-      onSelect(activeSelected);
-      const tile = byId.get(activeSelected)?.tile;
-      if (tile) setCamera(hexCenter(tile));
-    }
-  }, [activeSelected, selected, onSelect, byId]);
   React.useLayoutEffect(() => {
     const element = viewport.current;
     if (!element) return;
@@ -199,7 +211,7 @@ export default function TerritoryHexMap({
   const renderedViews = views.filter(({ tile }) => {
     const point = hexCenter(tile);
     return (
-      tile.id === activeSelected ||
+      tile.id === activeRoving ||
       (Math.abs(point.x - camera.x) < worldWidth / 2 + HEX_WIDTH &&
         Math.abs(point.y - camera.y) < worldHeight / 2 + HEX_WIDTH)
     );
@@ -323,37 +335,49 @@ export default function TerritoryHexMap({
           !!event.target.closest("[data-map-target]");
         if (
           event.key === "Escape" &&
-          (onCloseInspection || buyMode || leavingGeography)
+          !event.defaultPrevented &&
+          !document.querySelector(
+            '.MuiModal-root:not(.MuiModal-hidden), [role="menu"], [role="listbox"]',
+          ) &&
+          (onCloseInspection || activeSelected || buyMode || leavingGeography)
         ) {
           event.preventDefault();
           event.stopPropagation();
           if (onCloseInspection) onCloseInspection();
-          else if (buyMode) setBuyMode(false);
-          else buyingControl.current?.focus({ preventScroll: true });
+          else {
+            if (buyMode) setBuyMode(false);
+            buyingControl.current?.focus({ preventScroll: true });
+          }
+          onDeselect?.();
         }
       }}
     >
-      <div className="territoryMapBuying">
-        <span className="territoryMapCash">
-          {money(availableCash)} available
-        </span>
+      <Tooltip
+        title={buyMode ? "Finish buying land" : "Buy land"}
+        placement="top"
+        arrow
+      >
         <button
           type="button"
           className="territoryMapBuyToggle"
           ref={buyingControl}
+          aria-label="Buy land"
           aria-pressed={buyMode}
+          aria-describedby={`${mapId}-buy-status`}
           onClick={() => setBuyMode((value) => !value)}
         >
-          {buyMode ? "Done buying" : "Buy land"}
+          <AddLocationAltIcon aria-hidden="true" />
         </button>
-        <span
-          className="territoryMapPurchaseStatus"
-          role="status"
-          aria-live="polite"
-        >
-          {message || (buyMode ? "Activate a priced tile to buy it." : "")}
-        </span>
-      </div>
+      </Tooltip>
+      <span
+        className="srOnly"
+        id={`${mapId}-buy-status`}
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+      >
+        {message || (buyMode ? "Activate a priced tile to buy it." : "")}
+      </span>
       <div
         className="territoryMapViewport"
         role="region"
@@ -602,7 +626,7 @@ export default function TerritoryHexMap({
                       : {}),
                   } as MapStyle
                 }
-                tabIndex={tile.id === activeSelected ? 0 : -1}
+                tabIndex={tile.id === activeRoving ? 0 : -1}
                 aria-label={
                   quote
                     ? `${unaffordable ? "Inspect" : "Buy"} ${territoryTileLabel(tile)} · ${priceLabel}${unaffordable ? "; not enough available cash" : ""}`
@@ -611,7 +635,8 @@ export default function TerritoryHexMap({
                 aria-pressed={tile.id === activeSelected}
                 aria-describedby={`${mapId}-${tile.id}-status`}
                 onFocus={() => {
-                  onSelect(tile.id);
+                  setRovingId(tile.id);
+                  if (tile.id !== selected) onSelect(tile.id);
                   if (!pointer.current && !touches.current.size)
                     revealTile(tile);
                 }}

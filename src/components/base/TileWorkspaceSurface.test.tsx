@@ -1,5 +1,5 @@
 import * as React from "react";
-import { act, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import TileWorkspaceSurface from "./TileWorkspaceSurface";
 
 it("focuses new content without restoring the map until the surface closes", () => {
@@ -9,6 +9,7 @@ it("focuses new content without restoring the map until the surface closes", () 
       <button className="territoryTileTarget" tabIndex={0}>
         Selected tile
       </button>
+      <button className="territoryMapBuyToggle">Buy land</button>
       {open && (
         <TileWorkspaceSurface
           title={title}
@@ -34,6 +35,31 @@ it("focuses new content without restoring the map until the surface closes", () 
   expect(heading).toHaveFocus();
   expect(mapFocused).not.toHaveBeenCalled();
   rerender(show(2, "Build", false));
-  expect(screen.getByRole("button", { name: "Selected tile" })).toHaveFocus();
-  expect(mapFocused).toHaveBeenCalledTimes(1);
+  expect(screen.getByRole("button", { name: "Buy land" })).toHaveFocus();
+  expect(mapFocused).not.toHaveBeenCalled();
+});
+
+it("leaves Escape to a nested modal before closing the tile surface", () => {
+  const close = jest.fn();
+  const { rerender } = render(
+    <>
+      <TileWorkspaceSurface title="Site" focusKey="site" onClose={close}>
+        Site controls
+      </TileWorkspaceSurface>
+      <div className="MuiModal-root">Confirmation</div>
+    </>,
+  );
+  fireEvent.keyDown(screen.getByRole("dialog", { name: "Site" }), {
+    key: "Escape",
+  });
+  expect(close).not.toHaveBeenCalled();
+  rerender(
+    <TileWorkspaceSurface title="Site" focusKey="site" onClose={close}>
+      Site controls
+    </TileWorkspaceSurface>,
+  );
+  fireEvent.keyDown(screen.getByRole("dialog", { name: "Site" }), {
+    key: "Escape",
+  });
+  expect(close).toHaveBeenCalledTimes(1);
 });

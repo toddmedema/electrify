@@ -79,7 +79,9 @@ function show(
     const [inspectionOpen, setInspectionOpen] = React.useState(
       inspectionInitiallyOpen,
     );
-    const [selected, select] = React.useState(initialSelected);
+    const [selected, select] = React.useState<TerritoryTileId | undefined>(
+      initialSelected,
+    );
     return (
       <TerritoryTilePurchasesProvider game={activeGame}>
         <OtherPurchaseControl />
@@ -94,6 +96,7 @@ function show(
                 }
               : undefined
           }
+          onDeselect={() => select(undefined)}
           onSelect={(id, activate) => {
             select(id);
             onSelect(id, activate);
@@ -194,7 +197,7 @@ it.each([1280, 360])(
           )?.visibilityDistance === 3,
       )!;
     const id = idOf(candidate);
-    fireEvent.click(screen.getByRole("button", { name: "Done buying" }));
+    fireEvent.click(screen.getByRole("button", { name: "Buy land" }));
     tap(candidate);
     expect(map.onSelect).toHaveBeenLastCalledWith(id, true);
     expect(ownsTerritoryTile(map.store.getState().game, id)).toBe(false);
@@ -214,7 +217,7 @@ it.each([1280, 360])(
     expect(
       territoryTileViews(map.store.getState().game).length,
     ).toBeGreaterThan(initialCount);
-    expect(screen.getByRole("button", { name: "Done buying" })).toHaveAttribute(
+    expect(screen.getByRole("button", { name: "Buy land" })).toHaveAttribute(
       "aria-pressed",
       "true",
     );
@@ -402,7 +405,7 @@ it("keeps buying mode and releases commitments when the host rejects, then reset
   );
   expect(tile).not.toHaveAttribute("aria-busy");
   expect(screen.getByTestId("other-buy")).toHaveTextContent("committed 0");
-  expect(screen.getByRole("button", { name: "Done buying" })).toHaveAttribute(
+  expect(screen.getByRole("button", { name: "Buy land" })).toHaveAttribute(
     "aria-pressed",
     "true",
   );
@@ -421,7 +424,7 @@ it("closes an open inspection before leaving buying mode when Escape is pressed 
   const tile = map.candidates()[0];
   fireEvent.keyDown(tile, { key: "Escape" });
   expect(map.closeInspection).toHaveBeenCalledTimes(1);
-  expect(screen.getByRole("button", { name: "Done buying" })).toHaveAttribute(
+  expect(screen.getByRole("button", { name: "Buy land" })).toHaveAttribute(
     "aria-pressed",
     "true",
   );
@@ -439,15 +442,14 @@ it("returns from map geography to its buying control after closing inspection an
   act(() => tile.focus());
   expect(fireEvent.keyDown(tile, { key: "Escape" })).toBe(false);
   expect(map.closeInspection).toHaveBeenCalledTimes(1);
-  expect(screen.getByRole("button", { name: "Done buying" })).toHaveAttribute(
+  expect(screen.getByRole("button", { name: "Buy land" })).toHaveAttribute(
     "aria-pressed",
     "true",
   );
   expect(tile).toHaveFocus();
+  expect(tile).toHaveAttribute("aria-pressed", "false");
   expect(fireEvent.keyDown(tile, { key: "Escape" })).toBe(false);
-  expect(tile).toHaveFocus();
   const buy = screen.getByRole("button", { name: "Buy land" });
-  expect(fireEvent.keyDown(tile, { key: "Escape" })).toBe(false);
   expect(buy).toHaveFocus();
   // The next Back belongs to the game's global navigation again.
   expect(fireEvent.keyDown(buy, { key: "Escape" })).toBe(true);
@@ -511,4 +513,34 @@ it("keeps phone targets large and unaffordable land inspectable with its currenc
   expect(
     map.store.getState().game.territoryNetwork!.tilePurchases,
   ).toHaveLength(0);
+});
+
+it("keeps an unselected map unselected across game updates with one reachable tile", () => {
+  const map = show();
+  const tile = map.target("champlain:city");
+  fireEvent.keyDown(tile, { key: "Escape" });
+  const targets = () =>
+    screen
+      .getAllByRole<HTMLButtonElement>("button")
+      .filter((button) => button.hasAttribute("data-map-target"));
+  expect(
+    targets().filter(
+      (button) => button.getAttribute("aria-pressed") === "true",
+    ),
+  ).toHaveLength(0);
+  expect(targets().filter((button) => button.tabIndex === 0)).toHaveLength(1);
+  const camera = { ...map.viewport.dataset };
+  act(() => {
+    map.store.dispatch(delta({ speed: "NORMAL" }));
+  });
+  expect(
+    targets().filter(
+      (button) => button.getAttribute("aria-pressed") === "true",
+    ),
+  ).toHaveLength(0);
+  expect({ ...map.viewport.dataset }).toEqual(camera);
+  expect(map.onSelect).not.toHaveBeenCalled();
+  const buy = screen.getByRole("button", { name: "Buy land" });
+  expect(buy).not.toHaveTextContent(/Buy|available/);
+  expect(buy).toHaveAttribute("aria-pressed", "false");
 });

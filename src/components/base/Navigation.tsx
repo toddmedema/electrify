@@ -2,9 +2,17 @@ import * as React from "react";
 import { Badge, Button, Tooltip } from "@mui/material";
 import HistoryIcon from "@mui/icons-material/History";
 import InsertChartIcon from "@mui/icons-material/InsertChart";
+import MapIcon from "@mui/icons-material/Map";
+import FactoryIcon from "@mui/icons-material/Factory";
+import HandshakeIcon from "@mui/icons-material/Handshake";
 import ErrorIcon from "@mui/icons-material/Error";
 import { useAppSelector, useAppDispatch } from "../../Store";
-import { CardNameType, CardType, GameToolType } from "../../Types";
+import {
+  CardNameType,
+  CardType,
+  GameToolType,
+  MapWorkspaceView,
+} from "../../Types";
 import { navigate, selectCardName } from "../../reducers/Card";
 import { getScenario } from "../../data/Scenarios";
 import ConceptIcon from "./ConceptIcon";
@@ -56,6 +64,22 @@ export const GAME_TOOLS: {
     icon: <ConceptIcon concept="goal" />,
   },
 ];
+export const MAP_VIEWS: {
+  id: MapWorkspaceView;
+  label: string;
+  triggerId: string;
+  icon: React.ReactElement;
+}[] = [
+  { id: "FACILITIES", label: "Map", triggerId: "mapNav", icon: <MapIcon /> },
+  { id: "FLEET", label: "Fleet", triggerId: "fleetNav", icon: <FactoryIcon /> },
+  {
+    id: "AGREEMENTS",
+    label: "Agreements",
+    triggerId: "agreementsNav",
+    icon: <HandshakeIcon />,
+  },
+];
+
 export function gameToolForCard(card: CardNameType): GameTool | undefined {
   return card.startsWith("BUILD_")
     ? "BUILD_GENERATORS"
@@ -68,7 +92,11 @@ export default function Navigation({
   openTools,
   onToggle,
   destination,
+  mapView = "FACILITIES",
+  onMapView,
 }: {
+  mapView?: MapWorkspaceView;
+  onMapView?: (view: MapWorkspaceView) => void;
   openTools?: GameTool[];
   onToggle?: (tool: GameTool) => void;
   destination?: (tool: GameTool) => CardNameType;
@@ -114,6 +142,42 @@ export default function Navigation({
       aria-label="Game actions"
       {...dockLabels}
     >
+      {mapWorkspace &&
+        MAP_VIEWS.map((view) => {
+          const open = mapView === view.id && !opened.some(Boolean);
+          return (
+            <Tooltip
+              key={view.id}
+              title={view.label}
+              placement="top"
+              open={labelId === view.triggerId}
+              disableHoverListener
+              disableFocusListener
+              disableTouchListener
+              disableInteractive
+            >
+              <Button
+                id={view.triggerId}
+                {...buttonLabels}
+                className={`gameDockAction${open ? " gameDockActionOpen" : ""}`}
+                aria-label={view.label}
+                aria-current={open ? "page" : undefined}
+                aria-controls={open ? `tool-${view.id}` : undefined}
+                data-game-destination={view.id}
+                onClick={() =>
+                  onMapView ? onMapView(view.id) : dispatch(navigate(view.id))
+                }
+              >
+                <Badge>{view.icon}</Badge>
+                {!window.electrifyCouch && (
+                  <span className="gameDockLabel" aria-hidden="true">
+                    {view.label}
+                  </span>
+                )}
+              </Button>
+            </Tooltip>
+          );
+        })}
       {tools.map((tool) => {
         const open = opened.includes(tool.id);
         return (

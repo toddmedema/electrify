@@ -11,6 +11,7 @@ import settingsReducer, {
   change,
 } from "../../reducers/Settings";
 import type { SettingsType } from "../../Types";
+import { createGame } from "../../testing/Simulator";
 import { workspaceLayout } from "../../WorkspaceLayout";
 import GameWorkspace, {
   MIN_FLEET_WIDTH,
@@ -22,12 +23,16 @@ import GameWorkspace, {
 } from "./GameWorkspace";
 
 jest.mock("./GameAppBar", () => () => <div>Game status</div>);
-jest.mock("../views/FacilitiesContainer", () => () => (
-  <label>
-    Facility notes
-    <input aria-label="Facility notes" defaultValue="" />
-  </label>
-));
+jest.mock(
+  "../views/FacilitiesContainer",
+  () =>
+    ({ territoryView }: { territoryView: string }) => (
+      <label data-testid="base-view" data-territory-view={territoryView}>
+        Facility notes
+        <input aria-label="Facility notes" defaultValue="" />
+      </label>
+    ),
+);
 jest.mock("../views/InsightsContainer", () => () => <div>Insight charts</div>);
 jest.mock("../views/EventLogContainer", () => () => <div>Event history</div>);
 jest.mock("../views/Programs", () => () => (
@@ -77,7 +82,7 @@ function resize(width: number) {
   fireEvent(window, new Event("resize"));
 }
 
-function setup(width = 390, settings: Partial<SettingsType> = {}) {
+function setup(width = 390, settings: Partial<SettingsType> = {}, map = false) {
   resize(width);
   const store = configureStore({
     reducer: {
@@ -86,7 +91,10 @@ function setup(width = 390, settings: Partial<SettingsType> = {}) {
       game: () => ({
         ...gameReducer(undefined, { type: "workspace-test/init" }),
         inGame: true,
-        scenarioId: 100,
+        scenarioId: map ? 116 : 100,
+        territoryNetwork: map
+          ? createGame({ scenarioId: 116, seed: 188 }).territoryNetwork
+          : undefined,
       }),
     },
     preloadedState: {
@@ -445,4 +453,26 @@ it("fits columns using the chosen scale, with Single tool overriding abundant sp
     layout: "single",
     capacity: 1,
   });
+});
+
+it("routes map, fleet and agreements from the dock and remembers the base view beneath tools", async () => {
+  const app = setup(390, {}, true);
+  const base = screen.getByTestId("base-view");
+  expect(base).toHaveAttribute("data-territory-view", "FACILITIES");
+  await app.user.click(app.action("Fleet"));
+  expect(app.store.getState().card.name).toBe("FLEET");
+  expect(base).toHaveAttribute("data-territory-view", "FLEET");
+  expect(app.action("Fleet")).toHaveAttribute("aria-current", "page");
+  await app.user.click(app.action("Programs"));
+  expect(base).toHaveAttribute("data-territory-view", "FLEET");
+  await app.user.click(screen.getByRole("button", { name: "Close Programs" }));
+  expect(app.store.getState().card.name).toBe("FLEET");
+  await app.user.click(app.action("Agreements"));
+  expect(base).toHaveAttribute("data-territory-view", "AGREEMENTS");
+  await app.user.click(app.action("Insights"));
+  await app.user.click(app.action("Map"));
+  expect(base).toHaveAttribute("data-territory-view", "FACILITIES");
+  expect(
+    screen.queryByRole("button", { name: "Close Insights" }),
+  ).not.toBeInTheDocument();
 });

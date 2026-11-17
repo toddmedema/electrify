@@ -288,67 +288,88 @@
     }
   }
 }
-.territoryMapBuying {
+.territoryMapBuyToggle {
   position: absolute;
   z-index: 4;
   right: 16px;
   bottom: 16px;
   display: grid;
-  grid-template-columns: auto auto;
-  align-items: center;
-  gap: 8px 12px;
-  max-width: calc(100% - 32px);
-  padding: 12px;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  background: var(--bg-primary);
-  box-shadow: 0 2px 8px #0002;
-  .territoryMapCash {
-    font-size: 13px;
-    font-variant-numeric: tabular-nums;
-  }
-}
-.territoryMapBuyToggle {
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  min-width: 44px;
   min-height: 44px;
-  min-width: 104px;
-  border: 1px solid var(--interactive-blue);
-  border-radius: var(--radius-sm);
-  padding: 8px 12px;
-  background: var(--bg-primary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 0;
+  background: var(--bg-raised);
   color: var(--interactive-blue);
-  font: inherit;
-  font-weight: 600;
+  box-shadow: 0 4px 20px var(--shadow-ring);
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  svg {
+    width: 24px;
+    height: 24px;
+  }
+  &:hover {
+    background: var(--bg-selected);
+  }
   &[aria-pressed="true"] {
     background: var(--interactive-blue);
     color: var(--bg-primary);
+    border-color: var(--interactive-blue);
   }
   &:focus-visible {
     outline: 3px solid var(--focus-ring);
     outline-offset: 2px;
   }
 }
-.territoryMapPurchaseStatus {
-  grid-column: 1 / -1;
-  max-width: 280px;
-  font-size: 12px;
-  line-height: 18px;
-  &:empty {
-    display: none;
-  }
-}
 @media (max-width: 599px) {
-  .territoryMapBuying {
+  .territoryMapBuyToggle {
     right: 8px;
     bottom: 8px;
-    padding: 8px;
-    gap: 4px 8px;
-    max-width: calc(100% - 16px);
   }
   .territoryUtilityLabel strong {
     font-size: 12px;
     line-height: 16px;
   }
+}
+.gameWorkspace[data-map-workspace="true"][data-compact-dock="true"] {
+  --game-dock-button-height: 48px;
+  --game-dock-clearance: calc(72px + var(--game-dock-bottom));
+  .territoryMapBuyToggle {
+    bottom: var(--game-dock-clearance);
+  }
+}
+// Keep the map dock floating and all seven targets available at the minimum width.
+.gameWorkspace[data-map-workspace="true"][data-compact-dock="true"]
+  #navfooter.gameActionDock {
+  position: absolute;
+  width: max-content;
+  max-width: calc(100% - 16px);
+  left: var(--game-dock-left, 50%);
+  bottom: var(--game-dock-bottom);
+  transform: translateX(-50%);
+  margin: 0;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 4px 20px var(--shadow-ring);
+  overflow-x: auto;
+  .gameDockAction.MuiButton-root {
+    flex: 0 0 44px;
+    width: 44px;
+    min-width: 44px;
+    min-height: 48px;
+    border-radius: var(--radius-md);
+  }
+  .gameDockLabel {
+    display: none;
+  }
+}
+.gameWorkspace[data-map-workspace="true"] .territoryAgreements {
+  padding-bottom: calc(var(--game-dock-clearance) + 16px);
 }
 .territoryNetwork > .acquiredUtilities {
   position: absolute;

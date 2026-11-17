@@ -9,9 +9,10 @@ import {
   useToolScroll,
 } from "./GameToolMemory";
 import { useAppDispatch, useAppSelector } from "../../Store";
+import { hasTerritoryNetwork } from "../../helpers/Territories";
 import { navigate } from "../../reducers/Card";
 import { selectTutorialActions } from "../../reducers/Tutorial";
-import { CardNameType } from "../../Types";
+import { CardNameType, MapWorkspaceView } from "../../Types";
 import { useWorkspaceLayout } from "../../WorkspaceLayout";
 import GameAppBar from "./GameAppBar";
 import Navigation, {
@@ -47,14 +48,30 @@ export {
 } from "../../WorkspaceLayout";
 
 /** The dock's button width at this window width; keep in step with GameWorkspace.scss. */
-function dockButtonWidth(width: number): number {
-  return width >= 2200 ? 104 : width >= 1600 ? 88 : 72;
+function dockButtonWidth(width: number, map = false): number {
+  return map && width < 700
+    ? 44
+    : width >= 2200
+      ? 104
+      : width >= 1600
+        ? 88
+        : 72;
 }
 
-/** Five actions, their gaps, the dock's padding and border, and a margin each side. */
-export function dockClearanceWidth(width: number, scale = 1): number {
+/** Actions, their gaps, the dock's padding and border, and a margin each side. */
+export function dockClearanceWidth(
+  width: number,
+  scale = 1,
+  map = false,
+): number {
+  const count = map ? 7 : 5;
   return (
-    (5 * dockButtonWidth(width / scale) + 4 * 4 + 2 * 4 + 2 + 2 * 8) * scale
+    (count * dockButtonWidth(width / scale, map) +
+      (count - 1) * 4 +
+      2 * 4 +
+      2 +
+      2 * 8) *
+    scale
   );
 }
 
@@ -68,10 +85,11 @@ export function dockCenter(
   rightTools: number,
   tool: number,
   scale = 1,
+  map = false,
 ): number | undefined {
   const start = leftTools * tool;
   const end = width - rightTools * tool;
-  const half = dockClearanceWidth(width, scale) / 2;
+  const half = dockClearanceWidth(width, scale, map) / 2;
   return width / 2 - half >= start && width / 2 + half <= end
     ? undefined
     : (start + end) / 2;
@@ -97,6 +115,18 @@ function Workspace({
   const dispatch = useAppDispatch();
   const card = useAppSelector((state) => state.card.name);
   const active = gameToolForCard(card);
+  const mapWorkspace = useAppSelector((state) =>
+    hasTerritoryNetwork(state.game),
+  );
+  const [rememberedView, setRememberedView] =
+    React.useState<MapWorkspaceView>("FACILITIES");
+  const baseView =
+    card === "FACILITIES" || card === "FLEET" || card === "AGREEMENTS"
+      ? card
+      : rememberedView;
+  React.useEffect(() => {
+    setRememberedView(baseView);
+  }, [baseView]);
   const settings = useAppSelector((state) => state.settings);
   const tutorialActions = useAppSelector(selectTutorialActions);
   // Open tools, least recently opened first. The newest ones win when they don't all fit.
@@ -145,6 +175,7 @@ function Workspace({
           right.length,
           presentation.toolWidth,
           scale,
+          mapWorkspace,
         )
       : undefined;
   React.useLayoutEffect(() => {
@@ -189,7 +220,11 @@ function Workspace({
     if (active === tool) {
       retainFocus.current = true;
       const next = remaining[remaining.length - 1];
-      dispatch(navigate(next ? destination(next) : "FACILITIES"));
+      dispatch(
+        navigate(
+          next ? destination(next) : mapWorkspace ? baseView : "FACILITIES",
+        ),
+      );
     }
     document
       .getElementById(GAME_TOOLS.find((item) => item.id === tool)!.triggerId)
@@ -232,6 +267,7 @@ function Workspace({
           <BuildForecastProvider>
             <div
               className="gameWorkspace"
+              data-map-workspace={mapWorkspace || undefined}
               data-workspace-layout={layout}
               data-compact-dock={effectiveWidth < 700}
               data-dock-size={
@@ -268,6 +304,7 @@ function Workspace({
               >
                 <div
                   className="gameFleet"
+                  id={mapWorkspace ? `tool-${baseView}` : undefined}
                   data-chart-viewport
                   hidden={!fleetVisible}
                   style={
@@ -276,7 +313,10 @@ function Workspace({
                       : undefined
                   }
                 >
-                  <Facilities />
+                  <Facilities
+                    territoryView={baseView}
+                    onTerritoryView={(view) => dispatch(navigate(view))}
+                  />
                 </div>
                 <div className="gameToolTray">
                   {ordered.map((tool) => {
@@ -373,6 +413,11 @@ function Workspace({
                 </div>
               </div>
               <Navigation
+                mapView={baseView}
+                onMapView={(view) => {
+                  setRemembered([]);
+                  dispatch(navigate(view));
+                }}
                 openTools={visible}
                 destination={destination}
                 onToggle={(tool) => {

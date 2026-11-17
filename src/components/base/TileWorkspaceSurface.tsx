@@ -26,10 +26,10 @@ export default function TileWorkspaceSurface({
     const origin = document.activeElement;
     const map = heading.current?.closest(".territoryNetwork");
     return () => {
-      const selected = map?.querySelector<HTMLElement>(
-        '.territoryTileTarget[tabindex="0"]',
+      const returnControl = map?.querySelector<HTMLElement>(
+        ".territoryMapBuyToggle",
       );
-      if (selected) selected.focus({ preventScroll: true });
+      if (returnControl) returnControl.focus({ preventScroll: true });
       else if (origin instanceof HTMLElement && origin.isConnected)
         origin.focus({ preventScroll: true });
     };
@@ -43,7 +43,13 @@ export default function TileWorkspaceSurface({
       aria-labelledby={titleId}
       className={`tileWorkspaceSurface${building ? " tileWorkspaceBuilding" : ""}`}
       onKeyDown={(event) => {
-        if (event.key === "Escape" && !event.defaultPrevented) {
+        if (
+          event.key === "Escape" &&
+          !event.defaultPrevented &&
+          !document.querySelector(
+            '.MuiModal-root:not(.MuiModal-hidden), [role="menu"], [role="listbox"]',
+          )
+        ) {
           event.preventDefault();
           event.stopPropagation();
           onClose();

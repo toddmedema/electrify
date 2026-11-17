@@ -21,7 +21,12 @@ import gameReducer, {
 } from "../../reducers/Game";
 import uiReducer from "../../reducers/UI";
 import { createGame } from "../../testing/Simulator";
-import { FacilityOperatingType, GameType, TerritoryTileId } from "../../Types";
+import {
+  FacilityOperatingType,
+  GameType,
+  TerritoryTileId,
+  MapWorkspaceView,
+} from "../../Types";
 import Facilities, { fleetChartHeight } from "./Facilities";
 import TransmissionPanel from "./TransmissionPanel";
 import AcquiredUtilities from "./AcquiredUtilities";
@@ -292,6 +297,7 @@ function renderFacilities(
   game: GameType,
   selectedFacilityId: number | null,
   ref?: React.RefObject<Facilities>,
+  initialView: MapWorkspaceView = "FLEET",
 ): Handlers & {
   rerenderGame: (game: GameType, arrivingFacilityId?: number) => void;
 } {
@@ -315,9 +321,12 @@ function renderFacilities(
     arrivingFacilityId?: number;
   }) {
     const [selected, setSelected] = React.useState(selectedFacilityId);
+    const [territoryView, setTerritoryView] = React.useState(initialView);
     return (
       <Facilities
         ref={ref}
+        territoryView={territoryView}
+        onTerritoryView={setTerritoryView}
         game={game}
         arrivingFacilityId={arrivingFacilityId}
         selectedFacilityId={selected}
@@ -344,8 +353,6 @@ function renderFacilities(
   const view = render(<ControlledFacilities game={game} />, {
     wrapper: ({ children }) => <Provider store={store}>{children}</Provider>,
   });
-  if (game.territoryNetwork)
-    fireEvent.click(screen.getByRole("tab", { name: "Fleet" }));
   return {
     ...handlers,
     rerenderGame: (next, arrivingFacilityId) =>
@@ -361,8 +368,12 @@ function renderFacilities(
 it("opens the shared plant controls on the map without switching to the fleet", async () => {
   const game = createGame({ scenarioId: 116, seed: 188 });
   const plant = game.facilities.find((facility) => facility.fuel === "Hydro")!;
-  const { onSelect, onPause } = renderFacilities(game, null);
-  await user.click(screen.getByRole("tab", { name: "Territories" }));
+  const { onSelect, onPause } = renderFacilities(
+    game,
+    null,
+    undefined,
+    "FACILITIES",
+  );
   await user.click(
     screen.getByRole("button", { name: `Inspect ${plant.tileId!}` }),
   );
@@ -372,25 +383,29 @@ it("opens the shared plant controls on the map without switching to the fleet", 
   );
   expect(onPause).toHaveBeenCalledWith(plant.id, plant.name);
   expect(onSelect).not.toHaveBeenCalled();
-  expect(screen.getByRole("tab", { name: "Territories" })).toHaveAttribute(
-    "aria-selected",
-    "true",
-  );
+  expect(
+    screen.queryByRole("tablist", { name: "Facility views" }),
+  ).not.toBeInTheDocument();
+  expect(screen.getByLabelText("Tile map")).toBeVisible();
 });
 
 it("keeps the map inspector open when a purchased facility arrives", async () => {
   const game = createGame({ scenarioId: 116, seed: 188 });
   const plant = game.facilities.find((facility) => facility.fuel === "Hydro")!;
-  const { rerenderGame } = renderFacilities(game, null);
-  await user.click(screen.getByRole("tab", { name: "Territories" }));
+  const { rerenderGame } = renderFacilities(
+    game,
+    null,
+    undefined,
+    "FACILITIES",
+  );
   await user.click(
     screen.getByRole("button", { name: `Inspect ${plant.tileId!}` }),
   );
   rerenderGame(game, plant.id);
-  expect(screen.getByRole("tab", { name: "Territories" })).toHaveAttribute(
-    "aria-selected",
-    "true",
-  );
+  expect(
+    screen.queryByRole("tablist", { name: "Facility views" }),
+  ).not.toBeInTheDocument();
+  expect(screen.getByLabelText("Tile map")).toBeVisible();
   expect(screen.getByRole("dialog", { name: plant.name })).toBeVisible();
 });
 
@@ -2403,8 +2418,12 @@ it("keeps restored co-op trading choices reachable through territory agreements"
   world.grids[0].transmission!.buyingRule = "NONE";
   world.grids[0].transmission!.sellingRule = "NONE";
   const game = restoreWorld(checkpointWorld(world), "restored").grids[0];
-  const { onBuyingRule, onSellingRule } = renderFacilities(game, null);
-  await user.click(screen.getByRole("tab", { name: "Agreements" }));
+  const { onBuyingRule, onSellingRule } = renderFacilities(
+    game,
+    null,
+    undefined,
+    "AGREEMENTS",
+  );
   expect(
     screen.getByRole("heading", { name: "Co-op power sharing" }),
   ).toBeVisible();
