@@ -39,11 +39,11 @@ export default function HillsTerrain({ className }: HillsTerrainProps) {
       >
         <path
           d="M20 268C27 247 35 227 45 211M463 239C475 261 485 286 492 308"
-          strokeWidth="10"
+          strokeWidth="6"
         />
         <path
           d="M82 406C105 402 127 403 150 409M350 439C373 434 395 425 417 414"
-          strokeWidth="10"
+          strokeWidth="6"
         />
       </g>
     </svg>

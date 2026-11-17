@@ -38,12 +38,12 @@ export default function MountainTerrain({ className }: MountainTerrainProps) {
         <path
           d="M68 171 87 114 114 167 98 157 88 175 79 162Z"
           fill="#FFF8E1"
-          strokeWidth="10"
+          strokeWidth="6"
         />
         <path
           d="M20 326 43 244 87 114 120 179 146 276 161 326 99 349Z"
           fill="none"
-          strokeWidth="20"
+          strokeWidth="12"
         />
         <path
           d="M361 325 384 254 417 190 452 249 480 325 423 350Z"
@@ -58,7 +58,7 @@ export default function MountainTerrain({ className }: MountainTerrainProps) {
         <path
           d="M361 325 384 254 417 190 452 249 480 325 423 350Z"
           fill="none"
-          strokeWidth="20"
+          strokeWidth="12"
         />
         <path
           d="M130 421 177 394 230 419 278 401 332 432 393 418 339 446 283 463 218 461 162 446Z"
@@ -73,12 +73,12 @@ export default function MountainTerrain({ className }: MountainTerrainProps) {
         <path
           d="M130 421 177 394 230 419 278 401 332 432 393 418 339 446 283 463 218 461 162 446Z"
           fill="none"
-          strokeWidth="20"
+          strokeWidth="12"
         />
         <path
           d="M50 284 74 261 101 277M376 304 398 284 421 296M177 394V440L218 461M278 401 283 463M332 432 339 446"
           fill="none"
-          strokeWidth="10"
+          strokeWidth="6"
         />
       </g>
     </svg>

@@ -26,7 +26,7 @@ export default function PlainsTerrain({ className }: PlainsTerrainProps) {
       <g
         fill="none"
         stroke="#000"
-        strokeWidth="10"
+        strokeWidth="6"
         strokeLinecap="round"
         strokeLinejoin="round"
       >

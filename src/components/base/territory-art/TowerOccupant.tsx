@@ -20,7 +20,7 @@ export default function TowerOccupant({ className, platform = false }: Props) {
       fillOpacity={0.4}
       stroke="#000"
       strokeOpacity={0.4}
-      strokeWidth={20}
+      strokeWidth={12}
       strokeLinecap="round"
       strokeLinejoin="round"
     >
