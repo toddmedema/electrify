@@ -9,7 +9,7 @@ const CACHE = {
 
 function cacheControl(file) {
   if (
-    /^static\/(?:js|css)\/[^/]+\.[a-f0-9]{8,}\.(?:js|css)(?:\.map|\.LICENSE\.txt)?$/.test(
+    /^static\/(?:js|css)\/[^/]+\.[a-f0-9]{8,}(?:\.chunk)?\.(?:js|css)(?:\.map|\.LICENSE\.txt)?$/.test(
       file,
     ) ||
     file === "fonts/inter/InterVariable.woff2"

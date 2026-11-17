@@ -8968,3 +8968,13 @@ html:is(:not([data-touch-input="true"]), [data-controller-input="true"])
   outline: 2px solid var(--home-link);
   outline-offset: 2px;
 }
+
+.homeLoadStatus {
+  position: fixed;
+  top: 8px;
+  left: 24px;
+  right: 24px;
+  text-align: center;
+  color: var(--font-color-secondary);
+  z-index: 2100;
+}

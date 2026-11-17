@@ -5,6 +5,20 @@ days of data (November 11–14): 4 clicks and 111 impressions. Query and click-t
 observations are preliminary. Code changes in this PR need a production deployment
 before their live acceptance checks can pass.
 
+## Home delivery
+
+New web visitors receive the shared title menu before downloading the simulation,
+authentication, charts or manual. Choosing an action loads the existing game and
+routes through its normal menu callbacks. Existing save databases, accounts,
+interface preferences, installed apps and direct game links retain the full
+bootstrap. Stored Firebase accounts resume automatically; new visitors initialize
+Auth only when signing in. Popup transport initializes only for that sign-in.
+The wordmark reuses inline SVG artwork as a data image in both palettes, avoiding
+a separate image request while retaining a contentful first paint. Startup CSS
+and the font face are inline; the full stylesheet loads asynchronously before the
+interactive menu is revealed. Analytics waits for that reveal and browser idle.
+The publisher graph currently uses Person Todd Medema, pending owner correction.
+
 ## Hosting changes
 
 `scripts/deploy.sh ci-prod` builds the game, checks its assets, then calls

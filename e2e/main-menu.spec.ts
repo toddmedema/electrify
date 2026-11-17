@@ -337,6 +337,8 @@ test("footer icons have equal optical gaps beside Share", async ({ page }) => {
 });
 
 test("a failed load can be retried", async ({ page }) => {
+  // Returning players with stored preferences use the full bootstrap immediately.
+  await page.addInitScript(() => localStorage.setItem("interfaceScale", "1"));
   await page.route("**/*achievements*.js", (route) => route.abort());
   await page.goto("/");
   await expect(page.getByRole("alert")).toContainText(

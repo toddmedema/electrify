@@ -67,6 +67,8 @@ function distribution() {
 test("cache lifetimes follow content identity and mutable documents revalidate", () => {
   for (const file of [
     "static/js/main.abc123de.js",
+    "static/js/861.abc123de.chunk.js",
+    "static/css/861.abc123de.chunk.css",
     "static/css/main.abc123de.css",
     "static/js/main.abc123de.js.LICENSE.txt",
     "fonts/inter/InterVariable.woff2",

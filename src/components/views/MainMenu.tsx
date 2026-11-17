@@ -1,5 +1,7 @@
+import { useTheme } from "@mui/material/styles";
 import { DISCORD_URL, FEEDBACK_URL } from "../../CommunityLinks";
 import * as React from "react";
+import { homeLogoSource } from "../../HomeLogo";
 import { Box, Button, Stack, SvgIcon, Typography } from "@mui/material";
 import EmailIcon from "@mui/icons-material/Email";
 import InfoIcon from "@mui/icons-material/Info";
@@ -10,11 +12,11 @@ import {
   buildGameShareContent,
   canShare,
   shareText,
-} from "../../helpers/Share";
-import InstallAppButton from "../base/InstallAppButton";
+} from "../../helpers/ShareTransport";
 import MenuIconButton from "../base/MenuIconButton";
 import { getDesktop, isDesktopApp } from "../../Desktop";
 import { useMenuKeys } from "../base/useMenuKeys";
+const InstallAppButton = React.lazy(() => import("../base/InstallAppButton"));
 // Keep Steam's co-op UI and authoritative worker out of the browser edition entirely.
 const MultiplayerButton =
   process.env.REACT_APP_DESKTOP === "true"
@@ -23,6 +25,7 @@ const MultiplayerButton =
 
 export interface StateProps {
   audioEnabled?: boolean;
+  deferServices?: boolean;
   hasSavedGame: boolean;
   hasSavedGames: boolean;
 }
@@ -64,6 +67,7 @@ function focusHomeButton(event: React.PointerEvent) {
 
 const MainMenu = (props: Props): React.JSX.Element => {
   const menuKeys = useMenuKeys();
+  const mode = useTheme().palette.mode;
   // Native :active can wait until touch release. Track contact without delaying the click
   // or taking over the browser's scrolling and pointer-cancellation behavior.
   const pressedButton = React.useRef<HTMLElement | null>(null);
@@ -140,16 +144,13 @@ const MainMenu = (props: Props): React.JSX.Element => {
     >
       <div id="logo">
         <div className="homeLogo">
-          <svg
+          <img
             className="homeWordmark"
-            role="img"
-            aria-label="Electrify"
-            viewBox="0 0 300 70"
+            src={homeLogoSource(mode)}
+            alt="Electrify"
             width="300"
             height="70"
-          >
-            <use href="#electrify-wordmark" />
-          </svg>
+          />
           <svg
             className="homeEnergyTrace"
             viewBox="0 0 300 70"
@@ -294,7 +295,11 @@ const MainMenu = (props: Props): React.JSX.Element => {
         >
           <MenuBookIcon />
         </MenuIconButton>
-        {!desktopApp && <InstallAppButton iconOnly />}
+        {!desktopApp && !props.deferServices && (
+          <React.Suspense fallback={null}>
+            <InstallAppButton iconOnly />
+          </React.Suspense>
+        )}
         {!desktopApp && (
           <MenuIconButton
             data-achievements-trigger

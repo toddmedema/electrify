@@ -118,6 +118,11 @@
       window.requestIdleCallback(start, { timeout: 2000 });
     else window.setTimeout(start, 0);
   }
-  if (document.readyState === "complete") schedule();
-  else window.addEventListener("load", schedule, { once: true });
+  const afterLoad = function () {
+    if (document.getElementById("appStartup"))
+      document.addEventListener("electrify-ready", schedule, { once: true });
+    else schedule();
+  };
+  if (document.readyState === "complete") afterLoad();
+  else window.addEventListener("load", afterLoad, { once: true });
 })();

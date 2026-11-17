@@ -5,7 +5,8 @@ test("reduced motion keeps the home decoration still and actions usable", async 
 }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/");
-  const trace = page.locator(".homeEnergyTrace");
+  await expect(page.locator("#appStartup")).toHaveCount(0);
+  const trace = page.locator("#menuCard .homeEnergyTrace");
   await expect(trace).toBeVisible();
   await expect(trace).toHaveAttribute("aria-hidden", "true");
   expect(

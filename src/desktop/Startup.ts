@@ -91,6 +91,7 @@ function revealMenu(entrance: HTMLElement): void {
     }
   }
   entrance.remove();
+  document.dispatchEvent(new Event("electrify-ready"));
   if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
     const controls = Array.from(
       menu?.querySelectorAll<HTMLElement>("button, a[href]") ?? [],

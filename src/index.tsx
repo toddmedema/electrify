@@ -1,168 +1,28 @@
-import React from "react";
-import { createRoot } from "react-dom/client";
-import { Provider } from "react-redux";
-import { store } from "./Store";
-import App from "./App";
-import { registerServiceWorker } from "./ServiceWorkerRegistration";
+import { captureInstallPrompt } from "./InstallPromptEvent";
 import "./app.scss";
-import { installFocusVisibility } from "./FocusVisibility";
-import { getDesktop, isDesktopApp } from "./Desktop";
-import {
-  prepareDesktopStartup,
-  failDesktopStartup,
-  finishStartup,
-} from "./desktop/Startup";
+import "./InterfaceLayout.scss";
+import { canStartLightweightHome } from "./HomeEligibility";
 
-const container = document.getElementById("root")!;
-const root = createRoot(container);
-installFocusVisibility();
+captureInstallPrompt();
 
-function StartupHandoff(): null {
-  React.useLayoutEffect(() => {
-    finishStartup();
-  }, []);
-  return null;
-}
-
-const app = (
-  <React.StrictMode>
-    <Provider store={store}>
-      <App />
-      <StartupHandoff />
-    </Provider>
-  </React.StrictMode>
-);
-
-function renderApp(): void {
-  const pendingStyles = Array.from(
-    document.querySelectorAll<HTMLLinkElement>("link[data-app-style]"),
-  ).filter((link) => !link.sheet);
-  if (pendingStyles.length) {
-    void Promise.all(
-      pendingStyles.map(
-        (link) =>
-          new Promise<void>((resolve) => {
-            const done = () => {
-              link.removeAttribute("data-app-style");
-              resolve();
-            };
-            link.addEventListener("load", done, { once: true });
-            link.addEventListener("error", done, { once: true });
-          }),
-      ),
-    ).then(renderApp);
-    return;
-  }
-  if (process.env.NODE_ENV !== "production") {
-    // Dev-only perf instruments (docs/perf-plan.md B3/B4 and B6). The constant condition lets
-    // webpack drop this branch, and the chunks it imports, from production builds.
-    Promise.all([
-      import("./testing/PerfCensus"),
-      import("./testing/PerfOverlay"),
-    ]).then(
-      ([{ installPerfCensus }, { installPerfOverlay }]) => {
-        root.render(installPerfCensus(store, app));
-        installPerfOverlay();
-      },
-      (error) => {
-        console.warn("Perf instruments unavailable:", error);
-        root.render(app);
-      },
-    );
-  } else {
-    root.render(app);
-  }
-}
-
-let stopBootstrapQuit: (() => void) | undefined;
-const prepareAchievements = () =>
-  import(/* webpackChunkName: "achievements" */ "./achievements/Runtime").then(
-    ({ initializeAchievements }) => initializeAchievements(),
-  );
-const startDesktop: () => Promise<void> =
-  process.env.REACT_APP_DESKTOP === "true"
-    ? async () => {
-        stopBootstrapQuit?.();
-        stopBootstrapQuit = getDesktop()?.onBeforeQuit(() =>
-          getDesktop()?.readyToQuit(true),
-        );
-        prepareDesktopStartup();
-        try {
-          await prepareAchievements();
-          const { initializeDesktop } = await import(
-            /* webpackChunkName: "electron" */ "./desktop/Runtime"
-          );
-          await initializeDesktop();
-          stopBootstrapQuit?.();
-          stopBootstrapQuit = undefined;
-          renderApp();
-        } catch {
-          failDesktopStartup(
-            () => void startDesktop(),
-            () => void getDesktop()?.quit(),
-          );
-        }
-      }
-    : async () => {};
-const desktopApp = process.env.REACT_APP_DESKTOP === "true" && isDesktopApp();
+// Desktop and direct game links keep their normal bootstrap. New web visitors pay for
+// the engine, authored simulation data and online services only after choosing an action.
 if (
-  process.env.REACT_APP_DESKTOP === "true" &&
-  window.electrifyCouch?.role === "seat"
+  process.env.NODE_ENV === "production" &&
+  process.env.REACT_APP_DESKTOP !== "true"
 ) {
-  void Promise.all([
-    window.electrifyCouch.ready(),
-    import(/* webpackChunkName: "couch-seat" */ "./couch/Seat"),
-  ])
-    .then(([, { default: Seat }]) => {
-      root.render(
-        <Provider store={store}>
-          <Seat />
-          <StartupHandoff />
-        </Provider>,
-      );
+  void canStartLightweightHome()
+    .then(async (lightweight) => {
+      if (lightweight) {
+        const { showHome } = await import(
+          /* webpackChunkName: "home" */ "./HomeEntry"
+        );
+        showHome();
+      } else await import(/* webpackChunkName: "game" */ "./GameEntry");
     })
     .catch(() => {
-      document.getElementById("appStartup")?.remove();
-      root.render(
-        <div role="alert" style={{ padding: 24 }}>
-          <p>This company could not finish loading.</p>
-          <button
-            style={{ minHeight: 44, padding: "8px 16px", font: "inherit" }}
-            onClick={() => window.location.reload()}
-          >
-            Reload this company
-          </button>
-        </div>,
-      );
+      void import(/* webpackChunkName: "game" */ "./GameEntry");
     });
-} else if (desktopApp) void startDesktop();
-else {
-  const startWeb = () => {
-    void prepareAchievements()
-      .then(renderApp)
-      .catch(() => {
-        document.getElementById("appStartup")?.remove();
-        root.render(
-          <div role="alert" style={{ padding: 24 }}>
-            <h1>Electrify couldn't finish loading</h1>
-            <p>Check your connection and try again.</p>
-            <button
-              style={{ minHeight: 44, padding: "8px 16px", font: "inherit" }}
-              onClick={startWeb}
-            >
-              Retry
-            </button>
-          </div>,
-        );
-      });
-  };
-  startWeb();
-}
-
-if (
-  !desktopApp &&
-  process.env.NODE_ENV === "production" &&
-  "serviceWorker" in navigator
-) {
-  window.addEventListener("load", () => registerServiceWorker());
+} else {
+  void import(/* webpackChunkName: "game" */ "./GameEntry");
 }

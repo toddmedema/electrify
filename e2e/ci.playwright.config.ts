@@ -15,6 +15,8 @@ const smoke = [
   "cloud-saves.spec.ts",
   "menu-keyboard.spec.ts",
   "main-menu.spec.ts",
+  "home-entry.spec.ts",
+  "home-motion.spec.ts",
   "music.spec.ts",
   "music-startup.spec.ts",
   "pwa-sound.spec.ts",
@@ -60,7 +62,13 @@ export default defineConfig({
       ...project,
       testMatch:
         project.name === "mobile-360px"
-          ? [...layout, "tutorial-actions.spec.ts", "main-menu.spec.ts"]
+          ? [
+              ...layout,
+              "tutorial-actions.spec.ts",
+              "main-menu.spec.ts",
+              "home-entry.spec.ts",
+              "home-motion.spec.ts",
+            ]
           : [...smoke, ...layout],
     })),
 });

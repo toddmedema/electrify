@@ -18,7 +18,7 @@ const version = buildVersion();
 const output = process.env.BUILD_PATH || "build";
 const result = spawnSync(
   process.execPath,
-  [path.join(__dirname, "production-build.js")],
+  [path.join(__dirname, "production-build.js"), ...process.argv.slice(2)],
   {
     stdio: "inherit",
     env: { ...process.env, REACT_APP_VERSION: version },

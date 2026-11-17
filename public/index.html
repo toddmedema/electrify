@@ -388,16 +388,7 @@
       <div id="appStartup">
         <div class="appStartupLogo">
           <div class="homeLogo">
-            <svg
-              class="homeWordmark"
-              role="img"
-              aria-label="Electrify"
-              viewBox="0 0 300 70"
-              width="300"
-              height="70"
-            >
-              <use href="#electrify-wordmark" />
-            </svg>
+            <img class="homeWordmark" alt="Electrify" width="300" height="70" />
             <svg
               class="homeEnergyTrace"
               viewBox="0 0 300 70"
@@ -431,6 +422,21 @@
       (function () {
         const template = document.getElementById("appStartupTemplate");
         const entrance = template.content.cloneNode(true);
+        // A data image paints the inline artwork immediately, with no logo fetch.
+        const color =
+          document.documentElement.dataset.theme === "dark"
+            ? "#629be1"
+            : "#0084f8";
+        const artwork = document.getElementById("electrify-wordmark").innerHTML;
+        entrance.querySelector("img").src =
+          "data:image/svg+xml," +
+          encodeURIComponent(
+            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 70" color="' +
+              color +
+              '">' +
+              artwork +
+              "</svg>",
+          );
         document.body.append(entrance);
         document.getElementById("appStartup").dataset.startedAt = String(
           performance.now(),

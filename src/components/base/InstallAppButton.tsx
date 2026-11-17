@@ -1,3 +1,7 @@
+import {
+  BeforeInstallPromptEvent,
+  getPendingInstallPrompt,
+} from "../../InstallPromptEvent";
 import * as React from "react";
 import { Button, Typography } from "@mui/material";
 import InstallMobileIcon from "@mui/icons-material/InstallMobile";
@@ -10,11 +14,6 @@ import {
   removeStorageKey,
   setStorageKeyValue,
 } from "../../LocalStorage";
-
-interface BeforeInstallPromptEvent extends Event {
-  prompt: () => Promise<void>;
-  userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
-}
 
 interface InstallContextType {
   installPrompt?: BeforeInstallPromptEvent;
@@ -79,8 +78,9 @@ function iosDevice(): boolean {
 export function InstallPromptProvider(props: {
   children: React.ReactNode;
 }): React.JSX.Element {
-  const [installPrompt, setInstallPrompt] =
-    React.useState<BeforeInstallPromptEvent>();
+  const [installPrompt, setInstallPrompt] = React.useState<
+    BeforeInstallPromptEvent | undefined
+  >(getPendingInstallPrompt);
   const [installed, setInstalled] = React.useState(isInstalledWebApp);
   const [snoozed, setSnoozed] = React.useState(() => {
     try {
