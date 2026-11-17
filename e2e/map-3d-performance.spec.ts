@@ -90,6 +90,7 @@ for (const theme of ["light", "dark"] as const) {
     await panTo(page, map, getTerritoryTile(wind.tileId, game)!);
     const target = map.locator(`[data-map-target="${wind.tileId}"]`);
     await target.focus();
+    await target.press("Enter");
     const surface = page.locator(".tileWorkspaceSurface");
     await expect(surface).toBeVisible();
     const windScene = (await sample(canvas, true)).scene!.find(
