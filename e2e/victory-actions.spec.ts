@@ -188,6 +188,17 @@ for (const { theme, native, currentRank } of [
     await expect(
       dialog.getByRole("region", { name: "Mission results" }),
     ).toContainText("final net worth");
+    await expect(dialog.locator(".victoryMetric")).toHaveCount(3);
+    await expect(dialog.locator(".victoryMetric span")).toHaveText([
+      "customers",
+      "emissions",
+      "final net worth",
+    ]);
+    await expect(
+      dialog.locator(
+        '.victoryMetric:has-text("final net worth") [data-concept="money"]',
+      ),
+    ).toBeVisible();
     const popup = page
       .getByRole("button", { name: /^Dismiss .+ achievement notification$/ })
       .first();
@@ -422,7 +433,7 @@ for (const theme of ["light", "dark"] as const) {
     const dialog = page.getByRole("dialog", { name: "After the thaw" });
     await expect(dialog).toBeVisible();
     const metrics = dialog.locator(".victoryMetric");
-    await expect(metrics).toHaveCount(6);
+    await expect(metrics).toHaveCount(4);
     await expect(
       metrics.filter({
         hasText: /tenure|Cash stayed above|Largest shortage|Billed rate/,
@@ -591,7 +602,7 @@ test("shared reliability rule ends the run at the third completed month", async 
   await expect(
     failure.locator(".victoryMetric").filter({ hasText: "tenure" }),
   ).toContainText("3 months");
-  await expect(failure.locator(".victoryMetric")).toHaveCount(6);
+  await expect(failure.locator(".victoryMetric")).toHaveCount(4);
   const rate = failure
     .locator(".victoryMetric")
     .filter({ hasText: "lifetime rate" });
@@ -605,7 +616,7 @@ test("shared reliability rule ends the run at the third completed month", async 
   ).toHaveCount(0);
   await expect(
     failure.getByRole("region", { name: "Mission results" }),
-  ).toContainText("served");
+  ).toContainText("customers");
   await expectDialogToFit(failure);
   if (process.env.REVIEW_SCREENSHOT_DIR) {
     await expect(failure.locator("..")).toHaveCSS("opacity", "1");

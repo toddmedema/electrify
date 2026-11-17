@@ -540,7 +540,7 @@ for (const [theme, winning] of [
       page.locator("iframe#webpack-dev-server-client-overlay"),
     ).toHaveCount(0);
     expect(await noHorizontalScroll(page)).toBe(true);
-    const goal = evidence.getByText("served", { exact: true }).first();
+    const goal = evidence.getByText("customers", { exact: true }).first();
     await scrollEvidenceIntoView(goal);
     await expect(goal).toBeInViewport({ ratio: 1 });
     // The evidence scrolls inside the dialog while its action footer stays usable.
@@ -1208,7 +1208,7 @@ for (const [theme, requiredBills] of [
       ? evidence.getByText("Keep bills affordable", { exact: false }).first()
       : result
           .getByRole("region", { name: "Mission results" })
-          .getByText("served", { exact: true });
+          .getByText("customers", { exact: true });
     await scrollEvidenceIntoView(goal);
     await expect(goal).toBeInViewport({ ratio: 1 });
     if (requiredBills) {

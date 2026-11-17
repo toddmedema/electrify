@@ -508,6 +508,26 @@ for (const theme of ["light", "dark"] as const) {
     });
     await expect(result).toBeVisible();
     await expect(result.locator("..")).toHaveCSS("opacity", "1");
+    const metrics = result.locator(".victoryMetric");
+    await expect(metrics.locator("span")).toHaveText([
+      "customers",
+      "emissions",
+      "final net worth",
+      "Demand not met",
+    ]);
+    await expect(metrics).toHaveCount(4);
+    expect(
+      new Set(
+        await metrics.evaluateAll((cells) =>
+          cells.map((cell) => Math.round(cell.getBoundingClientRect().top)),
+        ),
+      ).size,
+    ).toBe(2);
+    await expect(
+      metrics
+        .filter({ hasText: "final net worth" })
+        .locator('[data-concept="money"]'),
+    ).toBeVisible();
     await expectDialogToFit(result);
     const board = result.getByRole("region", { name: /Leaderboard ·/ });
     await board.scrollIntoViewIfNeeded();
@@ -527,6 +547,9 @@ for (const theme of ["light", "dark"] as const) {
         board.getByRole("cell", { name: "Rank 1", exact: true }),
       ).toBeVisible();
     if (process.env.REVIEW_SCREENSHOT_DIR && native) {
+      await metrics.last().scrollIntoViewIfNeeded();
+      await expect(metrics.first()).toBeInViewport({ ratio: 1 });
+      await expect(metrics.last()).toBeInViewport({ ratio: 1 });
       await page.evaluate(() => document.fonts.ready);
       await result.screenshot({
         animations: "disabled",
@@ -535,6 +558,14 @@ for (const theme of ["light", "dark"] as const) {
           `campaign-result-${theme}-${info.project.name}.png`,
         ),
       });
+      await result
+        .getByRole("region", { name: "Mission results", exact: true })
+        .screenshot({
+          path: path.join(
+            process.env.REVIEW_SCREENSHOT_DIR,
+            `campaign-summary-${theme}-${info.project.name}.png`,
+          ),
+        });
     }
     await result
       .getByRole("button", { name: "Keep playing", exact: true })

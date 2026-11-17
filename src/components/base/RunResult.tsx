@@ -77,12 +77,15 @@ export function RunDebrief({
   scenarioId,
   outcome,
   leadMessage,
+  compact = false,
 }: {
   debrief: VictoryDebriefType;
   scenarioId?: number;
   outcome: VictoryType["outcome"];
   /** The ending already stated above the debrief, so a lone objective doesn't repeat it */
   leadMessage?: string;
+  /** The live end-game modal omits repeated headline metrics. */
+  compact?: boolean;
 }): React.JSX.Element {
   const units = useUnits();
   const objectiveResults =
@@ -108,12 +111,16 @@ export function RunDebrief({
       ? "<100%"
       : roundedReliability;
   const metrics = [
-    { concept: "supply" as const, label: "served", value: reliability },
-    {
-      concept: "money" as const,
-      label: "cash",
-      value: formatMoneyConcise(debrief.finalCash),
-    },
+    ...(compact
+      ? []
+      : [
+          { concept: "supply" as const, label: "served", value: reliability },
+          {
+            concept: "money" as const,
+            label: "cash",
+            value: formatMoneyConcise(debrief.finalCash),
+          },
+        ]),
     {
       concept: "customers" as const,
       label: "customers",
@@ -124,17 +131,17 @@ export function RunDebrief({
       label: "emissions",
       value: formatLargeMassSignificant(debrief.kgco2e, units),
     },
-    ...(debrief.scenarioMetrics || []).map((metric) => ({
-      concept: metric.concept,
-      label: metric.label,
-      value: metric.value,
-    })),
+    ...(debrief.scenarioMetrics || []).filter(
+      (metric) =>
+        !compact ||
+        !["net income", "demand served"].includes(metric.label.toLowerCase()),
+    ),
   ];
   return (
     <section className="victoryDebrief" aria-label="Mission results">
       {metrics.map((metric) => (
         <div key={metric.label} className="victoryMetric">
-          {metric.concept !== "money" && (
+          {(compact || metric.concept !== "money") && (
             <ConceptIcon concept={metric.concept} fontSize="small" />
           )}
           <strong>{metric.value}</strong>
