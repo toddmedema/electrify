@@ -1395,7 +1395,7 @@ describe("weather hardening in the purchase dialog", () => {
     });
     expect(option).toBeChecked();
     expect(option).toHaveAccessibleDescription(
-      "Rated to \u221230°C instead of \u22128°C; halves remaining cold losses and deep-freeze losses. Recommended here: winters often drop below \u22128°C.",
+      "Rated to \u221230°C instead of \u22128°C; halves losses from cold and freezes. Recommended here: winters often drop below \u22128°C.",
     );
     const impact = within(dialog).getByRole("region", {
       name: "Expected impact",

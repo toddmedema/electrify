@@ -26,7 +26,7 @@ import {
   PurchaseReviewDialogProps,
 } from "./PurchaseReviewDialog";
 
-const LABELS: [string, string] = ["Before opening", "After opening"];
+const LABELS: [string, string] = ["Before", "After"];
 const watts = (value: number | null) =>
   value === null ? "—" : formatForecastWatts(value);
 const energy = (value: number | null) =>
@@ -145,21 +145,29 @@ export default function BuildPurchaseReviewDialog({
                       `${LABELS[1]} (dashed)`,
                     ]}
                     formatSummaryValue={formatForecastWatts}
-                    buildOptions={({ scale }) => ({
+                    buildOptions={({ scale, getState }) => ({
                       width: 0,
                       height: 0,
                       legend: { show: false },
                       plugins: [zeroLinePlugin(chartPalette().tick)],
-                      scales: { x: { time: false, range: [0, 12] } },
+                      scales: {
+                        x: { time: false, range: (_u, min, max) => [min, max] },
+                      },
                       axes: [
                         xAxis(scale, {
-                          splits: () => [0, 3, 6, 9, 12],
+                          splits: () =>
+                            getState().months.filter(
+                              (_, index, months) =>
+                                index % 3 === 0 || index === months.length - 1,
+                            ),
                           values: (_u, ticks) =>
                             ticks.map(
                               (tick) =>
                                 getDateFromMinute(
-                                  result.after.startMinute +
-                                    tick * MINUTES_PER_MONTH,
+                                  Math.round(
+                                    getState().after.startMinute +
+                                      tick * MINUTES_PER_MONTH,
+                                  ),
                                   snapshot.startingYear,
                                 ).month,
                             ),
