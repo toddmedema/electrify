@@ -102,12 +102,23 @@
 }
 .territoryWireBacking {
   stroke: #fff8e1;
-  stroke-width: 4;
-  opacity: 0.86;
+  stroke-width: 2.5;
+  opacity: 0.6;
 }
 .territoryWire {
   stroke: #25393d;
-  stroke-width: 1.5;
+  stroke-width: 1.25;
+  opacity: 0.85;
+}
+[data-wire-kind="submerged"] {
+  .territoryWireBacking {
+    display: none;
+  }
+  .territoryWire {
+    stroke: #355c68;
+    stroke-dasharray: 3 4;
+    opacity: 0.5;
+  }
 }
 .territoryHexBorderBacking,
 .territoryHexBoundary,

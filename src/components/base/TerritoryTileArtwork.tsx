@@ -92,14 +92,8 @@ export function FacilityArtwork({
     />
   ) : null;
 }
-export function TowerArtwork({
-  platform,
-  className,
-}: {
-  platform?: boolean;
-  className?: string;
-}) {
-  return <TowerOccupant platform={platform} className={className} />;
+export function TowerArtwork({ className }: { className?: string }) {
+  return <TowerOccupant className={className} />;
 }
 export function CityArtwork({
   sector,

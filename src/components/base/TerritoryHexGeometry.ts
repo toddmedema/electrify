@@ -18,6 +18,11 @@ export interface MapPoint {
   x: number;
   y: number;
 }
+/** The quiet tower is drawn at 60% scale around the common ground anchor. */
+export const TOWER_ART_TRANSFORM = { x: 100, y: 146, scale: 0.6 } as const;
+export const TOWER_CROSSARM = { left: 170, right: 330, y: 220 } as const;
+export type HexWireStructure =
+  "tower" | "city" | "generator" | "hydro" | "storage" | "submerged";
 export const hexCenter = ({
   q,
   r,
@@ -29,9 +34,38 @@ export const groundAnchor = (tile: HexPosition): MapPoint => {
   const center = hexCenter(tile);
   return { x: center.x, y: center.y + (115 * HEX_HEIGHT) / 500 };
 };
-export const occupantTerminal = (tile: HexPosition): MapPoint => {
+/** Elevated facade entries; tower spans attach to the crossarm tip facing their neighbor. */
+export const occupantTerminal = (
+  tile: HexPosition,
+  structure: HexWireStructure = "tower",
+  toward?: HexPosition,
+): MapPoint => {
   const ground = groundAnchor(tile);
-  return { x: ground.x, y: ground.y - (15 * HEX_WIDTH) / 500 };
+  const anchors = {
+    city: { x: 250, y: 280 },
+    generator: { x: 250, y: 310 },
+    hydro: { x: 330, y: 215 },
+    storage: { x: 290, y: 325 },
+    submerged: { x: 250, y: 365 },
+  } as const;
+  const armX = toward
+    ? hexCenter(toward).x < hexCenter(tile).x
+      ? TOWER_CROSSARM.left
+      : TOWER_CROSSARM.right
+    : 250;
+  const source =
+    structure === "tower"
+      ? {
+          x: TOWER_ART_TRANSFORM.x + armX * TOWER_ART_TRANSFORM.scale,
+          y:
+            TOWER_ART_TRANSFORM.y +
+            TOWER_CROSSARM.y * TOWER_ART_TRANSFORM.scale,
+        }
+      : anchors[structure];
+  return {
+    x: ground.x + ((source.x - 250) * HEX_WIDTH) / 500,
+    y: ground.y + ((source.y - 365) * HEX_WIDTH) / 500,
+  };
 };
 export const foregroundOrigin = (tile: HexPosition): MapPoint => {
   const ground = groundAnchor(tile);
@@ -87,13 +121,18 @@ export interface HexWire<Id extends string = string> {
   from: Id;
   to: Id;
   crossing: MapPoint;
+  kind: "overhead" | "submerged";
+  start: MapPoint;
+  end: MapPoint;
+  control?: MapPoint;
   path: string;
 }
-/** One automatic path per adjacent developed pair, with a shared crossing and hidden terminal ends. */
+/** One visual link per adjacency: suspended conductors on land, buried cables across open water. */
 export function hexWires<T extends HexPosition>(
   tiles: readonly T[],
   developed: (tile: T) => boolean,
   connected: (a: T, b: T) => boolean = () => true,
+  structure: (tile: T) => HexWireStructure = () => "tower",
 ): HexWire<T["id"]>[] {
   const indexed = new Map(
     tiles.filter(developed).map((tile) => [key(tile), tile]),
@@ -107,22 +146,38 @@ export function hexWires<T extends HexPosition>(
         const from = hexCenter(tile),
           to = hexCenter(other);
         const crossing = { x: (from.x + to.x) / 2, y: (from.y + to.y) / 2 };
-        const points = [
-          occupantTerminal(tile),
-          groundAnchor(tile),
-          crossing,
-          groundAnchor(other),
-          occupantTerminal(other),
-        ];
+        const fromStructure = structure(tile),
+          toStructure = structure(other);
+        const submerged =
+          fromStructure === "submerged" || toStructure === "submerged";
+        const start = submerged
+          ? groundAnchor(tile)
+          : occupantTerminal(tile, fromStructure, other);
+        const end = submerged
+          ? groundAnchor(other)
+          : occupantTerminal(other, toStructure, tile);
+        // The quadratic midpoint sags by half this control offset, leaving clear air below it.
+        const sag = Math.min(
+          HEX_WIDTH * 0.12,
+          Math.min(
+            groundAnchor(tile).y - start.y,
+            groundAnchor(other).y - end.y,
+          ) * 0.6,
+        );
+        const control = submerged
+          ? undefined
+          : { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 + sag };
         return [
           {
             id: `${tile.id}|${other.id}`,
             from: tile.id,
             to: other.id,
             crossing,
-            path: points
-              .map((point, index) => `${index ? "L" : "M"}${pointText(point)}`)
-              .join(" "),
+            kind: submerged ? ("submerged" as const) : ("overhead" as const),
+            start,
+            end,
+            control,
+            path: `M${pointText(start)} ${control ? `Q${pointText(control)} ` : "L"}${pointText(end)}`,
           },
         ];
       }),

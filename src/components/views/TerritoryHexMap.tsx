@@ -5,6 +5,7 @@ import type { GameType, TerritoryTileId } from "../../Types";
 import { getTerritoryDefinition } from "../../data/Territories";
 import { TERRAIN_LABELS } from "../../data/TerrainLabels";
 import { territoryTileViews } from "../../helpers/TerritoryMapState";
+import type { TerritoryTileView } from "../../helpers/TerritoryMapState";
 import { tilePurchaseQuotes } from "../../helpers/Territories";
 import { useAppSelector } from "../../Store";
 import { terrainDetailsLabel } from "../base/TerritoryTileFacts";
@@ -24,6 +25,7 @@ import {
   foregroundOrigin,
   riverPorts,
 } from "../base/TerritoryHexGeometry";
+import type { HexWireStructure } from "../base/TerritoryHexGeometry";
 import {
   TerrainArtwork,
   FacilityArtwork,
@@ -44,6 +46,23 @@ interface Props {
   onSelect: (id: TerritoryTileId, inspect?: boolean) => void;
   onCloseInspection?: () => void;
   onDeselect?: () => void;
+}
+function wireStructure({
+  tile,
+  facility,
+}: TerritoryTileView): HexWireStructure {
+  if (tile.city) return "city";
+  if (facility)
+    return facility.peakWh !== undefined
+      ? "storage"
+      : facility.fuel === "Hydro"
+        ? "hydro"
+        : "generator";
+  return tile.terrain === "lake" ||
+    tile.terrain === "ocean" ||
+    tile.terrain === "river"
+    ? "submerged"
+    : "tower";
 }
 export default function TerritoryHexMap({
   game,
@@ -300,6 +319,7 @@ export default function TerritoryHexMap({
     renderedTiles,
     (tile) => !!byId.get(tile.id)?.developed,
     (a, b) => byId.get(a.id)?.ownerKey === byId.get(b.id)?.ownerKey,
+    (tile) => wireStructure(byId.get(tile.id)!),
   );
   const revealTile = (tile: { q: number; r: number }) => {
     const target = hexCenter(tile);
@@ -537,8 +557,14 @@ export default function TerritoryHexMap({
                 {wires.map((wire) => (
                   <g
                     key={wire.id}
+                    className="territoryFog"
                     data-wire-from={wire.from}
                     data-wire-to={wire.to}
+                    data-wire-kind={wire.kind}
+                    data-visibility-distance={Math.max(
+                      byId.get(wire.from)!.visibilityDistance,
+                      byId.get(wire.to)!.visibilityDistance,
+                    )}
                   >
                     <path className="territoryWireBacking" d={wire.path} />
                     <path className="territoryWire" d={wire.path} />
@@ -551,7 +577,12 @@ export default function TerritoryHexMap({
                   const { tile, facility } = view,
                     origin = foregroundOrigin(tile),
                     status = facilityMapStatus(view, game.date.minute);
-                  if (!facility && !tile.city && !view.developed) return null;
+                  if (
+                    !facility &&
+                    !tile.city &&
+                    (!view.developed || wireStructure(view) === "submerged")
+                  )
+                    return null;
                   return (
                     <svg
                       key={tile.id}
@@ -593,14 +624,7 @@ export default function TerritoryHexMap({
                           )}
                         </>
                       ) : (
-                        <TowerArtwork
-                          platform={
-                            tile.terrain === "ocean" ||
-                            tile.terrain === "lake" ||
-                            tile.terrain === "river"
-                          }
-                          className="territoryOccupantArtwork"
-                        />
+                        <TowerArtwork className="territoryOccupantArtwork" />
                       )}
                     </svg>
                   );
@@ -704,7 +728,7 @@ export default function TerritoryHexMap({
                       : undefined;
                   navigate(event, tile.id);
                 }}
-                title={`${TERRAIN_LABELS[tile.terrain]} · ${facility?.name ?? (tile.city ? `${tile.city.sector} city` : view.developed ? "Open site · transmission tower" : "Undeveloped site")}${status ? ` · ${status.label}` : ""}`}
+                title={`${TERRAIN_LABELS[tile.terrain]} · ${facility?.name ?? (tile.city ? `${tile.city.sector} city` : view.developed ? (wireStructure(view) === "submerged" ? "Open water · submerged cable" : "Open site · transmission tower") : "Undeveloped site")}${status ? ` · ${status.label}` : ""}`}
               >
                 <span className="territoryTileHitArea" aria-hidden="true" />
                 {utility && (
@@ -730,7 +754,9 @@ export default function TerritoryHexMap({
                     : tile.city
                       ? `${tile.city.sector} customers; no building slot`
                       : view.developed
-                        ? "One building site; transmission tower"
+                        ? wireStructure(view) === "submerged"
+                          ? "One building site; submerged cable"
+                          : "One building site; transmission tower"
                         : "One building site"}
                   .
                 </span>

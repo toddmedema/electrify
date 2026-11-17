@@ -1,14 +1,12 @@
 import * as React from "react";
+import { TOWER_ART_TRANSFORM, TOWER_CROSSARM } from "../TerritoryHexGeometry";
 
 type Props = {
   className?: string;
-  platform?: boolean;
 };
 
-// The lower box hides the wire terminal at (250, 350). Both variants share
-// source (250, 365) as their ground anchor. Empty sites use a deliberately
-// smaller, quieter structure than occupied cities and facilities.
-export default function TowerOccupant({ className, platform = false }: Props) {
+// Land towers keep a small footprint; the network helper shares their true crossarm anchors.
+export default function TowerOccupant({ className }: Props) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
@@ -24,11 +22,30 @@ export default function TowerOccupant({ className, platform = false }: Props) {
       strokeLinecap="round"
       strokeLinejoin="round"
     >
-      <g transform="translate(100 146) scale(0.6)">
+      <g
+        transform={`translate(${TOWER_ART_TRANSFORM.x} ${TOWER_ART_TRANSFORM.y}) scale(${TOWER_ART_TRANSFORM.scale})`}
+      >
         <path d="M220 115H280L325 365H300L270 145H230L200 365H175Z" />
-        <path d="M170 220H330" fill="none" />
-        {platform && <path d="M175 345H325V365H175Z" />}
-        <path d="M225 330H275V365H225Z" fillOpacity={1} />
+        <path
+          d={`M${TOWER_CROSSARM.left} ${TOWER_CROSSARM.y}H${TOWER_CROSSARM.right}`}
+          fill="none"
+        />
+        <path
+          d="M225 265L285 330M275 265L215 330"
+          fill="none"
+          strokeWidth={6}
+        />
+        {[TOWER_CROSSARM.left, TOWER_CROSSARM.right].map((x) => (
+          <circle
+            key={x}
+            cx={x}
+            cy={TOWER_CROSSARM.y}
+            r={6}
+            fill="#FFF8E1"
+            fillOpacity={0.8}
+            strokeWidth={6}
+          />
+        ))}
       </g>
     </svg>
   );

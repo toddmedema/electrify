@@ -7,6 +7,8 @@ import {
   foregroundOrigin,
   groundAnchor,
   occupantTerminal,
+  TOWER_ART_TRANSFORM,
+  TOWER_CROSSARM,
   riverPorts,
 } from "./TerritoryHexGeometry";
 const center = { id: "center", q: 0, r: 0, developed: true, owner: "you" };
@@ -26,9 +28,12 @@ it("projects a uniformly scaled foreground onto the terrain anchor", () => {
   expect(origin.y + (365 * HEX_WIDTH) / 500).toBeCloseTo(
     groundAnchor(center).y,
   );
-  expect(origin.y + (350 * HEX_WIDTH) / 500).toBeCloseTo(
-    occupantTerminal(center).y,
-  );
+  expect(
+    origin.y +
+      ((TOWER_ART_TRANSFORM.y + TOWER_CROSSARM.y * TOWER_ART_TRANSFORM.scale) *
+        HEX_WIDTH) /
+        500,
+  ).toBeCloseTo(occupantTerminal(center).y);
   expect(HEX_HEIGHT / HEX_WIDTH).toBeCloseTo(0.72);
 });
 it.each(Array.from({ length: 64 }, (_, i) => i))(
@@ -62,10 +67,60 @@ it.each(Array.from({ length: 64 }, (_, i) => i))(
       const a = hexCenter(tiles.find((tile) => tile.id === wire.from)!);
       const b = hexCenter(tiles.find((tile) => tile.id === wire.to)!);
       expect(wire.crossing).toEqual({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
-      expect(wire.path.match(/[ML]/g)).toHaveLength(5);
+      expect(wire.kind).toBe("overhead");
+      expect(wire.path.match(/[MQL]/g)).toEqual(["M", "Q"]);
+      const chordY = (wire.start.y + wire.end.y) / 2;
+      const midpointY = (wire.start.y + 2 * wire.control!.y + wire.end.y) / 4;
+      const groundY =
+        (groundAnchor(tiles.find((tile) => tile.id === wire.from)!).y +
+          groundAnchor(tiles.find((tile) => tile.id === wire.to)!).y) /
+        2;
+      expect(midpointY).toBeGreaterThan(chordY);
+      expect(midpointY).toBeLessThan(groundY);
     }
   },
 );
+it("attaches each land span to the facing crossarm rather than the tower footing", () => {
+  const [wire] = hexWires([center, around[1]], () => true);
+  const left = wire.from === center.id ? center : around[1];
+  const right = wire.to === around[1].id ? around[1] : center;
+  expect(wire.start).toEqual(occupantTerminal(left, "tower", right));
+  expect(wire.end).toEqual(occupantTerminal(right, "tower", left));
+  const tower = occupantTerminal(center, "tower", around[1]);
+  expect(tower.x).toBeGreaterThan(groundAnchor(center).x);
+  expect(tower.y).toBeLessThan(groundAnchor(center).y - 20);
+  const back = occupantTerminal(center, "tower", around[4]);
+  expect(back.x).toBeLessThan(groundAnchor(center).x);
+  expect(back.y).toBe(tower.y);
+});
+it.each(["city", "generator", "hydro", "storage"] as const)(
+  "terminates at the elevated %s facade with a suspended rather than ground path",
+  (structure) => {
+    const [wire] = hexWires(
+      [center, around[1]],
+      () => true,
+      () => true,
+      () => structure,
+    );
+    expect(wire.kind).toBe("overhead");
+    expect(wire.start.y).toBeLessThan(groundAnchor(center).y);
+    expect(wire.end.y).toBeLessThan(groundAnchor(around[1]).y);
+    expect(wire.control!.y).toBeGreaterThan((wire.start.y + wire.end.y) / 2);
+  },
+);
+it("uses a submerged cable across empty water without an imaginary elevated support", () => {
+  const [wire] = hexWires(
+    [center, around[1]],
+    () => true,
+    () => true,
+    (tile) => (tile.id === center.id ? "tower" : "submerged"),
+  );
+  expect(wire.kind).toBe("submerged");
+  expect(wire.control).toBeUndefined();
+  expect(wire.start).toEqual(groundAnchor(center));
+  expect(wire.end).toEqual(groundAnchor(around[1]));
+  expect(wire.path.match(/[MQL]/g)).toEqual(["M", "L"]);
+});
 it("does not connect across a company boundary or to undeveloped land", () => {
   const other = { ...around[0], owner: "neighbor" };
   expect(
