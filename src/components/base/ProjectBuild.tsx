@@ -2,6 +2,7 @@ import * as React from "react";
 import { useStore } from "react-redux";
 import {
   Alert,
+  Checkbox,
   Button,
   FormControlLabel,
   Radio,
@@ -25,6 +26,11 @@ import {
   type ProjectSelection,
   type ReadyProjectSite,
 } from "../../helpers/ProjectBuild";
+import {
+  resilienceBuildOptions,
+  resilienceSelection,
+  withResilienceOptions,
+} from "../../helpers/Hazards";
 import { purchaseFacility } from "../../helpers/PurchaseFacility";
 import { territoryBuildTileName } from "./TerritoryBuildDestination";
 import { territoryMapLabel } from "./TerritoryMapLayout";
@@ -44,6 +50,7 @@ export default function ProjectBuild({
   catalogue,
   onProject,
   onChangeProject,
+  onUpdateProject,
   onClose,
   onBusy,
 }: {
@@ -54,6 +61,8 @@ export default function ProjectBuild({
   catalogue: boolean;
   onProject: (project: ProjectSelection) => void;
   onChangeProject: () => void;
+  /** Update options without discarding the chosen geographic site. */
+  onUpdateProject?: (project: ProjectSelection) => void;
   onClose: () => void;
   onBusy: (busy: boolean) => void;
 }) {
@@ -373,8 +382,10 @@ export default function ProjectBuild({
               <>
                 <p>Choose a highlighted site.</p>
                 <p className="projectSiteLegend">
-                  <span>Connected · free site</span>
-                  <span>Connection required · quoted cost</span>
+                  <span>Connected · total project cost</span>
+                  <span>
+                    Connection required · total project and connection cost
+                  </span>
                 </p>
               </>
             )}
@@ -422,6 +433,46 @@ export default function ProjectBuild({
                     </dd>
                   </div>
                 </dl>
+                {!isStorage(ready.facility) && onUpdateProject && (
+                  <div
+                    className="projectBuildOptions"
+                    aria-label="Project upgrades"
+                  >
+                    {resilienceBuildOptions(ready.facility, game).map(
+                      (option) => (
+                        <FormControlLabel
+                          key={option.upgrade}
+                          disabled={!!progress}
+                          control={
+                            <Checkbox
+                              checked={option.selected}
+                              onChange={(event) => {
+                                if (lock.current || isStorage(ready.facility))
+                                  return;
+                                onUpdateProject(
+                                  selectProject(
+                                    withResilienceOptions(
+                                      ready.facility,
+                                      game,
+                                      {
+                                        ...resilienceSelection(
+                                          ready.facility,
+                                          game,
+                                        ),
+                                        [option.upgrade]: event.target.checked,
+                                      },
+                                    ),
+                                  ),
+                                );
+                              }}
+                            />
+                          }
+                          label={`${option.label} +${money(option.extraBuildCost)}`}
+                        />
+                      ),
+                    )}
+                  </div>
+                )}
                 {review.remaining < 0 && (
                   <p role="status">
                     {money(-review.remaining)} more cash needed

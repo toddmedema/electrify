@@ -23,7 +23,11 @@ import { currentTick } from "../../helpers/GameSelectors";
 import { formatWatts } from "../../helpers/Format";
 import type { GameType, TerritoryTileId } from "../../Types";
 import { GameToolMemoryContext } from "../base/GameToolMemory";
-import { MapWorkspacePanelContext } from "../base/GameWorkspaceContext";
+import {
+  MapWorkspacePanelContext,
+  GameWorkspaceLayoutContext,
+} from "../base/GameWorkspaceContext";
+import { workspaceLayout } from "../../WorkspaceLayout";
 import TerritoryNetwork from "./TerritoryNetwork";
 import gameReducer, { buildFacility } from "../../reducers/Game";
 import uiReducer from "../../reducers/UI";
@@ -63,7 +67,7 @@ jest.mock("./TerritoryHexMap", () => ({
     >("../../helpers/TerritoryMapState");
     return (
       <div aria-label="Tile map">
-        <button className="territoryMapBuyToggle">Connect</button>
+        <button className="territoryMapBuyToggle">Rapid connection mode</button>
         <button onClick={props.onPlanProject}>Build</button>
         {territoryTileViews(props.game).map(({ tile }) => (
           <button
@@ -88,7 +92,7 @@ function ready() {
   currentTick(game)!.cash = 1e9;
   return game;
 }
-function show(game = ready()) {
+function show(game = ready(), width?: number, scale = 1) {
   const store = configureStore({
     reducer: { game: gameReducer, ui: uiReducer },
     preloadedState: { game },
@@ -128,7 +132,18 @@ function show(game = ready()) {
         <MapWorkspacePanelContext.Provider
           value={{ open, inspect: onInspect, projectRequested }}
         >
-          <Connected />
+          <GameWorkspaceLayoutContext.Provider
+            value={
+              width
+                ? {
+                    ...workspaceLayout(width, scale, "automatic"),
+                    fleetVisible: true,
+                  }
+                : undefined
+            }
+          >
+            <Connected />
+          </GameWorkspaceLayoutContext.Provider>
         </MapWorkspacePanelContext.Provider>
       </GameToolMemoryContext.Provider>
     </Provider>
@@ -166,7 +181,9 @@ it("keeps the map clear until activation, and deselects the tile when Escape clo
   expect(within(surface()).getByRole("heading", { level: 3 })).toHaveFocus();
   fireEvent.keyDown(surface(), { key: "Escape" });
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Connect" })).toHaveFocus();
+  expect(
+    screen.getByRole("button", { name: "Rapid connection mode" }),
+  ).toHaveFocus();
   expect(tile).toHaveAttribute("aria-pressed", "false");
   expect(
     screen.queryByText(/company power pool|one project per tile|Territories$/i),
@@ -489,62 +506,73 @@ it("keeps a failed planner load in one closable panel and retries on the next op
   expect(store.getState().game.territoryNetwork!.tilePurchases).toHaveLength(0);
 });
 
-it("keeps the confirmed project locked when Build is activated during host Connect", async () => {
-  const game = ready();
-  game.multiplayer = { seat: "0" };
-  const { store, requestProject } = show(game);
-  const commands: Command[] = [];
-  registerMultiplayerRuntime({
-    submit: async (command) => {
-      commands.push(command);
-      if (command.kind === "action" && command.name === "buildFacility")
-        store.dispatch(
-          buildFacility(command.payload as Parameters<typeof buildFacility>[0]),
-        );
-    },
-    command: jest.fn(),
-    activity: jest.fn(),
-    leave: async () => undefined,
-  });
-  fireEvent.click(screen.getByRole("button", { name: "Build" }));
-  fireEvent.click(
-    await screen.findByRole("button", { name: "Choose sites for Wind" }),
-  );
-  inspect("green-uplands:site-1");
-  fireEvent.click(screen.getByRole("button", { name: "Review project" }));
-  fireEvent.click(screen.getByRole("button", { name: "Connect & build" }));
-  await act(async () => {
-    await Promise.resolve();
-  });
-  fireEvent.click(screen.getByRole("button", { name: "Build" }));
-  requestProject();
-  inspect("champlain:site-13");
-  fireEvent.keyDown(surface(), { key: "Escape" });
-  expect(screen.getByRole("button", { name: "Connecting…" })).toBeDisabled();
-  expect(screen.queryByRole("slider")).not.toBeInTheDocument();
-  expect(
-    screen.getByRole("heading", { name: "Connect and build Wind?" }),
-  ).toBeVisible();
-  expect(commands).toHaveLength(1);
-  expect(store.getState().game.facilities).toHaveLength(game.facilities.length);
-  const connect = commands[0];
-  if (connect.kind !== "action" || connect.name !== "acquireTile")
-    throw new Error("Expected connection command");
-  act(() => {
-    store.dispatch(
-      acquireTile(connect.payload as Parameters<typeof acquireTile>[0]),
+it.each([undefined, 1280])(
+  "keeps the confirmed project locked when Build is activated during host Connect (%s)",
+  async (width) => {
+    const game = ready();
+    game.multiplayer = { seat: "0" };
+    const { store, requestProject } = show(game, width);
+    const commands: Command[] = [];
+    registerMultiplayerRuntime({
+      submit: async (command) => {
+        commands.push(command);
+        if (command.kind === "action" && command.name === "buildFacility")
+          store.dispatch(
+            buildFacility(
+              command.payload as Parameters<typeof buildFacility>[0],
+            ),
+          );
+      },
+      command: jest.fn(),
+      activity: jest.fn(),
+      leave: async () => undefined,
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Build" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Choose sites for Wind" }),
     );
-  });
-  await waitFor(() =>
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
-  );
-  expect(commands).toHaveLength(2);
-  expect(
-    store
-      .getState()
-      .game.facilities.find(({ tileId }) => tileId === "green-uplands:site-1"),
-  ).toMatchObject({ name: "Wind", peakW: 20e6 });
-});
+    inspect("green-uplands:site-1");
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Review project" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Connect & build" }));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Build" }));
+    requestProject();
+    inspect("champlain:site-13");
+    fireEvent.keyDown(surface(), { key: "Escape" });
+    expect(screen.getByRole("button", { name: "Connecting…" })).toBeDisabled();
+    expect(screen.queryByRole("slider")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Connect and build Wind?" }),
+    ).toBeVisible();
+    expect(commands).toHaveLength(1);
+    expect(store.getState().game.facilities).toHaveLength(
+      game.facilities.length,
+    );
+    const connect = commands[0];
+    if (connect.kind !== "action" || connect.name !== "acquireTile")
+      throw new Error("Expected connection command");
+    act(() => {
+      store.dispatch(
+        acquireTile(connect.payload as Parameters<typeof acquireTile>[0]),
+      );
+    });
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+    );
+    expect(commands).toHaveLength(2);
+    expect(
+      store
+        .getState()
+        .game.facilities.find(
+          ({ tileId }) => tileId === "green-uplands:site-1",
+        ),
+    ).toMatchObject({ name: "Wind", peakW: 20e6 });
+  },
+);
 
 it("explains when a project has no compatible highlighted sites without requiring connection or cash", async () => {
   const game = ready();
@@ -565,4 +593,101 @@ it("explains when a project has no compatible highlighted sites without requirin
   expect(screen.getByRole("button", { name: "Change project" })).toBeEnabled();
   expect(store.getState().game.territoryNetwork!.tilePurchases).toHaveLength(0);
   expect(currentTick(store.getState().game)!.cash).toBe(0);
+});
+
+it("uses the persistent desktop rail for Build and owned empty tiles, preselecting that site without spending", async () => {
+  const game = ready();
+  const { store } = show(game, 1280);
+  const rail = screen.getByRole("complementary", { name: "Build facilities" });
+  fireEvent.click(screen.getByRole("button", { name: "Build" }));
+  expect(rail).toHaveFocus();
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  const id = freeTile(game).id;
+  inspect(id);
+  expect(
+    within(surface()).queryByRole("tab", { name: "Generators" }),
+  ).not.toBeInTheDocument();
+  expect(
+    within(surface()).getByText(/Choose a technology from the Build rail/),
+  ).toBeVisible();
+  fireEvent.click(
+    within(rail).getByRole("button", { name: "Choose sites for Wind" }),
+  );
+  expect(
+    await screen.findByRole("button", { name: "Review project" }),
+  ).toBeEnabled();
+  expect(screen.getByRole("button", { name: `Inspect ${id}` })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  expect(screen.getAllByRole("dialog")).toHaveLength(1);
+  expect(store.getState().game.facilities).toHaveLength(game.facilities.length);
+  expect(currentTick(store.getState().game)!.cash).toBe(1e9);
+});
+
+it.each([
+  [1023, 1],
+  [1280, 1.5],
+  [390, 1],
+  [360, 1],
+])(
+  "retains the catalogue below 1024 effective pixels (%s px at %s scale)",
+  async (width, scale) => {
+    show(ready(), width, scale);
+    expect(
+      screen.queryByRole("complementary", { name: "Build facilities" }),
+    ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Build" }));
+    expect(
+      await screen.findByRole("slider", { name: "Generator capacity" }),
+    ).toBeInTheDocument();
+  },
+);
+
+it("keeps a candidate and canonical quote when generator upgrades change", async () => {
+  const game = ready();
+  game.date.year = 2025;
+  game.startingYear = 2025;
+  show(game, 1280);
+  const rail = screen.getByRole("complementary", { name: "Build facilities" });
+  fireEvent.click(
+    within(rail).getByRole("button", { name: "Choose sites for Solar" }),
+  );
+  inspect("champlain:site-13");
+  const option = await screen.findByRole("checkbox", { name: /trackers/i });
+  const selected = screen.getByRole("button", {
+    name: "Inspect champlain:site-13",
+  });
+  expect(selected).toHaveAttribute("aria-pressed", "true");
+  fireEvent.click(option);
+  expect(selected).toHaveAttribute("aria-pressed", "true");
+  expect(screen.getByRole("button", { name: "Review project" })).toBeEnabled();
+  fireEvent.click(screen.getByRole("button", { name: "Review project" }));
+  expect(screen.getByRole("heading", { name: "Build Solar?" })).toBeVisible();
+});
+
+it("retains the inspected site when connecting transitions directly into desktop construction", async () => {
+  const game = ready();
+  const site = territoryTileViews(game).find(
+    ({ tile }) =>
+      !tile.city &&
+      tile.terrain === "forest" &&
+      tilePurchaseQuote(game, tile.id),
+  )!.tile;
+  const { store } = show(game, 1280);
+  inspect(site.id);
+  fireEvent.click(within(surface()).getByRole("button", { name: /Connect/ }));
+  expect(ownsTerritoryTile(store.getState().game, site.id)).toBe(true);
+  expect(
+    within(surface()).queryByRole("tab", { name: "Generators" }),
+  ).not.toBeInTheDocument();
+  fireEvent.click(
+    screen.getByRole("button", { name: "Choose sites for Wind" }),
+  );
+  expect(
+    await screen.findByRole("button", { name: "Review project" }),
+  ).toBeEnabled();
+  expect(
+    screen.getByRole("button", { name: `Inspect ${site.id}` }),
+  ).toHaveAttribute("aria-pressed", "true");
 });

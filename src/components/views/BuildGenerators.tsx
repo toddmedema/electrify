@@ -232,6 +232,8 @@ function typicalCapacityFactor(
 }
 
 interface GeneratorBuildItemProps {
+  /** Expanded canonical card without purchasing controls or dialogs. */
+  preview?: boolean;
   game?: GameType;
   hydroAvailability?: ReturnType<typeof getHydroAvailability>;
   onDismissHydroPrimer?: () => void;
@@ -530,7 +532,11 @@ export function GeneratorBuildItem(
   );
 
   const iconSrc = `/images/${generator.name.toLowerCase()}.svg`;
-  if (tile && !tileSupportsFacilityTechnology(tile, generator)) {
+  if (
+    !props.preview &&
+    tile &&
+    !tileSupportsFacilityTechnology(tile, generator)
+  ) {
     return (
       <BuildOptionCard
         name={generator.name}
@@ -541,8 +547,8 @@ export function GeneratorBuildItem(
   }
   // Nothing left to build: keep the card as a quiet one-line entry rather than a full pitch
   if (
-    props.hydroAvailability?.remaining.length === 0 ||
-    sites?.remaining === 0
+    !props.preview &&
+    (props.hydroAvailability?.remaining.length === 0 || sites?.remaining === 0)
   ) {
     return (
       <BuildOptionCard
@@ -567,11 +573,16 @@ export function GeneratorBuildItem(
       name={generator.name}
       iconSrc={iconSrc}
       compared={props.compared}
-      review={{
-        ariaLabel: `Review purchase of ${generator.name}`,
-        disabled: !canBuild,
-        onClick: openReview,
-      }}
+      preview={props.preview}
+      review={
+        props.preview
+          ? undefined
+          : {
+              ariaLabel: `Review purchase of ${generator.name}`,
+              disabled: !canBuild,
+              onClick: openReview,
+            }
+      }
       sizeAction={sizeAction}
       context={context}
       summary={

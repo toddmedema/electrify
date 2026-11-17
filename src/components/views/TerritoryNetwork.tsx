@@ -1,5 +1,7 @@
 import * as React from "react";
 import { Button, Tab, Tabs, Typography } from "@mui/material";
+import { SIDE_TOOL_MIN_WIDTH } from "../../WorkspaceLayout";
+import DesktopBuildRail from "../base/DesktopBuildRail";
 import { getTerritoryDefinition } from "../../data/Territories";
 import {
   tilePurchaseQuote,
@@ -42,6 +44,7 @@ import { signature } from "../base/DeferredProjection";
 import {
   projectSiteQuote,
   type ProjectSelection,
+  type ReadyProjectSite,
 } from "../../helpers/ProjectBuild";
 import { tilePurchaseQuotes } from "../../helpers/Territories";
 import BuildGenerators from "./BuildGenerators";
@@ -49,6 +52,7 @@ import BuildStorage from "./BuildStorage";
 import {
   GameBuildCompleteContext,
   GameWorkspaceContext,
+  GameWorkspaceLayoutContext,
   MapWorkspacePanelContext,
 } from "../base/GameWorkspaceContext";
 import ChartForecastDemandByType, {
@@ -124,6 +128,11 @@ export default function TerritoryNetwork(props: Props) {
 function TileNetwork(props: Props) {
   const { game } = props;
   const panel = React.useContext(MapWorkspacePanelContext);
+  const layout = React.useContext(GameWorkspaceLayoutContext);
+  const desktopRail = (layout?.effectiveWidth ?? 0) >= SIDE_TOOL_MIN_WIDTH;
+  const [railFocusRequest, setRailFocusRequest] = React.useState(0);
+  const [railSite, setRailSite] = React.useState<TerritoryTileId>();
+  const [projectPending, setProjectPending] = React.useState(false);
   const [selected, setSelected] = useToolState<TerritoryTileId | undefined>(
     "network.tile",
     undefined,
@@ -185,19 +194,22 @@ function TileNetwork(props: Props) {
     setCandidate(undefined);
     setInspected(undefined);
     setSelected(undefined);
+    setRailSite(undefined);
   }, [setSelected]);
   React.useEffect(() => {
     if (panel?.open) close();
   }, [panel?.open, close]);
   const startProject = React.useCallback(() => {
-    if (projectBusy.current) return;
+    if (projectBusy.current || pendingIds.size > 0) return;
     panel?.inspect();
     setInspected(undefined);
     setSelected(undefined);
     setCandidate(undefined);
     setCatalogue(true);
-    setPlanning(true);
-  }, [panel, setSelected]);
+    setRailSite(undefined);
+    setPlanning(!desktopRail);
+    if (desktopRail) setRailFocusRequest((value) => value + 1);
+  }, [panel, setSelected, desktopRail, pendingIds.size]);
   React.useEffect(() => {
     if (panel?.projectRequested) startProject();
   }, [panel?.projectRequested, startProject]);
@@ -205,17 +217,10 @@ function TileNetwork(props: Props) {
   const projectSites = React.useMemo(() => {
     if (!planning || !project || catalogue) return undefined;
     const connections = tilePurchaseQuotes(game);
-    return new Map(
+    return new Map<TerritoryTileId, ReadyProjectSite>(
       views.flatMap(({ tile }) => {
         const quote = projectSiteQuote(game, project, tile.id, connections);
-        return quote.facility
-          ? [
-              [
-                tile.id,
-                quote.owned ? ("owned" as const) : ("connection" as const),
-              ] as const,
-            ]
-          : [];
+        return quote.facility ? [[tile.id, quote] as const] : [];
       }),
     );
     // Reuse the shared economic/planning signature; map focus and clock ticks do not reprice every site.
@@ -247,6 +252,17 @@ function TileNetwork(props: Props) {
       setActivation((value) => value + 1);
       setCategory("generators");
       setInspected(id);
+      const activated = views.find(({ tile }) => tile.id === id);
+      setRailSite(undefined);
+      if (
+        desktopRail &&
+        activated?.owned &&
+        !activated.tile.city &&
+        !activated.facility
+      ) {
+        setRailSite(id);
+        setRailFocusRequest((value) => value + 1);
+      }
     }
   };
   const title = tile
@@ -258,12 +274,38 @@ function TileNetwork(props: Props) {
           ? `Build · ${TERRAIN_LABELS[tile.terrain]}`
           : `${TERRAIN_LABELS[tile.terrain]} site`
     : "Tile";
+  const preferredSite = candidate ?? (building ? tile?.id : railSite);
   return (
     <section
       className="territoryNetwork"
       data-tile-inspection={view ? "open" : undefined}
+      data-desktop-build-rail={desktopRail || undefined}
       aria-label="Territory map workspace"
     >
+      {desktopRail && views.length > 0 && (
+        <DesktopBuildRail
+          game={game}
+          project={project}
+          siteId={preferredSite}
+          busy={projectPending || pendingIds.size > 0}
+          focusRequest={railFocusRequest}
+          onProject={(selection) => {
+            if (projectBusy.current || pendingIds.size > 0) return;
+            panel?.inspect();
+            setProject(selection);
+            setCatalogue(false);
+            setPlanning(true);
+            setInspected(undefined);
+            const preferred =
+              preferredSite &&
+              projectSiteQuote(game, selection, preferredSite).facility
+                ? preferredSite
+                : undefined;
+            setCandidate(preferred);
+            setSelected(preferred);
+          }}
+        />
+      )}
       {views.length > 0 && (
         <TerritoryHexMap
           {...(view || planning ? { onCloseInspection: close } : {})}
@@ -290,14 +332,22 @@ function TileNetwork(props: Props) {
             setCandidate(undefined);
             setSelected(undefined);
           }}
+          onUpdateProject={(selection) => {
+            if (!projectBusy.current) setProject(selection);
+          }}
           onChangeProject={() => {
             if (projectBusy.current) return;
             setCatalogue(true);
             setCandidate(undefined);
+            if (desktopRail) {
+              setPlanning(false);
+              setRailFocusRequest((value) => value + 1);
+            }
           }}
           onClose={close}
           onBusy={(busy) => {
             projectBusy.current = busy;
+            setProjectPending(busy);
           }}
         />
       )}
@@ -313,10 +363,15 @@ function TileNetwork(props: Props) {
                 ? territory.name
                 : undefined
           }
-          building={building}
+          building={building && !desktopRail}
           onClose={close}
         >
-          {building ? (
+          {building && desktopRail ? (
+            <p>
+              Choose a technology from the Build rail to plan a project on this
+              site.
+            </p>
+          ) : building ? (
             <GameWorkspaceContext.Provider value={true}>
               <GameBuildCompleteContext.Provider value={keepTileOpen}>
                 <Tabs

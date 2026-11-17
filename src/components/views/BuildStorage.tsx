@@ -75,6 +75,8 @@ function storageBuildSummary(storage: StorageShoppingType): string {
 }
 
 interface StorageBuildItemProps {
+  /** Expanded canonical card without purchasing controls or dialogs. */
+  preview?: boolean;
   game: GameType;
   cash: number;
   interestRate: number;
@@ -89,7 +91,9 @@ interface StorageBuildItemProps {
   onBuild: (financed: boolean) => void;
 }
 
-function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
+export function StorageBuildItem(
+  props: StorageBuildItemProps,
+): React.JSX.Element {
   const { formatMoneyConcise } = useMoney();
   const { storage, cash } = props;
   // The catalog key also identifies facilities in saves and mods.
@@ -160,7 +164,11 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
     e.stopPropagation();
   };
 
-  if (tile && !tileSupportsFacilityTechnology(tile, storage)) {
+  if (
+    !props.preview &&
+    tile &&
+    !tileSupportsFacilityTechnology(tile, storage)
+  ) {
     return (
       <BuildOptionCard
         className="storageBuildOption"
@@ -182,11 +190,16 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
       className="storageBuildOption"
       name={displayName}
       iconSrc={`/images/${storage.name.toLowerCase()}.svg`}
-      review={{
-        ariaLabel: `Review purchase of ${displayName}`,
-        disabled: !!shortfall || !buildable,
-        onClick: openReview,
-      }}
+      preview={props.preview}
+      review={
+        props.preview
+          ? undefined
+          : {
+              ariaLabel: `Review purchase of ${displayName}`,
+              disabled: !!shortfall || !buildable,
+              onClick: openReview,
+            }
+      }
       sizeAction={
         (offerMaxSize || offerAffordableSize) &&
         (offerAffordableSize || storage.peakWh !== maxSizeWh) && (

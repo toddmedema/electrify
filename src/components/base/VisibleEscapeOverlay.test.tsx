@@ -1,5 +1,5 @@
 import * as React from "react";
-import { render } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { hasVisibleEscapeOverlay } from "./VisibleEscapeOverlay";
 
 it("does not treat the nonmodal tile inspector as an Escape overlay", () => {
@@ -11,6 +11,7 @@ it.each([
   <div className="MuiModal-root">Confirmation</div>,
   <ul role="menu">Menu</ul>,
   <ul role="listbox">Select options</ul>,
+  <section data-escape-overlay="true">Technology preview</section>,
 ])("keeps Escape with an available overlay: %j", (overlay) => {
   render(overlay);
   expect(hasVisibleEscapeOverlay()).toBe(true);
@@ -41,4 +42,31 @@ it.each([
     </>,
   );
   expect(hasVisibleEscapeOverlay()).toBe(true);
+});
+
+it("lets an overlay owner ignore its own surface while respecting a separate modal", () => {
+  const { rerender } = render(
+    <aside aria-label="Rail">
+      <section data-escape-overlay="true">Preview</section>
+    </aside>,
+  );
+  expect(hasVisibleEscapeOverlay()).toBe(true);
+  expect(
+    hasVisibleEscapeOverlay(
+      screen.getByRole("complementary", { name: "Rail" }),
+    ),
+  ).toBe(false);
+  rerender(
+    <>
+      <aside aria-label="Rail">
+        <section data-escape-overlay="true">Preview</section>
+      </aside>
+      <div className="MuiModal-root">Help</div>
+    </>,
+  );
+  expect(
+    hasVisibleEscapeOverlay(
+      screen.getByRole("complementary", { name: "Rail" }),
+    ),
+  ).toBe(true);
 });
