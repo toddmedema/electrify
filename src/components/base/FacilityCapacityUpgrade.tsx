@@ -173,7 +173,7 @@ export default function FacilityCapacityUpgrade({
   if (
     (!onExpand && !expansion) ||
     facility.yearsToBuildLeft > 0 ||
-    facilityPermanentlyShutdown(facility, game.date.minute)
+    (facilityPermanentlyShutdown(facility, game.date.minute) && !expansion)
   )
     return null;
   return (
@@ -204,8 +204,7 @@ export default function FacilityCapacityUpgrade({
             aria-label="Capacity upgrade construction"
           />
           <Typography variant="body2" color="textSecondary">
-            Current capacity remains available until the added capacity is
-            ready.
+            Only the added capacity is under construction.
           </Typography>
           {onCancelExpansion && (
             <Button

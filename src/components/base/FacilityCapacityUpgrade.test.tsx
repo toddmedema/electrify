@@ -233,13 +233,15 @@ it("shows expansion progress and confirms the refund before canceling", async ()
     ),
   );
   started.facilities[0].expansionInProgress!.yearsToBuildLeft *= 0.5;
+  // A scheduled closure must not hide the option to cancel work already paid for.
+  started.facilities[0].permanentShutdownMonth = 1;
   view.rerender(started);
   expect(
     screen.getByRole("progressbar", { name: "Capacity upgrade construction" }),
   ).toHaveAttribute("aria-valuenow", "50");
   expect(
     screen.getByRole("region", { name: "Capacity upgrade" }),
-  ).toHaveTextContent("Current capacity remains available");
+  ).toHaveTextContent("Only the added capacity is under construction");
   fireEvent.click(
     screen.getByRole("button", { name: "Cancel capacity upgrade" }),
   );
