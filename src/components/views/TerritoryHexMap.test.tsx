@@ -127,6 +127,7 @@ function show(
     preloadedState: { game, ui: { evidenceRunId: 1 } },
   });
   const onSelect = jest.fn();
+  const planProject = jest.fn();
   const closeInspection = jest.fn();
   function OtherPurchaseControl() {
     const { purchase, pendingCost } = useTerritoryTilePurchases();
@@ -152,6 +153,7 @@ function show(
           game={activeGame}
           projectPlanning={!!projectSites}
           projectSites={projectSites}
+          onPlanProject={planProject}
           selected={selected}
           onCloseInspection={
             inspectionOpen
@@ -198,6 +200,7 @@ function show(
     candidates,
     buyMode,
     onSelect,
+    planProject,
     closeInspection,
     setOtherTile: (id: TerritoryTileId) => {
       otherTile = id;
@@ -210,6 +213,17 @@ function idOf(button: HTMLButtonElement) {
 function hoverColor(button: HTMLButtonElement) {
   return button.style.getPropertyValue("--territory-hover-color");
 }
+it("leaves rapid connection mode when Build focuses the desktop catalogue without selecting a project", () => {
+  const map = show();
+  map.buyMode();
+  const rapid = screen.getByRole("button", { name: "Rapid connection mode" });
+  expect(rapid).toHaveAttribute("aria-pressed", "true");
+  fireEvent.click(screen.getByRole("button", { name: "Build" }));
+  expect(rapid).toHaveAttribute("aria-pressed", "false");
+  expect(map.planProject).toHaveBeenCalledTimes(1);
+  expect(map.store.getState().game.territoryNetwork!.tilePurchases).toEqual([]);
+});
+
 it("explains and colors physical building eligibility without guessing from terrain", () => {
   const map = show();
   const vacant = map.target("champlain:site-13"),
@@ -248,7 +262,7 @@ function readySites(...ids: TerritoryTileId[]) {
   return new Map(
     ids.map((id) => {
       const quote = projectSiteQuote(game, selectProject(facility), id);
-      if (!("facility" in quote)) throw new Error(`Invalid test site ${id}`);
+      if (!quote.facility) throw new Error(`Invalid test site ${id}`);
       return [id, quote] as const;
     }),
   );

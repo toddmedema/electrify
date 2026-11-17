@@ -6,6 +6,7 @@ import {
   openBuild,
   openPane,
   returnToTerritoryMap,
+  setMapProjectCapacity,
   sortBuildCatalog,
 } from "./layout";
 import { editSavedGame, readSavedGame } from "./save-fixture";
@@ -28,6 +29,48 @@ test("ordinary starting hills offer general technologies and retain special-site
   await page.getByRole("button", { name: "Start game", exact: true }).click();
   await returnToTerritoryMap(page);
   await page.locator('[data-map-target="champlain:site-12"]').click();
+  const rail = page.getByRole("complementary", { name: "Build facilities" });
+  if (await rail.isVisible()) {
+    await setMapProjectCapacity(rail, false, "0");
+    for (const name of [
+      "Solar",
+      "Wind",
+      "Oil",
+      "Natural Gas Peaker",
+      "Natural Gas CC",
+      "Biomass",
+      "Coal",
+      "Nuclear",
+    ]) {
+      await rail
+        .getByRole("button", { name: `Choose sites for ${name}`, exact: true })
+        .focus();
+      const preview = rail.getByRole("region", {
+        name: `${name} technology preview`,
+        exact: true,
+      });
+      await expect(preview).not.toContainText("Not buildable on this tile");
+      await expect(preview.locator(".buildOptionMetrics")).toBeVisible();
+      await expect(
+        preview.getByRole("button", { name: "Choose sites", exact: true }),
+      ).toBeEnabled();
+    }
+    for (const name of ["Hydro", "Geothermal", "Offshore Wind"]) {
+      await rail
+        .getByRole("button", { name: `Choose sites for ${name}`, exact: true })
+        .focus();
+      const row = rail
+        .getByRole("region", {
+          name: `${name} technology preview`,
+          exact: true,
+        })
+        .locator(`[data-build-option="${name}"]`);
+      await expect(row).toContainText("Not buildable on this tile");
+      await expect(row.locator(".buildOptionMetrics")).toHaveCount(0);
+      await expect(row.getByRole("button")).toHaveCount(0);
+    }
+    return;
+  }
   const tile = getAuthoredTerritoryTile("champlain:site-12")!;
   const panel = page.getByRole("dialog", {
     name: `Build · ${TERRAIN_LABELS[tile.terrain]}`,
@@ -133,6 +176,51 @@ for (const theme of ["light", "dark"] as const) {
           "One building site; transmission tower",
         );
         await tile.click();
+        const rail = page.getByRole("complementary", {
+          name: "Build facilities",
+        });
+        if (await rail.isVisible()) {
+          await rail
+            .getByRole("button", {
+              name: "Choose sites for Geothermal",
+              exact: true,
+            })
+            .focus();
+          const preview = rail.getByRole("region", {
+            name: "Geothermal technology preview",
+            exact: true,
+          });
+          const geothermal = preview.locator(
+            '[data-build-option="Geothermal"]',
+          );
+          await expect(geothermal).toContainText("Not buildable on this tile");
+          await expect(
+            geothermal.locator(
+              ".buildOptionMetrics,.buildOptionDescription,.buildOptionSparkline",
+            ),
+          ).toHaveCount(0);
+          await expect(geothermal.getByRole("button")).toHaveCount(0);
+          // The fixed desktop icon catalogue has no economic sort. Site restrictions
+          // remain visible in its canonical preview; mobile retains the sorted cards.
+          await expect(
+            page.getByRole("combobox", {
+              name: "Sort facilities",
+              exact: true,
+            }),
+          ).toHaveCount(0);
+          await expect(geothermal).toBeVisible();
+          expect(
+            await geothermal.evaluate(
+              (element) => element.scrollWidth - element.clientWidth,
+            ),
+          ).toBeLessThanOrEqual(1);
+          await reviewScreenshot(page, {
+            path: info.outputPath(`tile-forbidden-geothermal-${theme}.png`),
+            animations: "disabled",
+            scale: "css",
+          });
+          return;
+        }
         await expect(
           page.getByRole("dialog", { name: "Build · Plains", exact: true }),
         ).toBeVisible();

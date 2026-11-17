@@ -30,6 +30,7 @@ const smoke = [
   "offline-launch.spec.ts",
 ];
 const layout = [
+  "build-rail.spec.ts",
   "grid-status.spec.ts",
   "project-build.spec.ts",
   "map-3d.spec.ts",

@@ -667,7 +667,10 @@ export default function TerritoryHexMap({
           className="territoryMapBuildToggle"
           aria-label="Build"
           aria-pressed={projectPlanning}
-          onClick={onPlanProject}
+          onClick={() => {
+            setBuyMode(false);
+            onPlanProject();
+          }}
         >
           <ConstructionIcon aria-hidden="true" />
           <span>Build</span>
