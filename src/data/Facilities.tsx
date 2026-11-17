@@ -1,8 +1,17 @@
+import {
+  generatorMaxPeakW,
+  storageMaxPeakWh,
+  storagePowerW,
+} from "./FacilityCapacity";
 import { availableTerritorySpecialSites } from "./Territories";
 import { isUtilityExpansionGame } from "../helpers/ExpansionContext";
 import { customEventContext } from "../helpers/CustomScenarioEvents";
 import { FACILITY_FUELS } from "./FacilityFuels";
-import { getHydroAvailability, getHydroSite } from "./HydroSites";
+import {
+  getHydroAvailability,
+  getHydroSite,
+  validHydroCapacity,
+} from "./HydroSites";
 import {
   batteryYearsToBuild,
   naturalGasCCYearsToBuild,
@@ -56,6 +65,8 @@ import {
   getTerrainModifiers,
   isOceanWindTile,
 } from "../helpers/TerrainModifiers";
+
+export { airborneWindMaxPeakW } from "./FacilityCapacity";
 
 /**
  * What a dollar in the tables below is worth by the time the game reaches this month. The tables
@@ -302,10 +313,6 @@ export function airborneWindCostPerW(year: number): number {
   return costBetween(year, 2028, 7, 2035, 4.1);
 }
 
-export function airborneWindMaxPeakW(year: number): number {
-  return Math.min(500000000, 1200000 * pow(2, (year - 2028) / 2));
-}
-
 export function GENERATORS(
   state: GameType,
   peakW: number,
@@ -377,7 +384,7 @@ export function GENERATORS(
   // inventory rules above; this does not release or change any real site reservation.
   if (pinnedHydroSiteId) {
     const site = getHydroSite(pinnedHydroSiteId);
-    if (site)
+    if (site && validHydroCapacity(peakW))
       hydroAvailability = {
         status: peakW <= site.maxPeakW ? "available" : "too-large",
         remaining: [site],
@@ -430,7 +437,7 @@ export function GENERATORS(
       // The inflation-normalized AEO2020 equivalent was $4,381/kW, a 6% real decline.
       // https://www.eia.gov/analysis/studies/powerplants/capitalcost/
       peakW,
-      maxPeakW: 6000000000,
+      maxPeakW: generatorMaxPeakW(state, "Coal"),
       // ~6GW, start in the late 90's - https://www.power-technology.com/features/feature-giga-projects-the-worlds-biggest-thermal-power-plants/
       btuPerWh: 8.638,
       // AEO2025 net nominal heat rate, Btu/kWh expressed as Btu/Wh.
@@ -470,7 +477,7 @@ export function GENERATORS(
       // EIA AEO2025 reference: two brownfield AP1000s, $7,861/kW in 2023$,
       // 9% above the inflation-normalized AEO2020 estimate.
       peakW,
-      maxPeakW: 8000000000,
+      maxPeakW: generatorMaxPeakW(state, "Nuclear"),
       // ~8GW, built in the 80's - https://en.wikipedia.org/wiki/List_of_largest_power_stations#Nuclear
       btuPerWh: 10.608,
       spinMinutes: 600,
@@ -505,7 +512,7 @@ export function GENERATORS(
       peakW,
       // About five of EIA's reference turbines at one site. The larger gas stations are combined
       // cycles, which are their own facility below.
-      maxPeakW: 2000000000,
+      maxPeakW: generatorMaxPeakW(state, "Natural Gas Peaker"),
       btuPerWh: 9.142,
       spinMinutes: 10,
       annualOperatingCost: fixedOperatingCost(peakW, 6.87),
@@ -546,7 +553,7 @@ export function GENERATORS(
       // advantage is that it stays cheap when built small.
       peakW,
       // ~6GW, the largest gas stations of the late 1980s onward - https://www.power-technology.com/features/feature-giga-projects-the-worlds-biggest-thermal-power-plants/
-      maxPeakW: 6000000000,
+      maxPeakW: generatorMaxPeakW(state, "Natural Gas CC"),
       // AEO2025 Case 5 net HHV heat rate, 6,266 Btu/kWh: 31% less fuel per MWh than the peaker.
       btuPerWh: 6.266,
       // A hot start of an H-class combined cycle reaches full load in well under an hour, a
@@ -584,7 +591,7 @@ export function GENERATORS(
       // utility-scale petroleum reference plant.
       // https://www.eia.gov/electricity/generatorcosts/
       peakW,
-      maxPeakW: 6000000000,
+      maxPeakW: generatorMaxPeakW(state, "Oil"),
       // ~6GW, build in 2007 - https://www.power-technology.com/features/feature-giga-projects-the-worlds-biggest-thermal-power-plants/
       btuPerWh: 11,
       // https://www.eia.gov/electricity/annual/html/epa_08_01.html
@@ -621,7 +628,7 @@ export function GENERATORS(
       // DOE's project-screening guidance describes 10-50 MW as the economic range; larger
       // fleets can still be assembled as several plants with separate feedstock logistics.
       // https://www.energy.gov/indianenergy/transcript-may-2019-tribal-energy-webinar-series-initial-scoping-energy-projects-back
-      maxPeakW: 50000000,
+      maxPeakW: generatorMaxPeakW(state, "Biomass"),
       btuPerWh: 13.3,
       spinMinutes: 240,
       // EIA gives $154.26/kW-year fixed plus $5.93/MWh variable O&M in 2025 dollars, which are
@@ -655,7 +662,7 @@ export function GENERATORS(
       // $1,041/kW in 2024. Its outlook reaches $861/kW in 2029.
       // https://www.irena.org/Publications/2025/Jun/Renewable-Power-Generation-Costs-in-2024
       peakW,
-      maxPeakW: 1500000000,
+      maxPeakW: generatorMaxPeakW(state, "Wind"),
       // ~1.5GW, except one outlier - https://en.wikipedia.org/wiki/List_of_largest_power_stations
       btuPerWh: 0,
       annualOperatingCost: fixedOperatingCost(peakW, 33.06),
@@ -691,7 +698,7 @@ export function GENERATORS(
       // their real per-watt cost; the era multiple carries the variable part.
       // https://www.eia.gov/analysis/studies/powerplants/capitalcost/pdf/capital_cost_AEO2025.pdf
       peakW,
-      maxPeakW: Math.min(1500000000, 5000000 * pow(2, (year - 1991) / 3.5)),
+      maxPeakW: generatorMaxPeakW(state, "Offshore Wind"),
       // Largest projects roughly doubled every 3.5 years from Vindeby through Hornsea, then
       // levelled near 1.5GW; Dogger Bank's 3.6GW is three separately phased farms.
       // https://en.wikipedia.org/wiki/List_of_offshore_wind_farms
@@ -719,7 +726,7 @@ export function GENERATORS(
       // The 1.2MW NAWEP array is the source anchor. Doubling every two years and the 500MW
       // ceiling are deliberately conservative gameplay assumptions until fleet data exists.
       peakW,
-      maxPeakW: airborneWindMaxPeakW(year),
+      maxPeakW: generatorMaxPeakW(state, "Airborne Wind"),
       btuPerWh: 0,
       // NAWEP's series-production model uses EUR45.5/kW-year, converted at $1.13/EUR.
       annualOperatingCost: 0.0514 * peakW,
@@ -744,7 +751,7 @@ export function GENERATORS(
       // IRENA global installed cost fell from inflation-normalized $1,070/kW in 2020 to
       // $691/kW in 2024. Its outlook reaches $388/kW in 2029.
       peakW,
-      maxPeakW: year < 2000 ? 100000000 : 2000000000,
+      maxPeakW: generatorMaxPeakW(state, "Solar"),
       // 2000: 100MW - https://www1.eere.energy.gov/solar/pdfs/solar_timeline.pdf
       // 2019: ~2GW - https://en.wikipedia.org/wiki/List_of_largest_power_stations
       btuPerWh: 0,
@@ -778,7 +785,11 @@ export function GENERATORS(
       // 2024 at $2,267/kW. Site scarcity is now an explicit cap rather than a second price.
       peakW,
       viableLocationsRemaining: hydroLocationsRemaining,
-      maxPeakW: hydroAvailability.largest?.maxPeakW || 0,
+      maxPeakW: generatorMaxPeakW(
+        state,
+        "Hydro",
+        hydroAvailability.largest?.maxPeakW ?? 0,
+      ),
       btuPerWh: 0,
       spinMinutes: 1,
       annualOperatingCost: fixedOperatingCost(peakW, 33.54),
@@ -804,7 +815,7 @@ export function GENERATORS(
       // $4,015/kW in 2024, although its small project sample makes this series volatile.
       peakW,
       viableLocationsRemaining: geothermalLocationsRemaining,
-      maxPeakW: frontierGeothermal !== undefined ? 25e6 : 800000000,
+      maxPeakW: generatorMaxPeakW(state, "Geothermal"),
       // ~800MW, except for one outlier - https://en.wikipedia.org/wiki/List_of_largest_power_stations#Geothermal
       btuPerWh: 0,
       annualOperatingCost: fixedOperatingCost(peakW, 150.6),
@@ -834,7 +845,7 @@ export function GENERATORS(
       // and binary plants in every scenario, because stimulation and deeper wells add cost. The
       // $3/W figure is an aspiration, and EGS has no site limit to ration it.
       peakW,
-      maxPeakW: 500000000,
+      maxPeakW: generatorMaxPeakW(state, "Enhanced Geothermal"),
       btuPerWh: 0,
       annualOperatingCost: 0.16 * peakW,
       minimumStableOutput:
@@ -970,12 +981,11 @@ export function STORAGE(state: GameType, peakWh: number) {
       buildCost: 10000 + batteryCostPerWh(year) * peakWh,
       // NREL's 2020 four-hour benchmark was $345/kWh (2020$); IRENA's global fully installed
       // cost reached $192/kWh in 2024, a 54% real decline after CPI normalization.
-      peakW: 0.25 * peakWh,
+      peakW: storagePowerW("Battery", peakWh),
       // Four-hour duration is now the representative utility-scale configuration in both NREL
       // ATB and EIA AEO2025, replacing the old Powerpack-derived 1.25-hour assumption.
       peakWh,
-      maxPeakWh:
-        (year < 2021 ? 200000000 : 600000000) * pow(2, (year - 2018) / 4),
+      maxPeakWh: storageMaxPeakWh("Battery", year),
       // Tesla 129MWh is largest in world in 2018 - https://hornsdalepowerreserve.com.au/
       // ~2021 largest will be 1.2GWh - https://cleantechnica.com/2020/02/27/humongous-tesla-battery-plant-approved-in-california-is-10x-bigger-than-worlds-biggest-battery-plant/
       // Largest was 50MWh in 2016 - https://en.wikipedia.org/wiki/Battery_storage_power_station#Lithium-ion
@@ -1001,9 +1011,9 @@ export function STORAGE(state: GameType, peakWh: number) {
       // Form's projected 2030 system costs, in 2022 dollars, normalized to 2023 dollars.
       // $2,150/kW includes repowering; $17.50/kW-year is fixed O&M. No tax credit.
       buildCost: (2150 / 100000) * (304.702 / 292.655) * peakWh,
-      peakW: peakWh / 100,
+      peakW: storagePowerW("Iron-Air Battery", peakWh),
       peakWh,
-      maxPeakWh: 10000000000,
+      maxPeakWh: storageMaxPeakWh("Iron-Air Battery", year),
       // Provisional installed-system proxy, not a measured Form Energy LCA.
       constructionKgco2ePerWh: 0.08,
       lifespanYears: 20,
@@ -1023,11 +1033,11 @@ export function STORAGE(state: GameType, peakWh: number) {
       buildCost: 2000000 + 0.3319 * peakWh,
       // NREL's 2024 ATB closed-loop sites span $2,205-$4,434/kW. At this facility's ten-hour
       // duration, the midpoint is $332/kWh; costs are held flat because the technology is mature.
-      peakW: 0.1 * peakWh,
+      peakW: storagePowerW("Pumped Hydro", peakWh),
       viableLocationsRemaining: pumpedHydroLocationsRemaining,
       // Around 1/5th to 1/20th for larger projects - https://en.wikipedia.org/wiki/List_of_pumped-storage_hydroelectric_power_stations
       peakWh,
-      maxPeakWh: 20000000000,
+      maxPeakWh: storageMaxPeakWh("Pumped Hydro", year),
       // 24GWh, build in 1970's - http://large.stanford.edu/courses/2014/ph240/galvan-lopez2/
       // Resource availability above keeps this out of regions without suitable hydro potential.
       constructionKgco2ePerWh: 0.06,

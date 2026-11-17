@@ -1,9 +1,17 @@
+import { FACILITY_FUELS } from "../data/FacilityFuels";
+import {
+  generatorMaxPeakW,
+  storageMaxPeakWh,
+  storagePowerW,
+} from "../data/FacilityCapacity";
+import { getDateFromMinute } from "./DateTime";
 import { getBuildFacilityQuote } from "../data/Facilities";
 import { getInflationIndex } from "../data/Economy";
-import { getHydroSite } from "../data/HydroSites";
+import { getHydroSite, validHydroCapacity } from "../data/HydroSites";
 import {
   isStorage,
   type ExpandFacilityAction,
+  type CancelFacilityExpansionAction,
   type FacilityExpansionInProgressType,
   type FacilityOperatingType,
   type GameType,
@@ -49,6 +57,24 @@ export function validExpandFacilityAction(
   );
 }
 
+/** Delayed cancellations must identify the project, never just its reusable plant ID. */
+export function validCancelFacilityExpansionAction(
+  raw: unknown,
+): raw is CancelFacilityExpansionAction {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return false;
+  const action = raw as Record<string, unknown>;
+  return (
+    Object.keys(action).every((key) =>
+      ["facilityId", "quoteKey"].includes(key),
+    ) &&
+    Number.isSafeInteger(action.facilityId) &&
+    (action.facilityId as number) >= 0 &&
+    typeof action.quoteKey === "string" &&
+    action.quoteKey.length > 0 &&
+    action.quoteKey.length <= 2000
+  );
+}
+
 /** Canonical current-era target less current-era equivalent; no historic purchase-price credit. */
 export function facilityExpansionQuote(
   game: GameType,
@@ -61,6 +87,9 @@ export function facilityExpansionQuote(
   ): FacilityExpansionQuote => ({ status: "unavailable", reason, maxSize });
   const facility = game.facilities.find(({ id }) => id === facilityId);
   if (!facility) return unavailable("Plant not found.");
+  const projectSequence = (facility.expansionSequence ?? 0) + 1;
+  if (!Number.isSafeInteger(projectSequence) || projectSequence <= 0)
+    return unavailable("No further capacity projects can be started.");
   if (facility.yearsToBuildLeft > 0)
     return unavailable("Finish construction first.");
   if (facility.expansionInProgress)
@@ -136,7 +165,9 @@ export function facilityExpansionQuote(
   const target = quoteAt(targetSize);
   if (!current || !target)
     return unavailable("This capacity is unavailable for expansion.", maxSize);
-  const targetPeakW = facility.peakW + target.peakW - current.peakW;
+  const targetPeakW = isStorage(facility)
+    ? facility.peakW + (target.peakW - current.peakW)
+    : targetSize;
   if (tile && !tileFitsFacility(tile, { ...target, peakW: targetPeakW }))
     return unavailable(
       "This capacity exceeds the building tile limit.",
@@ -184,9 +215,11 @@ export function facilityExpansionQuote(
     facility.resilience,
     game.date.year,
     game.date.month,
+    projectSequence,
   ]);
   return {
     status: "ready",
+    projectSequence,
     facilityId,
     currentSize,
     targetSize,
@@ -242,10 +275,17 @@ export function validFacilityExpansion(
   facility: FacilityOperatingType,
   game: GameType,
 ): boolean {
+  if (
+    facility.expansionSequence !== undefined &&
+    (!Number.isSafeInteger(facility.expansionSequence) ||
+      facility.expansionSequence < 1)
+  )
+    return false;
   const raw = facility.expansionInProgress;
   if (raw === undefined) return true;
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return false;
   const allowed = [
+    "projectSequence",
     "targetSize",
     "targetPeakW",
     "targetPeakWh",
@@ -288,6 +328,9 @@ export function validFacilityExpansion(
   )
     return false;
   if (
+    !Number.isSafeInteger(raw.projectSequence) ||
+    raw.projectSequence < 1 ||
+    raw.projectSequence !== facility.expansionSequence ||
     facility.yearsToBuildLeft !== 0 ||
     facility.upgradeInProgress ||
     raw.targetSize > 1e12 ||
@@ -309,6 +352,36 @@ export function validFacilityExpansion(
       : raw.targetPeakWh !== undefined || raw.targetSize !== raw.targetPeakW
   )
     return false;
+  const identity = Object.entries(FACILITY_FUELS).find(
+    ([name]) => name === facility.name,
+  );
+  if (
+    !identity ||
+    identity[1] !== facility.fuel ||
+    (facility.fuel === "Natural Gas" &&
+      facility.gasCycle !==
+        (facility.name === "Natural Gas CC" ? "combined" : "simple"))
+  )
+    return false;
+  const projectContext = {
+    ...game,
+    date: getDateFromMinute(raw.startsMinute, game.startingYear),
+  };
+  const maxSize = isStorage(facility)
+    ? storageMaxPeakWh(facility.name, projectContext.date.year)
+    : generatorMaxPeakW(
+        projectContext,
+        facility.name,
+        getHydroSite(facility.hydroSiteId ?? "")?.maxPeakW,
+      );
+  if (raw.targetSize > maxSize) return false;
+  if (isStorage(facility)) {
+    const expectedPeakW =
+      facility.peakW +
+      (storagePowerW(facility.name, raw.targetSize) -
+        storagePowerW(facility.name, facility.peakWh));
+    if (raw.targetPeakW !== expectedPeakW) return false;
+  }
   // The review identity is also a cross-check of duplicated persisted terms. No prices are
   // recalculated during import: weather/economic datasets may not yet have been loaded.
   let reviewed: unknown;
@@ -317,7 +390,7 @@ export function validFacilityExpansion(
   } catch {
     return false;
   }
-  if (!Array.isArray(reviewed) || reviewed.length !== 15) return false;
+  if (!Array.isArray(reviewed) || reviewed.length !== 16) return false;
   const same = (actual: unknown, expected: number) =>
     typeof actual === "number" &&
     Number.isFinite(actual) &&
@@ -333,6 +406,9 @@ export function validFacilityExpansion(
     reviewed[3] !== raw.targetSize ||
     reviewed[4] !== raw.targetPeakW ||
     reviewed[5] !== raw.cost ||
+    reviewed[15] !== raw.projectSequence ||
+    reviewed[13] !== projectContext.date.year ||
+    reviewed[14] !== projectContext.date.month ||
     reviewed[6] !== raw.yearsToBuild ||
     !same(reviewed[7], raw.annualOperatingCostDelta / moneyScale) ||
     !same(reviewed[8], raw.costPerStartDelta / moneyScale) ||
@@ -359,7 +435,12 @@ export function validFacilityExpansion(
   }
   if (facility.fuel === "Hydro" && !isStorage(facility)) {
     const site = facility.hydroSiteId && getHydroSite(facility.hydroSiteId);
-    if (!site || raw.targetPeakW > site.maxPeakW) return false;
+    if (
+      !site ||
+      !validHydroCapacity(raw.targetPeakW) ||
+      raw.targetPeakW > site.maxPeakW
+    )
+      return false;
   }
   return true;
 }

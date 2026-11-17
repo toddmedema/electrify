@@ -1,3 +1,4 @@
+import * as FacilityCatalog from "../data/Facilities";
 import cloneDeep from "lodash.clonedeep";
 import { YEARS_PER_TICK, TICKS_PER_MONTH } from "../Constants";
 import { getBuildFacilityQuote, STORAGE } from "../data/Facilities";
@@ -161,7 +162,10 @@ it("cancels and sells pending equity exactly once, without reversing emitted con
   const beforeCarbon = started.facilities[0].constructionKgco2eEmitted ?? 0;
   const cancelled = reducer(
     started,
-    cancelFacilityExpansion(started.facilities[0].id),
+    cancelFacilityExpansion({
+      facilityId: started.facilities[0].id,
+      quoteKey: expansion.quoteKey,
+    }),
   );
   expect(currentCash(cancelled)).toBeCloseTo(currentCash(game), 3);
   expect(cancelled.facilities[0].constructionKgco2eEmitted).toBe(
@@ -169,7 +173,13 @@ it("cancels and sells pending equity exactly once, without reversing emitted con
   );
   expect(cancelled.facilities[0].expansionInProgress).toBeUndefined();
   expect(
-    reducer(cancelled, cancelFacilityExpansion(started.facilities[0].id)),
+    reducer(
+      cancelled,
+      cancelFacilityExpansion({
+        facilityId: started.facilities[0].id,
+        quoteKey: expansion.quoteKey,
+      }),
+    ),
   ).toEqual(cancelled);
   expect(
     currentCash(reducer(started, sellFacility(started.facilities[0].id))),
@@ -307,7 +317,10 @@ it("round trips pending work, rejects malformed saves, blocks retrofits and keep
   expect(saved).not.toBeNull();
   expect(saved!.game.facilities).toEqual(game.facilities);
   expect(
-    validateGameCommand(game, "cancelFacilityExpansion", game.facilities[0].id),
+    validateGameCommand(game, "cancelFacilityExpansion", {
+      facilityId: game.facilities[0].id,
+      quoteKey: game.facilities[0].expansionInProgress!.quoteKey,
+    }),
   ).toHaveProperty("payload");
   const frozen = reducer(
     game,
@@ -371,4 +384,246 @@ it("pins hydro expansion to its original named site without releasing any other 
     "unavailable",
   );
   expect(parseSave(serializeSave(started))).not.toBeNull();
+});
+
+it("keeps decimal generator targets exact through pending and completed save round trips", () => {
+  const original = setup();
+  const target = 220000000.1;
+  const started = begin(original, original.facilities[0].id, target);
+  expect(started.facilities[0].expansionInProgress!.targetPeakW).toBe(target);
+  expect(parseSave(serializeSave(started))).not.toBeNull();
+  started.facilities[0].expansionInProgress!.yearsToBuildLeft =
+    YEARS_PER_TICK / 2;
+  tickState(started);
+  expect(started.facilities[0].peakW).toBe(target);
+  expect(parseSave(serializeSave(started))).not.toBeNull();
+});
+
+it("rejects fractional hydro targets in live quotes and imported pending projects", () => {
+  const initial = setup(103);
+  const hydroQuote = getBuildFacilityQuote(initial, {
+    name: "Hydro",
+    peakW: 1e6,
+  })!;
+  const game = cloneDeep(
+    reducer(initial, buildFacility({ facility: hydroQuote, financed: false })),
+  );
+  const hydro = game.facilities.find((facility) => facility.fuel === "Hydro")!;
+  hydro.yearsToBuildLeft = 0;
+  hydro.minuteOperational = 0;
+  game.commissionedHydroSiteIds.push(hydro.hydroSiteId!);
+  expect(facilityExpansionQuote(game, hydro.id, 1000000.5).status).toBe(
+    "unavailable",
+  );
+  const started = begin(game, hydro.id, 1000001);
+  const saved = serializeSave(started);
+  const pending = saved.game.facilities.find(
+    ({ id }) => id === hydro.id,
+  )!.expansionInProgress!;
+  const key = JSON.parse(pending.quoteKey);
+  pending.targetSize = pending.targetPeakW = key[3] = key[4] = 1000000.5;
+  pending.quoteKey = JSON.stringify(key);
+  expect(parseSave(saved)).toBeNull();
+});
+
+it("rejects a self-consistent forged technology limit on import", () => {
+  const original = setup();
+  const started = begin(original);
+  expect(
+    facilityExpansionQuote(original, original.facilities[0].id, 100e9).status,
+  ).toBe("unavailable");
+  const oversized = serializeSave(started);
+  const pending = oversized.game.facilities[0].expansionInProgress!;
+  const key = JSON.parse(pending.quoteKey);
+  pending.targetSize = pending.targetPeakW = key[3] = key[4] = 100e9;
+  pending.quoteKey = JSON.stringify(key);
+  expect(parseSave(oversized)).toBeNull();
+});
+
+it("rejects self-consistent forged storage power geometry on import", () => {
+  const original = setup(100);
+  const storageQuote = STORAGE(original, 10e6).find(
+    ({ name }) => name === "Battery",
+  )!;
+  const withStorage = cloneDeep(
+    reducer(
+      original,
+      buildFacility({ facility: storageQuote, financed: false }),
+    ),
+  );
+  const storage = withStorage.facilities.find(isStorage)!;
+  storage.yearsToBuildLeft = 0;
+  storage.minuteOperational = 0;
+  const expanded = begin(withStorage, storage.id, 20e6);
+  expect(parseSave(serializeSave(expanded))).not.toBeNull();
+  const malformed = serializeSave(expanded);
+  const storagePending = malformed.game.facilities.find(
+    ({ id }) => id === storage.id,
+  )!.expansionInProgress!;
+  const storageKey = JSON.parse(storagePending.quoteKey);
+  storagePending.targetPeakW = storageKey[4] = 1e9;
+  storagePending.quoteKey = JSON.stringify(storageKey);
+  expect(parseSave(malformed)).toBeNull();
+});
+
+it("records only material completed expansions and retains earlier completed work after cancellation or sale", () => {
+  const original = setup();
+  const lever = `asset-expansion:${original.facilities[0].id}`;
+  const started = begin(original);
+  expect(
+    started.meaningfulDecisions.some((decision) => decision.lever === lever),
+  ).toBe(false);
+  const sold = reducer(
+    cloneDeep(started),
+    sellFacility(started.facilities[0].id),
+  );
+  expect(
+    sold.meaningfulDecisions.some((decision) => decision.lever === lever),
+  ).toBe(false);
+  started.facilities[0].expansionInProgress!.yearsToBuildLeft =
+    YEARS_PER_TICK / 2;
+  tickState(started);
+  const completedDecision = started.meaningfulDecisions.find(
+    (decision) => decision.lever === lever,
+  );
+  expect(completedDecision).toBeDefined();
+  const second = begin(started);
+  const canceled = reducer(second, {
+    type: cancelFacilityExpansion.type,
+    payload: {
+      facilityId: second.facilities[0].id,
+      quoteKey: second.facilities[0].expansionInProgress!.quoteKey,
+    },
+  });
+  expect(
+    canceled.meaningfulDecisions.find((decision) => decision.lever === lever),
+  ).toEqual(completedDecision);
+  const soldLater = reducer(second, sellFacility(second.facilities[0].id));
+  expect(
+    soldLater.meaningfulDecisions.find((decision) => decision.lever === lever),
+  ).toEqual(completedDecision);
+  const tiny = begin(
+    original,
+    original.facilities[0].id,
+    original.facilities[0].peakW + 1,
+  );
+  tiny.facilities[0].expansionInProgress!.yearsToBuildLeft = YEARS_PER_TICK / 2;
+  tickState(tiny);
+  expect(
+    tiny.meaningfulDecisions.some((decision) => decision.lever === lever),
+  ).toBe(false);
+});
+
+it("binds reducer cancellation and stale starts to an identity retained across cancellation, completion and saves", () => {
+  const original = setup();
+  const first = begin(original);
+  const id = first.facilities[0].id;
+  const firstProject = first.facilities[0].expansionInProgress!;
+  const cancelA = { facilityId: id, quoteKey: firstProject.quoteKey };
+  const canceled = reducer(first, cancelFacilityExpansion(cancelA));
+  const resumed = parseSave(serializeSave(canceled))!.game;
+  const second = begin(resumed, id, firstProject.targetSize);
+  const projectB = second.facilities[0].expansionInProgress!;
+  expect(projectB.quoteKey).not.toBe(firstProject.quoteKey);
+  expect(projectB.projectSequence).toBeGreaterThan(
+    firstProject.projectSequence,
+  );
+  expect(reducer(second, cancelFacilityExpansion(cancelA))).toEqual(second);
+  expect(
+    reducer(second, { type: cancelFacilityExpansion.type, payload: id }),
+  ).toEqual(second);
+  const empty = reducer(
+    second,
+    cancelFacilityExpansion({ facilityId: id, quoteKey: projectB.quoteKey }),
+  );
+  expect(
+    reducer(
+      empty,
+      expandFacility({
+        facilityId: id,
+        targetSize: firstProject.targetSize,
+        quoteKey: firstProject.quoteKey,
+      }),
+    ),
+  ).toEqual(empty);
+  const third = begin(empty);
+  third.facilities[0].expansionInProgress!.yearsToBuildLeft =
+    YEARS_PER_TICK / 2;
+  const sequence = third.facilities[0].expansionSequence!;
+  tickState(third);
+  expect(third.facilities[0].expansionSequence).toBe(sequence);
+  expect(
+    parseSave(serializeSave(third))!.game.facilities[0].expansionSequence,
+  ).toBe(sequence);
+});
+
+it("validates pending imports without repricing and leaves inherited oversized plants loadable", () => {
+  const original = setup();
+  const started = begin(original);
+  const price = jest
+    .spyOn(FacilityCatalog, "getBuildFacilityQuote")
+    .mockImplementation(() => {
+      throw new Error("Save validation must not reprice a project");
+    });
+  try {
+    expect(parseSave(serializeSave(started))).not.toBeNull();
+    expect(price).not.toHaveBeenCalled();
+  } finally {
+    price.mockRestore();
+  }
+  const inherited = cloneDeep(original);
+  inherited.facilities[0].peakW = 100e9;
+  expect(parseSave(serializeSave(inherited))).not.toBeNull();
+  expect(
+    facilityExpansionQuote(inherited, inherited.facilities[0].id, 100e9 + 1)
+      .status,
+  ).toBe("unavailable");
+});
+
+it("enforces the project's era ceiling even when an imported review key agrees with an impossible target", () => {
+  const original = setup(117);
+  const plant = original.facilities.find(({ name }) => name === "Coal")!;
+  const target = Math.min(500000, plant.peakW * 1.2);
+  const started = begin(original, plant.id, target);
+  expect(parseSave(serializeSave(started))).not.toBeNull();
+  expect(facilityExpansionQuote(original, plant.id, 1e6).status).toBe(
+    "unavailable",
+  );
+  const malformed = serializeSave(started);
+  const pending = malformed.game.facilities.find(
+    ({ id }) => id === plant.id,
+  )!.expansionInProgress!;
+  const key = JSON.parse(pending.quoteKey);
+  pending.targetSize = pending.targetPeakW = key[3] = key[4] = 1e6;
+  pending.quoteKey = JSON.stringify(key);
+  expect(parseSave(malformed)).toBeNull();
+});
+
+it("rejects imported storage targets over the era ceiling while preserving inherited storage power geometry", () => {
+  const initial = setup(100);
+  const storageQuote = STORAGE(initial, 10e6).find(
+    ({ name }) => name === "Battery",
+  )!;
+  const game = cloneDeep(
+    reducer(
+      initial,
+      buildFacility({ facility: storageQuote, financed: false }),
+    ),
+  );
+  const storage = game.facilities.find(isStorage)!;
+  storage.yearsToBuildLeft = 0;
+  storage.minuteOperational = 0;
+  storage.peakW = storage.peakWh * 0.8; // An inherited vintage with today's four-hour additions.
+  const started = begin(game, storage.id, 20e6);
+  expect(parseSave(serializeSave(started))).not.toBeNull();
+  const malformed = serializeSave(started);
+  const pending = malformed.game.facilities.find(
+    ({ id }) => id === storage.id,
+  )!.expansionInProgress!;
+  const key = JSON.parse(pending.quoteKey);
+  pending.targetSize = pending.targetPeakWh = key[3] = 100e9;
+  pending.targetPeakW = key[4] =
+    storage.peakW + (100e9 - storage.peakWh) * 0.25;
+  pending.quoteKey = JSON.stringify(key);
+  expect(parseSave(malformed)).toBeNull();
 });

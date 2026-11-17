@@ -120,6 +120,7 @@ it("does not apply co-op construction locally when disconnected", async () => {
 
 it("waits after the receipt for the exact target and quote rather than an unrelated projected expansion", async () => {
   const { store, payload, facility } = setup(true);
+  const initial = cloneDeep(store.getState().game);
   const submit = jest.fn(async () => undefined);
   runtime(submit);
   let settled = false;
@@ -149,7 +150,8 @@ it("waits after the receipt for the exact target and quote rather than an unrela
   );
   await new Promise<void>((resolve) => setTimeout(resolve, 80));
   expect(settled).toBe(false);
-  store.dispatch(cancelFacilityExpansion(facility.id));
+  // Replace a stale projection with the authoritative initial snapshot and accepted project.
+  store.dispatch(gameDelta(initial));
   store.dispatch(expandFacility(payload));
   expect(await result).toEqual({ status: "accepted" });
 });
@@ -197,10 +199,15 @@ it("waits for authoritative cancellation rather than treating its receipt as a r
   expect(submit).toHaveBeenCalledWith({
     kind: "action",
     name: "cancelFacilityExpansion",
-    payload: payload.facilityId,
+    payload: { facilityId: payload.facilityId, quoteKey: payload.quoteKey },
   });
   expect(settled).toBe(false);
-  store.dispatch(cancelFacilityExpansion(payload.facilityId));
+  store.dispatch(
+    cancelFacilityExpansion({
+      facilityId: payload.facilityId,
+      quoteKey: payload.quoteKey,
+    }),
+  );
   expect(await result).toEqual({ status: "accepted", refund: quote.cost });
 });
 
@@ -227,7 +234,12 @@ it("rejects a cancellation after a run change even if its plant ID matches", asy
   const { store, payload } = setup(true);
   store.dispatch(expandFacility(payload));
   runtime(async () => {
-    store.dispatch(cancelFacilityExpansion(payload.facilityId));
+    store.dispatch(
+      cancelFacilityExpansion({
+        facilityId: payload.facilityId,
+        quoteKey: payload.quoteKey,
+      }),
+    );
     store.dispatch(uiDelta({ evidenceRunId: 1 }));
     throw new Error("Run changed");
   });
@@ -252,4 +264,43 @@ it("rejects a cancellation review belonging to a different project", async () =>
   expect(
     store.getState().game.facilities[0].expansionInProgress?.quoteKey,
   ).toBe(payload.quoteKey);
+});
+
+it("sends the reviewed identity to the host and rejects a replacement arriving before its receipt", async () => {
+  const { store, payload } = setup(true);
+  store.dispatch(expandFacility(payload));
+  const cancelA = {
+    facilityId: payload.facilityId,
+    quoteKey: payload.quoteKey,
+  };
+  const submit = jest.fn(async () => {
+    store.dispatch(cancelFacilityExpansion(cancelA));
+    const quote = facilityExpansionQuote(
+      store.getState().game,
+      payload.facilityId,
+      payload.targetSize,
+    );
+    if (quote.status !== "ready") throw new Error(quote.reason);
+    store.dispatch(
+      expandFacility({
+        facilityId: payload.facilityId,
+        targetSize: payload.targetSize,
+        quoteKey: quote.quoteKey,
+      }),
+    );
+    store.dispatch(cancelFacilityExpansion(cancelA));
+  });
+  runtime(submit);
+  const result = await store.dispatch(
+    requestCancelFacilityExpansion(payload.facilityId, payload.quoteKey),
+  );
+  expect(result.status).toBe("rejected");
+  expect(submit).toHaveBeenCalledWith({
+    kind: "action",
+    name: "cancelFacilityExpansion",
+    payload: cancelA,
+  });
+  expect(
+    store.getState().game.facilities[0].expansionInProgress!.quoteKey,
+  ).not.toBe(payload.quoteKey);
 });

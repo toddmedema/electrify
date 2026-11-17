@@ -110,6 +110,6 @@ export const acquireLand =
 export const expandFacility = createAction<
   import("../Types").ExpandFacilityAction
 >("game/expandFacility");
-export const cancelFacilityExpansion = createAction<number>(
-  "game/cancelFacilityExpansion",
-);
+export const cancelFacilityExpansion = createAction<
+  import("../Types").CancelFacilityExpansionAction
+>("game/cancelFacilityExpansion");

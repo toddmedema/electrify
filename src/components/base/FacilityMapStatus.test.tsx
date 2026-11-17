@@ -65,7 +65,9 @@ it("prioritizes construction over operation pause and retained output", () => {
 
 it("shows added-capacity construction without classifying the operating base as offline", () => {
   const { view, facility } = ready();
+  facility.expansionSequence = 1;
   facility.expansionInProgress = {
+    projectSequence: 1,
     targetSize: facility.peakW + 1e6,
     targetPeakW: facility.peakW + 1e6,
     cost: 1e6,

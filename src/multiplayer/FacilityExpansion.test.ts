@@ -82,7 +82,7 @@ it("host prices and cancels only the sender's facilities and preserves a pending
     command(world, "0", {
       kind: "action",
       name: "cancelFacilityExpansion",
-      payload: original.id,
+      payload: { facilityId: original.id, quoteKey: quote.quoteKey },
     }),
   ).toBeUndefined();
   expect(world.grids[0].facilities[0].expansionInProgress).toBeUndefined();
@@ -90,7 +90,68 @@ it("host prices and cancels only the sender's facilities and preserves a pending
     command(world, "0", {
       kind: "action",
       name: "cancelFacilityExpansion",
-      payload: original.id,
+      payload: { facilityId: original.id, quoteKey: quote.quoteKey },
     }),
   ).toBeDefined();
+});
+
+it("rejects delayed cancellation and start commands after an identical same-month replacement", () => {
+  createGame({ scenarioId: 104 });
+  const world = createWorld(
+    { scenarioId: 104, difficulty: "Employee" },
+    coopSeats(2),
+    "replacement",
+    "epoch",
+  );
+  const game = world.grids[0];
+  currentTick(game)!.cash = 1e12;
+  const id = game.facilities[0].id;
+  const target = game.facilities[0].peakW * 1.2;
+  const first = facilityExpansionQuote(game, id, target);
+  if (first.status !== "ready") throw new Error(first.reason);
+  const startA: Command = {
+    kind: "action",
+    name: "expandFacility",
+    payload: { facilityId: id, targetSize: target, quoteKey: first.quoteKey },
+  };
+  const cancelA: Command = {
+    kind: "action",
+    name: "cancelFacilityExpansion",
+    payload: { facilityId: id, quoteKey: first.quoteKey },
+  };
+  expect(command(world, "0", startA)).toBeUndefined();
+  expect(command(world, "0", cancelA)).toBeUndefined();
+  const second = facilityExpansionQuote(world.grids[0], id, target);
+  if (second.status !== "ready") throw new Error(second.reason);
+  expect(second.quoteKey).not.toBe(first.quoteKey);
+  expect(
+    command(world, "0", {
+      kind: "action",
+      name: "expandFacility",
+      payload: {
+        facilityId: id,
+        targetSize: target,
+        quoteKey: second.quoteKey,
+      },
+    }),
+  ).toBeUndefined();
+  const cash = currentTick(world.grids[0])!.cash;
+  expect(command(world, "0", cancelA)).toBeDefined();
+  expect(command(world, "0", startA)).toBeDefined();
+  expect(
+    command(world, "0", {
+      kind: "action",
+      name: "cancelFacilityExpansion",
+      payload: id,
+    }),
+  ).toBeDefined();
+  expect(currentTick(world.grids[0])!.cash).toBe(cash);
+  expect(world.grids[0].facilities[0].expansionInProgress!.quoteKey).toBe(
+    second.quoteKey,
+  );
+  const restored = restoreWorld(checkpointWorld(world), "restored");
+  expect(restored.grids[0].facilities[0].expansionSequence).toBe(
+    second.projectSequence,
+  );
+  expect(command(restored, "0", cancelA)).toBeDefined();
 });

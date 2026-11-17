@@ -633,6 +633,8 @@ interface SharedOperatingType
   extends LoanInfo, LifetimeTotals, ConstructionEmissions {
   /** Added capacity stays unavailable until this cash-funded project completes. */
   expansionInProgress?: FacilityExpansionInProgressType;
+  /** Last started expansion identity, retained after cancellation and completion. */
+  expansionSequence?: number;
   startingAssetId?: string;
   territoryId?: TerritoryId;
   /** Exactly one developed map cell; absent outside the territory scenario. */
@@ -1201,8 +1203,15 @@ export interface ExpandFacilityAction {
   quoteKey: string;
 }
 
+/** Cancel only the exact reviewed project, including across host command delays. */
+export interface CancelFacilityExpansionAction {
+  facilityId: number;
+  quoteKey: string;
+}
+
 /** Size-dependent additions only: identity, age, efficiency, debt and stored energy stay put. */
 export interface FacilityExpansionInProgressType extends ConstructionEmissions {
+  projectSequence: number;
   targetSize: number;
   targetPeakW: number;
   targetPeakWh?: number;

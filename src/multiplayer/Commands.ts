@@ -1,6 +1,7 @@
 import {
   facilityExpansionQuote,
   validExpandFacilityAction,
+  validCancelFacilityExpansionAction,
 } from "../helpers/FacilityExpansion";
 import { isTerritoryTileId } from "../helpers/TerritoryTiles";
 import { validPowerAgreementAction } from "../helpers/PowerAgreements";
@@ -223,9 +224,11 @@ const GAME_COMMAND_VALIDATORS = {
         };
   },
   cancelFacilityExpansion: (game, payload) =>
-    Number.isSafeInteger(payload) &&
+    validCancelFacilityExpansionAction(payload) &&
     game.facilities.some(
-      (plant) => plant.id === payload && plant.expansionInProgress,
+      (plant) =>
+        plant.id === payload.facilityId &&
+        plant.expansionInProgress?.quoteKey === payload.quoteKey,
     )
       ? { payload }
       : { error: "Capacity expansion not found" },

@@ -2,6 +2,7 @@ import { expandFacility, cancelFacilityExpansion } from "./GameActions";
 import {
   facilityExpansionQuote,
   validExpandFacilityAction,
+  validCancelFacilityExpansionAction,
   completeFacilityExpansion,
 } from "../helpers/FacilityExpansion";
 import { pooledPeerExportEmissions } from "../helpers/PeerExportEmissions";
@@ -3099,8 +3100,10 @@ function applyExpandFacility(state: GameType, payload: unknown): boolean {
     ({ id }) => id === payload.facilityId,
   )!;
   now.cash -= quote.cost;
+  facility.expansionSequence = quote.projectSequence;
   // Keep only the validated project terms, not UI quote metadata or a replacement plant.
   facility.expansionInProgress = {
+    projectSequence: quote.projectSequence,
     targetSize: quote.targetSize,
     targetPeakW: quote.targetPeakW,
     ...(quote.targetPeakWh !== undefined
@@ -3125,13 +3128,6 @@ function applyExpandFacility(state: GameType, payload: unknown): boolean {
       actionTarget: { card: "FACILITIES", view: "FLEET" },
     },
   );
-  recordMeaningfulDecision(state, {
-    lever: `asset-expansion:${facility.id}`,
-    label: `Expand ${facility.name}`,
-    kind: "asset",
-    before: String(quote.currentSize),
-    after: String(quote.targetSize),
-  });
   state.timeline = reforecastSupply(state, true);
   return true;
 }
@@ -3140,11 +3136,17 @@ function applyCancelFacilityExpansion(
   state: GameType,
   payload: unknown,
 ): boolean {
-  if (!Number.isSafeInteger(payload)) return false;
-  const facility = state.facilities.find(({ id }) => id === payload);
+  if (!validCancelFacilityExpansionAction(payload)) return false;
+  const facility = state.facilities.find(({ id }) => id === payload.facilityId);
   const expansion = facility?.expansionInProgress;
   const now = getTimeFromTimeline(state.date.minute, state.timeline);
-  if (!facility || !expansion || !now) return false;
+  if (
+    !facility ||
+    !expansion ||
+    expansion.quoteKey !== payload.quoteKey ||
+    !now
+  )
+    return false;
   now.cash += expansion.cost;
   // Cancellation refunds committed capital, never construction emissions already released.
   const emitted = expansion.constructionKgco2eEmitted ?? 0;
@@ -3153,9 +3155,6 @@ function applyCancelFacilityExpansion(
   facility.constructionKgco2eEmitted =
     (facility.constructionKgco2eEmitted ?? 0) + emitted;
   delete facility.expansionInProgress;
-  state.meaningfulDecisions = state.meaningfulDecisions.filter(
-    ({ lever }) => lever !== `asset-expansion:${facility.id}`,
-  );
   logGameEvent(
     state,
     "BUILD",
@@ -5633,7 +5632,20 @@ function* supplyFacilitiesFinancesPhases(
     );
     accrueConstruction(expansion, expansion.yearsToBuild);
     if (expansion.yearsToBuildLeft > 0) return;
+    const previousCapacityW = facility.peakW;
+    const previousSize = facility.peakWh ?? facility.peakW;
     completeFacilityExpansion(facility);
+    if (
+      !simulated &&
+      isMaterialCapacityDecision(state, facility.peakW - previousCapacityW)
+    )
+      recordMeaningfulDecision(state, {
+        lever: `asset-expansion:${facility.id}`,
+        label: `Expand ${facility.name}`,
+        kind: "asset",
+        before: String(previousSize),
+        after: String(facility.peakWh ?? facility.peakW),
+      });
     if (!simulated)
       logGameEvent(
         state,

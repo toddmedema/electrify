@@ -123,12 +123,20 @@ export const requestCancelFacilityExpansion =
       getState().ui?.evidenceRunId === initial.ui?.evidenceRunId &&
       getState().game.seed === initial.game.seed &&
       getState().game.scenarioId === initial.game.scenarioId;
+    const payload = { facilityId, quoteKey: expansion.quoteKey };
     const findOutcome = (): FacilityExpansionCancellationResult | undefined => {
       if (!sameRun()) return undefined;
       const facility = getState().game.facilities.find(
         ({ id }) => id === facilityId,
       );
-      if (!facility || facility.expansionInProgress) return undefined;
+      if (!facility) return undefined;
+      if (facility.expansionSequence !== expansion.projectSequence)
+        return {
+          status: "rejected",
+          message:
+            "The capacity upgrade changed. Review the current project before canceling.",
+        };
+      if (facility.expansionInProgress) return undefined;
       const size = facility.peakWh ?? facility.peakW;
       if (size >= expansion.targetSize)
         return {
@@ -151,9 +159,9 @@ export const requestCancelFacilityExpansion =
         await runtime.submit({
           kind: "action",
           name: "cancelFacilityExpansion",
-          payload: facilityId,
+          payload,
         });
-      } else dispatch(cancelFacilityExpansion(facilityId));
+      } else dispatch(cancelFacilityExpansion(payload));
       if (!sameRun())
         return {
           status: "rejected",
