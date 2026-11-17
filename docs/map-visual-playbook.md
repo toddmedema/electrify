@@ -75,6 +75,14 @@ Keep the marker pointer-inert and hidden from assistive technology; the tile's e
 
 Known construction and active offline retrofit take precedence over pause; the accompanying text retains both facts when operation is paused. Otherwise pause takes precedence over signed actual output, including when a generator is still winding down. Staged work that allows output keeps the actual output glyph and a retrofit text suffix. Global clock pause never changes a facility's marker, and foreign output is never inferred.
 
+## Working facility motion
+
+Use the same actual owned production status as the marker: only a known producing generator receives motion. Idle, operation-paused, unfinished, offline-retrofit and unknown foreign facilities stay still. Keep the status roundel static. Decorative motion may continue while the simulation clock is paused because the current operating state has not changed; it does not represent elapsed simulation time or a calibrated output rate.
+
+Rotate only three geometrically equal wind blades around their shared hub, leaving the mast still. Use a very restrained kite sway for airborne wind, at most two faint neutral smoke/steam puffs at a working stack, and short water streaks contained within the hydro spillway. Preserve the dam silhouette and the cable attachments. Solar panels and storage have no invented moving parts, flashes or glints.
+
+Honor `prefers-reduced-motion` and document visibility. One map-level subscription controls motion availability; do not add per-facility listeners, JavaScript animation loops, random particles, blur filters or tick-driven announcements. Use slow CSS transforms, opacity and contained dash movement. Existing viewport culling and fog apply to moving artwork exactly as they do to its body.
+
 ## Automatic network and compositing
 
 Draw terrain for all cells, then automatic network paths, then all upright occupants sorted by ground-anchor Y, then owner boundaries/selected outline and floating labels. Root may keep a subtle internal ground seam; ownership outlines surround ownership regions, not arbitrary illustration contours. Keep tile hit regions unobstructed by artwork or paths.
