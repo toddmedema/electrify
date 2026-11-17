@@ -127,7 +127,6 @@ for (const theme of ["light", "dark"] as const) {
           .evaluateAll((cards) =>
             cards.map((card) => ({
               name: card.getAttribute("data-build-option"),
-              detailed: !!card.querySelector(".buildOptionMetrics"),
               buildable: !!card.querySelector(
                 'button[aria-label^="Review purchase of"]:not(:disabled)',
               ),
@@ -136,7 +135,7 @@ for (const theme of ["light", "dark"] as const) {
         // The primary grouping is actual buildability, regardless of the selected
         // economic sort or why a later row is unavailable.
         const firstUnavailable = ordered.findIndex((card) => !card.buildable);
-        if (firstUnavailable !== -1 && scenarioId === 116)
+        if (firstUnavailable !== -1)
           expect(
             ordered.slice(firstUnavailable).some((card) => card.buildable),
           ).toBe(false);
@@ -145,13 +144,9 @@ for (const theme of ["light", "dark"] as const) {
         expect(ordered.slice(0, index).some((card) => card.buildable)).toBe(
           true,
         );
-        expect(
-          ordered
-            .slice(index)
-            .filter((card) =>
-              scenarioId === 116 ? card.buildable : card.detailed,
-            ),
-        ).toEqual([]);
+        expect(ordered.slice(index).filter((card) => card.buildable)).toEqual(
+          [],
+        );
       }
       await geothermal.scrollIntoViewIfNeeded();
       await expect(geothermal).toBeVisible();

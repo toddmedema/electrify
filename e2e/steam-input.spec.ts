@@ -838,6 +838,9 @@ test("semantic actions play, build, adjust pricing, inspect charts and save at 1
     name: "Save name",
     exact: true,
   });
+  // The actions menu can still be exiting while the rename dialog is visible.
+  // Begin directional traversal only once that earlier popup has left the input surface.
+  await expect(page.locator('[role="menu"]:visible')).toHaveCount(0);
   await select(page, saveName);
   await input(page, "confirm");
   await expect(page.locator("html")).toHaveAttribute(
@@ -1165,6 +1168,8 @@ test("controller reviews, cancels and confirms a utility acquisition", async ({
   );
   await input(page, "confirm");
   await expect(dialog).toHaveCount(0);
+  // The accessible dialog disappears before MUI's exit surface relinquishes Escape.
+  await expect(page.locator(".MuiDialog-root:visible")).toHaveCount(0);
   await expect(
     line.getByRole("button", { name: "Acquire Ridge Electric", exact: true }),
   ).toHaveCount(0);
@@ -1173,6 +1178,10 @@ test("controller reviews, cancels and confirms a utility acquisition", async ({
   await expect(ownership).not.toHaveAttribute("open");
   // The acquired city's inspector stays open. Close that input surface before
   // traversing to the ownership disclosure behind it.
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-mock-input-context",
+    "Menu",
+  );
   await input(page, "back");
   await expect(line).toHaveCount(0);
   await expect(
@@ -1460,12 +1469,19 @@ test("TV saved preferences style direct scenario links before play", async ({
   await expect(
     help.getByRole("button", { name: "close", exact: true }),
   ).toBeVisible();
-  // Visibility precedes the end of the popover's opening scale transition.
-  await help.evaluate(async (element) => {
-    await Promise.all(
-      element.getAnimations().map((animation) => animation.finished),
-    );
-  });
+  // Opening animations can be replaced while the popover finds its final position.
+  await expect
+    .poll(() =>
+      help.evaluate((element) =>
+        element
+          .getAnimations()
+          .some(
+            (animation) =>
+              animation.pending || animation.playState === "running",
+          ),
+      ),
+    )
+    .toBe(false);
   const helpBounds = await help.boundingBox();
   const articleWidth = await help.evaluate(() =>
     Math.min(

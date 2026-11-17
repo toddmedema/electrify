@@ -418,7 +418,7 @@ it("keeps buying mode and releases commitments when the host rejects, then reset
   );
 });
 
-it("closes an open inspection before leaving buying mode when Escape is pressed on the map", () => {
+it("closes inspection, exits buying and deselects with one Escape on the map", () => {
   const map = show(1e9, true);
   map.buyMode();
   const tile = map.candidates()[0];
@@ -426,13 +426,10 @@ it("closes an open inspection before leaving buying mode when Escape is pressed 
   expect(map.closeInspection).toHaveBeenCalledTimes(1);
   expect(screen.getByRole("button", { name: "Buy land" })).toHaveAttribute(
     "aria-pressed",
-    "true",
-  );
-  fireEvent.keyDown(tile, { key: "Escape" });
-  expect(screen.getByRole("button", { name: "Buy land" })).toHaveAttribute(
-    "aria-pressed",
     "false",
   );
+  expect(map.target("champlain:city")).toHaveAttribute("aria-pressed", "false");
+  expect(screen.getByRole("button", { name: "Buy land" })).toHaveFocus();
 });
 
 it("returns from map geography to its buying control after closing inspection and buying mode, then releases Escape", () => {
@@ -444,11 +441,9 @@ it("returns from map geography to its buying control after closing inspection an
   expect(map.closeInspection).toHaveBeenCalledTimes(1);
   expect(screen.getByRole("button", { name: "Buy land" })).toHaveAttribute(
     "aria-pressed",
-    "true",
+    "false",
   );
-  expect(tile).toHaveFocus();
   expect(tile).toHaveAttribute("aria-pressed", "false");
-  expect(fireEvent.keyDown(tile, { key: "Escape" })).toBe(false);
   const buy = screen.getByRole("button", { name: "Buy land" });
   expect(buy).toHaveFocus();
   // The next Back belongs to the game's global navigation again.

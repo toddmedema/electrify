@@ -694,7 +694,7 @@ for (const theme of ["light", "dark"] as const) {
     });
     await expect(review).toBeEnabled();
     const project = surface.locator('[data-build-option="Wind"]');
-    await project.evaluate((element) => {
+    const projectScrollTop = await project.evaluate((element) => {
       let scroll = element.parentElement;
       while (
         scroll &&
@@ -712,10 +712,68 @@ for (const theme of ["light", "dark"] as const) {
         element.getBoundingClientRect().top -
         scroll.getBoundingClientRect().top -
         inset;
+      return scroll.scrollTop;
     });
     await expect(surface.locator(".constructionHeader")).toBeInViewport({
       ratio: 1,
     });
+    // Scroll the project through the sticky capacity row, as a player does when
+    // browsing. Its avatar must pass behind the capacity text rather than over it.
+    if ((page.viewportSize()?.width ?? 0) <= 740)
+      await project.evaluate((element) => {
+        let scroll = element.parentElement;
+        while (
+          scroll &&
+          !["auto", "scroll"].includes(getComputedStyle(scroll).overflowY)
+        )
+          scroll = scroll.parentElement;
+        if (!scroll) throw new Error("No project scroll container");
+        const avatar = element
+          .querySelector(".MuiCardHeader-avatar")!
+          .getBoundingClientRect();
+        const capacity = element
+          .closest(".tileWorkspaceSurface")!
+          .querySelector(".constructionCapacity strong")!
+          .getBoundingClientRect();
+        scroll.scrollTop +=
+          avatar.top + avatar.height / 2 - capacity.top - capacity.height / 2;
+      });
+    await expect
+      .poll(() =>
+        surface.locator(".constructionCapacity strong").evaluate((element) => {
+          const header = element.closest(".constructionHeader")!;
+          const bounds = element.getBoundingClientRect();
+          return [
+            bounds.left + Math.min(4, bounds.width / 4),
+            bounds.left + bounds.width / 2,
+          ].flatMap((x) => {
+            const top = document.elementsFromPoint(
+              x,
+              bounds.top + bounds.height / 2,
+            )[0];
+            return top && header.contains(top)
+              ? []
+              : [
+                  top
+                    ?.closest("[data-build-option]")
+                    ?.getAttribute("data-build-option") ??
+                    top?.tagName ??
+                    "outside viewport",
+                ];
+          });
+        }),
+      )
+      .toEqual([]);
+    await project.evaluate((element, top) => {
+      let scroll = element.parentElement;
+      while (
+        scroll &&
+        !["auto", "scroll"].includes(getComputedStyle(scroll).overflowY)
+      )
+        scroll = scroll.parentElement;
+      if (!scroll) throw new Error("No project scroll container");
+      scroll.scrollTop = top;
+    }, projectScrollTop);
     await expect(project.locator(".MuiCardHeader-root")).toBeInViewport({
       ratio: 1,
     });
@@ -1126,7 +1184,7 @@ for (const theme of ["light", "dark"] as const) {
     await expect(target).toHaveAttribute("aria-pressed", "false");
     const buy = network.getByRole("button", { name: "Buy land", exact: true });
     await expect(buy).toBeFocused();
-    await expect(buy).toHaveAttribute("aria-pressed", "true");
+    await expect(buy).toHaveAttribute("aria-pressed", "false");
   });
 
   for (const customer of [
