@@ -242,9 +242,15 @@ it("leaves general sites uncapped while named sites keep their physical power li
   expect(
     territoryBuildAvailability(game, wind, "green-uplands", tile.id),
   ).toMatchObject({ buildable: true, maxPeakW: Infinity });
-  const named = TERRITORY_TILES.find((entry) => entry.siteKind === "wind")!;
+  const named = TERRITORY_TILES.find((entry) => entry.siteKind === "hydro")!;
   expect(tileFitsFacility(named, wind)).toBe(false);
-  expect(tileSupportsFacilityTechnology(named, wind)).toBe(true);
+  expect(tileSupportsFacilityTechnology(named, wind)).toBe(false);
+  expect(
+    tileFitsFacility(named, { fuel: "Hydro", peakW: named.maxPeakW! }),
+  ).toBe(true);
+  expect(
+    tileFitsFacility(named, { fuel: "Hydro", peakW: named.maxPeakW! + 1 }),
+  ).toBe(false);
   expect(
     getBuildFacilityQuote(game, wind, "green-uplands", tile.id),
   ).toBeDefined();

@@ -10,10 +10,57 @@ import {
 } from "./layout";
 import { editSavedGame, readSavedGame } from "./save-fixture";
 import { purchaseTerms } from "../src/helpers/Financials";
+import { TERRAIN_LABELS } from "../src/data/TerrainLabels";
+import { getAuthoredTerritoryTile } from "../src/data/TerritoryTiles";
 import {
   intertieBuildQuote,
   intertieContextForGame,
 } from "../src/helpers/Transmission";
+
+test("ordinary starting hills offer general technologies and retain special-site restrictions", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    localStorage.setItem("theme", "dark");
+    localStorage.setItem("audioEnabled", "false");
+  });
+  await page.goto("/?scenario=116");
+  await page.getByRole("button", { name: "Start game", exact: true }).click();
+  await returnToTerritoryMap(page);
+  await page.locator('[data-map-target="champlain:site-12"]').click();
+  const tile = getAuthoredTerritoryTile("champlain:site-12")!;
+  const panel = page.getByRole("dialog", {
+    name: `Build · ${TERRAIN_LABELS[tile.terrain]}`,
+    exact: true,
+  });
+  await expect(panel).toBeVisible();
+  await panel.getByRole("slider").press("Home");
+  const options = panel.getByRole("list", { name: "Generator options" });
+  for (const name of [
+    "Solar",
+    "Wind",
+    "Oil",
+    "Natural Gas Peaker",
+    "Natural Gas CC",
+    "Biomass",
+    "Coal",
+    "Nuclear",
+  ]) {
+    const row = options.locator(`[data-build-option="${name}"]`);
+    await expect(row).not.toContainText("Not buildable on this tile");
+    await expect(
+      row.getByRole("button", {
+        name: `Review purchase of ${name}`,
+        exact: true,
+      }),
+    ).toHaveCount(1);
+  }
+  for (const name of ["Hydro", "Geothermal", "Offshore Wind"]) {
+    const row = options.locator(`[data-build-option="${name}"]`);
+    await expect(row).toContainText("Not buildable on this tile");
+    await expect(row.getByRole("button")).toHaveCount(0);
+  }
+});
 
 for (const theme of ["light", "dark"] as const) {
   test(`biomass emissions use explicit mass units in ${theme}`, async ({

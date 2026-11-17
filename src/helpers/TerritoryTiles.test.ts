@@ -128,7 +128,7 @@ it.each([
   "champlain:city",
   "champlain:site-0",
   "champlain:site-14",
-  "champlain:site-7",
+  "champlain:site-4",
   "valley-electric:site-1",
   "imaginary",
 ])(
@@ -306,12 +306,27 @@ it("gives retained pre-map overflow projects their own cells while rejecting mal
   expect(parseSave(current)).toBeNull();
 });
 
-it("reports the selected tile's physical inventory and resize limit independently of the requested technology size", () => {
+it("reports a resource tile's physical inventory and resize limit independently of the requested technology size", () => {
   const game = ready();
-  const quote = wind(game);
-  const tile = availableTerritoryTiles(game, quote, "champlain")[0];
+  const tile = getTerritoryTile("parcel-7:site-0")!;
+  const territoryId = tile.territoryId;
+  game.territoryNetwork!.tilePurchases!.push({
+    tileId: tile.id,
+    minute: 0,
+    price: 16e6,
+  });
+  const quote = GENERATORS(
+    game,
+    tile.maxPeakW!,
+    [20],
+    [500],
+    [],
+    [],
+    territoryId,
+    tile.id,
+  ).find(({ name }) => name === "Hydro")!;
   expect(
-    territoryBuildAvailability(game, quote, "champlain", tile.id),
+    territoryBuildAvailability(game, quote, territoryId, tile.id),
   ).toMatchObject({
     buildable: true,
     total: 1,
@@ -323,7 +338,7 @@ it("reports the selected tile's physical inventory and resize limit independentl
     territoryBuildAvailability(
       game,
       { ...quote, peakW: 200e6 },
-      "champlain",
+      territoryId,
       tile.id,
     ),
   ).toMatchObject({
@@ -340,12 +355,12 @@ it("reports the selected tile's physical inventory and resize limit independentl
     buildFacility({
       facility: quote,
       financed: false,
-      territoryId: "champlain",
+      territoryId,
       tileId: tile.id,
     }),
   );
   expect(
-    territoryBuildAvailability(built, quote, "champlain", tile.id),
+    territoryBuildAvailability(built, quote, territoryId, tile.id),
   ).toMatchObject({
     buildable: false,
     total: 1,

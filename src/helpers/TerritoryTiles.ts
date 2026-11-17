@@ -75,6 +75,15 @@ export function territorySiteKind(
 }
 const water = (terrain: TerrainType) =>
   terrain === "river" || terrain === "lake" || terrain === "ocean";
+/** Legacy industrial/wind/open-land labels describe ordinary land, not exclusive technologies. */
+function isGeneralBuildingLand(tile: TerritoryTileDefinition): boolean {
+  return (
+    !tile.city &&
+    !water(tile.terrain) &&
+    tile.siteKind !== "hydro" &&
+    tile.siteKind !== "geothermal"
+  );
+}
 /** Catalogue compatibility ignores selected size, ownership, occupancy and affordability. */
 export function tileSupportsFacilityTechnology(
   tile: TerritoryTileDefinition,
@@ -92,12 +101,12 @@ export function tileSupportsFacilityTechnology(
   if (water(tile.terrain)) return kind === "hydro" && tile.siteKind === "hydro";
   return (
     tile.siteKind === kind ||
-    (tile.siteKind === "general" && kind !== "hydro" && kind !== "geothermal")
+    (isGeneralBuildingLand(tile) && kind !== "hydro" && kind !== "geothermal")
   );
 }
 /** General land has no site power cap; the technology quote still owns its size limits. */
 export function territoryTilePowerLimit(tile: TerritoryTileDefinition): number {
-  return tile.city ? 0 : tile.siteKind === "general" ? Infinity : tile.maxPeakW;
+  return tile.city ? 0 : isGeneralBuildingLand(tile) ? Infinity : tile.maxPeakW;
 }
 /** Technology eligibility and one-site power limits are separate from ownership/occupancy. */
 export function tileFitsFacility(
