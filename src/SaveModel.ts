@@ -1,4 +1,6 @@
 import { isCurrencyCode } from "./helpers/Currency";
+import { isCompletedLegacyCampaign } from "./helpers/LegacyCampaign";
+import { LEGACY_CAMPAIGN_ID } from "./data/LegacyCampaign";
 import type {
   GameType,
   ScoreBreakdownType,
@@ -353,7 +355,12 @@ export function validateStatusResult(
     ? result === undefined
     : !!result &&
         result.outcome === status &&
-        result.scenarioId === game.scenarioId &&
+        (result.scenarioId === game.scenarioId ||
+          (result.scenarioId === LEGACY_CAMPAIGN_ID &&
+            isCompletedLegacyCampaign(game))) &&
+        (status !== "completed" ||
+          !game.campaign ||
+          isCompletedLegacyCampaign(game)) &&
         result.difficulty === game.difficulty;
 }
 

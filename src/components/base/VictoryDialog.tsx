@@ -22,7 +22,7 @@ import { formatScore } from "../../helpers/Format";
 import { ResultScore, resultTitle, RunDebrief } from "./RunResult";
 import { isDesktopApp } from "../../Desktop";
 import SignInButtons from "./SignInButtons";
-import { SCENARIOS } from "../../data/Scenarios";
+import { isRankedScenarioId } from "../../data/Scenarios";
 import ResultLeaderboard from "./ResultLeaderboard";
 import { SCORE_VERSION } from "../../helpers/Scoring";
 import { isLegacyCampaignScenario } from "../../data/LegacyCampaign";
@@ -51,9 +51,7 @@ export default function VictoryDialog(props: Props): React.JSX.Element {
   const [preview, setPreview] = React.useState(false);
   const [sharing, setSharing] = React.useState(false);
   const campaign = isLegacyCampaignScenario(victory?.scenarioId);
-  const ranked = Boolean(
-    !campaign && victory?.ranked && victory?.outcome === "completed",
-  );
+  const ranked = Boolean(victory?.ranked && victory?.outcome === "completed");
   if (!victory) {
     // Rendered closed rather than not at all, so MUI can animate the dialog out
     return <Dialog open={false} />;
@@ -199,14 +197,11 @@ export default function VictoryDialog(props: Props): React.JSX.Element {
               <SignInButtons />
             </Typography>
           )}
-        {!campaign &&
+        {(!campaign || ranked) &&
           victory.outcome === "completed" &&
           victory.scoreVersion === SCORE_VERSION &&
           !victory.modded &&
-          SCENARIOS.some(
-            (scenario) =>
-              scenario.id === victory.scenarioId && !scenario.tutorialSteps,
-          ) && (
+          isRankedScenarioId(victory.scenarioId) && (
             <ResultLeaderboard
               key={`${victory.scenarioId}:${victory.difficulty}:${victory.score}`}
               scenarioId={victory.scenarioId}
@@ -218,6 +213,7 @@ export default function VictoryDialog(props: Props): React.JSX.Element {
           )}
         {victory.debrief && (
           <RunDebrief
+            compact
             debrief={victory.debrief}
             scenarioId={victory.scenarioId}
             outcome={victory.outcome}

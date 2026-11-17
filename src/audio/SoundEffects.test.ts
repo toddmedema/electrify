@@ -50,6 +50,7 @@ describe("SoundEffects", () => {
       "POWER_RESTORED",
       "BUILD_COMMITTED",
       "CONSTRUCTION_COMPLETE",
+      "ACHIEVEMENT_UNLOCKED",
       "VICTORY",
       "FAILURE",
     ];
@@ -115,6 +116,33 @@ describe("SoundEffects", () => {
     effects.play("VICTORY");
     expect(starts.length).toBeGreaterThan(0);
     expect(outputValues).toEqual(expect.arrayContaining([0, 1]));
+  });
+
+  it("coalesces rapid achievement bursts without replaying them later", () => {
+    const { context, starts } = fakeContext();
+    const effects = new SoundEffects(context as unknown as AudioContext);
+    effects.play("ACHIEVEMENT_UNLOCKED");
+    const afterFirst = starts.length;
+    effects.play("ACHIEVEMENT_UNLOCKED");
+    expect(starts).toHaveLength(afterFirst);
+    jest.advanceTimersByTime(2_000);
+    expect(starts).toHaveLength(afterFirst);
+    effects.play("ACHIEVEMENT_UNLOCKED");
+    expect(starts.length).toBeGreaterThan(afterFirst);
+  });
+
+  it("keeps achievement chimes silent while effects are muted or paused", () => {
+    const { context, starts } = fakeContext();
+    const effects = new SoundEffects(context as unknown as AudioContext);
+    effects.setVolume(0);
+    effects.play("ACHIEVEMENT_UNLOCKED");
+    effects.setVolume(1);
+    effects.pause();
+    effects.play("ACHIEVEMENT_UNLOCKED");
+    effects.resume();
+    expect(starts).toHaveLength(0);
+    effects.play("ACHIEVEMENT_UNLOCKED");
+    expect(starts.length).toBeGreaterThan(0);
   });
 
   it("does not queue automatic cues behind autoplay permission", async () => {
