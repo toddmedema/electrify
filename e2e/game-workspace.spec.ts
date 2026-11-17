@@ -641,7 +641,7 @@ for (const theme of ["light", "dark"] as const) {
     for (const label of ["Build", "Programs", "Insights", "Events"]) {
       const action = dock.getByRole("button", { name: label, exact: true });
       await expect(action).toBeVisible();
-      await expect(action).toContainText(label);
+      await expect(action).not.toContainText(label);
       await expect(action).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
       const box = (await action.boundingBox())!;
       expect(box.height).toBeGreaterThanOrEqual(
