@@ -1,5 +1,11 @@
 import * as React from "react";
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import {
+  act,
+  createEvent,
+  fireEvent,
+  render,
+  screen,
+} from "@testing-library/react";
 import { configureStore } from "@reduxjs/toolkit";
 import { Provider } from "react-redux";
 import { useAppSelector } from "../../Store";
@@ -18,6 +24,23 @@ import {
   useTerritoryTilePurchases,
 } from "../base/TerritoryTilePurchases";
 import TerritoryHexMap from "./TerritoryHexMap";
+import { hexCenter } from "../base/TerritoryHexGeometry";
+
+it("releases arrow navigation to surrounding controls at the known map boundary", () => {
+  const game = createGame({ scenarioId: 116, seed: 188 });
+  const north = territoryTileViews(game)
+    .map(({ tile }) => tile)
+    .sort((a, b) => hexCenter(a).y - hexCenter(b).y)[0];
+  const map = show(1e9, false, north.id);
+  const target = map.target(north.id);
+  const event = createEvent.keyDown(target, {
+    key: "ArrowUp",
+    bubbles: true,
+    cancelable: true,
+  });
+  fireEvent(target, event);
+  expect(event.defaultPrevented).toBe(false);
+});
 
 // jsdom has no PointerEvent; preserve the identity and coordinates used by map panning.
 class TestPointerEvent extends MouseEvent {

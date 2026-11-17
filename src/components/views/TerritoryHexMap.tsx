@@ -354,7 +354,6 @@ export default function TerritoryHexMap({
               : undefined;
     const tile = byId.get(id)?.tile;
     if (!direction || !tile) return;
-    event.preventDefault();
     const point = hexCenter(tile);
     const next = tiles
       .filter((other) => other.id !== id)
@@ -372,6 +371,7 @@ export default function TerritoryHexMap({
       .filter((other) => other.forward > 1)
       .sort((a, b) => a.distance - b.distance)[0];
     if (!next) return;
+    event.preventDefault();
     focusAfterNavigation.current = next.tile.id;
     onSelect(next.tile.id);
     revealTile(next.tile);
