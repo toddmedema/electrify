@@ -16,6 +16,22 @@ export async function expectSignInButtonsToFit(scope: Page | Locator) {
   await expect(apple).toHaveCount(1);
   await expect(google).toBeVisible();
   await expect(apple).toBeVisible();
+  const consentLayout = await scope
+    .getByRole("checkbox", { name: "Join the Electrify mailing list" })
+    .evaluate((checkbox) => {
+      const label = checkbox.closest("label")!;
+      const consent = label.getBoundingClientRect();
+      const buttons = label
+        .parentElement!.querySelector('[role="group"]')!
+        .getBoundingClientRect();
+      return {
+        centerOffset:
+          consent.x + consent.width / 2 - (buttons.x + buttons.width / 2),
+        gap: buttons.top - consent.bottom,
+      };
+    });
+  expect(Math.abs(consentLayout.centerOffset)).toBeLessThanOrEqual(1);
+  expect(consentLayout.gap).toBeGreaterThanOrEqual(0);
   // Sharing enables sign-in after preparing its snapshot; allow transitions to settle.
   await expect(apple).toBeEnabled();
   for (const button of [google, apple]) {

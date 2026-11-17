@@ -11,7 +11,13 @@ export default function MailingListCheckbox({
 }): React.JSX.Element {
   return (
     <FormControlLabel
-      sx={{ m: 0, minHeight: 44 }}
+      sx={{
+        display: "flex",
+        width: "fit-content",
+        mx: "auto",
+        my: 0,
+        minHeight: 44,
+      }}
       control={
         <Checkbox
           size="small"
