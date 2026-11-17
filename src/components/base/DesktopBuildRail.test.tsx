@@ -1,25 +1,33 @@
 import * as React from "react";
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import DesktopBuildRail from "./DesktopBuildRail";
 import { GameToolMemoryContext } from "./GameToolMemory";
 import { createGame } from "../../testing/Simulator";
 import { currentTick } from "../../helpers/GameSelectors";
 import { projectCatalogue } from "../../helpers/ProjectBuild";
-import { isStorage, type TerritoryTileId } from "../../Types";
+import { isStorage, type GameType, type TerritoryTileId } from "../../Types";
+import { getHydroAvailability } from "../../data/HydroSites";
 import { hasVisibleEscapeOverlay } from "./VisibleEscapeOverlay";
 import { projectSiteQuote, selectProject } from "../../helpers/ProjectBuild";
 import { formatMoneyConcise } from "../../helpers/Format";
+import { wToSliderTick } from "../../helpers/BuildSizing";
+import {
+  getTerritoryTile,
+  territoryTilePowerLimit,
+} from "../../helpers/TerritoryTiles";
 
 jest.mock("./BuildForecast", () => ({ useBuildForecast: () => undefined }));
 jest.mock("./ManualLink", () => (props: { children?: React.ReactNode }) => (
   <>{props.children}</>
 ));
 
-function show(siteId?: TerritoryTileId) {
+function show(siteId?: TerritoryTileId, prepare?: (game: GameType) => void) {
   const game = createGame({ scenarioId: 116, seed: 188 });
   game.startingYear = 2025;
   game.date.year = 2025;
   currentTick(game)!.cash = 1e12;
+  prepare?.(game);
   const memory = new Map<string, unknown>();
   const onProject = jest.fn();
   const content = (busy = false, focusRequest = 0) => (
@@ -122,19 +130,32 @@ it("uses independent remembered power and energy sliders without changing an alr
   expect(onProject.mock.calls[1][0].peakWh).toBe(5e8);
 });
 
-it("allows preview focus and consumes Escape before the map, then restores icon focus", () => {
+it("enters a non-final technology preview with Right Arrow and tabs within it before Escape returns to the icon", async () => {
   show();
-  act(() => wind().focus());
+  const railButtons = within(
+    screen.getByRole("complementary", { name: "Build facilities" }),
+  ).getAllByRole("button");
+  for (let index = 0; index <= railButtons.indexOf(wind()); index++)
+    await userEvent.tab();
+  expect(wind()).toHaveFocus();
   const preview = screen.getByLabelText("Wind technology preview");
-  const choose = within(preview).getByRole("button", { name: "Choose sites" });
-  act(() => choose.focus());
+  await userEvent.keyboard("{ArrowRight}");
+  const close = within(preview).getByRole("button", {
+    name: "Close technology preview",
+  });
+  expect(close).toHaveFocus();
+  expect(wind()).toHaveAttribute("aria-keyshortcuts", "ArrowRight");
+  expect(wind()).toHaveAccessibleDescription(/Right Arrow/);
+  await userEvent.tab();
+  expect(within(preview).getAllByRole("button")[1]).toHaveFocus();
+  expect(close).not.toHaveFocus();
   expect(preview).toBeInTheDocument();
   const mapEscape = jest.fn();
   const mapCapture = () => {
     if (!hasVisibleEscapeOverlay()) mapEscape();
   };
   window.addEventListener("keydown", mapCapture, true);
-  fireEvent.keyDown(choose, { key: "Escape" });
+  await userEvent.keyboard("{Escape}");
   expect(
     screen.queryByLabelText("Wind technology preview"),
   ).not.toBeInTheDocument();
@@ -142,6 +163,52 @@ it("allows preview focus and consumes Escape before the map, then restores icon 
   expect(mapEscape).not.toHaveBeenCalled();
   window.removeEventListener("keydown", mapCapture, true);
 });
+
+it.each([
+  ["Hydro", "parcel-7:site-0", "Use site maximum"],
+  ["Geothermal", "parcel-3:site-0", "Use max size"],
+] as const)(
+  "offers an owned %s site's exact maximum even when an oversized project has no quote",
+  (name, siteId, shortcut) => {
+    const { game, onProject } = show(siteId, (game) => {
+      game.territoryNetwork!.tilePurchases.push({
+        tileId: siteId,
+        minute: game.date.minute,
+        price: 0,
+      });
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Generator power:/ }));
+    fireEvent.change(
+      screen.getByRole("slider", { name: "Generator capacity" }),
+      {
+        target: { value: wToSliderTick(8e7) },
+      },
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Done" }));
+    const option = projectCatalogue(game, 8e7, false).find(
+      (option) => option.name === name,
+    )!;
+    expect(
+      projectSiteQuote(game, selectProject(option), siteId).facility,
+    ).toBeUndefined();
+    const maximum =
+      name === "Hydro"
+        ? getHydroAvailability(game, option.peakW, "parcel-7", siteId).largest!
+            .maxPeakW
+        : territoryTilePowerLimit(getTerritoryTile(siteId, game)!);
+    fireEvent.mouseEnter(
+      screen.getByRole("button", { name: `Choose sites for ${name}` }),
+    );
+    const preview = screen.getByLabelText(`${name} technology preview`);
+    expect(
+      within(preview).queryByText("Price for the inspected site"),
+    ).not.toBeInTheDocument();
+    fireEvent.click(within(preview).getByRole("button", { name: shortcut }));
+    expect(onProject).toHaveBeenCalledWith(
+      expect.objectContaining({ name, peakW: maximum }),
+    );
+  },
+);
 
 it("dismisses on outside activation and scrolling, and guards all rail actions during host work", () => {
   const { update, onProject } = show();

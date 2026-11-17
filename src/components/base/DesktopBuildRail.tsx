@@ -15,6 +15,10 @@ import { currentTick } from "../../helpers/GameSelectors";
 import { hasVisibleEscapeOverlay } from "./VisibleEscapeOverlay";
 import { expectedMonthlyOutputShape } from "../../helpers/ExpectedOutput";
 import { territoryBuildAvailability } from "../../helpers/Territories";
+import {
+  getTerritoryTile,
+  ownsTerritoryTile,
+} from "../../helpers/TerritoryTiles";
 import { resilienceBuildOptions } from "../../helpers/Hazards";
 import {
   projectCatalogue,
@@ -47,9 +51,11 @@ export default function DesktopBuildRail({
 }) {
   const rail = React.useRef<HTMLElement>(null);
   const origin = React.useRef<HTMLButtonElement>();
+  const previewFirstControl = React.useRef<HTMLButtonElement>(null);
   const dismissTimer = React.useRef<ReturnType<typeof setTimeout>>();
   const suppressFocus = React.useRef(false);
   const [previewName, setPreviewName] = React.useState<string>();
+  const [previewEntry, setPreviewEntry] = React.useState(0);
   const [sizing, setSizing] = React.useState<"generator" | "storage">();
   const [generatorSize, setGeneratorSize] = useToolState(
     "project.generatorSize",
@@ -58,6 +64,7 @@ export default function DesktopBuildRail({
   const [storageSize, setStorageSize] = useToolState("project.storageSize", 18);
   const forecast = useBuildForecast(game);
   const previewId = React.useId();
+  const previewHintId = React.useId();
   const sizingId = React.useId();
   const pricingKey = `${signature(game)}|${game.interestRate}|${JSON.stringify(game.multiplayer?.tileOwners)}|${JSON.stringify(game.multiplayer?.landOwners)}`;
   const options = React.useMemo<FacilityShoppingType[]>(
@@ -85,6 +92,10 @@ export default function DesktopBuildRail({
     setSizing(undefined);
   }, [clearTimer]);
   React.useEffect(() => () => clearTimer(), [clearTimer]);
+  React.useLayoutEffect(() => {
+    if (previewEntry)
+      previewFirstControl.current?.focus({ preventScroll: true });
+  }, [previewEntry]);
   React.useEffect(() => {
     if (focusRequest) {
       dismiss();
@@ -162,13 +173,18 @@ export default function DesktopBuildRail({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [pricingKey, option, siteId],
   );
+  const inspectedTile = siteId ? getTerritoryTile(siteId, game) : undefined;
+  const ownedSite =
+    inspectedTile && ownsTerritoryTile(game, inspectedTile)
+      ? inspectedTile
+      : undefined;
   const siteAvailability =
-    quote?.facility && quote.owned
+    option && ownedSite
       ? territoryBuildAvailability(
           game,
-          quote.facility,
-          quote.tile.territoryId,
-          siteId,
+          quote?.facility ?? option,
+          ownedSite.territoryId,
+          ownedSite.id,
         )
       : undefined;
   const facility = quote?.facility ?? option;
@@ -213,6 +229,10 @@ export default function DesktopBuildRail({
         {sizeControl(false)}
         {sizeControl(true)}
       </div>
+      <span className="srOnly" id={previewHintId}>
+        Press Right Arrow to enter the technology preview, then Tab to move
+        between its controls. Escape returns to the technology.
+      </span>
       <div
         className="desktopBuildTechnologies"
         role="group"
@@ -237,12 +257,17 @@ export default function DesktopBuildRail({
                   disabled={busy}
                   aria-label={`Choose sites for ${item.name}`}
                   aria-pressed={project?.name === item.name}
-                  aria-describedby={
-                    previewName === item.name ? previewId : undefined
-                  }
+                  aria-keyshortcuts="ArrowRight"
+                  aria-describedby={`${previewHintId}${previewName === item.name ? ` ${previewId}` : ""}`}
                   onMouseEnter={(event) => show(item, event.currentTarget)}
                   onMouseLeave={leave}
                   onFocus={(event) => show(item, event.currentTarget)}
+                  onKeyDown={(event) => {
+                    if (event.key !== "ArrowRight" || busy) return;
+                    event.preventDefault();
+                    show(item, event.currentTarget);
+                    setPreviewEntry((value) => value + 1);
+                  }}
                   onClick={() => choose(item)}
                 >
                   <img src={`/images/${item.name.toLowerCase()}.svg`} alt="" />
@@ -317,6 +342,7 @@ export default function DesktopBuildRail({
             <IconButton
               size="small"
               aria-label="Close technology preview"
+              ref={previewFirstControl}
               onClick={dismiss}
             >
               <CloseIcon />
@@ -341,11 +367,9 @@ export default function DesktopBuildRail({
                   storage={facility}
                   minimumBuildCost={Infinity}
                   territoryAvailability={siteAvailability}
-                  territoryId={
-                    quote?.owned ? quote.tile.territoryId : undefined
-                  }
-                  tileId={quote?.owned ? siteId : undefined}
-                  lockedTile={!!quote?.owned}
+                  territoryId={ownedSite?.territoryId}
+                  tileId={ownedSite?.id}
+                  lockedTile={!!ownedSite}
                   onUseMaxSize={(size) => choose(facility, size)}
                   onBuild={() => undefined}
                 />
@@ -365,8 +389,8 @@ export default function DesktopBuildRail({
                       ? getHydroAvailability(
                           game,
                           facility.peakW,
-                          quote?.tile?.territoryId,
-                          quote?.owned ? siteId : undefined,
+                          ownedSite?.territoryId,
+                          ownedSite?.id,
                         )
                       : undefined
                   }
@@ -377,11 +401,9 @@ export default function DesktopBuildRail({
                     { game, tileId: quote?.facility ? siteId : undefined },
                   )}
                   territoryAvailability={siteAvailability}
-                  territoryId={
-                    quote?.owned ? quote.tile.territoryId : undefined
-                  }
-                  tileId={quote?.owned ? siteId : undefined}
-                  lockedTile={!!quote?.owned}
+                  territoryId={ownedSite?.territoryId}
+                  tileId={ownedSite?.id}
+                  lockedTile={!!ownedSite}
                   resilienceOptions={resilienceBuildOptions(facility, game)}
                   onUseSiteMaximum={(size) => choose(facility, size)}
                   onUseMaxSize={(size) => choose(facility, size)}

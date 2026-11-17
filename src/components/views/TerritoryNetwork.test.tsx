@@ -16,7 +16,9 @@ import {
 } from "../../helpers/Territories";
 import {
   availableTerritoryTiles,
+  getTerritoryTile,
   ownsTerritoryTile,
+  territoryTilePowerLimit,
 } from "../../helpers/TerritoryTiles";
 import { territoryTileViews } from "../../helpers/TerritoryMapState";
 import { currentTick } from "../../helpers/GameSelectors";
@@ -33,6 +35,7 @@ import gameReducer, { buildFacility } from "../../reducers/Game";
 import uiReducer from "../../reducers/UI";
 import { GENERATORS } from "../../data/Facilities";
 import { wToSliderTick } from "../../helpers/BuildSizing";
+import { getHydroAvailability } from "../../data/HydroSites";
 import { acquisitionQuote, transferUtility } from "../../helpers/Expansion";
 import { acquireTile } from "../../reducers/GameActions";
 import { registerMultiplayerRuntime } from "../../multiplayer/Registry";
@@ -644,11 +647,30 @@ it.each([
   },
 );
 
-it("keeps a candidate and canonical quote when generator upgrades change", async () => {
+it("keeps a candidate and canonical quote when generator upgrades change, then locks editing during host build", async () => {
   const game = ready();
   game.date.year = 2025;
   game.startingYear = 2025;
-  show(game, 1280);
+  game.multiplayer = { seat: "0" };
+  const { store } = show(game, 1280);
+  let finishBuild: () => void = () => undefined;
+  const pending = new Promise<void>((resolve) => {
+    finishBuild = resolve;
+  });
+  const commands: Command[] = [];
+  registerMultiplayerRuntime({
+    submit: async (command) => {
+      commands.push(command);
+      await pending;
+      if (command.kind === "action" && command.name === "buildFacility")
+        store.dispatch(
+          buildFacility(command.payload as Parameters<typeof buildFacility>[0]),
+        );
+    },
+    command: jest.fn(),
+    activity: jest.fn(),
+    leave: async () => undefined,
+  });
   const rail = screen.getByRole("complementary", { name: "Build facilities" });
   fireEvent.click(
     within(rail).getByRole("button", { name: "Choose sites for Solar" }),
@@ -659,12 +681,104 @@ it("keeps a candidate and canonical quote when generator upgrades change", async
     name: "Inspect champlain:site-13",
   });
   expect(selected).toHaveAttribute("aria-pressed", "true");
+  expect(option).not.toBeChecked();
   fireEvent.click(option);
+  expect(option).toBeChecked();
   expect(selected).toHaveAttribute("aria-pressed", "true");
   expect(screen.getByRole("button", { name: "Review project" })).toBeEnabled();
   fireEvent.click(screen.getByRole("button", { name: "Review project" }));
   expect(screen.getByRole("heading", { name: "Build Solar?" })).toBeVisible();
+  fireEvent.click(screen.getByRole("button", { name: "Build project" }));
+  expect(option).toBeDisabled();
+  fireEvent.click(option);
+  inspect("champlain:site-12");
+  fireEvent.click(
+    within(rail).getByRole("button", { name: "Choose sites for Wind" }),
+  );
+  expect(selected).toHaveAttribute("aria-pressed", "true");
+  expect(option).toBeChecked();
+  expect(commands).toHaveLength(1);
+  await act(async () => finishBuild());
+  await waitFor(() =>
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+  );
+  expect(
+    store
+      .getState()
+      .game.facilities.find(({ tileId }) => tileId === "champlain:site-13"),
+  ).toMatchObject({ name: "Solar" });
 });
+
+it("keeps the phone project sheet unchanged without desktop upgrade editing", async () => {
+  const game = ready();
+  game.date.year = 2025;
+  game.startingYear = 2025;
+  show(game, 390);
+  fireEvent.click(screen.getByRole("button", { name: "Build" }));
+  fireEvent.click(
+    await screen.findByRole("button", { name: "Choose sites for Solar" }),
+  );
+  inspect("champlain:site-13");
+  expect(
+    await screen.findByRole("button", { name: "Review project" }),
+  ).toBeEnabled();
+  expect(
+    screen.queryByRole("checkbox", { name: /trackers/i }),
+  ).not.toBeInTheDocument();
+});
+
+it.each([
+  ["Hydro", "parcel-7:site-0", "Use site maximum"],
+  ["Geothermal", "parcel-3:site-0", "Use max size"],
+] as const)(
+  "retains an inspected owned %s site when its oversized rail preview chooses the exact site maximum",
+  async (name, siteId, shortcut) => {
+    const game = ready();
+    game.territoryNetwork!.tilePurchases.push({
+      tileId: siteId,
+      minute: game.date.minute,
+      price: 0,
+    });
+    const maximum =
+      name === "Hydro"
+        ? getHydroAvailability(game, 8e7, "parcel-7", siteId).largest!.maxPeakW
+        : territoryTilePowerLimit(getTerritoryTile(siteId, game)!);
+    const { store } = show(game, 1280);
+    inspect(siteId);
+    fireEvent.click(screen.getByRole("button", { name: /Generator power:/ }));
+    fireEvent.change(
+      screen.getByRole("slider", { name: "Generator capacity" }),
+      {
+        target: { value: wToSliderTick(8e7) },
+      },
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Done" }));
+    fireEvent.mouseEnter(
+      screen.getByRole("button", { name: `Choose sites for ${name}` }),
+    );
+    fireEvent.click(
+      within(screen.getByLabelText(`${name} technology preview`)).getByRole(
+        "button",
+        { name: shortcut },
+      ),
+    );
+    expect(
+      await screen.findByRole("button", { name: "Review project" }),
+    ).toBeEnabled();
+    expect(
+      screen.getByRole("heading", {
+        name: `${name} · ${formatWatts(maximum)}`,
+      }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: `Inspect ${siteId}` }),
+    ).toHaveAttribute("aria-pressed", "true");
+    expect(currentTick(store.getState().game)!.cash).toBe(1e9);
+    expect(store.getState().game.facilities).toHaveLength(
+      game.facilities.length,
+    );
+  },
+);
 
 it("retains the inspected site when connecting transitions directly into desktop construction", async () => {
   const game = ready();

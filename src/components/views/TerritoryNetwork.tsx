@@ -332,9 +332,13 @@ function TileNetwork(props: Props) {
             setCandidate(undefined);
             setSelected(undefined);
           }}
-          onUpdateProject={(selection) => {
-            if (!projectBusy.current) setProject(selection);
-          }}
+          onUpdateProject={
+            desktopRail
+              ? (selection) => {
+                  if (!projectBusy.current) setProject(selection);
+                }
+              : undefined
+          }
           onChangeProject={() => {
             if (projectBusy.current) return;
             setCatalogue(true);
