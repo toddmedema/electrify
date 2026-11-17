@@ -144,7 +144,7 @@ function show(
       .getAllByRole<HTMLButtonElement>("button")
       .filter((button) => button.dataset.purchasable === "true");
   const buyMode = () =>
-    fireEvent.click(screen.getByRole("button", { name: "Buy land" }));
+    fireEvent.click(screen.getByRole("button", { name: "Connect" }));
   return {
     ...utils,
     store,
@@ -220,7 +220,7 @@ it.each([1280, 360])(
           )?.visibilityDistance === 1,
       )!;
     const id = idOf(candidate);
-    fireEvent.click(screen.getByRole("button", { name: "Buy land" }));
+    fireEvent.click(screen.getByRole("button", { name: "Connect" }));
     tap(candidate);
     expect(map.onSelect).toHaveBeenLastCalledWith(id, true);
     expect(ownsTerritoryTile(map.store.getState().game, id)).toBe(false);
@@ -240,11 +240,11 @@ it.each([1280, 360])(
     expect(
       territoryTileViews(map.store.getState().game).length,
     ).toBeGreaterThan(initialCount);
-    expect(screen.getByRole("button", { name: "Buy land" })).toHaveAttribute(
+    expect(screen.getByRole("button", { name: "Connect" })).toHaveAttribute(
       "aria-pressed",
       "true",
     );
-    expect(screen.getByRole("status")).toHaveTextContent("Tile purchased");
+    expect(screen.getByRole("status")).toHaveTextContent("Site connected");
   },
 );
 
@@ -256,7 +256,7 @@ it("describes ownership of each physical tile, including a partial purchase and 
     /^Your tile\./,
   );
   expect(map.target("green-uplands:site-1")).toHaveAccessibleDescription(
-    /^Available to buy\./,
+    /^Connection available\./,
   );
   act(() => {
     map.store.dispatch(
@@ -274,7 +274,7 @@ it("describes ownership of each physical tile, including a partial purchase and 
     /^Owned by Birch Utility\./,
   );
   expect(map.target("green-uplands:site-1")).toHaveAccessibleDescription(
-    /^Available to buy\./,
+    /^Connection available\./,
   );
 });
 
@@ -350,7 +350,7 @@ it("keeps focus, arrows and repeated activation keys free of purchases", () => {
       ),
   ).toHaveLength(1);
   fireEvent.keyDown(map.target(selectedId), { key: "Escape" });
-  expect(screen.getByRole("button", { name: "Buy land" })).toHaveAttribute(
+  expect(screen.getByRole("button", { name: "Connect" })).toHaveAttribute(
     "aria-pressed",
     "false",
   );
@@ -412,7 +412,7 @@ it("shares pending cash with surface purchases, prevents duplicates, and waits f
     map.store.dispatch(acquireTile({ tileId: id, quoteKey: quote.quoteKey }));
   });
   expect(map.target(id)).not.toHaveAttribute("aria-busy");
-  expect(screen.getByRole("status")).toHaveTextContent("Tile purchased");
+  expect(screen.getByRole("status")).toHaveTextContent("Site connected");
   expect(screen.getByTestId("other-buy")).toHaveTextContent("committed 0");
 });
 
@@ -428,14 +428,14 @@ it("keeps buying mode and releases commitments when the host rejects, then reset
   );
   expect(tile).not.toHaveAttribute("aria-busy");
   expect(screen.getByTestId("other-buy")).toHaveTextContent("committed 0");
-  expect(screen.getByRole("button", { name: "Buy land" })).toHaveAttribute(
+  expect(screen.getByRole("button", { name: "Connect" })).toHaveAttribute(
     "aria-pressed",
     "true",
   );
   act(() => {
     map.store.dispatch({ type: "test/load" });
   });
-  expect(screen.getByRole("button", { name: "Buy land" })).toHaveAttribute(
+  expect(screen.getByRole("button", { name: "Connect" })).toHaveAttribute(
     "aria-pressed",
     "false",
   );
@@ -447,12 +447,12 @@ it("closes inspection, exits buying and deselects with one Escape on the map", (
   const tile = map.candidates()[0];
   fireEvent.keyDown(tile, { key: "Escape" });
   expect(map.closeInspection).toHaveBeenCalledTimes(1);
-  expect(screen.getByRole("button", { name: "Buy land" })).toHaveAttribute(
+  expect(screen.getByRole("button", { name: "Connect" })).toHaveAttribute(
     "aria-pressed",
     "false",
   );
   expect(map.target("champlain:city")).toHaveAttribute("aria-pressed", "false");
-  expect(screen.getByRole("button", { name: "Buy land" })).toHaveFocus();
+  expect(screen.getByRole("button", { name: "Connect" })).toHaveFocus();
 });
 
 it("returns from map geography to its buying control after closing inspection and buying mode, then releases Escape", () => {
@@ -462,12 +462,12 @@ it("returns from map geography to its buying control after closing inspection an
   act(() => tile.focus());
   expect(fireEvent.keyDown(tile, { key: "Escape" })).toBe(false);
   expect(map.closeInspection).toHaveBeenCalledTimes(1);
-  expect(screen.getByRole("button", { name: "Buy land" })).toHaveAttribute(
+  expect(screen.getByRole("button", { name: "Connect" })).toHaveAttribute(
     "aria-pressed",
     "false",
   );
   expect(tile).toHaveAttribute("aria-pressed", "false");
-  const buy = screen.getByRole("button", { name: "Buy land" });
+  const buy = screen.getByRole("button", { name: "Connect" });
   expect(buy).toHaveFocus();
   // The next Back belongs to the game's global navigation again.
   expect(fireEvent.keyDown(buy, { key: "Escape" })).toBe(true);
@@ -506,7 +506,9 @@ it("requires a fresh activation if a displayed quote changes during a pointer ge
   });
   fireEvent.click(map.target(id), { detail: 1 });
   expect(host.submit).not.toHaveBeenCalled();
-  expect(screen.getByRole("status")).toHaveTextContent("price changed");
+  expect(screen.getByRole("status")).toHaveTextContent(
+    "connection cost changed",
+  );
   tap(map.target(id));
   expect(host.submit).toHaveBeenCalledTimes(1);
 });
@@ -534,7 +536,7 @@ it("keeps phone targets large and unaffordable land inspectable with its currenc
 });
 
 it.each([
-  { cash: 1e9, unaffordable: false, action: "Buy", reason: "" },
+  { cash: 1e9, unaffordable: false, action: "Connect", reason: "" },
   {
     cash: 1e6,
     unaffordable: true,
@@ -587,7 +589,7 @@ it("keeps an unselected map unselected across game updates with one reachable ti
   ).toHaveLength(0);
   expect({ ...map.viewport.dataset }).toEqual(camera);
   expect(map.onSelect).not.toHaveBeenCalled();
-  const buy = screen.getByRole("button", { name: "Buy land" });
+  const buy = screen.getByRole("button", { name: "Connect" });
   expect(buy).not.toHaveTextContent(/Buy|available/);
   expect(buy).toHaveAttribute("aria-pressed", "false");
 });

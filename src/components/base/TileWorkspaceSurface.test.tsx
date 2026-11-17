@@ -9,7 +9,7 @@ it("focuses new content without restoring the map until the surface closes", () 
       <button className="territoryTileTarget" tabIndex={0}>
         Selected tile
       </button>
-      <button className="territoryMapBuyToggle">Buy land</button>
+      <button className="territoryMapBuyToggle">Connect</button>
       {open && (
         <TileWorkspaceSurface
           title={title}
@@ -35,7 +35,7 @@ it("focuses new content without restoring the map until the surface closes", () 
   expect(heading).toHaveFocus();
   expect(mapFocused).not.toHaveBeenCalled();
   rerender(show(2, "Build", false));
-  expect(screen.getByRole("button", { name: "Buy land" })).toHaveFocus();
+  expect(screen.getByRole("button", { name: "Connect" })).toHaveFocus();
   expect(mapFocused).not.toHaveBeenCalled();
 });
 

@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Tooltip } from "@mui/material";
+import { Tooltip, useTheme } from "@mui/material";
 import ConstructionIcon from "@mui/icons-material/Construction";
 import AddLocationAltIcon from "@mui/icons-material/AddLocationAlt";
 import type { GameType, TerritoryTileId } from "../../Types";
@@ -8,6 +8,8 @@ import { TERRAIN_LABELS } from "../../data/TerrainLabels";
 import { territoryTileViews } from "../../helpers/TerritoryMapState";
 import type { TerritoryTileView } from "../../helpers/TerritoryMapState";
 import { tilePurchaseQuotes } from "../../helpers/Territories";
+import { getSunriseSunset } from "../../helpers/DateTime";
+import type { RendererState } from "../base/territory-3d/TerritoryCanvas3D";
 import { useAppSelector } from "../../Store";
 import { terrainDetailsLabel } from "../base/TerritoryTileFacts";
 import { facilityMapStatus } from "../base/FacilityMapStatus";
@@ -42,6 +44,10 @@ import {
   territoryPeerColors,
 } from "../base/TerritoryMapLayout";
 import "./TerritoryMapWorkspace.scss";
+
+const TerritoryScene3D = React.lazy(
+  () => import("../base/territory-3d/TerritoryScene3D"),
+);
 
 type MapStyle = React.CSSProperties & { "--territory-owner-color"?: string };
 interface Props {
@@ -82,6 +88,11 @@ export default function TerritoryHexMap({
   projectSites,
 }: Props) {
   const mapId = React.useId();
+  const dark = useTheme().palette.mode === "dark";
+  const [rendererState, setRendererState] = React.useState<
+    RendererState | "loading"
+  >("loading");
+  const threeDReady = rendererState === "ready";
   const motion = useFacilityMapMotion(game.speed);
   const viewport = React.useRef<HTMLDivElement>(null);
   const stage = React.useRef<HTMLDivElement>(null);
@@ -526,6 +537,33 @@ export default function TerritoryHexMap({
           }
         }}
       >
+        {typeof WebGL2RenderingContext !== "undefined" && (
+          <React.Suspense fallback={null}>
+            <TerritoryScene3D
+              views={renderedViews}
+              tiles={tiles}
+              wires={wires}
+              minute={game.date.minute}
+              minuteOfDay={game.date.minuteOfDay}
+              runKey={`${runId}:${game.seed}:${game.scenarioId}`}
+              daylight={getSunriseSunset(game.date, game.location)}
+              dark={dark}
+              frame={{
+                width: size.width,
+                height: size.height,
+                dpr: window.devicePixelRatio || 1,
+                cameraX: camera.x,
+                cameraY: camera.y,
+                scale,
+                background: dark ? [0.035, 0.055, 0.07] : [0.86, 0.9, 0.9],
+                visible: size.width > 0 && size.height > 0,
+                motionAllowed: motion.allowed,
+                playbackRate: motion.rate,
+              }}
+              onState={setRendererState}
+            />
+          </React.Suspense>
+        )}
         <div
           className="territoryMapStage"
           ref={stage}
@@ -548,61 +586,64 @@ export default function TerritoryHexMap({
               </clipPath>
             </defs>
             <g aria-hidden="true">
-              {renderedViews.map(({ tile, owned, visibilityDistance }) => {
-                const point = hexCenter(tile);
-                return (
-                  <g
-                    key={tile.id}
-                    className="territoryHex territoryFog"
-                    data-visibility-distance={visibilityDistance}
-                    data-terrain={tile.terrain}
-                    data-tile={tile.id}
-                    data-owned={owned}
-                    transform={`translate(${point.x} ${point.y})`}
-                  >
-                    <path className="territoryHexRim" d={hexRimPath} />
-                    <g clipPath={`url(#${mapId}-terrain-clip)`}>
-                      <svg
-                        x={-HEX_WIDTH / 2}
-                        y={-HEX_HEIGHT / 2}
-                        width={HEX_WIDTH}
-                        height={HEX_HEIGHT}
-                        preserveAspectRatio="none"
-                        viewBox="0 0 500 500"
-                      >
-                        <TerrainArtwork
-                          terrain={tile.terrain}
-                          ports={
-                            tile.terrain === "river"
-                              ? riverPorts(tile, tiles)
-                              : undefined
-                          }
-                          className="territoryTerrainArtwork"
-                        />
-                      </svg>
+              {!threeDReady &&
+                renderedViews.map(({ tile, owned, visibilityDistance }) => {
+                  const point = hexCenter(tile);
+                  return (
+                    <g
+                      key={tile.id}
+                      className="territoryHex territoryFog"
+                      data-visibility-distance={visibilityDistance}
+                      data-terrain={tile.terrain}
+                      data-tile={tile.id}
+                      data-owned={owned}
+                      transform={`translate(${point.x} ${point.y})`}
+                    >
+                      <path className="territoryHexRim" d={hexRimPath} />
+                      <g clipPath={`url(#${mapId}-terrain-clip)`}>
+                        <svg
+                          x={-HEX_WIDTH / 2}
+                          y={-HEX_HEIGHT / 2}
+                          width={HEX_WIDTH}
+                          height={HEX_HEIGHT}
+                          preserveAspectRatio="none"
+                          viewBox="0 0 500 500"
+                        >
+                          <TerrainArtwork
+                            terrain={tile.terrain}
+                            ports={
+                              tile.terrain === "river"
+                                ? riverPorts(tile, tiles)
+                                : undefined
+                            }
+                            className="territoryTerrainArtwork"
+                          />
+                        </svg>
+                      </g>
+                      <path className="territoryHexSeam" d={hexFacePath} />
                     </g>
-                    <path className="territoryHexSeam" d={hexFacePath} />
-                  </g>
-                );
-              })}
-              <g className="territoryWires" data-wire-count={wires.length}>
-                {wires.map((wire) => (
-                  <g
-                    key={wire.id}
-                    className="territoryFog"
-                    data-wire-from={wire.from}
-                    data-wire-to={wire.to}
-                    data-wire-kind={wire.kind}
-                    data-visibility-distance={Math.max(
-                      byId.get(wire.from)!.visibilityDistance,
-                      byId.get(wire.to)!.visibilityDistance,
-                    )}
-                  >
-                    <path className="territoryWireBacking" d={wire.path} />
-                    <path className="territoryWire" d={wire.path} />
-                  </g>
-                ))}
-              </g>
+                  );
+                })}
+              {!threeDReady && (
+                <g className="territoryWires" data-wire-count={wires.length}>
+                  {wires.map((wire) => (
+                    <g
+                      key={wire.id}
+                      className="territoryFog"
+                      data-wire-from={wire.from}
+                      data-wire-to={wire.to}
+                      data-wire-kind={wire.kind}
+                      data-visibility-distance={Math.max(
+                        byId.get(wire.from)!.visibilityDistance,
+                        byId.get(wire.to)!.visibilityDistance,
+                      )}
+                    >
+                      <path className="territoryWireBacking" d={wire.path} />
+                      <path className="territoryWire" d={wire.path} />
+                    </g>
+                  ))}
+                </g>
+              )}
               {[...renderedViews]
                 .sort((a, b) => hexCenter(a.tile).y - hexCenter(b.tile).y)
                 .map((view) => {
@@ -638,7 +679,11 @@ export default function TerritoryHexMap({
                       viewBox="0 0 500 500"
                       overflow="visible"
                     >
-                      {tile.city ? (
+                      {threeDReady ? (
+                        status ? (
+                          <FacilityMapStatusArtwork kind={status.kind} />
+                        ) : null
+                      ) : tile.city ? (
                         <CityArtwork
                           sector={tile.city.sector}
                           className="territoryOccupantArtwork"

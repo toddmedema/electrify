@@ -42,7 +42,7 @@ jest.mock("./TerritoryHexMap", () => ({
     >("../../helpers/TerritoryMapState");
     return (
       <div aria-label="Tile map">
-        <button className="territoryMapBuyToggle">Buy land</button>
+        <button className="territoryMapBuyToggle">Connect</button>
         {territoryTileViews(props.game).map(({ tile }) => (
           <button
             className="territoryTileTarget"
@@ -141,7 +141,7 @@ it("keeps the map clear until activation, and deselects the tile when Escape clo
   expect(within(surface()).getByRole("heading", { level: 3 })).toHaveFocus();
   fireEvent.keyDown(surface(), { key: "Escape" });
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Buy land" })).toHaveFocus();
+  expect(screen.getByRole("button", { name: "Connect" })).toHaveFocus();
   expect(tile).toHaveAttribute("aria-pressed", "false");
   expect(
     screen.queryByText(/company power pool|one project per tile|Territories$/i),
@@ -343,8 +343,8 @@ it("buys exactly the inspected tile in one action and shows its build catalogue"
   const before = currentTick(game)!.cash;
   const { store } = show(game);
   inspect(tile.id);
-  expect(surface()).toHaveTextContent("Cash after purchase");
-  const buy = within(surface()).getByRole("button", { name: /Buy tile/ });
+  expect(surface()).toHaveTextContent("Cash after connection");
+  const buy = within(surface()).getByRole("button", { name: /Connect/ });
   act(() => buy.focus());
   fireEvent.click(buy);
   expect(currentTick(store.getState().game)!.cash).toBe(before - quote.price);
@@ -366,7 +366,7 @@ it("keeps unaffordable tiles inspectable without spending", () => {
   const { store } = show(game);
   inspect(tile.id);
   expect(
-    within(surface()).getByRole("button", { name: /Buy tile/ }),
+    within(surface()).getByRole("button", { name: /Connect/ }),
   ).toBeDisabled();
   expect(within(surface()).getByRole("status")).toHaveTextContent(
     "more cash needed",
@@ -399,7 +399,7 @@ it("reveals purchased cities as customers rather than build destinations", () =>
   expect(tilePurchaseQuote(game, target.id)).toBeDefined();
   show(game);
   inspect(target.id);
-  fireEvent.click(within(surface()).getByRole("button", { name: /Buy tile/ }));
+  fireEvent.click(within(surface()).getByRole("button", { name: /Connect/ }));
   expect(surface()).toHaveTextContent("Connected customers");
   expect(
     within(surface()).queryByRole("tab", { name: "Generators" }),

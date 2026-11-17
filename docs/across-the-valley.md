@@ -16,16 +16,22 @@ without granting purchase adjacency. General land, residential or industrial cus
 special hydro or geothermal sites have distinct cash prices and benefits. See
 [territories](territories.md) for site budgets, accounting and legacy-save conversion.
 
-The map uses an isometric hex schematic, following the visual direction in
+The map uses a low-poly 3D hex board, following the visual direction in
 [issue 603](https://github.com/toddmedema/electrify/issues/603). Towns and factories indicate
 customers. Plains, forest, hills, mountain, river and lake are illustrated
-terrain backgrounds, with separate upright cities, generators, storage and towers.
+terrain meshes, with separate upright cities, generators, storage and towers.
+The simulated day drives sun/moon lighting and simple shadows. Devices without
+WebGL2 retain the simplified illustrated map; see [the 3D style](map-3d-style.md).
 Each hex holds one facility or a city; construction reserves its slot immediately.
 Independent utilities show their authored starting fleet. Empty developed hexes
 show towers and automatic wires to adjacent developed cells of the same utility.
 Selecting an individual hex opens its floating facility, city or construction
-surface. Empty owned tiles select their build destination automatically. The Buy land
-icon toggles repeated single-tile purchases with visible prices along owned borders.
+surface. Empty owned tiles select their build destination automatically. The Connect
+icon toggles repeated connections with visible prices along owned borders.
+**Build** lets players choose a technology and size first, then compare compatible
+connected and unconnected sites. Inspection spends nothing. The selected site
+shows connection and project costs, expected output and commissioning date; only
+explicit confirmation connects the site and starts construction.
 The map stays visible while Fleet, Agreements and the other dock icons open one
 inspection or tool panel; selecting the active icon closes that panel. There is no
 separate Map button. Acquiring land

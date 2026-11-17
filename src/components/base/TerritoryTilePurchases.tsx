@@ -136,8 +136,7 @@ export function TerritoryTilePurchasesProvider({
         throw new Error(
           "Connection is not confirmed. Review the site before trying again.",
         );
-      pending.current.delete(tileId);
-      refresh();
+      if (pending.current.delete(tileId)) refresh();
       return { status: "connected" };
     } catch (cause) {
       if (operationSession !== session.current)

@@ -1188,7 +1188,7 @@ test("controller reviews, cancels and confirms a utility acquisition", async ({
     page.locator('[data-map-target][aria-pressed="true"]'),
   ).toHaveCount(0);
   await expect(
-    page.getByRole("button", { name: "Buy land", exact: true }),
+    page.getByRole("button", { name: "Connect", exact: true }),
   ).toBeFocused();
   // Leave the map at its known upper-left edge before traversing the HUD.
   // Arrows within discovered geography continue to belong to the map itself.
@@ -1265,7 +1265,7 @@ test("controller cycles six right-hand panels around the persistent map", async 
   await input(page, "back");
   await expect(page.locator(".tileWorkspaceSurface")).toHaveCount(0);
   await expect(
-    page.getByRole("button", { name: "Buy land", exact: true }),
+    page.getByRole("button", { name: "Connect", exact: true }),
   ).toBeFocused();
 });
 
@@ -1284,7 +1284,7 @@ test("controller buys one map tile and returns from map geography to navigation"
     await input(page, "pause");
   await selectMapTile(page, "champlain:city");
   await input(page, "back");
-  const buy = page.getByRole("button", { name: "Buy land", exact: true });
+  const buy = page.getByRole("button", { name: "Connect", exact: true });
   await expect(buy).toBeFocused();
   await input(page, "confirm");
   await expect(buy).toHaveAttribute("aria-pressed", "true");

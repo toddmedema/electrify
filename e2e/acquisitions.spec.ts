@@ -116,7 +116,7 @@ async function inspectTile(page: Page, tile: TerritoryTileDefinition) {
 /** Connect an authored site through paid, physically adjacent company property. */
 async function revealTile(page: Page, tile: TerritoryTileDefinition) {
   const network = mapWorkspace(page);
-  const buy = network.getByRole("button", { name: "Buy land", exact: true });
+  const buy = network.getByRole("button", { name: "Connect", exact: true });
   for (let attempt = 0; attempt < 30; attempt++) {
     const game = (await readSavedGame(page))!;
     const views = territoryTileViews(game);
@@ -528,7 +528,7 @@ for (const theme of ["light", "dark"] as const) {
       }
       await panToTile(page, city);
       const buy = network.getByRole("button", {
-        name: "Buy land",
+        name: "Connect",
         exact: true,
       });
       await buy.click();
@@ -1025,7 +1025,7 @@ for (const theme of ["light", "dark"] as const) {
       network.locator('[data-map-target][aria-pressed="true"]'),
     ).toHaveCount(0);
     await expect(
-      network.getByRole("button", { name: "Buy land", exact: true }),
+      network.getByRole("button", { name: "Connect", exact: true }),
     ).toBeFocused();
     const occupied = territoryTileViews(before).find(
       (view) =>
@@ -1312,7 +1312,7 @@ for (const theme of ["light", "dark"] as const) {
       network.locator('[data-map-target][aria-pressed="true"]'),
     ).toHaveCount(0);
     await expect(
-      network.getByRole("button", { name: "Buy land", exact: true }),
+      network.getByRole("button", { name: "Connect", exact: true }),
     ).toBeFocused();
   });
 
@@ -1360,14 +1360,14 @@ for (const theme of ["light", "dark"] as const) {
       animations: "disabled",
       scale: "css",
     });
-    await expect(surface).toContainText("Cash after purchase");
+    await expect(surface).toContainText("Cash after connection");
     await expect(
       surface.getByRole("button", {
-        name: `Buy tile · ${formatMoneyConcise(quote.price)}`,
+        name: `Connect · ${formatMoneyConcise(quote.price)}`,
         exact: true,
       }),
     ).toBeEnabled();
-    await surface.getByRole("button", { name: /^Buy tile ·/ }).click();
+    await surface.getByRole("button", { name: /^Connect ·/ }).click();
     await expectLockedBuild(surface);
     await expect(surface.locator(".tileWorkspaceHeading h3")).toBeFocused();
     const owned = (await readSavedGame(page))!;
@@ -1436,7 +1436,7 @@ for (const theme of ["light", "dark"] as const) {
     await expectPhysicalMap(network, built);
     await inspectTile(page, neighbor);
     await expect(
-      surface.getByRole("button", { name: /^Buy tile ·/ }),
+      surface.getByRole("button", { name: /^Connect ·/ }),
     ).toBeEnabled();
   });
 
@@ -1535,13 +1535,13 @@ for (const theme of ["light", "dark"] as const) {
     )!.tile;
     await panToTile(page, frontier);
     const toggle = network.getByRole("button", {
-      name: "Buy land",
+      name: "Connect",
       exact: true,
     });
     await toggle.click();
     await expect(toggle).toHaveAttribute("aria-pressed", "true");
     const target = network.locator(`[data-map-target="${frontier.id}"]`);
-    await expect(target).toHaveAccessibleName(/Buy .*\$.*General site/);
+    await expect(target).toHaveAccessibleName(/Connect .*\$.*General site/);
     const viewport = network.locator(".territoryMapViewport");
     const box = (await target.boundingBox())!;
     const x = box.x + box.width / 2;
@@ -1619,7 +1619,7 @@ for (const theme of ["light", "dark"] as const) {
     await expect(
       network.locator(`.territoryHex[data-tile="${frontier.id}"]`),
     ).toHaveAttribute("data-visibility-distance", "0");
-    await expect(network.getByRole("status")).toContainText("Tile purchased");
+    await expect(network.getByRole("status")).toContainText("Site connected");
     await expect(network.getByRole("status")).toContainText(
       `${formatMoneyConcise(currentTick(bought)!.cash)} cash remaining`,
     );
@@ -1639,7 +1639,7 @@ for (const theme of ["light", "dark"] as const) {
     ).toHaveLength(2);
     await nextTarget.press("Escape");
     await expect(
-      network.getByRole("button", { name: "Buy land", exact: true }),
+      network.getByRole("button", { name: "Connect", exact: true }),
     ).toHaveAttribute("aria-pressed", "false");
   });
 
@@ -1661,9 +1661,7 @@ for (const theme of ["light", "dark"] as const) {
       (view) => tilePurchaseQuote(before, view.tile.id)?.benefit === "general",
     )!.tile;
     await panToTile(page, tile);
-    await network
-      .getByRole("button", { name: "Buy land", exact: true })
-      .click();
+    await network.getByRole("button", { name: "Connect", exact: true }).click();
     const target = network.locator(`[data-map-target="${tile.id}"]`);
     await expect(target).toHaveAccessibleName(
       /Inspect .*not enough available cash/,
@@ -1672,14 +1670,14 @@ for (const theme of ["light", "dark"] as const) {
     await target.click();
     const surface = tileSurface(page);
     await expect(
-      surface.getByRole("button", { name: /^Buy tile ·/ }),
+      surface.getByRole("button", { name: /^Connect ·/ }),
     ).toBeDisabled();
     await expect(surface.getByRole("status")).toContainText("more cash needed");
     expect(currentTick((await readSavedGame(page))!)!.cash).toBe(1);
     await surface.locator(".tileWorkspaceHeading h3").press("Escape");
     await expect(surface).toHaveCount(0);
     await expect(target).toHaveAttribute("aria-pressed", "false");
-    const buy = network.getByRole("button", { name: "Buy land", exact: true });
+    const buy = network.getByRole("button", { name: "Connect", exact: true });
     await expect(buy).toBeFocused();
     await expect(buy).toHaveAttribute("aria-pressed", "false");
   });
@@ -1706,7 +1704,7 @@ for (const theme of ["light", "dark"] as const) {
       );
       await expect(surface).toContainText("Estimated demand");
       await expectCityDemand(surface);
-      await surface.getByRole("button", { name: /^Buy tile ·/ }).click();
+      await surface.getByRole("button", { name: /^Connect ·/ }).click();
       await expect(surface).toContainText("Connected customers");
       await expect(
         surface.getByRole("region", {
@@ -1746,7 +1744,7 @@ for (const theme of ["light", "dark"] as const) {
       )!;
       await revealTile(page, tile);
       const surface = await inspectTile(page, tile);
-      await surface.getByRole("button", { name: /^Buy tile ·/ }).click();
+      await surface.getByRole("button", { name: /^Connect ·/ }).click();
       await expectLockedBuild(surface);
       const review = surface.getByRole("button", {
         name: `Review purchase of ${resource.name}`,
