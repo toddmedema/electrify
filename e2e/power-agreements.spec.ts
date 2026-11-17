@@ -98,6 +98,11 @@ for (const theme of ["light", "dark"] as const) {
     });
     await expect(review).toBeVisible();
     await line.scrollIntoViewIfNeeded();
+    await reviewScreenshot(page, {
+      path: testInfo.outputPath(`ppa-workspace-${theme}.png`),
+      animations: "disabled",
+      scale: "css",
+    });
     await reviewScreenshot(line, {
       path: testInfo.outputPath(`ppa-agreements-${theme}.png`),
       animations: "disabled",
