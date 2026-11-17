@@ -197,6 +197,107 @@ function show(
 function idOf(button: HTMLButtonElement) {
   return button.dataset.mapTarget as TerritoryTileId;
 }
+function hoverColor(button: HTMLButtonElement) {
+  return button.style.getPropertyValue("--territory-hover-color");
+}
+it("explains and colors physical building eligibility without guessing from terrain", () => {
+  const map = show();
+  const vacant = map.target("champlain:site-13"),
+    occupied = territoryTileViews(map.store.getState().game).find(
+      (view) => view.operatingFacility,
+    )!;
+  expect(hoverColor(vacant)).toBe("var(--interactive-blue)");
+  expect(vacant).toHaveAccessibleDescription(/Vacant building site/);
+  expect(hoverColor(map.target("champlain:city"))).toBe("var(--blackout-red)");
+  expect(map.target("champlain:city")).toHaveAccessibleDescription(
+    /Cities have no building slot/,
+  );
+  expect(hoverColor(map.target(occupied.tile.id))).toBe("var(--blackout-red)");
+  expect(map.target(occupied.tile.id)).toHaveAccessibleDescription(
+    /already has a facility or construction project/,
+  );
+  expect(hoverColor(map.target("champlain:site-14"))).toBe(
+    "var(--blackout-red)",
+  );
+  expect(map.target("champlain:site-14")).toHaveAccessibleDescription(
+    /No construction technology supports this site/,
+  );
+  expect(hoverColor(map.target("green-uplands:site-0"))).toBe(
+    "var(--interactive-blue)",
+  );
+  expect(map.target("green-uplands:site-0")).toHaveAccessibleDescription(
+    /Connect this vacant site before building/,
+  );
+});
+
+it("uses project candidates for construction and connection quotes for Rapid eligibility", () => {
+  const sites = new Map<TerritoryTileId, "owned" | "connection">([
+    ["champlain:site-13", "owned"],
+    ["green-uplands:site-0", "connection"],
+  ]);
+  const project = show(1e9, false, "champlain:city", sites);
+  expect(hoverColor(project.target("champlain:site-13"))).toBe(
+    "var(--interactive-blue)",
+  );
+  expect(hoverColor(project.target("green-uplands:site-0"))).toBe(
+    "var(--interactive-blue)",
+  );
+  expect(hoverColor(project.target("champlain:site-12"))).toBe(
+    "var(--blackout-red)",
+  );
+  expect(project.target("champlain:site-12")).toHaveAccessibleDescription(
+    /Unavailable for this project/,
+  );
+  project.unmount();
+
+  const rapid = show();
+  rapid.buyMode();
+  expect(hoverColor(rapid.target("green-uplands:site-0"))).toBe(
+    "var(--interactive-blue)",
+  );
+  expect(hoverColor(rapid.target("champlain:site-13"))).toBe(
+    "var(--blackout-red)",
+  );
+  expect(rapid.target("champlain:site-13")).toHaveAccessibleDescription(
+    /Already connected/,
+  );
+  expect(
+    rapid.store.getState().game.territoryNetwork!.tilePurchases,
+  ).toHaveLength(0);
+});
+
+it("keeps foreign company hover colors ahead of project eligibility", () => {
+  const map = show(1e9, false, "champlain:city", new Map());
+  expect(hoverColor(map.target("valley-electric:city"))).toBe(
+    "var(--territory-owner-valley)",
+  );
+  expect(hoverColor(map.target("ridge-electric:city"))).toBe(
+    "var(--territory-owner-ridge)",
+  );
+  act(() => {
+    map.store.dispatch(
+      delta({
+        multiplayer: {
+          seat: "0",
+          tileOwners: {
+            "green-uplands:site-2": { seat: "1", name: "Birch Utility" },
+            "green-uplands:site-3": { seat: "2", name: "Cedar Utility" },
+          },
+        },
+      }),
+    );
+  });
+  expect(hoverColor(map.target("green-uplands:site-2"))).toBe(
+    "var(--territory-owner-peer-0)",
+  );
+  expect(hoverColor(map.target("green-uplands:site-3"))).toBe(
+    "var(--territory-owner-peer-1)",
+  );
+  expect(map.target("green-uplands:site-2")).toHaveAccessibleDescription(
+    /Building unavailable while owned by Birch Utility/,
+  );
+});
+
 it("keeps connected project markers compact with their full accessible meaning on hover", async () => {
   const restore = enable3D();
   try {
@@ -678,6 +779,13 @@ it("retains ownership boundaries and wire topology through power ticks and camer
 });
 it("activates and hovers the picked elevated model while keyboard and explicit price labels keep their own targets", async () => {
   const restore = enable3D();
+  // jsdom cannot parse color-mix; observe the native assignment on each surface.
+  const backgrounds = new Map<CSSStyleDeclaration, string>();
+  jest
+    .spyOn(CSSStyleDeclaration.prototype, "background", "set")
+    .mockImplementation(function (this: CSSStyleDeclaration, value: string) {
+      backgrounds.set(this, value);
+    });
   try {
     const map = show();
     await screen.findByTestId("map-scene");
@@ -690,6 +798,20 @@ it("activates and hovers the picked elevated model while keyboard and explicit p
       model = map.target(facility.tile.id);
     fireEvent.pointerMove(ground, { pointerId: 1, clientX: 100, clientY: 100 });
     expect(model).toHaveAttribute("data-model-hovered", "true");
+    expect(hoverColor(model)).toBe("var(--blackout-red)");
+    expect(
+      backgrounds.get(
+        within(model).getByText("", { selector: ".territoryTileHitArea" })
+          .style,
+      ),
+    ).toBe("color-mix(in srgb, var(--territory-hover-color) 14%, transparent)");
+    expect(
+      backgrounds.get(
+        within(ground).getByText("", { selector: ".territoryTileHitArea" })
+          .style,
+      ),
+    ).toBe("transparent");
+    expect(ground).toHaveAttribute("title", model.title);
     tap(ground);
     expect(map.onSelect).toHaveBeenLastCalledWith(facility.tile.id, true);
     expect(
@@ -698,6 +820,9 @@ it("activates and hovers the picked elevated model while keyboard and explicit p
     fireEvent.pointerLeave(map.viewport);
     expect(model).not.toHaveAttribute("data-model-hovered");
     const price = within(ground).getByText(/^\$/);
+    fireEvent.pointerMove(price, { pointerId: 1, clientX: 100, clientY: 100 });
+    expect(ground).toHaveAttribute("data-model-hovered", "true");
+    expect(model).not.toHaveAttribute("data-model-hovered");
     fireEvent.pointerDown(price, { pointerId: 1, clientX: 100, clientY: 100 });
     fireEvent.pointerUp(price, { pointerId: 1, clientX: 100, clientY: 100 });
     fireEvent.click(price, { detail: 1 });
@@ -709,6 +834,15 @@ it("activates and hovers the picked elevated model while keyboard and explicit p
     expect(ownsTerritoryTile(map.store.getState().game, idOf(keyboard))).toBe(
       true,
     );
+    const company = map.target("valley-electric:city"),
+      companyLabel = within(company).getByText("Valley Electric");
+    fireEvent.pointerMove(companyLabel, {
+      pointerId: 1,
+      clientX: 100,
+      clientY: 100,
+    });
+    expect(company).toHaveAttribute("data-model-hovered", "true");
+    expect(hoverColor(company)).toBe("var(--territory-owner-valley)");
   } finally {
     restore();
   }

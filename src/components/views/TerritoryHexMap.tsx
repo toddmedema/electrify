@@ -5,9 +5,14 @@ import AddLocationAltIcon from "@mui/icons-material/AddLocationAlt";
 import type { GameType, TerritoryTileId } from "../../Types";
 import { getTerritoryDefinition } from "../../data/Territories";
 import { TERRAIN_LABELS } from "../../data/TerrainLabels";
+import { FACILITY_FUELS } from "../../data/FacilityFuels";
 import { territoryTileViews } from "../../helpers/TerritoryMapState";
 import type { TerritoryTileView } from "../../helpers/TerritoryMapState";
 import { tilePurchaseQuotes } from "../../helpers/Territories";
+import {
+  territoryTileInventory,
+  tileSupportsFacilityTechnology,
+} from "../../helpers/TerritoryTiles";
 import { getSunriseSunset } from "../../helpers/DateTime";
 import type { RendererState } from "../base/territory-3d/TerritoryCanvas3D";
 import type { ScenePicker } from "../base/territory-3d/SceneBuilder";
@@ -94,7 +99,10 @@ function sameTile(a: TerritoryTileView["tile"], b: TerritoryTileView["tile"]) {
   );
 }
 
-type MapStyle = React.CSSProperties & { "--territory-owner-color"?: string };
+type MapStyle = React.CSSProperties & {
+  "--territory-owner-color"?: string;
+  "--territory-hover-color"?: string;
+};
 interface Props {
   game: GameType;
   selected?: TerritoryTileId;
@@ -173,10 +181,12 @@ export default function TerritoryHexMap({
     () => new Map(views.map((view) => [view.tile.id, view])),
     [views],
   );
-  const purchaseQuotes = React.useMemo(
-    () => (buyMode || projectPlanning ? tilePurchaseQuotes(game) : undefined),
-    [buyMode, projectPlanning, game],
+  const connectionQuotes = React.useMemo(
+    () => tilePurchaseQuotes(game),
+    [game],
   );
+  const purchaseQuotes =
+    buyMode || projectPlanning ? connectionQuotes : undefined;
   React.useEffect(() => {
     if (projectPlanning) setBuyMode(false);
   }, [projectPlanning]);
@@ -402,6 +412,56 @@ export default function TerritoryHexMap({
         : id === "ridge-electric"
           ? "var(--territory-owner-ridge)"
           : peerColors[id.slice(5)];
+  const tileHover = (view: TerritoryTileView) => {
+    const { tile } = view;
+    const unavailable = (reason: string) => ({
+      color: "var(--blackout-red)",
+      reason,
+    });
+    const available = (reason: string) => ({
+      color: "var(--interactive-blue)",
+      reason,
+    });
+    if (view.ownerKey && !view.owned)
+      return {
+        color: color(view.ownerKey),
+        reason: `Building unavailable while owned by ${view.ownerName}.`,
+      };
+    if (projectPlanning)
+      return projectSites?.has(tile.id)
+        ? available("Compatible site for this project.")
+        : unavailable(
+            "Unavailable for this project; choose a highlighted site.",
+          );
+    if (buyMode)
+      return connectionQuotes.has(tile.id)
+        ? available("Available in Rapid connection mode.")
+        : unavailable(
+            view.owned
+              ? "Already connected."
+              : "Not available in Rapid connection mode; connect an adjacent site first.",
+          );
+    if (tile.city) return unavailable("Cities have no building slot.");
+    if (!territoryTileInventory(game, tile.id).remaining)
+      return unavailable(
+        view.facility
+          ? "This tile already has a facility or construction project."
+          : "This named site has already been used.",
+      );
+    if (
+      !Object.values(FACILITY_FUELS).some(
+        (fuel) => fuel && tileSupportsFacilityTechnology(tile, { fuel }),
+      )
+    )
+      return unavailable("No construction technology supports this site.");
+    if (!view.owned && !connectionQuotes.has(tile.id))
+      return unavailable("Connect an adjacent site before building here.");
+    return available(
+      view.owned
+        ? "Vacant building site; choose a compatible technology."
+        : "Connect this vacant site before building; choose a compatible technology.",
+    );
+  };
   const { ownerBoundaries, allWires } = React.useMemo(() => {
     const index = new Map(topology.map((view) => [view.tile.id, view]));
     const owners = [
@@ -533,7 +593,7 @@ export default function TerritoryHexMap({
     target.dataset.modelHovered = "true";
     if (hit)
       hit.style.background =
-        "color-mix(in srgb, var(--interactive-blue) 14%, transparent)";
+        "color-mix(in srgb, var(--territory-hover-color) 14%, transparent)";
     if (groundHit && ground !== target)
       groundHit.style.background = "transparent";
     titleTarget.title =
@@ -948,6 +1008,7 @@ export default function TerritoryHexMap({
             const territory = getTerritoryDefinition(tile.territoryId);
             const utility = !!tile.city && territory?.kind !== "greenfield";
             const quote = purchaseQuotes?.get(tile.id);
+            const hover = tileHover(view);
             const pending = pendingIds.has(tile.id);
             const unaffordable = !!quote && quote.price > availableCash;
             const label = utility
@@ -976,6 +1037,7 @@ export default function TerritoryHexMap({
                     top: `${(point.y - minY) * scale}px`,
                     width: HEX_WIDTH * scale,
                     height: HEX_HEIGHT * scale,
+                    "--territory-hover-color": hover.color,
                     ...(view.ownerKey
                       ? { "--territory-owner-color": color(view.ownerKey) }
                       : {}),
@@ -1015,7 +1077,7 @@ export default function TerritoryHexMap({
                       : undefined;
                   navigate(event, tile.id);
                 }}
-                title={`${TERRAIN_LABELS[tile.terrain]} · ${facility?.name ?? (tile.city ? `${tile.city.sector} city` : view.developed ? (wireStructure(view) === "submerged" ? "Open water · submerged cable" : "Open site · transmission tower") : "Undeveloped site")}${status ? ` · ${status.label}` : ""}`}
+                title={`${TERRAIN_LABELS[tile.terrain]} · ${facility?.name ?? (tile.city ? `${tile.city.sector} city` : view.developed ? (wireStructure(view) === "submerged" ? "Open water · submerged cable" : "Open site · transmission tower") : "Undeveloped site")}${status ? ` · ${status.label}` : ""} · ${hover.reason}`}
               >
                 <span className="territoryTileHitArea" aria-hidden="true" />
                 {projectSites?.has(tile.id) && (
@@ -1059,7 +1121,9 @@ export default function TerritoryHexMap({
                     ? "Your tile"
                     : view.ownerKey
                       ? `Owned by ${view.ownerName}`
-                      : "Connection available"}
+                      : connectionQuotes.has(tile.id)
+                        ? "Connection available"
+                        : "Unconnected tile"}
                   . {terrainDetailsLabel(tile.terrain)}.{" "}
                   {facility
                     ? `${facility.name}${status ? ` · ${status.label}` : ""}`
@@ -1070,7 +1134,7 @@ export default function TerritoryHexMap({
                           ? "One building site; submerged cable"
                           : "One building site; transmission tower"
                         : "One building site"}
-                  .
+                  . {hover.reason}
                 </span>
               </button>
             );

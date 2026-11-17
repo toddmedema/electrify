@@ -262,13 +262,21 @@
     clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
   }
   &:hover .territoryTileHitArea {
-    background: color-mix(in srgb, var(--interactive-blue) 14%, transparent);
+    background: color-mix(
+      in srgb,
+      var(--territory-hover-color) 14%,
+      transparent
+    );
   }
   &:focus-visible {
     outline: none;
   }
   &:focus-visible .territoryTileHitArea {
-    background: color-mix(in srgb, var(--interactive-blue) 10%, transparent);
+    background: color-mix(
+      in srgb,
+      var(--territory-hover-color) 10%,
+      transparent
+    );
   }
 }
 .territoryUtilityLabel {
