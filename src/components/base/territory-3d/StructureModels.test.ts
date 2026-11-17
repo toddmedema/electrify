@@ -4,6 +4,9 @@ import type { MapMesh, ModelPart, RGB, StructureKind, Vec3 } from "./Types";
 
 // The union owns the inventory: adding a kind requires giving it these contracts.
 const inventory: Record<StructureKind, true> = {
+  "city-small": true,
+  "city-medium": true,
+  "city-large": true,
   residential: true,
   "industrial-city": true,
   tower: true,
@@ -211,6 +214,54 @@ it("keeps the empty-land tower small and quiet", () => {
   expect(coloredVertices(model.parts[0].mesh, PALETTE.mint)).toHaveLength(0);
 });
 
+it("grows one mixed city family through denser windows and a taller skyline", () => {
+  const cities = (["small", "medium", "large"] as const).map((size) =>
+    getStructureModel(`city-${size}`),
+  );
+  for (const city of cities) {
+    const mesh = city.parts[0].mesh;
+    expect(city.parts).toHaveLength(1);
+    expect(coloredVertices(mesh, PALETTE.grass).length).toBeGreaterThan(0);
+    expect(coloredVertices(mesh, PALETTE.forestLight).length).toBeGreaterThan(
+      0,
+    );
+    expect(coloredVertices(mesh, PALETTE.timber).length).toBeGreaterThan(0);
+    expect(coloredVertices(mesh, PALETTE.smoke)).toHaveLength(0);
+    // A paved street and a low green park remain visible in every tier.
+    expect(
+      coloredVertices(mesh, PALETTE.steelShade).some(
+        ([x, y]) => Math.abs(x) > 0.3 && y < 0.05,
+      ),
+    ).toBe(true);
+    expect(
+      Math.max(...coloredVertices(mesh, PALETTE.grass).map((v) => v[1])),
+    ).toBeLessThan(0.06);
+    // Gabled townhouses survive the higher-density tiers rather than becoming factories.
+    expect(
+      upperSurfaceNormals(mesh, PALETTE.timber).some(
+        (normal) => normal > 0.5 && normal < 0.9,
+      ),
+    ).toBe(true);
+  }
+  for (let i = 1; i < cities.length; i++) {
+    expect(cities[i].height).toBeGreaterThan(cities[i - 1].height + 0.08);
+    expect(
+      coloredVertices(cities[i].parts[0].mesh, PALETTE.mint).length,
+    ).toBeGreaterThan(
+      coloredVertices(cities[i - 1].parts[0].mesh, PALETTE.mint).length,
+    );
+  }
+});
+
+it("uses the same mixed city geometry for temporary legacy sector aliases", () => {
+  const city = getStructureModel("city-medium");
+  for (const kind of ["residential", "industrial-city"] as const) {
+    const legacy = getStructureModel(kind);
+    expect(legacy.parts).toEqual(city.parts);
+    expect(legacy.terminals).toEqual(city.terminals);
+  }
+});
+
 it.each(["wind", "offshore-wind"] as const)(
   "gives %s a thick root, broad inner chord and swept, tapered airfoil sections",
   (kind) => {
@@ -257,7 +308,8 @@ it("retains stopped rotors and wings, but hides production-only effects without 
   for (const kind of kinds) {
     const moving = getStructureModel(kind).parts.filter((part) => part.motion);
     expect(moving.length > 0).toBe(
-      !["residential", "industrial-city", "tower"].includes(kind),
+      !kind.startsWith("city-") &&
+        !["residential", "industrial-city", "tower"].includes(kind),
     );
     for (const part of moving) {
       expect(part.phaseOffset ?? 0).toBeGreaterThanOrEqual(0);

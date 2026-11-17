@@ -1,5 +1,6 @@
 import * as React from "react";
 import type {
+  CitySizeType,
   FacilityOperatingType,
   FuelNameType,
   TerrainType,
@@ -100,11 +101,13 @@ export function TowerArtwork({ className }: { className?: string }) {
   return <TowerOccupant className={className} />;
 }
 export function CityArtwork({
-  sector,
+  size,
   className,
 }: {
-  sector: "residential" | "industrial";
+  size?: CitySizeType;
+  /** Temporary compatibility while map callers move to city sizes. */
+  sector?: "residential" | "industrial";
   className?: string;
 }) {
-  return <CityOccupant variant={sector} className={className} />;
+  return <CityOccupant size={size} className={className} />;
 }

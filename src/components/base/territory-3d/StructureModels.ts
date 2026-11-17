@@ -1,3 +1,4 @@
+import type { CitySizeType } from "../../../Types";
 import { MeshBuilder } from "./MeshBuilder";
 import { PALETTE as P } from "./Palette";
 import type {
@@ -158,60 +159,141 @@ function model(
   };
 }
 
-function city(kind: "residential" | "industrial-city"): MapModel {
-  const body = new MeshBuilder();
-  base(body, 0.53, 0.34);
-  if (kind === "residential") {
-    body.box([0.045, 0.17, -0.055], [0.16, 0.29, 0.18], P.cream);
-    body.box([0.045, 0.32, -0.055], [0.175, 0.014, 0.19], P.steel);
-    windows(body, 0.045, 0.24, 0.038, 0.11);
-    windows(body, 0.045, 0.16, 0.038, 0.11);
-    for (const [x, z] of [
-      [-0.165, 0.01],
-      [0.18, 0.07],
-    ]) {
-      body.box([x, 0.085, z], [0.13, 0.12, 0.15], P.cream);
-      gable(body, [x, 0.145, z], [0.15, 0.062, 0.17], P.forest);
-      body.box([x, 0.08, z + 0.077], [0.045, 0.045, 0.006], P.mint);
-    }
-  } else {
-    body.box([0, 0.09, 0], [0.47, 0.13, 0.27], P.cream);
-    for (let i = 0; i < 3; i++) {
-      const x = -0.235 + i * 0.157,
-        next = x + 0.157;
-      // Three asymmetric northlight teeth, with a dark glazed upright face.
-      body
-        .triangle(
-          [x, 0.155, 0.14],
-          [next, 0.155, 0.14],
-          [next, 0.22, 0.14],
-          P.cream,
-        )
-        .triangle(
-          [next, 0.155, -0.14],
-          [x, 0.155, -0.14],
-          [next, 0.22, -0.14],
-          P.cream,
-        )
-        .quad(
-          [x, 0.155, -0.14],
-          [x, 0.155, 0.14],
-          [next, 0.22, 0.14],
-          [next, 0.22, -0.14],
-          P.steel,
-        )
-        .quad(
-          [next, 0.155, 0.14],
-          [next, 0.155, -0.14],
-          [next, 0.22, -0.14],
-          [next, 0.22, 0.14],
-          P.steelShade,
-        );
-    }
-    body.cylinder([-0.17, 0.03, -0.09], 0.024, 0.018, 0.32, P.steelShade);
-    windows(body, 0, 0.09, 0.138, 0.36);
+/** Small separated panes stay legible on both sunlit and shaded city facades. */
+function cityWindows(
+  mesh: MeshBuilder,
+  x: number,
+  y: number,
+  z: number,
+  width: number,
+  depth: number,
+): void {
+  const pane = width / 5,
+    low = y - 0.014,
+    high = y + 0.014,
+    front = z + depth / 2 + 0.001,
+    right = x + width / 2 + 0.001;
+  for (const offset of [-width / 4, width / 4]) {
+    const left = x + offset - pane / 2;
+    mesh.quad(
+      [left, low, front],
+      [left + pane, low, front],
+      [left + pane, high, front],
+      [left, high, front],
+      P.mint,
+    );
   }
-  return model(kind, body, switchgear(body, 0.17));
+  for (const offset of [-depth / 4, depth / 4]) {
+    const back = z + offset - pane / 2;
+    mesh.quad(
+      [right, low, back + pane],
+      [right, low, back],
+      [right, high, back],
+      [right, high, back + pane],
+      P.mint,
+    );
+  }
+}
+
+function townhouse(mesh: MeshBuilder, x: number, z: number, roof: RGB): void {
+  mesh.box([x, 0.095, z], [0.1, 0.118, 0.11], P.cream);
+  gable(mesh, [x, 0.154, z], [0.116, 0.045, 0.126], roof);
+  cityWindows(mesh, x, 0.117, z, 0.1, 0.11);
+  mesh.box([x, 0.065, z + 0.057], [0.022, 0.058, 0.004], P.timber);
+}
+
+function cityBlock(
+  mesh: MeshBuilder,
+  x: number,
+  z: number,
+  width: number,
+  depth: number,
+  floors: number,
+  roof: RGB,
+  setback = false,
+): void {
+  const floorHeight = 0.056,
+    bottom = 0.036,
+    lowerFloors = setback ? floors - 2 : floors,
+    lowerHeight = lowerFloors * floorHeight + 0.018;
+  mesh.box(
+    [x, bottom + lowerHeight / 2, z],
+    [width, lowerHeight, depth],
+    P.cream,
+  );
+  mesh.box(
+    [x, bottom + lowerHeight, z],
+    [width + 0.012, 0.012, depth + 0.012],
+    roof,
+  );
+  if (setback) {
+    const upperHeight = 2 * floorHeight;
+    mesh.box(
+      [x, bottom + lowerHeight + upperHeight / 2, z],
+      [width - 0.032, upperHeight, depth - 0.032],
+      P.cream,
+    );
+    mesh.box(
+      [x, bottom + lowerHeight + upperHeight, z],
+      [width - 0.02, 0.012, depth - 0.02],
+      roof,
+    );
+  }
+  for (let floor = 0; floor < floors; floor++) {
+    const inset = setback && floor >= lowerFloors ? 0.032 : 0;
+    cityWindows(
+      mesh,
+      x,
+      bottom + 0.041 + floor * floorHeight,
+      z,
+      width - inset,
+      depth - inset,
+    );
+  }
+}
+
+function city(
+  size: CitySizeType,
+  kind: StructureKind = `city-${size}`,
+): MapModel {
+  const body = new MeshBuilder();
+  // A shared street and pocket park tie the three skylines into one city family.
+  body
+    .box([0, 0.018, 0], [0.64, 0.036, 0.46], P.steel)
+    .box([0, 0.04, 0.045], [0.62, 0.008, 0.065], P.steelShade)
+    .box([0.115, 0.04, -0.09], [0.035, 0.008, 0.25], P.steelShade)
+    .box([0.225, 0.041, -0.125], [0.165, 0.01, 0.155], P.grass);
+  for (const x of [-0.24, -0.12, 0, 0.24])
+    body.box([x, 0.045, 0.045], [0.045, 0.002, 0.006], P.cream);
+  for (const [x, z] of [
+    [0.19, -0.15],
+    [0.265, -0.105],
+  ])
+    body
+      .cylinder([x, 0.046, z], 0.006, 0.006, 0.04, P.timber, 5)
+      .cylinder([x, 0.073, z], 0.032, 0.018, 0.048, P.forestLight, 5);
+
+  if (size === "small") {
+    townhouse(body, -0.225, -0.105, P.forest);
+    townhouse(body, -0.075, -0.105, P.steelShade);
+    townhouse(body, 0.035, -0.105, P.timber);
+    townhouse(body, 0.205, 0.16, P.forest);
+    cityBlock(body, -0.17, 0.155, 0.13, 0.11, 3, P.steelShade);
+  } else if (size === "medium") {
+    cityBlock(body, -0.215, -0.12, 0.13, 0.14, 4, P.forest);
+    cityBlock(body, -0.035, -0.12, 0.15, 0.14, 5, P.steelShade);
+    cityBlock(body, -0.025, 0.16, 0.15, 0.11, 3, P.steelShade);
+    townhouse(body, -0.225, 0.16, P.timber);
+    townhouse(body, 0.205, 0.16, P.forest);
+  } else {
+    cityBlock(body, -0.215, -0.125, 0.14, 0.15, 6, P.forest);
+    cityBlock(body, -0.025, -0.125, 0.16, 0.16, 9, P.steelShade, true);
+    cityBlock(body, -0.085, 0.16, 0.13, 0.11, 4, P.steelShade);
+    cityBlock(body, 0.08, 0.16, 0.13, 0.11, 6, P.forest);
+    townhouse(body, -0.24, 0.16, P.timber);
+    townhouse(body, 0.24, 0.16, P.forest);
+  }
+  return model(kind, body, switchgear(body, 0.27));
 }
 
 function tower(): MapModel {
@@ -707,8 +789,11 @@ function pumpedHydro(): MapModel {
 }
 
 const factories: Record<StructureKind, () => MapModel> = {
-  residential: () => city("residential"),
-  "industrial-city": () => city("industrial-city"),
+  "city-small": () => city("small"),
+  "city-medium": () => city("medium"),
+  "city-large": () => city("large"),
+  residential: () => city("medium", "residential"),
+  "industrial-city": () => city("medium", "industrial-city"),
   tower,
   solar,
   wind: () => wind("wind"),
