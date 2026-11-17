@@ -13,6 +13,7 @@
     MAX_PENDING_EVENTS,
   );
   delete window.electrifyAnalyticsQueue;
+  let startAllowed = false;
   let configured = false;
   let loaded = false;
   let loadingScript;
@@ -29,7 +30,7 @@
   function initialize(reconnected) {
     if (
       !enabled() ||
-      document.readyState === "loading" ||
+      !startAllowed ||
       loaded ||
       loadingScript ||
       !window.navigator.onLine ||
@@ -107,15 +108,21 @@
   window.addEventListener("online", function () {
     initialize(true);
   });
-  if (document.readyState === "loading") {
-    // Async execution may precede the title and other page metadata.
-    document.addEventListener(
-      "DOMContentLoaded",
-      function () {
-        initialize(false);
-      },
-      { once: true },
-    );
+  function schedule() {
+    const start = function () {
+      startAllowed = true;
+      initialize(false);
+    };
+    // Leave document loading and the first render free of the third-party tag.
+    if (window.requestIdleCallback)
+      window.requestIdleCallback(start, { timeout: 2000 });
+    else window.setTimeout(start, 0);
   }
-  initialize(false);
+  const afterLoad = function () {
+    if (document.getElementById("appStartup"))
+      document.addEventListener("electrify-ready", schedule, { once: true });
+    else schedule();
+  };
+  if (document.readyState === "complete") afterLoad();
+  else window.addEventListener("load", afterLoad, { once: true });
 })();

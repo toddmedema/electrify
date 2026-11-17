@@ -38,7 +38,9 @@ for (const profile of [false, true]) {
       assert.equal(after.options.minimizer.options.keep_fnames, profile);
       assert.deepEqual(remainingMinimizers, otherMinimizers);
       const { splitChunks, ...otherOptimization } = optimized.optimization;
-      assert.deepEqual(splitChunks, { chunks: "all" });
+      assert.equal(splitChunks.chunks, "all");
+      assert.equal(splitChunks.cacheGroups.achievementHooks.enforce, true);
+      assert.equal(splitChunks.cacheGroups.achievementHooks.minSize, 0);
       assert.deepEqual(
         {
           ...otherOptimization,

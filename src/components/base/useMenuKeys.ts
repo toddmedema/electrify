@@ -1,6 +1,10 @@
-import { KeyboardEvent, useLayoutEffect, useRef } from "react";
+import { FocusEvent, KeyboardEvent, useLayoutEffect, useRef } from "react";
 import { CARD_TRANSITION_ANIMATION_MS } from "../../Constants";
 import { revealControl } from "./RevealControl";
+import {
+  focusInitialMenuControl,
+  isInitialMenuFocus,
+} from "../../InitialMenuFocus";
 
 const selector = "button,a[href],input,select,textarea,[role=button]";
 const popup = "[role=dialog],[role=menu],[role=listbox]";
@@ -21,9 +25,10 @@ function controls(root: Element): HTMLElement[] {
 }
 const preferred = (items: HTMLElement[]) =>
   items.find((item) => item.matches("[aria-pressed=true]")) || items[0];
-function focus(element?: HTMLElement) {
+function focus(element?: HTMLElement, initial = false) {
   if (!element) return;
-  element.focus({ preventScroll: true });
+  if (initial) focusInitialMenuControl(element);
+  else element.focus({ preventScroll: true });
   revealControl(element);
 }
 
@@ -97,7 +102,7 @@ export function useMenuKeys(settings = false, onBack?: () => void) {
         (interaction.current === 1 && ref.current?.contains(active)))
     ) {
       const items = rows()[0] || [];
-      focus(ref.current?.id === "menuCard" ? items[0] : preferred(items));
+      focus(ref.current?.id === "menuCard" ? items[0] : preferred(items), true);
     }
     if (!interaction.current) interaction.current = 1;
   });
@@ -200,8 +205,9 @@ export function useMenuKeys(settings = false, onBack?: () => void) {
   return {
     ref,
     onKeyDown,
-    onFocusCapture: () => {
-      if (interaction.current) interaction.current = 2;
+    onFocusCapture: (event: FocusEvent) => {
+      if (interaction.current && !isInitialMenuFocus(event.target))
+        interaction.current = 2;
     },
   };
 }

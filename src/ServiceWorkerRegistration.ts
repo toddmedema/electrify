@@ -3,6 +3,7 @@ import { isDesktopApp } from "./Desktop";
 
 /** Long enough for the app shell, current screen and first interaction to take priority. */
 export const BACKGROUND_CACHE_DELAY_MS = 3000;
+const registeringWindows = new WeakSet<Window>();
 
 /**
  * Registers the service worker, then warms its cache in the background. Every player gets the
@@ -11,16 +12,20 @@ export const BACKGROUND_CACHE_DELAY_MS = 3000;
  */
 export function registerServiceWorker(win: Window = window): void {
   if (process.env.REACT_APP_DESKTOP === "true" && isDesktopApp()) return;
+  // Both the lightweight title and the full game can reach this boundary in one document.
+  if (registeringWindows.has(win)) return;
+  registeringWindows.add(win);
   const serviceWorker = win.navigator.serviceWorker;
   let registered = false;
   let installed = Boolean(
     (win.navigator as Navigator & { standalone?: boolean }).standalone ||
     win.matchMedia?.("(display-mode: standalone)").matches,
   );
-  win.addEventListener("appinstalled", () => {
+  const onInstalled = () => {
     installed = true;
     syncAssets();
-  });
+  };
+  win.addEventListener("appinstalled", onInstalled);
   const syncAssets = () => {
     if (!registered) {
       return;
@@ -43,7 +48,12 @@ export function registerServiceWorker(win: Window = window): void {
       registered = true;
       win.setTimeout(syncAssets, BACKGROUND_CACHE_DELAY_MS);
     })
-    .catch((error) => console.warn("Couldn't enable offline play:", error));
+    .catch((error) => {
+      registeringWindows.delete(win);
+      win.removeEventListener("appinstalled", onInstalled);
+      win.removeEventListener("online", syncAssets);
+      console.warn("Couldn't enable offline play:", error);
+    });
 
   // A session that started offline only learns about a new build when connectivity returns.
   win.addEventListener("online", syncAssets);

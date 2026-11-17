@@ -33,6 +33,28 @@
           .setAttribute("content", mode === "dark" ? "#121212" : "#ffffff");
       })();
     </script>
+    <link
+      id="startupLogoLight"
+      rel="preload"
+      as="image"
+      href="%PUBLIC_URL%/images/logo-home.svg"
+      media="(prefers-color-scheme: light)"
+      fetchpriority="high"
+    />
+    <link
+      id="startupLogoDark"
+      rel="preload"
+      as="image"
+      href="%PUBLIC_URL%/images/logo-home-dark.svg"
+      media="(prefers-color-scheme: dark)"
+      fetchpriority="high"
+    />
+    <script>
+      document.getElementById("startupLogoLight").media =
+        document.documentElement.dataset.theme === "dark" ? "not all" : "all";
+      document.getElementById("startupLogoDark").media =
+        document.documentElement.dataset.theme === "dark" ? "all" : "not all";
+    </script>
     <style>
       /* Match the app canvas while its stylesheet is still loading. */
       html {
@@ -43,6 +65,9 @@
       }
       /* The summary stays in the document for crawlers and readers without scripts. */
       html.js .app-loading {
+        display: none;
+      }
+      html:not(.js) #appStartup {
         display: none;
       }
       /* Lay out the startup entrance before the app stylesheet arrives. */
@@ -76,7 +101,13 @@
         max-width: 680px;
         margin: 0 auto;
       }
-      #appStartup img {
+      .homeWordmark {
+        color: #0084f8;
+      }
+      html[data-theme="dark"] .homeWordmark {
+        color: #629be1;
+      }
+      #appStartup .homeWordmark {
         display: block;
         width: 100%;
         height: auto;
@@ -98,7 +129,7 @@
         font-size: var(--font-size-body1, 0.9375rem);
       }
       @media (max-height: 450px) {
-        #appStartup .homeLogo img {
+        #appStartup .homeLogo .homeWordmark {
           max-height: 72px;
           object-fit: contain;
         }
@@ -138,12 +169,41 @@
     <!-- Bundled typography is also available in an offline desktop build. -->
     <link
       rel="preload"
-      href="%PUBLIC_URL%/fonts/inter/InterVariable.woff2"
+      href="%PUBLIC_URL%/fonts/inter/InterVariable-latin.f222662c.woff2"
       as="font"
       type="font/woff2"
       crossorigin
     />
-    <link rel="stylesheet" href="%PUBLIC_URL%/fonts/inter/inter.css" />
+    <style>
+      @font-face {
+        font-family: Inter;
+        font-style: normal;
+        font-weight: 100 900;
+        font-display: swap;
+        src: url("%PUBLIC_URL%/fonts/inter/InterVariable.woff2") format("woff2");
+      }
+      @font-face {
+        font-family: "Inter";
+        font-style: normal;
+        font-weight: 100 900;
+        font-display: swap;
+        src: url("%PUBLIC_URL%/fonts/inter/InterVariable-latin.f222662c.woff2")
+          format("woff2");
+        unicode-range:
+          U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+          U+0300-036F, U+2000-206F, U+20A0-20CF, U+2100-214F, U+2190-21FF,
+          U+2212, U+2215, U+FEFF, U+FFFD;
+      }
+
+      @font-face {
+        font-family: Inter;
+        font-style: italic;
+        font-weight: 100 900;
+        font-display: swap;
+        src: url("%PUBLIC_URL%/fonts/inter/InterVariable-Italic.woff2")
+          format("woff2");
+      }
+    </style>
 
     <!-- Twitter Card data -->
     <meta name="twitter:card" content="summary_large_image" />
@@ -191,10 +251,21 @@
         "@context": "https://schema.org",
         "@graph": [
           {
+            "@type": "Person",
+            "@id": "https://electrifygame.com/#publisher",
+            "name": "Todd Medema",
+            "url": "https://www.toddmedema.com/"
+          },
+          {
             "@type": "WebSite",
             "@id": "https://electrifygame.com/#website",
             "url": "https://electrifygame.com/",
-            "name": "Electrify"
+            "name": "Electrify",
+            "alternateName": ["Electrify Game"],
+            "inLanguage": "en",
+            "publisher": {
+              "@id": "https://electrifygame.com/#publisher"
+            }
           },
           {
             "@type": "VideoGame",
@@ -207,7 +278,26 @@
             "genre": ["Strategy", "Simulation", "Educational"],
             "gamePlatform": "Web browser",
             "isAccessibleForFree": true,
-            "license": "https://github.com/toddmedema/electrify/blob/master/LICENSE.md"
+            "license": "https://github.com/toddmedema/electrify/blob/master/LICENSE.md",
+            "applicationCategory": "Game",
+            "operatingSystem": "Any (web browser)",
+            "playMode": "https://schema.org/SinglePlayer",
+            "offers": {
+              "@type": "Offer",
+              "price": "0",
+              "priceCurrency": "USD"
+            },
+            "author": {
+              "@id": "https://electrifygame.com/#publisher"
+            },
+            "publisher": {
+              "@id": "https://electrifygame.com/#publisher"
+            },
+            "screenshot": "https://electrifygame.com/images/gameplay-preview.png",
+            "sameAs": [
+              "https://github.com/toddmedema/electrify",
+              "https://discord.gg/ethMFvvmup"
+            ]
           }
         ]
       }
@@ -271,58 +361,63 @@
     <!-- Installed on web and desktop as soon as scripts run; handed off after the app commits
          and at least 500ms have elapsed. One screen with one message on every platform, so
          nothing changes between first paint and the menu. Keep logo geometry in step with MainMenu. -->
-    <template id="appStartupTemplate">
-      <div id="appStartup">
-        <div class="appStartupLogo">
-          <div class="homeLogo">
-            <img alt="Electrify" width="300" height="70" />
-            <svg
-              class="homeEnergyTrace"
-              viewBox="0 0 300 70"
-              aria-hidden="true"
-              focusable="false"
-            >
-              <path
-                class="homeEnergyPulse"
-                d="M57.7873 5.39465C57.7873 5.39465 85.2179 11.978 107.162 11.978C129.107 11.978 150.32 8.22915 150.32 8.22915"
-                pathLength="100"
-              />
-              <g class="homeSmoke">
-                <g class="homeSmokePuff">
-                  <g class="homeSmokeLift">
-                    <circle cx="222" cy="8.1" r="4.4" />
-                  </g>
-                </g>
-                <g class="homeSmokePuff">
-                  <g class="homeSmokeLift">
-                    <circle cx="222" cy="8.1" r="4.4" />
-                  </g>
+    <div id="appStartup">
+      <div class="appStartupLogo">
+        <div class="homeLogo">
+          <picture>
+            <source
+              srcset="%PUBLIC_URL%/images/logo-home-dark.svg"
+              media="(prefers-color-scheme: dark)"
+            />
+            <img
+              src="%PUBLIC_URL%/images/logo-home.svg"
+              fetchpriority="high"
+              class="homeWordmark"
+              alt="Electrify"
+              width="300"
+              height="70"
+            />
+          </picture>
+          <svg
+            class="homeEnergyTrace"
+            viewBox="0 0 300 70"
+            aria-hidden="true"
+            focusable="false"
+          >
+            <path
+              class="homeEnergyPulse"
+              d="M57.7873 5.39465C57.7873 5.39465 85.2179 11.978 107.162 11.978C129.107 11.978 150.32 8.22915 150.32 8.22915"
+              pathLength="100"
+            />
+            <g class="homeSmoke">
+              <g class="homeSmokePuff">
+                <g class="homeSmokeLift">
+                  <circle cx="222" cy="8.1" r="4.4" />
                 </g>
               </g>
-            </svg>
-          </div>
+              <g class="homeSmokePuff">
+                <g class="homeSmokeLift">
+                  <circle cx="222" cy="8.1" r="4.4" />
+                </g>
+              </g>
+            </g>
+          </svg>
         </div>
-        <div data-startup-status role="status">Loading…</div>
       </div>
-    </template>
+      <div data-startup-status role="status">Loading…</div>
+    </div>
     <script>
       (function () {
-        const template = document.getElementById("appStartupTemplate");
-        const entrance = template.content.cloneNode(true);
-        entrance.querySelector("img").src =
-          document.documentElement.dataset.theme === "dark"
-            ? "%PUBLIC_URL%/images/logo-home-dark.svg"
-            : "%PUBLIC_URL%/images/logo-home.svg";
-        document.body.append(entrance);
+        const image = document.querySelector("#appStartup img");
+        document.body.dataset.homeLogo = image.src;
+        document.querySelector("#appStartup source").media =
+          document.documentElement.dataset.theme === "dark" ? "all" : "not all";
         document.getElementById("appStartup").dataset.startedAt = String(
           performance.now(),
         );
-        template.remove();
       })();
     </script>
 
-    <!-- Prefetch low priority assets -->
-    <link rel="prefetch" href="%PUBLIC_URL%/data/FuelPricesRaw.csv" />
     <!-- <script async type="text/javascript" src="something.js"></script> -->
   </body>
 </html>

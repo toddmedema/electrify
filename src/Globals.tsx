@@ -1,6 +1,11 @@
+import { deferredWebAuth, hasStoredWebAccount } from "./WebAuth";
 import { initializeApp } from "firebase/app";
 import {
-  getAuth,
+  initializeAuth,
+  indexedDBLocalPersistence,
+  browserLocalPersistence,
+  browserSessionPersistence,
+  browserPopupRedirectResolver,
   GoogleAuthProvider,
   OAuthProvider,
   signInWithPopup,
@@ -29,7 +34,29 @@ const firebaseApp =
         appId: "1:882673691459:web:b6af63afe7ddf377a31df6",
       });
 // Desktop accounts come from Steam; even constructing Firebase Auth starts web transport.
-export const firebaseAppAuth = firebaseApp ? getAuth(firebaseApp) : undefined;
+export const firebaseAppAuth = firebaseApp
+  ? deferredWebAuth(() =>
+      initializeAuth(firebaseApp, {
+        persistence: [
+          indexedDBLocalPersistence,
+          browserLocalPersistence,
+          browserSessionPersistence,
+        ],
+      }),
+    )
+  : undefined;
+// Restore existing accounts without loading popup/iframe transport for new visitors.
+if (firebaseAppAuth && typeof window !== "undefined") {
+  const restore = () => {
+    void hasStoredWebAccount().then((stored) => {
+      if (stored) firebaseAppAuth?.initialize();
+      else firebaseAppAuth?.confirmSignedOut();
+    });
+  };
+  restore();
+  window.addEventListener("focus", restore);
+  window.addEventListener("storage", restore);
+}
 export type SignInProvider = "google" | "apple";
 
 export interface SignInOptions {
@@ -47,14 +74,19 @@ export function login({
     provider === "apple"
       ? new OAuthProvider("apple.com")
       : new GoogleAuthProvider();
-  return signInWithPopup(firebaseAppAuth!, authProvider)
+  return signInWithPopup(
+    firebaseAppAuth!.initialize(),
+    authProvider,
+    browserPopupRedirectResolver,
+  )
     .then((credential) => {
       if (mailingList) {
         // Auth listeners can close the dialog before signup finishes.
         // Keep signup independent of login and cloud sync.
-        void subscribeAfterSignIn(firebaseAppAuth!, credential.user).catch(
-          () => undefined,
-        );
+        void subscribeAfterSignIn(
+          firebaseAppAuth!.initialize(),
+          credential.user,
+        ).catch(() => undefined);
       }
       // The signed in user reaches the app through firebaseAppAuth.onAuthStateChanged
       // (see App.tsx); nothing is needed here. Do not log the credential -- it carries an
@@ -75,7 +107,7 @@ export function login({
 export function logout(): Promise<void> {
   if (process.env.REACT_APP_DESKTOP === "true" && isDesktopApp())
     return Promise.resolve();
-  return signOut(firebaseAppAuth!);
+  return signOut(firebaseAppAuth!.initialize());
 }
 
 // The slice of the History API the game uses. Card navigation pushes a hash entry so the
@@ -98,7 +130,6 @@ const refs = {
           back: () => undefined,
         },
   localStorage: null as Storage | null,
-  audioContext: null as AudioContext | null,
 };
 
 declare global {
@@ -241,18 +272,7 @@ export function getHistoryApi(): HistoryApi {
   return refs.history;
 }
 
-export function getAudioContext(): AudioContext | null {
-  if (refs.audioContext) {
-    return refs.audioContext;
-  }
-  try {
-    refs.audioContext = new window.AudioContext();
-  } catch (_err) {
-    console.warn("Web Audio API is not supported in this browser");
-    refs.audioContext = null;
-  }
-  return refs.audioContext;
-}
+export { getAudioContext } from "./AudioContext";
 
 export function openWindow(url: string): void {
   if (process.env.REACT_APP_DESKTOP === "true" && isDesktopApp()) {

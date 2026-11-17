@@ -1,13 +1,8 @@
+import { useTheme } from "@mui/material/styles";
 import { DISCORD_URL, FEEDBACK_URL } from "../../CommunityLinks";
 import * as React from "react";
-import {
-  Box,
-  Button,
-  Stack,
-  SvgIcon,
-  Typography,
-  useTheme,
-} from "@mui/material";
+import { homeLogoSource } from "../../HomeLogo";
+import { Box, Button, Stack, SvgIcon, Typography } from "@mui/material";
 import EmailIcon from "@mui/icons-material/Email";
 import InfoIcon from "@mui/icons-material/Info";
 import ShareIcon from "@mui/icons-material/Share";
@@ -17,11 +12,11 @@ import {
   buildGameShareContent,
   canShare,
   shareText,
-} from "../../helpers/Share";
-import InstallAppButton from "../base/InstallAppButton";
+} from "../../helpers/ShareTransport";
 import MenuIconButton from "../base/MenuIconButton";
 import { getDesktop, isDesktopApp } from "../../Desktop";
 import { useMenuKeys } from "../base/useMenuKeys";
+const InstallAppButton = React.lazy(() => import("../base/InstallAppButton"));
 // Keep Steam's co-op UI and authoritative worker out of the browser edition entirely.
 const MultiplayerButton =
   process.env.REACT_APP_DESKTOP === "true"
@@ -30,6 +25,7 @@ const MultiplayerButton =
 
 export interface StateProps {
   audioEnabled?: boolean;
+  deferServices?: boolean;
   hasSavedGame: boolean;
   hasSavedGames: boolean;
 }
@@ -71,6 +67,7 @@ function focusHomeButton(event: React.PointerEvent) {
 
 const MainMenu = (props: Props): React.JSX.Element => {
   const menuKeys = useMenuKeys();
+  const mode = useTheme().palette.mode;
   // Native :active can wait until touch release. Track contact without delaying the click
   // or taking over the browser's scrolling and pointer-cancellation behavior.
   const pressedButton = React.useRef<HTMLElement | null>(null);
@@ -113,10 +110,6 @@ const MainMenu = (props: Props): React.JSX.Element => {
       : { href: path };
   const startLabel = props.hasSavedGame ? "New game" : "Play";
   const [shareStatus, setShareStatus] = React.useState("");
-  // An <img> can't read the page's custom properties, so dark swaps in a copy of the logo painted
-  // in dark's desaturated blue; the overlaid pulse and smoke follow --interactive-blue on their own
-  const dark = useTheme().palette.mode === "dark";
-
   const onShare = async () => {
     const result = await shareText(buildGameShareContent());
     if (result === "clipboard") {
@@ -152,7 +145,8 @@ const MainMenu = (props: Props): React.JSX.Element => {
       <div id="logo">
         <div className="homeLogo">
           <img
-            src={dark ? "images/logo-home-dark.svg" : "images/logo-home.svg"}
+            className="homeWordmark"
+            src={homeLogoSource(mode)}
             alt="Electrify"
             width="300"
             height="70"
@@ -282,7 +276,11 @@ const MainMenu = (props: Props): React.JSX.Element => {
             }}
           >
             {props.audioEnabled === undefined && !desktopApp && (
-              <Button color="primary" onClick={() => props.onAudioChange(true)}>
+              <Button
+                data-audio-trigger
+                color="primary"
+                onClick={() => props.onAudioChange(true)}
+              >
                 Turn on sound
               </Button>
             )}
@@ -300,7 +298,11 @@ const MainMenu = (props: Props): React.JSX.Element => {
         >
           <MenuBookIcon />
         </MenuIconButton>
-        {!desktopApp && <InstallAppButton iconOnly />}
+        {!desktopApp && !props.deferServices && (
+          <React.Suspense fallback={null}>
+            <InstallAppButton iconOnly />
+          </React.Suspense>
+        )}
         {!desktopApp && (
           <MenuIconButton
             data-achievements-trigger
@@ -336,6 +338,21 @@ const MainMenu = (props: Props): React.JSX.Element => {
           </MenuIconButton>
         )}
       </footer>
+      <nav className="homeExplore" aria-label="Explore Electrify">
+        {[
+          ["/power-grid-simulator.html", "How to play"],
+          ["/scenarios.html", "Official scenarios"],
+          ["/classroom.html", "For teachers"],
+          ["/data-centers.html", "Data centers"],
+          ["/energy-simulators.html", "Compare simulators"],
+          ["/about.html", "About"],
+          ["/privacy.html", "Privacy"],
+        ].map(([path, label]) => (
+          <a key={path} {...sitePage(path)}>
+            {label}
+          </a>
+        ))}
+      </nav>
     </div>
   );
 };

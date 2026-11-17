@@ -12,11 +12,8 @@ import { useScreenEdgeMargin } from "../../ScreenEdgePadding";
 
 // The term the player tapped. A DOM node has no place in the store, so it lives here beside the
 // popover that reads it; ManualLink records it just before asking for the entry
-let helpAnchor: HTMLElement | null = null;
-
-export function setManualHelpAnchor(el: HTMLElement | null) {
-  helpAnchor = el;
-}
+import { getManualHelpAnchor } from "./ManualHelpAnchor";
+export { setManualHelpAnchor } from "./ManualHelpAnchor";
 
 type HelpEntry = { title: ManualEntryTitleType; entry: React.JSX.Element };
 
@@ -113,6 +110,7 @@ export default function ManualHelpPopover(
   const open = !!props.entry && !!entry;
   // A row can re-render its term away while the entry is open. Without a node still on the page
   // to point at, the popover centres itself instead of flying to the corner
+  const helpAnchor = getManualHelpAnchor();
   const anchored = !controllerInput && !!helpAnchor?.isConnected;
 
   return (

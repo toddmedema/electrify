@@ -20,6 +20,7 @@ function browser(
     url = "https://electrifygame.com/",
     native,
     readyState = "complete",
+    autoIdle = true,
   } = {},
 ) {
   const dom = new JSDOM(
@@ -48,7 +49,13 @@ function browser(
     get: () => online,
   });
   if (native) window[native] = { apiVersion: 1 };
-  const run = () => window.eval(source);
+  const idle = [];
+  window.requestIdleCallback = (callback) => idle.push(callback);
+  const flushIdle = () => idle.splice(0).forEach((callback) => callback());
+  const run = () => {
+    window.eval(source);
+    if (autoIdle) flushIdle();
+  };
   const scripts = () =>
     Array.from(window.document.querySelectorAll("script[src]"));
   const commands = () =>
@@ -58,9 +65,18 @@ function browser(
     run,
     scripts,
     commands,
+    idle: flushIdle,
     ready: () => {
       readyState = "interactive";
       window.document.dispatchEvent(new window.Event("DOMContentLoaded"));
+      assert.equal(
+        scripts().length,
+        0,
+        "DOMContentLoaded must not fetch the tag",
+      );
+      readyState = "complete";
+      window.dispatchEvent(new window.Event("load"));
+      if (autoIdle) flushIdle();
     },
     online: (value) => {
       online = value;
@@ -139,7 +155,7 @@ test("async runtime waits for page metadata and adopts earlier game events once"
   const append = b.window.document.head.appendChild;
   b.window.document.head.appendChild = function (script) {
     assert.equal(b.window.document.title, title);
-    assert.equal(b.window.document.readyState, "interactive");
+    assert.equal(b.window.document.readyState, "complete");
     assert.equal(b.commands().filter(([name]) => name === "config").length, 1);
     return append.call(this, script);
   };
@@ -153,6 +169,31 @@ test("async runtime waits for page metadata and adopts earlier game events once"
     ["event", "card_view", { card: "MANUAL", app_version: "early-version" }],
     ["event", "card_view", { card: "FACILITIES" }],
   ]);
+});
+
+test("the tag waits for load and idle even when events and reconnect arrive early", (t) => {
+  const b = browser(t, { readyState: "loading", autoIdle: false });
+  b.run();
+  b.window.electrifyAnalytics.logEvent("early", { scenario: 108 });
+  b.online(true);
+  assert.equal(b.scripts().length, 0);
+  b.ready();
+  b.window.electrifyAnalytics.initialize();
+  b.online(true);
+  assert.equal(b.scripts().length, 0, "load alone must still yield to idle");
+  b.idle();
+  assert.equal(b.scripts().length, 1);
+  b.scripts()[0].dispatchEvent(new b.window.Event("load"));
+  assert.deepEqual(b.commands()[2], ["event", "early", { scenario: 108 }]);
+});
+
+test("browsers without idle callbacks yield through a timer after load", (t) => {
+  const b = browser(t, { autoIdle: false });
+  delete b.window.requestIdleCallback;
+  b.run();
+  assert.equal(b.scripts().length, 0);
+  b.expire();
+  assert.equal(b.scripts().length, 1);
 });
 
 test("adopted events share the runtime's bounded queue", (t) => {
@@ -319,6 +360,14 @@ function assertAnalyticsDocument(document, name) {
       script.getAttribute("src"),
     ),
   );
+  if (name === "404.html") {
+    assert.equal(
+      shared.length,
+      0,
+      "error pages do not send analytics page views",
+    );
+    return;
+  }
   assert.equal(shared.length, 1, `${name}: one shared analytics runtime`);
   assert.ok(
     shared[0].parentElement === document.head,

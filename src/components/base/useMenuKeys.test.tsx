@@ -9,6 +9,7 @@ import userEvent from "@testing-library/user-event";
 import * as React from "react";
 import { ReactNode, useLayoutEffect } from "react";
 import { restoreMenuFocus, useMenuKeys } from "./useMenuKeys";
+import { finishStartup } from "../../desktop/Startup";
 
 function Menu(props: {
   children: ReactNode;
@@ -347,4 +348,130 @@ it("always starts and recovers home at the first action even when a saved prefer
   tv.focus();
   act(() => tv.blur());
   await waitFor(() => expect(first).toHaveFocus());
+});
+
+describe("startup focus while saves hydrate", () => {
+  let root: HTMLDivElement;
+  let entrance: HTMLDivElement;
+
+  beforeEach(() => {
+    jest.useFakeTimers();
+    jest.spyOn(performance, "now").mockReturnValue(1100);
+    jest.spyOn(window, "matchMedia").mockReturnValue({
+      matches: true,
+    } as MediaQueryList);
+    root = document.createElement("div");
+    root.id = "root";
+    entrance = document.createElement("div");
+    entrance.id = "appStartup";
+    entrance.dataset.startedAt = "1000";
+    document.body.append(root, entrance);
+    // jsdom has neither inert focus handling nor visibility transitions. Honor the
+    // browser's focus restriction while the restored root is still transitioning.
+    const nativeFocus = HTMLElement.prototype.focus;
+    jest.spyOn(HTMLElement.prototype, "focus").mockImplementation(function (
+      this: HTMLElement,
+      options?: FocusOptions,
+    ) {
+      if (getComputedStyle(this).visibility !== "hidden")
+        nativeFocus.call(this, options);
+    });
+  });
+
+  afterEach(() => {
+    root.remove();
+    entrance.remove();
+    jest.useRealTimers();
+  });
+
+  function home(saved: boolean) {
+    return (
+      <Menu home>
+        {saved && (
+          <button key="continue" data-main-action>
+            Continue
+          </button>
+        )}
+        <button key="play" data-main-action>
+          {saved ? "New game" : "Play"}
+        </button>
+        <button key="settings">Settings</button>
+      </Menu>
+    );
+  }
+
+  function begin() {
+    // The menu enters before its visibility transition permits native focus.
+    root.style.visibility = "hidden";
+    const view = render(home(false), { container: root });
+    root.style.visibility = "";
+    act(() => finishStartup());
+    return view;
+  }
+
+  it("uses the hydrated primary action when visibility delays startup focus", () => {
+    const view = begin();
+    // Model the inherited CSS visibility until the two-frame transition settles.
+    root.className = "startupTransition";
+    const style = document.createElement("style");
+    style.textContent = ".startupTransition { visibility: hidden; }";
+    document.head.append(style);
+    try {
+      act(() => jest.advanceTimersByTime(400));
+      expect(entrance).not.toBeInTheDocument();
+      expect(document.body).toHaveFocus();
+      view.rerender(home(true));
+      expect(document.body).toHaveFocus();
+      root.className = "";
+      act(() => jest.advanceTimersByTime(40));
+      expect(screen.getByRole("button", { name: "Continue" })).toHaveFocus();
+    } finally {
+      style.remove();
+    }
+  });
+
+  it("allows late hydration to replace startup's initial selection", () => {
+    const view = begin();
+    act(() => jest.advanceTimersByTime(400));
+    expect(screen.getByRole("button", { name: "Play" })).toHaveFocus();
+    view.rerender(home(true));
+    expect(screen.getByRole("button", { name: "Continue" })).toHaveFocus();
+  });
+
+  it.each(["ArrowDown", "Tab", "pointer"])(
+    "preserves an explicit %s selection when saves hydrate",
+    (input) => {
+      const view = begin();
+      act(() => jest.advanceTimersByTime(400));
+      const settings = screen.getByRole("button", { name: "Settings" });
+      if (input === "pointer") fireEvent.pointerDown(settings);
+      else
+        fireEvent.keyDown(screen.getByRole("button", { name: "Play" }), {
+          key: input,
+        });
+      act(() => settings.focus());
+      view.rerender(home(true));
+      expect(settings).toHaveFocus();
+    },
+  );
+
+  it.each(["footer", "dialog"])(
+    "leaves %s focus alone when startup saves hydrate",
+    (destination) => {
+      const view = begin();
+      act(() => jest.advanceTimersByTime(400));
+      const target = document.createElement("button");
+      target.textContent = destination;
+      if (destination === "dialog") target.setAttribute("role", "dialog");
+      document.body.append(target);
+      try {
+        act(() => target.focus());
+        view.rerender(home(true));
+        act(() => jest.advanceTimersByTime(40));
+        expect(target).toHaveFocus();
+      } finally {
+        target.remove();
+      }
+    },
+  );
 });

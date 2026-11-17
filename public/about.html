@@ -66,6 +66,26 @@
         "about": { "@id": "https://electrifygame.com/#game" }
       }
     </script>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          {
+            "@type": "ListItem",
+            "position": 1,
+            "name": "Electrify",
+            "item": "https://electrifygame.com/"
+          },
+          {
+            "@type": "ListItem",
+            "position": 2,
+            "name": "About",
+            "item": "https://electrifygame.com/about.html"
+          }
+        ]
+      }
+    </script>
   </head>
   <body>
     <a class="skip-link" href="#main-content">Skip to content</a>
@@ -88,6 +108,11 @@
         </nav>
       </div>
     </header>
+
+    <nav class="page-breadcrumb" aria-label="Breadcrumb">
+      <a href="/">Electrify</a><span aria-hidden="true"> / </span
+      ><span>About</span>
+    </nav>
 
     <section class="hero hero--illustrated" aria-labelledby="page-title">
       <div class="hero__inner">
@@ -313,6 +338,10 @@
           >.
         </p>
         <nav aria-label="Footer navigation">
+          <a href="/data-centers.html">Data centers</a>
+          <a href="/electrify-vs-en-roads.html">Electrify and En-ROADS</a>
+          <a href="/energy-simulators.html">Compare simulators</a>
+          <a href="/classroom.html">For teachers</a>
           <a href="/scenarios.html">Scenarios</a>
           <a href="/privacy.html">Privacy</a>
           <a href="https://github.com/toddmedema/electrify">GitHub</a>
