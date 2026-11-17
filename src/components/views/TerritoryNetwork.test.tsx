@@ -34,7 +34,16 @@ import { acquireTile } from "../../reducers/GameActions";
 import { registerMultiplayerRuntime } from "../../multiplayer/Registry";
 import type { Command } from "../../multiplayer/Types";
 
-afterEach(() => registerMultiplayerRuntime(undefined));
+let mockProjectLoadFailure = false;
+afterEach(() => {
+  registerMultiplayerRuntime(undefined);
+  mockProjectLoadFailure = false;
+});
+
+jest.mock("../base/ProjectBuild", () => {
+  if (mockProjectLoadFailure) throw new Error("Project chunk unavailable");
+  return jest.requireActual("../base/ProjectBuild");
+});
 
 jest.mock(
   "../base/ManualLink",
@@ -458,6 +467,28 @@ it("replaces tile inspection with a dock panel, without resurrecting the old ins
   expect(app.onInspect).toHaveBeenCalledTimes(2);
 });
 
+it("keeps a failed planner load in one closable panel and retries on the next opening", async () => {
+  mockProjectLoadFailure = true;
+  const { store } = show();
+  const cash = currentTick(store.getState().game)!.cash;
+  fireEvent.click(screen.getByRole("button", { name: "Build" }));
+  expect(
+    await screen.findByRole("heading", { name: "Project planner unavailable" }),
+  ).toBeVisible();
+  expect(screen.getAllByRole("dialog")).toHaveLength(1);
+  expect(screen.getByLabelText("Tile map")).toBeVisible();
+  fireEvent.keyDown(surface(), { key: "Escape" });
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  mockProjectLoadFailure = false;
+  fireEvent.click(screen.getByRole("button", { name: "Build" }));
+  expect(
+    await screen.findByRole("button", { name: "Choose sites for Wind" }),
+  ).toBeEnabled();
+  expect(screen.getAllByRole("dialog")).toHaveLength(1);
+  expect(currentTick(store.getState().game)!.cash).toBe(cash);
+  expect(store.getState().game.territoryNetwork!.tilePurchases).toHaveLength(0);
+});
+
 it("keeps the confirmed project locked when Build is activated during host Connect", async () => {
   const game = ready();
   game.multiplayer = { seat: "0" };
@@ -477,7 +508,7 @@ it("keeps the confirmed project locked when Build is activated during host Conne
   });
   fireEvent.click(screen.getByRole("button", { name: "Build" }));
   fireEvent.click(
-    screen.getByRole("button", { name: "Choose sites for Wind" }),
+    await screen.findByRole("button", { name: "Choose sites for Wind" }),
   );
   inspect("green-uplands:site-1");
   fireEvent.click(screen.getByRole("button", { name: "Review project" }));
@@ -515,13 +546,15 @@ it("keeps the confirmed project locked when Build is activated during host Conne
   ).toMatchObject({ name: "Wind", peakW: 20e6 });
 });
 
-it("explains when a project has no compatible highlighted sites without requiring connection or cash", () => {
+it("explains when a project has no compatible highlighted sites without requiring connection or cash", async () => {
   const game = ready();
   currentTick(game)!.cash = 0;
   const { store } = show(game);
   fireEvent.click(screen.getByRole("button", { name: "Build" }));
   fireEvent.click(
-    screen.getByRole("button", { name: "Choose sites for Offshore Wind" }),
+    await screen.findByRole("button", {
+      name: "Choose sites for Offshore Wind",
+    }),
   );
   expect(
     screen.getByText(/No compatible connected or adjacent sites/),

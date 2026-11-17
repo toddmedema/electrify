@@ -112,6 +112,25 @@ for (const theme of ["light", "dark"] as const) {
       "Estimated online",
     ])
       await expect(surface.getByText(label, { exact: true })).toBeVisible();
+    const initialCosts = await surface
+      .locator(".projectFacts > div")
+      .evaluateAll((facts) => {
+        const scroll = facts[0].closest(".projectCandidateScroll")!;
+        const bounds = scroll.getBoundingClientRect();
+        return facts.slice(0, 2).map((fact) => {
+          const value = fact.querySelector("dd")!.getBoundingClientRect();
+          return {
+            valueTop: value.top,
+            valueBottom: value.bottom,
+            visibleTop: bounds.top,
+            visibleBottom: bounds.bottom,
+          };
+        });
+      });
+    for (const cost of initialCosts) {
+      expect(cost.valueTop).toBeGreaterThanOrEqual(cost.visibleTop);
+      expect(cost.valueBottom).toBeLessThanOrEqual(cost.visibleBottom + 1);
+    }
     const explored = (await readSavedGame(page))!;
     expect(currentTick(explored)!.cash).toBe(currentTick(before)!.cash);
     expect(explored.territoryNetwork!.tilePurchases).toEqual(
@@ -143,12 +162,18 @@ for (const theme of ["light", "dark"] as const) {
         exact: true,
       })
       .check();
-    await expect(surface.getByText(/Down payment/)).toBeVisible();
+    const loanTerms = surface.getByText(/Down payment/);
+    await expect(loanTerms).toBeVisible();
+    await loanTerms.scrollIntoViewIfNeeded();
     const confirm = surface.getByRole("button", {
       name: "Connect & build",
       exact: true,
     });
     await expect(confirm).toBeEnabled();
+    await expect(confirm).toBeInViewport();
+    await reviewScreenshot(network, {
+      path: testInfo.outputPath(`project-review-loan-${theme}.png`),
+    });
     await confirm.click();
     await expect(surface).toHaveCount(0);
     const built = (await readSavedGame(page))!;

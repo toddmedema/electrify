@@ -357,16 +357,18 @@ export default function ProjectBuild({
       ) : (
         <div className="projectCandidateContent">
           <div className="projectCandidateScroll">
-            <Button size="small" disabled={!!progress} onClick={change}>
-              Change project
-            </Button>
-            {ready && (
-              <p className="projectLocation">
-                {reviewing && <strong>{title} · </strong>}
-                {territoryBuildTileName(ready.tile.id, game)} ·{" "}
-                {territoryMapLabel(ready.tile.territoryId)}
-              </p>
-            )}
+            <div className="projectCandidateHeader">
+              {ready && (
+                <p className="projectLocation">
+                  {reviewing && <strong>{title} · </strong>}
+                  {territoryBuildTileName(ready.tile.id, game)} ·{" "}
+                  {territoryMapLabel(ready.tile.territoryId)}
+                </p>
+              )}
+              <Button size="small" disabled={!!progress} onClick={change}>
+                Change project
+              </Button>
+            </div>
             {!candidate && compatibleSites > 0 && (
               <>
                 <p>Choose a highlighted site.</p>

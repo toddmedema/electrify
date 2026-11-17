@@ -39,7 +39,6 @@ import ExpandedFacilityDetails, {
   FacilityDetailActions,
 } from "../base/ExpandedFacilityDetails";
 import { signature } from "../base/DeferredProjection";
-import ProjectBuild from "../base/ProjectBuild";
 import {
   projectSiteQuote,
   type ProjectSelection,
@@ -63,6 +62,51 @@ import {
 } from "../base/TerritoryTilePurchases";
 
 const keepTileOpen = () => undefined;
+
+function ProjectBuildUnavailable({ onClose }: { onClose: () => void }) {
+  return (
+    <TileWorkspaceSurface
+      title="Project planner unavailable"
+      focusKey="project-unavailable"
+      returnFocusSelector=".territoryMapBuildToggle"
+      onClose={onClose}
+    >
+      <p role="status">
+        The project planner could not load. Close this panel and open Build to
+        try again.
+      </p>
+    </TileWorkspaceSurface>
+  );
+}
+
+function DeferredProjectBuild(
+  props: React.ComponentProps<typeof import("../base/ProjectBuild").default>,
+) {
+  // A new opening can retry a failed chunk without disturbing the map or saved project.
+  const [ProjectBuild] = React.useState(() =>
+    React.lazy(() =>
+      import(
+        /* webpackChunkName: "project-build" */ "../base/ProjectBuild"
+      ).catch(() => ({ default: ProjectBuildUnavailable })),
+    ),
+  );
+  return (
+    <React.Suspense
+      fallback={
+        <TileWorkspaceSurface
+          title="Plan a project"
+          focusKey="project-loading"
+          returnFocusSelector=".territoryMapBuildToggle"
+          onClose={props.onClose}
+        >
+          <p role="status">Loading project planner…</p>
+        </TileWorkspaceSurface>
+      }
+    >
+      <ProjectBuild {...props} />
+    </React.Suspense>
+  );
+}
 
 type Props = TransmissionPanelProps & {
   facilityActions: FacilityDetailActions;
@@ -233,7 +277,7 @@ function TileNetwork(props: Props) {
         />
       )}
       {planning && !panel?.open && (
-        <ProjectBuild
+        <DeferredProjectBuild
           game={game}
           project={project}
           candidate={candidate}
