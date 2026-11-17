@@ -8,6 +8,7 @@ import type {
   MapMesh,
   ModelPart,
   RendererDiagnostics,
+  RendererSceneInstance,
   Vec3,
 } from "./Types";
 
@@ -140,7 +141,8 @@ export class MapRenderer {
   private light: Vec3 = [0, 1, 0];
   // CPU preparation/submission duration; this does not measure GPU completion.
   private frameMs = 0;
-  private sampleDiagnostics = () => this.diagnostics();
+  private sampleDiagnostics = (includeScene = false) =>
+    this.diagnostics(includeScene);
 
   constructor(
     private canvas: MapCanvas,
@@ -181,7 +183,7 @@ export class MapRenderer {
     else this.cancelFrame();
   }
 
-  diagnostics(): RendererDiagnostics {
+  diagnostics(includeScene = false): RendererDiagnostics {
     return {
       frames: this.frames,
       drawCalls: this.drawCalls,
@@ -189,10 +191,71 @@ export class MapRenderer {
       meshCount: this.meshes.size,
       instanceCount: this.instanceCount,
       frameMs: this.frameMs,
+      cpuFrameMs: this.frameMs,
       phases: this.clock.snapshot(),
       light: [...this.light],
       state: this.state,
+      playbackRate: this.frame?.playbackRate ?? 0,
+      motionAllowed: this.frame?.motionAllowed ?? false,
+      visible: this.isVisible(),
+      ...(includeScene ? { scene: this.sceneDiagnostics() } : {}),
     };
+  }
+
+  private sceneDiagnostics(): RendererSceneInstance[] {
+    // Inspect the submitted passes, including their actual fog/pose data. This never rebuilds
+    // the scene or reads game state, and the ordinary cheap sample never scans these vertices.
+    const instances = new Map<MapInstance, RenderItem[]>();
+    for (const batch of [
+      ...this.passes.receivers,
+      ...this.passes.opaque,
+      ...this.passes.transparent,
+    ])
+      for (const item of batch.items) {
+        const items = instances.get(item.instance) ?? [];
+        items.push(item);
+        instances.set(item.instance, items);
+      }
+    return Array.from(instances, ([instance, items]) => {
+      const min = [Infinity, Infinity, Infinity],
+        max = [-Infinity, -Infinity, -Infinity];
+      let triangles = 0;
+      for (const { part, pose } of items) {
+        const vertices = part.mesh.positions;
+        triangles += vertices.length / 9;
+        for (let i = 0; i < vertices.length; i += 3)
+          for (let axis = 0; axis < 3; axis++) {
+            const value =
+              pose[axis] * vertices[i] +
+              pose[axis + 4] * vertices[i + 1] +
+              pose[axis + 8] * vertices[i + 2] +
+              pose[axis + 12];
+            min[axis] = Math.min(min[axis], value);
+            max[axis] = Math.max(max[axis], value);
+          }
+      }
+      return {
+        id: instance.id,
+        modelKey: instance.model.key,
+        fog: instance.fog,
+        fogMix: items[0].pose[16],
+        saturation: items[0].pose[19],
+        active: instance.active,
+        motionKey: instance.motionKey,
+        triangles,
+        min: min as unknown as Vec3,
+        max: max as unknown as Vec3,
+        ...(instance.model.connections
+          ? {
+              connections: instance.model.connections.map((wire) => ({
+                ...wire,
+                start: [...wire.start] as Vec3,
+                end: [...wire.end] as Vec3,
+              })),
+            }
+          : {}),
+      };
+    });
   }
 
   dispose(): void {

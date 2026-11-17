@@ -208,6 +208,53 @@ it("batches actual geometry, caps physical resolution, reuses buffers and expose
   renderer.dispose();
   expect(gl.deleteProgram).toHaveBeenCalledTimes(1);
 });
+it("samples submitted geometry and GPU instance styles only when explicitly requested", () => {
+  const { renderer, canvas } = setup();
+  const connections = [
+    {
+      from: "a",
+      to: "b",
+      kind: "overhead" as const,
+      start: [0, 0.5, 0] as const,
+      end: [1, 0.5, 0] as const,
+      lowY: 0.4,
+    },
+  ];
+  const instances = scene(false);
+  instances[0] = { ...instances[0], model: { ...model, connections } };
+  renderer.update(instances, frame);
+  flush(0);
+  expect(renderer.diagnostics().scene).toBeUndefined();
+  const diagnostic = canvas.map3DDiagnostics!(true);
+  expect(diagnostic.cpuFrameMs).toBe(diagnostic.frameMs);
+  expect(diagnostic).toMatchObject({
+    playbackRate: 1,
+    motionAllowed: true,
+    visible: true,
+  });
+  expect(diagnostic.scene).toHaveLength(2);
+  expect(diagnostic.scene![0]).toMatchObject({
+    id: "tile-0",
+    modelKey: "test-wind",
+    triangles: 24,
+    active: false,
+    min: [-0.5, expect.any(Number), -0.5],
+    max: [0.5, 1, 0.5],
+    fogMix: 0,
+    saturation: 1,
+    connections,
+  });
+  expect(diagnostic.scene![1].min[0]).toBe(0.5);
+  expect(diagnostic.scene![1].fogMix).toBeCloseTo(0.6);
+  expect(diagnostic.scene![1].saturation).toBeCloseTo(0.15);
+  expect(diagnostic.scene![0].connections![0].start).not.toBe(
+    connections[0].start,
+  );
+  renderer.update(instances, { ...frame, cameraX: 100000 });
+  flush(1);
+  expect(renderer.diagnostics(true).scene).toEqual([]);
+  renderer.dispose();
+});
 it("draws idle/reduced scenes once, retains stopped poses and suspends hidden documents", () => {
   const { renderer, gl } = setup();
   renderer.update(scene(), frame);

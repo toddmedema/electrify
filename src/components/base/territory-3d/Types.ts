@@ -113,7 +113,7 @@ export interface RendererSceneInstance {
   active: boolean;
   motionKey?: string;
   triangles: number;
-  /** World-space bounds of the authored solid vertices before decorative motion. */
+  /** World-space bounds of the actual submitted solid vertices at their current pose. */
   min: Vec3;
   max: Vec3;
   connections?: readonly MapWireConnection[];
