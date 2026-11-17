@@ -22,11 +22,14 @@ export default function HostConnectionWarning({
   const dialog = useAppSelector((state) => state.ui.dialog);
   const ownedAction = useRef<() => void>();
   useEffect(() => {
+    // Other effects can commit a dialog after this render. Recovery must check the
+    // current owner before releasing its notice or preserving a newer notification.
+    const currentDialog = store.getState().ui.dialog;
     if (!waiting && !synchronizing) {
       if (
         ownedAction.current &&
-        dialog.open &&
-        dialog.action === ownedAction.current
+        currentDialog.open &&
+        currentDialog.action === ownedAction.current
       )
         store.dispatch(dialogClose());
       ownedAction.current = undefined;
@@ -35,15 +38,15 @@ export default function HostConnectionWarning({
     const message = waiting ? HOST_WAITING_MESSAGE : HOST_SYNCHRONIZING_MESSAGE;
     if (
       ownedAction.current &&
-      dialog.open &&
-      dialog.action === ownedAction.current &&
-      dialog.message !== message
+      currentDialog.open &&
+      currentDialog.action === ownedAction.current &&
+      currentDialog.message !== message
     ) {
-      store.dispatch(dialogOpen({ ...dialog, message }));
+      store.dispatch(dialogOpen({ ...currentDialog, message }));
       return;
     }
     // Do not replace another notification or reopen after the player dismissed this episode.
-    if (ownedAction.current || dialog.open) return;
+    if (ownedAction.current || currentDialog.open) return;
     ownedAction.current = () => {
       store.dispatch(dialogClose());
       onReconnect();
