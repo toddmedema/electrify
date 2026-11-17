@@ -23,6 +23,16 @@ export interface MapModel {
   terminals: readonly Vec3[];
   footprint: number;
   height: number;
+  /** Sampled from the same terminals and segments that build a grouped conductor mesh. */
+  connections?: readonly MapWireConnection[];
+}
+export interface MapWireConnection {
+  from: string;
+  to: string;
+  kind: "overhead" | "submerged";
+  start: Vec3;
+  end: Vec3;
+  lowY: number;
 }
 export interface TerrainModelOptions {
   /** Zero for untouched land; otherwise reserve at least this width around the center. */
@@ -83,12 +93,33 @@ export interface RendererDiagnostics {
   meshCount: number;
   instanceCount: number;
   frameMs: number;
+  /** CPU draw submission only: excludes asynchronous GPU execution and presentation. */
+  cpuFrameMs: number;
   phases: Readonly<Record<string, number>>;
   light: Vec3;
   state: "ready" | "lost" | "unavailable";
+  playbackRate: number;
+  motionAllowed: boolean;
+  visible: boolean;
+  /** Optional costly geometry snapshot, requested explicitly by a diagnostic consumer. */
+  scene?: readonly RendererSceneInstance[];
+}
+export interface RendererSceneInstance {
+  id: string;
+  modelKey: string;
+  fog: MapInstance["fog"];
+  fogMix: number;
+  saturation: number;
+  active: boolean;
+  motionKey?: string;
+  triangles: number;
+  /** World-space bounds of the authored solid vertices before decorative motion. */
+  min: Vec3;
+  max: Vec3;
+  connections?: readonly MapWireConnection[];
 }
 
 /** Read-only diagnostics are sampled on demand, never written to the DOM each frame. */
 export type MapCanvas = HTMLCanvasElement & {
-  map3DDiagnostics?: () => RendererDiagnostics;
+  map3DDiagnostics?: (includeScene?: boolean) => RendererDiagnostics;
 };
