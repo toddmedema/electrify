@@ -87,9 +87,10 @@ prodbuild() {
 }
 
 prod() {
+  export AWS_DEFAULT_REGION='us-east-2'
+  node scripts/hosting/deploy.js --preflight
   prodbuild
   assertNoLfsPointers
-  export AWS_DEFAULT_REGION='us-east-2'
   node scripts/hosting/deploy.js
 }
 

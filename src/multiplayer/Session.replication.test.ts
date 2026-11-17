@@ -279,7 +279,7 @@ function fixture({
       failRecords = true;
     },
     holdRecordSend: () => {
-      let reject!: (error: Error) => void;
+      let reject!: (error: unknown) => void;
       heldRecordSend = new Promise<void>((_resolve, fail) => {
         reject = fail;
       });
@@ -483,6 +483,24 @@ test("a pre-consumption rejection resets the pending sequence and a failed recor
   }
 });
 
+test("a record send rejection without an Error still requests a baseline", async () => {
+  const f = fixture();
+  try {
+    await f.start();
+    const reject = f.holdRecordSend();
+    const command = f.host.submit({ kind: "rate", value: 0.11 });
+    await flush();
+    await command;
+    reject(undefined);
+    await flush();
+    expect(
+      f.posts.filter((request) => request.kind === "baseline"),
+    ).toHaveLength(1);
+  } finally {
+    f.dispose();
+  }
+});
+
 test("a disconnected peer cannot spend recovery attempts before its next state notification", async () => {
   const f = fixture({ recover: true });
   try {
@@ -508,6 +526,53 @@ test("a disconnected peer cannot spend recovery attempts before its next state n
     expect(f.guest.getSnapshot().view?.reason).not.toContain(
       "could not stay in sync",
     );
+  } finally {
+    f.dispose();
+  }
+});
+
+test("a disconnected send rejection preserves recovery until native disconnect and reconnect", async () => {
+  const f = fixture({ recover: true });
+  try {
+    await f.start();
+    jest.advanceTimersByTime(1000);
+    await flush();
+    const baseline = f.baseline();
+    const reject = f.holdRecordSend();
+    const command = f.host.submit({ kind: "rate", value: 0.11 });
+    await flush();
+    await command;
+    // Native can reject an in-flight send before announcing that the connection is gone.
+    f.setGuestDisconnected(true);
+    reject(new Error("Player is disconnected"));
+    await flush();
+    const prematureBaselines = f.posts.filter(
+      (request) => request.kind === "baseline",
+    );
+    const disconnectedBaseline = f.baseline();
+    expect(f.host.getSnapshot().lobby.connected).toEqual(["guest"]);
+    f.event("host", { kind: "disconnected", sender: "guest" });
+    await flush();
+    expect(f.host.getSnapshot().lobby.connected).toEqual([]);
+    f.setGuestDisconnected(false);
+    f.event("host", { kind: "state", state: f.state("host") });
+    await flush();
+    // Initial installation and the real reconnect use the two allowed attempts in 60 seconds.
+    expect(f.host.getSnapshot().view?.reason).not.toContain(
+      "could not stay in sync",
+    );
+    expect(
+      f.replicaPosts.filter((request) => request.kind === "baseline"),
+    ).toHaveLength(2);
+    expect(f.guest.getSnapshot()).toMatchObject({ synchronizing: false });
+    expect(f.guest.getSnapshot().view?.reason).not.toContain(
+      "could not stay in sync",
+    );
+    expect(prematureBaselines).toHaveLength(0);
+    expect(disconnectedBaseline).toBe(baseline);
+    expect(
+      f.posts.filter((request) => request.kind === "baseline"),
+    ).toHaveLength(1);
   } finally {
     f.dispose();
   }

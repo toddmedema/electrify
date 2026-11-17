@@ -4,6 +4,9 @@ const vm = require("node:vm");
 const fs = require("node:fs");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
+const { parse } = require("yaml");
+const { targets, OWNER } = require("../hosting/plan");
+const deploymentPolicy = require("../hosting/deployment-policy.v1.json");
 const {
   CACHE,
   cacheControl,
@@ -257,6 +260,7 @@ function fakeDeployment(
   config,
   policy = { MinTTL: 0, MaxTTL: 31536000 },
   failUpload = "",
+  options = {},
 ) {
   fs.mkdirSync(path.resolve(".tmp"), { recursive: true });
   const directory = fs.mkdtempSync(path.resolve(".tmp/hosting-deploy-"));
@@ -282,47 +286,504 @@ function fakeDeployment(
     fs.writeFileSync(path.join(build, file), "fixture");
   }
   const log = path.join(directory, "calls.jsonl");
+  const stateFile = path.join(directory, "state.json");
+  const state = {
+    config,
+    policy,
+    account: targets.account,
+    etag: "distribution-etag",
+    functionEtag: "function-etag",
+    owner: OWNER,
+    ...options.state,
+  };
+  fs.writeFileSync(stateFile, JSON.stringify(state));
+  fs.writeFileSync(log, "");
   fs.writeFileSync(
     path.join(bin, "aws"),
     `#!/usr/bin/env node
 const fs = require('node:fs');
 const args = process.argv.slice(2);
+const state = JSON.parse(fs.readFileSync(${JSON.stringify(stateFile)}, 'utf8'));
 const files = Object.fromEntries(args.filter(arg => arg.startsWith('file://')).map(arg => [arg, JSON.parse(fs.readFileSync(arg.slice(7), 'utf8'))]));
-fs.appendFileSync(${JSON.stringify(log)}, JSON.stringify({ args, files }) + '\\n');
+const codes = Object.fromEntries(args.filter(arg => arg.startsWith('fileb://')).map(arg => [arg, fs.readFileSync(arg.slice(8), 'utf8')]));
+fs.appendFileSync(${JSON.stringify(log)}, JSON.stringify({ args, files, codes }) + '\\n');
+if (state.denied === args[1]) { process.stderr.write('AccessDenied: fixture credential cannot ' + args[1]); process.exit(1); }
 if (args[0] === 's3' && ${JSON.stringify(failUpload)} && args.includes(${JSON.stringify(failUpload)})) { process.stderr.write('fixture asset upload failed'); process.exit(1); }
 let result = {};
-if (args[1] === 'get-distribution-config') result = { ETag: 'distribution-etag', DistributionConfig: ${JSON.stringify(config)} };
-if (args[1] === 'get-caller-identity') result = { Account: '123' };
-if (args[1] === 'get-cache-policy') result = { CachePolicy: { CachePolicyConfig: ${JSON.stringify(policy)} } };
-if (args[1] === 'describe-function') { process.stderr.write('NoSuchFunctionExists'); process.exit(1); }
+if (args[1] === 'get-distribution-config') result = { ETag: state.etag, DistributionConfig: state.config };
+if (args[1] === 'get-caller-identity') result = { Account: state.account };
+if (args[1] === 'get-cache-policy') result = { CachePolicy: { CachePolicyConfig: state.policy } };
+if (args[1] === 'describe-function') {
+  if (!args.includes('--stage') || args[args.indexOf('--stage') + 1] !== 'DEVELOPMENT') { process.stderr.write('Expected DEVELOPMENT function stage'); process.exit(1); }
+  if (state.missingFunctions === true || (Array.isArray(state.missingFunctions) && state.missingFunctions.includes(args[args.indexOf('--name') + 1]))) { process.stderr.write('NoSuchFunctionExists'); process.exit(1); }
+  result = { ETag: state.functionEtag, FunctionSummary: { FunctionConfig: { Comment: state.owner } } };
+}
 if (args[1] === 'get-bucket-website') result = { IndexDocument: { Suffix: 'index.html' }, RoutingRules: [{ Condition: { KeyPrefixEquals: 'old/' }, Redirect: { ReplaceKeyPrefixWith: 'new/' } }] };
-if (args[1] === 'create-function') result = { ETag: 'function-etag' };
+if (args[1] === 'create-function' || args[1] === 'update-function') result = { ETag: 'updated-function-etag' };
 if (args[1] === 'create-invalidation') result = { Invalidation: { Id: 'invalidation-id' } };
 process.stdout.write(JSON.stringify(result));
 `,
     { mode: 0o755 },
   );
-  const result = spawnSync(
-    process.execPath,
-    [path.resolve("scripts/hosting/deploy.js")],
-    {
+  fs.writeFileSync(
+    path.join(bin, "npx"),
+    `#!/usr/bin/env node
+require('node:fs').appendFileSync(${JSON.stringify(log)}, JSON.stringify({ args: ['firebase', 'deploy'], files: {} }) + '\\n');
+`,
+    { mode: 0o755 },
+  );
+  if (options.noBuild) fs.rmSync(build, { recursive: true });
+  const env = {
+    ...process.env,
+    PATH: `${bin}${path.delimiter}${process.env.PATH}`,
+    FIREBASE_SERVICE_ACCOUNT: "fixture",
+    REACT_APP_FIREBASE_API_KEY: "fixture",
+  };
+  const script = path.resolve("scripts/hosting/deploy.js");
+  const run = (args = [], entry = script) =>
+    spawnSync(process.execPath, [entry, ...args], {
       cwd: directory,
       encoding: "utf8",
-      env: {
-        ...process.env,
-        PATH: `${bin}${path.delimiter}${process.env.PATH}`,
-      },
-    },
-  );
+      env,
+    });
+  const result = run(options.args);
   return {
     result,
-    calls: fs
-      .readFileSync(log, "utf8")
-      .trim()
-      .split("\n")
-      .map((line) => JSON.parse(line)),
+    run,
+    runShell: (command) =>
+      spawnSync("bash", ["-e", "-c", command], {
+        cwd: directory,
+        encoding: "utf8",
+        env,
+      }),
+    setState: (change) => {
+      Object.assign(state, change);
+      fs.writeFileSync(stateFile, JSON.stringify(state));
+    },
+    get calls() {
+      return fs
+        .readFileSync(log, "utf8")
+        .trim()
+        .split("\n")
+        .filter(Boolean)
+        .map((line) => JSON.parse(line));
+    },
   };
 }
+
+const isRead = ({ args }) =>
+  [
+    "get-distribution-config",
+    "get-caller-identity",
+    "get-cache-policy",
+    "describe-function",
+    "get-bucket-website",
+  ].includes(args[1]);
+
+test("readiness succeeds without a build or any AWS writes", (t) => {
+  const { result, calls } = fakeDeployment(t, distribution(), undefined, "", {
+    args: ["--preflight"],
+    noBuild: true,
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(
+    calls.filter(({ args }) => args[1] === "describe-function").length,
+    2,
+  );
+  assert.ok(calls.every(isRead));
+});
+
+test("production workflow checks hosting readiness before Firebase or AWS mutations", (t) => {
+  const fixture = fakeDeployment(t, distribution(), undefined, "", {
+    args: ["--preflight"],
+    state: { denied: "get-distribution-config" },
+  });
+  const { jobs } = parse(
+    fs.readFileSync(".github/workflows/deploy-prod.yml", "utf8"),
+  );
+  const steps = jobs.deploy.steps;
+  const credentials = steps.findIndex(({ uses }) =>
+    uses?.startsWith("aws-actions/configure-aws-credentials@"),
+  );
+  const preflight = steps.findIndex(({ run }) => run?.includes("--preflight"));
+  const firebase = steps.findIndex(({ run }) =>
+    run?.includes("firebase-tools@15 deploy"),
+  );
+  const publish = steps.findIndex(
+    ({ run }) => run === "./scripts/deploy.sh ci-prod",
+  );
+  assert.ok(
+    credentials >= 0 &&
+      credentials < preflight &&
+      preflight < firebase &&
+      firebase < publish,
+    "AWS credentials and hosting readiness must precede Firebase and hosting deployment",
+  );
+  assert.equal(steps[credentials].with["output-env-credentials"], false);
+  assert.equal(steps[credentials].with["output-credentials"], true);
+  const credentialStep = steps[credentials].id;
+  assert.ok(credentialStep);
+  for (const [key, output] of [
+    ["AWS_ACCESS_KEY_ID", "aws-access-key-id"],
+    ["AWS_SECRET_ACCESS_KEY", "aws-secret-access-key"],
+  ]) {
+    const scoped = steps.filter((step) => step.env?.[key]);
+    assert.deepEqual(scoped, [steps[preflight], steps[publish]]);
+    for (const step of scoped)
+      assert.equal(
+        step.env[key],
+        "${{ steps." + credentialStep + ".outputs." + output + " }}",
+      );
+  }
+  const commands = [steps[preflight], steps[firebase]].map(({ run }) =>
+    run.replaceAll(
+      "node scripts/hosting/deploy.js",
+      `node ${path.resolve("scripts/hosting/deploy.js")}`,
+    ),
+  );
+  const result = fixture.runShell(commands.join("\n"));
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /AccessDenied/);
+  assert.ok(fixture.calls.every(isRead), JSON.stringify(fixture.calls));
+  fixture.setState({ denied: "" });
+  const ready = fixture.runShell(commands.join("\n"));
+  assert.equal(ready.status, 0, ready.stderr);
+  assert.equal(
+    fixture.calls.filter(({ args }) => args[0] === "firebase").length,
+    1,
+  );
+  assert.ok(
+    fixture.calls.filter(({ args }) => args[0] !== "firebase").every(isRead),
+  );
+});
+
+test("local production command rejects denied hosting access before building", (t) => {
+  const fixture = fakeDeployment(t, distribution(), undefined, "", {
+    args: ["--preflight"],
+    noBuild: true,
+    state: { denied: "get-distribution-config" },
+  });
+  const script = fs
+    .readFileSync("scripts/deploy.sh", "utf8")
+    .replaceAll(
+      "node scripts/hosting/deploy.js",
+      `node ${path.resolve("scripts/hosting/deploy.js")}`,
+    );
+  const result = fixture.runShell(`set -- ci-prod\n${script}`);
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /AccessDenied/);
+  assert.ok(fixture.calls.every(isRead));
+});
+
+test("deploy rereads readiness after preflight and rejects later conflicts or access denial before upload", (t) => {
+  for (const change of [
+    { denied: "get-distribution-config" },
+    {
+      config: {
+        ...distribution(),
+        DefaultCacheBehavior: {
+          ...distribution().DefaultCacheBehavior,
+          FunctionAssociations: {
+            Quantity: 1,
+            Items: [
+              { EventType: "viewer-request", FunctionARN: "arn:foreign" },
+            ],
+          },
+        },
+      },
+    },
+  ]) {
+    const fixture = fakeDeployment(t, distribution(), undefined, "", {
+      args: ["--preflight"],
+    });
+    assert.equal(fixture.result.status, 0, fixture.result.stderr);
+    fixture.setState(change);
+    const result = fixture.run();
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /AccessDenied|Existing viewer-request/);
+    assert.ok(fixture.calls.every(isRead), JSON.stringify(fixture.calls));
+  }
+});
+
+test("routine deployment requires owned preprovisioned functions and the production account", (t) => {
+  for (const [state, expected] of [
+    [{ missingFunctions: true }, /provision-functions/],
+    [{ owner: "foreign" }, /not owned/],
+    [{ account: "123456789012" }, /production account/],
+  ]) {
+    const { result, calls } = fakeDeployment(t, distribution(), undefined, "", {
+      args: ["--preflight"],
+      state,
+    });
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, expected);
+    assert.ok(calls.every(isRead));
+  }
+});
+
+test("publish uses fresh distribution and function ETags instead of the earlier preflight", (t) => {
+  const fixture = fakeDeployment(t, distribution(), undefined, "", {
+    args: ["--preflight"],
+  });
+  assert.equal(fixture.result.status, 0, fixture.result.stderr);
+  fixture.setState({
+    etag: "fresh-distribution-etag",
+    functionEtag: "fresh-function-etag",
+  });
+  const result = fixture.run();
+  assert.equal(result.status, 0, result.stderr);
+  for (const { args } of fixture.calls.filter(({ args }) =>
+    ["update-distribution", "update-function"].includes(args[1]),
+  ))
+    assert.equal(
+      args[args.indexOf("--if-match") + 1],
+      args[1] === "update-distribution"
+        ? "fresh-distribution-etag"
+        : "fresh-function-etag",
+    );
+});
+
+test("operator provisioning creates only missing named functions with current routing and never publishes", (t) => {
+  const entry = path.resolve("scripts/hosting/provision-functions.js");
+  const names = Object.values(targets.functions);
+  const help = fakeDeployment(t, distribution(), undefined, "", {
+    args: ["--preflight"],
+    state: { denied: "get-distribution-config" },
+  });
+  const usage = help.run(["--help"], entry);
+  assert.equal(usage.status, 0, usage.stderr);
+  assert.match(usage.stdout, /Creates only missing/);
+  assert.ok(help.calls.every(isRead));
+  for (const missingFunctions of [true, [names[1]], false]) {
+    const fixture = fakeDeployment(t, distribution(), undefined, "", {
+      args: ["--preflight"],
+      noBuild: true,
+      state: { missingFunctions },
+    });
+    const result = fixture.run([], entry);
+    assert.equal(result.status, 0, result.stderr);
+    const writes = fixture.calls.filter((call) => !isRead(call));
+    assert.deepEqual(
+      writes.map(({ args }) => args[args.indexOf("--name") + 1]),
+      missingFunctions === true ? names : missingFunctions || [],
+    );
+    for (const { args, codes } of writes) {
+      assert.equal(args[1], "create-function");
+      assert.equal(
+        JSON.parse(args[args.indexOf("--function-config") + 1]).Comment,
+        OWNER,
+      );
+      const file = args[args.indexOf("--function-code") + 1];
+      assert.equal(
+        fs.existsSync(file.slice(8)),
+        false,
+        "temporary function code is cleaned up",
+      );
+      const expected = args.includes(names[0])
+        ? requestCode(
+            canonicalPaths(fs.readFileSync("public/sitemap.xml", "utf8")),
+          )
+        : responseCode();
+      assert.equal(codes[file], expected);
+    }
+  }
+  for (const missingFunctions of [false, [names[0]]]) {
+    const foreign = fakeDeployment(t, distribution(), undefined, "", {
+      args: ["--preflight"],
+      state: { owner: "foreign", missingFunctions },
+    });
+    const result = foreign.run([], entry);
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /not owned/);
+    assert.ok(foreign.calls.every(isRead));
+  }
+});
+
+// AWS API-to-IAM mappings, intentionally independent of the deployment owner.
+// CLI waiters read the corresponding API; local S3 cp may cancel a multipart upload.
+function permissionsFor({ args }) {
+  const value = (flag) => {
+    assert.ok(args.includes(flag), `missing ${flag}: ${args.join(" ")}`);
+    return args[args.indexOf(flag) + 1];
+  };
+  const cf = `arn:aws:cloudfront::${targets.account}:`;
+  if (args[0] === "sts" && args[1] === "get-caller-identity") return [];
+  if (args[0] === "s3" && args[1] === "cp") {
+    assert.equal(args.includes("--acl"), false);
+    const bucket = new URL(args[3]).hostname;
+    const files = args.flatMap((arg, index) =>
+      arg === "--include" ? [args[index + 1]] : [],
+    );
+    assert.ok(files.length > 0);
+    return files.flatMap((file) =>
+      ["s3:PutObject", "s3:AbortMultipartUpload"].map((action) => [
+        action,
+        `arn:aws:s3:::${bucket}/${file}`,
+      ]),
+    );
+  }
+  function valueForDistribution() {
+    return args.includes("--distribution-id")
+      ? value("--distribution-id")
+      : args.includes("--id")
+        ? value("--id")
+        : "";
+  }
+  const mappings = {
+    "get-distribution-config": "GetDistributionConfig",
+    "update-distribution": "UpdateDistribution",
+    "create-invalidation": "CreateInvalidation",
+  };
+  if (args[0] === "cloudfront") {
+    if (mappings[args[1]])
+      return [
+        [
+          `cloudfront:${mappings[args[1]]}`,
+          `${cf}distribution/${valueForDistribution()}`,
+        ],
+      ];
+    if (args[1] === "wait") {
+      assert.ok(
+        ["distribution-deployed", "invalidation-completed"].includes(args[2]),
+        args.join(" "),
+      );
+      return [
+        [
+          args[2] === "distribution-deployed"
+            ? "cloudfront:GetDistribution"
+            : "cloudfront:GetInvalidation",
+          `${cf}distribution/${valueForDistribution()}`,
+        ],
+      ];
+    }
+    if (args[1] === "get-cache-policy")
+      return [
+        ["cloudfront:GetCachePolicy", `${cf}cache-policy/${value("--id")}`],
+      ];
+    const functions = {
+      "describe-function": "DescribeFunction",
+      "update-function": "UpdateFunction",
+      "publish-function": "PublishFunction",
+    };
+    if (functions[args[1]])
+      return [
+        [
+          `cloudfront:${functions[args[1]]}`,
+          `${cf}function/${value("--name")}`,
+        ],
+      ];
+  }
+  if (
+    args[0] === "s3api" &&
+    ["get-bucket-website", "put-bucket-website"].includes(args[1])
+  )
+    return [
+      [
+        args[1] === "get-bucket-website"
+          ? "s3:GetBucketWebsite"
+          : "s3:PutBucketWebsite",
+        `arn:aws:s3:::${value("--bucket")}`,
+      ],
+    ];
+  assert.fail(`Unreviewed release command: ${args.join(" ")}`);
+}
+
+function assertPolicyCovers(policy, calls) {
+  for (const [action, resource] of calls.flatMap(permissionsFor))
+    assert.ok(
+      policy.Statement.some(
+        (statement) =>
+          statement.Effect === "Allow" &&
+          [statement.Action].flat().includes(action) &&
+          [statement.Resource].flat().some((pattern) =>
+            new RegExp(
+              `^${pattern
+                .split("*")
+                .map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+                .join(".*")}$`,
+            ).test(resource),
+          ),
+      ),
+      `Policy lacks ${action} on ${resource}`,
+    );
+}
+
+test("versioned publisher policy covers executed CLI actions, waiter reads, and multipart cancellation with bounded resources", (t) => {
+  const { result, calls } = fakeDeployment(t, distribution());
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(Object.keys(deploymentPolicy).sort(), [
+    "Statement",
+    "Version",
+  ]);
+  assert.equal(deploymentPolicy.Version, "2012-10-17");
+  assertPolicyCovers(deploymentPolicy, calls);
+  const failed = fakeDeployment(
+    t,
+    distribution(),
+    undefined,
+    "static/js/main.123abcde.js",
+  );
+  assert.equal(failed.result.status, 1);
+  assertPolicyCovers(deploymentPolicy, failed.calls);
+  const expectedScopes = {
+    "cloudfront:GetDistributionConfig": [
+      `arn:aws:cloudfront::${targets.account}:distribution/${targets.distribution}`,
+    ],
+    "cloudfront:GetDistribution": [
+      `arn:aws:cloudfront::${targets.account}:distribution/${targets.distribution}`,
+    ],
+    "cloudfront:UpdateDistribution": [
+      `arn:aws:cloudfront::${targets.account}:distribution/${targets.distribution}`,
+    ],
+    "cloudfront:CreateInvalidation": [
+      `arn:aws:cloudfront::${targets.account}:distribution/${targets.distribution}`,
+    ],
+    "cloudfront:GetInvalidation": [
+      `arn:aws:cloudfront::${targets.account}:distribution/${targets.distribution}`,
+    ],
+    "cloudfront:GetCachePolicy": ["arn:aws:cloudfront::*:cache-policy/*"],
+    ...Object.fromEntries(
+      ["DescribeFunction", "UpdateFunction", "PublishFunction"].map(
+        (action) => [
+          `cloudfront:${action}`,
+          Object.values(targets.functions).map(
+            (name) => `arn:aws:cloudfront::${targets.account}:function/${name}`,
+          ),
+        ],
+      ),
+    ),
+    "s3:GetBucketWebsite": [`arn:aws:s3:::${targets.bucket}`],
+    "s3:PutBucketWebsite": [`arn:aws:s3:::${targets.bucket}`],
+    "s3:PutObject": [`arn:aws:s3:::${targets.bucket}/*`],
+    "s3:AbortMultipartUpload": [`arn:aws:s3:::${targets.bucket}/*`],
+  };
+  const scopes = {};
+  for (const statement of deploymentPolicy.Statement) {
+    assert.equal(statement.Effect, "Allow");
+    assert.equal(statement.Condition, undefined);
+    for (const action of [statement.Action].flat()) {
+      assert.equal(scopes[action], undefined, `duplicate ${action}`);
+      scopes[action] = [statement.Resource].flat();
+    }
+  }
+  assert.deepEqual(scopes, expectedScopes);
+  for (const missing of [
+    "cloudfront:GetDistributionConfig",
+    "cloudfront:GetDistribution",
+    "cloudfront:GetInvalidation",
+    "s3:AbortMultipartUpload",
+  ]) {
+    const broken = structuredClone(deploymentPolicy);
+    for (const statement of broken.Statement)
+      statement.Action = [statement.Action]
+        .flat()
+        .filter((action) => action !== missing);
+    assert.throws(
+      () => assertPolicyCovers(broken, calls),
+      new RegExp(`Policy lacks ${missing}`),
+    );
+  }
+});
 
 test("deployment uploads cache groups, preserves website rules, and waits before the smoke check", (t) => {
   const { result, calls } = fakeDeployment(t, distribution());
