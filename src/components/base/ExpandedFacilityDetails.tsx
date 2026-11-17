@@ -19,6 +19,7 @@ import {
 } from "../../helpers/Format";
 import { facilityActionIcon } from "../views/FacilityContextMenu";
 import { facilityDisplayName } from "./FacilityLabels";
+import { facilityOperatingStatus } from "./FacilityMapStatus";
 import { useMoney } from "./CurrencyContext";
 import ConfirmDialog from "./ConfirmDialog";
 import FacilityDetails from "./FacilityDetails";
@@ -168,21 +169,17 @@ export default function ExpandedFacilityDetails({
     facility,
     game.date.minute,
   );
+  const status = facilityOperatingStatus(facility, game.date.minute);
   return (
     <>
       {showStatus && (
         <Typography variant="body2" className="tileFacilityStatus">
+          {status.label}
           {underConstruction
-            ? `${facility.paused ? "Construction paused" : "Under construction"} · ${formatBuildMonths(facility.yearsToBuildLeft, "long")} left`
-            : permanentlyShutdown
-              ? "Permanently shut down"
-              : facility.paused
-                ? "Paused"
-                : installing && isUpgradingAt(facility, game.date.minute)
-                  ? "Upgrade in progress"
-                  : isStorage(facility)
-                    ? `${facility.currentW < 0 ? "Charging" : facility.currentW > 0 ? "Discharging" : "Idle"} · ${formatWattHoursOfPeak(facility.currentWh, facility.peakWh)}`
-                    : `${facility.currentW > 0 ? "Generating" : "Idle"} · ${formatWattsOfPeak(facility.currentW, facility.peakW)}`}
+            ? ` · ${formatBuildMonths(facility.yearsToBuildLeft, "long")} left`
+            : isStorage(facility)
+              ? ` · ${formatWattsOfPeak(facility.currentW, facility.peakW)} · ${formatWattHoursOfPeak(facility.currentWh, facility.peakWh)}`
+              : ` · ${formatWattsOfPeak(facility.currentW, facility.peakW)}`}
         </Typography>
       )}
       {open && (

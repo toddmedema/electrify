@@ -25,6 +25,7 @@ import { useToolState } from "../base/GameToolMemory";
 import { getTerrainModifiers } from "../../helpers/TerrainModifiers";
 import { cityDemandByType } from "../../helpers/CityDemand";
 import { facilityDisplayName } from "../base/FacilityLabels";
+import { facilityMapStatus } from "../base/FacilityMapStatus";
 import AcquiredUtilities from "./AcquiredUtilities";
 import TerritoryHexMap from "./TerritoryHexMap";
 import AcquisitionReviewDialog from "../base/AcquisitionReviewDialog";
@@ -255,6 +256,9 @@ function TileNetwork(props: Props) {
                     <span>{view.facility.name}</span>
                     <strong>{formatFacilitySize(view.facility)}</strong>
                   </div>
+                  <Typography variant="body2" className="tileFacilityStatus">
+                    {facilityMapStatus(view, game.date.minute)?.label}
+                  </Typography>
                 </div>
               ) : null}
               {!view.owned && !tile.city && (

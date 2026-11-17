@@ -8,6 +8,8 @@ import { territoryTileViews } from "../../helpers/TerritoryMapState";
 import { tilePurchaseQuotes } from "../../helpers/Territories";
 import { useAppSelector } from "../../Store";
 import { terrainDetailsLabel } from "../base/TerritoryTileFacts";
+import { facilityMapStatus } from "../base/FacilityMapStatus";
+import FacilityMapStatusArtwork from "../base/FacilityMapStatusArtwork";
 import { hasVisibleEscapeOverlay } from "../base/VisibleEscapeOverlay";
 import { useMoney } from "../base/CurrencyContext";
 import { useTerritoryTilePurchases } from "../base/TerritoryTilePurchases";
@@ -518,16 +520,15 @@ export default function TerritoryHexMap({
                 .sort((a, b) => hexCenter(a.tile).y - hexCenter(b.tile).y)
                 .map((view) => {
                   const { tile, facility } = view,
-                    origin = foregroundOrigin(tile);
+                    origin = foregroundOrigin(tile),
+                    status = facilityMapStatus(view, game.date.minute);
                   if (!facility && !tile.city && !view.developed) return null;
                   return (
                     <svg
                       key={tile.id}
                       className="territoryTileOccupant territoryFog"
                       data-visibility-distance={view.visibilityDistance}
-                      data-building={
-                        !!facility && facility.yearsToBuildLeft > 0
-                      }
+                      data-facility-status={status?.kind}
                       data-occupant={
                         tile.city
                           ? "city"
@@ -551,10 +552,17 @@ export default function TerritoryHexMap({
                           className="territoryOccupantArtwork"
                         />
                       ) : facility ? (
-                        <FacilityArtwork
-                          facility={facility}
-                          className="territoryOccupantArtwork"
-                        />
+                        <>
+                          <g className="territoryFacilityBody">
+                            <FacilityArtwork
+                              facility={facility}
+                              className="territoryOccupantArtwork"
+                            />
+                          </g>
+                          {status && (
+                            <FacilityMapStatusArtwork kind={status.kind} />
+                          )}
+                        </>
                       ) : (
                         <TowerArtwork
                           platform={
@@ -590,6 +598,7 @@ export default function TerritoryHexMap({
           {renderedViews.map((view) => {
             const { tile, facility } = view,
               point = hexCenter(tile);
+            const status = facilityMapStatus(view, game.date.minute);
             const territory = getTerritoryDefinition(tile.territoryId);
             const utility = !!tile.city && territory?.kind !== "greenfield";
             const quote = purchaseQuotes?.get(tile.id);
@@ -666,7 +675,7 @@ export default function TerritoryHexMap({
                       : undefined;
                   navigate(event, tile.id);
                 }}
-                title={`${TERRAIN_LABELS[tile.terrain]} · ${facility?.name ?? (tile.city ? `${tile.city.sector} city` : view.developed ? "Open site · transmission tower" : "Undeveloped site")}`}
+                title={`${TERRAIN_LABELS[tile.terrain]} · ${facility?.name ?? (tile.city ? `${tile.city.sector} city` : view.developed ? "Open site · transmission tower" : "Undeveloped site")}${status ? ` · ${status.label}` : ""}`}
               >
                 <span className="territoryTileHitArea" aria-hidden="true" />
                 {utility && (
@@ -687,7 +696,7 @@ export default function TerritoryHexMap({
                       : "Available to buy"}
                   . {terrainDetailsLabel(tile.terrain)}.{" "}
                   {facility
-                    ? `${facility.name}${facility.yearsToBuildLeft > 0 ? ", under construction" : ""}`
+                    ? `${facility.name}${status ? ` · ${status.label}` : ""}`
                     : tile.city
                       ? `${tile.city.sector} customers; no building slot`
                       : view.developed

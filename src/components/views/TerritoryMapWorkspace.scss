@@ -86,8 +86,9 @@
 .territoryTileOccupant {
   pointer-events: none;
 }
-.territoryTileOccupant[data-building="true"] {
-  opacity: 0.68;
+.territoryTileOccupant[data-facility-status="construction"]
+  .territoryFacilityBody {
+  opacity: 0.55;
 }
 .territoryWires {
   pointer-events: none;
