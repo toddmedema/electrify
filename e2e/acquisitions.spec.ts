@@ -987,10 +987,9 @@ for (const theme of ["light", "dark"] as const) {
       expect(geometry!.active).toBe(kind === "producing");
       if (kind === "construction")
         expect(geometry!.modelKey).toMatch(/:construction$/);
-      if (kind !== "producing")
-        await expect(
-          occupant.locator(".territoryOccupantArtwork"),
-        ).not.toHaveAttribute("data-facility-motion", "active");
+      await expect(occupant.locator(".territoryOccupantArtwork")).toHaveCount(
+        0,
+      );
       await expect(
         occupant.locator(":scope > .facilityMapStatusArtwork"),
       ).toHaveAttribute("aria-hidden", "true");
