@@ -3,7 +3,12 @@ import { tileFitsFacility } from "./TerritoryTiles";
 import { createGame } from "../testing/Simulator";
 import { currentTick } from "./GameSelectors";
 import { GENERATORS, STORAGE } from "../data/Facilities";
-import { projectReview, projectSiteQuote, selectProject } from "./ProjectBuild";
+import {
+  projectReview,
+  projectSiteQuote,
+  projectSiteCapitalCost,
+  selectProject,
+} from "./ProjectBuild";
 import { tilePurchaseQuotes } from "./Territories";
 import { territoryTileViews } from "./TerritoryMapState";
 import cloneDeep from "lodash.clonedeep";
@@ -37,6 +42,25 @@ it("quotes compatible connected and purchasable sites without spending or changi
   expect(currentTick(game)!.cash).toBe(cash);
   expect(game.territoryNetwork!.tilePurchases).toHaveLength(0);
   expect(project).not.toHaveProperty("buildCost");
+});
+
+it("shows the complete terrain-specific capital cost for owned and unconnected candidates", () => {
+  const { game } = fixture();
+  const project = selectProject(
+    GENERATORS(game, 20e6, [], []).find((option) => option.name === "Solar")!,
+  );
+  const owned = projectSiteQuote(game, project, "champlain:site-13");
+  const forest = projectSiteQuote(game, project, "green-uplands:site-1");
+  if (!owned.facility || !forest.facility)
+    throw new Error("Expected two candidate quotes");
+  expect(projectSiteCapitalCost(owned)).toBe(owned.facility.buildCost);
+  expect(projectSiteCapitalCost(owned)).toBeGreaterThan(0);
+  expect(forest.facility.buildCost).not.toBe(owned.facility.buildCost);
+  expect(projectSiteCapitalCost(forest)).toBe(
+    forest.facility.buildCost + forest.connectionCost,
+  );
+  expect(projectSiteCapitalCost(forest)).toBeGreaterThan(forest.connectionCost);
+  expect(game.territoryNetwork!.tilePurchases).toHaveLength(0);
 });
 it("rejects occupied, city, forbidden technology and unquoted distant sites", () => {
   const { game, project } = fixture();

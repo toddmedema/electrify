@@ -121,6 +121,11 @@ export type ReadyProjectSite = Extract<
   { facility: FacilityShoppingType }
 >;
 
+/** Total capital price, before choosing cash or loan terms in the final review. */
+export function projectSiteCapitalCost(quote: ReadyProjectSite): number {
+  return quote.connectionCost + quote.facility.buildCost;
+}
+
 export function projectReview(
   game: GameType,
   quote: ReadyProjectSite,
