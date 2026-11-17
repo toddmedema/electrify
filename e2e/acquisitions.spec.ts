@@ -321,6 +321,16 @@ async function expectPhysicalMap(network: Locator, game: GameType) {
   }
 }
 
+async function hasRunningFacilityMotion(art: Locator) {
+  return art.evaluate((element) =>
+    element
+      .getAnimations({ subtree: true })
+      .some(
+        (animation) => animation.pending || animation.playState === "running",
+      ),
+  );
+}
+
 async function expectLockedBuild(surface: Locator) {
   await expect(
     surface.getByRole("tab", { name: "Generators", exact: true }),
@@ -482,7 +492,7 @@ for (const theme of ["light", "dark"] as const) {
             ).toBeLessThanOrEqual(1);
           }
         }
-        if (name === "Fleet")
+        if (name === "Fleet" && width === 360)
           await reviewScreenshot(page, {
             path: info.outputPath(`persistent-fleet-${width}-${theme}.png`),
             animations: "disabled",
@@ -516,12 +526,121 @@ for (const theme of ["light", "dark"] as const) {
           .getByRole("button", { name: "Close tile", exact: true })
           .click();
       }
-      await reviewScreenshot(page, {
-        path: info.outputPath(`persistent-map-${width}-${theme}.png`),
-        animations: "disabled",
-        scale: "css",
+      await panToTile(page, city);
+      const buy = network.getByRole("button", {
+        name: "Buy land",
+        exact: true,
       });
+      await buy.click();
+      await expect(buy).toHaveAttribute("aria-pressed", "true");
+      const prices = network.locator(".territoryTilePrice");
+      await expect(prices.first()).toBeVisible();
+      expect((await prices.allTextContents()).join(" ")).not.toMatch(
+        /General site|Not enough cash/,
+      );
+      if (width === 1280 && theme === "dark")
+        await reviewScreenshot(page, {
+          path: info.outputPath("persistent-buy-layer-dark.png"),
+          animations: "disabled",
+          scale: "css",
+        });
+      await buy.click();
+      await expect(buy).toHaveAttribute("aria-pressed", "false");
+      expect(
+        (await readSavedGame(page))!.territoryNetwork!.tilePurchases,
+      ).toEqual(game.territoryNetwork!.tilePurchases);
     }
+  });
+
+  test(`facility motion follows production and reduced-motion preferences in ${theme}`, async ({
+    page,
+  }) => {
+    await page.emulateMedia({ reducedMotion: "no-preference" });
+    const network = await startMap(page, theme);
+    const game = (await readSavedGame(page))!;
+    const wind = game.facilities.find(
+      (facility) => facility.fuel === "Wind" && facility.currentW > 0,
+    )!;
+    const hydro = game.facilities.find(
+      (facility) => facility.fuel === "Hydro" && facility.currentW > 0,
+    )!;
+    const thermal = game.facilities.find(
+      (facility) => facility.fuel === "Natural Gas" && facility.currentW > 0,
+    )!;
+    expect(wind).toBeDefined();
+    expect(hydro).toBeDefined();
+    expect(thermal).toBeDefined();
+    const art = (id: string) =>
+      network.locator(`[data-occupant-tile="${id}"] .territoryOccupantArtwork`);
+    await expect(
+      page.getByRole("button", { name: "pause", exact: true }),
+    ).toHaveAttribute("aria-pressed", "true");
+    const surface = await inspectTile(
+      page,
+      getTerritoryTile(wind.tileId, game)!,
+    );
+    const windArt = art(wind.tileId!);
+    await expect(windArt).toHaveAttribute("data-facility-motion", "active");
+    const rotor = windArt.locator(".mapWindRotor");
+    const before = await rotor.evaluate(
+      (element) => getComputedStyle(element).transform,
+    );
+    await expect
+      .poll(() =>
+        rotor.evaluate((element) => getComputedStyle(element).transform),
+      )
+      .not.toBe(before);
+    await surface.getByRole("button", { name: /^Pause / }).click();
+    await expect(windArt).not.toHaveAttribute("data-facility-motion", "active");
+    await expect.poll(() => hasRunningFacilityMotion(windArt)).toBe(false);
+    const paused = (await readSavedGame(page))!.facilities.find(
+      (facility) => facility.id === wind.id,
+    )!;
+    expect(paused.paused).toBe(true);
+    expect(paused.currentW).toBeGreaterThan(0);
+    await surface.getByRole("button", { name: /^Resume / }).click();
+    await expect(windArt).toHaveAttribute("data-facility-motion", "active");
+    await expect.poll(() => hasRunningFacilityMotion(windArt)).toBe(true);
+    await surface
+      .getByRole("button", { name: "Close tile", exact: true })
+      .click();
+    await panToTile(page, getTerritoryTile(thermal.tileId, game)!);
+    const thermalArt = art(thermal.tileId!);
+    await expect(thermalArt).toHaveAttribute("data-facility-motion", "active");
+    await expect(
+      thermalArt.locator(".mapFacilityExhaust").first(),
+    ).toBeVisible();
+    await expect.poll(() => hasRunningFacilityMotion(thermalArt)).toBe(true);
+    await panToTile(page, getTerritoryTile(hydro.tileId, game)!);
+    const hydroArt = art(hydro.tileId!);
+    await expect(hydroArt).toHaveAttribute("data-facility-motion", "active");
+    await expect(hydroArt.locator(".mapHydroFlow")).toBeVisible();
+    await expect.poll(() => hasRunningFacilityMotion(hydroArt)).toBe(true);
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await expect(hydroArt).not.toHaveAttribute(
+      "data-facility-motion",
+      "active",
+    );
+    await expect.poll(() => hasRunningFacilityMotion(hydroArt)).toBe(false);
+    await expect(
+      network.locator(`[data-occupant-tile="${hydro.tileId}"]`),
+    ).toHaveAttribute("data-facility-status", "producing");
+    await page.emulateMedia({ reducedMotion: "no-preference" });
+    await expect(hydroArt).toHaveAttribute("data-facility-motion", "active");
+    await expect.poll(() => hasRunningFacilityMotion(hydroArt)).toBe(true);
+    const foreign = territoryTileViews(game).find(
+      (view) => !view.owned && view.facility,
+    )!;
+    expect(foreign).toBeDefined();
+    await panToTile(page, foreign.tile);
+    await expect(art(foreign.tile.id)).toBeVisible();
+    await expect(art(foreign.tile.id)).not.toHaveAttribute(
+      "data-facility-motion",
+      "active",
+    );
+    await expect
+      .poll(() => hasRunningFacilityMotion(art(foreign.tile.id)))
+      .toBe(false);
   });
 
   test(`map facility states follow actual operation, pause and construction in ${theme}`, async ({
@@ -636,11 +755,24 @@ for (const theme of ["light", "dark"] as const) {
       await expect(target).toBeInViewport({ ratio: 1 });
       await expect(occupant).toHaveAttribute("data-facility-status", kind);
       await expect(occupant).toHaveAttribute("data-visibility-distance", "0");
+      if (kind !== "producing")
+        await expect(
+          occupant.locator(".territoryOccupantArtwork"),
+        ).not.toHaveAttribute("data-facility-motion", "active");
       await expect(
         occupant.locator(":scope > .facilityMapStatusArtwork"),
       ).toHaveAttribute("aria-hidden", "true");
     }
     await expectPhysicalMap(network, built);
+    if (info.project.name === "desktop-chromium" && theme === "dark")
+      await reviewScreenshot(
+        network.locator(`[data-occupant-tile="${hydro.tileId}"]`),
+        {
+          path: info.outputPath("hydro-map-detail-dark.png"),
+          animations: "disabled",
+          scale: "css",
+        },
+      );
     await info.attach("facility-state-source", {
       body: JSON.stringify({
         minute: built.date.minute,
