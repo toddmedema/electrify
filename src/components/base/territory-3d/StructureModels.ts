@@ -1,0 +1,709 @@
+import { MeshBuilder } from "./MeshBuilder";
+import { PALETTE as P } from "./Palette";
+import type {
+  MapMesh,
+  MapModel,
+  ModelPart,
+  RGB,
+  StructureKind,
+  Vec3,
+} from "./Types";
+
+const models = new Map<StructureKind, MapModel>();
+const TAU = Math.PI * 2;
+const steamMesh = new MeshBuilder()
+  .cylinder([0, -0.016, 0], 0.024, 0.034, 0.035, P.smoke, 6)
+  .cylinder([0.015, 0.006, -0.005], 0.025, 0.018, 0.03, P.smoke, 5)
+  .build();
+
+/** A closed roof prism, rather than a screen-facing roof silhouette. */
+function gable(
+  mesh: MeshBuilder,
+  [x, y, z]: Vec3,
+  [width, rise, depth]: Vec3,
+  color: RGB,
+): void {
+  const left = x - width / 2,
+    right = x + width / 2,
+    back = z - depth / 2,
+    front = z + depth / 2;
+  mesh
+    .triangle([left, y, front], [right, y, front], [x, y + rise, front], color)
+    .triangle([right, y, back], [left, y, back], [x, y + rise, back], color)
+    .quad(
+      [left, y, back],
+      [left, y, front],
+      [x, y + rise, front],
+      [x, y + rise, back],
+      color,
+    )
+    .quad(
+      [x, y + rise, back],
+      [x, y + rise, front],
+      [right, y, front],
+      [right, y, back],
+      color,
+    )
+    .quad(
+      [left, y, back],
+      [right, y, back],
+      [right, y, front],
+      [left, y, front],
+      color,
+    );
+}
+
+function base(mesh: MeshBuilder, width = 0.64, depth = 0.4): void {
+  mesh.box([0, 0.018, 0], [width, 0.036, depth], P.steelShade);
+}
+
+/** Drawn cap centers are the conductor endpoints exported to the network. */
+function switchgear(mesh: MeshBuilder, z = 0.22): readonly Vec3[] {
+  mesh.box([0, 0.065, z], [0.24, 0.09, 0.06], P.steel);
+  const terminals: Vec3[] = [];
+  for (const x of [-0.085, 0.085]) {
+    mesh
+      .cylinder([x, 0.11, z], 0.012, 0.012, 0.032, P.cream)
+      .cylinder([x, 0.119, z], 0.018, 0.018, 0.008, P.steelShade)
+      .cylinder([x, 0.142, z], 0.014, 0.014, 0.008, P.steelShade);
+    terminals.push([x, 0.15, z]);
+  }
+  return terminals;
+}
+
+function windows(
+  mesh: MeshBuilder,
+  x: number,
+  y: number,
+  z: number,
+  width: number,
+): void {
+  mesh.box([x, y, z], [width, 0.039, 0.006], P.mint);
+  for (let i = -1; i <= 1; i++)
+    mesh.box(
+      [x + (i * width) / 4, y, z + 0.004],
+      [0.006, 0.039, 0.004],
+      P.cream,
+    );
+}
+
+function steam(position: Vec3, phaseOffset = 0): ModelPart {
+  return {
+    mesh: steamMesh,
+    position,
+    motion: "steam",
+    phaseOffset,
+    hideWhenInactive: true,
+    castsShadow: false,
+  };
+}
+
+function effect(
+  mesh: MapMesh,
+  motion: "flow" | "pulse",
+  position?: Vec3,
+): ModelPart {
+  return { mesh, position, motion, hideWhenInactive: true, castsShadow: false };
+}
+
+/** Include the renderer's entire motion envelope in terrain clearance and culling. */
+function model(
+  kind: StructureKind,
+  body: MeshBuilder,
+  terminals: readonly Vec3[],
+  moving: ModelPart[] = [],
+): MapModel {
+  const parts: ModelPart[] = [
+    { mesh: body.build(), castsShadow: true },
+    ...moving,
+  ];
+  let radius = 0,
+    height = 0;
+  for (const part of parts) {
+    const [px, py, pz] = part.position ?? [0, 0, 0];
+    const positions = part.mesh.positions;
+    for (let i = 0; i < positions.length; i += 3) {
+      const x = positions[i],
+        y = positions[i + 1],
+        z = positions[i + 2];
+      if (part.motion === "rotor" || part.motion === "sway") {
+        // Full rotation is a conservative bound for the wing's gentle sway too.
+        const reach = Math.hypot(x, y);
+        radius = Math.max(radius, Math.hypot(Math.abs(px) + reach, pz + z));
+        height = Math.max(height, py + reach);
+      } else if (part.motion === "steam") {
+        radius = Math.max(
+          radius,
+          Math.hypot(
+            Math.abs(px) + Math.abs(x) * 1.3,
+            Math.abs(pz) + Math.abs(z) * 1.3,
+          ),
+        );
+        height = Math.max(height, py + Math.max(y * 0.65, y * 1.3) + 0.28);
+      } else {
+        radius = Math.max(radius, Math.hypot(px + x, pz + z));
+        height = Math.max(
+          height,
+          py + y + (part.motion === "flow" ? 0.018 : 0),
+        );
+      }
+    }
+  }
+  return {
+    key: `structure:${kind}`,
+    parts,
+    terminals,
+    footprint: radius * 2 + 0.002,
+    height: height + 0.002,
+  };
+}
+
+function city(kind: "residential" | "industrial-city"): MapModel {
+  const body = new MeshBuilder();
+  base(body, 0.53, 0.34);
+  if (kind === "residential") {
+    body.box([0.045, 0.17, -0.055], [0.16, 0.29, 0.18], P.cream);
+    body.box([0.045, 0.32, -0.055], [0.175, 0.014, 0.19], P.steel);
+    windows(body, 0.045, 0.24, 0.038, 0.11);
+    windows(body, 0.045, 0.16, 0.038, 0.11);
+    for (const [x, z] of [
+      [-0.165, 0.01],
+      [0.18, 0.07],
+    ]) {
+      body.box([x, 0.085, z], [0.13, 0.12, 0.15], P.cream);
+      gable(body, [x, 0.145, z], [0.15, 0.062, 0.17], P.forest);
+      body.box([x, 0.08, z + 0.077], [0.045, 0.045, 0.006], P.mint);
+    }
+  } else {
+    body.box([0, 0.09, 0], [0.47, 0.13, 0.27], P.cream);
+    for (let i = 0; i < 3; i++) {
+      const x = -0.235 + i * 0.157,
+        next = x + 0.157;
+      // Three asymmetric northlight teeth, with a dark glazed upright face.
+      body
+        .triangle(
+          [x, 0.155, 0.14],
+          [next, 0.155, 0.14],
+          [next, 0.22, 0.14],
+          P.cream,
+        )
+        .triangle(
+          [next, 0.155, -0.14],
+          [x, 0.155, -0.14],
+          [next, 0.22, -0.14],
+          P.cream,
+        )
+        .quad(
+          [x, 0.155, -0.14],
+          [x, 0.155, 0.14],
+          [next, 0.22, 0.14],
+          [next, 0.22, -0.14],
+          P.steel,
+        )
+        .quad(
+          [next, 0.155, 0.14],
+          [next, 0.155, -0.14],
+          [next, 0.22, -0.14],
+          [next, 0.22, 0.14],
+          P.steelShade,
+        );
+    }
+    body.cylinder([-0.17, 0.03, -0.09], 0.024, 0.018, 0.32, P.steelShade);
+    windows(body, 0, 0.09, 0.138, 0.36);
+  }
+  return model(kind, body, switchgear(body, 0.17));
+}
+
+function tower(): MapModel {
+  const body = new MeshBuilder();
+  for (const x of [-1, 1])
+    for (const z of [-1, 1])
+      body.beam(
+        [x * 0.045, 0, z * 0.025],
+        [x * 0.017, 0.29, z * 0.012],
+        0.006,
+        P.steelShade,
+      );
+  for (const y of [0.09, 0.18]) {
+    const width = 0.045 - y * 0.095;
+    body.beam(
+      [-width, y, 0.018],
+      [width, y + 0.075, 0.014],
+      0.0035,
+      P.steelShade,
+    );
+    body.beam(
+      [width, y, 0.018],
+      [-width, y + 0.075, 0.014],
+      0.0035,
+      P.steelShade,
+    );
+  }
+  body.box([0, 0.245, 0], [0.17, 0.012, 0.016], P.steelShade);
+  const terminals: Vec3[] = [];
+  for (const x of [-0.08, 0.08]) {
+    body.cylinder([x, 0.251, 0], 0.009, 0.009, 0.018, P.steel);
+    terminals.push([x, 0.269, 0]);
+  }
+  return model("tower", body, terminals);
+}
+
+function solar(): MapModel {
+  const body = new MeshBuilder(),
+    glints = new MeshBuilder();
+  const tilt = 0.36;
+  for (const z of [-0.18, 0, 0.18]) {
+    const panel = new MeshBuilder()
+      .box([0, 0, 0], [0.612, 0.014, 0.152], P.steel)
+      .box([0, 0.009, 0], [0.6, 0.004, 0.14], P.solar);
+    for (const x of [-0.15, 0, 0.15])
+      panel.box([x, 0.012, 0], [0.003, 0.002, 0.14], P.steel);
+    panel.box([0, 0.012, 0], [0.6, 0.002, 0.003], P.steel);
+    body.merge(panel.build(), [0, 0.115, z], [tilt, 0, 0]);
+    for (const x of [-0.23, 0.23])
+      for (const dz of [-0.045, 0.045]) {
+        const top = 0.107 - Math.sin(tilt) * dz;
+        body.box(
+          [x, top / 2, z + dz * Math.cos(tilt)],
+          [0.012, top, 0.012],
+          P.steelShade,
+        );
+      }
+    glints.merge(
+      new MeshBuilder()
+        .box([0, 0.014, -0.037], [0.58, 0.002, 0.01], P.solar)
+        .build(),
+      [0, 0.115, z],
+      [tilt, 0, 0],
+    );
+  }
+  return model("solar", body, switchgear(body, 0.29), [
+    effect(glints.build(), "pulse"),
+  ]);
+}
+
+function wind(kind: "wind" | "offshore-wind"): MapModel {
+  const offshore = kind === "offshore-wind",
+    body = new MeshBuilder();
+  const deck = offshore ? 0.09 : 0.035;
+  if (offshore) {
+    for (const x of [-0.1, 0.1])
+      for (const z of [-0.08, 0.08]) {
+        body.beam([x * 1.3, 0.006, z * 1.3], [x, deck, z], 0.012, P.steelShade);
+        body.beam([-x, 0.005, z], [x, deck, z], 0.006, P.steelShade);
+      }
+    body.box([0, deck, 0], [0.3, 0.025, 0.25], P.steel);
+  } else body.box([0, deck / 2, 0], [0.16, deck, 0.15], P.steel);
+  body.cylinder([0, deck, 0], 0.026, 0.015, 0.48, P.cream, 8);
+  const pivot: Vec3 = [0, deck + 0.475, 0.045];
+  body.box([0, pivot[1], 0], [0.07, 0.045, 0.1], P.steel);
+  const rotor = new MeshBuilder();
+  const bladeBuilder = new MeshBuilder();
+  const bladeFront: Vec3[] = [
+    [-0.013, 0.022, 0.008],
+    [0.016, 0.027, 0.008],
+    [0.034, 0.175, 0.004],
+    [0.01, 0.28, 0],
+  ];
+  const bladeBack: Vec3[] = bladeFront.map(([x, y, z]) => [x, y, z - 0.013]);
+  bladeBuilder.quad(
+    bladeFront[0],
+    bladeFront[1],
+    bladeFront[2],
+    bladeFront[3],
+    P.mint,
+  );
+  bladeBuilder.quad(
+    bladeBack[3],
+    bladeBack[2],
+    bladeBack[1],
+    bladeBack[0],
+    P.steel,
+  );
+  for (let i = 0; i < 4; i++) {
+    const next = (i + 1) % 4;
+    bladeBuilder.quad(
+      bladeFront[i],
+      bladeBack[i],
+      bladeBack[next],
+      bladeFront[next],
+      P.mint,
+    );
+  }
+  const blade = bladeBuilder.build();
+  for (let i = 0; i < 3; i++)
+    rotor.merge(blade, [0, 0, 0], [0, 0, (i * TAU) / 3]);
+  rotor.merge(
+    new MeshBuilder()
+      .cylinder([0, 0, 0], 0.025, 0.018, 0.028, P.cream, 8)
+      .build(),
+    [0, 0, 0.022],
+    [Math.PI / 2, 0, 0],
+  );
+  return model(kind, body, switchgear(body, 0.12), [
+    {
+      mesh: rotor.build(),
+      position: pivot,
+      motion: "rotor",
+      castsShadow: true,
+    },
+  ]);
+}
+
+function airborne(): MapModel {
+  const body = new MeshBuilder();
+  base(body, 0.3, 0.23);
+  body.box([0, 0.078, 0], [0.23, 0.085, 0.17], P.cream);
+  body.merge(
+    new MeshBuilder()
+      .cylinder([0, 0, 0], 0.046, 0.046, 0.13, P.steelShade, 8)
+      .build(),
+    [-0.065, 0.09, 0.065],
+    [0, 0, -Math.PI / 2],
+  );
+  body.beam([0, 0.12, 0], [0, 0.64, 0], 0.004, P.steelShade);
+  const wing = new MeshBuilder();
+  const rim: Vec3[] = [
+    [-0.33, 0, 0.01],
+    [-0.11, 0.025, -0.12],
+    [0, 0.045, -0.075],
+    [0.11, 0.025, -0.12],
+    [0.33, 0, 0.01],
+    [0.1, -0.015, 0.12],
+    [0, -0.005, 0.075],
+    [-0.1, -0.015, 0.12],
+  ];
+  for (let i = 0; i < rim.length; i++) {
+    const a = rim[i],
+      b = rim[(i + 1) % rim.length];
+    wing.triangle([0, 0.045, 0], b, a, i % 2 ? P.mint : P.forestLight);
+    wing.triangle([0, -0.018, 0], a, b, P.steel);
+  }
+  wing
+    .beam(rim[0], [0, 0.045, 0], 0.004, P.steelShade)
+    .beam([0, 0.045, 0], rim[4], 0.004, P.steelShade);
+  return model("airborne-wind", body, switchgear(body, 0.14), [
+    {
+      mesh: wing.build(),
+      position: [0, 0.64, 0],
+      motion: "sway",
+      castsShadow: true,
+    },
+  ]);
+}
+
+function thermal(kind: "gas" | "oil" | "coal" | "biomass"): MapModel {
+  const body = new MeshBuilder(),
+    moving: ModelPart[] = [];
+  base(body);
+  body.box([0.075, 0.105, 0.015], [0.4, 0.15, 0.28], P.cream);
+  gable(
+    body,
+    [0.075, 0.18, 0.015],
+    [0.42, 0.045, 0.3],
+    kind === "biomass" ? P.forest : P.steel,
+  );
+  windows(body, 0.08, 0.1, 0.159, 0.29);
+  const stack = (x: number, z: number, height: number, radius = 0.027) => {
+    body.cylinder([x, 0.03, z], radius, radius * 0.82, height, P.steelShade, 8);
+    body.cylinder(
+      [x, height - 0.005, z],
+      radius * 1.03,
+      radius * 1.03,
+      0.035,
+      P.steel,
+      8,
+    );
+    moving.push(
+      steam([x, height + 0.045, z]),
+      steam([x, height + 0.045, z], 0.5),
+    );
+  };
+  if (kind === "gas") {
+    for (const x of [0.03, 0.19]) stack(x, -0.1, 0.3, 0.022);
+    body.merge(
+      new MeshBuilder()
+        .cylinder([0, 0, 0], 0.066, 0.066, 0.22, P.steel, 8)
+        .build(),
+      [-0.24, 0.105, 0.12],
+      [Math.PI / 2, 0, 0],
+    );
+    body.beam([-0.3, 0.06, -0.15], [-0.14, 0.06, -0.15], 0.014, P.mint);
+  } else if (kind === "oil") {
+    for (const z of [-0.1, 0.09]) {
+      body.cylinder([-0.23, 0.036, z], 0.08, 0.08, 0.15, P.cream, 8);
+      body.cylinder([-0.23, 0.186, z], 0.081, 0.025, 0.035, P.steel, 8);
+      body.cylinder([-0.23, 0.085, z], 0.081, 0.081, 0.013, P.steelShade, 8);
+    }
+    stack(0.21, -0.11, 0.4);
+  } else if (kind === "coal") {
+    body.box([-0.225, 0.075, -0.025], [0.17, 0.08, 0.29], P.steelShade);
+    gable(body, [-0.225, 0.115, -0.025], [0.14, 0.07, 0.25], P.ink);
+    body.beam([-0.22, 0.15, 0.08], [-0.035, 0.22, 0.02], 0.022, P.steelShade);
+    stack(0.21, -0.11, 0.43, 0.031);
+  } else {
+    body.cylinder([-0.225, 0.036, -0.02], 0.082, 0.082, 0.23, P.cream, 8);
+    body.cylinder([-0.225, 0.266, -0.02], 0.087, 0.02, 0.06, P.forest, 8);
+    for (const y of [0.1, 0.21])
+      body.cylinder([-0.225, y, -0.02], 0.084, 0.084, 0.01, P.steelShade, 8);
+    stack(0.22, -0.11, 0.33);
+    body.box([-0.19, 0.06, 0.155], [0.19, 0.045, 0.055], P.timber);
+  }
+  return model(kind, body, switchgear(body), moving);
+}
+
+function nuclear(): MapModel {
+  const body = new MeshBuilder();
+  base(body);
+  const cx = -0.16,
+    cz = -0.035;
+  const profile = [
+    [0.036, 0.142],
+    [0.125, 0.105],
+    [0.24, 0.078],
+    [0.365, 0.112],
+  ];
+  for (let ring = 0; ring < profile.length - 1; ring++)
+    for (let side = 0; side < 10; side++) {
+      const a = (side * TAU) / 10,
+        b = ((side + 1) * TAU) / 10;
+      const [low, lr] = profile[ring],
+        [high, hr] = profile[ring + 1];
+      body.quad(
+        [cx + Math.cos(b) * lr, low, cz + Math.sin(b) * lr],
+        [cx + Math.cos(a) * lr, low, cz + Math.sin(a) * lr],
+        [cx + Math.cos(a) * hr, high, cz + Math.sin(a) * hr],
+        [cx + Math.cos(b) * hr, high, cz + Math.sin(b) * hr],
+        P.cream,
+      );
+    }
+  body.cylinder([cx, 0.335, cz], 0.092, 0.092, 0.006, P.ink, 10);
+  for (let side = 0; side < 10; side++) {
+    const a = (side * TAU) / 10,
+      b = ((side + 1) * TAU) / 10;
+    body.quad(
+      [cx + Math.cos(a) * 0.112, 0.365, cz + Math.sin(a) * 0.112],
+      [cx + Math.cos(a) * 0.092, 0.365, cz + Math.sin(a) * 0.092],
+      [cx + Math.cos(b) * 0.092, 0.365, cz + Math.sin(b) * 0.092],
+      [cx + Math.cos(b) * 0.112, 0.365, cz + Math.sin(b) * 0.112],
+      P.steel,
+    );
+  }
+  body.cylinder([0.17, 0.036, -0.04], 0.115, 0.115, 0.125, P.steel, 10);
+  body.cylinder([0.17, 0.161, -0.04], 0.115, 0.089, 0.065, P.cream, 10);
+  body.cylinder([0.17, 0.226, -0.04], 0.089, 0.035, 0.035, P.cream, 10);
+  body.cylinder([0.17, 0.261, -0.04], 0.035, 0, 0.01, P.cream, 10);
+  body.box([0.13, 0.075, 0.13], [0.32, 0.1, 0.13], P.cream);
+  windows(body, 0.13, 0.085, 0.198, 0.23);
+  return model("nuclear", body, switchgear(body), [
+    steam([cx, 0.39, cz]),
+    steam([cx, 0.39, cz], 0.5),
+  ]);
+}
+
+function hydro(): MapModel {
+  const body = new MeshBuilder(),
+    water = new MeshBuilder();
+  base(body, 0.7, 0.45);
+  body.box([0, 0.147, -0.105], [0.66, 0.25, 0.26], P.steelShade);
+  body.box([0, 0.167, -0.242], [0.69, 0.29, 0.025], P.steel);
+  const front = (x: number) => 0.12 - 0.15 * (x / 0.32) ** 2;
+  for (let i = 0; i < 8; i++) {
+    const x = -0.32 + i * 0.08,
+      next = x + 0.08,
+      a = front(x),
+      b = front(next);
+    body
+      .quad(
+        [x, 0.035, a + 0.07],
+        [next, 0.035, b + 0.07],
+        [next, 0.32, b],
+        [x, 0.32, a],
+        i % 2 ? P.cream : P.steel,
+      )
+      .quad(
+        [x, 0.32, a],
+        [next, 0.32, b],
+        [next, 0.32, b - 0.065],
+        [x, 0.32, a - 0.065],
+        P.cream,
+      )
+      .quad(
+        [next, 0.035, b - 0.08],
+        [x, 0.035, a - 0.08],
+        [x, 0.32, a - 0.065],
+        [next, 0.32, b - 0.065],
+        P.steel,
+      );
+    body.quad(
+      [x, 0.275, -0.228],
+      [x, 0.275, a - 0.067],
+      [next, 0.275, b - 0.067],
+      [next, 0.275, -0.228],
+      P.water,
+    );
+    body.beam(
+      [x, 0.337, a - 0.012],
+      [next, 0.337, b - 0.012],
+      0.01,
+      P.steelShade,
+    );
+  }
+  for (const x of [-0.335, 0.335])
+    body.box([x, 0.17, -0.08], [0.03, 0.3, 0.33], P.cream);
+  // A real sloping water chute runs down the convex downstream face.
+  body.quad(
+    [-0.067, 0.055, 0.199],
+    [0.067, 0.055, 0.199],
+    [0.052, 0.306, 0.124],
+    [-0.052, 0.306, 0.124],
+    P.deepWater,
+  );
+  for (const x of [-0.065, 0.065])
+    body.beam([x, 0.32, 0.12], [x * 1.15, 0.046, 0.205], 0.011, P.cream);
+  for (const y of [0.12, 0.2, 0.27]) {
+    const z = 0.124 + ((0.306 - y) / 0.251) * 0.075;
+    water.box([0, y, z + 0.004], [0.087, 0.008, 0.008], P.water);
+  }
+  body.box([-0.22, 0.084, 0.145], [0.17, 0.12, 0.14], P.cream);
+  gable(body, [-0.22, 0.144, 0.145], [0.19, 0.025, 0.155], P.steel);
+  windows(body, -0.22, 0.085, 0.218, 0.11);
+  return model("hydro", body, switchgear(body, 0.245), [
+    effect(water.build(), "flow"),
+  ]);
+}
+
+function geothermal(): MapModel {
+  const body = new MeshBuilder();
+  base(body);
+  body.box([0.105, 0.09, 0.06], [0.38, 0.12, 0.24], P.cream);
+  gable(body, [0.105, 0.15, 0.06], [0.4, 0.035, 0.26], P.steel);
+  windows(body, 0.105, 0.09, 0.183, 0.25);
+  for (const [x, z, height] of [
+    [-0.235, -0.09, 0.24],
+    [-0.15, 0.1, 0.19],
+  ]) {
+    body.cylinder([x, 0.035, z], 0.035, 0.035, 0.025, P.ink);
+    body.beam([x, 0.045, z], [x, height, z], 0.019, P.steel, 6);
+    body.beam([x, height, z], [x + 0.1, height, z], 0.019, P.steel, 6);
+    body.beam([x + 0.1, height, z], [x + 0.1, 0.13, z], 0.019, P.steel, 6);
+    body.box([x, height - 0.045, z], [0.05, 0.012, 0.05], P.mint);
+  }
+  body.cylinder([0.2, 0.15, -0.075], 0.025, 0.025, 0.14, P.steel, 6);
+  return model("geothermal", body, switchgear(body), [
+    steam([0.2, 0.31, -0.075]),
+    steam([0.2, 0.31, -0.075], 0.5),
+  ]);
+}
+
+function storage(kind: "battery" | "iron-air"): MapModel {
+  const body = new MeshBuilder(),
+    flow = new MeshBuilder();
+  base(body);
+  if (kind === "battery") {
+    for (const x of [-0.16, 0.16]) {
+      body.box([x, 0.17, 0], [0.21, 0.27, 0.26], P.cream);
+      body.box([x, 0.312, 0], [0.13, 0.016, 0.13], P.steelShade);
+      body.box([x, 0.19, 0.133], [0.105, 0.1, 0.006], P.mint);
+      for (const y of [0.085, 0.105])
+        body.box([x, y, 0.134], [0.12, 0.006, 0.007], P.steelShade);
+      flow.box([x, 0.19, 0.139], [0.07, 0.008, 0.005], P.cream);
+    }
+  } else {
+    body.box([0, 0.15, 0], [0.58, 0.23, 0.29], P.cream);
+    body.box([0, 0.279, 0], [0.61, 0.03, 0.32], P.steel);
+    body.box([0, 0.185, 0.148], [0.48, 0.095, 0.007], P.steelShade);
+    for (let i = 0; i < 7; i++)
+      body.box(
+        [-0.21 + i * 0.07, 0.185, 0.155],
+        [0.013, 0.095, 0.008],
+        P.steel,
+      );
+    for (const x of [-0.15, 0.15]) {
+      body.cylinder([x, 0.295, 0], 0.055, 0.055, 0.006, P.steelShade, 8);
+      body.beam([x - 0.04, 0.302, 0], [x + 0.04, 0.302, 0], 0.005, P.steel);
+      body.box([x, 0.085, 0.15], [0.12, 0.045, 0.007], P.mint);
+      flow.box([x, 0.085, 0.157], [0.075, 0.008, 0.005], P.cream);
+    }
+  }
+  return model(kind, body, switchgear(body), [effect(flow.build(), "flow")]);
+}
+
+function pumpedHydro(): MapModel {
+  const body = new MeshBuilder(),
+    flow = new MeshBuilder();
+  base(body, 0.66, 0.45);
+  const basin = (
+    x: number,
+    z: number,
+    top: number,
+    width: number,
+    depth: number,
+  ) => {
+    body.box([x, top / 2, z], [width, top, depth], P.steelShade);
+    body.box([x, top + 0.004, z], [width - 0.03, 0.012, depth - 0.03], P.water);
+    for (const sign of [-1, 1]) {
+      body.box(
+        [x + (sign * width) / 2, top / 2 + 0.015, z],
+        [0.025, top + 0.03, depth + 0.025],
+        P.cream,
+      );
+      body.box(
+        [x, top / 2 + 0.015, z + (sign * depth) / 2],
+        [width, top + 0.03, 0.025],
+        P.cream,
+      );
+    }
+  };
+  basin(-0.13, -0.105, 0.26, 0.33, 0.2);
+  basin(0.17, 0.13, 0.075, 0.26, 0.17);
+  const pipe: Vec3[] = [
+    [0.048, 0.22, -0.1],
+    [0.105, 0.22, -0.1],
+    [0.105, 0.09, 0.035],
+    [-0.1, 0.09, 0.11],
+  ];
+  for (let i = 0; i < pipe.length - 1; i++)
+    body.beam(pipe[i], pipe[i + 1], 0.022, P.steel, 8);
+  for (const [x, y, z] of [
+    [0.07, 0.22, -0.1],
+    [0.105, 0.15, -0.03],
+    [0, 0.09, 0.07],
+  ])
+    flow.box([x, y, z], [0.02, 0.025, 0.02], P.mint);
+  body.box([-0.19, 0.077, 0.13], [0.21, 0.12, 0.15], P.cream);
+  gable(body, [-0.19, 0.137, 0.13], [0.23, 0.025, 0.17], P.steel);
+  windows(body, -0.19, 0.085, 0.208, 0.14);
+  return model("pumped-hydro", body, switchgear(body, 0.245), [
+    effect(flow.build(), "flow"),
+  ]);
+}
+
+const factories: Record<StructureKind, () => MapModel> = {
+  residential: () => city("residential"),
+  "industrial-city": () => city("industrial-city"),
+  tower,
+  solar,
+  wind: () => wind("wind"),
+  "offshore-wind": () => wind("offshore-wind"),
+  "airborne-wind": airborne,
+  gas: () => thermal("gas"),
+  oil: () => thermal("oil"),
+  coal: () => thermal("coal"),
+  biomass: () => thermal("biomass"),
+  nuclear,
+  hydro,
+  geothermal,
+  battery: () => storage("battery"),
+  "iron-air": () => storage("iron-air"),
+  "pumped-hydro": pumpedHydro,
+};
+
+/** One immutable geometry identity per authored kind; no game or per-tile state. */
+export function getStructureModel(kind: StructureKind): MapModel {
+  const cached = models.get(kind);
+  if (cached) return cached;
+  const result = factories[kind]();
+  models.set(kind, result);
+  return result;
+}
