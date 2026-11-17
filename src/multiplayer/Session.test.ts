@@ -151,6 +151,7 @@ function fixture(isHost = false, deferLeave = false) {
   let replicaIdentity = "";
   const replicaPosts: ReplicaRequest[] = [];
   const replica = {
+    onerror: null as ((event: Event) => void) | null,
     onmessage: null as ((event: MessageEvent<ReplicaResponse>) => void) | null,
     terminate: jest.fn(() => {
       replicaIdentity = "";
@@ -263,6 +264,7 @@ function fixture(isHost = false, deferLeave = false) {
     failReconnect: () => {
       failReconnect = true;
     },
+    failReplica: () => replica.onerror?.(new Event("error")),
     /** Every native send fails the way Electron reports a main-process throw. */
     failSends: (message: string | undefined) => {
       sendError = message;
@@ -824,29 +826,39 @@ function sentCommands(f: ReturnType<typeof fixture>) {
   );
 }
 
-test("a failed reconnect surfaces a connection error that offers Disconnect", async () => {
-  const f = fixture();
-  await f.session.initialize();
-  await deliver(f, {});
-  expect(f.session.getSnapshot().view).toBeDefined();
-  f.failReconnect();
-  // A native reconnect failure must not reject into an unhandled promise; it settles and
-  // reports the loss so the player is not left waiting on a dead link with no way out.
-  await expect(f.session.reconnect()).resolves.toBeUndefined();
-  const snapshot = f.session.getSnapshot();
-  expect(snapshot.lobby.error).toBe("Steam could not connect to the host");
-  // A failed reconnect is a connection loss, so a guest (not the host) gets a Disconnect offer.
-  expect(isConnectionLoss(snapshot.error, snapshot.lobby.error)).toBe(true);
-  expect(
-    offersDisconnect({
-      error: snapshot.error,
-      lobbyError: snapshot.lobby.error,
-      hostId: snapshot.lobby.hostId,
-      selfId: snapshot.lobby.selfId,
-    }),
-  ).toBe(true);
-  f.session.dispose();
-});
+test.each([false, true])(
+  "a failed reconnect offers Disconnect (prior replica failure: %s)",
+  async (replicaFailed) => {
+    const f = fixture();
+    await f.session.initialize();
+    await deliver(f, {});
+    expect(f.session.getSnapshot().view).toBeDefined();
+    if (replicaFailed) f.failReplica();
+    expect(f.session.getSnapshot().error).toBe(
+      replicaFailed
+        ? "The replica worker stopped. Reconnect to synchronize."
+        : undefined,
+    );
+    f.failReconnect();
+    // A native reconnect failure must not reject into an unhandled promise; it settles and
+    // reports the loss so the player is not left waiting on a dead link with no way out.
+    await expect(f.session.reconnect()).resolves.toBeUndefined();
+    const snapshot = f.session.getSnapshot();
+    expect(snapshot.error).toBeUndefined();
+    expect(snapshot.lobby.error).toBe("Steam could not connect to the host");
+    // A failed reconnect is a connection loss, so a guest (not the host) gets a Disconnect offer.
+    expect(isConnectionLoss(snapshot.error, snapshot.lobby.error)).toBe(true);
+    expect(
+      offersDisconnect({
+        error: snapshot.error,
+        lobbyError: snapshot.lobby.error,
+        hostId: snapshot.lobby.hostId,
+        selfId: snapshot.lobby.selfId,
+      }),
+    ).toBe(true);
+    f.session.dispose();
+  },
+);
 
 test("host silence is transient, updates once, and only a current authoritative view clears it", async () => {
   const f = fixture();

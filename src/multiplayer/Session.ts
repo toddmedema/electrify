@@ -1018,6 +1018,7 @@ export class MultiplayerSession {
       // error (the channel reserved for connection failures) so the notice offers Disconnect
       // instead of leaving a player waiting on a dead link with no way out.
       this.update({
+        error: undefined,
         lobby: {
           ...this.state.lobby,
           error: error instanceof Error ? error.message : "Could not reconnect",
