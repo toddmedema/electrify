@@ -1,7 +1,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const prettier = require("prettier");
-const { execFileSync } = require("node:child_process");
+const { createHash } = require("node:crypto");
 const { ORIGIN, STATIC_PAGES } = require("./registry");
 
 const ROOT = path.resolve(__dirname, "../..");
@@ -150,16 +150,55 @@ function createContext(pages) {
   };
 }
 
-// Only authored sources participate. Generated HTML commits must never move their own dates.
-function sourceDate(root, sources) {
-  const date = execFileSync(
-    "git",
-    ["log", "-1", "--format=%cs", "--", ...sources],
-    { cwd: root, encoding: "utf8" },
-  ).trim();
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date))
-    fail(`no git history for sitemap sources: ${sources.join(", ")}`);
-  return date;
+const SOURCE_DATES = "site/source-dates.json";
+const SOURCES = [
+  ...STATIC_PAGES.map((page) => page.source),
+  "site/scenarios.json",
+  "site/templates/pages.js",
+];
+
+function validateDate(date) {
+  if (
+    !/^\d{4}-\d{2}-\d{2}$/.test(date) ||
+    !Number.isFinite(Date.parse(date)) ||
+    new Date(date).toISOString().slice(0, 10) !== date ||
+    date > new Date().toISOString().slice(0, 10)
+  )
+    fail(`invalid or future source date: ${date}`);
+}
+
+// Store the author's change date alongside the exact source bytes. A commit,
+// squash merge, fresh checkout or generated-only edit cannot change this input.
+function sourceRecords(root, date) {
+  if (date !== undefined) validateDate(date);
+  const target = path.join(root, SOURCE_DATES);
+  const recorded = fs.existsSync(target)
+    ? JSON.parse(fs.readFileSync(target, "utf8"))
+    : {};
+  return Object.fromEntries(
+    SOURCES.map((source) => {
+      const sha256 = createHash("sha256")
+        .update(fs.readFileSync(path.join(root, source)))
+        .digest("hex");
+      const previous = recorded[source];
+      if (previous) validateDate(previous.date);
+      if (previous?.sha256 === sha256) return [source, previous];
+      if (date === undefined)
+        fail(
+          `${source} has no matching source date; run npm run site:generate -- --date YYYY-MM-DD with its actual authored-change date and commit ${SOURCE_DATES} with the source and outputs`,
+        );
+      if (previous && date < previous.date)
+        fail(`${source} date must not precede ${previous.date}`);
+      return [source, { date, sha256 }];
+    }),
+  );
+}
+
+function sourceDate(root, sources, records = sourceRecords(root)) {
+  return sources
+    .map((source) => records[source].date)
+    .sort()
+    .at(-1);
 }
 
 function sitemap(entries) {
@@ -190,7 +229,7 @@ ${pages.map((page) => `- [${page.name.replace(/[[\]\r\n]/g, "")}](${ORIGIN}${sce
 `;
 }
 
-async function buildSite({ root = ROOT, pages } = {}) {
+async function buildSite({ root = ROOT, pages, date } = {}) {
   const publicDir = path.join(root, "public");
   pages = validatePages(
     pages ||
@@ -209,7 +248,9 @@ async function buildSite({ root = ROOT, pages } = {}) {
     path.join(root, "site/templates/pages.js"),
   );
   const context = createContext(pages);
+  const records = sourceRecords(root, date);
   const output = new Map();
+  output.set(SOURCE_DATES, JSON.stringify(records, null, 2) + "\n");
   const format = async (html) =>
     prettier.format(
       html.replace(/<!doctype html>/i, `<!doctype html>\n${MARKER}`),
@@ -234,14 +275,15 @@ async function buildSite({ root = ROOT, pages } = {}) {
     sitemap([
       ...STATIC_PAGES.map((page) => ({
         pathname: page.path,
-        lastmod: sourceDate(root, [page.source]),
+        lastmod: sourceDate(root, [page.source], records),
       })),
       ...["/scenarios.html", ...pages.map(scenarioPath)].map((pathname) => ({
         pathname,
-        lastmod: sourceDate(root, [
-          "site/scenarios.json",
-          "site/templates/pages.js",
-        ]),
+        lastmod: sourceDate(
+          root,
+          ["site/scenarios.json", "site/templates/pages.js"],
+          records,
+        ),
       })),
     ]),
   );
@@ -249,8 +291,9 @@ async function buildSite({ root = ROOT, pages } = {}) {
   return output;
 }
 
-async function generate({ root = ROOT, check = false } = {}) {
-  const output = await buildSite({ root });
+async function generate({ root = ROOT, check = false, date } = {}) {
+  if (check && date !== undefined) fail("--date cannot be used with --check");
+  const output = await buildSite({ root, date });
   const changed = [];
   for (const [relative, contents] of output) {
     const target = path.join(root, relative);
@@ -286,11 +329,20 @@ async function generate({ root = ROOT, check = false } = {}) {
 
 if (require.main === module) {
   const args = process.argv.slice(2);
-  if (args.some((arg) => arg !== "--check")) {
-    console.error("Usage: node scripts/site/generate.js [--check]");
+  const valid =
+    args.length === 0 ||
+    (args.length === 1 && args[0] === "--check") ||
+    (args.length === 2 && args[0] === "--date");
+  if (!valid) {
+    console.error(
+      "Usage: node scripts/site/generate.js [--check | --date YYYY-MM-DD]",
+    );
     process.exitCode = 1;
   } else {
-    generate({ check: args.includes("--check") })
+    generate({
+      check: args.includes("--check"),
+      date: args[0] === "--date" ? args[1] : undefined,
+    })
       .then(({ files, changed }) => {
         process.stdout.write(
           args.includes("--check")

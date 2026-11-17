@@ -117,12 +117,17 @@ function deploy() {
     for (const file of files(build)) {
       const cache = file === "package.json" ? "no-cache" : cacheControl(file);
       const type = file.endsWith(".webp") ? "image/webp" : "";
-      const key = JSON.stringify([cache, type]);
+      const key = JSON.stringify([file.endsWith(".html"), cache, type]);
       if (!groups.has(key)) groups.set(key, []);
       groups.get(key).push(file);
     }
-    for (const [key, group] of groups) {
-      const [cache, type] = JSON.parse(key);
+    // S3 copies publish immediately, without a staged release. Finish every asset
+    // group before any entry document can reference the new build's dependencies.
+    const ordered = [...groups].sort(
+      ([left], [right]) => JSON.parse(left)[0] - JSON.parse(right)[0],
+    );
+    for (const [key, group] of ordered) {
+      const [, cache, type] = JSON.parse(key);
       const args = [
         "s3",
         "cp",

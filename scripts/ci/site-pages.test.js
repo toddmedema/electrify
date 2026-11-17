@@ -3,6 +3,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
+const { createHash } = require("node:crypto");
 const { execFileSync } = require("node:child_process");
 // Use the HTML parser already supplied by CRA's test environment.
 const { JSDOM } = require(
@@ -183,6 +184,25 @@ function fixture(t) {
   execFileSync("git", ["init", "--quiet"], { cwd: root });
   execFileSync("git", ["add", "."], { cwd: root });
   commit(root, "Initial authored pages", "2020-01-02T12:00:00Z");
+  const sources = [
+    ...STATIC_PAGES.map((page) => page.source),
+    "site/scenarios.json",
+    "site/templates/pages.js",
+  ];
+  write(
+    "site/source-dates.json",
+    Object.fromEntries(
+      sources.map((source) => [
+        source,
+        {
+          date: "2020-01-02",
+          sha256: createHash("sha256")
+            .update(fs.readFileSync(path.join(root, source)))
+            .digest("hex"),
+        },
+      ]),
+    ),
+  );
   return { root, pages, write, publicDir: path.join(root, "public") };
 }
 
@@ -374,8 +394,9 @@ test("checked-in site pages are current", async () => {
   await generate({ check: true });
 });
 
-test("sitemap dates follow authored source history and ignore generated-output commits", async (t) => {
+test("sitemap dates survive editing, committing source and output together, and squash merges", async (t) => {
   const { root, write } = fixture(t);
+  await generate({ root });
   const first = await buildSite({ root });
   const dates = (output) => {
     const dom = new JSDOM(output.get("public/sitemap.xml"), {
@@ -391,22 +412,50 @@ test("sitemap dates follow authored source history and ignore generated-output c
   };
   assert.deepEqual(new Set(dates(first).values()), new Set(["2020-01-02"]));
   write("public/about.html", "A changed authored page");
-  execFileSync("git", ["add", "public/about.html"], { cwd: root });
-  commit(root, "Edit about content", "2021-03-04T12:00:00Z");
+  await assert.rejects(
+    generate({ root, check: true }),
+    /public\/about.html.*--date/,
+  );
+  await assert.rejects(generate({ root }), /public\/about.html.*--date/);
+  await generate({ root, date: "2021-03-04" });
   const changed = await buildSite({ root });
   assert.equal(dates(changed).get(`${ORIGIN}/about.html`), "2021-03-04");
   assert.equal(
     dates(changed).get(`${ORIGIN}/scenarios/challenge-1.html`),
     "2020-01-02",
   );
-  for (const [file, content] of changed) write(file, content);
-  execFileSync("git", ["add", "public"], { cwd: root });
-  commit(root, "Regenerate output", "2022-05-06T12:00:00Z");
+  execFileSync("git", ["add", "."], { cwd: root });
+  commit(root, "Edit authored page and regenerate", "2021-03-04T12:00:00Z");
+  await generate({ root, check: true });
+  execFileSync("git", ["reset", "--soft", "HEAD~1"], { cwd: root });
+  commit(root, "Squash source and generated output", "2022-05-06T12:00:00Z");
+  await generate({ root, check: true });
+  const checkout = path.join(root, "fresh-checkout");
+  execFileSync("git", ["clone", "--quiet", root, checkout]);
+  await generate({ root: checkout, check: true });
+  write("public/llms.txt", "stale generated output");
+  execFileSync("git", ["add", "public/llms.txt"], { cwd: root });
+  commit(root, "Regenerate output only", "2023-07-08T12:00:00Z");
   assert.equal(
     (await buildSite({ root })).get("public/sitemap.xml"),
     changed.get("public/sitemap.xml"),
   );
   assert.equal(sourceDate(root, ["site/scenarios.json"]), "2020-01-02");
+  await generate({ root });
+  assert.deepEqual((await generate({ root, date: "2024-09-10" })).changed, []);
+});
+
+test("source dates reject missing records, invalid dates, future dates and backdating", async (t) => {
+  const { root, write } = fixture(t);
+  write("public/about.html", "Changed content");
+  for (const date of ["2021-02-29", "2021-13-01", "2999-01-01", "2019-12-31"])
+    await assert.rejects(generate({ root, date }), /date/);
+  await assert.rejects(
+    generate({ root, check: true, date: "2021-03-04" }),
+    /--date cannot be used with --check/,
+  );
+  write("site/source-dates.json", {});
+  await assert.rejects(generate({ root, check: true }), /--date/);
 });
 
 test("learning pages provide breadcrumbs, concise metadata, and a substantial simulator guide", async (t) => {

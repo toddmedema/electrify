@@ -252,7 +252,12 @@ test("complete deployed sitemap fits the CloudFront code size limit", () => {
   assert.ok(Buffer.byteLength(requestCode(canonicalPaths(xml))) <= 10240);
 });
 
-function fakeDeployment(t, config, policy = { MinTTL: 0, MaxTTL: 31536000 }) {
+function fakeDeployment(
+  t,
+  config,
+  policy = { MinTTL: 0, MaxTTL: 31536000 },
+  failUpload = "",
+) {
   fs.mkdirSync(path.resolve(".tmp"), { recursive: true });
   const directory = fs.mkdtempSync(path.resolve(".tmp/hosting-deploy-"));
   t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
@@ -268,6 +273,14 @@ function fakeDeployment(t, config, policy = { MinTTL: 0, MaxTTL: 31536000 }) {
     fs.writeFileSync(path.join(build, file), "fixture");
   fs.mkdirSync(path.join(build, "static/js"), { recursive: true });
   fs.writeFileSync(path.join(build, "static/js/main.123abcde.js"), "fixture");
+  for (const file of [
+    "static/css/main.123abcde.css",
+    "fonts/inter/InterVariable-latin.123abcde.woff2",
+    "images/preview.webp",
+  ]) {
+    fs.mkdirSync(path.dirname(path.join(build, file)), { recursive: true });
+    fs.writeFileSync(path.join(build, file), "fixture");
+  }
   const log = path.join(directory, "calls.jsonl");
   fs.writeFileSync(
     path.join(bin, "aws"),
@@ -276,6 +289,7 @@ const fs = require('node:fs');
 const args = process.argv.slice(2);
 const files = Object.fromEntries(args.filter(arg => arg.startsWith('file://')).map(arg => [arg, JSON.parse(fs.readFileSync(arg.slice(7), 'utf8'))]));
 fs.appendFileSync(${JSON.stringify(log)}, JSON.stringify({ args, files }) + '\\n');
+if (args[0] === 's3' && ${JSON.stringify(failUpload)} && args.includes(${JSON.stringify(failUpload)})) { process.stderr.write('fixture asset upload failed'); process.exit(1); }
 let result = {};
 if (args[1] === 'get-distribution-config') result = { ETag: 'distribution-etag', DistributionConfig: ${JSON.stringify(config)} };
 if (args[1] === 'get-caller-identity') result = { Account: '123' };
@@ -321,6 +335,24 @@ test("deployment uploads cache groups, preserves website rules, and waits before
         args.includes("static/js/main.123abcde.js"),
     ),
   );
+  const documents = uploads.filter(({ args }) =>
+    args.some((arg) => arg.endsWith(".html")),
+  );
+  const dependencies = uploads.filter(({ args }) =>
+    args.some((arg) => /\.(?:js|css|woff2|webp)$/.test(arg)),
+  );
+  assert.ok(dependencies.length >= 3);
+  for (const document of documents)
+    for (const dependency of dependencies)
+      assert.ok(
+        calls.indexOf(dependency) < calls.indexOf(document),
+        `dependency upload must finish before ${document.args.join(" ")}`,
+      );
+  assert.ok(
+    uploads.some(
+      ({ args }) => args.includes("image/webp") && args.includes(CACHE.media),
+    ),
+  );
   assert.ok(
     uploads.some(
       ({ args }) =>
@@ -343,6 +375,32 @@ test("deployment uploads cache groups, preserves website rules, and waits before
       ["create-invalidation", "--distribution-id"],
       ["wait", "invalidation-completed"],
     ],
+  );
+});
+
+test("a failed asset upload leaves entry documents and edge configuration unpublished", (t) => {
+  const { result, calls } = fakeDeployment(
+    t,
+    distribution(),
+    undefined,
+    "static/js/main.123abcde.js",
+  );
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /fixture asset upload failed/);
+  assert.ok(
+    calls.some(({ args }) => args.includes("static/js/main.123abcde.js")),
+  );
+  assert.ok(
+    calls.every(
+      ({ args }) =>
+        !args.some((arg) => arg.endsWith(".html")) &&
+        ![
+          "create-function",
+          "publish-function",
+          "put-bucket-website",
+          "update-distribution",
+        ].includes(args[1]),
+    ),
   );
 });
 

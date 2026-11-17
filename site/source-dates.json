@@ -1,0 +1,42 @@
+{
+  "public/index.html": {
+    "date": "2026-11-17",
+    "sha256": "1faeafb42bc91f76dbb597f35b454cb8125b5c9cddbe112daffb1f1e87decd52"
+  },
+  "public/about.html": {
+    "date": "2026-11-17",
+    "sha256": "2088dc11c7a48207cdcca4f44341906d22259f575f7f11780590dd1fcf7e94e4"
+  },
+  "public/data-centers.html": {
+    "date": "2026-11-17",
+    "sha256": "765a5471a557ade58d19ae4567d6150cb70c4dc065cf3aca8cbdf2c46bef96cd"
+  },
+  "public/electrify-vs-en-roads.html": {
+    "date": "2026-11-17",
+    "sha256": "3ea9f415da634f6041778e0706ff5398d41f811dd942db4c0bc386664da331af"
+  },
+  "public/power-grid-simulator.html": {
+    "date": "2026-11-17",
+    "sha256": "bfcc424e4f6f382aeee225835898f7d94cfc917f6db89fb3406bfba388bcf70c"
+  },
+  "public/classroom.html": {
+    "date": "2026-11-17",
+    "sha256": "4f110eb8b8922f74c3e13c05f79c0e193e9093ba7536e86347f28a4eadfa6123"
+  },
+  "public/energy-simulators.html": {
+    "date": "2026-11-17",
+    "sha256": "f2b56c5d9908386a2dfcfd43881f7facea7422f1b0378d293acee2cf1afe6a35"
+  },
+  "public/privacy.html": {
+    "date": "2026-11-17",
+    "sha256": "229904568bea0efc262838214d33597fffde8e3934316837bc6aa1e6470ad4da"
+  },
+  "site/scenarios.json": {
+    "date": "2026-11-17",
+    "sha256": "8030ab7b4cb623333b17c776dd47ffefbb0fb8aecd217337e55b0fc0dfec796a"
+  },
+  "site/templates/pages.js": {
+    "date": "2026-11-17",
+    "sha256": "1b0c883bd820538686d9d4d1bf8947107c66126ef9adfa38271c1c25e84b38d3"
+  }
+}

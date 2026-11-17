@@ -96,6 +96,17 @@ def page_errors(html, url):
     return page, errors
 
 
+def cache_max_age(headers):
+    values = []
+    for directive in urllib.request.parse_http_list(headers.get("Cache-Control", "")):
+        name, separator, value = directive.strip().partition("=")
+        if name.strip().lower() == "max-age":
+            values.append(value.strip() if separator else "")
+    if len(values) != 1 or not re.fullmatch(r'[0-9]+|"[0-9]+"', values[0]):
+        return None
+    return int(values[0].strip('"'))
+
+
 def check(base, hosting=False):
     failing, checked = 0, 0
 
@@ -142,7 +153,7 @@ def check(base, hosting=False):
                 if description in descriptions:
                     errors.append("duplicate description")
                 descriptions.add(description)
-            if hosting and "max-age=300" not in headers.get("Cache-Control", ""):
+            if hosting and cache_max_age(headers) != 300:
                 errors.append("HTML needs short cache lifetime")
             assets.update(page.assets)
             result(url, errors)
@@ -170,9 +181,9 @@ def check(base, hosting=False):
             try:
                 status, headers, _ = get(base + route, "HEAD")
                 errors = [] if status == 200 else [f"status {status}"]
-                if route in immutable and not all(value in headers.get("Cache-Control", "") for value in ["max-age=31536000", "immutable"]):
+                if route in immutable and (cache_max_age(headers) != 31536000 or not any(value.strip().lower() == "immutable" for value in headers.get("Cache-Control", "").split(","))):
                     errors.append("asset needs a one-year immutable cache lifetime")
-                if route in ["/", "/sitemap.xml"] and "max-age=300" not in headers.get("Cache-Control", ""):
+                if route in ["/", "/sitemap.xml"] and cache_max_age(headers) != 300:
                     errors.append("document needs short cache lifetime")
                 if route == "/" and "max-age=31536000" not in headers.get("Strict-Transport-Security", ""):
                     errors.append("missing HSTS")

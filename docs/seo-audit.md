@@ -85,7 +85,17 @@ descriptions, malformed/missing JSON-LD, incorrect canonical URLs, invalid snipp
 lengths and anything other than one h1. `--hosting` additionally checks cache
 headers, HSTS, data noindex, clean URL redirects, and the custom 404 response.
 The production workflow runs this after every deploy and fails if any check fails.
-CI uses complete Git history so page lastmod dates are not shallow-checkout dates.
+
+Sitemap dates come from `site/source-dates.json`, which pairs each authored source's
+SHA-256 with its actual change date. Initial records use the source's last Git
+author date. When editing an HTML source, scenario content or its template, run
+`npm run site:generate -- --date YYYY-MM-DD` with the actual authored-change date,
+then commit the source, date records and generated output together. Only changed
+sources get that date; unchanged sources keep theirs. For edits made on different
+dates, generate after each day's source edits. Generation and `site:check` reject
+changed sources without matching records, and reject invalid, future or decreasing
+dates. Ordinary regeneration never invents a date from the build clock. Dates stay
+stable after commits, squash merges, fresh checkouts and generated-only changes.
 
 The CloudFront configuration and functions are tested through generated function
 execution and a fake AWS CLI; no tooling test modifies AWS. The Python checker is
