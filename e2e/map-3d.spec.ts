@@ -1,5 +1,6 @@
 import { expect, test } from "./fixtures";
 import type { MapCanvas } from "../src/components/base/territory-3d/Types";
+import type { TerritoryTileId } from "../src/Types";
 import {
   openMapProjectCatalogue,
   returnToTerritoryMap,
@@ -228,7 +229,7 @@ for (const theme of ["light", "dark"] as const) {
       projectCatalogue(game, 20e6, false).find(({ name }) => name === "Wind")!,
     );
     const owned = map.locator('[data-project-site="owned"]').first();
-    const id = (await owned.getAttribute("data-map-target"))!;
+    const id = (await owned.getAttribute("data-map-target")) as TerritoryTileId;
     const quote = projectSiteQuote(game, project, id);
     expect(quote.facility).toBeDefined();
     if (!quote.facility) throw new Error("Owned project site has no quote");
