@@ -59,20 +59,18 @@ for (const theme of ["light", "dark"] as const) {
     await page.keyboard.press("Escape");
     await expect(pinned).toHaveCount(0);
 
-    // Only the desktop status opens a manual entry; the compact phone icon has a readout tooltip.
     const status = page.getByRole("button", {
-      name: /Open the Reserve manual entry/,
+      name: /^Current grid status: NOW/,
     });
-    const color = await status.evaluate(
-      (element) => getComputedStyle(element).color,
-    );
-    await expect(status).toHaveCSS("cursor", "help");
-    await status.hover();
-    await expect(status).not.toHaveCSS("background-image", "none");
-    await expect(status).toHaveCSS("color", color);
-    await page.waitForTimeout(600);
-    await expect(pinned).toHaveCount(0);
     await status.click();
+    const diagnosis = page.getByRole("dialog", {
+      name: "Grid status",
+      exact: true,
+    });
+    await diagnosis
+      .getByRole("button", { name: "About reserve", exact: true })
+      .click();
+    await expect(diagnosis).toHaveCount(0);
     await expect(
       pinned.getByRole("heading", { name: "Reserve capacity", exact: true }),
     ).toBeVisible();

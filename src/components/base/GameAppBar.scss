@@ -67,3 +67,139 @@ html[data-couch-seat] #appbar #topbar {
     }
   }
 }
+
+// The operating quantity remains visible at every width. The mission yields first.
+#appbar .gameStatusBar .gridHealth {
+  padding-block: 0;
+  min-height: 40px;
+  .gridStatusButton {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 4px;
+    min-height: 40px;
+    min-width: 0;
+    padding: 4px 0;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    &:hover {
+      background: var(--interactive-tint);
+    }
+    &:focus-visible {
+      outline: 2px solid var(--interactive-strong);
+      outline-offset: 2px;
+    }
+  }
+}
+.gridStatusQualifier {
+  font-size: 0.75em;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+.gridStatusPower {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.gridStatusUnit {
+  margin-inline-start: 3px;
+  font-weight: 400;
+}
+.gridStatusFuture {
+  color: var(--warning-on-fill);
+}
+.gridStatusPopover.MuiPaper-root {
+  width: min(360px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  box-sizing: border-box;
+  overflow-y: auto;
+  padding: 16px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-raised);
+  color: var(--font-color-primary);
+  font-size: var(--font-size-caption);
+  .gridStatusHeading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  h2 {
+    margin: 0;
+    font-size: var(--font-size-body1);
+  }
+  h3 {
+    margin: 0 0 8px;
+    font-size: inherit;
+  }
+  section {
+    margin-block: 12px;
+  }
+  p {
+    margin: 8px 0;
+  }
+  dl {
+    margin: 0;
+  }
+  dl > div {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    margin-block: 4px;
+  }
+  dd {
+    margin: 0;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+  .MuiButton-root,
+  .MuiIconButton-root {
+    min-height: 40px;
+  }
+  .MuiIconButton-root {
+    min-width: 40px;
+  }
+}
+.gridStatusMuted {
+  color: var(--font-color-faded);
+}
+.gridStatusActions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 16px;
+}
+@media (max-width: 599px) {
+  #appbar .gameStatusBar {
+    flex-direction: column;
+  }
+  #appbar .gameStatusBar .gridHealth {
+    flex: 1 0 auto;
+    width: 100%;
+    padding-inline: max(16px, env(safe-area-inset-left))
+      max(16px, env(safe-area-inset-right));
+    justify-content: flex-start;
+    .gridStatusButton {
+      width: 100%;
+      min-height: 44px;
+      white-space: normal;
+    }
+  }
+  #appbar .gameStatusBar .missionSummary {
+    flex: 1 0 auto;
+    padding-left: 16px;
+  }
+}
+@media (pointer: coarse) {
+  #appbar .gridStatusButton,
+  .gridStatusPopover.MuiPaper-root .MuiButton-root,
+  .gridStatusPopover.MuiPaper-root .MuiIconButton-root {
+    min-height: 44px;
+  }
+}

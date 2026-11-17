@@ -123,6 +123,7 @@ export default function MissionSummary({
   onActiveEvents,
   onEvidence,
   eventsOnly = false,
+  gridSupplyRiskVisible = false,
 }: {
   game: GameType;
   upcoming?: UpcomingStoryEventType[];
@@ -131,9 +132,15 @@ export default function MissionSummary({
   onEvidence?: (target: EvidenceTargetType) => void;
   /** The shared couch bar reports common events, rather than one company's risk. */
   eventsOnly?: boolean;
+  /** The actionable grid status already owns this supply forecast warning. */
+  gridSupplyRiskVisible?: boolean;
 }) {
   const mission = getMissionStatus(game);
-  const companyRisk = useMissionRisk(game, mission, upcoming, !eventsOnly);
+  const calculatedRisk = useMissionRisk(game, mission, upcoming, !eventsOnly);
+  const companyRisk =
+    gridSupplyRiskVisible && calculatedRisk?.id.startsWith("supply-plan:")
+      ? undefined
+      : calculatedRisk;
   const nextEvent = eventsOnly
     ? upcoming
         .filter(

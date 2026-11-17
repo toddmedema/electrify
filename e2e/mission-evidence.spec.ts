@@ -39,7 +39,7 @@ async function range(page: Page) {
     ]);
 }
 for (const theme of ["light", "dark"]) {
-  test(`mission warnings match the low-reserve readout in ${theme}`, async ({
+  test(`grid warnings separate current reserve from future supply risk in ${theme}`, async ({
     page,
   }, info) => {
     test.skip(!reviewProjects.has(info.project.name));
@@ -65,52 +65,21 @@ for (const theme of ["light", "dark"]) {
     });
     await page.reload();
     await page.getByRole("button", { name: "Continue", exact: true }).click();
-    const risk = page.getByRole("button", { name: /^Supply risk:/ });
-    await expect(risk).toBeVisible({ timeout: 30_000 });
     const grid = page.locator(".gridHealth:visible");
+    const risk = grid.getByRole("button", {
+      name: /^Current grid status: NOW.*FUTURE Supply risk:/,
+    });
+    await expect(risk).toBeVisible({ timeout: 30_000 });
     await expect(grid).toHaveClass(/gridHealth-low-reserve/);
-    if (info.project.name === "desktop-chromium") {
-      const styles = await page
-        .locator(".gameStatusBar:visible")
-        .evaluate((bar) => {
-          const properties = [
-            "fontSize",
-            "fontWeight",
-            "lineHeight",
-            "color",
-          ] as const;
-          const read = (element: Element) => {
-            const style = getComputedStyle(element);
-            return Object.fromEntries(
-              properties.map((key) => [key, style[key]]),
-            );
-          };
-          const grid = bar.querySelector(".gridHealth")!;
-          const risk = bar.querySelector(".missionRiskButton")!;
-          return {
-            gridText: read(grid.querySelector(".gridHealthMetric")!),
-            riskText: read(risk.querySelector(".missionRiskText")!),
-            gridHeight: grid.getBoundingClientRect().height,
-            riskHeight: risk.getBoundingClientRect().height,
-            gridBackground: getComputedStyle(grid).backgroundColor,
-            riskBackground: getComputedStyle(risk).backgroundColor,
-            gridIcon: read(grid.querySelector(".conceptIcon")!),
-            riskIcon: read(risk.querySelector(".conceptIcon")!),
-            gridGap: getComputedStyle(grid.querySelector("button")!).gap,
-            riskGap: getComputedStyle(risk).gap,
-          };
-        });
-      expect(styles.riskText).toEqual(styles.gridText);
-      expect(styles.riskHeight).toBe(styles.gridHeight);
-      expect(styles.riskBackground).toBe(styles.gridBackground);
-      expect(styles.riskIcon).toEqual(styles.gridIcon);
-      expect(styles.riskGap).toBe(styles.gridGap);
-      await grid.getByRole("button").click();
-      await expect(
-        page.getByRole("dialog", { name: "Manual help" }),
-      ).toBeVisible();
-      await page.keyboard.press("Escape");
-    }
+    await expect(risk).toContainText(/NOW.*reserve.*Low.*FUTURE Supply risk:/);
+    await expect(
+      page
+        .locator(".missionRiskButton:visible")
+        .filter({ hasText: "Supply risk:" }),
+    ).toHaveCount(0);
+    expect(await risk.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(
+      true,
+    );
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth - innerWidth,
@@ -132,6 +101,10 @@ for (const theme of ["light", "dark"]) {
     }
     await risk.focus();
     await page.keyboard.press("Enter");
+    await page
+      .getByRole("dialog", { name: "Grid status", exact: true })
+      .getByRole("button", { name: "View supply forecast" })
+      .click();
     await expect(
       page.getByRole("region", { name: "Insights", exact: true }),
     ).toBeVisible();
@@ -405,24 +378,21 @@ test("projected sample evidence and a deliberate purchase retain the bounded inv
   await page.mouse.move(0, 0);
   await expect(page.locator(".snackbarContent")).toBeHidden();
   await page.getByRole("button", { name: "Resume Coal", exact: true }).click();
-  // A shortfall later in the sampled day replaces the reassuring reserve reading.
+  // A future shortfall stays explicit without replacing the current reserve.
   const grid = page.locator(".gridHealth:visible");
-  await expect(grid).toHaveClass(/gridHealth-blackout-ahead/);
-  if (info.project.name === "mobile-390px") {
-    const warning = grid.getByRole("button", {
-      name: /^Current grid status: Blackout at \d+ [AP]M, .+ short$/,
-    });
-    await expect(warning).toBeVisible();
-    await warning.tap();
-    await expect(
-      page.getByRole("tooltip", {
-        name: /^Blackout at \d+ [AP]M, .+ short$/,
-      }),
-    ).toBeVisible();
-  } else {
-    await expect(grid).toContainText(/Blackout at/);
-    await expect(grid).toHaveClass(/statusWarning/);
-  }
+  await expect(grid).not.toHaveClass(/gridHealth-blackout/);
+  await expect(grid).toHaveClass(/statusWarning/);
+  const warning = grid.getByRole("button", {
+    name: /^Current grid status: NOW .*reserve.*FUTURE Short at/,
+  });
+  await expect(warning).toBeVisible();
+  await warning.click();
+  const diagnosis = page.getByRole("dialog", {
+    name: "Grid status",
+    exact: true,
+  });
+  await expect(diagnosis).toContainText(/Short at.*About .* short/);
+  await diagnosis.getByRole("button", { name: "Close grid status" }).click();
   await reviewScreenshot(
     info.project.name === "mobile-390px"
       ? page
@@ -432,9 +402,11 @@ test("projected sample evidence and a deliberate purchase retain the bounded inv
       animations: "disabled",
     },
   );
-  await expect(page.locator(".missionRiskButton:visible")).not.toContainText(
-    /shortfall/i,
-  );
+  await expect(
+    page
+      .locator(".missionRiskButton:visible")
+      .filter({ hasText: /shortfall/i }),
+  ).toHaveCount(0);
   await openInsights(page);
   await page.getByRole("button", { name: "Zoom in", exact: true }).click();
   const origin = await range(page);
