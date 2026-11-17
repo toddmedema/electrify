@@ -89,3 +89,52 @@ test("unmounting during a delayed import never creates a renderer", async () => 
   await act(async () => resolve(factory));
   expect(factory).not.toHaveBeenCalled();
 });
+
+test("renderer import failure reports the standard-map fallback and retains no diagnostics", async () => {
+  const state = jest.fn(),
+    connected = jest.fn();
+  const utils = render(
+    <TerritoryCanvas3D
+      instances={[]}
+      frame={frame}
+      runKey="one"
+      loadRenderer={async () => {
+        throw new Error("chunk unavailable");
+      }}
+      onState={state}
+      onRenderer={connected}
+    />,
+  );
+  await waitFor(() => expect(state).toHaveBeenLastCalledWith("unavailable"));
+  expect(state).toHaveBeenCalledWith("loading");
+  expect(connected).toHaveBeenLastCalledWith(undefined);
+  // The decorative canvas is intentionally absent from the accessibility tree.
+  // eslint-disable-next-line testing-library/no-container, testing-library/no-node-access
+  const canvas = utils.container.querySelector("canvas") as MapCanvas;
+  expect(canvas.map3DDiagnostics).toBeUndefined();
+});
+
+test("a renderer update failure disposes partially initialized resources", async () => {
+  const state = jest.fn(),
+    connected = jest.fn();
+  const renderer: RendererHandle = {
+    update: jest.fn(() => {
+      throw new Error("GPU unavailable");
+    }),
+    dispose: jest.fn(),
+    diagnostics: jest.fn(),
+  };
+  render(
+    <TerritoryCanvas3D
+      instances={[]}
+      frame={frame}
+      runKey="one"
+      loadRenderer={async () => () => renderer}
+      onState={state}
+      onRenderer={connected}
+    />,
+  );
+  await waitFor(() => expect(state).toHaveBeenLastCalledWith("unavailable"));
+  expect(renderer.dispose).toHaveBeenCalledTimes(1);
+  expect(connected).toHaveBeenLastCalledWith(undefined);
+});

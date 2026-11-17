@@ -5,6 +5,8 @@ import {
   fireEvent,
   render,
   screen,
+  waitFor,
+  within,
 } from "@testing-library/react";
 import { configureStore } from "@reduxjs/toolkit";
 import { Provider } from "react-redux";
@@ -25,6 +27,33 @@ import {
 } from "../base/TerritoryTilePurchases";
 import TerritoryHexMap from "./TerritoryHexMap";
 import { hexCenter } from "../base/TerritoryHexGeometry";
+import * as HexGeometry from "../base/TerritoryHexGeometry";
+import type { ScenePicker } from "../base/territory-3d/SceneBuilder";
+import type { RendererState } from "../base/territory-3d/TerritoryCanvas3D";
+
+const mockPick = jest.fn();
+let mockSceneError = false;
+jest.mock("../base/territory-3d/TerritoryScene3D", () => {
+  const React = jest.requireActual<typeof import("react")>("react");
+  return {
+    __esModule: true,
+    default: function MockScene({
+      onState,
+      onPicker,
+    }: {
+      onState: (state: RendererState) => void;
+      onPicker: (picker: ScenePicker | undefined) => void;
+    }) {
+      React.useEffect(() => {
+        onPicker(mockPick);
+        onState("ready");
+        return () => onPicker(undefined);
+      }, [onPicker, onState]);
+      if (mockSceneError) throw new Error("3D chunk unavailable");
+      return <div data-testid="map-scene" />;
+    },
+  };
+});
 
 it("releases arrow navigation to surrounding controls at the known map boundary", () => {
   const game = createGame({ scenarioId: 116, seed: 188 });
@@ -64,6 +93,8 @@ beforeEach(() => {
 afterEach(() => {
   registerMultiplayerRuntime(undefined);
   jest.restoreAllMocks();
+  mockPick.mockReset();
+  mockSceneError = false;
 });
 
 function show(
@@ -592,4 +623,132 @@ it("keeps an unselected map unselected across game updates with one reachable ti
   const buy = screen.getByRole("button", { name: "Connect" });
   expect(buy).not.toHaveTextContent(/Buy|available/);
   expect(buy).toHaveAttribute("aria-pressed", "false");
+});
+
+function enable3D() {
+  const descriptor = Object.getOwnPropertyDescriptor(
+    window,
+    "WebGL2RenderingContext",
+  );
+  Object.defineProperty(window, "WebGL2RenderingContext", {
+    configurable: true,
+    value: class {},
+  });
+  return () => {
+    if (descriptor)
+      Object.defineProperty(window, "WebGL2RenderingContext", descriptor);
+    else Reflect.deleteProperty(window, "WebGL2RenderingContext");
+  };
+}
+it("retains ownership boundaries and wire topology through power ticks and camera movement, then updates after a connection", () => {
+  const topology = jest.spyOn(HexGeometry, "hexWires");
+  const map = show();
+  const firstPasses = topology.mock.calls.length;
+  act(() => {
+    map.store.dispatch(delta({ speed: "NORMAL" }));
+  });
+  fireEvent.wheel(map.viewport, { deltaX: 1, deltaY: 1 });
+  expect(topology).toHaveBeenCalledTimes(firstPasses);
+  map.buyMode();
+  tap(map.candidates()[0]);
+  expect(topology.mock.calls.length).toBeGreaterThan(firstPasses);
+});
+it("activates and hovers the picked elevated model while keyboard and explicit price labels keep their own targets", async () => {
+  const restore = enable3D();
+  try {
+    const map = show();
+    await screen.findByTestId("map-scene");
+    const facility = territoryTileViews(map.store.getState().game).find(
+      (view) => view.operatingFacility,
+    )!;
+    mockPick.mockReturnValue(facility.tile.id);
+    map.buyMode();
+    const ground = map.candidates()[0],
+      model = map.target(facility.tile.id);
+    fireEvent.pointerMove(ground, { pointerId: 1, clientX: 100, clientY: 100 });
+    expect(model).toHaveAttribute("data-model-hovered", "true");
+    tap(ground);
+    expect(map.onSelect).toHaveBeenLastCalledWith(facility.tile.id, true);
+    expect(
+      map.store.getState().game.territoryNetwork!.tilePurchases,
+    ).toHaveLength(0);
+    fireEvent.pointerLeave(map.viewport);
+    expect(model).not.toHaveAttribute("data-model-hovered");
+    const price = within(ground).getByText(/^\$/);
+    fireEvent.pointerDown(price, { pointerId: 1, clientX: 100, clientY: 100 });
+    fireEvent.pointerUp(price, { pointerId: 1, clientX: 100, clientY: 100 });
+    fireEvent.click(price, { detail: 1 });
+    expect(ownsTerritoryTile(map.store.getState().game, idOf(ground))).toBe(
+      true,
+    );
+    const keyboard = map.candidates()[0];
+    fireEvent.click(keyboard, { detail: 0 });
+    expect(ownsTerritoryTile(map.store.getState().game, idOf(keyboard))).toBe(
+      true,
+    );
+  } finally {
+    restore();
+  }
+});
+
+it("binds a retargeted model gesture to the quote shown at pointer down", async () => {
+  const restore = enable3D();
+  try {
+    const map = show(),
+      host = fakeHost();
+    await screen.findByTestId("map-scene");
+    map.buyMode();
+    const candidate = map.candidates()[0],
+      id = idOf(candidate),
+      ground = map.target("champlain:city");
+    mockPick.mockReturnValue(id);
+    fireEvent.pointerDown(ground, { pointerId: 1, clientX: 100, clientY: 100 });
+    const before = map.store.getState().game;
+    act(() => {
+      map.store.dispatch(
+        delta({
+          date: getDateFromMinute(
+            before.date.minute + MINUTES_PER_MONTH,
+            before.startingYear,
+          ),
+          timeline: before.timeline.map((tick) => ({
+            ...tick,
+            minute: tick.minute + MINUTES_PER_MONTH,
+          })),
+        }),
+      );
+    });
+    fireEvent.pointerUp(ground, { pointerId: 1, clientX: 100, clientY: 100 });
+    fireEvent.click(ground, { detail: 1 });
+    expect(host.submit).not.toHaveBeenCalled();
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "connection cost changed",
+    );
+  } finally {
+    restore();
+  }
+});
+
+it("retains the accessible map and Connect action after the lazy scene fails", async () => {
+  const restore = enable3D();
+  jest.spyOn(console, "error").mockImplementation(() => undefined);
+  mockSceneError = true;
+  try {
+    const map = show();
+    await waitFor(() =>
+      expect(
+        screen.getByLabelText("Terrain, structures and utility ownership"),
+      ).toHaveAttribute("data-renderer", "unavailable"),
+    );
+    expect(map.target("champlain:city")).toHaveAccessibleName(
+      "Inspect You territory",
+    );
+    map.buyMode();
+    tap(map.candidates()[0]);
+    expect(
+      map.store.getState().game.territoryNetwork!.tilePurchases,
+    ).toHaveLength(1);
+  } finally {
+    restore();
+  }
 });
