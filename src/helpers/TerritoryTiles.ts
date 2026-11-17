@@ -264,8 +264,10 @@ export const territoryHexDistance = (
     Math.abs(a.q + a.r - b.q - b.r),
   );
 /** Purchase frontiers use physical company property; remote visibility never grants adjacency. */
-export function ownedTerritoryTiles(game: TileGame): TerritoryTileDefinition[] {
-  const owns = createTerritoryTileOwnership(game);
+export function ownedTerritoryTiles(
+  game: TileGame,
+  owns = createTerritoryTileOwnership(game),
+): TerritoryTileDefinition[] {
   return [
     ...TERRITORY_TILES,
     ...legacyTerritoryTiles(game),
@@ -275,12 +277,25 @@ export function ownedTerritoryTiles(game: TileGame): TerritoryTileDefinition[] {
     }),
   ].filter(owns);
 }
+/** Index physical property once per quote pass; each candidate checks only six neighbors. */
+export function createTerritoryTileAdjacency(
+  owned: readonly TerritoryTileDefinition[],
+) {
+  const coordinates = new Set(owned.map(({ q, r }) => `${q},${r}`));
+  return ({ q, r }: TerritoryTileDefinition) =>
+    coordinates.has(`${q + 1},${r}`) ||
+    coordinates.has(`${q - 1},${r}`) ||
+    coordinates.has(`${q},${r + 1}`) ||
+    coordinates.has(`${q},${r - 1}`) ||
+    coordinates.has(`${q + 1},${r - 1}`) ||
+    coordinates.has(`${q - 1},${r + 1}`);
+}
 export function isAdjacentToOwnedTerritoryTile(
   game: TileGame,
   tile: TerritoryTileDefinition,
   owned = ownedTerritoryTiles(game),
 ): boolean {
-  return owned.some((anchor) => territoryHexDistance(anchor, tile) === 1);
+  return createTerritoryTileAdjacency(owned)(tile);
 }
 /** Peer claims only extend sight through a real, operating link, projected by the host. */
 export function connectedPeerTerritoryTiles(

@@ -1,6 +1,8 @@
 import cloneDeep from "lodash.clonedeep";
+import { TRANSMISSION_CORRIDORS } from "../data/AdjacentMarkets";
 import { GENERATORS, getBuildFacilityQuote, STORAGE } from "../data/Facilities";
 import { TERRITORY_TILES } from "../data/TerritoryTiles";
+import * as tileData from "../data/TerritoryTiles";
 import reducer, { buildFacility, tickState } from "../reducers/Game";
 import { parseSave, serializeSave } from "../SaveGame";
 import { acquireTile } from "../reducers/GameActions";
@@ -15,6 +17,7 @@ import {
 } from "./Territories";
 import {
   getTerritoryTile,
+  isAdjacentToOwnedTerritoryTile,
   tileFitsFacility,
   territoryVisibilityDistance,
   tileSupportsFacilityTechnology,
@@ -59,6 +62,162 @@ it("does not turn a PPA visibility anchor into physical purchase adjacency", () 
   const remote = getTerritoryTile("frontier:5:-4")!;
   expect(territoryVisibilityDistance(game, remote)).toBe(1);
   expect(tilePurchaseQuote(game, remote.id)).toBeUndefined();
+  expect(tilePurchaseQuotes(game).has(remote.id)).toBe(false);
+});
+
+it("uses all six physical neighbors of empty retained property, with fresh lookups after ownership changes", () => {
+  const game = ready();
+  game.territoryNetwork!.legacyTiles!.push({
+    id: "champlain:legacy-100",
+    territoryId: "champlain",
+    q: 100,
+    r: -100,
+    terrain: "plains",
+    siteKind: "industrial",
+    maxPeakW: 40e6,
+  });
+  const quotes = tilePurchaseQuotes(game);
+  for (const [q, r] of [
+    [101, -100],
+    [99, -100],
+    [100, -99],
+    [100, -101],
+    [101, -101],
+    [99, -99],
+  ]) {
+    const tile = getTerritoryTile(`frontier:${q}:${r}`, game)!;
+    expect(isAdjacentToOwnedTerritoryTile(game, tile)).toBe(true);
+    expect(quotes.get(tile.id)).toBeDefined();
+    expect(tilePurchaseQuote(game, tile.id)).toEqual(quotes.get(tile.id));
+  }
+  for (const [q, r] of [
+    [101, -99],
+    [99, -101],
+    [102, -100],
+    [100, -98],
+  ]) {
+    const tile = getTerritoryTile(`frontier:${q}:${r}`, game)!;
+    expect(territoryVisibilityDistance(game, tile)).toBe(2);
+    expect(isAdjacentToOwnedTerritoryTile(game, tile)).toBe(false);
+    expect(tilePurchaseQuote(game, tile.id)).toBeUndefined();
+    expect(quotes.has(tile.id)).toBe(false);
+  }
+  expect(quotes.has("champlain:legacy-100")).toBe(false);
+  expect(getTerritoryTile("frontier:100:-100", game)).toBeUndefined();
+  game.territoryNetwork!.legacyTiles = [];
+  expect(tilePurchaseQuote(game, "frontier:101:-100")).toBeUndefined();
+  expect(tilePurchaseQuotes(game).has("frontier:101:-100")).toBe(false);
+});
+
+it("keeps connected peer sight and overlapping legacy IDs separate from owned coordinates and exclusive claims", () => {
+  const game = ready();
+  const retained = {
+    id: "champlain:legacy-100" as const,
+    territoryId: "champlain" as const,
+    q: 100,
+    r: -100,
+    terrain: "plains" as const,
+    siteKind: "industrial" as const,
+    maxPeakW: 40e6,
+  };
+  game.territoryNetwork!.legacyTiles!.push(retained);
+  const corridor = TRANSMISSION_CORRIDORS[0];
+  game.transmission!.lines.push({
+    ...game.transmission!.lines[0],
+    id: 999,
+    corridorId: corridor.id,
+    paused: false,
+    yearsToBuildLeft: 0,
+    capacityW: 1e6,
+    minuteCreated: 0,
+  });
+  game.multiplayer = {
+    seat: "local",
+    peers: [
+      {
+        id: "peer",
+        name: "Neighbor",
+        locationId: "SF",
+        corridor,
+        connected: true,
+        territoryTileIds: ["frontier:1000:-1000"],
+      },
+    ],
+    legacyTiles: [
+      {
+        tile: { ...retained, q: 200, r: -200 },
+        seat: "peer",
+        name: "Neighbor",
+      },
+    ],
+  };
+  const quotes = tilePurchaseQuotes(game);
+  for (const id of ["frontier:201:-200", "frontier:1001:-1000"] as const) {
+    const tile = getTerritoryTile(id, game)!;
+    expect(territoryVisibilityDistance(game, tile)).toBe(1);
+    expect(isAdjacentToOwnedTerritoryTile(game, tile)).toBe(false);
+    expect(tilePurchaseQuote(game, tile.id)).toBeUndefined();
+    expect(quotes.has(tile.id)).toBe(false);
+  }
+  const adjacent = getTerritoryTile("frontier:101:-100", game)!;
+  expect(quotes.get(adjacent.id)).toBeDefined();
+  const owner = { seat: "peer", name: "Neighbor" };
+  game.multiplayer.tileOwners = { [adjacent.id]: owner };
+  expect(tilePurchaseQuote(game, adjacent.id)).toBeUndefined();
+  expect(tilePurchaseQuotes(game).has(adjacent.id)).toBe(false);
+  game.multiplayer.tileOwners = {};
+  game.multiplayer.landOwners = { [adjacent.territoryId]: owner };
+  expect(tilePurchaseQuote(game, adjacent.id)).toBeUndefined();
+  expect(tilePurchaseQuotes(game).has(adjacent.id)).toBe(false);
+});
+
+it("bounds owned coordinate reads while quoting a long purchased frontier", () => {
+  const game = ready();
+  const count = 500;
+  game.territoryNetwork!.tilePurchases = Array.from(
+    { length: count },
+    (_, index) => ({
+      tileId: `frontier:${-5 - index}:-3`,
+      minute: 0,
+      price: 3e6,
+    }),
+  );
+  const budget = count * 100;
+  let reads = 0;
+  const read = (value: number) => {
+    if (++reads > budget)
+      throw new Error(
+        "Purchase quotes exceeded the owned-coordinate read budget",
+      );
+    return value;
+  };
+  const generate = tileData.getGeneratedTerritoryTile;
+  const spy = jest
+    .spyOn(tileData, "getGeneratedTerritoryTile")
+    .mockImplementation((id) => {
+      const tile = generate(id);
+      return tile
+        ? {
+            ...tile,
+            get q() {
+              return read(tile.q);
+            },
+            get r() {
+              return read(tile.r);
+            },
+          }
+        : undefined;
+    });
+  try {
+    const quotes = tilePurchaseQuotes(game);
+    expect(quotes.has("frontier:-505:-3")).toBe(true);
+    expect(quotes.has("frontier:-506:-3")).toBe(false);
+    expect(quotes.size).toBeGreaterThan(count);
+    expect(reads).toBeGreaterThan(count);
+    expect(reads).toBeLessThanOrEqual(budget);
+  } finally {
+    spy.mockRestore();
+  }
 });
 
 it("leaves general sites uncapped while named sites keep their physical power limit", () => {

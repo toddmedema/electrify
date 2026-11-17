@@ -45,8 +45,8 @@ import {
   territoryVisibilityDistance,
   visibleTerritoryTiles,
   createTerritoryTileOwnership,
+  createTerritoryTileAdjacency,
   ownedTerritoryTiles,
-  isAdjacentToOwnedTerritoryTile,
   territoryTilePowerLimit,
 } from "./TerritoryTiles";
 export {
@@ -299,13 +299,13 @@ function purchaseQuote(
   game: GameType,
   tile: NonNullable<ReturnType<typeof getTerritoryTile>>,
   owns = createTerritoryTileOwnership(game),
-  owned = ownedTerritoryTiles(game),
+  adjacent = createTerritoryTileAdjacency(ownedTerritoryTiles(game, owns)),
 ) {
   if (
     !hasTerritoryNetwork(game) ||
     !isLandTerritoryId(tile.territoryId) ||
     owns(tile) ||
-    !isAdjacentToOwnedTerritoryTile(game, tile, owned) ||
+    !adjacent(tile) ||
     game.multiplayer?.tileOwners?.[tile.id] ||
     game.multiplayer?.landOwners?.[tile.territoryId]
   )
@@ -339,10 +339,12 @@ export function tilePurchaseQuote(game: GameType, tileId: TerritoryTileId) {
 /** Batch map quotes share the finite discovery pass instead of rebuilding sight per tile. */
 export function tilePurchaseQuotes(game: GameType) {
   const owns = createTerritoryTileOwnership(game);
-  const owned = ownedTerritoryTiles(game);
+  const adjacent = createTerritoryTileAdjacency(
+    ownedTerritoryTiles(game, owns),
+  );
   return new Map(
     visibleTerritoryTiles(game).flatMap(({ tile }) => {
-      const quote = purchaseQuote(game, tile, owns, owned);
+      const quote = purchaseQuote(game, tile, owns, adjacent);
       return quote ? [[tile.id, quote] as const] : [];
     }),
   );
