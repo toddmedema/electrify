@@ -1,6 +1,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const prettier = require("prettier");
+const { execFileSync } = require("node:child_process");
 const { ORIGIN, STATIC_PAGES } = require("./registry");
 
 const ROOT = path.resolve(__dirname, "../..");
@@ -142,17 +143,29 @@ function createContext(pages) {
         : "Scenarios — Electrify electricity strategy game",
       description: page
         ? page.description
-        : "Choose your next grid challenge in Electrify. Manage an island utility, prepare for extreme weather, or build a company across generations. Free to play in your browser.",
+        : "Choose an Electrify grid challenge: run an island utility, prepare for extreme weather, or build a company across generations. Free in your browser.",
       canonical: `${ORIGIN}${page ? scenarioPath(page) : "/scenarios.html"}`,
       image: `${ORIGIN}/images/gameplay-preview.png`,
     }),
   };
 }
 
-function sitemap(paths) {
+// Only authored sources participate. Generated HTML commits must never move their own dates.
+function sourceDate(root, sources) {
+  const date = execFileSync(
+    "git",
+    ["log", "-1", "--format=%cs", "--", ...sources],
+    { cwd: root, encoding: "utf8" },
+  ).trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date))
+    fail(`no git history for sitemap sources: ${sources.join(", ")}`);
+  return date;
+}
+
+function sitemap(entries) {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-${paths.map((pathname) => `  <url>\n    <loc>${escapeHtml(ORIGIN + pathname)}</loc>\n  </url>`).join("\n")}
+${entries.map(({ pathname, lastmod }) => `  <url>\n    <loc>${escapeHtml(ORIGIN + pathname)}</loc>\n    <lastmod>${lastmod}</lastmod>\n  </url>`).join("\n")}
 </urlset>
 `;
 }
@@ -219,9 +232,17 @@ async function buildSite({ root = ROOT, pages } = {}) {
   output.set(
     "public/sitemap.xml",
     sitemap([
-      ...STATIC_PAGES.map((page) => page.path),
-      "/scenarios.html",
-      ...pages.map(scenarioPath),
+      ...STATIC_PAGES.map((page) => ({
+        pathname: page.path,
+        lastmod: sourceDate(root, [page.source]),
+      })),
+      ...["/scenarios.html", ...pages.map(scenarioPath)].map((pathname) => ({
+        pathname,
+        lastmod: sourceDate(root, [
+          "site/scenarios.json",
+          "site/templates/pages.js",
+        ]),
+      })),
     ]),
   );
   output.set("public/llms.txt", crawlerGuide(pages));
@@ -293,6 +314,7 @@ module.exports = {
   playUrl,
   iconUrl,
   createContext,
+  sourceDate,
   buildSite,
   generate,
 };

@@ -3,6 +3,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
+const { execFileSync } = require("node:child_process");
 // Use the HTML parser already supplied by CRA's test environment.
 const { JSDOM } = require(
   require.resolve("jsdom", {
@@ -16,6 +17,7 @@ const {
   generate,
   playUrl,
   scenarioPath,
+  sourceDate,
 } = require("../site/generate");
 const { ORIGIN, STATIC_PAGES } = require("../site/registry");
 
@@ -132,6 +134,26 @@ function scenario(scenarioId, overrides = {}) {
   };
 }
 
+function commit(root, message, date) {
+  execFileSync(
+    "git",
+    [
+      "-c",
+      "user.name=Site test",
+      "-c",
+      "user.email=site@example.test",
+      "commit",
+      "--quiet",
+      "-m",
+      message,
+    ],
+    {
+      cwd: root,
+      env: { ...process.env, GIT_AUTHOR_DATE: date, GIT_COMMITTER_DATE: date },
+    },
+  );
+}
+
 function fixture(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "electrify-site-"));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
@@ -158,6 +180,9 @@ function fixture(t) {
   );
   const pages = [scenario(1), scenario(2)];
   write("site/scenarios.json", pages);
+  execFileSync("git", ["init", "--quiet"], { cwd: root });
+  execFileSync("git", ["add", "."], { cwd: root });
+  commit(root, "Initial authored pages", "2020-01-02T12:00:00Z");
   return { root, pages, write, publicDir: path.join(root, "public") };
 }
 
@@ -347,4 +372,152 @@ test("generation is deterministic, catches drift, and removes retired generated 
 
 test("checked-in site pages are current", async () => {
   await generate({ check: true });
+});
+
+test("sitemap dates follow authored source history and ignore generated-output commits", async (t) => {
+  const { root, write } = fixture(t);
+  const first = await buildSite({ root });
+  const dates = (output) => {
+    const dom = new JSDOM(output.get("public/sitemap.xml"), {
+      contentType: "application/xml",
+    });
+    t.after(() => dom.window.close());
+    return new Map(
+      [...dom.window.document.querySelectorAll("url")].map((node) => [
+        node.querySelector("loc").textContent,
+        node.querySelector("lastmod").textContent,
+      ]),
+    );
+  };
+  assert.deepEqual(new Set(dates(first).values()), new Set(["2020-01-02"]));
+  write("public/about.html", "A changed authored page");
+  execFileSync("git", ["add", "public/about.html"], { cwd: root });
+  commit(root, "Edit about content", "2021-03-04T12:00:00Z");
+  const changed = await buildSite({ root });
+  assert.equal(dates(changed).get(`${ORIGIN}/about.html`), "2021-03-04");
+  assert.equal(
+    dates(changed).get(`${ORIGIN}/scenarios/challenge-1.html`),
+    "2020-01-02",
+  );
+  for (const [file, content] of changed) write(file, content);
+  execFileSync("git", ["add", "public"], { cwd: root });
+  commit(root, "Regenerate output", "2022-05-06T12:00:00Z");
+  assert.equal(
+    (await buildSite({ root })).get("public/sitemap.xml"),
+    changed.get("public/sitemap.xml"),
+  );
+  assert.equal(sourceDate(root, ["site/scenarios.json"]), "2020-01-02");
+});
+
+test("learning pages provide breadcrumbs, concise metadata, and a substantial simulator guide", async (t) => {
+  const output = await buildSite();
+  for (const pathname of [
+    ...STATIC_PAGES.map((page) => page.path).filter(
+      (pathname) => pathname !== "/",
+    ),
+    "/scenarios.html",
+  ]) {
+    const document =
+      pathname === "/scenarios.html"
+        ? new JSDOM(output.get("public/scenarios.html")).window.document
+        : readStaticPage(pathname, t);
+    if (pathname === "/scenarios.html")
+      t.after(() => document.defaultView.close());
+    assert.ok(document.title.length <= 60, `${pathname}: title length`);
+    const description = document.querySelector(
+      'meta[name="description"]',
+    ).content;
+    assert.ok(
+      description.length >= 70 && description.length <= 155,
+      `${pathname}: description length ${description.length}`,
+    );
+    const entities = [
+      ...document.querySelectorAll('script[type="application/ld+json"]'),
+    ].map((script) => JSON.parse(script.textContent));
+    const breadcrumbs = entities
+      .flatMap((entity) => [entity, entity.breadcrumb])
+      .find((entity) => entity?.["@type"] === "BreadcrumbList");
+    assert.ok(breadcrumbs, `${pathname}: breadcrumb data`);
+    assert.deepEqual(
+      breadcrumbs.itemListElement.map((item) => item.item),
+      [ORIGIN + "/", ORIGIN + pathname],
+    );
+    assert.ok(
+      document.querySelector('nav[aria-label="Breadcrumb"] a[href="/"]'),
+      `${pathname}: visible hierarchy`,
+    );
+  }
+  const document = readStaticPage("/power-grid-simulator.html", t);
+  assert.equal(document.querySelectorAll("h1").length, 1);
+  assert.ok(document.querySelectorAll("main h2").length >= 4);
+  assert.ok(
+    document.querySelector("main").textContent.trim().split(/\s+/).length >=
+      600,
+  );
+  assert.ok(
+    new Set(
+      [...document.querySelectorAll('main a[href^="/scenarios/"]')].map(
+        (anchor) => anchor.href,
+      ),
+    ).size >= 4,
+  );
+  assert.ok(document.querySelectorAll("main h3").length >= 4);
+  const image = document.querySelector(".learning-screenshot img");
+  assert.equal(image.width, 1200);
+  assert.equal(image.height, 630);
+  for (const candidate of image.srcset.split(",")) {
+    const [url, width] = candidate.trim().split(/\s+/);
+    assert.match(url, /\.webp$/);
+    assert.match(width, /^(400|800|1200)w$/);
+    assert.ok(
+      fs.statSync(path.join(ROOT, "public", url)).size <
+        fs.statSync(path.join(ROOT, "public/images/gameplay-preview.png")).size,
+    );
+  }
+  assert.ok(image.sizes);
+});
+
+test("every sitemap page receives links from four distinct pages, including descriptive scenario guide links", async (t) => {
+  const output = await buildSite();
+  const paths = [
+    ...STATIC_PAGES.map((page) => page.path),
+    "/scenarios.html",
+    ...JSON.parse(fs.readFileSync(path.join(ROOT, "site/scenarios.json"))).map(
+      scenarioPath,
+    ),
+  ];
+  const inbound = new Map(paths.map((pathname) => [pathname, new Set()]));
+  for (const pathname of paths) {
+    const document = output.has(`public${pathname}`)
+      ? new JSDOM(output.get(`public${pathname}`), { url: ORIGIN + pathname })
+          .window.document
+      : readStaticPage(pathname, t);
+    if (output.has(`public${pathname}`))
+      t.after(() => document.defaultView.close());
+    for (const anchor of document.querySelectorAll("a[href]")) {
+      const url = new URL(anchor.href);
+      if (url.origin === ORIGIN && url.pathname !== pathname)
+        inbound.get(url.pathname)?.add(pathname);
+    }
+    if (pathname.startsWith("/scenarios/")) {
+      assert.equal(
+        document.querySelectorAll('.scenario-related a[href^="/scenarios/"]')
+          .length,
+        3,
+      );
+      assert.ok(
+        [
+          ...document.querySelectorAll(
+            'main a[href="/power-grid-simulator.html"]',
+          ),
+        ].some((anchor) => /power grid simulator/i.test(anchor.textContent)),
+        pathname,
+      );
+    }
+  }
+  for (const [pathname, sources] of inbound)
+    assert.ok(
+      sources.size >= 4,
+      `${pathname}: only ${sources.size} distinct inbound pages`,
+    );
 });
