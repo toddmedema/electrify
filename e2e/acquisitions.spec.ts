@@ -61,7 +61,10 @@ async function startMap(page: Page, theme: "light" | "dark") {
 }
 
 /** Pan the actual camera rather than scrolling a virtualized tile into existence. */
-async function panToTile(page: Page, tile: TerritoryTileDefinition) {
+async function panToTile(
+  page: Page,
+  tile: Pick<TerritoryTileDefinition, "q" | "r">,
+) {
   const viewport = mapWorkspace(page).locator(".territoryMapViewport");
   const target = hexCenter(tile);
   for (let attempt = 0; attempt < 20; attempt++) {
@@ -86,7 +89,7 @@ async function panToTile(page: Page, tile: TerritoryTileDefinition) {
     await page.mouse.move(x + dx * step, y + dy * step, { steps: 4 });
     await page.mouse.up();
   }
-  throw new Error(`Could not pan the map to ${tile.id}`);
+  throw new Error(`Could not pan the map to ${tile.q},${tile.r}`);
 }
 
 async function inspectTile(page: Page, tile: TerritoryTileDefinition) {
@@ -311,6 +314,140 @@ async function expectCityDemand(surface: Locator) {
 }
 
 for (const theme of ["light", "dark"] as const) {
+  test(`map facility states follow actual operation, pause and construction in ${theme}`, async ({
+    page,
+  }, info) => {
+    const network = await startMap(page, theme);
+    const before = (await readSavedGame(page))!;
+    const hydro = before.facilities.find(
+      (facility) => facility.startingAssetId === "scenario-116-champlain-hydro",
+    )!;
+    const oil = before.facilities.find(
+      (facility) => facility.startingAssetId === "scenario-116-champlain-oil-a",
+    )!;
+    const biomass = before.facilities.find(
+      (facility) =>
+        facility.startingAssetId === "scenario-116-champlain-biomass",
+    )!;
+    expect(hydro.currentW).toBeGreaterThan(0);
+    expect(oil.currentW).toBe(0);
+    expect(!!oil.paused).toBe(false);
+    const surface = await inspectTile(
+      page,
+      getTerritoryTile(hydro.tileId, before)!,
+    );
+    await expect(surface.locator(".tileFacilityStatus")).toHaveText(
+      /^Generating ·/,
+    );
+    await inspectTile(page, getTerritoryTile(oil.tileId, before)!);
+    await expect(surface.locator(".tileFacilityStatus")).toHaveText(
+      /^Idle · 0\//,
+    );
+    await inspectTile(page, getTerritoryTile(biomass.tileId, before)!);
+    await surface.getByRole("button", { name: /^Pause / }).click();
+    await expect(surface.locator(".tileFacilityStatus")).toHaveText(
+      /^Operation paused ·/,
+    );
+    const paused = (await readSavedGame(page))!;
+    expect(
+      paused.facilities.find((facility) => facility.id === biomass.id)!.paused,
+    ).toBe(true);
+    expect(
+      paused.facilities.find((facility) => facility.id === biomass.id)!
+        .currentW,
+    ).toBe(biomass.currentW);
+
+    loadSimData(paused.location);
+    const wind = GENERATORS(paused, 20e6, [], []).find(
+      (item) => item.name === "Wind",
+    )!;
+    const hydroTile = getTerritoryTile(hydro.tileId, paused)!;
+    const site = [...availableTerritoryTiles(paused, wind, "champlain")]
+      .filter((tile) => tile.siteKind === "wind")
+      .sort(
+        (a, b) =>
+          territoryHexDistance(a, hydroTile) -
+          territoryHexDistance(b, hydroTile),
+      )[0];
+    expect(site).toBeDefined();
+    await inspectTile(page, site);
+    await surface
+      .getByRole("button", { name: "Review purchase of Wind", exact: true })
+      .click();
+    const review = page.getByRole("dialog", { name: /^Build .* Wind\?/ });
+    await review.getByRole("button", { name: "Pay cash", exact: true }).click();
+    await expect(review).toHaveCount(0);
+    await expect(surface.locator(".tileFacilityStatus")).toHaveText(
+      /^Under construction ·/,
+    );
+    const built = (await readSavedGame(page))!;
+    const plant = built.facilities.find(
+      (facility) => facility.tileId === site.id,
+    )!;
+    expect(plant.peakW).toBe(20e6);
+    expect(plant.yearsToBuildLeft).toBeGreaterThan(0);
+    expect(plant.currentW).toBe(0);
+    expect(!!plant.paused).toBe(false);
+    await surface
+      .getByRole("button", { name: "Close tile", exact: true })
+      .click();
+    await expect(surface).toHaveCount(0);
+    await expect(
+      network.locator('[data-map-target][aria-pressed="true"]'),
+    ).toHaveCount(0);
+    const dismiss = page.getByRole("button", {
+      name: "Dismiss notification",
+      exact: true,
+    });
+    if (await dismiss.isVisible()) await dismiss.click();
+    await expect(page.locator(".MuiSnackbar-root")).toHaveCount(0);
+
+    const states = [
+      [getTerritoryTile(hydro.tileId, built)!, "producing", "Generating"],
+      [getTerritoryTile(oil.tileId, built)!, "idle", "Idle"],
+      [getTerritoryTile(biomass.tileId, built)!, "paused", "Operation paused"],
+      [site, "construction", "Under construction"],
+    ] as const;
+    const centers = states.map(([tile]) => hexCenter(tile));
+    await panToTile(page, {
+      q:
+        (Math.min(...states.map(([tile]) => tile.q)) +
+          Math.max(...states.map(([tile]) => tile.q))) /
+        2,
+      r:
+        (Math.min(...states.map(([tile]) => tile.r)) +
+          Math.max(...states.map(([tile]) => tile.r))) /
+        2,
+    });
+    for (const [tile, kind, label] of states) {
+      const target = network.locator(`[data-map-target="${tile.id}"]`);
+      const occupant = network.locator(`[data-occupant-tile="${tile.id}"]`);
+      await expect(target).toHaveAccessibleDescription(new RegExp(label));
+      await expect(target).toBeInViewport({ ratio: 1 });
+      await expect(occupant).toHaveAttribute("data-facility-status", kind);
+      await expect(occupant).toHaveAttribute("data-visibility-distance", "0");
+      await expect(
+        occupant.locator(":scope > .facilityMapStatusArtwork"),
+      ).toHaveAttribute("aria-hidden", "true");
+    }
+    await expectPhysicalMap(network, built);
+    await info.attach("facility-state-source", {
+      body: JSON.stringify({
+        minute: built.date.minute,
+        centers,
+        facilities: built.facilities.filter((facility) =>
+          [hydro.id, oil.id, biomass.id, plant.id].includes(facility.id),
+        ),
+      }),
+      contentType: "application/json",
+    });
+    await reviewScreenshot(page, {
+      path: info.outputPath(`map-facility-states-${theme}.png`),
+      animations: "disabled",
+      scale: "css",
+    });
+  });
+
   test(`map fills the workspace and opens city charts and plant controls in ${theme}`, async ({
     page,
   }, info) => {
@@ -670,6 +807,11 @@ for (const theme of ["light", "dark"] as const) {
         modifiers.locator("dl > div").filter({ hasText: label }),
       ).toHaveText(`${label}${percentage(factor)}`);
     }
+    await reviewScreenshot(surface, {
+      path: info.outputPath(`unowned-terrain-${theme}.png`),
+      animations: "disabled",
+      scale: "css",
+    });
     await expect(surface).toContainText("Cash after purchase");
     await expect(
       surface.getByRole("button", {

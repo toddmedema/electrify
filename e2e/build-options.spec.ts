@@ -63,7 +63,7 @@ for (const theme of ["light", "dark"] as const) {
   ] as const) {
     test(`geothermal stays disabled without sites in ${place} in ${theme}`, async ({
       page,
-    }) => {
+    }, info) => {
       await page.addInitScript((mode) => {
         localStorage.setItem("theme", mode);
         localStorage.setItem("audioEnabled", "false");
@@ -160,6 +160,12 @@ for (const theme of ["light", "dark"] as const) {
           (element) => element.scrollWidth - element.clientWidth,
         ),
       ).toBeLessThanOrEqual(1);
+      if (scenarioId === 116)
+        await reviewScreenshot(page, {
+          path: info.outputPath(`tile-forbidden-geothermal-${theme}.png`),
+          animations: "disabled",
+          scale: "css",
+        });
     });
   }
 
