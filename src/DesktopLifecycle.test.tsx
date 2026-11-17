@@ -63,6 +63,8 @@ it("restores only current completed official bests after a Steam restart and kee
     result({ score: 10000, scoreVersion: 1 }),
     result({ score: 10001, scenarioId: 999 }),
     result({ score: 10002, scenarioId: 0 }),
+    result({ score: 700, scenarioId: 117, scenarioName: "Legacy campaign" }),
+    result({ score: 10003, scenarioId: 125 }),
   ];
   (saveRepository.list as jest.Mock).mockResolvedValue(
     results.map((record, index) => ({
@@ -99,6 +101,8 @@ it("restores only current completed official bests after a Steam restart and kee
     expect(store.getState().user.bests?.["101"]).toBeUndefined();
     expect(competitiveBest(store.getState().user.bests, 999)).toBeUndefined();
     expect(competitiveBest(store.getState().user.bests, 0)).toBeUndefined();
+    expect(competitiveBest(store.getState().user.bests, 117)?.score).toBe(700);
+    expect(competitiveBest(store.getState().user.bests, 125)).toBeUndefined();
     const higher = { scoreVersion: 2, score: 900, difficulty: "CEO", date: 2 };
     store.dispatch(userDelta({ bests: { "v2:101": higher } }));
     store.dispatch(

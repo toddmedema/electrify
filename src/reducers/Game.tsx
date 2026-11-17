@@ -20,6 +20,7 @@ import {
 } from "../data/LegacyCampaign";
 import {
   initializeLegacyCampaign,
+  isCompletedLegacyCampaign,
   legacyGenerationContext,
   legacyCompletedMonths,
   legacyMonthOffset,
@@ -4512,8 +4513,15 @@ export function* tickStatePhases(
         );
         const finalScore = totalScore(score);
         const difficulty = state.difficulty;
-        const { id: scoredScenarioId, name: scenarioName } = scenario;
-        const submitsScore = ranked && outcome === "completed";
+        const completedCampaign = isCompletedLegacyCampaign(state);
+        const scoredScenarioId = completedCampaign
+          ? LEGACY_CAMPAIGN_ID
+          : scenario.id;
+        const scenarioName = completedCampaign
+          ? "Legacy campaign"
+          : scenario.name;
+        const submitsScore =
+          (ranked || completedCampaign) && outcome === "completed";
         const runIdentity = state.runIdentity
           ? cloneDeep(state.runIdentity)
           : undefined;
@@ -4531,8 +4539,12 @@ export function* tickStatePhases(
           gameObjectiveResults(state),
         );
         if (state.campaign) {
-          debrief.startingCash = state.campaign.openingCash;
-          debrief.startingFleet = cloneDeep(state.campaign.openingFleet);
+          const opening = state.campaign.completedTerms[0]?.debrief;
+          debrief.startingCash =
+            opening?.startingCash ?? state.campaign.openingCash;
+          debrief.startingFleet = cloneDeep(
+            opening?.startingFleet ?? state.campaign.openingFleet,
+          );
         }
         // History counts playable months and spans the whole career in a campaign.
         const tenureMonths = history.length;
@@ -4745,7 +4757,7 @@ export function* tickStatePhases(
           campaign.pendingHandover = true;
         } else {
           finishScoredRun(
-            summary,
+            summarizeHistory(history),
             "completed",
             "Campaign complete!",
             "Your utility has completed nine CEO generations, from 1882 through 2061.",

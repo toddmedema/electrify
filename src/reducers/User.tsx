@@ -1,3 +1,4 @@
+import { measureFirestoreRead } from "../FirestoreReads";
 import { invalidateLeaderboards } from "../Leaderboard";
 import { createAsyncThunk, createSlice, PayloadAction } from "@reduxjs/toolkit";
 import {
@@ -112,12 +113,17 @@ async function saveBest(uid: string, scenarioId: number, best: BestScoreType) {
 async function backfillScoreNames(uid: string, displayName: string) {
   try {
     const db = getDb();
-    const mine = await getDocs(
-      query(
-        collection(db, "scores"),
-        where("uid", "==", uid),
-        limit(RENAME_BACKFILL_LIMIT),
-      ),
+    const mine = await measureFirestoreRead(
+      "profile.rename",
+      () =>
+        getDocs(
+          query(
+            collection(db, "scores"),
+            where("uid", "==", uid),
+            limit(RENAME_BACKFILL_LIMIT),
+          ),
+        ),
+      (snapshot) => snapshot.docs.length,
     );
     if (mine.empty) {
       return;
@@ -147,14 +153,16 @@ export async function fetchGlobalRank(
     const { desktopGlobalRank } = await import("../DesktopScores");
     return desktopGlobalRank(scenarioId, difficulty, score);
   }
-  const better = await getCountFromServer(
-    query(
-      collection(getDb(), "scores"),
-      where("scenarioId", "==", scenarioId),
-      where("scoreVersion", "==", SCORE_VERSION),
-      where("outcome", "==", "completed"),
-      where("score", ">", score),
-      orderBy("score", "desc"),
+  const better = await measureFirestoreRead("leaderboard.rank", () =>
+    getCountFromServer(
+      query(
+        collection(getDb(), "scores"),
+        where("scenarioId", "==", scenarioId),
+        where("scoreVersion", "==", SCORE_VERSION),
+        where("outcome", "==", "completed"),
+        where("score", ">", score),
+        orderBy("score", "desc"),
+      ),
     ),
   );
   return better.data().count + 1;
@@ -174,7 +182,11 @@ export const loadProfile = createAsyncThunk<
   { uid: string; googleDisplayName?: string | null }
 >("user/loadProfile", async ({ uid }) => {
   const ref = doc(getDb(), "users", uid);
-  const snapshot = await getDoc(ref);
+  const snapshot = await measureFirestoreRead(
+    "profile.load",
+    () => getDoc(ref),
+    (snapshot) => (snapshot.exists() ? 1 : 0),
+  );
   if (!snapshot.exists()) {
     await setDoc(ref, { createdAt: serverTimestamp() }, { merge: true });
     return {};

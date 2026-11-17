@@ -23,7 +23,12 @@ program cohorts, interties, and the continuous 1882-based clock. Customers are g
 accounts; a handover never replaces them with a new starting population. A company that avoids
 oil or import dependence can legitimately avoid the corresponding shock.
 
-Campaign saves are unranked. IDs 117–125 resolve native definitions without adding them to the
+Completing all nine terms submits one ranked campaign score under ID 117, using the same
+scoring rules as other investor-owned scenarios across the full 180-year history. Intermediate
+handovers and failed campaigns do not submit scores. Campaign setup and the final result show
+the campaign leaderboard, with the usual difficulty filters and personal bests.
+
+IDs 117–125 resolve native definitions without adding them to the
 challenge catalog. Public links to any of these IDs open campaign setup. The headless simulator
 can initialize the later definitions as independent balance fixtures; the player cannot use
 them to bypass inheritance.

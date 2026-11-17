@@ -6,9 +6,12 @@ import {
 import { DifficultyType } from "../../Types";
 import DifficultyPicker from "../base/DifficultyPicker";
 import ScreenPage from "../base/ScreenPage";
+import ScenarioLeaderboard from "../base/ScenarioLeaderboard";
+import { LEGACY_CAMPAIGN_ID } from "../../data/LegacyCampaign";
 
 export interface CampaignSetupProps {
   difficulty: DifficultyType;
+  uid?: string;
   unlockedThrough?: DifficultyType;
   activeGeneration?: number;
   busy?: boolean;
@@ -20,6 +23,7 @@ export interface CampaignSetupProps {
 
 export default function CampaignSetup({
   difficulty,
+  uid,
   unlockedThrough,
   activeGeneration,
   busy,
@@ -84,6 +88,12 @@ export default function CampaignSetup({
               ))}
             </Box>
           </Box>
+          <ScenarioLeaderboard
+            scenarioId={LEGACY_CAMPAIGN_ID}
+            difficulty={difficulty}
+            uid={uid}
+            emptyMessage="Complete all nine terms to join the leaderboard"
+          />
         </Stack>
       </Box>
       <Stack

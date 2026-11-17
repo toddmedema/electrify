@@ -87,6 +87,13 @@ export function closeProtocolGeneration(
   opening: GameType,
   saveEffects?: RunSaveEffects,
 ): GameType {
+  const game = prepareClosingProtocolGeneration(opening);
+  tickState(game, saveEffects);
+  return game;
+}
+
+/** Leave the last tick to the browser so it exercises the real completion and score effects. */
+export function prepareClosingProtocolGeneration(opening: GameType): GameType {
   const game = cloneDeep(opening);
   const campaign = game.campaign!;
   const growthGoal = scenarioObjectiveDefinitions(
@@ -168,6 +175,5 @@ export function closeProtocolGeneration(
     (campaign.termStartMonth + 240) * MINUTES_PER_MONTH - TICK_MINUTES,
     1882,
   );
-  tickState(game, saveEffects);
   return game;
 }
