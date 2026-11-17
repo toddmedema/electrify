@@ -80,6 +80,7 @@ function fixture(isHost = false, deferLeave = false) {
     failFactory = false,
     failSave = false,
     failLeave = false,
+    failReconnect = false,
     sendError: string | undefined;
   let releaseLeave = () => {};
   let checkpoint: World | null = null;
@@ -130,6 +131,8 @@ function fixture(isHost = false, deferLeave = false) {
         throw new Error("Disk full");
       if (request.kind === "leave" && failLeave)
         throw new Error("Steam unavailable");
+      if (request.kind === "reconnect" && failReconnect)
+        throw new Error("Steam could not connect to the host");
       if (request.kind === "state")
         return {
           available: true,
@@ -256,6 +259,9 @@ function fixture(isHost = false, deferLeave = false) {
     },
     failLeave: () => {
       failLeave = true;
+    },
+    failReconnect: () => {
+      failReconnect = true;
     },
     /** Every native send fails the way Electron reports a main-process throw. */
     failSends: (message: string | undefined) => {
@@ -817,6 +823,30 @@ function sentCommands(f: ReturnType<typeof fixture>) {
       : [],
   );
 }
+
+test("a failed reconnect surfaces a connection error that offers Disconnect", async () => {
+  const f = fixture();
+  await f.session.initialize();
+  await deliver(f, {});
+  expect(f.session.getSnapshot().view).toBeDefined();
+  f.failReconnect();
+  // A native reconnect failure must not reject into an unhandled promise; it settles and
+  // reports the loss so the player is not left waiting on a dead link with no way out.
+  await expect(f.session.reconnect()).resolves.toBeUndefined();
+  const snapshot = f.session.getSnapshot();
+  expect(snapshot.lobby.error).toBe("Steam could not connect to the host");
+  // A failed reconnect is a connection loss, so a guest (not the host) gets a Disconnect offer.
+  expect(isConnectionLoss(snapshot.error, snapshot.lobby.error)).toBe(true);
+  expect(
+    offersDisconnect({
+      error: snapshot.error,
+      lobbyError: snapshot.lobby.error,
+      hostId: snapshot.lobby.hostId,
+      selfId: snapshot.lobby.selfId,
+    }),
+  ).toBe(true);
+  f.session.dispose();
+});
 
 test("host silence is transient, updates once, and only a current authoritative view clears it", async () => {
   const f = fixture();
