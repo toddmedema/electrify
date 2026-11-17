@@ -582,6 +582,12 @@ for (const theme of ["light", "dark"] as const) {
     const windArt = art(wind.tileId!);
     await expect(windArt).toHaveAttribute("data-facility-motion", "active");
     const rotor = windArt.locator(".mapWindRotor");
+    const animation = await rotor.evaluateHandle(
+      (element) => element.getAnimations()[0],
+    );
+    await expect
+      .poll(() => animation.evaluate((value) => value.playbackRate))
+      .toBe(0.25);
     const before = await rotor.evaluate(
       (element) => getComputedStyle(element).transform,
     );
@@ -593,6 +599,19 @@ for (const theme of ["light", "dark"] as const) {
     await surface.getByRole("button", { name: /^Pause / }).click();
     await expect(windArt).not.toHaveAttribute("data-facility-motion", "active");
     await expect.poll(() => hasRunningFacilityMotion(windArt)).toBe(false);
+    const pausedPhase = await animation.evaluate((value) =>
+      Number(value.currentTime),
+    );
+    await page.waitForTimeout(180);
+    expect(await animation.evaluate((value) => Number(value.currentTime))).toBe(
+      pausedPhase,
+    );
+    expect(
+      await rotor.evaluate(
+        (element, original) => element.getAnimations()[0] === original,
+        animation,
+      ),
+    ).toBe(true);
     const paused = (await readSavedGame(page))!.facilities.find(
       (facility) => facility.id === wind.id,
     )!;
@@ -601,6 +620,15 @@ for (const theme of ["light", "dark"] as const) {
     await surface.getByRole("button", { name: /^Resume / }).click();
     await expect(windArt).toHaveAttribute("data-facility-motion", "active");
     await expect.poll(() => hasRunningFacilityMotion(windArt)).toBe(true);
+    expect(
+      await rotor.evaluate(
+        (element, original) => element.getAnimations()[0] === original,
+        animation,
+      ),
+    ).toBe(true);
+    expect(
+      await animation.evaluate((value) => Number(value.currentTime)),
+    ).toBeGreaterThanOrEqual(pausedPhase);
     await surface
       .getByRole("button", { name: "Close tile", exact: true })
       .click();
@@ -611,23 +639,89 @@ for (const theme of ["light", "dark"] as const) {
       thermalArt.locator(".mapFacilityExhaust").first(),
     ).toBeVisible();
     await expect.poll(() => hasRunningFacilityMotion(thermalArt)).toBe(true);
+    await expect
+      .poll(() =>
+        thermalArt
+          .locator(".mapFacilityExhaust")
+          .evaluateAll((elements) =>
+            Math.max(
+              ...elements.map((element) =>
+                Number(getComputedStyle(element).opacity),
+              ),
+            ),
+          ),
+      )
+      .toBeGreaterThan(0.5);
     await panToTile(page, getTerritoryTile(hydro.tileId, game)!);
     const hydroArt = art(hydro.tileId!);
     await expect(hydroArt).toHaveAttribute("data-facility-motion", "active");
     await expect(hydroArt.locator(".mapHydroFlow")).toBeVisible();
     await expect.poll(() => hasRunningFacilityMotion(hydroArt)).toBe(true);
+    const flow = await hydroArt
+      .locator(".mapHydroFlow")
+      .evaluateHandle((element) => element.getAnimations()[0]);
     await page.emulateMedia({ reducedMotion: "reduce" });
     await expect(hydroArt).not.toHaveAttribute(
       "data-facility-motion",
       "active",
     );
     await expect.poll(() => hasRunningFacilityMotion(hydroArt)).toBe(false);
+    const reducedPhase = await flow.evaluate((value) =>
+      Number(value.currentTime),
+    );
+    await page.waitForTimeout(180);
+    expect(await flow.evaluate((value) => Number(value.currentTime))).toBe(
+      reducedPhase,
+    );
     await expect(
       network.locator(`[data-occupant-tile="${hydro.tileId}"]`),
     ).toHaveAttribute("data-facility-status", "producing");
     await page.emulateMedia({ reducedMotion: "no-preference" });
     await expect(hydroArt).toHaveAttribute("data-facility-motion", "active");
     await expect.poll(() => hasRunningFacilityMotion(hydroArt)).toBe(true);
+    expect(
+      await hydroArt
+        .locator(".mapHydroFlow")
+        .evaluate(
+          (element, original) => element.getAnimations()[0] === original,
+          flow,
+        ),
+    ).toBe(true);
+    expect(
+      await flow.evaluate((value) => Number(value.currentTime)),
+    ).toBeGreaterThanOrEqual(reducedPhase);
+
+    await page.evaluate(() => {
+      Object.defineProperty(document, "hidden", {
+        configurable: true,
+        value: true,
+      });
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    await expect.poll(() => hasRunningFacilityMotion(hydroArt)).toBe(false);
+    const hiddenPhase = await flow.evaluate((value) =>
+      Number(value.currentTime),
+    );
+    await page.waitForTimeout(180);
+    expect(await flow.evaluate((value) => Number(value.currentTime))).toBe(
+      hiddenPhase,
+    );
+    await page.evaluate(() => {
+      Reflect.deleteProperty(document, "hidden");
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    await expect.poll(() => hasRunningFacilityMotion(hydroArt)).toBe(true);
+    expect(
+      await hydroArt
+        .locator(".mapHydroFlow")
+        .evaluate(
+          (element, original) => element.getAnimations()[0] === original,
+          flow,
+        ),
+    ).toBe(true);
+    expect(
+      await flow.evaluate((value) => Number(value.currentTime)),
+    ).toBeGreaterThanOrEqual(hiddenPhase);
     const foreign = territoryTileViews(game).find(
       (view) => !view.owned && view.facility,
     )!;
@@ -641,6 +735,42 @@ for (const theme of ["light", "dark"] as const) {
     await expect
       .poll(() => hasRunningFacilityMotion(art(foreign.tile.id)))
       .toBe(false);
+    // Let the real game clock advance only after checking the initial production snapshot.
+    await panToTile(page, getTerritoryTile(wind.tileId, game)!);
+    const rateAnimation = await rotor.evaluateHandle(
+      (element) => element.getAnimations()[0],
+    );
+    for (const [label, rate] of [
+      ["slow speed", 0.7],
+      ["normal speed", 0.1],
+      ["fast speed", 1.2],
+      ["ultra speed", 1.5],
+      ["pause", 0.25],
+    ] as const) {
+      const control = page.getByRole("button", { name: label, exact: true });
+      if (!(await control.count())) continue; // 24× is desktop only.
+      const phase = await rateAnimation.evaluate((value) =>
+        Number(value.currentTime),
+      );
+      await control.click();
+      await expect
+        .poll(() => rateAnimation.evaluate((value) => value.playbackRate))
+        .toBe(rate);
+      expect(
+        await rotor.evaluate(
+          (element, original) => element.getAnimations()[0] === original,
+          rateAnimation,
+        ),
+      ).toBe(true);
+      expect(
+        await rateAnimation.evaluate((value) => Number(value.currentTime)),
+      ).toBeGreaterThanOrEqual(phase);
+      expect(
+        await rateAnimation.evaluate(
+          (value) => value.effect!.getTiming().duration,
+        ),
+      ).toBe(14000);
+    }
   });
 
   test(`map facility states follow actual operation, pause and construction in ${theme}`, async ({

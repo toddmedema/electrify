@@ -119,7 +119,9 @@ it("releases the map's single media and document visibility subscriptions", () =
   const removeMedia = jest.spyOn(media, "removeEventListener");
   const removeDocument = jest.spyOn(document, "removeEventListener");
   function Motion() {
-    return <output>{useFacilityMapMotion() ? "Moving" : "Still"}</output>;
+    return (
+      <output>{useFacilityMapMotion().allowed ? "Moving" : "Still"}</output>
+    );
   }
   const { unmount } = render(<Motion />);
   expect(screen.getByRole("status")).toHaveTextContent("Moving");
@@ -131,29 +133,33 @@ it("releases the map's single media and document visibility subscriptions", () =
   );
 });
 
-it("keeps solar panels and storage static even with measured output", () => {
-  const { container, rerender } = render(
-    <FacilityArtwork facility={{ name: "Solar", fuel: "Sun" }} active />,
-  );
-  expect(container.querySelector("[data-facility-motion]")).toBeNull();
-  rerender(
-    <FacilityArtwork facility={{ name: "Battery", peakWh: 100e6 }} active />,
-  );
-  expect(container.querySelector("[data-facility-motion]")).toBeNull();
-});
-
-it.each(["Oil", "Uranium", "Biomass", "Hydro"] as const)(
-  "removes %s exhaust or flow when the facility stops working",
-  (fuel) => {
+it.each([
+  ["Solar", "Sun"],
+  ["Battery", undefined],
+  ["Iron-Air Battery", undefined],
+  ["Pumped Hydro", undefined],
+  ["Oil", "Oil"],
+  ["Nuclear", "Uranium"],
+  ["Biomass", "Biomass"],
+  ["Hydro", "Hydro"],
+  ["Geothermal", "Geothermal"],
+] as const)(
+  "keeps %s effects mounted through operation pause and resume",
+  (name, fuel) => {
+    const facility = fuel ? { name, fuel } : { name, peakWh: 100e6 };
     const { container, rerender } = render(
-      <FacilityArtwork facility={{ name: fuel, fuel }} active />,
+      <FacilityArtwork facility={facility} active />,
     );
-    expect(
-      container.querySelector(".mapFacilityExhaust, .mapHydroFlow"),
-    ).not.toBeNull();
-    rerender(<FacilityArtwork facility={{ name: fuel, fuel }} />);
-    expect(
-      container.querySelector(".mapFacilityExhaust, .mapHydroFlow"),
-    ).toBeNull();
+    const artwork = container.querySelector(".mapFacilityArtwork")!;
+    const effect = artwork.querySelector(".mapFacilityEffect > *")!;
+    expect(effect).not.toBeNull();
+    expect(artwork).toHaveAttribute("data-facility-motion", "active");
+    rerender(<FacilityArtwork facility={facility} />);
+    expect(container.querySelector(".mapFacilityArtwork")).toBe(artwork);
+    expect(artwork.querySelector(".mapFacilityEffect > *")).toBe(effect);
+    expect(artwork).not.toHaveAttribute("data-facility-motion");
+    rerender(<FacilityArtwork facility={facility} active />);
+    expect(artwork.querySelector(".mapFacilityEffect > *")).toBe(effect);
+    expect(artwork).toHaveAttribute("data-facility-motion", "active");
   },
 );

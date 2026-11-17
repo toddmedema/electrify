@@ -1,21 +1,27 @@
 import React from "react";
+import { useFacilityAnimation } from "../useFacilityMapMotion";
 
 export type StorageOccupantVariant = "battery" | "iron-air" | "pumped-hydro";
 
 type StorageOccupantProps = {
   className?: string;
   variant: StorageOccupantVariant;
+  active?: boolean;
 };
 
 export default function StorageOccupant({
   className,
   variant,
+  active = false,
 }: StorageOccupantProps) {
+  const { ref, moving } = useFacilityAnimation(active, variant);
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
       viewBox="0 0 500 500"
-      className={className}
+      ref={ref}
+      className={`${className ?? ""} mapFacilityArtwork`.trim()}
+      data-facility-motion={moving ? "active" : undefined}
       aria-hidden="true"
       focusable="false"
     >
@@ -98,6 +104,24 @@ export default function StorageOccupant({
             <circle cx="175" cy="325" r="20" fill="#64DFC5" strokeWidth="6" />
           </>
         )}
+      </g>
+      <g
+        className="mapFacilityEffect"
+        fill="none"
+        stroke="#FFF8E1"
+        strokeWidth={6}
+      >
+        <path
+          className="mapStorageFlow"
+          strokeDasharray="18 28"
+          d={
+            variant === "pumped-hydro"
+              ? "M287 178V245H185V285"
+              : variant === "iron-air"
+                ? "M172 320H213M287 320H328"
+                : "M182 260V230M317 260V230"
+          }
+        />
       </g>
     </svg>
   );

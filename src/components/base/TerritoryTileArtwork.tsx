@@ -85,6 +85,7 @@ export function FacilityArtwork({
               : "battery"
         }
         className={className}
+        active={active}
       />
     );
   return facility.fuel ? (

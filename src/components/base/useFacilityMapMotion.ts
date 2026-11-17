@@ -1,7 +1,21 @@
 import * as React from "react";
+import type { SpeedType } from "../../Types";
+
+export const FACILITY_MAP_PLAYBACK_RATE: Record<SpeedType, number> = {
+  PAUSED: 0.25,
+  SLOW: 0.7,
+  NORMAL: 0.1,
+  FAST: 1.2,
+  ULTRA: 1.5,
+};
+
+export const FacilityMapMotionContext = React.createContext({
+  allowed: true,
+  rate: FACILITY_MAP_PLAYBACK_RATE.PAUSED,
+});
 
 /** One preference/visibility subscription for the whole map, never one per plant. */
-export default function useFacilityMapMotion(): boolean {
+export default function useFacilityMapMotion(speed: SpeedType = "PAUSED") {
   const [reduced] = React.useState(() =>
     window.matchMedia("(prefers-reduced-motion: reduce)"),
   );
@@ -18,5 +32,25 @@ export default function useFacilityMapMotion(): boolean {
       document.removeEventListener("visibilitychange", refresh);
     };
   }, [reduced]);
-  return allowed;
+  return React.useMemo(
+    () => ({ allowed, rate: FACILITY_MAP_PLAYBACK_RATE[speed] }),
+    [allowed, speed],
+  );
+}
+
+/** Keep the same CSS animations alive: pause retains phase; retiming never seeks. */
+export function useFacilityAnimation(active: boolean, variant: string) {
+  const ref = React.useRef<SVGSVGElement>(null);
+  const { allowed, rate } = React.useContext(FacilityMapMotionContext);
+  const moving = active && allowed;
+  React.useLayoutEffect(() => {
+    for (const animation of ref.current?.getAnimations?.({ subtree: true }) ??
+      []) {
+      if (animation.playbackRate !== rate) animation.updatePlaybackRate(rate);
+      if (moving) {
+        if (animation.playState !== "running") animation.play();
+      } else if (animation.playState !== "paused") animation.pause();
+    }
+  }, [moving, rate, variant]);
+  return { ref, moving };
 }

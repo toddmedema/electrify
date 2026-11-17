@@ -10,7 +10,9 @@ import { tilePurchaseQuotes } from "../../helpers/Territories";
 import { useAppSelector } from "../../Store";
 import { terrainDetailsLabel } from "../base/TerritoryTileFacts";
 import { facilityMapStatus } from "../base/FacilityMapStatus";
-import useFacilityMapMotion from "../base/useFacilityMapMotion";
+import useFacilityMapMotion, {
+  FacilityMapMotionContext,
+} from "../base/useFacilityMapMotion";
 import FacilityMapStatusArtwork from "../base/FacilityMapStatusArtwork";
 import { hasVisibleEscapeOverlay } from "../base/VisibleEscapeOverlay";
 import { useMoney } from "../base/CurrencyContext";
@@ -73,7 +75,7 @@ export default function TerritoryHexMap({
   onDeselect,
 }: Props) {
   const mapId = React.useId();
-  const motionAllowed = useFacilityMapMotion();
+  const motion = useFacilityMapMotion(game.speed);
   const viewport = React.useRef<HTMLDivElement>(null);
   const stage = React.useRef<HTMLDivElement>(null);
   const buyingControl = React.useRef<HTMLButtonElement>(null);
@@ -616,13 +618,13 @@ export default function TerritoryHexMap({
                       ) : facility ? (
                         <>
                           <g className="territoryFacilityBody">
-                            <FacilityArtwork
-                              facility={facility}
-                              className="territoryOccupantArtwork"
-                              active={
-                                motionAllowed && status?.kind === "producing"
-                              }
-                            />
+                            <FacilityMapMotionContext.Provider value={motion}>
+                              <FacilityArtwork
+                                facility={facility}
+                                className="territoryOccupantArtwork"
+                                active={status?.kind === "producing"}
+                              />
+                            </FacilityMapMotionContext.Provider>
                           </g>
                           {status && (
                             <FacilityMapStatusArtwork kind={status.kind} />

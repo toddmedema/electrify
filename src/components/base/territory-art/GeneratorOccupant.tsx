@@ -1,4 +1,5 @@
 import * as React from "react";
+import { useFacilityAnimation } from "../useFacilityMapMotion";
 
 export type GeneratorOccupantVariant =
   | "wind"
@@ -175,12 +176,17 @@ function structure(variant: GeneratorOccupantVariant): React.ReactNode {
 
 function Exhaust({ x, y }: { x: number; y: number }) {
   return (
-    <g transform={`translate(${x} ${y})`} fill="#CFD8DC" stroke="none">
+    <g
+      transform={`translate(${x} ${y})`}
+      fill="#FFF8E1"
+      stroke="#70838A"
+      strokeWidth={6}
+    >
       {[0, 1].map((phase) => (
         <path
           key={phase}
           className={`mapFacilityExhaust mapFacilityExhaust-${phase}`}
-          d="M-12 0C-18-9-2-17 4-11C14-16 23-6 17 3C10 11-5 10-12 0Z"
+          d="M-20 0C-30-16-7-29 3-19C19-29 36-10 24 5C13 18-12 17-20 0Z"
         />
       ))}
     </g>
@@ -192,9 +198,25 @@ function WorkingEffects({ variant }: { variant: GeneratorOccupantVariant }) {
     case "thermal":
       return <Exhaust x={318} y={125} />;
     case "biomass":
-      return <Exhaust x={332} y={195} />;
+      return <Exhaust x={320} y={195} />;
     case "nuclear":
       return <Exhaust x={215} y={155} />;
+    case "geothermal":
+      return <Exhaust x={300} y={205} />;
+    case "solar":
+      return (
+        <g
+          className="mapSolarFlow"
+          fill="none"
+          stroke="#FFF8E1"
+          strokeWidth={6}
+          strokeDasharray="16 84"
+        >
+          {[0, 65, 130].map((offset) => (
+            <path key={offset} d={`M155 ${190 + offset}H335`} />
+          ))}
+        </g>
+      );
     case "hydro":
       return (
         <g
@@ -218,13 +240,14 @@ export default function GeneratorOccupant({
   className,
   active = false,
 }: Props) {
-  const working = active && variant !== "solar";
+  const { ref, moving } = useFacilityAnimation(active, variant);
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
       viewBox="0 0 500 500"
-      className={`${className ?? ""}${working ? " mapFacilityWorking" : ""}`.trim()}
-      data-facility-motion={working ? "active" : undefined}
+      ref={ref}
+      className={`${className ?? ""} mapFacilityArtwork`.trim()}
+      data-facility-motion={moving ? "active" : undefined}
       aria-hidden="true"
       focusable="false"
       fill="#FFF8E1"
@@ -234,7 +257,9 @@ export default function GeneratorOccupant({
       strokeLinejoin="round"
     >
       {structure(variant)}
-      {working && <WorkingEffects variant={variant} />}
+      <g className="mapFacilityEffect">
+        <WorkingEffects variant={variant} />
+      </g>
     </svg>
   );
 }

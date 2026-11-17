@@ -91,32 +91,43 @@
   opacity: 0.55;
 }
 
-// Physical details move only when the map enables measured, owned production.
-// Keep the supporting structure, cable entry and state marker still.
-.mapFacilityWorking {
+// Animations always exist; the map's WAAPI controller pauses and retimes them
+// without replacing their timeline. Supporting structures and cable entries stay still.
+.mapFacilityArtwork {
+  &:not([data-facility-motion="active"]) .mapFacilityEffect {
+    visibility: hidden;
+  }
   .mapWindRotor {
     transform-box: view-box;
     transform-origin: 250px 225px;
-    animation: mapWindSpin 14s linear infinite;
+    animation: mapWindSpin 14s linear infinite paused;
   }
   .mapAirborneWing {
     transform-box: view-box;
     transform-origin: 250px 210px;
-    animation: mapAirborneSway 10s ease-in-out infinite;
+    animation: mapAirborneSway 10s ease-in-out infinite paused;
   }
   .mapGeothermalVapor {
-    animation: mapGeothermalLift 6s ease-in-out infinite;
+    animation: mapGeothermalLift 6s ease-in-out infinite paused;
   }
   .mapFacilityExhaust {
     opacity: 0;
-    animation: mapExhaustLift 5.2s linear infinite;
+    animation: mapExhaustLift 5.2s linear infinite paused;
   }
   .mapFacilityExhaust-1 {
     animation-delay: -2.6s;
   }
   .mapHydroFlow {
-    opacity: 0.6;
-    animation: mapHydroFlow 2.8s linear infinite;
+    opacity: 0.75;
+    animation: mapHydroFlow 2.8s linear infinite paused;
+  }
+  .mapSolarFlow {
+    opacity: 0.7;
+    animation: mapPowerFlow 3.6s linear infinite paused;
+  }
+  .mapStorageFlow {
+    opacity: 0.7;
+    animation: mapStorageFlow 3.6s linear infinite paused;
   }
 }
 @keyframes mapWindSpin {
@@ -146,14 +157,15 @@
 }
 @keyframes mapExhaustLift {
   from {
-    transform: translate(0, 0) scale(0.7);
+    transform: translate(0, 0) scale(0.65);
     opacity: 0;
   }
-  35% {
-    opacity: 0.34;
+  25%,
+  55% {
+    opacity: 0.75;
   }
   to {
-    transform: translate(10px, -18px) scale(1.1);
+    transform: translate(16px, -52px) scale(1.2);
     opacity: 0;
   }
 }
@@ -162,19 +174,14 @@
     stroke-dashoffset: -48;
   }
 }
-@media (prefers-reduced-motion: reduce) {
-  .mapFacilityWorking {
-    .mapWindRotor,
-    .mapAirborneWing,
-    .mapGeothermalVapor,
-    .mapFacilityExhaust,
-    .mapHydroFlow {
-      animation: none;
-    }
-    .mapFacilityExhaust,
-    .mapHydroFlow {
-      display: none;
-    }
+@keyframes mapPowerFlow {
+  to {
+    stroke-dashoffset: -100;
+  }
+}
+@keyframes mapStorageFlow {
+  to {
+    stroke-dashoffset: -46;
   }
 }
 .territoryWires {
