@@ -65,6 +65,16 @@ All occupants use the same anchor, scale, outline grammar, palette discipline an
 
 The generator/storage implementers export typed variant unions supported by their components; root maps every existing domain option to a deliberate family and exhaustively handles that mapping. Do not independently invent domain fuel strings inside art files.
 
+## Facility state markers
+
+Preserve each technology's complete silhouette, including the solar panel rows. Add one static neutral roundel as a sibling of the facility body in the uniformly scaled 500-unit foreground canvas. `FacilityMapStatusArtwork` accepts only the shared status kind; the status helper owns classification and readable labels. Cities, empty-site towers and completed facilities with unknown operating status receive no marker.
+
+The roundel is centered at `(424,345)`, with a 42-unit radius and the shared 12-unit black outline. Its painted bounds are x376–472/y297–393: about 18px across at W=96, with clearance from the widest plant outline, the `(250,350)` wire terminal and the canvas edges. Use cream `#FFF8E1` backing and a solid black glyph in both themes. Shape carries the state: hardhat for construction or an offline retrofit, pause bars for operation paused, upward arrow for producing or discharging, horizontal minus for idle, and downward arrow for storage charging. Unknown is absent, never an idle minus.
+
+Keep the marker pointer-inert and hidden from assistive technology; the tile's existing description, tooltip and inspector provide the full status and known actual output. Do not add animation, a legend, progress rings, extra click targets or tick-driven live announcements. Construction dims only the facility body to roughly 0.55 opacity while its marker stays legible. Paused and idle bodies remain opaque. The existing fog wrapper fades body and marker together, and owner/selection outlines and labels retain their existing compositing order.
+
+Known construction and active offline retrofit take precedence over pause; the accompanying text retains both facts when operation is paused. Otherwise pause takes precedence over signed actual output, including when a generator is still winding down. Staged work that allows output keeps the actual output glyph and a retrofit text suffix. Global clock pause never changes a facility's marker, and foreign output is never inferred.
+
 ## Automatic network and compositing
 
 Draw terrain for all cells, then automatic network paths, then all upright occupants sorted by ground-anchor Y, then owner boundaries/selected outline and floating labels. Root may keep a subtle internal ground seam; ownership outlines surround ownership regions, not arbitrary illustration contours. Keep tile hit regions unobstructed by artwork or paths.
