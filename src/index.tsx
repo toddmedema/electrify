@@ -34,6 +34,25 @@ const app = (
 );
 
 function renderApp(): void {
+  const pendingStyles = Array.from(
+    document.querySelectorAll<HTMLLinkElement>("link[data-app-style]"),
+  ).filter((link) => !link.sheet);
+  if (pendingStyles.length) {
+    void Promise.all(
+      pendingStyles.map(
+        (link) =>
+          new Promise<void>((resolve) => {
+            const done = () => {
+              link.removeAttribute("data-app-style");
+              resolve();
+            };
+            link.addEventListener("load", done, { once: true });
+            link.addEventListener("error", done, { once: true });
+          }),
+      ),
+    ).then(renderApp);
+    return;
+  }
   if (process.env.NODE_ENV !== "production") {
     // Dev-only perf instruments (docs/perf-plan.md B3/B4 and B6). The constant condition lets
     // webpack drop this branch, and the chunks it imports, from production builds.

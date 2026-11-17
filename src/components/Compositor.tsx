@@ -24,7 +24,6 @@ import {
   isGatedStep,
 } from "../Types";
 import AudioContainer from "./base/AudioContainer";
-import GameWorkspace from "./base/GameWorkspace";
 import { rememberToolInput } from "./base/GameToolMemory";
 import { GAME_TOOLS, GameTool } from "./base/Navigation";
 import { restoreMenuFocus } from "./base/useMenuKeys";
@@ -39,14 +38,8 @@ import DataCenterGuide from "./base/DataCenterGuide";
 import LowCashWarning from "./base/LowCashWarning";
 import VictoryDialogContainer from "./base/VictoryDialogContainer";
 import SaveTransitionDialog from "./base/SaveTransitionDialog";
-import DataCenterSetupContainer from "./views/DataCenterSetupContainer";
 import LoadingContainer from "./views/LoadingContainer";
 import MainMenuContainer from "./views/MainMenuContainer";
-import ManualHelpPopover from "./base/ManualHelpPopover";
-import ManualContainer from "./views/ManualContainer";
-import NewGameContainer from "./views/NewGameContainer";
-import NewGameDetailsContainer from "./views/NewGameDetailsContainer";
-import CampaignSetupContainer from "./views/CampaignSetupContainer";
 import CampaignHandoverContainer from "./base/CampaignHandoverContainer";
 import SettingsContainer from "./views/SettingsContainer";
 import { navigate, navigateBack } from "../reducers/Card";
@@ -69,6 +62,19 @@ import {
 } from "./base/SwipeDismiss";
 import { isDesktopScreen, isSideToolLayout } from "../Globals";
 import { store } from "../Store";
+const GameWorkspace = React.lazy(() => import("./base/GameWorkspace"));
+const DataCenterSetupContainer = React.lazy(
+  () => import("./views/DataCenterSetupContainer"),
+);
+const ManualHelpPopover = React.lazy(() => import("./base/ManualHelpPopover"));
+const ManualContainer = React.lazy(() => import("./views/ManualContainer"));
+const NewGameContainer = React.lazy(() => import("./views/NewGameContainer"));
+const NewGameDetailsContainer = React.lazy(
+  () => import("./views/NewGameDetailsContainer"),
+);
+const CampaignSetupContainer = React.lazy(
+  () => import("./views/CampaignSetupContainer"),
+);
 
 const CustomGameContainer = React.lazy(
   () =>
@@ -500,6 +506,14 @@ export default class Compositor extends React.Component<Props, {}> {
   };
 
   private renderCard(): React.JSX.Element {
+    return (
+      <React.Suspense fallback={<p role="status">Loading…</p>}>
+        {this.renderCurrentCard()}
+      </React.Suspense>
+    );
+  }
+
+  private renderCurrentCard(): React.JSX.Element {
     const run = this.props.ui.evidenceRunId ?? 0;
     if (this.workspaceMemory.run !== run)
       this.workspaceMemory = { run, values: new Map() };
@@ -688,11 +702,17 @@ export default class Compositor extends React.Component<Props, {}> {
           )}
         <DataCenterGuide />
         <LowCashWarning />
-        <ManualHelpPopover
-          entry={ui.manualHelpEntry}
-          onClose={() => store.dispatch(manualHelpClose())}
-          onRelated={(title: string) => store.dispatch(manualHelpOpen(title))}
-        />
+        {ui.manualHelpEntry && (
+          <React.Suspense fallback={null}>
+            <ManualHelpPopover
+              entry={ui.manualHelpEntry}
+              onClose={() => store.dispatch(manualHelpClose())}
+              onRelated={(title: string) =>
+                store.dispatch(manualHelpOpen(title))
+              }
+            />
+          </React.Suspense>
+        )}
         <Dialog
           open={ui.dialog.open}
           sx={ui.dialog.tutorialComplete ? tutorialCompletionSx : undefined}

@@ -2,13 +2,18 @@ import {
   GoogleAuthProvider,
   OAuthProvider,
   signInWithPopup,
+  browserPopupRedirectResolver,
 } from "firebase/auth";
 import { firebaseAppAuth, login } from "./Globals";
 import { subscribeAfterSignIn } from "./MailingList";
 jest.mock("./MailingList", () => ({ subscribeAfterSignIn: jest.fn() }));
 
 jest.mock("firebase/auth", () => ({
-  getAuth: jest.fn(() => ({ currentUser: null })),
+  initializeAuth: jest.fn(() => ({
+    currentUser: null,
+    onAuthStateChanged: jest.fn(() => () => {}),
+  })),
+  browserPopupRedirectResolver: {},
   GoogleAuthProvider: jest.fn(),
   OAuthProvider: jest.fn(),
   signInWithPopup: jest.fn(),
@@ -27,8 +32,9 @@ it.each(["google", "apple"] as const)(
       provider === "apple" ? OAuthProvider : GoogleAuthProvider;
     expect(constructor).toHaveBeenCalledTimes(1);
     expect(signInWithPopup).toHaveBeenCalledWith(
-      firebaseAppAuth,
+      firebaseAppAuth!.initialize(),
       expect.any(constructor),
+      browserPopupRedirectResolver,
     );
     expect(constructor).toHaveBeenCalledWith(
       ...(provider === "apple" ? ["apple.com"] : []),
@@ -75,7 +81,7 @@ it.each(["google", "apple"] as const)(
     await expect(login({ provider, mailingList: false })).resolves.toBe(true);
     expect(subscribe).not.toHaveBeenCalled();
     await expect(login({ provider, mailingList: true })).resolves.toBe(true);
-    expect(subscribe).toHaveBeenCalledWith(firebaseAppAuth, user);
+    expect(subscribe).toHaveBeenCalledWith(firebaseAppAuth!.initialize(), user);
     expect(subscribe).toHaveBeenCalledTimes(1);
     (signInWithPopup as jest.Mock).mockRejectedValue({
       code: "auth/popup-closed-by-user",

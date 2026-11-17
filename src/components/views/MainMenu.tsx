@@ -1,13 +1,6 @@
 import { DISCORD_URL, FEEDBACK_URL } from "../../CommunityLinks";
 import * as React from "react";
-import {
-  Box,
-  Button,
-  Stack,
-  SvgIcon,
-  Typography,
-  useTheme,
-} from "@mui/material";
+import { Box, Button, Stack, SvgIcon, Typography } from "@mui/material";
 import EmailIcon from "@mui/icons-material/Email";
 import InfoIcon from "@mui/icons-material/Info";
 import ShareIcon from "@mui/icons-material/Share";
@@ -113,10 +106,6 @@ const MainMenu = (props: Props): React.JSX.Element => {
       : { href: path };
   const startLabel = props.hasSavedGame ? "New game" : "Play";
   const [shareStatus, setShareStatus] = React.useState("");
-  // An <img> can't read the page's custom properties, so dark swaps in a copy of the logo painted
-  // in dark's desaturated blue; the overlaid pulse and smoke follow --interactive-blue on their own
-  const dark = useTheme().palette.mode === "dark";
-
   const onShare = async () => {
     const result = await shareText(buildGameShareContent());
     if (result === "clipboard") {
@@ -151,12 +140,16 @@ const MainMenu = (props: Props): React.JSX.Element => {
     >
       <div id="logo">
         <div className="homeLogo">
-          <img
-            src={dark ? "images/logo-home-dark.svg" : "images/logo-home.svg"}
-            alt="Electrify"
+          <svg
+            className="homeWordmark"
+            role="img"
+            aria-label="Electrify"
+            viewBox="0 0 300 70"
             width="300"
             height="70"
-          />
+          >
+            <use href="#electrify-wordmark" />
+          </svg>
           <svg
             className="homeEnergyTrace"
             viewBox="0 0 300 70"
@@ -186,6 +179,7 @@ const MainMenu = (props: Props): React.JSX.Element => {
       <Typography component="h1" className="srOnly">
         Electrify
       </Typography>
+      <p className="homeDescription">A free electricity strategy game</p>
       <Box id="centeredMenu" sx={{ px: 3 }}>
         <Stack
           component="section"
@@ -336,6 +330,21 @@ const MainMenu = (props: Props): React.JSX.Element => {
           </MenuIconButton>
         )}
       </footer>
+      <nav className="homeExplore" aria-label="Explore Electrify">
+        {[
+          ["/power-grid-simulator.html", "How to play"],
+          ["/scenarios.html", "Official scenarios"],
+          ["/classroom.html", "For teachers"],
+          ["/data-centers.html", "Data centers"],
+          ["/energy-simulators.html", "Compare simulators"],
+          ["/about.html", "About"],
+          ["/privacy.html", "Privacy"],
+        ].map(([path, label]) => (
+          <a key={path} {...sitePage(path)}>
+            {label}
+          </a>
+        ))}
+      </nav>
     </div>
   );
 };
