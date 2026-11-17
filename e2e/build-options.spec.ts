@@ -28,9 +28,12 @@ test("ordinary starting hills offer general technologies and retain special-site
   await page.goto("/?scenario=116");
   await page.getByRole("button", { name: "Start game", exact: true }).click();
   await returnToTerritoryMap(page);
-  await page.locator('[data-map-target="champlain:site-12"]').click();
+  const target = page.locator('[data-map-target="champlain:site-12"]');
+  await target.focus();
+  await target.press("Enter");
   const rail = page.getByRole("complementary", { name: "Build facilities" });
   if (await rail.isVisible()) {
+    await expect(rail).toBeFocused();
     await setMapProjectCapacity(rail, false, "0");
     for (const name of [
       "Solar",
@@ -170,16 +173,18 @@ for (const theme of ["light", "dark"] as const) {
       if (scenarioId === 116) {
         await returnToTerritoryMap(page);
         const tile = page.locator(
-          '[data-map-target="champlain:site-5"][data-owned="true"]',
+          '[data-map-target="champlain:site-13"][data-owned="true"]',
         );
         await expect(tile).toContainText(
           "One building site; transmission tower",
         );
-        await tile.click();
+        await tile.focus();
+        await tile.press("Enter");
         const rail = page.getByRole("complementary", {
           name: "Build facilities",
         });
         if (await rail.isVisible()) {
+          await expect(rail).toBeFocused();
           await rail
             .getByRole("button", {
               name: "Choose sites for Geothermal",
