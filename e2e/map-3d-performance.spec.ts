@@ -1,4 +1,5 @@
 import type { Page, Locator } from "@playwright/test";
+import fs from "node:fs";
 import type { TerritoryTileDefinition } from "../src/data/TerritoryTiles";
 import type { MapCanvas } from "../src/components/base/territory-3d/Types";
 import { hexCenter } from "../src/components/base/TerritoryHexGeometry";
@@ -233,8 +234,10 @@ for (const theme of ["light", "dark"] as const) {
     const actualDate = (await readSavedGame(page))!.date;
     expect(actualDate.minuteOfDay).toBeGreaterThan(540);
     expect(actualDate.minuteOfDay).toBeLessThan(900);
+    const datePath = info.outputPath("daylight-map-time.json");
+    fs.writeFileSync(datePath, JSON.stringify(actualDate, null, 2));
     await info.attach("daylight-map-time", {
-      body: JSON.stringify(actualDate),
+      path: datePath,
       contentType: "application/json",
     });
     await reviewScreenshot(map, {
@@ -485,6 +488,8 @@ test("production 3D frame evidence includes panning and real month rollovers", a
     ).toBe(true);
     expect(Math.min(...result.draws)).toBeGreaterThan(0);
     expect(Math.min(...result.triangles)).toBeGreaterThan(100);
+    if (result.gpu.supported)
+      expect(result.gpu.milliseconds.length).toBeGreaterThan(0);
     windows.push({
       speed,
       viewport: page.viewportSize(),
@@ -514,8 +519,10 @@ test("production 3D frame evidence includes panning and real month rollovers", a
     limits:
       "CPU submission excludes asynchronous GPU execution. Timer queries, when available and not disjoint, measure the submitted map draw interval. RAF gaps measure callback scheduling, not physical presentation. Viewport emulation is not real phone testing. Existing targets and bundle ceilings are unchanged; timing samples are lab evidence, not machine-dependent CI gates.",
   };
+  const reportPath = info.outputPath("map-3d-performance.json");
+  fs.writeFileSync(reportPath, JSON.stringify(report, null, 2));
   await info.attach("map-3d-performance.json", {
-    body: JSON.stringify(report, null, 2),
+    path: reportPath,
     contentType: "application/json",
   });
 });
