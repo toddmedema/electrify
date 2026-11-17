@@ -2,7 +2,13 @@ import { login } from "../../Globals";
 import { captureRunIdentity } from "../../helpers/RunIdentity";
 import { SCENARIOS } from "../../data/Scenarios";
 import * as React from "react";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import {
+  cleanup,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import VictoryDialog, { Props } from "./VictoryDialog";
 import { VictoryType } from "../../Types";
@@ -78,6 +84,23 @@ beforeEach(() => {
 });
 
 describe("VictoryDialog", () => {
+  it("shows the completed campaign's leaderboard and personal best", () => {
+    renderDialog({
+      victory: aVictory({ scenarioId: 117, scenarioName: "Legacy campaign" }),
+    });
+    expect(
+      screen.getByRole("region", { name: "Result leaderboard" }),
+    ).toHaveTextContent("117 · CEO");
+    expect(screen.getByText("New personal best")).toBeVisible();
+  });
+
+  it("does not rank historical unranked campaign results", () => {
+    renderDialog({ victory: aVictory({ scenarioId: 125, ranked: false }) });
+    expect(
+      screen.queryByRole("region", { name: "Result leaderboard" }),
+    ).not.toBeInTheDocument();
+  });
+
   it("makes a campaign restart explicit and keeps it outside the leaderboard", async () => {
     const onRetry = jest.fn();
     const victory = aVictory({
@@ -209,6 +232,9 @@ describe("VictoryDialog", () => {
           unservedWh: 1000000000,
           kgco2e: 2000000000,
           scenarioMetrics: [
+            { label: "final net worth", value: "$700M", concept: "money" },
+            { label: "Net income", value: "-$255k", concept: "money" },
+            { label: "Demand served", value: "99.8%", concept: "goal" },
             {
               label: "Demand not met during Winter Storm Uri",
               value: "12GWh",
@@ -229,8 +255,16 @@ describe("VictoryDialog", () => {
     expect(
       screen.getByRole("region", { name: "Mission results" }),
     ).toBeVisible();
-    expect(screen.getByText("99.8%")).toBeInTheDocument();
-    expect(screen.getByText("$510M")).toBeInTheDocument();
+    const metrics = screen.getByRole("region", { name: "Mission results" });
+    expect(within(metrics).getAllByRole("strong")).toHaveLength(4);
+    expect(screen.queryByText("99.8%")).not.toBeInTheDocument();
+    expect(screen.queryByText("$510M")).not.toBeInTheDocument();
+    expect(screen.queryByText("Net income")).not.toBeInTheDocument();
+    expect(screen.queryByText("Demand served")).not.toBeInTheDocument();
+    expect(screen.getByText("customers")).toBeVisible();
+    expect(screen.getByText("emissions")).toBeVisible();
+    expect(screen.getByText("$700M")).toBeVisible();
+    expect(screen.getByLabelText("Money")).toBeVisible();
     expect(screen.queryByText("$330M")).not.toBeInTheDocument();
     expect(
       screen.getByText("Demand not met during Winter Storm Uri"),

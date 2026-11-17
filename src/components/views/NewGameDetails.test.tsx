@@ -1,4 +1,5 @@
 import { invalidateLeaderboards } from "../../Leaderboard";
+import ScenarioLeaderboard from "../base/ScenarioLeaderboard";
 import * as React from "react";
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -297,6 +298,81 @@ describe("NewGameDetails leaderboard", () => {
       mockWhere.mock.calls.filter(([field]) => field === "difficulty"),
     ).toHaveLength(DIFFICULTY_IDS.length);
   });
+
+  it.each(["resolves", "rejects"] as const)(
+    "reloads Friends all-level scores after a collapsed Global request %s",
+    async (outcome) => {
+      window.electrifyDesktop = { apiVersion: 1 } as DesktopBridge;
+      jest.spyOn(console, "warn").mockImplementation(() => {});
+      const globalRequest = deferred<ScoreType[]>();
+      const friendsRequest = deferred<ScoreType[]>();
+      const steamRow = (displayName: string): ScoreType =>
+        scoreRow(displayName, 500, {
+          uid: "steam:2",
+          difficulty: "Employee",
+        });
+      mockDesktopScores.mockImplementation(
+        (_scenarioId: number, difficulty: string | undefined, scope: string) =>
+          difficulty
+            ? Promise.resolve([steamRow(`${scope} Employee`)])
+            : scope === "global"
+              ? globalRequest.promise
+              : friendsRequest.promise,
+      );
+      render(<NewGameDetails {...props()} />);
+      await screen.findByText("global Employee");
+      await userEvent.click(
+        screen.getByRole("button", { name: "View all scores" }),
+      );
+      await waitFor(() =>
+        expect(mockDesktopScores).toHaveBeenCalledWith(
+          100,
+          undefined,
+          "global",
+          50,
+        ),
+      );
+      await userEvent.click(
+        screen.getByRole("button", { name: "Show this level" }),
+      );
+      await userEvent.click(screen.getByRole("button", { name: "Friends" }));
+      await screen.findByText("friends Employee");
+      expect(mockDesktopScores).not.toHaveBeenCalledWith(
+        100,
+        undefined,
+        "friends",
+        50,
+      );
+
+      await act(async () => {
+        if (outcome === "resolves")
+          globalRequest.resolve([steamRow("Stale global player")]);
+        else globalRequest.reject(new Error("Global board unavailable"));
+      });
+      await userEvent.click(
+        screen.getByRole("button", { name: "View all scores" }),
+      );
+      await waitFor(() =>
+        expect(mockDesktopScores).toHaveBeenCalledWith(
+          100,
+          undefined,
+          "friends",
+          50,
+        ),
+      );
+      expect(screen.getByText("Loading...")).toBeInTheDocument();
+      expect(screen.queryByText("Stale global player")).toBeNull();
+      expect(
+        screen.queryByText("Couldn't load the high scores right now."),
+      ).toBeNull();
+      await act(async () => {
+        friendsRequest.resolve([steamRow("Steam friend")]);
+      });
+      expect(screen.getByText("Steam friend")).toBeInTheDocument();
+      expect(screen.queryByText("Stale global player")).toBeNull();
+      expect(mockGetDocs).not.toHaveBeenCalled();
+    },
+  );
 
   it("uses Steam friends scores and ignores a stale global response on the expanded board", async () => {
     window.electrifyDesktop = { apiVersion: 1 } as DesktopBridge;
@@ -640,9 +716,14 @@ describe("NewGameDetails reads every difficulty up front", () => {
   it("ignores every answer that arrives after it unmounts", async () => {
     const pending = deferred<ScoreType[]>();
     respond(() => pending.promise);
-    const instance = React.createRef<NewGameDetails>();
+    const instance = React.createRef<ScenarioLeaderboard>();
     const { unmount } = render(
-      <NewGameDetails ref={instance} {...props({ uid: "player" })} />,
+      <ScenarioLeaderboard
+        ref={instance}
+        scenarioId={100}
+        difficulty="Employee"
+        uid="player"
+      />,
     );
     expect(mockGetDocs).toHaveBeenCalledTimes(DIFFICULTY_IDS.length + 1);
     const setState = jest.spyOn(instance.current!, "setState");
@@ -795,8 +876,10 @@ function scoreRow(
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
-  const promise = new Promise<T>((done) => {
+  let reject!: (reason: Error) => void;
+  const promise = new Promise<T>((done, fail) => {
     resolve = done;
+    reject = fail;
   });
-  return { promise, resolve };
+  return { promise, resolve, reject };
 }

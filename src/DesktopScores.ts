@@ -3,7 +3,7 @@ import { APP_VERSION } from "./AppVersion";
 import type { DifficultyType, ScoreType, VictoryType, UserType } from "./Types";
 import { competitiveBestKey, SCORE_VERSION } from "./helpers/Scoring";
 import type { SaveRepository } from "./SaveRepository";
-import { SCENARIOS } from "./data/Scenarios";
+import { isRankedScenarioId } from "./data/Scenarios";
 import manifest from "./data/RunCompatibility.json";
 import { Timestamp } from "firebase/firestore";
 
@@ -20,10 +20,7 @@ export async function readDesktopCompetitiveBests(
         result.scoreVersion !== SCORE_VERSION ||
         result.outcome !== "completed" ||
         entry.status !== "completed" ||
-        !SCENARIOS.some(
-          (scenario) =>
-            scenario.id === result.scenarioId && !scenario.tutorialSteps,
-        )
+        !isRankedScenarioId(result.scenarioId)
       )
         continue;
       const key = competitiveBestKey(result.scenarioId);

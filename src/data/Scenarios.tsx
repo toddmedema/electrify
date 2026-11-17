@@ -1,6 +1,6 @@
 import { UTILITY_AREAS } from "./UtilityExpansion";
 import { CHERNOBYL_SCENARIO } from "./ChernobylScenario";
-import { LEGACY_SCENARIOS } from "./LegacyCampaign";
+import { LEGACY_CAMPAIGN_ID, LEGACY_SCENARIOS } from "./LegacyCampaign";
 import { officialRetentionMetadata } from "./OfficialScenarioRules";
 import {
   beginIntertieStress,
@@ -1973,6 +1973,16 @@ export function getNextTutorial(scenarioId: number): ScenarioType | undefined {
 
 // Reserved for the game the player builds themselves; no authored scenario may use it
 export const CUSTOM_SCENARIO_ID = 999;
+
+/** The campaign competes as one career, never as nine independent CEO terms. */
+export function isRankedScenarioId(scenarioId: number): boolean {
+  return (
+    scenarioId === LEGACY_CAMPAIGN_ID ||
+    SCENARIOS.some(
+      (scenario) => scenario.id === scenarioId && !scenario.tutorialSteps,
+    )
+  );
+}
 
 /**
  * The one place the game turns a scenario id into a scenario.
