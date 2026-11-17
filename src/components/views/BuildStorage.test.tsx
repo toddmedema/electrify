@@ -9,7 +9,7 @@ import {
 import { createGame } from "../../testing/Simulator";
 import { GameType, isStorage } from "../../Types";
 import BuildStorage from "./BuildStorage";
-import { STORAGE } from "../../data/Facilities";
+import { GENERATORS, STORAGE } from "../../data/Facilities";
 import { purchaseTerms } from "../../helpers/Financials";
 import { configureStore } from "@reduxjs/toolkit";
 import { Provider } from "react-redux";
@@ -375,4 +375,146 @@ it("locks storage to its activated tile without destination pickers", () => {
     "champlain",
     tile.id,
   );
+});
+
+it("puts buildable storage first for every sort while retaining oversized compatible cards", () => {
+  const game = createGame({ scenarioId: 116, seed: 611 });
+  game.date.year = 2030;
+  game.timeline[0].cash = 1e12;
+  game.territoryNetwork!.landPurchases.push({
+    territoryId: "green-uplands",
+    minute: 0,
+    price: 18e6,
+  });
+  render(
+    <GameToolMemoryContext.Provider
+      value={
+        new Map<string, unknown>([
+          ["storage.size", wToSliderTick(1e9)],
+          ["storage.exactSizes", { Battery: 6e9 }],
+        ])
+      }
+    >
+      <BuildStorage
+        game={game}
+        lockedTileId="green-uplands:site-0"
+        onBack={jest.fn()}
+        onBuildStorage={jest.fn()}
+      />
+    </GameToolMemoryContext.Provider>,
+  );
+  for (const order of ["Build cost", "Build time"]) {
+    fireEvent.click(screen.getByRole("button", { name: /^Sort facilities:/ }));
+    fireEvent.click(screen.getByRole("menuitem", { name: order }));
+    const reviews = screen.getAllByRole<HTMLButtonElement>("button", {
+      name: /^Review purchase of/,
+    });
+    const enabled = reviews.filter((review) => !review.disabled);
+    expect(enabled.length).toBeGreaterThan(0);
+    expect(enabled.length).toBeLessThan(reviews.length);
+    expect(reviews.slice(0, enabled.length)).toEqual(enabled);
+  }
+  const battery = screen
+    .getAllByRole("listitem")
+    .find(
+      (card) => card.getAttribute("data-build-option") === "Lithium Battery",
+    )!;
+  expect(
+    within(battery).getByRole("button", { name: "Use max size" }),
+  ).toBeEnabled();
+  expect(
+    within(battery).getByRole("button", {
+      name: "Show Lithium Battery details",
+    }),
+  ).toBeEnabled();
+  expect(battery).not.toHaveTextContent("Not buildable on this tile");
+  expect(screen.queryByText(/Infinity|∞/)).not.toBeInTheDocument();
+});
+
+it("reduces tile-forbidden storage technologies to an icon, name and explanation", () => {
+  const game = createGame({ scenarioId: 116, seed: 611 });
+  game.date.year = 2030;
+  game.timeline[0].cash = 1e12;
+  const wind = GENERATORS(game, 1e6, [], []).find(
+    (facility) => facility.fuel === "Wind",
+  )!;
+  const tile = availableTerritoryTiles(game, wind, "champlain")[0];
+  render(
+    <BuildStorage
+      game={game}
+      lockedTileId={tile.id}
+      onBack={jest.fn()}
+      onBuildStorage={jest.fn()}
+    />,
+  );
+  const cards = screen
+    .getAllByRole("listitem")
+    .filter((card) => card.hasAttribute("data-build-option"));
+  expect(cards.length).toBeGreaterThan(0);
+  for (const card of cards) {
+    expect(card).toHaveTextContent("Not buildable on this tile");
+    expect(within(card).queryByRole("button")).not.toBeInTheDocument();
+    expect(within(card).queryByText("Build cost")).not.toBeInTheDocument();
+  }
+});
+
+it("updates storage order when live cash crosses a purchase threshold", () => {
+  const state = {
+    ...createGame({ scenarioId: 100, seed: 611 }),
+    speed: "FAST" as const,
+  };
+  state.date.year = 2030;
+  const size = 100e6;
+  const quote = STORAGE(state, size).find(
+    (storage) => storage.name === "Iron-Air Battery",
+  )!;
+  const cash = purchaseTerms(
+    quote.buildCost,
+    true,
+    state.interestRate,
+  ).downpayment;
+  const cashAt = (amount: number) => ({
+    ...state,
+    timeline: state.timeline.map((tick) => ({ ...tick, cash: amount })),
+  });
+  const store = configureStore({
+    reducer: {
+      game: (
+        game = cashAt(0),
+        action: { type: string; payload?: typeof state },
+      ) => (action.type === "replace" ? action.payload! : game),
+    },
+  });
+  render(
+    <Provider store={store}>
+      <GameToolMemoryContext.Provider
+        value={
+          new Map<string, unknown>([
+            ["storage.size", wToSliderTick(size)],
+            ["storage.sort", "yearsToBuild"],
+          ])
+        }
+      >
+        <BuildStorage
+          game={store.getState().game}
+          onBack={jest.fn()}
+          onBuildStorage={jest.fn()}
+        />
+      </GameToolMemoryContext.Provider>
+    </Provider>,
+  );
+  const before = screen.getAllByRole("button", {
+    name: /^Review purchase of/,
+  })[0];
+  expect(before).toBeDisabled();
+  act(() => {
+    store.dispatch({ type: "replace", payload: cashAt(cash) });
+  });
+  const reviews = screen.getAllByRole<HTMLButtonElement>("button", {
+    name: /^Review purchase of/,
+  });
+  const enabled = reviews.filter((review) => !review.disabled);
+  expect(enabled.length).toBeGreaterThan(0);
+  expect(reviews.slice(0, enabled.length)).toEqual(enabled);
+  expect(reviews[0]).not.toBe(before);
 });

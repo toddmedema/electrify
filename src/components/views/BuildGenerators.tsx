@@ -13,6 +13,7 @@ import type { TerritoryId, TerritoryTileId } from "../../Types";
 import {
   getTerritoryTile,
   tileFitsFacility,
+  tileSupportsFacilityTechnology,
 } from "../../helpers/TerritoryTiles";
 import { useMoney } from "../base/CurrencyContext";
 import {
@@ -68,6 +69,7 @@ import type { BuildForecast } from "../base/OutlookForecast";
 import {
   sameBuildQuote,
   useBuildAffordability,
+  useBuildAffordabilityKey,
   useBuildCashReader,
 } from "../base/useBuildCash";
 import {
@@ -528,6 +530,15 @@ export function GeneratorBuildItem(
   );
 
   const iconSrc = `/images/${generator.name.toLowerCase()}.svg`;
+  if (tile && !tileSupportsFacilityTechnology(tile, generator)) {
+    return (
+      <BuildOptionCard
+        name={generator.name}
+        iconSrc={iconSrc}
+        context="Not buildable on this tile"
+      />
+    );
+  }
   // Nothing left to build: keep the card as a quiet one-line entry rather than a full pitch
   if (
     props.hydroAvailability?.remaining.length === 0 ||
@@ -1120,10 +1131,7 @@ function BuildGenerators(props: Props): React.JSX.Element {
     }
   }, [hasNow, evidenceRequest, facilityDragActive, onEvidenceReady]);
 
-  if (!now) {
-    return <span />;
-  }
-  const cash = now.cash;
+  const cash = now?.cash ?? 0;
   const {
     timeline: forecastedTimeline,
     windSpeeds,
@@ -1178,9 +1186,9 @@ function BuildGenerators(props: Props): React.JSX.Element {
         : generator,
     )
     .filter((generator) =>
-      specialSite === "hydro"
+      !tileId && specialSite === "hydro"
         ? generator.name === "Hydro"
-        : specialSite === "geothermal"
+        : !tileId && specialSite === "geothermal"
           ? generator.fuel === "Geothermal"
           : true,
     )
@@ -1189,53 +1197,65 @@ function BuildGenerators(props: Props): React.JSX.Element {
         getTutorialStep(game)?.phase !== "GENERATOR_CHOICES" ||
         ["Natural Gas", "Sun", "Wind"].includes(generator.fuel),
     );
-  // Technologies that burn the same fuel stay side by side, placed among the rest by their better
-  // member, so the gas peaker and combined cycle read as one choice of how to burn gas
-  const sortValue = (generator: GeneratorShoppingType) =>
-    sort === "emissions"
-      ? generator.btuPerWh * (FUELS[generator.fuel]?.kgCO2ePerBtu ?? 0)
-      : generator[sort];
-  const bestInFuel = new Map<string, number>();
-  shownGenerators.forEach((generator) =>
-    bestInFuel.set(
-      generator.fuel,
-      Math.min(
-        bestInFuel.get(generator.fuel) ?? Infinity,
-        sortValue(generator),
-      ),
-    ),
-  );
-  const generators = shownGenerators.sort((a, b) => {
-    // Generators with no sites left always sink to the bottom.
-    const spentA = a.viableLocationsRemaining === 0;
-    const spentB = b.viableLocationsRemaining === 0;
-    if (spentA !== spentB) {
-      return spentA ? 1 : -1;
-    }
-    if (sort === "emissions") return sortValue(a) - sortValue(b);
-    if (props.focusFuel && a.fuel !== b.fuel) {
-      if (a.fuel === props.focusFuel) {
-        return -1;
-      }
-      if (b.fuel === props.focusFuel) {
-        return 1;
-      }
-    }
-    const groupA = bestInFuel.get(a.fuel) as number;
-    const groupB = bestInFuel.get(b.fuel) as number;
-    if (a.fuel !== b.fuel && groupA !== groupB) {
-      return groupA - groupB;
-    }
-    return sortValue(a) - sortValue(b);
-  });
   const territoryAvailabilityByName = new Map(
-    generators.map((generator) => [
+    shownGenerators.map((generator) => [
       generator.name,
       territoryNetwork
         ? territoryBuildAvailability(game, generator, territoryId, tileId)
         : undefined,
     ]),
   );
+  const affordability = useBuildAffordabilityKey(
+    cash,
+    shownGenerators.map(
+      (generator) =>
+        purchaseTerms(
+          withResilienceOptions(generator, game, {}).buildCost,
+          true,
+          game.interestRate,
+        ).downpayment,
+    ),
+  );
+  const canReviewByName = new Map(
+    shownGenerators.map((generator, index) => {
+      const territoryAvailability = territoryAvailabilityByName.get(
+        generator.name,
+      );
+      const availability = getBuildAvailability({
+        name: generator.name,
+        description: generator.description,
+        available: generator.available,
+        sizeBuildable: generator.peakW <= generator.maxPeakW,
+        maxSizeLabel: undefined,
+        location: game.location,
+        viableLocationsRemaining: generator.viableLocationsRemaining,
+        siteInventory: territoryAvailability,
+        hydroAvailability:
+          generator.name === "Hydro" ? hydroAvailability : undefined,
+      });
+      const outputPending =
+        !forecast &&
+        (generator.fuel === "Hydro" ||
+          WEATHER_DEPENDENT_FUELS.includes(generator.fuel));
+      return [
+        generator.name,
+        availability.buildable &&
+          (territoryAvailability?.buildable ?? true) &&
+          affordability[index] === "1" &&
+          !outputPending,
+      ];
+    }),
+  );
+  const sortValue = (generator: GeneratorShoppingType) =>
+    sort === "emissions"
+      ? generator.btuPerWh * (FUELS[generator.fuel]?.kgCO2ePerBtu ?? 0)
+      : generator[sort];
+  const generators = shownGenerators.sort((a, b) => {
+    return (
+      Number(canReviewByName.get(b.name)) -
+        Number(canReviewByName.get(a.name)) || sortValue(a) - sortValue(b)
+    );
+  });
   const outputShapes = new Map(
     generators.map((generator) => [
       generator.name,
@@ -1269,8 +1289,14 @@ function BuildGenerators(props: Props): React.JSX.Element {
   const lowestEnergyCost = Math.min(
     ...buildableGenerators.map((generator) => generator.lcWh),
   );
-  const comparedGenerators = generators.filter((generator) =>
-    comparedNames.includes(generator.name),
+  const selectedTile = territoryNetwork
+    ? getTerritoryTile(tileId, game)
+    : undefined;
+  const comparedGenerators = generators.filter(
+    (generator) =>
+      comparedNames.includes(generator.name) &&
+      (!selectedTile ||
+        tileSupportsFacilityTechnology(selectedTile, generator)),
   );
 
   // Tutorials script their own path through this list, so the primer waits for a real game
@@ -1305,6 +1331,8 @@ function BuildGenerators(props: Props): React.JSX.Element {
       onRemove={toggleCompare}
     />
   );
+
+  if (!now) return <span />;
 
   return (
     <div

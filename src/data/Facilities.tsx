@@ -910,9 +910,13 @@ export function GENERATORS(
             : DEFAULT_LCOE_DISCOUNT_RATE,
         )
       : Infinity;
-    // Keep site-limited generators visible so the build catalog can explain missing sites.
+    // Keep site-limited generators visible so the catalogue can explain missing sites, and
+    // researched offshore technology in map games so an inland tile can explain its siting.
     return (
       g.available ||
+      (hasTerritoryNetwork(state) &&
+        g.fuel === "Offshore Wind" &&
+        year > 1991) ||
       (g.name === "Hydro" && year > 1882) ||
       g.name === "Geothermal"
     );
