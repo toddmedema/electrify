@@ -203,7 +203,7 @@ it("keeps inspection on its activated tile while map focus moves", () => {
   act(() => other.focus());
   expect(
     within(surface()).getByRole("heading", { level: 3 }),
-  ).toHaveTextContent("Residential city");
+  ).toHaveTextContent("Large city");
   expect(
     within(surface()).queryByRole("tab", { name: "Generators" }),
   ).not.toBeInTheDocument();

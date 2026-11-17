@@ -1,4 +1,4 @@
-import type { TerrainType } from "../../Types";
+import type { CitySizeType, TerrainType } from "../../Types";
 export function terrainDetailsLabel(terrain: TerrainType): string {
   return (
     {
@@ -11,4 +11,10 @@ export function terrainDetailsLabel(terrain: TerrainType): string {
       ocean: "Open ocean",
     } as const
   )[terrain];
+}
+
+export function citySizeLabel(size: CitySizeType): string {
+  return { small: "Small city", medium: "Medium city", large: "Large city" }[
+    size
+  ];
 }

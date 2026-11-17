@@ -22,6 +22,7 @@ import { getInflationIndex, hasEconomy } from "../data/Economy";
 import { getDateFromMinute } from "./DateTime";
 import { currentTick } from "./GameSelectors";
 import { customerMarketSizeAt } from "./Customers";
+import { cityCustomerCount, cityProfile } from "./CityProfiles";
 import { landCustomerProfiles, landCustomerMarket } from "./TerritoryCustomers";
 import {
   programCustomers,
@@ -143,14 +144,16 @@ export function territoryBuildAvailability(
 
 function territoryDemandAreas(game: GameType, minute: number) {
   return [
-    ...Object.values(UTILITY_AREAS).filter(
-      ({ id }) =>
-        id === "champlain" ||
-        (hasTerritoryNetwork(game) &&
-          game.utilityExpansion?.acquisitions.some(
-            (receipt) => receipt.targetId === id && receipt.minute <= minute,
-          )),
-    ),
+    ...Object.values(UTILITY_AREAS)
+      .filter(
+        ({ id }) =>
+          id === "champlain" ||
+          (hasTerritoryNetwork(game) &&
+            game.utilityExpansion?.acquisitions.some(
+              (receipt) => receipt.targetId === id && receipt.minute <= minute,
+            )),
+      )
+      .map(({ id }) => cityProfile(game.seed, id)!),
     ...landCustomerProfiles(game, minute),
   ];
 }
@@ -199,15 +202,7 @@ export function territoryDemandShares(
       0,
     ]),
   ) as Record<TerritoryId, number>;
-  const utilityAreas = Object.values(UTILITY_AREAS).filter(
-    ({ id }) =>
-      id === "champlain" ||
-      (hasTerritoryNetwork(game) &&
-        game.utilityExpansion?.acquisitions.some(
-          (receipt) => receipt.targetId === id && receipt.minute <= tick.minute,
-        )),
-  );
-  const areas = [...utilityAreas, ...landCustomerProfiles(game, tick.minute)];
+  const areas = territoryDemandAreas(game, tick.minute);
   const totalWeight = areas.reduce(
     (sum, area) => sum + area.customers * area.demandScale,
     0,
@@ -313,7 +308,10 @@ function purchaseQuote(
   const territory = getTerritoryDefinition(tile.territoryId)!;
   const price = tilePrice(game, game.date.minute, tile.id);
   const customers = tile.city
-    ? customerMarketSizeAt(territory.customers ?? 0, game.date.minute)
+    ? customerMarketSizeAt(
+        cityCustomerCount(tile.territoryId),
+        game.date.minute,
+      )
     : 0;
   return {
     tileId: tile.id,
@@ -326,7 +324,7 @@ function purchaseQuote(
       tile.id,
       price,
       territory.benefit,
-      territory.customers ?? 0,
+      cityCustomerCount(tile.territoryId),
     ]),
   };
 }

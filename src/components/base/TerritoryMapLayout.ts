@@ -1,3 +1,4 @@
+import { citySizeLabel } from "./TerritoryTileFacts";
 import type { TerritoryId } from "../../Types";
 import { getTerritoryDefinition } from "../../data/Territories";
 import type { TerritoryTileDefinition } from "../../data/TerritoryTiles";
@@ -9,7 +10,7 @@ export function territoryMapLabel(id: TerritoryId): string {
 }
 export function territoryTileLabel(tile: TerritoryTileDefinition): string {
   if (tile.city)
-    return `${TERRAIN_LABELS[tile.terrain]} · ${tile.city.sector === "industrial" ? "Industrial" : "Residential"} city`;
+    return `${TERRAIN_LABELS[tile.terrain]} · ${citySizeLabel(tile.city.size)}`;
   if (tile.id.startsWith("frontier:"))
     return `${TERRAIN_LABELS[tile.terrain]} · Building site`;
   const ordinal = Number(tile.id.slice(tile.id.lastIndexOf("-") + 1)) + 1;
@@ -31,9 +32,8 @@ export function tilePurchaseBenefitLabel(quote: {
 }): string {
   switch (quote.benefit) {
     case "residential":
-      return `${formatCount(quote.customers)} homes`;
     case "industrial":
-      return `${formatCount(quote.customers)} businesses`;
+      return `${formatCount(quote.customers)} customers`;
     case "hydro":
       return "Hydro site";
     case "geothermal":

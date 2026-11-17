@@ -48,22 +48,22 @@ function withPublishedTerrain<T>(run: () => T): T {
   }
 }
 
-it("retains the authored residential and industrial city coordinates and sectors", () => {
+it("retains authored city identities and coordinates with meaningful size tiers", () => {
   expect(
     TERRITORY_TILES.filter(({ city }) => city).map(({ id, q, r, city }) => [
       id,
       q,
       r,
-      city!.sector,
+      city!.size,
     ]),
   ).toEqual([
-    ["champlain:city", -4, -4, "residential"],
-    ["valley-electric:city", 0, -4, "residential"],
-    ["ridge-electric:city", 0, -1, "industrial"],
-    ["parcel-1:city", -2, 2, "residential"],
-    ["parcel-5:city", 4, 2, "industrial"],
-    ["parcel-9:city", 1, 3, "residential"],
-    ["parcel-11:city", -2, 3, "industrial"],
+    ["champlain:city", -4, -4, "large"],
+    ["valley-electric:city", 0, -4, "large"],
+    ["ridge-electric:city", 0, -1, "large"],
+    ["parcel-1:city", -2, 2, "medium"],
+    ["parcel-5:city", 4, 2, "small"],
+    ["parcel-9:city", 1, 3, "medium"],
+    ["parcel-11:city", -2, 3, "small"],
   ]);
 });
 

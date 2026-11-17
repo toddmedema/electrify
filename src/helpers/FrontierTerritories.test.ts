@@ -16,7 +16,11 @@ import {
   territorySiteInventory,
   tilePurchaseQuotes,
   landPrice,
+  landTransferredCustomers,
+  territoryDemandByType,
 } from "./Territories";
+import { cityProfile } from "./CityProfiles";
+import { cityDemandByType } from "./CityDemand";
 import { combinedUtilityDemandProfile } from "./CombinedUtilityDemand";
 import { expansionRetentionBaseline } from "./Expansion";
 import { parseSave, serializeSave } from "../SaveGame";
@@ -28,6 +32,8 @@ import reducer, {
   tickState,
 } from "../reducers/Game";
 import { runMonths } from "../testing/SimulationTestHelpers";
+import { landCustomerProfiles, landCustomerMarket } from "./TerritoryCustomers";
+import { CUSTOMER_MARKET_MULTIPLIER } from "./Customers";
 import { programCustomers } from "./Policies";
 import {
   acquireLand,
@@ -145,7 +151,7 @@ it("quotes visible neutral cells and allows independent purchases without duplic
   );
 });
 it.each(["parcel-1", "parcel-5"] as LandTerritoryId[])(
-  "transfers %s customer sectors, market and retention benchmark once and round-trips",
+  "transfers %s mixed city accounts, market and retention benchmark once and round-trips",
   (id) => {
     let state = game();
     const before = currentTick(state)!.customers;
@@ -163,13 +169,22 @@ it.each(["parcel-1", "parcel-5"] as LandTerritoryId[])(
     expect(expansionRetentionBaseline(state)).toBe(
       originalBaseline + offer.customers,
     );
-    const profile = combinedUtilityDemandProfile(state);
-    expect(
-      profile.energyShares[id === "parcel-1" ? "Residential" : "Industrial"],
-    ).toBeGreaterThan(
-      combinedUtilityDemandProfile(game()).energyShares[
-        id === "parcel-1" ? "Residential" : "Industrial"
-      ],
+    const profile = cityProfile(state.seed, id)!;
+    const customerProfile = landCustomerProfiles(state).find(
+      (area) => area.id === id,
+    )!;
+    expect(customerProfile).toEqual(profile);
+    expect(landTransferredCustomers(state, id)).toBe(offer.customers);
+    expect(landCustomerMarket(state)).toBe(
+      profile.customers * CUSTOMER_MARKET_MULTIPLIER,
+    );
+    const combined = combinedUtilityDemandProfile(state);
+    for (const sector of ["Residential", "Commercial", "Industrial"] as const) {
+      expect(combined.energyShares[sector]).toBeGreaterThan(0);
+      expect(customerProfile.energyShares[sector]).toBeGreaterThan(0);
+    }
+    expect(cityDemandByType(state, currentTick(state)!, id, true)).toEqual(
+      territoryDemandByType(state, currentTick(state)!, id),
     );
     expect(validUtilityExpansion(state)).toBe(true);
     const saved = parseSave(JSON.parse(JSON.stringify(serializeSave(state))));

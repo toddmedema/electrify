@@ -4,8 +4,7 @@ import type {
   TerritoryId,
   TickPresentFutureType,
 } from "../Types";
-import { getTerritoryDefinition } from "../data/Territories";
-import { UTILITY_AREAS } from "../data/UtilityExpansion";
+import { cityProfile } from "./CityProfiles";
 import { demandByTypeAt } from "../data/DemandProfiles";
 import { areaBaselineDemand } from "./AreaDemand";
 import { customerMarketSizeAt } from "./Customers";
@@ -22,34 +21,27 @@ export function cityDemandByType(
   owned: boolean,
 ): DemandByTypeType {
   if (owned) return territoryDemandByType(game, tick, id);
-  const territory = getTerritoryDefinition(id);
-  const utility = Object.values(UTILITY_AREAS).find((area) => area.id === id);
-  const reference = utility ?? UTILITY_AREAS.champlain;
+  const profile = cityProfile(game.seed, id);
+  if (!profile)
+    return Object.fromEntries(
+      Object.keys(tick.demandByType).map((sector) => [sector, 0]),
+    ) as DemandByTypeType;
   const date = getDateFromMinute(tick.minute, game.startingYear);
-  const customers = customerMarketSizeAt(
-    utility?.customers ?? territory?.customers ?? 0,
-    tick.minute,
-  );
+  const customers = customerMarketSizeAt(profile.customers, tick.minute);
   const { baselineW } = areaBaselineDemand(
     date,
     game.location,
     tick.temperatureC,
     customers,
-    reference.demandScale *
-      (utility ? 1 : (territory?.customerLoadMultiplier ?? 1)),
-    reference.demandShapeExponent,
+    profile.demandScale,
+    profile.demandShapeExponent,
   );
-  const energyShares = utility?.energyShares ?? {
-    Residential: territory?.benefit === "residential" ? 1 : 0,
-    Commercial: 0,
-    Industrial: territory?.benefit === "industrial" ? 1 : 0,
-  };
   return demandByTypeAt(
     baselineW,
     date,
     game.startingYear,
     game.location,
     [],
-    energyShares,
+    profile.energyShares,
   );
 }

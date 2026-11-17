@@ -1,4 +1,10 @@
-import type { TerrainType, TerritoryId, TerritoryTileId } from "../Types";
+import type {
+  CitySizeType,
+  TerrainType,
+  TerritoryId,
+  TerritoryTileId,
+} from "../Types";
+import { citySizeForTerritory } from "../helpers/CityProfiles";
 import {
   TERRITORIES,
   territoryHydroSiteId,
@@ -20,7 +26,7 @@ type TileBase = {
 export type TerritoryTileDefinition = TileBase &
   (
     | {
-        city: { sector: "residential" | "industrial" };
+        city: { size: CitySizeType };
         siteKind?: never;
         maxPeakW?: never;
         startingAssetId?: never;
@@ -132,12 +138,7 @@ for (const territory of TERRITORIES) {
       ...next(),
       // Valley's city and inherited river plant share reciprocal channel edges.
       terrain: territory.id === "valley-electric" ? "river" : "plains",
-      city: {
-        sector:
-          utility?.id === "ridge-electric" || territory.benefit === "industrial"
-            ? "industrial"
-            : "residential",
-      },
+      city: { size: citySizeForTerritory(territory.id) },
     });
   }
   let index = 0;
@@ -228,7 +229,7 @@ export function territoryTileAt(
       q,
       r,
       terrain: "plains",
-      city: { sector: territory.benefit },
+      city: { size: citySizeForTerritory(id) },
     };
   const siteKind =
     territory.benefit === "hydro"

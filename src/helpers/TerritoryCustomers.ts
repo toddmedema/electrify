@@ -3,11 +3,11 @@ import {
   getTerritoryDefinition,
   purchasedLandTerritories,
 } from "../data/Territories";
-import { UTILITY_AREAS } from "../data/UtilityExpansion";
+import { cityCustomerCount, cityProfile } from "./CityProfiles";
 import { CUSTOMER_MARKET_MULTIPLIER, customerMarketSizeAt } from "./Customers";
 
 export function landCustomerProfiles(
-  game: Pick<GameType, "territoryNetwork">,
+  game: Pick<GameType, "territoryNetwork" | "seed">,
   minute = Infinity,
 ) {
   return purchasedLandTerritories(game)
@@ -19,23 +19,15 @@ export function landCustomerProfiles(
             receipt.territoryId === territory.id && receipt.minute <= minute,
         ),
     )
-    .map((territory) => ({
-      id: territory.id as TerritoryId,
-      customers: territory.customers!,
-      demandScale:
-        UTILITY_AREAS.champlain.demandScale *
-        (territory.customerLoadMultiplier ?? 1),
-      demandShapeExponent: UTILITY_AREAS.champlain.demandShapeExponent,
-      energyShares: {
-        Residential: territory.benefit === "residential" ? 1 : 0,
-        Commercial: 0,
-        Industrial: territory.benefit === "industrial" ? 1 : 0,
-      },
-    }));
+    .flatMap(({ id }) => {
+      const profile = cityProfile(game.seed, id);
+      return profile ? [profile] : [];
+    });
 }
 export function landCustomerMarket(game: Pick<GameType, "territoryNetwork">) {
-  return landCustomerProfiles(game).reduce(
-    (sum, area) => sum + area.customers * CUSTOMER_MARKET_MULTIPLIER,
+  return purchasedLandTerritories(game).reduce(
+    (sum, area) =>
+      sum + cityCustomerCount(area.id) * CUSTOMER_MARKET_MULTIPLIER,
     0,
   );
 }
@@ -60,7 +52,7 @@ export function landTransferredCustomerTotal(
       sum +
       (receipt.minute < beforeMinute
         ? customerMarketSizeAt(
-            getTerritoryDefinition(receipt.territoryId)?.customers ?? 0,
+            cityCustomerCount(receipt.territoryId),
             receipt.minute,
           )
         : 0),
@@ -74,9 +66,6 @@ export function landTransferredCustomers(
 ): number {
   const receipt = landReceipts(game).find((entry) => entry.territoryId === id);
   return receipt
-    ? customerMarketSizeAt(
-        getTerritoryDefinition(id)?.customers ?? 0,
-        receipt.minute,
-      )
+    ? customerMarketSizeAt(cityCustomerCount(id), receipt.minute)
     : 0;
 }

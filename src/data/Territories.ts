@@ -20,7 +20,7 @@ export interface TerritoryDefinition {
   benefit?: "general" | "residential" | "industrial" | "hydro" | "geothermal";
   price2005?: number;
   customers?: number;
-  /** Relative per-account load; industrial connections are larger than households. */
+  /** Retained per-account load weight; legacy service accounts vary in connection size. */
   customerLoadMultiplier?: number;
   sites: Readonly<Record<TerritorySiteKind, TerritorySiteBudget>>;
 }
@@ -83,15 +83,13 @@ export const TERRITORIES: readonly TerritoryDefinition[] = [
               ? "geothermal"
               : "general";
     const name =
-      benefit === "residential"
-        ? "Residential customers"
-        : benefit === "industrial"
-          ? "Industrial customers"
-          : benefit === "hydro"
-            ? "Hydro site"
-            : benefit === "geothermal"
-              ? "Geothermal site"
-              : "Open land";
+      benefit === "residential" || benefit === "industrial"
+        ? "Mixed city"
+        : benefit === "hydro"
+          ? "Hydro site"
+          : benefit === "geothermal"
+            ? "Geothermal site"
+            : "Open land";
     const budget = sites(0, 0, 0);
     if (benefit === "general") budget.general.count = 2;
     if (benefit === "hydro" || benefit === "geothermal")
@@ -116,9 +114,9 @@ export const TERRITORIES: readonly TerritoryDefinition[] = [
       customerLoadMultiplier: benefit === "industrial" ? 20 : 1,
       description:
         benefit === "residential"
-          ? "Connect 16,000 residential customers. No plants or building sites transfer."
+          ? "Connect 16,000 customers in a mixed city. No plants or building sites transfer."
           : benefit === "industrial"
-            ? "Connect 400 industrial customers. No plants or building sites transfer."
+            ? "Connect 400 larger service accounts in a mixed city. No plants or building sites transfer."
             : benefit === "hydro"
               ? "One fictional 20 MW hydro development site. Construction and water limits still apply."
               : benefit === "geothermal"

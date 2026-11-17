@@ -25,6 +25,9 @@ import { territoryTileViews } from "../../helpers/TerritoryMapState";
 import { TransmissionPanelProps } from "./TransmissionPanel";
 import { useToolState } from "../base/GameToolMemory";
 import { getTerrainModifiers } from "../../helpers/TerrainModifiers";
+import { customerMarketSizeAt } from "../../helpers/Customers";
+import { cityCustomerCount } from "../../helpers/CityProfiles";
+import { citySizeLabel } from "../base/TerritoryTileFacts";
 import { cityDemandByType } from "../../helpers/CityDemand";
 import { facilityDisplayName } from "../base/FacilityLabels";
 import { facilityMapStatus } from "../base/FacilityMapStatus";
@@ -174,11 +177,14 @@ function TileNetwork(props: Props) {
     : undefined;
   const quote = tile ? tilePurchaseQuote(game, tile.id) : undefined;
   const tick = currentTick(game);
-  const customers = tile
-    ? (utility?.customers ??
-      (view?.owned
-        ? landTransferredCustomers(game, tile.territoryId)
-        : (quote?.customers ?? territory?.customers ?? 0)))
+  const customers = tile?.city
+    ? view?.owned
+      ? (utility?.customers ?? landTransferredCustomers(game, tile.territoryId))
+      : (quote?.customers ??
+        customerMarketSizeAt(
+          cityCustomerCount(tile.territoryId),
+          game.date.minute,
+        ))
     : 0;
   const demandW =
     tick && tile
@@ -269,7 +275,7 @@ function TileNetwork(props: Props) {
     ? operatingFacility
       ? facilityDisplayName(operatingFacility)
       : tile.city
-        ? `${tile.city.sector === "industrial" ? "Industrial" : "Residential"} city`
+        ? citySizeLabel(tile.city.size)
         : building
           ? `Build · ${TERRAIN_LABELS[tile.terrain]}`
           : `${TERRAIN_LABELS[tile.terrain]} site`
