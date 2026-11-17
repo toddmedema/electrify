@@ -31,7 +31,7 @@ export default function TowerOccupant({ className }: Props) {
           fill="none"
         />
         <path
-          d="M225 265L285 330M275 265L215 330"
+          d="M214 265L295 330M286 265L205 330"
           fill="none"
           strokeWidth={6}
         />
