@@ -14,7 +14,7 @@ import type {
   Vec3,
 } from "./Types";
 
-const INSTANCE_FLOATS = 20;
+const INSTANCE_FLOATS = 24;
 const RETAINED_MESHES = 64;
 const MAX_PIXELS = 2500000;
 const FOG_MIX = [0, 0.15, 0.35, 0.6];
@@ -26,12 +26,14 @@ layout(location=1) in vec3 aNormal;
 layout(location=2) in vec3 aColor;
 layout(location=3) in mat4 aTransform;
 layout(location=7) in vec4 aStyle;
+layout(location=8) in vec4 aMaterial;
 uniform mat4 uProjection;
 uniform vec3 uLight;
 uniform bool uShadow;
 out vec3 vNormal;
 out vec3 vColor;
 out vec4 vStyle;
+out vec2 vMaterial;
 void main() {
   vec4 world = aTransform * vec4(aPosition, 1.0);
   if (uShadow) {
@@ -45,12 +47,14 @@ void main() {
   vNormal = normalize(mat3(aTransform) * aNormal);
   vColor = aColor;
   vStyle = aStyle;
+  vMaterial = aMaterial.xy;
 }`;
 const FRAGMENT = `#version 300 es
 precision highp float;
 in vec3 vNormal;
 in vec3 vColor;
 in vec4 vStyle;
+in vec2 vMaterial;
 uniform vec3 uLight;
 uniform vec3 uLightColor;
 uniform vec3 uBackground;
@@ -66,9 +70,11 @@ void main() {
   }
   float incidence = max(0.0, dot(normalize(vNormal), uLight));
   float band = incidence < 0.25 ? 0.48 : (incidence < 0.7 ? 0.76 : 1.0);
-  vec3 lit = vColor * (uAmbient + (1.0 - uAmbient) * band);
+  vec3 base = mix(vColor, vec3(1.0, 0.71, 0.32), vMaterial.x);
+  vec3 lit = base * (uAmbient + (1.0 - uAmbient) * band);
   lit *= mix(vec3(1.0), uLightColor, 0.65);
-  lit += vColor * vStyle.z;
+  lit += base * (vStyle.z + vMaterial.x * 0.42);
+  lit *= vMaterial.y;
   float saturation = vStyle.w;
   lit = mix(vec3(dot(lit, vec3(0.2126, 0.7152, 0.0722))), lit, saturation);
   color = vec4(mix(lit, uBackground, fog), vStyle.y);
@@ -245,6 +251,7 @@ export class MapRenderer {
         fogMix: items[0].pose[16],
         saturation: items[0].pose[19],
         active: instance.active,
+        producing: instance.producing ?? false,
         motionKey: instance.motionKey,
         triangles,
         min,
@@ -446,7 +453,7 @@ export class MapRenderer {
         );
       }
       gl.bindBuffer(gl.ARRAY_BUFFER, instances);
-      for (let column = 0; column < 5; column++) {
+      for (let column = 0; column < 6; column++) {
         const attribute = 3 + column;
         gl.enableVertexAttribArray(attribute);
         gl.vertexAttribPointer(
@@ -610,7 +617,19 @@ export class MapRenderer {
     pose[16] = FOG_MIX[instance.fog];
     pose[17] = alpha;
     pose[18] = glow;
-    pose[19] = FOG_SATURATION[instance.fog];
+    const facility = part.material !== undefined;
+    // Fog still caps saturation outside the clear owned foreground.
+    const saturation = facility
+      ? instance.active
+        ? instance.fog === 0
+          ? 1.3
+          : 1
+        : 0.78
+      : 1;
+    pose[19] = FOG_SATURATION[instance.fog] * saturation;
+    pose[20] =
+      part.material === "facility-window" && instance.producing ? 1 : 0;
+    pose[21] = facility && instance.active ? 1.06 : 1;
   }
 
   private draw(moving: boolean): void {

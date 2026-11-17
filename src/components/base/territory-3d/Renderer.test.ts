@@ -516,7 +516,7 @@ it("keeps distinct caster subsets correct when a mesh is shared across passes", 
   ]);
   expect(
     gl.bufferSubData.mock.calls.map((call) => (call[2] as Float32Array).length),
-  ).toEqual([40, 20]);
+  ).toEqual([48, 24]);
   renderer.update([{ ...scene(false)[0], model: sharedModel }], frame);
   flush(1000);
   expect(gl.drawArraysInstanced.mock.calls.map((call) => call[3])).toEqual([
@@ -536,5 +536,78 @@ it("releases partially initialized geometry when a vertex upload fails", () => {
   expect(gl.deleteBuffer).toHaveBeenCalledTimes(2);
   expect(gl.deleteVertexArray).toHaveBeenCalledTimes(1);
   expect(callbacks.size).toBe(0);
+  renderer.dispose();
+});
+
+it("batches explicit facility materials, lights only producing windows, and preserves fog", () => {
+  const { renderer, gl } = setup();
+  const mesh = model.parts[0].mesh;
+  const materials: MapModel = {
+    ...model,
+    parts: [
+      { mesh, material: "facility-surface" },
+      { mesh, material: "facility-window" },
+      { mesh },
+    ],
+  };
+  let allocations: number | undefined;
+  for (const fog of [0, 3] as const) {
+    let idleSaturation = 0;
+    for (const state of [
+      { active: false, producing: false },
+      { active: true, producing: false },
+      { active: true, producing: true },
+    ]) {
+      renderer.update(
+        [{ ...scene()[0], ...state, fog, model: materials }],
+        frame,
+      );
+      gl.bufferSubData.mockClear();
+      flush(0);
+      expect(gl.bufferSubData).toHaveBeenCalledTimes(1);
+      const pose = gl.bufferSubData.mock.calls[0][2] as Float32Array;
+      const surface = pose.subarray(0, 24),
+        window = pose.subarray(24, 48),
+        ordinary = pose.subarray(48, 72);
+      if (!state.active) idleSaturation = surface[19];
+      expect(surface[19] - idleSaturation).toBeGreaterThanOrEqual(
+        state.active ? 0.01 : 0,
+      );
+      expect(surface[20]).toBe(0);
+      expect(window[20]).toBe(state.producing ? 1 : 0);
+      expect(ordinary[19]).toBeCloseTo(fog === 0 ? 1 : 0.15);
+      expect(ordinary[20]).toBe(0);
+      expect(ordinary[21]).toBe(1);
+      expect(surface[16]).toBeCloseTo(fog === 0 ? 0 : 0.6);
+      expect(surface[19]).toBeLessThanOrEqual(fog === 0 ? 1.31 : 0.151);
+      expect(renderer.diagnostics(true).scene![0].producing).toBe(
+        state.producing,
+      );
+      expect(renderer.diagnostics().drawCalls).toBe(1);
+      expect(renderer.diagnostics().meshCount).toBe(1);
+      expect(callbacks.size).toBe(0);
+      allocations ??= gl.bufferData.mock.calls.length;
+      expect(gl.bufferData).toHaveBeenCalledTimes(allocations);
+    }
+  }
+  renderer.dispose();
+});
+
+it("retains the motion phase while charging switches to discharge and materials rebuild", () => {
+  const { renderer } = setup();
+  const charging = { ...scene()[0], active: true, producing: false };
+  renderer.update([charging], frame);
+  flush(0);
+  flush(1000);
+  const phase = renderer.diagnostics().phases["facility-0"];
+  expect(phase).toBeGreaterThan(0);
+  renderer.update([{ ...charging, producing: true }], {
+    ...frame,
+    playbackRate: 0.7,
+  });
+  flush(2000);
+  expect(renderer.diagnostics().phases["facility-0"]).toBeCloseTo(
+    phase + (0.7 * Math.PI * 2) / 8,
+  );
   renderer.dispose();
 });

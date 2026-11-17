@@ -10,6 +10,8 @@ export interface MapMesh {
 export type MapMotion = "rotor" | "steam" | "flow" | "pulse" | "sway";
 export interface ModelPart {
   mesh: MapMesh;
+  /** Facility glazing is authored separately; city glazing keeps its own palette. */
+  material?: "facility-surface" | "facility-window";
   position?: Vec3;
   motion?: MapMotion;
   phaseOffset?: number;
@@ -66,6 +68,8 @@ export interface MapInstance {
   position: Vec3;
   fog: 0 | 1 | 2 | 3;
   active: boolean;
+  /** Measured generation/discharge only; charging may be active without producing. */
+  producing?: boolean;
   /** Actual facility identity: changing speed or rebuilding batches must not reset phase. */
   motionKey?: string;
 }
@@ -115,6 +119,7 @@ export interface RendererSceneInstance {
   fogMix: number;
   saturation: number;
   active: boolean;
+  producing: boolean;
   motionKey?: string;
   triangles: number;
   /** World-space bounds of the actual submitted solid vertices at their current pose. */

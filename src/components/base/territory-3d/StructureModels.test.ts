@@ -415,3 +415,31 @@ it("gives hydro raised reservoir water, a low downstream spillway, and a bowed t
     crest.some((v) => Math.abs(v[0]) < 0.01 && v[2] < centerFront - 0.05),
   ).toBe(true);
 });
+
+it("authors facade glazing separately without turning panels, rotors or cabinets into windows", () => {
+  const facades: readonly StructureKind[] = [
+    "gas",
+    "oil",
+    "coal",
+    "biomass",
+    "nuclear",
+    "hydro",
+    "geothermal",
+    "pumped-hydro",
+    "airborne-wind",
+  ];
+  for (const kind of kinds) {
+    const parts = getStructureModel(kind).parts;
+    const glazing = parts.filter((part) => part.material === "facility-window");
+    expect(glazing.length).toBe(facades.includes(kind) ? 1 : 0);
+    for (const part of glazing) {
+      expect(part.motion).toBeUndefined();
+      expect(part.hideWhenInactive).toBeUndefined();
+      expect(part.castsShadow).toBe(false);
+    }
+    const quiet =
+      kind.startsWith("city-") ||
+      ["residential", "industrial-city", "tower"].includes(kind);
+    expect(parts.every((part) => part.material === undefined)).toBe(quiet);
+  }
+});

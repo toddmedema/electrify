@@ -5,7 +5,10 @@ import type {
 } from "../../../Types";
 import type { TerritoryTileDefinition } from "../../../data/TerritoryTiles";
 import type { TerritoryTileView } from "../../../helpers/TerritoryMapState";
-import { facilityMapStatus } from "../FacilityMapStatus";
+import {
+  facilityMapStatus,
+  facilityOperatingStatus,
+} from "../FacilityMapStatus";
 import { riverPorts } from "../TerritoryHexGeometry";
 import type { HexWire } from "../TerritoryHexGeometry";
 import { MeshBuilder } from "./MeshBuilder";
@@ -227,16 +230,22 @@ export class SceneBuilder {
       positions.set(tile.id, position);
       instances.push(cell.terrain);
       if (!model) continue;
-      const status = facilityMapStatus(view, minute);
+      // Map construction badges may describe added capacity while the base keeps running.
+      const status =
+        view.facility && !tile.city && view.operatingFacility
+          ? facilityOperatingStatus(view.operatingFacility, minute)
+          : facilityMapStatus(view, minute);
       const displayedModel =
           status?.kind === "construction" ? underConstruction(model) : model,
-        active = status?.kind === "producing" || status?.kind === "charging",
+        producing = status?.kind === "producing",
+        active = producing || status?.kind === "charging",
         motionKey = view.operatingFacility
           ? `${runKey}:facility:${view.operatingFacility.id}`
           : undefined;
       if (
         cell.structure?.model !== displayedModel ||
         cell.structure.active !== active ||
+        cell.structure.producing !== producing ||
         cell.structure.motionKey !== motionKey
       )
         cell.structure = {
@@ -245,6 +254,7 @@ export class SceneBuilder {
           fog: view.visibilityDistance,
           model: displayedModel,
           active,
+          producing,
           motionKey,
         };
       instances.push(cell.structure);

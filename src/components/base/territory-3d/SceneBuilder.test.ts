@@ -1,3 +1,8 @@
+import { STORAGE } from "../../../data/Facilities";
+import { createGame } from "../../../testing/Simulator";
+import { territoryTileViews } from "../../../helpers/TerritoryMapState";
+import type { StorageOperatingType } from "../../../Types";
+import * as facilityStatus from "../FacilityMapStatus";
 import type { TerritoryTileView } from "../../../helpers/TerritoryMapState";
 import { hexWires } from "../TerritoryHexGeometry";
 import { MeshBuilder } from "./MeshBuilder";
@@ -84,6 +89,7 @@ test("terrain reserves the structure footprint and unknown operation stays still
     ports: undefined,
   });
   expect(result[1].active).toBe(false);
+  expect(result[1].producing).toBe(false);
   expect(structureKind(tile)).toBe("solar");
   expect(
     structureKind({ ...tile, facility: { ...tile.facility, fuel: "Coal" } }),
@@ -343,3 +349,106 @@ test.each(["wind", "offshore-wind"] as const)(
     }
   },
 );
+
+function operatingView() {
+  const game = createGame({ scenarioId: 116, seed: 188 });
+  const view = territoryTileViews(game).find((tile) => tile.operatingFacility)!;
+  const facility = view.operatingFacility!;
+  facility.yearsToBuildLeft = 0;
+  facility.currentW = 20e6;
+  facility.paused = false;
+  return { game, view, facility };
+}
+
+it("follows measured production through idle, pause and construction without changing motion identity", () => {
+  const { builder } = setup();
+  const { view, facility } = operatingView();
+  const tiles = [view.tile];
+  const build = () => builder.build([view], tiles, [], 0, "run");
+  const running = build();
+  expect(running[1]).toMatchObject({ active: true, producing: true });
+  expect(running[0].active).toBe(false);
+  const motionKey = running[1].motionKey;
+  facility.currentW = 0;
+  const idle = build()[1];
+  expect(idle).toMatchObject({ active: false, producing: false, motionKey });
+  facility.currentW = 20e6;
+  facility.paused = true;
+  expect(build()[1]).toMatchObject({
+    active: false,
+    producing: false,
+    motionKey,
+  });
+  facility.paused = false;
+  facility.yearsToBuildLeft = 0.25;
+  const building = build()[1];
+  expect(building).toMatchObject({
+    active: false,
+    producing: false,
+    motionKey,
+  });
+  expect(building.model.key).toContain(":construction");
+});
+
+it("keeps the operating base lit when a separate map badge reports construction", () => {
+  const { builder } = setup();
+  const { view } = operatingView();
+  const badge = jest
+    .spyOn(facilityStatus, "facilityMapStatus")
+    .mockReturnValue({
+      kind: "construction",
+      label: "Adding capacity",
+    });
+  try {
+    const result = builder.build([view], [view.tile], [], 0, "run");
+    expect(result[1]).toMatchObject({ active: true, producing: true });
+    expect(result[1].model).toBe(model);
+  } finally {
+    badge.mockRestore();
+  }
+});
+
+it("animates charging storage without claiming production", () => {
+  const { builder } = setup();
+  const { game, view } = operatingView();
+  game.date.year = 2025;
+  const quote = STORAGE(game, 100e6).find((quote) => quote.name === "Battery")!;
+  const facility: StorageOperatingType = {
+    ...quote,
+    id: 500,
+    currentW: -20e6,
+    currentWh: 50e6,
+    yearsToBuildLeft: 0,
+    minuteCreated: 0,
+    loanAmountTotal: 0,
+    loanAmountLeft: 0,
+    loanMonthlyPayment: 0,
+    interestRate: 0,
+    lifetimeWh: 0,
+    lifetimePotentialWh: 0,
+    lifetimeRevenue: 0,
+    lifetimeExpenses: 0,
+  };
+  const tile: TerritoryTileView = {
+    ...view,
+    facility,
+    operatingFacility: facility,
+  };
+  const tiles = [view.tile];
+  const charging = builder.build([tile], tiles, [], 0, "run");
+  expect(charging[1]).toMatchObject({ active: true, producing: false });
+  facility.currentW = 20e6;
+  const discharging = builder.build([tile], tiles, [], 1, "run");
+  expect(discharging[1]).toMatchObject({ active: true, producing: true });
+  expect(discharging[1]).not.toBe(charging[1]);
+  expect(discharging[1].motionKey).toBe(charging[1].motionKey);
+});
+
+it("leaves city activity unknown even when an unrelated facility is present in its view", () => {
+  const { builder } = setup();
+  const { game, facility } = operatingView();
+  const city = territoryTileViews(game).find((view) => view.tile.city)!;
+  const tile = { ...city, facility, operatingFacility: facility };
+  const result = builder.build([tile], [tile.tile], [], 0, "run");
+  expect(result[1]).toMatchObject({ active: false, producing: false });
+});

@@ -78,14 +78,23 @@ function windows(
   y: number,
   z: number,
   width: number,
-): void {
-  mesh.box([x, y, z], [width, 0.039, 0.006], P.mint);
+): ModelPart {
+  const glazing = new MeshBuilder().box(
+    [x, y, z],
+    [width, 0.039, 0.006],
+    P.steelShade,
+  );
   for (let i = -1; i <= 1; i++)
     mesh.box(
       [x + (i * width) / 4, y, z + 0.004],
       [0.006, 0.039, 0.004],
       P.cream,
     );
+  return {
+    mesh: glazing.build(),
+    material: "facility-window",
+    castsShadow: false,
+  };
 }
 
 function steam(position: Vec3, phaseOffset = 0): ModelPart {
@@ -156,6 +165,27 @@ function model(
     terminals,
     footprint: radius * 2 + 0.002,
     height: height + 0.002,
+  };
+}
+
+type FacilityStructureKind = Exclude<
+  StructureKind,
+  `city-${CitySizeType}` | "residential" | "industrial-city" | "tower"
+>;
+
+function facilityModel(
+  kind: FacilityStructureKind,
+  body: MeshBuilder,
+  terminals: readonly Vec3[],
+  details: ModelPart[] = [],
+): MapModel {
+  const result = model(kind, body, terminals, details);
+  return {
+    ...result,
+    parts: result.parts.map((part) => ({
+      ...part,
+      material: part.material ?? "facility-surface",
+    })),
   };
 }
 
@@ -359,7 +389,7 @@ function solar(): MapModel {
       [tilt, 0, 0],
     );
   }
-  return model("solar", body, switchgear(body, 0.29), [
+  return facilityModel("solar", body, switchgear(body, 0.29), [
     effect(glints.build(), "pulse"),
   ]);
 }
@@ -449,7 +479,7 @@ function wind(kind: "wind" | "offshore-wind"): MapModel {
     [0, 0, 0.022],
     [Math.PI / 2, 0, 0],
   );
-  return model(kind, body, switchgear(body, 0.12), [
+  return facilityModel(kind, body, switchgear(body, 0.12), [
     {
       mesh: rotor.build(),
       position: pivot,
@@ -491,13 +521,14 @@ function airborne(): MapModel {
   wing
     .beam(rim[0], [0, 0.045, 0], 0.004, P.steelShade)
     .beam([0, 0.045, 0], rim[4], 0.004, P.steelShade);
-  return model("airborne-wind", body, switchgear(body, 0.14), [
+  return facilityModel("airborne-wind", body, switchgear(body, 0.14), [
     {
       mesh: wing.build(),
       position: [0, 0.64, 0],
       motion: "sway",
       castsShadow: true,
     },
+    windows(body, 0, 0.08, 0.088, 0.14),
   ]);
 }
 
@@ -512,7 +543,7 @@ function thermal(kind: "gas" | "oil" | "coal" | "biomass"): MapModel {
     [0.42, 0.045, 0.3],
     kind === "biomass" ? P.forest : P.steel,
   );
-  windows(body, 0.08, 0.1, 0.159, 0.29);
+  moving.push(windows(body, 0.08, 0.1, 0.159, 0.29));
   const stack = (x: number, z: number, height: number, radius = 0.027) => {
     body.cylinder([x, 0.03, z], radius, radius * 0.82, height, P.steelShade, 8);
     body.cylinder(
@@ -558,7 +589,7 @@ function thermal(kind: "gas" | "oil" | "coal" | "biomass"): MapModel {
     stack(0.22, -0.11, 0.33);
     body.box([-0.19, 0.06, 0.155], [0.19, 0.045, 0.055], P.timber);
   }
-  return model(kind, body, switchgear(body), moving);
+  return facilityModel(kind, body, switchgear(body), moving);
 }
 
 function nuclear(): MapModel {
@@ -603,8 +634,9 @@ function nuclear(): MapModel {
   body.cylinder([0.17, 0.226, -0.04], 0.089, 0.035, 0.035, P.cream, 10);
   body.cylinder([0.17, 0.261, -0.04], 0.035, 0, 0.01, P.cream, 10);
   body.box([0.13, 0.075, 0.13], [0.32, 0.1, 0.13], P.cream);
-  windows(body, 0.13, 0.085, 0.198, 0.23);
-  return model("nuclear", body, switchgear(body), [
+  const glazing = windows(body, 0.13, 0.085, 0.198, 0.23);
+  return facilityModel("nuclear", body, switchgear(body), [
+    glazing,
     steam([cx, 0.39, cz]),
     steam([cx, 0.39, cz], 0.5),
   ]);
@@ -676,8 +708,9 @@ function hydro(): MapModel {
   }
   body.box([-0.22, 0.084, 0.145], [0.17, 0.12, 0.14], P.cream);
   gable(body, [-0.22, 0.144, 0.145], [0.19, 0.025, 0.155], P.steel);
-  windows(body, -0.22, 0.085, 0.218, 0.11);
-  return model("hydro", body, switchgear(body, 0.245), [
+  const glazing = windows(body, -0.22, 0.085, 0.218, 0.11);
+  return facilityModel("hydro", body, switchgear(body, 0.245), [
+    glazing,
     effect(water.build(), "flow"),
   ]);
 }
@@ -687,7 +720,7 @@ function geothermal(): MapModel {
   base(body);
   body.box([0.105, 0.09, 0.06], [0.38, 0.12, 0.24], P.cream);
   gable(body, [0.105, 0.15, 0.06], [0.4, 0.035, 0.26], P.steel);
-  windows(body, 0.105, 0.09, 0.183, 0.25);
+  const glazing = windows(body, 0.105, 0.09, 0.183, 0.25);
   for (const [x, z, height] of [
     [-0.235, -0.09, 0.24],
     [-0.15, 0.1, 0.19],
@@ -699,7 +732,8 @@ function geothermal(): MapModel {
     body.box([x, height - 0.045, z], [0.05, 0.012, 0.05], P.mint);
   }
   body.cylinder([0.2, 0.15, -0.075], 0.025, 0.025, 0.14, P.steel, 6);
-  return model("geothermal", body, switchgear(body), [
+  return facilityModel("geothermal", body, switchgear(body), [
+    glazing,
     steam([0.2, 0.31, -0.075]),
     steam([0.2, 0.31, -0.075], 0.5),
   ]);
@@ -735,7 +769,9 @@ function storage(kind: "battery" | "iron-air"): MapModel {
       flow.box([x, 0.085, 0.157], [0.075, 0.008, 0.005], P.cream);
     }
   }
-  return model(kind, body, switchgear(body), [effect(flow.build(), "flow")]);
+  return facilityModel(kind, body, switchgear(body), [
+    effect(flow.build(), "flow"),
+  ]);
 }
 
 function pumpedHydro(): MapModel {
@@ -782,8 +818,9 @@ function pumpedHydro(): MapModel {
     flow.box([x, y, z], [0.02, 0.025, 0.02], P.mint);
   body.box([-0.19, 0.077, 0.13], [0.21, 0.12, 0.15], P.cream);
   gable(body, [-0.19, 0.137, 0.13], [0.23, 0.025, 0.17], P.steel);
-  windows(body, -0.19, 0.085, 0.208, 0.14);
-  return model("pumped-hydro", body, switchgear(body, 0.245), [
+  const glazing = windows(body, -0.19, 0.085, 0.208, 0.14);
+  return facilityModel("pumped-hydro", body, switchgear(body, 0.245), [
+    glazing,
     effect(flow.build(), "flow"),
   ]);
 }
