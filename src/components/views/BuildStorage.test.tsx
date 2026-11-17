@@ -14,6 +14,7 @@ import { purchaseTerms } from "../../helpers/Financials";
 import { configureStore } from "@reduxjs/toolkit";
 import { Provider } from "react-redux";
 import { availableTerritoryTiles } from "../../helpers/TerritoryTiles";
+import { getAuthoredTerritoryTile } from "../../data/TerritoryTiles";
 import { wToSliderTick } from "../../helpers/BuildSizing";
 import { GameToolMemoryContext } from "../base/GameToolMemory";
 import {
@@ -431,14 +432,42 @@ it("puts buildable storage first for every sort while retaining oversized compat
   expect(screen.queryByText(/Infinity|∞/)).not.toBeInTheDocument();
 });
 
-it("reduces tile-forbidden storage technologies to an icon, name and explanation", () => {
+it("offers full storage reviews on ordinary wind land", () => {
   const game = createGame({ scenarioId: 116, seed: 611 });
   game.date.year = 2030;
   game.timeline[0].cash = 1e12;
   const wind = GENERATORS(game, 1e6, [], []).find(
     (facility) => facility.fuel === "Wind",
   )!;
-  const tile = availableTerritoryTiles(game, wind, "champlain")[0];
+  const tile = availableTerritoryTiles(game, wind, "champlain").find(
+    (tile) => tile.siteKind === "wind",
+  )!;
+  render(
+    <BuildStorage
+      game={game}
+      lockedTileId={tile.id}
+      onBack={jest.fn()}
+      onBuildStorage={jest.fn()}
+    />,
+  );
+  const cards = screen
+    .getAllByRole("listitem")
+    .filter((card) => card.hasAttribute("data-build-option"));
+  expect(cards.length).toBeGreaterThan(0);
+  for (const card of cards) {
+    expect(
+      within(card).getByRole("button", { name: /^Review purchase of/ }),
+    ).toBeEnabled();
+    expect(within(card).getByText("Build cost")).toBeVisible();
+  }
+});
+
+it("reduces lake-forbidden storage technologies to an icon, name and explanation", () => {
+  const game = createGame({ scenarioId: 116, seed: 611 });
+  game.date.year = 2030;
+  game.timeline[0].cash = 1e12;
+  const tile = getAuthoredTerritoryTile("champlain:site-14")!;
+  expect(tile.terrain).toBe("lake");
   render(
     <BuildStorage
       game={game}

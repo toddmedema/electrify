@@ -55,11 +55,13 @@ it("uses the map-selected physical tile for the generator review and purchase", 
   const wind = GENERATORS(game, 50e6, [], []).find(
     (candidate) => candidate.name === "Wind",
   )!;
-  const tile = availableTerritoryTiles(game, wind, "champlain")[0];
+  const tile = availableTerritoryTiles(game, wind, "champlain").find(
+    (tile) => tile.siteKind === "wind",
+  )!;
   const memory = new Map<string, unknown>([
     [TERRITORY_BUILD_MEMORY_KEY, "champlain"],
     [TERRITORY_TILE_BUILD_MEMORY_KEY, tile.id],
-    ["generators.size", wToSliderTick(500e6)],
+    ["generators.size", wToSliderTick(2e9)],
   ]);
   const onBuild = jest.fn();
   render(
@@ -77,8 +79,10 @@ it("uses the map-selected physical tile for the generator review and purchase", 
   const solarCard = screen
     .getAllByRole("listitem")
     .find((item) => item.getAttribute("data-build-option") === "Solar")!;
-  expect(solarCard).toHaveTextContent("Not buildable on this tile");
-  expect(within(solarCard).queryByRole("button")).not.toBeInTheDocument();
+  expect(
+    within(solarCard).getByRole("button", { name: "Review purchase of Solar" }),
+  ).toBeEnabled();
+  expect(within(solarCard).getByText("Build cost")).toBeVisible();
   const windCard = screen.getByText(
     (_text, element) => element?.getAttribute("data-build-option") === "Wind",
   );
@@ -96,7 +100,7 @@ it("uses the map-selected physical tile for the generator review and purchase", 
   );
   fireEvent.click(screen.getByRole("button", { name: "Pay cash" }));
   expect(onBuild).toHaveBeenCalledWith(
-    expect.objectContaining({ name: "Wind", peakW: tile.maxPeakW }),
+    expect.objectContaining({ name: "Wind", peakW: wind.maxPeakW }),
     false,
     "champlain",
     tile.id,

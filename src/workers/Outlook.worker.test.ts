@@ -1,5 +1,7 @@
 import { GENERATORS, STORAGE } from "../data/Facilities";
 import { createGame } from "../testing/Simulator";
+import reducer, { buildFacility } from "../reducers/Game";
+import { availableTerritoryTiles } from "../helpers/TerritoryTiles";
 import { forecastWorkerSnapshot } from "../components/base/ForecastWorkerSnapshot";
 import {
   computeOutlook,
@@ -31,19 +33,44 @@ afterEach(() => postMessage.mockRestore());
 it.each(["generator", "storage"] as const)(
   "keeps the selected territory in a %s worker forecast and matches the page fallback",
   async (kind) => {
-    const game = createGame({ scenarioId: 116, seed: 188 });
+    let game = createGame({ scenarioId: 116, seed: 188 });
     game.territoryNetwork = {
       version: 3,
       landPurchases: [{ territoryId: "green-uplands", minute: 0, price: 18e6 }],
       legacyConnections: [],
     };
     game.date.year = 2020;
+    game.timeline.forEach((tick) => {
+      tick.cash = 1e12;
+    });
+    // Reserve the first plains cell through a real purchase, leaving forest next remotely.
+    game = reducer(
+      game,
+      buildFacility({
+        facility: GENERATORS(game, 20e6, [], []).find(
+          (quote) => quote.name === "Wind",
+        )!,
+        financed: false,
+        territoryId: "green-uplands",
+        tileId: "green-uplands:site-0",
+      }),
+    );
     const facility =
       kind === "generator"
         ? GENERATORS(game, 100e6, [], []).find(
             (quote) => quote.name === "Wind",
           )!
         : STORAGE(game, 100e6).find((quote) => quote.name === "Battery")!;
+    const homeTile = availableTerritoryTiles(game, facility, "champlain")[0];
+    const remoteTile = availableTerritoryTiles(
+      game,
+      facility,
+      "green-uplands",
+    )[0];
+    expect([homeTile.terrain, remoteTile.terrain]).toEqual([
+      "plains",
+      "forest",
+    ]);
     const snapshot = forecastWorkerSnapshot(game);
     const expected = computeOutlook(
       "buildImpact",
@@ -53,6 +80,9 @@ it.each(["generator", "storage"] as const)(
     );
     const home = computeOutlook("buildImpact", snapshot, facility);
     expect(expected).toBeDefined();
+    expect(expected).toEqual(
+      computeOutlook("buildImpact", game, facility, "green-uplands"),
+    );
     expect(JSON.stringify(expected) === JSON.stringify(home)).toBe(
       kind === "storage",
     );

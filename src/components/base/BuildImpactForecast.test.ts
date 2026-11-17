@@ -14,6 +14,7 @@ import {
 import { computeOutlook } from "./OutlookForecast";
 import { forecastShortfalls } from "../../helpers/ForecastShortfalls";
 import { forecastWorkerSnapshot } from "./ForecastWorkerSnapshot";
+import { availableTerritoryTiles } from "../../helpers/TerritoryTiles";
 
 function fixture() {
   const game = createGame({ scenarioId: 100, seed: 12345 });
@@ -29,7 +30,7 @@ function fixture() {
 it.each(["generator", "storage"] as const)(
   "forecasts a remote %s exactly as the selected territory's purchased fleet",
   (kind) => {
-    const game = createGame({ scenarioId: 116, seed: 188 });
+    let game = createGame({ scenarioId: 116, seed: 188 });
     game.territoryNetwork = {
       version: 3,
       landPurchases: [{ territoryId: "green-uplands", minute: 0, price: 18e6 }],
@@ -39,6 +40,18 @@ it.each(["generator", "storage"] as const)(
     game.timeline.forEach((tick) => {
       tick.cash = 1e12;
     });
+    // Reserve the first plains cell through a real purchase, leaving forest next remotely.
+    game = reducer(
+      game,
+      buildFacility({
+        facility: GENERATORS(game, 20e6, [], []).find(
+          (quote) => quote.name === "Wind",
+        )!,
+        financed: false,
+        territoryId: "green-uplands",
+        tileId: "green-uplands:site-0",
+      }),
+    );
     const facility = {
       ...(kind === "generator"
         ? GENERATORS(game, 100e6, [], []).find(
@@ -46,6 +59,16 @@ it.each(["generator", "storage"] as const)(
           )!
         : STORAGE(game, 100e6).find((quote) => quote.name === "Battery")!),
     };
+    const homeTile = availableTerritoryTiles(game, facility, "champlain")[0];
+    const remoteTile = availableTerritoryTiles(
+      game,
+      facility,
+      "green-uplands",
+    )[0];
+    expect([homeTile.terrain, remoteTile.terrain]).toEqual([
+      "plains",
+      "forest",
+    ]);
     const result = previewFacilityBuild(game, facility, "green-uplands");
     const purchased = reducer(
       game,
@@ -59,8 +82,8 @@ it.each(["generator", "storage"] as const)(
     expect(
       purchased.facilities.find(
         (facility) => !game.facilities.some(({ id }) => id === facility.id),
-      )?.territoryId,
-    ).toBe("green-uplands");
+      ),
+    ).toMatchObject({ territoryId: "green-uplands", tileId: remoteTile.id });
     const now = game.timeline[0];
     const actual = generateForecastTimeline(
       purchased,
