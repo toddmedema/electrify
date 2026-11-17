@@ -38,6 +38,18 @@ jobs:
 
       # Tests are not run here; workflow.yml gates pull requests before merge.
 
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-2
+
+      # Reject missing hosting prerequisites before Firebase or S3 changes.
+      # This is read-only; IAM writes are an operator rollout prerequisite.
+      - name: Check production hosting readiness
+        run: node scripts/hosting/deploy.js --preflight
+
       # Firestore rules and indexes go out BEFORE the bundle that depends on them.
       # The other order ships a client whose reads the deployed rules still refuse,
       # which fails closed and looks to a player like the game is broken.
@@ -71,13 +83,6 @@ jobs:
           printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$key"
           GOOGLE_APPLICATION_CREDENTIALS="$key" \
             npx --yes firebase-tools@15 deploy --only firestore,functions:mailing-list --non-interactive
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v6
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-2
 
       - name: Build and deploy to prod
         env:

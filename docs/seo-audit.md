@@ -22,9 +22,14 @@ The publisher graph uses Person Todd Medema, confirmed by the owner.
 
 ## Hosting changes
 
-`scripts/deploy.sh ci-prod` builds the game, checks its assets, then calls
-`scripts/hosting/deploy.js`. The hosting step reads the current distribution and
-bucket website configuration before uploading anything. It preserves origins,
+The production workflow configures its existing AWS credentials and runs
+`node scripts/hosting/deploy.js --preflight` **before any Firebase or AWS mutation**.
+This read-only check needs no build. `scripts/deploy.sh ci-prod` also checks
+readiness before building, checks built assets, then calls the publisher. Both use
+`scripts/hosting/plan.js`, with production targets owned by
+`scripts/hosting/targets.json`. The publisher rereads the current distribution,
+function ETags and bucket website configuration immediately before uploading;
+it never reuses an earlier preflight plan. It preserves origins,
 forwarding settings, routing rules, cache policies, unrelated error responses, and
 uses the distribution ETag to reject concurrent configuration changes.
 
@@ -54,20 +59,77 @@ that policy first. The deploy does not silently remove these protections. Functi
 updates use their ETags too. It waits for distribution propagation and the cache
 invalidation before the workflow runs the live smoke check.
 
-The production deploy identity now needs these permissions in addition to its
-existing S3 upload and CloudFront invalidation access: CloudFront
-GetDistributionConfig, UpdateDistribution, GetDistribution, GetCachePolicy,
-DescribeFunction, CreateFunction, UpdateFunction, PublishFunction, GetInvalidation;
-S3 GetBucketWebsite and PutBucketWebsite; and STS GetCallerIdentity. Scope writable
-resources to the production distribution, bucket and `electrify-seo-*` functions.
-Do not grant broad account administration to the deploy identity.
+### Production prerequisite rollout
 
-No production configuration was changed while preparing this code. The available
-local AWS account could not read the production distribution ID configured in the
-existing deploy script (`E38D57AILAHD00`); it returned `NoSuchDistribution`. Verify
-permissions and any existing viewer associations using the **production deploy
-identity** before the first deployment. A conflicting association fails before
-uploads, with an actionable error.
+The November 17 deployment failed on `cloudfront:GetDistributionConfig` for IAM
+user `electrify-gh-actions` in account `028836220400`, after Firebase had already
+deployed. Merging this change alone does **not** grant that identity permissions or
+provision the two required functions. An operator must complete this rollout before
+rerunning the production workflow. No production IAM or hosting configuration was
+changed while preparing this fix.
+
+The versioned release contract is `scripts/hosting/deployment-policy.v1.json`
+(`ElectrifyHostingPublisherV1`). It grants distribution operations only on
+`E38D57AILAHD00`, website configuration only on `electrifygame.com`, object uploads
+and failed multipart cancellation only under that bucket, and function
+Describe/Update/Publish only on `electrify-seo-request` and
+`electrify-seo-response`. Cache-policy reads allow that resource type across
+accounts so an attached AWS-managed policy can also be inspected; no cache-policy
+writes are granted. Waiters require GetDistribution and GetInvalidation. The
+local-file S3 copy needs PutObject and AbortMultipartUpload, including cancellation
+after an interrupted multipart upload; it does not request ACLs, delete objects or
+read object contents. GetCallerIdentity authenticates the selected account and
+[requires no IAM allow](https://docs.aws.amazon.com/STS/latest/APIReference/API_GetCallerIdentity.html).
+Action/resource mappings follow the
+[CloudFront authorization reference](https://docs.aws.amazon.com/service-authorization/latest/reference/list_cloudfront.html)
+and [S3 operation permissions](https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-with-s3-policy-actions.html).
+
+From the repository root, an IAM administrator should verify the account and
+principal, review the versioned policy, then attach it to the **existing** user:
+
+```sh
+test "$(aws --profile production-admin sts get-caller-identity --query Account --output text)" = 028836220400
+aws --profile production-admin iam get-user --user-name electrify-gh-actions --query User.Arn --output text
+# Confirm arn:aws:iam::028836220400:user/electrify-gh-actions before the write below.
+aws --profile production-admin iam put-user-policy \
+  --user-name electrify-gh-actions \
+  --policy-name ElectrifyHostingPublisherV1 \
+  --policy-document file://scripts/hosting/deployment-policy.v1.json
+```
+
+Reconcile any legacy attached policies separately: adding this inline policy does
+not remove broader existing grants. Organization policies, permissions boundaries,
+explicit denies and bucket policy restrictions can still prevent writes.
+
+CloudFront CreateFunction cannot be scoped to named resources in IAM, so routine
+release credentials deliberately lack it. An operator with provisioning access
+must create missing functions once, using the current public sitemap and the same
+function generators and ownership marker as releases:
+
+```sh
+node scripts/hosting/provision-functions.js --help
+AWS_PROFILE=production-operator node scripts/hosting/provision-functions.js
+AWS_PROFILE=production-release node scripts/hosting/deploy.js --preflight
+```
+
+Use profiles for account `028836220400`; `production-release` must select the same
+identity as the workflow secrets. Provisioning checks the account, distribution,
+cache policies and both function owners before creating anything. It creates only
+missing functions in DEVELOPMENT and cleans up temporary code; it never overwrites,
+publishes or associates an existing function. It refuses foreign ownership or
+conflicting viewer associations. The next normal release uploads assets, updates
+and publishes both functions, then associates them with the distribution. It does
+not require them to be LIVE during preflight. If there is a conflict, integrate
+the existing viewer behavior or cache-policy bounds explicitly before retrying.
+
+A passing read-only preflight proves credentials can read the required live
+configuration and that ownership/cache checks pass; it **does not prove write
+authorization**. The policy artifact and fake-CLI contract tests cover the release's
+required writes without granting IAM simulation or administration to the publisher.
+After the operator rollout, rerun the production workflow and confirm its existing
+post-deployment smoke check passes. A later configuration conflict or denial still
+fails the publisher's fresh read before uploads; ETags continue to reject concurrent
+configuration changes during publication.
 
 ## Verification
 
