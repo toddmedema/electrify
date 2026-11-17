@@ -208,6 +208,46 @@ export async function returnToTerritoryMap(page: Page): Promise<Locator> {
   return map;
 }
 
+/** Open the map catalogue through its public entry point at the current effective width. */
+export async function openMapProjectCatalogue(page: Page): Promise<Locator> {
+  const map = await returnToTerritoryMap(page);
+  await map.getByRole("button", { name: "Build", exact: true }).click();
+  const rail = map.getByRole("complementary", {
+    name: "Build facilities",
+    exact: true,
+  });
+  if (await rail.isVisible()) {
+    await expect(rail).toBeFocused();
+    return rail;
+  }
+  const catalogue = map.locator(".tileWorkspaceSurface");
+  await expect(
+    catalogue.getByRole("heading", { name: "Plan a project", exact: true }),
+  ).toBeVisible();
+  return catalogue;
+}
+
+/** Size the next map project through the rail popover or phone catalogue. */
+export async function setMapProjectCapacity(
+  catalogue: Locator,
+  storage: boolean,
+  tick: string,
+): Promise<void> {
+  const sizing = catalogue.getByRole("button", {
+    name: storage ? /^Storage energy:/ : /^Generator power:/,
+  });
+  const popover = await sizing.isVisible();
+  if (popover) await sizing.click();
+  await catalogue
+    .getByRole("slider", {
+      name: storage ? "Storage capacity" : "Generator capacity",
+      exact: true,
+    })
+    .fill(tick);
+  if (popover)
+    await catalogue.getByRole("button", { name: "Done", exact: true }).click();
+}
+
 /**
  * Open the Build tool from the dock, leaving it open when it already is: the dock button
  * toggles, so a second click would close it. Returns the Build region.

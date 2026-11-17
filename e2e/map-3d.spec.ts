@@ -1,9 +1,22 @@
 import { expect, test } from "./fixtures";
 import type { MapCanvas } from "../src/components/base/territory-3d/Types";
-import { returnToTerritoryMap } from "./layout";
+import {
+  openMapProjectCatalogue,
+  returnToTerritoryMap,
+  setMapProjectCapacity,
+} from "./layout";
 import { reviewScreenshot } from "./review-screenshot";
 import { getTerritoryTile } from "../src/helpers/TerritoryTiles";
 import { getTerrainModel } from "../src/components/base/territory-3d/TerrainModels";
+import { readSavedGame } from "./save-fixture";
+import { loadSimData } from "../src/testing/SimData";
+import {
+  projectCatalogue,
+  projectSiteCapitalCost,
+  projectSiteQuote,
+  selectProject,
+} from "../src/helpers/ProjectBuild";
+import { formatMoneyConcise } from "../src/helpers/Format";
 import {
   projectPoint,
   tilePosition3D,
@@ -171,13 +184,14 @@ for (const theme of ["light", "dark"] as const) {
     if ((await pause.getAttribute("aria-pressed")) !== "true")
       await pause.click();
     const map = await returnToTerritoryMap(page);
-    await map.getByRole("button", { name: "Build", exact: true }).click();
+    const catalogue = await openMapProjectCatalogue(page);
+    await setMapProjectCapacity(catalogue, false, "10");
     const surface = page.locator(".tileWorkspaceSurface");
-    await surface
+    await catalogue
       .getByRole("button", { name: "Choose sites for Wind", exact: true })
       .click();
     await expect(
-      surface.getByText("Connected · free site", { exact: true }),
+      surface.getByText("Connected · total project cost", { exact: true }),
     ).toBeVisible();
     const markers = map.locator(
       '[data-project-site="owned"] .territoryTilePrice',
@@ -208,20 +222,29 @@ for (const theme of ["light", "dark"] as const) {
       expect(size.width).toBeLessThanOrEqual(size.tileWidth);
       expect(size.height).toBeLessThanOrEqual(size.tileHeight / 2);
     }
-    await expect(markers.first()).toHaveAttribute(
-      "title",
-      "Connected · free site",
+    const game = (await readSavedGame(page))!;
+    loadSimData(game.location);
+    const project = selectProject(
+      projectCatalogue(game, 20e6, false).find(({ name }) => name === "Wind")!,
     );
+    const owned = map.locator('[data-project-site="owned"]').first();
+    const id = (await owned.getAttribute("data-map-target"))!;
+    const quote = projectSiteQuote(game, project, id);
+    expect(quote.facility).toBeDefined();
+    if (!quote.facility) throw new Error("Owned project site has no quote");
+    const total = formatMoneyConcise(projectSiteCapitalCost(quote));
+    const title = `Total project cost ${total} · Already connected`;
+    await expect(markers.first()).toHaveAttribute("title", title);
+    await expect(markers.first()).toHaveText(total);
     await expect(
       map.locator('[data-project-site="owned"]').first(),
-    ).toHaveAccessibleName(/Connected · free site/);
-    const owned = map.locator('[data-project-site="owned"]').first();
+    ).toHaveAccessibleName(/Total project cost .*Already connected/);
     await owned.focus();
     await owned.press("Enter");
     await expect(surface.getByText("Already connected · $0")).toBeVisible();
     const ownedMarker = owned.locator(".territoryTilePrice");
     await ownedMarker.hover();
-    await expect(ownedMarker).toHaveAttribute("title", "Connected · free site");
+    await expect(ownedMarker).toHaveAttribute("title", title);
     await page.mouse.move(0, 0);
     await reviewScreenshot(map, {
       path: info.outputPath(`project-markers-${theme}.png`),
@@ -256,8 +279,11 @@ test("unavailable WebGL leaves a fully operable simplified map", async ({
     "unavailable",
   );
   await expect(map.locator(".territoryTerrainArtwork").first()).toBeVisible();
-  await map.getByRole("button", { name: "Build", exact: true }).click();
+  const catalogue = await openMapProjectCatalogue(page);
+  await catalogue
+    .getByRole("button", { name: "Choose sites for Wind", exact: true })
+    .click();
   await expect(
-    page.getByRole("heading", { name: "Plan a project", exact: true }),
+    map.locator('[data-project-site="owned"]').first(),
   ).toBeVisible();
 });

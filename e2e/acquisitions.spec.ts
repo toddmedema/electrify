@@ -25,12 +25,17 @@ import {
 import { expect, test } from "./fixtures";
 import { reviewScreenshot } from "./review-screenshot";
 import { expectDialogToFit } from "./dialog-layout";
-import { returnToTerritoryMap } from "./layout";
+import { returnToTerritoryMap, setMapProjectCapacity } from "./layout";
 import { editSavedGame, readSavedGame, readSaveRecords } from "./save-fixture";
 
 const tileSurface = (page: Page) => page.locator(".tileWorkspaceSurface");
 const mapWorkspace = (page: Page) =>
   page.getByRole("region", { name: "Territory map workspace", exact: true });
+const buildRail = (page: Page) =>
+  mapWorkspace(page).getByRole("complementary", {
+    name: "Build facilities",
+    exact: true,
+  });
 
 async function openMap(page: Page) {
   return returnToTerritoryMap(page);
@@ -117,7 +122,12 @@ async function inspectTile(page: Page, tile: TerritoryTileDefinition) {
   await expect(target).toHaveAttribute("aria-pressed", "true");
   const surface = tileSurface(page);
   await expect(surface).toBeVisible();
-  await expect(surface.locator(".tileWorkspaceHeading h3")).toBeFocused();
+  if (
+    (await buildRail(page).isVisible()) &&
+    (await surface.getByRole("heading", { name: /^Build ·/ }).count())
+  )
+    await expect(buildRail(page)).toBeFocused();
+  else await expect(surface.locator(".tileWorkspaceHeading h3")).toBeFocused();
   await expectDialogToFit(surface);
   return surface;
 }
@@ -414,18 +424,80 @@ async function hasRunningFacilityMotion(art: Locator) {
 }
 
 async function expectLockedBuild(surface: Locator) {
-  await expect(
-    surface.getByRole("tab", { name: "Generators", exact: true }),
-  ).toBeVisible();
-  await expect(
-    surface.getByRole("tab", { name: "Storage", exact: true }),
-  ).toBeVisible();
+  const rail = buildRail(surface.page());
+  if (await rail.isVisible()) {
+    await expect(
+      rail.getByRole("region", { name: "Generator technologies", exact: true }),
+    ).toBeVisible();
+    await expect(
+      rail.getByRole("region", { name: "Storage technologies", exact: true }),
+    ).toBeVisible();
+  } else {
+    await expect(
+      surface.getByRole("tab", { name: "Generators", exact: true }),
+    ).toBeVisible();
+    await expect(
+      surface.getByRole("tab", { name: "Storage", exact: true }),
+    ).toBeVisible();
+  }
   await expect(
     surface.getByRole("combobox", { name: /^Build (destination|tile)$/ }),
   ).toHaveCount(0);
   await expect(surface).not.toContainText(
     /One building slot|company power pool/,
   );
+}
+
+/** Keep tile-first purchases on their exact inspected site in both build interfaces. */
+async function reviewTileBuild(page: Page, name: string) {
+  const surface = tileSurface(page);
+  if (await buildRail(page).isVisible()) {
+    await buildRail(page)
+      .getByRole("button", { name: `Choose sites for ${name}`, exact: true })
+      .click();
+    await surface
+      .getByRole("button", { name: "Review project", exact: true })
+      .click();
+    await expect(
+      surface.getByRole("heading", { name: `Build ${name}?`, exact: true }),
+    ).toBeVisible();
+    return surface;
+  }
+  await surface
+    .getByRole("button", {
+      name: `Review purchase of ${name === "Battery" ? "Lithium Battery" : name}`,
+      exact: true,
+    })
+    .click();
+  return page.getByRole("dialog", { name: /^Build / });
+}
+
+async function confirmTileBuild(
+  page: Page,
+  review: Locator,
+  tile: TerritoryTileDefinition,
+  financed = false,
+) {
+  const desktop = await buildRail(page).isVisible();
+  if (desktop) {
+    await review
+      .getByRole("radio", {
+        name: financed ? "Loan · connection paid in cash" : /^Cash ·/,
+      })
+      .check();
+    await review
+      .getByRole("button", { name: "Build project", exact: true })
+      .click();
+  } else {
+    await review
+      .getByRole("button", {
+        name: financed ? "Take loan" : "Pay cash",
+        exact: true,
+      })
+      .click();
+  }
+  await expect(review).toHaveCount(0);
+  if (desktop) await inspectTile(page, tile);
 }
 
 async function expectCityDemand(surface: Locator) {
@@ -474,7 +546,17 @@ for (const theme of ["light", "dark"] as const) {
         height: page.viewportSize()!.height,
       });
       await expect
-        .poll(() => viewport.evaluate((element) => element.clientWidth))
+        .poll(() =>
+          network.evaluate(
+            (element) =>
+              element
+                .querySelector(".territoryMapViewport")!
+                .getBoundingClientRect().width +
+              (element
+                .querySelector(".desktopBuildRail")
+                ?.getBoundingClientRect().width ?? 0),
+          ),
+        )
         .toBe(width);
       const camera = await viewport.evaluate((element) =>
         ["x", "y", "scale"].map((part) =>
@@ -927,12 +1009,8 @@ for (const theme of ["light", "dark"] as const) {
       )[0];
     expect(site).toBeDefined();
     await inspectTile(page, site);
-    await surface
-      .getByRole("button", { name: "Review purchase of Wind", exact: true })
-      .click();
-    const review = page.getByRole("dialog", { name: /^Build .* Wind\?/ });
-    await review.getByRole("button", { name: "Pay cash", exact: true }).click();
-    await expect(review).toHaveCount(0);
+    const review = await reviewTileBuild(page, "Wind");
+    await confirmTileBuild(page, review, site);
     await expect(surface.locator(".tileFacilityStatus")).toHaveText(
       /^Under construction ·/,
     );
@@ -1099,12 +1177,19 @@ for (const theme of ["light", "dark"] as const) {
         .getBoundingClientRect();
       return {
         map: { width: map.width, height: map.height },
+        railWidth:
+          element.querySelector(".desktopBuildRail")?.getBoundingClientRect()
+            .width ?? 0,
         workspace: { width: workspace.width, height: workspace.height },
         overflow: document.documentElement.scrollWidth - innerWidth,
       };
     });
     expect(
-      Math.abs(dimensions.map.width - dimensions.workspace.width),
+      Math.abs(
+        dimensions.map.width +
+          dimensions.railWidth -
+          dimensions.workspace.width,
+      ),
     ).toBeLessThanOrEqual(1);
     expect(
       Math.abs(dimensions.map.height - dimensions.workspace.height),
@@ -1265,12 +1350,16 @@ for (const theme of ["light", "dark"] as const) {
     )!.tile;
     await inspectTile(page, windTile);
     await expectLockedBuild(surface);
-    await expect(
-      surface.getByRole("button", {
-        name: "Review purchase of Wind",
-        exact: true,
-      }),
-    ).toBeEnabled();
+    const windChoice = (await buildRail(page).isVisible())
+      ? buildRail(page).getByRole("button", {
+          name: "Choose sites for Wind",
+          exact: true,
+        })
+      : surface.getByRole("button", {
+          name: "Review purchase of Wind",
+          exact: true,
+        });
+    await expect(windChoice).toBeEnabled();
     await expect(
       page.getByRole("tab", { name: "Interties", exact: true }),
     ).toHaveCount(0);
@@ -1288,39 +1377,55 @@ for (const theme of ["light", "dark"] as const) {
     const tile = availableTerritoryTiles(game, wind, "champlain")[0];
     const surface = await inspectTile(page, tile);
     await expectLockedBuild(surface);
-    const review = surface.getByRole("button", {
-      name: "Review purchase of Wind",
-      exact: true,
-    });
-    await expect(review).toBeEnabled();
-    const project = surface.locator('[data-build-option="Wind"]');
-    const projectScrollTop = await project.evaluate((element) => {
-      let scroll = element.parentElement;
-      while (
-        scroll &&
-        !["auto", "scroll"].includes(getComputedStyle(scroll).overflowY)
-      )
-        scroll = scroll.parentElement;
-      if (!scroll) throw new Error("No project scroll container");
-      const capacity = element
-        .closest(".tileWorkspaceSurface")!
-        .querySelector(".constructionHeader")!;
-      const inset = scroll.contains(capacity)
-        ? capacity.getBoundingClientRect().height
-        : 0;
-      scroll.scrollTop +=
-        element.getBoundingClientRect().top -
-        scroll.getBoundingClientRect().top -
-        inset;
-      return scroll.scrollTop;
-    });
-    await expect(surface.locator(".constructionHeader")).toBeInViewport({
-      ratio: 1,
-    });
-    // Scroll the project through the sticky capacity row, as a player does when
-    // browsing. Its avatar must pass behind the capacity text rather than over it.
-    if ((page.viewportSize()?.width ?? 0) <= 740)
-      await project.evaluate((element) => {
+    const desktop = await buildRail(page).isVisible();
+    let review: Locator;
+    if (desktop) {
+      const rail = buildRail(page);
+      const choice = rail.getByRole("button", {
+        name: "Choose sites for Wind",
+        exact: true,
+      });
+      await choice.hover();
+      const preview = rail.getByRole("region", {
+        name: "Wind technology preview",
+        exact: true,
+      });
+      await expect(preview).toBeVisible();
+      const card = preview.locator('[data-build-option="Wind"]');
+      await expect(card.locator(".MuiCardHeader-root")).toBeInViewport({
+        ratio: 1,
+      });
+      await expect(
+        card.locator(".buildOptionMetric").filter({ hasText: "Build cost" }),
+      ).toBeInViewport({ ratio: 1 });
+      await expect(
+        preview.getByRole("button", { name: "Choose sites", exact: true }),
+      ).toBeInViewport({ ratio: 1 });
+      expect(currentTick((await readSavedGame(page))!)!.cash).toBe(
+        currentTick(game)!.cash,
+      );
+      await choice.click();
+      await expect(
+        network.locator(`[data-map-target="${tile.id}"]`),
+      ).toHaveAttribute("aria-pressed", "true");
+      await expect(
+        surface.getByText("Project cost", { exact: true }),
+      ).toBeVisible();
+      await expect(
+        surface.getByText("Cash required now", { exact: true }),
+      ).toBeVisible();
+      review = surface.getByRole("button", {
+        name: "Review project",
+        exact: true,
+      });
+    } else {
+      review = surface.getByRole("button", {
+        name: "Review purchase of Wind",
+        exact: true,
+      });
+      await expect(review).toBeEnabled();
+      const project = surface.locator('[data-build-option="Wind"]');
+      const projectScrollTop = await project.evaluate((element) => {
         let scroll = element.parentElement;
         while (
           scroll &&
@@ -1328,58 +1433,87 @@ for (const theme of ["light", "dark"] as const) {
         )
           scroll = scroll.parentElement;
         if (!scroll) throw new Error("No project scroll container");
-        const avatar = element
-          .querySelector(".MuiCardHeader-avatar")!
-          .getBoundingClientRect();
         const capacity = element
           .closest(".tileWorkspaceSurface")!
-          .querySelector(".constructionCapacity strong")!
-          .getBoundingClientRect();
+          .querySelector(".constructionHeader")!;
+        const inset = scroll.contains(capacity)
+          ? capacity.getBoundingClientRect().height
+          : 0;
         scroll.scrollTop +=
-          avatar.top + avatar.height / 2 - capacity.top - capacity.height / 2;
+          element.getBoundingClientRect().top -
+          scroll.getBoundingClientRect().top -
+          inset;
+        return scroll.scrollTop;
       });
-    await expect
-      .poll(() =>
-        surface.locator(".constructionCapacity strong").evaluate((element) => {
-          const header = element.closest(".constructionHeader")!;
-          const bounds = element.getBoundingClientRect();
-          return [
-            bounds.left + Math.min(4, bounds.width / 4),
-            bounds.left + bounds.width / 2,
-          ].flatMap((x) => {
-            const top = document.elementsFromPoint(
-              x,
-              bounds.top + bounds.height / 2,
-            )[0];
-            return top && header.contains(top)
-              ? []
-              : [
-                  top
-                    ?.closest("[data-build-option]")
-                    ?.getAttribute("data-build-option") ??
-                    top?.tagName ??
-                    "outside viewport",
-                ];
-          });
-        }),
-      )
-      .toEqual([]);
-    await project.evaluate((element, top) => {
-      let scroll = element.parentElement;
-      while (
-        scroll &&
-        !["auto", "scroll"].includes(getComputedStyle(scroll).overflowY)
-      )
-        scroll = scroll.parentElement;
-      if (!scroll) throw new Error("No project scroll container");
-      scroll.scrollTop = top;
-    }, projectScrollTop);
-    await expect(project.locator(".MuiCardHeader-root")).toBeInViewport({
-      ratio: 1,
-    });
-    await expect(
-      project.locator(".buildOptionMetric").filter({ hasText: "Build cost" }),
-    ).toBeInViewport({ ratio: 1 });
+      await expect(surface.locator(".constructionHeader")).toBeInViewport({
+        ratio: 1,
+      });
+      // Scroll the project through the sticky capacity row, as a player does when
+      // browsing. Its avatar must pass behind the capacity text rather than over it.
+      if ((page.viewportSize()?.width ?? 0) <= 740)
+        await project.evaluate((element) => {
+          let scroll = element.parentElement;
+          while (
+            scroll &&
+            !["auto", "scroll"].includes(getComputedStyle(scroll).overflowY)
+          )
+            scroll = scroll.parentElement;
+          if (!scroll) throw new Error("No project scroll container");
+          const avatar = element
+            .querySelector(".MuiCardHeader-avatar")!
+            .getBoundingClientRect();
+          const capacity = element
+            .closest(".tileWorkspaceSurface")!
+            .querySelector(".constructionCapacity strong")!
+            .getBoundingClientRect();
+          scroll.scrollTop +=
+            avatar.top + avatar.height / 2 - capacity.top - capacity.height / 2;
+        });
+      await expect
+        .poll(() =>
+          surface
+            .locator(".constructionCapacity strong")
+            .evaluate((element) => {
+              const header = element.closest(".constructionHeader")!;
+              const bounds = element.getBoundingClientRect();
+              return [
+                bounds.left + Math.min(4, bounds.width / 4),
+                bounds.left + bounds.width / 2,
+              ].flatMap((x) => {
+                const top = document.elementsFromPoint(
+                  x,
+                  bounds.top + bounds.height / 2,
+                )[0];
+                return top && header.contains(top)
+                  ? []
+                  : [
+                      top
+                        ?.closest("[data-build-option]")
+                        ?.getAttribute("data-build-option") ??
+                        top?.tagName ??
+                        "outside viewport",
+                    ];
+              });
+            }),
+        )
+        .toEqual([]);
+      await project.evaluate((element, top) => {
+        let scroll = element.parentElement;
+        while (
+          scroll &&
+          !["auto", "scroll"].includes(getComputedStyle(scroll).overflowY)
+        )
+          scroll = scroll.parentElement;
+        if (!scroll) throw new Error("No project scroll container");
+        scroll.scrollTop = top;
+      }, projectScrollTop);
+      await expect(project.locator(".MuiCardHeader-root")).toBeInViewport({
+        ratio: 1,
+      });
+      await expect(
+        project.locator(".buildOptionMetric").filter({ hasText: "Build cost" }),
+      ).toBeInViewport({ ratio: 1 });
+    }
     await expect(review).toBeInViewport({ ratio: 1 });
     await expect(
       surface.getByRole("button", { name: "Close tile", exact: true }),
@@ -1419,10 +1553,26 @@ for (const theme of ["light", "dark"] as const) {
       scale: "css",
     });
     await review.click();
-    const confirmation = page.getByRole("dialog", { name: /^Build .* Wind\?/ });
-    await expectDialogToFit(confirmation);
-    await confirmation.press("Escape");
-    await expect(confirmation).toHaveCount(0);
+    if (desktop) {
+      await expect(
+        surface.getByRole("heading", { name: "Build Wind?", exact: true }),
+      ).toBeVisible();
+      await expectDialogToFit(surface);
+      await surface
+        .getByRole("button", { name: "Back to sites", exact: true })
+        .click();
+      await expect(review).toBeVisible();
+    } else {
+      const confirmation = page.getByRole("dialog", {
+        name: /^Build .* Wind\?/,
+      });
+      await expectDialogToFit(confirmation);
+      await confirmation.press("Escape");
+      await expect(confirmation).toHaveCount(0);
+    }
+    expect(currentTick((await readSavedGame(page))!)!.cash).toBe(
+      currentTick(game)!.cash,
+    );
     await surface
       .getByRole("button", { name: "Close tile", exact: true })
       .click();
@@ -1516,13 +1666,9 @@ for (const theme of ["light", "dark"] as const) {
     await openMap(page);
     await inspectTile(page, tile);
     await expectLockedBuild(surface);
-    await surface
-      .getByRole("button", { name: "Review purchase of Wind", exact: true })
-      .click();
-    const review = page.getByRole("dialog", { name: /^Build .* Wind\?/ });
+    const review = await reviewTileBuild(page, "Wind");
     await expectDialogToFit(review);
-    await review.getByRole("button", { name: "Pay cash", exact: true }).click();
-    await expect(review).toHaveCount(0);
+    await confirmTileBuild(page, review, tile);
     const built = (await readSavedGame(page))!;
     const plant = built.facilities.find(
       (facility) => facility.tileId === tile.id,
@@ -1588,21 +1734,16 @@ for (const theme of ["light", "dark"] as const) {
     await openMap(page);
     const surface = await inspectTile(page, tile);
     await expectLockedBuild(surface);
-    await surface.getByRole("tab", { name: "Storage", exact: true }).click();
-    await expectLockedBuild(surface);
-    await surface.getByRole("slider", { name: /^Capacity/ }).press("Home");
-    await surface
-      .getByRole("button", {
-        name: "Review purchase of Lithium Battery",
-        exact: true,
-      })
-      .click();
-    const review = page.getByRole("dialog", {
-      name: /^Build .* Lithium Battery\?/,
-    });
+    if (await buildRail(page).isVisible()) {
+      await setMapProjectCapacity(buildRail(page), true, "4");
+    } else {
+      await surface.getByRole("tab", { name: "Storage", exact: true }).click();
+      await expectLockedBuild(surface);
+      await surface.getByRole("slider", { name: /^Capacity/ }).press("Home");
+    }
+    const review = await reviewTileBuild(page, "Battery");
     await expectDialogToFit(review);
-    await review.getByRole("button", { name: "Pay cash", exact: true }).click();
-    await expect(review).toHaveCount(0);
+    await confirmTileBuild(page, review, tile);
     const built = (await readSavedGame(page))!;
     const storage = built.facilities.find(
       (facility) => facility.tileId === tile.id,
@@ -1875,18 +2016,9 @@ for (const theme of ["light", "dark"] as const) {
       const surface = await inspectTile(page, tile);
       await surface.getByRole("button", { name: /^Connect ·/ }).click();
       await expectLockedBuild(surface);
-      const review = surface.getByRole("button", {
-        name: `Review purchase of ${resource.name}`,
-        exact: true,
-      });
-      await expect(review).toBeEnabled();
-      await review.click();
-      const plant = page.getByRole("dialog", { name: /^Build / });
+      const plant = await reviewTileBuild(page, resource.name);
       await expectDialogToFit(plant);
-      await plant
-        .getByRole("button", { name: "Take loan", exact: true })
-        .click();
-      await expect(plant).toHaveCount(0);
+      await confirmTileBuild(page, plant, tile, true);
       expect((await readSavedGame(page))!.facilities).toEqual(
         expect.arrayContaining([
           expect.objectContaining({

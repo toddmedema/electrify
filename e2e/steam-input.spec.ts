@@ -1479,11 +1479,14 @@ test("TV saved preferences style direct scenario links before play", async ({
     "map",
   );
   await expect(page.locator("#appbar:visible")).toBeVisible();
-  const warning = page.locator(".missionSummary.statusWarning");
+  const warning = page.locator(".gridHealth.statusWarning");
   await expect(warning).toBeVisible();
+  await expect(warning.locator(".gridStatusFuture")).toContainText(
+    "FUTURE Supply risk:",
+  );
   expect(
-    await foregroundContrast(warning.locator(".missionRiskButton")),
-    "mission warning text keeps contrast on its amber surface",
+    await foregroundContrast(warning.locator(".gridStatusButton")),
+    "actionable supply warning text keeps contrast on its amber surface",
   ).toBeGreaterThanOrEqual(4.5);
   await expect(
     page.getByRole("button", { name: "Build", exact: true }),

@@ -655,9 +655,14 @@ test("TV couch player toolbars match named warning captions after a plant pause"
   const seat = couch.seats.get("local-p1")!.page;
   await seat.getByRole("button", { name: "Inspect Coal", exact: true }).click();
   await seat.getByRole("button", { name: "Pause Coal", exact: true }).click();
-  await expect(seat.locator(".gridHealth")).toHaveClass(/gridHealth-blackout/);
-  const warning = seat.locator(".gridStatusNow");
-  await expect(warning).toHaveText(/NOW.*W.*short/);
+  // Pausing changes the forecast immediately. The current operating sample still
+  // has reserve until the simulation advances; those facts must stay distinct.
+  await expect(seat.locator(".gridHealth")).toHaveClass(
+    /gridHealth-stable statusWarning/,
+  );
+  await expect(seat.locator(".gridStatusNow")).toHaveText(/NOW.*W.*reserve/);
+  const warning = seat.locator(".gridStatusFuture");
+  await expect(warning).toHaveText(/FUTURE Short at/);
   await expect(warning).toBeVisible();
   expect(await renderedFontSize(warning)).toBe(
     await renderedFontSize(seat.locator(".gridHealth:visible")),

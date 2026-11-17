@@ -1,11 +1,23 @@
 import { expect, test } from "./fixtures";
 import type { Page } from "@playwright/test";
 import { readSavedGame } from "./save-fixture";
-import { returnToTerritoryMap } from "./layout";
+import {
+  openMapProjectCatalogue,
+  returnToTerritoryMap,
+  setMapProjectCapacity,
+} from "./layout";
 import { getTerritoryTile } from "../src/helpers/TerritoryTiles";
 import { hexCenter } from "../src/components/base/TerritoryHexGeometry";
 import { currentTick } from "../src/helpers/GameSelectors";
 import { reviewScreenshot } from "./review-screenshot";
+import { loadSimData } from "../src/testing/SimData";
+import {
+  projectCatalogue,
+  projectSiteCapitalCost,
+  projectSiteQuote,
+  selectProject,
+} from "../src/helpers/ProjectBuild";
+import { formatMoneyConcise } from "../src/helpers/Format";
 
 async function start(page: Page, theme: "light" | "dark") {
   await page.addInitScript((mode) => {
@@ -73,18 +85,14 @@ for (const theme of ["light", "dark"] as const) {
       "data-buy-mode",
       "true",
     );
-    await build.click();
+    const catalogue = await openMapProjectCatalogue(page);
     await expect(network.locator(".territoryMap")).toHaveAttribute(
       "data-buy-mode",
       "false",
     );
     const surface = page.locator(".tileWorkspaceSurface");
-    await expect(
-      surface.getByRole("heading", { name: "Plan a project" }),
-    ).toBeVisible();
-    const size = surface.getByRole("slider", { name: "Generator capacity" });
-    await size.fill("10");
-    await surface
+    await setMapProjectCapacity(catalogue, false, "10");
+    await catalogue
       .getByRole("button", { name: "Choose sites for Wind", exact: true })
       .click();
     await expect(
@@ -96,12 +104,42 @@ for (const theme of ["light", "dark"] as const) {
     await expect(
       network.locator('[data-project-site="connection"]').first(),
     ).toBeVisible();
-    await chooseSite(page, "champlain:site-13");
+    loadSimData(before.location);
+    const project = selectProject(
+      projectCatalogue(before, 20e6, false).find(
+        ({ name }) => name === "Wind",
+      )!,
+    );
+    const owned = await chooseSite(page, "champlain:site-13");
+    const ownedQuote = projectSiteQuote(before, project, "champlain:site-13");
+    expect(ownedQuote.facility).toBeDefined();
+    if (!ownedQuote.facility)
+      throw new Error("Owned site has no project quote");
+    await expect(owned.locator(".territoryTilePrice")).toHaveAttribute(
+      "title",
+      `Total project cost ${formatMoneyConcise(projectSiteCapitalCost(ownedQuote))} · Already connected`,
+    );
     await expect(
       surface.getByRole("heading", { name: "Wind · 20MW", exact: true }),
     ).toBeVisible();
     await expect(surface.getByText("Already connected · $0")).toBeVisible();
     const target = await chooseSite(page, "green-uplands:site-1");
+    const connectionQuote = projectSiteQuote(
+      before,
+      project,
+      "green-uplands:site-1",
+    );
+    expect(connectionQuote.facility).toBeDefined();
+    if (!connectionQuote.facility)
+      throw new Error("Adjacent site has no project quote");
+    expect(connectionQuote.connectionCost).toBeGreaterThan(0);
+    expect(connectionQuote.facility.buildCost).not.toBe(
+      ownedQuote.facility.buildCost,
+    );
+    await expect(target.locator(".territoryTilePrice")).toHaveAttribute(
+      "title",
+      `Total project cost ${formatMoneyConcise(projectSiteCapitalCost(connectionQuote))} · Connection included`,
+    );
     await expect(
       surface.getByRole("heading", { name: "Wind · 20MW", exact: true }),
     ).toBeVisible();
