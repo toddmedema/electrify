@@ -20,7 +20,10 @@ import type { RendererState } from "../base/territory-3d/TerritoryCanvas3D";
 import type { ScenePicker } from "../base/territory-3d/SceneBuilder";
 import { useAppSelector } from "../../Store";
 import { terrainDetailsLabel } from "../base/TerritoryTileFacts";
-import { facilityMapStatus } from "../base/FacilityMapStatus";
+import {
+  facilityMapStatus,
+  facilityOperatingStatus,
+} from "../base/FacilityMapStatus";
 import useFacilityMapMotion, {
   FacilityMapMotionContext,
 } from "../base/useFacilityMapMotion";
@@ -958,6 +961,12 @@ export default function TerritoryHexMap({
                     status = facilityMapStatus(view, game.date.minute);
                   const showStatus =
                     status && showsMapStatus(status.kind, statusLayers);
+                  const operation = view.operatingFacility
+                    ? facilityOperatingStatus(
+                        view.operatingFacility,
+                        game.date.minute,
+                      )
+                    : status;
                   if (
                     !facility &&
                     !tile.city &&
@@ -1003,7 +1012,10 @@ export default function TerritoryHexMap({
                               <FacilityArtwork
                                 facility={facility}
                                 className="territoryOccupantArtwork"
-                                active={status?.kind === "producing"}
+                                active={
+                                  operation?.kind === "producing" ||
+                                  operation?.kind === "charging"
+                                }
                               />
                             </FacilityMapMotionContext.Provider>
                           </g>

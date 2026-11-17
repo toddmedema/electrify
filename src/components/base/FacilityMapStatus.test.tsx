@@ -63,6 +63,35 @@ it("prioritizes construction over operation pause and retained output", () => {
   });
 });
 
+it("shows added-capacity construction without classifying the operating base as offline", () => {
+  const { view, facility } = ready();
+  facility.expansionInProgress = {
+    targetSize: facility.peakW + 1e6,
+    targetPeakW: facility.peakW + 1e6,
+    cost: 1e6,
+    annualOperatingCostDelta: 0,
+    costPerStartDelta: 0,
+    startsMinute: 0,
+    yearsToBuild: 0.25,
+    yearsToBuildLeft: 0.25,
+    quoteKey: "status-only-fixture",
+  };
+  expect(facilityOperatingStatus(facility, 0)).toEqual({
+    kind: "producing",
+    label: "Generating; capacity upgrade in progress",
+  });
+  expect(facilityMapStatus(view, 0)).toEqual({
+    kind: "construction",
+    label: "Generating; capacity upgrade in progress",
+  });
+  facility.paused = true;
+  expect(facilityOperatingStatus(facility, 0).kind).toBe("paused");
+  expect(facilityMapStatus(view, 0)).toEqual({
+    kind: "construction",
+    label: "Operation paused; capacity upgrade in progress",
+  });
+});
+
 it("keeps construction progressing when only facility operation is paused", () => {
   const { game, facility } = ready();
   facility.yearsToBuildLeft = 0.25;

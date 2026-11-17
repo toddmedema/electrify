@@ -47,8 +47,8 @@ it("gives each known state a distinct shape and removes the marker for unknown o
 });
 
 it.each([
-  ["producing", "var(--delta-good)"],
-  ["idle", "var(--delta-bad)"],
+  ["producing", "#2E7D32"],
+  ["idle", "#C62828"],
 ] as const)("uses the semantic color for %s", (kind, color) => {
   const { container } = render(
     <svg>

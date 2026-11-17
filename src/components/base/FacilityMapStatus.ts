@@ -24,7 +24,7 @@ export function facilityOperatingStatus(
   const upgrading = isUpgradingAt(facility, minute);
   if (upgrading && retrofitOutputMultiplier(facility, minute) === 0)
     return { kind: "construction", label: `Retrofitting${paused}` };
-  const retrofit = upgrading ? "; retrofit in progress" : "";
+  const retrofit = `${upgrading ? "; retrofit in progress" : ""}${facility.expansionInProgress ? "; capacity upgrade in progress" : ""}`;
   if (facility.paused)
     return { kind: "paused", label: `Operation paused${retrofit}` };
   if (facility.currentW > 0)
@@ -43,8 +43,12 @@ export function facilityMapStatus(
   minute: number,
 ): FacilityMapStatus | undefined {
   if (view.tile.city || !view.facility) return undefined;
-  if (view.operatingFacility)
-    return facilityOperatingStatus(view.operatingFacility, minute);
+  if (view.operatingFacility) {
+    const status = facilityOperatingStatus(view.operatingFacility, minute);
+    return view.operatingFacility.expansionInProgress
+      ? { kind: "construction", label: status.label }
+      : status;
+  }
   if (view.facility.yearsToBuildLeft > 0)
     return { kind: "construction", label: "Under construction" };
   return { kind: "unknown", label: "Operating status unavailable" };

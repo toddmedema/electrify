@@ -124,7 +124,7 @@ export function facilityExpansionQuote(
     isStorage(small) ? small.maxPeakWh : small.maxPeakW,
     tile
       ? currentSize +
-          (territoryTilePowerLimit(tile) - facility.peakW) / wattsPerSize
+          (territoryTilePowerLimit(tile, small) - facility.peakW) / wattsPerSize
       : Infinity,
   );
   if (targetSize > maxSize)
