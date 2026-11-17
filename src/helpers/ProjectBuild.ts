@@ -16,7 +16,8 @@ import {
 } from "./TerritoryTiles";
 import { currentTick } from "./GameSelectors";
 import { facilityLoanMonths, purchaseTerms } from "./Financials";
-import { getDateFromMinute, MINUTES_PER_MONTH } from "./DateTime";
+import { getDateFromMinute } from "./DateTime";
+import { TICK_MINUTES, YEARS_PER_TICK } from "../Constants";
 
 /** Only identity, options and size survive a site change; prices are always resolved again. */
 export type ProjectSelection =
@@ -134,9 +135,11 @@ export function projectReview(
     facilityLoanMonths(quote.facility.lifespanYears),
   );
   const required = quote.connectionCost + terms.amountDue;
+  // Estimate with the fractional duration and live tick interval. Month-rollover pre-roll
+  // also advances construction, so completion near a boundary can fall in the prior month.
   const online = getDateFromMinute(
     game.date.minute +
-      Math.round(quote.facility.yearsToBuild * 12) * MINUTES_PER_MONTH,
+      Math.ceil(quote.facility.yearsToBuild / YEARS_PER_TICK) * TICK_MINUTES,
     game.startingYear,
   );
   // A calendar month, price, financing, cash or named-site change needs explicit review again.

@@ -146,6 +146,7 @@ function TileNetwork(props: Props) {
     if (panel?.open) close();
   }, [panel?.open, close]);
   const startProject = React.useCallback(() => {
+    if (projectBusy.current) return;
     panel?.inspect();
     setInspected(undefined);
     setSelected(undefined);
@@ -236,14 +237,17 @@ function TileNetwork(props: Props) {
           game={game}
           project={project}
           candidate={candidate}
+          compatibleSites={projectSites?.size ?? 0}
           catalogue={catalogue}
           onProject={(selection) => {
+            if (projectBusy.current) return;
             setProject(selection);
             setCatalogue(false);
             setCandidate(undefined);
             setSelected(undefined);
           }}
           onChangeProject={() => {
+            if (projectBusy.current) return;
             setCatalogue(true);
             setCandidate(undefined);
           }}

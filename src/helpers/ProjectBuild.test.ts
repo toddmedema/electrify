@@ -6,6 +6,10 @@ import { GENERATORS, STORAGE } from "../data/Facilities";
 import { projectReview, projectSiteQuote, selectProject } from "./ProjectBuild";
 import { tilePurchaseQuotes } from "./Territories";
 import { territoryTileViews } from "./TerritoryMapState";
+import cloneDeep from "lodash.clonedeep";
+import gameReducer, { buildFacility, tickState } from "../reducers/Game";
+import { getDateFromMinute } from "./DateTime";
+import { TICKS_PER_YEAR } from "../Constants";
 
 function fixture() {
   const game = createGame({ scenarioId: 116, seed: 188 });
@@ -96,4 +100,44 @@ it("keeps hydro, geothermal and offshore projects compatible with their physical
         : authored;
     expect(tileFitsFacility(tile, selectProject(facility))).toBe(true);
   }
+});
+
+it("shows the actual reducer completion month for fractional-month construction", () => {
+  const { game, project } = fixture();
+  game.difficulty = "Manager";
+  expect(game.date.month).toBe("Jan");
+  const quote = projectSiteQuote(game, project, "champlain:site-13");
+  if (!quote.facility) throw new Error(quote.reason);
+  const review = projectReview(game, quote, false);
+  const state = cloneDeep(
+    gameReducer(
+      game,
+      buildFacility({
+        facility: quote.facility,
+        financed: false,
+        territoryId: quote.tile.territoryId,
+        tileId: quote.tile.id,
+      }),
+    ),
+  );
+  const built = state.facilities.find(
+    ({ tileId }) => tileId === quote.tile.id,
+  )!;
+  expect(built).toBeDefined();
+  for (
+    let tick = 0;
+    tick < TICKS_PER_YEAR && built.yearsToBuildLeft > 0;
+    tick++
+  )
+    tickState(state);
+  expect(built.yearsToBuildLeft).toBe(0);
+  const actual = getDateFromMinute(
+    built.minuteOperational!,
+    state.startingYear,
+  );
+  expect(actual.month).toBe("Sep");
+  expect(review.online).toMatchObject({
+    month: actual.month,
+    year: actual.year,
+  });
 });

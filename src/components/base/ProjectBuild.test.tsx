@@ -12,6 +12,7 @@ import ProjectBuild from "./ProjectBuild";
 import { TerritoryTilePurchasesProvider } from "./TerritoryTilePurchases";
 import { createGame } from "../../testing/Simulator";
 import { currentTick } from "../../helpers/GameSelectors";
+import { formatWatts, formatWattHours } from "../../helpers/Format";
 import {
   projectCatalogue,
   type ProjectSelection,
@@ -29,7 +30,7 @@ const replace = createAction<GameType>("test/replace");
 afterEach(() => {
   registerMultiplayerRuntime(undefined);
 });
-function show(multiplayer = false, year?: number) {
+function show(multiplayer = false, year?: number, compatibleSites = 2) {
   const game = createGame({ scenarioId: 116, seed: 188 });
   currentTick(game)!.cash = 1e9;
   if (year) {
@@ -51,6 +52,7 @@ function show(multiplayer = false, year?: number) {
       defaults({ serializableCheck: false, immutableCheck: false }),
   });
   const close = jest.fn();
+  const onSelection = jest.fn();
   function Workspace() {
     const current = useSelector((state: { game: GameType }) => state.game);
     const [project, setProject] = React.useState<ProjectSelection>();
@@ -70,8 +72,10 @@ function show(multiplayer = false, year?: number) {
           game={current}
           project={project}
           candidate={candidate}
+          compatibleSites={compatibleSites}
           catalogue={catalogue}
           onProject={(selection) => {
+            onSelection(selection);
             setProject(selection);
             setCatalogue(false);
           }}
@@ -101,7 +105,7 @@ function show(multiplayer = false, year?: number) {
     fireEvent.click(screen.getByRole("button", { name: "Adjacent site" }));
     fireEvent.click(screen.getByRole("button", { name: "Review project" }));
   };
-  return { game, store, close, choose, adjacent };
+  return { game, store, close, choose, adjacent, onSelection };
 }
 function runtime(submit: (command: Command) => Promise<void>) {
   registerMultiplayerRuntime({
@@ -117,6 +121,7 @@ it("explores two sites with the selected size and spends only after explicit rev
   const cash = currentTick(game)!.cash;
   choose();
   fireEvent.click(screen.getByRole("button", { name: "Adjacent site" }));
+  expect(screen.getByText("Estimated online")).toBeVisible();
   expect(screen.getByRole("heading", { name: "Wind · 20MW" })).toBeVisible();
   fireEvent.click(screen.getByRole("button", { name: "Owned site" }));
   expect(screen.getByRole("heading", { name: "Wind · 20MW" })).toBeVisible();
@@ -282,4 +287,74 @@ it("cancels the pending project continuation when the run changes", async () => 
   );
   expect(commands).toHaveLength(1);
   expect(store.getState().game.facilities).toHaveLength(game.facilities.length);
+});
+
+it("corrects an oversized technology to its actual maximum before choosing sites", () => {
+  const { store, game } = show();
+  fireEvent.change(screen.getByRole("slider", { name: "Generator capacity" }), {
+    target: { value: "34" },
+  });
+  const choose = screen.getByRole("button", {
+    name: "Choose 1.5GW sites for Wind",
+  });
+  expect(screen.getByText("Maximum available size: 1.5GW")).toBeVisible();
+  fireEvent.click(choose);
+  fireEvent.click(screen.getByRole("button", { name: "Owned site" }));
+  expect(screen.getByRole("heading", { name: "Wind · 1.5GW" })).toBeVisible();
+  expect(screen.getByRole("button", { name: "Review project" })).toBeEnabled();
+  expect(currentTick(store.getState().game)!.cash).toBe(
+    currentTick(game)!.cash,
+  );
+  expect(store.getState().game.territoryNetwork!.tilePurchases).toHaveLength(0);
+});
+
+it("explains a project with no compatible sites and keeps Change project available", () => {
+  const { choose, store, game } = show(false, undefined, 0);
+  choose();
+  expect(
+    screen.getByText(/No compatible connected or adjacent sites/),
+  ).toBeVisible();
+  expect(
+    screen.queryByText("Choose a highlighted site."),
+  ).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Change project" }));
+  expect(
+    screen.getByRole("slider", { name: "Generator capacity" }),
+  ).toBeVisible();
+  expect(currentTick(store.getState().game)!.cash).toBe(
+    currentTick(game)!.cash,
+  );
+});
+
+it("chooses the exact storage technology limit without requiring affordable cash", () => {
+  const { game, store, onSelection } = show(false, 2031);
+  fireEvent.click(screen.getByRole("tab", { name: "Storage" }));
+  fireEvent.change(screen.getByRole("slider", { name: "Storage capacity" }), {
+    target: { value: "37" },
+  });
+  const battery = projectCatalogue(game, 20e9, true).find(
+    ({ name }) => name === "Battery",
+  )!;
+  const limit = battery.maxPeakWh!;
+  const label = formatWattHours(limit);
+  const newer = JSON.parse(JSON.stringify(store.getState().game)) as GameType;
+  currentTick(newer)!.cash = 0;
+  act(() => {
+    store.dispatch(replace(newer));
+  });
+  fireEvent.click(
+    screen.getByRole("button", { name: `Choose ${label} sites for Battery` }),
+  );
+  expect(onSelection).toHaveBeenLastCalledWith(
+    expect.objectContaining({ peakWh: limit }),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Owned site" }));
+  expect(
+    screen.getByRole("heading", {
+      name: `Battery · ${formatWatts(limit / 4)}`,
+    }),
+  ).toBeVisible();
+  expect(screen.getByText(/more cash needed/)).toBeVisible();
+  expect(screen.getByRole("button", { name: "Review project" })).toBeEnabled();
+  expect(currentTick(store.getState().game)!.cash).toBe(0);
 });

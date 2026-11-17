@@ -1,5 +1,12 @@
 import * as React from "react";
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { configureStore } from "@reduxjs/toolkit";
 import { Provider, useSelector } from "react-redux";
 import { createGame } from "../../testing/Simulator";
@@ -18,12 +25,16 @@ import type { GameType, TerritoryTileId } from "../../Types";
 import { GameToolMemoryContext } from "../base/GameToolMemory";
 import { MapWorkspacePanelContext } from "../base/GameWorkspaceContext";
 import TerritoryNetwork from "./TerritoryNetwork";
-import gameReducer from "../../reducers/Game";
+import gameReducer, { buildFacility } from "../../reducers/Game";
 import uiReducer from "../../reducers/UI";
 import { GENERATORS } from "../../data/Facilities";
 import { wToSliderTick } from "../../helpers/BuildSizing";
 import { acquisitionQuote, transferUtility } from "../../helpers/Expansion";
 import { acquireTile } from "../../reducers/GameActions";
+import { registerMultiplayerRuntime } from "../../multiplayer/Registry";
+import type { Command } from "../../multiplayer/Types";
+
+afterEach(() => registerMultiplayerRuntime(undefined));
 
 jest.mock(
   "../base/ManualLink",
@@ -35,6 +46,7 @@ jest.mock("./TerritoryHexMap", () => ({
   default: (props: {
     game: GameType;
     selected?: TerritoryTileId;
+    onPlanProject?: () => void;
     onSelect: (id: TerritoryTileId, activate?: boolean) => void;
   }) => {
     const { territoryTileViews } = jest.requireActual<
@@ -43,6 +55,7 @@ jest.mock("./TerritoryHexMap", () => ({
     return (
       <div aria-label="Tile map">
         <button className="territoryMapBuyToggle">Connect</button>
+        <button onClick={props.onPlanProject}>Build</button>
         {territoryTileViews(props.game).map(({ tile }) => (
           <button
             className="territoryTileTarget"
@@ -100,10 +113,12 @@ function show(game = ready()) {
     );
   }
   const onInspect = jest.fn();
-  const content = (open = false) => (
+  const content = (open = false, projectRequested = false) => (
     <Provider store={store}>
       <GameToolMemoryContext.Provider value={memory}>
-        <MapWorkspacePanelContext.Provider value={{ open, inspect: onInspect }}>
+        <MapWorkspacePanelContext.Provider
+          value={{ open, inspect: onInspect, projectRequested }}
+        >
           <Connected />
         </MapWorkspacePanelContext.Provider>
       </GameToolMemoryContext.Provider>
@@ -116,6 +131,7 @@ function show(game = ready()) {
     onAcquire,
     onInspect,
     showPanel: (open: boolean) => utils.rerender(content(open)),
+    requestProject: () => utils.rerender(content(false, true)),
     ...utils,
   };
 }
@@ -440,4 +456,80 @@ it("replaces tile inspection with a dock panel, without resurrecting the old ins
   inspect("champlain:city");
   expect(surface()).toBeVisible();
   expect(app.onInspect).toHaveBeenCalledTimes(2);
+});
+
+it("keeps the confirmed project locked when Build is activated during host Connect", async () => {
+  const game = ready();
+  game.multiplayer = { seat: "0" };
+  const { store, requestProject } = show(game);
+  const commands: Command[] = [];
+  registerMultiplayerRuntime({
+    submit: async (command) => {
+      commands.push(command);
+      if (command.kind === "action" && command.name === "buildFacility")
+        store.dispatch(
+          buildFacility(command.payload as Parameters<typeof buildFacility>[0]),
+        );
+    },
+    command: jest.fn(),
+    activity: jest.fn(),
+    leave: async () => undefined,
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Build" }));
+  fireEvent.click(
+    screen.getByRole("button", { name: "Choose sites for Wind" }),
+  );
+  inspect("green-uplands:site-1");
+  fireEvent.click(screen.getByRole("button", { name: "Review project" }));
+  fireEvent.click(screen.getByRole("button", { name: "Connect & build" }));
+  await act(async () => {
+    await Promise.resolve();
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Build" }));
+  requestProject();
+  inspect("champlain:site-13");
+  fireEvent.keyDown(surface(), { key: "Escape" });
+  expect(screen.getByRole("button", { name: "Connecting…" })).toBeDisabled();
+  expect(screen.queryByRole("slider")).not.toBeInTheDocument();
+  expect(
+    screen.getByRole("heading", { name: "Connect and build Wind?" }),
+  ).toBeVisible();
+  expect(commands).toHaveLength(1);
+  expect(store.getState().game.facilities).toHaveLength(game.facilities.length);
+  const connect = commands[0];
+  if (connect.kind !== "action" || connect.name !== "acquireTile")
+    throw new Error("Expected connection command");
+  act(() => {
+    store.dispatch(
+      acquireTile(connect.payload as Parameters<typeof acquireTile>[0]),
+    );
+  });
+  await waitFor(() =>
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+  );
+  expect(commands).toHaveLength(2);
+  expect(
+    store
+      .getState()
+      .game.facilities.find(({ tileId }) => tileId === "green-uplands:site-1"),
+  ).toMatchObject({ name: "Wind", peakW: 20e6 });
+});
+
+it("explains when a project has no compatible highlighted sites without requiring connection or cash", () => {
+  const game = ready();
+  currentTick(game)!.cash = 0;
+  const { store } = show(game);
+  fireEvent.click(screen.getByRole("button", { name: "Build" }));
+  fireEvent.click(
+    screen.getByRole("button", { name: "Choose sites for Offshore Wind" }),
+  );
+  expect(
+    screen.getByText(/No compatible connected or adjacent sites/),
+  ).toBeVisible();
+  expect(
+    screen.queryByText("Choose a highlighted site."),
+  ).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Change project" })).toBeEnabled();
+  expect(store.getState().game.territoryNetwork!.tilePurchases).toHaveLength(0);
+  expect(currentTick(store.getState().game)!.cash).toBe(0);
 });

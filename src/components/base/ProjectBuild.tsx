@@ -40,6 +40,7 @@ export default function ProjectBuild({
   game,
   project,
   candidate,
+  compatibleSites,
   catalogue,
   onProject,
   onChangeProject,
@@ -49,6 +50,7 @@ export default function ProjectBuild({
   game: GameType;
   project?: ProjectSelection;
   candidate?: TerritoryTileId;
+  compatibleSites: number;
   catalogue: boolean;
   onProject: (project: ProjectSelection) => void;
   onChangeProject: () => void;
@@ -265,10 +267,12 @@ export default function ProjectBuild({
             value={storage ? "storage" : "generators"}
             variant="fullWidth"
             aria-label="Project type"
-            onChange={(_event, value) => setStorage(value === "storage")}
+            onChange={(_event, value) => {
+              if (!lock.current) setStorage(value === "storage");
+            }}
           >
-            <Tab value="generators" label="Generators" />
-            <Tab value="storage" label="Storage" />
+            <Tab value="generators" label="Generators" disabled={!!progress} />
+            <Tab value="storage" label="Storage" disabled={!!progress} />
           </Tabs>
           <label className="projectSize">
             {storage ? "Storage capacity" : "Generator capacity"}
@@ -284,35 +288,70 @@ export default function ProjectBuild({
               max={storage ? 37 : 34}
               step={1}
               value={size}
-              onChange={(event) =>
-                (storage ? setStorageSize : setGeneratorSize)(
-                  Number(event.target.value),
-                )
-              }
+              disabled={!!progress}
+              onChange={(event) => {
+                if (!lock.current)
+                  (storage ? setStorageSize : setGeneratorSize)(
+                    Number(event.target.value),
+                  );
+              }}
             />
           </label>
           <ul className="projectOptions">
-            {options.map((option) => (
-              <li key={option.name}>
-                <div>
-                  <strong>{option.name}</strong>
-                  <span>{option.description}</span>
-                  <small>
-                    {isStorage(option)
-                      ? formatWattHours(option.peakWh)
-                      : formatWatts(option.peakW)}{" "}
-                    · {money(option.buildCost)} before site costs
-                  </small>
-                </div>
-                <Button
-                  variant="outlined"
-                  aria-label={`Choose sites for ${option.name}`}
-                  onClick={() => onProject(selectProject(option))}
-                >
-                  Choose sites
-                </Button>
-              </li>
-            ))}
+            {options.map((option) => {
+              const maxSize = isStorage(option)
+                ? option.maxPeakWh
+                : option.maxPeakW;
+              const requestedSize = isStorage(option)
+                ? option.peakWh
+                : option.peakW;
+              const tooLarge = maxSize > 0 && requestedSize > maxSize;
+              const maxLabel = isStorage(option)
+                ? formatWattHours(maxSize)
+                : formatWatts(maxSize);
+              return (
+                <li key={option.name}>
+                  <div>
+                    <strong>{option.name}</strong>
+                    <span>{option.description}</span>
+                    <small>
+                      {isStorage(option)
+                        ? formatWattHours(option.peakWh)
+                        : formatWatts(option.peakW)}{" "}
+                      · {money(option.buildCost)} before site costs
+                    </small>
+                    {tooLarge && (
+                      <small>Maximum available size: {maxLabel}</small>
+                    )}
+                    {maxSize <= 0 && (
+                      <small>No suitable sites currently available.</small>
+                    )}
+                  </div>
+                  <Button
+                    variant="outlined"
+                    disabled={!!progress}
+                    aria-label={
+                      tooLarge
+                        ? `Choose ${maxLabel} sites for ${option.name}`
+                        : `Choose sites for ${option.name}`
+                    }
+                    onClick={() => {
+                      if (lock.current) return;
+                      const selected = tooLarge
+                        ? projectCatalogue(
+                            game,
+                            maxSize,
+                            isStorage(option),
+                          ).find(({ name }) => name === option.name)
+                        : option;
+                      if (selected) onProject(selectProject(selected));
+                    }}
+                  >
+                    {tooLarge ? `Use ${maxLabel}` : "Choose sites"}
+                  </Button>
+                </li>
+              );
+            })}
           </ul>
         </div>
       ) : (
@@ -328,7 +367,7 @@ export default function ProjectBuild({
                 {territoryMapLabel(ready.tile.territoryId)}
               </p>
             )}
-            {!candidate && (
+            {!candidate && compatibleSites > 0 && (
               <>
                 <p>Choose a highlighted site.</p>
                 <p className="projectSiteLegend">
@@ -336,6 +375,13 @@ export default function ProjectBuild({
                   <span>Connection required · quoted cost</span>
                 </p>
               </>
+            )}
+            {!candidate && compatibleSites === 0 && (
+              <Alert severity="info">
+                No compatible connected or adjacent sites are available for this
+                project. Change the technology or size, or extend your network
+                with Connect.
+              </Alert>
             )}
             {candidate && !ready && (
               <Alert severity="info">{quote?.reason}</Alert>
@@ -368,7 +414,7 @@ export default function ProjectBuild({
                     <dd>{output}</dd>
                   </div>
                   <div>
-                    <dt>Online</dt>
+                    <dt>Estimated online</dt>
                     <dd>
                       {review.online.month} {review.online.year}
                     </dd>
