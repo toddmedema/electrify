@@ -290,6 +290,8 @@ export function validFacilityExpansion(
   if (
     facility.yearsToBuildLeft !== 0 ||
     facility.upgradeInProgress ||
+    raw.targetSize > 1e12 ||
+    raw.targetPeakW > 1e12 ||
     raw.targetSize <= (facility.peakWh ?? facility.peakW) ||
     raw.targetPeakW <= facility.peakW ||
     raw.yearsToBuild > 100 ||
@@ -305,6 +307,38 @@ export function validFacilityExpansion(
     isStorage(facility)
       ? raw.targetPeakWh !== raw.targetSize
       : raw.targetPeakWh !== undefined || raw.targetSize !== raw.targetPeakW
+  )
+    return false;
+  // The review identity is also a cross-check of duplicated persisted terms. No prices are
+  // recalculated during import: weather/economic datasets may not yet have been loaded.
+  let reviewed: unknown;
+  try {
+    reviewed = JSON.parse(raw.quoteKey);
+  } catch {
+    return false;
+  }
+  if (!Array.isArray(reviewed) || reviewed.length !== 15) return false;
+  const same = (actual: unknown, expected: number) =>
+    typeof actual === "number" &&
+    Number.isFinite(actual) &&
+    Math.abs(actual - expected) <= Math.max(1, Math.abs(expected)) * 1e-9;
+  const moneyScale = reviewed[10];
+  if (
+    typeof moneyScale !== "number" ||
+    !Number.isFinite(moneyScale) ||
+    moneyScale <= 0 ||
+    reviewed[0] !== facility.id ||
+    reviewed[1] !== (facility.peakWh ?? facility.peakW) ||
+    reviewed[2] !== facility.peakW ||
+    reviewed[3] !== raw.targetSize ||
+    reviewed[4] !== raw.targetPeakW ||
+    reviewed[5] !== raw.cost ||
+    reviewed[6] !== raw.yearsToBuild ||
+    !same(reviewed[7], raw.annualOperatingCostDelta / moneyScale) ||
+    !same(reviewed[8], raw.costPerStartDelta / moneyScale) ||
+    reviewed[9] !== raw.constructionKgco2eTotal ||
+    reviewed[11] !== (facility.hydroSiteId ?? null) ||
+    JSON.stringify(reviewed[12]) !== JSON.stringify(facility.resilience ?? null)
   )
     return false;
   const maximumEmissions =

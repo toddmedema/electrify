@@ -322,6 +322,8 @@ it("round trips pending work, rejects malformed saves, blocks retrofits and keep
   expect(facilitySignature(progress)).toBe(signature);
   for (const mutation of [
     { cost: -1 },
+    { cost: game.facilities[0].expansionInProgress!.cost + 1 },
+    { targetPeakW: game.facilities[0].expansionInProgress!.targetPeakW + 1 },
     { targetSize: 1 },
     { yearsToBuildLeft: Infinity },
     { targetPeakWh: 123 },
@@ -340,4 +342,33 @@ it("round trips pending work, rejects malformed saves, blocks retrofits and keep
   expect(
     advanced.facilities[0].expansionInProgress!.yearsToBuildLeft,
   ).toBeLessThan(game.facilities[0].expansionInProgress!.yearsToBuildLeft);
+});
+
+it("pins hydro expansion to its original named site without releasing any other claim", () => {
+  const initial = setup(103);
+  const hydroQuote = getBuildFacilityQuote(initial, {
+    name: "Hydro",
+    peakW: 1e6,
+  })!;
+  const game = cloneDeep(
+    reducer(initial, buildFacility({ facility: hydroQuote, financed: false })),
+  );
+  const hydro = game.facilities.find((facility) => facility.fuel === "Hydro")!;
+  expect(hydro.hydroSiteId).toBeDefined();
+  hydro.yearsToBuildLeft = 0;
+  hydro.minuteOperational = 0;
+  game.commissionedHydroSiteIds.push(hydro.hydroSiteId!);
+  const claims = [...game.commissionedHydroSiteIds];
+  // Inherited sites can be absent from the inventory offered for fresh construction.
+  const result = quote(game, hydro.id, hydro.peakW * 1.05);
+  const started = begin(game, hydro.id, result.targetSize);
+  expect(
+    started.facilities.find(({ id }) => id === hydro.id)!.hydroSiteId,
+  ).toBe(hydro.hydroSiteId);
+  expect(game.commissionedHydroSiteIds).toEqual(claims);
+  expect(started.commissionedHydroSiteIds).toEqual(claims);
+  expect(facilityExpansionQuote(game, hydro.id, 1e12).status).toBe(
+    "unavailable",
+  );
+  expect(parseSave(serializeSave(started))).not.toBeNull();
 });
