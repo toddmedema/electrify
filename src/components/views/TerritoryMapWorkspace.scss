@@ -174,21 +174,26 @@
     bottom: calc(100% + 4px);
     transform: translateX(-50%);
     padding: 4px 8px;
-    border: 2px solid var(--territory-owner-color);
-    border-radius: var(--radius-sm);
-    background: var(--bg-primary);
-    font-size: 14px;
-    line-height: 20px;
+    border: 1px solid
+      color-mix(in srgb, var(--territory-owner-color) 64%, transparent);
+    border-radius: var(--radius-lg);
+    background: color-mix(in srgb, var(--bg-raised) 88%, transparent);
+    box-shadow: 0 2px 8px var(--shadow-ring);
+    font-size: 13px;
+    line-height: 18px;
     font-weight: 600;
     pointer-events: auto;
     width: max-content;
-    max-width: calc(100% - 8px);
-    white-space: normal;
+    max-width: 160px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
     text-align: center;
   }
   &:hover strong,
   &[aria-pressed="true"] strong {
-    background: var(--bg-selected);
+    background: var(--bg-raised);
+    border-color: var(--territory-owner-color);
   }
   &:focus-visible strong {
     outline: 3px solid var(--focus-ring);
@@ -262,30 +267,34 @@
     display: flex;
     flex-direction: column;
     justify-content: center;
-    width: 104px;
-    min-height: 44px;
-    padding: 4px;
+    width: max-content;
+    max-width: 120px;
+    min-height: 28px;
+    padding: 4px 8px;
     box-sizing: border-box;
-    border: 1px solid var(--interactive-blue);
-    border-radius: var(--radius-sm);
-    background: var(--bg-primary);
+    border: 1px solid
+      color-mix(in srgb, var(--interactive-strong) 40%, transparent);
+    border-radius: var(--radius-lg);
+    background: color-mix(in srgb, var(--bg-raised) 88%, transparent);
+    box-shadow: 0 2px 8px var(--shadow-ring);
     color: var(--font-color-primary);
     font-size: 11px;
     line-height: 14px;
     b {
       font-size: 13px;
       line-height: 18px;
-      color: var(--interactive-blue);
+      color: var(--interactive-strong);
     }
-    em {
-      font-style: normal;
-      color: var(--font-color-faded);
-    }
+  }
+  &:hover .territoryTilePrice,
+  &:focus-visible .territoryTilePrice {
+    background: var(--bg-raised);
   }
   &[data-unaffordable="true"] .territoryTilePrice {
     border-color: var(--border-subtle);
     b {
-      color: var(--font-color-faded);
+      color: var(--font-color-primary);
+      font-weight: var(--font-weight-regular);
     }
   }
 }

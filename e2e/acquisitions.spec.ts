@@ -1174,7 +1174,7 @@ for (const theme of ["light", "dark"] as const) {
     await expect(target).toHaveAccessibleName(
       /Inspect .*not enough available cash/,
     );
-    await expect(target).toContainText("Not enough cash");
+    await expect(target).not.toContainText(/General site|Not enough cash/);
     await target.click();
     const surface = tileSurface(page);
     await expect(

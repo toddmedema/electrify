@@ -713,8 +713,9 @@ export default function TerritoryHexMap({
                 {quote && (
                   <span className="territoryTilePrice" aria-hidden="true">
                     <b>{pending ? "Buying…" : money(quote.price)}</b>
-                    <span>{tilePurchaseBenefitLabel(quote)}</span>
-                    {unaffordable && <em>Not enough cash</em>}
+                    {quote.benefit !== "general" && (
+                      <span>{tilePurchaseBenefitLabel(quote)}</span>
+                    )}
                   </span>
                 )}
                 <span className="srOnly" id={`${mapId}-${tile.id}-status`}>

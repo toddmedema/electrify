@@ -533,6 +533,35 @@ it("keeps phone targets large and unaffordable land inspectable with its currenc
   ).toHaveLength(0);
 });
 
+it.each([
+  { cash: 1e9, unaffordable: false, action: "Buy", reason: "" },
+  {
+    cash: 1e6,
+    unaffordable: true,
+    action: "Inspect",
+    reason: "; not enough available cash",
+  },
+])(
+  "keeps general-land price labels compact without losing cash-limited descriptions with $cash cash",
+  ({ cash, unaffordable, action, reason }) => {
+    const map = show(cash);
+    map.buyMode();
+    const tile = map
+      .candidates()
+      .find(
+        (button) =>
+          tilePurchaseQuote(map.store.getState().game, idOf(button))
+            ?.benefit === "general",
+      )!;
+    expect(tile).toHaveTextContent(/\$/);
+    expect(tile).not.toHaveTextContent(/General site|Not enough cash/);
+    expect(tile).toHaveAttribute("data-unaffordable", String(unaffordable));
+    expect(tile).toHaveAccessibleName(
+      new RegExp(`^${action} .*General site${reason}$`),
+    );
+  },
+);
+
 it("keeps an unselected map unselected across game updates with one reachable tile", () => {
   const map = show();
   const tile = map.target("champlain:city");
