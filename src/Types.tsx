@@ -1371,6 +1371,7 @@ export type LandTerritoryId =
 export type TerritoryId = UtilityId | LandTerritoryId;
 export type TerrainType =
   "plains" | "forest" | "hills" | "mountain" | "river" | "lake" | "ocean";
+export type CitySizeType = "small" | "medium" | "large";
 export type TerritoryTileId =
   | FrontierTerritoryId
   | `${TerritoryId}:city`
