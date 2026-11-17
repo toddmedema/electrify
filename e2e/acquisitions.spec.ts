@@ -205,11 +205,19 @@ async function expectPhysicalMap(network: Locator, game: GameType) {
           button.getBoundingClientRect().y +
           button.getBoundingClientRect().height / 2,
         selected: button.getAttribute("aria-pressed") === "true",
-        distance: element
-          .querySelector(
-            `[data-tile="${button.getAttribute("data-map-target")}"]`,
-          )
-          ?.getAttribute("data-visibility-distance"),
+        distance: scene
+          ? String(
+              scene.find(
+                (instance) =>
+                  instance.id ===
+                  `terrain:${button.getAttribute("data-map-target")}`,
+              )?.fog,
+            )
+          : element
+              .querySelector(
+                `[data-tile="${button.getAttribute("data-map-target")}"]`,
+              )
+              ?.getAttribute("data-visibility-distance"),
       })),
       occupants: Array.from(
         element.querySelectorAll(".territoryTileOccupant"),
