@@ -5,6 +5,7 @@ import Audio, { StateProps } from "./Audio";
 import {
   loadAudioFiles,
   pause,
+  playSoundEffect,
   resume,
   setMusicInGame,
   setMusicVolume,
@@ -13,6 +14,8 @@ import {
   unlockAudio,
 } from "../../data/Audio";
 import { INIT_DELAY } from "../../Constants";
+import { achievementJournal } from "../../achievements/Journal";
+import { recordIntent } from "../../achievements/Progress";
 
 jest.mock("../../InstalledApp");
 
@@ -46,8 +49,81 @@ beforeEach(() => {
   jest.clearAllMocks();
   (isInstalledWebApp as jest.Mock).mockReturnValue(false);
   state.loaded = "UNLOADED";
+  localStorage.clear();
+  achievementJournal.activate();
+  achievementJournal.refresh();
+  achievementJournal.setSteamAvailable(false);
+  achievementJournal.clearNotifications();
 });
 afterEach(() => jest.useRealTimers());
+
+it("chimes once for a batch of live achievements and again for a later award", () => {
+  render(<Audio {...props} />);
+  act(() => {
+    achievementJournal.merge(
+      recordIntent({ earned: ["FIRST_SPARK", "OUT_OF_JUICE"] }),
+      true,
+    );
+  });
+  expect(playSoundEffect).toHaveBeenCalledTimes(1);
+  expect(playSoundEffect).toHaveBeenLastCalledWith("ACHIEVEMENT_UNLOCKED");
+  act(() => {
+    achievementJournal.merge(recordIntent({ earned: ["FIRST_SPARK"] }), true);
+    achievementJournal.dismiss("FIRST_SPARK");
+    achievementJournal.setSync("synced");
+    achievementJournal.merge(recordIntent({ earned: ["LIGHTS_ON"] }), true);
+  });
+  expect(playSoundEffect).toHaveBeenCalledTimes(2);
+});
+
+it("keeps restored, synced and Steam-owned achievements silent", () => {
+  achievementJournal.merge(recordIntent({ earned: ["FIRST_SPARK"] }), true);
+  render(<Audio {...props} />);
+  act(() => {
+    achievementJournal.merge(recordIntent({ earned: ["OUT_OF_JUICE"] }));
+    achievementJournal.setSteamAvailable(true);
+    achievementJournal.merge(recordIntent({ earned: ["LIGHTS_ON"] }), true);
+    achievementJournal.setSteamAvailable(false);
+  });
+  expect(playSoundEffect).not.toHaveBeenCalled();
+});
+
+it("discards muted awards and stops observing achievements on unmount", () => {
+  const { rerender, unmount } = render(<Audio {...props} enabled={false} />);
+  act(() => {
+    achievementJournal.merge(recordIntent({ earned: ["FIRST_SPARK"] }), true);
+  });
+  rerender(<Audio {...props} />);
+  expect(playSoundEffect).not.toHaveBeenCalled();
+  unmount();
+  act(() => {
+    achievementJournal.merge(recordIntent({ earned: ["OUT_OF_JUICE"] }), true);
+  });
+  expect(playSoundEffect).not.toHaveBeenCalled();
+});
+
+it("discards hidden-page awards without replaying them on return", () => {
+  const visibility = jest.spyOn(document, "visibilityState", "get");
+  render(<Audio {...props} />);
+  try {
+    visibility.mockReturnValue("hidden");
+    act(() => {
+      achievementJournal.merge(recordIntent({ earned: ["FIRST_SPARK"] }), true);
+    });
+    visibility.mockReturnValue("visible");
+    act(() => achievementJournal.setSync("synced"));
+    expect(playSoundEffect).not.toHaveBeenCalled();
+    act(() => {
+      achievementJournal.merge(
+        recordIntent({ earned: ["OUT_OF_JUICE"] }),
+        true,
+      );
+    });
+    expect(playSoundEffect).toHaveBeenCalledTimes(1);
+  } finally {
+    visibility.mockRestore();
+  }
+});
 
 it("disables unsupported audio once and stops trying on later gestures", () => {
   (loadAudioFiles as jest.Mock).mockImplementationOnce(() => {

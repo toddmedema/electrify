@@ -15,6 +15,7 @@ import {
 } from "../../audio/SoundEvents";
 import { INIT_DELAY } from "../../Constants";
 import { isInstalledWebApp } from "../../InstalledApp";
+import { achievementJournal } from "../../achievements/Journal";
 import * as React from "react";
 
 export interface StateProps extends SoundEventSnapshot {
@@ -32,11 +33,28 @@ interface Props extends StateProps, DispatchProps {}
 
 export default class Audio extends React.Component<Props, {}> {
   private loadTimer: ReturnType<typeof setTimeout> | undefined;
+  private stopAchievements: (() => void) | undefined;
 
   /** Track scene and gesture changes, then prepare installed-app music after startup settles. */
   componentDidMount() {
     setMusicInGame(this.props.inGame, this.props.musicIntensity);
     if (!this.props.enabled || document.visibilityState === "hidden") pause();
+    // Only new live notifications deserve a chime. Consume them even while muted/hidden so
+    // enabling sound or returning to the tab cannot replay an old award. Steam owns its cues.
+    let previousNotifications = achievementJournal.getSnapshot().notifications;
+    this.stopAchievements = achievementJournal.subscribe(() => {
+      const current = achievementJournal.getSnapshot().notifications;
+      const unlocked = current.some(
+        (id) => !previousNotifications.includes(id),
+      );
+      previousNotifications = current;
+      if (
+        unlocked &&
+        this.props.enabled &&
+        document.visibilityState !== "hidden"
+      )
+        playSoundEffect("ACHIEVEMENT_UNLOCKED");
+    });
     document.addEventListener("click", this.onGesture, true);
     document.addEventListener("touchend", this.onGesture, true);
     document.addEventListener("keydown", this.onGesture, true);
@@ -50,6 +68,7 @@ export default class Audio extends React.Component<Props, {}> {
 
   componentWillUnmount() {
     clearTimeout(this.loadTimer);
+    this.stopAchievements?.();
     document.removeEventListener("click", this.onGesture, true);
     document.removeEventListener("touchend", this.onGesture, true);
     document.removeEventListener("keydown", this.onGesture, true);
