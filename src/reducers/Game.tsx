@@ -1,3 +1,4 @@
+import { pooledPeerExportEmissions } from "../helpers/PeerExportEmissions";
 import { assignTerritoryTiles } from "../helpers/TerritoryTiles";
 import {
   hasTerritoryNetwork,
@@ -6110,28 +6111,13 @@ function* supplyFacilitiesFinancesPhases(
       solarIrradianceWM2: now.solarIrradianceWM2,
       emissionsAt: (exportedW) => {
         if (state.utilityExpansion) {
-          const surplusW = Math.min(
+          return pooledPeerExportEmissions(
             exportedW,
             Math.max(0, supply - charge - now.demandW - reserveW),
+            supply - entitlementDeliveredW,
+            facilities,
+            peerExportHeadroom,
           );
-          const nativeSupplyW = supply - entitlementDeliveredW;
-          const nativeWeight = facilities.reduce(
-            (sum, facility) =>
-              sum +
-              (isStorage(facility) || facility.paused
-                ? 0
-                : facility.currentW * intensity(facility)),
-            0,
-          );
-          let weighted =
-            nativeSupplyW > 0 ? (surplusW * nativeWeight) / nativeSupplyW : 0;
-          let extraW = Math.max(0, exportedW - surplusW);
-          for (const item of peerExportHeadroom) {
-            const deliveredW = Math.min(item.watts, extraW);
-            extraW -= deliveredW;
-            weighted += deliveredW * intensity(item.generator);
-          }
-          return exportedW > 0 ? weighted / exportedW : 0;
         }
         let watts = entitlementDeliveredW,
           weighted = 0;
@@ -6952,6 +6938,19 @@ function* supplyFacilitiesFinancesPhases(
         if (!(key in value))
           delete (node as unknown as Record<string, unknown>)[key];
       Object.assign(node, value, { currentW: output, committed });
+      const headroom = storageHeadroom.get(node.id);
+      if (isStorage(node) && headroom) {
+        // A refresh retains the original charge. Undo any discharge headroom
+        // attributed to temporary charging, while keeping interruptible demand.
+        const currentGridW =
+          output < 0 ? output / node.roundTripEfficiency : output;
+        const watts = Math.max(
+          0,
+          Math.min(headroom.peakW, node.currentWh * TICKS_PER_HOUR) -
+            currentGridW,
+        );
+        now.reserveW += watts - headroom.watts;
+      }
     }
     for (const { node, value } of noElapsed.lines)
       Object.assign(node, value, { currentFlowW: node.currentFlowW });

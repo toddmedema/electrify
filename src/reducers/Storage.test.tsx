@@ -12,7 +12,11 @@ import {
   isStorage,
   StorageOperatingType,
 } from "../Types";
-import { generateNewTimeline, tickState } from "./Game";
+import reducer, {
+  generateNewTimeline,
+  togglePauseFacility,
+  tickState,
+} from "./Game";
 
 function fixture() {
   const game = createGame({ scenarioId: 103, seed: 44 });
@@ -156,6 +160,30 @@ describe("storage dispatch energy accounting", () => {
     expect(now.supplyW).toBeCloseTo(100);
     expect(store.currentW).toBeCloseTo(-60 / TICK_MINUTES);
   });
+  it.each([0, 5, 25])(
+    "uses the retained %s Wh for storage reserve during a paused refresh",
+    (currentWh) => {
+      const { game, generator, battery } = fixture();
+      game.transmission!.buyingRule = "SHORTAGES_AND_STORAGE";
+      game.facilities = [
+        { ...generator(1, 150), paused: true },
+        battery(2, { currentWh }),
+      ];
+      game.speed = "PAUSED";
+      const refreshed = reducer(game, togglePauseFacility(1));
+      const now = getTimeFromTimeline(
+        refreshed.date.minute,
+        refreshed.timeline,
+      )!;
+      expect(refreshed.date).toEqual(game.date);
+      expect(refreshed.facilities[1].currentWh).toBe(currentWh);
+      expect(now.storedWh).toBe(currentWh);
+      expect(now.storageChargeW).toBe(50);
+      // Interrupting the 50 W charge is available immediately; only retained
+      // energy can add discharge reserve on top of that relief.
+      expect(now.reserveW).toBe(50 + Math.min(100, currentWh * TICKS_PER_HOUR));
+    },
+  );
   it("does not dispatch an unused reserve after charging storage", () => {
     const { generator, battery, run } = fixture();
     const final = generator(3);
