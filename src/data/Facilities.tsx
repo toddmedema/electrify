@@ -2,7 +2,7 @@ import { availableTerritorySpecialSites } from "./Territories";
 import { isUtilityExpansionGame } from "../helpers/ExpansionContext";
 import { customEventContext } from "../helpers/CustomScenarioEvents";
 import { FACILITY_FUELS } from "./FacilityFuels";
-import { getHydroAvailability } from "./HydroSites";
+import { getHydroAvailability, getHydroSite } from "./HydroSites";
 import {
   batteryYearsToBuild,
   naturalGasCCYearsToBuild,
@@ -315,6 +315,7 @@ export function GENERATORS(
   airborneWindSpeedsKph: number[] = [],
   territoryId?: TerritoryId,
   tileId?: TerritoryTileId,
+  pinnedHydroSiteId?: string,
 ) {
   const magnitude = log10(peakW) - 6; // 0 = 1MW, 4 = 10GW (+1 for each 10x)
   const year = state.date.year;
@@ -366,12 +367,25 @@ export function GENERATORS(
     return fee;
   };
 
-  const hydroAvailability = getHydroAvailability(
+  let hydroAvailability = getHydroAvailability(
     state,
     peakW,
     territoryId,
     tileId,
   );
+  // Only standing-capacity expansion passes its already-owned site. Fresh builds retain the
+  // inventory rules above; this does not release or change any real site reservation.
+  if (pinnedHydroSiteId) {
+    const site = getHydroSite(pinnedHydroSiteId);
+    if (site)
+      hydroAvailability = {
+        status: peakW <= site.maxPeakW ? "available" : "too-large",
+        remaining: [site],
+        eligible: peakW <= site.maxPeakW ? [site] : [],
+        selected: peakW <= site.maxPeakW ? site : undefined,
+        largest: site,
+      };
+  }
   const hydroLocationsRemaining = hydroAvailability.remaining.length;
   const frontierGeothermal =
     state.utilityExpansion && isUtilityExpansionGame(state)
@@ -1076,6 +1090,7 @@ export function getBuildFacilityQuote(
   requested: Partial<FacilityShoppingType>,
   territoryId?: TerritoryId,
   tileId?: TerritoryTileId,
+  pinnedHydroSiteId?: string,
 ): FacilityShoppingType | undefined {
   const options: FacilityShoppingType[] =
     requested.peakWh === undefined
@@ -1090,6 +1105,7 @@ export function getBuildFacilityQuote(
           game.timeline.map((tick) => tick.windAirborneKph),
           territoryId,
           tileId,
+          pinnedHydroSiteId,
         )
       : STORAGE(game, requested.peakWh);
   let quote = options.find(
@@ -1100,10 +1116,9 @@ export function getBuildFacilityQuote(
   );
   if (
     !quote ||
-    (hasTerritoryNetwork(game) &&
-      (isStorage(quote)
-        ? quote.peakWh > quote.maxPeakWh
-        : quote.peakW > quote.maxPeakW)) ||
+    (isStorage(quote)
+      ? quote.peakWh > quote.maxPeakWh
+      : quote.peakW > quote.maxPeakW) ||
     !validResilienceRecord(quote.fuel, requested.resilience)
   )
     return undefined;

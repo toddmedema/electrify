@@ -1,3 +1,9 @@
+import { expandFacility, cancelFacilityExpansion } from "./GameActions";
+import {
+  facilityExpansionQuote,
+  validExpandFacilityAction,
+  completeFacilityExpansion,
+} from "../helpers/FacilityExpansion";
 import { pooledPeerExportEmissions } from "../helpers/PeerExportEmissions";
 import { assignTerritoryTiles } from "../helpers/TerritoryTiles";
 import {
@@ -2244,6 +2250,12 @@ export const gameSlice = createSlice({
   // start, loaded and quit are declared in GameActions so that Card and UI can react to them
   // without importing this module -- see the note there
   extraReducers: (builder) => {
+    builder.addCase(expandFacility, (state, action) => {
+      applyExpandFacility(state, action.payload);
+    });
+    builder.addCase(cancelFacilityExpansion, (state, action) => {
+      applyCancelFacilityExpansion(state, action.payload);
+    });
     builder.addCase(multiplayerSnapshot, (state, action) => {
       const incoming = action.payload;
       const sameGrid =
@@ -2644,7 +2656,7 @@ export function startLegacyCampaign(
 }
 
 // Re-exported so that everything still imports the game's actions from one place
-export { start, loaded, quit, resume };
+export { start, loaded, quit, resume, expandFacility, cancelFacilityExpansion };
 
 export default gameSlice.reducer;
 
@@ -3067,6 +3079,92 @@ function applyBuildFacility(
   return true;
 }
 
+/** Charge capital directly: forecasts preserve current cash and recompute asset equity. */
+function applyExpandFacility(state: GameType, payload: unknown): boolean {
+  if (!validExpandFacilityAction(payload)) return false;
+  const quote = facilityExpansionQuote(
+    state,
+    payload.facilityId,
+    payload.targetSize,
+  );
+  const now = getTimeFromTimeline(state.date.minute, state.timeline);
+  if (
+    quote.status !== "ready" ||
+    quote.quoteKey !== payload.quoteKey ||
+    !now ||
+    now.cash < quote.cost
+  )
+    return false;
+  const facility = state.facilities.find(
+    ({ id }) => id === payload.facilityId,
+  )!;
+  now.cash -= quote.cost;
+  // Keep only the validated project terms, not UI quote metadata or a replacement plant.
+  facility.expansionInProgress = {
+    targetSize: quote.targetSize,
+    targetPeakW: quote.targetPeakW,
+    ...(quote.targetPeakWh !== undefined
+      ? { targetPeakWh: quote.targetPeakWh }
+      : {}),
+    cost: quote.cost,
+    annualOperatingCostDelta: quote.annualOperatingCostDelta,
+    costPerStartDelta: quote.costPerStartDelta,
+    startsMinute: quote.startsMinute,
+    yearsToBuild: quote.yearsToBuild,
+    yearsToBuildLeft: quote.yearsToBuildLeft,
+    constructionKgco2eTotal: quote.constructionKgco2eTotal,
+    constructionKgco2eEmitted: 0,
+    quoteKey: quote.quoteKey,
+  };
+  logGameEvent(
+    state,
+    "BUILD",
+    `Expanding ${facility.name} to ${isStorage(facility) ? formatWattHours(quote.targetSize) : formatWatts(quote.targetSize)} for ${formatMoneyConcise(quote.cost, currencyForLocation(state.location, state.startingYear))}. Existing capacity remains available.`,
+    {
+      importance: "NOTABLE",
+      actionTarget: { card: "FACILITIES", view: "FLEET" },
+    },
+  );
+  recordMeaningfulDecision(state, {
+    lever: `asset-expansion:${facility.id}`,
+    label: `Expand ${facility.name}`,
+    kind: "asset",
+    before: String(quote.currentSize),
+    after: String(quote.targetSize),
+  });
+  state.timeline = reforecastSupply(state, true);
+  return true;
+}
+
+function applyCancelFacilityExpansion(
+  state: GameType,
+  payload: unknown,
+): boolean {
+  if (!Number.isSafeInteger(payload)) return false;
+  const facility = state.facilities.find(({ id }) => id === payload);
+  const expansion = facility?.expansionInProgress;
+  const now = getTimeFromTimeline(state.date.minute, state.timeline);
+  if (!facility || !expansion || !now) return false;
+  now.cash += expansion.cost;
+  // Cancellation refunds committed capital, never construction emissions already released.
+  const emitted = expansion.constructionKgco2eEmitted ?? 0;
+  facility.constructionKgco2eTotal =
+    (facility.constructionKgco2eTotal ?? 0) + emitted;
+  facility.constructionKgco2eEmitted =
+    (facility.constructionKgco2eEmitted ?? 0) + emitted;
+  delete facility.expansionInProgress;
+  state.meaningfulDecisions = state.meaningfulDecisions.filter(
+    ({ lever }) => lever !== `asset-expansion:${facility.id}`,
+  );
+  logGameEvent(
+    state,
+    "BUILD",
+    `Canceled capacity expansion of ${facility.name}; refunded ${formatMoneyConcise(expansion.cost, currencyForLocation(state.location, state.startingYear))}.`,
+  );
+  state.timeline = reforecastSupply(state, true);
+  return true;
+}
+
 function applySellFacility(state: GameType, id: number): boolean {
   const sold = state.facilities.find((g: FacilityOperatingType) => g.id === id);
   if (!sold || sold.saleRestricted) return false;
@@ -3483,7 +3581,12 @@ function applyRetrofitFacility(
 ): boolean {
   if (!validRetrofitFacility(payload)) return false;
   const facility = state.facilities.find(({ id }) => id === payload.facilityId);
-  if (!facility || facility.yearsToBuildLeft > 0) return false;
+  if (
+    !facility ||
+    facility.yearsToBuildLeft > 0 ||
+    facility.expansionInProgress
+  )
+    return false;
   const context = state;
   if (!context) return false;
   const conversion = payload.upgrade === "combinedCycle";
@@ -4083,7 +4186,12 @@ function tickWorkingState(state: GameType): GameType {
   return {
     ...state,
     timeline: [...state.timeline],
-    facilities: state.facilities.map((facility) => ({ ...facility })),
+    facilities: state.facilities.map((facility) => ({
+      ...facility,
+      ...(facility.expansionInProgress && {
+        expansionInProgress: { ...facility.expansionInProgress },
+      }),
+    })),
     ...(state.transmission && {
       transmission:
         state.transmission.lines.length || state.utilityExpansion
@@ -5511,6 +5619,27 @@ function* supplyFacilitiesFinancesPhases(
         `Upgrade complete: ${line.name} now carries ${formatWatts(line.capacityW)}`,
       );
     }
+  });
+
+  // Added capacity follows the same real/forecast construction pass as intertie widening.
+  // Pre-roll is dispatch stabilization, not elapsed building time. Accrue the final emissions
+  // before deleting the job so a last partial tick cannot lose its footprint.
+  facilities.forEach((facility) => {
+    const expansion = facility.expansionInProgress;
+    if (!advanceConstruction || preRoll || !expansion) return;
+    expansion.yearsToBuildLeft = Math.max(
+      0,
+      expansion.yearsToBuildLeft - YEARS_PER_TICK * tickScale,
+    );
+    accrueConstruction(expansion, expansion.yearsToBuild);
+    if (expansion.yearsToBuildLeft > 0) return;
+    completeFacilityExpansion(facility);
+    if (!simulated)
+      logGameEvent(
+        state,
+        "CONSTRUCTION",
+        `Capacity expansion complete: ${facility.name}, ${isStorage(facility) ? formatWattHours(facility.peakWh) : formatWatts(facility.peakW)}`,
+      );
   });
 
   const airborneWindOutputFactor = getAirborneWindOutputFactor(

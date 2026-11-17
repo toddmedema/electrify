@@ -1,3 +1,7 @@
+import {
+  facilityExpansionQuote,
+  validExpandFacilityAction,
+} from "../helpers/FacilityExpansion";
 import { isTerritoryTileId } from "../helpers/TerritoryTiles";
 import { validPowerAgreementAction } from "../helpers/PowerAgreements";
 import { isBuyingRule, isSellingRule } from "../helpers/TradingRules";
@@ -199,6 +203,32 @@ const GAME_COMMAND_VALIDATORS = {
       ? { payload }
       : { error: "Choose a valid facility upgrade" },
   cancelRetrofit: facility,
+  expandFacility: (game, payload) => {
+    if (!validExpandFacilityAction(payload))
+      return { error: "Choose a valid capacity expansion" };
+    const quote = facilityExpansionQuote(
+      game,
+      payload.facilityId,
+      payload.targetSize,
+    );
+    return quote.status === "ready" &&
+      quote.quoteKey === payload.quoteKey &&
+      (currentTick(game)?.cash ?? -1) >= quote.cost
+      ? { payload }
+      : {
+          error:
+            quote.status === "unavailable"
+              ? quote.reason
+              : "This expansion quote changed or is unaffordable",
+        };
+  },
+  cancelFacilityExpansion: (game, payload) =>
+    Number.isSafeInteger(payload) &&
+    game.facilities.some(
+      (plant) => plant.id === payload && plant.expansionInProgress,
+    )
+      ? { payload }
+      : { error: "Capacity expansion not found" },
   buildTransmissionLine: peerLine,
   upgradeTransmissionLine: upgradeLine,
   cancelTransmissionLine: line,

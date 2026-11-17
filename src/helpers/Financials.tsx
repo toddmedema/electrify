@@ -493,7 +493,8 @@ export function facilityCashBack(
     );
     return (
       g.buildCost * remainingLife * (g.cashBackMultiplier ?? 1) -
-      g.loanAmountLeft
+      g.loanAmountLeft +
+      (g.expansionInProgress?.cost ?? 0)
     );
   }
   // Cancellation unwinds the committed purchase. For a financed build this returns only the

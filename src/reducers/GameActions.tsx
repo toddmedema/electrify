@@ -105,3 +105,11 @@ export const acquireTile =
   createAction<import("../Types").AcquireTileAction>("game/acquireTile");
 export const acquireLand =
   createAction<import("../Types").AcquireLandAction>("game/acquireLand");
+
+/** Cash-funded standing capacity; the reducer revalidates the dated quote. */
+export const expandFacility = createAction<
+  import("../Types").ExpandFacilityAction
+>("game/expandFacility");
+export const cancelFacilityExpansion = createAction<number>(
+  "game/cancelFacilityExpansion",
+);

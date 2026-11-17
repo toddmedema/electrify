@@ -140,6 +140,8 @@ export function facilitySignature(game: GameType): string {
         facility.yearsToBuildLeft > 0,
         facility.peakW,
         facility.gasCycle,
+        facility.expansionInProgress?.quoteKey,
+        facility.expansionInProgress?.targetSize,
         facility.upgradeInProgress?.upgrade,
         facility.upgradeInProgress?.completesMinute,
       ].join(":"),

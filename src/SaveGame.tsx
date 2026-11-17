@@ -1,3 +1,4 @@
+import { validFacilityExpansion } from "./helpers/FacilityExpansion";
 import { validPowerAgreements } from "./helpers/PowerAgreements";
 import { POLICY_IDS } from "./data/Policies";
 import { validLegacyCampaign } from "./helpers/LegacyCampaign";
@@ -566,6 +567,7 @@ export function parseSave(
         optionalBooleansInvalid ||
         !validResilienceRecord(current.fuel, current.resilience) ||
         !validGasCycle(current.fuel, current.gasCycle) ||
+        !validFacilityExpansion(facility, game as GameType) ||
         !validUpgradeInProgress(current.upgradeInProgress) ||
         ((current.upgradeInProgress as { upgrade?: unknown } | undefined)
           ?.upgrade === "combinedCycle" &&

@@ -631,6 +631,8 @@ export interface FacilityMaintenanceObligationType {
 
 interface SharedOperatingType
   extends LoanInfo, LifetimeTotals, ConstructionEmissions {
+  /** Added capacity stays unavailable until this cash-funded project completes. */
+  expansionInProgress?: FacilityExpansionInProgressType;
   startingAssetId?: string;
   territoryId?: TerritoryId;
   /** Exactly one developed map cell; absent outside the territory scenario. */
@@ -1190,6 +1192,27 @@ export interface WeatherHazardProfileType {
 export interface RetrofitFacilityAction {
   facilityId: number;
   upgrade: FacilityUpgradeType;
+}
+
+/** Size is watts for generation and watt-hours for storage. Prices always come from the host. */
+export interface ExpandFacilityAction {
+  facilityId: number;
+  targetSize: number;
+  quoteKey: string;
+}
+
+/** Size-dependent additions only: identity, age, efficiency, debt and stored energy stay put. */
+export interface FacilityExpansionInProgressType extends ConstructionEmissions {
+  targetSize: number;
+  targetPeakW: number;
+  targetPeakWh?: number;
+  cost: number;
+  annualOperatingCostDelta: number;
+  costPerStartDelta: number;
+  startsMinute: number;
+  yearsToBuild: number;
+  yearsToBuildLeft: number;
+  quoteKey: string;
 }
 
 export type FacilityUpgradeType = ResilienceUpgradeType | "combinedCycle";

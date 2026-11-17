@@ -381,6 +381,8 @@ const migrations: readonly Migration[] = [
       },
     };
   },
+  // Standing facilities can retain paid capacity work; older clients must not discard it.
+  (save) => save,
 ];
 
 /** Structure versions are independent of app releases and simulation compatibility. */
