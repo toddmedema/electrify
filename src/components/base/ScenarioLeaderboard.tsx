@@ -325,6 +325,7 @@ export default class ScenarioLeaderboard extends React.Component<Props, State> {
               sx={{ m: 1.5 }}
               onChange={(_event, steamScope: "global" | "friends" | null) => {
                 if (!steamScope) return;
+                ++this.allScoresRequestId;
                 this.setState({ steamScope, allScores: undefined }, () => {
                   this.loadBoards();
                   if (this.state.leaderboardExpanded) void this.loadAllScores();
