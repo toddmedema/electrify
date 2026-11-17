@@ -97,6 +97,7 @@ export interface RendererDiagnostics {
   cpuFrameMs: number;
   phases: Readonly<Record<string, number>>;
   light: Vec3;
+  lightColor: RGB;
   state: "ready" | "lost" | "unavailable";
   playbackRate: number;
   motionAllowed: boolean;

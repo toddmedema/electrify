@@ -1,5 +1,6 @@
 import type { Locator, Page } from "@playwright/test";
 import type { GameType } from "../src/Types";
+import type { MapCanvas } from "../src/components/base/territory-3d/Types";
 import { TERRITORY_TILES } from "../src/data/TerritoryTiles";
 import type { TerritoryTileDefinition } from "../src/data/TerritoryTiles";
 import { GENERATORS, getBuildFacilityQuote } from "../src/data/Facilities";
@@ -35,7 +36,11 @@ async function openMap(page: Page) {
   return returnToTerritoryMap(page);
 }
 
-async function startMap(page: Page, theme: "light" | "dark") {
+async function startMap(
+  page: Page,
+  theme: "light" | "dark",
+  simplified = false,
+) {
   await page.addInitScript((mode) => {
     localStorage.setItem("theme", mode);
     localStorage.setItem("audioEnabled", "false");
@@ -47,6 +52,10 @@ async function startMap(page: Page, theme: "light" | "dark") {
   if ((await pause.getAttribute("aria-pressed")) !== "true")
     await pause.click();
   const network = await openMap(page);
+  await expect(network.locator("canvas.territory3DCanvas")).toHaveAttribute(
+    "data-renderer",
+    simplified ? "unavailable" : "ready",
+  );
   // The map can render before the asynchronous save session has its first snapshot.
   const saveState = page.locator("#appbar:visible [data-save-state]").first();
   await expect(saveState).toHaveAttribute("data-save-state", "saved");
@@ -151,69 +160,91 @@ async function revealTile(page: Page, tile: TerritoryTileDefinition) {
 async function expectPhysicalMap(network: Locator, game: GameType) {
   const views = territoryTileViews(game);
   // Resize/focus can move the camera between awaits. Compare one physical render.
-  const { targets, viewport, artworkCount, occupants, wires, wireShapes } =
-    await network.evaluate((element) => {
-      const viewport = element
-        .querySelector(".territoryMapViewport")!
-        .getBoundingClientRect();
-      return {
-        viewport: {
-          x: viewport.x,
-          y: viewport.y,
-          width: viewport.width,
-          height: viewport.height,
-        },
-        artworkCount: element.querySelectorAll(".territoryTerrainArtwork")
-          .length,
-        targets: Array.from(
-          element.querySelectorAll("button[data-map-target]"),
-        ).map((button) => ({
-          id: button.getAttribute("data-map-target")!,
-          territoryId: button.getAttribute("data-territory"),
-          terrain: button.getAttribute("data-terrain"),
-          owned: button.getAttribute("data-owned"),
-          width: button.getBoundingClientRect().width,
-          height: button.getBoundingClientRect().height,
-          x:
-            button.getBoundingClientRect().x +
-            button.getBoundingClientRect().width / 2,
-          y:
-            button.getBoundingClientRect().y +
-            button.getBoundingClientRect().height / 2,
-          selected: button.getAttribute("aria-pressed") === "true",
-          distance: element
-            .querySelector(
-              `[data-tile="${button.getAttribute("data-map-target")}"]`,
-            )
-            ?.getAttribute("data-visibility-distance"),
-        })),
-        occupants: Array.from(
-          element.querySelectorAll(".territoryTileOccupant"),
-        ).map((occupant) => ({
-          id: occupant.getAttribute("data-occupant-tile"),
-          kind: occupant.getAttribute("data-occupant"),
-          distance: occupant.getAttribute("data-visibility-distance"),
-        })),
-        wireShapes: Array.from(
-          element.querySelectorAll("[data-wire-from][data-wire-to]"),
-        ).map((wire) => ({
-          from: wire.getAttribute("data-wire-from")!,
-          to: wire.getAttribute("data-wire-to")!,
-          kind: wire.getAttribute("data-wire-kind"),
-          path: wire.querySelector(".territoryWire")!.getAttribute("d")!,
-        })),
-        wires: Array.from(
-          element.querySelectorAll("[data-wire-from][data-wire-to]"),
-        ).map((wire) =>
-          [
-            wire.getAttribute("data-wire-from"),
-            wire.getAttribute("data-wire-to"),
-          ]
-            .sort()
-            .join("|"),
-        ),
-      };
-    });
+  const {
+    targets,
+    viewport,
+    artworkCount,
+    occupants,
+    wires,
+    wireShapes,
+    scene,
+  } = await network.evaluate((element) => {
+    const viewport = element
+      .querySelector(".territoryMapViewport")!
+      .getBoundingClientRect();
+    const canvas = element.querySelector<MapCanvas>("canvas.territory3DCanvas");
+    const scene =
+      canvas?.dataset.renderer === "ready"
+        ? canvas.map3DDiagnostics?.(true).scene
+        : undefined;
+    const connections = scene?.flatMap(
+      (instance) => instance.connections ?? [],
+    );
+    return {
+      scene,
+      viewport: {
+        x: viewport.x,
+        y: viewport.y,
+        width: viewport.width,
+        height: viewport.height,
+      },
+      artworkCount: element.querySelectorAll(".territoryTerrainArtwork").length,
+      targets: Array.from(
+        element.querySelectorAll("button[data-map-target]"),
+      ).map((button) => ({
+        id: button.getAttribute("data-map-target")!,
+        territoryId: button.getAttribute("data-territory"),
+        terrain: button.getAttribute("data-terrain"),
+        owned: button.getAttribute("data-owned"),
+        width: button.getBoundingClientRect().width,
+        height: button.getBoundingClientRect().height,
+        x:
+          button.getBoundingClientRect().x +
+          button.getBoundingClientRect().width / 2,
+        y:
+          button.getBoundingClientRect().y +
+          button.getBoundingClientRect().height / 2,
+        selected: button.getAttribute("aria-pressed") === "true",
+        distance: element
+          .querySelector(
+            `[data-tile="${button.getAttribute("data-map-target")}"]`,
+          )
+          ?.getAttribute("data-visibility-distance"),
+      })),
+      occupants: Array.from(
+        element.querySelectorAll(".territoryTileOccupant"),
+      ).map((occupant) => ({
+        id: occupant.getAttribute("data-occupant-tile"),
+        kind: occupant.getAttribute("data-occupant"),
+        distance: occupant.getAttribute("data-visibility-distance"),
+      })),
+      wireShapes: connections
+        ? connections.map((wire) => ({ ...wire, path: null as string | null }))
+        : Array.from(
+            element.querySelectorAll("[data-wire-from][data-wire-to]"),
+          ).map((wire) => ({
+            from: wire.getAttribute("data-wire-from")!,
+            to: wire.getAttribute("data-wire-to")!,
+            kind: wire.getAttribute("data-wire-kind"),
+            path: wire.querySelector(".territoryWire")!.getAttribute("d")!,
+            start: undefined,
+            end: undefined,
+            lowY: undefined,
+          })),
+      wires: connections
+        ? connections.map((wire) => [wire.from, wire.to].sort().join("|"))
+        : Array.from(
+            element.querySelectorAll("[data-wire-from][data-wire-to]"),
+          ).map((wire) =>
+            [
+              wire.getAttribute("data-wire-from"),
+              wire.getAttribute("data-wire-to"),
+            ]
+              .sort()
+              .join("|"),
+          ),
+    };
+  });
   expect(targets.length).toBeGreaterThan(0);
   expect(targets.length).toBeLessThanOrEqual(views.length);
   expect(new Set(targets.map(({ id }) => id)).size).toBe(targets.length);
@@ -238,7 +269,37 @@ async function expectPhysicalMap(network: Locator, game: GameType) {
     }
     expect(target.distance).toBe(String(view.visibilityDistance));
   }
-  expect(artworkCount).toBe(targets.length);
+  if (scene) {
+    expect(artworkCount).toBe(0);
+    const terrain = scene.filter((instance) =>
+      instance.id.startsWith("terrain:"),
+    );
+    expect(terrain.map((instance) => instance.id.slice(8)).sort()).toEqual(
+      [...rendered].sort(),
+    );
+    expect(
+      scene
+        .filter((instance) => instance.id.startsWith("structure:"))
+        .map((instance) => instance.id.slice(10))
+        .sort(),
+    ).toEqual(occupants.map((occupant) => occupant.id!).sort());
+    for (const instance of scene) {
+      expect(instance.triangles).toBeGreaterThan(0);
+      expect(instance.max[1]).toBeGreaterThan(instance.min[1]);
+      if (!instance.id.startsWith("terrain:")) continue;
+      const view = views.find(({ tile }) => tile.id === instance.id.slice(8))!;
+      expect(instance.modelKey).toMatch(
+        new RegExp(`^terrain:${view.tile.terrain}:`),
+      );
+      expect(instance.fog).toBe(view.visibilityDistance);
+      expect(instance.fogMix).toBeCloseTo(
+        [0, 0.15, 0.35, 0.6][view.visibilityDistance],
+      );
+      expect(instance.saturation).toBeCloseTo(
+        [1, 0.8, 0.45, 0.15][view.visibilityDistance],
+      );
+    }
+  } else expect(artworkCount).toBe(targets.length);
   expect(occupants.sort((a, b) => a.id!.localeCompare(b.id!))).toEqual(
     views
       .filter(
@@ -291,11 +352,21 @@ async function expectPhysicalMap(network: Locator, game: GameType) {
         ["lake", "river", "ocean"].includes(view.tile.terrain),
     );
     expect(shape.kind).toBe(submerged ? "submerged" : "overhead");
-    if (submerged) {
+    if (shape.start && shape.end) {
+      expect(shape.start.every(Number.isFinite)).toBe(true);
+      expect(shape.end.every(Number.isFinite)).toBe(true);
+      if (submerged) expect(shape.lowY).toBeCloseTo(0.006);
+      else {
+        expect(shape.start[1]).toBeGreaterThan(0.1);
+        expect(shape.end[1]).toBeGreaterThan(0.1);
+        expect(shape.lowY).toBeLessThan(Math.min(shape.start[1], shape.end[1]));
+        expect(shape.lowY).toBeGreaterThan(0);
+      }
+    } else if (submerged) {
       expect(shape.path).toContain("L");
     } else {
       expect(shape.path).toContain("Q");
-      const points = shape.path.match(/-?\d+(?:\.\d+)?/g)!.map(Number);
+      const points = shape.path!.match(/-?\d+(?:\.\d+)?/g)!.map(Number);
       expect(points[1], "overhead origin stays above the ground").toBeLessThan(
         groundAnchor(from.tile).y,
       );
@@ -552,11 +623,26 @@ for (const theme of ["light", "dark"] as const) {
     }
   });
 
-  test(`facility motion follows production and reduced-motion preferences in ${theme}`, async ({
+  test(`simplified map motion follows production and reduced-motion preferences in ${theme}`, async ({
     page,
   }) => {
+    await page.addInitScript(() => {
+      const getContext = HTMLCanvasElement.prototype.getContext;
+      HTMLCanvasElement.prototype.getContext = function (
+        this: HTMLCanvasElement,
+        contextId: string,
+        options?: unknown,
+      ) {
+        if (contextId === "webgl2") return null;
+        return getContext.call(this, contextId, options);
+      } as typeof getContext;
+    });
     await page.emulateMedia({ reducedMotion: "no-preference" });
-    const network = await startMap(page, theme);
+    const network = await startMap(page, theme, true);
+    await expect(network.locator("canvas.territory3DCanvas")).toHaveAttribute(
+      "data-renderer",
+      "unavailable",
+    );
     const game = (await readSavedGame(page))!;
     const wind = game.facilities.find(
       (facility) => facility.fuel === "Wind" && facility.currentW > 0,
@@ -885,6 +971,22 @@ for (const theme of ["light", "dark"] as const) {
       await expect(target).toBeInViewport({ ratio: 1 });
       await expect(occupant).toHaveAttribute("data-facility-status", kind);
       await expect(occupant).toHaveAttribute("data-visibility-distance", "0");
+      const geometry = await network
+        .locator("canvas.territory3DCanvas")
+        .evaluate(
+          (canvas: MapCanvas, id) =>
+            canvas.map3DDiagnostics!(true).scene!.find(
+              (instance) => instance.id === `structure:${id}`,
+            ),
+          tile.id,
+        );
+      expect(
+        geometry,
+        `${kind} is represented by solid 3D geometry`,
+      ).toBeDefined();
+      expect(geometry!.active).toBe(kind === "producing");
+      if (kind === "construction")
+        expect(geometry!.modelKey).toMatch(/:construction$/);
       if (kind !== "producing")
         await expect(
           occupant.locator(".territoryOccupantArtwork"),
@@ -954,16 +1056,19 @@ for (const theme of ["light", "dark"] as const) {
     ).toBeVisible();
     await openMap(page);
     await expectPhysicalMap(network, before);
-    for (const [distance, opacity, saturation] of [
-      [1, "0.85", "saturate(0.8)"],
-      [2, "0.65", "saturate(0.45)"],
-      [3, "0.4", "saturate(0.15)"],
-    ] as const) {
-      const ground = network
-        .locator(`.territoryHex[data-visibility-distance="${distance}"]`)
-        .first();
-      await expect(ground).toHaveCSS("opacity", opacity);
-      await expect(ground).toHaveCSS("filter", saturation);
+    const canvas = network.locator("canvas.territory3DCanvas");
+    await expect(canvas).toHaveAttribute("data-renderer", "ready");
+    const fogScene = await canvas.evaluate(
+      (element: MapCanvas) => element.map3DDiagnostics!(true).scene!,
+    );
+    for (const distance of [1, 2, 3]) {
+      const ground = fogScene.find(
+        (instance) =>
+          instance.id.startsWith("terrain:") && instance.fog === distance,
+      );
+      expect(ground, `actual 3D fog ring ${distance}`).toBeDefined();
+      expect(ground!.fogMix).toBeCloseTo([0, 0.15, 0.35, 0.6][distance]);
+      expect(ground!.saturation).toBeCloseTo([1, 0.8, 0.45, 0.15][distance]);
     }
     await expect(
       network.getByRole("heading", { name: "Territories", exact: true }),
@@ -974,7 +1079,7 @@ for (const theme of ["light", "dark"] as const) {
     await expect(network).not.toContainText("company power pool");
     await expect(
       page.getByRole("button", { name: "Build", exact: true }),
-    ).toHaveCount(0);
+    ).toBeVisible();
     const dimensions = await network.evaluate((element) => {
       const map = element
         .querySelector(".territoryMapViewport")!

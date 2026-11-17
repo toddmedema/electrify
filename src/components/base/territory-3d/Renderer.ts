@@ -194,6 +194,7 @@ export class MapRenderer {
       cpuFrameMs: this.frameMs,
       phases: this.clock.snapshot(),
       light: [...this.light],
+      lightColor: [...(this.frame?.lighting.color ?? [0, 0, 0])],
       state: this.state,
       playbackRate: this.frame?.playbackRate ?? 0,
       motionAllowed: this.frame?.motionAllowed ?? false,
