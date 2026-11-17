@@ -189,7 +189,7 @@ it("repeatedly opens and focuses the legacy trading controls, which still update
     expect(controls).toBeVisible();
     const buying = within(controls).getByRole("combobox", { name: "Buying" });
     fireEvent.mouseDown(buying);
-    fireEvent.click(screen.getByRole("option", { name: label, exact: true }));
+    fireEvent.click(screen.getByRole("option", { name: label }));
     expect(store.getState().game.transmission!.buyingRule).toBe(rule);
   }
 });

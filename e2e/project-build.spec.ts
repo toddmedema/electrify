@@ -109,7 +109,7 @@ for (const theme of ["light", "dark"] as const) {
       "Cash required now",
       "Cash remaining",
       "Expected output",
-      "Online",
+      "Estimated online",
     ])
       await expect(surface.getByText(label, { exact: true })).toBeVisible();
     const explored = (await readSavedGame(page))!;
