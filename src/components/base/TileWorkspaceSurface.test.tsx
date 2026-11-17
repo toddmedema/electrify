@@ -9,7 +9,7 @@ it("focuses new content without restoring the map until the surface closes", () 
       <button className="territoryTileTarget" tabIndex={0}>
         Selected tile
       </button>
-      <button className="territoryMapBuyToggle">Connect</button>
+      <button className="territoryMapBuyToggle">Rapid connection mode</button>
       {open && (
         <TileWorkspaceSurface
           title={title}
