@@ -112,7 +112,7 @@ export default function MapWorkspace({
                 className="gameWorkspace"
                 data-map-workspace="true"
                 data-persistent-map="true"
-                data-workspace-layout={presentation.layout}
+                data-workspace-layout="map"
                 data-compact-dock={effectiveWidth < 700}
                 data-dock-size={
                   effectiveWidth >= 2200
