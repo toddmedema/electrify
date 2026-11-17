@@ -76,7 +76,13 @@ whole-area rights and their exact capital value. Coordinate-derived frontier
 geography needs no stored infinite board; receipts and active connections determine
 the visible three-hex frontier.
 
-Recognized published schema 13, 14, 15 and 16 co-op identities have ordered transitions.
+Schema 18 requires physical adjacency to owned property for new tile purchases.
+Older paid receipts retain their original visibility rule, property and exact cash
+balances. The inland authored ocean becomes a lake; installed offshore plants
+retain their plant-specific siting and wind inputs. Selling the plant removes
+that installation exception and never grants replacement offshore access.
+
+Recognized published schema 13, 14, 15, 16 and 17 co-op identities have ordered transitions.
 It preserves the run's original scoring provenance. Existing company-local land
 rights are retained, including old duplicate ownership; new claims are exclusive
 and checked in host command order. Other incompatible co-op identities retain

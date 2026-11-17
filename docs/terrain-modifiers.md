@@ -15,10 +15,11 @@ chosen whole-project percentages.
   use **1.20 × construction cost**.
 - River and lake: ordinary resource and cost inputs, with existing named hydro
   sites, head/flow, capacity and resource restrictions.
-- Ocean: the mapped offshore slot supplies Offshore Wind access. It keeps the
-  existing commissioning dates, project-size limits, offshore turbine curve and
-  offshore construction costs. Its resource uses offshore wind where available,
-  otherwise the shared regional wind. A measured zero remains zero.
+- Offshore Wind requires an actual ocean site. The authored inland water is a
+  lake, and the current generated frontier has no ocean cells. Pre-schema-18
+  offshore installations retain their existing turbine curve and weather inputs:
+  offshore wind where available, otherwise shared regional wind. A measured zero
+  remains zero. Their installation exception ends when the plant is sold.
 
 The hill/mountain cells represent selected exposed, accessible ridges, passes or
 benches. Sheltered slopes and inaccessible cliffs are not implied viable sites.
@@ -86,8 +87,8 @@ random streams are introduced.
 Focused suites cover the seven-terrain matrix, pre-curve cut-in/rated/cut-out
 boundaries, quote capacity factors and LCOE, exact once-only cash/debt charges,
 solar tracker add-ons, compatibility fallback, insufficient-cash atomic rejection,
-live/simulated/estimated-weather wind, demand preservation, inland ocean offshore
-builds, hydro/geothermal eligibility, inherited pricing, legacy neutrality and
+live/simulated/estimated-weather wind, demand preservation, retained inland
+offshore output and rejection of new lake builds, hydro/geothermal eligibility, inherited pricing, legacy neutrality and
 custom base-116 packages. Multiplayer tests submit edited costs/timings and check
 the canonical purchased asset. Expected-output tests retain authored override
 precedence. The integrating task owns the full simulation and CI gates.

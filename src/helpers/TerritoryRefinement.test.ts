@@ -1,7 +1,8 @@
 import cloneDeep from "lodash.clonedeep";
-import { GENERATORS } from "../data/Facilities";
+import { GENERATORS, getBuildFacilityQuote, STORAGE } from "../data/Facilities";
 import { TERRITORY_TILES } from "../data/TerritoryTiles";
-import reducer from "../reducers/Game";
+import reducer, { buildFacility, tickState } from "../reducers/Game";
+import { parseSave, serializeSave } from "../SaveGame";
 import { acquireTile } from "../reducers/GameActions";
 import { createGame } from "../testing/Simulator";
 import { currentTick } from "./GameSelectors";
@@ -10,11 +11,13 @@ import {
   tilePurchaseQuote,
   tilePurchaseQuotes,
   territoryBuildAvailability,
+  tilePrice,
 } from "./Territories";
 import {
   getTerritoryTile,
   tileFitsFacility,
   territoryVisibilityDistance,
+  tileSupportsFacilityTechnology,
 } from "./TerritoryTiles";
 
 function ready() {
@@ -82,6 +85,78 @@ it("leaves general sites uncapped while named sites keep their physical power li
   ).toMatchObject({ buildable: true, maxPeakW: Infinity });
   const named = TERRITORY_TILES.find((entry) => entry.siteKind === "wind")!;
   expect(tileFitsFacility(named, wind)).toBe(false);
+  expect(tileSupportsFacilityTechnology(named, wind)).toBe(true);
+  expect(
+    getBuildFacilityQuote(game, wind, "green-uplands", tile.id),
+  ).toBeDefined();
+  expect(
+    getBuildFacilityQuote(
+      game,
+      { ...wind, peakW: wind.maxPeakW + 1 },
+      "green-uplands",
+      tile.id,
+    ),
+  ).toBeUndefined();
+  const built = reducer(
+    game,
+    buildFacility({
+      facility: wind,
+      financed: true,
+      territoryId: "green-uplands",
+      tileId: tile.id,
+    }),
+  );
+  expect(built.facilities.find(({ tileId }) => tileId === tile.id)?.peakW).toBe(
+    500e6,
+  );
+  const future = { ...game, date: { ...game.date, year: 2025 } };
+  const battery = STORAGE(future, 2e9).find(({ name }) => name === "Battery")!;
+  expect(tileFitsFacility(tile, battery)).toBe(true);
+  expect(
+    getBuildFacilityQuote(
+      future,
+      { ...battery, peakWh: battery.maxPeakWh + 1 },
+      "green-uplands",
+      tile.id,
+    ),
+  ).toBeUndefined();
+});
+
+it("retains paid disconnected schema17 property and finances while rejecting a new disconnected receipt", () => {
+  const game = ready();
+  const tileId = "frontier:-7:-3";
+  const raw = JSON.parse(JSON.stringify(serializeSave(game)));
+  raw.game.territoryNetwork.tilePurchases.push({
+    tileId,
+    minute: 0,
+    price: tilePrice(game, 0, tileId),
+  });
+  expect(parseSave(cloneDeep(raw))).toBeNull();
+  raw.schemaVersion = 17;
+  const unchanged = JSON.stringify(raw);
+  const migrated = parseSave(raw)!.game;
+  expect(JSON.stringify(raw)).toBe(unchanged);
+  expect(migrated.territoryNetwork!.tilePurchases).toEqual([
+    { ...raw.game.territoryNetwork.tilePurchases[0], legacy: true },
+  ]);
+  expect(migrated.timeline).toEqual(raw.game.timeline);
+  expect(migrated.facilities).toEqual(raw.game.facilities);
+  expect(tilePurchaseQuote(migrated, "frontier:-8:-3")).toBeDefined();
+  const resumed = parseSave(
+    JSON.parse(JSON.stringify(serializeSave(migrated))),
+  )!.game;
+  expect(resumed).toEqual(migrated);
+  tickState(migrated);
+  tickState(resumed);
+  expect(resumed).toEqual(migrated);
+  const forged = cloneDeep(raw);
+  forged.game.territoryNetwork.tilePurchases[0].tileId = "frontier:-50:-3";
+  forged.game.territoryNetwork.tilePurchases[0].price = tilePrice(
+    game,
+    0,
+    "frontier:-50:-3",
+  );
+  expect(parseSave(forged)).toBeNull();
 });
 
 it("classifies the inland authored water cell as a lake and rejects new offshore construction there", () => {

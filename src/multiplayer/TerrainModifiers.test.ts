@@ -7,7 +7,7 @@ import { loadSimData } from "../testing/SimData";
 import { coopSeats } from "../testing/MultiplayerFixtures";
 import { applyCommand, createWorld } from "./World";
 
-it.each(["Wind", "Offshore Wind"] as const)(
+it.each(["Wind"] as const)(
   "host charges one canonical selected-site %s price despite an edited client quote",
   (name) => {
     loadSimData(UTILITY_AREAS.champlain.location);
@@ -23,9 +23,7 @@ it.each(["Wind", "Offshore Wind"] as const)(
         tile.territoryId === "champlain" &&
         tile.siteKind === "wind" &&
         !tile.startingAssetId &&
-        (name === "Offshore Wind"
-          ? tile.terrain === "ocean"
-          : tile.terrain === "mountain"),
+        tile.terrain === "mountain",
     )!.id;
     const quote = getBuildFacilityQuote(
       game,
@@ -62,3 +60,32 @@ it.each(["Wind", "Offshore Wind"] as const)(
     expect(currentTick(world.grids[0])!.cash).toBe(cash - terms.amountDue);
   },
 );
+
+it("host rejects new offshore construction on the inland lake before spending any cash", () => {
+  loadSimData(UTILITY_AREAS.champlain.location);
+  const world = createWorld(
+    { scenarioId: 116, difficulty: "Employee" },
+    coopSeats(2),
+    "lake",
+    "epoch",
+  );
+  const before = JSON.stringify(world.grids);
+  expect(
+    applyCommand(world, "0", {
+      matchId: world.matchId,
+      epoch: world.epoch,
+      sequence: 1,
+      command: {
+        kind: "action",
+        name: "buildFacility",
+        payload: {
+          territoryId: "champlain",
+          tileId: "champlain:site-14",
+          financed: false,
+          facility: { name: "Offshore Wind", peakW: 20e6, available: true },
+        },
+      },
+    }),
+  ).toBeDefined();
+  expect(JSON.stringify(world.grids)).toBe(before);
+});

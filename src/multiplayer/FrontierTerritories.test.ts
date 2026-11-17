@@ -6,7 +6,13 @@ import {
   landPurchaseQuote,
   ownedTerritories,
   landPrice,
+  tilePurchaseQuotes,
 } from "../helpers/Territories";
+import {
+  getTerritoryTiles,
+  getTerritoryTile,
+  territoryHexDistance,
+} from "../helpers/TerritoryTiles";
 import { loadSimData } from "../testing/SimData";
 import { coopSeats } from "../testing/MultiplayerFixtures";
 import {
@@ -28,8 +34,39 @@ function ready() {
   );
 }
 function buy(world: World, seat: string, id: LandTerritoryId) {
-  const game = world.grids[world.seats.findIndex((s) => s.id === seat)];
-  const quote = landPurchaseQuote(game, id)!;
+  const index = world.seats.findIndex((s) => s.id === seat);
+  const target = getTerritoryTiles().find((tile) => tile.territoryId === id)!;
+  for (
+    let step = 0;
+    !landPurchaseQuote(world.grids[index], id) && step < 40;
+    step++
+  ) {
+    const view = roomView(world, seat).game!;
+    const nearest = [...tilePurchaseQuotes(view).values()]
+      .filter((quote) => {
+        const tile = getTerritoryTile(quote.tileId, view)!;
+        return quote.territoryId !== id && !tile.city;
+      })
+      .sort(
+        (a, b) =>
+          territoryHexDistance(getTerritoryTile(a.tileId)!, target) -
+          territoryHexDistance(getTerritoryTile(b.tileId)!, target),
+      )[0];
+    expect(nearest).toBeDefined();
+    expect(
+      applyCommand(world, seat, {
+        matchId: world.matchId,
+        epoch: world.epoch,
+        sequence: (world.sequences[seat] ?? 0) + 1,
+        command: {
+          kind: "action",
+          name: "acquireTile",
+          payload: { tileId: nearest.tileId, quoteKey: nearest.quoteKey },
+        },
+      }),
+    ).toBeUndefined();
+  }
+  const quote = landPurchaseQuote(world.grids[index], id)!;
   return applyCommand(world, seat, {
     matchId: world.matchId,
     epoch: world.epoch,
@@ -43,8 +80,9 @@ function buy(world: World, seat: string, id: LandTerritoryId) {
 }
 it("serializes each parcel's claim while independent claims coexist through save/resume", () => {
   const world = ready();
-  const losingCash = currentTick(world.grids[1])!.cash;
   expect(buy(world, "0", "parcel-0")).toBeUndefined();
+  expect(buy(world, "1", "parcel-0")).toMatch(/owned/i);
+  const losingCash = currentTick(world.grids[1])!.cash;
   expect(buy(world, "1", "parcel-0")).toMatch(/owned/i);
   expect(currentTick(world.grids[1])!.cash).toBe(losingCash);
   expect(buy(world, "1", "parcel-2")).toBeUndefined();

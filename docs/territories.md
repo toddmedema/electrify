@@ -37,13 +37,16 @@ blocks cannot overlap or queue before the active term expires. Supplier limits,
 weather, expiry and minimum bills remain; no line is built or upgraded to sign.
 Inherited third-party contracts retain their own dates and replacement windows.
 
-Every visible unowned tile is an immediate cash purchase, without adjacency gating.
+An unowned tile can be purchased immediately when it touches a physically owned
+company tile. Active utility PPAs and connected peer land extend sight without
+granting purchase adjacency. Acquired utility land and retained paid disconnected
+property are company-owned anchors for further adjacent purchases.
 Prices use 2005 dollars, indexed by the existing seeded CPI:
 
 - General building tiles cost $3 million each. The original larger land area's
   seven tiles cost one seventh of its former $18 million price each. Any ordinary
   onshore generator or storage technology can use general sites, subject to
-  normal technology and quote limits.
+  normal technology and quote limits. General land has no additional site MW cap.
 - Residential tiles cost $32 million and add 16,000 customer accounts at the
   scenario's opening date. Industrial tiles cost $12 million and add 400 accounts,
   each with demand equivalent to 20 ordinary accounts. Account transfers scale with
@@ -69,8 +72,9 @@ share pending commitments, and co-op ownership appears only after host acceptanc
 
 Home and utility territories retain their industrial, wind and solar/storage
 budgets: thermal projects use industrial sites, wind uses wind sites, and solar
-and storage use open-land sites. Industrial and general projects are capped at
-300 MW per site; wind/open-land projects at 150 MW. Storage uses its power rating
+and storage use open-land sites. Industrial projects are capped at 300 MW per
+site; wind/open-land projects at 150 MW. General sites have no site power cap.
+Storage uses its power rating
 for the site limit and the existing technology quote for energy duration. Paused
 and unfinished projects reserve sites; selling an ordinary project frees one.
 Inherited hydro retains its named provenance.
@@ -90,12 +94,16 @@ budgets receive individual legacy overflow hexes rather than losing assets or
 stacking several facilities on one cell. Construction and paused projects reserve
 their cell immediately; cities cannot be built over. Schema 17 adds individual
 tile receipts. Earlier whole-area purchases retain every previously paid-for cell
-and their exact capital value, without extra charges or refunds.
+and their exact capital value, without extra charges or refunds. Schema 18 keeps
+previously paid individual receipts under their original visibility rule while
+requiring owned physical adjacency for new purchases. Inland water is a lake;
+previously installed offshore plants retain their output and finances, with no
+right to build a replacement offshore plant on the lake.
 
 In co-op, the host serializes purchases independently for each tile. The first
 valid accepted claim owns that tile; another company keeps its cash and cannot
 build there. Room views and restored worlds derive ownership from receipts.
-Recognized published schema 13, 14, 15 and 16 rules
+Recognized published schema 13, 14, 15, 16 and 17 rules
 identities have ordered migrations; existing duplicate uplands rights are
 preserved because those maps were company-local. New land claims are exclusive.
 Utility acquisitions remain separate company choices. Automatic peer market

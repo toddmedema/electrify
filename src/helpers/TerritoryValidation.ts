@@ -211,7 +211,7 @@ export function validTerritoryNetwork(
       !["industrial", "wind", "open-land", "hydro", "geothermal"].includes(
         tile.siteKind,
       ) ||
-      !["plains", "lake", "mountain", "ocean"].includes(tile.terrain) ||
+      !["plains", "lake", "mountain"].includes(tile.terrain) ||
       !Number.isFinite(tile.maxPeakW) ||
       tile.maxPeakW <= 0 ||
       (tile.hydroSiteId !== undefined &&

@@ -9,9 +9,15 @@ import reducer, {
   generateNewTimeline,
   previewFacilityBuild,
   tickState,
+  sellFacility,
 } from "../reducers/Game";
 import { modScenario } from "../mods/ModScenario";
-import type { GameType, TerrainType, TerritoryTileId } from "../Types";
+import type {
+  GameType,
+  TerrainType,
+  TerritoryTileId,
+  LegacyTerritoryTile,
+} from "../Types";
 import { isStorage } from "../Types";
 import { getWindOutputFactor, getOffshoreWindOutputFactor } from "./Energy";
 import { currentTick } from "./GameSelectors";
@@ -23,6 +29,7 @@ import {
 } from "./TerrainModifiers";
 import { territoryBuildAvailability } from "./Territories";
 import { acquisitionAssets } from "./Expansion";
+import { parseSave, serializeSave } from "../SaveGame";
 
 function fixture() {
   const game = createGame({ scenarioId: 116, seed: 12345 });
@@ -68,7 +75,6 @@ it.each([
   ["mountain", 1.15, 1.2],
   ["river", 1, 1],
   ["lake", 1, 1],
-  ["ocean", 1, 1],
 ] as const)(
   "scopes %s residual speed and build cost to fixed onshore wind and solar",
   (terrain, speed, cost) => {
@@ -344,91 +350,108 @@ it("uses the same local wind owner in live ticks, simulated output and estimated
   );
 });
 
-it("offers the mapped ocean's offshore technology despite inland weather, with existing cost/curve and real date/size limits", () => {
-  const game = fixture();
-  const ocean = TERRITORY_TILES.find(
-    (candidate) => candidate.terrain === "ocean",
-  )!.id;
-  const local = GENERATORS(
-    game,
-    20e6,
-    [20, 40],
-    [],
-    [],
-    [],
-    "champlain",
-    ocean,
-  ).find((candidate) => candidate.fuel === "Offshore Wind")!;
-  expect(local.available).toBe(true);
-  expect(local.capacityFactor).toBe(
-    (getOffshoreWindOutputFactor(20) + getOffshoreWindOutputFactor(40)) / 2,
-  );
-  const offshoreRegion = {
-    ...game,
-    location: { ...game.location, id: "NewYork", offshore: true },
-    territoryNetwork: undefined,
-  };
-  const regional = GENERATORS(
-    offshoreRegion,
-    20e6,
-    [20, 40],
-    [],
-    [20, 40],
-  ).find((candidate) => candidate.fuel === "Offshore Wind")!;
-  expect(local.buildCost).toBe(regional.buildCost);
-  const facility = { fuel: "Offshore Wind" as const, tileId: ocean };
-  expect(getTerrainWindOutputFactor(game, facility, 20)).toBe(
-    getOffshoreWindOutputFactor(20),
-  );
-  expect(getTerrainWindOutputFactor(game, facility, 20, 0)).toBe(0);
-  expect(getTerrainWindOutputFactor(game, facility, 20, 40)).toBe(
-    getOffshoreWindOutputFactor(40),
-  );
-  const result = reducer(
-    game,
-    buildFacility({
-      facility: local,
-      financed: false,
+it.each(["authored", "legacy"])(
+  "retains installed schema17 %s inland offshore plants and their weather output without granting replacement rights",
+  (placement) => {
+    const game = fixture();
+    const legacy: LegacyTerritoryTile = {
+      id: "champlain:legacy-100",
       territoryId: "champlain",
-      tileId: ocean,
-    }),
-  );
-  expect(
-    result.facilities.find((candidate) => candidate.tileId === ocean)?.fuel,
-  ).toBe("Offshore Wind");
-  const operating = cloneDeep(result);
-  const offshore = operating.facilities.find(
-    (candidate) => candidate.tileId === ocean,
-  )!;
-  offshore.yearsToBuildLeft = 0;
-  operating.facilities = [offshore];
-  const now = currentTick(operating)!;
-  const forecast = generateForecastTimeline(
-    operating,
-    now.cash,
-    now.customers,
-    12,
-    60,
-  );
-  expect(
-    forecast.some((tick) => (tick.supplyByFuel["Offshore Wind"] ?? 0) > 0),
-  ).toBe(true);
-  for (const tick of forecast)
-    expect(tick.supplyByFuel["Offshore Wind"]).toBe(
-      offshore.peakW * getOffshoreWindOutputFactor(tick.windKph),
+      q: 6,
+      r: -4,
+      terrain: "ocean",
+      siteKind: "wind",
+      maxPeakW: 150e6,
+    };
+    if (placement === "legacy")
+      game.territoryNetwork!.legacyTiles!.push(legacy);
+    const water =
+      placement === "legacy"
+        ? legacy
+        : TERRITORY_TILES.find(({ id }) => id === "champlain:site-14")!;
+    game.storyEffectsDisabled = false;
+    game.weatherHazardsDisabled = false;
+    let prior: GameType;
+    // Recreate the published schema17 geography through the real quote and reducer owners.
+    water.terrain = "ocean";
+    try {
+      const local = GENERATORS(
+        game,
+        20e6,
+        [20, 40],
+        [],
+        [],
+        [],
+        "champlain",
+        water.id,
+      ).find((candidate) => candidate.fuel === "Offshore Wind")!;
+      expect(local.available).toBe(true);
+      prior = cloneDeep(
+        reducer(
+          game,
+          buildFacility({
+            facility: local,
+            financed: false,
+            territoryId: "champlain",
+            tileId: water.id,
+          }),
+        ),
+      );
+    } finally {
+      if (placement === "authored") water.terrain = "lake";
+    }
+    const raw = JSON.parse(JSON.stringify(serializeSave(prior!)));
+    raw.schemaVersion = 17;
+    const unchanged = JSON.stringify(raw);
+    const migrated = parseSave(raw)!.game;
+    expect(JSON.stringify(raw)).toBe(unchanged);
+    expect(migrated.facilities).toEqual(raw.game.facilities);
+    expect(migrated.timeline).toEqual(raw.game.timeline);
+    const offshore = migrated.facilities.find(
+      ({ tileId }) => tileId === water.id,
+    )!;
+    expect(migrated.territoryNetwork!.legacyLakeOffshore).toEqual([
+      { facilityId: offshore.id, tileId: water.id },
+    ]);
+    expect(getTerrainWindOutputFactor(migrated, offshore, 20)).toBe(
+      getOffshoreWindOutputFactor(20),
     );
-  const tooEarly = { ...game, date: { ...game.date, year: 1991 } };
-  expect(
-    getBuildFacilityQuote(tooEarly, local, "champlain", ocean),
-  ).toBeUndefined();
-  expect(
-    getBuildFacilityQuote(game, { ...local, peakW: 1e9 }, "champlain", ocean),
-  ).toBeUndefined();
-  expect(
-    territoryBuildAvailability(game, quote(game, "plains"), "champlain", ocean)
-      .buildable,
-  ).toBe(false);
-});
+    expect(getTerrainWindOutputFactor(migrated, offshore, 20, 0)).toBe(0);
+    expect(getTerrainWindOutputFactor(migrated, offshore, 20, 40)).toBe(
+      getOffshoreWindOutputFactor(40),
+    );
+    expect(
+      getBuildFacilityQuote(migrated, offshore, "champlain", water.id),
+    ).toBeUndefined();
+    expect(
+      parseSave(JSON.parse(JSON.stringify(serializeSave(migrated))))!.game,
+    ).toEqual(migrated);
+    const operating = cloneDeep(migrated);
+    const plant = operating.facilities.find(({ id }) => id === offshore.id)!;
+    plant.yearsToBuildLeft = 0;
+    operating.facilities = [plant];
+    const now = currentTick(operating)!;
+    const forecast = generateForecastTimeline(
+      operating,
+      now.cash,
+      now.customers,
+      12,
+      60,
+    );
+    expect(
+      forecast.some((tick) => (tick.supplyByFuel["Offshore Wind"] ?? 0) > 0),
+    ).toBe(true);
+    for (const tick of forecast)
+      expect(tick.supplyByFuel["Offshore Wind"]).toBe(
+        plant.peakW * getOffshoreWindOutputFactor(tick.windKph),
+      );
+    const sold = reducer(migrated, sellFacility(offshore.id));
+    expect(sold.territoryNetwork!.legacyLakeOffshore).toEqual([]);
+    expect(
+      getBuildFacilityQuote(sold, offshore, "champlain", water.id),
+    ).toBeUndefined();
+  },
+);
 
 it("does not manufacture named hydro or geothermal sites from visual terrain", () => {
   const game = fixture();

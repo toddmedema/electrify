@@ -6,7 +6,6 @@ import {
   restoreWorld,
 } from "./World";
 import {
-  getTerritoryTiles,
   getTerritoryTile,
   territoryVisibilityDistance,
 } from "../helpers/TerritoryTiles";
@@ -34,7 +33,7 @@ it("projects actual foregrounds on other companies' claimed land without changin
     "epoch",
   );
   currentTick(world.grids[0])!.cash = 1e9;
-  const quote = landPurchaseQuote(world.grids[0], "parcel-0")!;
+  const quote = landPurchaseQuote(world.grids[0])!;
   expect(
     command(world, "0", {
       kind: "action",
@@ -42,9 +41,7 @@ it("projects actual foregrounds on other companies' claimed land without changin
       payload: { territoryId: quote.territoryId, quoteKey: quote.quoteKey },
     }),
   ).toBeUndefined();
-  const tile = getTerritoryTiles().find(
-    (tile) => tile.territoryId === "parcel-0" && !tile.city,
-  )!;
+  const tile = getTerritoryTile(quote.tileId)!;
   expect(
     command(world, "0", {
       kind: "action",

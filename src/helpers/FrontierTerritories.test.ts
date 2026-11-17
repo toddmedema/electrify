@@ -29,7 +29,11 @@ import reducer, {
 } from "../reducers/Game";
 import { runMonths } from "../testing/SimulationTestHelpers";
 import { programCustomers } from "./Policies";
-import { acquireLand, schedulePolicy } from "../reducers/GameActions";
+import {
+  acquireLand,
+  acquireTile,
+  schedulePolicy,
+} from "../reducers/GameActions";
 import {
   getTerritoryTile,
   getTerritoryTiles,
@@ -58,8 +62,8 @@ function buy(state: GameType, id: LandTerritoryId) {
     state = cloneDeep(
       reducer(
         state,
-        acquireLand({
-          territoryId: pathQuote.territoryId,
+        acquireTile({
+          tileId: pathQuote.tileId,
           quoteKey: pathQuote.quoteKey,
         }),
       ),
@@ -104,7 +108,9 @@ it("quotes visible neutral cells and allows independent purchases without duplic
   expect(LAND_TERRITORIES).toHaveLength(19);
   expect(tilePurchaseQuotes(state).size).toBeGreaterThan(0);
   expect(landPurchaseQuote(state, "parcel-17")).toBeUndefined();
-  const first = landPurchaseQuote(state, "parcel-0")!;
+  const first = [...tilePurchaseQuotes(state).values()].find((quote) =>
+    quote.territoryId.startsWith("frontier:"),
+  )!;
   expect(
     purchaseLand(state, {
       territoryId: first.territoryId,
@@ -119,7 +125,11 @@ it("quotes visible neutral cells and allows independent purchases without duplic
     }),
   ).toBe(false);
   expect(currentTick(state)!.cash).toBe(cash);
-  const second = landPurchaseQuote(state, "parcel-2")!;
+  const second = [...tilePurchaseQuotes(state).values()].find(
+    (quote) =>
+      quote.territoryId.startsWith("frontier:") &&
+      quote.territoryId !== first.territoryId,
+  )!;
   expect(
     purchaseLand(state, {
       territoryId: second.territoryId,
@@ -127,7 +137,11 @@ it("quotes visible neutral cells and allows independent purchases without duplic
     }),
   ).toBe(true);
   expect(ownedTerritories(state)).toEqual(
-    expect.arrayContaining(["champlain", "parcel-0", "parcel-2"]),
+    expect.arrayContaining([
+      "champlain",
+      first.territoryId,
+      second.territoryId,
+    ]),
   );
 });
 it.each(["parcel-1", "parcel-5"] as LandTerritoryId[])(
