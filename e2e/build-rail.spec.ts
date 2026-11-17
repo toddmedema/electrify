@@ -60,6 +60,11 @@ for (const theme of ["light", "dark"] as const) {
         exact: true,
       });
       await expect(preview).toBeVisible();
+      const previewBounds = (await preview.boundingBox())!;
+      const dockBounds = (await page.locator(".gameActionDock").boundingBox())!;
+      expect(previewBounds.y + previewBounds.height).toBeLessThanOrEqual(
+        dockBounds.y - 8,
+      );
       await expect(rail.locator(".desktopBuildPreview")).toHaveCount(1);
       for (const label of [
         "Build cost",

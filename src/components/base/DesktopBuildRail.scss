@@ -93,7 +93,7 @@
   box-sizing: border-box;
   width: clamp(320px, 34vw, 440px);
   max-width: calc(100vw - 136px);
-  max-height: calc(100% - 16px);
+  max-height: calc(100% - var(--game-dock-clearance, 80px) - 16px);
   overflow: auto;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
