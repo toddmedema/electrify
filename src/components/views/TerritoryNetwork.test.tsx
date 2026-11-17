@@ -734,7 +734,7 @@ it.each([
   "retains an inspected owned %s site when its oversized rail preview chooses the exact site maximum",
   async (name, siteId, shortcut) => {
     const game = ready();
-    game.territoryNetwork!.tilePurchases.push({
+    (game.territoryNetwork!.tilePurchases ??= []).push({
       tileId: siteId,
       minute: game.date.minute,
       price: 0,

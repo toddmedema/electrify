@@ -1881,8 +1881,12 @@ for (const theme of ["light", "dark"] as const) {
     await expect(
       network.locator(`.territoryHex[data-tile="${frontier.id}"]`),
     ).toHaveAttribute("data-visibility-distance", "0");
-    await expect(network.getByRole("status")).toContainText("Site connected");
-    await expect(network.getByRole("status")).toContainText(
+    await expect(
+      network.getByRole("status", { name: "Connection result" }),
+    ).toContainText("Site connected");
+    await expect(
+      network.getByRole("status", { name: "Connection result" }),
+    ).toContainText(
       `${formatMoneyConcise(currentTick(bought)!.cash)} cash remaining`,
     );
     await expect(

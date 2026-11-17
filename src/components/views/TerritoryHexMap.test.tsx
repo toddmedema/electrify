@@ -443,7 +443,9 @@ it.each([1280, 360])(
     expect(
       screen.getByRole("button", { name: "Rapid connection mode" }),
     ).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByRole("status")).toHaveTextContent("Site connected");
+    expect(
+      screen.getByRole("status", { name: "Connection result" }),
+    ).toHaveTextContent("Site connected");
   },
 );
 
@@ -598,9 +600,9 @@ it("shares pending cash with surface purchases, prevents duplicates, and waits f
   tap(tile);
   fireEvent.click(screen.getByTestId("other-buy"));
   expect(host.submit).toHaveBeenCalledTimes(1);
-  expect(screen.getByRole("status")).toHaveTextContent(
-    "Not enough available cash",
-  );
+  expect(
+    screen.getByRole("status", { name: "Connection result" }),
+  ).toHaveTextContent("Not enough available cash");
   expect(tile).toHaveAttribute("aria-busy", "true");
   await act(async () => host.complete());
   expect(tile).toHaveAttribute("aria-busy", "true");
@@ -610,7 +612,9 @@ it("shares pending cash with surface purchases, prevents duplicates, and waits f
     map.store.dispatch(acquireTile({ tileId: id, quoteKey: quote.quoteKey }));
   });
   expect(map.target(id)).not.toHaveAttribute("aria-busy");
-  expect(screen.getByRole("status")).toHaveTextContent("Site connected");
+  expect(
+    screen.getByRole("status", { name: "Connection result" }),
+  ).toHaveTextContent("Site connected");
   expect(screen.getByTestId("other-buy")).toHaveTextContent("committed 0");
 });
 
@@ -621,9 +625,9 @@ it("keeps buying mode and releases commitments when the host rejects, then reset
   const tile = map.candidates()[0];
   tap(tile);
   await act(async () => host.reject());
-  expect(screen.getByRole("status")).toHaveTextContent(
-    "Another utility claimed this tile",
-  );
+  expect(
+    screen.getByRole("status", { name: "Connection result" }),
+  ).toHaveTextContent("Another utility claimed this tile");
   expect(tile).not.toHaveAttribute("aria-busy");
   expect(screen.getByTestId("other-buy")).toHaveTextContent("committed 0");
   expect(
@@ -702,9 +706,14 @@ it("requires a fresh activation if a displayed quote changes during a pointer ge
   });
   fireEvent.click(map.target(id), { detail: 1 });
   expect(host.submit).not.toHaveBeenCalled();
-  expect(screen.getByRole("status")).toHaveTextContent(
-    "connection cost changed",
-  );
+  expect(
+    screen.getByRole("status", { name: "Connection result" }),
+  ).toHaveTextContent("connection cost changed");
+  map.buyMode();
+  map.buyMode();
+  expect(
+    screen.getByRole("button", { name: "Rapid connection mode" }),
+  ).toHaveAccessibleDescription(/Select a priced site to pay/);
   tap(map.target(id));
   expect(host.submit).toHaveBeenCalledTimes(1);
 });
@@ -919,9 +928,9 @@ it("binds a retargeted model gesture to the quote shown at pointer down", async 
     fireEvent.pointerUp(ground, { pointerId: 1, clientX: 100, clientY: 100 });
     fireEvent.click(ground, { detail: 1 });
     expect(host.submit).not.toHaveBeenCalled();
-    expect(screen.getByRole("status")).toHaveTextContent(
-      "connection cost changed",
-    );
+    expect(
+      screen.getByRole("status", { name: "Connection result" }),
+    ).toHaveTextContent("connection cost changed");
   } finally {
     restore();
   }

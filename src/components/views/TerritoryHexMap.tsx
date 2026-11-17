@@ -704,13 +704,22 @@ export default function TerritoryHexMap({
         className="srOnly"
         id={`${mapId}-buy-status`}
         role="status"
+        aria-label="Rapid connection instructions"
         aria-live="polite"
         aria-atomic="true"
       >
-        {message ||
-          (buyMode
-            ? "Rapid connection mode is on. Select a priced site to pay the displayed connection cost."
-            : "")}
+        {buyMode
+          ? "Rapid connection mode is on. Select a priced site to pay the displayed connection cost."
+          : ""}
+      </span>
+      <span
+        className="srOnly"
+        role="status"
+        aria-label="Connection result"
+        aria-live="polite"
+        aria-atomic="true"
+      >
+        {message}
       </span>
       <div
         className="territoryMapViewport"

@@ -164,6 +164,34 @@ it("enters a non-final technology preview with Right Arrow and tabs within it be
   window.removeEventListener("keydown", mapCapture, true);
 });
 
+it("returns keyboard focus to the trigger after explicit sizing and preview dismissal", async () => {
+  const { onProject } = show();
+  const size = screen.getByRole("button", { name: /Generator power:/ });
+  await userEvent.tab();
+  expect(size).toHaveFocus();
+  await userEvent.keyboard("{Enter}");
+  expect(
+    screen.getByRole("slider", { name: "Generator capacity" }),
+  ).toHaveFocus();
+  await userEvent.tab();
+  expect(screen.getByRole("button", { name: "Done" })).toHaveFocus();
+  await userEvent.keyboard("{Enter}");
+  expect(size).toHaveFocus();
+  expect(screen.queryByRole("slider")).not.toBeInTheDocument();
+  const buttons = within(
+    screen.getByRole("complementary", { name: "Build facilities" }),
+  ).getAllByRole("button");
+  for (let index = 1; index <= buttons.indexOf(wind()); index++)
+    await userEvent.tab();
+  expect(wind()).toHaveFocus();
+  await userEvent.keyboard("{ArrowRight}{Enter}");
+  expect(wind()).toHaveFocus();
+  expect(
+    screen.queryByLabelText("Wind technology preview"),
+  ).not.toBeInTheDocument();
+  expect(onProject).not.toHaveBeenCalled();
+});
+
 it.each([
   ["Hydro", "parcel-7:site-0", "Use site maximum"],
   ["Geothermal", "parcel-3:site-0", "Use max size"],
@@ -171,7 +199,7 @@ it.each([
   "offers an owned %s site's exact maximum even when an oversized project has no quote",
   (name, siteId, shortcut) => {
     const { game, onProject } = show(siteId, (game) => {
-      game.territoryNetwork!.tilePurchases.push({
+      (game.territoryNetwork!.tilePurchases ??= []).push({
         tileId: siteId,
         minute: game.date.minute,
         price: 0,

@@ -91,6 +91,14 @@ export default function DesktopBuildRail({
     setPreviewName(undefined);
     setSizing(undefined);
   }, [clearTimer]);
+  const dismissAndReturn = React.useCallback(() => {
+    dismiss();
+    if (rail.current?.contains(document.activeElement)) {
+      suppressFocus.current = true;
+      origin.current?.focus({ preventScroll: true });
+      suppressFocus.current = false;
+    }
+  }, [dismiss]);
   React.useEffect(() => () => clearTimer(), [clearTimer]);
   React.useLayoutEffect(() => {
     if (previewEntry)
@@ -120,12 +128,7 @@ export default function DesktopBuildRail({
         return;
       event.preventDefault();
       event.stopImmediatePropagation();
-      dismiss();
-      if (rail.current?.contains(document.activeElement)) {
-        suppressFocus.current = true;
-        origin.current?.focus({ preventScroll: true });
-        suppressFocus.current = false;
-      }
+      dismissAndReturn();
     };
     document.addEventListener("pointerdown", outside);
     document.addEventListener("keydown", escape, true);
@@ -133,7 +136,7 @@ export default function DesktopBuildRail({
       document.removeEventListener("pointerdown", outside);
       document.removeEventListener("keydown", escape, true);
     };
-  }, [previewName, sizing, dismiss]);
+  }, [previewName, sizing, dismiss, dismissAndReturn]);
   const show = (option: FacilityShoppingType, button: HTMLButtonElement) => {
     if (busy || suppressFocus.current) return;
     clearTimer();
@@ -325,7 +328,7 @@ export default function DesktopBuildRail({
               ? "storage project you choose. Discharge power depends on the technology."
               : "generator project you choose."}
           </p>
-          <Button onClick={dismiss}>Done</Button>
+          <Button onClick={dismissAndReturn}>Done</Button>
         </section>
       )}
       {facility && (
@@ -338,12 +341,12 @@ export default function DesktopBuildRail({
           onMouseLeave={leave}
         >
           <header>
-            <span>Technology preview</span>
+            <span>Technology preview · → to explore</span>
             <IconButton
               size="small"
               aria-label="Close technology preview"
               ref={previewFirstControl}
-              onClick={dismiss}
+              onClick={dismissAndReturn}
             >
               <CloseIcon />
             </IconButton>
