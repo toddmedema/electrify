@@ -2,6 +2,7 @@ import { expect, test } from "./fixtures";
 import { editSavedGame, readSavedGame } from "./save-fixture";
 import { expectDialogToFit } from "./dialog-layout";
 import { reviewScreenshot } from "./review-screenshot";
+import { openPane } from "./layout";
 
 for (const theme of ["light", "dark"] as const) {
   test(`company supply reviews and retains a signed agreement in ${theme}`, async ({
@@ -18,9 +19,15 @@ for (const theme of ["light", "dark"] as const) {
     }, theme);
     await page.goto("/?scenario=116");
     await page.getByRole("button", { name: "Start game", exact: true }).click();
-    const facilities = page.locator(".facilities:visible");
-    await page.getByRole("button", { name: "Agreements", exact: true }).click();
-    let line = facilities.locator(".territoryAgreements");
+    const agreements = page.getByRole("region", {
+      name: "Agreements",
+      exact: true,
+    });
+    await openPane(
+      agreements,
+      page.getByRole("button", { name: "Agreements", exact: true }),
+    );
+    let line = agreements.locator(".territoryAgreements");
     await expect(line).toContainText("Regional nuclear · Inherited");
     const opening = await readSavedGame(page);
     expect(opening!.transmission!.lines).toEqual([]);
@@ -47,8 +54,11 @@ for (const theme of ["light", "dark"] as const) {
     });
     await page.goto("/");
     await page.getByRole("button", { name: "Continue", exact: true }).click();
-    await page.getByRole("button", { name: "Agreements", exact: true }).click();
-    line = facilities.locator(".territoryAgreements");
+    await openPane(
+      agreements,
+      page.getByRole("button", { name: "Agreements", exact: true }),
+    );
+    line = agreements.locator(".territoryAgreements");
     await expect(line).toContainText("Regional nuclear · Inherited");
     await expect(line).toContainText("Through 31 Dec 2019");
     await expect(line).toContainText("114MW → 57MW on 1 Jan 2020");
@@ -252,7 +262,10 @@ for (const theme of ["light", "dark"] as const) {
     });
     await page.reload();
     await page.getByRole("button", { name: "Continue", exact: true }).click();
-    await page.getByRole("button", { name: "Agreements", exact: true }).click();
+    await openPane(
+      agreements,
+      page.getByRole("button", { name: "Agreements", exact: true }),
+    );
     await expect(line).toContainText("Scheduled · starts 1 Jan 2020");
     await expect(line).toContainText("1 Jan 2020–31 Dec 2024");
     expect(
@@ -268,7 +281,10 @@ for (const theme of ["light", "dark"] as const) {
     });
     await page.goto("/");
     await page.getByRole("button", { name: "Continue", exact: true }).click();
-    await page.getByRole("button", { name: "Agreements", exact: true }).click();
+    await openPane(
+      agreements,
+      page.getByRole("button", { name: "Agreements", exact: true }),
+    );
     await expect(line).toContainText("Regional nuclear · Expired 1 Jan 2020");
     await expect(line).toContainText(
       "each contract has a quantity limit and an expiry date",

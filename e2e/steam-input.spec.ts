@@ -1216,6 +1216,59 @@ test("controller reviews, cancels and confirms a utility acquisition", async ({
   ).toBe(true);
 });
 
+test("controller cycles six right-hand panels around the persistent map", async ({
+  page,
+}) => {
+  await page.goto("/?scenario=116");
+  await select(
+    page,
+    page.getByRole("button", { name: "Start game", exact: true }),
+  );
+  await input(page, "confirm");
+  const map = page.getByRole("region", {
+    name: "Territory map workspace",
+    exact: true,
+  });
+  await expect(map).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Map", exact: true }),
+  ).toHaveCount(0);
+  const viewport = map.locator(".territoryMapViewport");
+  const original = await viewport.elementHandle();
+  for (const name of [
+    "Fleet",
+    "Agreements",
+    "Programs",
+    "Insights",
+    "Events",
+    "Scenario",
+  ]) {
+    await input(page, "nextPane");
+    const panel = page.getByRole("region", { name, exact: true });
+    await expect(panel).toBeVisible();
+    await expect(page.locator(".gameToolPanel:visible")).toHaveCount(1);
+    await expect(panel).toHaveAttribute("data-tool-side", "right");
+    await expect(map).toBeVisible();
+    expect(
+      await original!.evaluate(
+        (element) =>
+          element === document.querySelector(".territoryMapViewport"),
+      ),
+    ).toBe(true);
+  }
+  await input(page, "nextPane");
+  await expect(page.locator(".gameToolPanel")).toHaveCount(0);
+  await expect(map).toBeVisible();
+  await selectMapTile(page, "champlain:city");
+  await input(page, "confirm");
+  await expect(page.locator(".tileWorkspaceSurface")).toBeVisible();
+  await input(page, "back");
+  await expect(page.locator(".tileWorkspaceSurface")).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Buy land", exact: true }),
+  ).toBeFocused();
+});
+
 test("controller buys one map tile and returns from map geography to navigation", async ({
   page,
 }) => {
@@ -1420,7 +1473,7 @@ test("TV saved preferences style direct scenario links before play", async ({
   await start.press("Enter");
   await expect(page.locator(".gameStage")).toHaveAttribute(
     "data-layout",
-    "single",
+    "map",
   );
   await expect(page.locator("#appbar:visible")).toBeVisible();
   const warning = page.locator(".missionSummary.statusWarning");

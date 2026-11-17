@@ -148,6 +148,26 @@ export async function waitForSettled(
   ).toHaveCount(1);
 }
 
+/** Return to the persistent territory map by closing its one active dock panel. */
+export async function returnToTerritoryMap(page: Page): Promise<Locator> {
+  const workspace = page.locator('.gameWorkspace[data-persistent-map="true"]');
+  const map = workspace.getByRole("region", {
+    name: "Territory map workspace",
+    exact: true,
+  });
+  await expect(map).toBeVisible();
+  const panel = workspace.locator(".gameToolPanel:visible");
+  expect(await panel.count()).toBeLessThanOrEqual(1);
+  if (await panel.count()) {
+    await panel
+      .locator(":scope > .gameToolHeader")
+      .getByRole("button", { name: /^Close / })
+      .click();
+  }
+  await expect(panel).toHaveCount(0);
+  return map;
+}
+
 /**
  * Open the Build tool from the dock, leaving it open when it already is: the dock button
  * toggles, so a second click would close it. Returns the Build region.

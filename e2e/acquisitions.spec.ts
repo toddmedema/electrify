@@ -17,10 +17,14 @@ import {
 import { getTerrainModifiers } from "../src/helpers/TerrainModifiers";
 import { loadSimData } from "../src/testing/SimData";
 import { territoryTileViews } from "../src/helpers/TerritoryMapState";
-import { hexCenter } from "../src/components/base/TerritoryHexGeometry";
+import {
+  groundAnchor,
+  hexCenter,
+} from "../src/components/base/TerritoryHexGeometry";
 import { expect, test } from "./fixtures";
 import { reviewScreenshot } from "./review-screenshot";
 import { expectDialogToFit } from "./dialog-layout";
+import { returnToTerritoryMap } from "./layout";
 import { editSavedGame, readSavedGame, readSaveRecords } from "./save-fixture";
 
 const tileSurface = (page: Page) => page.locator(".tileWorkspaceSurface");
@@ -28,9 +32,7 @@ const mapWorkspace = (page: Page) =>
   page.getByRole("region", { name: "Territory map workspace", exact: true });
 
 async function openMap(page: Page) {
-  await page.getByRole("button", { name: "Map", exact: true }).click();
-  await expect(mapWorkspace(page)).toBeVisible();
-  return mapWorkspace(page);
+  return returnToTerritoryMap(page);
 }
 
 async function startMap(page: Page, theme: "light" | "dark") {
@@ -149,7 +151,7 @@ async function revealTile(page: Page, tile: TerritoryTileDefinition) {
 async function expectPhysicalMap(network: Locator, game: GameType) {
   const views = territoryTileViews(game);
   // Resize/focus can move the camera between awaits. Compare one physical render.
-  const { targets, viewport, artworkCount, occupants, wires } =
+  const { targets, viewport, artworkCount, occupants, wires, wireShapes } =
     await network.evaluate((element) => {
       const viewport = element
         .querySelector(".territoryMapViewport")!
@@ -192,6 +194,14 @@ async function expectPhysicalMap(network: Locator, game: GameType) {
           kind: occupant.getAttribute("data-occupant"),
           distance: occupant.getAttribute("data-visibility-distance"),
         })),
+        wireShapes: Array.from(
+          element.querySelectorAll("[data-wire-from][data-wire-to]"),
+        ).map((wire) => ({
+          from: wire.getAttribute("data-wire-from")!,
+          to: wire.getAttribute("data-wire-to")!,
+          kind: wire.getAttribute("data-wire-kind"),
+          path: wire.querySelector(".territoryWire")!.getAttribute("d")!,
+        })),
         wires: Array.from(
           element.querySelectorAll("[data-wire-from][data-wire-to]"),
         ).map((wire) =>
@@ -233,7 +243,11 @@ async function expectPhysicalMap(network: Locator, game: GameType) {
     views
       .filter(
         (view) =>
-          rendered.has(view.tile.id) && (view.tile.city || view.developed),
+          rendered.has(view.tile.id) &&
+          (view.tile.city ||
+            view.facility ||
+            (view.developed &&
+              !["lake", "river", "ocean"].includes(view.tile.terrain))),
       )
       .map((view) => ({
         id: view.tile.id,
@@ -267,6 +281,30 @@ async function expectPhysicalMap(network: Locator, game: GameType) {
   );
   expect(wires.sort()).toEqual(expectedWires.sort());
   expect(new Set(wires).size).toBe(wires.length);
+  for (const shape of wireShapes) {
+    const from = views.find(({ tile }) => tile.id === shape.from)!;
+    const to = views.find(({ tile }) => tile.id === shape.to)!;
+    const submerged = [from, to].some(
+      (view) =>
+        !view.tile.city &&
+        !view.facility &&
+        ["lake", "river", "ocean"].includes(view.tile.terrain),
+    );
+    expect(shape.kind).toBe(submerged ? "submerged" : "overhead");
+    if (submerged) {
+      expect(shape.path).toContain("L");
+    } else {
+      expect(shape.path).toContain("Q");
+      const points = shape.path.match(/-?\d+(?:\.\d+)?/g)!.map(Number);
+      expect(points[1], "overhead origin stays above the ground").toBeLessThan(
+        groundAnchor(from.tile).y,
+      );
+      expect(
+        points[5],
+        "overhead destination stays above the ground",
+      ).toBeLessThan(groundAnchor(to.tile).y);
+    }
+  }
   for (const wire of wires) {
     const [a, b] = wire
       .split("|")
@@ -317,6 +355,175 @@ async function expectCityDemand(surface: Locator) {
 }
 
 for (const theme of ["light", "dark"] as const) {
+  test(`map persists beneath one right-hand panel in ${theme}`, async ({
+    page,
+  }, info) => {
+    const network = await startMap(page, theme);
+    const viewport = network.locator(".territoryMapViewport");
+    const original = await viewport.elementHandle();
+    await expect(
+      page.getByRole("button", { name: "Map", exact: true }),
+    ).toHaveCount(0);
+    const tools = [
+      "Fleet",
+      "Agreements",
+      "Programs",
+      "Insights",
+      "Events",
+      "Scenario",
+    ];
+    const widths =
+      info.project.name === "desktop-chromium"
+        ? [1280, 3840]
+        : [page.viewportSize()!.width];
+    for (const width of widths) {
+      await page.setViewportSize({
+        width,
+        height: page.viewportSize()!.height,
+      });
+      await expect
+        .poll(() => viewport.evaluate((element) => element.clientWidth))
+        .toBe(width);
+      const camera = await viewport.evaluate((element) =>
+        ["x", "y", "scale"].map((part) =>
+          element.getAttribute(`data-camera-${part}`),
+        ),
+      );
+      for (const name of tools) {
+        const trigger = page.getByRole("button", { name, exact: true });
+        await trigger.click();
+        const panel = page.getByRole("region", { name, exact: true });
+        await expect(panel).toBeVisible();
+        await expect(page.locator(".gameToolPanel:visible")).toHaveCount(1);
+        await expect(panel).toHaveAttribute("data-tool-side", "right");
+        await expect(trigger).toHaveAttribute("aria-expanded", "true");
+        await expect(network).toBeVisible();
+        expect(
+          await original!.evaluate(
+            (element) =>
+              element === document.querySelector(".territoryMapViewport"),
+          ),
+          "the same map stays mounted behind every tool",
+        ).toBe(true);
+        expect(
+          await viewport.evaluate((element) =>
+            ["x", "y", "scale"].map((part) =>
+              element.getAttribute(`data-camera-${part}`),
+            ),
+          ),
+          "opening a tool does not pan or zoom the map",
+        ).toEqual(camera);
+        const geometry = await panel.evaluate((element) => {
+          const box = element.getBoundingClientRect();
+          const stage = element.closest(".gameStage")!.getBoundingClientRect();
+          const body = element.querySelector(".gameToolBody")!;
+          return {
+            right: box.right,
+            bottom: box.bottom,
+            dockTop: document
+              .querySelector("#navfooter")!
+              .getBoundingClientRect().top,
+            rightInset: parseFloat(
+              getComputedStyle(element.parentElement!).right,
+            ),
+            stageRight: stage.right,
+            overflow: element.scrollWidth - element.clientWidth,
+            bodyOverflow: body.scrollWidth - body.clientWidth,
+            pageOverflow: document.documentElement.scrollWidth - innerWidth,
+          };
+        });
+        expect(
+          Math.abs(geometry.stageRight - geometry.right - geometry.rightInset),
+          "the panel uses its actual right inset, including on compact screens",
+        ).toBeLessThanOrEqual(1);
+        expect(
+          geometry.bottom,
+          "panel controls remain above the floating dock",
+        ).toBeLessThanOrEqual(geometry.dockTop - 8);
+        expect(geometry.overflow).toBeLessThanOrEqual(1);
+        expect(geometry.bodyOverflow).toBeLessThanOrEqual(1);
+        expect(geometry.pageOverflow).toBeLessThanOrEqual(1);
+        if (name === "Fleet") {
+          const chart = panel.locator(".facilitySupplyChart");
+          await expect(chart.locator("canvas").first()).toBeVisible();
+          await expect(
+            chart.locator(".chartLegendLabel").first(),
+          ).toBeVisible();
+          const fit = await panel.evaluate((element) => {
+            const box = element.getBoundingClientRect();
+            return Array.from(
+              element.querySelectorAll(
+                ".facilitySupplyChart, .chartLegendLabel, .facilityDisclosure, .facilityDispatchHeader button",
+              ),
+            )
+              .filter((item) => item.getClientRects().length > 0)
+              .map((item) => {
+                const rect = item.getBoundingClientRect();
+                return {
+                  text: item.textContent,
+                  left: rect.left - box.left,
+                  right: rect.right - box.right,
+                  overflow: item.scrollWidth - item.clientWidth,
+                };
+              });
+          });
+          for (const item of fit) {
+            expect(
+              item.left,
+              `${item.text} stays inside the Fleet panel`,
+            ).toBeGreaterThanOrEqual(0);
+            expect(
+              item.right,
+              `${item.text} stays inside the Fleet panel`,
+            ).toBeLessThanOrEqual(0);
+            expect(
+              item.overflow,
+              `${item.text} remains fully readable`,
+            ).toBeLessThanOrEqual(1);
+          }
+        }
+        if (name === "Fleet")
+          await reviewScreenshot(page, {
+            path: info.outputPath(`persistent-fleet-${width}-${theme}.png`),
+            animations: "disabled",
+            scale: "css",
+          });
+      }
+      await page.keyboard.press("Escape");
+      await expect(page.locator(".gameToolPanel")).toHaveCount(0);
+      await expect(
+        page.getByRole("button", { name: "Scenario", exact: true }),
+      ).toBeFocused();
+      const game = (await readSavedGame(page))!;
+      const city = getTerritoryTile("champlain:city", game)!;
+      const surface = await inspectTile(page, city);
+      await page.getByRole("button", { name: "Fleet", exact: true }).click();
+      await expect(surface).toHaveCount(0);
+      await expect(
+        page.getByRole("region", { name: "Fleet", exact: true }),
+      ).toBeVisible();
+      await returnToTerritoryMap(page);
+      await expect(surface).toHaveCount(0);
+      if (width >= 700) {
+        await panToTile(page, city);
+        await page
+          .getByRole("button", { name: "Insights", exact: true })
+          .click();
+        await network.locator(`[data-map-target="${city.id}"]`).click();
+        await expect(page.locator(".gameToolPanel")).toHaveCount(0);
+        await expect(surface).toBeVisible();
+        await surface
+          .getByRole("button", { name: "Close tile", exact: true })
+          .click();
+      }
+      await reviewScreenshot(page, {
+        path: info.outputPath(`persistent-map-${width}-${theme}.png`),
+        animations: "disabled",
+        scale: "css",
+      });
+    }
+  });
+
   test(`map facility states follow actual operation, pause and construction in ${theme}`, async ({
     page,
   }, info) => {

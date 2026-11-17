@@ -2,7 +2,12 @@ import { reviewScreenshot } from "./review-screenshot";
 import path from "path";
 import { expectContinuousDialogSurface } from "./dialog-surface";
 import { expect, test } from "./fixtures";
-import { openBuild, openPane, sortBuildCatalog } from "./layout";
+import {
+  openBuild,
+  openPane,
+  returnToTerritoryMap,
+  sortBuildCatalog,
+} from "./layout";
 import { editSavedGame, readSavedGame } from "./save-fixture";
 import { purchaseTerms } from "../src/helpers/Financials";
 import {
@@ -73,7 +78,7 @@ for (const theme of ["light", "dark"] as const) {
         .getByRole("button", { name: "Start game", exact: true })
         .click();
       if (scenarioId === 116) {
-        await page.getByRole("button", { name: "Map", exact: true }).click();
+        await returnToTerritoryMap(page);
         const tile = page.locator(
           '[data-map-target="champlain:site-5"][data-owned="true"]',
         );
