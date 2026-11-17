@@ -3,6 +3,7 @@ export type SoundEffectType =
   | "POWER_RESTORED"
   | "BUILD_COMMITTED"
   | "CONSTRUCTION_COMPLETE"
+  | "ACHIEVEMENT_UNLOCKED"
   | "VICTORY"
   | "FAILURE";
 
@@ -24,6 +25,7 @@ export const GRID_EFFECT_COOLDOWN_MS = 10_000;
 const EFFECT_COOLDOWNS_MS: Partial<Record<SoundEffectType, number>> = {
   BUILD_COMMITTED: 750,
   CONSTRUCTION_COMPLETE: 2_000,
+  ACHIEVEMENT_UNLOCKED: 2_000,
   VICTORY: 5_000,
   FAILURE: 5_000,
 };
@@ -220,6 +222,13 @@ export class SoundEffects {
         { frequency: 262, at: 0.08, duration: 0.18, volume: 0.18 },
         { frequency: 392, at: 0.2, duration: 0.2, volume: 0.2 },
         { frequency: 523, at: 0.32, duration: 0.28, volume: 0.2 },
+      ],
+      // A bright bell flourish, shorter and lighter than the end-of-run fanfare.
+      ACHIEVEMENT_UNLOCKED: [
+        { frequency: 784, at: 0, duration: 0.16, volume: 0.18 },
+        { frequency: 1047, at: 0.11, duration: 0.2, volume: 0.18 },
+        { frequency: 1319, at: 0.22, duration: 0.42, volume: 0.2 },
+        { frequency: 2093, at: 0.22, duration: 0.32, volume: 0.06 },
       ],
       // C-major arpeggio, long enough to mark the end of a run without replacing the music.
       VICTORY: [
