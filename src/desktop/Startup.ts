@@ -1,3 +1,5 @@
+import { focusInitialMenuControl } from "../InitialMenuFocus";
+
 /**
  * The startup entrance is already painted from index.html before the game bundle runs, with the
  * same message as the web build. This only restores that message after a failed attempt is retried;
@@ -91,6 +93,7 @@ function revealMenu(entrance: HTMLElement): void {
     }
   }
   entrance.remove();
+  document.dispatchEvent(new Event("electrify-ready"));
   if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
     const controls = Array.from(
       menu?.querySelectorAll<HTMLElement>("button, a[href]") ?? [],
@@ -144,14 +147,18 @@ function revealMenu(entrance: HTMLElement): void {
       cleanup,
     );
   }
-  const main = menu?.querySelector<HTMLElement>("[data-main-action]");
   const focusMain = () => {
     if (document.activeElement === document.body)
-      main?.focus({ preventScroll: true });
+      focusInitialMenuControl(
+        menu?.querySelector<HTMLElement>("[data-main-action]") ?? undefined,
+      );
   };
   focusMain();
   // Reduced motion shortens transitions rather than removing them, so the restored visibility
   // only takes effect once that transition starts and ends over the next two frames.
-  if (main && document.activeElement === document.body)
+  if (
+    menu?.querySelector("[data-main-action]") &&
+    document.activeElement === document.body
+  )
     window.requestAnimationFrame(() => window.requestAnimationFrame(focusMain));
 }

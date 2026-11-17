@@ -24,6 +24,7 @@ const APP_SHELL = [
   "/manifest.json",
   "/fonts/inter/inter.css",
   "/fonts/inter/InterVariable.woff2",
+  "/fonts/inter/InterVariable-latin.f222662c.woff2",
   "/fonts/inter/InterVariable-Italic.woff2",
   "/images/logo.svg",
   "/images/logo-dark.svg",

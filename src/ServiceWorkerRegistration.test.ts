@@ -23,6 +23,11 @@ function fakeWindow({
       window.setTimeout(callback, ms),
     addEventListener: (name: string, listener: Listener) =>
       listeners.set(name, [...(listeners.get(name) ?? []), listener]),
+    removeEventListener: (name: string, listener: Listener) =>
+      listeners.set(
+        name,
+        (listeners.get(name) ?? []).filter((l) => l !== listener),
+      ),
   };
   const originalServiceWorker = navigator.serviceWorker;
   // prefetchIcons() talks to the global navigator, so point it at the same fake worker.
@@ -79,6 +84,48 @@ describe("registerServiceWorker", () => {
     expect(messageTypes(sw.postMessage)).toEqual([
       "CACHE_BUILD",
       "CACHE_ICONS",
+    ]);
+  });
+
+  it("registers and installs background listeners once across title-to-game handoff", async () => {
+    const sw = fakeWindow();
+    restore = sw.restore;
+    registerServiceWorker(sw.win);
+    registerServiceWorker(sw.win);
+    await flush();
+    registerServiceWorker(sw.win);
+    expect(sw.register).toHaveBeenCalledTimes(1);
+    jest.advanceTimersByTime(BACKGROUND_CACHE_DELAY_MS);
+    await flush();
+    expect(messageTypes(sw.postMessage)).toEqual([
+      "CACHE_BUILD",
+      "CACHE_ICONS",
+    ]);
+    sw.postMessage.mockClear();
+    sw.fire("online");
+    await flush();
+    expect(messageTypes(sw.postMessage)).toEqual([
+      "CACHE_BUILD",
+      "CACHE_ICONS",
+    ]);
+  });
+
+  it("allows a later entry to retry a failed registration without duplicate listeners", async () => {
+    jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    const sw = fakeWindow();
+    restore = sw.restore;
+    sw.register.mockRejectedValueOnce(new Error("denied"));
+    registerServiceWorker(sw.win);
+    await flush();
+    registerServiceWorker(sw.win);
+    await flush();
+    expect(sw.register).toHaveBeenCalledTimes(2);
+    sw.fire("appinstalled");
+    await flush();
+    expect(messageTypes(sw.postMessage)).toEqual([
+      "CACHE_BUILD",
+      "CACHE_ICONS",
+      "SYNC_OFFLINE_DATA",
     ]);
   });
 

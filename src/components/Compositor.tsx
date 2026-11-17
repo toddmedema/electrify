@@ -24,7 +24,6 @@ import {
   isGatedStep,
 } from "../Types";
 import AudioContainer from "./base/AudioContainer";
-import GameWorkspace from "./base/GameWorkspace";
 import { rememberToolInput } from "./base/GameToolMemory";
 import { GAME_TOOLS, GameTool } from "./base/Navigation";
 import { restoreMenuFocus } from "./base/useMenuKeys";
@@ -39,14 +38,8 @@ import DataCenterGuide from "./base/DataCenterGuide";
 import LowCashWarning from "./base/LowCashWarning";
 import VictoryDialogContainer from "./base/VictoryDialogContainer";
 import SaveTransitionDialog from "./base/SaveTransitionDialog";
-import DataCenterSetupContainer from "./views/DataCenterSetupContainer";
 import LoadingContainer from "./views/LoadingContainer";
 import MainMenuContainer from "./views/MainMenuContainer";
-import ManualHelpPopover from "./base/ManualHelpPopover";
-import ManualContainer from "./views/ManualContainer";
-import NewGameContainer from "./views/NewGameContainer";
-import NewGameDetailsContainer from "./views/NewGameDetailsContainer";
-import CampaignSetupContainer from "./views/CampaignSetupContainer";
 import CampaignHandoverContainer from "./base/CampaignHandoverContainer";
 import SettingsContainer from "./views/SettingsContainer";
 import { navigate, navigateBack } from "../reducers/Card";
@@ -69,17 +62,36 @@ import {
 } from "./base/SwipeDismiss";
 import { isDesktopScreen, isSideToolLayout } from "../Globals";
 import { store } from "../Store";
+import LazyViewBoundary, { lazyView } from "./base/LazyViewBoundary";
+const GameWorkspace = lazyView(() => import("./base/GameWorkspace"));
+const DataCenterSetupContainer = lazyView(
+  () => import("./views/DataCenterSetupContainer"),
+);
+const ManualHelpPopover = lazyView(
+  () =>
+    import(/* webpackChunkName: "manual-help" */ "./base/ManualHelpPopover"),
+);
+const ManualContainer = lazyView(() => import("./views/ManualContainer"));
+const NewGameContainer = lazyView(
+  () => import(/* webpackChunkName: "new-game" */ "./views/NewGameContainer"),
+);
+const NewGameDetailsContainer = lazyView(
+  () => import("./views/NewGameDetailsContainer"),
+);
+const CampaignSetupContainer = lazyView(
+  () => import("./views/CampaignSetupContainer"),
+);
 
-const CustomGameContainer = React.lazy(
+const CustomGameContainer = lazyView(
   () =>
     import(/* webpackChunkName: "custom-game" */ "./views/CustomGameContainer"),
 );
 
-const SavedGames = React.lazy(
+const SavedGames = lazyView(
   () => import(/* webpackChunkName: "saved-games" */ "./views/SavedGames"),
 );
 
-const AchievementGallery = React.lazy(() =>
+const AchievementGallery = lazyView(() =>
   import(
     /* webpackChunkName: "achievements-ui" */ "../achievements/Interface"
   ).then(({ AchievementGallery }) => ({ default: AchievementGallery })),
@@ -88,7 +100,7 @@ const AchievementGallery = React.lazy(() =>
 // Desktop-only: web builds drop the screen and its mod parser entirely.
 const Mods =
   process.env.REACT_APP_DESKTOP === "true"
-    ? React.lazy(() => import("./views/Mods"))
+    ? lazyView(() => import("./views/Mods"))
     : () => null;
 
 const GAME_WORKSPACE_KEY = "GAME_WORKSPACE";
@@ -500,6 +512,19 @@ export default class Compositor extends React.Component<Props, {}> {
   };
 
   private renderCard(): React.JSX.Element {
+    return (
+      <LazyViewBoundary
+        onClose={() => store.dispatch(navigateBack())}
+        closeLabel="Go back"
+      >
+        <React.Suspense fallback={<p role="status">Loading…</p>}>
+          {this.renderCurrentCard()}
+        </React.Suspense>
+      </LazyViewBoundary>
+    );
+  }
+
+  private renderCurrentCard(): React.JSX.Element {
     const run = this.props.ui.evidenceRunId ?? 0;
     if (this.workspaceMemory.run !== run)
       this.workspaceMemory = { run, values: new Map() };
@@ -688,11 +713,22 @@ export default class Compositor extends React.Component<Props, {}> {
           )}
         <DataCenterGuide />
         <LowCashWarning />
-        <ManualHelpPopover
-          entry={ui.manualHelpEntry}
-          onClose={() => store.dispatch(manualHelpClose())}
-          onRelated={(title: string) => store.dispatch(manualHelpOpen(title))}
-        />
+        {ui.manualHelpEntry && (
+          <LazyViewBoundary
+            onClose={() => store.dispatch(manualHelpClose())}
+            closeLabel="Close help"
+          >
+            <React.Suspense fallback={null}>
+              <ManualHelpPopover
+                entry={ui.manualHelpEntry}
+                onClose={() => store.dispatch(manualHelpClose())}
+                onRelated={(title: string) =>
+                  store.dispatch(manualHelpOpen(title))
+                }
+              />
+            </React.Suspense>
+          </LazyViewBoundary>
+        )}
         <Dialog
           open={ui.dialog.open}
           sx={ui.dialog.tutorialComplete ? tutorialCompletionSx : undefined}

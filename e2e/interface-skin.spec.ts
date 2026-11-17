@@ -33,7 +33,7 @@ for (const theme of ["light", "dark"] as const) {
     ).toBe(true);
     expect(
       fontRequests.some((url) =>
-        url.endsWith("/fonts/inter/InterVariable.woff2"),
+        /\/fonts\/inter\/InterVariable(?:-latin\.[a-f0-9]+)?\.woff2$/.test(url),
       ),
     ).toBe(true);
     const origin = new URL(page.url()).origin;

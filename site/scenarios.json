@@ -29,7 +29,7 @@
       }
     ],
     "takeaway": "What would you change if you could start preparing four years before the freeze?",
-    "related": [108, 115, 111]
+    "related": [108, 115, 104]
   },
   {
     "scenarioId": 106,
@@ -93,7 +93,7 @@
       }
     ],
     "takeaway": "Try turning a price on pollution into a practical plan for the next twelve years.",
-    "related": [101, 102, 113]
+    "related": [101, 126, 113]
   },
   {
     "scenarioId": 103,
@@ -125,7 +125,7 @@
       }
     ],
     "takeaway": "How much of a temporary advantage would you turn into a twenty-year investment?",
-    "related": [102, 106, 100]
+    "related": [102, 106, 116]
   },
   {
     "scenarioId": 105,
@@ -157,7 +157,7 @@
       }
     ],
     "takeaway": "How much of the island's imported oil can you replace without leaving a gap in supply?",
-    "related": [101, 114, 111]
+    "related": [101, 114, 107]
   },
   {
     "scenarioId": 101,
@@ -189,7 +189,7 @@
       }
     ],
     "takeaway": "Find a pace of investment that follows falling costs without falling behind demand.",
-    "related": [100, 105, 123]
+    "related": [124, 105, 123]
   },
   {
     "scenarioId": 104,
@@ -221,7 +221,7 @@
       }
     ],
     "takeaway": "What would a utility built with hurricane recovery in mind do differently?",
-    "related": [107, 111, 105]
+    "related": [107, 111, 126]
   },
   {
     "scenarioId": 102,
@@ -253,7 +253,7 @@
       }
     ],
     "takeaway": "Build the company that comes after coal while the old company is still paying the bills.",
-    "related": [100, 103, 113]
+    "related": [117, 103, 113]
   },
   {
     "scenarioId": 108,
@@ -349,7 +349,7 @@
       }
     ],
     "takeaway": "A reliable connection is useful. Having a plan for losing it is useful too.",
-    "related": [104, 110, 123]
+    "related": [104, 110, 125]
   },
   {
     "scenarioId": 113,
@@ -381,7 +381,7 @@
       }
     ],
     "takeaway": "Can your new capacity arrive faster than the old fleet loses its ability to deliver?",
-    "related": [102, 114, 100]
+    "related": [120, 114, 100]
   },
   {
     "scenarioId": 114,
@@ -413,7 +413,7 @@
       }
     ],
     "takeaway": "Use the full reservoir to prepare for the years when it will no longer be full.",
-    "related": [108, 113, 105]
+    "related": [121, 113, 105]
   },
   {
     "scenarioId": 115,
@@ -445,7 +445,7 @@
       }
     ],
     "takeaway": "Build a utility that can keep up with hotter summers without making every year a new emergency.",
-    "related": [108, 107, 106]
+    "related": [108, 107, 122]
   },
   {
     "scenarioId": 116,
@@ -509,7 +509,7 @@
       }
     ],
     "takeaway": "How much service can you restore while keeping the recovery effort financially viable?",
-    "related": [110, 113, 104]
+    "related": [110, 111, 104]
   },
   {
     "scenarioId": 117,
@@ -707,7 +707,7 @@
       }
     ],
     "takeaway": "Bring your inherited company through a term when access to power can no longer be taken for granted.",
-    "related": [121, 123, 111]
+    "related": [121, 123, 125]
   },
   {
     "scenarioId": 123,

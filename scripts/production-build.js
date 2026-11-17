@@ -21,7 +21,19 @@ function productionCompression(
       ...config.optimization,
       // Workers have separate runtimes, but can load the same emitted module
       // chunks. Include the page entry so those modules are not shipped twice.
-      splitChunks: { ...config.optimization.splitChunks, chunks: "all" },
+      splitChunks: {
+        ...config.optimization.splitChunks,
+        chunks: "all",
+        cacheGroups: {
+          ...config.optimization.splitChunks?.cacheGroups,
+          achievementHooks: {
+            test: /[\\/]src[\\/]achievements[\\/]SimulationHooks\.ts$/,
+            name: "achievement-hooks",
+            minSize: 0,
+            enforce: true,
+          },
+        },
+      },
       minimizer: minimizers.map((plugin) =>
         plugin instanceof TerserPlugin
           ? new TerserPlugin({

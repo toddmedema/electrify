@@ -7,7 +7,7 @@ test.describe("scenario pages without JavaScript", () => {
   test.use({ javaScriptEnabled: false });
 
   for (const theme of ["light", "dark"] as const) {
-    test(`the directory leads to every readable scenario in ${theme} mode`, async ({
+    test(`About opens the complete scenario directory in ${theme} mode`, async ({
       page,
     }, info) => {
       await page.emulateMedia({ colorScheme: theme });
@@ -35,14 +35,28 @@ test.describe("scenario pages without JavaScript", () => {
         });
       }
 
+      expect(new Set(scenarios.map(({ slug }) => slug)).size).toBe(
+        scenarios.length,
+      );
+      await expect(
+        page.getByRole("main").locator("a[href^='/scenarios/']"),
+      ).toHaveCount(scenarios.length);
       for (const scenario of scenarios) {
         const pathname = `/scenarios/${scenario.slug}.html`;
         await expect(
           page.getByRole("main").locator(`a[href='${pathname}']`),
         ).toHaveCount(1);
       }
+    });
 
-      for (const scenario of scenarios) {
+    // Each authored scenario keeps the same real directory → detail → directory
+    // journey and 45-second budget, independently of the catalog's total size.
+    for (const scenario of scenarios) {
+      test(`${scenario.slug} is readable in ${theme} mode`, async ({
+        page,
+      }, info) => {
+        await page.emulateMedia({ colorScheme: theme });
+        await page.goto("/scenarios.html");
         await page
           .getByRole("main")
           .locator(`a[href='/scenarios/${scenario.slug}.html']`)
@@ -103,8 +117,8 @@ test.describe("scenario pages without JavaScript", () => {
           .getByRole("link", { name: "Scenarios", exact: true })
           .click();
         await expect(page).toHaveURL(/\/scenarios\.html$/);
-      }
-    });
+      });
+    }
   }
 });
 

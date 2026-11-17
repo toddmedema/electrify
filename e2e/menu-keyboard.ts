@@ -126,10 +126,8 @@ export async function verifyMenuKeyboard(page: Page): Promise<void> {
   });
   await expect(start).toBeVisible();
   await expect(start).toBeFocused();
-  // Up wraps from the first action to the rightmost footer icon; Down returns to Play.
-  const last = page
-    .locator(".mainMenuFooter button,.mainMenuFooter a[href]")
-    .last();
+  // Up wraps from the first action to the final menu control, including Explore links.
+  const last = page.locator("#menuCard button,#menuCard a[href]").last();
   await page.keyboard.press("ArrowUp");
   await expect(last).toBeFocused();
   await page.keyboard.press("ArrowDown");

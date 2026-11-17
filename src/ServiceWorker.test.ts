@@ -479,6 +479,7 @@ describe("cacheBuild", () => {
       expect.arrayContaining([
         "/fonts/inter/inter.css",
         "/fonts/inter/InterVariable.woff2",
+        "/fonts/inter/InterVariable-latin.f222662c.woff2",
         "/images/logo-home.svg",
         "/images/logo-home-dark.svg",
       ]),

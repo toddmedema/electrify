@@ -45,7 +45,9 @@ test("loading hands off to a smooth logo rise and individually staggered control
   });
   await page.goto("/", { waitUntil: "commit" });
   const loadingLogo = page.locator("#appStartup .homeLogo");
-  await expect(loadingLogo.getByAltText("Electrify")).toBeVisible();
+  await expect(
+    loadingLogo.getByRole("img", { name: "Electrify" }),
+  ).toBeVisible();
   const before = (await loadingLogo.boundingBox())!;
   releaseBundle();
   await expect(page.locator("#appStartup")).toHaveCount(0);
@@ -335,6 +337,8 @@ test("footer icons have equal optical gaps beside Share", async ({ page }) => {
 });
 
 test("a failed load can be retried", async ({ page }) => {
+  // Returning players with stored preferences use the full bootstrap immediately.
+  await page.addInitScript(() => localStorage.setItem("interfaceScale", "1"));
   await page.route("**/*achievements*.js", (route) => route.abort());
   await page.goto("/");
   await expect(page.getByRole("alert")).toContainText(
@@ -953,11 +957,23 @@ for (const theme of ["light", "dark"]) {
     for (const style of styles) expect(style).toEqual(styles[0]);
     await page.keyboard.press("Escape");
     await expect(page.getByRole("tooltip")).toHaveCount(0);
+    const exploreLinks = page
+      .getByRole("navigation", { name: "Explore Electrify" })
+      .getByRole("link");
+    for (const link of await exploreLinks.all()) {
+      await page.keyboard.press("ArrowDown");
+      await expect(link).toBeFocused();
+      await expect(page.getByRole("tooltip")).toHaveCount(0);
+    }
     await page.keyboard.press("ArrowDown");
     await expect(
       page.getByRole("button", { name: "Play", exact: true }),
     ).toBeFocused();
     await expect(page.getByRole("tooltip")).toHaveCount(0);
+    for (let index = (await exploreLinks.count()) - 1; index >= 0; index--) {
+      await page.keyboard.press("ArrowUp");
+      await expect(exploreLinks.nth(index)).toBeFocused();
+    }
     await page.keyboard.press("ArrowUp");
     await expectFooterTooltip(page, actions.last());
   });

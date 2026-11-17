@@ -3,7 +3,7 @@ import { useDispatch } from "react-redux";
 import type { AppDispatch } from "../../Store";
 import { manualHelpOpen } from "../../reducers/UI";
 import type { ManualEntryTitleType } from "./ManualEntries";
-import { setManualHelpAnchor } from "./ManualHelpPopover";
+import { setManualHelpAnchor } from "./ManualHelpAnchor";
 
 interface Props {
   entry: ManualEntryTitleType;

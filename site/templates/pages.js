@@ -24,6 +24,10 @@ function footer() {
         <nav aria-label="Footer navigation">
           <a href="/scenarios.html">All scenarios</a>
           <a href="/power-grid-simulator.html">How to play</a>
+          <a href="/classroom.html">For teachers</a>
+          <a href="/data-centers.html">Data centers</a>
+          <a href="/energy-simulators.html">Compare simulators</a>
+          <a href="/electrify-vs-en-roads.html">Electrify and En-ROADS</a>
           <a href="/about.html">About</a>
           <a href="/privacy.html">Privacy</a>
           <a href="https://github.com/toddmedema/electrify">Source code</a>
@@ -181,7 +185,7 @@ function renderScenarioPage(page, context) {
       <div class="page-content scenario-content">
         <section class="scenario-start" aria-labelledby="starting-title">
           <div class="scenario-section-label"><p class="eyebrow">The situation</p><h2 id="starting-title">Your starting point</h2></div>
-          <div class="scenario-prose">${page.setup.map((paragraph) => `<p>${e(paragraph)}</p>`).join("\n")}</div>
+          <div class="scenario-prose">${page.setup.map((paragraph) => `<p>${e(paragraph)}</p>`).join("\n")}<p>New to managing a utility? Read the <a href="/power-grid-simulator.html">power grid simulator guide</a> before trying your plan.</p></div>
         </section>
         <section class="scenario-decisions" aria-labelledby="your-decisions">
           <div class="scenario-section-label"><p class="eyebrow">The choices</p><h2 id="your-decisions">What will you do?</h2></div>
@@ -192,7 +196,7 @@ function renderScenarioPage(page, context) {
           <a class="button button--primary" href="${e(context.playUrl(page))}">${isCampaign ? "Open the campaign" : "Try this scenario"}<span aria-hidden="true">↗</span></a>
         </section>
         <section class="scenario-related" aria-labelledby="related-title">
-          <div class="scenario-related__heading"><div><p class="eyebrow">Keep exploring</p><h2 id="related-title">A different challenge</h2></div><a class="scenario-text-link" href="/scenarios.html">All scenarios <span aria-hidden="true">→</span></a></div>
+          <div class="scenario-related__heading"><div><p class="eyebrow">Keep exploring</p><h2 id="related-title">Related scenarios</h2></div><a class="scenario-text-link" href="/scenarios.html">All scenarios <span aria-hidden="true">→</span></a></div>
           <ul class="scenario-entries">${related.map((other) => entry(other, context, true)).join("\n")}</ul>
         </section>
       </div>
@@ -225,6 +229,23 @@ function renderScenarioIndex(pages, context) {
   const schema = {
     "@context": "https://schema.org",
     "@type": "CollectionPage",
+    breadcrumb: {
+      "@type": "BreadcrumbList",
+      itemListElement: [
+        {
+          "@type": "ListItem",
+          position: 1,
+          name: "Electrify",
+          item: `${context.origin}/`,
+        },
+        {
+          "@type": "ListItem",
+          position: 2,
+          name: "Scenarios",
+          item: metadata.canonical,
+        },
+      ],
+    },
     "@id": `${metadata.canonical}#webpage`,
     url: metadata.canonical,
     name: metadata.title,
@@ -247,6 +268,7 @@ function renderScenarioIndex(pages, context) {
         <div class="hero__inner">
           <div class="scenario-directory-hero__layout">
             <div class="hero__copy">
+              <nav class="scenario-breadcrumb" aria-label="Breadcrumb"><a href="/">Electrify</a><span aria-hidden="true">/</span><span>Scenarios</span></nav>
               <p class="eyebrow">The scenarios of Electrify</p>
               <h1 id="page-title">A different grid.<br />A different problem.</h1>
               <p class="hero__lede">An island running on imported oil. A city racing to supply new data centers. A utility with a century of decisions ahead of it. Where will you take charge?</p>
