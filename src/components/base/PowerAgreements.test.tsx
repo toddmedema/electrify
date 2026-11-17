@@ -152,6 +152,9 @@ it.each([1, 2, 3] as PowerAgreementTermsVersion[])(
 
 it("uses a short offer action with a unique accessible contract name", () => {
   mount();
+  expect(screen.getAllByRole("article")[0]).toHaveAccessibleName(
+    "Regional nuclear",
+  );
   const offer = screen.getByRole("button", {
     name: "Review Valley Electric supply agreement",
   });
@@ -161,6 +164,13 @@ it("uses a short offer action with a unique accessible contract name", () => {
       name: "Power purchase agreements",
     }),
   ).not.toBeInTheDocument();
+  fireEvent.click(offer);
+  const dialog = screen.getByRole("dialog", {
+    name: "Review Valley Electric supply agreement",
+  });
+  expect(
+    within(dialog).getByRole("table", { name: "Agreement terms" }),
+  ).toBeVisible();
 });
 
 it("retains expired recorded history without a live commitment or forecast", () => {

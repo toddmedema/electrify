@@ -118,6 +118,12 @@ export default function PowerAgreements({
   const [acceptanceError, setAcceptanceError] = React.useState<string>();
   const utility = inheritedUtilityForCorridor(line.corridorId);
   const sources = utility ? connectionAgreements(game, utility) : [];
+  const replacement =
+    review &&
+    sources.some(
+      (source) =>
+        source.id === review.id || source.id.startsWith(`${review.id}:`),
+    );
   const assessment = sources.find((source) => source.id === assessmentId);
   const expiredAssessment =
     !!assessment && game.date.minute >= assessment.endMinute;
@@ -187,44 +193,6 @@ export default function PowerAgreements({
       aria-label="Power purchase agreements"
       className="powerAgreements"
     >
-      {POWER_AGREEMENT_BLOCKS.filter(
-        (block) =>
-          "sellerUtilityId" in block &&
-          block.utilityId === utility &&
-          !sources.some((source) => source.id.startsWith(`${block.id}:`)),
-      ).map((block) => {
-        const quote = powerAgreementQuote(game, block.id);
-        return (
-          quote && (
-            <Box
-              component="article"
-              aria-label={quote.name}
-              key={block.id}
-              className="powerAgreement"
-            >
-              <Typography component="h4" className="powerAgreementHeading">
-                {quote.name}
-              </Typography>
-              <Typography variant="body2" className="powerAgreementMetrics">
-                Up to <strong>{formatWatts(quote.deliverableW)}</strong> ·{" "}
-                <strong>{rate(quote.priceToday)}</strong>
-              </Typography>
-              <Button
-                variant="outlined"
-                aria-label={`Review ${quote.name} agreement`}
-                onClick={(event) => {
-                  restore.current = event.currentTarget;
-                  setForecastCommitted(true);
-                  setAcceptanceError(undefined);
-                  setReview(quote);
-                }}
-              >
-                Review terms
-              </Button>
-            </Box>
-          )
-        );
-      })}
       {sources.map((source) => {
         const expired = game.date.minute >= source.endMinute;
         const account = game.transmission?.agreementAccounts?.find(
@@ -384,6 +352,44 @@ export default function PowerAgreements({
           </Box>
         );
       })}
+      {POWER_AGREEMENT_BLOCKS.filter(
+        (block) =>
+          "sellerUtilityId" in block &&
+          block.utilityId === utility &&
+          !sources.some((source) => source.id.startsWith(`${block.id}:`)),
+      ).map((block) => {
+        const quote = powerAgreementQuote(game, block.id);
+        return (
+          quote && (
+            <Box
+              component="article"
+              aria-label={quote.name}
+              key={block.id}
+              className="powerAgreement"
+            >
+              <Typography component="h4" className="powerAgreementHeading">
+                {quote.name}
+              </Typography>
+              <Typography variant="body2" className="powerAgreementMetrics">
+                Up to <strong>{formatWatts(quote.deliverableW)}</strong> ·{" "}
+                <strong>{rate(quote.priceToday)}</strong>
+              </Typography>
+              <Button
+                variant="outlined"
+                aria-label={`Review ${quote.name} agreement`}
+                onClick={(event) => {
+                  restore.current = event.currentTarget;
+                  setForecastCommitted(true);
+                  setAcceptanceError(undefined);
+                  setReview(quote);
+                }}
+              >
+                Review terms
+              </Button>
+            </Box>
+          )
+        );
+      })}
       <DecisionDialog
         open={!!review || !!assessment}
         fullWidth
@@ -392,7 +398,7 @@ export default function PowerAgreements({
         closeDisabled={accepting}
         title={
           review
-            ? `Review ${review.name} replacement`
+            ? `Review ${review.name} ${replacement ? "replacement" : "agreement"}`
             : `${assessment?.name ?? "Agreement"} ${expiredAssessment ? "recorded history" : "remaining term"}`
         }
         onClose={close}
@@ -418,7 +424,7 @@ export default function PowerAgreements({
                   if (fresh?.quoteKey !== review.quoteKey) {
                     if (fresh) setReview(fresh);
                     setAcceptanceError(
-                      "Agreement terms changed; review the replacement again.",
+                      "Agreement terms changed; review the updated terms.",
                     );
                     return;
                   }
@@ -451,7 +457,7 @@ export default function PowerAgreements({
                     );
                     if (!receipt)
                       throw new Error(
-                        "Agreement terms changed; review the replacement again.",
+                        "Agreement terms changed; review the updated terms.",
                       );
                     restore.current = document.getElementById(
                       `intertie-disclosure-${line.id}`,
@@ -532,7 +538,9 @@ export default function PowerAgreements({
                 <BuildDetails
                   label={
                     review
-                      ? "Replacement agreement terms"
+                      ? replacement
+                        ? "Replacement agreement terms"
+                        : "Agreement terms"
                       : "Active agreement terms"
                   }
                 >
