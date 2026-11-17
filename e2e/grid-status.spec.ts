@@ -37,9 +37,8 @@ for (const theme of ["light", "dark"] as const) {
     await expect(
       dialog.getByRole("heading", { name: "Grid status", exact: true }),
     ).toBeFocused();
-    await expect(dialog).toContainText(
-      /Purchased power now: \d.*W.*% of supply/,
-    );
+    await expect(dialog).toContainText(/Purchased power now: \d.*W total/);
+    await expect(dialog).toContainText(/For customers: \d.*W.*% of supply/);
     await expect(dialog).toContainText("Under agreement:");
     await expect(dialog).toContainText(/Storage ready:|No storage ready/);
     expect(
@@ -75,5 +74,53 @@ for (const theme of ["light", "dark"] as const) {
       await expect(page.locator(".gameToolPanel:visible")).toHaveCount(1);
     }
     await expect(page.locator("#chartForecastSupplyDemand")).toBeVisible();
+  });
+
+  test(`legacy grid status opens existing trading controls in ${theme}`, async ({
+    page,
+  }) => {
+    test.setTimeout(120000);
+    await page.addInitScript((mode) => {
+      localStorage.clear();
+      localStorage.setItem("theme", mode);
+      localStorage.setItem("audioEnabled", "false");
+    }, theme);
+    // This authored legacy scenario starts with an operating intertie.
+    await page.goto("/?scenario=111");
+    await page.getByRole("button", { name: "Start game", exact: true }).click();
+    const status = page.getByRole("button", { name: /^Current grid status/ });
+    const dialog = page.getByRole("dialog", {
+      name: "Grid status",
+      exact: true,
+    });
+    const controls = page.getByRole("region", { name: "Intertie management" });
+    for (const choice of ["None", "Shortages + Charging"]) {
+      await status.click();
+      await dialog.getByRole("button", { name: "Manage agreements" }).click();
+      await expect(dialog).toHaveCount(0);
+      await expect(controls).toBeVisible();
+      await expect(controls).toBeFocused();
+      await expect(controls).toBeInViewport();
+      await expect(
+        page.getByRole("region", { name: "Build", exact: true }),
+      ).toHaveCount(0);
+      const buying = controls.getByRole("combobox", {
+        name: "Buying",
+        exact: true,
+      });
+      await buying.click();
+      await page.getByRole("option", { name: choice, exact: true }).click();
+      await expect(buying).toContainText(choice);
+      await expect(
+        controls.getByRole("combobox", { name: "Selling", exact: true }),
+      ).toBeVisible();
+    }
+    // An island without external access has no management destination to offer.
+    await page.goto("/?scenario=105");
+    await page.getByRole("button", { name: "Start game", exact: true }).click();
+    await status.click();
+    await expect(
+      dialog.getByRole("button", { name: "Manage agreements" }),
+    ).toHaveCount(0);
   });
 }

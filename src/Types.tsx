@@ -329,7 +329,11 @@ export type StoryActionTargetType =
   | { card: "EVENTS" };
 
 export type EvidenceTargetType =
-  "supply-demand" | "finances" | "mission-details" | StoryActionTargetType;
+  | "supply-demand"
+  | "interties"
+  | "finances"
+  | "mission-details"
+  | StoryActionTargetType;
 
 export interface EvidenceRequestType {
   id: number;

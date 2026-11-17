@@ -1175,10 +1175,15 @@ export default class Facilities extends React.Component<Props, SelectionState> {
   }
 
   private evidenceAnchor = React.createRef<HTMLDivElement>();
+  private intertiesAnchor = React.createRef<HTMLElement>();
 
   private resolveEvidence() {
     const request = this.props.evidenceRequest;
     if (!request || this.dragging || this.props.facilityDragActive) return;
+    if (request.target === "interties") {
+      this.props.onEvidenceReady?.(request, this.intertiesAnchor.current);
+      return;
+    }
     if (
       request.target !== "supply-demand" &&
       !(
@@ -1473,18 +1478,24 @@ export default class Facilities extends React.Component<Props, SelectionState> {
                 {!territoryNetwork &&
                   intertiesAvailable &&
                   !!game.transmission?.lines.length && (
-                    <TransmissionPanel
-                      game={game}
-                      onBuild={onTransmissionBuild}
-                      onUpgrade={onTransmissionUpgrade}
-                      onAcquire={this.props.onUtilityAcquire}
-                      onCancel={this.props.onTransmissionCancel}
-                      onPause={this.props.onTransmissionPause}
-                      onBuyingRule={onBuyingRule}
-                      onSellingRule={onSellingRule}
-                      onBeforeDragStart={this.onBeforeDragStart}
-                      onDragEnd={this.onDragEnd}
-                    />
+                    <section
+                      aria-label="Intertie management"
+                      ref={this.intertiesAnchor}
+                      tabIndex={-1}
+                    >
+                      <TransmissionPanel
+                        game={game}
+                        onBuild={onTransmissionBuild}
+                        onUpgrade={onTransmissionUpgrade}
+                        onAcquire={this.props.onUtilityAcquire}
+                        onCancel={this.props.onTransmissionCancel}
+                        onPause={this.props.onTransmissionPause}
+                        onBuyingRule={onBuyingRule}
+                        onSellingRule={onSellingRule}
+                        onBeforeDragStart={this.onBeforeDragStart}
+                        onDragEnd={this.onDragEnd}
+                      />
+                    </section>
                   )}
               </List>
             </div>

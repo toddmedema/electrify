@@ -21,6 +21,7 @@ import { isUtilityExpansionGame } from "../../helpers/ExpansionContext";
 import { utilityServiceGap } from "../../helpers/UtilityPlanning";
 import { hasTerritoryNetwork } from "../../helpers/Territories";
 import { getScenario } from "../../data/Scenarios";
+import { corridorsForLocation } from "../../data/AdjacentMarkets";
 import { setManualHelpAnchor } from "./ManualHelpPopover";
 import { MONTHS } from "../../Constants";
 import {
@@ -102,10 +103,20 @@ export default function GridStatus({
     action();
   };
   const storage = anchor ? readyStorage(game) : undefined;
+  const territoryNetwork = hasTerritoryNetwork(game);
+  const legacyInterties = !!(
+    game.transmission?.lines.length &&
+    (game.multiplayer || corridorsForLocation(game.location).length)
+  );
   const importedW = now.importedW;
+  const storageImportedW = now.storageImportedW ?? 0;
+  const customerImportedW =
+    importedW === undefined
+      ? undefined
+      : Math.max(0, importedW - storageImportedW);
   const importedShare =
-    importedW !== undefined && now.supplyW > 0
-      ? Math.round((100 * importedW) / now.supplyW)
+    customerImportedW !== undefined && now.supplyW > 0
+      ? Math.round((100 * customerImportedW) / now.supplyW)
       : undefined;
   const warning =
     health.state === "low-reserve" || health.state === "at-limit" || !!future;
@@ -204,8 +215,23 @@ export default function GridStatus({
             {importedW === undefined
               ? "Purchased power now: Unavailable"
               : importedW > 0
-                ? `Purchased power now: ${formatWatts(importedW)}${importedShare === undefined ? "" : ` · ${importedShare}% of supply`}`
+                ? `Purchased power now: ${formatWatts(importedW)} total`
                 : "No purchased power now"}
+            {importedW !== undefined && importedW > 0 && (
+              <>
+                <br />
+                For customers: {formatWatts(customerImportedW ?? 0)}
+                {importedShare === undefined
+                  ? ""
+                  : ` · ${importedShare}% of supply`}
+                {storageImportedW > 0 && (
+                  <>
+                    <br />
+                    Charging storage: {formatWatts(storageImportedW)}
+                  </>
+                )}
+              </>
+            )}
             {now.entitlementImportCapacityW !== undefined && (
               <>
                 <br />
@@ -228,35 +254,33 @@ export default function GridStatus({
             </Button>
           )}
           {!tutorial && onNavigate && (
-            <>
+            <Button
+              variant="outlined"
+              onClick={() =>
+                navigate(() =>
+                  onNavigate(territoryNetwork ? "FLEET" : "FACILITIES"),
+                )
+              }
+            >
+              Manage fleet
+            </Button>
+          )}
+          {!tutorial &&
+            ((territoryNetwork && onNavigate) ||
+              (legacyInterties && onEvidence)) && (
               <Button
                 variant="outlined"
                 onClick={() =>
                   navigate(() =>
-                    onNavigate(
-                      hasTerritoryNetwork(game) ? "FLEET" : "FACILITIES",
-                    ),
-                  )
-                }
-              >
-                Manage fleet
-              </Button>
-              <Button
-                variant="outlined"
-                onClick={() =>
-                  navigate(() =>
-                    onNavigate(
-                      hasTerritoryNetwork(game)
-                        ? "AGREEMENTS"
-                        : "BUILD_INTERTIES",
-                    ),
+                    territoryNetwork
+                      ? onNavigate?.("AGREEMENTS")
+                      : onEvidence?.("interties"),
                   )
                 }
               >
                 Manage agreements
               </Button>
-            </>
-          )}
+            )}
           {onReserveHelp && (
             <Button
               onClick={() => {
