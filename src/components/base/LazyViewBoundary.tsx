@@ -16,7 +16,7 @@ class ViewDownloadError extends Error {
 /** Recreate only the rejected lazy type; React otherwise caches its rejected promise. */
 export function lazyView<View extends Exclude<React.ElementType, string>>(
   load: () => Promise<{ default: View }>,
-): React.ComponentType<React.ComponentPropsWithoutRef<View>> {
+): React.ComponentType<React.ComponentPropsWithRef<View>> {
   const createView = () =>
     React.lazy(() =>
       load().catch(() => {
