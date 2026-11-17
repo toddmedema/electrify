@@ -33,6 +33,10 @@ import Facilities, { DispatchProps, StateProps } from "./Facilities";
 import { TRANSMISSION_CORRIDORS } from "../../data/AdjacentMarkets";
 import { focusEvidence } from "../../helpers/Evidence";
 import { multiplayerRuntime } from "../../multiplayer/Registry";
+import {
+  requestFacilityExpansion,
+  requestCancelFacilityExpansion,
+} from "../../helpers/RequestFacilityExpansion";
 
 const mapStateToProps = (state: AppStateType): StateProps => {
   return {
@@ -75,6 +79,9 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
     onReprioritize: (spotInList: number, delta: number) => {
       dispatch(reprioritizeFacility({ spotInList, delta }));
     },
+    onExpand: (payload) => dispatch(requestFacilityExpansion(payload)),
+    onCancelExpansion: (id, quoteKey) =>
+      dispatch(requestCancelFacilityExpansion(id, quoteKey)),
     onRetrofit: (payload) => {
       dispatch(retrofitFacility(payload));
     },

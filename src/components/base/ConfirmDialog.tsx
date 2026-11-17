@@ -11,6 +11,7 @@ export interface ConfirmDialogProps {
   onCancel: () => void;
   onConfirm: () => void;
   confirmDisabled?: boolean;
+  pending?: boolean;
   // Focus Cancel first for choices that throw something away
   destructive?: boolean;
   // A dialog opened from inside a clickable row portals out of the DOM but not out of React's
@@ -29,6 +30,7 @@ export default function ConfirmDialog({
   onCancel,
   onConfirm,
   confirmDisabled,
+  pending,
   destructive,
   isolateClicks,
   contentClassName,
@@ -37,12 +39,18 @@ export default function ConfirmDialog({
     <DecisionDialog
       open={open}
       onClose={onCancel}
+      closeDisabled={pending}
       title={title}
       isolateClicks={isolateClicks}
       contentClassName={contentClassName}
       actions={
         <>
-          <Button onClick={onCancel} color="primary" autoFocus={destructive}>
+          <Button
+            onClick={onCancel}
+            color="primary"
+            autoFocus={destructive}
+            disabled={pending}
+          >
             {cancelLabel}
           </Button>
           <Button
@@ -50,7 +58,7 @@ export default function ConfirmDialog({
             color="primary"
             variant="contained"
             autoFocus={!destructive}
-            disabled={confirmDisabled}
+            disabled={confirmDisabled || pending}
           >
             {confirmLabel}
           </Button>

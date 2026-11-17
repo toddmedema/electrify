@@ -23,8 +23,9 @@ import { facilityOperatingStatus } from "./FacilityMapStatus";
 import { useMoney } from "./CurrencyContext";
 import ConfirmDialog from "./ConfirmDialog";
 import FacilityDetails from "./FacilityDetails";
+import type { FacilityCapacityUpgradeActions } from "./FacilityCapacityUpgrade";
 
-export interface FacilityDetailActions {
+export interface FacilityDetailActions extends FacilityCapacityUpgradeActions {
   onSell: (id: number) => void;
   onTogglePause: (id: number) => void;
   onPause: (id: number, name: string) => void;
@@ -229,6 +230,8 @@ export default function ExpandedFacilityDetails({
         location={game.location}
         game={game}
         onRetrofit={actions.onRetrofit}
+        onExpand={actions.onExpand}
+        onCancelExpansion={actions.onCancelExpansion}
       />
       <MemoizedFacilityActions
         facility={facility}

@@ -47,7 +47,8 @@ import { formatCount, formatMoneyConcise } from "../../helpers/Format";
 import { GAME_TO_REAL_YEARS, TICKS_PER_HOUR } from "../../Constants";
 import { purchaseTerms } from "../../helpers/Financials";
 import { modScenario } from "../../mods/ModScenario";
-import { acquireUtility } from "../../reducers/GameActions";
+import { acquireUtility, expandFacility } from "../../reducers/GameActions";
+import { facilityExpansionQuote } from "../../helpers/FacilityExpansion";
 import { acquisitionQuote } from "../../helpers/Expansion";
 import { currentTick } from "../../helpers/GameSelectors";
 import {
@@ -291,6 +292,8 @@ interface Handlers {
   onSell: jest.Mock;
   onRetrofit: jest.Mock;
   onCancelRetrofit: jest.Mock;
+  onExpand: jest.Mock;
+  onCancelExpansion: jest.Mock;
 }
 
 function renderFacilities(
@@ -311,6 +314,11 @@ function renderFacilities(
     onSell: jest.fn(),
     onRetrofit: jest.fn(),
     onCancelRetrofit: jest.fn(),
+    onExpand: jest.fn(async () => ({ status: "accepted" as const })),
+    onCancelExpansion: jest.fn(async () => ({
+      status: "accepted" as const,
+      refund: 0,
+    })),
   };
   const store = configureStore({ reducer: { ui: uiReducer } });
   function ControlledFacilities({
@@ -341,6 +349,8 @@ function renderFacilities(
         onReprioritize={handlers.onReprioritize}
         onRetrofit={handlers.onRetrofit}
         onCancelRetrofit={handlers.onCancelRetrofit}
+        onExpand={handlers.onExpand}
+        onCancelExpansion={handlers.onCancelExpansion}
         onFacilityDragStart={() => undefined}
         onFacilityDragEnd={() => undefined}
         onSelect={(id) => {
@@ -2439,4 +2449,74 @@ it("keeps restored co-op trading choices reachable through territory agreements"
   await user.click(screen.getByRole("option", { name: "All profitable" }));
   expect(onBuyingRule).toHaveBeenCalledWith("SHORTAGES");
   expect(onSellingRule).toHaveBeenCalledWith("PROFITABLE");
+});
+
+it.each(["FLEET", "FACILITIES"] as const)(
+  "reviews capacity expansion from the public %s plant controls",
+  async (initialView) => {
+    const game = createGame({ scenarioId: 116, seed: 188 });
+    currentTick(game)!.cash = 1e12;
+    const plant = game.facilities.find(
+      (candidate) =>
+        facilityExpansionQuote(game, candidate.id, candidate.peakW + 1)
+          .status === "ready",
+    );
+    if (!plant) throw new Error("Expected an expandable starting plant");
+    const utils = renderFacilities(
+      game,
+      initialView === "FLEET" ? plant.id : null,
+      undefined,
+      initialView,
+    );
+    if (initialView === "FACILITIES")
+      await user.click(
+        screen.getByRole("button", { name: `Inspect ${plant.tileId!}` }),
+      );
+    await user.click(screen.getByRole("button", { name: "Upgrade capacity" }));
+    const review = screen.getByRole("dialog", {
+      name: `Upgrade ${plant.name} capacity`,
+    });
+    const input = within(review).getByRole("spinbutton");
+    const targetSize = Number((input as HTMLInputElement).value) * 1e6;
+    const quote = facilityExpansionQuote(game, plant.id, targetSize);
+    if (quote.status !== "ready") throw new Error(quote.reason);
+    await user.click(within(review).getByRole("button", { name: /^Pay / }));
+    expect(utils.onExpand).toHaveBeenCalledWith({
+      facilityId: plant.id,
+      targetSize,
+      quoteKey: quote.quoteKey,
+    });
+    expect(utils.onRetrofit).not.toHaveBeenCalled();
+  },
+);
+
+it("keeps a running plant's reading and glyph while showing capacity construction in its fleet row", () => {
+  const game = createGame({ scenarioId: 104, seed: 818 });
+  currentTick(game)!.cash = 1e12;
+  const plant = game.facilities[0];
+  const quote = facilityExpansionQuote(game, plant.id, plant.peakW * 1.2);
+  if (quote.status !== "ready") throw new Error(quote.reason);
+  const started = cloneDeep(
+    gameReducer(
+      game,
+      expandFacility({
+        facilityId: plant.id,
+        targetSize: quote.targetSize,
+        quoteKey: quote.quoteKey,
+      }),
+    ),
+  );
+  started.facilities[0].currentW = started.facilities[0].peakW / 2;
+  renderFacilities(started, null);
+  const row = screen.getAllByRole("listitem").find((item) =>
+    within(item).queryByRole("button", {
+      name: /Inspect .*capacity upgrading/,
+    }),
+  )!;
+  expect(
+    within(row).getByRole("img", { name: `${plant.name} running` }),
+  ).toBeInTheDocument();
+  expect(row).toHaveTextContent("Upgrading ·");
+  expect(row).toHaveTextContent("50%");
+  expect(row).not.toHaveTextContent("offline for an upgrade");
 });

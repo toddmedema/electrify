@@ -66,6 +66,7 @@ import {
   formatWatts,
   formatWattsOfPeak,
   formatWattsInUnit,
+  formatBuildMonths,
   getWattUnit,
 } from "../../helpers/Format";
 import ChartSupplyDemand from "../base/ChartSupplyDemand";
@@ -75,6 +76,7 @@ import FacilityRowText from "../base/FacilityRowText";
 import { constructionStatus } from "../base/ConstructionProgress";
 import { SIDE_LAYOUT_MIN_WIDTH } from "../../Globals";
 import ExpandedFacilityDetails from "../base/ExpandedFacilityDetails";
+import type { FacilityCapacityUpgradeActions } from "../base/FacilityCapacityUpgrade";
 import GameCard from "../base/GameCard";
 import ConceptIcon from "../base/ConceptIcon";
 import { combineStoryEffects } from "../../data/WorldEvents";
@@ -96,7 +98,7 @@ import { BuyingRuleType, SellingRuleType } from "../../Types";
 import { corridorsForLocation } from "../../data/AdjacentMarkets";
 import { GAME_TO_REAL_YEARS, TICKS_PER_HOUR } from "../../Constants";
 
-interface FacilityListItemProps {
+interface FacilityListItemProps extends FacilityCapacityUpgradeActions {
   arriving: boolean;
   onArrivalShown?: (id: number) => void;
   facility: FacilityOperatingType;
@@ -430,6 +432,16 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
       ) : null;
     }
   }
+  if (facility.expansionInProgress) {
+    detail = (
+      <>
+        {detail}
+        {detail && " · "}
+        Upgrading ·{" "}
+        {formatBuildMonths(facility.expansionInProgress.yearsToBuildLeft)} left
+      </>
+    );
+  }
   // Output communicates normal operation; keep explicit labels for other states.
   const status =
     offlineForWork || partialUpgrade || activity === "RUNNING" ? (
@@ -544,7 +556,10 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                 (hazardStatus && !underConstruction
                   ? `, ${hazardStatusText(hazardStatus).spoken}`
                   : "") +
-                (storage ? `, ${status}` : "")
+                (storage ? `, ${status}` : "") +
+                (facility.expansionInProgress
+                  ? `, capacity upgrading, ${formatBuildMonths(facility.expansionInProgress.yearsToBuildLeft, "long")} left`
+                  : "")
               }
               aria-expanded={selected}
               aria-pressed={props.bulkSelected}
@@ -628,6 +643,8 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
               onPause={onPause}
               onTogglePause={onTogglePause}
               onRetrofit={props.onRetrofit}
+              onExpand={props.onExpand}
+              onCancelExpansion={props.onCancelExpansion}
               onCancelRetrofit={props.onCancelRetrofit}
             />
           )}
@@ -751,7 +768,7 @@ export interface StateProps {
   selectedFacilityId: number | null;
 }
 
-export interface DispatchProps {
+export interface DispatchProps extends FacilityCapacityUpgradeActions {
   onArrivalShown?: (id: number) => void;
   onEvidenceReady?: (
     request: EvidenceRequestType,
@@ -1311,6 +1328,8 @@ export default class Facilities extends React.Component<Props, SelectionState> {
                     onPause,
                     onTogglePause,
                     onRetrofit: this.props.onRetrofit,
+                    onExpand: this.props.onExpand,
+                    onCancelExpansion: this.props.onCancelExpansion,
                     onCancelRetrofit: this.props.onCancelRetrofit,
                   }}
                 />
@@ -1425,6 +1444,8 @@ export default class Facilities extends React.Component<Props, SelectionState> {
                               onTogglePause={onTogglePause}
                               onPause={onPause}
                               onRetrofit={this.props.onRetrofit}
+                              onExpand={this.props.onExpand}
+                              onCancelExpansion={this.props.onCancelExpansion}
                               onCancelRetrofit={this.props.onCancelRetrofit}
                               onRowClick={this.onRowClick}
                               onContextMenu={this.onContextMenu}
