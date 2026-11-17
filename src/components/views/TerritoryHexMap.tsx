@@ -8,6 +8,7 @@ import { territoryTileViews } from "../../helpers/TerritoryMapState";
 import { tilePurchaseQuotes } from "../../helpers/Territories";
 import { useAppSelector } from "../../Store";
 import { terrainDetailsLabel } from "../base/TerritoryTileFacts";
+import { hasVisibleEscapeOverlay } from "../base/VisibleEscapeOverlay";
 import { useMoney } from "../base/CurrencyContext";
 import { useTerritoryTilePurchases } from "../base/TerritoryTilePurchases";
 import {
@@ -336,9 +337,7 @@ export default function TerritoryHexMap({
         if (
           event.key === "Escape" &&
           !event.defaultPrevented &&
-          !document.querySelector(
-            '.MuiModal-root:not(.MuiModal-hidden), [role="menu"], [role="listbox"]',
-          ) &&
+          !hasVisibleEscapeOverlay() &&
           (onCloseInspection || activeSelected || buyMode || leavingGeography)
         ) {
           event.preventDefault();

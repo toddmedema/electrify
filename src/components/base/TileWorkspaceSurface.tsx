@@ -1,6 +1,7 @@
 import * as React from "react";
 import { IconButton, Typography } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
+import { hasVisibleEscapeOverlay } from "./VisibleEscapeOverlay";
 import "./TileWorkspaceSurface.scss";
 
 /** A nonmodal inspector: the map remains interactive behind the same desktop panel/phone sheet. */
@@ -46,9 +47,7 @@ export default function TileWorkspaceSurface({
         if (
           event.key === "Escape" &&
           !event.defaultPrevented &&
-          !document.querySelector(
-            '.MuiModal-root:not(.MuiModal-hidden), [role="menu"], [role="listbox"]',
-          )
+          !hasVisibleEscapeOverlay()
         ) {
           event.preventDefault();
           event.stopPropagation();

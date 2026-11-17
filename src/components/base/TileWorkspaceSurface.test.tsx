@@ -39,27 +39,62 @@ it("focuses new content without restoring the map until the surface closes", () 
   expect(mapFocused).not.toHaveBeenCalled();
 });
 
-it("leaves Escape to a nested modal before closing the tile surface", () => {
+it.each(["modal", "menu", "listbox"])(
+  "leaves Escape to a foreground %s before closing the tile surface",
+  (overlay) => {
+    const close = jest.fn();
+    const { rerender } = render(
+      <>
+        <TileWorkspaceSurface title="Site" focusKey="site" onClose={close}>
+          Site controls
+        </TileWorkspaceSurface>
+        <div
+          className={overlay === "modal" ? "MuiModal-root" : undefined}
+          role={overlay === "modal" ? undefined : overlay}
+        >
+          Foreground controls
+        </div>
+      </>,
+    );
+    fireEvent.keyDown(screen.getByRole("dialog", { name: "Site" }), {
+      key: "Escape",
+    });
+    expect(close).not.toHaveBeenCalled();
+    rerender(
+      <TileWorkspaceSurface title="Site" focusKey="site" onClose={close}>
+        Site controls
+      </TileWorkspaceSurface>,
+    );
+    fireEvent.keyDown(screen.getByRole("dialog", { name: "Site" }), {
+      key: "Escape",
+    });
+    expect(close).toHaveBeenCalledTimes(1);
+  },
+);
+
+it("closes on Escape while the hidden game menu remains mounted", () => {
   const close = jest.fn();
-  const { rerender } = render(
+  render(
     <>
       <TileWorkspaceSurface title="Site" focusKey="site" onClose={close}>
         Site controls
       </TileWorkspaceSurface>
-      <div className="MuiModal-root">Confirmation</div>
+      <div
+        id="gameCardMenu"
+        className="MuiPopover-root MuiMenu-root MuiModal-root MuiModal-hidden"
+        aria-hidden="true"
+      >
+        <ul role="menu" aria-label="Game menu">
+          <li role="menuitem">Settings</li>
+        </ul>
+      </div>
     </>,
   );
-  fireEvent.keyDown(screen.getByRole("dialog", { name: "Site" }), {
-    key: "Escape",
-  });
-  expect(close).not.toHaveBeenCalled();
-  rerender(
-    <TileWorkspaceSurface title="Site" focusKey="site" onClose={close}>
-      Site controls
-    </TileWorkspaceSurface>,
-  );
-  fireEvent.keyDown(screen.getByRole("dialog", { name: "Site" }), {
-    key: "Escape",
-  });
+
+  expect(
+    fireEvent.keyDown(screen.getByRole("dialog", { name: "Site" }), {
+      key: "Escape",
+    }),
+  ).toBe(false);
   expect(close).toHaveBeenCalledTimes(1);
 });
