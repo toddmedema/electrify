@@ -194,7 +194,7 @@ it.each([1280, 360])(
         (button) =>
           territoryTileViews(map.store.getState().game).find(
             ({ tile }) => tile.id === idOf(button),
-          )?.visibilityDistance === 3,
+          )?.visibilityDistance === 1,
       )!;
     const id = idOf(candidate);
     fireEvent.click(screen.getByRole("button", { name: "Buy land" }));

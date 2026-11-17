@@ -1175,6 +1175,12 @@ test("controller reviews, cancels and confirms a utility acquisition", async ({
   // traversing to the ownership disclosure behind it.
   await input(page, "back");
   await expect(line).toHaveCount(0);
+  await expect(
+    page.locator('[data-map-target][aria-pressed="true"]'),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Buy land", exact: true }),
+  ).toBeFocused();
   await select(page, ownership.locator("summary"));
   await input(page, "confirm");
   await expect(
@@ -1208,9 +1214,8 @@ test("controller buys one map tile and returns from map geography to navigation"
   const buy = page.getByRole("button", { name: "Buy land", exact: true });
   await expect(buy).toBeFocused();
   await input(page, "confirm");
-  const done = page.getByRole("button", { name: "Done buying", exact: true });
-  await expect(done).toHaveAttribute("aria-pressed", "true");
-  await expect(done).toBeFocused();
+  await expect(buy).toHaveAttribute("aria-pressed", "true");
+  await expect(buy).toBeFocused();
   await input(page, "confirm");
   await expect(buy).toHaveAttribute("aria-pressed", "false");
   await input(page, "confirm");
@@ -1221,14 +1226,13 @@ test("controller buys one map tile and returns from map geography to navigation"
   await input(page, "confirm");
   await expect(tile).toHaveAttribute("data-owned", "true");
   await expect(tile).toBeFocused();
-  await expect(done).toHaveAttribute("aria-pressed", "true");
+  await expect(buy).toHaveAttribute("aria-pressed", "true");
   expect((await readSavedGame(page))?.territoryNetwork?.tilePurchases).toEqual([
     expect.objectContaining({ tileId: "green-uplands:site-0" }),
   ]);
   await input(page, "back");
   await expect(buy).toHaveAttribute("aria-pressed", "false");
-  await expect(tile).toBeFocused();
-  await input(page, "back");
+  await expect(tile).toHaveAttribute("aria-pressed", "false");
   await expect(buy).toBeFocused();
   await select(
     page,

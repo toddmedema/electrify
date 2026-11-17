@@ -73,14 +73,7 @@ for (const theme of ["light", "dark"] as const) {
         .getByRole("button", { name: "Start game", exact: true })
         .click();
       if (scenarioId === 116) {
-        const facilities = page.locator(".facilities:visible");
-        await openPane(
-          facilities,
-          page.getByRole("button", { name: "Facilities", exact: true }),
-        );
-        await facilities
-          .getByRole("tab", { name: "Territories", exact: true })
-          .click();
+        await page.getByRole("button", { name: "Map", exact: true }).click();
         const tile = page.locator(
           '[data-map-target="champlain:site-5"][data-owned="true"]',
         );
@@ -99,15 +92,23 @@ for (const theme of ["light", "dark"] as const) {
       const geothermal = options.locator('[data-build-option="Geothermal"]');
       await expect(geothermal).toContainText(
         scenarioId === 116
-          ? "This technology or project size does not fit this tile."
+          ? "Not buildable on this tile"
           : `No geothermal sites near ${place}.`,
       );
-      await expect(
-        geothermal.getByRole("button", {
-          name: "Review purchase of Geothermal",
-          exact: true,
-        }),
-      ).toBeDisabled();
+      const geothermalReview = geothermal.getByRole("button", {
+        name: "Review purchase of Geothermal",
+        exact: true,
+      });
+      if (scenarioId === 116) {
+        await expect(geothermalReview).toHaveCount(0);
+        await expect(
+          geothermal.locator(
+            ".buildOptionMetrics,.buildOptionDescription,.buildOptionSparkline",
+          ),
+        ).toHaveCount(0);
+      } else {
+        await expect(geothermalReview).toBeDisabled();
+      }
       await expect(
         geothermal.getByRole("button", {
           name: "Compare Geothermal",
@@ -132,6 +133,13 @@ for (const theme of ["light", "dark"] as const) {
               ),
             })),
           );
+        // The primary grouping is actual buildability, regardless of the selected
+        // economic sort or why a later row is unavailable.
+        const firstUnavailable = ordered.findIndex((card) => !card.buildable);
+        if (firstUnavailable !== -1 && scenarioId === 116)
+          expect(
+            ordered.slice(firstUnavailable).some((card) => card.buildable),
+          ).toBe(false);
         const index = ordered.findIndex((card) => card.name === "Geothermal");
         expect(index).toBeGreaterThanOrEqual(0);
         expect(ordered.slice(0, index).some((card) => card.buildable)).toBe(
