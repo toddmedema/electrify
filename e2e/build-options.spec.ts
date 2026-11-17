@@ -45,9 +45,12 @@ test("ordinary starting hills offer general technologies and retain special-site
       "Coal",
       "Nuclear",
     ]) {
-      await rail
-        .getByRole("button", { name: `Choose sites for ${name}`, exact: true })
-        .focus();
+      const trigger = rail.getByRole("button", {
+        name: `Choose sites for ${name}`,
+        exact: true,
+      });
+      await trigger.focus();
+      await expect(trigger).toBeFocused();
       const preview = rail.getByRole("region", {
         name: `${name} technology preview`,
         exact: true,
@@ -62,15 +65,17 @@ test("ordinary starting hills offer general technologies and retain special-site
       await rail
         .getByRole("button", { name: `Choose sites for ${name}`, exact: true })
         .focus();
-      const row = rail
-        .getByRole("region", {
-          name: `${name} technology preview`,
-          exact: true,
-        })
-        .locator(`[data-build-option="${name}"]`);
-      await expect(row).toContainText("Not buildable on this tile");
-      await expect(row.locator(".buildOptionMetrics")).toHaveCount(0);
-      await expect(row.getByRole("button")).toHaveCount(0);
+      const preview = rail.getByRole("region", {
+        name: `${name} technology preview`,
+        exact: true,
+      });
+      // A global technology preview keeps its details for comparing other sites.
+      // It still explains why the inspected tile cannot host this technology.
+      await expect(preview).toContainText("vacant compatible site");
+      await expect(preview.locator(".buildOptionMetrics")).toBeVisible();
+      await expect(
+        preview.getByRole("button", { name: /^Review purchase of/ }),
+      ).toHaveCount(0);
     }
     return;
   }
@@ -185,12 +190,12 @@ for (const theme of ["light", "dark"] as const) {
         });
         if (await rail.isVisible()) {
           await expect(rail).toBeFocused();
-          await rail
-            .getByRole("button", {
-              name: "Choose sites for Geothermal",
-              exact: true,
-            })
-            .focus();
+          const trigger = rail.getByRole("button", {
+            name: "Choose sites for Geothermal",
+            exact: true,
+          });
+          await trigger.focus();
+          await expect(trigger).toBeFocused();
           const preview = rail.getByRole("region", {
             name: "Geothermal technology preview",
             exact: true,
@@ -198,13 +203,11 @@ for (const theme of ["light", "dark"] as const) {
           const geothermal = preview.locator(
             '[data-build-option="Geothermal"]',
           );
-          await expect(geothermal).toContainText("Not buildable on this tile");
+          await expect(preview).toContainText("vacant compatible site");
+          await expect(geothermal.locator(".buildOptionMetrics")).toBeVisible();
           await expect(
-            geothermal.locator(
-              ".buildOptionMetrics,.buildOptionDescription,.buildOptionSparkline",
-            ),
+            geothermal.getByRole("button", { name: /^Review purchase of/ }),
           ).toHaveCount(0);
-          await expect(geothermal.getByRole("button")).toHaveCount(0);
           // The fixed desktop icon catalogue has no economic sort. Site restrictions
           // remain visible in its canonical preview; mobile retains the sorted cards.
           await expect(
@@ -224,6 +227,24 @@ for (const theme of ["light", "dark"] as const) {
             animations: "disabled",
             scale: "css",
           });
+          await preview
+            .getByRole("button", { name: "Choose sites", exact: true })
+            .click();
+          await tile.focus();
+          await tile.press("Enter");
+          await expect(tile).toHaveAccessibleDescription(
+            /Unavailable for this project/,
+          );
+          const project = page.locator(".tileWorkspaceSurface");
+          await expect(project.getByRole("alert")).toContainText(
+            "vacant compatible site",
+          );
+          await expect(
+            project.getByRole("button", {
+              name: "Review project",
+              exact: true,
+            }),
+          ).toHaveCount(0);
           return;
         }
         await expect(
