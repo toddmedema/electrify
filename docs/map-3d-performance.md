@@ -108,5 +108,32 @@ in `daylight-map-time.json` beside each successful theme/viewport journey.
 
 This software-renderer run does **not** establish the hardware performance budget:
 desktop callback cadence misses 120 Hz, and the 390 px 12× window misses 60 Hz.
-Hardware-GPU and real-phone verification remain outstanding. No target, timing
+The windowless Metal follow-up below supplies hardware-GPU evidence; real-phone
+verification remains outstanding. No target, timing
 ceiling, simulation baseline or bundle ceiling was changed to accommodate this run.
+
+
+### Windowless Metal follow-up
+
+The same immutable production build subsequently ran on the installed headless
+Chromium 151.0.7922.34 with a git-ignored configuration adding `--enable-gpu` and
+`--use-angle=metal` while retaining every normal launch argument. It opened no
+window and changed no shipped browser behavior or CI launch default. The actual
+backend reported **ANGLE Metal Renderer: Apple M5 Max**. All three production
+timing journeys passed with one browser worker, including their real pan and
+month-rollover windows.
+
+Hardware GPU timer queries returned 8,305 valid samples across all seven speed
+windows, with zero disjoint samples. CPU draw-submission p95 was approximately
+0.1 ms throughout. GPU draw-interval p95 was 0.381/0.375/0.364 ms for desktop
+1×/12×/24×, 0.203/0.200 ms at 390 px, and 0.199/0.198 ms at 360 px. Desktop 1×/12×
+used 1280 px; the existing 24× control used 1440 px. All GPU draw intervals were
+well within half of the existing desktop frame budget.
+
+Callback-gap p95 was 8.4/8.7/8.4 ms for desktop 1×/12×/24×, 8.4/8.4 ms at 390 px,
+and 8.5/8.9 ms at 360 px. Panning p95 ranged from 8.4 to 9.1 ms. Raw reports remain
+under `.tmp/metal-performance-results`, with backend/build identity, individual
+samples, geometry/resource counts and actual rollover evidence. These measurements
+bound the map's draw work; they do not measure physical presentation or every UI
+and browser cost. Phone viewports still use the M5 Max GPU and do not certify phone
+hardware. Existing goals and ceilings remain unchanged.
