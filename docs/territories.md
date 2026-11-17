@@ -70,12 +70,13 @@ opening construction after each one. Its pressed state remains on until toggled 
 dragging, focus changes and arrow navigation never purchase. Both entry points
 share pending commitments, and co-op ownership appears only after host acceptance.
 
-Home and utility territories retain their industrial, wind and solar/storage
-budgets: thermal projects use industrial sites, wind uses wind sites, and solar
-and storage use open-land sites. Industrial projects are capped at 300 MW per
-site; wind/open-land projects at 150 MW. General sites have no site power cap.
-Storage uses its power rating
-for the site limit and the existing technology quote for energy duration. Paused
+The historical industrial, wind and open-land labels all describe ordinary
+building land. Any ordinary onshore generator or storage technology can use those
+cells, with no additional site MW cap; the technology's own calendar, size and
+resource limits still apply. Named hydro and geothermal sites retain their
+technology restrictions and physical power limits, and inland water does not
+permit new offshore construction. Storage retains the existing technology quote
+for power and energy duration. Paused
 and unfinished projects reserve sites; selling an ordinary project frees one.
 Inherited hydro retains its named provenance.
 

@@ -31,6 +31,28 @@ import { territoryBuildAvailability } from "./Territories";
 import { acquisitionAssets } from "./Expansion";
 import { parseSave, serializeSave } from "../SaveGame";
 
+// Exercise the full modifier matrix independently of the authored regional map.
+// The geography suite checks the real lowland/ridge placements separately.
+const terrainFixture = [
+  ["green-uplands:site-2", "hills"],
+  ["green-uplands:site-3", "mountain"],
+] as const;
+let authoredTerrains: TerrainType[];
+beforeEach(() => {
+  authoredTerrains = terrainFixture.map(([id, terrain]) => {
+    const tile = TERRITORY_TILES.find((candidate) => candidate.id === id)!;
+    const authored = tile.terrain;
+    tile.terrain = terrain;
+    return authored;
+  });
+});
+afterEach(() => {
+  terrainFixture.forEach(([id], index) => {
+    TERRITORY_TILES.find((candidate) => candidate.id === id)!.terrain =
+      authoredTerrains[index];
+  });
+});
+
 function fixture() {
   const game = createGame({ scenarioId: 116, seed: 12345 });
   currentTick(game)!.cash = 1e12;

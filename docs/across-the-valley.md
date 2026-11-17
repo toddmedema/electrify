@@ -10,28 +10,68 @@ remain independent, with new empty-land claims accepted once in host command ord
 
 Inherited nuclear and Québec hydro commitments retain their original dates.
 Acquisition transfers plants, customers, sites, debts and third-party obligations;
-a PPA with the acquired seller ends as an external delivery/charge. Every visible
-unowned tile is purchasable. General land, residential or industrial customers, and
+a PPA with the acquired seller ends as an external delivery/charge. Visible unowned
+tiles touching physically owned company land are purchasable; a PPA extends sight
+without granting purchase adjacency. General land, residential or industrial customers, and
 special hydro or geothermal sites have distinct cash prices and benefits. See
 [territories](territories.md) for site budgets, accounting and legacy-save conversion.
 
 The map uses an isometric hex schematic, following the visual direction in
 [issue 603](https://github.com/toddmedema/electrify/issues/603). Towns and factories indicate
-customers. Plains, forest, hills, mountain, river, lake and ocean are illustrated
+customers. Plains, forest, hills, mountain, river and lake are illustrated
 terrain backgrounds, with separate upright cities, generators, storage and towers.
 Each hex holds one facility or a city; construction reserves its slot immediately.
 Independent utilities show their authored starting fleet. Empty developed hexes
 show towers and automatic wires to adjacent developed cells of the same utility.
 Selecting an individual hex opens its floating facility, city or construction
 surface. Empty owned tiles select their build destination automatically. The Buy land
-icon toggles repeated single-tile purchases with visible prices along owned borders. Map,
-Fleet and Agreements are available from the floating navigation dock. Acquiring land
+icon toggles repeated single-tile purchases with visible prices along owned borders.
+The map stays visible while Fleet, Agreements and the other dock icons open one
+inspection or tool panel; selecting the active icon closes that panel. There is no
+separate Map button. Acquiring land
 or connecting to a utility reveals three further hexes, with progressively faded
 terrain and structures. Coordinate-based generation extends the map as players
 expand. The wires are visual and add no transmission management. Utility names
 float above their land, with the player labeled “You” and distinct ownership borders.
 Neutral land has no proper name; symbols show its benefit. Native map buttons support
 keyboard, touch and controller selection without a numbered key.
+
+## Champlain Valley-inspired geography
+
+The board is a schematic, not a surveyed map, a fixed-area GIS grid or a
+reconstruction of 2005 utility boundaries. The
+[Vermont biophysical regions map](https://efotg.sc.egov.usda.gov/references/public/VT/Bio_Region.pdf)
+and [Lake Champlain Basin Program topography](https://atlas.lcbp.org/nature-environment/geology/)
+provide its broad organizing pattern: western lake and lowlands rising toward the
+Green Mountains in the east. Existing river cells suggest the Winooski settlement
+corridor. They do not trace its course or establish real plant locations.
+
+The authored override map in `src/data/TerritoryTiles.ts` makes Champlain sites
+1–7, 12 and 13 plains, together with green-uplands sites 2, 3 and 6. Valley sites
+3 and 8 and Ridge site 10 form additional mountain ground to the east. Existing
+forest pockets, both western lake cells, river cells and inherited wind terrain
+remain. No water cell consumes an existing land reservation, and no ocean, hydro
+claim or geothermal resource is added. The generated frontier retains its
+versioned integer geography rather than extending a claim of researched local detail.
+
+City roles retain their authored sectors and coordinates: Burlington-inspired
+mixed urban load in the west, a residential river corridor, and an eastern
+industrial cluster inspired by Essex/Williston. Burlington's
+[South End plan](https://www.burlingtonvt.gov/324/South-End-Plan) describes its mixed
+office/industrial employment, while the
+[Vermont DEC semiconductor facility record, section 9.2](https://dec.vermont.gov/sites/dec/files/wmp/HazWaste/Documents/Permits/Global%20Foundries/Section%209%20-%20%20Contingency%20Plan.pdf)
+places a manufacturing campus across Essex, Essex Junction and Williston. These
+support broad placement inspiration, not customer totals, demand calibration or
+exact municipal footprints. Outer residential and industrial cities remain generic
+load clusters. Valley and Ridge retain their separately authored Rutland and White
+River Junction location metadata; company dispatch still uses Burlington weather.
+
+Every tile ID, coordinate, owner, starting asset, city sector and customer total
+is retained. New Wind/Solar quotes use the revised terrain through the normal
+[terrain modifiers](terrain-modifiers.md). Existing Wind on affected cells also
+uses the revised local wind input; saves retain the installed plant's investment,
+loan, construction progress and land receipts. The terrain refinement does not
+freeze old wind output, reset progress or require a save-schema migration.
 
 ## Authored portfolios and historical references
 

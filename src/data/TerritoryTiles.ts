@@ -81,6 +81,27 @@ function siteTerrain(kind: TerritorySiteKind, index: number): TerrainType {
     return ["plains", "hills", "forest"][index % 3] as TerrainType;
   return landTerrains[index % landTerrains.length];
 }
+/** Broad Champlain Valley-inspired lowlands and eastern ridges, not tile-sized GIS.
+ * Keep IDs/coordinates and inherited wind terrain fixed; see docs/across-the-valley.md.
+ */
+const authoredTerrain: Readonly<Partial<Record<TerritoryTileId, TerrainType>>> =
+  {
+    "champlain:site-1": "plains",
+    "champlain:site-2": "plains",
+    "champlain:site-3": "plains",
+    "champlain:site-4": "plains",
+    "champlain:site-5": "plains",
+    "champlain:site-6": "plains",
+    "champlain:site-7": "plains",
+    "champlain:site-12": "plains",
+    "champlain:site-13": "plains",
+    "green-uplands:site-2": "plains",
+    "green-uplands:site-3": "plains",
+    "green-uplands:site-6": "plains",
+    "valley-electric:site-3": "mountain",
+    "valley-electric:site-8": "mountain",
+    "ridge-electric:site-10": "mountain",
+  };
 const tiles: TerritoryTileDefinition[] = [];
 const neutralPosition = { index: 0 };
 for (const territory of TERRITORIES) {
@@ -127,11 +148,12 @@ for (const territory of TERRITORIES) {
     terrain: TerrainType,
     asset?: (typeof inherited)[number],
   ) => {
+    const id: TerritoryTileId = `${territory.id}:site-${index++}`;
     tiles.push({
-      id: `${territory.id}:site-${index++}`,
+      id,
       territoryId: territory.id,
       ...next(),
-      terrain,
+      terrain: authoredTerrain[id] ?? terrain,
       siteKind,
       maxPeakW,
       ...(asset?.assetId ? { startingAssetId: asset.assetId } : {}),
