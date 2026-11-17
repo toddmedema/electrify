@@ -296,7 +296,7 @@ describe("weather resilience details", () => {
       }),
     );
     expect(screen.getByRole("dialog")).toHaveTextContent(
-      "Rated to \u221222°F instead of 18°F; halves remaining cold losses and deep-freeze losses.",
+      "Rated to \u221222°F instead of 18°F; halves losses from cold and freezes.",
     );
   });
 

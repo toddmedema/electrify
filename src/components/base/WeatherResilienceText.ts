@@ -32,7 +32,7 @@ export function coldPackageEffect(
   standardMinTempC: number,
   units: UnitSystemType,
 ): string {
-  return `Rated to ${formatDesignTemperature(packagedMinTempC, units)} instead of ${formatDesignTemperature(standardMinTempC, units)}; halves remaining cold losses and deep-freeze losses.`;
+  return `Rated to ${formatDesignTemperature(packagedMinTempC, units)} instead of ${formatDesignTemperature(standardMinTempC, units)}; halves losses from cold and freezes.`;
 }
 
 /** "9 days" or "1 day". */
