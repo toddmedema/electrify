@@ -63,6 +63,16 @@ test.describe("shared browser analytics", () => {
       "/scenarios/deep-freeze.html",
     ]) {
       await page.goto(pathname);
+      // Public pages start the tag after window load and idle; await that readiness.
+      await expect
+        .poll(() =>
+          page.evaluate(() =>
+            Boolean(
+              (window as typeof window & { dataLayer?: unknown[] }).dataLayer,
+            ),
+          ),
+        )
+        .toBe(true);
       const commands = await page.evaluate(() =>
         Array.from(
           (window as typeof window & { dataLayer: ArrayLike<unknown>[] })

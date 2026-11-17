@@ -1,5 +1,8 @@
 import { expect, test } from "./fixtures";
 
+// Held-download probes must own requests even after background offline caching starts.
+test.use({ serviceWorkers: "block" });
+
 test("a fresh production title defers the game until an action and preserves the selected destination", async ({
   page,
 }) => {

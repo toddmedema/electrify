@@ -2,10 +2,18 @@ import { expect, test, type Locator, type Page } from "./fixtures";
 import { openPane } from "./layout";
 import path from "path";
 
+async function scrollPlotIntoView(plot: Locator) {
+  // Font readiness and responsive layout can replace the first canvas while it is settling.
+  // Retry only gesture setup; every touch, tooltip and viewport assertion still runs below.
+  await expect(async () => {
+    await plot.scrollIntoViewIfNeeded();
+  }).toPass({ timeout: 12000 });
+}
+
 async function restoreMouseAfterTouch(page: Page, chart: Locator) {
   const plot = chart.locator(".u-over");
   const tooltip = chart.locator(".chartTooltip");
-  await plot.scrollIntoViewIfNeeded();
+  await scrollPlotIntoView(plot);
   const box = (await plot.boundingBox())!;
   const x = Math.round(box.x + box.width * 0.4);
   const y = Math.round(box.y + box.height * 0.5);
@@ -45,7 +53,7 @@ async function restoreMouseAfterTouch(page: Page, chart: Locator) {
 
 async function ignoreForeignContact(page: Page, chart: Locator) {
   const plot = chart.locator(".u-over");
-  await plot.scrollIntoViewIfNeeded();
+  await scrollPlotIntoView(plot);
   const box = (await plot.boundingBox())!;
   const initial = [
     await chart.getAttribute("data-viewport-min"),
@@ -101,7 +109,7 @@ async function navigateWithTwoFingers(
   staggered: boolean,
 ) {
   const plot = chart.locator(".u-over");
-  await plot.scrollIntoViewIfNeeded();
+  await scrollPlotIntoView(plot);
   const box = (await plot.boundingBox())!;
   const session = await page.context().newCDPSession(page);
   const range = async () => [
@@ -192,7 +200,7 @@ async function navigateWithTwoFingers(
 
 async function scrub(page: Page, chart: Locator, scroller?: Locator) {
   const plot = chart.locator(".u-over");
-  await plot.scrollIntoViewIfNeeded();
+  await scrollPlotIntoView(plot);
   const box = (await plot.boundingBox())!;
   const scrollBefore = await scroller?.evaluate((el) => el.scrollTop);
   const session = await page.context().newCDPSession(page);
@@ -268,7 +276,7 @@ for (const theme of ["light", "dark"]) {
     try {
       for (const chart of await charts.all()) {
         const plot = chart.locator(".u-over");
-        await plot.scrollIntoViewIfNeeded();
+        await scrollPlotIntoView(plot);
         const box = (await plot.boundingBox())!;
         const before = await scroller.evaluate((el) => el.scrollTop);
         const canScrollDown = await scroller.evaluate(
@@ -326,7 +334,7 @@ for (const theme of ["light", "dark"]) {
     await page.getByRole("button", { name: "Start game" }).click();
     const chart = page.locator("#chartSupplyDemand [role=img]");
     const plot = chart.locator(".u-over");
-    await plot.scrollIntoViewIfNeeded();
+    await scrollPlotIntoView(plot);
     const session = await page.context().newCDPSession(page);
     const tooltip = chart.locator(".chartTooltip-breakdown");
     try {

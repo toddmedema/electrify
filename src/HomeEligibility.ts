@@ -14,7 +14,11 @@ export async function canStartLightweightHome(): Promise<boolean> {
   )
     return false;
   try {
-    if (window.matchMedia("(display-mode: standalone)").matches) return false;
+    if (
+      (navigator as Navigator & { standalone?: boolean }).standalone ||
+      window.matchMedia("(display-mode: standalone)").matches
+    )
+      return false;
     // Preserve returning players' saves, account restoration, audio and stored preferences.
     // Unavailable inventory APIs use the normal app rather than guessing whether saves exist.
     if (!indexedDB.databases || localStorage.getItem("audioEnabled") === "true")

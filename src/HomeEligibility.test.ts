@@ -27,3 +27,15 @@ it("keeps direct game links, saved preferences and unavailable inventories on th
   inventory.mockRejectedValue(new Error("denied"));
   expect(await canStartLightweightHome()).toBe(false);
 });
+
+it("keeps Safari-style installed sessions on the full startup", async () => {
+  Object.defineProperty(navigator, "standalone", {
+    configurable: true,
+    value: true,
+  });
+  try {
+    expect(await canStartLightweightHome()).toBe(false);
+  } finally {
+    Reflect.deleteProperty(navigator, "standalone");
+  }
+});

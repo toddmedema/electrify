@@ -6,6 +6,10 @@ import MainMenu, { DispatchProps } from "./components/views/MainMenu";
 import { createAppTheme } from "./Theme";
 import { finishStartup } from "./desktop/Startup";
 import { installFocusVisibility } from "./FocusVisibility";
+import {
+  BACKGROUND_CACHE_DELAY_MS,
+  registerServiceWorker,
+} from "./ServiceWorkerRegistration";
 import "./app.scss";
 import "./InterfaceLayout.scss";
 
@@ -38,6 +42,27 @@ export function Home() {
   }, []);
   React.useLayoutEffect(() => {
     finishStartup();
+  }, []);
+  React.useEffect(() => {
+    if (
+      process.env.NODE_ENV !== "production" ||
+      !("serviceWorker" in navigator)
+    )
+      return;
+    // Preserve one-visit offline launch without competing with the title's critical requests.
+    let timer: number | undefined;
+    const schedule = () => {
+      timer = window.setTimeout(
+        registerServiceWorker,
+        BACKGROUND_CACHE_DELAY_MS,
+      );
+    };
+    if (document.readyState === "complete") schedule();
+    else window.addEventListener("load", schedule, { once: true });
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener("load", schedule);
+    };
   }, []);
   const run = async (action?: keyof DispatchProps, audio?: boolean) => {
     if (actionPending) return;

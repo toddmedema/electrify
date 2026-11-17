@@ -8919,12 +8919,16 @@ option {
 }
 
 // Keep title-screen text legible while leaving the logo's established blue intact.
-#menuCard {
+#menuCard,
+.couchSettingsPrompt {
   --home-link: #0868be;
   --interactive-blue: var(--home-link);
-  .MuiButton-text.MuiButton-colorPrimary:not(.Mui-disabled) {
-    color: var(--home-link);
-  }
+}
+#menuCard .MuiButton-text.MuiButton-colorPrimary:not(.Mui-disabled),
+.couchSettingsPrompt .MuiButton-text.MuiButton-colorPrimary:not(.Mui-disabled) {
+  color: var(--home-link);
+}
+#menuCard {
   .homeDescription {
     margin: 16px 24px 0;
     color: var(--font-color-secondary);
@@ -8946,7 +8950,8 @@ option {
     font-size: 0.8125rem;
   }
 }
-html[data-theme="dark"] #menuCard {
+html[data-theme="dark"] #menuCard,
+html[data-theme="dark"] .couchSettingsPrompt {
   --home-link: #8bc8f8;
 }
 
