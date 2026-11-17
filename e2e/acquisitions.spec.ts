@@ -1321,15 +1321,22 @@ for (const theme of ["light", "dark"] as const) {
   }, info) => {
     const network = await startMap(page, theme);
     const before = (await readSavedGame(page))!;
-    const tile = territoryTileViews(before).find(
-      (view) =>
-        view.tile.territoryId === "green-uplands" &&
-        view.tile.terrain === "hills",
-    )!.tile;
+    const view = territoryTileViews(before).find(
+      (view) => view.tile.id === "green-uplands:site-1",
+    );
+    expect(view).toBeDefined();
+    expect(view).toMatchObject({
+      owned: false,
+      facility: undefined,
+      tile: { terrain: "forest" },
+    });
+    const tile = view!.tile;
+    expect(isAdjacentToOwnedTerritoryTile(before, tile)).toBe(true);
     const neighbor = TERRITORY_TILES.find(
       (other) => other.territoryId === tile.territoryId && other.id !== tile.id,
     )!;
     const quote = tilePurchaseQuote(before, tile.id)!;
+    expect(quote).toBeDefined();
     const surface = await inspectTile(page, tile);
     const wind = getTerrainModifiers(before, "Wind", tile.id);
     const solar = getTerrainModifiers(before, "Sun", tile.id);
@@ -1343,6 +1350,7 @@ for (const theme of ["light", "dark"] as const) {
       ["Wind build cost", wind.buildCost],
       ["Solar build cost", solar.buildCost],
     ] as const) {
+      expect(factor).not.toBe(1);
       await expect(
         modifiers.locator("dl > div").filter({ hasText: label }),
       ).toHaveText(`${label}${percentage(factor)}`);
@@ -1446,13 +1454,16 @@ for (const theme of ["light", "dark"] as const) {
     await page.goto("/");
     await page.getByRole("button", { name: "Continue", exact: true }).click();
     const before = (await readSavedGame(page))!;
-    const tile = territoryTileViews(before).find(
-      (view) =>
-        view.owned &&
-        !view.facility &&
-        view.tile.siteKind === "open-land" &&
-        view.tile.terrain === "forest",
-    )!.tile;
+    const view = territoryTileViews(before).find(
+      (view) => view.tile.id === "champlain:site-13",
+    );
+    expect(view).toBeDefined();
+    expect(view).toMatchObject({
+      owned: true,
+      facility: undefined,
+      tile: { siteKind: "open-land", terrain: "plains" },
+    });
+    const tile = view!.tile;
     await openMap(page);
     const surface = await inspectTile(page, tile);
     await expectLockedBuild(surface);
@@ -1490,6 +1501,10 @@ for (const theme of ["light", "dark"] as const) {
       tile.territoryId,
       tile.id,
     )!;
+    expect(quote).toBeDefined();
+    const available = availableTerritoryTiles(before, quote, tile.territoryId);
+    expect(available.map((option) => option.id)).toContain(tile.id);
+    expect(available[0]?.id).not.toBe(tile.id);
     expect(currentTick(built)!.cash).toBeCloseTo(
       currentTick(before)!.cash - quote.buildCost,
       1,
