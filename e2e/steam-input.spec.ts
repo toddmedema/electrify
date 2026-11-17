@@ -1490,8 +1490,8 @@ test("TV saved preferences style direct scenario links before play", async ({
   ).toBeGreaterThanOrEqual(4.5);
   await expect(
     page.getByRole("button", { name: "Build", exact: true }),
-  ).toHaveCount(0);
-  const tile = await selectMapTile(page, "champlain:site-5");
+  ).toBeInViewport({ ratio: 1 });
+  const tile = await selectMapTile(page, "champlain:site-13");
   await expect(tile).toHaveAttribute("data-owned", "true");
   await expect(tile).toContainText("One building site; transmission tower");
   await input(page, "confirm");
@@ -1507,9 +1507,27 @@ test("TV saved preferences style direct scenario links before play", async ({
   await expect(
     builder.getByRole("combobox", { name: /^Build (destination|tile)$/ }),
   ).toHaveCount(0);
-  const metrics = page
-    .getByRole("list", { name: "Generator options" })
-    .locator(".buildOptionMetric");
+  const rail = page.getByRole("complementary", {
+    name: "Build facilities",
+    exact: true,
+  });
+  let metrics: Locator;
+  if (await rail.isVisible()) {
+    await expect(rail).toBeFocused();
+    await rail
+      .getByRole("button", { name: "Choose sites for Wind", exact: true })
+      .hover();
+    const preview = rail.getByRole("region", {
+      name: "Wind technology preview",
+      exact: true,
+    });
+    await expect(preview).toBeVisible();
+    metrics = preview.locator(".buildOptionMetric");
+  } else {
+    metrics = builder
+      .getByRole("list", { name: "Generator options" })
+      .locator(".buildOptionMetric");
+  }
   await expect(metrics.first()).toBeVisible();
   for (const metric of await metrics.all()) {
     expect(
