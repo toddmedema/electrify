@@ -1190,6 +1190,17 @@ test("controller reviews, cancels and confirms a utility acquisition", async ({
   await expect(
     page.getByRole("button", { name: "Buy land", exact: true }),
   ).toBeFocused();
+  // Leave the map at its known upper-left edge before traversing the HUD.
+  // Arrows within discovered geography continue to belong to the map itself.
+  const edge = territoryTileViews((await readSavedGame(page))!)
+    .map(({ tile }) => tile)
+    .sort(
+      (a, b) =>
+        hexCenter(a).y - hexCenter(b).y || hexCenter(a).x - hexCenter(b).x,
+    )[0];
+  await selectMapTile(page, edge.id);
+  await input(page, "up");
+  await expect(page.locator("[data-map-target]:focus")).toHaveCount(0);
   await select(page, ownership.locator("summary"));
   await input(page, "confirm");
   await expect(
