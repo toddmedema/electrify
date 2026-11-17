@@ -8,6 +8,7 @@ import { HYDRO_TARGET_CAPACITY_FACTOR } from "./Hydro";
 import { expectedMonthlyOutputShape } from "./ExpectedOutput";
 import { TERRITORY_TILES } from "../data/TerritoryTiles";
 import { getTerrainWindOutputFactor } from "./TerrainModifiers";
+import { getOffshoreWindOutputFactor } from "./Energy";
 
 function forecast(game: GameType): TickPresentFutureType[] {
   return generateNewTimeline(
@@ -127,7 +128,9 @@ describe("expectedMonthlyOutputShape", () => {
     (name) => {
       const game = createGame({ scenarioId: 116, seed: 7 });
       const tileId = TERRITORY_TILES.find((tile) =>
-        name === "Wind" ? tile.terrain === "hills" : tile.terrain === "ocean",
+        name === "Wind"
+          ? tile.terrain === "hills"
+          : tile.terrain === "lake" && tile.siteKind === "wind",
       )!.id;
       const technology = { name, fuel: name, peakW: 50e6 };
       const timeline = Array.from({ length: 12 }, (_, month) => ({
@@ -147,6 +150,11 @@ describe("expectedMonthlyOutputShape", () => {
           ),
         ),
       );
+      // Hills cross cut-in and storm cut-out; inland water grants no offshore fallback.
+      expect(shape.monthly[0] > 0).toBe(name === "Wind");
+      expect(shape.monthly[2]).toBe(name === "Wind" ? 1 : 0);
+      expect(shape.monthly[3]).toBe(0);
+      expect(shape.monthly.some((factor) => factor > 0)).toBe(name === "Wind");
       const authored = timeline.map((tick) => ({
         ...tick,
         renewableCapacityFactors: { [name]: 0.42 },
@@ -157,4 +165,25 @@ describe("expectedMonthlyOutputShape", () => {
       ).toEqual(Array(12).fill(0.42));
     },
   );
+
+  it("uses explicit offshore weather for a selected inland lake", () => {
+    const game = createGame({ scenarioId: 116, seed: 7 });
+    const tileId = TERRITORY_TILES.find(
+      (tile) => tile.terrain === "lake" && tile.siteKind === "wind",
+    )!.id;
+    const timeline = Array.from({ length: 12 }, (_, month) => ({
+      ...solarTick(month * MINUTES_PER_MONTH, 500),
+      windKph: 0,
+      windOffshoreKph: [20, 40][month % 2],
+    }));
+    const shape = expectedMonthlyOutputShape(
+      { name: "Offshore Wind", fuel: "Offshore Wind", peakW: 50e6 },
+      timeline,
+      { game, tileId },
+    )!;
+    expect(shape.monthly).toEqual(
+      timeline.map((tick) => getOffshoreWindOutputFactor(tick.windOffshoreKph)),
+    );
+    expect(shape.mean).toBeGreaterThan(0);
+  });
 });
