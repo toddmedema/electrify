@@ -180,7 +180,6 @@ const MainMenu = (props: Props): React.JSX.Element => {
       <Typography component="h1" className="srOnly">
         Electrify
       </Typography>
-      <p className="homeDescription">A free electricity strategy game</p>
       <Box id="centeredMenu" sx={{ px: 3 }}>
         <Stack
           component="section"
