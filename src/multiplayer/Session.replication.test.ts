@@ -279,7 +279,7 @@ function fixture({
       failRecords = true;
     },
     holdRecordSend: () => {
-      let reject!: (error: Error) => void;
+      let reject!: (error: unknown) => void;
       heldRecordSend = new Promise<void>((_resolve, fail) => {
         reject = fail;
       });
@@ -478,6 +478,24 @@ test("a pre-consumption rejection resets the pending sequence and a failed recor
     expect(
       f.posts.filter((request) => request.kind === "baseline").length,
     ).toBeGreaterThan(0);
+  } finally {
+    f.dispose();
+  }
+});
+
+test("a record send rejection without an Error still requests a baseline", async () => {
+  const f = fixture();
+  try {
+    await f.start();
+    const reject = f.holdRecordSend();
+    const command = f.host.submit({ kind: "rate", value: 0.11 });
+    await flush();
+    await command;
+    reject(undefined);
+    await flush();
+    expect(
+      f.posts.filter((request) => request.kind === "baseline"),
+    ).toHaveLength(1);
   } finally {
     f.dispose();
   }

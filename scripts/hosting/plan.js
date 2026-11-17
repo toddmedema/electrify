@@ -58,9 +58,17 @@ function readHostingPlan({ allowMissingFunctions = false } = {}) {
   }
   const existing = {};
   for (const [event, name] of Object.entries(targets.functions)) {
-    existing[event] = aws(["cloudfront", "describe-function", "--name", name], {
-      optional: true,
-    });
+    existing[event] = aws(
+      [
+        "cloudfront",
+        "describe-function",
+        "--name",
+        name,
+        "--stage",
+        "DEVELOPMENT",
+      ],
+      { optional: true },
+    );
     if (!existing[event]) {
       if (!allowMissingFunctions)
         throw new Error(

@@ -24,7 +24,8 @@ The publisher graph uses Person Todd Medema, confirmed by the owner.
 
 The production workflow configures its existing AWS credentials and runs
 `node scripts/hosting/deploy.js --preflight` **before any Firebase or AWS mutation**.
-This read-only check needs no build. `scripts/deploy.sh ci-prod` also checks
+The readiness and hosting publisher steps receive the AWS credentials. This
+read-only check needs no build. `scripts/deploy.sh ci-prod` also checks
 readiness before building, checks built assets, then calls the publisher. Both use
 `scripts/hosting/plan.js`, with production targets owned by
 `scripts/hosting/targets.json`. The publisher rereads the current distribution,
@@ -84,17 +85,23 @@ Action/resource mappings follow the
 [CloudFront authorization reference](https://docs.aws.amazon.com/service-authorization/latest/reference/list_cloudfront.html)
 and [S3 operation permissions](https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-with-s3-policy-actions.html).
 
-From the repository root, an IAM administrator should verify the account and
-principal, review the versioned policy, then attach it to the **existing** user:
+From the repository root, an IAM administrator can review the versioned policy
+and run this block to verify the account and principal before attachment.
 
 ```sh
-test "$(aws --profile production-admin sts get-caller-identity --query Account --output text)" = 028836220400
-aws --profile production-admin iam get-user --user-name electrify-gh-actions --query User.Arn --output text
-# Confirm arn:aws:iam::028836220400:user/electrify-gh-actions before the write below.
-aws --profile production-admin iam put-user-policy \
-  --user-name electrify-gh-actions \
-  --policy-name ElectrifyHostingPublisherV1 \
-  --policy-document file://scripts/hosting/deployment-policy.v1.json
+(
+  set -eu
+  account=$(aws --profile production-admin sts get-caller-identity --query Account --output text)
+  user_arn=$(aws --profile production-admin iam get-user --user-name electrify-gh-actions --query User.Arn --output text)
+  if [ "$account" != 028836220400 ] || [ "$user_arn" != arn:aws:iam::028836220400:user/electrify-gh-actions ]; then
+    echo 'Expected the production account and electrify-gh-actions IAM user' >&2
+    exit 1
+  fi
+  aws --profile production-admin iam put-user-policy \
+    --user-name electrify-gh-actions \
+    --policy-name ElectrifyHostingPublisherV1 \
+    --policy-document file://scripts/hosting/deployment-policy.v1.json
+)
 ```
 
 Reconcile any legacy attached policies separately: adding this inline policy does

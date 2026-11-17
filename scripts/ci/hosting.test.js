@@ -314,6 +314,7 @@ if (args[1] === 'get-distribution-config') result = { ETag: state.etag, Distribu
 if (args[1] === 'get-caller-identity') result = { Account: state.account };
 if (args[1] === 'get-cache-policy') result = { CachePolicy: { CachePolicyConfig: state.policy } };
 if (args[1] === 'describe-function') {
+  if (!args.includes('--stage') || args[args.indexOf('--stage') + 1] !== 'DEVELOPMENT') { process.stderr.write('Expected DEVELOPMENT function stage'); process.exit(1); }
   if (state.missingFunctions === true || (Array.isArray(state.missingFunctions) && state.missingFunctions.includes(args[args.indexOf('--name') + 1]))) { process.stderr.write('NoSuchFunctionExists'); process.exit(1); }
   result = { ETag: state.functionEtag, FunctionSummary: { FunctionConfig: { Comment: state.owner } } };
 }
@@ -408,10 +409,32 @@ test("production workflow checks hosting readiness before Firebase or AWS mutati
   const firebase = steps.findIndex(({ run }) =>
     run?.includes("firebase-tools@15 deploy"),
   );
-  assert.ok(
-    credentials >= 0 && credentials < preflight && preflight < firebase,
-    "AWS credentials and hosting readiness must precede Firebase deployment",
+  const publish = steps.findIndex(
+    ({ run }) => run === "./scripts/deploy.sh ci-prod",
   );
+  assert.ok(
+    credentials >= 0 &&
+      credentials < preflight &&
+      preflight < firebase &&
+      firebase < publish,
+    "AWS credentials and hosting readiness must precede Firebase and hosting deployment",
+  );
+  assert.equal(steps[credentials].with["output-env-credentials"], false);
+  assert.equal(steps[credentials].with["output-credentials"], true);
+  const credentialStep = steps[credentials].id;
+  assert.ok(credentialStep);
+  for (const [key, output] of [
+    ["AWS_ACCESS_KEY_ID", "aws-access-key-id"],
+    ["AWS_SECRET_ACCESS_KEY", "aws-secret-access-key"],
+  ]) {
+    const scoped = steps.filter((step) => step.env?.[key]);
+    assert.deepEqual(scoped, [steps[preflight], steps[publish]]);
+    for (const step of scoped)
+      assert.equal(
+        step.env[key],
+        "${{ steps." + credentialStep + ".outputs." + output + " }}",
+      );
+  }
   const commands = [steps[preflight], steps[firebase]].map(({ run }) =>
     run.replaceAll(
       "node scripts/hosting/deploy.js",
