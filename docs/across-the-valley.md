@@ -23,8 +23,9 @@ Each hex holds one facility or a city; construction reserves its slot immediatel
 Independent utilities show their authored starting fleet. Empty developed hexes
 show towers and automatic wires to adjacent developed cells of the same utility.
 Selecting an individual hex opens its floating facility, city or construction
-surface. Empty owned tiles select their build destination automatically. A Buy land
-layer supports repeated single-tile purchases with visible prices. Acquiring land
+surface. Empty owned tiles select their build destination automatically. The Buy land
+icon toggles repeated single-tile purchases with visible prices along owned borders. Map,
+Fleet and Agreements are available from the floating navigation dock. Acquiring land
 or connecting to a utility reveals three further hexes, with progressively faded
 terrain and structures. Coordinate-based generation extends the map as players
 expand. The wires are visual and add no transmission management. Utility names

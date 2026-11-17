@@ -65,8 +65,8 @@ transfers are counted once and join the retention objective's baseline before
 its deadline; buying land does not replace a required utility acquisition.
 
 Ordinary inspection offers one clearly priced purchase action. The explicit
-**Buy land** layer labels opportunities and supports repeated purchases without
-opening construction after each one. The layer remains on until **Done buying**;
+**Buy land** icon toggles price labels and supports repeated purchases without
+opening construction after each one. Its pressed state remains on until toggled off;
 dragging, focus changes and arrow navigation never purchase. Both entry points
 share pending commitments, and co-op ownership appears only after host acceptance.
 
