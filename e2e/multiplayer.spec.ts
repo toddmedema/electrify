@@ -2897,14 +2897,38 @@ for (const count of [2, 4]) {
         exact: true,
       });
       await expect(disconnected).toBeVisible();
+      // Native reconnection completes before the replica is installed. Hold that boundary
+      // so the transient close of the lost-connection notice cannot count as recovery.
+      await buyer.evaluate(() => {
+        (window as SteamTestWindow).holdReplicaBaseline = true;
+      });
       await disconnected
         .getByRole("button", { name: "Reconnect", exact: true })
         .click();
+      await expect(disconnected).toContainText("Synchronizing with host…");
+      await reviewScreenshot(disconnected, {
+        path: test.info().outputPath("reconnect-synchronizing.png"),
+      });
+      await expect
+        .poll(() =>
+          buyer.evaluate(() =>
+            Boolean((window as SteamTestWindow).releaseReplicaBaseline),
+          ),
+        )
+        .toBe(true);
+      await buyer.evaluate(() =>
+        (window as SteamTestWindow).releaseReplicaBaseline!(),
+      );
       await expect(disconnected).toBeHidden();
       await expect
         .poll(() => room.state(buyerId).connected)
         .toEqual([room.host]);
       for (const page of pages) await ready(page);
+      for (const page of pages)
+        await expect(clock(page)).toHaveAttribute("data-active-speed", "SLOW");
+      await reviewScreenshot(buyer.locator("#appbar"), {
+        path: test.info().outputPath("reconnect-recovered.png"),
+      });
       if (count === 4) {
         await buyer.setViewportSize({ width: 360, height: 844 });
         await expectClockInViewport(buyer);
