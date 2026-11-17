@@ -742,7 +742,7 @@ for (const theme of ["light", "dark"] as const) {
     );
     for (const [label, rate] of [
       ["slow speed", 0.7],
-      ["normal speed", 0.1],
+      ["normal speed", 1],
       ["fast speed", 1.2],
       ["ultra speed", 1.5],
       ["pause", 0.25],

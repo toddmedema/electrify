@@ -4,7 +4,7 @@ import type { SpeedType } from "../../Types";
 export const FACILITY_MAP_PLAYBACK_RATE: Record<SpeedType, number> = {
   PAUSED: 0.25,
   SLOW: 0.7,
-  NORMAL: 0.1,
+  NORMAL: 1,
   FAST: 1.2,
   ULTRA: 1.5,
 };
