@@ -90,6 +90,12 @@ export const purchaseFacility =
       acknowledge(built);
       return { status: "accepted", facilityId: built.id };
     } catch (cause) {
+      // The authoritative build may arrive before a failed receipt connection.
+      const built = sameRun() ? findBuilt() : undefined;
+      if (built) {
+        acknowledge(built);
+        return { status: "accepted", facilityId: built.id };
+      }
       return {
         status: "rejected",
         message:
