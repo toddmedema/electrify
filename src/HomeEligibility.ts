@@ -7,6 +7,12 @@ export async function canStartLightweightHome(): Promise<boolean> {
     window.location.hash
   )
     return false;
+  // Safari's install instructions live in the normal menu; retain that flow on Apple touch devices.
+  if (
+    /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)
+  )
+    return false;
   try {
     if (window.matchMedia("(display-mode: standalone)").matches) return false;
     // Preserve returning players' saves, account restoration, audio and stored preferences.

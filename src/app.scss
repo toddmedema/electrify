@@ -8921,7 +8921,8 @@ option {
 // Keep title-screen text legible while leaving the logo's established blue intact.
 #menuCard {
   --home-link: #0868be;
-  .MuiButton-textPrimary:not(.Mui-disabled) {
+  --interactive-blue: var(--home-link);
+  .MuiButton-text.MuiButton-colorPrimary:not(.Mui-disabled) {
     color: var(--home-link);
   }
   .homeDescription {

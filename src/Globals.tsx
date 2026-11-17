@@ -50,6 +50,7 @@ if (firebaseAppAuth && typeof window !== "undefined") {
   const restore = () => {
     void hasStoredWebAccount().then((stored) => {
       if (stored) firebaseAppAuth?.initialize();
+      else firebaseAppAuth?.confirmSignedOut();
     });
   };
   restore();

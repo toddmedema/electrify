@@ -7,6 +7,10 @@ test("a fresh production title defers the game until an action and preserves the
     !process.env.E2E_BASE_URL && !process.env.E2E_BUILD_DIR,
     "The small entry is a production delivery feature.",
   );
+  const fonts: string[] = [];
+  page.on("request", (request) => {
+    if (request.url().endsWith(".woff2")) fonts.push(request.url());
+  });
   await page.goto("/");
   await expect(
     page.getByRole("button", { name: "Play", exact: true }),
@@ -22,6 +26,12 @@ test("a fresh production title defers the game until an action and preserves the
       .getByRole("navigation", { name: "Explore Electrify" })
       .getByRole("link"),
   ).toHaveCount(7);
+  expect(
+    fonts.some((url) => /InterVariable-latin\.[a-f0-9]+\.woff2$/.test(url)),
+  ).toBe(true);
+  expect(fonts.some((url) => /\/InterVariable\.woff2$/.test(url))).toBe(false);
+  await page.evaluate(() => document.fonts.load("16px Inter", "Ж"));
+  expect(fonts.some((url) => /\/InterVariable\.woff2$/.test(url))).toBe(true);
   let release!: () => void;
   const held = new Promise<void>((resolve) => {
     release = resolve;
@@ -67,12 +77,14 @@ test("sound unlocks within the gesture while game chunks are still held", async 
     "Production chunk delivery.",
   );
   await page.addInitScript(() => {
-    const resume = AudioContext.prototype.resume;
-    AudioContext.prototype.resume = function () {
-      document.documentElement.dataset.audioGesture = String(
-        navigator.userActivation.isActive,
-      );
-      return resume.call(this);
+    const OriginalAudioContext = window.AudioContext;
+    window.AudioContext = class extends OriginalAudioContext {
+      constructor(options?: AudioContextOptions) {
+        super(options);
+        document.documentElement.dataset.audioGesture = String(
+          navigator.userActivation.isActive,
+        );
+      }
     };
   });
   await page.goto("/");

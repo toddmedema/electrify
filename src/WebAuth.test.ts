@@ -69,3 +69,19 @@ it("restores existing Firebase IndexedDB accounts", async () => {
   db.close();
   expect(await hasStoredWebAccount()).toBe(true);
 });
+
+it("reports a confirmed anonymous session to early and late subscribers without starting Auth", async () => {
+  const create = jest.fn();
+  const deferred = deferredWebAuth(create);
+  const early = jest.fn();
+  deferred.onAuthStateChanged(early);
+  deferred.confirmSignedOut();
+  expect(early).toHaveBeenCalledWith(null);
+  const late = jest.fn();
+  deferred.onAuthStateChanged(late);
+  await Promise.resolve();
+  expect(late).toHaveBeenCalledWith(null);
+  deferred.confirmSignedOut();
+  expect(early).toHaveBeenCalledTimes(1);
+  expect(create).not.toHaveBeenCalled();
+});

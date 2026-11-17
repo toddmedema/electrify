@@ -33,6 +33,16 @@ if (
     .then(async (lightweight) => {
       if (lightweight) {
         try {
+          // Paint the parser-discovered logo before optional title UI work.
+          const logo =
+            document.querySelector<HTMLImageElement>("#appStartup img");
+          await logo?.decode().catch(() => undefined);
+          if (document.visibilityState !== "hidden")
+            await new Promise<void>((resolve) => {
+              requestAnimationFrame(() =>
+                requestAnimationFrame(() => resolve()),
+              );
+            });
           const { showHome } = await import(
             /* webpackChunkName: "home" */ "./HomeEntry"
           );

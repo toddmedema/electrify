@@ -9,15 +9,16 @@ before their live acceptance checks can pass.
 
 New web visitors receive the shared title menu before downloading the simulation,
 authentication, charts or manual. Choosing an action loads the existing game and
-routes through its normal menu callbacks. Existing save databases, accounts,
+routes through its normal menu callbacks. Existing save databases, accounts, Apple touch-device install instructions,
 interface preferences, installed apps and direct game links retain the full
 bootstrap. Stored Firebase accounts resume automatically; new visitors initialize
 Auth only when signing in. Popup transport initializes only for that sign-in.
-The wordmark reuses inline SVG artwork as a data image in both palettes, avoiding
-a separate image request while retaining a contentful first paint. Startup CSS
-and the font face are inline; the full stylesheet loads asynchronously before the
+The startup wordmark is a static high-priority image in the initial HTML, with
+an early preload and a stored-theme-aware dark variant. The mounted menu reuses
+that request. Startup CSS and the font faces are inline; a hashed 154 KB Latin subset replaces
+the 352 KB full-font preload, with the original face retained for other scripts; the full stylesheet loads asynchronously before the
 interactive menu is revealed. Analytics waits for that reveal and browser idle.
-The publisher graph currently uses Person Todd Medema, pending owner correction.
+The publisher graph uses Person Todd Medema, confirmed by the owner.
 
 ## Hosting changes
 
@@ -29,7 +30,7 @@ uses the distribution ETag to reject concurrent configuration changes.
 
 The deploy assigns cache lifetimes from `scripts/hosting/policy.js`:
 
-- Hashed JavaScript/CSS and InterVariable.woff2: one year, immutable. **Rename the
+- Hashed JavaScript/CSS/fonts and InterVariable.woff2: one year, immutable. **Rename the
   font and update its references if its bytes change**; an immutable URL cannot
   safely serve a replacement font.
 - Unhashed analytics.js and inter.css: one week.
@@ -123,8 +124,8 @@ No repository metadata mutation was necessary.
 - Recheck Search Console → Links once processing finishes. Build a baseline of
   referring domains, then consider itch.io, educational directories, teacher
   resource lists and relevant simulator maintainers. Add Steam when a page exists.
-- Confirm whether the publisher should remain Person Todd Medema or use a business
-  entity. No ratings or reviews should be fabricated for structured data.
+- Publisher was confirmed as Person Todd Medema. Keep that entity consistent;
+  do not fabricate ratings or reviews.
 - Before enabling HSTS includeSubDomains, inventory and test HTTPS on every active
   subdomain. Current code applies HSTS only to the serving hostname.
 - Before the first deploy, verify the production identity's new permissions,

@@ -72,6 +72,7 @@ test("cache lifetimes follow content identity and mutable documents revalidate",
     "static/css/main.abc123de.css",
     "static/js/main.abc123de.js.LICENSE.txt",
     "fonts/inter/InterVariable.woff2",
+    "fonts/inter/InterVariable-latin.f222662c.woff2",
   ])
     assert.equal(cacheControl(file), CACHE.immutable, file);
   for (const file of [

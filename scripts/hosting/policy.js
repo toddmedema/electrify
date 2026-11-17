@@ -12,6 +12,7 @@ function cacheControl(file) {
     /^static\/(?:js|css)\/[^/]+\.[a-f0-9]{8,}(?:\.chunk)?\.(?:js|css)(?:\.map|\.LICENSE\.txt)?$/.test(
       file,
     ) ||
+    /^fonts\/inter\/InterVariable-latin\.[a-f0-9]{8}\.woff2$/.test(file) ||
     file === "fonts/inter/InterVariable.woff2"
   )
     return CACHE.immutable;

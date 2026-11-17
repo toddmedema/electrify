@@ -1,3 +1,4 @@
+import { foregroundContrast } from "./contrast";
 import { expect, test } from "./fixtures";
 
 test("reduced motion keeps the home decoration still and actions usable", async ({
@@ -60,42 +61,19 @@ for (const theme of ["light", "dark"] as const) {
         .locator("#menuCard")
         .evaluate((element) => element.scrollWidth - element.clientWidth),
     ).toBeLessThanOrEqual(1);
-    await expect(page.locator("#logo img")).toHaveAttribute(
-      "src",
-      /^data:image\/svg\+xml,/,
-    );
+    expect(
+      await page
+        .locator("#logo img")
+        .evaluate((element: HTMLImageElement) => element.naturalWidth),
+    ).toBeGreaterThan(0);
     expect(authRequests).toEqual([]);
-    const contrast = await page
-      .locator("#menuCard .MuiButton-textPrimary, .homeExplore a")
-      .evaluateAll((elements) => {
-        const luminance = (color: string) => {
-          const channels = color
-            .match(/[\d.]+/g)!
-            .slice(0, 3)
-            .map(Number)
-            .map((value) => {
-              const channel = value / 255;
-              return channel <= 0.04045
-                ? channel / 12.92
-                : Math.pow((channel + 0.055) / 1.055, 2.4);
-            });
-          return (
-            channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722
-          );
-        };
-        return elements.map((element) => {
-          const foreground = luminance(getComputedStyle(element).color);
-          const background = luminance(
-            getComputedStyle(document.querySelector("#menuCard")!)
-              .backgroundColor,
-          );
-          return (
-            (Math.max(foreground, background) + 0.05) /
-            (Math.min(foreground, background) + 0.05)
-          );
-        });
-      });
-    for (const ratio of contrast) expect(ratio).toBeGreaterThanOrEqual(4.5);
+    const controls = page.locator(
+      "#menuCard .MuiButton-text.MuiButton-colorPrimary, .homeExplore a",
+    );
+    expect(await controls.count()).toBeGreaterThanOrEqual(10);
+    for (const control of await controls.all()) {
+      expect(await foregroundContrast(control)).toBeGreaterThanOrEqual(4.5);
+    }
     await explore.getByRole("link", { name: "For teachers" }).click();
     await expect(page).toHaveURL(/classroom\.html$/);
   });

@@ -3,8 +3,12 @@ import type { Auth, User } from "firebase/auth";
 /** Register account consumers without starting Firebase for a first-time title-screen visitor. */
 export function deferredWebAuth(
   create: () => Auth,
-): Pick<Auth, "currentUser" | "onAuthStateChanged"> & { initialize(): Auth } {
+): Pick<Auth, "currentUser" | "onAuthStateChanged"> & {
+  initialize(): Auth;
+  confirmSignedOut(): void;
+} {
   let auth: Auth | undefined;
+  let signedOut = false;
   const listeners = new Set<{
     next: (user: User | null) => void;
     stop?: () => void;
@@ -19,6 +23,11 @@ export function deferredWebAuth(
   };
   return {
     initialize,
+    confirmSignedOut() {
+      if (auth || signedOut) return;
+      signedOut = true;
+      for (const listener of listeners) listener.next(null);
+    },
     get currentUser() {
       return auth?.currentUser || null;
     },
@@ -30,6 +39,10 @@ export function deferredWebAuth(
         stop: auth?.onAuthStateChanged(callback),
       };
       listeners.add(listener);
+      if (signedOut && !auth)
+        queueMicrotask(() => {
+          if (!auth && listeners.has(listener)) listener.next(null);
+        });
       return () => {
         listener.stop?.();
         listeners.delete(listener);

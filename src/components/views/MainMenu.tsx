@@ -277,7 +277,11 @@ const MainMenu = (props: Props): React.JSX.Element => {
             }}
           >
             {props.audioEnabled === undefined && !desktopApp && (
-              <Button color="primary" onClick={() => props.onAudioChange(true)}>
+              <Button
+                data-audio-trigger
+                color="primary"
+                onClick={() => props.onAudioChange(true)}
+              >
                 Turn on sound
               </Button>
             )}
