@@ -174,9 +174,47 @@ for (const theme of ["light", "dark"] as const) {
       const last = technologies
         .getByRole("button", { name: /^Choose sites for / })
         .last();
-      await last.scrollIntoViewIfNeeded();
+      await technologies.evaluate((element) => {
+        element.scrollTop = 0;
+      });
+      await expect(last).not.toBeInViewport();
+      await rail.focus();
+      const buttonCount = await rail.getByRole("button").count();
+      for (let index = 0; index < buttonCount; index++)
+        await page.keyboard.press("Tab");
+      await expect(last).toBeFocused();
       await expect(last).toBeInViewport({ ratio: 1 });
+      const lastName = (await last.getAttribute("aria-label"))!.replace(
+        "Choose sites for ",
+        "",
+      );
+      const lastPreview = rail.getByRole("region", {
+        name: `${lastName} technology preview`,
+        exact: true,
+      });
+      await expect(lastPreview).toBeVisible();
+      await last.press("ArrowRight");
+      await expect(
+        lastPreview.getByRole("button", {
+          name: "Close technology preview",
+          exact: true,
+        }),
+      ).toBeFocused();
+      await page.keyboard.press("Escape");
+      await expect(last).toBeFocused();
+      await expect(lastPreview).toHaveCount(0);
+      await last.press("ArrowRight");
+      await expect(lastPreview).toBeVisible();
+      const scrollBefore = await technologies.evaluate(
+        (element) => element.scrollTop,
+      );
+      const listBounds = (await technologies.boundingBox())!;
+      await page.mouse.move(listBounds.x + 2, listBounds.y + 8);
+      await page.mouse.wheel(0, -100);
       await expect(rail.locator(".desktopBuildPreview")).toHaveCount(0);
+      await expect
+        .poll(() => technologies.evaluate((element) => element.scrollTop))
+        .toBeLessThan(scrollBefore);
       const geometry = await rail.evaluate((element) => {
         const rail = element.getBoundingClientRect();
         const map = element

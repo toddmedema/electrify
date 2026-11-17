@@ -50,6 +50,8 @@ export default function DesktopBuildRail({
   onProject: (project: ProjectSelection) => void;
 }) {
   const rail = React.useRef<HTMLElement>(null);
+  const technologies = React.useRef<HTMLDivElement>(null);
+  const focusScroll = React.useRef<number>();
   const origin = React.useRef<HTMLButtonElement>();
   const previewFirstControl = React.useRef<HTMLButtonElement>(null);
   const dismissTimer = React.useRef<ReturnType<typeof setTimeout>>();
@@ -88,6 +90,7 @@ export default function DesktopBuildRail({
   }, []);
   const dismiss = React.useCallback(() => {
     clearTimer();
+    focusScroll.current = undefined;
     setPreviewName(undefined);
     setSizing(undefined);
   }, [clearTimer]);
@@ -240,7 +243,13 @@ export default function DesktopBuildRail({
         className="desktopBuildTechnologies"
         role="group"
         aria-label="Construction technology list"
-        onScroll={dismiss}
+        ref={technologies}
+        onWheel={dismiss}
+        onScroll={(event) => {
+          const expected = focusScroll.current;
+          focusScroll.current = undefined;
+          if (event.currentTarget.scrollTop !== expected) dismiss();
+        }}
       >
         {[false, true].map((storage) => (
           <section
@@ -264,7 +273,20 @@ export default function DesktopBuildRail({
                   aria-describedby={`${previewHintId}${previewName === item.name ? ` ${previewId}` : ""}`}
                   onMouseEnter={(event) => show(item, event.currentTarget)}
                   onMouseLeave={leave}
-                  onFocus={(event) => show(item, event.currentTarget)}
+                  onFocus={(event) => {
+                    if (busy || suppressFocus.current) return;
+                    const list = technologies.current!;
+                    const before = list.scrollTop;
+                    // Reveal before the browser's native focus scroll. Only its
+                    // resulting position is exempt from normal scroll dismissal.
+                    event.currentTarget.scrollIntoView({
+                      block: "nearest",
+                      inline: "nearest",
+                    });
+                    if (list.scrollTop !== before)
+                      focusScroll.current = list.scrollTop;
+                    show(item, event.currentTarget);
+                  }}
                   onKeyDown={(event) => {
                     if (event.key !== "ArrowRight" || busy) return;
                     event.preventDefault();
