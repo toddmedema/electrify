@@ -1581,7 +1581,7 @@ for (const theme of ["light", "dark"] as const) {
     ).toHaveCount(0);
     await expect(
       network.getByRole("button", {
-        name: "Rapid connection mode",
+        name: desktop ? "Build" : "Rapid connection mode",
         exact: true,
       }),
     ).toBeFocused();
@@ -1878,9 +1878,24 @@ for (const theme of ["light", "dark"] as const) {
         (view) => view.visibilityDistance >= 1 && view.visibilityDistance <= 3,
       ),
     ).toBe(true);
-    await expect(
-      network.locator(`.territoryHex[data-tile="${frontier.id}"]`),
-    ).toHaveAttribute("data-visibility-distance", "0");
+    const canvas = network.locator("canvas.territory3DCanvas");
+    if ((await canvas.getAttribute("data-renderer")) === "ready") {
+      await expect
+        .poll(() =>
+          canvas.evaluate(
+            (element: MapCanvas, id) =>
+              element.map3DDiagnostics!(true).scene?.find(
+                (instance) => instance.id === `terrain:${id}`,
+              )?.fog,
+            frontier.id,
+          ),
+        )
+        .toBe(0);
+    } else {
+      await expect(
+        network.locator(`.territoryHex[data-tile="${frontier.id}"]`),
+      ).toHaveAttribute("data-visibility-distance", "0");
+    }
     await expect(
       network.getByRole("status", { name: "Connection result" }),
     ).toContainText("Site connected");
