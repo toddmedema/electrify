@@ -86,6 +86,9 @@ async function panToTile(
     const y = box.y + box.height * 0.35;
     await page.mouse.move(x, y);
     await page.mouse.down();
+    // Cross the drag threshold even when the final camera correction is tiny.
+    // Return within this gesture so mouseup cannot activate the tile underneath.
+    await page.mouse.move(x + 12, y);
     await page.mouse.move(x + dx * step, y + dy * step, { steps: 4 });
     await page.mouse.up();
   }
