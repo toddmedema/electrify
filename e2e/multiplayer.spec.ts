@@ -28,6 +28,7 @@ type SteamTestWindow = typeof window & {
   receivedMockSteamEvents?: NativeEvent[];
   mockSteamGeneration?: number;
   mockWorkerView?: (view: RoomView) => Promise<void>;
+  mockWorkerMonthsElapsed?: number;
   holdReplicaBaseline?: boolean;
   releaseReplicaBaseline?: () => void;
   holdReplicaViews?: boolean;
@@ -223,6 +224,8 @@ class SteamRoom {
     private readonly installedMods: InstalledMod[][] = [],
     private readonly personaNames: readonly string[] = STEAM_NAMES,
   ) {}
+  // Full view exports are diagnostic traffic, separate from the shipping worker/renderer path.
+  observeViews = true;
   modEntries = new Map<string, InstalledMod[]>();
   modRequests = new Map<string, ModRequest[]>();
   subscriptions = new Map<string, Set<string>>();
@@ -591,7 +594,7 @@ class SteamRoom {
       if (id === this.host) this.hostView = view;
     });
     await page.addInitScript(
-      ({ id }) => {
+      ({ id, observeViews }) => {
         const NativeWorker = window.Worker;
         window.Worker = class extends NativeWorker {
           private multiplayer = false;
@@ -604,9 +607,12 @@ class SteamRoom {
             this.addEventListener("message", (event) => {
               if (this.multiplayer && event.data.kind === "views") {
                 const view = event.data.views[id];
-                if (view)
-                  void (window as SteamTestWindow).mockWorkerView!(view);
                 const target = window as SteamTestWindow;
+                if (view) {
+                  target.mockWorkerMonthsElapsed =
+                    view.game?.date.monthsElapsed;
+                  if (observeViews) void target.mockWorkerView!(view);
+                }
                 if (target.holdReplicaViews) {
                   event.stopImmediatePropagation();
                   target.releaseReplicaViews = () => {
@@ -661,7 +667,7 @@ class SteamRoom {
           }
         };
       },
-      { id },
+      { id, observeViews: this.observeViews },
     );
     await page.addInitScript(
       ({ id }) => {
@@ -1576,7 +1582,9 @@ test(
   "12x multiplayer speed controls respond while video chat is encoding",
   { tag: "@mobile" },
   async ({ browser }) => {
-    const { room, pages, errors } = await startSharedGame(browser, 2);
+    const { room, pages, errors } = await startSharedGame(browser, 2, {
+      observeViews: false,
+    });
     const host = pages[0];
     const cdp = await host.context().newCDPSession(host);
     // Reserve CPU headroom for the competing call, on a production desktop renderer too.
@@ -1657,7 +1665,10 @@ test(
       await expect(clock(host)).toHaveAttribute("data-active-speed", "FAST");
       await expect
         .poll(
-          () => room.views.get("76561198000000002")?.game?.date.monthsElapsed,
+          () =>
+            pages[1].evaluate(
+              () => (window as SteamTestWindow).mockWorkerMonthsElapsed,
+            ),
           {
             timeout: 60000,
           },
@@ -1722,8 +1733,13 @@ async function ready(page: Page) {
     .click();
 }
 
-async function startSharedGame(browser: Browser, count: number) {
+async function startSharedGame(
+  browser: Browser,
+  count: number,
+  options: { observeViews?: boolean } = {},
+) {
   const room = new SteamRoom();
+  room.observeViews = options.observeViews ?? true;
   const pages: Page[] = [],
     errors: string[] = [];
   for (let index = 0; index < count; index++) {

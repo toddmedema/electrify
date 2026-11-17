@@ -1008,10 +1008,23 @@ export class MultiplayerSession {
     await this.request({ kind: "invite" });
   }
   async reconnect() {
-    this.update({
-      lobby: (await this.request({ kind: "reconnect" })) as LobbyState,
-      error: undefined,
-    });
+    try {
+      this.update({
+        lobby: (await this.request({ kind: "reconnect" })) as LobbyState,
+        error: undefined,
+      });
+    } catch (error) {
+      // A failed reconnect means the host link is gone. Surface it as a lobby connection
+      // error (the channel reserved for connection failures) so the notice offers Disconnect
+      // instead of leaving a player waiting on a dead link with no way out.
+      this.update({
+        error: undefined,
+        lobby: {
+          ...this.state.lobby,
+          error: error instanceof Error ? error.message : "Could not reconnect",
+        },
+      });
+    }
   }
   /** Reloads the multiplayer saves; only the newest request may replace the list. */
   async refreshSaves(sync = true) {
