@@ -1,5 +1,5 @@
 import * as React from "react";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import DesktopBuildRail from "./DesktopBuildRail";
 import { GameToolMemoryContext } from "./GameToolMemory";
@@ -53,10 +53,6 @@ function show(siteId?: TerritoryTileId, prepare?: (game: GameType) => void) {
 }
 const wind = () =>
   screen.getByRole("button", { name: "Choose sites for Wind" });
-
-beforeEach(() => {
-  HTMLElement.prototype.scrollIntoView = jest.fn();
-});
 
 it("keeps every current catalogue technology discoverable with its canonical icon", () => {
   const { game } = show();
@@ -196,40 +192,58 @@ it("returns keyboard focus to the trigger after explicit sizing and preview dism
   expect(onProject).not.toHaveBeenCalled();
 });
 
-it.each(["before", "after"] as const)(
-  "keeps an offscreen technology preview when native scrolling occurs %s its focus event, but dismisses on wheel",
-  async (nativeScrollOrder) => {
+it("keeps the last technology preview through multiple native focus scrolls and Right Arrow", async () => {
+  show();
+  const rail = screen.getByRole("complementary", { name: "Build facilities" });
+  const technologies = within(rail).getByRole("group", {
+    name: "Construction technology list",
+  });
+  const last = within(technologies).getAllByRole("button").at(-1)!;
+  const buttons = within(rail).getAllByRole("button");
+  for (let index = 0; index <= buttons.indexOf(last); index++)
+    await userEvent.tab();
+  expect(last).toHaveFocus();
+  const name = last
+    .getAttribute("aria-label")!
+    .replace("Choose sites for ", "");
+  const previewName = `${name} technology preview`;
+  for (const scrollTop of [500, 750, 600]) {
+    fireEvent.scroll(technologies, { target: { scrollTop } });
+    expect(screen.getByLabelText(previewName)).toBeInTheDocument();
+  }
+  const preview = screen.getByLabelText(previewName);
+  await userEvent.keyboard("{ArrowRight}");
+  expect(
+    within(preview).getByRole("button", { name: "Close technology preview" }),
+  ).toHaveFocus();
+});
+
+it.each(["Solar", "Geothermal"])(
+  "preserves directly focused %s through native scrolling but dismisses on wheel, scrollbar activation and blur",
+  (name) => {
     show();
-    const rail = screen.getByRole("complementary", {
-      name: "Build facilities",
-    });
-    const technologies = within(rail).getByRole("group", {
+    const technologies = screen.getByRole("group", {
       name: "Construction technology list",
     });
-    const last = within(technologies).getAllByRole("button").at(-1)!;
-    // jsdom has no layout or native focus scrolling. Model the offscreen button's
-    // reveal and then deliver the browser's queued scroll event separately.
-    if (nativeScrollOrder === "before") technologies.scrollTop = 500;
-    else
-      last.scrollIntoView = () => {
-        technologies.scrollTop = 500;
-      };
-    const buttons = within(rail).getAllByRole("button");
-    for (let index = 0; index <= buttons.indexOf(last); index++)
-      await userEvent.tab();
-    expect(last).toHaveFocus();
-    const name = last
-      .getAttribute("aria-label")!
-      .replace("Choose sites for ", "");
+    const button = within(technologies).getByRole("button", {
+      name: `Choose sites for ${name}`,
+    });
+    button.scrollIntoView = jest.fn();
+    act(() => button.focus());
     const previewName = `${name} technology preview`;
-    expect(screen.getByLabelText(previewName)).toBeInTheDocument();
-    fireEvent.scroll(technologies, { target: { scrollTop: 500 } });
-    const preview = screen.getByLabelText(previewName);
-    await userEvent.keyboard("{ArrowRight}");
-    expect(
-      within(preview).getByRole("button", { name: "Close technology preview" }),
-    ).toHaveFocus();
+    for (const scrollTop of [500, 750, 600]) {
+      fireEvent.scroll(technologies, { target: { scrollTop } });
+      expect(button).toHaveFocus();
+      expect(screen.getByLabelText(previewName)).toBeInTheDocument();
+    }
     fireEvent.wheel(technologies, { deltaY: -100 });
+    expect(screen.queryByLabelText(previewName)).not.toBeInTheDocument();
+    expect(button).toHaveFocus();
+    fireEvent.mouseEnter(button);
+    fireEvent.pointerDown(technologies);
+    expect(screen.queryByLabelText(previewName)).not.toBeInTheDocument();
+    fireEvent.mouseEnter(button);
+    fireEvent.blur(button, { relatedTarget: document.body });
     expect(screen.queryByLabelText(previewName)).not.toBeInTheDocument();
   },
 );
