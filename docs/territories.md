@@ -3,15 +3,15 @@
 Scenario 116 and mods based on it share one company power pool. Facilities and
 storage serve every owned customer's demand automatically. Territory location
 controls suitable finite sites and inherited customer sectors. It never limits
-power transfers, requires a connection purchase, or adds a parallel connection fee.
-The authored starting area extends into deterministic terrain as players acquire
-individual tiles. Each hex contains a city with no construction slot, or exactly
-one facility site. Regional weather remains shared, with the small local
+power transfers or adds a separate line project or fee beyond the tile's connection
+cost. The authored starting area extends into deterministic terrain as players
+acquire individual tiles with **Connect**. Each hex contains a city with no
+construction slot, or exactly one facility site. Regional weather remains shared, with the small local
 [terrain modifiers](terrain-modifiers.md) applied to wind speed and construction.
 
 The map labels the player's utility “You” and names neighboring utilities directly,
 with distinct ownership borders. Acquired utility land joins the player's border.
-Unowned tiles have no proper names. Terrain is a separate illustrated surface
+Unowned tiles have no proper names. Terrain is a separate 3D surface
 beneath cities, generators, storage or transmission towers. Empty developed sites
 show towers, with automatic wires joining adjacent developed cells of the same
 company. Wires are visual: they add no transfer limit, price or upkeep. Selecting

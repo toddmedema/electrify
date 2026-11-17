@@ -1,4 +1,8 @@
-# Electrify terrain and occupants — final visual playbook
+# Electrify illustrated map fallback
+
+The default map now follows the [3D map playbook](map-3d-style.md). This document
+describes the illustrated fallback used when WebGL2 is unavailable or its context
+is lost. Catalogue icons retain their existing SVG style.
 
 ## Purpose
 
