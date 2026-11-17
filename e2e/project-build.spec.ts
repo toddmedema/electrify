@@ -66,7 +66,9 @@ for (const theme of ["light", "dark"] as const) {
     const before = (await readSavedGame(page))!;
     const build = network.getByRole("button", { name: "Build", exact: true });
     await expect(build.getByText("Build", { exact: true })).toBeVisible();
-    await network.getByRole("button", { name: "Connect", exact: true }).click();
+    await network
+      .getByRole("button", { name: "Rapid connection mode", exact: true })
+      .click();
     await expect(network.locator(".territoryMap")).toHaveAttribute(
       "data-buy-mode",
       "true",

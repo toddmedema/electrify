@@ -53,7 +53,9 @@ for (const theme of ["light", "dark"] as const) {
     });
     await expect(canvas).toHaveAttribute("data-renderer", "lost");
     await expect(map.locator(".territoryTerrainArtwork").first()).toBeVisible();
-    await map.getByRole("button", { name: "Connect", exact: true }).click();
+    await map
+      .getByRole("button", { name: "Rapid connection mode", exact: true })
+      .click();
     await expect(map.locator(".territoryMap")).toHaveAttribute(
       "data-buy-mode",
       "true",

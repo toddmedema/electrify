@@ -125,7 +125,10 @@ async function inspectTile(page: Page, tile: TerritoryTileDefinition) {
 /** Connect an authored site through paid, physically adjacent company property. */
 async function revealTile(page: Page, tile: TerritoryTileDefinition) {
   const network = mapWorkspace(page);
-  const buy = network.getByRole("button", { name: "Connect", exact: true });
+  const buy = network.getByRole("button", {
+    name: "Rapid connection mode",
+    exact: true,
+  });
   for (let attempt = 0; attempt < 30; attempt++) {
     const game = (await readSavedGame(page))!;
     const views = territoryTileViews(game);
@@ -607,7 +610,7 @@ for (const theme of ["light", "dark"] as const) {
       }
       await panToTile(page, city);
       const buy = network.getByRole("button", {
-        name: "Connect",
+        name: "Rapid connection mode",
         exact: true,
       });
       await buy.click();
@@ -1137,7 +1140,10 @@ for (const theme of ["light", "dark"] as const) {
       network.locator('[data-map-target][aria-pressed="true"]'),
     ).toHaveCount(0);
     await expect(
-      network.getByRole("button", { name: "Connect", exact: true }),
+      network.getByRole("button", {
+        name: "Rapid connection mode",
+        exact: true,
+      }),
     ).toBeFocused();
     const occupied = territoryTileViews(before).find(
       (view) =>
@@ -1424,7 +1430,10 @@ for (const theme of ["light", "dark"] as const) {
       network.locator('[data-map-target][aria-pressed="true"]'),
     ).toHaveCount(0);
     await expect(
-      network.getByRole("button", { name: "Connect", exact: true }),
+      network.getByRole("button", {
+        name: "Rapid connection mode",
+        exact: true,
+      }),
     ).toBeFocused();
   });
 
@@ -1647,7 +1656,7 @@ for (const theme of ["light", "dark"] as const) {
     )!.tile;
     await panToTile(page, frontier);
     const toggle = network.getByRole("button", {
-      name: "Connect",
+      name: "Rapid connection mode",
       exact: true,
     });
     await toggle.click();
@@ -1751,7 +1760,10 @@ for (const theme of ["light", "dark"] as const) {
     ).toHaveLength(2);
     await nextTarget.press("Escape");
     await expect(
-      network.getByRole("button", { name: "Connect", exact: true }),
+      network.getByRole("button", {
+        name: "Rapid connection mode",
+        exact: true,
+      }),
     ).toHaveAttribute("aria-pressed", "false");
   });
 
@@ -1773,7 +1785,9 @@ for (const theme of ["light", "dark"] as const) {
       (view) => tilePurchaseQuote(before, view.tile.id)?.benefit === "general",
     )!.tile;
     await panToTile(page, tile);
-    await network.getByRole("button", { name: "Connect", exact: true }).click();
+    await network
+      .getByRole("button", { name: "Rapid connection mode", exact: true })
+      .click();
     const target = network.locator(`[data-map-target="${tile.id}"]`);
     await expect(target).toHaveAccessibleName(
       /Inspect .*not enough available cash/,
@@ -1789,7 +1803,10 @@ for (const theme of ["light", "dark"] as const) {
     await surface.locator(".tileWorkspaceHeading h3").press("Escape");
     await expect(surface).toHaveCount(0);
     await expect(target).toHaveAttribute("aria-pressed", "false");
-    const buy = network.getByRole("button", { name: "Connect", exact: true });
+    const buy = network.getByRole("button", {
+      name: "Rapid connection mode",
+      exact: true,
+    });
     await expect(buy).toBeFocused();
     await expect(buy).toHaveAttribute("aria-pressed", "false");
   });

@@ -30,6 +30,14 @@ import { hexCenter } from "../base/TerritoryHexGeometry";
 import * as HexGeometry from "../base/TerritoryHexGeometry";
 import type { ScenePicker } from "../base/territory-3d/SceneBuilder";
 import type { RendererState } from "../base/territory-3d/TerritoryCanvas3D";
+import {
+  projectCatalogue,
+  projectSiteQuote,
+  projectSiteCapitalCost,
+  selectProject,
+} from "../../helpers/ProjectBuild";
+import type { ReadyProjectSite } from "../../helpers/ProjectBuild";
+import { formatMoneyConcise } from "../../helpers/Format";
 
 const mockPick = jest.fn();
 let mockSceneError = false;
@@ -101,7 +109,7 @@ function show(
   cash = 1e9,
   inspectionInitiallyOpen = false,
   initialSelected: TerritoryTileId = "champlain:city",
-  projectSites?: ReadonlyMap<TerritoryTileId, "owned" | "connection">,
+  projectSites?: ReadonlyMap<TerritoryTileId, ReadyProjectSite>,
 ) {
   const game = createGame({ scenarioId: 116, seed: 188 });
   currentTick(game)!.cash = cash;
@@ -178,7 +186,9 @@ function show(
       .getAllByRole<HTMLButtonElement>("button")
       .filter((button) => button.dataset.purchasable === "true");
   const buyMode = () =>
-    fireEvent.click(screen.getByRole("button", { name: "Connect" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Rapid connection mode" }),
+    );
   return {
     ...utils,
     store,
@@ -230,11 +240,22 @@ it("explains and colors physical building eligibility without guessing from terr
   );
 });
 
+function readySites(...ids: TerritoryTileId[]) {
+  const game = createGame({ scenarioId: 116, seed: 188 });
+  const facility = projectCatalogue(game, 20e6, false).find(
+    (option) => option.name === "Solar",
+  )!;
+  return new Map(
+    ids.map((id) => {
+      const quote = projectSiteQuote(game, selectProject(facility), id);
+      if (!("facility" in quote)) throw new Error(`Invalid test site ${id}`);
+      return [id, quote] as const;
+    }),
+  );
+}
+
 it("uses project candidates for construction and connection quotes for Rapid eligibility", () => {
-  const sites = new Map<TerritoryTileId, "owned" | "connection">([
-    ["champlain:site-13", "owned"],
-    ["green-uplands:site-0", "connection"],
-  ]);
+  const sites = readySites("champlain:site-13", "green-uplands:site-0");
   const project = show(1e9, false, "champlain:city", sites);
   expect(hoverColor(project.target("champlain:site-13"))).toBe(
     "var(--interactive-blue)",
@@ -298,22 +319,30 @@ it("keeps foreign company hover colors ahead of project eligibility", () => {
   );
 });
 
-it("keeps connected project markers compact with their full accessible meaning on hover", async () => {
+it("shows full terrain-specific capital costs on owned and unconnected project markers without spending", async () => {
   const restore = enable3D();
   try {
-    const map = show(
-      1e9,
-      false,
-      "champlain:city",
-      new Map([["champlain:site-13", "owned"]]),
-    );
+    const sites = readySites("champlain:site-13", "green-uplands:site-0");
+    const map = show(1e9, false, "champlain:city", sites);
     await screen.findByTestId("map-scene");
-    const target = map.target("champlain:site-13");
-    expect(target).toHaveAccessibleName(/Connected · free site/);
-    const marker = within(target).getByTitle("Connected · free site");
-    expect(marker).toHaveTextContent(/^\$0$/);
-    fireEvent.pointerMove(marker, { pointerId: 1, clientX: 100, clientY: 100 });
-    expect(marker).toHaveAttribute("title", "Connected · free site");
+    for (const [id, quote] of sites) {
+      const target = map.target(id);
+      const price = formatMoneyConcise(projectSiteCapitalCost(quote));
+      const title = `Total project cost ${price} · ${quote.owned ? "Already connected" : "Connection included"}`;
+      expect(target).toHaveAccessibleName(expect.stringContaining(title));
+      const marker = within(target).getByTitle(title);
+      expect(marker).toHaveTextContent(price);
+      expect(marker).not.toHaveTextContent(/^\$0$/);
+      fireEvent.pointerMove(marker, {
+        pointerId: 1,
+        clientX: 100,
+        clientY: 100,
+      });
+      expect(marker).toHaveAttribute("title", title);
+    }
+    expect(map.store.getState().game.territoryNetwork!.tilePurchases).toEqual(
+      [],
+    );
   } finally {
     restore();
   }
@@ -375,7 +404,9 @@ it.each([1280, 360])(
           )?.visibilityDistance === 1,
       )!;
     const id = idOf(candidate);
-    fireEvent.click(screen.getByRole("button", { name: "Connect" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Rapid connection mode" }),
+    );
     tap(candidate);
     expect(map.onSelect).toHaveBeenLastCalledWith(id, true);
     expect(ownsTerritoryTile(map.store.getState().game, id)).toBe(false);
@@ -395,10 +426,9 @@ it.each([1280, 360])(
     expect(
       territoryTileViews(map.store.getState().game).length,
     ).toBeGreaterThan(initialCount);
-    expect(screen.getByRole("button", { name: "Connect" })).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
+    expect(
+      screen.getByRole("button", { name: "Rapid connection mode" }),
+    ).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByRole("status")).toHaveTextContent("Site connected");
   },
 );
@@ -505,10 +535,9 @@ it("keeps focus, arrows and repeated activation keys free of purchases", () => {
       ),
   ).toHaveLength(1);
   fireEvent.keyDown(map.target(selectedId), { key: "Escape" });
-  expect(screen.getByRole("button", { name: "Connect" })).toHaveAttribute(
-    "aria-pressed",
-    "false",
-  );
+  expect(
+    screen.getByRole("button", { name: "Rapid connection mode" }),
+  ).toHaveAttribute("aria-pressed", "false");
 });
 
 it("suppresses clicks after panning and a second touch, and allows the next deliberate tap", () => {
@@ -583,17 +612,15 @@ it("keeps buying mode and releases commitments when the host rejects, then reset
   );
   expect(tile).not.toHaveAttribute("aria-busy");
   expect(screen.getByTestId("other-buy")).toHaveTextContent("committed 0");
-  expect(screen.getByRole("button", { name: "Connect" })).toHaveAttribute(
-    "aria-pressed",
-    "true",
-  );
+  expect(
+    screen.getByRole("button", { name: "Rapid connection mode" }),
+  ).toHaveAttribute("aria-pressed", "true");
   act(() => {
     map.store.dispatch({ type: "test/load" });
   });
-  expect(screen.getByRole("button", { name: "Connect" })).toHaveAttribute(
-    "aria-pressed",
-    "false",
-  );
+  expect(
+    screen.getByRole("button", { name: "Rapid connection mode" }),
+  ).toHaveAttribute("aria-pressed", "false");
 });
 
 it("closes inspection, exits buying and deselects with one Escape on the map", () => {
@@ -602,12 +629,13 @@ it("closes inspection, exits buying and deselects with one Escape on the map", (
   const tile = map.candidates()[0];
   fireEvent.keyDown(tile, { key: "Escape" });
   expect(map.closeInspection).toHaveBeenCalledTimes(1);
-  expect(screen.getByRole("button", { name: "Connect" })).toHaveAttribute(
-    "aria-pressed",
-    "false",
-  );
+  expect(
+    screen.getByRole("button", { name: "Rapid connection mode" }),
+  ).toHaveAttribute("aria-pressed", "false");
   expect(map.target("champlain:city")).toHaveAttribute("aria-pressed", "false");
-  expect(screen.getByRole("button", { name: "Connect" })).toHaveFocus();
+  expect(
+    screen.getByRole("button", { name: "Rapid connection mode" }),
+  ).toHaveFocus();
 });
 
 it("returns from map geography to its buying control after closing inspection and buying mode, then releases Escape", () => {
@@ -617,12 +645,11 @@ it("returns from map geography to its buying control after closing inspection an
   act(() => tile.focus());
   expect(fireEvent.keyDown(tile, { key: "Escape" })).toBe(false);
   expect(map.closeInspection).toHaveBeenCalledTimes(1);
-  expect(screen.getByRole("button", { name: "Connect" })).toHaveAttribute(
-    "aria-pressed",
-    "false",
-  );
+  expect(
+    screen.getByRole("button", { name: "Rapid connection mode" }),
+  ).toHaveAttribute("aria-pressed", "false");
   expect(tile).toHaveAttribute("aria-pressed", "false");
-  const buy = screen.getByRole("button", { name: "Connect" });
+  const buy = screen.getByRole("button", { name: "Rapid connection mode" });
   expect(buy).toHaveFocus();
   // The next Back belongs to the game's global navigation again.
   expect(fireEvent.keyDown(buy, { key: "Escape" })).toBe(true);
@@ -744,7 +771,7 @@ it("keeps an unselected map unselected across game updates with one reachable ti
   ).toHaveLength(0);
   expect({ ...map.viewport.dataset }).toEqual(camera);
   expect(map.onSelect).not.toHaveBeenCalled();
-  const buy = screen.getByRole("button", { name: "Connect" });
+  const buy = screen.getByRole("button", { name: "Rapid connection mode" });
   expect(buy).not.toHaveTextContent(/Buy|available/);
   expect(buy).toHaveAttribute("aria-pressed", "false");
 });

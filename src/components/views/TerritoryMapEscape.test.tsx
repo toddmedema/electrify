@@ -88,7 +88,7 @@ it.each([
   "closes inspection from %s with buying mode %s, then releases Escape",
   (name, buying) => {
     show();
-    const buy = screen.getByRole("button", { name: "Connect" });
+    const buy = screen.getByRole("button", { name: "Rapid connection mode" });
     if (buying) fireEvent.click(buy);
     const outside = screen.getByText(name);
     act(() => outside.focus());
