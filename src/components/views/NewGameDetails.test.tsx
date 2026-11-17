@@ -1,4 +1,5 @@
 import { invalidateLeaderboards } from "../../Leaderboard";
+import ScenarioLeaderboard from "../base/ScenarioLeaderboard";
 import * as React from "react";
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -640,9 +641,14 @@ describe("NewGameDetails reads every difficulty up front", () => {
   it("ignores every answer that arrives after it unmounts", async () => {
     const pending = deferred<ScoreType[]>();
     respond(() => pending.promise);
-    const instance = React.createRef<NewGameDetails>();
+    const instance = React.createRef<ScenarioLeaderboard>();
     const { unmount } = render(
-      <NewGameDetails ref={instance} {...props({ uid: "player" })} />,
+      <ScenarioLeaderboard
+        ref={instance}
+        scenarioId={100}
+        difficulty="Employee"
+        uid="player"
+      />,
     );
     expect(mockGetDocs).toHaveBeenCalledTimes(DIFFICULTY_IDS.length + 1);
     const setState = jest.spyOn(instance.current!, "setState");

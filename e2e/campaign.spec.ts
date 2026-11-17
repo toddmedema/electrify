@@ -4,6 +4,7 @@ import "../src/Store";
 import { test, expect } from "./fixtures";
 import { openBuild, openPane } from "./layout";
 import { expectDialogToFit } from "./dialog-layout";
+import { installLeaderboardFixture } from "./leaderboard-fixture";
 import { editSavedGame, readSavedGame } from "./save-fixture";
 import { TICKS_PER_MONTH, DIFFICULTY_LABELS } from "../src/Constants";
 import { LEGACY_SCENARIOS } from "../src/data/LegacyCampaign";
@@ -15,7 +16,10 @@ import gameReducer, {
   generateNewTimeline,
   tickState,
 } from "../src/reducers/Game";
-import { closeProtocolGeneration } from "../src/testing/LegacyCampaignProtocolFixtures";
+import {
+  closeProtocolGeneration,
+  prepareClosingProtocolGeneration,
+} from "../src/testing/LegacyCampaignProtocolFixtures";
 import { loadSimData } from "../src/testing/SimData";
 import {
   getDateFromMinute,
@@ -122,6 +126,14 @@ for (const theme of ["light", "dark"] as const) {
         exact: true,
       }),
     ).toHaveAttribute("aria-pressed", "true");
+    const campaignBoard = page.getByRole("region", {
+      name: "Leaderboard — Medium",
+    });
+    await campaignBoard.scrollIntoViewIfNeeded();
+    await expect(campaignBoard).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Start campaign", exact: true }),
+    ).toBeVisible();
     await expect(page.locator('[class*="-exit-active"]')).toHaveCount(0);
     const content = await page.locator(".campaignSetupContent").boundingBox();
     const header = await page
@@ -439,6 +451,102 @@ for (const theme of ["light", "dark"] as const) {
     const finalCompany = await readSavedGame(page);
     expect(finalCompany?.campaign?.generationIndex).toBe(8);
     expect(finalCompany?.objectiveProgress?.completedMonths).toBe(0);
+  });
+}
+
+for (const theme of ["light", "dark"] as const) {
+  test(`only the ninth campaign term opens the ranked result in ${theme}`, async ({
+    page,
+  }, info) => {
+    test.skip(!REVIEW_PROJECTS.includes(info.project.name));
+    await page.addInitScript((mode) => {
+      localStorage.clear();
+      localStorage.setItem("theme", mode);
+      localStorage.setItem("audioEnabled", "false");
+    }, theme);
+    await installLeaderboardFixture(page, 1);
+    await page.goto("/?campaign=legacy");
+    await expect(
+      page.getByRole("button", { name: "Start campaign", exact: true }),
+    ).toBeVisible();
+    const native =
+      (await page.getByRole("group", { name: "Steam leaderboard" }).count()) >
+      0;
+    await page
+      .getByRole("button", { name: "Start campaign", exact: true })
+      .click();
+    await expect(page.locator(".facilities:visible")).toBeVisible();
+    await page
+      .getByRole("button", { name: "pause", exact: true })
+      .first()
+      .click();
+    await editSavedGame(page, (save) => {
+      loadSimData(save.game.location);
+      let game = save.game;
+      for (let index = 0; index < 8; index++) {
+        game = gameReducer(
+          closeProtocolGeneration(game),
+          continueLegacyCampaign(),
+        );
+      }
+      save.game = prepareClosingProtocolGeneration(game);
+      expect(save.game.campaign?.completedTerms).toHaveLength(8);
+      expect(
+        parseSave(JSON.parse(JSON.stringify(encodeSave(save)))),
+      ).not.toBeNull();
+    });
+    await page.reload();
+    await page.getByRole("button", { name: "Continue", exact: true }).click();
+    await expect(page.locator(".facilities:visible")).toBeVisible();
+    await page
+      .getByRole("button", { name: "normal speed", exact: true })
+      .first()
+      .click();
+    const result = page.getByRole("dialog", {
+      name: "Campaign complete!",
+      exact: true,
+    });
+    await expect(result).toBeVisible();
+    await expect(result.locator("..")).toHaveCSS("opacity", "1");
+    await expectDialogToFit(result);
+    const board = result.getByRole("region", { name: /Leaderboard ·/ });
+    await board.scrollIntoViewIfNeeded();
+    await expect(board).toBeVisible();
+    await expect(board.getByRole("row", { name: "This run" })).toBeVisible();
+    await expect(
+      result.getByText(
+        native ? "New personal best" : "Sign in to join the leaderboard",
+        { exact: true },
+      ),
+    ).toBeVisible();
+    await expect(
+      result.getByRole("button", { name: "Play campaign again" }),
+    ).toBeVisible();
+    if (native)
+      await expect(
+        board.getByRole("cell", { name: "Rank 1", exact: true }),
+      ).toBeVisible();
+    if (process.env.REVIEW_SCREENSHOT_DIR && native) {
+      await page.evaluate(() => document.fonts.ready);
+      await result.screenshot({
+        animations: "disabled",
+        path: path.join(
+          process.env.REVIEW_SCREENSHOT_DIR,
+          `campaign-result-${theme}-${info.project.name}.png`,
+        ),
+      });
+    }
+    await result
+      .getByRole("button", { name: "Keep playing", exact: true })
+      .click();
+    expect(await readSavedGame(page)).toBeUndefined();
+    await page
+      .getByRole("button", { name: "pause", exact: true })
+      .first()
+      .click();
+    await expect(
+      page.getByRole("dialog", { name: "Campaign complete!", exact: true }),
+    ).toHaveCount(0);
   });
 }
 

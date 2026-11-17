@@ -1,7 +1,12 @@
 import "../Store";
-import { getStore } from "../StoreRegistry";
+import { getGameEffects, getStore } from "../StoreRegistry";
 import type { RunSaveEffects } from "../SaveEffects";
 import { encodeSave } from "../SaveEncoding";
+import {
+  savedRunResult,
+  validateSaveFileEnvelope,
+  validateStatusResult,
+} from "../SaveModel";
 import { GENERATORS } from "../data/Facilities";
 import {
   hasEconomy,
@@ -16,7 +21,16 @@ import { TICKS_PER_MONTH, TICK_MINUTES } from "../Constants";
 import { LEGACY_SCENARIOS } from "../data/LegacyCampaign";
 import { getScenario } from "../data/Scenarios";
 import { scenarioRules } from "./ScenarioRules";
-import { MINUTES_PER_MONTH, summarizeTimeline } from "./DateTime";
+import {
+  MINUTES_PER_MONTH,
+  summarizeTimeline,
+  summarizeHistory,
+} from "./DateTime";
+import {
+  computeScoreBreakdown,
+  startingDollarRevenue,
+  totalScore,
+} from "./Scoring";
 import {
   gameObjectiveResults,
   scenarioObjectiveDefinitions,
@@ -42,6 +56,7 @@ import {
   firstCompany,
   closingCompany,
   closeProtocolGeneration,
+  prepareClosingProtocolGeneration,
 } from "../testing/LegacyCampaignProtocolFixtures";
 import { validLegacyCampaign } from "./LegacyCampaign";
 import { isStorage } from "../Types";
@@ -62,7 +77,7 @@ function expectColdImport(save: SaveGameType): void {
   }
 }
 
-test("campaign initialization uses the native unranked setup and rejects forged progress", () => {
+test("campaign initialization uses the native setup and rejects forged progress", () => {
   const game = firstCompany();
   expectColdImport(serializeSave(game));
   expect(game.campaign?.generationIndex).toBe(0);
@@ -302,6 +317,9 @@ test("a resumed later generation does not mistake missing presentation history f
 
 test("all nine generations retain bounded, verifiable saves past 1200 global months", () => {
   jest.useFakeTimers();
+  const submit = jest
+    .spyOn(getGameEffects(), "submitHighscore")
+    .mockImplementation(() => {});
   try {
     let game = firstCompany();
     const outcomes: VictoryType[] = [];
@@ -315,6 +333,23 @@ test("all nine generations retain bounded, verifiable saves past 1200 global mon
       expect(game.campaign?.completedTerms).toHaveLength(index + 1);
       expect(game.objectiveProgress?.completedMonths).toBe(240);
       expect(game.campaign?.pendingHandover).toBe(index < 8);
+      jest.advanceTimersByTime(1);
+      expect(outcomes).toHaveLength(index === 8 ? 1 : 0);
+      expect(submit).toHaveBeenCalledTimes(index === 8 ? 1 : 0);
+      expect(
+        validateStatusResult(
+          "completed",
+          {
+            scenarioId: 117,
+            scenarioName: "Legacy campaign",
+            difficulty: game.difficulty,
+            score: 999,
+            breakdown: {},
+            outcome: "completed",
+          },
+          game,
+        ),
+      ).toBe(index === 8);
       const save = cloneDeep(serializeSave(game));
       if (!parseSave(save))
         throw new Error(`Protocol save rejected after term ${index + 1}`);
@@ -357,24 +392,82 @@ test("all nine generations retain bounded, verifiable saves past 1200 global mon
     expect(game.runIdentity).toBeUndefined();
     expect(outcomes).toHaveLength(1);
     expect(outcomes[0].outcome).toBe("completed");
+    const breakdown = computeScoreBreakdown(
+      LEGACY_SCENARIOS[8],
+      summarizeHistory(game.monthlyHistory),
+      startingDollarRevenue(game.monthlyHistory, game.startingYear, game.seed),
+    );
+    expect(outcomes[0]).toMatchObject({
+      ranked: true,
+      scenarioId: 117,
+      scenarioName: "Legacy campaign",
+      breakdown,
+      score: totalScore(breakdown),
+    });
+    const completedFile = {
+      name: "Nine-term utility",
+      status: "completed",
+      result: savedRunResult(outcomes[0]),
+      save: serializeSave(game),
+    };
+    expect(
+      validateSaveFileEnvelope(completedFile, parseSave).result?.scenarioId,
+    ).toBe(117);
     expect(game.campaign?.openingCash).not.toBe(LEGACY_SCENARIOS[8].cash);
-    expect(outcomes[0].debrief?.startingCash).toBe(game.campaign?.openingCash);
+    const openingDebrief = game.campaign!.completedTerms[0].debrief;
+    expect(outcomes[0].debrief?.startingCash).toBe(openingDebrief.startingCash);
     expect(outcomes[0].debrief?.startingFleet).toEqual(
-      game.campaign?.openingFleet,
+      openingDebrief.startingFleet,
     );
     jest.advanceTimersByTime(1);
+    expect(submit).toHaveBeenCalledTimes(1);
+    expect(submit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        scenarioId: 117,
+        difficulty: game.difficulty,
+        score: totalScore(breakdown),
+        scoreBreakdown: breakdown,
+        outcome: "completed",
+      }),
+    );
     expect(getStore().getState().ui.victory?.debrief?.startingCash).toBe(
-      game.campaign?.openingCash,
+      openingDebrief.startingCash,
     );
     expect(getStore().getState().ui.victory?.debrief?.startingFleet).toEqual(
-      game.campaign?.openingFleet,
+      openingDebrief.startingFleet,
     );
     for (let tick = 0; tick < MINUTES_PER_MONTH / TICK_MINUTES; tick++)
       tickState(game);
     expect(game.date.monthsElapsed).toBe(2161);
     expect(game.campaign?.completedTerms).toHaveLength(9);
+    jest.advanceTimersByTime(1);
+    expect(submit).toHaveBeenCalledTimes(1);
     expect(parseSave(serializeSave(game))).not.toBeNull();
   } finally {
+    submit.mockRestore();
+    jest.clearAllTimers();
+    jest.useRealTimers();
+  }
+});
+
+test("a failed campaign never submits a competitive score", () => {
+  jest.useFakeTimers();
+  const submit = jest
+    .spyOn(getGameEffects(), "submitHighscore")
+    .mockImplementation(() => {});
+  try {
+    const game = prepareClosingProtocolGeneration(firstCompany());
+    game.timeline.forEach((tick) => {
+      tick.cash = -1e12;
+    });
+    const outcomes: VictoryType[] = [];
+    tickState(game, { outcome: (result) => outcomes.push(result) });
+    expect(outcomes).toHaveLength(1);
+    expect(outcomes[0]).toMatchObject({ ranked: false, outcome: "bankrupt" });
+    jest.advanceTimersByTime(1);
+    expect(submit).not.toHaveBeenCalled();
+  } finally {
+    submit.mockRestore();
     jest.clearAllTimers();
     jest.useRealTimers();
   }

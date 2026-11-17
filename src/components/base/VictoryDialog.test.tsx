@@ -78,6 +78,23 @@ beforeEach(() => {
 });
 
 describe("VictoryDialog", () => {
+  it("shows the completed campaign's leaderboard and personal best", () => {
+    renderDialog({
+      victory: aVictory({ scenarioId: 117, scenarioName: "Legacy campaign" }),
+    });
+    expect(
+      screen.getByRole("region", { name: "Result leaderboard" }),
+    ).toHaveTextContent("117 · CEO");
+    expect(screen.getByText("New personal best")).toBeVisible();
+  });
+
+  it("does not rank historical unranked campaign results", () => {
+    renderDialog({ victory: aVictory({ scenarioId: 125, ranked: false }) });
+    expect(
+      screen.queryByRole("region", { name: "Result leaderboard" }),
+    ).not.toBeInTheDocument();
+  });
+
   it("makes a campaign restart explicit and keeps it outside the leaderboard", async () => {
     const onRetry = jest.fn();
     const victory = aVictory({

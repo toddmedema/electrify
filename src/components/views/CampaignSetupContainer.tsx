@@ -26,9 +26,11 @@ export default function CampaignSetupContainer(): React.JSX.Element {
     state.game.inGame ? state.game.campaign?.generationIndex : undefined,
   );
   const busy = useAppSelector((state) => !!state.saves.transitioning);
+  const uid = useAppSelector((state) => state.user.uid);
   return (
     <CampaignSetup
       difficulty={difficulty}
+      uid={uid}
       unlockedThrough={unlockedThrough}
       activeGeneration={activeGeneration}
       busy={busy}

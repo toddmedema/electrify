@@ -3,7 +3,8 @@ import { openPane } from "./layout";
 import { editSavedGame, readSavedGame, readSaveRecords } from "./save-fixture";
 import { expectDialogToFit } from "./dialog-layout";
 import path from "path";
-import { expect, test, Page } from "./fixtures";
+import { expect, test } from "./fixtures";
+import { installLeaderboardFixture } from "./leaderboard-fixture";
 import { getScenario } from "../src/data/Scenarios";
 import { resolveStoryAtDate } from "../src/data/WorldEvents";
 import {
@@ -24,80 +25,6 @@ import {
 import { parseSave } from "../src/SaveGame";
 import { ruleChoices } from "../src/helpers/ScenarioRuleDependencies";
 import type { GameType } from "../src/Types";
-
-/** Exercise populated standings through the real native-score adapter, without a native window. */
-async function installLeaderboardFixture(page: Page, currentRank: number) {
-  await page.addInitScript((rank) => {
-    const display = {
-      fullscreen: false,
-      width: 1280,
-      height: 800,
-      resolutions: [],
-    };
-    const steamId = "76561198000000001";
-    let submitted:
-      | {
-          scenarioId: number;
-          difficulty: GameType["difficulty"];
-          score: number;
-        }
-      | undefined;
-    const noop = () => () => {};
-    window.electrifyDesktop = {
-      apiVersion: 1,
-      getState: async () => ({
-        display,
-        steam: {
-          available: true,
-          online: true,
-          cloudEnabled: false,
-          steamId,
-          displayName: "Current operator",
-        },
-      }),
-      setDisplay: async () => display,
-      onStateChanged: noop,
-      onGameFocusChanged: noop,
-      onBeforeQuit: noop,
-      readyToQuit: () => {},
-      quit: async () => {},
-      openFriends: async () => {},
-      readSaveLibrary: async () => ({
-        local: null,
-        cloud: null,
-        cloudState: "disabled",
-      }),
-      writeSaveLibrary: async () => ({ cloudState: "disabled" }),
-      submitScore: async ({ scenarioId, difficulty, score }) => {
-        submitted = { scenarioId, difficulty, score: Math.round(score) };
-      },
-      getLeaderboard: async (selection) =>
-        selection.scope === "player"
-          ? submitted
-            ? [
-                {
-                  ...submitted,
-                  steamId,
-                  displayName: "Current operator",
-                  rank,
-                },
-              ]
-            : []
-          : [
-              "Lakeside Municipal Electricity Cooperative",
-              "Northern Wind",
-              "Solar operator",
-            ].map((displayName, i) => ({
-              steamId: `7656119800000000${i + 2}`,
-              displayName,
-              score: 1000 - i * 100,
-              rank: i + 1,
-              scenarioId: selection.scenarioId,
-              difficulty: selection.difficulty || "VP",
-            })),
-    };
-  }, currentRank);
-}
 
 /** Synthetic history still needs the same story receipts and objective evidence as real play. */
 function rebuildCompletionEvidence(game: GameType): void {
@@ -289,8 +216,15 @@ for (const { theme, native, currentRank } of [
       await expect(leaderboard.getByRole("row")).toHaveCount(4);
       await expect(leaderboard.getByRole("columnheader")).toHaveCount(0);
       await expect(
-        leaderboard.getByRole("row", { name: "This run" }),
-      ).toContainText(`${currentRank.toLocaleString("en-US")}Current operator`);
+        leaderboard
+          .getByRole("row", { name: "This run" })
+          .getByRole("cell", { name: `Rank ${currentRank}`, exact: true }),
+      ).toBeVisible();
+      await expect(
+        leaderboard
+          .getByRole("row", { name: "This run" })
+          .getByRole("cell", { name: "Current operator", exact: true }),
+      ).toBeVisible();
       await expect(
         leaderboard
           .getByRole("row", { name: "This run" })

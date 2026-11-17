@@ -24,6 +24,17 @@ export const legacyCompletedMonths = (
     Partial<Pick<GameType, "campaign" | "startingMonth">>,
 ): number => Math.max(0, game.date.monthsElapsed - legacyMonthOffset(game));
 
+/** Only the inherited nine-term career can use the campaign's competitive identity. */
+export function isCompletedLegacyCampaign(game: GameType): boolean {
+  return Boolean(
+    game.campaign &&
+    game.scenarioId ===
+      LEGACY_GENERATIONS[LEGACY_GENERATIONS.length - 1].scenarioId &&
+    game.campaign.generationIndex === LEGACY_GENERATIONS.length - 1 &&
+    game.campaign.completedTerms.length === LEGACY_GENERATIONS.length,
+  );
+}
+
 /** Authored competition remains independent from the player's live price and bill memory. */
 export const legacyMarketReferenceRate = (
   game: Partial<Pick<GameType, "campaign">>,
