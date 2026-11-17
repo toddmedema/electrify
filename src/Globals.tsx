@@ -129,7 +129,6 @@ const refs = {
           back: () => undefined,
         },
   localStorage: null as Storage | null,
-  audioContext: null as AudioContext | null,
 };
 
 declare global {
@@ -272,18 +271,7 @@ export function getHistoryApi(): HistoryApi {
   return refs.history;
 }
 
-export function getAudioContext(): AudioContext | null {
-  if (refs.audioContext) {
-    return refs.audioContext;
-  }
-  try {
-    refs.audioContext = new window.AudioContext();
-  } catch (_err) {
-    console.warn("Web Audio API is not supported in this browser");
-    refs.audioContext = null;
-  }
-  return refs.audioContext;
-}
+export { getAudioContext } from "./AudioContext";
 
 export function openWindow(url: string): void {
   if (process.env.REACT_APP_DESKTOP === "true" && isDesktopApp()) {

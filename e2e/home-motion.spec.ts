@@ -60,9 +60,10 @@ for (const theme of ["light", "dark"] as const) {
         .locator("#menuCard")
         .evaluate((element) => element.scrollWidth - element.clientWidth),
     ).toBeLessThanOrEqual(1);
-    expect(
-      await page.locator("#electrify-wordmark path").count(),
-    ).toBeGreaterThan(0);
+    await expect(page.locator("#logo img")).toHaveAttribute(
+      "src",
+      /^data:image\/svg\+xml,/,
+    );
     expect(authRequests).toEqual([]);
     const contrast = await page
       .locator("#menuCard .MuiButton-textPrimary, .homeExplore a")

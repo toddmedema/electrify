@@ -1,3 +1,4 @@
+import { unlockAudioContext } from "./AudioContext";
 import * as React from "react";
 import { ThemeProvider, StyledEngineProvider } from "@mui/material/styles";
 import { root } from "./Root";
@@ -41,12 +42,17 @@ export function Home() {
   const run = async (action?: keyof DispatchProps, audio?: boolean) => {
     if (actionPending) return;
     actionPending = true;
+    const screen = document
+      .querySelector<HTMLElement>("#menuCard")
+      ?.closest("main");
+    if (screen) screen.inert = true;
     setPending(true);
     try {
       const game = await import(/* webpackChunkName: "game" */ "./GameEntry");
       if (action) await game.runHomeAction(action, audio);
     } catch {
       actionPending = false;
+      if (screen) screen.inert = false;
       setPending(false);
       setFailed(true);
     }
@@ -83,20 +89,23 @@ export function Home() {
                     onMods={() => void run("onMods")}
                     onAchievements={() => void run("onAchievements")}
                     onManual={() => void run("onManual")}
-                    onAudioChange={(value) => void run("onAudioChange", value)}
+                    onAudioChange={(value) => {
+                      if (value) unlockAudioContext();
+                      void run("onAudioChange", value);
+                    }}
                   />
-                  {pending && (
-                    <p className="homeLoadStatus" role="status">
-                      Loading game…
-                    </p>
-                  )}
-                  {failed && (
-                    <p className="homeLoadStatus" role="alert">
-                      The game could not load. Check your connection and try the
-                      action again.
-                    </p>
-                  )}
                 </main>
+                {pending && (
+                  <p className="homeLoadStatus" role="status">
+                    Loading game…
+                  </p>
+                )}
+                {failed && (
+                  <p className="homeLoadStatus" role="alert">
+                    The game could not load. Check your connection and try the
+                    action again.
+                  </p>
+                )}
               </div>
             </div>
           </div>

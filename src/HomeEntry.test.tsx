@@ -1,6 +1,8 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { Home } from "./HomeEntry";
 const mockAction = jest.fn();
+const mockUnlock = jest.fn();
+jest.mock("./AudioContext", () => ({ unlockAudioContext: () => mockUnlock() }));
 const mockLoaded = jest.fn();
 jest.mock("./Root", () => ({ root: { render: jest.fn() } }));
 jest.mock("./GameEntry", () => {
@@ -20,6 +22,8 @@ it("shows crawlable links without the engine and retries a failed first intent",
   );
   expect(mockAction).toHaveBeenCalledWith("onStart", undefined);
   mockAction.mockResolvedValueOnce(undefined);
-  fireEvent.click(screen.getByRole("button", { name: /^Play$/ }));
+  fireEvent.click(screen.getByRole("button", { name: "Turn on sound" }));
+  expect(mockUnlock).toHaveBeenCalledTimes(1);
   await waitFor(() => expect(mockAction).toHaveBeenCalledTimes(2));
+  expect(mockAction).toHaveBeenLastCalledWith("onAudioChange", true);
 });
