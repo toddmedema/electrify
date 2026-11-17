@@ -10,6 +10,7 @@ import { tilePurchaseQuotes } from "../../helpers/Territories";
 import { useAppSelector } from "../../Store";
 import { terrainDetailsLabel } from "../base/TerritoryTileFacts";
 import { facilityMapStatus } from "../base/FacilityMapStatus";
+import useFacilityMapMotion from "../base/useFacilityMapMotion";
 import FacilityMapStatusArtwork from "../base/FacilityMapStatusArtwork";
 import { hasVisibleEscapeOverlay } from "../base/VisibleEscapeOverlay";
 import { useMoney } from "../base/CurrencyContext";
@@ -72,6 +73,7 @@ export default function TerritoryHexMap({
   onDeselect,
 }: Props) {
   const mapId = React.useId();
+  const motionAllowed = useFacilityMapMotion();
   const viewport = React.useRef<HTMLDivElement>(null);
   const stage = React.useRef<HTMLDivElement>(null);
   const buyingControl = React.useRef<HTMLButtonElement>(null);
@@ -617,6 +619,9 @@ export default function TerritoryHexMap({
                             <FacilityArtwork
                               facility={facility}
                               className="territoryOccupantArtwork"
+                              active={
+                                motionAllowed && status?.kind === "producing"
+                              }
                             />
                           </g>
                           {status && (

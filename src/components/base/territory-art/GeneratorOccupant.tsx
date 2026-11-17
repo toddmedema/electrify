@@ -14,12 +14,13 @@ export type GeneratorOccupantVariant =
 type Props = {
   variant: GeneratorOccupantVariant;
   className?: string;
+  active?: boolean;
 };
 
 function WindStructure({ offshore }: { offshore: boolean }) {
   return (
     <>
-      <path d="M235 365L245 205H255L265 365Z" fill="#FFF8E1" />
+      <path d="M235 365L245 225H255L265 365Z" fill="#FFF8E1" />
       {offshore ? (
         <>
           <path
@@ -32,19 +33,16 @@ function WindStructure({ offshore }: { offshore: boolean }) {
       ) : (
         <path d="M225 335H275V365H225Z" fill="#CFD8DC" />
       )}
-      <path
-        d="M240 205C225 180 235 135 250 115C263 145 268 176 260 200Z"
-        fill="#64DFC5"
-      />
-      <path
-        d="M260 200C295 190 335 225 365 250C327 249 289 235 252 220Z"
-        fill="#64DFC5"
-      />
-      <path
-        d="M245 215C230 249 181 260 135 250C162 225 205 200 240 198Z"
-        fill="#64DFC5"
-      />
-      <circle cx="250" cy="205" r="20" fill="#FFF8E1" />
+      <g className="mapWindRotor" fill="#64DFC5">
+        {[0, 120, 240].map((angle) => (
+          <path
+            key={angle}
+            transform={`rotate(${angle} 250 225)`}
+            d="M242 225C228 200 239 145 250 115C263 155 267 198 258 223Z"
+          />
+        ))}
+      </g>
+      <circle cx="250" cy="225" r="20" fill="#FFF8E1" />
     </>
   );
 }
@@ -79,15 +77,17 @@ function structure(variant: GeneratorOccupantVariant): React.ReactNode {
       return (
         <>
           <path d="M250 210Q220 270 250 325" fill="none" strokeWidth={6} />
-          <path
-            d="M135 180L225 115L250 145L275 115L365 180L295 235L250 210L205 235Z"
-            fill="#64DFC5"
-          />
-          <path
-            d="M135 180L250 145L365 180M250 145V210"
-            fill="none"
-            strokeWidth={6}
-          />
+          <g className="mapAirborneWing">
+            <path
+              d="M135 180L225 115L250 145L275 115L365 180L295 235L250 210L205 235Z"
+              fill="#64DFC5"
+            />
+            <path
+              d="M135 180L250 145L365 180M250 145V210"
+              fill="none"
+              strokeWidth={6}
+            />
+          </g>
           <path d="M205 335L225 310H275L295 335V365H205Z" fill="#CFD8DC" />
           <circle cx="250" cy="338" r="18" fill="#FFF8E1" strokeWidth={6} />
         </>
@@ -137,11 +137,13 @@ function structure(variant: GeneratorOccupantVariant): React.ReactNode {
     case "geothermal":
       return (
         <>
-          <path
-            d="M165 180C135 160 195 145 175 115M315 175C285 155 345 140 325 115"
-            fill="none"
-            strokeWidth={6}
-          />
+          <g className="mapGeothermalVapor">
+            <path
+              d="M165 180C135 160 195 145 175 115M315 175C285 155 345 140 325 115"
+              fill="none"
+              strokeWidth={6}
+            />
+          </g>
           <path
             d="M135 365V245Q135 210 170 210H215V240H170V365Z"
             fill="#CFD8DC"
@@ -171,14 +173,58 @@ function structure(variant: GeneratorOccupantVariant): React.ReactNode {
   }
 }
 
-// Every structure covers (250, 350), hiding its incoming network terminal.
-// Root places source (250, 365) at the tile's uniformly scaled ground anchor.
-export default function GeneratorOccupant({ variant, className }: Props) {
+function Exhaust({ x, y }: { x: number; y: number }) {
+  return (
+    <g transform={`translate(${x} ${y})`} fill="#CFD8DC" stroke="none">
+      {[0, 1].map((phase) => (
+        <path
+          key={phase}
+          className={`mapFacilityExhaust mapFacilityExhaust-${phase}`}
+          d="M-12 0C-18-9-2-17 4-11C14-16 23-6 17 3C10 11-5 10-12 0Z"
+        />
+      ))}
+    </g>
+  );
+}
+
+function WorkingEffects({ variant }: { variant: GeneratorOccupantVariant }) {
+  switch (variant) {
+    case "thermal":
+      return <Exhaust x={318} y={125} />;
+    case "biomass":
+      return <Exhaust x={332} y={195} />;
+    case "nuclear":
+      return <Exhaust x={215} y={155} />;
+    case "hydro":
+      return (
+        <g
+          className="mapHydroFlow"
+          fill="none"
+          stroke="#FFF8E1"
+          strokeWidth={6}
+          strokeDasharray="18 30"
+        >
+          <path d="M239 248L233 343M266 248L273 343" />
+        </g>
+      );
+    default:
+      return null;
+  }
+}
+
+// The ground anchor stays (250,365); elevated facade cable entries remain static.
+export default function GeneratorOccupant({
+  variant,
+  className,
+  active = false,
+}: Props) {
+  const working = active && variant !== "solar";
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
       viewBox="0 0 500 500"
-      className={className}
+      className={`${className ?? ""}${working ? " mapFacilityWorking" : ""}`.trim()}
+      data-facility-motion={working ? "active" : undefined}
       aria-hidden="true"
       focusable="false"
       fill="#FFF8E1"
@@ -188,6 +234,7 @@ export default function GeneratorOccupant({ variant, className }: Props) {
       strokeLinejoin="round"
     >
       {structure(variant)}
+      {working && <WorkingEffects variant={variant} />}
     </svg>
   );
 }

@@ -68,9 +68,11 @@ export type MapArtFacility = Pick<
 export function FacilityArtwork({
   facility,
   className,
+  active = false,
 }: {
   facility: MapArtFacility;
   className?: string;
+  active?: boolean;
 }) {
   if (facility.peakWh !== undefined)
     return (
@@ -89,6 +91,7 @@ export function FacilityArtwork({
     <GeneratorOccupant
       variant={GENERATOR_ART[facility.fuel]}
       className={className}
+      active={active}
     />
   ) : null;
 }
