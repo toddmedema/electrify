@@ -76,6 +76,8 @@ interface GpuMesh {
   instances: WebGLBuffer;
   count: number;
   capacity: number;
+  uploadedData?: Float32Array;
+  uploadedRevision?: number;
 }
 interface RenderItem {
   instance: MapInstance;
@@ -86,6 +88,8 @@ interface Batch {
   mesh: GpuMesh;
   items: RenderItem[];
   data: Float32Array;
+  animated: boolean;
+  revision: number;
 }
 interface Passes {
   receivers: Batch[];
@@ -132,7 +136,9 @@ export class MapRenderer {
   private triangles = 0;
   private sceneInstanceCount = 0;
   private instanceCount = 0;
+  private poseRevision = 0;
   private light: Vec3 = [0, 1, 0];
+  // CPU preparation/submission duration; this does not measure GPU completion.
   private frameMs = 0;
   private sampleDiagnostics = () => this.diagnostics();
 
@@ -156,12 +162,21 @@ export class MapRenderer {
 
   update(instances: readonly MapInstance[], frame: MapFrame): void {
     if (this.disposed) return;
+    const previous = this.frame;
+    const sceneChanged =
+      this.instances !== instances ||
+      !previous ||
+      previous.width !== frame.width ||
+      previous.height !== frame.height ||
+      previous.cameraX !== frame.cameraX ||
+      previous.cameraY !== frame.cameraY ||
+      previous.scale !== frame.scale;
     this.instances = instances;
     this.frame = frame;
     this.projection = projectionMatrix(frame);
     this.clock.sync(instances);
+    if (this.state === "ready" && sceneChanged) this.buildScene();
     if (!this.canAnimate()) this.clock.resetTimestamp();
-    if (this.state === "ready") this.buildScene();
     if (this.isVisible()) this.schedule();
     else this.cancelFrame();
   }
@@ -280,7 +295,12 @@ export class MapRenderer {
   };
 
   private isVisible(): boolean {
-    return !!this.frame?.visible && !this.canvas.ownerDocument.hidden;
+    return (
+      !!this.frame?.visible &&
+      this.frame.width > 0 &&
+      this.frame.height > 0 &&
+      !this.canvas.ownerDocument.hidden
+    );
   }
 
   private canAnimate(): boolean {
@@ -288,7 +308,7 @@ export class MapRenderer {
       this.isVisible() &&
       !!this.frame?.motionAllowed &&
       (this.frame?.playbackRate ?? 0) > 0 &&
-      this.clock.moving
+      this.motionItems.length > 0
     );
   }
 
@@ -316,52 +336,70 @@ export class MapRenderer {
     if (!this.isVisible() || this.disposed || this.state !== "ready") return;
     const moving = this.canAnimate();
     this.clock.tick(timestamp, moving, this.frame?.playbackRate ?? 0);
-    this.draw();
+    try {
+      this.draw(moving);
+    } catch (_error) {
+      this.fail();
+      return;
+    }
     if (moving) this.schedule();
   };
 
   private createMesh(mesh: MapMesh): GpuMesh {
     const gl = this.gl!;
-    const vao = gl.createVertexArray();
-    const vertices = gl.createBuffer();
-    const instances = gl.createBuffer();
-    if (!vao || !vertices || !instances) {
+    let vao: WebGLVertexArrayObject | null = null;
+    let vertices: WebGLBuffer | null = null;
+    let instances: WebGLBuffer | null = null;
+    try {
+      vao = gl.createVertexArray();
+      vertices = gl.createBuffer();
+      instances = gl.createBuffer();
+      if (!vao || !vertices || !instances)
+        throw new Error("Map mesh allocation failed");
+      const count = mesh.positions.length / 3;
+      const data = new Float32Array(count * 9);
+      for (let vertex = 0; vertex < count; vertex++) {
+        const offset = vertex * 3;
+        data.set(mesh.positions.subarray(offset, offset + 3), vertex * 9);
+        data.set(mesh.normals.subarray(offset, offset + 3), vertex * 9 + 3);
+        data.set(mesh.colors.subarray(offset, offset + 3), vertex * 9 + 6);
+      }
+      gl.bindVertexArray(vao);
+      gl.bindBuffer(gl.ARRAY_BUFFER, vertices);
+      gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW);
+      for (let attribute = 0; attribute < 3; attribute++) {
+        gl.enableVertexAttribArray(attribute);
+        gl.vertexAttribPointer(
+          attribute,
+          3,
+          gl.FLOAT,
+          false,
+          36,
+          attribute * 12,
+        );
+      }
+      gl.bindBuffer(gl.ARRAY_BUFFER, instances);
+      for (let column = 0; column < 5; column++) {
+        const attribute = 3 + column;
+        gl.enableVertexAttribArray(attribute);
+        gl.vertexAttribPointer(
+          attribute,
+          4,
+          gl.FLOAT,
+          false,
+          INSTANCE_FLOATS * 4,
+          column * 16,
+        );
+        gl.vertexAttribDivisor(attribute, 1);
+      }
+      gl.bindVertexArray(null);
+      return { vao, vertices, instances, count, capacity: 0 };
+    } catch (error) {
       if (vao) gl.deleteVertexArray(vao);
       if (vertices) gl.deleteBuffer(vertices);
       if (instances) gl.deleteBuffer(instances);
-      throw new Error("Map mesh allocation failed");
+      throw error;
     }
-    const count = mesh.positions.length / 3;
-    const data = new Float32Array(count * 9);
-    for (let vertex = 0; vertex < count; vertex++) {
-      const offset = vertex * 3;
-      data.set(mesh.positions.subarray(offset, offset + 3), vertex * 9);
-      data.set(mesh.normals.subarray(offset, offset + 3), vertex * 9 + 3);
-      data.set(mesh.colors.subarray(offset, offset + 3), vertex * 9 + 6);
-    }
-    gl.bindVertexArray(vao);
-    gl.bindBuffer(gl.ARRAY_BUFFER, vertices);
-    gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW);
-    for (let attribute = 0; attribute < 3; attribute++) {
-      gl.enableVertexAttribArray(attribute);
-      gl.vertexAttribPointer(attribute, 3, gl.FLOAT, false, 36, attribute * 12);
-    }
-    gl.bindBuffer(gl.ARRAY_BUFFER, instances);
-    for (let column = 0; column < 5; column++) {
-      const attribute = 3 + column;
-      gl.enableVertexAttribArray(attribute);
-      gl.vertexAttribPointer(
-        attribute,
-        4,
-        gl.FLOAT,
-        false,
-        INSTANCE_FLOATS * 4,
-        column * 16,
-      );
-      gl.vertexAttribDivisor(attribute, 1);
-    }
-    gl.bindVertexArray(null);
-    return { vao, vertices, instances, count, capacity: 0 };
   }
 
   private buildScene(): void {
@@ -406,7 +444,7 @@ export class MapRenderer {
             pose: new Float32Array(INSTANCE_FLOATS),
           };
           this.pose(item);
-          if (part.motion) this.motionItems.push(item);
+          if (part.motion && instance.active) this.motionItems.push(item);
           const add = (pass: Map<GpuMesh, RenderItem[]>) => {
             const items = pass.get(mesh!);
             if (items) items.push(item);
@@ -418,12 +456,32 @@ export class MapRenderer {
           if (part.castsShadow && part.motion !== "steam") add(grouped.shadows);
         }
       }
+      const shared = new Map<GpuMesh, Batch[]>();
       for (const name of Object.keys(grouped) as (keyof Passes)[])
-        this.passes[name] = Array.from(grouped[name], ([mesh, items]) => ({
-          mesh,
-          items,
-          data: new Float32Array(items.length * INSTANCE_FLOATS),
-        }));
+        this.passes[name] = Array.from(grouped[name], ([mesh, items]) => {
+          const candidates = shared.get(mesh) ?? [];
+          const existing = candidates.find(
+            (batch) =>
+              batch.items.length === items.length &&
+              batch.items.every((item, index) => item === items[index]),
+          );
+          if (existing) return existing;
+          const data = new Float32Array(items.length * INSTANCE_FLOATS);
+          for (let index = 0; index < items.length; index++)
+            data.set(items[index].pose, index * INSTANCE_FLOATS);
+          const batch: Batch = {
+            mesh,
+            items,
+            data,
+            animated: items.some(
+              (item) => item.part.motion && item.instance.active,
+            ),
+            revision: this.poseRevision,
+          };
+          candidates.push(batch);
+          shared.set(mesh, candidates);
+          return batch;
+        });
       // Bound the warm cache, without discarding any mesh needed by the visible scene.
       let unused = this.meshes.size - used.size;
       for (const [key, mesh] of this.meshes) {
@@ -435,9 +493,7 @@ export class MapRenderer {
         }
       }
     } catch (_error) {
-      this.cancelFrame();
-      this.releaseResources(true);
-      this.setState("unavailable");
+      this.fail();
     }
   }
 
@@ -490,13 +546,17 @@ export class MapRenderer {
     pose[19] = FOG_SATURATION[instance.fog];
   }
 
-  private draw(): void {
+  private draw(moving: boolean): void {
     const gl = this.gl,
       frame = this.frame,
       uniforms = this.uniforms;
     if (!gl || !frame || !uniforms || frame.width <= 0 || frame.height <= 0)
       return;
     const started = performance.now();
+    if (moving) {
+      for (const item of this.motionItems) this.pose(item);
+      this.poseRevision++;
+    }
     const dpr = Math.max(
       0.25,
       Math.min(
@@ -534,7 +594,6 @@ export class MapRenderer {
     gl.stencilOp(gl.KEEP, gl.KEEP, gl.REPLACE);
     this.drawCalls = 0;
     this.triangles = 0;
-    for (const item of this.motionItems) this.pose(item);
     this.drawBatches(this.passes.receivers);
     gl.stencilMask(0);
     this.drawBatches(this.passes.opaque);
@@ -568,8 +627,11 @@ export class MapRenderer {
     const gl = this.gl!;
     for (const batch of batches) {
       const { mesh, items, data } = batch;
-      for (let index = 0; index < items.length; index++)
-        data.set(items[index].pose, index * INSTANCE_FLOATS);
+      if (batch.animated && batch.revision !== this.poseRevision) {
+        for (let index = 0; index < items.length; index++)
+          data.set(items[index].pose, index * INSTANCE_FLOATS);
+        batch.revision = this.poseRevision;
+      }
       gl.bindVertexArray(mesh.vao);
       gl.bindBuffer(gl.ARRAY_BUFFER, mesh.instances);
       if (mesh.capacity < items.length) {
@@ -581,7 +643,14 @@ export class MapRenderer {
           gl.DYNAMIC_DRAW,
         );
       }
-      gl.bufferSubData(gl.ARRAY_BUFFER, 0, data, 0, data.length);
+      if (
+        mesh.uploadedData !== data ||
+        mesh.uploadedRevision !== batch.revision
+      ) {
+        gl.bufferSubData(gl.ARRAY_BUFFER, 0, data, 0, data.length);
+        mesh.uploadedData = data;
+        mesh.uploadedRevision = batch.revision;
+      }
       gl.drawArraysInstanced(gl.TRIANGLES, 0, mesh.count, items.length);
       this.drawCalls++;
       this.triangles += (mesh.count / 3) * items.length;
@@ -592,6 +661,13 @@ export class MapRenderer {
     this.gl?.deleteVertexArray(mesh.vao);
     this.gl?.deleteBuffer(mesh.vertices);
     this.gl?.deleteBuffer(mesh.instances);
+  }
+
+  private fail(): void {
+    this.cancelFrame();
+    this.releaseResources(true);
+    this.readyPending = false;
+    this.setState("unavailable");
   }
 
   private releaseResources(deleteGpu: boolean): void {

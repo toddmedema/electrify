@@ -195,7 +195,7 @@ it("batches actual geometry, caps physical resolution, reuses buffers and expose
   );
   flush(1000);
   expect(
-    Array.from(gl.bufferSubData.mock.calls[5][2] as Float32Array),
+    Array.from(gl.bufferSubData.mock.calls[3][2] as Float32Array),
   ).not.toEqual(initialPose);
   expect(gl.bufferData).toHaveBeenCalledTimes(allocations);
   expect(renderer.diagnostics().phases["facility-0"]).toBeGreaterThan(0);
@@ -317,4 +317,102 @@ it("bounds inactive GPU caches while keeping the current visible geometry", () =
   expect(gl.deleteVertexArray).toHaveBeenCalledTimes(
     gl.createVertexArray.mock.calls.length,
   );
+});
+
+it("stops requesting frames when active models are offscreen or the surface has no size", () => {
+  const { renderer } = setup();
+  renderer.update(
+    [scene(false)[0], { ...scene()[1], position: [100, 0, 100] }],
+    frame,
+  );
+  flush(0);
+  expect(renderer.diagnostics().instanceCount).toBe(1);
+  expect(callbacks.size).toBe(0);
+  renderer.update(scene(), { ...frame, width: 0 });
+  expect(callbacks.size).toBe(0);
+  renderer.update(scene(), frame);
+  flush(1000000);
+  expect(renderer.diagnostics().phases["facility-0"]).toBe(0);
+  expect(callbacks.size).toBe(1);
+  renderer.dispose();
+});
+
+it("retains static uploads across animation and lighting-only updates", () => {
+  const { renderer, gl } = setup();
+  const instances = scene();
+  renderer.update(instances, frame);
+  flush(0);
+  // Receivers, the shared opaque/shadow batch, and steam upload once each.
+  expect(gl.bufferSubData).toHaveBeenCalledTimes(3);
+  flush(1000);
+  expect(gl.bufferSubData).toHaveBeenCalledTimes(5);
+  renderer.update(instances, { ...frame, motionAllowed: false });
+  flush(2000);
+  const uploads = gl.bufferSubData.mock.calls.length;
+  renderer.update(instances, {
+    ...frame,
+    motionAllowed: false,
+    lighting: { ...frame.lighting, direction: [-0.4, 0.8, 0.4] },
+  });
+  flush(3000);
+  expect(gl.bufferSubData).toHaveBeenCalledTimes(uploads);
+  expect(renderer.diagnostics().light).toEqual([-0.4, 0.8, 0.4]);
+  expect(callbacks.size).toBe(0);
+  renderer.dispose();
+});
+
+it("releases resources and exposes fallback when a frame upload fails", () => {
+  const { renderer, gl, state } = setup();
+  renderer.update(scene(), frame);
+  gl.bufferSubData.mockImplementationOnce(() => {
+    throw new Error("GPU upload failed");
+  });
+  expect(() => flush(0)).not.toThrow();
+  expect(state).toHaveBeenLastCalledWith("unavailable");
+  expect(renderer.diagnostics().meshCount).toBe(0);
+  expect(callbacks.size).toBe(0);
+  expect(gl.deleteBuffer).toHaveBeenCalledTimes(6);
+  expect(gl.deleteProgram).toHaveBeenCalledTimes(1);
+  renderer.dispose();
+  expect(gl.deleteProgram).toHaveBeenCalledTimes(1);
+});
+
+it("keeps distinct caster subsets correct when a mesh is shared across passes", () => {
+  const { renderer, gl } = setup();
+  const mesh = model.parts[1].mesh;
+  const sharedModel: MapModel = {
+    ...model,
+    parts: [
+      { mesh, castsShadow: true, position: [-0.2, 0, 0] },
+      { mesh, position: [0.2, 0, 0] },
+    ],
+  };
+  renderer.update([{ ...scene(false)[0], model: sharedModel }], frame);
+  flush(0);
+  expect(gl.drawArraysInstanced.mock.calls.map((call) => call[3])).toEqual([
+    2, 1,
+  ]);
+  expect(
+    gl.bufferSubData.mock.calls.map((call) => (call[2] as Float32Array).length),
+  ).toEqual([40, 20]);
+  renderer.update([{ ...scene(false)[0], model: sharedModel }], frame);
+  flush(1000);
+  expect(gl.drawArraysInstanced.mock.calls.map((call) => call[3])).toEqual([
+    2, 1, 2, 1,
+  ]);
+  expect(gl.bufferSubData).toHaveBeenCalledTimes(4);
+  renderer.dispose();
+});
+
+it("releases partially initialized geometry when a vertex upload fails", () => {
+  const { renderer, gl, state } = setup();
+  gl.bufferData.mockImplementationOnce(() => {
+    throw new Error("GPU vertex upload failed");
+  });
+  expect(() => renderer.update(scene(), frame)).not.toThrow();
+  expect(state).toHaveBeenLastCalledWith("unavailable");
+  expect(gl.deleteBuffer).toHaveBeenCalledTimes(2);
+  expect(gl.deleteVertexArray).toHaveBeenCalledTimes(1);
+  expect(callbacks.size).toBe(0);
+  renderer.dispose();
 });
