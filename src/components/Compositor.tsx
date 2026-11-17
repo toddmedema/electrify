@@ -62,30 +62,36 @@ import {
 } from "./base/SwipeDismiss";
 import { isDesktopScreen, isSideToolLayout } from "../Globals";
 import { store } from "../Store";
-const GameWorkspace = React.lazy(() => import("./base/GameWorkspace"));
-const DataCenterSetupContainer = React.lazy(
+import LazyViewBoundary, { lazyView } from "./base/LazyViewBoundary";
+const GameWorkspace = lazyView(() => import("./base/GameWorkspace"));
+const DataCenterSetupContainer = lazyView(
   () => import("./views/DataCenterSetupContainer"),
 );
-const ManualHelpPopover = React.lazy(() => import("./base/ManualHelpPopover"));
-const ManualContainer = React.lazy(() => import("./views/ManualContainer"));
-const NewGameContainer = React.lazy(() => import("./views/NewGameContainer"));
-const NewGameDetailsContainer = React.lazy(
+const ManualHelpPopover = lazyView(
+  () =>
+    import(/* webpackChunkName: "manual-help" */ "./base/ManualHelpPopover"),
+);
+const ManualContainer = lazyView(() => import("./views/ManualContainer"));
+const NewGameContainer = lazyView(
+  () => import(/* webpackChunkName: "new-game" */ "./views/NewGameContainer"),
+);
+const NewGameDetailsContainer = lazyView(
   () => import("./views/NewGameDetailsContainer"),
 );
-const CampaignSetupContainer = React.lazy(
+const CampaignSetupContainer = lazyView(
   () => import("./views/CampaignSetupContainer"),
 );
 
-const CustomGameContainer = React.lazy(
+const CustomGameContainer = lazyView(
   () =>
     import(/* webpackChunkName: "custom-game" */ "./views/CustomGameContainer"),
 );
 
-const SavedGames = React.lazy(
+const SavedGames = lazyView(
   () => import(/* webpackChunkName: "saved-games" */ "./views/SavedGames"),
 );
 
-const AchievementGallery = React.lazy(() =>
+const AchievementGallery = lazyView(() =>
   import(
     /* webpackChunkName: "achievements-ui" */ "../achievements/Interface"
   ).then(({ AchievementGallery }) => ({ default: AchievementGallery })),
@@ -94,7 +100,7 @@ const AchievementGallery = React.lazy(() =>
 // Desktop-only: web builds drop the screen and its mod parser entirely.
 const Mods =
   process.env.REACT_APP_DESKTOP === "true"
-    ? React.lazy(() => import("./views/Mods"))
+    ? lazyView(() => import("./views/Mods"))
     : () => null;
 
 const GAME_WORKSPACE_KEY = "GAME_WORKSPACE";
@@ -507,9 +513,14 @@ export default class Compositor extends React.Component<Props, {}> {
 
   private renderCard(): React.JSX.Element {
     return (
-      <React.Suspense fallback={<p role="status">Loading…</p>}>
-        {this.renderCurrentCard()}
-      </React.Suspense>
+      <LazyViewBoundary
+        onClose={() => store.dispatch(navigateBack())}
+        closeLabel="Go back"
+      >
+        <React.Suspense fallback={<p role="status">Loading…</p>}>
+          {this.renderCurrentCard()}
+        </React.Suspense>
+      </LazyViewBoundary>
     );
   }
 
@@ -703,15 +714,20 @@ export default class Compositor extends React.Component<Props, {}> {
         <DataCenterGuide />
         <LowCashWarning />
         {ui.manualHelpEntry && (
-          <React.Suspense fallback={null}>
-            <ManualHelpPopover
-              entry={ui.manualHelpEntry}
-              onClose={() => store.dispatch(manualHelpClose())}
-              onRelated={(title: string) =>
-                store.dispatch(manualHelpOpen(title))
-              }
-            />
-          </React.Suspense>
+          <LazyViewBoundary
+            onClose={() => store.dispatch(manualHelpClose())}
+            closeLabel="Close help"
+          >
+            <React.Suspense fallback={null}>
+              <ManualHelpPopover
+                entry={ui.manualHelpEntry}
+                onClose={() => store.dispatch(manualHelpClose())}
+                onRelated={(title: string) =>
+                  store.dispatch(manualHelpOpen(title))
+                }
+              />
+            </React.Suspense>
+          </LazyViewBoundary>
         )}
         <Dialog
           open={ui.dialog.open}

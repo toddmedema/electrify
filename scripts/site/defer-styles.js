@@ -10,7 +10,7 @@ function deferStyles(file) {
       link.includes("/static/css/")
         ? link.replace(
             /\s*\/?\s*>$/,
-            ' media="print" data-app-style onload="this.media=\'all\'">',
+            " media=\"print\" data-app-style onload=\"this.media='all';this.removeAttribute('data-app-style')\" onerror=\"this.dataset.appStyleError='true';this.removeAttribute('data-app-style')\">",
           ) + `<noscript>${link}</noscript>`
         : link,
     ),

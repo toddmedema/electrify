@@ -12,9 +12,12 @@ import {
 } from "./ServiceWorkerRegistration";
 import "./app.scss";
 import "./InterfaceLayout.scss";
+import { getPendingInstallPrompt } from "./InstallPromptEvent";
+import { waitForAppStyles } from "./StartupStyles";
+import { showBootstrapFailure } from "./StartupFailure";
 
-let actionPending = false;
 export function Home() {
+  const actionPending = React.useRef(false);
   const [failed, setFailed] = React.useState(false);
   const [pending, setPending] = React.useState(false);
   const [mode, setMode] = React.useState<"light" | "dark">(() =>
@@ -64,32 +67,37 @@ export function Home() {
       window.removeEventListener("load", schedule);
     };
   }, []);
-  const run = async (action?: keyof DispatchProps, audio?: boolean) => {
-    if (actionPending) return;
-    actionPending = true;
-    const screen = document
-      .querySelector<HTMLElement>("#menuCard")
-      ?.closest("main");
-    if (screen) screen.inert = true;
-    setPending(true);
-    try {
-      const game = await import(/* webpackChunkName: "game" */ "./GameEntry");
-      if (action) await game.runHomeAction(action, audio);
-    } catch {
-      actionPending = false;
-      if (screen) screen.inert = false;
-      setPending(false);
-      setFailed(true);
-    }
-  };
+  const run = React.useCallback(
+    async (action?: keyof DispatchProps, audio?: boolean) => {
+      if (actionPending.current) return;
+      actionPending.current = true;
+      const screen = document
+        .querySelector<HTMLElement>("#menuCard")
+        ?.closest("main");
+      if (screen) screen.inert = true;
+      setPending(true);
+      setFailed(false);
+      try {
+        const game = await import(/* webpackChunkName: "game" */ "./GameEntry");
+        if (action) await game.runHomeAction(action, audio);
+      } catch {
+        actionPending.current = false;
+        if (screen) screen.inert = false;
+        setPending(false);
+        setFailed(true);
+      }
+    },
+    [],
+  );
   React.useEffect(() => {
     const activateInstall = () => {
       void run();
     };
     window.addEventListener("beforeinstallprompt", activateInstall);
+    if (getPendingInstallPrompt()) activateInstall();
     return () =>
       window.removeEventListener("beforeinstallprompt", activateInstall);
-  });
+  }, [run]);
   return (
     <StyledEngineProvider injectFirst>
       <ThemeProvider theme={createAppTheme(mode)}>
@@ -142,18 +150,8 @@ export function Home() {
 
 export function showHome(): void {
   installFocusVisibility();
-  const styles = Array.from(
-    document.querySelectorAll<HTMLLinkElement>("link[data-app-style]"),
+  void waitForAppStyles().then(
+    () => root.render(<Home />),
+    showBootstrapFailure,
   );
-  void Promise.all(
-    styles
-      .filter((link) => !link.sheet)
-      .map(
-        (link) =>
-          new Promise<void>((resolve) => {
-            link.addEventListener("load", () => resolve(), { once: true });
-            link.addEventListener("error", () => resolve(), { once: true });
-          }),
-      ),
-  ).then(() => root.render(<Home />));
 }
