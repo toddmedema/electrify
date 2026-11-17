@@ -35,6 +35,7 @@ jest.mock(
 );
 jest.mock("../views/InsightsContainer", () => () => <div>Insight charts</div>);
 jest.mock("../views/EventLogContainer", () => () => <div>Event history</div>);
+jest.mock("./ScenarioDetails", () => () => <div>Scenario objectives</div>);
 jest.mock("../views/Programs", () => () => (
   <input aria-label="Electricity rate" type="range" defaultValue="50" />
 ));
@@ -455,24 +456,44 @@ it("fits columns using the chosen scale, with Single tool overriding abundant sp
   });
 });
 
-it("routes map, fleet and agreements from the dock and remembers the base view beneath tools", async () => {
-  const app = setup(390, {}, true);
-  const base = screen.getByTestId("base-view");
-  expect(base).toHaveAttribute("data-territory-view", "FACILITIES");
-  await app.user.click(app.action("Fleet"));
-  expect(app.store.getState().card.name).toBe("FLEET");
-  expect(base).toHaveAttribute("data-territory-view", "FLEET");
-  expect(app.action("Fleet")).toHaveAttribute("aria-current", "page");
-  await app.user.click(app.action("Programs"));
-  expect(base).toHaveAttribute("data-territory-view", "FLEET");
-  await app.user.click(screen.getByRole("button", { name: "Close Programs" }));
-  expect(app.store.getState().card.name).toBe("FLEET");
-  await app.user.click(app.action("Agreements"));
-  expect(base).toHaveAttribute("data-territory-view", "AGREEMENTS");
-  await app.user.click(app.action("Insights"));
-  await app.user.click(app.action("Map"));
-  expect(base).toHaveAttribute("data-territory-view", "FACILITIES");
-  expect(
-    screen.queryByRole("button", { name: "Close Insights" }),
-  ).not.toBeInTheDocument();
-});
+it.each([360, 1280, 3840])(
+  "keeps the map mounted beneath exactly one right panel at %ipx",
+  async (width) => {
+    const app = setup(width, {}, true);
+    const map = screen.getByTestId("base-view");
+    const notes = within(map).getByRole("textbox", { name: "Facility notes" });
+    await app.user.type(notes, "Keep this map position");
+    expect(map).toHaveAttribute("data-territory-view", "FACILITIES");
+    expect(
+      screen.queryByRole("button", { name: "Map" }),
+    ).not.toBeInTheDocument();
+    for (const name of [
+      "Fleet",
+      "Agreements",
+      "Programs",
+      "Insights",
+      "Events",
+      "Scenario",
+    ]) {
+      await app.user.click(app.action(name));
+      const panel = screen.getByRole("region", { name });
+      expect(screen.getAllByRole("region")).toHaveLength(1);
+      expect(panel).toHaveAttribute("data-tool-side", "right");
+      expect(map).toBeVisible();
+      expect(map).toHaveAttribute("data-territory-view", "FACILITIES");
+      expect(notes).toHaveValue("Keep this map position");
+      expect(app.action(name)).toHaveAttribute("aria-expanded", "true");
+    }
+    await app.user.click(
+      screen.getByRole("button", { name: "Close Scenario" }),
+    );
+    expect(app.store.getState().card.name).toBe("FACILITIES");
+    expect(screen.queryAllByRole("region")).toHaveLength(0);
+    expect(map).toBeVisible();
+    expect(app.action("Scenario")).toHaveFocus();
+    await app.user.click(app.action("Fleet"));
+    await app.user.click(app.action("Fleet"));
+    expect(app.store.getState().card.name).toBe("FACILITIES");
+    expect(screen.queryAllByRole("region")).toHaveLength(0);
+  },
+);

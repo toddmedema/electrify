@@ -787,6 +787,7 @@ export interface DispatchProps {
 }
 
 export interface Props extends StateProps, DispatchProps {
+  paneId?: string;
   territoryView?: MapWorkspaceView;
   onTerritoryView?: (view: MapWorkspaceView) => void;
 }
@@ -1282,7 +1283,10 @@ export default class Facilities extends React.Component<Props, SelectionState> {
     const storyEffects = combineStoryEffects(activeStoryEvents);
 
     return (
-      <GameCard className="facilities" id="facilitiesPane">
+      <GameCard
+        className="facilities"
+        id={this.props.paneId ?? "facilitiesPane"}
+      >
         <>
           {territoryNetwork && !showFleet && (
             <div className="scrollable territoryWorkspace">

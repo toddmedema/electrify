@@ -2,7 +2,6 @@ import * as React from "react";
 import { Badge, Button, Tooltip } from "@mui/material";
 import HistoryIcon from "@mui/icons-material/History";
 import InsertChartIcon from "@mui/icons-material/InsertChart";
-import MapIcon from "@mui/icons-material/Map";
 import FactoryIcon from "@mui/icons-material/Factory";
 import HandshakeIcon from "@mui/icons-material/Handshake";
 import ErrorIcon from "@mui/icons-material/Error";
@@ -65,12 +64,11 @@ export const GAME_TOOLS: {
   },
 ];
 export const MAP_VIEWS: {
-  id: MapWorkspaceView;
+  id: Exclude<MapWorkspaceView, "FACILITIES">;
   label: string;
   triggerId: string;
   icon: React.ReactElement;
 }[] = [
-  { id: "FACILITIES", label: "Map", triggerId: "mapNav", icon: <MapIcon /> },
   { id: "FLEET", label: "Fleet", triggerId: "fleetNav", icon: <FactoryIcon /> },
   {
     id: "AGREEMENTS",
@@ -144,7 +142,7 @@ export default function Navigation({
     >
       {mapWorkspace &&
         MAP_VIEWS.map((view) => {
-          const open = mapView === view.id && !opened.some(Boolean);
+          const open = mapView === view.id;
           return (
             <Tooltip
               key={view.id}
@@ -161,11 +159,13 @@ export default function Navigation({
                 {...buttonLabels}
                 className={`gameDockAction${open ? " gameDockActionOpen" : ""}`}
                 aria-label={view.label}
-                aria-current={open ? "page" : undefined}
+                aria-expanded={open}
                 aria-controls={open ? `tool-${view.id}` : undefined}
                 data-game-destination={view.id}
                 onClick={() =>
-                  onMapView ? onMapView(view.id) : dispatch(navigate(view.id))
+                  onMapView
+                    ? onMapView(open ? "FACILITIES" : view.id)
+                    : dispatch(navigate(open ? "FACILITIES" : view.id))
                 }
               >
                 <Badge>{view.icon}</Badge>

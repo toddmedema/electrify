@@ -16,6 +16,7 @@ import { currentTick } from "../../helpers/GameSelectors";
 import { formatWatts } from "../../helpers/Format";
 import type { GameType, TerritoryTileId } from "../../Types";
 import { GameToolMemoryContext } from "../base/GameToolMemory";
+import { MapWorkspacePanelContext } from "../base/GameWorkspaceContext";
 import TerritoryNetwork from "./TerritoryNetwork";
 import gameReducer from "../../reducers/Game";
 import uiReducer from "../../reducers/UI";
@@ -98,17 +99,24 @@ function show(game = ready()) {
       />
     );
   }
+  const onInspect = jest.fn();
+  const content = (open = false) => (
+    <Provider store={store}>
+      <GameToolMemoryContext.Provider value={memory}>
+        <MapWorkspacePanelContext.Provider value={{ open, inspect: onInspect }}>
+          <Connected />
+        </MapWorkspacePanelContext.Provider>
+      </GameToolMemoryContext.Provider>
+    </Provider>
+  );
+  const utils = render(content());
   return {
     store,
     facilityActions,
     onAcquire,
-    ...render(
-      <Provider store={store}>
-        <GameToolMemoryContext.Provider value={memory}>
-          <Connected />
-        </GameToolMemoryContext.Provider>
-      </Provider>,
-    ),
+    onInspect,
+    showPanel: (open: boolean) => utils.rerender(content(open)),
+    ...utils,
   };
 }
 const inspect = (id: TerritoryTileId) =>
@@ -415,4 +423,21 @@ it("keeps acquisition receipts and fleet controls reachable after buying a utili
     within(surface()).getByRole("button", { name: `Pause ${plant.name}` }),
   ).toBeEnabled();
   expect(screen.getByText("Acquired utilities (1)")).toBeInTheDocument();
+});
+
+it("replaces tile inspection with a dock panel, without resurrecting the old inspector", () => {
+  const app = show();
+  inspect("champlain:city");
+  expect(surface()).toBeVisible();
+  expect(app.onInspect).toHaveBeenCalledTimes(1);
+  app.showPanel(true);
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  expect(
+    screen.getByRole("button", { name: "Inspect champlain:city" }),
+  ).toHaveAttribute("aria-pressed", "false");
+  app.showPanel(false);
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  inspect("champlain:city");
+  expect(surface()).toBeVisible();
+  expect(app.onInspect).toHaveBeenCalledTimes(2);
 });

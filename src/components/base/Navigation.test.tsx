@@ -105,7 +105,10 @@ describe("Navigation", () => {
       screen.queryByRole("button", { name: "Build" }),
     ).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Programs" })).toBeEnabled();
-    for (const name of ["Map", "Fleet", "Agreements"])
+    expect(
+      screen.queryByRole("button", { name: "Map" }),
+    ).not.toBeInTheDocument();
+    for (const name of ["Fleet", "Agreements"])
       expect(screen.getByRole("button", { name })).toBeEnabled();
     act(() => {
       store.dispatch(delta({ scenarioId: 103 }));

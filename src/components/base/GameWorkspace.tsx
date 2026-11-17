@@ -32,6 +32,7 @@ import {
   GameBuildCompleteContext,
   GameWorkspaceLayoutContext,
 } from "./GameWorkspaceContext";
+import MapWorkspace from "./MapWorkspace";
 import "./GameWorkspace.scss";
 
 type ToolSide = "decision" | "intelligence";
@@ -64,7 +65,7 @@ export function dockClearanceWidth(
   scale = 1,
   map = false,
 ): number {
-  const count = map ? 7 : 5;
+  const count = map ? 6 : 5;
   return (
     (count * dockButtonWidth(width / scale, map) +
       (count - 1) * 4 +
@@ -104,7 +105,8 @@ export function dockCenter(
 export default function GameWorkspace({
   memory,
 }: { memory?: Map<string, unknown> } = {}) {
-  return <Workspace memory={memory} />;
+  const map = useAppSelector((state) => hasTerritoryNetwork(state.game));
+  return map ? <MapWorkspace memory={memory} /> : <Workspace memory={memory} />;
 }
 
 function Workspace({

@@ -43,6 +43,7 @@ import BuildStorage from "./BuildStorage";
 import {
   GameBuildCompleteContext,
   GameWorkspaceContext,
+  MapWorkspacePanelContext,
 } from "../base/GameWorkspaceContext";
 import ChartForecastDemandByType, {
   demandTypesBySizeAtStart,
@@ -71,6 +72,7 @@ export default function TerritoryNetwork(props: Props) {
 
 function TileNetwork(props: Props) {
   const { game } = props;
+  const panel = React.useContext(MapWorkspacePanelContext);
   const [selected, setSelected] = useToolState<TerritoryTileId | undefined>(
     "network.tile",
     undefined,
@@ -92,9 +94,10 @@ function TileNetwork(props: Props) {
     }
   }, [review, game.utilityExpansion?.acquisitions.length]);
   const views = territoryTileViews(game);
-  const view = inspected
-    ? views.find(({ tile }) => tile.id === inspected)
-    : undefined;
+  const view =
+    inspected && !panel?.open
+      ? views.find(({ tile }) => tile.id === inspected)
+      : undefined;
   const tile = view?.tile;
   const territory = tile ? getTerritoryDefinition(tile.territoryId) : undefined;
   const operatingFacility = view?.operatingFacility;
@@ -121,6 +124,9 @@ function TileNetwork(props: Props) {
     setInspected(undefined);
     setSelected(undefined);
   }, [setSelected]);
+  React.useEffect(() => {
+    if (panel?.open) close();
+  }, [panel?.open, close]);
   const build = React.useCallback(
     (
       facility: FacilityShoppingType,
@@ -138,6 +144,7 @@ function TileNetwork(props: Props) {
   const inspect = (id: TerritoryTileId, activate = false) => {
     setSelected(id);
     if (activate) {
+      panel?.inspect();
       setActivation((value) => value + 1);
       setCategory("generators");
       setInspected(id);
