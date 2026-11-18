@@ -43,6 +43,7 @@ for (const theme of ["light", "dark"]) {
     page,
   }, info) => {
     test.skip(!reviewProjects.has(info.project.name));
+    await page.emulateMedia({ reducedMotion: "reduce" });
     // Wide windows show the two tinted readouts together inside the top bar.
     if (info.project.name === "desktop-chromium")
       await page.setViewportSize({ width: 1440, height: 900 });

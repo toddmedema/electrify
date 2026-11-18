@@ -205,6 +205,7 @@ for (const theme of ["light", "dark"] as const) {
   test(`connected project site markers fit on one line · ${theme}`, async ({
     page,
   }, info) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
     await page.addInitScript(
       (mode) => localStorage.setItem("theme", mode),
       theme,
@@ -259,22 +260,26 @@ for (const theme of ["light", "dark"] as const) {
     const project = selectProject(
       projectCatalogue(game, 20e6, false).find(({ name }) => name === "Wind")!,
     );
-    const owned = map.locator('[data-project-site="owned"]').first();
-    const id = (await owned.getAttribute("data-map-target")) as TerritoryTileId;
+    const id = (await map
+      .locator('[data-project-site="owned"]')
+      .first()
+      .getAttribute("data-map-target")) as TerritoryTileId;
+    // Focusing can recenter the camera and change which sites are mounted first.
+    const owned = map.locator(`[data-map-target="${id}"]`);
+    const ownedMarker = owned.locator(".territoryTilePrice");
     const quote = projectSiteQuote(game, project, id);
     expect(quote.facility).toBeDefined();
     if (!quote.facility) throw new Error("Owned project site has no quote");
     const total = formatMoneyConcise(projectSiteCapitalCost(quote));
     const title = `Total project cost ${total} · Already connected`;
-    await expect(markers.first()).toHaveAttribute("title", title);
-    await expect(markers.first()).toHaveText(total);
-    await expect(
-      map.locator('[data-project-site="owned"]').first(),
-    ).toHaveAccessibleName(/Total project cost .*Already connected/);
+    await expect(ownedMarker).toHaveAttribute("title", title);
+    await expect(ownedMarker).toHaveText(total);
+    await expect(owned).toHaveAccessibleName(
+      /Total project cost .*Already connected/,
+    );
     await owned.focus();
     await owned.press("Enter");
     await expect(surface.getByText("Already connected · $0")).toBeVisible();
-    const ownedMarker = owned.locator(".territoryTilePrice");
     await ownedMarker.hover();
     await expect(ownedMarker).toHaveAttribute("title", title);
     await page.mouse.move(0, 0);

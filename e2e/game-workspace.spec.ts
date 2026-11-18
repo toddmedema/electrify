@@ -397,6 +397,7 @@ test("Build and Programs restore selections and scrolling without reopening hidd
   // One tool at a time: switching tools hides the other instead of opening beside it.
   if (page.viewportSize()!.width >= 1024)
     await page.setViewportSize({ width: 1023, height: 800 });
+  await page.emulateMedia({ reducedMotion: "reduce" });
   await startGame(page, "dark");
   const build = page.getByRole("region", { name: "Build", exact: true });
   await page.locator("#insightsNav").click();
@@ -406,14 +407,15 @@ test("Build and Programs restore selections and scrolling without reopening hidd
   await size.press("ArrowRight");
   const generatorSize = await size.inputValue();
   const list = build.locator(".cardList");
-  const left = await list.evaluate((element) => {
-    element.scrollTop = Math.min(
-      240,
-      element.scrollHeight - element.clientHeight,
-    );
-    return element.scrollTop;
-  });
+  const left = await list.evaluate((element) =>
+    Math.min(240, element.scrollHeight - element.clientHeight),
+  );
   expect(left).toBeGreaterThan(0);
+  const listBounds = (await list.boundingBox())!;
+  await page.mouse.move(listBounds.x + listBounds.width / 2, listBounds.y + 24);
+  await page.mouse.wheel(0, left);
+  const scrollPosition = () => list.evaluate((element) => element.scrollTop);
+  await expect.poll(scrollPosition).toBe(left);
   await page.getByRole("tab", { name: "Storage", exact: true }).click();
   await size.focus();
   await size.press("ArrowRight");
@@ -435,9 +437,7 @@ test("Build and Programs restore selections and scrolling without reopening hidd
   await expect(size).toHaveValue(tier);
   await page.getByRole("tab", { name: "Generators", exact: true }).click();
   await expect(size).toHaveValue(generatorSize);
-  await expect
-    .poll(() => list.evaluate((element) => element.scrollTop))
-    .toBe(left);
+  await expect.poll(scrollPosition).toBe(left);
   await page.getByRole("tab", { name: "Storage", exact: true }).click();
   await expect(size).toHaveValue(storageSize);
 

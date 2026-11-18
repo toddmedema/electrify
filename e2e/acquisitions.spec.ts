@@ -1348,10 +1348,17 @@ for (const theme of ["light", "dark"] as const) {
         view.tile.siteKind === "wind" &&
         !view.facility,
     )!.tile;
-    await inspectTile(page, windTile);
+    const rail = buildRail(page);
+    const desktop = await rail.isVisible();
+    if (desktop) {
+      await selectTerritoryMapTile(page, windTile);
+      await expectDialogToFit(surface);
+    } else {
+      await inspectTile(page, windTile);
+    }
     await expectLockedBuild(surface);
-    const windChoice = (await buildRail(page).isVisible())
-      ? buildRail(page).getByRole("button", {
+    const windChoice = desktop
+      ? rail.getByRole("button", {
           name: "Choose sites for Wind",
           exact: true,
         })

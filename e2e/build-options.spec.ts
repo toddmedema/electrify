@@ -21,6 +21,7 @@ import {
 test("ordinary starting hills offer general technologies and retain special-site restrictions", async ({
   page,
 }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
   await page.addInitScript(() => {
     localStorage.setItem("theme", "dark");
     localStorage.setItem("audioEnabled", "false");
@@ -28,6 +29,9 @@ test("ordinary starting hills offer general technologies and retain special-site
   await page.goto("/?scenario=116");
   await page.getByRole("button", { name: "Start game", exact: true }).click();
   await returnToTerritoryMap(page);
+  const pause = page.getByRole("button", { name: "pause", exact: true });
+  if ((await pause.getAttribute("aria-pressed")) !== "true")
+    await pause.click();
   const target = page.locator('[data-map-target="champlain:site-12"]');
   await target.focus();
   await target.press("Enter");
