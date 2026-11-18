@@ -5,6 +5,7 @@ import {
   checkpointWorld,
   restoreWorld,
 } from "./World";
+import { ViewPublication } from "./ViewPublication";
 import {
   availableTerritoryTiles,
   getTerritoryTile,
@@ -58,7 +59,12 @@ it("projects actual foregrounds on other companies' claimed land without changin
     }),
   ).toBeUndefined();
   const before = JSON.stringify(checkpointWorld(world));
-  const view = roomView(world, "1").game!;
+  const publication = new ViewPublication();
+  publication.request(world, 0, { force: true });
+  const views = publication.take(world, 0);
+  expect(views["0"]).toEqual(roomView(world, "0"));
+  expect(views["1"]).toEqual(roomView(world, "1"));
+  const view = views["1"].game!;
   expect(view.multiplayer!.tileFacilities![tile.id]).toMatchObject({
     seat: "0",
     name: "Wind",

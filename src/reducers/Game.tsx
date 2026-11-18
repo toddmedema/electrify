@@ -39,7 +39,10 @@ import {
   isSellingRule,
   incrementalGenerationCostPerMWh,
 } from "../helpers/TradingRules";
-import { combinedUtilityDemandProfile } from "../helpers/CombinedUtilityDemand";
+import {
+  combinedUtilityDemandProfile,
+  type CombinedUtilityDemandProfile,
+} from "../helpers/CombinedUtilityDemand";
 import {
   isUtilityExpansionGame,
   ownedUtilityConnection,
@@ -4177,6 +4180,19 @@ export function tutorialCompleteDialog({
   });
 }
 
+function copyTerritoryDebt(network: GameType["territoryNetwork"]) {
+  // Ticks pay down retained connection loans. Property receipts and footprints
+  // change through player actions and can be shared with the frozen snapshot.
+  return network?.legacyConnections.length
+    ? {
+        ...network,
+        legacyConnections: network.legacyConnections.map((line) => ({
+          ...line,
+        })),
+      }
+    : network;
+}
+
 /**
  * Give a live tick private mutable outputs while keeping large read-only inputs plain.
  * Only the frame being settled is written, preserving untouched chart rows.
@@ -4216,7 +4232,7 @@ function tickWorkingState(state: GameType): GameType {
     eventLog: [...state.eventLog],
     reportedEventKeys: [...state.reportedEventKeys],
     utilityExpansion: cloneDeep(state.utilityExpansion),
-    territoryNetwork: cloneDeep(state.territoryNetwork),
+    territoryNetwork: copyTerritoryDebt(state.territoryNetwork),
     ...(state.campaign && {
       campaign: {
         ...state.campaign,
@@ -4955,7 +4971,8 @@ function getDemandW(
   game: GameType,
   prev: TickPresentFutureType,
   now: TickPresentFutureType,
-  tickScale = 1,
+  tickScale: number,
+  profile: CombinedUtilityDemandProfile | undefined,
 ) {
   const scenario =
     getScenario(game.scenarioId, game.customScenario) || SCENARIOS[0];
@@ -4986,9 +5003,6 @@ function getDemandW(
     now.customers = current?.customers ?? prev.customers;
     now.customerRate = current?.customerRate ?? prev.customerRate;
   }
-  const profile = game.utilityExpansion
-    ? combinedUtilityDemandProfile(game)
-    : undefined;
   const { baselineW, weatherShare } = areaBaselineDemand(
     date,
     game.location,
@@ -5254,10 +5268,14 @@ function reforecastDemand(
 ): TickPresentFutureType[] {
   const projection = {
     ...state,
-    territoryNetwork: cloneDeep(state.territoryNetwork),
     policies: cloneDeep(state.policies),
     utilityExpansion: cloneDeep(state.utilityExpansion),
   };
+  // A demand pass never changes ownership. Derive the seeded city mix once;
+  // weather, policy and the evolving customer count still apply per frame.
+  const profile = projection.utilityExpansion
+    ? combinedUtilityDemandProfile(projection)
+    : undefined;
   let prev = {
     ...state.timeline[0],
     deferredResidential: initialDeferred,
@@ -5283,7 +5301,7 @@ function reforecastDemand(
         ) *
           tickScale) /
         TICKS_PER_MONTH;
-      t.demandW = getDemandW(date, projection, prev, t, tickScale);
+      t.demandW = getDemandW(date, projection, prev, t, tickScale, profile);
       prev = t;
       return t;
     }
@@ -7157,7 +7175,7 @@ function supplyForecastPass(
     ...state,
     policies: cloneDeep(state.policies),
     utilityExpansion: cloneDeep(state.utilityExpansion),
-    territoryNetwork: cloneDeep(state.territoryNetwork),
+    territoryNetwork: copyTerritoryDebt(state.territoryNetwork),
     commissionedHydroSiteIds: [...state.commissionedHydroSiteIds],
     facilities: cloneDeep(state.facilities),
     transmission: cloneDeep(state.transmission ?? emptyTransmissionState()),

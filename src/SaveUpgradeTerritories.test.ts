@@ -3,6 +3,7 @@ import { validPowerAgreements } from "./helpers/PowerAgreements";
 import { validTerritoryNetwork } from "./helpers/TerritoryValidation";
 import type { GameType } from "./Types";
 import cloneDeep from "lodash.clonedeep";
+import { createNextState, freeze } from "@reduxjs/toolkit";
 import { SAVE_SCHEMA_VERSION } from "./SaveSchema";
 import { validTransmissionLine, parseSave, serializeSave } from "./SaveGame";
 import { upgradeSave } from "./SaveUpgrade";
@@ -20,7 +21,12 @@ import {
 } from "./helpers/Transmission";
 import { inheritedConnection } from "./helpers/PowerAgreements";
 import { acquisitionQuote } from "./helpers/Expansion";
-import { applyAcquireUtility, tickState } from "./reducers/Game";
+import { projectionSignature } from "./helpers/Projection";
+import {
+  applyAcquireUtility,
+  generateForecastTimeline,
+  tickState,
+} from "./reducers/Game";
 import { modScenario } from "./mods/ModScenario";
 import { modPackage } from "./testing/ModFixtures";
 
@@ -179,6 +185,34 @@ it("keeps legacy projects frozen while servicing their debt and retaining capita
   expect(after.buildCost).toBe(before.buildCost);
   expect(currentTick(game)!.netWorth).toBeGreaterThan(netWorth - 1e7);
   expect(parseSave(serializeSave(game))).not.toBeNull();
+});
+
+it("keeps a migrated property's forecast current across ordinary loan payments", () => {
+  const game = freeze(parseSave(legacyPortfolio())!.game, true);
+  const network = game.territoryNetwork!;
+  const loan = network.legacyConnections.at(-1)!;
+  const openingBalance = loan.loanAmountLeft;
+  const { cash, customers } = currentTick(game)!;
+  const signature = projectionSignature(game);
+
+  generateForecastTimeline(game, cash, customers);
+  const next = createNextState(game, (draft) => tickState(draft));
+
+  expect(loan.loanAmountLeft).toBe(openingBalance);
+  expect(
+    next.territoryNetwork!.legacyConnections.at(-1)!.loanAmountLeft,
+  ).toBeLessThan(openingBalance);
+  expect(next.territoryNetwork!.landPurchases).toBe(network.landPurchases);
+  expect(projectionSignature(next)).toBe(signature);
+  expect(
+    projectionSignature({
+      ...next,
+      territoryNetwork: {
+        ...next.territoryNetwork!,
+        landPurchases: [],
+      },
+    }),
+  ).not.toBe(signature);
 });
 it("retains seeded resume and roundtrip behavior for a current land owner", () => {
   const game = createGame({ scenarioId: 116, seed: 61 });

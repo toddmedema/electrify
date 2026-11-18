@@ -171,6 +171,7 @@ export function facilitySignature(game: GameType): string {
  * player-visible decision, which is what a rebuild is worth.
  */
 export function projectionSignature(game: GameType): string {
+  const territory = game.territoryNetwork;
   return [
     game.scenarioId,
     game.difficulty,
@@ -202,7 +203,23 @@ export function projectionSignature(game: GameType): string {
         ),
       },
     ),
-    JSON.stringify(game.territoryNetwork),
+    // Property transactions affect the forecast. Retained connection debt is
+    // refreshed at rollover, like facility debt, rather than on every payment.
+    territory
+      ? JSON.stringify([
+          territory.landPurchases,
+          territory.tilePurchases,
+          territory.legacyConnections.map(
+            ({
+              id,
+              corridorId,
+              buildCost,
+              loanMonthlyPayment,
+              interestRate,
+            }) => [id, corridorId, buildCost, loanMonthlyPayment, interestRate],
+          ),
+        ])
+      : "",
     game.creditPremium,
     JSON.stringify(game.loadAdditions),
     game.storyEffectsDisabled,

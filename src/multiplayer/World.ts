@@ -4,7 +4,6 @@ import {
   hasTerritoryNetwork,
   getTerritoryTiles,
   legacyTerritoryTiles,
-  ownsTerritoryTile,
   createTerritoryTileOwnership,
   connectedPeerTerritoryTiles,
   getTerritoryTile,
@@ -850,18 +849,43 @@ function companyResults(world: World): CompanyResultType[] {
   });
 }
 
+/** Share physical ownership only within a synchronous publication. */
+export function roomViewBuilder(world: World) {
+  let ownership: ReturnType<typeof worldTerritoryOwnership> | undefined;
+  return (seatId: string): RoomView =>
+    buildRoomView(
+      world,
+      seatId,
+      (ownership ??= worldTerritoryOwnership(world)),
+    );
+}
+
 export function roomView(world: World, seatId: string): RoomView {
+  return roomViewBuilder(world)(seatId);
+}
+
+function buildRoomView(
+  world: World,
+  seatId: string,
+  ownership: ReturnType<typeof worldTerritoryOwnership>,
+): RoomView {
   const index = world.seats.findIndex((s) => s.id === seatId);
   if (index < 0) throw new Error("Player is not in this match");
-  const game = cloneGrid(territoryGameForWorld(world, index));
-  const visible = visibleTerritoryTiles(game);
+  const game = territoryGameForWorld(
+    world,
+    index,
+    world.grids,
+    undefined,
+    ownership,
+  );
+  const visible = hasTerritoryNetwork(game) ? visibleTerritoryTiles(game) : [];
   const visibleIds = new Set(visible.map(({ tile }) => tile.id));
   const visibleCells = new Set(
     visible.map(({ tile }) => `${tile.q},${tile.r}`),
   );
   const visibleRegions = new Set(visible.map(({ tile }) => tile.territoryId));
-  const tileOwners = sharedTileOwners(world) ?? {};
-  const owns = createTerritoryTileOwnership(game);
+  const tileOwners = { ...ownership.tileOwners };
+  const owns = ownership.owns[index];
   // Each company can acquire the same utility. Prefer local property, then roster order.
   for (const { tile } of visible) {
     if (owns(tile) || tileOwners[tile.id]) continue;
@@ -908,7 +932,7 @@ export function roomView(world: World, seatId: string): RoomView {
       ? companyResults(world)
       : undefined,
     landOwners: Object.fromEntries(
-      Object.entries(sharedLandOwners(world) ?? {}).filter(([id]) =>
+      Object.entries(ownership.landOwners).filter(([id]) =>
         visibleRegions.has(id as import("../Types").TerritoryId),
       ),
     ),
@@ -926,7 +950,7 @@ export function roomView(world: World, seatId: string): RoomView {
                 if (
                   !tile ||
                   tileOwners[tile.id]?.seat !== world.seats[owner].id ||
-                  !ownsTerritoryTile(grid, tile) ||
+                  !ownership.owns[owner](tile) ||
                   !visibleIds.has(tile.id)
                 )
                   return [];
@@ -975,7 +999,8 @@ export function roomView(world: World, seatId: string): RoomView {
     },
   };
   return {
-    game,
+    // Filter host-only geography before cloning the seat's detached view.
+    game: cloneGrid(game),
     speed: world.speed,
     readyRequired: world.readyRequired,
     disconnected: [],
@@ -1385,6 +1410,7 @@ function territoryGameForWorld(
   index: number,
   grids = world.grids,
   minute?: number,
+  ownership = worldTerritoryOwnership(world, grids),
 ): GameType {
   const game = grids[index];
   const active = (seat: string) => {
@@ -1399,7 +1425,7 @@ function territoryGameForWorld(
     ...game,
     multiplayer: {
       ...world.grids[index].multiplayer!,
-      tileOwners: sharedTileOwners({ ...world, grids }),
+      tileOwners: ownership.tileOwners,
       legacyTiles: grids.flatMap((grid, owner) =>
         owner === index
           ? []
@@ -1429,7 +1455,7 @@ function territoryGameForWorld(
               };
             }),
       ),
-      landOwners: sharedLandOwners({ ...world, grids }),
+      landOwners: ownership.landOwners,
       peers: world.grids[index].multiplayer?.peers?.map((peer) => {
         const other = world.seats.findIndex((seat) => seat.id === peer.id);
         const connected =
@@ -1452,7 +1478,7 @@ function territoryGameForWorld(
           connected,
           territoryTileIds:
             connected && hasTerritoryNetwork(grids[other])
-              ? worldOwnedTerritoryTiles(grids[other]).map((tile) => tile.id)
+              ? ownership.ownedTiles[other].map((tile) => tile.id)
               : [],
         };
       }),
@@ -1546,8 +1572,10 @@ export function restoreWorld(
   return result;
 }
 
-function worldOwnedTerritoryTiles(grid: GameType) {
-  const owns = createTerritoryTileOwnership(grid);
+function worldOwnedTerritoryTiles(
+  grid: GameType,
+  owns = createTerritoryTileOwnership(grid),
+) {
   const tiles = new Map([
     ...getTerritoryTiles().map((tile) => [tile.id, tile] as const),
     ...legacyTerritoryTiles(grid).map((tile) => [tile.id, tile] as const),
@@ -1559,35 +1587,42 @@ function worldOwnedTerritoryTiles(grid: GameType) {
   return [...tiles.values()].filter(owns);
 }
 
-/** Host-only projection; physical ownership comes from validated receipts, never the renderer. */
-function sharedTileOwners(
-  world: World,
-): NonNullable<GameType["multiplayer"]>["tileOwners"] {
-  return Object.fromEntries(
-    world.grids.flatMap((grid, index) => {
-      return worldOwnedTerritoryTiles(grid)
+/** Host-only projection from validated receipts. Historical replay supplies its own grids. */
+function worldTerritoryOwnership(world: World, grids = world.grids) {
+  const owns = grids.map(createTerritoryTileOwnership);
+  const ownedTiles = grids.map((grid, index) =>
+    hasTerritoryNetwork(grid)
+      ? worldOwnedTerritoryTiles(grid, owns[index])
+      : [],
+  );
+  const tileOwners = Object.fromEntries(
+    ownedTiles.flatMap((tiles, index) =>
+      tiles
         .filter(
           (tile) =>
             isLandTerritoryId(tile.territoryId) || tile.id.includes(":legacy-"),
         )
-        .map((tile) => [
-          tile.id,
-          { seat: world.seats[index].id, name: world.seats[index].name },
-        ]);
-    }),
-  );
-}
-function sharedLandOwners(
-  world: World,
-): NonNullable<GameType["multiplayer"]>["landOwners"] {
-  return Object.fromEntries(
-    world.grids.flatMap((grid, index) =>
-      (grid.territoryNetwork?.landPurchases ?? []).map((receipt) => [
-        receipt.territoryId,
-        { seat: world.seats[index].id, name: world.seats[index].name },
-      ]),
+        .map(
+          (tile) =>
+            [
+              tile.id,
+              { seat: world.seats[index].id, name: world.seats[index].name },
+            ] as const,
+        ),
     ),
   );
+  const landOwners = Object.fromEntries(
+    grids.flatMap((grid, index) =>
+      (grid.territoryNetwork?.landPurchases ?? []).map(
+        (receipt) =>
+          [
+            receipt.territoryId,
+            { seat: world.seats[index].id, name: world.seats[index].name },
+          ] as const,
+      ),
+    ),
+  );
+  return { owns, ownedTiles, tileOwners, landOwners };
 }
 
 /** Recognized published worlds follow ordered migrations; arbitrary runtime identities never do. */
