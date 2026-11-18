@@ -27,6 +27,7 @@ interface Purchases {
 }
 interface PendingPurchase {
   price: number;
+  tileIds: TerritoryTileId[];
 }
 const PurchaseContext = React.createContext<Purchases | undefined>(undefined);
 
@@ -72,15 +73,13 @@ export function TerritoryTilePurchasesProvider({
     (sum, [id, entry]) => sum + (ownsTerritoryTile(game, id) ? 0 : entry.price),
     0,
   );
+  const pendingIds = new Set(
+    [...pending.current.values()].flatMap(({ tileIds }) => tileIds),
+  );
   const purchase = async (
     tileId: TerritoryTileId,
     expectedQuoteKey?: string,
   ): Promise<TilePurchaseResult> => {
-    if (pending.current.has(tileId))
-      return {
-        status: "rejected",
-        message: "This connection is already pending.",
-      };
     const latest = currentGame.current;
     const quote = tilePurchaseQuote(latest, tileId);
     if (!quote) {
@@ -90,6 +89,16 @@ export function TerritoryTilePurchasesProvider({
         message: "This site is no longer available.",
       };
     }
+    const tileIds = quote.purchases.map(({ tileId }) => tileId);
+    if (
+      [...pending.current.values()].some((entry) =>
+        entry.tileIds.some((id) => tileIds.includes(id)),
+      )
+    )
+      return {
+        status: "rejected",
+        message: "This connection is already pending.",
+      };
     if (expectedQuoteKey && quote.quoteKey !== expectedQuoteKey) {
       setMessage("The connection cost changed. Review it and activate again.");
       return {
@@ -109,7 +118,7 @@ export function TerritoryTilePurchasesProvider({
         message: "Not enough available cash to connect this site.",
       };
     }
-    const entry = { price: quote.price };
+    const entry = { price: quote.price, tileIds };
     const operationSession = session.current;
     pending.current.set(tileId, entry);
     setMessage(`Connecting · ${money(quote.price)}…`);
@@ -159,7 +168,7 @@ export function TerritoryTilePurchasesProvider({
   return (
     <PurchaseContext.Provider
       value={{
-        pendingIds: new Set(pending.current.keys()),
+        pendingIds,
         pendingCost,
         availableCash: (currentTick(game)?.cash ?? 0) - pendingCost,
         message,

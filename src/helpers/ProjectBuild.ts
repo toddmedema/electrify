@@ -105,6 +105,10 @@ export function projectSiteQuote(
     };
   const owned = ownsTerritoryTile(game, tile);
   const connection = owned ? undefined : connections.get(tileId);
+  if (connection?.utilityName)
+    return {
+      reason: "Acquire this utility before planning a project on its site.",
+    };
   if (!owned && !connection)
     return {
       reason: "Connect an adjacent site first, or choose a highlighted site.",

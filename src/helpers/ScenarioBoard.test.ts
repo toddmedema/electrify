@@ -4,7 +4,16 @@ import { createGame } from "../testing/Simulator";
 import { currentTick } from "./GameSelectors";
 import { territoryTileViews } from "./TerritoryMapState";
 import { purchaseTile, tilePrice, tilePurchaseQuote } from "./Territories";
-import { scenarioMapTiles, territoryHexDistance } from "./TerritoryTiles";
+import {
+  getTerritoryTile,
+  isAdjacentToOwnedTerritoryTile,
+  scenarioMapTiles,
+  territoryHexDistance,
+} from "./TerritoryTiles";
+import { parseSave, serializeSave } from "../SaveGame";
+import reducer from "../reducers/Game";
+import { acquireTile } from "../reducers/GameActions";
+import { validTerritoryNetwork } from "./TerritoryValidation";
 import type { TerritoryTileId } from "../Types";
 
 function ready() {
@@ -55,7 +64,7 @@ it("keeps older off-board property visible and caps new connections at the scena
   expect(tilePurchaseQuote(game, "frontier:-8:0")).toBeDefined();
 });
 
-it("serves each city with a utility and protects the incumbent plant until its customers transfer", () => {
+it("serves each city with a utility and sells both sites from the plant border", () => {
   const game = ready();
   const views = territoryTileViews(game);
   const cities = views.filter(({ tile }) => tile.city);
@@ -77,15 +86,48 @@ it("serves each city with a utility and protects the incumbent plant until its c
       purchaseTile(game, { tileId: quote.tileId, quoteKey: quote.quoteKey }),
     ).toBe(true);
   };
-  connect("green-uplands:site-1");
-  connect("green-uplands:site-4");
-  expect(tilePurchaseQuote(game, "parcel-0:site-1")).toBeUndefined();
-  connect("parcel-1:city");
-  connect("parcel-0:site-1");
-  expect(
-    territoryTileViews(game).find(({ tile }) => tile.id === "parcel-0:site-1"),
-  ).toMatchObject({
-    owned: true,
-    facility: undefined,
+  const plant = getTerritoryTile("parcel-0:site-1")!;
+  const city = getTerritoryTile("parcel-1:city")!;
+  expect(tilePurchaseQuote(game, plant.id)).toBeUndefined();
+  connect("green-uplands:site-2");
+  connect("green-uplands:site-5");
+  expect(isAdjacentToOwnedTerritoryTile(game, city)).toBe(false);
+  expect(isAdjacentToOwnedTerritoryTile(game, plant)).toBe(true);
+  const quote = tilePurchaseQuote(game, plant.id)!;
+  expect(tilePurchaseQuote(game, city.id)).toMatchObject({
+    utilityName: quote.utilityName,
+    price: quote.price,
+    purchases: quote.purchases,
   });
+  expect(quote.utilityName).toMatch(/^Vergennes /);
+  expect(quote.purchases.map(({ tileId }) => tileId)).toEqual([
+    plant.id,
+    city.id,
+  ]);
+  const payload = { tileId: plant.id, quoteKey: quote.quoteKey };
+  const cash = currentTick(game)!.cash;
+  const customers = currentTick(game)!.customers;
+  currentTick(game)!.cash = quote.price - 1;
+  const insufficient = JSON.stringify(game);
+  expect(purchaseTile(game, payload)).toBe(false);
+  expect(JSON.stringify(game)).toBe(insufficient);
+
+  currentTick(game)!.cash = cash;
+  const purchased = reducer(game, acquireTile(payload));
+  expect(reducer(purchased, acquireTile(payload))).toBe(purchased);
+  expect(currentTick(purchased)!.cash).toBeCloseTo(cash - quote.price);
+  expect(currentTick(purchased)!.customers).toBe(customers + quote.customers);
+  for (const id of [plant.id, city.id]) {
+    expect(
+      territoryTileViews(purchased).find(({ tile }) => tile.id === id),
+    ).toMatchObject({
+      owned: true,
+      facility: undefined,
+    });
+    expect(tilePurchaseQuote(purchased, id)).toBeUndefined();
+  }
+  expect(validTerritoryNetwork(purchased)).toBe(true);
+  expect(
+    parseSave(JSON.parse(JSON.stringify(serializeSave(purchased)))),
+  ).not.toBeNull();
 });

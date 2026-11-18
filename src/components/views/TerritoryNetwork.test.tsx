@@ -439,7 +439,10 @@ it("shows purchased cities as customers rather than build destinations", () => {
   for (let step = 0; step < 12 && !tilePurchaseQuote(game, target.id); step++) {
     const current = game;
     const next = territoryTileViews(current)
-      .filter(({ tile }) => !tile.city && !!tilePurchaseQuote(current, tile.id))
+      .filter(({ tile }) => {
+        const quote = tilePurchaseQuote(current, tile.id);
+        return !tile.city && quote && !quote.utilityName;
+      })
       .sort((a, b) => distance(a.tile) - distance(b.tile))[0].tile;
     const quote = tilePurchaseQuote(game, next.id)!;
     game = gameReducer(
@@ -450,7 +453,9 @@ it("shows purchased cities as customers rather than build destinations", () => {
   expect(tilePurchaseQuote(game, target.id)).toBeDefined();
   show(game);
   inspect(target.id);
-  fireEvent.click(within(surface()).getByRole("button", { name: /Connect/ }));
+  fireEvent.click(
+    within(surface()).getByRole("button", { name: /Acquire utility/ }),
+  );
   expect(surface()).toHaveTextContent("Connected customers");
   expect(
     within(surface()).queryByRole("tab", { name: "Generators" }),

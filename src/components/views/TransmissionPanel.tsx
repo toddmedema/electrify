@@ -132,6 +132,7 @@ import {
 } from "../../helpers/ExpansionContext";
 import {
   acquisitionTargetForCorridor,
+  bordersUtility,
   utilityOffer,
 } from "../../helpers/Expansion";
 
@@ -932,7 +933,9 @@ export default function TransmissionPanel({
                       ? acquisitionTargetForCorridor(line.corridorId)
                       : undefined;
                     const availableAcquisition =
-                      acquisitionTarget && line.yearsToBuildLeft <= 0;
+                      acquisitionTarget &&
+                      line.yearsToBuildLeft <= 0 &&
+                      bordersUtility(game, acquisitionTarget.id);
                     const peer = game.multiplayer?.peers?.find(
                       (p) => p.corridor.id === line.corridorId,
                     );

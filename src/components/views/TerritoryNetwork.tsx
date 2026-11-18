@@ -35,6 +35,7 @@ import AcquiredUtilities from "./AcquiredUtilities";
 import TerritoryHexMap from "./TerritoryHexMap";
 import AcquisitionReviewDialog from "../base/AcquisitionReviewDialog";
 import UtilityOfferDialog from "../base/UtilityOfferDialog";
+import { bordersUtility } from "../../helpers/Expansion";
 import { useMoney } from "../base/CurrencyContext";
 import { useAppDispatch, useAppSelector } from "../../Store";
 import { generatorSizeChanged } from "../../reducers/GameActions";
@@ -472,7 +473,10 @@ function TileNetwork(props: Props) {
                 <div className="territoryBuildActions">
                   <Button
                     variant="contained"
-                    disabled={!props.onAcquire}
+                    disabled={
+                      !props.onAcquire ||
+                      !bordersUtility(game, tile.territoryId)
+                    }
                     onClick={() => setReview(true)}
                   >
                     Acquire {territory.name}
@@ -484,13 +488,16 @@ function TileNetwork(props: Props) {
               ) : (
                 !view.owned && (
                   <div className="tilePurchaseSummary">
-                    {view.municipalCity && (
+                    {quote?.utilityName ? (
                       <Typography variant="body2">
-                        {quote
-                          ? "The utility will remove its plant when the site transfers."
-                          : `Connect the customers in ${view.municipalCity.city?.name ?? "the city"} before acquiring this site.`}
+                        Includes both sites and {formatCount(quote.customers)}{" "}
+                        customers. The seller removes its plant on transfer.
                       </Typography>
-                    )}
+                    ) : view.municipalCity && quote ? (
+                      <Typography variant="body2">
+                        The seller removes its plant on transfer.
+                      </Typography>
+                    ) : null}
                     <Button
                       variant="contained"
                       disabled={
@@ -503,7 +510,7 @@ function TileNetwork(props: Props) {
                       {pendingIds.has(tile.id)
                         ? "Connecting…"
                         : quote
-                          ? `Connect · ${money(quote.price)}`
+                          ? `${quote.utilityName ? "Acquire utility" : "Connect"} · ${money(quote.price)}`
                           : "Connection unavailable"}
                     </Button>
                     {quote && availableCash < quote.price && (

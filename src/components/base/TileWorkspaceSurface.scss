@@ -96,7 +96,34 @@
     }
   }
   .tileCityDemand {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
     margin-top: 16px;
+    margin-bottom: 12px;
+
+    .chartLegend {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 8em), 1fr));
+      align-items: start;
+      gap: 4px 12px;
+      padding: 0;
+      font-weight: 400;
+      letter-spacing: normal;
+    }
+    .chartLegendItem {
+      min-width: 0;
+      white-space: normal;
+    }
+    .chartLegendLabel {
+      overflow-wrap: anywhere;
+    }
+    .chartLegendSwatch {
+      flex-shrink: 0;
+    }
+    .uplot {
+      background: transparent;
+    }
   }
   .tileWorkspaceBody .facilityDetails {
     padding: 0 0 16px;

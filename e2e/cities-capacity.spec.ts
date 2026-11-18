@@ -66,6 +66,45 @@ async function sceneFacility(map: Locator, tileId: string) {
 }
 
 for (const theme of ["light", "dark"] as const) {
+  test(`city demand legend and plot share the inspector surface · ${theme}`, async ({
+    page,
+  }, info) => {
+    const map = await start(page, theme);
+    await selectTerritoryMapTile(page, getTerritoryTile("champlain:city")!);
+    const demand = map.getByRole("region", {
+      name: "City demand by use",
+      exact: true,
+    });
+    const title = demand.getByRole("heading", { name: "Demand by use" });
+    const legend = demand.locator(".chartLegend");
+    for (const use of [
+      "Residential",
+      "Commercial",
+      "Industrial",
+      "Data Centers",
+      "Transportation",
+    ])
+      await expect(legend.getByText(use, { exact: true })).toBeVisible();
+
+    const firstItem = await legend
+      .locator(".chartLegendItem")
+      .first()
+      .boundingBox();
+    expect(firstItem?.x).toBeCloseTo((await title.boundingBox())!.x, 1);
+    expect(
+      await legend.evaluate(
+        (element) => element.scrollWidth <= element.clientWidth,
+      ),
+    ).toBe(true);
+    await expect(demand.locator(".uplot")).toHaveCSS(
+      "background-color",
+      "rgba(0, 0, 0, 0)",
+    );
+    await reviewScreenshot(demand, {
+      path: info.outputPath(`city-demand-${theme}.png`),
+    });
+  });
+
   test(`mixed cities and optional status layers preserve operation · ${theme}`, async ({
     page,
   }, info) => {

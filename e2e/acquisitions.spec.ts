@@ -9,6 +9,7 @@ import { getDateFromMinute, MINUTES_PER_MONTH } from "../src/helpers/DateTime";
 import { currentTick } from "../src/helpers/GameSelectors";
 import { formatMoneyConcise, formatMoneyStable } from "../src/helpers/Format";
 import {
+  purchaseTile,
   tilePurchaseQuote,
   tilePurchaseQuotes,
 } from "../src/helpers/Territories";
@@ -32,6 +33,7 @@ import { expectDialogToFit } from "./dialog-layout";
 import {
   readTerritoryMapCamera,
   returnToTerritoryMap,
+  selectTerritoryMapTile,
   setMapProjectCapacity,
 } from "./layout";
 import { editSavedGame, readSavedGame, readSaveRecords } from "./save-fixture";
@@ -1963,56 +1965,55 @@ for (const theme of ["light", "dark"] as const) {
     await expect(buy).toHaveAttribute("aria-pressed", "false");
   });
 
-  for (const customer of [
-    { id: "parcel-1", name: "Vergennes" },
-    { id: "parcel-5", name: "Waterbury" },
-  ] as const) {
-    test(`${customer.name} adds quoted customers without plants in ${theme}`, async ({
-      page,
-    }) => {
-      test.slow(); // Each approach involves multiple on-map purchases and autosaves.
-      await startMap(page, theme);
-      const tile = TERRITORY_TILES.find(
-        (tile) => tile.territoryId === customer.id,
-      )!;
-      await revealTile(page, tile);
-      const before = (await readSavedGame(page))!;
-      const quote = tilePurchaseQuote(before, tile.id)!;
-      const surface = await inspectTile(page, tile);
-      await expect(surface).toHaveAccessibleName(customer.name);
-      const utility = territoryTileViews(before).find(
-        ({ tile: candidate }) => candidate.id === tile.id,
-      )!;
-      expect(utility.ownerKey).toMatch(/^municipal:/);
-      await expect(surface).toContainText(utility.ownerName);
-      await expect(surface).toContainText("Estimated demand");
-      await expectCityDemand(surface);
-      await surface.getByRole("button", { name: /^Connect ·/ }).click();
-      await expect(surface).toContainText("Connected customers");
-      await expect(
-        surface.getByRole("region", {
-          name: "City demand by use",
-          exact: true,
-        }),
-      ).toBeVisible();
-      await expectCityDemand(surface);
-      const saved = (await readSavedGame(page))!;
-      expect(
-        currentTick(saved)!.customers - currentTick(before)!.customers,
-      ).toBe(quote.customers);
-      expect(currentTick(saved)!.cash).toBeCloseTo(
-        currentTick(before)!.cash - quote.price,
-        1,
-      );
-      expect(saved.facilities).toHaveLength(before.facilities.length);
-      expect(
-        saved.territoryNetwork!.tilePurchases!.map((receipt) => receipt.tileId),
-      ).toContain(tile.id);
-      await expect(
-        surface.getByRole("tab", { name: "Generators", exact: true }),
-      ).toHaveCount(0);
+  test(`acquires Vergennes from its plant border in ${theme}`, async ({
+    page,
+  }) => {
+    await startMap(page, theme);
+    const city = getTerritoryTile("parcel-1:city")!;
+    const plant = getTerritoryTile("parcel-0:site-1")!;
+    await editSavedGame(page, ({ game }) => {
+      for (const tileId of [
+        "green-uplands:site-2",
+        "green-uplands:site-5",
+      ] as const) {
+        const quote = tilePurchaseQuote(game, tileId)!;
+        expect(purchaseTile(game, { tileId, quoteKey: quote.quoteKey })).toBe(
+          true,
+        );
+      }
     });
-  }
+    await page.goto("/");
+    await page.getByRole("button", { name: "Continue", exact: true }).click();
+    const map = await openMap(page);
+    const before = (await readSavedGame(page))!;
+    expect(isAdjacentToOwnedTerritoryTile(before, city)).toBe(false);
+    const quote = tilePurchaseQuote(before, plant.id)!;
+    expect(tilePurchaseQuote(before, city.id)?.price).toBe(quote.price);
+    await panToTile(page, plant);
+    await map.locator(`[data-map-target="${plant.id}"]`).click();
+    const surface = tileSurface(page);
+    await expect(surface).toContainText(quote.utilityName!);
+    await surface.getByRole("button", { name: /^Acquire utility ·/ }).click();
+    const saved = (await readSavedGame(page))!;
+    expect(ownsTerritoryTile(saved, plant.id)).toBe(true);
+    expect(ownsTerritoryTile(saved, city.id)).toBe(true);
+    expect(currentTick(saved)!.customers - currentTick(before)!.customers).toBe(
+      quote.customers,
+    );
+    expect(currentTick(saved)!.cash).toBeCloseTo(
+      currentTick(before)!.cash - quote.price,
+      1,
+    );
+    expect(saved.facilities).toHaveLength(before.facilities.length);
+    await surface
+      .getByRole("button", { name: "Close tile", exact: true })
+      .click();
+    await selectTerritoryMapTile(page, city);
+    const cityPanel = tileSurface(page);
+    await expect(cityPanel).toHaveAccessibleName("Vergennes");
+    await expect(cityPanel).toContainText("Connected customers");
+    await expectCityDemand(cityPanel);
+  });
 
   for (const resource of [
     { id: "parcel-7", name: "Hydro", fuel: "Hydro" },

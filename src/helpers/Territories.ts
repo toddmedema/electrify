@@ -18,7 +18,7 @@ import {
   purchasedLandTerritories,
 } from "../data/Territories";
 import { isValleyBoardTile } from "../data/TerritoryTiles";
-import { municipalPlantAt } from "../data/MunicipalUtilities";
+import { municipalUtilityAt } from "../data/MunicipalUtilities";
 import { UTILITY_AREAS } from "../data/UtilityExpansion";
 import { getInflationIndex, hasEconomy } from "../data/Economy";
 import { getDateFromMinute } from "./DateTime";
@@ -293,8 +293,22 @@ export function tilePrice(
 }
 type TerritoryTile = NonNullable<ReturnType<typeof getTerritoryTile>>;
 
-/** Connection eligibility is independent of the quote and also drives map affordances. */
-export function createTilePurchaseEligibility(
+function availableLand(
+  game: GameType,
+  owns: ReturnType<typeof createTerritoryTileOwnership>,
+  tile: TerritoryTile,
+): tile is TerritoryTile & { territoryId: LandTerritoryId } {
+  return (
+    isLandTerritoryId(tile.territoryId) &&
+    isValleyBoardTile(tile.id) &&
+    !owns(tile) &&
+    !game.multiplayer?.tileOwners?.[tile.id] &&
+    !game.multiplayer?.landOwners?.[tile.territoryId]
+  );
+}
+
+/** A seller is reachable at any available part of its border. */
+function tilePurchaseContext(
   game: GameType,
   owns = createTerritoryTileOwnership(game),
 ) {
@@ -302,84 +316,99 @@ export function createTilePurchaseEligibility(
   const adjacent = createTerritoryTileAdjacency(
     ownedTerritoryTiles(game, owns),
   );
-  const canAcquirePlantSite = (tileId: TerritoryTileId) => {
-    const utility = municipalPlantAt.get(tileId);
-    if (!utility) return true;
-    const { city } = utility;
-    return (
-      owns(city) ||
-      !!game.multiplayer?.tileOwners?.[city.id] ||
-      (isLandTerritoryId(city.territoryId) &&
-        !!game.multiplayer?.landOwners?.[city.territoryId])
-    );
+  const sellerAt = (tile: TerritoryTile) => {
+    const utility = municipalUtilityAt(tile);
+    const otherId =
+      utility?.plant &&
+      (tile.id === utility.city.id ? utility.plant.tileId : utility.city.id);
+    const other = otherId ? getTerritoryTile(otherId, game) : undefined;
+    // Legacy purchases can leave the city and plant site under different owners.
+    return {
+      utility,
+      companion: other && availableLand(game, owns, other) ? other : undefined,
+    };
   };
-  return (
-    tile: TerritoryTile,
-  ): tile is TerritoryTile & { territoryId: LandTerritoryId } =>
-    enabled &&
-    isLandTerritoryId(tile.territoryId) &&
-    isValleyBoardTile(tile.id) &&
-    !owns(tile) &&
-    adjacent(tile) &&
-    !game.multiplayer?.tileOwners?.[tile.id] &&
-    !game.multiplayer?.landOwners?.[tile.territoryId] &&
-    canAcquirePlantSite(tile.id);
+  const eligible = (tile: TerritoryTile) => {
+    if (!enabled || !availableLand(game, owns, tile)) return false;
+    if (adjacent(tile)) return true;
+    const { companion } = sellerAt(tile);
+    return !!companion && adjacent(companion);
+  };
+  const quote = (tile: TerritoryTile) => {
+    if (!enabled || !availableLand(game, owns, tile)) return undefined;
+    const { utility, companion: bundle } = sellerAt(tile);
+    const direct = adjacent(tile);
+    if (!direct && !(bundle && adjacent(bundle))) return undefined;
+    const sites = bundle ? (direct ? [tile, bundle] : [bundle, tile]) : [tile];
+    const city = tile.city ? tile : bundle?.city ? bundle : undefined;
+    const territory = getTerritoryDefinition(
+      city?.territoryId ?? tile.territoryId,
+    )!;
+    const baseCustomers = cityCustomerCount(
+      city?.territoryId ?? tile.territoryId,
+    );
+    const purchases = sites.map(({ id }) => ({
+      tileId: id,
+      price: tilePrice(game, game.date.minute, id),
+    }));
+    const price = purchases.reduce((total, part) => total + part.price, 0);
+    return {
+      tileId: tile.id,
+      territoryId: tile.territoryId,
+      price,
+      benefit: territory.benefit!,
+      customers: city
+        ? customerMarketSizeAt(baseCustomers, game.date.minute)
+        : 0,
+      purchases,
+      utilityName: bundle ? utility?.name : undefined,
+      // Bind the quote to the full transfer so a stale click cannot buy a smaller deal.
+      quoteKey: JSON.stringify([
+        tile.id,
+        price,
+        territory.benefit,
+        baseCustomers,
+        ...(bundle ? [purchases] : []),
+      ]),
+    };
+  };
+  return { eligible, quote };
 }
 
-function purchaseQuote(
+export function createTilePurchaseEligibility(
   game: GameType,
-  tile: TerritoryTile & { territoryId: LandTerritoryId },
+  owns = createTerritoryTileOwnership(game),
 ) {
-  const territory = getTerritoryDefinition(tile.territoryId)!;
-  const price = tilePrice(game, game.date.minute, tile.id);
-  const customers = tile.city
-    ? customerMarketSizeAt(
-        cityCustomerCount(tile.territoryId),
-        game.date.minute,
-      )
-    : 0;
-  return {
-    tileId: tile.id,
-    territoryId: tile.territoryId,
-    price,
-    benefit: territory.benefit!,
-    customers,
-    // Organic account growth improves the same purchase; it does not invalidate its price.
-    quoteKey: JSON.stringify([
-      tile.id,
-      price,
-      territory.benefit,
-      cityCustomerCount(tile.territoryId),
-    ]),
-  };
+  return tilePurchaseContext(game, owns).eligible;
 }
+
 export function tilePurchaseQuote(game: GameType, tileId: TerritoryTileId) {
   const tile = getTerritoryTile(tileId, game);
-  return tile && createTilePurchaseEligibility(game)(tile)
-    ? purchaseQuote(game, tile)
-    : undefined;
+  return tile && tilePurchaseContext(game).quote(tile);
 }
 /** Quote neighboring cells on the fixed scenario board with one shared ownership lookup. */
 export function tilePurchaseQuotes(
   game: GameType,
   visible: readonly { tile: TerritoryTile }[] = scenarioMapTiles(game),
 ) {
-  const eligible = createTilePurchaseEligibility(game);
+  const { quote } = tilePurchaseContext(game);
   return new Map(
-    visible.flatMap(({ tile }) =>
-      eligible(tile) ? [[tile.id, purchaseQuote(game, tile)] as const] : [],
-    ),
+    visible.flatMap(({ tile }) => {
+      const offer = quote(tile);
+      return offer ? [[tile.id, offer] as const] : [];
+    }),
   );
 }
-/** Compatibility entry point selects ONE still-available visible cell; it never grants a region. */
+/** Compatibility entry point uses the first available site as the purchase entrance. */
 export function landPurchaseQuote(
   game: GameType,
   id: LandTerritoryId = "green-uplands",
 ) {
-  const eligible = createTilePurchaseEligibility(game);
+  const { quote } = tilePurchaseContext(game);
   for (const tile of getTerritoryTiles(game)) {
-    if (tile.territoryId === id && eligible(tile))
-      return purchaseQuote(game, tile);
+    if (tile.territoryId !== id) continue;
+    const offer = quote(tile);
+    if (offer) return offer;
   }
   return undefined;
 }
@@ -426,11 +455,9 @@ export function purchaseTile(game: GameType, value: unknown): boolean {
   const oldProgramCustomers = programCustomers(game);
   now.cash -= quote.price;
   now.customers += quote.customers;
-  (game.territoryNetwork.tilePurchases ??= []).push({
-    tileId: quote.tileId,
-    minute: game.date.minute,
-    price: quote.price,
-  });
+  (game.territoryNetwork.tilePurchases ??= []).push(
+    ...quote.purchases.map((site) => ({ ...site, minute: game.date.minute })),
+  );
   if (quote.customers > 0) {
     game.customerMarketSize =
       UTILITY_AREAS.champlain.addressablePool +

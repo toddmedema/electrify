@@ -1,4 +1,10 @@
-import { getFacilityTile } from "./TerritoryTiles";
+import {
+  createTerritoryTileAdjacency,
+  getFacilityTile,
+  hasTerritoryNetwork,
+  ownedTerritoryTiles,
+} from "./TerritoryTiles";
+import { TERRITORY_TILES } from "../data/TerritoryTiles";
 import {
   landTransferredCustomerTotal,
   landCustomerMarket,
@@ -314,11 +320,20 @@ export function utilityOffer(
     ),
   };
 }
-/** A dated seller snapshot becomes an executable quote without a connection prerequisite. */
+export function bordersUtility(game: GameType, targetId: string): boolean {
+  if (!hasTerritoryNetwork(game)) return true;
+  const adjacent = createTerritoryTileAdjacency(ownedTerritoryTiles(game));
+  return TERRITORY_TILES.some(
+    (tile) => tile.territoryId === targetId && adjacent(tile),
+  );
+}
+
+/** A neighboring utility can be bought without a power agreement or a line. */
 export function acquisitionQuote(
   game: GameType,
   targetId: string,
 ): AcquisitionQuote | undefined {
+  if (!bordersUtility(game, targetId)) return undefined;
   const offer = utilityOffer(game, targetId);
   if (!offer) return undefined;
   return {

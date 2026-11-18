@@ -25,11 +25,11 @@ stay within the board. Older saves retain their paid sites beyond its edge.
 The board uses the same versioned coordinates in single-player and co-op.
 
 Vergennes, Waterbury, Bristol, and Middlebury each have a local utility with a
-neighboring plant. Connecting a city transfers its customers. The incumbent
-keeps operating its plant until the site is acquired separately, when the
-seller removes the equipment.
+neighboring plant. Touching either site lets the player acquire both sites and
+the utility's customers together. The seller removes the equipment on transfer.
 
-Valley Electric and Ridge Electric can each be inspected and acquired directly.
+Valley Electric and Ridge Electric can each be inspected from any tile.
+Acquiring either utility requires a shared land border with one of its tiles.
 Their plants, customers, sites, corporate debt and dated third-party obligations
 transfer together. A purchase agreement with the acquired seller ends as an
 external supply/charge; its owned fleet replaces that promise. Buying an inefficient
