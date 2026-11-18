@@ -465,7 +465,7 @@ it.each([360, 1280, 3840])(
     const app = setup(width, {}, true);
     const map = screen.getByTestId("base-view");
     const notes = within(map).getByRole("textbox", { name: "Facility notes" });
-    await app.user.type(notes, "Keep this map position");
+    fireEvent.change(notes, { target: { value: "Keep this map position" } });
     expect(map).toHaveAttribute("data-territory-view", "FACILITIES");
     expect(
       screen.queryByRole("button", { name: "Map" }),

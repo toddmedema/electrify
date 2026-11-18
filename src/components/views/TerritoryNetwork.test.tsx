@@ -537,7 +537,9 @@ it("keeps a failed planner load in one closable panel and retries on the next op
   mockProjectLoadFailure = false;
   fireEvent.click(screen.getByRole("button", { name: "Build" }));
   expect(
-    await screen.findByRole("button", { name: "Choose sites for Wind" }),
+    await screen.findByLabelText("Choose sites for Wind", {
+      selector: "button",
+    }),
   ).toBeEnabled();
   expect(screen.getAllByRole("dialog")).toHaveLength(1);
   expect(currentTick(store.getState().game)!.cash).toBe(cash);
@@ -798,7 +800,7 @@ it.each([
       ),
     );
     expect(
-      await screen.findByRole("button", { name: "Review project" }),
+      await screen.findByText("Review project", { selector: "button" }),
     ).toBeEnabled();
     expect(
       screen.getByRole("heading", {
@@ -834,7 +836,7 @@ it("retains the inspected site when connecting transitions directly into desktop
     screen.getByRole("button", { name: "Choose sites for Wind" }),
   );
   expect(
-    await screen.findByRole("button", { name: "Review project" }),
+    await screen.findByText("Review project", { selector: "button" }),
   ).toBeEnabled();
   expect(
     screen.getByRole("button", { name: `Inspect ${site.id}` }),

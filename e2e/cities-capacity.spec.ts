@@ -21,6 +21,7 @@ const persistentMap = (page: Page) =>
   });
 
 async function start(page: Page, theme: "light" | "dark") {
+  await page.emulateMedia({ reducedMotion: "reduce" });
   await page.addInitScript((mode) => {
     localStorage.setItem("theme", mode);
     localStorage.setItem("audioEnabled", "false");

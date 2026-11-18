@@ -5,6 +5,8 @@ import type { MapCanvas } from "../src/components/base/territory-3d/Types";
 import { TERRITORY_TILES } from "../src/data/TerritoryTiles";
 import type { TerritoryTileDefinition } from "../src/data/TerritoryTiles";
 import { GENERATORS, getBuildFacilityQuote } from "../src/data/Facilities";
+import { TICK_MINUTES } from "../src/Constants";
+import { tickState } from "../src/reducers/Game";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "../src/helpers/DateTime";
 import { currentTick } from "../src/helpers/GameSelectors";
 import { formatMoneyConcise, formatMoneyStable } from "../src/helpers/Format";
@@ -56,6 +58,7 @@ async function startMap(
   theme: "light" | "dark",
   simplified = false,
 ) {
+  if (!simplified) await page.emulateMedia({ reducedMotion: "reduce" });
   await page.addInitScript((mode) => {
     localStorage.setItem("theme", mode);
     localStorage.setItem("audioEnabled", "false");
@@ -391,7 +394,10 @@ async function expectPhysicalMap(network: Locator, game: GameType) {
       else {
         expect(shape.start[1]).toBeGreaterThan(0.1);
         expect(shape.end[1]).toBeGreaterThan(0.1);
-        expect(shape.lowY).toBeLessThan(Math.min(shape.start[1], shape.end[1]));
+        const [startY, endY] = [shape.start[1], shape.end[1]];
+        // A steep line can sag below its straight path while still climbing.
+        expect(shape.lowY).toBeLessThanOrEqual(Math.min(startY, endY));
+        expect(shape.lowY).toBeLessThan((startY + endY) / 2);
         expect(shape.lowY).toBeGreaterThan(0);
       }
     } else if (submerged) {
@@ -2049,16 +2055,29 @@ for (const theme of ["light", "dark"] as const) {
 test("normal valley play saves across the first year and resumes from IndexedDB", async ({
   page,
 }) => {
-  test.setTimeout(120000);
   await startMap(page, "light");
+  // Build the months of history with the real reducer, then let the browser settle
+  // and persist the rollover itself. The save test does not depend on host frame rate.
+  await editSavedGame(page, ({ game }) => {
+    loadSimData(game.location);
+    const boundary = 12 * MINUTES_PER_MONTH - TICK_MINUTES * 15;
+    for (
+      let minute = game.date.minute;
+      minute < boundary;
+      minute += TICK_MINUTES
+    )
+      tickState(game);
+    expect(game.date.minute).toBe(boundary);
+  });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
   await page.getByRole("button", { name: "fast speed", exact: true }).click();
   await expect
-    .poll(async () => (await readSavedGame(page))?.date.monthsElapsed ?? 0, {
-      timeout: 60000,
-    })
-    .toBeGreaterThanOrEqual(13);
+    .poll(async () => (await readSavedGame(page))?.monthlyHistory.length ?? 0)
+    .toBeGreaterThanOrEqual(12);
   await page.getByRole("button", { name: "pause", exact: true }).click();
   const before = (await readSavedGame(page))!;
+  expect(before.date.year).toBe(before.startingYear + 1);
   const state = page.locator("#appbar:visible [data-save-state]").first();
   await expect(state).toHaveAttribute("data-save-state", "saved");
   expect(before.monthlyHistory.length).toBeGreaterThanOrEqual(12);
