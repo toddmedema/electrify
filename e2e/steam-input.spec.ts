@@ -1488,9 +1488,14 @@ test("TV saved preferences style direct scenario links before play", async ({
     await foregroundContrast(warning.locator(".gridStatusButton")),
     "actionable supply warning text keeps contrast on its amber surface",
   ).toBeGreaterThanOrEqual(4.5);
-  await expect(
-    page.getByRole("button", { name: "Build", exact: true }),
-  ).toBeInViewport({ ratio: 1 });
+  const rail = page.getByRole("complementary", {
+    name: "Build facilities",
+    exact: true,
+  });
+  const buildEntry = (await rail.isVisible())
+    ? rail.getByRole("button", { name: /^Power:/ })
+    : page.getByRole("button", { name: "Build", exact: true });
+  await expect(buildEntry).toBeInViewport({ ratio: 1 });
   const tile = await selectMapTile(page, "champlain:site-13");
   await expect(tile).toHaveAttribute("data-owned", "true");
   await expect(tile).toContainText("One building site; transmission tower");
@@ -1507,10 +1512,6 @@ test("TV saved preferences style direct scenario links before play", async ({
   await expect(
     builder.getByRole("combobox", { name: /^Build (destination|tile)$/ }),
   ).toHaveCount(0);
-  const rail = page.getByRole("complementary", {
-    name: "Build facilities",
-    exact: true,
-  });
   let metrics: Locator;
   if (await rail.isVisible()) {
     await expect(rail).toBeFocused();
