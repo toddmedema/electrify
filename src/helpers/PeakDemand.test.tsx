@@ -324,7 +324,7 @@ test.each([false, true])(
       residentialAfter = 0,
       industrialBefore = 0,
       industrialAfter = 0;
-    for (let minute = 0; minute < 1440; minute += 15) {
+    for (let minute = 0; minute < 29 * 60; minute += 15) {
       const tick = demand(minute);
       tick.demandByType.Residential = 100 + minute / 10;
       tick.solarIrradianceWM2 = minute >= 360 && minute < 1200 ? 0.001 : 0;
@@ -348,7 +348,7 @@ test.each([false, true])(
         );
         expect(tick.demandByType.Industrial).toBe(before.Industrial);
         const expectedBill =
-          before.Residential * 0.95 +
+          before.Residential * (minute < 1440 ? 0.95 : 1) +
           tick.shiftedResidentialW! * 0.9 +
           before.Commercial +
           before.Industrial * 0.95 +
@@ -401,8 +401,11 @@ test.each([18 * 60, 22 * 60])(
     expect(rebuilt.map((t) => t.deferredResidentialWh)).toEqual(
       continuedForecast.map((t) => t.deferredResidentialWh),
     );
+    const finalRecoveryMinute =
+      (game.date.monthsElapsed + 1) * MINUTES_PER_MONTH + 5 * 60 - 15;
     expect(
-      rebuilt.find((t) => t.minute % 1440 === 1425)!.deferredResidentialWh,
+      rebuilt.find((tick) => tick.minute === finalRecoveryMinute)
+        ?.deferredResidentialWh,
     ).toBeCloseTo(0, 6);
     game.timeline = rebuilt;
     game = parseSave(JSON.parse(JSON.stringify(serializeSave(game))))!.game;
