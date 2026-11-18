@@ -101,8 +101,9 @@ export const STANDARD_BALANCE_PLAYS: Record<number, Partial<SimOptionsType>> = {
     ],
   },
   102: {
+    // Keep the newer coal plant running until the steam replacement opens.
     initialBuild: {
-      name: "Natural Gas Peaker",
+      name: "Natural Gas Steam",
       peakW: 600000000,
       financed: true,
     },
@@ -118,10 +119,11 @@ export const STANDARD_BALANCE_PLAYS: Record<number, Partial<SimOptionsType>> = {
       },
       ...dispatch([1, 2, 3, 4], 3),
       { month: 38, type: "toggle", facilityId: 1 },
-      { month: 38, type: "toggle", facilityId: 2 },
+      { month: 50, type: "toggle", facilityId: 2 },
     ],
   },
   103: {
+    // Smaller reserve orders cover growth and leave room for the era’s higher peaker fuel costs.
     initialBuild: {
       name: "Natural Gas Peaker",
       peakW: 800000000,
@@ -135,12 +137,12 @@ export const STANDARD_BALANCE_PLAYS: Record<number, Partial<SimOptionsType>> = {
       {
         month: 1,
         type: "build",
-        build: { name: "Natural Gas Peaker", peakW: 300000000, financed: true },
+        build: { name: "Natural Gas Peaker", peakW: 150000000, financed: true },
       },
       {
         month: 2,
         type: "build",
-        build: { name: "Natural Gas Peaker", peakW: 300000000, financed: true },
+        build: { name: "Natural Gas Peaker", peakW: 150000000, financed: true },
       },
       ...dispatch([1, 2, 3, 4], 3),
       { month: 38, type: "toggle", facilityId: 1 },

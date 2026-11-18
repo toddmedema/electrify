@@ -75,13 +75,21 @@ test("the JavaScript validator's key lists match the TypeScript model", () => {
   expect(sorted(FACILITY_NAMES)).toEqual(sorted(Object.keys(FACILITIES)));
 });
 
-test("mod facility names are exactly the buildable generator and storage catalog", () => {
-  // Every catalog entry asks for its modifier before availability filtering.
+test("mod facility names match the generator and storage catalog across eras", () => {
+  const modern = createGame({
+    scenarioId: 100,
+    seed: 1,
+    difficulty: "Manager",
+  });
+  const historical = createGame({
+    scenarioId: 102,
+    seed: 1,
+    difficulty: "Manager",
+  });
   const asked = jest.spyOn(ScenarioMod, "facilityModifier");
-  const game = createGame({ scenarioId: 100, seed: 1, difficulty: "Manager" });
-  asked.mockClear();
-  GENERATORS(game, 1e8, [10], [100]);
-  STORAGE(game, 1e8);
+  GENERATORS(modern, 1e8, [10], [100]);
+  GENERATORS(historical, 1e8, [10], [100]);
+  STORAGE(modern, 1e8);
   const catalog = asked.mock.calls.map(([, name]) => name);
   asked.mockRestore();
   expect(sorted(FACILITY_NAMES)).toEqual(sorted([...new Set(catalog)]));
