@@ -1972,8 +1972,8 @@ for (const theme of ["light", "dark"] as const) {
   });
 
   for (const customer of [
-    { id: "parcel-1", kind: "residential" },
-    { id: "parcel-5", kind: "industrial" },
+    { id: "parcel-1", kind: "medium" },
+    { id: "parcel-5", kind: "small" },
   ] as const) {
     test(`${customer.kind} tile adds quoted customers without plants in ${theme}`, async ({
       page,
@@ -1987,9 +1987,7 @@ for (const theme of ["light", "dark"] as const) {
       const quote = tilePurchaseQuote(before, tile.id)!;
       const surface = await inspectTile(page, tile);
       await expect(surface).toHaveAccessibleName(
-        customer.kind === "residential"
-          ? "Residential city"
-          : "Industrial city",
+        customer.kind === "medium" ? "Medium city" : "Small city",
       );
       await expect(surface).toContainText("Estimated demand");
       await expectCityDemand(surface);

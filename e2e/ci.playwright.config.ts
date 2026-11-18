@@ -33,6 +33,7 @@ const layout = [
   "build-rail.spec.ts",
   "grid-status.spec.ts",
   "project-build.spec.ts",
+  "cities-capacity.spec.ts",
   "map-3d.spec.ts",
   "map-3d-performance.spec.ts",
   "chernobyl-recovery.spec.ts",
