@@ -178,6 +178,7 @@ html[data-couch-seat] #appbar #topbar {
 @media (max-width: 599px) {
   #appbar .gameStatusBar {
     flex-direction: column;
+    flex-wrap: nowrap;
   }
   #appbar .gameStatusBar .gridHealth {
     flex: 1 0 auto;

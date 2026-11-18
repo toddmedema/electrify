@@ -175,7 +175,11 @@ export function startDesktopInput(
     const buttons = controls().filter(
       (button) =>
         button.matches(".gameActionDock button") &&
-        button.dataset.gameDestination !== "FACILITIES",
+        button.dataset.gameDestination !== "FACILITIES" &&
+        // The map's Build action starts project selection. Bumpers cycle the map and its tools.
+        !button.matches(
+          '.gameWorkspace[data-map-workspace="true"] .gameDockBuild',
+        ),
     );
     const card = store.getState().card.name;
     const active =

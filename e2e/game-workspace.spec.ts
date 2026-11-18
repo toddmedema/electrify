@@ -1378,7 +1378,7 @@ for (const theme of ["light", "dark"] as const) {
 }
 
 for (const theme of ["light", "dark"] as const) {
-  test(`enlarged phone status and edge-padded tooltip remain readable in ${theme}`, async ({
+  test(`enlarged phone status and edge-padded diagnosis remain readable in ${theme}`, async ({
     page,
   }, info) => {
     test.skip(!info.project.use.hasTouch, "Phone status reflow");
@@ -1440,9 +1440,12 @@ for (const theme of ["light", "dark"] as const) {
         name: /^Current grid status:/,
       });
       await status.tap();
-      const tooltip = page.getByRole("tooltip");
-      await expect(tooltip).toBeVisible();
-      const edge = await tooltip.evaluate((element) => {
+      const diagnosis = page.getByRole("dialog", {
+        name: "Grid status",
+        exact: true,
+      });
+      await expect(diagnosis).toBeVisible();
+      const edge = await diagnosis.evaluate((element) => {
         const rect = element.getBoundingClientRect();
         return {
           minimum: Math.ceil(Math.min(innerWidth, innerHeight) * 0.04),
@@ -1452,6 +1455,11 @@ for (const theme of ["light", "dark"] as const) {
       });
       expect(edge.left).toBeGreaterThanOrEqual(edge.minimum - 1);
       expect(edge.right).toBeGreaterThanOrEqual(edge.minimum - 1);
+      await diagnosis
+        .getByRole("button", { name: "Close grid status" })
+        .click();
+      await expect(diagnosis).toHaveCount(0);
+      await expect(status).toBeFocused();
     }
   });
 
