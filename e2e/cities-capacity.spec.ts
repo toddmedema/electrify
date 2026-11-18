@@ -86,7 +86,9 @@ for (const theme of ["light", "dark"] as const) {
     const city = territoryTileViews(before).find(
       (view) => view.owned && view.tile.city,
     )!.tile;
-    await selectTerritoryMapTile(page, city);
+    const cityTarget = await selectTerritoryMapTile(page, city);
+    const capitalLabel = cityTarget.getByText("Burlington", { exact: true });
+    await expect(capitalLabel).toBeVisible();
     const surface = map.locator(".tileWorkspaceSurface");
     await expect(surface).toHaveAccessibleName("Burlington");
     const demand = surface.getByRole("region", {
@@ -131,12 +133,7 @@ for (const theme of ["light", "dark"] as const) {
     });
     await expect(status).toBeChecked();
     await expect(layers.getByRole("checkbox")).toHaveCount(1);
-    const capitalLabel = map
-      .locator('[data-map-target="champlain:city"]')
-      .getByText("Burlington", { exact: true });
-    await expect(capitalLabel).toBeAttached();
     await status.uncheck();
-    await expect(capitalLabel).toHaveCount(0);
     await expect(active.locator(".facilityMapStatusArtwork")).toHaveCount(0);
     await expect(selected).toHaveAttribute("title", /Generating/);
     expect(await sceneFacility(map, ids.active)).toMatchObject({
@@ -148,6 +145,11 @@ for (const theme of ["light", "dark"] as const) {
     await expect(layers).toHaveCount(0);
     await expect(trigger).toBeFocused();
     await expect(map.locator(".facilityMapStatusArtwork")).toHaveCount(0);
+    await selectTerritoryMapTile(page, city);
+    await expect(capitalLabel).toHaveCount(0);
+    await surface
+      .getByRole("button", { name: "Close tile", exact: true })
+      .click();
     await selectTerritoryMapTile(page, getTerritoryTile(ids.idle)!);
     const idle = map.locator(`[data-occupant-tile="${ids.idle}"]`);
     await expect(idle).toHaveAttribute("data-facility-status", "idle");
@@ -157,9 +159,13 @@ for (const theme of ["light", "dark"] as const) {
       .click();
     await trigger.click();
     await status.check();
-    await expect(capitalLabel).toBeAttached();
     await layers.press("Escape");
     await expect(idle.locator(".facilityMapStatusArtwork")).toBeVisible();
+    await selectTerritoryMapTile(page, city);
+    await expect(capitalLabel).toBeVisible();
+    await surface
+      .getByRole("button", { name: "Close tile", exact: true })
+      .click();
     const after = (await readSavedGame(page))!;
     expect(after.facilities).toEqual(before.facilities);
     expect(currentTick(after)!.cash).toBe(currentTick(before)!.cash);
