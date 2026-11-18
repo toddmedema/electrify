@@ -430,7 +430,7 @@ export class SceneBuilder {
   pick(
     point: { x: number; y: number },
     frame: PickFrame,
-    phases: Readonly<Record<string, number>> = {},
+    motionPhase?: (key: string) => number,
   ): TerritoryTileId | undefined {
     if (frame.scale <= 0) return undefined;
     const x =
@@ -455,9 +455,10 @@ export class SceneBuilder {
           (part.hideWhenInactive && !instance.active)
         )
           continue;
-        const phase =
-            (phases[instance.motionKey ?? instance.id] ?? 0) +
-            (part.phaseOffset ?? 0) * Math.PI * 2,
+        const phase = part.motion
+            ? (motionPhase?.(instance.motionKey ?? instance.id) ?? 0) +
+              (part.phaseOffset ?? 0) * Math.PI * 2
+            : 0,
           angle =
             part.motion === "rotor"
               ? rotorAngle(phase)

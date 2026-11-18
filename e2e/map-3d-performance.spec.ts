@@ -354,6 +354,7 @@ async function beginWindow(page: Page) {
       const month = () => date.textContent!.match(/[A-Za-z]+ \d+/)![0];
       let label = month(),
         previous: number | undefined,
+        previousDraw = canvas.map3DDiagnostics!().frames,
         raf = 0;
       const observer = new MutationObserver(() => {
         const next = month();
@@ -378,13 +379,16 @@ async function beginWindow(page: Page) {
         const diagnostic = canvas.map3DDiagnostics!();
         if (previous !== undefined && probe.gaps.length < 8192) {
           probe.gaps.push(at - previous);
-          probe.cpu.push(diagnostic.cpuFrameMs);
-          probe.draws.push(diagnostic.drawCalls);
-          probe.triangles.push(diagnostic.triangles);
-          probe.meshes.push(diagnostic.meshCount);
-          probe.instances.push(diagnostic.instanceCount);
+          if (diagnostic.frames !== previousDraw) {
+            probe.cpu.push(diagnostic.cpuFrameMs);
+            probe.draws.push(diagnostic.drawCalls);
+            probe.triangles.push(diagnostic.triangles);
+            probe.meshes.push(diagnostic.meshCount);
+            probe.instances.push(diagnostic.instanceCount);
+          }
         }
         previous = at;
+        previousDraw = diagnostic.frames;
         raf = requestAnimationFrame(frame);
       };
       const gpu = window.__mapGpuProbe!;
@@ -479,7 +483,7 @@ test("production 3D frame evidence includes panning and real month rollovers", a
     });
     expect(result.gaps.length).toBeGreaterThan(30);
     expect(
-      result.cpu.every(Number.isFinite),
+      result.cpu.length > 0 && result.cpu.every(Number.isFinite),
       "CPU samples must come from the actual renderer",
     ).toBe(true);
     expect(Math.min(...result.draws)).toBeGreaterThan(0);
@@ -493,7 +497,7 @@ test("production 3D frame evidence includes panning and real month rollovers", a
       ordinary: stats(result.gaps.slice(0, ordinary)),
       pan: stats(result.gaps.slice(ordinary, panned)),
       callbackGaps: stats(result.gaps),
-      cpuSubmission: stats(result.cpu),
+      cpuFrame: stats(result.cpu),
       gpuDraws: result.gpu.supported ? stats(result.gpu.milliseconds) : null,
       gpuDisjointSamples: result.gpu.disjoint,
       maxDrawCalls: Math.max(...result.draws),
@@ -513,7 +517,7 @@ test("production 3D frame evidence includes panning and real month rollovers", a
     runtime,
     windows,
     limits:
-      "CPU submission excludes asynchronous GPU execution. Timer queries, when available and not disjoint, measure the submitted map draw interval. RAF gaps measure callback scheduling, not physical presentation. Viewport emulation is not real phone testing. Existing targets and bundle ceilings are unchanged; timing samples are lab evidence, not machine-dependent CI gates.",
+      "CPU frame timing includes renderer scene preparation and submission, and excludes asynchronous GPU execution. Timer queries, when available and not disjoint, measure the submitted map draw interval. RAF gaps measure callback scheduling, not physical presentation. Viewport emulation is not real phone testing. Existing targets and bundle ceilings are unchanged; timing samples are lab evidence, not machine-dependent CI gates.",
   };
   const reportPath = info.outputPath("map-3d-performance.json");
   fs.writeFileSync(reportPath, JSON.stringify(report, null, 2));

@@ -375,6 +375,64 @@ it("draws idle/reduced scenes once, retains stopped poses and suspends hidden do
   expect(renderer.diagnostics().phases["facility-0"]).toBeGreaterThan(phase);
   renderer.dispose();
 });
+it("keeps the idle canvas asleep when React recreates equivalent frame inputs", () => {
+  const { renderer, gl } = setup();
+  const instances = scene(false);
+  const idleFrame = {
+    ...frame,
+    weather: {
+      rain: 0,
+      snowfall: 0,
+      cloud: 0.4,
+      wind: 0.3,
+      waterLevel: 0.5,
+      snowpack: 0,
+    },
+  };
+  renderer.update(instances, idleFrame);
+  flush(0);
+  gl.drawArraysInstanced.mockClear();
+
+  renderer.update(instances, {
+    ...idleFrame,
+    background: [...idleFrame.background],
+    lighting: {
+      ...idleFrame.lighting,
+      direction: [...idleFrame.lighting.direction],
+    },
+    weather: { ...idleFrame.weather, rain: 0.1 },
+  });
+  flush(16);
+  expect(gl.drawArraysInstanced).not.toHaveBeenCalled();
+  expect(renderer.diagnostics().frames).toBe(1);
+
+  renderer.update(instances, { ...idleFrame, cameraX: 5 });
+  flush(32);
+  expect(renderer.diagnostics().frames).toBe(2);
+  renderer.dispose();
+});
+
+it("uploads only the latest visible scene when several updates arrive before paint", () => {
+  const { renderer, gl } = setup();
+  const first = scene(false);
+  const latest = [{ ...first[0], id: "latest" }];
+  renderer.update(first, frame);
+  renderer.update(latest, { ...frame, cameraX: 100, visible: false });
+  flush(0);
+  expect(gl.createBuffer).not.toHaveBeenCalled();
+
+  renderer.update(first, frame);
+  renderer.update(latest, frame);
+  expect(callbacks.size).toBe(1);
+  expect(gl.createBuffer).not.toHaveBeenCalled();
+  flush(16);
+  expect(gl.bufferSubData).toHaveBeenCalledTimes(2);
+  expect(renderer.diagnostics(true).scene?.map(({ id }) => id)).toEqual([
+    "latest",
+  ]);
+  renderer.dispose();
+});
+
 it.each([TICK_MS.SLOW, TICK_MS.NORMAL])(
   "moves light and shadows between updates at a %i ms tick interval",
   (lightingTransitionMs) => {
@@ -401,7 +459,11 @@ it.each([TICK_MS.SLOW, TICK_MS.NORMAL])(
     expect(shadows[shadows.length - 1][1]).toBeCloseTo(0.225);
 
     // Changing camera position during the same simulation tick retains the transition.
-    renderer.update(instances, { ...after, cameraX: 5 });
+    renderer.update(instances, {
+      ...after,
+      cameraX: 5,
+      lighting: { ...after.lighting },
+    });
     flush(1000 + lightingTransitionMs / 2);
     expect(renderer.diagnostics().light[0]).toBeLessThan(first[0]);
     flush(1000 + lightingTransitionMs);
@@ -446,8 +508,9 @@ it("rebuilds lost GPU resources and notifies readiness only after restored drawi
   canvas.dispatchEvent(new Event("webglcontextrestored"));
   expect(state).toHaveBeenLastCalledWith("lost");
   expect(gl.createProgram).toHaveBeenCalledTimes(2);
-  expect(gl.createBuffer).toHaveBeenCalledTimes(12);
+  expect(gl.createBuffer).toHaveBeenCalledTimes(6);
   flush(1000000);
+  expect(gl.createBuffer).toHaveBeenCalledTimes(12);
   expect(state).toHaveBeenLastCalledWith("ready");
   expect(renderer.diagnostics().phases["facility-0"]).toBe(phase);
   renderer.dispose();
@@ -485,8 +548,8 @@ it("bounds inactive GPU caches while keeping the current visible geometry", () =
       ],
       frame,
     );
+    flush(i * 16);
   }
-  flush(0);
   expect(renderer.diagnostics().meshCount).toBeLessThanOrEqual(65);
   expect(renderer.diagnostics().instanceCount).toBe(1);
   expect(renderer.diagnostics().drawCalls).toBe(1);
@@ -590,7 +653,8 @@ it("releases partially initialized geometry when a vertex upload fails", () => {
   gl.bufferData.mockImplementationOnce(() => {
     throw new Error("GPU vertex upload failed");
   });
-  expect(() => renderer.update(scene(), frame)).not.toThrow();
+  renderer.update(scene(), frame);
+  expect(() => flush(0)).not.toThrow();
   expect(state).toHaveBeenLastCalledWith("unavailable");
   expect(gl.deleteBuffer).toHaveBeenCalledTimes(2);
   expect(gl.deleteVertexArray).toHaveBeenCalledTimes(1);

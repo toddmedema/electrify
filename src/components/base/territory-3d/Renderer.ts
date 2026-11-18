@@ -162,6 +162,42 @@ type Uniforms = Record<
   WebGLUniformLocation | null
 >;
 
+function sameProjection(a: MapFrame, b?: MapFrame): boolean {
+  return (
+    a.width === b?.width &&
+    a.height === b.height &&
+    a.scale === b.scale &&
+    a.cameraX === b.cameraX &&
+    a.cameraY === b.cameraY
+  );
+}
+
+function sameVector(a: Vec3, b: Vec3): boolean {
+  return a[0] === b[0] && a[1] === b[1] && a[2] === b[2];
+}
+
+function sameLighting(a: MapLighting, b: MapLighting): boolean {
+  return (
+    a === b ||
+    (a.ambient === b.ambient &&
+      a.shadow === b.shadow &&
+      sameVector(a.direction, b.direction) &&
+      sameVector(a.color, b.color))
+  );
+}
+
+function sameShaderWeather(
+  a: MapFrame["weather"],
+  b: MapFrame["weather"],
+): boolean {
+  return (
+    a?.cloud === b?.cloud &&
+    a?.wind === b?.wind &&
+    a?.waterLevel === b?.waterLevel &&
+    a?.snowpack === b?.snowpack
+  );
+}
+
 /** Bounded solid-mesh WebGL2 presentation; owns no game state or React updates. */
 export class MapRenderer {
   private gl: WebGL2RenderingContext | null = null;
@@ -174,7 +210,9 @@ export class MapRenderer {
   private projection: Float32Array = new Float32Array(16);
   private instances: readonly MapInstance[] = [];
   private frame: MapFrame | undefined;
+  private projectionFrame: MapFrame | undefined;
   private sceneFrame: MapFrame | undefined;
+  private sceneInstances: readonly MapInstance[] | undefined;
   private clock = new FacilityMotionClock();
   private raf: number | undefined;
   private state: State = "unavailable";
@@ -190,7 +228,7 @@ export class MapRenderer {
   private heldLighting: MapLighting | undefined;
   private lightingTransition:
     { from: MapLighting; started: number; duration: number } | undefined;
-  // CPU preparation/submission duration; this does not measure GPU completion.
+  // CPU time for scene preparation and draw submission.
   private frameMs = 0;
   private sampleDiagnostics = (includeScene = false) =>
     this.diagnostics(includeScene);
@@ -216,26 +254,28 @@ export class MapRenderer {
   update(instances: readonly MapInstance[], frame: MapFrame): void {
     if (this.disposed) return;
     const previous = this.frame;
-    const instancesChanged = this.instances !== instances;
-    const scene = this.sceneFrame;
-    const viewChanged =
-      !scene ||
-      scene.width !== frame.width ||
-      scene.height !== frame.height ||
-      scene.scale !== frame.scale ||
-      Math.abs(scene.cameraX - frame.cameraX) >= CAMERA_OVERSCAN ||
-      Math.abs(scene.cameraY - frame.cameraY) >= CAMERA_OVERSCAN;
-    const waterOnly =
-      instancesChanged &&
-      !viewChanged &&
-      this.state === "ready" &&
-      this.updateReservoirLevels(instances);
+    const lightingChanged =
+      !previous || !sameLighting(frame.lighting, previous.lighting);
+    const changed =
+      !previous ||
+      instances !== this.instances ||
+      !sameProjection(frame, previous) ||
+      lightingChanged ||
+      frame.dpr !== previous.dpr ||
+      frame.visible !== previous.visible ||
+      frame.motionAllowed !== previous.motionAllowed ||
+      frame.playbackRate !== previous.playbackRate ||
+      frame.lightingTransitionMs !== previous.lightingTransitionMs ||
+      !sameVector(frame.background, previous.background) ||
+      !sameShaderWeather(frame.weather, previous.weather);
+    if (!changed) return;
+
     this.instances = instances;
     this.frame = frame;
     const duration = frame.motionAllowed
       ? frame.lightingTransitionMs
       : undefined;
-    if (frame.lighting !== previous?.lighting) {
+    if (lightingChanged) {
       this.heldLighting = undefined;
       this.lightingTransition =
         duration && this.paintedLighting && this.isVisible()
@@ -246,17 +286,36 @@ export class MapRenderer {
       this.heldLighting = this.paintedLighting;
       this.lightingTransition = undefined;
     }
-    this.projection = projectionMatrix(frame);
-    if (instancesChanged && !waterOnly) this.clock.sync(instances);
-    if (
-      this.state === "ready" &&
-      (viewChanged || (instancesChanged && !waterOnly))
-    )
-      this.buildScene();
-    if (!this.canAnimate()) this.clock.resetTimestamp();
+    if (!frame.motionAllowed || frame.playbackRate <= 0)
+      this.clock.resetTimestamp();
     if (this.isVisible()) this.schedule();
     else this.cancelFrame();
   }
+
+  private prepareScene(frame: MapFrame): void {
+    if (!sameProjection(frame, this.projectionFrame)) {
+      this.projection = projectionMatrix(frame);
+      this.projectionFrame = frame;
+    }
+    const scene = this.sceneFrame;
+    const viewChanged =
+      !scene ||
+      scene.width !== frame.width ||
+      scene.height !== frame.height ||
+      scene.scale !== frame.scale ||
+      Math.abs(scene.cameraX - frame.cameraX) >= CAMERA_OVERSCAN ||
+      Math.abs(scene.cameraY - frame.cameraY) >= CAMERA_OVERSCAN;
+    const instancesChanged = this.sceneInstances !== this.instances;
+    const waterOnly =
+      instancesChanged &&
+      !viewChanged &&
+      this.updateReservoirLevels(this.instances);
+    if (instancesChanged && !waterOnly) this.clock.sync(this.instances);
+    if (viewChanged || (instancesChanged && !waterOnly)) this.buildScene(frame);
+    this.sceneInstances = this.instances;
+  }
+
+  motionPhase = (key: string): number => this.clock.phase(key);
 
   diagnostics(includeScene = false): RendererDiagnostics {
     return {
@@ -433,7 +492,6 @@ export class MapRenderer {
     // disappears between context creation and the first painted frame.
     this.state = "ready";
     this.readyPending = true;
-    this.buildScene();
     this.schedule();
   }
 
@@ -494,15 +552,24 @@ export class MapRenderer {
   private animate = (timestamp: number): void => {
     this.raf = undefined;
     if (!this.isVisible() || this.disposed || this.state !== "ready") return;
-    const moving = this.canAnimate();
-    this.clock.tick(timestamp, moving, this.frame?.playbackRate ?? 0);
+    const started = performance.now();
     try {
+      // Camera and simulation updates can arrive before the same paint. Only
+      // prepare the scene that will actually be submitted, including on reveal.
+      this.prepareScene(this.frame!);
+      if (this.state !== "ready") return;
+      const moving = this.canAnimate();
+      this.clock.tick(timestamp, moving, this.frame!.playbackRate);
       this.draw(moving, this.lightAt(timestamp));
+      this.frameMs = performance.now() - started;
+      if (this.readyPending) {
+        this.readyPending = false;
+        this.setState("ready");
+      }
+      if (moving || this.lightingTransition) this.schedule();
     } catch (_error) {
       this.fail();
-      return;
     }
-    if (moving || this.lightingTransition) this.schedule();
   };
 
   private lightAt(timestamp: number): MapLighting {
@@ -575,10 +642,11 @@ export class MapRenderer {
   }
 
   private updateReservoirLevels(instances: readonly MapInstance[]): boolean {
-    if (instances.length !== this.instances.length) return false;
+    const scene = this.sceneInstances;
+    if (!scene || instances.length !== scene.length) return false;
     const updates = new Map<string, MapInstance>();
     for (let index = 0; index < instances.length; index++) {
-      const previous = this.instances[index];
+      const previous = scene[index];
       const next = instances[index];
       if (previous === next) continue;
       if (
@@ -613,9 +681,7 @@ export class MapRenderer {
     return true;
   }
 
-  private buildScene(): void {
-    if (!this.frame || !this.gl) return;
-    const frame = this.frame;
+  private buildScene(frame: MapFrame): void {
     this.sceneFrame = frame;
     const used = new Set<MapMesh>();
     const grouped = {
@@ -794,7 +860,6 @@ export class MapRenderer {
       uniforms = this.uniforms;
     if (!gl || !frame || !uniforms || frame.width <= 0 || frame.height <= 0)
       return;
-    const started = performance.now();
     if (moving) {
       for (const item of this.motionItems) this.pose(item);
       this.poseRevision++;
@@ -875,11 +940,6 @@ export class MapRenderer {
     this.frames++;
     this.paintedLighting = lighting;
     this.instanceCount = this.sceneInstanceCount;
-    this.frameMs = performance.now() - started;
-    if (this.readyPending) {
-      this.readyPending = false;
-      this.setState("ready");
-    }
   }
 
   private drawBatches(batches: readonly Batch[]): void {
@@ -935,6 +995,8 @@ export class MapRenderer {
       if (this.program) this.gl?.deleteProgram(this.program);
     }
     this.meshes.clear();
+    this.sceneFrame = undefined;
+    this.sceneInstances = undefined;
     this.program = null;
     this.uniforms = undefined;
     this.passes = emptyPasses();

@@ -15,18 +15,21 @@ phases retain the current scene plus at most 256 culled identities. Neither cach
 uses simulation ticks or tile identities as an unbounded model key.
 
 The renderer owns one animation clock. Idle and reduced-motion scenes draw when
-their input changes. Hidden documents, invisible surfaces and wholly culled motion
-stop scheduling frames. A paused simulation leaves decorative production motion at
-25%; operation pause, idle, construction, reduced motion and visibility suspension
-preserve each facility's phase. Lighting uses the simulated minute and the existing
+a visual input changes. Camera and simulation updates that arrive before a draw
+share one scene preparation pass. Hidden documents and invisible surfaces skip GPU
+batch preparation and drawing. Wholly culled motion stops scheduling frames.
+A paused simulation leaves decorative production motion at 25%. Operation pause,
+idle, construction, reduced motion and visibility suspension preserve each
+facility's phase. Lighting uses the simulated minute and the existing
 sunrise/sunset calculation. Wall-clock time never advances sunlight.
 
 ## Inspecting actual geometry
 
-`canvas.map3DDiagnostics()` samples current frame counters, CPU submission duration,
-phase, playback rate, visibility and actual lighting inputs. `frameMs` remains a
-compatibility alias of `cpuFrameMs`. These durations exclude asynchronous GPU
-execution, browser compositing and physical presentation.
+`canvas.map3DDiagnostics()` samples current frame counters, CPU scene preparation and
+submission duration, phase, playback rate, visibility and actual lighting inputs.
+`frameMs` remains a compatibility alias of `cpuFrameMs`. These durations exclude asynchronous GPU
+execution, React work that builds scene inputs, browser compositing and physical
+presentation.
 
 `canvas.map3DDiagnostics(true)` additionally scans the actual submitted draw passes.
 It reports each submitted instance's model key, triangle count, posed world-space
@@ -61,9 +64,9 @@ including actual camera drags and at least one real month rollover at each avail
 1×, 12× and desktop 24× speed. The 24× control uses the existing 1300 px breakpoint;
 that desktop window resizes to 1440 px and records its own viewport separately from
 the 1280 px 1×/12× windows. Its `map-3d-performance.json` attachment retains raw
-samples, browser/build/backend identity, callback gaps, CPU submission, long tasks,
-draw/triangle counts and peak mesh/instance counts. Samples and pending GPU queries
-are bounded.
+samples, browser/build/backend identity, callback gaps, CPU frame duration, long
+tasks, draw/triangle counts and peak mesh/instance counts. Each recorded CPU frame
+duration represents a new draw. Samples and pending GPU queries are bounded.
 
 Where the browser exposes `EXT_disjoint_timer_query_webgl2`, test-only instrumentation
 times the map's actual draw interval with GPU queries. Unavailable timers are reported

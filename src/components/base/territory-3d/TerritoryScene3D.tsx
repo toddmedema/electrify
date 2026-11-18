@@ -97,11 +97,7 @@ export default function TerritoryScene3D({
   }, []);
   React.useLayoutEffect(() => {
     onPicker((point) =>
-      builder.pick(
-        point,
-        latestFrame.current,
-        renderer.current?.diagnostics().phases,
-      ),
+      builder.pick(point, latestFrame.current, renderer.current?.motionPhase),
     );
     return () => onPicker(undefined);
   }, [builder, onPicker]);

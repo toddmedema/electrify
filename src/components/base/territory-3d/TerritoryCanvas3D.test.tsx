@@ -36,6 +36,7 @@ test("delayed loading uses the latest frame, retains one renderer and disposes d
     update: jest.fn(),
     dispose: jest.fn(),
     diagnostics: jest.fn(),
+    motionPhase: jest.fn(),
   };
   const factory = jest.fn(() => renderer),
     state = jest.fn();
@@ -123,6 +124,7 @@ test("a renderer update failure disposes partially initialized resources", async
     }),
     dispose: jest.fn(),
     diagnostics: jest.fn(),
+    motionPhase: jest.fn(),
   };
   render(
     <TerritoryCanvas3D

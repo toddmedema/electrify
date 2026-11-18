@@ -11,6 +11,7 @@ export type RendererState = "loading" | "ready" | "lost" | "unavailable";
 export interface RendererHandle {
   update: (instances: readonly MapInstance[], frame: MapFrame) => void;
   diagnostics: () => RendererDiagnostics;
+  motionPhase: (key: string) => number;
   dispose: () => void;
 }
 export type RendererFactory = (

@@ -382,13 +382,14 @@ test.each(["wind", "offshore-wind"] as const)(
           ],
           pickFrame,
         ),
-        phases = { [`structure:${tile.tile.id}`]: phase };
-      expect(builder.pick(point, pickFrame, phases)).toBe(tile.tile.id);
+        motionPhase = (key: string) =>
+          key === `structure:${tile.tile.id}` ? phase : 0;
+      expect(builder.pick(point, pickFrame, motionPhase)).toBe(tile.tile.id);
       expect(
         builder.pick(
           { ...point, x: pickFrame.width - point.x },
           pickFrame,
-          phases,
+          motionPhase,
         ),
       ).toBeUndefined();
     }

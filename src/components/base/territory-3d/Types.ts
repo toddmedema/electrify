@@ -115,7 +115,7 @@ export interface RendererDiagnostics {
   meshCount: number;
   instanceCount: number;
   frameMs: number;
-  /** CPU draw submission only: excludes asynchronous GPU execution and presentation. */
+  /** CPU scene preparation and submission, excluding GPU execution and presentation. */
   cpuFrameMs: number;
   phases: Readonly<Record<string, number>>;
   light: Vec3;
