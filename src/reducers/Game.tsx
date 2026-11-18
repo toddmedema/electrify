@@ -7013,10 +7013,14 @@ function supplyForecastPass(
         stepMinutes,
         withoutMinimumStableOutput,
       );
-      t = updateSupplyFacilitiesFinances(
+      // The extra settlement shares the result frame, but its gas dispatch must not
+      // overwrite the preceding interval's commitment targets on the same asset ID.
+      const closing = { ...t };
+      if (!withoutMinimumStableOutput) copyCommitmentMetadata(t, closing);
+      const settled = updateSupplyFacilitiesFinances(
         newState,
-        t,
-        t,
+        closing,
+        closing,
         simulated,
         false,
         !withoutMinimumStableOutput,
@@ -7028,6 +7032,8 @@ function supplyForecastPass(
         closesMinute,
         repowerEmissions,
       );
+      copyCommitmentMetadata(t, settled);
+      t = settled;
     }
     observe?.(newState, t);
     prev = t;

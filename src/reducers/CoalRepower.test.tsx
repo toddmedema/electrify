@@ -4,6 +4,7 @@ import { parseSave, serializeSave } from "../SaveGame";
 import { CoalRepowerType, GameType } from "../Types";
 import { LEGACY_CAMPAIGN_ID } from "../data/LegacyCampaign";
 import { coalRepowerQuote, completeCoalRepower } from "../helpers/CoalRepower";
+import { serializeCommitmentMetadata } from "../helpers/Commitment";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "../helpers/DateTime";
 import { currentTick } from "../helpers/GameSelectors";
 import { validateGameCommand } from "../multiplayer/Commands";
@@ -245,13 +246,14 @@ it("commissions the replacement in the exclusive month-end agreement forecast", 
   const end = MINUTES_PER_MONTH;
   advance(game, end - 3 * TICK_MINUTES);
   const coal = findCoal(game);
+  coal.peakW = 3e9;
   const upgrade = "coalToGasPeaker";
   coal.upgradeInProgress = {
     upgrade,
     cost: 1,
     startsMinute: game.date.minute,
     completesMinute: end,
-    targetPeakW: coal.peakW,
+    targetPeakW: 2e9,
     constructionKgco2eTotal: 800,
   };
   // An existing v3 meter activates the extra closing settlement on the final frame.
@@ -277,6 +279,11 @@ it("commissions the replacement in the exclusive month-end agreement forecast", 
   expect(forecast.timeline.at(-1)?.supplyByFuel["Natural Gas"]).toBeGreaterThan(
     0,
   );
+  expect(
+    serializeCommitmentMetadata(forecast.timeline)?.at(-1)?.dispatchTargets[
+      coal.id
+    ],
+  ).toBe(coal.peakW * 0.9);
   expect(
     forecast.timeline.reduce(
       (sum, tick) => sum + (tick.constructionKgco2e ?? 0),
