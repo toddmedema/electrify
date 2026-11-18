@@ -1,5 +1,6 @@
 import { expect, test, Locator, Page } from "./fixtures";
 import { foregroundContrast } from "./contrast";
+import { TUTORIALS } from "../src/data/Scenarios";
 import { readSavedGame } from "./save-fixture";
 
 async function expectFooterTooltip(page: Page, action: Locator) {
@@ -112,6 +113,45 @@ test("loading hands off to a smooth logo rise and individually staggered control
   ).toBeFocused();
 });
 
+test("finishing every tutorial removes the shortcut while leaving the lessons replayable", async ({
+  page,
+}) => {
+  await page.addInitScript(
+    (ids) => {
+      localStorage.setItem(
+        "plays",
+        JSON.stringify({
+          plays: ids.map((scenarioId) => ({
+            scenarioId,
+            timesPlayed: 1,
+            date: "2026-11-18",
+          })),
+        }),
+      );
+    },
+    TUTORIALS.map((tutorial) => tutorial.id),
+  );
+  await page.goto("/");
+  const play = page.getByRole("button", { name: "Play", exact: true });
+  await expect(play).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Tutorials", exact: true }),
+  ).toHaveCount(0);
+  await play.click();
+  await expect(
+    page.getByRole("heading", { name: "Choose a game", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Tutorials complete", { exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: `View all ${TUTORIALS.length}`, exact: true })
+    .click();
+  await expect(
+    page.getByRole("group", { name: "All tutorials" }).getByRole("button"),
+  ).toHaveCount(TUTORIALS.length);
+});
+
 test("warm reloads and new tabs keep the minimum loading time and animate again", async ({
   page,
   context,
@@ -181,7 +221,9 @@ test("keyboard and pointer actions work during the entrance", async ({
   await page.reload();
   await expect(page.locator("#appStartup")).toHaveCount(0);
   await page.getByRole("button", { name: "Play", exact: true }).click();
-  await expect(page.locator(".facilities:visible")).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Choose a game", exact: true }),
+  ).toBeVisible();
 });
 
 test("hovering a home control makes it the active button, and keyboard continues from there", async ({
@@ -307,6 +349,10 @@ test("loading and returning from Saved games select Continue at the top", async 
   await expect(first).toBeFocused();
   await page.clock.runFor(1000);
   await expect(first).toBeFocused();
+  await page.getByRole("button", { name: "Play", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Choose a game", exact: true }),
+  ).toBeVisible();
 });
 
 test("footer icons have equal optical gaps beside Share", async ({ page }) => {
@@ -514,7 +560,7 @@ for (const theme of ["light", "dark"]) {
       }
       await page.goto("/");
       const primary = page.getByRole("button", {
-        name: hasSave ? "New game" : "Play",
+        name: "Play",
         exact: true,
       });
       await expect(primary).toBeVisible();
@@ -746,6 +792,9 @@ for (const theme of ["light", "dark"]) {
         page.viewportSize()!.width,
       );
     }
+    const play = page.getByRole("button", { name: "Play", exact: true });
+    await expect(play).toBeFocused();
+    await page.keyboard.press("ArrowUp");
     await expect(actions.first()).toBeFocused();
     for (const key of ["ArrowDown", "ArrowRight"]) {
       for (let index = 1; index <= count; index++) {
@@ -775,7 +824,7 @@ for (const theme of ["light", "dark"]) {
       footer.getByRole("button", { name: "Install app" }),
     ).toBeFocused();
     await page.evaluate(() => window.dispatchEvent(new Event("appinstalled")));
-    await expect(actions.first()).toBeFocused();
+    await expect(play).toBeFocused();
     await expect(page.getByRole("tooltip")).toHaveCount(0);
   });
 }
@@ -967,7 +1016,7 @@ for (const theme of ["light", "dark"]) {
     }
     await page.keyboard.press("ArrowDown");
     await expect(
-      page.getByRole("button", { name: "Play", exact: true }),
+      page.getByRole("button", { name: "Tutorials", exact: true }),
     ).toBeFocused();
     await expect(page.getByRole("tooltip")).toHaveCount(0);
     for (let index = (await exploreLinks.count()) - 1; index >= 0; index--) {

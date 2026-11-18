@@ -450,7 +450,7 @@ html:is(:not([data-touch-input="true"]), [data-controller-input="true"]) {
     main:not([inert])
     #menuCard:not(:focus-within)
     .mainActions
-    .MuiButton-root:first-child {
+    [data-main-action] {
     background-color: var(--interactive-blue);
     color: var(--interactive-contrast);
     // The fill carries selection, including when a controller moves real focus.
@@ -488,7 +488,7 @@ html[data-touch-input="true"]:not([data-controller-input="true"]) #menuCard {
   }
 
   // Keep the next action prominent while tapping resources or returning from another screen.
-  #centeredMenu .mainActions .MuiButton-root:first-child {
+  #centeredMenu .mainActions [data-main-action] {
     background-color: var(--interactive-blue);
     color: var(--interactive-contrast);
 

@@ -13,7 +13,7 @@ for (const theme of ["light", "dark"]) {
       localStorage.setItem("audioEnabled", "false");
     }, theme);
     await page.goto("/");
-    await page.getByRole("button", { name: "Play", exact: true }).click();
+    await page.getByRole("button", { name: "Tutorials", exact: true }).click();
     await page.getByRole("button", { name: "Next", exact: true }).click();
     await page.locator('[data-fuel="Coal"] .facilityRowHeader').click();
     await expect(page.locator(".tutorialHud")).toContainText(

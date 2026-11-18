@@ -28,11 +28,13 @@ export interface StateProps {
   deferServices?: boolean;
   hasSavedGame: boolean;
   hasSavedGames: boolean;
+  hasUnfinishedTutorials: boolean;
 }
 
 export interface DispatchProps {
   onAudioChange: (change: boolean) => void;
   onContinue: () => void;
+  onTutorials: () => void;
   onSavedGames: () => void;
   onSettings: () => void;
   onMods: () => void;
@@ -108,7 +110,6 @@ const MainMenu = (props: Props): React.JSX.Element => {
           rel: "noopener noreferrer",
         }
       : { href: path };
-  const startLabel = props.hasSavedGame ? "New game" : "Play";
   const [shareStatus, setShareStatus] = React.useState("");
   const onShare = async () => {
     const result = await shareText(buildGameShareContent());
@@ -198,13 +199,18 @@ const MainMenu = (props: Props): React.JSX.Element => {
               Continue
             </Button>
           )}
+          {props.hasUnfinishedTutorials && (
+            <Button size="large" color="primary" onClick={props.onTutorials}>
+              Tutorials
+            </Button>
+          )}
           <Button
-            data-main-action
+            data-main-action={props.hasSavedGame ? undefined : true}
             size="large"
             color="primary"
             onClick={props.onStart}
           >
-            {startLabel}
+            Play
           </Button>
           {props.hasSavedGames && (
             <Button

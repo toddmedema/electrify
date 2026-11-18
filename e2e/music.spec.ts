@@ -273,7 +273,7 @@ test("first tutorial keeps its sources through the real native song boundary", a
     localStorage.removeItem("plays");
     window.electrifyMusicSeekTail = true;
   });
-  await page.getByRole("button", { name: "Play", exact: true }).click();
+  await page.getByRole("button", { name: "Tutorials", exact: true }).click();
   await expect(page.locator(".tutorialHud")).toBeVisible();
   await expect
     .poll(async () => (await playbackSnapshot(page)).active.length)

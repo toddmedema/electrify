@@ -90,7 +90,6 @@ async function mockDesktop(
       localStorage.setItem("musicVolume", "0.5");
       localStorage.setItem("soundEffectsVolume", "0.5");
       localStorage.setItem("theme", theme);
-      // A returning player reaches the New Game catalog instead of Mission 1.
       localStorage.setItem(
         "plays",
         JSON.stringify({
@@ -1424,10 +1423,7 @@ for (const layout of [
     });
     await mockDesktop(page, false, layout.theme);
     await page.goto("/");
-    await page
-      .getByRole("button", { name: "New game", exact: true })
-      .or(page.getByRole("button", { name: "Play", exact: true }))
-      .click();
+    await page.getByRole("button", { name: "Play", exact: true }).click();
     await page.getByLabel("Open community scenarios").click();
     const screenRoot = page.locator(".modsScreen");
     await expect(
