@@ -33,12 +33,12 @@ it("shares one explicit multiplier between the root UI and chart subscriptions",
   const changed = jest.fn();
   const stop = subscribeInterfaceScale(changed);
   try {
-    applyInterfaceScale(2.5);
-    expect(document.documentElement.style.fontSize).toBe("250%");
-    expect(document.documentElement.dataset.interfaceScale).toBe("2.5");
-    expect(getInterfaceScale()).toBe(2.5);
+    applyInterfaceScale(2);
+    expect(document.documentElement.style.fontSize).toBe("200%");
+    expect(document.documentElement.dataset.interfaceScale).toBe("2");
+    expect(getInterfaceScale()).toBe(2);
     expect(changed).toHaveBeenCalledTimes(1);
-    applyInterfaceScale(2.5);
+    applyInterfaceScale(2);
     expect(changed).toHaveBeenCalledTimes(1);
     applyInterfaceScale(1.25);
     expect(document.documentElement.style.fontSize).toBe("125%");
@@ -48,20 +48,30 @@ it("shares one explicit multiplier between the root UI and chart subscriptions",
   }
 });
 
-it.each([undefined, null, "", "1.5", "250%", 0.99, 2.51, {}, NaN, Infinity])(
+it.each([undefined, null, "", "1.5", "250%", 0.99, {}, NaN, Infinity])(
   "rejects malformed or unsupported interface scales: %p",
   (value) => {
     expect(normalizeInterfaceScale(value)).toBe(1);
-    applyInterfaceScale(2.5);
+    applyInterfaceScale(2);
     applyInterfaceScale(value);
     expect(getInterfaceScale()).toBe(1);
     expect(document.documentElement.style.fontSize).toBe("100%");
   },
 );
 
-it("preserves every legacy text and explicit TV-scale product", () => {
+it.each([2.5, 3])(
+  "clamps a scale above the largest choice to 200%: %p",
+  (value) => {
+    expect(normalizeInterfaceScale(value)).toBe(2);
+    applyInterfaceScale(value);
+    expect(getInterfaceScale()).toBe(2);
+    expect(document.documentElement.style.fontSize).toBe("200%");
+  },
+);
+
+it("preserves legacy text and TV-scale products within the supported range", () => {
   expect(migrateInterfaceScale("large", true, 1.75)).toBe(1.96875);
-  expect(migrateInterfaceScale("larger", true, 2)).toBe(2.5);
+  expect(migrateInterfaceScale("larger", true, 2)).toBe(2);
   expect(migrateInterfaceScale("larger", false, 2)).toBe(1.25);
   expect(migrateInterfaceScale("large", undefined, 2)).toBe(1.125);
   expect(migrateInterfaceScale("invalid", true, Infinity)).toBe(1.5);

@@ -74,7 +74,7 @@ it.each([
   ["standard", undefined, "2", 1],
   ["large", "false", "1.75", 1.125],
   ["large", "true", "1.75", 1.96875],
-  ["larger", "true", "2", 2.5],
+  ["larger", "true", "2", 2],
   ["invalid", "true", "invalid", 1.5],
 ])(
   "migrates old preferences once: %p, %p, %p",
@@ -105,7 +105,7 @@ it("migrates a legacy couch setup into independent preferences without runtime T
   expect(initialSettings).not.toHaveProperty("tvScale");
 });
 
-it.each([2, 2.25])(
+it.each([1.5, 2])(
   "restores explicit scale independently of old preferences and persists changes to %p",
   (scale) => {
     localStorage.setItem("interfaceScale", "1.75");
@@ -136,7 +136,6 @@ it.each([
   '"1.5"',
   "[]",
   "{}",
-  "2.5001",
   "0.5",
   "1.5junk",
   "0x2",
@@ -147,6 +146,16 @@ it.each([
     localStorage.setItem("textSize", "larger");
     localStorage.setItem("tvMode", "true");
     expect(settings().initialSettings.interfaceScale).toBe(1);
+  },
+);
+
+it.each(["2.5", "3"])(
+  "clamps a stored scale above the largest choice to 200% without reviving legacy preferences: %p",
+  (stored) => {
+    localStorage.setItem("interfaceScale", stored);
+    localStorage.setItem("textSize", "larger");
+    localStorage.setItem("tvMode", "true");
+    expect(settings().initialSettings.interfaceScale).toBe(2);
   },
 );
 

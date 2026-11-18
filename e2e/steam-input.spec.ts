@@ -1204,7 +1204,7 @@ async function setupTv(page: Page, maximum: boolean, theme: "light" | "dark") {
   await input(page, "confirm");
   await page
     .getByRole("combobox", { name: "Interface scale", exact: true })
-    .selectOption(maximum ? "2.5" : "1.5");
+    .selectOption(maximum ? "2" : "1.5");
   await select(
     page,
     page.getByRole("button", { name: "Single tool", exact: true }),
@@ -1296,7 +1296,7 @@ test("TV saved preferences style direct scenario links before play", async ({
   await expect(start).toBeVisible();
   await expect(page.locator("html")).toHaveAttribute(
     "data-interface-scale",
-    "2.5",
+    "2",
   );
   const edge = await page.locator(".appFrame").evaluate((element) => ({
     actual: parseFloat(getComputedStyle(element).paddingTop),

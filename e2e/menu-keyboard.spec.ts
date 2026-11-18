@@ -67,7 +67,6 @@ test("interface scale persists and scales controls with text at every display he
     "150%",
     "175%",
     "200%",
-    "250%",
   ]);
   const standardHeight = await scale.evaluate(
     (element) => element.getBoundingClientRect().height,
@@ -87,8 +86,8 @@ test("interface scale persists and scales controls with text at every display he
   await expect(page.locator("html")).toHaveCSS("font-size", "24px");
   await page.getByRole("button", { name: "Settings", exact: true }).click();
   await expect(scale).toHaveValue("1.5");
-  await scale.selectOption("2.5");
-  await expect(page.locator("html")).toHaveCSS("font-size", "40px");
+  await scale.selectOption("2");
+  await expect(page.locator("html")).toHaveCSS("font-size", "32px");
   await page.setViewportSize(originalViewport);
   await expect(scale).toBeVisible();
   expect(
@@ -103,7 +102,7 @@ for (const theme of ["light", "dark"] as const) {
     page,
   }) => {
     await page.addInitScript((mode) => {
-      localStorage.setItem("interfaceScale", "2.5");
+      localStorage.setItem("interfaceScale", "2");
       localStorage.setItem("theme", mode);
       localStorage.setItem(
         "plays",
@@ -146,16 +145,17 @@ for (const theme of ["light", "dark"] as const) {
       expect(current.map.y).toBeGreaterThan(current.details.y);
     }
     await page.setViewportSize({ width: 1920, height: 1080 });
+    // The full one-rem column gap at the chosen scale, minus rounding tolerance.
     await expect
       .poll(async () => {
         const current = await geometry();
         return current.details.x - current.map.x - current.map.width;
       })
-      .toBeGreaterThanOrEqual(39);
+      .toBeGreaterThanOrEqual(31);
     const wide = await geometry();
     expect(wide.map.width).toBeGreaterThanOrEqual(960);
     expect(wide.details.width).toBeGreaterThanOrEqual(640);
-    await expect(page.locator("html")).toHaveCSS("font-size", "40px");
+    await expect(page.locator("html")).toHaveCSS("font-size", "32px");
   });
 }
 
@@ -239,7 +239,7 @@ test("screen-edge padding persists independently and reaches dialogs at every sc
     path: info.outputPath("display-padding.png"),
     animations: "disabled",
   });
-  await scale.selectOption("2.5");
+  await scale.selectOption("2");
   await expect(frame).toHaveCSS("padding-left", `${margin}px`);
   expect(
     await page.evaluate(

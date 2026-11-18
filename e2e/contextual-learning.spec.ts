@@ -138,7 +138,7 @@ for (const theme of ["light", "dark"] as const) {
     });
     await page.addInitScript((mode) => {
       localStorage.clear();
-      localStorage.setItem("interfaceScale", "2.5");
+      localStorage.setItem("interfaceScale", "2");
       localStorage.setItem("theme", mode);
       localStorage.setItem("audioEnabled", "false");
     }, theme);

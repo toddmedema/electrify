@@ -248,7 +248,7 @@ describe("Settings", () => {
     expect(onUnitsChange).toHaveBeenCalledWith("imperial");
   });
 
-  it("offers explicit interface scales from 100% through 250%", async () => {
+  it("offers explicit interface scales from 100% through 200%", async () => {
     const onInterfaceScaleChange = jest.fn();
     renderSettings({ onInterfaceScaleChange });
     const scale = screen.getByRole("combobox", { name: "Interface scale" });
@@ -257,10 +257,25 @@ describe("Settings", () => {
       within(scale)
         .getAllByRole("option")
         .map((option) => option.textContent),
-    ).toEqual(["100%", "125%", "150%", "175%", "200%", "250%"]);
+    ).toEqual(["100%", "125%", "150%", "175%", "200%"]);
     await userEvent.selectOptions(scale, "1.5");
-    await userEvent.selectOptions(scale, "2.5");
-    expect(onInterfaceScaleChange.mock.calls).toEqual([[1.5], [2.5]]);
+    await userEvent.selectOptions(scale, "2");
+    expect(onInterfaceScaleChange.mock.calls).toEqual([[1.5], [2]]);
+  });
+
+  it("shows a stored scale above the largest choice clamped to 200%", () => {
+    renderSettings({
+      settings: {
+        theme: "system",
+        units: "metric",
+        musicVolume: 1,
+        soundEffectsVolume: 1,
+        interfaceScale: 2.5,
+      },
+    });
+    const scale = screen.getByRole("combobox", { name: "Interface scale" });
+    expect(scale).toHaveValue("2");
+    expect(within(scale).queryByRole("option", { name: "250%" })).toBeNull();
   });
 
   it("offers Automatic and Single tool workspaces outside the desktop app", async () => {

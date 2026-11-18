@@ -412,7 +412,7 @@ A wake checkpoint failure uses the existing visible save error and retry path.
 
 ### Couch display settings and controllers
 
-Settings offers one Interface scale for text, charts, icons and controls (100–250%), and
+Settings offers one Interface scale for text, charts, icons and controls (100–200%), and
 Workspace: Automatic or Single tool. Automatic uses the available space at the chosen scale;
 Single tool gives the active tool the main area while keeping essential status and navigation
 visible. Advanced display contains independent Screen-edge padding (0%, 2% or 4%) for displays

@@ -1392,7 +1392,7 @@ for (const theme of ["light", "dark"] as const) {
   }, info) => {
     test.skip(!info.project.use.hasTouch, "Phone status reflow");
     await startGame(page, theme, 111);
-    for (const scale of ["1.25", "1.5", "2.5"]) {
+    for (const scale of ["1.25", "1.5", "2"]) {
       await page.getByRole("button", { name: "menu", exact: true }).click();
       await page
         .getByRole("menuitem", { name: "Settings", exact: true })
