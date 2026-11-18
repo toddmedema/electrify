@@ -175,11 +175,16 @@ function TileNetwork(props: Props) {
   const utility = tile
     ? Object.values(UTILITY_AREAS).find(({ id }) => id === tile.territoryId)
     : undefined;
+  const acquisition = game.utilityExpansion?.acquisitions.find(
+    ({ targetId }) => targetId === tile?.territoryId,
+  );
   const quote = tile ? tilePurchaseQuote(game, tile.id) : undefined;
   const tick = currentTick(game);
   const customers = tile?.city
     ? view?.owned
-      ? (utility?.customers ?? landTransferredCustomers(game, tile.territoryId))
+      ? (acquisition?.transferredCustomers ??
+        utility?.customers ??
+        landTransferredCustomers(game, tile.territoryId))
       : (quote?.customers ??
         customerMarketSizeAt(
           cityCustomerCount(tile.territoryId),

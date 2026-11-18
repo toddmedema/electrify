@@ -120,6 +120,19 @@ export function territoryTilePowerLimit(
       ? terrainBuildingPowerLimit(tile.terrain, facility)
       : tile.maxPeakW;
 }
+/** Retained EGS installations predate the switch from named resources to ordinary land. */
+export function isRetainedEnhancedGeothermalSite(
+  tile: TerritoryTileDefinition,
+  facility: SiteTechnology,
+): boolean {
+  return (
+    !tile.city &&
+    tile.siteKind === "geothermal" &&
+    !isStorage(facility) &&
+    facility.fuel === "Geothermal" &&
+    facility.name === "Enhanced Geothermal"
+  );
+}
 /** Technology eligibility and one-site power limits are separate from ownership/occupancy. */
 export function tileFitsFacility(
   tile: TerritoryTileDefinition,
@@ -133,7 +146,9 @@ export function tileFitsFacility(
       (Number.isFinite(facility.peakWh) && facility.peakWh > 0)) &&
     (allowHistoricalSize ||
       facility.peakW <= territoryTilePowerLimit(tile, facility)) &&
-    tileSupportsFacilityTechnology(tile, facility)
+    (tileSupportsFacilityTechnology(tile, facility) ||
+      // Older legal EGS plants used the named geothermal sites. Preserve those placements only.
+      (allowHistoricalSize && isRetainedEnhancedGeothermalSite(tile, facility)))
   );
 }
 /** A retained installation is tied to its original plant ID, not a reusable offshore site. */
@@ -560,7 +575,9 @@ export function assignTerritoryTiles(game: GameType): boolean {
       tileFitsFacility(
         tile,
         facility,
-        historicalSize || isGeneralBuildingLand(tile),
+        historicalSize ||
+          isGeneralBuildingLand(tile) ||
+          isRetainedEnhancedGeothermalSite(tile, facility),
       );
     if (facility.tileId !== undefined) {
       const tile = getTerritoryTile(facility.tileId, game);

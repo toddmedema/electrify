@@ -41,11 +41,12 @@ export function facilityOperatingStatus(
 export function facilityMapStatus(
   view: TerritoryTileView,
   minute: number,
+  includeConstruction = true,
 ): FacilityMapStatus | undefined {
   if (view.tile.city || !view.facility) return undefined;
   if (view.operatingFacility) {
     const status = facilityOperatingStatus(view.operatingFacility, minute);
-    return view.operatingFacility.expansionInProgress
+    return includeConstruction && view.operatingFacility.expansionInProgress
       ? { kind: "construction", label: status.label }
       : status;
   }

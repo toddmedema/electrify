@@ -17,6 +17,8 @@ import {
   purchaseLand,
   territoryBuildAvailability,
   tilePurchaseQuote,
+  tilePurchaseQuotes,
+  purchaseTile,
 } from "./Territories";
 import {
   assignTerritoryTiles,
@@ -26,11 +28,18 @@ import {
   getTerritoryTiles,
   getTerritoryTile,
   ownsTerritoryTile,
+  tileFitsFacility,
+  territoryHexDistance,
 } from "./TerritoryTiles";
 import * as tileCatalogue from "./TerritoryTiles";
 import { territoryTileViews } from "./TerritoryMapState";
 import { acquisitionQuote, transferUtility } from "./Expansion";
-import type { GameType, StorageOperatingType, TerritoryTileId } from "../Types";
+import {
+  isStorage,
+  type GameType,
+  type StorageOperatingType,
+  type TerritoryTileId,
+} from "../Types";
 
 function ready() {
   const game = createGame({ scenarioId: 116, seed: 12345 });
@@ -490,3 +499,58 @@ it.each(["missing", "empty", "moved", "duplicate", "invalid capacity"])(
     expect(parseSave(current)).toBeNull();
   },
 );
+
+it("retains Enhanced Geothermal on its paid named site without permitting a new incompatible build", () => {
+  const game = ready();
+  tickState(game);
+  const tile = TERRITORY_TILES.find((tile) => tile.siteKind === "geothermal")!;
+  for (let step = 0; !ownsTerritoryTile(game, tile) && step < 30; step++) {
+    const next = [...tilePurchaseQuotes(game).values()].sort(
+      (a, b) =>
+        territoryHexDistance(getTerritoryTile(a.tileId)!, tile) -
+        territoryHexDistance(getTerritoryTile(b.tileId)!, tile),
+    )[0];
+    expect(
+      purchaseTile(game, { tileId: next.tileId, quoteKey: next.quoteKey }),
+    ).toBe(true);
+  }
+  expect(ownsTerritoryTile(game, tile)).toBe(true);
+  const quote = GENERATORS(
+    { ...game, date: { ...game.date, year: 2030 } },
+    10e6,
+    [],
+    [],
+  ).find(({ name }) => name === "Enhanced Geothermal")!;
+  const template = game.facilities[0];
+  if (isStorage(template)) throw new Error("Expected an opening generator");
+  const facility = {
+    ...template,
+    ...quote,
+    id: 100,
+    minuteCreated: game.date.minute,
+    territoryId: tile.territoryId,
+    tileId: tile.id,
+    startingAssetId: undefined,
+    hydroSiteId: undefined,
+    gasCycle: undefined,
+    resilience: undefined,
+    constructionKgco2eTotal: 0,
+    constructionKgco2eEmitted: 0,
+  };
+  game.facilities.push(facility);
+  expect(tileFitsFacility(tile, facility)).toBe(false);
+  expect(tileFitsFacility(tile, facility, true)).toBe(true);
+  expect(assignTerritoryTiles(game)).toBe(true);
+  const parsed = parseSave(serializeSave(game));
+  expect(parsed).not.toBeNull();
+  expect(
+    parsed!.game.facilities.find(({ id }) => id === facility.id)?.tileId,
+  ).toBe(tile.id);
+  const ordinaryLand = TERRITORY_TILES.find(
+    (candidate) => candidate.siteKind === "open-land",
+  )!;
+  expect(tileFitsFacility(ordinaryLand, facility)).toBe(true);
+  expect(
+    tileFitsFacility(tile, { ...facility, name: "Solar", fuel: "Sun" }, true),
+  ).toBe(false);
+});

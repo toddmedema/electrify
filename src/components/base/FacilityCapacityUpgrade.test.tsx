@@ -14,6 +14,7 @@ import { createGame } from "../../testing/Simulator";
 import { currentTick } from "../../helpers/GameSelectors";
 import { facilityExpansionQuote } from "../../helpers/FacilityExpansion";
 import { getBuildFacilityQuote } from "../../data/Facilities";
+import * as facilities from "../../data/Facilities";
 import { GameType, isStorage } from "../../Types";
 import reducer, { buildFacility } from "../../reducers/Game";
 import { expandFacility } from "../../reducers/GameActions";
@@ -78,6 +79,50 @@ function open() {
   fireEvent.click(screen.getByRole("button", { name: "Upgrade capacity" }));
   return screen.getByRole("dialog");
 }
+
+it("does not price catalogues while the upgrade review is closed or its clock advances", () => {
+  const quote = jest.spyOn(facilities, "getBuildFacilityQuote");
+  try {
+    const view = show();
+    expect(quote).not.toHaveBeenCalled();
+    const later = cloneDeep(view.game);
+    later.date.minute += 1;
+    view.rerender(later);
+    expect(
+      screen.getByRole("button", { name: "Upgrade capacity" }),
+    ).toBeEnabled();
+    expect(quote).not.toHaveBeenCalled();
+    open();
+    expect(quote).toHaveBeenCalled();
+  } finally {
+    quote.mockRestore();
+  }
+});
+
+it("keeps physical limits and retrofit availability visible without pricing a closed review", () => {
+  const view = show();
+  const retrofit = cloneDeep(view.game);
+  retrofit.facilities[0].upgradeInProgress = {
+    upgrade: "coldWeatherPackage",
+    cost: 1e6,
+    startsMinute: 0,
+    completesMinute: 100,
+  };
+  view.rerender(retrofit);
+  expect(
+    screen.getByRole("button", { name: "Upgrade capacity" }),
+  ).toBeDisabled();
+  expect(screen.getByText("Finish the existing retrofit first.")).toBeVisible();
+  const capped = cloneDeep(view.game);
+  capped.facilities[0].peakW = 6e9;
+  view.rerender(capped);
+  expect(
+    screen.getByRole("button", { name: "Upgrade capacity" }),
+  ).toBeDisabled();
+  expect(
+    screen.getByText("This capacity exceeds the technology or site limit."),
+  ).toBeVisible();
+});
 
 it.each([false, true])(
   "reviews exact added capacity and sends only canonical identities (storage=%s)",

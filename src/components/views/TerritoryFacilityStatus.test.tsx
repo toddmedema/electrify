@@ -142,3 +142,29 @@ it("leaves completed foreign facilities unbadged and explains unavailable operat
     ),
   ).toBeInTheDocument();
 });
+
+it("shows an expanding plant's green operating badge when only Construction is hidden", () => {
+  const { game, facility } = ready();
+  facility.expansionInProgress = {
+    projectSequence: 1,
+    targetSize: facility.peakW + 1e6,
+    targetPeakW: facility.peakW + 1e6,
+    cost: 1e6,
+    annualOperatingCostDelta: 0,
+    costPerStartDelta: 0,
+    startsMinute: 0,
+    yearsToBuild: 1,
+    yearsToBuildLeft: 1,
+    quoteKey: "status-only-fixture",
+  };
+  const { occupant } = show(game, facility.tileId!);
+  expect(occupant).toHaveAttribute("data-facility-status", "construction");
+  fireEvent.click(screen.getByRole("button", { name: "Map layers" }));
+  fireEvent.click(screen.getByRole("checkbox", { name: "Construction" }));
+  expect(occupant).toHaveAttribute("data-facility-status", "producing");
+  expect(decorativeChild(occupant, ".facilityMapStatusArtwork")).not.toBeNull();
+  fireEvent.click(
+    screen.getByRole("checkbox", { name: "Producing and charging" }),
+  );
+  expect(decorativeChild(occupant, ".facilityMapStatusArtwork")).toBeNull();
+});

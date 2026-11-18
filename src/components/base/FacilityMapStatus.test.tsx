@@ -94,6 +94,32 @@ it("shows added-capacity construction without classifying the operating base as 
   });
 });
 
+it.each(["producing", "charging", "paused"] as const)(
+  "retains %s base state when the expansion construction layer is hidden",
+  (kind) => {
+    const { view } = ready();
+    const facility = kind === "charging" ? storage() : view.operatingFacility!;
+    facility.currentW = kind === "charging" ? -20e6 : 20e6;
+    facility.paused = kind === "paused";
+    facility.expansionInProgress = {
+      projectSequence: 1,
+      targetSize: (facility.peakWh ?? facility.peakW) + 1e6,
+      targetPeakW: facility.peakW + 1e6,
+      cost: 1e6,
+      annualOperatingCostDelta: 0,
+      costPerStartDelta: 0,
+      startsMinute: 0,
+      yearsToBuild: 1,
+      yearsToBuildLeft: 1,
+      quoteKey: "status-only-fixture",
+    };
+    const expanding = { ...view, facility, operatingFacility: facility };
+    expect(facilityMapStatus(expanding, 0)?.kind).toBe("construction");
+    expect(facilityMapStatus(expanding, 0, false)?.kind).toBe(kind);
+    expect(facilityOperatingStatus(facility, 0).kind).toBe(kind);
+  },
+);
+
 it("keeps construction progressing when only facility operation is paused", () => {
   const { game, facility } = ready();
   facility.yearsToBuildLeft = 0.25;

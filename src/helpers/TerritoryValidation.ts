@@ -1,6 +1,7 @@
 import {
   getTerritoryTile,
   tileFitsFacility,
+  isRetainedEnhancedGeothermalSite,
   ownsTerritoryTile,
   territoryVisibilityDistance,
   territoryHexDistance,
@@ -305,6 +306,7 @@ export function validTerritoryNetwork(
           tile,
           facility,
           isGeneralBuildingLand(tile) ||
+            isRetainedEnhancedGeothermalSite(tile, facility) ||
             !isLandTerritoryId(tile.territoryId) ||
             !!state.landPurchases.some(
               ({ territoryId }) => territoryId === tile.territoryId,

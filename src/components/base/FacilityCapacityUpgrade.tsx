@@ -13,6 +13,18 @@ import type {
   GameType,
 } from "../../Types";
 import { isStorage } from "../../Types";
+import {
+  generatorMaxPeakW,
+  storageMaxPeakWh,
+  storagePowerW,
+} from "../../data/FacilityCapacity";
+import { getHydroSite } from "../../data/HydroSites";
+import {
+  getTerritoryTile,
+  hasTerritoryNetwork,
+  territoryTilePowerLimit,
+  tileSupportsFacilityTechnology,
+} from "../../helpers/TerritoryTiles";
 import { facilityExpansionQuote } from "../../helpers/FacilityExpansion";
 import { facilityPermanentlyShutdown } from "../../helpers/Financials";
 import { currentCash } from "../../helpers/GameSelectors";
@@ -58,8 +70,34 @@ export default function FacilityCapacityUpgrade({
   const size = facility.peakWh ?? facility.peakW;
   const unit = storage ? "MWh" : "MW";
   const capacity = storage ? formatWattHours : formatWatts;
-  const availability = facilityExpansionQuote(game, facility.id, size + 1);
-  const maximum = availability.maxSize;
+  // Closed inspectors need physical eligibility, not three complete economic catalogues per tick.
+  const tile = facility.tileId
+    ? getTerritoryTile(facility.tileId, game)
+    : undefined;
+  const technologyMaximum = storage
+    ? storageMaxPeakWh(facility.name, game.date.year)
+    : generatorMaxPeakW(
+        game,
+        facility.name,
+        getHydroSite(facility.hydroSiteId ?? "")?.maxPeakW,
+      );
+  const wattsPerSize = storage ? storagePowerW(facility.name, 1) : 1;
+  const physicalMaximum = Math.min(
+    technologyMaximum,
+    tile
+      ? size +
+          (territoryTilePowerLimit(tile, facility) - facility.peakW) /
+            wattsPerSize
+      : Infinity,
+  );
+  const physicalUnavailable = facility.upgradeInProgress
+    ? "Finish the existing retrofit first."
+    : hasTerritoryNetwork(game) &&
+        (!tile || !tileSupportsFacilityTechnology(tile, facility))
+      ? "This plant has no expandable building tile."
+      : physicalMaximum <= size
+        ? "This capacity exceeds the technology or site limit."
+        : undefined;
   const [open, setOpen] = React.useState(false);
   const [target, setTarget] = React.useState("");
   const [reviewedKey, setReviewedKey] = React.useState<string>();
@@ -78,8 +116,14 @@ export default function FacilityCapacityUpgrade({
     }
   }, [open, cancelReview]);
   const targetSize = target.trim() ? Number(target) * 1e6 : NaN;
-  const quote = facilityExpansionQuote(game, facility.id, targetSize);
-  const ready = quote.status === "ready" ? quote : undefined;
+  const availability = open
+    ? facilityExpansionQuote(game, facility.id, size + 1)
+    : undefined;
+  const maximum = availability?.maxSize ?? physicalMaximum;
+  const quote = open
+    ? facilityExpansionQuote(game, facility.id, targetSize)
+    : undefined;
+  const ready = quote?.status === "ready" ? quote : undefined;
   const cash = currentCash(game);
   const shortfall = ready ? Math.max(0, ready.cost - cash) : 0;
   const changed = !!ready && ready.quoteKey !== reviewedKey;
@@ -94,8 +138,10 @@ export default function FacilityCapacityUpgrade({
       )
     : 0;
   const unavailable =
-    availability.status === "unavailable" ? availability.reason : undefined;
-  const offer = !!onExpand && availability.status === "ready";
+    availability?.status === "unavailable"
+      ? availability.reason
+      : physicalUnavailable;
+  const offer = !!onExpand && !unavailable;
   const changeTarget = (value: string) => {
     setTarget(value);
     setMessage(undefined);
@@ -335,7 +381,7 @@ export default function FacilityCapacityUpgrade({
           )}
           {!ready && (
             <DialogContentText role="alert">
-              {quote.status === "unavailable"
+              {quote?.status === "unavailable"
                 ? quote.reason
                 : "Choose a larger capacity."}
             </DialogContentText>

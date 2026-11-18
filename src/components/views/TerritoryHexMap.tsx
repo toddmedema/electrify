@@ -958,7 +958,11 @@ export default function TerritoryHexMap({
                 .map((view) => {
                   const { tile, facility } = view,
                     origin = foregroundOrigin(tile),
-                    status = facilityMapStatus(view, game.date.minute);
+                    status = facilityMapStatus(
+                      view,
+                      game.date.minute,
+                      statusLayers.construction,
+                    );
                   const showStatus =
                     status && showsMapStatus(status.kind, statusLayers);
                   const operation = view.operatingFacility

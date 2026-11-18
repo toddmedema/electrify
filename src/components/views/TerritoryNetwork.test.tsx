@@ -22,7 +22,7 @@ import {
 } from "../../helpers/TerritoryTiles";
 import { territoryTileViews } from "../../helpers/TerritoryMapState";
 import { currentTick } from "../../helpers/GameSelectors";
-import { formatWatts } from "../../helpers/Format";
+import { formatCount, formatWatts } from "../../helpers/Format";
 import type { GameType, TerritoryTileId } from "../../Types";
 import { GameToolMemoryContext } from "../base/GameToolMemory";
 import {
@@ -37,7 +37,7 @@ import { GENERATORS } from "../../data/Facilities";
 import { wToSliderTick } from "../../helpers/BuildSizing";
 import { getHydroAvailability } from "../../data/HydroSites";
 import { acquisitionQuote, transferUtility } from "../../helpers/Expansion";
-import { acquireTile } from "../../reducers/GameActions";
+import { acquireTile, acquireUtility } from "../../reducers/GameActions";
 import { registerMultiplayerRuntime } from "../../multiplayer/Registry";
 import type { Command } from "../../multiplayer/Types";
 
@@ -449,6 +449,30 @@ it("reveals purchased cities as customers rather than build destinations", () =>
   expect(
     within(surface()).queryByRole("tab", { name: "Generators" }),
   ).not.toBeInTheDocument();
+});
+
+it("shows the same grown customer count before and after a delayed utility acquisition", () => {
+  const game = ready();
+  game.date.minute += 5 * 365 * 24 * 60;
+  game.date.monthsElapsed += 60;
+  game.date.year += 5;
+  currentTick(game)!.cash = 1e12;
+  const quote = acquisitionQuote(game, "ridge-electric")!;
+  const app = show(game);
+  inspect("ridge-electric:city");
+  expect(surface()).toHaveTextContent("Customers to connect");
+  expect(surface()).toHaveTextContent(formatCount(quote.customers));
+  act(() =>
+    app.store.dispatch(
+      acquireUtility({
+        targetId: quote.targetId,
+        financed: false,
+        quoteKey: quote.quoteKey,
+      }),
+    ),
+  );
+  expect(surface()).toHaveTextContent("Connected customers");
+  expect(surface()).toHaveTextContent(formatCount(quote.customers));
 });
 
 it("keeps acquisition receipts and fleet controls reachable after buying a utility", () => {
