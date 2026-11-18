@@ -1189,9 +1189,7 @@ export type CoalRepowerType = (typeof COAL_REPOWER_UPGRADES)[number];
 export type FacilityUpgradeType =
   ResilienceUpgradeType | "combinedCycle" | CoalRepowerType;
 
-export function isCoalRepower(
-  upgrade: FacilityUpgradeType | undefined,
-): upgrade is CoalRepowerType {
+export function isCoalRepower(upgrade: unknown): upgrade is CoalRepowerType {
   return upgrade === "coalToGasCC" || upgrade === "coalToGasPeaker";
 }
 
@@ -1204,6 +1202,8 @@ export interface FacilityUpgradeInProgressType {
   cost: number; // What the player paid, and what a cancellation refunds
   startsMinute: number;
   completesMinute: number;
+  /** Rated gas output approved when a coal repower starts. */
+  targetPeakW?: number;
   /** Embodied emissions booked over a coal repower's construction interval. */
   constructionKgco2eTotal?: number;
 }

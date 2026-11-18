@@ -158,7 +158,10 @@ function actionsFor(
     },
     {
       key: "cancelUpgrade",
-      label: "Cancel upgrade",
+      label:
+        facilities.length === 1 && coalRepowerInProgress(facilities[0])
+          ? "Cancel conversion"
+          : "Cancel upgrade",
       facilities: facilities.filter(
         (f) =>
           !!f.upgradeInProgress &&

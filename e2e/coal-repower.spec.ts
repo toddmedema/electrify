@@ -61,7 +61,7 @@ for (const theme of ["light", "dark"]) {
       path: info.outputPath(`combined-cycle-preview-${theme}.png`),
       animations: "disabled",
     });
-    await dialog.getByRole("button", { name: "close", exact: true }).click();
+    await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
     await expect(dialog).toBeHidden();
 
     await peaker.click();
@@ -72,16 +72,30 @@ for (const theme of ["light", "dark"]) {
     await expect(dialog).toBeHidden();
     await expect(repowering).toContainText("Natural Gas Peaker");
     await expect(repowering).toContainText("complete");
+    await expect(coal).toHaveAccessibleDescription(
+      /Natural Gas Peaker, \d+% complete/,
+    );
     await expect(
       repowering.getByRole("button", { name: /^Convert to/ }),
     ).toHaveCount(0);
     await expect(
       fleet.getByRole("button", { name: "Pause Coal", exact: true }),
     ).toBeEnabled();
+    const sell = fleet.getByRole("button", { name: "Sell Coal", exact: true });
+    await expect(sell).toHaveCount(0);
+    await reviewScreenshot(
+      fleet.locator('.facilityRow[data-facility="Coal"] .facilityActions'),
+      {
+        path: info.outputPath(`conversion-controls-${theme}.png`),
+        animations: "disabled",
+      },
+    );
     await fleet
       .getByRole("button", { name: "Cancel conversion of Coal", exact: true })
       .click();
     await expect(peaker).toBeEnabled();
     await expect(cc).toBeEnabled();
+    await expect(sell).toBeEnabled();
+    await expect(coal).toBeFocused();
   });
 }

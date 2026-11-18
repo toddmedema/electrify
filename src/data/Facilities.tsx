@@ -14,7 +14,11 @@ import { getCostTableDeflator, getInflationIndex, hasEconomy } from "./Economy";
 import { DIFFICULTIES } from "../Constants";
 import { costBetween } from "../helpers/Math";
 import { facilityModifier, modScaledValue } from "../helpers/ScenarioMod";
-import { applyLegacyGeneratorEra, applyLegacyStorageEra } from "./LegacyEra";
+import {
+  applyLegacyGeneratorEra,
+  applyLegacyStorageEra,
+  gasNameplateLimitW,
+} from "./LegacyEra";
 import { GameType, GeneratorShoppingType, StorageShoppingType } from "../Types";
 import {
   getAirborneWindCapacityFactor,
@@ -462,7 +466,7 @@ export function GENERATORS(
       peakW,
       // About five of EIA's reference turbines at one site. The larger gas stations are combined
       // cycles, which are their own facility below.
-      maxPeakW: 2000000000,
+      maxPeakW: gasNameplateLimitW(state, "simple"),
       btuPerWh: 9.142,
       spinMinutes: 10,
       annualOperatingCost: fixedOperatingCost(peakW, 6.87),
@@ -503,7 +507,7 @@ export function GENERATORS(
       // advantage is that it stays cheap when built small.
       peakW,
       // ~6GW, the largest gas stations of the late 1980s onward - https://www.power-technology.com/features/feature-giga-projects-the-worlds-biggest-thermal-power-plants/
-      maxPeakW: 6000000000,
+      maxPeakW: gasNameplateLimitW(state, "combined"),
       // AEO2025 Case 5 net HHV heat rate, 6,266 Btu/kWh: 31% less fuel per MWh than the peaker.
       btuPerWh: 6.266,
       // A hot start of an H-class combined cycle reaches full load in well under an hour, a

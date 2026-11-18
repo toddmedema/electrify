@@ -1141,7 +1141,8 @@ function completeRetrofits(state: GameType, simulated = false): number {
   state.facilities.forEach((facility) => {
     const upgrade = upgradeInProgress(facility);
     if (!upgrade) return;
-    const repower = isCoalRepower(upgrade.upgrade);
+    const { upgrade: kind } = upgrade;
+    const repower = isCoalRepower(kind);
     if (repower) {
       constructionKgco2e += coalRepowerConstructionEmissions(
         upgrade,
@@ -1152,24 +1153,20 @@ function completeRetrofits(state: GameType, simulated = false): number {
     if (state.date.minute < upgrade.completesMinute) return;
     if (repower) {
       if (!completeCoalRepower(facility, state, upgrade)) return;
-    } else if (upgrade.upgrade === "combinedCycle") {
+    } else if (kind === "combinedCycle") {
       completeGasConversion(facility, state);
       if (!simulated) desktopSimulationHooks()?.converted(state, facility.id);
     } else {
-      facility.resilience = retrofittedResilience(
-        facility,
-        state,
-        upgrade.upgrade,
-      );
+      facility.resilience = retrofittedResilience(facility, state, kind);
     }
     delete facility.upgradeInProgress;
     if (simulated) return;
 
     const message = repower
       ? `Conversion complete: ${facility.name} replaces the coal plant.`
-      : upgrade.upgrade === "coldWeatherPackage"
-        ? `Upgrade complete: ${facility.name} now has ${retrofitLabel(upgrade.upgrade)}`
-        : `Upgrade complete: ${facility.name} is back online with ${retrofitLabel(upgrade.upgrade)}`;
+      : kind === "coldWeatherPackage"
+        ? `Upgrade complete: ${facility.name} now has ${retrofitLabel(kind)}`
+        : `Upgrade complete: ${facility.name} is back online with ${retrofitLabel(kind)}`;
     logGameEvent(state, "CONSTRUCTION", message, {
       actionTarget: { card: "FACILITIES", view: "FLEET" },
     });
@@ -3379,6 +3376,7 @@ function applyRetrofitFacility(
       (project?.durationMinutes ??
         (conversion ? GAS_CONVERSION_MINUTES : RETROFIT_DOWNTIME_MINUTES)),
     ...(project && {
+      targetPeakW: project.target.peakW,
       constructionKgco2eTotal: project.constructionKgco2eTotal,
     }),
   };
@@ -5272,7 +5270,9 @@ function* supplyFacilitiesFinancesPhases(
   // frame's already-recorded construction charge when booking the boundary's additional work.
   let constructionKgco2e =
     repowerEmissions +
-    (!simulated && now === prev ? now.constructionKgco2e || 0 : 0);
+    (now === prev && (!simulated || settlementEndMinute > now.minute)
+      ? now.constructionKgco2e || 0
+      : 0);
   const accrueConstruction = (
     asset: ConstructionEmissions & { yearsToBuildLeft: number },
     yearsToBuild: number,
@@ -6853,6 +6853,41 @@ function completeForecastConversion(
   return true;
 }
 
+/** Settle construction and commission technology before a private forecast interval dispatches. */
+function advanceForecastConversions(
+  state: GameType,
+  minute: number,
+  elapsedMinutes: number,
+  withoutMinimumStableOutput?: boolean,
+): number {
+  let emissions = 0;
+  for (const facility of state.facilities) {
+    const work = facility.upgradeInProgress;
+    if (!work) continue;
+    const repower = isCoalRepower(work.upgrade);
+    if (repower && elapsedMinutes > 0) {
+      emissions += coalRepowerConstructionEmissions(
+        work,
+        minute,
+        elapsedMinutes,
+      );
+    }
+    if (
+      minute < work.completesMinute ||
+      (!repower && work.upgrade !== "combinedCycle")
+    )
+      continue;
+    if (
+      completeForecastConversion(facility, state) &&
+      withoutMinimumStableOutput &&
+      !isStorage(facility)
+    ) {
+      facility.minimumStableOutput = undefined;
+    }
+  }
+  return emissions;
+}
+
 function supplyForecastPass(
   state: GameType,
   simulated?: boolean,
@@ -6893,32 +6928,12 @@ function supplyForecastPass(
       !(preserveCurrentFrame && t.minute === state.date.minute)
     ) {
       advanceGamePolicies(newState, Math.floor(t.minute / MINUTES_PER_MONTH));
-      let repowerEmissions = 0;
-      // The forecast owns private facilities. Install the target before serving the future tick.
-      for (const facility of newState.facilities) {
-        const project = facility.upgradeInProgress;
-        if (!project) continue;
-        const repower = isCoalRepower(project.upgrade);
-        if (repower && t.minute !== state.date.minute) {
-          repowerEmissions += coalRepowerConstructionEmissions(
-            project,
-            t.minute,
-            stepMinutes,
-          );
-        }
-        if (
-          t.minute < project.completesMinute ||
-          (!repower && project.upgrade !== "combinedCycle")
-        )
-          continue;
-        if (
-          completeForecastConversion(facility, newState) &&
-          withoutMinimumStableOutput &&
-          !isStorage(facility)
-        ) {
-          facility.minimumStableOutput = undefined;
-        }
-      }
+      const repowerEmissions = advanceForecastConversions(
+        newState,
+        t.minute,
+        t.minute === state.date.minute ? 0 : stepMinutes,
+        withoutMinimumStableOutput,
+      );
       t = { ...t };
       copyCommitmentMetadata(sourceTick, t);
       t = updateSupplyFacilitiesFinances(
@@ -6992,19 +7007,12 @@ function supplyForecastPass(
         (account) => account.termsVersion === 3,
       )
     ) {
-      const repowerEmissions = newState.facilities.reduce((sum, facility) => {
-        const project = coalRepowerInProgress(facility);
-        return (
-          sum +
-          (project
-            ? coalRepowerConstructionEmissions(
-                project,
-                closesMinute,
-                stepMinutes,
-              )
-            : 0)
-        );
-      }, 0);
+      const repowerEmissions = advanceForecastConversions(
+        newState,
+        closesMinute,
+        stepMinutes,
+        withoutMinimumStableOutput,
+      );
       t = updateSupplyFacilitiesFinances(
         newState,
         t,
@@ -7109,36 +7117,56 @@ function reforecastSupply(
   const futureBaseline = baseline.slice(
     forecastIndexAt(state, state.date.minute) + (preserveCurrentFrame ? 1 : 0),
   );
-  state.facilities.forEach((facility) => {
-    if (!isStorage(facility) && (facility.minimumStableOutput || 0) > 0) {
-      const project = facility.upgradeInProgress;
-      const conversionMinute =
-        project?.upgrade === "combinedCycle" || isCoalRepower(project?.upgrade)
-          ? project?.completesMinute
-          : undefined;
-      const converted =
-        conversionMinute !== undefined &&
-        (futureBaseline.at(-1)?.minute ?? -Infinity) >= conversionMinute
-          ? { ...facility }
-          : undefined;
-      if (converted) completeForecastConversion(converted, state);
+  for (const facility of state.facilities) {
+    if (isStorage(facility)) continue;
+    const project = facility.upgradeInProgress;
+    const repower = isCoalRepower(project?.upgrade);
+    const conversionMinute =
+      project?.upgrade === "combinedCycle" || repower
+        ? project?.completesMinute
+        : undefined;
+    const converted =
+      conversionMinute !== undefined &&
+      (futureBaseline.at(-1)?.minute ?? -Infinity) >= conversionMinute
+        ? { ...facility }
+        : undefined;
+    if (converted) completeForecastConversion(converted, state);
+
+    if (repower && converted && conversionMinute !== undefined) {
+      // The replacement starts cold. Coal running costs and avoided starts belong to the old unit.
+      const boundary = futureBaseline.findIndex(
+        (tick) => tick.minute >= conversionMinute,
+      );
+      for (const [unit, frames] of [
+        [facility, futureBaseline.slice(0, boundary)],
+        [converted, futureBaseline.slice(boundary)],
+      ] as const) {
+        if ((unit.minimumStableOutput || 0) <= 0) continue;
+        prepareGeneratorCommitment({
+          facilityId: unit.id,
+          forecast: frames,
+          minimumOperatingCost: (tick) =>
+            minimumStableOperatingCost(state, unit, tick, stepMinutes),
+        });
+      }
+    } else if ((facility.minimumStableOutput || 0) > 0) {
       prepareGeneratorCommitment({
         facilityId: facility.id,
         forecast: futureBaseline,
-        minimumOperatingCost: (futureTick) =>
+        minimumOperatingCost: (tick) =>
           minimumStableOperatingCost(
             state,
             converted &&
               conversionMinute !== undefined &&
-              futureTick.minute >= conversionMinute
+              tick.minute >= conversionMinute
               ? converted
               : facility,
-            futureTick,
+            tick,
             stepMinutes,
           ),
       });
     }
-  });
+  }
   return supplyForecastPass(
     { ...state, timeline: baseline },
     simulated,

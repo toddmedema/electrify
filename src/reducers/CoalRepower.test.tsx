@@ -2,8 +2,9 @@ import cloneDeep from "lodash.clonedeep";
 import { TICK_MINUTES } from "../Constants";
 import { parseSave, serializeSave } from "../SaveGame";
 import { CoalRepowerType, GameType } from "../Types";
-import { coalRepowerQuote } from "../helpers/CoalRepower";
-import { MINUTES_PER_MONTH } from "../helpers/DateTime";
+import { LEGACY_CAMPAIGN_ID } from "../data/LegacyCampaign";
+import { coalRepowerQuote, completeCoalRepower } from "../helpers/CoalRepower";
+import { getDateFromMinute, MINUTES_PER_MONTH } from "../helpers/DateTime";
 import { currentTick } from "../helpers/GameSelectors";
 import { validateGameCommand } from "../multiplayer/Commands";
 import { createGame } from "../testing/Simulator";
@@ -150,6 +151,24 @@ it("rejects ineligible and unfunded starts and refunds a canceled project once",
   invalid.upgradeInProgress.constructionKgco2eTotal = 0;
   invalid.fuel = "Oil";
   expect(parseSave(badSave)).toBeNull();
+  invalid.fuel = "Coal";
+  invalid.peakWh = 1;
+  expect(parseSave(badSave)).toBeNull();
+  delete invalid.peakWh;
+  const project = invalid.upgradeInProgress;
+  project.targetPeakW += 1e6;
+  expect(parseSave(badSave)).toBeNull();
+  project.targetPeakW = coal.peakW;
+  project.startsMinute += TICK_MINUTES;
+  project.completesMinute += TICK_MINUTES;
+  expect(parseSave(badSave)).toBeNull();
+  project.startsMinute -= TICK_MINUTES;
+  project.completesMinute -= TICK_MINUTES;
+  badSave.game.date = getDateFromMinute(
+    project.completesMinute,
+    game.startingYear,
+  );
+  expect(parseSave(badSave)).toBeNull();
 
   const unfunded = cloneDeep(game);
   currentTick(unfunded)!.cash = 0;
@@ -169,6 +188,7 @@ it("forecasts the replacement fuel and construction emissions without converting
     cost: quote.cost,
     startsMinute: 0,
     completesMinute: 120,
+    targetPeakW: coal.peakW,
     constructionKgco2eTotal: 800,
   };
   // Put the coal plant first and give it a steady load below either plant's nameplate.
@@ -189,4 +209,78 @@ it("forecasts the replacement fuel and construction emissions without converting
   expect(
     forecast.timeline.reduce((sum, t) => sum + (t.constructionKgco2e ?? 0), 0),
   ).toBe(800);
+});
+
+it("keeps quoted peaker capacity and operating characteristics across a catalog vintage change", () => {
+  const game = scenario();
+  game.scenarioId = LEGACY_CAMPAIGN_ID + 4;
+  game.startingYear = 1981;
+  const startsMinute = 11 * MINUTES_PER_MONTH;
+  game.date = getDateFromMinute(startsMinute, game.startingYear);
+  const coal = { ...findCoal(game), peakW: 300e6 };
+  const upgrade = "coalToGasPeaker";
+  const quote = coalRepowerQuote(coal, game, upgrade)!;
+  expect(quote.target.peakW).toBe(30e6);
+  expect(quote.target.btuPerWh).toBe(13.5);
+  const completesMinute = startsMinute + quote.durationMinutes;
+  game.date = getDateFromMinute(completesMinute, game.startingYear);
+  expect(game.date.year).toBe(1982);
+  expect(
+    completeCoalRepower(coal, game, {
+      upgrade,
+      cost: quote.cost,
+      startsMinute,
+      completesMinute,
+      constructionKgco2eTotal: quote.constructionKgco2eTotal,
+      targetPeakW: quote.target.peakW,
+    }),
+  ).toBe(true);
+  expect(coal.peakW).toBe(30e6);
+  expect(coal.btuPerWh).toBe(13.5);
+  expect(coal.assumedStartsPerYear).toBeUndefined();
+});
+
+it("commissions the replacement in the exclusive month-end agreement forecast", () => {
+  const game = scenario();
+  const end = MINUTES_PER_MONTH;
+  advance(game, end - 3 * TICK_MINUTES);
+  const coal = findCoal(game);
+  const upgrade = "coalToGasPeaker";
+  coal.upgradeInProgress = {
+    upgrade,
+    cost: 1,
+    startsMinute: game.date.minute,
+    completesMinute: end,
+    targetPeakW: coal.peakW,
+    constructionKgco2eTotal: 800,
+  };
+  // An existing v3 meter activates the extra closing settlement on the final frame.
+  game.transmission!.agreementAccounts = [
+    {
+      agreementId: "test-meter",
+      termsVersion: 3,
+      accountingStartMinute: 0,
+      accountedThroughMinute: game.date.minute,
+      months: [],
+    },
+  ];
+  game.timeline.forEach((tick) => {
+    tick.demandW = coal.peakW * 0.9;
+  });
+  const forecast = reducer(
+    game,
+    reprioritizeFacility({ spotInList: 1, delta: -1 }),
+  );
+  expect(findCoal(forecast).id).toBe(coal.id);
+  expect(forecast.timeline.at(-2)?.supplyByFuel.Coal).toBeGreaterThan(0);
+  expect(forecast.timeline.at(-1)?.supplyByFuel.Coal ?? 0).toBe(0);
+  expect(forecast.timeline.at(-1)?.supplyByFuel["Natural Gas"]).toBeGreaterThan(
+    0,
+  );
+  expect(
+    forecast.timeline.reduce(
+      (sum, tick) => sum + (tick.constructionKgco2e ?? 0),
+      0,
+    ),
+  ).toBeCloseTo(800);
 });

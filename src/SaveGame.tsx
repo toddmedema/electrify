@@ -474,6 +474,13 @@ export function parseSave(raw: unknown): SaveGameType | null {
     return null;
   }
   const inheritedScenario = getScenario(game.scenarioId, game.customScenario);
+  const upgradeContext = {
+    date: game.date,
+    startingYear: game.startingYear,
+    scenarioId: game.scenarioId,
+    customScenario: game.customScenario,
+    difficulty: game.difficulty,
+  };
   if (inheritedScenario && !Array.isArray(inheritedScenario.facilities))
     return null;
   if (
@@ -561,7 +568,11 @@ export function parseSave(raw: unknown): SaveGameType | null {
         optionalBooleansInvalid ||
         !validResilienceRecord(current.fuel, current.resilience) ||
         !validGasCycle(current.fuel, current.gasCycle) ||
-        !validUpgradeInProgress(current.upgradeInProgress, current) ||
+        !validUpgradeInProgress(
+          current.upgradeInProgress,
+          current,
+          upgradeContext,
+        ) ||
         ((current.upgradeInProgress as { upgrade?: unknown } | undefined)
           ?.upgrade === "combinedCycle" &&
           (current.fuel !== "Natural Gas" || current.gasCycle !== "simple"))

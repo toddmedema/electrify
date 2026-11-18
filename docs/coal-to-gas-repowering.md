@@ -162,8 +162,8 @@ sulfur and particulate pollution during operation, and gas turbine emissions sti
   the engineering estimate for brownfield savings and the time approximates field construction
   at Big Bend. Use the game's existing 1990 combined-cycle availability.
 - Size the replacement to the coal nameplate rating, capped at the destination technology's site
-  maximum. Actual projects choose output from turbine sizes, site conditions and system
-  needs. A fixed equal-size conversion gives players a predictable quote and keeps incremental
+  maximum when the project is approved. Actual projects choose output from turbine sizes, site
+  conditions and system needs. A fixed equal-size conversion gives players a predictable quote and keeps incremental
   capacity a separate decision. Apply normal gas dispatch, fuel, costs and emissions once the
   new equipment is commissioned. Start a fresh gas-facility service life at commissioning,
   consistent with modeling replacement generating equipment. A real burner retrofit keeps

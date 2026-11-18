@@ -413,6 +413,8 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
       ? "installing winterization, 90% capacity available"
       : undefined;
   const storage = isStorage(facility) ? facility : undefined;
+  const disclosure = React.useRef<HTMLButtonElement>(null);
+  const repowerProgressId = React.useId();
   const wasBuilding = React.useRef(underConstruction);
   const [arriving, setArriving] = React.useState(arrivalRequested);
   const [ready, setReady] = React.useState(false);
@@ -518,7 +520,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
       <>
         <span className="facilityStatusLong">
           {repowering
-            ? `Repowering ${Math.round(builtFraction * 100)}%`
+            ? `Repowering ${Math.floor(builtFraction * 100)}%`
             : partialUpgrade
               ? `Winterizing ${Math.round(builtFraction * 100)}% · 90% capacity available`
               : resilienceName(installing!.upgrade)}
@@ -526,7 +528,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
         </span>
         <span className="facilityStatusShort">
           {repowering
-            ? `Repowering ${Math.round(builtFraction * 100)}%`
+            ? `Repowering ${Math.floor(builtFraction * 100)}%`
             : `${daysLeft}d left`}
         </span>
       </>
@@ -679,7 +681,9 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
             )}
             <button
               type="button"
+              ref={disclosure}
               className="facilityDisclosure"
+              aria-describedby={repowering ? repowerProgressId : undefined}
               aria-label={
                 `Inspect ${facilityDisplayName(facility)}` +
                 (hazardStatus && !underConstruction
@@ -742,6 +746,11 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                 <ChevronDownGlyph className="facilityChevron" aria-hidden />
               </ListItem>
             </button>
+            {repowering && (
+              <span id={repowerProgressId} className="srOnly">
+                {activityLabel}
+              </span>
+            )}
             {props.showCheckboxes && (
               <Checkbox
                 className="facilitySelectionCheckbox"
@@ -775,6 +784,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
               }
               cancelLabel="Never mind"
               confirmLabel={underConstruction ? "Cancel construction" : "Sell"}
+              confirmDisabled={repowering}
               onCancel={toggleDialog}
               onConfirm={() => {
                 props.onSell(facility.id);
@@ -788,16 +798,22 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                     : "Selling won't free this site."}
                 </DialogContentText>
               )}
-              <DialogContentText>
-                You will receive{" "}
-                {formatMoneyConcise(
-                  facilityCashBack(facility, game.date.minute),
-                )}
-                {facility.loanAmountLeft > 0
-                  ? ` and the rest will go towards paying off the remaining loan balance of ${formatMoneyConcise(facility.loanAmountLeft)}`
-                  : ""}
-                .
-              </DialogContentText>
+              {repowering ? (
+                <DialogContentText>
+                  Cancel the conversion before selling this plant.
+                </DialogContentText>
+              ) : (
+                <DialogContentText>
+                  You will receive{" "}
+                  {formatMoneyConcise(
+                    facilityCashBack(facility, game.date.minute),
+                  )}
+                  {facility.loanAmountLeft > 0
+                    ? ` and the rest will go towards paying off the remaining loan balance of ${formatMoneyConcise(facility.loanAmountLeft)}`
+                    : ""}
+                  .
+                </DialogContentText>
+              )}
             </ConfirmDialog>
           )}
           {selected && (
@@ -817,7 +833,14 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
               permanentlyShutdown={permanentlyShutdown}
               onPause={onPause}
               onTogglePause={onTogglePause}
-              onCancelRetrofit={props.onCancelRetrofit}
+              onCancelRetrofit={
+                props.onCancelRetrofit &&
+                ((id) => {
+                  props.onCancelRetrofit?.(id);
+                  if (repowering)
+                    disclosure.current?.focus({ preventScroll: true });
+                })
+              }
               onOpenSell={toggleDialog}
             />
           )}

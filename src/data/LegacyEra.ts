@@ -1,6 +1,7 @@
 import type {
   FuelPricesType,
   GameType,
+  GasCycleType,
   GeneratorShoppingType,
   ModFacilityNameType,
   StorageShoppingType,
@@ -15,6 +16,13 @@ export function isLegacyCampaignScenarioId(id: number): boolean {
 type LegacyContext = Pick<GameType, "scenarioId" | "customScenario" | "date">;
 export function isLegacyEraGame(game: LegacyContext): boolean {
   return isLegacyCampaignScenarioId(game.scenarioId) && !game.customScenario;
+}
+
+export function gasNameplateLimitW(game: LegacyContext, cycle: GasCycleType) {
+  if (cycle === "combined") return 6_000_000_000;
+  return isLegacyEraGame(game) && game.date.year < 1982
+    ? 30_000_000
+    : 2_000_000_000;
 }
 
 export function getLegacyBuildBounds(
@@ -245,7 +253,7 @@ export function applyLegacyGeneratorEra(
     quote.yearsToBuild = 6.5;
   } else if (quote.name === "Natural Gas Peaker" && year < 1982) {
     quote.available = year >= 1950;
-    quote.maxPeakW = 30000000;
+    quote.maxPeakW = gasNameplateLimitW(game, "simple");
     quote.btuPerWh = 13.5;
     quote.buildCost = eraCost(quote, 10000000, 22000000);
     quote.yearsToBuild = 1.5;

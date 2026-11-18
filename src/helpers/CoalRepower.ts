@@ -1,15 +1,17 @@
 import { DIFFICULTIES, TICK_MINUTES } from "../Constants";
 import { GENERATORS } from "../data/Facilities";
 import { getInflationIndex } from "../data/Economy";
+import { gasNameplateLimitW } from "../data/LegacyEra";
 import {
   CoalRepowerType,
+  DifficultyType,
   FacilityOperatingType,
   FacilityUpgradeInProgressType,
   GameType,
   isCoalRepower,
   isStorage,
 } from "../Types";
-import { MINUTES_PER_MONTH } from "./DateTime";
+import { getDateFromMinute, MINUTES_PER_MONTH } from "./DateTime";
 import { activeScenario } from "./GameSelectors";
 
 // Brownfield site reuse assumptions. See docs/coal-to-gas-repowering.md for the cases and scope.
@@ -39,18 +41,60 @@ export const COAL_REPOWER_OPTIONS = {
   }
 >;
 
+export type RepowerContext = Pick<
+  GameType,
+  "date" | "startingYear" | "scenarioId" | "customScenario" | "difficulty"
+>;
+
+function repowerCapacityW(
+  sourceW: number,
+  game: RepowerContext,
+  kind: CoalRepowerType,
+) {
+  const cycle = kind === "coalToGasCC" ? "combined" : "simple";
+  return Math.min(sourceW, gasNameplateLimitW(game, cycle));
+}
+
+function repowerDurationMinutes(
+  kind: CoalRepowerType,
+  difficulty: DifficultyType,
+) {
+  const months =
+    COAL_REPOWER_OPTIONS[kind].baseMonths * DIFFICULTIES[difficulty].buildTime;
+  return Math.ceil((months * MINUTES_PER_MONTH) / TICK_MINUTES) * TICK_MINUTES;
+}
+
 function coalRepowerTarget(
-  facility: FacilityOperatingType,
+  peakW: number,
   game: GameType,
   kind: CoalRepowerType,
 ) {
   const name = COAL_REPOWER_OPTIONS[kind].name;
-  const atSize = (peakW: number) =>
-    GENERATORS(game, peakW, [], []).find((g) => g.name === name);
-  const target = atSize(facility.peakW);
-  return target && target.peakW > target.maxPeakW
-    ? atSize(target.maxPeakW)
-    : target;
+  return GENERATORS(game, peakW, [], []).find((g) => g.name === name);
+}
+
+/** Check timing and rated output from a project's approval vintage. */
+export function validCoalRepowerSchedule(
+  game: RepowerContext,
+  kind: CoalRepowerType,
+  sourceW: number,
+  startsMinute: number,
+  completesMinute: number,
+  targetPeakW: number,
+): boolean {
+  if (
+    startsMinute > game.date.minute ||
+    completesMinute <= game.date.minute ||
+    completesMinute - startsMinute !==
+      repowerDurationMinutes(kind, game.difficulty) ||
+    activeScenario(game)?.tutorialSteps
+  )
+    return false;
+  const date = getDateFromMinute(startsMinute, game.startingYear);
+  return (
+    date.year >= COAL_REPOWER_OPTIONS[kind].firstYear &&
+    targetPeakW === repowerCapacityW(sourceW, { ...game, date }, kind)
+  );
 }
 
 export function coalRepowerQuote(
@@ -72,13 +116,15 @@ export function coalRepowerQuote(
     activeScenario(game)?.tutorialSteps
   )
     return undefined;
-  const target = coalRepowerTarget(facility, game, kind);
+  const target = coalRepowerTarget(
+    repowerCapacityW(facility.peakW, game, kind),
+    game,
+    kind,
+  );
   if (!target) return undefined;
-  const months = option.baseMonths * DIFFICULTIES[game.difficulty].buildTime;
   return {
     cost: Math.round(target.buildCost * option.buildCostShare),
-    durationMinutes:
-      Math.ceil((months * MINUTES_PER_MONTH) / TICK_MINUTES) * TICK_MINUTES,
+    durationMinutes: repowerDurationMinutes(kind, game.difficulty),
     constructionKgco2eTotal:
       (target.constructionKgco2ePerW ?? 0) * target.peakW,
     target,
@@ -125,26 +171,30 @@ export function completeCoalRepower(
   if (
     isStorage(facility) ||
     facility.fuel !== "Coal" ||
-    !isCoalRepower(project.upgrade)
+    !isCoalRepower(project.upgrade) ||
+    project.targetPeakW === undefined
   )
     return false;
-  const target = coalRepowerTarget(facility, game, project.upgrade);
+  const date = getDateFromMinute(project.startsMinute, game.startingYear);
+  const target = coalRepowerTarget(
+    project.targetPeakW,
+    { ...game, date },
+    project.upgrade,
+  );
   if (!target) return false;
   // The catalog supplies the new turbine, including the site's normal gas weather rating.
   // Keep prior operating history and debt. The gas investment replaces the coal resale basis.
   const { resilienceExtraBuildCost: _resilienceExtraBuildCost, ...technology } =
     target;
+  delete facility.resilienceExtraBuildCost;
   Object.assign(facility, technology, {
     buildCost: project.cost,
     yearsToBuild:
       (project.completesMinute - project.startsMinute) /
       (12 * MINUTES_PER_MONTH),
     minuteOperational: project.completesMinute,
-    costIndexAtBuild: getInflationIndex(
-      game.date,
-      game.startingYear,
-      game.seed,
-    ),
+    assumedStartsPerYear: target.assumedStartsPerYear,
+    costIndexAtBuild: getInflationIndex(date, game.startingYear, game.seed),
     currentW: 0,
     committed: false,
     generatingLastRealTick: false,

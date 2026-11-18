@@ -114,6 +114,7 @@ export default function CoalRepower({
   onRetrofit?: (payload: RetrofitFacilityAction) => void;
 }) {
   const [review, setReview] = React.useState<CoalRepowerType>();
+  const section = React.useRef<HTMLElement>(null);
   const project = coalRepowerInProgress(facility);
   const options = onRetrofit
     ? COAL_REPOWER_UPGRADES.flatMap((kind) => {
@@ -129,15 +130,30 @@ export default function CoalRepower({
   if (!project && !options.length) return null;
   const cash = currentCash(game);
   return (
-    <section className="facilityDetailSection" aria-label="Coal repowering">
+    <section
+      ref={section}
+      tabIndex={-1}
+      className="facilityDetailSection"
+      aria-label="Coal repowering"
+    >
       <Typography component="h3" className="facilityDetailHeading">
         Repower with natural gas
       </Typography>
       {project ? (
-        <Typography variant="body2">
-          {COAL_REPOWER_OPTIONS[project.upgrade].name} ·{" "}
-          {formatPercent(upgradeProgress(project, game.date.minute))} complete
-        </Typography>
+        <>
+          <Typography variant="body2">
+            {COAL_REPOWER_OPTIONS[project.upgrade].name} ·{" "}
+            {Math.floor(upgradeProgress(project, game.date.minute) * 100)}%
+            complete
+          </Typography>
+          <Typography
+            variant="body2"
+            color="textSecondary"
+            className="facilityDetailDescription"
+          >
+            Cancel the conversion before selling this plant.
+          </Typography>
+        </>
       ) : (
         <Typography
           variant="body2"
@@ -161,7 +177,12 @@ export default function CoalRepower({
           facility={facility}
           game={game}
           kind={review}
-          onRetrofit={onRetrofit}
+          onRetrofit={(payload) => {
+            onRetrofit(payload);
+            requestAnimationFrame(() =>
+              section.current?.focus({ preventScroll: true }),
+            );
+          }}
           onClose={() => setReview(undefined)}
         />
       )}
