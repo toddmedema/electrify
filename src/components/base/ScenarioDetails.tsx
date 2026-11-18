@@ -24,7 +24,6 @@ import {
 import { useUnits } from "./UnitsContext";
 import { formatLargeMassApprox, KG_PER_MEGATONNE } from "../../helpers/Units";
 import CustomerGrowthChallenge from "./CustomerGrowthChallenge";
-import ConceptIcon from "./ConceptIcon";
 import { formatScore, formatForecastNumber } from "../../helpers/Format";
 import { getMissionStatus } from "../../helpers/MissionStatus";
 import { scenarioObjectiveDefinitions } from "../../helpers/ObjectiveRules";
@@ -226,25 +225,17 @@ function ScoreOutlook(props: {
           data-status={outlook?.status ?? "loading"}
         >
           {outlook?.status === "loss" ? (
-            <>
-              <ConceptIcon
-                concept="danger"
-                fontSize="small"
-                color="inherit"
-                decorative
-              />
-              <div>
-                <strong>Projected loss:</strong>
-                <Box
-                  component="ul"
-                  sx={{ m: 0, mt: 0.5, pl: 2.5, "& li + li": { mt: 0.5 } }}
-                >
-                  {loss.failures.map((failure) => (
-                    <li key={failure.id}>{failure.text}</li>
-                  ))}
-                </Box>
-              </div>
-            </>
+            <div>
+              <strong>Projected loss:</strong>
+              <Box
+                component="ul"
+                sx={{ m: 0, mt: 0.5, pl: 2.5, "& li + li": { mt: 0.5 } }}
+              >
+                {loss.failures.map((failure) => (
+                  <li key={failure.id}>{failure.text}</li>
+                ))}
+              </Box>
+            </div>
           ) : (
             loss.text
           )}
