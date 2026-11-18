@@ -13,12 +13,12 @@ Inherited nuclear and Québec hydro commitments retain their original dates.
 Acquisition transfers plants, customers, sites, debts and third-party obligations;
 a PPA with the acquired seller ends as an external delivery/charge. Visible unowned
 tiles touching physically owned company land are purchasable; a PPA extends sight
-without granting purchase adjacency. General land, residential or industrial customers, and
+without granting purchase adjacency. General land, mixed-demand cities, and
 special hydro or geothermal sites have distinct cash prices and benefits. See
 [territories](territories.md) for site budgets, accounting and legacy-save conversion.
 
 The map uses a low-poly 3D hex board, following the visual direction in
-[issue 603](https://github.com/toddmedema/electrify/issues/603). Towns and factories indicate
+[issue 603](https://github.com/toddmedema/electrify/issues/603). Small, medium and large cities indicate
 customers. Plains, forest, hills, mountain, river and lake are illustrated
 terrain meshes, with separate upright cities, generators, storage and towers.
 The simulated day drives sun/moon lighting and simple shadows. Devices without
@@ -61,19 +61,19 @@ remain. No water cell consumes an existing land reservation, and no ocean, hydro
 claim or geothermal resource is added. The generated frontier retains its
 versioned integer geography rather than extending a claim of researched local detail.
 
-City roles retain their authored sectors and coordinates: Burlington-inspired
-mixed urban load in the west, a residential river corridor, and an eastern
-industrial cluster inspired by Essex/Williston. Burlington's
+City coordinates retain the Burlington-inspired urban load in the west, the river
+corridor and an eastern cluster inspired by Essex/Williston. Each now has its own
+deterministic mixed demand rather than a residential or industrial identity. Burlington's
 [South End plan](https://www.burlingtonvt.gov/324/South-End-Plan) describes its mixed
 office/industrial employment, while the
 [Vermont DEC semiconductor facility record, section 9.2](https://dec.vermont.gov/sites/dec/files/wmp/HazWaste/Documents/Permits/Global%20Foundries/Section%209%20-%20%20Contingency%20Plan.pdf)
 places a manufacturing campus across Essex, Essex Junction and Williston. These
 support broad placement inspiration, not customer totals, demand calibration or
-exact municipal footprints. Outer residential and industrial cities remain generic
+exact municipal footprints. Outer cities remain generic
 load clusters. Valley and Ridge retain their separately authored Rutland and White
 River Junction location metadata; company dispatch still uses Burlington weather.
 
-Every tile ID, coordinate, owner, starting asset, city sector and customer total
+Every tile ID, coordinate, owner, starting asset and customer total
 is retained. New Wind/Solar quotes use the revised terrain through the normal
 [terrain modifiers](terrain-modifiers.md). Existing Wind on affected cells also
 uses the revised local wind input; saves retain the installed plant's investment,

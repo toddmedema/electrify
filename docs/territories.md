@@ -2,7 +2,7 @@
 
 Scenario 116 and mods based on it share one company power pool. Facilities and
 storage serve every owned customer's demand automatically. Territory location
-controls suitable finite sites and inherited customer sectors. It never limits
+controls suitable finite sites and inherited customer demand. It never limits
 power transfers or adds a separate line project or fee beyond the tile's connection
 cost. The authored starting area extends into deterministic terrain as players
 acquire individual tiles with **Connect**. Each hex contains a city with no
@@ -47,10 +47,10 @@ Prices use 2005 dollars, indexed by the existing seeded CPI:
   seven tiles cost one seventh of its former $18 million price each. Any ordinary
   onshore generator or storage technology can use general sites, subject to
   terrain siting allowances and normal technology and quote limits.
-- Residential tiles cost $32 million and add 16,000 customer accounts at the
-  scenario's opening date. Industrial tiles cost $12 million and add 400 accounts,
+- Medium cities cost $32 million and add 16,000 customer accounts at the
+  scenario's opening date. Small cities cost $12 million and add 400 service accounts,
   each with demand equivalent to 20 ordinary accounts. Account transfers scale with
-  the existing dated market growth and update the company's demand sector mix.
+  the existing dated market growth and update the company's demand mix.
   These city tiles have no building sites or inherited plants.
 - Hydro tiles cost $16 million and provide one fictional 20 MW hydro site.
   Geothermal tiles cost $14 million and provide one fictional 25 MW site.
@@ -98,6 +98,35 @@ Existing plants retain their placement, capacity and finances when terrain
 allowances change, including plants on individually purchased frontier cells.
 New construction and capacity-expansion targets must fit today's allowances.
 Inherited hydro retains its named provenance.
+
+Cities share one visual family: small towns, medium urban centers and large city
+skylines. Customer counts determine the tier; accounts below 8,000 are small,
+below 50,000 medium, and the remainder large. Counts and load scaling retain the
+authored economic identities. Every city has a seed-and-ID-derived mixture of
+residential, commercial and industrial demand. Discovery and connection order do
+not change that mixture. Inspection and the company demand calculation use the
+same profile, including for cities the player does not own.
+
+## Capacity upgrades
+
+An existing generator or storage facility offers **Upgrade capacity** in its
+details. The cash price is the current quote for the target size less the current
+quote for its installed size, retaining its technology, location and build options.
+The review shows the total target, added capital, cash remaining and construction
+time. Added capacity uses the normal target project's construction duration;
+existing capacity continues operating under its ordinary dispatch rules. Storage
+retains its actual stored energy, and hydro retains its stored water.
+
+Each facility supports one capacity project at a time. A pending retrofit prevents
+another project. Completion preserves the plant's identity, age, loans and history;
+it adds the paid capital and operating-cost difference. Cancellation returns the
+capacity project's capital once without undoing already emitted construction
+carbon. Co-op commands and save validation bind each project to its own identity.
+
+Producing plants use a green plus, idle plants a red minus, and active 3D models
+gain saturation and illuminated windows. Charging remains a separate storage state.
+The bottom-right **Map layers** menu independently controls operating, idle/paused
+and construction markers. These preferences only affect badges.
 
 The relative allowances draw on primary-source mechanisms rather than equal-area
 engineering comparisons. [NREL's solar land-use study (2013)](https://docs.nlr.gov/docs/fy13osti/56290.pdf)

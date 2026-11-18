@@ -13,12 +13,7 @@ function glyph(kind: Exclude<FacilityMapStatusKind, "unknown">) {
     case "paused":
       return <path d="M-20-24H-7V24H-20ZM7-24H20V24H7Z" />;
     case "producing":
-      return (
-        <path
-          fill="#2E7D32"
-          d="M-24-6H-6V-24H6V-6H24V6H6V24H-6V6H-24Z"
-        />
-      );
+      return <path fill="#2E7D32" d="M-24-6H-6V-24H6V-6H24V6H6V24H-6V6H-24Z" />;
     case "charging":
       return <path d="M0-27L25-2H9V25H-9V-2H-25Z" transform="rotate(180)" />;
     case "idle":

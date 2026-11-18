@@ -82,6 +82,12 @@ balances. The inland authored ocean becomes a lake; installed offshore plants
 retain their plant-specific siting and wind inputs. Selling the plant removes
 that installation exception and never grants replacement offshore access.
 
+Schema 19 adds optional capacity-expansion projects. Older saves need no new
+project fields. Current saves validate the target, retained installed capacity,
+construction progress, capital terms and unique project identity. An imported
+pending project cannot bypass technology, era or terrain limits; inherited
+installed plants retain their existing capacity.
+
 Recognized published schema 13, 14, 15, 16 and 17 co-op identities have ordered transitions.
 It preserves the run's original scoring provenance. Existing company-local land
 rights are retained, including old duplicate ownership; new claims are exclusive
