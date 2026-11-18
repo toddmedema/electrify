@@ -43,6 +43,7 @@ import { useMoney } from "./CurrencyContext";
 import { facilityDisplayName } from "./FacilityLabels";
 import ConfirmDialog from "./ConfirmDialog";
 import DecisionImpactPreview from "./DecisionImpactPreview";
+import { signature } from "./DeferredProjection";
 import "./FacilityCapacityUpgrade.scss";
 
 export interface FacilityCapacityUpgradeActions {
@@ -116,13 +117,42 @@ export default function FacilityCapacityUpgrade({
     }
   }, [open, cancelReview]);
   const targetSize = target.trim() ? Number(target) * 1e6 : NaN;
-  const availability = open
-    ? facilityExpansionQuote(game, facility.id, size + 1)
+  const pricingKey = open
+    ? JSON.stringify([
+        signature(game),
+        game.date.month,
+        game.date.monthNumber,
+        game.interestRate,
+        game.commissionedHydroSiteIds,
+        facility.name,
+        facility.tileId,
+        facility.territoryId,
+        facility.hydroSiteId,
+        facility.resilience,
+        facility.costIndexAtBuild,
+        facility.expansionSequence,
+        facilityPermanentlyShutdown(facility, game.date.minute),
+      ])
     : undefined;
+  const { id: facilityId } = facility;
+  const availability = React.useMemo(
+    () =>
+      pricingKey === undefined
+        ? undefined
+        : facilityExpansionQuote(game, facilityId, size + 1),
+    // Pricing changes with the planning inputs, while cash is checked live below.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [pricingKey, facilityId, size],
+  );
   const maximum = availability?.maxSize ?? physicalMaximum;
-  const quote = open
-    ? facilityExpansionQuote(game, facility.id, targetSize)
-    : undefined;
+  const quote = React.useMemo(
+    () =>
+      pricingKey === undefined
+        ? undefined
+        : facilityExpansionQuote(game, facilityId, targetSize),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [pricingKey, facilityId, size, targetSize],
+  );
   const ready = quote?.status === "ready" ? quote : undefined;
   const cash = currentCash(game);
   const shortfall = ready ? Math.max(0, ready.cost - cash) : 0;

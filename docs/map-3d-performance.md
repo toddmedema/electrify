@@ -73,11 +73,14 @@ panning callback windows separately and retains the rendered month boundaries.
 
 The existing goals remain 120 Hz / 8.33 ms for desktop and 60 Hz / 16.67 ms for
 phones, with roughly half the frame available for presentation and tick work. These
-are lab reports, following `e2e/frame-budget.spec.ts`, rather than machine-dependent
-CI timing gates. Callback cadence cannot prove physical presentation, a 60 Hz
+are lab reports, following `e2e/frame-budget.spec.ts`. The production CI matrix
+runs the functional `e2e/map-3d.spec.ts` suite. Callback cadence cannot prove physical presentation, a 60 Hz
 headless callback stream cannot demonstrate 120 Hz, and viewport emulation cannot
-certify a phone GPU. Report those limits together with results. The existing bundle,
-simulation and tick-performance ceilings remain unchanged.
+certify a phone GPU. Report those limits together with results. The Valley map,
+build rail and inspection styles increase the main CSS gzip baseline from 30,800
+to 34,118 bytes. The existing 10% tolerance sets its ceiling at about 37.5 kB.
+JavaScript keeps its existing ceilings and the production build uses the existing
+four Terser compression passes.
 
 The integrating task owns the fresh production build, full checks, final measurements
 and published evidence. A partial viewport/speed run establishes only that scope.
@@ -112,7 +115,6 @@ The windowless Metal follow-up below supplies hardware-GPU evidence; real-phone
 verification remains outstanding. No target, timing
 ceiling, simulation baseline or bundle ceiling was changed to accommodate this run.
 
-
 ### Windowless Metal follow-up
 
 The same immutable production build subsequently ran on the installed headless
@@ -135,5 +137,5 @@ and 8.5/8.9 ms at 360 px. Panning p95 ranged from 8.4 to 9.1 ms. Raw reports rem
 under `.tmp/metal-performance-results`, with backend/build identity, individual
 samples, geometry/resource counts and actual rollover evidence. These measurements
 bound the map's draw work; they do not measure physical presentation or every UI
-and browser cost. Phone viewports still use the M5 Max GPU and do not certify phone
-hardware. Existing goals and ceilings remain unchanged.
+and browser cost. Phone viewports still use the M5 Max GPU. The frame targets
+above apply to measurements on physical phones.

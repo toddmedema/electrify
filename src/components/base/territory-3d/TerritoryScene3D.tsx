@@ -25,6 +25,11 @@ const loadRenderer: RendererLoader = async () => {
   return (canvas, onState) => new MapRenderer(canvas, onState);
 };
 
+export interface SceneCamera {
+  subscribe: (listener: () => void) => () => void;
+  getSnapshot: () => { x: number; y: number };
+}
+
 /** Lazy boundary keeps GPU/model code outside the initial game shell. */
 export default function TerritoryScene3D({
   views,
@@ -34,7 +39,8 @@ export default function TerritoryScene3D({
   minuteOfDay,
   speed,
   runKey,
-  frame,
+  frame: viewport,
+  camera,
   daylight,
   dark,
   onState,
@@ -47,7 +53,11 @@ export default function TerritoryScene3D({
   minuteOfDay: number;
   speed: SpeedType;
   runKey: string;
-  frame: Omit<MapFrame, "lighting" | "lightingTransitionMs">;
+  frame: Omit<
+    MapFrame,
+    "lighting" | "lightingTransitionMs" | "cameraX" | "cameraY"
+  >;
+  camera: SceneCamera;
   daylight: {
     sunrise: number;
     sunset: number;
@@ -57,6 +67,11 @@ export default function TerritoryScene3D({
   onState: (state: RendererState) => void;
   onPicker: (picker: ScenePicker | undefined) => void;
 }) {
+  const { x: cameraX, y: cameraY } = React.useSyncExternalStore(
+    camera.subscribe,
+    camera.getSnapshot,
+  );
+  const frame = { ...viewport, cameraX, cameraY };
   const builder = React.useMemo(() => new SceneBuilder(factories), []);
   const instances = React.useMemo(
     () => builder.build(views, tiles, wires, minute, runKey),

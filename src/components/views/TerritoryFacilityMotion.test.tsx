@@ -36,7 +36,12 @@ function draw(game: GameType, tileId: TerritoryTileId) {
   const view = render(
     <Provider store={store}>
       <TerritoryTilePurchasesProvider game={game}>
-        <TerritoryHexMap game={game} selected={tileId} onSelect={jest.fn()} />
+        <TerritoryHexMap
+          views={territoryTileViews(game)}
+          game={game}
+          selected={tileId}
+          onSelect={jest.fn()}
+        />
       </TerritoryTilePurchasesProvider>
     </Provider>,
   );

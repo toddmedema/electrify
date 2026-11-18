@@ -290,21 +290,32 @@ export function tilePrice(
       : 1;
   return landPrice(game, minute, tile.territoryId) / count;
 }
+type TerritoryTile = NonNullable<ReturnType<typeof getTerritoryTile>>;
+
+/** Connection eligibility is independent of the quote and also drives map affordances. */
+export function createTilePurchaseEligibility(
+  game: GameType,
+  owns = createTerritoryTileOwnership(game),
+) {
+  const enabled = hasTerritoryNetwork(game);
+  const adjacent = createTerritoryTileAdjacency(
+    ownedTerritoryTiles(game, owns),
+  );
+  return (
+    tile: TerritoryTile,
+  ): tile is TerritoryTile & { territoryId: LandTerritoryId } =>
+    enabled &&
+    isLandTerritoryId(tile.territoryId) &&
+    !owns(tile) &&
+    adjacent(tile) &&
+    !game.multiplayer?.tileOwners?.[tile.id] &&
+    !game.multiplayer?.landOwners?.[tile.territoryId];
+}
+
 function purchaseQuote(
   game: GameType,
-  tile: NonNullable<ReturnType<typeof getTerritoryTile>>,
-  owns = createTerritoryTileOwnership(game),
-  adjacent = createTerritoryTileAdjacency(ownedTerritoryTiles(game, owns)),
+  tile: TerritoryTile & { territoryId: LandTerritoryId },
 ) {
-  if (
-    !hasTerritoryNetwork(game) ||
-    !isLandTerritoryId(tile.territoryId) ||
-    owns(tile) ||
-    !adjacent(tile) ||
-    game.multiplayer?.tileOwners?.[tile.id] ||
-    game.multiplayer?.landOwners?.[tile.territoryId]
-  )
-    return undefined;
   const territory = getTerritoryDefinition(tile.territoryId)!;
   const price = tilePrice(game, game.date.minute, tile.id);
   const customers = tile.city
@@ -330,21 +341,22 @@ function purchaseQuote(
 }
 export function tilePurchaseQuote(game: GameType, tileId: TerritoryTileId) {
   const tile = getTerritoryTile(tileId, game);
-  return tile && territoryVisibilityDistance(game, tile) !== undefined
+  return tile &&
+    createTilePurchaseEligibility(game)(tile) &&
+    territoryVisibilityDistance(game, tile) !== undefined
     ? purchaseQuote(game, tile)
     : undefined;
 }
 /** Batch map quotes share the finite discovery pass instead of rebuilding sight per tile. */
-export function tilePurchaseQuotes(game: GameType) {
-  const owns = createTerritoryTileOwnership(game);
-  const adjacent = createTerritoryTileAdjacency(
-    ownedTerritoryTiles(game, owns),
-  );
+export function tilePurchaseQuotes(
+  game: GameType,
+  visible: readonly { tile: TerritoryTile }[] = visibleTerritoryTiles(game),
+) {
+  const eligible = createTilePurchaseEligibility(game);
   return new Map(
-    visibleTerritoryTiles(game).flatMap(({ tile }) => {
-      const quote = purchaseQuote(game, tile, owns, adjacent);
-      return quote ? [[tile.id, quote] as const] : [];
-    }),
+    visible.flatMap(({ tile }) =>
+      eligible(tile) ? [[tile.id, purchaseQuote(game, tile)] as const] : [],
+    ),
   );
 }
 /** Compatibility entry point selects ONE still-available visible cell; it never grants a region. */
@@ -352,10 +364,16 @@ export function landPurchaseQuote(
   game: GameType,
   id: LandTerritoryId = "green-uplands",
 ) {
-  const tile = getTerritoryTiles(game).find(
-    (tile) => tile.territoryId === id && !!tilePurchaseQuote(game, tile.id),
-  );
-  return tile ? tilePurchaseQuote(game, tile.id) : undefined;
+  const eligible = createTilePurchaseEligibility(game);
+  for (const tile of getTerritoryTiles(game)) {
+    if (
+      tile.territoryId === id &&
+      eligible(tile) &&
+      territoryVisibilityDistance(game, tile) !== undefined
+    )
+      return purchaseQuote(game, tile);
+  }
+  return undefined;
 }
 export function validTilePurchaseAction(
   game: GameType,

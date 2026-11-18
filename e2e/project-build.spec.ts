@@ -2,6 +2,7 @@ import { expect, test } from "./fixtures";
 import type { Page } from "@playwright/test";
 import { readSavedGame } from "./save-fixture";
 import {
+  readTerritoryMapCamera,
   openMapProjectCatalogue,
   returnToTerritoryMap,
   setMapProjectCapacity,
@@ -41,11 +42,7 @@ async function chooseSite(page: Page, id: string) {
   const point = hexCenter(tile);
   const viewport = page.locator(".territoryMapViewport");
   for (let attempt = 0; attempt < 20; attempt++) {
-    const camera = await viewport.evaluate((element) => ({
-      x: Number(element.getAttribute("data-camera-x")),
-      y: Number(element.getAttribute("data-camera-y")),
-      scale: Number(element.getAttribute("data-camera-scale")),
-    }));
+    const camera = await readTerritoryMapCamera(viewport);
     const dx = (camera.x - point.x) * camera.scale;
     const dy = (camera.y - point.y) * camera.scale;
     if (Math.abs(dx) < 1 && Math.abs(dy) < 1) break;

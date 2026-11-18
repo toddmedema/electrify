@@ -18,6 +18,7 @@ import type {
 const INSTANCE_FLOATS = 24;
 const RETAINED_MESHES = 64;
 const MAX_PIXELS = 2500000;
+const CAMERA_OVERSCAN = HEX_WIDTH / 2;
 const FOG_MIX = [0, 0.15, 0.35, 0.6];
 const FOG_SATURATION = [1, 0.8, 0.45, 0.15];
 const VERTEX = `#version 300 es
@@ -136,6 +137,7 @@ export class MapRenderer {
   private projection: Float32Array = new Float32Array(16);
   private instances: readonly MapInstance[] = [];
   private frame: MapFrame | undefined;
+  private sceneFrame: MapFrame | undefined;
   private clock = new FacilityMotionClock();
   private raf: number | undefined;
   private state: State = "unavailable";
@@ -177,14 +179,16 @@ export class MapRenderer {
   update(instances: readonly MapInstance[], frame: MapFrame): void {
     if (this.disposed) return;
     const previous = this.frame;
+    const instancesChanged = this.instances !== instances;
+    const scene = this.sceneFrame;
     const sceneChanged =
-      this.instances !== instances ||
-      !previous ||
-      previous.width !== frame.width ||
-      previous.height !== frame.height ||
-      previous.cameraX !== frame.cameraX ||
-      previous.cameraY !== frame.cameraY ||
-      previous.scale !== frame.scale;
+      instancesChanged ||
+      !scene ||
+      scene.width !== frame.width ||
+      scene.height !== frame.height ||
+      scene.scale !== frame.scale ||
+      Math.abs(scene.cameraX - frame.cameraX) >= CAMERA_OVERSCAN ||
+      Math.abs(scene.cameraY - frame.cameraY) >= CAMERA_OVERSCAN;
     this.instances = instances;
     this.frame = frame;
     const duration = frame.motionAllowed
@@ -202,7 +206,7 @@ export class MapRenderer {
       this.lightingTransition = undefined;
     }
     this.projection = projectionMatrix(frame);
-    this.clock.sync(instances);
+    if (instancesChanged) this.clock.sync(instances);
     if (this.state === "ready" && sceneChanged) this.buildScene();
     if (!this.canAnimate()) this.clock.resetTimestamp();
     if (this.isVisible()) this.schedule();
@@ -513,6 +517,7 @@ export class MapRenderer {
   private buildScene(): void {
     if (!this.frame || !this.gl) return;
     const frame = this.frame;
+    this.sceneFrame = frame;
     const used = new Set<MapMesh>();
     const grouped = {
       receivers: new Map<GpuMesh, RenderItem[]>(),
@@ -527,8 +532,9 @@ export class MapRenderer {
         const center = projectPoint(instance.position, frame);
         // Include offscreen tall models and the maximum three-tile shadow reach.
         const margin =
-          (3 + Math.max(instance.model.height, instance.model.footprint)) *
-          HEX_WIDTH *
+          ((3 + Math.max(instance.model.height, instance.model.footprint)) *
+            HEX_WIDTH +
+            CAMERA_OVERSCAN) *
           Math.abs(frame.scale);
         if (
           center.x < -margin ||

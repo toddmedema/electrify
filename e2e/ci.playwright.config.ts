@@ -35,7 +35,6 @@ const layout = [
   "project-build.spec.ts",
   "cities-capacity.spec.ts",
   "map-3d.spec.ts",
-  "map-3d-performance.spec.ts",
   "chernobyl-recovery.spec.ts",
   "difficulty-unlocks.spec.ts",
   "toggle-borders.spec.ts",

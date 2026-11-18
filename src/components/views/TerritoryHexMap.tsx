@@ -5,18 +5,15 @@ import type { GameType, TerritoryTileId } from "../../Types";
 import { getTerritoryDefinition } from "../../data/Territories";
 import { TERRAIN_LABELS } from "../../data/TerrainLabels";
 import { FACILITY_FUELS } from "../../data/FacilityFuels";
-import { territoryTileViews } from "../../helpers/TerritoryMapState";
 import type { TerritoryTileView } from "../../helpers/TerritoryMapState";
 import { tilePurchaseQuotes } from "../../helpers/Territories";
 import { projectSiteCapitalCost } from "../../helpers/ProjectBuild";
 import type { ReadyProjectSite } from "../../helpers/ProjectBuild";
-import {
-  territoryTileInventory,
-  tileSupportsFacilityTechnology,
-} from "../../helpers/TerritoryTiles";
+import { tileSupportsFacilityTechnology } from "../../helpers/TerritoryTiles";
 import { getSunriseSunset } from "../../helpers/DateTime";
 import type { RendererState } from "../base/territory-3d/TerritoryCanvas3D";
 import type { ScenePicker } from "../base/territory-3d/SceneBuilder";
+import type { SceneCamera } from "../base/territory-3d/TerritoryScene3D";
 import { useAppSelector } from "../../Store";
 import { citySizeLabel, terrainDetailsLabel } from "../base/TerritoryTileFacts";
 import {
@@ -61,6 +58,7 @@ import "./TerritoryMapWorkspace.scss";
 const TerritoryScene3D = React.lazy(
   () => import("../base/territory-3d/TerritoryScene3D"),
 );
+const PAN_OVERSCAN = HEX_WIDTH / 2;
 
 class MapSceneBoundary extends React.Component<
   { children: React.ReactNode; onError: () => void },
@@ -112,6 +110,7 @@ type MapStyle = React.CSSProperties & {
 };
 interface Props {
   game: GameType;
+  views: readonly TerritoryTileView[];
   selected?: TerritoryTileId;
   onSelect: (id: TerritoryTileId, inspect?: boolean) => void;
   onCloseInspection?: () => void;
@@ -138,6 +137,7 @@ function wireStructure({
 }
 export default function TerritoryHexMap({
   game,
+  views,
   selected,
   onSelect,
   onCloseInspection,
@@ -169,7 +169,6 @@ export default function TerritoryHexMap({
     "network.showStatusLayer",
     true,
   );
-  const views = React.useMemo(() => territoryTileViews(game), [game]);
   const topology = useStableArray(
     views.map((view) => ({
       tile: view.tile,
@@ -191,12 +190,11 @@ export default function TerritoryHexMap({
     () => new Map(views.map((view) => [view.tile.id, view])),
     [views],
   );
-  const connectionQuotes = React.useMemo(
-    () => tilePurchaseQuotes(game),
-    [game],
+  const purchaseQuotes = React.useMemo(
+    () =>
+      buyMode && !projectPlanning ? tilePurchaseQuotes(game, views) : undefined,
+    [buyMode, projectPlanning, game, views],
   );
-  const purchaseQuotes =
-    buyMode || projectPlanning ? connectionQuotes : undefined;
   React.useEffect(() => {
     if (projectPlanning) setBuyMode(false);
   }, [projectPlanning]);
@@ -260,16 +258,60 @@ export default function TerritoryHexMap({
   const activeRoving =
     activeSelected ??
     (rovingId && byId.has(rovingId) ? rovingId : homeTile?.id);
-  const [camera, setCamera] = React.useState(() =>
-    hexCenter(
+  const [camera] = React.useState(() => {
+    let center = hexCenter(
       (selected ? byId.get(selected)?.tile : undefined) ??
         homeTile ?? { q: 0, r: 0 },
-    ),
-  );
+    );
+    const listeners = new Set<() => void>();
+    return {
+      getSnapshot: () => center,
+      subscribe: (listener: () => void) => {
+        listeners.add(listener);
+        return () => {
+          listeners.delete(listener);
+        };
+      },
+      move(next: typeof center) {
+        center = next;
+        listeners.forEach((listener) => listener());
+      },
+    } satisfies SceneCamera & { move: (next: typeof center) => void };
+  });
+  const [cullCenter, setCullCenter] = React.useState(camera.getSnapshot);
+  const cullAnchor = React.useRef(cullCenter);
   const [size, setSize] = React.useState({ width: 0, height: 0 });
   const scale = size.width > 0 && size.width < 600 ? 0.75 : 0.875;
   const worldWidth = size.width / scale;
   const worldHeight = size.height / scale;
+  const moveStage = React.useCallback(
+    ({ x, y }: ReturnType<typeof hexCenter>) => {
+      if (stage.current)
+        stage.current.style.transform = `translate(${size.width / 2 - x * scale}px, ${size.height / 2 - y * scale}px)`;
+    },
+    [size.width, size.height, scale],
+  );
+  const setCamera = React.useCallback(
+    (update: React.SetStateAction<ReturnType<typeof hexCenter>>) => {
+      const current = camera.getSnapshot();
+      const next = typeof update === "function" ? update(current) : update;
+      if (next.x === current.x && next.y === current.y) return;
+      moveStage(next);
+      if (
+        Math.abs(next.x - cullAnchor.current.x) >= PAN_OVERSCAN ||
+        Math.abs(next.y - cullAnchor.current.y) >= PAN_OVERSCAN
+      ) {
+        cullAnchor.current = next;
+        setCullCenter(next);
+      }
+      camera.move(next);
+    },
+    [camera, moveStage],
+  );
+  React.useLayoutEffect(
+    () => moveStage(camera.getSnapshot()),
+    [camera, moveStage],
+  );
   const focusAfterNavigation = React.useRef<TerritoryTileId>();
   const pointer = React.useRef<{
     id: number;
@@ -285,6 +327,21 @@ export default function TerritoryHexMap({
   }>();
   const activationTarget = React.useRef<TerritoryTileId>();
   const pointerHover = React.useRef<() => void>();
+  const hoverFrame = React.useRef<number>();
+  const hoverPoint = React.useRef<{
+    target: EventTarget;
+    clientX: number;
+    clientY: number;
+  }>();
+  const clearHover = React.useCallback(() => {
+    if (hoverFrame.current !== undefined)
+      cancelAnimationFrame(hoverFrame.current);
+    hoverFrame.current = undefined;
+    hoverPoint.current = undefined;
+    pointerHover.current?.();
+    pointerHover.current = undefined;
+  }, []);
+  React.useEffect(() => clearHover, [clearHover]);
   const framedRun = React.useRef<{
     runId?: number;
     seed: number;
@@ -343,6 +400,7 @@ export default function TerritoryHexMap({
     activeRoving,
     byId,
     views,
+    setCamera,
   ]);
   React.useLayoutEffect(() => {
     const element = viewport.current;
@@ -379,7 +437,7 @@ export default function TerritoryHexMap({
     };
     element.addEventListener("wheel", wheel, { passive: false });
     return () => element.removeEventListener("wheel", wheel);
-  }, [scale]);
+  }, [scale, setCamera]);
   React.useLayoutEffect(() => {
     if (!focusAfterNavigation.current) return;
     const target = stage.current?.querySelector<HTMLButtonElement>(
@@ -387,16 +445,16 @@ export default function TerritoryHexMap({
     );
     target?.focus({ preventScroll: true });
     if (target) focusAfterNavigation.current = undefined;
-  }, [selected, camera]);
-  const minX = camera.x - worldWidth / 2;
-  const minY = camera.y - worldHeight / 2;
+  }, [selected, cullCenter]);
   const renderedTiles = useStableArray(
     tiles.filter((tile) => {
       const point = hexCenter(tile);
       return (
         tile.id === activeRoving ||
-        (Math.abs(point.x - camera.x) < worldWidth / 2 + HEX_WIDTH &&
-          Math.abs(point.y - camera.y) < worldHeight / 2 + HEX_WIDTH)
+        (Math.abs(point.x - cullCenter.x) <
+          worldWidth / 2 + HEX_WIDTH + PAN_OVERSCAN &&
+          Math.abs(point.y - cullCenter.y) <
+            worldHeight / 2 + HEX_WIDTH + PAN_OVERSCAN)
       );
     }),
     (a, b) => a === b,
@@ -443,7 +501,7 @@ export default function TerritoryHexMap({
             "Unavailable for this project; choose a highlighted site.",
           );
     if (buyMode)
-      return connectionQuotes.has(tile.id)
+      return view.connectable
         ? available("Available in Rapid connection mode.")
         : unavailable(
             view.owned
@@ -451,7 +509,7 @@ export default function TerritoryHexMap({
               : "Not available in Rapid connection mode; connect an adjacent site first.",
           );
     if (tile.city) return unavailable("Cities have no building slot.");
-    if (!territoryTileInventory(game, tile.id).remaining)
+    if (view.reserved)
       return unavailable(
         view.facility
           ? "This tile already has a facility or construction project."
@@ -463,7 +521,7 @@ export default function TerritoryHexMap({
       )
     )
       return unavailable("No construction technology supports this site.");
-    if (!view.owned && !connectionQuotes.has(tile.id))
+    if (!view.owned && !view.connectable)
       return unavailable("Connect an adjacent site before building here.");
     return available(
       view.owned
@@ -577,7 +635,7 @@ export default function TerritoryHexMap({
       (ground?.dataset.mapTarget as TerritoryTileId | undefined)
     );
   };
-  const hoverTile = (event: React.PointerEvent<HTMLDivElement>) => {
+  const hoverTile = (event: NonNullable<typeof hoverPoint.current>) => {
     pointerHover.current?.();
     pointerHover.current = undefined;
     if (!threeDReady) return;
@@ -589,7 +647,8 @@ export default function TerritoryHexMap({
       );
     if (!target) return;
     const titleTarget =
-      event.target instanceof HTMLElement ? event.target : event.currentTarget;
+      event.target instanceof HTMLElement ? event.target : viewport.current;
+    if (!titleTarget) return;
     const previousTitle = titleTarget.getAttribute("title");
     target.dataset.modelHovered = "true";
     titleTarget.title =
@@ -601,7 +660,6 @@ export default function TerritoryHexMap({
       else titleTarget.title = previousTitle;
     };
   };
-  React.useEffect(() => () => pointerHover.current?.(), []);
   const navigate = (
     event: React.KeyboardEvent<HTMLButtonElement>,
     id: TerritoryTileId,
@@ -672,6 +730,15 @@ export default function TerritoryHexMap({
             if (projectPlanning) onDeselect?.();
             setBuyMode((value) => !value);
           }}
+          onKeyDown={(event) => {
+            if (event.key !== "ArrowUp") return;
+            const entry = stage.current?.querySelector<HTMLButtonElement>(
+              "[data-map-target][tabindex='0']",
+            );
+            if (!entry) return;
+            event.preventDefault();
+            entry.focus({ preventScroll: true });
+          }}
         >
           <RapidConnectionIcon aria-hidden="true" />
         </button>
@@ -701,13 +768,12 @@ export default function TerritoryHexMap({
         className="territoryMapViewport"
         role="region"
         aria-label="Territory map"
-        data-camera-x={camera.x}
-        data-camera-y={camera.y}
         data-camera-scale={scale}
         ref={viewport}
         onPointerDown={(event) => {
           const middle = event.button === 1;
           if (event.button !== 0 && !middle) return;
+          clearHover();
           if (middle) event.preventDefault();
           const id = middle ? undefined : pointerTile(event),
             quote = id && purchaseQuotes?.get(id);
@@ -754,7 +820,20 @@ export default function TerritoryHexMap({
             drag.id !== event.pointerId ||
             touches.current.size !== 1
           ) {
-            hoverTile(event);
+            if (
+              threeDReady &&
+              event.pointerType !== "touch" &&
+              !touches.current.size
+            ) {
+              const { target, clientX, clientY } = event;
+              hoverPoint.current = { target, clientX, clientY };
+              hoverFrame.current ??= requestAnimationFrame(() => {
+                hoverFrame.current = undefined;
+                const point = hoverPoint.current;
+                hoverPoint.current = undefined;
+                if (point) hoverTile(point);
+              });
+            }
             return;
           }
           const dx = event.clientX - drag.x,
@@ -762,8 +841,7 @@ export default function TerritoryHexMap({
           if (!drag.dragging && dx * dx + dy * dy < 36) return;
           if (!drag.dragging)
             event.currentTarget.setPointerCapture?.(event.pointerId);
-          pointerHover.current?.();
-          pointerHover.current = undefined;
+          clearHover();
           drag.dragging = true;
           suppressClick.current = true;
           drag.x = event.clientX;
@@ -782,14 +860,12 @@ export default function TerritoryHexMap({
             event.currentTarget.releasePointerCapture(event.pointerId);
         }}
         onPointerCancel={(event) => {
+          clearHover();
           touches.current.delete(event.pointerId);
           pointer.current = undefined;
           suppressClick.current = true;
         }}
-        onPointerLeave={() => {
-          pointerHover.current?.();
-          pointerHover.current = undefined;
-        }}
+        onPointerLeave={clearHover}
         onClickCapture={(event) => {
           if (suppressClick.current && event.detail !== 0) {
             event.preventDefault();
@@ -824,12 +900,11 @@ export default function TerritoryHexMap({
                 runKey={`${runId}:${game.seed}:${game.scenarioId}`}
                 daylight={getSunriseSunset(game.date, game.location)}
                 dark={dark}
+                camera={camera}
                 frame={{
                   width: size.width,
                   height: size.height,
                   dpr: window.devicePixelRatio || 1,
-                  cameraX: camera.x,
-                  cameraY: camera.y,
                   scale,
                   background: dark ? [0.035, 0.055, 0.07] : [0.86, 0.9, 0.9],
                   visible: size.width > 0 && size.height > 0,
@@ -842,16 +917,10 @@ export default function TerritoryHexMap({
             </React.Suspense>
           </MapSceneBoundary>
         )}
-        <div
-          className="territoryMapStage"
-          ref={stage}
-          data-camera-x={camera.x}
-          data-camera-y={camera.y}
-          data-camera-scale={scale}
-        >
+        <div className="territoryMapStage" ref={stage}>
           <svg
             className="territoryHexGrid"
-            viewBox={`${minX} ${minY} ${Math.max(1, worldWidth)} ${Math.max(1, worldHeight)}`}
+            viewBox={`0 0 ${Math.max(1, worldWidth)} ${Math.max(1, worldHeight)}`}
             role="img"
             aria-labelledby={`${mapId}-title`}
           >
@@ -1061,8 +1130,8 @@ export default function TerritoryHexMap({
                 className={`territoryTileTarget${utility || (cityLabel && showStatusLayer) ? " territoryUtilityLabel" : ""}`}
                 style={
                   {
-                    left: `${(point.x - minX) * scale}px`,
-                    top: `${(point.y - minY) * scale}px`,
+                    left: point.x * scale,
+                    top: point.y * scale,
                     width: HEX_WIDTH * scale,
                     height: HEX_HEIGHT * scale,
                     "--territory-hover-color": hover.color,
@@ -1155,7 +1224,7 @@ export default function TerritoryHexMap({
                     ? "Your tile"
                     : view.ownerKey
                       ? `Owned by ${view.ownerName}`
-                      : connectionQuotes.has(tile.id)
+                      : view.connectable
                         ? "Connection available"
                         : "Unconnected tile"}
                   . {terrainDetailsLabel(tile.terrain)}.{" "}

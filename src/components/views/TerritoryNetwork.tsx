@@ -36,7 +36,7 @@ import TerritoryHexMap from "./TerritoryHexMap";
 import AcquisitionReviewDialog from "../base/AcquisitionReviewDialog";
 import UtilityOfferDialog from "../base/UtilityOfferDialog";
 import { useMoney } from "../base/CurrencyContext";
-import { useAppDispatch } from "../../Store";
+import { useAppDispatch, useAppSelector } from "../../Store";
 import { generatorSizeChanged } from "../../reducers/GameActions";
 import { purchaseFacility } from "../../helpers/PurchaseFacility";
 import TileWorkspaceSurface from "../base/TileWorkspaceSurface";
@@ -164,7 +164,7 @@ function TileNetwork(props: Props) {
       summaryRef.current.focus();
     }
   }, [review, game.utilityExpansion?.acquisitions.length]);
-  const views = territoryTileViews(game);
+  const views = React.useMemo(() => territoryTileViews(game), [game]);
   const view =
     inspected && !panel?.open && !planning
       ? views.find(({ tile }) => tile.id === inspected)
@@ -192,7 +192,7 @@ function TileNetwork(props: Props) {
         ))
     : 0;
   const demandW =
-    tick && tile
+    tick && tile?.city
       ? Object.values(
           cityDemandByType(game, tick, tile.territoryId, !!view?.owned),
         ).reduce((sum, watts) => sum + watts, 0)
@@ -224,10 +224,13 @@ function TileNetwork(props: Props) {
   React.useEffect(() => {
     if (panel?.projectRequested) startProject();
   }, [panel?.projectRequested, startProject]);
-  const projectPricingKey = `${signature(game)}|${game.interestRate}|${JSON.stringify(game.multiplayer?.tileOwners)}|${JSON.stringify(game.multiplayer?.landOwners)}`;
+  const projectPricingKey =
+    planning && project && !catalogue
+      ? `${signature(game)}|${game.interestRate}|${JSON.stringify(views.map(({ tile }) => tile.id))}|${JSON.stringify(game.multiplayer?.tileOwners)}|${JSON.stringify(game.multiplayer?.landOwners)}`
+      : undefined;
   const projectSites = React.useMemo(() => {
     if (!planning || !project || catalogue) return undefined;
-    const connections = tilePurchaseQuotes(game);
+    const connections = tilePurchaseQuotes(game, views);
     return new Map<TerritoryTileId, ReadyProjectSite>(
       views.flatMap(({ tile }) => {
         const quote = projectSiteQuote(game, project, tile.id, connections);
@@ -324,6 +327,7 @@ function TileNetwork(props: Props) {
           projectSites={projectSites}
           onDeselect={close}
           game={game}
+          views={views}
           selected={selected}
           onSelect={inspect}
         />
@@ -540,13 +544,23 @@ function CityDemand({
   territoryId: TerritoryId;
   owned: boolean;
 }) {
-  const timeline = game.timeline.map((tick) => ({
-    ...tick,
-    demandByType: cityDemandByType(game, tick, territoryId, owned),
-  }));
-  const first = timeline[0]?.minute ?? game.date.minute;
-  const last = timeline[timeline.length - 1]?.minute ?? first + 1;
-  const types = demandTypesBySizeAtStart(timeline, first);
+  const runId = useAppSelector((state) => state.ui?.evidenceRunId);
+  const forecastKey = signature(game);
+  const first = game.timeline[0]?.minute ?? game.date.minute;
+  const last = game.timeline.at(-1)?.minute ?? first + 1;
+  const { timeline, domain, types } = React.useMemo(() => {
+    const timeline = game.timeline.map((tick) => ({
+      minute: tick.minute,
+      demandByType: cityDemandByType(game, tick, territoryId, owned),
+    }));
+    return {
+      timeline,
+      domain: { x: [first, Math.max(first + 1, last)] as [number, number] },
+      types: demandTypesBySizeAtStart(timeline, first),
+    };
+    // The forecast signature and minute bounds track the chart inputs across live ticks.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [forecastKey, runId, first, last, territoryId, owned]);
   return (
     <section className="tileCityDemand" aria-label="City demand by use">
       <Typography component="h4" variant="subtitle2">
@@ -561,7 +575,7 @@ function CityDemand({
       <ChartForecastDemandByType
         height={160}
         timeline={timeline}
-        domain={{ x: [first, Math.max(first + 1, last)] }}
+        domain={domain}
         displayTypes={types}
         startingYear={game.startingYear}
         multiyear={false}

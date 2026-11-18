@@ -209,6 +209,20 @@ export async function returnToTerritoryMap(page: Page): Promise<Locator> {
   return map;
 }
 
+export async function readTerritoryMapCamera(viewport: Locator) {
+  return viewport.evaluate((element) => {
+    const stage = element.querySelector<HTMLElement>(".territoryMapStage")!;
+    const transform = new DOMMatrix(stage.style.transform || undefined);
+    const scale = Number(element.getAttribute("data-camera-scale"));
+    const { clientWidth: width, clientHeight: height } = element;
+    return {
+      x: (width / 2 - transform.e) / scale,
+      y: (height / 2 - transform.f) / scale,
+      scale,
+    };
+  });
+}
+
 /** Pan the real camera before activating a virtualized tile through its keyboard target. */
 export async function selectTerritoryMapTile(
   page: Page,
@@ -218,11 +232,7 @@ export async function selectTerritoryMapTile(
   const viewport = map.locator(".territoryMapViewport");
   const point = hexCenter(tile);
   for (let attempt = 0; attempt < 20; attempt++) {
-    const camera = await viewport.evaluate((element) => ({
-      x: Number(element.getAttribute("data-camera-x")),
-      y: Number(element.getAttribute("data-camera-y")),
-      scale: Number(element.getAttribute("data-camera-scale")),
-    }));
+    const camera = await readTerritoryMapCamera(viewport);
     const dx = (camera.x - point.x) * camera.scale;
     const dy = (camera.y - point.y) * camera.scale;
     if (Math.abs(dx) < 1 && Math.abs(dy) < 1) break;

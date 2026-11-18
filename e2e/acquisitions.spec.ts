@@ -26,7 +26,11 @@ import {
 import { expect, test } from "./fixtures";
 import { reviewScreenshot } from "./review-screenshot";
 import { expectDialogToFit } from "./dialog-layout";
-import { returnToTerritoryMap, setMapProjectCapacity } from "./layout";
+import {
+  readTerritoryMapCamera,
+  returnToTerritoryMap,
+  setMapProjectCapacity,
+} from "./layout";
 import { editSavedGame, readSavedGame, readSaveRecords } from "./save-fixture";
 
 const tileSurface = (page: Page) => page.locator(".tileWorkspaceSurface");
@@ -85,11 +89,7 @@ async function panToTile(
   const viewport = mapWorkspace(page).locator(".territoryMapViewport");
   const target = hexCenter(tile);
   for (let attempt = 0; attempt < 20; attempt++) {
-    const camera = await viewport.evaluate((element) => ({
-      x: Number(element.getAttribute("data-camera-x")),
-      y: Number(element.getAttribute("data-camera-y")),
-      scale: Number(element.getAttribute("data-camera-scale")),
-    }));
+    const camera = await readTerritoryMapCamera(viewport);
     const dx = (camera.x - target.x) * camera.scale;
     const dy = (camera.y - target.y) * camera.scale;
     if (Math.abs(dx) < 1 && Math.abs(dy) < 1) return;
@@ -562,11 +562,7 @@ for (const theme of ["light", "dark"] as const) {
           ),
         )
         .toBe(width);
-      const camera = await viewport.evaluate((element) =>
-        ["x", "y", "scale"].map((part) =>
-          element.getAttribute(`data-camera-${part}`),
-        ),
-      );
+      const camera = await readTerritoryMapCamera(viewport);
       for (const name of tools) {
         const trigger = page.getByRole("button", { name, exact: true });
         await trigger.click();
@@ -584,11 +580,7 @@ for (const theme of ["light", "dark"] as const) {
           "the same map stays mounted behind every tool",
         ).toBe(true);
         expect(
-          await viewport.evaluate((element) =>
-            ["x", "y", "scale"].map((part) =>
-              element.getAttribute(`data-camera-${part}`),
-            ),
-          ),
+          await readTerritoryMapCamera(viewport),
           "opening a tool does not pan or zoom the map",
         ).toEqual(camera);
         const geometry = await panel.evaluate((element) => {
@@ -1847,10 +1839,7 @@ for (const theme of ["light", "dark"] as const) {
       (await readSavedGame(page))!.territoryNetwork!.tilePurchases,
     ).toEqual(before.territoryNetwork!.tilePurchases);
     await panToTile(page, frontier);
-    const camera = await viewport.evaluate((element) => [
-      element.getAttribute("data-camera-x"),
-      element.getAttribute("data-camera-y"),
-    ]);
+    const camera = await readTerritoryMapCamera(viewport);
     const quote = tilePurchaseQuote(before, frontier.id)!;
     await reviewScreenshot(page, {
       path: info.outputPath(`rapid-buy-${theme}.png`),
@@ -1861,12 +1850,7 @@ for (const theme of ["light", "dark"] as const) {
     await expect(target).toHaveAttribute("data-owned", "true");
     await expect(toggle).toHaveAttribute("aria-pressed", "true");
     await expect(tileSurface(page)).toHaveCount(0);
-    expect(
-      await viewport.evaluate((element) => [
-        element.getAttribute("data-camera-x"),
-        element.getAttribute("data-camera-y"),
-      ]),
-    ).toEqual(camera);
+    expect(await readTerritoryMapCamera(viewport)).toEqual(camera);
     const bought = (await readSavedGame(page))!;
     expect(currentTick(bought)!.cash).toBeCloseTo(
       currentTick(before)!.cash - quote.price,

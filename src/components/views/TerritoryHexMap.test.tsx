@@ -150,6 +150,7 @@ function show(
         <OtherPurchaseControl />
         <TerritoryHexMap
           game={activeGame}
+          views={territoryTileViews(activeGame)}
           projectPlanning={!!projectSites}
           projectSites={projectSites}
           selected={selected}
@@ -176,7 +177,9 @@ function show(
     </Provider>,
   );
   const viewport = screen.getByRole("region", { name: "Territory map" });
-  const stage = viewport;
+  // jsdom cannot compute layout. Read the camera transform to recover tile positions.
+  // eslint-disable-next-line testing-library/no-node-access
+  const stage = viewport.querySelector<HTMLElement>(".territoryMapStage")!;
   const target = (id: TerritoryTileId) =>
     screen
       .getAllByRole<HTMLButtonElement>("button")
@@ -214,8 +217,10 @@ it("pans with the middle button without connecting or selecting a tile", () => {
   const map = show();
   map.buyMode();
   const tile = map.candidates()[0];
-  const viewport = screen.getByLabelText("Territory map");
-  const x = viewport.getAttribute("data-camera-x");
+  const { stage } = map;
+  const transform = stage.style.transform;
+  const left = tile.style.left;
+  const top = tile.style.top;
   fireEvent.pointerDown(tile, {
     button: 1,
     pointerId: 1,
@@ -234,7 +239,9 @@ it("pans with the middle button without connecting or selecting a tile", () => {
     clientX: 130,
     clientY: 120,
   });
-  expect(viewport.getAttribute("data-camera-x")).not.toBe(x);
+  expect(stage.style.transform).not.toBe(transform);
+  expect(tile.style.left).toBe(left);
+  expect(tile.style.top).toBe(top);
   expect(map.onSelect).not.toHaveBeenCalled();
   expect(
     screen.queryByRole("button", { name: "Build" }),
@@ -379,10 +386,25 @@ it("shows full terrain-specific capital costs on owned and unconnected project m
     restore();
   }
 });
-function fullyVisible(tile: HTMLButtonElement, width: number, height = 900) {
-  const x = Number.parseFloat(tile.style.left),
-    y = Number.parseFloat(tile.style.top),
-    halfWidth = Number.parseFloat(tile.style.width) / 2,
+function tileCenter(tile: HTMLButtonElement, stage: HTMLElement) {
+  const transform = stage.style.transform;
+  const [x, y] = transform
+    .slice("translate(".length)
+    .split(", ")
+    .map(Number.parseFloat);
+  return {
+    x: x + Number.parseFloat(tile.style.left),
+    y: y + Number.parseFloat(tile.style.top),
+  };
+}
+function fullyVisible(
+  tile: HTMLButtonElement,
+  stage: HTMLElement,
+  width: number,
+  height = 900,
+) {
+  const { x, y } = tileCenter(tile, stage);
+  const halfWidth = Number.parseFloat(tile.style.width) / 2,
     halfHeight = Number.parseFloat(tile.style.height) / 2;
   return (
     x - halfWidth >= 0 &&
@@ -445,7 +467,7 @@ it.each([1280, 360])(
     map.buyMode();
     const initialCount = territoryTileViews(map.store.getState().game).length;
     const position = { left: candidate.style.left, top: candidate.style.top };
-    const camera = { ...map.stage.dataset };
+    const camera = map.stage.style.transform;
     tap(candidate);
     expect(ownsTerritoryTile(map.store.getState().game, id)).toBe(true);
     expect(
@@ -454,7 +476,7 @@ it.each([1280, 360])(
     expect(map.target(id)).toHaveAttribute("aria-pressed", "true");
     expect(map.target(id).style.left).toBe(position.left);
     expect(map.target(id).style.top).toBe(position.top);
-    expect({ ...map.stage.dataset }).toEqual(camera);
+    expect(map.stage.style.transform).toBe(camera);
     expect(
       territoryTileViews(map.store.getState().game).length,
     ).toBeGreaterThan(initialCount);
@@ -508,12 +530,12 @@ it.each([360, 390])(
       .getAllByRole<HTMLButtonElement>("button")
       .filter((tile) => tile.dataset.owned === "true");
     expect(
-      owned.filter((tile) => fullyVisible(tile, width)).length,
+      owned.filter((tile) => fullyVisible(tile, map.stage, width)).length,
     ).toBeGreaterThanOrEqual(8);
     const capital = map.target("champlain:city");
-    expect(fullyVisible(capital, width)).toBe(true);
+    expect(fullyVisible(capital, map.stage, width)).toBe(true);
     // Keep a full cell from the edge to its center, including the city artwork.
-    expect(Number.parseFloat(capital.style.left)).toBeGreaterThanOrEqual(
+    expect(tileCenter(capital, map.stage).x).toBeGreaterThanOrEqual(
       Number.parseFloat(capital.style.width),
     );
     expect(Number.parseFloat(capital.style.width)).toBe(96);
@@ -525,9 +547,15 @@ it("initially shows the owned land and named utilities on desktop", () => {
   const owned = screen
     .getAllByRole<HTMLButtonElement>("button")
     .filter((tile) => tile.dataset.owned === "true");
-  expect(owned.filter((tile) => fullyVisible(tile, 1280))).toHaveLength(16);
-  expect(fullyVisible(map.target("valley-electric:city"), 1280)).toBe(true);
-  expect(fullyVisible(map.target("ridge-electric:city"), 1280)).toBe(true);
+  expect(
+    owned.filter((tile) => fullyVisible(tile, map.stage, 1280)),
+  ).toHaveLength(16);
+  expect(
+    fullyVisible(map.target("valley-electric:city"), map.stage, 1280),
+  ).toBe(true);
+  expect(fullyVisible(map.target("ridge-electric:city"), map.stage, 1280)).toBe(
+    true,
+  );
 });
 
 it("keeps a resumed selected tile a full cell from the phone viewport edges", () => {
@@ -536,10 +564,8 @@ it("keeps a resumed selected tile a full cell from the phone viewport edges", ()
   const selected = map.target("champlain:site-13");
   const cellWidth = Number.parseFloat(selected.style.width);
   expect(selected).toHaveAttribute("aria-pressed", "true");
-  expect(Number.parseFloat(selected.style.left)).toBeGreaterThanOrEqual(
-    cellWidth,
-  );
-  expect(Number.parseFloat(selected.style.left)).toBeLessThanOrEqual(
+  expect(tileCenter(selected, map.stage).x).toBeGreaterThanOrEqual(cellWidth);
+  expect(tileCenter(selected, map.stage).x).toBeLessThanOrEqual(
     360 - cellWidth,
   );
 });
@@ -749,10 +775,7 @@ it("keeps phone targets large and unaffordable land inspectable with its currenc
   tap(tile);
   expect(map.onSelect).toHaveBeenLastCalledWith(idOf(tile), true);
   // The shared phone sheet occupies at most 62%; leave the selected hex above it.
-  expect(
-    Number.parseFloat(tile.style.top) +
-      Number.parseFloat(tile.style.height) / 2,
-  ).toBeLessThan(900 * 0.38);
+  expect(tileCenter(tile, map.stage).y).toBeLessThan(900 * 0.38);
   expect(
     map.store.getState().game.territoryNetwork!.tilePurchases,
   ).toHaveLength(0);
@@ -857,8 +880,13 @@ it("activates and hovers the picked elevated model while keyboard and explicit p
     map.buyMode();
     const ground = map.candidates()[0],
       model = map.target(facility.tile.id);
+    mockPick.mockClear();
+    fireEvent.pointerMove(ground, { pointerId: 1, clientX: 90, clientY: 90 });
     fireEvent.pointerMove(ground, { pointerId: 1, clientX: 100, clientY: 100 });
-    expect(model).toHaveAttribute("data-model-hovered", "true");
+    await waitFor(() =>
+      expect(model).toHaveAttribute("data-model-hovered", "true"),
+    );
+    expect(mockPick).toHaveBeenCalledTimes(1);
     expect(hoverColor(model)).toBe("var(--blackout-red)");
     expect(ground).not.toHaveAttribute("data-model-hovered");
     expect(ground).toHaveAttribute("title", model.title);
@@ -871,7 +899,9 @@ it("activates and hovers the picked elevated model while keyboard and explicit p
     expect(model).not.toHaveAttribute("data-model-hovered");
     const price = within(ground).getByText(/^\$/);
     fireEvent.pointerMove(price, { pointerId: 1, clientX: 100, clientY: 100 });
-    expect(ground).toHaveAttribute("data-model-hovered", "true");
+    await waitFor(() =>
+      expect(ground).toHaveAttribute("data-model-hovered", "true"),
+    );
     expect(model).not.toHaveAttribute("data-model-hovered");
     fireEvent.pointerDown(price, { pointerId: 1, clientX: 100, clientY: 100 });
     fireEvent.pointerUp(price, { pointerId: 1, clientX: 100, clientY: 100 });
@@ -891,7 +921,9 @@ it("activates and hovers the picked elevated model while keyboard and explicit p
       clientX: 100,
       clientY: 100,
     });
-    expect(company).toHaveAttribute("data-model-hovered", "true");
+    await waitFor(() =>
+      expect(company).toHaveAttribute("data-model-hovered", "true"),
+    );
     expect(hoverColor(company)).toBe("var(--territory-owner-valley)");
   } finally {
     restore();

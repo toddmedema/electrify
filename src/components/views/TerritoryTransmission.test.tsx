@@ -33,6 +33,7 @@ it("keeps owned open water free of unsupported towers while retaining the dam", 
       <TerritoryTilePurchasesProvider game={game}>
         <TerritoryHexMap
           game={game}
+          views={views}
           selected={water.tile.id}
           onSelect={() => undefined}
         />

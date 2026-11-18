@@ -169,7 +169,10 @@ build there. Room views and restored worlds derive ownership from receipts.
 Recognized published schema 13, 14, 15, 16 and 17 rules
 identities have ordered migrations; existing duplicate uplands rights are
 preserved because those maps were company-local. New land claims are exclusive.
-Utility acquisitions remain separate company choices. Automatic peer market
+Utility acquisitions remain separate company choices. Discovered tiles show
+the acquiring company's current facilities, including new construction.
+If several companies acquire the same utility, each sees its own fleet there.
+Other viewers see the first acquirer in room roster order. Automatic peer market
 quantities remain bounded, without player wire controls or new wire fees. Buying
 and selling choices remain available under Agreements → Co-op power sharing,
 including when a restored company previously disabled either direction.

@@ -24,9 +24,11 @@ import {
   yAxis,
 } from "./UPlotHelpers";
 
+type DemandSample = Pick<TickPresentFutureType, "minute" | "demandByType">;
+
 export interface Props {
   height?: number;
-  timeline: TickPresentFutureType[];
+  timeline: readonly DemandSample[];
   domain: { x: [number, number] };
   /** Shared with the DOM legend so both surfaces always present the same ranking. */
   displayTypes?: readonly DemandTypeNameType[];
@@ -117,7 +119,7 @@ const EMPTY_BREAKDOWN: DemandByTypeType = {
  * legend and stacked chart hard to follow, so the first plotted instant owns the ordering.
  */
 export function demandTypesBySizeAtStart(
-  timeline: TickPresentFutureType[],
+  timeline: readonly DemandSample[],
   startMinute: number,
 ): DemandTypeNameType[] {
   const firstVisible =

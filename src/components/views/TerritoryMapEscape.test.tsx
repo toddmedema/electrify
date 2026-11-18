@@ -7,10 +7,12 @@ import reducer from "../../reducers/Game";
 import { createGame } from "../../testing/Simulator";
 import { TerritoryTilePurchasesProvider } from "../base/TerritoryTilePurchases";
 import TileWorkspaceSurface from "../base/TileWorkspaceSurface";
+import { territoryTileViews } from "../../helpers/TerritoryMapState";
 import TerritoryHexMap from "./TerritoryHexMap";
 
 function show() {
   const game = createGame({ scenarioId: 116, seed: 188 });
+  const views = territoryTileViews(game);
   const store = configureStore({ reducer: { game: reducer } });
   function Workspace({ hidden = false, overlay = false } = {}) {
     const [selected, setSelected] = React.useState<TerritoryTileId | undefined>(
@@ -29,6 +31,7 @@ function show() {
               <section className="territoryNetwork">
                 <TerritoryHexMap
                   game={game}
+                  views={views}
                   selected={selected}
                   onSelect={setSelected}
                   onDeselect={close}

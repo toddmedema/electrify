@@ -3,11 +3,15 @@ import {
   validExpandFacilityAction,
   validCancelFacilityExpansionAction,
 } from "../helpers/FacilityExpansion";
-import { isTerritoryTileId } from "../helpers/TerritoryTiles";
+import {
+  getTerritoryTile,
+  isTerritoryTileId,
+  territoryVisibilityDistance,
+} from "../helpers/TerritoryTiles";
 import { validPowerAgreementAction } from "../helpers/PowerAgreements";
 import { isBuyingRule, isSellingRule } from "../helpers/TradingRules";
 import { acquisitionQuote, validAcquisitionAction } from "../helpers/Expansion";
-import { isTerritoryId } from "../data/Territories";
+import { isLandTerritoryId, isTerritoryId } from "../data/Territories";
 import {
   validLandPurchaseAction,
   validTilePurchaseAction,
@@ -168,18 +172,44 @@ const buildFacility: Validator = (game, payload) => {
 
 /** The co-op allowlist: every game action a player may send, with its payload check. */
 const GAME_COMMAND_VALIDATORS = {
-  acquireTile: (game, payload) =>
-    validTilePurchaseAction(game, payload) &&
-    (currentTick(game)?.cash ?? -1) >=
+  acquireTile: (game, payload) => {
+    const tile = getTerritoryTile(
+      (payload as { tileId?: unknown } | null)?.tileId,
+      game,
+    );
+    const claim =
+      tile &&
+      isLandTerritoryId(tile.territoryId) &&
+      (game.multiplayer?.tileOwners?.[tile.id] ??
+        game.multiplayer?.landOwners?.[tile.territoryId]);
+    if (
+      tile &&
+      claim &&
+      claim.seat !== game.multiplayer?.seat &&
+      territoryVisibilityDistance(game, tile) !== undefined
+    )
+      return { error: `This land tile is already owned by ${claim.name}` };
+    if (!validTilePurchaseAction(game, payload))
+      return {
+        error: "This land tile is unavailable or its quote has changed",
+      };
+    if (
+      (currentTick(game)?.cash ?? -1) <
       tilePurchaseQuote(game, payload.tileId)!.price
-      ? { payload }
-      : { error: "This land tile is owned, unavailable or unaffordable" },
+    )
+      return { error: "This land tile is unaffordable with your current cash" };
+    return { payload };
+  },
   acquireLand: (game, payload) =>
-    validLandPurchaseAction(game, payload) &&
-    (currentTick(game)?.cash ?? -1) >=
-      landPurchaseQuote(game, payload.territoryId)!.price
-      ? { payload }
-      : { error: "This land purchase is owned, unavailable or unaffordable" },
+    !validLandPurchaseAction(game, payload)
+      ? {
+          error:
+            "This land purchase is already owned, unavailable or its quote has changed",
+        }
+      : (currentTick(game)?.cash ?? -1) <
+          landPurchaseQuote(game, payload.territoryId)!.price
+        ? { error: "This land purchase is unaffordable with your current cash" }
+        : { payload },
   acceptPowerAgreement: (game, payload) =>
     validPowerAgreementAction(game, payload)
       ? { payload }

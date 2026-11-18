@@ -67,7 +67,6 @@ test("production browser shards run the complete PR matrix exactly once", () => 
       "project-build.spec.ts",
       "cities-capacity.spec.ts",
       "map-3d.spec.ts",
-      "map-3d-performance.spec.ts",
       "chart-touch.spec.ts",
       "chernobyl-recovery.spec.ts",
       "insights-expanded-chart.spec.ts",

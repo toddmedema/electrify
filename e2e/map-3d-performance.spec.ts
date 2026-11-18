@@ -6,7 +6,7 @@ import { hexCenter } from "../src/components/base/TerritoryHexGeometry";
 import { getTerritoryTile } from "../src/helpers/TerritoryTiles";
 import { territoryTileViews } from "../src/helpers/TerritoryMapState";
 import { expect, test } from "./fixtures";
-import { returnToTerritoryMap } from "./layout";
+import { readTerritoryMapCamera, returnToTerritoryMap } from "./layout";
 import { readSavedGame, readSaveRecords } from "./save-fixture";
 import { reviewScreenshot } from "./review-screenshot";
 
@@ -52,11 +52,7 @@ async function panTo(
   const viewport = map.locator(".territoryMapViewport"),
     target = hexCenter(tile);
   for (let attempt = 0; attempt < 20; attempt++) {
-    const camera = await viewport.evaluate((element) => ({
-      x: Number(element.getAttribute("data-camera-x")),
-      y: Number(element.getAttribute("data-camera-y")),
-      scale: Number(element.getAttribute("data-camera-scale")),
-    }));
+    const camera = await readTerritoryMapCamera(viewport);
     const dx = (camera.x - target.x) * camera.scale,
       dy = (camera.y - target.y) * camera.scale;
     if (Math.abs(dx) < 1 && Math.abs(dy) < 1) return;

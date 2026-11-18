@@ -9,6 +9,7 @@ import {
   connectedPeerTerritoryTiles,
   getTerritoryTile,
   territoryVisibilityDistance,
+  visibleTerritoryTiles,
   territoryHexDistance,
   isAdjacentToOwnedTerritoryTile,
 } from "../helpers/TerritoryTiles";
@@ -17,7 +18,6 @@ import {
   type TerritoryPurchaseContext,
 } from "../helpers/TerritoryValidation";
 import { landPurchaseQuote } from "../helpers/Territories";
-import { territoryTileViews } from "../helpers/TerritoryMapState";
 import { isLandTerritoryId } from "../data/Territories";
 import { currencyForLocation } from "../helpers/Currency";
 import { formatMoneyFull } from "../helpers/Format";
@@ -547,7 +547,7 @@ function applyCommandOnce(
       world.grids[index].territoryNetwork?.tilePurchases?.length ===
         game.territoryNetwork?.tilePurchases?.length
     )
-      return "This land tile is unavailable or unaffordable";
+      return "This land tile is no longer available";
     return;
   }
   if (command.kind === "rate") {
@@ -854,12 +854,30 @@ export function roomView(world: World, seatId: string): RoomView {
   const index = world.seats.findIndex((s) => s.id === seatId);
   if (index < 0) throw new Error("Player is not in this match");
   const game = cloneGrid(territoryGameForWorld(world, index));
-  const visible = territoryTileViews(game);
+  const visible = visibleTerritoryTiles(game);
   const visibleIds = new Set(visible.map(({ tile }) => tile.id));
   const visibleCells = new Set(
     visible.map(({ tile }) => `${tile.q},${tile.r}`),
   );
   const visibleRegions = new Set(visible.map(({ tile }) => tile.territoryId));
+  const tileOwners = sharedTileOwners(world) ?? {};
+  const owns = createTerritoryTileOwnership(game);
+  // Each company can acquire the same utility. Prefer local property, then roster order.
+  for (const { tile } of visible) {
+    if (owns(tile) || tileOwners[tile.id]) continue;
+    const owner = world.grids.findIndex(
+      (grid, owner) =>
+        owner !== index &&
+        grid.utilityExpansion?.acquisitions.some(
+          ({ targetId }) => targetId === tile.territoryId,
+        ),
+    );
+    if (owner >= 0 && !tile.id.includes(":legacy-"))
+      tileOwners[tile.id] = {
+        seat: world.seats[owner].id,
+        name: world.seats[owner].name,
+      };
+  }
   game.multiplayer = {
     ...game.multiplayer!,
     // Compute sight with complete host footprints, then publish only discovered cells.
@@ -895,7 +913,7 @@ export function roomView(world: World, seatId: string): RoomView {
       ),
     ),
     tileOwners: Object.fromEntries(
-      Object.entries(sharedTileOwners(world) ?? {}).filter(([id]) =>
+      Object.entries(tileOwners).filter(([id]) =>
         visibleIds.has(id as import("../Types").TerritoryTileId),
       ),
     ),
@@ -907,8 +925,7 @@ export function roomView(world: World, seatId: string): RoomView {
                 const tile = getFacilityTile(facility, grid);
                 if (
                   !tile ||
-                  (!isLandTerritoryId(tile.territoryId) &&
-                    !tile.id.includes(":legacy-")) ||
+                  tileOwners[tile.id]?.seat !== world.seats[owner].id ||
                   !ownsTerritoryTile(grid, tile) ||
                   !visibleIds.has(tile.id)
                 )

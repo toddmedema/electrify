@@ -6,6 +6,7 @@ import {
   restoreWorld,
 } from "./World";
 import {
+  availableTerritoryTiles,
   getTerritoryTile,
   territoryVisibilityDistance,
 } from "../helpers/TerritoryTiles";
@@ -15,6 +16,8 @@ import { coopSeats } from "../testing/MultiplayerFixtures";
 import { loadSimData } from "../testing/SimData";
 import { UTILITY_AREAS } from "../data/UtilityExpansion";
 import { powerAgreementQuote } from "../helpers/PowerAgreements";
+import { acquisitionQuote } from "../helpers/Expansion";
+import { getBuildFacilityQuote } from "../data/Facilities";
 import { territoryTileViews } from "../helpers/TerritoryMapState";
 import type { Command, World } from "./Types";
 const command = (world: World, seat: string, command: Command) =>
@@ -65,6 +68,61 @@ it("projects actual foregrounds on other companies' claimed land without changin
   expect(Object.keys(view.multiplayer!.tileFacilities!)).toEqual([tile.id]);
   expect(view.facilities.some((f) => f.tileId === tile.id)).toBe(false);
   expect(JSON.stringify(checkpointWorld(world))).toBe(before);
+});
+
+it("publishes new construction on a peer's acquired utility and gives local ownership priority", () => {
+  loadSimData(UTILITY_AREAS.champlain.location);
+  const world = createWorld(
+    { scenarioId: 116, difficulty: "Employee" },
+    coopSeats(2),
+    "acquired-map-view",
+    "epoch",
+  );
+  const targetId = "valley-electric";
+  const acquire = (seat: number) => {
+    const grid = world.grids[seat];
+    currentTick(grid)!.cash = 3e9;
+    expect(
+      command(world, String(seat), {
+        kind: "action",
+        name: "acquireUtility",
+        payload: {
+          targetId,
+          quoteKey: acquisitionQuote(grid, targetId)!.quoteKey,
+          financed: false,
+        },
+      }),
+    ).toBeUndefined();
+  };
+  acquire(0);
+  const grid = world.grids[0];
+  const wind = getBuildFacilityQuote(grid, { name: "Wind", peakW: 50e6 })!;
+  const tile = availableTerritoryTiles(grid, wind, targetId)[0];
+  expect(tile).toBeDefined();
+  expect(
+    command(world, "0", {
+      kind: "action",
+      name: "buildFacility",
+      payload: {
+        facility: wind,
+        financed: false,
+        territoryId: targetId,
+        tileId: tile.id,
+      },
+    }),
+  ).toBeUndefined();
+  const mapped = () =>
+    territoryTileViews(roomView(world, "1").game!).find(
+      (view) => view.tile.id === tile.id,
+    );
+  expect(mapped()).toMatchObject({
+    ownerKey: "peer:0",
+    owned: false,
+    facility: { fuel: "Wind", peakW: 50e6 },
+  });
+  acquire(1);
+  expect(mapped()).toMatchObject({ ownerKey: "you", owned: true });
+  expect(mapped()?.facility).toBeUndefined();
 });
 
 it("projects and reserves retained peer property, including after retirement of its plant", () => {

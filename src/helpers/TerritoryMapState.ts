@@ -3,10 +3,11 @@ import { UTILITY_AREAS } from "../data/UtilityExpansion";
 import { isLandTerritoryId } from "../data/Territories";
 import type { TerritoryTileDefinition } from "../data/TerritoryTiles";
 import {
-  facilityOnTile,
+  facilityTileId,
   visibleTerritoryTiles,
   createTerritoryTileOwnership,
 } from "./TerritoryTiles";
+import { createTilePurchaseEligibility } from "./Territories";
 export interface TileFacilityView {
   name: FacilityOperatingType["name"];
   fuel?: FuelNameType;
@@ -22,11 +23,23 @@ export interface TerritoryTileView {
   developed: boolean;
   facility?: TileFacilityView;
   operatingFacility?: FacilityOperatingType;
+  connectable?: boolean;
+  reserved?: boolean;
   visibilityDistance: 0 | 1 | 2 | 3;
 }
 /** One truthful foreground per cell; peer structures are projected by the shared world. */
 export function territoryTileViews(game: GameType): TerritoryTileView[] {
   const owns = createTerritoryTileOwnership(game);
+  const connectable = createTilePurchaseEligibility(game, owns);
+  const facilities = new Map<
+    TerritoryTileView["tile"]["id"],
+    FacilityOperatingType
+  >();
+  for (const facility of game.facilities) {
+    const id = facilityTileId(facility);
+    if (id && !facilities.has(id)) facilities.set(id, facility);
+  }
+  const usedHydroSites = new Set(game.commissionedHydroSiteIds);
   const inherited = Object.values(UTILITY_AREAS).flatMap(
     (area) => area.facilities,
   );
@@ -41,9 +54,9 @@ export function territoryTileViews(game: GameType): TerritoryTileView[] {
     const retainedClaim = retainedClaims.get(`${tile.q},${tile.r}`);
     const claim =
       retainedClaim ??
+      game.multiplayer?.tileOwners?.[tile.id] ??
       (isLandTerritoryId(tile.territoryId)
-        ? (game.multiplayer?.tileOwners?.[tile.id] ??
-          game.multiplayer?.landOwners?.[tile.territoryId])
+        ? game.multiplayer?.landOwners?.[tile.territoryId]
         : undefined);
     const ownerKey = isOwned
       ? "you"
@@ -61,9 +74,8 @@ export function territoryTileViews(game: GameType): TerritoryTileView[] {
     const ownerName = isOwned
       ? "You"
       : (claim?.name ?? utility?.name ?? "Unowned land");
-    const operatingFacility = isOwned
-      ? facilityOnTile(game, tile.id)
-      : undefined;
+    const placedFacility = facilities.get(tile.id);
+    const operatingFacility = isOwned ? placedFacility : undefined;
     const peerFacility =
       !isOwned && claim
         ? retainedClaim
@@ -95,6 +107,10 @@ export function territoryTileViews(game: GameType): TerritoryTileView[] {
       developed: !!ownerKey,
       facility,
       operatingFacility,
+      connectable: connectable(tile),
+      reserved:
+        !!placedFacility ||
+        (!!tile.hydroSiteId && usedHydroSites.has(tile.hydroSiteId)),
     };
   });
 }

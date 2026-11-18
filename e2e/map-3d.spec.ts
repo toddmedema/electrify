@@ -2,6 +2,7 @@ import { expect, test } from "./fixtures";
 import type { MapCanvas } from "../src/components/base/territory-3d/Types";
 import type { TerritoryTileId } from "../src/Types";
 import {
+  readTerritoryMapCamera,
   openMapProjectCatalogue,
   returnToTerritoryMap,
   setMapProjectCapacity,
@@ -64,7 +65,7 @@ for (const theme of ["light", "dark"] as const) {
     if (!page.viewportSize() || page.viewportSize()!.width >= 1024) {
       const viewport = map.locator(".territoryMapViewport");
       const bounds = (await viewport.boundingBox())!;
-      const cameraX = (await viewport.getAttribute("data-camera-x"))!;
+      const cameraX = (await readTerritoryMapCamera(viewport)).x;
       const x = bounds.x + bounds.width / 2;
       const y = bounds.y + bounds.height / 2;
       await page.mouse.move(x, y);
@@ -75,7 +76,9 @@ for (const theme of ["light", "dark"] as const) {
       await page.mouse.down({ button: "middle" });
       await page.mouse.move(x + 40, y + 20, { steps: 4 });
       await page.mouse.up({ button: "middle" });
-      await expect(viewport).not.toHaveAttribute("data-camera-x", cameraX);
+      await expect
+        .poll(async () => (await readTerritoryMapCamera(viewport)).x)
+        .not.toBe(cameraX);
       await expect(map.locator(".tileWorkspaceSurface")).toHaveCount(0);
     }
     const contextLoss = await canvas.evaluateHandle((element: MapCanvas) => {
@@ -151,13 +154,16 @@ test("clicking real mountain relief above its ground selects the mountain tile",
   await mountain.press("Escape");
   await expect(mountain).toHaveAttribute("aria-pressed", "false");
   const viewport = map.locator(".territoryMapViewport");
-  const frame = await viewport.evaluate((element) => ({
+  const {
+    x: cameraX,
+    y: cameraY,
+    scale,
+  } = await readTerritoryMapCamera(viewport);
+  const { width, height } = await viewport.evaluate((element) => ({
     width: element.clientWidth,
     height: element.clientHeight,
-    cameraX: Number(element.getAttribute("data-camera-x")),
-    cameraY: Number(element.getAttribute("data-camera-y")),
-    scale: Number(element.getAttribute("data-camera-scale")),
   }));
+  const frame = { width, height, cameraX, cameraY, scale };
   // Take a point inside the actual highest relief triangle, close to its peak.
   const mesh = getTerrainModel("mountain").parts[1].mesh.positions;
   let peak = [0, -Infinity, 0];

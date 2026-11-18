@@ -182,7 +182,28 @@ async function select(
 /** Enter the roving map stop, then let D-pad movement reveal virtualized cells. */
 async function selectMapTile(page: Page, id: TerritoryTileId) {
   const target = page.locator(`[data-map-target="${id}"]`);
-  await select(page, page.locator('[data-map-target][tabindex="0"]'));
+  if (!(await page.locator("[data-map-target]:focus").count())) {
+    const entry = page.getByRole("button", {
+      name: "Rapid connection mode",
+      exact: true,
+    });
+    await expect(page.locator("html")).toHaveAttribute(
+      "data-mock-input-context",
+      "Gameplay",
+    );
+    if (
+      !(await entry.evaluate((element) => element === document.activeElement))
+    ) {
+      await input(page, "previousPane");
+      await expect(
+        page.getByRole("region", { name: "Scenario", exact: true }),
+      ).toBeVisible();
+      await input(page, "nextPane");
+      await expect(entry).toBeFocused();
+    }
+    await input(page, "up");
+    await expect(page.locator('[data-map-target][tabindex="0"]')).toBeFocused();
+  }
   const currentId = (await page
     .locator("[data-map-target]:focus")
     .getAttribute("data-map-target")) as TerritoryTileId;

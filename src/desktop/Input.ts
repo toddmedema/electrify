@@ -56,6 +56,7 @@ export function startDesktopInput(
   let runningSpeed = "NORMAL";
   let previousState = store.getState();
   let chartFrame: number | undefined;
+  let mapFocusFrame: number | undefined;
   let editingText = false;
   let choosingTextOption: HTMLElement | null = null;
   const gameplay = () =>
@@ -169,6 +170,8 @@ export function startDesktopInput(
     next?.click();
   };
   const pane = (delta: number) => {
+    if (mapFocusFrame !== undefined) cancelAnimationFrame(mapFocusFrame);
+    mapFocusFrame = undefined;
     const buttons = controls().filter(
       (button) =>
         button.matches(".gameActionDock button") &&
@@ -185,6 +188,14 @@ export function startDesktopInput(
     const next = (current + delta + buttons.length + 1) % (buttons.length + 1);
     if (next === 0) {
       store.dispatch(navigate("FACILITIES"));
+      mapFocusFrame = requestAnimationFrame(() => {
+        mapFocusFrame = undefined;
+        if (!live || !foreground || store.getState().card.name !== "FACILITIES")
+          return;
+        controls()
+          .find((control) => control.matches(".territoryMapBuyToggle"))
+          ?.focus({ preventScroll: true });
+      });
     } else {
       const button = buttons[next - 1];
       const panelId = button.getAttribute("aria-controls");
@@ -518,6 +529,7 @@ export function startDesktopInput(
     live = false;
     clearPointer();
     if (chartFrame !== undefined) cancelAnimationFrame(chartFrame);
+    if (mapFocusFrame !== undefined) cancelAnimationFrame(mapFocusFrame);
     observer.disconnect();
     revealObserver?.disconnect();
     if (revealFrame !== undefined) cancelAnimationFrame(revealFrame);

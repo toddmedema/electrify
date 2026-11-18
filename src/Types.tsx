@@ -1567,7 +1567,7 @@ export interface GameType {
     tileOwners?: Partial<
       Record<TerritoryTileId, { seat: string; name: string }>
     >;
-    /** Read-only foregrounds on claimed land, derived from the shared world for the map. */
+    /** Visible foregrounds on claimed land and acquired utility tiles. */
     tileFacilities?: Partial<
       Record<
         TerritoryTileId,

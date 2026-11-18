@@ -363,6 +363,7 @@
   }
 }
 .territoryHexGrid {
+  overflow: visible;
   pointer-events: none;
 }
 .territoryFog[data-visibility-distance="1"] {

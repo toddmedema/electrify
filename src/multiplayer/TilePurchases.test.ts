@@ -346,11 +346,11 @@ it("rejects stale, unaffordable and duplicate city claims without duplicate cust
   const game = world.grids[0];
   const quote = tilePurchaseQuote(game, "parcel-1:city")!;
   const before = JSON.stringify(world.grids);
-  expect(buy(world, "0", quote.tileId, "stale")).toBeDefined();
+  expect(buy(world, "0", quote.tileId, "stale")).toMatch(/quote has changed/);
   expect(JSON.stringify(world.grids)).toBe(before);
   currentTick(game)!.cash = quote.price - 1;
   const low = JSON.stringify(world.grids);
-  expect(buy(world, "0", quote.tileId, quote.quoteKey)).toBeDefined();
+  expect(buy(world, "0", quote.tileId, quote.quoteKey)).toMatch(/unaffordable/);
   expect(JSON.stringify(world.grids)).toBe(low);
   currentTick(game)!.cash = quote.price;
   const customers = currentTick(game)!.customers;
