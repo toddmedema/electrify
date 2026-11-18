@@ -2,13 +2,12 @@ import { expect, test } from "./fixtures";
 import type { Page } from "@playwright/test";
 import { readSavedGame } from "./save-fixture";
 import {
-  readTerritoryMapCamera,
   openMapProjectCatalogue,
   returnToTerritoryMap,
+  selectTerritoryMapTile,
   setMapProjectCapacity,
 } from "./layout";
 import { getTerritoryTile } from "../src/helpers/TerritoryTiles";
-import { hexCenter } from "../src/components/base/TerritoryHexGeometry";
 import { currentTick } from "../src/helpers/GameSelectors";
 import { reviewScreenshot } from "./review-screenshot";
 import { loadSimData } from "../src/testing/SimData";
@@ -21,6 +20,7 @@ import {
 import { formatMoneyConcise } from "../src/helpers/Format";
 
 async function start(page: Page, theme: "light" | "dark") {
+  await page.emulateMedia({ reducedMotion: "reduce" });
   await page.addInitScript((mode) => {
     localStorage.setItem("theme", mode);
     localStorage.setItem("audioEnabled", "false");
@@ -36,36 +36,6 @@ async function start(page: Page, theme: "light" | "dark") {
     page.locator("#appbar:visible [data-save-state]").first(),
   ).toHaveAttribute("data-save-state", "saved");
   return network;
-}
-async function chooseSite(page: Page, id: string) {
-  const tile = getTerritoryTile(id)!;
-  const point = hexCenter(tile);
-  const viewport = page.locator(".territoryMapViewport");
-  for (let attempt = 0; attempt < 20; attempt++) {
-    const camera = await readTerritoryMapCamera(viewport);
-    const dx = (camera.x - point.x) * camera.scale;
-    const dy = (camera.y - point.y) * camera.scale;
-    if (Math.abs(dx) < 1 && Math.abs(dy) < 1) break;
-    const box = (await viewport.boundingBox())!;
-    const step = Math.min(
-      1,
-      (box.width * 0.25) / Math.max(1, Math.abs(dx)),
-      (box.height * 0.2) / Math.max(1, Math.abs(dy)),
-    );
-    const x = box.x + box.width / 2,
-      y = box.y + 40;
-    await page.mouse.move(x, y);
-    await page.mouse.down();
-    await page.mouse.move(x + 12, y);
-    await page.mouse.move(x + dx * step, y + dy * step, { steps: 4 });
-    await page.mouse.up();
-  }
-  const target = page.locator(`[data-map-target="${id}"]`);
-  // The public focus handler brings the physical tile into the camera before activation.
-  await target.focus();
-  await target.press("Enter");
-  await expect(target).toHaveAttribute("aria-pressed", "true");
-  return target;
 }
 for (const theme of ["light", "dark"] as const) {
   test(`plans before connecting, retains size across sites, and builds the exact site · ${theme}`, async ({
@@ -108,7 +78,10 @@ for (const theme of ["light", "dark"] as const) {
         ({ name }) => name === "Wind",
       )!,
     );
-    const owned = await chooseSite(page, "champlain:site-13");
+    const owned = await selectTerritoryMapTile(
+      page,
+      getTerritoryTile("champlain:site-13")!,
+    );
     const ownedQuote = projectSiteQuote(before, project, "champlain:site-13");
     expect(ownedQuote.facility).toBeDefined();
     if (!ownedQuote.facility)
@@ -121,7 +94,10 @@ for (const theme of ["light", "dark"] as const) {
       surface.getByRole("heading", { name: "Wind · 20MW", exact: true }),
     ).toBeVisible();
     await expect(surface.getByText("Already connected · $0")).toBeVisible();
-    const target = await chooseSite(page, "green-uplands:site-1");
+    const target = await selectTerritoryMapTile(
+      page,
+      getTerritoryTile("green-uplands:site-1")!,
+    );
     const connectionQuote = projectSiteQuote(
       before,
       project,

@@ -144,36 +144,27 @@ async function inspectTile(page: Page, tile: TerritoryTileDefinition) {
   return surface;
 }
 
-/** Connect an authored site through paid, physically adjacent company property. */
-async function revealTile(page: Page, tile: TerritoryTileDefinition) {
-  const network = mapWorkspace(page);
-  const buy = network.getByRole("button", {
-    name: "Rapid connection mode",
-    exact: true,
-  });
+/** Build the paid approach in the save so the browser can exercise the final connection. */
+function connectFrontierToSite(game: GameType, tile: TerritoryTileDefinition) {
   for (let attempt = 0; attempt < 30; attempt++) {
-    const game = (await readSavedGame(page))!;
-    const views = territoryTileViews(game);
-    const quotes = tilePurchaseQuotes(game, views);
-    if (quotes.has(tile.id) || ownsTerritoryTile(game, tile.id)) {
-      if ((await buy.getAttribute("aria-pressed")) === "true")
-        await buy.click();
-      return;
-    }
-    const next = views
-      .filter((view) => quotes.get(view.tile.id)?.benefit === "general")
+    const quotes = tilePurchaseQuotes(game);
+    if (quotes.has(tile.id)) return;
+    const next = Array.from(quotes.values())
+      .filter((quote) => quote.benefit === "general")
+      .map((quote) => ({ quote, tile: getTerritoryTile(quote.tileId)! }))
       .sort(
         (a, b) =>
           territoryHexDistance(a.tile, tile) -
           territoryHexDistance(b.tile, tile),
-      )[0]?.tile;
+      )[0];
     expect(next, `a purchasable frontier towards ${tile.id}`).toBeDefined();
-    expect(isAdjacentToOwnedTerritoryTile(game, next)).toBe(true);
-    await panToTile(page, next);
-    if ((await buy.getAttribute("aria-pressed")) !== "true") await buy.click();
-    const target = network.locator(`[data-map-target="${next.id}"]`);
-    await target.click();
-    await expect(target).toHaveAttribute("data-owned", "true");
+    expect(isAdjacentToOwnedTerritoryTile(game, next.tile)).toBe(true);
+    expect(
+      purchaseTile(game, {
+        tileId: next.tile.id,
+        quoteKey: next.quote.quoteKey,
+      }),
+    ).toBe(true);
   }
   throw new Error(
     `Could not connect ${tile.id} through the owned map frontier`,
@@ -2032,7 +2023,16 @@ for (const theme of ["light", "dark"] as const) {
       const tile = TERRITORY_TILES.find(
         (tile) => tile.territoryId === resource.id,
       )!;
-      await revealTile(page, tile);
+      if (!tilePurchaseQuote((await readSavedGame(page))!, tile.id)) {
+        await editSavedGame(page, ({ game }) =>
+          connectFrontierToSite(game, tile),
+        );
+        await page.goto("/");
+        await page
+          .getByRole("button", { name: "Continue", exact: true })
+          .click();
+        await openMap(page);
+      }
       const surface = await inspectTile(page, tile);
       await surface.getByRole("button", { name: /^Connect ·/ }).click();
       await expectLockedBuild(surface);

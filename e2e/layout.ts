@@ -229,9 +229,10 @@ export async function selectTerritoryMapTile(
   tile: { id: string; q: number; r: number },
 ): Promise<Locator> {
   const map = await returnToTerritoryMap(page);
+  const target = map.locator(`[data-map-target="${tile.id}"]`);
   const viewport = map.locator(".territoryMapViewport");
   const point = hexCenter(tile);
-  for (let attempt = 0; attempt < 20; attempt++) {
+  for (let attempt = 0; attempt < 20 && !(await target.count()); attempt++) {
     const camera = await readTerritoryMapCamera(viewport);
     const dx = (camera.x - point.x) * camera.scale;
     const dy = (camera.y - point.y) * camera.scale;
@@ -248,10 +249,9 @@ export async function selectTerritoryMapTile(
     await page.mouse.down();
     // Cross the drag threshold even when the camera needs only a tiny correction.
     await page.mouse.move(x + 12, y);
-    await page.mouse.move(x + dx * step, y + dy * step, { steps: 4 });
+    await page.mouse.move(x + dx * step, y + dy * step);
     await page.mouse.up();
   }
-  const target = map.locator(`[data-map-target="${tile.id}"]`);
   await target.focus();
   await target.press("Enter");
   await expect(target).toHaveAttribute("aria-pressed", "true");

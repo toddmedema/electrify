@@ -1151,11 +1151,16 @@ test("controller advances the first tutorial through inspection, chart and clock
 test("controller reviews, cancels and confirms a utility acquisition", async ({
   page,
 }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/?scenario=116");
   const start = page.getByRole("button", { name: "Start game", exact: true });
   await select(page, start);
   await input(page, "confirm");
   await expect(page.locator("#appbar:visible")).toBeVisible();
+  const pause = page.getByRole("button", { name: "pause", exact: true });
+  if ((await pause.getAttribute("aria-pressed")) !== "true")
+    await input(page, "pause");
+  await expect(pause).toHaveAttribute("aria-pressed", "true");
   await editSavedGame(page, ({ game }) => {
     for (const tick of game.timeline) tick.cash = 1e9;
   });
