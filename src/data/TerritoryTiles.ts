@@ -26,7 +26,7 @@ type TileBase = {
 export type TerritoryTileDefinition = TileBase &
   (
     | {
-        city: { size: CitySizeType };
+        city: { size: CitySizeType; name?: string };
         siteKind?: never;
         maxPeakW?: never;
         startingAssetId?: never;
@@ -47,10 +47,12 @@ const utilityCoordinates: Record<
   "champlain" | "valley-electric" | "ridge-electric",
   { q: number; r: number }[]
 > = {
-  // Retain the existing inland water cell's physical identity.
+  // Burlington sits south of the river city. Keep the inherited lake locations.
   champlain: coordinates([
-    [-4, [-4, -3, -2, -1]],
-    [-3, [-4, -3, -2, -1]],
+    [-3, [-1]],
+    [-4, [-3, -2, -1]],
+    [-3, [-4, -3, -2]],
+    [-4, [-4]],
     [-2, [-3, -2, -1]],
     [-1, [-4, -3, -2, -1]],
     [-2, [-4]],
@@ -66,10 +68,10 @@ const greenCoordinates = coordinates([
   [0, [-4, -3, -2, -1]],
   [1, [-3, -2, -1]],
 ]);
-// Snake order keeps every two-cell neutral parcel adjacent across row boundaries.
+// Keep each two-cell parcel adjacent around the western settlement corridor.
 const neutralCoordinates = coordinates([
-  [2, [-4, -3, -2, -1, 0, 1, 2, 3, 4, 5]],
-  [3, [5, 4, 3, 2, 1, 0, -1, -2, -3, -4]],
+  [2, [-2, -3, -4, -1, 0, 1, 2, 3, 4, 5]],
+  [3, [5, 4, 3, 2, 1, 0, -1, -4, -3, -2]],
   [4, [-4, -3, -2, -1, 0, 1, 2, 3]],
 ]);
 const landTerrains: readonly TerrainType[] = [
@@ -109,6 +111,19 @@ const authoredTerrain: Readonly<Partial<Record<TerritoryTileId, TerrainType>>> =
     "ridge-electric:site-10": "mountain",
   };
 const tiles: TerritoryTileDefinition[] = [];
+// Relative positions follow the Vermont municipal map. The art tiers reflect
+// 2020 populations; the fictional utilities' service areas keep their own loads.
+const settlements: Partial<
+  Record<TerritoryId, { name: string; size: CitySizeType }>
+> = {
+  champlain: { name: "Burlington", size: "large" },
+  "valley-electric": { name: "Winooski", size: "small" },
+  "ridge-electric": { name: "Williston", size: "medium" },
+  "parcel-1": { name: "Vergennes", size: "small" },
+  "parcel-5": { name: "Waterbury", size: "small" },
+  "parcel-9": { name: "Bristol", size: "small" },
+  "parcel-11": { name: "Middlebury", size: "medium" },
+};
 const neutralPosition = { index: 0 };
 for (const territory of TERRITORIES) {
   const utility =
@@ -138,7 +153,9 @@ for (const territory of TERRITORIES) {
       ...next(),
       // Valley's city and inherited river plant share reciprocal channel edges.
       terrain: territory.id === "valley-electric" ? "river" : "plains",
-      city: { size: citySizeForTerritory(territory.id) },
+      city: settlements[territory.id] ?? {
+        size: citySizeForTerritory(territory.id),
+      },
     });
   }
   let index = 0;

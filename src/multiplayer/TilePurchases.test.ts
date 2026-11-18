@@ -66,7 +66,7 @@ function startClock(world: World) {
 }
 it("accepts unchanged land quotes after a host clock tick and rejects real CPI repricing", () => {
   const world = ready();
-  buyToward(world, "0", "green-uplands:site-6");
+  buyToward(world, "0", "green-uplands:site-4");
   const offer = tilePurchaseQuote(
     roomView(world, "0").game!,
     "green-uplands:site-0",
@@ -88,7 +88,7 @@ it("accepts unchanged land quotes after a host clock tick and rejects real CPI r
   );
   const next = tilePurchaseQuote(
     roomView(world, "0").game!,
-    "green-uplands:site-1",
+    "green-uplands:site-2",
   )!;
   world.grids.forEach((grid) => {
     grid.date = getDateFromMinute(MINUTES_PER_MONTH, grid.startingYear);
@@ -342,7 +342,7 @@ it.each([
 });
 it("rejects stale, unaffordable and duplicate city claims without duplicate customer credit", () => {
   const world = ready();
-  buyToward(world, "0", "green-uplands:site-6");
+  buyToward(world, "0", "green-uplands:site-4");
   const game = world.grids[0];
   const quote = tilePurchaseQuote(game, "parcel-1:city")!;
   const before = JSON.stringify(world.grids);

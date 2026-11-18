@@ -1,12 +1,14 @@
 import * as React from "react";
 import { Button, IconButton } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
+import { DOWNPAYMENT_PERCENT } from "../../Constants";
 import { GENERATORS, STORAGE } from "../../data/Facilities";
 import { getHydroAvailability } from "../../data/HydroSites";
 import {
   isStorage,
   type FacilityShoppingType,
   type GameType,
+  type TerrainType,
   type TerritoryTileId,
 } from "../../Types";
 import { sliderTickToW } from "../../helpers/BuildSizing";
@@ -14,10 +16,18 @@ import { formatWatts, formatWattHours } from "../../helpers/Format";
 import { currentTick } from "../../helpers/GameSelectors";
 import { hasVisibleEscapeOverlay } from "./VisibleEscapeOverlay";
 import { expectedMonthlyOutputShape } from "../../helpers/ExpectedOutput";
-import { territoryBuildAvailability } from "../../helpers/Territories";
 import {
+  territoryBuildAvailability,
+  tilePurchaseQuotes,
+} from "../../helpers/Territories";
+import {
+  createTerritoryTileOwnership,
   getTerritoryTile,
+  getTerritoryTiles,
   ownsTerritoryTile,
+  territoryTileInventory,
+  tileFitsFacility,
+  tileSupportsFacilityTechnology,
 } from "../../helpers/TerritoryTiles";
 import { resilienceBuildOptions } from "../../helpers/Hazards";
 import {
@@ -33,6 +43,67 @@ import { signature } from "./DeferredProjection";
 import { useBuildForecast } from "./BuildForecast";
 import { useToolState } from "./GameToolMemory";
 import "./DesktopBuildRail.scss";
+
+const technologyOrder = [
+  "Solar",
+  "Wind",
+  "Offshore Wind",
+  "Airborne Wind",
+  "Hydro",
+  "Geothermal",
+  "Enhanced Geothermal",
+  "Natural Gas Peaker",
+  "Natural Gas CC",
+  "Oil",
+  "Biomass",
+  "Coal",
+  "Nuclear",
+  "Battery",
+  "Iron-Air Battery",
+  "Pumped Hydro",
+];
+
+function railSites(game: GameType, options: FacilityShoppingType[]) {
+  const tiles = getTerritoryTiles(game);
+  const owns = createTerritoryTileOwnership(game);
+  const connections = tilePurchaseQuotes(game);
+  const candidates = tiles
+    .filter((tile) => owns(tile) || connections.has(tile.id))
+    .filter((tile) => territoryTileInventory(game, tile.id).remaining)
+    .sort(
+      (a, b) =>
+        (connections.get(a.id)?.price ?? 0) -
+        (connections.get(b.id)?.price ?? 0),
+    );
+  return new Map(
+    options
+      .filter((facility) =>
+        tiles.some((tile) => tileSupportsFacilityTechnology(tile, facility)),
+      )
+      .map((facility) => {
+        const selection = selectProject(facility);
+        let minimumDue = Infinity;
+        // Within one terrain, the cheapest legal connection also has the cheapest project.
+        const pricedTerrain = new Set<TerrainType>();
+        for (const tile of candidates) {
+          if (
+            pricedTerrain.has(tile.terrain) ||
+            !tileFitsFacility(tile, selection)
+          )
+            continue;
+          const quote = projectSiteQuote(game, selection, tile.id, connections);
+          if (!quote.facility) continue;
+          pricedTerrain.add(tile.terrain);
+          minimumDue = Math.min(
+            minimumDue,
+            quote.connectionCost +
+              quote.facility.buildCost * DOWNPAYMENT_PERCENT,
+          );
+        }
+        return [facility.name, minimumDue] as const;
+      }),
+  );
+}
 
 /** A catalogue of technology identities; only the active preview mounts a full build card. */
 export default function DesktopBuildRail({
@@ -81,10 +152,22 @@ export default function DesktopBuildRail({
         ),
         ...STORAGE(game, sliderTickToW(storageSize)),
         // Planning inputs, rather than clock ticks or map focus, own catalogue pricing.
-      ]),
+      ]).sort(
+        (a, b) =>
+          technologyOrder.indexOf(a.name) - technologyOrder.indexOf(b.name),
+      ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [pricingKey, generatorSize, storageSize, forecast],
   );
+  const minimumDue = React.useMemo(
+    () => railSites(game, options),
+    // Cash changes every tick. Site eligibility and prices use the planning inputs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [pricingKey, options],
+  );
+  const cash = currentTick(game)?.cash ?? 0;
+  const canChoose = (facility: FacilityShoppingType) =>
+    !busy && (minimumDue.get(facility.name) ?? Infinity) <= cash;
   const clearTimer = React.useCallback(() => {
     if (dismissTimer.current !== undefined) clearTimeout(dismissTimer.current);
   }, []);
@@ -154,21 +237,25 @@ export default function DesktopBuildRail({
   };
   const choose = (option: FacilityShoppingType, exactSize?: number) => {
     if (busy) return;
-    const max = isStorage(option) ? option.maxPeakWh : option.maxPeakW;
     const requested = isStorage(option) ? option.peakWh : option.peakW;
-    const size = exactSize ?? (max > 0 && requested > max ? max : requested);
+    const size = exactSize ?? requested;
     const selected =
       size === requested
         ? option
         : projectCatalogue(game, size, isStorage(option)).find(
             ({ name }) => name === option.name,
           );
-    if (selected) {
+    if (!selected) return;
+    const due =
+      size === requested
+        ? minimumDue.get(selected.name)
+        : railSites(game, [selected]).get(selected.name);
+    if ((due ?? Infinity) <= cash) {
       dismiss();
       onProject(selectProject(selected));
     }
   };
-  const option = options.find(({ name }) => name === previewName);
+  const option = options.find((item) => item.name === previewName);
   const quote = React.useMemo(
     () =>
       option && siteId
@@ -195,7 +282,7 @@ export default function DesktopBuildRail({
   const facility = quote?.facility ?? option;
   const sizeControl = (storage: boolean) => {
     const category = storage ? "storage" : "generator";
-    const label = storage ? "Storage energy" : "Generator power";
+    const label = storage ? "Energy" : "Power";
     const value = sliderTickToW(storage ? storageSize : generatorSize);
     return (
       <Button
@@ -230,10 +317,7 @@ export default function DesktopBuildRail({
           dismiss();
       }}
     >
-      <div className="desktopBuildSizing">
-        {sizeControl(false)}
-        {sizeControl(true)}
-      </div>
+      <div className="desktopBuildSizing">{sizeControl(false)}</div>
       <span className="srOnly" id={previewHintId}>
         Press Right Arrow to enter the technology preview, then Tab to move
         between its controls. Escape returns to the technology.
@@ -261,35 +345,59 @@ export default function DesktopBuildRail({
               storage ? "Storage technologies" : "Generator technologies"
             }
           >
+            {storage && (
+              <>
+                <hr />
+                <div className="desktopBuildSizing">{sizeControl(true)}</div>
+              </>
+            )}
             <h3>{storage ? "Storage" : "Generators"}</h3>
             {options
-              .filter((item) => isStorage(item) === storage)
+              .filter(
+                (item) =>
+                  isStorage(item) === storage && minimumDue.has(item.name),
+              )
               .map((item) => (
-                <button
+                <div
                   key={item.name}
-                  type="button"
-                  className="desktopBuildTechnology"
-                  disabled={busy}
-                  aria-label={`Choose sites for ${item.name}`}
-                  aria-pressed={project?.name === item.name}
-                  aria-keyshortcuts="ArrowRight"
-                  aria-describedby={`${previewHintId}${previewName === item.name ? ` ${previewId}` : ""}`}
-                  onMouseEnter={(event) => show(item, event.currentTarget)}
-                  onMouseLeave={leave}
-                  onFocus={(event) => show(item, event.currentTarget)}
-                  onKeyDown={(event) => {
-                    if (event.key !== "ArrowRight" || busy) return;
-                    event.preventDefault();
-                    show(item, event.currentTarget);
-                    setPreviewEntry((value) => value + 1);
+                  onMouseEnter={(event) => {
+                    const button = event.currentTarget.querySelector("button");
+                    if (button) show(item, button);
                   }}
-                  onClick={() => choose(item)}
+                  onMouseLeave={leave}
                 >
-                  <img src={`/images/${item.name.toLowerCase()}.svg`} alt="" />
-                  <span>
-                    {item.name === "Battery" ? "Lithium Battery" : item.name}
-                  </span>
-                </button>
+                  <button
+                    type="button"
+                    className="desktopBuildTechnology"
+                    disabled={!canChoose(item)}
+                    title={
+                      busy || canChoose(item)
+                        ? item.name
+                        : minimumDue.get(item.name) === Infinity
+                          ? `${item.name} · No available sites at this size`
+                          : `${item.name} · Insufficient cash to start construction`
+                    }
+                    aria-label={`Choose sites for ${item.name}`}
+                    aria-pressed={project?.name === item.name}
+                    aria-keyshortcuts="ArrowRight"
+                    aria-describedby={`${previewHintId}${previewName === item.name ? ` ${previewId}` : ""}`}
+                    onFocus={(event) => show(item, event.currentTarget)}
+                    onKeyDown={(event) => {
+                      if (event.key !== "ArrowRight" || !canChoose(item))
+                        return;
+                      event.preventDefault();
+                      show(item, event.currentTarget);
+                      setPreviewEntry((value) => value + 1);
+                    }}
+                    onClick={() => choose(item)}
+                  >
+                    <img
+                      src={`/images/${item.name.toLowerCase()}.svg`}
+                      alt=""
+                    />
+                    {storage && <span>{item.name}</span>}
+                  </button>
+                </div>
               ))}
           </section>
         ))}
@@ -299,12 +407,10 @@ export default function DesktopBuildRail({
           className="desktopBuildSizePopover"
           data-escape-overlay="true"
           id={sizingId}
-          aria-label={`${sizing === "storage" ? "Storage energy" : "Generator power"} sizing`}
+          aria-label={`${sizing === "storage" ? "Energy" : "Power"} sizing`}
         >
           <label>
-            {sizing === "storage"
-              ? "Storage energy (MWh)"
-              : "Generator power (MW)"}
+            {sizing === "storage" ? "Energy (MWh)" : "Power (MW)"}
             <strong>
               {sizing === "storage"
                 ? formatWattHours(sliderTickToW(storageSize))
@@ -376,7 +482,7 @@ export default function DesktopBuildRail({
                 <StorageBuildItem
                   preview
                   game={game}
-                  cash={currentTick(game)?.cash ?? 0}
+                  cash={cash}
                   interestRate={game.interestRate}
                   location={game.location}
                   storage={facility}
@@ -396,7 +502,7 @@ export default function DesktopBuildRail({
                   date={game.date}
                   seed={game.seed}
                   location={game.location}
-                  cash={currentTick(game)?.cash ?? 0}
+                  cash={cash}
                   interestRate={game.interestRate}
                   hydroAvailability={
                     facility.name === "Hydro" &&
@@ -428,7 +534,7 @@ export default function DesktopBuildRail({
             </ul>
           </div>
           <Button
-            disabled={busy}
+            disabled={!canChoose(facility)}
             onClick={() => choose(facility)}
             variant="contained"
           >

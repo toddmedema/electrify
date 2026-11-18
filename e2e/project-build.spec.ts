@@ -76,8 +76,9 @@ for (const theme of ["light", "dark"] as const) {
   }, testInfo) => {
     const network = await start(page, theme);
     const before = (await readSavedGame(page))!;
-    const build = network.getByRole("button", { name: "Build", exact: true });
-    await expect(build.getByText("Build", { exact: true })).toBeVisible();
+    await expect(
+      network.getByRole("button", { name: "Build", exact: true }),
+    ).toHaveCount(0);
     await network
       .getByRole("button", { name: "Rapid connection mode", exact: true })
       .click();
@@ -86,15 +87,15 @@ for (const theme of ["light", "dark"] as const) {
       "true",
     );
     const catalogue = await openMapProjectCatalogue(page);
-    await expect(network.locator(".territoryMap")).toHaveAttribute(
-      "data-buy-mode",
-      "false",
-    );
     const surface = page.locator(".tileWorkspaceSurface");
     await setMapProjectCapacity(catalogue, false, "10");
     await catalogue
       .getByRole("button", { name: "Choose sites for Wind", exact: true })
       .click();
+    await expect(network.locator(".territoryMap")).toHaveAttribute(
+      "data-buy-mode",
+      "false",
+    );
     await expect(
       surface.getByText("Choose a highlighted site.", { exact: true }),
     ).toBeVisible();

@@ -1,4 +1,6 @@
 import * as React from "react";
+import { TICK_MS } from "../../../Constants";
+import type { SpeedType } from "../../../Types";
 import type { TerritoryTileView } from "../../../helpers/TerritoryMapState";
 import type { TerritoryTileDefinition } from "../../../data/TerritoryTiles";
 import type { HexWire } from "../TerritoryHexGeometry";
@@ -30,6 +32,7 @@ export default function TerritoryScene3D({
   wires,
   minute,
   minuteOfDay,
+  speed,
   runKey,
   frame,
   daylight,
@@ -42,8 +45,9 @@ export default function TerritoryScene3D({
   wires: readonly HexWire[];
   minute: number;
   minuteOfDay: number;
+  speed: SpeedType;
   runKey: string;
-  frame: Omit<MapFrame, "lighting">;
+  frame: Omit<MapFrame, "lighting" | "lightingTransitionMs">;
   daylight: {
     sunrise: number;
     sunset: number;
@@ -58,7 +62,12 @@ export default function TerritoryScene3D({
     () => builder.build(views, tiles, wires, minute, runKey),
     [builder, views, tiles, wires, minute, runKey],
   );
-  const light = mapLighting({ minute: minuteOfDay, ...daylight, dark });
+  const lighting = React.useMemo(
+    () => mapLighting({ minute: minuteOfDay, ...daylight, dark }),
+    [minuteOfDay, daylight, dark],
+  );
+  const lightingTransitionMs =
+    speed === "SLOW" || speed === "NORMAL" ? TICK_MS[speed] : undefined;
   const renderer = React.useRef<RendererHandle>();
   const latestFrame = React.useRef(frame);
   latestFrame.current = frame;
@@ -78,7 +87,7 @@ export default function TerritoryScene3D({
   return (
     <TerritoryCanvas3D
       instances={instances}
-      frame={{ ...frame, lighting: light }}
+      frame={{ ...frame, lighting, lightingTransitionMs }}
       runKey={runKey}
       loadRenderer={loadRenderer}
       onState={onState}

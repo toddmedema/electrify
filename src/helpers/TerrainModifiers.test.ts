@@ -98,7 +98,7 @@ it.each([
   ["river", 1, 1],
   ["lake", 1, 1],
 ] as const)(
-  "scopes %s residual speed and build cost to fixed onshore wind and solar",
+  "applies %s siting costs to all technologies and residual speed to fixed onshore wind",
   (terrain, speed, cost) => {
     const game = fixture();
     const tileId = TERRITORY_TILES.find(
@@ -122,7 +122,7 @@ it.each([
     ] as const) {
       expect(getTerrainModifiers(game, fuel, tileId)).toEqual({
         onshoreWindSpeed: 1,
-        buildCost: 1,
+        buildCost: cost,
       });
     }
     expect(getTerrainModifiers(game, "Wind")).toEqual({
@@ -188,7 +188,8 @@ it.each(["forest", "hills", "mountain"] as const)(
     expect(solar.capacityFactor).toBe(flatSolar.capacityFactor);
     expect(solar.annualOperatingCost).toBe(flatSolar.annualOperatingCost);
     expect(quote(game, terrain, "Natural Gas Peaker").buildCost).toBe(
-      quote(game, "plains", "Natural Gas Peaker").buildCost,
+      quote(game, "plains", "Natural Gas Peaker").buildCost *
+        modifiers.buildCost,
     );
   },
 );
@@ -268,7 +269,7 @@ it("prices solar terrain before the independently toggleable tracker add-on", ()
   )!;
   expect(
     getBuildFacilityQuote(game, battery, "green-uplands", tileId)?.buildCost,
-  ).toBe(battery.buildCost);
+  ).toBeCloseTo(battery.buildCost * 1.05);
 });
 
 it("retains deterministic free-tile fallback and rejects insufficient cash before any mutation", () => {

@@ -14,7 +14,9 @@ it("gives all other companies distinct borders even when seat hashes collide", (
 
 it("labels each city by size and connects mixed service accounts with one customer label", () => {
   for (const tile of TERRITORY_TILES.filter((tile) => tile.city)) {
-    expect(territoryTileLabel(tile)).toContain(citySizeLabel(tile.city!.size));
+    expect(territoryTileLabel(tile)).toContain(
+      tile.city!.name ?? citySizeLabel(tile.city!.size),
+    );
     expect(territoryTileLabel(tile)).not.toMatch(/residential|industrial/i);
   }
   expect(

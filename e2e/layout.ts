@@ -251,15 +251,15 @@ export async function selectTerritoryMapTile(
 /** Open the map catalogue through its public entry point at the current effective width. */
 export async function openMapProjectCatalogue(page: Page): Promise<Locator> {
   const map = await returnToTerritoryMap(page);
-  await map.getByRole("button", { name: "Build", exact: true }).click();
   const rail = map.getByRole("complementary", {
     name: "Build facilities",
     exact: true,
   });
-  if (await rail.isVisible()) {
-    await expect(rail).toBeFocused();
-    return rail;
-  }
+  if (await rail.isVisible()) return rail;
+  await page
+    .getByRole("navigation", { name: "Game actions" })
+    .getByRole("button", { name: "Build", exact: true })
+    .click();
   const catalogue = map.locator(".tileWorkspaceSurface");
   await expect(
     catalogue.getByRole("heading", { name: "Plan a project", exact: true }),
@@ -274,7 +274,7 @@ export async function setMapProjectCapacity(
   tick: string,
 ): Promise<void> {
   const sizing = catalogue.getByRole("button", {
-    name: storage ? /^Storage energy:/ : /^Generator power:/,
+    name: storage ? /^Energy:/ : /^Power:/,
   });
   const popover = await sizing.isVisible();
   if (popover) await sizing.click();

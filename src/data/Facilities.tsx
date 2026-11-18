@@ -958,7 +958,11 @@ export function windAnnualOutputDegradation(commissioningYear: number): number {
 // Conservative commercial rollout after the announced 2029 Irish project; see economics docs.
 export const IRON_AIR_AVAILABLE_YEAR = 2030;
 
-export function STORAGE(state: GameType, peakWh: number) {
+export function STORAGE(
+  state: GameType,
+  peakWh: number,
+  tileId?: TerritoryTileId,
+) {
   // 0 = 1MW, 4 = 10GW (+1 for each 10x)
   const magnitude = log10(peakWh) - 6;
   const year = state.date.year;
@@ -1061,6 +1065,11 @@ export function STORAGE(state: GameType, peakWh: number) {
   // update with calculations that occur across all entries, like difficulty multipliers
   const difficulty = DIFFICULTIES[state.difficulty];
   const inflation = getCostInflation(state);
+  const { buildCost: terrainCost } = getTerrainModifiers(
+    state,
+    undefined,
+    tileId,
+  );
   storage = storage.filter((g: StorageShoppingType) => {
     applyLegacyStorageEra(state, g);
     const mod = facilityModifier(state, g.name);
@@ -1080,6 +1089,7 @@ export function STORAGE(state: GameType, peakWh: number) {
       `facilities.${g.name}.yearsToBuild`,
     );
     g.buildCost *= difficulty.buildCost * inflation;
+    g.buildCost *= terrainCost;
     g.annualOperatingCost *= difficulty.expensesOM * inflation;
     g.yearsToBuild *= difficulty.buildTime;
     if (
@@ -1117,7 +1127,7 @@ export function getBuildFacilityQuote(
           tileId,
           pinnedHydroSiteId,
         )
-      : STORAGE(game, requested.peakWh);
+      : STORAGE(game, requested.peakWh, tileId);
   let quote = options.find(
     (candidate) =>
       candidate.available &&

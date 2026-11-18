@@ -107,13 +107,13 @@ for (const theme of ["light", "dark"] as const) {
     if (desktop) {
       await expect(
         rail.getByRole("button", {
-          name: "Generator power: 30MW",
+          name: "Power: 30MW",
           exact: true,
         }),
       ).toBeVisible();
       await expect(
         rail.getByRole("button", {
-          name: "Storage energy: 60MWh",
+          name: "Energy: 60MWh",
           exact: true,
         }),
       ).toBeVisible();
@@ -148,13 +148,13 @@ for (const theme of ["light", "dark"] as const) {
       await expect(surface).toHaveCount(0);
       await expect(
         rail.getByRole("button", {
-          name: "Generator power: 30MW",
+          name: "Power: 30MW",
           exact: true,
         }),
       ).toBeVisible();
       await expect(
         rail.getByRole("button", {
-          name: "Storage energy: 60MWh",
+          name: "Energy: 60MWh",
           exact: true,
         }),
       ).toBeVisible();
@@ -172,15 +172,22 @@ for (const theme of ["light", "dark"] as const) {
         ),
       ).toBeGreaterThan(0);
       const last = technologies
-        .getByRole("button", { name: /^Choose sites for / })
+        .getByRole("button", { name: /^Choose sites for /, disabled: false })
         .last();
       await technologies.evaluate((element) => {
         element.scrollTop = 0;
       });
       await expect(last).not.toBeInViewport();
       await rail.focus();
-      const buttonCount = await rail.getByRole("button").count();
-      for (let index = 0; index < buttonCount; index++)
+      const stepsToLast = await last.evaluate((button) => {
+        const buttons = Array.from(
+          button
+            .closest(".desktopBuildRail")!
+            .querySelectorAll("button:enabled"),
+        );
+        return buttons.indexOf(button) + 1;
+      });
+      for (let index = 0; index < stepsToLast; index++)
         await page.keyboard.press("Tab");
       await expect(last).toBeFocused();
       await expect(last).toBeInViewport({ ratio: 1 });

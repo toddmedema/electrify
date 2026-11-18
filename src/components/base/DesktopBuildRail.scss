@@ -2,9 +2,9 @@
   position: relative;
   z-index: 9;
   display: flex;
-  flex: 0 0 104px;
+  flex: 0 0 80px;
   flex-direction: column;
-  width: 104px;
+  width: 80px;
   min-height: 0;
   box-sizing: border-box;
   border-right: 1px solid var(--border-subtle);
@@ -12,10 +12,11 @@
   color: var(--font-color-primary);
   outline-offset: -4px;
 }
-.desktopBuildSizing {
+.desktopBuildRail > .desktopBuildSizing {
   flex: 0 0 auto;
-  padding: 8px 4px;
-  border-bottom: 1px solid var(--border-subtle);
+  padding: 8px 4px 0;
+}
+.desktopBuildSizing {
   .desktopBuildSize {
     display: flex;
     flex-direction: column;
@@ -37,6 +38,11 @@
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: 4px 4px calc(var(--game-dock-clearance, 80px) + 8px);
+  hr {
+    margin: 8px 4px 4px;
+    border: 0;
+    border-top: 1px solid var(--border-subtle);
+  }
   h3 {
     margin: 8px 0 4px;
     text-align: center;
@@ -63,10 +69,10 @@
   line-height: 1.2;
   cursor: pointer;
   img {
-    width: 32px;
-    height: 32px;
+    width: 38px;
+    height: 38px;
   }
-  &:hover,
+  &:hover:not(:disabled),
   &:focus-visible,
   &[aria-pressed="true"] {
     border-color: var(--interactive-strong);

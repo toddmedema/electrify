@@ -143,7 +143,7 @@ it("leaves completed foreign facilities unbadged and explains unavailable operat
   ).toBeInTheDocument();
 });
 
-it("shows an expanding plant's green operating badge when only Construction is hidden", () => {
+it("hides and restores the construction badge with the facility status layer", () => {
   const { game, facility } = ready();
   facility.expansionInProgress = {
     projectSequence: 1,
@@ -160,11 +160,10 @@ it("shows an expanding plant's green operating badge when only Construction is h
   const { occupant } = show(game, facility.tileId!);
   expect(occupant).toHaveAttribute("data-facility-status", "construction");
   fireEvent.click(screen.getByRole("button", { name: "Map layers" }));
-  fireEvent.click(screen.getByRole("checkbox", { name: "Construction" }));
-  expect(occupant).toHaveAttribute("data-facility-status", "producing");
-  expect(decorativeChild(occupant, ".facilityMapStatusArtwork")).not.toBeNull();
-  fireEvent.click(
-    screen.getByRole("checkbox", { name: "Producing and charging" }),
-  );
+  const toggle = screen.getByRole("checkbox", { name: "Facility status" });
+  fireEvent.click(toggle);
+  expect(occupant).toHaveAttribute("data-facility-status", "construction");
   expect(decorativeChild(occupant, ".facilityMapStatusArtwork")).toBeNull();
+  fireEvent.click(toggle);
+  expect(decorativeChild(occupant, ".facilityMapStatusArtwork")).not.toBeNull();
 });

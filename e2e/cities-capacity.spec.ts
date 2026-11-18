@@ -88,7 +88,7 @@ for (const theme of ["light", "dark"] as const) {
     )!.tile;
     await selectTerritoryMapTile(page, city);
     const surface = map.locator(".tileWorkspaceSurface");
-    await expect(surface).toHaveAccessibleName("Large city");
+    await expect(surface).toHaveAccessibleName("Burlington");
     const demand = surface.getByRole("region", {
       name: "City demand by use",
       exact: true,
@@ -121,21 +121,22 @@ for (const theme of ["light", "dark"] as const) {
     });
     await trigger.click();
     const layers = page.getByRole("dialog", {
-      name: "Facility status",
+      name: "Map layers",
       exact: true,
     });
     await expectDialogToFit(layers);
-    for (const name of [
-      "Producing and charging",
-      "Idle and paused",
-      "Construction",
-    ])
-      await expect(
-        layers.getByRole("checkbox", { name, exact: true }),
-      ).toBeChecked();
-    await layers
-      .getByRole("checkbox", { name: "Producing and charging", exact: true })
-      .uncheck();
+    const status = layers.getByRole("checkbox", {
+      name: "Facility status",
+      exact: true,
+    });
+    await expect(status).toBeChecked();
+    await expect(layers.getByRole("checkbox")).toHaveCount(1);
+    const capitalLabel = map
+      .locator('[data-map-target="champlain:city"]')
+      .getByText("Burlington", { exact: true });
+    await expect(capitalLabel).toBeAttached();
+    await status.uncheck();
+    await expect(capitalLabel).toHaveCount(0);
     await expect(active.locator(".facilityMapStatusArtwork")).toHaveCount(0);
     await expect(selected).toHaveAttribute("title", /Generating/);
     expect(await sceneFacility(map, ids.active)).toMatchObject({
@@ -143,12 +144,6 @@ for (const theme of ["light", "dark"] as const) {
       producing: true,
       saturation: operation!.saturation,
     });
-    await layers
-      .getByRole("checkbox", { name: "Idle and paused", exact: true })
-      .uncheck();
-    await layers
-      .getByRole("checkbox", { name: "Construction", exact: true })
-      .uncheck();
     await layers.press("Escape");
     await expect(layers).toHaveCount(0);
     await expect(trigger).toBeFocused();
@@ -161,12 +156,8 @@ for (const theme of ["light", "dark"] as const) {
       .getByRole("button", { name: "Close tile", exact: true })
       .click();
     await trigger.click();
-    for (const name of [
-      "Producing and charging",
-      "Idle and paused",
-      "Construction",
-    ])
-      await layers.getByRole("checkbox", { name, exact: true }).check();
+    await status.check();
+    await expect(capitalLabel).toBeAttached();
     await layers.press("Escape");
     await expect(idle.locator(".facilityMapStatusArtwork")).toBeVisible();
     const after = (await readSavedGame(page))!;
@@ -266,16 +257,13 @@ for (const theme of ["light", "dark"] as const) {
     });
     await map.getByRole("button", { name: "Map layers", exact: true }).click();
     const layers = page.getByRole("dialog", {
-      name: "Facility status",
+      name: "Map layers",
       exact: true,
     });
     await layers
-      .getByRole("checkbox", { name: "Construction", exact: true })
+      .getByRole("checkbox", { name: "Facility status", exact: true })
       .uncheck();
-    // Hiding the added-capacity construction layer still shows the running base plant.
-    await expect(
-      occupant.locator('.facilityMapStatusArtwork path[fill="#2E7D32"]'),
-    ).toBeVisible();
+    await expect(occupant.locator(".facilityMapStatusArtwork")).toHaveCount(0);
     expect(await sceneFacility(map, tile.id)).toMatchObject({
       active: true,
       producing: true,

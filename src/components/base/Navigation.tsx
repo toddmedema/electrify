@@ -92,9 +92,11 @@ export default function Navigation({
   destination,
   mapView = "FACILITIES",
   onMapView,
+  showMapBuild = false,
 }: {
   mapView?: MapWorkspaceView;
   onMapView?: (view: MapWorkspaceView) => void;
+  showMapBuild?: boolean;
   openTools?: GameTool[];
   onToggle?: (tool: GameTool) => void;
   destination?: (tool: GameTool) => CardNameType;
@@ -129,7 +131,7 @@ export default function Navigation({
   const tools = GAME_TOOLS.filter(
     (tool) =>
       (hasScenarioDetails || tool.id !== "SCENARIO") &&
-      (!mapWorkspace || tool.id !== "BUILD_GENERATORS") &&
+      (!mapWorkspace || showMapBuild || tool.id !== "BUILD_GENERATORS") &&
       (!tutorialActions || tutorialActions.includes(tool.id)),
   );
   if (!tools.length) return null;

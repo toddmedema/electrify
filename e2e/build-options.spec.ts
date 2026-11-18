@@ -43,7 +43,6 @@ test("ordinary starting hills offer general technologies and retain special-site
       "Natural Gas CC",
       "Biomass",
       "Coal",
-      "Nuclear",
     ]) {
       const trigger = rail.getByRole("button", {
         name: `Choose sites for ${name}`,
@@ -61,10 +60,22 @@ test("ordinary starting hills offer general technologies and retain special-site
         preview.getByRole("button", { name: "Choose sites", exact: true }),
       ).toBeEnabled();
     }
-    for (const name of ["Hydro", "Geothermal", "Offshore Wind"]) {
+    await expect(
+      rail.getByRole("button", {
+        name: "Choose sites for Nuclear",
+        exact: true,
+      }),
+    ).toBeDisabled();
+    await expect(
+      rail.getByRole("button", {
+        name: "Choose sites for Offshore Wind",
+        exact: true,
+      }),
+    ).toHaveCount(0);
+    for (const name of ["Hydro", "Geothermal"]) {
       await rail
         .getByRole("button", { name: `Choose sites for ${name}`, exact: true })
-        .focus();
+        .hover();
       const preview = rail.getByRole("region", {
         name: `${name} technology preview`,
         exact: true,
@@ -81,7 +92,7 @@ test("ordinary starting hills offer general technologies and retain special-site
   }
   const tile = getAuthoredTerritoryTile("champlain:site-12")!;
   const panel = page.getByRole("dialog", {
-    name: `Build · ${TERRAIN_LABELS[tile.terrain]}`,
+    name: TERRAIN_LABELS[tile.terrain],
     exact: true,
   });
   await expect(panel).toBeVisible();
@@ -194,8 +205,8 @@ for (const theme of ["light", "dark"] as const) {
             name: "Choose sites for Geothermal",
             exact: true,
           });
-          await trigger.focus();
-          await expect(trigger).toBeFocused();
+          await expect(trigger).toBeDisabled();
+          await trigger.hover();
           const preview = rail.getByRole("region", {
             name: "Geothermal technology preview",
             exact: true,
@@ -227,28 +238,13 @@ for (const theme of ["light", "dark"] as const) {
             animations: "disabled",
             scale: "css",
           });
-          await preview
-            .getByRole("button", { name: "Choose sites", exact: true })
-            .click();
-          await tile.focus();
-          await tile.press("Enter");
-          await expect(tile).toHaveAccessibleDescription(
-            /Unavailable for this project/,
-          );
-          const project = page.locator(".tileWorkspaceSurface");
-          await expect(project.getByRole("alert")).toContainText(
-            "vacant compatible site",
-          );
           await expect(
-            project.getByRole("button", {
-              name: "Review project",
-              exact: true,
-            }),
-          ).toHaveCount(0);
+            preview.getByRole("button", { name: "Choose sites", exact: true }),
+          ).toBeDisabled();
           return;
         }
         await expect(
-          page.getByRole("dialog", { name: "Build · Plains", exact: true }),
+          page.getByRole("dialog", { name: "Plains", exact: true }),
         ).toBeVisible();
       } else {
         await openBuild(page);

@@ -61,7 +61,9 @@ it("keeps every current catalogue technology discoverable with its canonical ico
     ...projectCatalogue(game, 2e6, false),
     ...projectCatalogue(game, 1e8, true),
   ];
-  for (const option of expected) {
+  for (const option of expected.filter(
+    ({ name }) => name !== "Offshore Wind",
+  )) {
     const button = within(rail).getByRole("button", {
       name: `Choose sites for ${option.name}`,
     });
@@ -73,6 +75,41 @@ it("keeps every current catalogue technology discoverable with its canonical ico
   expect(
     screen.queryByLabelText(/technology preview$/),
   ).not.toBeInTheDocument();
+});
+
+it("keeps a fixed icon order and fades technologies the company cannot afford", () => {
+  const { game, update } = show(undefined, (game) => {
+    currentTick(game)!.cash = 0;
+  });
+  const generators = screen.getByRole("region", {
+    name: "Generator technologies",
+  });
+  const buttons = within(generators).getAllByRole("button", {
+    name: /^Choose sites for /,
+  });
+  expect(
+    buttons.map((button) =>
+      button.getAttribute("aria-label")?.replace("Choose sites for ", ""),
+    ),
+  ).toEqual([
+    "Solar",
+    "Wind",
+    "Hydro",
+    "Geothermal",
+    "Natural Gas Peaker",
+    "Natural Gas CC",
+    "Oil",
+    "Biomass",
+    "Coal",
+    "Nuclear",
+  ]);
+  for (const button of buttons) {
+    expect(button).toBeDisabled();
+    expect(button).toHaveTextContent(/^$/);
+  }
+  currentTick(game)!.cash = 1e9;
+  update();
+  expect(wind()).toBeEnabled();
 });
 
 it("opens just one full expanded card on hover without spending or stealing focus", () => {
@@ -107,7 +144,7 @@ it("opens just one full expanded card on hover without spending or stealing focu
 
 it("uses independent remembered power and energy sliders without changing an already chosen project", () => {
   const { memory, onProject } = show();
-  fireEvent.click(screen.getByRole("button", { name: /Generator power:/ }));
+  fireEvent.click(screen.getByRole("button", { name: /Power:/ }));
   fireEvent.change(screen.getByRole("slider", { name: "Generator capacity" }), {
     target: { value: "12" },
   });
@@ -115,7 +152,7 @@ it("uses independent remembered power and energy sliders without changing an alr
   fireEvent.click(screen.getByRole("button", { name: "Done" }));
   fireEvent.click(wind());
   expect(onProject.mock.calls[0][0].peakW).toBe(4e7);
-  fireEvent.click(screen.getByRole("button", { name: /Storage energy:/ }));
+  fireEvent.click(screen.getByRole("button", { name: /Energy:/ }));
   fireEvent.change(screen.getByRole("slider", { name: "Storage capacity" }), {
     target: { value: "22" },
   });
@@ -166,7 +203,7 @@ it("enters a non-final technology preview with Right Arrow and tabs within it be
 
 it("returns keyboard focus to the trigger after explicit sizing and preview dismissal", async () => {
   const { onProject } = show();
-  const size = screen.getByRole("button", { name: /Generator power:/ });
+  const size = screen.getByRole("button", { name: /Power:/ });
   await userEvent.tab();
   expect(size).toHaveFocus();
   await userEvent.keyboard("{Enter}");
@@ -198,8 +235,12 @@ it("keeps the last technology preview through multiple native focus scrolls and 
   const technologies = within(rail).getByRole("group", {
     name: "Construction technology list",
   });
-  const last = within(technologies).getAllByRole("button").at(-1)!;
-  const buttons = within(rail).getAllByRole("button");
+  const last = within(technologies)
+    .getAllByRole<HTMLButtonElement>("button")
+    .at(-1)!;
+  const buttons = within(rail)
+    .getAllByRole<HTMLButtonElement>("button")
+    .filter((button) => !button.disabled);
   for (let index = 0; index <= buttons.indexOf(last); index++)
     await userEvent.tab();
   expect(last).toHaveFocus();
@@ -218,7 +259,7 @@ it("keeps the last technology preview through multiple native focus scrolls and 
   ).toHaveFocus();
 });
 
-it.each(["Solar", "Geothermal"])(
+it.each(["Solar", "Wind"])(
   "preserves directly focused %s through native scrolling but dismisses on wheel, scrollbar activation and blur",
   (name) => {
     show();
@@ -261,7 +302,7 @@ it.each([
         price: 0,
       });
     });
-    fireEvent.click(screen.getByRole("button", { name: /Generator power:/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Power:/ }));
     fireEvent.change(
       screen.getByRole("slider", { name: "Generator capacity" }),
       {
@@ -341,20 +382,15 @@ it("uses the owning site quote for preview prices and explains incompatible site
   expect(
     within(preview).getByText(formatMoneyConcise(quote.facility.buildCost)),
   ).toBeInTheDocument();
-  fireEvent.mouseEnter(
-    screen.getByRole("button", { name: "Choose sites for Offshore Wind" }),
-  );
   expect(
-    within(screen.getByLabelText("Offshore Wind technology preview")).getByText(
-      /vacant compatible site/,
-    ),
-  ).toBeInTheDocument();
+    screen.queryByRole("button", { name: "Choose sites for Offshore Wind" }),
+  ).not.toBeInTheDocument();
   expect(onProject).not.toHaveBeenCalled();
 });
 
-it("keeps exact technology limits when choosing an oversized project", () => {
+it("disables an oversized project until the player changes the sizing", () => {
   const { game, onProject } = show();
-  fireEvent.click(screen.getByRole("button", { name: /Generator power:/ }));
+  fireEvent.click(screen.getByRole("button", { name: /Power:/ }));
   fireEvent.change(screen.getByRole("slider", { name: "Generator capacity" }), {
     target: { value: "34" },
   });
@@ -364,7 +400,6 @@ it("keeps exact technology limits when choosing an oversized project", () => {
   )!;
   expect(option.maxPeakW).toBeLessThan(option.peakW);
   fireEvent.click(wind());
-  expect(onProject).toHaveBeenCalledWith(
-    expect.objectContaining({ name: "Wind", peakW: option.maxPeakW }),
-  );
+  expect(wind()).toBeDisabled();
+  expect(onProject).not.toHaveBeenCalled();
 });

@@ -32,8 +32,7 @@ import {
   withResilienceOptions,
 } from "../../helpers/Hazards";
 import { purchaseFacility } from "../../helpers/PurchaseFacility";
-import { territoryBuildTileName } from "./TerritoryBuildDestination";
-import { territoryMapLabel } from "./TerritoryMapLayout";
+import { territoryMapLabel, territoryTileLabel } from "./TerritoryMapLayout";
 import { signature } from "./DeferredProjection";
 import { useBuildForecast } from "./BuildForecast";
 import { useMoney } from "./CurrencyContext";
@@ -265,7 +264,7 @@ export default function ProjectBuild({
       }
       focusKey={`${catalogue}:${candidate ?? "sites"}:${reviewing}`}
       projectCandidate={!catalogue}
-      returnFocusSelector=".territoryMapBuildToggle"
+      returnFocusSelector=".desktopBuildRail, #buildNav"
       onClose={() => {
         if (!lock.current) onClose();
       }}
@@ -370,7 +369,7 @@ export default function ProjectBuild({
               {ready && (
                 <p className="projectLocation">
                   {reviewing && <strong>{title} · </strong>}
-                  {territoryBuildTileName(ready.tile.id, game)} ·{" "}
+                  {territoryTileLabel(ready.tile)} ·{" "}
                   {territoryMapLabel(ready.tile.territoryId)}
                 </p>
               )}

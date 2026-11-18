@@ -75,7 +75,7 @@ function ProjectBuildUnavailable({ onClose }: { onClose: () => void }) {
     <TileWorkspaceSurface
       title="Project planner unavailable"
       focusKey="project-unavailable"
-      returnFocusSelector=".territoryMapBuildToggle"
+      returnFocusSelector=".desktopBuildRail, #buildNav"
       onClose={onClose}
     >
       <p role="status">
@@ -103,7 +103,7 @@ function DeferredProjectBuild(
         <TileWorkspaceSurface
           title="Plan a project"
           focusKey="project-loading"
-          returnFocusSelector=".territoryMapBuildToggle"
+          returnFocusSelector=".desktopBuildRail, #buildNav"
           onClose={props.onClose}
         >
           <p role="status">Loading project planner…</p>
@@ -280,9 +280,9 @@ function TileNetwork(props: Props) {
     ? operatingFacility
       ? facilityDisplayName(operatingFacility)
       : tile.city
-        ? citySizeLabel(tile.city.size)
+        ? (tile.city.name ?? citySizeLabel(tile.city.size))
         : building
-          ? `Build · ${TERRAIN_LABELS[tile.terrain]}`
+          ? TERRAIN_LABELS[tile.terrain]
           : `${TERRAIN_LABELS[tile.terrain]} site`
     : "Tile";
   const preferredSite = candidate ?? (building ? tile?.id : railSite);
@@ -320,7 +320,6 @@ function TileNetwork(props: Props) {
       {views.length > 0 && (
         <TerritoryHexMap
           {...(view || planning ? { onCloseInspection: close } : {})}
-          onPlanProject={startProject}
           projectPlanning={planning}
           projectSites={projectSites}
           onDeselect={close}
@@ -382,13 +381,11 @@ function TileNetwork(props: Props) {
           onClose={close}
         >
           {building && desktopRail ? (
-            <p>
-              Choose a technology from the Build rail to plan a project on this
-              site.
-            </p>
+            <TileTerrainModifiers game={game} tileId={tile.id} />
           ) : building ? (
             <GameWorkspaceContext.Provider value={true}>
               <GameBuildCompleteContext.Provider value={keepTileOpen}>
+                <TileTerrainModifiers game={game} tileId={tile.id} />
                 <Tabs
                   className="tileBuildTabs"
                   value={storageFits ? category : "generators"}
@@ -484,18 +481,6 @@ function TileNetwork(props: Props) {
               ) : (
                 !view.owned && (
                   <div className="tilePurchaseSummary">
-                    {quote && (
-                      <div className="tilePurchaseMoney">
-                        <div>
-                          <span>Connection cost</span>
-                          <strong>{money(quote.price)}</strong>
-                        </div>
-                        <div>
-                          <span>Cash after connection</span>
-                          <strong>{money(availableCash - quote.price)}</strong>
-                        </div>
-                      </div>
-                    )}
                     <Button
                       variant="contained"
                       disabled={
@@ -593,29 +578,34 @@ function TileTerrainModifiers({
   game: Props["game"];
   tileId: TerritoryTileId;
 }) {
-  const wind = getTerrainModifiers(game, "Wind", tileId);
-  const solar = getTerrainModifiers(game, "Sun", tileId);
+  const { onshoreWindSpeed, buildCost } = getTerrainModifiers(
+    game,
+    "Wind",
+    tileId,
+  );
   const percentage = (factor: number) =>
     `${factor >= 1 ? "+" : "−"}${Math.round(Math.abs(factor - 1) * 100)}%`;
   const modifiers = [
-    { label: "Wind speed", value: wind.onshoreWindSpeed },
-    { label: "Wind build cost", value: wind.buildCost },
-    { label: "Solar build cost", value: solar.buildCost },
+    {
+      label: "wind speed",
+      value: onshoreWindSpeed,
+      good: onshoreWindSpeed > 1,
+    },
+    { label: "build cost", value: buildCost, good: buildCost < 1 },
   ].filter(({ value }) => value !== 1);
   return (
     <section aria-label="Terrain modifiers">
       {modifiers.length ? (
-        <dl className="tileTerrainModifiers">
-          {modifiers.map(({ label, value }) => (
-            <div key={label}>
-              <dt>{label}</dt>
-              <dd>{percentage(value)}</dd>
-            </div>
+        <ul className="tileTerrainModifiers">
+          {modifiers.map(({ label, value, good }) => (
+            <li key={label}>
+              <strong data-favorable={good}>{percentage(value)}</strong> {label}
+            </li>
           ))}
-        </dl>
+        </ul>
       ) : (
         <Typography variant="body2" color="textSecondary">
-          Standard wind and solar conditions
+          Standard build cost
         </Typography>
       )}
     </section>

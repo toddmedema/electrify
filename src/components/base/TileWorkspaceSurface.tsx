@@ -32,7 +32,10 @@ export default function TileWorkspaceSurface({
     const map = heading.current?.closest(".territoryNetwork");
     return () => {
       const returnControl =
-        map?.querySelector<HTMLElement>(returnFocusSelector);
+        map?.querySelector<HTMLElement>(returnFocusSelector) ??
+        map
+          ?.closest(".gameWorkspace")
+          ?.querySelector<HTMLElement>(returnFocusSelector);
       if (returnControl) returnControl.focus({ preventScroll: true });
       else if (origin instanceof HTMLElement && origin.isConnected)
         origin.focus({ preventScroll: true });

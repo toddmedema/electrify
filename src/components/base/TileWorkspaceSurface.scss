@@ -58,6 +58,9 @@
     padding: 0;
   }
 
+  &.tileWorkspaceBuilding [aria-label="Terrain modifiers"] {
+    padding: 8px 16px;
+  }
   .tileBuildTabs {
     flex: 0 0 auto;
     border-bottom: 1px solid var(--border-subtle);
@@ -70,16 +73,27 @@
     display: grid;
     gap: 12px;
   }
-  .tilePurchaseMoney,
   .tileCityMetrics {
     display: grid;
     gap: 8px;
   }
-  .tilePurchaseMoney > div,
   .tileCityMetrics > div {
     display: flex;
     justify-content: space-between;
     gap: 16px;
+  }
+  .tileTerrainModifiers {
+    display: grid;
+    gap: 4px;
+    margin: 0 0 12px;
+    padding: 0;
+    list-style: none;
+    strong[data-favorable="true"] {
+      color: var(--delta-good);
+    }
+    strong[data-favorable="false"] {
+      color: var(--delta-bad);
+    }
   }
   .tileCityDemand {
     margin-top: 16px;

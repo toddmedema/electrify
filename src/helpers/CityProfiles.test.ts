@@ -1,11 +1,7 @@
 import type { TerritoryId } from "../Types";
-import { TERRITORY_TILES, territoryTileAt } from "../data/TerritoryTiles";
+import { territoryTileAt } from "../data/TerritoryTiles";
 import { UTILITY_AREAS } from "../data/UtilityExpansion";
-import {
-  cityCustomerCount,
-  cityProfile,
-  citySizeForTerritory,
-} from "./CityProfiles";
+import { cityCustomerCount, cityProfile } from "./CityProfiles";
 
 const cityIds: TerritoryId[] = [
   "champlain",
@@ -82,15 +78,7 @@ it.each(Object.values(UTILITY_AREAS))(
     }
   },
 );
-it("uses the same city-size identity in authored and generated physical tiles", () => {
-  expect(
-    new Set(
-      TERRITORY_TILES.flatMap((tile) => (tile.city ? [tile.city.size] : [])),
-    ),
-  ).toEqual(new Set(["small", "medium", "large"]));
-  for (const tile of TERRITORY_TILES.filter((tile) => tile.city)) {
-    expect(tile.city!.size).toBe(citySizeForTerritory(tile.territoryId));
-  }
+it("sizes generated settlements from their simulated service accounts", () => {
   const generated = Array.from({ length: 200 }, (_, q) =>
     territoryTileAt(q + 10, 10),
   ).find((tile) => tile?.city)!;

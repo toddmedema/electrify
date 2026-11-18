@@ -1,4 +1,5 @@
 import { HEX_WIDTH } from "../TerritoryHexGeometry";
+import { interpolateMapLighting } from "./Lighting";
 import { FacilityMotionClock, MOTION_CYCLE } from "./MotionClock";
 import { projectPoint, projectionMatrix } from "./Projection";
 import { rotorAngle } from "./RotorPose";
@@ -6,11 +7,11 @@ import type {
   MapCanvas,
   MapFrame,
   MapInstance,
+  MapLighting,
   MapMesh,
   ModelPart,
   RendererDiagnostics,
   RendererSceneInstance,
-  RGB,
   Vec3,
 } from "./Types";
 
@@ -146,8 +147,10 @@ export class MapRenderer {
   private sceneInstanceCount = 0;
   private instanceCount = 0;
   private poseRevision = 0;
-  private light: Vec3 = [0, 1, 0];
-  private lightColor: RGB = [0, 0, 0];
+  private paintedLighting: MapLighting | undefined;
+  private heldLighting: MapLighting | undefined;
+  private lightingTransition:
+    { from: MapLighting; started: number; duration: number } | undefined;
   // CPU preparation/submission duration; this does not measure GPU completion.
   private frameMs = 0;
   private sampleDiagnostics = (includeScene = false) =>
@@ -184,6 +187,20 @@ export class MapRenderer {
       previous.scale !== frame.scale;
     this.instances = instances;
     this.frame = frame;
+    const duration = frame.motionAllowed
+      ? frame.lightingTransitionMs
+      : undefined;
+    if (frame.lighting !== previous?.lighting) {
+      this.heldLighting = undefined;
+      this.lightingTransition =
+        duration && this.paintedLighting && this.isVisible()
+          ? { from: this.paintedLighting, started: performance.now(), duration }
+          : undefined;
+    } else if (!duration && this.lightingTransition) {
+      // Pausing between ticks keeps the last painted sky until the clock advances.
+      this.heldLighting = this.paintedLighting;
+      this.lightingTransition = undefined;
+    }
     this.projection = projectionMatrix(frame);
     this.clock.sync(instances);
     if (this.state === "ready" && sceneChanged) this.buildScene();
@@ -202,8 +219,12 @@ export class MapRenderer {
       frameMs: this.frameMs,
       cpuFrameMs: this.frameMs,
       phases: this.clock.snapshot(),
-      light: [...this.light],
-      lightColor: [...this.lightColor],
+      light: this.paintedLighting
+        ? [...this.paintedLighting.direction]
+        : [0, 1, 0],
+      lightColor: this.paintedLighting
+        ? [...this.paintedLighting.color]
+        : [0, 0, 0],
       state: this.state,
       playbackRate: this.frame?.playbackRate ?? 0,
       motionAllowed: this.frame?.motionAllowed ?? false,
@@ -403,6 +424,7 @@ export class MapRenderer {
       this.canvas.ownerDocument.defaultView?.cancelAnimationFrame(this.raf);
     this.raf = undefined;
     this.clock.resetTimestamp();
+    this.lightingTransition = undefined;
   }
 
   private animate = (timestamp: number): void => {
@@ -411,13 +433,25 @@ export class MapRenderer {
     const moving = this.canAnimate();
     this.clock.tick(timestamp, moving, this.frame?.playbackRate ?? 0);
     try {
-      this.draw(moving);
+      this.draw(moving, this.lightAt(timestamp));
     } catch (_error) {
       this.fail();
       return;
     }
-    if (moving) this.schedule();
+    if (moving || this.lightingTransition) this.schedule();
   };
+
+  private lightAt(timestamp: number): MapLighting {
+    const target = this.frame!.lighting;
+    const transition = this.lightingTransition;
+    if (!transition) return this.heldLighting ?? target;
+    const fraction =
+      Math.max(0, timestamp - transition.started) / transition.duration;
+    if (fraction < 1)
+      return interpolateMapLighting(transition.from, target, fraction);
+    this.lightingTransition = undefined;
+    return target;
+  }
 
   private createMesh(mesh: MapMesh): GpuMesh {
     const gl = this.gl!;
@@ -632,7 +666,7 @@ export class MapRenderer {
     pose[21] = facility && instance.active ? 1.06 : 1;
   }
 
-  private draw(moving: boolean): void {
+  private draw(moving: boolean, lighting: MapLighting): void {
     const gl = this.gl,
       frame = this.frame,
       uniforms = this.uniforms;
@@ -665,11 +699,11 @@ export class MapRenderer {
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT | gl.STENCIL_BUFFER_BIT);
     gl.useProgram(this.program);
     gl.uniformMatrix4fv(uniforms.projection, false, this.projection);
-    gl.uniform3f(uniforms.light, ...frame.lighting.direction);
-    gl.uniform3f(uniforms.lightColor, ...frame.lighting.color);
+    gl.uniform3f(uniforms.light, ...lighting.direction);
+    gl.uniform3f(uniforms.lightColor, ...lighting.color);
     gl.uniform3f(uniforms.background, ...frame.background);
-    gl.uniform1f(uniforms.ambient, frame.lighting.ambient);
-    gl.uniform1f(uniforms.shadowAlpha, frame.lighting.shadow);
+    gl.uniform1f(uniforms.ambient, lighting.ambient);
+    gl.uniform1f(uniforms.shadowAlpha, lighting.shadow);
     gl.uniform1i(uniforms.shadow, 0);
     gl.enable(gl.DEPTH_TEST);
     gl.depthFunc(gl.LEQUAL);
@@ -700,8 +734,7 @@ export class MapRenderer {
     gl.disable(gl.BLEND);
     gl.bindVertexArray(null);
     this.frames++;
-    this.light = frame.lighting.direction;
-    this.lightColor = frame.lighting.color;
+    this.paintedLighting = lighting;
     this.instanceCount = this.sceneInstanceCount;
     this.frameMs = performance.now() - started;
     if (this.readyPending) {

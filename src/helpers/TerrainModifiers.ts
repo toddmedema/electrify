@@ -40,7 +40,7 @@ export function getTerrainModifiers(
           : 1;
   return {
     onshoreWindSpeed: fuel === "Wind" ? windSpeed : 1,
-    buildCost: fuel === "Wind" || fuel === "Sun" ? buildCost : 1,
+    buildCost,
   };
 }
 

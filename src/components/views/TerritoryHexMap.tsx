@@ -1,6 +1,5 @@
 import * as React from "react";
 import { Tooltip, useTheme } from "@mui/material";
-import ConstructionIcon from "@mui/icons-material/Construction";
 import RapidConnectionIcon from "../base/RapidConnectionIcon";
 import type { GameType, TerritoryTileId } from "../../Types";
 import { getTerritoryDefinition } from "../../data/Territories";
@@ -19,7 +18,7 @@ import { getSunriseSunset } from "../../helpers/DateTime";
 import type { RendererState } from "../base/territory-3d/TerritoryCanvas3D";
 import type { ScenePicker } from "../base/territory-3d/SceneBuilder";
 import { useAppSelector } from "../../Store";
-import { terrainDetailsLabel } from "../base/TerritoryTileFacts";
+import { citySizeLabel, terrainDetailsLabel } from "../base/TerritoryTileFacts";
 import {
   facilityMapStatus,
   facilityOperatingStatus,
@@ -28,10 +27,7 @@ import useFacilityMapMotion, {
   FacilityMapMotionContext,
 } from "../base/useFacilityMapMotion";
 import FacilityMapStatusArtwork from "../base/FacilityMapStatusArtwork";
-import MapStatusLayers, {
-  DEFAULT_MAP_STATUS_LAYERS,
-  showsMapStatus,
-} from "../base/MapStatusLayers";
+import MapStatusLayers from "../base/MapStatusLayers";
 import { useToolState } from "../base/GameToolMemory";
 import { hasVisibleEscapeOverlay } from "../base/VisibleEscapeOverlay";
 import { useGameWorkspaceLayout } from "../base/GameWorkspaceContext";
@@ -120,7 +116,6 @@ interface Props {
   onSelect: (id: TerritoryTileId, inspect?: boolean) => void;
   onCloseInspection?: () => void;
   onDeselect?: () => void;
-  onPlanProject?: () => void;
   projectPlanning?: boolean;
   projectSites?: ReadonlyMap<TerritoryTileId, ReadyProjectSite>;
 }
@@ -147,7 +142,6 @@ export default function TerritoryHexMap({
   onSelect,
   onCloseInspection,
   onDeselect,
-  onPlanProject,
   projectPlanning = false,
   projectSites,
 }: Props) {
@@ -171,9 +165,9 @@ export default function TerritoryHexMap({
   const { pendingIds, availableCash, message, purchase } =
     useTerritoryTilePurchases();
   const [buyMode, setBuyMode] = React.useState(false);
-  const [statusLayers, setStatusLayers] = useToolState(
-    "network.statusLayers",
-    DEFAULT_MAP_STATUS_LAYERS,
+  const [showStatusLayer, setShowStatusLayer] = useToolState(
+    "network.showStatusLayer",
+    true,
   );
   const views = React.useMemo(() => territoryTileViews(game), [game]);
   const topology = useStableArray(
@@ -256,21 +250,20 @@ export default function TerritoryHexMap({
     window.addEventListener("keydown", escape, true);
     return () => window.removeEventListener("keydown", escape, true);
   }, [activeSelected, buyMode, onCloseInspection, onDeselect]);
+  const homeTile =
+    views.find(({ owned, tile }) => owned && tile.city)?.tile ??
+    views.find(({ owned }) => owned)?.tile ??
+    tiles[0];
   const [rovingId, setRovingId] = React.useState(
-    () =>
-      activeSelected ??
-      views.find((view) => view.owned)?.tile.id ??
-      tiles[0]?.id,
+    () => activeSelected ?? homeTile?.id,
   );
   const activeRoving =
     activeSelected ??
-    (rovingId && byId.has(rovingId)
-      ? rovingId
-      : (views.find((view) => view.owned)?.tile.id ?? tiles[0]?.id));
+    (rovingId && byId.has(rovingId) ? rovingId : homeTile?.id);
   const [camera, setCamera] = React.useState(() =>
     hexCenter(
       (selected ? byId.get(selected)?.tile : undefined) ??
-        tiles[0] ?? { q: 0, r: 0 },
+        homeTile ?? { q: 0, r: 0 },
     ),
   );
   const [size, setSize] = React.useState({ width: 0, height: 0 });
@@ -595,30 +588,15 @@ export default function TerritoryHexMap({
         `[data-map-target="${id}"]`,
       );
     if (!target) return;
-    const ground =
-      event.target instanceof Element
-        ? event.target.closest<HTMLButtonElement>("[data-map-target]")
-        : null;
-    const hit = target.querySelector<HTMLElement>(".territoryTileHitArea");
-    const groundHit = ground?.querySelector<HTMLElement>(
-      ".territoryTileHitArea",
-    );
     const titleTarget =
       event.target instanceof HTMLElement ? event.target : event.currentTarget;
     const previousTitle = titleTarget.getAttribute("title");
     target.dataset.modelHovered = "true";
-    if (hit)
-      hit.style.background =
-        "color-mix(in srgb, var(--territory-hover-color) 14%, transparent)";
-    if (groundHit && ground !== target)
-      groundHit.style.background = "transparent";
     titleTarget.title =
       titleTarget.closest<HTMLElement>(".territoryTilePrice")?.title ||
       target.title;
     pointerHover.current = () => {
       delete target.dataset.modelHovered;
-      if (hit) hit.style.removeProperty("background");
-      if (groundHit) groundHit.style.removeProperty("background");
       if (previousTitle === null) titleTarget.removeAttribute("title");
       else titleTarget.title = previousTitle;
     };
@@ -673,21 +651,7 @@ export default function TerritoryHexMap({
       data-renderer={rendererState}
       aria-label="Terrain, structures and utility ownership"
     >
-      {onPlanProject && (
-        <button
-          type="button"
-          className="territoryMapBuildToggle"
-          aria-label="Build"
-          aria-pressed={projectPlanning}
-          onClick={() => {
-            setBuyMode(false);
-            onPlanProject();
-          }}
-        >
-          <ConstructionIcon aria-hidden="true" />
-          <span>Build</span>
-        </button>
-      )}
+      <MapStatusLayers value={showStatusLayer} onChange={setShowStatusLayer} />
       <Tooltip
         title={
           buyMode
@@ -712,7 +676,6 @@ export default function TerritoryHexMap({
           <RapidConnectionIcon aria-hidden="true" />
         </button>
       </Tooltip>
-      <MapStatusLayers value={statusLayers} onChange={setStatusLayers} />
       <span
         className="srOnly"
         id={`${mapId}-buy-status`}
@@ -743,8 +706,10 @@ export default function TerritoryHexMap({
         data-camera-scale={scale}
         ref={viewport}
         onPointerDown={(event) => {
-          if (event.button !== 0) return;
-          const id = pointerTile(event),
+          const middle = event.button === 1;
+          if (event.button !== 0 && !middle) return;
+          if (middle) event.preventDefault();
+          const id = middle ? undefined : pointerTile(event),
             quote = id && purchaseQuotes?.get(id);
           activationTarget.current = id;
           activationQuote.current = id
@@ -778,6 +743,9 @@ export default function TerritoryHexMap({
               ?.querySelector<HTMLButtonElement>(`[data-map-target="${id}"]`)
               ?.focus({ preventScroll: true });
           }
+        }}
+        onAuxClick={(event) => {
+          if (event.button === 1) event.preventDefault();
         }}
         onPointerMove={(event) => {
           const drag = pointer.current;
@@ -852,6 +820,7 @@ export default function TerritoryHexMap({
                 wires={wires}
                 minute={game.date.minute}
                 minuteOfDay={game.date.minuteOfDay}
+                speed={game.speed}
                 runKey={`${runId}:${game.seed}:${game.scenarioId}`}
                 daylight={getSunriseSunset(game.date, game.location)}
                 dark={dark}
@@ -958,13 +927,9 @@ export default function TerritoryHexMap({
                 .map((view) => {
                   const { tile, facility } = view,
                     origin = foregroundOrigin(tile),
-                    status = facilityMapStatus(
-                      view,
-                      game.date.minute,
-                      statusLayers.construction,
-                    );
+                    status = facilityMapStatus(view, game.date.minute);
                   const showStatus =
-                    status && showsMapStatus(status.kind, statusLayers);
+                    showStatusLayer && status && status.kind !== "unknown";
                   const operation = view.operatingFacility
                     ? facilityOperatingStatus(
                         view.operatingFacility,
@@ -1058,6 +1023,8 @@ export default function TerritoryHexMap({
             const status = facilityMapStatus(view, game.date.minute);
             const territory = getTerritoryDefinition(tile.territoryId);
             const utility = !!tile.city && territory?.kind !== "greenfield";
+            const cityLabel =
+              tile.city?.name ?? (tile.city && citySizeLabel(tile.city.size));
             const quote = purchaseQuotes?.get(tile.id);
             const projectSite = projectSites?.get(tile.id);
             const projectPrice = projectSite
@@ -1067,7 +1034,7 @@ export default function TerritoryHexMap({
             const pending = pendingIds.has(tile.id);
             const unaffordable = !!quote && quote.price > availableCash;
             const label = utility
-              ? `Inspect ${view.owned ? "You" : view.ownerName} territory`
+              ? `Inspect ${view.owned ? "You" : view.ownerName} territory${cityLabel ? ` · ${cityLabel}` : ""}`
               : `Inspect ${territoryTileLabel(tile)}`;
             const priceLabel = quote
               ? `${money(quote.price)} · ${tilePurchaseBenefitLabel(quote)}`
@@ -1091,7 +1058,7 @@ export default function TerritoryHexMap({
                 data-purchasable={!!quote}
                 data-unaffordable={unaffordable}
                 aria-busy={pending || undefined}
-                className={`territoryTileTarget${utility ? " territoryUtilityLabel" : ""}`}
+                className={`territoryTileTarget${utility || (cityLabel && showStatusLayer) ? " territoryUtilityLabel" : ""}`}
                 style={
                   {
                     left: `${(point.x - minX) * scale}px`,
@@ -1120,7 +1087,8 @@ export default function TerritoryHexMap({
                   if (!pointer.current && !touches.current.size)
                     revealTile(tile);
                 }}
-                onPointerDown={() => {
+                onPointerDown={(event) => {
+                  if (event.button !== 0) return;
                   activationQuote.current = quote
                     ? { tileId: tile.id, quoteKey: quote.quoteKey }
                     : undefined;
@@ -1138,7 +1106,7 @@ export default function TerritoryHexMap({
                       : undefined;
                   navigate(event, tile.id);
                 }}
-                title={`${TERRAIN_LABELS[tile.terrain]} · ${facility?.name ?? (tile.city ? `${tile.city.size} city` : view.developed ? (wireStructure(view) === "submerged" ? "Open water · submerged cable" : "Open site · transmission tower") : "Undeveloped site")}${status ? ` · ${status.label}` : ""} · ${hover.reason}`}
+                title={`${TERRAIN_LABELS[tile.terrain]} · ${facility?.name ?? cityLabel ?? (view.developed ? (wireStructure(view) === "submerged" ? "Open water · submerged cable" : "Open site · transmission tower") : "Undeveloped site")}${status ? ` · ${status.label}` : ""} · ${hover.reason}`}
               >
                 <span className="territoryTileHitArea" aria-hidden="true" />
                 {projectSites?.has(tile.id) && (
@@ -1157,8 +1125,13 @@ export default function TerritoryHexMap({
                     )}
                   </svg>
                 )}
-                {utility && (
-                  <strong>{view.owned ? "You" : view.ownerName}</strong>
+                {(utility || (cityLabel && showStatusLayer)) && (
+                  <strong>
+                    {cityLabel && showStatusLayer && <span>{cityLabel}</span>}
+                    {utility && (
+                      <span>{view.owned ? "You" : view.ownerName}</span>
+                    )}
+                  </strong>
                 )}
                 {projectSite && (
                   <span
@@ -1189,7 +1162,7 @@ export default function TerritoryHexMap({
                   {facility
                     ? `${facility.name}${status ? ` · ${status.label}` : ""}`
                     : tile.city
-                      ? `${tile.city.size} city; no building slot`
+                      ? `${cityLabel}; no building slot`
                       : view.developed
                         ? wireStructure(view) === "submerged"
                           ? "One building site; submerged cable"

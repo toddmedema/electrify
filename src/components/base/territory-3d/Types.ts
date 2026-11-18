@@ -87,6 +87,8 @@ export interface MapFrame {
   scale: number;
   background: RGB;
   lighting: MapLighting;
+  /** At slower speeds, distribute a simulated lighting step across the next tick interval. */
+  lightingTransitionMs?: number;
   visible: boolean;
   motionAllowed: boolean;
   playbackRate: number;

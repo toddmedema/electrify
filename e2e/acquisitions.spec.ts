@@ -1,3 +1,4 @@
+import { TERRAIN_LABELS } from "../src/data/TerrainLabels";
 import type { Locator, Page } from "@playwright/test";
 import type { GameType } from "../src/Types";
 import type { MapCanvas } from "../src/components/base/territory-3d/Types";
@@ -124,7 +125,10 @@ async function inspectTile(page: Page, tile: TerritoryTileDefinition) {
   await expect(surface).toBeVisible();
   if (
     (await buildRail(page).isVisible()) &&
-    (await surface.getByRole("heading", { name: /^Build ·/ }).count())
+    (await target.getAttribute("data-owned")) === "true" &&
+    (await surface
+      .getByRole("heading", { name: TERRAIN_LABELS[tile.terrain], exact: true })
+      .count())
   )
     await expect(buildRail(page)).toBeFocused();
   else await expect(surface.locator(".tileWorkspaceHeading h3")).toBeFocused();
@@ -1166,8 +1170,8 @@ for (const theme of ["light", "dark"] as const) {
     ).toHaveCount(0);
     await expect(network).not.toContainText("company power pool");
     await expect(
-      page.getByRole("button", { name: "Build", exact: true }),
-    ).toBeVisible();
+      network.getByRole("button", { name: "Build", exact: true }),
+    ).toHaveCount(0);
     const dimensions = await network.evaluate((element) => {
       const map = element
         .querySelector(".territoryMapViewport")!
@@ -1267,7 +1271,7 @@ for (const theme of ["light", "dark"] as const) {
     await expect(
       network.locator(`[data-map-target="${lake.id}"]`),
     ).toHaveAccessibleDescription(/Enclosed lake basin/);
-    await expect(surface).toHaveAccessibleName("Build · Lake");
+    await expect(surface).toHaveAccessibleName("Lake");
     await expect(surface).not.toContainText(
       /Hydropower site\. Plant construction|Build a generator or storage on this tile|general construction|300MW max/,
     );
@@ -1580,10 +1584,12 @@ for (const theme of ["light", "dark"] as const) {
       network.locator('[data-map-target][aria-pressed="true"]'),
     ).toHaveCount(0);
     await expect(
-      network.getByRole("button", {
-        name: desktop ? "Build" : "Rapid connection mode",
-        exact: true,
-      }),
+      desktop
+        ? buildRail(page)
+        : network.getByRole("button", {
+            name: "Rapid connection mode",
+            exact: true,
+          }),
     ).toBeFocused();
   });
 
@@ -1610,28 +1616,26 @@ for (const theme of ["light", "dark"] as const) {
     expect(quote).toBeDefined();
     const surface = await inspectTile(page, tile);
     const wind = getTerrainModifiers(before, "Wind", tile.id);
-    const solar = getTerrainModifiers(before, "Sun", tile.id);
     const modifiers = surface.getByRole("region", {
       name: "Terrain modifiers",
     });
     const percentage = (factor: number) =>
       `${factor >= 1 ? "+" : "−"}${Math.round(Math.abs(factor - 1) * 100)}%`;
     for (const [label, factor] of [
-      ["Wind speed", wind.onshoreWindSpeed],
-      ["Wind build cost", wind.buildCost],
-      ["Solar build cost", solar.buildCost],
+      ["wind speed", wind.onshoreWindSpeed],
+      ["build cost", wind.buildCost],
     ] as const) {
       expect(factor).not.toBe(1);
       await expect(
-        modifiers.locator("dl > div").filter({ hasText: label }),
-      ).toHaveText(`${label}${percentage(factor)}`);
+        modifiers.getByRole("listitem").filter({ hasText: label }),
+      ).toHaveText(`${percentage(factor)} ${label}`);
     }
     await reviewScreenshot(surface, {
       path: info.outputPath(`unowned-terrain-${theme}.png`),
       animations: "disabled",
       scale: "css",
     });
-    await expect(surface).toContainText("Cash after connection");
+    await expect(surface).not.toContainText("Cash after connection");
     await expect(
       surface.getByRole("button", {
         name: `Connect · ${formatMoneyConcise(quote.price)}`,
@@ -1986,9 +1990,7 @@ for (const theme of ["light", "dark"] as const) {
       const before = (await readSavedGame(page))!;
       const quote = tilePurchaseQuote(before, tile.id)!;
       const surface = await inspectTile(page, tile);
-      await expect(surface).toHaveAccessibleName(
-        customer.kind === "medium" ? "Medium city" : "Small city",
-      );
+      await expect(surface).toHaveAccessibleName(tile.city!.name!);
       await expect(surface).toContainText("Estimated demand");
       await expectCityDemand(surface);
       await surface.getByRole("button", { name: /^Connect ·/ }).click();

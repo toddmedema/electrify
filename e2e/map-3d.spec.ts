@@ -50,13 +50,34 @@ for (const theme of ["light", "dark"] as const) {
     await expect(map.locator(".territoryOccupantArtwork")).toHaveCount(0);
     await expect(
       map.getByRole("button", { name: "Build", exact: true }),
-    ).toBeVisible();
+    ).toHaveCount(0);
+    const capital = map.locator('[data-map-target="champlain:city"]');
+    await expect(
+      capital.getByText("Burlington", { exact: true }),
+    ).toBeInViewport({ ratio: 1 });
     await expect(page.locator(".gridStatusButton:visible")).toContainText(
       /NOW.*[kMGT]?W/,
     );
     await reviewScreenshot(map, {
       path: info.outputPath(`map-3d-${theme}.png`),
     });
+    if (!page.viewportSize() || page.viewportSize()!.width >= 1024) {
+      const viewport = map.locator(".territoryMapViewport");
+      const bounds = (await viewport.boundingBox())!;
+      const cameraX = (await viewport.getAttribute("data-camera-x"))!;
+      const x = bounds.x + bounds.width / 2;
+      const y = bounds.y + bounds.height / 2;
+      await page.mouse.move(x, y);
+      const hovered = viewport.locator(
+        '[data-model-hovered="true"] .territoryTileHitArea',
+      );
+      await expect(hovered).toHaveCSS("background-image", /radial-gradient/);
+      await page.mouse.down({ button: "middle" });
+      await page.mouse.move(x + 40, y + 20, { steps: 4 });
+      await page.mouse.up({ button: "middle" });
+      await expect(viewport).not.toHaveAttribute("data-camera-x", cameraX);
+      await expect(map.locator(".tileWorkspaceSurface")).toHaveCount(0);
+    }
     const contextLoss = await canvas.evaluateHandle((element: MapCanvas) => {
       const gl = element.getContext("webgl2")!;
       const loss = gl.getExtension("WEBGL_lose_context");

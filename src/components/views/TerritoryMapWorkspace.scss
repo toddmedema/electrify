@@ -261,21 +261,21 @@
     inset: 0;
     clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
   }
-  &:hover .territoryTileHitArea {
-    background: color-mix(
-      in srgb,
-      var(--territory-hover-color) 14%,
-      transparent
-    );
-  }
   &:focus-visible {
     outline: none;
   }
-  &:focus-visible .territoryTileHitArea {
-    background: color-mix(
-      in srgb,
-      var(--territory-hover-color) 10%,
-      transparent
+  &[data-model-hovered="true"] .territoryTileHitArea,
+  &:focus-visible .territoryTileHitArea,
+  .territoryMap:not([data-renderer="ready"]) &:hover .territoryTileHitArea {
+    background: radial-gradient(
+      ellipse closest-side,
+      color-mix(in srgb, var(--territory-hover-color) 8%, transparent) 42%,
+      color-mix(
+          in srgb,
+          color-mix(in srgb, var(--territory-hover-color) 58%, white) 78%,
+          transparent
+        )
+        100%
     );
   }
 }
@@ -288,7 +288,11 @@
     transform: translateX(-50%);
     padding: 4px 8px;
     border: 1px solid
-      color-mix(in srgb, var(--territory-owner-color) 64%, transparent);
+      color-mix(
+        in srgb,
+        var(--territory-owner-color, var(--border-subtle)) 64%,
+        transparent
+      );
     border-radius: var(--radius-lg);
     background: color-mix(in srgb, var(--bg-raised) 88%, transparent);
     box-shadow: 0 2px 8px var(--shadow-ring);
@@ -302,6 +306,13 @@
     white-space: nowrap;
     text-overflow: ellipsis;
     text-align: center;
+    span {
+      display: block;
+    }
+    span + span {
+      font-size: 11px;
+      font-weight: 400;
+    }
   }
   &:hover strong,
   &[aria-pressed="true"] strong {
@@ -464,7 +475,7 @@
     bottom: var(--game-dock-clearance);
   }
 }
-// Keep the map dock floating and all seven targets available at the minimum width.
+// Keep the compact map dock floating, with horizontal scrolling when needed.
 .gameWorkspace[data-map-workspace="true"][data-compact-dock="true"]
   #navfooter.gameActionDock {
   position: absolute;
@@ -489,6 +500,14 @@
   }
   .gameDockLabel {
     display: none;
+  }
+}
+@media (max-width: 399px) {
+  .gameWorkspace[data-map-workspace="true"][data-compact-dock="true"]
+    #navfooter.gameActionDock {
+    max-width: calc(100% - 4px);
+    gap: 0;
+    padding-inline: 0;
   }
 }
 .gameWorkspace[data-map-workspace="true"] .territoryAgreements {
@@ -524,30 +543,6 @@
   }
 }
 
-// The labeled project action shares the map entry rail with quick Connect.
-.territoryMapBuildToggle {
-  position: absolute;
-  z-index: 5;
-  right: 72px;
-  bottom: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  min-height: 48px;
-  padding: 0 16px;
-  border: 1px solid var(--interactive-blue);
-  border-radius: var(--radius-lg);
-  background: var(--bg-raised);
-  color: var(--interactive-blue);
-  font: inherit;
-  font-weight: 600;
-  cursor: pointer;
-  &:focus-visible {
-    outline: 3px solid var(--focus-ring);
-    outline-offset: 2px;
-  }
-}
 .projectSiteOutline {
   position: absolute;
   inset: 0;
@@ -570,45 +565,18 @@
 .projectSiteInnerOutline {
   stroke-width: 2;
 }
-@media (max-width: 599px) {
-  .territoryMapBuildToggle {
-    right: 64px;
-    bottom: 8px;
-  }
-}
-.gameWorkspace[data-map-workspace="true"][data-compact-dock="true"]
-  .territoryMapBuildToggle {
-  bottom: var(--game-dock-clearance);
-}
-
 .territoryMapLayerToggle {
-  bottom: 72px;
+  right: 72px;
 }
 .mapStatusLayersPanel {
-  display: flex;
-  flex-direction: column;
-  padding: 16px;
-  width: 248px;
-  box-sizing: border-box;
-  h3 {
-    font-size: 16px;
-    font-weight: 600;
-    margin: 0 0 8px;
-  }
+  padding: 8px 16px;
   .MuiFormControlLabel-root {
     min-height: 44px;
     margin: 0;
-    .MuiTypography-root {
-      font-size: 14px;
-    }
   }
 }
 @media (max-width: 599px) {
   .territoryMapLayerToggle {
-    bottom: 64px;
+    right: 64px;
   }
-}
-.gameWorkspace[data-map-workspace="true"][data-compact-dock="true"]
-  .territoryMapLayerToggle {
-  bottom: calc(var(--game-dock-clearance) + 56px);
 }

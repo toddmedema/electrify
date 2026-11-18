@@ -7,12 +7,9 @@ sources support the mechanisms and plausible scale, but do not establish the
 chosen whole-project percentages.
 
 - Plains: ordinary regional wind and construction cost.
-- Forest: fixed onshore Wind uses **0.95 × regional wind speed**; new onshore Wind
-  and Solar use **1.05 × construction cost**.
-- Hills: fixed onshore Wind uses **1.10 × wind speed**; new onshore Wind and Solar
-  use **1.10 × construction cost**.
-- Mountain: fixed onshore Wind uses **1.15 × wind speed**; new onshore Wind and Solar
-  use **1.20 × construction cost**.
+- Forest: fixed onshore Wind uses **0.95 × regional wind speed**; new projects use **1.05 × construction cost**.
+- Hills: fixed onshore Wind uses **1.10 × wind speed**; new projects use **1.10 × construction cost**.
+- Mountain: fixed onshore Wind uses **1.15 × wind speed**; new projects use **1.20 × construction cost**.
 - River and lake: ordinary resource and cost inputs, with existing named hydro
   sites, head/flow, capacity and resource restrictions.
 - Offshore Wind requires an actual ocean site. The authored inland water is a
@@ -67,17 +64,16 @@ owner. Authored technology capacity-factor overrides retain precedence in charts
 
 `GENERATORS` accepts an optional eighth `tileId`, resolves the selected or first
 compatible free tile, and applies the construction multiplier once before build
-options and LCOE. `getBuildFacilityQuote` regenerates catalog economics from
+options and LCOE. `STORAGE` applies the same multiplier to a selected tile. `getBuildFacilityQuote` regenerates catalog economics from
 technology, size, current game state and options. Local purchases and multiplayer
 hosts use that canonical quote, so stale or edited client prices cannot alter the
 cash debit or loan. Build-impact previews reprice the same way while retaining
 explicit preview-only duration overrides. Selected hydro cells also scope the
 existing named-site availability API.
 
-Cost multipliers apply only to **new onshore Wind and Solar**. They do not reprice
-inherited or acquired assets, land, city demand, fuel, operating costs, retrofit
-footprints, thermal plants, batteries, hydro, conventional/enhanced geothermal,
-pumped storage, Offshore Wind or Airborne Wind. Terrain does not change pooled
+Cost multipliers apply to new generator and storage projects on buildable land.
+Existing facilities retain their purchase costs and financing. Land prices, city
+demand, fuel, and operating costs use their own inputs. Terrain does not change pooled
 company dispatch or introduce transmission tariffs or upkeep. Separate
 [terrain siting allowances](territories.md) bound new facility and expansion
 capacity; these construction-cost multipliers do not change those allowances.

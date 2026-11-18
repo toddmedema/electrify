@@ -1,3 +1,4 @@
+import { TICK_MS } from "../../../Constants";
 import { MeshBuilder } from "./MeshBuilder";
 import { MapRenderer } from "./Renderer";
 import { projectPoint } from "./Projection";
@@ -370,6 +371,62 @@ it("draws idle/reduced scenes once, retains stopped poses and suspends hidden do
   expect(renderer.diagnostics().phases["facility-0"]).toBe(phase);
   flush(1001000);
   expect(renderer.diagnostics().phases["facility-0"]).toBeGreaterThan(phase);
+  renderer.dispose();
+});
+it.each([TICK_MS.SLOW, TICK_MS.NORMAL])(
+  "moves light and shadows between updates at a %i ms tick interval",
+  (lightingTransitionMs) => {
+    const { renderer, gl } = setup();
+    const instances = scene(false);
+    const before = { ...frame, lightingTransitionMs };
+    renderer.update(instances, before);
+    flush(0);
+    expect(callbacks.size).toBe(0);
+
+    jest.spyOn(performance, "now").mockReturnValue(1000);
+    const after: MapFrame = {
+      ...before,
+      lighting: { ...frame.lighting, direction: [0, 1, 0], shadow: 0.3 },
+    };
+    renderer.update(instances, after);
+    flush(1000 + lightingTransitionMs / 4);
+    const first = renderer.diagnostics().light;
+    expect(first[0]).toBeLessThan(before.lighting.direction[0]);
+    expect(first[0]).toBeGreaterThan(after.lighting.direction[0]);
+    const shadows = gl.uniform1f.mock.calls.filter(
+      ([uniform]) => uniform.name === "uShadowAlpha",
+    );
+    expect(shadows[shadows.length - 1][1]).toBeCloseTo(0.225);
+
+    // Changing camera position during the same simulation tick retains the transition.
+    renderer.update(instances, { ...after, cameraX: 5 });
+    flush(1000 + lightingTransitionMs / 2);
+    expect(renderer.diagnostics().light[0]).toBeLessThan(first[0]);
+    flush(1000 + lightingTransitionMs);
+    expect(renderer.diagnostics().light).toEqual(after.lighting.direction);
+    expect(callbacks.size).toBe(0);
+    renderer.dispose();
+  },
+);
+it("holds the painted sky when paused during a lighting transition", () => {
+  const { renderer } = setup();
+  const instances = scene(false);
+  const before = { ...frame, lightingTransitionMs: TICK_MS.SLOW };
+  renderer.update(instances, before);
+  flush(0);
+
+  const after: MapFrame = {
+    ...before,
+    lighting: { ...frame.lighting, direction: [0, 1, 0] },
+  };
+  jest.spyOn(performance, "now").mockReturnValue(1000);
+  renderer.update(instances, after);
+  flush(1050);
+  const light = renderer.diagnostics().light;
+  renderer.update(instances, { ...after, lightingTransitionMs: undefined });
+  flush(1200);
+  expect(renderer.diagnostics().light).toEqual(light);
+  expect(callbacks.size).toBe(0);
   renderer.dispose();
 });
 it("rebuilds lost GPU resources and notifies readiness only after restored drawing", () => {

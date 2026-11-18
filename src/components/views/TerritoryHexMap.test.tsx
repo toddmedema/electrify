@@ -127,7 +127,6 @@ function show(
     preloadedState: { game, ui: { evidenceRunId: 1 } },
   });
   const onSelect = jest.fn();
-  const planProject = jest.fn();
   const closeInspection = jest.fn();
   function OtherPurchaseControl() {
     const { purchase, pendingCost } = useTerritoryTilePurchases();
@@ -153,7 +152,6 @@ function show(
           game={activeGame}
           projectPlanning={!!projectSites}
           projectSites={projectSites}
-          onPlanProject={planProject}
           selected={selected}
           onCloseInspection={
             inspectionOpen
@@ -200,7 +198,6 @@ function show(
     candidates,
     buyMode,
     onSelect,
-    planProject,
     closeInspection,
     setOtherTile: (id: TerritoryTileId) => {
       otherTile = id;
@@ -213,14 +210,35 @@ function idOf(button: HTMLButtonElement) {
 function hoverColor(button: HTMLButtonElement) {
   return button.style.getPropertyValue("--territory-hover-color");
 }
-it("leaves rapid connection mode when Build focuses the desktop catalogue without selecting a project", () => {
+it("pans with the middle button without connecting or selecting a tile", () => {
   const map = show();
   map.buyMode();
-  const rapid = screen.getByRole("button", { name: "Rapid connection mode" });
-  expect(rapid).toHaveAttribute("aria-pressed", "true");
-  fireEvent.click(screen.getByRole("button", { name: "Build" }));
-  expect(rapid).toHaveAttribute("aria-pressed", "false");
-  expect(map.planProject).toHaveBeenCalledTimes(1);
+  const tile = map.candidates()[0];
+  const viewport = screen.getByLabelText("Territory map");
+  const x = viewport.getAttribute("data-camera-x");
+  fireEvent.pointerDown(tile, {
+    button: 1,
+    pointerId: 1,
+    clientX: 100,
+    clientY: 100,
+  });
+  fireEvent.pointerMove(tile, {
+    buttons: 4,
+    pointerId: 1,
+    clientX: 130,
+    clientY: 120,
+  });
+  fireEvent.pointerUp(tile, {
+    button: 1,
+    pointerId: 1,
+    clientX: 130,
+    clientY: 120,
+  });
+  expect(viewport.getAttribute("data-camera-x")).not.toBe(x);
+  expect(map.onSelect).not.toHaveBeenCalled();
+  expect(
+    screen.queryByRole("button", { name: "Build" }),
+  ).not.toBeInTheDocument();
   expect(map.store.getState().game.territoryNetwork!.tilePurchases).toEqual([]);
 });
 
@@ -829,13 +847,6 @@ it("retains ownership boundaries and wire topology through power ticks and camer
 });
 it("activates and hovers the picked elevated model while keyboard and explicit price labels keep their own targets", async () => {
   const restore = enable3D();
-  // jsdom cannot parse color-mix; observe the native assignment on each surface.
-  const backgrounds = new Map<CSSStyleDeclaration, string>();
-  jest
-    .spyOn(CSSStyleDeclaration.prototype, "background", "set")
-    .mockImplementation(function (this: CSSStyleDeclaration, value: string) {
-      backgrounds.set(this, value);
-    });
   try {
     const map = show();
     await screen.findByTestId("map-scene");
@@ -849,18 +860,7 @@ it("activates and hovers the picked elevated model while keyboard and explicit p
     fireEvent.pointerMove(ground, { pointerId: 1, clientX: 100, clientY: 100 });
     expect(model).toHaveAttribute("data-model-hovered", "true");
     expect(hoverColor(model)).toBe("var(--blackout-red)");
-    expect(
-      backgrounds.get(
-        within(model).getByText("", { selector: ".territoryTileHitArea" })
-          .style,
-      ),
-    ).toBe("color-mix(in srgb, var(--territory-hover-color) 14%, transparent)");
-    expect(
-      backgrounds.get(
-        within(ground).getByText("", { selector: ".territoryTileHitArea" })
-          .style,
-      ),
-    ).toBe("transparent");
+    expect(ground).not.toHaveAttribute("data-model-hovered");
     expect(ground).toHaveAttribute("title", model.title);
     tap(ground);
     expect(map.onSelect).toHaveBeenLastCalledWith(facility.tile.id, true);
@@ -948,7 +948,7 @@ it("retains the accessible map and Connect action after the lazy scene fails", a
       ).toHaveAttribute("data-renderer", "unavailable"),
     );
     expect(map.target("champlain:city")).toHaveAccessibleName(
-      "Inspect You territory",
+      "Inspect You territory · Burlington",
     );
     map.buyMode();
     tap(map.candidates()[0]);

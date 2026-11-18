@@ -4,7 +4,7 @@ import CloseIcon from "@mui/icons-material/Close";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import { useAppDispatch, useAppSelector } from "../../Store";
 import { navigate } from "../../reducers/Card";
-import { useWorkspaceLayout } from "../../WorkspaceLayout";
+import { SIDE_TOOL_MIN_WIDTH, useWorkspaceLayout } from "../../WorkspaceLayout";
 import { BuildForecastProvider } from "./BuildForecast";
 import GameAppBar from "./GameAppBar";
 import Navigation, {
@@ -202,6 +202,7 @@ export default function MapWorkspace({
                   </div>
                 </div>
                 <Navigation
+                  showMapBuild={effectiveWidth < SIDE_TOOL_MIN_WIDTH}
                   mapView={
                     active === "FLEET" || active === "AGREEMENTS"
                       ? active

@@ -62,3 +62,29 @@ export function mapLighting(input: LightingInput): MapLighting {
     shadow: (0.12 + daylight * 0.13) * smooth(Math.abs(altitude) / 0.3),
   };
 }
+
+export function interpolateMapLighting(
+  from: MapLighting,
+  to: MapLighting,
+  fraction: number,
+): MapLighting {
+  const blend = (start: number, end: number) =>
+    start + (end - start) * fraction;
+  const vector = (start: Vec3, end: Vec3): Vec3 => [
+    blend(start[0], end[0]),
+    blend(start[1], end[1]),
+    blend(start[2], end[2]),
+  ];
+  const direction = vector(from.direction, to.direction);
+  const length = Math.hypot(...direction);
+  return {
+    direction: [
+      direction[0] / length,
+      direction[1] / length,
+      direction[2] / length,
+    ],
+    color: vector(from.color, to.color),
+    ambient: blend(from.ambient, to.ambient),
+    shadow: blend(from.shadow, to.shadow),
+  };
+}

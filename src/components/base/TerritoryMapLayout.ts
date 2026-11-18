@@ -9,8 +9,7 @@ export function territoryMapLabel(id: TerritoryId): string {
   return getTerritoryDefinition(id)?.name ?? "Territory";
 }
 export function territoryTileLabel(tile: TerritoryTileDefinition): string {
-  if (tile.city)
-    return `${TERRAIN_LABELS[tile.terrain]} · ${citySizeLabel(tile.city.size)}`;
+  if (tile.city) return tile.city.name ?? citySizeLabel(tile.city.size);
   if (tile.id.startsWith("frontier:"))
     return `${TERRAIN_LABELS[tile.terrain]} · Building site`;
   const ordinal = Number(tile.id.slice(tile.id.lastIndexOf("-") + 1)) + 1;

@@ -61,24 +61,14 @@ remain. No water cell consumes an existing land reservation, and no ocean, hydro
 claim or geothermal resource is added. The generated frontier retains its
 versioned integer geography rather than extending a claim of researched local detail.
 
-City coordinates retain the Burlington-inspired urban load in the west, the river
-corridor and an eastern cluster inspired by Essex/Williston. Each now has its own
-deterministic mixed demand rather than a residential or industrial identity. Burlington's
-[South End plan](https://www.burlingtonvt.gov/324/South-End-Plan) describes its mixed
-office/industrial employment, while the
-[Vermont DEC semiconductor facility record, section 9.2](https://dec.vermont.gov/sites/dec/files/wmp/HazWaste/Documents/Permits/Global%20Foundries/Section%209%20-%20%20Contingency%20Plan.pdf)
-places a manufacturing campus across Essex, Essex Junction and Williston. These
-support broad placement inspiration, not customer totals, demand calibration or
-exact municipal footprints. Outer cities remain generic
-load clusters. Valley and Ridge retain their separately authored Rutland and White
-River Junction location metadata; company dispatch still uses Burlington weather.
-
-Every tile ID, coordinate, owner, starting asset and customer total
-is retained. New Wind/Solar quotes use the revised terrain through the normal
-[terrain modifiers](terrain-modifiers.md). Existing Wind on affected cells also
-uses the revised local wind input; saves retain the installed plant's investment,
-loan, construction progress and land receipts. The terrain refinement does not
-freeze old wind output, reset progress or require a save-schema migration.
+The authored cities represent Burlington on the lake side of the board, Winooski
+on the river to its northeast, and Williston to the southeast. Vergennes and
+Middlebury extend the western settlement corridor southward, with Bristol
+inland and Waterbury farther east. The
+[Vermont municipal map and population counts](https://outside.vermont.gov/dept/sos/Services/LAB/LAB%20Senate%20Map%20FINAL%20SMD%202021%201129.pdf)
+guide relative placement and the small, medium, and large artwork tiers. The
+utilities retain their fictional service-area customer totals and their existing
+location metadata. The procedurally generated frontier uses generic settlements.
 
 ## Authored portfolios and historical references
 
@@ -153,7 +143,7 @@ Old callers retain their original demand calculation exactly. Later regional
 end-use trends continue normally; no data-center or mining block is scheduled.
 Acquired facilities join the existing fleet and use the same operating-area
 weather. Local [terrain modifiers](terrain-modifiers.md) adjust onshore wind speed
-and new Wind/Solar construction cost; acquisitions do not add separate climates.
+and construction costs across technologies.
 
 Existing Champlain and Valley hydro plants have bounded, explicitly fictional
 inherited inventory claims. The catalogue provenance names the issue rather than

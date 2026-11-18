@@ -48,22 +48,23 @@ function withPublishedTerrain<T>(run: () => T): T {
   }
 }
 
-it("retains authored city identities and coordinates with meaningful size tiers", () => {
+it("keeps city IDs stable with Vermont settlements in geographic order and population tiers", () => {
   expect(
     TERRITORY_TILES.filter(({ city }) => city).map(({ id, q, r, city }) => [
       id,
       q,
       r,
+      city!.name,
       city!.size,
     ]),
   ).toEqual([
-    ["champlain:city", -4, -4, "large"],
-    ["valley-electric:city", 0, -4, "large"],
-    ["ridge-electric:city", 0, -1, "large"],
-    ["parcel-1:city", -2, 2, "medium"],
-    ["parcel-5:city", 4, 2, "small"],
-    ["parcel-9:city", 1, 3, "medium"],
-    ["parcel-11:city", -2, 3, "small"],
+    ["champlain:city", -1, -3, "Burlington", "large"],
+    ["valley-electric:city", 0, -4, "Winooski", "small"],
+    ["ridge-electric:city", 0, -1, "Williston", "medium"],
+    ["parcel-1:city", -4, 2, "Vergennes", "small"],
+    ["parcel-5:city", 4, 2, "Waterbury", "small"],
+    ["parcel-9:city", 1, 3, "Bristol", "small"],
+    ["parcel-11:city", -4, 3, "Middlebury", "medium"],
   ]);
 });
 
@@ -111,7 +112,7 @@ it("keeps the complete opening state, demand, inherited acquisition assets and v
 });
 
 it.each(["Wind", "Solar", "Biomass"] as const)(
-  "uses the refined geography in canonical %s quotes without repricing other technologies",
+  "uses the refined geography in canonical %s quotes",
   (name) => {
     const game = createGame({ scenarioId: 116, seed: 12345 });
     for (const [id, oldCost, newCost] of [
@@ -125,9 +126,8 @@ it.each(["Wind", "Solar", "Biomass"] as const)(
       const published = withPublishedTerrain(quote);
       const refined = quote();
       expect(refined).toBeDefined();
-      const applies = name === "Wind" || name === "Solar";
       expect(refined.buildCost).toBeCloseTo(
-        published.buildCost * (applies ? newCost / oldCost : 1),
+        (published.buildCost * newCost) / oldCost,
         5,
       );
       expect(refined.capacityFactor === published.capacityFactor).toBe(

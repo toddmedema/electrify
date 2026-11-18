@@ -62,7 +62,6 @@ jest.mock("./TerritoryHexMap", () => ({
   default: (props: {
     game: GameType;
     selected?: TerritoryTileId;
-    onPlanProject?: () => void;
     onSelect: (id: TerritoryTileId, activate?: boolean) => void;
   }) => {
     const { territoryTileViews } = jest.requireActual<
@@ -71,7 +70,6 @@ jest.mock("./TerritoryHexMap", () => ({
     return (
       <div aria-label="Tile map">
         <button className="territoryMapBuyToggle">Rapid connection mode</button>
-        <button onClick={props.onPlanProject}>Build</button>
         {territoryTileViews(props.game).map(({ tile }) => (
           <button
             className="territoryTileTarget"
@@ -129,6 +127,12 @@ function show(game = ready(), width?: number, scale = 1) {
     );
   }
   const onInspect = jest.fn();
+  let projectRequested = false;
+  const openProject = () => {
+    if (projectRequested) utils.rerender(content());
+    projectRequested = true;
+    utils.rerender(content(false, true));
+  };
   const content = (open = false, projectRequested = false) => (
     <Provider store={store}>
       <GameToolMemoryContext.Provider value={memory}>
@@ -145,6 +149,7 @@ function show(game = ready(), width?: number, scale = 1) {
                 : undefined
             }
           >
+            <button onClick={openProject}>Build</button>
             <Connected />
           </GameWorkspaceLayoutContext.Provider>
         </MapWorkspacePanelContext.Provider>
@@ -158,7 +163,9 @@ function show(game = ready(), width?: number, scale = 1) {
     onAcquire,
     onInspect,
     showPanel: (open: boolean) => utils.rerender(content(open)),
-    requestProject: () => utils.rerender(content(false, true)),
+    requestProject: () => {
+      openProject();
+    },
     ...utils,
   };
 }
@@ -203,7 +210,7 @@ it("keeps inspection on its activated tile while map focus moves", () => {
   act(() => other.focus());
   expect(
     within(surface()).getByRole("heading", { level: 3 }),
-  ).toHaveTextContent("Large city");
+  ).toHaveTextContent("Burlington");
   expect(
     within(surface()).queryByRole("tab", { name: "Generators" }),
   ).not.toBeInTheDocument();
@@ -371,9 +378,8 @@ it("shows researched terrain effects before purchase, with speed labelled separa
   const effects = within(surface()).getByRole("region", {
     name: "Terrain modifiers",
   });
-  expect(effects).toHaveTextContent("Wind speed−5%");
-  expect(effects).toHaveTextContent("Wind build cost+5%");
-  expect(effects).toHaveTextContent("Solar build cost+5%");
+  expect(effects).toHaveTextContent("−5% wind speed");
+  expect(effects).toHaveTextContent("+5% build cost");
   expect(surface()).not.toHaveTextContent(
     /MW max|Build a generator or storage|general construction/,
   );
@@ -388,7 +394,7 @@ it("buys exactly the inspected tile in one action and shows its build catalogue"
   const before = currentTick(game)!.cash;
   const { store } = show(game);
   inspect(tile.id);
-  expect(surface()).toHaveTextContent("Cash after connection");
+  expect(surface()).not.toHaveTextContent("Cash after connection");
   const buy = within(surface()).getByRole("button", { name: /Connect/ });
   act(() => buy.focus());
   fireEvent.click(buy);
@@ -635,7 +641,7 @@ it("uses the persistent desktop rail for Build and owned empty tiles, preselecti
     within(surface()).queryByRole("tab", { name: "Generators" }),
   ).not.toBeInTheDocument();
   expect(
-    within(surface()).getByText(/Choose a technology from the Build rail/),
+    within(surface()).getByRole("region", { name: "Terrain modifiers" }),
   ).toBeVisible();
   fireEvent.click(
     within(rail).getByRole("button", { name: "Choose sites for Wind" }),
@@ -769,7 +775,7 @@ it.each([
         : territoryTilePowerLimit(getTerritoryTile(siteId, game)!);
     const { store } = show(game, 1280);
     inspect(siteId);
-    fireEvent.click(screen.getByRole("button", { name: /Generator power:/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Power:/ }));
     fireEvent.change(
       screen.getByRole("slider", { name: "Generator capacity" }),
       {

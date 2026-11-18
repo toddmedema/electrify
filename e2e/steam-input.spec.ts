@@ -1497,7 +1497,7 @@ test("TV saved preferences style direct scenario links before play", async ({
   await input(page, "confirm");
   await expect(tile).toHaveAttribute("aria-pressed", "true");
   const builder = page.getByRole("dialog", {
-    name: "Build · Plains",
+    name: "Plains",
     exact: true,
   });
   await expect(builder).toBeVisible();
