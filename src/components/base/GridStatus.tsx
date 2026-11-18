@@ -22,7 +22,7 @@ import { utilityServiceGap } from "../../helpers/UtilityPlanning";
 import { hasTerritoryNetwork } from "../../helpers/Territories";
 import { getScenario } from "../../data/Scenarios";
 import { corridorsForLocation } from "../../data/AdjacentMarkets";
-import { setManualHelpAnchor } from "./ManualHelpPopover";
+import { setManualHelpAnchor } from "./ManualHelpAnchor";
 import { MONTHS } from "../../Constants";
 import {
   projectionReady,
