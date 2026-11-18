@@ -20,7 +20,7 @@ export default function MapStatusLayers({
     <>
       <Tooltip title="Map layers" placement="top" arrow>
         <button
-          className="territoryMapBuyToggle territoryMapLayerToggle"
+          className="territoryMapControl territoryMapLayerToggle"
           type="button"
           ref={trigger}
           aria-label="Map layers"

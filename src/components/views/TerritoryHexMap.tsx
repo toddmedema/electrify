@@ -663,7 +663,7 @@ export default function TerritoryHexMap({
       >
         <button
           type="button"
-          className="territoryMapBuyToggle"
+          className="territoryMapControl territoryMapBuyToggle"
           ref={buyingControl}
           aria-label="Rapid connection mode"
           aria-pressed={buyMode}

@@ -422,7 +422,7 @@
     }
   }
 }
-.territoryMapBuyToggle {
+.territoryMapControl {
   position: absolute;
   z-index: 4;
   right: 16px;
@@ -459,7 +459,7 @@
   }
 }
 @media (max-width: 599px) {
-  .territoryMapBuyToggle {
+  .territoryMapControl {
     right: 8px;
     bottom: 8px;
   }
@@ -471,7 +471,7 @@
 .gameWorkspace[data-map-workspace="true"][data-compact-dock="true"] {
   --game-dock-button-height: 48px;
   --game-dock-clearance: calc(72px + var(--game-dock-bottom));
-  .territoryMapBuyToggle {
+  .territoryMapControl {
     bottom: var(--game-dock-clearance);
   }
 }
