@@ -670,7 +670,6 @@ export function legacyPolicyAllowed(
       return year >= 1982;
     case "solar":
       return year >= 2000;
-      return year >= 2000;
     case "evCharging":
       return year >= 2010;
     case "battery":

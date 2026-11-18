@@ -43,6 +43,7 @@ for (const theme of ["light", "dark"]) {
       name: "Offset peak demand",
     });
     await expect(peakPrograms.getByRole("button")).toHaveCount(3);
+    await expect(peakPrograms).not.toContainText("rollout 0%");
     await dialog
       .getByRole("heading", { name: "Reduce overall demand", exact: true })
       .scrollIntoViewIfNeeded();
