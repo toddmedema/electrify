@@ -3,13 +3,22 @@
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { OWNER, targets, aws, readHostingPlan } = require("./plan");
+const { isDeepStrictEqual } = require("node:util");
+const {
+  OWNER,
+  targets,
+  aws,
+  readDistributionPlan,
+  readHostingPlan,
+} = require("./plan");
 const {
   cacheControl,
   canonicalPaths,
   requestCode,
   responseCode,
 } = require("./policy");
+
+const MAX_DISTRIBUTION_UPDATE_ATTEMPTS = 3;
 
 function files(directory, prefix = "") {
   return fs.readdirSync(directory, { withFileTypes: true }).flatMap((item) => {
@@ -18,6 +27,39 @@ function files(directory, prefix = "") {
       ? files(path.join(directory, item.name), relative + "/")
       : [relative];
   });
+}
+
+function reconcileDistribution(jsonFile) {
+  for (
+    let attempt = 1;
+    attempt <= MAX_DISTRIBUTION_UPDATE_ATTEMPTS;
+    attempt++
+  ) {
+    const { live, config } = readDistributionPlan();
+    if (isDeepStrictEqual(live.DistributionConfig, config)) return;
+    try {
+      aws([
+        "cloudfront",
+        "update-distribution",
+        "--id",
+        targets.distribution,
+        "--if-match",
+        live.ETag,
+        "--distribution-config",
+        jsonFile(config),
+      ]);
+      return;
+    } catch (error) {
+      if (
+        error.code !== "PreconditionFailed" ||
+        attempt === MAX_DISTRIBUTION_UPDATE_ATTEMPTS
+      )
+        throw error;
+      console.warn(
+        "CloudFront distribution version changed. Rechecking configuration.",
+      );
+    }
+  }
 }
 
 function deploy() {
@@ -37,7 +79,7 @@ function deploy() {
     return "file://" + target;
   }
   try {
-    const { live, config, existing, website } = readHostingPlan();
+    const { existing, website } = readHostingPlan();
     // Content first: a new edge mapping must never reference an absent page.
     const groups = new Map();
     for (const file of files(build)) {
@@ -106,16 +148,8 @@ function deploy() {
         "--website-configuration",
         jsonFile({ ...website, ErrorDocument: { Key: "404.html" } }),
       ]);
-    aws([
-      "cloudfront",
-      "update-distribution",
-      "--id",
-      targets.distribution,
-      "--if-match",
-      live.ETag,
-      "--distribution-config",
-      jsonFile(config),
-    ]);
+    // Publishing an attached function can advance the distribution ETag.
+    reconcileDistribution(jsonFile);
     aws([
       "cloudfront",
       "wait",

@@ -303,7 +303,13 @@ function fakeDeployment(
     `#!/usr/bin/env node
 const fs = require('node:fs');
 const args = process.argv.slice(2);
-const state = JSON.parse(fs.readFileSync(${JSON.stringify(stateFile)}, 'utf8'));
+const stateFile = ${JSON.stringify(stateFile)};
+const state = JSON.parse(fs.readFileSync(stateFile, 'utf8'));
+const value = (flag) => args[args.indexOf(flag) + 1];
+const advanceDistribution = () => {
+  state.etag += '-changed';
+  fs.writeFileSync(stateFile, JSON.stringify(state));
+};
 const files = Object.fromEntries(args.filter(arg => arg.startsWith('file://')).map(arg => [arg, JSON.parse(fs.readFileSync(arg.slice(7), 'utf8'))]));
 const codes = Object.fromEntries(args.filter(arg => arg.startsWith('fileb://')).map(arg => [arg, fs.readFileSync(arg.slice(8), 'utf8')]));
 fs.appendFileSync(${JSON.stringify(log)}, JSON.stringify({ args, files, codes }) + '\\n');
@@ -320,6 +326,26 @@ if (args[1] === 'describe-function') {
 }
 if (args[1] === 'get-bucket-website') result = { IndexDocument: { Suffix: 'index.html' }, RoutingRules: [{ Condition: { KeyPrefixEquals: 'old/' }, Redirect: { ReplaceKeyPrefixWith: 'new/' } }] };
 if (args[1] === 'create-function' || args[1] === 'update-function') result = { ETag: 'updated-function-etag' };
+if (args[1] === 'publish-function') {
+  const arn = 'arn:aws:cloudfront::' + state.account + ':function/' + value('--name');
+  const behaviors = [state.config.DefaultCacheBehavior, ...(state.config.CacheBehaviors?.Items || [])];
+  if (behaviors.some(behavior => behavior.FunctionAssociations?.Items?.some(item => item.FunctionARN === arn))) {
+    advanceDistribution();
+  }
+}
+if (args[1] === 'update-distribution') {
+  if (state.distributionUpdateConflicts > 0) {
+    state.distributionUpdateConflicts -= 1;
+    state.config.Comment = 'concurrent operator edit';
+    advanceDistribution();
+  }
+  if (value('--if-match') !== state.etag) {
+    process.stderr.write('An error occurred (PreconditionFailed) when calling the UpdateDistribution operation: stale distribution ETag');
+    process.exit(1);
+  }
+  state.config = files[value('--distribution-config')];
+  advanceDistribution();
+}
 if (args[1] === 'create-invalidation') result = { Invalidation: { Id: 'invalidation-id' } };
 process.stdout.write(JSON.stringify(result));
 `,
@@ -357,8 +383,8 @@ require('node:fs').appendFileSync(${JSON.stringify(log)}, JSON.stringify({ args:
         env,
       }),
     setState: (change) => {
-      Object.assign(state, change);
-      fs.writeFileSync(stateFile, JSON.stringify(state));
+      const current = JSON.parse(fs.readFileSync(stateFile, "utf8"));
+      fs.writeFileSync(stateFile, JSON.stringify({ ...current, ...change }));
     },
     get calls() {
       return fs
@@ -541,6 +567,62 @@ test("publish uses fresh distribution and function ETags instead of the earlier 
         ? "fresh-distribution-etag"
         : "fresh-function-etag",
     );
+});
+
+test("repeat deployment completes when publishing attached functions changes the distribution ETag", (t) => {
+  const fixture = fakeDeployment(t, distribution());
+  assert.equal(fixture.result.status, 0, fixture.result.stderr);
+  const previousCallCount = fixture.calls.length;
+
+  const repeat = fixture.run();
+  assert.equal(repeat.status, 0, repeat.stderr);
+  const calls = fixture.calls.slice(previousCallCount).map(({ args }) => args);
+  assert.equal(
+    calls.filter((args) => args[1] === "publish-function").length,
+    2,
+  );
+  assert.ok(calls.every((args) => args[1] !== "update-distribution"));
+  assert.deepEqual(
+    calls.slice(-3).map((args) => args.slice(1, 3)),
+    [
+      ["wait", "distribution-deployed"],
+      ["create-invalidation", "--distribution-id"],
+      ["wait", "invalidation-completed"],
+    ],
+  );
+});
+
+test("a distribution update rebases on the latest configuration after a 412", (t) => {
+  const { result, calls } = fakeDeployment(t, distribution(), undefined, "", {
+    state: { distributionUpdateConflicts: 1 },
+  });
+  assert.equal(result.status, 0, result.stderr);
+  const updates = calls.filter(({ args }) => args[1] === "update-distribution");
+  assert.equal(updates.length, 2);
+  assert.deepEqual(Object.values(updates[1].files), [
+    {
+      ...Object.values(updates[0].files)[0],
+      Comment: "concurrent operator edit",
+    },
+  ]);
+  assert.equal(
+    calls.filter(({ args }) => args[1] === "publish-function").length,
+    2,
+  );
+  assert.ok(calls.some(({ args }) => args[1] === "create-invalidation"));
+});
+
+test("persistent distribution ETag conflicts fail after bounded attempts", (t) => {
+  const { result, calls } = fakeDeployment(t, distribution(), undefined, "", {
+    state: { distributionUpdateConflicts: 10 },
+  });
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /PreconditionFailed/);
+  assert.equal(
+    calls.filter(({ args }) => args[1] === "update-distribution").length,
+    3,
+  );
+  assert.ok(calls.every(({ args }) => args[1] !== "create-invalidation"));
 });
 
 test("operator provisioning creates only missing named functions with current routing and never publishes", (t) => {
