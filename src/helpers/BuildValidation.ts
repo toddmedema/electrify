@@ -1,8 +1,10 @@
 import {
+  COAL_REPOWER_UPGRADES,
   FacilityShoppingType,
   GasCycleType,
   FacilityUpgradeType,
   RetrofitFacilityAction,
+  isCoalRepower,
 } from "../Types";
 import { DESIGN_MIN_TEMP_BOUNDS_C } from "../data/Hazards";
 
@@ -19,6 +21,7 @@ const FACILITY_UPGRADES: readonly FacilityUpgradeType[] = [
   "coldWeatherPackage",
   "solarTrackers",
   "combinedCycle",
+  ...COAL_REPOWER_UPGRADES,
 ];
 
 const RESILIENCE_FIELDS_BY_FUEL: Readonly<Record<string, readonly string[]>> = {
@@ -75,12 +78,33 @@ export function validGasCycle(fuel: unknown, raw: unknown): boolean {
 }
 
 /** A saved retrofit in progress: a known upgrade, a non-negative price and an ordered window. */
-export function validUpgradeInProgress(raw: unknown): boolean {
+export function validUpgradeInProgress(
+  raw: unknown,
+  facility?: Record<string, unknown>,
+): boolean {
   if (raw === undefined) return true;
   if (!raw || typeof raw !== "object") return false;
   const upgrade = raw as Record<string, unknown>;
+  const kind = upgrade.upgrade as FacilityUpgradeType;
+  if (isCoalRepower(kind)) {
+    if (
+      !facility ||
+      facility.fuel !== "Coal" ||
+      facility.yearsToBuildLeft !== 0 ||
+      facility.saleRestricted ||
+      facility.permanentShutdownMonth !== undefined ||
+      !nonNegative(facility.peakW) ||
+      facility.peakW === 0 ||
+      !nonNegative(upgrade.constructionKgco2eTotal) ||
+      upgrade.constructionKgco2eTotal > facility.peakW * 20 ||
+      !Number.isSafeInteger(upgrade.startsMinute) ||
+      !Number.isSafeInteger(upgrade.completesMinute) ||
+      upgrade.startsMinute === upgrade.completesMinute
+    )
+      return false;
+  }
   return (
-    FACILITY_UPGRADES.includes(upgrade.upgrade as FacilityUpgradeType) &&
+    FACILITY_UPGRADES.includes(kind) &&
     nonNegative(upgrade.cost) &&
     nonNegative(upgrade.startsMinute) &&
     nonNegative(upgrade.completesMinute) &&

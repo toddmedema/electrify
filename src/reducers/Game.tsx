@@ -89,6 +89,13 @@ import {
   completeGasConversion,
   GAS_CONVERSION_MINUTES,
 } from "../helpers/GasConversion";
+import {
+  COAL_REPOWER_OPTIONS,
+  coalRepowerConstructionEmissions,
+  coalRepowerInProgress,
+  coalRepowerQuote,
+  completeCoalRepower,
+} from "../helpers/CoalRepower";
 import { accessContextForGame, corridorsForGame } from "../data/IntertieAccess";
 import {
   beginIntertieStress,
@@ -388,6 +395,7 @@ import {
   TickPresentFutureType,
   FuelProductionType,
   FacilityUpgradeType,
+  isCoalRepower,
   RetrofitFacilityAction,
   BuyingRuleType,
   SellingRuleType,
@@ -1127,37 +1135,39 @@ function recordColdSnap(
   return raisesGasPrice;
 }
 
-/**
- * Logs each facility whose hail repairs finished in the tick that just ran and that no other
- * weather hazard still limits. Driven from the clock rather than the timeline, whose prev and now
- * frames coincide on a month's rollover tick.
- */
-/**
- * Installs every retrofit whose month offline has ended. Runs once per real tick, right after the
- * clock advances and before a new month's weather hazards are drawn, so a plant finishing at the
- * rollover meets that month's weather with its upgrade. Forecasts use isUpgradingAt for the outage
- * and install technology conversions on their private fleet in supplyForecastPass.
- */
-function completeRetrofits(state: GameType, simulated = false) {
+/** Install finished technology before dispatching the next elapsed tick. */
+function completeRetrofits(state: GameType, simulated = false): number {
+  let constructionKgco2e = 0;
   state.facilities.forEach((facility) => {
     const upgrade = upgradeInProgress(facility);
-    if (!upgrade || state.date.minute < upgrade.completesMinute) return;
-    const context = state;
-    if (!context) return;
-    if (upgrade.upgrade === "combinedCycle") {
-      completeGasConversion(facility, context);
+    if (!upgrade) return;
+    const repower = isCoalRepower(upgrade.upgrade);
+    if (repower) {
+      constructionKgco2e += coalRepowerConstructionEmissions(
+        upgrade,
+        state.date.minute,
+        TICK_MINUTES,
+      );
+    }
+    if (state.date.minute < upgrade.completesMinute) return;
+    if (repower) {
+      if (!completeCoalRepower(facility, state, upgrade)) return;
+    } else if (upgrade.upgrade === "combinedCycle") {
+      completeGasConversion(facility, state);
       if (!simulated) desktopSimulationHooks()?.converted(state, facility.id);
-    } else
+    } else {
       facility.resilience = retrofittedResilience(
         facility,
-        context,
+        state,
         upgrade.upgrade,
       );
+    }
     delete facility.upgradeInProgress;
     if (simulated) return;
-    // Staged winterization keeps the plant running, so it never comes back online.
-    const message =
-      upgrade.upgrade === "coldWeatherPackage"
+
+    const message = repower
+      ? `Conversion complete: ${facility.name} replaces the coal plant.`
+      : upgrade.upgrade === "coldWeatherPackage"
         ? `Upgrade complete: ${facility.name} now has ${retrofitLabel(upgrade.upgrade)}`
         : `Upgrade complete: ${facility.name} is back online with ${retrofitLabel(upgrade.upgrade)}`;
     logGameEvent(state, "CONSTRUCTION", message, {
@@ -1168,8 +1178,14 @@ function completeRetrofits(state: GameType, simulated = false) {
         getStore().dispatch(snackbarOpen(message));
       }, 0);
   });
+  return constructionKgco2e;
 }
 
+/**
+ * Logs each facility whose hail repairs finished in the tick that just ran and that no other
+ * weather hazard still limits. Driven from the clock rather than the timeline, whose prev and now
+ * frames coincide on a month's rollover tick.
+ */
 function logHailRepairsCompleted(state: GameType) {
   const minute = state.date.minute;
   const logged = new Set<number>();
@@ -2921,7 +2937,7 @@ function applyBuildFacility(
 
 function applySellFacility(state: GameType, id: number): boolean {
   const sold = state.facilities.find((g: FacilityOperatingType) => g.id === id);
-  if (!sold || sold.saleRestricted) return false;
+  if (!sold || sold.saleRestricted || coalRepowerInProgress(sold)) return false;
   logGameEvent(
     state,
     sold.yearsToBuildLeft > 0 ? "BUILD" : "SELL",
@@ -3278,8 +3294,18 @@ function applyUpgradeTransmissionLine(
 
 /** The retrofit's name as it reads mid-sentence, e.g. "a cold-weather package". */
 function retrofitLabel(upgrade: FacilityUpgradeType): string {
-  if (upgrade === "combinedCycle") return "combined-cycle generation";
-  return "a cold-weather package";
+  if (isCoalRepower(upgrade)) return COAL_REPOWER_OPTIONS[upgrade].name;
+  return upgrade === "combinedCycle"
+    ? "combined-cycle generation"
+    : "a cold-weather package";
+}
+
+/** Levers are lowercase kebab-case; saves reject anything else. */
+function retrofitLever(upgrade: FacilityUpgradeType): string {
+  if (isCoalRepower(upgrade)) return COAL_REPOWER_OPTIONS[upgrade].decision;
+  return upgrade === "combinedCycle"
+    ? "combined-cycle"
+    : "cold-weather-package";
 }
 
 /**
@@ -3311,60 +3337,71 @@ function recordRetrofitTransaction(
   trimWorldEventOccurrences(state);
 }
 
-/**
- * Starts installing a weather-resilience upgrade on a standing facility.
- * The price is recomputed here from current state rather than trusted from the dialog and
- * paid up front. The plant is offline for RETROFIT_DOWNTIME_MINUTES, after which the upgrade takes
- * effect; see completeRetrofits.
- */
+/** Start work using a fresh quote from the reducer's own state. */
 function applyRetrofitFacility(
   state: GameType,
   payload: unknown,
   bulk = false,
 ): boolean {
   if (!validRetrofitFacility(payload)) return false;
+  const { upgrade } = payload;
   const facility = state.facilities.find(({ id }) => id === payload.facilityId);
   if (!facility || facility.yearsToBuildLeft > 0) return false;
-  const context = state;
-  if (!context) return false;
-  const conversion = payload.upgrade === "combinedCycle";
-  const cost =
-    payload.upgrade === "combinedCycle"
-      ? gasConversionQuote(facility, context)?.cost
-      : retrofitCost(facility, context, payload.upgrade);
+
+  const conversion = upgrade === "combinedCycle";
+  const repower = isCoalRepower(upgrade);
+  const project = repower
+    ? coalRepowerQuote(facility, state, upgrade)
+    : undefined;
+  const cost = repower
+    ? project?.cost
+    : conversion
+      ? gasConversionQuote(facility, state)?.cost
+      : retrofitCost(facility, state, upgrade);
   const now = getTimeFromTimeline(state.date.minute, state.timeline);
   if (cost === undefined || !Number.isFinite(cost) || cost < 0 || !now)
     return false;
   if (now.cash < cost) return false;
+
   now.cash -= cost;
-  now.netWorth -= cost;
-  now.expensesOM += cost;
-  facility.lifetimeExpenses = (facility.lifetimeExpenses || 0) + cost;
+  if (!project) {
+    now.netWorth -= cost;
+    now.expensesOM += cost;
+    facility.lifetimeExpenses = (facility.lifetimeExpenses || 0) + cost;
+    recordRetrofitTransaction(state, facility.id, upgrade, cost);
+  }
   facility.upgradeInProgress = {
-    upgrade: payload.upgrade,
+    upgrade,
     cost,
     startsMinute: state.date.minute,
     completesMinute:
       state.date.minute +
-      (conversion ? GAS_CONVERSION_MINUTES : RETROFIT_DOWNTIME_MINUTES),
+      (project?.durationMinutes ??
+        (conversion ? GAS_CONVERSION_MINUTES : RETROFIT_DOWNTIME_MINUTES)),
+    ...(project && {
+      constructionKgco2eTotal: project.constructionKgco2eTotal,
+    }),
   };
-  recordRetrofitTransaction(state, facility.id, payload.upgrade, cost);
-  const label = retrofitLabel(payload.upgrade);
-  logGameEvent(
-    state,
-    "BUILD",
-    `Installing ${label} on ${facility.name} for ${formatMoneyConcise(cost, currencyForLocation(state.location, state.startingYear))}. ${payload.upgrade === "coldWeatherPackage" ? "Staged work keeps 90% of capacity available for a month." : `Offline for ${conversion ? "six months" : "a month"}.`}`,
-    {
-      importance: "NOTABLE",
-      actionTarget: { card: "FACILITIES", view: "FLEET" },
-    },
+
+  const label = retrofitLabel(upgrade);
+  const price = formatMoneyConcise(
+    cost,
+    currencyForLocation(state.location, state.startingYear),
   );
-  // Levers are lowercase kebab-case; saves reject anything else.
-  const lever = conversion ? "combined-cycle" : "cold-weather-package";
+  const message = project
+    ? `Repowering ${facility.name} as ${label} for ${price}. Coal can run during construction.`
+    : `Installing ${label} on ${facility.name} for ${price}. ${upgrade === "coldWeatherPackage" ? "Staged work keeps 90% of capacity available for a month." : `Offline for ${conversion ? "six months" : "a month"}.`}`;
+  logGameEvent(state, "BUILD", message, {
+    importance: "NOTABLE",
+    actionTarget: { card: "FACILITIES", view: "FLEET" },
+  });
+  const lever = retrofitLever(upgrade);
   if (!bulk)
     recordMeaningfulDecision(state, {
       lever: `resilience:${facility.id}:${lever}`,
-      label: `Add ${label} to ${facility.name}`,
+      label: project
+        ? `Convert ${facility.name} to ${label}`
+        : `Add ${label} to ${facility.name}`,
       kind: "asset",
       before: "standard",
       after: lever,
@@ -3373,10 +3410,7 @@ function applyRetrofitFacility(
   return true;
 }
 
-/**
- * Cancels a retrofit that is still being installed: the plant returns to service at once, as it
- * was, and the whole price is refunded. Lets the player try an upgrade without committing to it.
- */
+/** Cancel work in progress and refund its full purchase price. */
 function applyCancelRetrofit(state: GameType, payload: unknown): boolean {
   if (!Number.isSafeInteger(payload)) return false;
   const facility = state.facilities.find(({ id }) => id === payload);
@@ -3393,15 +3427,14 @@ function applyCancelRetrofit(state: GameType, payload: unknown): boolean {
     return false;
   const refund = upgrade.cost;
   now.cash += refund;
-  now.netWorth += refund;
-  now.expensesOM -= refund;
-  facility.lifetimeExpenses = (facility.lifetimeExpenses || 0) - refund;
+  if (!isCoalRepower(upgrade.upgrade)) {
+    now.netWorth += refund;
+    now.expensesOM -= refund;
+    facility.lifetimeExpenses = (facility.lifetimeExpenses || 0) - refund;
+    recordRetrofitTransaction(state, facility.id, upgrade.upgrade, -refund);
+  }
   delete facility.upgradeInProgress;
-  recordRetrofitTransaction(state, facility.id, upgrade.upgrade, -refund);
-  const lever =
-    upgrade.upgrade === "combinedCycle"
-      ? "combined-cycle"
-      : "cold-weather-package";
+  const lever = retrofitLever(upgrade.upgrade);
   recordMeaningfulDecision(state, {
     lever: `resilience:${facility.id}:${lever}`,
     label: `Cancel upgrade of ${facility.name}`,
@@ -4098,7 +4131,7 @@ export function* tickStatePhases(
     state.date.minute + TICK_MINUTES,
     state.startingYear,
   );
-  completeRetrofits(state);
+  const repowerEmissions = completeRetrofits(state);
   const now = getTimeFromTimeline(state.date.minute, state.timeline);
   const prev = getTimeFromTimeline(
     state.date.minute - TICK_MINUTES,
@@ -4118,6 +4151,7 @@ export function* tickStatePhases(
       undefined,
       true,
       state.date.minute,
+      repowerEmissions,
     );
     desktopSimulationHooks()?.tick(state, now);
     logHailRepairsCompleted(state);
@@ -5130,6 +5164,7 @@ function* supplyFacilitiesFinancesPhases(
   excludedAgreementId?: string,
   settleAgreementAccounts = false,
   settlementEndMinute = now.minute,
+  repowerEmissions = 0,
 ): Generator<
   SharedTickPhase,
   TickPresentFutureType,
@@ -5236,7 +5271,8 @@ function* supplyFacilitiesFinancesPhases(
   // At rollover getTimeFromTimeline clamps both now and prev to the final frame. Keep that
   // frame's already-recorded construction charge when booking the boundary's additional work.
   let constructionKgco2e =
-    !simulated && now === prev ? now.constructionKgco2e || 0 : 0;
+    repowerEmissions +
+    (!simulated && now === prev ? now.constructionKgco2e || 0 : 0);
   const accrueConstruction = (
     asset: ConstructionEmissions & { yearsToBuildLeft: number },
     yearsToBuild: number,
@@ -6792,6 +6828,31 @@ function* supplyFacilitiesFinancesPhases(
 
 type ForecastObserver = (state: GameType, tick: TickPresentFutureType) => void;
 
+/** Apply a finished technology conversion to a private forecast copy of a facility. */
+function completeForecastConversion(
+  facility: FacilityOperatingType,
+  state: GameType,
+): boolean {
+  const project = facility.upgradeInProgress;
+  if (!project) return false;
+  const context = {
+    ...state,
+    date: getDateFromMinute(project.completesMinute, state.startingYear),
+  };
+  if (isCoalRepower(project.upgrade)) {
+    if (!completeCoalRepower(facility, context, project)) return false;
+  } else if (
+    project.upgrade === "combinedCycle" &&
+    facility.gasCycle === "simple"
+  ) {
+    completeGasConversion(facility, context);
+  } else {
+    return false;
+  }
+  delete facility.upgradeInProgress;
+  return true;
+}
+
 function supplyForecastPass(
   state: GameType,
   simulated?: boolean,
@@ -6832,29 +6893,32 @@ function supplyForecastPass(
       !(preserveCurrentFrame && t.minute === state.date.minute)
     ) {
       advanceGamePolicies(newState, Math.floor(t.minute / MINUTES_PER_MONTH));
-      // Both forecast passes use private facilities, even when their caller omits `simulated`.
-      // Install the conversion here so baseline dispatch and the optimized pass see the same
-      // technology. The baseline must remain free of minimum-load constraints after conversion.
-      newState.facilities.forEach((facility) => {
-        if (
-          facility.upgradeInProgress?.upgrade === "combinedCycle" &&
-          t.minute >= facility.upgradeInProgress.completesMinute &&
-          facility.gasCycle === "simple"
-        ) {
-          const context = newState;
-          if (!context) return;
-          completeGasConversion(facility, {
-            ...context,
-            date: getDateFromMinute(
-              facility.upgradeInProgress.completesMinute,
-              state.startingYear,
-            ),
-          });
-          if (withoutMinimumStableOutput && !isStorage(facility)) {
-            facility.minimumStableOutput = undefined;
-          }
+      let repowerEmissions = 0;
+      // The forecast owns private facilities. Install the target before serving the future tick.
+      for (const facility of newState.facilities) {
+        const project = facility.upgradeInProgress;
+        if (!project) continue;
+        const repower = isCoalRepower(project.upgrade);
+        if (repower && t.minute !== state.date.minute) {
+          repowerEmissions += coalRepowerConstructionEmissions(
+            project,
+            t.minute,
+            stepMinutes,
+          );
         }
-      });
+        if (
+          t.minute < project.completesMinute ||
+          (!repower && project.upgrade !== "combinedCycle")
+        )
+          continue;
+        if (
+          completeForecastConversion(facility, newState) &&
+          withoutMinimumStableOutput &&
+          !isStorage(facility)
+        ) {
+          facility.minimumStableOutput = undefined;
+        }
+      }
       t = { ...t };
       copyCommitmentMetadata(sourceTick, t);
       t = updateSupplyFacilitiesFinances(
@@ -6871,6 +6935,8 @@ function supplyForecastPass(
         undefined,
         excludedAgreementId,
         true,
+        t.minute,
+        repowerEmissions,
       );
       // The current tick already happened. Reforecast its supply against the player's action,
       // but keep the transaction and customer balance that caused this reforecast. Otherwise
@@ -6926,6 +6992,19 @@ function supplyForecastPass(
         (account) => account.termsVersion === 3,
       )
     ) {
+      const repowerEmissions = newState.facilities.reduce((sum, facility) => {
+        const project = coalRepowerInProgress(facility);
+        return (
+          sum +
+          (project
+            ? coalRepowerConstructionEmissions(
+                project,
+                closesMinute,
+                stepMinutes,
+              )
+            : 0)
+        );
+      }, 0);
       t = updateSupplyFacilitiesFinances(
         newState,
         t,
@@ -6939,6 +7018,7 @@ function supplyForecastPass(
         excludedAgreementId,
         true,
         closesMinute,
+        repowerEmissions,
       );
     }
     observe?.(newState, t);
@@ -6963,7 +7043,7 @@ export function forecastMonthClosingTimelineAtCustomerRate(
     minute += TICK_MINUTES
   ) {
     forecast.date = getDateFromMinute(minute, forecast.startingYear);
-    completeRetrofits(forecast, true);
+    const repowerEmissions = completeRetrofits(forecast, true);
     const now = getTimeFromTimeline(minute, forecast.timeline);
     const prev = getTimeFromTimeline(minute - TICK_MINUTES, forecast.timeline);
     if (!now || !prev) return undefined;
@@ -6981,6 +7061,7 @@ export function forecastMonthClosingTimelineAtCustomerRate(
       undefined,
       true,
       minute,
+      repowerEmissions,
     );
   }
   return forecast.timeline;
@@ -7030,20 +7111,17 @@ function reforecastSupply(
   );
   state.facilities.forEach((facility) => {
     if (!isStorage(facility) && (facility.minimumStableOutput || 0) > 0) {
+      const project = facility.upgradeInProgress;
       const conversionMinute =
-        facility.upgradeInProgress?.upgrade === "combinedCycle"
-          ? facility.upgradeInProgress.completesMinute
+        project?.upgrade === "combinedCycle" || isCoalRepower(project?.upgrade)
+          ? project?.completesMinute
           : undefined;
       const converted =
-        conversionMinute === undefined ? undefined : { ...facility };
-      if (converted && conversionMinute !== undefined) {
-        const context = state;
-        if (!context) return;
-        completeGasConversion(converted, {
-          ...context,
-          date: getDateFromMinute(conversionMinute, state.startingYear),
-        });
-      }
+        conversionMinute !== undefined &&
+        (futureBaseline.at(-1)?.minute ?? -Infinity) >= conversionMinute
+          ? { ...facility }
+          : undefined;
+      if (converted) completeForecastConversion(converted, state);
       prepareGeneratorCommitment({
         facilityId: facility.id,
         forecast: futureBaseline,
@@ -7433,6 +7511,8 @@ function getNetWorth(
   let netWorth = cash;
   facilities.forEach((g: FacilityOperatingType) => {
     netWorth += facilityCashBack(g, currentMinute);
+    // A paid repower is work in progress until its cost becomes the new gas plant's basis.
+    netWorth += coalRepowerInProgress(g)?.cost ?? 0;
   });
   transmissionLines.forEach((line) => {
     // The project is worth what has been paid for it at every construction stage. At purchase,

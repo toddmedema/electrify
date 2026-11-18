@@ -12,7 +12,11 @@ import {
 import { withResilienceOptions } from "../helpers/Hazards";
 import { validPolicyChange } from "../helpers/Policies";
 import { validScenarioResponse } from "../helpers/ScenarioChoices";
-import { isStorage } from "../Types";
+import { isCoalRepower, isStorage } from "../Types";
+import {
+  coalRepowerInProgress,
+  coalRepowerQuote,
+} from "../helpers/CoalRepower";
 import type { FacilityShoppingType, GameType } from "../Types";
 import type { gameSlice } from "../reducers/Game";
 import type * as GameActions from "../reducers/GameActions";
@@ -148,13 +152,23 @@ const GAME_COMMAND_VALIDATORS = {
       : { error: "Not enough cash for this acquisition" };
   },
   buildFacility,
-  sellFacility: facility,
+  sellFacility: (game, payload) =>
+    game.facilities.some((f) => f.id === payload && coalRepowerInProgress(f))
+      ? { error: "Cancel the conversion before selling this plant" }
+      : facility(game, payload),
   togglePauseFacility: facility,
   reprioritizeFacility: dispatchPosition((game) => game.facilities.length),
-  retrofitFacility: (_game, payload) =>
-    validRetrofitFacility(payload)
+  retrofitFacility: (game, payload) => {
+    if (!validRetrofitFacility(payload))
+      return { error: "Choose a valid facility upgrade" };
+    if (!isCoalRepower(payload.upgrade)) return { payload };
+    const source = game.facilities.find((f) => f.id === payload.facilityId);
+    const quote = source && coalRepowerQuote(source, game, payload.upgrade);
+    if (!quote) return { error: "That conversion is unavailable" };
+    return (currentTick(game)?.cash ?? -1) >= quote.cost
       ? { payload }
-      : { error: "Choose a valid facility upgrade" },
+      : { error: "Not enough cash for this conversion" };
+  },
   cancelRetrofit: facility,
   buildTransmissionLine: peerLine,
   upgradeTransmissionLine: upgradeLine,

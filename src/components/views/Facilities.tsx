@@ -85,6 +85,10 @@ import {
   upgradeInProgress,
   upgradeProgress,
 } from "../../helpers/Hazards";
+import {
+  COAL_REPOWER_OPTIONS,
+  coalRepowerInProgress,
+} from "../../helpers/CoalRepower";
 import { dayCount, resilienceName } from "../base/WeatherResilienceText";
 import TransmissionPanel from "./TransmissionPanel";
 import { facilityDisplayName } from "../base/FacilityLabels";
@@ -254,6 +258,7 @@ function FacilityActions(props: {
     onCancelRetrofit,
   } = props;
   const underConstruction = facility.yearsToBuildLeft > 0;
+  const repowering = !!coalRepowerInProgress(facility);
   if (permanentlyShutdown && facility.saleRestricted)
     return (
       <div className="facilityActions">
@@ -274,32 +279,36 @@ function FacilityActions(props: {
           className="facilityCancelConstruction"
           variant="outlined"
           startIcon={facilityActionIcon("cancelUpgrade")}
-          aria-label={"Cancel upgrade of " + facilityDisplayName(facility)}
+          aria-label={`Cancel ${repowering ? "conversion" : "upgrade"} of ${facilityDisplayName(facility)}`}
           onClick={() => onCancelRetrofit(facility.id)}
         >
-          <span className="facilityActionLabel">Cancel upgrade</span>
-        </Button>
-      )}
-      {!underConstruction && !upgrading && !permanentlyShutdown && (
-        <Button
-          variant="outlined"
-          startIcon={facilityActionIcon(facility.paused ? "resume" : "pause")}
-          aria-label={
-            facility.paused
-              ? "Resume " + facilityDisplayName(facility)
-              : "Pause " + facilityDisplayName(facility)
-          }
-          onClick={() =>
-            facility.paused
-              ? onTogglePause(facility.id)
-              : onPause(facility.id, facilityDisplayName(facility))
-          }
-        >
           <span className="facilityActionLabel">
-            {facility.paused ? "Resume" : "Pause"}
+            {repowering ? "Cancel conversion" : "Cancel upgrade"}
           </span>
         </Button>
       )}
+      {!underConstruction &&
+        (!upgrading || repowering) &&
+        !permanentlyShutdown && (
+          <Button
+            variant="outlined"
+            startIcon={facilityActionIcon(facility.paused ? "resume" : "pause")}
+            aria-label={
+              facility.paused
+                ? "Resume " + facilityDisplayName(facility)
+                : "Pause " + facilityDisplayName(facility)
+            }
+            onClick={() =>
+              facility.paused
+                ? onTogglePause(facility.id)
+                : onPause(facility.id, facilityDisplayName(facility))
+            }
+          >
+            <span className="facilityActionLabel">
+              {facility.paused ? "Resume" : "Pause"}
+            </span>
+          </Button>
+        )}
       {facility.saleRestricted ? (
         <Typography
           variant="caption"
@@ -309,24 +318,26 @@ function FacilityActions(props: {
           This plant can't be sold.
         </Typography>
       ) : (
-        <Button
-          className={
-            underConstruction ? "facilityCancelConstruction" : undefined
-          }
-          variant="outlined"
-          startIcon={facilityActionIcon(
-            underConstruction ? "cancelConstruction" : "sell",
-          )}
-          aria-label={
-            (underConstruction ? "Cancel construction of " : "Sell ") +
-            facilityDisplayName(facility)
-          }
-          onClick={onOpenSell}
-        >
-          <span className="facilityActionLabel">
-            {underConstruction ? "Cancel construction" : "Sell"}
-          </span>
-        </Button>
+        !repowering && (
+          <Button
+            className={
+              underConstruction ? "facilityCancelConstruction" : undefined
+            }
+            variant="outlined"
+            startIcon={facilityActionIcon(
+              underConstruction ? "cancelConstruction" : "sell",
+            )}
+            aria-label={
+              (underConstruction ? "Cancel construction of " : "Sell ") +
+              facilityDisplayName(facility)
+            }
+            onClick={onOpenSell}
+          >
+            <span className="facilityActionLabel">
+              {underConstruction ? "Cancel construction" : "Sell"}
+            </span>
+          </Button>
+        )
       )}
     </div>
   );
@@ -344,6 +355,8 @@ const MemoizedFacilityActions = React.memo(
       previous.facility.saleRestricted === next.facility.saleRestricted &&
       previousUnderConstruction === nextUnderConstruction &&
       previous.upgrading === next.upgrading &&
+      !!coalRepowerInProgress(previous.facility) ===
+        !!coalRepowerInProgress(next.facility) &&
       previous.permanentlyShutdown === next.permanentlyShutdown &&
       previous.onCancelRetrofit === next.onCancelRetrofit &&
       previous.onPause === next.onPause &&
@@ -389,12 +402,16 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
     ? undefined
     : upgradeInProgress(facility);
   const upgrading = !!installing && isUpgradingAt(facility, game.date.minute);
+  const project = coalRepowerInProgress(facility);
+  const repowering = upgrading && !!project;
   const partialUpgrade =
     upgrading && retrofitOutputMultiplier(facility, game.date.minute) > 0;
   const offlineForWork = underConstruction || (upgrading && !partialUpgrade);
-  const activityLabel = partialUpgrade
-    ? "installing winterization, 90% capacity available"
-    : undefined;
+  const activityLabel = repowering
+    ? `construction of ${COAL_REPOWER_OPTIONS[project.upgrade].name} under way`
+    : partialUpgrade
+      ? "installing winterization, 90% capacity available"
+      : undefined;
   const storage = isStorage(facility) ? facility : undefined;
   const wasBuilding = React.useRef(underConstruction);
   const [arriving, setArriving] = React.useState(arrivalRequested);
@@ -426,7 +443,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
   let activity: FacilityActivityType = "RUNNING";
   if (underConstruction) {
     activity = "BUILDING";
-  } else if (upgrading) {
+  } else if (upgrading && !repowering) {
     activity = "UPGRADING";
   } else if (facility.paused) {
     activity = "PAUSED";
@@ -500,12 +517,18 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
     detail = (
       <>
         <span className="facilityStatusLong">
-          {partialUpgrade
-            ? `Winterizing ${Math.round(builtFraction * 100)}% · 90% capacity available`
-            : resilienceName(installing!.upgrade)}
+          {repowering
+            ? `Repowering ${Math.round(builtFraction * 100)}%`
+            : partialUpgrade
+              ? `Winterizing ${Math.round(builtFraction * 100)}% · 90% capacity available`
+              : resilienceName(installing!.upgrade)}
           , {dayCount(daysLeft)} left
         </span>
-        <span className="facilityStatusShort">{daysLeft}d left</span>
+        <span className="facilityStatusShort">
+          {repowering
+            ? `Repowering ${Math.round(builtFraction * 100)}%`
+            : `${daysLeft}d left`}
+        </span>
       </>
     );
   } else if (facility.peakWh) {
@@ -551,7 +574,9 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
   }
   // Output communicates normal operation; keep explicit labels for other states.
   const status =
-    offlineForWork || partialUpgrade || activity === "RUNNING" ? (
+    offlineForWork ||
+    (partialUpgrade && !repowering) ||
+    activity === "RUNNING" ? (
       reading
     ) : typeof reading === "string" ? (
       `${reading} · ${ACTIVITY_LABELS[activity]}`

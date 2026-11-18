@@ -646,7 +646,7 @@ interface SharedOperatingType
 
 export interface GeneratorOperatingType
   extends GeneratorShoppingType, SharedOperatingType {
-  // A retrofit being installed, which holds the plant offline until it completes.
+  // A retrofit or repower under way on this facility.
   upgradeInProgress?: FacilityUpgradeInProgressType;
   // Unit commitment is distinct from instantaneous output: a plant ramps through outputs below
   // its stable minimum while starting and stopping, but cannot remain there indefinitely.
@@ -1174,23 +1174,38 @@ export interface WeatherHazardProfileType {
   source: string;
 }
 
-/** The action payload for adding a resilience upgrade to a standing facility. */
+/** The action payload for upgrading or repowering a standing facility. */
 export interface RetrofitFacilityAction {
   facilityId: number;
   upgrade: FacilityUpgradeType;
 }
 
-export type FacilityUpgradeType = ResilienceUpgradeType | "combinedCycle";
+export const COAL_REPOWER_UPGRADES = [
+  "coalToGasCC",
+  "coalToGasPeaker",
+] as const;
+export type CoalRepowerType = (typeof COAL_REPOWER_UPGRADES)[number];
+
+export type FacilityUpgradeType =
+  ResilienceUpgradeType | "combinedCycle" | CoalRepowerType;
+
+export function isCoalRepower(
+  upgrade: FacilityUpgradeType | undefined,
+): upgrade is CoalRepowerType {
+  return upgrade === "coalToGasCC" || upgrade === "coalToGasPeaker";
+}
 
 /**
- * A retrofit being installed on a standing facility. The plant is offline from startsMinute until
- * completesMinute, when the upgrade takes effect; cancelling before then refunds `cost` in full.
+ * Work on a standing facility. The upgrade takes effect at completesMinute.
+ * Cancellation before then refunds `cost` in full.
  */
 export interface FacilityUpgradeInProgressType {
   upgrade: FacilityUpgradeType;
   cost: number; // What the player paid, and what a cancellation refunds
   startsMinute: number;
   completesMinute: number;
+  /** Embodied emissions booked over a coal repower's construction interval. */
+  constructionKgco2eTotal?: number;
 }
 
 export interface WorldEventEffectsType {
