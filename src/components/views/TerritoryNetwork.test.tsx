@@ -1,4 +1,5 @@
 import * as React from "react";
+import cloneDeep from "lodash.clonedeep";
 import {
   act,
   fireEvent,
@@ -20,7 +21,10 @@ import {
   ownsTerritoryTile,
   territoryTilePowerLimit,
 } from "../../helpers/TerritoryTiles";
-import { territoryTileViews } from "../../helpers/TerritoryMapState";
+import {
+  territoryTileViews,
+  type TerritoryTileView,
+} from "../../helpers/TerritoryMapState";
 import { currentTick } from "../../helpers/GameSelectors";
 import { formatCount, formatWatts } from "../../helpers/Format";
 import type { GameType, TerritoryTileId } from "../../Types";
@@ -60,17 +64,18 @@ jest.mock(
 jest.mock("./TerritoryHexMap", () => ({
   __esModule: true,
   default: (props: {
-    game: GameType;
+    views: readonly TerritoryTileView[];
     selected?: TerritoryTileId;
     onSelect: (id: TerritoryTileId, activate?: boolean) => void;
-  }) => {
-    const { territoryTileViews } = jest.requireActual<
-      typeof import("../../helpers/TerritoryMapState")
-    >("../../helpers/TerritoryMapState");
-    return (
-      <div aria-label="Tile map">
-        <button className="territoryMapBuyToggle">Rapid connection mode</button>
-        {territoryTileViews(props.game).map(({ tile }) => (
+  }) => (
+    <div aria-label="Tile map">
+      <button className="territoryMapBuyToggle">Rapid connection mode</button>
+      {props.views
+        .filter(
+          ({ tile, owned, connectable }) =>
+            owned || tile.city || connectable || tile.id === props.selected,
+        )
+        .map(({ tile }) => (
           <button
             className="territoryTileTarget"
             tabIndex={props.selected === tile.id ? 0 : -1}
@@ -83,13 +88,14 @@ jest.mock("./TerritoryHexMap", () => ({
             {tile.terrain}
           </button>
         ))}
-      </div>
-    );
-  },
+    </div>
+  ),
 }));
 
+let opening: GameType | undefined;
 function ready() {
-  const game = createGame({ scenarioId: 116, seed: 188 });
+  opening ??= createGame({ scenarioId: 116, seed: 188 });
+  const game = cloneDeep(opening);
   currentTick(game)!.cash = 1e9;
   return game;
 }
@@ -98,7 +104,7 @@ function show(game = ready(), width?: number, scale = 1) {
     reducer: { game: gameReducer, ui: uiReducer },
     preloadedState: { game },
     middleware: (getDefaultMiddleware) =>
-      getDefaultMiddleware({ serializableCheck: false }),
+      getDefaultMiddleware({ serializableCheck: false, immutableCheck: false }),
   });
   const facilityActions = {
     onSell: jest.fn(),
@@ -170,7 +176,9 @@ function show(game = ready(), width?: number, scale = 1) {
   };
 }
 const inspect = (id: TerritoryTileId) =>
-  fireEvent.click(screen.getByRole("button", { name: `Inspect ${id}` }));
+  fireEvent.click(
+    screen.getByLabelText(`Inspect ${id}`, { selector: "button" }),
+  );
 const surface = () => screen.getByRole("dialog");
 function freeTile(game: GameType) {
   const wind = GENERATORS(game, 30e6, [], []).find(
@@ -225,7 +233,7 @@ it("keeps inspection on its activated tile while map focus moves", () => {
 it("focuses every explicit activation, including another tile with the same heading", () => {
   const game = ready();
   const sites = territoryTileViews(game).filter(
-    ({ tile, owned, facility }) => !owned && !tile.city && !facility,
+    ({ tile, connectable, facility }) => connectable && !tile.city && !facility,
   );
   const first = sites.find(({ tile }) =>
     sites.some(
@@ -371,7 +379,7 @@ it.each([
 it("shows researched terrain effects before purchase, with speed labelled separately from output", () => {
   const game = ready();
   const forest = territoryTileViews(game).find(
-    ({ tile, owned }) => !owned && !tile.city && tile.terrain === "forest",
+    ({ tile, connectable }) => connectable && tile.terrain === "forest",
   )!.tile;
   show(game);
   inspect(forest.id);
@@ -569,11 +577,13 @@ it.each([undefined, 1280])(
     });
     fireEvent.click(screen.getByRole("button", { name: "Build" }));
     fireEvent.click(
-      await screen.findByRole("button", { name: "Choose sites for Wind" }),
+      await screen.findByLabelText("Choose sites for Wind", {
+        selector: "button",
+      }),
     );
     inspect("green-uplands:site-1");
     fireEvent.click(
-      await screen.findByRole("button", { name: "Review project" }),
+      await screen.findByText("Review project", { selector: "button" }),
     );
     fireEvent.click(screen.getByRole("button", { name: "Connect & build" }));
     await act(async () => {
@@ -654,7 +664,7 @@ it("uses the persistent desktop rail for Build and owned empty tiles, preselecti
     within(rail).getByRole("button", { name: "Choose sites for Wind" }),
   );
   expect(
-    await screen.findByRole("button", { name: "Review project" }),
+    await screen.findByText("Review project", { selector: "button" }),
   ).toBeEnabled();
   expect(screen.getByRole("button", { name: `Inspect ${id}` })).toHaveAttribute(
     "aria-pressed",
@@ -753,11 +763,13 @@ it("keeps the phone project sheet unchanged without desktop upgrade editing", as
   show(game, 390);
   fireEvent.click(screen.getByRole("button", { name: "Build" }));
   fireEvent.click(
-    await screen.findByRole("button", { name: "Choose sites for Solar" }),
+    await screen.findByLabelText("Choose sites for Solar", {
+      selector: "button",
+    }),
   );
   inspect("champlain:site-13");
   expect(
-    await screen.findByRole("button", { name: "Review project" }),
+    await screen.findByText("Review project", { selector: "button" }),
   ).toBeEnabled();
   expect(
     screen.queryByRole("checkbox", { name: /trackers/i }),
