@@ -264,8 +264,8 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           </li>
           <li>
             <strong>Managed EV charging:</strong> Charging moves into the next
-            six hours, though drivers can override it. The offer opens when 30%
-            of local cars are electric and compatible with managed charging.
+            six hours, though drivers can override it. The offer opens when
+            compatible charging can shift enough of the local grid's load.
           </li>
           <li>
             <strong>Home battery virtual power plant:</strong> Home batteries

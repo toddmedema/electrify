@@ -6,7 +6,6 @@ import type {
   TickPresentFutureType,
 } from "../Types";
 import { DEFAULT_CUSTOM_SCENARIO } from "../data/Scenarios";
-import { getSimLocation } from "../testing/SimData";
 import { createGame } from "../testing/Simulator";
 import { customerBillingRate } from "../helpers/Policies";
 import { getTimeFromTimeline, MINUTES_PER_MONTH } from "../helpers/DateTime";
@@ -17,25 +16,40 @@ import { cancelPolicy, schedulePolicy } from "./GameActions";
 const queueWh = (queue: DeferredResidentialLoad[] | undefined) =>
   (queue ?? []).reduce((sum, entry) => sum + entry.energyWh, 0);
 
-function gameAt(
-  year: number,
-  programs: { evCharging?: "On"; timeOfUse?: "On" } = {},
-  location = getSimLocation("SF")!,
-) {
-  return createGame({
+function gameAt(year: number, transportationShare?: number) {
+  const game = createGame({
     scenarioId: 999,
     seed: 4,
     scenario: {
       ...DEFAULT_CUSTOM_SCENARIO,
       startingYear: year,
-      location,
-      locationId: location.id,
       cash: 1e10,
       startingCustomers: 10000,
       intertiesEnabled: false,
     },
-    initialPrograms: programs,
   });
+  if (transportationShare !== undefined) {
+    for (const tick of game.timeline) {
+      const transportationW = tick.demandW * transportationShare;
+      tick.demandByType.Residential -=
+        transportationW - tick.demandByType.Transportation;
+      tick.demandByType.Transportation = transportationW;
+    }
+  }
+  return game;
+}
+
+function withPrograms(
+  game: GameType,
+  ids: readonly ("evCharging" | "timeOfUse")[],
+): GameType {
+  return cloneDeep(
+    ids.reduce(
+      (state, id) =>
+        gameReducer(state, schedulePolicy({ id, tier: "On", month: 1 })),
+      game,
+    ),
+  );
 }
 
 function nextMonth(game: GameType) {
@@ -55,7 +69,7 @@ function rebuild(game: GameType, ticks = TICKS_PER_MONTH, stepMinutes = 15) {
 }
 
 test("household battery discharge cannot discount commercial demand through a recovered TOU load", () => {
-  const game = gameAt(2040, { timeOfUse: "On" });
+  const game = withPrograms(gameAt(2040), ["timeOfUse"]);
   game.policies!.programs.timeOfUse.tier = "On";
   const tick = cloneDeep(game.timeline[0]);
   tick.minute = 22 * 60;
@@ -72,42 +86,31 @@ test("household battery discharge cannot discount commercial demand through a re
   expect(customerBillingRate(game, tick)).toBe(game.dollarsPerkWh);
 });
 
-test.each([1980, 2015, 2025, 2039])(
-  "both preview and scheduling reject EV enrollment when the local fleet is too small in %s",
-  (year) => {
-    const game = gameAt(year);
+test.each([
+  [1980, 0.12],
+  [2015, 0.12],
+  [2025, 0.12],
+  [2040, 0.005],
+  [2040, 0.02],
+])(
+  "preview and scheduling reject a low-impact EV market (%i, transport share %f)",
+  (year, share) => {
+    const game = gameAt(year, share);
     const start = { id: "evCharging", tier: "On", month: 1 } as const;
     expect(gameReducer(game, schedulePolicy(start))).toBe(game);
     expect(() => previewPolicy(game, start, 13)).toThrow("not available");
   },
 );
 
-test("EV enrollment opens earlier in a market with more compatible cars", () => {
-  const game = gameAt(2026, {}, getSimLocation("Oslo")!);
-  const start = { id: "evCharging", tier: "On", month: 1 } as const;
-  const scheduled = cloneDeep(gameReducer(game, schedulePolicy(start)));
-  nextMonth(scheduled);
-  expect(scheduled.policies!.programs.evCharging.adoption).toBeCloseTo(1 / 12);
-  expect(scheduled.timeline.some((tick) => (tick.evShiftedW ?? 0) > 0)).toBe(
-    true,
-  );
-});
-
-test("the first eligible January can be scheduled in December", () => {
-  const game = gameAt(2039);
-  for (let i = 0; i < 11; i++) nextMonth(game);
-  const start = { id: "evCharging", tier: "On", month: 12 } as const;
-  expect(
-    gameReducer(game, schedulePolicy(start)).policies!.programs.evCharging
-      .pending,
-  ).toEqual({
-    tier: "On",
-    month: 12,
-  });
+test("meaningful charging load can enter the program at the same fleet share", () => {
+  const game = withPrograms(gameAt(2040, 0.12), ["evCharging"]);
+  nextMonth(game);
+  expect(game.policies!.programs.evCharging.adoption).toBeCloseTo(1 / 12);
+  expect(game.timeline.some((tick) => (tick.evShiftedW ?? 0) > 0)).toBe(true);
 });
 
 test("a scheduled EV preview includes actual participation expense and leaves live adoption alone", () => {
-  const game = gameAt(2040);
+  const game = gameAt(2040, 0.12);
   const before = cloneDeep(game.policies);
   const preview = previewPolicy(
     game,
@@ -122,7 +125,7 @@ test("a scheduled EV preview includes actual participation expense and leaves li
 
 test("EV payments reach the recorded monthly expenses and stop after cancellation", () => {
   const id = "evCharging";
-  let game = gameAt(2040, { [id]: "On" });
+  let game = withPrograms(gameAt(2040, 0.12), [id]);
   nextMonth(game);
   const monthlyCost = game.policies!.programs[id].spending;
   expect(monthlyCost).toBeGreaterThan(0);
@@ -147,7 +150,7 @@ test("EV payments reach the recorded monthly expenses and stop after cancellatio
 
 test("EV deferrals survive cancellation at the month boundary and return by the original deadline", () => {
   const id = "evCharging";
-  let game = gameAt(2040);
+  let game = gameAt(2040, 0.12);
   game = cloneDeep(
     gameReducer(
       game,
@@ -184,10 +187,7 @@ test("EV deferrals survive cancellation at the month boundary and return by the 
 });
 
 test("EV forecasts own their queues and conserve their deferred energy beside time-of-use", () => {
-  const game = gameAt(2040, {
-    evCharging: "On",
-    timeOfUse: "On",
-  });
+  const game = withPrograms(gameAt(2040, 0.12), ["evCharging", "timeOfUse"]);
   nextMonth(game);
   while (game.date.minute < MINUTES_PER_MONTH + 18 * 60) tickState(game);
   const snapshot = cloneDeep(game);

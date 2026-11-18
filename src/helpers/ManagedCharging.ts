@@ -17,6 +17,40 @@ interface ManagedChargingInput {
   stepMinutes?: number;
 }
 
+/** The same equipment and participation limit used when dispatching and offering the program. */
+export function managedChargingShiftableW(
+  transportationW: number,
+  customers: number,
+  year: number,
+  location?: LocationType,
+  enrollment: number = MANAGED_CHARGING.maxEnrollment,
+): number {
+  const { fleetShare, smartChargingShare, eligibleTransportationShare } =
+    electricVehicleEligibility(year, location);
+  const participating = Math.max(
+    0,
+    Math.min(MANAGED_CHARGING.maxEnrollment, enrollment),
+  );
+  // A stock-based energy ceiling prevents a tiny 2015 fleet controlling an arbitrarily large
+  // transport sector. The separate share ceiling always leaves an inflexible transport floor.
+  const fleetChargingW =
+    (Math.max(0, customers) *
+      MANAGED_CHARGING.vehiclesPerCustomer *
+      fleetShare *
+      MANAGED_CHARGING.dailyChargingWhPerVehicle) /
+    24;
+  return (
+    Math.min(
+      Math.max(0, transportationW) * eligibleTransportationShare,
+      fleetChargingW,
+    ) *
+    smartChargingShare *
+    participating *
+    (1 - MANAGED_CHARGING.overrideShare) *
+    MANAGED_CHARGING.incrementalShiftShare
+  );
+}
+
 /** Only existing road-EV charging can move; rail and other transport remain unchanged.
  * Queued energy belongs to the charging session, so cancellation or a month rollover cannot
  * erase it. All accepted charging returns within six hours after the four-hour peak window.
@@ -41,29 +75,16 @@ export function shiftManagedCharging({
       shiftedW: 0,
       recoveredW: 0,
     };
-  const { fleetShare, smartChargingShare, eligibleTransportationShare } =
-    electricVehicleEligibility(year, location);
   const dayMinutes = 1440;
   const offset =
     (((minute - startHour * 60) % dayMinutes) + dayMinutes) % dayMinutes;
-  const participating = Math.max(
-    0,
-    Math.min(MANAGED_CHARGING.maxEnrollment, enrollment),
+  const movableW = managedChargingShiftableW(
+    baselineW,
+    customers,
+    year,
+    location,
+    enrollment,
   );
-  // A stock-based energy ceiling prevents a tiny 2015 fleet controlling an arbitrarily large
-  // transport sector. The separate share ceiling always leaves an inflexible transport floor.
-  const fleetChargingW =
-    (Math.max(0, customers) *
-      MANAGED_CHARGING.vehiclesPerCustomer *
-      fleetShare *
-      MANAGED_CHARGING.dailyChargingWhPerVehicle) /
-    24;
-  const movableW =
-    Math.min(baselineW * eligibleTransportationShare, fleetChargingW) *
-    smartChargingShare *
-    participating *
-    (1 - MANAGED_CHARGING.overrideShare) *
-    MANAGED_CHARGING.incrementalShiftShare;
   let shiftedW = 0;
   for (
     let windowStart = minute - offset;

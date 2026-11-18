@@ -1,3 +1,4 @@
+import { CUSTOMER_BATTERIES } from "../data/CustomerBatteries";
 import { needsObjectiveEnergyMeters } from "./ScenarioRules";
 import { modScaledValue } from "./ScenarioMod";
 import {
@@ -296,9 +297,24 @@ export function advancePolicies(
         return;
       }
       if (isFlexibilityPolicy(id)) {
-        const enabled = s.tier === "On";
+        // Expired home-battery contracts free enrollment slots for current equipment.
+        // The enrollment pace and current household pool still cap replacements.
+        if (
+          id === "battery" &&
+          s.installs?.length &&
+          s.installs[0][0] <= m - CUSTOMER_BATTERIES.endLifeMonths
+        ) {
+          s.installs = s.installs.filter(
+            ([joined]) => joined > m - CUSTOMER_BATTERIES.endLifeMonths,
+          );
+          s.adoption = Math.min(
+            1,
+            s.installs.reduce((sum, [, share]) => sum + share, 0),
+          );
+          delete s.completedMonth;
+        }
         const increment =
-          enabled && flexibilityAvailable(game, id, m)
+          s.tier === "On"
             ? Math.min(1 - s.adoption, 1 / flexibilityMonths(id))
             : 0;
         if (increment > 0) {

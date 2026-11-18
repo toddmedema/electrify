@@ -50,7 +50,8 @@ at 30%, and at most 25% of capable households enroll.
 An enrollment cohort represents a share of starting customer equivalents, scaled to the
 local equipment and opt-in shares in its enrollment year. Each enrolled system is modeled
 as 5 kW and 10 kWh with a 20% household reserve. Its energy capacity fades to 70% over ten
-years. Contracts exit the modeled fleet gradually over years 10–15. The terms use $45 per
+years. Contracts exit the modeled fleet gradually over years 10–15. Expired contracts
+free enrollment slots for compatible batteries in the current market. The terms use $45 per
 sustained kW per year, paid monthly while On, with the usual cost index. A fresh system can
 deliver 2 kW over four hours and earns $90 annually. Dispatch can be lower when the fleet is
 partially charged.

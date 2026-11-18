@@ -1,3 +1,4 @@
+import { CUSTOMER_BATTERIES } from "../data/CustomerBatteries";
 import cloneDeep from "lodash.clonedeep";
 import {
   advancePolicies,
@@ -10,6 +11,7 @@ import {
   policyBudget,
   policyTotalCost,
   programCustomers,
+  validPolicies,
 } from "./Policies";
 import { POLICIES, residentialSolarCostPerW } from "../data/Policies";
 import { createGame } from "../testing/Simulator";
@@ -183,6 +185,29 @@ test("a build-out finishes after exactly its funded months, then costs nothing a
     gameReducer(fresh, schedulePolicy(change)).policies?.programs.efficiency
       .pending,
   ).toEqual({ tier: "On", month: 1 });
+});
+
+test("expired home battery contracts free slots for current equipment", () => {
+  const game = createGame({ scenarioId: 106 });
+  const expiration = 1 + CUSTOMER_BATTERIES.endLifeMonths;
+  game.policies = emptyPolicies(expiration - 1);
+  const battery = game.policies.programs.battery;
+  battery.tier = "On";
+  battery.adoption = 1;
+  battery.installs = Array.from({ length: 12 }, (_, i) => [i + 1, 1 / 12]);
+  advancePolicies(game, expiration);
+  const installments = battery.installs;
+  expect(installments.map(([month]) => month)).toEqual([
+    ...Array.from({ length: 11 }, (_, i) => i + 2),
+    expiration,
+  ]);
+  expect(validPolicies(game.policies, expiration)).toBe(true);
+
+  battery.tier = "Off";
+  advancePolicies(game, expiration + 1);
+  expect(battery.adoption).toBeCloseTo(11 / 12);
+  expect(battery.spending).toBe(0);
+  expect(validPolicies(game.policies, expiration + 1)).toBe(true);
 });
 
 test("the tariff repays shifted load evenly through eight hours across midnight", () => {

@@ -1,3 +1,4 @@
+import { DEFAULT_CUSTOM_SCENARIO } from "../../data/Scenarios";
 import * as React from "react";
 import {
   act,
@@ -247,7 +248,21 @@ test.each<PolicyId>(POLICY_IDS)(
     const stub = jest
       .spyOn(client, "createPolicyPreviewWorker")
       .mockReturnValue(worker as unknown as Worker);
-    const game = createGame({ scenarioId: 106 });
+    const game =
+      id === "evCharging" || id === "battery"
+        ? createGame({
+            scenarioId: 999,
+            scenario: { ...DEFAULT_CUSTOM_SCENARIO, startingYear: 2040 },
+          })
+        : createGame({ scenarioId: 106 });
+    if (id === "evCharging") {
+      for (const tick of game.timeline) {
+        const transportationW = tick.demandW * 0.12;
+        tick.demandByType.Residential -=
+          transportationW - tick.demandByType.Transportation;
+        tick.demandByType.Transportation = transportationW;
+      }
+    }
     const result = {
       ...previewPolicy(game, { id, tier: "On", month: 1 }, 48),
       current: [47000000, 40000000],
