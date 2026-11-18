@@ -8,7 +8,10 @@ import { GENERATORS, getBuildFacilityQuote } from "../src/data/Facilities";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "../src/helpers/DateTime";
 import { currentTick } from "../src/helpers/GameSelectors";
 import { formatMoneyConcise, formatMoneyStable } from "../src/helpers/Format";
-import { tilePurchaseQuote } from "../src/helpers/Territories";
+import {
+  tilePurchaseQuote,
+  tilePurchaseQuotes,
+} from "../src/helpers/Territories";
 import {
   availableTerritoryTiles,
   getTerritoryTile,
@@ -146,15 +149,14 @@ async function revealTile(page: Page, tile: TerritoryTileDefinition) {
   for (let attempt = 0; attempt < 30; attempt++) {
     const game = (await readSavedGame(page))!;
     const views = territoryTileViews(game);
-    if (tilePurchaseQuote(game, tile.id) || ownsTerritoryTile(game, tile.id)) {
+    const quotes = tilePurchaseQuotes(game, views);
+    if (quotes.has(tile.id) || ownsTerritoryTile(game, tile.id)) {
       if ((await buy.getAttribute("aria-pressed")) === "true")
         await buy.click();
       return;
     }
     const next = views
-      .filter(
-        (view) => tilePurchaseQuote(game, view.tile.id)?.benefit === "general",
-      )
+      .filter((view) => quotes.get(view.tile.id)?.benefit === "general")
       .sort(
         (a, b) =>
           territoryHexDistance(a.tile, tile) -
@@ -283,13 +285,16 @@ async function expectPhysicalMap(network: Locator, game: GameType) {
     expect(target.width).toBeGreaterThanOrEqual(44);
     expect(target.height).toBeGreaterThanOrEqual(44);
     if (!target.selected) {
-      expect(target.x).toBeGreaterThanOrEqual(viewport.x - target.width - 1);
+      // Artwork needs one hex of padding. The pan buffer allows another quarter
+      // hex at the last cull position and a quarter hex of camera travel.
+      const padding = 1.5 * target.width + 1;
+      expect(target.x).toBeGreaterThanOrEqual(viewport.x - padding);
       expect(target.x).toBeLessThanOrEqual(
-        viewport.x + viewport.width + target.width + 1,
+        viewport.x + viewport.width + padding,
       );
-      expect(target.y).toBeGreaterThanOrEqual(viewport.y - target.width - 1);
+      expect(target.y).toBeGreaterThanOrEqual(viewport.y - padding);
       expect(target.y).toBeLessThanOrEqual(
-        viewport.y + viewport.height + target.width + 1,
+        viewport.y + viewport.height + padding,
       );
     }
     expect(target.distance).toBe(String(view.visibilityDistance));

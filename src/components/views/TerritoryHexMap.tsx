@@ -58,7 +58,7 @@ import "./TerritoryMapWorkspace.scss";
 const TerritoryScene3D = React.lazy(
   () => import("../base/territory-3d/TerritoryScene3D"),
 );
-const PAN_OVERSCAN = HEX_WIDTH / 2;
+const PAN_OVERSCAN = HEX_WIDTH / 4;
 
 class MapSceneBoundary extends React.Component<
   { children: React.ReactNode; onError: () => void },

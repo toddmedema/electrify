@@ -382,6 +382,11 @@ function TileNetwork(props: Props) {
                 : undefined
           }
           building={building && !desktopRail}
+          initialFocusSelector={
+            building && desktopRail && railSite === tile.id
+              ? ".desktopBuildRail"
+              : undefined
+          }
           onClose={close}
         >
           {building && desktopRail ? (

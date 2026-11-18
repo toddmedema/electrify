@@ -11,6 +11,7 @@ export default function TileWorkspaceSurface({
   subtitle,
   building,
   projectCandidate,
+  initialFocusSelector,
   returnFocusSelector = ".territoryMapBuyToggle",
   onClose,
   children,
@@ -21,6 +22,7 @@ export default function TileWorkspaceSurface({
   subtitle?: string;
   building?: boolean;
   projectCandidate?: boolean;
+  initialFocusSelector?: string;
   returnFocusSelector?: string;
   onClose: () => void;
   children: React.ReactNode;
@@ -42,8 +44,13 @@ export default function TileWorkspaceSurface({
     };
   }, [returnFocusSelector]);
   React.useLayoutEffect(() => {
-    heading.current?.focus({ preventScroll: true });
-  }, [focusKey]);
+    const target = initialFocusSelector
+      ? heading.current
+          ?.closest(".territoryNetwork")
+          ?.querySelector<HTMLElement>(initialFocusSelector)
+      : undefined;
+    (target ?? heading.current)?.focus({ preventScroll: true });
+  }, [focusKey, initialFocusSelector]);
   return (
     <section
       role="dialog"
