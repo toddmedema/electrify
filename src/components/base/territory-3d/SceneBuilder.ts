@@ -1,15 +1,17 @@
 import type {
+  FacilityOperatingType,
   FuelNameType,
   TerrainType,
   TerritoryTileId,
 } from "../../../Types";
+import { isStorage } from "../../../Types";
 import type { TerritoryTileDefinition } from "../../../data/TerritoryTiles";
 import type { TerritoryTileView } from "../../../helpers/TerritoryMapState";
 import {
   facilityMapStatus,
   facilityOperatingStatus,
 } from "../FacilityMapStatus";
-import { riverPorts } from "../TerritoryHexGeometry";
+import { HEX_NEIGHBORS, riverPorts } from "../TerritoryHexGeometry";
 import type { HexWire } from "../TerritoryHexGeometry";
 import { MeshBuilder } from "./MeshBuilder";
 import { PALETTE } from "./Palette";
@@ -19,6 +21,7 @@ import { HEX_WIDTH } from "../TerritoryHexGeometry";
 import type {
   MapInstance,
   MapModel,
+  ModelPart,
   MapFrame,
   MapWireConnection,
   StructureKind,
@@ -26,13 +29,15 @@ import type {
   Vec3,
 } from "./Types";
 
+import { WATERSHED_LEVEL_OFFSETS, waterLevelOffset } from "./WaterSurface";
+
 export type ScenePicker = (point: {
   x: number;
   y: number;
 }) => TerritoryTileId | undefined;
 type PickFrame = Pick<
   MapFrame,
-  "width" | "height" | "cameraX" | "cameraY" | "scale"
+  "width" | "height" | "cameraX" | "cameraY" | "scale" | "weather"
 >;
 interface TileScene {
   tile: TerritoryTileDefinition;
@@ -40,6 +45,38 @@ interface TileScene {
   terrain: MapInstance;
   model?: MapModel;
   structure?: MapInstance;
+}
+
+function waterRange(part: ModelPart) {
+  return part.material === "watershed-water"
+    ? WATERSHED_LEVEL_OFFSETS
+    : part.waterLevelRange;
+}
+
+function fillFraction(
+  stored: number | undefined,
+  capacity: number | undefined,
+) {
+  if (
+    stored === undefined ||
+    !Number.isFinite(stored) ||
+    capacity === undefined ||
+    !Number.isFinite(capacity) ||
+    capacity <= 0
+  )
+    return undefined;
+  return Math.max(0, Math.min(1, stored / capacity));
+}
+
+function reservoirFill(facility?: FacilityOperatingType) {
+  if (!facility) return undefined;
+  if (isStorage(facility))
+    return facility.name === "Pumped Hydro"
+      ? fillFraction(facility.currentWh, facility.peakWh)
+      : undefined;
+  return facility.fuel === "Hydro"
+    ? fillFraction(facility.reservoirWh, facility.reservoirCapacityWh)
+    : undefined;
 }
 
 const pickBounds = new WeakMap<MapModel, readonly number[]>();
@@ -50,7 +87,8 @@ function bounds(model: MapModel): readonly number[] {
   for (const part of model.parts) {
     if (part.motion === "steam") continue;
     const vertices = part.mesh.positions,
-      offset = part.position ?? [0, 0, 0];
+      offset = part.position ?? [0, 0, 0],
+      [empty, full] = waterRange(part) ?? [0, 0];
     for (let i = 0; i < vertices.length; i += 3) {
       const radius =
         part.motion === "rotor" || part.motion === "sway"
@@ -61,11 +99,13 @@ function bounds(model: MapModel): readonly number[] {
         y0 =
           offset[1] +
           (radius === undefined ? vertices[i + 1] : -radius) -
-          (part.motion === "flow" ? 0.018 : 0),
+          (part.motion === "flow" ? 0.018 : 0) +
+          Math.min(empty, full),
         y1 =
           offset[1] +
           (radius === undefined ? vertices[i + 1] : radius) +
-          (part.motion === "flow" ? 0.018 : 0),
+          (part.motion === "flow" ? 0.018 : 0) +
+          Math.max(empty, full),
         z = offset[2] + vertices[i + 2];
       value[0] = Math.min(value[0], x0);
       value[1] = Math.max(value[1], x1);
@@ -158,6 +198,7 @@ export class SceneBuilder {
   private wireKey?: string;
   private wireModels: MapInstance[] = [];
   private tiles?: readonly TerritoryTileDefinition[];
+  private terrainAt = new Map<string, TerrainType>();
   private cells = new Map<string, TileScene>();
   private instances: MapInstance[] = [];
   constructor(private factories: ModelFactories) {}
@@ -171,6 +212,9 @@ export class SceneBuilder {
   ): MapInstance[] {
     if (allTiles !== this.tiles) {
       this.tiles = allTiles;
+      this.terrainAt = new Map(
+        allTiles.map(({ q, r, terrain }) => [`${q},${r}`, terrain]),
+      );
       this.cells.clear();
       this.wireKey = undefined;
     }
@@ -192,6 +236,23 @@ export class SceneBuilder {
       ) {
         const model = kind ? this.factories.structure(kind) : undefined;
         const position = tilePosition3D(tile);
+        const terrain = this.factories.terrain(tile.terrain, {
+          footprint: model?.footprint ?? 0,
+          ports:
+            tile.terrain === "river" ? riverPorts(tile, allTiles) : undefined,
+          ...(tile.terrain === "mountain" || tile.terrain === "forest"
+            ? {
+                adjacentEdges: HEX_NEIGHBORS.reduce(
+                  (edges, [dq, dr], edge) =>
+                    this.terrainAt.get(`${tile.q + dq},${tile.r + dr}`) ===
+                    tile.terrain
+                      ? edges | (1 << edge)
+                      : edges,
+                  0,
+                ),
+              }
+            : {}),
+        });
         cell = {
           tile,
           kind,
@@ -201,18 +262,12 @@ export class SceneBuilder {
             position,
             fog: view.visibilityDistance,
             active: false,
-            model: this.factories.terrain(tile.terrain, {
-              footprint: model?.footprint ?? 0,
-              ports:
-                tile.terrain === "river"
-                  ? riverPorts(tile, allTiles)
-                  : undefined,
-            }),
+            model: terrain,
           },
           structure: model
             ? {
                 id: `structure:${tile.id}`,
-                position,
+                position: [position[0], terrain.supportY ?? 0, position[2]],
                 fog: view.visibilityDistance,
                 active: false,
                 model,
@@ -221,7 +276,7 @@ export class SceneBuilder {
         };
         this.cells.set(tile.id, cell);
       }
-      const position = cell.terrain.position;
+      const position = cell.structure?.position ?? cell.terrain.position;
       const model = cell.model;
       if (model) models.set(tile.id, model);
       positions.set(tile.id, position);
@@ -239,11 +294,15 @@ export class SceneBuilder {
         motionKey = view.operatingFacility
           ? `${runKey}:facility:${view.operatingFacility.id}`
           : undefined;
+      const waterLevel = tile.city
+        ? undefined
+        : reservoirFill(view.operatingFacility);
       if (
         cell.structure?.model !== displayedModel ||
         cell.structure.active !== active ||
         cell.structure.producing !== producing ||
-        cell.structure.motionKey !== motionKey
+        cell.structure.motionKey !== motionKey ||
+        cell.structure.waterLevel !== waterLevel
       )
         cell.structure = {
           id: `structure:${tile.id}`,
@@ -253,6 +312,7 @@ export class SceneBuilder {
           active,
           producing,
           motionKey,
+          waterLevel,
         };
       instances.push(cell.structure);
     }
@@ -404,7 +464,17 @@ export class SceneBuilder {
               : part.motion === "sway"
                 ? Math.sin(phase) * 0.045
                 : 0,
-          rise = part.motion === "flow" ? Math.sin(phase) * 0.018 : 0,
+          range = waterRange(part),
+          rise =
+            (part.motion === "flow" ? Math.sin(phase) * 0.018 : 0) +
+            (range
+              ? waterLevelOffset(
+                  range,
+                  part.material === "watershed-water"
+                    ? frame.weather?.waterLevel
+                    : instance.waterLevel,
+                )
+              : 0),
           c = Math.cos(angle),
           s = Math.sin(angle),
           offset = part.position ?? [0, 0, 0],

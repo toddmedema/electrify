@@ -425,10 +425,10 @@ it("keeps unaffordable tiles inspectable without spending", () => {
   expect(store.getState().game.territoryNetwork!.tilePurchases).toHaveLength(0);
 });
 
-it("reveals purchased cities as customers rather than build destinations", () => {
+it("shows purchased cities as customers rather than build destinations", () => {
   let game = ready();
   const target = territoryTileViews(game).find(
-    ({ tile, owned, ownerKey }) => !!tile.city && !owned && !ownerKey,
+    ({ tile }) => tile.id === "parcel-1:city",
   )!.tile;
   const distance = (tile: typeof target) =>
     Math.max(

@@ -1,6 +1,7 @@
 import { STORAGE } from "../../../data/Facilities";
 import { createGame } from "../../../testing/Simulator";
 import { territoryTileViews } from "../../../helpers/TerritoryMapState";
+import { isStorage } from "../../../Types";
 import type { StorageOperatingType } from "../../../Types";
 import * as facilityStatus from "../FacilityMapStatus";
 import type { TerritoryTileView } from "../../../helpers/TerritoryMapState";
@@ -140,6 +141,40 @@ test("conductors use elevated real terminals and retain mesh identity across unr
   ]);
 });
 
+test("mountain pylons stand on the raised summit pad and lift nearby wire terminals", () => {
+  const peak = {
+    ...view(),
+    tile: { ...view().tile, terrain: "mountain" as const },
+  };
+  const foothill = view(1);
+  const views = [peak, foothill];
+  const tiles = views.map(({ tile }) => tile);
+  const builder = new SceneBuilder({
+    terrain: getTerrainModel,
+    structure: getStructureModel,
+  });
+  const frames = builder.build(
+    views,
+    tiles,
+    hexWires(tiles, () => true),
+    0,
+    "run",
+  );
+  const mountain = frames.find(
+    (frame) => frame.id === `terrain:${peak.tile.id}`,
+  )!;
+  const tower = frames.find(
+    (frame) => frame.id === `structure:${peak.tile.id}`,
+  )!;
+  const [wire] = frames.find((frame) => frame.id === "wires:0")!.model
+    .connections!;
+  expect(tower.position[1]).toBeGreaterThan(0.6);
+  expect(tower.position[1]).toBe(mountain.model.supportY);
+  expect(tower.position[1]).toBeCloseTo(mountain.model.height);
+  expect(wire.start[1] - wire.end[1]).toBeCloseTo(tower.position[1]);
+  expect(wire.lowY).toBeGreaterThan(0.2);
+});
+
 test("frontier conductors carry their actual origin and bounds for viewport culling", () => {
   const views = [view(40), view(41)];
   views[1] = {
@@ -230,7 +265,17 @@ test("real mountain relief picks its own tile above the neighboring ground hex",
     terrain: getTerrainModel,
     structure: getStructureModel,
   });
-  const peak = projectPoint([-0.035, 0.34, -0.455], pickFrame);
+  const relief = getTerrainModel("mountain").parts[1].mesh.positions;
+  let face = 0;
+  for (let i = 9; i < relief.length; i += 9) {
+    const highest = (start: number) =>
+      Math.max(relief[start + 1], relief[start + 4], relief[start + 7]);
+    if (highest(i) > highest(face)) face = i;
+  }
+  const centroid = (axis: number) =>
+    (relief[face + axis] + relief[face + axis + 3] + relief[face + axis + 6]) /
+    3;
+  const peak = projectPoint([centroid(0), centroid(1), centroid(2)], pickFrame);
   for (const views of [
     [mountain, north],
     [north, mountain],
@@ -408,40 +453,76 @@ it("keeps the operating base lit when a separate map badge reports construction"
   }
 });
 
-it("animates charging storage without claiming production", () => {
+it.each(["Battery", "Pumped Hydro"] as const)(
+  "animates charging %s without claiming production",
+  (technology) => {
+    const { builder } = setup();
+    const { game, view } = operatingView();
+    game.date.year = 2025;
+    const quote = STORAGE(
+      { ...game, location: { ...game.location, id: "Boston" } },
+      100e6,
+    ).find((quote) => quote.name === technology)!;
+    expect(quote).toBeDefined();
+    const facility: StorageOperatingType = {
+      ...quote,
+      id: 500,
+      currentW: -20e6,
+      currentWh: 50e6,
+      yearsToBuildLeft: 0,
+      minuteCreated: 0,
+      loanAmountTotal: 0,
+      loanAmountLeft: 0,
+      loanMonthlyPayment: 0,
+      interestRate: 0,
+      lifetimeWh: 0,
+      lifetimePotentialWh: 0,
+      lifetimeRevenue: 0,
+      lifetimeExpenses: 0,
+    };
+    const tile: TerritoryTileView = {
+      ...view,
+      facility,
+      operatingFacility: facility,
+    };
+    const tiles = [view.tile];
+    const charging = builder.build([tile], tiles, [], 0, "run");
+    expect(charging[1]).toMatchObject({ active: true, producing: false });
+    expect(charging[1].waterLevel).toBe(
+      technology === "Pumped Hydro" ? 50e6 / facility.peakWh : undefined,
+    );
+    facility.currentW = 20e6;
+    facility.currentWh = 20e6;
+    const discharging = builder.build([tile], tiles, [], 1, "run");
+    expect(discharging[1]).toMatchObject({ active: true, producing: true });
+    expect(discharging[1]).not.toBe(charging[1]);
+    expect(discharging[1].motionKey).toBe(charging[1].motionKey);
+    expect(discharging[1].waterLevel).toBe(
+      technology === "Pumped Hydro" ? 20e6 / facility.peakWh : undefined,
+    );
+  },
+);
+
+it("follows the conventional hydro reservoir without rebuilding the terrain", () => {
   const { builder } = setup();
-  const { game, view } = operatingView();
-  game.date.year = 2025;
-  const quote = STORAGE(game, 100e6).find((quote) => quote.name === "Battery")!;
-  const facility: StorageOperatingType = {
-    ...quote,
-    id: 500,
-    currentW: -20e6,
-    currentWh: 50e6,
-    yearsToBuildLeft: 0,
-    minuteCreated: 0,
-    loanAmountTotal: 0,
-    loanAmountLeft: 0,
-    loanMonthlyPayment: 0,
-    interestRate: 0,
-    lifetimeWh: 0,
-    lifetimePotentialWh: 0,
-    lifetimeRevenue: 0,
-    lifetimeExpenses: 0,
+  const { view, facility } = operatingView();
+  if (isStorage(facility)) throw new Error("Expected a starting generator");
+  const hydro = {
+    ...facility,
+    fuel: "Hydro" as const,
+    reservoirCapacityWh: 100,
+    reservoirWh: 27,
   };
-  const tile: TerritoryTileView = {
-    ...view,
-    facility,
-    operatingFacility: facility,
-  };
-  const tiles = [view.tile];
-  const charging = builder.build([tile], tiles, [], 0, "run");
-  expect(charging[1]).toMatchObject({ active: true, producing: false });
-  facility.currentW = 20e6;
-  const discharging = builder.build([tile], tiles, [], 1, "run");
-  expect(discharging[1]).toMatchObject({ active: true, producing: true });
-  expect(discharging[1]).not.toBe(charging[1]);
-  expect(discharging[1].motionKey).toBe(charging[1].motionKey);
+  const tile = { ...view, facility: hydro, operatingFacility: hydro };
+  const tiles = [tile.tile];
+  const build = () => builder.build([tile], tiles, [], 0, "run");
+  const low = build();
+  expect(low[1].waterLevel).toBe(0.27);
+  hydro.reservoirWh = 80;
+  const high = build();
+  expect(high[1].waterLevel).toBe(0.8);
+  expect(high[0]).toBe(low[0]);
+  expect(high[1].model).toBe(low[1].model);
 });
 
 it("leaves city activity unknown even when an unrelated facility is present in its view", () => {

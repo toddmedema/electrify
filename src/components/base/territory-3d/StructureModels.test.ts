@@ -369,8 +369,12 @@ it("builds three identical equally spaced tilted blue solar rows on grounded sup
 });
 
 it("gives hydro raised reservoir water, a low downstream spillway, and a bowed thick crest", () => {
-  const mesh = getStructureModel("hydro").parts[0].mesh;
-  const reservoir = coloredVertices(mesh, PALETTE.water);
+  const { parts } = getStructureModel("hydro");
+  const mesh = parts[0].mesh;
+  const reservoir = coloredVertices(
+    parts.find(({ material }) => material === "water")!.mesh,
+    PALETTE.water,
+  );
   const spillway = coloredVertices(mesh, PALETTE.deepWater);
   expect(Math.min(...reservoir.map((v) => v[1]))).toBeGreaterThan(0.25);
   expect(Math.min(...spillway.map((v) => v[1]))).toBeLessThan(0.08);

@@ -1,7 +1,13 @@
 import { HEX_WIDTH } from "../TerritoryHexGeometry";
 import { interpolateMapLighting } from "./Lighting";
 import { FacilityMotionClock, MOTION_CYCLE } from "./MotionClock";
-import { projectPoint, projectionMatrix } from "./Projection";
+import {
+  CAMERA_COS,
+  CAMERA_SIN,
+  projectPoint,
+  projectionMatrix,
+} from "./Projection";
+import { WATERSHED_LEVEL_OFFSETS, waterLevelOffset } from "./WaterSurface";
 import { rotorAngle } from "./RotorPose";
 import type {
   MapCanvas,
@@ -32,12 +38,18 @@ layout(location=8) in vec4 aMaterial;
 uniform mat4 uProjection;
 uniform vec3 uLight;
 uniform bool uShadow;
+uniform vec4 uWeather;
 out vec3 vNormal;
 out vec3 vColor;
 out vec4 vStyle;
-out vec2 vMaterial;
+flat out vec3 vMaterial;
+out vec3 vSurfacePosition;
 void main() {
   vec4 world = aTransform * vec4(aPosition, 1.0);
+  if (aMaterial.z == 2.0) {
+    world.y += mix(${WATERSHED_LEVEL_OFFSETS[0]}, ${WATERSHED_LEVEL_OFFSETS[1]}, uWeather.z);
+  }
+  vSurfacePosition = world.xyz;
   if (uShadow) {
     vec2 reach = -uLight.xz * max(0.0, world.y - 0.003) / max(0.25, uLight.y);
     float distance = length(reach);
@@ -49,15 +61,18 @@ void main() {
   vNormal = normalize(mat3(aTransform) * aNormal);
   vColor = aColor;
   vStyle = aStyle;
-  vMaterial = aMaterial.xy;
+  vMaterial = aMaterial.xyz;
 }`;
 const FRAGMENT = `#version 300 es
 precision highp float;
 in vec3 vNormal;
 in vec3 vColor;
 in vec4 vStyle;
-in vec2 vMaterial;
+flat in vec3 vMaterial;
+in vec3 vSurfacePosition;
 uniform vec3 uLight;
+uniform vec3 uWaterHalfVector;
+uniform vec4 uWeather;
 uniform vec3 uLightColor;
 uniform vec3 uBackground;
 uniform float uAmbient;
@@ -70,11 +85,30 @@ void main() {
     color = vec4(0.08, 0.13, 0.17, uShadowAlpha * (1.0 - fog * 0.65));
     return;
   }
-  float incidence = max(0.0, dot(normalize(vNormal), uLight));
+  vec3 normal = normalize(vNormal);
+  float incidence = max(0.0, dot(normal, uLight));
   float band = incidence < 0.25 ? 0.48 : (incidence < 0.7 ? 0.76 : 1.0);
   vec3 base = mix(vColor, vec3(1.0, 0.71, 0.32), vMaterial.x);
+  if (vMaterial.z == 3.0) {
+    float snowLine = mix(0.96, 0.29, uWeather.w);
+    float cap = smoothstep(snowLine, snowLine + 0.13, vSurfacePosition.y);
+    // Snow clings more strongly to shoulders than to steep rock faces.
+    base = mix(base, vec3(0.88, 0.93, 0.98),
+      cap * smoothstep(0.0, 0.18, uWeather.w) * (0.52 + 0.48 * normal.y));
+  }
   vec3 lit = base * (uAmbient + (1.0 - uAmbient) * band);
   lit *= mix(vec3(1.0), uLightColor, 0.65);
+  if (vMaterial.z == 1.0 || vMaterial.z == 2.0) {
+    // A bounded sky tint and broad glint, with the normal shadow pass laid over both.
+    float cloud = uWeather.x;
+    vec3 sky = mix(uLightColor * uAmbient, uBackground, 0.35 + cloud * 0.35);
+    float ripple = sin(dot(vSurfacePosition.xz, vec2(17.0, 43.0)));
+    float gloss = clamp(dot(normal, uWaterHalfVector) + ripple * (0.03 + 0.06 * uWeather.y), 0.0, 1.0);
+    float glossSquared = gloss * gloss;
+    float glint = glossSquared * glossSquared;
+    glint *= glint;
+    lit = mix(lit, sky, 0.15) + uLightColor * glint * mix(0.16, 0.028, cloud);
+  }
   lit += base * (vStyle.z + vMaterial.x * 0.42);
   lit *= vMaterial.y;
   float saturation = vStyle.w;
@@ -119,6 +153,8 @@ type Uniforms = Record<
   | "projection"
   | "light"
   | "lightColor"
+  | "weather"
+  | "waterHalfVector"
   | "background"
   | "ambient"
   | "shadowAlpha"
@@ -134,6 +170,7 @@ export class MapRenderer {
   private meshes = new Map<MapMesh, GpuMesh>();
   private passes = emptyPasses();
   private motionItems: RenderItem[] = [];
+  private waterBatches: Batch[] = [];
   private projection: Float32Array = new Float32Array(16);
   private instances: readonly MapInstance[] = [];
   private frame: MapFrame | undefined;
@@ -181,14 +218,18 @@ export class MapRenderer {
     const previous = this.frame;
     const instancesChanged = this.instances !== instances;
     const scene = this.sceneFrame;
-    const sceneChanged =
-      instancesChanged ||
+    const viewChanged =
       !scene ||
       scene.width !== frame.width ||
       scene.height !== frame.height ||
       scene.scale !== frame.scale ||
       Math.abs(scene.cameraX - frame.cameraX) >= CAMERA_OVERSCAN ||
       Math.abs(scene.cameraY - frame.cameraY) >= CAMERA_OVERSCAN;
+    const waterOnly =
+      instancesChanged &&
+      !viewChanged &&
+      this.state === "ready" &&
+      this.updateReservoirLevels(instances);
     this.instances = instances;
     this.frame = frame;
     const duration = frame.motionAllowed
@@ -206,8 +247,12 @@ export class MapRenderer {
       this.lightingTransition = undefined;
     }
     this.projection = projectionMatrix(frame);
-    if (instancesChanged) this.clock.sync(instances);
-    if (this.state === "ready" && sceneChanged) this.buildScene();
+    if (instancesChanged && !waterOnly) this.clock.sync(instances);
+    if (
+      this.state === "ready" &&
+      (viewChanged || (instancesChanged && !waterOnly))
+    )
+      this.buildScene();
     if (!this.canAnimate()) this.clock.resetTimestamp();
     if (this.isVisible()) this.schedule();
     else this.cancelFrame();
@@ -240,31 +285,43 @@ export class MapRenderer {
   private sceneDiagnostics(): RendererSceneInstance[] {
     // Inspect the submitted passes, including their actual fog/pose data. This never rebuilds
     // the scene or reads game state, and the ordinary cheap sample never scans these vertices.
-    const instances = new Map<MapInstance, RenderItem[]>();
+    const instances = new Map<string, RenderItem[]>();
     for (const batch of [
       ...this.passes.receivers,
       ...this.passes.opaque,
       ...this.passes.transparent,
     ])
       for (const item of batch.items) {
-        const items = instances.get(item.instance) ?? [];
+        const items = instances.get(item.instance.id) ?? [];
         items.push(item);
-        instances.set(item.instance, items);
+        instances.set(item.instance.id, items);
       }
-    return Array.from(instances, ([instance, items]) => {
+    return Array.from(instances.values(), (items) => {
+      const { instance } = items[0];
       const min: [number, number, number] = [Infinity, Infinity, Infinity],
         max: [number, number, number] = [-Infinity, -Infinity, -Infinity];
       let triangles = 0;
+      const waterSurfaceY: number[] = [];
       for (const { part, pose } of items) {
         const vertices = part.mesh.positions;
         triangles += vertices.length / 9;
+        const watershed = part.material === "watershed-water";
+        const surfaceOffset = watershed
+          ? waterLevelOffset(
+              WATERSHED_LEVEL_OFFSETS,
+              this.frame?.weather?.waterLevel,
+            )
+          : 0;
+        if (watershed || part.material === "water")
+          waterSurfaceY.push(pose[13] + vertices[1] + surfaceOffset);
         for (let i = 0; i < vertices.length; i += 3)
           for (let axis = 0; axis < 3; axis++) {
             const value =
               pose[axis] * vertices[i] +
               pose[axis + 4] * vertices[i + 1] +
               pose[axis + 8] * vertices[i + 2] +
-              pose[axis + 12];
+              pose[axis + 12] +
+              (axis === 1 ? surfaceOffset : 0);
             min[axis] = Math.min(min[axis], value);
             max[axis] = Math.max(max[axis], value);
           }
@@ -281,6 +338,7 @@ export class MapRenderer {
         triangles,
         min,
         max,
+        ...(waterSurfaceY.length ? { waterSurfaceY } : {}),
         ...(instance.model.connections
           ? {
               connections: instance.model.connections.map((wire) => ({
@@ -359,6 +417,8 @@ export class MapRenderer {
         projection: gl.getUniformLocation(program, "uProjection"),
         light: gl.getUniformLocation(program, "uLight"),
         lightColor: gl.getUniformLocation(program, "uLightColor"),
+        weather: gl.getUniformLocation(program, "uWeather"),
+        waterHalfVector: gl.getUniformLocation(program, "uWaterHalfVector"),
         background: gl.getUniformLocation(program, "uBackground"),
         ambient: gl.getUniformLocation(program, "uAmbient"),
         shadowAlpha: gl.getUniformLocation(program, "uShadowAlpha"),
@@ -514,6 +574,45 @@ export class MapRenderer {
     }
   }
 
+  private updateReservoirLevels(instances: readonly MapInstance[]): boolean {
+    if (instances.length !== this.instances.length) return false;
+    const updates = new Map<string, MapInstance>();
+    for (let index = 0; index < instances.length; index++) {
+      const previous = this.instances[index];
+      const next = instances[index];
+      if (previous === next) continue;
+      if (
+        previous.id !== next.id ||
+        previous.model !== next.model ||
+        previous.position !== next.position ||
+        previous.fog !== next.fog ||
+        previous.active !== next.active ||
+        previous.producing !== next.producing ||
+        previous.motionKey !== next.motionKey
+      )
+        return false;
+      if (previous.waterLevel !== next.waterLevel) updates.set(next.id, next);
+    }
+    if (updates.size === 0) return true;
+
+    // Keep the static geometry and its GPU buffers when only reservoir fill changes.
+    for (const batch of this.waterBatches) {
+      let data: Float32Array | undefined;
+      for (let index = 0; index < batch.items.length; index++) {
+        const item = batch.items[index];
+        if (!item.part.waterLevelRange) continue;
+        const updated = updates.get(item.instance.id);
+        if (!updated) continue;
+        item.instance = updated;
+        this.pose(item);
+        data ??= batch.data.slice();
+        data.set(item.pose, index * INSTANCE_FLOATS);
+      }
+      if (data) batch.data = data;
+    }
+    return true;
+  }
+
   private buildScene(): void {
     if (!this.frame || !this.gl) return;
     const frame = this.frame;
@@ -526,6 +625,7 @@ export class MapRenderer {
       transparent: new Map<GpuMesh, RenderItem[]>(),
     };
     this.motionItems = [];
+    this.waterBatches = [];
     this.sceneInstanceCount = 0;
     try {
       for (const instance of this.instances) {
@@ -592,6 +692,8 @@ export class MapRenderer {
             ),
             revision: this.poseRevision,
           };
+          if (items.some((item) => item.part.waterLevelRange))
+            this.waterBatches.push(batch);
           candidates.push(batch);
           shared.set(mesh, candidates);
           return batch;
@@ -652,12 +754,18 @@ export class MapRenderer {
     pose[10] = scale;
     pose[15] = 1;
     pose[12] = instance.position[0] + (part.position?.[0] ?? 0);
-    pose[13] = instance.position[1] + (part.position?.[1] ?? 0) + rise;
+    const waterOffset = part.waterLevelRange
+      ? waterLevelOffset(part.waterLevelRange, instance.waterLevel)
+      : 0;
+    pose[13] =
+      instance.position[1] + (part.position?.[1] ?? 0) + rise + waterOffset;
     pose[14] = instance.position[2] + (part.position?.[2] ?? 0);
     pose[16] = FOG_MIX[instance.fog];
     pose[17] = alpha;
     pose[18] = glow;
-    const facility = part.material !== undefined;
+    const facility =
+      part.material === "facility-surface" ||
+      part.material === "facility-window";
     // Fog still caps saturation outside the clear owned foreground.
     const saturation = facility
       ? instance.active
@@ -670,6 +778,14 @@ export class MapRenderer {
     pose[20] =
       part.material === "facility-window" && instance.producing ? 1 : 0;
     pose[21] = facility && instance.active ? 1.06 : 1;
+    pose[22] =
+      part.material === "water"
+        ? 1
+        : part.material === "watershed-water"
+          ? 2
+          : part.material === "mountain"
+            ? 3
+            : 0;
   }
 
   private draw(moving: boolean, lighting: MapLighting): void {
@@ -707,6 +823,23 @@ export class MapRenderer {
     gl.uniformMatrix4fv(uniforms.projection, false, this.projection);
     gl.uniform3f(uniforms.light, ...lighting.direction);
     gl.uniform3f(uniforms.lightColor, ...lighting.color);
+    gl.uniform4f(
+      uniforms.weather,
+      frame.weather?.cloud ?? 0,
+      frame.weather?.wind ?? 0,
+      frame.weather?.waterLevel ?? 0.5,
+      frame.weather?.snowpack ?? 0,
+    );
+    const [lx, ly, lz] = lighting.direction;
+    const halfY = ly + CAMERA_SIN,
+      halfZ = lz + CAMERA_COS;
+    const halfLength = Math.hypot(lx, halfY, halfZ) || 1;
+    gl.uniform3f(
+      uniforms.waterHalfVector,
+      lx / halfLength,
+      halfY / halfLength,
+      halfZ / halfLength,
+    );
     gl.uniform3f(uniforms.background, ...frame.background);
     gl.uniform1f(uniforms.ambient, lighting.ambient);
     gl.uniform1f(uniforms.shadowAlpha, lighting.shadow);
@@ -806,5 +939,6 @@ export class MapRenderer {
     this.uniforms = undefined;
     this.passes = emptyPasses();
     this.motionItems = [];
+    this.waterBatches = [];
   }
 }

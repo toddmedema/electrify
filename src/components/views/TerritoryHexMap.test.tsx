@@ -477,9 +477,9 @@ it.each([1280, 360])(
     expect(map.target(id).style.left).toBe(position.left);
     expect(map.target(id).style.top).toBe(position.top);
     expect(map.stage.style.transform).toBe(camera);
-    expect(
-      territoryTileViews(map.store.getState().game).length,
-    ).toBeGreaterThan(initialCount);
+    expect(territoryTileViews(map.store.getState().game).length).toBe(
+      initialCount,
+    );
     expect(
       screen.getByRole("button", { name: "Rapid connection mode" }),
     ).toHaveAttribute("aria-pressed", "true");

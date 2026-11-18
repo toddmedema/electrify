@@ -58,8 +58,8 @@ The authored override map in `src/data/TerritoryTiles.ts` makes Champlain sites
 3 and 8 and Ridge site 10 form additional mountain ground to the east. Existing
 forest pockets, both western lake cells, river cells and inherited wind terrain
 remain. No water cell consumes an existing land reservation, and no ocean, hydro
-claim or geothermal resource is added. The generated frontier retains its
-versioned integer geography rather than extending a claim of researched local detail.
+claim or geothermal resource is added. A fixed border of versioned terrain
+cells rounds out the authored board.
 
 The authored cities represent Burlington on the lake side of the board, Winooski
 on the river to its northeast, and Williston to the southeast. Vergennes and
@@ -68,7 +68,7 @@ inland and Waterbury farther east. The
 [Vermont municipal map and population counts](https://outside.vermont.gov/dept/sos/Services/LAB/LAB%20Senate%20Map%20FINAL%20SMD%202021%201129.pdf)
 guide relative placement and the small, medium, and large artwork tiers. The
 utilities retain their fictional service-area customer totals and their existing
-location metadata. The procedurally generated frontier uses generic settlements.
+location metadata. The four smaller settlements each have a local utility and neighboring generation.
 
 ## Authored portfolios and historical references
 

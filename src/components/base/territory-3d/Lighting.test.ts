@@ -71,3 +71,14 @@ it.each(["polar-day", "polar-night"] as const)(
     );
   },
 );
+
+it("softens shadows as a cloud deck builds without moving the sun", () => {
+  const clear = mapLighting(day);
+  const scattered = mapLighting({ ...day, cloud: 0.65 });
+  const overcast = mapLighting({ ...day, cloud: 1 });
+  expect(overcast.direction).toEqual(clear.direction);
+  expect(clear.shadow).toBeGreaterThan(scattered.shadow);
+  expect(scattered.shadow).toBeGreaterThan(overcast.shadow);
+  expect(overcast.color[0]).toBeLessThan(clear.color[0]);
+  expect(overcast.ambient).toBeGreaterThan(clear.ambient);
+});

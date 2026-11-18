@@ -16,6 +16,7 @@ import {
 } from "../data/Territories";
 import {
   TERRITORY_TILES,
+  VALLEY_BOARD,
   getAuthoredTerritoryTile,
   getGeneratedTerritoryTile,
   territoryTileAt,
@@ -471,7 +472,36 @@ export function visibleTerritoryTiles(game: TileGame): VisibleTerritoryTile[] {
   }
   return [...result.values()];
 }
-/** Finite catalogue: authored cells, retained placements and the currently discovered frontier. */
+/** The scenario board is visible immediately. Retained sites outside it keep their footprints. */
+export function scenarioMapTiles(game: TileGame): VisibleTerritoryTile[] {
+  const key = ({ q, r }: TerritoryTileDefinition) => `${q},${r}`;
+  const owned = ownedTerritoryTiles(game);
+  const mapped = new Map(VALLEY_BOARD.map((tile) => [key(tile), tile]));
+  for (const tile of retainedTerritoryTiles(game)) mapped.set(key(tile), tile);
+  for (const tile of connectedPeerTerritoryTiles(game))
+    mapped.set(key(tile), tile);
+  for (const tile of owned) mapped.set(key(tile), tile);
+
+  const distances = new Map<string, 0 | 1 | 2>();
+  for (const anchor of owned)
+    for (let dq = -2; dq <= 2; dq++)
+      for (let dr = Math.max(-2, -dq - 2); dr <= Math.min(2, -dq + 2); dr++) {
+        const coordinate = `${anchor.q + dq},${anchor.r + dr}`;
+        const distance = Math.max(
+          Math.abs(dq),
+          Math.abs(dr),
+          Math.abs(dq + dr),
+        ) as 0 | 1 | 2;
+        if (distance < (distances.get(coordinate) ?? 3))
+          distances.set(coordinate, distance);
+      }
+  return Array.from(mapped, ([coordinate, tile]) => ({
+    tile,
+    visibilityDistance: distances.get(coordinate) ?? 3,
+  }));
+}
+
+/** Catalogue for the current scenario, including previously retained placements. */
 export function getTerritoryTiles(
   game?: TileGame,
 ): readonly TerritoryTileDefinition[] {
@@ -481,7 +511,7 @@ export function getTerritoryTiles(
       [
         ...TERRITORY_TILES,
         ...legacyTerritoryTiles(game),
-        ...visibleTerritoryTiles(game).map(({ tile }) => tile),
+        ...scenarioMapTiles(game).map(({ tile }) => tile),
       ].map((tile) => [tile.id, tile]),
     ).values(),
   ];

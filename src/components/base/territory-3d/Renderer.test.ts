@@ -3,6 +3,7 @@ import { MeshBuilder } from "./MeshBuilder";
 import { MapRenderer } from "./Renderer";
 import { projectPoint } from "./Projection";
 import { getStructureModel } from "./StructureModels";
+import { getTerrainModel } from "./TerrainModels";
 import type { MapCanvas, MapFrame, MapInstance, MapModel, Vec3 } from "./Types";
 
 function mockContext() {
@@ -66,6 +67,7 @@ function mockContext() {
     useProgram: jest.fn(),
     uniformMatrix4fv: jest.fn(),
     uniform3f: jest.fn(),
+    uniform4f: jest.fn(),
     uniform1f: jest.fn(),
     uniform1i: jest.fn(),
     enable: jest.fn(),
@@ -666,5 +668,102 @@ it("retains the motion phase while charging switches to discharge and materials 
   expect(renderer.diagnostics().phases["facility-0"]).toBeCloseTo(
     phase + (0.7 * Math.PI * 2) / 8,
   );
+  renderer.dispose();
+});
+
+it("raises river and lake water in the same draw passes when the watershed gets wetter", () => {
+  const { renderer, gl } = setup();
+  const instances: MapInstance[] = (["lake", "river", "ocean"] as const).map(
+    (kind, index) => ({
+      id: kind,
+      model: getTerrainModel(kind),
+      position: [index, 0, 0],
+      active: false,
+      fog: 0,
+    }),
+  );
+  const weather = {
+    rain: 0,
+    snowfall: 0,
+    cloud: 0.4,
+    wind: 0.25,
+    waterLevel: 0,
+    snowpack: 0.2,
+  };
+  renderer.update(instances, { ...frame, weather: weather });
+  flush(0);
+  const dry = renderer.diagnostics(true);
+  const surfaces = (stats: typeof dry) =>
+    stats.scene!.map(
+      ({ id, waterSurfaceY }) => [id, waterSurfaceY?.[0]] as const,
+    );
+  const dryLevels = Object.fromEntries(surfaces(dry));
+  expect(dryLevels.lake).toBeCloseTo(-0.045);
+  expect(dryLevels.river).toBeCloseTo(dryLevels.lake!);
+  expect(dryLevels.ocean).toBe(0);
+  expect(gl.uniform4f).toHaveBeenCalledWith(
+    { name: "uWeather" },
+    0.4,
+    0.25,
+    0,
+    0.2,
+  );
+
+  gl.bufferSubData.mockClear();
+  renderer.update(instances, {
+    ...frame,
+    weather: { ...weather, waterLevel: 1 },
+  });
+  flush(100);
+  const wet = renderer.diagnostics(true);
+  const wetLevels = Object.fromEntries(surfaces(wet));
+  expect(wetLevels.lake).toBeGreaterThan(dryLevels.lake! + 0.04);
+  expect(wetLevels.river).toBeCloseTo(wetLevels.lake!);
+  expect(wetLevels.ocean).toBe(dryLevels.ocean);
+  expect(wet.drawCalls).toBe(dry.drawCalls);
+  expect(gl.bufferSubData).not.toHaveBeenCalled();
+  expect(callbacks.size).toBe(0);
+  renderer.dispose();
+});
+
+it("raises real Hydro and upper Pumped Hydro water while lowering the lower basin", () => {
+  const { renderer, gl } = setup();
+  const instances: MapInstance[] = (["hydro", "pumped-hydro"] as const).map(
+    (kind, index) => ({
+      id: kind,
+      model: getStructureModel(kind),
+      position: [index, 0, 0],
+      active: false,
+      fog: 0,
+      waterLevel: 0,
+    }),
+  );
+  const staticTiles = scene(false);
+  renderer.update([...staticTiles, ...instances], frame);
+  flush(0);
+  const water = () =>
+    renderer
+      .diagnostics(true)
+      .scene!.flatMap(({ waterSurfaceY }) =>
+        waterSurfaceY ? [waterSurfaceY] : [],
+      );
+  const empty = water();
+  expect(empty.map((surfaces) => surfaces.length)).toEqual([1, 2]);
+
+  gl.bufferSubData.mockClear();
+  const filled = instances.map((instance) => ({ ...instance, waterLevel: 1 }));
+  renderer.update([...staticTiles, ...filled], frame);
+  flush(100);
+  const full = water();
+  expect(gl.bufferSubData).toHaveBeenCalledTimes(3);
+  expect(full[0][0]).toBeGreaterThan(empty[0][0] + 0.18);
+  expect(full[1][0]).toBeGreaterThan(empty[1][0] + 0.18);
+  expect(full[1][1]).toBeLessThan(empty[1][1] - 0.04);
+
+  gl.bufferSubData.mockClear();
+  renderer.update([...staticTiles, instances[0], filled[1]], frame);
+  flush(200);
+  expect(water()).toEqual([empty[0], full[1]]);
+  expect(gl.bufferSubData).toHaveBeenCalledTimes(1);
   renderer.dispose();
 });

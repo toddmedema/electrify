@@ -119,8 +119,8 @@ function buyToward(world: World, seat: string, target: TerritoryTileId) {
 }
 it("reveals connected peer land but requires each company's own physical path for new purchases and resume", () => {
   const world = ready();
-  const peerTile = "frontier:-16:-3";
-  const target = getTerritoryTile("frontier:-19:-3")!;
+  const peerTile = "frontier:-8:3";
+  const target = getTerritoryTile("frontier:-8:6")!;
   expect(
     territoryVisibilityDistance(roomView(world, "1").game!, target),
   ).toBeUndefined();
@@ -260,8 +260,8 @@ it.each(["missing", "paused", "building", "retired"])(
   "does not reveal disconnected peer land with a %s link",
   (condition) => {
     const world = ready();
-    buyToward(world, "0", "frontier:-16:-3");
-    const target = getTerritoryTile("frontier:-19:-3")!;
+    buyToward(world, "0", "frontier:-8:3");
+    const target = getTerritoryTile("frontier:-8:6")!;
     if (condition === "missing")
       world.grids[1].transmission!.lines =
         world.grids[1].transmission!.lines.filter(
@@ -279,7 +279,7 @@ it.each(["missing", "paused", "building", "retired"])(
       world.outcomes["0"] = { outcome: "fired", title: "Retired", month: 0 };
     const game = roomView(world, "1").game!;
     expect(territoryVisibilityDistance(game, target)).toBeUndefined();
-    expect(game.multiplayer!.tileOwners?.["frontier:-16:-3"]).toBeUndefined();
+    expect(game.multiplayer!.tileOwners?.["frontier:-8:3"]).toBeUndefined();
     expect(tilePurchaseQuote(game, target.id)).toBeUndefined();
     const cash = currentTick(world.grids[1])!.cash;
     expect(buy(world, "1", target.id, "forged")).toBeDefined();

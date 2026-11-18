@@ -66,7 +66,7 @@ it("does not turn a PPA visibility anchor into physical purchase adjacency", () 
   expect(tilePurchaseQuotes(game).has(remote.id)).toBe(false);
 });
 
-it("uses all six physical neighbors of empty retained property, with fresh lookups after ownership changes", () => {
+it("keeps all six physical neighbors of a retained site without extending the scenario board", () => {
   const game = ready();
   game.territoryNetwork!.legacyTiles!.push({
     id: "champlain:legacy-100",
@@ -88,8 +88,8 @@ it("uses all six physical neighbors of empty retained property, with fresh looku
   ]) {
     const tile = getTerritoryTile(`frontier:${q}:${r}`, game)!;
     expect(isAdjacentToOwnedTerritoryTile(game, tile)).toBe(true);
-    expect(quotes.get(tile.id)).toBeDefined();
-    expect(tilePurchaseQuote(game, tile.id)).toEqual(quotes.get(tile.id));
+    expect(quotes.get(tile.id)).toBeUndefined();
+    expect(tilePurchaseQuote(game, tile.id)).toBeUndefined();
   }
   for (const [q, r] of [
     [101, -99],
@@ -160,7 +160,7 @@ it("keeps connected peer sight and overlapping legacy IDs separate from owned co
     expect(tilePurchaseQuote(game, tile.id)).toBeUndefined();
     expect(quotes.has(tile.id)).toBe(false);
   }
-  const adjacent = getTerritoryTile("frontier:101:-100", game)!;
+  const adjacent = getTerritoryTile("frontier:-5:-3", game)!;
   expect(quotes.get(adjacent.id)).toBeDefined();
   const owner = { seat: "peer", name: "Neighbor" };
   game.multiplayer.tileOwners = { [adjacent.id]: owner };
@@ -211,9 +211,9 @@ it("bounds owned coordinate reads while quoting a long purchased frontier", () =
     });
   try {
     const quotes = tilePurchaseQuotes(game);
-    expect(quotes.has("frontier:-505:-3")).toBe(true);
+    expect(quotes.has("frontier:-505:-3")).toBe(false);
     expect(quotes.has("frontier:-506:-3")).toBe(false);
-    expect(quotes.size).toBeGreaterThan(count);
+    expect(quotes.size).toBeLessThan(count);
     expect(reads).toBeGreaterThan(count);
     expect(reads).toBeLessThanOrEqual(budget);
   } finally {
@@ -319,7 +319,7 @@ it("retains paid disconnected schema17 property and finances while rejecting a n
   ]);
   expect(migrated.timeline).toEqual(raw.game.timeline);
   expect(migrated.facilities).toEqual(raw.game.facilities);
-  expect(tilePurchaseQuote(migrated, "frontier:-8:-3")).toBeDefined();
+  expect(tilePurchaseQuote(migrated, "frontier:-7:-2")).toBeDefined();
   const resumed = parseSave(
     JSON.parse(JSON.stringify(serializeSave(migrated))),
   )!.game;

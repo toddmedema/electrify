@@ -128,7 +128,7 @@ test("clicking real mountain relief above its ground selects the mountain tile",
     "ready",
   );
   const mountainId = await map
-    .locator('[data-map-target][data-terrain="mountain"]')
+    .locator('[data-map-target][data-terrain="mountain"]:not([data-owner])')
     .evaluateAll((elements) => {
       const viewport = elements[0]
         .closest(".territoryMapViewport")!
@@ -191,7 +191,11 @@ test("clicking real mountain relief above its ground selects the mountain tile",
         ?.dataset.mapTarget,
     click,
   );
-  expect(ground).toBeTruthy();
+  // With a finite board, a foreground peak can also project above the map edge.
+  expect(point.x).toBeGreaterThan(0);
+  expect(point.x).toBeLessThan(width);
+  expect(point.y).toBeGreaterThan(0);
+  expect(point.y).toBeLessThan(height);
   expect(ground).not.toBe(tile.id);
   await page.mouse.click(click.x, click.y);
   await expect(mountain).toHaveAttribute("aria-pressed", "true");

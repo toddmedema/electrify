@@ -3,6 +3,7 @@
   --territory-owner-you: #006bbb;
   --territory-owner-valley: #955b22;
   --territory-owner-ridge: #7951a6;
+  --territory-owner-municipal: #646e47;
   --territory-owner-peer-0: #32766a;
   --territory-owner-peer-1: #96516c;
   --territory-owner-peer-2: #926817;
@@ -26,6 +27,7 @@
   --territory-owner-you: #62acfa;
   --territory-owner-valley: #d2a469;
   --territory-owner-ridge: #b69bdf;
+  --territory-owner-municipal: #b0bd92;
   --territory-owner-peer-0: #7dc9bf;
   --territory-owner-peer-1: #d9a0bc;
   --territory-owner-peer-2: #d5be7c;
@@ -313,6 +315,10 @@
       font-size: 11px;
       font-weight: 400;
     }
+  }
+  &[data-municipal-city="true"] strong,
+  .territoryMap[data-buy-mode="true"] & strong {
+    pointer-events: none;
   }
   &:hover strong,
   &[aria-pressed="true"] strong {

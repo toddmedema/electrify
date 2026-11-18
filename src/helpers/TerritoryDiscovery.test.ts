@@ -5,7 +5,11 @@ import {
   getTerritoryDefinition,
   territoryHydroSiteId,
 } from "../data/Territories";
-import { TERRITORY_TILES, territoryTileAt } from "../data/TerritoryTiles";
+import {
+  TERRITORY_TILES,
+  VALLEY_BOARD,
+  territoryTileAt,
+} from "../data/TerritoryTiles";
 import { validHydroClaims } from "../data/HydroSites";
 import { parseSave, serializeSave } from "../SaveGame";
 import reducer, { buildFacility, tickState } from "../reducers/Game";
@@ -189,16 +193,13 @@ it("does not grant neighboring authored sites, duplicate cash or customer credit
   expect(currentTick(game)!.customers).toBe(customers + quote.customers);
 });
 function generatedTarget(benefit: string) {
-  for (let q = -15; q <= 15; q++)
-    for (let r = -15; r <= 15; r++) {
-      const tile = territoryTileAt(q, r)!;
-      if (
-        tile.id.startsWith("frontier:") &&
-        getTerritoryDefinition(tile.territoryId)?.benefit === benefit
-      )
-        return tile;
-    }
-  throw new Error(`Missing generated ${benefit} fixture`);
+  const tile = VALLEY_BOARD.find(
+    (candidate) =>
+      candidate.id.startsWith("frontier:") &&
+      getTerritoryDefinition(candidate.territoryId)?.benefit === benefit,
+  );
+  if (!tile) throw new Error(`Missing generated ${benefit} fixture`);
+  return tile;
 }
 function expectDeterministicResume(game: GameType) {
   expect(validTerritoryNetwork(game)).toBe(true);
@@ -271,10 +272,12 @@ it.each(["general", "hydro", "geothermal"] as const)(
   },
 );
 it.each(["residential", "industrial"] as const)(
-  "generated %s cities use the sector customer owner once",
+  "authored %s cities use the sector customer owner once",
   (benefit) => {
     const game = ready();
-    const target = generatedTarget(benefit);
+    const target = getTerritoryTile(
+      benefit === "residential" ? "parcel-1:city" : "parcel-11:city",
+    )!;
     reveal(game, target);
     const offer = buy(game, target.id);
     expect(offer.customers).toBeGreaterThan(0);

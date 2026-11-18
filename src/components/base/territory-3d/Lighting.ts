@@ -6,6 +6,7 @@ interface LightingInput {
   sunset: number;
   daylight: "normal" | "polar-day" | "polar-night";
   dark: boolean;
+  cloud?: number;
 }
 const DAY = 1440;
 const wrap = (value: number) => ((value % DAY) + DAY) % DAY;
@@ -45,6 +46,7 @@ export function mapLighting(input: LightingInput): MapLighting {
     -0.38,
   ];
   const length = Math.hypot(...direction);
+  const cloud = smooth(((input.cloud ?? 0) - 0.24) / 0.76);
   const moon: RGB = [0.66, 0.78, 1];
   const sun: RGB = [1, 0.95, 0.82];
   return {
@@ -54,12 +56,18 @@ export function mapLighting(input: LightingInput): MapLighting {
       direction[2] / length,
     ],
     color: [
-      moon[0] + (sun[0] - moon[0]) * daylight,
-      moon[1] + (sun[1] - moon[1]) * daylight,
-      moon[2] + (sun[2] - moon[2]) * daylight,
+      (moon[0] + (sun[0] - moon[0]) * daylight) * (1 - cloud * 0.16),
+      (moon[1] + (sun[1] - moon[1]) * daylight) * (1 - cloud * 0.12),
+      (moon[2] + (sun[2] - moon[2]) * daylight) * (1 - cloud * 0.05),
     ],
-    ambient: (input.dark ? 0.3 : 0.46) + daylight * (input.dark ? 0.23 : 0.19),
-    shadow: (0.12 + daylight * 0.13) * smooth(Math.abs(altitude) / 0.3),
+    ambient:
+      (input.dark ? 0.3 : 0.46) +
+      daylight * (input.dark ? 0.23 : 0.19) +
+      cloud * 0.09,
+    shadow:
+      (0.12 + daylight * 0.13) *
+      smooth(Math.abs(altitude) / 0.3) *
+      (1 - cloud * 0.65),
   };
 }
 

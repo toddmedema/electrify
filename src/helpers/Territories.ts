@@ -17,6 +17,8 @@ import {
   getTerritoryDefinition,
   purchasedLandTerritories,
 } from "../data/Territories";
+import { isValleyBoardTile } from "../data/TerritoryTiles";
+import { municipalPlantAt } from "../data/MunicipalUtilities";
 import { UTILITY_AREAS } from "../data/UtilityExpansion";
 import { getInflationIndex, hasEconomy } from "../data/Economy";
 import { getDateFromMinute } from "./DateTime";
@@ -43,8 +45,7 @@ import {
   facilityOnTile,
   ownsTerritoryTile,
   getTerritoryTiles,
-  territoryVisibilityDistance,
-  visibleTerritoryTiles,
+  scenarioMapTiles,
   createTerritoryTileOwnership,
   createTerritoryTileAdjacency,
   ownedTerritoryTiles,
@@ -301,15 +302,28 @@ export function createTilePurchaseEligibility(
   const adjacent = createTerritoryTileAdjacency(
     ownedTerritoryTiles(game, owns),
   );
+  const canAcquirePlantSite = (tileId: TerritoryTileId) => {
+    const utility = municipalPlantAt.get(tileId);
+    if (!utility) return true;
+    const { city } = utility;
+    return (
+      owns(city) ||
+      !!game.multiplayer?.tileOwners?.[city.id] ||
+      (isLandTerritoryId(city.territoryId) &&
+        !!game.multiplayer?.landOwners?.[city.territoryId])
+    );
+  };
   return (
     tile: TerritoryTile,
   ): tile is TerritoryTile & { territoryId: LandTerritoryId } =>
     enabled &&
     isLandTerritoryId(tile.territoryId) &&
+    isValleyBoardTile(tile.id) &&
     !owns(tile) &&
     adjacent(tile) &&
     !game.multiplayer?.tileOwners?.[tile.id] &&
-    !game.multiplayer?.landOwners?.[tile.territoryId];
+    !game.multiplayer?.landOwners?.[tile.territoryId] &&
+    canAcquirePlantSite(tile.id);
 }
 
 function purchaseQuote(
@@ -341,16 +355,14 @@ function purchaseQuote(
 }
 export function tilePurchaseQuote(game: GameType, tileId: TerritoryTileId) {
   const tile = getTerritoryTile(tileId, game);
-  return tile &&
-    createTilePurchaseEligibility(game)(tile) &&
-    territoryVisibilityDistance(game, tile) !== undefined
+  return tile && createTilePurchaseEligibility(game)(tile)
     ? purchaseQuote(game, tile)
     : undefined;
 }
-/** Batch map quotes share the finite discovery pass instead of rebuilding sight per tile. */
+/** Quote neighboring cells on the fixed scenario board with one shared ownership lookup. */
 export function tilePurchaseQuotes(
   game: GameType,
-  visible: readonly { tile: TerritoryTile }[] = visibleTerritoryTiles(game),
+  visible: readonly { tile: TerritoryTile }[] = scenarioMapTiles(game),
 ) {
   const eligible = createTilePurchaseEligibility(game);
   return new Map(
@@ -366,11 +378,7 @@ export function landPurchaseQuote(
 ) {
   const eligible = createTilePurchaseEligibility(game);
   for (const tile of getTerritoryTiles(game)) {
-    if (
-      tile.territoryId === id &&
-      eligible(tile) &&
-      territoryVisibilityDistance(game, tile) !== undefined
-    )
+    if (tile.territoryId === id && eligible(tile))
       return purchaseQuote(game, tile);
   }
   return undefined;

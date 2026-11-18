@@ -1862,15 +1862,14 @@ for (const theme of ["light", "dark"] as const) {
       1,
     );
     expect(bought.territoryNetwork!.tilePurchases).toHaveLength(1);
-    const revealed = territoryTileViews(bought).filter(
-      (view) => !views.some((old) => old.tile.id === view.tile.id),
+    const connectedViews = territoryTileViews(bought);
+    expect(connectedViews.map(({ tile }) => tile.id)).toEqual(
+      views.map(({ tile }) => tile.id),
     );
-    expect(revealed.length).toBeGreaterThan(0);
     expect(
-      revealed.every(
-        (view) => view.visibilityDistance >= 1 && view.visibilityDistance <= 3,
-      ),
-    ).toBe(true);
+      connectedViews.find(({ tile }) => tile.id === frontier.id)
+        ?.visibilityDistance,
+    ).toBe(0);
     const canvas = network.locator("canvas.territory3DCanvas");
     if ((await canvas.getAttribute("data-renderer")) === "ready") {
       await expect
@@ -1965,12 +1964,13 @@ for (const theme of ["light", "dark"] as const) {
   });
 
   for (const customer of [
-    { id: "parcel-1", kind: "medium" },
-    { id: "parcel-5", kind: "small" },
+    { id: "parcel-1", name: "Vergennes" },
+    { id: "parcel-5", name: "Waterbury" },
   ] as const) {
-    test(`${customer.kind} tile adds quoted customers without plants in ${theme}`, async ({
+    test(`${customer.name} adds quoted customers without plants in ${theme}`, async ({
       page,
     }) => {
+      test.slow(); // Each approach involves multiple on-map purchases and autosaves.
       await startMap(page, theme);
       const tile = TERRITORY_TILES.find(
         (tile) => tile.territoryId === customer.id,
@@ -1979,7 +1979,12 @@ for (const theme of ["light", "dark"] as const) {
       const before = (await readSavedGame(page))!;
       const quote = tilePurchaseQuote(before, tile.id)!;
       const surface = await inspectTile(page, tile);
-      await expect(surface).toHaveAccessibleName(tile.city!.name!);
+      await expect(surface).toHaveAccessibleName(customer.name);
+      const utility = territoryTileViews(before).find(
+        ({ tile: candidate }) => candidate.id === tile.id,
+      )!;
+      expect(utility.ownerKey).toMatch(/^municipal:/);
+      await expect(surface).toContainText(utility.ownerName);
       await expect(surface).toContainText("Estimated demand");
       await expectCityDemand(surface);
       await surface.getByRole("button", { name: /^Connect ·/ }).click();

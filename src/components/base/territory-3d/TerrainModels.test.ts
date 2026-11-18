@@ -78,13 +78,11 @@ function insidePad(triangle: readonly Vec3[], halfWidth: number) {
 }
 
 function waterTriangles(model: MapModel) {
-  const floor = model.parts[0].mesh;
-  return triangles(floor).filter(
-    (triangle, index) =>
-      triangle.every((p) => Math.abs(p[1]) < EPSILON) &&
-      // The shared cyan water palette is distinct from neutral rock and green turf.
-      floor.colors[index * 9 + 2] - floor.colors[index * 9] > 0.2,
-  );
+  return model.parts
+    .filter(
+      ({ material }) => material === "water" || material === "watershed-water",
+    )
+    .flatMap(({ mesh }) => triangles(mesh));
 }
 
 function edgeWater(model: MapModel, edge: number): Vec3[] {
@@ -123,15 +121,22 @@ it.each(TERRAINS)(
       ),
     ).toBe(true);
     const top = faces.filter((face) => face.every((p) => p[1] === 0));
-    expect(top.reduce((sum, face) => sum + projectedArea(face), 0)).toBeCloseTo(
-      Math.sqrt(3) / 2,
-      6,
-    );
+    expect(
+      [...top, ...waterTriangles(model)].reduce(
+        (sum, face) => sum + projectedArea(face),
+        0,
+      ),
+    ).toBeCloseTo(Math.sqrt(3) / 2, 6);
     expect(
       Math.max(...Array.from(floor.positions).filter((_p, i) => i % 3 === 1)),
     ).toBe(0);
     model.parts.slice(1).forEach((part) => {
-      expect(part).toMatchObject({ castsShadow: true, receivesShadow: false });
+      const water =
+        part.material === "water" || part.material === "watershed-water";
+      expect(part).toMatchObject({
+        castsShadow: !water,
+        receivesShadow: water,
+      });
       expect(part.motion).toBeUndefined();
     });
     const heights = model.parts.flatMap((part) =>
@@ -179,6 +184,8 @@ it.each([0, 0.6, 0.8, 1.01])(
   "reserves the entire central square for a %s-wide occupant",
   (footprint) => {
     for (const terrain of TERRAINS) {
+      if (!footprint && (terrain === "mountain" || terrain === "forest"))
+        continue;
       const model = getTerrainModel(terrain, { footprint });
       const halfWidth = Math.max(0.55, footprint) / 2;
       for (const part of model.parts.slice(1))
@@ -186,7 +193,7 @@ it.each([0, 0.6, 0.8, 1.01])(
           const overlap = insidePad(triangle, halfWidth);
           const intersects =
             projectedArea(overlap) > 1e-10 &&
-            overlap.some((p) => p[1] > EPSILON);
+            overlap.some((p) => p[1] > (model.supportY ?? 0) + EPSILON);
           expect({ terrain, intersects }).toEqual({
             terrain,
             intersects: false,
@@ -213,6 +220,49 @@ it("retains recognizable forest, hill and mountain volume beside a wide building
     getTerrainModel("forest", { footprint: 0.8 }).parts[1].mesh.positions
       .length,
   ).toBeLessThan(getTerrainModel("forest").parts[1].mesh.positions.length);
+});
+
+it("joins all six mountain edges at the same rise across natural and graded slopes", () => {
+  const edgeProfile = (model: MapModel, edge: number, offset: Vec3) => {
+    const a = CORNERS[edge],
+      b = CORNERS[(edge + 1) % CORNERS.length];
+    return new Set(
+      triangles(model.parts[1].mesh)
+        .flat()
+        .filter(
+          (p) =>
+            Math.abs(
+              (b[0] - a[0]) * (p[2] - a[2]) - (b[2] - a[2]) * (p[0] - a[0]),
+            ) < EPSILON,
+        )
+        .map((p) =>
+          p.map((value, axis) => (value + offset[axis]).toFixed(6)).join(","),
+        ),
+    );
+  };
+
+  for (const [edge, [q, r]] of HEX_NEIGHBORS.entries()) {
+    const opposite = (edge + 3) % 6;
+    const natural = getTerrainModel("mountain", { adjacentEdges: 1 << edge });
+    const developed = getTerrainModel("mountain", {
+      footprint: 0.24,
+      adjacentEdges: 1 << opposite,
+    });
+    const naturalEdge = edgeProfile(natural, edge, [0, 0, 0]);
+    expect(naturalEdge.size).toBe(3);
+    const offset = tilePosition3D({ q, r });
+    const rounded = (profile: Set<string>) =>
+      [...profile]
+        .map((point) => point.replaceAll("-0.000000", "0.000000"))
+        .sort();
+    expect(rounded(naturalEdge)).toEqual(
+      rounded(edgeProfile(developed, opposite, offset)),
+    );
+    expect([...naturalEdge].some((p) => Number(p.split(",")[1]) > 0.25)).toBe(
+      true,
+    );
+    expect(natural.parts[0].mesh).toBe(developed.parts[0].mesh);
+  }
 });
 
 it("keeps opaque water level, lake water enclosed and ocean water continuous at every edge", () => {
@@ -294,16 +344,19 @@ it("canonicalizes repeated options into a bounded cache without leaking tile var
   );
   const models = new Set<MapModel>();
   for (const terrain of TERRAINS)
-    for (const footprint of [0, 0.6, 0.7, 0.9])
+    for (const footprint of [0, 0.24, 0.6, 0.7, 0.9])
       for (let mask = 0; mask < 64; mask++) {
         const ports = [0, 1, 2, 3, 4, 5].filter((edge) => mask & (1 << edge));
         models.add(getTerrainModel(terrain, { footprint, ports }));
       }
-  expect(models.size).toBe(280);
+  expect(models.size).toBe(281);
+  expect(
+    getTerrainModel("mountain", { adjacentEdges: 65, footprint: 0.27 }),
+  ).toBe(getTerrainModel("mountain", { adjacentEdges: 1, footprint: 0.67 }));
   const continuousVariants = new Set<MapModel>();
   for (let i = 0; i <= 1000; i++)
     continuousVariants.add(
       getTerrainModel("forest", { footprint: i / 1000, ports: [i] }),
     );
-  expect(continuousVariants.size).toBe(4);
+  expect(continuousVariants.size).toBe(5);
 });

@@ -287,3 +287,19 @@ export function getGeneratedTerritoryTile(
   const tile = territoryTileAt(coordinates.q, coordinates.r);
   return tile?.id === id ? tile : undefined;
 }
+
+/** Across the Valley has a fixed board. Keep the coordinate generator for older saves. */
+export const VALLEY_BOARD: readonly TerritoryTileDefinition[] = Array.from(
+  { length: 13 },
+  (_, row) =>
+    Array.from({ length: 17 }, (_, column) => ({
+      q: column - 8,
+      r: row - 6,
+    })).flatMap(({ q, r }) =>
+      q + r >= -10 && q + r <= 9 ? [territoryTileAt(q, r)!] : [],
+    ),
+).flat();
+const valleyBoardIds = new Set(VALLEY_BOARD.map(({ id }) => id));
+
+export const isValleyBoardTile = (id: TerritoryTileId) =>
+  valleyBoardIds.has(id);

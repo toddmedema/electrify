@@ -4,9 +4,10 @@ import { isLandTerritoryId } from "../data/Territories";
 import type { TerritoryTileDefinition } from "../data/TerritoryTiles";
 import {
   facilityTileId,
-  visibleTerritoryTiles,
+  scenarioMapTiles,
   createTerritoryTileOwnership,
 } from "./TerritoryTiles";
+import { municipalUtilityAt } from "../data/MunicipalUtilities";
 import { createTilePurchaseEligibility } from "./Territories";
 export interface TileFacilityView {
   name: FacilityOperatingType["name"];
@@ -24,6 +25,7 @@ export interface TerritoryTileView {
   facility?: TileFacilityView;
   operatingFacility?: FacilityOperatingType;
   connectable?: boolean;
+  municipalCity?: TerritoryTileDefinition;
   reserved?: boolean;
   visibilityDistance: 0 | 1 | 2 | 3;
 }
@@ -49,7 +51,7 @@ export function territoryTileViews(game: GameType): TerritoryTileView[] {
       claim,
     ]),
   );
-  return visibleTerritoryTiles(game).map(({ tile, visibilityDistance }) => {
+  return scenarioMapTiles(game).map(({ tile, visibilityDistance }) => {
     const isOwned = owns(tile);
     const retainedClaim = retainedClaims.get(`${tile.q},${tile.r}`);
     const claim =
@@ -58,13 +60,14 @@ export function territoryTileViews(game: GameType): TerritoryTileView[] {
       (isLandTerritoryId(tile.territoryId)
         ? game.multiplayer?.landOwners?.[tile.territoryId]
         : undefined);
+    const municipal = !isOwned && !claim ? municipalUtilityAt(tile) : undefined;
     const ownerKey = isOwned
       ? "you"
       : claim
         ? `peer:${claim.seat}`
         : !isLandTerritoryId(tile.territoryId)
           ? tile.territoryId
-          : undefined;
+          : municipal && `municipal:${municipal.city.id}`;
     const utility =
       tile.territoryId === "champlain" ||
       tile.territoryId === "valley-electric" ||
@@ -73,7 +76,7 @@ export function territoryTileViews(game: GameType): TerritoryTileView[] {
         : undefined;
     const ownerName = isOwned
       ? "You"
-      : (claim?.name ?? utility?.name ?? "Unowned land");
+      : (claim?.name ?? utility?.name ?? municipal?.name ?? "Unowned land");
     const placedFacility = facilities.get(tile.id);
     const operatingFacility = isOwned ? placedFacility : undefined;
     const peerFacility =
@@ -89,6 +92,9 @@ export function territoryTileViews(game: GameType): TerritoryTileView[] {
     const facility: TileFacilityView | undefined =
       operatingFacility ??
       peerFacility ??
+      (municipal?.plant?.tileId === tile.id
+        ? municipal.plant.facility
+        : undefined) ??
       (asset
         ? {
             name: asset.name ?? asset.fuel ?? "Generator",
@@ -108,6 +114,8 @@ export function territoryTileViews(game: GameType): TerritoryTileView[] {
       facility,
       operatingFacility,
       connectable: connectable(tile),
+      municipalCity:
+        municipal?.plant?.tileId === tile.id ? municipal.city : undefined,
       reserved:
         !!placedFacility ||
         (!!tile.hydroSiteId && usedHydroSites.has(tile.hydroSiteId)),

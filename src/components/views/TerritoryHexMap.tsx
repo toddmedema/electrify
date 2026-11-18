@@ -2,7 +2,7 @@ import * as React from "react";
 import { Tooltip, useTheme } from "@mui/material";
 import RapidConnectionIcon from "../base/RapidConnectionIcon";
 import type { GameType, TerritoryTileId } from "../../Types";
-import { getTerritoryDefinition } from "../../data/Territories";
+import { isLandTerritoryId } from "../../data/Territories";
 import { TERRAIN_LABELS } from "../../data/TerrainLabels";
 import { FACILITY_FUELS } from "../../data/FacilityFuels";
 import type { TerritoryTileView } from "../../helpers/TerritoryMapState";
@@ -14,6 +14,8 @@ import { getSunriseSunset } from "../../helpers/DateTime";
 import type { RendererState } from "../base/territory-3d/TerritoryCanvas3D";
 import type { ScenePicker } from "../base/territory-3d/SceneBuilder";
 import type { SceneCamera } from "../base/territory-3d/TerritoryScene3D";
+import { readMapWeather } from "../base/territory-3d/MapWeather";
+import WeatherAtmosphere from "../base/territory-3d/WeatherAtmosphere";
 import { useAppSelector } from "../../Store";
 import { citySizeLabel, terrainDetailsLabel } from "../base/TerritoryTileFacts";
 import {
@@ -157,6 +159,7 @@ export default function TerritoryHexMap({
     picker.current = value;
   }, []);
   const motion = useFacilityMapMotion(game.speed);
+  const weather = React.useMemo(() => readMapWeather(game), [game]);
   const viewport = React.useRef<HTMLDivElement>(null);
   const stage = React.useRef<HTMLDivElement>(null);
   const buyingControl = React.useRef<HTMLButtonElement>(null);
@@ -291,10 +294,24 @@ export default function TerritoryHexMap({
     },
     [size.width, size.height, scale],
   );
+  const mapBounds = React.useMemo(() => {
+    const points = tiles.map(hexCenter);
+    const margin = HEX_WIDTH / 2;
+    return {
+      left: Math.min(...points.map(({ x }) => x)) - margin,
+      right: Math.max(...points.map(({ x }) => x)) + margin,
+      top: Math.min(...points.map(({ y }) => y)) - margin,
+      bottom: Math.max(...points.map(({ y }) => y)) + margin,
+    };
+  }, [tiles]);
   const setCamera = React.useCallback(
     (update: React.SetStateAction<ReturnType<typeof hexCenter>>) => {
       const current = camera.getSnapshot();
-      const next = typeof update === "function" ? update(current) : update;
+      const point = typeof update === "function" ? update(current) : update;
+      const next = {
+        x: Math.max(mapBounds.left, Math.min(mapBounds.right, point.x)),
+        y: Math.max(mapBounds.top, Math.min(mapBounds.bottom, point.y)),
+      };
       if (next.x === current.x && next.y === current.y) return;
       moveStage(next);
       if (
@@ -306,7 +323,7 @@ export default function TerritoryHexMap({
       }
       camera.move(next);
     },
-    [camera, moveStage],
+    [camera, mapBounds, moveStage],
   );
   React.useLayoutEffect(
     () => moveStage(camera.getSnapshot()),
@@ -478,7 +495,9 @@ export default function TerritoryHexMap({
         ? "var(--territory-owner-valley)"
         : id === "ridge-electric"
           ? "var(--territory-owner-ridge)"
-          : peerColors[id.slice(5)];
+          : id.startsWith("municipal:")
+            ? "var(--territory-owner-municipal)"
+            : peerColors[id.slice(5)];
   const tileHover = (view: TerritoryTileView) => {
     const { tile } = view;
     const unavailable = (reason: string) => ({
@@ -489,25 +508,25 @@ export default function TerritoryHexMap({
       color: "var(--interactive-blue)",
       reason,
     });
+    if (buyMode && view.connectable)
+      return available("Available in Rapid connection mode.");
+    if (projectPlanning && projectSites?.has(tile.id))
+      return available("Compatible site for this project.");
     if (view.ownerKey && !view.owned)
       return {
         color: color(view.ownerKey),
         reason: `Building unavailable while owned by ${view.ownerName}.`,
       };
     if (projectPlanning)
-      return projectSites?.has(tile.id)
-        ? available("Compatible site for this project.")
-        : unavailable(
-            "Unavailable for this project; choose a highlighted site.",
-          );
+      return unavailable(
+        "Unavailable for this project; choose a highlighted site.",
+      );
     if (buyMode)
-      return view.connectable
-        ? available("Available in Rapid connection mode.")
-        : unavailable(
-            view.owned
-              ? "Already connected."
-              : "Not available in Rapid connection mode; connect an adjacent site first.",
-          );
+      return unavailable(
+        view.owned
+          ? "Already connected."
+          : "Not available in Rapid connection mode; connect an adjacent site first.",
+      );
     if (tile.city) return unavailable("Cities have no building slot.");
     if (view.reserved)
       return unavailable(
@@ -910,6 +929,7 @@ export default function TerritoryHexMap({
                   visible: size.width > 0 && size.height > 0,
                   motionAllowed: motion.allowed,
                   playbackRate: motion.rate,
+                  weather,
                 }}
                 onState={setRendererState}
                 onPicker={setPicker}
@@ -917,6 +937,11 @@ export default function TerritoryHexMap({
             </React.Suspense>
           </MapSceneBoundary>
         )}
+        <WeatherAtmosphere
+          weather={weather}
+          moving={motion.allowed && game.speed !== "PAUSED"}
+          dark={dark}
+        />
         <div className="territoryMapStage" ref={stage}>
           <svg
             className="territoryHexGrid"
@@ -1090,8 +1115,7 @@ export default function TerritoryHexMap({
             const { tile, facility } = view,
               point = hexCenter(tile);
             const status = facilityMapStatus(view, game.date.minute);
-            const territory = getTerritoryDefinition(tile.territoryId);
-            const utility = !!tile.city && territory?.kind !== "greenfield";
+            const utility = !!tile.city && !!view.ownerKey;
             const cityLabel =
               tile.city?.name ?? (tile.city && citySizeLabel(tile.city.size));
             const quote = purchaseQuotes?.get(tile.id);
@@ -1117,6 +1141,9 @@ export default function TerritoryHexMap({
                 data-owner={view.ownerKey}
                 data-owned={view.owned}
                 data-terrain={tile.terrain}
+                data-municipal-city={
+                  tile.city && isLandTerritoryId(tile.territoryId)
+                }
                 data-project-site={
                   projectSite
                     ? projectSite.owned

@@ -1,8 +1,18 @@
 import type { TerrainType } from "../../../Types";
+import { getForestModel } from "./ForestModels";
 import { MeshBuilder } from "./MeshBuilder";
+import { buildMountainRelief, mountainProfile } from "./MountainModels";
 import { PALETTE } from "./Palette";
 import { GROUND_RADIUS } from "./Projection";
-import type { MapModel, RGB, TerrainModelOptions, Vec3 } from "./Types";
+import type {
+  MapMesh,
+  MapModel,
+  ModelPart,
+  RGB,
+  TerrainModelOptions,
+  Vec3,
+} from "./Types";
+import { WATERSHED_BANK_DEPTH } from "./WaterSurface";
 
 type GroundPoint = readonly [number, number];
 type RaisedPoint = readonly [number, number, number];
@@ -22,15 +32,19 @@ const WATER_FACET: RGB = [
   PALETTE.water[1] * 0.88 + PALETTE.deepWater[1] * 0.12,
   PALETTE.water[2] * 0.88 + PALETTE.deepWater[2] * 0.12,
 ];
-const cache: Record<TerrainType, (MapModel | undefined)[]> = {
+const cache: Record<
+  Exclude<TerrainType, "forest">,
+  (MapModel | undefined)[]
+> = {
   plains: [],
-  forest: [],
   hills: [],
   mountain: [],
   river: [],
   lake: [],
   ocean: [],
 };
+
+let mountainFloor: MapMesh | undefined;
 
 const point = ([x, z]: GroundPoint, y = 0): Vec3 => [x, y, z];
 const lerp = (a: GroundPoint, b: GroundPoint, t: number): GroundPoint => [
@@ -169,15 +183,37 @@ function bank(
   );
 }
 
+/** A shallow submerged shelf exposes shoreline as the surface drops. */
+function waterBank(
+  floor: MeshBuilder,
+  a: GroundPoint,
+  b: GroundPoint,
+  lowA: GroundPoint,
+  lowB: GroundPoint,
+) {
+  surface(
+    floor,
+    [
+      point(a),
+      point(b),
+      point(lowB, WATERSHED_BANK_DEPTH),
+      point(lowA, WATERSHED_BANK_DEPTH),
+    ],
+    PALETTE.earthShade,
+  );
+}
+
 function river(
   floor: MeshBuilder,
   relief: MeshBuilder,
+  water: MeshBuilder,
   ports: number,
   clear: number,
 ) {
   const inner = HEX.map((p) => scaled(p, 0.27));
+  const bed = (p: GroundPoint) => scaled(p, 0.72);
   surface(
-    floor,
+    water,
     inner.map((p) => point(p)),
     PALETTE.water,
   );
@@ -199,7 +235,7 @@ function river(
         PALETTE.grass,
       );
       surface(
-        floor,
+        water,
         [point(iwa), point(wa), point(wb), point(iwb)],
         PALETTE.water,
       );
@@ -208,20 +244,45 @@ function river(
         [point(iwb), point(wb), point(b), point(ib)],
         PALETTE.grassShade,
       );
+      const iwaBed = lerp(iwa, iwb, 0.23);
+      const iwbBed = lerp(iwb, iwa, 0.23);
+      waterBank(floor, ia, iwa, bed(ia), bed(iwa));
+      waterBank(floor, iwb, ib, bed(iwb), bed(ib));
+      waterBank(floor, iwa, wa, iwaBed, lerp(wa, wb, 0.23));
+      waterBank(floor, wb, iwb, lerp(wb, wa, 0.23), iwbBed);
+      for (const [corner, channel] of [
+        [iwa, iwaBed],
+        [iwb, iwbBed],
+      ])
+        surface(
+          floor,
+          [
+            point(corner),
+            point(bed(corner), WATERSHED_BANK_DEPTH),
+            point(channel, WATERSHED_BANK_DEPTH),
+          ],
+          PALETTE.earthShade,
+        );
       bank(relief, iwa, wa, [a[0] - wa[0], a[1] - wa[1]], clear);
       bank(relief, wb, iwb, [b[0] - wb[0], b[1] - wb[1]], clear);
     } else {
       surface(floor, [point(ia), point(a), point(b), point(ib)], PALETTE.grass);
+      waterBank(floor, ia, ib, bed(ia), bed(ib));
     }
   }
 }
 
-function lake(floor: MeshBuilder, relief: MeshBuilder, clear: number) {
+function lake(
+  floor: MeshBuilder,
+  relief: MeshBuilder,
+  water: MeshBuilder,
+  clear: number,
+) {
   const shore = HEX.map((p, index) =>
     scaled(p, [0.73, 0.76, 0.69, 0.75, 0.7, 0.74][index]),
   );
   surface(
-    floor,
+    water,
     shore.map((p) => point(p)),
     PALETTE.water,
   );
@@ -233,79 +294,36 @@ function lake(floor: MeshBuilder, relief: MeshBuilder, clear: number) {
       [point(a), point(HEX[i]), point(HEX[(i + 1) % 6]), point(b)],
       PALETTE.grass,
     );
+    waterBank(floor, a, b, scaled(a, 0.76), scaled(b, 0.76));
     bank(relief, a, b, [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2], clear);
   }
 }
 
-function trees(builder: MeshBuilder, clear: number) {
-  const placements = [
-    [-0.4, -0.12, 0.06, 0.24],
-    [0.4, 0.1, 0.06, 0.28],
-    [-0.39, 0.15, 0.065, 0.3],
-    [0.035, -0.485, 0.055, 0.27],
-    [-0.025, 0.475, 0.055, 0.21],
-  ] as const;
-  placements.forEach(([x, z, radius, height], index) => {
-    if (Math.abs(x) - radius < clear && Math.abs(z) - radius < clear) return;
-    builder.cylinder([x, 0, z], 0.016, 0.012, 0.09, PALETTE.timber, 5);
-    builder.cylinder([x, 0.055, z], radius, 0, height * 0.7, PALETTE.forest, 5);
-    builder.cylinder(
-      [x, 0.11, z],
-      radius * 0.77,
-      0,
-      height * 0.7,
-      index % 2 ? PALETTE.forestLight : PALETTE.forest,
-      5,
-    );
-  });
-}
-
-function build(terrain: TerrainType, bucket: number, ports: number): MapModel {
+function build(
+  terrain: Exclude<TerrainType, "forest">,
+  bucket: number,
+  mask: number,
+): MapModel {
   const clear = CLEAR_WIDTHS[bucket] / 2;
   const floor = new MeshBuilder();
   const relief = new MeshBuilder();
-  substrate(floor, terrain === "ocean");
+  const water = new MeshBuilder();
+  let supportY: number | undefined;
+  const sharedFloor = terrain === "mountain" ? mountainFloor : undefined;
+  if (!sharedFloor) substrate(floor, terrain === "ocean");
   switch (terrain) {
     case "river":
-      river(floor, relief, ports, clear);
+      river(floor, relief, water, mask, clear);
       break;
     case "lake":
-      lake(floor, relief, clear);
+      lake(floor, relief, water, clear);
       break;
     case "ocean":
-      ground(floor, PALETTE.water, WATER_FACET);
+      ground(water, PALETTE.water, WATER_FACET);
       break;
     case "mountain":
-      ground(floor, PALETTE.rock, PALETTE.rockShade);
-      mound(
-        relief,
-        [
-          [-0.25, -0.37],
-          [-0.12, -0.5],
-          [0, -0.56],
-          [0.2, -0.4],
-          [0.12, -0.29],
-        ],
-        [-0.035, 0.36, -0.455],
-        clear,
-        PALETTE.rock,
-        PALETTE.rockShade,
-      );
-      // A wide plant removes this whole shoulder rather than leaving a tall, thin sliver.
-      if (clear < 0.4)
-        mound(
-          relief,
-          [
-            [0.28, -0.22],
-            [0.47, -0.19],
-            [0.48, 0.15],
-            [0.29, 0.22],
-          ],
-          [0.405, 0.23, 0],
-          clear,
-          PALETTE.rock,
-          PALETTE.rockShade,
-        );
+      if (!sharedFloor) ground(floor, PALETTE.rock, PALETTE.rockShade);
+      supportY = buildMountainRelief(relief, bucket, mask);
       break;
     case "hills":
       ground(floor, PALETTE.grass, PALETTE.grassShade);
@@ -337,38 +355,70 @@ function build(terrain: TerrainType, bucket: number, ports: number): MapModel {
         PALETTE.grassShade,
       );
       break;
-    case "forest":
-      ground(floor, PALETTE.grassShade, PALETTE.grass);
-      trees(relief, clear);
-      break;
     case "plains":
       ground(floor, PALETTE.grass, PALETTE.grassShade);
       break;
   }
   const raised = relief.build();
+  const surfaceWater = water.build();
+  const waterPart: ModelPart = {
+    mesh: surfaceWater,
+    material: terrain === "ocean" ? "water" : "watershed-water",
+    castsShadow: false,
+    receivesShadow: true,
+  };
   let height = 0;
   for (let i = 1; i < raised.positions.length; i += 3)
     height = Math.max(height, raised.positions[i]);
+  const floorMesh = sharedFloor ?? floor.build();
+  if (terrain === "mountain") mountainFloor = floorMesh;
   return {
-    key: `terrain:${terrain}:${bucket}:${ports}`,
+    key: `terrain:${terrain}:${bucket}:${mask}`,
     parts: [
-      { mesh: floor.build(), castsShadow: false, receivesShadow: true },
+      { mesh: floorMesh, castsShadow: false, receivesShadow: true },
       ...(raised.positions.length
-        ? [{ mesh: raised, castsShadow: true, receivesShadow: false }]
+        ? [
+            {
+              mesh: raised,
+              ...(terrain === "mountain"
+                ? { material: "mountain" as const }
+                : {}),
+              castsShadow: true,
+              receivesShadow: false,
+            },
+          ]
         : []),
+      ...(surfaceWater.positions.length ? [waterPart] : []),
     ],
     terminals: [],
     footprint: 1,
     height,
+    ...(supportY !== undefined && { supportY }),
   };
 }
 
-/** Shared models have four upward-rounded clearing sizes and at most 64 river port masks. */
+/** Discrete clearing profiles and six edge bits bound the number of shared meshes. */
 export function getTerrainModel(
   terrain: TerrainType,
   options?: TerrainModelOptions,
 ): MapModel {
+  if (terrain === "forest")
+    return getForestModel(options, () => {
+      const floor = new MeshBuilder();
+      substrate(floor, false);
+      ground(floor, PALETTE.grassShade, PALETTE.grass);
+      return floor.build();
+    });
   const requested = options?.footprint ?? 0;
+  if (terrain === "mountain") {
+    const profile = mountainProfile(requested);
+    const edges = (options?.adjacentEdges ?? 0) & 63;
+    return (cache.mountain[profile * 64 + edges] ??= build(
+      "mountain",
+      profile,
+      edges,
+    ));
+  }
   const bucket =
     requested > 0.8 ? 3 : requested > 0.65 ? 2 : requested > 0.55 ? 1 : 0;
   let ports = terrain === "river" && options?.ports === undefined ? 9 : 0;

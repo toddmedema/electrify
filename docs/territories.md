@@ -19,11 +19,15 @@ a hex opens its floating inspection or construction surface. Empty owned sites
 open the generator/storage catalogue already locked to that tile; occupied sites
 show the actual facility controls. City tiles show customers and demand by use.
 
-The map reveals three hexes beyond owned land and active utility connections.
-Terrain and structures fade and desaturate with distance; undiscovered cells
-cannot be bought. Acquiring a visible frontier tile extends that frontier, so the
-map has no small fixed boundary. Geography comes from a versioned integer
-coordinate hash shared by every co-op company, independently of weather seeds.
+Across the Valley opens with a fixed 196-hex board. Terrain and structures
+desaturate over three distance bands from the company's land. New connections
+stay within the board. Older saves retain their paid sites beyond its edge.
+The board uses the same versioned coordinates in single-player and co-op.
+
+Vergennes, Waterbury, Bristol, and Middlebury each have a local utility with a
+neighboring plant. Connecting a city transfers its customers. The incumbent
+keeps operating its plant until the site is acquired separately, when the
+seller removes the equipment.
 
 Valley Electric and Ridge Electric can each be inspected and acquired directly.
 Their plants, customers, sites, corporate debt and dated third-party obligations
@@ -37,10 +41,9 @@ blocks cannot overlap or queue before the active term expires. Supplier limits,
 weather, expiry and minimum bills remain; no line is built or upgraded to sign.
 Inherited third-party contracts retain their own dates and replacement windows.
 
-An unowned tile can be purchased immediately when it touches a physically owned
-company tile. Active utility PPAs and connected peer land extend sight without
-granting purchase adjacency. Acquired utility land and retained paid disconnected
-property are company-owned anchors for further adjacent purchases.
+An available tile can be purchased when it touches a physically owned company
+tile. Acquired utility land and retained paid property both qualify as company
+land for adjacent connections within the board.
 Prices use 2005 dollars, indexed by the existing seeded CPI:
 
 - General building tiles cost $3 million each. The original larger land area's

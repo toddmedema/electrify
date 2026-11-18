@@ -78,8 +78,14 @@ export default function TerritoryScene3D({
     [builder, views, tiles, wires, minute, runKey],
   );
   const lighting = React.useMemo(
-    () => mapLighting({ minute: minuteOfDay, ...daylight, dark }),
-    [minuteOfDay, daylight, dark],
+    () =>
+      mapLighting({
+        minute: minuteOfDay,
+        ...daylight,
+        dark,
+        cloud: viewport.weather?.cloud,
+      }),
+    [minuteOfDay, daylight, dark, viewport.weather?.cloud],
   );
   const lightingTransitionMs =
     speed === "SLOW" || speed === "NORMAL" ? TICK_MS[speed] : undefined;

@@ -374,13 +374,7 @@ function TileNetwork(props: Props) {
         <TileWorkspaceSurface
           title={title}
           focusKey={`${tile.id}:${activation}:${view.ownerKey ?? "unowned"}:${operatingFacility?.id ?? (view.facility ? "facility" : "empty")}`}
-          subtitle={
-            view.owned
-              ? view.ownerName
-              : territory.kind === "utility"
-                ? territory.name
-                : undefined
-          }
+          subtitle={view.ownerKey ? view.ownerName : undefined}
           building={building && !desktopRail}
           initialFocusSelector={
             building && desktopRail && railSite === tile.id
@@ -490,6 +484,13 @@ function TileNetwork(props: Props) {
               ) : (
                 !view.owned && (
                   <div className="tilePurchaseSummary">
+                    {view.municipalCity && (
+                      <Typography variant="body2">
+                        {quote
+                          ? "The utility will remove its plant when the site transfers."
+                          : `Connect the customers in ${view.municipalCity.city?.name ?? "the city"} before acquiring this site.`}
+                      </Typography>
+                    )}
                     <Button
                       variant="contained"
                       disabled={

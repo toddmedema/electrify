@@ -154,7 +154,10 @@ function model(
         radius = Math.max(radius, Math.hypot(px + x, pz + z));
         height = Math.max(
           height,
-          py + y + (part.motion === "flow" ? 0.018 : 0),
+          py +
+            y +
+            (part.motion === "flow" ? 0.018 : 0) +
+            (part.waterLevelRange ? Math.max(...part.waterLevelRange) : 0),
         );
       }
     }
@@ -642,11 +645,26 @@ function nuclear(): MapModel {
   ]);
 }
 
+function reservoir(
+  surface: MeshBuilder,
+  waterLevelRange: NonNullable<ModelPart["waterLevelRange"]>,
+): ModelPart {
+  return {
+    mesh: surface.build(),
+    material: "water",
+    waterLevelRange,
+    castsShadow: false,
+  };
+}
+
 function hydro(): MapModel {
   const body = new MeshBuilder(),
-    water = new MeshBuilder();
+    water = new MeshBuilder(),
+    flow = new MeshBuilder();
   base(body, 0.7, 0.45);
-  body.box([0, 0.147, -0.105], [0.66, 0.25, 0.26], P.steelShade);
+  // Basin floor stays exposed at empty. The front dam and back retaining wall
+  // still frame the water as it rises beneath the crest.
+  body.box([0, 0.063, -0.105], [0.66, 0.08, 0.26], P.steelShade);
   body.box([0, 0.167, -0.242], [0.69, 0.29, 0.025], P.steel);
   const front = (x: number) => 0.12 - 0.15 * (x / 0.32) ** 2;
   for (let i = 0; i < 8; i++) {
@@ -676,7 +694,7 @@ function hydro(): MapModel {
         [next, 0.32, b - 0.065],
         P.steel,
       );
-    body.quad(
+    water.quad(
       [x, 0.275, -0.228],
       [x, 0.275, a - 0.067],
       [next, 0.275, b - 0.067],
@@ -704,14 +722,15 @@ function hydro(): MapModel {
     body.beam([x, 0.32, 0.12], [x * 1.15, 0.046, 0.205], 0.011, P.cream);
   for (const y of [0.12, 0.2, 0.27]) {
     const z = 0.124 + ((0.306 - y) / 0.251) * 0.075;
-    water.box([0, y, z + 0.004], [0.087, 0.008, 0.008], P.water);
+    flow.box([0, y, z + 0.004], [0.087, 0.008, 0.008], P.water);
   }
   body.box([-0.22, 0.084, 0.145], [0.17, 0.12, 0.14], P.cream);
   gable(body, [-0.22, 0.144, 0.145], [0.19, 0.025, 0.155], P.steel);
   const glazing = windows(body, -0.22, 0.085, 0.218, 0.11);
   return facilityModel("hydro", body, switchgear(body, 0.245), [
     glazing,
-    effect(water.build(), "flow"),
+    reservoir(water, [-0.174, 0.021]),
+    effect(flow.build(), "flow"),
   ]);
 }
 
@@ -784,9 +803,21 @@ function pumpedHydro(): MapModel {
     top: number,
     width: number,
     depth: number,
+    upper: boolean,
   ) => {
-    body.box([x, top / 2, z], [width, top, depth], P.steelShade);
-    body.box([x, top + 0.004, z], [width - 0.03, 0.012, depth - 0.03], P.water);
+    const bottom = Math.max(0.037, top * 0.24);
+    body.box([x, bottom / 2, z], [width, bottom, depth], P.steelShade);
+    const left = x - width / 2 + 0.011;
+    const right = x + width / 2 - 0.011;
+    const back = z - depth / 2 + 0.011;
+    const front = z + depth / 2 - 0.011;
+    const water = new MeshBuilder().quad(
+      [left, top, back],
+      [left, top, front],
+      [right, top, front],
+      [right, top, back],
+      P.water,
+    );
     for (const sign of [-1, 1]) {
       body.box(
         [x + (sign * width) / 2, top / 2 + 0.015, z],
@@ -799,9 +830,13 @@ function pumpedHydro(): MapModel {
         P.cream,
       );
     }
+    // Stored energy tracks the upper basin. The lower basin declines as the upper fills.
+    const empty = bottom - top - 0.001,
+      full = 0.01;
+    return reservoir(water, upper ? [empty, full] : [full, empty]);
   };
-  basin(-0.13, -0.105, 0.26, 0.33, 0.2);
-  basin(0.17, 0.13, 0.075, 0.26, 0.17);
+  const upper = basin(-0.13, -0.105, 0.26, 0.33, 0.2, true);
+  const lower = basin(0.17, 0.13, 0.075, 0.26, 0.17, false);
   const pipe: Vec3[] = [
     [0.048, 0.22, -0.1],
     [0.105, 0.22, -0.1],
@@ -821,6 +856,8 @@ function pumpedHydro(): MapModel {
   const glazing = windows(body, -0.19, 0.085, 0.208, 0.14);
   return facilityModel("pumped-hydro", body, switchgear(body, 0.245), [
     glazing,
+    upper,
+    lower,
     effect(flow.build(), "flow"),
   ]);
 }

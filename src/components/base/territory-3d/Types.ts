@@ -1,3 +1,5 @@
+import type { MapWeather } from "./MapWeather";
+
 export type Vec3 = readonly [number, number, number];
 export type RGB = readonly [number, number, number];
 
@@ -10,8 +12,14 @@ export interface MapMesh {
 export type MapMotion = "rotor" | "steam" | "flow" | "pulse" | "sway";
 export interface ModelPart {
   mesh: MapMesh;
-  /** Facility glazing is authored separately; city glazing keeps its own palette. */
-  material?: "facility-surface" | "facility-window";
+  material?:
+    | "facility-surface"
+    | "facility-window"
+    | "water"
+    | "watershed-water"
+    | "mountain";
+  /** Tile-width offsets at empty and full storage, respectively. */
+  waterLevelRange?: readonly [empty: number, full: number];
   position?: Vec3;
   motion?: MapMotion;
   phaseOffset?: number;
@@ -25,6 +33,8 @@ export interface MapModel {
   terminals: readonly Vec3[];
   footprint: number;
   height: number;
+  /** Center ground elevation for an occupant on raised terrain. */
+  supportY?: number;
   /** Sampled from the same terminals and segments that build a grouped conductor mesh. */
   connections?: readonly MapWireConnection[];
 }
@@ -40,6 +50,8 @@ export interface TerrainModelOptions {
   /** Zero for untouched land; otherwise reserve at least this width around the center. */
   footprint?: number;
   ports?: readonly number[];
+  /** Bits for edges shared with the same terrain, in HEX_NEIGHBORS order. */
+  adjacentEdges?: number;
 }
 export type StructureKind =
   | "city-small"
@@ -68,6 +80,8 @@ export interface MapInstance {
   active: boolean;
   /** Measured generation/discharge only; charging may be active without producing. */
   producing?: boolean;
+  /** Fraction of the actual reservoir capacity; undefined when no level is disclosed. */
+  waterLevel?: number;
   /** Actual facility identity: changing speed or rebuilding batches must not reset phase. */
   motionKey?: string;
 }
@@ -87,6 +101,7 @@ export interface MapFrame {
   scale: number;
   background: RGB;
   lighting: MapLighting;
+  weather?: MapWeather;
   /** At slower speeds, distribute a simulated lighting step across the next tick interval. */
   lightingTransitionMs?: number;
   visible: boolean;
@@ -125,6 +140,8 @@ export interface RendererSceneInstance {
   /** World-space bounds of the actual submitted solid vertices at their current pose. */
   min: Vec3;
   max: Vec3;
+  /** World-space elevations of submitted water surfaces. */
+  waterSurfaceY?: readonly number[];
   connections?: readonly MapWireConnection[];
 }
 
