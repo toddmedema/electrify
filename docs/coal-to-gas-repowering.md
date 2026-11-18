@@ -180,10 +180,10 @@ The cost fractions and project durations above are representative game settings 
 case evidence. Published examples vary by site, project scope, permitting and the condition
 of the equipment available for reuse.
 
-In-game conversions are cash purchases funded at approval. The paid project counts as an
-asset during construction. Commissioning retires the old coal equipment's remaining resale
+In-game conversions can be paid in cash or with a standard project loan. The project counts as
+an asset during construction. Loan payments begin at approval. Commissioning retires the old coal equipment's remaining resale
 value and starts depreciating the new gas investment. The site keeps its dispatch position,
-operating history and any outstanding debt. Canceling before commissioning refunds the purchase
-price. The gas construction emissions accrue over the project's actual elapsed work at the
+operating history and any outstanding debt. Canceling before commissioning settles the conversion
+loan and returns the project equity paid so far. The gas construction emissions accrue over the project's actual elapsed work at the
 catalog's rate for the destination technology. The game keeps guided missions and coal
 facilities with transfer restrictions or mandated disconnections on their authored paths.

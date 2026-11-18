@@ -14,6 +14,7 @@ import ConfirmDialog from "./ConfirmDialog";
 import {
   facilityAgeYears,
   facilityCashBack,
+  facilityLoanBalance,
   facilityEquivalentCycles,
   facilityLifetime,
   facilityMaintenanceCost,
@@ -368,7 +369,7 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
               value={
                 <>
                   {formatMoneyConcise(facilityCashBack(facility, date.minute))}
-                  {facility.loanAmountLeft > 0 && (
+                  {facilityLoanBalance(facility) > 0 && (
                     <span className="facilityStatNote">After loan payoff</span>
                   )}
                 </>
@@ -515,11 +516,11 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
                     : undefined
               }
             />
-            {facility.loanAmountLeft > 0 && (
+            {facilityLoanBalance(facility) > 0 && (
               <Stat
                 label="Loan balance"
                 entry={MANUAL_ENTRY.INTEREST_RATES}
-                value={formatMoneyConcise(facility.loanAmountLeft)}
+                value={formatMoneyConcise(facilityLoanBalance(facility))}
               />
             )}
             {/* Every operating facility pays this, whether or not it also pays per MWh: solar,

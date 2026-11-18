@@ -51,6 +51,7 @@ import { isValidLocation } from "./helpers/Locations";
 import { isValidDifficulty } from "./helpers/Difficulty";
 import {
   validGasCycle,
+  validRepowerLoan,
   validResilienceRecord,
   validUpgradeInProgress,
 } from "./helpers/BuildValidation";
@@ -568,6 +569,7 @@ export function parseSave(raw: unknown): SaveGameType | null {
         optionalBooleansInvalid ||
         !validResilienceRecord(current.fuel, current.resilience) ||
         !validGasCycle(current.fuel, current.gasCycle) ||
+        !validRepowerLoan(current) ||
         !validUpgradeInProgress(
           current.upgradeInProgress,
           current,

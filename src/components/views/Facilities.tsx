@@ -53,6 +53,7 @@ import {
 } from "../../Types";
 import {
   facilityCashBack,
+  facilityLoanBalance,
   facilityPermanentlyShutdown,
 } from "../../helpers/Financials";
 import { storyOutputMultiplier } from "../../helpers/Story";
@@ -807,8 +808,8 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                   {formatMoneyConcise(
                     facilityCashBack(facility, game.date.minute),
                   )}
-                  {facility.loanAmountLeft > 0
-                    ? ` and the rest will go towards paying off the remaining loan balance of ${formatMoneyConcise(facility.loanAmountLeft)}`
+                  {facilityLoanBalance(facility) > 0
+                    ? ` and the rest will go towards paying off the remaining loan balance of ${formatMoneyConcise(facilityLoanBalance(facility))}`
                     : ""}
                   .
                 </DialogContentText>

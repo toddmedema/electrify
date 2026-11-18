@@ -10,16 +10,24 @@ import {
 import {
   COAL_REPOWER_OPTIONS,
   coalRepowerInProgress,
+  coalRepowerPurchaseTerms,
   coalRepowerQuote,
 } from "../../helpers/CoalRepower";
 import { MINUTES_PER_MONTH } from "../../helpers/DateTime";
-import { formatNumber, formatPercent, formatWatts } from "../../helpers/Format";
+import {
+  formatForecastWatts,
+  formatNumber,
+  formatWatts,
+} from "../../helpers/Format";
+import {
+  estimatedAnnualOperatingCost,
+  facilityLoanMonths,
+} from "../../helpers/Financials";
 import { currentCash } from "../../helpers/GameSelectors";
 import { upgradeProgress } from "../../helpers/Hazards";
-import ConfirmDialog from "./ConfirmDialog";
-import { useMoney } from "./CurrencyContext";
-import DecisionImpactPreview from "./DecisionImpactPreview";
+import { useCoalRepowerImpact } from "./CoalRepowerImpact";
 import FacilityUpgradeAction from "./FacilityUpgradeAction";
+import PurchaseReviewDialog from "./PurchaseReviewDialog";
 
 export function coalRepowerActionLabel(kind: CoalRepowerType): string {
   return `Convert to ${COAL_REPOWER_OPTIONS[kind].name}`;
@@ -43,64 +51,60 @@ export function CoalRepowerReview({
   onClose: () => void;
   onRetrofit: (payload: RetrofitFacilityAction) => void;
 }) {
-  const { formatMoneyConcise } = useMoney();
   const quote = coalRepowerQuote(facility, game, kind);
+  const impact = useCoalRepowerImpact(game, facility.id, kind);
   if (!quote) return null;
 
   const { cost, durationMinutes, target } = quote;
-  const cash = currentCash(game);
-  const canAfford = cash >= cost;
-  const capacity = formatWatts(target.peakW);
+  const margin = impact.status === "ready" ? impact.result : undefined;
+  const capacityChange =
+    target.peakW !== facility.peakW
+      ? ` Nameplate capacity drops from ${formatWatts(facility.peakW)} to ${formatWatts(target.peakW)}.`
+      : "";
   return (
-    <ConfirmDialog
+    <PurchaseReviewDialog
       open
-      isolateClicks
-      contentClassName="noPadding"
       title={`${coalRepowerActionLabel(kind)}?`}
-      confirmLabel={`Pay ${formatMoneyConcise(cost)}`}
-      confirmDisabled={!canAfford}
-      onCancel={onClose}
-      onConfirm={() => {
-        if (canAfford) onRetrofit({ facilityId: facility.id, upgrade: kind });
+      cash={currentCash(game)}
+      buildCost={cost}
+      interestRate={game.interestRate}
+      loanMonths={facilityLoanMonths(target.lifespanYears)}
+      cashLabel="Cash option"
+      upkeepLabel="Maintenance"
+      upkeepPerMonth={estimatedAnnualOperatingCost(target) / 12}
+      onClose={onClose}
+      onPurchase={(financed) => {
+        onRetrofit({ facilityId: facility.id, upgrade: kind, financed });
         onClose();
       }}
-    >
-      <DecisionImpactPreview
-        facts={[
-          {
-            concept: "money",
-            label: "Cash purchase",
-            value: canAfford
-              ? `About ${formatMoneyConcise(cash - cost)} left`
-              : `${formatMoneyConcise(cost - cash)} more cash needed`,
-            detail:
-              "Cancel before completion for a full refund. Existing loans stay payable.",
-          },
-          {
-            concept: "time",
-            label: "Construction",
-            value: `${projectMonths(durationMinutes)} months`,
-            detail:
-              "Coal can keep running while the gas plant is built. The gas plant takes over at completion.",
-          },
-          {
-            concept: "supply",
-            label: "Rated capacity",
-            value:
-              target.peakW === facility.peakW
-                ? capacity
-                : `${formatWatts(facility.peakW)} → ${capacity}`,
-            detail: `The new gas plant begins a ${target.lifespanYears}-year service life.`,
-          },
-          {
-            concept: "fuel",
-            label: "Fuel and start time",
-            value: `Natural Gas · ${target.spinMinutes} min`,
-            detail: `${formatNumber(target.btuPerWh * 1000)} Btu/kWh · ${formatPercent(target.minimumStableOutput ?? 0)} minimum output`,
-          },
-        ]}
-      />
-    </ConfirmDialog>
+      extraFacts={[
+        {
+          concept: "time",
+          label: "Conversion complete in",
+          value: `${projectMonths(durationMinutes)} months`,
+          detail: `Coal can keep running until the gas plant takes over.${capacityChange}`,
+        },
+        {
+          concept: "fuel",
+          label: "Gas plant operation",
+          value:
+            kind === "coalToGasCC"
+              ? "Efficient for steady demand"
+              : "Fast starts for peak demand",
+          detail: `${target.spinMinutes} min to start · ${formatNumber(target.btuPerWh * 1000)} Btu/kWh`,
+        },
+        {
+          concept: "supply",
+          label: "Lowest supply margin",
+          value: margin
+            ? `${formatForecastWatts(margin.beforeW)} → ${formatForecastWatts(margin.afterW)}`
+            : impact.status === "loading" || impact.status === "idle"
+              ? "Estimating…"
+              : "Forecast unavailable",
+          detail: "First year after completion, without vs. with conversion.",
+        },
+      ]}
+    />
   );
 }
 
@@ -163,15 +167,22 @@ export default function CoalRepower({
           Build new gas turbines at this coal site.
         </Typography>
       )}
-      {options.map(({ kind, quote }) => (
-        <FacilityUpgradeAction
-          key={kind}
-          label={coalRepowerActionLabel(kind)}
-          cost={quote.cost}
-          shortfall={Math.max(0, quote.cost - cash)}
-          onClick={() => setReview(kind)}
-        />
-      ))}
+      {options.map(({ kind, quote }) => {
+        const { amountDue } = coalRepowerPurchaseTerms(
+          quote,
+          true,
+          game.interestRate,
+        );
+        return (
+          <FacilityUpgradeAction
+            key={kind}
+            label={coalRepowerActionLabel(kind)}
+            cost={quote.cost}
+            shortfall={Math.max(0, amountDue - cash)}
+            onClick={() => setReview(kind)}
+          />
+        );
+      })}
       {review && reviewAvailable && onRetrofit && (
         <CoalRepowerReview
           facility={facility}

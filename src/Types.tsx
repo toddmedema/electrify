@@ -648,6 +648,8 @@ export interface GeneratorOperatingType
   extends GeneratorShoppingType, SharedOperatingType {
   // A retrofit or repower under way on this facility.
   upgradeInProgress?: FacilityUpgradeInProgressType;
+  /** Separate project debt keeps any standing loan on its original terms. */
+  repowerLoan?: LoanInfo;
   // Unit commitment is distinct from instantaneous output: a plant ramps through outputs below
   // its stable minimum while starting and stopping, but cannot remain there indefinitely.
   committed?: boolean;
@@ -704,7 +706,7 @@ export interface LifetimeTotals {
   lifetimeStarts?: number;
 }
 
-interface LoanInfo {
+export interface LoanInfo {
   loanAmountTotal: number;
   loanAmountLeft: number;
   loanMonthlyPayment: number;
@@ -1178,6 +1180,8 @@ export interface WeatherHazardProfileType {
 export interface RetrofitFacilityAction {
   facilityId: number;
   upgrade: FacilityUpgradeType;
+  /** Only coal repowers offer financing. Older commands pay cash. */
+  financed?: boolean;
 }
 
 export const COAL_REPOWER_UPGRADES = [
@@ -1195,11 +1199,11 @@ export function isCoalRepower(upgrade: unknown): upgrade is CoalRepowerType {
 
 /**
  * Work on a standing facility. The upgrade takes effect at completesMinute.
- * Cancellation before then refunds `cost` in full.
+ * Cancellation before then returns the project's equity.
  */
 export interface FacilityUpgradeInProgressType {
   upgrade: FacilityUpgradeType;
-  cost: number; // What the player paid, and what a cancellation refunds
+  cost: number; // Capitalized project price before financing
   startsMinute: number;
   completesMinute: number;
   /** Rated gas output approved when a coal repower starts. */

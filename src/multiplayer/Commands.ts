@@ -15,6 +15,7 @@ import { validScenarioResponse } from "../helpers/ScenarioChoices";
 import { isCoalRepower, isStorage } from "../Types";
 import {
   coalRepowerInProgress,
+  coalRepowerPurchaseTerms,
   coalRepowerQuote,
 } from "../helpers/CoalRepower";
 import type { FacilityShoppingType, GameType } from "../Types";
@@ -165,7 +166,14 @@ const GAME_COMMAND_VALIDATORS = {
     const source = game.facilities.find((f) => f.id === payload.facilityId);
     const quote = source && coalRepowerQuote(source, game, payload.upgrade);
     if (!quote) return { error: "That conversion is unavailable" };
-    return (currentTick(game)?.cash ?? -1) >= quote.cost
+    const { amountDue, monthlyPayment } = coalRepowerPurchaseTerms(
+      quote,
+      !!payload.financed,
+      game.interestRate,
+    );
+    return Number.isFinite(amountDue) &&
+      Number.isFinite(monthlyPayment) &&
+      (currentTick(game)?.cash ?? -1) >= amountDue
       ? { payload }
       : { error: "Not enough cash for this conversion" };
   },

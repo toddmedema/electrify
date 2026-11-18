@@ -93,8 +93,10 @@ import {
   COAL_REPOWER_OPTIONS,
   coalRepowerConstructionEmissions,
   coalRepowerInProgress,
+  coalRepowerPurchaseTerms,
   coalRepowerQuote,
   completeCoalRepower,
+  scheduledCoalRepower,
 } from "../helpers/CoalRepower";
 import { accessContextForGame, corridorsForGame } from "../data/IntertieAccess";
 import {
@@ -394,7 +396,9 @@ import {
   SpeedType,
   TickPresentFutureType,
   FuelProductionType,
+  CoalRepowerType,
   FacilityUpgradeType,
+  LoanInfo,
   isCoalRepower,
   RetrofitFacilityAction,
   BuyingRuleType,
@@ -2801,6 +2805,55 @@ export function previewFacilityBuild(
   };
 }
 
+/** Compare both fleet plans in the same twelve months after the proposed changeover. */
+export function previewCoalRepowerImpact(
+  game: GameType,
+  facilityId: number,
+  kind: CoalRepowerType,
+): { beforeW: number; afterW: number } | undefined {
+  const facility = game.facilities.find(({ id }) => id === facilityId);
+  const quote = facility && coalRepowerQuote(facility, game, kind);
+  const now = getTimeFromTimeline(game.date.minute, game.timeline);
+  if (!facility || isStorage(facility) || !quote || !now) return undefined;
+
+  const project = scheduledCoalRepower(kind, quote, game.date.minute);
+  const year = TICKS_PER_YEAR * TICK_MINUTES;
+  const step = 60;
+  const ticks = Math.ceil((quote.durationMinutes + year) / step) + 1;
+  const comparisonEnd = project.completesMinute + year;
+  const lowestMargin = (plan: GameType) => {
+    const forecast = generateForecastTimeline(
+      plan,
+      now.cash,
+      now.customers,
+      ticks,
+      step,
+    );
+    let lowest = Infinity;
+    for (const tick of forecast) {
+      if (
+        tick.minute >= project.completesMinute &&
+        tick.minute < comparisonEnd
+      ) {
+        lowest = Math.min(lowest, tick.reserveW ?? tick.supplyW - tick.demandW);
+      }
+    }
+    return lowest;
+  };
+  const beforeW = lowestMargin(game);
+  const afterW = lowestMargin({
+    ...game,
+    facilities: game.facilities.map((candidate) =>
+      candidate.id === facilityId
+        ? { ...facility, upgradeInProgress: project }
+        : candidate,
+    ),
+  });
+  return Number.isFinite(beforeW) && Number.isFinite(afterW)
+    ? { beforeW, afterW }
+    : undefined;
+}
+
 function refreshInterestRate(
   state: GameType,
   cash: number,
@@ -2942,7 +2995,7 @@ function applySellFacility(state: GameType, id: number): boolean {
       ? `Canceled construction of ${sold.name}`
       : `Sold ${sold.name}, ${sold.peakWh ? formatWattHours(sold.peakWh) : formatWatts(sold.peakW)} for ${formatMoneyConcise(facilityCashBack(sold, state.date.minute), currencyForLocation(state.location, state.startingYear))}`,
   );
-  const ownedState = `${sold.name}:${sold.peakWh ?? sold.peakW}:${sold.loanAmountTotal > 0 ? "financed" : "cash"}`;
+  const ownedState = `${sold.name}:${sold.peakWh ?? sold.peakW}:${sold.loanAmountTotal > 0 || sold.repowerLoan ? "financed" : "cash"}`;
   endWeatherHazardsForFacility(state, id);
   // in one loop, refund cash from selling + remove from list
   state.facilities = state.facilities.filter((g: FacilityOperatingType) => {
@@ -3358,28 +3411,43 @@ function applyRetrofitFacility(
   const now = getTimeFromTimeline(state.date.minute, state.timeline);
   if (cost === undefined || !Number.isFinite(cost) || cost < 0 || !now)
     return false;
-  if (now.cash < cost) return false;
+  const terms = project
+    ? coalRepowerPurchaseTerms(project, !!payload.financed, state.interestRate)
+    : undefined;
+  const cashDue = terms?.amountDue ?? cost;
+  if (!Number.isFinite(cashDue) || now.cash < cashDue) return false;
+  if (terms && !Number.isFinite(terms.monthlyPayment)) return false;
 
-  now.cash -= cost;
-  if (!project) {
+  now.cash -= cashDue;
+  if (project && repower) {
+    facility.upgradeInProgress = scheduledCoalRepower(
+      upgrade,
+      project,
+      state.date.minute,
+    );
+    if (terms && terms.loanAmount > 0) {
+      facility.repowerLoan = {
+        loanAmountTotal: terms.loanAmount,
+        loanAmountLeft: terms.loanAmount,
+        loanMonthlyPayment: terms.monthlyPayment,
+        interestRate: state.interestRate,
+      };
+      refreshInterestRate(state, now.cash);
+    }
+  } else {
     now.netWorth -= cost;
     now.expensesOM += cost;
     facility.lifetimeExpenses = (facility.lifetimeExpenses || 0) + cost;
     recordRetrofitTransaction(state, facility.id, upgrade, cost);
+    facility.upgradeInProgress = {
+      upgrade,
+      cost,
+      startsMinute: state.date.minute,
+      completesMinute:
+        state.date.minute +
+        (conversion ? GAS_CONVERSION_MINUTES : RETROFIT_DOWNTIME_MINUTES),
+    };
   }
-  facility.upgradeInProgress = {
-    upgrade,
-    cost,
-    startsMinute: state.date.minute,
-    completesMinute:
-      state.date.minute +
-      (project?.durationMinutes ??
-        (conversion ? GAS_CONVERSION_MINUTES : RETROFIT_DOWNTIME_MINUTES)),
-    ...(project && {
-      targetPeakW: project.target.peakW,
-      constructionKgco2eTotal: project.constructionKgco2eTotal,
-    }),
-  };
 
   const label = retrofitLabel(upgrade);
   const price = formatMoneyConcise(
@@ -3408,7 +3476,7 @@ function applyRetrofitFacility(
   return true;
 }
 
-/** Cancel work in progress and refund its full purchase price. */
+/** Cancel the work, settle its conversion loan and return the paid project equity. */
 function applyCancelRetrofit(state: GameType, payload: unknown): boolean {
   if (!Number.isSafeInteger(payload)) return false;
   const facility = state.facilities.find(({ id }) => id === payload);
@@ -3423,15 +3491,21 @@ function applyCancelRetrofit(state: GameType, payload: unknown): boolean {
     upgrade.cost < 0
   )
     return false;
-  const refund = upgrade.cost;
+  const repower = isCoalRepower(upgrade.upgrade);
+  const projectLoan = repower ? facility.repowerLoan : undefined;
+  const refund = upgrade.cost - (projectLoan?.loanAmountLeft ?? 0);
   now.cash += refund;
-  if (!isCoalRepower(upgrade.upgrade)) {
+  if (!repower) {
     now.netWorth += refund;
     now.expensesOM -= refund;
     facility.lifetimeExpenses = (facility.lifetimeExpenses || 0) - refund;
     recordRetrofitTransaction(state, facility.id, upgrade.upgrade, -refund);
   }
   delete facility.upgradeInProgress;
+  if (projectLoan) {
+    delete facility.repowerLoan;
+    refreshInterestRate(state, now.cash);
+  }
   const lever = retrofitLever(upgrade.upgrade);
   recordMeaningfulDecision(state, {
     lever: `resilience:${facility.id}:${lever}`,
@@ -5149,6 +5223,21 @@ export function peerTradePrice(
   return state.multiplayer?.pricePerMWh ?? basePeerTradePrice(tick);
 }
 
+/** Settle one interval of a fixed-rate facility loan, including a conversion loan. */
+function settleFacilityLoan(loan: LoanInfo, ticksPerMonth: number) {
+  const monthlyInterest = getPaymentInterest(
+    loan.loanAmountLeft,
+    loan.interestRate,
+  );
+  // The final interval only pays the principal still outstanding.
+  const principal = Math.min(
+    (loan.loanMonthlyPayment - monthlyInterest) / ticksPerMonth,
+    loan.loanAmountLeft,
+  );
+  loan.loanAmountLeft -= principal;
+  return { interest: monthlyInterest / ticksPerMonth, principal };
+}
+
 function* supplyFacilitiesFinancesPhases(
   state: GameType,
   prev: TickPresentFutureType,
@@ -6549,28 +6638,24 @@ function* supplyFacilitiesFinancesPhases(
         facilityExpenses += facilityFuel + carbonFee * facilityFeeableKgco2e;
       }
       if (g.loanAmountLeft > 0) {
-        const paymentInterest = getPaymentInterest(
-          g.loanAmountLeft,
-          g.interestRate,
-        );
-        // Never more principal than is actually outstanding. The last payment of a loan is a
-        // whole tick's worth against whatever fraction of it is left, so without the floor the
-        // balance settles a few dollars below zero and stays there for the rest of the run --
-        // which reads as the lender owing the player money, counts towards net worth, and trips
-        // the loan invariant on every tick from then on
-        const paymentPrincipal = Math.min(
-          (g.loanMonthlyPayment - paymentInterest) / ticksPerMonth,
-          g.loanAmountLeft,
-        );
-        expensesInterest += paymentInterest / ticksPerMonth;
-        principalRepayment += paymentPrincipal;
-        g.loanAmountLeft -= paymentPrincipal;
-        // The last payment of a loan is the only interesting one, and nothing else on screen
-        // marks it: the interest line simply stops going down
-        if (!simulated && g.loanAmountLeft <= 0) {
+        const { interest, principal } = settleFacilityLoan(g, ticksPerMonth);
+        expensesInterest += interest;
+        principalRepayment += principal;
+        facilityExpenses += interest;
+        if (!simulated && g.loanAmountLeft <= 0)
           logGameEvent(state, "LOAN", `Loan paid off: ${g.name}`);
-        }
-        facilityExpenses += paymentInterest / ticksPerMonth;
+      }
+      const projectLoan = g.repowerLoan;
+      if (projectLoan && projectLoan.loanAmountLeft > 0) {
+        const { interest, principal } = settleFacilityLoan(
+          projectLoan,
+          ticksPerMonth,
+        );
+        expensesInterest += interest;
+        principalRepayment += principal;
+        facilityExpenses += interest;
+        if (!simulated && projectLoan.loanAmountLeft <= 0)
+          logGameEvent(state, "LOAN", `Conversion loan paid off: ${g.name}`);
       }
       // Only a real tick is a tick of this facility's life. The pre-roll frames after a month
       // rollover and every tick of every forecast come through here too, and neither happened
@@ -7545,7 +7630,7 @@ function getNetWorth(
   let netWorth = cash;
   facilities.forEach((g: FacilityOperatingType) => {
     netWorth += facilityCashBack(g, currentMinute);
-    // A paid repower is work in progress until its cost becomes the new gas plant's basis.
+    // Repowering capital counts as work in progress until it becomes the new gas plant's basis.
     netWorth += coalRepowerInProgress(g)?.cost ?? 0;
   });
   transmissionLines.forEach((line) => {

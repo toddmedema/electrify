@@ -3,14 +3,20 @@ import { TICK_MINUTES } from "../Constants";
 import { parseSave, serializeSave } from "../SaveGame";
 import { CoalRepowerType, GameType } from "../Types";
 import { LEGACY_CAMPAIGN_ID } from "../data/LegacyCampaign";
-import { coalRepowerQuote, completeCoalRepower } from "../helpers/CoalRepower";
+import {
+  coalRepowerPurchaseTerms,
+  coalRepowerQuote,
+  completeCoalRepower,
+} from "../helpers/CoalRepower";
 import { serializeCommitmentMetadata } from "../helpers/Commitment";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "../helpers/DateTime";
+import { facilityLoanBalance } from "../helpers/Financials";
 import { currentTick } from "../helpers/GameSelectors";
 import { validateGameCommand } from "../multiplayer/Commands";
 import { createGame } from "../testing/Simulator";
 import reducer, {
   cancelRetrofit,
+  previewCoalRepowerImpact,
   reprioritizeFacility,
   resume,
   retrofitFacility,
@@ -290,4 +296,104 @@ it("commissions the replacement in the exclusive month-end agreement forecast", 
       0,
     ),
   ).toBeCloseTo(800);
+});
+
+it("finances the replacement separately and refunds its paid equity on cancellation", () => {
+  const game = scenario();
+  const coal = findCoal(game);
+  const originalRate = 0.04;
+  Object.assign(coal, {
+    loanAmountTotal: 20e6,
+    loanAmountLeft: 8e6,
+    loanMonthlyPayment: 32e3,
+    interestRate: originalRate,
+  });
+  advance(game, TICK_MINUTES);
+  const before = currentTick(game)!;
+  const upgrade = "coalToGasPeaker";
+  const quote = coalRepowerQuote(coal, game, upgrade)!;
+  const terms = coalRepowerPurchaseTerms(quote, true, game.interestRate);
+  const payload = { facilityId: coal.id, upgrade, financed: true } as const;
+  const loanOnly = cloneDeep(game);
+  currentTick(loanOnly)!.cash = terms.amountDue;
+  expect(
+    reducer(
+      cloneDeep(loanOnly),
+      retrofitFacility({ ...payload, financed: false }),
+    ),
+  ).toEqual(loanOnly);
+  expect(validateGameCommand(loanOnly, "retrofitFacility", payload)).toEqual({
+    payload,
+  });
+  expect(
+    currentTick(reducer(cloneDeep(loanOnly), retrofitFacility(payload)))!.cash,
+  ).toBe(0);
+  currentTick(loanOnly)!.cash -= 1;
+  expect(reducer(loanOnly, retrofitFacility(payload))).toBe(loanOnly);
+  expect(
+    validateGameCommand(loanOnly, "retrofitFacility", payload),
+  ).toHaveProperty("error");
+
+  const started = reducer(game, retrofitFacility(payload));
+  expect(currentTick(started)!.cash).toBe(before.cash - terms.downpayment);
+  expect(currentTick(started)!.netWorth).toBeCloseTo(before.netWorth);
+  expect(findCoal(started)).toMatchObject({
+    interestRate: originalRate,
+    loanAmountLeft: coal.loanAmountLeft,
+    repowerLoan: {
+      loanAmountTotal: terms.loanAmount,
+      loanAmountLeft: terms.loanAmount,
+      loanMonthlyPayment: terms.monthlyPayment,
+      interestRate: game.interestRate,
+    },
+  });
+  const played = cloneDeep(started);
+  advance(played, MINUTES_PER_MONTH);
+  const outstanding = findCoal(played).repowerLoan!.loanAmountLeft;
+  expect(outstanding).toBeLessThan(terms.loanAmount);
+  const saved = JSON.parse(JSON.stringify(serializeSave(played)));
+  expect(parseSave(saved)).not.toBeNull();
+  const facilityInSave = saved.game.facilities.find(
+    ({ id }: { id: number }) => id === coal.id,
+  );
+  facilityInSave.repowerLoan.loanAmountLeft = terms.loanAmount + 1;
+  expect(parseSave(saved)).toBeNull();
+
+  const cancelCash = currentTick(played)!.cash;
+  const canceled = reducer(cloneDeep(played), cancelRetrofit(coal.id));
+  expect(currentTick(canceled)!.cash).toBeCloseTo(
+    cancelCash + (quote.cost - outstanding),
+  );
+  expect(findCoal(canceled).repowerLoan).toBeUndefined();
+  expect(findCoal(canceled).loanAmountLeft).toBe(
+    findCoal(played).loanAmountLeft,
+  );
+  expect(findCoal(canceled).interestRate).toBe(originalRate);
+
+  advance(played, game.date.minute + quote.durationMinutes);
+  const gas = played.facilities.find(({ id }) => id === coal.id)!;
+  expect(gas.fuel).toBe("Natural Gas");
+  expect(gas.repowerLoan!.loanAmountLeft).toBeLessThan(outstanding);
+  expect(facilityLoanBalance(gas)).toBe(
+    gas.loanAmountLeft + gas.repowerLoan!.loanAmountLeft,
+  );
+  expect(
+    parseSave(JSON.parse(JSON.stringify(serializeSave(played)))),
+  ).not.toBeNull();
+});
+
+it("estimates the margin effect of the replacement's dispatch at equal capacity", () => {
+  const game = scenario();
+  const coal = findCoal(game);
+  const kind = "coalToGasPeaker";
+  expect(coalRepowerQuote(coal, game, kind)?.target.peakW).toBe(coal.peakW);
+  const impact = previewCoalRepowerImpact(game, coal.id, kind);
+  expect(impact).toBeDefined();
+  expect(impact!.afterW).toBeGreaterThan(impact!.beforeW);
+  expect(findCoal(game)).toBe(coal);
+  expect(coal.upgradeInProgress).toBeUndefined();
+
+  coal.paused = true;
+  const paused = previewCoalRepowerImpact(game, coal.id, kind);
+  expect(paused?.afterW).toBe(paused?.beforeW);
 });

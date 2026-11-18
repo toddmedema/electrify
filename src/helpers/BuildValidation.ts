@@ -8,6 +8,7 @@ import {
 } from "../Types";
 import { DESIGN_MIN_TEMP_BOUNDS_C } from "../data/Hazards";
 import { RepowerContext, validCoalRepowerSchedule } from "./CoalRepower";
+import { maxLoanAmount } from "./Financials";
 
 const MAXIMUM_CONSTRUCTION_KGCO2E: Readonly<Record<string, number>> = {
   constructionKgco2ePerW: 20,
@@ -121,6 +122,47 @@ export function validUpgradeInProgress(
   );
 }
 
+/** A separate conversion loan can belong to active coal work or the commissioned gas site. */
+export function validRepowerLoan(facility: Record<string, unknown>): boolean {
+  if (facility.repowerLoan === undefined) return true;
+  if (
+    !facility.repowerLoan ||
+    typeof facility.repowerLoan !== "object" ||
+    facility.peakWh !== undefined ||
+    facility.yearsToBuildLeft !== 0
+  )
+    return false;
+  const work = facility.upgradeInProgress as
+    { upgrade?: unknown; cost?: unknown } | undefined;
+  const cost =
+    facility.fuel === "Coal" && isCoalRepower(work?.upgrade)
+      ? work?.cost
+      : facility.fuel === "Natural Gas" &&
+          validGasCycle(facility.fuel, facility.gasCycle) &&
+          facility.gasCycle !== undefined
+        ? facility.buildCost
+        : undefined;
+  const loan = facility.repowerLoan as Record<string, unknown>;
+  const {
+    loanAmountLeft: left,
+    loanAmountTotal: total,
+    loanMonthlyPayment: payment,
+    interestRate: rate,
+  } = loan;
+  return (
+    nonNegative(cost) &&
+    cost > 0 &&
+    nonNegative(total) &&
+    total > 0 &&
+    Math.abs(total - maxLoanAmount(cost)) <= cost * 1e-9 &&
+    nonNegative(left) &&
+    left <= total &&
+    nonNegative(rate) &&
+    nonNegative(payment) &&
+    payment > (total * rate) / 12
+  );
+}
+
 /** A quote's weather hardening and the share of its price the options account for. */
 function validResilience(facility: Record<string, unknown>): boolean {
   if (
@@ -141,7 +183,9 @@ export function validRetrofitFacility(
   return (
     Number.isSafeInteger(payload.facilityId) &&
     (payload.facilityId as number) >= 0 &&
-    FACILITY_UPGRADES.includes(payload.upgrade as FacilityUpgradeType)
+    FACILITY_UPGRADES.includes(payload.upgrade as FacilityUpgradeType) &&
+    (payload.financed === undefined ||
+      (isCoalRepower(payload.upgrade) && typeof payload.financed === "boolean"))
   );
 }
 

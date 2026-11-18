@@ -13,6 +13,7 @@ import {
 } from "../Types";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "./DateTime";
 import { activeScenario } from "./GameSelectors";
+import { facilityLoanMonths, purchaseTerms } from "./Financials";
 
 // Brownfield site reuse assumptions. See docs/coal-to-gas-repowering.md for the cases and scope.
 export const COAL_REPOWER_OPTIONS = {
@@ -131,6 +132,20 @@ export function coalRepowerQuote(
   };
 }
 
+export function coalRepowerPurchaseTerms(
+  quote: NonNullable<ReturnType<typeof coalRepowerQuote>>,
+  financed: boolean,
+  interestRate: number,
+) {
+  return purchaseTerms(
+    quote.cost,
+    financed,
+    interestRate,
+    0,
+    facilityLoanMonths(quote.target.lifespanYears),
+  );
+}
+
 type CoalRepowerProject = FacilityUpgradeInProgressType & {
   upgrade: CoalRepowerType;
 };
@@ -139,6 +154,22 @@ function isCoalRepowerProject(
   project: FacilityUpgradeInProgressType | undefined,
 ): project is CoalRepowerProject {
   return isCoalRepower(project?.upgrade);
+}
+
+/** Use the same construction record for a paid project and its private supply forecast. */
+export function scheduledCoalRepower(
+  kind: CoalRepowerType,
+  quote: NonNullable<ReturnType<typeof coalRepowerQuote>>,
+  startsMinute: number,
+): CoalRepowerProject {
+  return {
+    upgrade: kind,
+    cost: quote.cost,
+    startsMinute,
+    completesMinute: startsMinute + quote.durationMinutes,
+    targetPeakW: quote.target.peakW,
+    constructionKgco2eTotal: quote.constructionKgco2eTotal,
+  };
 }
 
 export function coalRepowerInProgress(
