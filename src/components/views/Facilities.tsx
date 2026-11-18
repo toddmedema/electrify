@@ -407,11 +407,6 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
   const partialUpgrade =
     upgrading && retrofitOutputMultiplier(facility, game.date.minute) > 0;
   const offlineForWork = underConstruction || (upgrading && !partialUpgrade);
-  const activityLabel = repowering
-    ? `construction of ${COAL_REPOWER_OPTIONS[project.upgrade].name} under way`
-    : partialUpgrade
-      ? "installing winterization, 90% capacity available"
-      : undefined;
   const storage = isStorage(facility) ? facility : undefined;
   const disclosure = React.useRef<HTMLButtonElement>(null);
   const repowerProgressId = React.useId();
@@ -504,6 +499,12 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
   ) : (
     formatWattsOfPeak(outputW, facility.peakW)
   );
+  const repowerPercent = Math.floor(builtFraction * 100);
+  const activityLabel = repowering
+    ? `construction of ${COAL_REPOWER_OPTIONS[project.upgrade].name}, ${repowerPercent}% complete`
+    : partialUpgrade
+      ? "installing winterization, 90% capacity available"
+      : undefined;
   let reading: React.ReactNode = "";
   let detail: React.ReactNode = null;
   if (underConstruction) {
@@ -520,16 +521,14 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
       <>
         <span className="facilityStatusLong">
           {repowering
-            ? `Repowering ${Math.floor(builtFraction * 100)}%`
+            ? `Repowering ${repowerPercent}%`
             : partialUpgrade
               ? `Winterizing ${Math.round(builtFraction * 100)}% · 90% capacity available`
               : resilienceName(installing!.upgrade)}
           , {dayCount(daysLeft)} left
         </span>
         <span className="facilityStatusShort">
-          {repowering
-            ? `Repowering ${Math.floor(builtFraction * 100)}%`
-            : `${daysLeft}d left`}
+          {repowering ? `Repowering ${repowerPercent}%` : `${daysLeft}d left`}
         </span>
       </>
     );
@@ -837,8 +836,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                 props.onCancelRetrofit &&
                 ((id) => {
                   props.onCancelRetrofit?.(id);
-                  if (repowering)
-                    disclosure.current?.focus({ preventScroll: true });
+                  if (repowering) disclosure.current?.focus();
                 })
               }
               onOpenSell={toggleDialog}
