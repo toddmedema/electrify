@@ -1468,6 +1468,7 @@ test("TV saved preferences style direct scenario links before play", async ({
   page,
 }, info) => {
   skipNonTv(info);
+  await page.emulateMedia({ reducedMotion: "reduce" });
   await page.addInitScript(() => {
     const savedTv = () => {
       localStorage.setItem("tvMode", "true");
@@ -1556,11 +1557,13 @@ test("TV saved preferences style direct scenario links before play", async ({
       .locator(".buildOptionMetric");
   }
   await expect(metrics.first()).toBeVisible();
-  for (const metric of await metrics.all()) {
+  const overflows = await metrics.evaluateAll((elements) =>
+    elements.map((element) => element.scrollWidth - element.clientWidth),
+  );
+  expect(overflows.length).toBeGreaterThan(0);
+  for (const overflow of overflows) {
     expect(
-      await metric.evaluate(
-        (element) => element.scrollWidth - element.clientWidth,
-      ),
+      overflow,
       "generator values stay within their own metric column",
     ).toBeLessThanOrEqual(1);
   }
