@@ -55,7 +55,8 @@ for (const theme of ["light", "dark"]) {
     }
     await expect(dialog).toHaveAccessibleName("Convert to Natural Gas CC?");
     await expect(dialog).toContainText("90 min");
-    await expect(dialog).toContainText("300 MW");
+    await expect(dialog).toContainText("7.2 months");
+    await expect(dialog).toContainText(/300\s?MW/);
     await expect(dialog).toContainText("Coal can keep running");
     await reviewScreenshot(dialog, {
       path: info.outputPath(`combined-cycle-preview-${theme}.png`),
@@ -67,6 +68,7 @@ for (const theme of ["light", "dark"]) {
     await peaker.click();
     await expect(dialog).toHaveAccessibleName("Convert to Natural Gas Peaker?");
     await expect(dialog).toContainText("10 min");
+    await expect(dialog).toContainText("3.6 months");
     await expect(dialog).toContainText("full refund");
     await dialog.getByRole("button", { name: /^Pay \$/ }).click();
     await expect(dialog).toBeHidden();

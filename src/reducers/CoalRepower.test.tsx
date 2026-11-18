@@ -42,17 +42,17 @@ it.each<[CoalRepowerType, string, number, number]>([
     expect(quote.cost).toBe(Math.round(quote.target.buildCost * costShare));
     const completion =
       Math.ceil(quote.durationMinutes / MINUTES_PER_MONTH) * MINUTES_PER_MONTH;
+    // A pre-existing coal loan continues to amortize while the gas equipment is being built.
+    Object.assign(coal, {
+      loanAmountTotal: 20e6,
+      loanAmountLeft: 8e6,
+      loanMonthlyPayment: 25e3,
+    });
     advance(game, completion - quote.durationMinutes);
     const currentQuote = coalRepowerQuote(findCoal(game), game, upgrade)!;
     const before = currentTick(game)!;
     const source = { ...findCoal(game) };
     const sourceIndex = game.facilities.findIndex((f) => f.id === source.id);
-    // A pre-existing coal loan continues to amortize while the gas equipment is being built.
-    Object.assign(findCoal(game), {
-      loanAmountTotal: 20e6,
-      loanAmountLeft: 8e6,
-      loanMonthlyPayment: 25e3,
-    });
     const payload = { facilityId: source.id, upgrade };
     expect(validateGameCommand(game, "retrofitFacility", payload)).toEqual({
       payload,
@@ -97,7 +97,7 @@ it.each<[CoalRepowerType, string, number, number]>([
       loanAmountTotal: 20e6,
     });
     expect(gas.loanAmountLeft).toBeGreaterThan(0);
-    expect(gas.loanAmountLeft).toBeLessThan(8e6);
+    expect(gas.loanAmountLeft).toBeLessThan(source.loanAmountLeft);
     expect(gas.upgradeInProgress).toBeUndefined();
     expect(restored.facilities).toEqual(played.facilities);
     expect(restored.monthlyHistory).toEqual(played.monthlyHistory);

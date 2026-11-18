@@ -27,7 +27,7 @@ export function coalRepowerActionLabel(kind: CoalRepowerType): string {
 
 function projectMonths(minutes: number): string {
   const months = minutes / MINUTES_PER_MONTH;
-  return formatNumber(months, { maximumFractionDigits: 1 });
+  return formatNumber(Math.round(months * 10) / 10);
 }
 
 export function CoalRepowerReview({
@@ -71,7 +71,7 @@ export function CoalRepowerReview({
             concept: "money",
             label: "Cash purchase",
             value: canAfford
-              ? `${formatMoneyConcise(cash)} → ${formatMoneyConcise(cash - cost)}`
+              ? `About ${formatMoneyConcise(cash - cost)} left`
               : `${formatMoneyConcise(cost - cash)} more cash needed`,
             detail:
               "Cancel before completion for a full refund. Existing loans stay payable.",
