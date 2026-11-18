@@ -67,7 +67,7 @@ its deadline; buying land does not replace a required utility acquisition.
 Ordinary inspection offers one clearly priced **Connect** action. “Connection cost”
 is the same instant land transaction described above; the wording adds no line
 capacity, recurring fee or construction delay. The explicit
-**Connect** icon toggles price labels and supports repeated purchases without
+**Rapid connection mode** icon toggles price labels and supports repeated purchases without
 opening construction after each one. Its pressed state remains on until toggled off;
 dragging, focus changes and arrow navigation never spend cash. Both entry points
 share pending commitments, and co-op ownership appears only after host acceptance.

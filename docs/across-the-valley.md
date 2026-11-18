@@ -27,7 +27,7 @@ Each hex holds one facility or a city; construction reserves its slot immediatel
 Independent utilities show their authored starting fleet. Empty developed hexes
 show towers and automatic wires to adjacent developed cells of the same utility.
 Selecting an individual hex opens its floating facility, city or construction
-surface. Empty owned tiles select their build destination automatically. The Connect
+surface. Empty owned tiles select their build destination automatically. The Rapid connection mode
 icon toggles repeated connections with visible prices along owned borders.
 **Build** lets players choose a technology and size first, then compare compatible
 connected and unconnected sites. Inspection spends nothing. The selected site

@@ -118,9 +118,13 @@ it("reserves shared general sites through construction and pause; selling frees 
     territorySiteInventory(game, "green-uplands", "general").remaining,
   ).toBe(1);
   expect(
-    territoryBuildAvailability(game, { ...wind, peakW: 301e6 }, "green-uplands")
+    territoryBuildAvailability(game, { ...wind, peakW: 300e6 }, "green-uplands")
       .buildable,
   ).toBe(true);
+  expect(
+    territoryBuildAvailability(game, { ...wind, peakW: 301e6 }, "green-uplands")
+      .buildable,
+  ).toBe(false);
   const battery = STORAGE(
     { ...game, date: { ...game.date, year: 2025 } },
     50e6,
