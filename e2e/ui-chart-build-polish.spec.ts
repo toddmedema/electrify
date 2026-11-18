@@ -320,9 +320,10 @@ for (const theme of ["light", "dark"] as const) {
       expect(Math.max(...widths) - Math.min(...widths)).toBeLessThan(1);
       await expect(
         programs.getByRole("button", {
-          name: /^Smart heating and hot water · Off$/,
+          name: /^Time-of-use tariff · Off$/,
         }),
       ).toBeVisible();
+      await expect(programs).not.toContainText("Managed EV charging");
       await expect(programs).not.toContainText("rollout 0%");
       if (
         process.env.REVIEW_SCREENSHOT_DIR &&

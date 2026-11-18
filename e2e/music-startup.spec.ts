@@ -103,7 +103,7 @@ test("enabling prepared installed-app sound starts on that gesture and quick tog
     expectResumedPlayhead(resumed.offset, before);
   }
   await page.getByRole("button", { name: "Back", exact: true }).click();
-  await page.getByRole("button", { name: "Play", exact: true }).click();
+  await page.getByRole("button", { name: "Tutorials", exact: true }).click();
   await expect(page.locator(".tutorialHud")).toBeVisible();
   await expect
     .poll(() =>
@@ -227,7 +227,7 @@ test("a muted installed app caches every audio file before its first offline sou
     )
     .toBe("running");
   await page.getByRole("button", { name: "Back", exact: true }).click();
-  await page.getByRole("button", { name: "Play", exact: true }).click();
+  await page.getByRole("button", { name: "Tutorials", exact: true }).click();
   await expect(page.locator(".tutorialHud")).toBeVisible();
   await expect
     .poll(() =>

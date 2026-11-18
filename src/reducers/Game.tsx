@@ -165,23 +165,20 @@ import {
   customerBillingRate,
   emptyPolicies,
   policyAvailable,
-  policyAllowedForGame,
+  canStartPolicy,
   validPolicyChange,
   samePolicyChoice,
   isOperatingPolicy,
   buildoutComplete,
   programCustomers,
-  policyPeakHour,
   policyStartHour,
+  windowOffset,
 } from "../helpers/Policies";
 import { POLICIES, POLICY_IDS } from "../data/Policies";
-import {
-  isFlexibilityPolicy,
-  flexibilityAvailable,
-} from "../helpers/CustomerFlexibility";
-import { shiftThermalDemand } from "../helpers/ThermalFlexibility";
+import { isFlexibilityPolicy } from "../helpers/CustomerFlexibility";
 import { shiftManagedCharging } from "../helpers/ManagedCharging";
 import { MANAGED_CHARGING } from "../data/ElectricVehicles";
+import { CUSTOMER_BATTERIES } from "../data/CustomerBatteries";
 import {
   customerBatteryFleet,
   dispatchCustomerBattery,
@@ -2403,15 +2400,7 @@ export const gameSlice = createSlice({
       // after the original shareable identity has been removed.
       if (state.rulesChanged) {
         state.timeline = reforecastWeatherAndPrices(state, false, true);
-        state.timeline = reforecastDemand(
-          state,
-          1,
-          [],
-          [],
-          [],
-          undefined,
-          true,
-        );
+        state.timeline = reforecastDemand(state, 1, [], [], undefined, true);
         state.timeline = reforecastSupply(
           state,
           true,
@@ -2551,7 +2540,7 @@ export const gameSlice = createSlice({
         getTimeFromTimeline(state.date.minute, state.timeline)!.cash,
       );
       rebaseGameRetentionBaseline(state, expansionRetentionBaseline(state));
-      state.timeline = reforecastDemand(state, 1, [], [], [], undefined, true);
+      state.timeline = reforecastDemand(state, 1, [], [], undefined, true);
       state.timeline = reforecastSupply(
         state,
         true,
@@ -2568,7 +2557,7 @@ export const gameSlice = createSlice({
         getTimeFromTimeline(state.date.minute, state.timeline)!.cash,
       );
       rebaseGameRetentionBaseline(state, expansionRetentionBaseline(state));
-      state.timeline = reforecastDemand(state, 1, [], [], [], undefined, true);
+      state.timeline = reforecastDemand(state, 1, [], [], undefined, true);
       state.timeline = reforecastSupply(
         state,
         true,
@@ -2737,7 +2726,7 @@ export function applyAcquireUtility(
   refreshInterestRate(state, now.cash, now.netWorth);
   // The settled current tick retains its meters, stored energy and program queues. Ownership
   // and cash transfer now; the enlarged demand and shared fleet settle on the next elapsed tick.
-  state.timeline = reforecastDemand(state, 1, [], [], [], undefined, true);
+  state.timeline = reforecastDemand(state, 1, [], [], undefined, true);
   state.timeline = reforecastSupply(state, true, TICK_MINUTES, undefined, true);
   logGameEvent(
     state,
@@ -3934,18 +3923,10 @@ function applyPolicyEdit(
   if (
     !cancel &&
     payload.tier === "On" &&
-    !policyAllowedForGame(state, payload.id, payload.month)
+    !canStartPolicy(state, payload.id, payload.month)
   )
     return false;
   const existing = state.policies?.programs[payload.id];
-  if (
-    !cancel &&
-    payload.tier === "On" &&
-    isFlexibilityPolicy(payload.id) &&
-    !(existing?.adoption ?? 0) &&
-    !flexibilityAvailable(state, payload.id, payload.month)
-  )
-    return false;
   // A finished build-out has nothing left to fund, pause or resume.
   if (
     !cancel &&
@@ -5035,30 +5016,6 @@ function getDemandW(
     TICK_MINUTES * tickScale,
   );
   const programs = game.policies?.programs;
-  if ((programs?.thermal?.adoption ?? 0) > 0 || prev.deferredThermal?.length) {
-    const thermal = shiftThermalDemand({
-      minute: now.minute,
-      residentialW: Math.max(
-        0,
-        now.demandByType.Residential - (now.shiftedResidentialW ?? 0),
-      ),
-      weatherShare: weatherShare,
-      temperatureC: now.temperatureC,
-      location: game.location,
-      startingYear: game.startingYear,
-      program: programs?.thermal ?? emptyPolicies().programs.thermal,
-      deferred: prev.deferredThermal,
-      stepMinutes: TICK_MINUTES * tickScale,
-    });
-    now.deferredThermalStart = (prev.deferredThermal ?? []).map((entry) => ({
-      ...entry,
-    }));
-    now.deferredThermal = thermal.deferred;
-    now.thermalShiftedW = thermal.shiftedW;
-    now.thermalRecoveredW = thermal.recoveredW;
-    now.demandByType.Residential =
-      thermal.residentialW + (now.shiftedResidentialW ?? 0);
-  }
   if (
     (programs?.evCharging?.adoption ?? 0) > 0 ||
     prev.deferredCharging?.length
@@ -5261,7 +5218,6 @@ function reforecastDemand(
   state: GameType,
   tickScale = 1,
   initialDeferred: TickPresentFutureType["deferredResidential"] = [],
-  initialThermal: TickPresentFutureType["deferredThermal"] = [],
   initialCharging: TickPresentFutureType["deferredCharging"] = [],
   representedTransportationW?: number,
   preserveCurrentFrame = false,
@@ -5279,7 +5235,6 @@ function reforecastDemand(
   let prev = {
     ...state.timeline[0],
     deferredResidential: initialDeferred,
-    deferredThermal: initialThermal,
     deferredCharging: initialCharging,
   } as TickPresentFutureType;
   return state.timeline.map((t: TickPresentFutureType) => {
@@ -5498,16 +5453,17 @@ function* supplyFacilitiesFinancesPhases(
         )
       : EMPTY_CUSTOMER_BATTERY_FLEET;
   const batteryEnabled = batteryProgram?.tier === "On";
-  const batteryPeak = policyPeakHour(
-    now.minute,
-    policyStartHour(batteryProgram),
-  );
+  const remainingBatteryPeakMinutes =
+    CUSTOMER_BATTERIES.peakWindowHours * 60 -
+    windowOffset(now.minute, policyStartHour(batteryProgram));
+  const batteryPeak = remainingBatteryPeakMinutes > 0;
   const batteryBefore = trackCustomerBattery
     ? dispatchCustomerBattery(batteryFleet, batteryStartWh, {
         deficitW: now.demandByType.Residential,
         stepMinutes,
         enabled: batteryEnabled,
         peak: batteryPeak,
+        remainingPeakMinutes: remainingBatteryPeakMinutes,
       })
     : EMPTY_CUSTOMER_BATTERY_DISPATCH;
   if (trackCustomerBattery) {
@@ -5799,14 +5755,26 @@ function* supplyFacilitiesFinancesPhases(
   let hydroReservoirCapacityWh = 0;
   let hydroSpillWh = 0;
   let hydroMandatedReleaseW = 0;
+  // A full charge request excludes rooftop electricity already available this tick.
+  // Dispatch extra generation only after native load and utility storage have cleared.
+  const customerChargeRequestW =
+    batteryEnabled && !batteryPeak
+      ? dispatchCustomerBattery(batteryFleet, batteryBefore.storedWh, {
+          rooftopSurplusW: now.rooftopSurplusW ?? 0,
+          gridSurplusW: Infinity,
+          stepMinutes,
+        }).gridChargeW
+      : 0;
   const peerHeadroom: {
     generator: GeneratorOperatingType;
     watts: number;
     costPerMWh: number;
   }[] = [];
+  const customerChargeHeadroom: typeof peerHeadroom | undefined =
+    customerChargeRequestW > 0 ? [] : undefined;
   const startedFacilityIds = new Set<number>();
   const carbonFee = tickStoryEffects.carbonFeePerKgCO2e ?? state.feePerKgCO2e;
-  // Read once per tick, and only when a live co-op grid prices its spare output.
+  // Read once per tick when pricing spare output for exports or battery charging.
   let peerTickFuelPrices: FuelPricesType | undefined;
   const tradeFuelDate = now.minute < state.date.minute ? state.date : tickDate;
   const peerFuelPrices = () =>
@@ -6021,7 +5989,8 @@ function* supplyFacilitiesFinancesPhases(
             break;
         }
         if (
-          transmission.sellingRule === "PROFITABLE" &&
+          (transmission.sellingRule === "PROFITABLE" ||
+            customerChargeRequestW > 0) &&
           !hydro &&
           !WEATHER_DEPENDENT_FUELS.includes(g.fuel) &&
           previousW > 0 &&
@@ -6031,7 +6000,7 @@ function* supplyFacilitiesFinancesPhases(
             : requiredTargetW > 0 ||
               (i < indexOfLastUnchargedBattery && totalChargeNeeded > 0))
         ) {
-          peerHeadroom.push({
+          const headroom = {
             generator: g,
             costPerMWh: incrementalGenerationCostPerMWh(
               g,
@@ -6047,7 +6016,11 @@ function* supplyFacilitiesFinancesPhases(
                 previousW + (g.peakW * stepMinutes) / g.spinMinutes,
               ) - g.currentW,
             ),
-          });
+          };
+          if (transmission.sellingRule === "PROFITABLE")
+            peerHeadroom.push(headroom);
+          if (customerChargeHeadroom && headroom.watts > 0)
+            customerChargeHeadroom.push(headroom);
         }
         supply += g.currentW;
         supplyByFuel[g.fuel] = (supplyByFuel[g.fuel] || 0) + g.currentW;
@@ -6396,8 +6369,39 @@ function* supplyFacilitiesFinancesPhases(
     0,
     Infinity,
   ).exportedW.reduce((sum, w) => sum + w, 0);
-  // Export already-produced surplus; unused dispatchable capacity remains ready without
-  // burning fuel or pretending that a reserve is electricity supplied to customers.
+  // Off-peak top-ups use inexpensive, already-running local generators. Reserve
+  // enough rampable power for the grid, use true surplus first and never buy imports
+  // for the household fleet. Electricity only reaches batteries after it is generated.
+  if (
+    customerChargeHeadroom?.length &&
+    !peer?.importedW &&
+    supply - charge >= now.demandW
+  ) {
+    const surplusW = supply - charge - now.demandW;
+    const chargeBudgetW =
+      surplusW +
+      reachableHeadroomW -
+      now.demandW * CUSTOMER_BATTERIES.chargingReserveShare;
+    let extraW = Math.min(customerChargeRequestW, chargeBudgetW) - surplusW;
+    const maxCost =
+      CUSTOMER_BATTERIES.maximumChargingCostPerMWh *
+      getInflationIndex(tickDate, state.startingYear, state.seed);
+    for (const item of customerChargeHeadroom.sort(
+      (a, b) => a.costPerMWh - b.costPerMWh,
+    )) {
+      if (extraW <= 0 || item.costPerMWh > maxCost) break;
+      const watts = Math.min(extraW, item.watts);
+      const generator = item.generator;
+      generator.currentW += watts;
+      supply += watts;
+      supplyByFuel[generator.fuel] =
+        (supplyByFuel[generator.fuel] || 0) + watts;
+      spareGenerationW -= watts;
+      reachableHeadroomW -= watts;
+      item.watts -= watts;
+      extraW -= watts;
+    }
+  }
   const batteryAfter = trackCustomerBattery
     ? dispatchCustomerBattery(batteryFleet, batteryBefore.storedWh, {
         rooftopSurplusW: now.rooftopSurplusW ?? 0,
@@ -7607,10 +7611,6 @@ function generateTimeline(
     previousDemandTick?.deferredResidential ??
       getTimeFromTimeline(state.date.minute, readOnlyState.timeline)
         ?.deferredResidentialStart ??
-      [],
-    previousDemandTick?.deferredThermal ??
-      getTimeFromTimeline(state.date.minute, readOnlyState.timeline)
-        ?.deferredThermalStart ??
       [],
     previousDemandTick?.deferredCharging ??
       getTimeFromTimeline(state.date.minute, readOnlyState.timeline)

@@ -286,7 +286,7 @@ for (const theme of ["light", "dark"] as const) {
       exact: true,
     });
     await settleSheets(page);
-    await expect(programs.locator(".customerProgramTitle")).toHaveCount(7);
+    await expect(programs.locator(".customerProgramTitle")).toHaveCount(5);
     for (const title of await programs.locator(".customerProgramTitle").all()) {
       const name = await title.locator(":scope > span").first().boundingBox();
       const status = await title

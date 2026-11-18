@@ -565,7 +565,9 @@ test("TV home controller navigation includes every footer icon and wraps", async
     page.getByRole("heading", { name: "Manual", exact: true }),
   ).toBeVisible();
   await input(page, "back");
-  await expect(actions.first()).toBeFocused();
+  await expect(
+    page.getByRole("button", { name: "Play", exact: true }),
+  ).toBeFocused();
 });
 
 test("TV footer tooltips follow controller selection after mouse input", async ({
@@ -1117,9 +1119,10 @@ test("controller advances the first tutorial through inspection, chart and clock
     "data-mock-input-context",
     "Menu",
   );
-  await expect(
-    page.getByRole("button", { name: "Play", exact: true }),
-  ).toBeFocused();
+  await select(
+    page,
+    page.getByRole("button", { name: "Tutorials", exact: true }),
+  );
   await input(page, "confirm");
   const hud = page.locator(".tutorialHud");
   await expect(hud).toBeVisible();
@@ -1787,10 +1790,7 @@ async function tvJourney(page: Page, testInfo: TestInfo, maximum: boolean) {
     testInfo.project.use.colorScheme === "dark" ? "dark" : "light",
   ] as const) {
     await setupTv(page, maximum, theme);
-    await select(
-      page,
-      page.getByRole("button", { name: /^(Play|New game)$/, exact: true }),
-    );
+    await select(page, page.getByRole("button", { name: "Play", exact: true }));
     await input(page, "confirm");
     await select(
       page,

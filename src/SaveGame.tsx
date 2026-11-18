@@ -32,7 +32,6 @@ import {
   validDeferredResidential,
   policyAllowedForGame,
 } from "./helpers/Policies";
-import { validDeferredThermal } from "./helpers/ThermalFlexibility";
 import {
   restoreCommitmentMetadata,
   serializeCommitmentMetadata,
@@ -877,16 +876,12 @@ export function parseSave(
       (t) =>
         !validDeferredResidential(t.deferredResidential) ||
         !validDeferredResidential(t.deferredResidentialStart) ||
-        !validDeferredThermal(t.deferredThermal) ||
-        !validDeferredThermal(t.deferredThermalStart) ||
         !validDeferredCharging(t.deferredCharging) ||
         !validDeferredCharging(t.deferredChargingStart) ||
         [
           t.customerBillingRate,
           t.deferredResidentialWh,
           t.deferredResidentialWhStart,
-          t.thermalShiftedW,
-          t.thermalRecoveredW,
           t.evShiftedW,
           t.evRecoveredW,
           t.customerBatteryWh,

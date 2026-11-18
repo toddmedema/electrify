@@ -492,12 +492,8 @@ export type TickPresentFutureType = Partial<FuelPricesType> &
     deferredResidential?: DeferredResidentialLoad[]; // Outstanding energy tied to its original recovery window.
     deferredResidentialStart?: DeferredResidentialLoad[]; // Before this tick, for repeated forecasts.
     shiftedResidentialW?: number; // Returned enrolled residential load, billed at the late rate.
-    deferredThermal?: DeferredResidentialLoad[];
-    deferredThermalStart?: DeferredResidentialLoad[];
     deferredCharging?: DeferredResidentialLoad[];
     deferredChargingStart?: DeferredResidentialLoad[];
-    thermalShiftedW?: number;
-    thermalRecoveredW?: number;
     evShiftedW?: number;
     evRecoveredW?: number;
     customerBatteryWh?: number; // Customer storage, separate from utility-owned facilities.
@@ -1323,7 +1319,6 @@ export type PolicyId =
   | "solar"
   | "timeOfUse"
   | "curtailment"
-  | "thermal"
   | "evCharging"
   | "battery";
 export type PolicyTier = "Off" | "On";

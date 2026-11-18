@@ -1,3 +1,4 @@
+import { CUSTOMER_BATTERIES } from "../data/CustomerBatteries";
 import { needsObjectiveEnergyMeters } from "./ScenarioRules";
 import { modScaledValue } from "./ScenarioMod";
 import {
@@ -28,7 +29,6 @@ import { programCustomers } from "./ProgramCustomers";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "./DateTime";
 import {
   flexibilityMonths,
-  flexibilityCapitalCost,
   flexibilityMonthlyCost,
   flexibilityAvailable,
   isFlexibilityPolicy,
@@ -48,13 +48,6 @@ export function emptyPolicies(month = 0): PoliciesType {
         installs: [],
       },
       solar: { tier: "Off", adoption: 0, spending: 0, spent: 0, installs: [] },
-      thermal: {
-        tier: "Off",
-        adoption: 0,
-        spending: 0,
-        spent: 0,
-        installs: [],
-      },
       evCharging: {
         tier: "Off",
         adoption: 0,
@@ -95,6 +88,20 @@ export function policyAllowedForGame(
     game.startingYear + Math.floor(month / 12),
   );
 }
+/** Fresh offers and edits to existing enrollment use the same eligibility in play and preview. */
+export function canStartPolicy(
+  game: GameType,
+  id: PolicyId,
+  month: number,
+): boolean {
+  return (
+    policyAllowedForGame(game, id, month) &&
+    (!isFlexibilityPolicy(id) ||
+      (game.policies?.programs[id]?.adoption ?? 0) > 0 ||
+      flexibilityAvailable(game, id, month))
+  );
+}
+
 export function validPolicyChange(value: unknown): value is PolicyChangeType {
   const p = value as PolicyChangeType | undefined;
   return (
@@ -183,11 +190,7 @@ export function policyBudget(
   month: number,
 ): number {
   if (tier === "Off" || isOperatingPolicy(id)) return 0;
-  if (isFlexibilityPolicy(id))
-    return (
-      flexibilityCapitalCost(game, id, month) / flexibilityMonths(id) +
-      flexibilityMonthlyCost(game, id, month)
-    );
+  if (isFlexibilityPolicy(id)) return flexibilityMonthlyCost(game, id, month);
   return (
     policyTotalCost(game, id as BuildoutPolicyId, month) /
     buildoutMonths(id as BuildoutPolicyId)
@@ -294,19 +297,36 @@ export function advancePolicies(
         return;
       }
       if (isFlexibilityPolicy(id)) {
-        const enabled = s.tier === "On";
+        // Expired home-battery contracts free enrollment slots for current equipment.
+        // The enrollment pace and current household pool still cap replacements.
+        if (
+          id === "battery" &&
+          s.installs?.length &&
+          s.installs[0][0] <= m - CUSTOMER_BATTERIES.endLifeMonths
+        ) {
+          s.installs = s.installs.filter(
+            ([joined]) => joined > m - CUSTOMER_BATTERIES.endLifeMonths,
+          );
+          s.adoption = Math.min(
+            1,
+            s.installs.reduce((sum, [, share]) => sum + share, 0),
+          );
+          delete s.completedMonth;
+        }
         const increment =
-          enabled && flexibilityAvailable(game, id, m)
+          s.tier === "On"
             ? Math.min(1 - s.adoption, 1 / flexibilityMonths(id))
             : 0;
-        const capital = flexibilityCapitalCost(game, id, m) * increment;
         if (increment > 0) {
           (s.installs ??= []).push([m, increment]);
           s.adoption = Math.min(1, s.adoption + increment);
         }
-        s.spending =
-          capital +
-          flexibilityMonthlyCost(game, id, m, representedTransportationW);
+        s.spending = flexibilityMonthlyCost(
+          game,
+          id,
+          m,
+          representedTransportationW,
+        );
         s.spent += s.spending;
         return;
       }
@@ -343,7 +363,7 @@ const validStartHour = (hour: unknown) =>
     hour < 24);
 export const policyStartHour = (program?: { startHour?: number }) =>
   program?.startHour ?? 17;
-const windowOffset = (minute: number, startHour: number) =>
+export const windowOffset = (minute: number, startHour: number) =>
   (((minute - startHour * 60) % MINUTES_PER_MONTH) + MINUTES_PER_MONTH) %
   MINUTES_PER_MONTH;
 export const policyPeakHour = (minute: number, startHour = 17) =>
@@ -367,11 +387,12 @@ export function validDeferredResidential(value: unknown): boolean {
       entry.energyWh >= 0 &&
       Number.isInteger(entry.recoveryStartMinute) &&
       entry.recoveryStartMinute >= 0 &&
-      entry.recoveryEndMinute === entry.recoveryStartMinute + 180,
+      entry.recoveryEndMinute ===
+        entry.recoveryStartMinute + POLICIES.timeOfUse.recoveryHours * 60,
   );
 }
 
-/** Each batch keeps its original three-hour recovery window, including when
+/** Each batch keeps its original eight-hour recovery window, including when
  * a new month changes or disables the tariff. Industry never enters the queue. */
 export function applyPeakDemand(
   game: GameType,
@@ -406,7 +427,8 @@ export function applyPeakDemand(
         batch = {
           energyWh: 0,
           recoveryStartMinute,
-          recoveryEndMinute: recoveryStartMinute + 180,
+          recoveryEndMinute:
+            recoveryStartMinute + POLICIES.timeOfUse.recoveryHours * 60,
         };
         queue.push(batch);
       }
