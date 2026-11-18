@@ -2,7 +2,7 @@ import type { GameType, PolicyId } from "../Types";
 import { getInflationIndex } from "../data/Economy";
 import {
   MANAGED_CHARGING,
-  electricVehicleEligibility,
+  managedChargingAvailable,
   managedChargingAnnualCost,
 } from "../data/ElectricVehicles";
 import {
@@ -11,11 +11,6 @@ import {
   batteryEnrollmentShare,
   batteryRebateCost,
 } from "../data/CustomerBatteries";
-import { THERMAL_FLEXIBILITY } from "../data/ThermalFlexibility";
-import {
-  thermalCapitalCostPerCustomer,
-  thermalMonthlyRewardPerCustomer,
-} from "./ThermalFlexibility";
 import {
   customerBatteryFleet,
   batteryMonthlyCompensation,
@@ -23,20 +18,14 @@ import {
 import { getDateFromMinute, MINUTES_PER_MONTH } from "./DateTime";
 import { programCustomers } from "./ProgramCustomers";
 
-export type FlexibilityPolicyId = "thermal" | "evCharging" | "battery";
-export const FLEXIBILITY_IDS: FlexibilityPolicyId[] = [
-  "thermal",
-  "evCharging",
-  "battery",
-];
+export type FlexibilityPolicyId = "evCharging" | "battery";
+export const FLEXIBILITY_IDS: FlexibilityPolicyId[] = ["evCharging", "battery"];
 export const isFlexibilityPolicy = (id: PolicyId): id is FlexibilityPolicyId =>
-  id === "thermal" || id === "evCharging" || id === "battery";
+  id === "evCharging" || id === "battery";
 export const flexibilityMonths = (id: FlexibilityPolicyId) =>
-  id === "thermal"
-    ? THERMAL_FLEXIBILITY.buildoutMonths
-    : id === "battery"
-      ? CUSTOMER_BATTERIES.buildoutMonths
-      : MANAGED_CHARGING.enrollmentMonths;
+  id === "battery"
+    ? CUSTOMER_BATTERIES.buildoutMonths
+    : MANAGED_CHARGING.enrollmentMonths;
 const yearAt = (game: GameType, month: number) =>
   game.startingYear + Math.floor(month / 12);
 export function flexibilityAvailable(
@@ -45,16 +34,10 @@ export function flexibilityAvailable(
   month = game.date.monthsElapsed,
 ): boolean {
   const year = yearAt(game, month);
-  if (id === "evCharging")
-    return (
-      electricVehicleEligibility(year, game.location).smartChargingShare > 0
-    );
-  if (id === "battery")
-    return (
-      batteryEligibleHouseholdShare(year, game.location) > 0 &&
-      batteryEnrollmentShare(year) > 0
-    );
-  return thermalCapitalCostPerCustomer(game.location, year) > 0;
+  return id === "evCharging"
+    ? managedChargingAvailable(year, game.location)
+    : batteryEligibleHouseholdShare(year, game.location) > 0 &&
+        batteryEnrollmentShare(year) > 0;
 }
 export function flexibilityCapitalCost(
   game: GameType,
@@ -64,11 +47,7 @@ export function flexibilityCapitalCost(
   const year = yearAt(game, month);
   const customers = programCustomers(game);
   const cost =
-    id === "thermal"
-      ? customers * thermalCapitalCostPerCustomer(game.location, year)
-      : id === "battery"
-        ? batteryRebateCost(customers, 1, year, game.location)
-        : 0;
+    id === "battery" ? batteryRebateCost(customers, 1, year, game.location) : 0;
   return (
     cost *
     getInflationIndex(
@@ -88,36 +67,29 @@ export function flexibilityMonthlyCost(
   if (!program || program.tier === "Off") return 0;
   const customers = programCustomers(game);
   const cost =
-    id === "thermal"
-      ? customers *
-        thermalMonthlyRewardPerCustomer(
+    id === "evCharging"
+      ? managedChargingAnnualCost(
+          customers,
+          yearAt(game, month),
           game.location,
-          program,
-          game.startingYear,
-        )
-      : id === "evCharging"
-        ? managedChargingAnnualCost(
+          MANAGED_CHARGING.maxEnrollment * program.adoption,
+          representedTransportationW ??
+            (game.timeline.length
+              ? game.timeline.reduce(
+                  (sum, tick) => sum + tick.demandByType.Transportation,
+                  0,
+                ) / game.timeline.length
+              : 0),
+        ) / 12
+      : batteryMonthlyCompensation(
+          customerBatteryFleet(
+            program,
+            month,
+            game.startingYear,
             customers,
-            yearAt(game, month),
             game.location,
-            MANAGED_CHARGING.maxEnrollment * program.adoption,
-            representedTransportationW ??
-              (game.timeline.length
-                ? game.timeline.reduce(
-                    (sum, tick) => sum + tick.demandByType.Transportation,
-                    0,
-                  ) / game.timeline.length
-                : 0),
-          ) / 12
-        : batteryMonthlyCompensation(
-            customerBatteryFleet(
-              program,
-              month,
-              game.startingYear,
-              customers,
-              game.location,
-            ),
-          );
+          ),
+        );
   return (
     cost *
     getInflationIndex(

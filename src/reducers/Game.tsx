@@ -139,7 +139,7 @@ import {
   customerBillingRate,
   emptyPolicies,
   policyAvailable,
-  policyAllowedForGame,
+  canStartPolicy,
   validPolicyChange,
   samePolicyChoice,
   isOperatingPolicy,
@@ -149,11 +149,7 @@ import {
   policyStartHour,
 } from "../helpers/Policies";
 import { POLICIES, POLICY_IDS } from "../data/Policies";
-import {
-  isFlexibilityPolicy,
-  flexibilityAvailable,
-} from "../helpers/CustomerFlexibility";
-import { shiftThermalDemand } from "../helpers/ThermalFlexibility";
+import { isFlexibilityPolicy } from "../helpers/CustomerFlexibility";
 import { shiftManagedCharging } from "../helpers/ManagedCharging";
 import { MANAGED_CHARGING } from "../data/ElectricVehicles";
 import {
@@ -2362,15 +2358,7 @@ export const gameSlice = createSlice({
       // after the original shareable identity has been removed.
       if (state.rulesChanged) {
         state.timeline = reforecastWeatherAndPrices(state, false, true);
-        state.timeline = reforecastDemand(
-          state,
-          1,
-          [],
-          [],
-          [],
-          undefined,
-          true,
-        );
+        state.timeline = reforecastDemand(state, 1, [], [], undefined, true);
         state.timeline = reforecastSupply(
           state,
           true,
@@ -2662,7 +2650,7 @@ export function applyAcquireUtility(
   refreshInterestRate(state, now.cash, now.netWorth);
   // The settled current tick retains its meters, stored energy and program queues. Ownership
   // and cash transfer now; the enlarged demand and shared fleet settle on the next elapsed tick.
-  state.timeline = reforecastDemand(state, 1, [], [], [], undefined, true);
+  state.timeline = reforecastDemand(state, 1, [], [], undefined, true);
   state.timeline = reforecastSupply(state, true, TICK_MINUTES, undefined, true);
   logGameEvent(
     state,
@@ -3670,18 +3658,10 @@ function applyPolicyEdit(
   if (
     !cancel &&
     payload.tier === "On" &&
-    !policyAllowedForGame(state, payload.id, payload.month)
+    !canStartPolicy(state, payload.id, payload.month)
   )
     return false;
   const existing = state.policies?.programs[payload.id];
-  if (
-    !cancel &&
-    payload.tier === "On" &&
-    isFlexibilityPolicy(payload.id) &&
-    !(existing?.adoption ?? 0) &&
-    !flexibilityAvailable(state, payload.id, payload.month)
-  )
-    return false;
   // A finished build-out has nothing left to fund, pause or resume.
   if (
     !cancel &&
@@ -4746,30 +4726,6 @@ function getDemandW(
     TICK_MINUTES * tickScale,
   );
   const programs = game.policies?.programs;
-  if ((programs?.thermal?.adoption ?? 0) > 0 || prev.deferredThermal?.length) {
-    const thermal = shiftThermalDemand({
-      minute: now.minute,
-      residentialW: Math.max(
-        0,
-        now.demandByType.Residential - (now.shiftedResidentialW ?? 0),
-      ),
-      weatherShare: weatherShare,
-      temperatureC: now.temperatureC,
-      location: game.location,
-      startingYear: game.startingYear,
-      program: programs?.thermal ?? emptyPolicies().programs.thermal,
-      deferred: prev.deferredThermal,
-      stepMinutes: TICK_MINUTES * tickScale,
-    });
-    now.deferredThermalStart = (prev.deferredThermal ?? []).map((entry) => ({
-      ...entry,
-    }));
-    now.deferredThermal = thermal.deferred;
-    now.thermalShiftedW = thermal.shiftedW;
-    now.thermalRecoveredW = thermal.recoveredW;
-    now.demandByType.Residential =
-      thermal.residentialW + (now.shiftedResidentialW ?? 0);
-  }
   if (
     (programs?.evCharging?.adoption ?? 0) > 0 ||
     prev.deferredCharging?.length
@@ -4972,7 +4928,6 @@ function reforecastDemand(
   state: GameType,
   tickScale = 1,
   initialDeferred: TickPresentFutureType["deferredResidential"] = [],
-  initialThermal: TickPresentFutureType["deferredThermal"] = [],
   initialCharging: TickPresentFutureType["deferredCharging"] = [],
   representedTransportationW?: number,
   preserveCurrentFrame = false,
@@ -4985,7 +4940,6 @@ function reforecastDemand(
   let prev = {
     ...state.timeline[0],
     deferredResidential: initialDeferred,
-    deferredThermal: initialThermal,
     deferredCharging: initialCharging,
   } as TickPresentFutureType;
   return state.timeline.map((t: TickPresentFutureType) => {
@@ -7241,10 +7195,6 @@ function generateTimeline(
     previousDemandTick?.deferredResidential ??
       getTimeFromTimeline(state.date.minute, readOnlyState.timeline)
         ?.deferredResidentialStart ??
-      [],
-    previousDemandTick?.deferredThermal ??
-      getTimeFromTimeline(state.date.minute, readOnlyState.timeline)
-        ?.deferredThermalStart ??
       [],
     previousDemandTick?.deferredCharging ??
       getTimeFromTimeline(state.date.minute, readOnlyState.timeline)

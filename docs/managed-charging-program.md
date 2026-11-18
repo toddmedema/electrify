@@ -42,6 +42,12 @@ Australia/New Zealand; emerging markets use a deliberately lower trajectory. Unk
 locations use the world curve. Passenger cars include battery cars and plug-in hybrids,
 but exclude conventional hybrids.
 
+The catalog offers enrollment once at least 30% of local passenger cars are electric
+and compatible with managed charging. It multiplies the existing local EV stock and
+compatibility shares. This is a cheap readiness proxy for the shortage-study benchmark,
+which varied by weather, fleet and peak hour. Eligibility uses the first month the
+player can enroll, so the offer can open when a run crosses an adoption milestone.
+
 Modern flexible EV load is exactly zero through 2010, including 1980 scenarios. In 2015,
 fleet shares are around 0.1–0.3% in most covered markets (about 2.7% in early-moving
 Norway), with only 15% compatible for control. Capability rises separately to 40% in

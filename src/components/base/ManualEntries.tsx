@@ -220,7 +220,7 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     title: "Customer programs",
     group: "Gameplay",
     keywords:
-      "efficiency rooftop solar rebates build-out project pause resume completion demand time-of-use tariff curtailment contracts peak enrollment smart heating hot water thermostat managed ev charging electric vehicle home battery virtual power plant vpp flexibility",
+      "efficiency rooftop solar rebates build-out project pause resume completion demand time-of-use tariff curtailment contracts peak enrollment managed ev charging electric vehicle home battery virtual power plant vpp flexibility",
     entry: (
       <div>
         <p>
@@ -241,8 +241,8 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           </li>
           <li>
             Rooftop solar cuts daytime demand, best in sunny, cool places. You
-            don't pay for surplus power. Rebates cost much more in the early
-            2000s, when panels were expensive.
+            don't pay for surplus power. The rebate covers 15% of installation
+            costs, which are much higher in the early 2000s.
           </li>
         </ul>
         <p>
@@ -251,9 +251,10 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
         <ul>
           <li>
             <strong>Time-of-use tariff:</strong> Half of homes move 20% of their
-            use into the next three hours. They pay 30% above the{" "}
+            use across the next eight hours. They pay 30% above the{" "}
             <EntryLink to={MANUAL_ENTRY.RATES}>base rate</EntryLink> in the
-            window and 10% below it for those three hours.
+            window and 10% below it on shifted use and the first three hours
+            after the window.
           </li>
           <li>
             <strong>Peak curtailment contracts:</strong> Half of industrial and
@@ -261,22 +262,19 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
             Participants get 10% off all day.
           </li>
           <li>
-            <strong>Smart heating and hot water:</strong> Heaters pause during
-            the window, then catch up over three hours.
-          </li>
-          <li>
             <strong>Managed EV charging:</strong> Charging moves into the next
-            six hours, though drivers can override it.
+            six hours, though drivers can override it. The offer opens when 30%
+            of local cars are electric and compatible with managed charging.
           </li>
           <li>
             <strong>Home battery virtual power plant:</strong> Home batteries
-            act like a shared power plant from 2016, keeping 20% for their
-            owners.
+            share stored electricity during the peak window in exchange for
+            participation payments. Households keep 20% in reserve.
           </li>
         </ul>
         <Figure
           src="/images/manual-peak-shifting.webp"
-          alt="A day of electricity demand before and after a program. Demand drops during a four-hour evening peak window and rises in the three hours after it, so the highest peak is lower."
+          alt="A day of electricity demand before and after a program. Demand drops during a four-hour evening peak window and rises after it, so the highest peak is lower."
           width={720}
           height={390}
         />

@@ -176,6 +176,18 @@ export function electricVehicleEligibility(
   return { fleetShare, smartChargingShare, eligibleTransportationShare };
 }
 
+/** Local passenger cars that are both electric and compatible with smart charging.
+ * This fleet proxy separates immature and mature markets in the shortage studies without
+ * forecasting hypothetical outages each time players open the program catalog. */
+const MIN_MANAGEABLE_FLEET_SHARE = 0.3;
+export function managedChargingAvailable(year: number, location: LocationType) {
+  const { fleetShare, smartChargingShare } = electricVehicleEligibility(
+    year,
+    location,
+  );
+  return fleetShare * smartChargingShare >= MIN_MANAGEABLE_FLEET_SHARE;
+}
+
 /** Enrollment is the actual fraction of compatible vehicles signed up, including ramp-up.
  * Credits/admin are annual real 2025 dollars; the policy owner applies inflation/month scaling. */
 export function managedChargingParticipants(

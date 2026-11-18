@@ -1,4 +1,6 @@
-# Controlled heating and hot water
+# Retired program: Controlled heating and hot water
+
+This document records the research behind the former customer program.
 
 The `thermal` program funds controls over 36 months and pays participating equipment a monthly
 reward while dispatch is enabled. It moves electricity consumption rather than saving energy.

@@ -119,7 +119,7 @@ operating asset retains its purchased vintage. The catalog's normal modern path 
   fuel prices use the first available receipts scaled by modeled CPI;
   the 1973–74 oil transition is authored. The recorded 1979 and 2000–01 shocks are not doubled
   by event multipliers. Pre-1913 CPI is held flat and early prime is modeled at 6%.
-- Efficiency and curtailment open in 1973, time-of-use in 1982, solar/thermal programs in 2000,
+- Efficiency and curtailment open in 1973, time-of-use in 1982, rooftop solar rebates in 2000,
   EV programs in 2010, and customer batteries in 2015. UI, commands, imports, and forecasts share
   these gates.
 - Crisis corridor limits, future demand steps, and future emissions targets are scenario

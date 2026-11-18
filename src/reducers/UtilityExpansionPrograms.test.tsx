@@ -203,7 +203,6 @@ it("a purchase preserves one installed battery fleet, stored energy and demand q
     before.customerBatteryWhStart,
   );
   expect(transferred.deferredResidential).toEqual(before.deferredResidential);
-  expect(transferred.deferredThermal).toEqual(before.deferredThermal);
   expect(transferred.deferredCharging).toEqual(before.deferredCharging);
   expect(transferred.customerRate).toBe(before.customerRate);
   expect(

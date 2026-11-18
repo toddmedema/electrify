@@ -23,11 +23,11 @@ describe("labelMonth", () => {
 });
 
 describe("programStatus", () => {
-  it.each(["thermal", "evCharging", "battery"] as const)(
+  it.each(["evCharging", "battery"] as const)(
     "only shows %s rollout after enrollment starts",
     (id) => {
       const modern = createGame({ scenarioId: 106 });
-      modern.startingYear = 2030;
+      modern.startingYear = 2060;
       expect(programStatus(modern, id, program({}))).toBe("Off");
       expect(programStatus(modern, id, program({ tier: "On" }))).toBe("On");
       expect(programStatus(modern, id, program({ adoption: 0.25 }))).toBe(

@@ -1,6 +1,7 @@
 import cloneDeep from "lodash.clonedeep";
 import {
   advancePolicies,
+  applyPeakDemand,
   applyPolicyDemand,
   buildoutCompletionMonth,
   buildoutMonthsDone,
@@ -182,6 +183,36 @@ test("a build-out finishes after exactly its funded months, then costs nothing a
     gameReducer(fresh, schedulePolicy(change)).policies?.programs.efficiency
       .pending,
   ).toEqual({ tier: "On", month: 1 });
+});
+
+test("the tariff repays shifted load evenly through eight hours across midnight", () => {
+  const game = createGame({ scenarioId: 106 });
+  game.policies = emptyPolicies();
+  const tariff = game.policies.programs.timeOfUse;
+  tariff.tier = "On";
+  tariff.startHour = 21;
+  const tickAt = (minute: number) => ({
+    ...game.timeline[0],
+    minute,
+    demandByType: { ...game.timeline[0].demandByType, Residential: 100 },
+  });
+  const peak = tickAt(22 * 60);
+  applyPeakDemand(game, peak, [], 60);
+  expect(peak.demandByType.Residential).toBe(90);
+  expect(peak.deferredResidential).toEqual([
+    { energyWh: 10, recoveryStartMinute: 25 * 60, recoveryEndMinute: 33 * 60 },
+  ]);
+  // Cancel while energy is still owed. Existing batches finish on their original schedule.
+  tariff.tier = "Off";
+  let queue = peak.deferredResidential;
+  const recovery = Array.from({ length: 10 }, (_, offset) => {
+    const tick = tickAt((24 + offset) * 60);
+    applyPeakDemand(game, tick, queue, 60);
+    queue = tick.deferredResidential;
+    return tick.shiftedResidentialW;
+  });
+  expect(recovery).toEqual([0, ...Array<number>(8).fill(1.25), 0]);
+  expect(queue).toEqual([]);
 });
 
 test("solar affects only eligible daylight load after efficiency; neutral demand is exact", () => {
@@ -524,8 +555,8 @@ test("rooftop rebates follow the installed price of their year", () => {
       (programCustomers(game) * POLICIES.solar.cap)
     );
   };
-  // Start-year dollars: a quarter of the era's installed price per watt, plus a month of inflation.
-  expect(perWatt(105) / (0.25 * residentialSolarCostPerW(2003))).toBeCloseTo(
+  // Start-year dollars plus one month of inflation.
+  expect(perWatt(105) / (0.15 * residentialSolarCostPerW(2003))).toBeCloseTo(
     1,
     1,
   );

@@ -20,7 +20,6 @@ import EnergySavingsLeafIcon from "@mui/icons-material/EnergySavingsLeaf";
 import SolarPowerIcon from "@mui/icons-material/SolarPower";
 import ScheduleIcon from "@mui/icons-material/Schedule";
 import PrecisionManufacturingIcon from "@mui/icons-material/PrecisionManufacturing";
-import ThermostatIcon from "@mui/icons-material/Thermostat";
 import ElectricCarIcon from "@mui/icons-material/ElectricCar";
 import BatteryChargingFullIcon from "@mui/icons-material/BatteryChargingFull";
 import { useAppDispatch, useAppSelector } from "../../Store";
@@ -43,9 +42,9 @@ import { POLICIES, POLICY_IDS } from "../../data/Policies";
 import {
   FLEXIBILITY_IDS,
   isFlexibilityPolicy,
+  type FlexibilityPolicyId,
   flexibilityMonths,
   flexibilityAvailable,
-  flexibilityCapitalCost,
   flexibilityMonthlyCost,
 } from "../../helpers/CustomerFlexibility";
 import { electricVehicleEligibility } from "../../data/ElectricVehicles";
@@ -59,7 +58,7 @@ import {
   buildoutMonthsDone,
   emptyPolicies,
   policyAvailable,
-  policyAllowedForGame,
+  canStartPolicy,
   policyBudget,
   policyTotalCost,
   programCustomers,
@@ -101,7 +100,6 @@ const PROGRAM_ICONS: Record<PolicyId, typeof ScheduleIcon> = {
   timeOfUse: ScheduleIcon,
   // Not the factory glyph: that one means "generator" throughout the game
   curtailment: PrecisionManufacturingIcon,
-  thermal: ThermostatIcon,
   evCharging: ElectricCarIcon,
   battery: BatteryChargingFullIcon,
 };
@@ -180,7 +178,7 @@ function FlexibilitySummary({
   month,
 }: {
   game: GameType;
-  id: "thermal" | "evCharging" | "battery";
+  id: FlexibilityPolicyId;
   program: PolicyProgramType;
   month: number;
 }) {
@@ -216,11 +214,6 @@ function FlexibilitySummary({
       : undefined;
   const facts: ProgramFact[] = [
     {
-      label: "Installation cost",
-      value: `${formatMoneyConcise(buildoutComplete(program.adoption) ? 0 : flexibilityCapitalCost(game, id, month) / flexibilityMonths(id))}/mo`,
-      detail: `${flexibilityMonths(id)} months to full rollout`,
-    },
-    {
       label: "Participation payments",
       value: `${formatMoneyConcise(flexibilityMonthlyCost(game, id, game.date.monthsElapsed))}/mo`,
       detail: `${formatMoneyConcise(flexibilityMonthlyCost(fullRollout, id, month))}/mo at full rollout while on`,
@@ -231,7 +224,11 @@ function FlexibilitySummary({
       label: "Local equipment",
       value: `${year} · ${available ? "Available" : "Not yet available"}`,
     },
-    { label: "Rollout", value: formatPercent(program.adoption) },
+    {
+      label: "Rollout",
+      value: formatPercent(program.adoption),
+      detail: `${flexibilityMonths(id)} months to full rollout`,
+    },
   ];
   if (id === "evCharging")
     equipment.push({
@@ -248,11 +245,7 @@ function FlexibilitySummary({
   return (
     <>
       {!available && (
-        <Alert severity="info">
-          {id === "battery" && year >= 2013 && year < 2016
-            ? "Home battery programs become available in 2016."
-            : `No eligible equipment in ${year}.`}
-        </Alert>
+        <Alert severity="info">This program is unavailable in {year}.</Alert>
       )}
       <ProgramFacts facts={facts} />
       <ProgramDetails label="Equipment & rollout">
@@ -536,14 +529,21 @@ function ProgramList({
         section(
           "Reduce overall demand",
           BUILDOUT_IDS.filter(
-            (id) => policyAllowedForGame(game, id) && !finished(id),
+            (id) =>
+              canStartPolicy(game, id, game.date.monthsElapsed + 1) &&
+              !finished(id),
           ).map(choice),
         )}
       {policiesOn &&
         section(
           "Offset peak demand",
           [...POLICY_IDS.filter(isOperatingPolicy), ...FLEXIBILITY_IDS]
-            .filter((id) => policyAllowedForGame(game, id))
+            .filter(
+              (id) =>
+                programs[id].tier === "On" ||
+                programs[id].pending ||
+                canStartPolicy(game, id, game.date.monthsElapsed + 1),
+            )
             .map(choice),
         )}
       {policiesOn &&
@@ -634,7 +634,7 @@ function PolicyProgramDetail({
                 }}
                 helperText={
                   selected === "timeOfUse"
-                    ? `Use shifts to ${policyWindowLabel((startHour + 4) % 24, 3)}`
+                    ? `Use shifts to ${policyWindowLabel((startHour + 4) % 24, POLICIES.timeOfUse.recoveryHours)}`
                     : undefined
                 }
               >
@@ -973,10 +973,8 @@ export function ProgramsScreen({
                 (!cancelling && (unchanged || !result)) ||
                 effective >= end ||
                 (policy &&
-                  isFlexibilityPolicy(policy) &&
                   tier === "On" &&
-                  !flexibilityAvailable(game, policy, effective) &&
-                  current!.adoption === 0)
+                  !canStartPolicy(game, policy, effective))
               }
               onClick={() => {
                 if (cancelling)

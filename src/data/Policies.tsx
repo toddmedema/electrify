@@ -6,7 +6,6 @@ export const POLICY_IDS: PolicyId[] = [
   "solar",
   "timeOfUse",
   "curtailment",
-  "thermal",
   "evCharging",
   "battery",
 ];
@@ -26,11 +25,6 @@ const BUILDOUT_MONTHS = 48;
 const EFFICIENCY_FULL_LIFE_MONTHS = 120;
 const EFFICIENCY_END_LIFE_MONTHS = 240;
 export const POLICIES = {
-  thermal: {
-    name: "Smart heating and hot water",
-    description:
-      "Shift heating and hot-water use out of your peak window. Comfort limits apply and deferred use returns over three hours.",
-  },
   evCharging: {
     name: "Managed EV charging",
     description:
@@ -44,8 +38,9 @@ export const POLICIES = {
   timeOfUse: {
     name: "Time-of-use tariff",
     description:
-      "Half of homes shift 20% of peak-window use into the next three hours. Higher peak prices can drive customers away.",
+      "Half of homes shift 20% of peak-window use across the next eight hours. Higher peak prices can drive customers away.",
     cap: 0.2,
+    recoveryHours: 8,
     costPerCustomer: 0,
   },
   curtailment: {
@@ -80,9 +75,9 @@ export const POLICIES = {
     // Solar Initiative, among the largest rebate programs, funded about 1.9 GW across roughly 12
     // million utility customers - about 160 W each.
     cap: 150,
-    // Utility rebates typically covered about a quarter of a residential system's installed price;
-    // customers and tax credits paid the rest. The price itself follows the installation year.
-    rebateShare: 0.25,
+    // A partial subsidy leaves installation costs shared with customers. The price follows the
+    // installation year.
+    rebateShare: 0.15,
     // Only about half of residential systems face south (LBNL Tracking the Sun 2024), and roofs
     // add shading and soiling losses that ground-mounted utility plants avoid.
     derate: 0.9,

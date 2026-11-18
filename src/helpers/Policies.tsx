@@ -48,13 +48,6 @@ export function emptyPolicies(month = 0): PoliciesType {
         installs: [],
       },
       solar: { tier: "Off", adoption: 0, spending: 0, spent: 0, installs: [] },
-      thermal: {
-        tier: "Off",
-        adoption: 0,
-        spending: 0,
-        spent: 0,
-        installs: [],
-      },
       evCharging: {
         tier: "Off",
         adoption: 0,
@@ -95,6 +88,20 @@ export function policyAllowedForGame(
     game.startingYear + Math.floor(month / 12),
   );
 }
+/** Fresh offers and edits to existing enrollment use the same eligibility in play and preview. */
+export function canStartPolicy(
+  game: GameType,
+  id: PolicyId,
+  month: number,
+): boolean {
+  return (
+    policyAllowedForGame(game, id, month) &&
+    (!isFlexibilityPolicy(id) ||
+      (game.policies?.programs[id]?.adoption ?? 0) > 0 ||
+      flexibilityAvailable(game, id, month))
+  );
+}
+
 export function validPolicyChange(value: unknown): value is PolicyChangeType {
   const p = value as PolicyChangeType | undefined;
   return (
@@ -367,11 +374,12 @@ export function validDeferredResidential(value: unknown): boolean {
       entry.energyWh >= 0 &&
       Number.isInteger(entry.recoveryStartMinute) &&
       entry.recoveryStartMinute >= 0 &&
-      entry.recoveryEndMinute === entry.recoveryStartMinute + 180,
+      entry.recoveryEndMinute ===
+        entry.recoveryStartMinute + POLICIES.timeOfUse.recoveryHours * 60,
   );
 }
 
-/** Each batch keeps its original three-hour recovery window, including when
+/** Each batch keeps its original eight-hour recovery window, including when
  * a new month changes or disables the tariff. Industry never enters the queue. */
 export function applyPeakDemand(
   game: GameType,
@@ -406,7 +414,8 @@ export function applyPeakDemand(
         batch = {
           energyWh: 0,
           recoveryStartMinute,
-          recoveryEndMinute: recoveryStartMinute + 180,
+          recoveryEndMinute:
+            recoveryStartMinute + POLICIES.timeOfUse.recoveryHours * 60,
         };
         queue.push(batch);
       }
