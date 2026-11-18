@@ -391,7 +391,7 @@ test("a fresh offline install launches fullscreen with every bundled file and a 
 
 test("the first offline walkthrough leads to a mission that saves, resumes after relaunch, and quits from the game", async () => {
   let page = desktop.page;
-  await page.getByRole("button", { name: "Play", exact: true }).click();
+  await page.getByRole("button", { name: "Tutorials", exact: true }).click();
   await page.getByRole("button", { name: "Next", exact: true }).click();
   await page.getByRole("button", { name: "Inspect Coal", exact: true }).click();
   await page.getByRole("button", { name: "Next", exact: true }).click();

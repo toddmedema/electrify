@@ -17,6 +17,15 @@ it("uses the small entry only for visitors with no local save database", async (
   inventory.mockResolvedValue([{ name: "electrify-saves" }]);
   expect(await canStartLightweightHome()).toBe(false);
 });
+it("uses the full menu when the player has tutorial progress", async () => {
+  localStorage.setItem(
+    "plays",
+    JSON.stringify({
+      plays: [{ scenarioId: 0, timesPlayed: 1, date: "2026-11-18" }],
+    }),
+  );
+  expect(await canStartLightweightHome()).toBe(false);
+});
 it("keeps direct game links, saved preferences and unavailable inventories on the full entry", async () => {
   window.history.replaceState(null, "", "/?scenario=107");
   expect(await canStartLightweightHome()).toBe(false);
