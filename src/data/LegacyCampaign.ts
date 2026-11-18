@@ -1,3 +1,4 @@
+import { homeBatteryProgramAvailable } from "./CustomerBatteries";
 import type { ScenarioType, PolicyId } from "../Types";
 import { roundToSignificantDigits } from "../helpers/Math";
 import type {
@@ -673,6 +674,6 @@ export function legacyPolicyAllowed(
     case "evCharging":
       return year >= 2010;
     case "battery":
-      return year >= 2015;
+      return homeBatteryProgramAvailable(year);
   }
 }

@@ -7,9 +7,7 @@ import {
 } from "../data/ElectricVehicles";
 import {
   CUSTOMER_BATTERIES,
-  batteryEligibleHouseholdShare,
-  batteryEnrollmentShare,
-  batteryRebateCost,
+  homeBatteryProgramAvailable,
 } from "../data/CustomerBatteries";
 import {
   customerBatteryFleet,
@@ -36,26 +34,7 @@ export function flexibilityAvailable(
   const year = yearAt(game, month);
   return id === "evCharging"
     ? managedChargingAvailable(year, game.location)
-    : batteryEligibleHouseholdShare(year, game.location) > 0 &&
-        batteryEnrollmentShare(year) > 0;
-}
-export function flexibilityCapitalCost(
-  game: GameType,
-  id: FlexibilityPolicyId,
-  month: number,
-): number {
-  const year = yearAt(game, month);
-  const customers = programCustomers(game);
-  const cost =
-    id === "battery" ? batteryRebateCost(customers, 1, year, game.location) : 0;
-  return (
-    cost *
-    getInflationIndex(
-      getDateFromMinute(month * MINUTES_PER_MONTH, game.startingYear),
-      game.startingYear,
-      game.seed,
-    )
-  );
+    : homeBatteryProgramAvailable(year);
 }
 export function flexibilityMonthlyCost(
   game: GameType,

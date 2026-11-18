@@ -242,16 +242,40 @@ test("charging consumes already generated surplus before export and earns no ret
   expect(now.revenue - now.revenueExports!).toBeCloseTo(retailRevenue);
 });
 
-test("unused dispatchable capacity cannot charge customer batteries or create electricity", () => {
+test("affordable local generation recharges the fleet without inflating retail supply", () => {
   const game = fixture();
-  const plant = generator(game);
+  const plant = generator(game, 100);
+  plant.btuPerWh = 6;
+  plant.variableOperatingCostPerMWh = 0;
   tickState(game);
   const now = getTimeFromTimeline(game.date.minute, game.timeline)!;
-  expect(now.reserveW).toBeGreaterThan(0);
-  expect(plant.currentW).toBeCloseTo(now.demandW);
-  expect(now.customerBatteryGridChargeW).toBe(0);
-  expect(now.customerBatteryWh).toBe(0);
+  expect(now.customerBatteryGridChargeW).toBeGreaterThan(0);
+  expect(plant.currentW).toBeCloseTo(
+    now.demandW + now.customerBatteryGridChargeW!,
+  );
+  expect(now.supplyW).toBeCloseTo(now.demandW);
+  expect(now.customerBatteryWh! + now.customerBatteryLossWh!).toBeCloseTo(
+    now.customerBatteryGridChargeW! / TICKS_PER_HOUR,
+  );
+  expect(now.expensesFuel).toBeGreaterThan(0);
 });
+
+test.each(["expensive energy", "no spare reserve"])(
+  "the home battery fleet leaves %s alone",
+  (condition) => {
+    const game = fixture();
+    const plant = generator(game, 100);
+    if (condition === "expensive energy")
+      plant.variableOperatingCostPerMWh = 1000;
+    else plant.peakW = 103;
+    tickState(game);
+    const now = getTimeFromTimeline(game.date.minute, game.timeline)!;
+    expect(now.reserveW).toBeGreaterThan(0);
+    expect(plant.currentW).toBeCloseTo(now.demandW);
+    expect(now.customerBatteryGridChargeW).toBe(0);
+    expect(now.customerBatteryWh).toBe(0);
+  },
+);
 
 test("rooftop electricity serves homes first and only its true surplus charges customer batteries", () => {
   const original = fixture();

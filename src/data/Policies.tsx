@@ -33,7 +33,7 @@ export const POLICIES = {
   battery: {
     name: "Home battery virtual power plant",
     description:
-      "Store surplus electricity in home batteries for your peak window. Batteries lose energy and age while keeping a household reserve.",
+      "Pay households to share power from batteries they already own. The fleet recharges off peak and keeps a household reserve during your peak window.",
   },
   timeOfUse: {
     name: "Time-of-use tariff",

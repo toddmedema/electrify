@@ -28,7 +28,6 @@ import { programCustomers } from "./ProgramCustomers";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "./DateTime";
 import {
   flexibilityMonths,
-  flexibilityCapitalCost,
   flexibilityMonthlyCost,
   flexibilityAvailable,
   isFlexibilityPolicy,
@@ -190,11 +189,7 @@ export function policyBudget(
   month: number,
 ): number {
   if (tier === "Off" || isOperatingPolicy(id)) return 0;
-  if (isFlexibilityPolicy(id))
-    return (
-      flexibilityCapitalCost(game, id, month) / flexibilityMonths(id) +
-      flexibilityMonthlyCost(game, id, month)
-    );
+  if (isFlexibilityPolicy(id)) return flexibilityMonthlyCost(game, id, month);
   return (
     policyTotalCost(game, id as BuildoutPolicyId, month) /
     buildoutMonths(id as BuildoutPolicyId)
@@ -306,14 +301,16 @@ export function advancePolicies(
           enabled && flexibilityAvailable(game, id, m)
             ? Math.min(1 - s.adoption, 1 / flexibilityMonths(id))
             : 0;
-        const capital = flexibilityCapitalCost(game, id, m) * increment;
         if (increment > 0) {
           (s.installs ??= []).push([m, increment]);
           s.adoption = Math.min(1, s.adoption + increment);
         }
-        s.spending =
-          capital +
-          flexibilityMonthlyCost(game, id, m, representedTransportationW);
+        s.spending = flexibilityMonthlyCost(
+          game,
+          id,
+          m,
+          representedTransportationW,
+        );
         s.spent += s.spending;
         return;
       }
@@ -350,7 +347,7 @@ const validStartHour = (hour: unknown) =>
     hour < 24);
 export const policyStartHour = (program?: { startHour?: number }) =>
   program?.startHour ?? 17;
-const windowOffset = (minute: number, startHour: number) =>
+export const windowOffset = (minute: number, startHour: number) =>
   (((minute - startHour * 60) % MINUTES_PER_MONTH) + MINUTES_PER_MONTH) %
   MINUTES_PER_MONTH;
 export const policyPeakHour = (minute: number, startHour = 17) =>

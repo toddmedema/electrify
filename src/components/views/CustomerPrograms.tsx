@@ -48,7 +48,10 @@ import {
   flexibilityMonthlyCost,
 } from "../../helpers/CustomerFlexibility";
 import { electricVehicleEligibility } from "../../data/ElectricVehicles";
-import { customerBatteryFleet } from "../../helpers/CustomerBatteries";
+import {
+  customerBatteryFleet,
+  customerBatterySustainedW,
+} from "../../helpers/CustomerBatteries";
 import { GENERATORS } from "../../data/Facilities";
 import {
   BuildoutPolicyId,
@@ -239,8 +242,8 @@ function FlexibilitySummary({
   if (battery)
     equipment.push({
       label: "Enrolled storage",
-      value: `${formatWatts(battery.powerW)} / ${formatWattHours(battery.capacityWh)}`,
-      detail: "20% household reserve",
+      value: `${formatWatts(customerBatterySustainedW(battery))} / ${formatWattHours(battery.capacityWh)}`,
+      detail: "Four-hour power · 20% household reserve",
     });
   return (
     <>

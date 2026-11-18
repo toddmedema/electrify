@@ -1,3 +1,4 @@
+import { CUSTOMER_BATTERIES } from "../../data/CustomerBatteries";
 import { useCurrency, useMoney } from "./CurrencyContext";
 import * as React from "react";
 import KeyboardShortcuts, { SHORTCUTS_SEARCH_TEXT } from "./KeyboardShortcuts";
@@ -268,8 +269,9 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           </li>
           <li>
             <strong>Home battery virtual power plant:</strong> Home batteries
-            share stored electricity during the peak window in exchange for
-            participation payments. Households keep 20% in reserve.
+            can enroll from {CUSTOMER_BATTERIES.offerFromYear}. Households are
+            paid to share battery power across the peak window and keep 20% in
+            reserve.
           </li>
         </ul>
         <Figure
