@@ -12,6 +12,14 @@ import { returnToTerritoryMap, selectTerritoryMapTile } from "./layout";
 import { editSavedGame, readSavedGame } from "./save-fixture";
 import { reviewScreenshot } from "./review-screenshot";
 
+// MUI dialogs hide the underlying workspace from accessibility, while its renderer keeps running.
+const persistentMap = (page: Page) =>
+  page.getByRole("region", {
+    name: "Territory map workspace",
+    exact: true,
+    includeHidden: true,
+  });
+
 async function start(page: Page, theme: "light" | "dark") {
   await page.addInitScript((mode) => {
     localStorage.setItem("theme", mode);
@@ -31,7 +39,7 @@ async function start(page: Page, theme: "light" | "dark") {
   await expect(
     page.locator("#appbar:visible [data-save-state]").first(),
   ).toHaveAttribute("data-save-state", "saved");
-  return map;
+  return persistentMap(page);
 }
 
 async function continueGame(page: Page) {
@@ -42,7 +50,7 @@ async function continueGame(page: Page) {
     "data-renderer",
     "ready",
   );
-  return map;
+  return persistentMap(page);
 }
 
 async function sceneFacility(map: Locator, tileId: string) {
@@ -190,6 +198,7 @@ for (const theme of ["light", "dark"] as const) {
     const quote = facilityExpansionQuote(before, facility.id, targetSize);
     expect(quote.status).toBe("ready");
     if (quote.status !== "ready") throw new Error(quote.reason);
+    expect(quote.cost).toBeLessThanOrEqual(currentTick(before)!.cash);
     const tile = getTerritoryTile(facility.tileId!)!;
     await selectTerritoryMapTile(page, tile);
     let upgrade = map.getByRole("region", {
@@ -263,7 +272,10 @@ for (const theme of ["light", "dark"] as const) {
     await layers
       .getByRole("checkbox", { name: "Construction", exact: true })
       .uncheck();
-    await expect(occupant.locator(".facilityMapStatusArtwork")).toHaveCount(0);
+    // Hiding the added-capacity construction layer still shows the running base plant.
+    await expect(
+      occupant.locator('.facilityMapStatusArtwork path[fill="#2E7D32"]'),
+    ).toBeVisible();
     expect(await sceneFacility(map, tile.id)).toMatchObject({
       active: true,
       producing: true,
