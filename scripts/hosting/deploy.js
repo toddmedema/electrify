@@ -1,38 +1,15 @@
 #!/usr/bin/env node
-// Called only by scripts/deploy.sh after a successful production build.
+// --preflight is read-only and needs no build; publishing always reads a fresh plan.
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { spawnSync } = require("node:child_process");
+const { OWNER, targets, aws, readHostingPlan } = require("./plan");
 const {
   cacheControl,
   canonicalPaths,
   requestCode,
   responseCode,
-  patchDistribution,
 } = require("./policy");
-const BUCKET = "electrifygame.com";
-const DISTRIBUTION = "E38D57AILAHD00";
-const OWNER = "Electrify SEO hosting (scripts/hosting/deploy.js)";
-
-function aws(args, { optional = false } = {}) {
-  const result = spawnSync("aws", [...args, "--output", "json"], {
-    encoding: "utf8",
-  });
-  if (result.status !== 0) {
-    if (
-      optional &&
-      /NoSuchFunctionExists|NoSuchWebsiteConfiguration/.test(
-        result.stderr || "",
-      )
-    )
-      return null;
-    throw new Error(
-      `aws ${args.slice(0, 2).join(" ")} failed: ${result.stderr || result.error}`,
-    );
-  }
-  return result.stdout.trim() ? JSON.parse(result.stdout) : {};
-}
 
 function files(directory, prefix = "") {
   return fs.readdirSync(directory, { withFileTypes: true }).flatMap((item) => {
@@ -60,58 +37,7 @@ function deploy() {
     return "file://" + target;
   }
   try {
-    const live = aws([
-      "cloudfront",
-      "get-distribution-config",
-      "--id",
-      DISTRIBUTION,
-    ]);
-    const account = aws(["sts", "get-caller-identity"]).Account;
-    const names = {
-      "viewer-request": "electrify-seo-request",
-      "viewer-response": "electrify-seo-response",
-    };
-    const arns = Object.fromEntries(
-      Object.entries(names).map(([event, name]) => [
-        event,
-        `arn:aws:cloudfront::${account}:function/${name}`,
-      ]),
-    );
-    // Preflight all conflicts before any AWS mutation. Never clobber another viewer function.
-    const config = patchDistribution(live.DistributionConfig, arns);
-    for (const behavior of [
-      config.DefaultCacheBehavior,
-      ...(config.CacheBehaviors?.Items || []),
-    ]) {
-      if (behavior.CachePolicyId) {
-        const policy = aws([
-          "cloudfront",
-          "get-cache-policy",
-          "--id",
-          behavior.CachePolicyId,
-        ]);
-        const { MinTTL, MaxTTL } = policy.CachePolicy.CachePolicyConfig;
-        if (MinTTL > 300 || MaxTTL < 31536000)
-          throw new Error(
-            `Cache policy ${behavior.CachePolicyId} clamps SEO lifetimes; use an equivalent policy allowing 300–31536000 seconds before deploying`,
-          );
-      }
-    }
-    const existing = {};
-    for (const [event, name] of Object.entries(names)) {
-      existing[event] = aws(
-        ["cloudfront", "describe-function", "--name", name],
-        { optional: true },
-      );
-      if (
-        existing[event] &&
-        existing[event].FunctionSummary.FunctionConfig.Comment !== OWNER
-      )
-        throw new Error(`Function ${name} is not owned by this deploy script`);
-    }
-    const website = aws(["s3api", "get-bucket-website", "--bucket", BUCKET], {
-      optional: true,
-    });
+    const { live, config, existing, website } = readHostingPlan();
     // Content first: a new edge mapping must never reference an absent page.
     const groups = new Map();
     for (const file of files(build)) {
@@ -132,7 +58,7 @@ function deploy() {
         "s3",
         "cp",
         build,
-        `s3://${BUCKET}`,
+        `s3://${targets.bucket}`,
         "--recursive",
         "--exclude",
         "*",
@@ -142,7 +68,7 @@ function deploy() {
       if (type) args.push("--content-type", type);
       aws(args);
     }
-    for (const [event, name] of Object.entries(names)) {
+    for (const [event, name] of Object.entries(targets.functions)) {
       const code = path.join(directory, `${name}.js`);
       fs.writeFileSync(
         code,
@@ -150,15 +76,16 @@ function deploy() {
       );
       const args = [
         "cloudfront",
-        existing[event] ? "update-function" : "create-function",
+        "update-function",
         "--name",
         name,
         "--function-config",
         jsonFile({ Comment: OWNER, Runtime: "cloudfront-js-2.0" }),
         "--function-code",
         "fileb://" + code,
+        "--if-match",
+        existing[event].ETag,
       ];
-      if (existing[event]) args.push("--if-match", existing[event].ETag);
       const result = aws(args);
       aws([
         "cloudfront",
@@ -175,7 +102,7 @@ function deploy() {
         "s3api",
         "put-bucket-website",
         "--bucket",
-        BUCKET,
+        targets.bucket,
         "--website-configuration",
         jsonFile({ ...website, ErrorDocument: { Key: "404.html" } }),
       ]);
@@ -183,18 +110,24 @@ function deploy() {
       "cloudfront",
       "update-distribution",
       "--id",
-      DISTRIBUTION,
+      targets.distribution,
       "--if-match",
       live.ETag,
       "--distribution-config",
       jsonFile(config),
     ]);
-    aws(["cloudfront", "wait", "distribution-deployed", "--id", DISTRIBUTION]);
+    aws([
+      "cloudfront",
+      "wait",
+      "distribution-deployed",
+      "--id",
+      targets.distribution,
+    ]);
     const invalidation = aws([
       "cloudfront",
       "create-invalidation",
       "--distribution-id",
-      DISTRIBUTION,
+      targets.distribution,
       "--paths",
       "/*",
     ]);
@@ -203,7 +136,7 @@ function deploy() {
       "wait",
       "invalidation-completed",
       "--distribution-id",
-      DISTRIBUTION,
+      targets.distribution,
       "--id",
       invalidation.Invalidation.Id,
     ]);
@@ -214,7 +147,11 @@ function deploy() {
 
 if (require.main === module) {
   try {
-    deploy();
+    if (process.argv.length === 3 && process.argv[2] === "--preflight")
+      readHostingPlan();
+    else if (process.argv.length !== 2)
+      throw new Error("Usage: node scripts/hosting/deploy.js [--preflight]");
+    else deploy();
   } catch (error) {
     console.error(error.message);
     process.exitCode = 1;

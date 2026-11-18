@@ -777,8 +777,14 @@ for (const theme of ["light", "dark"] as const) {
       await expect(
         impact.getByRole("img", { name: /Estimated monthly supply margin/ }),
       ).toBeVisible();
-      await expect(impact).toContainText("Before opening");
-      await expect(impact).toContainText("After opening");
+      await expect(impact.locator(".chartLegendLabel")).toHaveText([
+        "Before",
+        "After",
+      ]);
+      await expect(impact.locator(".uplot")).toHaveCSS(
+        "background-color",
+        "rgba(0, 0, 0, 0)",
+      );
       await expect(impact).not.toContainText("Infinity");
       if (
         kind === "Generator" &&

@@ -1,0 +1,48 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ProductionDistribution",
+      "Effect": "Allow",
+      "Action": [
+        "cloudfront:GetDistributionConfig",
+        "cloudfront:GetDistribution",
+        "cloudfront:UpdateDistribution",
+        "cloudfront:CreateInvalidation",
+        "cloudfront:GetInvalidation"
+      ],
+      "Resource": "arn:aws:cloudfront::028836220400:distribution/E38D57AILAHD00"
+    },
+    {
+      "Sid": "ReadAttachedCachePolicies",
+      "Effect": "Allow",
+      "Action": "cloudfront:GetCachePolicy",
+      "Resource": "arn:aws:cloudfront::*:cache-policy/*"
+    },
+    {
+      "Sid": "OwnedSeoFunctions",
+      "Effect": "Allow",
+      "Action": [
+        "cloudfront:DescribeFunction",
+        "cloudfront:UpdateFunction",
+        "cloudfront:PublishFunction"
+      ],
+      "Resource": [
+        "arn:aws:cloudfront::028836220400:function/electrify-seo-request",
+        "arn:aws:cloudfront::028836220400:function/electrify-seo-response"
+      ]
+    },
+    {
+      "Sid": "ProductionWebsiteConfiguration",
+      "Effect": "Allow",
+      "Action": ["s3:GetBucketWebsite", "s3:PutBucketWebsite"],
+      "Resource": "arn:aws:s3:::electrifygame.com"
+    },
+    {
+      "Sid": "PublishAssetsAndCancelFailedMultipartUploads",
+      "Effect": "Allow",
+      "Action": ["s3:PutObject", "s3:AbortMultipartUpload"],
+      "Resource": "arn:aws:s3:::electrifygame.com/*"
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "account": "028836220400",
+  "bucket": "electrifygame.com",
+  "distribution": "E38D57AILAHD00",
+  "functions": {
+    "viewer-request": "electrify-seo-request",
+    "viewer-response": "electrify-seo-response"
+  }
+}

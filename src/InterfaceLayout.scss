@@ -476,6 +476,9 @@ html[data-interface-scale]:not([data-interface-scale="1"])
 
 .buildImpact {
   padding: 12px 16px;
+  .uplot {
+    background: transparent;
+  }
   summary {
     min-height: 44px;
     display: flex;
