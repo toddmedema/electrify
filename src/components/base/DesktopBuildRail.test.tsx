@@ -153,9 +153,13 @@ it("uses independent remembered power and energy sliders without changing an alr
   fireEvent.click(wind());
   expect(onProject.mock.calls[0][0].peakW).toBe(4e7);
   fireEvent.click(screen.getByRole("button", { name: /Energy:/ }));
-  fireEvent.change(screen.getByRole("slider", { name: "Storage capacity" }), {
-    target: { value: "22" },
-  });
+  const energy = screen.getByRole("slider", { name: "Storage capacity" });
+  expect(energy).toHaveFocus();
+  fireEvent.scroll(
+    screen.getByRole("group", { name: "Construction technology list" }),
+  );
+  expect(energy).toHaveFocus();
+  fireEvent.change(energy, { target: { value: "22" } });
   expect(memory.get("project.storageSize")).toBe(22);
   expect(memory.get("project.generatorSize")).toBe(12);
   expect(onProject).toHaveBeenCalledTimes(1);

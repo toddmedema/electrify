@@ -329,6 +329,9 @@ export default function DesktopBuildRail({
         onWheel={dismiss}
         onPointerDown={dismiss}
         onScroll={(event) => {
+          // Reaching Energy may scroll the list before the slider takes focus.
+          // Wheel and pointer handlers already dismiss on deliberate scrolling.
+          if (sizing) return;
           // Native focus scrolling can arrive in several steps. Keep the
           // focused technology's preview; explicit scrolling intent dismisses it.
           if (
