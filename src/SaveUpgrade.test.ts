@@ -192,7 +192,7 @@ it("refreshes changed-rule future forecasts on resume while preserving recorded 
       {
         energyWh: 3_000_000,
         recoveryStartMinute: played.date.minute + TICK_MINUTES,
-        recoveryEndMinute: played.date.minute + TICK_MINUTES + 180,
+        recoveryEndMinute: played.date.minute + TICK_MINUTES + 8 * 60,
       },
     ];
     current.deferredResidentialWh = 3_000_000;

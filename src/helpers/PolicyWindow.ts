@@ -30,7 +30,6 @@ export function policyChoiceLabel(
   if (!choice || choice.tier === "Off") return "Off";
   return id === "timeOfUse" ||
     id === "curtailment" ||
-    id === "thermal" ||
     id === "evCharging" ||
     id === "battery"
     ? `On · ${policyWindowLabel(choice.startHour ?? 17)}`

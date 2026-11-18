@@ -36,7 +36,10 @@ export function programStatus(
 ): string {
   if (isOperatingPolicy(id)) return program.tier;
   if (isFlexibilityPolicy(id)) {
-    if (!flexibilityAvailable(game, id) && program.adoption === 0)
+    if (
+      !flexibilityAvailable(game, id, game.date.monthsElapsed + 1) &&
+      program.adoption === 0
+    )
       return "No eligible equipment yet";
     return program.adoption > 0
       ? `${program.tier} · rollout ${formatPercent(program.adoption)}`

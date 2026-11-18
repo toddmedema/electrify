@@ -28,8 +28,6 @@ const objectFields = {
   transmissionCapacityLimitsWByCorridor: "dictionary",
   deferredResidential: "queue",
   deferredResidentialStart: "queue",
-  deferredThermal: "queue",
-  deferredThermalStart: "queue",
   deferredCharging: "queue",
   deferredChargingStart: "queue",
 } as const satisfies Record<ObjectTickKey, "dictionary" | "queue">;

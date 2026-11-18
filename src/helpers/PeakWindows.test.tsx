@@ -43,7 +43,7 @@ test.each(Array.from({ length: 24 }, (_, hour) => hour))(
     let residentialBefore = 0,
       residentialAfter = 0,
       industrialRemoved = 0;
-    for (let minute = 0; minute < 2880 + 420; minute += 15) {
+    for (let minute = 0; minute < 2880 + 12 * 60; minute += 15) {
       if (minute === 2880) {
         game.policies.programs.timeOfUse.tier = "Off";
         game.policies.programs.curtailment.tier = "Off";
@@ -104,7 +104,7 @@ test("independent windows bill recovered energy at a discount even during a new 
     Transportation: 100,
   };
   applyPeakDemand(game, tick, [
-    { energyWh: 60, recoveryStartMinute: 1440, recoveryEndMinute: 1620 },
+    { energyWh: 160, recoveryStartMinute: 1440, recoveryEndMinute: 1920 },
   ]);
   expect(tick.demandByType.Residential).toBe(110);
   expect(tick.demandByType.Industrial).toBe(100);

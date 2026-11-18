@@ -16,10 +16,10 @@ describe("current save policies", () => {
     game.policies.programs.battery.adoption = 0.5;
     game.policies.programs.battery.installs = [[1, 0.5]];
     const tick = game.timeline[0];
-    tick.deferredThermal = [
-      { energyWh: 10, recoveryStartMinute: 60, recoveryEndMinute: 240 },
+    tick.deferredResidential = [
+      { energyWh: 10, recoveryStartMinute: 60, recoveryEndMinute: 540 },
     ];
-    tick.deferredThermalStart = clone(tick.deferredThermal);
+    tick.deferredResidentialStart = clone(tick.deferredResidential);
     tick.deferredCharging = [
       { energyWh: 20, recoveryStartMinute: 60, recoveryEndMinute: 420 },
     ];
@@ -35,7 +35,7 @@ describe("current save policies", () => {
     ).toEqual(clone(tick));
   });
 
-  it.each(["thermal", "evCharging", "battery"] as const)(
+  it.each(["evCharging", "battery"] as const)(
     "accepts a completed %s rollout with a pending Off or window change in JSON saves",
     (id) => {
       const game = createGame({ scenarioId: 100 });
@@ -66,11 +66,11 @@ describe("current save policies", () => {
 
   it.each([
     [
-      "deferredThermal",
-      [{ energyWh: -1, recoveryStartMinute: 60, recoveryEndMinute: 240 }],
+      "deferredResidential",
+      [{ energyWh: -1, recoveryStartMinute: 60, recoveryEndMinute: 540 }],
     ],
     [
-      "deferredThermalStart",
+      "deferredResidentialStart",
       [{ energyWh: 1, recoveryStartMinute: 60, recoveryEndMinute: 420 }],
     ],
     [

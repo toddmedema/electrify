@@ -178,8 +178,6 @@ function accumulateTick(
     // Local resumable frames and recovery batches are not numeric averaged chart history.
     delete sample.deferredResidential;
     delete sample.deferredResidentialStart;
-    delete sample.deferredThermal;
-    delete sample.deferredThermalStart;
     delete sample.deferredCharging;
     delete sample.deferredChargingStart;
     sample.renewableCapacityFactors = factors;
