@@ -834,12 +834,16 @@ test("save readiness waits for the requested persisted snapshot despite a saved 
         request.onsuccess = () => {
           const db = request.result;
           const tx = db.transaction("payloads", "readwrite");
-          tx.objectStore("payloads").put({ id, save: wire });
+          tx.objectStore("payloads").put({ id, save: JSON.parse(wire) });
           tx.oncomplete = () => db.close();
         };
       });
     },
-    { databaseName: SAVE_DATABASE_NAME, id: targetId, wire },
+    {
+      databaseName: SAVE_DATABASE_NAME,
+      id: targetId,
+      wire: JSON.stringify(wire),
+    },
   );
   const samples: number[] = [];
   const committed = await waitForSavedGame(
