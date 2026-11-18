@@ -10,6 +10,36 @@ import {
   intertieContextForGame,
 } from "../src/helpers/Transmission";
 
+test("The End of an Era offers slow-start gas baseload", async ({ page }) => {
+  await page.goto("/?scenario=102");
+  await page.getByRole("button", { name: "Start game", exact: true }).click();
+  await openBuild(page);
+  await page.getByRole("tab", { name: "Generators", exact: true }).click();
+  const options = page.getByRole("list", { name: "Generator options" });
+  const steam = options.locator('[data-build-option="Natural Gas Steam"]');
+  const icon = steam.getByRole("img", {
+    name: "Natural Gas Steam",
+    exact: true,
+  });
+  await expect(icon).toHaveAttribute("src", "/images/natural gas steam.svg");
+  await expect
+    .poll(() => icon.evaluate((image: HTMLImageElement) => image.naturalWidth))
+    .toBeGreaterThan(0);
+  await expect(steam).toContainText("Steady supply");
+  await steam
+    .getByRole("button", { name: "Show Natural Gas Steam details" })
+    .click();
+  await expect(
+    steam.getByRole("row", { name: /Ramp up\/down time.*240 min/ }),
+  ).toBeVisible();
+  await expect(
+    options.locator('[data-build-option="Natural Gas Peaker"]'),
+  ).toBeVisible();
+  await expect(
+    options.locator('[data-build-option="Natural Gas CC"]'),
+  ).toHaveCount(0);
+});
+
 for (const theme of ["light", "dark"] as const) {
   test(`biomass emissions use explicit mass units in ${theme}`, async ({
     page,

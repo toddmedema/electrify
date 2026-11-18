@@ -1,5 +1,6 @@
 import { customEventContext } from "../helpers/CustomScenarioEvents";
 import { FACILITY_FUELS } from "./FacilityFuels";
+import { gasHeatRate, gasSteamMaxPeakW } from "./GasPlantVintages";
 import { getHydroAvailability } from "./HydroSites";
 import {
   batteryYearsToBuild,
@@ -85,6 +86,7 @@ const COAL_START_COST_PER_MW_2023 = (54 + 5.81) * CPI_2011_TO_2023;
 // other-start cost for combined cycles, and EIA folds the plant's routine turbine maintenance into
 // variable O&M, so this is the cycling damage alone.
 const GAS_CC_START_COST_PER_MW_2023 = 35 * CPI_2011_TO_2023;
+const GAS_STEAM_START_COST_PER_MW_2023 = 36 * CPI_2011_TO_2023;
 
 // EIA's directly matched 340 kW commercial Oil reciprocating-engine case, normalized from
 // 2015$ to 2023$ with annual-average CPI-U. These stay separate because fixed service is paid for
@@ -107,6 +109,7 @@ export const MINIMUM_STABLE_OUTPUT_BY_FACILITY: Readonly<
   Coal: 0.4,
   Nuclear: 0.5,
   "Natural Gas Peaker": 0.5,
+  "Natural Gas Steam": 0.4,
   "Natural Gas CC": 0.45,
   Oil: 0.5,
   Biomass: 0.4,
@@ -369,6 +372,11 @@ export function GENERATORS(
   );
   const solarCapacityFactor = getSolarCapacityFactor(irradiancesWM2);
 
+  const steamMaxPeakW = gasSteamMaxPeakW(year);
+  // Project scale follows historical unit sizes, so early small utilities can buy gas steam.
+  const steamReferenceW =
+    year < 1942 ? 25000000 : year < 1960 ? 100000000 : 300000000;
+
   let generators = [
     // FUELED
     {
@@ -448,7 +456,7 @@ export function GENERATORS(
       fuel: FACILITY_FUELS["Natural Gas Peaker"],
       gasCycle: "simple",
       description:
-        "Cheap to build and running in minutes, but it burns about half again as much gas per MWh as a combined cycle",
+        "A combustion turbine that starts in minutes to cover demand peaks and shortfalls",
       available: year > 1940, // First full scale plant was 4MW in Switzerland in 1940
       buildCost: scaledBuildCost(
         costBetween(year, 2019, 0.713 * CPI_2019_TO_2023, 2023, 0.836),
@@ -463,7 +471,7 @@ export function GENERATORS(
       // About five of EIA's reference turbines at one site. The larger gas stations are combined
       // cycles, which are their own facility below.
       maxPeakW: 2000000000,
-      btuPerWh: 9.142,
+      btuPerWh: gasHeatRate(year, "simple"),
       spinMinutes: 10,
       annualOperatingCost: fixedOperatingCost(peakW, 6.87),
       variableOperatingCostPerMWh: 1.24,
@@ -481,12 +489,46 @@ export function GENERATORS(
       capacityFactor: 0.12,
       lifespanYears: 40,
     },
+    ...(steamMaxPeakW > 0
+      ? [
+          {
+            name: "Natural Gas Steam",
+            fuel: FACILITY_FUELS["Natural Gas Steam"],
+            gasCycle: "steam",
+            description:
+              "A gas-fired boiler raises steam for a turbine. It takes hours to warm up and works best when run steadily",
+            available: true,
+            // Historical EPA project costs and NREL oil/gas steam O&M, in 2023 dollars.
+            buildCost: scaledBuildCost(
+              1.1,
+              steamReferenceW,
+              peakW,
+              BUILD_COST_FIXED_SHARE.thermal,
+            ),
+            peakW,
+            maxPeakW: steamMaxPeakW,
+            btuPerWh: gasHeatRate(year, "steam"),
+            spinMinutes: 240,
+            annualOperatingCost: fixedOperatingCost(peakW, 35.89),
+            variableOperatingCostPerMWh: 6.04,
+            minimumStableOutput:
+              MINIMUM_STABLE_OUTPUT_BY_FACILITY["Natural Gas Steam"],
+            tracksStarts: true,
+            costPerStart: GAS_STEAM_START_COST_PER_MW_2023 * (peakW / 1000000),
+            assumedStartsPerYear: 20,
+            yearsToBuild: 4,
+            constructionKgco2ePerW: 0.1,
+            capacityFactor: 0.7,
+            lifespanYears: 40,
+          },
+        ]
+      : []),
     {
       name: "Natural Gas CC",
       fuel: FACILITY_FUELS["Natural Gas CC"],
       gasCycle: "combined",
       description:
-        "Reuses the turbine's hot exhaust to raise steam for a second turbine, burning about a third less gas per MWh, but it is slow to start and ramp",
+        "Reuses the gas turbine's exhaust to raise steam for a second turbine, saving fuel per MWh and taking longer to start",
       // Combined cycles existed from the 1960s, but the modern baseload design dates from the
       // first F-class turbine entering combined-cycle service at Virginia Power's Chesterfield
       // station in 1990; the 1990s "dash for gas" followed.

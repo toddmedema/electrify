@@ -1,5 +1,6 @@
 import { currencyForLocation } from "../helpers/Currency";
 import { getLegacyBuildBounds, isLegacyEraGame } from "../data/LegacyEra";
+import { gasHeatRate, gasSteamMaxPeakW } from "../data/GasPlantVintages";
 import {
   LEGACY_CAMPAIGN_ID,
   LEGACY_GENERATION_MONTHS,
@@ -2854,7 +2855,17 @@ function applyBuildFacility(
         return false;
     }
   }
-  // Validate future shopping quotes as carefully as current catalog entries.
+  // Reject dated technologies from stale shopping quotes.
+  if (
+    (requested.name === "Natural Gas Steam" ||
+      requested.gasCycle === "steam") &&
+    (isStorage(requested) ||
+      requested.name !== "Natural Gas Steam" ||
+      requested.gasCycle !== "steam" ||
+      !requested.available ||
+      requested.peakW > gasSteamMaxPeakW(state.date.year))
+  )
+    return false;
   if (
     requested.name === "Iron-Air Battery" &&
     (state.date.year < IRON_AIR_AVAILABLE_YEAR || !isStorage(requested))
@@ -7332,16 +7343,18 @@ function buildFacilityHelper(
       startingAssetId?: string;
       assetId?: string;
     };
+    const vintageYear = state.date.year - initialAgeYears;
     const facility = {
       ...facilitySnapshot,
       hydroSiteId: hydroSiteId ?? g.hydroSiteId,
+      ...(newGame && (g.gasCycle === "simple" || g.gasCycle === "steam")
+        ? { btuPerWh: gasHeatRate(vintageYear, g.gasCycle) }
+        : {}),
       // A scenario's catalog is priced in its starting year, but an inherited wind farm belongs
       // to its commissioning vintage and should use that cohort's observed degradation rate.
       ...(newGame && g.fuel === "Wind"
         ? {
-            annualOutputDegradation: windAnnualOutputDegradation(
-              state.date.year - initialAgeYears,
-            ),
+            annualOutputDegradation: windAnnualOutputDegradation(vintageYear),
           }
         : {}),
       ...financing,

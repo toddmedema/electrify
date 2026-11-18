@@ -45,6 +45,7 @@ const FACILITIES: Record<ModFacilityNameType, true> = {
   Coal: true,
   Nuclear: true,
   "Natural Gas Peaker": true,
+  "Natural Gas Steam": true,
   "Natural Gas CC": true,
   Oil: true,
   Biomass: true,

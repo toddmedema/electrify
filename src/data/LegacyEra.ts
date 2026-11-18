@@ -170,7 +170,7 @@ export const LEGACY_HYDRO_SITES = [
  * They are NOT inferred generator-only costs from Pearl Street's bundled district investment.
  * https://edison.rutgers.edu/images/archive/innovations/EL/PearlStreetHeadnote.pdf
  * Heat-rate anchors: ~138 Btu/Wh early steam (IURC glossary p84); national steam 11.699 in 1955
- * and 10.760 in 1960 (EIA A6). Intermediate steam/peaker efficiencies, fixed sizes, ramps,
+ * and 10.760 in 1960 (EIA A6). Intermediate steam efficiencies, fixed sizes, ramps,
  * lives and build times are authored assumptions, not additional observed historical anchors.
  * https://pubs.naruc.org/pub/DD7DB67E-1866-DAAC-99FB-36526B06C7C6#page=87
  * https://www.eia.gov/totalenergy/data/annual/txt/ptb1206.html
@@ -246,7 +246,6 @@ export function applyLegacyGeneratorEra(
   } else if (quote.name === "Natural Gas Peaker" && year < 1982) {
     quote.available = year >= 1950;
     quote.maxPeakW = 30000000;
-    quote.btuPerWh = 13.5;
     quote.buildCost = eraCost(quote, 10000000, 22000000);
     quote.yearsToBuild = 1.5;
   }

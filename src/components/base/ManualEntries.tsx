@@ -373,10 +373,11 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
         />
         <p>
           A <strong>Natural Gas Peaker</strong> is a single turbine that starts
-          in minutes. A <strong>Natural Gas CC</strong> (combined cycle) also
-          uses the turbine's hot exhaust to drive a steam turbine. It burns
-          about a third less gas per MWh but starts more slowly, so it suits
-          demand that lasts for hours.{" "}
+          in minutes. A <strong>Natural Gas Steam</strong> plant burns gas in a
+          boiler and takes hours to warm up. It was built for baseload in
+          earlier decades. A <strong>Natural Gas CC</strong> (combined cycle)
+          recovers heat from a gas turbine's exhaust to make more electricity
+          per unit of fuel. It suits demand that lasts for hours.{" "}
           <EntryLink to={MANUAL_ENTRY.HYDROPOWER}>Hydro</EntryLink> can do
           either job.
         </p>
