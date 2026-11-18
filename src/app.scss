@@ -7078,6 +7078,11 @@ $programs_column: 800px;
   background: var(--bg-raised);
   // The chart sits on the panel rather than in a darker box of its own
   --chart-surface: var(--bg-raised);
+
+  // The loss readout has no icon, so its text shares the title's left edge
+  .insightsWarning {
+    margin-left: 0;
+  }
 }
 
 // The refresh label shares the title's line without replacing any completed forecast content.

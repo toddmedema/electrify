@@ -139,11 +139,11 @@ it("lists each projected failure separately and removes redundant goal forecasts
   expect(outlook).not.toHaveTextContent("Projected final");
   expect(status).toContainHTML("<strong>Projected loss:</strong>");
   expect(status).toHaveClass("insightsWarning");
-  // The game's shared danger glyph, not a one-off warning triangle
+  // No icon: the label carries the warning, and the text shares the panel's left edge
   expect(
     // eslint-disable-next-line testing-library/no-node-access
     status.querySelector('[data-concept="danger"]'),
-  ).toBeInTheDocument();
+  ).toBeNull();
   const conditions = screen.getByRole("region", { name: "Goals" });
   expect(conditions).not.toHaveTextContent(
     /Projected miss|Projected to meet|Projected loss/,
