@@ -2810,7 +2810,7 @@ export function previewCoalRepowerImpact(
   game: GameType,
   facilityId: number,
   kind: CoalRepowerType,
-): { beforeW: number; afterW: number } | undefined {
+) {
   const facility = game.facilities.find(({ id }) => id === facilityId);
   const quote = facility && coalRepowerQuote(facility, game, kind);
   const now = getTimeFromTimeline(game.date.minute, game.timeline);
@@ -2820,8 +2820,12 @@ export function previewCoalRepowerImpact(
   const year = TICKS_PER_YEAR * TICK_MINUTES;
   const step = 60;
   const ticks = Math.ceil((quote.durationMinutes + year) / step) + 1;
-  const comparisonEnd = project.completesMinute + year;
-  const lowestMargin = (plan: GameType) => {
+  const startsMinute = project.completesMinute;
+  const months = Array.from(
+    { length: year / MINUTES_PER_MONTH },
+    (_, month) => month,
+  );
+  const monthlyMargins = (plan: GameType) => {
     const forecast = generateForecastTimeline(
       plan,
       now.cash,
@@ -2829,19 +2833,21 @@ export function previewCoalRepowerImpact(
       ticks,
       step,
     );
-    let lowest = Infinity;
+    const lowest = months.map(() => Infinity);
     for (const tick of forecast) {
-      if (
-        tick.minute >= project.completesMinute &&
-        tick.minute < comparisonEnd
-      ) {
-        lowest = Math.min(lowest, tick.reserveW ?? tick.supplyW - tick.demandW);
-      }
+      const month = Math.floor(
+        (tick.minute - startsMinute) / MINUTES_PER_MONTH,
+      );
+      if (month >= 0 && month < lowest.length)
+        lowest[month] = Math.min(
+          lowest[month],
+          tick.reserveW ?? tick.supplyW - tick.demandW,
+        );
     }
     return lowest;
   };
-  const beforeW = lowestMargin(game);
-  const afterW = lowestMargin({
+  const before = monthlyMargins(game);
+  const after = monthlyMargins({
     ...game,
     facilities: game.facilities.map((candidate) =>
       candidate.id === facilityId
@@ -2849,9 +2855,16 @@ export function previewCoalRepowerImpact(
         : candidate,
     ),
   });
-  return Number.isFinite(beforeW) && Number.isFinite(afterW)
-    ? { beforeW, afterW }
-    : undefined;
+  if (!before.every(Number.isFinite) || !after.every(Number.isFinite))
+    return undefined;
+  return {
+    startsMinute,
+    months,
+    before: { monthlyMarginW: before },
+    after: { monthlyMarginW: after },
+    beforeW: Math.min(...before),
+    afterW: Math.min(...after),
+  };
 }
 
 function refreshInterestRate(

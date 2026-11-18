@@ -1,12 +1,10 @@
 import * as React from "react";
-import { Typography } from "@mui/material";
 import type { FacilityShoppingType, GameType } from "../../Types";
 import {
   formatForecastWatts,
   formatForecastWattHours,
 } from "../../helpers/Format";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "../../helpers/DateTime";
-import { chartPalette } from "../../Theme";
 import { signature } from "./DeferredProjection";
 import { forecastWorkerSnapshot } from "./ForecastWorkerSnapshot";
 import {
@@ -17,9 +15,7 @@ import {
 } from "./OutlookForecast";
 import { createOutlookWorker } from "./OutlookWorkerClient";
 import { useWorkerRequest } from "./useWorkerRequest";
-import UPlotChart from "./UPlotChart";
-import { xAxis, yAxis, zeroLinePlugin } from "./UPlotHelpers";
-import { PolicyDemandLegend } from "./PolicyDemandChart";
+import SupplyMarginComparisonChart from "./SupplyMarginComparisonChart";
 import type { DecisionImpactFactType } from "./DecisionImpactPreview";
 import {
   LivePurchaseReviewDialog as PurchaseReviewDialog,
@@ -110,97 +106,23 @@ export default function BuildPurchaseReviewDialog({
         <>
           {purchase.afterFacts}
           {snapshot && (
-            <div className="buildImpact">
-              <div className="chartCaption">Lowest supply margin</div>
-              {result ? (
-                <>
-                  <PolicyDemandLegend labels={LABELS} />
-                  <UPlotChart
-                    ariaLabel="Estimated monthly supply margin before and after commissioning, twelve months each"
-                    height={160}
-                    state={result}
-                    interactiveTooltip
-                    tooltip={(index, forecast) => {
-                      const date = getDateFromMinute(
-                        Math.round(
-                          forecast.after.startMinute +
-                            forecast.months[index] * MINUTES_PER_MONTH,
-                        ),
-                        snapshot.startingYear,
-                      );
-                      return [
-                        `${date.month} ${date.year - 1} → ${date.month} ${date.year}`,
-                        `${LABELS[0]}: ${watts(forecast.before.monthlyMarginW[index])}`,
-                        "",
-                        `${LABELS[1]}: ${watts(forecast.after.monthlyMarginW[index])}`,
-                      ].join("\n");
-                    }}
-                    data={[
-                      result.months,
-                      result.before.monthlyMarginW,
-                      result.after.monthlyMarginW,
-                    ]}
-                    seriesLabels={[
-                      `${LABELS[0]} (solid)`,
-                      `${LABELS[1]} (dashed)`,
-                    ]}
-                    formatSummaryValue={formatForecastWatts}
-                    buildOptions={({ scale, getState }) => ({
-                      width: 0,
-                      height: 0,
-                      legend: { show: false },
-                      plugins: [zeroLinePlugin(chartPalette().tick)],
-                      scales: {
-                        x: { time: false, range: (_u, min, max) => [min, max] },
-                      },
-                      axes: [
-                        xAxis(scale, {
-                          splits: () =>
-                            getState().months.filter(
-                              (_, index, months) =>
-                                index % 3 === 0 || index === months.length - 1,
-                            ),
-                          values: (_u, ticks) =>
-                            ticks.map(
-                              (tick) =>
-                                getDateFromMinute(
-                                  Math.round(
-                                    getState().after.startMinute +
-                                      tick * MINUTES_PER_MONTH,
-                                  ),
-                                  snapshot.startingYear,
-                                ).month,
-                            ),
-                        }),
-                        yAxis(scale, {
-                          values: (_u, ticks) => ticks.map(formatForecastWatts),
-                        }),
-                      ],
-                      series: [
-                        {},
-                        {
-                          label: LABELS[0],
-                          stroke: chartPalette().demand,
-                          width: 2,
-                        },
-                        {
-                          label: LABELS[1],
-                          stroke: chartPalette().supply,
-                          width: 2,
-                          dash: [6, 4],
-                        },
-                      ],
-                    })}
-                  />
-                </>
-              ) : (
-                <Typography role="status" sx={{ py: 2 }}>
-                  {state.status === "error"
-                    ? "Couldn’t estimate this project. Reopen the review to retry."
-                    : "Estimating grid impact…"}
-                </Typography>
-              )}
-            </div>
+            <SupplyMarginComparisonChart
+              forecast={result}
+              failed={state.status === "error"}
+              labels={LABELS}
+              ariaLabel="Estimated monthly supply margin before and after commissioning, twelve months each"
+              dateAt={(month, forecast) =>
+                getDateFromMinute(
+                  Math.round(
+                    forecast.after.startMinute + month * MINUTES_PER_MONTH,
+                  ),
+                  snapshot.startingYear,
+                )
+              }
+              periodLabel={(date) =>
+                `${date.month} ${date.year - 1} → ${date.month} ${date.year}`
+              }
+            />
           )}
         </>
       }

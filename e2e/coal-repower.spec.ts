@@ -65,11 +65,22 @@ for (const theme of ["light", "dark"]) {
       await cc.click();
     }
     await expect(dialog).toHaveAccessibleName("Convert to Natural Gas CC?");
-    await expect(dialog).toContainText("90 min");
-    await expect(dialog).toContainText("7.2 months");
+    await expect(dialog).toContainText("7 months");
     await expect(dialog).toContainText("Coal can keep running");
     const facts = dialog.locator(".decisionImpactFact");
     await expect(facts.filter({ hasText: "Rated capacity" })).toHaveCount(0);
+    await expect(facts.filter({ hasText: "Maintenance" })).toContainText(
+      /\$[\d.]+[kM]\/mo → \$[\d.]+[kM]\/mo/,
+    );
+    await expect(facts.filter({ hasText: "Variable Costs" })).toContainText(
+      /\$[\d.]+[kM]?\/MWh → \$[\d.]+[kM]?\/MWh/,
+    );
+    await expect(facts.filter({ hasText: "Startup time" })).toContainText(
+      /\d+ min → 90 min/,
+    );
+    const chart = dialog.getByRole("img", {
+      name: /^Estimated monthly lowest supply margin with and without conversion/,
+    });
     await expect(facts.filter({ hasText: "Cash option" })).toContainText(
       /\$[\d.]+M now/,
     );
@@ -84,7 +95,9 @@ for (const theme of ["light", "dark"]) {
     await expect(margin).toContainText(quantifiedMargin, {
       timeout: 20_000,
     });
+    await expect(chart).toBeVisible();
     await expectDialogToFit(dialog);
+    if (info.project.use.hasTouch) await chart.scrollIntoViewIfNeeded();
     await reviewScreenshot(dialog, {
       path: info.outputPath(`combined-cycle-preview-${theme}.png`),
       animations: "disabled",
@@ -100,12 +113,16 @@ for (const theme of ["light", "dark"]) {
 
     await peaker.click();
     await expect(dialog).toHaveAccessibleName("Convert to Natural Gas Peaker?");
-    await expect(dialog).toContainText("10 min");
-    await expect(dialog).toContainText("3.6 months");
+    await expect(facts.filter({ hasText: "Startup time" })).toContainText(
+      /\d+ min → 10 min/,
+    );
+    await expect(dialog).toContainText("4 months");
     await expect(margin).toContainText(quantifiedMargin, {
       timeout: 20_000,
     });
+    await expect(chart).toBeVisible();
     await expectDialogToFit(dialog);
+    if (info.project.use.hasTouch) await chart.scrollIntoViewIfNeeded();
     await reviewScreenshot(dialog, {
       path: info.outputPath(`peaker-preview-${theme}.png`),
       animations: "disabled",

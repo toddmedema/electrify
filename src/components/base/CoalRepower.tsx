@@ -6,6 +6,7 @@ import {
   FacilityOperatingType,
   GameType,
   RetrofitFacilityAction,
+  isStorage,
 } from "../../Types";
 import {
   COAL_REPOWER_OPTIONS,
@@ -13,10 +14,11 @@ import {
   coalRepowerPurchaseTerms,
   coalRepowerQuote,
 } from "../../helpers/CoalRepower";
-import { MINUTES_PER_MONTH } from "../../helpers/DateTime";
+import { getInflationIndex } from "../../data/Economy";
+import { getDateFromMinute, MINUTES_PER_MONTH } from "../../helpers/DateTime";
 import {
+  formatBuildMonths,
   formatForecastWatts,
-  formatNumber,
   formatWatts,
 } from "../../helpers/Format";
 import {
@@ -26,16 +28,13 @@ import {
 import { currentCash } from "../../helpers/GameSelectors";
 import { upgradeProgress } from "../../helpers/Hazards";
 import { useCoalRepowerImpact } from "./CoalRepowerImpact";
+import { useMoney } from "./CurrencyContext";
 import FacilityUpgradeAction from "./FacilityUpgradeAction";
 import PurchaseReviewDialog from "./PurchaseReviewDialog";
+import SupplyMarginComparisonChart from "./SupplyMarginComparisonChart";
 
 export function coalRepowerActionLabel(kind: CoalRepowerType): string {
   return `Convert to ${COAL_REPOWER_OPTIONS[kind].name}`;
-}
-
-function projectMonths(minutes: number): string {
-  const months = minutes / MINUTES_PER_MONTH;
-  return formatNumber(Math.round(months * 10) / 10);
 }
 
 export function CoalRepowerReview({
@@ -53,10 +52,14 @@ export function CoalRepowerReview({
 }) {
   const quote = coalRepowerQuote(facility, game, kind);
   const impact = useCoalRepowerImpact(game, facility.id, kind);
-  if (!quote) return null;
+  const { formatPricePerMWh } = useMoney();
+  if (!quote || isStorage(facility)) return null;
 
   const { cost, durationMinutes, target } = quote;
   const margin = impact.status === "ready" ? impact.result : undefined;
+  const escalation =
+    getInflationIndex(game.date, game.startingYear, game.seed) /
+    (facility.costIndexAtBuild || 1);
   const capacityChange =
     target.peakW !== facility.peakW
       ? ` Nameplate capacity drops from ${formatWatts(facility.peakW)} to ${formatWatts(target.peakW)}.`
@@ -71,6 +74,9 @@ export function CoalRepowerReview({
       loanMonths={facilityLoanMonths(target.lifespanYears)}
       cashLabel="Cash option"
       upkeepLabel="Maintenance"
+      upkeepBeforePerMonth={
+        (estimatedAnnualOperatingCost(facility) * escalation) / 12
+      }
       upkeepPerMonth={estimatedAnnualOperatingCost(target) / 12}
       onClose={onClose}
       onPurchase={(financed) => {
@@ -79,19 +85,23 @@ export function CoalRepowerReview({
       }}
       extraFacts={[
         {
+          concept: "money",
+          label: "Variable Costs",
+          value: `${formatPricePerMWh((facility.variableOperatingCostPerMWh ?? 0) * escalation)} → ${formatPricePerMWh(target.variableOperatingCostPerMWh ?? 0)}`,
+        },
+        {
           concept: "time",
           label: "Conversion complete in",
-          value: `${projectMonths(durationMinutes)} months`,
+          value: formatBuildMonths(
+            durationMinutes / (12 * MINUTES_PER_MONTH),
+            "long",
+          ),
           detail: `Coal can keep running until the gas plant takes over.${capacityChange}`,
         },
         {
-          concept: "fuel",
-          label: "Gas plant operation",
-          value:
-            kind === "coalToGasCC"
-              ? "Efficient for steady demand"
-              : "Fast starts for peak demand",
-          detail: `${target.spinMinutes} min to start · ${formatNumber(target.btuPerWh * 1000)} Btu/kWh`,
+          concept: "time",
+          label: "Startup time",
+          value: `${facility.spinMinutes} min → ${target.spinMinutes} min`,
         },
         {
           concept: "supply",
@@ -104,6 +114,21 @@ export function CoalRepowerReview({
           detail: "First year after completion, without vs. with conversion.",
         },
       ]}
+      afterFacts={
+        <SupplyMarginComparisonChart
+          forecast={margin}
+          failed={impact.status === "error"}
+          labels={["Without conversion", "With conversion"]}
+          ariaLabel="Estimated monthly lowest supply margin with and without conversion, first year after completion"
+          dateAt={(month, forecast) =>
+            getDateFromMinute(
+              forecast.startsMinute + month * MINUTES_PER_MONTH,
+              game.startingYear,
+            )
+          }
+          periodLabel={(date) => `${date.month} ${date.year}`}
+        />
+      }
     />
   );
 }

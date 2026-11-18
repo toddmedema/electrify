@@ -388,12 +388,19 @@ it("estimates the margin effect of the replacement's dispatch at equal capacity"
   const kind = "coalToGasPeaker";
   expect(coalRepowerQuote(coal, game, kind)?.target.peakW).toBe(coal.peakW);
   const impact = previewCoalRepowerImpact(game, coal.id, kind);
-  expect(impact).toBeDefined();
+  expect(impact?.months).toHaveLength(12);
+  expect(impact?.startsMinute).toBe(
+    game.date.minute + coalRepowerQuote(coal, game, kind)!.durationMinutes,
+  );
+  expect(impact?.before.monthlyMarginW).toHaveLength(12);
+  expect(impact?.after.monthlyMarginW).toHaveLength(12);
+  expect(impact!.beforeW).toBe(Math.min(...impact!.before.monthlyMarginW));
+  expect(impact!.afterW).toBe(Math.min(...impact!.after.monthlyMarginW));
   expect(impact!.afterW).toBeGreaterThan(impact!.beforeW);
   expect(findCoal(game)).toBe(coal);
   expect(coal.upgradeInProgress).toBeUndefined();
 
   coal.paused = true;
   const paused = previewCoalRepowerImpact(game, coal.id, kind);
-  expect(paused?.afterW).toBe(paused?.beforeW);
+  expect(paused?.after.monthlyMarginW).toEqual(paused?.before.monthlyMarginW);
 });
