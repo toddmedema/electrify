@@ -4293,7 +4293,16 @@ function adoptTickWorkingState(
     if (snapshot.policies) working.policies = snapshot.policies;
   }
   if (snapshot.blackout && !working.blackout) delete draft.blackout;
-  Object.assign(draft, working);
+  // Compare against the plain snapshot so unchanged fields never enter Immer's set trap.
+  function publish<K extends keyof GameType>(key: K) {
+    const value = working[key];
+    if (
+      !Object.is(value, snapshot[key]) ||
+      (value === undefined && !Object.hasOwn(snapshot, key))
+    )
+      draft[key] = value;
+  }
+  (Object.keys(working) as (keyof GameType)[]).forEach(publish);
 }
 
 // Ticks the state forward in place
