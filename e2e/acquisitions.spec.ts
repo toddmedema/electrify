@@ -2055,7 +2055,12 @@ for (const theme of ["light", "dark"] as const) {
 test("normal valley play saves across the first year and resumes from IndexedDB", async ({
   page,
 }) => {
+  await page.addInitScript(() => {
+    Math.random = () => 0.25;
+  });
   await startMap(page, "light");
+  // The reducer can queue notifications during settlement, even in a fixture.
+  await import("../src/Store");
   // Build the months of history with the real reducer, then let the browser settle
   // and persist the rollover itself. The save test does not depend on host frame rate.
   await editSavedGame(page, ({ game }) => {
