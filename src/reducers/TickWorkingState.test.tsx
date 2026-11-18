@@ -1,7 +1,14 @@
 import { createNextState, freeze } from "@reduxjs/toolkit";
 import cloneDeep from "lodash.clonedeep";
-import { TICK_MINUTES, TICK_MS, TICKS_PER_MONTH } from "../Constants";
+import {
+  TICK_MINUTES,
+  TICK_MS,
+  TICKS_PER_MONTH,
+  YEARS_PER_TICK,
+} from "../Constants";
 import { getScenario } from "../data/Scenarios";
+import { facilityExpansionQuote } from "../helpers/FacilityExpansion";
+import { currentTick } from "../helpers/GameSelectors";
 import {
   copyCommitmentMetadata,
   serializeCommitmentMetadata,
@@ -10,6 +17,7 @@ import { getTimeFromTimeline } from "../helpers/DateTime";
 import { getStore } from "../StoreRegistry";
 import { createGame } from "../testing/Simulator";
 import { FacilityUpgradeType, GameType } from "../Types";
+import { expandFacility } from "./GameActions";
 import gameReducer, {
   buildTransmissionLine,
   loaded,
@@ -89,6 +97,7 @@ describe("live tick working state", () => {
     expect(actual.eventLog).toBe(state.eventLog);
     expect(actual.reportedEventKeys).toBe(state.reportedEventKeys);
     expect(actual.worldEvents).toBe(state.worldEvents);
+    expect(actual.meaningfulDecisions).toBe(state.meaningfulDecisions);
     expect(actual.policies).toBe(state.policies);
     expect(actual.transmission).toBe(state.transmission);
     expect(actual.timeline[0]).toBe(state.timeline[0]);
@@ -287,6 +296,68 @@ describe("live presentation tick batches", () => {
     expect(actual.timeline[0]).toBe(before.timeline[0]);
     expect(actual.timeline[20]).toBe(before.timeline[20]);
   });
+
+  it.each([false, true])(
+    "settles a capacity expansion in a real Redux tick without changing frozen history (earlier expansion: %s)",
+    (earlierExpansion) => {
+      let state = createGame({ scenarioId: 104, seed: 818 });
+      currentTick(state)!.cash = 1e12;
+      const id = state.facilities[0].id;
+      const originalCapacity = state.facilities[0].peakW;
+      const lever = `asset-expansion:${id}`;
+      const startExpansion = () => {
+        const plant = state.facilities.find((facility) => facility.id === id)!;
+        const quote = facilityExpansionQuote(state, id, plant.peakW * 1.2);
+        if (quote.status !== "ready") throw new Error(quote.reason);
+        state = mutableCopy(
+          gameReducer(
+            state,
+            expandFacility({
+              facilityId: id,
+              targetSize: quote.targetSize,
+              quoteKey: quote.quoteKey,
+            }),
+          ),
+        );
+        state.facilities.find(
+          (facility) => facility.id === id,
+        )!.expansionInProgress!.yearsToBuildLeft = YEARS_PER_TICK / 2;
+        return quote;
+      };
+      startExpansion();
+      if (earlierExpansion) {
+        tickState(state);
+        startExpansion();
+      }
+      const target = state.facilities[0].expansionInProgress!.targetPeakW;
+      const { actual, before } = presentBatch(state, 1);
+
+      expect(Object.isFrozen(before.meaningfulDecisions)).toBe(true);
+      expect(actual.facilities[0].peakW).toBe(target);
+      expect(actual.facilities[0].expansionInProgress).toBeUndefined();
+      expect(
+        actual.meaningfulDecisions.filter((entry) => entry.lever === lever),
+      ).toEqual([
+        expect.objectContaining({
+          before: String(originalCapacity),
+          after: String(target),
+        }),
+      ]);
+      expect(actual.meaningfulDecisions).not.toBe(before.meaningfulDecisions);
+      expect(before.meaningfulDecisions).toHaveLength(earlierExpansion ? 1 : 0);
+      expect(before.meaningfulDecisions.every(Object.isFrozen)).toBe(true);
+      expect(actual.meaningfulDecisions[0]).not.toBe(
+        before.meaningfulDecisions[0],
+      );
+      const completionEvents = (game: GameType) =>
+        game.eventLog.filter((event) =>
+          event.message.startsWith("Capacity expansion complete:"),
+        );
+      expect(completionEvents(actual)).toHaveLength(
+        completionEvents(before).length + 1,
+      );
+    },
+  );
 
   it.each([12, 120])(
     "stops and resumes at the declarative official onset in a real %i-step ULTRA/catch-up batch",

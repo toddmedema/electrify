@@ -4392,6 +4392,7 @@ export function* tickStatePhases(
       undefined,
       true,
       state.date.minute,
+      true,
     );
     desktopSimulationHooks()?.tick(state, now);
     logHailRepairsCompleted(state);
@@ -5405,6 +5406,7 @@ function* supplyFacilitiesFinancesPhases(
   excludedAgreementId?: string,
   settleAgreementAccounts = false,
   settlementEndMinute = now.minute,
+  realSettlement = false,
 ): Generator<
   SharedTickPhase,
   TickPresentFutureType,
@@ -5636,9 +5638,14 @@ function* supplyFacilitiesFinancesPhases(
     const previousSize = facility.peakWh ?? facility.peakW;
     completeFacilityExpansion(facility);
     if (
-      !simulated &&
+      realSettlement &&
       isMaterialCapacityDecision(state, facility.peakW - previousCapacityW)
-    )
+    ) {
+      // A tick's working state shares immutable history with the Redux snapshot. Copy only
+      // when recording a completion, including entries updated by a later expansion of this plant.
+      state.meaningfulDecisions = state.meaningfulDecisions.map((entry) => ({
+        ...entry,
+      }));
       recordMeaningfulDecision(state, {
         lever: `asset-expansion:${facility.id}`,
         label: `Expand ${facility.name}`,
@@ -5646,7 +5653,10 @@ function* supplyFacilitiesFinancesPhases(
         before: String(previousSize),
         after: String(facility.peakWh ?? facility.peakW),
       });
-    if (!simulated)
+    }
+    // A reforecast can omit `simulated` while operating on a private fleet and shared history.
+    // Only an elapsed live tick is allowed to announce that the actual facility has completed.
+    if (realSettlement)
       logGameEvent(
         state,
         "CONSTRUCTION",

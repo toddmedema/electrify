@@ -260,6 +260,41 @@ it("keeps old capacity online, completes in forecasts and live ticks, and books 
   });
 });
 
+it.each([false, true])(
+  "keeps completion history private during an ordinary reforecast (earlier expansion: %s)",
+  (earlierExpansion) => {
+    let game = begin(setup());
+    const id = game.facilities[0].id;
+    const lever = `asset-expansion:${id}`;
+    if (earlierExpansion) {
+      game.facilities[0].expansionInProgress!.yearsToBuildLeft =
+        YEARS_PER_TICK / 2;
+      tickState(game);
+      game = begin(game);
+    }
+    game.facilities[0].expansionInProgress!.yearsToBuildLeft =
+      YEARS_PER_TICK / 2;
+    const before = cloneDeep(game);
+
+    const forecasted = reducer(
+      game,
+      reprioritizeFacility({ spotInList: 0, delta: 1 }),
+    );
+
+    expect(forecasted.date).toEqual(before.date);
+    expect(forecasted.facilities.find((plant) => plant.id === id)).toEqual(
+      before.facilities[0],
+    );
+    expect(forecasted.eventLog).toEqual(before.eventLog);
+    expect(
+      forecasted.meaningfulDecisions.filter((entry) => entry.lever === lever),
+    ).toEqual(
+      before.meaningfulDecisions.filter((entry) => entry.lever === lever),
+    );
+    expect(game).toEqual(before);
+  },
+);
+
 it("preserves absolute stored energy, reservoir water, debt and operating history at completion", () => {
   const game = setup(100);
   const storageQuote = STORAGE(game, 10e6).find(
