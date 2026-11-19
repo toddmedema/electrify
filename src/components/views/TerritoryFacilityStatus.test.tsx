@@ -143,6 +143,64 @@ it("leaves completed foreign facilities unbadged and explains unavailable operat
   ).toBeInTheDocument();
 });
 
+it("renders and inspects separate peer properties with the same retained tile ID", () => {
+  jest.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(3200);
+  const { game } = ready();
+  const tile = {
+    id: "champlain:legacy-100",
+    territoryId: "champlain",
+    q: 6,
+    r: -4,
+    terrain: "plains",
+    siteKind: "industrial",
+    maxPeakW: 40e6,
+  } as const;
+  game.multiplayer = {
+    seat: "0",
+    legacyTiles: [
+      {
+        tile,
+        seat: "1",
+        name: "North Grid",
+        facility: {
+          name: "Oil",
+          fuel: "Oil",
+          peakW: 40e6,
+          yearsToBuildLeft: 0,
+        },
+      },
+      {
+        tile: { ...tile, q: 7 },
+        seat: "2",
+        name: "South Grid",
+        facility: {
+          name: "Coal",
+          fuel: "Coal",
+          peakW: 40e6,
+          yearsToBuildLeft: 0,
+        },
+      },
+    ],
+  };
+  show(game, "champlain:city");
+  const buttons = screen.getAllByRole("button");
+  const north = buttons.filter((button) => button.dataset.owner === "peer:1");
+  const south = buttons.filter((button) => button.dataset.owner === "peer:2");
+  expect(north).toHaveLength(1);
+  expect(south).toHaveLength(1);
+  expect(north[0]).toHaveAccessibleDescription(expect.stringContaining("Oil"));
+  expect(south[0]).toHaveAccessibleDescription(expect.stringContaining("Coal"));
+
+  fireEvent.click(north[0]);
+  const northInspection = within(screen.getByRole("dialog"));
+  expect(northInspection.getByText("North Grid")).toBeVisible();
+  expect(northInspection.getByText("Oil")).toBeVisible();
+  fireEvent.click(south[0]);
+  const southInspection = within(screen.getByRole("dialog"));
+  expect(southInspection.getByText("South Grid")).toBeVisible();
+  expect(southInspection.getByText("Coal")).toBeVisible();
+});
+
 it("hides and restores the construction badge with the facility status layer", () => {
   const { game, facility } = ready();
   facility.expansionInProgress = {

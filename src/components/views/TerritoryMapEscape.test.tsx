@@ -2,12 +2,14 @@ import * as React from "react";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { configureStore } from "@reduxjs/toolkit";
 import { Provider } from "react-redux";
-import type { TerritoryTileId } from "../../Types";
 import reducer from "../../reducers/Game";
 import { createGame } from "../../testing/Simulator";
 import { TerritoryTilePurchasesProvider } from "../base/TerritoryTilePurchases";
 import TileWorkspaceSurface from "../base/TileWorkspaceSurface";
-import { territoryTileViews } from "../../helpers/TerritoryMapState";
+import {
+  territoryTileViews,
+  type TerritoryMapTileKey,
+} from "../../helpers/TerritoryMapState";
 import TerritoryHexMap from "./TerritoryHexMap";
 
 function show() {
@@ -15,9 +17,9 @@ function show() {
   const views = territoryTileViews(game);
   const store = configureStore({ reducer: { game: reducer } });
   function Workspace({ hidden = false, overlay = false } = {}) {
-    const [selected, setSelected] = React.useState<TerritoryTileId | undefined>(
-      "champlain:city",
-    );
+    const [selected, setSelected] = React.useState<
+      TerritoryMapTileKey | undefined
+    >("champlain:city");
     const [inspected, setInspected] = React.useState(true);
     const close = () => {
       setSelected(undefined);

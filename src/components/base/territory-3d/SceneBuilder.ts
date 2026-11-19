@@ -2,11 +2,14 @@ import type {
   FacilityOperatingType,
   FuelNameType,
   TerrainType,
-  TerritoryTileId,
 } from "../../../Types";
 import { isStorage } from "../../../Types";
 import type { TerritoryTileDefinition } from "../../../data/TerritoryTiles";
-import type { TerritoryTileView } from "../../../helpers/TerritoryMapState";
+import {
+  territoryMapTileKey,
+  type TerritoryMapTileKey,
+  type TerritoryTileView,
+} from "../../../helpers/TerritoryMapState";
 import {
   facilityMapStatus,
   facilityOperatingStatus,
@@ -34,7 +37,7 @@ import { WATERSHED_LEVEL_OFFSETS, waterLevelOffset } from "./WaterSurface";
 export type ScenePicker = (point: {
   x: number;
   y: number;
-}) => TerritoryTileId | undefined;
+}) => TerritoryMapTileKey | undefined;
 type PickFrame = Pick<
   MapFrame,
   "width" | "height" | "cameraX" | "cameraY" | "scale" | "weather"
@@ -221,13 +224,14 @@ export class SceneBuilder {
     const models = new Map<string, MapModel>();
     const positions = new Map<string, Vec3>();
     const byId = new Map<string, TerritoryTileView>(
-      views.map((view) => [view.tile.id, view]),
+      views.map((view) => [territoryMapTileKey(view.tile), view]),
     );
     const instances: MapInstance[] = [];
     for (const view of views) {
       const { tile } = view,
+        tileKey = territoryMapTileKey(tile),
         kind = structureKind(view);
-      let cell = this.cells.get(tile.id);
+      let cell = this.cells.get(tileKey);
       if (
         !cell ||
         cell.tile !== tile ||
@@ -258,7 +262,7 @@ export class SceneBuilder {
           kind,
           model,
           terrain: {
-            id: `terrain:${tile.id}`,
+            id: `terrain:${tileKey}`,
             position,
             fog: view.visibilityDistance,
             active: false,
@@ -266,7 +270,7 @@ export class SceneBuilder {
           },
           structure: model
             ? {
-                id: `structure:${tile.id}`,
+                id: `structure:${tileKey}`,
                 position: [position[0], terrain.supportY ?? 0, position[2]],
                 fog: view.visibilityDistance,
                 active: false,
@@ -274,12 +278,12 @@ export class SceneBuilder {
               }
             : undefined,
         };
-        this.cells.set(tile.id, cell);
+        this.cells.set(tileKey, cell);
       }
       const position = cell.structure?.position ?? cell.terrain.position;
       const model = cell.model;
-      if (model) models.set(tile.id, model);
-      positions.set(tile.id, position);
+      if (model) models.set(tileKey, model);
+      positions.set(tileKey, position);
       instances.push(cell.terrain);
       if (!model) continue;
       // Map construction badges may describe added capacity while the base keeps running.
@@ -305,7 +309,7 @@ export class SceneBuilder {
         cell.structure.waterLevel !== waterLevel
       )
         cell.structure = {
-          id: `structure:${tile.id}`,
+          id: `structure:${tileKey}`,
           position,
           fog: view.visibilityDistance,
           model: displayedModel,
@@ -433,7 +437,7 @@ export class SceneBuilder {
     frame: PickFrame,
     motionPhase?: (key: string) => number,
     instances: readonly MapInstance[] = this.instances,
-  ): TerritoryTileId | undefined {
+  ): TerritoryMapTileKey | undefined {
     if (frame.scale <= 0) return undefined;
     const x =
         ((point.x - frame.width / 2) / frame.scale + frame.cameraX) / HEX_WIDTH,
@@ -441,7 +445,7 @@ export class SceneBuilder {
         ((point.y - frame.height / 2) / frame.scale + frame.cameraY) /
         HEX_WIDTH;
     let depth = -Infinity,
-      tileId: TerritoryTileId | undefined;
+      tileKey: TerritoryMapTileKey | undefined;
     for (const instance of instances) {
       if (instance.id.startsWith("wires:")) continue;
       const px = x - instance.position[0],
@@ -515,13 +519,13 @@ export class SceneBuilder {
             instance.position[2] * CAMERA_COS;
           if (hitDepth > depth) {
             depth = hitDepth;
-            tileId = instance.id.startsWith("structure:")
-              ? (instance.id.slice(10) as TerritoryTileId)
-              : (instance.id.slice(8) as TerritoryTileId);
+            tileKey = instance.id.startsWith("structure:")
+              ? (instance.id.slice(10) as TerritoryMapTileKey)
+              : (instance.id.slice(8) as TerritoryMapTileKey);
           }
         }
       }
     }
-    return tileId;
+    return tileKey;
   }
 }

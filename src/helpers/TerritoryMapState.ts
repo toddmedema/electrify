@@ -1,4 +1,9 @@
-import type { FacilityOperatingType, FuelNameType, GameType } from "../Types";
+import type {
+  FacilityOperatingType,
+  FuelNameType,
+  GameType,
+  TerritoryTileId,
+} from "../Types";
 import { UTILITY_AREAS } from "../data/UtilityExpansion";
 import { isLandTerritoryId } from "../data/Territories";
 import type { TerritoryTileDefinition } from "../data/TerritoryTiles";
@@ -15,6 +20,16 @@ export interface TileFacilityView {
   peakW: number;
   peakWh?: number;
   yearsToBuildLeft: number;
+}
+/** Retained facility IDs are company-local; the map identifies them by physical position. */
+export type TerritoryMapTileKey =
+  TerritoryTileId | `retained:${number}:${number}`;
+export function territoryMapTileKey({
+  id,
+  q,
+  r,
+}: Pick<TerritoryTileDefinition, "id" | "q" | "r">): TerritoryMapTileKey {
+  return id.includes(":legacy-") ? `retained:${q}:${r}` : id;
 }
 export interface TerritoryTileView {
   tile: TerritoryTileDefinition;
@@ -77,8 +92,7 @@ export function territoryTileViews(game: GameType): TerritoryTileView[] {
     const ownerName = isOwned
       ? "You"
       : (claim?.name ?? utility?.name ?? municipal?.name ?? "Unowned land");
-    const placedFacility = facilities.get(tile.id);
-    const operatingFacility = isOwned ? placedFacility : undefined;
+    const operatingFacility = isOwned ? facilities.get(tile.id) : undefined;
     const peerFacility =
       !isOwned && claim
         ? retainedClaim
@@ -117,7 +131,7 @@ export function territoryTileViews(game: GameType): TerritoryTileView[] {
       municipalCity:
         municipal?.plant?.tileId === tile.id ? municipal.city : undefined,
       reserved:
-        !!placedFacility ||
+        !!operatingFacility ||
         (!!tile.hydroSiteId && usedHydroSites.has(tile.hydroSiteId)),
     };
   });

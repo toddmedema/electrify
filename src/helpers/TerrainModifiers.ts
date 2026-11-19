@@ -2,6 +2,7 @@ import type {
   FacilityOperatingType,
   FuelNameType,
   GameType,
+  TerrainType,
   TerritoryTileId,
 } from "../Types";
 import { getOffshoreWindOutputFactor, getWindOutputFactor } from "./Energy";
@@ -22,6 +23,13 @@ export function getTerrainModifiers(
   const terrain = hasTerritoryNetwork(game)
     ? getTerritoryTile(tileId, game)?.terrain
     : undefined;
+  return terrainModifiers(terrain, fuel);
+}
+
+export function terrainModifiers(
+  terrain: TerrainType | undefined,
+  fuel: FuelNameType | undefined,
+): { onshoreWindSpeed: number; buildCost: number } {
   const windSpeed =
     terrain === "forest"
       ? 0.95

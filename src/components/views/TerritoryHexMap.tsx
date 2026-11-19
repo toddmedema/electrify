@@ -1,11 +1,15 @@
 import * as React from "react";
 import { Tooltip, useTheme } from "@mui/material";
 import RapidConnectionIcon from "../base/RapidConnectionIcon";
-import type { GameType, TerritoryTileId } from "../../Types";
+import type { GameType } from "../../Types";
 import { isLandTerritoryId } from "../../data/Territories";
 import { TERRAIN_LABELS } from "../../data/TerrainLabels";
 import { FACILITY_FUELS } from "../../data/FacilityFuels";
-import type { TerritoryTileView } from "../../helpers/TerritoryMapState";
+import {
+  territoryMapTileKey,
+  type TerritoryMapTileKey,
+  type TerritoryTileView,
+} from "../../helpers/TerritoryMapState";
 import { tilePurchaseQuotes } from "../../helpers/Territories";
 import { projectSiteCapitalCost } from "../../helpers/ProjectBuild";
 import type { ReadyProjectSite } from "../../helpers/ProjectBuild";
@@ -113,13 +117,13 @@ type MapStyle = React.CSSProperties & {
 interface Props {
   game: GameType;
   views: readonly TerritoryTileView[];
-  selected?: TerritoryTileId;
-  onSelect: (id: TerritoryTileId, inspect?: boolean) => void;
+  selected?: TerritoryMapTileKey;
+  onSelect: (id: TerritoryMapTileKey, inspect?: boolean) => void;
   onCloseInspection?: () => void;
   onDeselect?: () => void;
   projectPlanning?: boolean;
   projectPending?: boolean;
-  projectSites?: ReadonlyMap<TerritoryTileId, ReadyProjectSite>;
+  projectSites?: ReadonlyMap<TerritoryMapTileKey, ReadyProjectSite>;
 }
 function wireStructure({
   tile,
@@ -191,8 +195,8 @@ export default function TerritoryHexMap({
     () => topology.map((view) => view.tile),
     [topology],
   );
-  const byId = React.useMemo(
-    () => new Map(views.map((view) => [view.tile.id, view])),
+  const byKey = React.useMemo(
+    () => new Map(views.map((view) => [territoryMapTileKey(view.tile), view])),
     [views],
   );
   const purchaseQuotes = React.useMemo(
@@ -203,7 +207,7 @@ export default function TerritoryHexMap({
   React.useEffect(() => {
     if (projectPlanning) setBuyMode(false);
   }, [projectPlanning]);
-  const activeSelected = selected && byId.has(selected) ? selected : undefined;
+  const activeSelected = selected && byKey.has(selected) ? selected : undefined;
   React.useEffect(() => {
     const escape = (event: KeyboardEvent) => {
       if (
@@ -257,15 +261,15 @@ export default function TerritoryHexMap({
     views.find(({ owned, tile }) => owned && tile.city)?.tile ??
     views.find(({ owned }) => owned)?.tile ??
     tiles[0];
+  const homeKey = homeTile && territoryMapTileKey(homeTile);
   const [rovingId, setRovingId] = React.useState(
-    () => activeSelected ?? homeTile?.id,
+    () => activeSelected ?? homeKey,
   );
   const activeRoving =
-    activeSelected ??
-    (rovingId && byId.has(rovingId) ? rovingId : homeTile?.id);
+    activeSelected ?? (rovingId && byKey.has(rovingId) ? rovingId : homeKey);
   const [camera] = React.useState(() => {
     let center = hexCenter(
-      (selected ? byId.get(selected)?.tile : undefined) ??
+      (selected ? byKey.get(selected)?.tile : undefined) ??
         homeTile ?? { q: 0, r: 0 },
     );
     const listeners = new Set<() => void>();
@@ -331,7 +335,7 @@ export default function TerritoryHexMap({
     () => moveStage(camera.getSnapshot()),
     [camera, moveStage],
   );
-  const focusAfterNavigation = React.useRef<TerritoryTileId>();
+  const focusAfterNavigation = React.useRef<TerritoryMapTileKey>();
   const pointer = React.useRef<{
     id: number;
     x: number;
@@ -341,7 +345,7 @@ export default function TerritoryHexMap({
   const touches = React.useRef(new Set<number>());
   const suppressClick = React.useRef(false);
   const activation = React.useRef<{
-    tileId: TerritoryTileId;
+    tileKey: TerritoryMapTileKey;
     quoteKey?: string;
   }>();
   const pointerHover = React.useRef<() => void>();
@@ -376,7 +380,7 @@ export default function TerritoryHexMap({
       return;
     framedRun.current = { runId, seed: game.seed, scenarioId: game.scenarioId };
     const focus = hexCenter(
-      byId.get(activeSelected ?? activeRoving!)?.tile ?? { q: 0, r: 0 },
+      byKey.get(activeSelected ?? activeRoving!)?.tile ?? { q: 0, r: 0 },
     );
     const bounds = views.reduce(
       (bounds, { tile, owned }) => {
@@ -416,7 +420,7 @@ export default function TerritoryHexMap({
     worldHeight,
     activeSelected,
     activeRoving,
-    byId,
+    byKey,
     views,
     setCamera,
   ]);
@@ -468,7 +472,7 @@ export default function TerritoryHexMap({
     tiles.filter((tile) => {
       const point = hexCenter(tile);
       return (
-        tile.id === activeRoving ||
+        territoryMapTileKey(tile) === activeRoving ||
         (Math.abs(point.x - cullCenter.x) <
           worldWidth / 2 + HEX_WIDTH + PAN_OVERSCAN &&
           Math.abs(point.y - cullCenter.y) <
@@ -478,8 +482,12 @@ export default function TerritoryHexMap({
     (a, b) => a === b,
   );
   const renderedViews = React.useMemo(
-    () => renderedTiles.map((tile) => ({ ...byId.get(tile.id)!, tile })),
-    [renderedTiles, byId],
+    () =>
+      renderedTiles.map((tile) => ({
+        ...byKey.get(territoryMapTileKey(tile))!,
+        tile,
+      })),
+    [renderedTiles, byKey],
   );
   const peerColors = territoryPeerColors(
     [
@@ -511,7 +519,7 @@ export default function TerritoryHexMap({
     });
     if (buyMode && view.connectable)
       return available("Available in Rapid connection mode.");
-    if (projectPlanning && projectSites?.has(tile.id))
+    if (projectPlanning && projectSites?.has(territoryMapTileKey(tile)))
       return available("Compatible site for this project.");
     if (view.ownerKey && !view.owned)
       return {
@@ -550,7 +558,9 @@ export default function TerritoryHexMap({
     );
   };
   const { ownerBoundaries, allWires } = React.useMemo(() => {
-    const index = new Map(topology.map((view) => [view.tile.id, view]));
+    const index = new Map(
+      topology.map((view) => [territoryMapTileKey(view.tile), view]),
+    );
     const owners = [
       ...new Set(
         topology.flatMap((view) => (view.ownerKey ? [view.ownerKey] : [])),
@@ -561,11 +571,15 @@ export default function TerritoryHexMap({
         owner,
         path: hexBoundary(
           tiles,
-          (tile) => index.get(tile.id)?.ownerKey === owner,
+          (tile) => index.get(territoryMapTileKey(tile))?.ownerKey === owner,
         ),
       })),
       allWires: hexWires(
-        tiles,
+        tiles.map((tile) => ({
+          q: tile.q,
+          r: tile.r,
+          id: territoryMapTileKey(tile),
+        })),
         (tile) => !!index.get(tile.id)?.developed,
         (a, b) => index.get(a.id)?.ownerKey === index.get(b.id)?.ownerKey,
         (tile) => index.get(tile.id)!.structure,
@@ -573,11 +587,15 @@ export default function TerritoryHexMap({
     };
   }, [tiles, topology]);
   const selectedBoundary = React.useMemo(
-    () => hexBoundary(tiles, (tile) => tile.id === activeSelected),
+    () =>
+      hexBoundary(
+        tiles,
+        (tile) => territoryMapTileKey(tile) === activeSelected,
+      ),
     [tiles, activeSelected],
   );
   const wires = React.useMemo(() => {
-    const rendered = new Set(renderedTiles.map((tile) => tile.id));
+    const rendered = new Set(renderedTiles.map(territoryMapTileKey));
     return allWires.filter(
       (wire) => rendered.has(wire.from) && rendered.has(wire.to),
     );
@@ -607,7 +625,7 @@ export default function TerritoryHexMap({
         ),
     }));
   };
-  const inspectTile = (tile: { id: TerritoryTileId; q: number; r: number }) => {
+  const inspectTile = (tile: TerritoryTileView["tile"]) => {
     if ((workspace?.effectiveWidth ?? size.width) <= 740) {
       const point = hexCenter(tile);
       // Leave the selected ground and occupant above the phone's inspection sheet.
@@ -616,38 +634,42 @@ export default function TerritoryHexMap({
         y: point.y + worldHeight * (projectPlanning ? 0.3 : 0.22),
       });
     }
-    onSelect(tile.id, true);
+    onSelect(territoryMapTileKey(tile), true);
   };
-  const rememberActivation = (id?: TerritoryTileId) => {
-    const quote = id && purchaseQuotes?.get(id);
-    activation.current = id
+  const rememberActivation = (key?: TerritoryMapTileKey) => {
+    const tile = key && byKey.get(key)?.tile;
+    const quote = tile && purchaseQuotes?.get(tile.id);
+    activation.current = key
       ? {
-          tileId: id,
+          tileKey: key,
           quoteKey:
-            quote && quote.price <= availableCash && !pendingIds.has(id)
+            quote &&
+            quote.price <= availableCash &&
+            !pendingIds.has(quote.tileId)
               ? quote.quoteKey
               : undefined,
         }
       : undefined;
   };
-  const activateTile = (id: TerritoryTileId) => {
+  const activateTile = (key: TerritoryMapTileKey) => {
     const started = activation.current;
     activation.current = undefined;
-    const view = byId.get(id);
+    const view = byKey.get(key);
     if (!view) return;
-    const quote = purchaseQuotes?.get(id),
+    const { tile } = view;
+    const quote = purchaseQuotes?.get(tile.id),
       expectedQuote =
-        started?.tileId === id ? started.quoteKey : quote?.quoteKey;
-    onSelect(id);
-    if (pendingIds.has(id)) return;
+        started?.tileKey === key ? started.quoteKey : quote?.quoteKey;
+    onSelect(key);
+    if (pendingIds.has(tile.id)) return;
     if (
       expectedQuote &&
       quote &&
       quote.price <= availableCash &&
       !projectPlanning
     )
-      void purchase(id, expectedQuote);
-    else inspectTile(view.tile);
+      void purchase(tile.id, expectedQuote);
+    else inspectTile(tile);
   };
   const pointerTile = (event: {
     target: EventTarget;
@@ -660,7 +682,7 @@ export default function TerritoryHexMap({
       !threeDReady ||
       element?.closest(".territoryTilePrice, .territoryUtilityLabel strong")
     )
-      return ground?.dataset.mapTarget as TerritoryTileId | undefined;
+      return ground?.dataset.mapTarget as TerritoryMapTileKey | undefined;
     const rect = viewport.current?.getBoundingClientRect();
     return (
       (rect &&
@@ -668,7 +690,7 @@ export default function TerritoryHexMap({
           x: event.clientX - rect.left,
           y: event.clientY - rect.top,
         })) ??
-      (ground?.dataset.mapTarget as TerritoryTileId | undefined)
+      (ground?.dataset.mapTarget as TerritoryMapTileKey | undefined)
     );
   };
   const hoverTile = (event: NonNullable<typeof hoverPoint.current>) => {
@@ -698,7 +720,7 @@ export default function TerritoryHexMap({
   };
   const navigate = (
     event: React.KeyboardEvent<HTMLButtonElement>,
-    id: TerritoryTileId,
+    id: TerritoryMapTileKey,
   ) => {
     if ((event.key === "Enter" || event.key === " ") && event.repeat) {
       event.preventDefault();
@@ -714,11 +736,11 @@ export default function TerritoryHexMap({
             : event.key === "ArrowDown"
               ? [0, 1]
               : undefined;
-    const tile = byId.get(id)?.tile;
+    const tile = byKey.get(id)?.tile;
     if (!direction || !tile) return;
     const point = hexCenter(tile);
     const next = tiles
-      .filter((other) => other.id !== id)
+      .filter((other) => territoryMapTileKey(other) !== id)
       .map((other) => {
         const target = hexCenter(other),
           dx = target.x - point.x,
@@ -734,8 +756,9 @@ export default function TerritoryHexMap({
       .sort((a, b) => a.distance - b.distance)[0];
     if (!next) return;
     event.preventDefault();
-    focusAfterNavigation.current = next.tile.id;
-    onSelect(next.tile.id);
+    const key = territoryMapTileKey(next.tile);
+    focusAfterNavigation.current = key;
+    onSelect(key);
     revealTile(next.tile);
   };
   return (
@@ -918,7 +941,7 @@ export default function TerritoryHexMap({
           }
           if (event.detail === 0) return;
           const id = pointerTile(event);
-          if (activation.current && activation.current.tileId !== id) {
+          if (activation.current && activation.current.tileKey !== id) {
             activation.current = undefined;
             event.preventDefault();
             event.stopPropagation();
@@ -986,13 +1009,14 @@ export default function TerritoryHexMap({
               {!threeDReady &&
                 renderedViews.map(({ tile, owned, visibilityDistance }) => {
                   const point = hexCenter(tile);
+                  const key = territoryMapTileKey(tile);
                   return (
                     <g
-                      key={tile.id}
+                      key={key}
                       className="territoryHex territoryFog"
                       data-visibility-distance={visibilityDistance}
                       data-terrain={tile.terrain}
-                      data-tile={tile.id}
+                      data-tile={key}
                       data-owned={owned}
                       transform={`translate(${point.x} ${point.y})`}
                     >
@@ -1031,8 +1055,8 @@ export default function TerritoryHexMap({
                       data-wire-to={wire.to}
                       data-wire-kind={wire.kind}
                       data-visibility-distance={Math.max(
-                        byId.get(wire.from)!.visibilityDistance,
-                        byId.get(wire.to)!.visibilityDistance,
+                        byKey.get(wire.from)!.visibilityDistance,
+                        byKey.get(wire.to)!.visibilityDistance,
                       )}
                     >
                       <path className="territoryWireBacking" d={wire.path} />
@@ -1045,6 +1069,7 @@ export default function TerritoryHexMap({
                 .sort((a, b) => hexCenter(a.tile).y - hexCenter(b.tile).y)
                 .map((view) => {
                   const { tile, facility } = view,
+                    key = territoryMapTileKey(tile),
                     origin = foregroundOrigin(tile),
                     status = facilityMapStatus(view, game.date.minute);
                   const showStatus =
@@ -1063,7 +1088,7 @@ export default function TerritoryHexMap({
                     return null;
                   return (
                     <svg
-                      key={tile.id}
+                      key={key}
                       className="territoryTileOccupant territoryFog"
                       data-visibility-distance={view.visibilityDistance}
                       data-facility-status={status?.kind}
@@ -1076,7 +1101,7 @@ export default function TerritoryHexMap({
                               : "generator"
                             : "tower"
                       }
-                      data-occupant-tile={tile.id}
+                      data-occupant-tile={key}
                       x={origin.x}
                       y={origin.y}
                       width={HEX_WIDTH}
@@ -1138,13 +1163,14 @@ export default function TerritoryHexMap({
           </svg>
           {renderedViews.map((view) => {
             const { tile, facility } = view,
+              key = territoryMapTileKey(tile),
               point = hexCenter(tile);
             const status = facilityMapStatus(view, game.date.minute);
             const utility = !!tile.city && !!view.ownerKey;
             const cityLabel =
               tile.city?.name ?? (tile.city && citySizeLabel(tile.city.size));
             const quote = purchaseQuotes?.get(tile.id);
-            const projectSite = projectSites?.get(tile.id);
+            const projectSite = projectSites?.get(key);
             const projectPrice = projectSite
               ? money(projectSiteCapitalCost(projectSite))
               : undefined;
@@ -1159,9 +1185,9 @@ export default function TerritoryHexMap({
               : "";
             return (
               <button
-                key={tile.id}
+                key={key}
                 type="button"
-                data-map-target={tile.id}
+                data-map-target={key}
                 data-territory={tile.territoryId}
                 data-owner={view.ownerKey}
                 data-owned={view.owned}
@@ -1192,7 +1218,7 @@ export default function TerritoryHexMap({
                       : {}),
                   } as MapStyle
                 }
-                tabIndex={tile.id === activeRoving ? 0 : -1}
+                tabIndex={key === activeRoving ? 0 : -1}
                 aria-label={
                   projectPlanning
                     ? `Inspect ${territoryTileLabel(tile)}${projectSite ? ` · Total project cost ${projectPrice} · ${projectSite.owned ? "Already connected" : "Connection included"}` : " · unavailable for this project"}`
@@ -1200,36 +1226,36 @@ export default function TerritoryHexMap({
                       ? `${unaffordable ? "Inspect" : quote.utilityName ? "Acquire" : "Connect"} ${quote.utilityName ?? territoryTileLabel(tile)} · ${priceLabel}${unaffordable ? "; not enough available cash" : ""}`
                       : label
                 }
-                aria-pressed={tile.id === activeSelected}
-                aria-describedby={`${mapId}-${tile.id}-status`}
+                aria-pressed={key === activeSelected}
+                aria-describedby={`${mapId}-${key}-status`}
                 onFocus={() => {
-                  setRovingId(tile.id);
-                  if (tile.id !== selected) onSelect(tile.id);
+                  setRovingId(key);
+                  if (key !== selected) onSelect(key);
                   if (!pointer.current && !touches.current.size)
                     revealTile(tile);
                 }}
                 onClick={() => {
-                  activateTile(tile.id);
+                  activateTile(key);
                 }}
                 onKeyDown={(event) => {
                   if (
                     (event.key === "Enter" || event.key === " ") &&
                     !event.repeat
                   )
-                    rememberActivation(tile.id);
-                  navigate(event, tile.id);
+                    rememberActivation(key);
+                  navigate(event, key);
                 }}
                 title={`${TERRAIN_LABELS[tile.terrain]} · ${facility?.name ?? cityLabel ?? (view.developed ? (wireStructure(view) === "submerged" ? "Open water · submerged cable" : "Open site · transmission tower") : "Undeveloped site")}${status ? ` · ${status.label}` : ""} · ${hover.reason}`}
               >
                 <span className="territoryTileHitArea" aria-hidden="true" />
-                {projectSites?.has(tile.id) && (
+                {projectSite && (
                   <svg
                     className="projectSiteOutline"
                     aria-hidden="true"
                     viewBox={`${-HEX_WIDTH / 2} ${-HEX_HEIGHT / 2} ${HEX_WIDTH} ${HEX_HEIGHT}`}
                   >
                     <path d={hexFacePath} />
-                    {tile.id === activeSelected && (
+                    {key === activeSelected && (
                       <path
                         className="projectSiteInnerOutline"
                         d={hexFacePath}
@@ -1263,7 +1289,7 @@ export default function TerritoryHexMap({
                     )}
                   </span>
                 )}
-                <span className="srOnly" id={`${mapId}-${tile.id}-status`}>
+                <span className="srOnly" id={`${mapId}-${key}-status`}>
                   {view.owned
                     ? "Your tile"
                     : view.ownerKey

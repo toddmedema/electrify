@@ -17,7 +17,10 @@ import { acquireTile } from "../../reducers/GameActions";
 import { currentTick } from "../../helpers/GameSelectors";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "../../helpers/DateTime";
 import { tilePurchaseQuote } from "../../helpers/Territories";
-import { territoryTileViews } from "../../helpers/TerritoryMapState";
+import {
+  territoryTileViews,
+  type TerritoryMapTileKey,
+} from "../../helpers/TerritoryMapState";
 import { ownsTerritoryTile } from "../../helpers/TerritoryTiles";
 import { registerMultiplayerRuntime } from "../../multiplayer/Registry";
 import type { TerritoryTileId } from "../../Types";
@@ -145,7 +148,7 @@ function show(
     const [inspectionOpen, setInspectionOpen] = React.useState(
       inspectionInitiallyOpen,
     );
-    const [selected, select] = React.useState<TerritoryTileId | undefined>(
+    const [selected, select] = React.useState<TerritoryMapTileKey | undefined>(
       initialSelected,
     );
     return (

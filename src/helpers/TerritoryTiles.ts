@@ -506,15 +506,17 @@ export function getTerritoryTiles(
   game?: TileGame,
 ): readonly TerritoryTileDefinition[] {
   if (!game) return TERRITORY_TILES;
-  return [
-    ...new Map(
-      [
-        ...TERRITORY_TILES,
-        ...legacyTerritoryTiles(game),
-        ...scenarioMapTiles(game).map(({ tile }) => tile),
-      ].map((tile) => [tile.id, tile]),
-    ).values(),
-  ];
+  const retained = legacyTerritoryTiles(game);
+  const byId = new Map(
+    [
+      ...TERRITORY_TILES,
+      ...retained,
+      ...scenarioMapTiles(game).map(({ tile }) => tile),
+    ].map((tile) => [tile.id, tile]),
+  );
+  // Build commands use company-local IDs. A peer's matching label cannot replace paid local land.
+  for (const tile of retained) byId.set(tile.id, tile);
+  return [...byId.values()];
 }
 export function isTerritoryTileId(
   value: unknown,

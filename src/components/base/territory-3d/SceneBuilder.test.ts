@@ -9,7 +9,7 @@ import { hexWires } from "../TerritoryHexGeometry";
 import { MeshBuilder } from "./MeshBuilder";
 import { SceneBuilder, structureKind } from "./SceneBuilder";
 import type { MapModel, Vec3 } from "./Types";
-import { projectPoint } from "./Projection";
+import { projectPoint, tilePosition3D } from "./Projection";
 import { getTerrainModel } from "./TerrainModels";
 import { getStructureModel } from "./StructureModels";
 
@@ -355,6 +355,24 @@ test("picking follows solid elevated triangles and leaves gaps in a silhouette t
   expect(
     builder.pick(projectPoint([-0.6, 0, 0], pickFrame), pickFrame),
   ).toBeUndefined();
+});
+test("picks distinct retained hexes that share a facility tile ID", () => {
+  const retained = [view(), view(2)].map((item) => ({
+    ...item,
+    developed: false,
+    tile: { ...item.tile, id: "green-uplands:legacy-100" as const },
+  }));
+  const builder = new SceneBuilder({
+    terrain: () => flatGround,
+    structure: () => model,
+  });
+  const tiles = retained.map(({ tile }) => tile);
+  builder.build(retained, tiles, [], 0, "run");
+  expect(
+    tiles.map((tile) =>
+      builder.pick(projectPoint(tilePosition3D(tile), pickFrame), pickFrame),
+    ),
+  ).toEqual(["retained:0:0", "retained:2:0"]);
 });
 test("picking uses camera depth instead of tile iteration order", () => {
   const tall: MapModel = {

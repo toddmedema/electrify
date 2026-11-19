@@ -20,11 +20,19 @@ import type {
 } from "../../Types";
 import { UTILITY_AREAS } from "../../data/UtilityExpansion";
 import { TERRAIN_LABELS } from "../../data/TerrainLabels";
-import { tileFitsFacility } from "../../helpers/TerritoryTiles";
-import { territoryTileViews } from "../../helpers/TerritoryMapState";
+import {
+  getTerritoryTile,
+  tileFitsFacility,
+} from "../../helpers/TerritoryTiles";
+import {
+  territoryMapTileKey,
+  territoryTileViews,
+  type TerritoryMapTileKey,
+  type TerritoryTileView,
+} from "../../helpers/TerritoryMapState";
 import { TransmissionPanelProps } from "./TransmissionPanel";
 import { useToolState } from "../base/GameToolMemory";
-import { getTerrainModifiers } from "../../helpers/TerrainModifiers";
+import { terrainModifiers } from "../../helpers/TerrainModifiers";
 import { customerMarketSizeAt } from "../../helpers/Customers";
 import { cityCustomerCount } from "../../helpers/CityProfiles";
 import { citySizeLabel } from "../base/TerritoryTileFacts";
@@ -137,7 +145,7 @@ function TileNetwork(props: Props) {
   const [railFocusRequest, setRailFocusRequest] = React.useState(0);
   const [railSite, setRailSite] = React.useState<TerritoryTileId>();
   const [projectPending, setProjectPending] = React.useState(false);
-  const [selected, setSelected] = useToolState<TerritoryTileId | undefined>(
+  const [selected, setSelected] = useToolState<TerritoryMapTileKey | undefined>(
     "network.tile",
     undefined,
   );
@@ -149,7 +157,7 @@ function TileNetwork(props: Props) {
   );
   const [candidate, setCandidate] = React.useState<TerritoryTileId>();
   const projectBusy = React.useRef(false);
-  const [inspected, setInspected] = React.useState<TerritoryTileId>();
+  const [inspected, setInspected] = React.useState<TerritoryMapTileKey>();
   const [activation, setActivation] = React.useState(0);
   const [category, setCategory] = React.useState("generators");
   const [review, setReview] = React.useState(false);
@@ -168,7 +176,7 @@ function TileNetwork(props: Props) {
   const views = React.useMemo(() => territoryTileViews(game), [game]);
   const view =
     inspected && !panel?.open && !planning
-      ? views.find(({ tile }) => tile.id === inspected)
+      ? views.find(({ tile }) => territoryMapTileKey(tile) === inspected)
       : undefined;
   const tile = view?.tile;
   const territory = tile ? getTerritoryDefinition(tile.territoryId) : undefined;
@@ -179,7 +187,8 @@ function TileNetwork(props: Props) {
   const acquisition = game.utilityExpansion?.acquisitions.find(
     ({ targetId }) => targetId === tile?.territoryId,
   );
-  const quote = tile ? tilePurchaseQuote(game, tile.id) : undefined;
+  const quote =
+    tile && view?.connectable ? tilePurchaseQuote(game, tile.id) : undefined;
   const tick = currentTick(game);
   const customers = tile?.city
     ? view?.owned
@@ -227,15 +236,18 @@ function TileNetwork(props: Props) {
   }, [panel?.projectRequested, startProject]);
   const projectPricingKey =
     planning && project && !catalogue
-      ? `${signature(game)}|${game.interestRate}|${JSON.stringify(views.map(({ tile }) => tile.id))}|${JSON.stringify(game.multiplayer?.tileOwners)}|${JSON.stringify(game.multiplayer?.landOwners)}`
+      ? `${signature(game)}|${game.interestRate}|${JSON.stringify(views.map(({ tile }) => territoryMapTileKey(tile)))}|${JSON.stringify(game.multiplayer?.tileOwners)}|${JSON.stringify(game.multiplayer?.landOwners)}`
       : undefined;
   const projectSites = React.useMemo(() => {
     if (!planning || !project || catalogue) return undefined;
     const connections = tilePurchaseQuotes(game, views);
-    return new Map<TerritoryTileId, ReadyProjectSite>(
-      views.flatMap(({ tile }) => {
+    return new Map<TerritoryMapTileKey, ReadyProjectSite>(
+      views.flatMap(({ tile, owned, connectable }) => {
+        if (!owned && !connectable) return [];
         const quote = projectSiteQuote(game, project, tile.id, connections);
-        return quote.facility ? [[tile.id, quote] as const] : [];
+        return quote.facility
+          ? [[territoryMapTileKey(tile), quote] as const]
+          : [];
       }),
     );
     // Reuse the shared economic/planning signature; map focus and clock ticks do not reprice every site.
@@ -253,29 +265,33 @@ function TileNetwork(props: Props) {
   const sizeChanged = React.useCallback(() => {
     dispatch(generatorSizeChanged());
   }, [dispatch]);
-  const inspect = (id: TerritoryTileId, activate = false) => {
+  const inspect = (key: TerritoryMapTileKey, activate = false) => {
     if (projectBusy.current) return;
-    setSelected(id);
+    setSelected(key);
+    if (!activate) return;
+    const activated = views.find(
+      ({ tile }) => territoryMapTileKey(tile) === key,
+    );
+    if (!activated) return;
+    const id = activated.tile.id;
     if (planning && !catalogue) {
-      if (activate) setCandidate(id);
+      // A peer's retained alias can share an economic ID with a local site.
+      setCandidate(activated.owned || id === key ? id : undefined);
       return;
     }
-    if (activate) {
-      panel?.inspect();
-      setActivation((value) => value + 1);
-      setCategory("generators");
-      setInspected(id);
-      const activated = views.find(({ tile }) => tile.id === id);
-      setRailSite(undefined);
-      if (
-        desktopRail &&
-        activated?.owned &&
-        !activated.tile.city &&
-        !activated.facility
-      ) {
-        setRailSite(id);
-        setRailFocusRequest((value) => value + 1);
-      }
+    panel?.inspect();
+    setActivation((value) => value + 1);
+    setCategory("generators");
+    setInspected(key);
+    setRailSite(undefined);
+    if (
+      desktopRail &&
+      activated.owned &&
+      !activated.tile.city &&
+      !activated.facility
+    ) {
+      setRailSite(id);
+      setRailFocusRequest((value) => value + 1);
     }
   };
   const title = tile
@@ -315,7 +331,9 @@ function TileNetwork(props: Props) {
                 ? preferredSite
                 : undefined;
             setCandidate(preferred);
-            setSelected(preferred);
+            const preferredTile =
+              preferred && getTerritoryTile(preferred, game);
+            setSelected(preferredTile && territoryMapTileKey(preferredTile));
           }}
         />
       )}
@@ -374,7 +392,7 @@ function TileNetwork(props: Props) {
       {view && tile && territory && (
         <TileWorkspaceSurface
           title={title}
-          focusKey={`${tile.id}:${activation}:${view.ownerKey ?? "unowned"}:${operatingFacility?.id ?? (view.facility ? "facility" : "empty")}`}
+          focusKey={`${inspected}:${activation}:${view.ownerKey ?? "unowned"}:${operatingFacility?.id ?? (view.facility ? "facility" : "empty")}`}
           subtitle={view.ownerKey ? view.ownerName : undefined}
           building={building && !desktopRail}
           initialFocusSelector={
@@ -385,11 +403,11 @@ function TileNetwork(props: Props) {
           onClose={close}
         >
           {building && desktopRail ? (
-            <TileTerrainModifiers game={game} tileId={tile.id} />
+            <TileTerrainModifiers terrain={tile.terrain} />
           ) : building ? (
             <GameWorkspaceContext.Provider value={true}>
               <GameBuildCompleteContext.Provider value={keepTileOpen}>
-                <TileTerrainModifiers game={game} tileId={tile.id} />
+                <TileTerrainModifiers terrain={tile.terrain} />
                 <Tabs
                   className="tileBuildTabs"
                   value={storageFits ? category : "generators"}
@@ -469,7 +487,7 @@ function TileNetwork(props: Props) {
                 </div>
               ) : null}
               {!view.owned && !tile.city && (
-                <TileTerrainModifiers game={game} tileId={tile.id} />
+                <TileTerrainModifiers terrain={tile.terrain} />
               )}
               {!view.owned && territory.kind === "utility" ? (
                 <div className="territoryBuildActions">
@@ -601,17 +619,11 @@ function CityDemand({
 }
 
 function TileTerrainModifiers({
-  game,
-  tileId,
+  terrain,
 }: {
-  game: Props["game"];
-  tileId: TerritoryTileId;
+  terrain: TerritoryTileView["tile"]["terrain"];
 }) {
-  const { onshoreWindSpeed, buildCost } = getTerrainModifiers(
-    game,
-    "Wind",
-    tileId,
-  );
+  const { onshoreWindSpeed, buildCost } = terrainModifiers(terrain, "Wind");
   const percentage = (factor: number) =>
     `${factor >= 1 ? "+" : "−"}${Math.round(Math.abs(factor - 1) * 100)}%`;
   const modifiers = [

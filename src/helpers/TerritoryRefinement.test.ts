@@ -17,6 +17,7 @@ import {
 } from "./Territories";
 import {
   getTerritoryTile,
+  getTerritoryTiles,
   isAdjacentToOwnedTerritoryTile,
   tileFitsFacility,
   territoryVisibilityDistance,
@@ -170,6 +171,29 @@ it("keeps connected peer sight and overlapping legacy IDs separate from owned co
   game.multiplayer.landOwners = { [adjacent.territoryId]: owner };
   expect(tilePurchaseQuote(game, adjacent.id)).toBeUndefined();
   expect(tilePurchaseQuotes(game).has(adjacent.id)).toBe(false);
+});
+
+it("keeps the local paid site in the build catalogue when a peer's retained ID collides", () => {
+  const game = ready();
+  const retained = {
+    id: "champlain:legacy-100",
+    territoryId: "champlain",
+    q: 6,
+    r: -4,
+    terrain: "plains",
+    siteKind: "industrial",
+    maxPeakW: 40e6,
+  } as const;
+  game.territoryNetwork!.legacyTiles!.push(retained);
+  game.multiplayer = {
+    seat: "local",
+    legacyTiles: [
+      { tile: { ...retained, q: 7 }, seat: "peer", name: "Neighbor" },
+    ],
+  };
+  expect(getTerritoryTiles(game).find(({ id }) => id === retained.id)).toEqual(
+    retained,
+  );
 });
 
 it("bounds owned coordinate reads while quoting a long purchased frontier", () => {
