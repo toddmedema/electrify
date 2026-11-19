@@ -362,8 +362,10 @@ const tutorialCompletionSx = {
       minHeight: 40,
       "@media (pointer: coarse)": { minHeight: 44 },
     },
+    "& .tutorialFeedbackAction": { display: "flex", flexBasis: "100%" },
     "@media (max-width: 599px)": {
       paddingBottom: "max(16px, env(safe-area-inset-bottom))",
+      "& .tutorialFeedbackAction": { display: "contents" },
       "& .MuiButton-root": { flex: "1 1 auto", margin: 0 },
       "& .MuiButton-contained": { flexBasis: "100%", order: 1 },
     },
@@ -778,18 +780,20 @@ export default class Compositor extends React.Component<Props, {}> {
           </DialogContent>
           <DialogActions disableSpacing={Boolean(ui.dialog.tutorialComplete)}>
             {ui.dialog.tutorialComplete && (
-              <Button
-                onClick={() =>
-                  store.dispatch(
-                    feedbackOpen({
-                      source: "tutorial",
-                      scenarioId: this.props.scenarioId,
-                    }),
-                  )
-                }
-              >
-                Share feedback
-              </Button>
+              <div className="tutorialFeedbackAction">
+                <Button
+                  onClick={() =>
+                    store.dispatch(
+                      feedbackOpen({
+                        source: "tutorial",
+                        scenarioId: this.props.scenarioId,
+                      }),
+                    )
+                  }
+                >
+                  Share feedback
+                </Button>
+              </div>
             )}
             {ui.dialog.offerInstall && (
               <InstallAppButton label="Install for later" afterMilestone />
