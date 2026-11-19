@@ -1,0 +1,59 @@
+name: PR 837 review screenshots
+on:
+  push:
+    branches: [codex/qa/pr-837-screenshots]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  captures:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    env:
+      DISABLE_ESLINT_PLUGIN: "true"
+      E2E_BUILD_DIR: ${{ github.workspace }}/build
+      E2E_PORT: "3189"
+      PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/.tmp/playwright-browsers
+      REVIEW_SCREENSHOT_DIR: ${{ github.workspace }}/test-results/pr-837-screenshots
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: 06c544bdd53d6630597b942f2f486be84c893848
+          fetch-depth: 0
+          lfs: true
+          persist-credentials: false
+      - uses: ./.github/actions/install
+      - uses: actions/cache/restore@v6
+        with:
+          path: .tmp/playwright-browsers
+          key: playwright-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json') }}
+      - name: Install Chromium
+        run: |
+          sudo "$(command -v node)" scripts/ci/ubuntu-apt.js
+          npx playwright install --with-deps --only-shell chromium
+      - name: Build the exact PR web renderer
+        id: web
+        continue-on-error: true
+        run: npm run build
+      - name: Download the exact PR desktop renderer if the web build fails
+        if: steps.web.outcome == 'failure'
+        uses: actions/download-artifact@v8
+        with:
+          name: desktop-renderer
+          path: .tmp/desktop-artifact
+          run-id: 44605458044
+          github-token: ${{ github.token }}
+      - name: Use the desktop renderer in the local browser if the web build failed
+        if: steps.web.outcome == 'failure'
+        run: echo "E2E_BUILD_DIR=$GITHUB_WORKSPACE/.tmp/desktop-artifact/build" >> "$GITHUB_ENV"
+      - name: Capture the tutorial completion and feedback form
+        run: |
+          npm run test:e2e -- --config=e2e/production.playwright.config.ts --project=desktop-chromium --project=mobile-360px --workers=2 --retries=0 e2e/tutorial-capstone.spec.ts --grep 'guided objective reaches'
+      - name: Preserve review screenshots
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: pr-837-review-screenshots
+          path: test-results/pr-837-screenshots/
+          retention-days: 7
+          if-no-files-found: error
