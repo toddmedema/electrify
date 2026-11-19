@@ -2058,9 +2058,11 @@ for (const theme of ["light", "dark"] as const) {
         (tile) => tile.territoryId === resource.id,
       )!;
       if (!tilePurchaseQuote((await readSavedGame(page))!, tile.id)) {
-        await editSavedGame(page, ({ game }) =>
-          connectFrontierToSite(game, tile),
-        );
+        await editSavedGame(page, ({ game }) => {
+          // Fund the paid approach so this test reaches the resource project.
+          currentTick(game)!.cash = 300e6;
+          connectFrontierToSite(game, tile);
+        });
         await page.goto("/");
         await page
           .getByRole("button", { name: "Continue", exact: true })

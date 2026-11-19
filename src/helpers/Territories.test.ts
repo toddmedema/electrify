@@ -38,7 +38,7 @@ it("enables site budgets only in the expansion scenario", () => {
   expect(hasTerritoryNetwork({ ...game, scenarioId: 100 })).toBe(false);
   expect(ownedTerritories(game)).toEqual(["champlain"]);
 });
-it("exchanges one seventh of the old land price for a single immediate tile, with no plants, customers or line", () => {
+it("pays the connection quote for one immediately available building site", () => {
   const game = createGame({ scenarioId: 116, seed: 61 });
   const before = {
     cash: currentTick(game)!.cash,
@@ -47,7 +47,7 @@ it("exchanges one seventh of the old land price for a single immediate tile, wit
     facilities: game.facilities.length,
   };
   const quote = landPurchaseQuote(game)!;
-  expect(quote.price).toBeCloseTo((before.cash * 0.15) / 7, 5);
+  expect(quote.price).toBeCloseTo(4.2e6);
   buyLand(game);
   expect(currentTick(game)!.cash).toBeCloseTo(before.cash - quote.price, 5);
   expect(currentTick(game)!.cash).toBeGreaterThan(100e6);
