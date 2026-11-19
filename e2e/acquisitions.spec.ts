@@ -485,11 +485,8 @@ async function reviewTileBuild(page: Page, name: string) {
     await buildRail(page)
       .getByRole("button", { name: `Choose sites for ${name}`, exact: true })
       .click();
-    await surface
-      .getByRole("button", { name: "Review project", exact: true })
-      .click();
     await expect(
-      surface.getByRole("heading", { name: `Build ${name}?`, exact: true }),
+      surface.getByRole("button", { name: "Cash", exact: true }),
     ).toBeVisible();
     return surface;
   }
@@ -511,12 +508,7 @@ async function confirmTileBuild(
   const desktop = await buildRail(page).isVisible();
   if (desktop) {
     await review
-      .getByRole("radio", {
-        name: financed ? "Loan · connection paid in cash" : /^Cash ·/,
-      })
-      .check();
-    await review
-      .getByRole("button", { name: "Build project", exact: true })
+      .getByRole("button", { name: financed ? "Loan" : "Cash", exact: true })
       .click();
   } else {
     await review
@@ -1414,7 +1406,7 @@ for (const theme of ["light", "dark"] as const) {
       ).toBeInViewport({ ratio: 1 });
       await expect(
         preview.getByRole("button", { name: "Choose sites", exact: true }),
-      ).toBeInViewport({ ratio: 1 });
+      ).toHaveCount(0);
       expect(currentTick((await readSavedGame(page))!)!.cash).toBe(
         currentTick(game)!.cash,
       );
@@ -1423,13 +1415,13 @@ for (const theme of ["light", "dark"] as const) {
         network.locator(`[data-map-target="${tile.id}"]`),
       ).toHaveAttribute("aria-pressed", "true");
       await expect(
-        surface.getByText("Project cost", { exact: true }),
+        surface.getByText("Build cost", { exact: true }),
       ).toBeVisible();
       await expect(
-        surface.getByText("Cash required now", { exact: true }),
+        surface.getByText("Cash purchase", { exact: true }),
       ).toBeVisible();
       review = surface.getByRole("button", {
-        name: "Review project",
+        name: "Cancel",
         exact: true,
       });
     } else {
@@ -1566,17 +1558,12 @@ for (const theme of ["light", "dark"] as const) {
       animations: "disabled",
       scale: "css",
     });
-    await review.click();
     if (desktop) {
-      await expect(
-        surface.getByRole("heading", { name: "Build Wind?", exact: true }),
-      ).toBeVisible();
       await expectDialogToFit(surface);
-      await surface
-        .getByRole("button", { name: "Back to sites", exact: true })
-        .click();
-      await expect(review).toBeVisible();
+      await review.click();
+      await expect(surface).toHaveCount(0);
     } else {
+      await review.click();
       const confirmation = page.getByRole("dialog", {
         name: /^Build .* Wind\?/,
       });
@@ -1587,9 +1574,10 @@ for (const theme of ["light", "dark"] as const) {
     expect(currentTick((await readSavedGame(page))!)!.cash).toBe(
       currentTick(game)!.cash,
     );
-    await surface
-      .getByRole("button", { name: "Close tile", exact: true })
-      .click();
+    if (!desktop)
+      await surface
+        .getByRole("button", { name: "Close tile", exact: true })
+        .click();
     await expect(
       network.locator('[data-map-target][aria-pressed="true"]'),
     ).toHaveCount(0);

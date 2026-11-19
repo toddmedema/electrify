@@ -10,7 +10,7 @@ import { isStorage, type GameType, type TerritoryTileId } from "../../Types";
 import { getHydroAvailability } from "../../data/HydroSites";
 import { hasVisibleEscapeOverlay } from "./VisibleEscapeOverlay";
 import { projectSiteQuote, selectProject } from "../../helpers/ProjectBuild";
-import { formatMoneyConcise } from "../../helpers/Format";
+import { formatPurchasePrice } from "../../helpers/Format";
 import { wToSliderTick } from "../../helpers/BuildSizing";
 import {
   getTerritoryTile,
@@ -126,7 +126,7 @@ it("opens just one full expanded card on hover without spending or stealing focu
   expect(within(preview).getByText("Accounting lifetime")).toBeInTheDocument();
   expect(
     within(preview).queryByRole("button", {
-      name: /Review purchase|Show.*details/,
+      name: /Review purchase|Show.*details|Close technology preview|^Choose sites$/,
     }),
   ).not.toBeInTheDocument();
   expect(button).not.toHaveFocus();
@@ -146,6 +146,40 @@ it("opens just one full expanded card on hover without spending or stealing focu
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
 });
 
+it("opens sizing on hover and keeps it open after a click until an outside press", () => {
+  show();
+  jest.useFakeTimers();
+  try {
+    const trigger = screen.getByRole("button", { name: /Energy:/ });
+    fireEvent.mouseEnter(trigger);
+    const slider = screen.getByRole("slider", { name: "Storage capacity" });
+    expect(slider).not.toHaveFocus();
+    const sizing = screen.getByRole("region", { name: "Energy sizing" });
+    expect(sizing).toHaveTextContent(/^$/);
+    expect(sizing.firstElementChild).toBe(slider);
+    fireEvent.mouseLeave(trigger);
+    fireEvent.mouseEnter(sizing);
+    act(() => jest.advanceTimersByTime(200));
+    expect(slider).toBeVisible();
+    fireEvent.mouseLeave(sizing);
+    act(() => jest.advanceTimersByTime(200));
+    expect(slider).not.toBeInTheDocument();
+    fireEvent.mouseEnter(trigger);
+    fireEvent.click(trigger);
+    fireEvent.mouseLeave(trigger);
+    act(() => jest.advanceTimersByTime(200));
+    expect(
+      screen.getByRole("slider", { name: "Storage capacity" }),
+    ).toHaveFocus();
+    fireEvent.pointerDown(document.body);
+    expect(
+      screen.queryByRole("slider", { name: "Storage capacity" }),
+    ).not.toBeInTheDocument();
+  } finally {
+    jest.useRealTimers();
+  }
+});
+
 it("uses independent remembered power and energy sliders without changing an already chosen project", () => {
   const { memory, onProject } = show();
   fireEvent.click(screen.getByRole("button", { name: /Power:/ }));
@@ -153,7 +187,7 @@ it("uses independent remembered power and energy sliders without changing an alr
     target: { value: "12" },
   });
   expect(memory.get("project.generatorSize")).toBe(12);
-  fireEvent.click(screen.getByRole("button", { name: "Done" }));
+  fireEvent.keyDown(screen.getByRole("slider"), { key: "Escape" });
   fireEvent.click(wind());
   expect(onProject.mock.calls[0][0].peakW).toBe(4e7);
   fireEvent.click(screen.getByRole("button", { name: /Energy:/ }));
@@ -167,7 +201,7 @@ it("uses independent remembered power and energy sliders without changing an alr
   expect(memory.get("project.storageSize")).toBe(22);
   expect(memory.get("project.generatorSize")).toBe(12);
   expect(onProject).toHaveBeenCalledTimes(1);
-  fireEvent.click(screen.getByRole("button", { name: "Done" }));
+  fireEvent.keyDown(screen.getByRole("slider"), { key: "Escape" });
   fireEvent.click(
     screen.getByRole("button", { name: "Choose sites for Battery" }),
   );
@@ -175,7 +209,7 @@ it("uses independent remembered power and energy sliders without changing an alr
   expect(onProject.mock.calls[1][0].peakWh).toBe(5e8);
 });
 
-it("enters a non-final technology preview with Right Arrow and tabs within it before Escape returns to the icon", async () => {
+it("enters a technology preview with Right Arrow and Escape returns to the icon", async () => {
   show();
   const railButtons = within(
     screen.getByRole("complementary", { name: "Build facilities" }),
@@ -185,15 +219,9 @@ it("enters a non-final technology preview with Right Arrow and tabs within it be
   expect(wind()).toHaveFocus();
   const preview = screen.getByLabelText("Wind technology preview");
   await userEvent.keyboard("{ArrowRight}");
-  const close = within(preview).getByRole("button", {
-    name: "Close technology preview",
-  });
-  expect(close).toHaveFocus();
+  expect(preview).toHaveFocus();
   expect(wind()).toHaveAttribute("aria-keyshortcuts", "ArrowRight");
   expect(wind()).toHaveAccessibleDescription(/Right Arrow/);
-  await userEvent.tab();
-  expect(within(preview).getAllByRole("button")[1]).toHaveFocus();
-  expect(close).not.toHaveFocus();
   expect(preview).toBeInTheDocument();
   const mapEscape = jest.fn();
   const mapCapture = () => {
@@ -218,9 +246,7 @@ it("returns keyboard focus to the trigger after explicit sizing and preview dism
   expect(
     screen.getByRole("slider", { name: "Generator capacity" }),
   ).toHaveFocus();
-  await userEvent.tab();
-  expect(screen.getByRole("button", { name: "Done" })).toHaveFocus();
-  await userEvent.keyboard("{Enter}");
+  await userEvent.keyboard("{Escape}");
   expect(size).toHaveFocus();
   expect(screen.queryByRole("slider")).not.toBeInTheDocument();
   const buttons = within(
@@ -229,7 +255,7 @@ it("returns keyboard focus to the trigger after explicit sizing and preview dism
   for (let index = 1; index <= buttons.indexOf(wind()); index++)
     await userEvent.tab();
   expect(wind()).toHaveFocus();
-  await userEvent.keyboard("{ArrowRight}{Enter}");
+  await userEvent.keyboard("{ArrowRight}{Escape}");
   expect(wind()).toHaveFocus();
   expect(
     screen.queryByLabelText("Wind technology preview"),
@@ -262,9 +288,7 @@ it("keeps the last technology preview through multiple native focus scrolls and 
   }
   const preview = screen.getByLabelText(previewName);
   await userEvent.keyboard("{ArrowRight}");
-  expect(
-    within(preview).getByRole("button", { name: "Close technology preview" }),
-  ).toHaveFocus();
+  expect(preview).toHaveFocus();
 });
 
 it.each(["Solar", "Wind"])(
@@ -317,7 +341,7 @@ it.each([
         target: { value: wToSliderTick(8e7) },
       },
     );
-    fireEvent.click(screen.getByRole("button", { name: "Done" }));
+    fireEvent.keyDown(screen.getByRole("slider"), { key: "Escape" });
     const option = projectCatalogue(game, 8e7, false).find(
       (option) => option.name === name,
     )!;
@@ -388,7 +412,7 @@ it("uses the owning site quote for preview prices and explains incompatible site
     within(preview).getByText("Price for the inspected site"),
   ).toBeInTheDocument();
   expect(
-    within(preview).getByText(formatMoneyConcise(quote.facility.buildCost)),
+    within(preview).getByText(formatPurchasePrice(quote.facility.buildCost)),
   ).toBeInTheDocument();
   expect(
     screen.queryByRole("button", { name: "Choose sites for Offshore Wind" }),
@@ -402,7 +426,7 @@ it("disables an oversized project until the player changes the sizing", () => {
   fireEvent.change(screen.getByRole("slider", { name: "Generator capacity" }), {
     target: { value: "34" },
   });
-  fireEvent.click(screen.getByRole("button", { name: "Done" }));
+  fireEvent.keyDown(screen.getByRole("slider"), { key: "Escape" });
   const option = projectCatalogue(game, 8e9, false).find(
     ({ name }) => name === "Wind",
   )!;

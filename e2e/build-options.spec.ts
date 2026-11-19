@@ -46,7 +46,7 @@ test("ordinary starting hills offer general technologies and retain special-site
     await expect(
       rail.getByRole("slider", { name: "Generator capacity" }),
     ).toHaveValue("0");
-    await rail.getByRole("button", { name: "Done", exact: true }).click();
+    await page.keyboard.press("Escape");
     for (const name of [
       "Solar",
       "Wind",
@@ -68,9 +68,7 @@ test("ordinary starting hills offer general technologies and retain special-site
       });
       await expect(preview).not.toContainText("Not buildable on this tile");
       await expect(preview.locator(".buildOptionMetrics")).toBeVisible();
-      await expect(
-        preview.getByRole("button", { name: "Choose sites", exact: true }),
-      ).toBeEnabled();
+      await expect(trigger).toBeEnabled();
     }
     await expect(
       rail.getByRole("button", {
@@ -210,9 +208,7 @@ for (const theme of ["light", "dark"] as const) {
         const tile = page.locator(
           '[data-map-target="champlain:site-12"][data-owned="true"]',
         );
-        await expect(tile).toContainText(
-          "One building site; transmission tower",
-        );
+        await expect(tile).toContainText("Open site");
         await tile.focus();
         await tile.press("Enter");
         const rail = page.getByRole("complementary", {
@@ -258,7 +254,10 @@ for (const theme of ["light", "dark"] as const) {
             scale: "css",
           });
           await expect(
-            preview.getByRole("button", { name: "Choose sites", exact: true }),
+            rail.getByRole("button", {
+              name: "Choose sites for Geothermal",
+              exact: true,
+            }),
           ).toBeDisabled();
           return;
         }

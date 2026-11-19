@@ -292,7 +292,7 @@ function IntertieBuildItem(props: {
   year: number;
   onCompanyReview?: () => void;
 }): React.JSX.Element {
-  const { currency, formatMoneyConcise } = useMoney();
+  const { currency, formatMoneyConcise, formatPurchasePrice } = useMoney();
   const { cash, corridor, outlook, units } = props;
   const market = adjacentMarketForCorridor(corridor.id);
   const name = market?.name || corridor.name;
@@ -371,7 +371,7 @@ function IntertieBuildItem(props: {
           <BuildMetric
             label="Total cost"
             entry={MANUAL_ENTRY.INTERTIES}
-            value={formatMoneyConcise(corridor.buildCost)}
+            value={formatPurchasePrice(corridor.buildCost)}
           />
           {market && (
             <BuildMetric

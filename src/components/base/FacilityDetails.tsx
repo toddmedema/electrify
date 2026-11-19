@@ -21,6 +21,7 @@ import {
   facilityMaintenanceCost,
   facilityOutputFactor,
   facilityPermanentlyShutdown,
+  getTotalDebt,
 } from "../../helpers/Financials";
 import {
   formatPercent,
@@ -280,6 +281,7 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
     currencyForLocation(location, props.game?.startingYear),
   );
   const lifetime = facilityLifetime(facility);
+  const loanBalance = getTotalDebt([facility]);
   const { fuel, variableOperatingCostPerMWh, minimumStableOutput } = facility;
   const storage = isStorage(facility) ? facility : undefined;
   const accentColor = facilityColor(fuel);
@@ -368,7 +370,7 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
               value={
                 <>
                   {formatMoneyConcise(facilityCashBack(facility, date.minute))}
-                  {facility.loanAmountLeft > 0 && (
+                  {loanBalance > 0 && (
                     <span className="facilityStatNote">After loan payoff</span>
                   )}
                 </>
@@ -515,11 +517,11 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
                     : undefined
               }
             />
-            {facility.loanAmountLeft > 0 && (
+            {loanBalance > 0 && (
               <Stat
                 label="Loan balance"
                 entry={MANUAL_ENTRY.INTEREST_RATES}
-                value={formatMoneyConcise(facility.loanAmountLeft)}
+                value={formatMoneyConcise(loanBalance)}
               />
             )}
             {/* Every operating facility pays this, whether or not it also pays per MWh: solar,
@@ -527,7 +529,7 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
                 a paused one half, so say so rather than showing the full rate as if it applied. */}
             {facilityMaintenanceCost(facility, date.minute) === undefined && (
               <Stat
-                label="Fixed upkeep"
+                label="Fixed"
                 entry={MANUAL_ENTRY.OPERATING_COSTS}
                 value={
                   facility.paused
@@ -539,7 +541,7 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
             {variableOperatingCostPerMWh !== undefined &&
               facilityMaintenanceCost(facility, date.minute) === undefined && (
                 <Stat
-                  label="Variable upkeep"
+                  label="Variable"
                   entry={MANUAL_ENTRY.OPERATING_COSTS}
                   value={formatPricePerMWh(variableOperatingCostPerMWh)}
                 />

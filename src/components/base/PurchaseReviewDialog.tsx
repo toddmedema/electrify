@@ -9,7 +9,11 @@ import DecisionImpactPreview, {
   DecisionImpactFactType,
 } from "./DecisionImpactPreview";
 import { purchaseTerms } from "../../helpers/Financials";
-import { formatMoneyConcise, formatNumber } from "../../helpers/Format";
+import {
+  formatMoneyConcise,
+  formatNumber,
+  formatPurchasePrice,
+} from "../../helpers/Format";
 import { LOAN_MONTHS } from "../../Constants";
 import { useBuildCash } from "./useBuildCash";
 
@@ -24,7 +28,7 @@ export function financingShortfallText(
 ): string | undefined {
   return cash >= downpayment
     ? undefined
-    : `Need ${formatMoneyConcise(downpayment, currency)} down payment · you have ${formatMoneyConcise(cash, currency)}`;
+    : `Need ${formatPurchasePrice(downpayment, currency)} down payment · you have ${formatMoneyConcise(cash, currency)}`;
 }
 
 /** Keep balance changes local to this text instead of redrawing the quote's metrics and chart. */
@@ -106,7 +110,7 @@ export function LivePurchaseReviewDialog(
 export default function PurchaseReviewDialog(
   props: PurchaseReviewDialogProps,
 ): React.JSX.Element {
-  const { formatMoneyConcise } = useMoney();
+  const { formatMoneyConcise, formatPurchasePrice } = useMoney();
   const {
     open,
     cash,
@@ -171,7 +175,7 @@ export default function PurchaseReviewDialog(
       label: props.cashLabel ?? "Cash purchase",
       value:
         props.paymentSummary?.cash.value ??
-        `${formatMoneyConcise(cashDue)} now`,
+        `${formatPurchasePrice(cashDue)} now`,
       // A disabled Pay cash says why: the shortfall, beside the price it falls short of.
       detail:
         [
@@ -191,7 +195,7 @@ export default function PurchaseReviewDialog(
       helpLabel: "interest rate",
       value:
         props.paymentSummary?.loan.value ??
-        `${formatMoneyConcise(financedCashDue)} now + ${formatMoneyConcise(loan.monthlyPayment)}/mo`,
+        `${formatPurchasePrice(financedCashDue)} now + ${formatMoneyConcise(loan.monthlyPayment)}/mo`,
       detail: [
         `New loan: ${formatNumber(interestRate * 100)}% for ${loanMonths / 12} years.`,
         props.paymentSummary?.loan.detail,

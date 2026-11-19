@@ -11,7 +11,7 @@ import PurchaseReviewDialog, {
   financingShortfallText,
 } from "./PurchaseReviewDialog";
 import { purchaseTerms } from "../../helpers/Financials";
-import { formatMoneyConcise } from "../../helpers/Format";
+import { formatMoneyConcise, formatPurchasePrice } from "../../helpers/Format";
 
 function renderDialog(
   overrides: Partial<React.ComponentProps<typeof PurchaseReviewDialog>> = {},
@@ -43,13 +43,13 @@ describe("PurchaseReviewDialog", () => {
     renderDialog({ refinancedBalance: 500000 });
     const terms = purchaseTerms(2000000, true, 0.05, 500000);
     expect(
-      screen.getByText(`${formatMoneyConcise(2000000)} now`),
+      screen.getByText(`${formatPurchasePrice(2000000)} now`),
     ).toBeInTheDocument();
     expect(screen.queryByText(/Payments start now/)).not.toBeInTheDocument();
     expect(
       screen.getByText(/ now \+ /, { selector: "strong" }),
     ).toHaveTextContent(
-      `${formatMoneyConcise(terms.downpayment)} now + ${formatMoneyConcise(terms.monthlyPayment)}/mo`,
+      `${formatPurchasePrice(terms.downpayment)} now + ${formatMoneyConcise(terms.monthlyPayment)}/mo`,
     );
     expect(screen.getByText(/Includes refinancing/)).toHaveTextContent(
       /^New loan: 5% for 30 years\. Includes refinancing/,
@@ -121,7 +121,7 @@ describe("PurchaseReviewDialog", () => {
     expect(
       screen.getByText(/ now \+ /, { selector: "strong" }),
     ).toHaveTextContent(
-      `${formatMoneyConcise(terms.downpayment + 100000)} now + ${formatMoneyConcise(terms.monthlyPayment)}/mo`,
+      `${formatPurchasePrice(terms.downpayment + 100000)} now + ${formatMoneyConcise(terms.monthlyPayment)}/mo`,
     );
     expect(
       screen.queryByText(/cash-only transaction fee/),
@@ -207,7 +207,7 @@ describe("financingShortfallText", () => {
   it("names the down payment and the cash on hand only when short", () => {
     expect(financingShortfallText(100, 50)).toBeUndefined();
     expect(financingShortfallText(0, 2000000)).toBe(
-      `Need ${formatMoneyConcise(2000000)} down payment · you have ${formatMoneyConcise(0)}`,
+      `Need ${formatPurchasePrice(2000000)} down payment · you have ${formatMoneyConcise(0)}`,
     );
   });
 });

@@ -582,10 +582,7 @@ it.each([undefined, 1280])(
       }),
     );
     inspect("green-uplands:site-1");
-    fireEvent.click(
-      await screen.findByText("Review project", { selector: "button" }),
-    );
-    fireEvent.click(screen.getByRole("button", { name: "Connect & build" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Cash" }));
     await act(async () => {
       await Promise.resolve();
     });
@@ -664,9 +661,7 @@ it("uses the persistent desktop rail for Build and owned empty tiles, preselecti
   fireEvent.click(
     within(rail).getByRole("button", { name: "Choose sites for Wind" }),
   );
-  expect(
-    await screen.findByText("Review project", { selector: "button" }),
-  ).toBeEnabled();
+  expect(await screen.findByRole("button", { name: "Cash" })).toBeEnabled();
   expect(screen.getByRole("button", { name: `Inspect ${id}` })).toHaveAttribute(
     "aria-pressed",
     "true",
@@ -733,10 +728,9 @@ it("keeps a candidate and canonical quote when generator upgrades change, then l
   fireEvent.click(option);
   expect(option).toBeChecked();
   expect(selected).toHaveAttribute("aria-pressed", "true");
-  expect(screen.getByRole("button", { name: "Review project" })).toBeEnabled();
-  fireEvent.click(screen.getByRole("button", { name: "Review project" }));
-  expect(screen.getByRole("heading", { name: "Build Solar?" })).toBeVisible();
-  fireEvent.click(screen.getByRole("button", { name: "Build project" }));
+  const cash = screen.getByRole("button", { name: "Cash" });
+  expect(cash).toBeEnabled();
+  fireEvent.click(cash);
   expect(option).toBeDisabled();
   fireEvent.click(option);
   inspect("champlain:site-12");
@@ -769,9 +763,7 @@ it("keeps the phone project sheet unchanged without desktop upgrade editing", as
     }),
   );
   inspect("champlain:site-13");
-  expect(
-    await screen.findByText("Review project", { selector: "button" }),
-  ).toBeEnabled();
+  expect(await screen.findByRole("button", { name: "Cash" })).toBeEnabled();
   expect(
     screen.queryByRole("checkbox", { name: /trackers/i }),
   ).not.toBeInTheDocument();
@@ -802,7 +794,10 @@ it.each([
         target: { value: wToSliderTick(8e7) },
       },
     );
-    fireEvent.click(screen.getByRole("button", { name: "Done" }));
+    fireEvent.keyDown(
+      screen.getByRole("slider", { name: "Generator capacity" }),
+      { key: "Escape" },
+    );
     fireEvent.mouseEnter(
       screen.getByRole("button", { name: `Choose sites for ${name}` }),
     );
@@ -812,9 +807,7 @@ it.each([
         { name: shortcut },
       ),
     );
-    expect(
-      await screen.findByText("Review project", { selector: "button" }),
-    ).toBeEnabled();
+    expect(await screen.findByRole("button", { name: "Cash" })).toBeEnabled();
     expect(
       screen.getByRole("heading", {
         name: `${name} · ${formatWatts(maximum)}`,
@@ -848,9 +841,7 @@ it("retains the inspected site when connecting transitions directly into desktop
   fireEvent.click(
     screen.getByRole("button", { name: "Choose sites for Wind" }),
   );
-  expect(
-    await screen.findByText("Review project", { selector: "button" }),
-  ).toBeEnabled();
+  expect(await screen.findByRole("button", { name: "Cash" })).toBeEnabled();
   expect(
     screen.getByRole("button", { name: `Inspect ${site.id}` }),
   ).toHaveAttribute("aria-pressed", "true");

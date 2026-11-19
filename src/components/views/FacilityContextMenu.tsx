@@ -170,7 +170,7 @@ export default function FacilityContextMenu(props: {
   onRetrofit?: DispatchProps["onRetrofit"];
   onCancelRetrofit?: DispatchProps["onCancelRetrofit"];
 }) {
-  const { formatMoneyConcise } = useMoney();
+  const { formatMoneyConcise, formatPurchasePrice } = useMoney();
   const [pending, setPending] = React.useState<{
     key: ActionKey;
     ids: number[];
@@ -227,7 +227,7 @@ export default function FacilityContextMenu(props: {
     }
   };
   const actionLabel = (action: FleetAction, bulk: boolean) =>
-    `${action.label}${bulk ? ` (${action.facilities.length})` : ""}${action.cost !== undefined ? ` · ${formatMoneyConcise(action.cost)}` : ""}`;
+    `${action.label}${bulk ? ` (${action.facilities.length})` : ""}${action.cost !== undefined ? ` · ${formatPurchasePrice(action.cost)}` : ""}`;
   const title =
     selected.length === 1
       ? `${formatFacilitySize(selected[0])} ${facilityDisplayName(selected[0])}`
@@ -290,7 +290,7 @@ export default function FacilityContextMenu(props: {
           title={`${confirmation.label}${affected.length === 1 ? `: ${formatFacilitySize(affected[0])} ${facilityDisplayName(affected[0])}` : `: ${affected.length} facilities`}?`}
           confirmLabel={
             cost !== undefined
-              ? `Pay ${formatMoneyConcise(cost)}`
+              ? `Pay ${formatPurchasePrice(cost)}`
               : confirmation.label
           }
           cancelLabel="Never mind"

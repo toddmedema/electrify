@@ -47,7 +47,7 @@ export default function AcquisitionReviewDialog({
   onAcquire,
 }: Props): React.JSX.Element | null {
   const dispatch = useAppDispatch();
-  const { formatMoneyConcise } = useMoney(
+  const { formatMoneyConcise, formatPurchasePrice } = useMoney(
     currencyForLocation(game.location, game.startingYear),
   );
   const [error, setError] = React.useState<string>();
@@ -111,10 +111,10 @@ export default function AcquisitionReviewDialog({
       cashLabel="Cash option"
       paymentSummary={{
         cash: {
-          value: `${formatMoneyConcise(quote.cashDue)} now + ${formatMoneyConcise(quote.cashMonthlyDebtService + quote.networkOMPerMonth)}/mo`,
+          value: `${formatPurchasePrice(quote.cashDue)} now + ${formatMoneyConcise(quote.cashMonthlyDebtService + quote.networkOMPerMonth)}/mo`,
         },
         loan: {
-          value: `${formatMoneyConcise(quote.financedCashDue)} now + ${formatMoneyConcise(quote.monthlyDebtService + quote.networkOMPerMonth)}/mo`,
+          value: `${formatPurchasePrice(quote.financedCashDue)} now + ${formatMoneyConcise(quote.monthlyDebtService + quote.networkOMPerMonth)}/mo`,
         },
       }}
       extraFacts={[
@@ -141,7 +141,7 @@ export default function AcquisitionReviewDialog({
             )}
             {cash < quote.financedCashDue && (
               <Typography variant="body2" color="warning.main">
-                Need {formatMoneyConcise(quote.financedCashDue)} cash for the
+                Need {formatPurchasePrice(quote.financedCashDue)} cash for the
                 down payment and fee. You have {formatMoneyConcise(cash)}.
               </Typography>
             )}
@@ -221,12 +221,12 @@ export default function AcquisitionReviewDialog({
                   {
                     concept: "money",
                     label: "Purchase price",
-                    value: formatMoneyConcise(quote.equityPrice),
+                    value: formatPurchasePrice(quote.equityPrice),
                   },
                   {
                     concept: "money",
                     label: "Transaction fee",
-                    value: formatMoneyConcise(quote.fee),
+                    value: formatPurchasePrice(quote.fee),
                     detail: "Paid in cash with either option",
                   },
                   {

@@ -97,6 +97,10 @@
   button {
     min-height: 44px;
   }
+  [role="status"] {
+    flex-basis: 100%;
+    font-size: 13px;
+  }
 }
 .projectSiteLegend {
   display: grid;

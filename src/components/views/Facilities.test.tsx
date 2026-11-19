@@ -564,9 +564,9 @@ describe("the fleet list", () => {
     const oil = oilGame.facilities.find((facility) => facility.name === "Oil")!;
     renderFacilities(oilGame, oil.id);
 
-    expect(screen.getByText("Fixed upkeep")).toBeInTheDocument();
+    expect(screen.getByText("Fixed")).toBeInTheDocument();
     expect(screen.getByText("$1.82M/yr")).toBeInTheDocument();
-    expect(screen.getByText("Variable upkeep")).toBeInTheDocument();
+    expect(screen.getByText("Variable")).toBeInTheDocument();
     expect(screen.getByText("$15.2/MWh")).toBeInTheDocument();
     expect(screen.queryByText("Starts")).toBeNull();
     expect(screen.queryByText("Non-fuel start cost")).toBeNull();

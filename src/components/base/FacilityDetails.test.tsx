@@ -466,9 +466,9 @@ describe("fixed upkeep", () => {
     showDetails(game, facility);
     const economics = screen.getByRole("region", { name: "Economics" });
     expect(economics).toHaveTextContent(
-      `Fixed upkeep${formatMoneyConcise(facility.annualOperatingCost, currencyForLocation(game.location, game.startingYear))}/yr`,
+      `Fixed${formatMoneyConcise(facility.annualOperatingCost, currencyForLocation(game.location, game.startingYear))}/yr`,
     );
-    expect(economics).not.toHaveTextContent("Variable upkeep");
+    expect(economics).not.toHaveTextContent("Variable");
     expect(economics).not.toHaveTextContent("while paused");
   });
 
@@ -481,7 +481,7 @@ describe("fixed upkeep", () => {
     showDetails(game, solar);
     const economics = screen.getByRole("region", { name: "Economics" });
     expect(economics).toHaveTextContent(
-      `Fixed upkeep${formatMoneyConcise(solar.annualOperatingCost / 2, currencyForLocation(game.location, game.startingYear))}/yr · half rate while paused`,
+      `Fixed${formatMoneyConcise(solar.annualOperatingCost / 2, currencyForLocation(game.location, game.startingYear))}/yr · half rate while paused`,
     );
     expect(economics).not.toHaveTextContent(
       `${formatMoneyConcise(solar.annualOperatingCost, currencyForLocation(game.location, game.startingYear))}/yr`,
@@ -497,9 +497,9 @@ describe("fixed upkeep", () => {
     showDetails(game, gas);
     const economics = screen.getByRole("region", { name: "Economics" });
     expect(economics).toHaveTextContent(
-      `Fixed upkeep${formatMoneyConcise(gas.annualOperatingCost, currencyForLocation(game.location, game.startingYear))}/yr`,
+      `Fixed${formatMoneyConcise(gas.annualOperatingCost, currencyForLocation(game.location, game.startingYear))}/yr`,
     );
-    expect(economics).toHaveTextContent("Variable upkeep€");
+    expect(economics).toHaveTextContent("Variable€");
     expect(economics).not.toHaveTextContent("$");
   });
 });
@@ -524,7 +524,7 @@ it("shows the monthly cleanup charge without ordinary upkeep", () => {
   );
   expect(screen.getByText("Cleanup and recovery")).toBeInTheDocument();
   expect(screen.getByText("$2M/mo", { exact: false })).toBeInTheDocument();
-  expect(screen.queryByText("Fixed upkeep")).not.toBeInTheDocument();
+  expect(screen.queryByText("Fixed")).not.toBeInTheDocument();
 });
 
 it("dates a cleanup charge before it begins", () => {

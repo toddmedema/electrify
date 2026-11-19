@@ -97,7 +97,7 @@ interface StorageBuildItemProps {
 export function StorageBuildItem(
   props: StorageBuildItemProps,
 ): React.JSX.Element {
-  const { formatMoneyConcise } = useMoney();
+  const { formatMoneyConcise, formatPurchasePrice } = useMoney();
   const { storage, cash } = props;
   // The catalog key also identifies facilities in saves and mods.
   const displayName =
@@ -254,7 +254,7 @@ export function StorageBuildItem(
           <BuildMetric
             label="Build cost"
             entry={MANUAL_ENTRY.TOTAL_COST_OF_ENERGY}
-            value={formatMoneyConcise(storage.buildCost)}
+            value={formatPurchasePrice(storage.buildCost)}
           />
           <BuildMetric
             label="Build time"
@@ -276,7 +276,7 @@ export function StorageBuildItem(
       details={
         <BuildDetails label="storage properties">
           <BuildDetailRow
-            label="Upkeep"
+            label="Fixed"
             value={`${formatMoneyConcise(storage.annualOperatingCost)}/yr`}
             entry={MANUAL_ENTRY.OPERATING_COSTS}
           />

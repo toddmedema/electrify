@@ -21,7 +21,7 @@ export default function GasConversion(props: {
   onRetrofit?: (payload: RetrofitFacilityAction) => void;
 }) {
   const [confirming, setConfirming] = React.useState(false);
-  const { formatMoneyConcise } = useMoney(
+  const { formatMoneyConcise, formatPurchasePrice } = useMoney(
     currencyForLocation(props.game.location, props.game.startingYear),
   );
   const quote = gasConversionQuote(props.facility, props.game);
@@ -62,7 +62,7 @@ export default function GasConversion(props: {
           isolateClicks
           contentClassName="noPadding"
           title={`Convert ${props.facility.name} to combined cycle?`}
-          confirmLabel={`Pay ${formatMoneyConcise(quote.cost)}`}
+          confirmLabel={`Pay ${formatPurchasePrice(quote.cost)}`}
           confirmDisabled={shortfall > 0}
           onCancel={() => setConfirming(false)}
           onConfirm={() => {
