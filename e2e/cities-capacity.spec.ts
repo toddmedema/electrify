@@ -1,4 +1,5 @@
 import type { Locator, Page } from "@playwright/test";
+import { isStorage } from "../src/Types";
 import type { MapCanvas } from "../src/components/base/territory-3d/Types";
 import { facilityExpansionQuote } from "../src/helpers/FacilityExpansion";
 import { currentTick } from "../src/helpers/GameSelectors";
@@ -65,6 +66,57 @@ async function sceneFacility(map: Locator, tileId: string) {
       tileId,
     );
 }
+
+test("an inherited gas steam plant submits exhaust only while generating", async ({
+  page,
+}, info) => {
+  await start(page, "light");
+  const tileId = await editSavedGame(page, ({ game }) => {
+    const facility = game.facilities.find(
+      (plant) => plant.name === "Natural Gas CC",
+    );
+    if (!facility || !facility.tileId || isStorage(facility))
+      throw new Error("Expected a mapped gas generator fixture");
+    facility.name = "Natural Gas Steam";
+    facility.gasCycle = "steam";
+    facility.currentW = facility.peakW / 2;
+    facility.paused = false;
+    return facility.tileId;
+  });
+  const tile = getTerritoryTile(tileId)!;
+  const map = await continueGame(page);
+  const target = await selectTerritoryMapTile(page, tile);
+  await expect(target).toHaveAccessibleDescription(/Generating/);
+  const active = await sceneFacility(map, tileId);
+  expect(active).toMatchObject({
+    modelKey: "structure:gas-steam",
+    active: true,
+    producing: true,
+  });
+  const close = map.getByRole("button", { name: "Close tile", exact: true });
+  await close.click();
+  await reviewScreenshot(map.locator(".territoryMapViewport"), {
+    path: info.outputPath("gas-steam-generating.png"),
+  });
+
+  await editSavedGame(page, ({ game }) => {
+    game.facilities.find((plant) => plant.tileId === tileId)!.currentW = 0;
+  });
+  await continueGame(page);
+  const idleTarget = await selectTerritoryMapTile(page, tile);
+  await expect(idleTarget).toHaveAccessibleDescription(/Idle/);
+  const idle = await sceneFacility(map, tileId);
+  expect(idle).toMatchObject({
+    modelKey: "structure:gas-steam",
+    active: false,
+    producing: false,
+  });
+  expect(active!.triangles).toBeGreaterThan(idle!.triangles);
+  await close.click();
+  await reviewScreenshot(map.locator(".territoryMapViewport"), {
+    path: info.outputPath("gas-steam-idle.png"),
+  });
+});
 
 for (const theme of ["light", "dark"] as const) {
   test(`city demand legend and plot share the inspector surface · ${theme}`, async ({

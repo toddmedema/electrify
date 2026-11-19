@@ -4,6 +4,7 @@ const FACILITY_NAMES = [
   "Coal",
   "Nuclear",
   "Natural Gas Peaker",
+  "Natural Gas Steam",
   "Natural Gas CC",
   "Oil",
   "Biomass",

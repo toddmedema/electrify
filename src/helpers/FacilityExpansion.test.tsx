@@ -2,6 +2,7 @@ import * as FacilityCatalog from "../data/Facilities";
 import cloneDeep from "lodash.clonedeep";
 import { YEARS_PER_TICK, TICKS_PER_MONTH, TICK_MINUTES } from "../Constants";
 import { getBuildFacilityQuote, STORAGE } from "../data/Facilities";
+import { DEFAULT_CUSTOM_SCENARIO } from "../data/Scenarios";
 import { createGame } from "../testing/Simulator";
 import reducer, {
   buildFacility,
@@ -110,6 +111,31 @@ it("quotes only the current-era incremental build, keeping historical capital an
       }),
     ),
   ).toEqual(started);
+});
+
+it("accepts and restores an in-era gas-fired steam capacity project", () => {
+  const scenario = {
+    ...DEFAULT_CUSTOM_SCENARIO,
+    startingYear: 1980,
+    facilities: [{ name: "Natural Gas Steam", peakW: 100e6 }],
+  };
+  const game = createGame({ scenarioId: scenario.id, scenario });
+  currentTick(game)!.cash = 1e12;
+  const facility = game.facilities[0];
+  expect(facilityExpansionQuote(game, facility.id, 1.1e9)).toMatchObject({
+    status: "unavailable",
+    maxSize: 1e9,
+  });
+  const started = begin(game, facility.id, 200e6);
+  const restored = parseSave(
+    JSON.parse(JSON.stringify(serializeSave(started))),
+  );
+  expect(restored?.game.facilities[0]).toMatchObject({
+    name: "Natural Gas Steam",
+    gasCycle: "steam",
+    peakW: 100e6,
+    expansionInProgress: { targetPeakW: 200e6 },
+  });
 });
 
 it("rejects malformed, shrinking, stale, foreign, over-limit, conflicting and unaffordable orders", () => {

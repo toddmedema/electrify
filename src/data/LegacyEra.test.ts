@@ -94,6 +94,10 @@ it("gates regional equipment dates and closes new nuclear orders without changin
     GENERATORS(gameAt(year), 10000000, [], []).map(({ name }) => name);
   expect(names(1949)).not.toContain("Natural Gas Peaker");
   expect(names(1950)).toContain("Natural Gas Peaker");
+  expect(names(1942)).toContain("Natural Gas Steam");
+  expect(names(1962)).toContain("Natural Gas Steam");
+  expect(names(1982)).toContain("Natural Gas Steam");
+  expect(names(1991)).not.toContain("Natural Gas Steam");
   expect(names(1959)).not.toContain("Nuclear");
   expect(names(1960)).toContain("Nuclear");
   const reactor = GENERATORS(gameAt(1975), 100000000, [], []).find(

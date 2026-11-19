@@ -75,7 +75,7 @@ export function validResilienceRecord(fuel: unknown, raw: unknown): boolean {
   );
 }
 
-const GAS_CYCLES: readonly GasCycleType[] = ["simple", "combined"];
+const GAS_CYCLES: readonly GasCycleType[] = ["simple", "combined", "steam"];
 
 /**
  * A gas plant's turbine arrangement. Optional, so a crafted record without one stays loadable,

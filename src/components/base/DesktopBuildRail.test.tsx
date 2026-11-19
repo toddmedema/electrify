@@ -77,6 +77,36 @@ it("keeps every current catalogue technology discoverable with its canonical ico
   ).not.toBeInTheDocument();
 });
 
+it("offers the steam plant beside the peaker in the historical build rail", () => {
+  const { onProject } = show(undefined, (game) => {
+    game.startingYear = 1980;
+    game.date.year = 1980;
+  });
+  const rail = screen.getByRole("complementary", { name: "Build facilities" });
+  const names = within(rail)
+    .getAllByRole("button", { name: /^Choose sites for / })
+    .map((button) => button.getAttribute("aria-label"));
+  const steamName = "Choose sites for Natural Gas Steam";
+  expect(names.indexOf(steamName)).toBe(
+    names.indexOf("Choose sites for Natural Gas Peaker") + 1,
+  );
+  const steam = within(rail).getByRole("button", { name: steamName });
+  expect(within(steam).getByRole("presentation")).toHaveAttribute(
+    "src",
+    "/images/natural gas steam.svg",
+  );
+  fireEvent.focus(steam);
+  expect(
+    within(
+      screen.getByLabelText("Natural Gas Steam technology preview"),
+    ).getByText("240 min"),
+  ).toBeVisible();
+  fireEvent.click(steam);
+  expect(onProject).toHaveBeenCalledWith(
+    expect.objectContaining({ name: "Natural Gas Steam", gasCycle: "steam" }),
+  );
+});
+
 it("keeps a fixed icon order and fades technologies the company cannot afford", () => {
   const { game, update, onProject } = show(undefined, (game) => {
     currentTick(game)!.cash = 0;

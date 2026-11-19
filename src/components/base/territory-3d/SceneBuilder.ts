@@ -148,6 +148,8 @@ export function structureKind(
       : facility.name === "Iron-Air Battery"
         ? "iron-air"
         : "battery";
+  if (facility?.fuel === "Natural Gas" && facility.name === "Natural Gas Steam")
+    return "gas-steam";
   if (facility?.fuel) return fuelModels[facility.fuel];
   if (!view.developed || ["river", "lake", "ocean"].includes(view.tile.terrain))
     return undefined;

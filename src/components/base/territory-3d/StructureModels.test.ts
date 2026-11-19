@@ -13,6 +13,7 @@ const inventory: Record<StructureKind, true> = {
   "offshore-wind": true,
   "airborne-wind": true,
   gas: true,
+  "gas-steam": true,
   oil: true,
   coal: true,
   biomass: true,
@@ -308,7 +309,15 @@ it("retains stopped rotors and wings, but hides production-only effects without 
   }
 });
 
-it.each(["gas", "oil", "coal", "biomass", "nuclear", "geothermal"] as const)(
+it.each([
+  "gas",
+  "gas-steam",
+  "oil",
+  "coal",
+  "biomass",
+  "nuclear",
+  "geothermal",
+] as const)(
   "stages %s exhaust puffs at distinct fractional-cycle offsets",
   (kind) => {
     const steam = getStructureModel(kind).parts.filter(
@@ -410,6 +419,7 @@ it("gives hydro raised reservoir water, a low downstream spillway, and a bowed t
 it("authors facade glazing separately without turning panels, rotors or cabinets into windows", () => {
   const facades: readonly StructureKind[] = [
     "gas",
+    "gas-steam",
     "oil",
     "coal",
     "biomass",

@@ -5,6 +5,7 @@ export const FACILITY_FUELS = {
   Coal: "Coal",
   Nuclear: "Uranium",
   "Natural Gas Peaker": "Natural Gas",
+  "Natural Gas Steam": "Natural Gas",
   "Natural Gas CC": "Natural Gas",
   Oil: "Oil",
   Biomass: "Biomass",
