@@ -363,6 +363,33 @@
 .app_container:has(.gameWorkspace) .snackbar-above-nav {
   bottom: calc(var(--game-dock-clearance) + 8px) !important;
 }
+
+html:has(
+  .app_container:not(.menu-layout) main:not([inert]) [data-desktop-map]
+) {
+  .snackbar-above-nav,
+  body > .achievementToast.MuiSnackbar-root {
+    top: var(--desktop-map-notification-top);
+    bottom: auto !important;
+  }
+
+  // A dialog portals its achievements into the modal, outside this selector.
+  body > .achievementToast.MuiSnackbar-root {
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+  }
+
+  body > .achievementToast .achievementToastStack {
+    max-height: max(
+      0px,
+      calc(
+        100dvh - var(--desktop-map-notification-top) - var(--achievement-bottom)
+      )
+    );
+  }
+}
+
 [data-tutorial-hide~="nav"] .gameWorkspace #navfooter {
   display: flex !important;
   visibility: visible;

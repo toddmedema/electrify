@@ -103,13 +103,16 @@ export interface DispatchProps {
   onQuit: () => void;
 }
 
-export interface Props extends StateProps, DispatchProps {}
+export interface Props extends StateProps, DispatchProps {
+  eventStatus?: React.ReactNode;
+}
 
 /** Status controls retain focus when the row moves between header layouts. */
 const RESTORABLE_STATUS_FOCUS = [
   ".gridHealthSummary",
   ".missionRiskButton",
   ".missionSummaryMonths",
+  ".mapEventStatus",
 ];
 const NO_ACTIVE_EVENTS: ActiveEventGroupType[] = [];
 
@@ -363,6 +366,7 @@ export function GameAppBar(props: Props) {
           onEvidence={props.onEvidence}
         />
       )}
+      {props.eventStatus}
     </div>
   );
 

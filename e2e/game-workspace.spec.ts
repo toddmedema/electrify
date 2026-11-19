@@ -73,6 +73,57 @@ test("snackbars clear medium and large floating docks", async ({
   }
 });
 
+test("map notifications follow the full desktop header and clear the compact dock", async ({
+  page,
+}, info) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await startGame(page, "light", 116);
+  const header = page.locator("#appbar");
+  const dock = page.locator("#navfooter");
+  const snackbar = page.locator(".snackbar-above-nav");
+  await page.keyboard.press("Shift+1");
+  await expect(snackbar).toBeVisible();
+
+  if (info.project.use.hasTouch) {
+    const toast = (await snackbar.boundingBox())!;
+    expect(toast.y).toBeGreaterThan(page.viewportSize()!.height / 2);
+    expect(toast.y + toast.height).toBeLessThan((await dock.boundingBox())!.y);
+    return;
+  }
+
+  const expectBelowHeader = async () => {
+    await expect
+      .poll(async () => {
+        const [toast, bar] = await Promise.all([
+          snackbar.boundingBox(),
+          header.boundingBox(),
+        ]);
+        return Math.round(toast!.y - bar!.y - bar!.height);
+      })
+      .toBe(8);
+    const toast = (await snackbar.boundingBox())!;
+    expect(toast.x + toast.width / 2).toBeCloseTo(
+      page.viewportSize()!.width / 2,
+      0,
+    );
+  };
+  await expectBelowHeader();
+  await reviewScreenshot(page, {
+    path: info.outputPath("desktop-map-notification.png"),
+  });
+  await snackbar.getByRole("button", { name: "Dismiss notification" }).click();
+  await expect(snackbar).toBeHidden();
+
+  // A wider header folds into a single row. The toast tracks it even over an open tool.
+  await page.setViewportSize({ width: 1600, height: 900 });
+  await expect(header).toHaveClass(/appbarSingleRow/);
+  const insights = page.getByRole("region", { name: "Insights", exact: true });
+  await openPane(insights, dock.getByRole("button", { name: "Insights" }));
+  await page.keyboard.press("Shift+1");
+  await expect(snackbar).toBeVisible();
+  await expectBelowHeader();
+});
+
 for (const side of [false, true]) {
   test(`purchases ${side ? "keep Build open in a side panel" : "close Build in an overlay"}`, async ({
     page,

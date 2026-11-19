@@ -3,6 +3,29 @@
   margin-left: auto;
 }
 
+#appbar .mapEventStatus.MuiButton-root {
+  flex: none;
+  align-self: center;
+  min-height: 40px;
+  padding-inline: 8px;
+  font-size: var(--font-size-caption);
+  text-transform: none;
+  white-space: nowrap;
+
+  &[data-emergency="true"] {
+    color: var(--blackout-on-tint);
+    background-color: var(--blackout-tint);
+  }
+
+  @media (pointer: coarse) {
+    min-height: 44px;
+  }
+}
+
+#appbar:not(.appbarSingleRow) .mapEventStatus {
+  margin-inline-end: 8px;
+}
+
 #topbar {
   container: game-topbar / inline-size;
 }

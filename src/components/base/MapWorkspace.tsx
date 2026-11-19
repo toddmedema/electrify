@@ -12,6 +12,7 @@ import Navigation, {
   MAP_VIEWS,
   gameToolForCard,
   GameTool,
+  MapEventStatus,
 } from "./Navigation";
 import {
   GameToolMemoryContext,
@@ -59,12 +60,47 @@ export default function MapWorkspace({
   const [programBack, setProgramBack] = React.useState<() => void>();
   const presentation = useWorkspaceLayout(workspace, settings);
   const { effectiveWidth } = presentation;
+  const desktopMap = effectiveWidth >= SIDE_TOOL_MIN_WIDTH;
+  React.useLayoutEffect(() => {
+    if (!desktopMap) return;
+    const frame = workspace.current;
+    const header = frame?.querySelector("#appbar");
+    if (!frame || !header) return;
+    // Both notification systems render outside the workspace, and the header can
+    // gain or lose rows independently of the viewport size.
+    const style = document.documentElement.style;
+    const measure = () =>
+      style.setProperty(
+        "--desktop-map-notification-top",
+        `${header.getBoundingClientRect().bottom + 8}px`,
+      );
+    measure();
+    const observer =
+      typeof ResizeObserver === "undefined"
+        ? undefined
+        : new ResizeObserver(measure);
+    observer?.observe(header);
+    observer?.observe(frame);
+    window.addEventListener("resize", measure);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener("resize", measure);
+      style.removeProperty("--desktop-map-notification-top");
+    };
+  }, [desktopMap, settings.screenEdgePadding]);
   useToolFocusMemory(workspace, memory, active ?? "fleet", "map");
   const config =
     active && [...MAP_VIEWS, ...GAME_TOOLS].find((item) => item.id === active);
   const returnToMap = React.useCallback(
     () => dispatch(navigate("FACILITIES")),
     [dispatch],
+  );
+  const toggleTool = React.useCallback(
+    (tool: GameTool) => {
+      if (!projectBusy)
+        dispatch(navigate(active === tool ? "FACILITIES" : tool));
+    },
+    [active, dispatch, projectBusy],
   );
   React.useLayoutEffect(() => {
     if (projectBusy && (requestedPanel || requestedProject)) returnToMap();
@@ -123,6 +159,7 @@ export default function MapWorkspace({
                 className="gameWorkspace"
                 data-map-workspace="true"
                 data-persistent-map="true"
+                data-desktop-map={desktopMap || undefined}
                 data-workspace-layout="map"
                 data-compact-dock={effectiveWidth < 700}
                 data-dock-size={
@@ -137,7 +174,16 @@ export default function MapWorkspace({
                   ["--game-tool-width" as string]: `${presentation.toolWidth}px`,
                 }}
               >
-                <GameAppBar />
+                <GameAppBar
+                  eventStatus={
+                    desktopMap && (
+                      <MapEventStatus
+                        open={active === "EVENTS"}
+                        onToggle={toggleTool}
+                      />
+                    )
+                  }
+                />
                 <div
                   className="gameStage"
                   data-layout="map"
@@ -209,7 +255,8 @@ export default function MapWorkspace({
                   </div>
                 </div>
                 <Navigation
-                  showMapBuild={effectiveWidth < SIDE_TOOL_MIN_WIDTH}
+                  showMapBuild={!desktopMap}
+                  showEventStatus={!desktopMap}
                   mapView={
                     active === "FLEET" || active === "AGREEMENTS"
                       ? active
@@ -223,10 +270,7 @@ export default function MapWorkspace({
                       ? [active]
                       : []
                   }
-                  onToggle={(tool) => {
-                    if (!projectBusy)
-                      dispatch(navigate(active === tool ? "FACILITIES" : tool));
-                  }}
+                  onToggle={toggleTool}
                 />
               </div>
             </BuildForecastProvider>
