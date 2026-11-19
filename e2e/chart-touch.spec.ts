@@ -328,7 +328,7 @@ for (const theme of ["light", "dark"]) {
       localStorage.clear();
       localStorage.setItem("theme", theme);
       localStorage.setItem("audioEnabled", "false");
-      localStorage.setItem("interfaceScale", "2.5");
+      localStorage.setItem("interfaceScale", "2");
     }, theme);
     await page.goto("/?scenario=107");
     await page.getByRole("button", { name: "Start game" }).click();

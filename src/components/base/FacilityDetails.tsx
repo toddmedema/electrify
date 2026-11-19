@@ -2,6 +2,7 @@ import { currencyForLocation } from "../../helpers/Currency";
 import { useMoney } from "./CurrencyContext";
 import { facilityDisplayName } from "./FacilityLabels";
 import GasConversion from "./GasConversion";
+import CoalRepower from "./CoalRepower";
 import FacilityUpgradeAction from "./FacilityUpgradeAction";
 import FacilityCapacityUpgrade, {
   FacilityCapacityUpgradeActions,
@@ -16,12 +17,12 @@ import ConfirmDialog from "./ConfirmDialog";
 import {
   facilityAgeYears,
   facilityCashBack,
+  facilityLoanBalance,
   facilityEquivalentCycles,
   facilityLifetime,
   facilityMaintenanceCost,
   facilityOutputFactor,
   facilityPermanentlyShutdown,
-  getTotalDebt,
 } from "../../helpers/Financials";
 import {
   formatPercent,
@@ -53,6 +54,7 @@ import { storyOutputMultiplier } from "../../helpers/Story";
 import {
   DateType,
   FacilityOperatingType,
+  isCoalRepower,
   isStorage,
   FuelNameType,
   GameType,
@@ -171,7 +173,8 @@ function WeatherResilienceSection(props: {
     ? retrofittedResilience(facility, game, summary.upgrade)
     : undefined;
   const hazard = facilityHazardStatus(game, facility);
-  const installing = upgradeInProgress(facility);
+  const project = upgradeInProgress(facility);
+  const installing = isCoalRepower(project?.upgrade) ? undefined : project;
   const activeOutage =
     hazard?.hazard === "EXTREME_COLD"
       ? "Doesn't end this month's cold outage."
@@ -282,7 +285,7 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
     currencyForLocation(location, props.game?.startingYear),
   );
   const lifetime = facilityLifetime(facility);
-  const loanBalance = getTotalDebt([facility]);
+  const loanBalance = facilityLoanBalance(facility);
   const { fuel, variableOperatingCostPerMWh, minimumStableOutput } = facility;
   const storage = isStorage(facility) ? facility : undefined;
   const accentColor = facilityColor(fuel);
@@ -630,6 +633,13 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
           game={props.game}
           onExpand={props.onExpand}
           onCancelExpansion={props.onCancelExpansion}
+        />
+      )}
+      {props.game && facility.fuel === "Coal" && (
+        <CoalRepower
+          facility={facility}
+          game={props.game}
+          onRetrofit={props.onRetrofit}
         />
       )}
       {props.game && !permanentlyShutdown && (

@@ -8,9 +8,10 @@ import {
 } from "../../Types";
 import {
   facilityCashBack,
-  getTotalDebt,
+  facilityLoanBalance,
   facilityPermanentlyShutdown,
 } from "../../helpers/Financials";
+import { coalRepowerInProgress } from "../../helpers/CoalRepower";
 import { isUpgradingAt, upgradeInProgress } from "../../helpers/Hazards";
 import {
   formatBuildMonths,
@@ -53,6 +54,7 @@ function FacilityActions(props: {
     onCancelRetrofit,
   } = props;
   const underConstruction = facility.yearsToBuildLeft > 0;
+  const repowering = !!coalRepowerInProgress(facility);
   if (permanentlyShutdown && facility.saleRestricted)
     return (
       <div className="facilityActions">
@@ -68,37 +70,41 @@ function FacilityActions(props: {
   return (
     <div className="facilityActions">
       {upgrading && !permanentlyShutdown && onCancelRetrofit && (
-        // Refunds in full and returns the plant to service at once, so it needs no confirmation
+        // Cancellation returns the paid project equity.
         <Button
           className="facilityCancelConstruction"
           variant="outlined"
           startIcon={facilityActionIcon("cancelUpgrade")}
-          aria-label={"Cancel upgrade of " + facilityDisplayName(facility)}
+          aria-label={`Cancel ${repowering ? "conversion" : "upgrade"} of ${facilityDisplayName(facility)}`}
           onClick={() => onCancelRetrofit(facility.id)}
         >
-          <span className="facilityActionLabel">Cancel upgrade</span>
-        </Button>
-      )}
-      {!underConstruction && !upgrading && !permanentlyShutdown && (
-        <Button
-          variant="outlined"
-          startIcon={facilityActionIcon(facility.paused ? "resume" : "pause")}
-          aria-label={
-            facility.paused
-              ? "Resume " + facilityDisplayName(facility)
-              : "Pause " + facilityDisplayName(facility)
-          }
-          onClick={() =>
-            facility.paused
-              ? onTogglePause(facility.id)
-              : onPause(facility.id, facilityDisplayName(facility))
-          }
-        >
           <span className="facilityActionLabel">
-            {facility.paused ? "Resume" : "Pause"}
+            {repowering ? "Cancel conversion" : "Cancel upgrade"}
           </span>
         </Button>
       )}
+      {!underConstruction &&
+        (!upgrading || repowering) &&
+        !permanentlyShutdown && (
+          <Button
+            variant="outlined"
+            startIcon={facilityActionIcon(facility.paused ? "resume" : "pause")}
+            aria-label={
+              facility.paused
+                ? "Resume " + facilityDisplayName(facility)
+                : "Pause " + facilityDisplayName(facility)
+            }
+            onClick={() =>
+              facility.paused
+                ? onTogglePause(facility.id)
+                : onPause(facility.id, facilityDisplayName(facility))
+            }
+          >
+            <span className="facilityActionLabel">
+              {facility.paused ? "Resume" : "Pause"}
+            </span>
+          </Button>
+        )}
       {facility.saleRestricted ? (
         <Typography
           variant="caption"
@@ -108,24 +114,26 @@ function FacilityActions(props: {
           This plant can't be sold.
         </Typography>
       ) : (
-        <Button
-          className={
-            underConstruction ? "facilityCancelConstruction" : undefined
-          }
-          variant="outlined"
-          startIcon={facilityActionIcon(
-            underConstruction ? "cancelConstruction" : "sell",
-          )}
-          aria-label={
-            (underConstruction ? "Cancel construction of " : "Sell ") +
-            facilityDisplayName(facility)
-          }
-          onClick={onOpenSell}
-        >
-          <span className="facilityActionLabel">
-            {underConstruction ? "Cancel construction" : "Sell"}
-          </span>
-        </Button>
+        !repowering && (
+          <Button
+            className={
+              underConstruction ? "facilityCancelConstruction" : undefined
+            }
+            variant="outlined"
+            startIcon={facilityActionIcon(
+              underConstruction ? "cancelConstruction" : "sell",
+            )}
+            aria-label={
+              (underConstruction ? "Cancel construction of " : "Sell ") +
+              facilityDisplayName(facility)
+            }
+            onClick={onOpenSell}
+          >
+            <span className="facilityActionLabel">
+              {underConstruction ? "Cancel construction" : "Sell"}
+            </span>
+          </Button>
+        )
       )}
     </div>
   );
@@ -143,6 +151,8 @@ const MemoizedFacilityActions = React.memo(
       previous.facility.saleRestricted === next.facility.saleRestricted &&
       previousUnderConstruction === nextUnderConstruction &&
       previous.upgrading === next.upgrading &&
+      !!coalRepowerInProgress(previous.facility) ===
+        !!coalRepowerInProgress(next.facility) &&
       previous.permanentlyShutdown === next.permanentlyShutdown &&
       previous.onCancelRetrofit === next.onCancelRetrofit &&
       previous.onPause === next.onPause &&
@@ -167,9 +177,10 @@ export default function ExpandedFacilityDetails({
 } & FacilityDetailActions) {
   const { formatMoneyConcise } = useMoney();
   const [open, setOpen] = React.useState(false);
-  const debt = getTotalDebt([facility]);
   const underConstruction = facility.yearsToBuildLeft > 0;
   const installing = upgradeInProgress(facility);
+  const repowering = !!coalRepowerInProgress(facility);
+  const loanBalance = facilityLoanBalance(facility);
   const permanentlyShutdown = facilityPermanentlyShutdown(
     facility,
     game.date.minute,
@@ -204,6 +215,7 @@ export default function ExpandedFacilityDetails({
           }
           cancelLabel="Never mind"
           confirmLabel={underConstruction ? "Cancel construction" : "Sell"}
+          confirmDisabled={repowering}
           onCancel={() => setOpen(false)}
           onConfirm={() => {
             actions.onSell(facility.id);
@@ -217,14 +229,20 @@ export default function ExpandedFacilityDetails({
                 : "Selling won't free this site."}
             </DialogContentText>
           )}
-          <DialogContentText>
-            You will receive{" "}
-            {formatMoneyConcise(facilityCashBack(facility, game.date.minute))}
-            {debt > 0
-              ? ` and the rest will go towards paying off the remaining loan balance of ${formatMoneyConcise(debt)}`
-              : ""}
-            .
-          </DialogContentText>
+          {repowering ? (
+            <DialogContentText>
+              Cancel the conversion before selling this plant.
+            </DialogContentText>
+          ) : (
+            <DialogContentText>
+              You will receive{" "}
+              {formatMoneyConcise(facilityCashBack(facility, game.date.minute))}
+              {loanBalance > 0
+                ? ` and the rest will go towards paying off the remaining loan balance of ${formatMoneyConcise(loanBalance)}`
+                : ""}
+              .
+            </DialogContentText>
+          )}
         </ConfirmDialog>
       )}
       <FacilityDetails

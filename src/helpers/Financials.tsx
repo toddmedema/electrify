@@ -193,22 +193,21 @@ const PREMIUM_PER_POINT = 0.05;
 // end of the scale stays a number rather than running away.
 export const MAX_CREDIT_POINTS = 40;
 
-type BorrowedAsset = Pick<
+type AssetDebt = Pick<
   FacilityOperatingType,
-  "loanAmountLeft" | "expansionInProgress" | "expansionLoans"
+  "loanAmountLeft" | "repowerLoan" | "expansionInProgress" | "expansionLoans"
 >;
 
-function outstandingAssetDebt(asset: BorrowedAsset): number {
-  let debt = asset.loanAmountLeft;
-  if (asset.expansionInProgress?.loan) {
+export function facilityLoanBalance(asset: AssetDebt): number {
+  let debt = asset.loanAmountLeft + (asset.repowerLoan?.loanAmountLeft ?? 0);
+  if (asset.expansionInProgress?.loan)
     debt += asset.expansionInProgress.loan.loanAmountLeft;
-  }
   for (const loan of asset.expansionLoans ?? []) debt += loan.loanAmountLeft;
   return debt;
 }
 
-export function getTotalDebt(assets: readonly BorrowedAsset[]): number {
-  return assets.reduce((debt, asset) => debt + outstandingAssetDebt(asset), 0);
+export function getTotalDebt(assets: readonly AssetDebt[]): number {
+  return assets.reduce((debt, asset) => debt + facilityLoanBalance(asset), 0);
 }
 
 export interface CreditInputsType {
@@ -505,11 +504,11 @@ export function facilityCashBack(
     );
     return (
       g.buildCost * remainingLife * (g.cashBackMultiplier ?? 1) -
-      outstandingAssetDebt(g) +
+      facilityLoanBalance(g) +
       (g.expansionInProgress?.cost ?? 0)
     );
   }
   // Cancellation unwinds the committed purchase. For a financed build this returns only the
   // down payment/equity because the outstanding loan is settled at the same time.
-  return g.buildCost - g.loanAmountLeft;
+  return g.buildCost - facilityLoanBalance(g);
 }

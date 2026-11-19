@@ -507,24 +507,6 @@
 .gameWorkspace[data-map-workspace="true"] .territoryAgreements {
   padding-bottom: calc(var(--game-dock-clearance) + 16px);
 }
-.territoryNetwork > .acquiredUtilities {
-  position: absolute;
-  z-index: 3;
-  top: 8px;
-  left: 8px;
-  margin: 0;
-  max-width: min(360px, calc(100% - 16px));
-  max-height: calc(100% - 144px);
-  overflow: auto;
-  background: var(--bg-primary);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-sm);
-  > summary {
-    min-height: 44px;
-    box-sizing: border-box;
-    padding: 12px;
-  }
-}
 @media (max-width: 599px) {
   .territoryTileTarget .territoryTilePrice {
     width: 88px;

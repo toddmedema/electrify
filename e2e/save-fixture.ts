@@ -6,7 +6,7 @@ import type { GameType, SaveGameType, SaveMetadata } from "../src/Types";
 
 type WireRecord = { metadata: SaveMetadata; save: unknown };
 
-/** Wait for the asynchronous lifecycle flush before inspecting the real save database. */
+/** Request a lifecycle flush and await rendered status; use waitForSavedGame for a specific persisted change. */
 async function flushSave(page: Page) {
   await page.evaluate(() => window.dispatchEvent(new Event("pagehide")));
   const status = page.locator("#appbar:visible [data-save-state]").first();
@@ -130,6 +130,26 @@ export async function readSavedGame(
   const record = await selectedRecord(page, saveId);
   await page.evaluate(() => window.dispatchEvent(new Event("pageshow")));
   return record ? (decodeSave(record.save) as SaveGameType).game : undefined;
+}
+
+/** Wait for the caller's change in the real database; rendered status can describe an older snapshot. */
+export async function waitForSavedGame(
+  page: Page,
+  ready: (game: GameType) => boolean,
+  message: string,
+  saveId?: string,
+): Promise<GameType> {
+  let game: GameType | undefined;
+  await expect
+    .poll(
+      async () => {
+        game = await readSavedGame(page, saveId);
+        return game !== undefined && ready(game);
+      },
+      { message },
+    )
+    .toBe(true);
+  return game!;
 }
 
 /** Edit a flushed fixture, preserving the production codec and invalidating its old writer. */

@@ -44,7 +44,6 @@ import {
 import { cityDemandByType } from "../../helpers/CityDemand";
 import { facilityDisplayName } from "../base/FacilityLabels";
 import { facilityMapStatus } from "../base/FacilityMapStatus";
-import AcquiredUtilities from "./AcquiredUtilities";
 import TerritoryHexMap, { type MapTileMenuTarget } from "./TerritoryHexMap";
 import TerritoryTileMenu from "./TerritoryTileMenu";
 import AcquisitionReviewDialog from "../base/AcquisitionReviewDialog";
@@ -183,14 +182,6 @@ function TileNetwork(props: Props) {
   const { purchase, pendingIds, availableCash } = useTerritoryTilePurchases();
   const dispatch = useAppDispatch();
   const { formatMoneyConcise: money, formatPurchasePrice } = useMoney();
-  const summaryRef = React.useRef<HTMLElement>(null);
-  const acquired = React.useRef(false);
-  React.useEffect(() => {
-    if (!utilityDialog && acquired.current && summaryRef.current) {
-      acquired.current = false;
-      summaryRef.current.focus();
-    }
-  }, [utilityDialog, game.utilityExpansion?.acquisitions.length]);
   const views = React.useMemo(() => territoryTileViews(game), [game]);
   const view =
     inspected && !panel?.open && !planning
@@ -198,6 +189,9 @@ function TileNetwork(props: Props) {
       : undefined;
   const tile = view?.tile;
   const territory = tile ? getTerritoryDefinition(tile.territoryId) : undefined;
+  // Let the purchase dialog finish before moving focus to the updated inspector.
+  const inspectorOwner =
+    utilityDialog?.action === "acquire" ? tile?.territoryId : view?.ownerKey;
   const operatingFacility = view?.operatingFacility;
   const utility = tile
     ? Object.values(UTILITY_AREAS).find(({ id }) => id === tile.territoryId)
@@ -437,12 +431,11 @@ function TileNetwork(props: Props) {
           }}
         />
       )}
-      <AcquiredUtilities game={game} summaryRef={summaryRef} />
       {view && tile && territory && (
         <TileWorkspaceSurface
           title={title}
-          focusKey={`${inspected}:${activation}:${view.ownerKey ?? "unowned"}:${operatingFacility?.id ?? (view.facility ? "facility" : "empty")}`}
-          subtitle={view.ownerName}
+          focusKey={`${inspected}:${activation}:${inspectorOwner ?? "unowned"}:${operatingFacility?.id ?? (view.facility ? "facility" : "empty")}`}
+          subtitle={view.ownerKey ? view.ownerName : undefined}
           building={building && !desktopRail}
           initialFocusSelector={
             building && desktopRail && railSite === tile.id
@@ -613,11 +606,7 @@ function TileNetwork(props: Props) {
           game={game}
           targetId={utilityDialog.id}
           onClose={() => setUtilityDialog(undefined)}
-          onAcquire={async (payload) => {
-            const accepted = await props.onAcquire!(payload);
-            acquired.current = accepted;
-            return accepted;
-          }}
+          onAcquire={props.onAcquire}
         />
       )}
       {utilityDialog?.action === "inspect" && (

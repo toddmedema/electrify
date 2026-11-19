@@ -124,6 +124,9 @@
   .tileWorkspaceSurface.tileWorkspaceProject {
     max-height: min(55%, calc(100% - var(--game-dock-clearance, 80px) - 176px));
   }
+  .tileWorkspaceProject .tileWorkspaceHeading {
+    padding-block: 4px;
+  }
   .tileWorkspaceProject .tileWorkspaceHeading h3 {
     font-size: 16px;
     line-height: 24px;
@@ -133,6 +136,9 @@
   }
   .projectFacts {
     gap: 8px;
+  }
+  .projectMonthlyPayment {
+    display: block;
   }
   .projectCandidateActions button {
     flex: 1;

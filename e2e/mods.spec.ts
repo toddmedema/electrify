@@ -4,11 +4,18 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { packageDigest, validateMod } from "../src/mods/ModSchema";
 import { wToSliderTick } from "../src/helpers/BuildSizing";
-import type { GameType } from "../src/Types";
+import type { GameType, SaveGameType } from "../src/Types";
+import { decodeSave, encodeSave } from "../src/SaveEncoding";
+import { SAVE_DATABASE_NAME } from "../src/SaveRepository";
 import type { InstalledMod, ModLibrary, ModRequest } from "../src/mods/Types";
 import { openPane } from "./layout";
 import { verifyMenuKeyboard } from "./menu-keyboard";
-import { readSavedGame } from "./save-fixture";
+import {
+  copySavedGame,
+  readSavedGame,
+  readSaveRecords,
+  waitForSavedGame,
+} from "./save-fixture";
 import { gameObjectiveResults } from "../src/helpers/ObjectiveRules";
 import type { DesktopInputFrame } from "../src/Desktop";
 
@@ -783,6 +790,79 @@ test("cold share-load preparation stays isolated when another mod starts", async
   }
 });
 
+test("save readiness waits for the requested persisted snapshot despite a saved marker", async ({
+  page,
+}) => {
+  await mockDesktop(page, false, "light");
+  await page.goto("/");
+  await page.getByRole("button", { name: "Mods", exact: true }).click();
+  await playAndCheckRun(page, "Community Grid");
+  await expect.poll(async () => (await readSaveRecords(page)).length).toBe(1);
+  const targetId = await copySavedGame(
+    page,
+    (await readSaveRecords(page))[0].metadata.id,
+  );
+  const before = (await readSavedGame(page, targetId))!;
+  const nextRate = before.dollarsPerkWh + 0.01;
+  const record = (await readSaveRecords(page)).find(
+    (entry) => entry.metadata.id === targetId,
+  )!;
+  const save = decodeSave(record.save) as SaveGameType;
+  const wire = encodeSave({
+    ...save,
+    game: { ...before, dollarsPerkWh: nextRate },
+  });
+
+  // A full navigation stops the real writer. Only this controlled publisher can
+  // update the copied fixture, and the rendered marker deliberately stays saved.
+  await page.route("**/save-fixture-regression", (route) =>
+    route.fulfill({
+      contentType: "text/html",
+      body: '<div id="appbar"><span data-save-state="saved" data-active-save-id="another-save">Saved</span></div>',
+    }),
+  );
+  await page.goto("/save-fixture-regression");
+  await page.evaluate(
+    ({ databaseName, id, wire }) => {
+      let reads = 0;
+      window.addEventListener("pagehide", () => {
+        // The first flush/read must observe the old payload. Publish only once
+        // readiness has rejected that snapshot and requests a second flush.
+        if (++reads !== 2) return;
+        const request = indexedDB.open(databaseName);
+        request.onsuccess = () => {
+          const db = request.result;
+          const tx = db.transaction("payloads", "readwrite");
+          tx.objectStore("payloads").put({ id, save: JSON.parse(wire) });
+          tx.oncomplete = () => db.close();
+        };
+      });
+    },
+    {
+      databaseName: SAVE_DATABASE_NAME,
+      id: targetId,
+      wire: JSON.stringify(wire),
+    },
+  );
+  const samples: number[] = [];
+  const committed = await waitForSavedGame(
+    page,
+    (game) => {
+      samples.push(game.dollarsPerkWh);
+      return game.dollarsPerkWh === nextRate;
+    },
+    "the requested save contains the new rate",
+    targetId,
+  );
+  expect(samples[0]).toBe(before.dollarsPerkWh);
+  expect(samples.at(-1)).toBe(nextRate);
+  expect(committed).toEqual({ ...before, dollarsPerkWh: nextRate });
+  await expect(page.locator("[data-save-state]")).toHaveAttribute(
+    "data-save-state",
+    "saved",
+  );
+});
+
 test("a mod choice blocks, explains funding and updates the saved forecast", async ({
   page,
 }) => {
@@ -912,7 +992,16 @@ test("a mod choice blocks, explains funding and updates the saved forecast", asy
   await expect(
     next.getByRole("button", { name: "Operating plan 1", exact: true }),
   ).toBeFocused();
-  const committed = (await readSavedGame(page))!;
+  const committed = await waitForSavedGame(
+    page,
+    (game) =>
+      game.worldEvents.occurrences.some(
+        (event) =>
+          event.key === "mod:choice-grid:grid-bond" &&
+          event.attributes.choice === "funded",
+      ),
+    "the funded investment is committed to the save",
+  );
   expect(committed.date.minute).toBe(before.date.minute);
   expect(committed.speed).toBe("PAUSED");
   expect(committed.timeline[0].cash - before.timeline[0].cash).toBe(50000);
@@ -951,7 +1040,16 @@ test("a mod choice blocks, explains funding and updates the saved forecast", asy
     page.locator("[data-scenario-choice]"),
     "all simultaneous decisions are answered",
   ).toHaveCount(0);
-  const answered = (await readSavedGame(page))!;
+  const answered = await waitForSavedGame(
+    page,
+    (game) =>
+      game.worldEvents.occurrences.some(
+        (event) =>
+          event.key === "mod:choice-grid:later-review" &&
+          event.attributes.choice === "response-8",
+      ),
+    "the last operating plan is committed to the save",
+  );
   expect(answered.speed).toBe("PAUSED");
   expect(answered.timeline[0].cash).toBe(committed.timeline[0].cash);
   expect(

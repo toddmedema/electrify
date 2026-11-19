@@ -398,7 +398,9 @@ export default function ProjectBuild({
                     <dt>Loan option</dt>
                     <dd>
                       {price(payment.loan.required)} now +{" "}
-                      {money(payment.loan.terms.monthlyPayment)}/mo
+                      <span className="projectMonthlyPayment">
+                        {money(payment.loan.terms.monthlyPayment)}/mo
+                      </span>
                     </dd>
                   </div>
                   <div>

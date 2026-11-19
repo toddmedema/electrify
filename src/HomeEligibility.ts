@@ -26,9 +26,6 @@ export async function canStartLightweightHome(): Promise<boolean> {
     for (const key of [
       "plays",
       "interfaceScale",
-      "textSize",
-      "tvMode",
-      "tvScale",
       "screenEdgePadding",
       "workspace",
     ]) {
