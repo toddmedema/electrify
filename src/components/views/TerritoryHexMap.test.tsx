@@ -110,6 +110,7 @@ function show(
   inspectionInitiallyOpen = false,
   initialSelected: TerritoryTileId = "champlain:city",
   projectSites?: ReadonlyMap<TerritoryTileId, ReadyProjectSite>,
+  projectPending = false,
 ) {
   const game = createGame({ scenarioId: 116, seed: 188 });
   currentTick(game)!.cash = cash;
@@ -152,6 +153,7 @@ function show(
           game={activeGame}
           views={territoryTileViews(activeGame)}
           projectPlanning={!!projectSites}
+          projectPending={projectPending}
           projectSites={projectSites}
           selected={selected}
           onCloseInspection={
@@ -683,6 +685,41 @@ it("keeps buying mode and releases commitments when the host rejects, then reset
   expect(
     screen.getByRole("button", { name: "Rapid connection mode" }),
   ).toHaveAttribute("aria-pressed", "false");
+});
+
+it("does not spend when an Inspect gesture becomes affordable before release", async () => {
+  const map = show(5e6);
+  const host = fakeHost();
+  map.buyMode();
+  const affordable = map.candidates().filter((button) => {
+    const price = tilePurchaseQuote(
+      map.store.getState().game,
+      idOf(button),
+    )!.price;
+    return price > 2.5e6 && price <= 5e6;
+  });
+  const [first, second] = affordable;
+  const id = idOf(second);
+  tap(first);
+  const inspected = map.target(id);
+  expect(inspected).toHaveAccessibleName(/^Inspect.*not enough available cash/);
+  fireEvent.pointerDown(inspected, { pointerId: 1 });
+  await act(async () => host.reject());
+  expect(map.target(id)).toHaveAccessibleName(/^(Connect|Acquire)/);
+  fireEvent.pointerUp(map.target(id), { pointerId: 1 });
+  fireEvent.click(map.target(id), { detail: 1 });
+  expect(map.onSelect).toHaveBeenLastCalledWith(id, true);
+  expect(host.submit).toHaveBeenCalledTimes(1);
+  tap(map.target(id));
+  expect(host.submit).toHaveBeenCalledTimes(2);
+});
+
+it("keeps Rapid connection off during a pending project confirmation", () => {
+  const map = show(undefined, false, undefined, new Map(), true);
+  const rapid = screen.getByRole("button", { name: "Rapid connection mode" });
+  expect(rapid).toHaveAttribute("aria-disabled", "true");
+  map.buyMode();
+  expect(rapid).toHaveAttribute("aria-pressed", "false");
 });
 
 it("closes inspection, exits buying and deselects with one Escape on the map", () => {

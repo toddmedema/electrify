@@ -118,6 +118,7 @@ interface Props {
   onCloseInspection?: () => void;
   onDeselect?: () => void;
   projectPlanning?: boolean;
+  projectPending?: boolean;
   projectSites?: ReadonlyMap<TerritoryTileId, ReadyProjectSite>;
 }
 function wireStructure({
@@ -145,6 +146,7 @@ export default function TerritoryHexMap({
   onCloseInspection,
   onDeselect,
   projectPlanning = false,
+  projectPending = false,
   projectSites,
 }: Props) {
   const mapId = React.useId();
@@ -338,11 +340,10 @@ export default function TerritoryHexMap({
   }>();
   const touches = React.useRef(new Set<number>());
   const suppressClick = React.useRef(false);
-  const activationQuote = React.useRef<{
+  const activation = React.useRef<{
     tileId: TerritoryTileId;
-    quoteKey: string;
+    quoteKey?: string;
   }>();
-  const activationTarget = React.useRef<TerritoryTileId>();
   const pointerHover = React.useRef<() => void>();
   const hoverFrame = React.useRef<number>();
   const hoverPoint = React.useRef<{
@@ -617,18 +618,34 @@ export default function TerritoryHexMap({
     }
     onSelect(tile.id, true);
   };
+  const rememberActivation = (id?: TerritoryTileId) => {
+    const quote = id && purchaseQuotes?.get(id);
+    activation.current = id
+      ? {
+          tileId: id,
+          quoteKey:
+            quote && quote.price <= availableCash && !pendingIds.has(id)
+              ? quote.quoteKey
+              : undefined,
+        }
+      : undefined;
+  };
   const activateTile = (id: TerritoryTileId) => {
+    const started = activation.current;
+    activation.current = undefined;
     const view = byId.get(id);
     if (!view) return;
     const quote = purchaseQuotes?.get(id),
       expectedQuote =
-        activationQuote.current?.tileId === id
-          ? activationQuote.current.quoteKey
-          : quote?.quoteKey;
-    activationQuote.current = undefined;
+        started?.tileId === id ? started.quoteKey : quote?.quoteKey;
     onSelect(id);
     if (pendingIds.has(id)) return;
-    if (quote && quote.price <= availableCash && !projectPlanning)
+    if (
+      expectedQuote &&
+      quote &&
+      quote.price <= availableCash &&
+      !projectPlanning
+    )
       void purchase(id, expectedQuote);
     else inspectTile(view.tile);
   };
@@ -744,8 +761,10 @@ export default function TerritoryHexMap({
           ref={buyingControl}
           aria-label="Rapid connection mode"
           aria-pressed={buyMode}
+          aria-disabled={projectPending || undefined}
           aria-describedby={`${mapId}-buy-status`}
           onClick={() => {
+            if (projectPending) return;
             if (projectPlanning) onDeselect?.();
             setBuyMode((value) => !value);
           }}
@@ -794,17 +813,8 @@ export default function TerritoryHexMap({
           if (event.button !== 0 && !middle) return;
           clearHover();
           if (middle) event.preventDefault();
-          const id = middle ? undefined : pointerTile(event),
-            quote = id && purchaseQuotes?.get(id);
-          activationTarget.current = id;
-          activationQuote.current = id
-            ? {
-                tileId: id,
-                quoteKey: quote
-                  ? quote.quoteKey
-                  : "unavailable-at-gesture-start",
-              }
-            : undefined;
+          const id = middle ? undefined : pointerTile(event);
+          rememberActivation(id);
           touches.current.add(event.pointerId);
           if (touches.current.size > 1) {
             suppressClick.current = true;
@@ -882,23 +892,25 @@ export default function TerritoryHexMap({
           clearHover();
           touches.current.delete(event.pointerId);
           pointer.current = undefined;
+          activation.current = undefined;
           suppressClick.current = true;
         }}
         onPointerLeave={clearHover}
         onClickCapture={(event) => {
           if (suppressClick.current && event.detail !== 0) {
+            activation.current = undefined;
             event.preventDefault();
             event.stopPropagation();
             return;
           }
           if (event.detail === 0) return;
           const id = pointerTile(event);
-          if (activationTarget.current && activationTarget.current !== id) {
+          if (activation.current && activation.current.tileId !== id) {
+            activation.current = undefined;
             event.preventDefault();
             event.stopPropagation();
             return;
           }
-          activationTarget.current = undefined;
           if (id) {
             event.preventDefault();
             event.stopPropagation();
@@ -1183,12 +1195,6 @@ export default function TerritoryHexMap({
                   if (!pointer.current && !touches.current.size)
                     revealTile(tile);
                 }}
-                onPointerDown={(event) => {
-                  if (event.button !== 0) return;
-                  activationQuote.current = quote
-                    ? { tileId: tile.id, quoteKey: quote.quoteKey }
-                    : undefined;
-                }}
                 onClick={() => {
                   activateTile(tile.id);
                 }}
@@ -1197,9 +1203,7 @@ export default function TerritoryHexMap({
                     (event.key === "Enter" || event.key === " ") &&
                     !event.repeat
                   )
-                    activationQuote.current = quote
-                      ? { tileId: tile.id, quoteKey: quote.quoteKey }
-                      : undefined;
+                    rememberActivation(tile.id);
                   navigate(event, tile.id);
                 }}
                 title={`${TERRAIN_LABELS[tile.terrain]} · ${facility?.name ?? cityLabel ?? (view.developed ? (wireStructure(view) === "submerged" ? "Open water · submerged cable" : "Open site · transmission tower") : "Undeveloped site")}${status ? ` · ${status.label}` : ""} · ${hover.reason}`}

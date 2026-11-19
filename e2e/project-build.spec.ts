@@ -37,6 +37,27 @@ async function start(page: Page, theme: "light" | "dark") {
   ).toHaveAttribute("data-save-state", "saved");
   return network;
 }
+
+test("keeps project actions reachable on a short landscape display", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 640, height: 320 });
+  await start(page, "light");
+  const catalogue = await openMapProjectCatalogue(page);
+  await setMapProjectCapacity(catalogue, false, "10");
+  await catalogue
+    .getByRole("button", { name: "Choose sites for Wind" })
+    .click();
+  await selectTerritoryMapTile(page, getTerritoryTile("champlain:site-13")!);
+  const surface = page.getByRole("dialog", { name: "Wind · 20MW" });
+  const review = surface.getByRole("button", { name: "Review project" });
+  await expect(review).toBeInViewport({ ratio: 1 });
+  await review.click();
+  await expect(
+    surface.getByRole("button", { name: "Build project" }),
+  ).toBeInViewport({ ratio: 1 });
+});
+
 for (const theme of ["light", "dark"] as const) {
   test(`plans before connecting, retains size across sites, and builds the exact site · ${theme}`, async ({
     page,

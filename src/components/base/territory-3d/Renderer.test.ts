@@ -33,6 +33,11 @@ function mockContext() {
     INCR: 19,
     SRC_ALPHA: 20,
     ONE_MINUS_SRC_ALPHA: 21,
+    NO_ERROR: 0,
+    OUT_OF_MEMORY: 0x0505,
+    CONTEXT_LOST_WEBGL: 0x9242,
+    getError: jest.fn((): number => 0),
+    isContextLost: jest.fn(() => false),
     getContextAttributes: jest.fn(() => ({ stencil: true })),
     createProgram: jest.fn(() => ({ id: ++identity })),
     createShader: jest.fn(() => ({ id: ++identity })),
@@ -619,6 +624,40 @@ it("releases resources and exposes fallback when a frame upload fails", () => {
   expect(gl.deleteProgram).toHaveBeenCalledTimes(1);
   renderer.dispose();
   expect(gl.deleteProgram).toHaveBeenCalledTimes(1);
+});
+
+it("keeps the fallback and discards buffers after an allocation reports OUT_OF_MEMORY", () => {
+  const { renderer, gl, state } = setup();
+  gl.bufferData.mockImplementation((_target, _data, usage) => {
+    if (usage === gl.DYNAMIC_DRAW)
+      gl.getError.mockReturnValue(gl.OUT_OF_MEMORY);
+  });
+  renderer.update(scene(), frame);
+  flush(0);
+  expect(state.mock.calls).toEqual([["unavailable"]]);
+  expect(renderer.diagnostics().meshCount).toBe(0);
+  expect(gl.deleteBuffer).toHaveBeenCalledTimes(6);
+  expect(callbacks.size).toBe(0);
+  renderer.dispose();
+});
+
+it("can restore a context lost during the first buffer upload", () => {
+  const { renderer, canvas, gl, state } = setup();
+  gl.bufferSubData.mockImplementationOnce(() => {
+    gl.getError.mockReturnValueOnce(gl.CONTEXT_LOST_WEBGL);
+    gl.isContextLost.mockReturnValueOnce(true);
+  });
+  renderer.update(scene(), frame);
+  flush(0);
+  expect(state.mock.calls).toEqual([["lost"]]);
+  expect(gl.deleteBuffer).not.toHaveBeenCalled();
+  const lost = new Event("webglcontextlost", { cancelable: true });
+  canvas.dispatchEvent(lost);
+  expect(lost.defaultPrevented).toBe(true);
+  canvas.dispatchEvent(new Event("webglcontextrestored"));
+  flush(1000);
+  expect(state.mock.calls).toEqual([["lost"], ["ready"]]);
+  renderer.dispose();
 });
 
 it("keeps distinct caster subsets correct when a mesh is shared across passes", () => {

@@ -325,6 +325,7 @@ function TileNetwork(props: Props) {
         <TerritoryHexMap
           {...(view || planning ? { onCloseInspection: close } : {})}
           projectPlanning={planning}
+          projectPending={projectPending}
           projectSites={projectSites}
           onDeselect={close}
           game={game}
@@ -333,7 +334,7 @@ function TileNetwork(props: Props) {
           onSelect={inspect}
         />
       )}
-      {planning && !panel?.open && (
+      {planning && (!panel?.open || projectPending) && (
         <DeferredProjectBuild
           game={game}
           project={project}
@@ -367,6 +368,7 @@ function TileNetwork(props: Props) {
           onBusy={(busy) => {
             projectBusy.current = busy;
             setProjectPending(busy);
+            panel?.onProjectBusyChange?.(busy);
           }}
         />
       )}
@@ -429,9 +431,11 @@ function TileNetwork(props: Props) {
                   <div className="tileCityMetrics">
                     <div>
                       <span>
-                        {view.owned
-                          ? "Connected customers"
-                          : "Customers to connect"}
+                        {!view.owned
+                          ? "Customers to connect"
+                          : utility && !acquisition
+                            ? "Opening customers"
+                            : "Customers transferred"}
                       </span>
                       <strong>{formatCount(customers)}</strong>
                     </div>

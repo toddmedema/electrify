@@ -218,6 +218,7 @@ export class MapRenderer {
   private state: State = "unavailable";
   private disposed = false;
   private readyPending = false;
+  private bufferUpdates = false;
   private frames = 0;
   private drawCalls = 0;
   private triangles = 0;
@@ -484,8 +485,7 @@ export class MapRenderer {
         shadow: gl.getUniformLocation(program, "uShadow"),
       };
     } catch (_error) {
-      this.releaseResources(true);
-      this.setState("unavailable");
+      this.fail();
       return;
     }
     // Notify the host only after a real clear/draw, so fallback art never
@@ -497,10 +497,16 @@ export class MapRenderer {
 
   private contextLost = (event: Event): void => {
     event.preventDefault();
+    this.loseContext();
+  };
+
+  private loseContext(): void {
+    if (this.state === "lost") return;
     this.cancelFrame();
     this.releaseResources(false);
+    this.readyPending = false;
     this.setState("lost");
-  };
+  }
 
   private contextRestored = (): void => {
     if (!this.disposed) this.initialize();
@@ -554,6 +560,7 @@ export class MapRenderer {
     if (!this.isVisible() || this.disposed || this.state !== "ready") return;
     const started = performance.now();
     try {
+      this.bufferUpdates = false;
       // Camera and simulation updates can arrive before the same paint. Only
       // prepare the scene that will actually be submitted, including on reveal.
       this.prepareScene(this.frame!);
@@ -606,6 +613,7 @@ export class MapRenderer {
       gl.bindVertexArray(vao);
       gl.bindBuffer(gl.ARRAY_BUFFER, vertices);
       gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW);
+      this.bufferUpdates = true;
       for (let attribute = 0; attribute < 3; attribute++) {
         gl.enableVertexAttribArray(attribute);
         gl.vertexAttribPointer(
@@ -937,6 +945,13 @@ export class MapRenderer {
     gl.depthMask(true);
     gl.disable(gl.BLEND);
     gl.bindVertexArray(null);
+    // WebGL errors do not throw. Check once per upload frame before exposing
+    // the paint. A failure discards every mesh and its upload metadata.
+    if (
+      (this.readyPending || this.bufferUpdates) &&
+      gl.getError() !== gl.NO_ERROR
+    )
+      throw new Error("Map GPU buffer upload or draw failed");
     this.frames++;
     this.paintedLighting = lighting;
     this.instanceCount = this.sceneInstanceCount;
@@ -961,12 +976,14 @@ export class MapRenderer {
           mesh.capacity * INSTANCE_FLOATS * 4,
           gl.DYNAMIC_DRAW,
         );
+        this.bufferUpdates = true;
       }
       if (
         mesh.uploadedData !== data ||
         mesh.uploadedRevision !== batch.revision
       ) {
         gl.bufferSubData(gl.ARRAY_BUFFER, 0, data, 0, data.length);
+        this.bufferUpdates = true;
         mesh.uploadedData = data;
         mesh.uploadedRevision = batch.revision;
       }
@@ -983,6 +1000,10 @@ export class MapRenderer {
   }
 
   private fail(): void {
+    if (this.gl?.isContextLost()) {
+      this.loseContext();
+      return;
+    }
     this.cancelFrame();
     this.releaseResources(true);
     this.readyPending = false;

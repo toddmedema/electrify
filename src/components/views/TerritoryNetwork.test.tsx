@@ -343,7 +343,7 @@ it("shows the city's real sector demand in the existing demand-by-use chart", ()
   const game = ready();
   show(game);
   inspect("champlain:city");
-  expect(surface()).toHaveTextContent("Connected customers");
+  expect(surface()).toHaveTextContent("Opening customers");
   expect(surface()).toHaveTextContent(
     formatWatts(territoryDemandShares(game, currentTick(game)!)["champlain"]),
   );
@@ -464,7 +464,7 @@ it("shows purchased cities as customers rather than build destinations", () => {
   fireEvent.click(
     within(surface()).getByRole("button", { name: /Acquire utility/ }),
   );
-  expect(surface()).toHaveTextContent("Connected customers");
+  expect(surface()).toHaveTextContent("Customers transferred");
   expect(
     within(surface()).queryByRole("tab", { name: "Generators" }),
   ).not.toBeInTheDocument();
@@ -490,7 +490,7 @@ it("shows the same grown customer count before and after a delayed utility acqui
       }),
     ),
   );
-  expect(surface()).toHaveTextContent("Connected customers");
+  expect(surface()).toHaveTextContent("Customers transferred");
   expect(surface()).toHaveTextContent(formatCount(quote.customers));
 });
 
@@ -559,7 +559,7 @@ it.each([undefined, 1280])(
   async (width) => {
     const game = ready();
     game.multiplayer = { seat: "0" };
-    const { store, requestProject } = show(game, width);
+    const { store, requestProject, showPanel } = show(game, width);
     const commands: Command[] = [];
     registerMultiplayerRuntime({
       submit: async (command) => {
@@ -593,6 +593,7 @@ it.each([undefined, 1280])(
     requestProject();
     inspect("champlain:site-13");
     fireEvent.keyDown(surface(), { key: "Escape" });
+    showPanel(true);
     expect(screen.getByRole("button", { name: "Connecting…" })).toBeDisabled();
     expect(screen.queryByRole("slider")).not.toBeInTheDocument();
     expect(

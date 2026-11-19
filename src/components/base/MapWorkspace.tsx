@@ -43,12 +43,15 @@ export default function MapWorkspace({
   const card = useAppSelector((state) => state.card.name);
   const settings = useAppSelector((state) => state.settings);
   const candidate = gameToolForCard(card);
-  const active: MapTool | undefined =
+  const [projectBusy, setProjectBusy] = React.useState(false);
+  const requestedPanel: MapTool | undefined =
     card === "FLEET" || card === "AGREEMENTS"
       ? card
       : candidate === "BUILD_GENERATORS"
         ? undefined
         : candidate;
+  const requestedProject = candidate === "BUILD_GENERATORS";
+  const active = projectBusy ? undefined : requestedPanel;
   const localMemory = React.useRef(new Map<string, unknown>());
   const memory = sharedMemory ?? localMemory.current;
   const workspace = React.useRef<HTMLDivElement>(null);
@@ -63,6 +66,9 @@ export default function MapWorkspace({
     () => dispatch(navigate("FACILITIES")),
     [dispatch],
   );
+  React.useLayoutEffect(() => {
+    if (projectBusy && (requestedPanel || requestedProject)) returnToMap();
+  }, [projectBusy, requestedPanel, requestedProject, returnToMap]);
   const close = React.useCallback(() => {
     returnToMap();
     if (config)
@@ -96,9 +102,10 @@ export default function MapWorkspace({
     () => ({
       open: !!active,
       inspect: returnToMap,
-      projectRequested: candidate === "BUILD_GENERATORS",
+      projectRequested: !projectBusy && requestedProject,
+      onProjectBusyChange: setProjectBusy,
     }),
-    [active, returnToMap, candidate],
+    [active, returnToMap, projectBusy, requestedProject],
   );
   return (
     <GameToolMemoryContext.Provider value={memory}>
@@ -208,15 +215,18 @@ export default function MapWorkspace({
                       ? active
                       : "FACILITIES"
                   }
-                  onMapView={(view) => dispatch(navigate(view))}
+                  onMapView={(view) => {
+                    if (!projectBusy) dispatch(navigate(view));
+                  }}
                   openTools={
                     active && active !== "FLEET" && active !== "AGREEMENTS"
                       ? [active]
                       : []
                   }
-                  onToggle={(tool) =>
-                    dispatch(navigate(active === tool ? "FACILITIES" : tool))
-                  }
+                  onToggle={(tool) => {
+                    if (!projectBusy)
+                      dispatch(navigate(active === tool ? "FACILITIES" : tool));
+                  }}
                 />
               </div>
             </BuildForecastProvider>

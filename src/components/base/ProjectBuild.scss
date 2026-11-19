@@ -134,3 +134,10 @@
     flex: 1;
   }
 }
+
+@media (max-width: 740px) and (max-height: 420px) {
+  .tileWorkspaceSurface.tileWorkspaceProject {
+    // Keep the heading and action row on screen when the map is short.
+    max-height: calc(100% - var(--game-dock-clearance, 80px) - 16px);
+  }
+}

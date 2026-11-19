@@ -1213,7 +1213,7 @@ for (const theme of ["light", "dark"] as const) {
     ).toBeLessThan(discovered.length);
     const city = getTerritoryTile("champlain:city", before)!;
     const surface = await inspectTile(page, city);
-    await expect(surface).toContainText("Connected customers");
+    await expect(surface).toContainText("Opening customers");
     await expect(surface).toContainText("Current demand");
     await expectCityDemand(surface);
     await reviewScreenshot(page, {
@@ -2017,7 +2017,7 @@ for (const theme of ["light", "dark"] as const) {
     await selectTerritoryMapTile(page, city);
     const cityPanel = tileSurface(page);
     await expect(cityPanel).toHaveAccessibleName("Vergennes");
-    await expect(cityPanel).toContainText("Connected customers");
+    await expect(cityPanel).toContainText("Customers transferred");
     await expectCityDemand(cityPanel);
   });
 
