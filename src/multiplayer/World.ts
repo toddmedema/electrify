@@ -1510,13 +1510,20 @@ function territoryPurchaseHistory(
         !replayRecords(grid.facilities) ||
         !replayRecords(grid.territoryNetwork?.landPurchases) ||
         !replayRecords(grid.territoryNetwork?.legacyTiles) ||
+        grid.territoryNetwork!.legacyTiles!.some(
+          ({ id, q, r }) =>
+            typeof id !== "string" ||
+            !Number.isSafeInteger(q) ||
+            !Number.isSafeInteger(r),
+        ) ||
         !replayRecords(grid.utilityExpansion?.acquisitions) ||
         !replayRecords(grid.transmission?.lines) ||
         (grid.transmission?.acceptedAgreements !== undefined &&
           !replayRecords(grid.transmission.acceptedAgreements)) ||
         !replayRecords(grid.multiplayer?.peers) ||
         grid.multiplayer!.peers!.some(
-          ({ corridor }) => !corridor || typeof corridor !== "object",
+          ({ id, corridor }) =>
+            typeof id !== "string" || typeof corridor?.id !== "string",
         ),
     )
   )

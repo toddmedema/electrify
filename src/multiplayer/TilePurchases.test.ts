@@ -209,6 +209,20 @@ it("rejects missing land ledgers before replaying co-op tile purchases", () => {
     "Multiplayer save contains invalid grids or connections",
   );
 });
+it("rejects invalid retained tile IDs before replaying co-op purchases", () => {
+  const world = ready();
+  buyToward(world, "0", "green-uplands:site-4");
+  const raw = JSON.parse(JSON.stringify(checkpointWorld(world)));
+  expect(() => restoreWorld(raw, "valid-retained-tiles")).not.toThrow();
+  for (const id of [undefined, 42]) {
+    raw.grids[0].territoryNetwork.legacyTiles = [
+      { id, territoryId: "champlain", q: 6, r: -4 },
+    ];
+    expect(() => restoreWorld(raw, "invalid-retained-tile")).toThrow(
+      "Multiplayer save contains invalid grids or connections",
+    );
+  }
+});
 it("reveals a connected peer's acquired utility without granting its ownership or future acquisition anchors", () => {
   const world = ready();
   const target = getTerritoryTile("frontier:7:-4")!;
