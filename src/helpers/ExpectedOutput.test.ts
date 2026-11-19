@@ -5,7 +5,10 @@ import { createGame } from "../testing/Simulator";
 import { GameType, TickPresentFutureType } from "../Types";
 import { MINUTES_PER_MONTH } from "./DateTime";
 import { HYDRO_TARGET_CAPACITY_FACTOR } from "./Hydro";
-import { expectedMonthlyOutputShape } from "./ExpectedOutput";
+import {
+  expectedMonthlyOutputShape,
+  windOutputByTerrain,
+} from "./ExpectedOutput";
 import { TERRITORY_TILES } from "../data/TerritoryTiles";
 import { getTerrainWindOutputFactor } from "./TerrainModifiers";
 import { getOffshoreWindOutputFactor } from "./Energy";
@@ -37,6 +40,14 @@ function solarTick(minute: number, irradiance: number): TickPresentFutureType {
     hydroRunoffMm: 0,
   } as TickPresentFutureType;
 }
+
+it("compares terrain using the turbine curve and skips a zero-output baseline", () => {
+  const factors = windOutputByTerrain([20, 24, 28]);
+  expect(factors.forest).toBeLessThan(1);
+  expect(factors.hills).toBeGreaterThan(1);
+  expect(factors.mountain).toBeGreaterThan(1.15);
+  expect(windOutputByTerrain([0, 0])).toEqual({});
+});
 
 describe("expectedMonthlyOutputShape", () => {
   const solar = { name: "Solar", fuel: "Sun" as const, peakW: 1_000_000 };

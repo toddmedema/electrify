@@ -871,9 +871,7 @@ it("takes facility actions from the map and confirms a sale of the same facility
   });
   fireEvent.contextMenu(tile);
   let menu = screen.getByRole("menu", { name: "Tile actions" });
-  fireEvent.click(
-    within(menu).getByRole("menuitem", { name: "Pause", exact: true }),
-  );
+  fireEvent.click(within(menu).getByRole("menuitem", { name: "Pause" }));
   expect(facilityActions.onPause).toHaveBeenCalledWith(
     facility.id,
     facility.name,
@@ -882,14 +880,10 @@ it("takes facility actions from the map and confirms a sale of the same facility
 
   fireEvent.contextMenu(tile);
   menu = screen.getByRole("menu", { name: "Tile actions" });
-  fireEvent.click(
-    within(menu).getByRole("menuitem", { name: "Sell", exact: true }),
-  );
+  fireEvent.click(within(menu).getByRole("menuitem", { name: "Sell" }));
   const confirmation = screen.getByRole("dialog", { name: /^Sell:/ });
   expect(facilityActions.onSell).not.toHaveBeenCalled();
-  fireEvent.click(
-    within(confirmation).getByRole("button", { name: "Sell", exact: true }),
-  );
+  fireEvent.click(within(confirmation).getByRole("button", { name: "Sell" }));
   expect(facilityActions.onSell).toHaveBeenCalledWith(facility.id);
 });
 
@@ -906,7 +900,6 @@ it("opens the capacity upgrade directly from the tile actions", async () => {
   fireEvent.click(
     within(menu).getByRole("menuitem", {
       name: "Upgrade capacity",
-      exact: true,
     }),
   );
   expect(

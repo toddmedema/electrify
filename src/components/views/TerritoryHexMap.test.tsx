@@ -161,6 +161,7 @@ function show(
           projectPlanning={!!projectSites}
           projectPending={projectPending}
           projectSites={projectSites}
+          projectWindOutput={projectSites && { forest: 0.8, mountain: 1.29 }}
           selected={selected}
           onCloseInspection={
             inspectionOpen
@@ -1094,10 +1095,10 @@ it("opens the actions for the picked model on right-click and for the focused ti
 });
 
 it.each([
-  ["green-uplands:site-1", "−5%", "false"],
-  ["champlain:site-9", "+15%", "true"],
+  ["green-uplands:site-1", "−20%", "false"],
+  ["champlain:site-9", "+29%", "true"],
 ] as const)(
-  "shows the wind terrain modifier on %s",
+  "shows the estimated wind output modifier on %s",
   (id, modifier, favorable) => {
     const game = createGame({ scenarioId: 116, seed: 188 });
     const wind = projectCatalogue(game, 20e6, false).find(
@@ -1108,7 +1109,7 @@ it.each([
     const map = show(1e9, false, "champlain:city", new Map([[id, quote]]));
     const target = map.target(id);
     expect(target).toHaveAccessibleName(
-      expect.stringContaining(`${modifier} wind speed`),
+      expect.stringContaining(`${modifier} estimated output vs flat terrain`),
     );
     expect(within(target).getByText(modifier)).toHaveAttribute(
       "data-favorable",

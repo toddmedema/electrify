@@ -135,6 +135,10 @@ for (const theme of ["light", "dark"] as const) {
       formatPurchasePrice(projectSiteCapitalCost(connectionQuote)),
     );
     await expect(target).toHaveAccessibleName(/Connection included/);
+    await expect(target.locator(".territoryTileProduction")).toBeVisible();
+    await expect(target).toHaveAccessibleName(
+      /estimated output vs flat terrain/,
+    );
     await expect(
       surface.getByRole("heading", { name: projectTitle, exact: true }),
     ).toBeVisible();
@@ -152,16 +156,23 @@ for (const theme of ["light", "dark"] as const) {
       .evaluateAll((facts) => {
         const scroll = facts[0].closest(".projectCandidateScroll")!;
         const bounds = scroll.getBoundingClientRect();
-        return facts.slice(0, 2).map((fact) => {
-          const value = fact.querySelector("dd")!.getBoundingClientRect();
-          return {
-            valueTop: value.top,
-            valueBottom: value.bottom,
-            visibleTop: bounds.top,
-            visibleBottom: bounds.bottom,
-          };
-        });
+        return facts
+          .filter((fact) =>
+            ["Cash purchase", "Loan option"].includes(
+              fact.querySelector("dt")!.textContent!,
+            ),
+          )
+          .map((fact) => {
+            const value = fact.querySelector("dd")!.getBoundingClientRect();
+            return {
+              valueTop: value.top,
+              valueBottom: value.bottom,
+              visibleTop: bounds.top,
+              visibleBottom: bounds.bottom,
+            };
+          });
       });
+    expect(initialCosts).toHaveLength(2);
     for (const cost of initialCosts) {
       expect(cost.valueTop).toBeGreaterThanOrEqual(cost.visibleTop);
       expect(cost.valueBottom).toBeLessThanOrEqual(cost.visibleBottom + 1);

@@ -391,16 +391,6 @@ export default function ProjectBuild({
               <>
                 <dl className="projectFacts">
                   <div>
-                    <dt>Connection</dt>
-                    <dd>
-                      {ready.owned ? "Connected" : price(ready.connectionCost)}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>Build cost</dt>
-                    <dd>{price(ready.facility.buildCost)}</dd>
-                  </div>
-                  <div>
                     <dt>Cash purchase</dt>
                     <dd>{price(payment.cash.required)} now</dd>
                   </div>
@@ -410,6 +400,16 @@ export default function ProjectBuild({
                       {price(payment.loan.required)} now +{" "}
                       {money(payment.loan.terms.monthlyPayment)}/mo
                     </dd>
+                  </div>
+                  <div>
+                    <dt>Connection</dt>
+                    <dd>
+                      {ready.owned ? "Connected" : price(ready.connectionCost)}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Build cost</dt>
+                    <dd>{price(ready.facility.buildCost)}</dd>
                   </div>
                   <div className="projectOutput">
                     <dt>Expected output</dt>

@@ -319,7 +319,7 @@ export default function DesktopBuildRail({
     const value = sliderTickToW(storage ? storageSize : generatorSize);
     const expanded = sizing?.category === category;
     const open = (button: HTMLButtonElement, pinned: boolean) => {
-      if (busy || (!pinned && sizing?.pinned)) return;
+      if (busy || suppressFocus.current || (!pinned && sizing?.pinned)) return;
       clearTimer();
       origin.current = button;
       setPreviewName(undefined);
@@ -335,6 +335,10 @@ export default function DesktopBuildRail({
         aria-controls={expanded ? sizingId : undefined}
         onMouseEnter={(event) => open(event.currentTarget, false)}
         onMouseLeave={leaveSizing}
+        onFocus={(event) => {
+          if (event.currentTarget.matches(":focus-visible"))
+            open(event.currentTarget, false);
+        }}
         onClick={(event) => {
           if (!expanded || !sizing?.pinned) open(event.currentTarget, true);
         }}

@@ -1,9 +1,8 @@
 import * as React from "react";
 import { Tooltip, useTheme } from "@mui/material";
 import ConceptIcon from "../base/ConceptIcon";
-import { terrainModifiers } from "../../helpers/TerrainModifiers";
 import RapidConnectionIcon from "../base/RapidConnectionIcon";
-import type { GameType } from "../../Types";
+import type { GameType, TerrainType } from "../../Types";
 import { isLandTerritoryId } from "../../data/Territories";
 import { TERRAIN_LABELS } from "../../data/TerrainLabels";
 import {
@@ -137,6 +136,7 @@ interface Props {
   projectPlanning?: boolean;
   projectPending?: boolean;
   projectSites?: ReadonlyMap<TerritoryMapTileKey, ReadyProjectSite>;
+  projectWindOutput?: Partial<Record<TerrainType, number>>;
 }
 function wireStructure({
   tile,
@@ -166,6 +166,7 @@ export default function TerritoryHexMap({
   projectPlanning = false,
   projectPending = false,
   projectSites,
+  projectWindOutput,
 }: Props) {
   const mapId = React.useId();
   const workspace = useGameWorkspaceLayout();
@@ -760,6 +761,9 @@ export default function TerritoryHexMap({
     clearHover();
     activation.current = undefined;
     suppressClick.current = true;
+    stage.current
+      ?.querySelector<HTMLButtonElement>(`[data-map-target="${key}"]`)
+      ?.focus({ preventScroll: true });
     onTileMenu?.({ key, left, top });
   };
   const navigate = (
@@ -1237,14 +1241,13 @@ export default function TerritoryHexMap({
             const priceLabel = quote
               ? `${money(quote.price)} · ${tilePurchaseBenefitLabel(quote)}`
               : "";
-            const windSpeed = projectSite
-              ? terrainModifiers(tile.terrain, projectSite.facility.fuel)
-                  .onshoreWindSpeed
-              : 1;
-            const windModifier =
-              windSpeed !== 1 ? formatTerrainPercent(windSpeed) : undefined;
+            const outputFactor = projectWindOutput?.[tile.terrain] ?? 1;
+            const outputModifier =
+              Math.abs(outputFactor - 1) >= 0.005
+                ? formatTerrainPercent(outputFactor)
+                : undefined;
             const projectLabel = projectSite
-              ? `Total project cost ${projectPrice} · ${projectSite.owned ? "Already connected" : "Connection included"}${windModifier ? ` · ${windModifier} wind speed` : ""}`
+              ? `Total project cost ${projectPrice} · ${projectSite.owned ? "Already connected" : "Connection included"}${outputModifier ? ` · ${outputModifier} estimated output vs flat terrain` : ""}`
               : undefined;
             const tileLabel = [
               cityLabel ?? TERRAIN_LABELS[tile.terrain],
@@ -1373,12 +1376,12 @@ export default function TerritoryHexMap({
                     data-tooltip={projectLabel}
                   >
                     <b>{projectPrice}</b>
-                    {windModifier && (
+                    {outputModifier && (
                       <span
                         className="territoryTileProduction"
-                        data-favorable={windSpeed > 1}
+                        data-favorable={outputFactor > 1}
                       >
-                        {windModifier}
+                        {outputModifier}
                         <ConceptIcon
                           concept="supply"
                           fontSize="small"

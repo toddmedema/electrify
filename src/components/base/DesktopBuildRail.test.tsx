@@ -242,6 +242,9 @@ it("returns keyboard focus to the trigger after explicit sizing and preview dism
   const size = screen.getByRole("button", { name: /Power:/ });
   await userEvent.tab();
   expect(size).toHaveFocus();
+  expect(
+    screen.getByRole("slider", { name: "Generator capacity" }),
+  ).toBeVisible();
   await userEvent.keyboard("{Enter}");
   expect(
     screen.getByRole("slider", { name: "Generator capacity" }),

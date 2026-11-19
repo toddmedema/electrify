@@ -2121,7 +2121,7 @@ test("normal valley play saves across the first year and resumes from IndexedDB"
 
 test("map tile hover and right-click expose the tile's own actions", async ({
   page,
-}) => {
+}, info) => {
   const network = await startMap(page, "light");
   const tile = TERRITORY_TILES.find(({ id }) => id === "green-uplands:site-1")!;
   const game = (await readSavedGame(page))!;
@@ -2134,7 +2134,6 @@ test("map tile hover and right-click expose the tile's own actions", async ({
   await expect(tooltip).toHaveText("Forest · Open site · Unconnected");
   await expect(target).not.toHaveAttribute("title", /.+/);
 
-  await target.focus();
   await target.click({ button: "right" });
   const menu = page.getByRole("menu", { name: "Tile actions" });
   const connect = menu.getByRole("menuitem", {

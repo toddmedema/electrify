@@ -32,6 +32,8 @@ import {
 } from "../../helpers/TerritoryMapState";
 import { TransmissionPanelProps } from "./TransmissionPanel";
 import { useToolState } from "../base/GameToolMemory";
+import { useBuildForecast } from "../base/BuildForecast";
+import { windOutputByTerrain } from "../../helpers/ExpectedOutput";
 import { terrainModifiers } from "../../helpers/TerrainModifiers";
 import { customerMarketSizeAt } from "../../helpers/Customers";
 import { cityCustomerCount } from "../../helpers/CityProfiles";
@@ -158,6 +160,14 @@ function TileNetwork(props: Props) {
   const [project, setProject] = useToolState<ProjectSelection | undefined>(
     "network.project",
     undefined,
+  );
+  const windSpeeds = useBuildForecast(
+    game,
+    planning && !catalogue && project?.fuel === "Wind",
+  )?.windSpeeds;
+  const projectWindOutput = React.useMemo(
+    () => windSpeeds && windOutputByTerrain(windSpeeds),
+    [windSpeeds],
   );
   const [candidate, setCandidate] = React.useState<TerritoryTileId>();
   const projectBusy = React.useRef(false);
@@ -360,12 +370,15 @@ function TileNetwork(props: Props) {
           projectPlanning={planning}
           projectPending={projectPending}
           projectSites={projectSites}
+          projectWindOutput={projectWindOutput}
           onDeselect={close}
           game={game}
           views={views}
           selected={selected}
           onSelect={inspect}
-          onTileMenu={setMenu}
+          onTileMenu={(target) => {
+            if (!projectBusy.current) setMenu(target);
+          }}
         />
       )}
       <TerritoryTileMenu
