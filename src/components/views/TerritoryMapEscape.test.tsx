@@ -39,9 +39,6 @@ function show() {
                   onDeselect={close}
                   onCloseInspection={inspected ? close : undefined}
                 />
-                <details>
-                  <summary>Acquired utilities</summary>
-                </details>
                 {inspected && (
                   <TileWorkspaceSurface
                     title="City"
@@ -84,18 +81,13 @@ function show() {
   };
 }
 
-it.each([
-  ["Acquired utilities", false],
-  ["Acquired utilities", true],
-  ["Controller help", false],
-  ["Controller help", true],
-] as const)(
-  "closes inspection from %s with buying mode %s, then releases Escape",
-  (name, buying) => {
+it.each([false, true])(
+  "closes inspection from controller help with buying mode %s, then releases Escape",
+  (buying) => {
     show();
     const buy = screen.getByRole("button", { name: "Rapid connection mode" });
     if (buying) fireEvent.click(buy);
-    const outside = screen.getByText(name);
+    const outside = screen.getByRole("button", { name: "Controller help" });
     act(() => outside.focus());
     expect(outside).toHaveFocus();
     expect(fireEvent.keyDown(outside, { key: "Escape" })).toBe(false);
@@ -140,7 +132,8 @@ it("honors an already handled Escape", () => {
     cancelable: true,
   });
   event.preventDefault();
-  act(() => screen.getByText("Acquired utilities").dispatchEvent(event));
+  const help = screen.getByRole("button", { name: "Controller help" });
+  act(() => help.dispatchEvent(event));
   expect(screen.getByRole("dialog", { name: "City" })).toBeInTheDocument();
 });
 

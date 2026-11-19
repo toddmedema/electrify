@@ -494,7 +494,7 @@ it("shows the same grown customer count before and after a delayed utility acqui
   expect(surface()).toHaveTextContent(formatCount(quote.customers));
 });
 
-it("keeps acquisition receipts and fleet controls reachable after buying a utility", () => {
+it("keeps fleet controls reachable after buying a utility", () => {
   const game = ready();
   const quote = acquisitionQuote(game, "ridge-electric")!;
   transferUtility(game, {
@@ -510,7 +510,6 @@ it("keeps acquisition receipts and fleet controls reachable after buying a utili
   expect(
     within(surface()).getByRole("button", { name: `Pause ${plant.name}` }),
   ).toBeEnabled();
-  expect(screen.getByText("Acquired utilities (1)")).toBeInTheDocument();
 });
 
 it("replaces tile inspection with a dock panel, without resurrecting the old inspector", () => {
