@@ -102,7 +102,7 @@ async function runCommand(command, args = [], options = {}) {
       claimTask(root, taskId(env));
       const scheduling = {
         slots: heavySlots,
-        root: options.coordinationRoot || coordinationRoot(),
+        root: path.resolve(options.coordinationRoot || coordinationRoot()),
         inherited: env.ELECTRIFY_DEVELOPMENT_LEASE,
         signal: abort.signal,
         command: [command, ...args].join(" "),

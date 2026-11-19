@@ -47,7 +47,7 @@ function fixture(t) {
     `
     process.on('message',message=>{if(message==='cancel')process.emit('SIGTERM')});
     require(${JSON.stringify(require.resolve("../dev/run"))}).runCommand(process.argv[2],process.argv.slice(3),
-      {root:process.cwd(),coordinationRoot:require('node:path').join(process.cwd(),'locks')})
+      {root:process.env.SELECTED_CHECKOUT || process.cwd(),coordinationRoot:process.env.SELECTED_COORDINATION || require('node:path').join(process.cwd(),'locks')})
       .then(code=>{process.exitCode=code;if(process.connected)process.disconnect()})
       .catch(error=>{console.error(error.message);process.exitCode=1;if(process.connected)process.disconnect()});
   `,
@@ -405,3 +405,69 @@ test("abrupt supervisor death keeps the slot reserved while its command is alive
   );
   assert.equal(readOwner(path.join(root, "locks/heavy")).token, owner.token);
 });
+
+test(
+  "cross-checkout previews use the selected adapter and the supervisor's relative coordination root",
+  { timeout: 20000 },
+  async (t) => {
+    const supervisor = fixture(t);
+    const selected = fixture(t);
+    selected.write(
+      "scripts/start.js",
+      `exports.start = (compile) => {
+    require('node:fs').writeFileSync('selected-preview.json', JSON.stringify({cwd:process.cwd(), args:process.argv.slice(2)}));
+    compile.release();
+  };`,
+    );
+    const leases = [];
+    t.after(() => leases.forEach((lease) => lease.release()));
+    for (let i = 0; i < 3; i++)
+      leases.push(
+        await acquireLease("heavy", {
+          root: path.join(supervisor.root, "locks"),
+          slots: 3,
+        }),
+      );
+    const child = spawn(
+      process.execPath,
+      ["runner.cjs", "start", "literal argument"],
+      {
+        cwd: supervisor.root,
+        env: {
+          ...supervisor.env,
+          SELECTED_CHECKOUT: selected.root,
+          SELECTED_COORDINATION: "locks",
+        },
+        stdio: ["ignore", "pipe", "pipe"],
+      },
+    );
+    t.after(() => {
+      if (child.exitCode === null && child.signalCode === null) child.kill();
+    });
+    let stderr = "";
+    const queued = new Promise((resolve) =>
+      child.stderr.on("data", (data) => {
+        stderr += data;
+        if (stderr.includes("Preview compilation queued")) resolve();
+      }),
+    );
+    const exited = once(child, "exit");
+    await Promise.race([
+      queued,
+      exited.then(([code]) => {
+        throw new Error(`Preview exited ${code} before queueing: ${stderr}`);
+      }),
+    ]);
+    assert(!fs.existsSync(path.join(selected.root, "selected-preview.json")));
+    leases[0].release();
+    const [code] = await exited;
+    assert.equal(code, 0, stderr);
+    assert.deepEqual(
+      JSON.parse(
+        fs.readFileSync(path.join(selected.root, "selected-preview.json")),
+      ),
+      { cwd: fs.realpathSync(selected.root), args: ["literal argument"] },
+    );
+    assert(!fs.existsSync(path.join(selected.root, "locks")));
+  },
+);

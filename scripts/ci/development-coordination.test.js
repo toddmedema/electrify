@@ -6,6 +6,7 @@ const path = require("node:path");
 const net = require("node:net");
 const { fork } = require("node:child_process");
 const { once } = require("node:events");
+const { setTimeout: delay } = require("node:timers/promises");
 const {
   queueStatus,
   acquireLease,
@@ -21,6 +22,12 @@ function fixture(t) {
   );
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   return root;
+}
+
+async function waitFor(predicate) {
+  const deadline = Date.now() + 5000;
+  while (!predicate() && Date.now() < deadline) await delay(10);
+  assert(predicate(), "Expected asynchronous state was not reached");
 }
 
 function message(child, type) {
@@ -250,6 +257,7 @@ test("queued work keeps arrival order across slow polling, cancellation and new 
   const newer = enqueue("newer", 5);
   const snapshot = () => queueStatus(root);
   try {
+    await waitFor(() => snapshot().waiting.length === 3);
     assert.deepEqual(
       snapshot().waiting.map((w) => [w.position, w.command]),
       [
@@ -378,6 +386,246 @@ test(
       assert.equal(queueStatus(root).holders.length, 2);
     } finally {
       for (const lease of leases) lease.release();
+      await new Promise((resolve) => watch.close(resolve));
+    }
+  },
+);
+
+test("a paused ticket publisher cannot be overtaken by another process", async (t) => {
+  const root = fixture(t);
+  const file = path.join(root, "publisher.cjs");
+  fs.writeFileSync(
+    file,
+    `
+    const fs = require('node:fs');
+    const path = require('node:path');
+    const rename = fs.renameSync;
+    fs.renameSync = (from, to) => {
+      if (process.argv[2] === 'first' && path.basename(to).startsWith('heavy-wait-')) {
+        process.send({type:'paused'});
+        const deadline = Date.now() + 10000;
+        while (!fs.existsSync(${JSON.stringify(path.join(root, "resume"))})) {
+          if (Date.now() > deadline) throw Error('Publisher was never resumed');
+          Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 10);
+        }
+      }
+      if (process.argv[2] === 'second' && path.basename(to) === 'heavy-admission')
+        process.send({type:'progress', state:'contending'});
+      return rename(from, to);
+    };
+    const {acquireLease} = require(${JSON.stringify(require.resolve("../dev/coordination"))});
+    process.once('message', async () => {
+      const lease = await acquireLease('heavy', {root:${JSON.stringify(root)}, pollMs:10});
+      process.send({type:'progress', state:'acquired'});
+      process.once('message', () => { lease.release(); process.disconnect(); });
+    });
+  `,
+  );
+  const children = ["first", "second"].map((name) =>
+    fork(file, [name], {
+      stdio: ["ignore", "ignore", "inherit", "ipc"],
+    }),
+  );
+  t.after(() => {
+    if (fs.existsSync(root))
+      fs.writeFileSync(path.join(root, "resume"), "resume");
+    for (const child of children)
+      if (child.exitCode === null && child.signalCode === null) child.kill();
+  });
+  const [first, second] = children;
+  const paused = message(first, "paused");
+  const firstReady = message(first, "progress");
+  first.send("start");
+  await paused;
+  const competing = message(second, "progress");
+  second.send("start");
+  assert.equal((await competing).state, "contending");
+  assert.deepEqual(queueStatus(root).holders, []);
+  const secondReady = new Promise((resolve) =>
+    second.on("message", (value) => {
+      if (value.state === "acquired") resolve(value);
+    }),
+  );
+  fs.writeFileSync(path.join(root, "resume"), "resume");
+  assert.equal((await firstReady).state, "acquired");
+  first.send("release");
+  await secondReady;
+  const exited = once(second, "exit");
+  second.send("release");
+  await exited;
+});
+
+test("queued rebuilds reject changed dependency metadata before compilation", async (t) => {
+  const root = fixture(t);
+  const { PreviewCompilation } = require("../dev/preview");
+  const checkout = path.join(root, "checkout");
+  fs.mkdirSync(path.join(checkout, "node_modules"), { recursive: true });
+  fs.writeFileSync(path.join(checkout, "package.json"), "{}");
+  fs.writeFileSync(
+    path.join(checkout, "package-lock.json"),
+    JSON.stringify({ lockfileVersion: 3, packages: { "": {} } }),
+  );
+  const installed = path.join(checkout, "node_modules/.package-lock.json");
+  fs.writeFileSync(
+    installed,
+    JSON.stringify({ lockfileVersion: 3, packages: {} }),
+  );
+  const plugin = new PreviewCompilation(root, undefined, checkout);
+  await plugin.acquire();
+  plugin.release();
+  const leases = [];
+  t.after(() => {
+    plugin.release();
+    for (const lease of leases) lease.release();
+  });
+  for (let i = 0; i < 3; i++)
+    leases.push(await acquireLease("heavy", { root, slots: 3 }));
+  // Use webpack's actual watchRun hook for the rebuild admission.
+  const compiler = require("webpack")({
+    mode: "development",
+    entry: __filename,
+  });
+  plugin.apply(compiler);
+  const rebuild = compiler.hooks.watchRun.promise(compiler);
+  const rejected = assert.rejects(rebuild, /Dependency preflight failed/);
+  await waitFor(() => queueStatus(root).waiting.length === 1);
+  fs.rmSync(installed);
+  leases[0].release();
+  await rejected;
+  assert.equal(queueStatus(root).holders.length, 2);
+});
+
+test(
+  "fatal webpack errors retain the lease until pending TypeScript settles",
+  { timeout: 20000 },
+  async (t) => {
+    const root = fixture(t);
+    const { PreviewCompilation } = require("../dev/preview");
+    const checker = require("react-dev-utils/ForkTsCheckerWebpackPlugin");
+    const plugin = new PreviewCompilation(root);
+    const input = path.join(root, "index.js");
+    fs.writeFileSync(input, "export default 1");
+    let finishTypecheck;
+    let builds = 0;
+    const compiler = require("webpack")({
+      mode: "development",
+      context: root,
+      entry: input,
+      output: { path: path.join(root, "dist") },
+      plugins: [
+        plugin,
+        {
+          apply(c) {
+            c.hooks.emit.tapPromise("fatal once", async () => {
+              if (++builds !== 1) return;
+              await checker.issuesPool.submit(async (done) => {
+                finishTypecheck = done;
+              });
+              throw new Error("fatal emit regression fixture");
+            });
+          },
+        },
+      ],
+    });
+    let failed;
+    const failure = new Promise((resolve) => {
+      failed = resolve;
+    });
+    let done;
+    const completion = new Promise((resolve) => {
+      done = resolve;
+    });
+    compiler.hooks.afterDone.tap("observe recovery", done);
+    const watch = compiler.watch({}, (error) => {
+      if (error) failed(error);
+    });
+    try {
+      assert.match((await failure).message, /fatal emit regression fixture/);
+      assert.equal(queueStatus(root).holders.length, 1);
+      watch.invalidate();
+      finishTypecheck();
+      await completion;
+      assert.equal(builds, 2);
+      assert.deepEqual(queueStatus(root).holders, []);
+    } finally {
+      finishTypecheck?.();
+      await new Promise((resolve) => watch.close(resolve));
+    }
+  },
+);
+
+test(
+  "explicit invalidation during done cannot let an older completion release a rebuild",
+  { timeout: 20000 },
+  async (t) => {
+    const root = fixture(t);
+    const { PreviewCompilation } = require("../dev/preview");
+    const checker = require("react-dev-utils/ForkTsCheckerWebpackPlugin");
+    const input = path.join(root, "index.js");
+    fs.writeFileSync(input, "export default 1");
+    let finishTypecheck, resumeRebuild;
+    let builds = 0;
+    let bundleEmitted, rebuildEntered;
+    const emitted = new Promise((resolve) => {
+      bundleEmitted = resolve;
+    });
+    const rebuilding = new Promise((resolve) => {
+      rebuildEntered = resolve;
+    });
+    const compiler = require("webpack")({
+      mode: "development",
+      context: root,
+      entry: input,
+      output: { path: path.join(root, "dist") },
+      plugins: [
+        new PreviewCompilation(root),
+        {
+          apply(c) {
+            c.hooks.make.tapPromise("hold rebuild", async () => {
+              builds++;
+              if (builds === 1)
+                await checker.issuesPool.submit(async (done) => {
+                  finishTypecheck = done;
+                });
+              else
+                await new Promise((resolve) => {
+                  resumeRebuild = resolve;
+                  rebuildEntered();
+                });
+            });
+            c.hooks.done.tap("observe first bundle", () => {
+              if (builds === 1) bundleEmitted();
+            });
+          },
+        },
+      ],
+    });
+    let firstDone, secondDone;
+    const firstCompletion = new Promise((resolve) => {
+      firstDone = resolve;
+    });
+    const secondCompletion = new Promise((resolve) => {
+      secondDone = resolve;
+    });
+    let completions = 0;
+    compiler.hooks.afterDone.tap("observe completion", () => {
+      if (++completions === 1) firstDone();
+      else secondDone();
+    });
+    const watch = compiler.watch({}, () => {});
+    try {
+      await emitted;
+      watch.invalidate();
+      finishTypecheck();
+      await rebuilding;
+      await firstCompletion;
+      assert.equal(queueStatus(root).holders.length, 1);
+      resumeRebuild();
+      await secondCompletion;
+      assert.deepEqual(queueStatus(root).holders, []);
+    } finally {
+      finishTypecheck?.();
+      resumeRebuild?.();
       await new Promise((resolve) => watch.close(resolve));
     }
   },

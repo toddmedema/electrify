@@ -8,9 +8,10 @@ const { taskId } = require("./task");
 const { setTimeout: delay } = require("node:timers/promises");
 
 class PreviewCompilation {
-  constructor(root, signal) {
+  constructor(root, signal, checkout = process.cwd()) {
     this.signal = signal;
     this.root = root;
+    this.checkout = checkout;
   }
 
   async acquire() {
@@ -28,6 +29,12 @@ class PreviewCompilation {
           `Preview compilation queued at position ${position} behind PID ${owner.pid}. Use npm run task -- queue for details.`,
         ),
     });
+    try {
+      if (this.lease.queued) checkDependencies(this.checkout);
+    } catch (error) {
+      this.release();
+      throw error;
+    }
     this.lease.setChild(
       process.pid,
       Number(process.env.ELECTRIFY_DEVELOPMENT_GROUP) || undefined,
@@ -41,28 +48,54 @@ class PreviewCompilation {
   }
 
   apply(compiler) {
+    const checker = require("react-dev-utils/ForkTsCheckerWebpackPlugin");
+    let finishing;
+    const completions = new WeakMap();
+    const beginCompletion = () => {
+      if (!finishing) {
+        let resolve;
+        const promise = new Promise((done) => {
+          resolve = done;
+        });
+        finishing = { promise, resolve, lease: this.lease };
+      }
+      return finishing;
+    };
+    const finish = (completion = beginCompletion()) => {
+      completion.draining ??= (async () => {
+        // Watch-mode fatal errors do not disconnect ForkTsChecker. Both normal
+        // and failed builds retain their slot until its workers have settled.
+        while (checker.issuesPool.pending || checker.dependenciesPool.pending)
+          await delay(50);
+        if (this.lease === completion.lease) this.release();
+        if (finishing === completion) finishing = undefined;
+        completion.resolve();
+      })();
+      return completion.draining;
+    };
     compiler.hooks.watchRun.tapPromise(
       { name: "ElectrifyPreview", stage: -Infinity },
-      () => this.acquire(),
-    );
-    // CRA's development type checker can keep compiling after webpack emits
-    // "Compiled successfully". Its pool belongs to this preview process. Let
-    // the normal done handlers publish HMR immediately, then finish this build
-    // before afterDone yields the slot or webpack starts another watch cycle.
-    const checker = require("react-dev-utils/ForkTsCheckerWebpackPlugin");
-    compiler.hooks.done.tapPromise(
-      { name: "ElectrifyPreview", stage: Infinity },
       async () => {
-        while (checker.issuesPool.pending)
-          await delay(50, undefined, { signal: this.signal });
+        // Webpack clears Watching.running before awaiting done. Explicit
+        // invalidation can enter watchRun while the previous cycle still drains.
+        if (finishing) await finishing.promise;
+        await this.acquire();
       },
     );
-    for (const hook of [
-      compiler.hooks.afterDone,
-      compiler.hooks.failed,
-      compiler.hooks.watchClose,
-    ])
-      hook.tap("ElectrifyPreview", () => this.release());
+    compiler.hooks.done.tap(
+      { name: "ElectrifyPreview", stage: -Infinity },
+      (stats) => completions.set(stats.compilation, beginCompletion()),
+    );
+    // Let CRA publish HMR before draining, then release this completion's lease.
+    // afterDone may run after another watch cycle has already started.
+    compiler.hooks.done.tapPromise(
+      { name: "ElectrifyPreview", stage: Infinity },
+      (stats) => finish(completions.get(stats.compilation)),
+    );
+    for (const hook of [compiler.hooks.failed, compiler.hooks.watchClose])
+      hook.tap("ElectrifyPreview", () => {
+        void finish();
+      });
   }
 }
 
@@ -74,7 +107,7 @@ async function startPreview({ coordinationRoot, entry, args, prepare }) {
   const compile = new PreviewCompilation(coordinationRoot, abort.signal);
   process.once("exit", () => compile.release());
   try {
-    if ((await compile.acquire()).queued) checkDependencies();
+    await compile.acquire();
     checkAssets(process.cwd());
     for (const generator of prepare) {
       const result = spawnSync(process.execPath, [generator], {
@@ -88,7 +121,7 @@ async function startPreview({ coordinationRoot, entry, args, prepare }) {
       }
     }
     process.argv = [process.execPath, entry, ...args];
-    require("../start").start(compile);
+    require(entry).start(compile);
   } catch (error) {
     compile.release();
     throw error;

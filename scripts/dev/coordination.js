@@ -188,63 +188,79 @@ async function acquireLease(name, options = {}) {
   };
   fs.mkdirSync(prepared);
   fs.writeFileSync(path.join(prepared, `${token}.json`), JSON.stringify(owner));
-  // Publish a complete ticket, ordered by the machine's monotonic clock.
-  // Renaming the ticket into a slot atomically dequeues the winner.
+  // A short shared lease serializes ticket ordering/publication with admission.
+  // A publisher paused after choosing its order cannot be overtaken.
   let ticket = prepared;
-  if (name === "heavy") {
-    const order = process.hrtime.bigint().toString().padStart(24, "0");
-    ticket = path.join(root, `heavy-wait-${order}-${token}`);
-    fs.renameSync(prepared, ticket);
-  }
   let announced = false;
+  let waitedForAdmission = false;
   try {
     for (;;) {
       options.signal?.throwIfAborted();
-      let recovered = false;
-      const waiting = name === "heavy" ? waitingOwners(root, true) : [];
-      const position =
-        waiting.findIndex((waiter) => waiter.token === token) + 1;
-      let occupied = position > 1 ? waiting[0] : null;
-      for (const directory of occupied ? [] : directories) {
-        try {
-          // The complete metadata becomes visible atomically with ownership.
-          fs.renameSync(ticket, directory);
-          return {
-            token,
-            inherited: false,
-            waitMs: Date.now() - started,
-            queued: announced,
-            setChild(pid, groupId) {
-              owner.childPid = pid;
-              if (groupId !== undefined) owner.groupId = groupId;
-              const file = path.join(directory, `${token}.json`);
-              const temporary = path.join(root, `${token}.update`);
-              fs.writeFileSync(temporary, JSON.stringify(owner));
-              fs.renameSync(temporary, file);
-            },
-            release() {
-              removeOwner(directory, token);
-            },
-          };
-        } catch (error) {
-          if (!["EEXIST", "ENOTEMPTY", "EPERM"].includes(error.code))
-            throw error;
+      const admission =
+        name === "heavy"
+          ? await acquireLease("heavy-admission", {
+              root,
+              signal: options.signal,
+              pollMs: 10,
+            })
+          : undefined;
+      waitedForAdmission ||= !!admission?.queued;
+      let occupied,
+        position,
+        recovered = false;
+      try {
+        if (name === "heavy" && ticket === prepared) {
+          const order = process.hrtime.bigint().toString().padStart(24, "0");
+          const published = path.join(root, `heavy-wait-${order}-${token}`);
+          fs.renameSync(prepared, published);
+          ticket = published;
         }
-        const current = readOwner(directory);
-        if (!current) {
-          recovered = true;
+        const waiting = name === "heavy" ? waitingOwners(root, true) : [];
+        position = waiting.findIndex((waiter) => waiter.token === token) + 1;
+        occupied = position > 1 ? waiting[0] : null;
+        for (const directory of occupied ? [] : directories) {
           try {
-            fs.rmdirSync(directory);
+            // The complete metadata becomes visible atomically with ownership.
+            fs.renameSync(ticket, directory);
+            return {
+              token,
+              inherited: false,
+              waitMs: Date.now() - started,
+              queued: announced || waitedForAdmission,
+              setChild(pid, groupId) {
+                owner.childPid = pid;
+                if (groupId !== undefined) owner.groupId = groupId;
+                const file = path.join(directory, `${token}.json`);
+                const temporary = path.join(root, `${token}.update`);
+                fs.writeFileSync(temporary, JSON.stringify(owner));
+                fs.renameSync(temporary, file);
+              },
+              release() {
+                removeOwner(directory, token);
+              },
+            };
           } catch (error) {
-            if (!["ENOENT", "ENOTEMPTY", "EEXIST"].includes(error.code))
+            if (!["EEXIST", "ENOTEMPTY", "EPERM"].includes(error.code))
               throw error;
           }
-        } else if (!ownerAlive(current)) {
-          removeOwner(directory, current.token);
-          recovered = true;
-        } else {
-          occupied = current;
+          const current = readOwner(directory);
+          if (!current) {
+            recovered = true;
+            try {
+              fs.rmdirSync(directory);
+            } catch (error) {
+              if (!["ENOENT", "ENOTEMPTY", "EEXIST"].includes(error.code))
+                throw error;
+            }
+          } else if (!ownerAlive(current)) {
+            removeOwner(directory, current.token);
+            recovered = true;
+          } else {
+            occupied = current;
+          }
         }
+      } finally {
+        admission?.release();
       }
       if (recovered) continue;
       if (occupied) {
