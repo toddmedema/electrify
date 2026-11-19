@@ -55,8 +55,10 @@ import {
   TowerArtwork,
 } from "../base/TerritoryTileArtwork";
 import {
+  TERRITORY_OWNER_PALETTE,
   territoryTileLabel,
   tilePurchaseBenefitLabel,
+  territoryOwnerColor,
   territoryPeerColors,
 } from "../base/TerritoryMapLayout";
 import "./TerritoryMapWorkspace.scss";
@@ -290,7 +292,10 @@ export default function TerritoryHexMap({
   const [cullCenter, setCullCenter] = React.useState(camera.getSnapshot);
   const cullAnchor = React.useRef(cullCenter);
   const [size, setSize] = React.useState({ width: 0, height: 0 });
-  const scale = size.width > 0 && size.width < 600 ? 0.75 : 0.875;
+  const [zoom, setZoom] = React.useState(1);
+  const wheelZoom = React.useRef(zoom);
+  const baseScale = size.width > 0 && size.width < 600 ? 0.75 : 0.875;
+  const scale = baseScale * zoom;
   const worldWidth = size.width / scale;
   const worldHeight = size.height / scale;
   const moveStage = React.useCallback(
@@ -379,6 +384,8 @@ export default function TerritoryHexMap({
     )
       return;
     framedRun.current = { runId, seed: game.seed, scenarioId: game.scenarioId };
+    wheelZoom.current = 1;
+    setZoom(1);
     const focus = hexCenter(
       byKey.get(activeSelected ?? activeRoving!)?.tile ?? { q: 0, r: 0 },
     );
@@ -401,8 +408,8 @@ export default function TerritoryHexMap({
           y: (bounds.minY + bounds.maxY) / 2,
         }
       : focus;
-    const rangeX = Math.max(0, worldWidth / 2 - HEX_WIDTH);
-    const rangeY = Math.max(0, worldHeight / 2 - HEX_WIDTH);
+    const rangeX = Math.max(0, size.width / (2 * baseScale) - HEX_WIDTH);
+    const rangeY = Math.max(0, size.height / (2 * baseScale) - HEX_WIDTH);
     // Start toward the useful land without clipping the capital or resumed selection.
     // Frame once per run: purchases, frontier reveals and resize keep the player's camera.
     setCamera({
@@ -416,8 +423,7 @@ export default function TerritoryHexMap({
     game.scenarioId,
     size.width,
     size.height,
-    worldWidth,
-    worldHeight,
+    baseScale,
     activeSelected,
     activeRoving,
     byKey,
@@ -446,20 +452,45 @@ export default function TerritoryHexMap({
           : event.deltaMode === 2
             ? element.clientHeight
             : 1;
+      clearHover();
+      const currentScale = baseScale * wheelZoom.current;
+      if (!event.shiftKey && event.deltaY) {
+        const nextZoom = Math.max(
+          0.5,
+          Math.min(
+            2,
+            wheelZoom.current * Math.exp((-event.deltaY * unit) / 600),
+          ),
+        );
+        if (nextZoom === wheelZoom.current) return;
+        wheelZoom.current = nextZoom;
+        const box = element.getBoundingClientRect();
+        const scaleChange = 1 / currentScale - 1 / (baseScale * nextZoom);
+        // Keep the ground under the pointer fixed while the camera scales.
+        setCamera((point) => ({
+          x:
+            point.x + (event.clientX - box.left - size.width / 2) * scaleChange,
+          y:
+            point.y + (event.clientY - box.top - size.height / 2) * scaleChange,
+        }));
+        setZoom(nextZoom);
+        return;
+      }
       setCamera((point) => ({
         x:
           point.x +
           ((event.shiftKey && !event.deltaX ? event.deltaY : event.deltaX) *
             unit) /
-            scale,
+            currentScale,
         y:
           point.y +
-          ((event.shiftKey && !event.deltaX ? 0 : event.deltaY) * unit) / scale,
+          ((event.shiftKey && !event.deltaX ? 0 : event.deltaY) * unit) /
+            currentScale,
       }));
     };
     element.addEventListener("wheel", wheel, { passive: false });
     return () => element.removeEventListener("wheel", wheel);
-  }, [scale, setCamera]);
+  }, [baseScale, clearHover, setCamera, size.width, size.height]);
   React.useLayoutEffect(() => {
     if (!focusAfterNavigation.current) return;
     const target = stage.current?.querySelector<HTMLButtonElement>(
@@ -489,24 +520,21 @@ export default function TerritoryHexMap({
       })),
     [renderedTiles, byKey],
   );
-  const peerColors = territoryPeerColors(
+  const peerIds = useStableArray(
     [
       ...(game.multiplayer?.peers?.map((peer) => peer.id) ?? []),
       ...views.flatMap((view) =>
         view.ownerKey?.startsWith("peer:") ? [view.ownerKey.slice(5)] : [],
       ),
     ].filter((id) => id !== game.multiplayer?.seat),
+    (a, b) => a === b,
   );
-  const color = (id: string) =>
-    id === "you"
-      ? "var(--territory-owner-you)"
-      : id === "valley-electric"
-        ? "var(--territory-owner-valley)"
-        : id === "ridge-electric"
-          ? "var(--territory-owner-ridge)"
-          : id.startsWith("municipal:")
-            ? "var(--territory-owner-municipal)"
-            : peerColors[id.slice(5)];
+  const peerColors = React.useMemo(
+    () => territoryPeerColors(peerIds),
+    [peerIds],
+  );
+  const color = (id: string) => territoryOwnerColor(id, peerColors);
+  const ownerPalette = TERRITORY_OWNER_PALETTE[dark ? "dark" : "light"];
   const tileHover = (view: TerritoryTileView) => {
     const { tile } = view;
     const unavailable = (reason: string) => ({
@@ -586,6 +614,10 @@ export default function TerritoryHexMap({
       ),
     };
   }, [tiles, topology]);
+  const selectedTile = React.useMemo(
+    () => tiles.find((tile) => territoryMapTileKey(tile) === activeSelected),
+    [tiles, activeSelected],
+  );
   const selectedBoundary = React.useMemo(
     () =>
       hexBoundary(
@@ -767,6 +799,7 @@ export default function TerritoryHexMap({
       data-buy-mode={buyMode}
       data-renderer={rendererState}
       aria-label="Terrain, structures and utility ownership"
+      style={ownerPalette as MapStyle}
     >
       <MapStatusLayers value={showStatusLayer} onChange={setShowStatusLayer} />
       <Tooltip
@@ -960,6 +993,10 @@ export default function TerritoryHexMap({
               <TerritoryScene3D
                 views={renderedViews}
                 tiles={tiles}
+                ownership={topology}
+                ownerPalette={ownerPalette}
+                peerColors={peerColors}
+                selectedTile={selectedTile}
                 wires={wires}
                 minute={game.date.minute}
                 minuteOfDay={game.date.minuteOfDay}
@@ -985,11 +1022,7 @@ export default function TerritoryHexMap({
             </React.Suspense>
           </MapSceneBoundary>
         )}
-        <WeatherAtmosphere
-          weather={weather}
-          moving={motion.allowed && game.speed !== "PAUSED"}
-          dark={dark}
-        />
+        <WeatherAtmosphere weather={weather} motion={motion} dark={dark} />
         <div className="territoryMapStage" ref={stage}>
           <svg
             className="territoryHexGrid"
@@ -1142,23 +1175,30 @@ export default function TerritoryHexMap({
                     </svg>
                   );
                 })}
-              {ownerBoundaries.map(({ owner, path }) => (
-                <g
-                  key={owner}
-                  data-owner={owner}
-                  style={
-                    { "--territory-owner-color": color(owner) } as MapStyle
-                  }
-                >
-                  <path className="territoryHexBorderBacking" d={path} />
-                  <path className="territoryHexBoundary" d={path} />
-                </g>
-              ))}
-              <path
-                className="territoryHexSelectionBacking"
-                d={selectedBoundary}
-              />
-              <path className="territoryHexSelection" d={selectedBoundary} />
+              {!threeDReady && (
+                <>
+                  {ownerBoundaries.map(({ owner, path }) => (
+                    <g
+                      key={owner}
+                      data-owner={owner}
+                      style={
+                        { "--territory-owner-color": color(owner) } as MapStyle
+                      }
+                    >
+                      <path className="territoryHexBorderBacking" d={path} />
+                      <path className="territoryHexBoundary" d={path} />
+                    </g>
+                  ))}
+                  <path
+                    className="territoryHexSelectionBacking"
+                    d={selectedBoundary}
+                  />
+                  <path
+                    className="territoryHexSelection"
+                    d={selectedBoundary}
+                  />
+                </>
+              )}
             </g>
           </svg>
           {renderedViews.map((view) => {

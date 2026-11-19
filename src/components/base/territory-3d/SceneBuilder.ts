@@ -447,7 +447,11 @@ export class SceneBuilder {
     let depth = -Infinity,
       tileKey: TerritoryMapTileKey | undefined;
     for (const instance of instances) {
-      if (instance.id.startsWith("wires:")) continue;
+      if (
+        !instance.id.startsWith("terrain:") &&
+        !instance.id.startsWith("structure:")
+      )
+        continue;
       const px = x - instance.position[0],
         py =
           y -

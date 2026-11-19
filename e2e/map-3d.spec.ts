@@ -47,6 +47,13 @@ for (const theme of ["light", "dark"] as const) {
     expect(before.drawCalls).toBeGreaterThan(5);
     expect(before.triangles).toBeGreaterThan(100);
     expect(before.instanceCount).toBeGreaterThan(10);
+    const border = await canvas.evaluate((element: MapCanvas) =>
+      element.map3DDiagnostics!(true).scene?.find(
+        ({ id }) => id === "border:ownership",
+      ),
+    );
+    expect(border?.triangles).toBeGreaterThan(0);
+    await expect(map.locator(".territoryHexBoundary")).toHaveCount(0);
     await expect(map.locator(".territoryTerrainArtwork")).toHaveCount(0);
     await expect(map.locator(".territoryOccupantArtwork")).toHaveCount(0);
     await expect(
@@ -80,6 +87,22 @@ for (const theme of ["light", "dark"] as const) {
         .poll(async () => (await readTerritoryMapCamera(viewport)).x)
         .not.toBe(cameraX);
       await expect(map.locator(".tileWorkspaceSurface")).toHaveCount(0);
+      if (theme === "light") {
+        // A low-frequency wheel moves the map from half to double its starting scale.
+        await page.mouse.move(x, y);
+        const baseline = await readTerritoryMapCamera(viewport);
+        await page.mouse.wheel(0, -2000);
+        await expect
+          .poll(async () => (await readTerritoryMapCamera(viewport)).scale)
+          .toBe(baseline.scale * 2);
+        await page.mouse.wheel(0, 2000);
+        await expect
+          .poll(async () => (await readTerritoryMapCamera(viewport)).scale)
+          .toBe(baseline.scale / 2);
+        const camera = await readTerritoryMapCamera(viewport);
+        expect(camera.x).toBeCloseTo(baseline.x, 3);
+        expect(camera.y).toBeCloseTo(baseline.y, 3);
+      }
     }
     const contextLoss = await canvas.evaluateHandle((element: MapCanvas) => {
       const gl = element.getContext("webgl2")!;
@@ -91,6 +114,7 @@ for (const theme of ["light", "dark"] as const) {
     });
     await expect(canvas).toHaveAttribute("data-renderer", "lost");
     await expect(map.locator(".territoryTerrainArtwork").first()).toBeVisible();
+    await expect(map.locator(".territoryHexBoundary").first()).toBeVisible();
     await map
       .getByRole("button", { name: "Rapid connection mode", exact: true })
       .click();

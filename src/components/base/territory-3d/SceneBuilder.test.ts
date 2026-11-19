@@ -12,6 +12,8 @@ import type { MapModel, Vec3 } from "./Types";
 import { projectPoint, tilePosition3D } from "./Projection";
 import { getTerrainModel } from "./TerrainModels";
 import { getStructureModel } from "./StructureModels";
+import { buildOwnershipBorder, buildSelectionBorder } from "./BorderGeometry";
+import { TERRITORY_OWNER_PALETTE } from "../TerritoryMapLayout";
 
 const model: MapModel = {
   key: "test-structure",
@@ -396,6 +398,30 @@ test("picking uses camera depth instead of tile iteration order", () => {
   expect(builder.pick(projectPoint([0, 0.8, 0], pickFrame), pickFrame)).toBe(
     front.tile.id,
   );
+});
+test("ownership edges and selection dashes cannot intercept ground picking", () => {
+  const land = { ...view(), developed: false };
+  const neighbor = { ...view(1), developed: false };
+  const builder = new SceneBuilder({
+    terrain: getTerrainModel,
+    structure: getStructureModel,
+  });
+  const tiles = [land.tile, neighbor.tile];
+  const scene = builder.build([land, neighbor], tiles, [], 0, "run");
+  const ownership = buildOwnershipBorder(
+    [land, neighbor],
+    TERRITORY_OWNER_PALETTE.light,
+    {},
+    false,
+  )!;
+  const selection = buildSelectionBorder(land.tile);
+  // The joined area has ten exposed edges with two quads for each painted stroke.
+  expect(ownership.model.parts[0].mesh.positions.length / 9).toBe(40);
+  // This point is inside a selection dash and also over the terrain below it.
+  const point = projectPoint([0.494, 0.012, -0.17], pickFrame);
+  expect(
+    builder.pick(point, pickFrame, undefined, [...scene, ownership, selection]),
+  ).toBe(land.tile.id);
 });
 test.each(["wind", "offshore-wind"] as const)(
   "picks the actual %s blade at signed retained phases and misses its mirrored pose",

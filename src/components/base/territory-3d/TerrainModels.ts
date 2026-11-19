@@ -3,7 +3,7 @@ import { getForestModel } from "./ForestModels";
 import { MeshBuilder } from "./MeshBuilder";
 import { buildMountainRelief, mountainProfile } from "./MountainModels";
 import { PALETTE } from "./Palette";
-import { GROUND_RADIUS } from "./Projection";
+import { GROUND_HEX_CORNERS as HEX, GROUND_RADIUS } from "./Projection";
 import type {
   MapMesh,
   MapModel,
@@ -17,14 +17,6 @@ import { WATERSHED_BANK_DEPTH } from "./WaterSurface";
 type GroundPoint = readonly [number, number];
 type RaisedPoint = readonly [number, number, number];
 
-const HEX: readonly GroundPoint[] = [
-  [0, -GROUND_RADIUS],
-  [0.5, -GROUND_RADIUS / 2],
-  [0.5, GROUND_RADIUS / 2],
-  [0, GROUND_RADIUS],
-  [-0.5, GROUND_RADIUS / 2],
-  [-0.5, -GROUND_RADIUS / 2],
-];
 const CLEAR_WIDTHS = [0.55, 0.65, 0.8, 1.2] as const;
 const DEPTH = 0.055;
 const WATER_FACET: RGB = [

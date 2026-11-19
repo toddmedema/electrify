@@ -3,6 +3,15 @@ import type { MapFrame, Vec3 } from "./Types";
 
 /** This camera exactly preserves the existing board's projected ground and hit targets. */
 export const GROUND_RADIUS = 1 / Math.sqrt(3);
+/** Clockwise corners, starting at the vertex before edge 0 of HEX_NEIGHBORS. */
+export const GROUND_HEX_CORNERS = [
+  [0, -GROUND_RADIUS],
+  [0.5, -GROUND_RADIUS / 2],
+  [0.5, GROUND_RADIUS / 2],
+  [0, GROUND_RADIUS],
+  [-0.5, GROUND_RADIUS / 2],
+  [-0.5, -GROUND_RADIUS / 2],
+] as const;
 export const CAMERA_SIN = ((HEX_HEIGHT / HEX_WIDTH) * Math.sqrt(3)) / 2;
 export const CAMERA_COS = Math.sqrt(1 - CAMERA_SIN * CAMERA_SIN);
 export const tilePosition3D = ({ q, r }: { q: number; r: number }): Vec3 => [
