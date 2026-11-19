@@ -1241,7 +1241,9 @@ function BuildGenerators(props: Props): React.JSX.Element {
         ).downpayment,
     ),
   );
-  const canReviewByName = new Map(
+  // Forecast readiness gates review buttons. Keep the affordable options in place
+  // when the background forecast arrives while the player is scrolling.
+  const affordableBuildByName = new Map(
     shownGenerators.map((generator, index) => {
       const territoryAvailability = territoryAvailabilityByName.get(
         generator.name,
@@ -1258,16 +1260,11 @@ function BuildGenerators(props: Props): React.JSX.Element {
         hydroAvailability:
           generator.name === "Hydro" ? hydroAvailability : undefined,
       });
-      const outputPending =
-        !forecast &&
-        (generator.fuel === "Hydro" ||
-          WEATHER_DEPENDENT_FUELS.includes(generator.fuel));
       return [
         generator.name,
         availability.buildable &&
           (territoryAvailability?.buildable ?? true) &&
-          affordability[index] === "1" &&
-          !outputPending,
+          affordability[index] === "1",
       ];
     }),
   );
@@ -1277,8 +1274,8 @@ function BuildGenerators(props: Props): React.JSX.Element {
       : generator[sort];
   const generators = shownGenerators.sort((a, b) => {
     return (
-      Number(canReviewByName.get(b.name)) -
-        Number(canReviewByName.get(a.name)) || sortValue(a) - sortValue(b)
+      Number(affordableBuildByName.get(b.name)) -
+        Number(affordableBuildByName.get(a.name)) || sortValue(a) - sortValue(b)
     );
   });
   const outputShapes = new Map(

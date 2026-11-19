@@ -406,6 +406,10 @@ test("Build and Programs restore selections and scrolling without reopening hidd
   await size.focus();
   await size.press("ArrowRight");
   const generatorSize = await size.inputValue();
+  // Measure tab restoration after forecast charts have finished laying out the list.
+  await expect(
+    build.getByText("Calculating output and energy costs…", { exact: true }),
+  ).toHaveCount(0);
   const list = build.locator(".cardList");
   const left = await list.evaluate((element) =>
     Math.min(240, element.scrollHeight - element.clientHeight),

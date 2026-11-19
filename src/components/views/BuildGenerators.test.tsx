@@ -362,6 +362,11 @@ it("shows build options and focuses evidence before background quotes arrive", (
         onEvidenceReady={ready}
       />,
     );
+    const generatorOrder = () =>
+      within(screen.getByRole("list", { name: "Generator options" }))
+        .getAllByRole("listitem")
+        .flatMap((row) => row.getAttribute("data-build-option") ?? []);
+    const pendingOrder = generatorOrder();
     const loading = screen.getByRole("status");
     expect(loading).toHaveTextContent("Calculating output and energy costs");
     expect(screen.getByRole("slider")).toBeInTheDocument();
@@ -389,6 +394,7 @@ it("shows build options and focuses evidence before background quotes arrive", (
       request,
       screen.getByLabelText("Generator build options"),
     );
+    expect(generatorOrder()).toEqual(pendingOrder);
     expect(loading).not.toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Review purchase of Solar" }),
