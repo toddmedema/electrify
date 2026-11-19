@@ -194,6 +194,14 @@ it("finances added capacity independently, settles its equity on cancellation an
   expect(job.loan).toEqual(financed.loan);
   expect(started.facilities[0].loanAmountLeft).toBe(plant.loanAmountLeft);
   expect(currentCash(started)).toBeCloseTo(0, 4);
+  expect(currentTick(started)!.expensesInterest).toBe(
+    currentTick(game)!.expensesInterest,
+  );
+  expect(currentTick(started)!.expensesExpansionInterest).toBeUndefined();
+  expect(
+    started.timeline.find(({ minute }) => minute > started.date.minute)
+      ?.expensesExpansionInterest,
+  ).toBeGreaterThan(0);
   expect(
     getTotalDebt(started.facilities) - getTotalDebt(game.facilities),
   ).toBeCloseTo(financed.loan.loanAmountTotal, 4);
@@ -201,20 +209,45 @@ it("finances added capacity independently, settles its equity on cancellation an
     JSON.parse(JSON.stringify(serializeSave(started))),
   );
   expect(restored?.game.facilities[0].expansionInProgress).toEqual(job);
-  const malformed = JSON.parse(JSON.stringify(serializeSave(started)));
-  malformed.game.facilities[0].expansionInProgress.loan.interestRate += 0.01;
-  expect(parseSave(malformed)).toBeNull();
+  for (const corrupt of [
+    { interestRate: game.interestRate + 0.01 },
+    { loanAmountLeft: 0 },
+    { loanMonthlyPayment: Infinity },
+    { startsMinute: game.date.minute + TICK_MINUTES },
+  ]) {
+    const malformed = JSON.parse(JSON.stringify(serializeSave(started)));
+    Object.assign(
+      malformed.game.facilities[0].expansionInProgress.loan,
+      corrupt,
+    );
+    expect(parseSave(malformed)).toBeNull();
+  }
 
   const advancing = cloneDeep(started);
   tickState(advancing);
   const active = advancing.facilities[0].expansionInProgress!;
   expect(active.loan!.loanAmountLeft).toBeLessThan(job.loan!.loanAmountLeft);
   expect(facilityExpansionRefund(active)).toBeGreaterThan(financed.amountDue);
+  expect(
+    parseSave(JSON.parse(JSON.stringify(serializeSave(advancing))))?.game
+      .facilities[0].expansionInProgress,
+  ).toEqual(active);
+  expect(currentTick(advancing)!.expensesExpansionInterest).toBeGreaterThan(0);
   const canceled = reducer(
     advancing,
     cancelFacilityExpansion({ facilityId: plant.id, quoteKey: job.quoteKey }),
   );
   expect(canceled.facilities[0].expansionInProgress).toBeUndefined();
+  expect(currentTick(canceled)!.expensesInterest).toBe(
+    currentTick(advancing)!.expensesInterest,
+  );
+  expect(currentTick(canceled)!.expensesExpansionInterest).toBe(
+    currentTick(advancing)!.expensesExpansionInterest,
+  );
+  expect(
+    canceled.timeline.find(({ minute }) => minute > canceled.date.minute)
+      ?.expensesExpansionInterest,
+  ).toBeUndefined();
   expect(getTotalDebt(canceled.facilities)).toBeCloseTo(
     getTotalDebt(advancing.facilities) - active.loan!.loanAmountLeft,
     4,
@@ -237,6 +270,11 @@ it("finances added capacity independently, settles its equity on cancellation an
   expect(completed?.game.facilities[0].expansionLoans).toEqual(
     completing.facilities[0].expansionLoans,
   );
+  const tamperedCompleted = JSON.parse(
+    JSON.stringify(serializeSave(completing)),
+  );
+  tamperedCompleted.game.facilities[0].expansionLoans[0].loanAmountLeft = 0;
+  expect(parseSave(tamperedCompleted)).toBeNull();
   const saleEquity = facilityCashBack(
     completing.facilities[0],
     completing.date.minute,

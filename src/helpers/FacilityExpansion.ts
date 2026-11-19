@@ -1,4 +1,4 @@
-import { LOAN_MONTHS } from "../Constants";
+import { LOAN_MONTHS, TICK_MINUTES } from "../Constants";
 import { FACILITY_FUELS } from "../data/FacilityFuels";
 import {
   generatorMaxPeakW,
@@ -22,6 +22,7 @@ import {
   facilityLoanMonths,
   facilityPermanentlyShutdown,
   getMonthlyPayment,
+  loanBalanceAfterTicks,
   purchaseTerms,
 } from "./Financials";
 import {
@@ -66,6 +67,7 @@ export function financeFacilityExpansionQuote(
       loanMonthlyPayment: terms.monthlyPayment,
       interestRate,
       months,
+      startsMinute: quote.startsMinute,
     },
     quoteKey: `${quote.quoteKey.slice(0, -1)},${JSON.stringify(interestRate)},${months}]`,
   };
@@ -393,7 +395,10 @@ export function validExpandedFacilityCapacity(
   );
 }
 
-function validFacilityExpansionLoan(loan: FacilityExpansionLoanType): boolean {
+function validFacilityExpansionLoan(
+  loan: FacilityExpansionLoanType,
+  nowMinute: number,
+): boolean {
   if (!loan || typeof loan !== "object" || Array.isArray(loan)) return false;
   const fields = [
     "loanAmountTotal",
@@ -401,24 +406,40 @@ function validFacilityExpansionLoan(loan: FacilityExpansionLoanType): boolean {
     "loanMonthlyPayment",
     "interestRate",
     "months",
+    "startsMinute",
   ];
-  return (
-    Object.keys(loan).length === fields.length &&
-    Object.keys(loan).every((key) => fields.includes(key)) &&
-    Number.isFinite(loan.loanAmountTotal) &&
-    loan.loanAmountTotal > 0 &&
-    loan.loanAmountTotal <= MAX_FACILITY_EXPANSION_COST &&
-    Number.isFinite(loan.loanAmountLeft) &&
-    loan.loanAmountLeft >= 0 &&
-    loan.loanAmountLeft <= loan.loanAmountTotal &&
-    Number.isFinite(loan.interestRate) &&
-    loan.interestRate >= 0 &&
-    loan.interestRate <= 1 &&
-    Number.isInteger(loan.months) &&
-    loan.months >= 1 &&
-    loan.months <= LOAN_MONTHS &&
-    loan.loanMonthlyPayment ===
+  if (
+    Object.keys(loan).length !== fields.length ||
+    Object.keys(loan).some((key) => !fields.includes(key)) ||
+    !Number.isFinite(loan.loanAmountTotal) ||
+    loan.loanAmountTotal <= 0 ||
+    loan.loanAmountTotal > MAX_FACILITY_EXPANSION_COST ||
+    !Number.isFinite(loan.loanAmountLeft) ||
+    loan.loanAmountLeft < 0 ||
+    loan.loanAmountLeft > loan.loanAmountTotal ||
+    !Number.isFinite(loan.interestRate) ||
+    loan.interestRate < 0 ||
+    loan.interestRate > 1 ||
+    !Number.isInteger(loan.months) ||
+    loan.months < 1 ||
+    loan.months > LOAN_MONTHS ||
+    !Number.isSafeInteger(loan.startsMinute) ||
+    loan.startsMinute < 0 ||
+    loan.startsMinute > nowMinute ||
+    loan.startsMinute % TICK_MINUTES !== 0 ||
+    !Number.isFinite(loan.loanMonthlyPayment) ||
+    loan.loanMonthlyPayment !==
       getMonthlyPayment(loan.loanAmountTotal, loan.interestRate, loan.months)
+  )
+    return false;
+  const reachable = loanBalanceAfterTicks(
+    loan.loanAmountTotal,
+    loan.loanMonthlyPayment,
+    loan.interestRate,
+    (nowMinute - loan.startsMinute) / TICK_MINUTES,
+  );
+  return (
+    Math.abs(loan.loanAmountLeft - reachable) <= loan.loanAmountTotal * 1e-7
   );
 }
 
@@ -440,7 +461,11 @@ export function validFacilityExpansion(
       !facility.expansionSequence ||
       facility.expansionLoans.length >
         facility.expansionSequence - Number(!!facility.expansionInProgress) ||
-      !facility.expansionLoans.every(validFacilityExpansionLoan) ||
+      !facility.expansionLoans.every(
+        (loan) =>
+          validFacilityExpansionLoan(loan, game.date.minute) &&
+          loan.startsMinute >= facility.minuteCreated,
+      ) ||
       facility.expansionLoans.reduce(
         (total, loan) => total + loan.loanAmountTotal,
         0,
@@ -564,7 +589,8 @@ export function validFacilityExpansion(
   if (raw.loan !== undefined) {
     if (
       reviewed.length !== 19 ||
-      !validFacilityExpansionLoan(raw.loan) ||
+      !validFacilityExpansionLoan(raw.loan, game.date.minute) ||
+      raw.loan.startsMinute !== raw.startsMinute ||
       reviewed[17] !== raw.loan.interestRate ||
       reviewed[18] !== raw.loan.months ||
       raw.loan.months !== facilityLoanMonths(facility.lifespanYears) ||

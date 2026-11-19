@@ -453,6 +453,8 @@ export type TickPresentFutureType = Partial<FuelPricesType> &
     agreementUsefulMWh?: Record<string, number>;
     agreementPayments?: Record<string, number>;
     agreementUsefulValues?: Record<string, number>;
+    /** Already settled on this frame and retained across no-elapsed forecasts. */
+    expensesExpansionInterest?: number;
     /** This frame's payment for committed energy that was not imported. */
     agreementUnusedExpenses?: number;
     /** Closing minimum payments keyed by the elapsed month they settle. */
@@ -1215,6 +1217,7 @@ export interface CancelFacilityExpansionAction {
 
 export interface FacilityExpansionLoanType extends LoanInfo {
   months: number;
+  startsMinute: number;
 }
 
 /** Size-dependent additions only: identity, age, efficiency and stored energy stay put. */

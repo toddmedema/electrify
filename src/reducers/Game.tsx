@@ -6787,6 +6787,11 @@ function* supplyFacilitiesFinancesPhases(
   expensesOM += oneTimeWorldEventCost(hazardOneTimeCosts, prev, now);
   let expensesFuel = 0;
   let expensesInterest = 0;
+  const settleExpansionLoans = !preRoll && advanceConstruction;
+  // A reforecast of the current frame retains the interest actually booked before any action.
+  let expansionInterest = !advanceConstruction
+    ? (now.expensesExpansionInterest ?? 0)
+    : 0;
   let principalRepayment = 0;
   // Hoisted out of the loop below, the way the demand pass at the top of this file already does
   // it: prices move by the month, and this is per facility per tick
@@ -6894,7 +6899,10 @@ function* supplyFacilitiesFinancesPhases(
         }
         facilityExpenses += paymentInterest / ticksPerMonth;
       }
-      if (g.expansionLoans || g.expansionInProgress?.loan) {
+      if (
+        settleExpansionLoans &&
+        (g.expansionLoans || g.expansionInProgress?.loan)
+      ) {
         const pendingLoan = g.expansionInProgress?.loan;
         const loans = pendingLoan
           ? [...(g.expansionLoans ?? []), pendingLoan]
@@ -6905,15 +6913,13 @@ function* supplyFacilitiesFinancesPhases(
             loan.loanAmountLeft,
             loan.interestRate,
           );
-          if (!preRoll && advanceConstruction) {
-            const principal = Math.min(
-              (loan.loanMonthlyPayment - interest) / ticksPerMonth,
-              loan.loanAmountLeft,
-            );
-            principalRepayment += principal;
-            loan.loanAmountLeft -= principal;
-          }
-          expensesInterest += interest / ticksPerMonth;
+          const principal = Math.min(
+            (loan.loanMonthlyPayment - interest) / ticksPerMonth,
+            loan.loanAmountLeft,
+          );
+          principalRepayment += principal;
+          loan.loanAmountLeft -= principal;
+          expansionInterest += interest / ticksPerMonth;
           facilityExpenses += interest / ticksPerMonth;
         }
         if (g.expansionLoans?.some((loan) => loan.loanAmountLeft === 0)) {
@@ -7040,6 +7046,12 @@ function* supplyFacilitiesFinancesPhases(
     expensesOM +=
       (annualNetworkOM * costIndexNow * difficulty.expensesOM) /
       (12 * ticksPerMonth);
+  }
+  if (expansionInterest > 0) {
+    expensesInterest += expansionInterest;
+    now.expensesExpansionInterest = expansionInterest;
+  } else if (now.expensesExpansionInterest !== undefined) {
+    delete now.expensesExpansionInterest;
   }
   const expensesCarbonFee = carbonFee * feeableKgco2e;
 
