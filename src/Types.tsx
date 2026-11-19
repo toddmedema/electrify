@@ -627,8 +627,10 @@ export interface FacilityMaintenanceObligationType {
 
 interface SharedOperatingType
   extends LoanInfo, LifetimeTotals, ConstructionEmissions {
-  /** Added capacity stays unavailable until this cash-funded project completes. */
+  /** Added capacity stays unavailable until this project completes. */
   expansionInProgress?: FacilityExpansionInProgressType;
+  /** Outstanding loans from completed capacity projects. */
+  expansionLoans?: FacilityExpansionLoanType[];
   /** Last started expansion identity, retained after cancellation and completion. */
   expansionSequence?: number;
   /** Capacity and construction booked by projects after an inherited facility was acquired. */
@@ -1202,6 +1204,7 @@ export interface ExpandFacilityAction {
   facilityId: number;
   targetSize: number;
   quoteKey: string;
+  financed?: boolean;
 }
 
 /** Cancel only the exact reviewed project, including across host command delays. */
@@ -1210,13 +1213,18 @@ export interface CancelFacilityExpansionAction {
   quoteKey: string;
 }
 
-/** Size-dependent additions only: identity, age, efficiency, debt and stored energy stay put. */
+export interface FacilityExpansionLoanType extends LoanInfo {
+  months: number;
+}
+
+/** Size-dependent additions only: identity, age, efficiency and stored energy stay put. */
 export interface FacilityExpansionInProgressType extends ConstructionEmissions {
   projectSequence: number;
   targetSize: number;
   targetPeakW: number;
   targetPeakWh?: number;
   cost: number;
+  loan?: FacilityExpansionLoanType;
   annualOperatingCostDelta: number;
   costPerStartDelta: number;
   startsMinute: number;

@@ -13,7 +13,7 @@ export type FacilityExpansionRequestResult =
   { status: "accepted" } | { status: "rejected"; message: string };
 
 export type FacilityExpansionCancellationResult =
-  | { status: "accepted"; refund: number }
+  | { status: "accepted"; refund?: number }
   | { status: "completed"; message: string }
   | { status: "rejected"; message: string };
 
@@ -28,6 +28,7 @@ export const requestFacilityExpansion =
       initial.game,
       payload.facilityId,
       payload.targetSize,
+      payload.financed,
     );
     if (quote.status !== "ready")
       return { status: "rejected", message: quote.reason };
@@ -36,7 +37,7 @@ export const requestFacilityExpansion =
         status: "rejected",
         message: "The quote changed. Review the updated project and try again.",
       };
-    if (currentCash(initial.game) < quote.cost)
+    if (currentCash(initial.game) < quote.amountDue)
       return {
         status: "rejected",
         message: "More cash is needed for this upgrade.",
@@ -145,7 +146,10 @@ export const requestCancelFacilityExpansion =
             "The upgrade already completed. The added capacity is available; no refund was issued.",
         };
       return size === (before.peakWh ?? before.peakW)
-        ? { status: "accepted", refund: expansion.cost }
+        ? {
+            status: "accepted",
+            refund: expansion.loan ? undefined : expansion.cost,
+          }
         : undefined;
     };
     try {

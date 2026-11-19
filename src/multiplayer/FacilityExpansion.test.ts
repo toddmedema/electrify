@@ -21,7 +21,7 @@ function command(world: World, sender: string, action: Command) {
   });
 }
 
-it("host prices and cancels only the sender's facilities and preserves a pending checkpoint", () => {
+it("host finances and cancels only the sender's expansion and restores its debt from checkpoints", () => {
   createGame({ scenarioId: 104 }); // Load the same simulation datasets as the real host.
   const world = createWorld(
     { scenarioId: 104, difficulty: "Employee" },
@@ -38,6 +38,7 @@ it("host prices and cancels only the sender's facilities and preserves a pending
     world.grids[0],
     original.id,
     original.peakW * 1.2,
+    true,
   );
   if (quote.status !== "ready") throw new Error(quote.reason);
   const action: Command = {
@@ -47,6 +48,7 @@ it("host prices and cancels only the sender's facilities and preserves a pending
       facilityId: original.id,
       targetSize: quote.targetSize,
       quoteKey: quote.quoteKey,
+      financed: true,
     },
   };
   expect(
@@ -57,6 +59,9 @@ it("host prices and cancels only the sender's facilities and preserves a pending
   ).toBeDefined();
   expect(command(world, "0", action)).toBeUndefined();
   expect(world.grids[0].facilities[0].peakW).toBe(original.peakW);
+  expect(world.grids[0].facilities[0].expansionInProgress?.loan).toEqual(
+    quote.loan,
+  );
   expect(world.grids[0].facilities[0].expansionInProgress!.quoteKey).toBe(
     quote.quoteKey,
   );

@@ -41,7 +41,7 @@ function ready(storage = false) {
   }
   return { game, facility: game.facilities[0] };
 }
-function show(storage = false) {
+function show(storage = false, openOnMount = false) {
   const setup = ready(storage);
   const onExpand = jest.fn(
     async (): Promise<FacilityExpansionRequestResult> => ({
@@ -62,6 +62,7 @@ function show(storage = false) {
       <FacilityCapacityUpgrade
         game={game}
         facility={game.facilities.find(({ id }) => id === setup.facility.id)!}
+        openOnMount={openOnMount}
         onExpand={onExpand}
         onCancelExpansion={onCancelExpansion}
       />
@@ -130,12 +131,12 @@ it.each([false, true])(
     const view = show(storage);
     const dialog = open();
     const size = view.facility.peakWh ?? view.facility.peakW;
-    const targetSize = size * 1.12345;
+    const targetSize = size + 5e6;
     fireEvent.change(
-      within(dialog).getByRole("spinbutton", {
+      within(dialog).getByRole("slider", {
         name: `New capacity (${storage ? "MWh" : "MW"})`,
       }),
-      { target: { value: String(targetSize / 1e6) } },
+      { target: { value: "5" } },
     );
     const quote = facilityExpansionQuote(
       view.game,
@@ -143,8 +144,11 @@ it.each([false, true])(
       targetSize,
     );
     expect(quote.status).toBe("ready");
-    expect(dialog).toHaveTextContent("Added capital cost");
-    expect(dialog).toHaveTextContent("Cash remaining");
+    expect(dialog).toHaveTextContent("Cash option");
+    expect(dialog).toHaveTextContent("Loan option");
+    expect(dialog).toHaveTextContent("Added maintenance");
+    expect(dialog).toHaveTextContent("Added capacity online in");
+    expect(dialog).not.toHaveTextContent("Cancel before completion");
     expect(dialog).toHaveTextContent("Current capacity keeps operating");
     fireEvent.click(within(dialog).getByRole("button", { name: /^Pay / }));
     expect(view.onExpand).toHaveBeenCalledWith({
@@ -161,45 +165,63 @@ it.each([false, true])(
   },
 );
 
-it("uses the authoritative maximum and rejects empty, shrinking and over-limit targets", () => {
-  const view = show();
-  const dialog = open();
-  const input = within(dialog).getByRole("spinbutton");
+it("opens directly from its facility action and sizes only between current capacity and the site maximum", () => {
+  const view = show(false, true);
+  const dialog = screen.getByRole("dialog");
+  const slider = within(dialog).getByRole("slider");
   const quote = facilityExpansionQuote(
     view.game,
     view.facility.id,
     view.facility.peakW + 1,
   );
-  expect(quote.status).toBe("ready");
-  fireEvent.click(within(dialog).getByRole("button", { name: "Use maximum" }));
-  expect(input).toHaveValue(quote.maxSize! / 1e6);
-  expect(within(dialog).getByRole("button", { name: /^Pay / })).toBeEnabled();
-  for (const value of [
-    "",
+  if (quote.status !== "ready") throw new Error(quote.reason);
+  const cash = within(dialog).getByRole("button", { name: "Pay cash" });
+  const loan = within(dialog).getByRole("button", { name: "Take loan" });
+  expect(slider).toHaveAttribute(
+    "aria-valuemin",
     String(view.facility.peakW / 1e6),
-    String(quote.maxSize! / 1e6 + 1),
-  ]) {
-    fireEvent.change(input, { target: { value } });
-    const confirm = within(dialog).getByRole("button", {
-      name: "Upgrade capacity",
-    });
-    expect(confirm).toBeDisabled();
-    fireEvent.click(confirm);
-  }
+  );
+  expect(slider).toHaveAttribute("aria-valuemax", String(quote.maxSize / 1e6));
+  fireEvent.change(slider, { target: { value: slider.getAttribute("max") } });
+  expect(slider).toHaveAttribute("aria-valuenow", String(quote.maxSize / 1e6));
+  expect(cash).toBeEnabled();
+  expect(loan).toBeEnabled();
+  fireEvent.change(slider, {
+    target: { value: "0" },
+  });
+  expect(cash).toBeDisabled();
+  expect(loan).toBeDisabled();
   expect(view.onExpand).not.toHaveBeenCalled();
 });
 
-it("rejects an unaffordable target after cash changes during review", () => {
+it("can take a loan when cash falls below the capital cost but covers the down payment", async () => {
   const view = show();
   const dialog = open();
-  const poorer = cloneDeep(view.game);
-  currentTick(poorer)!.cash = 0;
-  view.rerender(poorer);
-  expect(within(dialog).getByRole("button", { name: /^Pay / })).toBeDisabled();
-  expect(within(dialog).getByRole("alert")).toHaveTextContent(
-    "more cash needed",
+  const slider = within(dialog).getByRole("slider");
+  const quote = facilityExpansionQuote(
+    view.game,
+    view.facility.id,
+    Number(slider.getAttribute("aria-valuenow")) * 1e6,
+    true,
   );
-  expect(view.onExpand).not.toHaveBeenCalled();
+  if (quote.status !== "ready") throw new Error(quote.reason);
+  const poorer = cloneDeep(view.game);
+  currentTick(poorer)!.cash = quote.amountDue;
+  view.rerender(poorer);
+  expect(
+    within(dialog).getByRole("button", { name: "Pay cash" }),
+  ).toBeDisabled();
+  expect(dialog).toHaveTextContent("more cash needed");
+  fireEvent.click(within(dialog).getByRole("button", { name: "Take loan" }));
+  expect(view.onExpand).toHaveBeenCalledWith({
+    facilityId: view.facility.id,
+    targetSize: quote.targetSize,
+    quoteKey: quote.quoteKey,
+    financed: true,
+  });
+  await waitFor(() =>
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+  );
 });
 
 it("requires explicit review when the quote changes while open", () => {
@@ -229,7 +251,7 @@ it("locks dismissal and duplicate submission until the host responds, keeping re
   fireEvent.click(pay);
   fireEvent.click(pay);
   expect(view.onExpand).toHaveBeenCalledTimes(1);
-  expect(within(dialog).getByRole("spinbutton")).toBeDisabled();
+  expect(within(dialog).getByRole("slider")).toBeDisabled();
   expect(within(dialog).getByRole("button", { name: "Cancel" })).toBeDisabled();
   await userEvent.keyboard("{Escape}");
   expect(dialog).toBeInTheDocument();

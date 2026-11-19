@@ -17,9 +17,10 @@ import {
   acquireUtility,
 } from "../reducers/GameActions";
 import { currentCash, currentTick } from "./GameSelectors";
-import { facilityCashBack } from "./Financials";
+import { facilityCashBack, getTotalDebt } from "./Financials";
 import {
   facilityExpansionQuote,
+  facilityExpansionRefund,
   completeFacilityExpansion,
   validExpandFacilityAction,
 } from "./FacilityExpansion";
@@ -124,6 +125,7 @@ it("rejects malformed, shrinking, stale, foreign, over-limit, conflicting and un
     null,
     {},
     { ...action, cost: 0 },
+    { ...action, financed: "yes" },
     { ...action, targetSize: Infinity },
     { ...action, facilityId: -1 },
   ]) {
@@ -154,6 +156,94 @@ it("rejects malformed, shrinking, stale, foreign, over-limit, conflicting and un
   const poor = cloneDeep(game);
   currentTick(poor)!.cash = 0;
   expect(reducer(poor, expandFacility(action))).toEqual(poor);
+});
+
+it("finances added capacity independently, settles its equity on cancellation and retains debt on completion", () => {
+  const game = setup();
+  const plant = game.facilities[0];
+  const targetSize = plant.peakW * 1.2;
+  const cost = quote(game).cost;
+  const financed = facilityExpansionQuote(game, plant.id, targetSize, true);
+  if (financed.status !== "ready" || !financed.loan)
+    throw new Error("Expected loan terms");
+  const payload = {
+    facilityId: plant.id,
+    targetSize,
+    quoteKey: financed.quoteKey,
+    financed: true,
+  };
+  currentTick(game)!.cash = financed.amountDue;
+  expect(financed.amountDue).toBeLessThan(cost);
+  expect(validateGameCommand(game, "expandFacility", payload)).toHaveProperty(
+    "payload",
+  );
+  expect(
+    validateGameCommand(game, "expandFacility", {
+      ...payload,
+      financed: false,
+    }),
+  ).toHaveProperty("error");
+  expect(
+    reducer(
+      { ...game, interestRate: game.interestRate + 0.005 },
+      expandFacility(payload),
+    ).facilities[0].expansionInProgress,
+  ).toBeUndefined();
+  const started = reducer(game, expandFacility(payload));
+  const job = started.facilities[0].expansionInProgress!;
+  expect(job.loan).toEqual(financed.loan);
+  expect(started.facilities[0].loanAmountLeft).toBe(plant.loanAmountLeft);
+  expect(currentCash(started)).toBeCloseTo(0, 4);
+  expect(
+    getTotalDebt(started.facilities) - getTotalDebt(game.facilities),
+  ).toBeCloseTo(financed.loan.loanAmountTotal, 4);
+  const restored = parseSave(
+    JSON.parse(JSON.stringify(serializeSave(started))),
+  );
+  expect(restored?.game.facilities[0].expansionInProgress).toEqual(job);
+  const malformed = JSON.parse(JSON.stringify(serializeSave(started)));
+  malformed.game.facilities[0].expansionInProgress.loan.interestRate += 0.01;
+  expect(parseSave(malformed)).toBeNull();
+
+  const advancing = cloneDeep(started);
+  tickState(advancing);
+  const active = advancing.facilities[0].expansionInProgress!;
+  expect(active.loan!.loanAmountLeft).toBeLessThan(job.loan!.loanAmountLeft);
+  expect(facilityExpansionRefund(active)).toBeGreaterThan(financed.amountDue);
+  const canceled = reducer(
+    advancing,
+    cancelFacilityExpansion({ facilityId: plant.id, quoteKey: job.quoteKey }),
+  );
+  expect(canceled.facilities[0].expansionInProgress).toBeUndefined();
+  expect(getTotalDebt(canceled.facilities)).toBeCloseTo(
+    getTotalDebt(advancing.facilities) - active.loan!.loanAmountLeft,
+    4,
+  );
+  expect(currentCash(canceled)).toBeCloseTo(
+    currentCash(advancing) + facilityExpansionRefund(active),
+    3,
+  );
+
+  advancing.facilities[0].expansionInProgress!.yearsToBuildLeft =
+    YEARS_PER_TICK / 2;
+  tickState(advancing);
+  expect(advancing.facilities[0].peakW).toBe(targetSize);
+  expect(advancing.facilities[0].expansionInProgress).toBeUndefined();
+  expect(advancing.facilities[0].expansionLoans).toHaveLength(1);
+  const completed = parseSave(
+    JSON.parse(JSON.stringify(serializeSave(advancing))),
+  );
+  expect(completed?.game.facilities[0].expansionLoans).toEqual(
+    advancing.facilities[0].expansionLoans,
+  );
+  const saleEquity = facilityCashBack(
+    advancing.facilities[0],
+    advancing.date.minute,
+  );
+  expect(currentCash(reducer(advancing, sellFacility(plant.id)))).toBeCloseTo(
+    currentCash(advancing) + saleEquity,
+    3,
+  );
 });
 
 it("cancels and sells pending equity exactly once, without reversing emitted construction carbon", () => {

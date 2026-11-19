@@ -390,6 +390,8 @@ const migrations: readonly Migration[] = [
   },
   // Standing facilities can retain paid capacity work and reconcile it with acquisition terms.
   (save) => save,
+  // Capacity upgrades can carry a separate loan. Earlier upgrades were paid in cash.
+  (save) => save,
 ];
 
 /** Structure versions are independent of app releases and simulation compatibility. */

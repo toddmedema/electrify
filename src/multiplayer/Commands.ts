@@ -259,10 +259,11 @@ const GAME_COMMAND_VALIDATORS = {
       game,
       payload.facilityId,
       payload.targetSize,
+      payload.financed,
     );
     return quote.status === "ready" &&
       quote.quoteKey === payload.quoteKey &&
-      (currentTick(game)?.cash ?? -1) >= quote.cost
+      (currentTick(game)?.cash ?? -1) >= quote.amountDue
       ? { payload }
       : {
           error:

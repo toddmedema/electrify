@@ -25,6 +25,7 @@ import { gasConversionQuote } from "../../helpers/GasConversion";
 import { currentCash } from "../../helpers/GameSelectors";
 import {
   facilityCashBack,
+  getTotalDebt,
   facilityPermanentlyShutdown,
 } from "../../helpers/Financials";
 import { formatFacilitySize } from "../../helpers/Format";
@@ -199,10 +200,7 @@ export default function FacilityContextMenu(props: {
     (sum, facility) => sum + facilityCashBack(facility, game.date.minute),
     0,
   );
-  const loans = affected.reduce(
-    (sum, facility) => sum + facility.loanAmountLeft,
-    0,
-  );
+  const loans = getTotalDebt(affected);
   const execute = (action: FleetAction) => {
     for (const facility of action.facilities) {
       switch (action.key) {

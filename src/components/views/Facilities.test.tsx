@@ -2474,10 +2474,10 @@ it.each(["FLEET", "FACILITIES"] as const)(
       );
     await user.click(screen.getByRole("button", { name: "Upgrade capacity" }));
     const review = screen.getByRole("dialog", {
-      name: `Upgrade ${plant.name} capacity`,
+      name: `Upgrade ${plant.name} capacity?`,
     });
-    const input = within(review).getByRole("spinbutton");
-    const targetSize = Number((input as HTMLInputElement).value) * 1e6;
+    const input = within(review).getByRole("slider");
+    const targetSize = Number(input.getAttribute("aria-valuenow")) * 1e6;
     const quote = facilityExpansionQuote(game, plant.id, targetSize);
     if (quote.status !== "ready") throw new Error(quote.reason);
     await user.click(within(review).getByRole("button", { name: /^Pay / }));

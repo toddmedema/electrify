@@ -86,6 +86,10 @@ export interface PurchaseReviewDialogProps {
   onlineInLabel?: string;
   titleId?: string;
   loanButtonId?: string;
+  /** Controls inside a map/fleet inspector must not activate its parent. */
+  isolateClicks?: boolean;
+  /** Keep the payment preview hidden when there is no valid quote yet. */
+  hideFacts?: boolean;
   /** A visible cancel action in addition to the dialog close control. */
   cancelLabel?: string;
   onClose: () => void;
@@ -243,6 +247,7 @@ export default function PurchaseReviewDialog(
       titleId={props.titleId}
       title={props.title}
       closable
+      isolateClicks={props.isolateClicks}
       actionsClassName={`purchaseReviewControls${props.cancelLabel ? " purchaseReviewActions" : ""}`}
       contentClassName="noPadding purchaseReviewContent"
       actions={
@@ -293,7 +298,7 @@ export default function PurchaseReviewDialog(
         </Typography>
       )}
       {props.preface}
-      <DecisionImpactPreview facts={facts} />
+      {!props.hideFacts && <DecisionImpactPreview facts={facts} />}
       {props.afterFacts}
     </DecisionDialog>
   );

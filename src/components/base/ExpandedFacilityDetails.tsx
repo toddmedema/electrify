@@ -8,6 +8,7 @@ import {
 } from "../../Types";
 import {
   facilityCashBack,
+  getTotalDebt,
   facilityPermanentlyShutdown,
 } from "../../helpers/Financials";
 import { isUpgradingAt, upgradeInProgress } from "../../helpers/Hazards";
@@ -164,6 +165,7 @@ export default function ExpandedFacilityDetails({
 } & FacilityDetailActions) {
   const { formatMoneyConcise } = useMoney();
   const [open, setOpen] = React.useState(false);
+  const debt = getTotalDebt([facility]);
   const underConstruction = facility.yearsToBuildLeft > 0;
   const installing = upgradeInProgress(facility);
   const permanentlyShutdown = facilityPermanentlyShutdown(
@@ -216,8 +218,8 @@ export default function ExpandedFacilityDetails({
           <DialogContentText>
             You will receive{" "}
             {formatMoneyConcise(facilityCashBack(facility, game.date.minute))}
-            {facility.loanAmountLeft > 0
-              ? ` and the rest will go towards paying off the remaining loan balance of ${formatMoneyConcise(facility.loanAmountLeft)}`
+            {debt > 0
+              ? ` and the rest will go towards paying off the remaining loan balance of ${formatMoneyConcise(debt)}`
               : ""}
             .
           </DialogContentText>

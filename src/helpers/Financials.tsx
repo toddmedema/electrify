@@ -193,10 +193,22 @@ const PREMIUM_PER_POINT = 0.05;
 // end of the scale stays a number rather than running away.
 export const MAX_CREDIT_POINTS = 40;
 
-export function getTotalDebt(
-  assets: readonly Pick<FacilityOperatingType, "loanAmountLeft">[],
-): number {
-  return assets.reduce((debt: number, asset) => debt + asset.loanAmountLeft, 0);
+type BorrowedAsset = Pick<
+  FacilityOperatingType,
+  "loanAmountLeft" | "expansionInProgress" | "expansionLoans"
+>;
+
+function outstandingAssetDebt(asset: BorrowedAsset): number {
+  let debt = asset.loanAmountLeft;
+  if (asset.expansionInProgress?.loan) {
+    debt += asset.expansionInProgress.loan.loanAmountLeft;
+  }
+  for (const loan of asset.expansionLoans ?? []) debt += loan.loanAmountLeft;
+  return debt;
+}
+
+export function getTotalDebt(assets: readonly BorrowedAsset[]): number {
+  return assets.reduce((debt, asset) => debt + outstandingAssetDebt(asset), 0);
 }
 
 export interface CreditInputsType {
@@ -493,7 +505,7 @@ export function facilityCashBack(
     );
     return (
       g.buildCost * remainingLife * (g.cashBackMultiplier ?? 1) -
-      g.loanAmountLeft +
+      outstandingAssetDebt(g) +
       (g.expansionInProgress?.cost ?? 0)
     );
   }
