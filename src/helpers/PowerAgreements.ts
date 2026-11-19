@@ -1,3 +1,4 @@
+import { isUtilityExpansionGame } from "./ExpansionContext";
 import { GAME_TO_REAL_YEARS, TICK_MINUTES } from "../Constants";
 import type {
   AcceptPowerAgreementAction,
@@ -53,7 +54,7 @@ export function inheritedConnection(
   return {
     id: lineId,
     corridorId: INHERITED_CONNECTIONS[id],
-    name: `${id === "champlain" ? "Champlain" : id === "valley-electric" ? "Valley" : "Ridge"} regional connection`,
+    name: `${id === "champlain" ? "Champlain" : id === "valley-electric" ? "Valley" : "Ridge"} ↔ Regional grid`,
     capacityW: UTILITY_AREAS[id].sourceInterfaceW,
     buildCost: 0,
     annualOperatingCost: 0,
@@ -198,8 +199,9 @@ function quotePowerAgreement(
   selectedDurationYears?: number,
   signingTemperatureC = getTimeFromTimeline(game.date.minute, game.timeline)
     ?.temperatureC ?? 15,
+  validatingReceipt = false,
 ) {
-  if (game.scenarioId !== 116 || game.customScenario) return undefined;
+  if (!isUtilityExpansionGame(game)) return undefined;
   const block = POWER_AGREEMENT_BLOCKS.find((entry) => entry.id === blockId);
   if (!block || !utilityOwnedAt(game, block.utilityId, game.date.minute))
     return undefined;
@@ -218,18 +220,32 @@ function quotePowerAgreement(
       Math.abs(signingTemperatureC) > 100)
   )
     return undefined;
-  const line = game.transmission?.lines.find(
-    (entry) =>
-      entry.corridorId === INHERITED_CONNECTIONS[block.utilityId] &&
-      entry.yearsToBuildLeft === 0,
-  );
-  if (!line) return undefined;
+  if (
+    "sellerUtilityId" in block &&
+    utilityOwnedAt(game, block.sellerUtilityId, game.date.minute) &&
+    !(
+      validatingReceipt &&
+      game.utilityExpansion?.acquisitions.some(
+        (receipt) =>
+          receipt.targetId === block.sellerUtilityId &&
+          receipt.minute === game.date.minute,
+      )
+    )
+  )
+    return undefined;
   const receipts =
     game.transmission?.acceptedAgreements?.filter(
       (receipt) => receipt.blockId === blockId,
     ) ?? [];
   const last = receipts[receipts.length - 1];
   const boundary = last?.endMinute ?? agreementYearMinute(block.lossYear);
+  if ("sellerUtilityId" in block && last && game.date.minute < last.endMinute)
+    return undefined;
+  if (
+    "sellerUtilityId" in block &&
+    receipts.some((receipt) => receipt.startMinute > game.date.minute)
+  )
+    return undefined;
   if (game.date.minute < boundary - 24 * MINUTES_PER_MONTH) return undefined;
   const startMinute =
     game.date.minute <= boundary
@@ -245,7 +261,7 @@ function quotePowerAgreement(
     endMinute: startMinute + durationYears * 12 * MINUTES_PER_MONTH,
   };
   const signingMarketPricePerMWh = adjacentMarketPricePerMWh(
-    INHERITED_CONNECTIONS[block.utilityId],
+    agreementCorridorId(block.id, block.utilityId),
     intertieContextForGame(game),
     game.date.minute,
     { temperatureC: signingTemperatureC },
@@ -379,7 +395,18 @@ export function connectionAgreements(
               termsVersion: receipt.termsVersion,
               durationYears: receipt.durationYears ?? block.years,
               startMinute: receipt.startMinute,
-              endMinute: receipt.endMinute,
+              // Acquisition internalizes the contract. An unfinished monthly minimum is
+              // no longer an external bill, while previously settled payments stay recorded.
+              billingEndMinute: receipt.endMinute,
+              endMinute:
+                "sellerUtilityId" in block
+                  ? Math.min(
+                      receipt.endMinute,
+                      game.utilityExpansion?.acquisitions.find(
+                        (entry) => entry.targetId === block.sellerUtilityId,
+                      )?.minute ?? Infinity,
+                    )
+                  : receipt.endMinute,
             },
           ]
         : [];
@@ -387,6 +414,8 @@ export function connectionAgreements(
   );
   return [...records, ...replacements].map((source) => ({
     ...source,
+    billingEndMinute:
+      "billingEndMinute" in source ? source.billingEndMinute : source.endMinute,
     active: minute >= source.startMinute && minute < source.endMinute,
     durationDiscount:
       source.termsVersion === 3
@@ -402,7 +431,7 @@ export function connectionAgreements(
             game,
             source.pricePerMWh,
             source.durationYears,
-            INHERITED_CONNECTIONS[utilityId],
+            agreementCorridorId(source.id, utilityId),
             minute,
           )
         : agreementPrice(game, source.pricePerMWh, minute),
@@ -421,8 +450,7 @@ export function validPowerAgreements(game: GameType): boolean {
     (!Array.isArray(receipts) || receipts.length > MAX_RECEIPTS)
   )
     return false;
-  if (receipts?.length && (game.scenarioId !== 116 || game.customScenario))
-    return false;
+  if (receipts?.length && !isUtilityExpansionGame(game)) return false;
   for (const [index, receipt] of (receipts ?? []).entries()) {
     if (
       !receipt ||
@@ -454,6 +482,7 @@ export function validPowerAgreements(game: GameType): boolean {
       receipt.termsVersion,
       receipt.durationYears,
       receipt.signingTemperatureC,
+      true,
     );
     if (
       !quote ||
@@ -487,32 +516,6 @@ export function validPowerAgreements(game: GameType): boolean {
     );
   if (![1, 2, 3].includes(game.transmission?.inheritedAgreementTerms ?? 0))
     return false;
-  for (const utility of Object.keys(INHERITED_CONNECTIONS) as UtilityId[]) {
-    const line = game.transmission?.lines.find(
-      (entry) => entry.corridorId === INHERITED_CONNECTIONS[utility],
-    );
-    const owned = utilityOwnedAt(game, utility, game.date.minute);
-    if (!!line !== owned) return false;
-    if (
-      line &&
-      (line.capacityW !== UTILITY_AREAS[utility].sourceInterfaceW ||
-        line.buildCost !== 0 ||
-        line.annualOperatingCost !== 0 ||
-        line.yearsToBuildLeft !== 0 ||
-        line.upgrade ||
-        line.financed ||
-        line.loanAmountLeft !== 0 ||
-        line.loanMonthlyPayment !== 0 ||
-        line.interestRate !== 0 ||
-        line.minuteCreated !==
-          (utility === "champlain"
-            ? 0
-            : game.utilityExpansion!.acquisitions.find(
-                (receipt) => receipt.targetId === utility,
-              )!.minute))
-    )
-      return false;
-  }
   return true;
 }
 
@@ -600,7 +603,7 @@ export function recordAgreementSettlements(
         row.usefulValue! += settlement.usefulValue! * fraction;
         const topUp =
           boundary ===
-          Math.min((month + 1) * MINUTES_PER_MONTH, source.endMinute)
+          Math.min((month + 1) * MINUTES_PER_MONTH, source.billingEndMinute)
             ? agreementMonthTopUp(row)
             : 0;
         row.payment = row.usefulValue! + topUp;
@@ -711,7 +714,7 @@ function validAgreementAccounts(game: GameType): boolean {
         )
           return false;
         const closed =
-          end >= Math.min(minute + MINUTES_PER_MONTH, source.endMinute);
+          end >= Math.min(minute + MINUTES_PER_MONTH, source.billingEndMinute);
         const payment =
           row.usefulValue! + (closed ? agreementMonthTopUp(row) : 0);
         const tolerance = Math.max(1e-5, payment * 1e-10);
@@ -770,4 +773,19 @@ function validAgreementAccounts(game: GameType): boolean {
     }
   }
   return true;
+}
+
+/** Supplier provenance drives availability/pricing; it never creates a player-owned wire. */
+export function agreementCorridorId(
+  sourceId: string,
+  utilityId: UtilityId,
+): string {
+  const block = POWER_AGREEMENT_BLOCKS.find(
+    (entry) => sourceId === entry.id || sourceId.startsWith(`${entry.id}:`),
+  );
+  return block && "sellerUtilityId" in block
+    ? block.sellerUtilityId === "valley-electric"
+      ? "vt-champlain-valley"
+      : "vt-champlain-ridge"
+    : INHERITED_CONNECTIONS[utilityId];
 }

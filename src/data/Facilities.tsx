@@ -1,7 +1,18 @@
+import {
+  generatorMaxPeakW,
+  storageMaxPeakWh,
+  storagePowerW,
+} from "./FacilityCapacity";
+import { availableTerritorySpecialSites } from "./Territories";
+import { isUtilityExpansionGame } from "../helpers/ExpansionContext";
 import { customEventContext } from "../helpers/CustomScenarioEvents";
 import { FACILITY_FUELS } from "./FacilityFuels";
-import { gasHeatRate, gasSteamMaxPeakW } from "./GasPlantVintages";
-import { getHydroAvailability } from "./HydroSites";
+import { gasHeatRate } from "./GasPlantVintages";
+import {
+  getHydroAvailability,
+  getHydroSite,
+  validHydroCapacity,
+} from "./HydroSites";
 import {
   batteryYearsToBuild,
   naturalGasCCYearsToBuild,
@@ -16,7 +27,15 @@ import { DIFFICULTIES } from "../Constants";
 import { costBetween } from "../helpers/Math";
 import { facilityModifier, modScaledValue } from "../helpers/ScenarioMod";
 import { applyLegacyGeneratorEra, applyLegacyStorageEra } from "./LegacyEra";
-import { GameType, GeneratorShoppingType, StorageShoppingType } from "../Types";
+import {
+  GameType,
+  FacilityShoppingType,
+  GeneratorShoppingType,
+  StorageShoppingType,
+  TerritoryId,
+  TerritoryTileId,
+  isStorage,
+} from "../Types";
 import {
   getAirborneWindCapacityFactor,
   getOffshoreWindCapacityFactor,
@@ -32,9 +51,26 @@ import {
 import { resolveStoryAtDate, combineStoryEffects } from "./WorldEvents";
 import { scenarioRules } from "../helpers/ScenarioRules";
 import { getScenario } from "./Scenarios";
-import { applyDefaultResilience } from "../helpers/Hazards";
+import {
+  applyDefaultResilience,
+  withResilienceOptions,
+} from "../helpers/Hazards";
+import {
+  requestedFacilitySize,
+  validResilienceRecord,
+} from "../helpers/BuildValidation";
 import { pow } from "../helpers/Pow";
 import { exp, log10 } from "../helpers/Libm";
+import {
+  availableTerritoryTiles,
+  hasTerritoryNetwork,
+} from "../helpers/TerritoryTiles";
+import {
+  getTerrainModifiers,
+  isOceanWindTile,
+} from "../helpers/TerrainModifiers";
+
+export { airborneWindMaxPeakW } from "./FacilityCapacity";
 
 /**
  * What a dollar in the tables below is worth by the time the game reaches this month. The tables
@@ -283,10 +319,6 @@ export function airborneWindCostPerW(year: number): number {
   return costBetween(year, 2028, 7, 2035, 4.1);
 }
 
-export function airborneWindMaxPeakW(year: number): number {
-  return Math.min(500000000, 1200000 * pow(2, (year - 2028) / 2));
-}
-
 export function GENERATORS(
   state: GameType,
   peakW: number,
@@ -294,6 +326,9 @@ export function GENERATORS(
   irradiancesWM2: number[],
   offshoreWindSpeedsKph: number[] = [],
   airborneWindSpeedsKph: number[] = [],
+  territoryId?: TerritoryId,
+  tileId?: TerritoryTileId,
+  pinnedHydroSiteId?: string,
 ) {
   const magnitude = log10(peakW) - 6; // 0 = 1MW, 4 = 10GW (+1 for each 10x)
   const year = state.date.year;
@@ -345,17 +380,35 @@ export function GENERATORS(
     return fee;
   };
 
-  const hydroAvailability = getHydroAvailability(state, peakW);
+  let hydroAvailability = getHydroAvailability(
+    state,
+    peakW,
+    territoryId,
+    tileId,
+  );
+  // Only standing-capacity expansion passes its already-owned site. Fresh builds retain the
+  // inventory rules above; this does not release or change any real site reservation.
+  if (pinnedHydroSiteId) {
+    const site = getHydroSite(pinnedHydroSiteId);
+    if (site && validHydroCapacity(peakW))
+      hydroAvailability = {
+        status: peakW <= site.maxPeakW ? "available" : "too-large",
+        remaining: [site],
+        eligible: peakW <= site.maxPeakW ? [site] : [],
+        selected: peakW <= site.maxPeakW ? site : undefined,
+        largest: site,
+      };
+  }
   const hydroLocationsRemaining = hydroAvailability.remaining.length;
-  const geothermalLocations = getViableLocationCount(
-    state.location,
-    "Geothermal",
-  );
-  const geothermalLocationsRemaining = getViableLocationsRemaining(
-    state.location,
-    state.facilities,
-    "Geothermal",
-  );
+  const frontierGeothermal =
+    state.utilityExpansion && isUtilityExpansionGame(state)
+      ? availableTerritorySpecialSites(state, "geothermal", territoryId).length
+      : undefined;
+  const geothermalLocations =
+    frontierGeothermal ?? getViableLocationCount(state.location, "Geothermal");
+  const geothermalLocationsRemaining =
+    frontierGeothermal ??
+    getViableLocationsRemaining(state.location, state.facilities, "Geothermal");
   const enhancedGeothermalCostPerW = Math.max(
     3,
     5.5 * pow(3 / 5.5, (year - 2028) / 7),
@@ -372,7 +425,7 @@ export function GENERATORS(
   );
   const solarCapacityFactor = getSolarCapacityFactor(irradiancesWM2);
 
-  const steamMaxPeakW = gasSteamMaxPeakW(year);
+  const steamMaxPeakW = generatorMaxPeakW(state, "Natural Gas Steam");
   // Project scale follows historical unit sizes, so early small utilities can buy gas steam.
   const steamReferenceW =
     year < 1942 ? 25000000 : year < 1960 ? 100000000 : 300000000;
@@ -395,7 +448,7 @@ export function GENERATORS(
       // The inflation-normalized AEO2020 equivalent was $4,381/kW, a 6% real decline.
       // https://www.eia.gov/analysis/studies/powerplants/capitalcost/
       peakW,
-      maxPeakW: 6000000000,
+      maxPeakW: generatorMaxPeakW(state, "Coal"),
       // ~6GW, start in the late 90's - https://www.power-technology.com/features/feature-giga-projects-the-worlds-biggest-thermal-power-plants/
       btuPerWh: 8.638,
       // AEO2025 net nominal heat rate, Btu/kWh expressed as Btu/Wh.
@@ -435,7 +488,7 @@ export function GENERATORS(
       // EIA AEO2025 reference: two brownfield AP1000s, $7,861/kW in 2023$,
       // 9% above the inflation-normalized AEO2020 estimate.
       peakW,
-      maxPeakW: 8000000000,
+      maxPeakW: generatorMaxPeakW(state, "Nuclear"),
       // ~8GW, built in the 80's - https://en.wikipedia.org/wiki/List_of_largest_power_stations#Nuclear
       btuPerWh: 10.608,
       spinMinutes: 600,
@@ -470,7 +523,7 @@ export function GENERATORS(
       peakW,
       // About five of EIA's reference turbines at one site. The larger gas stations are combined
       // cycles, which are their own facility below.
-      maxPeakW: 2000000000,
+      maxPeakW: generatorMaxPeakW(state, "Natural Gas Peaker"),
       btuPerWh: gasHeatRate(year, "simple"),
       spinMinutes: 10,
       annualOperatingCost: fixedOperatingCost(peakW, 6.87),
@@ -545,7 +598,7 @@ export function GENERATORS(
       // advantage is that it stays cheap when built small.
       peakW,
       // ~6GW, the largest gas stations of the late 1980s onward - https://www.power-technology.com/features/feature-giga-projects-the-worlds-biggest-thermal-power-plants/
-      maxPeakW: 6000000000,
+      maxPeakW: generatorMaxPeakW(state, "Natural Gas CC"),
       // AEO2025 Case 5 net HHV heat rate, 6,266 Btu/kWh: 31% less fuel per MWh than the peaker.
       btuPerWh: 6.266,
       // A hot start of an H-class combined cycle reaches full load in well under an hour, a
@@ -583,7 +636,7 @@ export function GENERATORS(
       // utility-scale petroleum reference plant.
       // https://www.eia.gov/electricity/generatorcosts/
       peakW,
-      maxPeakW: 6000000000,
+      maxPeakW: generatorMaxPeakW(state, "Oil"),
       // ~6GW, build in 2007 - https://www.power-technology.com/features/feature-giga-projects-the-worlds-biggest-thermal-power-plants/
       btuPerWh: 11,
       // https://www.eia.gov/electricity/annual/html/epa_08_01.html
@@ -620,7 +673,7 @@ export function GENERATORS(
       // DOE's project-screening guidance describes 10-50 MW as the economic range; larger
       // fleets can still be assembled as several plants with separate feedstock logistics.
       // https://www.energy.gov/indianenergy/transcript-may-2019-tribal-energy-webinar-series-initial-scoping-energy-projects-back
-      maxPeakW: 50000000,
+      maxPeakW: generatorMaxPeakW(state, "Biomass"),
       btuPerWh: 13.3,
       spinMinutes: 240,
       // EIA gives $154.26/kW-year fixed plus $5.93/MWh variable O&M in 2025 dollars, which are
@@ -654,7 +707,7 @@ export function GENERATORS(
       // $1,041/kW in 2024. Its outlook reaches $861/kW in 2029.
       // https://www.irena.org/Publications/2025/Jun/Renewable-Power-Generation-Costs-in-2024
       peakW,
-      maxPeakW: 1500000000,
+      maxPeakW: generatorMaxPeakW(state, "Wind"),
       // ~1.5GW, except one outlier - https://en.wikipedia.org/wiki/List_of_largest_power_stations
       btuPerWh: 0,
       annualOperatingCost: fixedOperatingCost(peakW, 33.06),
@@ -690,7 +743,7 @@ export function GENERATORS(
       // their real per-watt cost; the era multiple carries the variable part.
       // https://www.eia.gov/analysis/studies/powerplants/capitalcost/pdf/capital_cost_AEO2025.pdf
       peakW,
-      maxPeakW: Math.min(1500000000, 5000000 * pow(2, (year - 1991) / 3.5)),
+      maxPeakW: generatorMaxPeakW(state, "Offshore Wind"),
       // Largest projects roughly doubled every 3.5 years from Vindeby through Hornsea, then
       // levelled near 1.5GW; Dogger Bank's 3.6GW is three separately phased farms.
       // https://en.wikipedia.org/wiki/List_of_offshore_wind_farms
@@ -718,7 +771,7 @@ export function GENERATORS(
       // The 1.2MW NAWEP array is the source anchor. Doubling every two years and the 500MW
       // ceiling are deliberately conservative gameplay assumptions until fleet data exists.
       peakW,
-      maxPeakW: airborneWindMaxPeakW(year),
+      maxPeakW: generatorMaxPeakW(state, "Airborne Wind"),
       btuPerWh: 0,
       // NAWEP's series-production model uses EUR45.5/kW-year, converted at $1.13/EUR.
       annualOperatingCost: 0.0514 * peakW,
@@ -743,7 +796,7 @@ export function GENERATORS(
       // IRENA global installed cost fell from inflation-normalized $1,070/kW in 2020 to
       // $691/kW in 2024. Its outlook reaches $388/kW in 2029.
       peakW,
-      maxPeakW: year < 2000 ? 100000000 : 2000000000,
+      maxPeakW: generatorMaxPeakW(state, "Solar"),
       // 2000: 100MW - https://www1.eere.energy.gov/solar/pdfs/solar_timeline.pdf
       // 2019: ~2GW - https://en.wikipedia.org/wiki/List_of_largest_power_stations
       btuPerWh: 0,
@@ -777,7 +830,11 @@ export function GENERATORS(
       // 2024 at $2,267/kW. Site scarcity is now an explicit cap rather than a second price.
       peakW,
       viableLocationsRemaining: hydroLocationsRemaining,
-      maxPeakW: hydroAvailability.largest?.maxPeakW || 0,
+      maxPeakW: generatorMaxPeakW(
+        state,
+        "Hydro",
+        hydroAvailability.largest?.maxPeakW ?? 0,
+      ),
       btuPerWh: 0,
       spinMinutes: 1,
       annualOperatingCost: fixedOperatingCost(peakW, 33.54),
@@ -803,7 +860,7 @@ export function GENERATORS(
       // $4,015/kW in 2024, although its small project sample makes this series volatile.
       peakW,
       viableLocationsRemaining: geothermalLocationsRemaining,
-      maxPeakW: 800000000,
+      maxPeakW: generatorMaxPeakW(state, "Geothermal"),
       // ~800MW, except for one outlier - https://en.wikipedia.org/wiki/List_of_largest_power_stations#Geothermal
       btuPerWh: 0,
       annualOperatingCost: fixedOperatingCost(peakW, 150.6),
@@ -833,7 +890,7 @@ export function GENERATORS(
       // and binary plants in every scenario, because stimulation and deeper wells add cost. The
       // $3/W figure is an aspiration, and EGS has no site limit to ration it.
       peakW,
-      maxPeakW: 500000000,
+      maxPeakW: generatorMaxPeakW(state, "Enhanced Geothermal"),
       btuPerWh: 0,
       annualOperatingCost: 0.16 * peakW,
       minimumStableOutput:
@@ -852,6 +909,23 @@ export function GENERATORS(
   const difficulty = DIFFICULTIES[state.difficulty];
   const inflation = getCostInflation(state);
   generators = generators.filter((g: GeneratorShoppingType) => {
+    const selectedTileId =
+      tileId ??
+      (hasTerritoryNetwork(state) && state.utilityExpansion
+        ? availableTerritoryTiles(state, g, territoryId ?? "champlain")[0]?.id
+        : undefined);
+    const terrain = getTerrainModifiers(state, g.fuel, selectedTileId);
+    if (g.fuel === "Wind" && terrain.onshoreWindSpeed !== 1) {
+      g.capacityFactor = getWindCapacityFactor(
+        windSpeedsKph.map((windKph) => windKph * terrain.onshoreWindSpeed),
+      );
+    }
+    if (g.fuel === "Offshore Wind" && isOceanWindTile(state, selectedTileId)) {
+      g.available = year > 1991;
+      g.capacityFactor = getOffshoreWindCapacityFactor(
+        offshoreWindSpeedsKph.length ? offshoreWindSpeedsKph : windSpeedsKph,
+      );
+    }
     applyLegacyGeneratorEra(state, g);
     const mod = facilityModifier(state, g.name);
     g.buildCost = modScaledValue(
@@ -870,6 +944,7 @@ export function GENERATORS(
       `facilities.${g.name}.yearsToBuild`,
     );
     g.buildCost *= difficulty.buildCost * inflation;
+    g.buildCost *= terrain.buildCost;
     g.buildCost *=
       currentStoryEffects.buildCostMultipliersByFuel?.[g.fuel] || 1;
     g.annualOperatingCost *= difficulty.expensesOM * inflation;
@@ -905,9 +980,13 @@ export function GENERATORS(
             : DEFAULT_LCOE_DISCOUNT_RATE,
         )
       : Infinity;
-    // Keep site-limited generators visible so the build catalog can explain missing sites.
+    // Keep site-limited generators visible so the catalogue can explain missing sites, and
+    // researched offshore technology in map games so an inland tile can explain its siting.
     return (
       g.available ||
+      (hasTerritoryNetwork(state) &&
+        g.fuel === "Offshore Wind" &&
+        year > 1991) ||
       (g.name === "Hydro" && year > 1882) ||
       g.name === "Geothermal"
     );
@@ -924,7 +1003,12 @@ export function windAnnualOutputDegradation(commissioningYear: number): number {
 // Conservative commercial rollout after the announced 2029 Irish project; see economics docs.
 export const IRON_AIR_AVAILABLE_YEAR = 2030;
 
-export function STORAGE(state: GameType, peakWh: number) {
+export function STORAGE(
+  state: GameType,
+  peakWh: number,
+  tileId?: TerritoryTileId,
+  territoryId?: TerritoryId,
+) {
   // 0 = 1MW, 4 = 10GW (+1 for each 10x)
   const magnitude = log10(peakWh) - 6;
   const year = state.date.year;
@@ -947,12 +1031,11 @@ export function STORAGE(state: GameType, peakWh: number) {
       buildCost: 10000 + batteryCostPerWh(year) * peakWh,
       // NREL's 2020 four-hour benchmark was $345/kWh (2020$); IRENA's global fully installed
       // cost reached $192/kWh in 2024, a 54% real decline after CPI normalization.
-      peakW: 0.25 * peakWh,
+      peakW: storagePowerW("Battery", peakWh),
       // Four-hour duration is now the representative utility-scale configuration in both NREL
       // ATB and EIA AEO2025, replacing the old Powerpack-derived 1.25-hour assumption.
       peakWh,
-      maxPeakWh:
-        (year < 2021 ? 200000000 : 600000000) * pow(2, (year - 2018) / 4),
+      maxPeakWh: storageMaxPeakWh("Battery", year),
       // Tesla 129MWh is largest in world in 2018 - https://hornsdalepowerreserve.com.au/
       // ~2021 largest will be 1.2GWh - https://cleantechnica.com/2020/02/27/humongous-tesla-battery-plant-approved-in-california-is-10x-bigger-than-worlds-biggest-battery-plant/
       // Largest was 50MWh in 2016 - https://en.wikipedia.org/wiki/Battery_storage_power_station#Lithium-ion
@@ -978,9 +1061,9 @@ export function STORAGE(state: GameType, peakWh: number) {
       // Form's projected 2030 system costs, in 2022 dollars, normalized to 2023 dollars.
       // $2,150/kW includes repowering; $17.50/kW-year is fixed O&M. No tax credit.
       buildCost: (2150 / 100000) * (304.702 / 292.655) * peakWh,
-      peakW: peakWh / 100,
+      peakW: storagePowerW("Iron-Air Battery", peakWh),
       peakWh,
-      maxPeakWh: 10000000000,
+      maxPeakWh: storageMaxPeakWh("Iron-Air Battery", year),
       // Provisional installed-system proxy, not a measured Form Energy LCA.
       constructionKgco2ePerWh: 0.08,
       lifespanYears: 20,
@@ -1000,11 +1083,11 @@ export function STORAGE(state: GameType, peakWh: number) {
       buildCost: 2000000 + 0.3319 * peakWh,
       // NREL's 2024 ATB closed-loop sites span $2,205-$4,434/kW. At this facility's ten-hour
       // duration, the midpoint is $332/kWh; costs are held flat because the technology is mature.
-      peakW: 0.1 * peakWh,
+      peakW: storagePowerW("Pumped Hydro", peakWh),
       viableLocationsRemaining: pumpedHydroLocationsRemaining,
       // Around 1/5th to 1/20th for larger projects - https://en.wikipedia.org/wiki/List_of_pumped-storage_hydroelectric_power_stations
       peakWh,
-      maxPeakWh: 20000000000,
+      maxPeakWh: storageMaxPeakWh("Pumped Hydro", year),
       // 24GWh, build in 1970's - http://large.stanford.edu/courses/2014/ph240/galvan-lopez2/
       // Resource availability above keeps this out of regions without suitable hydro potential.
       constructionKgco2ePerWh: 0.06,
@@ -1028,6 +1111,8 @@ export function STORAGE(state: GameType, peakWh: number) {
   // update with calculations that occur across all entries, like difficulty multipliers
   const difficulty = DIFFICULTIES[state.difficulty];
   const inflation = getCostInflation(state);
+  const terrainCost = getTerrainModifiers(state, undefined, tileId).buildCost;
+  const chooseTile = !tileId && territoryId && hasTerritoryNetwork(state);
   storage = storage.filter((g: StorageShoppingType) => {
     applyLegacyStorageEra(state, g);
     const mod = facilityModifier(state, g.name);
@@ -1047,6 +1132,13 @@ export function STORAGE(state: GameType, peakWh: number) {
       `facilities.${g.name}.yearsToBuild`,
     );
     g.buildCost *= difficulty.buildCost * inflation;
+    g.buildCost *= chooseTile
+      ? getTerrainModifiers(
+          state,
+          undefined,
+          availableTerritoryTiles(state, g, territoryId)[0]?.id,
+        ).buildCost
+      : terrainCost;
     g.annualOperatingCost *= difficulty.expensesOM * inflation;
     g.yearsToBuild *= difficulty.buildTime;
     if (
@@ -1059,4 +1151,61 @@ export function STORAGE(state: GameType, peakWh: number) {
   });
 
   return storage;
+}
+
+/** Resolve current catalog economics from identity/size/options, never a caller's price. */
+export function getBuildFacilityQuote(
+  game: GameType,
+  requested: Partial<FacilityShoppingType>,
+  territoryId?: TerritoryId,
+  tileId?: TerritoryTileId,
+  pinnedHydroSiteId?: string,
+): FacilityShoppingType | undefined {
+  if (requestedFacilitySize(requested) === undefined) return undefined;
+  const options: FacilityShoppingType[] =
+    requested.peakWh === undefined
+      ? GENERATORS(
+          game,
+          requested.peakW ?? 0,
+          game.timeline.map((tick) => tick.windKph),
+          game.timeline.map((tick) => tick.solarIrradianceWM2),
+          game.timeline.flatMap((tick) =>
+            tick.windOffshoreKph === undefined ? [] : [tick.windOffshoreKph],
+          ),
+          game.timeline.map((tick) => tick.windAirborneKph),
+          territoryId,
+          tileId,
+          pinnedHydroSiteId,
+        )
+      : STORAGE(game, requested.peakWh, tileId, territoryId);
+  let quote = options.find(
+    (candidate) =>
+      candidate.available &&
+      candidate.name === requested.name &&
+      candidate.gasCycle === requested.gasCycle,
+  );
+  if (
+    !quote ||
+    (isStorage(quote)
+      ? quote.peakWh > quote.maxPeakWh
+      : quote.peakW > quote.maxPeakW) ||
+    !validResilienceRecord(quote.fuel, requested.resilience)
+  )
+    return undefined;
+  if (!isStorage(quote) && requested.resilience)
+    quote = withResilienceOptions(quote, game, requested.resilience);
+  return quote;
+}
+
+/** Network placement and forecasts must retain the requested technology and power rating. */
+export function getMatchingBuildFacilityQuote(
+  game: GameType,
+  facility: FacilityShoppingType,
+  territoryId: TerritoryId,
+  tileId?: TerritoryTileId,
+): FacilityShoppingType | undefined {
+  const quote = getBuildFacilityQuote(game, facility, territoryId, tileId);
+  return quote?.fuel === facility.fuel && quote?.peakW === facility.peakW
+    ? quote
+    : undefined;
 }

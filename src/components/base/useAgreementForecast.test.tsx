@@ -154,12 +154,20 @@ it("invalidates load/reset and offers retry after failure", () => {
   expect(workers).toHaveLength(3);
 });
 
-it("never launches comparisons with buying disabled", () => {
+it("compares pooled agreements even when uncovered market buying is disabled", () => {
   const game = fixture();
   game.transmission!.buyingRule = "NONE";
   const view = renderHook(() =>
     useAgreementForecast(game, "champlain-nuclear"),
   );
+  expect(view.result.current.blocked).toBeUndefined();
+  expect(mockCreateWorker).toHaveBeenCalledTimes(1);
+});
+
+it("keeps disabled ordinary-market comparisons blocked outside the pooled scenario", () => {
+  const game = createGame({ scenarioId: 100, seed: 12345 });
+  game.transmission!.buyingRule = "NONE";
+  const view = renderHook(() => useAgreementForecast(game, "unavailable"));
   expect(view.result.current.blocked).toBe("buying");
   expect(mockCreateWorker).not.toHaveBeenCalled();
 });

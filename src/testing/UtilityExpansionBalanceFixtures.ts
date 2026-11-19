@@ -6,7 +6,7 @@ import { loadSimData } from "./SimData";
 import type { ScheduledSimActionType } from "./Simulator";
 
 export type ExpansionPortfolio =
-  "line-only" | "unprepared" | "firm" | "mixed" | "both";
+  "standalone" | "unprepared" | "firm" | "mixed" | "both";
 export interface ExpansionBalanceCase {
   id: string;
   targetId: UtilityTargetId;
@@ -16,10 +16,10 @@ export interface ExpansionBalanceCase {
 export const EXPANSION_BALANCE_CASES: readonly ExpansionBalanceCase[] = [
   ...UTILITY_TARGETS.flatMap((target) => [
     {
-      id: `${target.id}-line-only`,
+      id: `${target.id}-standalone`,
       targetId: target.id,
       financed: true,
-      portfolio: "line-only" as const,
+      portfolio: "standalone" as const,
     },
     {
       id: `${target.id}-unprepared`,
@@ -52,12 +52,6 @@ export function expansionBalanceActions(
   loadSimData(UTILITY_AREAS.champlain.location);
   const target = UTILITY_TARGETS.find(({ id }) => id === fixture.targetId)!;
   const actions: ScheduledSimActionType[] = [
-    {
-      month: 0,
-      type: "intertie",
-      corridorId: target.corridorId,
-      financed: true,
-    },
     ...Array.from({ length: 19 }, (_, index): ScheduledSimActionType => ({
       month: (index + 1) * 12,
       type: "rate",
@@ -113,7 +107,7 @@ export function expansionBalanceActions(
       type: "build",
       build: { name: "Natural Gas CC", peakW: 100e6, financed: true },
     });
-  if (fixture.portfolio !== "line-only") {
+  if (fixture.portfolio !== "standalone") {
     actions.push({
       month: purchaseMonth,
       type: "acquire",
@@ -150,12 +144,6 @@ export function expansionBalanceActions(
   if (fixture.portfolio === "both")
     actions.push(
       {
-        month: 0,
-        type: "intertie",
-        corridorId: "vt-champlain-ridge",
-        financed: true,
-      },
-      {
         month: 108,
         type: "acquire",
         targetId: "ridge-electric",
@@ -181,5 +169,35 @@ export function expansionBalanceActions(
       },
       { month: 216, type: "retire", assetId: "scenario-116-ridge-oil" },
     );
-  return actions.sort((left, right) => left.month - right.month);
+  // New capacity is sited where the expanded company needs it. The home fleet remains
+  // responsible for Champlain; the acquired territory receives its own replacement plants.
+  // Split wind projects at the authored 150 MW site limit instead of bypassing site budgets.
+  const territorialActions = actions.flatMap(
+    (action): ScheduledSimActionType[] => {
+      if (action.type !== "build") return [action];
+      const territoryId =
+        fixture.portfolio === "both" &&
+        (action.month === 108 || action.month === 168)
+          ? "ridge-electric"
+          : action.month < purchaseMonth ||
+              action.month === 144 ||
+              (cashValleyMixed && action.month === 156)
+            ? "champlain"
+            : fixture.targetId;
+      const build = action.build;
+      if (build.peakW === undefined)
+        return [{ ...action, build: { ...build, territoryId } }];
+      const peakW = build.peakW;
+      const projects = build.name === "Wind" ? Math.ceil(peakW / 150e6) : 1;
+      return Array.from({ length: projects }, () => ({
+        ...action,
+        build: {
+          ...build,
+          peakW: peakW / projects,
+          territoryId,
+        },
+      }));
+    },
+  );
+  return territorialActions.sort((left, right) => left.month - right.month);
 }

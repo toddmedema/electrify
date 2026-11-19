@@ -1,4 +1,5 @@
 import { expect, Locator, Page } from "@playwright/test";
+import { hexCenter } from "../src/components/base/TerritoryHexGeometry";
 
 /** Both providers must remain equal, usable columns at every supported width. */
 export async function expectSignInButtonsToFit(scope: Page | Locator) {
@@ -186,6 +187,117 @@ export async function waitForSettled(
     page.locator(selector),
     description ?? `exactly one ${selector} after the card transition settles`,
   ).toHaveCount(1);
+}
+
+/** Return to the persistent territory map by closing its one active dock panel. */
+export async function returnToTerritoryMap(page: Page): Promise<Locator> {
+  const workspace = page.locator('.gameWorkspace[data-persistent-map="true"]');
+  const map = workspace.getByRole("region", {
+    name: "Territory map workspace",
+    exact: true,
+  });
+  await expect(map).toBeVisible();
+  const panel = workspace.locator(".gameToolPanel:visible");
+  expect(await panel.count()).toBeLessThanOrEqual(1);
+  if (await panel.count()) {
+    await panel
+      .locator(":scope > .gameToolHeader")
+      .getByRole("button", { name: /^Close / })
+      .click();
+  }
+  await expect(panel).toHaveCount(0);
+  return map;
+}
+
+export async function readTerritoryMapCamera(viewport: Locator) {
+  return viewport.evaluate((element) => {
+    const stage = element.querySelector<HTMLElement>(".territoryMapStage")!;
+    const transform = new DOMMatrix(stage.style.transform || undefined);
+    const scale = Number(element.getAttribute("data-camera-scale"));
+    const { clientWidth: width, clientHeight: height } = element;
+    return {
+      x: (width / 2 - transform.e) / scale,
+      y: (height / 2 - transform.f) / scale,
+      scale,
+    };
+  });
+}
+
+/** Pan the real camera before activating a virtualized tile through its keyboard target. */
+export async function selectTerritoryMapTile(
+  page: Page,
+  tile: { id: string; q: number; r: number },
+): Promise<Locator> {
+  const map = await returnToTerritoryMap(page);
+  const target = map.locator(`[data-map-target="${tile.id}"]`);
+  const viewport = map.locator(".territoryMapViewport");
+  const point = hexCenter(tile);
+  for (let attempt = 0; attempt < 20 && !(await target.count()); attempt++) {
+    const camera = await readTerritoryMapCamera(viewport);
+    const dx = (camera.x - point.x) * camera.scale;
+    const dy = (camera.y - point.y) * camera.scale;
+    if (Math.abs(dx) < 1 && Math.abs(dy) < 1) break;
+    const box = (await viewport.boundingBox())!;
+    const step = Math.min(
+      1,
+      (box.width * 0.25) / Math.max(1, Math.abs(dx)),
+      (box.height * 0.2) / Math.max(1, Math.abs(dy)),
+    );
+    const x = box.x + box.width / 2;
+    const y = box.y + 40;
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    // Cross the drag threshold even when the camera needs only a tiny correction.
+    await page.mouse.move(x + 12, y);
+    await page.mouse.move(x + dx * step, y + dy * step);
+    await page.mouse.up();
+  }
+  await target.focus();
+  await target.press("Enter");
+  await expect(target).toHaveAttribute("aria-pressed", "true");
+  return target;
+}
+
+/** Open the map catalogue through its public entry point at the current effective width. */
+export async function openMapProjectCatalogue(page: Page): Promise<Locator> {
+  const map = await returnToTerritoryMap(page);
+  const rail = map.getByRole("complementary", {
+    name: "Build facilities",
+    exact: true,
+  });
+  if (await rail.isVisible()) return rail;
+  await page
+    .getByRole("navigation", { name: "Game actions" })
+    .getByRole("button", { name: "Build", exact: true })
+    .click();
+  const catalogue = map.locator(".tileWorkspaceSurface");
+  await expect(
+    catalogue.getByRole("heading", { name: "Plan a project", exact: true }),
+  ).toBeVisible();
+  return catalogue;
+}
+
+/** Size the next map project through the rail popover or phone catalogue. */
+export async function setMapProjectCapacity(
+  catalogue: Locator,
+  storage: boolean,
+  tick: string,
+): Promise<void> {
+  const sizing = catalogue.getByRole("button", {
+    name: storage ? /^Energy:/ : /^Power:/,
+  });
+  const opened =
+    (await sizing.isVisible()) &&
+    (await sizing.getAttribute("aria-expanded")) !== "true";
+  if (opened) await sizing.click();
+  await catalogue
+    .getByRole("slider", {
+      name: storage ? "Storage capacity" : "Generator capacity",
+      exact: true,
+    })
+    .fill(tick);
+  if (opened)
+    await catalogue.getByRole("button", { name: "Done", exact: true }).click();
 }
 
 /**

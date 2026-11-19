@@ -35,6 +35,20 @@ function fixture() {
         { energyWh: 12, recoveryStartMinute: 60, recoveryEndMinute: 240 },
       ],
       deferredResidentialStart: [],
+      territories: {
+        champlain: {
+          demandW: 10,
+          supplyW: 10,
+          generationW: 20,
+          importedW: 0,
+          exportedW: 10,
+          unservedW: 0,
+          curtailedW: -0,
+          storageChargeW: 0,
+          storageDischargeW: 0,
+        },
+        "green-uplands": undefined,
+      },
     },
     {
       minute: 60,
@@ -45,6 +59,7 @@ function fixture() {
       supplyByFuel: { Coal: 20, Gas: 4 },
       renewableCapacityFactors: undefined,
       deferredResidential: undefined,
+      territories: undefined,
     },
     {
       minute: 120,

@@ -4,26 +4,14 @@ import { FEEDBACK_URL } from "../../CommunityLinks";
 import type { AppDispatch } from "../../Store";
 import * as React from "react";
 import {
-  ClickAwayListener,
   MenuItem,
   Toolbar,
   Tooltip,
   Typography,
   useMediaQuery,
 } from "@mui/material";
-import CheckCircleIcon from "@mui/icons-material/CheckCircle";
-import {
-  formatHour,
-  getDateFromMinute,
-  getTimeFromTimeline,
-  MINUTES_PER_MONTH,
-} from "../../helpers/DateTime";
-import { projectedShortfall } from "../../helpers/MissionStatus";
-import {
-  formatForecastWatts,
-  formatWatts,
-  formatNumber,
-} from "../../helpers/Format";
+import { getTimeFromTimeline, MINUTES_PER_MONTH } from "../../helpers/DateTime";
+import { formatNumber } from "../../helpers/Format";
 import { navigate } from "../../reducers/Card";
 import {
   isBigScreen,
@@ -38,14 +26,14 @@ import {
   AppStateType,
   GameType,
   SpeedType,
+  CardNameType,
+  GameToolType,
   TickPresentFutureType,
 } from "../../Types";
 import { connectToStore } from "./ConnectToStore";
-import ConceptIcon from "./ConceptIcon";
 import { useOnline } from "./OnlineStatus";
 import { buildSpeedOptions, sharedClockSpeedProps } from "./SpeedControls";
 import MissionSummary from "./MissionSummary";
-import StatusReadout from "./StatusReadout";
 import { EvidenceRequestType, EvidenceTargetType } from "../../Types";
 import { acknowledgeEvidence, manualHelpOpen } from "../../reducers/UI";
 import { MANUAL_ENTRY } from "./ManualEntries";
@@ -62,7 +50,16 @@ import { restoreMenuFocus } from "./useMenuKeys";
 import { createSelector } from "@reduxjs/toolkit";
 import GameMenu from "./GameMenu";
 import { GameDate, YearProgressBar } from "./GameCalendar";
+import GridStatus from "./GridStatus";
+import { getGridHealth } from "../../helpers/GridStatus";
+import { selectTutorialActions } from "../../reducers/Tutorial";
 import "./GameAppBar.scss";
+
+export {
+  getGridHealth,
+  reserveCapacityW,
+  stableGridSummary,
+} from "../../helpers/GridStatus";
 
 /**
  * The game's global state: cash, monthly profit, the date, speed, year progress,
@@ -83,6 +80,7 @@ export interface StateProps {
   activeEvents?: ActiveEventGroupType[];
   upcomingEvents?: UpcomingStoryEventType[];
   game: GameType;
+  tutorialActions?: GameToolType[];
   evidenceRequest?: EvidenceRequestType;
   facilityDragActive?: boolean;
   activeSave?: { id: string; name: string };
@@ -96,6 +94,7 @@ export interface DispatchProps {
   onEvidenceAcknowledged?: (request: EvidenceRequestType) => void;
   onManual: () => void;
   onReserveHelp?: () => void;
+  onNavigate?: (card: CardNameType) => void;
   onSettings: () => void;
   onAchievements?: () => void;
   onSavedGames?: () => void;
@@ -106,195 +105,13 @@ export interface DispatchProps {
 
 export interface Props extends StateProps, DispatchProps {}
 
-const LOW_RESERVE_RATIO = 0.1;
-const MINUTES_PER_DAY = 1440;
-const NO_ACTIVE_EVENTS: ActiveEventGroupType[] = [];
-/** Status row controls that keep keyboard focus when the row moves into or out of the top bar. */
+/** Status controls retain focus when the row moves between header layouts. */
 const RESTORABLE_STATUS_FOCUS = [
   ".gridHealthSummary",
   ".missionRiskButton",
   ".missionSummaryMonths",
 ];
-
-type GridHealthState =
-  "stable" | "low-reserve" | "at-limit" | "blackout-ahead" | "blackout";
-
-interface GridHealth {
-  state: GridHealthState;
-  label: string;
-  metric: string;
-  announcement: string;
-}
-
-/** The reducer includes ramp, water and storage limits in this available cushion. */
-export function reserveCapacityW(
-  _game: GameType,
-  now: TickPresentFutureType,
-): number {
-  return now.reserveW ?? now.supplyW - now.demandW;
-}
-
-/**
- * Turns the live supply margin into the few states a player can act on at a glance. A shortfall
- * later in today's operating sample outranks any reserve reading now: a "Stable" grid that is
- * about to black out would be false reassurance.
- */
-export function getGridHealth(
-  game: GameType,
-  now: TickPresentFutureType,
-): GridHealth {
-  if (now.supplyW < now.demandW) {
-    return {
-      state: "blackout",
-      label: "Blackout",
-      metric: `${formatWatts(now.demandW - now.supplyW)} short`,
-      announcement: "Blackout. Demand is higher than supply.",
-    };
-  }
-
-  const ahead = projectedShortfall(game.timeline, game.date.minute);
-  if (ahead) {
-    const when = getDateFromMinute(ahead.minute, game.startingYear);
-    const at = formatHour(when);
-    const sameDay =
-      Math.floor(ahead.minute / MINUTES_PER_DAY) ===
-      Math.floor(game.date.minute / MINUTES_PER_DAY);
-    return {
-      state: "blackout-ahead",
-      label: sameDay ? `Blackout at ${at}` : `Blackout ahead at ${at}`,
-      metric: `${formatForecastWatts(ahead.demandW - ahead.supplyW)} short`,
-      announcement: `Blackout expected at ${at}. Demand will be higher than supply.`,
-    };
-  }
-
-  const reserveW = Math.max(0, reserveCapacityW(game, now));
-  if (reserveW === 0) {
-    return {
-      state: "at-limit",
-      label: "At limit",
-      metric: "0W reserve",
-      announcement: "Grid at limit. No reserve remains.",
-    };
-  }
-
-  const reserveRatio = now.demandW > 0 ? reserveW / now.demandW : Infinity;
-  if (reserveRatio <= LOW_RESERVE_RATIO) {
-    const reservePercent = Math.round(reserveRatio * 100);
-    return {
-      state: "low-reserve",
-      label: "Low reserve",
-      metric: `${formatWatts(reserveW)} (${reservePercent}%)`,
-      announcement: "Low reserve.",
-    };
-  }
-
-  return {
-    state: "stable",
-    label: "Stable",
-    metric: `${formatWatts(reserveW)} reserve`,
-    announcement: "Grid stable.",
-  };
-}
-
-/** The full stable readout, which phones keep behind the icon's tooltip. */
-export function stableGridSummary(
-  game: GameType,
-  now: TickPresentFutureType,
-): string {
-  return `Stable, ${formatWatts(now.demandW)} demand met with ${formatWatts(
-    Math.max(0, reserveCapacityW(game, now)),
-  )} reserve`;
-}
-
-const STATUS_TOOLTIP_MS = 2500;
-
-/** Never color or an icon alone: every state that needs attention has a word, even on a phone. */
-const STATUS_WORD: Record<Exclude<GridHealthState, "stable">, string> = {
-  "low-reserve": "Low",
-  "at-limit": "Limit",
-  // Names the coming problem; "Soon" alone did not say what was coming.
-  "blackout-ahead": "Short",
-  blackout: "Blackout",
-};
-
-/**
- * Grid health on a phone: a fixed-size icon whose tooltip carries the full readout. Hover and
- * keyboard focus open it as usual; a tap toggles it, until a tap elsewhere or a few seconds.
- * Reset when the status changes so a previously pinned tooltip does not reopen on its own.
- */
-function CompactGridStatus({
-  health,
-  summary,
-}: {
-  health: GridHealth;
-  summary: string;
-}) {
-  const [open, setOpen] = React.useState(false);
-  // A tap pins the tooltip: the browser follows a touch with a synthetic mouseleave, which
-  // would otherwise close it the moment the finger lifts.
-  const [pinned, setPinned] = React.useState(false);
-  React.useEffect(() => {
-    if (!pinned) return;
-    const timer = setTimeout(() => {
-      setPinned(false);
-      setOpen(false);
-    }, STATUS_TOOLTIP_MS);
-    return () => clearTimeout(timer);
-  }, [pinned]);
-  return (
-    <div className={`gridHealth gridHealth-${health.state} gridHealth-compact`}>
-      <ClickAwayListener
-        onClickAway={() => {
-          setPinned(false);
-          setOpen(false);
-        }}
-      >
-        <Tooltip
-          title={summary}
-          open={open}
-          onOpen={() => setOpen(true)}
-          onClose={() => {
-            if (!pinned) setOpen(false);
-          }}
-          disableTouchListener
-          arrow
-        >
-          <button
-            type="button"
-            className="gridHealthStatusButton"
-            aria-label={`Current grid status: ${summary}`}
-            onClick={() => {
-              setOpen(!pinned);
-              setPinned(!pinned);
-            }}
-          >
-            <span className="gridHealthStatusIcon" aria-hidden="true">
-              {health.state === "stable" ? (
-                <>
-                  <ConceptIcon
-                    concept="supply"
-                    className="gridHealthStableBolt"
-                    decorative
-                  />
-                  <CheckCircleIcon className="gridHealthStableCheck" />
-                </>
-              ) : (
-                <ConceptIcon
-                  concept={health.state === "blackout" ? "blackout" : "danger"}
-                />
-              )}
-            </span>
-            {health.state !== "stable" && (
-              <span className="gridHealthStatusWord">
-                {STATUS_WORD[health.state]}
-              </span>
-            )}
-          </button>
-        </Tooltip>
-      </ClickAwayListener>
-    </div>
-  );
-}
+const NO_ACTIVE_EVENTS: ActiveEventGroupType[] = [];
 
 /**
  * This month's profit, bit-identical to deriveExpandedSummary(summarizeTimeline(...)).profit
@@ -339,15 +156,8 @@ export function GameAppBar(props: Props) {
     onEvidence,
     onEvidenceAcknowledged,
   } = props;
-  const {
-    game,
-    onManual,
-    onNextTutorial,
-    onQuit,
-    onReserveHelp,
-    onSettings,
-    onSpeedChange,
-  } = props;
+  const { game, onManual, onNextTutorial, onQuit, onSettings, onSpeedChange } =
+    props;
   const date = game.date;
   const now = getTimeFromTimeline(date.minute, game.timeline);
   const [menuAnchorEl, setMenuAnchorEl] = React.useState<HTMLElement | null>(
@@ -369,10 +179,6 @@ export function GameAppBar(props: Props) {
     ? workspace.layout === "side" &&
       workspace.effectiveWidth >= SIDE_LAYOUT_MIN_WIDTH
     : wideRow;
-  const wideStatus = useMediaQuery("(min-width:600px)", { noSsr: true });
-  const roomForStatusText = workspace
-    ? workspace.effectiveWidth >= 600
-    : wideStatus;
   const monthlyProfit = React.useMemo(
     () => monthProfit(game.timeline, date.monthsElapsed),
     [game.timeline, date.monthsElapsed],
@@ -535,53 +341,22 @@ export function GameAppBar(props: Props) {
 
   const gridHealth = getGridHealth(game, now);
   const inBlackout = gridHealth.state === "blackout";
-  // Low reserve and at-limit share the mission tracker's goal-risk warning treatment.
-  const inWarning = !inBlackout && gridHealth.state !== "stable";
-  // Tutorials have no mission row, so the readout would be too short to hold a full-size control;
-  // their HUD tells the story instead.
   const activeEvents = (!isTutorial && props.activeEvents) || NO_ACTIVE_EVENTS;
-  // Phones keep a fixed icon, plus one word whenever the grid needs attention.
-  const compactStatus = !roomForStatusText;
-  const summary =
-    gridHealth.state === "stable"
-      ? stableGridSummary(game, now)
-      : `${gridHealth.label}, ${gridHealth.metric}`;
-
   const statusRow = (
     <div className="gameStatusBar">
-      {compactStatus ? (
-        <CompactGridStatus
-          key={gridHealth.state}
-          health={gridHealth}
-          summary={summary}
-        />
-      ) : (
-        <div
-          className={`gridHealth gridHealth-${gridHealth.state}${inWarning ? " statusWarning" : ""}`}
-          role="group"
-          aria-label={`Current grid status: ${gridHealth.label}, ${gridHealth.metric}`}
-        >
-          <StatusReadout
-            className="gridHealthSummary manual-help-action"
-            textClassName="gridHealthMetric"
-            concept={
-              inBlackout
-                ? "blackout"
-                : gridHealth.state === "stable"
-                  ? "supply"
-                  : "danger"
-            }
-            aria-label={`${gridHealth.label}, ${gridHealth.metric}. Open the Reserve manual entry`}
-            onClick={() => onReserveHelp?.()}
-          >
-            {gridHealth.label}, {gridHealth.metric}
-          </StatusReadout>
-        </div>
-      )}
+      <GridStatus
+        game={game}
+        now={now}
+        tutorialActions={props.tutorialActions}
+        onEvidence={onEvidence}
+        onNavigate={props.onNavigate}
+        onReserveHelp={props.onReserveHelp}
+      />
       {/* Tutorials have no term goal to track; their own HUD carries the objective. */}
       {!isTutorial && !couchSeat && (
         <MissionSummary
           game={game}
+          gridSupplyRiskVisible
           upcoming={props.upcomingEvents}
           activeEvents={activeEvents}
           onActiveEvents={openEvents}
@@ -708,6 +483,7 @@ const mapStateToProps = (state: AppStateType): StateProps => ({
   activeEvents: selectActiveEventGroups(state),
   upcomingEvents: selectUpcomingStoryEvents(state),
   game: state.game,
+  tutorialActions: selectTutorialActions(state),
   evidenceRequest: state.ui.evidenceRequest,
   facilityDragActive: state.ui.facilityDragActive,
   activeSave: selectActiveSave(state),
@@ -718,6 +494,9 @@ const mapStateToProps = (state: AppStateType): StateProps => ({
 
 const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
   return {
+    onNavigate: (card) => {
+      dispatch(navigate(card));
+    },
     onEvidence: (target) => {
       dispatch(openEvidence(target));
     },

@@ -1,3 +1,4 @@
+import { hasTerritoryNetwork } from "../../helpers/Territories";
 import { intertieApprovedMessage } from "../../helpers/BuildConsequences";
 import * as React from "react";
 import { useToolScroll } from "../base/GameToolMemory";
@@ -47,6 +48,7 @@ export default function BuildFacilities({
   const introductoryChoices =
     getTutorialStep(game)?.phase === "GENERATOR_CHOICES";
   const intertiesAvailable =
+    !hasTerritoryNetwork(game) &&
     !!game.transmission &&
     (!!game.multiplayer || corridorsForLocation(game.location).length > 0);
   // Isolated grids have nothing to connect to, so the tab would only ever be empty.

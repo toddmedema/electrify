@@ -15,6 +15,7 @@ import { corridorOpenInYear } from "./IntertieTrends";
 import { log } from "../helpers/Libm";
 
 export interface IntertieAccessContext {
+  territoryNetwork?: boolean;
   peers?: NonNullable<GameType["multiplayer"]>["peers"];
   scenarioId?: number;
   frozenStartingIntertieAccess?: FrozenStartingIntertieAccessType;
@@ -369,6 +370,7 @@ export function corridorsForGame(
       date: Pick<GameType["date"], "year">;
     },
 ) {
+  if (isUtilityExpansionGame(game)) return [];
   if (game.multiplayer) {
     const starting =
       getScenario(game.scenarioId, game.customScenario)?.startingInterties ||

@@ -13,6 +13,7 @@ import { navigate } from "../../reducers/Card";
 import { initGame, loaded, delta } from "../../reducers/Game";
 import { isResumedGame } from "../../SaveGame";
 import { validPowerAgreements } from "../../helpers/PowerAgreements";
+import { validTerritoryPurchasePrices } from "../../helpers/TerritoryValidation";
 import {
   completeSaveLoading,
   failSaveLoading,
@@ -159,6 +160,10 @@ export const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
         if (resumed && !validPowerAgreements(game))
           throw new Error(
             "This save's power agreement history does not match its terms. Your saved progress has been preserved.",
+          );
+        if (resumed && !validTerritoryPurchasePrices(game))
+          throw new Error(
+            "This save's land purchase history does not match its terms. Your saved progress has been preserved.",
           );
         if (!resumed) {
           // A new game uses the scenario's authored opening fleet.

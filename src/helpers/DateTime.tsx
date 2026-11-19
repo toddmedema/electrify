@@ -178,10 +178,11 @@ function accumulateTick(
     // Local resumable frames and recovery batches are not numeric averaged chart history.
     delete sample.deferredResidential;
     delete sample.deferredResidentialStart;
-    delete sample.deferredThermal;
-    delete sample.deferredThermalStart;
     delete sample.deferredCharging;
     delete sample.deferredChargingStart;
+    // Territory balances describe a constrained dispatch frame, not a monthly average.
+    // Retaining the first frame would disagree with the averaged company chart totals.
+    delete sample.territories;
     sample.renewableCapacityFactors = factors;
     summary.chartAverage = {
       ...sample,
@@ -466,6 +467,14 @@ export function formatMinuteAsMonthAxis(
     multiyear,
     yearOnly,
   );
+}
+
+export function formatClockTime(date: DateType): string {
+  const minutes = date.minuteOfDay % 60;
+  const hour = Math.floor(date.minuteOfDay / 60);
+  const clockHour = hour % 12 || 12;
+  const minuteText = minutes ? `:${String(minutes).padStart(2, "0")}` : "";
+  return `${clockHour}${minuteText} ${hour < 12 ? "AM" : "PM"}`;
 }
 
 export function formatHour(date: DateType): string {

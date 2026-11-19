@@ -1,5 +1,6 @@
 import * as React from "react";
 import type { GameType, PowerAgreementReceipt } from "../../Types";
+import { isUtilityExpansionGame } from "../../helpers/ExpansionContext";
 import {
   agreementForecastKey,
   AgreementForecast,
@@ -30,7 +31,7 @@ export function useAgreementForecast(
   const epoch = `${session.current.id}:${session.current.revision}`;
   const blocked = game.multiplayer
     ? "coop"
-    : game.transmission?.buyingRule === "NONE"
+    : !isUtilityExpansionGame(game) && game.transmission?.buyingRule === "NONE"
       ? "buying"
       : undefined;
   const key =

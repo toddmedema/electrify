@@ -54,3 +54,42 @@ individual grids are never imported as solo saves. Solo migrations do not imply
 that peers with different simulation or message formats can play together.
 
 See [cloud saves](cloud-saves.md) for synchronization and immutable shared snapshots.
+
+Schema 13 located Across the Valley facilities by provenance. Schema 14 replaces
+its physical routing with a company pool and a dated cash land receipt. Existing
+paid land projects grant rights immediately; their original invested capital,
+construction/upgrade progress, debts and financing terms remain in a frozen legacy
+ledger. No refund or new fee is booked. Historical readings, PPAs, acquisitions,
+facilities and oversized existing projects remain. Loan payments continue, while
+wire construction, upkeep and congestion cease. Land value is counted once.
+Current saves validate owned locations, canonical land prices and bounded legacy
+investments; version 1 physical markers cannot enter the current runtime.
+
+Schema 15 extends land receipts to every neutral parcel. Schema 16 assigns one
+physical tile per facility in Across the Valley, preserving the facility's capacity,
+stored energy, construction, financing and history. Cities have no building slot.
+Older over-budget fleets get separate legacy overflow cells rather than losing
+facilities; current saves reject invalid or duplicate placements.
+
+Schema 17 adds individual tile purchase receipts while retaining earlier paid
+whole-area rights and their exact capital value. Coordinate-derived frontier
+geography needs no stored infinite board; receipts and active connections determine
+the visible three-hex frontier.
+
+Schema 18 requires physical adjacency to owned property for new tile purchases.
+Older paid receipts retain their original visibility rule, property and exact cash
+balances. The inland authored ocean becomes a lake; installed offshore plants
+retain their plant-specific siting and wind inputs. Selling the plant removes
+that installation exception and never grants replacement offshore access.
+
+Schema 19 adds optional capacity-expansion projects. Older saves need no new
+project fields. Current saves validate the target, retained installed capacity,
+construction progress, capital terms and unique project identity. An imported
+pending project cannot bypass technology, era or terrain limits; inherited
+installed plants retain their existing capacity.
+
+Recognized published schema 13, 14, 15, 16 and 17 co-op identities have ordered transitions.
+It preserves the run's original scoring provenance. Existing company-local land
+rights are retained, including old duplicate ownership; new claims are exclusive
+and checked in host command order. Other incompatible co-op identities retain
+their existing rejection behavior. See [territories](territories.md).

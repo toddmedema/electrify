@@ -196,7 +196,7 @@ because its starting fleet goes bankrupt before a build-out can finish.
 
 Programs are sized by starting served customers (`programCustomers`, the market size over
 `CUSTOMER_MARKET_MULTIPLIER`) times demand scale. Efficiency costs a flat total per customer.
-Rooftop rebates pay a quarter of `residentialSolarCostPerW` for the installation year, so they are
+Rooftop rebates pay 15% of `residentialSolarCostPerW` for the installation year, so they are
 several times dearer in the early-2000s scenarios. Both use start-year dollars carried forward by
 inflation, like facility costs. Adoption is allocated once at the month boundary and recorded as a
 cohort in `installs`; its actual cost is spread across that month's ticks. Efficiency savings

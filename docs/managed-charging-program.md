@@ -42,6 +42,12 @@ Australia/New Zealand; emerging markets use a deliberately lower trajectory. Unk
 locations use the world curve. Passenger cars include battery cars and plug-in hybrids,
 but exclude conventional hybrids.
 
+The offer opens when full enrollment could shift at least 0.5% of the local grid's
+peak using the existing demand timeline and average transportation load. This is a
+cheap power proxy for covering 5% of a reference shortage equal to 10% of peak.
+It uses the same fleet, equipment and participation limits as dispatch. The check
+runs for the first month in which a customer can enroll.
+
 Modern flexible EV load is exactly zero through 2010, including 1980 scenarios. In 2015,
 fleet shares are around 0.1–0.3% in most covered markets (about 2.7% in early-moving
 Norway), with only 15% compatible for control. Capability rises separately to 40% in

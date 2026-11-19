@@ -6,11 +6,16 @@ import { store } from "../../Store";
 import { TUTORIALS } from "../../data/Scenarios";
 import { getPlayedScenarioIds } from "../../LocalStorage";
 import { navigate } from "../../reducers/Card";
-import { start } from "../../reducers/Game";
+import { startTutorial } from "../../reducers/Game";
 import { change as changeSettings } from "../../reducers/Settings";
 import { selectContinueSave } from "../../SaveModel";
 import { resumeSavedGame, runSaveTransition } from "../../SaveSession";
 import MainMenu, { DispatchProps, StateProps } from "./MainMenu";
+
+function getNextTutorial() {
+  const played = getPlayedScenarioIds();
+  return TUTORIALS.find((tutorial) => !played.includes(tutorial.id));
+}
 
 const mapStateToProps = (state: AppStateType): StateProps => {
   const saved = selectContinueSave(state.saves?.entries || []);
@@ -18,6 +23,7 @@ const mapStateToProps = (state: AppStateType): StateProps => {
     audioEnabled: state.settings.audioEnabled,
     hasSavedGame: !!saved,
     hasSavedGames: !!state.saves?.entries.length,
+    hasUnfinishedTutorials: !!getNextTutorial(),
   };
 };
 
@@ -50,16 +56,12 @@ export const mapDispatchToProps = (
       dispatch(navigate("ACHIEVEMENTS"));
     },
     onStart: () => {
-      // A brand-new player jumps straight into Mission 1.
-      const played = getPlayedScenarioIds();
-      const anyTutorialDone = TUTORIALS.some(
-        (t) => played.indexOf(t.id) !== -1,
-      );
-      if (!anyTutorialDone && !selectContinueSave(getEntries())) {
-        void runSaveTransition(() => dispatch(start(TUTORIALS[0].id)));
-      } else {
-        dispatch(navigate("NEW_GAME"));
-      }
+      dispatch(navigate("NEW_GAME"));
+    },
+    onTutorials: () => {
+      const tutorial = getNextTutorial();
+      if (tutorial)
+        void runSaveTransition(() => startTutorial(dispatch, tutorial.id));
     },
   };
 };

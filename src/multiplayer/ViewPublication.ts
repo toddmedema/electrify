@@ -1,4 +1,4 @@
-import { roomView } from "./World";
+import { roomViewBuilder, type roomView } from "./World";
 import type { RoomView, World } from "./Types";
 import { CONTROL_VIEW_INTERVAL_MS, VIEW_INTERVAL_MS } from "./Timing";
 
@@ -16,7 +16,7 @@ export class ViewPublication {
   private urgent = false;
   private force = false;
   private receipts = new Map<string, NonNullable<RoomView["receipt"]>>();
-  constructor(private build: typeof roomView = roomView) {}
+  constructor(private build?: typeof roomView) {}
 
   private key(world: World) {
     return JSON.stringify([
@@ -66,9 +66,13 @@ export class ViewPublication {
         (!seatIds || seatIds.includes(seat.id)) &&
         (all || this.receipts.has(seat.id)),
     );
+    const build = this.build;
+    const project = build
+      ? (seatId: string) => build(world, seatId)
+      : roomViewBuilder(world);
     const views = Object.fromEntries(
       seats.map((seat) => {
-        const view = this.build(world, seat.id);
+        const view = project(seat.id);
         const receipt = this.receipts.get(seat.id);
         if (receipt) view.receipt = receipt;
         return [seat.id, view];

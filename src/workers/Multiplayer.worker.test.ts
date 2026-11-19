@@ -18,6 +18,7 @@ jest.mock("../data/Weather", () => ({
 }));
 jest.mock("../multiplayer/World", () => {
   const blockers = new WeakMap<World, string[]>();
+  const roomView = jest.fn((_world: World, _seatId: string) => ({}));
   return {
     createWorld: jest.fn(),
     matchScenario: jest.fn(() => ({ location: { id: "SF" } })),
@@ -25,7 +26,9 @@ jest.mock("../multiplayer/World", () => {
     savedMatchSpec: jest.requireActual("../multiplayer/World").savedMatchSpec,
     applyCommand: jest.fn(),
     stepWorld: jest.fn(),
-    roomView: jest.fn(() => ({})),
+    roomView,
+    roomViewBuilder: (world: World) => (seatId: string) =>
+      roomView(world, seatId),
     checkpointWorld: (world: World) => world,
     worldBlockers: (world: World) => blockers.get(world) || [],
     setWorldBlockers: (world: World, reasons: string[]) => {

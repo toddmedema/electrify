@@ -186,6 +186,24 @@ function eraCost(
   );
 }
 
+/** Physical project ceilings, shared by catalogue quotes and data-free save validation. */
+export function legacyGeneratorMaxPeakW(
+  game: LegacyContext,
+  name: string,
+): number | undefined {
+  if (!isLegacyEraGame(game)) return undefined;
+  const year = game.date.year;
+  if (name === "Coal" && year < 1942) return year < 1902 ? 500000 : 5000000;
+  if (name === "Oil" && year < 1982) return 350000000;
+  if (name === "Nuclear") return 100000000;
+  if (name === "Natural Gas Peaker" && year < 1982) return 30000000;
+  if (name === "Solar" && year < 2010)
+    return year < 2000 ? 10000000 : 100000000;
+  if (name === "Wind" && year < 2010)
+    return year < 1990 ? 50000000 : year < 2000 ? 200000000 : 500000000;
+  return undefined;
+}
+
 export function applyLegacyGeneratorEra(
   game: LegacyContext,
   quote: GeneratorShoppingType,
@@ -196,7 +214,6 @@ export function applyLegacyGeneratorEra(
     if (year < 1902) {
       quote.buildCost = eraCost(quote, 100000, 180000 * (304.702 / 9.9));
       quote.annualOperatingCost = quote.peakW * 0.3 * (304.702 / 9.9);
-      quote.maxPeakW = 500000;
       quote.btuPerWh = 138;
       quote.yearsToBuild = 1;
       quote.spinMinutes = 60;
@@ -205,7 +222,6 @@ export function applyLegacyGeneratorEra(
     } else if (year < 1942) {
       quote.buildCost = eraCost(quote, 1000000, 12000000);
       quote.annualOperatingCost = quote.peakW * 0.45;
-      quote.maxPeakW = 5000000;
       quote.btuPerWh = year < 1922 ? 35 : 16.5;
       quote.yearsToBuild = year < 1922 ? 2 : 3;
       quote.spinMinutes = 120;
@@ -231,7 +247,6 @@ export function applyLegacyGeneratorEra(
     quote.available = year >= 1942;
     quote.buildCost = eraCost(quote, 100000000, 350000000);
     quote.annualOperatingCost = quote.peakW * 0.08;
-    quote.maxPeakW = 350000000;
     quote.btuPerWh = year < 1960 ? 11.7 : 10.76;
     quote.spinMinutes = 240;
     quote.minimumStableOutput = 0.2;
@@ -240,12 +255,10 @@ export function applyLegacyGeneratorEra(
       "Era oil-fired steam proxy: slow to change and exposed to fuel prices";
   } else if (quote.name === "Nuclear") {
     quote.available = year >= 1960 && year < 1976;
-    quote.maxPeakW = 100000000;
     quote.buildCost = eraCost(quote, 100000000, 850000000);
     quote.yearsToBuild = 6.5;
   } else if (quote.name === "Natural Gas Peaker" && year < 1982) {
     quote.available = year >= 1950;
-    quote.maxPeakW = 30000000;
     quote.buildCost = eraCost(quote, 10000000, 22000000);
     quote.yearsToBuild = 1.5;
   }
@@ -265,11 +278,7 @@ export function applyLegacyGeneratorEra(
   // Conservative fictional project ceilings, rather than offering today's largest projects in
   // the first commercial year. Solar's 1980s megawatt scale is discussed in DOE's timeline:
   // https://www1.eere.energy.gov/solar/pdfs/solar_timeline.pdf
-  if (quote.name === "Solar" && year < 2010)
-    quote.maxPeakW = year < 2000 ? 10000000 : 100000000;
-  if (quote.name === "Wind" && year < 2010)
-    quote.maxPeakW =
-      year < 1990 ? 50000000 : year < 2000 ? 200000000 : 500000000;
+  quote.maxPeakW = legacyGeneratorMaxPeakW(game, quote.name) ?? quote.maxPeakW;
   if (quote.fuel === "Sun" && year < 1983) quote.available = false;
   if (quote.fuel === "Wind" && year < 1982) quote.available = false;
 }

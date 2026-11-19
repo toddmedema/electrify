@@ -35,7 +35,7 @@ describe("buildFacility", () => {
     state.date.year = 2035;
     state.location = { ...LOCATIONS.SF, offshore: true };
     const quotes = [
-      ...GENERATORS(state, 50000000, [20], [500]),
+      ...GENERATORS(state, 10000000, [20], [500]),
       ...STORAGE(state, 50000000),
     ];
     expect(quotes.length).toBeGreaterThan(10);
@@ -108,7 +108,7 @@ describe("buildFacility", () => {
     );
     state = gameReducer(
       state,
-      buildFacility({ facility: STORAGE(state, 400000000)[0], financed: true }),
+      buildFacility({ facility: STORAGE(state, 200000000)[0], financed: true }),
     );
     expect(state.facilities.map(({ id, name }) => `${id} ${name}`)).toEqual([
       "4 Natural Gas CC",

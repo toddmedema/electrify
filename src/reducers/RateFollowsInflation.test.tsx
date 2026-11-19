@@ -40,8 +40,9 @@ describe("utility rate following inflation", () => {
     (flexibility) => {
       const game = createGame({
         scenarioId: PUBLIC_ID,
-        initialPrograms: flexibility ? { thermal: "On" } : undefined,
+        initialPrograms: flexibility ? { timeOfUse: "On" } : undefined,
       });
+      if (flexibility) game.policies!.programs.timeOfUse.pending!.startHour = 8;
       // A hand-set rate that following then resumes from: the forecast must carry it forward
       // with inflation, not lock it to the scenario's target.
       const resumed = gameReducer(
@@ -54,9 +55,9 @@ describe("utility rate following inflation", () => {
         generateNewTimeline(state, now.cash, now.customers, 13 * 24, 60);
       const following = forecast(resumed);
       const manual = forecast(fixed);
-      expect(following.some((tick) => (tick.thermalShiftedW ?? 0) > 0)).toBe(
-        flexibility,
-      );
+      expect(
+        following.some((tick) => (tick.shiftedResidentialW ?? 0) > 0),
+      ).toBe(flexibility);
       expect(following.slice(0, 24)).toEqual(manual.slice(0, 24));
       const nextYear = following[12 * 24];
       expect(nextYear.customerBillingRate).toBe(

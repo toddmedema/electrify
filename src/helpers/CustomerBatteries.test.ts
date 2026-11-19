@@ -3,14 +3,14 @@ import {
   batteryEligibleHouseholdShare,
   batteryCohortHouseholds,
   batteryEnrollmentShare,
-  batteryRebateCost,
   CUSTOMER_BATTERIES,
-  residentialBatteryCostPerWh,
+  homeBatteryProgramAvailable,
 } from "../data/CustomerBatteries";
 import {
   batteryMonthlyCompensation,
   customerBatteryFleet,
   dispatchCustomerBattery,
+  customerBatterySustainedW,
 } from "./CustomerBatteries";
 
 const location = { country: "Australia", region: "Oceania" };
@@ -22,10 +22,7 @@ const program: PolicyProgramType = {
   installs: [[1, 1]],
 };
 const fleet = {
-  installedHouseholds: 1,
   enrolledHouseholds: 1,
-  installedPowerW: 5000,
-  installedCapacityWh: 10000,
   powerW: 5000,
   capacityWh: 10000,
   reserveWh: 2000,
@@ -33,7 +30,6 @@ const fleet = {
 
 test("modern home batteries do not exist in 1980 and have only a tiny addressable 2015 market", () => {
   expect(batteryEligibleHouseholdShare(1980, location)).toBe(0);
-  expect(batteryRebateCost(100000, 1, 1980, location)).toBe(0);
   const early = batteryEligibleHouseholdShare(2015, location);
   expect(early).toBeGreaterThan(0);
   expect(early).toBeLessThan(0.001);
@@ -41,7 +37,6 @@ test("modern home batteries do not exist in 1980 and have only a tiny addressabl
     early * 50,
   );
   expect(batteryEnrollmentShare(2015)).toBe(0);
-  expect(batteryRebateCost(100000, 1, 2015, location)).toBe(0);
   expect(customerBatteryFleet(program, 61, 2015, 100000, location).powerW).toBe(
     0,
   );
@@ -75,35 +70,40 @@ test("readiness reflects the local market and stays bounded in distant future cu
       0.3,
     );
   }
-  expect(residentialBatteryCostPerWh(3000)).toBe(
-    residentialBatteryCostPerWh(2040),
+});
+
+test("an offer is gated by calendar year", () => {
+  expect(
+    homeBatteryProgramAvailable(CUSTOMER_BATTERIES.offerFromYear - 1),
+  ).toBe(false);
+  expect(homeBatteryProgramAvailable(CUSTOMER_BATTERIES.offerFromYear)).toBe(
+    true,
   );
 });
 
-test("rebates price the actual installation cohort, cost nothing at zero rollout and scale with it", () => {
-  expect(batteryRebateCost(10000, 0, 2025, location)).toBe(0);
-  const whole = batteryRebateCost(10000, 1, 2025, location);
-  expect(whole).toBeGreaterThan(0);
-  expect(batteryRebateCost(10000, 0.25, 2025, location)).toBeCloseTo(whole / 4);
-  expect(residentialBatteryCostPerWh(2015)).toBeGreaterThan(
-    residentialBatteryCostPerWh(2025),
+test("payments follow enrolled four-hour capacity", () => {
+  const whole = customerBatteryFleet(program, 1, 2025, 10000, location);
+  const partial = customerBatteryFleet(
+    { ...program, installs: [[1, 0.25]] },
+    1,
+    2025,
+    10000,
+    location,
   );
-  const funded = customerBatteryFleet(program, 1, 2025, 10000, location);
-  expect(funded.installedHouseholds).toBe(
+  expect(whole.enrolledHouseholds).toBe(
     batteryCohortHouseholds(10000, 1, 2025, location),
   );
-  expect(funded.enrolledHouseholds).toBe(funded.installedHouseholds);
-  expect(funded.powerW).toBe(funded.installedPowerW);
-  expect(funded.capacityWh).toBe(funded.installedCapacityWh);
-  expect(whole / funded.installedHouseholds).toBeCloseTo(
-    CUSTOMER_BATTERIES.householdEnergyWh *
-      residentialBatteryCostPerWh(2025) *
-      CUSTOMER_BATTERIES.rebateShare,
+  expect(customerBatterySustainedW(fleet)).toBe(2000);
+  expect(batteryMonthlyCompensation(fleet)).toBe(
+    (2 * CUSTOMER_BATTERIES.annualPaymentPerKw) / 12,
+  );
+  expect(batteryMonthlyCompensation(partial)).toBeCloseTo(
+    batteryMonthlyCompensation(whole) / 4,
   );
 });
 
 test.each([2016, 2017])(
-  "a %i cohort does not acquire free hardware or VPP agreements as adoption rises",
+  "a %i cohort retains its enrollment count and pays for declining capacity",
   (startingYear) => {
     const installed = customerBatteryFleet(
       program,
@@ -126,17 +126,14 @@ test.each([2016, 2017])(
       10000,
       location,
     );
-    expect(later.installedHouseholds).toBe(installed.installedHouseholds);
-    expect(later.installedCapacityWh).toBeLessThan(
-      installed.installedCapacityWh,
-    );
-    expect(newInstallation.installedHouseholds).toBeGreaterThan(
-      later.installedHouseholds,
+    expect(later.enrolledHouseholds).toBe(installed.enrolledHouseholds);
+    expect(later.capacityWh).toBeLessThan(installed.capacityWh);
+    expect(newInstallation.enrolledHouseholds).toBeGreaterThan(
+      later.enrolledHouseholds,
     );
     expect(installed.powerW).toBeGreaterThan(0);
     expect(later.powerW).toBe(installed.powerW);
-    expect(later.enrolledHouseholds).toBe(installed.enrolledHouseholds);
-    expect(batteryMonthlyCompensation(later)).toBe(
+    expect(batteryMonthlyCompensation(later)).toBeLessThan(
       batteryMonthlyCompensation(installed),
     );
     // Installation status is independent of the current dispatch contract.
@@ -160,13 +157,11 @@ test("future cohorts are excluded, energy fades with age and all hardware eventu
   const ten = customerBatteryFleet(program, 121, 2025, 10000, location);
   const retiring = customerBatteryFleet(program, 151, 2025, 10000, location);
   const fifteen = customerBatteryFleet(program, 181, 2025, 10000, location);
-  expect(ten.installedHouseholds).toBe(fresh.installedHouseholds);
-  expect(ten.installedCapacityWh).toBeCloseTo(fresh.installedCapacityWh * 0.7);
-  expect(retiring.installedHouseholds).toBeCloseTo(
-    fresh.installedHouseholds / 2,
-  );
-  expect(retiring.installedCapacityWh).toBeCloseTo(ten.installedCapacityWh / 2);
-  expect(fifteen.installedHouseholds).toBe(0);
+  expect(ten.enrolledHouseholds).toBe(fresh.enrolledHouseholds);
+  expect(ten.capacityWh).toBeCloseTo(fresh.capacityWh * 0.7);
+  expect(retiring.enrolledHouseholds).toBeCloseTo(fresh.enrolledHouseholds / 2);
+  expect(retiring.capacityWh).toBeCloseTo(ten.capacityWh / 2);
+  expect(fifteen.enrolledHouseholds).toBe(0);
   expect(fifteen.powerW).toBe(0);
   expect(batteryMonthlyCompensation(fifteen)).toBe(0);
   expect(batteryMonthlyCompensation(fresh)).toBeGreaterThan(0);
@@ -286,4 +281,18 @@ test("peak dispatch never charges grid energy, and no tick can charge and discha
   expect(
     dispatchCustomerBattery(fleet, 5000, { deficitW: 1000 }).dischargeW,
   ).toBe(0);
+});
+
+test("a full battery can sustain four hours at its contracted power before hitting its reserve", () => {
+  let energy = fleet.capacityWh;
+  for (let remaining = 240; remaining > 0; remaining -= 15) {
+    const dispatch = dispatchCustomerBattery(fleet, energy, {
+      deficitW: 5000,
+      peak: true,
+      remainingPeakMinutes: remaining,
+    });
+    expect(dispatch.dischargeW).toBeCloseTo(2000);
+    energy = dispatch.storedWh;
+  }
+  expect(energy).toBeCloseTo(fleet.reserveWh);
 });

@@ -1,8 +1,8 @@
 import * as React from "react";
 import { Snackbar, SnackbarProps } from "@mui/material";
 
-/** MUI portals every modal to the body; a Dialog carries this class while it is open. */
-const MODAL_SELECTOR = ".MuiDialog-root";
+/** Include nonmodal workspace dialogs, which can contain the same plant actions. */
+const MODAL_SELECTOR = '.MuiDialog-root, [role="dialog"]';
 
 function modalOpen(): boolean {
   return !!document.querySelector(MODAL_SELECTOR);
@@ -15,7 +15,7 @@ export function useModalOpen(): boolean {
     const update = () => setOpen(modalOpen());
     update();
     const observer = new MutationObserver(update);
-    observer.observe(document.body, { childList: true });
+    observer.observe(document.body, { childList: true, subtree: true });
     return () => observer.disconnect();
   }, []);
   return open;

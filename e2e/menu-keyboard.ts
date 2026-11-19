@@ -126,16 +126,23 @@ export async function verifyMenuKeyboard(page: Page): Promise<void> {
   });
   await expect(start).toBeVisible();
   await expect(start).toBeFocused();
-  // Up wraps from the first action to the final menu control, including Explore links.
+  const tutorials = page.getByRole("button", {
+    name: "Tutorials",
+    exact: true,
+  });
+  await page.keyboard.press("ArrowUp");
+  await expect(tutorials).toBeFocused();
+  // Up wraps from Tutorials to the final menu control, including Explore links.
   const last = page.locator("#menuCard button,#menuCard a[href]").last();
   await page.keyboard.press("ArrowUp");
   await expect(last).toBeFocused();
   await page.keyboard.press("ArrowDown");
+  await expect(tutorials).toBeFocused();
+  await page.keyboard.press("ArrowDown");
 
   await expect(start).toBeFocused();
   await page.keyboard.press("Enter");
-  await expect(page.locator(".facilities:visible")).toBeVisible();
   await expect(
-    page.getByRole("region", { name: "Step 1 of 5", exact: true }),
+    page.getByRole("heading", { name: "Choose a game", exact: true }),
   ).toBeVisible();
 }

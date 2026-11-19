@@ -25,6 +25,8 @@ function controls(root: Element): HTMLElement[] {
 }
 const preferred = (items: HTMLElement[]) =>
   items.find((item) => item.matches("[aria-pressed=true]")) || items[0];
+const homeAction = (items: HTMLElement[]) =>
+  items.find((item) => item.hasAttribute("data-main-action")) || items[0];
 function focus(element?: HTMLElement, initial = false) {
   if (!element) return;
   if (initial) focusInitialMenuControl(element);
@@ -102,7 +104,10 @@ export function useMenuKeys(settings = false, onBack?: () => void) {
         (interaction.current === 1 && ref.current?.contains(active)))
     ) {
       const items = rows()[0] || [];
-      focus(ref.current?.id === "menuCard" ? items[0] : preferred(items), true);
+      focus(
+        ref.current?.id === "menuCard" ? homeAction(items) : preferred(items),
+        true,
+      );
     }
     if (!interaction.current) interaction.current = 1;
   });
@@ -119,7 +124,7 @@ export function useMenuKeys(settings = false, onBack?: () => void) {
         !document.querySelector(popup) &&
         (active === document.body || active === document.documentElement)
       )
-        focus(controls(root)[0]);
+        focus(homeAction(controls(root)));
     };
     // Let a click finish transferring focus before deciding that selection was lost.
     const scheduleRecovery = () => {

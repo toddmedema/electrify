@@ -156,6 +156,7 @@ describe("RANDOM_STREAM", () => {
       transmissionLulls: 9,
       wildfireHazards: 10,
       weatherHazards: 11,
+      cityMix: 12,
     });
   });
 });

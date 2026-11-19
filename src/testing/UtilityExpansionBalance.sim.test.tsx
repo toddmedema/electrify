@@ -176,7 +176,7 @@ for (const difficulty of difficulties)
         ).length,
       );
       expect(result.finalUtilityExpansion?.acquisitions.length).toBe(
-        fixture.portfolio === "line-only"
+        fixture.portfolio === "standalone"
           ? 0
           : fixture.portfolio === "both"
             ? 2

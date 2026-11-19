@@ -20,18 +20,27 @@ it("preserves negative savings and the requested horizon without competing metri
   render(
     <AgreementForecastDetails
       forecast={forecast({
-        result: { cashDifference: -1250000 } as AgreementForecast,
+        result: {
+          cashDifference: -1250000,
+          withAgreement: { demandMWh: 100, servedMWh: 100 },
+          withoutAgreement: { demandMWh: 100, servedMWh: 60 },
+        } as AgreementForecast,
       })}
       horizon="over 5 years"
     />,
   );
   expect(screen.getByRole("status")).toHaveTextContent("-$1.3M over 5 years");
-  expect(screen.getByText("Based on current supply and demand")).toBeVisible();
+  expect(
+    screen.getByText("Compared with omitting this agreement"),
+  ).toBeVisible();
+  expect(
+    screen.getByText("Demand served: 100% with agreement · 60% without"),
+  ).toBeVisible();
   expect(screen.queryByRole("heading")).not.toBeInTheDocument();
 });
 it.each([
-  [{}, "Calculating…", "Based on current supply and demand"],
-  [{ updating: true }, "Updating…", "Based on current supply and demand"],
+  [{}, "Calculating…", "Compared with omitting this agreement"],
+  [{ updating: true }, "Updating…", "Compared with omitting this agreement"],
   [
     { blocked: "coop" as const },
     "Unavailable in co-op",

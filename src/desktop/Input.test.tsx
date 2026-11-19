@@ -502,6 +502,58 @@ it("waits for context activation and leaves older/native-unavailable editions us
   expect(getInputPresentation().active).toBe(false);
 });
 
+it.each(["aria-hidden", "hidden", "inert"])(
+  "activates an existing dialog before the first Back when its ancestor loses %s",
+  async (attribute) => {
+    const close = jest.fn();
+    render(
+      <main className="base_main">
+        <div className="gameWorkspace">
+          <div
+            data-testid="tile-inspector-ancestor"
+            {...{
+              [attribute]:
+                attribute === "hidden"
+                  ? true
+                  : attribute === "aria-hidden"
+                    ? "true"
+                    : "",
+            }}
+          >
+            <section
+              role="dialog"
+              aria-label="Tile inspector"
+              onKeyDown={(event) => {
+                if (event.key === "Escape") {
+                  event.preventDefault();
+                  close();
+                }
+              }}
+            >
+              Tile controls
+            </section>
+          </div>
+        </div>
+      </main>,
+    );
+    const ancestor = screen.getByTestId("tile-inspector-ancestor");
+    const f = bridge();
+    stop = startDesktopInput(store, f.desktop);
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(f.desktop.setInputContext).toHaveBeenLastCalledWith("Gameplay");
+    await act(async () => {
+      ancestor.removeAttribute(attribute);
+      await Promise.resolve();
+    });
+    // The native bridge emits actions only on intent; there is no warm-up frame.
+    expect(f.desktop.setInputContext).toHaveBeenLastCalledWith("Menu");
+    f.emit({ actions: ["back"] });
+    expect(close).toHaveBeenCalledTimes(1);
+  },
+);
+
 it.each([
   ["PROGRAMS", "nextChart"],
   ["PROGRAMS", "previousChart"],
@@ -581,6 +633,49 @@ it.each(["BUILD_STORAGE", "BUILD_INTERTIES"] as const)(
     await Promise.resolve();
     f.emit({ actions: ["previousPane"] });
     expect(store.getState().card.name).toBe(category);
+  },
+);
+
+it.each([
+  ["previousPane", "SCENARIO"],
+  ["nextPane", "FLEET"],
+] as const)(
+  "map pane cycling %s treats Map as a single destination",
+  async (action, expected) => {
+    store.dispatch(delta({ inGame: true }));
+    store.dispatch(navigate("FACILITIES"));
+    render(
+      <main className="base_main">
+        <div className="gameWorkspace">
+          <nav className="gameActionDock">
+            {(
+              [
+                "FACILITIES",
+                "FLEET",
+                "AGREEMENTS",
+                "PROGRAMS",
+                "INSIGHTS",
+                "EVENTS",
+                "SCENARIO",
+              ] as const
+            ).map((card) => (
+              <button
+                key={card}
+                aria-controls={`tool-${card}`}
+                data-game-destination={card}
+              >
+                {card}
+              </button>
+            ))}
+          </nav>
+        </div>
+      </main>,
+    );
+    const f = bridge();
+    stop = startDesktopInput(store, f.desktop);
+    await Promise.resolve();
+    f.emit({ actions: [action] });
+    expect(store.getState().card.name).toBe(expected);
   },
 );
 

@@ -325,6 +325,8 @@ export const WEATHER_DEPENDENT_FUELS: readonly FuelNameType[] = [
 
 export const NAV_CARDS = [
   "FACILITIES",
+  "FLEET",
+  "AGREEMENTS",
   "INSIGHTS",
   "EVENTS",
   "SCENARIO",

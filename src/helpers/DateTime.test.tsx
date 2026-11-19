@@ -212,6 +212,19 @@ describe("summarizeTimeline", () => {
       tick.storedWh = index * 1000;
       tick.customerBatteryWh = undefined;
       tick.customerBatteryLossWh = 0;
+      tick.territories = {
+        champlain: {
+          demandW: tick.demandW,
+          supplyW: tick.supplyW,
+          generationW: tick.supplyW,
+          importedW: 0,
+          exportedW: 0,
+          unservedW: tick.demandW - tick.supplyW,
+          curtailedW: 0,
+          storageChargeW: 0,
+          storageDischargeW: 0,
+        },
+      };
     });
     const original = JSON.stringify(timeline);
     const average = summarizeTimeline(timeline, 2020).chartAverage!;
@@ -221,6 +234,7 @@ describe("summarizeTimeline", () => {
     expect(average.storedWh).toBe(500);
     expect(average).not.toHaveProperty("customerBatteryWh");
     expect(average.customerBatteryLossWh).toBe(0);
+    expect(average).not.toHaveProperty("territories");
     expect(average.windKph).toBe(50);
     expect(average.renewableCapacityFactors!.Wind).toBeGreaterThanOrEqual(0);
     expect(JSON.stringify(timeline)).toBe(original);

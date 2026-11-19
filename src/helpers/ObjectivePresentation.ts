@@ -2,6 +2,7 @@ import { CurrencyType, USD_CURRENCY } from "./Currency";
 import { formatNumber, formatRateCompact, getWattUnit } from "./Format";
 import { roundToSignificantDigits } from "./Math";
 import type { CompiledRuleObjective } from "../data/ScenarioRules";
+import { UTILITY_TARGETS } from "../data/UtilityExpansion";
 import type { ObjectiveResult } from "../data/ScenarioObjectives";
 import { MONTHS } from "../Constants";
 import { objectiveTarget } from "./ScenarioObjectives";
@@ -116,6 +117,15 @@ export function objectiveTargetText(
   objective: CompiledRuleObjective,
   currency: CurrencyType = USD_CURRENCY,
 ): string {
+  if (
+    objective.metric === "utilityOwnership" &&
+    objective.id === "acquire-neighbor"
+  ) {
+    const names = UTILITY_TARGETS.filter(({ id }) =>
+      objective.targets.includes(id),
+    ).map(({ name }) => name);
+    if (names.length) return `Acquire ${names.join(" or ")}`;
+  }
   const target = objectiveValueText(
     objective,
     objectiveTarget(objective),
@@ -227,6 +237,11 @@ export function objectiveGoalText(
 
 /** A short heading names the goal; its target carries quantities, conditions and dates. */
 export function objectiveHeadingText(objective: CompiledRuleObjective): string {
+  if (
+    objective.metric === "utilityOwnership" &&
+    objective.id === "acquire-neighbor"
+  )
+    return "Acquire a competitor";
   if (
     objective.label !== objectiveTargetText(objective) &&
     !/\d/.test(objective.label)

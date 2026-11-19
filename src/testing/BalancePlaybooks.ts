@@ -4,7 +4,7 @@ import {
   expansionBalanceActions,
 } from "./UtilityExpansionBalanceFixtures";
 
-/** Expansion requires a connection, transfer and retirements in addition to generation. */
+/** Expansion requires a transfer and retirements in addition to generation. */
 export const expansionEconomicsPlay = (
   seed = 12345,
 ): Partial<SimOptionsType> => ({

@@ -14,6 +14,8 @@ import { formatMoneyFull, formatNumber } from "../../helpers/Format";
 import { currentTick } from "../../helpers/GameSelectors";
 import {
   agreementYearMinute,
+  connectionAgreements,
+  inheritedConnection,
   powerAgreementQuote,
 } from "../../helpers/PowerAgreements";
 import {
@@ -62,7 +64,7 @@ function fixture() {
   return game;
 }
 function mount(game = fixture()) {
-  const line = game.transmission!.lines[0];
+  const line = inheritedConnection("champlain", 1);
   const store = configureStore({
     reducer: {
       game: gameReducer,
@@ -77,7 +79,7 @@ function mount(game = fixture()) {
   const dispatch = jest.spyOn(store, "dispatch");
   function ConnectedAgreements() {
     const state = useSelector((state: { game: GameType }) => state.game);
-    return <PowerAgreements game={state} line={state.transmission!.lines[0]} />;
+    return <PowerAgreements game={state} line={line} />;
   }
   render(
     <Provider store={store}>
@@ -111,6 +113,130 @@ function review(temperatureC = 20) {
   };
 }
 
+it.each([1, 2, 3] as PowerAgreementTermsVersion[])(
+  "keeps v%s commitment and minimum exposure visible while disclosing secondary terms",
+  (version) => {
+    const game = fixture();
+    game.transmission!.inheritedAgreementTerms = version;
+    const source = connectionAgreements(game, "champlain").find(
+      (entry) => entry.id === "champlain-nuclear",
+    )!;
+    mount(game);
+    const agreement = screen.getByRole("article", { name: "Regional nuclear" });
+    expect(
+      within(agreement).getByText("Up to", { exact: false }),
+    ).toHaveTextContent(`Up to 95MW · ${rate(source.priceToday)}`);
+    expect(within(agreement).getByText("Through 31 Dec 2019")).toBeVisible();
+    expect(
+      within(agreement).getByText(
+        version === 1
+          ? "No minimum purchase"
+          : /Minimum payment: .*even if unused/,
+      ),
+    ).toBeVisible();
+    const details = within(agreement).getByRole("group", {
+      name: "Regional nuclear details",
+    });
+    expect(details).not.toHaveAttribute("open");
+    expect(within(agreement).getByText(/Market now/)).not.toBeVisible();
+    fireEvent.click(within(agreement).getByText("Details"));
+    expect(details).toHaveAttribute("open");
+    expect(within(agreement).getByText(/Market now/)).toBeVisible();
+    expect(
+      within(agreement).getByRole("button", {
+        name: "Forecast Regional nuclear remaining term",
+      }),
+    ).toBeVisible();
+  },
+);
+
+it("uses a short offer action with a unique accessible contract name", () => {
+  mount();
+  expect(screen.getAllByRole("article")[0]).toHaveAccessibleName(
+    "Regional nuclear",
+  );
+  const offer = screen.getByRole("button", {
+    name: "Review Valley Electric supply agreement",
+  });
+  expect(offer).toHaveTextContent("Review terms");
+  expect(
+    screen.queryByRole("heading", {
+      name: "Power purchase agreements",
+    }),
+  ).not.toBeInTheDocument();
+  fireEvent.click(offer);
+  const dialog = screen.getByRole("dialog", {
+    name: "Review Valley Electric supply agreement",
+  });
+  expect(
+    within(dialog).getByRole("table", { name: "Agreement terms" }),
+  ).toBeVisible();
+});
+
+it("retains expired recorded history without a live commitment or forecast", () => {
+  const game = fixture();
+  game.date = getDateFromMinute(agreementYearMinute(2020), game.startingYear);
+  game.transmission!.agreementAccounts = [
+    {
+      agreementId: "champlain-nuclear",
+      termsVersion: 3,
+      accountingStartMinute: agreementYearMinute(2020) - 1440,
+      accountedThroughMinute: agreementYearMinute(2020),
+      months: [
+        {
+          month: 179,
+          availableMWh: 0,
+          usefulMWh: 0,
+          availableValue: 0,
+          usefulValue: 0,
+          payment: 0,
+        },
+      ],
+    },
+  ];
+  mount(game);
+  const agreement = screen.getByRole("article", { name: "Regional nuclear" });
+  expect(
+    within(agreement).queryByText(/Minimum payment/),
+  ).not.toBeInTheDocument();
+  expect(within(agreement).queryByText(/Up to/)).not.toBeInTheDocument();
+  fireEvent.click(
+    within(agreement).getByRole("button", {
+      name: "Regional nuclear recorded history",
+    }),
+  );
+  expect(
+    within(screen.getByRole("dialog")).getByRole("table", {
+      name: "Recorded agreement history",
+    }),
+  ).toBeVisible();
+  expect(mockForecast.mock.lastCall?.[1]).toBeUndefined();
+});
+
+it("quotes the Ridge supplier's own reference price", () => {
+  const { game, line } = mount();
+  const now = currentTick(game)!;
+  const otherMarket = adjacentMarketPricePerMWh(
+    line.corridorId,
+    intertieContextForGame(game),
+    now.minute,
+    now,
+  );
+  const quote = powerAgreementQuote(game, "ridge-purchase")!;
+  const reference = quote.receipt.signingMarketPricePerMWh!;
+  expect(reference).not.toBe(otherMarket);
+  fireEvent.click(
+    screen.getByRole("button", {
+      name: "Review Ridge Electric supply agreement",
+    }),
+  );
+  expect(
+    within(screen.getByRole("dialog")).getByRole("row", {
+      name: /Reference price/,
+    }),
+  ).toHaveTextContent(rate(reference));
+});
+
 it("shows the direct discount alongside monthly energy and deliverable power", () => {
   const { game, line, dialog, quote } = review();
   expect(agreementSummary(game, line.corridorId)).toContain(
@@ -123,12 +249,12 @@ it("shows the direct discount alongside monthly energy and deliverable power", (
       .map((cell) => cell.textContent),
   ).toEqual([
     "Agreement price",
-    "Market price",
+    "Reference price",
     "Discount",
     "Minimum supply",
     "Maximum supply",
     "Duration",
-    "Forecasted savings",
+    "Forecasted cash impact",
   ]);
   const max = within(table).getByRole("row", { name: /Maximum supply/ });
   expect(max).toHaveTextContent("57 MW");
@@ -167,7 +293,7 @@ it.each([20, -40])(
       within(dialog).getByRole("row", { name: /Agreement price/ }),
     ).toHaveTextContent(`${rate(quote.priceToday)}Follows inflation`);
     const comparison = within(dialog).getByRole("row", {
-      name: /Market price/,
+      name: /Reference price/,
     });
     expect(comparison).toHaveTextContent(rate(marketPrice));
     expect(comparison).not.toHaveTextContent("higher");
@@ -382,14 +508,18 @@ it.each([1, 2, 3] as PowerAgreementTermsVersion[])(
     game.transmission!.inheritedAgreementTerms = version;
     mockForecast.mockReturnValue({
       blocked: undefined,
-      result: { cashDifference: -1234 } as NonNullable<
-        ReturnType<typeof useAgreementForecast>["result"]
-      >,
+      result: {
+        cashDifference: -1234,
+        withAgreement: { demandMWh: 100, servedMWh: 100 },
+        withoutAgreement: { demandMWh: 100, servedMWh: 60 },
+      } as NonNullable<ReturnType<typeof useAgreementForecast>["result"]>,
       error: false,
       updating: false,
       retry: jest.fn(),
     });
     mount(game);
+    const agreement = screen.getByRole("article", { name: "Regional nuclear" });
+    fireEvent.click(within(agreement).getByText("Details"));
     fireEvent.click(
       screen.getByRole("button", {
         name: "Forecast Regional nuclear remaining term",
@@ -406,9 +536,9 @@ it.each([1, 2, 3] as PowerAgreementTermsVersion[])(
           : "MWh/monthPaid for even if you don't use it",
     );
     expect(
-      within(dialog).getByRole("row", { name: /Forecasted savings/ }),
+      within(dialog).getByRole("row", { name: /Forecasted cash impact/ }),
     ).toHaveTextContent(
-      "-$1.2k over 2 years remainingBased on current supply and demand",
+      "-$1.2k over 2 years remainingCompared with omitting this agreement",
     );
     expect(dialog).not.toHaveTextContent("The price follows inflation");
   },
