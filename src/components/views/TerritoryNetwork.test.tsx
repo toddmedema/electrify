@@ -56,6 +56,10 @@ jest.mock("../base/ProjectBuild", () => {
   return jest.requireActual("../base/ProjectBuild");
 });
 
+jest.mock("../base/BuildForecast", () => ({
+  useBuildForecast: () => undefined,
+}));
+
 jest.mock(
   "../base/ManualLink",
   () => (props: { children?: React.ReactNode }) => <>{props.children}</>,
