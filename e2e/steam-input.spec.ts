@@ -2465,12 +2465,13 @@ for (const source of [
       "data-interface-scale",
       accept ? "1.5" : "1",
     );
+    // Acceptance persists the applied choices; dismissal keeps defaults without writing them.
     expect(await page.evaluate(() => localStorage.getItem("workspace"))).toBe(
-      accept ? "single" : "automatic",
+      accept ? "single" : null,
     );
     expect(
       await page.evaluate(() => localStorage.getItem("screenEdgePadding")),
-    ).toBe("0");
+    ).toBeNull();
     await page.evaluate(() =>
       sessionStorage.setItem("mockKeepPreferencesOnReload", "true"),
     );
