@@ -33,7 +33,6 @@ import { TOOL_SHORTCUTS } from "./base/KeyboardShortcuts";
 import { listenForShortcuts } from "./base/GlobalShortcuts";
 import DisplayNameDialogContainer from "./base/DisplayNameDialogContainer";
 import FeedbackDialog from "./base/FeedbackDialog";
-import FeedbackPrompt from "./base/FeedbackPrompt";
 import InstallAppButton from "./base/InstallAppButton";
 import TutorialHud from "./base/TutorialHud";
 import DataCenterGuide from "./base/DataCenterGuide";
@@ -772,16 +771,14 @@ export default class Compositor extends React.Component<Props, {}> {
           }}
         >
           <DialogTitle id="app-dialog-title">{ui.dialog.title}</DialogTitle>
-          <DialogContent>
-            {ui.dialog.message}
-            {ui.dialog.allTutorialsCompleted && ui.dialog.open && (
-              <FeedbackPrompt milestone="all-tutorials" />
-            )}
-          </DialogContent>
+          <DialogContent>{ui.dialog.message}</DialogContent>
           <DialogActions disableSpacing={Boolean(ui.dialog.tutorialComplete)}>
             {ui.dialog.tutorialComplete && (
               <div className="tutorialFeedbackAction">
                 <Button
+                  variant={
+                    ui.dialog.allTutorialsCompleted ? "outlined" : "text"
+                  }
                   onClick={() =>
                     store.dispatch(
                       feedbackOpen({

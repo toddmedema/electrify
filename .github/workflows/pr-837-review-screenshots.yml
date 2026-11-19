@@ -3,18 +3,47 @@ on:
   push:
     branches: [codex/qa/pr-837-screenshots]
 permissions:
+  contents: read
   actions: read
 jobs:
-  prepare:
+  captures:
     runs-on: ubuntu-22.04
-    timeout-minutes: 5
+    timeout-minutes: 15
+    env:
+      DISABLE_ESLINT_PLUGIN: "true"
+      E2E_BUILD_DIR: ${{ github.workspace }}/build
+      E2E_PORT: "3189"
+      PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/.tmp/playwright-browsers
+      REVIEW_SCREENSHOT_DIR: ${{ github.workspace }}/test-results/pr-837-screenshots
     steps:
-      - uses: actions/download-artifact@v8
+      - uses: actions/checkout@v7
+        with:
+          ref: e51fd957a3f22f9266176f6967a5a1cc020a5580
+          fetch-depth: 0
+          lfs: true
+          persist-credentials: false
+      - uses: ./.github/actions/install
+      - uses: actions/cache/restore@v6
+        with:
+          path: .tmp/playwright-browsers
+          key: playwright-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json') }}
+      - name: Install Chromium
+        run: |
+          sudo "$(command -v node)" scripts/ci/ubuntu-apt.js
+          npx playwright install --with-deps --only-shell chromium
+      - name: Build the exact PR web renderer
+        run: npm run build
+      - name: Capture the tutorial completion and feedback form
+        run: |
+          npm run test:e2e -- --config=e2e/production.playwright.config.ts --project=desktop-chromium --project=mobile-360px --workers=2 --retries=0 e2e/tutorial-capstone.spec.ts --grep 'guided objective reaches|completed tutorial keeps'
+      - name: Preserve review screenshots
+        if: always()
+        uses: actions/upload-artifact@v7
         with:
           name: pr-837-review-screenshots
-          path: ${{ runner.temp }}/feedback-captures
-          run-id: 44607679323
-          github-token: ${{ github.token }}
+          path: test-results/pr-837-screenshots/
+          retention-days: 7
+          if-no-files-found: error
       - name: Prepare the verified PNGs for the GitHub attachment editor
         run: |
           python3 - <<'PY'
@@ -24,7 +53,7 @@ jobs:
           import os
           import textwrap
 
-          source = Path(os.environ["RUNNER_TEMP"]) / "feedback-captures"
+          source = Path(os.environ["REVIEW_SCREENSHOT_DIR"])
           captures = (
               ("desktop-chromium", "mission-complete.png", "tutorial-completion-desktop"),
               ("desktop-chromium", "share-feedback.png", "feedback-form-desktop"),
@@ -33,7 +62,7 @@ jobs:
           with Path(os.environ["GITHUB_STEP_SUMMARY"]).open("a") as summary:
               summary.write("## Verified attachment payloads\n\n")
               for viewport, filename, label in captures:
-                  image, = source.glob(f"*-{viewport}/{filename}")
+                  image, = source.glob(f"tutorial-capstone-guided*-{viewport}/{filename}")
                   raw = image.read_bytes()
                   h = sha256(raw).hexdigest()
                   data = "\n".join(textwrap.wrap(b64encode(raw).decode(), width=120))

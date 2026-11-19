@@ -109,8 +109,6 @@ export default function FeedbackDialog({
               color="text.secondary"
             >
               Tell us what worked or what we could improve.
-              {context.scenarioId !== undefined &&
-                " Your scenario and game version are included."}
             </Typography>
             <TextField
               autoFocus
