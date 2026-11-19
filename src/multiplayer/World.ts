@@ -1486,6 +1486,13 @@ function territoryGameForWorld(
   };
 }
 
+const replayRecords = (value: unknown): boolean =>
+  Array.isArray(value) &&
+  value.every(
+    (entry) =>
+      entry !== null && typeof entry === "object" && !Array.isArray(entry),
+  );
+
 /** Admit only reachable receipts, preserving each ledger's order across shared clock instants.
  * Same-minute decisions may interleave; a circular or future claim cannot bootstrap discovery. */
 function territoryPurchaseHistory(
@@ -1496,6 +1503,24 @@ function territoryPurchaseHistory(
     ReturnType<typeof connectedPeerTerritoryTiles>
   >[] = world.grids.map(() => new Map());
   if (!world.grids.some(hasTerritoryNetwork)) return contexts;
+  // Replay needs historical anchors before the context-aware grid validation can run.
+  if (
+    world.grids.some(
+      (grid) =>
+        !replayRecords(grid.facilities) ||
+        !replayRecords(grid.territoryNetwork?.landPurchases) ||
+        !replayRecords(grid.territoryNetwork?.legacyTiles) ||
+        !replayRecords(grid.utilityExpansion?.acquisitions) ||
+        !replayRecords(grid.transmission?.lines) ||
+        (grid.transmission?.acceptedAgreements !== undefined &&
+          !replayRecords(grid.transmission.acceptedAgreements)) ||
+        !replayRecords(grid.multiplayer?.peers) ||
+        grid.multiplayer!.peers!.some(
+          ({ corridor }) => !corridor || typeof corridor !== "object",
+        ),
+    )
+  )
+    return undefined;
   const ledgers = world.grids.map(
     (grid) => grid.territoryNetwork?.tilePurchases,
   );
@@ -1506,7 +1531,10 @@ function territoryPurchaseHistory(
         entries.some(
           (receipt) =>
             !receipt ||
-            !getTerritoryTile(receipt.tileId, world.grids[i]) ||
+            !getTerritoryTile(receipt.tileId, {
+              facilities: world.grids[i].facilities,
+              territoryNetwork: world.grids[i].territoryNetwork,
+            }) ||
             !Number.isSafeInteger(receipt.minute) ||
             receipt.minute < 0 ||
             receipt.minute > world.grids[i].date.minute ||

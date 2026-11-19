@@ -199,6 +199,16 @@ it("rejects circular same-minute remote claims even with forged projected owners
   });
   expect(() => restoreWorld(raw, "circular-anchor")).toThrow();
 });
+it("rejects missing land ledgers before replaying co-op tile purchases", () => {
+  const world = ready();
+  buyToward(world, "0", "green-uplands:site-4");
+  const raw = JSON.parse(JSON.stringify(checkpointWorld(world)));
+  expect(() => restoreWorld(raw, "valid-land-ledger")).not.toThrow();
+  delete raw.grids[0].territoryNetwork.landPurchases;
+  expect(() => restoreWorld(raw, "missing-land-ledger")).toThrow(
+    "Multiplayer save contains invalid grids or connections",
+  );
+});
 it("reveals a connected peer's acquired utility without granting its ownership or future acquisition anchors", () => {
   const world = ready();
   const target = getTerritoryTile("frontier:7:-4")!;

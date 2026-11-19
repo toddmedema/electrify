@@ -402,17 +402,16 @@ export function validHydroClaims(state: HydroState): boolean {
       (territory) => territory.benefit === "hydro",
     ))
       allowed.add(territoryHydroSiteId(territory.id));
-    if (
-      state.facilities.some(
+    return (
+      validHydroClaimSet(state, allowed) &&
+      state.facilities.every(
         (facility) =>
-          (facility.hydroSiteId?.startsWith("scenario-116-parcel-") ||
-            facility.hydroSiteId?.startsWith("scenario-116-frontier:")) &&
-          facility.hydroSiteId !==
+          (!facility.hydroSiteId?.startsWith("scenario-116-parcel-") &&
+            !facility.hydroSiteId?.startsWith("scenario-116-frontier:")) ||
+          facility.hydroSiteId ===
             territoryHydroSiteId(facility.territoryId ?? "champlain"),
       )
-    )
-      return false;
-    return validHydroClaimSet(state, allowed);
+    );
   }
   if (
     !Array.isArray(state.commissionedHydroSiteIds) ||

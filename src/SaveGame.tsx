@@ -475,7 +475,7 @@ export function parseSave(
   ) {
     return null;
   }
-  if (!Array.isArray(game.facilities) || !validHydroClaims(game as GameType)) {
+  if (!Array.isArray(game.facilities)) {
     return null;
   }
   const inheritedScenario = getScenario(game.scenarioId, game.customScenario);
@@ -566,7 +566,6 @@ export function parseSave(
         optionalBooleansInvalid ||
         !validResilienceRecord(current.fuel, current.resilience) ||
         !validGasCycle(current.fuel, current.gasCycle) ||
-        !validFacilityExpansion(facility, game as GameType) ||
         !validUpgradeInProgress(current.upgradeInProgress) ||
         ((current.upgradeInProgress as { upgrade?: unknown } | undefined)
           ?.upgrade === "combinedCycle" &&
@@ -806,6 +805,10 @@ export function parseSave(
       !validLegacyCampaign(game as GameType) ||
       !validLegacyCampaignEvidence(game as GameType) ||
       !validUtilityExpansion(game as GameType, peers) ||
+      !validHydroClaims(game as GameType) ||
+      !game.facilities.every((facility) =>
+        validFacilityExpansion(facility, game as GameType),
+      ) ||
       !validPowerAgreements(game as GameType) ||
       !validScenarioRuleState(game as GameType) ||
       !validGameObjectiveProgress(game as GameType)

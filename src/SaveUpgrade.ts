@@ -311,6 +311,13 @@ const migrations: readonly Migration[] = [
       ) ||
       !Array.isArray(state.landPurchases) ||
       !Array.isArray(state.legacyConnections) ||
+      !Array.isArray(save.game.facilities) ||
+      !save.game.facilities.every(
+        (facility) =>
+          object(facility) &&
+          (facility.territoryId === undefined ||
+            typeof facility.territoryId === "string"),
+      ) ||
       (state.tilePurchases !== undefined &&
         (!Array.isArray(state.tilePurchases) || state.tilePurchases.length > 0))
     )

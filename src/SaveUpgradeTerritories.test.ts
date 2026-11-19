@@ -9,11 +9,20 @@ import { validTransmissionLine, parseSave, serializeSave } from "./SaveGame";
 import { upgradeSave } from "./SaveUpgrade";
 import { createGame } from "./testing/Simulator";
 import { currentTick } from "./helpers/GameSelectors";
+import { getBuildFacilityQuote } from "./data/Facilities";
+import { facilityExpansionQuote } from "./helpers/FacilityExpansion";
 import {
   ownedTerritories,
   landPurchaseQuote,
   purchaseLand,
+  purchaseTile,
+  tilePurchaseQuotes,
 } from "./helpers/Territories";
+import {
+  isGeneralBuildingLand,
+  getTerritoryTile,
+  ownsTerritoryTile,
+} from "./helpers/TerritoryTiles";
 import { accessContextForGame } from "./data/IntertieAccess";
 import {
   intertieBuildQuote,
@@ -22,11 +31,13 @@ import {
 import { inheritedConnection } from "./helpers/PowerAgreements";
 import { acquisitionQuote } from "./helpers/Expansion";
 import { projectionSignature } from "./helpers/Projection";
-import {
+import reducer, {
   applyAcquireUtility,
+  buildFacility,
   generateForecastTimeline,
   tickState,
 } from "./reducers/Game";
+import { expandFacility } from "./reducers/GameActions";
 import { modScenario } from "./mods/ModScenario";
 import { modPackage } from "./testing/ModFixtures";
 
@@ -217,13 +228,16 @@ it("keeps a migrated property's forecast current across ordinary loan payments",
 it("retains seeded resume and roundtrip behavior for a current land owner", () => {
   const game = createGame({ scenarioId: 116, seed: 61 });
   const quote = landPurchaseQuote(game)!;
-  purchaseLand(game, {
-    territoryId: quote.territoryId,
-    quoteKey: quote.quoteKey,
-  });
+  expect(
+    purchaseLand(game, {
+      territoryId: quote.territoryId,
+      quoteKey: quote.quoteKey,
+    }),
+  ).toBe(true);
   const resumed = parseSave(
     JSON.parse(JSON.stringify(serializeSave(game))),
   )!.game;
+  expect(ownsTerritoryTile(resumed, quote.tileId)).toBe(true);
   for (let i = 0; i < 5; i++) {
     tickState(game);
     tickState(resumed);
@@ -232,6 +246,79 @@ it("retains seeded resume and roundtrip behavior for a current land owner", () =
     JSON.parse(JSON.stringify(game)),
   );
   expect(parseSave(serializeSave(game))).not.toBeNull();
+});
+it.each([null, { hydroSiteId: 42 }])(
+  "rejects malformed Valley facility %p without throwing",
+  (facility) => {
+    const raw = JSON.parse(
+      JSON.stringify(serializeSave(createGame({ scenarioId: 116, seed: 61 }))),
+    );
+    const plant = raw.game.facilities[0];
+    raw.game.facilities[0] = facility && { ...plant, ...facility };
+    expect(parseSave(raw)).toBeNull();
+  },
+);
+it.each([{}, [null]])(
+  "rejects schema 16 facility data %p before reconstructing legacy tiles",
+  (facilities) => {
+    const raw = JSON.parse(
+      JSON.stringify(serializeSave(createGame({ scenarioId: 116, seed: 61 }))),
+    );
+    raw.schemaVersion = 16;
+    delete raw.game.territoryNetwork.legacyTiles;
+    raw.game.facilities = facilities;
+    expect(upgradeSave(raw)).toBeNull();
+  },
+);
+it("rejects malformed retained tiles even when a generated tile has a pending project", () => {
+  const game = createGame({ scenarioId: 116, seed: 61 });
+  currentTick(game)!.cash = 3e9;
+  const offer = [...tilePurchaseQuotes(game).values()].find(
+    ({ tileId }) =>
+      tileId.startsWith("frontier:") &&
+      isGeneralBuildingLand(getTerritoryTile(tileId)!),
+  )!;
+  const tile = getTerritoryTile(offer.tileId)!;
+  expect(
+    purchaseTile(game, { tileId: tile.id, quoteKey: offer.quoteKey }),
+  ).toBe(true);
+  const order = getBuildFacilityQuote(
+    game,
+    { name: "Wind", peakW: 10e6 },
+    tile.territoryId,
+    tile.id,
+  )!;
+  const built = cloneDeep(
+    reducer(
+      game,
+      buildFacility({
+        facility: order,
+        financed: false,
+        territoryId: tile.territoryId,
+        tileId: tile.id,
+      }),
+    ),
+  );
+  const plant = built.facilities.find(({ tileId }) => tileId === tile.id)!;
+  plant.yearsToBuildLeft = 0;
+  plant.minuteOperational = built.date.minute;
+  const project = facilityExpansionQuote(built, plant.id, 20e6);
+  if (project.status !== "ready") throw new Error(project.reason);
+  const pending = reducer(
+    built,
+    expandFacility({
+      facilityId: plant.id,
+      targetSize: project.targetSize,
+      quoteKey: project.quoteKey,
+    }),
+  );
+  expect(
+    pending.facilities.find(({ id }) => id === plant.id)?.expansionInProgress,
+  ).toBeDefined();
+  const raw = JSON.parse(JSON.stringify(serializeSave(pending)));
+  expect(parseSave(raw)).not.toBeNull();
+  raw.game.territoryNetwork.legacyTiles = {};
+  expect(parseSave(raw)).toBeNull();
 });
 it.each([
   null,

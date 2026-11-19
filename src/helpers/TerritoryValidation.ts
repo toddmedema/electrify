@@ -18,6 +18,7 @@ import {
   LAND_TERRITORIES,
 } from "../data/Territories";
 import { UTILITY_AREAS } from "../data/UtilityExpansion";
+import { hasEconomy } from "../data/Economy";
 import { isUtilityExpansionGame } from "./ExpansionContext";
 import {
   facilityTerritoryId,
@@ -87,6 +88,29 @@ export function territoryGameAtPurchase(
       : undefined,
   };
 }
+
+/** A cold save can validate receipt structure before the dated economy is ready. */
+export function validTerritoryPurchasePrices(game: GameType): boolean {
+  const state = game.territoryNetwork;
+  if (
+    !state ||
+    (!state.tilePurchases?.length &&
+      state.landPurchases.every(({ legacy }) => legacy === true))
+  )
+    return true;
+  return (
+    hasEconomy() &&
+    state.landPurchases.every(
+      ({ legacy, price, minute, territoryId }) =>
+        legacy === true || close(price, landPrice(game, minute, territoryId)),
+    ) &&
+    (!state.tilePurchases ||
+      state.tilePurchases.every(({ price, minute, tileId }) =>
+        close(price, tilePrice(game, minute, tileId)),
+      ))
+  );
+}
+
 /** Derived balances may be absent in historical frames; they are never migration inputs. */
 export function validTerritoryNetwork(
   game: GameType,
@@ -159,11 +183,7 @@ export function validTerritoryNetwork(
         return false;
     } else if (
       receipt.legacy !== undefined ||
-      Object.keys(receipt).length !== 3 ||
-      !close(
-        receipt.price,
-        landPrice(game, receipt.minute, receipt.territoryId),
-      )
+      Object.keys(receipt).length !== 3
     )
       return false;
   }
@@ -240,8 +260,7 @@ export function validTerritoryNetwork(
       receipt.minute < 0 ||
       receipt.minute > game.date.minute ||
       receipt.minute % TICK_MINUTES !== 0 ||
-      !nonnegative(receipt.price) ||
-      !close(receipt.price, tilePrice(game, receipt.minute, tile.id))
+      !nonnegative(receipt.price)
     )
       return false;
     const earlier = (state.tilePurchases ?? []).slice(0, purchased.size);
@@ -258,6 +277,7 @@ export function validTerritoryNetwork(
       return false;
     purchased.add(tile.id);
   }
+  if (hasEconomy() && !validTerritoryPurchasePrices(game)) return false;
   if (
     state.legacyConnections.some(
       (line) => line.corridorId === "vt-champlain-uplands",
