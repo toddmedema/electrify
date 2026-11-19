@@ -88,7 +88,13 @@ construction progress, capital terms and unique project identity. An imported
 pending project cannot bypass technology, era or terrain limits; inherited
 installed plants retain their existing capacity.
 
-Recognized published schema 13, 14, 15, 16 and 17 co-op identities have ordered transitions.
+Schema 20 adds optional coal-to-gas repower projects without changing existing projects.
+
+Schema 21 records the distance to the nearest owned city on new ordinary tile
+receipts. Older receipts keep their exact parcel prices. Later city acquisitions
+leave previous receipts and invested capital intact.
+
+Recognized published schema 13, 14, 15, 16, 17, 19 and 20 co-op identities have ordered transitions.
 It preserves the run's original scoring provenance. Existing company-local land
 rights are retained, including old duplicate ownership; new claims are exclusive
 and checked in host command order. Other incompatible co-op identities retain

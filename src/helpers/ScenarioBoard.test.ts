@@ -11,7 +11,8 @@ import {
   territoryHexDistance,
 } from "./TerritoryTiles";
 import { parseSave, serializeSave } from "../SaveGame";
-import reducer from "../reducers/Game";
+import reducer, { applyAcquireUtility } from "../reducers/Game";
+import { acquisitionQuote } from "./Expansion";
 import { acquireTile } from "../reducers/GameActions";
 import { validTerritoryNetwork } from "./TerritoryValidation";
 import type { TerritoryTileId } from "../Types";
@@ -64,6 +65,87 @@ it("keeps older off-board property visible and caps new connections at the scena
   expect(tilePurchaseQuote(game, "frontier:-8:0")).toBeDefined();
 });
 
+it("prices ordinary building tiles by terrain and the nearest owned city", () => {
+  let game = ready();
+  const price = (id: TerritoryTileId) => tilePurchaseQuote(game, id)!.price;
+  const connect = (id: TerritoryTileId) => {
+    const quote = tilePurchaseQuote(game, id)!;
+    const next = reducer(
+      game,
+      acquireTile({ tileId: id, quoteKey: quote.quoteKey }),
+    );
+    expect(next).not.toBe(game);
+    game = next;
+  };
+
+  // Both sites start three hexes from Burlington, one in forest and one on plains.
+  expect(price("green-uplands:site-1")).toBeCloseTo(6.45e6);
+  expect(price("green-uplands:site-2")).toBeCloseTo(4.2e6);
+  connect("green-uplands:site-2");
+  expect(price("green-uplands:site-5")).toBeCloseTo(7.8e6);
+  connect("green-uplands:site-5");
+
+  const remaining = "green-uplands:site-4";
+  const before = tilePurchaseQuote(game, remaining)!;
+  expect(before.price).toBeCloseTo(4.8e6);
+  connect("parcel-0:site-1");
+  expect(price(remaining)).toBeCloseTo(3e6);
+  expect(
+    purchaseTile(game, { tileId: remaining, quoteKey: before.quoteKey }),
+  ).toBe(false);
+  connect(remaining);
+
+  const raw = JSON.parse(JSON.stringify(serializeSave(game)));
+  expect(parseSave(raw)?.game.territoryNetwork?.tilePurchases).toEqual(
+    game.territoryNetwork?.tilePurchases,
+  );
+  const first = raw.game.territoryNetwork.tilePurchases[0];
+  first.connectionDistance = 1;
+  first.price = 3e6;
+  expect(parseSave(raw)).toBeNull();
+});
+
+it.each([true, false])(
+  "restores a tile purchase made in the same tick as a regional acquisition (acquisition first: %s)",
+  (acquisitionFirst) => {
+    const game = ready();
+    const tileId = "green-uplands:site-3";
+    const acquire = () => {
+      const targetId = "ridge-electric";
+      const quote = acquisitionQuote(game, targetId)!;
+      expect(
+        applyAcquireUtility(game, {
+          targetId,
+          financed: false,
+          quoteKey: quote.quoteKey,
+        }),
+      ).toBe(true);
+    };
+    if (acquisitionFirst) acquire();
+    const quote = tilePurchaseQuote(game, tileId)!;
+    expect(purchaseTile(game, { tileId, quoteKey: quote.quoteKey })).toBe(true);
+    if (!acquisitionFirst) acquire();
+    expect(game.territoryNetwork!.tilePurchases![0].connectionDistance).toBe(
+      acquisitionFirst ? 1 : 3,
+    );
+    expect(parseSave(serializeSave(game))).not.toBeNull();
+  },
+);
+
+it("keeps a schema 19 receipt at its original parcel price", () => {
+  const game = ready();
+  const tileId = "green-uplands:site-2";
+  const price = tilePrice(game, 0, tileId);
+  expect(tilePurchaseQuote(game, tileId)!.price).toBeGreaterThan(price);
+  const receipt = { tileId, minute: 0, price } as const;
+  game.territoryNetwork!.tilePurchases = [receipt];
+  currentTick(game)!.cash -= price;
+  const save = parseSave({ ...serializeSave(game), schemaVersion: 19 });
+  expect(save?.game.territoryNetwork?.tilePurchases).toEqual([receipt]);
+  expect(currentTick(save!.game)!.cash).toBe(currentTick(game)!.cash);
+  expect(parseSave(serializeSave(save!.game))?.game).toEqual(save!.game);
+});
+
 it("serves each city with a utility and sells both sites from the plant border", () => {
   const game = ready();
   const views = territoryTileViews(game);
@@ -100,6 +182,9 @@ it("serves each city with a utility and sells both sites from the plant border",
     purchases: quote.purchases,
   });
   expect(quote.utilityName).toMatch(/^Vergennes /);
+  expect(quote.price).toBe(
+    tilePrice(game, 0, plant.id) + tilePrice(game, 0, city.id),
+  );
   expect(quote.purchases.map(({ tileId }) => tileId)).toEqual([
     plant.id,
     city.id,
