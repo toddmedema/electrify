@@ -77,6 +77,8 @@ test("map notifications follow the full desktop header and clear the compact doc
   page,
 }, info) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
+  if (!info.project.use.hasTouch)
+    await page.setViewportSize({ width: 1199, height: 800 });
   await startGame(page, "light", 116);
   const header = page.locator("#appbar");
   const dock = page.locator("#navfooter");
@@ -107,6 +109,7 @@ test("map notifications follow the full desktop header and clear the compact doc
       0,
     );
   };
+  await expect(header).not.toHaveClass(/appbarSingleRow/);
   await expectBelowHeader();
   await reviewScreenshot(page, {
     path: info.outputPath("desktop-map-notification.png"),
@@ -1354,11 +1357,11 @@ test("wide screens keep several tools beside the fleet and remember them across 
 });
 
 for (const theme of ["light", "dark"] as const) {
-  test(`desktop controls and side rails switch together at 1300px in ${theme}`, async ({
+  test(`header and desktop speed changes preserve focus in ${theme}`, async ({
     page,
   }, testInfo) => {
     test.skip(testInfo.project.name !== "desktop-chromium");
-    await page.setViewportSize({ width: 1299, height: 800 });
+    await page.setViewportSize({ width: 1199, height: 800 });
     await startGame(page, theme, 111);
     await page.locator("#programsNav").click();
     const rate = page.locator("#rateSlider input");
@@ -1371,7 +1374,7 @@ for (const theme of ["light", "dark"] as const) {
       name: "ultra speed",
       exact: true,
     });
-    for (const width of [1299, 1300, 1440, 1299]) {
+    for (const width of [1199, 1200, 1299, 1300, 1440, 1199]) {
       await page.setViewportSize({ width, height: 800 });
       const desktop = width >= 1300;
       const profit = appbar.getByLabel(/^Monthly profit forecast/);
@@ -1386,12 +1389,15 @@ for (const theme of ["light", "dark"] as const) {
       expect(profitBox!.x).toBeGreaterThan(cashBox!.x + cashBox!.width);
       expect(dateBox!.x).toBeGreaterThan(profitBox!.x + profitBox!.width);
       await expect(stage).toHaveAttribute("data-layout", "side");
-      if (desktop) {
+      if (width >= 1200) {
         await expect(appbar).toHaveClass(/appbarSingleRow/);
+      } else {
+        await expect(appbar).not.toHaveClass(/appbarSingleRow/);
+      }
+      if (desktop) {
         await expect(ultra).toBeInViewport();
         await expectSideRails(page);
       } else {
-        await expect(appbar).not.toHaveClass(/appbarSingleRow/);
         await expect(ultra).toHaveCount(0);
       }
       await expect(rate).toBeFocused();

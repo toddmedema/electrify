@@ -115,6 +115,7 @@ const RESTORABLE_STATUS_FOCUS = [
   ".mapEventStatus",
 ];
 const NO_ACTIVE_EVENTS: ActiveEventGroupType[] = [];
+const SINGLE_ROW_MIN_WIDTH = 1200;
 
 /**
  * This month's profit, bit-identical to deriveExpandedSummary(summarizeTimeline(...)).profit
@@ -177,10 +178,13 @@ export function GameAppBar(props: Props) {
   const bigScreen = isBigScreen();
   // Tracks resizes even while paused, when the bar otherwise has no reason to re-render.
   const workspace = useGameWorkspaceLayout();
-  const wideRow = useMediaQuery(SIDE_LAYOUT_MEDIA, { noSsr: true });
+  const wideRow = useMediaQuery(`(min-width:${SINGLE_ROW_MIN_WIDTH}px)`, {
+    noSsr: true,
+  });
+  const wideSpeedControls = useMediaQuery(SIDE_LAYOUT_MEDIA, { noSsr: true });
   const singleRow = workspace
     ? workspace.layout === "side" &&
-      workspace.effectiveWidth >= SIDE_LAYOUT_MIN_WIDTH
+      workspace.effectiveWidth >= SINGLE_ROW_MIN_WIDTH
     : wideRow;
   const monthlyProfit = React.useMemo(
     () => monthProfit(game.timeline, date.monthsElapsed),
@@ -234,11 +238,10 @@ export function GameAppBar(props: Props) {
    * built once per actual change and handed back as the same elements. React then skips them
    * entirely on the frames in between, which is where a good quarter of the frame budget went.
    */
-  // Layout and speed availability must use the same media-query snapshot during resize.
   const desktop = workspace
     ? workspace.effectiveWidth >= SIDE_LAYOUT_MIN_WIDTH ||
       !!window.electrifyCouch
-    : singleRow;
+    : wideSpeedControls;
   const speedDisabled = !!multiplayer?.ending;
   const speedOptions = React.useMemo(
     () =>
