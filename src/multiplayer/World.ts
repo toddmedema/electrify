@@ -1697,12 +1697,14 @@ function upgradeTerritoryWorld(value: unknown): unknown {
       (old.gameSchema === 20 &&
         old.rules ===
           "coop-2-cf979e3b45deb328dd12a266f291e16398174095d47beca6df0d4f9da1dbd577") ||
-      // Published master89557e6 and acquisition branch755cf1d9 share schema21.
+      // Published masters 89557e6/9702439 and acquisition branch 755cf1d9 share schema 21.
       (old.gameSchema === 21 &&
         (old.rules ===
           "coop-2-fcb444f119733dd48aef5c28f13cb78fc856be210f448c495109eb5987d70476" ||
           old.rules ===
-            "coop-2-15c753596aead2c7b8214074ea6ee123deffa20b96db9d73b4abd0e420548a55"))
+            "coop-2-15c753596aead2c7b8214074ea6ee123deffa20b96db9d73b4abd0e420548a55" ||
+          old.rules ===
+            "coop-2-8423406cc7fc00c2bcf0e3cd7b647ad746beabc840cbeb1fc847e15d0389d64c"))
     ) ||
     !Array.isArray(old.grids) ||
     !old.grids.every(
