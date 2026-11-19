@@ -429,12 +429,16 @@ export function validFacilityExpansion(
   const identity = Object.entries(FACILITY_FUELS).find(
     ([name]) => name === facility.name,
   );
+  const expectedGasCycle =
+    facility.name === "Natural Gas Steam"
+      ? "steam"
+      : facility.name === "Natural Gas CC"
+        ? "combined"
+        : "simple";
   if (
     !identity ||
     identity[1] !== facility.fuel ||
-    (facility.fuel === "Natural Gas" &&
-      facility.gasCycle !==
-        (facility.name === "Natural Gas CC" ? "combined" : "simple"))
+    (facility.fuel === "Natural Gas" && facility.gasCycle !== expectedGasCycle)
   )
     return false;
   const projectContext = {

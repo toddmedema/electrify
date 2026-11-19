@@ -1,4 +1,5 @@
 import { getHydroAvailability } from "../data/HydroSites";
+import { parseSave, serializeSave } from "../SaveGame";
 import cloneDeep from "lodash.clonedeep";
 import gameReducer, {
   buildFacility,
@@ -44,6 +45,48 @@ describe("buildFacility", () => {
         valid: validBuildFacility({ facility, financed: true }),
       }).toEqual({ name: facility.name, valid: true });
     }
+  });
+
+  it("orders gas steam for baseload in 1980 and preserves the project when saved", () => {
+    const game = createGame({ scenarioId: 102 });
+    const quote = GENERATORS(game, 100e6, [], []).find(
+      ({ name }) => name === "Natural Gas Steam",
+    )!;
+    const order = buildFacility({ facility: quote, financed: true });
+    const withProject = gameReducer(game, order);
+    expect(withProject.facilities[0]).toMatchObject({
+      name: "Natural Gas Steam",
+      gasCycle: "steam",
+      btuPerWh: 10.5,
+      spinMinutes: 240,
+      yearsToBuildLeft: quote.yearsToBuild,
+    });
+    const saved = parseSave(
+      JSON.parse(JSON.stringify(serializeSave(withProject))),
+    );
+    expect(saved?.game.facilities[0]).toEqual(withProject.facilities[0]);
+
+    const later = { ...game, date: { ...game.date, year: 1991 } };
+    expect(gameReducer(later, order).facilities).toEqual(later.facilities);
+
+    const oversized = buildFacility({
+      facility: { ...quote, peakW: 1.1e9, maxPeakW: 1.1e9 },
+      financed: true,
+    });
+    expect(gameReducer(game, oversized).facilities).toEqual(game.facilities);
+  });
+
+  it("uses an inherited peaker's vintage along with the current catalog", () => {
+    const game = createGame({ scenarioId: 122 });
+    const inherited = game.facilities.find(
+      ({ gasCycle }) => gasCycle === "simple",
+    )!;
+    const quote = GENERATORS(game, inherited.peakW, [], []).find(
+      ({ gasCycle }) => gasCycle === "simple",
+    )!;
+    // The 1982 starting fleet includes a peaker commissioned in 1977.
+    expect(inherited.btuPerWh).toBeCloseTo(13.72, 5);
+    expect(quote.btuPerWh).toBeCloseTo(12.84, 5);
   });
 
   it("dispatches a new combined cycle first and a new peaker after the other generators", () => {

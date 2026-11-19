@@ -63,6 +63,7 @@ export type StructureKind =
   | "offshore-wind"
   | "airborne-wind"
   | "gas"
+  | "gas-steam"
   | "oil"
   | "coal"
   | "biomass"

@@ -2,6 +2,7 @@ import type { GameType } from "../Types";
 import { pow } from "../helpers/Pow";
 import { isUtilityExpansionGame } from "../helpers/ExpansionContext";
 import { legacyGeneratorMaxPeakW } from "./LegacyEra";
+import { gasSteamMaxPeakW } from "./GasPlantVintages";
 
 type CapacityContext = Pick<
   GameType,
@@ -30,6 +31,8 @@ export function generatorMaxPeakW(
       return 8000000000;
     case "Natural Gas Peaker":
       return 2000000000;
+    case "Natural Gas Steam":
+      return gasSteamMaxPeakW(year);
     case "Biomass":
       return 50000000;
     case "Wind":

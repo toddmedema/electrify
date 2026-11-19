@@ -459,6 +459,45 @@ function operatingView() {
   return { game, view, facility };
 }
 
+it("selects the distinct boiler and switches its production effects off as the plant idles", () => {
+  const { view, facility } = operatingView();
+  if (isStorage(facility)) throw new Error("Expected a generator fixture");
+  const steam: TerritoryTileView = {
+    ...view,
+    facility: {
+      name: "Natural Gas Steam",
+      fuel: "Natural Gas",
+      peakW: facility.peakW,
+      yearsToBuildLeft: 0,
+    },
+    operatingFacility: {
+      ...facility,
+      name: "Natural Gas Steam",
+      fuel: "Natural Gas",
+      gasCycle: "steam",
+      peakWh: undefined,
+    },
+  };
+  const builder = new SceneBuilder({
+    terrain: getTerrainModel,
+    structure: getStructureModel,
+  });
+  const tiles = [steam.tile];
+  const active = builder.build([steam], tiles, [], 0, "run")[1];
+  expect(active).toMatchObject({
+    model: { key: "structure:gas-steam" },
+    active: true,
+    producing: true,
+  });
+  const idle: TerritoryTileView = {
+    ...steam,
+    operatingFacility: { ...steam.operatingFacility!, currentW: 0 },
+  };
+  const stopped = builder.build([idle], tiles, [], 60, "run")[1];
+  expect(stopped).toMatchObject({ active: false, producing: false });
+  expect(stopped.model).toBe(active.model);
+});
+
 it("follows measured production through idle, pause and construction without changing motion identity", () => {
   const { builder } = setup();
   const { view, facility } = operatingView();

@@ -234,8 +234,8 @@ export type FuelNameType =
   | "Oil"
   | "Geothermal"
   | "Hydro";
-/** A simple-cycle peaking turbine, or a combined cycle that recovers its exhaust heat. */
-export type GasCycleType = "simple" | "combined";
+/** Direct combustion turbine, turbine plus heat recovery, or boiler-fired steam turbine. */
+export type GasCycleType = "simple" | "combined" | "steam";
 /** The fuels bought on a market. The rest are free once a plant is built. */
 export type PricedFuelNameType =
   "Biomass" | "Coal" | "Natural Gas" | "Oil" | "Uranium";
@@ -756,7 +756,7 @@ export interface GeneratorShoppingType extends SharedShoppingType {
   // Lowest steady output as a fraction of nameplate. Starting and shutdown ramps may pass below
   // it transiently; an online unit otherwise produces at least this much.
   minimumStableOutput?: number;
-  // "Natural Gas" only: the turbine arrangement. Both burn the same fuel, so fuel-keyed rules
+  // "Natural Gas" only: the turbine arrangement. All burn the same fuel, so fuel-keyed rules
   // (prices, cold snaps, charts) treat them alike; this names the technology without relying on
   // the display name, so a later simple-to-combined conversion can change it in place.
   gasCycle?: GasCycleType;
@@ -939,6 +939,7 @@ export type ModFacilityNameType =
   | "Coal"
   | "Nuclear"
   | "Natural Gas Peaker"
+  | "Natural Gas Steam"
   | "Natural Gas CC"
   | "Oil"
   | "Biomass"

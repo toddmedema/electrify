@@ -595,6 +595,33 @@ function thermal(kind: "gas" | "oil" | "coal" | "biomass"): MapModel {
   return facilityModel(kind, body, switchgear(body), moving);
 }
 
+function gasSteam(): MapModel {
+  const body = new MeshBuilder();
+  base(body);
+
+  // A tall boiler house supplies steam to the lower turbine hall through the overhead pipe.
+  body.box([-0.15, 0.169, -0.04], [0.25, 0.266, 0.25], P.cream);
+  gable(body, [-0.15, 0.302, -0.04], [0.27, 0.041, 0.27], P.steel);
+  body.box([0.13, 0.104, 0.023], [0.31, 0.136, 0.26], P.cream);
+  gable(body, [0.13, 0.172, 0.023], [0.33, 0.034, 0.28], P.steelShade);
+  body.beam([-0.026, 0.25, -0.07], [0.102, 0.25, -0.07], 0.027, P.steel, 8);
+  body.beam([0.102, 0.25, -0.07], [0.102, 0.161, -0.07], 0.027, P.steel, 8);
+  body.box([-0.15, 0.085, 0.092], [0.098, 0.098, 0.016], P.steelShade);
+
+  const stackX = 0.27,
+    stackZ = 0.12,
+    outletY = 0.473;
+  body
+    .cylinder([stackX, 0.036, stackZ], 0.041, 0.031, 0.437, P.steel, 8)
+    .cylinder([stackX, 0.443, stackZ], 0.038, 0.038, 0.03, P.steelShade, 8)
+    .cylinder([stackX, outletY, stackZ], 0.026, 0.026, 0.002, P.ink, 8);
+  return facilityModel("gas-steam", body, switchgear(body), [
+    windows(body, 0.13, 0.113, 0.157, 0.227),
+    steam([stackX, outletY + 0.012, stackZ]),
+    steam([stackX, outletY + 0.012, stackZ], 0.5),
+  ]);
+}
+
 function nuclear(): MapModel {
   const body = new MeshBuilder();
   base(body);
@@ -872,6 +899,7 @@ const factories: Record<StructureKind, () => MapModel> = {
   "offshore-wind": () => wind("offshore-wind"),
   "airborne-wind": airborne,
   gas: () => thermal("gas"),
+  "gas-steam": gasSteam,
   oil: () => thermal("oil"),
   coal: () => thermal("coal"),
   biomass: () => thermal("biomass"),

@@ -53,6 +53,7 @@ const technologyOrder = [
   "Geothermal",
   "Enhanced Geothermal",
   "Natural Gas Peaker",
+  "Natural Gas Steam",
   "Natural Gas CC",
   "Oil",
   "Biomass",

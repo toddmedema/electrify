@@ -63,7 +63,8 @@ test("operating original coal retains a nonempty warning through save/import and
     sellFacilityId: undefined,
     sellAtMonth: undefined,
     scheduledActions: source.scheduledActions?.filter(
-      (action) => !(action.type === "toggle" && action.month === 38),
+      (action) =>
+        !(action.type === "toggle" && [1, 2].includes(action.facilityId)),
     ),
   };
   const rules = scenarioRules(getScenario(102), {
@@ -80,6 +81,9 @@ test("operating original coal retains a nonempty warning through save/import and
     { plan },
   );
   expect(violations).toEqual([]);
+  const coal = game.facilities.filter(({ fuel }) => fuel === "Coal");
+  expect(coal).toHaveLength(2);
+  expect(coal.every(({ paused }) => !paused)).toBe(true);
   const original = game.facilities.find((facility) => facility.id === 1)!;
   expect(original.fuel).toBe("Coal");
   expect(original.paused).not.toBe(true);
