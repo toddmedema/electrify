@@ -1141,6 +1141,40 @@ it("pins up to three current-grid choices into a comparison tray", () => {
   ).toHaveTextContent("Comparing 2/3");
 });
 
+it("lets the current tile compare its eligible technology even when three hidden choices are remembered", () => {
+  const game = createGame({ scenarioId: 116, seed: 611 });
+  game.timeline[0].cash = 1e12;
+  game.territoryNetwork!.landPurchases.push({
+    territoryId: "parcel-7",
+    minute: 0,
+    price: 18e6,
+  });
+  const tile = TerritoryTileData.TERRITORY_TILES.find(
+    (candidate) =>
+      candidate.territoryId === "parcel-7" && candidate.hydroSiteId,
+  )!;
+  const memory = new Map<string, unknown>([
+    ["generators.compared", ["Coal", "Solar", "Wind"]],
+    ["generators.size", wToSliderTick(20e6)],
+  ]);
+  render(
+    <GameToolMemoryContext.Provider value={memory}>
+      <BuildGenerators
+        game={game}
+        lockedTileId={tile.id}
+        onBack={jest.fn()}
+        onBuildGenerator={jest.fn()}
+      />
+    </GameToolMemoryContext.Provider>,
+  );
+  const compare = screen.getByRole("button", { name: "Compare Hydro" });
+  expect(compare).toBeEnabled();
+  fireEvent.click(compare);
+  expect(
+    screen.getByRole("region", { name: "Generator comparison" }),
+  ).toHaveTextContent("Comparing 1/3");
+});
+
 it("keeps comparison with the scrolling catalog when Fleet is hidden or space is constrained", () => {
   const game = createGame({ scenarioId: 100, difficulty: "Employee" });
   const workspace = (fleetVisible: boolean, constrained = false) => (

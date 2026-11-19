@@ -78,7 +78,7 @@ it("keeps every current catalogue technology discoverable with its canonical ico
 });
 
 it("keeps a fixed icon order and fades technologies the company cannot afford", () => {
-  const { game, update } = show(undefined, (game) => {
+  const { game, update, onProject } = show(undefined, (game) => {
     currentTick(game)!.cash = 0;
   });
   const generators = screen.getByRole("region", {
@@ -107,6 +107,10 @@ it("keeps a fixed icon order and fades technologies the company cannot afford", 
     expect(button).toHaveAttribute("aria-disabled", "true");
     expect(button).toHaveTextContent(/^$/);
   }
+  fireEvent.focus(wind());
+  expect(screen.getByLabelText("Wind technology preview")).toBeVisible();
+  fireEvent.click(wind());
+  expect(onProject).not.toHaveBeenCalled();
   currentTick(game)!.cash = 1e9;
   update();
   expect(wind()).toHaveAttribute("aria-disabled", "false");

@@ -139,6 +139,19 @@ describe("PurchaseReviewDialog", () => {
     expect(onPurchase).not.toHaveBeenCalled();
   });
 
+  it("shows a rejected purchase message and leaves the purchase available to retry", async () => {
+    const onPurchase = jest
+      .fn()
+      .mockResolvedValue("This site was just occupied.");
+    const { button } = renderDialog({ onPurchase });
+    fireEvent.click(button("Take loan"));
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "This site was just occupied.",
+    );
+    expect(screen.getByRole("dialog")).toBeVisible();
+    expect(button("Take loan")).toBeEnabled();
+  });
+
   it("allows retry after the owning purchase API rejects a submission", async () => {
     const rejected = jest.fn().mockResolvedValue(false);
     const { button } = renderDialog({ onPurchase: rejected });
