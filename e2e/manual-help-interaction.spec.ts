@@ -14,9 +14,14 @@ async function openWorkspaceHelp(
   await page.goto("/?scenario=111");
   await page.getByRole("button", { name: "Start game", exact: true }).click();
   const build = await openBuild(page);
-  const option = build.locator(".buildOption").first();
-  await option.getByRole("button", { name: /^Show .* details$/ }).click();
-  const help = option.getByRole("button", { name: /^What is / }).first();
+  // Once the forecast arrives, reviewable generators can move above this card.
+  const option = build.locator('[data-build-option="Oil"]');
+  await expect(option).toBeVisible();
+  await expect(
+    build.getByText("Calculating output and energy costs…", { exact: true }),
+  ).toBeHidden();
+  await option.getByRole("button", { name: "Show Oil details" }).click();
+  const help = option.getByRole("button", { name: "What is build cost?" });
   await expect(help).toBeVisible();
   return { build, help };
 }
