@@ -2,7 +2,10 @@ import type { AppDispatch } from "../../Store";
 import { connectToStore } from "../base/ConnectToStore";
 import { generatorSizeChanged } from "../../reducers/GameActions";
 import { navigate } from "../../reducers/Card";
-import { purchaseFacility } from "../../helpers/PurchaseFacility";
+import {
+  purchaseFacility,
+  type FacilityPurchaseResult,
+} from "../../helpers/PurchaseFacility";
 import {
   AppStateType,
   GeneratorShoppingType,
@@ -38,9 +41,8 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
       financed: boolean,
       territoryId?: TerritoryId,
       tileId?: TerritoryTileId,
-    ) => {
-      dispatch(purchaseFacility(facility, financed, territoryId, tileId));
-    },
+    ): Promise<FacilityPurchaseResult> =>
+      dispatch(purchaseFacility(facility, financed, territoryId, tileId)),
   };
 };
 
