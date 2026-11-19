@@ -788,7 +788,7 @@ export default class Compositor extends React.Component<Props, {}> {
                     )
                   }
                 >
-                  Share feedback
+                  Feedback
                 </Button>
               </div>
             )}
@@ -811,7 +811,9 @@ export default class Compositor extends React.Component<Props, {}> {
                     : undefined
                 }
               >
-                {ui.dialog.secondaryLabel || "Close"}
+                {ui.dialog.tutorialComplete
+                  ? "Menu"
+                  : ui.dialog.secondaryLabel || "Close"}
               </Button>
             )}
             {ui.dialog.tertiaryAction && (

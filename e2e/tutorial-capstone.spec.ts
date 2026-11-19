@@ -171,12 +171,16 @@ async function completeMission(
   await expect(
     completionDialog.getByText("Build a generator", { exact: true }),
   ).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: "Next tutorial" }),
-  ).toBeVisible();
-  await expect(page.getByRole("button", { name: "Main menu" })).toBeVisible();
-  const primary = page.getByRole("button", { name: "Next tutorial" });
-  const secondary = page.getByRole("button", { name: "Main menu" });
+  const primary = completionDialog.getByRole("button", {
+    name: "Next tutorial",
+    exact: true,
+  });
+  const secondary = completionDialog.getByRole("button", {
+    name: "Menu",
+    exact: true,
+  });
+  await expect(primary).toBeVisible();
+  await expect(secondary).toBeVisible();
   const primaryBox = (await primary.boundingBox())!;
   const secondaryBox = (await secondary.boundingBox())!;
   if (testInfo.project.name.startsWith("mobile-")) {
@@ -194,7 +198,8 @@ async function completeMission(
   ).toBeVisible();
   await expect(primary).toBeFocused();
   const shareFeedback = completionDialog.getByRole("button", {
-    name: "Share feedback",
+    name: "Feedback",
+    exact: true,
   });
   if (keepPlaying) {
     await expect(shareFeedback).toHaveClass(/MuiButton-text/);
