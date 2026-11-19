@@ -203,10 +203,7 @@ export default function ExpandedFacilityDetails({
           title={
             <>
               {underConstruction ? "Cancel construction of" : "Sell"}{" "}
-              {formatFacilitySize(facility)}{" "}
-              {facility.name === facility.name
-                ? facility.name.toLowerCase()
-                : facility.name}{" "}
+              {formatFacilitySize(facility)} {facility.name.toLowerCase()}{" "}
               facility?
             </>
           }
