@@ -56,9 +56,19 @@ jest.mock("../base/ProjectBuild", () => {
   return jest.requireActual("../base/ProjectBuild");
 });
 
-jest.mock("../base/BuildForecast", () => ({
-  useBuildForecast: () => undefined,
-}));
+jest.mock("../base/BuildForecast", () => {
+  const forecast = {
+    timeline: [],
+    windSpeeds: [24],
+    offshoreWindSpeeds: [],
+    airborneWindSpeeds: [],
+    solarIrradiances: [450],
+  };
+  return {
+    useBuildForecast: (_game: unknown, enabled = true) =>
+      enabled ? forecast : undefined,
+  };
+});
 
 jest.mock(
   "../base/ManualLink",
