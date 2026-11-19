@@ -131,12 +131,11 @@ export default function FacilityCapacityUpgrade({
     );
     return initialQuote.status === "ready" ? initialQuote.quoteKey : undefined;
   });
-  const [cancelReview, setCancelReview] =
-    React.useState<FacilityExpansionInProgressType>(
-      openOnMount && onCancelExpansion
-        ? facility.expansionInProgress
-        : undefined,
-    );
+  const [cancelReview, setCancelReview] = React.useState<
+    FacilityExpansionInProgressType | undefined
+  >(
+    openOnMount && onCancelExpansion ? facility.expansionInProgress : undefined,
+  );
   const [pending, setPending] = React.useState(false);
   const [message, setMessage] = React.useState<string>();
   const submitting = React.useRef(false);
