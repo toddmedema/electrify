@@ -259,7 +259,8 @@ export default function DesktopBuildRail({
   const leave = () => {
     clearTimer();
     dismissTimer.current = setTimeout(() => {
-      if (!rail.current?.contains(document.activeElement)) dismiss();
+      if (!rail.current?.contains(document.activeElement))
+        setPreviewName(undefined);
     }, 160);
   };
   const leaveSizing = () => {
@@ -383,13 +384,14 @@ export default function DesktopBuildRail({
             positionSizing();
             return;
           }
-          // Native focus scrolling can arrive in several steps. Keep the
-          // focused technology's preview; explicit scrolling intent dismisses it.
+          // A scroll notification can arrive after a row receives hover or focus.
+          // Explicit wheel and scrollbar activity dismiss the preview separately.
+          const button = origin.current;
           if (
-            origin.current !== document.activeElement ||
-            !event.currentTarget.contains(document.activeElement)
+            !event.currentTarget.contains(button ?? null) ||
+            (button !== document.activeElement && !button?.matches(":hover"))
           )
-            dismiss();
+            setPreviewName(undefined);
         }}
       >
         {[false, true].map((storage) => (

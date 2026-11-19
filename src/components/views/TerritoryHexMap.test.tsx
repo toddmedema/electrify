@@ -1088,7 +1088,11 @@ it("opens the actions for the picked model on right-click and for the focused ti
     expect(map.onTileMenu).toHaveBeenLastCalledWith(
       expect.objectContaining({ key: "champlain:city" }),
     );
-    expect(map.onSelect).not.toHaveBeenCalled();
+    // Opening the menu moves focus and its highlight, without activating inspection.
+    expect(map.onSelect.mock.calls).toEqual([
+      ["champlain:site-0", undefined],
+      ["champlain:city", undefined],
+    ]);
   } finally {
     restore();
   }

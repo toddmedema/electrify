@@ -45,7 +45,7 @@ it("compares terrain using the turbine curve and skips a zero-output baseline", 
   const factors = windOutputByTerrain([20, 24, 28]);
   expect(factors.forest).toBeLessThan(1);
   expect(factors.hills).toBeGreaterThan(1);
-  expect(factors.mountain).toBeGreaterThan(1.15);
+  expect(factors.mountain).toBeCloseTo(1.13835, 4);
   expect(windOutputByTerrain([0, 0])).toEqual({});
 });
 

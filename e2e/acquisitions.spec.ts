@@ -1266,7 +1266,9 @@ for (const theme of ["light", "dark"] as const) {
     await inspectTile(page, lake);
     await expect(
       network.locator(`[data-map-target="${lake.id}"]`),
-    ).toHaveAccessibleDescription(/Enclosed lake basin/);
+    ).toHaveAccessibleDescription(
+      /Lake · Your tile · No compatible technology/,
+    );
     await expect(surface).toHaveAccessibleName("Lake");
     await expect(surface).not.toContainText(
       /Hydropower site\. Plant construction|Build a generator or storage on this tile|general construction|300MW max/,

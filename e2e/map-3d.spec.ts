@@ -80,8 +80,8 @@ for (const theme of ["light", "dark"] as const) {
       const viewport = map.locator(".territoryMapViewport");
       const bounds = (await viewport.boundingBox())!;
       const cameraX = (await readTerritoryMapCamera(viewport)).x;
-      const x = bounds.x + bounds.width / 2;
-      const y = bounds.y + bounds.height / 2;
+      const x = Math.round(bounds.x + bounds.width / 2);
+      const y = Math.round(bounds.y + bounds.height / 2);
       await page.mouse.move(x, y);
       const hovered = viewport.locator(
         '[data-model-hovered="true"] .territoryTileHitArea',
@@ -96,7 +96,16 @@ for (const theme of ["light", "dark"] as const) {
       await expect(map.locator(".tileWorkspaceSurface")).toHaveCount(0);
       if (theme === "light") {
         // A low-frequency wheel moves the map from half to double its starting scale.
-        await page.mouse.move(x, y);
+        const zoomX = x + 80;
+        const zoomY = y + 48;
+        const center = await viewport.evaluate((element) => {
+          const { left, top } = element.getBoundingClientRect();
+          return {
+            x: left + element.clientWidth / 2,
+            y: top + element.clientHeight / 2,
+          };
+        });
+        await page.mouse.move(zoomX, zoomY);
         const baseline = await readTerritoryMapCamera(viewport);
         await page.mouse.wheel(0, -2000);
         await expect
@@ -107,8 +116,20 @@ for (const theme of ["light", "dark"] as const) {
           .poll(async () => (await readTerritoryMapCamera(viewport)).scale)
           .toBe(baseline.scale / 2);
         const camera = await readTerritoryMapCamera(viewport);
-        expect(camera.x).toBeCloseTo(baseline.x, 3);
-        expect(camera.y).toBeCloseTo(baseline.y, 3);
+        const offsetX = zoomX - center.x;
+        const offsetY = zoomY - center.y;
+        const driftX =
+          camera.x -
+          baseline.x +
+          offsetX / camera.scale -
+          offsetX / baseline.scale;
+        const driftY =
+          camera.y -
+          baseline.y +
+          offsetY / camera.scale -
+          offsetY / baseline.scale;
+        // Chromium rounds wheel coordinates to CSS pixels.
+        expect(Math.hypot(driftX, driftY) * camera.scale).toBeLessThan(1);
       }
     }
     const contextLoss = await canvas.evaluateHandle((element: MapCanvas) => {

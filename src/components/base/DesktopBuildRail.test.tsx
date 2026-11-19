@@ -151,7 +151,14 @@ it("opens sizing on hover and keeps it open after a click until an outside press
   jest.useFakeTimers();
   try {
     const trigger = screen.getByRole("button", { name: /Energy:/ });
-    fireEvent.mouseEnter(trigger);
+    const technologies = screen.getByRole("group", {
+      name: "Construction technology list",
+    });
+    // The scrolled Energy trigger can receive pointer entry and the delayed scroll together.
+    act(() => {
+      trigger.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
+      technologies.dispatchEvent(new Event("scroll"));
+    });
     const slider = screen.getByRole("slider", { name: "Storage capacity" });
     expect(slider).not.toHaveFocus();
     const sizing = screen.getByRole("region", { name: "Energy sizing" });

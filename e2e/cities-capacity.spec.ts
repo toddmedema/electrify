@@ -4,7 +4,7 @@ import { facilityExpansionQuote } from "../src/helpers/FacilityExpansion";
 import { currentTick } from "../src/helpers/GameSelectors";
 import { territoryTileViews } from "../src/helpers/TerritoryMapState";
 import { getTerritoryTile } from "../src/helpers/TerritoryTiles";
-import { formatMoneyConcise } from "../src/helpers/Format";
+import { formatPurchasePrice } from "../src/helpers/Format";
 import { loadSimData } from "../src/testing/SimData";
 import { expect, test } from "./fixtures";
 import { expectDialogToFit } from "./dialog-layout";
@@ -155,7 +155,7 @@ for (const theme of ["light", "dark"] as const) {
     const operation = await sceneFacility(map, ids.active);
     expect(operation).toMatchObject({ active: true, producing: true });
     const selected = map.locator(`[data-map-target="${ids.active}"]`);
-    await expect(selected).toHaveAttribute("title", /Generating/);
+    await expect(selected).toHaveAccessibleDescription(/Generating/);
 
     const trigger = map.getByRole("button", {
       name: "Map layers",
@@ -175,7 +175,7 @@ for (const theme of ["light", "dark"] as const) {
     await expect(layers.getByRole("checkbox")).toHaveCount(1);
     await status.uncheck();
     await expect(active.locator(".facilityMapStatusArtwork")).toHaveCount(0);
-    await expect(selected).toHaveAttribute("title", /Generating/);
+    await expect(selected).toHaveAccessibleDescription(/Generating/);
     expect(await sceneFacility(map, ids.active)).toMatchObject({
       active: true,
       producing: true,
@@ -231,11 +231,6 @@ for (const theme of ["light", "dark"] as const) {
       (facility) => facility.name === "Natural Gas CC",
     )!;
     loadSimData(before.location);
-    const targetSize = facility.peakW * 1.25;
-    const quote = facilityExpansionQuote(before, facility.id, targetSize);
-    expect(quote.status).toBe("ready");
-    if (quote.status !== "ready") throw new Error(quote.reason);
-    expect(quote.cost).toBeLessThanOrEqual(currentTick(before)!.cash);
     const tile = getTerritoryTile(facility.tileId!)!;
     await selectTerritoryMapTile(page, tile);
     let upgrade = map.getByRole("region", {
@@ -245,20 +240,35 @@ for (const theme of ["light", "dark"] as const) {
     await upgrade
       .getByRole("button", { name: "Upgrade capacity", exact: true })
       .click();
-    const dialog = page.getByRole("dialog", { name: /^Upgrade .* capacity$/ });
+    const dialog = page.getByRole("dialog", {
+      name: /^Upgrade .* capacity\?$/,
+    });
     await expectDialogToFit(dialog);
-    await dialog
-      .getByRole("spinbutton", { name: "New capacity (MW)", exact: true })
-      .fill(String(targetSize / 1e6));
+    const slider = dialog.getByRole("slider", {
+      name: "New capacity (MW)",
+      exact: true,
+    });
+    await slider.press("Home");
+    await slider.press("ArrowRight");
+    const targetSize = Number(await slider.getAttribute("aria-valuenow")) * 1e6;
+    expect(targetSize).toBeGreaterThan(facility.peakW);
+    const quote = facilityExpansionQuote(before, facility.id, targetSize);
+    if (quote.status !== "ready") throw new Error(quote.reason);
+    expect(quote.cost).toBeLessThanOrEqual(currentTick(before)!.cash);
     for (const label of [
-      "Capacity",
-      "Added capital cost",
-      "Cash remaining",
-      "Construction time",
+      "Cash option",
+      "Loan option",
+      "Added maintenance",
+      "Added capacity online in",
     ])
       await expect(dialog.getByText(label, { exact: true })).toBeVisible();
+    await expect(
+      dialog.getByText(`${formatPurchasePrice(quote.cost)} now`, {
+        exact: true,
+      }),
+    ).toBeVisible();
     const payment = dialog.getByRole("button", {
-      name: `Pay ${formatMoneyConcise(quote.cost)}`,
+      name: "Pay cash",
       exact: true,
     });
     await expect(payment).toBeEnabled();

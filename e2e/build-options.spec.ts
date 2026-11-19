@@ -1072,7 +1072,7 @@ for (const theme of ["light", "dark"] as const) {
         exact: true,
       })
       .click();
-    await expect(ironAir.getByRole("row", { name: /Upkeep/ })).toBeVisible();
+    await expect(ironAir.getByRole("row", { name: /^Fixed/ })).toBeVisible();
     await expect(ironAir.getByRole("row", { name: /Efficiency/ })).toHaveCount(
       0,
     );
