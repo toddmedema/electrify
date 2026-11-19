@@ -1,10 +1,15 @@
 import React from "react";
+import FrostGround from "./FrostGround";
 
 type LakeTerrainProps = {
   className?: string;
+  frostFill?: string;
 };
 
-export default function LakeTerrain({ className }: LakeTerrainProps) {
+export default function LakeTerrain({
+  className,
+  frostFill,
+}: LakeTerrainProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
@@ -14,7 +19,11 @@ export default function LakeTerrain({ className }: LakeTerrainProps) {
       aria-hidden="true"
       focusable="false"
     >
-      <path d="M250 0 500 125V375L250 500 0 375V125Z" fill="#B8D9C3" />
+      <path
+        d="M250 0 500 125V375L250 500 0 375V125Z"
+        fill="var(--terrain-frost-field, #B8D9C3)"
+      />
+      <FrostGround fill={frostFill} />
       <path
         d="M132 111C190 76 285 92 345 122 403 136 444 182 440 248 437 309 405 346 360 390 318 431 256 456 202 432 157 412 138 382 100 362 64 343 52 298 64 254 78 208 77 144 132 111Z"
         fill="#7FC8CE"

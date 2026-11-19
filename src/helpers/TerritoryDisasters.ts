@@ -72,7 +72,7 @@ export function readTerritoryDisasters(game: GameType) {
       (event) => event.definitionId === COLD_DEFINITION_ID,
     )
       ? "derate"
-      : regionalCold && !tile.city && tile.terrain !== "ocean"
+      : regionalCold && tile.terrain !== "ocean"
         ? "regional"
         : undefined;
     const condition = [

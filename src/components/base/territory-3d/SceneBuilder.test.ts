@@ -626,3 +626,22 @@ it("leaves city activity unknown even when an unrelated facility is present in i
   const result = builder.build([tile], [tile.tile], [], 0, "run");
   expect(result[1]).toMatchObject({ active: false, producing: false });
 });
+
+test("frost follows the land surface as cold starts and ends, independently of structures", () => {
+  const dry = view();
+  const cold: TerritoryTileView = {
+    ...dry,
+    disaster: { frost: "derate", condition: "Extreme cold" },
+  };
+  const { builder } = setup();
+  const tiles = [dry.tile];
+  const [ground, tower] = builder.build([dry], tiles, [], 0, "run");
+  const [frosted, sameTower] = builder.build([cold], tiles, [], 15, "run");
+  expect(frosted.frost).toBe(true);
+  expect(frosted.model).toBe(ground.model);
+  expect(sameTower).toEqual(tower);
+  expect(sameTower).not.toMatchObject({ frost: true });
+  const [thawed] = builder.build([dry], tiles, [], 30, "run");
+  expect(thawed).not.toMatchObject({ frost: true });
+  expect(thawed.model).toBe(ground.model);
+});

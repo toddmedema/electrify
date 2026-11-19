@@ -901,3 +901,23 @@ it("raises real Hydro and upper Pumped Hydro water while lowering the lower basi
   expect(gl.bufferSubData).toHaveBeenCalledTimes(1);
   renderer.dispose();
 });
+
+it("uploads the frost material when cold starts and ends while keeping surface water clear", () => {
+  const { renderer, gl } = setup();
+  const mesh = model.parts[0].mesh;
+  const shoreline: MapModel = {
+    ...model,
+    parts: [{ mesh }, { mesh, material: "watershed-water" }],
+  };
+  for (const frost of [false, true, false]) {
+    renderer.update([{ ...scene()[0], model: shoreline, frost }], frame);
+    gl.bufferSubData.mockClear();
+    flush(0);
+    expect(gl.bufferSubData).toHaveBeenCalledTimes(1);
+    const pose = gl.bufferSubData.mock.calls[0][2] as Float32Array;
+    expect(pose[23]).toBe(frost ? 1 : 0);
+    expect(pose[47]).toBe(0);
+    expect(renderer.diagnostics().meshCount).toBe(1);
+  }
+  renderer.dispose();
+});

@@ -2,8 +2,7 @@ import type { TileDisaster } from "../../../helpers/TerritoryDisasters";
 import React from "react";
 
 /** Small static silhouettes read as well paused as they do at high game speed. */
-export default function DisasterArtwork({ ground, hail, frost }: TileDisaster) {
-  const rime = `m270 403 53 10 50-24 44 8m-95 14 7-25m44 3 10-17${frost === "derate" ? "m-11 17-17-17-16 2m16-2 2-15m27 36 13-17" : ""}`;
+export default function DisasterArtwork({ ground, hail }: TileDisaster) {
   return (
     <>
       {ground === "burning" && (
@@ -72,26 +71,6 @@ export default function DisasterArtwork({ ground, hail, frost }: TileDisaster) {
             d="m324 350 25-6 10-31 21 33 27-9m-48-24 21-11"
             stroke="#e0eef6"
             strokeWidth="9"
-          />
-        </g>
-      )}
-      {frost && (
-        <g
-          data-disaster={frost === "derate" ? "freeze-derate" : "freeze"}
-          fill="none"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path
-            d={rime}
-            stroke="#355664"
-            strokeWidth={frost === "derate" ? 17 : 12}
-            opacity=".75"
-          />
-          <path
-            d={rime}
-            stroke={frost === "derate" ? "#eefaff" : "#a6cfda"}
-            strokeWidth={frost === "derate" ? 10 : 6}
           />
         </g>
       )}

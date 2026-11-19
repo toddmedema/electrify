@@ -81,6 +81,8 @@ export interface MapInstance {
   position: Vec3;
   fog: 0 | 1 | 2 | 3;
   active: boolean;
+  /** Cold-weather deposit on exposed terrain. */
+  frost?: boolean;
   /** Measured generation/discharge only; charging may be active without producing. */
   producing?: boolean;
   /** Fraction of the actual reservoir capacity; undefined when no level is disclosed. */

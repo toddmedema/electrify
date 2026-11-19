@@ -78,6 +78,15 @@
 .territoryHex[data-terrain="ocean"] {
   --territory-tile-rim: #356c78;
 }
+.territoryHex[data-frost] {
+  --territory-tile-rim: #85999b;
+  --terrain-frost-field: #cddedc;
+  --terrain-frost-field-shade: #b3c9c6;
+  --terrain-frost-rock: #b9cbd0;
+  --terrain-frost-rock-shade: #93a7b0;
+  --terrain-frost-bank: #b3bfb7;
+  --terrain-frost-canopy: #789b92;
+}
 .territoryHexRim,
 .territoryHexSeam {
   stroke: #52645d;

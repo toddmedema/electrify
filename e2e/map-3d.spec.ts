@@ -12,8 +12,8 @@ import { getTerritoryTile } from "../src/helpers/TerritoryTiles";
 import { getTerrainModel } from "../src/components/base/territory-3d/TerrainModels";
 import { editSavedGame, readSavedGame } from "./save-fixture";
 import { TICK_MINUTES } from "../src/Constants";
-import { getDateFromMinute } from "../src/helpers/DateTime";
-import { WILDFIRE_DAMAGE_ID } from "../src/helpers/Hazards";
+import { getDateFromMinute, MINUTES_PER_MONTH } from "../src/helpers/DateTime";
+import { COLD_DEFINITION_ID, WILDFIRE_DAMAGE_ID } from "../src/helpers/Hazards";
 import {
   FIRE_BURN_MINUTES,
   FIRE_REPAIR_MINUTES,
@@ -418,4 +418,99 @@ test("shows an advancing wildfire and scar with WebGL or the SVG fallback", asyn
     ),
   ).toBeVisible();
   await expect(flames).toBeVisible();
+});
+
+test("shows extreme cold on terrain and explains the plant derate in both renderers", async ({
+  page,
+}, info) => {
+  const desktop = info.project.name === "desktop-chromium";
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.addInitScript(
+    (theme) => {
+      localStorage.setItem("theme", theme);
+      localStorage.setItem("audioEnabled", "false");
+    },
+    desktop ? "light" : "dark",
+  );
+  await page.goto("/?scenario=116");
+  await page.getByRole("button", { name: "Start game", exact: true }).click();
+  const pause = page.getByRole("button", { name: "pause", exact: true });
+  await expect(pause).toBeVisible();
+  if ((await pause.getAttribute("aria-pressed")) !== "true")
+    await pause.click();
+  await expect
+    .poll(async () => (await readSavedGame(page))?.scenarioId)
+    .toBe(116);
+
+  const gasTile = await editSavedGame(page, ({ game }) => {
+    const gas = game.facilities.find(
+      (facility) => facility.fuel === "Natural Gas",
+    )!;
+    game.date = getDateFromMinute(12 * 60, game.startingYear);
+    game.speed = "PAUSED";
+    game.worldEvents.active = [
+      {
+        key: "review-extreme-cold",
+        definitionId: COLD_DEFINITION_ID,
+        startsMinute: 0,
+        endsMinute: MINUTES_PER_MONTH,
+        attributes: { hazard: "EXTREME_COLD", regional: true, minTempC: -24 },
+        effects: { facilityOutputMultipliersById: { [gas.id]: 0.7 } },
+      },
+    ];
+    return gas.tileId!;
+  });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
+  const map = await returnToTerritoryMap(page);
+  const viewport = map.locator(".territoryMapViewport");
+  const canvas = map.locator("canvas.territory3DCanvas");
+  await expect(canvas).toHaveAttribute("data-renderer", "ready");
+  const gas = map.locator(`[data-map-target="${gasTile}"]`);
+  await gas.focus();
+  await expect(gas).toBeInViewport({ ratio: 0.75 });
+  await expect(gas).toHaveAccessibleDescription(/Extreme cold.*70% available/);
+  await expect(map.locator("[data-disaster-tile]")).toHaveCount(0);
+  await gas.blur();
+  await reviewScreenshot(viewport, {
+    path: info.outputPath("frost-webgl-map.png"),
+  });
+
+  await gas.press("Enter");
+  const inspector = map.locator(".tileWorkspaceSurface");
+  await expect(
+    inspector.getByText("Extreme cold", { exact: true }).first(),
+  ).toBeVisible();
+  await expect(inspector.getByText("70% available")).toBeVisible();
+  await page.evaluate(() => (document.activeElement as HTMLElement)?.blur());
+  if (desktop) {
+    await reviewScreenshot(page, {
+      path: info.outputPath("frost-webgl-inspector.png"),
+      clip: { x: 210, y: 104, width: 1068, height: 610 },
+    });
+  }
+  await inspector.getByRole("button", { name: /^Close/ }).click();
+
+  await canvas.evaluate((element: MapCanvas) => {
+    element
+      .getContext("webgl2")!
+      .getExtension("WEBGL_lose_context")!
+      .loseContext();
+  });
+  await expect(canvas).toHaveAttribute("data-renderer", "lost");
+  const plantGround = map.locator(
+    `[data-tile="${gasTile}"][data-frost="derate"]`,
+  );
+  const regionalGround = map.locator(
+    '[data-frost="regional"] .territoryTerrainArtwork',
+  );
+  await expect(
+    plantGround.locator('.territoryTerrainArtwork path[fill*="frost-cover"]'),
+  ).toBeVisible();
+  await expect(regionalGround.first()).toBeVisible();
+  await expect(map.locator("[data-disaster-tile]")).toHaveCount(0);
+  await expect(gas).toHaveAccessibleDescription(/Extreme cold.*70% available/);
+  await reviewScreenshot(viewport, {
+    path: info.outputPath("frost-svg-map.png"),
+  });
 });

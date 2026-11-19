@@ -43,7 +43,7 @@ uniform vec4 uWeather;
 out vec3 vNormal;
 out vec3 vColor;
 out vec4 vStyle;
-flat out vec3 vMaterial;
+flat out vec4 vMaterial;
 out vec3 vSurfacePosition;
 void main() {
   vec4 world = aTransform * vec4(aPosition, 1.0);
@@ -62,14 +62,14 @@ void main() {
   vNormal = normalize(mat3(aTransform) * aNormal);
   vColor = aColor;
   vStyle = aStyle;
-  vMaterial = aMaterial.xyz;
+  vMaterial = aMaterial;
 }`;
 const FRAGMENT = `#version 300 es
 precision highp float;
 in vec3 vNormal;
 in vec3 vColor;
 in vec4 vStyle;
-flat in vec3 vMaterial;
+flat in vec4 vMaterial;
 in vec3 vSurfacePosition;
 uniform vec3 uLight;
 uniform vec3 uWaterHalfVector;
@@ -80,6 +80,21 @@ uniform float uAmbient;
 uniform float uShadowAlpha;
 uniform bool uShadow;
 out vec4 color;
+float frostGrain(vec2 point) {
+  vec3 hash = fract(vec3(point.xyx) * 0.1031);
+  hash += dot(hash, hash.yzx + 33.33);
+  return fract((hash.x + hash.y) * hash.z);
+}
+float frostPatch(vec2 point) {
+  vec2 cell = floor(point);
+  vec2 edge = fract(point);
+  edge = edge * edge * (3.0 - 2.0 * edge);
+  return mix(
+    mix(frostGrain(cell), frostGrain(cell + vec2(1.0, 0.0)), edge.x),
+    mix(frostGrain(cell + vec2(0.0, 1.0)), frostGrain(cell + 1.0), edge.x),
+    edge.y
+  );
+}
 void main() {
   float fog = vStyle.x;
   if (uShadow) {
@@ -96,6 +111,21 @@ void main() {
     // Snow clings more strongly to shoulders than to steep rock faces.
     base = mix(base, vec3(0.88, 0.93, 0.98),
       cap * smoothstep(0.0, 0.18, uWeather.w) * (0.52 + 0.48 * normal.y));
+  }
+  if (vMaterial.w > 0.0 && normal.y > 0.08) {
+    // Anchor the glaze to the landscape. Bare rock and shaded foliage show through.
+    vec2 surface = vSurfacePosition.xz + vSurfacePosition.y * vec2(0.22, -0.37);
+    float exposure = smoothstep(0.08, 0.76, normal.y);
+    float patches = frostPatch(surface * vec2(7.0, 10.0));
+    vec2 crystal = surface * vec2(28.0, 37.0);
+    float grain = frostGrain(floor(crystal));
+    vec2 facet = fract(crystal) - 0.5;
+    float facetEdge = abs(facet.x + facet.y * 0.7) + abs(facet.y) * 0.55;
+    float crystals = (1.0 - smoothstep(0.18, 0.39, facetEdge))
+      * smoothstep(0.55, 0.86, grain) * smoothstep(0.33, 0.58, patches);
+    float crust = smoothstep(0.42, 0.75, patches + (grain - 0.5) * 0.14);
+    float deposit = exposure * (0.12 + 0.61 * crust + 0.26 * crystals);
+    base = mix(base, vec3(0.88, 0.96, 0.99), deposit);
   }
   vec3 lit = base * (uAmbient + (1.0 - uAmbient) * band);
   lit *= mix(vec3(1.0), uLightColor, 0.65);
@@ -668,6 +698,7 @@ export class MapRenderer {
         previous.position !== next.position ||
         previous.fog !== next.fog ||
         previous.active !== next.active ||
+        previous.frost !== next.frost ||
         previous.producing !== next.producing ||
         previous.motionKey !== next.motionKey
       )
@@ -865,6 +896,7 @@ export class MapRenderer {
           : part.material === "mountain"
             ? 3
             : 0;
+    pose[23] = instance.frost && pose[22] !== 1 && pose[22] !== 2 ? 1 : 0;
   }
 
   private draw(moving: boolean, lighting: MapLighting): void {

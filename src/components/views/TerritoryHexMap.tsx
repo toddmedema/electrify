@@ -30,6 +30,7 @@ import useFacilityMapMotion, {
   FacilityMapMotionContext,
 } from "../base/useFacilityMapMotion";
 import DisasterArtwork from "../base/territory-art/DisasterArtwork";
+import { FrostGroundPatterns } from "../base/territory-art/FrostGround";
 import FacilityMapStatusArtwork from "../base/FacilityMapStatusArtwork";
 import MapStatusLayers from "../base/MapStatusLayers";
 import { useToolState } from "../base/GameToolMemory";
@@ -1005,6 +1006,9 @@ export default function TerritoryHexMap({
               <clipPath id={`${mapId}-terrain-clip`}>
                 <path d={hexFacePath} />
               </clipPath>
+              {!threeDReady && (
+                <FrostGroundPatterns id={`${mapId}-frost-cover`} />
+              )}
             </defs>
             <g aria-hidden="true">
               {!threeDReady &&
@@ -1019,6 +1023,7 @@ export default function TerritoryHexMap({
                         data-visibility-distance={visibilityDistance}
                         data-terrain={tile.terrain}
                         data-ground-condition={disaster?.ground}
+                        data-frost={disaster?.frost}
                         data-tile={key}
                         data-owned={owned}
                         transform={`translate(${point.x} ${point.y})`}
@@ -1036,6 +1041,11 @@ export default function TerritoryHexMap({
                             <TerrainArtwork
                               terrain={tile.terrain}
                               weather={disaster?.ground}
+                              frostFill={
+                                disaster?.frost
+                                  ? `url(#${mapId}-frost-cover${(tile.q + tile.r) % 2 ? "-offset" : ""})`
+                                  : undefined
+                              }
                               ports={
                                 tile.terrain === "river"
                                   ? riverPorts(tile, tiles)
@@ -1073,9 +1083,7 @@ export default function TerritoryHexMap({
               {renderedViews.map(({ tile, disaster, visibilityDistance }) => {
                 if (
                   !disaster ||
-                  (disaster.ground !== "burning" &&
-                    !disaster.hail &&
-                    !disaster.frost)
+                  (disaster.ground !== "burning" && !disaster.hail)
                 )
                   return null;
                 const origin = foregroundOrigin(tile);

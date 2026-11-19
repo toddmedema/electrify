@@ -238,6 +238,7 @@ export class SceneBuilder {
           view.disaster?.ground === "burning"
             ? "scorched"
             : view.disaster?.ground;
+      const frost = view.disaster?.frost !== undefined;
       let cell = this.cells.get(tileKey);
       if (
         !cell ||
@@ -276,6 +277,7 @@ export class SceneBuilder {
             position,
             fog: view.visibilityDistance,
             active: false,
+            frost,
             model: terrain,
           },
           structure: model
@@ -290,6 +292,8 @@ export class SceneBuilder {
         };
         this.cells.set(tileKey, cell);
       }
+      if (cell.terrain.frost !== frost)
+        cell.terrain = { ...cell.terrain, frost };
       const position = cell.structure?.position ?? cell.terrain.position;
       const model = cell.model;
       if (model) models.set(tileKey, model);

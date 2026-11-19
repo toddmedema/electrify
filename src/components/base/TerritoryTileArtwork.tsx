@@ -23,7 +23,7 @@ import StorageOccupant from "./territory-art/StorageOccupant";
 export { TERRAIN_LABELS } from "../../data/TerrainLabels";
 const terrainArt: Record<
   Exclude<TerrainType, "forest">,
-  React.ComponentType<{ className?: string }>
+  React.ComponentType<{ className?: string; frostFill?: string }>
 > = {
   plains: PlainsTerrain,
   hills: HillsTerrain,
@@ -37,19 +37,27 @@ export function TerrainArtwork({
   ports,
   className,
   weather,
+  frostFill,
 }: {
   terrain: TerrainType;
   ports?: readonly number[];
   className?: string;
   weather?: TerrainWeather;
+  frostFill?: string;
 }) {
   if (terrain === "forest")
-    return <ForestTerrain className={className} weather={weather} />;
+    return (
+      <ForestTerrain
+        className={className}
+        weather={weather}
+        frostFill={frostFill}
+      />
+    );
   const Art = terrainArt[terrain];
   return terrain === "river" ? (
-    <RiverTerrain ports={ports} className={className} />
+    <RiverTerrain ports={ports} className={className} frostFill={frostFill} />
   ) : (
-    <Art className={className} />
+    <Art className={className} frostFill={frostFill} />
   );
 }
 /** Explicit mapping keeps a new domain fuel from silently becoming a generic power symbol. */
