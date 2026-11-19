@@ -1,0 +1,73 @@
+name: PR 835 review screenshots
+on:
+  push:
+    branches: [codex/qa/pr-835-screenshots]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  captures:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 12
+    env:
+      PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/.tmp/playwright-browsers
+      E2E_BUILD_DIR: ${{ github.workspace }}/.tmp/web-renderer
+      E2E_PORT: "3189"
+      REVIEW_SCREENSHOT_DIR: ${{ github.workspace }}/test-results/pr-835-screenshots
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: 08aa57d4fcbfac3262afbda18ad2b1c83bd5a3f6
+          persist-credentials: false
+          lfs: true
+          fetch-depth: 0
+      - uses: ./.github/actions/install
+      - uses: actions/cache/restore@v6
+        with:
+          path: .tmp/playwright-browsers
+          key: playwright-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json') }}
+      - name: Set up the locked headless browser
+        run: |
+          sudo "$(command -v node)" scripts/ci/ubuntu-apt.js
+          npx playwright install --with-deps --only-shell chromium
+      - name: Generate local manifests
+        run: npm run compatibility:generate && npm run icons:generate
+      - uses: actions/download-artifact@v8
+        with:
+          name: web-renderer
+          path: .tmp/web-renderer
+          run-id: 44594506465
+          github-token: ${{ github.token }}
+      - name: Capture selected tile and desktop notifications
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          
+          workspace = Path("e2e/game-workspace.spec.ts")
+          source = workspace.read_text()
+          anchor = '  await startGame(page, "light", 116);\n  const header'
+          assert source.count(anchor) == 1
+          workspace.write_text(source.replace(anchor,
+              '  await startGame(page, "light", 116);\n'
+              '  await expect(page.locator("canvas.territory3DCanvas")).toHaveAttribute("data-renderer", "ready");\n'
+              '  const header',
+          ))
+          map_spec = Path("e2e/map-3d.spec.ts")
+          source = map_spec.read_text()
+          anchor = '  await expect(selection).toHaveCSS("stroke-dasharray", "4px, 4px");\n'
+          assert source.count(anchor) == 1
+          map_spec.write_text(source.replace(anchor, anchor +
+              '  const tileBox = (await mountain.boundingBox())!;\n'
+              '  await reviewScreenshot(page, {\n'
+              '    path: info.outputPath("selected-mountain-tile.png"),\n'
+              '    clip: { x: Math.max(0, tileBox.x - 95), y: Math.max(0, tileBox.y - 60), width: tileBox.width + 190, height: tileBox.height + 120 },\n'
+              '  });\n',
+          ))
+          PY
+          npm run test:e2e -- --config=e2e/production.playwright.config.ts --project=desktop-chromium --workers=1 e2e/game-workspace.spec.ts e2e/acquisitions.spec.ts e2e/map-3d.spec.ts --grep "map notifications follow|acquires a neighboring utility directly in light|clicking real mountain relief"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: pr-835-review-screenshots
+          path: test-results/pr-835-screenshots/
+          retention-days: 7
+          if-no-files-found: error
