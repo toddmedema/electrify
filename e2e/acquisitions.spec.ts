@@ -1,5 +1,5 @@
 import { TERRAIN_LABELS } from "../src/data/TerrainLabels";
-import type { Locator, Page } from "@playwright/test";
+import type { JSHandle, Locator, Page } from "@playwright/test";
 import type { GameType } from "../src/Types";
 import type { MapCanvas } from "../src/components/base/territory-3d/Types";
 import { TERRITORY_TILES } from "../src/data/TerritoryTiles";
@@ -431,6 +431,24 @@ async function hasRunningFacilityMotion(art: Locator) {
   );
 }
 
+async function expectHeldFacilityPhase(
+  animation: JSHandle<Animation>,
+): Promise<number> {
+  const { phase, frames } = await animation.evaluate(async (value) => {
+    const phase = Number(value.currentTime);
+    const frames = [];
+    for (let index = 0; index < 3; index++) {
+      await new Promise<void>((resolve) =>
+        requestAnimationFrame(() => resolve()),
+      );
+      frames.push(Number(value.currentTime));
+    }
+    return { phase, frames };
+  });
+  for (const sample of frames) expect(sample).toBe(phase);
+  return phase;
+}
+
 async function expectLockedBuild(surface: Locator) {
   const rail = buildRail(surface.page());
   if (await rail.isVisible()) {
@@ -778,13 +796,7 @@ for (const theme of ["light", "dark"] as const) {
     await surface.getByRole("button", { name: /^Pause / }).click();
     await expect(windArt).not.toHaveAttribute("data-facility-motion", "active");
     await expect.poll(() => hasRunningFacilityMotion(windArt)).toBe(false);
-    const pausedPhase = await animation.evaluate((value) =>
-      Number(value.currentTime),
-    );
-    await page.waitForTimeout(180);
-    expect(await animation.evaluate((value) => Number(value.currentTime))).toBe(
-      pausedPhase,
-    );
+    const pausedPhase = await expectHeldFacilityPhase(animation);
     expect(
       await rotor.evaluate(
         (element, original) => element.getAnimations()[0] === original,
@@ -836,22 +848,17 @@ for (const theme of ["light", "dark"] as const) {
     await expect(hydroArt).toHaveAttribute("data-facility-motion", "active");
     await expect(hydroArt.locator(".mapHydroFlow")).toBeVisible();
     await expect.poll(() => hasRunningFacilityMotion(hydroArt)).toBe(true);
-    const flow = await hydroArt
-      .locator(".mapHydroFlow")
-      .evaluateHandle((element) => element.getAnimations()[0]);
+    const flowPart = hydroArt.locator(".mapHydroFlow");
+    const flow = await flowPart.evaluateHandle(
+      (element) => element.getAnimations()[0],
+    );
     await page.emulateMedia({ reducedMotion: "reduce" });
     await expect(hydroArt).not.toHaveAttribute(
       "data-facility-motion",
       "active",
     );
     await expect.poll(() => hasRunningFacilityMotion(hydroArt)).toBe(false);
-    const reducedPhase = await flow.evaluate((value) =>
-      Number(value.currentTime),
-    );
-    await page.waitForTimeout(180);
-    expect(await flow.evaluate((value) => Number(value.currentTime))).toBe(
-      reducedPhase,
-    );
+    const reducedPhase = await expectHeldFacilityPhase(flow);
     await expect(
       network.locator(`[data-occupant-tile="${hydro.tileId}"]`),
     ).toHaveAttribute("data-facility-status", "producing");
@@ -878,13 +885,7 @@ for (const theme of ["light", "dark"] as const) {
       document.dispatchEvent(new Event("visibilitychange"));
     });
     await expect.poll(() => hasRunningFacilityMotion(hydroArt)).toBe(false);
-    const hiddenPhase = await flow.evaluate((value) =>
-      Number(value.currentTime),
-    );
-    await page.waitForTimeout(180);
-    expect(await flow.evaluate((value) => Number(value.currentTime))).toBe(
-      hiddenPhase,
-    );
+    const hiddenPhase = await expectHeldFacilityPhase(flow);
     await page.evaluate(() => {
       Reflect.deleteProperty(document, "hidden");
       document.dispatchEvent(new Event("visibilitychange"));
@@ -1814,6 +1815,10 @@ for (const theme of ["light", "dark"] as const) {
     const target = network.locator(`[data-map-target="${frontier.id}"]`);
     await expect(target).toHaveAccessibleName(/Connect .*\$.*General site/);
     const viewport = network.locator(".territoryMapViewport");
+    const beforeDrag = await readTerritoryMapCamera(viewport);
+    const columns = views.map(({ tile }) => hexCenter(tile).x);
+    const boardCenterX = (Math.min(...columns) + Math.max(...columns)) / 2;
+    const dragX = beforeDrag.x > boardCenterX ? 60 : -60;
     const box = (await target.boundingBox())!;
     const x = box.x + box.width / 2;
     const y = box.y + box.height / 2;
@@ -1826,7 +1831,7 @@ for (const theme of ["light", "dark"] as const) {
       for (let step = 1; step <= 6; step++)
         await session.send("Input.dispatchTouchEvent", {
           type: "touchMove",
-          touchPoints: [{ x: x + step * 10, y: y + step * 5 }],
+          touchPoints: [{ x: x + (step * dragX) / 6, y }],
         });
       await session.send("Input.dispatchTouchEvent", {
         type: "touchEnd",
@@ -1836,9 +1841,15 @@ for (const theme of ["light", "dark"] as const) {
     } else {
       await page.mouse.move(x, y);
       await page.mouse.down();
-      await page.mouse.move(x + 60, y + 30, { steps: 6 });
+      await page.mouse.move(x + dragX, y, { steps: 6 });
       await page.mouse.up();
     }
+    await expect
+      .poll(async () => {
+        const camera = await readTerritoryMapCamera(viewport);
+        return (camera.x - beforeDrag.x) * camera.scale * Math.sign(-dragX);
+      })
+      .toBeGreaterThan(24);
     expect(
       (await readSavedGame(page))!.territoryNetwork!.tilePurchases,
     ).toEqual(before.territoryNetwork!.tilePurchases);

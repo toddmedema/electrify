@@ -78,7 +78,9 @@ for (const theme of ["light", "dark"] as const) {
     );
     const catalogue = await openMapProjectCatalogue(page);
     const surface = page.locator(".tileWorkspaceSurface");
-    await setMapProjectCapacity(catalogue, false, "10");
+    const peakW = 30e6;
+    const projectTitle = "Wind · 30MW";
+    await setMapProjectCapacity(catalogue, false, "11");
     await catalogue
       .getByRole("button", { name: "Choose sites for Wind", exact: true })
       .click();
@@ -97,7 +99,7 @@ for (const theme of ["light", "dark"] as const) {
     ).toBeVisible();
     loadSimData(before.location);
     const project = selectProject(
-      projectCatalogue(before, 20e6, false).find(
+      projectCatalogue(before, peakW, false).find(
         ({ name }) => name === "Wind",
       )!,
     );
@@ -114,7 +116,7 @@ for (const theme of ["light", "dark"] as const) {
       `Total project cost ${formatMoneyConcise(projectSiteCapitalCost(ownedQuote))} · Already connected`,
     );
     await expect(
-      surface.getByRole("heading", { name: "Wind · 20MW", exact: true }),
+      surface.getByRole("heading", { name: projectTitle, exact: true }),
     ).toBeVisible();
     await expect(surface.getByText("Already connected · $0")).toBeVisible();
     const target = await selectTerritoryMapTile(
@@ -138,7 +140,7 @@ for (const theme of ["light", "dark"] as const) {
       `Total project cost ${formatMoneyConcise(projectSiteCapitalCost(connectionQuote))} · Connection included`,
     );
     await expect(
-      surface.getByRole("heading", { name: "Wind · 20MW", exact: true }),
+      surface.getByRole("heading", { name: projectTitle, exact: true }),
     ).toBeVisible();
     for (const label of [
       "Connection cost",
@@ -214,11 +216,11 @@ for (const theme of ["light", "dark"] as const) {
     await confirm.click();
     await expect(surface).toHaveCount(0);
     const built = (await readSavedGame(page))!;
-    expect(
-      built.facilities.find(
-        (facility) => facility.tileId === "green-uplands:site-1",
-      ),
-    ).toMatchObject({ name: "Wind", peakW: 20e6 });
+    const facility = built.facilities.find(
+      (facility) => facility.tileId === "green-uplands:site-1",
+    );
+    expect(facility).toMatchObject({ name: "Wind", peakW });
+    expect(facility?.loanAmountLeft).toBeGreaterThan(0);
     expect(built.territoryNetwork!.tilePurchases).toHaveLength(
       before.territoryNetwork!.tilePurchases!.length + 1,
     );
