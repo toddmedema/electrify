@@ -48,7 +48,11 @@ class PreviewCompilation {
   }
 
   apply(compiler) {
-    const checker = require("react-dev-utils/ForkTsCheckerWebpackPlugin");
+    const checker = require(
+      require.resolve("react-dev-utils/ForkTsCheckerWebpackPlugin", {
+        paths: [this.checkout],
+      }),
+    );
     let finishing;
     const completions = new WeakMap();
     const beginCompletion = () => {

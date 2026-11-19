@@ -470,6 +470,11 @@ test("queued rebuilds reject changed dependency metadata before compilation", as
     installed,
     JSON.stringify({ lockfileVersion: 3, packages: {} }),
   );
+  fs.symlinkSync(
+    path.dirname(require.resolve("react-dev-utils/package.json")),
+    path.join(checkout, "node_modules/react-dev-utils"),
+    "junction",
+  );
   const plugin = new PreviewCompilation(root, undefined, checkout);
   await plugin.acquire();
   plugin.release();
@@ -626,6 +631,81 @@ test(
     } finally {
       finishTypecheck?.();
       resumeRebuild?.();
+      await new Promise((resolve) => watch.close(resolve));
+    }
+  },
+);
+
+test(
+  "a selected checkout's separate TypeScript installation retains its compilation lease",
+  { timeout: 20000 },
+  async (t) => {
+    const root = fixture(t);
+    const checkout = path.join(root, "checkout");
+    fs.mkdirSync(path.join(checkout, "node_modules"), { recursive: true });
+    // Give B its own actual checker and CRA adapter modules. Their other locked
+    // dependencies can resolve from A without sharing the checker class or pools.
+    fs.symlinkSync(
+      path.resolve(__dirname, "../../node_modules"),
+      path.join(root, "node_modules"),
+      "junction",
+    );
+    for (const name of ["react-dev-utils", "fork-ts-checker-webpack-plugin"])
+      fs.cpSync(
+        path.dirname(require.resolve(`${name}/package.json`)),
+        path.join(checkout, "node_modules", name),
+        { recursive: true },
+      );
+    const checkerA = require("react-dev-utils/ForkTsCheckerWebpackPlugin");
+    const checkerB = require(
+      path.join(
+        checkout,
+        "node_modules/react-dev-utils/ForkTsCheckerWebpackPlugin",
+      ),
+    );
+    assert.notEqual(checkerA, checkerB);
+    assert.notEqual(checkerA.issuesPool, checkerB.issuesPool);
+    assert.equal(checkerA.issuesPool.pending, 0);
+    let finishTypecheck;
+    await checkerB.issuesPool.submit(async (done) => {
+      finishTypecheck = done;
+    });
+    const { PreviewCompilation } = require("../dev/preview");
+    const input = path.join(checkout, "index.js");
+    fs.writeFileSync(input, "export default 1");
+    const locks = path.join(root, "locks");
+    const compiler = require("webpack")({
+      mode: "development",
+      context: checkout,
+      entry: input,
+      output: { path: path.join(checkout, "dist") },
+      plugins: [new PreviewCompilation(locks, undefined, checkout)],
+    });
+    let emitted;
+    const bundleEmitted = new Promise((resolve) => {
+      emitted = resolve;
+    });
+    compiler.hooks.done.tap("observe B bundle", emitted);
+    let done;
+    const completion = new Promise((resolve) => {
+      done = resolve;
+    });
+    compiler.hooks.afterDone.tap("observe B idle", done);
+    const watch = compiler.watch({}, (error) => {
+      assert.ifError(error);
+    });
+    try {
+      await bundleEmitted;
+      // Wait until the preview's final done hook has yielded for pending checks.
+      await new Promise((resolve) => setImmediate(resolve));
+      assert.equal(checkerA.issuesPool.pending, 0);
+      assert.equal(checkerB.issuesPool.pending, 1);
+      assert.equal(queueStatus(locks).holders.length, 1);
+      finishTypecheck();
+      await completion;
+      assert.deepEqual(queueStatus(locks).holders, []);
+    } finally {
+      finishTypecheck();
       await new Promise((resolve) => watch.close(resolve));
     }
   },
