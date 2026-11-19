@@ -1,5 +1,6 @@
 import { TUTORIALS } from "../src/data/Scenarios";
 import { reviewScreenshot } from "./review-screenshot";
+import { expectDialogActionsOnOneRow } from "./dialog-layout";
 import { expect, test, type Page, type TestInfo } from "./fixtures";
 
 async function completeMission(
@@ -181,21 +182,15 @@ async function completeMission(
   });
   await expect(primary).toBeVisible();
   await expect(secondary).toBeVisible();
-  const primaryBox = (await primary.boundingBox())!;
-  const secondaryBox = (await secondary.boundingBox())!;
-  if (testInfo.project.name.startsWith("mobile-")) {
-    expect(primaryBox.y).toBeGreaterThanOrEqual(
-      secondaryBox.y + secondaryBox.height,
-    );
-  } else {
-    expect(primaryBox.y).toBeCloseTo(secondaryBox.y, 0);
-    expect(primaryBox.x).toBeGreaterThanOrEqual(
-      secondaryBox.x + secondaryBox.width,
-    );
-  }
-  await expect(
-    completionDialog.getByRole("button", { name: "Keep playing" }),
-  ).toBeVisible();
+  const practice = completionDialog.getByRole("button", {
+    name: /^(Practice|Keep playing)$/,
+  });
+  await expect(practice).toBeVisible();
+  await expectDialogActionsOnOneRow(
+    completionDialog,
+    4,
+    testInfo.project.use.hasTouch ? 44 : 40,
+  );
   await expect(primary).toBeFocused();
   const shareFeedback = completionDialog.getByRole("button", {
     name: "Feedback",
@@ -207,9 +202,7 @@ async function completeMission(
     const clock = page.locator("#appbar [data-game-minute]");
     const minuteBefore = await clock.getAttribute("data-game-minute");
     expect(minuteBefore).toMatch(/^\d+$/);
-    await completionDialog
-      .getByRole("button", { name: "Keep playing" })
-      .click();
+    await practice.click();
     await expect(completionDialog).toBeHidden();
     await expect(page.locator(".tutorialHud")).toHaveCount(0);
     expect(await page.locator(".facilityRow").allTextContents()).toEqual(
