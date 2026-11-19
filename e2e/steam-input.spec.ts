@@ -1202,11 +1202,9 @@ test("controller reviews, cancels and confirms a utility acquisition", async ({
   await expect(
     line.getByRole("button", { name: "Acquire Ridge Electric", exact: true }),
   ).toHaveCount(0);
-  const ownership = page.locator(".facilities:visible .acquiredUtilities");
-  await expect(ownership.locator("summary")).toBeFocused();
-  await expect(ownership).not.toHaveAttribute("open");
-  // The acquired city's inspector stays open. Close that input surface before
-  // traversing to the ownership disclosure behind it.
+  await expect(
+    line.getByRole("heading", { name: "Williston", exact: true }),
+  ).toBeFocused();
   await expect(page.locator("html")).toHaveAttribute(
     "data-mock-input-context",
     "Menu",
@@ -1219,24 +1217,6 @@ test("controller reviews, cancels and confirms a utility acquisition", async ({
   await expect(
     page.getByRole("button", { name: "Rapid connection mode", exact: true }),
   ).toBeFocused();
-  // Leave the map at its known upper-left edge before traversing the HUD.
-  // Arrows within discovered geography continue to belong to the map itself.
-  const edge = territoryTileViews((await readSavedGame(page))!)
-    .map(({ tile }) => tile)
-    .sort(
-      (a, b) =>
-        hexCenter(a).y - hexCenter(b).y || hexCenter(a).x - hexCenter(b).x,
-    )[0];
-  await selectMapTile(page, edge.id);
-  await input(page, "up");
-  await expect(page.locator("[data-map-target]:focus")).toHaveCount(0);
-  await select(page, ownership.locator("summary"));
-  await input(page, "confirm");
-  await expect(
-    ownership.getByRole("heading", { name: "Ridge Electric", exact: true }),
-  ).toBeVisible();
-  await input(page, "confirm");
-  await expect(ownership).not.toHaveAttribute("open");
   const saved = await readSavedGame(page);
   expect(
     saved?.utilityExpansion?.acquisitions.some(

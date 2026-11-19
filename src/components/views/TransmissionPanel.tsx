@@ -125,7 +125,6 @@ import ConfirmDialog from "../base/ConfirmDialog";
 import ConstructionBuildHeader from "../base/ConstructionBuildHeader";
 import AcquisitionReviewDialog from "../base/AcquisitionReviewDialog";
 import UtilityOfferDialog from "../base/UtilityOfferDialog";
-import AcquiredUtilities from "./AcquiredUtilities";
 import {
   isUtilityExpansionGame,
   ownedUtilityConnection,
@@ -683,19 +682,11 @@ export default function TransmissionPanel({
 }: TransmissionPanelProps) {
   const { formatMoneyConcise } = useMoney();
   const units = useUnits();
-  const acquiredSummaryRef = React.useRef<HTMLElement>(null);
-  const focusAcquiredSummary = React.useRef(false);
   const projectsRef = React.useRef<HTMLUListElement>(null);
   const revealResizedRow = useBuildRowReveal(projectsRef);
   const [acquisitionTargetId, setAcquisitionTargetId] = React.useState<
     string | null
   >(null);
-  React.useEffect(() => {
-    if (!acquisitionTargetId && focusAcquiredSummary.current) {
-      focusAcquiredSummary.current = false;
-      acquiredSummaryRef.current?.focus();
-    }
-  }, [acquisitionTargetId]);
   const [companyTargetId, setCompanyTargetId] = React.useState<string | null>(
     null,
   );
@@ -843,10 +834,7 @@ export default function TransmissionPanel({
           onClose={() => setAcquisitionTargetId(null)}
           onAcquire={async (payload) => {
             const accepted = await onAcquire(payload);
-            if (accepted) {
-              setSelectedLine(null);
-              focusAcquiredSummary.current = true;
-            }
+            if (accepted) setSelectedLine(null);
             return accepted;
           }}
         />
@@ -1455,10 +1443,6 @@ export default function TransmissionPanel({
             </Droppable>
           </DragDropContext>
         </section>
-      )}
-
-      {!projectsOnly && (
-        <AcquiredUtilities game={game} summaryRef={acquiredSummaryRef} />
       )}
 
       {projectsOnly && !unbuiltCorridors.length && (

@@ -29,9 +29,7 @@ import {
 } from "../../Types";
 import Facilities, { fleetChartHeight } from "./Facilities";
 import TransmissionPanel from "./TransmissionPanel";
-import AcquiredUtilities from "./AcquiredUtilities";
 import TerritoryNetwork from "./TerritoryNetwork";
-import { inheritedConnection } from "../../helpers/PowerAgreements";
 import { CurrencyContext } from "../base/CurrencyContext";
 import { currencyByCode } from "../../helpers/Currency";
 
@@ -43,13 +41,12 @@ import {
   HAIL_DEFINITION_ID,
   retrofitCost,
 } from "../../helpers/Hazards";
-import { formatCount, formatMoneyConcise } from "../../helpers/Format";
+import { formatMoneyConcise } from "../../helpers/Format";
 import { GAME_TO_REAL_YEARS, TICKS_PER_HOUR } from "../../Constants";
 import { purchaseTerms } from "../../helpers/Financials";
 import { modScenario } from "../../mods/ModScenario";
-import { acquireUtility, expandFacility } from "../../reducers/GameActions";
+import { expandFacility } from "../../reducers/GameActions";
 import { facilityExpansionQuote } from "../../helpers/FacilityExpansion";
-import { acquisitionQuote } from "../../helpers/Expansion";
 import { currentTick } from "../../helpers/GameSelectors";
 import {
   createWorld,
@@ -90,137 +87,6 @@ jest.mock("./TerritoryHexMap", () => ({
     );
   },
 }));
-
-describe("acquired utilities", () => {
-  function expansionGame(acquire = true) {
-    let game = createGame({ scenarioId: 116, seed: 12345 });
-    for (const targetId of ["valley-electric", "ridge-electric"] as const) {
-      currentTick(game)!.cash = 2e9;
-      if (acquire) {
-        const quote = acquisitionQuote(game, targetId)!;
-        game = cloneDeep(
-          gameReducer(
-            game,
-            acquireUtility({
-              targetId,
-              financed: targetId === "valley-electric",
-              quoteKey: quote.quoteKey,
-            }),
-          ),
-        );
-      }
-    }
-    return game;
-  }
-
-  function show(game: GameType) {
-    render(
-      <Provider store={configureStore({ reducer: { ui: uiReducer } })}>
-        <AcquiredUtilities
-          game={game}
-          summaryRef={React.createRef<HTMLElement>()}
-        />
-      </Provider>,
-    );
-  }
-
-  it("does not show an ownership disclosure for independent utilities", () => {
-    show(expansionGame(false));
-    expect(screen.queryByText(/Acquired utilities/)).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole("list", { name: "Acquired utilities" }),
-    ).not.toBeInTheDocument();
-  });
-
-  it("shows acquired utility receipts in their own collapsible disclosure", async () => {
-    show(expansionGame());
-    const disclosure = screen.getByText("Acquired utilities (2)", {
-      selector: "summary",
-    });
-    expect(screen.getByText("Valley Electric")).not.toBeVisible();
-    await user.click(disclosure);
-    expect(screen.getByText("Valley Electric")).toBeVisible();
-    expect(screen.getByText("Ridge Electric")).toBeVisible();
-    expect(screen.getAllByText("Customers acquired")).toHaveLength(2);
-    await user.click(disclosure);
-    expect(screen.getByText("Valley Electric")).not.toBeVisible();
-  });
-
-  it("keeps transfer receipts historical and totals each utility's outstanding loans and payments", async () => {
-    const game = expansionGame();
-    const valley = {
-      ...inheritedConnection("champlain", 900),
-      corridorId: "vt-champlain-valley",
-    };
-    const ridge = {
-      ...inheritedConnection("champlain", 901),
-      corridorId: "vt-champlain-ridge",
-    };
-    valley.loanAmountLeft = 0;
-    valley.loanMonthlyPayment = 10e3;
-    ridge.loanAmountLeft = 2e6;
-    ridge.loanMonthlyPayment = 40e3;
-    game.territoryNetwork!.legacyConnections.push(valley, ridge);
-    for (const loan of game.utilityExpansion!.loans) {
-      loan.loanAmountLeft =
-        loan.targetId === "valley-electric"
-          ? loan.kind === "assumed"
-            ? 4e6
-            : 8e6
-          : 17e6;
-      loan.loanMonthlyPayment =
-        loan.targetId === "valley-electric"
-          ? loan.kind === "assumed"
-            ? 20e3
-            : 30e3
-          : 50e3;
-    }
-    const transferred =
-      game.utilityExpansion!.acquisitions[0].transferredCustomers;
-    currentTick(game)!.customers = 1;
-    show(game);
-    await user.click(
-      screen.getByText("Acquired utilities (2)", { selector: "summary" }),
-    );
-    const entries = within(
-      screen.getByRole("list", { name: "Acquired utilities" }),
-    ).getAllByRole("listitem");
-    expect(entries[0]).toHaveTextContent("Acquired Jan 2005");
-    expect(entries[0]).toHaveTextContent(formatCount(transferred));
-    expect(entries[0]).not.toHaveTextContent("Connection upkeep");
-    expect(entries[0]).toHaveTextContent("Debt payment$50k/mo");
-    expect(entries[0]).toHaveTextContent("Debt remaining$12M");
-    expect(entries[1]).toHaveTextContent("Debt payment$90k/mo");
-    expect(entries[1]).toHaveTextContent("Debt remaining$19M");
-    expect(
-      within(entries[0])
-        .getAllByRole("term")
-        .map((term) => term.textContent),
-    ).toEqual(["Customers acquired", "Debt payment", "Debt remaining"]);
-    expect(within(entries[0]).queryByRole("button")).not.toBeInTheDocument();
-  });
-
-  it("shows no debt payment after acquisition loans are paid off", async () => {
-    const game = expansionGame();
-    for (const loan of [
-      ...game.transmission!.lines,
-      ...game.utilityExpansion!.loans,
-    ]) {
-      loan.loanAmountLeft = 0;
-      loan.loanMonthlyPayment = 10e3;
-    }
-    show(game);
-    await user.click(
-      screen.getByText("Acquired utilities (2)", { selector: "summary" }),
-    );
-    for (const entry of within(
-      screen.getByRole("list", { name: "Acquired utilities" }),
-    ).getAllByRole("listitem")) {
-      expect(entry).toHaveTextContent("Debt remaining$0");
-      expect(entry).toHaveTextContent("Debt payment$0/mo");
-    }
-  });
-});
 
 test("intertie flow distinguishes customer purchases from storage charging", () => {
   const initial = createGame({ scenarioId: 100, seed: 61 });
