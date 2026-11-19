@@ -31,6 +31,9 @@ it("keeps the acquisition goal short without changing its two eligible competito
     (item) => item.id === "acquire-neighbor",
   )!;
   expect(objective.compact).toBe("Acquire a competitor");
+  expect(objective.target).toBe(
+    "Acquire Valley Electric or Ridge Electric · Dec 2014",
+  );
   expect(objective.status).toBe("pending");
 });
 
