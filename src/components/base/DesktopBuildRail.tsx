@@ -371,6 +371,9 @@ export default function DesktopBuildRail({
         onWheel={() => {
           if (!sizing?.pinned) dismiss();
         }}
+        onPointerDown={() => {
+          if (!sizing) dismiss();
+        }}
         onScroll={(event) => {
           if (sizing) {
             positionSizing();

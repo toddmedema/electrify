@@ -591,11 +591,11 @@ it.each([undefined, 1280])(
     inspect("champlain:site-13");
     fireEvent.keyDown(surface(), { key: "Escape" });
     showPanel(true);
-    expect(screen.getByRole("button", { name: "Connecting…" })).toBeDisabled();
+    expect(within(surface()).getByText("Connecting…")).toBeVisible();
+    for (const name of ["Cash", "Loan", "Cancel"])
+      expect(within(surface()).getByRole("button", { name })).toBeDisabled();
     expect(screen.queryByRole("slider")).not.toBeInTheDocument();
-    expect(
-      screen.getByRole("heading", { name: "Connect and build Wind?" }),
-    ).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Wind · 20MW" })).toBeVisible();
     expect(commands).toHaveLength(1);
     expect(store.getState().game.facilities).toHaveLength(
       game.facilities.length,

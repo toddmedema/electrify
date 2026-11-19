@@ -70,12 +70,12 @@ test("ordinary starting hills offer general technologies and retain special-site
       await expect(preview.locator(".buildOptionMetrics")).toBeVisible();
       await expect(trigger).toBeEnabled();
     }
-    await expect(
-      rail.getByRole("button", {
-        name: "Choose sites for Nuclear",
-        exact: true,
-      }),
-    ).toBeDisabled();
+    const nuclear = rail.getByRole("button", {
+      name: "Choose sites for Nuclear",
+      exact: true,
+    });
+    await expect(nuclear).toBeDisabled();
+    await expect(nuclear.locator("img")).toHaveCSS("filter", "saturate(0.2)");
     await expect(
       rail.getByRole("button", {
         name: "Choose sites for Offshore Wind",
