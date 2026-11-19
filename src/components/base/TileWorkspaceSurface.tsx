@@ -55,7 +55,7 @@ export default function TileWorkspaceSurface({
     <section
       role="dialog"
       aria-labelledby={titleId}
-      className={`tileWorkspaceSurface${building ? " tileWorkspaceBuilding" : ""}${projectCandidate ? " tileWorkspaceProject" : ""}`}
+      className={`tileWorkspaceSurface${subtitle ? " tileWorkspaceInspector" : ""}${building ? " tileWorkspaceBuilding" : ""}${projectCandidate ? " tileWorkspaceProject" : ""}`}
       onKeyDown={(event) => {
         if (
           event.key === "Escape" &&
@@ -70,11 +70,6 @@ export default function TileWorkspaceSurface({
     >
       <header className="tileWorkspaceHeading">
         <div>
-          {subtitle && (
-            <Typography variant="overline" color="textSecondary">
-              {subtitle}
-            </Typography>
-          )}
           <Typography
             id={titleId}
             component="h3"
@@ -84,6 +79,11 @@ export default function TileWorkspaceSurface({
           >
             {title}
           </Typography>
+          {subtitle && (
+            <Typography variant="body2" color="textSecondary">
+              {subtitle}
+            </Typography>
+          )}
         </div>
         <IconButton aria-label="Close tile" onClick={onClose}>
           <CloseIcon />

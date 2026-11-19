@@ -43,6 +43,11 @@
     }
   }
 
+  &.tileWorkspaceInspector .tileWorkspaceHeading {
+    border-bottom: 0;
+    padding-bottom: 4px;
+  }
+
   .tileWorkspaceBody {
     min-height: 0;
     overflow: auto;

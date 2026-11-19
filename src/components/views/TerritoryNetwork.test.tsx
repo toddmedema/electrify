@@ -67,6 +67,11 @@ jest.mock("./TerritoryHexMap", () => ({
     views: readonly TerritoryTileView[];
     selected?: TerritoryTileId;
     onSelect: (id: TerritoryTileId, activate?: boolean) => void;
+    onTileMenu: (anchor: {
+      key: TerritoryTileId;
+      top: number;
+      left: number;
+    }) => void;
   }) => (
     <div aria-label="Tile map">
       <button className="territoryMapBuyToggle">Rapid connection mode</button>
@@ -84,6 +89,9 @@ jest.mock("./TerritoryHexMap", () => ({
             aria-label={`Inspect ${tile.id}`}
             onFocus={() => props.onSelect(tile.id)}
             onClick={() => props.onSelect(tile.id, true)}
+            onContextMenu={() =>
+              props.onTileMenu({ key: tile.id, top: 100, left: 100 })
+            }
           >
             {tile.terrain}
           </button>
@@ -111,6 +119,7 @@ function show(game = ready(), width?: number, scale = 1) {
     onTogglePause: jest.fn(),
     onPause: jest.fn(),
     onRetrofit: jest.fn(),
+    onExpand: jest.fn(),
     onCancelRetrofit: jest.fn(),
   };
   const memory = new Map<string, unknown>([
@@ -845,4 +854,62 @@ it("retains the inspected site when connecting transitions directly into desktop
   expect(
     screen.getByRole("button", { name: `Inspect ${site.id}` }),
   ).toHaveAttribute("aria-pressed", "true");
+});
+
+it("takes facility actions from the map and confirms a sale of the same facility", () => {
+  const game = ready();
+  const facility = game.facilities.find(
+    (item) =>
+      item.tileId &&
+      !item.saleRestricted &&
+      !item.paused &&
+      item.yearsToBuildLeft <= 0,
+  )!;
+  const { facilityActions } = show(game);
+  const tile = screen.getByRole("button", {
+    name: `Inspect ${facility.tileId}`,
+  });
+  fireEvent.contextMenu(tile);
+  let menu = screen.getByRole("menu", { name: "Tile actions" });
+  fireEvent.click(
+    within(menu).getByRole("menuitem", { name: "Pause", exact: true }),
+  );
+  expect(facilityActions.onPause).toHaveBeenCalledWith(
+    facility.id,
+    facility.name,
+  );
+  expect(facilityActions.onSell).not.toHaveBeenCalled();
+
+  fireEvent.contextMenu(tile);
+  menu = screen.getByRole("menu", { name: "Tile actions" });
+  fireEvent.click(
+    within(menu).getByRole("menuitem", { name: "Sell", exact: true }),
+  );
+  const confirmation = screen.getByRole("dialog", { name: /^Sell:/ });
+  expect(facilityActions.onSell).not.toHaveBeenCalled();
+  fireEvent.click(
+    within(confirmation).getByRole("button", { name: "Sell", exact: true }),
+  );
+  expect(facilityActions.onSell).toHaveBeenCalledWith(facility.id);
+});
+
+it("opens the capacity upgrade directly from the tile actions", async () => {
+  const game = ready();
+  const facility = game.facilities.find(
+    (item) => item.tileId && item.name === "Wind",
+  )!;
+  show(game);
+  fireEvent.contextMenu(
+    screen.getByRole("button", { name: `Inspect ${facility.tileId}` }),
+  );
+  const menu = screen.getByRole("menu", { name: "Tile actions" });
+  fireEvent.click(
+    within(menu).getByRole("menuitem", {
+      name: "Upgrade capacity",
+      exact: true,
+    }),
+  );
+  expect(
+    await screen.findByRole("dialog", { name: "Upgrade Wind capacity?" }),
+  ).toBeVisible();
 });

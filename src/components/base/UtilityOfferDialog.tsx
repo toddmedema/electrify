@@ -33,9 +33,11 @@ export default function UtilityOfferDialog({
   targetId: string;
   onClose: () => void;
 }) {
-  const { currency, formatMoneyConcise: money } = useMoney(
-    currencyForLocation(game.location, game.startingYear),
-  );
+  const {
+    currency,
+    formatMoneyConcise: money,
+    formatPurchasePrice,
+  } = useMoney(currencyForLocation(game.location, game.startingYear));
   const dispatch = useAppDispatch();
   React.useEffect(() => {
     const token = `company-terms:${targetId}`;
@@ -81,7 +83,10 @@ export default function UtilityOfferDialog({
         obligations to your company. Terms may change before purchase.
       </Typography>
       <BuildDetails label={`${offer.name} acquisition terms`}>
-        <BuildDetailRow label="Price" value={money(offer.cashDue)} />
+        <BuildDetailRow
+          label="Price"
+          value={formatPurchasePrice(offer.cashDue)}
+        />
         <BuildDetailRow label="Assumed debt" value={money(offer.assumedDebt)} />
         <BuildDetailRow
           label="Customers"
@@ -89,7 +94,7 @@ export default function UtilityOfferDialog({
         />
         <BuildDetailRow
           label="Loan down payment"
-          value={money(offer.financedCashDue)}
+          value={formatPurchasePrice(offer.financedCashDue)}
         />
         <BuildDetailRow
           label="Debt & upkeep · cash"

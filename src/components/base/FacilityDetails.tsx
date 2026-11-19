@@ -87,6 +87,7 @@ export interface Props extends FacilityCapacityUpgradeActions {
   /** Needed by a hydro plant's water outlook and by the weather resilience section */
   game?: GameType;
   onRetrofit?: (payload: RetrofitFacilityAction) => void;
+  expandRequest?: number;
 }
 
 /**
@@ -623,6 +624,8 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
       )}
       {props.game && (
         <FacilityCapacityUpgrade
+          key={props.expandRequest}
+          openOnMount={props.expandRequest !== undefined}
           facility={facility}
           game={props.game}
           onExpand={props.onExpand}

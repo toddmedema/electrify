@@ -12,6 +12,7 @@ import { currentTick } from "../src/helpers/GameSelectors";
 import {
   formatMoneyConcise,
   formatMoneyStable,
+  formatPurchasePrice,
   formatWattHours,
 } from "../src/helpers/Format";
 import {
@@ -1636,7 +1637,7 @@ for (const theme of ["light", "dark"] as const) {
     await expect(surface).not.toContainText("Cash after connection");
     await expect(
       surface.getByRole("button", {
-        name: `Connect · ${formatMoneyConcise(quote.price)}`,
+        name: `Connect · ${formatPurchasePrice(quote.price)}`,
         exact: true,
       }),
     ).toBeEnabled();
@@ -2116,4 +2117,46 @@ test("normal valley play saves across the first year and resumes from IndexedDB"
   expect(after.transmission?.lines).toEqual(before.transmission?.lines);
   await expect(state).toHaveAttribute("data-save-state", "saved");
   await expect(page.getByText("Save failed", { exact: true })).toHaveCount(0);
+});
+
+test("map tile hover and right-click expose the tile's own actions", async ({
+  page,
+}) => {
+  const network = await startMap(page, "light");
+  const tile = TERRITORY_TILES.find(({ id }) => id === "green-uplands:site-1")!;
+  const game = (await readSavedGame(page))!;
+  const quote = tilePurchaseQuote(game, tile.id)!;
+  await panToTile(page, tile);
+  const target = network.locator(`[data-map-target="${tile.id}"]`);
+
+  await target.hover();
+  const tooltip = network.getByRole("tooltip");
+  await expect(tooltip).toHaveText("Forest · Open site · Unconnected");
+  await expect(target).not.toHaveAttribute("title", /.+/);
+
+  await target.focus();
+  await target.click({ button: "right" });
+  const menu = page.getByRole("menu", { name: "Tile actions" });
+  const connect = menu.getByRole("menuitem", {
+    name: `Connect (${formatPurchasePrice(quote.price)})`,
+    exact: true,
+  });
+  await expect(connect).toBeEnabled();
+  await expect(tooltip).toHaveCount(0);
+  await expect(connect).toBeFocused();
+  await reviewScreenshot(page, {
+    path: info.outputPath("tile-context-menu.png"),
+    animations: "disabled",
+    scale: "css",
+  });
+  await connect.press("Escape");
+  await expect(menu).toHaveCount(0);
+  await expect(target).toBeFocused();
+
+  await target.press("Shift+F10");
+  await connect.click();
+  await expect(target).toHaveAttribute("data-owned", "true");
+  await expect
+    .poll(async () => ownsTerritoryTile((await readSavedGame(page))!, tile.id))
+    .toBe(true);
 });

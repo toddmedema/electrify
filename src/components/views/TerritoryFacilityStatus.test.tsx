@@ -85,7 +85,7 @@ it.each([
     facility.yearsToBuildLeft = years;
     const { target, occupant } = show(game, facility.tileId!);
     expect(target).toHaveAccessibleDescription(expect.stringContaining(label));
-    expect(target).toHaveAttribute("title", expect.stringContaining(label));
+    expect(target).not.toHaveAttribute("title");
     expect(occupant).toHaveAttribute("data-facility-status", kind);
     expect(occupant).toHaveAttribute("data-visibility-distance", "0");
     // The badge is a sibling of the faded facility body, under the same fog wrapper.

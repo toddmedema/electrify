@@ -38,6 +38,13 @@ export interface FacilityMenuTarget {
   left: number;
 }
 
+export interface ContextMenuAction {
+  label: string;
+  icon: React.ReactNode;
+  disabled?: boolean;
+  onSelect: () => void;
+}
+
 type ActionKey =
   | "pause"
   | "resume"
@@ -165,6 +172,8 @@ export default function FacilityContextMenu(props: {
   target: FacilityMenuTarget | null;
   onClose: () => void;
   onMenuExited?: () => void;
+  tileActions?: ContextMenuAction[];
+  tileCaption?: string;
   onSell: DispatchProps["onSell"];
   onTogglePause: DispatchProps["onTogglePause"];
   onPause: DispatchProps["onPause"];
@@ -227,25 +236,48 @@ export default function FacilityContextMenu(props: {
   const actionLabel = (action: FleetAction, bulk: boolean) =>
     `${action.label}${bulk ? ` (${action.facilities.length})` : ""}${action.cost !== undefined ? ` · ${formatPurchasePrice(action.cost)}` : ""}`;
   const title =
-    selected.length === 1
+    props.tileCaption ??
+    (selected.length === 1
       ? `${formatFacilitySize(selected[0])} ${facilityDisplayName(selected[0])}`
-      : null;
+      : null);
   return (
     <>
       <Menu
-        open={!!target && selected.length > 0 && offered.length > 0}
+        open={!!target && (offered.length > 0 || !!props.tileActions?.length)}
         onClose={props.onClose}
         anchorReference="anchorPosition"
         anchorPosition={
           target ? { top: target.top, left: target.left } : undefined
         }
         slotProps={{
-          list: { "aria-label": "Facility actions" },
-          paper: { className: "facilityContextMenu" },
+          list: {
+            "aria-label": props.tileActions
+              ? "Tile actions"
+              : "Facility actions",
+          },
+          paper: {
+            className: props.tileActions
+              ? "facilityContextMenu territoryTileMenu"
+              : "facilityContextMenu",
+          },
           transition: { onExited: props.onMenuExited },
         }}
       >
         {title && <ListSubheader disableSticky>{title}</ListSubheader>}
+        {props.tileActions?.map(({ label, icon, disabled, onSelect }) => (
+          <MenuItem
+            key={label}
+            disabled={disabled}
+            onClick={() => {
+              props.onClose();
+              onSelect();
+            }}
+          >
+            <ListItemIcon>{icon}</ListItemIcon>
+            <ListItemText>{label}</ListItemText>
+          </MenuItem>
+        ))}
+        {!!props.tileActions?.length && !!offered.length && <Divider />}
         {offered.flatMap((action, index) => [
           ...(action.key === "sell" && index > 0
             ? [<Divider key="sale-divider" />]
