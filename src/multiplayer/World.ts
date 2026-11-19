@@ -1686,7 +1686,11 @@ function upgradeTerritoryWorld(value: unknown): unknown {
         (old.rules ===
           "coop-2-c85efcd401375172030f9ab31b7b1f81f0ecf4f450732f36d86e265355e91bef" ||
           old.rules ===
-            "coop-2-fdb701fc666648e148ecc4d6a02e4b2001090bc79052092a4e567ea9184714ef"))
+            "coop-2-fdb701fc666648e148ecc4d6a02e4b2001090bc79052092a4e567ea9184714ef")) ||
+      // Published master 40c3cafc: coal repowers precede connection receipt pricing.
+      (old.gameSchema === 20 &&
+        old.rules ===
+          "coop-2-cf979e3b45deb328dd12a266f291e16398174095d47beca6df0d4f9da1dbd577")
     ) ||
     !Array.isArray(old.grids) ||
     !old.grids.every(
@@ -1696,6 +1700,8 @@ function upgradeTerritoryWorld(value: unknown): unknown {
         (old.gameSchema === 15 ||
           old.gameSchema === 16 ||
           old.gameSchema === 17 ||
+          old.gameSchema === 19 ||
+          old.gameSchema === 20 ||
           isUtilityExpansionGame(grid)),
     )
   )

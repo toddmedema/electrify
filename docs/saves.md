@@ -94,7 +94,7 @@ Schema 21 records the distance to the nearest owned city on new ordinary tile
 receipts. Older receipts keep their exact parcel prices. Later city acquisitions
 leave previous receipts and invested capital intact.
 
-Recognized published schema 13, 14, 15, 16, 17 and 19 co-op identities have ordered transitions.
+Recognized published schema 13, 14, 15, 16, 17, 19 and 20 co-op identities have ordered transitions.
 It preserves the run's original scoring provenance. Existing company-local land
 rights are retained, including old duplicate ownership; new claims are exclusive
 and checked in host command order. Other incompatible co-op identities retain

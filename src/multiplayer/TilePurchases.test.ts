@@ -64,34 +64,48 @@ function startClock(world: World) {
     ).toBeUndefined();
   });
 }
-it("resumes a published schema 19 co-op world with its parcel-priced receipt", () => {
-  const world = ready();
-  const game = world.grids[0];
-  const tileId = "green-uplands:site-2";
-  const price = tilePrice(game, 0, tileId);
-  const receipt = { tileId, minute: 0, price } as const;
-  game.territoryNetwork!.tilePurchases = [receipt];
-  currentTick(game)!.cash -= price;
-  const raw = {
-    ...checkpointWorld(world),
-    gameSchema: 19,
-    rules:
-      "coop-2-c85efcd401375172030f9ab31b7b1f81f0ecf4f450732f36d86e265355e91bef",
-  };
-  const resumed = restoreWorld(raw, "parcel-receipt");
-  expect(resumed.grids[0].territoryNetwork!.tilePurchases).toEqual([receipt]);
-  expect(currentTick(resumed.grids[0])!.cash).toBe(currentTick(game)!.cash);
-  const quote = tilePurchaseQuote(
-    roomView(resumed, "0").game!,
-    "green-uplands:site-5",
-  )!;
-  expect(buy(resumed, "0", quote.tileId, quote.quoteKey)).toBeUndefined();
-  const roundTrip = restoreWorld(checkpointWorld(resumed), "mixed-tile-prices");
-  expect(roundTrip.grids[0].territoryNetwork!.tilePurchases).toEqual([
-    receipt,
-    { ...quote.purchases[0], minute: game.date.minute },
-  ]);
-});
+it.each([
+  [
+    19,
+    "coop-2-c85efcd401375172030f9ab31b7b1f81f0ecf4f450732f36d86e265355e91bef",
+  ],
+  [
+    20,
+    "coop-2-cf979e3b45deb328dd12a266f291e16398174095d47beca6df0d4f9da1dbd577",
+  ],
+])(
+  "resumes a published schema %i co-op world with its parcel-priced receipt (%s)",
+  (gameSchema, rules) => {
+    const world = ready();
+    const game = world.grids[0];
+    const tileId = "green-uplands:site-2";
+    const price = tilePrice(game, 0, tileId);
+    const receipt = { tileId, minute: 0, price } as const;
+    game.territoryNetwork!.tilePurchases = [receipt];
+    currentTick(game)!.cash -= price;
+    const raw = {
+      ...checkpointWorld(world),
+      gameSchema,
+      rules,
+    };
+    const resumed = restoreWorld(raw, "parcel-receipt");
+    expect(resumed.grids[0].territoryNetwork!.tilePurchases).toEqual([receipt]);
+    expect(currentTick(resumed.grids[0])!.cash).toBe(currentTick(game)!.cash);
+    const quote = tilePurchaseQuote(
+      roomView(resumed, "0").game!,
+      "green-uplands:site-5",
+    )!;
+    expect(buy(resumed, "0", quote.tileId, quote.quoteKey)).toBeUndefined();
+    const roundTrip = restoreWorld(
+      checkpointWorld(resumed),
+      "mixed-tile-prices",
+    );
+    expect(roundTrip.grids[0].territoryNetwork!.tilePurchases).toEqual([
+      receipt,
+      { ...quote.purchases[0], minute: game.date.minute },
+    ]);
+  },
+);
 
 it("accepts unchanged land quotes after a host clock tick and rejects real CPI repricing", () => {
   const world = ready();
