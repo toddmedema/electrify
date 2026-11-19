@@ -10,7 +10,15 @@ import {
 import { reviewScreenshot } from "./review-screenshot";
 import { getTerritoryTile } from "../src/helpers/TerritoryTiles";
 import { getTerrainModel } from "../src/components/base/territory-3d/TerrainModels";
-import { readSavedGame } from "./save-fixture";
+import { editSavedGame, readSavedGame } from "./save-fixture";
+import { TICK_MINUTES } from "../src/Constants";
+import { getDateFromMinute } from "../src/helpers/DateTime";
+import { WILDFIRE_DAMAGE_ID } from "../src/helpers/Hazards";
+import {
+  FIRE_BURN_MINUTES,
+  FIRE_REPAIR_MINUTES,
+  FIRE_SPREAD_MINUTES,
+} from "../src/helpers/TerritoryWildfire";
 import { loadSimData } from "../src/testing/SimData";
 import {
   projectCatalogue,
@@ -323,4 +331,91 @@ test("unavailable WebGL leaves a fully operable simplified map", async ({
   await expect(
     map.locator('[data-project-site="owned"]').first(),
   ).toBeVisible();
+});
+
+test("shows an advancing wildfire and scar with WebGL or the SVG fallback", async ({
+  page,
+}, info) => {
+  const theme = info.project.name === "desktop-chromium" ? "light" : "dark";
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.addInitScript((mode) => {
+    localStorage.setItem("theme", mode);
+    localStorage.setItem("audioEnabled", "false");
+  }, theme);
+  await page.goto("/?scenario=116");
+  await page.getByRole("button", { name: "Start game", exact: true }).click();
+  const pause = page.getByRole("button", { name: "pause", exact: true });
+  await expect(pause).toBeVisible();
+  if ((await pause.getAttribute("aria-pressed")) !== "true")
+    await pause.click();
+  await expect
+    .poll(async () => (await readSavedGame(page))?.scenarioId)
+    .toBe(116);
+  const burned = "champlain:site-9";
+  const burning = "champlain:site-8";
+  await editSavedGame(page, ({ game }) => {
+    const wind = game.facilities.find(
+      (facility) => facility.tileId === burning,
+    )!;
+    game.date = getDateFromMinute(
+      FIRE_BURN_MINUTES + TICK_MINUTES,
+      game.startingYear,
+    );
+    game.speed = "PAUSED";
+    game.territoryWeather = {
+      dryness: 0.81,
+      fires: [
+        {
+          startsMinute: 0,
+          tiles: [
+            { tileId: burned, ignitesMinute: 0 },
+            { tileId: burning, ignitesMinute: FIRE_SPREAD_MINUTES },
+          ],
+        },
+      ],
+    };
+    game.worldEvents.active.push({
+      key: "review-wildfire",
+      definitionId: WILDFIRE_DAMAGE_ID,
+      startsMinute: FIRE_SPREAD_MINUTES,
+      endsMinute: FIRE_SPREAD_MINUTES + FIRE_REPAIR_MINUTES,
+      attributes: { hazard: "WILDFIRE", facilityId: wind.id },
+      effects: { facilityOutputMultipliersById: { [wind.id]: 0.55 } },
+    });
+  });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
+  const map = await returnToTerritoryMap(page);
+  const canvas = map.locator("canvas.territory3DCanvas");
+  await expect(canvas).toHaveAttribute("data-renderer", "ready");
+  const active = map.locator(`[data-map-target="${burning}"]`);
+  const scar = map.locator(`[data-map-target="${burned}"]`);
+  await active.focus();
+  await expect(active).toHaveAccessibleDescription(
+    /Wildfire burning.*Wildfire damage.*55% available/,
+  );
+  await expect(active).toBeInViewport({ ratio: 0.75 });
+  await expect(scar).toBeInViewport({ ratio: 0.75 });
+  await expect(scar).toHaveAccessibleDescription(/Scorched by wildfire/);
+  const flames = map.locator(
+    `[data-disaster-tile="${burning}"] [data-disaster="fire"]`,
+  );
+  await expect(flames).toBeVisible();
+  await reviewScreenshot(map.locator(".territoryMapViewport"), {
+    path: info.outputPath(`wildfire-map-${theme}.png`),
+  });
+
+  await canvas.evaluate((element: MapCanvas) => {
+    element
+      .getContext("webgl2")!
+      .getExtension("WEBGL_lose_context")!
+      .loseContext();
+  });
+  await expect(canvas).toHaveAttribute("data-renderer", "lost");
+  await expect(
+    map.locator(
+      `[data-tile="${burned}"][data-ground-condition="scorched"] .territoryTerrainArtwork`,
+    ),
+  ).toBeVisible();
+  await expect(flames).toBeVisible();
 });

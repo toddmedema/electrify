@@ -1,3 +1,4 @@
+import type { TerrainWeather } from "../../helpers/TerritoryDisasters";
 import * as React from "react";
 import type {
   CitySizeType,
@@ -21,11 +22,10 @@ import StorageOccupant from "./territory-art/StorageOccupant";
 
 export { TERRAIN_LABELS } from "../../data/TerrainLabels";
 const terrainArt: Record<
-  TerrainType,
+  Exclude<TerrainType, "forest">,
   React.ComponentType<{ className?: string }>
 > = {
   plains: PlainsTerrain,
-  forest: ForestTerrain,
   hills: HillsTerrain,
   mountain: MountainTerrain,
   river: RiverTerrain,
@@ -36,11 +36,15 @@ export function TerrainArtwork({
   terrain,
   ports,
   className,
+  weather,
 }: {
   terrain: TerrainType;
   ports?: readonly number[];
   className?: string;
+  weather?: TerrainWeather;
 }) {
+  if (terrain === "forest")
+    return <ForestTerrain className={className} weather={weather} />;
   const Art = terrainArt[terrain];
   return terrain === "river" ? (
     <RiverTerrain ports={ports} className={className} />

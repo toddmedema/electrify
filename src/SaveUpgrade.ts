@@ -392,6 +392,8 @@ const migrations: readonly Migration[] = [
   (save) => save,
   // 19 -> 20: coal repowers extend the upgrade record. Existing projects are unchanged.
   (save) => save,
+  // 20 -> 21: territory weather begins on the next monthly check for existing runs.
+  (save) => save,
 ];
 
 /** Structure versions are independent of app releases and simulation compatibility. */

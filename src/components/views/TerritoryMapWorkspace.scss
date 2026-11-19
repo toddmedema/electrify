@@ -59,6 +59,18 @@
 .territoryHex[data-terrain="mountain"] {
   --territory-tile-rim: #7d898d;
 }
+// The SVG fallback retains relief silhouettes and uses the same ash state as the 3D materials.
+.territoryHex:is(
+  [data-ground-condition="burning"],
+  [data-ground-condition="scorched"]
+) {
+  --territory-tile-rim: #47484b;
+
+  &:is([data-terrain="mountain"], [data-terrain="hills"])
+    .territoryTerrainArtwork {
+    filter: grayscale(0.85) brightness(0.63);
+  }
+}
 .territoryHex[data-terrain="river"],
 .territoryHex[data-terrain="lake"] {
   --territory-tile-rim: #7ca6ac;

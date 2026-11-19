@@ -1,3 +1,4 @@
+import type { TerrainWeather } from "../../../helpers/TerritoryDisasters";
 import type { MapWeather } from "./MapWeather";
 
 export type Vec3 = readonly [number, number, number];
@@ -47,6 +48,7 @@ export interface MapWireConnection {
   lowY: number;
 }
 export interface TerrainModelOptions {
+  weather?: TerrainWeather;
   /** Zero for untouched land; otherwise reserve at least this width around the center. */
   footprint?: number;
   ports?: readonly number[];

@@ -523,6 +523,27 @@ test("world blockers are detached live state and resume still discards them", ()
   expect(restored.readyRequired).toBe(true);
 });
 
+test("restores the schema-20 checkpoint from before territory weather", () => {
+  const world = create(2);
+  const saved = {
+    ...checkpointWorld(world),
+    gameSchema: 20,
+    rules:
+      "coop-2-cf979e3b45deb328dd12a266f291e16398174095d47beca6df0d4f9da1dbd577",
+  };
+  const before = JSON.stringify(saved);
+  const restored = restoreWorld(saved, "resumed");
+  expect(restored.gameSchema).toBe(SAVE_SCHEMA_VERSION);
+  expect(restored.rules).toBe(world.rules);
+  expect(restored.grids.map((grid) => grid.facilities)).toEqual(
+    world.grids.map((grid) => grid.facilities),
+  );
+  expect(
+    restored.grids.every((grid) => grid.territoryWeather === undefined),
+  ).toBe(true);
+  expect(JSON.stringify(saved)).toBe(before);
+});
+
 test("future and unsupported shared schemas are rejected without mutating the checkpoint", () => {
   const saved = checkpointWorld(create(2));
   for (const bad of [

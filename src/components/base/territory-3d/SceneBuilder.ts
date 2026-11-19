@@ -43,6 +43,7 @@ type PickFrame = Pick<
   "width" | "height" | "cameraX" | "cameraY" | "scale" | "weather"
 >;
 interface TileScene {
+  weather?: TerrainModelOptions["weather"];
   tile: TerritoryTileDefinition;
   kind?: StructureKind;
   terrain: MapInstance;
@@ -232,18 +233,24 @@ export class SceneBuilder {
     for (const view of views) {
       const { tile } = view,
         tileKey = territoryMapTileKey(tile),
-        kind = structureKind(view);
+        kind = structureKind(view),
+        weather =
+          view.disaster?.ground === "burning"
+            ? "scorched"
+            : view.disaster?.ground;
       let cell = this.cells.get(tileKey);
       if (
         !cell ||
         cell.tile !== tile ||
         cell.kind !== kind ||
+        cell.weather !== weather ||
         cell.terrain.fog !== view.visibilityDistance
       ) {
         const model = kind ? this.factories.structure(kind) : undefined;
         const position = tilePosition3D(tile);
         const terrain = this.factories.terrain(tile.terrain, {
           footprint: model?.footprint ?? 0,
+          weather,
           ports:
             tile.terrain === "river" ? riverPorts(tile, allTiles) : undefined,
           ...(tile.terrain === "mountain" || tile.terrain === "forest"
@@ -261,6 +268,7 @@ export class SceneBuilder {
         });
         cell = {
           tile,
+          weather,
           kind,
           model,
           terrain: {
