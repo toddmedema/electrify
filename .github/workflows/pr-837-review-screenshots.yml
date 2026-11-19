@@ -18,7 +18,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: 0ecbad58cccf2c865344ed240698f35a92a027c3
+          ref: bda6d3209b80819ee190b79bb17290c1ecfa9bb2
           fetch-depth: 0
           lfs: true
           persist-credentials: false
@@ -55,12 +55,13 @@ jobs:
 
           source = Path(os.environ["REVIEW_SCREENSHOT_DIR"])
           captures = (
-              ("desktop-chromium", "mission-complete.png", "tutorial-completion-desktop"),
+              ("tutorial-capstone-guided*-desktop-chromium/mission-complete.png", "tutorial-completion-desktop"),
+              ("storage-capstone*-mobile-360px/storage-completion-dark.png", "tutorial-completion-mobile"),
           )
           with Path(os.environ["GITHUB_STEP_SUMMARY"]).open("a") as summary:
               summary.write("## Verified attachment payloads\n\n")
-              for viewport, filename, label in captures:
-                  image, = source.glob(f"tutorial-capstone-guided*-{viewport}/{filename}")
+              for pattern, label in captures:
+                  image, = source.glob(pattern)
                   raw = image.read_bytes()
                   h = sha256(raw).hexdigest()
                   data = "\n".join(textwrap.wrap(b64encode(raw).decode(), width=120))

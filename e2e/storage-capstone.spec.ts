@@ -1,4 +1,5 @@
 import { reviewScreenshot } from "./review-screenshot";
+import { expectDialogActionsOnOneRow } from "./dialog-layout";
 import { expect, test } from "./fixtures";
 import { dragCoalAbovePumpedHydro, waitForSettled } from "./layout";
 
@@ -115,14 +116,15 @@ for (const theme of ["light", "dark"]) {
     await expect(
       dialog.getByRole("button", { name: "Menu", exact: true }),
     ).toBeVisible();
-    for (const button of await dialog.getByRole("button").all()) {
-      const box = (await button.boundingBox())!;
-      expect(box.x).toBeGreaterThanOrEqual(0);
-      expect(box.x + box.width).toBeLessThanOrEqual(page.viewportSize()!.width);
-      expect(box.height).toBeGreaterThanOrEqual(
-        testInfo.project.name.startsWith("mobile") ? 44 : 40,
-      );
-    }
+    await expectDialogActionsOnOneRow(
+      dialog,
+      5,
+      testInfo.project.use.hasTouch ? 44 : 40,
+    );
+    await reviewScreenshot(dialog, {
+      path: testInfo.outputPath(`storage-completion-${theme}.png`),
+      animations: "disabled",
+    });
     await page.screenshot({
       path: testInfo.outputPath(`storage-complete-${theme}.png`),
       animations: "disabled",
