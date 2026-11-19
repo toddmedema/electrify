@@ -32,6 +32,8 @@ import { isBlackoutToast } from "../helpers/BlackoutToast";
 import { TOOL_SHORTCUTS } from "./base/KeyboardShortcuts";
 import { listenForShortcuts } from "./base/GlobalShortcuts";
 import DisplayNameDialogContainer from "./base/DisplayNameDialogContainer";
+import FeedbackDialog from "./base/FeedbackDialog";
+import FeedbackPrompt from "./base/FeedbackPrompt";
 import InstallAppButton from "./base/InstallAppButton";
 import TutorialHud from "./base/TutorialHud";
 import DataCenterGuide from "./base/DataCenterGuide";
@@ -52,7 +54,13 @@ import {
   selectTutorialActions,
   selectTutorialHiddenUi,
 } from "../reducers/Tutorial";
-import { snackbarOpen, manualHelpClose, manualHelpOpen } from "../reducers/UI";
+import {
+  feedbackClose,
+  feedbackOpen,
+  snackbarOpen,
+  manualHelpClose,
+  manualHelpOpen,
+} from "../reducers/UI";
 import {
   flingSwipe,
   followSwipe,
@@ -585,6 +593,7 @@ export default class Compositor extends React.Component<Props, {}> {
 
     if (
       this.props.ui.dialog !== nextProps.ui.dialog ||
+      this.props.ui.feedback !== nextProps.ui.feedback ||
       this.props.ui.snackbar !== nextProps.ui.snackbar ||
       this.props.ui.manualHelpEntry !== nextProps.ui.manualHelpEntry
     ) {
@@ -761,8 +770,27 @@ export default class Compositor extends React.Component<Props, {}> {
           }}
         >
           <DialogTitle id="app-dialog-title">{ui.dialog.title}</DialogTitle>
-          <DialogContent>{ui.dialog.message}</DialogContent>
-          <DialogActions>
+          <DialogContent>
+            {ui.dialog.message}
+            {ui.dialog.allTutorialsCompleted && ui.dialog.open && (
+              <FeedbackPrompt milestone="all-tutorials" />
+            )}
+          </DialogContent>
+          <DialogActions disableSpacing={Boolean(ui.dialog.tutorialComplete)}>
+            {ui.dialog.tutorialComplete && (
+              <Button
+                onClick={() =>
+                  store.dispatch(
+                    feedbackOpen({
+                      source: "tutorial",
+                      scenarioId: this.props.scenarioId,
+                    }),
+                  )
+                }
+              >
+                Share feedback
+              </Button>
+            )}
             {ui.dialog.offerInstall && (
               <InstallAppButton label="Install for later" afterMilestone />
             )}
@@ -867,6 +895,12 @@ export default class Compositor extends React.Component<Props, {}> {
         {/* Connected, so they still update when shouldComponentUpdate blocks this component --
             neither is driven by the current card, and both can open over any of them */}
         <VictoryDialogContainer />
+        {ui.feedback && (
+          <FeedbackDialog
+            context={ui.feedback}
+            onClose={() => store.dispatch(feedbackClose())}
+          />
+        )}
         <CampaignHandoverContainer />
         <SaveTransitionDialog />
         <DisplayNameDialogContainer />

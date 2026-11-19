@@ -13,6 +13,7 @@ import {
   challengeComparison,
 } from "../../helpers/Challenge";
 import { logEvent } from "../../Globals";
+import FeedbackPrompt from "./FeedbackPrompt";
 import ShareIcon from "@mui/icons-material/Share";
 import ConceptIcon from "./ConceptIcon";
 import ReportProblemOutlinedIcon from "@mui/icons-material/ReportProblemOutlined";
@@ -41,6 +42,7 @@ export interface DispatchProps {
   // Reported once the player has actually shared, with how it went out
   onShared: (victory: VictoryType, method: string) => void;
   onShareFailed: () => void;
+  onFeedback?: (victory: VictoryType) => void;
 }
 
 export interface Props extends StateProps, DispatchProps {}
@@ -142,6 +144,12 @@ export default function VictoryDialog(props: Props): React.JSX.Element {
           </Typography>
         )}
         <ResultScore result={victory} />
+        {victory.outcome && props.onFeedback && (
+          <FeedbackPrompt
+            milestone="first-scenario"
+            onFeedback={() => props.onFeedback?.(victory)}
+          />
+        )}
         {comparison && (
           <Typography role="status" sx={{ mt: 2 }}>
             {comparison}{" "}

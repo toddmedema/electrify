@@ -20,6 +20,7 @@ contextBridge.exposeInMainWorld(
     getState: () => ipcRenderer.invoke("desktop:state"),
     setDisplay: (display) => ipcRenderer.invoke("desktop:display", display),
     quit: () => ipcRenderer.invoke("desktop:quit"),
+    submitFeedback: (input) => ipcRenderer.invoke("desktop:feedback", input),
     readSaveLibrary: () => ipcRenderer.invoke("desktop:read-saves"),
     writeSaveLibrary: (library, syncCloud = false) =>
       ipcRenderer.invoke("desktop:write-saves", library, syncCloud),

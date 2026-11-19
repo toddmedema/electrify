@@ -1,6 +1,5 @@
 import { useMoney } from "./CurrencyContext";
 import { useGameWorkspaceLayout } from "./GameWorkspaceContext";
-import { FEEDBACK_URL } from "../../CommunityLinks";
 import type { AppDispatch } from "../../Store";
 import * as React from "react";
 import {
@@ -15,7 +14,6 @@ import { formatNumber } from "../../helpers/Format";
 import { navigate } from "../../reducers/Card";
 import {
   isBigScreen,
-  openWindow,
   SIDE_LAYOUT_MEDIA,
   SIDE_LAYOUT_MIN_WIDTH,
 } from "../../Globals";
@@ -35,7 +33,11 @@ import { useOnline } from "./OnlineStatus";
 import { buildSpeedOptions, sharedClockSpeedProps } from "./SpeedControls";
 import MissionSummary from "./MissionSummary";
 import { EvidenceRequestType, EvidenceTargetType } from "../../Types";
-import { acknowledgeEvidence, manualHelpOpen } from "../../reducers/UI";
+import {
+  acknowledgeEvidence,
+  feedbackOpen,
+  manualHelpOpen,
+} from "../../reducers/UI";
 import { MANUAL_ENTRY } from "./ManualEntries";
 import { openEvidence } from "../../helpers/Evidence";
 import {
@@ -100,6 +102,7 @@ export interface DispatchProps {
   onSavedGames?: () => void;
   onSpeedChange: (speed: SpeedType) => void;
   onNextTutorial: (scenarioId: number) => void;
+  onFeedback?: (scenarioId: number) => void;
   onQuit: () => void;
 }
 
@@ -286,9 +289,16 @@ export function GameAppBar(props: Props) {
         {!inMultiplayer && (
           <MenuItem onClick={props.onSavedGames}>Saved games</MenuItem>
         )}
-        <MenuItem onClick={() => openWindow(FEEDBACK_URL)}>
-          Send feedback
-        </MenuItem>
+        {props.onFeedback && (
+          <MenuItem
+            onClick={() => {
+              handleMenuClose();
+              props.onFeedback?.(game.scenarioId);
+            }}
+          >
+            Share feedback
+          </MenuItem>
+        )}
         {/* Mid-tutorial, the thing a player who has seen enough wants is the next tutorial,
               not the scenario list they would have to go back through to reach it */}
         {nextTutorial && (
@@ -324,6 +334,8 @@ export function GameAppBar(props: Props) {
       props.onAchievements,
       steamAvailable,
       onNextTutorial,
+      props.onFeedback,
+      game.scenarioId,
       handleQuit,
       nextTutorial,
       isTutorial,
@@ -520,6 +532,9 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
     },
     onSpeedChange: (speed: SpeedType) => {
       dispatch(setSpeed(speed));
+    },
+    onFeedback: (scenarioId) => {
+      dispatch(feedbackOpen({ source: "game-menu", scenarioId }));
     },
     onNextTutorial: (scenarioId: number) => {
       void runSaveTransition(() => startTutorial(dispatch, scenarioId));

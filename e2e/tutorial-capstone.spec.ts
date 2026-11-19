@@ -1,3 +1,4 @@
+import { TUTORIALS } from "../src/data/Scenarios";
 import { reviewScreenshot } from "./review-screenshot";
 import { expect, test, type Page, type TestInfo } from "./fixtures";
 
@@ -133,6 +134,24 @@ async function completeMission(
     page.getByRole("button", { name: "Resume Coal", exact: true }),
   ).toHaveCount(0);
 
+  if (!keepPlaying) {
+    // Mission 1 can be the last tutorial the player completes.
+    await page.evaluate(
+      (ids) => {
+        localStorage.setItem(
+          "plays",
+          JSON.stringify({
+            plays: ids.map((scenarioId) => ({
+              scenarioId,
+              date: new Date().toISOString(),
+              timesPlayed: 1,
+            })),
+          }),
+        );
+      },
+      TUTORIALS.slice(1).map(({ id }) => id),
+    );
+  }
   await page.getByRole("button", { name: "fast speed" }).click();
   await expect(
     page.getByRole("heading", { name: /Mission complete!/ }),
@@ -175,6 +194,9 @@ async function completeMission(
   ).toBeVisible();
   await expect(primary).toBeFocused();
   if (keepPlaying) {
+    await expect(
+      completionDialog.getByText(/How were the tutorials/),
+    ).toHaveCount(0);
     const fleetBefore = await page.locator(".facilityRow").allTextContents();
     const clock = page.locator("#appbar [data-game-minute]");
     const minuteBefore = await clock.getAttribute("data-game-minute");
@@ -197,6 +219,53 @@ async function completeMission(
       .toBeGreaterThan(Number(minuteBefore));
     return;
   }
+  await expect(
+    completionDialog.getByText(/How were the tutorials/),
+  ).toBeVisible();
+  const shareFeedback = completionDialog.getByRole("button", {
+    name: "Share feedback",
+  });
+  await shareFeedback.click();
+  const feedback = page.getByRole("dialog", { name: "Share feedback" });
+  await expect(
+    feedback.getByRole("textbox", { name: "Your feedback" }),
+  ).toBeFocused();
+  let received: unknown;
+  await page.route("**/submitGameFeedback", async (route) => {
+    const headers = {
+      "Access-Control-Allow-Origin": new URL(page.url()).origin,
+      "Access-Control-Allow-Methods": "POST",
+      "Access-Control-Allow-Headers": "Content-Type",
+    };
+    if (route.request().method() === "OPTIONS") {
+      await route.fulfill({ status: 204, headers });
+      return;
+    }
+    received = route.request().postDataJSON();
+    await route.fulfill({ headers, json: { result: { sent: true } } });
+  });
+  await feedback
+    .getByRole("textbox", { name: "Your feedback" })
+    .fill("The capstone helped.");
+  await reviewScreenshot(feedback, {
+    path: testInfo.outputPath("share-feedback.png"),
+    animations: "disabled",
+  });
+  await feedback.getByRole("button", { name: "Send feedback" }).click();
+  await expect(feedback.getByRole("status")).toHaveText(
+    "Thanks for sharing your feedback.",
+  );
+  expect(received).toMatchObject({
+    data: {
+      source: "tutorial",
+      scenarioId: TUTORIALS[0].id,
+      message: "The capstone helped.",
+      replyEmail: "",
+    },
+  });
+  await expect(feedback.getByRole("button", { name: "Done" })).toBeFocused();
+  await feedback.getByRole("button", { name: "Done" }).click();
+  await expect(shareFeedback).toBeFocused();
   await primary.click();
   await expect(
     page.getByRole("region", { name: "Step 1 of 10", exact: true }),
