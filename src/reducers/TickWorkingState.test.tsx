@@ -14,6 +14,7 @@ import gameReducer, {
   buildTransmissionLine,
   loaded,
   quit,
+  retrofitFacility,
   resume,
   setSpeed,
   tick,
@@ -154,6 +155,45 @@ describe("live tick working state", () => {
     expect(actual.transmission!.lines[0].loanAmountLeft).toBeLessThan(
       state.transmission!.lines[0].loanAmountLeft,
     );
+  });
+
+  it("settles conversion debt without changing the frozen previous loan", () => {
+    const game = createGame({ scenarioId: 100, seed: 4242 });
+    const coal = game.facilities.find((facility) => facility.fuel === "Coal")!;
+    Object.assign(coal, {
+      loanAmountTotal: 20e6,
+      loanAmountLeft: 8e6,
+      loanMonthlyPayment: 25e3,
+    });
+    const state = gameReducer(
+      game,
+      retrofitFacility({
+        facilityId: coal.id,
+        upgrade: "coalToGasPeaker",
+        financed: true,
+      }),
+    );
+    const original = state.facilities.find(
+      (facility) => facility.id === coal.id,
+    )!;
+    expect(original.repowerLoan).toBeDefined();
+    expect(Object.isFrozen(original.repowerLoan)).toBe(true);
+    const before = mutableCopy(state);
+    const expected = mutableCopy(state);
+    tickState(expected);
+
+    const actual = draftTick(state);
+
+    expectSameState(actual, expected);
+    expectSameState(state, before);
+    const settled = actual.facilities.find(
+      (facility) => facility.id === coal.id,
+    )!;
+    expect(settled.repowerLoan).not.toBe(original.repowerLoan);
+    expect(settled.repowerLoan!.loanAmountLeft).toBeLessThan(
+      original.repowerLoan!.loanAmountLeft,
+    );
+    expect(settled.loanAmountLeft).toBeLessThan(original.loanAmountLeft);
   });
 
   it("removes a completed blackout without mutating the previous snapshot", () => {

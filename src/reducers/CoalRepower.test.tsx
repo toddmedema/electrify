@@ -8,7 +8,10 @@ import {
   coalRepowerQuote,
   completeCoalRepower,
 } from "../helpers/CoalRepower";
-import { serializeCommitmentMetadata } from "../helpers/Commitment";
+import {
+  copyCommitmentMetadata,
+  serializeCommitmentMetadata,
+} from "../helpers/Commitment";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "../helpers/DateTime";
 import { facilityLoanBalance } from "../helpers/Financials";
 import { currentTick } from "../helpers/GameSelectors";
@@ -16,6 +19,7 @@ import { validateGameCommand } from "../multiplayer/Commands";
 import { createGame } from "../testing/Simulator";
 import reducer, {
   cancelRetrofit,
+  generateNewTimeline,
   previewCoalRepowerImpact,
   reprioritizeFacility,
   resume,
@@ -28,6 +32,14 @@ const findCoal = (game: GameType) =>
   game.facilities.find((f) => f.fuel === "Coal")!;
 const scenario = () =>
   createGame({ scenarioId: 100, seed: 4242, difficulty: "Intern" });
+
+function mutableCopy(game: GameType): GameType {
+  const copy = cloneDeep(game);
+  game.timeline.forEach((tick, index) =>
+    copyCommitmentMetadata(tick, copy.timeline[index]),
+  );
+  return copy;
+}
 
 function advance(game: GameType, minute: number) {
   for (let next = game.date.minute; next < minute; next += TICK_MINUTES) {
@@ -74,7 +86,7 @@ it.each<[CoalRepowerType, string, number, number]>([
     ).toHaveProperty("error");
     expect(reducer(started, sellFacility(source.id))).toBe(started);
 
-    const played = cloneDeep(started);
+    const played = mutableCopy(started);
     advance(played, MINUTES_PER_MONTH);
     expect(played.facilities[sourceIndex]).toMatchObject({
       id: source.id,
@@ -87,7 +99,10 @@ it.each<[CoalRepowerType, string, number, number]>([
       JSON.parse(JSON.stringify(serializeSave(played))),
     );
     expect(inProgress).not.toBeNull();
-    const restored = cloneDeep(reducer(undefined, resume(inProgress!.game)));
+    const restored = mutableCopy(reducer(undefined, resume(inProgress!.game)));
+    const forecast = serializeCommitmentMetadata(played.timeline);
+    expect(forecast?.some((tick) => tick !== null)).toBe(true);
+    expect(serializeCommitmentMetadata(restored.timeline)).toEqual(forecast);
 
     advance(played, completion);
     advance(restored, completion);
@@ -184,6 +199,95 @@ it("rejects ineligible and unfunded starts and refunds a canceled project once",
     error: "Not enough cash for this conversion",
   });
 });
+
+it("retires aging coal bindings in live ticks and forecasts while retaining other targets", () => {
+  const game = createGame({
+    scenarioId: 102,
+    seed: 4242,
+    difficulty: "Manager",
+  });
+  currentTick(game)!.cash = 1e10;
+  // Both inherited units qualify, so replacing one must retain the other's binding.
+  game.facilities[1].minuteOperational = game.facilities[0].minuteOperational;
+  advance(game, 73 * MINUTES_PER_MONTH + 4 * TICK_MINUTES);
+  const coal = findCoal(game);
+  const other = { ...game.facilities[1] };
+  const aging = game.worldEvents.active.find((event) =>
+    event.key.endsWith(":aging-derate"),
+  )!;
+  expect(aging).toBeDefined();
+  expect(aging.effects.facilityOutputMultipliersById).toEqual({
+    [coal.id]: 0.85,
+    [other.id]: 0.85,
+  });
+  Object.assign(coal, {
+    loanAmountTotal: 20e6,
+    loanAmountLeft: 8e6,
+    loanMonthlyPayment: 25e3,
+  });
+  const upgrade = "coalToGasPeaker";
+  const quote = coalRepowerQuote(coal, game, upgrade)!;
+  const completion = game.date.minute + quote.durationMinutes;
+  expect(completion).toBeLessThan(96 * MINUTES_PER_MONTH);
+  const played = mutableCopy(
+    reducer(game, retrofitFacility({ facilityId: coal.id, upgrade })),
+  );
+  advance(played, completion - 3 * TICK_MINUTES);
+  const before = { ...played.facilities[0] };
+  const occurrences = cloneDeep(played.worldEvents.occurrences);
+  const withoutLimit = mutableCopy(played);
+  withoutLimit.worldEvents.active = withoutLimit.worldEvents.active.filter(
+    (event) => event.key !== aging.key,
+  );
+  withoutLimit.storyEffectsDisabled = true;
+  // A large load requests full output from both units, exposing either stale equipment cap.
+  const forecast = generateNewTimeline(played, 1e10, 1e8, 8);
+  const reference = generateNewTimeline(withoutLimit, 1e10, 1e8, 8);
+  const after = forecast.filter((tick) => tick.minute >= completion);
+  const referenceAfter = reference.filter((tick) => tick.minute >= completion);
+  expect(after).not.toHaveLength(0);
+  expect(after[0].supplyByFuel["Natural Gas"]).toBeGreaterThan(0);
+  expect(after.map((tick) => tick.supplyByFuel["Natural Gas"])).toEqual(
+    referenceAfter.map((tick) => tick.supplyByFuel["Natural Gas"]),
+  );
+  after.forEach((tick, index) => {
+    expect(tick.supplyByFuel.Coal).toBeGreaterThan(0);
+    expect(tick.supplyByFuel.Coal).toBeLessThanOrEqual(other.peakW * 0.85);
+    expect(tick.supplyByFuel.Coal).toBeLessThan(
+      referenceAfter[index].supplyByFuel.Coal!,
+    );
+  });
+  expect(played.facilities[0]).toEqual(before);
+  expect(played.worldEvents.occurrences).toEqual(occurrences);
+
+  played.timeline.forEach((tick) => {
+    tick.demandW = 1e9;
+  });
+  advance(played, completion + TICK_MINUTES);
+  const gas = played.facilities[0];
+  expect(gas).toMatchObject({
+    id: before.id,
+    fuel: "Natural Gas",
+    minuteCreated: completion,
+    minuteOperational: completion,
+    loanAmountTotal: before.loanAmountTotal,
+  });
+  expect(gas.startingAssetId).toBeUndefined();
+  expect(gas.currentW).toBeGreaterThan(gas.peakW * 0.85);
+  expect(gas.lifetimeWh).toBeGreaterThanOrEqual(before.lifetimeWh);
+  expect(gas.loanAmountLeft).toBeGreaterThan(0);
+  expect(gas.loanAmountLeft).toBeLessThan(before.loanAmountLeft);
+  expect(played.facilities[1]).toMatchObject({
+    id: other.id,
+    fuel: "Coal",
+    minuteCreated: other.minuteCreated,
+    startingAssetId: other.startingAssetId,
+  });
+  expect(played.worldEvents.occurrences).toEqual(occurrences);
+  expect(
+    parseSave(JSON.parse(JSON.stringify(serializeSave(played)))),
+  ).not.toBeNull();
+}, 120_000);
 
 it("forecasts the replacement fuel and construction emissions without converting the live plant", () => {
   const game = scenario();
@@ -347,7 +451,7 @@ it("finances the replacement separately and refunds its paid equity on cancellat
       interestRate: game.interestRate,
     },
   });
-  const played = cloneDeep(started);
+  const played = mutableCopy(started);
   advance(played, MINUTES_PER_MONTH);
   const outstanding = findCoal(played).repowerLoan!.loanAmountLeft;
   expect(outstanding).toBeLessThan(terms.loanAmount);

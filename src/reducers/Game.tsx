@@ -4042,7 +4042,12 @@ function tickWorkingState(state: GameType): GameType {
   return {
     ...state,
     timeline: [...state.timeline],
-    facilities: state.facilities.map((facility) => ({ ...facility })),
+    facilities: state.facilities.map((facility) => {
+      const copy = { ...facility };
+      if (!isStorage(copy) && copy.repowerLoan)
+        copy.repowerLoan = { ...copy.repowerLoan };
+      return copy;
+    }),
     ...(state.transmission && {
       transmission: state.transmission.lines.length
         ? {

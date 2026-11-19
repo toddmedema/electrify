@@ -218,11 +218,15 @@ export function completeCoalRepower(
   const { resilienceExtraBuildCost: _resilienceExtraBuildCost, ...technology } =
     target;
   delete facility.resilienceExtraBuildCost;
+  // The dispatch ID belongs to the site; equipment-bound events use this creation identity.
+  // Retire the coal identity so its recorded limits cannot follow the replacement turbine.
+  delete facility.startingAssetId;
   Object.assign(facility, technology, {
     buildCost: project.cost,
     yearsToBuild:
       (project.completesMinute - project.startsMinute) /
       (12 * MINUTES_PER_MONTH),
+    minuteCreated: project.completesMinute,
     minuteOperational: project.completesMinute,
     assumedStartsPerYear: target.assumedStartsPerYear,
     costIndexAtBuild: getInflationIndex(date, game.startingYear, game.seed),
