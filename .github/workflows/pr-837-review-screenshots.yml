@@ -4,10 +4,8 @@ on:
     branches: [codex/qa/pr-837-screenshots]
 permissions:
   actions: read
-  contents: write
-  pull-requests: write
 jobs:
-  attach:
+  prepare:
     runs-on: ubuntu-22.04
     timeout-minutes: 5
     steps:
@@ -17,59 +15,27 @@ jobs:
           path: ${{ runner.temp }}/feedback-captures
           run-id: 44607679323
           github-token: ${{ github.token }}
-      - name: Attach the reviewed screenshots to PR 837
-        env:
-          GH_TOKEN: ${{ github.token }}
-          EXPECTED_HEAD: 46811a6ed2774bb69803b3bf2840b6e1cfc235c2
+      - name: Prepare the verified PNGs for the GitHub attachment editor
         run: |
-          gh --version
-          test "$(gh pr view 837 --repo "$GITHUB_REPOSITORY" --json headRefOid --jq .headRefOid)" = "$EXPECTED_HEAD"
-          mkdir "$RUNNER_TEMP/feedback-review"
-          gh pr view 837 --repo "$GITHUB_REPOSITORY" --json body --jq .body > "$RUNNER_TEMP/feedback-review/body.md"
           python3 - <<'PY'
+          from base64 import b64encode
+          from hashlib import sha256
           from pathlib import Path
           import os
-          import shutil
+          import textwrap
 
-          temp = Path(os.environ["RUNNER_TEMP"])
-          source = temp / "feedback-captures"
-          review = temp / "feedback-review"
+          source = Path(os.environ["RUNNER_TEMP"]) / "feedback-captures"
           captures = (
-              ("desktop-chromium", "mission-complete.png", "tutorial-completion-desktop.png"),
-              ("desktop-chromium", "share-feedback.png", "feedback-form-desktop.png"),
-              ("mobile-360px", "share-feedback.png", "feedback-form-mobile.png"),
+              ("desktop-chromium", "mission-complete.png", "tutorial-completion-desktop"),
+              ("desktop-chromium", "share-feedback.png", "feedback-form-desktop"),
+              ("mobile-360px", "share-feedback.png", "feedback-form-mobile"),
           )
-          for viewport, original, named in captures:
-              image, = source.glob(f"*-{viewport}/{original}")
-              shutil.copyfile(image, review / named)
-          description = review / "body.md"
-          body = description.read_text()
-          if "## Screenshots" in body:
-              raise SystemExit("PR already contains a screenshots section")
-          body = body.replace(
-              "The local sandbox denies localhost listeners and headless Chromium startup, so a complete local CI run, browser verification, and UI screenshot capture were blocked. This PR is a draft while hosted checks run.",
-              "The production web build and tutorial feedback flow passed at 1280 and 360 px in the [hosted capture run](https://github.com/toddmedema/electrify/actions/runs/44607679323). Full local CI remains blocked by localhost permissions.",
-          ).replace(
-              "[Feedback delivery setup](docs/feedback.md)",
-              "[Feedback delivery setup](https://github.com/toddmedema/electrify/blob/codex/in-game-feedback/docs/feedback.md)",
-          )
-          description.write_text(body.rstrip() + """
-
-          ## Screenshots
-
-          ### Tutorial completion · desktop
-
-          ![Desktop tutorial completion with Share feedback and Next tutorial](./tutorial-completion-desktop.png)
-
-          ### Feedback form · desktop and mobile
-
-          ![Desktop feedback form](./feedback-form-desktop.png)
-
-          ![360 px mobile feedback form in dark mode](./feedback-form-mobile.png)
-          """)
+          with Path(os.environ["GITHUB_STEP_SUMMARY"]).open("a") as summary:
+              summary.write("## Verified attachment payloads\n\n")
+              for viewport, filename, label in captures:
+                  image, = source.glob(f"*-{viewport}/{filename}")
+                  raw = image.read_bytes()
+                  h = sha256(raw).hexdigest()
+                  data = "\n".join(textwrap.wrap(b64encode(raw).decode(), width=120))
+                  summary.write(f"### {label}\n\n```text\nPR837:{label}:{h}\n{data}\n```\n\n")
           PY
-          cd "$RUNNER_TEMP/feedback-review"
-          gh pr edit 837 --repo "$GITHUB_REPOSITORY" --body-file body.md \
-            --attach ./tutorial-completion-desktop.png \
-            --attach ./feedback-form-desktop.png \
-            --attach ./feedback-form-mobile.png
