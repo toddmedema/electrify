@@ -15,7 +15,7 @@ import {
   formatWatts,
   formatWattHours,
 } from "../../helpers/Format";
-import { formatHour, getDateFromMinute } from "../../helpers/DateTime";
+import { formatClockTime, getDateFromMinute } from "../../helpers/DateTime";
 import { projectedShortfall } from "../../helpers/MissionStatus";
 import { isUtilityExpansionGame } from "../../helpers/ExpansionContext";
 import { utilityServiceGap } from "../../helpers/UtilityPlanning";
@@ -82,7 +82,7 @@ export default function GridStatus({
     ahead &&
     Math.floor(ahead.minute / 1440) === Math.floor(game.date.minute / 1440);
   const future = when
-    ? `Short at ${sameDay ? "" : `${when.month} ${when.year}, `}${formatHour(when)}`
+    ? `Short at ${sameDay ? "" : `${when.month} ${when.year}, `}${formatClockTime(when)}`
     : gap
       ? `Supply risk: ${MONTHS[gap.month - 1]} ${gap.year}`
       : undefined;

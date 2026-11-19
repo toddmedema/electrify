@@ -575,14 +575,40 @@ export function availableTerritoryTiles(
   facility: FacilityShoppingType,
   id: TerritoryId,
 ): readonly TerritoryTileDefinition[] {
-  if (!ownedTerritories(game).includes(id)) return [];
+  return technologyTiles(game, facility, id).filter(
+    (tile) => tileFitsFacility(tile, facility) && !tileReserved(game, tile),
+  );
+}
+function technologyTiles(
+  game: GameType,
+  facility: SiteTechnology,
+  id: TerritoryId,
+): TerritoryTileDefinition[] {
+  const owns = createTerritoryTileOwnership(game);
   return getTerritoryTiles(game).filter(
     (tile) =>
       tile.territoryId === id &&
-      ownsTerritoryTile(game, tile) &&
-      tileFitsFacility(tile, facility) &&
-      !tileReserved(game, tile),
+      owns(tile) &&
+      tileSupportsFacilityTechnology(tile, facility),
   );
+}
+
+export function territoryFacilityInventory(
+  game: GameType,
+  facility: FacilityShoppingType,
+  id: TerritoryId,
+) {
+  const compatible = technologyTiles(game, facility, id);
+  const free = compatible.filter((tile) => !tileReserved(game, tile));
+  return {
+    total: compatible.length,
+    remaining: free.length,
+    maxPeakW: free.reduce(
+      (limit, tile) => Math.max(limit, territoryTilePowerLimit(tile, facility)),
+      0,
+    ),
+    available: free.filter((tile) => tileFitsFacility(tile, facility)),
+  };
 }
 /** Assign missing placements only; explicit invalid/duplicate placements are never silently repaired. */
 export function assignTerritoryTiles(game: GameType): boolean {

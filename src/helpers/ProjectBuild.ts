@@ -82,7 +82,14 @@ export function withTerritoryCatalogueLimits(
             (maxPowerW * facility.peakWh) / facility.peakW,
           ),
         }
-      : { ...facility, maxPeakW: Math.min(facility.maxPeakW, maxPowerW) };
+      : {
+          ...facility,
+          // The ordinary catalogue only knows owned hydro sites. Planning can connect a new site.
+          maxPeakW:
+            facility.fuel === "Hydro"
+              ? maxPowerW
+              : Math.min(facility.maxPeakW, maxPowerW),
+        };
   });
 }
 

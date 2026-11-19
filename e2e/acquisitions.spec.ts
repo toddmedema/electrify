@@ -1140,7 +1140,9 @@ for (const theme of ["light", "dark"] as const) {
     await expect(
       page
         .getByRole("region", { name: "Goals", exact: true })
-        .getByText("Acquire a competitor", { exact: true }),
+        .getByText("Acquire Valley Electric or Ridge Electric", {
+          exact: true,
+        }),
     ).toBeVisible();
     await openMap(page);
     await expectPhysicalMap(network, before);

@@ -6243,6 +6243,8 @@ function* supplyFacilitiesFinancesPhases(
         ? chargeCapacityW()
         : 0;
     const reserveW = now.demandW * PEER_TRADE_RESERVE_FRACTION;
+    const surplusW = Math.max(0, supply - charge - now.demandW);
+    const exportSurplusW = Math.max(0, surplusW - reserveW);
     const intensity = (g: GeneratorOperatingType) =>
       (g.btuPerWh || 0) * (FUELS[g.fuel]?.kgCO2ePerBtu || 0) * 1e6;
     peer = yield {
@@ -6250,7 +6252,7 @@ function* supplyFacilitiesFinancesPhases(
       offerW:
         storageChargeW > 0
           ? 0
-          : Math.max(0, supply - charge - now.demandW - reserveW) +
+          : exportSurplusW +
             Math.max(
               0,
               peerExportHeadroom.reduce((sum, item) => sum + item.watts, 0) -
@@ -6264,7 +6266,7 @@ function* supplyFacilitiesFinancesPhases(
         if (state.utilityExpansion) {
           return pooledPeerExportEmissions(
             exportedW,
-            Math.max(0, supply - charge - now.demandW - reserveW),
+            exportSurplusW,
             supply - entitlementDeliveredW,
             facilities,
             peerExportHeadroom,
@@ -6312,7 +6314,8 @@ function* supplyFacilitiesFinancesPhases(
     };
     let extra = Math.max(
       0,
-      (peer?.exportedW || 0) - Math.max(0, supply - charge - now.demandW),
+      (peer?.exportedW || 0) -
+        (state.utilityExpansion ? exportSurplusW : surplusW),
     );
     for (const item of peerExportHeadroom) {
       const { generator, watts } = item;

@@ -104,12 +104,12 @@ it("keeps a fixed icon order and fades technologies the company cannot afford", 
     "Nuclear",
   ]);
   for (const button of buttons) {
-    expect(button).toBeDisabled();
+    expect(button).toHaveAttribute("aria-disabled", "true");
     expect(button).toHaveTextContent(/^$/);
   }
   currentTick(game)!.cash = 1e9;
   update();
-  expect(wind()).toBeEnabled();
+  expect(wind()).toHaveAttribute("aria-disabled", "false");
 });
 
 it("opens just one full expanded card on hover without spending or stealing focus", () => {
@@ -358,7 +358,7 @@ it("dismisses on outside activation and scrolling, and guards all rail actions d
   expect(
     screen.queryByLabelText("Wind technology preview"),
   ).not.toBeInTheDocument();
-  expect(wind()).toBeDisabled();
+  expect(wind()).toHaveAttribute("aria-disabled", "true");
   fireEvent.click(wind());
   expect(onProject).not.toHaveBeenCalled();
   update(false, 1);
@@ -404,6 +404,6 @@ it("disables an oversized project until the player changes the sizing", () => {
   )!;
   expect(option.maxPeakW).toBeLessThan(option.peakW);
   fireEvent.click(wind());
-  expect(wind()).toBeDisabled();
+  expect(wind()).toHaveAttribute("aria-disabled", "true");
   expect(onProject).not.toHaveBeenCalled();
 });

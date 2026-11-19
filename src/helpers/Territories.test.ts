@@ -1,5 +1,6 @@
 import { GENERATORS, STORAGE } from "../data/Facilities";
 import { createGame } from "../testing/Simulator";
+import { cityProfile } from "./CityProfiles";
 import { currentTick } from "./GameSelectors";
 import {
   hasTerritoryNetwork,
@@ -75,6 +76,10 @@ it("rejects unaffordable and duplicate purchases atomically", () => {
   currentTick(game)!.cash = quote.price;
   expect(purchaseLand(game, payload)).toBe(true);
   expect(currentTick(game)!.cash).toBe(0);
+  currentTick(game)!.cash = quote.price * 2;
+  const next = landPurchaseQuote(game)!;
+  expect(next.quoteKey).not.toBe(quote.quoteKey);
+  expect(currentTick(game)!.cash).toBeGreaterThanOrEqual(next.price);
   const after = JSON.stringify(game);
   expect(purchaseLand(game, payload)).toBe(false);
   expect(JSON.stringify(game)).toBe(after);
@@ -151,4 +156,27 @@ it("retains utility sector demand weights while using a single company demand to
   );
   expect(shares["green-uplands"]).toBe(0);
   expect(shares["ridge-electric"]).toBeGreaterThan(0);
+  const areas = [
+    cityProfile(game.seed, "champlain")!,
+    cityProfile(game.seed, "ridge-electric")!,
+  ] as const;
+  for (const sector of ["Residential", "Industrial"] as const) {
+    const sectorOnly = Object.fromEntries(
+      Object.keys(tick.demandByType).map((name) => [
+        name,
+        name === sector ? tick.demandW : 0,
+      ]),
+    ) as typeof tick.demandByType;
+    const weights = areas.map(
+      (area) => area.customers * area.demandScale * area.energyShares[sector],
+    );
+    const result = territoryDemandShares(game, {
+      ...tick,
+      demandByType: sectorOnly,
+    });
+    expect(result["ridge-electric"]).toBeCloseTo(
+      (tick.demandW * weights[1]) / (weights[0] + weights[1]),
+      5,
+    );
+  }
 });

@@ -372,7 +372,7 @@ export default function DesktopBuildRail({
                   <button
                     type="button"
                     className="desktopBuildTechnology"
-                    disabled={!canChoose(item)}
+                    aria-disabled={!canChoose(item)}
                     title={
                       busy || canChoose(item)
                         ? item.name
@@ -386,8 +386,7 @@ export default function DesktopBuildRail({
                     aria-describedby={`${previewHintId}${previewName === item.name ? ` ${previewId}` : ""}`}
                     onFocus={(event) => show(item, event.currentTarget)}
                     onKeyDown={(event) => {
-                      if (event.key !== "ArrowRight" || !canChoose(item))
-                        return;
+                      if (event.key !== "ArrowRight" || busy) return;
                       event.preventDefault();
                       show(item, event.currentTarget);
                       setPreviewEntry((value) => value + 1);

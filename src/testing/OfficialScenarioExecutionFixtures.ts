@@ -92,7 +92,7 @@ function applyScheduled(
 ): GameType {
   switch (action.type) {
     case "land": {
-      const quote = landPurchaseQuote(game);
+      const quote = landPurchaseQuote(game, action.territoryId);
       if (!quote) throw new Error("No land available");
       return officialCommand(
         game,

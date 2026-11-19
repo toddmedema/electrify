@@ -22,14 +22,23 @@ it("previews the selected physical build tile and rejects a city in the same ter
   const facility = GENERATORS(game, 50e6, [], []).find(
     (candidate) => candidate.name === "Wind",
   )!;
-  const tile = availableTerritoryTiles(game, facility, "champlain")[0];
+  const tiles = availableTerritoryTiles(game, facility, "champlain");
+  const tile = tiles.find(({ terrain }) => terrain !== tiles[0].terrain)!;
   const city = getTerritoryTiles(game).find(
     (candidate) => candidate.territoryId === "champlain" && candidate.city,
   )!;
   const before = JSON.stringify(game);
-  expect(
-    computeOutlook("buildImpact", game, facility, "champlain", tile.id),
-  ).toBeDefined();
+  const selected = computeOutlook(
+    "buildImpact",
+    game,
+    facility,
+    "champlain",
+    tile.id,
+  );
+  expect(selected).toBeDefined();
+  expect(selected).not.toEqual(
+    computeOutlook("buildImpact", game, facility, "champlain"),
+  );
   expect(() =>
     computeOutlook("buildImpact", game, facility, "champlain", city.id),
   ).toThrow("Cities add demand and have no building slot.");

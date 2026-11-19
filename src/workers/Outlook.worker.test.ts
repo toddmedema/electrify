@@ -100,3 +100,37 @@ it.each(["generator", "storage"] as const)(
     expect(result).toEqual({ requestId: 1, result: expected });
   },
 );
+
+it("forecasts the explicit non-default site within the selected territory", async () => {
+  const game = createGame({ scenarioId: 116, seed: 188 });
+  const facility = GENERATORS(game, 50e6, [], []).find(
+    ({ name }) => name === "Wind",
+  )!;
+  const tiles = availableTerritoryTiles(game, facility, "champlain");
+  const chosen = tiles.find(({ terrain }) => terrain !== tiles[0].terrain)!;
+  const snapshot = forecastWorkerSnapshot(game);
+  const expected = computeOutlook(
+    "buildImpact",
+    snapshot,
+    facility,
+    "champlain",
+    chosen.id,
+  );
+  expect(expected).toBeDefined();
+  expect(expected).not.toEqual(
+    computeOutlook("buildImpact", snapshot, facility, "champlain"),
+  );
+  const reply = await new Promise<OutlookReply>((resolve) => {
+    postMessage.mockImplementationOnce(resolve);
+    const request: OutlookRequest = {
+      requestId: 2,
+      kind: "buildImpact",
+      game: snapshot,
+      facility,
+      territoryId: "champlain",
+      tileId: chosen.id,
+    };
+    worker.onmessage?.({ data: request } as MessageEvent<OutlookRequest>);
+  });
+  expect(reply).toEqual({ requestId: 2, result: expected });
+});

@@ -210,6 +210,31 @@ it("retains expired recorded history without a live commitment or forecast", () 
       name: "Recorded agreement history",
     }),
   ).toBeVisible();
+  expect(mockForecast.mock.lastCall?.[1]).toBeUndefined();
+});
+
+it("quotes the Ridge supplier's own reference price", () => {
+  const { game, line } = mount();
+  const now = currentTick(game)!;
+  const otherMarket = adjacentMarketPricePerMWh(
+    line.corridorId,
+    intertieContextForGame(game),
+    now.minute,
+    now,
+  );
+  const quote = powerAgreementQuote(game, "ridge-purchase")!;
+  const reference = quote.receipt.signingMarketPricePerMWh!;
+  expect(reference).not.toBe(otherMarket);
+  fireEvent.click(
+    screen.getByRole("button", {
+      name: "Review Ridge Electric supply agreement",
+    }),
+  );
+  expect(
+    within(screen.getByRole("dialog")).getByRole("row", {
+      name: /Reference price/,
+    }),
+  ).toHaveTextContent(rate(reference));
 });
 
 it("shows the direct discount alongside monthly energy and deliverable power", () => {

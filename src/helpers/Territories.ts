@@ -37,9 +37,8 @@ import {
   ownedTerritories,
   facilityTerritoryId,
   territorySiteKind,
-  territorySiteInventory,
   territoryTileInventory,
-  availableTerritoryTiles,
+  territoryFacilityInventory,
   getTerritoryTile,
   tileFitsFacility,
   facilityOnTile,
@@ -80,17 +79,13 @@ export function territoryBuildAvailability(
       maxPeakW: Infinity,
     };
   const territory = getTerritoryDefinition(id);
-  const specific = territorySiteKind(facility);
-  const kind =
-    specific !== "hydro" &&
-    specific !== "geothermal" &&
-    (territory?.sites.general.count ?? 0) > 0
-      ? "general"
-      : specific;
-  const inventory =
+  const automatic =
     tileId === undefined
-      ? territorySiteInventory(game, id, kind, facility)
-      : territoryTileInventory(game, tileId, facility);
+      ? territoryFacilityInventory(game, facility, id)
+      : undefined;
+  const { remaining, total, maxPeakW } =
+    automatic ?? territoryTileInventory(game, tileId, facility);
+  const inventory = { remaining, total, maxPeakW };
   const requested =
     tileId === undefined ? undefined : getTerritoryTile(tileId, game);
   const reject = (reason: string) => ({
@@ -119,7 +114,7 @@ export function territoryBuildAvailability(
     if (!inventory.remaining)
       return reject("This named site has already been used.");
   }
-  const free = requested ? [] : availableTerritoryTiles(game, facility, id);
+  const free = automatic?.available ?? [];
   const selected = requested ?? free[0];
   if (!selected) {
     if (!inventory.remaining)

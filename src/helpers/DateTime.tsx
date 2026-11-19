@@ -469,6 +469,14 @@ export function formatMinuteAsMonthAxis(
   );
 }
 
+export function formatClockTime(date: DateType): string {
+  const minutes = date.minuteOfDay % 60;
+  const hour = Math.floor(date.minuteOfDay / 60);
+  const clockHour = hour % 12 || 12;
+  const minuteText = minutes ? `:${String(minutes).padStart(2, "0")}` : "";
+  return `${clockHour}${minuteText} ${hour < 12 ? "AM" : "PM"}`;
+}
+
 export function formatHour(date: DateType): string {
   const time = new Date(
     `${date.year}-${date.monthNumber}-1 ${Math.floor(date.minuteOfDay / 60)}:00`,

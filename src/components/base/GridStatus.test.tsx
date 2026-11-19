@@ -16,6 +16,7 @@ import gameReducer from "../../reducers/Game";
 import cardReducer, { navigate } from "../../reducers/Card";
 import uiReducer from "../../reducers/UI";
 import { openEvidence } from "../../helpers/Evidence";
+import { getDateFromMinute } from "../../helpers/DateTime";
 import { clearTransmissionMarket } from "../../helpers/Transmission";
 import Facilities from "../views/FacilitiesContainer";
 import { GameWorkspaceContext } from "./GameWorkspaceContext";
@@ -95,6 +96,22 @@ it("shows live import exposure and agreement capacity, then closes before each n
     card: "INSIGHTS",
     layer: "SUPPLY_DEMAND",
   });
+});
+
+it("shows the quarter-hour of the next shortage", () => {
+  const { props, rerender } = setup();
+  const minute = 18 * 60 + 15;
+  props.game.date = getDateFromMinute(minute, props.game.startingYear);
+  props.game.timeline = [
+    { ...props.now, minute, demandW: 100e6, supplyW: 100e6 },
+    { ...props.now, minute: minute + 30, demandW: 100e6, supplyW: 50e6 },
+  ];
+  rerender(
+    <ThemeProvider theme={createAppTheme("light")}>
+      <GridStatus {...props} now={props.game.timeline[0]} />
+    </ThemeProvider>,
+  );
+  expect(screen.getByText("Short at 6:45 PM")).toBeVisible();
 });
 
 it("returns focus to the status trigger after closing", async () => {

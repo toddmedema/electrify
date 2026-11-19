@@ -6,9 +6,10 @@ import {
   Select,
   Typography,
 } from "@mui/material";
-import { TERRITORIES } from "../../data/Territories";
+import { getTerritoryDefinition } from "../../data/Territories";
 import { ownedTerritories } from "../../helpers/Territories";
 import {
+  createTerritoryTileOwnership,
   facilityOnTile,
   getTerritoryTile,
   getTerritoryTiles,
@@ -97,12 +98,14 @@ export default function TerritoryBuildDestination({
   onTileChange: (id: TerritoryTileId | undefined) => void;
 }) {
   const id = React.useId();
-  const owned = ownedTerritories(game);
+  const owned = new Set(ownedTerritories(game));
+  const destinations = new Set([...owned, value]);
+  const ownsTile = createTerritoryTileOwnership(game);
   const freeTiles = getTerritoryTiles(game).filter(
     (tile) =>
       !tile.city &&
       tile.territoryId === value &&
-      owned.includes(value) &&
+      ownsTile(tile) &&
       !facilityOnTile(game, tile.id) &&
       (!tile.hydroSiteId ||
         !game.commissionedHydroSiteIds?.includes(tile.hydroSiteId)),
@@ -127,21 +130,25 @@ export default function TerritoryBuildDestination({
             onChange(event.target.value as TerritoryId);
           }}
         >
-          {TERRITORIES.filter(
-            (territory) =>
-              territory.id === value ||
-              (owned.includes(territory.id) &&
-                Object.values(territory.sites).some((site) => site.count > 0)),
-          ).map((territory) => (
-            <MenuItem
-              key={territory.id}
-              value={territory.id}
-              disabled={!owned.includes(territory.id)}
-            >
-              {territoryName(territory.id)}
-              {!owned.includes(territory.id) ? " · not owned" : ""}
-            </MenuItem>
-          ))}
+          {[...destinations].map((destination) => {
+            const territory = getTerritoryDefinition(destination);
+            if (
+              !territory ||
+              (destination !== value &&
+                !Object.values(territory.sites).some((site) => site.count > 0))
+            )
+              return null;
+            return (
+              <MenuItem
+                key={destination}
+                value={destination}
+                disabled={!owned.has(destination)}
+              >
+                {territoryName(destination)}
+                {!owned.has(destination) ? " · not owned" : ""}
+              </MenuItem>
+            );
+          })}
         </Select>
       </FormControl>
       <FormControl fullWidth size="small" sx={{ mt: 2 }}>

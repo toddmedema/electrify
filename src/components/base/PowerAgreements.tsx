@@ -4,6 +4,7 @@ import * as React from "react";
 import { Box, Button, Slider, Typography } from "@mui/material";
 import type { GameType, TransmissionLineOperatingType } from "../../Types";
 import {
+  agreementCorridorId,
   agreementDate,
   agreementYearMinute,
   connectionAgreements,
@@ -138,6 +139,7 @@ export default function PowerAgreements({
     !review || forecastCommitted,
   );
   const restore = React.useRef<HTMLElement | null>(null);
+  const portfolio = React.useRef<HTMLElement | null>(null);
   const token = `power-agreement:${line.id}`;
   const reviewing = !!review;
   React.useEffect(() => {
@@ -149,14 +151,19 @@ export default function PowerAgreements({
   }, [dispatch, token, reviewing, assessmentId]);
   if (!utility) return null;
   const now = currentTick(game);
-  const marketPrice = now
-    ? adjacentMarketPricePerMWh(
-        line.corridorId,
-        intertieContextForGame(game),
-        now.minute,
-        now,
-      )
-    : undefined;
+  const marketContext = intertieContextForGame(game);
+  const marketPriceFor = (sourceId: string) =>
+    now
+      ? adjacentMarketPricePerMWh(
+          agreementCorridorId(sourceId, utility),
+          marketContext,
+          now.minute,
+          now,
+        )
+      : undefined;
+  const referencePrice = review
+    ? (review.receipt.signingMarketPricePerMWh ?? marketPriceFor(review.id))
+    : assessment && marketPriceFor(assessment.id);
   const terms = review
     ? { ...review, termsVersion: review.receipt.termsVersion }
     : assessment;
@@ -190,10 +197,13 @@ export default function PowerAgreements({
   return (
     <Box
       component="section"
+      ref={portfolio}
+      tabIndex={-1}
       aria-label="Power purchase agreements"
       className="powerAgreements"
     >
       {sources.map((source) => {
+        const marketPrice = marketPriceFor(source.id);
         const expired = game.date.minute >= source.endMinute;
         const account = game.transmission?.agreementAccounts?.find(
           (entry) => entry.agreementId === source.id,
@@ -459,9 +469,10 @@ export default function PowerAgreements({
                       throw new Error(
                         "Agreement terms changed; review the updated terms.",
                       );
-                    restore.current = document.getElementById(
-                      `intertie-disclosure-${line.id}`,
-                    );
+                    restore.current =
+                      document.getElementById(
+                        `intertie-disclosure-${line.id}`,
+                      ) ?? portfolio.current;
                     close();
                     dispatch(
                       snackbarOpen(
@@ -556,14 +567,14 @@ export default function PowerAgreements({
                   <BuildDetailRow
                     label="Reference price"
                     value={
-                      marketPrice === undefined
+                      referencePrice === undefined
                         ? "Unavailable"
-                        : rate(marketPrice)
+                        : rate(referencePrice)
                     }
                   />
                   <BuildDetailRow
                     label="Discount"
-                    value={discountRate(terms.priceToday, marketPrice)}
+                    value={discountRate(terms.priceToday, referencePrice)}
                   />
                   <BuildDetailRow
                     label="Minimum supply"

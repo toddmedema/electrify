@@ -1302,11 +1302,13 @@ function BuildGenerators(props: Props): React.JSX.Element {
   const selectedTile = territoryNetwork
     ? getTerritoryTile(tileId, game)
     : undefined;
-  const comparedGenerators = generators.filter(
-    (generator) =>
-      comparedNames.includes(generator.name) &&
-      (!selectedTile ||
-        tileSupportsFacilityTechnology(selectedTile, generator)),
+  const comparableGenerators = selectedTile
+    ? generators.filter((generator) =>
+        tileSupportsFacilityTechnology(selectedTile, generator),
+      )
+    : generators;
+  const comparedGenerators = comparableGenerators.filter((generator) =>
+    comparedNames.includes(generator.name),
   );
 
   // Tutorials script their own path through this list, so the primer waits for a real game
@@ -1323,13 +1325,14 @@ function BuildGenerators(props: Props): React.JSX.Element {
     !getScenario(game.scenarioId, game.customScenario)?.tutorialSteps;
 
   const toggleCompare = (name: string) => {
-    setComparedNames((current) =>
-      current.includes(name)
-        ? current.filter((candidate) => candidate !== name)
-        : current.length < 3
-          ? [...current, name]
-          : current,
-    );
+    setComparedNames((current) => {
+      if (current.includes(name))
+        return current.filter((candidate) => candidate !== name);
+      const visible = current.filter((candidate) =>
+        comparableGenerators.some((generator) => generator.name === candidate),
+      );
+      return visible.length < 3 ? [...visible, name] : current;
+    });
   };
 
   const comparison = (
@@ -1488,7 +1491,7 @@ function BuildGenerators(props: Props): React.JSX.Element {
                 outputCeiling={outputCeiling}
                 forecastPending={!forecast}
                 compared={compared}
-                compareDisabled={comparedNames.length >= 3}
+                compareDisabled={comparedGenerators.length >= 3}
                 onCompare={() => toggleCompare(g.name)}
                 resilienceOptions={resilienceBuildOptions(g, game)}
                 withResilience={(selection) =>
