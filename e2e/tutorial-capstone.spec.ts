@@ -193,10 +193,11 @@ async function completeMission(
     completionDialog.getByRole("button", { name: "Keep playing" }),
   ).toBeVisible();
   await expect(primary).toBeFocused();
+  const shareFeedback = completionDialog.getByRole("button", {
+    name: "Share feedback",
+  });
   if (keepPlaying) {
-    await expect(
-      completionDialog.getByText(/How were the tutorials/),
-    ).toHaveCount(0);
+    await expect(shareFeedback).toHaveClass(/MuiButton-text/);
     const fleetBefore = await page.locator(".facilityRow").allTextContents();
     const clock = page.locator("#appbar [data-game-minute]");
     const minuteBefore = await clock.getAttribute("data-game-minute");
@@ -219,12 +220,7 @@ async function completeMission(
       .toBeGreaterThan(Number(minuteBefore));
     return;
   }
-  await expect(
-    completionDialog.getByText(/How were the tutorials/),
-  ).toBeVisible();
-  const shareFeedback = completionDialog.getByRole("button", {
-    name: "Share feedback",
-  });
+  await expect(shareFeedback).toHaveClass(/MuiButton-outlined/);
   await shareFeedback.click();
   const feedback = page.getByRole("dialog", { name: "Share feedback" });
   await expect(

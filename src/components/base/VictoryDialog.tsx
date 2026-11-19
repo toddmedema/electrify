@@ -145,10 +145,7 @@ export default function VictoryDialog(props: Props): React.JSX.Element {
         )}
         <ResultScore result={victory} />
         {victory.outcome && props.onFeedback && (
-          <FeedbackPrompt
-            milestone="first-scenario"
-            onFeedback={() => props.onFeedback?.(victory)}
-          />
+          <FeedbackPrompt onFeedback={() => props.onFeedback?.(victory)} />
         )}
         {comparison && (
           <Typography role="status" sx={{ mt: 2 }}>

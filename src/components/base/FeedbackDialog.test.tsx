@@ -64,18 +64,15 @@ it("retains a failed draft and reuses the request ID on retry", async () => {
   }
 });
 
-it("offers each milestone once independently and never opens the form automatically", () => {
+it("offers feedback only on the first scenario result and waits for the player to open it", () => {
   const onFeedback = jest.fn();
-  const view = render(
-    <FeedbackPrompt milestone="first-scenario" onFeedback={onFeedback} />,
-  );
+  const view = render(<FeedbackPrompt onFeedback={onFeedback} />);
+  expect(onFeedback).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole("button", { name: "Share feedback" }));
   expect(onFeedback).toHaveBeenCalledTimes(1);
   view.unmount();
-  render(<FeedbackPrompt milestone="first-scenario" onFeedback={onFeedback} />);
+  render(<FeedbackPrompt onFeedback={onFeedback} />);
   expect(screen.queryByRole("button", { name: "Share feedback" })).toBeNull();
-  render(<FeedbackPrompt milestone="all-tutorials" />);
-  expect(screen.getByText(/How were the tutorials/)).toBeVisible();
   expect(screen.queryByRole("dialog")).toBeNull();
   expect(onFeedback).toHaveBeenCalledTimes(1);
 });
