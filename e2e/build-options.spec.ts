@@ -2,13 +2,176 @@ import { reviewScreenshot } from "./review-screenshot";
 import path from "path";
 import { expectContinuousDialogSurface } from "./dialog-surface";
 import { expect, test } from "./fixtures";
-import { openBuild, openPane, sortBuildCatalog } from "./layout";
+import {
+  openBuild,
+  openPane,
+  returnToTerritoryMap,
+  setMapProjectCapacity,
+  sortBuildCatalog,
+} from "./layout";
 import { editSavedGame, readSavedGame } from "./save-fixture";
 import { purchaseTerms } from "../src/helpers/Financials";
+import { TERRAIN_LABELS } from "../src/data/TerrainLabels";
+import { getAuthoredTerritoryTile } from "../src/data/TerritoryTiles";
 import {
   intertieBuildQuote,
   intertieContextForGame,
 } from "../src/helpers/Transmission";
+
+test("The End of an Era offers slow-start gas baseload", async ({ page }) => {
+  await page.goto("/?scenario=102");
+  await page.getByRole("button", { name: "Start game", exact: true }).click();
+  await openBuild(page);
+  await page.getByRole("tab", { name: "Generators", exact: true }).click();
+  const options = page.getByRole("list", { name: "Generator options" });
+  const steam = options.locator('[data-build-option="Natural Gas Steam"]');
+  const icon = steam.getByRole("img", {
+    name: "Natural Gas Steam",
+    exact: true,
+  });
+  await expect(icon).toHaveAttribute("src", "/images/natural gas steam.svg");
+  await expect
+    .poll(() => icon.evaluate((image: HTMLImageElement) => image.naturalWidth))
+    .toBeGreaterThan(0);
+  await expect(steam).toContainText("Steady supply");
+  await steam
+    .getByRole("button", { name: "Show Natural Gas Steam details" })
+    .click();
+  await expect(
+    steam.getByRole("row", { name: /Ramp up\/down time.*240 min/ }),
+  ).toBeVisible();
+  await expect(
+    options.locator('[data-build-option="Natural Gas Peaker"]'),
+  ).toBeVisible();
+  await expect(
+    options.locator('[data-build-option="Natural Gas CC"]'),
+  ).toHaveCount(0);
+});
+
+test("ordinary starting hills offer general technologies and retain special-site restrictions", async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.addInitScript(() => {
+    localStorage.setItem("theme", "dark");
+    localStorage.setItem("audioEnabled", "false");
+  });
+  await page.goto("/?scenario=116");
+  await page.getByRole("button", { name: "Start game", exact: true }).click();
+  await returnToTerritoryMap(page);
+  const pause = page.getByRole("button", { name: "pause", exact: true });
+  if ((await pause.getAttribute("aria-pressed")) !== "true")
+    await pause.click();
+  const target = page.locator('[data-map-target="champlain:site-12"]');
+  await target.focus();
+  await target.press("Enter");
+  const rail = page.getByRole("complementary", { name: "Build facilities" });
+  if (await rail.isVisible()) {
+    await expect(rail).toBeFocused();
+    const power = rail.getByRole("button", { name: /^Power:/ });
+    await power.click();
+    await expect(power).toHaveAttribute("aria-expanded", "true");
+    await setMapProjectCapacity(rail, false, "0");
+    await expect(power).toHaveAttribute("aria-expanded", "true");
+    await expect(
+      rail.getByRole("slider", { name: "Generator capacity" }),
+    ).toHaveValue("0");
+    await rail.getByRole("button", { name: "Done", exact: true }).click();
+    for (const name of [
+      "Solar",
+      "Wind",
+      "Oil",
+      "Natural Gas Peaker",
+      "Natural Gas CC",
+      "Biomass",
+      "Coal",
+    ]) {
+      const trigger = rail.getByRole("button", {
+        name: `Choose sites for ${name}`,
+        exact: true,
+      });
+      await trigger.focus();
+      await expect(trigger).toBeFocused();
+      const preview = rail.getByRole("region", {
+        name: `${name} technology preview`,
+        exact: true,
+      });
+      await expect(preview).not.toContainText("Not buildable on this tile");
+      await expect(preview.locator(".buildOptionMetrics")).toBeVisible();
+      await expect(
+        preview.getByRole("button", { name: "Choose sites", exact: true }),
+      ).toBeEnabled();
+    }
+    await expect(
+      rail.getByRole("button", {
+        name: "Choose sites for Nuclear",
+        exact: true,
+      }),
+    ).toBeDisabled();
+    await expect(
+      rail.getByRole("button", {
+        name: "Choose sites for Offshore Wind",
+        exact: true,
+      }),
+    ).toHaveCount(0);
+    for (const name of ["Hydro", "Geothermal"]) {
+      await rail
+        .getByRole("button", { name: `Choose sites for ${name}`, exact: true })
+        .hover();
+      const preview = rail.getByRole("region", {
+        name: `${name} technology preview`,
+        exact: true,
+      });
+      // A global technology preview keeps its details for comparing other sites.
+      // It still explains why the inspected tile cannot host this technology.
+      await expect(preview).toContainText("vacant compatible site");
+      await expect(preview.locator(".buildOptionMetrics")).toBeVisible();
+      await expect(
+        preview.getByRole("button", { name: /^Review purchase of/ }),
+      ).toHaveCount(0);
+    }
+    return;
+  }
+  const tile = getAuthoredTerritoryTile("champlain:site-12")!;
+  const panel = page.getByRole("dialog", {
+    name: TERRAIN_LABELS[tile.terrain],
+    exact: true,
+  });
+  await expect(panel).toBeVisible();
+  await panel.getByRole("slider").press("Home");
+  const options = panel.getByRole("list", { name: "Generator options" });
+  for (const name of [
+    "Solar",
+    "Wind",
+    "Oil",
+    "Natural Gas Peaker",
+    "Natural Gas CC",
+    "Biomass",
+    "Coal",
+  ]) {
+    const row = options.locator(`[data-build-option="${name}"]`);
+    await expect(row).not.toContainText("Not buildable on this tile");
+    await expect(
+      row.getByRole("button", {
+        name: `Review purchase of ${name}`,
+        exact: true,
+      }),
+    ).toBeEnabled();
+  }
+  const nuclear = options.locator('[data-build-option="Nuclear"]');
+  await expect(nuclear).not.toContainText("Not buildable on this tile");
+  const nuclearReview = nuclear.getByRole("button", {
+    name: "Review purchase of Nuclear",
+    exact: true,
+  });
+  await expect(nuclearReview).toBeDisabled();
+  await expect(nuclearReview).toHaveAccessibleDescription(/down payment/);
+  for (const name of ["Hydro", "Geothermal", "Offshore Wind"]) {
+    const row = options.locator(`[data-build-option="${name}"]`);
+    await expect(row).toContainText("Not buildable on this tile");
+    await expect(row.getByRole("button")).toHaveCount(0);
+  }
+});
 
 for (const theme of ["light", "dark"] as const) {
   test(`biomass emissions use explicit mass units in ${theme}`, async ({
@@ -63,7 +226,7 @@ for (const theme of ["light", "dark"] as const) {
   ] as const) {
     test(`geothermal stays disabled without sites in ${place} in ${theme}`, async ({
       page,
-    }) => {
+    }, info) => {
       await page.addInitScript((mode) => {
         localStorage.setItem("theme", mode);
         localStorage.setItem("audioEnabled", "false");
@@ -72,23 +235,101 @@ for (const theme of ["light", "dark"] as const) {
       await page
         .getByRole("button", { name: "Start game", exact: true })
         .click();
-      await openBuild(page);
+      if (scenarioId === 116) {
+        await returnToTerritoryMap(page);
+        const tile = page.locator(
+          '[data-map-target="champlain:site-12"][data-owned="true"]',
+        );
+        await expect(tile).toContainText(
+          "One building site; transmission tower",
+        );
+        await tile.focus();
+        await tile.press("Enter");
+        const rail = page.getByRole("complementary", {
+          name: "Build facilities",
+        });
+        if (await rail.isVisible()) {
+          await expect(rail).toBeFocused();
+          const trigger = rail.getByRole("button", {
+            name: "Choose sites for Geothermal",
+            exact: true,
+          });
+          await expect(trigger).toBeDisabled();
+          await trigger.hover();
+          const preview = rail.getByRole("region", {
+            name: "Geothermal technology preview",
+            exact: true,
+          });
+          const geothermal = preview.locator(
+            '[data-build-option="Geothermal"]',
+          );
+          await expect(preview).toContainText("vacant compatible site");
+          await expect(geothermal.locator(".buildOptionMetrics")).toBeVisible();
+          await expect(
+            geothermal.getByRole("button", { name: /^Review purchase of/ }),
+          ).toHaveCount(0);
+          // The fixed desktop icon catalogue has no economic sort. Site restrictions
+          // remain visible in its canonical preview; mobile retains the sorted cards.
+          await expect(
+            page.getByRole("combobox", {
+              name: "Sort facilities",
+              exact: true,
+            }),
+          ).toHaveCount(0);
+          await expect(geothermal).toBeVisible();
+          expect(
+            await geothermal.evaluate(
+              (element) => element.scrollWidth - element.clientWidth,
+            ),
+          ).toBeLessThanOrEqual(1);
+          await reviewScreenshot(page, {
+            path: info.outputPath(`tile-forbidden-geothermal-${theme}.png`),
+            animations: "disabled",
+            scale: "css",
+          });
+          await expect(
+            preview.getByRole("button", { name: "Choose sites", exact: true }),
+          ).toBeDisabled();
+          return;
+        }
+        await expect(
+          page.getByRole("dialog", { name: "Plains", exact: true }),
+        ).toBeVisible();
+      } else {
+        await openBuild(page);
+      }
       await page.getByRole("tab", { name: "Generators", exact: true }).click();
       const options = page.getByRole("list", { name: "Generator options" });
       const geothermal = options.locator('[data-build-option="Geothermal"]');
       await expect(geothermal).toContainText(
-        `No geothermal sites near ${place}.`,
+        scenarioId === 116
+          ? "Not buildable on this tile"
+          : `No geothermal sites near ${place}.`,
       );
-      await expect(
-        geothermal.getByRole("button", {
-          name: "Review purchase of Geothermal",
-          exact: true,
-        }),
-      ).toBeDisabled();
+      const geothermalReview = geothermal.getByRole("button", {
+        name: "Review purchase of Geothermal",
+        exact: true,
+      });
+      if (scenarioId === 116) {
+        await expect(geothermalReview).toHaveCount(0);
+        await expect(
+          geothermal.locator(
+            ".buildOptionMetrics,.buildOptionDescription,.buildOptionSparkline",
+          ),
+        ).toHaveCount(0);
+      } else {
+        await expect(geothermalReview).toBeDisabled();
+      }
       await expect(
         geothermal.getByRole("button", {
           name: "Compare Geothermal",
           exact: true,
+        }),
+      ).toHaveCount(0);
+      // Forecasting temporarily disables review for weather-dependent generators.
+      await expect(
+        page.getByRole("status").filter({
+          hasText: "Calculating output and energy costs…",
         }),
       ).toHaveCount(0);
       for (const order of [
@@ -103,12 +344,24 @@ for (const theme of ["light", "dark"] as const) {
           .evaluateAll((cards) =>
             cards.map((card) => ({
               name: card.getAttribute("data-build-option"),
-              detailed: !!card.querySelector(".buildOptionMetrics"),
+              buildable: !!card.querySelector(
+                'button[aria-label^="Review purchase of"]:not(:disabled)',
+              ),
             })),
           );
+        // The primary grouping is actual buildability, regardless of the selected
+        // economic sort or why a later row is unavailable.
+        const firstUnavailable = ordered.findIndex((card) => !card.buildable);
+        if (firstUnavailable !== -1)
+          expect(
+            ordered.slice(firstUnavailable).some((card) => card.buildable),
+          ).toBe(false);
         const index = ordered.findIndex((card) => card.name === "Geothermal");
         expect(index).toBeGreaterThanOrEqual(0);
-        expect(ordered.slice(index).filter((card) => card.detailed)).toEqual(
+        expect(ordered.slice(0, index).some((card) => card.buildable)).toBe(
+          true,
+        );
+        expect(ordered.slice(index).filter((card) => card.buildable)).toEqual(
           [],
         );
       }
@@ -119,6 +372,12 @@ for (const theme of ["light", "dark"] as const) {
           (element) => element.scrollWidth - element.clientWidth,
         ),
       ).toBeLessThanOrEqual(1);
+      if (scenarioId === 116)
+        await reviewScreenshot(page, {
+          path: info.outputPath(`tile-forbidden-geothermal-${theme}.png`),
+          animations: "disabled",
+          scale: "css",
+        });
     });
   }
 

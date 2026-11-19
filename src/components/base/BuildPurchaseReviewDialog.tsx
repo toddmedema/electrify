@@ -1,9 +1,15 @@
 import * as React from "react";
-import type { FacilityShoppingType, GameType } from "../../Types";
+import type {
+  FacilityShoppingType,
+  GameType,
+  TerritoryId,
+  TerritoryTileId,
+} from "../../Types";
 import {
   formatForecastWatts,
   formatForecastWattHours,
 } from "../../helpers/Format";
+import type { FacilityPurchaseResult } from "../../helpers/PurchaseFacility";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "../../helpers/DateTime";
 import { signature } from "./DeferredProjection";
 import { forecastWorkerSnapshot } from "./ForecastWorkerSnapshot";
@@ -32,14 +38,30 @@ function minimum(values: Array<number | null>): number | null {
   return known.length === values.length ? Math.min(...known) : null;
 }
 
+export type FacilityPurchaseSubmission = void | Promise<FacilityPurchaseResult>;
+
+export function finishBuildReview(
+  submission: FacilityPurchaseSubmission,
+  close: () => void,
+): void | Promise<void | string> {
+  if (!submission) return close();
+  return submission.then((result) =>
+    result.status === "accepted" ? close() : result.message,
+  );
+}
+
 /** Compare the twelve-month periods immediately before and after commissioning. */
 export default function BuildPurchaseReviewDialog({
   game,
   facility,
+  territoryId,
+  tileId,
   ...purchase
 }: PurchaseReviewDialogProps & {
   game?: GameType;
   facility: FacilityShoppingType;
+  territoryId?: TerritoryId;
+  tileId?: TerritoryTileId;
 }) {
   const gameKey = purchase.open && game ? signature(game) : undefined;
   const runScope = game?.runIdentity ?? game?.location ?? game?.monthlyHistory;
@@ -52,15 +74,24 @@ export default function BuildPurchaseReviewDialog({
   const state = useWorkerRequest(
     snapshot
       ? {
-          key: JSON.stringify(facility),
+          key: JSON.stringify([facility, territoryId, tileId]),
           scope: snapshot,
           message: (requestId: number): OutlookRequest => ({
             requestId,
             kind: "buildImpact",
             game: snapshot,
             facility,
+            territoryId,
+            tileId,
           }),
-          fallback: () => computeOutlook("buildImpact", snapshot, facility),
+          fallback: () =>
+            computeOutlook(
+              "buildImpact",
+              snapshot,
+              facility,
+              territoryId,
+              tileId,
+            ),
         }
       : undefined,
     {

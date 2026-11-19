@@ -3,7 +3,7 @@ import { expect, Page, test } from "./fixtures";
 async function reachStartTimeStep(page: Page) {
   await page.addInitScript(() => window.localStorage.clear());
   await page.goto("/");
-  await page.getByRole("button", { name: "Play", exact: true }).click();
+  await page.getByRole("button", { name: "Tutorials", exact: true }).click();
   await page.getByRole("button", { name: "Next", exact: true }).click();
   await page.getByRole("button", { name: "Inspect Coal", exact: true }).click();
   await page.getByRole("button", { name: "Next" }).click();
@@ -38,7 +38,7 @@ test("Exit returns directly to the main menu and leaves the unfinished tutorial 
     page.getByRole("button", { name: "Play", exact: true }),
   ).toBeVisible();
   await expect(page.locator(".snackbarContent")).toBeHidden();
-  await page.getByRole("button", { name: "Play", exact: true }).click();
+  await page.getByRole("button", { name: "Tutorials", exact: true }).click();
   await expect(page.getByText("Welcome to Electrify")).toBeVisible();
 });
 
@@ -67,7 +67,7 @@ for (const explicitlyExit of [false, true]) {
         .getByRole("menuitem", { name: "Main menu", exact: true })
         .click();
     }
-    await page.getByRole("button", { name: "Play", exact: true }).click();
+    await page.getByRole("button", { name: "Tutorials", exact: true }).click();
     await expect(page.getByText("Welcome to Electrify")).toBeVisible();
   });
 }

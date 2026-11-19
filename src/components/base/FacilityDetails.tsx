@@ -4,6 +4,9 @@ import { facilityDisplayName } from "./FacilityLabels";
 import GasConversion from "./GasConversion";
 import CoalRepower from "./CoalRepower";
 import FacilityUpgradeAction from "./FacilityUpgradeAction";
+import FacilityCapacityUpgrade, {
+  FacilityCapacityUpgradeActions,
+} from "./FacilityCapacityUpgrade";
 import { currentCash } from "../../helpers/GameSelectors";
 import { HYDRO_SITES } from "../../data/HydroSites";
 import { combineStoryEffects } from "../../data/WorldEvents";
@@ -78,7 +81,7 @@ import { MONTHS } from "../../Constants";
 // enough that the last few months are still legible in 72 pixels
 const TREND_MONTHS = 12;
 
-export interface Props {
+export interface Props extends FacilityCapacityUpgradeActions {
   facility: FacilityOperatingType;
   date: DateType;
   seed: number;
@@ -619,6 +622,14 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
             )}
           </dl>
         </section>
+      )}
+      {props.game && (
+        <FacilityCapacityUpgrade
+          facility={facility}
+          game={props.game}
+          onExpand={props.onExpand}
+          onCancelExpansion={props.onCancelExpansion}
+        />
       )}
       {props.game && facility.fuel === "Coal" && (
         <CoalRepower

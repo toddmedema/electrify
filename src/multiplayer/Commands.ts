@@ -1,15 +1,34 @@
+import {
+  facilityExpansionQuote,
+  validExpandFacilityAction,
+  validCancelFacilityExpansionAction,
+} from "../helpers/FacilityExpansion";
+import {
+  getTerritoryTile,
+  isTerritoryTileId,
+  territoryVisibilityDistance,
+} from "../helpers/TerritoryTiles";
 import { validPowerAgreementAction } from "../helpers/PowerAgreements";
 import { isBuyingRule, isSellingRule } from "../helpers/TradingRules";
-import { isUtilityExpansionGame } from "../helpers/ExpansionContext";
 import { acquisitionQuote, validAcquisitionAction } from "../helpers/Expansion";
-import { UTILITY_TARGETS } from "../data/UtilityExpansion";
-import { currentTick } from "../helpers/GameSelectors";
-import { GENERATORS, STORAGE } from "../data/Facilities";
+import { isLandTerritoryId, isTerritoryId } from "../data/Territories";
 import {
+  validLandPurchaseAction,
+  validTilePurchaseAction,
+  tilePurchaseQuote,
+  landPurchaseQuote,
+  hasTerritoryNetwork,
+  territoryBuildAvailability,
+} from "../helpers/Territories";
+import { currentTick } from "../helpers/GameSelectors";
+import { getBuildFacilityQuote } from "../data/Facilities";
+import {
+  requestedFacilitySize,
   validRetrofitFacility,
   validResilienceRecord,
 } from "../helpers/BuildValidation";
 import { withResilienceOptions } from "../helpers/Hazards";
+import { facilityConstructionReview } from "../helpers/FacilityConstructionReview";
 import { validPolicyChange } from "../helpers/Policies";
 import { validScenarioResponse } from "../helpers/ScenarioChoices";
 import { isCoalRepower, isStorage } from "../Types";
@@ -33,6 +52,7 @@ const facility: Validator = (game, payload) =>
     : { error: "Plant not found" };
 
 const line: Validator = (game, payload) =>
+  !hasTerritoryNetwork(game) &&
   Number.isSafeInteger(payload) &&
   game.transmission?.lines.some((l) => l.id === payload)
     ? { payload }
@@ -56,13 +76,10 @@ const dispatchPosition =
 /** Co-op players can only build or upgrade their links to each other. */
 const peerLine: Validator = (game, payload) => {
   const target = payload as { corridorId?: string; financed?: boolean };
-  return !target ||
-    !(
-      game.multiplayer?.peers?.some(
-        (p) => p.corridor.id === target.corridorId,
-      ) ||
-      (isUtilityExpansionGame(game) &&
-        UTILITY_TARGETS.some((t) => t.corridorId === target.corridorId))
+  return hasTerritoryNetwork(game) ||
+    !target ||
+    !game.multiplayer?.peers?.some(
+      (p) => p.corridor.id === target.corridorId,
     ) ||
     typeof target.financed !== "boolean"
     ? { error: "Choose another player's intertie" }
@@ -72,7 +89,8 @@ const peerLine: Validator = (game, payload) => {
 /** Existing outside assets belong to one company; shared links still require both owners. */
 const upgradeLine: Validator = (game, payload) => {
   const target = payload as { corridorId?: string; financed?: boolean } | null;
-  return target &&
+  return !hasTerritoryNetwork(game) &&
+    target &&
     typeof target.financed === "boolean" &&
     game.transmission?.lines.some(
       (line) => line.corridorId === target.corridorId,
@@ -89,6 +107,9 @@ const buildFacility: Validator = (game, payload) => {
   const build = payload as {
     facility?: Partial<FacilityShoppingType>;
     financed?: boolean;
+    territoryId?: unknown;
+    tileId?: unknown;
+    reviewKey?: unknown;
   };
   if (!build || !build.facility || typeof build.financed !== "boolean")
     return { error: "That build is unavailable" };
@@ -96,47 +117,122 @@ const buildFacility: Validator = (game, payload) => {
     return {
       error: "Build for the company without an operating-area destination",
     };
-  const requested = build.facility;
-  const size = requested.peakWh ?? requested.peakW;
   if (
-    typeof size !== "number" ||
-    !Number.isFinite(size) ||
-    size <= 0 ||
-    size > 1e12
+    build.territoryId !== undefined &&
+    (!hasTerritoryNetwork(game) || !isTerritoryId(build.territoryId))
   )
+    return { error: "Choose a valid territory for this build" };
+  const territoryId = isTerritoryId(build.territoryId)
+    ? build.territoryId
+    : "champlain";
+  if (
+    build.tileId !== undefined &&
+    (!hasTerritoryNetwork(game) || !isTerritoryTileId(build.tileId, game))
+  )
+    return { error: "Choose a valid tile for this build" };
+  const tileId = isTerritoryTileId(build.tileId, game)
+    ? build.tileId
+    : undefined;
+  const requested = build.facility;
+  const size = requestedFacilitySize(requested);
+  if (size === undefined || size > 1e12)
     return { error: "Choose a valid facility size" };
-  const options: FacilityShoppingType[] =
-    requested.peakWh === undefined
-      ? GENERATORS(
-          game,
-          size,
-          game.timeline.map((t) => t.windKph),
-          game.timeline.map((t) => t.solarIrradianceWM2),
-          game.timeline.map((t) => t.windOffshoreKph || 0),
-          game.timeline.map((t) => t.windAirborneKph || 0),
-        )
-      : STORAGE(game, requested.peakWh);
-  let quote = options.find(
-    (f) =>
-      f.available &&
-      f.name === requested.name &&
-      f.gasCycle === requested.gasCycle,
+  let quote = getBuildFacilityQuote(
+    game,
+    { ...requested, resilience: undefined },
+    territoryId,
+    tileId,
   );
   if (!quote) return { error: "That build is unavailable" };
   if (!validResilienceRecord(quote.fuel, requested.resilience))
     return { error: "Choose valid facility options" };
   if (!isStorage(quote) && requested.resilience)
     quote = withResilienceOptions(quote, game, requested.resilience);
+  let selectedTileId = tileId;
+  if (hasTerritoryNetwork(game)) {
+    const availability = territoryBuildAvailability(
+      game,
+      quote,
+      territoryId,
+      tileId,
+    );
+    if (!availability.buildable)
+      return {
+        error: availability.reason ?? "That territory cannot host this build",
+      };
+    selectedTileId = availability.tileId;
+  }
+  if (build.reviewKey !== undefined) {
+    const selectedQuote =
+      selectedTileId !== tileId
+        ? getBuildFacilityQuote(game, requested, territoryId, selectedTileId)
+        : quote;
+    if (
+      !selectedQuote ||
+      build.reviewKey !==
+        facilityConstructionReview(
+          game,
+          selectedQuote,
+          build.financed,
+          selectedTileId,
+        ).key
+    )
+      return {
+        error: "Construction terms changed. Review the updated project.",
+      };
+    quote = selectedQuote;
+  }
   return {
     payload: {
       facility: quote,
       financed: build.financed,
+      ...(hasTerritoryNetwork(game)
+        ? { territoryId, tileId: selectedTileId }
+        : {}),
     },
   };
 };
 
 /** The co-op allowlist: every game action a player may send, with its payload check. */
 const GAME_COMMAND_VALIDATORS = {
+  acquireTile: (game, payload) => {
+    const tile = getTerritoryTile(
+      (payload as { tileId?: unknown } | null)?.tileId,
+      game,
+    );
+    const claim =
+      tile &&
+      isLandTerritoryId(tile.territoryId) &&
+      (game.multiplayer?.tileOwners?.[tile.id] ??
+        game.multiplayer?.landOwners?.[tile.territoryId]);
+    if (
+      tile &&
+      claim &&
+      claim.seat !== game.multiplayer?.seat &&
+      territoryVisibilityDistance(game, tile) !== undefined
+    )
+      return { error: `This land tile is already owned by ${claim.name}` };
+    if (!validTilePurchaseAction(game, payload))
+      return {
+        error: "This land tile is unavailable or its quote has changed",
+      };
+    if (
+      (currentTick(game)?.cash ?? -1) <
+      tilePurchaseQuote(game, payload.tileId)!.price
+    )
+      return { error: "This land tile is unaffordable with your current cash" };
+    return { payload };
+  },
+  acquireLand: (game, payload) =>
+    !validLandPurchaseAction(game, payload)
+      ? {
+          error:
+            "This land purchase is already owned, unavailable or its quote has changed",
+        }
+      : (currentTick(game)?.cash ?? -1) <
+          landPurchaseQuote(game, payload.territoryId)!.price
+        ? { error: "This land purchase is unaffordable with your current cash" }
+        : { payload },
   acceptPowerAgreement: (game, payload) =>
     validPowerAgreementAction(game, payload)
       ? { payload }
@@ -178,6 +274,34 @@ const GAME_COMMAND_VALIDATORS = {
       : { error: "Not enough cash for this conversion" };
   },
   cancelRetrofit: facility,
+  expandFacility: (game, payload) => {
+    if (!validExpandFacilityAction(payload))
+      return { error: "Choose a valid capacity expansion" };
+    const quote = facilityExpansionQuote(
+      game,
+      payload.facilityId,
+      payload.targetSize,
+    );
+    return quote.status === "ready" &&
+      quote.quoteKey === payload.quoteKey &&
+      (currentTick(game)?.cash ?? -1) >= quote.cost
+      ? { payload }
+      : {
+          error:
+            quote.status === "unavailable"
+              ? quote.reason
+              : "This expansion quote changed or is unaffordable",
+        };
+  },
+  cancelFacilityExpansion: (game, payload) =>
+    validCancelFacilityExpansionAction(payload) &&
+    game.facilities.some(
+      (plant) =>
+        plant.id === payload.facilityId &&
+        plant.expansionInProgress?.quoteKey === payload.quoteKey,
+    )
+      ? { payload }
+      : { error: "Capacity expansion not found" },
   buildTransmissionLine: peerLine,
   upgradeTransmissionLine: upgradeLine,
   cancelTransmissionLine: line,

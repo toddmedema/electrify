@@ -1,5 +1,12 @@
 import { HOURS_PER_YEAR_REAL } from "../Constants";
-import { GeneratorShoppingType, TickPresentFutureType } from "../Types";
+import {
+  GameType,
+  GeneratorShoppingType,
+  TickPresentFutureType,
+  TerritoryTileId,
+} from "../Types";
+import { getTerrainWindOutputFactor } from "./TerrainModifiers";
+import { hasTerritoryNetwork } from "./TerritoryTiles";
 import { MINUTES_PER_MONTH } from "./DateTime";
 import {
   getAirborneWindCapacityFactor,
@@ -30,6 +37,10 @@ export type OutputWeatherTick = Pick<
 >;
 
 export type ExpectedOutputKind = "weather" | "water-inflow" | "on-demand";
+export type ExpectedOutputContext = {
+  game: GameType;
+  tileId?: TerritoryTileId;
+};
 
 export interface ExpectedOutputShape {
   kind: ExpectedOutputKind;
@@ -48,6 +59,7 @@ const WEATHER_FUELS = new Set([
 export function technologyCapacityFactor(
   technology: OutputTechnology,
   ticks: OutputWeatherTick[],
+  context?: ExpectedOutputContext,
 ): number {
   if (
     ticks.every(
@@ -57,6 +69,25 @@ export function technologyCapacityFactor(
     return (
       ticks.reduce(
         (sum, tick) => sum + tick.renewableCapacityFactors![technology.name],
+        0,
+      ) / ticks.length
+    );
+  }
+  if (
+    context &&
+    hasTerritoryNetwork(context.game) &&
+    (technology.fuel === "Wind" || technology.fuel === "Offshore Wind")
+  ) {
+    return (
+      ticks.reduce(
+        (total, tick) =>
+          total +
+          getTerrainWindOutputFactor(
+            context.game,
+            { fuel: technology.fuel, tileId: context.tileId },
+            tick.windKph,
+            tick.windOffshoreKph,
+          ),
         0,
       ) / ticks.length
     );
@@ -124,6 +155,7 @@ export function expectedOutputKind(fuel: string): ExpectedOutputKind {
 export function expectedMonthlyOutputShape(
   technology: OutputTechnology,
   timeline: OutputWeatherTick[],
+  context?: ExpectedOutputContext,
 ): ExpectedOutputShape | undefined {
   const kind = expectedOutputKind(technology.fuel);
   if (kind === "on-demand") {
@@ -134,7 +166,7 @@ export function expectedMonthlyOutputShape(
     return undefined;
   }
   const monthly = Array.from({ length: 12 }, (_, month) =>
-    technologyCapacityFactor(technology, calendarMonths.get(month)!),
+    technologyCapacityFactor(technology, calendarMonths.get(month)!, context),
   );
   const lowMonth = monthly.reduce(
     (low, value, month) => (value < monthly[low] ? month : low),

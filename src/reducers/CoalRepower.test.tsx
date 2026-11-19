@@ -2,6 +2,7 @@ import cloneDeep from "lodash.clonedeep";
 import { TICK_MINUTES } from "../Constants";
 import { parseSave, serializeSave } from "../SaveGame";
 import { CoalRepowerType, GameType } from "../Types";
+import { gasHeatRate } from "../data/GasPlantVintages";
 import { LEGACY_CAMPAIGN_ID } from "../data/LegacyCampaign";
 import {
   coalRepowerPurchaseTerms,
@@ -13,12 +14,14 @@ import {
   serializeCommitmentMetadata,
 } from "../helpers/Commitment";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "../helpers/DateTime";
+import { facilityExpansionQuote } from "../helpers/FacilityExpansion";
 import { facilityLoanBalance } from "../helpers/Financials";
 import { currentTick } from "../helpers/GameSelectors";
 import { validateGameCommand } from "../multiplayer/Commands";
 import { createGame } from "../testing/Simulator";
 import reducer, {
   cancelRetrofit,
+  expandFacility,
   generateNewTimeline,
   previewCoalRepowerImpact,
   reprioritizeFacility,
@@ -322,6 +325,37 @@ it("forecasts the replacement fuel and construction emissions without converting
   ).toBe(800);
 });
 
+it("allows only one project when coal repowering and expansion are both quoted", () => {
+  const game = scenario();
+  currentTick(game)!.cash = 10e9;
+  const coal = findCoal(game);
+  const repower = { facilityId: coal.id, upgrade: "coalToGasPeaker" as const };
+  const quote = facilityExpansionQuote(game, coal.id, coal.peakW + 1e6);
+  if (quote.status !== "ready") throw new Error(quote.reason);
+  const expansion = {
+    facilityId: coal.id,
+    targetSize: quote.targetSize,
+    quoteKey: quote.quoteKey,
+  };
+
+  const expanding = reducer(game, expandFacility(expansion));
+  expect(findCoal(expanding).expansionInProgress).toBeDefined();
+  expect(
+    coalRepowerQuote(findCoal(expanding), expanding, repower.upgrade),
+  ).toBeUndefined();
+  expect(
+    validateGameCommand(expanding, "retrofitFacility", repower),
+  ).toHaveProperty("error");
+  expect(reducer(expanding, retrofitFacility(repower))).toBe(expanding);
+
+  const repowering = reducer(game, retrofitFacility(repower));
+  expect(findCoal(repowering).upgradeInProgress).toBeDefined();
+  expect(
+    validateGameCommand(repowering, "expandFacility", expansion),
+  ).toHaveProperty("error");
+  expect(reducer(repowering, expandFacility(expansion))).toBe(repowering);
+});
+
 it("keeps quoted peaker capacity and operating characteristics across a catalog vintage change", () => {
   const game = scenario();
   game.scenarioId = LEGACY_CAMPAIGN_ID + 4;
@@ -332,7 +366,7 @@ it("keeps quoted peaker capacity and operating characteristics across a catalog 
   const upgrade = "coalToGasPeaker";
   const quote = coalRepowerQuote(coal, game, upgrade)!;
   expect(quote.target.peakW).toBe(30e6);
-  expect(quote.target.btuPerWh).toBe(13.5);
+  expect(quote.target.btuPerWh).toBe(gasHeatRate(1981, "simple"));
   const completesMinute = startsMinute + quote.durationMinutes;
   game.date = getDateFromMinute(completesMinute, game.startingYear);
   expect(game.date.year).toBe(1982);
@@ -347,7 +381,8 @@ it("keeps quoted peaker capacity and operating characteristics across a catalog 
     }),
   ).toBe(true);
   expect(coal.peakW).toBe(30e6);
-  expect(coal.btuPerWh).toBe(13.5);
+  expect(coal.btuPerWh).toBe(quote.target.btuPerWh);
+  expect(coal.btuPerWh).not.toBe(gasHeatRate(1982, "simple"));
   expect(coal.assumedStartsPerYear).toBeUndefined();
 });
 

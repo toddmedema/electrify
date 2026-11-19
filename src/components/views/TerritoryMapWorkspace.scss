@@ -1,0 +1,589 @@
+.territoryMap,
+.territoryResourceLegend {
+  --territory-owner-you: #006bbb;
+  --territory-owner-valley: #955b22;
+  --territory-owner-ridge: #7951a6;
+  --territory-owner-municipal: #646e47;
+  --territory-owner-peer-0: #32766a;
+  --territory-owner-peer-1: #96516c;
+  --territory-owner-peer-2: #926817;
+  --territory-grass: #dfe9d5;
+  --territory-grass-rim: #a1b5a1;
+  --territory-hill: #e7e0d3;
+  --territory-hill-rim: #b9ad97;
+  --territory-water: #d6e4e7;
+  --territory-water-rim: #9eb8bf;
+  --territory-built: #dfe4ea;
+  --territory-built-rim: #a5b0bb;
+  --territory-outline: #536157;
+  --territory-art-mint: #64dfc5;
+  --territory-art-cream: #fff8e1;
+  --territory-art-steel: #cfd8dc;
+  --territory-art-grass: #b8d9c3;
+  --territory-art-water: #7fc8ce;
+}
+[data-theme="dark"] .territoryMap,
+[data-theme="dark"] .territoryResourceLegend {
+  --territory-owner-you: #62acfa;
+  --territory-owner-valley: #d2a469;
+  --territory-owner-ridge: #b69bdf;
+  --territory-owner-municipal: #b0bd92;
+  --territory-owner-peer-0: #7dc9bf;
+  --territory-owner-peer-1: #d9a0bc;
+  --territory-owner-peer-2: #d5be7c;
+  --territory-grass: #29382d;
+  --territory-grass-rim: #1d2921;
+  --territory-hill: #3a352d;
+  --territory-hill-rim: #28251f;
+  --territory-water: #23373e;
+  --territory-water-rim: #17272d;
+  --territory-built: #303944;
+  --territory-built-rim: #202934;
+  --territory-outline: #78877b;
+  --territory-art-mint: #67cbb8;
+  --territory-art-cream: #ddd7c0;
+  --territory-art-steel: #aebec7;
+  --territory-art-grass: #88af96;
+  --territory-art-water: #78acb7;
+}
+
+.territoryHex {
+  --territory-tile-rim: #92ad99;
+}
+.territoryHex[data-terrain="forest"] {
+  --territory-tile-rim: #486e59;
+}
+.territoryHex[data-terrain="hills"] {
+  --territory-tile-rim: #9c8c70;
+}
+.territoryHex[data-terrain="mountain"] {
+  --territory-tile-rim: #7d898d;
+}
+.territoryHex[data-terrain="river"],
+.territoryHex[data-terrain="lake"] {
+  --territory-tile-rim: #7ca6ac;
+}
+.territoryHex[data-terrain="ocean"] {
+  --territory-tile-rim: #356c78;
+}
+.territoryHexRim,
+.territoryHexSeam {
+  stroke: #52645d;
+  stroke-width: 1;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+.territoryHexRim {
+  fill: var(--territory-tile-rim);
+}
+.territoryHexSeam {
+  fill: none;
+}
+.territoryTerrainArtwork,
+.territoryOccupantArtwork {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.territoryTileOccupant {
+  pointer-events: none;
+}
+.territoryTileOccupant[data-facility-status="construction"]
+  .territoryFacilityBody {
+  opacity: 0.55;
+}
+
+// Animations always exist; the map's WAAPI controller pauses and retimes them
+// without replacing their timeline. Supporting structures and cable entries stay still.
+.mapFacilityArtwork {
+  &:not([data-facility-motion="active"]) .mapFacilityEffect {
+    visibility: hidden;
+  }
+  .mapWindRotor {
+    transform-box: view-box;
+    transform-origin: 250px 225px;
+    animation: mapWindSpin 14s linear infinite paused;
+  }
+  .mapAirborneWing {
+    transform-box: view-box;
+    transform-origin: 250px 210px;
+    animation: mapAirborneSway 10s ease-in-out infinite paused;
+  }
+  .mapGeothermalVapor {
+    animation: mapGeothermalLift 6s ease-in-out infinite paused;
+  }
+  .mapFacilityExhaust {
+    opacity: 0;
+    animation: mapExhaustLift 5.2s linear infinite paused;
+  }
+  .mapFacilityExhaust-1 {
+    animation-delay: -2.6s;
+  }
+  .mapHydroFlow {
+    opacity: 0.75;
+    animation: mapHydroFlow 2.8s linear infinite paused;
+  }
+  .mapSolarFlow {
+    opacity: 0.7;
+    animation: mapPowerFlow 3.6s linear infinite paused;
+  }
+  .mapStorageFlow {
+    opacity: 0.7;
+    animation: mapStorageFlow 3.6s linear infinite paused;
+  }
+}
+@keyframes mapWindSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes mapAirborneSway {
+  0%,
+  100% {
+    transform: rotate(-2deg);
+  }
+  50% {
+    transform: rotate(2deg);
+  }
+}
+@keyframes mapGeothermalLift {
+  0%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.8;
+  }
+  50% {
+    transform: translateY(-8px);
+    opacity: 0.55;
+  }
+}
+@keyframes mapExhaustLift {
+  from {
+    transform: translate(0, 0) scale(0.65);
+    opacity: 0;
+  }
+  25%,
+  55% {
+    opacity: 0.75;
+  }
+  to {
+    transform: translate(16px, -52px) scale(1.2);
+    opacity: 0;
+  }
+}
+@keyframes mapHydroFlow {
+  to {
+    stroke-dashoffset: -48;
+  }
+}
+@keyframes mapPowerFlow {
+  to {
+    stroke-dashoffset: -100;
+  }
+}
+@keyframes mapStorageFlow {
+  to {
+    stroke-dashoffset: -46;
+  }
+}
+.territoryWires {
+  pointer-events: none;
+}
+.territoryWire,
+.territoryWireBacking {
+  fill: none;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+.territoryWireBacking {
+  stroke: #fff8e1;
+  stroke-width: 2.5;
+  opacity: 0.6;
+}
+.territoryWire {
+  stroke: #25393d;
+  stroke-width: 1.25;
+  opacity: 0.85;
+}
+[data-wire-kind="submerged"] {
+  .territoryWireBacking {
+    display: none;
+  }
+  .territoryWire {
+    stroke: #355c68;
+    stroke-dasharray: 3 4;
+    opacity: 0.5;
+  }
+}
+.territoryHexBorderBacking,
+.territoryHexBoundary,
+.territoryHexSelection,
+.territoryHexSelectionBacking {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  pointer-events: none;
+  vector-effect: non-scaling-stroke;
+}
+.territoryHexBorderBacking {
+  stroke: var(--bg-primary);
+  stroke-width: 6;
+}
+.territoryHexBoundary {
+  stroke: var(--territory-owner-color);
+  stroke-width: 3;
+}
+.territoryHexSelectionBacking {
+  stroke: #17252c;
+  stroke-width: 5;
+  stroke-dasharray: 4 4;
+}
+.territoryHexSelection {
+  stroke: #fff8e1;
+  stroke-width: 2;
+  stroke-dasharray: 4 4;
+}
+.territoryTileTarget {
+  pointer-events: none;
+  position: absolute;
+  transform: translate(-50%, -50%);
+  padding: 0;
+  border: 0;
+  min-width: 44px;
+  min-height: 44px;
+  background: transparent;
+  color: var(--font-color-primary);
+  font: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  .territoryTileHitArea {
+    pointer-events: auto;
+    position: absolute;
+    inset: 0;
+    clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+  }
+  &:focus-visible {
+    outline: none;
+  }
+  &[data-model-hovered="true"] .territoryTileHitArea,
+  &:focus-visible .territoryTileHitArea,
+  .territoryMap:not([data-renderer="ready"]) &:hover .territoryTileHitArea {
+    background: radial-gradient(
+      ellipse closest-side,
+      color-mix(in srgb, var(--territory-hover-color) 8%, transparent) 42%,
+      color-mix(
+          in srgb,
+          color-mix(in srgb, var(--territory-hover-color) 58%, white) 78%,
+          transparent
+        )
+        100%
+    );
+  }
+}
+.territoryUtilityLabel {
+  z-index: 2;
+  strong {
+    position: absolute;
+    left: 50%;
+    bottom: calc(100% + 4px);
+    transform: translateX(-50%);
+    padding: 4px 8px;
+    border: 1px solid
+      color-mix(
+        in srgb,
+        var(--territory-owner-color, var(--border-subtle)) 64%,
+        transparent
+      );
+    border-radius: var(--radius-lg);
+    background: color-mix(in srgb, var(--bg-raised) 88%, transparent);
+    box-shadow: 0 2px 8px var(--shadow-ring);
+    font-size: 13px;
+    line-height: 18px;
+    font-weight: 600;
+    pointer-events: auto;
+    width: max-content;
+    max-width: 160px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    text-align: center;
+    span {
+      display: block;
+    }
+    span + span {
+      font-size: 11px;
+      font-weight: 400;
+    }
+  }
+  &[data-municipal-city="true"] strong,
+  .territoryMap[data-buy-mode="true"] & strong {
+    pointer-events: none;
+  }
+  &:hover strong,
+  &[aria-pressed="true"] strong {
+    background: var(--bg-raised);
+    border-color: var(--territory-owner-color);
+  }
+  &:focus-visible strong {
+    outline: 3px solid var(--focus-ring);
+    outline-offset: 2px;
+  }
+}
+
+.territoryWorkspace:has(.territoryNetwork) {
+  display: flex;
+  overflow: hidden;
+}
+.territoryNetwork {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+.territoryMap {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--bg-sunken);
+}
+.territoryMapViewport,
+.territoryMapStage,
+.territoryHexGrid {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.territoryMapViewport {
+  overflow: hidden;
+  overscroll-behavior: contain;
+  touch-action: none;
+  user-select: none;
+  cursor: grab;
+  &:active {
+    cursor: grabbing;
+  }
+}
+.territoryHexGrid {
+  overflow: visible;
+  pointer-events: none;
+}
+.territoryFog[data-visibility-distance="1"] {
+  opacity: 0.85;
+  filter: saturate(0.8);
+}
+.territoryFog[data-visibility-distance="2"] {
+  opacity: 0.65;
+  filter: saturate(0.45);
+}
+.territoryFog[data-visibility-distance="3"] {
+  opacity: 0.4;
+  filter: saturate(0.15);
+}
+.territoryTileTarget {
+  &:focus-visible .territoryTileHitArea {
+    outline: 3px solid var(--focus-ring);
+    outline-offset: -4px;
+  }
+  .territoryTilePrice {
+    position: absolute;
+    pointer-events: auto;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    width: max-content;
+    max-width: 120px;
+    min-height: 28px;
+    padding: 4px 8px;
+    box-sizing: border-box;
+    border: 1px solid
+      color-mix(in srgb, var(--interactive-strong) 40%, transparent);
+    border-radius: var(--radius-lg);
+    background: color-mix(in srgb, var(--bg-raised) 88%, transparent);
+    box-shadow: 0 2px 8px var(--shadow-ring);
+    color: var(--font-color-primary);
+    font-size: 11px;
+    line-height: 14px;
+    b {
+      font-size: 13px;
+      line-height: 18px;
+      color: var(--interactive-strong);
+    }
+  }
+  &:hover .territoryTilePrice,
+  &:focus-visible .territoryTilePrice {
+    background: var(--bg-raised);
+  }
+  &[data-unaffordable="true"] .territoryTilePrice {
+    border-color: var(--border-subtle);
+    b {
+      color: var(--font-color-primary);
+      font-weight: var(--font-weight-regular);
+    }
+  }
+}
+.territoryMapControl {
+  position: absolute;
+  z-index: 4;
+  right: 16px;
+  bottom: 16px;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  min-width: 44px;
+  min-height: 44px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 0;
+  background: var(--bg-raised);
+  color: var(--interactive-blue);
+  box-shadow: 0 4px 20px var(--shadow-ring);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  svg {
+    width: 24px;
+    height: 24px;
+  }
+  &:hover {
+    background: var(--bg-selected);
+  }
+  &[aria-pressed="true"] {
+    background: var(--interactive-blue);
+    color: var(--bg-primary);
+    border-color: var(--interactive-blue);
+  }
+  &:focus-visible {
+    outline: 3px solid var(--focus-ring);
+    outline-offset: 2px;
+  }
+}
+@media (max-width: 599px) {
+  .territoryMapControl {
+    right: 8px;
+    bottom: 8px;
+  }
+  .territoryUtilityLabel strong {
+    font-size: 12px;
+    line-height: 16px;
+  }
+}
+.gameWorkspace[data-map-workspace="true"][data-compact-dock="true"] {
+  --game-dock-button-height: 48px;
+  --game-dock-clearance: calc(72px + var(--game-dock-bottom));
+  .territoryMapControl {
+    bottom: var(--game-dock-clearance);
+  }
+}
+// Keep the compact map dock floating, with horizontal scrolling when needed.
+.gameWorkspace[data-map-workspace="true"][data-compact-dock="true"]
+  #navfooter.gameActionDock {
+  position: absolute;
+  width: max-content;
+  max-width: calc(100% - 16px);
+  left: var(--game-dock-left, 50%);
+  bottom: var(--game-dock-bottom);
+  transform: translateX(-50%);
+  margin: 0;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 4px 20px var(--shadow-ring);
+  overflow-x: auto;
+  .gameDockAction.MuiButton-root {
+    flex: 0 0 44px;
+    width: 44px;
+    min-width: 44px;
+    min-height: 48px;
+    border-radius: var(--radius-md);
+  }
+  .gameDockLabel {
+    display: none;
+  }
+}
+@media (max-width: 399px) {
+  .gameWorkspace[data-map-workspace="true"][data-compact-dock="true"]
+    #navfooter.gameActionDock {
+    max-width: calc(100% - 4px);
+    gap: 0;
+    padding-inline: 0;
+  }
+}
+.gameWorkspace[data-map-workspace="true"] .territoryAgreements {
+  padding-bottom: calc(var(--game-dock-clearance) + 16px);
+}
+.territoryNetwork > .acquiredUtilities {
+  position: absolute;
+  z-index: 3;
+  top: 8px;
+  left: 8px;
+  margin: 0;
+  max-width: min(360px, calc(100% - 16px));
+  max-height: calc(100% - 144px);
+  overflow: auto;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  > summary {
+    min-height: 44px;
+    box-sizing: border-box;
+    padding: 12px;
+  }
+}
+@media (max-width: 599px) {
+  .territoryTileTarget .territoryTilePrice {
+    width: 88px;
+    font-size: 10px;
+    line-height: 12px;
+    b {
+      font-size: 12px;
+      line-height: 16px;
+    }
+  }
+}
+
+.projectSiteOutline {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+  path {
+    fill: none;
+    stroke: var(--interactive-blue);
+    stroke-width: 3;
+    vector-effect: non-scaling-stroke;
+  }
+}
+.territoryTileTarget[data-project-site="connection"]
+  .projectSiteOutline
+  > path:first-child {
+  stroke-dasharray: 7 4;
+}
+.projectSiteInnerOutline {
+  stroke-width: 2;
+}
+.territoryMapLayerToggle {
+  right: 72px;
+}
+.mapStatusLayersPanel {
+  padding: 8px 16px;
+  .MuiFormControlLabel-root {
+    min-height: 44px;
+    margin: 0;
+  }
+}
+@media (max-width: 599px) {
+  .territoryMapLayerToggle {
+    right: 64px;
+  }
+}

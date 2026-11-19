@@ -1,6 +1,6 @@
 # Facility economics refresh
 
-Last reviewed: 2026-09-28 (gas split into a simple-cycle peaker and a combined cycle). The
+Last reviewed: 2026-11-18 (historical gas steam and peaker vintages). The
 implemented latest observations are 2023 for EIA's engineering estimates and 2024 for IRENA's
 global deployment data.
 
@@ -96,8 +96,8 @@ The EIA AEO2025 reference designs also update:
   about as much as its reference peaker; the peaker's economic case is that it stays cheap when
   built small (a 100 MW peaker quotes about $1,150/kW, a 100 MW combined cycle about $2,040/kW,
   because 12% of each reference project is fixed) and that it costs little to keep in reserve.
-  Heat rates are held at the reference plant for every year, as they are for the other thermal
-  plants, so an early combined cycle is somewhat more efficient than its real contemporaries.
+  The combined cycle holds the reference heat rate across eras, so early quotes can be more
+  efficient than their real contemporaries. The peaker uses the vintage curve below.
 - Oil: the matched EIA commercial Oil reciprocating-engine case reports $24/kW-year fixed O&M and
   $20/MWh variable O&M in 2015 dollars. Annual-average CPI-U (`304.702 / 237.017`) converts these
   to $30.8536856/kW-year and $25.7114047/MWh in 2023 dollars. Fixed O&M scales with nameplate and
@@ -324,13 +324,47 @@ future work.
 
 ## Commercial technology review
 
-Natural gas is now two facilities, Natural Gas Peaker and Natural Gas CC, because the one gas
-plant mixed a simple-cycle turbine's cost, heat rate and start time with an all-gas capacity
-factor and a combined cycle's 6 GW size. Both keep the "Natural Gas" fuel, so fuel prices, cold
-snaps and their cold-weather package, story effects and the supply charts treat them alike; their
-`gasCycle` field names the technology. A simple-to-combined conversion (adding a heat-recovery
-steam generator to an existing peaker) is left for later, as an upgrade that changes
-`gasCycle` in place. No other facility type is added in this pass:
+The three gas technologies share the "Natural Gas" fuel for prices, cold-weather hardening,
+story effects and supply charts. Their `gasCycle` field identifies the equipment. A peaker
+can be converted to combined cycle by adding a heat-recovery steam generator.
+
+### Historical gas steam and peaker vintages
+
+Natural Gas Steam models the conventional gas boiler and steam turbine built for baseload.
+Orders are available from 1925 through 1990 in any game context. The window runs from early
+commercial utility adoption in California through late dedicated units such as Permskaya.
+Later supercritical plants such as Helwan South used a different generation of the technology.
+[California historic inventory](https://demo2.parks.ca.gov/pages/1067/files/CA_Multiple_PGE%20Historic%20Era%20Electrical%20Infrastructure%20MPDF%20DRAFT.pdf),
+[Permskaya operator](https://www.ogk1.com/eng/operation/generating_facilities/perm_thermal_power_station/),
+[World Bank project completion report](https://documents1.worldbank.org/curated/en/425031605805927994/pdf/Egypt-Arab-Republic-of-EG-Helwan-South-Power-Project.pdf).
+
+- Steam heat rates in Btu/kWh HHV interpolate between 20,000 (1925), 16,500 (1942), 12,200
+  (1954) and 10,500 (1970 onward). The early values approximate the national fossil-steam
+  record. A 1976 EPA report puts the 1972 gas steam fleet at 10,764 and assumed new additions
+  at 9,500. [Historical efficiency series](https://ntrs.nasa.gov/api/citations/19760016614/downloads/19760016614.pdf),
+  [EPA gas steam estimates](https://nepis.epa.gov/Exe/ZyPURL.cgi?Dockey=9100YL4C.TXT).
+- Peaker heat rates in Btu/kWh HHV interpolate between representative equipment vintages:
+  20,000 (1941), 17,500 (1957), 14,700 (1970), 13,300 (1980), 11,000 (1990), 9,905 (2019)
+  and 9,142 (2023 onward). Early combustion turbines and GE Frame 5/7 models anchor the older
+  estimates. The last two values come from EIA's F-class and H-class references. New builds
+  keep the heat rate quoted at purchase. Inherited assets use their commissioning year.
+  [ASME Neuchâtel history](https://www.asme.org/wwwasmeorg/media/ResourceFiles/AboutASME/Who%20We%20Are/Engineering%20History/Landmarks/135-Neuchatel-Gas-Turbine.pdf),
+  [GE turbine history](https://www.gevernova.com/content/dam/gepower-pgdp/global/en_US/documents/technical/ger/ger-3571h-perf-reliability-improvements-hdgt.pdf),
+  [EIA 2020](https://www.eia.gov/analysis/studies/powerplants/capitalcost/pdf/capital_cost_AEO2020.pdf),
+  [EIA 2025](https://www.eia.gov/analysis/studies/powerplants/capitalcost/pdf/capital_cost_AEO2025.pdf).
+- The steam quote uses a four-hour ramp to full output, four years of lead time, and $1,100/kW
+  in 2023 dollars at the reference size. The cost scales from a historical EPA 1 GW estimate
+  to a smaller representative project. Reference sizes of 25, 100 and 300 MW reflect increasing
+  unit sizes. The 70% quoted capacity factor represents baseload duty. A 40% minimum stable
+  output, 40-year life, 20 starts per year and 0.1 kgCO2e/W construction intensity are modeling
+  assumptions. NREL oil/gas steam benchmarks yield $35.89/kW-year of fixed O&M, $6.04/MWh of
+  variable O&M and about $48.77/MW per hot start after inflation adjustment.
+  [EPA startup data](https://nepis.epa.gov/Exe/ZyPURL.cgi?Dockey=9101EP5D.TXT),
+  [EPA project costs](https://nepis.epa.gov/Exe/ZyPURL.cgi?Dockey=9100H0IC.TXT),
+  [NREL operating costs](https://www.nrel.gov/docs/fy15osti/64072.pdf),
+  [NREL cycling costs](https://nrel.gov/docs/fy12osti/55433.pdf).
+
+### Other commercial technologies
 
 - Solar-plus-storage is commercially routine, but players can already construct the two facilities
   independently; a combined entry would duplicate their capabilities.

@@ -89,6 +89,8 @@ export interface Props {
   location: LocationType;
   height?: number;
   legend?: boolean;
+  /** Name external power without implying physical wires in territory scenarios. */
+  exchangeLabel?: string;
   /** Treat `height` as measured pixels. */
   exactHeight?: boolean;
   timeline: ChartData[];
@@ -112,6 +114,7 @@ interface State {
   currentMinute: number | null;
   minute: number;
   speed: SpeedType;
+  exchangeLabel?: string;
   sources: SupplySource[];
   bySource: number[][];
   supply: number[];
@@ -456,6 +459,7 @@ export function formatProductionTooltip(
     | "totalDemand"
     | "startingYear"
   > & {
+    exchangeLabel?: string;
     units?: UnitSystemType;
     shortfalls?: ShortfallInterval[];
     minute?: number;
@@ -468,9 +472,10 @@ export function formatProductionTooltip(
   const projected = d.minute >= (state.minute ?? 0);
   const watts = projected ? formatForecastWatts : formatWatts;
   const weather = productionWeather(d, state.units ?? "metric", projected);
+  const exchangeLabel = state.exchangeLabel ?? "Interties";
   const loads: Array<[string, number | undefined]> = [
     ["Storage charging", storageChargingW(d)],
-    ["Interties", d.exportedW],
+    [exchangeLabel, d.exportedW],
   ];
   const shortfall = shortfallTooltip(
     state.timeline,
@@ -482,7 +487,8 @@ export function formatProductionTooltip(
     time + shortfall,
     `Total supply: ${watts(state.supply[idx])}`,
     ...state.sources.map(
-      (source, i) => `${source}: ${watts(state.bySource[i][idx])}`,
+      (source, i) =>
+        `${source === "Interties" ? exchangeLabel : source}: ${watts(state.bySource[i][idx])}`,
     ),
     "",
     `Total load: ${watts(state.totalDemand[idx])}`,
@@ -508,6 +514,7 @@ const ChartSupplyDemand = (props: Props): React.JSX.Element => {
     timeline,
     location,
     fuelOrder = [],
+    exchangeLabel = "Interties",
   } = props;
   const {
     sources,
@@ -639,6 +646,7 @@ const ChartSupplyDemand = (props: Props): React.JSX.Element => {
         : currentMinute,
     minute: currentMinute,
     speed: props.speed ?? "PAUSED",
+    exchangeLabel,
     sources,
     bySource,
     supply,
@@ -655,7 +663,8 @@ const ChartSupplyDemand = (props: Props): React.JSX.Element => {
           items={[
             { name: "Demand", color: chartPalette().demand, dash: "8,4" },
             ...sources.map((source) => ({
-              name: SOURCE_LEGEND[source],
+              name:
+                source === "Interties" ? exchangeLabel : SOURCE_LEGEND[source],
               color: sourcePattern(source)
                 ? chartPalette().powerFlowPattern
                 : sourceColor(source),
@@ -706,14 +715,16 @@ const ChartSupplyDemand = (props: Props): React.JSX.Element => {
             source === "Storage"
               ? "Storage discharging"
               : source === "Interties"
-                ? "Interties importing"
+                ? exchangeLabel === "Interties"
+                  ? "Interties importing"
+                  : `${exchangeLabel} imports`
                 : source,
           ),
           ...fuels,
           "Total supply",
           "Demand",
           "Storage charging",
-          "Interties",
+          exchangeLabel,
           "Total load",
         ]}
         buildOptions={buildOptions}

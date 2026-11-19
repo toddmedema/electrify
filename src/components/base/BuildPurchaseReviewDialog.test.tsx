@@ -5,7 +5,8 @@ import type uPlot from "uplot";
 import { GENERATORS } from "../../data/Facilities";
 import { MINUTES_PER_MONTH } from "../../helpers/DateTime";
 import { createGame } from "../../testing/Simulator";
-import type { GameType } from "../../Types";
+import type { GameType, TerritoryId, TerritoryTileId } from "../../Types";
+import { availableTerritoryTiles } from "../../helpers/TerritoryTiles";
 import BuildPurchaseReviewDialog from "./BuildPurchaseReviewDialog";
 import { signature } from "./DeferredProjection";
 import {
@@ -27,19 +28,36 @@ interface StubWorker {
 }
 let workers: StubWorker[];
 
-function fixture() {
-  const game = createGame({ scenarioId: 100, seed: 12345 });
+function fixture(territoryNetwork = false) {
+  const game = createGame({
+    scenarioId: territoryNetwork ? 116 : 100,
+    seed: 12345,
+  });
+  if (territoryNetwork) {
+    game.territoryNetwork = {
+      version: 3,
+      landPurchases: [{ territoryId: "green-uplands", minute: 0, price: 18e6 }],
+      legacyConnections: [],
+    };
+  }
   const facility = GENERATORS(game, 50e6, [], []).find(
-    (quote) => quote.name === "Natural Gas Peaker",
+    (quote) =>
+      quote.name === (territoryNetwork ? "Wind" : "Natural Gas Peaker"),
   )!;
   const store = configureStore({ reducer: { game: () => game } });
-  const review = (state: GameType) => (
+  const review = (
+    state: GameType,
+    territoryId?: TerritoryId,
+    tileId?: TerritoryTileId,
+  ) => (
     <Provider store={store}>
       <BuildPurchaseReviewDialog
         open
         title="Build peaker?"
         game={state}
         facility={facility}
+        territoryId={territoryId}
+        tileId={tileId}
         cash={1e12}
         buildCost={facility.buildCost}
         interestRate={0.05}
@@ -56,8 +74,15 @@ const flush = () => act(() => jest.advanceTimersByTime(100));
 const chartState = () => jest.mocked(UPlotChart).mock.calls.at(-1)![0].state;
 function reply(index: number) {
   const worker = workers[index];
-  const { requestId, game, facility } = worker.postMessage.mock.calls[0][0];
-  const result = computeOutlook("buildImpact", game, facility)!;
+  const { requestId, game, facility, territoryId, tileId } =
+    worker.postMessage.mock.calls[0][0];
+  const result = computeOutlook(
+    "buildImpact",
+    game,
+    facility,
+    territoryId,
+    tileId,
+  )!;
   act(() => worker.onmessage?.({ data: { requestId, result } }));
   return result;
 }
@@ -186,8 +211,15 @@ it("replaces an imported run's estimate even when its projection signature match
 it.each(["unavailable", "blocked"])(
   "shows the synchronous forecast when worker startup is %s",
   (failure) => {
-    const { game, facility, review } = fixture();
-    const expected = computeOutlook("buildImpact", game, facility)!;
+    const { game, facility, review } = fixture(true);
+    const tile = availableTerritoryTiles(game, facility, "green-uplands")[1];
+    const expected = computeOutlook(
+      "buildImpact",
+      game,
+      facility,
+      "green-uplands",
+      tile.id,
+    )!;
     if (failure === "unavailable") {
       global.Worker = undefined as unknown as typeof Worker;
       factory.mockImplementation(() => new Worker(""));
@@ -196,7 +228,7 @@ it.each(["unavailable", "blocked"])(
         throw new Error("worker blocked");
       });
     }
-    render(review(game));
+    render(review(game, "green-uplands", tile.id));
     expect(screen.getByRole("status")).toHaveTextContent(
       "Estimating grid impact",
     );
@@ -208,3 +240,57 @@ it.each(["unavailable", "blocked"])(
     expect(facts).not.toHaveTextContent("Estimating…");
   },
 );
+
+it("refreshes the same quote when its build destination changes and ignores the previous reply", () => {
+  const { game, facility, review } = fixture(true);
+  const view = render(review(game, "champlain"));
+  flush();
+  const initial = reply(0);
+  expect(chartState()).toEqual(initial);
+  expect(workers[0].postMessage.mock.calls[0][0].territoryId).toBe("champlain");
+
+  view.rerender(review(game, "green-uplands"));
+  expect(screen.getByRole("status")).toHaveTextContent(
+    "Estimating grid impact",
+  );
+  flush();
+  expect(factory).toHaveBeenCalledTimes(2);
+  expect(workers[0].terminate).toHaveBeenCalledTimes(1);
+  expect(workers[1].postMessage.mock.calls[0][0].territoryId).toBe(
+    "green-uplands",
+  );
+  reply(0);
+  expect(screen.getByRole("status")).toBeInTheDocument();
+  const refreshed = reply(1);
+  expect(refreshed).toEqual(
+    computeOutlook("buildImpact", game, facility, "green-uplands"),
+  );
+  expect(chartState()).toEqual(refreshed);
+});
+
+it("refreshes a forecast when only the selected physical tile changes", () => {
+  const { game, facility, review } = fixture(true);
+  const [first, second] = availableTerritoryTiles(game, facility, "champlain");
+  expect(first).toBeDefined();
+  expect(second).toBeDefined();
+  const view = render(review(game, "champlain", first.id));
+  flush();
+  reply(0);
+  expect(workers[0].postMessage.mock.calls[0][0].tileId).toBe(first.id);
+
+  view.rerender(review(game, "champlain", second.id));
+  expect(screen.getByRole("status")).toHaveTextContent(
+    "Estimating grid impact",
+  );
+  flush();
+  expect(factory).toHaveBeenCalledTimes(2);
+  expect(workers[0].terminate).toHaveBeenCalledTimes(1);
+  expect(workers[1].postMessage.mock.calls[0][0].tileId).toBe(second.id);
+  reply(0);
+  expect(screen.getByRole("status")).toBeInTheDocument();
+  const refreshed = reply(1);
+  expect(refreshed).toEqual(
+    computeOutlook("buildImpact", game, facility, "champlain", second.id),
+  );
+  expect(chartState()).toEqual(refreshed);
+});

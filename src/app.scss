@@ -450,7 +450,7 @@ html:is(:not([data-touch-input="true"]), [data-controller-input="true"]) {
     main:not([inert])
     #menuCard:not(:focus-within)
     .mainActions
-    .MuiButton-root:first-child {
+    [data-main-action] {
     background-color: var(--interactive-blue);
     color: var(--interactive-contrast);
     // The fill carries selection, including when a controller moves real focus.
@@ -488,7 +488,7 @@ html[data-touch-input="true"]:not([data-controller-input="true"]) #menuCard {
   }
 
   // Keep the next action prominent while tapping resources or returning from another screen.
-  #centeredMenu .mainActions .MuiButton-root:first-child {
+  #centeredMenu .mainActions [data-main-action] {
     background-color: var(--interactive-blue);
     color: var(--interactive-contrast);
 
@@ -8903,23 +8903,258 @@ option {
 }
 
 .powerAgreements {
-  margin-top: 16px;
-  padding-top: 16px;
-  border-top: 1px solid var(--border-subtle);
   overflow-wrap: anywhere;
   .powerAgreement {
-    padding: 12px 0;
+    padding: 16px 0;
     border-bottom: 1px solid var(--border-subtle);
-    margin-bottom: 12px;
-    button {
+    > p + p {
+      margin-top: 4px;
+    }
+    &:last-child {
+      border-bottom: 0;
+    }
+    button,
+    summary {
       min-height: 40px;
-      margin-top: 8px;
+    }
+  }
+  .powerAgreementHeading {
+    margin: 0 0 8px;
+    font-size: var(--font-size-body1);
+    font-weight: var(--font-weight-emphasis);
+    line-height: 1.5;
+  }
+  .powerAgreementStatus {
+    color: var(--font-color-faded);
+    font-size: var(--font-size-body2);
+    font-weight: var(--font-weight-regular);
+  }
+  .powerAgreementMetrics {
+    font-variant-numeric: tabular-nums;
+  }
+  .powerAgreementMinimum {
+    font-size: var(--font-size-caption);
+  }
+  .powerAgreementActions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 4px 8px;
+    margin-top: 8px;
+    > button {
+      flex: 0 1 auto;
+    }
+  }
+  .powerAgreementDetails {
+    flex: 1 1 auto;
+    min-width: 0;
+    summary {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: fit-content;
+      padding: 0 8px;
+      color: var(--interactive-strong);
+      font-size: var(--font-size-body2);
+      font-weight: var(--font-weight-emphasis);
+      cursor: pointer;
+      border-radius: var(--radius-md);
+      list-style: none;
+      &::-webkit-details-marker {
+        display: none;
+      }
+      &::after {
+        content: "+";
+      }
+      &:hover {
+        background: var(--interactive-tint);
+      }
+      &:focus-visible {
+        outline: 2px solid var(--focus-ring);
+        outline-offset: 2px;
+      }
+    }
+    &[open] {
+      flex-basis: 100%;
+      summary::after {
+        content: "−";
+      }
+    }
+  }
+  .powerAgreementDetailBody {
+    display: grid;
+    gap: 4px;
+    padding-top: 8px;
+    button {
+      justify-self: start;
+      padding-left: 0;
+      padding-right: 0;
     }
   }
   @media (pointer: coarse) {
-    .powerAgreement button {
+    .powerAgreement button,
+    .powerAgreement summary {
       min-height: 44px;
     }
+  }
+}
+.powerAgreementPortfolio {
+  & + & {
+    padding-top: 16px;
+    margin-top: 8px;
+    border-top: 1px solid var(--border-subtle);
+  }
+  > h3 {
+    color: var(--font-color-faded);
+  }
+}
+
+// Across the Valley: territory ownership, finite sites, and purchase agreements.
+.territoryViewTabs {
+  flex: 0 0 auto;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.territoryWorkspace {
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+}
+.territoryAgreements {
+  padding: 16px;
+}
+.territoryDetail {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  > header {
+    padding: 16px;
+    background: var(--bg-raised);
+  }
+  > header p {
+    margin-top: 8px;
+  }
+  .transmissionFleet,
+  .transmissionPanel {
+    border-top: 1px solid var(--border-subtle);
+  }
+  .transmissionPanel .cardList {
+    overflow: visible;
+  }
+  .constructionBuildHeader {
+    padding: 12px;
+  }
+}
+.territoryBalance {
+  margin: 0;
+  padding: 8px 16px;
+  > div {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 0;
+  }
+  dt {
+    color: var(--font-color-faded);
+    font-size: 13px;
+  }
+  dd {
+    margin: 0;
+    font-weight: 600;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+  .territoryShortage {
+    color: var(--delta-bad);
+    dt {
+      color: inherit;
+    }
+  }
+}
+.territoryLineReading {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 16px;
+  background: var(--bg-raised);
+  font-size: 12px;
+  meter {
+    width: 100%;
+    height: 12px;
+    accent-color: var(--interactive-blue);
+  }
+  > span {
+    color: var(--font-color-faded);
+  }
+}
+.territorySites {
+  padding: 16px;
+  > div {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 8px 0;
+    font-size: 12px;
+  }
+  strong {
+    text-align: right;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+  small {
+    display: block;
+    margin-top: 4px;
+    color: var(--font-color-faded);
+    font-weight: 400;
+  }
+}
+.territoryBuildActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0 16px 16px;
+  > .MuiButton-root:first-child {
+    flex: 1;
+  }
+}
+.territoryAgreements {
+  > p {
+    margin: 8px 0 16px;
+  }
+}
+.territoryBuildDestination {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+  > .MuiTypography-root {
+    display: block;
+    margin-top: 8px;
+  }
+}
+.facilityTerritoryLabel {
+  color: var(--font-color-faded);
+  font-size: 11px;
+  font-weight: 400;
+  margin-left: 8px;
+}
+@media (max-width: 599px) {
+  .territoryAgreements {
+    padding: 12px;
+  }
+  .territoryDetail > header,
+  .territorySites {
+    padding: 12px;
+  }
+  .territoryBalance {
+    padding: 8px 12px;
+  }
+  .territoryBuildActions {
+    padding: 0 12px 12px;
+  }
+  .territoryBuildActions > .MuiButton-root {
+    min-height: 44px;
+  }
+  .facilityTerritoryLabel {
+    display: block;
+    margin-left: 0;
   }
 }
 

@@ -3,8 +3,16 @@ import * as Weather from "../../data/Weather";
 import * as Economy from "../../data/Economy";
 import * as FuelPrices from "../../data/FuelPrices";
 import { createGame } from "../../testing/Simulator";
+import { TICKS_PER_MONTH } from "../../Constants";
 import { tickState } from "../../reducers/Game";
 import { parseSave, serializeSave } from "../../SaveGame";
+import { currentTick } from "../../helpers/GameSelectors";
+import {
+  landPurchaseQuote,
+  purchaseLand,
+  tilePrice,
+} from "../../helpers/Territories";
+import { ownsTerritoryTile } from "../../helpers/TerritoryTiles";
 import cardReducer, {
   initialCard,
   navigate,
@@ -20,6 +28,50 @@ import {
   weatherFailureMessage,
   mapDispatchToProps,
 } from "./LoadingContainer";
+
+it("restores land bought at a dated price and rejects forged prices after the economy loads", async () => {
+  const game = createGame({ scenarioId: 116, seed: 12345 });
+  for (let i = 0; i < TICKS_PER_MONTH; i++) tickState(game);
+  currentTick(game)!.cash = 3e9;
+  const { territoryId, tileId, quoteKey, price } = landPurchaseQuote(game)!;
+  expect(price).not.toBe(tilePrice(game, 0, tileId));
+  expect(purchaseLand(game, { territoryId, quoteKey })).toBe(true);
+  const wire = JSON.parse(JSON.stringify(serializeSave(game)));
+  const economy = jest.spyOn(Economy, "initEconomy");
+  const available = jest.spyOn(Economy, "hasEconomy");
+  const fuel = jest
+    .spyOn(FuelPrices, "initFuelPrices")
+    .mockImplementation((done) => done?.());
+  const weather = jest
+    .spyOn(Weather, "initWeather")
+    .mockImplementation((_location, done) => done?.());
+  try {
+    economy.mockImplementation((done) => {
+      available.mockReturnValue(true);
+      done?.();
+    });
+    for (const forged of [false, true]) {
+      if (forged) wire.game.territoryNetwork.tilePurchases[0].price += 1e6;
+      available.mockReturnValue(false);
+      const parsed = parseSave(wire);
+      expect(parsed).not.toBeNull();
+      expect(ownsTerritoryTile(parsed!.game, tileId)).toBe(true);
+      const dispatch = jest.fn();
+      const onError = jest.fn();
+      await mapDispatchToProps(dispatch as never).load(parsed!.game, onError);
+      expect(dispatch.mock.calls).toEqual(forged ? [] : [[loaded()]]);
+      expect(onError.mock.calls).toEqual(
+        forged ? [[expect.stringContaining("land purchase history")]] : [],
+      );
+      expect(parseSave(wire) === null).toBe(forged);
+    }
+  } finally {
+    available.mockRestore();
+    economy.mockRestore();
+    fuel.mockRestore();
+    weather.mockRestore();
+  }
+});
 
 it.each([
   [2, false],

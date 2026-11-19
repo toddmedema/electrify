@@ -61,8 +61,10 @@ it.each(["screen", "help"])(
     );
     const instance = compositor.current;
     try {
+      // Flush the mocked import and React's Suspense retry before inspecting the screen.
+      await act(async () => undefined);
       if (kind === "help") {
-        const workspace = await screen.findByRole("button", {
+        const workspace = screen.getByRole("button", {
           name: "Retained workspace 0",
         });
         fireEvent.click(workspace);
@@ -75,12 +77,12 @@ it.each(["screen", "help"])(
             />
           </Provider>,
         );
+        await act(async () => undefined);
       }
-      expect(await screen.findByRole("dialog")).toHaveTextContent(
-        "couldn't load",
-      );
+      expect(screen.getByRole("dialog")).toHaveTextContent("couldn't load");
       fireEvent.click(screen.getByRole("button", { name: "Retry" }));
-      expect(await screen.findByText(`Recovered ${kind}`)).toBeVisible();
+      await act(async () => undefined);
+      expect(screen.getByText(`Recovered ${kind}`)).toBeVisible();
       expect(kind === "screen" ? mockScreenAttempts : mockHelpAttempts).toBe(2);
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
       expect(compositor.current).toBe(instance);

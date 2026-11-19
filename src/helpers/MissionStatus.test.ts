@@ -25,6 +25,18 @@ import { store } from "../Store";
 
 const wildfire = SCENARIOS.find((s) => s.id === 111)!;
 
+it("keeps the acquisition goal short without changing its two eligible competitors", () => {
+  const game = createGame({ scenarioId: 116, seed: 188 });
+  const objective = getMissionStatus(game).requirements.find(
+    (item) => item.id === "acquire-neighbor",
+  )!;
+  expect(objective.compact).toBe("Acquire a competitor");
+  expect(objective.target).toBe(
+    "Acquire Valley Electric or Ridge Electric · Dec 2014",
+  );
+  expect(objective.status).toBe("pending");
+});
+
 const createNextState = (
   game: GameType,
   recipe: (game: GameType) => void,

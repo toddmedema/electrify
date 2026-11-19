@@ -9,7 +9,7 @@ import { selectProjection } from "./Projection";
 import { currentTick } from "./GameSelectors";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "./DateTime";
 
-it("shows both dated offers without permitting an unconnected purchase or mutating the game", () => {
+it("shows executable dated offers without a wire and rejects forged terms without mutation", () => {
   const game = createGame({
     scenarioId: 116,
     difficulty: "Employee",
@@ -22,7 +22,9 @@ it("shows both dated offers without permitting an unconnected purchase or mutati
     expect(offer.assumedDebt).toBe(target.assumedDebt);
     expect(offer.facilities).toHaveLength(3);
     expect(offer.contracts.length).toBeGreaterThan(0);
-    expect(acquisitionQuote(game, target.id)).toBeUndefined();
+    expect(acquisitionQuote(game, target.id)).toMatchObject({
+      targetId: target.id,
+    });
     expect(
       transferUtility(game, {
         targetId: target.id,

@@ -1,3 +1,4 @@
+import { facilityConstructionReview } from "../helpers/FacilityConstructionReview";
 import "../Store";
 import { TextEncoder } from "util";
 import { webcrypto } from "crypto";
@@ -5,7 +6,7 @@ import { ReplicaRuntime } from "./ReplicaRuntime";
 import type { ReplicaRequest, ReplicaResponse } from "./ReplicaProtocol";
 import type { ReplicaBaseline } from "./Replication";
 import { ReplicatedWorld } from "./Replication";
-import { createWorld } from "./World";
+import { applyCommand, createWorld } from "./World";
 import { loadSimData } from "../testing/SimData";
 import { modScenario } from "../mods/ModScenario";
 import { modBrowseSummary } from "./ModBrowse";
@@ -31,6 +32,10 @@ import type { WorkerRequest, WorkerResponse } from "./WorkerProtocol";
 import { COOP_TEST_SPEC } from "../testing/MultiplayerFixtures";
 import { DEFAULT_CUSTOM_SCENARIO } from "../data/Scenarios";
 import { coopSelection } from "./Choosing";
+import { getBuildFacilityQuote } from "../data/Facilities";
+import { UTILITY_AREAS } from "../data/UtilityExpansion";
+import { availableTerritoryTiles } from "../helpers/TerritoryTiles";
+import { currentTick } from "../helpers/GameSelectors";
 
 const host = "host",
   guest = "guest";
@@ -1993,7 +1998,86 @@ test("a host treats a guest sleep save request as a safety stop requiring fresh 
   f.session.dispose();
 });
 
-test("build submission uses the company fleet in its authoritative wire command", async () => {
+test.each([
+  {},
+  { territoryId: "champlain" },
+  { tileId: "champlain:site-13" },
+  { territoryId: "champlain", tileId: "champlain:site-13" },
+])(
+  "build submission preserves destination %j and strips client economics",
+  async (destination) => {
+    const f = fixture();
+    await f.session.initialize();
+    await deliver(f, { grids: ownGrid() });
+    const submitted = f.session.submit({
+      kind: "action",
+      name: "buildFacility",
+      payload: {
+        facility: { name: "Wind", peakW: 50e6, buildCost: 1 },
+        financed: true,
+        ...destination,
+        quotedCost: 1,
+        operatingAreaId: "untrusted",
+      },
+    });
+    expect(sentCommands(f)).toEqual([
+      {
+        kind: "action",
+        name: "buildFacility",
+        payload: {
+          facility: {
+            name: "Wind",
+            peakW: 50e6,
+            peakWh: undefined,
+            gasCycle: undefined,
+            resilience: undefined,
+          },
+          financed: true,
+          ...destination,
+        },
+      },
+    ]);
+    await deliver(f, {
+      revision: 2,
+      lastSequence: 1,
+      receipt: { sequence: 1 },
+      grids: ownGrid(),
+    });
+    await submitted;
+    f.session.dispose();
+  },
+);
+
+test("the host builds the exact project site selected through a public session", async () => {
+  loadSimData(UTILITY_AREAS.champlain.location);
+  const world = createWorld(
+    { scenarioId: 116, difficulty: "Employee" },
+    [
+      { id: host, name: "Host" },
+      { id: guest, name: "Guest" },
+    ],
+    "match",
+    "epoch",
+  );
+  const game = world.grids[1];
+  currentTick(game)!.cash = 1e9;
+  const project = getBuildFacilityQuote(game, { name: "Wind", peakW: 20e6 })!;
+  const sites = availableTerritoryTiles(game, project, "champlain");
+  expect(sites.length).toBeGreaterThan(1);
+  const target = sites[sites.length - 1];
+  const quote = getBuildFacilityQuote(
+    game,
+    project,
+    target.territoryId,
+    target.id,
+  )!;
+  const reviewKey = facilityConstructionReview(
+    game,
+    quote,
+    false,
+    target.id,
+  ).key;
+  const beforeIds = new Set(game.facilities.map(({ id }) => id));
   const f = fixture();
   await f.session.initialize();
   await deliver(f, { grids: ownGrid() });
@@ -2001,25 +2085,32 @@ test("build submission uses the company fleet in its authoritative wire command"
     kind: "action",
     name: "buildFacility",
     payload: {
-      facility: { name: "Wind", peakW: 50e6, buildCost: 1 },
-      financed: true,
+      facility: { ...project, buildCost: 1, yearsToBuild: 0 },
+      financed: false,
+      territoryId: target.territoryId,
+      tileId: target.id,
+      reviewKey,
     },
   });
-  expect(sentCommands(f)).toEqual([
-    {
-      kind: "action",
-      name: "buildFacility",
-      payload: {
-        facility: {
-          name: "Wind",
-          peakW: 50e6,
-          peakWh: undefined,
-          gasCycle: undefined,
-          resilience: undefined,
-        },
-        financed: true,
-      },
-    },
+  expect(sentCommands(f)[0]).toMatchObject({ payload: { reviewKey } });
+  expect(
+    applyCommand(world, guest, {
+      matchId: world.matchId,
+      epoch: world.epoch,
+      sequence: 1,
+      command: sentCommands(f)[0],
+    }),
+  ).toBeUndefined();
+  expect(
+    world.grids[1].facilities.filter(({ id }) => !beforeIds.has(id)),
+  ).toEqual([
+    expect.objectContaining({
+      name: project.name,
+      territoryId: target.territoryId,
+      tileId: target.id,
+      buildCost: quote.buildCost,
+      yearsToBuildLeft: quote.yearsToBuild,
+    }),
   ]);
   await deliver(f, {
     revision: 2,

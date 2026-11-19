@@ -1,20 +1,79 @@
 # Across the Valley
 
 Scenario 116 is a fictional Vermont Investor utility, January 2005–December 2024.
-A completed Tier-1 connection to Valley Electric or Ridge Electric unlocks that
-utility's acquisition. Optional upgrades buy transfer capacity, not permission to
-acquire. Human co-op companies remain independent.
+Acquire Valley Electric or Ridge Electric directly, sign finite power agreements,
+build facilities and connect individual tiles for customers or new building sites.
+All owned customers and facilities share one company power pool. Location controls
+finite suitable sites. Connecting uses the existing tile price; there is no
+additional line project, transfer bottleneck or recurring connection fee. Human
+co-op companies remain independent, with new empty-land claims accepted once in
+host command order.
 
-Champlain starts with an operating 300 MW regional connection carrying its
-inherited nuclear and Québec hydro power purchase agreements. Buying Valley or
-Ridge adds that company's operating regional connection and original agreements.
-These inherited interfaces are separate from the expansion projects needed for
-acquisition. Contracts, replacement offers, shared capacity and market fallback
-are documented in [Physical interties and power purchase agreements](power-agreements.md).
+Inherited nuclear and Québec hydro commitments retain their original dates.
+Acquisition transfers plants, customers, sites, debts and third-party obligations;
+a PPA with the acquired seller ends as an external delivery/charge. Visible unowned
+tiles touching physically owned company land are purchasable; a PPA extends sight
+without granting purchase adjacency. General land, mixed-demand cities, and
+special hydro or geothermal sites have distinct cash prices and benefits. See
+[territories](territories.md) for site budgets, accounting and legacy-save conversion.
+
+The map uses a low-poly 3D hex board, following the visual direction in
+[issue 603](https://github.com/toddmedema/electrify/issues/603). Small, medium and large cities indicate
+customers. Plains, forest, hills, mountain, river and lake are illustrated
+terrain meshes, with separate upright cities, generators, storage and towers.
+The simulated day drives sun/moon lighting and simple shadows. Devices without
+WebGL2 retain the simplified illustrated map; see [the 3D style](map-3d-style.md).
+Each hex holds one facility or a city; construction reserves its slot immediately.
+Independent utilities show their authored starting fleet. Empty developed hexes
+show towers and automatic wires to adjacent developed cells of the same utility.
+Selecting an individual hex opens its floating facility, city or construction
+surface. Empty owned tiles select their build destination automatically. The Rapid connection mode
+icon toggles repeated connections with visible prices along owned borders.
+**Build** lets players choose a technology and size first, then compare compatible
+connected and unconnected sites. Inspection spends nothing. The selected site
+shows connection and project costs, expected output and commissioning date; only
+explicit confirmation connects the site and starts construction.
+The map stays visible while Fleet, Agreements and the other dock icons open one
+inspection or tool panel; selecting the active icon closes that panel. There is no
+separate Map button. Acquiring land
+or connecting to a utility reveals up to three hexes farther into the fixed
+196-hex board, with progressively faded terrain and structures. Coordinate-based
+generation restores terrain recorded in older saves. The wires are visual and add
+no transmission management. Utility names
+float above their land, with the player labeled “You” and distinct ownership borders.
+Neutral land has no proper name; symbols show its benefit. Native map buttons support
+keyboard, touch and controller selection without a numbered key.
+
+## Champlain Valley-inspired geography
+
+The board is a schematic, not a surveyed map, a fixed-area GIS grid or a
+reconstruction of 2005 utility boundaries. The
+[Vermont biophysical regions map](https://efotg.sc.egov.usda.gov/references/public/VT/Bio_Region.pdf)
+and [Lake Champlain Basin Program topography](https://atlas.lcbp.org/nature-environment/geology/)
+provide its broad organizing pattern: western lake and lowlands rising toward the
+Green Mountains in the east. Existing river cells suggest the Winooski settlement
+corridor. They do not trace its course or establish real plant locations.
+
+The authored override map in `src/data/TerritoryTiles.ts` makes Champlain sites
+1–7, 12 and 13 plains, together with green-uplands sites 2, 3 and 6. Valley sites
+3 and 8 and Ridge site 10 form additional mountain ground to the east. Existing
+forest pockets, both western lake cells, river cells and inherited wind terrain
+remain. No water cell consumes an existing land reservation, and no ocean, hydro
+claim or geothermal resource is added. A fixed border of versioned terrain
+cells rounds out the authored board.
+
+The authored cities represent Burlington on the lake side of the board, Winooski
+on the river to its northeast, and Williston to the southeast. Vergennes and
+Middlebury extend the western settlement corridor southward, with Bristol
+inland and Waterbury farther east. The
+[Vermont municipal map and population counts](https://outside.vermont.gov/dept/sos/Services/LAB/LAB%20Senate%20Map%20FINAL%20SMD%202021%201129.pdf)
+guide relative placement and the small, medium, and large artwork tiers. The
+utilities retain their fictional service-area customer totals and their existing
+location metadata. The four smaller settlements each have a local utility and neighboring generation.
 
 ## Authored portfolios and historical references
 
-The three utilities, their ownership, acquisition prerequisite, fleet capacities,
+The three utilities, their ownership, fleet capacities,
 asset ages, source entitlements, network costs, prices, deadlines and geographic
 service areas are game assumptions from [issue 683](https://github.com/toddmedema/electrify/issues/683).
 They are not a reconstruction of Green Mountain Power, Central Vermont Public
@@ -35,7 +94,7 @@ converts these to approximately $410M and $200M in 2005 dollars, using
 195.3/224.939. These are valuation references, not exact adjusted closing cash.
 All acquisition prices, assumed debt, fees and service-network O&M are authored
 2005-dollar values; the transaction indexes once to its purchase month's nominal
-money. Plant quotes and intertie costs retain their existing owners.
+money. Plant quotes retain their existing pricing owner.
 
 The $0.105/kWh retail-style rate accompanies explicit service-network O&M; no
 additional generation-share discount applies. Assumed loans use 5% fixed interest
@@ -84,7 +143,8 @@ mix; it does not keep its own customer population, weather or dispatch.
 Old callers retain their original demand calculation exactly. Later regional
 end-use trends continue normally; no data-center or mining block is scheduled.
 Acquired facilities join the existing fleet and use the same operating-area
-weather. Acquisitions do not add weather diversification.
+weather. Local [terrain modifiers](terrain-modifiers.md) adjust onshore wind speed
+and construction costs across technologies.
 
 Existing Champlain and Valley hydro plants have bounded, explicitly fictional
 inherited inventory claims. The catalogue provenance names the issue rather than
@@ -139,23 +199,20 @@ simulation, forecasts and company offers use the same `utilityNetworkAnnualOM`
 owner. Offers show the incremental combined-company cost, which can differ from
 the seller's standalone cost.
 
-The fictional purchased-power changes are visible before buying a connection:
+The dated purchased-power changes are visible before acquiring a utility.
 Valley's nuclear right falls from 160 to 80 MW in January 2017 (152 to 76 MW
 deliverable). In January 2020, Champlain's 100 MW nuclear right ends, both Québec
 rights fall from 120 to 60 MW (114 to 57 MW deliverable), and Ridge's firm pool
-falls from 40 to 20 MW (38 to 19 MW deliverable). The remaining agreements keep
-their existing real prices. These changes reduce contracted coverage; the
-physical connections remain available for uncovered purchases at regional market
-prices and availability. Players can review replacement agreements on the
-connection, use the market or build their own supply. Contracted and market
-purchases share the same wire and source limits. The Valley reminder arrives in
+falls from 40 to 20 MW (38 to 19 MW deliverable). Remaining agreements retain
+their existing real prices. Players must sign finite replacements or build supply;
+there is no unlimited regional-market fallback. The Valley reminder arrives in
 2013, and the common 2020 change is announced in 2016.
 
-Both companies' read-only terms can be inspected before the connection purchase.
-They show a dated offer, the existing company's and seller's future contract
-changes, and the separate acquisition obligation. Finishing the connection makes
-the acquisition review action directly visible. Only the existing owning purchase
-API can transfer a company, with a completed line and a fresh executable quote.
+Both companies' offers can be inspected directly from the territory map. They
+show dated terms, future contract changes, and the separate acquisition obligation.
+The owning purchase API requires a fresh executable quote and funds, with no
+connection prerequisite. Agreements display forecasted cash impact against
+omitting the agreement rather than assuming unlimited substitute purchases.
 
 Scenario's Supply plan shares the existing tariff-sensitive projection. It shows
 the next year's customer count and peak demand, the first projected month below
@@ -176,7 +233,7 @@ utility ownership and dated seller contracts belong to the expansion base.
 The reusable fixture is `src/testing/UtilityExpansionBalanceFixtures.ts`; the
 runner is `src/testing/UtilityExpansionBalance.sim.test.tsx`. Full authoring
 coverage uses seeds 12345, 1 and 7 at every difficulty: each target with cash and
-financed purchases, firm and mixed portfolios, line-only and unprepared controls,
+financed purchases, firm and mixed portfolios, independent-generation and unprepared controls,
 and an optional purchase of both targets.
 
 ```sh
@@ -190,34 +247,21 @@ transactions, timed obligations and outcomes. Early losses are not evidence abou
 later events. Current-format saves persist the aggregate customer and market
 totals, transaction and financial ledgers, and one forecast timeline.
 
-The pre-PPA renewal revision passed all 195 cases in the full matrix, including
-135 prepared plans, plus 24 pressure and acquisition-window cases. Those historical
-results included the since-removed 2015 and 2020 upkeep multipliers. A frozen
-baseline confirmed that its inherited-only Employee routes were fired in month
-183 on all three seeds. That result depended on withdrawn agreements also removing
-effective import access. With explicit retained regional connections, those
-routes can purchase uncovered energy from the market. The pressure suite now
-checks falling contracted delivery, increasing market purchases and retained
-physical capacity across complete 2019 and 2020 years. Its prepared CEO cases
-continue to check acquisitions in January, March and May 2014.
+The land-development playbook buys one tile in the original larger general-land
+area for one seventh of its former $18M cash price, builds 100 MW of wind there,
+and completes the 240-month scenario
+alongside a prepared Valley acquisition at every difficulty. The land purchase
+reduces cash available for facilities while its non-depreciating value preserves
+net worth. Separate controls check that unused finite agreements still charge
+their minimum and that signing a neighbor PPA cannot create duplicate power
+after buying its seller.
 
-The following seed-12345 figures record the earlier renewal revision, before
-explicit regional connections and generic PPA market fallback. They include an
-additional investment and a later cash acquisition, so they are complete strategy
-outcomes rather than an isolated cost sensitivity.
-
-| CEO prepared route     | Original ending cash | Revised ending cash | Original / revised builds |
-| ---------------------- | -------------------: | ------------------: | ------------------------: |
-| Valley, firm, financed |              $3.531B |             $2.121B |                     5 / 6 |
-| Valley, mixed, cash    |              $2.860B |             $1.391B |                     5 / 6 |
-| Ridge, mixed, cash     |              $2.488B |             $1.391B |                     5 / 6 |
-| Both, firm, financed   |              $3.873B |             $2.225B |                     7 / 8 |
-
-In that pre-PPA revision, the two CEO mixed cash plans added $124–184M annually
-during 2020–24. The design does not impose a terminal cash cap or a universal
-construction quota. Current pressure checks exercise retained-wire market
-fallback and viable neighboring cash purchase dates, rather than treating lower
-final cash or the former forced shortage date as the balance criterion.
+Prepared cash and financed portfolios retain their full-term service, retirement,
+retention and financial-invariant checks. Unprepared acquisition controls must
+expose the 2020 loss of contracted coverage instead of receiving free replacement
+market access. CEO cash plans also exercise neighboring acquisition dates in
+January, March and May 2014. Report current integrated outcomes with the PR;
+historical physical-routing results do not establish this revision's balance.
 
 The save regression uses a normal first-year rollover with inactive optional
 customer-battery meters, raw validation before JSON normalization, and a full

@@ -15,3 +15,23 @@ test("ordinary custom saves round trip without accepting stored native rules", (
   expect(parseSave(forged)).toBeNull();
   expect(parseSave(source)).not.toBeNull();
 });
+
+test("a custom 1980 game can start with gas steam and restore its vintage", () => {
+  const scenario = {
+    ...DEFAULT_CUSTOM_SCENARIO,
+    startingYear: 1980,
+    facilities: [
+      { name: "Natural Gas Steam", peakW: 100e6, initialAgeYears: 20 },
+    ],
+  };
+  const game = createGame({ scenarioId: scenario.id, scenario });
+  const restored = parseSave(JSON.parse(JSON.stringify(serializeSave(game))));
+  const boiler = restored?.game.facilities[0];
+  expect(boiler).toMatchObject({
+    name: "Natural Gas Steam",
+    gasCycle: "steam",
+    spinMinutes: 240,
+  });
+  // A 1960-vintage boiler is less efficient than a 1980 quote.
+  expect(boiler!.btuPerWh).toBeCloseTo(11.5625, 4);
+});

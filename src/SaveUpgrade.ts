@@ -1,5 +1,11 @@
+import {
+  legacyTerritoryTiles,
+  assignTerritoryTiles,
+  getTerritoryTile,
+} from "./helpers/TerritoryTiles";
 import type { BuyingRuleType, SellingRuleType, GameType } from "./Types";
 import { inheritedConnection } from "./helpers/PowerAgreements";
+import { facilityTerritoryId } from "./helpers/Territories";
 
 type DecodedSave = Record<string, unknown>;
 type Migration = (save: DecodedSave) => DecodedSave | null;
@@ -136,7 +142,255 @@ const migrations: readonly Migration[] = [
   // 11 -> 12: variable-duration monthly-energy terms are opt-in new promises only.
   // Preserve every existing v1/v2 receipt, inherited term, meter and recorded dollar.
   (save) => save,
-  // 12 -> 13: new coal repowers extend the upgrade record. Existing projects are unchanged.
+  // 12 -> 13: locate existing scenario116 assets without rewriting recorded history or accounts.
+  (save) => {
+    if (!object(save.game)) return null;
+    const game = save.game;
+    const custom = game.customScenario;
+    const base116 =
+      (game.scenarioId === 116 && custom === undefined) ||
+      (game.scenarioId === 999 &&
+        object(custom) &&
+        custom.id === 999 &&
+        object(custom.mod) &&
+        object(custom.mod.parameters) &&
+        custom.mod.parameters.baseScenarioId === 116);
+    if (!base116) return save;
+    if (
+      game.territoryNetwork !== undefined ||
+      !Array.isArray(game.facilities) ||
+      game.facilities.some(
+        (facility) => !object(facility) || facility.territoryId !== undefined,
+      )
+    )
+      return null;
+    return {
+      ...save,
+      game: {
+        ...game,
+        territoryNetwork: { version: 1 },
+        facilities: game.facilities.map((facility) => ({
+          ...facility,
+          territoryId: facilityTerritoryId(facility),
+        })),
+      },
+    };
+  },
+  // 13 -> 14: pool company power and convert every paid land project to immediate rights.
+  // Freeze retired project terms/capital/debt; refund nothing and preserve recorded history.
+  (save) => {
+    if (!object(save.game)) return null;
+    const game = save.game;
+    if (game.territoryNetwork === undefined) return save;
+    if (
+      !object(game.territoryNetwork) ||
+      game.territoryNetwork.version !== 1 ||
+      Object.keys(game.territoryNetwork).length !== 1 ||
+      !object(game.transmission) ||
+      !Array.isArray(game.transmission.lines) ||
+      !object(game.date)
+    )
+      return null;
+    const lines = game.transmission.lines;
+    if (lines.some((line) => !object(line))) return null;
+    const uplands = lines.find(
+      (line) => line.corridorId === "vt-champlain-uplands",
+    );
+    const legacyConnections = lines.filter(
+      (line) =>
+        typeof line.corridorId === "string" &&
+        !line.corridorId.startsWith("peer:"),
+    );
+    return {
+      ...save,
+      game: {
+        ...game,
+        territoryNetwork: {
+          version: 2,
+          landPurchases: uplands
+            ? [
+                {
+                  territoryId: "green-uplands",
+                  minute: uplands.minuteCreated,
+                  price: uplands.buildCost,
+                  legacy: true,
+                },
+              ]
+            : [],
+          legacyConnections,
+        },
+        transmission: {
+          ...game.transmission,
+          lines: lines.filter((line) => !legacyConnections.includes(line)),
+        },
+      },
+    };
+  },
+  // 14 -> 15: retain paid rights and their exact capital while allowing independent parcels.
+  (save) => {
+    if (!object(save.game)) return null;
+    const game = save.game;
+    if (game.territoryNetwork === undefined) return save;
+    if (
+      !object(game.territoryNetwork) ||
+      game.territoryNetwork.version !== 2 ||
+      Object.keys(game.territoryNetwork).length !== 3
+    )
+      return null;
+    if (
+      !Array.isArray(game.territoryNetwork.landPurchases) ||
+      game.territoryNetwork.landPurchases.length > 1 ||
+      game.territoryNetwork.landPurchases.some(
+        (receipt) =>
+          !object(receipt) || receipt.territoryId !== "green-uplands",
+      )
+    )
+      return null;
+    const multiplayer = object(game.multiplayer) ? game.multiplayer : undefined;
+    const { landOwner, ...retainedMultiplayer } = multiplayer ?? {};
+    return {
+      ...save,
+      game: {
+        ...game,
+        territoryNetwork: { ...game.territoryNetwork, version: 3 },
+        ...(multiplayer
+          ? {
+              multiplayer: {
+                ...retainedMultiplayer,
+                ...(landOwner !== undefined
+                  ? { landOwners: { "green-uplands": landOwner } }
+                  : {}),
+              },
+            }
+          : {}),
+      },
+    };
+  },
+  // 15 -> 16: split retained territory budgets into one city or one facility per hex.
+  (save) => {
+    if (!object(save.game)) return null;
+    if (save.game.territoryNetwork === undefined) return save;
+    if (
+      !object(save.game.territoryNetwork) ||
+      save.game.territoryNetwork.version !== 3 ||
+      !Array.isArray(save.game.facilities) ||
+      save.game.facilities.some(
+        (facility) =>
+          !object(facility) ||
+          !Number.isSafeInteger(facility.id) ||
+          (typeof facility.fuel !== "string" &&
+            typeof facility.peakWh !== "number") ||
+          typeof facility.peakW !== "number",
+      )
+    )
+      return null;
+    const game = {
+      ...save.game,
+      facilities: save.game.facilities.map((facility) => ({ ...facility })),
+    } as unknown as GameType;
+    if (!assignTerritoryTiles(game)) return null;
+    return { ...save, game };
+  },
+  // 16 -> 17: paid region receipts retain every original tile and exact finances.
+  // Freeze retained overflow footprints; new purchases record one cell in a separate ledger.
+  (save) => {
+    if (!object(save.game)) return null;
+    if (save.game.territoryNetwork === undefined) return save;
+    const state = save.game.territoryNetwork;
+    if (
+      !object(state) ||
+      state.version !== 3 ||
+      Object.keys(state).some(
+        (key) =>
+          ![
+            "version",
+            "landPurchases",
+            "legacyConnections",
+            "tilePurchases",
+          ].includes(key),
+      ) ||
+      !Array.isArray(state.landPurchases) ||
+      !Array.isArray(state.legacyConnections) ||
+      !Array.isArray(save.game.facilities) ||
+      !save.game.facilities.every(
+        (facility) =>
+          object(facility) &&
+          (facility.territoryId === undefined ||
+            typeof facility.territoryId === "string"),
+      ) ||
+      (state.tilePurchases !== undefined &&
+        (!Array.isArray(state.tilePurchases) || state.tilePurchases.length > 0))
+    )
+      return null;
+    return {
+      ...save,
+      game: {
+        ...save.game,
+        territoryNetwork: {
+          ...state,
+          tilePurchases: [],
+          legacyTiles: legacyTerritoryTiles({
+            facilities: (save.game as unknown as GameType).facilities,
+          }),
+        },
+      },
+    };
+  },
+  // 17 -> 18: purchases now require owned physical adjacency. Retain prior paid rights and
+  // installed offshore plants when the landlocked authored water is corrected to a lake.
+  (save) => {
+    if (!object(save.game)) return null;
+    if (save.game.territoryNetwork === undefined) return save;
+    const state = save.game.territoryNetwork;
+    if (
+      !object(state) ||
+      state.version !== 3 ||
+      Object.keys(state).length !== 5 ||
+      !Array.isArray(state.tilePurchases) ||
+      !Array.isArray(state.legacyTiles) ||
+      !Array.isArray(save.game.facilities) ||
+      state.tilePurchases.some(
+        (entry) =>
+          !object(entry) ||
+          Object.keys(entry).length !== 3 ||
+          !("tileId" in entry) ||
+          !("minute" in entry) ||
+          !("price" in entry),
+      ) ||
+      state.legacyTiles.some((entry) => !object(entry)) ||
+      save.game.facilities.some((entry) => !object(entry))
+    )
+      return null;
+    const game = save.game as unknown as GameType;
+    const legacyLakeOffshore = game.facilities.flatMap((facility) => {
+      const tile = getTerritoryTile(facility.tileId, game);
+      return facility.fuel === "Offshore Wind" &&
+        tile &&
+        (tile.id === "champlain:site-14" || tile.terrain === "ocean")
+        ? [{ facilityId: facility.id, tileId: tile.id }]
+        : [];
+    });
+    return {
+      ...save,
+      game: {
+        ...save.game,
+        territoryNetwork: {
+          ...state,
+          tilePurchases: state.tilePurchases.map((receipt) => ({
+            ...receipt,
+            legacy: true,
+          })),
+          legacyTiles: state.legacyTiles.map((tile) =>
+            tile.terrain === "ocean" ? { ...tile, terrain: "lake" } : tile,
+          ),
+          ...(legacyLakeOffshore.length ? { legacyLakeOffshore } : {}),
+        },
+      },
+    };
+  },
+  // Standing facilities can retain paid capacity work and reconcile it with acquisition terms.
+  (save) => save,
+  // 19 -> 20: coal repowers extend the upgrade record. Existing projects are unchanged.
   (save) => save,
 ];
 

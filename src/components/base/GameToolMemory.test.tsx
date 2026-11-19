@@ -20,31 +20,40 @@ beforeEach(() => {
   stopInput = rememberToolInput(() => inputMemory);
 });
 
-test("opening a detail remembers a scroll that has not dispatched its scroll event yet", () => {
-  function Tool() {
-    const [detail, setDetail] = React.useState(false);
-    const ref = useToolScroll<HTMLDivElement>(detail ? "detail" : "list");
-    return (
-      <div ref={ref} role="region" aria-label="Tool">
+test.each(["inside", "outside"])(
+  "a button %s the list remembers scroll before its scroll event",
+  (position) => {
+    function Tool() {
+      const [detail, setDetail] = React.useState(false);
+      const ref = useToolScroll<HTMLDivElement>(detail ? "detail" : "list");
+      const button = (
         <button onClick={() => setDetail(!detail)}>
           {detail ? "Back" : "Open detail"}
         </button>
-      </div>
+      );
+      return (
+        <>
+          {position === "outside" && button}
+          <div ref={ref} role="region" aria-label="Tool">
+            {position === "inside" && button}
+          </div>
+        </>
+      );
+    }
+    const memory = new Map<string, unknown>();
+    render(
+      <GameToolMemoryContext.Provider value={memory}>
+        <Tool />
+      </GameToolMemoryContext.Provider>,
     );
-  }
-  const memory = new Map<string, unknown>();
-  render(
-    <GameToolMemoryContext.Provider value={memory}>
-      <Tool />
-    </GameToolMemoryContext.Provider>,
-  );
-  const body = screen.getByRole("region", { name: "Tool" });
-  // Browsers dispatch scroll asynchronously, including when clicking scrolls a target into view.
-  body.scrollTop = 180;
-  fireEvent.click(screen.getByRole("button", { name: "Open detail" }));
-  fireEvent.click(screen.getByRole("button", { name: "Back" }));
-  expect(body.scrollTop).toBe(180);
-});
+    const body = screen.getByRole("region", { name: "Tool" });
+    // Browsers dispatch scroll asynchronously, including when clicking scrolls a target into view.
+    body.scrollTop = 180;
+    fireEvent.click(screen.getByRole("button", { name: "Open detail" }));
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
+    expect(body.scrollTop).toBe(180);
+  },
+);
 
 afterEach(() => {
   stopInput();

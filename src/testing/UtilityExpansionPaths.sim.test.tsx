@@ -200,6 +200,13 @@ function applyScheduled(
         },
       });
       break;
+    case "intertie-upgrade":
+      command(world, seat, {
+        kind: "action",
+        name: "upgradeTransmissionLine",
+        payload: { corridorId: action.corridorId, financed: action.financed },
+      });
+      break;
     case "acquire": {
       const quote = acquisitionQuote(game, action.targetId);
       if (!quote)
@@ -236,6 +243,7 @@ function applyScheduled(
         payload: {
           facility: officialQuote(game, action.build),
           financed: action.build.financed,
+          territoryId: action.build.territoryId,
         },
       });
       break;
@@ -342,8 +350,9 @@ it("a legal 2013 company battery after acquisition stays bounded through play, s
       type: "build",
       build: {
         name: "Solar",
-        peakW: 500e6,
+        peakW: 150e6,
         financed: true,
+        territoryId: "champlain",
       },
     },
     {
@@ -351,8 +360,9 @@ it("a legal 2013 company battery after acquisition stays bounded through play, s
       type: "build",
       build: {
         name: "Solar",
-        peakW: 500e6,
+        peakW: 150e6,
         financed: true,
+        territoryId: "champlain",
       },
     },
     {
@@ -362,6 +372,7 @@ it("a legal 2013 company battery after acquisition stays bounded through play, s
         name: "Battery",
         peakWh: 64e6,
         financed: true,
+        territoryId: "champlain",
       },
     },
   ];
@@ -392,7 +403,17 @@ it("a legal 2013 company battery after acquisition stays bounded through play, s
   expect(observedTicks).toBeGreaterThan(96);
   expect(
     game.facilities.filter((facility) => facility.name === "Solar"),
-  ).toHaveLength(2);
+  ).toEqual([
+    expect.objectContaining({ peakW: 150e6, territoryId: "champlain" }),
+    expect.objectContaining({ peakW: 150e6, territoryId: "champlain" }),
+  ]);
+  expect(game.facilities.filter(isStorage)).toEqual([
+    expect.objectContaining({
+      name: "Battery",
+      peakWh: 64e6,
+      territoryId: "champlain",
+    }),
+  ]);
   expect(maximumStoredWh).toBeGreaterThan(0);
   const restored = parseSave(JSON.parse(JSON.stringify(serializeSave(game))));
   expect(restored).not.toBeNull();
@@ -426,16 +447,7 @@ it("a late purchase rebases one customer goal before the deadline and preserves 
   const fixture = EXPANSION_BALANCE_CASES.find(
     ({ id }) => id === "valley-electric-firm-loan",
   )!;
-  const scheduledActions: ScheduledSimActionType[] = [
-    ...expansionBalanceActions(fixture, 12345),
-    {
-      month: 0,
-      type: "intertie",
-      corridorId: "vt-champlain-ridge",
-      financed: true,
-    },
-  ];
-  scheduledActions.sort((a, b) => a.month - b.month);
+  const scheduledActions = expansionBalanceActions(fixture, 12345);
   let beforeDeadline: GameType | undefined;
   const { game } = playOfficialExecution(
     116,

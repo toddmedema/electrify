@@ -416,3 +416,30 @@ it("keeps weather in the chart tooltip without a separate weather strip", () => 
     "Weather: Hot 95°F · Wind 5 mph",
   );
 });
+
+it("names pooled external power in the legend, summaries and tooltip", () => {
+  render(
+    <ChartSupplyDemand
+      timeline={timeline}
+      currentMinute={0}
+      location={LOCATIONS.SF}
+      startingYear={2020}
+      exchangeLabel="External power"
+      legend
+    />,
+  );
+  expect(screen.getByText("External power")).toBeVisible();
+  expect(screen.queryByText("Interties")).not.toBeInTheDocument();
+  expect(screen.getByRole("img")).toHaveAccessibleName(
+    /External power imports/,
+  );
+  const stack = supplyDemandStack(timeline, []);
+  expect(
+    formatProductionTooltip(0, {
+      timeline,
+      ...stack,
+      startingYear: 2020,
+      exchangeLabel: "External power",
+    }),
+  ).toContain("External power: 30W");
+});

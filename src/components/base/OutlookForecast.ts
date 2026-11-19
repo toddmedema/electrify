@@ -14,6 +14,8 @@ import type {
   CoalRepowerType,
   FacilityShoppingType,
   GameType,
+  TerritoryId,
+  TerritoryTileId,
   TickPresentFutureType,
 } from "../../Types";
 import { MINUTES_PER_MONTH } from "../../helpers/DateTime";
@@ -171,6 +173,8 @@ export interface OutlookRequest {
   kind: OutlookKind;
   game: GameType;
   facility?: FacilityShoppingType;
+  territoryId?: TerritoryId;
+  tileId?: TerritoryTileId;
   repower?: CoalRepowerImpactRequest;
 }
 export type OutlookReply = {
@@ -183,6 +187,8 @@ export function computeOutlook<K extends OutlookKind>(
   kind: K,
   game: GameType,
   facility?: FacilityShoppingType,
+  territoryId?: TerritoryId,
+  tileId?: TerritoryTileId,
   repower?: CoalRepowerImpactRequest,
 ): OutlookResults[K] {
   const now = currentTick(game);
@@ -200,6 +206,8 @@ export function computeOutlook<K extends OutlookKind>(
     const { before, after, commissionedMinute } = previewFacilityBuild(
       game,
       facility,
+      territoryId,
+      tileId,
     );
     const beforePeriod = buildImpactPeriod(
       game,

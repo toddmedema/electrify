@@ -39,6 +39,8 @@ export function useCoalRepowerImpact(
           "coalRepowerImpact",
           snapshot,
           undefined,
+          undefined,
+          undefined,
           repower,
         );
         if (!impact) throw new Error("No conversion forecast");

@@ -501,6 +501,7 @@ export function retrofitCost(
   if (
     !isOperational(facility) ||
     upgradeInProgress(facility) ||
+    facility.expansionInProgress ||
     upgrade !== "coldWeatherPackage" ||
     !isWinterizationFuel(facility.fuel) ||
     facility.resilience?.[upgrade] ||

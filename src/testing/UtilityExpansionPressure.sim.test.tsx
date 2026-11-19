@@ -5,8 +5,6 @@ import {
   EXPANSION_BALANCE_CASES,
 } from "./UtilityExpansionBalanceFixtures";
 import { expectNoViolations } from "./SimulationTestHelpers";
-import { UTILITY_AREAS } from "../data/UtilityExpansion";
-import { INHERITED_CONNECTIONS } from "../helpers/PowerAgreements";
 import type { MonthlyHistoryType } from "../Types";
 
 jest.setTimeout(180000);
@@ -39,7 +37,7 @@ const annualPurchases = (months: MonthlyHistoryType[]) => ({
 
 for (const seed of [12345, 1, 7])
   for (const target of ["valley-electric", "ridge-electric"] as const) {
-    it(`${target} seed ${seed}: retained connections carry market purchases after the 2020 coverage loss`, () => {
+    it(`${target} seed ${seed}: unprepared supply cannot buy unlimited replacement power after the 2020 coverage loss`, () => {
       const fixture = EXPANSION_BALANCE_CASES.find(
         (item) => item.id === `${target}-unprepared`,
       )!;
@@ -55,27 +53,18 @@ for (const seed of [12345, 1, 7])
       const before = result.months.slice(168, 180);
       const after = result.months.slice(180, 192);
       expect(before).toHaveLength(12);
-      expect(after).toHaveLength(12);
+      expect(after.length).toBeGreaterThan(0);
+      expect(after.length).toBeLessThan(12);
+      expect(result.outcome).toBe("fired");
       const purchasesBefore = annualPurchases(before);
       const purchasesAfter = annualPurchases(after);
       expect(purchasesAfter.contractedMeanMW).toBeLessThan(
         purchasesBefore.contractedMeanMW,
       );
-      expect(purchasesAfter.marketMeanMW).toBeGreaterThan(
-        purchasesBefore.marketMeanMW,
-      );
-      expect(purchasesAfter.marketMeanMW).toBeGreaterThan(0);
+      expect(purchasesBefore.marketMeanMW).toBeCloseTo(0, 6);
+      expect(purchasesAfter.marketMeanMW).toBeCloseTo(0, 6);
       expect(purchasesAfter.cost).toBeGreaterThan(0);
-      for (const utility of ["champlain", target] as const) {
-        const line = result.finalTransmissionLines.find(
-          (line) => line.corridorId === INHERITED_CONNECTIONS[utility],
-        );
-        expect(line).toMatchObject({
-          capacityW: UTILITY_AREAS[utility].sourceInterfaceW,
-          yearsToBuildLeft: 0,
-        });
-        expect(line?.paused).not.toBe(true);
-      }
+      expect(result.finalTransmissionLines).toEqual([]);
       evidence.push({
         seed,
         target,

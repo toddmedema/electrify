@@ -11,11 +11,7 @@ import {
   validScenarioMod,
 } from "../helpers/ScenarioMod";
 import { serializeSave, parseSave } from "../SaveGame";
-import reducer, {
-  buildTransmissionLine,
-  generateForecastTimeline,
-  tickState,
-} from "../reducers/Game";
+import reducer, { generateForecastTimeline, tickState } from "../reducers/Game";
 import { acquireUtility } from "../reducers/GameActions";
 import { createGame } from "../testing/Simulator";
 import { copyOfficialGame } from "../testing/OfficialScenarioExecutionFixtures";
@@ -115,18 +111,6 @@ it("mod base 116 preserves source rights, company customers, obligations and exa
   expect(game.objectiveProgress!.retentionBaseline).toBe(90000);
   expect(game.objectiveProgress!.entries).toHaveLength(4);
   expect(currentTick(game)!.entitlementImportCapacityW).toBeGreaterThan(0);
-  game = copyOfficialGame(
-    reducer(
-      game,
-      buildTransmissionLine({
-        corridorId: "vt-champlain-ridge",
-        financed: true,
-      }),
-    ),
-  );
-  game.transmission!.lines.find(
-    (line) => line.corridorId === "vt-champlain-ridge",
-  )!.yearsToBuildLeft = 0;
   const quote = acquisitionQuote(game, "ridge-electric")!;
   expect(quote).toBeDefined();
   game = copyOfficialGame(
@@ -211,16 +195,6 @@ it("the host owns acquisitions and restores native target lines for a mod base 1
       sequence: (world.sequences["0"] || 0) + 1,
       command: action,
     });
-  expect(
-    command({
-      kind: "action",
-      name: "buildTransmissionLine",
-      payload: { corridorId: "vt-champlain-ridge", financed: true },
-    }),
-  ).toBeUndefined();
-  world.grids[0].transmission!.lines.find(
-    (line) => line.corridorId === "vt-champlain-ridge",
-  )!.yearsToBuildLeft = 0;
   const peer = cloneDeep(world.grids[1].utilityExpansion);
   const quote = acquisitionQuote(world.grids[0], "ridge-electric")!;
   expect(
@@ -244,7 +218,7 @@ it("the host owns acquisitions and restores native target lines for a mod base 1
   );
   expect(
     restored.grids[0].transmission!.lines.map((line) => line.corridorId),
-  ).toContain("vt-champlain-ridge");
+  ).not.toContain("vt-champlain-ridge");
 });
 
 it.each([116, 999])(

@@ -4,7 +4,6 @@ import { SaveMetadata } from "../../Types";
 import type { AppDispatch } from "../../Store";
 import { TUTORIALS } from "../../data/Scenarios";
 import { navigate } from "../../reducers/Card";
-import { start } from "../../reducers/Game";
 import { mapDispatchToProps } from "./MainMenuContainer";
 
 jest.mock("../../LocalStorage", () => ({
@@ -43,8 +42,8 @@ describe("MainMenuContainer onStart", () => {
     entries = [];
   });
 
-  it("starts Mission 1 immediately for a brand-new player", () => {
-    expect(startFromMenu()).toEqual([start(TUTORIALS[0].id)]);
+  it("opens the game selection for a brand-new player", () => {
+    expect(startFromMenu()).toEqual([navigate("NEW_GAME")]);
   });
 
   it("opens the mission list after any tutorial is complete", () => {

@@ -1,7 +1,7 @@
 import { ViewPublication } from "./ViewPublication";
 import type { RoomView, World } from "./Types";
 
-jest.mock("./World", () => ({ roomView: jest.fn() }));
+jest.mock("./World", () => ({ roomViewBuilder: jest.fn() }));
 
 function fixture() {
   const world = {

@@ -1,7 +1,7 @@
 import { DIFFICULTIES, TICK_MINUTES } from "../Constants";
 import { GENERATORS } from "../data/Facilities";
 import { getInflationIndex } from "../data/Economy";
-import { gasNameplateLimitW } from "../data/LegacyEra";
+import { generatorMaxPeakW } from "../data/FacilityCapacity";
 import {
   CoalRepowerType,
   DifficultyType,
@@ -52,8 +52,10 @@ function repowerCapacityW(
   game: RepowerContext,
   kind: CoalRepowerType,
 ) {
-  const cycle = kind === "coalToGasCC" ? "combined" : "simple";
-  return Math.min(sourceW, gasNameplateLimitW(game, cycle));
+  return Math.min(
+    sourceW,
+    generatorMaxPeakW(game, COAL_REPOWER_OPTIONS[kind].name),
+  );
 }
 
 function repowerDurationMinutes(
@@ -66,12 +68,22 @@ function repowerDurationMinutes(
 }
 
 function coalRepowerTarget(
+  site: FacilityOperatingType,
   peakW: number,
   game: GameType,
   kind: CoalRepowerType,
 ) {
   const name = COAL_REPOWER_OPTIONS[kind].name;
-  return GENERATORS(game, peakW, [], []).find((g) => g.name === name);
+  return GENERATORS(
+    game,
+    peakW,
+    [],
+    [],
+    [],
+    [],
+    site.territoryId,
+    site.tileId,
+  ).find((g) => g.name === name);
 }
 
 /** Check timing and rated output from a project's approval vintage. */
@@ -113,11 +125,13 @@ export function coalRepowerQuote(
     facility.saleRestricted ||
     facility.permanentShutdownMonth !== undefined ||
     facility.upgradeInProgress ||
+    facility.expansionInProgress ||
     game.date.year < option.firstYear ||
     activeScenario(game)?.tutorialSteps
   )
     return undefined;
   const target = coalRepowerTarget(
+    facility,
     repowerCapacityW(facility.peakW, game, kind),
     game,
     kind,
@@ -208,6 +222,7 @@ export function completeCoalRepower(
     return false;
   const date = getDateFromMinute(project.startsMinute, game.startingYear);
   const target = coalRepowerTarget(
+    facility,
     project.targetPeakW,
     { ...game, date },
     project.upgrade,
@@ -221,6 +236,7 @@ export function completeCoalRepower(
   // The dispatch ID belongs to the site; equipment-bound events use this creation identity.
   // Retire the coal identity so its recorded limits cannot follow the replacement turbine.
   delete facility.startingAssetId;
+  delete facility.acquiredExpansion;
   Object.assign(facility, technology, {
     buildCost: project.cost,
     yearsToBuild:

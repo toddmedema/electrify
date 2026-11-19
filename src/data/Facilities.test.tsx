@@ -224,6 +224,25 @@ describe("current facility economics", () => {
     });
   });
 
+  it("offers gas steam only during its historical construction window", () => {
+    const steam = (year: number) =>
+      generatorAt(year, "Natural Gas Steam", 100e6);
+    expect(steam(1924)).toBeUndefined();
+    expect(steam(1925)).toBeDefined();
+    expect(steam(1980)).toMatchObject({
+      fuel: "Natural Gas",
+      gasCycle: "steam",
+      spinMinutes: 240,
+      btuPerWh: 10.5,
+    });
+    expect(steam(1990)).toBeDefined();
+    expect(steam(1991)).toBeUndefined();
+    expect(steam(1954)!.btuPerWh).toBeGreaterThan(steam(1980)!.btuPerWh);
+    const peaker = generatorAt(1980, "Natural Gas Peaker", 100e6)!;
+    expect(peaker.btuPerWh).toBe(13.3);
+    expect(peaker.spinMinutes).toBeLessThan(steam(1980)!.spinMinutes);
+  });
+
   it("splits Oil O&M into fixed capacity and variable generation costs", () => {
     const oil = generatorAt(2023, "Oil", 100000000);
 

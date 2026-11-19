@@ -1,5 +1,5 @@
 import * as Economy from "../data/Economy";
-import { loanBalanceAfterTicks } from "../helpers/Financials";
+import { loanBalanceAfterTicks, purchaseTerms } from "../helpers/Financials";
 import { TICKS_PER_MONTH, TICK_MINUTES } from "../Constants";
 import { GENERATORS } from "../data/Facilities";
 import { runMonths } from "./SimulationTestHelpers";
@@ -7,58 +7,106 @@ import cloneDeep from "lodash.clonedeep";
 import { serializeCommitmentMetadata } from "../helpers/Commitment";
 import { createGame } from "./Simulator";
 import reducer, {
-  buildTransmissionLine,
   generateForecastTimeline,
   tickState,
   sellFacility,
   buildFacility,
   delta,
-  upgradeTransmissionLine,
 } from "../reducers/Game";
 import { acquireUtility } from "../reducers/GameActions";
 import { validUtilityExpansion } from "../helpers/ExpansionValidation";
 import { acquisitionQuote } from "../helpers/Expansion";
+import { territoryDemandShares } from "../helpers/Territories";
 import { currentTick } from "../helpers/GameSelectors";
 import { parseSave, serializeSave } from "../SaveGame";
 import { encodeSave } from "../SaveEncoding";
-import { initialIntertieBuildTier } from "../helpers/BuildSizing";
+import { accessContextForGame } from "../data/IntertieAccess";
+import { inheritedConnection } from "../helpers/PowerAgreements";
 import {
+  intertieBuildQuote,
   intertieUpgradeQuote,
-  intertieContextForGame,
 } from "../helpers/Transmission";
-import type { GameType, UtilityTargetId } from "../Types";
+import type {
+  GameType,
+  TransmissionLineOperatingType,
+  UtilityTargetId,
+} from "../Types";
 import { copyOfficialGame } from "./OfficialScenarioExecutionFixtures";
 import { gameObjectiveResults } from "../helpers/ObjectiveRules";
 import { getMissionStatus } from "../helpers/MissionStatus";
 
 function ready(targetId: UtilityTargetId): GameType {
-  let game = createGame({
+  const game = createGame({
     scenarioId: 116,
     seed: 12345,
     difficulty: "Employee",
   });
-  game = copyOfficialGame(
-    reducer(
-      game,
-      buildTransmissionLine({
-        corridorId:
-          targetId === "valley-electric"
-            ? "vt-champlain-valley"
-            : "vt-champlain-ridge",
-        financed: true,
-      }),
-    ),
-  );
-  // The boundary fixture starts at completed construction; long scenarios exercise actual elapsed construction.
-  game.transmission!.lines.find(
-    (line) =>
-      line.corridorId ===
-      (targetId === "valley-electric"
-        ? "vt-champlain-valley"
-        : "vt-champlain-ridge"),
-  )!.yearsToBuildLeft = 0;
   currentTick(game)!.cash = 1e9;
+  expect(acquisitionQuote(game, targetId)).toBeDefined();
+  expect(game.transmission!.lines).toEqual([]);
   return game;
+}
+
+function legacyPortfolio(tier = 1, pendingUpgrade = false) {
+  const game = ready("valley-electric");
+  const context = accessContextForGame(game);
+  const lines = ["vt-champlain-valley", "vt-champlain-ridge"].map(
+    (corridorId, index): TransmissionLineOperatingType => {
+      const quote = intertieBuildQuote(
+        corridorId,
+        game.date.year,
+        tier,
+        context,
+      )!;
+      expect(quote).toBeDefined();
+      const terms = purchaseTerms(quote.buildCost, true, game.interestRate);
+      currentTick(game)!.cash -= terms.amountDue;
+      const line: TransmissionLineOperatingType = {
+        ...quote,
+        id: index + 2,
+        corridorId,
+        yearsToBuildLeft: 0,
+        minuteCreated: 0,
+        financed: true,
+        loanAmountLeft: terms.loanAmount,
+        loanMonthlyPayment: terms.monthlyPayment,
+        interestRate: game.interestRate,
+        currentFlowW: 0,
+        paused: index === 1,
+      };
+      if (pendingUpgrade && index === 0) {
+        const upgrade = intertieUpgradeQuote(
+          line,
+          game.date.year,
+          1,
+          1,
+          context,
+        )!;
+        expect(upgrade).toBeDefined();
+        const financing = purchaseTerms(
+          upgrade.buildCost,
+          true,
+          game.interestRate,
+          line.loanAmountLeft,
+        );
+        currentTick(game)!.cash -= financing.amountDue;
+        line.buildCost += upgrade.buildCost;
+        line.loanAmountLeft += financing.loanAmount;
+        line.loanMonthlyPayment = financing.monthlyPayment;
+        line.upgrade = {
+          ...upgrade,
+          yearsToBuildLeft: upgrade.yearsToBuild / 2,
+          constructionKgco2eEmitted: upgrade.constructionKgco2eTotal / 2,
+        };
+      }
+      return line;
+    },
+  );
+  game.transmission!.lines = [inheritedConnection("champlain", 1), ...lines];
+  const raw = JSON.parse(JSON.stringify(serializeSave(game)));
+  raw.schemaVersion = 13;
+  raw.game.territoryNetwork = { version: 1 };
+  return raw;
 }
 function buy(game: GameType, targetId: UtilityTargetId): GameType {
   const quote = acquisitionQuote(game, targetId);
@@ -91,31 +139,40 @@ function persisted(game: GameType): GameType {
   return parseSave(JSON.parse(JSON.stringify(encodeSave(save))))!.game;
 }
 
+function expectRetainedInvestment(
+  game: GameType,
+  investment: TransmissionLineOperatingType,
+): TransmissionLineOperatingType {
+  const retained = game.territoryNetwork!.legacyConnections.find(
+    (line) => line.id === investment.id,
+  )!;
+  expect(retained).toBeDefined();
+  expect(retained).toEqual(investment);
+  return retained;
+}
+
 it.each([1, 2, 3, 4])(
-  "retains Tier %i corridor investments when both utilities are acquired after reload",
+  "retains migrated Tier %i corridor investments when both utilities are acquired after reload",
   (tier) => {
-    let game = createGame({
-      scenarioId: 116,
-      seed: 12345,
-      difficulty: "Employee",
-    });
-    expect(initialIntertieBuildTier(game)).toBeGreaterThan(1);
-    for (const corridorId of ["vt-champlain-valley", "vt-champlain-ridge"])
-      game = copyOfficialGame(
-        reducer(
-          game,
-          buildTransmissionLine({ corridorId, financed: true, tier }),
-        ),
-      );
-    const projects = game.transmission!.lines.filter(
-      (line) => line.buildCost > 0,
+    const raw = legacyPortfolio(tier);
+    const original = cloneDeep(raw);
+    const parsed = parseSave(raw);
+    expect(parsed).not.toBeNull();
+    expect(raw).toEqual(original);
+    let game = persisted(parsed!.game);
+    expect(game.territoryNetwork!.legacyConnections).toEqual(
+      raw.game.transmission.lines,
     );
-    expect(projects).toHaveLength(2);
-    // Match the browser fixture: complete the paid corridors, then resume the saved company.
-    for (const line of projects) line.yearsToBuildLeft = 0;
-    for (const frame of game.timeline) frame.cash = 1e9;
-    game = persisted(game);
-    const investments = cloneDeep(game.transmission!.lines);
+    for (const key of [
+      "timeline",
+      "monthlyHistory",
+      "date",
+      "utilityExpansion",
+    ] as const)
+      expect(game[key]).toEqual(raw.game[key]);
+    expect(game.transmission!.lines).toEqual([]);
+    const investments = cloneDeep(game.territoryNetwork!.legacyConnections);
+    expect(investments.filter((line) => line.buildCost > 0)).toHaveLength(2);
     for (const [index, targetId] of (
       ["valley-electric", "ridge-electric"] as const
     ).entries()) {
@@ -123,6 +180,7 @@ it.each([1, 2, 3, 4])(
       const cash = currentTick(game)!.cash;
       const customers = currentTick(game)!.customers;
       const financed = index === 0;
+      const minute = game.date.minute;
       game = copyOfficialGame(
         reducer(
           game,
@@ -137,26 +195,13 @@ it.each([1, 2, 3, 4])(
         customers + quote.customers,
         6,
       );
-      for (const investment of investments)
-        expect(
-          game.transmission!.lines.find((line) => line.id === investment.id),
-        ).toEqual(
-          investment.buildCost > 0 &&
-            (investment.corridorId === "vt-champlain-valley" || index === 1)
-            ? { ...investment, paused: false, currentFlowW: 0 }
-            : investment,
-        );
+      expect(game.date.minute).toBe(minute);
       expect(
-        game.transmission!.lines.find(
-          (line) =>
-            line.corridorId ===
-            (index === 0 ? "vt-valley-regional" : "vt-ridge-regional"),
-        ),
-      ).toMatchObject({
-        capacityW: index === 0 ? 350e6 : 60e6,
-        buildCost: 0,
-        yearsToBuildLeft: 0,
-      });
+        territoryDemandShares(game, currentTick(game)!)[targetId],
+      ).toBeGreaterThan(0);
+      for (const investment of investments)
+        expectRetainedInvestment(game, investment);
+      expect(game.transmission!.lines).toEqual([]);
       game = persisted(game);
       const before = JSON.stringify(game);
       generateForecastTimeline(
@@ -166,31 +211,15 @@ it.each([1, 2, 3, 4])(
         3,
       );
       expect(JSON.stringify(game)).toBe(before);
-      const corridorId =
-        index === 0 ? "vt-champlain-valley" : "vt-champlain-ridge";
-      const ownedLine = game.transmission!.lines.find(
-        (line) => line.corridorId === corridorId,
-      )!;
-      expect(
-        intertieUpgradeQuote(
-          ownedLine,
-          game.date.year,
-          1,
-          1,
-          intertieContextForGame(game),
-        ),
-      ).toBeUndefined();
-      expect(
-        reducer(game, upgradeTransmissionLine({ corridorId, financed: true })),
-      ).toBe(game);
+      const paid = investments[index + 1];
       for (const field of [
         "capacityW",
         "buildCost",
         "annualOperatingCost",
       ] as const) {
         const malformed = JSON.parse(JSON.stringify(serializeSave(game)));
-        malformed.game.transmission.lines.find(
-          (line: { id: number }) => line.id === ownedLine.id,
+        malformed.game.territoryNetwork.legacyConnections.find(
+          (line: { id: number }) => line.id === paid.id,
         )[field] += 1;
         expect(parseSave(malformed)).toBeNull();
       }
@@ -199,40 +228,58 @@ it.each([1, 2, 3, 4])(
 );
 
 it.each([0, 1])(
-  "preserves a paid pending upgrade acquired after %i elapsed ticks",
+  "preserves a migrated paid pending upgrade acquired after %i elapsed ticks",
   (elapsed) => {
-    let game = ready("valley-electric");
-    game = copyOfficialGame(
-      reducer(
-        game,
-        upgradeTransmissionLine({
-          corridorId: "vt-champlain-valley",
-          financed: true,
-        }),
-      ),
+    const raw = legacyPortfolio(1, true);
+    let game = parseSave(raw)!.game;
+    expect(game.territoryNetwork!.legacyConnections).toEqual(
+      raw.game.transmission.lines,
     );
     for (let tick = 0; tick < elapsed; tick++) tickState(game);
     game = persisted(game);
-    const line = game.transmission!.lines.find(
-      (line) => line.corridorId === "vt-champlain-valley",
-    )!;
-    expect(line.upgrade).toBeDefined();
-    const investment = cloneDeep(line);
+    const investment = cloneDeep(
+      game.territoryNetwork!.legacyConnections.find(
+        (line) => line.corridorId === "vt-champlain-valley",
+      )!,
+    );
+    expect(investment.upgrade).toBeDefined();
     game = buy(game, "valley-electric");
-    expect(
-      game.transmission!.lines.find((line) => line.id === investment.id),
-    ).toEqual({ ...investment, paused: false, currentFlowW: 0 });
+    expectRetainedInvestment(game, investment);
     game = persisted(game);
     const resumed = persisted(game);
+    const withoutArchive = cloneDeep(game);
+    withoutArchive.territoryNetwork!.legacyConnections = [];
     for (let tick = 0; tick < 3; tick++) {
       tickState(game);
       tickState(resumed);
+      tickState(withoutArchive);
+      for (const field of [
+        "supplyW",
+        "availableSupplyW",
+        "reserveW",
+        "expensesOM",
+      ] as const)
+        expect(currentTick(game)![field]).toBe(
+          currentTick(withoutArchive)![field],
+        );
     }
     expect(persisted(resumed)).toEqual(JSON.parse(JSON.stringify(game)));
-    expect(
-      game.transmission!.lines.find((line) => line.id === investment.id)!
-        .upgrade!.yearsToBuildLeft,
-    ).toBeLessThan(investment.upgrade!.yearsToBuildLeft);
+    const retained = game.territoryNetwork!.legacyConnections.find(
+      (line) => line.id === investment.id,
+    )!;
+    expect({ ...retained, loanAmountLeft: investment.loanAmountLeft }).toEqual(
+      investment,
+    );
+    expect(retained.loanAmountLeft).toBeLessThan(investment.loanAmountLeft);
+    expect(retained.loanAmountLeft).toBeCloseTo(
+      loanBalanceAfterTicks(
+        investment.loanAmountLeft,
+        investment.loanMonthlyPayment,
+        investment.interestRate,
+        3,
+      ),
+      6,
+    );
     for (const field of [
       "targetCapacityW",
       "buildCost",
@@ -243,7 +290,7 @@ it.each([0, 1])(
       "constructionKgco2eEmitted",
     ] as const) {
       const malformed = JSON.parse(JSON.stringify(serializeSave(game)));
-      const upgrade = malformed.game.transmission.lines.find(
+      const upgrade = malformed.game.territoryNetwork.legacyConnections.find(
         (line: { id: number }) => line.id === investment.id,
       ).upgrade;
       upgrade[field] =
@@ -337,7 +384,7 @@ it("corporate loans survive plant sales and opening asset equity is not counted 
 });
 
 it("rejects inconsistent or forged acquisition import ledgers", () => {
-  const game = buy(ready("ridge-electric"), "ridge-electric");
+  const game = buy(parseSave(legacyPortfolio())!.game, "ridge-electric");
   const mutations: ((g: GameType) => void)[] = [
     (g) => {
       g.utilityExpansion!.networkAssets.push(
@@ -377,14 +424,15 @@ it("rejects inconsistent or forged acquisition import ledgers", () => {
       g.customerMarketSize += 100;
     },
     (g) => {
-      g.transmission!.lines.find(
+      g.territoryNetwork!.legacyConnections.find(
         (line) => line.corridorId === "vt-champlain-ridge",
-      )!.paused = true;
+      )!.paused = "paused" as unknown as boolean;
     },
     (g) => {
-      g.transmission!.lines.find(
+      const line = g.territoryNetwork!.legacyConnections.find(
         (line) => line.corridorId === "vt-champlain-ridge",
-      )!.currentFlowW = 1;
+      )!;
+      line.currentFlowW = line.capacityW + 1;
     },
     (g) => {
       currentTick(g)!.customers = g.customerMarketSize * 1e6;

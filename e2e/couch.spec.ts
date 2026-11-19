@@ -307,12 +307,9 @@ async function expectSharedCaptionSize(
     .poll(
       async () => {
         const status = seat.locator(".gridHealth").first();
-        const namedStatus = status.locator(
-          ".gridHealthStatusWord, .gridHealthMetric",
-        );
+        const namedStatus = status.locator(".gridStatusNow");
         const reserveFont = await renderedFontSize(
-          // Stable compact status intentionally uses only an icon. Its visible
-          // status wrapper still owns the shared caption font for named risks.
+          // The current quantity shares the global caption ramp at every pane width.
           (await namedStatus.count()) ? namedStatus.first() : status,
         );
         const fonts = await Promise.all([
@@ -658,9 +655,14 @@ test("TV couch player toolbars match named warning captions after a plant pause"
   const seat = couch.seats.get("local-p1")!.page;
   await seat.getByRole("button", { name: "Inspect Coal", exact: true }).click();
   await seat.getByRole("button", { name: "Pause Coal", exact: true }).click();
-  await expect(seat.locator(".gridHealth")).toHaveClass(/gridHealth-blackout/);
-  const warning = seat.locator(".gridHealthStatusWord");
-  await expect(warning).toHaveText("Short");
+  // Pausing changes the forecast immediately. The current operating sample still
+  // has reserve until the simulation advances; those facts must stay distinct.
+  await expect(seat.locator(".gridHealth")).toHaveClass(
+    /gridHealth-stable statusWarning/,
+  );
+  await expect(seat.locator(".gridStatusNow")).toHaveText(/NOW.*W.*reserve/);
+  const warning = seat.locator(".gridStatusFuture");
+  await expect(warning).toHaveText(/FUTURE Short at/);
   await expect(warning).toBeVisible();
   expect(await renderedFontSize(warning)).toBe(
     await renderedFontSize(seat.locator(".gridHealth:visible")),

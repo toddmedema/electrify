@@ -234,8 +234,8 @@ export type FuelNameType =
   | "Oil"
   | "Geothermal"
   | "Hydro";
-/** A simple-cycle peaking turbine, or a combined cycle that recovers its exhaust heat. */
-export type GasCycleType = "simple" | "combined";
+/** Direct combustion turbine, turbine plus heat recovery, or boiler-fired steam turbine. */
+export type GasCycleType = "simple" | "combined" | "steam";
 /** The fuels bought on a market. The rest are free once a plant is built. */
 export type PricedFuelNameType =
   "Biomass" | "Coal" | "Natural Gas" | "Oil" | "Uranium";
@@ -270,6 +270,8 @@ export type CardNameType =
   | "BUILD_STORAGE"
   | "BUILD_INTERTIES"
   | "FACILITIES"
+  | "FLEET"
+  | "AGREEMENTS"
   | "INSIGHTS"
   | "EVENTS"
   | "SCENARIO"
@@ -286,6 +288,8 @@ export type CardNameType =
   | "CUSTOM_GAME"
   | "DATA_CENTER_SETUP"
   | "CHALLENGE";
+
+export type MapWorkspaceView = "FACILITIES" | "FLEET" | "AGREEMENTS";
 
 export type ConceptNameType =
   | "money"
@@ -325,7 +329,11 @@ export type StoryActionTargetType =
   | { card: "EVENTS" };
 
 export type EvidenceTargetType =
-  "supply-demand" | "finances" | "mission-details" | StoryActionTargetType;
+  | "supply-demand"
+  | "interties"
+  | "finances"
+  | "mission-details"
+  | StoryActionTargetType;
 
 export interface EvidenceRequestType {
   id: number;
@@ -449,6 +457,7 @@ export type TickPresentFutureType = Partial<FuelPricesType> &
     agreementUnusedExpenses?: number;
     /** Closing minimum payments keyed by the elapsed month they settle. */
     agreementClosingExpenses?: Record<string, number>;
+    territories?: Partial<Record<TerritoryId, TerritoryTick>>;
     minute: number;
     supplyW: number; // Watts
     availableSupplyW?: number; // Supply plus unused fuel-burning generation capacity
@@ -483,12 +492,8 @@ export type TickPresentFutureType = Partial<FuelPricesType> &
     deferredResidential?: DeferredResidentialLoad[]; // Outstanding energy tied to its original recovery window.
     deferredResidentialStart?: DeferredResidentialLoad[]; // Before this tick, for repeated forecasts.
     shiftedResidentialW?: number; // Returned enrolled residential load, billed at the late rate.
-    deferredThermal?: DeferredResidentialLoad[];
-    deferredThermalStart?: DeferredResidentialLoad[];
     deferredCharging?: DeferredResidentialLoad[];
     deferredChargingStart?: DeferredResidentialLoad[];
-    thermalShiftedW?: number;
-    thermalRecoveredW?: number;
     evShiftedW?: number;
     evRecoveredW?: number;
     customerBatteryWh?: number; // Customer storage, separate from utility-owned facilities.
@@ -622,7 +627,19 @@ export interface FacilityMaintenanceObligationType {
 
 interface SharedOperatingType
   extends LoanInfo, LifetimeTotals, ConstructionEmissions {
+  /** Added capacity stays unavailable until this cash-funded project completes. */
+  expansionInProgress?: FacilityExpansionInProgressType;
+  /** Last started expansion identity, retained after cancellation and completion. */
+  expansionSequence?: number;
+  /** Capacity and construction booked by projects after an inherited facility was acquired. */
+  acquiredExpansion?: Required<ConstructionEmissions> & {
+    addedCapacityW: number;
+    investedCapital: number;
+  };
   startingAssetId?: string;
+  territoryId?: TerritoryId;
+  /** Exactly one developed map cell; absent outside the territory scenario. */
+  tileId?: TerritoryTileId;
   /** Transfer restrictions on inherited assets; absent means ordinary resale value. */
   cashBackMultiplier?: number;
   saleRestricted?: boolean;
@@ -741,7 +758,7 @@ export interface GeneratorShoppingType extends SharedShoppingType {
   // Lowest steady output as a fraction of nameplate. Starting and shutdown ramps may pass below
   // it transiently; an online unit otherwise produces at least this much.
   minimumStableOutput?: number;
-  // "Natural Gas" only: the turbine arrangement. Both burn the same fuel, so fuel-keyed rules
+  // "Natural Gas" only: the turbine arrangement. All burn the same fuel, so fuel-keyed rules
   // (prices, cold snaps, charts) treat them alike; this names the technology without relying on
   // the display name, so a later simple-to-combined conversion can change it in place.
   gasCycle?: GasCycleType;
@@ -924,6 +941,7 @@ export type ModFacilityNameType =
   | "Coal"
   | "Nuclear"
   | "Natural Gas Peaker"
+  | "Natural Gas Steam"
   | "Natural Gas CC"
   | "Oil"
   | "Biomass"
@@ -1184,6 +1202,34 @@ export interface RetrofitFacilityAction {
   financed?: boolean;
 }
 
+/** Size is watts for generation and watt-hours for storage. Prices always come from the host. */
+export interface ExpandFacilityAction {
+  facilityId: number;
+  targetSize: number;
+  quoteKey: string;
+}
+
+/** Cancel only the exact reviewed project, including across host command delays. */
+export interface CancelFacilityExpansionAction {
+  facilityId: number;
+  quoteKey: string;
+}
+
+/** Size-dependent additions only: identity, age, efficiency, debt and stored energy stay put. */
+export interface FacilityExpansionInProgressType extends ConstructionEmissions {
+  projectSequence: number;
+  targetSize: number;
+  targetPeakW: number;
+  targetPeakWh?: number;
+  cost: number;
+  annualOperatingCostDelta: number;
+  costPerStartDelta: number;
+  startsMinute: number;
+  yearsToBuild: number;
+  yearsToBuildLeft: number;
+  quoteKey: string;
+}
+
 export const COAL_REPOWER_UPGRADES = [
   "coalToGasCC",
   "coalToGasPeaker",
@@ -1298,7 +1344,6 @@ export type PolicyId =
   | "solar"
   | "timeOfUse"
   | "curtailment"
-  | "thermal"
   | "evCharging"
   | "battery";
 export type PolicyTier = "Off" | "On";
@@ -1370,6 +1415,43 @@ export interface PeerSettlement {
 }
 export type UtilityId = "champlain" | "valley-electric" | "ridge-electric";
 export type UtilityTargetId = Exclude<UtilityId, "champlain">;
+export type FrontierTerritoryId = `frontier:${number}:${number}`;
+export type LandTerritoryId =
+  | FrontierTerritoryId
+  | "green-uplands"
+  | `parcel-${0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 17}`;
+export type TerritoryId = UtilityId | LandTerritoryId;
+export type TerrainType =
+  "plains" | "forest" | "hills" | "mountain" | "river" | "lake" | "ocean";
+export type CitySizeType = "small" | "medium" | "large";
+export type TerritoryTileId =
+  | FrontierTerritoryId
+  | `${TerritoryId}:city`
+  | `${TerritoryId}:site-${number}`
+  | `${TerritoryId}:legacy-${number}`;
+/** Frozen overflow property from pre-map saves; persists after its plant is retired. */
+export interface LegacyTerritoryTile {
+  id: TerritoryTileId;
+  territoryId: TerritoryId;
+  q: number;
+  r: number;
+  terrain: TerrainType;
+  siteKind: "industrial" | "wind" | "open-land" | "hydro" | "geothermal";
+  maxPeakW: number;
+  hydroSiteId?: string;
+}
+/** Legacy recorded territory readings retained for save history. */
+export interface TerritoryTick {
+  demandW: number;
+  supplyW: number;
+  generationW: number;
+  storageChargeW: number;
+  storageDischargeW: number;
+  importedW: number;
+  exportedW: number;
+  unservedW: number;
+  curtailedW: number;
+}
 export interface AcquisitionLoan {
   id: string;
   targetId: UtilityTargetId;
@@ -1397,6 +1479,14 @@ export interface UtilityExpansionState {
     /** Immutable seller accounts transferred, not a separately simulated customer population. */
     transferredCustomers: number;
   }[];
+}
+export interface AcquireTileAction {
+  tileId: TerritoryTileId;
+  quoteKey: string;
+}
+export interface AcquireLandAction {
+  territoryId: LandTerritoryId;
+  quoteKey: string;
 }
 export interface AcquireUtilityAction {
   targetId: UtilityTargetId;
@@ -1446,10 +1536,71 @@ export interface LegacyCampaignType {
 }
 
 export interface GameType {
+  territoryNetwork?: {
+    version: 3;
+    landPurchases: {
+      territoryId: LandTerritoryId;
+      minute: number;
+      price: number;
+      legacy?: true;
+    }[];
+    /** Immutable physical footprints, including empty retained property. */
+    legacyTiles?: LegacyTerritoryTile[];
+    /** Existing inland offshore plants keep their installation, never replacement rights. */
+    legacyLakeOffshore?: {
+      facilityId: number;
+      tileId: TerritoryTileId;
+    }[];
+    /** Physical purchases since schema 17; older land receipts retain every original cell. */
+    tilePurchases?: {
+      tileId: TerritoryTileId;
+      minute: number;
+      price: number;
+      /** Paid under the pre-adjacency visibility rule; new actions never create this marker. */
+      legacy?: true;
+    }[];
+    /** Frozen legacy projects: capital and debt remain; routing/construction/upkeep are retired. */
+    legacyConnections: TransmissionLineOperatingType[];
+  };
   utilityExpansion?: UtilityExpansionState;
   /** Isolated co-op grid; never publish its score or run the single-player clock/effects. */
   multiplayer?: {
     seat: string;
+    /** Shared finite land claim, projected by the host from all company receipts. */
+    landOwner?: { seat: string; name: string };
+    landOwners?: Partial<
+      Record<LandTerritoryId, { seat: string; name: string }>
+    >;
+    /** Host-owned retained geometry; peer IDs alone cannot reconstruct another fleet. */
+    legacyTiles?: {
+      tile: LegacyTerritoryTile;
+      seat: string;
+      name: string;
+      facility?: {
+        name: FacilityOperatingType["name"];
+        fuel?: FuelNameType;
+        peakW: number;
+        peakWh?: number;
+        yearsToBuildLeft: number;
+      };
+    }[];
+    tileOwners?: Partial<
+      Record<TerritoryTileId, { seat: string; name: string }>
+    >;
+    /** Visible foregrounds on claimed land and acquired utility tiles. */
+    tileFacilities?: Partial<
+      Record<
+        TerritoryTileId,
+        {
+          seat: string;
+          name: FacilityOperatingType["name"];
+          fuel?: FuelNameType;
+          peakW: number;
+          peakWh?: number;
+          yearsToBuildLeft: number;
+        }
+      >
+    >;
     pricePerMWh?: number;
     /** Set by the host at the rollover where this company's run ends. */
     ending?: CompanyOutcomeType;
@@ -1462,6 +1613,10 @@ export interface GameType {
       corridor: TransmissionCorridorDefinitionType;
       availableSupplyW?: number;
       ratingW?: number;
+      /** Host projection of both completed, operating endpoints of this peer link. */
+      connected?: boolean;
+      /** Host-owned visibility anchors; includes this peer's acquired utility cells. */
+      territoryTileIds?: TerritoryTileId[];
       upgradeRequestedBy?: string;
       /** This player asked for the pending upgrade and waits on the other owner. */
       upgradeRequestedBySelf?: boolean;

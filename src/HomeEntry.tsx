@@ -115,8 +115,10 @@ export function Home() {
                     }
                     hasSavedGame={false}
                     hasSavedGames={false}
+                    hasUnfinishedTutorials
                     onStart={() => void run("onStart")}
                     onContinue={() => void run("onContinue")}
+                    onTutorials={() => void run("onTutorials")}
                     onSavedGames={() => void run("onSavedGames")}
                     onSettings={() => void run("onSettings")}
                     onMods={() => void run("onMods")}

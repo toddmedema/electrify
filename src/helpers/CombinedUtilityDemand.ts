@@ -1,9 +1,7 @@
+import { cityProfile } from "./CityProfiles";
+import { landCustomerProfiles } from "./TerritoryCustomers";
 import type { GameType } from "../Types";
-import {
-  UTILITY_AREAS,
-  UTILITY_TARGETS,
-  UtilityEnergyShares,
-} from "../data/UtilityExpansion";
+import { UTILITY_TARGETS, UtilityEnergyShares } from "../data/UtilityExpansion";
 
 export interface CombinedUtilityDemandProfile {
   demandScale: number;
@@ -12,21 +10,22 @@ export interface CombinedUtilityDemandProfile {
 }
 
 /**
- * One company's static demand composition, derived only from acquired package identities.
+ * One company's demand composition, derived from the run seed and acquired city identities.
  * Customer counts weight the authored per-account scale and shape exponent; sector shares use
  * customer × scale weights so a higher-load package contributes its share of electricity use.
  * The single evolving customer count and Burlington weather are applied by the demand owner.
  */
 export function combinedUtilityDemandProfile(
-  game: Pick<GameType, "utilityExpansion">,
+  game: Pick<GameType, "utilityExpansion" | "territoryNetwork" | "seed">,
 ): CombinedUtilityDemandProfile {
   const owned = new Set(
     game.utilityExpansion?.acquisitions.map(({ targetId }) => targetId),
   );
   const definitions = [
-    UTILITY_AREAS.champlain,
-    ...UTILITY_TARGETS.filter(({ id }) => owned.has(id)).map(
-      ({ id }) => UTILITY_AREAS[id],
+    ...landCustomerProfiles(game),
+    cityProfile(game.seed, "champlain")!,
+    ...UTILITY_TARGETS.filter(({ id }) => owned.has(id)).map(({ id }) =>
+      cityProfile(game.seed, id)!,
     ),
   ];
   if (definitions.length === 1) {

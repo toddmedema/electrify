@@ -14,9 +14,14 @@ async function openWorkspaceHelp(
   await page.goto("/?scenario=111");
   await page.getByRole("button", { name: "Start game", exact: true }).click();
   const build = await openBuild(page);
-  const option = build.locator(".buildOption").first();
-  await option.getByRole("button", { name: /^Show .* details$/ }).click();
-  const help = option.getByRole("button", { name: /^What is / }).first();
+  // Once the forecast arrives, reviewable generators can move above this card.
+  const option = build.locator('[data-build-option="Oil"]');
+  await expect(option).toBeVisible();
+  await expect(
+    build.getByText("Calculating output and energy costs…", { exact: true }),
+  ).toBeHidden();
+  await option.getByRole("button", { name: "Show Oil details" }).click();
+  const help = option.getByRole("button", { name: "What is build cost?" });
   await expect(help).toBeVisible();
   return { build, help };
 }
@@ -59,20 +64,18 @@ for (const theme of ["light", "dark"] as const) {
     await page.keyboard.press("Escape");
     await expect(pinned).toHaveCount(0);
 
-    // Only the desktop status opens a manual entry; the compact phone icon has a readout tooltip.
     const status = page.getByRole("button", {
-      name: /Open the Reserve manual entry/,
+      name: /^Current grid status: NOW/,
     });
-    const color = await status.evaluate(
-      (element) => getComputedStyle(element).color,
-    );
-    await expect(status).toHaveCSS("cursor", "help");
-    await status.hover();
-    await expect(status).not.toHaveCSS("background-image", "none");
-    await expect(status).toHaveCSS("color", color);
-    await page.waitForTimeout(600);
-    await expect(pinned).toHaveCount(0);
     await status.click();
+    const diagnosis = page.getByRole("dialog", {
+      name: "Grid status",
+      exact: true,
+    });
+    await diagnosis
+      .getByRole("button", { name: "About reserve", exact: true })
+      .click();
+    await expect(diagnosis).toHaveCount(0);
     await expect(
       pinned.getByRole("heading", { name: "Reserve capacity", exact: true }),
     ).toBeVisible();

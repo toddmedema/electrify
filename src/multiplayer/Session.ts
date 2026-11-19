@@ -30,7 +30,12 @@ import {
   type HostBrowseSelection,
 } from "./Browse";
 import { modBrowseSummary, validSelectedMod } from "./ModBrowse";
-import type { ScenarioType } from "../Types";
+import type {
+  FacilityShoppingType,
+  ScenarioType,
+  TerritoryId,
+  TerritoryTileId,
+} from "../Types";
 import { validScenarioMod } from "../helpers/ScenarioMod";
 import { resumeBlocker, resumeSeats, slotClaim } from "./Slots";
 import {
@@ -920,8 +925,11 @@ export class MultiplayerSession {
   submit(command: Command): Promise<void> {
     if (command.kind === "action" && command.name === "buildFacility") {
       const payload = command.payload as {
-        facility: import("../Types").FacilityShoppingType;
+        facility: FacilityShoppingType;
         financed: boolean;
+        territoryId?: TerritoryId;
+        tileId?: TerritoryTileId;
+        reviewKey?: string;
       };
       const { name, peakW, peakWh, gasCycle, resilience } = payload.facility;
       command = {
@@ -929,6 +937,13 @@ export class MultiplayerSession {
         payload: {
           facility: { name, peakW, peakWh, gasCycle, resilience },
           financed: payload.financed,
+          ...(payload.territoryId !== undefined && {
+            territoryId: payload.territoryId,
+          }),
+          ...(payload.tileId !== undefined && { tileId: payload.tileId }),
+          ...(payload.reviewKey !== undefined && {
+            reviewKey: payload.reviewKey,
+          }),
         },
       };
     }

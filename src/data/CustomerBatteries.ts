@@ -1,16 +1,18 @@
 import type { LocationType } from "../Types";
-import { costBetween } from "../helpers/Math";
 
 /** Evidence and the distinction between observations and game assumptions are documented in
  * docs/customer-battery-program.md. Dollar inputs follow the game's real-cost convention. */
 export const CUSTOMER_BATTERIES = {
-  buildoutMonths: 48,
+  buildoutMonths: 12,
+  offerFromYear: 2022,
+  peakWindowHours: 4,
   householdPowerW: 5000,
   householdEnergyWh: 10000,
-  rebateShare: 0.3,
   reserveShare: 0.2,
   chargeEfficiency: 0.9,
-  annualPaymentPerHousehold: 60,
+  annualPaymentPerKw: 45,
+  maximumChargingCostPerMWh: 65,
+  chargingReserveShare: 0.05,
   enrollmentCap: 0.25,
   fullLifeMonths: 120,
   endLifeMonths: 180,
@@ -25,8 +27,8 @@ const ELIGIBLE_HOUSEHOLD_SHARES = [
   [2050, 0.25],
 ] as const;
 
-/** Addressable hardware market, not existing battery ownership. The VPP opt-in share further
- * limits the systems this program can fund. Both shares freeze at installation. */
+/** Estimated share of households with an existing compatible battery. The opt-in share
+ * further limits the devices enrolled in each cohort. */
 export function batteryEligibleHouseholdShare(
   year: number,
   location: Pick<LocationType, "country" | "region">,
@@ -77,18 +79,12 @@ export function batteryEligibleHouseholdShare(
   return Math.min(0.3, Math.max(0, share * readiness));
 }
 
-/** Installed residential system cost (not cell cost), in real dollars per Wh. IRENA's German
- * 2020 observation is $776/kWh, 71% below 2014; CSIRO's 2024 small system estimate is about
- * US$900/kWh at the stated conversion. Early/future interpolation is a game assumption. */
-export function residentialBatteryCostPerWh(year: number): number {
-  if (year <= 2020) return costBetween(year, 2014, 2.676, 2020, 0.776);
-  if (year <= 2024) return costBetween(year, 2020, 0.776, 2024, 0.9);
-  return costBetween(year, 2024, 0.9, 2040, 0.45);
-}
+export const homeBatteryProgramAvailable = (year: number) =>
+  year >= CUSTOMER_BATTERIES.offerFromYear;
 
 /** Access agreements and communications were not mature when the earliest household
- * batteries appeared. This is the share of the addressable hardware market willing and
- * able to sign the VPP agreement at installation, not a second limit on funded assets. */
+ * batteries appeared. This is the share of existing owners willing and able to sign a VPP
+ * agreement. */
 export function batteryEnrollmentShare(year: number): number {
   if (year < 2016) return 0;
   return Math.min(
@@ -97,38 +93,18 @@ export function batteryEnrollmentShare(year: number): number {
   );
 }
 
-/** Only systems signed up for VPP access receive this rebate. Existing funded cohorts never
- * gain new households when technology or willingness to enroll improves in a later year. */
+/** The contracted fleet grows as existing batteries enroll. Completed cohorts retain the
+ * household count they signed up with. */
 export function batteryCohortHouseholds(
   customers: number,
   rolloutShare: number,
-  installationYear: number,
+  enrollmentYear: number,
   location: Pick<LocationType, "country" | "region">,
 ): number {
   return (
     Math.max(0, customers) *
     Math.max(0, rolloutShare) *
-    batteryEligibleHouseholdShare(installationYear, location) *
-    batteryEnrollmentShare(installationYear)
-  );
-}
-
-/** A fresh funded cohort's utility subsidy. The customer funds the remaining hardware cost. */
-export function batteryRebateCost(
-  customers: number,
-  rolloutShare: number,
-  installationYear: number,
-  location: Pick<LocationType, "country" | "region">,
-): number {
-  return (
-    batteryCohortHouseholds(
-      customers,
-      rolloutShare,
-      installationYear,
-      location,
-    ) *
-    CUSTOMER_BATTERIES.householdEnergyWh *
-    residentialBatteryCostPerWh(installationYear) *
-    CUSTOMER_BATTERIES.rebateShare
+    batteryEligibleHouseholdShare(enrollmentYear, location) *
+    batteryEnrollmentShare(enrollmentYear)
   );
 }

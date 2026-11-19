@@ -1,3 +1,4 @@
+import { CUSTOMER_BATTERIES } from "../../data/CustomerBatteries";
 import { useCurrency, useMoney } from "./CurrencyContext";
 import * as React from "react";
 import KeyboardShortcuts, { SHORTCUTS_SEARCH_TEXT } from "./KeyboardShortcuts";
@@ -220,7 +221,7 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     title: "Customer programs",
     group: "Gameplay",
     keywords:
-      "efficiency rooftop solar rebates build-out project pause resume completion demand time-of-use tariff curtailment contracts peak enrollment smart heating hot water thermostat managed ev charging electric vehicle home battery virtual power plant vpp flexibility",
+      "efficiency rooftop solar rebates build-out project pause resume completion demand time-of-use tariff curtailment contracts peak enrollment managed ev charging electric vehicle home battery virtual power plant vpp flexibility",
     entry: (
       <div>
         <p>
@@ -241,8 +242,8 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           </li>
           <li>
             Rooftop solar cuts daytime demand, best in sunny, cool places. You
-            don't pay for surplus power. Rebates cost much more in the early
-            2000s, when panels were expensive.
+            don't pay for surplus power. The rebate covers 15% of installation
+            costs, which are much higher in the early 2000s.
           </li>
         </ul>
         <p>
@@ -251,9 +252,10 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
         <ul>
           <li>
             <strong>Time-of-use tariff:</strong> Half of homes move 20% of their
-            use into the next three hours. They pay 30% above the{" "}
+            use across the next eight hours. They pay 30% above the{" "}
             <EntryLink to={MANUAL_ENTRY.RATES}>base rate</EntryLink> in the
-            window and 10% below it for those three hours.
+            window and 10% below it on shifted use and the first three hours
+            after the window.
           </li>
           <li>
             <strong>Peak curtailment contracts:</strong> Half of industrial and
@@ -261,22 +263,20 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
             Participants get 10% off all day.
           </li>
           <li>
-            <strong>Smart heating and hot water:</strong> Heaters pause during
-            the window, then catch up over three hours.
-          </li>
-          <li>
             <strong>Managed EV charging:</strong> Charging moves into the next
-            six hours, though drivers can override it.
+            six hours, though drivers can override it. The offer opens when
+            compatible charging can shift enough of the local grid's load.
           </li>
           <li>
             <strong>Home battery virtual power plant:</strong> Home batteries
-            act like a shared power plant from 2016, keeping 20% for their
-            owners.
+            can enroll from {CUSTOMER_BATTERIES.offerFromYear}. Households are
+            paid to share battery power across the peak window and keep 20% in
+            reserve.
           </li>
         </ul>
         <Figure
           src="/images/manual-peak-shifting.webp"
-          alt="A day of electricity demand before and after a program. Demand drops during a four-hour evening peak window and rises in the three hours after it, so the highest peak is lower."
+          alt="A day of electricity demand before and after a program. Demand drops during a four-hour evening peak window and rises after it, so the highest peak is lower."
           width={720}
           height={390}
         />
@@ -373,10 +373,11 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
         />
         <p>
           A <strong>Natural Gas Peaker</strong> is a single turbine that starts
-          in minutes. A <strong>Natural Gas CC</strong> (combined cycle) also
-          uses the turbine's hot exhaust to drive a steam turbine. It burns
-          about a third less gas per MWh but starts more slowly, so it suits
-          demand that lasts for hours.{" "}
+          in minutes. A <strong>Natural Gas Steam</strong> plant burns gas in a
+          boiler and takes hours to warm up. It was built for baseload in
+          earlier decades. A <strong>Natural Gas CC</strong> (combined cycle)
+          recovers heat from a gas turbine's exhaust to make more electricity
+          per unit of fuel. It suits demand that lasts for hours.{" "}
           <EntryLink to={MANUAL_ENTRY.HYDROPOWER}>Hydro</EntryLink> can do
           either job.
         </p>

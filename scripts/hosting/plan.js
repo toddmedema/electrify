@@ -9,26 +9,23 @@ function aws(args, { optional = false } = {}) {
     encoding: "utf8",
   });
   if (result.status !== 0) {
+    const stderr = result.stderr || "";
+    const code = stderr.match(/\((\w+)\) when calling the \w+ operation/)?.[1];
     if (
       optional &&
-      /NoSuchFunctionExists|NoSuchWebsiteConfiguration/.test(
-        result.stderr || "",
-      )
+      /NoSuchFunctionExists|NoSuchWebsiteConfiguration/.test(stderr)
     )
       return null;
-    throw new Error(
-      `aws ${args.slice(0, 2).join(" ")} failed: ${result.stderr || result.error}`,
+    const error = new Error(
+      `aws ${args.slice(0, 2).join(" ")} failed: ${stderr || result.error}`,
     );
+    error.code = code;
+    throw error;
   }
   return result.stdout.trim() ? JSON.parse(result.stdout) : {};
 }
 
-function readHostingPlan({ allowMissingFunctions = false } = {}) {
-  const identity = aws(["sts", "get-caller-identity"]);
-  if (identity.Account !== targets.account)
-    throw new Error(
-      `Expected production account ${targets.account}, got ${identity.Account}; use the production deployment credentials`,
-    );
+function readDistributionPlan() {
   const live = aws([
     "cloudfront",
     "get-distribution-config",
@@ -41,7 +38,6 @@ function readHostingPlan({ allowMissingFunctions = false } = {}) {
       `arn:aws:cloudfront::${targets.account}:function/${name}`,
     ]),
   );
-  // Check every conflict before any caller is allowed to mutate production.
   const config = patchDistribution(live.DistributionConfig, arns);
   const policies = new Set(
     [config.DefaultCacheBehavior, ...(config.CacheBehaviors?.Items || [])]
@@ -56,6 +52,16 @@ function readHostingPlan({ allowMissingFunctions = false } = {}) {
         `Cache policy ${id} clamps SEO lifetimes; use an equivalent policy allowing 300–31536000 seconds before deploying`,
       );
   }
+  return { live, config };
+}
+
+function readHostingPlan({ allowMissingFunctions = false } = {}) {
+  const identity = aws(["sts", "get-caller-identity"]);
+  if (identity.Account !== targets.account)
+    throw new Error(
+      `Expected production account ${targets.account}, got ${identity.Account}; use the production deployment credentials`,
+    );
+  readDistributionPlan();
   const existing = {};
   for (const [event, name] of Object.entries(targets.functions)) {
     existing[event] = aws(
@@ -81,7 +87,7 @@ function readHostingPlan({ allowMissingFunctions = false } = {}) {
     ["s3api", "get-bucket-website", "--bucket", targets.bucket],
     { optional: true },
   );
-  return { live, config, existing, website };
+  return { existing, website };
 }
 
-module.exports = { OWNER, targets, aws, readHostingPlan };
+module.exports = { OWNER, targets, aws, readDistributionPlan, readHostingPlan };
