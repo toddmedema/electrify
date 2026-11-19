@@ -6,7 +6,7 @@ import {
   isUtilityExpansionGame,
   isUtilityExpansionScenario,
 } from "./ExpansionContext";
-import { expansionRetentionBaseline } from "./Expansion";
+import { expansionRetentionBaseline, utilityAcquisitions } from "./Expansion";
 import { UTILITY_AREAS } from "../data/UtilityExpansion";
 import { formatCount, formatNumber, formatForecastNumber } from "./Format";
 import {
@@ -34,6 +34,7 @@ import { ruleDigest, canonicalRuleJson } from "./RuleIdentity";
 import { MINUTES_PER_MONTH } from "./DateTime";
 import { getTotalDebt } from "./Financials";
 import {
+  acquiredUtilityCount,
   createObjectiveProgress,
   recordObjectiveMonth,
   evaluateScenarioObjectives,
@@ -361,6 +362,7 @@ function historyProgress(
   history: readonly MonthlyHistoryType[],
   context: ObjectiveContext,
   startingCustomers: number,
+  acquisitions: ReturnType<typeof utilityAcquisitions> = [],
 ): ObjectiveProgress {
   let progress = createObjectiveProgress(
     objectives,
@@ -378,7 +380,15 @@ function historyProgress(
     progress = recordObjectiveMonth(
       progress,
       objectives,
-      { month, history: row },
+      {
+        month,
+        history: row,
+        ...(context.retentionAtDeadlineOnly && {
+          ownedUtilities: acquisitions
+            .filter(({ minute }) => minute < (month + 1) * MINUTES_PER_MONTH)
+            .map(({ targetId }) => targetId),
+        }),
+      },
       context,
     );
   }
@@ -563,6 +573,7 @@ export function gameObjectiveProgress(
       game.monthlyHistory,
       objectiveContextForGame(game, scenario),
       objectiveRetentionBaseline(game, scenario),
+      utilityAcquisitions(game),
     )
   );
 }
@@ -574,10 +585,10 @@ export function gameObjectiveResults(game: GameType): ObjectiveResult[] {
   if (!objectives.length) return [];
   const context = objectiveContextForGame(game, scenario);
   const progress = gameObjectiveProgress(game)!;
-  const acquisitionKey =
-    game.utilityExpansion?.acquisitions
-      .map(({ targetId, minute }) => `${targetId}:${minute}`)
-      .join("|") ?? "";
+  const acquisitions = game.utilityExpansion ? utilityAcquisitions(game) : [];
+  const acquisitionKey = acquisitions
+    .map(({ targetId, minute }) => `${targetId}:${minute}`)
+    .join("|");
   const cached = resultCache.get(progress);
   if (
     cached?.completedMonths === context.completedMonths &&
@@ -599,16 +610,25 @@ export function gameObjectiveResults(game: GameType): ObjectiveResult[] {
       context.completedMonths > objective.deadlineMonth
     )
       return result;
-    const acquired = game.utilityExpansion?.acquisitions.some(
-      (receipt) =>
-        objective.targets.includes(receipt.targetId) &&
-        receipt.minute < (objective.deadlineMonth + 1) * MINUTES_PER_MONTH,
+    const observed = acquiredUtilityCount(
+      objective,
+      acquisitions
+        .filter(
+          ({ minute }) =>
+            minute < (objective.deadlineMonth + 1) * MINUTES_PER_MONTH,
+        )
+        .map(({ targetId }) => targetId),
     );
-    if (!acquired) return result;
+    if (observed < result.target)
+      return {
+        ...result,
+        observed,
+        ...(observed > 0 && { status: "inProgress" as const }),
+      };
     const completed: ObjectiveResult = {
       ...result,
       status: "completed",
-      observed: 1,
+      observed,
       observedMonths: 1,
     };
     // A proven acquisition clears an earlier explanation. Omit the optional field:
@@ -725,7 +745,7 @@ export function recordGameObjectiveMonth(
       history: row,
       ...(game.utilityExpansion
         ? {
-            ownedUtilities: game.utilityExpansion.acquisitions.map(
+            ownedUtilities: utilityAcquisitions(game).map(
               ({ targetId }) => targetId,
             ),
             ownedAssetIds: game.facilities.flatMap((facility) =>
@@ -790,12 +810,13 @@ export function validGameObjectiveProgress(game: GameType): boolean {
       if (objective.metric === "utilityOwnership") {
         for (const [month, numerator, denominator] of evidence?.observations ??
           []) {
-          const atClose = expansion.acquisitions.some(
-            (acquisition) =>
-              objective.targets.includes(acquisition.targetId) &&
-              acquisition.minute < (month + 1) * MINUTES_PER_MONTH,
+          const atClose = acquiredUtilityCount(
+            objective,
+            utilityAcquisitions(game)
+              .filter(({ minute }) => minute < (month + 1) * MINUTES_PER_MONTH)
+              .map(({ targetId }) => targetId),
           );
-          if (numerator !== Number(atClose) || denominator !== 1) return false;
+          if (numerator !== atClose || denominator !== 1) return false;
         }
       }
     }

@@ -567,7 +567,7 @@ function ruleDiagnostics(value, path = "") {
       emissionsPerDeliveredMWh: ["maxKgCO2ePerMWh"],
       localFuelShare: ["fuels", "minShare"],
       fuelRetirement: ["fuel", "deadlineMonth", "commissionedBeforeYear"],
-      utilityOwnership: ["targets", "deadlineMonth"],
+      utilityOwnership: ["targets", "minUtilities", "deadlineMonth"],
       assetRetirement: ["assetIds", "deadlineMonth"],
       monthlyBilledRate: ["maxDollarsPerKWh"],
       monthEndDebt: ["maxDebtDollars"],
@@ -653,6 +653,14 @@ function ruleDiagnostics(value, path = "") {
         "invalid-value",
         at(p, "hours"),
         "must be [17, 21], with the end hour excluded.",
+      );
+    if (v.minUtilities !== undefined && v.metric === "utilityOwnership")
+      number(
+        v.minUtilities,
+        at(p, "minUtilities"),
+        1,
+        Array.isArray(v.targets) ? v.targets.length : 16,
+        true,
       );
     for (const key of ["targets", "assetIds"]) {
       if (metricFields.includes(key) && list(v[key], at(p, key), 16)) {

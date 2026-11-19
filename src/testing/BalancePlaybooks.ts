@@ -4,7 +4,7 @@ import {
   expansionBalanceActions,
 } from "./UtilityExpansionBalanceFixtures";
 
-/** Expansion requires a transfer and retirements in addition to generation. */
+/** Expansion plans balance utility purchases and generation. */
 export const expansionEconomicsPlay = (
   seed = 12345,
 ): Partial<SimOptionsType> => ({
@@ -53,7 +53,7 @@ const line = (
 /**
  * Reproducible CEO plans made from persistent, UI-legal commitments. Every plan contains exactly
  * ten material choices (including mandatory scenario responses). Prior scenarios use at least four
- * categories; expansion uses the required asset, rate and retirement commitments. There is
+ * categories; expansion uses acquisition, construction and rate commitments. There is
  * no more than one lifetime rate lever, and no inverse action. Capacity clears CEO's 99.5% three-month
  * firing threshold. Late operating/program changes still remain in force through a settlement.
  */
@@ -293,7 +293,7 @@ export const STANDARD_BALANCE_PLAYS: Record<number, Partial<SimOptionsType>> = {
   },
 };
 
-/** A single build teaches earlier scenarios; expansion also requires transfer and retirements. */
+/** A single build teaches earlier scenarios; expansion also requires utility acquisitions. */
 export const INTERN_ONE_BUILD_PLAYS: Record<
   number,
   Partial<Pick<SimOptionsType, "initialBuild" | "scheduledActions">>

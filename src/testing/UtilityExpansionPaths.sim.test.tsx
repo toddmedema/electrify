@@ -1,6 +1,7 @@
 import { generateForecastTimeline } from "../reducers/Game";
 import { isStorage } from "../Types";
 import { TICK_MINUTES } from "../Constants";
+import { tilePurchaseQuote } from "../helpers/Territories";
 import { MINUTES_PER_MONTH } from "../helpers/DateTime";
 import { loanBalanceAfterTicks } from "../helpers/Financials";
 import { deserialize, serialize } from "v8";
@@ -207,6 +208,17 @@ function applyScheduled(
         payload: { corridorId: action.corridorId, financed: action.financed },
       });
       break;
+    case "tile": {
+      const quote = tilePurchaseQuote(game, action.tileId);
+      if (!quote)
+        throw new Error(`Host connection unavailable: ${action.tileId}`);
+      command(world, seat, {
+        kind: "action",
+        name: "acquireTile",
+        payload: { tileId: action.tileId, quoteKey: quote.quoteKey },
+      });
+      break;
+    }
     case "acquire": {
       const quote = acquisitionQuote(game, action.targetId);
       if (!quote)
@@ -222,18 +234,6 @@ function applyScheduled(
           quoteKey: quote.quoteKey,
         },
       });
-      break;
-    }
-    case "retire": {
-      const asset = game.facilities.find(
-        (facility) => facility.startingAssetId === action.assetId,
-      );
-      if (asset)
-        command(world, seat, {
-          kind: "action",
-          name: "sellFacility",
-          payload: asset.id,
-        });
       break;
     }
     case "build":
@@ -252,7 +252,7 @@ function applyScheduled(
   }
 }
 
-it("host-authoritative co-op reaches 2024 with independent targets and restores purchase, 2017 and retirement checkpoints", () => {
+it("host-authoritative co-op reaches 2024 with independent targets and restores purchase, 2017 and late-term checkpoints", () => {
   loadSimData(UTILITY_AREAS.champlain.location);
   let world = createWorld(
     { scenarioId: 116, difficulty: "Employee" },
@@ -260,14 +260,27 @@ it("host-authoritative co-op reaches 2024 with independent targets and restores 
     "expansion-full-term",
     "initial",
   );
-  const actions = UTILITY_TARGETS.map((target) =>
-    expansionBalanceActions(
+  const actions = UTILITY_TARGETS.map((target) => {
+    const plan = expansionBalanceActions(
       EXPANSION_BALANCE_CASES.find(
         ({ id }) => id === `${target.id}-firm-loan`,
       )!,
       world.grids[0].seed,
-    ),
-  );
+    );
+    if (target.id === "valley-electric") return plan;
+    // Rival co-op companies use different municipal sellers on the shared map.
+    return plan.flatMap((action): ScheduledSimActionType[] => {
+      if (action.type === "tile")
+        return action.tileId === "green-uplands:site-2"
+          ? [{ ...action, tileId: "parcel-3:site-0" }]
+          : [];
+      if (action.type === "acquire" && action.targetId === "parcel-1")
+        return [{ ...action, targetId: "parcel-5" }];
+      if (action.type === "acquire" && action.targetId === "parcel-11")
+        return [{ ...action, targetId: "parcel-9" }];
+      return [action];
+    });
+  });
   const reached: number[] = [];
   for (const seat of world.seats) command(world, seat.id, { kind: "ready" });
   for (let month = 0; month < 240; month++) {
@@ -281,7 +294,7 @@ it("host-authoritative co-op reaches 2024 with independent targets and restores 
       if (world.grids[0].date.minute === previous)
         throw new Error(`Host stopped at month ${month}: ${world.reason}`);
     }
-    if (![97, 144, 228].includes(month + 1)) continue;
+    if (![97, 120, 144, 228].includes(month + 1)) continue;
     const before = world.grids.map((grid) => digest(serialGame(grid)));
     world = restoreWorld(
       JSON.parse(JSON.stringify(checkpointWorld(world))),
@@ -291,7 +304,7 @@ it("host-authoritative co-op reaches 2024 with independent targets and restores 
     reached.push(month + 1);
     for (const seat of world.seats) command(world, seat.id, { kind: "ready" });
   }
-  expect(reached).toEqual([97, 144, 228]);
+  expect(reached).toEqual([97, 120, 144, 228]);
   expect(world.grids.map((game) => game.date.monthsElapsed)).toEqual([
     240, 240,
   ]);

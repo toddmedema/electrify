@@ -2,7 +2,6 @@ import * as React from "react";
 import { Button, Tab, Tabs, Typography } from "@mui/material";
 import { SIDE_TOOL_MIN_WIDTH } from "../../WorkspaceLayout";
 import DesktopBuildRail from "../base/DesktopBuildRail";
-import { getTerritoryDefinition } from "../../data/Territories";
 import {
   tilePurchaseQuote,
   landTransferredCustomers,
@@ -17,6 +16,7 @@ import type {
   FacilityShoppingType,
   TerritoryId,
   TerritoryTileId,
+  UtilityAcquisitionId,
 } from "../../Types";
 import { UTILITY_AREAS } from "../../data/UtilityExpansion";
 import { TERRAIN_LABELS } from "../../data/TerrainLabels";
@@ -37,13 +37,11 @@ import { customerMarketSizeAt } from "../../helpers/Customers";
 import { cityCustomerCount } from "../../helpers/CityProfiles";
 import { citySizeLabel } from "../base/TerritoryTileFacts";
 import { cityDemandByType } from "../../helpers/CityDemand";
-import { facilityDisplayName } from "../base/FacilityLabels";
 import { facilityMapStatus } from "../base/FacilityMapStatus";
 import AcquiredUtilities from "./AcquiredUtilities";
 import TerritoryHexMap from "./TerritoryHexMap";
 import AcquisitionReviewDialog from "../base/AcquisitionReviewDialog";
-import UtilityOfferDialog from "../base/UtilityOfferDialog";
-import { bordersUtility } from "../../helpers/Expansion";
+import { utilityAcquisitions } from "../../helpers/Expansion";
 import { useMoney } from "../base/CurrencyContext";
 import { useAppDispatch, useAppSelector } from "../../Store";
 import { generatorSizeChanged } from "../../reducers/GameActions";
@@ -160,26 +158,29 @@ function TileNetwork(props: Props) {
   const [inspected, setInspected] = React.useState<TerritoryMapTileKey>();
   const [activation, setActivation] = React.useState(0);
   const [category, setCategory] = React.useState("generators");
-  const [review, setReview] = React.useState(false);
-  const [terms, setTerms] = React.useState(false);
+  const [review, setReview] = React.useState<UtilityAcquisitionId>();
   const { purchase, pendingIds, availableCash } = useTerritoryTilePurchases();
   const dispatch = useAppDispatch();
   const { formatMoneyConcise: money } = useMoney();
   const summaryRef = React.useRef<HTMLElement>(null);
   const acquired = React.useRef(false);
+  const { utilityExpansion, territoryNetwork } = game;
+  const acquisitions = React.useMemo(
+    () => utilityAcquisitions({ utilityExpansion, territoryNetwork }),
+    [utilityExpansion, territoryNetwork],
+  );
   React.useEffect(() => {
     if (!review && acquired.current && summaryRef.current) {
       acquired.current = false;
       summaryRef.current.focus();
     }
-  }, [review, game.utilityExpansion?.acquisitions.length]);
+  }, [review, acquisitions.length]);
   const views = React.useMemo(() => territoryTileViews(game), [game]);
   const view =
     inspected && !panel?.open && !planning
       ? views.find(({ tile }) => territoryMapTileKey(tile) === inspected)
       : undefined;
   const tile = view?.tile;
-  const territory = tile ? getTerritoryDefinition(tile.territoryId) : undefined;
   const operatingFacility = view?.operatingFacility;
   const utility = tile
     ? Object.values(UTILITY_AREAS).find(({ id }) => id === tile.territoryId)
@@ -296,7 +297,7 @@ function TileNetwork(props: Props) {
   };
   const title = tile
     ? operatingFacility
-      ? facilityDisplayName(operatingFacility)
+      ? operatingFacility.name
       : tile.city
         ? (tile.city.name ?? citySizeLabel(tile.city.size))
         : building
@@ -388,8 +389,12 @@ function TileNetwork(props: Props) {
           }}
         />
       )}
-      <AcquiredUtilities game={game} summaryRef={summaryRef} />
-      {view && tile && territory && (
+      <AcquiredUtilities
+        game={game}
+        acquisitions={acquisitions}
+        summaryRef={summaryRef}
+      />
+      {view && tile && (
         <TileWorkspaceSurface
           title={title}
           focusKey={`${inspected}:${activation}:${view.ownerKey ?? "unowned"}:${operatingFacility?.id ?? (view.facility ? "facility" : "empty")}`}
@@ -489,35 +494,19 @@ function TileNetwork(props: Props) {
               {!view.owned && !tile.city && (
                 <TileTerrainModifiers terrain={tile.terrain} />
               )}
-              {!view.owned && territory.kind === "utility" ? (
+              {view.acquisitionId && props.onAcquire ? (
                 <div className="territoryBuildActions">
                   <Button
                     variant="contained"
-                    disabled={
-                      !props.onAcquire ||
-                      !bordersUtility(game, tile.territoryId)
-                    }
-                    onClick={() => setReview(true)}
+                    onClick={() => setReview(view.acquisitionId)}
                   >
-                    Acquire {territory.name}
-                  </Button>
-                  <Button variant="outlined" onClick={() => setTerms(true)}>
-                    Inspect {territory.name}
+                    Acquire {view.ownerName}
                   </Button>
                 </div>
               ) : (
-                !view.owned && (
+                !view.owned &&
+                !view.acquisitionId && (
                   <div className="tilePurchaseSummary">
-                    {quote?.utilityName ? (
-                      <Typography variant="body2">
-                        Includes both sites and {formatCount(quote.customers)}{" "}
-                        customers. The seller removes its plant on transfer.
-                      </Typography>
-                    ) : view.municipalCity && quote ? (
-                      <Typography variant="body2">
-                        The seller removes its plant on transfer.
-                      </Typography>
-                    ) : null}
                     <Button
                       variant="contained"
                       disabled={
@@ -530,7 +519,7 @@ function TileNetwork(props: Props) {
                       {pendingIds.has(tile.id)
                         ? "Connecting…"
                         : quote
-                          ? `${quote.utilityName ? "Acquire utility" : "Connect"} · ${money(quote.price)}`
+                          ? `Connect · ${money(quote.price)}`
                           : "Connection unavailable"}
                     </Button>
                     {quote && availableCash < quote.price && (
@@ -545,23 +534,16 @@ function TileNetwork(props: Props) {
           )}
         </TileWorkspaceSurface>
       )}
-      {review && tile && props.onAcquire && (
+      {review && props.onAcquire && (
         <AcquisitionReviewDialog
           game={game}
-          targetId={tile.territoryId}
-          onClose={() => setReview(false)}
+          targetId={review}
+          onClose={() => setReview(undefined)}
           onAcquire={async (payload) => {
             const accepted = await props.onAcquire!(payload);
             acquired.current = accepted;
             return accepted;
           }}
-        />
-      )}
-      {terms && tile && (
-        <UtilityOfferDialog
-          game={game}
-          targetId={tile.territoryId}
-          onClose={() => setTerms(false)}
         />
       )}
     </section>

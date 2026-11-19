@@ -1,29 +1,15 @@
+import { MUNICIPAL_UTILITIES } from "./MunicipalUtilities";
+import { UTILITY_TARGETS } from "./UtilityExpansion";
 import type { CompiledRuleObjective } from "./ScenarioRules";
 
-/** Authored obligations use original identities, never replacement plant fuel totals. */
 export const UTILITY_EXPANSION_OBJECTIVES: CompiledRuleObjective[] = [
   {
     id: "acquire-neighbor",
-    label: "Acquire a competitor",
+    label: "Acquire 3 competitors",
     metric: "utilityOwnership",
-    targets: ["valley-electric", "ridge-electric"],
+    targets: [...UTILITY_TARGETS, ...MUNICIPAL_UTILITIES].map(({ id }) => id),
+    minUtilities: 3,
     deadlineMonth: 119,
-    required: true,
-  },
-  {
-    id: "retire-champlain-oil",
-    label: "Retire Champlain's original Oil A",
-    metric: "assetRetirement",
-    assetIds: ["scenario-116-champlain-oil-a"],
-    deadlineMonth: 191,
-    required: true,
-  },
-  {
-    id: "retire-acquired-oil",
-    label: "Retire acquired original oil assets",
-    metric: "assetRetirement",
-    assetIds: ["scenario-116-valley-oil", "scenario-116-ridge-oil"],
-    deadlineMonth: 227,
     required: true,
   },
   {

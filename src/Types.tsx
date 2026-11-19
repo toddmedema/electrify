@@ -1402,6 +1402,7 @@ export type LandTerritoryId =
   | "green-uplands"
   | `parcel-${0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 17}`;
 export type TerritoryId = UtilityId | LandTerritoryId;
+export type UtilityAcquisitionId = UtilityTargetId | LandTerritoryId;
 export type TerrainType =
   "plains" | "forest" | "hills" | "mountain" | "river" | "lake" | "ocean";
 export type CitySizeType = "small" | "medium" | "large";
@@ -1470,7 +1471,7 @@ export interface AcquireLandAction {
   quoteKey: string;
 }
 export interface AcquireUtilityAction {
-  targetId: UtilityTargetId;
+  targetId: UtilityAcquisitionId;
   financed: boolean;
   quoteKey: string;
 }

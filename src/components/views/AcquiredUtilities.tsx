@@ -1,6 +1,8 @@
 import { useMoney } from "../base/CurrencyContext";
 import * as React from "react";
-import { UTILITY_AREAS, UTILITY_TARGETS } from "../../data/UtilityExpansion";
+import { UTILITY_TARGETS } from "../../data/UtilityExpansion";
+import { municipalUtility } from "../../data/MunicipalUtilities";
+import { utilityAcquisitions } from "../../helpers/Expansion";
 import { legacyTerritoryConnections } from "../../helpers/Territories";
 import { getDateFromMinute } from "../../helpers/DateTime";
 import { formatCount } from "../../helpers/Format";
@@ -12,33 +14,35 @@ import { ChevronDownGlyph } from "../base/Glyphs";
 export default function AcquiredUtilities({
   game,
   summaryRef,
+  acquisitions = utilityAcquisitions(game),
 }: {
   game: GameType;
   summaryRef: React.RefObject<HTMLElement>;
+  acquisitions?: ReturnType<typeof utilityAcquisitions>;
 }) {
   const { formatMoneyConcise } = useMoney();
   const expansion = game.utilityExpansion;
-  if (!expansion?.acquisitions.length) return null;
+  if (!acquisitions.length) return null;
   return (
     <details className="acquiredUtilities">
       <summary ref={summaryRef}>
-        {`Acquired utilities (${expansion.acquisitions.length})`}
+        {`Acquired utilities (${acquisitions.length})`}
         <ChevronDownGlyph className="rowChevron" aria-hidden />
       </summary>
       <ul aria-label="Acquired utilities">
-        {expansion.acquisitions.map((receipt) => {
-          const utility = UTILITY_AREAS[receipt.targetId];
+        {acquisitions.map((receipt) => {
           const target = UTILITY_TARGETS.find(
             (target) => target.id === receipt.targetId,
-          )!;
+          );
+          const name = target?.name ?? municipalUtility(receipt.targetId)?.name;
           const line = [
             ...(game.transmission?.lines ?? []),
             ...legacyTerritoryConnections(game),
-          ].find((line) => line.corridorId === target.corridorId);
+          ].find((line) => line.corridorId === target?.corridorId);
           const acquired = getDateFromMinute(receipt.minute, game.startingYear);
           const outstandingLoans = [
             ...(line ? [line] : []),
-            ...expansion.loans.filter(
+            ...(expansion?.loans ?? []).filter(
               (loan) => loan.targetId === receipt.targetId,
             ),
           ].filter((loan) => loan.loanAmountLeft > 0);
@@ -48,7 +52,7 @@ export default function AcquiredUtilities({
           );
           return (
             <li key={receipt.targetId}>
-              <h3 className="facilityDetailHeading">{utility.name}</h3>
+              <h3 className="facilityDetailHeading">{name}</h3>
               <p className="acquiredUtilityDate">
                 Acquired {acquired.month} {acquired.year}
               </p>

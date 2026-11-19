@@ -20,7 +20,6 @@ import { getDateFromMinute, MINUTES_PER_MONTH } from "../../helpers/DateTime";
 import uiReducer from "../../reducers/UI";
 import { UtilityTargetId } from "../../Types";
 import AcquisitionReviewDialog from "./AcquisitionReviewDialog";
-import { facilityDisplayName } from "./FacilityLabels";
 
 function review(targetId: UtilityTargetId, year = 2005, customers = 90000) {
   const initial = createGame({
@@ -77,8 +76,9 @@ it.each(["valley-electric", "ridge-electric"] as const)(
           : "90k → 140k (+56%)",
       ),
     ).toBeVisible();
-    expect(screen.getByText(/Retain 90%/)).toBeVisible();
-    expect(screen.getByText(/Retire the acquired oil/)).toBeVisible();
+    expect(
+      screen.queryByText(/Retire the acquired oil/),
+    ).not.toBeInTheDocument();
     const payments = screen.getByRole("region", { name: "Expected impact" });
     expect(within(payments).getByText(expectedMargin(preview))).toBeVisible();
     expect(payments).toHaveTextContent(
@@ -119,7 +119,7 @@ it.each(["valley-electric", "ridge-electric"] as const)(
       within(assets).getByRole("region", { name: "Operating plants" }),
     );
     for (const plant of quote.facilities) {
-      expect(plants.getByText(facilityDisplayName(plant))).toBeVisible();
+      expect(plants.getByText(plant.name)).toBeVisible();
       expect(plants.getByText(formatWatts(plant.peakW))).toBeVisible();
     }
     for (const contract of quote.contracts)
@@ -178,7 +178,7 @@ it.each([2017, 2024])(
   },
 );
 
-it("excludes expired power rights and past oil retirement commitments from a 2025 purchase", async () => {
+it("explains expired power rights from a 2025 purchase", async () => {
   const { quote, preview } = review("valley-electric", 2025);
   expect(quote.contracts).toEqual([]);
   expect(screen.getByText(expectedMargin(preview))).toBeVisible();
@@ -188,7 +188,7 @@ it("excludes expired power rights and past oil retirement commitments from a 202
     within(assets).getByText(/nuclear purchase has expired/),
   ).toBeVisible();
   expect(
-    within(assets).getByText("No inherited purchased-power rights remain."),
+    within(assets).getByText("No purchased-power contracts transfer."),
   ).toBeVisible();
   expect(screen.queryByText(/Retire the acquired oil/)).not.toBeInTheDocument();
 });

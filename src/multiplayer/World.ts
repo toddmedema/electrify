@@ -499,7 +499,10 @@ function applyCommandOnce(
   if (command.kind === "action") {
     if (!isGameCommand(command.name)) return "That game action is unavailable";
     let name: GameCommandName = command.name;
-    const buying = name === "acquireLand" || name === "acquireTile";
+    const buying =
+      name === "acquireLand" ||
+      name === "acquireTile" ||
+      name === "acquireUtility";
     // Quotes see the current host ledger, including claims made since the sender's last view.
     const quotingGame = buying ? territoryGameForWorld(world, index) : game;
     const validation = validateGameCommand(quotingGame, name, command.payload);
@@ -528,10 +531,13 @@ function applyCommandOnce(
         validation.payload as { corridorId: string; financed: boolean },
       );
     const before = game.facilities.length;
-    const updated = commandResult(
-      game,
-      reducer(quotingGame, commandAction(name, validation.payload)),
+    const reduced = reducer(
+      quotingGame,
+      commandAction(name, validation.payload),
     );
+    if (name === "acquireUtility" && reduced === quotingGame)
+      return "This acquisition is no longer available";
+    const updated = commandResult(game, reduced);
     // Projection data is for the quote/reducer pass, never another persisted source of claims.
     world.grids[index] = buying
       ? { ...updated, multiplayer: game.multiplayer }
@@ -1681,7 +1687,12 @@ function upgradeTerritoryWorld(value: unknown): unknown {
           "coop-2-06e4afd05778c47de20788acd02787291d3f09456465a0a89ace5fbeadd2d018") ||
       (old.gameSchema === 17 &&
         old.rules ===
-          "coop-2-b590dfc2a358c3d4fd7c14330f8a5e92181b38944a04098dc416dcfbbf904907")
+          "coop-2-b590dfc2a358c3d4fd7c14330f8a5e92181b38944a04098dc416dcfbbf904907") ||
+      (old.gameSchema === 19 &&
+        (old.rules ===
+          "coop-2-c85efcd401375172030f9ab31b7b1f81f0ecf4f450732f36d86e265355e91bef" ||
+          old.rules ===
+            "coop-2-fdb701fc666648e148ecc4d6a02e4b2001090bc79052092a4e567ea9184714ef"))
     ) ||
     !Array.isArray(old.grids) ||
     !old.grids.every(
@@ -1691,6 +1702,7 @@ function upgradeTerritoryWorld(value: unknown): unknown {
         (old.gameSchema === 15 ||
           old.gameSchema === 16 ||
           old.gameSchema === 17 ||
+          old.gameSchema === 19 ||
           isUtilityExpansionGame(grid)),
     )
   )

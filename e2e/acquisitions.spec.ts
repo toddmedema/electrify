@@ -1,3 +1,4 @@
+import { acquisitionQuote } from "../src/helpers/Expansion";
 import { TERRAIN_LABELS } from "../src/data/TerrainLabels";
 import type { JSHandle, Locator, Page } from "@playwright/test";
 import type { GameType } from "../src/Types";
@@ -1145,7 +1146,7 @@ for (const theme of ["light", "dark"] as const) {
     await expect(
       page
         .getByRole("region", { name: "Goals", exact: true })
-        .getByText("Acquire Valley Electric or Ridge Electric · Dec 2014", {
+        .getByText("Acquire 3 competitors · Dec 2014", {
           exact: true,
         }),
     ).toBeVisible();
@@ -1289,18 +1290,6 @@ for (const theme of ["light", "dark"] as const) {
     const surface = await inspectTile(page, ridge);
     await expect(surface).toContainText("Estimated demand");
     await expectCityDemand(surface);
-    await surface
-      .getByRole("button", { name: "Inspect Ridge Electric", exact: true })
-      .click();
-    const terms = page.getByRole("dialog", {
-      name: "Acquisition terms",
-      exact: true,
-    });
-    await expectDialogToFit(terms);
-    await expect(terms).toContainText("Assumed debt");
-    await terms
-      .getByRole("button", { name: "Back to territories", exact: true })
-      .click();
     const acquire = surface.getByRole("button", {
       name: "Acquire Ridge Electric",
       exact: true,
@@ -1997,7 +1986,7 @@ for (const theme of ["light", "dark"] as const) {
 
   test(`acquires Vergennes from its plant border in ${theme}`, async ({
     page,
-  }) => {
+  }, info) => {
     await startMap(page, theme);
     const city = getTerritoryTile("parcel-1:city")!;
     const plant = getTerritoryTile("parcel-0:site-1")!;
@@ -2017,13 +2006,51 @@ for (const theme of ["light", "dark"] as const) {
     const map = await openMap(page);
     const before = (await readSavedGame(page))!;
     expect(isAdjacentToOwnedTerritoryTile(before, city)).toBe(false);
-    const quote = tilePurchaseQuote(before, plant.id)!;
-    expect(tilePurchaseQuote(before, city.id)?.price).toBe(quote.price);
+    const quote = acquisitionQuote(before, "parcel-1")!;
+    expect(tilePurchaseQuote(before, city.id)).toBeUndefined();
+    await map.getByRole("button", { name: "Rapid connection mode" }).click();
     await panToTile(page, plant);
-    await map.locator(`[data-map-target="${plant.id}"]`).click();
+    const plantTarget = map.locator(`[data-map-target="${plant.id}"]`);
+    await expect(plantTarget).toHaveAttribute("data-purchasable", "false");
+    await plantTarget.click();
     const surface = tileSurface(page);
-    await expect(surface).toContainText(quote.utilityName!);
-    await surface.getByRole("button", { name: /^Acquire utility ·/ }).click();
+    const acquire = surface.getByRole("button", {
+      name: `Acquire ${quote.name}`,
+      exact: true,
+    });
+    await acquire.click();
+    const review = page.getByRole("dialog", {
+      name: `Acquire ${quote.name}?`,
+      exact: true,
+    });
+    await expectDialogToFit(review);
+    await expect(review).toContainText("Sites transferred");
+    await expect(review).toContainText("The seller removes its plant.");
+    await expect(review.getByRole("button", { name: "Take loan" })).toHaveCount(
+      0,
+    );
+    const cancel = review.getByRole("button", { name: "Cancel", exact: true });
+    const confirm = review.getByRole("button", {
+      name: "Confirm",
+      exact: true,
+    });
+    const [cancelBox, confirmBox] = await Promise.all([
+      cancel.boundingBox(),
+      confirm.boundingBox(),
+    ]);
+    expect(Math.abs(cancelBox!.y - confirmBox!.y)).toBeLessThan(2);
+    await cancel.click();
+    expect(ownsTerritoryTile((await readSavedGame(page))!, plant.id)).toBe(
+      false,
+    );
+    await acquire.click();
+    await reviewScreenshot(review, {
+      path: info.outputPath(`municipal-acquisition-${theme}.png`),
+      animations: "disabled",
+      scale: "css",
+    });
+    await confirm.click();
+    await expect(review).toHaveCount(0);
     const saved = (await readSavedGame(page))!;
     expect(ownsTerritoryTile(saved, plant.id)).toBe(true);
     expect(ownsTerritoryTile(saved, city.id)).toBe(true);
@@ -2031,7 +2058,7 @@ for (const theme of ["light", "dark"] as const) {
       quote.customers,
     );
     expect(currentTick(saved)!.cash).toBeCloseTo(
-      currentTick(before)!.cash - quote.price,
+      currentTick(before)!.cash - quote.cashDue,
       1,
     );
     expect(saved.facilities).toHaveLength(before.facilities.length);

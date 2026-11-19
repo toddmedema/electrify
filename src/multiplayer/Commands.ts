@@ -10,7 +10,11 @@ import {
 } from "../helpers/TerritoryTiles";
 import { validPowerAgreementAction } from "../helpers/PowerAgreements";
 import { isBuyingRule, isSellingRule } from "../helpers/TradingRules";
-import { acquisitionQuote, validAcquisitionAction } from "../helpers/Expansion";
+import {
+  acquisitionPaymentDue,
+  acquisitionQuote,
+  validAcquisitionAction,
+} from "../helpers/Expansion";
 import { isLandTerritoryId, isTerritoryId } from "../data/Territories";
 import {
   validLandPurchaseAction,
@@ -238,7 +242,7 @@ const GAME_COMMAND_VALIDATORS = {
     const quote = acquisitionQuote(game, payload.targetId);
     if (!quote || quote.quoteKey !== payload.quoteKey)
       return { error: "This acquisition quote has changed. Review it again." };
-    const due = payload.financed ? quote.financedCashDue : quote.cashDue;
+    const due = acquisitionPaymentDue(quote, payload.financed);
     return (currentTick(game)?.cash ?? -1) >= due
       ? { payload }
       : { error: "Not enough cash for this acquisition" };

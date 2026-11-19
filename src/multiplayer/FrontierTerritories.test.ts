@@ -1,3 +1,4 @@
+import { acquisitionQuote } from "../helpers/Expansion";
 import { SAVE_SCHEMA_VERSION } from "../SaveSchema";
 import { LAND_TERRITORIES } from "../data/Territories";
 import { UTILITY_AREAS } from "../data/UtilityExpansion";
@@ -78,6 +79,18 @@ function buy(world: World, seat: string, id: LandTerritoryId) {
     },
   });
 }
+function acquireVergennes(world: World, seat: string, quoteKey: string) {
+  return applyCommand(world, seat, {
+    matchId: world.matchId,
+    epoch: world.epoch,
+    sequence: (world.sequences[seat] ?? 0) + 1,
+    command: {
+      kind: "action",
+      name: "acquireUtility",
+      payload: { targetId: "parcel-1", financed: false, quoteKey },
+    },
+  });
+}
 it("serializes each parcel's claim while independent claims coexist through save/resume", () => {
   const world = ready();
   expect(buy(world, "0", "parcel-0")).toBeUndefined();
@@ -86,21 +99,32 @@ it("serializes each parcel's claim while independent claims coexist through save
   expect(buy(world, "1", "parcel-0")).toMatch(/owned/i);
   expect(currentTick(world.grids[1])!.cash).toBe(losingCash);
   expect(buy(world, "1", "parcel-2")).toBeUndefined();
-  expect(buy(world, "0", "parcel-1")).toBeUndefined();
+  const quote = acquisitionQuote(roomView(world, "0").game!, "parcel-1")!;
+  expect(acquireVergennes(world, "0", quote.quoteKey)).toBeUndefined();
   expect(roomView(world, "1").game!.multiplayer!.tileOwners).toMatchObject({
     "parcel-0:site-0": { seat: "0" },
     "parcel-1:city": { seat: "0" },
     "parcel-2:site-0": { seat: "1" },
   });
-  const restored = restoreWorld(
-    JSON.parse(JSON.stringify(checkpointWorld(world))),
-    "restored",
+  const saved = JSON.parse(JSON.stringify(checkpointWorld(world)));
+  saved.gameSchema = 19;
+  saved.rules =
+    "coop-2-fdb701fc666648e148ecc4d6a02e4b2001090bc79052092a4e567ea9184714ef";
+  saved.grids[0].objectiveProgress = { rulesDigest: "pre-acquisition-goals" };
+  const restored = restoreWorld(saved, "restored");
+  expect(
+    restored.grids[0].objectiveProgress?.entries.map(({ id }) => id),
+  ).toEqual(["acquire-neighbor", "retain-customers"]);
+  expect(currentTick(restored.grids[0])!.cash).toBe(
+    currentTick(world.grids[0])!.cash,
   );
   expect(ownedTerritories(restored.grids[0])).toEqual(
     expect.arrayContaining(["parcel-0", "parcel-1"]),
   );
   expect(ownedTerritories(restored.grids[1])).toContain("parcel-2");
-  expect(buy(restored, "1", "parcel-1")).toMatch(/owned/i);
+  expect(acquireVergennes(restored, "1", quote.quoteKey)).toMatch(
+    /quote has changed/,
+  );
 });
 it("migrates only recognized published schema14 co-op rules and keeps paid claims and cash", () => {
   const world = ready();

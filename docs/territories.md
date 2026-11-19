@@ -24,14 +24,17 @@ desaturate over three distance bands from the company's land. New connections
 stay within the board. Older saves retain their paid sites beyond its edge.
 The board uses the same versioned coordinates in single-player and co-op.
 
-Vergennes, Waterbury, Bristol, and Middlebury each have a local utility with a
-neighboring plant. Touching either site lets the player acquire both sites and
-the utility's customers together. The seller removes the equipment on transfer.
+Open any competitor's tile and choose **Acquire** to review its deal. A shared
+border with any of the seller's sites enables confirmation. The same review
+shows the cash price, customers, sites, and the change in expected supply margin.
 
-Valley Electric and Ridge Electric can each be inspected from any tile.
-Acquiring either utility requires a shared land border with one of its tiles.
-Their plants, customers, sites, corporate debt and dated third-party obligations
-transfer together. A purchase agreement with the acquired seller ends as an
+The municipal utilities in Vergennes, Waterbury, Bristol, and Middlebury
+transfer their city, customers, and neighboring plant site for cash. The seller
+removes the equipment and the site becomes available to build on.
+
+Valley Electric and Ridge Electric transfer their plants, customers, sites,
+corporate debt, and dated third-party obligations. Their reviews include loan
+terms, inherited power contracts, and monthly utility operations. A purchase agreement with the acquired seller ends as an
 external supply/charge; its owned fleet replaces that promise. Buying an inefficient
 fleet can increase operating costs. Acquiring it does not improve its plants.
 
@@ -63,9 +66,8 @@ Prices use 2005 dollars, indexed by the existing seeded CPI:
 
 Land has no construction clock or recurring upkeep. Its dated receipt records the
 price, and land remains a non-depreciating capital asset. Exchanging cash for land
-preserves net worth while reducing cash available for facilities. Customer
-transfers are counted once and join the retention objective's baseline before
-its deadline; buying land does not replace a required utility acquisition.
+preserves net worth while reducing cash available for facilities. A utility acquisition credits customers once and counts toward the competitor
+goal. Its customers join the retention baseline.
 
 Ordinary inspection offers one clearly priced **Connect** action. “Connection cost”
 is the same instant land transaction described above; the wording adds no line

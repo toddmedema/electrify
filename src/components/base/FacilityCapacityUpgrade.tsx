@@ -40,7 +40,6 @@ import type {
   FacilityExpansionCancellationResult,
 } from "../../helpers/RequestFacilityExpansion";
 import { useMoney } from "./CurrencyContext";
-import { facilityDisplayName } from "./FacilityLabels";
 import ConfirmDialog from "./ConfirmDialog";
 import DecisionImpactPreview from "./DecisionImpactPreview";
 import { signature } from "./DeferredProjection";
@@ -332,7 +331,7 @@ export default function FacilityCapacityUpgrade({
         <ConfirmDialog
           open
           isolateClicks
-          title={`Upgrade ${facilityDisplayName(facility)} capacity`}
+          title={`Upgrade ${facility.name} capacity`}
           contentClassName="facilityCapacityDialog"
           pending={pending}
           confirmLabel={
@@ -463,10 +462,10 @@ export default function FacilityCapacityUpgrade({
           }}
         >
           <DialogContentText>
-            Cancel the added capacity at {facilityDisplayName(facility)} for a
-            full refund of {money.formatMoneyConcise(cancelReview.cost)}. The
-            existing {capacity(size)} plant keeps operating. Construction
-            emissions already released remain recorded.
+            Cancel the added capacity at {facility.name} for a full refund of{" "}
+            {money.formatMoneyConcise(cancelReview.cost)}. The existing{" "}
+            {capacity(size)} plant keeps operating. Construction emissions
+            already released remain recorded.
           </DialogContentText>
           {message && (
             <DialogContentText role="alert">{message}</DialogContentText>

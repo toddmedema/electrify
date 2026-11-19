@@ -14,7 +14,7 @@ export function landCustomerProfiles(
     .filter(
       (territory) =>
         (territory.customers ?? 0) > 0 &&
-        landReceipts(game).some(
+        landCustomerReceipts(game).some(
           (receipt) =>
             receipt.territoryId === territory.id && receipt.minute <= minute,
         ),
@@ -31,7 +31,7 @@ export function landCustomerMarket(game: Pick<GameType, "territoryNetwork">) {
     0,
   );
 }
-function landReceipts(game: Pick<GameType, "territoryNetwork">) {
+export function landCustomerReceipts(game: Pick<GameType, "territoryNetwork">) {
   return [
     ...(game.territoryNetwork?.landPurchases ?? []),
     ...(game.territoryNetwork?.tilePurchases ?? []).flatMap((receipt) => {
@@ -47,7 +47,7 @@ export function landTransferredCustomerTotal(
   game: Pick<GameType, "territoryNetwork">,
   beforeMinute = Infinity,
 ) {
-  return landReceipts(game).reduce(
+  return landCustomerReceipts(game).reduce(
     (sum, receipt) =>
       sum +
       (receipt.minute < beforeMinute
@@ -64,7 +64,9 @@ export function landTransferredCustomers(
   game: Pick<GameType, "territoryNetwork">,
   id: TerritoryId,
 ): number {
-  const receipt = landReceipts(game).find((entry) => entry.territoryId === id);
+  const receipt = landCustomerReceipts(game).find(
+    (entry) => entry.territoryId === id,
+  );
   return receipt
     ? customerMarketSizeAt(cityCustomerCount(id), receipt.minute)
     : 0;

@@ -124,7 +124,6 @@ import CancelIcon from "@mui/icons-material/Cancel";
 import ConfirmDialog from "../base/ConfirmDialog";
 import ConstructionBuildHeader from "../base/ConstructionBuildHeader";
 import AcquisitionReviewDialog from "../base/AcquisitionReviewDialog";
-import UtilityOfferDialog from "../base/UtilityOfferDialog";
 import AcquiredUtilities from "./AcquiredUtilities";
 import {
   isUtilityExpansionGame,
@@ -696,9 +695,6 @@ export default function TransmissionPanel({
       acquiredSummaryRef.current?.focus();
     }
   }, [acquisitionTargetId]);
-  const [companyTargetId, setCompanyTargetId] = React.useState<string | null>(
-    null,
-  );
   const [cancelLine, setCancelLine] =
     React.useState<TransmissionLineOperatingType | null>(null);
   const [selectedLine, setSelectedLine] = React.useState<number | null>(null);
@@ -836,18 +832,18 @@ export default function TransmissionPanel({
 
   return (
     <div className={projectsOnly ? "transmissionPanel" : "transmissionFleet"}>
-      {acquisitionTargetId && onAcquire && (
+      {acquisitionTargetId && (
         <AcquisitionReviewDialog
           game={game}
           targetId={acquisitionTargetId}
           onClose={() => setAcquisitionTargetId(null)}
           onAcquire={async (payload) => {
-            const accepted = await onAcquire(payload);
+            const accepted = await onAcquire?.(payload);
             if (accepted) {
               setSelectedLine(null);
               focusAcquiredSummary.current = true;
             }
-            return accepted;
+            return !!accepted;
           }}
         />
       )}
@@ -1524,7 +1520,9 @@ export default function TransmissionPanel({
                   outlook={outlookFor(corridor.id, corridor.capacityW)}
                   units={units}
                   onCompanyReview={
-                    offer ? () => setCompanyTargetId(offer.targetId) : undefined
+                    offer
+                      ? () => setAcquisitionTargetId(offer.targetId)
+                      : undefined
                   }
                   onReview={() => setReviewId(corridor.id)}
                   onUseMaxSize={
@@ -1609,13 +1607,6 @@ export default function TransmissionPanel({
           }
           upkeepDetail="Plus electricity purchases and loan payments."
           onPurchase={approve}
-        />
-      )}
-      {companyTargetId && (
-        <UtilityOfferDialog
-          game={game}
-          targetId={companyTargetId}
-          onClose={() => setCompanyTargetId(null)}
         />
       )}
     </div>

@@ -1,8 +1,9 @@
 # Across the Valley
 
 Scenario 116 is a fictional Vermont Investor utility, January 2005–December 2024.
-Acquire Valley Electric or Ridge Electric directly, sign finite power agreements,
-build facilities and connect individual tiles for customers or new building sites.
+Acquire three competing utilities by December 2014 and retain 90% of your expanded
+customer base in December 2024. Build facilities, sign power agreements, and connect
+individual building sites as your service area grows.
 All owned customers and facilities share one company power pool. Location controls
 finite suitable sites. Connecting uses the existing tile price; there is no
 additional line project, transfer bottleneck or recurring connection fee. Human
@@ -10,8 +11,9 @@ co-op companies remain independent, with new empty-land claims accepted once in
 host command order.
 
 Inherited nuclear and Québec hydro commitments retain their original dates.
-Acquisition transfers plants, customers, sites, debts and third-party obligations;
-a PPA with the acquired seller ends as an external delivery/charge. Visible unowned
+Each deal transfers the customers and sites shown in its review. Regional deals
+also transfer operating plants, debt, and inherited power contracts. A PPA with
+the acquired seller ends as an external delivery and charge. Visible unowned
 tiles touching physically owned company land are purchasable; a PPA extends sight
 without granting purchase adjacency. General land, mixed-demand cities, and
 special hydro or geothermal sites have distinct cash prices and benefits. See
@@ -169,7 +171,7 @@ energy, incentives and historical benefits are preserved at their actual amounts
 buying customers does not install another copy of that equipment.
 
 Acquisition receipts retain target identity and timing for purchased-power
-contracts, retirement obligations and transaction validation. Corporate borrowing
+contracts, scenario progress, and transaction validation. Corporate borrowing
 and the non-resellable service-network assets remain in their financial ledgers.
 They do not track separate operating customer populations. Network impairment
 uses combined company retention while each asset keeps its purchase vintage and
@@ -177,9 +179,7 @@ uses combined company retention while each asset keeps its purchase vintage and
 
 The end-of-2024 retention goal is 90% of the original 90,000 customers plus the
 customers transferred in purchases before that evaluation. A purchase during
-Keep playing does not rewrite an already recorded mission result. The original
-Oil A and acquired original oil retirement deadlines remain unchanged. Valley's
-nuclear purchase still drops from 160 MW to 80 MW in January 2017, and all bounded
+Keep playing leaves the recorded mission result final. Valley's nuclear purchase drops from 160 MW to 80 MW in January 2017, and all bounded
 purchased-power rights serve the combined company without external resale.
 
 Inherited Ridge gas keeps a fixed $147,475 opening cold-weather package value,
@@ -208,16 +208,16 @@ their existing real prices. Players must sign finite replacements or build suppl
 there is no unlimited regional-market fallback. The Valley reminder arrives in
 2013, and the common 2020 change is announced in 2016.
 
-Both companies' offers can be inspected directly from the territory map. They
-show dated terms, future contract changes, and the separate acquisition obligation.
-The owning purchase API requires a fresh executable quote and funds, with no
-connection prerequisite. Agreements display forecasted cash impact against
+Use **Acquire** from any competitor's tile to review price, customer transfer,
+sites, and expected supply margin. Municipal offers include the plant being
+removed and the cost of each site. Regional offers include financing, operating
+plants, and dated power contracts. Confirmation requires a shared border, an up-to-date
+quote, and enough cash. Agreements display forecasted cash impact against
 omitting the agreement rather than assuming unlimited substitute purchases.
 
 Scenario's Supply plan shares the existing tariff-sensitive projection. It shows
 the next year's customer count and peak demand, the first projected month below
-the difficulty's service threshold, original-asset retirement dates and future
-contract limits. Preparation dates use the real dated, difficulty-scaled quote
+the difficulty's service threshold and future contract limits. Preparation dates use the real dated, difficulty-scaled quote
 for a reference 150 MW combined-cycle plant. Other projects and demand programs
 remain choices; the reference does not claim to cover the whole forecast gap.
 
@@ -243,7 +243,7 @@ npm run test:once -- UtilityExpansionBalance --runInBand
 ```
 
 Reports record company-wide energy, finances, customer retention, accepted
-transactions, timed obligations and outcomes. Early losses are not evidence about
+transactions, acquisition and retention outcomes. Early losses are not evidence about
 later events. Current-format saves persist the aggregate customer and market
 totals, transaction and financial ledgers, and one forecast timeline.
 
@@ -256,7 +256,7 @@ net worth. Separate controls check that unused finite agreements still charge
 their minimum and that signing a neighbor PPA cannot create duplicate power
 after buying its seller.
 
-Prepared cash and financed portfolios retain their full-term service, retirement,
+Prepared cash and financed portfolios retain their full-term service, acquisition,
 retention and financial-invariant checks. Unprepared acquisition controls must
 expose the 2020 loss of contracted coverage instead of receiving free replacement
 market access. CEO cash plans also exercise neighboring acquisition dates in

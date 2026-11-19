@@ -608,12 +608,12 @@ it("acknowledges ownership immediately without inventing completed-month history
   game = buy(game, "ridge-electric");
   const after = gameObjectiveResults(game);
   expect(
-    after.find((result) => result.metric === "utilityOwnership")!.status,
-  ).toBe("completed");
+    after.find((result) => result.metric === "utilityOwnership"),
+  ).toMatchObject({ status: "inProgress", observed: 1, target: 3 });
   expect(
     after.find((result) => result.metric === "customerRetention")!.status,
   ).toBe("pending");
-  expect(getMissionStatus(game).headline!.id).toBe("retire-champlain-oil");
+  expect(getMissionStatus(game).headline!.id).toBe("acquire-neighbor");
   expect(JSON.stringify(game.monthlyHistory)).toBe(history);
   expect(game.objectiveProgress!.completedMonths).toBe(completed);
 });

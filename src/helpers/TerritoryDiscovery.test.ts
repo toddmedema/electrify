@@ -13,7 +13,7 @@ import {
 import { validHydroClaims } from "../data/HydroSites";
 import { parseSave, serializeSave } from "../SaveGame";
 import reducer, { buildFacility, tickState } from "../reducers/Game";
-import { acquireTile } from "../reducers/GameActions";
+import { acquireTile, acquireUtility } from "../reducers/GameActions";
 import { createGame } from "../testing/Simulator";
 import type { GameType, TerritoryTileId } from "../Types";
 import { currentTick } from "./GameSelectors";
@@ -58,7 +58,11 @@ function reveal(game: GameType, target: { q: number; r: number }) {
     territoryHexDistance(tile, target);
   for (let step = 0; step < 40; step++) {
     const tile = territoryTileAt(target.q, target.r)!;
-    if (tilePurchaseQuote(game, tile.id) || ownsTerritoryTile(game, tile))
+    if (
+      tilePurchaseQuote(game, tile.id) ||
+      acquisitionQuote(game, tile.territoryId) ||
+      ownsTerritoryTile(game, tile)
+    )
       return tile;
     const candidates = [...tilePurchaseQuotes(game).keys()]
       .map((id) => getTerritoryTile(id, game)!)
@@ -180,17 +184,18 @@ it("does not grant neighboring authored sites, duplicate cash or customer credit
   const city = reveal(game, { q: 1, r: 3 });
   if (!city.city) throw new Error("Expected authored industrial city");
   const customers = currentTick(game)!.customers;
-  const quote = buy(game, city.id);
-  expect(currentTick(game)!.customers).toBe(customers + quote.customers);
-  expect(landTransferredCustomers(game, city.territoryId)).toBe(
+  const quote = acquisitionQuote(game, city.territoryId)!;
+  const payload = {
+    targetId: quote.targetId,
+    financed: false,
+    quoteKey: quote.quoteKey,
+  };
+  const purchased = reducer(game, acquireUtility(payload));
+  expect(currentTick(purchased)!.customers).toBe(customers + quote.customers);
+  expect(landTransferredCustomers(purchased, city.territoryId)).toBe(
     quote.customers,
   );
-  const cash = currentTick(game)!.cash;
-  expect(
-    purchaseTile(game, { tileId: city.id, quoteKey: quote.quoteKey }),
-  ).toBe(false);
-  expect(currentTick(game)!.cash).toBe(cash);
-  expect(currentTick(game)!.customers).toBe(customers + quote.customers);
+  expect(reducer(purchased, acquireUtility(payload))).toBe(purchased);
 });
 function generatedTarget(benefit: string) {
   const tile = VALLEY_BOARD.find(
@@ -279,7 +284,16 @@ it.each(["residential", "industrial"] as const)(
       benefit === "residential" ? "parcel-1:city" : "parcel-11:city",
     )!;
     reveal(game, target);
-    const offer = buy(game, target.id);
+    const offer = acquisitionQuote(game, target.territoryId)!;
+    const acquired = reducer(
+      game,
+      acquireUtility({
+        targetId: offer.targetId,
+        quoteKey: offer.quoteKey,
+        financed: false,
+      }),
+    );
+    Object.assign(game, cloneDeep(acquired));
     expect(offer.customers).toBeGreaterThan(0);
     expect(
       territoryDemandByType(game, currentTick(game)!, target.territoryId)[

@@ -18,7 +18,6 @@ import {
   formatWattHoursOfPeak,
 } from "../../helpers/Format";
 import { facilityActionIcon } from "../views/FacilityContextMenu";
-import { facilityDisplayName } from "./FacilityLabels";
 import { facilityOperatingStatus } from "./FacilityMapStatus";
 import { useMoney } from "./CurrencyContext";
 import ConfirmDialog from "./ConfirmDialog";
@@ -72,7 +71,7 @@ function FacilityActions(props: {
           className="facilityCancelConstruction"
           variant="outlined"
           startIcon={facilityActionIcon("cancelUpgrade")}
-          aria-label={"Cancel upgrade of " + facilityDisplayName(facility)}
+          aria-label={"Cancel upgrade of " + facility.name}
           onClick={() => onCancelRetrofit(facility.id)}
         >
           <span className="facilityActionLabel">Cancel upgrade</span>
@@ -84,13 +83,13 @@ function FacilityActions(props: {
           startIcon={facilityActionIcon(facility.paused ? "resume" : "pause")}
           aria-label={
             facility.paused
-              ? "Resume " + facilityDisplayName(facility)
-              : "Pause " + facilityDisplayName(facility)
+              ? "Resume " + facility.name
+              : "Pause " + facility.name
           }
           onClick={() =>
             facility.paused
               ? onTogglePause(facility.id)
-              : onPause(facility.id, facilityDisplayName(facility))
+              : onPause(facility.id, facility.name)
           }
         >
           <span className="facilityActionLabel">
@@ -117,7 +116,7 @@ function FacilityActions(props: {
           )}
           aria-label={
             (underConstruction ? "Cancel construction of " : "Sell ") +
-            facilityDisplayName(facility)
+            facility.name
           }
           onClick={onOpenSell}
         >
@@ -191,10 +190,7 @@ export default function ExpandedFacilityDetails({
           title={
             <>
               {underConstruction ? "Cancel construction of" : "Sell"}{" "}
-              {formatFacilitySize(facility)}{" "}
-              {facilityDisplayName(facility) === facility.name
-                ? facility.name.toLowerCase()
-                : facilityDisplayName(facility)}{" "}
+              {formatFacilitySize(facility)} {facility.name.toLowerCase()}{" "}
               facility?
             </>
           }

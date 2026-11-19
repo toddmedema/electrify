@@ -814,7 +814,7 @@ describe("the fleet list", () => {
     expect(onPause).toHaveBeenCalledWith(facility.id, facility.name);
   });
 
-  it("names the original Oil A retirement target in its direct sale confirmation", async () => {
+  it("uses the normal oil plant label in its sale confirmation", async () => {
     const expansion = createGame({ scenarioId: 116 });
     const oil = expansion.facilities.find(
       (facility) => facility.startingAssetId === "scenario-116-champlain-oil-a",
@@ -822,11 +822,11 @@ describe("the fleet list", () => {
     const { onSell } = renderFacilities(expansion, oil.id);
     await user.click(
       screen.getByRole("button", {
-        name: "Sell Oil A",
+        name: "Sell Oil",
       }),
     );
     const dialog = screen.getByRole("dialog");
-    expect(dialog).toHaveAccessibleName("Sell 40MW Oil A facility?");
+    expect(dialog).toHaveAccessibleName("Sell 40MW oil facility?");
     expect(
       within(dialog).getByRole("button", { name: "Never mind" }),
     ).toHaveFocus();

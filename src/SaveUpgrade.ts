@@ -1,3 +1,4 @@
+import { gameObjectiveProgress } from "./helpers/ObjectiveRules";
 import {
   legacyTerritoryTiles,
   assignTerritoryTiles,
@@ -390,6 +391,29 @@ const migrations: readonly Migration[] = [
   },
   // Standing facilities can retain paid capacity work and reconcile it with acquisition terms.
   (save) => save,
+  // 19 -> 20: rebuild the Valley's scored goals from saved customer history and purchase receipts.
+  (save) => {
+    if (!object(save.game)) return null;
+    if (
+      save.game.scenarioId !== 116 ||
+      save.game.objectiveProgress === undefined
+    )
+      return save;
+    if (
+      !object(save.game.objectiveProgress) ||
+      !Array.isArray(save.game.monthlyHistory)
+    )
+      return null;
+    const { objectiveProgress: _retiredRules, ...game } = save.game;
+    try {
+      const progress = gameObjectiveProgress(game as unknown as GameType);
+      return progress
+        ? { ...save, game: { ...game, objectiveProgress: progress } }
+        : null;
+    } catch {
+      return null;
+    }
+  },
 ];
 
 /** Structure versions are independent of app releases and simulation compatibility. */

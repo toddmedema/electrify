@@ -522,6 +522,13 @@ const objective = () => ({
     }[metric];
     Object.assign(props, targets);
     required.push(...Object.keys(targets));
+    if (metric === "utilityOwnership")
+      props.minUtilities = numeric(
+        1,
+        16,
+        "Minimum number of distinct target utilities to acquire. Defaults to one.",
+        true,
+      );
     if (metric === "fuelRetirement")
       props.commissionedBeforeYear = numeric(
         1800,

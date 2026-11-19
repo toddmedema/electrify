@@ -93,7 +93,6 @@ import {
 } from "../../helpers/Hazards";
 import { dayCount, resilienceName } from "../base/WeatherResilienceText";
 import TransmissionPanel, { TradingControls } from "./TransmissionPanel";
-import { facilityDisplayName } from "../base/FacilityLabels";
 import { BuyingRuleType, SellingRuleType } from "../../Types";
 import { corridorsForLocation } from "../../data/AdjacentMarkets";
 import { GAME_TO_REAL_YEARS, TICKS_PER_HOUR } from "../../Constants";
@@ -527,7 +526,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                 type="button"
                 {...provided.dragHandleProps}
                 className="facilityDragHandle"
-                aria-label={"Reorder " + facilityDisplayName(facility)}
+                aria-label={"Reorder " + facility.name}
                 title="Drag to reorder"
                 onClick={(event) => {
                   if (event.shiftKey || event.ctrlKey || event.metaKey)
@@ -549,7 +548,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
               type="button"
               className="facilityDisclosure"
               aria-label={
-                `Inspect ${facilityDisplayName(facility)}` +
+                `Inspect ${facility.name}` +
                 (hasTerritoryNetwork(game)
                   ? `, ${territoryName(facilityTerritoryId(facility))}`
                   : "") +
@@ -570,9 +569,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                 <FacilityRowText
                   name={
                     <>
-                      <span className="facilityName">
-                        {facilityDisplayName(facility)}
-                      </span>
+                      <span className="facilityName">{facility.name}</span>
                       {hasTerritoryNetwork(game) && (
                         <span className="facilityTerritoryLabel">
                           {territoryName(facilityTerritoryId(facility))}
@@ -629,7 +626,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                 onClick={(event) => props.onToggleSelection(facility.id, event)}
                 slotProps={{
                   input: {
-                    "aria-label": `Select ${facilityDisplayName(facility)}`,
+                    "aria-label": `Select ${facility.name}`,
                   },
                 }}
               />

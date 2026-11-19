@@ -52,6 +52,18 @@ function buy(world: World, seat: string, tileId: unknown, quoteKey: unknown) {
     },
   });
 }
+function acquireTown(world: World, seat: string, quoteKey: string) {
+  return applyCommand(world, seat, {
+    matchId: world.matchId,
+    epoch: world.epoch,
+    sequence: (world.sequences[seat] ?? 0) + 1,
+    command: {
+      kind: "action",
+      name: "acquireUtility",
+      payload: { targetId: "parcel-1", financed: false, quoteKey },
+    },
+  });
+}
 function startClock(world: World) {
   world.seats.forEach((seat) => {
     expect(
@@ -71,7 +83,7 @@ it("accepts unchanged land quotes after a host clock tick and rejects real CPI r
     roomView(world, "0").game!,
     "green-uplands:site-0",
   )!;
-  const city = tilePurchaseQuote(roomView(world, "0").game!, "parcel-1:city")!;
+  const city = acquisitionQuote(roomView(world, "0").game!, "parcel-1")!;
   startClock(world);
   stepWorld(world);
   expect(world.grids[0].date.minute).toBe(TICK_MINUTES);
@@ -79,10 +91,14 @@ it("accepts unchanged land quotes after a host clock tick and rejects real CPI r
     tilePurchaseQuote(roomView(world, "0").game!, offer.tileId)!.price,
   ).toBe(offer.price);
   expect(buy(world, "0", offer.tileId, offer.quoteKey)).toBeUndefined();
-  const grownCity = tilePurchaseQuote(roomView(world, "0").game!, city.tileId)!;
+  const grownCity = acquisitionQuote(
+    roomView(world, "0").game!,
+    city.targetId,
+  )!;
   expect(grownCity.customers).toBeGreaterThan(city.customers);
   const customers = currentTick(world.grids[0])!.customers;
-  expect(buy(world, "0", city.tileId, city.quoteKey)).toBeUndefined();
+  expect(acquireTown(world, "0", city.quoteKey)).toMatch(/quote has changed/);
+  expect(acquireTown(world, "0", grownCity.quoteKey)).toBeUndefined();
   expect(currentTick(world.grids[0])!.customers).toBe(
     customers + grownCity.customers,
   );
@@ -368,23 +384,25 @@ it("rejects stale, unaffordable and duplicate city claims without duplicate cust
   const world = ready();
   buyToward(world, "0", "green-uplands:site-4");
   const game = world.grids[0];
-  const quote = tilePurchaseQuote(game, "parcel-1:city")!;
+  const quote = acquisitionQuote(game, "parcel-1")!;
   const before = JSON.stringify(world.grids);
-  expect(buy(world, "0", quote.tileId, "stale")).toMatch(/quote has changed/);
+  expect(acquireTown(world, "0", "stale")).toMatch(/quote has changed/);
   expect(JSON.stringify(world.grids)).toBe(before);
-  currentTick(game)!.cash = quote.price - 1;
+  currentTick(game)!.cash = quote.cashDue - 1;
   const low = JSON.stringify(world.grids);
-  expect(buy(world, "0", quote.tileId, quote.quoteKey)).toMatch(/unaffordable/);
+  expect(acquireTown(world, "0", quote.quoteKey)).toMatch(/not enough cash/i);
   expect(JSON.stringify(world.grids)).toBe(low);
-  currentTick(game)!.cash = quote.price;
+  currentTick(game)!.cash = quote.cashDue;
   const customers = currentTick(game)!.customers;
-  expect(buy(world, "0", quote.tileId, quote.quoteKey)).toBeUndefined();
+  expect(acquireTown(world, "0", quote.quoteKey)).toBeUndefined();
   expect(currentTick(world.grids[0])!.cash).toBe(0);
   expect(currentTick(world.grids[0])!.customers).toBe(
     customers + quote.customers,
   );
   const after = JSON.stringify(world.grids);
-  expect(buy(world, "0", quote.tileId, quote.quoteKey)).toBeDefined();
+  expect(acquireTown(world, "1", quote.quoteKey)).toMatch(/quote has changed/);
+  expect(JSON.stringify(world.grids)).toBe(after);
+  expect(acquireTown(world, "0", quote.quoteKey)).toBeDefined();
   expect(JSON.stringify(world.grids)).toBe(after);
 });
 it("restores only the published schema16 identity, preserving old whole-parcel rights and finances", () => {
