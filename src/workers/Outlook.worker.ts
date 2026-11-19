@@ -13,14 +13,22 @@ async function runPending(): Promise<void> {
   if (running) return;
   running = true;
   while (pending) {
-    const { requestId, kind, game, facility, territoryId, tileId } = pending;
+    const { requestId, kind, game, facility, territoryId, tileId, repower } =
+      pending;
     pending = undefined;
     try {
       await loadData(game);
       if (pending) continue;
       worker.postMessage({
         requestId,
-        result: computeOutlook(kind, game, facility, territoryId, tileId),
+        result: computeOutlook(
+          kind,
+          game,
+          facility,
+          territoryId,
+          tileId,
+          repower,
+        ),
       });
     } catch (_error) {
       worker.postMessage({ requestId, error: true });

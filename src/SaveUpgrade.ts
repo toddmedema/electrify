@@ -390,6 +390,8 @@ const migrations: readonly Migration[] = [
   },
   // Standing facilities can retain paid capacity work and reconcile it with acquisition terms.
   (save) => save,
+  // 19 -> 20: coal repowers extend the upgrade record. Existing projects are unchanged.
+  (save) => save,
 ];
 
 /** Structure versions are independent of app releases and simulation compatibility. */

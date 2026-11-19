@@ -52,6 +52,7 @@ import { isValidLocation } from "./helpers/Locations";
 import { isValidDifficulty } from "./helpers/Difficulty";
 import {
   validGasCycle,
+  validRepowerLoan,
   validResilienceRecord,
   validUpgradeInProgress,
 } from "./helpers/BuildValidation";
@@ -479,6 +480,13 @@ export function parseSave(
     return null;
   }
   const inheritedScenario = getScenario(game.scenarioId, game.customScenario);
+  const upgradeContext = {
+    date: game.date,
+    startingYear: game.startingYear,
+    scenarioId: game.scenarioId,
+    customScenario: game.customScenario,
+    difficulty: game.difficulty,
+  };
   if (inheritedScenario && !Array.isArray(inheritedScenario.facilities))
     return null;
   if (
@@ -566,7 +574,12 @@ export function parseSave(
         optionalBooleansInvalid ||
         !validResilienceRecord(current.fuel, current.resilience) ||
         !validGasCycle(current.fuel, current.gasCycle) ||
-        !validUpgradeInProgress(current.upgradeInProgress) ||
+        !validRepowerLoan(current) ||
+        !validUpgradeInProgress(
+          current.upgradeInProgress,
+          current,
+          upgradeContext,
+        ) ||
         ((current.upgradeInProgress as { upgrade?: unknown } | undefined)
           ?.upgrade === "combinedCycle" &&
           (current.fuel !== "Natural Gas" || current.gasCycle !== "simple"))
