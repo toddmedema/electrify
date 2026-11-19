@@ -1145,7 +1145,7 @@ for (const theme of ["light", "dark"] as const) {
     await expect(
       page
         .getByRole("region", { name: "Goals", exact: true })
-        .getByText("Acquire Valley Electric or Ridge Electric", {
+        .getByText("Acquire Valley Electric or Ridge Electric · Dec 2014", {
           exact: true,
         }),
     ).toBeVisible();

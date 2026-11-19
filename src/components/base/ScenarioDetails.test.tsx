@@ -338,6 +338,11 @@ it("keeps acquisition and retirement goals in scenario details", () => {
   expect(
     within(goals).getByText("Retain customers", { exact: true }),
   ).toBeInTheDocument();
-  expect(goals).toHaveTextContent("Acquire a competitor · Dec 2014");
+  expect(
+    within(goals).getByText(
+      "Acquire Valley Electric or Ridge Electric · Dec 2014",
+      { exact: true },
+    ),
+  ).toBeInTheDocument();
   expect(goals).toHaveTextContent("Keep ≥90% of customer baseline by Dec 2024");
 });
