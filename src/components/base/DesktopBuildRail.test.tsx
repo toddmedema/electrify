@@ -1,0 +1,413 @@
+import * as React from "react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import DesktopBuildRail from "./DesktopBuildRail";
+import { GameToolMemoryContext } from "./GameToolMemory";
+import { createGame } from "../../testing/Simulator";
+import { currentTick } from "../../helpers/GameSelectors";
+import { projectCatalogue } from "../../helpers/ProjectBuild";
+import { isStorage, type GameType, type TerritoryTileId } from "../../Types";
+import { getHydroAvailability } from "../../data/HydroSites";
+import { hasVisibleEscapeOverlay } from "./VisibleEscapeOverlay";
+import { projectSiteQuote, selectProject } from "../../helpers/ProjectBuild";
+import { formatMoneyConcise } from "../../helpers/Format";
+import { wToSliderTick } from "../../helpers/BuildSizing";
+import {
+  getTerritoryTile,
+  territoryTilePowerLimit,
+} from "../../helpers/TerritoryTiles";
+
+jest.mock("./BuildForecast", () => ({ useBuildForecast: () => undefined }));
+jest.mock("./ManualLink", () => (props: { children?: React.ReactNode }) => (
+  <>{props.children}</>
+));
+
+function show(siteId?: TerritoryTileId, prepare?: (game: GameType) => void) {
+  const game = createGame({ scenarioId: 116, seed: 188 });
+  game.startingYear = 2025;
+  game.date.year = 2025;
+  currentTick(game)!.cash = 1e12;
+  prepare?.(game);
+  const memory = new Map<string, unknown>();
+  const onProject = jest.fn();
+  const content = (busy = false, focusRequest = 0) => (
+    <GameToolMemoryContext.Provider value={memory}>
+      <DesktopBuildRail
+        game={game}
+        siteId={siteId}
+        busy={busy}
+        focusRequest={focusRequest}
+        onProject={onProject}
+      />
+    </GameToolMemoryContext.Provider>
+  );
+  const utils = render(content());
+  return {
+    game,
+    memory,
+    onProject,
+    ...utils,
+    update: (busy = false, focusRequest = 0) =>
+      utils.rerender(content(busy, focusRequest)),
+  };
+}
+const wind = () =>
+  screen.getByRole("button", { name: "Choose sites for Wind" });
+
+it("keeps every current catalogue technology discoverable with its canonical icon", () => {
+  const { game } = show();
+  const rail = screen.getByRole("complementary", { name: "Build facilities" });
+  const expected = [
+    ...projectCatalogue(game, 2e6, false),
+    ...projectCatalogue(game, 1e8, true),
+  ];
+  for (const option of expected.filter(
+    ({ name }) => name !== "Offshore Wind",
+  )) {
+    const button = within(rail).getByRole("button", {
+      name: `Choose sites for ${option.name}`,
+    });
+    expect(within(button).getByRole("presentation")).toHaveAttribute(
+      "src",
+      `/images/${option.name.toLowerCase()}.svg`,
+    );
+  }
+  expect(
+    screen.queryByLabelText(/technology preview$/),
+  ).not.toBeInTheDocument();
+});
+
+it("keeps a fixed icon order and fades technologies the company cannot afford", () => {
+  const { game, update, onProject } = show(undefined, (game) => {
+    currentTick(game)!.cash = 0;
+  });
+  const generators = screen.getByRole("region", {
+    name: "Generator technologies",
+  });
+  const buttons = within(generators).getAllByRole("button", {
+    name: /^Choose sites for /,
+  });
+  expect(
+    buttons.map((button) =>
+      button.getAttribute("aria-label")?.replace("Choose sites for ", ""),
+    ),
+  ).toEqual([
+    "Solar",
+    "Wind",
+    "Hydro",
+    "Geothermal",
+    "Natural Gas Peaker",
+    "Natural Gas CC",
+    "Oil",
+    "Biomass",
+    "Coal",
+    "Nuclear",
+  ]);
+  for (const button of buttons) {
+    expect(button).toHaveAttribute("aria-disabled", "true");
+    expect(button).toHaveTextContent(/^$/);
+  }
+  fireEvent.focus(wind());
+  expect(screen.getByLabelText("Wind technology preview")).toBeVisible();
+  fireEvent.click(wind());
+  expect(onProject).not.toHaveBeenCalled();
+  currentTick(game)!.cash = 1e9;
+  update();
+  expect(wind()).toHaveAttribute("aria-disabled", "false");
+});
+
+it("opens just one full expanded card on hover without spending or stealing focus", () => {
+  const { game, onProject } = show();
+  const before = JSON.stringify(game);
+  const button = wind();
+  fireEvent.mouseEnter(button);
+  const preview = screen.getByLabelText("Wind technology preview");
+  expect(within(preview).getByText("Build cost")).toBeInTheDocument();
+  expect(within(preview).getByText("Accounting lifetime")).toBeInTheDocument();
+  expect(
+    within(preview).queryByRole("button", {
+      name: /Review purchase|Show.*details/,
+    }),
+  ).not.toBeInTheDocument();
+  expect(button).not.toHaveFocus();
+  fireEvent.mouseEnter(
+    screen.getByRole("button", { name: "Choose sites for Battery" }),
+  );
+  expect(
+    screen.queryByLabelText("Wind technology preview"),
+  ).not.toBeInTheDocument();
+  expect(
+    within(screen.getByLabelText("Battery technology preview")).getByText(
+      "Discharge power",
+    ),
+  ).toBeInTheDocument();
+  expect(onProject).not.toHaveBeenCalled();
+  expect(JSON.stringify(game)).toBe(before);
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+});
+
+it("uses independent remembered power and energy sliders without changing an already chosen project", () => {
+  const { memory, onProject } = show();
+  fireEvent.click(screen.getByRole("button", { name: /Power:/ }));
+  fireEvent.change(screen.getByRole("slider", { name: "Generator capacity" }), {
+    target: { value: "12" },
+  });
+  expect(memory.get("project.generatorSize")).toBe(12);
+  fireEvent.click(screen.getByRole("button", { name: "Done" }));
+  fireEvent.click(wind());
+  expect(onProject.mock.calls[0][0].peakW).toBe(4e7);
+  fireEvent.click(screen.getByRole("button", { name: /Energy:/ }));
+  const energy = screen.getByRole("slider", { name: "Storage capacity" });
+  expect(energy).toHaveFocus();
+  fireEvent.scroll(
+    screen.getByRole("group", { name: "Construction technology list" }),
+  );
+  expect(energy).toHaveFocus();
+  fireEvent.change(energy, { target: { value: "22" } });
+  expect(memory.get("project.storageSize")).toBe(22);
+  expect(memory.get("project.generatorSize")).toBe(12);
+  expect(onProject).toHaveBeenCalledTimes(1);
+  fireEvent.click(screen.getByRole("button", { name: "Done" }));
+  fireEvent.click(
+    screen.getByRole("button", { name: "Choose sites for Battery" }),
+  );
+  expect(isStorage(onProject.mock.calls[1][0])).toBe(true);
+  expect(onProject.mock.calls[1][0].peakWh).toBe(5e8);
+});
+
+it("enters a non-final technology preview with Right Arrow and tabs within it before Escape returns to the icon", async () => {
+  show();
+  const railButtons = within(
+    screen.getByRole("complementary", { name: "Build facilities" }),
+  ).getAllByRole("button");
+  for (let index = 0; index <= railButtons.indexOf(wind()); index++)
+    await userEvent.tab();
+  expect(wind()).toHaveFocus();
+  const preview = screen.getByLabelText("Wind technology preview");
+  await userEvent.keyboard("{ArrowRight}");
+  const close = within(preview).getByRole("button", {
+    name: "Close technology preview",
+  });
+  expect(close).toHaveFocus();
+  expect(wind()).toHaveAttribute("aria-keyshortcuts", "ArrowRight");
+  expect(wind()).toHaveAccessibleDescription(/Right Arrow/);
+  await userEvent.tab();
+  expect(within(preview).getAllByRole("button")[1]).toHaveFocus();
+  expect(close).not.toHaveFocus();
+  expect(preview).toBeInTheDocument();
+  const mapEscape = jest.fn();
+  const mapCapture = () => {
+    if (!hasVisibleEscapeOverlay()) mapEscape();
+  };
+  window.addEventListener("keydown", mapCapture, true);
+  await userEvent.keyboard("{Escape}");
+  expect(
+    screen.queryByLabelText("Wind technology preview"),
+  ).not.toBeInTheDocument();
+  expect(wind()).toHaveFocus();
+  expect(mapEscape).not.toHaveBeenCalled();
+  window.removeEventListener("keydown", mapCapture, true);
+});
+
+it("returns keyboard focus to the trigger after explicit sizing and preview dismissal", async () => {
+  const { onProject } = show();
+  const size = screen.getByRole("button", { name: /Power:/ });
+  await userEvent.tab();
+  expect(size).toHaveFocus();
+  await userEvent.keyboard("{Enter}");
+  expect(
+    screen.getByRole("slider", { name: "Generator capacity" }),
+  ).toHaveFocus();
+  await userEvent.tab();
+  expect(screen.getByRole("button", { name: "Done" })).toHaveFocus();
+  await userEvent.keyboard("{Enter}");
+  expect(size).toHaveFocus();
+  expect(screen.queryByRole("slider")).not.toBeInTheDocument();
+  const buttons = within(
+    screen.getByRole("complementary", { name: "Build facilities" }),
+  ).getAllByRole("button");
+  for (let index = 1; index <= buttons.indexOf(wind()); index++)
+    await userEvent.tab();
+  expect(wind()).toHaveFocus();
+  await userEvent.keyboard("{ArrowRight}{Enter}");
+  expect(wind()).toHaveFocus();
+  expect(
+    screen.queryByLabelText("Wind technology preview"),
+  ).not.toBeInTheDocument();
+  expect(onProject).not.toHaveBeenCalled();
+});
+
+it("keeps the last technology preview through multiple native focus scrolls and Right Arrow", async () => {
+  show();
+  const rail = screen.getByRole("complementary", { name: "Build facilities" });
+  const technologies = within(rail).getByRole("group", {
+    name: "Construction technology list",
+  });
+  const last = within(technologies)
+    .getAllByRole<HTMLButtonElement>("button")
+    .at(-1)!;
+  const buttons = within(rail)
+    .getAllByRole<HTMLButtonElement>("button")
+    .filter((button) => !button.disabled);
+  for (let index = 0; index <= buttons.indexOf(last); index++)
+    await userEvent.tab();
+  expect(last).toHaveFocus();
+  const name = last
+    .getAttribute("aria-label")!
+    .replace("Choose sites for ", "");
+  const previewName = `${name} technology preview`;
+  for (const scrollTop of [500, 750, 600]) {
+    fireEvent.scroll(technologies, { target: { scrollTop } });
+    expect(screen.getByLabelText(previewName)).toBeInTheDocument();
+  }
+  const preview = screen.getByLabelText(previewName);
+  await userEvent.keyboard("{ArrowRight}");
+  expect(
+    within(preview).getByRole("button", { name: "Close technology preview" }),
+  ).toHaveFocus();
+});
+
+it.each(["Solar", "Wind"])(
+  "preserves directly focused %s through native scrolling but dismisses on wheel, scrollbar activation and blur",
+  (name) => {
+    show();
+    const technologies = screen.getByRole("group", {
+      name: "Construction technology list",
+    });
+    const button = within(technologies).getByRole("button", {
+      name: `Choose sites for ${name}`,
+    });
+    button.scrollIntoView = jest.fn();
+    act(() => button.focus());
+    const previewName = `${name} technology preview`;
+    for (const scrollTop of [500, 750, 600]) {
+      fireEvent.scroll(technologies, { target: { scrollTop } });
+      expect(button).toHaveFocus();
+      expect(screen.getByLabelText(previewName)).toBeInTheDocument();
+    }
+    fireEvent.wheel(technologies, { deltaY: -100 });
+    expect(screen.queryByLabelText(previewName)).not.toBeInTheDocument();
+    expect(button).toHaveFocus();
+    fireEvent.mouseEnter(button);
+    fireEvent.pointerDown(technologies);
+    expect(screen.queryByLabelText(previewName)).not.toBeInTheDocument();
+    fireEvent.mouseEnter(button);
+    fireEvent.blur(button, { relatedTarget: document.body });
+    expect(screen.queryByLabelText(previewName)).not.toBeInTheDocument();
+  },
+);
+
+it.each([
+  ["Hydro", "parcel-7:site-0", "Use site maximum"],
+  ["Geothermal", "parcel-3:site-0", "Use max size"],
+] as const)(
+  "offers an owned %s site's exact maximum even when an oversized project has no quote",
+  (name, siteId, shortcut) => {
+    const { game, onProject } = show(siteId, (game) => {
+      (game.territoryNetwork!.tilePurchases ??= []).push({
+        tileId: siteId,
+        minute: game.date.minute,
+        price: 0,
+      });
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Power:/ }));
+    fireEvent.change(
+      screen.getByRole("slider", { name: "Generator capacity" }),
+      {
+        target: { value: wToSliderTick(8e7) },
+      },
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Done" }));
+    const option = projectCatalogue(game, 8e7, false).find(
+      (option) => option.name === name,
+    )!;
+    expect(
+      projectSiteQuote(game, selectProject(option), siteId).facility,
+    ).toBeUndefined();
+    const maximum =
+      name === "Hydro"
+        ? getHydroAvailability(game, option.peakW, "parcel-7", siteId).largest!
+            .maxPeakW
+        : territoryTilePowerLimit(getTerritoryTile(siteId, game)!);
+    fireEvent.mouseEnter(
+      screen.getByRole("button", { name: `Choose sites for ${name}` }),
+    );
+    const preview = screen.getByLabelText(`${name} technology preview`);
+    expect(
+      within(preview).queryByText("Price for the inspected site"),
+    ).not.toBeInTheDocument();
+    fireEvent.click(within(preview).getByRole("button", { name: shortcut }));
+    expect(onProject).toHaveBeenCalledWith(
+      expect.objectContaining({ name, peakW: maximum }),
+    );
+  },
+);
+
+it("dismisses on outside activation and scrolling, and guards all rail actions during host work", () => {
+  const { update, onProject } = show();
+  fireEvent.mouseEnter(wind());
+  fireEvent.pointerDown(document.body);
+  expect(
+    screen.queryByLabelText("Wind technology preview"),
+  ).not.toBeInTheDocument();
+  fireEvent.mouseEnter(wind());
+  fireEvent.scroll(
+    screen.getByRole("group", { name: "Construction technology list" }),
+  );
+  expect(
+    screen.queryByLabelText("Wind technology preview"),
+  ).not.toBeInTheDocument();
+  fireEvent.mouseEnter(wind());
+  update(true);
+  expect(
+    screen.queryByLabelText("Wind technology preview"),
+  ).not.toBeInTheDocument();
+  expect(wind()).toHaveAttribute("aria-disabled", "true");
+  fireEvent.click(wind());
+  expect(onProject).not.toHaveBeenCalled();
+  update(false, 1);
+  expect(
+    screen.getByRole("complementary", { name: "Build facilities" }),
+  ).toHaveFocus();
+});
+
+it("uses the owning site quote for preview prices and explains incompatible sites", () => {
+  const { game, onProject } = show("champlain:site-13");
+  const option = projectCatalogue(game, 2e7, false).find(
+    ({ name }) => name === "Wind",
+  )!;
+  const quote = projectSiteQuote(
+    game,
+    selectProject(option),
+    "champlain:site-13",
+  );
+  if (!quote.facility) throw new Error("Expected an owned Wind site quote");
+  fireEvent.mouseEnter(wind());
+  const preview = screen.getByLabelText("Wind technology preview");
+  expect(
+    within(preview).getByText("Price for the inspected site"),
+  ).toBeInTheDocument();
+  expect(
+    within(preview).getByText(formatMoneyConcise(quote.facility.buildCost)),
+  ).toBeInTheDocument();
+  expect(
+    screen.queryByRole("button", { name: "Choose sites for Offshore Wind" }),
+  ).not.toBeInTheDocument();
+  expect(onProject).not.toHaveBeenCalled();
+});
+
+it("disables an oversized project until the player changes the sizing", () => {
+  const { game, onProject } = show();
+  fireEvent.click(screen.getByRole("button", { name: /Power:/ }));
+  fireEvent.change(screen.getByRole("slider", { name: "Generator capacity" }), {
+    target: { value: "34" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Done" }));
+  const option = projectCatalogue(game, 8e9, false).find(
+    ({ name }) => name === "Wind",
+  )!;
+  expect(option.maxPeakW).toBeLessThan(option.peakW);
+  fireEvent.click(wind());
+  expect(wind()).toHaveAttribute("aria-disabled", "true");
+  expect(onProject).not.toHaveBeenCalled();
+});

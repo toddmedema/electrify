@@ -1,3 +1,4 @@
+import * as Energy from "./Energy";
 import { createGame } from "../testing/Simulator";
 import { currentTick } from "./GameSelectors";
 import { lowCashRateQuote } from "./LowCashRate";
@@ -53,8 +54,13 @@ it.each([1, 3] as const)(
       difficulty: "Employee",
     });
     game.transmission!.inheritedAgreementTerms = termsVersion;
-    game.transmission!.lines[0].paused = true;
-    game.facilities = [];
+    jest.spyOn(Energy, "getWindOutputFactor").mockReturnValue(1);
+    game.facilities = game.facilities.filter(
+      (facility) => facility.fuel === "Wind",
+    );
+    game.facilities.forEach((facility) => {
+      facility.peakW = 1e9;
+    });
     for (let i = 0; i < 48; i++) tickState(game);
     const before = JSON.stringify(game);
     const closingCash = forecastMonthClosingCashAtCustomerRate(
@@ -96,3 +102,5 @@ it("persists the warning month and rejects untrusted future or invalid markers",
     ).toBeNull();
   }
 });
+
+afterEach(() => jest.restoreAllMocks());

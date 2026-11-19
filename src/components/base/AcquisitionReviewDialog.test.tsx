@@ -2,7 +2,6 @@ import userEvent from "@testing-library/user-event";
 import { render, screen, within } from "@testing-library/react";
 import { configureStore } from "@reduxjs/toolkit";
 import { Provider } from "react-redux";
-import { UTILITY_TARGETS } from "../../data/UtilityExpansion";
 import { acquisitionQuote } from "../../helpers/Expansion";
 import { currentTick } from "../../helpers/GameSelectors";
 import {
@@ -14,21 +13,16 @@ import {
 import { copyOfficialGame } from "../../testing/OfficialScenarioExecutionFixtures";
 import { createGame } from "../../testing/Simulator";
 import {
-  buildTransmissionLine,
   generateForecastTimeline,
   previewUtilityAcquisition,
 } from "../../reducers/Game";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "../../helpers/DateTime";
-import reducer from "../../reducers/Game";
 import uiReducer from "../../reducers/UI";
 import { UtilityTargetId } from "../../Types";
 import AcquisitionReviewDialog from "./AcquisitionReviewDialog";
 import { facilityDisplayName } from "./FacilityLabels";
 
 function review(targetId: UtilityTargetId, year = 2005, customers = 90000) {
-  const corridorId = UTILITY_TARGETS.find(
-    (target) => target.id === targetId,
-  )!.corridorId;
   const initial = createGame({
     scenarioId: 116,
     seed: 12345,
@@ -36,18 +30,7 @@ function review(targetId: UtilityTargetId, year = 2005, customers = 90000) {
   });
   currentTick(initial)!.cash = 2e9;
   currentTick(initial)!.customers = customers;
-  const game = copyOfficialGame(
-    reducer(
-      initial,
-      buildTransmissionLine({
-        corridorId,
-        financed: false,
-      }),
-    ),
-  );
-  game.transmission!.lines.find(
-    (line) => line.corridorId === corridorId,
-  )!.yearsToBuildLeft = 0;
+  const game = copyOfficialGame(initial);
   if (year !== 2005) {
     game.date = getDateFromMinute(
       (year - game.startingYear) * 12 * MINUTES_PER_MONTH,
@@ -151,11 +134,11 @@ it.each(["valley-electric", "ridge-electric"] as const)(
     expect(within(financing).getByText(/5% over 20 years/)).toBeVisible();
     expect(within(financing).getByText(/over 30 years/)).toBeVisible();
 
-    const schedule = disclosure("Supply & network changes");
+    const schedule = disclosure("Supply & operating changes");
     expect(
       within(schedule).getByText(/routine maintenance and renewal/),
     ).not.toBeVisible();
-    await user.click(within(schedule).getByText("Supply & network changes"));
+    await user.click(within(schedule).getByText("Supply & operating changes"));
     expect(
       within(schedule).getByText(/routine maintenance and renewal/),
     ).toBeVisible();
@@ -166,9 +149,11 @@ it.each(["valley-electric", "ridge-electric"] as const)(
 it("keeps Valley’s inherited supply and future reduction discoverable", async () => {
   review("valley-electric");
   const assets = disclosure("Plants & purchased power");
-  const schedule = disclosure("Supply & network changes");
+  const schedule = disclosure("Supply & operating changes");
   await userEvent.click(within(assets).getByText("Plants & purchased power"));
-  await userEvent.click(within(schedule).getByText("Supply & network changes"));
+  await userEvent.click(
+    within(schedule).getByText("Supply & operating changes"),
+  );
   expect(schedule).toHaveTextContent("Jan 2017");
   expect(schedule).toHaveTextContent("76MW deliverable");
   expect(within(assets).getByText(/January 2017/)).toHaveTextContent(

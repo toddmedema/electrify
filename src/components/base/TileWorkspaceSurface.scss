@@ -1,0 +1,193 @@
+.tileWorkspaceSurface {
+  position: absolute;
+  z-index: 8;
+  top: 16px;
+  right: 16px;
+  display: flex;
+  flex-direction: column;
+  width: min(440px, calc(100% - 32px));
+  max-height: calc(100% - 32px);
+  min-height: 0;
+  box-sizing: border-box;
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--bg-raised);
+  color: var(--font-color-primary);
+  box-shadow: 0 8px 24px var(--shadow-ring);
+
+  &.tileWorkspaceBuilding {
+    width: min(680px, 66%);
+    height: calc(100% - 32px);
+  }
+
+  .tileWorkspaceHeading {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 12px 12px 12px 16px;
+    border-bottom: 1px solid var(--border-subtle);
+
+    > div {
+      min-width: 0;
+    }
+    h3 {
+      outline-offset: 4px;
+    }
+    .MuiIconButton-root {
+      flex: 0 0 auto;
+      min-width: 40px;
+      min-height: 40px;
+    }
+  }
+
+  .tileWorkspaceBody {
+    min-height: 0;
+    overflow: auto;
+    overscroll-behavior: contain;
+    padding: 16px;
+  }
+
+  &.tileWorkspaceBuilding .tileWorkspaceBody {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 0;
+  }
+
+  &.tileWorkspaceBuilding [aria-label="Terrain modifiers"] {
+    padding: 8px 16px;
+  }
+  .tileBuildTabs {
+    flex: 0 0 auto;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+  .screenCatalog {
+    min-height: 0;
+    flex: 1;
+  }
+  .tilePurchaseSummary {
+    display: grid;
+    gap: 12px;
+  }
+  .tileCityMetrics {
+    display: grid;
+    gap: 8px;
+  }
+  .tileCityMetrics > div {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+  }
+  .tileTerrainModifiers {
+    display: grid;
+    gap: 4px;
+    margin: 0 0 12px;
+    padding: 0;
+    list-style: none;
+    strong[data-favorable="true"] {
+      color: var(--delta-good);
+    }
+    strong[data-favorable="false"] {
+      color: var(--delta-bad);
+    }
+  }
+  .tileCityDemand {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+    margin-top: 16px;
+    margin-bottom: 12px;
+
+    .chartLegend {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 8em), 1fr));
+      align-items: start;
+      gap: 4px 12px;
+      padding: 0;
+      font-weight: 400;
+      letter-spacing: normal;
+    }
+    .chartLegendItem {
+      min-width: 0;
+      white-space: normal;
+    }
+    .chartLegendLabel {
+      overflow-wrap: anywhere;
+    }
+    .chartLegendSwatch {
+      flex-shrink: 0;
+    }
+    .uplot {
+      background: transparent;
+    }
+  }
+  .tileWorkspaceBody .facilityDetails {
+    padding: 0 0 16px;
+  }
+  .tileWorkspaceBody .facilityActions {
+    margin: 0;
+    padding-bottom: 0;
+  }
+  .tileFacilityStatus {
+    margin-bottom: 12px;
+  }
+}
+
+@media (max-width: 740px) {
+  .tileWorkspaceSurface,
+  .tileWorkspaceSurface.tileWorkspaceBuilding {
+    top: auto;
+    right: 8px;
+    bottom: calc(var(--game-dock-clearance, 80px) + 8px);
+    left: 8px;
+    width: auto;
+    max-height: 62%;
+    border-radius: var(--radius-lg) var(--radius-lg) var(--radius-md)
+      var(--radius-md);
+  }
+  .tileWorkspaceSurface.tileWorkspaceBuilding {
+    // Leave a strip of the map above the builder and keep it clear of the dock.
+    height: calc(100% - var(--game-dock-clearance, 80px) - 32px);
+    max-height: calc(100% - var(--game-dock-clearance, 80px) - 32px);
+
+    .tileWorkspaceBody {
+      display: block;
+      overflow: auto;
+    }
+    .screenCatalog {
+      flex: none;
+    }
+    .screenCatalog > .cardList {
+      flex: none !important;
+      overflow: visible;
+    }
+    // Capacity stays with the decision as the tabs and projects scroll together.
+    .constructionHeader {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+    }
+    .buildOption {
+      scroll-margin-top: 52px;
+    }
+  }
+  .tileWorkspaceSurface .tileWorkspaceHeading {
+    padding: 8px 8px 8px 12px;
+  }
+  .tileWorkspaceSurface .tileWorkspaceBody {
+    padding: 12px;
+  }
+}
+
+@media (pointer: coarse) {
+  .tileWorkspaceSurface button {
+    min-height: 44px;
+  }
+  .tileWorkspaceSurface .tileWorkspaceHeading .MuiIconButton-root {
+    min-width: 44px;
+  }
+}

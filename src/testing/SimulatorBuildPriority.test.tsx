@@ -1,4 +1,9 @@
 import { createGame, runSimulation } from "./Simulator";
+import { getScenario } from "../data/Scenarios";
+import { currentTick } from "../helpers/GameSelectors";
+import { landPurchaseQuote } from "../helpers/Territories";
+import gameReducer from "../reducers/Game";
+import { acquireLand } from "../reducers/GameActions";
 import type { InitialBuildType } from "./Simulator";
 
 const oil: InitialBuildType = { name: "Oil", peakW: 50e6, financed: true };
@@ -65,4 +70,47 @@ test("scheduled reserve orders use the same placement contract", () => {
   expect(result.violations).toEqual([]);
   expect(result.builds).toHaveLength(1);
   expect(result.finalFacilities.map(({ id }) => id)).toEqual([1, 2, 3]);
+});
+
+test("a rejected later land order cannot pass because an earlier parcel was purchased", () => {
+  const options = {
+    scenarioId: 116,
+    scenario: { ...getScenario(116)!, cash: 3e6 },
+    months: 1,
+  };
+  const before = createGame(options);
+  const first = landPurchaseQuote(before, "green-uplands")!;
+  const paid = gameReducer(
+    before,
+    acquireLand({ territoryId: first.territoryId, quoteKey: first.quoteKey }),
+  );
+  expect(paid.territoryNetwork!.tilePurchases).toEqual([
+    { tileId: first.tileId, minute: before.date.minute, price: first.price },
+  ]);
+  expect(currentTick(paid)!.cash).toBe(options.scenario.cash - first.price);
+  const second = landPurchaseQuote(paid, "green-uplands")!;
+  expect(second).toBeDefined();
+  expect(second.tileId).not.toBe(first.tileId);
+  expect(currentTick(paid)!.cash).toBeLessThan(second.price);
+  expect(
+    gameReducer(
+      paid,
+      acquireLand({
+        territoryId: second.territoryId,
+        quoteKey: second.quoteKey,
+      }),
+    ),
+  ).toEqual(paid);
+
+  const order = {
+    month: 0,
+    type: "land",
+    territoryId: "green-uplands",
+  } as const;
+  expect(() =>
+    runSimulation({ ...options, scheduledActions: [order] }),
+  ).not.toThrow();
+  expect(() =>
+    runSimulation({ ...options, scheduledActions: [order, order] }),
+  ).toThrow("Land purchase rejected");
 });

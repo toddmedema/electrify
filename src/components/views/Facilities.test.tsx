@@ -21,9 +21,17 @@ import gameReducer, {
 } from "../../reducers/Game";
 import uiReducer from "../../reducers/UI";
 import { createGame } from "../../testing/Simulator";
-import { FacilityOperatingType, GameType } from "../../Types";
+import {
+  FacilityOperatingType,
+  GameType,
+  TerritoryTileId,
+  MapWorkspaceView,
+} from "../../Types";
 import Facilities, { fleetChartHeight } from "./Facilities";
 import TransmissionPanel from "./TransmissionPanel";
+import AcquiredUtilities from "./AcquiredUtilities";
+import TerritoryNetwork from "./TerritoryNetwork";
+import { inheritedConnection } from "../../helpers/PowerAgreements";
 import { CurrencyContext } from "../base/CurrencyContext";
 import { currencyByCode } from "../../helpers/Currency";
 
@@ -39,25 +47,55 @@ import { formatCount, formatMoneyConcise } from "../../helpers/Format";
 import { GAME_TO_REAL_YEARS, TICKS_PER_HOUR } from "../../Constants";
 import { purchaseTerms } from "../../helpers/Financials";
 import { modScenario } from "../../mods/ModScenario";
-import { acquireUtility } from "../../reducers/GameActions";
+import { acquireUtility, expandFacility } from "../../reducers/GameActions";
+import { facilityExpansionQuote } from "../../helpers/FacilityExpansion";
 import { acquisitionQuote } from "../../helpers/Expansion";
 import { currentTick } from "../../helpers/GameSelectors";
+import {
+  createWorld,
+  checkpointWorld,
+  restoreWorld,
+} from "../../multiplayer/World";
+import { coopSeats } from "../../testing/MultiplayerFixtures";
+import { loadSimData } from "../../testing/SimData";
+import { UTILITY_AREAS } from "../../data/UtilityExpansion";
+import { territoryTileViews } from "../../helpers/TerritoryMapState";
+
+// Exercise Facilities/Network's selection contract; the map owns viewport culling and geometry.
+jest.mock("./TerritoryHexMap", () => ({
+  __esModule: true,
+  default: (props: {
+    game: GameType;
+    selected: TerritoryTileId;
+    onSelect: (id: TerritoryTileId, activate?: boolean) => void;
+  }) => {
+    const { territoryTileViews } = jest.requireActual<
+      typeof import("../../helpers/TerritoryMapState")
+    >("../../helpers/TerritoryMapState");
+    return (
+      <div aria-label="Tile map">
+        {territoryTileViews(props.game).map(({ tile }) => (
+          <button
+            className="territoryTileTarget"
+            tabIndex={props.selected === tile.id ? 0 : -1}
+            key={tile.id}
+            aria-label={`Inspect ${tile.id}`}
+            onFocus={() => props.onSelect(tile.id)}
+            onClick={() => props.onSelect(tile.id, true)}
+          >
+            {tile.terrain}
+          </button>
+        ))}
+      </div>
+    );
+  },
+}));
 
 describe("acquired utilities", () => {
   function expansionGame(acquire = true) {
     let game = createGame({ scenarioId: 116, seed: 12345 });
     for (const targetId of ["valley-electric", "ridge-electric"] as const) {
       currentTick(game)!.cash = 2e9;
-      game = cloneDeep(
-        gameReducer(
-          game,
-          buildTransmissionLine({
-            corridorId: `vt-champlain-${targetId === "valley-electric" ? "valley" : "ridge"}`,
-            financed: true,
-          }),
-        ),
-      );
-      game.transmission!.lines.at(-1)!.yearsToBuildLeft = 0;
       if (acquire) {
         const quote = acquisitionQuote(game, targetId)!;
         game = cloneDeep(
@@ -78,12 +116,9 @@ describe("acquired utilities", () => {
   function show(game: GameType) {
     render(
       <Provider store={configureStore({ reducer: { ui: uiReducer } })}>
-        <TransmissionPanel
+        <AcquiredUtilities
           game={game}
-          onBuild={jest.fn()}
-          onUpgrade={jest.fn()}
-          onBuyingRule={jest.fn()}
-          onSellingRule={jest.fn()}
+          summaryRef={React.createRef<HTMLElement>()}
         />
       </Provider>,
     );
@@ -92,21 +127,13 @@ describe("acquired utilities", () => {
   it("does not show an ownership disclosure for independent utilities", () => {
     show(expansionGame(false));
     expect(screen.queryByText(/Acquired utilities/)).not.toBeInTheDocument();
-    expect(screen.getByRole("list", { name: "Interties" })).toHaveTextContent(
-      "Valley expansion connection",
-    );
+    expect(
+      screen.queryByRole("list", { name: "Acquired utilities" }),
+    ).not.toBeInTheDocument();
   });
 
-  it("moves acquired corridors out of Interties and keeps regional connections operable", async () => {
+  it("shows acquired utility receipts in their own collapsible disclosure", async () => {
     show(expansionGame());
-    const interties = screen.getByRole("list", { name: "Interties" });
-    expect(interties).not.toHaveTextContent("expansion connection");
-    for (const name of ["Champlain", "Valley", "Ridge"])
-      expect(
-        within(interties).getByRole("button", {
-          name: new RegExp(`^Inspect ${name} regional connection`),
-        }),
-      ).toBeVisible();
     const disclosure = screen.getByText("Acquired utilities (2)", {
       selector: "summary",
     });
@@ -121,17 +148,19 @@ describe("acquired utilities", () => {
 
   it("keeps transfer receipts historical and totals each utility's outstanding loans and payments", async () => {
     const game = expansionGame();
-    const valley = game.transmission!.lines.find(
-      (line) => line.corridorId === "vt-champlain-valley",
-    )!;
+    const valley = {
+      ...inheritedConnection("champlain", 900),
+      corridorId: "vt-champlain-valley",
+    };
+    const ridge = {
+      ...inheritedConnection("champlain", 901),
+      corridorId: "vt-champlain-ridge",
+    };
     valley.loanAmountLeft = 0;
     valley.loanMonthlyPayment = 10e3;
-    valley.annualOperatingCost = 0;
-    const ridge = game.transmission!.lines.find(
-      (line) => line.corridorId === "vt-champlain-ridge",
-    )!;
     ridge.loanAmountLeft = 2e6;
     ridge.loanMonthlyPayment = 40e3;
+    game.territoryNetwork!.legacyConnections.push(valley, ridge);
     for (const loan of game.utilityExpansion!.loans) {
       loan.loanAmountLeft =
         loan.targetId === "valley-electric"
@@ -158,7 +187,7 @@ describe("acquired utilities", () => {
     ).getAllByRole("listitem");
     expect(entries[0]).toHaveTextContent("Acquired Jan 2005");
     expect(entries[0]).toHaveTextContent(formatCount(transferred));
-    expect(entries[0]).toHaveTextContent("Connection upkeep$0/mo");
+    expect(entries[0]).not.toHaveTextContent("Connection upkeep");
     expect(entries[0]).toHaveTextContent("Debt payment$50k/mo");
     expect(entries[0]).toHaveTextContent("Debt remaining$12M");
     expect(entries[1]).toHaveTextContent("Debt payment$90k/mo");
@@ -167,16 +196,11 @@ describe("acquired utilities", () => {
       within(entries[0])
         .getAllByRole("term")
         .map((term) => term.textContent),
-    ).toEqual([
-      "Customers acquired",
-      "Connection upkeep",
-      "Debt payment",
-      "Debt remaining",
-    ]);
+    ).toEqual(["Customers acquired", "Debt payment", "Debt remaining"]);
     expect(within(entries[0]).queryByRole("button")).not.toBeInTheDocument();
   });
 
-  it("shows no debt payment after all connection and acquisition loans are paid off", async () => {
+  it("shows no debt payment after acquisition loans are paid off", async () => {
     const game = expansionGame();
     for (const loan of [
       ...game.transmission!.lines,
@@ -259,6 +283,8 @@ function playedGame(ticks: number): GameType {
 }
 
 interface Handlers {
+  onBuyingRule: jest.Mock;
+  onSellingRule: jest.Mock;
   onTogglePause: jest.Mock;
   onPause: jest.Mock;
   onSelect: jest.Mock;
@@ -266,14 +292,21 @@ interface Handlers {
   onSell: jest.Mock;
   onRetrofit: jest.Mock;
   onCancelRetrofit: jest.Mock;
+  onExpand: jest.Mock;
+  onCancelExpansion: jest.Mock;
 }
 
 function renderFacilities(
   game: GameType,
   selectedFacilityId: number | null,
   ref?: React.RefObject<Facilities>,
-): Handlers & { rerenderGame: (game: GameType) => void } {
+  initialView: MapWorkspaceView = "FLEET",
+): Handlers & {
+  rerenderGame: (game: GameType, arrivingFacilityId?: number) => void;
+} {
   const handlers: Handlers = {
+    onBuyingRule: jest.fn(),
+    onSellingRule: jest.fn(),
     onTogglePause: jest.fn(),
     onPause: jest.fn(),
     onSelect: jest.fn(),
@@ -281,26 +314,43 @@ function renderFacilities(
     onSell: jest.fn(),
     onRetrofit: jest.fn(),
     onCancelRetrofit: jest.fn(),
+    onExpand: jest.fn(async () => ({ status: "accepted" as const })),
+    onCancelExpansion: jest.fn(async () => ({
+      status: "accepted" as const,
+      refund: 0,
+    })),
   };
   const store = configureStore({ reducer: { ui: uiReducer } });
-  function ControlledFacilities({ game }: { game: GameType }) {
+  function ControlledFacilities({
+    game,
+    arrivingFacilityId,
+  }: {
+    game: GameType;
+    arrivingFacilityId?: number;
+  }) {
     const [selected, setSelected] = React.useState(selectedFacilityId);
+    const [territoryView, setTerritoryView] = React.useState(initialView);
     return (
       <Facilities
         ref={ref}
+        territoryView={territoryView}
+        onTerritoryView={setTerritoryView}
         game={game}
+        arrivingFacilityId={arrivingFacilityId}
         selectedFacilityId={selected}
         onTransmissionUpgrade={() => undefined}
         onStorageBuild={() => undefined}
         onTransmissionBuild={() => undefined}
-        onBuyingRule={() => undefined}
-        onSellingRule={() => undefined}
+        onBuyingRule={handlers.onBuyingRule}
+        onSellingRule={handlers.onSellingRule}
         onSell={handlers.onSell}
         onTogglePause={handlers.onTogglePause}
         onPause={handlers.onPause}
         onReprioritize={handlers.onReprioritize}
         onRetrofit={handlers.onRetrofit}
         onCancelRetrofit={handlers.onCancelRetrofit}
+        onExpand={handlers.onExpand}
+        onCancelExpansion={handlers.onCancelExpansion}
         onFacilityDragStart={() => undefined}
         onFacilityDragEnd={() => undefined}
         onSelect={(id) => {
@@ -315,9 +365,59 @@ function renderFacilities(
   });
   return {
     ...handlers,
-    rerenderGame: (next) => view.rerender(<ControlledFacilities game={next} />),
+    rerenderGame: (next, arrivingFacilityId) =>
+      view.rerender(
+        <ControlledFacilities
+          game={next}
+          arrivingFacilityId={arrivingFacilityId}
+        />,
+      ),
   };
 }
+
+it("opens the shared plant controls on the map without switching to the fleet", async () => {
+  const game = createGame({ scenarioId: 116, seed: 188 });
+  const plant = game.facilities.find((facility) => facility.fuel === "Hydro")!;
+  const { onSelect, onPause } = renderFacilities(
+    game,
+    null,
+    undefined,
+    "FACILITIES",
+  );
+  await user.click(
+    screen.getByRole("button", { name: `Inspect ${plant.tileId!}` }),
+  );
+  const detail = screen.getByRole("dialog", { name: plant.name });
+  await user.click(
+    within(detail).getByRole("button", { name: `Pause ${plant.name}` }),
+  );
+  expect(onPause).toHaveBeenCalledWith(plant.id, plant.name);
+  expect(onSelect).not.toHaveBeenCalled();
+  expect(
+    screen.queryByRole("tablist", { name: "Facility views" }),
+  ).not.toBeInTheDocument();
+  expect(screen.getByLabelText("Tile map")).toBeVisible();
+});
+
+it("keeps the map inspector open when a purchased facility arrives", async () => {
+  const game = createGame({ scenarioId: 116, seed: 188 });
+  const plant = game.facilities.find((facility) => facility.fuel === "Hydro")!;
+  const { rerenderGame } = renderFacilities(
+    game,
+    null,
+    undefined,
+    "FACILITIES",
+  );
+  await user.click(
+    screen.getByRole("button", { name: `Inspect ${plant.tileId!}` }),
+  );
+  rerenderGame(game, plant.id);
+  expect(
+    screen.queryByRole("tablist", { name: "Facility views" }),
+  ).not.toBeInTheDocument();
+  expect(screen.getByLabelText("Tile map")).toBeVisible();
+  expect(screen.getByRole("dialog", { name: plant.name })).toBeVisible();
+});
 
 // Address inspection targets by their class; asking for a role by name computes an accessible
 // name for every candidate, which over a rendered pane costs about a second a call.
@@ -1470,7 +1570,7 @@ describe("unified connections", () => {
 });
 
 it.each([false, true])(
-  "offers completed connection acquisition in a native or validated base-116 mod (mod: %s)",
+  "offers direct utility acquisition in a native or validated base-116 mod (mod: %s)",
   async (mod) => {
     const customScenario = mod
       ? modScenario({
@@ -1490,43 +1590,48 @@ it.each([false, true])(
       scenario: customScenario,
       seed: 12345,
     });
-    const game = cloneDeep(
-      gameReducer(
-        state,
-        buildTransmissionLine({
-          corridorId: "vt-champlain-ridge",
-          financed: true,
-        }),
-      ),
-    );
-    game.transmission!.lines.find(
-      (line) => line.corridorId === "vt-champlain-ridge",
-    )!.yearsToBuildLeft = 0;
+    const game = cloneDeep(state);
+    const target = territoryTileViews(game).find(
+      ({ tile }) => tile.territoryId === "ridge-electric",
+    )!.tile;
+    const onAcquire = jest.fn();
     render(
-      <Provider store={configureStore({ reducer: { ui: uiReducer } })}>
-        <TransmissionPanel
+      <Provider
+        store={configureStore({ reducer: { ui: uiReducer, game: () => game } })}
+      >
+        <TerritoryNetwork
           game={game}
+          facilityActions={{
+            onSell: jest.fn(),
+            onPause: jest.fn(),
+            onTogglePause: jest.fn(),
+          }}
           onBuild={jest.fn()}
           onUpgrade={jest.fn()}
           onBuyingRule={jest.fn()}
           onSellingRule={jest.fn()}
-          onAcquire={jest.fn()}
+          onAcquire={onAcquire}
         />
       </Provider>,
     );
+    await user.click(
+      screen.getByRole("button", { name: `Inspect ${target.id}` }),
+    );
+    const acquire = screen.getByRole("button", {
+      name: "Acquire Ridge Electric",
+    });
+    expect(acquire).toBeEnabled();
+    expect(game.transmission!.lines).toEqual([]);
+    await user.click(acquire);
     expect(
-      screen.queryByRole("button", { name: "Acquire Ridge Electric" }),
-    ).not.toBeInTheDocument();
-    const inspect = fleetButton(/^Inspect Ridge/);
-    await user.click(inspect);
-    expect(fleetButton("Acquire Ridge Electric")).toBeVisible();
+      screen.getByRole("dialog", { name: "Acquire Ridge Electric?" }),
+    ).toBeVisible();
+    expect(onAcquire).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
     expect(
-      screen.queryByText(/Review the company terms/),
+      screen.queryByRole("dialog", { name: "Acquire Ridge Electric?" }),
     ).not.toBeInTheDocument();
-    await user.click(inspect);
-    expect(
-      screen.queryByRole("button", { name: "Acquire Ridge Electric" }),
-    ).not.toBeInTheDocument();
+    expect(onAcquire).not.toHaveBeenCalled();
   },
 );
 
@@ -2283,4 +2388,135 @@ it("removes an already-paused reactor's resume control when its permanent shutdo
   ).not.toBeInTheDocument();
   expect(screen.getByText("This plant can't be sold.")).toBeInTheDocument();
   expect(view.onTogglePause).not.toHaveBeenCalled();
+});
+
+it("distinguishes facility inspection actions by territory and opens them from the keyboard", async () => {
+  const game = createGame({ scenarioId: 116, seed: 188 });
+  const wind = game.facilities.find(({ fuel }) => fuel === "Wind")!;
+  game.utilityExpansion!.acquisitions.push({
+    targetId: "valley-electric",
+    minute: 0,
+    financed: false,
+    transferredCustomers: 159000,
+  });
+  game.facilities = [
+    { ...wind, territoryId: "champlain" },
+    { ...wind, id: 999, territoryId: "valley-electric" },
+  ];
+  renderFacilities(game, null);
+  const home = screen.getByRole("button", { name: "Inspect Wind, You" });
+  const valley = screen.getByRole("button", {
+    name: "Inspect Wind, Valley Electric",
+  });
+  home.focus();
+  await user.keyboard("{Enter}");
+  expect(home).toHaveAttribute("aria-expanded", "true");
+  valley.focus();
+  await user.keyboard("{Enter}");
+  expect(valley).toHaveAttribute("aria-expanded", "true");
+  expect(home).toHaveAttribute("aria-expanded", "false");
+});
+
+it("keeps restored co-op trading choices reachable through territory agreements", async () => {
+  loadSimData(UTILITY_AREAS.champlain.location);
+  const world = createWorld(
+    { scenarioId: 116, difficulty: "Employee" },
+    coopSeats(2),
+    "trading-controls",
+    "initial",
+  );
+  world.grids[0].transmission!.buyingRule = "NONE";
+  world.grids[0].transmission!.sellingRule = "NONE";
+  const game = restoreWorld(checkpointWorld(world), "restored").grids[0];
+  const { onBuyingRule, onSellingRule } = renderFacilities(
+    game,
+    null,
+    undefined,
+    "AGREEMENTS",
+  );
+  expect(
+    screen.getByRole("heading", { name: "Co-op power sharing" }),
+  ).toBeVisible();
+  const buying = screen.getByRole("combobox", { name: "Buying" });
+  expect(buying).toHaveTextContent("None");
+  await user.click(buying);
+  await user.click(screen.getByRole("option", { name: "Shortages only" }));
+  const selling = screen.getByRole("combobox", {
+    name: "Selling",
+  });
+  expect(selling).toHaveTextContent("None");
+  await user.click(selling);
+  await user.click(screen.getByRole("option", { name: "All profitable" }));
+  expect(onBuyingRule).toHaveBeenCalledWith("SHORTAGES");
+  expect(onSellingRule).toHaveBeenCalledWith("PROFITABLE");
+});
+
+it.each(["FLEET", "FACILITIES"] as const)(
+  "reviews capacity expansion from the public %s plant controls",
+  async (initialView) => {
+    const game = createGame({ scenarioId: 116, seed: 188 });
+    currentTick(game)!.cash = 1e12;
+    const plant = game.facilities.find(
+      (candidate) =>
+        facilityExpansionQuote(game, candidate.id, candidate.peakW + 1)
+          .status === "ready",
+    );
+    if (!plant) throw new Error("Expected an expandable starting plant");
+    const utils = renderFacilities(
+      game,
+      initialView === "FLEET" ? plant.id : null,
+      undefined,
+      initialView,
+    );
+    if (initialView === "FACILITIES")
+      await user.click(
+        screen.getByRole("button", { name: `Inspect ${plant.tileId!}` }),
+      );
+    await user.click(screen.getByRole("button", { name: "Upgrade capacity" }));
+    const review = screen.getByRole("dialog", {
+      name: `Upgrade ${plant.name} capacity`,
+    });
+    const input = within(review).getByRole("spinbutton");
+    const targetSize = Number((input as HTMLInputElement).value) * 1e6;
+    const quote = facilityExpansionQuote(game, plant.id, targetSize);
+    if (quote.status !== "ready") throw new Error(quote.reason);
+    await user.click(within(review).getByRole("button", { name: /^Pay / }));
+    expect(utils.onExpand).toHaveBeenCalledWith({
+      facilityId: plant.id,
+      targetSize,
+      quoteKey: quote.quoteKey,
+    });
+    expect(utils.onRetrofit).not.toHaveBeenCalled();
+  },
+);
+
+it("keeps a running plant's reading and glyph while showing capacity construction in its fleet row", () => {
+  const game = createGame({ scenarioId: 104, seed: 818 });
+  currentTick(game)!.cash = 1e12;
+  const plant = game.facilities[0];
+  const quote = facilityExpansionQuote(game, plant.id, plant.peakW * 1.2);
+  if (quote.status !== "ready") throw new Error(quote.reason);
+  const started = cloneDeep(
+    gameReducer(
+      game,
+      expandFacility({
+        facilityId: plant.id,
+        targetSize: quote.targetSize,
+        quoteKey: quote.quoteKey,
+      }),
+    ),
+  );
+  started.facilities[0].currentW = started.facilities[0].peakW / 2;
+  renderFacilities(started, null);
+  const row = screen.getAllByRole("listitem").find((item) =>
+    within(item).queryByRole("button", {
+      name: /Inspect .*capacity upgrading/,
+    }),
+  )!;
+  expect(
+    within(row).getByRole("img", { name: `${plant.name} running` }),
+  ).toBeInTheDocument();
+  expect(row).toHaveTextContent("Upgrading ·");
+  expect(row).toHaveTextContent("50%");
+  expect(row).not.toHaveTextContent("offline for an upgrade");
 });

@@ -270,6 +270,8 @@ export type CardNameType =
   | "BUILD_STORAGE"
   | "BUILD_INTERTIES"
   | "FACILITIES"
+  | "FLEET"
+  | "AGREEMENTS"
   | "INSIGHTS"
   | "EVENTS"
   | "SCENARIO"
@@ -286,6 +288,8 @@ export type CardNameType =
   | "CUSTOM_GAME"
   | "DATA_CENTER_SETUP"
   | "CHALLENGE";
+
+export type MapWorkspaceView = "FACILITIES" | "FLEET" | "AGREEMENTS";
 
 export type ConceptNameType =
   | "money"
@@ -325,7 +329,11 @@ export type StoryActionTargetType =
   | { card: "EVENTS" };
 
 export type EvidenceTargetType =
-  "supply-demand" | "finances" | "mission-details" | StoryActionTargetType;
+  | "supply-demand"
+  | "interties"
+  | "finances"
+  | "mission-details"
+  | StoryActionTargetType;
 
 export interface EvidenceRequestType {
   id: number;
@@ -449,6 +457,7 @@ export type TickPresentFutureType = Partial<FuelPricesType> &
     agreementUnusedExpenses?: number;
     /** Closing minimum payments keyed by the elapsed month they settle. */
     agreementClosingExpenses?: Record<string, number>;
+    territories?: Partial<Record<TerritoryId, TerritoryTick>>;
     minute: number;
     supplyW: number; // Watts
     availableSupplyW?: number; // Supply plus unused fuel-burning generation capacity
@@ -618,7 +627,19 @@ export interface FacilityMaintenanceObligationType {
 
 interface SharedOperatingType
   extends LoanInfo, LifetimeTotals, ConstructionEmissions {
+  /** Added capacity stays unavailable until this cash-funded project completes. */
+  expansionInProgress?: FacilityExpansionInProgressType;
+  /** Last started expansion identity, retained after cancellation and completion. */
+  expansionSequence?: number;
+  /** Capacity and construction booked by projects after an inherited facility was acquired. */
+  acquiredExpansion?: Required<ConstructionEmissions> & {
+    addedCapacityW: number;
+    investedCapital: number;
+  };
   startingAssetId?: string;
+  territoryId?: TerritoryId;
+  /** Exactly one developed map cell; absent outside the territory scenario. */
+  tileId?: TerritoryTileId;
   /** Transfer restrictions on inherited assets; absent means ordinary resale value. */
   cashBackMultiplier?: number;
   saleRestricted?: boolean;
@@ -1176,6 +1197,34 @@ export interface RetrofitFacilityAction {
   upgrade: FacilityUpgradeType;
 }
 
+/** Size is watts for generation and watt-hours for storage. Prices always come from the host. */
+export interface ExpandFacilityAction {
+  facilityId: number;
+  targetSize: number;
+  quoteKey: string;
+}
+
+/** Cancel only the exact reviewed project, including across host command delays. */
+export interface CancelFacilityExpansionAction {
+  facilityId: number;
+  quoteKey: string;
+}
+
+/** Size-dependent additions only: identity, age, efficiency, debt and stored energy stay put. */
+export interface FacilityExpansionInProgressType extends ConstructionEmissions {
+  projectSequence: number;
+  targetSize: number;
+  targetPeakW: number;
+  targetPeakWh?: number;
+  cost: number;
+  annualOperatingCostDelta: number;
+  costPerStartDelta: number;
+  startsMinute: number;
+  yearsToBuild: number;
+  yearsToBuildLeft: number;
+  quoteKey: string;
+}
+
 export type FacilityUpgradeType = ResilienceUpgradeType | "combinedCycle";
 
 /**
@@ -1346,6 +1395,43 @@ export interface PeerSettlement {
 }
 export type UtilityId = "champlain" | "valley-electric" | "ridge-electric";
 export type UtilityTargetId = Exclude<UtilityId, "champlain">;
+export type FrontierTerritoryId = `frontier:${number}:${number}`;
+export type LandTerritoryId =
+  | FrontierTerritoryId
+  | "green-uplands"
+  | `parcel-${0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 17}`;
+export type TerritoryId = UtilityId | LandTerritoryId;
+export type TerrainType =
+  "plains" | "forest" | "hills" | "mountain" | "river" | "lake" | "ocean";
+export type CitySizeType = "small" | "medium" | "large";
+export type TerritoryTileId =
+  | FrontierTerritoryId
+  | `${TerritoryId}:city`
+  | `${TerritoryId}:site-${number}`
+  | `${TerritoryId}:legacy-${number}`;
+/** Frozen overflow property from pre-map saves; persists after its plant is retired. */
+export interface LegacyTerritoryTile {
+  id: TerritoryTileId;
+  territoryId: TerritoryId;
+  q: number;
+  r: number;
+  terrain: TerrainType;
+  siteKind: "industrial" | "wind" | "open-land" | "hydro" | "geothermal";
+  maxPeakW: number;
+  hydroSiteId?: string;
+}
+/** Legacy recorded territory readings retained for save history. */
+export interface TerritoryTick {
+  demandW: number;
+  supplyW: number;
+  generationW: number;
+  storageChargeW: number;
+  storageDischargeW: number;
+  importedW: number;
+  exportedW: number;
+  unservedW: number;
+  curtailedW: number;
+}
 export interface AcquisitionLoan {
   id: string;
   targetId: UtilityTargetId;
@@ -1373,6 +1459,14 @@ export interface UtilityExpansionState {
     /** Immutable seller accounts transferred, not a separately simulated customer population. */
     transferredCustomers: number;
   }[];
+}
+export interface AcquireTileAction {
+  tileId: TerritoryTileId;
+  quoteKey: string;
+}
+export interface AcquireLandAction {
+  territoryId: LandTerritoryId;
+  quoteKey: string;
 }
 export interface AcquireUtilityAction {
   targetId: UtilityTargetId;
@@ -1422,10 +1516,71 @@ export interface LegacyCampaignType {
 }
 
 export interface GameType {
+  territoryNetwork?: {
+    version: 3;
+    landPurchases: {
+      territoryId: LandTerritoryId;
+      minute: number;
+      price: number;
+      legacy?: true;
+    }[];
+    /** Immutable physical footprints, including empty retained property. */
+    legacyTiles?: LegacyTerritoryTile[];
+    /** Existing inland offshore plants keep their installation, never replacement rights. */
+    legacyLakeOffshore?: {
+      facilityId: number;
+      tileId: TerritoryTileId;
+    }[];
+    /** Physical purchases since schema 17; older land receipts retain every original cell. */
+    tilePurchases?: {
+      tileId: TerritoryTileId;
+      minute: number;
+      price: number;
+      /** Paid under the pre-adjacency visibility rule; new actions never create this marker. */
+      legacy?: true;
+    }[];
+    /** Frozen legacy projects: capital and debt remain; routing/construction/upkeep are retired. */
+    legacyConnections: TransmissionLineOperatingType[];
+  };
   utilityExpansion?: UtilityExpansionState;
   /** Isolated co-op grid; never publish its score or run the single-player clock/effects. */
   multiplayer?: {
     seat: string;
+    /** Shared finite land claim, projected by the host from all company receipts. */
+    landOwner?: { seat: string; name: string };
+    landOwners?: Partial<
+      Record<LandTerritoryId, { seat: string; name: string }>
+    >;
+    /** Host-owned retained geometry; peer IDs alone cannot reconstruct another fleet. */
+    legacyTiles?: {
+      tile: LegacyTerritoryTile;
+      seat: string;
+      name: string;
+      facility?: {
+        name: FacilityOperatingType["name"];
+        fuel?: FuelNameType;
+        peakW: number;
+        peakWh?: number;
+        yearsToBuildLeft: number;
+      };
+    }[];
+    tileOwners?: Partial<
+      Record<TerritoryTileId, { seat: string; name: string }>
+    >;
+    /** Visible foregrounds on claimed land and acquired utility tiles. */
+    tileFacilities?: Partial<
+      Record<
+        TerritoryTileId,
+        {
+          seat: string;
+          name: FacilityOperatingType["name"];
+          fuel?: FuelNameType;
+          peakW: number;
+          peakWh?: number;
+          yearsToBuildLeft: number;
+        }
+      >
+    >;
     pricePerMWh?: number;
     /** Set by the host at the rollover where this company's run ends. */
     ending?: CompanyOutcomeType;
@@ -1438,6 +1593,10 @@ export interface GameType {
       corridor: TransmissionCorridorDefinitionType;
       availableSupplyW?: number;
       ratingW?: number;
+      /** Host projection of both completed, operating endpoints of this peer link. */
+      connected?: boolean;
+      /** Host-owned visibility anchors; includes this peer's acquired utility cells. */
+      territoryTileIds?: TerritoryTileId[];
       upgradeRequestedBy?: string;
       /** This player asked for the pending upgrade and waits on the other owner. */
       upgradeRequestedBySelf?: boolean;

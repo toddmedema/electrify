@@ -1,3 +1,5 @@
+import { landCustomerMarket } from "./TerritoryCustomers";
+import { legacyTerritoryConnections } from "./Territories";
 import { legacyMonthOffset, legacyCompletedMonths } from "./LegacyCampaign";
 import { isLegacyCampaignScenario } from "../data/LegacyCampaign";
 import {
@@ -736,6 +738,7 @@ export function recordGameObjectiveMonth(
             debtPrincipal: getTotalDebt([
               ...game.facilities,
               ...(game.transmission?.lines ?? []),
+              ...legacyTerritoryConnections(game),
               ...(game.utilityExpansion?.loans ?? []),
             ]),
           }
@@ -767,6 +770,7 @@ export function validGameObjectiveProgress(game: GameType): boolean {
     scenario.mod &&
     (isUtilityExpansionGame(game)
       ? game.customerMarketSize -
+        landCustomerMarket(game) -
         (game.utilityExpansion?.acquisitions.reduce(
           (sum, receipt) =>
             sum + UTILITY_AREAS[receipt.targetId].addressablePool,

@@ -7,6 +7,7 @@ import type {
 } from "../Types";
 import { generateForecastTimeline } from "../reducers/Game";
 import { currentTick } from "./GameSelectors";
+import { isUtilityExpansionGame } from "./ExpansionContext";
 import { projectionSignature } from "./Projection";
 import {
   agreementIntervalMinutes,
@@ -30,7 +31,7 @@ export interface AgreementForecast {
   endMinute: number;
   cashDifference: number;
   withAgreement: AgreementService;
-  marketPurchases: AgreementService;
+  withoutAgreement: AgreementService;
   remaining: AgreementEnergy;
   recorded: AgreementEnergy;
   recordingStartMinute: number;
@@ -119,7 +120,10 @@ export function computeAgreementForecast(
   offer?: PowerAgreementReceipt,
   cacheEpoch = "default",
 ): AgreementForecast {
-  if (game.multiplayer || game.transmission?.buyingRule === "NONE")
+  if (
+    game.multiplayer ||
+    (!isUtilityExpansionGame(game) && game.transmission?.buyingRule === "NONE")
+  )
     throw new Error("Comparison unavailable");
   const key = `${cacheEpoch}|${agreementForecastKey(game, agreementId, offer)}`;
   const cached = results.get(key);
@@ -163,7 +167,7 @@ export function computeAgreementForecast(
       ),
     };
   const withTimeline = baseline.timeline;
-  const marketTimeline = generateForecastTimeline(
+  const withoutTimeline = generateForecastTimeline(
     assessed,
     now.cash,
     now.customers,
@@ -215,9 +219,9 @@ export function computeAgreementForecast(
     cutoffMinute: cutoff,
     startMinute: start,
     endMinute: end,
-    cashDifference: withTimeline.at(-1)!.cash - marketTimeline.at(-1)!.cash,
+    cashDifference: withTimeline.at(-1)!.cash - withoutTimeline.at(-1)!.cash,
     withAgreement: service(withTimeline, start, end),
-    marketPurchases: service(marketTimeline, start, end),
+    withoutAgreement: service(withoutTimeline, start, end),
     remaining,
     recorded,
     recordingStartMinute,

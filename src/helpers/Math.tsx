@@ -44,6 +44,7 @@ const UNIFORM_STREAM = {
   transmissionLulls: 9,
   wildfireHazards: 10,
   weatherHazards: 11,
+  cityMix: 12,
 } as const;
 
 const NORMAL_STREAM = {

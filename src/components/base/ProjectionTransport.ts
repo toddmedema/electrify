@@ -30,7 +30,11 @@ const objectFields = {
   deferredResidentialStart: "queue",
   deferredCharging: "queue",
   deferredChargingStart: "queue",
-} as const satisfies Record<ObjectTickKey, "dictionary" | "queue">;
+  territories: "territories",
+} as const satisfies Record<
+  ObjectTickKey,
+  "dictionary" | "queue" | "territories"
+>;
 type DictionaryKey = {
   [K in ObjectTickKey]: (typeof objectFields)[K] extends "dictionary"
     ? K
@@ -63,12 +67,17 @@ interface PackedQueue {
   indices: Uint32Array<ArrayBuffer>;
   arrayIds: Uint32Array<ArrayBuffer>;
 }
+interface PackedTerritories {
+  presence: Uint8Array<ArrayBuffer>;
+  entries: Record<string, PackedDictionary>;
+}
 export interface ProjectionTransport {
   ticks: {
     numbers: PackedNumbers;
     dictionaries: Record<DictionaryKey, PackedDictionary>;
     queues: Record<QueueKey, PackedQueue>;
     queueEntries: PackedNumbers;
+    territories: PackedTerritories;
   };
   sampledIndices: Uint32Array<ArrayBuffer>;
   cashMonths: number;
@@ -156,6 +165,28 @@ export function packProjection(projection: ProjectionView): {
     };
     transfers.push(states.buffer);
   });
+  const territoryStates = Uint8Array.from(forecast, (tick) =>
+    presence(tick, "territories"),
+  );
+  const territories: PackedTerritories = {
+    presence: territoryStates,
+    entries: {},
+  };
+  transfers.push(territoryStates.buffer);
+  const territoryIds = new Set(
+    forecast.flatMap((tick) => Object.keys(tick.territories ?? {})),
+  );
+  territoryIds.forEach((id) => {
+    const rows = forecast.map((tick) => tick.territories ?? {});
+    const states = Uint8Array.from(rows, (row) => presence(row, id));
+    territories.entries[id] = {
+      presence: states,
+      numbers: addNumbers(
+        packNumbers(rows.map((row) => row[id as keyof typeof row] ?? {})),
+      ),
+    };
+    transfers.push(states.buffer);
+  });
   const entries: DeferredResidentialLoad[] = [];
   const entryIndices = new Map<DeferredResidentialLoad, number>();
   const arrayIds = new Map<DeferredResidentialLoad[], number>();
@@ -214,7 +245,7 @@ export function packProjection(projection: ProjectionView): {
   } = projection;
   return {
     transport: {
-      ticks: { numbers, dictionaries, queues, queueEntries },
+      ticks: { numbers, dictionaries, queues, queueEntries, territories },
       sampledIndices,
       cashMonths: projection.cashProjected.length,
       view,
@@ -253,6 +284,21 @@ export function projectionDecoder(
                 : readNumbers(packed.numbers, rowIndex),
           });
       });
+      const territories = transport.ticks.territories;
+      if (territories.presence[rowIndex]) {
+        const values: Record<string, object | undefined> = {};
+        Object.entries(territories.entries).forEach(([id, packed]) => {
+          if (packed.presence[rowIndex])
+            values[id] =
+              packed.presence[rowIndex] === 1
+                ? undefined
+                : readNumbers(packed.numbers, rowIndex);
+        });
+        Object.assign(row, {
+          territories:
+            territories.presence[rowIndex] === 1 ? undefined : values,
+        });
+      }
       queueKeys.forEach((key) => {
         const packed = transport.ticks.queues[key];
         if (!packed.presence[rowIndex]) return;

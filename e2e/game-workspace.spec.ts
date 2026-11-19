@@ -246,30 +246,29 @@ for (const theme of ["light", "dark"] as const) {
     ).toBeVisible();
   });
 
-  test(`mobile grid status keeps the header height during a blackout in ${theme}`, async ({
+  test(`mobile grid status keeps the power visible during a blackout in ${theme}`, async ({
     page,
   }, testInfo) => {
     test.skip(page.viewportSize()!.width >= 700);
     await startGame(page, theme);
     const status = page.locator(".gridHealth");
     await expect(status).toHaveClass(/gridHealth-stable/);
-    const initialHeight = (await page.locator("#appbar").boundingBox())!.height;
     await page
       .getByRole("button", { name: "Inspect Coal", exact: true })
       .click();
     await page.getByRole("button", { name: "Pause Coal", exact: true }).click();
     await expect(status).toHaveClass(/gridHealth-blackout/);
-    await expect(status.locator(".gridHealthMetric")).toHaveCount(0);
-    const icon = status.getByRole("button", {
-      name: /^Current grid status: Blackout/,
+    const readout = status.getByRole("button", {
+      name: /^Current grid status: NOW .* short/,
     });
-    await expect(icon).toHaveCSS("height", "44px");
-    expect((await page.locator("#appbar").boundingBox())!.height).toBe(
-      initialHeight,
-    );
-    await icon.tap();
+    await expect(readout).toContainText(/NOW.*MW.*short/);
+    expect((await readout.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    expect(
+      await readout.evaluate((el) => el.scrollWidth <= el.clientWidth),
+    ).toBe(true);
+    await readout.tap();
     await expect(
-      page.getByRole("tooltip", { name: /^Blackout, .* short/ }),
+      page.getByRole("dialog", { name: "Grid status", exact: true }),
     ).toBeVisible();
     await reviewScreenshot(page, {
       path: testInfo.outputPath(`grid-blackout-${theme}.png`),
@@ -398,6 +397,7 @@ test("Build and Programs restore selections and scrolling without reopening hidd
   // One tool at a time: switching tools hides the other instead of opening beside it.
   if (page.viewportSize()!.width >= 1024)
     await page.setViewportSize({ width: 1023, height: 800 });
+  await page.emulateMedia({ reducedMotion: "reduce" });
   await startGame(page, "dark");
   const build = page.getByRole("region", { name: "Build", exact: true });
   await page.locator("#insightsNav").click();
@@ -406,15 +406,20 @@ test("Build and Programs restore selections and scrolling without reopening hidd
   await size.focus();
   await size.press("ArrowRight");
   const generatorSize = await size.inputValue();
+  // Measure tab restoration after forecast charts have finished laying out the list.
+  await expect(
+    build.getByText("Calculating output and energy costs…", { exact: true }),
+  ).toHaveCount(0);
   const list = build.locator(".cardList");
-  const left = await list.evaluate((element) => {
-    element.scrollTop = Math.min(
-      240,
-      element.scrollHeight - element.clientHeight,
-    );
-    return element.scrollTop;
-  });
+  const left = await list.evaluate((element) =>
+    Math.min(240, element.scrollHeight - element.clientHeight),
+  );
   expect(left).toBeGreaterThan(0);
+  const listBounds = (await list.boundingBox())!;
+  await page.mouse.move(listBounds.x + listBounds.width / 2, listBounds.y + 24);
+  await page.mouse.wheel(0, left);
+  const scrollPosition = () => list.evaluate((element) => element.scrollTop);
+  await expect.poll(scrollPosition).toBe(left);
   await page.getByRole("tab", { name: "Storage", exact: true }).click();
   await size.focus();
   await size.press("ArrowRight");
@@ -436,9 +441,7 @@ test("Build and Programs restore selections and scrolling without reopening hidd
   await expect(size).toHaveValue(tier);
   await page.getByRole("tab", { name: "Generators", exact: true }).click();
   await expect(size).toHaveValue(generatorSize);
-  await expect
-    .poll(() => list.evaluate((element) => element.scrollTop))
-    .toBe(left);
+  await expect.poll(scrollPosition).toBe(left);
   await page.getByRole("tab", { name: "Storage", exact: true }).click();
   await expect(size).toHaveValue(storageSize);
 
@@ -641,7 +644,7 @@ for (const theme of ["light", "dark"] as const) {
     for (const label of ["Build", "Programs", "Insights", "Events"]) {
       const action = dock.getByRole("button", { name: label, exact: true });
       await expect(action).toBeVisible();
-      await expect(action).toContainText(label);
+      await expect(action).not.toContainText(label);
       await expect(action).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
       const box = (await action.boundingBox())!;
       expect(box.height).toBeGreaterThanOrEqual(
@@ -761,34 +764,25 @@ test("dock labels support pointer, keyboard and touch without accidental tool ac
   await startGame(page, "light");
   const dock = page.locator("#navfooter");
   const status = page.locator(".gridHealth");
-  if (page.viewportSize()!.width < 700) {
-    // Phones shrink a stable grid to a checked bolt; the readout is a tap away.
-    const summary =
-      /^Stable, \d.*[kMGT]?W demand met with \d.*[kMGT]?W reserve$/;
-    const bolt = status.getByRole("button", {
-      name: /^Current grid status: Stable, /,
-    });
-    await expect(bolt).toHaveCSS("height", "44px");
-    await expect(status.locator(".gridHealthMetric")).toHaveCount(0);
-    await bolt.tap();
-    await expect(page.getByRole("tooltip", { name: summary })).toBeVisible();
-    await bolt.tap();
-    await expect(page.getByRole("tooltip", { name: summary })).toHaveCount(0);
-    await bolt.tap();
-    await expect(page.getByRole("tooltip", { name: summary })).toBeVisible();
-    await page
-      .locator(".gameStage .facilities")
-      .tap({ position: { x: 8, y: 8 } });
-    await expect(page.getByRole("tooltip", { name: summary })).toHaveCount(0);
-  } else {
-    await expect(status.locator(".gridHealthMetric")).toHaveText(
-      /^Stable, \d.*[kMGT]?W reserve$/,
-    );
-    await expect(status.locator(".gridHealthMetric")).toHaveCSS(
-      "text-align",
-      "left",
-    );
+  for (const name of ["Build", "Programs", "Insights", "Events"]) {
+    const action = dock.getByRole("button", { name, exact: true });
+    await expect(action).toBeVisible();
+    await expect(action).not.toContainText(name);
   }
+  const readout = status.getByRole("button", {
+    name: /^Current grid status: NOW/,
+  });
+  await expect(readout).toContainText(/NOW.*W.*reserve/);
+  await expect(readout).toHaveCSS("text-align", "left");
+  await readout.click();
+  const diagnosis = page.getByRole("dialog", {
+    name: "Grid status",
+    exact: true,
+  });
+  await expect(diagnosis).toBeVisible();
+  await diagnosis.getByRole("button", { name: "Close grid status" }).click();
+  await expect(diagnosis).toHaveCount(0);
+  await expect(readout).toBeFocused();
   await expect(status).toHaveCSS("border-right-width", "0px");
 
   if (!testInfo.project.use.hasTouch) {
@@ -798,6 +792,8 @@ test("dock labels support pointer, keyboard and touch without accidental tool ac
       page.getByRole("tooltip", { name: "Build (Q, B)", exact: true }),
     ).toBeVisible();
     await page.mouse.move(0, 0);
+    // The diagnostic exercised pointer input; switch back to real keyboard modality.
+    await page.keyboard.press("Tab");
     await page.locator("#programsNav").focus();
     await expect(
       page.getByRole("tooltip", { name: "Programs (W)", exact: true }),
@@ -818,8 +814,7 @@ test("dock labels support pointer, keyboard and touch without accidental tool ac
     const actions = ["Build", "Programs", "Insights", "Events"];
     for (const label of actions) {
       const action = dock.getByRole("button", { name: label, exact: true });
-      await expect(action.locator(".gameDockLabel")).toHaveText(label);
-      await expect(action.locator(".gameDockLabel")).toBeVisible();
+      await expect(action).not.toContainText(label);
     }
     const build = (await page.locator("#buildNav").boundingBox())!;
     await session.send("Input.dispatchTouchEvent", {
@@ -840,7 +835,7 @@ test("dock labels support pointer, keyboard and touch without accidental tool ac
       await expect(
         page.getByRole("tooltip", { name: label, exact: true }),
       ).toBeVisible();
-      await expect(action.locator(".gameDockLabel")).toBeVisible();
+      await expect(action).not.toContainText(label);
       await expect(page.locator(".gameToolPanel")).toHaveCount(0);
     }
     await session.send("Input.dispatchTouchEvent", {
@@ -1387,7 +1382,7 @@ for (const theme of ["light", "dark"] as const) {
 }
 
 for (const theme of ["light", "dark"] as const) {
-  test(`enlarged phone status and edge-padded tooltip remain readable in ${theme}`, async ({
+  test(`enlarged phone status and edge-padded diagnosis remain readable in ${theme}`, async ({
     page,
   }, info) => {
     test.skip(!info.project.use.hasTouch, "Phone status reflow");
@@ -1449,18 +1444,35 @@ for (const theme of ["light", "dark"] as const) {
         name: /^Current grid status:/,
       });
       await status.tap();
-      const tooltip = page.getByRole("tooltip");
-      await expect(tooltip).toBeVisible();
-      const edge = await tooltip.evaluate((element) => {
+      const diagnosis = page.getByRole("dialog", {
+        name: "Grid status",
+        exact: true,
+      });
+      await expect(diagnosis).toBeVisible();
+      const edge = await diagnosis.evaluate((element) => {
         const rect = element.getBoundingClientRect();
         return {
           minimum: Math.ceil(Math.min(innerWidth, innerHeight) * 0.04),
           left: rect.left,
           right: innerWidth - rect.right,
+          top: rect.top,
+          bottom: innerHeight - rect.bottom,
+          viewportHeight: innerHeight,
+          maximumHeight: Number.parseFloat(getComputedStyle(element).maxHeight),
         };
       });
       expect(edge.left).toBeGreaterThanOrEqual(edge.minimum - 1);
       expect(edge.right).toBeGreaterThanOrEqual(edge.minimum - 1);
+      expect(edge.top).toBeGreaterThanOrEqual(edge.minimum - 1);
+      expect(edge.bottom).toBeGreaterThanOrEqual(edge.minimum - 1);
+      expect(edge.maximumHeight).toBeLessThanOrEqual(
+        edge.viewportHeight - 2 * edge.minimum,
+      );
+      await diagnosis
+        .getByRole("button", { name: "Close grid status" })
+        .click();
+      await expect(diagnosis).toHaveCount(0);
+      await expect(status).toBeFocused();
     }
   });
 

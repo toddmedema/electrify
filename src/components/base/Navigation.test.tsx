@@ -5,6 +5,7 @@ import { store } from "../../Store";
 import { delta, markEventsRead } from "../../reducers/Game";
 import { ActiveWorldEventType } from "../../Types";
 import Navigation from "./Navigation";
+import { createGame } from "../../testing/Simulator";
 import {
   resetInputPresentation,
   updateInputPresentation,
@@ -63,22 +64,26 @@ describe("Navigation", () => {
       "BUILD_STORAGE",
     );
   });
-  it("keeps accessible icon-only actions in a couch company", () => {
-    window.electrifyCouch = {
-      role: "seat",
-      seatId: "local-p1",
-      getGeneration: () => 1,
-      ready: async () => {},
-      onMessage: () => () => {},
-      post: () => {},
-    };
-    renderNavigation();
-    for (const name of ["Build", "Programs", "Insights"]) {
-      const button = screen.getByRole("button", { name });
-      expect(button).toHaveAccessibleName(name);
-      expect(button).not.toHaveTextContent(name);
-    }
-  });
+  it.each([false, true])(
+    "keeps accessible icon-only actions (couch: %s)",
+    (couch) => {
+      if (couch)
+        window.electrifyCouch = {
+          role: "seat",
+          seatId: "local-p1",
+          getGeneration: () => 1,
+          ready: async () => {},
+          onMessage: () => () => {},
+          post: () => {},
+        };
+      renderNavigation();
+      for (const name of ["Build", "Programs", "Insights"]) {
+        const button = screen.getByRole("button", { name });
+        expect(button).toHaveAccessibleName(name);
+        expect(button).not.toHaveTextContent(name);
+      }
+    },
+  );
   beforeEach(() => {
     store.dispatch(
       delta({
@@ -89,6 +94,33 @@ describe("Navigation", () => {
         eventLogReadThroughId: 0,
       }),
     );
+  });
+
+  it("keeps Build out of map games and restores it for other scenarios", () => {
+    store.dispatch(
+      delta({
+        scenarioId: 116,
+        territoryNetwork: createGame({ scenarioId: 116, seed: 188 })
+          .territoryNetwork,
+      }),
+    );
+    const view = renderNavigation();
+    expect(
+      screen.queryByRole("button", { name: "Build" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Programs" })).toBeEnabled();
+    expect(
+      screen.queryByRole("button", { name: "Map" }),
+    ).not.toBeInTheDocument();
+    for (const name of ["Fleet", "Agreements"])
+      expect(screen.getByRole("button", { name })).toBeEnabled();
+    act(() => {
+      store.dispatch(delta({ scenarioId: 103 }));
+    });
+    expect(screen.getByRole("button", { name: "Build" })).toBeEnabled();
+    for (const name of ["Map", "Fleet", "Agreements"])
+      expect(screen.queryByRole("button", { name })).not.toBeInTheDocument();
+    view.unmount();
   });
 
   it("keeps an emergency alert after reading events and resuming until the last emergency ends", () => {
@@ -188,7 +220,7 @@ describe("Navigation", () => {
     for (const name of ["Build", "Programs", "Insights", "Events"]) {
       const button = screen.getByRole("button", { name });
       expect(button).toBeVisible();
-      expect(button).toHaveTextContent(name);
+      expect(button).not.toHaveTextContent(name);
     }
     expect(screen.queryByRole("button", { name: "Facilities" })).toBeNull();
   });

@@ -1,14 +1,14 @@
 import { useMoney } from "../base/CurrencyContext";
 import * as React from "react";
 import { UTILITY_AREAS, UTILITY_TARGETS } from "../../data/UtilityExpansion";
-import { getCostTableIndex } from "../../data/Economy";
+import { legacyTerritoryConnections } from "../../helpers/Territories";
 import { getDateFromMinute } from "../../helpers/DateTime";
 import { formatCount } from "../../helpers/Format";
 import { getTotalDebt } from "../../helpers/Financials";
 import type { GameType } from "../../Types";
 import { ChevronDownGlyph } from "../base/Glyphs";
 
-/** Ownership is a record; operating plants and regional connections stay in the fleet. */
+/** Ownership is a record; operating plants and dated obligations join the company pool. */
 export default function AcquiredUtilities({
   game,
   summaryRef,
@@ -19,7 +19,6 @@ export default function AcquiredUtilities({
   const { formatMoneyConcise } = useMoney();
   const expansion = game.utilityExpansion;
   if (!expansion?.acquisitions.length) return null;
-  const costIndex = getCostTableIndex(game.date, game.startingYear, game.seed);
   return (
     <details className="acquiredUtilities">
       <summary ref={summaryRef}>
@@ -32,9 +31,10 @@ export default function AcquiredUtilities({
           const target = UTILITY_TARGETS.find(
             (target) => target.id === receipt.targetId,
           )!;
-          const line = game.transmission?.lines.find(
-            (line) => line.corridorId === target.corridorId,
-          );
+          const line = [
+            ...(game.transmission?.lines ?? []),
+            ...legacyTerritoryConnections(game),
+          ].find((line) => line.corridorId === target.corridorId);
           const acquired = getDateFromMinute(receipt.minute, game.startingYear);
           const outstandingLoans = [
             ...(line ? [line] : []),
@@ -57,15 +57,6 @@ export default function AcquiredUtilities({
                   <dt>Customers acquired</dt>
                   <dd className="facilityStatValue">
                     {formatCount(receipt.transferredCustomers)}
-                  </dd>
-                </div>
-                <div className="facilityStat">
-                  <dt>Connection upkeep</dt>
-                  <dd className="facilityStatValue">
-                    {formatMoneyConcise(
-                      ((line?.annualOperatingCost ?? 0) * costIndex) / 12,
-                    )}
-                    /mo
                   </dd>
                 </div>
                 <div className="facilityStat">

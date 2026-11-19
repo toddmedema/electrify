@@ -6,18 +6,29 @@ import {
   DemandTypeNameType,
   TickPresentFutureType,
 } from "../../Types";
-import { formatMinuteAsTooltipHeader } from "../../helpers/DateTime";
+import {
+  formatMinuteAsTooltipHeader,
+  formatMinuteOfDayChartAxis,
+  getHourTicks,
+} from "../../helpers/DateTime";
 import {
   formatForecastWatts as formatWatts,
   formatForecastWattsAxis as formatWattsAxis,
 } from "../../helpers/Format";
 import { chartPalette, demandTypeColors } from "../../Theme";
 import UPlotChart, { BuildContext } from "./UPlotChart";
-import { FORECAST_RIGHT_PAD, forecastMonthAxis, yAxis } from "./UPlotHelpers";
+import {
+  FORECAST_RIGHT_PAD,
+  forecastMonthAxis,
+  xAxis,
+  yAxis,
+} from "./UPlotHelpers";
+
+type DemandSample = Pick<TickPresentFutureType, "minute" | "demandByType">;
 
 export interface Props {
   height?: number;
-  timeline: TickPresentFutureType[];
+  timeline: readonly DemandSample[];
   domain: { x: [number, number] };
   /** Shared with the DOM legend so both surfaces always present the same ranking. */
   displayTypes?: readonly DemandTypeNameType[];
@@ -26,6 +37,8 @@ export interface Props {
   startingYear: number;
   multiyear: boolean;
   showXLabels?: boolean;
+  /** City inspections use the same clock labels as the fleet's daily demand chart. */
+  xAxis?: "month" | "hour";
   syncKey?: string;
 }
 
@@ -40,7 +53,22 @@ interface State {
   typeLabels: Partial<Record<DemandTypeNameType, string>>;
 }
 
-function buildOptions(showXLabels: boolean) {
+export function demandChartTimeAxis(
+  scale: number,
+  getState: () => Pick<State, "domain" | "startingYear" | "multiyear">,
+  axis: "month" | "hour",
+  showXLabels = true,
+): uPlot.Axis {
+  return axis === "hour"
+    ? xAxis(scale, {
+        showLabels: showXLabels,
+        splits: () => getHourTicks(...getState().domain.x),
+        values: (_u, splits) => splits.map(formatMinuteOfDayChartAxis),
+      })
+    : forecastMonthAxis(scale, getState, showXLabels);
+}
+
+function buildOptions(showXLabels: boolean, axis: "month" | "hour") {
   return ({ getState, scale }: BuildContext<State>): uPlot.Options => ({
     width: 0,
     height: 0,
@@ -56,7 +84,7 @@ function buildOptions(showXLabels: boolean) {
       y: { range: () => [0, getState().maxY] as [number, number] },
     },
     axes: [
-      forecastMonthAxis(scale, getState, showXLabels),
+      demandChartTimeAxis(scale, getState, axis, showXLabels),
       yAxis(scale, {
         values: (_u, splits) =>
           splits.map((value) => formatWattsAxis(value, splits)),
@@ -91,7 +119,7 @@ const EMPTY_BREAKDOWN: DemandByTypeType = {
  * legend and stacked chart hard to follow, so the first plotted instant owns the ordering.
  */
 export function demandTypesBySizeAtStart(
-  timeline: TickPresentFutureType[],
+  timeline: readonly DemandSample[],
   startMinute: number,
 ): DemandTypeNameType[] {
   const firstVisible =
@@ -155,6 +183,7 @@ export default class ChartForecastDemandByType extends React.PureComponent<
       showXLabels,
       syncKey,
       typeLabels = {},
+      xAxis = "month",
     } = this.props;
     const minutes: number[] = [];
     const byType: DemandByTypeType[] = [];
@@ -200,8 +229,8 @@ export default class ChartForecastDemandByType extends React.PureComponent<
           data={[minutes, ...stacked]}
           summaryData={[minutes, ...unstacked]}
           seriesLabels={DEMAND_TYPES.map((type) => typeLabels[type] || type)}
-          buildOptions={buildOptions(showXLabels !== false)}
-          structureKey={String(showXLabels !== false)}
+          buildOptions={buildOptions(showXLabels !== false, xAxis)}
+          structureKey={`${showXLabels !== false}:${xAxis}`}
           syncKey={syncKey}
           tooltip={tooltip}
         />

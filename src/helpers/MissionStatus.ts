@@ -28,6 +28,7 @@ import type { ObjectiveResult } from "../data/ScenarioObjectives";
 import {
   objectiveDefinitionText,
   objectiveGoalText,
+  objectiveHeadingText,
   objectiveObservedText,
   objectiveTargetText,
   objectiveValueText,
@@ -110,7 +111,11 @@ function objectiveRequirement(
           3,
           currency,
         );
-  const compact = `${target} (${observed})`;
+  const compact =
+    objective.metric === "utilityOwnership" &&
+    objective.id === "acquire-neighbor"
+      ? objectiveHeadingText(objective)
+      : `${target} (${observed})`;
   return {
     id: result.id,
     label: result.label,

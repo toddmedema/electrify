@@ -1,0 +1,174 @@
+.territoryMapWeather {
+  --map-weather-cloud: #536e84;
+  --map-weather-rain: #376589c7;
+  --map-weather-snow-rim: #24405a96;
+  --map-weather-wind: #477697b3;
+  --map-weather-motion: paused;
+  position: absolute;
+  inset: 0;
+  contain: paint;
+  container-type: size;
+  pointer-events: none;
+
+  &[data-weather-motion="running"] {
+    --map-weather-motion: running;
+  }
+  &[data-weather-theme="dark"] {
+    --map-weather-cloud: #8297ae;
+    --map-weather-rain: #b3d7f0ce;
+    --map-weather-snow-rim: #1024369e;
+    --map-weather-wind: #bddcf4bd;
+  }
+
+  > div {
+    position: absolute;
+    inset: -34% -25%;
+    animation-play-state: var(--map-weather-motion);
+    transition: opacity 320ms ease-out;
+  }
+
+  // Cover the viewport through the full rotation and travel, including tall phones.
+  > .mapWeatherRain,
+  > .mapWeatherSnow {
+    inset: calc(-31cqw - 128px) calc(-31cqh - 16px);
+  }
+  > .mapWeatherWind {
+    inset: -12cqw calc(-12cqh - 190px);
+  }
+}
+
+// The 2D fallback paints terrain in the DOM stage above the WebGL layer.
+.territoryMap:not([data-renderer="ready"]) .territoryMapWeather {
+  z-index: 1;
+}
+
+.mapWeatherClouds {
+  background:
+    radial-gradient(
+      ellipse at 26% 31%,
+      color-mix(in srgb, var(--map-weather-cloud) 24%, transparent) 5%,
+      transparent 62%
+    ),
+    radial-gradient(
+      ellipse at 77% 66%,
+      color-mix(in srgb, var(--map-weather-cloud) 20%, transparent) 8%,
+      transparent 58%
+    );
+  animation: mapWeatherCloudDrift 28s ease-in-out -7s infinite alternate;
+}
+
+.mapWeatherRain {
+  rotate: var(--map-weather-rain-angle);
+  background-image:
+    radial-gradient(
+      ellipse 0.9px 8px at 12px 20px,
+      var(--map-weather-rain) 28%,
+      transparent
+    ),
+    radial-gradient(
+      ellipse 0.7px 5px at 37px 49px,
+      var(--map-weather-rain) 32%,
+      transparent
+    ),
+    radial-gradient(
+      ellipse 0.8px 7px at 51px 86px,
+      var(--map-weather-rain) 35%,
+      transparent
+    );
+  background-size: 59px 104px;
+  animation: mapWeatherRainFall 560ms linear -177ms infinite;
+}
+
+.mapWeatherSnow {
+  rotate: var(--map-weather-snow-angle);
+  background-image:
+    radial-gradient(
+      circle at 16px 23px,
+      #f6fdff 1px,
+      var(--map-weather-snow-rim) 1.6px,
+      transparent 2.5px
+    ),
+    radial-gradient(
+      circle at 37px 70px,
+      #eef9ff 1.2px,
+      var(--map-weather-snow-rim) 2px,
+      transparent 3px
+    ),
+    radial-gradient(
+      circle at 69px 99px,
+      #f6fdff 0.7px,
+      var(--map-weather-snow-rim) 1.4px,
+      transparent 2.1px
+    ),
+    radial-gradient(
+      circle at 94px 48px,
+      #eef9ff 1px,
+      var(--map-weather-snow-rim) 1.6px,
+      transparent 2.4px
+    );
+  background-size: 105px 128px;
+  animation: mapWeatherSnowFall 5.6s linear -1.7s infinite;
+}
+
+.mapWeatherWind {
+  rotate: -12deg;
+  background-image:
+    radial-gradient(
+      ellipse 33px 1px at 51px 39px,
+      var(--map-weather-wind) 12%,
+      transparent
+    ),
+    radial-gradient(
+      ellipse 22px 0.7px at 153px 101px,
+      var(--map-weather-wind) 12%,
+      transparent
+    );
+  background-size: 190px 139px;
+  animation: mapWeatherGust 1.25s ease-in-out -400ms infinite;
+}
+
+@keyframes mapWeatherCloudDrift {
+  from {
+    transform: translate3d(-5%, -1%, 0);
+  }
+  to {
+    transform: translate3d(5%, 2%, 0);
+  }
+}
+
+@keyframes mapWeatherRainFall {
+  from {
+    transform: translate3d(0, -104px, 0);
+  }
+  to {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes mapWeatherSnowFall {
+  0% {
+    transform: translate3d(0, -128px, 0);
+  }
+  50% {
+    transform: translate3d(16px, -64px, 0);
+  }
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes mapWeatherGust {
+  from {
+    transform: translate3d(-190px, 0, 0);
+  }
+  to {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .territoryMapWeather > div {
+    animation-play-state: paused;
+    transition: none;
+  }
+}

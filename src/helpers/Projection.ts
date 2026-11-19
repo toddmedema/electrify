@@ -1,3 +1,4 @@
+import { legacyTerritoryConnections } from "./Territories";
 import { needsObjectiveEnergyMeters } from "./ScenarioRules";
 import { GAME_TO_REAL_YEARS, TICK_MINUTES, TICKS_PER_YEAR } from "../Constants";
 import { getScenario } from "../data/Scenarios";
@@ -139,6 +140,8 @@ export function facilitySignature(game: GameType): string {
         facility.yearsToBuildLeft > 0,
         facility.peakW,
         facility.gasCycle,
+        facility.expansionInProgress?.quoteKey,
+        facility.expansionInProgress?.targetSize,
         facility.upgradeInProgress?.upgrade,
         facility.upgradeInProgress?.completesMinute,
       ].join(":"),
@@ -168,6 +171,7 @@ export function facilitySignature(game: GameType): string {
  * player-visible decision, which is what a rebuild is worth.
  */
 export function projectionSignature(game: GameType): string {
+  const territory = game.territoryNetwork;
   return [
     game.scenarioId,
     game.difficulty,
@@ -199,6 +203,23 @@ export function projectionSignature(game: GameType): string {
         ),
       },
     ),
+    // Property transactions affect the forecast. Retained connection debt is
+    // refreshed at rollover, like facility debt, rather than on every payment.
+    territory
+      ? JSON.stringify([
+          territory.landPurchases,
+          territory.tilePurchases,
+          territory.legacyConnections.map(
+            ({
+              id,
+              corridorId,
+              buildCost,
+              loanMonthlyPayment,
+              interestRate,
+            }) => [id, corridorId, buildCost, loanMonthlyPayment, interestRate],
+          ),
+        ])
+      : "",
     game.creditPremium,
     JSON.stringify(game.loadAdditions),
     game.storyEffectsDisabled,
@@ -271,6 +292,7 @@ function buildProjection(
             debtPrincipal: getTotalDebt([
               ...state.facilities,
               ...(state.transmission?.lines ?? []),
+              ...legacyTerritoryConnections(state),
               ...(state.utilityExpansion?.loans ?? []),
             ]),
             ...(state.utilityExpansion

@@ -1,9 +1,11 @@
 import * as React from "react";
+import uPlot from "uplot";
 import { render, screen } from "@testing-library/react";
 import { DemandByTypeType, TickPresentFutureType } from "../../Types";
 import ChartForecastDemandByType, {
   demandTypesBySizeAtStart,
   formatDemandTypeTooltip,
+  demandChartTimeAxis,
 } from "./ChartForecastDemandByType";
 
 function tick(
@@ -12,6 +14,51 @@ function tick(
 ): TickPresentFutureType {
   return { minute, demandByType } as TickPresentFutureType;
 }
+
+it("labels city demand by hour across midnight while keeping forecasts on their month axis", () => {
+  const breakdown = {
+    Residential: 100,
+    Commercial: 20,
+    Industrial: 10,
+    Transportation: 0,
+    Mining: 0,
+    "Data Centers": 0,
+  };
+  const props = {
+    timeline: [tick(2880, breakdown), tick(4320, breakdown)],
+    domain: { x: [2880, 4320] as [number, number] },
+    startingYear: 2005,
+    multiyear: false,
+  };
+  const renderAxis = (xAxis: "hour" | "month") => {
+    const axis = demandChartTimeAxis(1, () => props, xAxis);
+    const splits = (axis.splits as Exclude<uPlot.Axis.Splits, number[]>)(
+      null as unknown as uPlot,
+      0,
+      2880,
+      4320,
+      0,
+      0,
+    );
+    return (axis.values as uPlot.Axis.DynamicValues)(
+      null as unknown as uPlot,
+      splits,
+      0,
+      0,
+      0,
+    );
+  };
+  expect(renderAxis("hour")).toEqual([
+    "12 AM",
+    "4 AM",
+    "8 AM",
+    "12 PM",
+    "4 PM",
+    "8 PM",
+    "12 AM",
+  ]);
+  expect(renderAxis("month")).not.toContain("12 AM");
+});
 
 it("makes every demand category readable without the canvas", () => {
   render(

@@ -1,4 +1,16 @@
-import { useMoney } from "../base/CurrencyContext";
+import TerritoryNetwork from "./TerritoryNetwork";
+import PowerAgreements from "../base/PowerAgreements";
+import {
+  INHERITED_CONNECTIONS,
+  inheritedConnection,
+  utilityOwnedAt,
+} from "../../helpers/PowerAgreements";
+import { UtilityId } from "../../Types";
+import {
+  hasTerritoryNetwork,
+  facilityTerritoryId,
+} from "../../helpers/Territories";
+import { territoryName } from "../base/TerritoryBuildDestination";
 import {
   getInterfaceScale,
   subscribeInterfaceScale,
@@ -9,7 +21,6 @@ import {
   Button,
   Checkbox,
   Chip,
-  DialogContentText,
   List,
   ListItem,
   ListItemAvatar,
@@ -17,11 +28,10 @@ import {
   Typography,
 } from "@mui/material";
 import CheckIcon from "@mui/icons-material/Check";
-import ConfirmDialog from "../base/ConfirmDialog";
 import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
 import RemoveIcon from "@mui/icons-material/Remove";
+import AddIcon from "@mui/icons-material/Add";
 import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
-import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
 import { ChevronDownGlyph } from "../base/Glyphs";
 import {
   DragDropContext,
@@ -32,10 +42,7 @@ import {
   DragStart,
   NotDraggingStyle,
 } from "@hello-pangea/dnd";
-import FacilityContextMenu, {
-  FacilityMenuTarget,
-  facilityActionIcon,
-} from "./FacilityContextMenu";
+import FacilityContextMenu, { FacilityMenuTarget } from "./FacilityContextMenu";
 import { facilityGroupMoves } from "./FacilitySelection";
 import { TickThrottle } from "../../helpers/RenderThrottle";
 import {
@@ -50,18 +57,16 @@ import {
   GameType,
   RetrofitFacilityAction,
   EvidenceRequestType,
+  MapWorkspaceView,
 } from "../../Types";
-import {
-  facilityCashBack,
-  facilityPermanentlyShutdown,
-} from "../../helpers/Financials";
+import { facilityPermanentlyShutdown } from "../../helpers/Financials";
 import { storyOutputMultiplier } from "../../helpers/Story";
 import {
   formatWattHoursOfPeak,
   formatWatts,
   formatWattsOfPeak,
-  formatFacilitySize,
   formatWattsInUnit,
+  formatBuildMonths,
   getWattUnit,
 } from "../../helpers/Format";
 import ChartSupplyDemand from "../base/ChartSupplyDemand";
@@ -70,7 +75,8 @@ import FlowBar from "../base/FlowBar";
 import FacilityRowText from "../base/FacilityRowText";
 import { constructionStatus } from "../base/ConstructionProgress";
 import { SIDE_LAYOUT_MIN_WIDTH } from "../../Globals";
-import FacilityDetails from "../base/FacilityDetails";
+import ExpandedFacilityDetails from "../base/ExpandedFacilityDetails";
+import type { FacilityCapacityUpgradeActions } from "../base/FacilityCapacityUpgrade";
 import GameCard from "../base/GameCard";
 import ConceptIcon from "../base/ConceptIcon";
 import { combineStoryEffects } from "../../data/WorldEvents";
@@ -86,13 +92,13 @@ import {
   upgradeProgress,
 } from "../../helpers/Hazards";
 import { dayCount, resilienceName } from "../base/WeatherResilienceText";
-import TransmissionPanel from "./TransmissionPanel";
+import TransmissionPanel, { TradingControls } from "./TransmissionPanel";
 import { facilityDisplayName } from "../base/FacilityLabels";
 import { BuyingRuleType, SellingRuleType } from "../../Types";
 import { corridorsForLocation } from "../../data/AdjacentMarkets";
 import { GAME_TO_REAL_YEARS, TICKS_PER_HOUR } from "../../Constants";
 
-interface FacilityListItemProps {
+interface FacilityListItemProps extends FacilityCapacityUpgradeActions {
   arriving: boolean;
   onArrivalShown?: (id: number) => void;
   facility: FacilityOperatingType;
@@ -207,11 +213,12 @@ function activityIcon(activity: FacilityActivityType, color: string) {
     case "PAUSED":
       return <ConceptIcon concept="pause" style={style} />;
     case "IDLE":
-      return <RemoveIcon style={style} />;
+      return <RemoveIcon style={{ color: "var(--delta-bad)" }} />;
     case "CHARGING":
       return <ArrowUpwardIcon style={style} />;
     case "DISCHARGING":
-      return <ArrowDownwardIcon style={style} />;
+    case "RUNNING":
+      return <AddIcon style={{ color: "var(--delta-good)" }} />;
     default:
       return <ConceptIcon concept="supply" style={style} />;
   }
@@ -235,131 +242,7 @@ const ACTIVITY_LABELS: { [k in FacilityActivityType]: string } = {
 // "Nearly empty." forecast lead -- the row warns before that bites.
 const RESERVOIR_WARNING_FRACTION = 0.2;
 
-function FacilityActions(props: {
-  facility: FacilityOperatingType;
-  upgrading: boolean;
-  permanentlyShutdown: boolean;
-  onPause: DispatchProps["onPause"];
-  onTogglePause: DispatchProps["onTogglePause"];
-  onCancelRetrofit?: DispatchProps["onCancelRetrofit"];
-  onOpenSell: () => void;
-}) {
-  const {
-    facility,
-    onOpenSell,
-    onPause,
-    onTogglePause,
-    upgrading,
-    permanentlyShutdown,
-    onCancelRetrofit,
-  } = props;
-  const underConstruction = facility.yearsToBuildLeft > 0;
-  if (permanentlyShutdown && facility.saleRestricted)
-    return (
-      <div className="facilityActions">
-        <Typography
-          variant="caption"
-          color="textSecondary"
-          className="facilityActionNote"
-        >
-          This plant can't be sold.
-        </Typography>
-      </div>
-    );
-  return (
-    <div className="facilityActions">
-      {upgrading && !permanentlyShutdown && onCancelRetrofit && (
-        // Refunds in full and returns the plant to service at once, so it needs no confirmation
-        <Button
-          className="facilityCancelConstruction"
-          variant="outlined"
-          startIcon={facilityActionIcon("cancelUpgrade")}
-          aria-label={"Cancel upgrade of " + facilityDisplayName(facility)}
-          onClick={() => onCancelRetrofit(facility.id)}
-        >
-          <span className="facilityActionLabel">Cancel upgrade</span>
-        </Button>
-      )}
-      {!underConstruction && !upgrading && !permanentlyShutdown && (
-        <Button
-          variant="outlined"
-          startIcon={facilityActionIcon(facility.paused ? "resume" : "pause")}
-          aria-label={
-            facility.paused
-              ? "Resume " + facilityDisplayName(facility)
-              : "Pause " + facilityDisplayName(facility)
-          }
-          onClick={() =>
-            facility.paused
-              ? onTogglePause(facility.id)
-              : onPause(facility.id, facilityDisplayName(facility))
-          }
-        >
-          <span className="facilityActionLabel">
-            {facility.paused ? "Resume" : "Pause"}
-          </span>
-        </Button>
-      )}
-      {facility.saleRestricted ? (
-        <Typography
-          variant="caption"
-          color="textSecondary"
-          className="facilityActionNote"
-        >
-          This plant can't be sold.
-        </Typography>
-      ) : (
-        <Button
-          className={
-            underConstruction ? "facilityCancelConstruction" : undefined
-          }
-          variant="outlined"
-          startIcon={facilityActionIcon(
-            underConstruction ? "cancelConstruction" : "sell",
-          )}
-          aria-label={
-            (underConstruction ? "Cancel construction of " : "Sell ") +
-            facilityDisplayName(facility)
-          }
-          onClick={onOpenSell}
-        >
-          <span className="facilityActionLabel">
-            {underConstruction ? "Cancel construction" : "Sell"}
-          </span>
-        </Button>
-      )}
-    </div>
-  );
-}
-
-const MemoizedFacilityActions = React.memo(
-  FacilityActions,
-  (previous, next) => {
-    const previousUnderConstruction = previous.facility.yearsToBuildLeft > 0;
-    const nextUnderConstruction = next.facility.yearsToBuildLeft > 0;
-    return (
-      previous.facility.id === next.facility.id &&
-      previous.facility.name === next.facility.name &&
-      previous.facility.paused === next.facility.paused &&
-      previous.facility.saleRestricted === next.facility.saleRestricted &&
-      previousUnderConstruction === nextUnderConstruction &&
-      previous.upgrading === next.upgrading &&
-      previous.permanentlyShutdown === next.permanentlyShutdown &&
-      previous.onCancelRetrofit === next.onCancelRetrofit &&
-      previous.onPause === next.onPause &&
-      previous.onTogglePause === next.onTogglePause &&
-      previous.onOpenSell === next.onOpenSell
-    );
-  },
-);
-
 function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
-  const { formatMoneyConcise } = useMoney();
-  const [open, setOpen] = React.useState(false);
-  const toggleDialog = React.useCallback(() => {
-    setOpen((value) => !value);
-  }, []);
-
   const {
     facility,
     game,
@@ -549,6 +432,16 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
       ) : null;
     }
   }
+  if (facility.expansionInProgress) {
+    detail = (
+      <>
+        {detail}
+        {detail && " · "}
+        Upgrading ·{" "}
+        {formatBuildMonths(facility.expansionInProgress.yearsToBuildLeft)} left
+      </>
+    );
+  }
   // Output communicates normal operation; keep explicit labels for other states.
   const status =
     offlineForWork || partialUpgrade || activity === "RUNNING" ? (
@@ -657,10 +550,16 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
               className="facilityDisclosure"
               aria-label={
                 `Inspect ${facilityDisplayName(facility)}` +
+                (hasTerritoryNetwork(game)
+                  ? `, ${territoryName(facilityTerritoryId(facility))}`
+                  : "") +
                 (hazardStatus && !underConstruction
                   ? `, ${hazardStatusText(hazardStatus).spoken}`
                   : "") +
-                (storage ? `, ${status}` : "")
+                (storage ? `, ${status}` : "") +
+                (facility.expansionInProgress
+                  ? `, capacity upgrading, ${formatBuildMonths(facility.expansionInProgress.yearsToBuildLeft, "long")} left`
+                  : "")
               }
               aria-expanded={selected}
               aria-pressed={props.bulkSelected}
@@ -674,6 +573,11 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                       <span className="facilityName">
                         {facilityDisplayName(facility)}
                       </span>
+                      {hasTerritoryNetwork(game) && (
+                        <span className="facilityTerritoryLabel">
+                          {territoryName(facilityTerritoryId(facility))}
+                        </span>
+                      )}
                       {ready && (
                         <span className="facilityReadyLabel">Ready</span>
                       )}
@@ -731,69 +635,17 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
               />
             )}
           </div>
-          {open && (
-            // Inside the row, so isolateClicks keeps every click in the confirmation dialog
-            // from also landing on the row behind it and toggling the selection
-            <ConfirmDialog
-              open
-              destructive
-              isolateClicks
-              title={
-                <>
-                  {underConstruction ? "Cancel construction of" : "Sell"}{" "}
-                  {formatFacilitySize(facility)}{" "}
-                  {facilityDisplayName(facility) === facility.name
-                    ? facility.name.toLowerCase()
-                    : facilityDisplayName(facility)}{" "}
-                  facility?
-                </>
-              }
-              cancelLabel="Never mind"
-              confirmLabel={underConstruction ? "Cancel construction" : "Sell"}
-              onCancel={toggleDialog}
-              onConfirm={() => {
-                props.onSell(facility.id);
-                toggleDialog();
-              }}
-            >
-              {facility.hydroSiteId && (
-                <DialogContentText>
-                  {underConstruction
-                    ? "Canceling frees this site."
-                    : "Selling won't free this site."}
-                </DialogContentText>
-              )}
-              <DialogContentText>
-                You will receive{" "}
-                {formatMoneyConcise(
-                  facilityCashBack(facility, game.date.minute),
-                )}
-                {facility.loanAmountLeft > 0
-                  ? ` and the rest will go towards paying off the remaining loan balance of ${formatMoneyConcise(facility.loanAmountLeft)}`
-                  : ""}
-                .
-              </DialogContentText>
-            </ConfirmDialog>
-          )}
           {selected && (
-            <FacilityDetails
+            <ExpandedFacilityDetails
               facility={facility}
-              date={game.date}
-              seed={game.seed}
-              location={game.location}
               game={game}
-              onRetrofit={props.onRetrofit}
-            />
-          )}
-          {selected && (
-            <MemoizedFacilityActions
-              facility={facility}
-              upgrading={upgrading}
-              permanentlyShutdown={permanentlyShutdown}
+              onSell={props.onSell}
               onPause={onPause}
               onTogglePause={onTogglePause}
+              onRetrofit={props.onRetrofit}
+              onExpand={props.onExpand}
+              onCancelExpansion={props.onCancelExpansion}
               onCancelRetrofit={props.onCancelRetrofit}
-              onOpenSell={toggleDialog}
             />
           )}
         </div>
@@ -844,6 +696,7 @@ function FacilitySupplyChart({
         height={height}
         exactHeight
         timeline={game.timeline}
+        exchangeLabel={hasTerritoryNetwork(game) ? "External power" : undefined}
         fuelOrder={fuelOrder}
         currentMinute={game.date.minute}
         speed={game.speed}
@@ -915,7 +768,7 @@ export interface StateProps {
   selectedFacilityId: number | null;
 }
 
-export interface DispatchProps {
+export interface DispatchProps extends FacilityCapacityUpgradeActions {
   onArrivalShown?: (id: number) => void;
   onEvidenceReady?: (
     request: EvidenceRequestType,
@@ -936,7 +789,11 @@ export interface DispatchProps {
   ) => void;
   onSelect: (id: FacilityOperatingType["id"] | null) => void;
   onStorageBuild: () => void;
-  onTransmissionBuild: (corridorId: string, financed: boolean) => void;
+  onTransmissionBuild: (
+    corridorId: string,
+    financed: boolean,
+    tier?: number,
+  ) => void;
   onTransmissionCancel?: (id: number) => void;
   onTransmissionPause?: (id: number, name: string, paused: boolean) => void;
   onTransmissionUpgrade: (corridorId: string, financed: boolean) => void;
@@ -947,7 +804,11 @@ export interface DispatchProps {
   onSellingRule: (rule: SellingRuleType) => void;
 }
 
-export interface Props extends StateProps, DispatchProps {}
+export interface Props extends StateProps, DispatchProps {
+  paneId?: string;
+  territoryView?: MapWorkspaceView;
+  onTerritoryView?: (view: MapWorkspaceView) => void;
+}
 
 interface SelectionState {
   ids: number[];
@@ -1287,6 +1148,7 @@ export default class Facilities extends React.Component<Props, SelectionState> {
     if (
       nextProps.game.speed !== this.props.game.speed ||
       nextProps.evidenceRequest !== this.props.evidenceRequest ||
+      nextProps.territoryView !== this.props.territoryView ||
       nextProps.arrivingFacilityId !== this.props.arrivingFacilityId ||
       nextProps.facilityDragActive !== this.props.facilityDragActive ||
       (nextProps.game.speed !== "FAST" && nextProps.game.speed !== "ULTRA") ||
@@ -1299,7 +1161,14 @@ export default class Facilities extends React.Component<Props, SelectionState> {
     return this.throttle.due(nextProps.game.date.minute, 4);
   }
 
-  public componentDidUpdate() {
+  public componentDidUpdate(previous: Props) {
+    if (
+      hasTerritoryNetwork(this.props.game) &&
+      this.props.selectedFacilityId !== previous.selectedFacilityId &&
+      this.props.selectedFacilityId !== null &&
+      this.props.territoryView !== "FLEET"
+    )
+      this.props.onTerritoryView?.("FLEET");
     this.resolveEvidence();
     this.throttle.rendered(this.props.game.date.minute);
   }
@@ -1324,10 +1193,15 @@ export default class Facilities extends React.Component<Props, SelectionState> {
   }
 
   private evidenceAnchor = React.createRef<HTMLDivElement>();
+  private intertiesAnchor = React.createRef<HTMLElement>();
 
   private resolveEvidence() {
     const request = this.props.evidenceRequest;
     if (!request || this.dragging || this.props.facilityDragActive) return;
+    if (request.target === "interties") {
+      this.props.onEvidenceReady?.(request, this.intertiesAnchor.current);
+      return;
+    }
     if (
       request.target !== "supply-demand" &&
       !(
@@ -1337,6 +1211,13 @@ export default class Facilities extends React.Component<Props, SelectionState> {
       )
     )
       return;
+    if (
+      hasTerritoryNetwork(this.props.game) &&
+      this.props.territoryView !== "FLEET"
+    ) {
+      this.props.onTerritoryView?.("FLEET");
+      return;
+    }
     this.props.onEvidenceReady?.(request, this.evidenceAnchor.current);
   }
 
@@ -1410,6 +1291,8 @@ export default class Facilities extends React.Component<Props, SelectionState> {
     const showCheckboxes =
       selectionEnabled && (this.state.modifierHeld || selectionMode);
     const facilitiesCount = game.facilities.length;
+    const territoryNetwork = hasTerritoryNetwork(game);
+    const showFleet = !territoryNetwork || this.props.territoryView === "FLEET";
     const intertiesAvailable = !!(
       game.transmission &&
       (game.multiplayer || corridorsForLocation(game.location).length)
@@ -1423,137 +1306,15 @@ export default class Facilities extends React.Component<Props, SelectionState> {
     const storyEffects = combineStoryEffects(activeStoryEvents);
 
     return (
-      <GameCard className="facilities" id="facilitiesPane">
+      <GameCard
+        className="facilities"
+        id={this.props.paneId ?? "facilitiesPane"}
+      >
         <>
-          <div className="scrollable facilitiesBody" ref={this.setScrollBody}>
-            <FacilitySupplyChart game={game} anchor={this.evidenceAnchor} />
-            {/* The scroller holds section labels and the intertie fleet as well as rows, so the
-              lists are the drag-and-drop containers inside it rather than the scroller itself. */}
-            <List
-              dense
-              component="div"
-              className="scrollable unifiedFacilitiesList"
-              data-group-dragging={this.state.groupDragging || undefined}
-              onKeyDown={this.onSelectionKeyDown}
-            >
-              <Typography
-                component="div"
-                id="dispatch-order"
-                className={`facilitySectionLabel facilityDispatchHeader${selectionMode || selection.length > 1 ? " facilityDispatchSelecting" : ""}`}
-                variant="overline"
-              >
-                <span className="facilitySectionTitle">Plants & storage</span>
-                {selectionEnabled && (selectionMode || selection.length > 1) ? (
-                  <div className="facilitySelectionBar">
-                    <span role="status" aria-label="Facility selection">
-                      {selection.length}{" "}
-                      {selection.length === 1 ? "facility" : "facilities"}{" "}
-                      selected
-                    </span>
-                    <div className="facilitySelectionActions">
-                      <Button
-                        size="small"
-                        endIcon={<ChevronDownGlyph />}
-                        aria-haspopup="menu"
-                        aria-expanded={!!this.state.menu}
-                        disabled={!selection.length}
-                        onClick={this.openActions}
-                      >
-                        Actions
-                      </Button>
-                      <Button
-                        size="small"
-                        aria-label="Clear selection"
-                        onClick={this.clearSelection}
-                      >
-                        Clear
-                        <span className="facilityClearFullLabel">
-                          selection
-                        </span>
-                      </Button>
-                    </div>
-                  </div>
-                ) : (
-                  <span className="facilitySectionFlow">
-                    {"Generating " + formatWatts(currentGenerationW(game))}
-                  </span>
-                )}
-              </Typography>
-              <DragDropContext
-                onBeforeDragStart={this.onBeforeDragStart}
-                onDragEnd={this.onDragEnd}
-              >
-                <Droppable droppableId="droppable">
-                  {(provided) => (
-                    <div
-                      {...provided.droppableProps}
-                      ref={provided.innerRef}
-                      role="list"
-                      aria-label="Plants and storage"
-                    >
-                      {game.facilities.map(
-                        (g: FacilityOperatingType, i: number) => (
-                          <FacilityListItem
-                            arriving={this.props.arrivingFacilityId === g.id}
-                            onArrivalShown={this.props.onArrivalShown}
-                            facility={g}
-                            game={game}
-                            key={g.id}
-                            onSell={onSell}
-                            onTogglePause={onTogglePause}
-                            onPause={onPause}
-                            onRetrofit={this.props.onRetrofit}
-                            onCancelRetrofit={this.props.onCancelRetrofit}
-                            onRowClick={this.onRowClick}
-                            onContextMenu={this.onContextMenu}
-                            bulkSelected={selection.some((f) => f.id === g.id)}
-                            selectionEnabled={selectionEnabled}
-                            showCheckboxes={showCheckboxes}
-                            onToggleSelection={this.onToggleSelection}
-                            selectionCount={selection.length}
-                            selected={selectedFacilityId === g.id}
-                            storyOutputMultiplier={storyOutputMultiplier(
-                              g,
-                              storyEffects,
-                              game.date.minute,
-                            )}
-                            limitReason={(() => {
-                              const reasons = activeStoryEvents
-                                .filter(
-                                  (event) =>
-                                    storyOutputMultiplier(
-                                      g,
-                                      event.effects,
-                                      game.date.minute,
-                                    ) < 1,
-                                )
-                                .map((event) => event.title || event.message)
-                                .filter(Boolean);
-                              return reasons.length
-                                ? `Limited due to ${Array.from(new Set(reasons)).join("; ")}`
-                                : "Limited by an active event";
-                            })()}
-                            hazardStatus={facilityHazardStatus(game, g)}
-                            spotInList={i}
-                          />
-                        ),
-                      )}
-                      {provided.placeholder}
-                    </div>
-                  )}
-                </Droppable>
-              </DragDropContext>
-              {facilitiesCount < 2 && (
-                <Typography
-                  color="textSecondary"
-                  variant="body2"
-                  style={{ textAlign: "center", marginTop: "12px" }}
-                >
-                  Choose Build to add a generator or storage.
-                </Typography>
-              )}
-              {intertiesAvailable && !!game.transmission?.lines.length && (
-                <TransmissionPanel
+          {territoryNetwork && !showFleet && (
+            <div className="scrollable territoryWorkspace">
+              {this.props.territoryView !== "AGREEMENTS" ? (
+                <TerritoryNetwork
                   game={game}
                   onBuild={onTransmissionBuild}
                   onUpgrade={onTransmissionUpgrade}
@@ -1562,12 +1323,205 @@ export default class Facilities extends React.Component<Props, SelectionState> {
                   onPause={this.props.onTransmissionPause}
                   onBuyingRule={onBuyingRule}
                   onSellingRule={onSellingRule}
+                  facilityActions={{
+                    onSell,
+                    onPause,
+                    onTogglePause,
+                    onRetrofit: this.props.onRetrofit,
+                    onExpand: this.props.onExpand,
+                    onCancelExpansion: this.props.onCancelExpansion,
+                    onCancelRetrofit: this.props.onCancelRetrofit,
+                  }}
+                />
+              ) : (
+                <div className="territoryAgreements">
+                  {game.multiplayer && (
+                    <section>
+                      <Typography component="h3" variant="subtitle1">
+                        Co-op power sharing
+                      </Typography>
+                      <TradingControls
+                        game={game}
+                        onBuyingRule={onBuyingRule}
+                        onSellingRule={onSellingRule}
+                      />
+                    </section>
+                  )}
+                  {(Object.keys(INHERITED_CONNECTIONS) as UtilityId[])
+                    .filter((id) => utilityOwnedAt(game, id, game.date.minute))
+                    .map((id, index) => (
+                      <section key={id} className="powerAgreementPortfolio">
+                        <Typography component="h3" variant="subtitle2">
+                          {territoryName(id)}
+                        </Typography>
+                        <PowerAgreements
+                          game={game}
+                          line={inheritedConnection(id, index + 1)}
+                        />
+                      </section>
+                    ))}
+                </div>
+              )}
+            </div>
+          )}
+          {showFleet && (
+            <div className="scrollable facilitiesBody" ref={this.setScrollBody}>
+              <FacilitySupplyChart game={game} anchor={this.evidenceAnchor} />
+              {/* The scroller holds section labels and the intertie fleet as well as rows, so the
+              lists are the drag-and-drop containers inside it rather than the scroller itself. */}
+              <List
+                dense
+                component="div"
+                className="scrollable unifiedFacilitiesList"
+                data-group-dragging={this.state.groupDragging || undefined}
+                onKeyDown={this.onSelectionKeyDown}
+              >
+                <Typography
+                  component="div"
+                  id="dispatch-order"
+                  className={`facilitySectionLabel facilityDispatchHeader${selectionMode || selection.length > 1 ? " facilityDispatchSelecting" : ""}`}
+                  variant="overline"
+                >
+                  <span className="facilitySectionTitle">Plants & storage</span>
+                  {selectionEnabled &&
+                  (selectionMode || selection.length > 1) ? (
+                    <div className="facilitySelectionBar">
+                      <span role="status" aria-label="Facility selection">
+                        {selection.length}{" "}
+                        {selection.length === 1 ? "facility" : "facilities"}{" "}
+                        selected
+                      </span>
+                      <div className="facilitySelectionActions">
+                        <Button
+                          size="small"
+                          endIcon={<ChevronDownGlyph />}
+                          aria-haspopup="menu"
+                          aria-expanded={!!this.state.menu}
+                          disabled={!selection.length}
+                          onClick={this.openActions}
+                        >
+                          Actions
+                        </Button>
+                        <Button
+                          size="small"
+                          aria-label="Clear selection"
+                          onClick={this.clearSelection}
+                        >
+                          Clear
+                          <span className="facilityClearFullLabel">
+                            selection
+                          </span>
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <span className="facilitySectionFlow">
+                      {"Generating " + formatWatts(currentGenerationW(game))}
+                    </span>
+                  )}
+                </Typography>
+                <DragDropContext
                   onBeforeDragStart={this.onBeforeDragStart}
                   onDragEnd={this.onDragEnd}
-                />
-              )}
-            </List>
-          </div>
+                >
+                  <Droppable droppableId="droppable">
+                    {(provided) => (
+                      <div
+                        {...provided.droppableProps}
+                        ref={provided.innerRef}
+                        role="list"
+                        aria-label="Plants and storage"
+                      >
+                        {game.facilities.map(
+                          (g: FacilityOperatingType, i: number) => (
+                            <FacilityListItem
+                              arriving={this.props.arrivingFacilityId === g.id}
+                              onArrivalShown={this.props.onArrivalShown}
+                              facility={g}
+                              game={game}
+                              key={g.id}
+                              onSell={onSell}
+                              onTogglePause={onTogglePause}
+                              onPause={onPause}
+                              onRetrofit={this.props.onRetrofit}
+                              onExpand={this.props.onExpand}
+                              onCancelExpansion={this.props.onCancelExpansion}
+                              onCancelRetrofit={this.props.onCancelRetrofit}
+                              onRowClick={this.onRowClick}
+                              onContextMenu={this.onContextMenu}
+                              bulkSelected={selection.some(
+                                (f) => f.id === g.id,
+                              )}
+                              selectionEnabled={selectionEnabled}
+                              showCheckboxes={showCheckboxes}
+                              onToggleSelection={this.onToggleSelection}
+                              selectionCount={selection.length}
+                              selected={selectedFacilityId === g.id}
+                              storyOutputMultiplier={storyOutputMultiplier(
+                                g,
+                                storyEffects,
+                                game.date.minute,
+                              )}
+                              limitReason={(() => {
+                                const reasons = activeStoryEvents
+                                  .filter(
+                                    (event) =>
+                                      storyOutputMultiplier(
+                                        g,
+                                        event.effects,
+                                        game.date.minute,
+                                      ) < 1,
+                                  )
+                                  .map((event) => event.title || event.message)
+                                  .filter(Boolean);
+                                return reasons.length
+                                  ? `Limited due to ${Array.from(new Set(reasons)).join("; ")}`
+                                  : "Limited by an active event";
+                              })()}
+                              hazardStatus={facilityHazardStatus(game, g)}
+                              spotInList={i}
+                            />
+                          ),
+                        )}
+                        {provided.placeholder}
+                      </div>
+                    )}
+                  </Droppable>
+                </DragDropContext>
+                {facilitiesCount < 2 && (
+                  <Typography
+                    color="textSecondary"
+                    variant="body2"
+                    style={{ textAlign: "center", marginTop: "12px" }}
+                  >
+                    Choose Build to add a generator or storage.
+                  </Typography>
+                )}
+                {!territoryNetwork &&
+                  intertiesAvailable &&
+                  !!game.transmission?.lines.length && (
+                    <section
+                      aria-label="Intertie management"
+                      ref={this.intertiesAnchor}
+                      tabIndex={-1}
+                    >
+                      <TransmissionPanel
+                        game={game}
+                        onBuild={onTransmissionBuild}
+                        onUpgrade={onTransmissionUpgrade}
+                        onAcquire={this.props.onUtilityAcquire}
+                        onCancel={this.props.onTransmissionCancel}
+                        onPause={this.props.onTransmissionPause}
+                        onBuyingRule={onBuyingRule}
+                        onSellingRule={onSellingRule}
+                        onBeforeDragStart={this.onBeforeDragStart}
+                        onDragEnd={this.onDragEnd}
+                      />
+                    </section>
+                  )}
+              </List>
+            </div>
+          )}
           <FacilityContextMenu
             game={game}
             target={this.state.menu}

@@ -18,6 +18,7 @@ export function gasConversionQuote(
     facility.fuel !== "Natural Gas" ||
     facility.yearsToBuildLeft > 0 ||
     facility.upgradeInProgress ||
+    facility.expansionInProgress ||
     game.date.year < 1990 ||
     facility.lifespanYears - facilityAgeYears(facility, game.date.minute) <= 0.5
   )

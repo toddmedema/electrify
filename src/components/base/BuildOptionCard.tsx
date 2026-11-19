@@ -47,6 +47,8 @@ export interface BuildOptionCardProps {
    * told whether the disclosure is open, so costly content can wait for it.
    */
   details?: React.ReactNode | ((expanded: boolean) => React.ReactNode);
+  /** Expanded, read-only technology preview; purchase dialogs are not mounted. */
+  preview?: boolean;
   /** Beside the details toggle, such as Compare on a narrow layout */
   footerActions?: React.ReactNode;
   /** The review dialog */
@@ -61,7 +63,8 @@ export interface BuildOptionCardProps {
 export default function BuildOptionCard(
   props: BuildOptionCardProps,
 ): React.JSX.Element {
-  const [expanded, setExpanded] = React.useState(false);
+  const [disclosed, setExpanded] = React.useState(false);
+  const expanded = props.preview || disclosed;
   const { name, sizeAction, context, metrics, details } = props;
   const warningId = React.useId();
   // A disabled Review says why through the visible shortfall rather than staying silent.
@@ -161,7 +164,7 @@ export default function BuildOptionCard(
           <Box className="buildOptionMetrics">{metrics}</Box>
           {(details || props.footerActions) && (
             <Box className="buildOptionFooter">
-              {details && (
+              {details && !props.preview && (
                 <Button
                   color="primary"
                   className="expand-details"
@@ -187,7 +190,7 @@ export default function BuildOptionCard(
           )}
         </>
       )}
-      {props.children}
+      {!props.preview && props.children}
     </Card>
   );
 }

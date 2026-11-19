@@ -1,11 +1,11 @@
 import { expect, test } from "./fixtures";
-import { openPane } from "./layout";
 import { editSavedGame, readSavedGame } from "./save-fixture";
 import { expectDialogToFit } from "./dialog-layout";
 import { reviewScreenshot } from "./review-screenshot";
+import { openPane } from "./layout";
 
 for (const theme of ["light", "dark"] as const) {
-  test(`inherited connection reviews and retains a signed agreement in ${theme}`, async ({
+  test(`company supply reviews and retains a signed agreement in ${theme}`, async ({
     page,
   }, testInfo) => {
     test.setTimeout(120000);
@@ -19,57 +19,48 @@ for (const theme of ["light", "dark"] as const) {
     }, theme);
     await page.goto("/?scenario=116");
     await page.getByRole("button", { name: "Start game", exact: true }).click();
-    const facilities = page.locator(".facilities:visible");
-    await openPane(
-      facilities,
-      page.getByRole("button", { name: "Facilities", exact: true }),
-    );
-    let line = facilities
-      .locator(".transmissionLine")
-      .filter({ hasText: "Champlain regional connection" });
-    await expect(line).toContainText("209MW under agreement");
-    await expect(
-      line.getByRole("button", { name: /^Review upgrade/ }),
-    ).toHaveCount(0);
-    const opening = await readSavedGame(page);
-    expect(
-      opening!.transmission!.lines.find(
-        (entry) => entry.corridorId === "vt-champlain-regional",
-      ),
-    ).toMatchObject({ capacityW: 300e6, buildCost: 0, yearsToBuildLeft: 0 });
-    const openingInspect = line.getByRole("button", {
-      name: /^Inspect Champlain regional connection/,
-    });
-    await openingInspect.click();
-    await expect(
-      line.getByText("Market price now", { exact: true }),
-    ).toBeVisible();
-    await expect(
-      line.getByText("Total import limit", { exact: true }),
-    ).toBeVisible();
-    await expect(
-      line.getByText("Market emissions (CO₂e)", { exact: true }),
-    ).toBeVisible();
-    const marketBuying = facilities.getByRole("combobox", {
-      name: "Market buying",
+    const agreements = page.getByRole("region", {
+      name: "Agreements",
       exact: true,
     });
-    await marketBuying.click();
-    await page.getByRole("option", { name: "None", exact: true }).click();
-    await expect(line).toContainText(
-      "Market buying is off. Existing agreements continue.",
+    await openPane(
+      agreements,
+      page.getByRole("button", { name: "Agreements", exact: true }),
     );
-    await expect(line).not.toContainText("Flow limited by: Trading rule");
-    const contractedOnly = await readSavedGame(page);
-    const current = contractedOnly!.timeline.find(
-      (tick) => tick.minute === contractedOnly!.date.minute,
-    )!;
-    expect(current.importedW).toBeGreaterThan(0);
-    expect(current.importedW).toBe(current.entitlementImportedW);
-    await marketBuying.click();
-    await page
-      .getByRole("option", { name: "Shortages only", exact: true })
-      .click();
+    let line = agreements.locator(".territoryAgreements");
+    await expect(line).toContainText("Regional nuclear · Inherited");
+    await expect(
+      agreements.getByRole("heading", { name: "Supply agreements" }),
+    ).toHaveCount(0);
+    await expect(
+      agreements.getByRole("heading", { name: "Power purchase agreements" }),
+    ).toHaveCount(0);
+    const inherited = line.locator(".powerAgreement").filter({
+      has: page.getByRole("heading", { name: "Regional nuclear · Inherited" }),
+    });
+    await expect(inherited.getByText(/Up to 95MW/)).toBeVisible();
+    await expect(
+      inherited.getByText(/Minimum payment: .*even if unused/),
+    ).toBeVisible();
+    await expect(inherited.getByText(/Market now/)).toBeHidden();
+    await inherited.locator("summary").click();
+    await expect(inherited.getByText(/Market now/)).toBeVisible();
+    await inherited.locator("summary").click();
+    for (const control of await line.locator("button, summary").all()) {
+      if (await control.isVisible()) {
+        const box = await control.boundingBox();
+        expect(box!.height).toBeGreaterThanOrEqual(
+          testInfo.project.name.includes("mobile") ? 44 : 40,
+        );
+      }
+    }
+    expect(
+      await agreements.evaluate(
+        (element) => element.scrollWidth <= element.clientWidth,
+      ),
+    ).toBe(true);
+    const opening = await readSavedGame(page);
+    expect(opening!.transmission!.lines).toEqual([]);
     await editSavedGame(page, ({ game }) => {
       // A paused continuation fixture enters the authored 24-month offer window. Historic
       // readings remain untouched; the continuation owner recalculates future prices/supply.
@@ -94,48 +85,27 @@ for (const theme of ["light", "dark"] as const) {
     await page.goto("/");
     await page.getByRole("button", { name: "Continue", exact: true }).click();
     await openPane(
-      facilities,
-      page.getByRole("button", { name: "Facilities", exact: true }),
+      agreements,
+      page.getByRole("button", { name: "Agreements", exact: true }),
     );
-    line = facilities
-      .locator(".transmissionLine")
-      .filter({ hasText: "Champlain regional connection" });
-    const inspect = line.getByRole("button", {
-      name: /^Inspect Champlain regional connection/,
-    });
-    await inspect.click();
-    await expect(inspect).toHaveAttribute("aria-expanded", "true");
-    await expect(line).toContainText("Power purchase agreements");
+    line = agreements.locator(".territoryAgreements");
     await expect(line).toContainText("Regional nuclear · Inherited");
     await expect(line).toContainText("Through 31 Dec 2019");
     await expect(line).toContainText("114MW → 57MW on 1 Jan 2020");
-    const summary = line.locator(".powerAgreementSummary");
-    await expect(summary).toContainText("Replacement available");
-    expect(
-      await line
-        .locator(".facilityStatus")
-        .evaluate((element) => element.scrollWidth <= element.clientWidth + 1),
-    ).toBe(true);
-    expect(
-      await summary.evaluate((element) => getComputedStyle(element).whiteSpace),
-    ).toBe("normal");
     const review = line.getByRole("button", {
       name: "Review Québec hydro replacement",
       exact: true,
     });
     await expect(review).toBeVisible();
     await line.scrollIntoViewIfNeeded();
+    await reviewScreenshot(page, {
+      path: testInfo.outputPath(`ppa-workspace-${theme}.png`),
+      animations: "disabled",
+      scale: "css",
+    });
     await reviewScreenshot(line, {
       path: testInfo.outputPath(`ppa-agreements-${theme}.png`),
       animations: "disabled",
-    });
-    const header = line.locator(".facilityRowHeader");
-    await header.scrollIntoViewIfNeeded();
-    const headerBounds = (await header.boundingBox())!;
-    await reviewScreenshot(page, {
-      path: testInfo.outputPath(`ppa-connection-${theme}.png`),
-      animations: "disabled",
-      clip: { ...headerBounds, width: Math.min(560, headerBounds.width) },
     });
     await review.click();
     const dialog = page.getByRole("dialog", {
@@ -152,12 +122,12 @@ for (const theme of ["light", "dark"] as const) {
     });
     await expect(table.getByRole("rowheader")).toHaveText([
       "Agreement price",
-      "Market price",
+      "Reference price",
       "Discount",
       "Minimum supply",
       "Maximum supply",
       "Duration",
-      "Forecasted savings",
+      "Forecasted cash impact",
     ]);
     await expect(
       dialog.getByRole("row", { name: /Minimum supply/ }),
@@ -181,7 +151,7 @@ for (const theme of ["light", "dark"] as const) {
           .replaceAll(",", ""),
       );
     const marketRate = Number(
-      (await dialog.getByRole("row", { name: /Market price/ }).innerText())
+      (await dialog.getByRole("row", { name: /Reference price/ }).innerText())
         .match(/\$([\d,.]+)\/MWh/)![1]
         .replaceAll(",", ""),
     );
@@ -217,17 +187,19 @@ for (const theme of ["light", "dark"] as const) {
     await expect(dialog.locator(".powerAgreementDuration")).toHaveText(
       "5 years",
     );
-    await expect(discount).toHaveText("Discount9.4%");
+    await expect(discount).toHaveText("Discount9.44%");
     await expect(dialog.getByRole("row", { name: /Duration/ })).toContainText(
       "5 yearsEnds Dec 2024",
     );
     expect(await agreementRate()).toBeGreaterThan(tenYearRate);
     expect(await agreementRate()).toBeLessThan(oneYearRate);
-    const savings = dialog.getByRole("row", { name: /Forecasted savings/ });
+    const savings = dialog.getByRole("row", { name: /Forecasted cash impact/ });
     await expect(savings).toContainText(/-?\$[\d.,]+[kMBT]? over 5 years/, {
       timeout: 45000,
     });
-    await expect(savings).toContainText("Based on current supply and demand");
+    await expect(savings).toContainText(
+      "Compared with omitting this agreement",
+    );
     await expect(
       dialog.getByRole("heading", { name: "Demand served" }),
     ).toHaveCount(0);
@@ -261,8 +233,7 @@ for (const theme of ["light", "dark"] as const) {
     await page.keyboard.press("Enter");
     await expect(dialog).toHaveCount(0);
     await expect(line).toContainText("Scheduled · starts 1 Jan 2020");
-    await expect(line).toContainText("1 Jan 2020–31 Dec 2024");
-    await expect(inspect).toBeFocused();
+    await expect(line).toContainText("Through 31 Dec 2024");
     await expect(review).toHaveCount(0);
     const signedAgreement = line
       .locator(".powerAgreement")
@@ -290,6 +261,8 @@ for (const theme of ["light", "dark"] as const) {
       path: testInfo.outputPath(`ppa-signed-${theme}.png`),
       animations: "disabled",
     });
+    await signedAgreement.locator("summary").click();
+    await expect(signedAgreement).toContainText("1 Jan 2020–31 Dec 2024");
     await signedAgreement
       .getByRole("button", { name: /^Forecast .* remaining term$/ })
       .click();
@@ -299,7 +272,7 @@ for (const theme of ["light", "dark"] as const) {
     });
     await expect(remaining.getByRole("slider")).toHaveCount(0);
     await expect(
-      remaining.getByRole("row", { name: /Forecasted savings/ }),
+      remaining.getByRole("row", { name: /Forecasted cash impact/ }),
     ).toContainText(/-?\$[\d.,]+[kMBT]? over 5 years remaining/, {
       timeout: 45000,
     });
@@ -327,12 +300,11 @@ for (const theme of ["light", "dark"] as const) {
     await page.reload();
     await page.getByRole("button", { name: "Continue", exact: true }).click();
     await openPane(
-      facilities,
-      page.getByRole("button", { name: "Facilities", exact: true }),
+      agreements,
+      page.getByRole("button", { name: "Agreements", exact: true }),
     );
-    await inspect.click();
     await expect(line).toContainText("Scheduled · starts 1 Jan 2020");
-    await expect(line).toContainText("1 Jan 2020–31 Dec 2024");
+    await expect(line).toContainText("Through 31 Dec 2024");
     expect(
       (await readSavedGame(page))!.transmission!.acceptedAgreements,
     ).toEqual(signed!.transmission!.acceptedAgreements);
@@ -341,35 +313,59 @@ for (const theme of ["light", "dark"] as const) {
       game.date.minute += offset;
       game.date.monthsElapsed = 180;
       game.date.year = 2020;
+      // The paused date jump records no accounting. Retain one valid, unused
+      // month so this journey also verifies the archived-history action.
+      game.transmission!.agreementAccounts = [
+        {
+          agreementId: "champlain-nuclear",
+          termsVersion: 3,
+          accountingStartMinute: 179 * 1440,
+          accountedThroughMinute: 180 * 1440,
+          months: [
+            {
+              month: 179,
+              availableMWh: 0,
+              usefulMWh: 0,
+              availableValue: 0,
+              usefulValue: 0,
+              payment: 0,
+            },
+          ],
+        },
+      ];
       game.objectiveProgress = undefined;
       for (const tick of game.timeline) tick.minute += offset;
     });
     await page.goto("/");
     await page.getByRole("button", { name: "Continue", exact: true }).click();
     await openPane(
-      facilities,
-      page.getByRole("button", { name: "Facilities", exact: true }),
+      agreements,
+      page.getByRole("button", { name: "Agreements", exact: true }),
     );
-    await inspect.click();
     await expect(line).toContainText("Regional nuclear · Expired 1 Jan 2020");
-    await expect(line).toContainText(
-      "Uncovered purchases use regional market prices and availability",
-    );
+    const expired = line.locator(".powerAgreement").filter({
+      has: page.getByRole("heading", {
+        name: "Regional nuclear · Expired 1 Jan 2020",
+      }),
+    });
+    await expect(expired.getByText(/Up to/)).toHaveCount(0);
     await expect(
-      line.getByRole("button", {
-        name: "Pause Champlain regional connection",
-        exact: true,
+      expired.getByRole("button", {
+        name: "Regional nuclear recorded history",
       }),
     ).toBeVisible();
-    expect(
-      (await readSavedGame(page))!.transmission!.lines.find(
-        (entry) => entry.corridorId === "vt-champlain-regional",
-      )!.capacityW,
-    ).toBe(300e6);
-    expect(
-      await page.evaluate(
-        () => document.documentElement.scrollWidth <= window.innerWidth,
-      ),
-    ).toBe(true);
+    await expired
+      .getByRole("button", { name: "Regional nuclear recorded history" })
+      .click();
+    const history = page.getByRole("dialog", {
+      name: "Regional nuclear recorded history",
+    });
+    await expect(
+      history.getByRole("table", { name: "Recorded agreement history" }),
+    ).toContainText("0 MWh used");
+    await expectDialogToFit(history);
+    await page.keyboard.press("Escape");
+    await expect(history).toHaveCount(0);
+    expect((await readSavedGame(page))!.transmission!.lines).toEqual([]);
   });
 }

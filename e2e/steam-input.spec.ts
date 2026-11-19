@@ -3,7 +3,9 @@ import path from "node:path";
 import { waitForDesktopInput } from "./menu-keyboard";
 import { foregroundContrast } from "./contrast";
 import { decodeSave } from "../src/SaveEncoding";
-import type { SaveGameType } from "../src/Types";
+import type { SaveGameType, TerritoryTileId } from "../src/Types";
+import { territoryTileViews } from "../src/helpers/TerritoryMapState";
+import { hexCenter } from "../src/components/base/TerritoryHexGeometry";
 import type {
   DesktopInputAction as InputAction,
   DesktopInputFrame as InputFrame,
@@ -133,10 +135,10 @@ async function select(
       if (!active || active === document.body)
         return { direction: "down", key: "body" };
       if (
-        active.matches(".worldMapMarker") &&
-        !element.matches(".worldMapMarker")
+        active.matches(".worldMapMarker,.territoryTileTarget") &&
+        !element.matches(".worldMapMarker,.territoryTileTarget")
       ) {
-        // Every arrow belongs to map geography. Back returns to its zoom controls
+        // Every arrow belongs to map geography. Back returns to its toolbar
         // before the player can navigate to another form control.
         return { direction: "back", key: "map" };
       }
@@ -175,6 +177,76 @@ async function select(
     control,
     "reachable through the rendered control positions",
   ).toBeFocused();
+}
+
+/** Enter the roving map stop, then let D-pad movement reveal virtualized cells. */
+async function selectMapTile(page: Page, id: TerritoryTileId) {
+  const target = page.locator(`[data-map-target="${id}"]`);
+  if (!(await page.locator("[data-map-target]:focus").count())) {
+    const entry = page.getByRole("button", {
+      name: "Rapid connection mode",
+      exact: true,
+    });
+    await expect(page.locator("html")).toHaveAttribute(
+      "data-mock-input-context",
+      "Gameplay",
+    );
+    if (
+      !(await entry.evaluate((element) => element === document.activeElement))
+    ) {
+      await input(page, "previousPane");
+      await expect(
+        page.getByRole("region", { name: "Scenario", exact: true }),
+      ).toBeVisible();
+      await input(page, "nextPane");
+      await expect(entry).toBeFocused();
+    }
+    await input(page, "up");
+    await expect(page.locator('[data-map-target][tabindex="0"]')).toBeFocused();
+  }
+  const currentId = (await page
+    .locator("[data-map-target]:focus")
+    .getAttribute("data-map-target")) as TerritoryTileId;
+  const game = await readSavedGame(page);
+  expect(game).toBeDefined();
+  // Plan over revealed geography, including cells outside the mounted viewport.
+  // The map's flattened hexes can make vertical movement skip a staggered row.
+  const points = territoryTileViews(game!).map(({ tile }) => ({
+    id: tile.id,
+    ...hexCenter(tile),
+  }));
+  const directions = [
+    ["left", -1, 0],
+    ["right", 1, 0],
+    ["up", 0, -1],
+    ["down", 0, 1],
+  ] as const;
+  const routes = new Map<TerritoryTileId, InputAction[]>([[currentId, []]]);
+  const queue = [currentId];
+  for (const fromId of queue) {
+    if (routes.has(id)) break;
+    const from = points.find((point) => point.id === fromId)!;
+    for (const [action, x, y] of directions) {
+      const next = points
+        .filter((point) => (point.x - from.x) * x + (point.y - from.y) * y > 1)
+        .sort(
+          (a, b) =>
+            (a.x - from.x) * (a.x - from.x) * (x ? 1 : 4) +
+            (a.y - from.y) * (a.y - from.y) * (y ? 1 : 4) -
+            ((b.x - from.x) * (b.x - from.x) * (x ? 1 : 4) +
+              (b.y - from.y) * (b.y - from.y) * (y ? 1 : 4)),
+        )[0];
+      if (!next || routes.has(next.id)) continue;
+      routes.set(next.id, [...routes.get(fromId)!, action]);
+      queue.push(next.id);
+    }
+  }
+  expect(routes.has(id), "tile is reachable through the D-pad map graph").toBe(
+    true,
+  );
+  for (const action of routes.get(id)!) await input(page, action);
+  await expect(target, "reachable through map geography").toBeFocused();
+  return target;
 }
 
 test.beforeEach(async ({ page }, info) => {
@@ -789,6 +861,9 @@ test("semantic actions play, build, adjust pricing, inspect charts and save at 1
     name: "Save name",
     exact: true,
   });
+  // The actions menu can still be exiting while the rename dialog is visible.
+  // Begin directional traversal only once that earlier popup has left the input surface.
+  await expect(page.locator('[role="menu"]:visible')).toHaveCount(0);
   await select(page, saveName);
   await input(page, "confirm");
   await expect(page.locator("html")).toHaveAttribute(
@@ -1079,35 +1154,17 @@ test("controller advances the first tutorial through inspection, chart and clock
 test("controller reviews, cancels and confirms a utility acquisition", async ({
   page,
 }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/?scenario=116");
   const start = page.getByRole("button", { name: "Start game", exact: true });
   await select(page, start);
   await input(page, "confirm");
   await expect(page.locator("#appbar:visible")).toBeVisible();
-  await input(page, "build");
-  const build = page.getByRole("region", { name: "Build", exact: true });
-  await select(
-    page,
-    build.getByRole("tab", { name: "Interties", exact: true }),
-  );
-  await input(page, "confirm");
-  await select(
-    page,
-    build.getByRole("button", { name: /Review purchase of .*Ridge Electric/ }),
-  );
-  await input(page, "confirm");
-  const dialog = page.getByRole("dialog");
-  await select(
-    page,
-    dialog.getByRole("button", { name: "Take loan", exact: true }),
-  );
-  await input(page, "confirm");
-  await expect(dialog).toHaveCount(0);
-  // Fixture advances only construction; the acquisition still uses its real owning action.
+  const pause = page.getByRole("button", { name: "pause", exact: true });
+  if ((await pause.getAttribute("aria-pressed")) !== "true")
+    await input(page, "pause");
+  await expect(pause).toHaveAttribute("aria-pressed", "true");
   await editSavedGame(page, ({ game }) => {
-    game.transmission!.lines.find(
-      (line) => line.corridorId === "vt-champlain-ridge",
-    )!.yearsToBuildLeft = 0;
     for (const tick of game.timeline) tick.cash = 1e9;
   });
   await page.goto("/");
@@ -1116,11 +1173,13 @@ test("controller reviews, cancels and confirms a utility acquisition", async ({
     page.getByRole("button", { name: "Continue", exact: true }),
   );
   await input(page, "confirm");
-  const line = page.locator(
-    '.facilities:visible .transmissionLine[data-corridor-id="vt-champlain-ridge"]',
-  );
-  await select(page, line.getByRole("button", { name: /^Inspect / }));
+  await selectMapTile(page, "ridge-electric:city");
   await input(page, "confirm");
+  const dialog = page.getByRole("dialog", {
+    name: "Acquire Ridge Electric?",
+    exact: true,
+  });
+  const line = page.locator(".tileWorkspaceSurface");
   const acquire = line.getByRole("button", {
     name: "Acquire Ridge Electric",
     exact: true,
@@ -1138,10 +1197,40 @@ test("controller reviews, cancels and confirms a utility acquisition", async ({
   );
   await input(page, "confirm");
   await expect(dialog).toHaveCount(0);
-  await expect(line).toHaveCount(0);
+  // The accessible dialog disappears before MUI's exit surface relinquishes Escape.
+  await expect(page.locator(".MuiDialog-root:visible")).toHaveCount(0);
+  await expect(
+    line.getByRole("button", { name: "Acquire Ridge Electric", exact: true }),
+  ).toHaveCount(0);
   const ownership = page.locator(".facilities:visible .acquiredUtilities");
   await expect(ownership.locator("summary")).toBeFocused();
   await expect(ownership).not.toHaveAttribute("open");
+  // The acquired city's inspector stays open. Close that input surface before
+  // traversing to the ownership disclosure behind it.
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-mock-input-context",
+    "Menu",
+  );
+  await input(page, "back");
+  await expect(line).toHaveCount(0);
+  await expect(
+    page.locator('[data-map-target][aria-pressed="true"]'),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Rapid connection mode", exact: true }),
+  ).toBeFocused();
+  // Leave the map at its known upper-left edge before traversing the HUD.
+  // Arrows within discovered geography continue to belong to the map itself.
+  const edge = territoryTileViews((await readSavedGame(page))!)
+    .map(({ tile }) => tile)
+    .sort(
+      (a, b) =>
+        hexCenter(a).y - hexCenter(b).y || hexCenter(a).x - hexCenter(b).x,
+    )[0];
+  await selectMapTile(page, edge.id);
+  await input(page, "up");
+  await expect(page.locator("[data-map-target]:focus")).toHaveCount(0);
+  await select(page, ownership.locator("summary"));
   await input(page, "confirm");
   await expect(
     ownership.getByRole("heading", { name: "Ridge Electric", exact: true }),
@@ -1154,6 +1243,110 @@ test("controller reviews, cancels and confirms a utility acquisition", async ({
       (receipt) => receipt.targetId === "ridge-electric",
     ),
   ).toBe(true);
+});
+
+test("controller cycles six right-hand panels around the persistent map", async ({
+  page,
+}) => {
+  await page.goto("/?scenario=116");
+  await select(
+    page,
+    page.getByRole("button", { name: "Start game", exact: true }),
+  );
+  await input(page, "confirm");
+  const map = page.getByRole("region", {
+    name: "Territory map workspace",
+    exact: true,
+  });
+  await expect(map).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Map", exact: true }),
+  ).toHaveCount(0);
+  const viewport = map.locator(".territoryMapViewport");
+  const original = await viewport.elementHandle();
+  for (const name of [
+    "Fleet",
+    "Agreements",
+    "Programs",
+    "Insights",
+    "Events",
+    "Scenario",
+  ]) {
+    await input(page, "nextPane");
+    const panel = page.getByRole("region", { name, exact: true });
+    await expect(panel).toBeVisible();
+    await expect(page.locator(".gameToolPanel:visible")).toHaveCount(1);
+    await expect(panel).toHaveAttribute("data-tool-side", "right");
+    await expect(map).toBeVisible();
+    expect(
+      await original!.evaluate(
+        (element) =>
+          element === document.querySelector(".territoryMapViewport"),
+      ),
+    ).toBe(true);
+  }
+  await input(page, "nextPane");
+  await expect(page.locator(".gameToolPanel")).toHaveCount(0);
+  await expect(map).toBeVisible();
+  await selectMapTile(page, "champlain:city");
+  await input(page, "confirm");
+  await expect(page.locator(".tileWorkspaceSurface")).toBeVisible();
+  await input(page, "back");
+  await expect(page.locator(".tileWorkspaceSurface")).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Rapid connection mode", exact: true }),
+  ).toBeFocused();
+});
+
+test("controller buys one map tile and returns from map geography to navigation", async ({
+  page,
+}) => {
+  await page.goto("/?scenario=116");
+  await select(
+    page,
+    page.getByRole("button", { name: "Start game", exact: true }),
+  );
+  await input(page, "confirm");
+  await expect(page.locator("#appbar:visible")).toBeVisible();
+  const pause = page.getByRole("button", { name: "pause", exact: true });
+  if ((await pause.getAttribute("aria-pressed")) !== "true")
+    await input(page, "pause");
+  await selectMapTile(page, "champlain:city");
+  await input(page, "back");
+  const buy = page.getByRole("button", {
+    name: "Rapid connection mode",
+    exact: true,
+  });
+  await expect(buy).toBeFocused();
+  await input(page, "confirm");
+  await expect(buy).toHaveAttribute("aria-pressed", "true");
+  await expect(buy).toBeFocused();
+  await input(page, "confirm");
+  await expect(buy).toHaveAttribute("aria-pressed", "false");
+  await input(page, "confirm");
+  const tile = await selectMapTile(page, "green-uplands:site-0");
+  const before = await readSavedGame(page);
+  expect(before?.territoryNetwork?.tilePurchases).toHaveLength(0);
+  await expect(tile).toHaveAttribute("data-purchasable", "true");
+  await input(page, "confirm");
+  await expect(tile).toHaveAttribute("data-owned", "true");
+  await expect(tile).toBeFocused();
+  await expect(buy).toHaveAttribute("aria-pressed", "true");
+  expect((await readSavedGame(page))?.territoryNetwork?.tilePurchases).toEqual([
+    expect.objectContaining({ tileId: "green-uplands:site-0" }),
+  ]);
+  await input(page, "back");
+  await expect(buy).toHaveAttribute("aria-pressed", "false");
+  await expect(tile).toHaveAttribute("aria-pressed", "false");
+  await expect(buy).toBeFocused();
+  await select(
+    page,
+    page.getByRole("button", { name: "Programs", exact: true }),
+  );
+  await input(page, "confirm");
+  await expect(
+    page.getByRole("region", { name: "Programs", exact: true }),
+  ).toBeVisible();
 });
 
 test("TV couch settings keep gameplay and controls readable with explicit device setup", async ({
@@ -1278,6 +1471,7 @@ test("TV saved preferences style direct scenario links before play", async ({
   page,
 }, info) => {
   skipNonTv(info);
+  await page.emulateMedia({ reducedMotion: "reduce" });
   await page.addInitScript(() => {
     const savedTv = () => {
       localStorage.setItem("tvMode", "true");
@@ -1312,27 +1506,74 @@ test("TV saved preferences style direct scenario links before play", async ({
   await start.press("Enter");
   await expect(page.locator(".gameStage")).toHaveAttribute(
     "data-layout",
-    "single",
+    "map",
   );
   await expect(page.locator("#appbar:visible")).toBeVisible();
-  const warning = page.locator(".missionSummary.statusWarning");
+  const warning = page.locator(".gridHealth.statusWarning");
   await expect(warning).toBeVisible();
+  await expect(warning.locator(".gridStatusFuture")).toContainText(
+    "FUTURE Supply risk:",
+  );
   expect(
-    await foregroundContrast(warning.locator(".missionRiskButton")),
-    "mission warning text keeps contrast on its amber surface",
+    await foregroundContrast(warning.locator(".gridStatusButton")),
+    "actionable supply warning text keeps contrast on its amber surface",
   ).toBeGreaterThanOrEqual(4.5);
-  await page.getByRole("button", { name: "Build", exact: true }).click();
-  await page.getByRole("tab", { name: "Interties", exact: true }).click();
-  const metrics = page.locator(".transmissionProject .buildOptionMetric");
+  const rail = page.getByRole("complementary", {
+    name: "Build facilities",
+    exact: true,
+  });
+  const buildEntry = (await rail.isVisible())
+    ? rail.getByRole("button", { name: /^Power:/ })
+    : page.getByRole("button", { name: "Build", exact: true });
+  await expect(buildEntry).toBeInViewport({ ratio: 1 });
+  const tile = await selectMapTile(page, "champlain:site-13");
+  await expect(tile).toHaveAttribute("data-owned", "true");
+  await expect(tile).toContainText("One building site; transmission tower");
+  await input(page, "confirm");
+  await expect(tile).toHaveAttribute("aria-pressed", "true");
+  const builder = page.getByRole("dialog", {
+    name: "Plains",
+    exact: true,
+  });
+  await expect(builder).toBeVisible();
+  await expect(
+    page.getByRole("tab", { name: "Interties", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    builder.getByRole("combobox", { name: /^Build (destination|tile)$/ }),
+  ).toHaveCount(0);
+  let metrics: Locator;
+  if (await rail.isVisible()) {
+    await expect(rail).toBeFocused();
+    await rail
+      .getByRole("button", { name: "Choose sites for Wind", exact: true })
+      .hover();
+    const preview = rail.getByRole("region", {
+      name: "Wind technology preview",
+      exact: true,
+    });
+    await expect(preview).toBeVisible();
+    metrics = preview.locator(".buildOptionMetric");
+  } else {
+    metrics = builder
+      .getByRole("list", { name: "Generator options" })
+      .locator(".buildOptionMetric");
+  }
   await expect(metrics.first()).toBeVisible();
-  for (const metric of await metrics.all()) {
+  const overflows = await metrics.evaluateAll((elements) =>
+    elements.map((element) => element.scrollWidth - element.clientWidth),
+  );
+  expect(overflows.length).toBeGreaterThan(0);
+  for (const overflow of overflows) {
     expect(
-      await metric.evaluate(
-        (element) => element.scrollWidth - element.clientWidth,
-      ),
-      "intertie values stay within their own metric column",
+      overflow,
+      "generator values stay within their own metric column",
     ).toBeLessThanOrEqual(1);
   }
+  await builder
+    .getByRole("button", { name: "Close tile", exact: true })
+    .click();
+  await expect(builder).toHaveCount(0);
   await page.getByRole("button", { name: "Events", exact: true }).click();
   const goalWidth = await page
     .locator(".operationsPriorities")
@@ -1349,12 +1590,19 @@ test("TV saved preferences style direct scenario links before play", async ({
   await expect(
     help.getByRole("button", { name: "close", exact: true }),
   ).toBeVisible();
-  // Visibility precedes the end of the popover's opening scale transition.
-  await help.evaluate(async (element) => {
-    await Promise.all(
-      element.getAnimations().map((animation) => animation.finished),
-    );
-  });
+  // Opening animations can be replaced while the popover finds its final position.
+  await expect
+    .poll(() =>
+      help.evaluate((element) =>
+        element
+          .getAnimations()
+          .some(
+            (animation) =>
+              animation.pending || animation.playState === "running",
+          ),
+      ),
+    )
+    .toBe(false);
   const helpBounds = await help.boundingBox();
   const articleWidth = await help.evaluate(() =>
     Math.min(

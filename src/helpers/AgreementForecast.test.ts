@@ -1,3 +1,4 @@
+import * as Energy from "./Energy";
 import cloneDeep from "lodash.clonedeep";
 import { createGame } from "../testing/Simulator";
 import { GAME_TO_REAL_YEARS, TICK_MINUTES } from "../Constants";
@@ -30,12 +31,9 @@ function fixture(month = 299) {
 
 afterEach(() => jest.restoreAllMocks());
 
-it.each([
-  [20, -1],
-  [250, 1],
-])(
+it.each([20, 250])(
   "reports actual closing-cash cost/benefit with spot price %s",
-  (price, direction) => {
+  (price) => {
     jest
       .spyOn(Transmission, "adjacentMarketPricePerMWh")
       .mockReturnValue(price);
@@ -47,7 +45,19 @@ it.each([
       undefined,
       String(price),
     );
-    expect(Math.sign(forecast.cashDifference)).toBe(direction);
+    expect(forecast.withAgreement.servedMWh).toBeGreaterThan(
+      forecast.withoutAgreement.servedMWh,
+    );
+    const noSpot = cloneDeep(game);
+    noSpot.transmission!.buyingRule = "NONE";
+    expect(
+      computeAgreementForecast(
+        noSpot,
+        "champlain-quebec:0",
+        undefined,
+        String(price),
+      ),
+    ).toEqual(forecast);
     expect(JSON.stringify(game)).toBe(before);
     const now = currentTick(game)!;
     const ticks = (forecast.endMinute - game.date.minute) / TICK_MINUTES + 1;
@@ -92,7 +102,7 @@ it("reaches the full exclusive delivery end beyond the mission and keeps unavail
     57 * 24 * GAME_TO_REAL_YEARS * 60 * 0.5,
   );
   const closed = cloneDeep(game);
-  closed.transmission!.buyingRule = "NONE";
+  closed.multiplayer = { seat: "0" };
   expect(() => computeAgreementForecast(closed, "champlain-quebec:0")).toThrow(
     "Comparison unavailable",
   );
@@ -115,16 +125,26 @@ it("can cost more while serving a larger share with constrained merchant access,
   expect(
     result.withAgreement.servedMWh / result.withAgreement.demandMWh,
   ).toBeGreaterThan(
-    result.marketPurchases.servedMWh / result.marketPurchases.demandMWh,
+    result.withoutAgreement.servedMWh / result.withoutAgreement.demandMWh,
   );
   expect(result.remaining.availableMWh).toBeLessThanOrEqual(
     20 * 24 * GAME_TO_REAL_YEARS + 1e-5,
   );
 });
 
-it("reports equal service when the existing market can serve the same demand", () => {
+it("reports equal service when owned generation covers demand without the agreement", () => {
   const game = fixture();
   currentTick(game)!.customers = 10000;
+  const native = createGame({ scenarioId: 116, seed: 12345 }).facilities.filter(
+    (facility) => facility.fuel === "Natural Gas",
+  );
+  native.forEach((facility) => {
+    facility.peakW = 300e6;
+    facility.currentW = 300e6;
+    facility.spinMinutes = 1;
+    facility.lifespanYears = 100;
+  });
+  game.facilities = native;
   const result = computeAgreementForecast(
     game,
     "champlain-quebec:0",
@@ -135,7 +155,7 @@ it("reports equal service when the existing market can serve the same demand", (
     result.withAgreement.servedMWh / result.withAgreement.demandMWh,
   ).toBeCloseTo(1, 10);
   expect(
-    result.marketPurchases.servedMWh / result.marketPurchases.demandMWh,
+    result.withoutAgreement.servedMWh / result.withoutAgreement.demandMWh,
   ).toBeCloseTo(1, 10);
 });
 
@@ -171,8 +191,13 @@ it("carries actual v3 monthly usage into private forecast settlement and closing
     seed: 12345,
     difficulty: "Employee",
   });
-  game.facilities = [];
-  game.transmission!.lines[0].paused = true;
+  jest.spyOn(Energy, "getWindOutputFactor").mockReturnValue(1);
+  game.facilities = game.facilities.filter(
+    (facility) => facility.fuel === "Wind",
+  );
+  game.facilities.forEach((facility) => {
+    facility.peakW = 1e9;
+  });
   for (let i = 0; i < 48; i++) tickState(game);
   const before = JSON.stringify(game.transmission!.agreementAccounts);
   const key = agreementForecastKey(game, "champlain-nuclear");
@@ -215,6 +240,17 @@ it("allows a v3 forecast loss from unused monthly energy despite its below-marke
   ];
   game.date = getDateFromMinute(299 * MINUTES_PER_MONTH, 2005);
   currentTick(game)!.customers = 100;
+  jest.spyOn(Energy, "getWindOutputFactor").mockReturnValue(1);
+  game.facilities = createGame({
+    scenarioId: 116,
+    seed: 12345,
+  }).facilities.filter((facility) => facility.fuel === "Wind");
+  game.facilities.forEach((facility) => {
+    facility.peakW = 1e9;
+    facility.minuteCreated = game.date.minute;
+    facility.minuteOperational = game.date.minute;
+    facility.lifespanYears = 100;
+  });
   const result = computeAgreementForecast(
     game,
     "champlain-quebec:0",
@@ -223,9 +259,7 @@ it("allows a v3 forecast loss from unused monthly energy despite its below-marke
   );
   expect(result.cashDifference).toBeLessThan(0);
   expect(result.remaining.unusedPayment).toBeGreaterThan(0);
-  expect(result.remaining.payment).toBeGreaterThan(
-    result.remaining.unusedPayment,
-  );
+  expect(result.remaining.payment).toBe(result.remaining.unusedPayment);
 });
 
 it("uses each offered signing ceiling in the real-reducer forecast and its cache", () => {

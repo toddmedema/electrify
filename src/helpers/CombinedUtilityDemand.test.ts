@@ -1,11 +1,13 @@
+import { cityProfile } from "./CityProfiles";
 import { UTILITY_AREAS } from "../data/UtilityExpansion";
 import { GameType, UtilityTargetId } from "../Types";
 import { combinedUtilityDemandProfile } from "./CombinedUtilityDemand";
 
 function ownership(
   ...targets: UtilityTargetId[]
-): Pick<GameType, "utilityExpansion"> {
+): Pick<GameType, "utilityExpansion" | "seed"> {
   return {
+    seed: 188,
     utilityExpansion: {
       networkAssets: [],
       loans: [],
@@ -19,18 +21,18 @@ function ownership(
   };
 }
 
-it("preserves the exact Champlain demand profile before a purchase", () => {
-  expect(combinedUtilityDemandProfile({})).toEqual({
+it("uses the seeded Champlain profile before a purchase while retaining calibrated scale", () => {
+  expect(combinedUtilityDemandProfile({ seed: 188 })).toEqual({
     demandScale: UTILITY_AREAS.champlain.demandScale,
     demandShapeExponent: UTILITY_AREAS.champlain.demandShapeExponent,
-    energyShares: UTILITY_AREAS.champlain.energyShares,
+    energyShares: cityProfile(188, "champlain")!.energyShares,
   });
 });
 
 it("combines acquired package profiles into one customer-weighted composition", () => {
   const profile = combinedUtilityDemandProfile(ownership("valley-electric"));
-  const home = UTILITY_AREAS.champlain,
-    target = UTILITY_AREAS["valley-electric"];
+  const home = cityProfile(188, "champlain")!,
+    target = cityProfile(188, "valley-electric")!;
   expect(profile.demandScale).toBe(
     (home.customers * home.demandScale +
       target.customers * target.demandScale) /
@@ -65,6 +67,6 @@ it("derives composition from identities, independently of purchase order, dates 
 it("lets Ridge's industrial composition make the merged mix steadier", () => {
   const profile = combinedUtilityDemandProfile(ownership("ridge-electric"));
   expect(profile.energyShares.Industrial).toBeGreaterThan(
-    UTILITY_AREAS.champlain.energyShares.Industrial,
+    cityProfile(188, "champlain")!.energyShares.Industrial,
   );
 });
