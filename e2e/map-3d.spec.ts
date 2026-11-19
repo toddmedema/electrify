@@ -1,3 +1,4 @@
+import type { Locator } from "@playwright/test";
 import { expect, test } from "./fixtures";
 import type { MapCanvas } from "../src/components/base/territory-3d/Types";
 import type { TerritoryTileId } from "../src/Types";
@@ -24,6 +25,19 @@ import {
   tilePosition3D,
 } from "../src/components/base/territory-3d/Projection";
 
+async function readyDiagnostics(canvas: Locator) {
+  const read = () =>
+    canvas.evaluate((element: MapCanvas) => element.map3DDiagnostics?.(true));
+  let diagnostics: Awaited<ReturnType<typeof read>>;
+  await expect
+    .poll(async () => {
+      diagnostics = await read();
+      return diagnostics?.drawCalls ?? 0;
+    })
+    .toBeGreaterThan(5);
+  return diagnostics!;
+}
+
 for (const theme of ["light", "dark"] as const) {
   test(`renders real 3D, preserves map controls and recovers a lost context · ${theme}`, async ({
     page,
@@ -41,17 +55,10 @@ for (const theme of ["light", "dark"] as const) {
     const map = await returnToTerritoryMap(page);
     const canvas = map.locator("canvas.territory3DCanvas");
     await expect(canvas).toHaveAttribute("data-renderer", "ready");
-    const before = await canvas.evaluate((element: MapCanvas) =>
-      element.map3DDiagnostics!(),
-    );
-    expect(before.drawCalls).toBeGreaterThan(5);
+    const before = await readyDiagnostics(canvas);
     expect(before.triangles).toBeGreaterThan(100);
     expect(before.instanceCount).toBeGreaterThan(10);
-    const border = await canvas.evaluate((element: MapCanvas) =>
-      element.map3DDiagnostics!(true).scene?.find(
-        ({ id }) => id === "border:ownership",
-      ),
-    );
+    const border = before.scene?.find(({ id }) => id === "border:ownership");
     expect(border?.triangles).toBeGreaterThan(0);
     await expect(map.locator(".territoryHexBoundary")).toHaveCount(0);
     await expect(map.locator(".territoryTerrainArtwork")).toHaveCount(0);
@@ -125,9 +132,7 @@ for (const theme of ["light", "dark"] as const) {
     await contextLoss.evaluate((loss) => loss.restoreContext());
     await expect(canvas).toHaveAttribute("data-renderer", "ready");
     await expect(map.locator(".territoryTerrainArtwork")).toHaveCount(0);
-    const after = await canvas.evaluate((element: MapCanvas) =>
-      element.map3DDiagnostics!(),
-    );
+    const after = await readyDiagnostics(canvas);
     expect(after.frames).toBeGreaterThan(before.frames);
     expect(after.light).toEqual(before.light);
     await expect(map.locator(".territoryMap")).toHaveAttribute(
@@ -226,7 +231,7 @@ test("clicking real mountain relief above its ground selects the mountain tile",
 });
 
 for (const theme of ["light", "dark"] as const) {
-  test(`connected project site markers fit on one line · ${theme}`, async ({
+  test(`connected project site markers fit inside their tiles · ${theme}`, async ({
     page,
   }, info) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
