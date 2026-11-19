@@ -3,25 +3,6 @@
 // translating only those retired options to their current equivalents.
 const { spawnSync } = require("node:child_process");
 const path = require("node:path");
-const site = spawnSync(
-  process.execPath,
-  [path.join(__dirname, "site/generate.js"), "--check"],
-  {
-    stdio: "inherit",
-  },
-);
-if (site.error) throw site.error;
-if (site.status !== 0) process.exit(site.status || 1);
-
-process.env.BABEL_ENV = "development";
-process.env.NODE_ENV = "development";
-process.env.REACT_APP_VERSION = require("./build-version").buildVersion();
-require("react-scripts/config/env");
-
-const devServerConfigPath =
-  require.resolve("react-scripts/config/webpackDevServer.config");
-const createDevServerConfig = require(devServerConfigPath);
-
 function captureMiddlewares(callback, devServer) {
   if (!callback) {
     return [];
@@ -50,18 +31,24 @@ function captureMiddlewares(callback, devServer) {
   return captured;
 }
 
-function adaptDevServerConfig(config) {
+function adaptDevServerConfig(config, compile) {
   const { https, onAfterSetupMiddleware, onBeforeSetupMiddleware, ...adapted } =
     config;
 
   if (https) {
     adapted.server = { type: "https", options: https };
   }
-  adapted.setupMiddlewares = (middlewares, devServer) => [
-    ...captureMiddlewares(onBeforeSetupMiddleware, devServer),
-    ...middlewares,
-    ...captureMiddlewares(onAfterSetupMiddleware, devServer),
-  ];
+  adapted.setupMiddlewares = (middlewares, devServer) => {
+    // WDS calls this before its dev middleware starts watching the compiler.
+    compile?.apply(devServer.compiler);
+    // CRA still calls close() on signals and stdin EOF; WDS 5 renamed it.
+    devServer.close ??= () => devServer.stopCallback();
+    return [
+      ...captureMiddlewares(onBeforeSetupMiddleware, devServer),
+      ...middlewares,
+      ...captureMiddlewares(onAfterSetupMiddleware, devServer),
+    ];
+  };
   // The e2e suite (ELECTRIFY_E2E=1, set by e2e/playwright.config.ts) must not be blocked by a
   // lazy code chunk that fails to fetch while the dev server is busy: the dev overlay would
   // cover every control and fail each later click in that test. Only chunk-load failures are
@@ -83,7 +70,31 @@ function adaptDevServerConfig(config) {
   return adapted;
 }
 
-require.cache[devServerConfigPath].exports = (...args) =>
-  adaptDevServerConfig(createDevServerConfig(...args));
+function start(compile) {
+  const site = spawnSync(
+    process.execPath,
+    [path.join(__dirname, "site/generate.js"), "--check"],
+    {
+      stdio: "inherit",
+    },
+  );
+  if (site.error) throw site.error;
+  if (site.status !== 0) process.exit(site.status || 1);
 
-require("react-scripts/scripts/start");
+  process.env.BABEL_ENV = "development";
+  process.env.NODE_ENV = "development";
+  process.env.REACT_APP_VERSION = require("./build-version").buildVersion();
+  require("react-scripts/config/env");
+
+  const devServerConfigPath =
+    require.resolve("react-scripts/config/webpackDevServer.config");
+  const createDevServerConfig = require("react-scripts/config/webpackDevServer.config");
+
+  require.cache[devServerConfigPath].exports = (...args) =>
+    adaptDevServerConfig(createDevServerConfig(...args), compile);
+
+  require("react-scripts/scripts/start");
+}
+
+if (require.main === module) start();
+module.exports = { start };

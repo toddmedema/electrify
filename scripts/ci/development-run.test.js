@@ -122,6 +122,14 @@ test("bad dependency installations fail before generators or work execute", (t) 
   const { root, write, run } = fixture(t);
   fs.rmSync(path.join(root, "node_modules/.package-lock.json"));
   write("scripts/build.js", "require('node:fs').writeFileSync('ran','bad')");
+  // Fill every machine slot. A broken checkout must fail without joining the queue.
+  for (const label of ["heavy", "heavy-2", "heavy-3"]) {
+    write("locks/" + label + "/busy.json", {
+      token: "busy",
+      pid: process.pid,
+      cwd: root,
+    });
+  }
   const result = run("build");
   assert.equal(result.status, 1);
   assert.match(result.stderr, /Dependency preflight failed/);

@@ -7,6 +7,7 @@ const net = require("node:net");
 const { fork } = require("node:child_process");
 const { once } = require("node:events");
 const {
+  queueStatus,
   acquireLease,
   reservePort,
   readOwner,
@@ -222,3 +223,162 @@ test("checkout claims reject another task and survive command lifetimes", (t) =>
   assert.equal(claimTask(root, "task-b").task, "task-b");
   releaseTask(root, "task-b");
 });
+
+test("queued work keeps arrival order across slow polling, cancellation and new arrivals", async (t) => {
+  const root = fixture(t);
+  const busy = await acquireLease("heavy", {
+    root,
+    command: "build",
+    task: "owner",
+  });
+  t.after(() => busy.release());
+  const order = [];
+  const abort = new AbortController();
+  const enqueue = (command, pollMs, signal) =>
+    acquireLease("heavy", {
+      root,
+      command,
+      task: "test",
+      pollMs,
+      signal,
+    }).then((lease) => {
+      order.push(command);
+      lease.release();
+    });
+  const older = enqueue("older", 100);
+  const cancelled = enqueue("cancelled", 10, abort.signal);
+  const newer = enqueue("newer", 5);
+  const snapshot = () => queueStatus(root);
+  try {
+    assert.deepEqual(
+      snapshot().waiting.map((w) => [w.position, w.command]),
+      [
+        [1, "older"],
+        [2, "cancelled"],
+        [3, "newer"],
+      ],
+    );
+    assert.equal(snapshot().holders[0].task, "owner");
+    assert(snapshot().holders[0].ageMs >= 0);
+  } finally {
+    abort.abort();
+    await assert.rejects(cancelled, /abort/i);
+    busy.release();
+    await Promise.all([older, newer, enqueue("last", 1)]);
+  }
+  assert.deepEqual(order, ["older", "newer", "last"]);
+  assert.deepEqual(snapshot().waiting, []);
+});
+
+test("a killed waiter gives the next live request its turn", async (t) => {
+  const root = fixture(t);
+  const locks = path.join(root, "locks");
+  const held = await acquireLease("heavy", { root: locks });
+  t.after(() => held.release());
+  const abandoned = worker(t, root, "abandoned");
+  const waiting = message(abandoned, "waiting");
+  abandoned.send("start");
+  await waiting;
+  const exited = once(abandoned, "exit");
+  abandoned.kill("SIGKILL");
+  await exited;
+  held.release();
+  const next = await acquireLease("heavy", { root: locks, wait: false });
+  next.release();
+  assert.deepEqual(fs.readdirSync(locks), []);
+});
+
+test(
+  "webpack yields a preview slot while idle and reacquires it for rebuilds",
+  { timeout: 20000 },
+  async (t) => {
+    const { PreviewCompilation } = require("../dev/preview");
+    const webpack = require("webpack");
+    const root = fixture(t);
+    const input = path.join(root, "index.js");
+    fs.writeFileSync(input, "export default 1");
+    const plugin = new PreviewCompilation(root);
+    let active = 0;
+    const compiler = webpack({
+      mode: "development",
+      context: root,
+      entry: input,
+      output: { path: path.join(root, "dist") },
+      plugins: [
+        plugin,
+        {
+          apply(c) {
+            c.hooks.make.tap("observe", () => {
+              assert.equal(
+                queueStatus(root).holders.some(
+                  (h) => h.command === "start (compile)",
+                ),
+                true,
+              );
+              active++;
+            });
+          },
+        },
+      ],
+    });
+    let finish;
+    const completion = () =>
+      new Promise((resolve, reject) => {
+        finish = { resolve, reject };
+      });
+    let result = completion();
+    compiler.hooks.afterDone.tap("observe idle preview", (stats) =>
+      finish.resolve(stats),
+    );
+    const watch = compiler.watch({}, (err) => {
+      if (err) finish.reject(err);
+    });
+    const leases = [];
+    try {
+      assert.equal((await result).hasErrors(), false);
+      assert.deepEqual(queueStatus(root).holders, []);
+      for (let i = 0; i < 3; i++)
+        leases.push(
+          await acquireLease("heavy", { root, slots: 3, command: "check" }),
+        );
+      result = completion();
+      fs.writeFileSync(input, "export default (");
+      const deadline = Date.now() + 5000;
+      while (!queueStatus(root).waiting.length && Date.now() < deadline)
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      assert.equal(queueStatus(root).waiting[0]?.command, "start (compile)");
+      assert.equal(active, 1);
+      leases[0].release();
+      assert.equal((await result).hasErrors(), true);
+      assert.equal(queueStatus(root).holders.length, 2);
+      // A shared compilation slot also covers CRA's async TypeScript worker
+      // after webpack has emitted the bundle.
+      const checker = require("react-dev-utils/ForkTsCheckerWebpackPlugin");
+      let finishTypecheck;
+      await checker.issuesPool.submit(async (done) => {
+        finishTypecheck = done;
+      });
+      try {
+        const emitted = new Promise((resolve) =>
+          compiler.hooks.done.tap("observe emitted bundle", resolve),
+        );
+        result = completion();
+        fs.writeFileSync(input, "export default 2");
+        await emitted;
+        assert(
+          queueStatus(root).holders.some(
+            (h) => h.command === "start (compile)",
+          ),
+        );
+      } finally {
+        finishTypecheck();
+      }
+      assert.equal((await result).hasErrors(), false);
+      assert.equal(active, 3);
+      assert.equal(queueStatus(root).holders.length, 2);
+    } finally {
+      for (const lease of leases) lease.release();
+      await new Promise((resolve) => watch.close(resolve));
+    }
+  },
+);

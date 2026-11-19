@@ -86,55 +86,134 @@ function removeOwner(directory, token) {
   }
 }
 
+const heavySlots = 3;
+
+function entries(root) {
+  try {
+    return fs.readdirSync(root);
+  } catch (error) {
+    if (error.code === "ENOENT") return [];
+    throw error;
+  }
+}
+
+function waitingOwners(root, reap = false) {
+  return entries(root)
+    .filter((name) => name.startsWith("heavy-wait-"))
+    .sort()
+    .flatMap((name) => {
+      const dir = path.join(root, name);
+      const owner = readOwner(dir);
+      if (!owner) return [];
+      if (ownerAlive(owner)) return [owner];
+      if (reap) removeOwner(dir, owner.token);
+      return [];
+    });
+}
+
+function queueStatus(root = coordinationRoot()) {
+  const holders = [],
+    previews = [];
+  const now = Date.now();
+  const describe = (owner) => ({
+    command: owner.command || "unknown (older checkout)",
+    task: owner.task || null,
+    pid: owner.pid,
+    cwd: owner.cwd,
+    ageMs: owner.startedAt
+      ? Math.max(0, now - Date.parse(owner.startedAt))
+      : null,
+  });
+  for (const name of entries(root).sort()) {
+    if (!/^(heavy(?:-\d+)?|port-\d+)$/.test(name)) continue;
+    const owner = readOwner(path.join(root, name));
+    if (!owner || !ownerAlive(owner)) continue;
+    if (name.startsWith("heavy"))
+      holders.push({ slot: name, ...describe(owner) });
+    else if (owner.preview)
+      previews.push({ port: Number(name.slice(5)), ...describe(owner) });
+  }
+  const waiting = waitingOwners(root).map((owner, index) => ({
+    position: index + 1,
+    ...describe(owner),
+  }));
+  return { holders, waiting, previews };
+}
+
+function inheritedLease(
+  name,
+  { root = coordinationRoot(), slots = 1, inherited },
+) {
+  if (!inherited) return;
+  for (const dir of slotDirectories(root, name, slots)) {
+    const owner = readOwner(dir);
+    if (owner?.token === inherited && ownerAlive(owner))
+      return {
+        token: inherited,
+        groupId: owner.groupId,
+        inherited: true,
+        waitMs: 0,
+        release() {},
+      };
+  }
+}
+
+function slotDirectories(root, name, slots) {
+  // Keep the original slot names so older checkouts still respect the same cap.
+  return Array.from({ length: slots }, (_, index) =>
+    path.join(root, index === 0 ? name : `${name}-${index + 1}`),
+  );
+}
+
 async function acquireLease(name, options = {}) {
   const root = options.root || coordinationRoot();
   fs.mkdirSync(root, { recursive: true });
   const slots = options.slots ?? 1;
   if (!Number.isSafeInteger(slots) || slots < 1)
     throw new Error("Reservation slots must be a positive integer");
-  // Keep the original name for slot one so older checkouts still coordinate with us.
-  const directories = Array.from({ length: slots }, (_, index) =>
-    path.join(root, index === 0 ? name : `${name}-${index + 1}`),
-  );
-  const inherited = options.inherited;
-  if (inherited) {
-    for (const directory of directories) {
-      const owner = readOwner(directory);
-      if (owner?.token === inherited && ownerAlive(owner))
-        return {
-          token: inherited,
-          groupId: owner.groupId,
-          inherited: true,
-          waitMs: 0,
-          release() {},
-        };
-    }
-  }
+  const directories = slotDirectories(root, name, slots);
+  const nested = inheritedLease(name, options);
+  if (nested) return nested;
   const token = randomUUID();
   const prepared = path.join(root, `${name}-${token}`);
+  const started = Date.now();
   const owner = {
     token,
     pid: process.pid,
-    cwd: process.cwd(),
-    startedAt: new Date().toISOString(),
+    cwd: options.cwd || process.cwd(),
+    command: options.command,
+    task: options.task,
+    preview: options.preview,
+    startedAt: new Date(started).toISOString(),
   };
   fs.mkdirSync(prepared);
   fs.writeFileSync(path.join(prepared, `${token}.json`), JSON.stringify(owner));
-  const started = Date.now();
+  // Publish a complete ticket, ordered by the machine's monotonic clock.
+  // Renaming the ticket into a slot atomically dequeues the winner.
+  let ticket = prepared;
+  if (name === "heavy") {
+    const order = process.hrtime.bigint().toString().padStart(24, "0");
+    ticket = path.join(root, `heavy-wait-${order}-${token}`);
+    fs.renameSync(prepared, ticket);
+  }
   let announced = false;
   try {
     for (;;) {
       options.signal?.throwIfAborted();
-      let occupied;
       let recovered = false;
-      for (const directory of directories) {
+      const waiting = name === "heavy" ? waitingOwners(root, true) : [];
+      const position =
+        waiting.findIndex((waiter) => waiter.token === token) + 1;
+      let occupied = position > 1 ? waiting[0] : null;
+      for (const directory of occupied ? [] : directories) {
         try {
           // The complete metadata becomes visible atomically with ownership.
-          fs.renameSync(prepared, directory);
+          fs.renameSync(ticket, directory);
           return {
             token,
             inherited: false,
             waitMs: Date.now() - started,
+            queued: announced,
             setChild(pid, groupId) {
               owner.childPid = pid;
               if (groupId !== undefined) owner.groupId = groupId;
@@ -174,14 +253,14 @@ async function acquireLease(name, options = {}) {
             `Reservation ${name} is held by PID ${occupied.pid} in ${occupied.cwd}`,
           );
         if (!announced) {
-          options.onWait?.(occupied);
+          options.onWait?.(occupied, position);
           announced = true;
         }
       }
       await delay(options.pollMs || 200, undefined, { signal: options.signal });
     }
   } finally {
-    fs.rmSync(prepared, { recursive: true, force: true });
+    fs.rmSync(ticket, { recursive: true, force: true });
   }
 }
 
@@ -222,6 +301,9 @@ async function reservePort(requested, options = {}) {
 module.exports = {
   coordinationRoot,
   acquireLease,
+  inheritedLease,
+  queueStatus,
+  heavySlots,
   reservePort,
   alive,
   groupAlive,

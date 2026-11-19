@@ -108,10 +108,11 @@ The check's Jest suites use at most four workers; set `ELECTRIFY_CHECK_WORKERS` 
 that limit. This default limits contention on shared machines; it is not a measured speedup.
 The simulation CLI runs its single suite in process. These gates keep their caches inside `.tmp/`.
 
-Before pushing code changes for a pull request, run `npm run check:ci` once on the integrated code instead.
-It includes those eight gates plus tick performance, the production web build, bundle-size
-ceilings, the production browser smoke/layout matrix and the desktop renderer's multiplayer
-suite: fourteen gates in total. The packaged Electron UI suite remains CI-only.
+Before opening or updating a PR, run local tests covering the change, its callers and affected
+integration paths. Broaden testing when a change affects shared behavior. Include the commands
+and results in the PR. Hosted CI runs the full suite. For a broad local check or CI diagnosis,
+`npm run check:ci` includes fifteen gates covering the CPU suites, production build, bundle
+limits, browser matrix, multiplayer and controller journeys. Packaged Electron runs on CI.
 
 After repairing a failed gate, use the printed retry command, for example
 `npm run check -- --steps lint,tests`. This reports a partial check; retain earlier passing
