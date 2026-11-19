@@ -8,10 +8,11 @@ const { taskId } = require("./task");
 const { setTimeout: delay } = require("node:timers/promises");
 
 class PreviewCompilation {
-  constructor(root, signal, checkout = process.cwd()) {
+  constructor(root, signal, checkout = process.cwd(), onPreflightFailure) {
     this.signal = signal;
     this.root = root;
     this.checkout = checkout;
+    this.onPreflightFailure = onPreflightFailure;
   }
 
   async acquire() {
@@ -33,6 +34,7 @@ class PreviewCompilation {
       if (this.lease.queued) checkDependencies(this.checkout);
     } catch (error) {
       this.release();
+      this.onPreflightFailure?.(error);
       throw error;
     }
     this.lease.setChild(
@@ -108,7 +110,19 @@ async function startPreview({ coordinationRoot, entry, args, prepare }) {
   const stopWaiting = () => abort.abort();
   process.once("SIGINT", stopWaiting);
   process.once("SIGTERM", stopWaiting);
-  const compile = new PreviewCompilation(coordinationRoot, abort.signal);
+  const compile = new PreviewCompilation(
+    coordinationRoot,
+    abort.signal,
+    process.cwd(),
+    (error) => {
+      console.error(
+        `${error.message}\nPreview stopped. Repair dependencies, then restart npm start.`,
+      );
+      // Exit only this supervised preview. The command wrapper drains its owned
+      // process group before releasing the listening port reservation.
+      process.exit(1);
+    },
+  );
   process.once("exit", () => compile.release());
   try {
     await compile.acquire();

@@ -471,3 +471,79 @@ test(
     assert(!fs.existsSync(path.join(selected.root, "locks")));
   },
 );
+
+test(
+  "a failed queued rebuild shuts down the listening preview and releases its port",
+  { timeout: 25000 },
+  async (t) => {
+    const { root, write, env } = fixture(t);
+    fs.symlinkSync(
+      path.dirname(require.resolve("react-dev-utils/package.json")),
+      path.join(root, "node_modules/react-dev-utils"),
+      "junction",
+    );
+    write("index.js", "export default 1");
+    write(
+      "scripts/start.js",
+      `
+    const fs = require('node:fs');
+    const webpack = require(${JSON.stringify(require.resolve("webpack"))});
+    const DevServer = require(${JSON.stringify(require.resolve("webpack-dev-server"))});
+    exports.start = compile => {
+      const compiler = webpack({mode:'development',context:process.cwd(),entry:'./index.js',output:{path:require('node:path').join(process.cwd(),'dist')}});
+      compiler.hooks.afterDone.tap('ready', () => fs.writeFileSync('preview-ready', 'ready'));
+      const server = new DevServer({host:'127.0.0.1',port:Number(process.env.PORT),client:false,
+        setupMiddlewares:(middlewares,server) => {compile.apply(server.compiler);return middlewares;}}, compiler);
+      server.start().then(() => fs.writeFileSync('preview-port', String(server.server.address().port)));
+    };
+  `,
+    );
+    const child = spawn(process.execPath, ["runner.cjs", "start"], {
+      cwd: root,
+      env,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    const exited = once(child, "close");
+    t.after(() => {
+      if (child.exitCode === null && child.signalCode === null) child.kill();
+    });
+    let stderr = "";
+    child.stderr.on("data", (data) => {
+      stderr += data;
+    });
+    const waitFor = async (predicate) => {
+      const deadline = Date.now() + 10000;
+      while (!predicate() && child.exitCode === null && Date.now() < deadline)
+        await delay(10);
+      assert(predicate(), stderr);
+    };
+    await waitFor(
+      () =>
+        fs.existsSync(path.join(root, "preview-ready")) &&
+        fs.existsSync(path.join(root, "preview-port")),
+    );
+    const port = Number(
+      fs.readFileSync(path.join(root, "preview-port"), "utf8"),
+    );
+    const locks = path.join(root, "locks");
+    const leases = [];
+    t.after(() => leases.forEach((lease) => lease.release()));
+    for (let i = 0; i < 3; i++)
+      leases.push(await acquireLease("heavy", { root: locks, slots: 3 }));
+    write("index.js", "export default 2");
+    await waitFor(() => stderr.includes("Preview compilation queued"));
+    fs.rmSync(path.join(root, "node_modules/.package-lock.json"));
+    leases[0].release();
+    const [code] = await exited;
+    assert.equal(code, 1, stderr);
+    assert.match(stderr, /Dependency preflight failed/);
+    assert.match(stderr, /restart npm start/);
+    assert(!fs.existsSync(path.join(locks, `port-${port}`)));
+    const server = require("node:net").createServer();
+    t.after(() => server.close());
+    await new Promise((resolve, reject) => {
+      server.once("error", reject);
+      server.listen(port, "127.0.0.1", resolve);
+    });
+  },
+);

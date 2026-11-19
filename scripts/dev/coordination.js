@@ -2,7 +2,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const net = require("node:net");
-const { randomUUID } = require("node:crypto");
+const { createHash, randomUUID } = require("node:crypto");
 const { setTimeout: delay } = require("node:timers/promises");
 
 function coordinationRoot() {
@@ -74,10 +74,12 @@ function ownerAlive(owner) {
 function removeOwner(directory, token) {
   // Remove only this owner's unique filename. Another reaper/acquirer can never
   // make us unlink a replacement owner, even between unlink and rmdir.
-  try {
-    fs.unlinkSync(path.join(directory, `${token}.json`));
-  } catch (error) {
-    if (error.code !== "ENOENT") throw error;
+  for (const extension of ["pending", "json"]) {
+    try {
+      fs.unlinkSync(path.join(directory, `${token}.${extension}`));
+    } catch (error) {
+      if (error.code !== "ENOENT") throw error;
+    }
   }
   try {
     fs.rmdirSync(directory);
@@ -97,18 +99,65 @@ function entries(root) {
   }
 }
 
+// Staging records are local-process identities, including Linux PID namespaces.
+// Never infer death from a PID that belongs to another host/namespace.
+function processScope() {
+  let namespace = "host";
+  if (process.platform === "linux") {
+    try {
+      namespace = fs.readlinkSync("/proc/self/ns/pid");
+    } catch {
+      return undefined;
+    }
+  }
+  return createHash("sha256")
+    .update(`${os.hostname()}:${namespace}`)
+    .digest("hex");
+}
+
+const scope = processScope();
+const requestPattern =
+  /^heavy-request-(\d+)-(\d+)-([a-f0-9]+|unknown)-([a-f0-9-]+)$/;
+
 function waitingOwners(root, reap = false) {
   return entries(root)
-    .filter((name) => name.startsWith("heavy-wait-"))
-    .sort()
     .flatMap((name) => {
+      const request = requestPattern.exec(name);
+      if (!request && !name.startsWith("heavy-wait-")) return [];
       const dir = path.join(root, name);
-      const owner = readOwner(dir);
+      let owner = readOwner(dir);
+      if (!owner && request) {
+        // mkdir registers arrival before metadata publication. A live publisher
+        // in that short interval still owns its place, not a CPU slot.
+        if (!fs.existsSync(dir)) return [];
+        owner = {
+          pid: Number(request[2]),
+          scope: request[3],
+          token: request[4],
+        };
+      }
       if (!owner) return [];
-      if (ownerAlive(owner)) return [owner];
+      const order =
+        request?.[1] || name.slice("heavy-wait-".length).split("-")[0];
+      const inspectable = !request || (scope && owner.scope === scope);
+      if (!inspectable || ownerAlive(owner)) return [{ ...owner, order }];
       if (reap) removeOwner(dir, owner.token);
       return [];
-    });
+    })
+    .sort(
+      (a, b) =>
+        a.order.localeCompare(b.order) || a.token.localeCompare(b.token),
+    );
+}
+
+function reapAdmissionStaging(root) {
+  for (const name of entries(root)) {
+    if (!/^heavy-admission-[a-f0-9-]{36}$/.test(name)) continue;
+    const dir = path.join(root, name);
+    const owner = readOwner(dir);
+    if (owner && scope && owner.scope === scope && !ownerAlive(owner))
+      removeOwner(dir, owner.token);
+  }
 }
 
 function queueStatus(root = coordinationRoot()) {
@@ -175,11 +224,18 @@ async function acquireLease(name, options = {}) {
   const nested = inheritedLease(name, options);
   if (nested) return nested;
   const token = randomUUID();
-  const prepared = path.join(root, `${name}-${token}`);
+  const order = process.hrtime.bigint().toString().padStart(24, "0");
+  const prepared = path.join(
+    root,
+    name === "heavy"
+      ? `heavy-request-${order}-${process.pid}-${scope || "unknown"}-${token}`
+      : `${name}-${token}`,
+  );
   const started = Date.now();
   const owner = {
     token,
     pid: process.pid,
+    scope,
     cwd: options.cwd || process.cwd(),
     command: options.command,
     task: options.task,
@@ -187,20 +243,24 @@ async function acquireLease(name, options = {}) {
     startedAt: new Date(started).toISOString(),
   };
   fs.mkdirSync(prepared);
-  fs.writeFileSync(path.join(prepared, `${token}.json`), JSON.stringify(owner));
-  // A short shared lease serializes ticket ordering/publication with admission.
-  // A publisher paused after choosing its order cannot be overtaken.
+  const metadata = path.join(prepared, `${token}.pending`);
+  fs.writeFileSync(metadata, JSON.stringify(owner));
+  fs.renameSync(metadata, path.join(prepared, `${token}.json`));
+  // The request is registered before waiting for the admission mutex. The mutex
+  // serializes publication and admission; all requests retain their arrival order.
   let ticket = prepared;
   let announced = false;
   let waitedForAdmission = false;
   try {
     for (;;) {
       options.signal?.throwIfAborted();
+      if (name === "heavy") reapAdmissionStaging(root);
       const admission =
         name === "heavy"
           ? await acquireLease("heavy-admission", {
               root,
               signal: options.signal,
+              wait: options.wait,
               pollMs: 10,
             })
           : undefined;
@@ -210,7 +270,6 @@ async function acquireLease(name, options = {}) {
         recovered = false;
       try {
         if (name === "heavy" && ticket === prepared) {
-          const order = process.hrtime.bigint().toString().padStart(24, "0");
           const published = path.join(root, `heavy-wait-${order}-${token}`);
           fs.renameSync(prepared, published);
           ticket = published;

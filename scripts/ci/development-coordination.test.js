@@ -410,13 +410,13 @@ test("a paused ticket publisher cannot be overtaken by another process", async (
         }
       }
       if (process.argv[2] === 'second' && path.basename(to) === 'heavy-admission')
-        process.send({type:'progress', state:'contending'});
+        process.send({type:'contending'});
       return rename(from, to);
     };
     const {acquireLease} = require(${JSON.stringify(require.resolve("../dev/coordination"))});
     process.once('message', async () => {
       const lease = await acquireLease('heavy', {root:${JSON.stringify(root)}, pollMs:10});
-      process.send({type:'progress', state:'acquired'});
+      process.send({type:'acquired'});
       process.once('message', () => { lease.release(); process.disconnect(); });
     });
   `,
@@ -434,20 +434,16 @@ test("a paused ticket publisher cannot be overtaken by another process", async (
   });
   const [first, second] = children;
   const paused = message(first, "paused");
-  const firstReady = message(first, "progress");
+  const firstReady = message(first, "acquired");
   first.send("start");
   await paused;
-  const competing = message(second, "progress");
+  const competing = message(second, "contending");
   second.send("start");
-  assert.equal((await competing).state, "contending");
+  await competing;
   assert.deepEqual(queueStatus(root).holders, []);
-  const secondReady = new Promise((resolve) =>
-    second.on("message", (value) => {
-      if (value.state === "acquired") resolve(value);
-    }),
-  );
+  const secondReady = message(second, "acquired");
   fs.writeFileSync(path.join(root, "resume"), "resume");
-  assert.equal((await firstReady).state, "acquired");
+  await firstReady;
   first.send("release");
   await secondReady;
   const exited = once(second, "exit");
@@ -617,7 +613,18 @@ test(
       if (++completions === 1) firstDone();
       else secondDone();
     });
-    const watch = compiler.watch({}, () => {});
+    // This fixture drives invalidation explicitly. Late filesystem events from
+    // creating index.js must not schedule a third build behind its held rebuild.
+    const watch = compiler.watch({ ignored: /.*/ }, () => {});
+    t.signal.addEventListener(
+      "abort",
+      () => {
+        finishTypecheck?.();
+        resumeRebuild?.();
+        watch.close(() => {});
+      },
+      { once: true },
+    );
     try {
       await emitted;
       watch.invalidate();
@@ -710,3 +717,210 @@ test(
     }
   },
 );
+
+function admissionWaiter(t, root, pauseMetadata = false) {
+  const file = path.join(root, "admission-waiter.cjs");
+  fs.writeFileSync(
+    file,
+    `
+    const fs = require('node:fs');
+    const path = require('node:path');
+    const write = fs.writeFileSync;
+    fs.writeFileSync = (file, data, ...args) => {
+      if (${pauseMetadata} && String(file).endsWith('.pending') && path.basename(path.dirname(file)).startsWith('heavy-request-')) {
+        process.send({type:'contending'});
+        const deadline = Date.now() + 10000;
+        while (!fs.existsSync(${JSON.stringify(path.join(root, "resume-waiter"))})) {
+          if (Date.now() > deadline) throw Error('Metadata publisher was never resumed');
+          Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 10);
+        }
+      }
+      return write(file, data, ...args);
+    };
+    const rename = fs.renameSync;
+    let paused = false;
+    fs.renameSync = (from, to) => {
+      try { return rename(from, to); }
+      catch (error) {
+        if (!paused && path.basename(to) === 'heavy-admission') {
+          paused = true;
+          process.send({type:'contending'});
+          const deadline = Date.now() + 10000;
+          while (!fs.existsSync(${JSON.stringify(path.join(root, "resume-waiter"))})) {
+            if (Date.now() > deadline) throw Error('Admission waiter was never resumed');
+            Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 10);
+          }
+        }
+        throw error;
+      }
+    };
+    const {acquireLease} = require(${JSON.stringify(require.resolve("../dev/coordination"))});
+    process.once('message', async () => {
+      const lease = await acquireLease('heavy', {root:${JSON.stringify(root)}, command:'earlier', pollMs:10});
+      process.send({type:'acquired'});
+      process.once('message', () => { lease.release(); process.disconnect(); });
+    });
+  `,
+  );
+  const child = fork(file, [], {
+    stdio: ["ignore", "ignore", "inherit", "ipc"],
+  });
+  t.after(() => {
+    if (fs.existsSync(root))
+      fs.writeFileSync(path.join(root, "resume-waiter"), "resume");
+    if (child.exitCode === null && child.signalCode === null) child.kill();
+  });
+  return child;
+}
+
+test("an earlier admission waiter keeps its position when a new request takes the mutex", async (t) => {
+  const root = fixture(t);
+  const mutex = await acquireLease("heavy-admission", { root });
+  t.after(() => mutex.release());
+  const earlier = admissionWaiter(t, root);
+  const contending = message(earlier, "contending");
+  earlier.send("start");
+  await contending;
+  mutex.release();
+  const abort = new AbortController();
+  t.after(() => abort.abort());
+  let laterQueued = false;
+  const later = acquireLease("heavy", {
+    root,
+    command: "later",
+    signal: abort.signal,
+    pollMs: 10,
+    onWait: () => {
+      laterQueued = true;
+    },
+  });
+  later.catch(() => {}); // Cleanup may abort a deliberately broken implementation.
+  t.after(async () => {
+    abort.abort();
+    await later.then(
+      (lease) => lease.release(),
+      () => {},
+    );
+  });
+  // The later process can run freely while the earlier one is paused between
+  // admission polls; it must still see the earlier registered request.
+  await waitFor(() => laterQueued || queueStatus(root).holders.length > 0);
+  assert.equal(
+    queueStatus(root).holders.length,
+    0,
+    "later request overtook the admission waiter",
+  );
+  assert.equal(laterQueued, true);
+  const acquiredEarlier = message(earlier, "acquired");
+  fs.writeFileSync(path.join(root, "resume-waiter"), "resume");
+  await acquiredEarlier;
+  assert.equal(queueStatus(root).holders[0].command, "earlier");
+  const exited = once(earlier, "exit");
+  earlier.send("release");
+  await exited;
+  (await later).release();
+});
+
+test("killed admission waiters leave no staging records after the next acquisition", async (t) => {
+  const root = fixture(t);
+  const mutex = await acquireLease("heavy-admission", { root });
+  t.after(() => mutex.release());
+  const child = admissionWaiter(t, root);
+  const contending = message(child, "contending");
+  child.send("start");
+  await contending;
+  const staged = fs.readdirSync(root).filter((name) => {
+    try {
+      return readOwner(path.join(root, name))?.pid === child.pid;
+    } catch (error) {
+      if (error.code === "ENOTDIR") return false;
+      throw error;
+    }
+  });
+  assert.equal(staged.length, 2);
+  const exited = once(child, "exit");
+  child.kill("SIGKILL");
+  await exited;
+  mutex.release();
+  const lease = await acquireLease("heavy", { root, wait: false });
+  lease.release();
+  for (const name of staged)
+    assert(
+      !fs.existsSync(path.join(root, name)),
+      `orphan staging record: ${name}`,
+    );
+});
+
+test("nonwaiting heavy acquisition fails immediately on admission contention", async (t) => {
+  const root = fixture(t);
+  const mutex = await acquireLease("heavy-admission", { root });
+  t.after(() => mutex.release());
+  // The timeout only bounds a broken implementation; it is not the expected
+  // rejection. Correct fail-fast behavior reports the occupied mutex.
+  await assert.rejects(
+    acquireLease("heavy", {
+      root,
+      wait: false,
+      signal: AbortSignal.timeout(1000),
+    }),
+    /Reservation heavy-admission is held by PID/,
+  );
+  assert.deepEqual(fs.readdirSync(root), ["heavy-admission"]);
+});
+
+test("unpublished request metadata retains arrival order and is reaped only after owner death", async (t) => {
+  const root = fixture(t);
+  const child = admissionWaiter(t, root, true);
+  const paused = message(child, "contending");
+  child.send("start");
+  await paused;
+  const request = fs
+    .readdirSync(root)
+    .find((name) => name.startsWith("heavy-request-"));
+  assert(request);
+  assert.equal(readOwner(path.join(root, request)), null);
+  let waiting = false;
+  const abort = new AbortController();
+  const successor = acquireLease("heavy", {
+    root,
+    signal: abort.signal,
+    pollMs: 10,
+    onWait: () => {
+      waiting = true;
+    },
+  });
+  successor.catch(() => {});
+  t.after(async () => {
+    abort.abort();
+    await successor.then(
+      (lease) => lease.release(),
+      () => {},
+    );
+  });
+  await waitFor(() => waiting);
+  assert.equal(queueStatus(root).holders.length, 0);
+  assert(fs.existsSync(path.join(root, request)));
+  const exited = once(child, "exit");
+  child.kill("SIGKILL");
+  await exited;
+  (await successor).release();
+  assert(!fs.existsSync(path.join(root, request)));
+});
+
+test("staging cleanup preserves records from an unverified process namespace", async (t) => {
+  const root = fixture(t);
+  const name = "heavy-admission-11111111-1111-1111-1111-111111111111";
+  const dir = path.join(root, name);
+  fs.mkdirSync(dir);
+  fs.writeFileSync(
+    path.join(dir, "foreign.json"),
+    JSON.stringify({
+      token: "foreign",
+      pid: 2147483647,
+      scope: "foreign-namespace",
+    }),
+  );
+  const lease = await acquireLease("heavy", { root, wait: false });
+  lease.release();
+  assert.equal(readOwner(dir).scope, "foreign-namespace");
+});
