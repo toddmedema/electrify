@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { execFileSync } = require("node:child_process");
+const { execFileSync, spawnSync } = require("node:child_process");
 const {
   bundleLinuxRuntime,
   verifyLinuxRuntime,
@@ -45,6 +45,7 @@ function fixture(t) {
     { mode: 0o755 },
   );
   return {
+    root,
     depot,
     libraries,
     options: {
@@ -88,6 +89,68 @@ test(
       () => verifyLinuxRuntime(f.depot, false),
       /runtime mismatch: libnss3/,
     );
+  },
+);
+
+test(
+  "A direct NixOS launch uses the Nix runtime and forwards the Electron arguments",
+  { skip: process.platform === "win32" },
+  (t) => {
+    const { root, depot, options } = fixture(t);
+    bundleLinuxRuntime(depot, options);
+    const launcher = path.join(depot, "Electrify");
+    const osRelease = path.join(root, "os-release");
+    const hostEtc = path.join(root, "host-etc");
+    // Exercise the packaged shell script with a simulated host filesystem.
+    fs.writeFileSync(osRelease, "ID=nixos\n");
+    fs.writeFileSync(
+      launcher,
+      fs
+        .readFileSync(launcher, "utf8")
+        .replace("/etc/os-release", osRelease)
+        .replaceAll("/.host-etc", hostEtc),
+    );
+    const bin = path.join(root, "bin");
+    const runtime = path.join(root, "nix runtime");
+    fs.mkdirSync(bin);
+    fs.mkdirSync(path.join(runtime, "bin"), { recursive: true });
+    fs.writeFileSync(
+      path.join(bin, "nix-build"),
+      '#!/bin/sh\n[ "$1" = --no-out-link ] && [ -r "$2" ] || exit 2\nprintf "%s\\n" "$TEST_RUNTIME"\n',
+      { mode: 0o755 },
+    );
+    fs.writeFileSync(
+      path.join(runtime, "bin", "electrify-nixos"),
+      '#!/bin/sh\nprintf "nix runtime\\n"\nexec "$@"\n',
+      { mode: 0o755 },
+    );
+    const env = {
+      ...process.env,
+      PATH: `${bin}:${process.env.PATH}`,
+      TEST_RUNTIME: runtime,
+      SteamAppId: "",
+      LD_LIBRARY_PATH: "/host/lib",
+    };
+    delete env.ELECTRIFY_RUNTIME_LIB;
+    const args = ["--version", "two words", "$literal"];
+    const launch = (environment = env) =>
+      execFileSync(launcher, args, { env: environment, encoding: "utf8" })
+        .trim()
+        .split("\n");
+    assert.deepEqual(launch(), ["nix runtime", "/host/lib", "", ...args]);
+
+    const lib = path.join(depot, "lib");
+    const direct = [`${lib}:/host/lib`, lib, ...args];
+    assert.deepEqual(launch({ ...env, SteamAppId: "1234" }), direct);
+    fs.mkdirSync(hostEtc);
+    assert.deepEqual(launch(), direct);
+    fs.rmdirSync(hostEtc);
+
+    fs.writeFileSync(path.join(bin, "nix-build"), "#!/bin/sh\nexit 2\n");
+    const failed = spawnSync(launcher, args, { env, encoding: "utf8" });
+    assert.equal(failed.status, 1);
+    assert.match(failed.stderr, /Electrify.*NixOS runtime.*<nixpkgs>/);
+    assert.equal(failed.stdout, "");
   },
 );
 
