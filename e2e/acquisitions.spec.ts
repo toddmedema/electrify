@@ -1666,7 +1666,7 @@ for (const theme of ["light", "dark"] as const) {
       before.territoryNetwork!.landPurchases,
     );
     expect(owned.territoryNetwork!.tilePurchases).toEqual([
-      { tileId: tile.id, minute: owned.date.minute, price: quote.price },
+      { ...quote.purchases[0], minute: owned.date.minute },
     ]);
     expect(ownsTerritoryTile(owned, tile.id)).toBe(true);
     expect(ownsTerritoryTile(owned, neighbor.id)).toBe(false);
@@ -1878,7 +1878,8 @@ for (const theme of ["light", "dark"] as const) {
     await panToTile(page, frontier);
     const camera = await readTerritoryMapCamera(viewport);
     const quote = tilePurchaseQuote(before, frontier.id)!;
-    await reviewScreenshot(page, {
+    await expect(target).toContainText(formatMoneyConcise(quote.price));
+    await reviewScreenshot(viewport, {
       path: info.outputPath(`rapid-buy-${theme}.png`),
       animations: "disabled",
       scale: "css",
