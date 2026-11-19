@@ -6,7 +6,7 @@ import { parseSave, serializeSave } from "../SaveGame";
 import { createGame } from "../testing/Simulator";
 import { acquisitionAssets } from "../helpers/Expansion";
 import { currentTick } from "../helpers/GameSelectors";
-import { tilePurchaseQuote } from "../helpers/Territories";
+import { tilePrice, tilePurchaseQuote } from "../helpers/Territories";
 import { territoryTileViews } from "../helpers/TerritoryMapState";
 import { getTerrainWindOutputFactor } from "../helpers/TerrainModifiers";
 import { facilityOnTile } from "../helpers/TerritoryTiles";
@@ -137,7 +137,7 @@ it.each(["Wind", "Solar", "Biomass"] as const)(
   },
 );
 
-it("restores current saves built on the published terrain without changing plants, receipts, financing or progress, then resumes reproducibly", () => {
+it("restores parcel-priced saves built on the published terrain and resumes reproducibly", () => {
   const retained = withPublishedTerrain(() => {
     let game = createGame({ scenarioId: 116, seed: 12345 });
     currentTick(game)!.cash = 3e9;
@@ -150,6 +150,12 @@ it("restores current saves built on the published terrain without changing plant
       game = cloneDeep(
         reducer(game, acquireTile({ tileId, quoteKey: purchase.quoteKey })),
       );
+      // The published terrain predates distance-based pricing.
+      const receipt = game.territoryNetwork!.tilePurchases!.at(-1)!;
+      const price = tilePrice(game, receipt.minute, tileId);
+      currentTick(game)!.cash += receipt.price - price;
+      receipt.price = price;
+      delete receipt.connectionDistance;
       const quote = getBuildFacilityQuote(
         game,
         { name, peakW: 20e6 },
@@ -174,7 +180,9 @@ it("restores current saves built on the published terrain without changing plant
     // Retain real in-progress construction and its outstanding financed balance.
     tickState(game);
     return {
-      raw: JSON.parse(JSON.stringify(serializeSave(game))),
+      raw: JSON.parse(
+        JSON.stringify({ ...serializeSave(game), schemaVersion: 19 }),
+      ),
       oldWindFactor,
     };
   });

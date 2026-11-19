@@ -95,7 +95,7 @@ function legacyPortfolio(
   raw.game.territoryNetwork = { version: 1 };
   return raw;
 }
-it.each([19, 20])(
+it.each([19, 20, 21])(
   "rebuilds Valley goals from schema%i without changing paid assets or history",
   (schemaVersion) => {
     const game = createGame({ scenarioId: 116, seed: 61 });

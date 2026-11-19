@@ -157,7 +157,6 @@ it("uses active dated utility PPAs as anchors and removes them on expiry, while 
 it("does not grant neighboring authored sites, duplicate cash or customer credit", () => {
   const game = ready();
   const first = buy(game, "green-uplands:site-0");
-  expect(first.price).toBeCloseTo(18e6 / 7, 5);
   expect(ownsTerritoryTile(game, "green-uplands:site-1")).toBe(false);
   const wind = GENERATORS(
     game,

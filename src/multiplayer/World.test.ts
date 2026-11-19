@@ -10,6 +10,7 @@ import {
   createWorld,
   pauseWorld,
   restoreWorld,
+  savedMatchSpec,
   roomView,
   stepWorld,
   setWorldBlockers,
@@ -522,6 +523,76 @@ test("world blockers are detached live state and resume still discards them", ()
   expect(worldBlockers(restored)).toEqual([]);
   expect(restored.readyRequired).toBe(true);
 });
+
+const publishedCoopIdentities = [
+  [
+    19,
+    "coop-2-c85efcd401375172030f9ab31b7b1f81f0ecf4f450732f36d86e265355e91bef",
+  ],
+  [
+    19,
+    "coop-2-fdb701fc666648e148ecc4d6a02e4b2001090bc79052092a4e567ea9184714ef",
+  ],
+  // Generated from published master 40c3cafc55fc1c4fb4d2b4003ebfbe191b2e1f81.
+  [
+    20,
+    "coop-2-cf979e3b45deb328dd12a266f291e16398174095d47beca6df0d4f9da1dbd577",
+  ],
+] as const;
+
+test.each(publishedCoopIdentities)(
+  "resumes a published schema %i custom co-op identity %s without losing progress",
+  (gameSchema, rules) => {
+    const world = create(2);
+    const raw = { ...checkpointWorld(world), gameSchema, rules };
+    const original = JSON.stringify(raw);
+    expect(savedMatchSpec(raw)).toEqual(COOP_TEST_SPEC);
+    const restored = restoreWorld(raw, "published-schema");
+    expect(restored.gameSchema).toBe(SAVE_SCHEMA_VERSION);
+    // Hydration reattaches forecast symbols; compare stored state and its explicit dispatch plans.
+    expect(JSON.stringify(restored.grids)).toBe(JSON.stringify(world.grids));
+    expect(checkpointWorld(restored).commitments).toEqual(raw.commitments);
+    const roundTrip = restoreWorld(checkpointWorld(restored), "round-trip");
+    expect(JSON.stringify(roundTrip.grids)).toBe(
+      JSON.stringify(restored.grids),
+    );
+    expect(JSON.stringify(raw)).toBe(original);
+
+    for (const continued of [restored, roundTrip]) {
+      continued.seats.forEach((_seat, player) => {
+        command(continued, player, { kind: "ready" });
+        command(continued, player, { kind: "speed", speed: "NORMAL" });
+      });
+      for (let tick = 0; tick < 10; tick++) stepWorld(continued);
+    }
+    expect(restored.grids[0].date.minute).toBeGreaterThan(
+      world.grids[0].date.minute,
+    );
+    expect(JSON.stringify(roundTrip.grids)).toBe(
+      JSON.stringify(restored.grids),
+    );
+  },
+);
+
+test.each(publishedCoopIdentities)(
+  "rejects unknown identities and corrupt grids for published schema %i (%s)",
+  (gameSchema, rules) => {
+    const raw = { ...checkpointWorld(create(2)), gameSchema, rules };
+    const unknown = { ...raw, rules: "coop-2-" + "0".repeat(64) };
+    const originalUnknown = JSON.stringify(unknown);
+    expect(() => savedMatchSpec(unknown)).toThrow(/unsupported format/);
+    expect(() => restoreWorld(unknown, "unknown")).toThrow(
+      /unsupported format/,
+    );
+    expect(JSON.stringify(unknown)).toBe(originalUnknown);
+
+    const corrupt = cloneDeep(raw);
+    corrupt.grids[0].facilities[0].peakW = -1;
+    const originalCorrupt = JSON.stringify(corrupt);
+    expect(() => restoreWorld(corrupt, "corrupt")).toThrow();
+    expect(JSON.stringify(corrupt)).toBe(originalCorrupt);
+  },
+);
 
 test("future and unsupported shared schemas are rejected without mutating the checkpoint", () => {
   const saved = checkpointWorld(create(2));

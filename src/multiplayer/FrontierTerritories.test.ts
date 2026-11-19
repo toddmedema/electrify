@@ -100,6 +100,14 @@ it.each([
     20,
     "coop-2-cf979e3b45deb328dd12a266f291e16398174095d47beca6df0d4f9da1dbd577",
   ],
+  [
+    21,
+    "coop-2-fcb444f119733dd48aef5c28f13cb78fc856be210f448c495109eb5987d70476",
+  ],
+  [
+    21,
+    "coop-2-15c753596aead2c7b8214074ea6ee123deffa20b96db9d73b4abd0e420548a55",
+  ],
 ] as const)(
   "retains independent parcel claims and cash from published schema%i",
   (schema, rules) => {

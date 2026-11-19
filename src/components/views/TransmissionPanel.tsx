@@ -836,14 +836,18 @@ export default function TransmissionPanel({
           game={game}
           targetId={acquisitionTargetId}
           onClose={() => setAcquisitionTargetId(null)}
-          onAcquire={async (payload) => {
-            const accepted = await onAcquire?.(payload);
-            if (accepted) {
-              focusIntertiesAfterAcquisition.current = true;
-              setSelectedLine(null);
-            }
-            return !!accepted;
-          }}
+          onAcquire={
+            onAcquire
+              ? async (payload) => {
+                  const accepted = await onAcquire(payload);
+                  if (accepted) {
+                    focusIntertiesAfterAcquisition.current = true;
+                    setSelectedLine(null);
+                  }
+                  return !!accepted;
+                }
+              : undefined
+          }
         />
       )}
       {!projectsOnly && (

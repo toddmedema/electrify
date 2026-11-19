@@ -2,6 +2,7 @@ import {
   type AcquireLandAction,
   type AcquireTileAction,
   type TerritoryTileId,
+  type TerrainType,
   type DemandByTypeType,
   type LandTerritoryId,
   type FacilityShoppingType,
@@ -51,6 +52,8 @@ import {
   createTerritoryTileOwnership,
   createTerritoryTileAdjacency,
   ownedTerritoryTiles,
+  territoryHexDistance,
+  isGeneralBuildingLand,
   territoryTilePowerLimit,
 } from "./TerritoryTiles";
 export {
@@ -258,6 +261,19 @@ export function legacyTerritoryConnections(
   return game.territoryNetwork?.legacyConnections ?? [];
 }
 export const LAND_PRICE_2005 = 18e6;
+function landInflation(
+  game: Pick<GameType, "seed" | "startingYear">,
+  minute: number,
+): number {
+  return hasEconomy()
+    ? getInflationIndex(
+        getDateFromMinute(minute, game.startingYear),
+        2005,
+        game.seed,
+      )
+    : 1;
+}
+
 export function landPrice(
   game: Pick<GameType, "seed" | "startingYear">,
   minute: number,
@@ -265,16 +281,10 @@ export function landPrice(
 ): number {
   return (
     (getTerritoryDefinition(id)?.price2005 ?? LAND_PRICE_2005) *
-    (hasEconomy()
-      ? getInflationIndex(
-          getDateFromMinute(minute, game.startingYear),
-          2005,
-          game.seed,
-        )
-      : 1)
+    landInflation(game, minute)
   );
 }
-/** Historical whole-region pricing remains the validator for retained receipts only. */
+/** Parcel pricing for existing receipts, municipal acquisitions and named resource sites. */
 export function tilePrice(
   game: Pick<GameType, "seed" | "startingYear">,
   minute: number,
@@ -290,6 +300,35 @@ export function tilePrice(
   return landPrice(game, minute, tile.territoryId) / count;
 }
 type TerritoryTile = NonNullable<ReturnType<typeof getTerritoryTile>>;
+
+// DOE National Transmission Planning Study, chapter 3, table D-3.
+const lineTerrainCost: Partial<Record<TerrainType, number>> = {
+  plains: 1,
+  forest: 2.25,
+  hills: 1.4,
+  mountain: 1.75,
+};
+const CONNECTION_TERMINAL_COST_2005 = 2.4e6;
+const CONNECTION_LINE_COST_PER_HEX_2005 = 0.6e6;
+
+export function isOrdinaryTileConnection(tile: TerritoryTile): boolean {
+  return isGeneralBuildingLand(tile) && !municipalUtilityAt(tile);
+}
+
+export function ordinaryTileConnectionPrice(
+  game: Pick<GameType, "seed" | "startingYear">,
+  minute: number,
+  terrain: TerrainType,
+  distance: number,
+): number {
+  return (
+    (CONNECTION_TERMINAL_COST_2005 +
+      CONNECTION_LINE_COST_PER_HEX_2005 *
+        distance *
+        (lineTerrainCost[terrain] ?? 1)) *
+    landInflation(game, minute)
+  );
+}
 
 function availableLand(
   game: GameType,
@@ -310,9 +349,9 @@ function tilePurchaseContext(
   owns = createTerritoryTileOwnership(game),
 ) {
   const enabled = hasTerritoryNetwork(game);
-  const adjacent = createTerritoryTileAdjacency(
-    ownedTerritoryTiles(game, owns),
-  );
+  const owned = ownedTerritoryTiles(game, owns);
+  const adjacent = createTerritoryTileAdjacency(owned);
+  const cities = owned.filter(({ city }) => city);
   const eligible = (
     tile: TerritoryTile,
   ): tile is TerritoryTile & { territoryId: LandTerritoryId } =>
@@ -323,8 +362,27 @@ function tilePurchaseContext(
   const quote = (tile: TerritoryTile) => {
     if (!eligible(tile)) return undefined;
     const territory = getTerritoryDefinition(tile.territoryId)!;
-    const price = tilePrice(game, game.date.minute, tile.id);
     const baseCustomers = cityCustomerCount(tile.territoryId);
+    const minute = game.date.minute;
+    const connectionDistance = isOrdinaryTileConnection(tile)
+      ? Math.min(...cities.map((city) => territoryHexDistance(city, tile)))
+      : undefined;
+    const price =
+      connectionDistance === undefined
+        ? tilePrice(game, minute, tile.id)
+        : ordinaryTileConnectionPrice(
+            game,
+            minute,
+            tile.terrain,
+            connectionDistance,
+          );
+    const purchases = [
+      {
+        tileId: tile.id,
+        price,
+        ...(connectionDistance === undefined ? {} : { connectionDistance }),
+      },
+    ];
     return {
       tileId: tile.id,
       territoryId: tile.territoryId,
@@ -333,7 +391,7 @@ function tilePurchaseContext(
       customers: tile.city
         ? customerMarketSizeAt(baseCustomers, game.date.minute)
         : 0,
-      purchases: [{ tileId: tile.id, price }],
+      purchases,
       quoteKey: JSON.stringify([
         tile.id,
         price,

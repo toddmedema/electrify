@@ -1693,9 +1693,16 @@ function upgradeTerritoryWorld(value: unknown): unknown {
           "coop-2-c85efcd401375172030f9ab31b7b1f81f0ecf4f450732f36d86e265355e91bef" ||
           old.rules ===
             "coop-2-fdb701fc666648e148ecc4d6a02e4b2001090bc79052092a4e567ea9184714ef")) ||
+      // Published master 40c3cafc: coal repowers precede connection receipt pricing.
       (old.gameSchema === 20 &&
         old.rules ===
-          "coop-2-cf979e3b45deb328dd12a266f291e16398174095d47beca6df0d4f9da1dbd577")
+          "coop-2-cf979e3b45deb328dd12a266f291e16398174095d47beca6df0d4f9da1dbd577") ||
+      // Published master89557e6 and acquisition branch755cf1d9 share schema21.
+      (old.gameSchema === 21 &&
+        (old.rules ===
+          "coop-2-fcb444f119733dd48aef5c28f13cb78fc856be210f448c495109eb5987d70476" ||
+          old.rules ===
+            "coop-2-15c753596aead2c7b8214074ea6ee123deffa20b96db9d73b4abd0e420548a55"))
     ) ||
     !Array.isArray(old.grids) ||
     !old.grids.every(
@@ -1707,6 +1714,7 @@ function upgradeTerritoryWorld(value: unknown): unknown {
           old.gameSchema === 17 ||
           old.gameSchema === 19 ||
           old.gameSchema === 20 ||
+          old.gameSchema === 21 ||
           isUtilityExpansionGame(grid)),
     )
   )

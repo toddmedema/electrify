@@ -32,7 +32,17 @@ import type {
   UtilityTargetId,
 } from "../Types";
 import { copyOfficialGame } from "./OfficialScenarioExecutionFixtures";
-import { gameObjectiveResults } from "../helpers/ObjectiveRules";
+import {
+  gameObjectiveResults,
+  recordGameObjectiveMonth,
+  runFailure,
+} from "../helpers/ObjectiveRules";
+import {
+  EMPTY_HISTORY,
+  getDateFromMinute,
+  MINUTES_PER_MONTH,
+} from "../helpers/DateTime";
+import { SCENARIOS } from "../data/Scenarios";
 import { getMissionStatus } from "../helpers/MissionStatus";
 
 function ready(targetId: UtilityTargetId): GameType {
@@ -671,3 +681,46 @@ it.each(["storyEffectsDisabled", "weatherHazardsDisabled"] as const)(
     expect(roundtrip(game)).toEqual(JSON.parse(JSON.stringify(game)));
   },
 );
+
+function restoredAcquisitionDeadline() {
+  const game = buy(
+    buy(ready("ridge-electric"), "ridge-electric"),
+    "valley-electric",
+  );
+  game.territoryNetwork!.tilePurchases = [
+    { tileId: "parcel-1:city", minute: 0, price: 0 },
+  ];
+  game.date = getDateFromMinute(121 * MINUTES_PER_MONTH, game.startingYear);
+  game.monthlyHistory = Array.from({ length: 121 }, (_, month) => ({
+    ...EMPTY_HISTORY,
+    year: game.startingYear + Math.floor(month / 12),
+    month: (month % 12) + 1,
+    customers: 1e6,
+  })).reverse();
+  game.objectiveProgress = undefined;
+  return game;
+}
+
+it("restores acquisition deadline receipts during the month close fallback", () => {
+  const game = restoredAcquisitionDeadline();
+  recordGameObjectiveMonth(game, game.monthlyHistory[0]);
+  expect(
+    gameObjectiveResults(game).find(
+      ({ metric }) => metric === "utilityOwnership",
+    ),
+  ).toMatchObject({ status: "completed", observed: 3 });
+});
+
+it("restores acquisition deadline receipts during the verdict fallback", () => {
+  const game = restoredAcquisitionDeadline();
+  const scenario = SCENARIOS.find(({ id }) => id === 116)!;
+  expect(
+    runFailure(
+      game,
+      scenario,
+      game.monthlyHistory,
+      { cash: 1e9, minute: game.date.minute },
+      false,
+    ),
+  ).toBeUndefined();
+});

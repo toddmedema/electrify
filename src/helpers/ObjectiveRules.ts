@@ -723,6 +723,7 @@ export function recordGameObjectiveMonth(
       game.monthlyHistory.filter((existing) => existing !== row),
       { ...context, completedMonths: month },
       objectiveRetentionBaseline(game, scenario),
+      utilityAcquisitions(game),
     );
   const needsDebt = objectives.some(
     (objective) => objective.metric === "monthEndDebt",
@@ -906,6 +907,7 @@ export function runFailure(
         | "startingMonth"
         | "objectiveProgress"
         | "utilityExpansion"
+        | "territoryNetwork"
         | "scenarioId"
         | "customScenario"
         | "monthlyHistory"
@@ -945,6 +947,7 @@ export function runFailure(
       history,
       context,
       objectiveRetentionBaseline(game, scenario),
+      utilityAcquisitions(game),
     );
   const results = inheritedResultReasons(
     evaluateScenarioObjectives(objectives, progress, context),

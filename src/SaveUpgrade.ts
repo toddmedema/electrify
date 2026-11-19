@@ -393,7 +393,10 @@ const migrations: readonly Migration[] = [
   (save) => save,
   // 19 -> 20: coal repowers extend the upgrade record. Existing projects are unchanged.
   (save) => save,
-  // 20 -> 21: rebuild the Valley's scored goals from saved customer history and purchase receipts.
+  // 20 -> 21: new ordinary tile receipts include connection distance. Existing receipts
+  // keep their original parcel pricing and need no new field.
+  (save) => save,
+  // 21 -> 22: rebuild the Valley's scored goals from saved customer history and purchase receipts.
   (save) => {
     if (!object(save.game)) return null;
     if (

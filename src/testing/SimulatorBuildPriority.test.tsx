@@ -75,17 +75,19 @@ test("scheduled reserve orders use the same placement contract", () => {
 test("a rejected later land order cannot pass because an earlier parcel was purchased", () => {
   const options = {
     scenarioId: 116,
-    scenario: { ...getScenario(116)!, cash: 3e6 },
+    scenario: { ...getScenario(116)!, cash: 1e9 },
     months: 1,
   };
   const before = createGame(options);
   const first = landPurchaseQuote(before, "green-uplands")!;
+  options.scenario.cash = first.price;
+  currentTick(before)!.cash = first.price;
   const paid = gameReducer(
     before,
     acquireLand({ territoryId: first.territoryId, quoteKey: first.quoteKey }),
   );
   expect(paid.territoryNetwork!.tilePurchases).toEqual([
-    { tileId: first.tileId, minute: before.date.minute, price: first.price },
+    { ...first.purchases[0], minute: before.date.minute },
   ]);
   expect(currentTick(paid)!.cash).toBe(options.scenario.cash - first.price);
   const second = landPurchaseQuote(paid, "green-uplands")!;

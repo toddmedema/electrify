@@ -49,10 +49,14 @@ tile. Acquired utility land and retained paid property both qualify as company
 land for adjacent connections within the board.
 Prices use 2005 dollars, indexed by the existing seeded CPI:
 
-- General building tiles cost $3 million each. The original larger land area's
-  seven tiles cost one seventh of its former $18 million price each. Any ordinary
-  onshore generator or storage technology can use general sites, subject to
-  terrain siting allowances and normal technology and quote limits.
+- Ordinary building land costs **$2.4 million plus $600,000 per hex** from the
+  nearest city you own. The line cost per hex is multiplied by **1.00** on plains,
+  **2.25** in forest, **1.40** in hills or **1.75** in mountains, using the
+  terrain of the tile you connect. A plains tile costs $3 million at one hex and
+  $4.8 million at four. Owning a closer city can lower later quotes. Municipal
+  plant sites keep their parcel pricing as part of the utility acquisition.
+  Ordinary onshore generators and storage can use general sites within the
+  usual siting and technology limits.
 - Medium cities cost $32 million and add 16,000 customer accounts at the
   scenario's opening date. Small cities cost $12 million and add 400 service accounts,
   each with demand equivalent to 20 ordinary accounts. Account transfers scale with
@@ -63,6 +67,17 @@ Prices use 2005 dollars, indexed by the existing seeded CPI:
   Facility construction is a separate purchase using the existing technologies,
   construction schedules and operating models. A commissioned hydro site remains
   consumed after the plant is retired.
+
+The fixed hookup and per-distance line cost follow the structure of
+[NREL's bottom-up transmission cost model, §§4.3.7–8](https://www.nrel.gov/docs/fy23osti/84875.pdf#page=24).
+[MISO's 2024 cost guide, Tables 4.1-1 and 4.2-1/2](https://cdn.misoenergy.org/MISO%20Transmission%20Cost%20Estimation%20Guide%20for%20MTEP24337433.pdf)
+estimates $1.8–2.2 million per mile for 115 kV overhead line and $8.3 million
+for a new four-position 115 kV substation. The board uses schematic hex distance.
+The game sets the one-hex plains cost at $3 million with a 20% line share.
+The line terrain ratios come from the
+[U.S. DOE National Transmission Planning Study, Chapter 3, Table D-3](https://www.energy.gov/sites/default/files/2024-10/NationalTransmissionPlanningStudy-Chapter3.pdf).
+The study models clearing and access in forests as more expensive than the
+mountain category. The game uses the destination terrain as a proxy for the route.
 
 Land has no construction clock or recurring upkeep. Its dated receipt records the
 price, and land remains a non-depreciating capital asset. Exchanging cash for land
