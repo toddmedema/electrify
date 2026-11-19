@@ -224,24 +224,25 @@ it("finances added capacity independently, settles its equity on cancellation an
     3,
   );
 
-  advancing.facilities[0].expansionInProgress!.yearsToBuildLeft =
+  const completing = cloneDeep(advancing);
+  completing.facilities[0].expansionInProgress!.yearsToBuildLeft =
     YEARS_PER_TICK / 2;
-  tickState(advancing);
-  expect(advancing.facilities[0].peakW).toBe(targetSize);
-  expect(advancing.facilities[0].expansionInProgress).toBeUndefined();
-  expect(advancing.facilities[0].expansionLoans).toHaveLength(1);
+  tickState(completing);
+  expect(completing.facilities[0].peakW).toBe(targetSize);
+  expect(completing.facilities[0].expansionInProgress).toBeUndefined();
+  expect(completing.facilities[0].expansionLoans).toHaveLength(1);
   const completed = parseSave(
-    JSON.parse(JSON.stringify(serializeSave(advancing))),
+    JSON.parse(JSON.stringify(serializeSave(completing))),
   );
   expect(completed?.game.facilities[0].expansionLoans).toEqual(
-    advancing.facilities[0].expansionLoans,
+    completing.facilities[0].expansionLoans,
   );
   const saleEquity = facilityCashBack(
-    advancing.facilities[0],
-    advancing.date.minute,
+    completing.facilities[0],
+    completing.date.minute,
   );
-  expect(currentCash(reducer(advancing, sellFacility(plant.id)))).toBeCloseTo(
-    currentCash(advancing) + saleEquity,
+  expect(currentCash(reducer(completing, sellFacility(plant.id)))).toBeCloseTo(
+    currentCash(completing) + saleEquity,
     3,
   );
 });

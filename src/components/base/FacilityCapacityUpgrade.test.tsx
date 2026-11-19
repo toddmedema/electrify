@@ -8,6 +8,8 @@ import {
   within,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { Provider } from "react-redux";
+import { store } from "../../Store";
 import cloneDeep from "lodash.clonedeep";
 import { ThemeProvider, createTheme } from "@mui/material";
 import { createGame } from "../../testing/Simulator";
@@ -58,15 +60,17 @@ function show(storage = false, openOnMount = false) {
     components: { MuiButtonBase: { defaultProps: { disableRipple: true } } },
   });
   const content = (game: GameType) => (
-    <ThemeProvider theme={theme}>
-      <FacilityCapacityUpgrade
-        game={game}
-        facility={game.facilities.find(({ id }) => id === setup.facility.id)!}
-        openOnMount={openOnMount}
-        onExpand={onExpand}
-        onCancelExpansion={onCancelExpansion}
-      />
-    </ThemeProvider>
+    <Provider store={store}>
+      <ThemeProvider theme={theme}>
+        <FacilityCapacityUpgrade
+          game={game}
+          facility={game.facilities.find(({ id }) => id === setup.facility.id)!}
+          openOnMount={openOnMount}
+          onExpand={onExpand}
+          onCancelExpansion={onCancelExpansion}
+        />
+      </ThemeProvider>
+    </Provider>
   );
   const view = render(content(setup.game));
   return {
