@@ -761,7 +761,55 @@ it("reconciles completed and canceled work on an acquired plant without relaxing
   ).toEqual(savedPlant);
   savedPlant.peakW += 1;
   expect(parseSave(saved)).toBeNull();
+
+  savedPlant.peakW = operated.peakW;
+  savedPlant.acquiredExpansion!.investedCapital = 1e16;
+  savedPlant.buildCost = plant.buildCost + 1e16;
+  expect(parseSave(saved)).toBeNull();
 });
+
+it.each([
+  ["biomass", 12e6, 51e6],
+  ["oil", 28e6, 1.1e9],
+] as const)(
+  "rejects completed acquired %s expansion above its allowable capacity",
+  (asset, target, oversized) => {
+    const game = setup(116);
+    const acquisition = acquisitionQuote(game, "valley-electric")!;
+    const bought = cloneDeep(
+      reducer(
+        game,
+        acquireUtility({
+          targetId: "valley-electric",
+          financed: false,
+          quoteKey: acquisition.quoteKey,
+        }),
+      ),
+    );
+    const plant = bought.facilities.find(
+      ({ startingAssetId }) =>
+        startingAssetId === `scenario-116-valley-${asset}`,
+    )!;
+    expect(facilityExpansionQuote(bought, plant.id, oversized).status).toBe(
+      "unavailable",
+    );
+    const expanded = begin(bought, plant.id, target);
+    expanded.facilities.find(
+      ({ id }) => id === plant.id,
+    )!.expansionInProgress!.yearsToBuildLeft = YEARS_PER_TICK / 2;
+    tickState(expanded);
+    const saved = cloneDeep(serializeSave(expanded));
+    expect(parseSave(saved)).not.toBeNull();
+
+    const installed = saved.game.facilities.find(({ id }) => id === plant.id)!;
+    const account = installed.acquiredExpansion!;
+    installed.peakW = oversized;
+    account.addedCapacityW = oversized - plant.peakW;
+    installed.buildCost += 1e6;
+    account.investedCapital += 1e6;
+    expect(parseSave(saved)).toBeNull();
+  },
+);
 
 it("binds a new expansion to the particular installation when a facility ID is reused", () => {
   const original = setup();

@@ -1,5 +1,9 @@
 import { landCustomerMarket } from "./TerritoryCustomers";
 import {
+  MAX_FACILITY_EXPANSION_COST,
+  validExpandedFacilityCapacity,
+} from "./FacilityExpansion";
+import {
   isStorage,
   type FacilityOperatingType,
   type GameType,
@@ -56,6 +60,7 @@ const obsoleteAreaState = (game: GameType) =>
   );
 
 function validAcquiredFacilityExpansion(
+  game: GameType,
   facility: FacilityOperatingType,
   inherited: FacilityOperatingType,
 ): boolean {
@@ -74,11 +79,13 @@ function validAcquiredFacilityExpansion(
     constructionKgco2eTotal,
     constructionKgco2eEmitted,
   } = expansion;
+  const sequence = facility.expansionSequence;
+  if (!sequence || !Number.isSafeInteger(sequence)) return false;
+  const settledProjects = sequence - (facility.expansionInProgress ? 1 : 0);
   const hasAddedCapacity = addedCapacityW > 0;
   const hasInvestedCapital = investedCapital > 0;
   return (
-    Number.isSafeInteger(facility.expansionSequence) &&
-    facility.expansionSequence! > (facility.expansionInProgress ? 1 : 0) &&
+    settledProjects > 0 &&
     [
       addedCapacityW,
       investedCapital,
@@ -86,8 +93,16 @@ function validAcquiredFacilityExpansion(
       constructionKgco2eEmitted,
     ].every(nonnegative) &&
     hasAddedCapacity === hasInvestedCapital &&
+    (!hasAddedCapacity ||
+      validExpandedFacilityCapacity(
+        game,
+        facility,
+        facility.peakW,
+        facility.peakWh,
+      )) &&
+    investedCapital / settledProjects <= MAX_FACILITY_EXPANSION_COST &&
     (hasAddedCapacity || constructionKgco2eTotal > 0) &&
-    constructionKgco2eEmitted <= constructionKgco2eTotal &&
+    close(constructionKgco2eEmitted, constructionKgco2eTotal) &&
     close(facility.peakW, inherited.peakW + addedCapacityW) &&
     close(facility.buildCost, inherited.buildCost + investedCapital) &&
     facility.constructionKgco2eTotal === constructionKgco2eTotal &&
@@ -294,7 +309,8 @@ export function validUtilityExpansion(
       (facility.name !== expected.name ||
         facility.fuel !== expected.fuel ||
         facility.gasCycle !== expected.gasCycle ||
-        !validAcquiredFacilityExpansion(facility, expected) ||
+        isStorage(facility) !== isStorage(expected) ||
+        !validAcquiredFacilityExpansion(game, facility, expected) ||
         facility.minuteOperational !== expected.minuteOperational ||
         facility.minuteCreated !== expected.minuteCreated ||
         facility.loanAmountLeft !== 0 ||

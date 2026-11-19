@@ -27,6 +27,7 @@ import {
 // Pumped hydro reaches twelve base years at the 1 TWh input cap. Scenario modifiers
 // can multiply that duration by ten; difficulty can only shorten it.
 const MAX_EXPANSION_CONSTRUCTION_YEARS = 120;
+export const MAX_FACILITY_EXPANSION_COST = 1e15;
 
 export type FacilityExpansionQuote =
   | ({
@@ -190,6 +191,7 @@ export function facilityExpansionQuote(
         ((target.peakWh ?? 0) - (current.peakWh ?? 0)),
   );
   if (
+    cost > MAX_FACILITY_EXPANSION_COST ||
     yearsToBuild > MAX_EXPANSION_CONSTRUCTION_YEARS ||
     ![cost, yearsToBuild, targetPeakW].every(
       (value) => Number.isFinite(value) && value > 0,
@@ -308,6 +310,38 @@ export function completeFacilityExpansion(
   delete facility.expansionInProgress;
 }
 
+/** Keep accepted expansion capacity inside its technology and physical site limits. */
+export function validExpandedFacilityCapacity(
+  game: GameType,
+  facility: FacilityOperatingType,
+  targetPeakW: number,
+  targetPeakWh?: number,
+): boolean {
+  const hydro = facility.fuel === "Hydro" && !isStorage(facility);
+  const hydroSite = hydro
+    ? getHydroSite(facility.hydroSiteId ?? "")
+    : undefined;
+  const maxSize = isStorage(facility)
+    ? storageMaxPeakWh(facility.name, game.date.year)
+    : generatorMaxPeakW(game, facility.name, hydroSite?.maxPeakW);
+  if (
+    (targetPeakWh ?? targetPeakW) > Math.min(1e12, maxSize) ||
+    targetPeakW > 1e12 ||
+    (hydro && (!hydroSite || !validHydroCapacity(targetPeakW)))
+  )
+    return false;
+  if (!hasTerritoryNetwork(game)) return true;
+  const tile = facility.tileId && getTerritoryTile(facility.tileId, game);
+  return (
+    !!tile &&
+    tileFitsFacility(tile, {
+      ...facility,
+      peakW: targetPeakW,
+      peakWh: targetPeakWh,
+    })
+  );
+}
+
 /** Save validation deliberately uses no loaded weather/fuel tables. */
 export function validFacilityExpansion(
   facility: FacilityOperatingType,
@@ -339,13 +373,17 @@ export function validFacilityExpansion(
   ];
   if (Object.keys(raw).some((key) => !allowed.includes(key))) return false;
   if (
-    ![raw.targetSize, raw.targetPeakW, raw.cost, raw.yearsToBuild].every(
+    ![raw.targetSize, raw.targetPeakW, raw.yearsToBuild].every(
       (value) =>
         typeof value === "number" &&
         Number.isFinite(value) &&
         value > 0 &&
         value <= 1e15,
-    )
+    ) ||
+    typeof raw.cost !== "number" ||
+    !Number.isFinite(raw.cost) ||
+    raw.cost <= 0 ||
+    raw.cost > MAX_FACILITY_EXPANSION_COST
   )
     return false;
   if (
@@ -371,8 +409,6 @@ export function validFacilityExpansion(
     raw.projectSequence !== facility.expansionSequence ||
     facility.yearsToBuildLeft !== 0 ||
     facility.upgradeInProgress ||
-    raw.targetSize > 1e12 ||
-    raw.targetPeakW > 1e12 ||
     raw.targetSize <= (facility.peakWh ?? facility.peakW) ||
     raw.targetPeakW <= facility.peakW ||
     raw.yearsToBuild > MAX_EXPANSION_CONSTRUCTION_YEARS ||
@@ -405,14 +441,15 @@ export function validFacilityExpansion(
     ...game,
     date: getDateFromMinute(raw.startsMinute, game.startingYear),
   };
-  const maxSize = isStorage(facility)
-    ? storageMaxPeakWh(facility.name, projectContext.date.year)
-    : generatorMaxPeakW(
-        projectContext,
-        facility.name,
-        getHydroSite(facility.hydroSiteId ?? "")?.maxPeakW,
-      );
-  if (raw.targetSize > maxSize) return false;
+  if (
+    !validExpandedFacilityCapacity(
+      projectContext,
+      facility,
+      raw.targetPeakW,
+      raw.targetPeakWh,
+    )
+  )
+    return false;
   if (isStorage(facility)) {
     const expectedPeakW =
       facility.peakW +
@@ -460,27 +497,5 @@ export function validFacilityExpansion(
   const maximumEmissions =
     (raw.targetPeakW - facility.peakW) * 20 +
     (isStorage(facility) ? raw.targetSize - facility.peakWh : 0);
-  if ((raw.constructionKgco2eTotal ?? 0) > maximumEmissions) return false;
-  if (hasTerritoryNetwork(game)) {
-    const tile = facility.tileId && getTerritoryTile(facility.tileId, game);
-    if (
-      !tile ||
-      !tileFitsFacility(tile, {
-        ...facility,
-        peakW: raw.targetPeakW,
-        peakWh: raw.targetPeakWh,
-      })
-    )
-      return false;
-  }
-  if (facility.fuel === "Hydro" && !isStorage(facility)) {
-    const site = facility.hydroSiteId && getHydroSite(facility.hydroSiteId);
-    if (
-      !site ||
-      !validHydroCapacity(raw.targetPeakW) ||
-      raw.targetPeakW > site.maxPeakW
-    )
-      return false;
-  }
-  return true;
+  return (raw.constructionKgco2eTotal ?? 0) <= maximumEmissions;
 }
