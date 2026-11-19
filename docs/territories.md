@@ -71,8 +71,9 @@ Ordinary inspection offers one clearly priced **Connect** action. “Connection 
 is the same instant land transaction described above; the wording adds no line
 capacity, recurring fee or construction delay. The explicit
 **Rapid connection mode** icon toggles price labels and supports repeated purchases without
-opening construction after each one. Its pressed state remains on until toggled off;
-dragging, focus changes and arrow navigation never spend cash. Both entry points
+opening construction after each one. A successful purchase keeps the mode on.
+Toggle it off, press Escape with focus on the map, or start planning a project
+to exit. Dragging, focus changes and arrow navigation never spend cash. Both entry points
 share pending commitments, and co-op ownership appears only after host acceptance.
 
 The historical industrial, wind and open-land labels all describe ordinary
@@ -128,8 +129,9 @@ carbon. Co-op commands and save validation bind each project to its own identity
 
 Producing plants use a green plus, idle plants a red minus, and active 3D models
 gain saturation and illuminated windows. Charging remains a separate storage state.
-The bottom-right **Map layers** menu independently controls operating, idle/paused
-and construction markers. These preferences only affect badges.
+The bottom-right **Map layers** menu has one **Facility status** checkbox for
+operating, idle, paused and construction markers, along with city-name labels.
+Facility operation continues when the overlay is hidden.
 
 The relative allowances draw on primary-source mechanisms rather than equal-area
 engineering comparisons. [NREL's solar land-use study (2013)](https://docs.nlr.gov/docs/fy13osti/56290.pdf)

@@ -36,9 +36,10 @@ explicit confirmation connects the site and starts construction.
 The map stays visible while Fleet, Agreements and the other dock icons open one
 inspection or tool panel; selecting the active icon closes that panel. There is no
 separate Map button. Acquiring land
-or connecting to a utility reveals three further hexes, with progressively faded
-terrain and structures. Coordinate-based generation extends the map as players
-expand. The wires are visual and add no transmission management. Utility names
+or connecting to a utility reveals up to three hexes farther into the fixed
+196-hex board, with progressively faded terrain and structures. Coordinate-based
+generation restores terrain recorded in older saves. The wires are visual and add
+no transmission management. Utility names
 float above their land, with the player labeled “You” and distinct ownership borders.
 Neutral land has no proper name; symbols show its benefit. Native map buttons support
 keyboard, touch and controller selection without a numbered key.

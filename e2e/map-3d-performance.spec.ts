@@ -248,6 +248,8 @@ interface GpuProbe {
   enabled: boolean;
   milliseconds: number[];
   disjoint: number;
+  discarded: number;
+  finish: () => void;
 }
 interface MapProbe {
   gaps: number[];
@@ -291,15 +293,14 @@ async function installGpuProbe(page: Page) {
         enabled: false,
         milliseconds: [],
         disjoint: 0,
+        discarded: 0,
+        finish: () => undefined,
       };
       window.__mapGpuProbe = probe;
       if (!extension) return value;
       const pending: WebGLQuery[] = [];
       let active = false;
-      const draw = gl.drawArraysInstanced.bind(gl);
-      gl.drawArraysInstanced = (
-        ...args: Parameters<WebGL2RenderingContext["drawArraysInstanced"]>
-      ) => {
+      const collect = () => {
         while (
           pending.length &&
           gl.getQueryParameter(pending[0], gl.QUERY_RESULT_AVAILABLE)
@@ -312,6 +313,17 @@ async function installGpuProbe(page: Page) {
             );
           gl.deleteQuery(query);
         }
+      };
+      probe.finish = () => {
+        collect();
+        probe.discarded = pending.length;
+        for (const query of pending.splice(0)) gl.deleteQuery(query);
+      };
+      const draw = gl.drawArraysInstanced.bind(gl);
+      gl.drawArraysInstanced = (
+        ...args: Parameters<WebGL2RenderingContext["drawArraysInstanced"]>
+      ) => {
+        collect();
         if (probe.enabled && !active && pending.length < 16) {
           const query = gl.createQuery();
           if (query) {
@@ -394,6 +406,7 @@ async function beginWindow(page: Page) {
       const gpu = window.__mapGpuProbe!;
       gpu.milliseconds = [];
       gpu.disjoint = 0;
+      gpu.discarded = 0;
       gpu.enabled = true;
       raf = requestAnimationFrame(frame);
       probe.stop = () => {
@@ -401,6 +414,7 @@ async function beginWindow(page: Page) {
         observer.disconnect();
         longTasks.disconnect();
         gpu.enabled = false;
+        gpu.finish();
       };
     });
 }
@@ -418,6 +432,10 @@ function stats(values: readonly number[]) {
 test("production 3D frame evidence includes panning and real month rollovers", async ({
   page,
 }, info) => {
+  test.skip(
+    !process.env.E2E_BASE_URL,
+    "Set E2E_BASE_URL to a production build to collect timing evidence.",
+  );
   test.setTimeout(120000);
   await installGpuProbe(page);
   const { map, canvas, pause } = await startMap(page, "light");
@@ -456,6 +474,7 @@ test("production 3D frame evidence includes panning and real month rollovers", a
       () => window.__mapFrameProbe!.gaps.length,
     );
     for (const dx of [-box.width * 0.3, box.width * 0.3]) {
+      const before = await readTerritoryMapCamera(viewport);
       await page.mouse.move(box.x + box.width / 2, box.y + box.height * 0.35);
       await page.mouse.down();
       await page.mouse.move(
@@ -464,6 +483,13 @@ test("production 3D frame evidence includes panning and real month rollovers", a
         { steps: 12 },
       );
       await page.mouse.up();
+      await expect
+        .poll(
+          async () =>
+            (before.x - (await readTerritoryMapCamera(viewport)).x) *
+            Math.sign(dx),
+        )
+        .toBeGreaterThan(0.5);
     }
     const panned = await page.evaluate(
       () => window.__mapFrameProbe!.gaps.length,
@@ -479,7 +505,8 @@ test("production 3D frame evidence includes panning and real month rollovers", a
     const result = await page.evaluate(() => {
       const probe = window.__mapFrameProbe!;
       probe.stop();
-      return { ...probe, stop: undefined, gpu: window.__mapGpuProbe! };
+      const { finish: _finish, ...gpu } = window.__mapGpuProbe!;
+      return { ...probe, stop: undefined, gpu };
     });
     expect(result.gaps.length).toBeGreaterThan(30);
     expect(
@@ -500,6 +527,7 @@ test("production 3D frame evidence includes panning and real month rollovers", a
       cpuFrame: stats(result.cpu),
       gpuDraws: result.gpu.supported ? stats(result.gpu.milliseconds) : null,
       gpuDisjointSamples: result.gpu.disjoint,
+      gpuDiscardedQueries: result.gpu.discarded,
       maxDrawCalls: Math.max(...result.draws),
       maxTriangles: Math.max(...result.triangles),
       maxMeshes: Math.max(...result.meshes),
