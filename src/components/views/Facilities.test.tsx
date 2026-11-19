@@ -11,7 +11,7 @@ import {
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import * as React from "react";
-import { Provider } from "react-redux";
+import { Provider, useSelector } from "react-redux";
 import cloneDeep from "lodash.clonedeep";
 import { MINUTES_PER_MONTH, getTimeFromTimeline } from "../../helpers/DateTime";
 import gameReducer, {
@@ -45,9 +45,10 @@ import { formatMoneyConcise } from "../../helpers/Format";
 import { GAME_TO_REAL_YEARS, TICKS_PER_HOUR } from "../../Constants";
 import { purchaseTerms } from "../../helpers/Financials";
 import { modScenario } from "../../mods/ModScenario";
-import { expandFacility } from "../../reducers/GameActions";
+import { acquireUtility, expandFacility } from "../../reducers/GameActions";
 import { facilityExpansionQuote } from "../../helpers/FacilityExpansion";
 import { currentTick } from "../../helpers/GameSelectors";
+import { ownedUtility } from "../../helpers/Expansion";
 import {
   createWorld,
   checkpointWorld,
@@ -1500,6 +1501,79 @@ it.each([false, true])(
     expect(onAcquire).not.toHaveBeenCalled();
   },
 );
+
+it("returns focus to Interties after an acquisition removes the trading row", async () => {
+  const initialGame = createGame({ scenarioId: 116, seed: 12345 });
+  currentTick(initialGame)!.cash = 1e9;
+  const corridorId = "vt-champlain-ridge";
+  const quote = transmission.intertieBuildQuote(
+    corridorId,
+    initialGame.date.year,
+    1,
+    transmission.intertieContextForGame(initialGame),
+  )!;
+  initialGame.transmission!.lines = [
+    {
+      ...quote,
+      id: 1,
+      corridorId,
+      yearsToBuildLeft: 0,
+      minuteCreated: 0,
+      financed: false,
+      loanAmountLeft: 0,
+      loanMonthlyPayment: 0,
+      interestRate: initialGame.interestRate,
+      currentFlowW: 0,
+      paused: false,
+    },
+  ];
+  const store = configureStore({
+    reducer: { game: gameReducer, ui: uiReducer },
+    preloadedState: { game: initialGame },
+  });
+  function Interties() {
+    const game = useSelector(
+      (state: ReturnType<typeof store.getState>) => state.game,
+    );
+    return (
+      <TransmissionPanel
+        game={game}
+        onBuild={jest.fn()}
+        onUpgrade={jest.fn()}
+        onBuyingRule={jest.fn()}
+        onSellingRule={jest.fn()}
+        onAcquire={(payload) => {
+          store.dispatch(acquireUtility(payload));
+          return ownedUtility(store.getState().game, payload.targetId);
+        }}
+      />
+    );
+  }
+  render(
+    <Provider store={store}>
+      <Interties />
+    </Provider>,
+  );
+  const line = screen.getByRole("button", {
+    name: /^Inspect Champlain ↔ Ridge/,
+  });
+  await user.click(line);
+  const purchase = screen.getByRole("button", {
+    name: "Acquire Ridge Electric",
+  });
+  await user.click(purchase);
+  await user.click(screen.getByRole("button", { name: "Cancel" }));
+  expect(purchase).toHaveFocus();
+
+  await user.click(purchase);
+  const review = screen.getByRole("dialog", {
+    name: "Acquire Ridge Electric?",
+  });
+  await user.click(within(review).getByRole("button", { name: "Pay cash" }));
+  expect(review).not.toBeInTheDocument();
+  expect(line).not.toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "Interties" })).toHaveFocus();
+});
 
 describe("the intertie upgrade control", () => {
   /** A California run whose northern intertie is open and carrying power. */

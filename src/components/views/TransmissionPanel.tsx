@@ -682,11 +682,19 @@ export default function TransmissionPanel({
 }: TransmissionPanelProps) {
   const { formatMoneyConcise } = useMoney();
   const units = useUnits();
+  const intertiesHeadingRef = React.useRef<HTMLHeadingElement>(null);
+  const focusIntertiesAfterAcquisition = React.useRef(false);
   const projectsRef = React.useRef<HTMLUListElement>(null);
   const revealResizedRow = useBuildRowReveal(projectsRef);
   const [acquisitionTargetId, setAcquisitionTargetId] = React.useState<
     string | null
   >(null);
+  React.useEffect(() => {
+    if (acquisitionTargetId !== null || !focusIntertiesAfterAcquisition.current)
+      return;
+    focusIntertiesAfterAcquisition.current = false;
+    intertiesHeadingRef.current?.focus();
+  }, [acquisitionTargetId]);
   const [companyTargetId, setCompanyTargetId] = React.useState<string | null>(
     null,
   );
@@ -834,7 +842,10 @@ export default function TransmissionPanel({
           onClose={() => setAcquisitionTargetId(null)}
           onAcquire={async (payload) => {
             const accepted = await onAcquire(payload);
-            if (accepted) setSelectedLine(null);
+            if (accepted) {
+              focusIntertiesAfterAcquisition.current = true;
+              setSelectedLine(null);
+            }
             return accepted;
           }}
         />
@@ -843,6 +854,8 @@ export default function TransmissionPanel({
         <section aria-labelledby="your-interties-title">
           <Typography
             id="your-interties-title"
+            ref={intertiesHeadingRef}
+            tabIndex={-1}
             className="facilitySectionLabel"
             variant="subtitle2"
           >
