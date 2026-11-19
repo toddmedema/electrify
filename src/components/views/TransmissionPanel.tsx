@@ -292,7 +292,7 @@ function IntertieBuildItem(props: {
   year: number;
   onCompanyReview?: () => void;
 }): React.JSX.Element {
-  const { currency, formatMoneyConcise, formatPurchasePrice } = useMoney();
+  const { currency, formatPurchasePrice } = useMoney();
   const { cash, corridor, outlook, units } = props;
   const market = adjacentMarketForCorridor(corridor.id);
   const name = market?.name || corridor.name;

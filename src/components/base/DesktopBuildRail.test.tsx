@@ -156,7 +156,7 @@ it("opens sizing on hover and keeps it open after a click until an outside press
     expect(slider).not.toHaveFocus();
     const sizing = screen.getByRole("region", { name: "Energy sizing" });
     expect(sizing).toHaveTextContent(/^$/);
-    expect(sizing.firstElementChild).toBe(slider);
+    expect(within(sizing).queryByRole("button")).not.toBeInTheDocument();
     fireEvent.mouseLeave(trigger);
     fireEvent.mouseEnter(sizing);
     act(() => jest.advanceTimersByTime(200));

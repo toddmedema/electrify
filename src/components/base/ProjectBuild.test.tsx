@@ -157,9 +157,11 @@ it("rejects a payment when cash changed after the displayed quote", () => {
   adjacent();
   const newer = JSON.parse(JSON.stringify(store.getState().game)) as GameType;
   currentTick(newer)!.cash -= 1;
+  const pay = screen.getByRole("button", { name: "Cash" });
+  // Click while React is still showing the preceding store snapshot.
   act(() => {
     store.dispatch(replace(newer));
-    fireEvent.click(screen.getByRole("button", { name: "Cash" }));
+    pay.click();
   });
   expect(
     screen.getByText("Project changed. Check the updated costs before paying."),
