@@ -1,6 +1,10 @@
 import { GENERATORS, STORAGE } from "../data/Facilities";
 import { createGame } from "../testing/Simulator";
 import { cityProfile } from "./CityProfiles";
+import {
+  availableTerritoryTiles,
+  territoryTilePowerLimit,
+} from "./TerritoryTiles";
 import { currentTick } from "./GameSelectors";
 import {
   hasTerritoryNetwork,
@@ -138,6 +142,45 @@ it("reserves shared general sites through construction and pause; selling frees 
     territoryBuildAvailability(game, battery, "green-uplands").buildable,
   ).toBe(true);
 });
+it("offers the size limit of a free compatible tile with a different legacy site label", () => {
+  const game = ready();
+  const solar = GENERATORS(game, 20e6, [], []).find(
+    ({ name }) => name === "Solar",
+  )!;
+  const smallOptions = availableTerritoryTiles(game, solar, "champlain");
+  const limited = smallOptions.find(
+    (tile) =>
+      tile.siteKind !== "open-land" &&
+      territoryTilePowerLimit(tile, solar) < 100e6,
+  )!;
+  const occupied = availableTerritoryTiles(
+    game,
+    { ...solar, peakW: 1 },
+    "champlain",
+  )
+    .filter(({ id }) => id !== limited.id)
+    .map(({ id }, index) => ({
+      ...game.facilities[0],
+      id: 1000 + index,
+      tileId: id,
+    }));
+  game.facilities.push(...occupied);
+  const large = territoryBuildAvailability(
+    game,
+    { ...solar, peakW: 100e6 },
+    "champlain",
+  );
+  expect(large).toMatchObject({
+    buildable: false,
+    remaining: 1,
+    maxPeakW: territoryTilePowerLimit(limited, solar),
+    reason: "This project exceeds the territory’s per-site power limit.",
+  });
+  expect(territoryBuildAvailability(game, solar, "champlain").tileId).toBe(
+    limited.id,
+  );
+});
+
 it("retains utility sector demand weights while using a single company demand total", () => {
   const game = ready();
   const quote = acquisitionQuote(game, "ridge-electric")!;

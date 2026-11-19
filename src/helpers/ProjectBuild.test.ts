@@ -1,5 +1,8 @@
 import { TERRITORY_TILES } from "../data/TerritoryTiles";
-import { tileFitsFacility } from "./TerritoryTiles";
+import {
+  createTerritoryTileOwnership,
+  tileFitsFacility,
+} from "./TerritoryTiles";
 import { createGame } from "../testing/Simulator";
 import { currentTick } from "./GameSelectors";
 import { GENERATORS, STORAGE } from "../data/Facilities";
@@ -50,6 +53,21 @@ it("offers terrain-bounded map catalogue maxima while retaining lower technology
       ?.maxPeakW,
   ).toBe(1500e6);
 });
+it("can offer the map's hydro ceiling after all owned sites have been commissioned", () => {
+  const { game } = fixture();
+  const owns = createTerritoryTileOwnership(game);
+  game.commissionedHydroSiteIds = TERRITORY_TILES.flatMap((tile) =>
+    owns(tile) && tile.hydroSiteId ? [tile.hydroSiteId] : [],
+  );
+  const hydro = (facilities: ReturnType<typeof GENERATORS>) =>
+    facilities.find(({ name }) => name === "Hydro");
+  expect(hydro(GENERATORS(game, 100e6, [], []))?.maxPeakW).toBe(0);
+  expect(
+    projectCatalogue(game, 100e6, false).find(({ name }) => name === "Hydro")!
+      .maxPeakW,
+  ).toBeGreaterThan(0);
+});
+
 it("quotes compatible connected and purchasable sites without spending or changing the project", () => {
   const { game, project } = fixture();
   const cash = currentTick(game)!.cash;
