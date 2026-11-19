@@ -1838,6 +1838,49 @@ it("updates quoted build costs when the local currency context changes", () => {
   ).toBeInTheDocument();
 });
 
+it("keeps the tile purchase review open when the host rejects construction", async () => {
+  const game = createGame({ scenarioId: 116, seed: 611 });
+  game.timeline[0].cash = 1e12;
+  const wind = GENERATORS(game, 30e6, [], []).find(
+    ({ name }) => name === "Wind",
+  )!;
+  const tile = availableTerritoryTiles(game, wind, "champlain")[0];
+  const onBack = jest.fn();
+  const onBuildGenerator = jest
+    .fn()
+    .mockResolvedValueOnce({
+      status: "rejected",
+      message: "This site was just occupied.",
+    })
+    .mockResolvedValueOnce({ status: "accepted", facilityId: 123 });
+  const memory = new Map<string, unknown>([
+    ["generators.size", wToSliderTick(30e6)],
+  ]);
+  render(
+    <GameToolMemoryContext.Provider value={memory}>
+      <BuildGenerators
+        game={game}
+        lockedTileId={tile.id}
+        onBack={onBack}
+        onBuildGenerator={onBuildGenerator}
+      />
+    </GameToolMemoryContext.Provider>,
+  );
+  fireEvent.click(
+    screen.getByRole("button", { name: "Review purchase of Wind" }),
+  );
+  const dialog = screen.getByRole("dialog");
+  const pay = within(dialog).getByRole("button", { name: "Pay cash" });
+  fireEvent.click(pay);
+  expect(await within(dialog).findByRole("alert")).toHaveTextContent(
+    "This site was just occupied.",
+  );
+  expect(onBack).not.toHaveBeenCalled();
+  expect(pay).toBeEnabled();
+  fireEvent.click(pay);
+  await waitFor(() => expect(onBack).toHaveBeenCalledTimes(1));
+});
+
 it("locks the tile catalogue to its activated tile without destination pickers", () => {
   const game = createGame({ scenarioId: 116, seed: 611 });
   game.timeline[0].cash = 1e12;

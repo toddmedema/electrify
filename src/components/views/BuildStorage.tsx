@@ -49,7 +49,10 @@ import {
   getSiteInventory,
   siteCountLabel,
 } from "../base/BuildAvailability";
-import BuildPurchaseReviewDialog from "../base/BuildPurchaseReviewDialog";
+import BuildPurchaseReviewDialog, {
+  finishBuildReview,
+  type FacilityPurchaseSubmission,
+} from "../base/BuildPurchaseReviewDialog";
 import BuildMetric from "../base/BuildMetric";
 import {
   formatLargeMassValueConcise,
@@ -87,7 +90,8 @@ interface StorageBuildItemProps {
   tileId?: TerritoryTileId;
   lockedTile?: boolean;
   onUseMaxSize: (peakWh: number) => void;
-  onBuild: (financed: boolean) => void;
+  onBuild: (financed: boolean) => FacilityPurchaseSubmission;
+  onBuilt?: () => void;
 }
 
 export function StorageBuildItem(
@@ -339,10 +343,12 @@ export function StorageBuildItem(
         upkeepPerMonth={storage.annualOperatingCost / 12}
         upkeepDetail="Plus charging and loan payments."
         onlineInMonths={Math.round(storage.yearsToBuild * 12)}
-        onPurchase={(financed) => {
-          props.onBuild(financed);
-          setOpen(false);
-        }}
+        onPurchase={(financed) =>
+          finishBuildReview(props.onBuild(financed), () => {
+            setOpen(false);
+            props.onBuilt?.();
+          })
+        }
         extraFacts={[
           {
             concept: "storage",
@@ -399,7 +405,7 @@ export interface DispatchProps {
     financed: boolean,
     territoryId?: TerritoryId,
     tileId?: TerritoryTileId,
-  ) => void;
+  ) => FacilityPurchaseSubmission;
   onBack: () => void;
 }
 
@@ -550,15 +556,15 @@ function StorageBuildDialog(props: Props): React.JSX.Element {
             location={game.location}
             onBuild={(financed: boolean) => {
               if (territoryNetwork)
-                props.onBuildStorage(
+                return props.onBuildStorage(
                   g,
                   financed,
                   territoryId,
                   tileId ?? territoryAvailabilityByName.get(g.name)?.tileId,
                 );
-              else props.onBuildStorage(g, financed);
-              (completeBuild ?? onBack)();
+              return props.onBuildStorage(g, financed);
             }}
+            onBuilt={completeBuild ?? onBack}
           />
         ))}
       </List>

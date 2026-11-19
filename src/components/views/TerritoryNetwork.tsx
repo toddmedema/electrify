@@ -247,9 +247,7 @@ function TileNetwork(props: Props) {
       financed: boolean,
       territoryId?: TerritoryId,
       tileId?: TerritoryTileId,
-    ) => {
-      dispatch(purchaseFacility(facility, financed, territoryId, tileId));
-    },
+    ) => dispatch(purchaseFacility(facility, financed, territoryId, tileId)),
     [dispatch],
   );
   const sizeChanged = React.useCallback(() => {

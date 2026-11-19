@@ -118,7 +118,10 @@ import BuildMetric from "../base/BuildMetric";
 import ConstructionBuildHeader from "../base/ConstructionBuildHeader";
 import useBuildRowReveal from "../base/useBuildRowReveal";
 import { getLegacyBuildBounds } from "../../data/LegacyEra";
-import BuildPurchaseReviewDialog from "../base/BuildPurchaseReviewDialog";
+import BuildPurchaseReviewDialog, {
+  finishBuildReview,
+  type FacilityPurchaseSubmission,
+} from "../base/BuildPurchaseReviewDialog";
 import Sparkline from "../base/Sparkline";
 import InteractiveSparkline from "../base/InteractiveSparkline";
 
@@ -264,7 +267,11 @@ interface GeneratorBuildItemProps {
   withResilience?: (
     selection: ResilienceSelectionType,
   ) => GeneratorShoppingType;
-  onBuild: (financed: boolean, selection?: ResilienceSelectionType) => void;
+  onBuild: (
+    financed: boolean,
+    selection?: ResilienceSelectionType,
+  ) => FacilityPurchaseSubmission;
+  onBuilt?: () => void;
 }
 
 export function GeneratorBuildItem(
@@ -824,10 +831,18 @@ export function GeneratorBuildItem(
         upkeepLabel="Maintenance"
         upkeepPerMonth={estimatedAnnualOperatingCost(quote) / 12}
         onlineInMonths={Math.round(generator.yearsToBuild * 12)}
-        onPurchase={(financed) => {
-          props.onBuild(financed, hasOptions ? resilienceSelection : undefined);
-          setOpen(false);
-        }}
+        onPurchase={(financed) =>
+          finishBuildReview(
+            props.onBuild(
+              financed,
+              hasOptions ? resilienceSelection : undefined,
+            ),
+            () => {
+              setOpen(false);
+              props.onBuilt?.();
+            },
+          )
+        }
         preface={
           <>
             {props.territoryId && (
@@ -1045,7 +1060,7 @@ export interface DispatchProps {
     financed: boolean,
     territoryId?: TerritoryId,
     tileId?: TerritoryTileId,
-  ) => void;
+  ) => FacilityPurchaseSubmission;
   onBack: () => void;
   onSizeChange?: () => void;
 }
@@ -1503,15 +1518,15 @@ function BuildGenerators(props: Props): React.JSX.Element {
                       ? g
                       : withResilienceOptions(g, game, selection);
                   if (territoryNetwork)
-                    props.onBuildGenerator(
+                    return props.onBuildGenerator(
                       selected,
                       financed,
                       territoryId,
                       tileId ?? territoryAvailabilityByName.get(g.name)?.tileId,
                     );
-                  else props.onBuildGenerator(selected, financed);
-                  (completeBuild ?? onBack)();
+                  return props.onBuildGenerator(selected, financed);
                 }}
+                onBuilt={completeBuild ?? onBack}
               />
             </React.Fragment>
           );

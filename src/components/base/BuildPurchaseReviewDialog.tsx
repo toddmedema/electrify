@@ -10,6 +10,7 @@ import {
   formatForecastWatts,
   formatForecastWattHours,
 } from "../../helpers/Format";
+import type { FacilityPurchaseResult } from "../../helpers/PurchaseFacility";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "../../helpers/DateTime";
 import { chartPalette } from "../../Theme";
 import { signature } from "./DeferredProjection";
@@ -39,6 +40,18 @@ const energy = (value: number | null) =>
 function minimum(values: Array<number | null>): number | null {
   const known = values.filter((value): value is number => value !== null);
   return known.length === values.length ? Math.min(...known) : null;
+}
+
+export type FacilityPurchaseSubmission = void | Promise<FacilityPurchaseResult>;
+
+export function finishBuildReview(
+  submission: FacilityPurchaseSubmission,
+  close: () => void,
+): void | Promise<void | string> {
+  if (!submission) return close();
+  return submission.then((result) =>
+    result.status === "accepted" ? close() : result.message,
+  );
 }
 
 /** Compare the twelve-month periods immediately before and after commissioning. */
