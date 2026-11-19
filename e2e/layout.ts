@@ -286,15 +286,17 @@ export async function setMapProjectCapacity(
   const sizing = catalogue.getByRole("button", {
     name: storage ? /^Energy:/ : /^Power:/,
   });
-  const popover = await sizing.isVisible();
-  if (popover) await sizing.click();
+  const opened =
+    (await sizing.isVisible()) &&
+    (await sizing.getAttribute("aria-expanded")) !== "true";
+  if (opened) await sizing.click();
   await catalogue
     .getByRole("slider", {
       name: storage ? "Storage capacity" : "Generator capacity",
       exact: true,
     })
     .fill(tick);
-  if (popover)
+  if (opened)
     await catalogue.getByRole("button", { name: "Done", exact: true }).click();
 }
 

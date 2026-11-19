@@ -38,7 +38,15 @@ test("ordinary starting hills offer general technologies and retain special-site
   const rail = page.getByRole("complementary", { name: "Build facilities" });
   if (await rail.isVisible()) {
     await expect(rail).toBeFocused();
+    const power = rail.getByRole("button", { name: /^Power:/ });
+    await power.click();
+    await expect(power).toHaveAttribute("aria-expanded", "true");
     await setMapProjectCapacity(rail, false, "0");
+    await expect(power).toHaveAttribute("aria-expanded", "true");
+    await expect(
+      rail.getByRole("slider", { name: "Generator capacity" }),
+    ).toHaveValue("0");
+    await rail.getByRole("button", { name: "Done", exact: true }).click();
     for (const name of [
       "Solar",
       "Wind",
@@ -110,7 +118,6 @@ test("ordinary starting hills offer general technologies and retain special-site
     "Natural Gas CC",
     "Biomass",
     "Coal",
-    "Nuclear",
   ]) {
     const row = options.locator(`[data-build-option="${name}"]`);
     await expect(row).not.toContainText("Not buildable on this tile");
@@ -119,8 +126,16 @@ test("ordinary starting hills offer general technologies and retain special-site
         name: `Review purchase of ${name}`,
         exact: true,
       }),
-    ).toHaveCount(1);
+    ).toBeEnabled();
   }
+  const nuclear = options.locator('[data-build-option="Nuclear"]');
+  await expect(nuclear).not.toContainText("Not buildable on this tile");
+  const nuclearReview = nuclear.getByRole("button", {
+    name: "Review purchase of Nuclear",
+    exact: true,
+  });
+  await expect(nuclearReview).toBeDisabled();
+  await expect(nuclearReview).toHaveAccessibleDescription(/down payment/);
   for (const name of ["Hydro", "Geothermal", "Offshore Wind"]) {
     const row = options.locator(`[data-build-option="${name}"]`);
     await expect(row).toContainText("Not buildable on this tile");

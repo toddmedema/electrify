@@ -9,7 +9,11 @@ import { TICK_MINUTES } from "../src/Constants";
 import { tickState } from "../src/reducers/Game";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "../src/helpers/DateTime";
 import { currentTick } from "../src/helpers/GameSelectors";
-import { formatMoneyConcise, formatMoneyStable } from "../src/helpers/Format";
+import {
+  formatMoneyConcise,
+  formatMoneyStable,
+  formatWattHours,
+} from "../src/helpers/Format";
 import {
   purchaseTile,
   tilePurchaseQuote,
@@ -1751,6 +1755,7 @@ for (const theme of ["light", "dark"] as const) {
       await expectLockedBuild(surface);
       await surface.getByRole("slider", { name: /^Capacity/ }).press("Home");
     }
+    const capacityWh = 5e6;
     const review = await reviewTileBuild(page, "Battery");
     await expectDialogToFit(review);
     await confirmTileBuild(page, review, tile);
@@ -1763,13 +1768,13 @@ for (const theme of ["light", "dark"] as const) {
         name: "Battery",
         territoryId: tile.territoryId,
         tileId: tile.id,
-        peakWh: expect.any(Number),
+        peakWh: capacityWh,
       }),
     );
     loadSimData(before.location);
     const quote = getBuildFacilityQuote(
       before,
-      storage,
+      { name: "Battery", peakWh: capacityWh },
       tile.territoryId,
       tile.id,
     )!;
@@ -1787,6 +1792,14 @@ for (const theme of ["light", "dark"] as const) {
     ).toBeEnabled();
     await page.goto("/");
     await page.getByRole("button", { name: "Continue", exact: true }).click();
+    await openMap(page);
+    const resumed = await inspectTile(page, tile);
+    await expect(
+      resumed.getByRole("heading", { name: "Battery", exact: true }),
+    ).toBeVisible();
+    await expect(
+      resumed.getByRole("region", { name: "Construction", exact: true }),
+    ).toContainText(formatWattHours(capacityWh));
     expect(
       (await readSavedGame(page))!.facilities.find(
         (facility) => facility.id === storage.id,
