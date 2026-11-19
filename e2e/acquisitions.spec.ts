@@ -2143,6 +2143,7 @@ test("map tile hover and right-click expose the tile's own actions", async ({
   await expect(connect).toBeEnabled();
   await expect(tooltip).toHaveCount(0);
   await expect(connect).toBeFocused();
+  await expect(menu).toBeInViewport({ ratio: 1 });
   await reviewScreenshot(page, {
     path: info.outputPath("tile-context-menu.png"),
     animations: "disabled",
@@ -2151,6 +2152,17 @@ test("map tile hover and right-click expose the tile's own actions", async ({
   await connect.press("Escape");
   await expect(menu).toHaveCount(0);
   await expect(target).toBeFocused();
+
+  await target.press("Shift+F10");
+  await menu.getByRole("menuitem", { name: "Inspect", exact: true }).click();
+  const inspector = network.getByRole("dialog", {
+    name: "Forest",
+    exact: true,
+  });
+  await expect(
+    inspector.getByRole("heading", { name: "Forest" }),
+  ).toBeFocused();
+  await inspector.getByRole("button", { name: "Close tile" }).click();
 
   await target.press("Shift+F10");
   await connect.click();

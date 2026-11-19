@@ -887,6 +887,22 @@ it("takes facility actions from the map and confirms a sale of the same facility
   expect(facilityActions.onSell).toHaveBeenCalledWith(facility.id);
 });
 
+it("focuses the site inspector after a keyboard user chooses Inspect", async () => {
+  show();
+  const tile = screen.getByRole("button", {
+    name: "Inspect green-uplands:site-1",
+  });
+  act(() => tile.focus());
+  fireEvent.contextMenu(tile);
+  fireEvent.click(
+    within(screen.getByRole("menu", { name: "Tile actions" })).getByRole(
+      "menuitem",
+      { name: "Inspect" },
+    ),
+  );
+  expect(await screen.findByRole("heading", { name: "Forest" })).toHaveFocus();
+});
+
 it("opens the capacity upgrade directly from the tile actions", async () => {
   const game = ready();
   const facility = game.facilities.find(

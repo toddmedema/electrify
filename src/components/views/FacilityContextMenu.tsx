@@ -185,6 +185,7 @@ export default function FacilityContextMenu(props: {
     key: ActionKey;
     ids: number[];
   } | null>(null);
+  const afterTileMenu = React.useRef<() => void>();
   const { game, target } = props;
   const selected = game.facilities.filter((f) => target?.ids.includes(f.id));
   const offered = actionsFor(game, selected).filter(
@@ -260,7 +261,14 @@ export default function FacilityContextMenu(props: {
               ? "facilityContextMenu territoryTileMenu"
               : "facilityContextMenu",
           },
-          transition: { onExited: props.onMenuExited },
+          transition: {
+            onExited: () => {
+              props.onMenuExited?.();
+              const select = afterTileMenu.current;
+              afterTileMenu.current = undefined;
+              select?.();
+            },
+          },
         }}
       >
         {title && <ListSubheader disableSticky>{title}</ListSubheader>}
@@ -269,8 +277,9 @@ export default function FacilityContextMenu(props: {
             key={label}
             disabled={disabled}
             onClick={() => {
+              // Let the menu restore focus before the new inspector or dialog opens.
+              afterTileMenu.current = onSelect;
               props.onClose();
-              onSelect();
             }}
           >
             <ListItemIcon>{icon}</ListItemIcon>
