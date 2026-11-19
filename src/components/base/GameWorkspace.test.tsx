@@ -85,18 +85,19 @@ function resize(width: number) {
 
 function setup(width = 390, settings: Partial<SettingsType> = {}, map = false) {
   resize(width);
+  const game = {
+    ...gameReducer(undefined, { type: "workspace-test/init" }),
+    inGame: true,
+    scenarioId: map ? 116 : 100,
+    territoryNetwork: map
+      ? createGame({ scenarioId: 116, seed: 188 }).territoryNetwork
+      : undefined,
+  };
   const store = configureStore({
     reducer: {
       card: cardReducer,
       settings: settingsReducer,
-      game: () => ({
-        ...gameReducer(undefined, { type: "workspace-test/init" }),
-        inGame: true,
-        scenarioId: map ? 116 : 100,
-        territoryNetwork: map
-          ? createGame({ scenarioId: 116, seed: 188 }).territoryNetwork
-          : undefined,
-      }),
+      game: () => game,
     },
     preloadedState: {
       card: { ...initialCard, name: "FACILITIES" as const },
