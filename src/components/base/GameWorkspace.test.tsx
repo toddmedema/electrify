@@ -414,7 +414,7 @@ it("adapts Automatic to the explicit scale while retaining focused controls", as
   await user.click(action("Insights"));
   const rate = screen.getByRole("slider", { name: "Electricity rate" });
   act(() => rate.focus());
-  act(() => store.dispatch(change({ interfaceScale: 2.5 })));
+  act(() => store.dispatch(change({ interfaceScale: 2 })));
   expect(screen.getAllByRole("region")).toHaveLength(1);
   expect(screen.getByRole("region", { name: "Programs" })).toBeVisible();
   expect(rate).toHaveFocus();
@@ -450,7 +450,7 @@ it("fits columns using the chosen scale, with Single tool overriding abundant sp
     layout: "side",
     capacity: 3,
   });
-  expect(workspaceLayout(1920, 2.5, "automatic")).toMatchObject({
+  expect(workspaceLayout(1920, 2, "automatic")).toMatchObject({
     layout: "single",
     capacity: 1,
   });

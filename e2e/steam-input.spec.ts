@@ -1400,7 +1400,7 @@ async function setupTv(page: Page, maximum: boolean, theme: "light" | "dark") {
   await input(page, "confirm");
   await page
     .getByRole("combobox", { name: "Interface scale", exact: true })
-    .selectOption(maximum ? "2.5" : "1.5");
+    .selectOption(maximum ? "2" : "1.5");
   await select(
     page,
     page.getByRole("button", { name: "Single tool", exact: true }),
@@ -1467,33 +1467,33 @@ async function expectControllerGlyphScale(glyph: Locator) {
   expect(sizes.actual.height).toBeGreaterThan(24);
 }
 
-test("TV saved preferences style direct scenario links before play", async ({
+test("Saved display preferences style direct scenario links before play", async ({
   page,
 }, info) => {
   skipNonTv(info);
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.addInitScript(() => {
-    const savedTv = () => {
-      localStorage.setItem("tvMode", "true");
-      localStorage.setItem("tvScale", "2");
-      localStorage.setItem("tvInset", "4");
-      localStorage.setItem("textSize", "larger");
+    const savedPrefs = () => {
+      localStorage.setItem("interfaceScale", "2");
+      localStorage.setItem("workspace", "single");
+      localStorage.setItem("screenEdgePadding", "4");
     };
-    // The shared bridge fixture clears preferences. Preserve this explicit saved-TV setup
-    // independently of init-script execution order, as the cloud-invitation fixture does.
+    // The shared bridge fixture clears preferences. Preserve these explicit display
+    // preferences independently of init-script execution order, as the cloud-invitation
+    // fixture does.
     const clear = Storage.prototype.clear;
     Storage.prototype.clear = function () {
       clear.call(this);
-      if (this === localStorage) savedTv();
+      if (this === localStorage) savedPrefs();
     };
-    savedTv();
+    savedPrefs();
   });
   await page.goto("/?scenario=116");
   const start = page.getByRole("button", { name: "Start game", exact: true });
   await expect(start).toBeVisible();
   await expect(page.locator("html")).toHaveAttribute(
     "data-interface-scale",
-    "2.5",
+    "2",
   );
   const edge = await page.locator(".appFrame").evaluate((element) => ({
     actual: parseFloat(getComputedStyle(element).paddingTop),
@@ -2465,12 +2465,13 @@ for (const source of [
       "data-interface-scale",
       accept ? "1.5" : "1",
     );
+    // Acceptance persists the applied choices; dismissal keeps defaults without writing them.
     expect(await page.evaluate(() => localStorage.getItem("workspace"))).toBe(
-      accept ? "single" : "automatic",
+      accept ? "single" : null,
     );
     expect(
       await page.evaluate(() => localStorage.getItem("screenEdgePadding")),
-    ).toBe("0");
+    ).toBeNull();
     await page.evaluate(() =>
       sessionStorage.setItem("mockKeepPreferencesOnReload", "true"),
     );
