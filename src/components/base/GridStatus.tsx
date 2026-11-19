@@ -24,6 +24,7 @@ import { getScenario } from "../../data/Scenarios";
 import { corridorsForLocation } from "../../data/AdjacentMarkets";
 import { setManualHelpAnchor } from "./ManualHelpAnchor";
 import { MONTHS } from "../../Constants";
+import { useScreenEdgeMargin } from "../../ScreenEdgePadding";
 import {
   projectionReady,
   readProjection,
@@ -73,6 +74,7 @@ export default function GridStatus({
   onReserveHelp?: () => void;
 }) {
   const health = getGridHealth(game, now);
+  const edgeMargin = useScreenEdgeMargin(16);
   const { gap, updating } = useSupplyRisk(game, now);
   const ahead = projectedShortfall(game.timeline, game.date.minute);
   const when = ahead
@@ -157,7 +159,7 @@ export default function GridStatus({
         onClose={close}
         anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
         transformOrigin={{ vertical: "top", horizontal: "left" }}
-        marginThreshold={16}
+        marginThreshold={edgeMargin}
         slotProps={{
           transition: { onEntered: () => title.current?.focus() },
           paper: {

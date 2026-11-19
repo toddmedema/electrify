@@ -119,6 +119,7 @@ for (const theme of ["light", "dark"] as const) {
     await page.goto("/?scenario=105");
     await page.getByRole("button", { name: "Start game", exact: true }).click();
     await status.click();
+    await expect(dialog).toBeVisible();
     await expect(
       dialog.getByRole("button", { name: "Manage agreements" }),
     ).toHaveCount(0);

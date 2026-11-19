@@ -1451,10 +1451,19 @@ for (const theme of ["light", "dark"] as const) {
           minimum: Math.ceil(Math.min(innerWidth, innerHeight) * 0.04),
           left: rect.left,
           right: innerWidth - rect.right,
+          top: rect.top,
+          bottom: innerHeight - rect.bottom,
+          viewportHeight: innerHeight,
+          maximumHeight: Number.parseFloat(getComputedStyle(element).maxHeight),
         };
       });
       expect(edge.left).toBeGreaterThanOrEqual(edge.minimum - 1);
       expect(edge.right).toBeGreaterThanOrEqual(edge.minimum - 1);
+      expect(edge.top).toBeGreaterThanOrEqual(edge.minimum - 1);
+      expect(edge.bottom).toBeGreaterThanOrEqual(edge.minimum - 1);
+      expect(edge.maximumHeight).toBeLessThanOrEqual(
+        edge.viewportHeight - 2 * edge.minimum,
+      );
       await diagnosis
         .getByRole("button", { name: "Close grid status" })
         .click();
