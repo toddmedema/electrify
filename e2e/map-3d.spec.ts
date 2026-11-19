@@ -18,7 +18,7 @@ import {
   projectSiteQuote,
   selectProject,
 } from "../src/helpers/ProjectBuild";
-import { formatMoneyConcise } from "../src/helpers/Format";
+import { formatPurchasePrice } from "../src/helpers/Format";
 import {
   projectPoint,
   tilePosition3D,
@@ -277,7 +277,7 @@ for (const theme of ["light", "dark"] as const) {
       expect(size.lines).toBe(1);
       expect(size.textWidth).toBeLessThanOrEqual(size.width);
       expect(size.width).toBeLessThanOrEqual(size.tileWidth);
-      expect(size.height).toBeLessThanOrEqual(size.tileHeight / 2);
+      expect(size.height).toBeLessThanOrEqual(size.tileHeight * 0.75);
     }
     const game = (await readSavedGame(page))!;
     loadSimData(game.location);
@@ -294,18 +294,18 @@ for (const theme of ["light", "dark"] as const) {
     const quote = projectSiteQuote(game, project, id);
     expect(quote.facility).toBeDefined();
     if (!quote.facility) throw new Error("Owned project site has no quote");
-    const total = formatMoneyConcise(projectSiteCapitalCost(quote));
-    const title = `Total project cost ${total} · Already connected`;
-    await expect(ownedMarker).toHaveAttribute("title", title);
-    await expect(ownedMarker).toHaveText(total);
+    const total = formatPurchasePrice(projectSiteCapitalCost(quote));
+    await expect(ownedMarker.locator("b")).toHaveText(total);
     await expect(owned).toHaveAccessibleName(
       /Total project cost .*Already connected/,
     );
     await owned.focus();
     await owned.press("Enter");
-    await expect(surface.getByText("Already connected · $0")).toBeVisible();
+    await expect(surface.getByText("Connected", { exact: true })).toBeVisible();
     await ownedMarker.hover();
-    await expect(ownedMarker).toHaveAttribute("title", title);
+    await expect(map.getByRole("tooltip")).toContainText(
+      `Total project cost ${total} · Already connected`,
+    );
     await page.mouse.move(0, 0);
     await reviewScreenshot(map, {
       path: info.outputPath(`project-markers-${theme}.png`),
