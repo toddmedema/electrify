@@ -4,7 +4,7 @@ import type { CompiledRuleObjective } from "./ScenarioRules";
 export const UTILITY_EXPANSION_OBJECTIVES: CompiledRuleObjective[] = [
   {
     id: "acquire-neighbor",
-    label: "Acquire Valley Electric or Ridge Electric",
+    label: "Acquire a competitor",
     metric: "utilityOwnership",
     targets: ["valley-electric", "ridge-electric"],
     deadlineMonth: 119,

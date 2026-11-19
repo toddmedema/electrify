@@ -3,7 +3,7 @@ import { useMoney } from "./CurrencyContext";
 import { Button, Typography } from "@mui/material";
 import type { PowerAgreementAccount } from "../../Types";
 import { agreementDate } from "../../helpers/PowerAgreements";
-import { formatNumber } from "../../helpers/Format";
+import { formatNumber, formatPercent } from "../../helpers/Format";
 import type { useAgreementForecast } from "./useAgreementForecast";
 import BuildDetails, { BuildDetailRow } from "./BuildDetails";
 
@@ -29,7 +29,7 @@ export default function AgreementForecastDetails({
       ? "Shared supply depends on other companies"
       : forecast.blocked === "buying"
         ? "Turn on market buying to compare"
-        : "Based on current supply and demand";
+        : "Compared with omitting this agreement";
   return (
     <>
       <span role="status" aria-live="polite">
@@ -50,6 +50,23 @@ export default function AgreementForecastDetails({
       <Typography component="div" variant="caption" color="textSecondary">
         {caption}
       </Typography>
+      {forecast.result &&
+        forecast.result.withAgreement.demandMWh > 0 &&
+        forecast.result.withoutAgreement.demandMWh > 0 && (
+          <Typography component="div" variant="caption" color="textSecondary">
+            Demand served:{" "}
+            {formatPercent(
+              forecast.result.withAgreement.servedMWh /
+                forecast.result.withAgreement.demandMWh,
+            )}{" "}
+            with agreement ·{" "}
+            {formatPercent(
+              forecast.result.withoutAgreement.servedMWh /
+                forecast.result.withoutAgreement.demandMWh,
+            )}{" "}
+            without
+          </Typography>
+        )}
     </>
   );
 }

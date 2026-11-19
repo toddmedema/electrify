@@ -93,3 +93,23 @@ test("site counts read as remaining of total", () => {
   expect(siteCountLabel({ remaining: 1, total: 1 })).toBe("1 of 1 site left");
   expect(siteCountLabel({ remaining: 1, total: 3 })).toBe("Last site left");
 });
+
+test("a purchased geothermal inventory replaces the regional geology count without bypassing technology or reservation rules", () => {
+  const options = {
+    ...hydroOption,
+    name: "Geothermal",
+    location: withHydro,
+    viableLocationsRemaining: 1,
+    siteInventory: { total: 1, remaining: 1 },
+  };
+  expect(getBuildAvailability(options).buildable).toBe(true);
+  expect(getBuildAvailability({ ...options, available: false }).buildable).toBe(
+    false,
+  );
+  expect(
+    getBuildAvailability({
+      ...options,
+      siteInventory: { total: 1, remaining: 0 },
+    }).buildable,
+  ).toBe(false);
+});

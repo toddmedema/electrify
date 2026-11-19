@@ -23,7 +23,7 @@ import {
 import UtilityContractSchedule from "./UtilityContractSchedule";
 import { facilityDisplayName } from "./FacilityLabels";
 
-/** Information only: the purchase API still requires a finished connection and fresh quote. */
+/** Read-only seller disclosure before a separately reviewed purchase. */
 export default function UtilityOfferDialog({
   game,
   targetId,
@@ -52,11 +52,11 @@ export default function UtilityOfferDialog({
         closable
         title="Acquisition terms unavailable"
         onClose={onClose}
-        actions={<Button onClick={onClose}>Back to connections</Button>}
+        actions={<Button onClick={onClose}>Back to territories</Button>}
       >
         <Typography role="alert">
           This company is no longer available to acquire. Return to your
-          connections and review current ownership.
+          territories and review current ownership.
         </Typography>
       </DecisionDialog>
     );
@@ -74,11 +74,11 @@ export default function UtilityOfferDialog({
       title="Acquisition terms"
       contentClassName="acquisitionTermsContent"
       onClose={onClose}
-      actions={<Button onClick={onClose}>Back to connections</Button>}
+      actions={<Button onClick={onClose}>Back to territories</Button>}
     >
       <Typography variant="body2" sx={{ mb: 2 }}>
-        Connect to {offer.name} first, then acquire it separately. Terms may
-        change before purchase.
+        Acquire {offer.name} to add its customers, fleet, sites and dated
+        obligations to your company. Terms may change before purchase.
       </Typography>
       <BuildDetails label={`${offer.name} acquisition terms`}>
         <BuildDetailRow label="Price" value={money(offer.cashDue)} />
@@ -105,9 +105,9 @@ export default function UtilityOfferDialog({
         option.
       </Typography>
       <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
-        Includes {money(offer.networkOMPerMonth)}/mo in network upkeep, which
-        rises with customer growth and inflation. Plant operations and power
-        purchases cost extra.
+        Includes {money(offer.networkOMPerMonth)}/mo in utility operations,
+        which rises with customer growth and inflation. Plant operations and
+        power purchases cost extra.
       </Typography>
       <details className="acquisitionDisclosure">
         <summary>Plants &amp; purchased power</summary>
@@ -177,7 +177,7 @@ export default function UtilityOfferDialog({
         </div>
       </details>
       <details className="acquisitionDisclosure">
-        <summary>Supply &amp; network changes</summary>
+        <summary>Supply &amp; operating changes</summary>
         <div>
           <UtilityContractSchedule game={game} targetId={offer.targetId} />
         </div>

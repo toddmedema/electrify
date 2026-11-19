@@ -4,6 +4,7 @@ import * as React from "react";
 import { Box, Button, Slider, Typography } from "@mui/material";
 import type { GameType, TransmissionLineOperatingType } from "../../Types";
 import {
+  agreementCorridorId,
   agreementDate,
   agreementYearMinute,
   connectionAgreements,
@@ -118,6 +119,12 @@ export default function PowerAgreements({
   const [acceptanceError, setAcceptanceError] = React.useState<string>();
   const utility = inheritedUtilityForCorridor(line.corridorId);
   const sources = utility ? connectionAgreements(game, utility) : [];
+  const replacement =
+    review &&
+    sources.some(
+      (source) =>
+        source.id === review.id || source.id.startsWith(`${review.id}:`),
+    );
   const assessment = sources.find((source) => source.id === assessmentId);
   const expiredAssessment =
     !!assessment && game.date.minute >= assessment.endMinute;
@@ -132,6 +139,7 @@ export default function PowerAgreements({
     !review || forecastCommitted,
   );
   const restore = React.useRef<HTMLElement | null>(null);
+  const portfolio = React.useRef<HTMLElement | null>(null);
   const token = `power-agreement:${line.id}`;
   const reviewing = !!review;
   React.useEffect(() => {
@@ -143,14 +151,19 @@ export default function PowerAgreements({
   }, [dispatch, token, reviewing, assessmentId]);
   if (!utility) return null;
   const now = currentTick(game);
-  const marketPrice = now
-    ? adjacentMarketPricePerMWh(
-        line.corridorId,
-        intertieContextForGame(game),
-        now.minute,
-        now,
-      )
-    : undefined;
+  const marketContext = intertieContextForGame(game);
+  const marketPriceFor = (sourceId: string) =>
+    now
+      ? adjacentMarketPricePerMWh(
+          agreementCorridorId(sourceId, utility),
+          marketContext,
+          now.minute,
+          now,
+        )
+      : undefined;
+  const referencePrice = review
+    ? (review.receipt.signingMarketPricePerMWh ?? marketPriceFor(review.id))
+    : assessment && marketPriceFor(assessment.id);
   const terms = review
     ? { ...review, termsVersion: review.receipt.termsVersion }
     : assessment;
@@ -184,13 +197,13 @@ export default function PowerAgreements({
   return (
     <Box
       component="section"
+      ref={portfolio}
+      tabIndex={-1}
       aria-label="Power purchase agreements"
       className="powerAgreements"
     >
-      <Typography component="h3" variant="subtitle2">
-        Power purchase agreements
-      </Typography>
       {sources.map((source) => {
+        const marketPrice = marketPriceFor(source.id);
         const expired = game.date.minute >= source.endMinute;
         const account = game.transmission?.agreementAccounts?.find(
           (entry) => entry.agreementId === source.id,
@@ -209,40 +222,35 @@ export default function PowerAgreements({
         const quote =
           block && !hasLater ? powerAgreementQuote(game, block.id) : undefined;
         return (
-          <Box key={source.id} className="powerAgreement">
-            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+          <Box
+            component="article"
+            aria-label={source.name}
+            key={source.id}
+            className="powerAgreement"
+          >
+            <Typography component="h4" className="powerAgreementHeading">
               {source.name} ·{" "}
-              {expired
-                ? `Expired ${agreementDate(source.endMinute)}`
-                : source.inherited
-                  ? "Inherited"
-                  : source.startMinute > game.date.minute
-                    ? `Scheduled · starts ${agreementDate(source.startMinute)}`
-                    : "Active"}
+              <span className="powerAgreementStatus">
+                {expired
+                  ? `Expired ${agreementDate(source.endMinute)}`
+                  : source.inherited
+                    ? "Inherited"
+                    : source.startMinute > game.date.minute
+                      ? `Scheduled · starts ${agreementDate(source.startMinute)}`
+                      : "Active"}
+              </span>
             </Typography>
             {!expired && (
               <>
-                <Typography variant="body2">
-                  {formatWatts(source.nominalW * source.deliverability)} covered
-                  · {rate(source.priceToday)}, follows inflation
+                <Typography variant="body2" className="powerAgreementMetrics">
+                  Up to{" "}
+                  <strong>
+                    {formatWatts(source.nominalW * source.deliverability)}
+                  </strong>{" "}
+                  · <strong>{rate(source.priceToday)}</strong>
                 </Typography>
-                {marketPrice !== undefined && marketPrice > 0 && (
-                  <Typography variant="body2" color="textSecondary">
-                    Market now {rate(marketPrice)} ·{" "}
-                    {marketComparison(source.priceToday, marketPrice)}
-                  </Typography>
-                )}
                 <Typography variant="body2" color="textSecondary">
-                  {source.termsVersion === 1
-                    ? "No minimum purchase"
-                    : source.termsVersion === 3
-                      ? `Minimum: ${monthlyEnergy(source.minimumMWhPerMonth)}`
-                      : `Minimum: pay for ${formatWatts(source.nominalW * source.deliverability)} whenever available`}
-                </Typography>
-                <Typography variant="body2">
-                  {source.inherited
-                    ? `Through ${agreementDate(source.endMinute, true)}`
-                    : `${agreementDate(source.startMinute)}–${agreementDate(source.endMinute, true)}`}
+                  Through {agreementDate(source.endMinute, true)}
                 </Typography>
                 {source.reductionYear !== undefined &&
                   game.date.minute <
@@ -256,49 +264,129 @@ export default function PowerAgreements({
                       on 1 Jan {source.reductionYear}
                     </Typography>
                   )}
+                <Typography
+                  variant="body2"
+                  color="textSecondary"
+                  className="powerAgreementMinimum"
+                >
+                  {source.termsVersion === 1
+                    ? "No minimum purchase"
+                    : source.termsVersion === 3
+                      ? `Minimum payment: ${monthlyEnergy(source.minimumMWhPerMonth)}, even if unused`
+                      : `Minimum payment: ${formatWatts(source.nominalW * source.deliverability)} whenever available, even if unused`}
+                </Typography>
               </>
             )}
-            {(() => {
-              if (!account) return null;
-              const available = account.months.reduce(
-                (sum, row) => sum + row.availableMWh,
-                0,
-              );
-              const useful = account.months.reduce(
-                (sum, row) => sum + row.usefulMWh,
-                0,
-              );
-              return (
-                <Typography variant="body2" color="textSecondary">
-                  Recorded since {agreementDate(account.accountingStartMinute)}{" "}
-                  ·{" "}
-                  {available > 0
-                    ? `${formatPercent(useful / available, 1)} used`
-                    : "No available minimum"}
-                </Typography>
-              );
-            })()}
-            {(!expired || account) && (
-              <Button
-                size="small"
-                onClick={(event) => {
-                  restore.current = event.currentTarget;
-                  setAssessmentId(source.id);
-                }}
-                aria-label={
-                  expired
-                    ? `${source.name} recorded history`
-                    : `Forecast ${source.name} remaining term`
-                }
-              >
-                {expired ? "View recorded history" : "Forecast remaining term"}
-              </Button>
-            )}
-            {quote && (
+            <div className="powerAgreementActions">
+              {quote && (
+                <Button
+                  variant="outlined"
+                  size="small"
+                  aria-label={`Review ${quote.name} replacement`}
+                  onClick={(event) => {
+                    restore.current = event.currentTarget;
+                    setForecastCommitted(true);
+                    setAcceptanceError(undefined);
+                    setReview(quote);
+                  }}
+                >
+                  Review replacement
+                </Button>
+              )}
+              {!expired && (
+                <details
+                  className="powerAgreementDetails"
+                  aria-label={`${source.name} details`}
+                >
+                  <summary>Details</summary>
+                  <div className="powerAgreementDetailBody">
+                    <Typography variant="body2" color="textSecondary">
+                      {agreementDate(source.startMinute)}–
+                      {agreementDate(source.endMinute, true)}
+                    </Typography>
+                    <Typography variant="body2" color="textSecondary">
+                      Maximum: {monthlyEnergy(source.maximumMWhPerMonth)}
+                    </Typography>
+                    {marketPrice !== undefined && marketPrice > 0 && (
+                      <Typography variant="body2" color="textSecondary">
+                        Market now {rate(marketPrice)} ·{" "}
+                        {marketComparison(source.priceToday, marketPrice)}
+                      </Typography>
+                    )}
+                    {account &&
+                      (() => {
+                        const available = account.months.reduce(
+                          (sum, row) => sum + row.availableMWh,
+                          0,
+                        );
+                        const useful = account.months.reduce(
+                          (sum, row) => sum + row.usefulMWh,
+                          0,
+                        );
+                        return (
+                          <Typography variant="body2" color="textSecondary">
+                            Recorded since{" "}
+                            {agreementDate(account.accountingStartMinute)} ·{" "}
+                            {available > 0
+                              ? `${formatPercent(useful / available, 1)} used`
+                              : "No available minimum"}
+                          </Typography>
+                        );
+                      })()}
+                    <Button
+                      size="small"
+                      onClick={(event) => {
+                        restore.current = event.currentTarget;
+                        setAssessmentId(source.id);
+                      }}
+                      aria-label={`Forecast ${source.name} remaining term`}
+                    >
+                      Forecast remaining term
+                    </Button>
+                  </div>
+                </details>
+              )}
+              {expired && account && (
+                <Button
+                  size="small"
+                  onClick={(event) => {
+                    restore.current = event.currentTarget;
+                    setAssessmentId(source.id);
+                  }}
+                  aria-label={`${source.name} recorded history`}
+                >
+                  View recorded history
+                </Button>
+              )}
+            </div>
+          </Box>
+        );
+      })}
+      {POWER_AGREEMENT_BLOCKS.filter(
+        (block) =>
+          "sellerUtilityId" in block &&
+          block.utilityId === utility &&
+          !sources.some((source) => source.id.startsWith(`${block.id}:`)),
+      ).map((block) => {
+        const quote = powerAgreementQuote(game, block.id);
+        return (
+          quote && (
+            <Box
+              component="article"
+              aria-label={quote.name}
+              key={block.id}
+              className="powerAgreement"
+            >
+              <Typography component="h4" className="powerAgreementHeading">
+                {quote.name}
+              </Typography>
+              <Typography variant="body2" className="powerAgreementMetrics">
+                Up to <strong>{formatWatts(quote.deliverableW)}</strong> ·{" "}
+                <strong>{rate(quote.priceToday)}</strong>
+              </Typography>
               <Button
                 variant="outlined"
-                size="small"
-                aria-label={`Review ${quote.name} replacement`}
+                aria-label={`Review ${quote.name} agreement`}
                 onClick={(event) => {
                   restore.current = event.currentTarget;
                   setForecastCommitted(true);
@@ -306,16 +394,12 @@ export default function PowerAgreements({
                   setReview(quote);
                 }}
               >
-                Review replacement
+                Review terms
               </Button>
-            )}
-          </Box>
+            </Box>
+          )
         );
       })}
-      <Typography variant="body2" color="textSecondary">
-        Agreements and market purchases share this connection. Uncovered
-        purchases use regional market prices and availability.
-      </Typography>
       <DecisionDialog
         open={!!review || !!assessment}
         fullWidth
@@ -324,7 +408,7 @@ export default function PowerAgreements({
         closeDisabled={accepting}
         title={
           review
-            ? `Review ${review.name} replacement`
+            ? `Review ${review.name} ${replacement ? "replacement" : "agreement"}`
             : `${assessment?.name ?? "Agreement"} ${expiredAssessment ? "recorded history" : "remaining term"}`
         }
         onClose={close}
@@ -350,7 +434,7 @@ export default function PowerAgreements({
                   if (fresh?.quoteKey !== review.quoteKey) {
                     if (fresh) setReview(fresh);
                     setAcceptanceError(
-                      "Agreement terms changed; review the replacement again.",
+                      "Agreement terms changed; review the updated terms.",
                     );
                     return;
                   }
@@ -383,11 +467,12 @@ export default function PowerAgreements({
                     );
                     if (!receipt)
                       throw new Error(
-                        "Agreement terms changed; review the replacement again.",
+                        "Agreement terms changed; review the updated terms.",
                       );
-                    restore.current = document.getElementById(
-                      `intertie-disclosure-${line.id}`,
-                    );
+                    restore.current =
+                      document.getElementById(
+                        `intertie-disclosure-${line.id}`,
+                      ) ?? portfolio.current;
                     close();
                     dispatch(
                       snackbarOpen(
@@ -456,11 +541,17 @@ export default function PowerAgreements({
                   />
                 </Box>
               )}
+              <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
+                Delivery and emissions follow the supplier’s power mix and
+                availability.
+              </Typography>
               <Box className="powerAgreementTerms">
                 <BuildDetails
                   label={
                     review
-                      ? "Replacement agreement terms"
+                      ? replacement
+                        ? "Replacement agreement terms"
+                        : "Agreement terms"
                       : "Active agreement terms"
                   }
                 >
@@ -474,16 +565,16 @@ export default function PowerAgreements({
                     }
                   />
                   <BuildDetailRow
-                    label="Market price"
+                    label="Reference price"
                     value={
-                      marketPrice === undefined
+                      referencePrice === undefined
                         ? "Unavailable"
-                        : rate(marketPrice)
+                        : rate(referencePrice)
                     }
                   />
                   <BuildDetailRow
                     label="Discount"
-                    value={discountRate(terms.priceToday, marketPrice)}
+                    value={discountRate(terms.priceToday, referencePrice)}
                   />
                   <BuildDetailRow
                     label="Minimum supply"
@@ -523,7 +614,7 @@ export default function PowerAgreements({
                     }
                   />
                   <BuildDetailRow
-                    label="Forecasted savings"
+                    label="Forecasted cash impact"
                     value={
                       <AgreementForecastDetails
                         currency={currency}

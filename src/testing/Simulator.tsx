@@ -1,9 +1,12 @@
+import { legacyTerritoryConnections } from "../helpers/Territories";
+import { landPurchaseQuote } from "../helpers/Territories";
 import { powerAgreementQuote } from "../helpers/PowerAgreements";
 import { getTotalDebt } from "../helpers/Financials";
 import { pendingScenarioChoice } from "../helpers/ScenarioChoices";
 import {
   chooseScenarioResponse,
   acquireUtility,
+  acquireLand,
   acceptPowerAgreement,
 } from "../reducers/GameActions";
 import { acquisitionQuote } from "../helpers/Expansion";
@@ -71,6 +74,7 @@ import { isLegacyCampaignScenario } from "../data/LegacyCampaign";
 export type StrategyType = "none" | "keepUp";
 
 interface InitialBuildBaseType {
+  territoryId?: import("../Types").TerritoryId;
   name: string;
   financed: boolean;
   priority?: "default" | "reserve";
@@ -80,6 +84,11 @@ export type InitialBuildType = InitialBuildBaseType &
   ({ peakW: number; peakWh?: never } | { peakWh: number; peakW?: never });
 
 export type ScheduledSimActionType =
+  | {
+      month: number;
+      type: "land";
+      territoryId?: import("../Types").LandTerritoryId;
+    }
   | { month: number; type: "agreement"; blockId: string }
   | {
       month: number;
@@ -360,6 +369,7 @@ function setUpGame(
       buildFacility({
         facility: build,
         financed: options.initialBuild.financed,
+        territoryId: options.initialBuild.territoryId,
       }),
     );
     state = applyBuildPriority(
@@ -506,6 +516,26 @@ export function runSimulation(options: SimOptionsType): SimResultType {
       .forEach((action) => {
         const previousIds = new Set(state.facilities.map(({ id }) => id));
         switch (action.type) {
+          case "land": {
+            const quote = landPurchaseQuote(state, action.territoryId);
+            if (!quote) throw new Error("No land available");
+            state = cloneDeep(
+              gameReducer(
+                state,
+                acquireLand({
+                  territoryId: quote.territoryId,
+                  quoteKey: quote.quoteKey,
+                }),
+              ),
+            );
+            if (
+              !state.territoryNetwork?.tilePurchases?.some(
+                ({ tileId }) => tileId === quote.tileId,
+              )
+            )
+              throw new Error("Land purchase rejected");
+            break;
+          }
           case "agreement": {
             const quote = powerAgreementQuote(state, action.blockId);
             if (!quote)
@@ -580,6 +610,7 @@ export function runSimulation(options: SimOptionsType): SimResultType {
                   buildFacility({
                     facility,
                     financed: action.build.financed,
+                    territoryId: action.build.territoryId,
                   }),
                 ),
                 action.build.priority,
@@ -883,6 +914,7 @@ export function runSimulation(options: SimOptionsType): SimResultType {
     finalDebt: getTotalDebt([
       ...state.facilities,
       ...(state.transmission?.lines || []),
+      ...legacyTerritoryConnections(state),
       ...(state.utilityExpansion?.loans ?? []),
     ]),
     finalTransmissionLines: state.transmission?.lines || [],

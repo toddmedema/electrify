@@ -22,6 +22,24 @@ function generator(overrides: Record<string, unknown> = {}) {
 const valid = (facility: Record<string, unknown>) =>
   validBuildFacility({ facility, financed: false });
 
+it("accepts the technology maximum and rejects oversized or nonfinite build targets", () => {
+  expect(valid(generator({ peakW: 10e6 }))).toBe(true);
+  for (const peakW of [10e6 + 1, NaN, Infinity, -1, 0])
+    expect(valid(generator({ peakW }))).toBe(false);
+  const storage = {
+    ...generator(),
+    name: "Battery",
+    fuel: undefined,
+    peakWh: 20e6,
+    maxPeakWh: 20e6,
+    roundTripEfficiency: 0.85,
+    hourlyLoss: 0.0001,
+  };
+  expect(valid(storage)).toBe(true);
+  for (const peakWh of [20e6 + 1, NaN, Infinity, -1, 0])
+    expect(valid({ ...storage, peakWh })).toBe(false);
+});
+
 describe("validBuildFacility weather resilience", () => {
   it("accepts quotes with and without resilience", () => {
     expect(valid(generator())).toBe(true);

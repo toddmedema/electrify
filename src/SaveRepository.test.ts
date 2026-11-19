@@ -8,11 +8,7 @@ import type { SaveLease, SaveMetadata, VictoryType } from "./Types";
 import { SAVE_SCHEMA_VERSION } from "./SaveSchema";
 import { createGame } from "./testing/Simulator";
 import { runMonths } from "./testing/SimulationTestHelpers";
-import reducer, {
-  buildTransmissionLine,
-  continueLegacyCampaign,
-  tickState,
-} from "./reducers/Game";
+import reducer, { continueLegacyCampaign, tickState } from "./reducers/Game";
 import {
   firstCompany,
   closingCompany,
@@ -192,15 +188,6 @@ describe("SaveRepository", () => {
     let terminal: VictoryType | undefined;
     jest.useFakeTimers();
     try {
-      game = copyOfficialGame(
-        reducer(
-          game,
-          buildTransmissionLine({
-            corridorId: "vt-champlain-valley",
-            financed: false,
-          }),
-        ),
-      );
       while (game.date.monthsElapsed < 25) tickState(game);
       const quote = acquisitionQuote(game, "valley-electric")!;
       expect(quote).toBeDefined();

@@ -5,20 +5,14 @@ import {
 } from "../data/CustomerBatteries";
 
 export interface CustomerBatteryFleet {
-  installedHouseholds: number;
   enrolledHouseholds: number;
-  installedPowerW: number;
-  installedCapacityWh: number;
   powerW: number;
   capacityWh: number;
   reserveWh: number;
 }
 
 export const EMPTY_CUSTOMER_BATTERY_FLEET: CustomerBatteryFleet = {
-  installedHouseholds: 0,
   enrolledHouseholds: 0,
-  installedPowerW: 0,
-  installedCapacityWh: 0,
   powerW: 0,
   capacityWh: 0,
   reserveWh: 0,
@@ -40,39 +34,43 @@ export function customerBatteryFleet(
   customers: number,
   location: Pick<LocationType, "country" | "region">,
 ): CustomerBatteryFleet {
-  let installedHouseholds = 0;
+  let enrolledHouseholds = 0;
   let equivalentEnergyHouseholds = 0;
-  for (const [installed, share] of program.installs ?? []) {
-    if (installed > month) continue;
-    const age = month - installed;
-    const installationYear = startingYear + Math.floor(installed / 12);
+  for (const [enrolled, share] of program.installs ?? []) {
+    if (enrolled > month) continue;
+    const age = month - enrolled;
+    const enrollmentYear = startingYear + Math.floor(enrolled / 12);
     const houses =
-      batteryCohortHouseholds(customers, share, installationYear, location) *
+      batteryCohortHouseholds(customers, share, enrollmentYear, location) *
       batterySurvival(age);
-    installedHouseholds += houses;
+    enrolledHouseholds += houses;
     equivalentEnergyHouseholds += houses * (1 - Math.min(120, age) * 0.0025);
   }
-  const installedPowerW =
-    installedHouseholds * CUSTOMER_BATTERIES.householdPowerW;
-  const installedCapacityWh =
+  const powerW = enrolledHouseholds * CUSTOMER_BATTERIES.householdPowerW;
+  const capacityWh =
     equivalentEnergyHouseholds * CUSTOMER_BATTERIES.householdEnergyWh;
   return {
-    installedHouseholds,
-    enrolledHouseholds: installedHouseholds,
-    installedPowerW,
-    installedCapacityWh,
-    powerW: installedPowerW,
-    capacityWh: installedCapacityWh,
-    reserveWh: installedCapacityWh * CUSTOMER_BATTERIES.reserveShare,
+    enrolledHouseholds,
+    powerW,
+    capacityWh,
+    reserveWh: capacityWh * CUSTOMER_BATTERIES.reserveShare,
   };
+}
+
+/** Dependable power from a full fleet for the duration of its contract window. */
+export function customerBatterySustainedW(fleet: CustomerBatteryFleet): number {
+  return Math.min(
+    fleet.powerW,
+    (fleet.capacityWh - fleet.reserveWh) / CUSTOMER_BATTERIES.peakWindowHours,
+  );
 }
 
 export function batteryMonthlyCompensation(
   fleet: CustomerBatteryFleet,
 ): number {
   return (
-    (fleet.enrolledHouseholds * CUSTOMER_BATTERIES.annualPaymentPerHousehold) /
-    12
+    (customerBatterySustainedW(fleet) * CUSTOMER_BATTERIES.annualPaymentPerKw) /
+    12000
   );
 }
 
@@ -113,6 +111,7 @@ export function dispatchCustomerBattery(
     stepMinutes = 15,
     enabled = true,
     peak = false,
+    remainingPeakMinutes = stepMinutes,
   }: {
     rooftopSurplusW?: number;
     gridSurplusW?: number;
@@ -120,6 +119,7 @@ export function dispatchCustomerBattery(
     stepMinutes?: number;
     enabled?: boolean;
     peak?: boolean;
+    remainingPeakMinutes?: number;
   } = {},
 ): CustomerBatteryDispatch {
   const startWh = Math.max(0, storedWh);
@@ -131,9 +131,16 @@ export function dispatchCustomerBattery(
   let dischargeW = 0;
   if (enabled && hours > 0) {
     if (peak && deficitW > 0) {
+      // Budget the remaining energy across the entire peak window. A battery that
+      // starts the window fully charged can sustain its contracted power until the end.
+      const deliveryHours = Math.max(stepMinutes, remainingPeakMinutes) / 60;
       dischargeW = Math.max(
         0,
-        Math.min(deficitW, fleet.powerW, (energy - fleet.reserveWh) / hours),
+        Math.min(
+          deficitW,
+          fleet.powerW,
+          (energy - fleet.reserveWh) / deliveryHours,
+        ),
       );
       energy -= dischargeW * hours;
     } else {

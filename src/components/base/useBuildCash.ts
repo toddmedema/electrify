@@ -45,6 +45,18 @@ export function useBuildAffordability(
   return useCashValue(fallback, (cash) => cash >= downpayment);
 }
 
+/** Reorder a catalogue only when cash crosses one of its current purchase thresholds. */
+export function useBuildAffordabilityKey(
+  fallback: number,
+  downpayments: readonly number[],
+): string {
+  return useCashValue(fallback, (cash) =>
+    downpayments
+      .map((downpayment) => (cash >= downpayment ? "1" : "0"))
+      .join(""),
+  );
+}
+
 /** Quote inputs move monthly or after decisions. Cash readers subscribe independently. */
 export function sameBuildQuote<Props extends { game: GameType }>(
   previous: Props,

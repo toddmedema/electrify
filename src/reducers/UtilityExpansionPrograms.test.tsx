@@ -1,8 +1,8 @@
+import { CUSTOMER_BATTERIES } from "../data/CustomerBatteries";
 import cloneDeep from "lodash.clonedeep";
 import { TICKS_PER_MONTH, TICK_MINUTES, YEARS_PER_TICK } from "../Constants";
 import { GENERATORS } from "../data/Facilities";
 import { POLICIES } from "../data/Policies";
-import { UTILITY_TARGETS } from "../data/UtilityExpansion";
 import { customerBatteryFleet } from "../helpers/CustomerBatteries";
 import { acquisitionQuote } from "../helpers/Expansion";
 import { currentTick } from "../helpers/GameSelectors";
@@ -15,7 +15,6 @@ import { createGame } from "../testing/Simulator";
 import type { GameType, UtilityTargetId } from "../Types";
 import reducer, {
   buildFacility,
-  buildTransmissionLine,
   delta,
   generateForecastTimeline,
   tickState,
@@ -37,17 +36,8 @@ function preparedCompany(): GameType {
   )!.yearsToBuildLeft = YEARS_PER_TICK / 2;
   return game;
 }
-function connection(game: GameType, targetId: UtilityTargetId): GameType {
-  const corridorId = UTILITY_TARGETS.find(
-    (target) => target.id === targetId,
-  )!.corridorId;
-  const connected = copyOfficialGame(
-    reducer(game, buildTransmissionLine({ corridorId, financed: false })),
-  );
-  connected.transmission!.lines.find(
-    (line) => line.corridorId === corridorId,
-  )!.yearsToBuildLeft = 0;
-  return connected;
+function connection(game: GameType, _targetId: UtilityTargetId): GameType {
+  return copyOfficialGame(game);
 }
 function buy(game: GameType, targetId: UtilityTargetId): GameType {
   const quote = acquisitionQuote(game, targetId)!;
@@ -159,16 +149,21 @@ it("a purchase preserves one installed battery fleet, stored energy and demand q
     connection(preparedCompany(), "ridge-electric"),
     "ridge-electric",
   );
-  runMonths(game, 132);
+  const firstVppMonth =
+    (CUSTOMER_BATTERIES.offerFromYear - game.startingYear) * 12;
+  runMonths(game, firstVppMonth - 1);
   for (const policy of [
-    { id: "battery", tier: "On", month: 133, startHour: 17 },
-    { id: "timeOfUse", tier: "On", month: 133, startHour: 21 },
+    { id: "battery", tier: "On", month: firstVppMonth, startHour: 17 },
+    { id: "timeOfUse", tier: "On", month: firstVppMonth, startHour: 21 },
   ] as const)
     game = copyOfficialGame(reducer(game, schedulePolicy(policy)));
   runMonths(game, 1);
   expect(game.policies!.programs.battery.adoption).toBeGreaterThan(0);
   game = copyOfficialGame(
-    reducer(game, schedulePolicy({ id: "battery", tier: "Off", month: 134 })),
+    reducer(
+      game,
+      schedulePolicy({ id: "battery", tier: "Off", month: firstVppMonth + 1 }),
+    ),
   );
   runMonths(game, 1);
   while (game.date.minuteOfDay < 22 * 60) tickState(game);
@@ -203,7 +198,6 @@ it("a purchase preserves one installed battery fleet, stored energy and demand q
     before.customerBatteryWhStart,
   );
   expect(transferred.deferredResidential).toEqual(before.deferredResidential);
-  expect(transferred.deferredThermal).toEqual(before.deferredThermal);
   expect(transferred.deferredCharging).toEqual(before.deferredCharging);
   expect(transferred.customerRate).toBe(before.customerRate);
   expect(

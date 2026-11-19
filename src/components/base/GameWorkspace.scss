@@ -2,8 +2,8 @@
 // On the root, because toasts render outside the workspace and clear the same dock.
 :root {
   --game-dock-bottom: max(12px, env(safe-area-inset-bottom));
-  --game-dock-button-width: 4.5rem;
-  --game-dock-button-height: 3.5rem;
+  --game-dock-button-width: 3rem;
+  --game-dock-button-height: 3rem;
   --game-dock-icon-size: 1.5rem;
   --game-dock-label-size: var(--font-size-caption-sm);
   --game-dock-label-line: 1rem;
@@ -16,7 +16,7 @@
 // These breakpoints follow available width at the chosen scale, including edge padding.
 :root:has(.gameWorkspace[data-dock-size="medium"]) {
   --game-dock-bottom: max(1.5rem, env(safe-area-inset-bottom));
-  --game-dock-button-width: 5.5rem;
+  --game-dock-button-width: 4rem;
   --game-dock-button-height: 4rem;
   --game-dock-icon-size: 1.75rem;
   --game-dock-label-size: 0.8125rem;
@@ -24,8 +24,8 @@
 }
 :root:has(.gameWorkspace[data-dock-size="large"]) {
   --game-dock-bottom: max(2.5rem, env(safe-area-inset-bottom));
-  --game-dock-button-width: 6.5rem;
-  --game-dock-button-height: 4.75rem;
+  --game-dock-button-width: 5rem;
+  --game-dock-button-height: 4.5rem;
   --game-dock-icon-size: 2.125rem;
   --game-dock-label-size: 0.9375rem;
   --game-dock-label-line: 1.25rem;
@@ -423,7 +423,7 @@
   }
 }
 
-// Compact docks keep all text labels. At high scale the rail scrolls rather than shrinking controls.
+// Compact docks keep icon targets readable; hover and hold previews supply their labels.
 .gameWorkspace[data-compact-dock="true"] #navfooter.gameActionDock {
   width: 100%;
   max-width: 100%;
@@ -434,9 +434,9 @@
   border-radius: 0;
   .gameDockAction.MuiButton-root {
     flex: 1 0 auto;
-    min-width: 4.25rem;
-    width: 4.25rem;
-    min-height: 3.5rem;
+    min-width: 3rem;
+    width: 3rem;
+    min-height: 3rem;
     gap: 0;
     border-radius: 0;
   }
@@ -451,5 +451,45 @@
 @media (prefers-reduced-motion: reduce) {
   .gameToolPanel {
     animation: none;
+  }
+}
+
+// The geographic workspace always retains its map; one right-hand surface floats above it.
+.gameWorkspace[data-persistent-map="true"] {
+  .gameMapStage {
+    max-width: none;
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .gameToolTray {
+    inset: 12px 12px var(--game-dock-clearance) auto;
+    width: min(var(--game-tool-width), calc(100% - 24px));
+    height: auto;
+    display: flex;
+    z-index: 5;
+  }
+  .gameStage[data-panel-count="0"] .gameToolTray {
+    display: none;
+  }
+  .gameToolPanel {
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    padding: 0;
+    box-shadow: 0 4px 20px var(--shadow-ring);
+    animation: none;
+  }
+  .gameToolBody {
+    .facilitiesBody,
+    .unifiedFacilitiesList,
+    .territoryAgreements {
+      padding-bottom: 16px;
+      scroll-padding-bottom: 16px;
+    }
+  }
+  @media (max-width: 599px) {
+    .gameToolTray {
+      inset: 8px 8px var(--game-dock-clearance) auto;
+      width: min(var(--game-tool-width), calc(100% - 16px));
+    }
   }
 }

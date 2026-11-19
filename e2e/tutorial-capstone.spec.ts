@@ -14,7 +14,7 @@ async function completeMission(
     testInfo.project.name.startsWith("mobile-") ? "dark" : "light",
   );
   await page.goto("/");
-  await page.getByRole("button", { name: "Play", exact: true }).click();
+  await page.getByRole("button", { name: "Tutorials", exact: true }).click();
 
   await expect(
     page.getByRole("heading", { name: "Step 1 of 5" }),

@@ -35,9 +35,8 @@ test("Space activates Play", async ({ page }) => {
   await start.focus();
   await expect(start).toBeFocused();
   await page.keyboard.press("Space");
-  await expect(page.locator(".facilities:visible")).toBeVisible();
   await expect(
-    page.getByRole("region", { name: "Step 1 of 5", exact: true }),
+    page.getByRole("heading", { name: "Choose a game", exact: true }),
   ).toBeVisible();
 });
 

@@ -214,7 +214,7 @@ test.describe("shared browser analytics", () => {
     ).toBeVisible();
     await page.getByRole("button", { name: "Play", exact: true }).click();
     await expect(
-      page.getByRole("button", { name: "Next", exact: true }),
+      page.getByRole("heading", { name: "Choose a game", exact: true }),
     ).toBeVisible();
   });
 });

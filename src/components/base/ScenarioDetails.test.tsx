@@ -139,11 +139,11 @@ it("lists each projected failure separately and removes redundant goal forecasts
   expect(outlook).not.toHaveTextContent("Projected final");
   expect(status).toContainHTML("<strong>Projected loss:</strong>");
   expect(status).toHaveClass("insightsWarning");
-  // The game's shared danger glyph, not a one-off warning triangle
+  // No icon: the label carries the warning, and the text shares the panel's left edge
   expect(
     // eslint-disable-next-line testing-library/no-node-access
     status.querySelector('[data-concept="danger"]'),
-  ).toBeInTheDocument();
+  ).toBeNull();
   const conditions = screen.getByRole("region", { name: "Goals" });
   expect(conditions).not.toHaveTextContent(
     /Projected miss|Projected to meet|Projected loss/,
@@ -333,13 +333,16 @@ it("keeps acquisition and retirement goals in scenario details", () => {
   renderDetails(game);
   const goals = screen.getByRole("region", { name: "Goals" });
   expect(
-    within(goals).getByText("Acquire a utility", { exact: true }),
+    within(goals).getByText("Acquire a competitor", { exact: true }),
   ).toBeInTheDocument();
   expect(
     within(goals).getByText("Retain customers", { exact: true }),
   ).toBeInTheDocument();
-  expect(goals).toHaveTextContent(
-    "Acquire Valley Electric or Ridge Electric · Dec 2014",
-  );
+  expect(
+    within(goals).getByText(
+      "Acquire Valley Electric or Ridge Electric · Dec 2014",
+      { exact: true },
+    ),
+  ).toBeInTheDocument();
   expect(goals).toHaveTextContent("Keep ≥90% of customer baseline by Dec 2024");
 });

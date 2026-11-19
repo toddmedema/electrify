@@ -11,6 +11,7 @@ import settingsReducer, {
   change,
 } from "../../reducers/Settings";
 import type { SettingsType } from "../../Types";
+import { createGame } from "../../testing/Simulator";
 import { workspaceLayout } from "../../WorkspaceLayout";
 import GameWorkspace, {
   MIN_FLEET_WIDTH,
@@ -22,14 +23,19 @@ import GameWorkspace, {
 } from "./GameWorkspace";
 
 jest.mock("./GameAppBar", () => () => <div>Game status</div>);
-jest.mock("../views/FacilitiesContainer", () => () => (
-  <label>
-    Facility notes
-    <input aria-label="Facility notes" defaultValue="" />
-  </label>
-));
+jest.mock(
+  "../views/FacilitiesContainer",
+  () =>
+    ({ territoryView }: { territoryView: string }) => (
+      <label data-testid="base-view" data-territory-view={territoryView}>
+        Facility notes
+        <input aria-label="Facility notes" defaultValue="" />
+      </label>
+    ),
+);
 jest.mock("../views/InsightsContainer", () => () => <div>Insight charts</div>);
 jest.mock("../views/EventLogContainer", () => () => <div>Event history</div>);
+jest.mock("./ScenarioDetails", () => () => <div>Scenario objectives</div>);
 jest.mock("../views/Programs", () => () => (
   <input aria-label="Electricity rate" type="range" defaultValue="50" />
 ));
@@ -77,17 +83,21 @@ function resize(width: number) {
   fireEvent(window, new Event("resize"));
 }
 
-function setup(width = 390, settings: Partial<SettingsType> = {}) {
+function setup(width = 390, settings: Partial<SettingsType> = {}, map = false) {
   resize(width);
+  const game = {
+    ...gameReducer(undefined, { type: "workspace-test/init" }),
+    inGame: true,
+    scenarioId: map ? 116 : 100,
+    territoryNetwork: map
+      ? createGame({ scenarioId: 116, seed: 188 }).territoryNetwork
+      : undefined,
+  };
   const store = configureStore({
     reducer: {
       card: cardReducer,
       settings: settingsReducer,
-      game: () => ({
-        ...gameReducer(undefined, { type: "workspace-test/init" }),
-        inGame: true,
-        scenarioId: 100,
-      }),
+      game: () => game,
     },
     preloadedState: {
       card: { ...initialCard, name: "FACILITIES" as const },
@@ -360,17 +370,20 @@ it.each([390, SIDE_TOOL_MIN_WIDTH - 1, SIDE_TOOL_MIN_WIDTH])(
 );
 
 it("moves the dock off a side tool only when the window centre would cover it", () => {
-  // 1024: a 360px tool reaches past the dock's left edge at the window centre.
-  expect(dockCenter(1024, 1, 0, 360)).toBe(692);
-  expect(dockCenter(1024, 0, 1, 360)).toBe(332);
+  // Icon-only controls leave room for a normal tool at the window centre.
+  expect(dockCenter(1024, 1, 0, 360)).toBeUndefined();
+  expect(dockCenter(1024, 0, 1, 360)).toBeUndefined();
+  // A wider tool still moves the dock into the remaining space.
+  expect(dockCenter(1024, 1, 0, 430)).toBe(727);
+  expect(dockCenter(1024, 0, 1, 430)).toBe(297);
   expect(dockCenter(1440, 1, 0, 403)).toBeUndefined();
   expect(dockCenter(1024, 0, 0, 360)).toBeUndefined();
 });
 
 it("reserves room for the larger dock on large windows", () => {
-  expect(dockClearanceWidth(1599)).toBe(402);
-  expect(dockClearanceWidth(1600)).toBe(482);
-  expect(dockClearanceWidth(2200)).toBe(562);
+  expect(dockClearanceWidth(1599)).toBe(282);
+  expect(dockClearanceWidth(1600)).toBe(362);
+  expect(dockClearanceWidth(2200)).toBe(442);
   // At 1600 a side tool on each side leaves the larger dock clear of both at the window centre...
   expect(dockCenter(1600, 1, 1, 448)).toBeUndefined();
   // ...but two tools on the left of a 2200px window would cover it.
@@ -446,3 +459,45 @@ it("fits columns using the chosen scale, with Single tool overriding abundant sp
     capacity: 1,
   });
 });
+
+it.each([360, 1280, 3840])(
+  "keeps the map mounted beneath exactly one right panel at %ipx",
+  async (width) => {
+    const app = setup(width, {}, true);
+    const map = screen.getByTestId("base-view");
+    const notes = within(map).getByRole("textbox", { name: "Facility notes" });
+    fireEvent.change(notes, { target: { value: "Keep this map position" } });
+    expect(map).toHaveAttribute("data-territory-view", "FACILITIES");
+    expect(
+      screen.queryByRole("button", { name: "Map" }),
+    ).not.toBeInTheDocument();
+    for (const name of [
+      "Fleet",
+      "Agreements",
+      "Programs",
+      "Insights",
+      "Events",
+      "Scenario",
+    ]) {
+      await app.user.click(app.action(name));
+      const panel = screen.getByRole("region", { name });
+      expect(screen.getAllByRole("region")).toHaveLength(1);
+      expect(panel).toHaveAttribute("data-tool-side", "right");
+      expect(map).toBeVisible();
+      expect(map).toHaveAttribute("data-territory-view", "FACILITIES");
+      expect(notes).toHaveValue("Keep this map position");
+      expect(app.action(name)).toHaveAttribute("aria-expanded", "true");
+    }
+    await app.user.click(
+      screen.getByRole("button", { name: "Close Scenario" }),
+    );
+    expect(app.store.getState().card.name).toBe("FACILITIES");
+    expect(screen.queryAllByRole("region")).toHaveLength(0);
+    expect(map).toBeVisible();
+    expect(app.action("Scenario")).toHaveFocus();
+    await app.user.click(app.action("Fleet"));
+    await app.user.click(app.action("Fleet"));
+    expect(app.store.getState().card.name).toBe("FACILITIES");
+    expect(screen.queryAllByRole("region")).toHaveLength(0);
+  },
+);

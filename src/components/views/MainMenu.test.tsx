@@ -49,8 +49,10 @@ function props(overrides: Partial<Props> = {}): Props {
     audioEnabled: true,
     hasSavedGame: false,
     hasSavedGames: false,
+    hasUnfinishedTutorials: false,
     onAudioChange: jest.fn(),
     onContinue: jest.fn(),
+    onTutorials: jest.fn(),
     onSavedGames: jest.fn(),
     onSettings: jest.fn(),
     onMods: jest.fn(),
@@ -144,7 +146,7 @@ describe("MainMenu", () => {
       ).not.toBeInTheDocument();
     },
   );
-  it("starts a new game from the primary play action", async () => {
+  it("opens game selection from Play", async () => {
     const onStart = jest.fn();
     const user = userEvent.setup();
     renderMainMenu(<MainMenu {...props({ onStart })} />);
@@ -153,24 +155,32 @@ describe("MainMenu", () => {
     expect(onStart).toHaveBeenCalled();
     expect(screen.queryByText("Continue")).not.toBeInTheDocument();
     expect(
+      screen.queryByRole("button", { name: "Tutorials" }),
+    ).not.toBeInTheDocument();
+    expect(
       screen.queryByRole("button", { name: "Saved games" }),
     ).not.toBeInTheDocument();
   });
 
-  it("prioritizes continuing a save while offering mission selection and the save library", async () => {
+  it("offers unfinished tutorials between Continue and Play", async () => {
     const onSavedGames = jest.fn();
+    const onTutorials = jest.fn();
     renderMainMenu(
       <MainMenu
-        {...props({ hasSavedGame: true, hasSavedGames: true, onSavedGames })}
+        {...props({
+          hasSavedGame: true,
+          hasSavedGames: true,
+          hasUnfinishedTutorials: true,
+          onSavedGames,
+          onTutorials,
+        })}
       />,
     );
 
     expect(
       screen.getByRole("button", { name: "Continue" }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "New game" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Play" })).toBeInTheDocument();
     expect(
       screen.getByRole("navigation", { name: "Game resources" }),
     ).toBeInTheDocument();
@@ -179,9 +189,12 @@ describe("MainMenu", () => {
     ).getAllByRole("button");
     expect(buttons.map((button) => button.textContent)).toEqual([
       "Continue",
-      "New game",
+      "Tutorials",
+      "Play",
       "Saved games",
     ]);
+    await userEvent.click(screen.getByRole("button", { name: "Tutorials" }));
+    expect(onTutorials).toHaveBeenCalledTimes(1);
     await userEvent.click(screen.getByRole("button", { name: "Saved games" }));
     expect(onSavedGames).toHaveBeenCalledTimes(1);
   });

@@ -1,11 +1,4 @@
-import {
-  act,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-  within,
-} from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import {
   deriveExpandedSummary,
   getTimeFromTimeline,
@@ -521,144 +514,58 @@ describe("GameAppBar", () => {
     }));
     expect(reserveCapacityW(game, now)).toBe(now.reserveW);
     renderAppBar({ game: { ...game, inGame: true } });
+    expect(screen.getByText(/^NOW/)).toBeInTheDocument();
     expect(
-      screen.getByText(/^Stable, \d.*[kMGT]?W reserve$/),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByLabelText(/Current grid status: Stable, .* reserve/),
+      screen.getByLabelText(/Current grid status: NOW .* reserve/),
     ).toBeVisible();
   });
 
-  it("shrinks a stable grid to a checked icon on phones, with the full readout on hover", async () => {
+  it("keeps a stable current reserve separate from a future shortfall on phones", async () => {
     mockPaneLayout = false;
-    try {
-      const game = createGame({ scenarioId: 101 });
-      const now = getTimeFromTimeline(game.date.minute, game.timeline)!;
-      now.supplyW = now.demandW;
-      now.demandW = 72e6;
-      now.reserveW = 10e6;
-      expect(stableGridSummary(game, now)).toBe(
-        "Stable, 72MW demand met with 10MW reserve",
-      );
-      renderAppBar({ game: { ...game, inGame: true } });
-      expect(screen.queryByText(/^Stable, /)).not.toBeInTheDocument();
-      const status = screen.getByRole("button", {
-        name: "Current grid status: Stable, 72MW demand met with 10MW reserve",
-      });
-      fireEvent.mouseOver(status);
-      expect(
-        await screen.findByRole("tooltip", {
-          name: "Stable, 72MW demand met with 10MW reserve",
-        }),
-      ).toBeVisible();
-    } finally {
-      mockPaneLayout = true;
-    }
+    const game = createGame({ scenarioId: 101 });
+    const now = getTimeFromTimeline(game.date.minute, game.timeline)!;
+    now.demandW = 72e6;
+    now.supplyW = now.demandW;
+    now.reserveW = 10e6;
+    const later = game.timeline.find((tick) => tick.minute > now.minute)!;
+    later.demandW = later.supplyW + 120e6;
+    expect(getGridHealth(game, now)).toMatchObject({
+      state: "stable",
+      metric: "10MW reserve",
+    });
+    expect(stableGridSummary(game, now)).toBe(
+      "Stable, 72MW demand met with 10MW reserve",
+    );
+    renderAppBar({ game: { ...game, inGame: true } });
+    const status = screen.getByRole("button", {
+      name: /Current grid status: NOW 10MW reserve. FUTURE Short at/,
+    });
+    expect(status).toHaveTextContent(/NOW 10MW reserve/);
+    expect(status).toHaveTextContent(/FUTURE Short at/);
+    fireEvent.click(status);
+    expect(
+      await screen.findByRole("dialog", { name: "Grid status" }),
+    ).toHaveTextContent("About 120MW short");
+    mockPaneLayout = true;
   });
 
-  it.each(["low-reserve", "at-limit", "blackout-ahead", "blackout"] as const)(
-    "keeps %s compact on phones with details available by tap",
-    async (state) => {
-      mockPaneLayout = false;
-      try {
-        const game = createGame({ scenarioId: 101 });
-        const now = getTimeFromTimeline(game.date.minute, game.timeline)!;
-        now.supplyW = now.demandW;
-        now.reserveW = state === "at-limit" ? 0 : now.demandW * 0.05;
-        if (state === "blackout") now.supplyW = now.demandW - 10e6;
-        if (state === "blackout-ahead") {
-          const later = game.timeline.find((tick) => tick.minute > now.minute)!;
-          later.demandW = later.supplyW + 10e6;
-        }
-        const health = getGridHealth(game, now);
-        expect(health.state).toBe(state);
-        const summary = `${health.label}, ${health.metric}`;
-        renderAppBar({ game: { ...game, inGame: true } });
-        const status = screen.getByRole("button", {
-          name: `Current grid status: ${summary}`,
-        });
-        expect(status).toHaveTextContent(/^(Low|Limit|Short|Blackout)$/);
-        expect(screen.queryByText(summary)).not.toBeInTheDocument();
-        fireEvent.click(status);
-        expect(
-          await screen.findByRole("tooltip", { name: summary }),
-        ).toBeVisible();
-        fireEvent.click(status);
-        await waitFor(() => {
-          expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
-        });
-      } finally {
-        mockPaneLayout = true;
-      }
+  it.each([
+    {
+      reserveW: 5e6,
+      supplyW: 100e6,
+      state: "low-reserve",
+      metric: "5MW reserve",
+    },
+    { reserveW: 0, supplyW: 100e6, state: "at-limit", metric: "0MW reserve" },
+    { reserveW: 500e6, supplyW: 90e6, state: "blackout", metric: "10MW short" },
+  ])(
+    "distinguishes the current $state",
+    ({ reserveW, supplyW, state, metric }) => {
+      const game = createGame({ scenarioId: 101 });
+      const now = { ...game.timeline[0], demandW: 100e6, supplyW, reserveW };
+      expect(getGridHealth(game, now)).toMatchObject({ state, metric });
     },
   );
-
-  it("warns when reachable reserve falls to five percent of demand", () => {
-    const game = createGame({ scenarioId: 101 });
-    const now = getTimeFromTimeline(game.date.minute, game.timeline)!;
-    now.supplyW = now.demandW;
-    now.reserveW = now.demandW * 0.05;
-    expect(getGridHealth(game, now)).toMatchObject({
-      state: "low-reserve",
-      metric: expect.stringMatching(/\(5%\)/),
-    });
-    renderAppBar({ game: { ...game, inGame: true } });
-    expect(
-      screen.getByLabelText(/Current grid status: Low reserve/),
-    ).toBeVisible();
-  });
-
-  it("distinguishes zero reserve from a blackout and prioritizes actual shortages", () => {
-    const game = createGame({ scenarioId: 101 });
-    const now = getTimeFromTimeline(game.date.minute, game.timeline)!;
-    expect(
-      getGridHealth(game, {
-        ...now,
-        supplyW: now.demandW,
-        reserveW: 0,
-      } as TickPresentFutureType),
-    ).toMatchObject({
-      state: "at-limit",
-      metric: "0W reserve",
-    });
-    expect(
-      getGridHealth(game, {
-        ...now,
-        supplyW: now.demandW - 373000000,
-        reserveW: 500000000,
-      } as TickPresentFutureType),
-    ).toMatchObject({
-      state: "blackout",
-      metric: "373MW short",
-    });
-  });
-
-  it("reports a shortfall later today instead of a reassuring reserve", () => {
-    const game = createGame({ scenarioId: 101 });
-    const now = getTimeFromTimeline(game.date.minute, game.timeline)!;
-    now.supplyW = now.demandW;
-    now.reserveW = now.demandW * 0.5;
-    const later = game.timeline.find((tick) => tick.minute > now.minute)!;
-    later.demandW = later.supplyW + 120_000_000;
-    expect(getGridHealth(game, now)).toMatchObject({
-      state: "blackout-ahead",
-      label: expect.stringMatching(/^Blackout at \d+ [AP]M$/),
-      metric: "120MW short",
-    });
-    // A blackout happening now still outranks the one expected later.
-    expect(
-      getGridHealth(game, {
-        ...now,
-        supplyW: now.demandW - 1_000_000,
-      } as TickPresentFutureType).state,
-    ).toBe("blackout");
-    renderAppBar({ game: { ...game, inGame: true } });
-    const readout = screen.getByLabelText(
-      /Current grid status: Blackout at \d+ [AP]M, 120MW short/,
-    );
-    expect(readout).toHaveClass("statusWarning");
-    expect(screen.queryByText(/^Stable/)).toBeNull();
-  });
 
   it("shows active events in the mission row and opens Events", () => {
     const onEvidence = jest.fn();

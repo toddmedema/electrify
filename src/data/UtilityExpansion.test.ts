@@ -12,12 +12,16 @@ import { getDateFromMinute } from "../helpers/DateTime";
 import { weatherLocationIds } from "../helpers/WeatherLocations";
 import { loadSimData } from "../testing/SimData";
 import { climateLoadArchetype, demandByTypeAt } from "./DemandProfiles";
-import { corridorsForLocation } from "./AdjacentMarkets";
+import {
+  adjacentMarketForCorridor,
+  corridorsForLocation,
+} from "./AdjacentMarkets";
 import { getHydroAvailability, resolveStartingHydroSites } from "./HydroSites";
 import { getViableLocationCount } from "./FacilitySites";
 import { importEmissionsKgco2ePerMWh } from "./ImportEmissions";
 import { getWeather, hasWeather, initWeather } from "./Weather";
 import { SCENARIOS } from "./Scenarios";
+import { GREEN_UPLANDS_CORRIDOR_ID } from "./Territories";
 import {
   UTILITY_AREAS,
   INHERITED_COLD_PACKAGE_COST_2005,
@@ -156,12 +160,20 @@ describe("Across the Valley catalog", () => {
         .map((corridor) => corridor.capacityW),
     ).toEqual([300e6, 350e6, 60e6]);
     const corridors = allCorridors.filter((corridor) => corridor.buildCost > 0);
-    expect(corridors.map(({ id }) => id)).toEqual(
-      UTILITY_TARGETS.map(({ corridorId }) => corridorId),
-    );
+    expect(corridors.map(({ id }) => id)).toEqual([
+      ...UTILITY_TARGETS.map(({ corridorId }) => corridorId),
+      GREEN_UPLANDS_CORRIDOR_ID,
+    ]);
     corridors.forEach((corridor) => {
-      expect(corridor.capacityW).toBe(100e6);
+      expect(corridor.capacityW).toBe(
+        corridor.id === GREEN_UPLANDS_CORRIDOR_ID ? 120e6 : 100e6,
+      );
       expect(corridor.routeType).toBe("NEW");
+    });
+    expect(adjacentMarketForCorridor(GREEN_UPLANDS_CORRIDOR_ID)).toMatchObject({
+      basePricePerMWh: 0,
+      availableSupplyW: 0,
+      availableDemandW: 0,
     });
     const assets = Object.values(UTILITY_AREAS).flatMap(({ facilities }) =>
       facilities.map(({ assetId }) => assetId),

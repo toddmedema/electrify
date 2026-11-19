@@ -58,6 +58,8 @@ export function getBuildAvailability(options: {
   maxSizeLabel: React.ReactNode;
   location?: LocationType;
   viableLocationsRemaining?: number;
+  /** A purchased territory owns its site inventory instead of regional geology. */
+  siteInventory?: SiteInventory;
 }): BuildAvailability {
   const place = shortPlaceName(options.location);
   if (options.hydroAvailability) {
@@ -78,11 +80,13 @@ export function getBuildAvailability(options: {
       secondaryText: options.description,
     };
   }
-  const sites = getSiteInventory(
-    options.name,
-    options.location,
-    options.viableLocationsRemaining,
-  );
+  const sites =
+    options.siteInventory ??
+    getSiteInventory(
+      options.name,
+      options.location,
+      options.viableLocationsRemaining,
+    );
   if (sites && sites.total === 0) {
     const noun = SITE_NOUNS[options.name] || options.name.toLowerCase();
     return {

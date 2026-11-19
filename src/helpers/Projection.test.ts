@@ -219,18 +219,6 @@ it("forecasts weather and its demand effects instead of revealing the future rec
 function acquiredGame(seed = 12345) {
   let game = cloneDeep(createGame({ scenarioId: 116, seed }));
   game.timeline[0].cash = 1e9;
-  game = cloneDeep(
-    reducer(
-      game,
-      buildTransmissionLine({
-        corridorId: "vt-champlain-ridge",
-        financed: true,
-      }),
-    ),
-  );
-  game.transmission!.lines.find(
-    (line) => line.corridorId === "vt-champlain-ridge",
-  )!.yearsToBuildLeft = 0;
   const quote = acquisitionQuote(game, "ridge-electric")!;
   game = cloneDeep(
     reducer(

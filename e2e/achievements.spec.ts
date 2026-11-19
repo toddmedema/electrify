@@ -171,7 +171,7 @@ test("a real mission stacks simultaneous awards and persists them without repeat
   }, STORAGE_KEY);
   await page.clock.install();
   await page.goto("/");
-  await page.getByRole("button", { name: "Play", exact: true }).click();
+  await page.getByRole("button", { name: "Tutorials", exact: true }).click();
   await page.getByRole("button", { name: "Next", exact: true }).click();
   await page.getByRole("button", { name: "Inspect Coal", exact: true }).click();
   await page.getByRole("button", { name: "Next", exact: true }).click();

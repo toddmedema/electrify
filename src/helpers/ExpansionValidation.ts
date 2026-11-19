@@ -1,5 +1,11 @@
+import { landCustomerMarket } from "./TerritoryCustomers";
+import {
+  MAX_FACILITY_EXPANSION_COST,
+  validExpandedFacilityCapacity,
+} from "./FacilityExpansion";
 import {
   isStorage,
+  type FacilityOperatingType,
   type GameType,
   type UtilityNetworkAsset,
   type UtilityTargetId,
@@ -27,8 +33,11 @@ import {
   isUtilityExpansionGame,
   validUtilityExpansionSetup,
   validUtilityExpansionHeader,
-  ownedUtilityConnection,
 } from "./ExpansionContext";
+import {
+  validTerritoryNetwork,
+  type TerritoryPurchaseContext,
+} from "./TerritoryValidation";
 
 const nonnegative = (value: unknown): value is number =>
   typeof value === "number" && Number.isFinite(value) && value >= 0;
@@ -50,11 +59,72 @@ const obsoleteAreaState = (game: GameType) =>
     Object.prototype.hasOwnProperty.call(t, "areaTicks"),
   );
 
+function validAcquiredFacilityExpansion(
+  game: GameType,
+  facility: FacilityOperatingType,
+  inherited: FacilityOperatingType,
+): boolean {
+  const expansion = facility.acquiredExpansion;
+  if (expansion === undefined)
+    return (
+      facility.peakW === inherited.peakW &&
+      close(facility.buildCost, inherited.buildCost) &&
+      (facility.constructionKgco2eTotal ?? 0) === 0 &&
+      (facility.constructionKgco2eEmitted ?? 0) === 0
+    );
+  if (!record(expansion) || Object.keys(expansion).length !== 4) return false;
+  const {
+    addedCapacityW,
+    investedCapital,
+    constructionKgco2eTotal,
+    constructionKgco2eEmitted,
+  } = expansion;
+  const sequence = facility.expansionSequence;
+  if (!sequence || !Number.isSafeInteger(sequence)) return false;
+  const settledProjects = sequence - (facility.expansionInProgress ? 1 : 0);
+  const hasAddedCapacity = addedCapacityW > 0;
+  const hasInvestedCapital = investedCapital > 0;
+  return (
+    settledProjects > 0 &&
+    [
+      addedCapacityW,
+      investedCapital,
+      constructionKgco2eTotal,
+      constructionKgco2eEmitted,
+    ].every(nonnegative) &&
+    hasAddedCapacity === hasInvestedCapital &&
+    (!hasAddedCapacity ||
+      validExpandedFacilityCapacity(
+        game,
+        facility,
+        facility.peakW,
+        facility.peakWh,
+      )) &&
+    investedCapital / settledProjects <= MAX_FACILITY_EXPANSION_COST &&
+    (hasAddedCapacity || constructionKgco2eTotal > 0) &&
+    close(constructionKgco2eEmitted, constructionKgco2eTotal) &&
+    close(facility.peakW, inherited.peakW + addedCapacityW) &&
+    close(facility.buildCost, inherited.buildCost + investedCapital) &&
+    facility.constructionKgco2eTotal === constructionKgco2eTotal &&
+    facility.constructionKgco2eEmitted === constructionKgco2eEmitted
+  );
+}
+
 /** Current saves contain one company and one bounded, receipt-owned acquisition ledger. */
-export function validUtilityExpansion(game: GameType): boolean {
+export function validUtilityExpansion(
+  game: GameType,
+  peers?: TerritoryPurchaseContext,
+): boolean {
   if (obsoleteAreaState(game)) return false;
   const state = game.utilityExpansion;
-  if (!isUtilityExpansionGame(game)) return state === undefined;
+  if (!isUtilityExpansionGame(game))
+    return (
+      state === undefined &&
+      game.facilities.every(
+        (facility) => facility.acquiredExpansion === undefined,
+      ) &&
+      validTerritoryNetwork(game, peers)
+    );
   if (
     !state ||
     !record(state) ||
@@ -71,6 +141,7 @@ export function validUtilityExpansion(game: GameType): boolean {
     (game.customScenario && !validUtilityExpansionSetup(game.customScenario))
   )
     return false;
+  if (!validTerritoryNetwork(game, peers)) return false;
   const targets = new Set<UtilityTargetId>();
   for (const receipt of state.acquisitions) {
     if (
@@ -90,6 +161,7 @@ export function validUtilityExpansion(game: GameType): boolean {
   }
   const pool =
     UTILITY_AREAS.champlain.addressablePool +
+    landCustomerMarket(game) +
     state.acquisitions.reduce(
       (sum, receipt) => sum + UTILITY_AREAS[receipt.targetId].addressablePool,
       0,
@@ -101,14 +173,6 @@ export function validUtilityExpansion(game: GameType): boolean {
     !nonnegative(current.customers) ||
     current.customers >
       customerMarketSizeAt(pool, game.date.minute) * (1 + 1e-9)
-  )
-    return false;
-  if (
-    game.transmission?.lines.some(
-      (line) =>
-        ownedUtilityConnection(game, line.corridorId) &&
-        (line.paused || line.currentFlowW !== 0),
-    )
   )
     return false;
   const networks = new Set<UtilityTargetId>();
@@ -216,7 +280,10 @@ export function validUtilityExpansion(game: GameType): boolean {
   const assetIds = new Set<string>();
   for (const facility of game.facilities) {
     const id = facility.startingAssetId;
-    if (!id) continue;
+    if (!id) {
+      if (facility.acquiredExpansion !== undefined) return false;
+      continue;
+    }
     const definition = Object.values(UTILITY_AREAS).find((portfolio) =>
       portfolio.facilities.some((asset) => asset.assetId === id),
     );
@@ -228,6 +295,7 @@ export function validUtilityExpansion(game: GameType): boolean {
       return false;
     assetIds.add(id);
     const expected = expectedAssets.get(id);
+    if (facility.acquiredExpansion !== undefined && !expected) return false;
     const packageCost = INHERITED_COLD_PACKAGE_COST_2005[id];
     if (
       packageCost !== undefined &&
@@ -241,16 +309,14 @@ export function validUtilityExpansion(game: GameType): boolean {
       (facility.name !== expected.name ||
         facility.fuel !== expected.fuel ||
         facility.gasCycle !== expected.gasCycle ||
-        facility.peakW !== expected.peakW ||
-        !close(facility.buildCost, expected.buildCost) ||
+        isStorage(facility) !== isStorage(expected) ||
+        !validAcquiredFacilityExpansion(game, facility, expected) ||
         facility.minuteOperational !== expected.minuteOperational ||
         facility.minuteCreated !== expected.minuteCreated ||
         facility.loanAmountLeft !== 0 ||
         facility.loanAmountTotal !== 0 ||
         facility.loanMonthlyPayment !== 0 ||
-        facility.interestRate !== 0 ||
-        (facility.constructionKgco2eTotal ?? 0) !== 0 ||
-        (facility.constructionKgco2eEmitted ?? 0) !== 0)
+        facility.interestRate !== 0)
     )
       return false;
   }

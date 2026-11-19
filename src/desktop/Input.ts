@@ -56,6 +56,7 @@ export function startDesktopInput(
   let runningSpeed = "NORMAL";
   let previousState = store.getState();
   let chartFrame: number | undefined;
+  let mapFocusFrame: number | undefined;
   let editingText = false;
   let choosingTextOption: HTMLElement | null = null;
   const gameplay = () =>
@@ -169,8 +170,16 @@ export function startDesktopInput(
     next?.click();
   };
   const pane = (delta: number) => {
-    const buttons = controls().filter((button) =>
-      button.matches(".gameActionDock button"),
+    if (mapFocusFrame !== undefined) cancelAnimationFrame(mapFocusFrame);
+    mapFocusFrame = undefined;
+    const buttons = controls().filter(
+      (button) =>
+        button.matches(".gameActionDock button") &&
+        button.dataset.gameDestination !== "FACILITIES" &&
+        // The map's Build action starts project selection. Bumpers cycle the map and its tools.
+        !button.matches(
+          '.gameWorkspace[data-map-workspace="true"] .gameDockBuild',
+        ),
     );
     const card = store.getState().card.name;
     const active =
@@ -183,6 +192,14 @@ export function startDesktopInput(
     const next = (current + delta + buttons.length + 1) % (buttons.length + 1);
     if (next === 0) {
       store.dispatch(navigate("FACILITIES"));
+      mapFocusFrame = requestAnimationFrame(() => {
+        mapFocusFrame = undefined;
+        if (!live || !foreground || store.getState().card.name !== "FACILITIES")
+          return;
+        controls()
+          .find((control) => control.matches(".territoryMapBuyToggle"))
+          ?.focus({ preventScroll: true });
+      });
     } else {
       const button = buttons[next - 1];
       const panelId = button.getAttribute("aria-controls");
@@ -384,6 +401,11 @@ export function startDesktopInput(
   });
   const surfaceSelector =
     "[role=dialog],[role=menu],[role=listbox],.MuiModal-root,.base_main,.gameWorkspace";
+  // MUI can reveal an already-mounted inspector by unhiding its ancestor.
+  // Sync before the next native intent, which must not become a context warm-up frame.
+  const containsSurface = (node: Node) =>
+    node instanceof Element &&
+    (node.matches(surfaceSelector) || !!node.querySelector(surfaceSelector));
   const observer = new MutationObserver((mutations) => {
     if (
       getInputPresentation().active &&
@@ -397,16 +419,11 @@ export function startDesktopInput(
     if (
       mutations.some((mutation) =>
         mutation.type === "attributes"
-          ? (mutation.target as Element).matches(surfaceSelector)
+          ? containsSurface(mutation.target)
           : [
               ...Array.from(mutation.addedNodes),
               ...Array.from(mutation.removedNodes),
-            ].some(
-              (node) =>
-                node instanceof Element &&
-                (node.matches(surfaceSelector) ||
-                  !!node.querySelector(surfaceSelector)),
-            ),
+            ].some(containsSurface),
       )
     )
       sync();
@@ -415,7 +432,7 @@ export function startDesktopInput(
     childList: true,
     subtree: true,
     attributes: true,
-    attributeFilter: ["aria-hidden", "hidden", "inert"],
+    attributeFilter: ["aria-hidden", "hidden", "inert", "class", "style"],
   });
   // Text, disclosure and chart layout can settle after focus moves. Keep that actual
   // control exposed as its ancestors resize, without changing focus or a remembered scroll.
@@ -516,6 +533,7 @@ export function startDesktopInput(
     live = false;
     clearPointer();
     if (chartFrame !== undefined) cancelAnimationFrame(chartFrame);
+    if (mapFocusFrame !== undefined) cancelAnimationFrame(mapFocusFrame);
     observer.disconnect();
     revealObserver?.disconnect();
     if (revealFrame !== undefined) cancelAnimationFrame(revealFrame);

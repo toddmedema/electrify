@@ -85,8 +85,10 @@ export interface PurchaseReviewDialogProps {
   /** A visible cancel action in addition to the dialog close control. */
   cancelLabel?: string;
   onClose: () => void;
-  /** One submission at a time; resolving false unlocks a rejected purchase for retry. */
-  onPurchase: (financed: boolean) => void | boolean | Promise<void | boolean>;
+  /** A rejected purchase may return a message to display before retry. */
+  onPurchase: (
+    financed: boolean,
+  ) => void | boolean | string | Promise<void | boolean | string>;
 }
 
 /** Catalog quotes stay stable while this review reads the balance directly from the game. */
@@ -120,10 +122,12 @@ export default function PurchaseReviewDialog(
   // unmounted. The ref closes that window synchronously, and reopening rearms it.
   const purchaseSubmitted = React.useRef(false);
   const [submitting, setSubmitting] = React.useState(false);
+  const [purchaseError, setPurchaseError] = React.useState<string>();
   React.useEffect(() => {
     if (open) {
       purchaseSubmitted.current = false;
       setSubmitting(false);
+      setPurchaseError(undefined);
     }
   }, [open]);
   const loan = purchaseTerms(
@@ -151,8 +155,10 @@ export default function PurchaseReviewDialog(
     }
     purchaseSubmitted.current = true;
     setSubmitting(true);
+    setPurchaseError(undefined);
     const result = await onPurchase(financed);
-    if (result === false) {
+    if (result === false || typeof result === "string") {
+      if (typeof result === "string") setPurchaseError(result);
       purchaseSubmitted.current = false;
       setSubmitting(false);
     }
@@ -277,6 +283,11 @@ export default function PurchaseReviewDialog(
         </>
       }
     >
+      {purchaseError && (
+        <Typography role="alert" color="error" sx={{ mx: 2, mb: 2 }}>
+          {purchaseError}
+        </Typography>
+      )}
       {props.preface}
       <DecisionImpactPreview facts={facts} />
       {props.afterFacts}

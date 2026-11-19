@@ -49,19 +49,7 @@ function ready() {
     "epoch",
   );
   currentTick(world.grids[0])!.cash = 1e9;
-  expect(corridorsForGame(world.grids[0]).map((c) => c.id)).toEqual(
-    expect.arrayContaining(["vt-champlain-valley", "vt-champlain-ridge"]),
-  );
-  expect(
-    command(world, {
-      kind: "action",
-      name: "buildTransmissionLine",
-      payload: { corridorId: "vt-champlain-ridge", financed: true },
-    }),
-  ).toBeUndefined();
-  world.grids[0].transmission!.lines.find(
-    (l) => l.corridorId === "vt-champlain-ridge",
-  )!.yearsToBuildLeft = 0;
+  expect(corridorsForGame(world.grids[0])).toEqual([]);
   return world;
 }
 

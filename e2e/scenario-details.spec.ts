@@ -138,7 +138,12 @@ test("scenario outlook flags insolvency with the first projected month-end", asy
   const outlook = panel.getByRole("region", { name: "Score outlook" });
   const failure = outlook.getByRole("status", { name: "Scenario forecast" });
   await expect(failure.locator("strong")).toHaveText("Projected loss:");
-  await expect(failure.locator("svg")).toBeVisible();
+  // No icon: the label carries the warning, and the text shares the title's left edge
+  await expect(failure.locator("svg")).toHaveCount(0);
+  const title = outlook.getByRole("heading", { name: "Score outlook" });
+  expect((await failure.boundingBox())!.x).toBeCloseTo(
+    (await title.boundingBox())!.x,
+  );
   await expect(outlook).not.toContainText("If you build nothing");
   await expect(failure.getByRole("listitem").first()).toContainText(
     /Cash below \$0 by \w+ \d{4}\./,

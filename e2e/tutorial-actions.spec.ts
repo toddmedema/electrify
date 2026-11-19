@@ -41,11 +41,7 @@ for (const [index, mission] of missions.entries()) {
       },
     );
     await page.goto("/");
-    await page.getByRole("button", { name: "Play", exact: true }).click();
-    if (index > 0)
-      await page
-        .getByRole("button", { name: `Start ${mission.name}`, exact: true })
-        .click();
+    await page.getByRole("button", { name: "Tutorials", exact: true }).click();
     await expect(page.locator(".tutorialHud")).toBeVisible();
     const dock = page.getByRole("navigation", { name: "Game actions" });
     if (mission.actions.length) {

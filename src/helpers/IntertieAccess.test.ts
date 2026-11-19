@@ -64,10 +64,15 @@ describe("authored utility transmission access", () => {
       row.importAccessWByTier?.slice(1).forEach((supply, tier) => {
         expect(supply).toBeGreaterThan(row.importAccessWByTier![tier]);
       });
-      // An authored allocation on a path that did not exist yet would be unreachable
+      // Valley retains supplier pricing profiles without purchasable wire projects.
+      const reachable = corridorsForGame(game(row.scenarioId)).map(
+        ({ id }) => id,
+      );
       expect(
-        corridorsForGame(game(row.scenarioId)).map(({ id }) => id),
-      ).toContain(row.corridorId);
+        row.scenarioId === 116
+          ? reachable.length === 0
+          : reachable.includes(row.corridorId),
+      ).toBe(true);
     }
     for (const authored of SCENARIOS) {
       const state = game(authored.id);

@@ -12,9 +12,7 @@ import { createGame } from "../testing/Simulator";
 import { runMonths } from "../testing/SimulationTestHelpers";
 import { SCENARIOS } from "../data/Scenarios";
 import { STORAGE } from "../data/Facilities";
-import { UTILITY_TARGETS } from "../data/UtilityExpansion";
 import gameReducer, {
-  buildTransmissionLine,
   previewUtilityAcquisition,
   togglePauseFacility,
   tickState,
@@ -71,22 +69,10 @@ function finished(patch: Partial<MonthlyHistoryType> = {}, id = 101): GameType {
 }
 const earned = (state: GameType) => state.desktopAchievements!.earned;
 function connectedUtility(targetIds: UtilityTargetId[]): GameType {
-  let state = game(116);
+  const state = game(116);
   currentTick(state)!.cash = 2e9;
-  for (const targetId of targetIds) {
-    const corridorId = UTILITY_TARGETS.find(
-      ({ id }) => id === targetId,
-    )!.corridorId;
-    state = cloneDeep(
-      gameReducer(
-        state,
-        buildTransmissionLine({ corridorId, financed: false }),
-      ),
-    );
-    state.transmission!.lines.find(
-      (line) => line.corridorId === corridorId,
-    )!.yearsToBuildLeft = 0;
-  }
+  for (const targetId of targetIds)
+    expect(acquisitionQuote(state, targetId)).toBeDefined();
   return state;
 }
 beforeAll(() => installSimulationHooks(hooks));

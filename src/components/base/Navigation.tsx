@@ -2,15 +2,23 @@ import * as React from "react";
 import { Badge, Button, Tooltip } from "@mui/material";
 import HistoryIcon from "@mui/icons-material/History";
 import InsertChartIcon from "@mui/icons-material/InsertChart";
+import FactoryIcon from "@mui/icons-material/Factory";
+import HandshakeIcon from "@mui/icons-material/Handshake";
 import ErrorIcon from "@mui/icons-material/Error";
 import { useAppSelector, useAppDispatch } from "../../Store";
-import { CardNameType, CardType, GameToolType } from "../../Types";
+import {
+  CardNameType,
+  CardType,
+  GameToolType,
+  MapWorkspaceView,
+} from "../../Types";
 import { navigate, selectCardName } from "../../reducers/Card";
 import { getScenario } from "../../data/Scenarios";
 import ConceptIcon from "./ConceptIcon";
 import useDockLabels from "./useDockLabels";
 import { TOOL_SHORTCUTS } from "./KeyboardShortcuts";
 import { useControllerInput } from "../../desktop/InputPresentation";
+import { hasTerritoryNetwork } from "../../helpers/Territories";
 import { selectTutorialActions } from "../../reducers/Tutorial";
 
 export interface StateProps {
@@ -55,6 +63,21 @@ export const GAME_TOOLS: {
     icon: <ConceptIcon concept="goal" />,
   },
 ];
+export const MAP_VIEWS: {
+  id: Exclude<MapWorkspaceView, "FACILITIES">;
+  label: string;
+  triggerId: string;
+  icon: React.ReactElement;
+}[] = [
+  { id: "FLEET", label: "Fleet", triggerId: "fleetNav", icon: <FactoryIcon /> },
+  {
+    id: "AGREEMENTS",
+    label: "Agreements",
+    triggerId: "agreementsNav",
+    icon: <HandshakeIcon />,
+  },
+];
+
 export function gameToolForCard(card: CardNameType): GameTool | undefined {
   return card.startsWith("BUILD_")
     ? "BUILD_GENERATORS"
@@ -67,7 +90,13 @@ export default function Navigation({
   openTools,
   onToggle,
   destination,
+  mapView = "FACILITIES",
+  onMapView,
+  showMapBuild = false,
 }: {
+  mapView?: MapWorkspaceView;
+  onMapView?: (view: MapWorkspaceView) => void;
+  showMapBuild?: boolean;
   openTools?: GameTool[];
   onToggle?: (tool: GameTool) => void;
   destination?: (tool: GameTool) => CardNameType;
@@ -96,9 +125,13 @@ export default function Navigation({
   const opened = openTools ?? [gameToolForCard(cardName)];
   const tutorialActions = useAppSelector(selectTutorialActions);
   const { labelId, fromTouch, buttonLabels, dockLabels } = useDockLabels();
+  const mapWorkspace = useAppSelector((state) =>
+    hasTerritoryNetwork(state.game),
+  );
   const tools = GAME_TOOLS.filter(
     (tool) =>
       (hasScenarioDetails || tool.id !== "SCENARIO") &&
+      (!mapWorkspace || showMapBuild || tool.id !== "BUILD_GENERATORS") &&
       (!tutorialActions || tutorialActions.includes(tool.id)),
   );
   if (!tools.length) return null;
@@ -109,6 +142,39 @@ export default function Navigation({
       aria-label="Game actions"
       {...dockLabels}
     >
+      {mapWorkspace &&
+        MAP_VIEWS.map((view) => {
+          const open = mapView === view.id;
+          return (
+            <Tooltip
+              key={view.id}
+              title={view.label}
+              placement="top"
+              open={labelId === view.triggerId}
+              disableHoverListener
+              disableFocusListener
+              disableTouchListener
+              disableInteractive
+            >
+              <Button
+                id={view.triggerId}
+                {...buttonLabels}
+                className={`gameDockAction${open ? " gameDockActionOpen" : ""}`}
+                aria-label={view.label}
+                aria-expanded={open}
+                aria-controls={open ? `tool-${view.id}` : undefined}
+                data-game-destination={view.id}
+                onClick={() =>
+                  onMapView
+                    ? onMapView(open ? "FACILITIES" : view.id)
+                    : dispatch(navigate(open ? "FACILITIES" : view.id))
+                }
+              >
+                <Badge>{view.icon}</Badge>
+              </Button>
+            </Tooltip>
+          );
+        })}
       {tools.map((tool) => {
         const open = opened.includes(tool.id);
         return (
@@ -169,11 +235,6 @@ export default function Navigation({
               >
                 {tool.icon}
               </Badge>
-              {!window.electrifyCouch && (
-                <span className="gameDockLabel" aria-hidden="true">
-                  {tool.label}
-                </span>
-              )}
               {tool.id === "EVENTS" && emergency && (
                 <span className="srOnly" id="eventsEmergency">
                   Ongoing emergency

@@ -17,7 +17,7 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
-import { GENERATORS } from "../../data/Facilities";
+import { GENERATORS, getBuildFacilityQuote } from "../../data/Facilities";
 import { createGame } from "../../testing/Simulator";
 import * as ExpectedOutput from "../../helpers/ExpectedOutput";
 import * as GameReducer from "../../reducers/Game";
@@ -35,11 +35,86 @@ import { purchaseTerms } from "../../helpers/Financials";
 import { computeOutlook } from "../base/OutlookForecast";
 import { isStorage, type EvidenceRequestType } from "../../Types";
 import { LEGACY_SCENARIOS } from "../../data/LegacyCampaign";
+import {
+  availableTerritoryTiles,
+  territoryTilePowerLimit,
+} from "../../helpers/TerritoryTiles";
+import * as TerritoryTileData from "../../data/TerritoryTiles";
+import { wToSliderTick } from "../../helpers/BuildSizing";
+import {
+  TERRITORY_BUILD_MEMORY_KEY,
+  TERRITORY_TILE_BUILD_MEMORY_KEY,
+  territoryBuildTileName,
+} from "../base/TerritoryBuildDestination";
 
 jest.mock(
   "../base/ManualLink",
   () => (props: { children?: React.ReactNode }) => <>{props.children}</>,
 );
+
+it("uses the map-selected physical tile for the generator review and purchase", () => {
+  const game = createGame({ scenarioId: 116, seed: 611 });
+  game.timeline[0].cash = 1e12;
+  const wind = GENERATORS(game, 50e6, [], []).find(
+    (candidate) => candidate.name === "Wind",
+  )!;
+  const tile = availableTerritoryTiles(game, wind, "champlain").find(
+    (tile) => tile.siteKind === "wind",
+  )!;
+  const memory = new Map<string, unknown>([
+    [TERRITORY_BUILD_MEMORY_KEY, "champlain"],
+    [TERRITORY_TILE_BUILD_MEMORY_KEY, tile.id],
+    ["generators.size", wToSliderTick(2e9)],
+  ]);
+  const onBuild = jest.fn();
+  render(
+    <GameToolMemoryContext.Provider value={memory}>
+      <BuildGenerators
+        game={game}
+        onBack={jest.fn()}
+        onBuildGenerator={onBuild}
+      />
+    </GameToolMemoryContext.Provider>,
+  );
+  expect(
+    screen.getByRole("combobox", { name: "Build tile" }),
+  ).toHaveTextContent(territoryBuildTileName(tile.id, game));
+  const solarCard = screen
+    .getAllByRole("listitem")
+    .find((item) => item.getAttribute("data-build-option") === "Solar")!;
+  expect(
+    within(solarCard).getByRole("button", { name: "Review purchase of Solar" }),
+  ).toBeDisabled();
+  expect(
+    within(solarCard).getByRole("button", { name: "Use max size" }),
+  ).toBeEnabled();
+  expect(within(solarCard).getByText("Build cost")).toBeVisible();
+  const windCard = screen.getByText(
+    (_text, element) => element?.getAttribute("data-build-option") === "Wind",
+  );
+  expect(
+    within(windCard).getByRole("button", { name: "Review purchase of Wind" }),
+  ).toBeDisabled();
+  fireEvent.click(
+    within(windCard).getByRole("button", { name: "Use max size" }),
+  );
+  fireEvent.click(
+    screen.getByRole("button", { name: "Review purchase of Wind" }),
+  );
+  expect(screen.getByRole("dialog")).toHaveTextContent(
+    territoryBuildTileName(tile.id, game, wind),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Pay cash" }));
+  expect(onBuild).toHaveBeenCalledWith(
+    expect.objectContaining({
+      name: "Wind",
+      peakW: territoryTilePowerLimit(tile, wind),
+    }),
+    false,
+    "champlain",
+    tile.id,
+  );
+});
 
 it("buys a sub-megawatt generator through the campaign's ordinary size and loan controls", () => {
   const game = createGame({
@@ -287,6 +362,11 @@ it("shows build options and focuses evidence before background quotes arrive", (
         onEvidenceReady={ready}
       />,
     );
+    const generatorOrder = () =>
+      within(screen.getByRole("list", { name: "Generator options" }))
+        .getAllByRole("listitem")
+        .flatMap((row) => row.getAttribute("data-build-option") ?? []);
+    const pendingOrder = generatorOrder();
     const loading = screen.getByRole("status");
     expect(loading).toHaveTextContent("Calculating output and energy costs");
     expect(screen.getByRole("slider")).toBeInTheDocument();
@@ -314,6 +394,7 @@ it("shows build options and focuses evidence before background quotes arrive", (
       request,
       screen.getByLabelText("Generator build options"),
     );
+    expect(generatorOrder()).toEqual(pendingOrder);
     expect(loading).not.toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Review purchase of Solar" }),
@@ -1066,6 +1147,40 @@ it("pins up to three current-grid choices into a comparison tray", () => {
   ).toHaveTextContent("Comparing 2/3");
 });
 
+it("lets the current tile compare its eligible technology even when three hidden choices are remembered", () => {
+  const game = createGame({ scenarioId: 116, seed: 611 });
+  game.timeline[0].cash = 1e12;
+  game.territoryNetwork!.landPurchases.push({
+    territoryId: "parcel-7",
+    minute: 0,
+    price: 18e6,
+  });
+  const tile = TerritoryTileData.TERRITORY_TILES.find(
+    (candidate) =>
+      candidate.territoryId === "parcel-7" && candidate.hydroSiteId,
+  )!;
+  const memory = new Map<string, unknown>([
+    ["generators.compared", ["Coal", "Solar", "Wind"]],
+    ["generators.size", wToSliderTick(20e6)],
+  ]);
+  render(
+    <GameToolMemoryContext.Provider value={memory}>
+      <BuildGenerators
+        game={game}
+        lockedTileId={tile.id}
+        onBack={jest.fn()}
+        onBuildGenerator={jest.fn()}
+      />
+    </GameToolMemoryContext.Provider>,
+  );
+  const compare = screen.getByRole("button", { name: "Compare Hydro" });
+  expect(compare).toBeEnabled();
+  fireEvent.click(compare);
+  expect(
+    screen.getByRole("region", { name: "Generator comparison" }),
+  ).toHaveTextContent("Comparing 1/3");
+});
+
 it("keeps comparison with the scrolling catalog when Fleet is hidden or space is constrained", () => {
   const game = createGame({ scenarioId: 100, difficulty: "Employee" });
   const workspace = (fleetVisible: boolean, constrained = false) => (
@@ -1196,7 +1311,7 @@ it("quotes a Hydro site maximum and updates the shared slider", () => {
 });
 
 it.each([103, 108, 110, 113, 115, 116, "custom", "exhausted sites"] as const)(
-  "keeps geothermal disabled at the bottom with an explanation for %s",
+  "keeps geothermal behind buildable options with an explanation for %s",
   (inventory) => {
     const game =
       inventory === "custom"
@@ -1248,7 +1363,9 @@ it.each([103, 108, 110, 113, 115, 116, "custom", "exhausted sites"] as const)(
     expect(card).toHaveTextContent(
       inventory === "exhausted sites"
         ? /used all 4 sites/
-        : /No geothermal sites near/,
+        : inventory === 116
+          ? /No sites of this type remain in this territory/
+          : /No geothermal sites near/,
     );
     expect(card).not.toHaveTextContent("in this game");
     expect(
@@ -1277,12 +1394,15 @@ it.each([103, 108, 110, 113, 115, 116, "custom", "exhausted sites"] as const)(
         screen.getByRole("button", { name: /^Sort facilities:/ }),
       );
       fireEvent.click(screen.getByRole("menuitem", { name: order }));
-      const reviews = screen.getAllByRole("button", {
+      const reviews = screen.getAllByRole<HTMLButtonElement>("button", {
         name: /^Review purchase of/,
       });
-      expect(reviews.slice(-unavailable.length)).toEqual(
-        expect.arrayContaining(unavailable),
-      );
+      const enabled = reviews.filter((button) => !button.disabled);
+      expect(reviews.slice(0, enabled.length)).toEqual(enabled);
+      for (const button of unavailable)
+        expect(
+          reviews.findIndex((review) => review === button),
+        ).toBeGreaterThanOrEqual(enabled.length);
     }
   },
 );
@@ -1334,12 +1454,11 @@ it("updates fit counts and distinguishes exhausted and unavailable Hydro invento
   expect(
     screen.getByText("No remaining buildable locations"),
   ).toBeInTheDocument();
-  const reviews = screen.getAllByRole("button", { name: /Review purchase of/ });
-  expect(reviews.slice(-2)).toContain(
-    screen.getByRole("button", {
-      name: "Review purchase of Hydro",
-    }),
-  );
+  const reviews = screen.getAllByRole<HTMLButtonElement>("button", {
+    name: /Review purchase of/,
+  });
+  const enabled = reviews.filter((button) => !button.disabled);
+  expect(reviews.slice(0, enabled.length)).toEqual(enabled);
   expect(
     screen.getByRole("button", { name: "Review purchase of Hydro" }),
   ).toBeDisabled();
@@ -1657,13 +1776,18 @@ it.each([undefined, "Natural Gas"] as const)(
   "sorts generators by lowest direct emissions with initial fuel focus %s",
   (focusFuel) => {
     const game = createGame({ scenarioId: 111, difficulty: "CEO" });
+    game.timeline = game.timeline.map((tick) => ({ ...tick, cash: 1e12 }));
     render(
-      <BuildGenerators
-        game={game}
-        focusFuel={focusFuel}
-        onBack={jest.fn()}
-        onBuildGenerator={jest.fn()}
-      />,
+      <GameToolMemoryContext.Provider
+        value={new Map([["generators.size", wToSliderTick(1e6)]])}
+      >
+        <BuildGenerators
+          game={game}
+          focusFuel={focusFuel}
+          onBack={jest.fn()}
+          onBuildGenerator={jest.fn()}
+        />
+      </GameToolMemoryContext.Provider>,
     );
     fireEvent.click(screen.getByRole("button", { name: /^Sort facilities:/ }));
     const choices = screen.getAllByRole("menuitem");
@@ -1718,4 +1842,290 @@ it("updates quoted build costs when the local currency context changes", () => {
       formatMoneyConcise(generator.buildCost, currencyByCode("ZMW")),
     ),
   ).toBeInTheDocument();
+});
+
+it("keeps the tile purchase review open when the host rejects construction", async () => {
+  const game = createGame({ scenarioId: 116, seed: 611 });
+  game.timeline[0].cash = 1e12;
+  const wind = GENERATORS(game, 30e6, [], []).find(
+    ({ name }) => name === "Wind",
+  )!;
+  const tile = availableTerritoryTiles(game, wind, "champlain")[0];
+  const onBack = jest.fn();
+  const onBuildGenerator = jest
+    .fn()
+    .mockResolvedValueOnce({
+      status: "rejected",
+      message: "This site was just occupied.",
+    })
+    .mockResolvedValueOnce({ status: "accepted", facilityId: 123 });
+  const memory = new Map<string, unknown>([
+    ["generators.size", wToSliderTick(30e6)],
+  ]);
+  render(
+    <GameToolMemoryContext.Provider value={memory}>
+      <BuildGenerators
+        game={game}
+        lockedTileId={tile.id}
+        onBack={onBack}
+        onBuildGenerator={onBuildGenerator}
+      />
+    </GameToolMemoryContext.Provider>,
+  );
+  fireEvent.click(
+    screen.getByRole("button", { name: "Review purchase of Wind" }),
+  );
+  const dialog = screen.getByRole("dialog");
+  const pay = within(dialog).getByRole("button", { name: "Pay cash" });
+  fireEvent.click(pay);
+  expect(await within(dialog).findByRole("alert")).toHaveTextContent(
+    "This site was just occupied.",
+  );
+  expect(onBack).not.toHaveBeenCalled();
+  expect(pay).toBeEnabled();
+  fireEvent.click(pay);
+  await waitFor(() => expect(onBack).toHaveBeenCalledTimes(1));
+});
+
+it("locks the tile catalogue to its activated tile without destination pickers", () => {
+  const game = createGame({ scenarioId: 116, seed: 611 });
+  game.timeline[0].cash = 1e12;
+  const wind = GENERATORS(game, 30e6, [], []).find(
+    (candidate) => candidate.name === "Wind",
+  )!;
+  const tile = availableTerritoryTiles(game, wind, "champlain")[0];
+  const memory = new Map<string, unknown>([
+    [TERRITORY_BUILD_MEMORY_KEY, "green-uplands"],
+    [TERRITORY_TILE_BUILD_MEMORY_KEY, "green-uplands:site-0"],
+    ["generators.size", wToSliderTick(30e6)],
+  ]);
+  const onBuild = jest.fn();
+  render(
+    <GameToolMemoryContext.Provider value={memory}>
+      <BuildGenerators
+        game={game}
+        lockedTileId={tile.id}
+        onBack={jest.fn()}
+        onBuildGenerator={onBuild}
+      />
+    </GameToolMemoryContext.Provider>,
+  );
+  expect(
+    screen.queryByRole("combobox", { name: "Build destination" }),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole("combobox", { name: "Build tile" }),
+  ).not.toBeInTheDocument();
+  fireEvent.click(
+    screen.getByRole("button", { name: "Review purchase of Wind" }),
+  );
+  expect(screen.getByRole("dialog")).toHaveTextContent(
+    territoryBuildTileName(tile.id, game, wind),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Pay cash" }));
+  expect(onBuild).toHaveBeenCalledWith(
+    expect.objectContaining({ name: "Wind", peakW: 30e6 }),
+    false,
+    "champlain",
+    tile.id,
+  );
+});
+
+it("puts offshore construction first for every sort on a legal ocean tile and keeps incompatible technologies minimal", () => {
+  const game = createGame({ scenarioId: 116, seed: 611 });
+  game.date.year = 2030;
+  game.timeline[0].cash = 1e12;
+  const originalTile = TerritoryTileData.getAuthoredTerritoryTile;
+  const site = originalTile("champlain:site-14")!;
+  if (site.city) throw new Error("Expected a construction site fixture");
+  // A legal coastal fixture exercises the catalogue without adding ocean to the inland world.
+  const coast = {
+    ...site,
+    terrain: "ocean" as const,
+    siteKind: "wind" as const,
+  };
+  const lookup = jest
+    .spyOn(TerritoryTileData, "getAuthoredTerritoryTile")
+    .mockImplementation((id) => (id === coast.id ? coast : originalTile(id)));
+  try {
+    render(
+      <GameToolMemoryContext.Provider
+        value={new Map([["generators.size", wToSliderTick(20e6)]])}
+      >
+        <BuildGenerators
+          game={game}
+          lockedTileId={coast.id}
+          onBack={jest.fn()}
+          onBuildGenerator={jest.fn()}
+        />
+      </GameToolMemoryContext.Provider>,
+    );
+    for (const order of [
+      "Build cost",
+      "Build time",
+      "Cost per MWh",
+      "Emissions",
+    ]) {
+      fireEvent.click(
+        screen.getByRole("button", { name: /^Sort facilities:/ }),
+      );
+      fireEvent.click(screen.getByRole("menuitem", { name: order }));
+      const cards = screen
+        .getAllByRole("listitem")
+        .filter((card) => card.hasAttribute("data-build-option"));
+      expect(cards[0]).toHaveAttribute("data-build-option", "Offshore Wind");
+      expect(
+        within(cards[0]).getByRole("button", {
+          name: "Review purchase of Offshore Wind",
+        }),
+      ).toBeEnabled();
+      for (const card of cards.slice(1)) {
+        expect(card).toHaveTextContent("Not buildable on this tile");
+        expect(within(card).queryByRole("button")).not.toBeInTheDocument();
+        expect(within(card).queryByText("Build cost")).not.toBeInTheDocument();
+      }
+    }
+  } finally {
+    lookup.mockRestore();
+  }
+});
+
+it("ranks affordable generator reviews first for every selected sort", () => {
+  const game = createGame({ scenarioId: 100, seed: 611 });
+  const size = 100e6;
+  const downpayments = GENERATORS(game, size, [], [])
+    .filter(
+      (generator) =>
+        generator.available && generator.peakW <= generator.maxPeakW,
+    )
+    .map(
+      (generator) =>
+        purchaseTerms(
+          withResilienceOptions(generator, game, {}).buildCost,
+          true,
+          game.interestRate,
+        ).downpayment,
+    );
+  game.timeline[0].cash = Math.min(...downpayments) + 1;
+  render(
+    <GameToolMemoryContext.Provider
+      value={new Map([["generators.size", wToSliderTick(size)]])}
+    >
+      <BuildGenerators
+        game={game}
+        onBack={jest.fn()}
+        onBuildGenerator={jest.fn()}
+      />
+    </GameToolMemoryContext.Provider>,
+  );
+  for (const order of [
+    "Build cost",
+    "Build time",
+    "Cost per MWh",
+    "Emissions",
+  ]) {
+    fireEvent.click(screen.getByRole("button", { name: /^Sort facilities:/ }));
+    fireEvent.click(screen.getByRole("menuitem", { name: order }));
+    const reviews = screen.getAllByRole<HTMLButtonElement>("button", {
+      name: /^Review purchase of/,
+    });
+    const enabled = reviews.filter((review) => !review.disabled);
+    expect(enabled.length).toBeGreaterThan(0);
+    expect(enabled.length).toBeLessThan(reviews.length);
+    expect(reviews.slice(0, enabled.length)).toEqual(enabled);
+  }
+});
+
+it("updates the generator order when live cash crosses a purchase threshold", () => {
+  const game = {
+    ...createGame({ scenarioId: 100, seed: 611 }),
+    speed: "FAST" as const,
+  };
+  const size = 100e6;
+  const quote = GENERATORS(game, size, [], []).find(
+    (generator) => generator.name === "Solar",
+  )!;
+  const cash = purchaseTerms(
+    quote.buildCost,
+    true,
+    game.interestRate,
+  ).downpayment;
+  const cashAt = (amount: number) => ({
+    ...game,
+    timeline: game.timeline.map((tick) => ({ ...tick, cash: amount })),
+  });
+  const store = configureStore({
+    reducer: {
+      game: (
+        state = cashAt(0),
+        action: { type: string; payload?: typeof game },
+      ) => (action.type === "replace" ? action.payload! : state),
+    },
+  });
+  render(
+    <Provider store={store}>
+      <GameToolMemoryContext.Provider
+        value={
+          new Map<string, unknown>([
+            ["generators.size", wToSliderTick(size)],
+            ["generators.sort", "yearsToBuild"],
+          ])
+        }
+      >
+        <BuildGenerators
+          game={store.getState().game}
+          onBack={jest.fn()}
+          onBuildGenerator={jest.fn()}
+        />
+      </GameToolMemoryContext.Provider>
+    </Provider>,
+  );
+  const before = screen.getAllByRole("button", {
+    name: /^Review purchase of/,
+  })[0];
+  expect(before).toBeDisabled();
+  act(() => {
+    store.dispatch({ type: "replace", payload: cashAt(cash) });
+  });
+  const reviews = screen.getAllByRole<HTMLButtonElement>("button", {
+    name: /^Review purchase of/,
+  });
+  const enabled = reviews.filter((review) => !review.disabled);
+  expect(enabled.length).toBeGreaterThan(0);
+  expect(reviews.slice(0, enabled.length)).toEqual(enabled);
+  expect(reviews[0]).not.toBe(before);
+});
+
+it("keeps unsupported Hydro and Offshore Wind minimal on general land", () => {
+  const game = createGame({ scenarioId: 116, seed: 611 });
+  game.timeline[0].cash = 1e12;
+  game.territoryNetwork!.landPurchases.push({
+    territoryId: "green-uplands",
+    minute: 0,
+    price: 18e6,
+  });
+  render(
+    <BuildGenerators
+      game={game}
+      lockedTileId="green-uplands:site-0"
+      onBack={jest.fn()}
+      onBuildGenerator={jest.fn()}
+    />,
+  );
+  for (const name of ["Hydro", "Offshore Wind"]) {
+    const card = screen
+      .getAllByRole("listitem")
+      .find((item) => item.getAttribute("data-build-option") === name)!;
+    expect(card).toHaveTextContent("Not buildable on this tile");
+    expect(within(card).queryByRole("button")).not.toBeInTheDocument();
+    expect(within(card).queryByText("Build cost")).not.toBeInTheDocument();
+  }
+  expect(
+    getBuildFacilityQuote(
+      game,
+      { name: "Offshore Wind", peakW: 20e6 },
+      "green-uplands",
+      "green-uplands:site-0",
+    ),
+  ).toBeUndefined();
 });
