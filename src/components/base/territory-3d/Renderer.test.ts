@@ -477,27 +477,38 @@ it.each([TICK_MS.SLOW, TICK_MS.NORMAL])(
     renderer.dispose();
   },
 );
-it("holds the painted sky when paused during a lighting transition", () => {
-  const { renderer } = setup();
-  const instances = scene(false);
-  const before = { ...frame, lightingTransitionMs: TICK_MS.SLOW };
-  renderer.update(instances, before);
-  flush(0);
+it.each([false, true])(
+  "holds the painted sky when paused during a lighting transition (hidden: %s)",
+  (hide) => {
+    const { renderer } = setup();
+    const instances = scene(false);
+    const before = { ...frame, lightingTransitionMs: TICK_MS.SLOW };
+    renderer.update(instances, before);
+    flush(0);
 
-  const after: MapFrame = {
-    ...before,
-    lighting: { ...frame.lighting, direction: [0, 1, 0] },
-  };
-  jest.spyOn(performance, "now").mockReturnValue(1000);
-  renderer.update(instances, after);
-  flush(1050);
-  const light = renderer.diagnostics().light;
-  renderer.update(instances, { ...after, lightingTransitionMs: undefined });
-  flush(1200);
-  expect(renderer.diagnostics().light).toEqual(light);
-  expect(callbacks.size).toBe(0);
-  renderer.dispose();
-});
+    const after: MapFrame = {
+      ...before,
+      lighting: { ...frame.lighting, direction: [0, 1, 0] },
+    };
+    jest.spyOn(performance, "now").mockReturnValue(1000);
+    renderer.update(instances, after);
+    flush(1050);
+    const light = renderer.diagnostics().light;
+    if (hide) {
+      hidden = true;
+      document.dispatchEvent(new Event("visibilitychange"));
+    }
+    renderer.update(instances, { ...after, lightingTransitionMs: undefined });
+    if (hide) {
+      hidden = false;
+      document.dispatchEvent(new Event("visibilitychange"));
+    }
+    flush(1200);
+    expect(renderer.diagnostics().light).toEqual(light);
+    expect(callbacks.size).toBe(0);
+    renderer.dispose();
+  },
+);
 it("rebuilds lost GPU resources and notifies readiness only after restored drawing", () => {
   const { renderer, canvas, gl, state } = setup();
   renderer.update(scene(), frame);
@@ -817,6 +828,7 @@ it("raises river and lake water in the same draw passes when the watershed gets 
     ...frame,
     weather: { ...weather, waterLevel: 1 },
   });
+  expect(renderer.diagnostics(true).scene).toEqual(dry.scene);
   flush(100);
   const wet = renderer.diagnostics(true);
   const wetLevels = Object.fromEntries(surfaces(wet));
@@ -827,6 +839,25 @@ it("raises river and lake water in the same draw passes when the watershed gets 
   expect(gl.bufferSubData).not.toHaveBeenCalled();
   expect(callbacks.size).toBe(0);
   renderer.dispose();
+});
+
+it("provides the last submitted camera and instances while a newer frame waits to draw", () => {
+  const { renderer } = setup();
+  const original = scene(false);
+  const next = original.slice(1);
+  const shifted = { ...frame, cameraX: 100 };
+  renderer.update(original, frame);
+  expect(renderer.getPaintedScene()).toBeUndefined();
+  flush(0);
+  renderer.update(next, shifted);
+  expect(renderer.getPaintedScene()).toEqual({ frame, instances: original });
+  flush(50);
+  expect(renderer.getPaintedScene()).toEqual({
+    frame: shifted,
+    instances: next,
+  });
+  renderer.dispose();
+  expect(renderer.getPaintedScene()).toBeUndefined();
 });
 
 it("raises real Hydro and upper Pumped Hydro water while lowering the lower basin", () => {

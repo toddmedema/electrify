@@ -361,10 +361,11 @@ export class SceneBuilder {
           a[2] + (b[2] - a[2]) * t,
         ];
         let lowY = Infinity;
-        for (let i = 0; i < 12; i++) {
-          if (submerged && i % 2) continue;
-          const start = point(i / 12),
-            end = point((i + 1) / 12);
+        const segments = 12;
+        for (let i = 0; i < segments; i++) {
+          if (submerged && i % 2 && i < segments - 1) continue;
+          const start = point(i / segments),
+            end = point((i + 1) / segments);
           lowY = Math.min(lowY, start[1], end[1]);
           builder.beam(start, end, submerged ? 0.004 : 0.006, PALETTE.steel, 3);
           if (!submerged) builder.beam(start, end, 0.003, PALETTE.ink, 3);
@@ -431,6 +432,7 @@ export class SceneBuilder {
     point: { x: number; y: number },
     frame: PickFrame,
     motionPhase?: (key: string) => number,
+    instances: readonly MapInstance[] = this.instances,
   ): TerritoryTileId | undefined {
     if (frame.scale <= 0) return undefined;
     const x =
@@ -440,7 +442,7 @@ export class SceneBuilder {
         HEX_WIDTH;
     let depth = -Infinity,
       tileId: TerritoryTileId | undefined;
-    for (const instance of this.instances) {
+    for (const instance of instances) {
       if (instance.id.startsWith("wires:")) continue;
       const px = x - instance.position[0],
         py =

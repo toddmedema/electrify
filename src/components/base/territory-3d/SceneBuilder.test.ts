@@ -201,6 +201,41 @@ test("frontier conductors carry their actual origin and bounds for viewport cull
   expect(Math.max(...x)).toBeLessThan(0.41);
 });
 
+test("submerged cable geometry reaches the land terminal", () => {
+  const land = view(1);
+  const water = {
+    ...view(),
+    tile: { ...view().tile, terrain: "lake" as const },
+  };
+  const views = [water, land];
+  const tiles = views.map(({ tile }) => tile);
+  const { builder } = setup();
+  const wires = hexWires(
+    tiles,
+    () => true,
+    undefined,
+    ({ terrain }) => (terrain === "lake" ? "submerged" : "tower"),
+  );
+  const cable = builder
+    .build(views, tiles, wires, 0, "run")
+    .find(({ id }) => id === "wires:0")!;
+  const [connection] = cable.model.connections!;
+  expect(connection.kind).toBe("submerged");
+  expect(connection.to).toBe(land.tile.id);
+  const vertices = cable.model.parts[0].mesh.positions;
+  let nearest = Infinity;
+  for (let i = 0; i < vertices.length; i += 3)
+    nearest = Math.min(
+      nearest,
+      Math.hypot(
+        vertices[i] + cable.position[0] - connection.end[0],
+        vertices[i + 1] + cable.position[1] - connection.end[1],
+        vertices[i + 2] + cable.position[2] - connection.end[2],
+      ),
+    );
+  expect(nearest).toBeLessThan(0.01);
+});
+
 test("power ticks reuse static terrain, structure and wire topology while construction stays live", () => {
   const tile = {
     ...view(),

@@ -285,12 +285,11 @@ it("shares the same blade and hub geometry between land and offshore wind", () =
 
 it("lights the airborne wing's upper facets from above", () => {
   const mesh = getStructureModel("airborne-wind").parts[1].mesh;
-  expect(
-    Math.min(
-      ...upperSurfaceNormals(mesh, PALETTE.mint),
-      ...upperSurfaceNormals(mesh, PALETTE.forestLight),
-    ),
-  ).toBeGreaterThan(0.1);
+  const mint = upperSurfaceNormals(mesh, PALETTE.mint);
+  const forest = upperSurfaceNormals(mesh, PALETTE.forestLight);
+  expect(mint.length).toBeGreaterThan(0);
+  expect(forest.length).toBeGreaterThan(0);
+  expect(Math.min(...mint, ...forest)).toBeGreaterThan(0.1);
 });
 
 it("retains stopped rotors and wings, but hides production-only effects without effect shadows", () => {

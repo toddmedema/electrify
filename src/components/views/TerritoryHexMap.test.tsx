@@ -82,9 +82,11 @@ it("releases arrow navigation to surrounding controls at the known map boundary"
 // jsdom has no PointerEvent; preserve the identity and coordinates used by map panning.
 class TestPointerEvent extends MouseEvent {
   pointerId: number;
+  pointerType: string;
   constructor(type: string, init: PointerEventInit = {}) {
     super(type, init);
     this.pointerId = init.pointerId ?? 1;
+    this.pointerType = init.pointerType ?? "mouse";
   }
 }
 const originalPointerEvent = window.PointerEvent;
@@ -904,6 +906,29 @@ it("retains ownership boundaries and wire topology through power ticks and camer
   map.buyMode();
   tap(map.candidates()[0]);
   expect(topology.mock.calls.length).toBeGreaterThan(firstPasses);
+});
+
+it("leaves browser zoom and uncaptured pointer exits to the browser", () => {
+  const map = show();
+  const before = { ...map.viewport.dataset };
+  const zoom = new WheelEvent("wheel", {
+    bubbles: true,
+    cancelable: true,
+    ctrlKey: true,
+    deltaY: 50,
+  });
+  fireEvent(map.viewport, zoom);
+  expect(zoom.defaultPrevented).toBe(false);
+
+  const tile = map.target("champlain:city");
+  fireEvent.pointerDown(tile, { clientX: 20, clientY: 20, buttons: 1 });
+  fireEvent.pointerLeave(map.viewport, {
+    clientX: -1,
+    clientY: 20,
+    buttons: 1,
+  });
+  fireEvent.pointerMove(tile, { clientX: 65, clientY: 20, buttons: 0 });
+  expect({ ...map.viewport.dataset }).toEqual(before);
 });
 it("activates and hovers the picked elevated model while keyboard and explicit price labels keep their own targets", async () => {
   const restore = enable3D();

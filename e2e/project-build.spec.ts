@@ -54,7 +54,9 @@ test("keeps project actions reachable on a short landscape display", async ({
   await expect(review).toBeInViewport({ ratio: 1 });
   await review.click();
   await expect(
-    surface.getByRole("button", { name: "Build project" }),
+    page
+      .getByRole("dialog", { name: "Build Wind?" })
+      .getByRole("button", { name: "Build project" }),
   ).toBeInViewport({ ratio: 1 });
 });
 

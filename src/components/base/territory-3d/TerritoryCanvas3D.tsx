@@ -3,6 +3,7 @@ import type {
   MapCanvas,
   MapFrame,
   MapInstance,
+  PaintedScene,
   RendererDiagnostics,
 } from "./Types";
 import "./TerritoryCanvas3D.scss";
@@ -10,7 +11,8 @@ import "./TerritoryCanvas3D.scss";
 export type RendererState = "loading" | "ready" | "lost" | "unavailable";
 export interface RendererHandle {
   update: (instances: readonly MapInstance[], frame: MapFrame) => void;
-  diagnostics: () => RendererDiagnostics;
+  diagnostics: (includeScene?: boolean) => RendererDiagnostics;
+  getPaintedScene: () => PaintedScene | undefined;
   motionPhase: (key: string) => number;
   dispose: () => void;
 }
@@ -39,7 +41,9 @@ export default function TerritoryCanvas3D({
   const canvas = React.useRef<MapCanvas>(null);
   const renderer = React.useRef<RendererHandle>();
   const latest = React.useRef({ instances, frame, onState, onRenderer });
-  latest.current = { instances, frame, onState, onRenderer };
+  React.useLayoutEffect(() => {
+    latest.current = { instances, frame, onState, onRenderer };
+  }, [instances, frame, onState, onRenderer]);
   const [state, setState] = React.useState<RendererState | "loading">(
     "loading",
   );
@@ -61,7 +65,7 @@ export default function TerritoryCanvas3D({
         latest.current.onRenderer?.(value);
         if (!element.map3DDiagnostics)
           Object.defineProperty(element, "map3DDiagnostics", {
-            value: () => value.diagnostics(),
+            value: (includeScene?: boolean) => value.diagnostics(includeScene),
             configurable: true,
           });
         value.update(latest.current.instances, latest.current.frame);

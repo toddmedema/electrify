@@ -1,5 +1,11 @@
 import * as React from "react";
-import { act, render, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import TerritoryCanvas3D, {
   RendererFactory,
   RendererHandle,
@@ -36,6 +42,7 @@ test("delayed loading uses the latest frame, retains one renderer and disposes d
     update: jest.fn(),
     dispose: jest.fn(),
     diagnostics: jest.fn(),
+    getPaintedScene: jest.fn(),
     motionPhase: jest.fn(),
   };
   const factory = jest.fn(() => renderer),
@@ -66,9 +73,61 @@ test("delayed loading uses the latest frame, retains one renderer and disposes d
   // eslint-disable-next-line testing-library/no-container, testing-library/no-node-access
   const canvas = utils.container.querySelector("canvas") as MapCanvas;
   expect(canvas.map3DDiagnostics).toBeDefined();
+  canvas.map3DDiagnostics?.(true);
+  expect(renderer.diagnostics).toHaveBeenCalledWith(true);
   utils.unmount();
   expect(renderer.dispose).toHaveBeenCalledTimes(1);
   expect(canvas.map3DDiagnostics).toBeUndefined();
+});
+
+test("delayed loading ignores a camera update that suspends before commit", async () => {
+  let resolve!: (factory: RendererFactory) => void;
+  const load = () =>
+    new Promise<RendererFactory>((done) => {
+      resolve = done;
+    });
+  const renderer: RendererHandle = {
+    update: jest.fn(),
+    dispose: jest.fn(),
+    diagnostics: jest.fn(),
+    getPaintedScene: jest.fn(),
+    motionPhase: jest.fn(),
+  };
+  const pending = new Promise<void>(() => {});
+  const attempted = jest.fn();
+  const onState = jest.fn();
+  function Gate({ cameraX }: { cameraX: number }) {
+    if (cameraX !== frame.cameraX) {
+      attempted();
+      throw pending;
+    }
+    return null;
+  }
+  function Scene() {
+    const [cameraX, setCamera] = React.useState(frame.cameraX);
+    return (
+      <>
+        <button onClick={() => React.startTransition(() => setCamera(500))}>
+          Move camera
+        </button>
+        <React.Suspense fallback="Loading scene">
+          <TerritoryCanvas3D
+            instances={[]}
+            frame={{ ...frame, cameraX }}
+            loadRenderer={load}
+            onState={onState}
+            runKey="one"
+          />
+          <Gate cameraX={cameraX} />
+        </React.Suspense>
+      </>
+    );
+  }
+  render(<Scene />);
+  fireEvent.click(screen.getByRole("button", { name: "Move camera" }));
+  expect(attempted).toHaveBeenCalled();
+  await act(async () => resolve(() => renderer));
+  expect(renderer.update).toHaveBeenCalledWith([], frame);
 });
 test("unmounting during a delayed import never creates a renderer", async () => {
   let resolve!: (factory: RendererFactory) => void;
@@ -124,6 +183,7 @@ test("a renderer update failure disposes partially initialized resources", async
     }),
     dispose: jest.fn(),
     diagnostics: jest.fn(),
+    getPaintedScene: jest.fn(),
     motionPhase: jest.fn(),
   };
   render(

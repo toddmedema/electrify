@@ -137,7 +137,27 @@
 
 @media (max-width: 740px) and (max-height: 420px) {
   .tileWorkspaceSurface.tileWorkspaceProject {
-    // Keep the heading and action row on screen when the map is short.
-    max-height: calc(100% - var(--game-dock-clearance, 80px) - 16px);
+    max-height: calc(100% - var(--game-dock-clearance, 80px) - 8px);
+    overflow: auto;
+    overscroll-behavior: contain;
+    .tileWorkspaceHeading {
+      padding-block: 4px;
+    }
+    .tileWorkspaceBody {
+      flex: none;
+      overflow: visible;
+    }
+    .projectCandidateContent {
+      display: block;
+      height: auto;
+    }
+    .projectCandidateScroll {
+      overflow: visible;
+    }
+    .projectCandidateActions {
+      position: sticky;
+      bottom: 0;
+      padding-block: 4px;
+    }
   }
 }

@@ -434,8 +434,8 @@ export default function TerritoryHexMap({
     const element = viewport.current;
     if (!element) return;
     const wheel = (event: WheelEvent) => {
-      event.preventDefault();
       if (event.ctrlKey) return;
+      event.preventDefault();
       const unit =
         event.deltaMode === 1
           ? 16
@@ -895,7 +895,20 @@ export default function TerritoryHexMap({
           activation.current = undefined;
           suppressClick.current = true;
         }}
-        onPointerLeave={clearHover}
+        onPointerLeave={(event) => {
+          clearHover();
+          const drag = pointer.current;
+          if (
+            event.pointerType === "mouse" &&
+            drag?.id === event.pointerId &&
+            !drag.dragging
+          ) {
+            touches.current.delete(event.pointerId);
+            pointer.current = undefined;
+            activation.current = undefined;
+            suppressClick.current = true;
+          }
+        }}
         onClickCapture={(event) => {
           if (suppressClick.current && event.detail !== 0) {
             activation.current = undefined;

@@ -90,15 +90,22 @@ export default function TerritoryScene3D({
   const lightingTransitionMs =
     speed === "SLOW" || speed === "NORMAL" ? TICK_MS[speed] : undefined;
   const renderer = React.useRef<RendererHandle>();
-  const latestFrame = React.useRef(frame);
-  latestFrame.current = frame;
   const setRenderer = React.useCallback((value: RendererHandle | undefined) => {
     renderer.current = value;
   }, []);
   React.useLayoutEffect(() => {
-    onPicker((point) =>
-      builder.pick(point, latestFrame.current, renderer.current?.motionPhase),
-    );
+    onPicker((point) => {
+      const handle = renderer.current;
+      if (!handle) return;
+      const painted = handle.getPaintedScene();
+      if (painted)
+        return builder.pick(
+          point,
+          painted.frame,
+          handle.motionPhase,
+          painted.instances,
+        );
+    });
     return () => onPicker(undefined);
   }, [builder, onPicker]);
   return (
