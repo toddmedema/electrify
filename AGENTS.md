@@ -71,7 +71,14 @@ files are large, so broad rewrites create expensive review diffs.
   `.tmp/check-builds/desktop`. Standalone `build` and `desktop:build` still default to `build/`.
 - Local npm browser/check commands reserve and print an unused `E2E_PORT`. To keep a specific
   port across invocations, set it explicitly; an occupied or reserved port fails before tests.
-  Leave other tasks' servers alone. An already-running dev server may serve another checkout.
+  Preserve other tasks' servers except for the verified merged-PR cleanup below. An
+  already-running dev server may serve another checkout.
+- Agents may automatically stop preview servers or obsolete validation for PRs freshly verified
+  as merged and free their validation/port reservations. Verify the matching checkout/head and
+  exact process tree, with no later unmerged work. Prefer graceful shutdown and normal
+  reservation cleanup; remove stale reservations only after proving their recorded owner and
+  process group are gone. Preserve unrelated and unmerged work, and never remove a lease
+  already acquired by another task.
 - Keep local validation windowless: use `npm run check` and headless Chromium through
   `npm run test:e2e`. The Electron UI suite opens native windows and takes keyboard focus;
   leave it to CI unless the user explicitly requests a local native-window test. It requires
