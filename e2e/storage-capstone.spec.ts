@@ -113,7 +113,7 @@ for (const theme of ["light", "dark"]) {
       dialog.getByRole("button", { name: "Install for later", exact: true }),
     ).toBeVisible();
     await expect(
-      dialog.getByRole("button", { name: "Main menu", exact: true }),
+      dialog.getByRole("button", { name: "Menu", exact: true }),
     ).toBeVisible();
     for (const button of await dialog.getByRole("button").all()) {
       const box = (await button.boundingBox())!;

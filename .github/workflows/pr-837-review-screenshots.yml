@@ -18,7 +18,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: e51fd957a3f22f9266176f6967a5a1cc020a5580
+          ref: 0ecbad58cccf2c865344ed240698f35a92a027c3
           fetch-depth: 0
           lfs: true
           persist-credentials: false
@@ -35,7 +35,7 @@ jobs:
         run: npm run build
       - name: Capture the tutorial completion and feedback form
         run: |
-          npm run test:e2e -- --config=e2e/production.playwright.config.ts --project=desktop-chromium --project=mobile-360px --workers=2 --retries=0 e2e/tutorial-capstone.spec.ts --grep 'guided objective reaches|completed tutorial keeps'
+          npm run test:e2e -- --config=e2e/production.playwright.config.ts --project=desktop-chromium --project=mobile-390px --project=mobile-360px --workers=2 --retries=0 e2e/tutorial-capstone.spec.ts e2e/storage-capstone.spec.ts
       - name: Preserve review screenshots
         if: always()
         uses: actions/upload-artifact@v7
@@ -56,8 +56,6 @@ jobs:
           source = Path(os.environ["REVIEW_SCREENSHOT_DIR"])
           captures = (
               ("desktop-chromium", "mission-complete.png", "tutorial-completion-desktop"),
-              ("desktop-chromium", "share-feedback.png", "feedback-form-desktop"),
-              ("mobile-360px", "share-feedback.png", "feedback-form-mobile"),
           )
           with Path(os.environ["GITHUB_STEP_SUMMARY"]).open("a") as summary:
               summary.write("## Verified attachment payloads\n\n")
