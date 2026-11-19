@@ -7,9 +7,11 @@ import {
 import {
   generateForecastTimeline,
   generateResourceForecast,
+  previewCoalRepowerImpact,
   previewFacilityBuild,
 } from "../../reducers/Game";
 import type {
+  CoalRepowerType,
   FacilityShoppingType,
   GameType,
   TerritoryId,
@@ -153,8 +155,14 @@ function buildImpactPeriod(
   return { startMinute, monthlyMarginW, unservedWh };
 }
 
+export interface CoalRepowerImpactRequest {
+  facilityId: number;
+  upgrade: CoalRepowerType;
+}
+
 export interface OutlookResults {
   buildImpact: BuildImpactForecast | undefined;
+  coalRepowerImpact: ReturnType<typeof previewCoalRepowerImpact>;
   build: BuildForecast | undefined;
   hydro: ReservoirOutlookPoint[] | undefined;
   intertie: IntertieForecastTick[] | undefined;
@@ -167,6 +175,7 @@ export interface OutlookRequest {
   facility?: FacilityShoppingType;
   territoryId?: TerritoryId;
   tileId?: TerritoryTileId;
+  repower?: CoalRepowerImpactRequest;
 }
 export type OutlookReply = {
   requestId: number;
@@ -180,9 +189,18 @@ export function computeOutlook<K extends OutlookKind>(
   facility?: FacilityShoppingType,
   territoryId?: TerritoryId,
   tileId?: TerritoryTileId,
+  repower?: CoalRepowerImpactRequest,
 ): OutlookResults[K] {
   const now = currentTick(game);
   if (!now) return undefined;
+  if (kind === "coalRepowerImpact") {
+    return (repower &&
+      previewCoalRepowerImpact(
+        game,
+        repower.facilityId,
+        repower.upgrade,
+      )) as OutlookResults[K];
+  }
   if (kind === "buildImpact") {
     if (!facility) return undefined;
     const { before, after, commissionedMinute } = previewFacilityBuild(

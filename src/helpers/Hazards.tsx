@@ -11,6 +11,7 @@ import {
   TickPresentFutureType,
   WeatherHazardProfileType,
   WeatherHazardType,
+  isCoalRepower,
 } from "../Types";
 import {
   COLD_MAX_DERATE,
@@ -433,7 +434,7 @@ export function upgradeInProgress(
   return facility.upgradeInProgress;
 }
 
-/** Whether a retrofit holds the facility offline at this minute. */
+/** Whether a facility has work in progress at this minute. */
 export function isUpgradingAt(
   facility: FacilityOperatingType,
   minute: number,
@@ -442,13 +443,15 @@ export function isUpgradingAt(
   return !!upgrade && minute < upgrade.completesMinute;
 }
 
-/** Winterization is staged across units; other retrofits require a complete outage. */
+/** Winterization is staged across units. A coal repower builds beside the operating plant. */
 export function retrofitOutputMultiplier(
   facility: FacilityOperatingType,
   minute: number,
 ): number {
   if (!isUpgradingAt(facility, minute)) return 1;
-  return facility.upgradeInProgress?.upgrade === "coldWeatherPackage" ? 0.9 : 0;
+  const upgrade = facility.upgradeInProgress?.upgrade;
+  if (isCoalRepower(upgrade)) return 1;
+  return upgrade === "coldWeatherPackage" ? 0.9 : 0;
 }
 
 export function bulkWinterizationQuote(game: GameType) {

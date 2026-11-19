@@ -663,8 +663,10 @@ interface SharedOperatingType
 
 export interface GeneratorOperatingType
   extends GeneratorShoppingType, SharedOperatingType {
-  // A retrofit being installed, which holds the plant offline until it completes.
+  // A retrofit or repower under way on this facility.
   upgradeInProgress?: FacilityUpgradeInProgressType;
+  /** Separate project debt keeps any standing loan on its original terms. */
+  repowerLoan?: LoanInfo;
   // Unit commitment is distinct from instantaneous output: a plant ramps through outputs below
   // its stable minimum while starting and stopping, but cannot remain there indefinitely.
   committed?: boolean;
@@ -721,7 +723,7 @@ export interface LifetimeTotals {
   lifetimeStarts?: number;
 }
 
-interface LoanInfo {
+export interface LoanInfo {
   loanAmountTotal: number;
   loanAmountLeft: number;
   loanMonthlyPayment: number;
@@ -1192,10 +1194,12 @@ export interface WeatherHazardProfileType {
   source: string;
 }
 
-/** The action payload for adding a resilience upgrade to a standing facility. */
+/** The action payload for upgrading or repowering a standing facility. */
 export interface RetrofitFacilityAction {
   facilityId: number;
   upgrade: FacilityUpgradeType;
+  /** Only coal repowers offer financing. Older commands pay cash. */
+  financed?: boolean;
 }
 
 /** Size is watts for generation and watt-hours for storage. Prices always come from the host. */
@@ -1226,17 +1230,32 @@ export interface FacilityExpansionInProgressType extends ConstructionEmissions {
   quoteKey: string;
 }
 
-export type FacilityUpgradeType = ResilienceUpgradeType | "combinedCycle";
+export const COAL_REPOWER_UPGRADES = [
+  "coalToGasCC",
+  "coalToGasPeaker",
+] as const;
+export type CoalRepowerType = (typeof COAL_REPOWER_UPGRADES)[number];
+
+export type FacilityUpgradeType =
+  ResilienceUpgradeType | "combinedCycle" | CoalRepowerType;
+
+export function isCoalRepower(upgrade: unknown): upgrade is CoalRepowerType {
+  return upgrade === "coalToGasCC" || upgrade === "coalToGasPeaker";
+}
 
 /**
- * A retrofit being installed on a standing facility. The plant is offline from startsMinute until
- * completesMinute, when the upgrade takes effect; cancelling before then refunds `cost` in full.
+ * Work on a standing facility. The upgrade takes effect at completesMinute.
+ * Cancellation before then returns the project's equity.
  */
 export interface FacilityUpgradeInProgressType {
   upgrade: FacilityUpgradeType;
-  cost: number; // What the player paid, and what a cancellation refunds
+  cost: number; // Capitalized project price before financing
   startsMinute: number;
   completesMinute: number;
+  /** Rated gas output approved when a coal repower starts. */
+  targetPeakW?: number;
+  /** Embodied emissions booked over a coal repower's construction interval. */
+  constructionKgco2eTotal?: number;
 }
 
 export interface WorldEventEffectsType {

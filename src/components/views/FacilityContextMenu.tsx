@@ -13,7 +13,9 @@ import {
 import CancelIcon from "@mui/icons-material/Cancel";
 import ConceptIcon from "../base/ConceptIcon";
 import {
+  COAL_REPOWER_UPGRADES,
   FacilityOperatingType,
+  isCoalRepower,
   GameType,
   RetrofitFacilityAction,
 } from "../../Types";
@@ -22,9 +24,16 @@ import {
   isUpgradingAt,
 } from "../../helpers/Hazards";
 import { gasConversionQuote } from "../../helpers/GasConversion";
+import {
+  coalRepowerInProgress,
+  coalRepowerPurchaseTerms,
+  coalRepowerQuote,
+} from "../../helpers/CoalRepower";
+import { CoalRepowerReview, coalRepowerActionLabel } from "../base/CoalRepower";
 import { currentCash } from "../../helpers/GameSelectors";
 import {
   facilityCashBack,
+  facilityLoanBalance,
   facilityPermanentlyShutdown,
 } from "../../helpers/Financials";
 import { formatFacilitySize } from "../../helpers/Format";
@@ -73,6 +82,7 @@ interface FleetAction {
   label: string;
   facilities: FacilityOperatingType[];
   cost?: number;
+  requiredCash?: number;
   confirm?: boolean;
 }
 
@@ -83,7 +93,7 @@ function actionsFor(
   const operating = facilities.filter(
     (f) =>
       f.yearsToBuildLeft <= 0 &&
-      !isUpgradingAt(f, game.date.minute) &&
+      (!isUpgradingAt(f, game.date.minute) || coalRepowerInProgress(f)) &&
       !facilityPermanentlyShutdown(f, game.date.minute),
   );
   const upgrades: FleetAction[] = [
@@ -119,8 +129,31 @@ function actionsFor(
       }
     }
   }
+  const repowers =
+    facilities.length === 1
+      ? COAL_REPOWER_UPGRADES.flatMap((key) => {
+          const quote = coalRepowerQuote(facilities[0], game, key);
+          return quote
+            ? [
+                {
+                  key,
+                  label: coalRepowerActionLabel(key),
+                  facilities,
+                  cost: quote.cost,
+                  requiredCash: coalRepowerPurchaseTerms(
+                    quote,
+                    true,
+                    game.interestRate,
+                  ).amountDue,
+                  confirm: true,
+                },
+              ]
+            : [];
+        })
+      : [];
   return [
     ...upgrades,
+    ...repowers,
     {
       key: "pause",
       label: "Pause",
@@ -133,7 +166,10 @@ function actionsFor(
     },
     {
       key: "cancelUpgrade",
-      label: "Cancel upgrade",
+      label:
+        facilities.length === 1 && coalRepowerInProgress(facilities[0])
+          ? "Cancel conversion"
+          : "Cancel upgrade",
       facilities: facilities.filter(
         (f) =>
           !!f.upgradeInProgress &&
@@ -152,7 +188,10 @@ function actionsFor(
       key: "sell",
       label: "Sell",
       facilities: facilities.filter(
-        (f) => f.yearsToBuildLeft <= 0 && !f.saleRestricted,
+        (f) =>
+          f.yearsToBuildLeft <= 0 &&
+          !f.saleRestricted &&
+          !coalRepowerInProgress(f),
       ),
       confirm: true,
     },
@@ -191,16 +230,24 @@ export default function FacilityContextMenu(props: {
         game.facilities.filter((f) => pending.ids.includes(f.id)),
       ).find((action) => action.key === pending.key)
     : undefined;
+  React.useEffect(() => {
+    if (pending && isCoalRepower(pending.key) && !confirmation)
+      setPending(null);
+  }, [pending, confirmation]);
   const affected = confirmation?.facilities ?? [];
+  const cash = currentCash(game);
   const cost = confirmation?.cost;
-  const shortfall =
-    cost === undefined ? 0 : Math.max(0, cost - currentCash(game));
+  const shortfall = cost === undefined ? 0 : Math.max(0, cost - cash);
+  const unaffordable = (action: FleetAction) => {
+    const requiredCash = action.requiredCash ?? action.cost;
+    return requiredCash !== undefined && requiredCash > cash;
+  };
   const cashBack = affected.reduce(
     (sum, facility) => sum + facilityCashBack(facility, game.date.minute),
     0,
   );
   const loans = affected.reduce(
-    (sum, facility) => sum + facility.loanAmountLeft,
+    (sum, facility) => sum + facilityLoanBalance(facility),
     0,
   );
   const execute = (action: FleetAction) => {
@@ -254,9 +301,7 @@ export default function FacilityContextMenu(props: {
             : []),
           <MenuItem
             key={action.key}
-            disabled={
-              action.cost !== undefined && action.cost > currentCash(game)
-            }
+            disabled={unaffordable(action)}
             onClick={() => {
               props.onClose();
               if (action.confirm)
@@ -275,16 +320,25 @@ export default function FacilityContextMenu(props: {
             </ListItemText>
           </MenuItem>,
         ])}
-        {offered.some(
-          (action) =>
-            action.cost !== undefined && action.cost > currentCash(game),
-        ) && (
+        {offered.some(unaffordable) && (
           <ListSubheader disableSticky className="facilityMenuHint">
             More cash needed for disabled upgrades
           </ListSubheader>
         )}
       </Menu>
-      {pending && confirmation && (
+      {pending &&
+        confirmation &&
+        isCoalRepower(confirmation.key) &&
+        props.onRetrofit && (
+          <CoalRepowerReview
+            facility={affected[0]}
+            game={game}
+            kind={confirmation.key}
+            onRetrofit={props.onRetrofit}
+            onClose={() => setPending(null)}
+          />
+        )}
+      {pending && confirmation && !isCoalRepower(confirmation.key) && (
         <ConfirmDialog
           open
           title={`${confirmation.label}${affected.length === 1 ? `: ${formatFacilitySize(affected[0])} ${facilityDisplayName(affected[0])}` : `: ${affected.length} facilities`}?`}

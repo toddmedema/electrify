@@ -211,7 +211,7 @@ export default function PurchaseReviewDialog(
             value:
               props.upkeepBeforePerMonth === undefined
                 ? `${formatMoneyConcise(props.upkeepPerMonth)}/mo`
-                : `${formatMoneyConcise(props.upkeepBeforePerMonth)} → ${formatMoneyConcise(props.upkeepPerMonth)}/mo`,
+                : `${formatMoneyConcise(props.upkeepBeforePerMonth)}/mo → ${formatMoneyConcise(props.upkeepPerMonth)}/mo`,
             detail: props.upkeepDetail,
           },
         ]),

@@ -816,7 +816,7 @@ describe("UPlotChart resizing", () => {
   });
 
   it("reserves a readable chart when supporting chrome must scroll and stays stable across resizing and reopening", () => {
-    applyInterfaceScale(2.5);
+    applyInterfaceScale(2);
     const viewport = document.createElement("div");
     viewport.setAttribute("data-chart-viewport", "");
     let availableHeight = 360;
@@ -846,17 +846,21 @@ describe("UPlotChart resizing", () => {
     );
     const view = render(ui(true), { container: block });
     const initialOptions = (uPlot as unknown as jest.Mock).mock.calls.at(-1)[0];
-    expect(initialOptions.height).toBe(320);
+    expect(initialOptions.height).toBe(256);
     const notifyResize = () =>
       act(() => {
         resize([], {} as ResizeObserver);
         jest.advanceTimersByTime(16);
       });
+    // While the viewport still fits eight lines of scaled type, the readable floor holds.
     availableHeight = 300;
+    notifyResize();
+    expect(uPlotPrototype.setSize).not.toHaveBeenCalled();
+    availableHeight = 280;
     notifyResize();
     expect(uPlotPrototype.setSize).toHaveBeenLastCalledWith({
       width: 400,
-      height: 260,
+      height: 248,
     });
     const calls = uPlotPrototype.setSize.mock.calls.length;
     notifyResize();

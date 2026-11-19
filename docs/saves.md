@@ -88,7 +88,9 @@ construction progress, capital terms and unique project identity. An imported
 pending project cannot bypass technology, era or terrain limits; inherited
 installed plants retain their existing capacity.
 
-Schema 20 records the distance to the nearest owned city on new ordinary tile
+Schema 20 adds optional coal-to-gas repower projects without changing existing projects.
+
+Schema 21 records the distance to the nearest owned city on new ordinary tile
 receipts. Older receipts keep their exact parcel prices. Later city acquisitions
 leave previous receipts and invested capital intact.
 

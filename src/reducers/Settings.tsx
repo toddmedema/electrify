@@ -3,7 +3,6 @@ import {
   getStorageBooleanOrUndefined,
   getStorageChoice,
   getStorageNumber,
-  getStorageString,
   setStorageKeyValue,
 } from "../LocalStorage";
 import { SettingsType } from "../Types";
@@ -13,10 +12,7 @@ import { THEME_CHOICES } from "../Theme";
 import { isDesktopApp } from "../Desktop";
 import { isInstalledWebApp } from "../InstalledApp";
 import { getLocalStorage } from "../Globals";
-import {
-  migrateInterfaceScale,
-  normalizeInterfaceScale,
-} from "../InterfaceScale";
+import { normalizeInterfaceScale } from "../InterfaceScale";
 import { WORKSPACE_CHOICES, normalizeWorkspace } from "../WorkspaceLayout";
 import {
   normalizeScreenEdgePadding,
@@ -29,49 +25,21 @@ function storedVolume(key: string): number {
 }
 
 function storedWorkspace(): SettingsType["workspace"] {
-  const stored = getLocalStorage().getItem("workspace");
-  if (stored !== null)
-    return getStorageChoice("workspace", WORKSPACE_CHOICES, "automatic");
-  const workspace =
-    getStorageBooleanOrUndefined("tvMode") === true ? "single" : "automatic";
-  setStorageKeyValue("workspace", workspace);
-  return workspace;
+  return getStorageChoice("workspace", WORKSPACE_CHOICES, "automatic");
 }
 
 function storedInterfaceScale(): number {
   const stored = getLocalStorage().getItem("interfaceScale");
-  if (stored !== null) {
-    try {
-      return normalizeInterfaceScale(JSON.parse(stored));
-    } catch (_error) {
-      return 1;
-    }
+  if (stored === null) return 1;
+  try {
+    return normalizeInterfaceScale(JSON.parse(stored));
+  } catch (_error) {
+    return 1;
   }
-  const scale = migrateInterfaceScale(
-    getStorageString("textSize", "standard"),
-    getStorageBooleanOrUndefined("tvMode"),
-    getStorageNumber("tvScale", 1.5),
-  );
-  // Persist once so later layout changes cannot reinterpret old TV preferences.
-  setStorageKeyValue("interfaceScale", scale);
-  return scale;
 }
 
 function storedScreenEdgePadding(): SettingsType["screenEdgePadding"] {
-  if (getLocalStorage().getItem("screenEdgePadding") !== null)
-    return getStorageChoice("screenEdgePadding", SCREEN_EDGE_PADDINGS, 0);
-  // TV padding was active only with an explicitly enabled TV layout. Keep its old
-  // 2% default for those players, while new and ordinary desktop players start at zero.
-  const padding =
-    getStorageBooleanOrUndefined("tvMode") === true
-      ? getStorageChoice(
-          "tvInset",
-          SCREEN_EDGE_PADDINGS,
-          getLocalStorage().getItem("tvInset") === null ? 2 : 0,
-        )
-      : 0;
-  setStorageKeyValue("screenEdgePadding", padding);
-  return padding;
+  return getStorageChoice("screenEdgePadding", SCREEN_EDGE_PADDINGS, 0);
 }
 
 function normalizedChanges(

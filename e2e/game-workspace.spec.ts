@@ -961,12 +961,13 @@ test("quick touch swipes scroll the enlarged dock without opening a tool", async
     width: page.viewportSize()!.width,
     height: 1080,
   });
-  await startGame(page, "light", 100, 2.5);
+  await startGame(page, "light", 100, 2);
   const dock = page.locator("#navfooter");
   const box = (await dock.boundingBox())!;
+  // The compact dock overflows by about 90 px at the maximum scale on a 390 px viewport.
   expect(
     await dock.evaluate((element) => element.scrollWidth - element.clientWidth),
-  ).toBeGreaterThan(100);
+  ).toBeGreaterThan(50);
   const session = await page.context().newCDPSession(page);
   const y = box.y + box.height / 2;
   await session.send("Input.dispatchTouchEvent", {
@@ -1387,7 +1388,7 @@ for (const theme of ["light", "dark"] as const) {
   }, info) => {
     test.skip(!info.project.use.hasTouch, "Phone status reflow");
     await startGame(page, theme, 111);
-    for (const scale of ["1.25", "1.5", "2.5"]) {
+    for (const scale of ["1.25", "1.5", "2"]) {
       await page.getByRole("button", { name: "menu", exact: true }).click();
       await page
         .getByRole("menuitem", { name: "Settings", exact: true })

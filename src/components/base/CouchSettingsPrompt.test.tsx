@@ -175,24 +175,3 @@ it("waits for a future title visit when detection arrives after play begins", as
   );
   expect(prompt()).toBeVisible();
 });
-
-it.each(["true", "false"])(
-  "honors a valid legacy answer %p",
-  async (legacy) => {
-    localStorage.setItem("tvMode", legacy);
-    mount({ bigPicture: true });
-    await act(async () => undefined);
-    expect(prompt()).toBeNull();
-  },
-);
-
-it.each(["invalid", "", "null", '"false"'])(
-  "does not mistake malformed legacy choice %p for an answer",
-  async (legacy) => {
-    localStorage.setItem("tvMode", legacy);
-    mount({ bigPicture: true });
-    expect(
-      await screen.findByRole("button", { name: "Dismiss" }),
-    ).toBeVisible();
-  },
-);
