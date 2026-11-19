@@ -378,6 +378,10 @@ it("shows full terrain-specific capital costs on owned and unconnected project m
       const price = formatPurchasePrice(projectSiteCapitalCost(quote));
       const title = `Total project cost ${price} · ${quote.owned ? "Already connected" : "Connection included"}`;
       expect(target).toHaveAccessibleName(expect.stringContaining(title));
+      act(() => target.focus());
+      expect(screen.getByRole("tooltip")).toHaveTextContent(title);
+      act(() => target.blur());
+      expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
       const marker = within(target).getByText(price, { exact: true });
       expect(marker).toHaveTextContent(price);
       expect(marker).not.toHaveTextContent(/^\$0$/);
@@ -681,19 +685,19 @@ it("suppresses clicks after panning and a second touch, and allows the next deli
 });
 
 it("shares pending cash with surface purchases, prevents duplicates, and waits for authoritative ownership after the receipt", async () => {
-  const map = show(5e6);
+  const cash = 5e6;
+  const map = show(cash);
   const host = fakeHost();
   map.buyMode();
-  const choices = map
+  const game = map.store.getState().game;
+  const prices = (button: HTMLButtonElement) =>
+    tilePurchaseQuote(game, idOf(button))!.price;
+  const [tile, other] = map
     .candidates()
-    .filter(
-      (button) =>
-        (tilePurchaseQuote(map.store.getState().game, idOf(button))?.price ??
-          Infinity) < 3.1e6,
-    );
-  const tile = choices[0],
-    id = idOf(tile);
-  const otherId = idOf(choices[1]);
+    .filter((button) => prices(button) <= cash);
+  expect(prices(tile) + prices(other)).toBeGreaterThan(cash);
+  const id = idOf(tile);
+  const otherId = idOf(other);
   map.setOtherTile(otherId);
   tap(tile);
   tap(tile);

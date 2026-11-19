@@ -1567,6 +1567,8 @@ export interface GameType {
       tileId: TerritoryTileId;
       minute: number;
       price: number;
+      /** Hexes to the nearest owned city when quoted; absent for parcel-priced receipts. */
+      connectionDistance?: number;
       /** Paid under the pre-adjacency visibility rule; new actions never create this marker. */
       legacy?: true;
     }[];

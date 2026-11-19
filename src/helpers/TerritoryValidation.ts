@@ -3,6 +3,7 @@ import {
   tileFitsFacility,
   isRetainedEnhancedGeothermalSite,
   ownsTerritoryTile,
+  ownedTerritoryTiles,
   territoryVisibilityDistance,
   territoryHexDistance,
   isAdjacentToOwnedTerritoryTile,
@@ -11,7 +12,10 @@ import {
 } from "./TerritoryTiles";
 import { TICK_MINUTES } from "../Constants";
 import type { GameType, TerritoryTileId } from "../Types";
-import type { TerritoryTileDefinition } from "../data/TerritoryTiles";
+import {
+  isValleyBoardTile,
+  type TerritoryTileDefinition,
+} from "../data/TerritoryTiles";
 import {
   isTerritoryId,
   isLandTerritoryId,
@@ -25,6 +29,8 @@ import {
   ownedTerritories,
   landPrice,
   tilePrice,
+  isOrdinaryTileConnection,
+  ordinaryTileConnectionPrice,
 } from "./Territories";
 
 const record = (value: unknown): value is Record<string, unknown> =>
@@ -89,6 +95,34 @@ export function territoryGameAtPurchase(
   };
 }
 
+function validConnectionDistance(
+  game: GameType,
+  tile: TerritoryTileDefinition,
+  distance: number,
+): boolean {
+  // Regional acquisitions have a separate ledger. At the same minute they may
+  // have happened before or after this tile purchase. Local city purchases are
+  // already ordered by the tile ledger.
+  const sameMinute =
+    game.utilityExpansion?.acquisitions
+      .filter(({ minute }) => minute === game.date.minute)
+      .map(({ targetId }): TerritoryTileId => `${targetId}:city`) ?? [];
+  const distances = new Map(
+    ownedTerritoryTiles(game)
+      .filter(({ city }) => city)
+      .map((city) => [city.id, territoryHexDistance(tile, city)]),
+  );
+  let nearest = Infinity;
+  for (const [id, hexes] of distances)
+    if (!sameMinute.includes(id)) nearest = Math.min(nearest, hexes);
+  if (distance === nearest) return true;
+  for (const id of sameMinute) {
+    nearest = Math.min(nearest, distances.get(id) ?? Infinity);
+    if (distance === nearest) return true;
+  }
+  return false;
+}
+
 /** A cold save can validate receipt structure before the dated economy is ready. */
 export function validTerritoryPurchasePrices(game: GameType): boolean {
   const state = game.territoryNetwork;
@@ -98,16 +132,35 @@ export function validTerritoryPurchasePrices(game: GameType): boolean {
       state.landPurchases.every(({ legacy }) => legacy === true))
   )
     return true;
+  const receipts = state.tilePurchases ?? [];
   return (
     hasEconomy() &&
     state.landPurchases.every(
       ({ legacy, price, minute, territoryId }) =>
         legacy === true || close(price, landPrice(game, minute, territoryId)),
     ) &&
-    (!state.tilePurchases ||
-      state.tilePurchases.every(({ price, minute, tileId }) =>
-        close(price, tilePrice(game, minute, tileId)),
-      ))
+    receipts.every(({ price, minute, tileId, connectionDistance }, index) => {
+      if (connectionDistance === undefined)
+        return close(price, tilePrice(game, minute, tileId));
+      const tile = getTerritoryTile(tileId, game);
+      return (
+        !!tile &&
+        validConnectionDistance(
+          territoryGameAtPurchase(game, minute, receipts.slice(0, index)),
+          tile,
+          connectionDistance,
+        ) &&
+        close(
+          price,
+          ordinaryTileConnectionPrice(
+            game,
+            minute,
+            tile.terrain,
+            connectionDistance,
+          ),
+        )
+      );
+    })
   );
 }
 
@@ -247,9 +300,6 @@ export function validTerritoryNetwork(
     const tile = getTerritoryTile(receipt?.tileId, game);
     if (
       !record(receipt) ||
-      (receipt.legacy === true
-        ? Object.keys(receipt).length !== 4
-        : receipt.legacy !== undefined || Object.keys(receipt).length !== 3) ||
       !tile ||
       !isLandTerritoryId(tile.territoryId) ||
       purchased.has(tile.id) ||
@@ -261,6 +311,19 @@ export function validTerritoryNetwork(
       receipt.minute > game.date.minute ||
       receipt.minute % TICK_MINUTES !== 0 ||
       !nonnegative(receipt.price)
+    )
+      return false;
+    const { legacy, connectionDistance } = receipt;
+    if (
+      (legacy !== undefined && legacy !== true) ||
+      (connectionDistance !== undefined &&
+        (legacy === true ||
+          !Number.isSafeInteger(connectionDistance) ||
+          connectionDistance < 1 ||
+          !isValleyBoardTile(tile.id) ||
+          !isOrdinaryTileConnection(tile))) ||
+      Object.keys(receipt).length !==
+        3 + Number(legacy === true || connectionDistance !== undefined)
     )
       return false;
     const earlier = (state.tilePurchases ?? []).slice(0, purchased.size);

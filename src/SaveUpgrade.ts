@@ -392,7 +392,10 @@ const migrations: readonly Migration[] = [
   (save) => save,
   // 19 -> 20: coal repowers extend the upgrade record. Existing projects are unchanged.
   (save) => save,
-  // 20 -> 21: capacity upgrades can carry a separate loan. Earlier upgrades were paid in cash.
+  // 20 -> 21: new ordinary tile receipts include connection distance. Existing receipts
+  // keep their original parcel pricing and need no new field.
+  (save) => save,
+  // 21 -> 22: capacity upgrades can carry a separate loan. Earlier upgrades were paid in cash.
   (save) => save,
 ];
 

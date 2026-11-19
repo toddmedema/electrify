@@ -1341,9 +1341,13 @@ export default function TerritoryHexMap({
                   if (!pointer.current && !touches.current.size) {
                     clearHover();
                     revealTile(tile);
-                    const rect = event.currentTarget.getBoundingClientRect();
+                    const source =
+                      event.currentTarget.querySelector<HTMLElement>(
+                        ".territoryTilePrice[data-tooltip]",
+                      ) ?? event.currentTarget;
+                    const rect = source.getBoundingClientRect();
                     showTooltip({
-                      source: event.currentTarget,
+                      source,
                       clientX: rect.left + rect.width / 2,
                       clientY: rect.top + rect.height / 2,
                     });

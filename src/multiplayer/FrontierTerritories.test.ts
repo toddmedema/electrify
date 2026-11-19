@@ -82,7 +82,10 @@ function buy(world: World, seat: string, id: LandTerritoryId) {
 const PUBLISHED_SCHEMA_20_RULES =
   "coop-2-cf979e3b45deb328dd12a266f291e16398174095d47beca6df0d4f9da1dbd577";
 
-it.each([undefined, 20])(
+const PUBLISHED_SCHEMA_21_RULES =
+  "coop-2-fcb444f119733dd48aef5c28f13cb78fc856be210f448c495109eb5987d70476";
+
+it.each([undefined, 20, 21])(
   "retains independent parcel claims and cash through schema%s save/resume",
   (schema) => {
     const world = ready();
@@ -99,9 +102,10 @@ it.each([undefined, 20])(
       "parcel-2:site-0": { seat: "1" },
     });
     const raw = JSON.parse(JSON.stringify(checkpointWorld(world)));
-    if (schema === 20) {
+    if (schema === 20 || schema === 21) {
       raw.gameSchema = schema;
-      raw.rules = PUBLISHED_SCHEMA_20_RULES;
+      raw.rules =
+        schema === 20 ? PUBLISHED_SCHEMA_20_RULES : PUBLISHED_SCHEMA_21_RULES;
     }
     expect(savedMatchSpec(raw)).toEqual(world.spec);
     const restored = restoreWorld(raw, "restored");
@@ -124,17 +128,23 @@ it.each([undefined, 20])(
   },
 );
 
-it("rejects unknown schema20 identities and corrupted published schema20 grids", () => {
-  const world = ready();
-  const raw = JSON.parse(JSON.stringify(checkpointWorld(world)));
-  raw.gameSchema = 20;
-  raw.rules = `${PUBLISHED_SCHEMA_20_RULES}-unknown`;
-  expect(() => savedMatchSpec(raw)).toThrow();
-  expect(() => restoreWorld(raw, "unknown")).toThrow();
-  raw.rules = PUBLISHED_SCHEMA_20_RULES;
-  raw.grids[0].customerRate = -1;
-  expect(() => restoreWorld(raw, "corrupt")).toThrow();
-});
+it.each([
+  [20, PUBLISHED_SCHEMA_20_RULES],
+  [21, PUBLISHED_SCHEMA_21_RULES],
+])(
+  "rejects unknown schema%s identities and corrupted published grids",
+  (schema, rules) => {
+    const world = ready();
+    const raw = JSON.parse(JSON.stringify(checkpointWorld(world)));
+    raw.gameSchema = schema;
+    raw.rules = `${rules}-unknown`;
+    expect(() => savedMatchSpec(raw)).toThrow();
+    expect(() => restoreWorld(raw, "unknown")).toThrow();
+    raw.rules = rules;
+    raw.grids[0].customerRate = -1;
+    expect(() => restoreWorld(raw, "corrupt")).toThrow();
+  },
+);
 
 it("migrates only recognized published schema14 co-op rules and keeps paid claims and cash", () => {
   const world = ready();

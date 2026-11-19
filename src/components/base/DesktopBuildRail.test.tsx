@@ -237,7 +237,7 @@ it.each(["trigger", "slider"])(
       expect(focused === "trigger" ? trigger : slider).toHaveFocus();
       fireEvent.change(slider, { target: { value: "12" } });
       expect(slider).toHaveValue("12");
-      await act(async () => (document.activeElement as HTMLElement).blur());
+      await act(async () => (focused === "trigger" ? trigger : slider).blur());
       expect(screen.queryByRole("slider")).not.toBeInTheDocument();
     } finally {
       jest.useRealTimers();
