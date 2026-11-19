@@ -51,6 +51,7 @@ const layout = [
   "modal-layout.spec.ts",
   "wildfire-scenario.spec.ts",
   "acquisitions.spec.ts",
+  "tutorial-capstone.spec.ts",
 ];
 
 // Run the PR smoke matrix at 1280/390 px and layout checks at 1280/390/360 px.
