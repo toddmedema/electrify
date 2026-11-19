@@ -530,6 +530,50 @@ it("describes ownership of each physical tile, including a partial purchase and 
   );
 });
 
+it("refreshes a stationary pointer tooltip after a peer claims its tile", async () => {
+  const map = show();
+  const tile = map.target("green-uplands:site-2");
+  fireEvent.pointerMove(tile, { pointerId: 1, clientX: 100, clientY: 100 });
+  await waitFor(() =>
+    expect(screen.getByRole("tooltip")).toHaveTextContent(/Unconnected/),
+  );
+  act(() => {
+    map.store.dispatch(
+      delta({
+        multiplayer: {
+          seat: "0",
+          tileOwners: {
+            "green-uplands:site-2": { seat: "1", name: "Birch Utility" },
+          },
+        },
+      }),
+    );
+  });
+  expect(tile).toHaveAccessibleDescription(/Owned by Birch Utility/);
+  expect(screen.getByRole("tooltip")).toHaveTextContent(
+    /Owned by Birch Utility/,
+  );
+  expect(screen.getByRole("tooltip")).not.toHaveTextContent(/Unconnected/);
+});
+
+it("shows the tile status tooltip on keyboard focus and dismisses it on blur", () => {
+  const map = show();
+  const tile = map.target("green-uplands:site-2");
+  act(() => tile.focus());
+  expect(tile).toHaveFocus();
+  expect(screen.getByRole("tooltip")).toHaveTextContent(/Unconnected/);
+  expect(tile).toHaveAccessibleDescription(
+    screen.getByRole("tooltip").textContent!,
+  );
+  act(() =>
+    screen.getByRole("button", { name: "Rapid connection mode" }).focus(),
+  );
+  expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+  expect(
+    map.store.getState().game.territoryNetwork!.tilePurchases,
+  ).toHaveLength(0);
+});
+
 it.each([360, 390])(
   "initially shows useful owned land while keeping the capital visible at %ipx",
   (width) => {

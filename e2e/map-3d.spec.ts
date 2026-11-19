@@ -326,6 +326,12 @@ for (const theme of ["light", "dark"] as const) {
       /Total project cost .*Already connected/,
     );
     await owned.focus();
+    await expect(map.getByRole("tooltip")).toContainText(
+      `Total project cost ${total} · Already connected`,
+    );
+    await map.getByRole("button", { name: "Rapid connection mode" }).focus();
+    await expect(map.getByRole("tooltip")).toHaveCount(0);
+    await owned.focus();
     await owned.press("Enter");
     await expect(surface.getByText("Connected", { exact: true })).toBeVisible();
     await ownedMarker.hover();

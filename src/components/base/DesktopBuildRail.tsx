@@ -267,7 +267,13 @@ export default function DesktopBuildRail({
   const leaveSizing = () => {
     clearTimer();
     if (!sizing?.pinned) {
-      dismissTimer.current = setTimeout(() => setSizing(undefined), 160);
+      dismissTimer.current = setTimeout(() => {
+        if (
+          !origin.current?.contains(document.activeElement) &&
+          !sizingPanel.current?.contains(document.activeElement)
+        )
+          setSizing(undefined);
+      }, 160);
     }
   };
   const choose = (option: FacilityShoppingType, exactSize?: number) => {

@@ -367,6 +367,11 @@ export default function TerritoryHexMap({
     quoteKey?: string;
   }>();
   const tooltip = React.useRef<HTMLDivElement>(null);
+  const tooltipAnchor = React.useRef<{
+    source: HTMLElement;
+    clientX: number;
+    clientY: number;
+  }>();
   const pointerHover = React.useRef<HTMLElement>();
   const hoverFrame = React.useRef<number>();
   const hoverPoint = React.useRef<{
@@ -381,6 +386,7 @@ export default function TerritoryHexMap({
     hoverPoint.current = undefined;
     if (pointerHover.current) delete pointerHover.current.dataset.modelHovered;
     pointerHover.current = undefined;
+    tooltipAnchor.current = undefined;
     if (tooltip.current) tooltip.current.hidden = true;
   }, []);
   React.useEffect(() => clearHover, [clearHover]);
@@ -716,6 +722,36 @@ export default function TerritoryHexMap({
       (ground?.dataset.mapTarget as TerritoryMapTileKey | undefined)
     );
   };
+  const showTooltip = React.useCallback(
+    (anchor?: NonNullable<typeof tooltipAnchor.current>) => {
+      tooltipAnchor.current = anchor;
+      const node = tooltip.current;
+      const rect = viewport.current?.getBoundingClientRect();
+      if (!node || !rect) return;
+      const text = anchor?.source.isConnected
+        ? anchor.source.dataset.tooltip
+        : undefined;
+      node.hidden = !text;
+      if (!text || !anchor) return;
+      if (node.textContent !== text) node.textContent = text;
+      const x = anchor.clientX - rect.left;
+      const y = anchor.clientY - rect.top;
+      const left = Math.max(
+        8,
+        Math.min(x + 12, rect.width - node.offsetWidth - 8),
+      );
+      const top =
+        y + 16 + node.offsetHeight <= rect.height - 8
+          ? y + 16
+          : Math.max(8, y - node.offsetHeight - 8);
+      node.style.transform = `translate(${left}px, ${top}px)`;
+    },
+    [],
+  );
+  React.useLayoutEffect(() => {
+    // Ownership, project quotes and status can change under a stationary pointer.
+    if (tooltipAnchor.current) showTooltip(tooltipAnchor.current);
+  });
   const hoverTile = (event: NonNullable<typeof hoverPoint.current>) => {
     const key = pointerTile(event);
     const target = key
@@ -730,40 +766,28 @@ export default function TerritoryHexMap({
       if (model) model.dataset.modelHovered = "true";
       pointerHover.current = model ?? undefined;
     }
-    const node = tooltip.current;
-    const rect = viewport.current?.getBoundingClientRect();
-    if (!node || !rect) return;
     const price =
       event.target instanceof Element
         ? event.target.closest<HTMLElement>(".territoryTilePrice")
         : undefined;
-    const text = target && (price?.dataset.tooltip ?? target.dataset.tooltip);
-    node.hidden = !text;
-    if (!text) return;
-    if (node.textContent !== text) node.textContent = text;
-    const x = event.clientX - rect.left;
-    const y = event.clientY - rect.top;
-    const left = Math.max(
-      8,
-      Math.min(x + 12, rect.width - node.offsetWidth - 8),
+    const source = price?.dataset.tooltip !== undefined ? price : target;
+    showTooltip(
+      source
+        ? { source, clientX: event.clientX, clientY: event.clientY }
+        : undefined,
     );
-    const top =
-      y + 16 + node.offsetHeight <= rect.height - 8
-        ? y + 16
-        : Math.max(8, y - node.offsetHeight - 8);
-    node.style.transform = `translate(${left}px, ${top}px)`;
   };
   const openTileMenu = (
     key: TerritoryMapTileKey,
     left: number,
     top: number,
   ) => {
-    clearHover();
     activation.current = undefined;
     suppressClick.current = true;
     stage.current
       ?.querySelector<HTMLButtonElement>(`[data-map-target="${key}"]`)
       ?.focus({ preventScroll: true });
+    clearHover();
     onTileMenu?.({ key, left, top });
   };
   const navigate = (
@@ -1311,12 +1335,21 @@ export default function TerritoryHexMap({
                 }
                 aria-pressed={key === activeSelected}
                 aria-describedby={`${mapId}-${key}-status`}
-                onFocus={() => {
+                onFocus={(event) => {
                   setRovingId(key);
                   if (key !== selected) onSelect(key);
-                  if (!pointer.current && !touches.current.size)
+                  if (!pointer.current && !touches.current.size) {
+                    clearHover();
                     revealTile(tile);
+                    const rect = event.currentTarget.getBoundingClientRect();
+                    showTooltip({
+                      source: event.currentTarget,
+                      clientX: rect.left + rect.width / 2,
+                      clientY: rect.top + rect.height / 2,
+                    });
+                  }
                 }}
+                onBlur={clearHover}
                 onClick={() => {
                   activateTile(key);
                 }}

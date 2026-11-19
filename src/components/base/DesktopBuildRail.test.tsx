@@ -217,6 +217,34 @@ it("opens sizing on hover and keeps it open after a click until an outside press
   }
 });
 
+it.each(["trigger", "slider"])(
+  "keeps hover-open sizing after pointer leave while the %s has keyboard focus",
+  async (focused) => {
+    show();
+    jest.useFakeTimers();
+    try {
+      const trigger = screen.getByRole("button", { name: /Power:/ });
+      fireEvent.mouseEnter(trigger);
+      const sizing = screen.getByRole("region", { name: "Power sizing" });
+      const slider = within(sizing).getByRole("slider", {
+        name: "Generator capacity",
+      });
+      await act(async () => (focused === "trigger" ? trigger : slider).focus());
+      fireEvent.mouseLeave(trigger);
+      fireEvent.mouseLeave(sizing);
+      act(() => jest.advanceTimersByTime(200));
+      expect(slider).toBeVisible();
+      expect(focused === "trigger" ? trigger : slider).toHaveFocus();
+      fireEvent.change(slider, { target: { value: "12" } });
+      expect(slider).toHaveValue("12");
+      await act(async () => (document.activeElement as HTMLElement).blur());
+      expect(screen.queryByRole("slider")).not.toBeInTheDocument();
+    } finally {
+      jest.useRealTimers();
+    }
+  },
+);
+
 it("uses independent remembered power and energy sliders without changing an already chosen project", () => {
   const { memory, onProject } = show();
   fireEvent.click(screen.getByRole("button", { name: /Power:/ }));
