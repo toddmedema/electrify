@@ -263,21 +263,6 @@ describe("Settings", () => {
     expect(onInterfaceScaleChange.mock.calls).toEqual([[1.5], [2]]);
   });
 
-  it("shows a stored scale above the largest choice clamped to 200%", () => {
-    renderSettings({
-      settings: {
-        theme: "system",
-        units: "metric",
-        musicVolume: 1,
-        soundEffectsVolume: 1,
-        interfaceScale: 2.5,
-      },
-    });
-    const scale = screen.getByRole("combobox", { name: "Interface scale" });
-    expect(scale).toHaveValue("2");
-    expect(within(scale).queryByRole("option", { name: "250%" })).toBeNull();
-  });
-
   it("offers Automatic and Single tool workspaces outside the desktop app", async () => {
     const onWorkspaceChange = jest.fn();
     renderSettings({ onWorkspaceChange });
@@ -333,7 +318,7 @@ describe("Settings", () => {
     expect(automatic).toHaveAttribute("aria-pressed", "true");
   });
 
-  it("displays an exact migrated intermediate scale", () => {
+  it("displays an exact stored intermediate scale", () => {
     renderSettings({
       settings: {
         theme: "system",

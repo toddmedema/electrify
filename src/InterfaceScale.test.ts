@@ -1,7 +1,6 @@
 import {
   applyInterfaceScale,
   getInterfaceScale,
-  migrateInterfaceScale,
   normalizeInterfaceScale,
   subscribeInterfaceScale,
 } from "./InterfaceScale";
@@ -48,7 +47,7 @@ it("shares one explicit multiplier between the root UI and chart subscriptions",
   }
 });
 
-it.each([undefined, null, "", "1.5", "250%", 0.99, {}, NaN, Infinity])(
+it.each([undefined, null, "", "1.5", "250%", 0.99, 2.01, 3, {}, NaN, Infinity])(
   "rejects malformed or unsupported interface scales: %p",
   (value) => {
     expect(normalizeInterfaceScale(value)).toBe(1);
@@ -58,24 +57,6 @@ it.each([undefined, null, "", "1.5", "250%", 0.99, {}, NaN, Infinity])(
     expect(document.documentElement.style.fontSize).toBe("100%");
   },
 );
-
-it.each([2.5, 3])(
-  "clamps a scale above the largest choice to 200%: %p",
-  (value) => {
-    expect(normalizeInterfaceScale(value)).toBe(2);
-    applyInterfaceScale(value);
-    expect(getInterfaceScale()).toBe(2);
-    expect(document.documentElement.style.fontSize).toBe("200%");
-  },
-);
-
-it("preserves legacy text and TV-scale products within the supported range", () => {
-  expect(migrateInterfaceScale("large", true, 1.75)).toBe(1.96875);
-  expect(migrateInterfaceScale("larger", true, 2)).toBe(2);
-  expect(migrateInterfaceScale("larger", false, 2)).toBe(1.25);
-  expect(migrateInterfaceScale("large", undefined, 2)).toBe(1.125);
-  expect(migrateInterfaceScale("invalid", true, Infinity)).toBe(1.5);
-});
 
 it.each([1, 1.5])(
   "projects scale %p to seats without another multiplier",

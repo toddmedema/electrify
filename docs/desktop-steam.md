@@ -416,9 +416,8 @@ Settings offers one Interface scale for text, charts, icons and controls (100–
 Workspace: Automatic or Single tool. Automatic uses the available space at the chosen scale;
 Single tool gives the active tool the main area while keeping essential status and navigation
 visible. Advanced display contains independent Screen-edge padding (0%, 2% or 4%) for displays
-that crop their edges. These preferences stay on this device. Existing text and TV preferences
-migrate once into the independent scale, workspace and padding choices; display resolution
-does not add an automatic scale factor. Split-screen companies retain their native zoom and
+that crop their edges. These preferences stay on this device. Display resolution does not
+add an automatic scale factor. Split-screen companies retain their native zoom and
 single-tool workspace without applying scale twice.
 
 The first qualifying title-screen launch offers a small bottom prompt in Steam Big Picture,
@@ -426,8 +425,8 @@ with a connected controller, or through a Remote Play TV client. Steam Deck uses
 signals. The prompt takes no focus and leaves Play available. Use couch settings applies 150%
 Interface scale and Single tool, retaining Screen-edge padding; Dismiss keeps current choices.
 The prompt is remembered as soon as it is shown, including across restarts without an answer.
-A valid previous TV-layout answer also counts as answered. Detection never changes preferences
-without acceptance, and signals arriving after leaving the title wait until a later title visit.
+Detection never changes preferences without acceptance, and signals arriving after leaving the
+title wait until a later title visit.
 
 Controller navigation, contextual hints and full controls help work independently of display
 preferences. Build keeps comparison and forecast information inside constrained views. Charts,

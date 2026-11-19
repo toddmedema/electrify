@@ -70,47 +70,10 @@ it("persists optional desktop preferences independently of the sound switch", ()
   });
 });
 
-it.each([
-  ["standard", undefined, "2", 1],
-  ["large", "false", "1.75", 1.125],
-  ["large", "true", "1.75", 1.96875],
-  ["larger", "true", "2", 2],
-  ["invalid", "true", "invalid", 1.5],
-])(
-  "migrates old preferences once: %p, %p, %p",
-  (text, mode, scale, expected) => {
-    localStorage.setItem("textSize", String(text));
-    if (mode !== undefined) localStorage.setItem("tvMode", String(mode));
-    localStorage.setItem("tvScale", String(scale));
-    expect(settings().initialSettings.interfaceScale).toBe(expected);
-    expect(localStorage.getItem("interfaceScale")).toBe(String(expected));
-    localStorage.setItem("tvMode", "false");
-    localStorage.setItem("textSize", "standard");
-    expect(settings().initialSettings.interfaceScale).toBe(expected);
-  },
-);
-
-it("migrates a legacy couch setup into independent preferences without runtime TV flags", () => {
-  localStorage.setItem("textSize", "large");
-  localStorage.setItem("tvMode", "true");
-  localStorage.setItem("tvScale", "1.75");
-  localStorage.setItem("tvInset", "4");
-  const { initialSettings } = settings();
-  expect(initialSettings).toMatchObject({
-    interfaceScale: 1.96875,
-    workspace: "single",
-    screenEdgePadding: 4,
-  });
-  expect(initialSettings).not.toHaveProperty("tvMode");
-  expect(initialSettings).not.toHaveProperty("tvScale");
-});
-
 it.each([1.5, 2])(
-  "restores explicit scale independently of old preferences and persists changes to %p",
+  "restores an explicit stored scale and persists changes to %p",
   (scale) => {
     localStorage.setItem("interfaceScale", "1.75");
-    localStorage.setItem("textSize", "larger");
-    localStorage.setItem("tvMode", "true");
     const { default: reducer, initialSettings, change } = settings();
     expect(initialSettings.interfaceScale).toBe(1.75);
     const large = reducer(initialSettings, change({ interfaceScale: scale }));
@@ -137,27 +100,14 @@ it.each([
   "[]",
   "{}",
   "0.5",
+  "2.5",
+  "3",
   "1.5junk",
   "0x2",
-])(
-  "rejects malformed stored interface scale without reviving legacy preferences: %p",
-  (stored) => {
-    localStorage.setItem("interfaceScale", stored);
-    localStorage.setItem("textSize", "larger");
-    localStorage.setItem("tvMode", "true");
-    expect(settings().initialSettings.interfaceScale).toBe(1);
-  },
-);
-
-it.each(["2.5", "3"])(
-  "clamps a stored scale above the largest choice to 200% without reviving legacy preferences: %p",
-  (stored) => {
-    localStorage.setItem("interfaceScale", stored);
-    localStorage.setItem("textSize", "larger");
-    localStorage.setItem("tvMode", "true");
-    expect(settings().initialSettings.interfaceScale).toBe(2);
-  },
-);
+])("rejects a malformed stored interface scale: %p", (stored) => {
+  localStorage.setItem("interfaceScale", stored);
+  expect(settings().initialSettings.interfaceScale).toBe(1);
+});
 
 it.each(["standalone", "ios"])(
   "defaults installed %s PWA sound on and remembers an explicit mute after relaunch",
@@ -186,20 +136,9 @@ it.each(["standalone", "ios"])(
   },
 );
 
-it("migrates the old chosen TV layout once and restores explicit workspace choices", () => {
-  localStorage.setItem("tvMode", "true");
-  const { default: reducer, initialSettings, change } = settings();
-  expect(initialSettings.workspace).toBe("single");
-  expect(localStorage.getItem("workspace")).toBe("single");
-  const updated = reducer(initialSettings, change({ workspace: "automatic" }));
-  expect(updated.workspace).toBe("automatic");
-  expect(settings().initialSettings.workspace).toBe("automatic");
-});
-
 it.each(["invalid", "true", "null", '"single"', ""])(
-  "rejects a malformed stored workspace instead of reviving an old preset: %p",
+  "rejects a malformed stored workspace: %p",
   (workspace) => {
-    localStorage.setItem("tvMode", "true");
     localStorage.setItem("workspace", workspace);
     expect(settings().initialSettings.workspace).toBe("automatic");
   },
@@ -216,30 +155,6 @@ it("rejects an invalid runtime workspace and persists the valid fallback", () =>
 });
 
 it.each([
-  [undefined, undefined, 0],
-  [undefined, "4", 0],
-  ["false", "4", 0],
-  ["true", undefined, 2],
-  ["true", "0", 0],
-  ["true", "2", 2],
-  ["true", "4", 4],
-  ["true", "4junk", 0],
-  ["true", "", 0],
-  ["true", "Infinity", 0],
-  ["true", '"4"', 0],
-])(
-  "migrates padding only from the active legacy layout: %p, %p",
-  (mode, inset, expected) => {
-    if (mode !== undefined) localStorage.setItem("tvMode", mode);
-    if (inset !== undefined) localStorage.setItem("tvInset", inset);
-    expect(settings().initialSettings.screenEdgePadding).toBe(expected);
-    expect(localStorage.getItem("screenEdgePadding")).toBe(String(expected));
-    localStorage.setItem("tvMode", "false");
-    expect(settings().initialSettings.screenEdgePadding).toBe(expected);
-  },
-);
-
-it.each([
   "",
   "NaN",
   "Infinity",
@@ -253,15 +168,10 @@ it.each([
   "4.1",
   "4junk",
   "0x4",
-])(
-  "rejects malformed stored padding without reviving legacy inset: %p",
-  (padding) => {
-    localStorage.setItem("screenEdgePadding", padding);
-    localStorage.setItem("tvMode", "true");
-    localStorage.setItem("tvInset", "4");
-    expect(settings().initialSettings.screenEdgePadding).toBe(0);
-  },
-);
+])("rejects a malformed stored padding: %p", (padding) => {
+  localStorage.setItem("screenEdgePadding", padding);
+  expect(settings().initialSettings.screenEdgePadding).toBe(0);
+});
 
 it("persists independent padding choices and rejects invalid runtime values", () => {
   const { default: reducer, initialSettings, change } = settings();
