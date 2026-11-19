@@ -19,6 +19,7 @@ interface Purchases {
   pendingIds: ReadonlySet<TerritoryTileId>;
   pendingCost: number;
   availableCash: number;
+  readAvailableCash: () => number;
   message: string;
   purchase: (
     tileId: TerritoryTileId,
@@ -69,10 +70,16 @@ export function TerritoryTilePurchasesProvider({
     );
     refresh();
   }, [game, money]);
-  const pendingCost = [...pending.current].reduce(
-    (sum, [id, entry]) => sum + (ownsTerritoryTile(game, id) ? 0 : entry.price),
-    0,
-  );
+  const pendingCostFor = (state: GameType) =>
+    [...pending.current].reduce(
+      (sum, [id, entry]) =>
+        sum + (ownsTerritoryTile(state, id) ? 0 : entry.price),
+      0,
+    );
+  const pendingCost = pendingCostFor(game);
+  const availableCashFor = (state: GameType) =>
+    (currentTick(state)?.cash ?? 0) - pendingCostFor(state);
+  const readAvailableCash = () => availableCashFor(store.getState().game);
   const pendingIds = new Set(
     [...pending.current.values()].flatMap(({ tileIds }) => tileIds),
   );
@@ -106,12 +113,7 @@ export function TerritoryTilePurchasesProvider({
         message: "The connection cost changed. Review the updated details.",
       };
     }
-    const committed = [...pending.current].reduce(
-      (sum, [id, entry]) =>
-        sum + (ownsTerritoryTile(latest, id) ? 0 : entry.price),
-      0,
-    );
-    if ((currentTick(latest)?.cash ?? 0) - committed < quote.price) {
+    if (availableCashFor(latest) < quote.price) {
       setMessage("Not enough available cash to connect this site.");
       return {
         status: "rejected",
@@ -171,6 +173,7 @@ export function TerritoryTilePurchasesProvider({
         pendingIds,
         pendingCost,
         availableCash: (currentTick(game)?.cash ?? 0) - pendingCost,
+        readAvailableCash,
         message,
         purchase,
       }}

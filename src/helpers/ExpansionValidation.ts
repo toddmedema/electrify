@@ -1,6 +1,7 @@
 import { landCustomerMarket } from "./TerritoryCustomers";
 import {
   isStorage,
+  type FacilityOperatingType,
   type GameType,
   type UtilityNetworkAsset,
   type UtilityTargetId,
@@ -54,6 +55,46 @@ const obsoleteAreaState = (game: GameType) =>
     Object.prototype.hasOwnProperty.call(t, "areaTicks"),
   );
 
+function validAcquiredFacilityExpansion(
+  facility: FacilityOperatingType,
+  inherited: FacilityOperatingType,
+): boolean {
+  const expansion = facility.acquiredExpansion;
+  if (expansion === undefined)
+    return (
+      facility.peakW === inherited.peakW &&
+      close(facility.buildCost, inherited.buildCost) &&
+      (facility.constructionKgco2eTotal ?? 0) === 0 &&
+      (facility.constructionKgco2eEmitted ?? 0) === 0
+    );
+  if (!record(expansion) || Object.keys(expansion).length !== 4) return false;
+  const {
+    addedCapacityW,
+    investedCapital,
+    constructionKgco2eTotal,
+    constructionKgco2eEmitted,
+  } = expansion;
+  const hasAddedCapacity = addedCapacityW > 0;
+  const hasInvestedCapital = investedCapital > 0;
+  return (
+    Number.isSafeInteger(facility.expansionSequence) &&
+    facility.expansionSequence! > (facility.expansionInProgress ? 1 : 0) &&
+    [
+      addedCapacityW,
+      investedCapital,
+      constructionKgco2eTotal,
+      constructionKgco2eEmitted,
+    ].every(nonnegative) &&
+    hasAddedCapacity === hasInvestedCapital &&
+    (hasAddedCapacity || constructionKgco2eTotal > 0) &&
+    constructionKgco2eEmitted <= constructionKgco2eTotal &&
+    close(facility.peakW, inherited.peakW + addedCapacityW) &&
+    close(facility.buildCost, inherited.buildCost + investedCapital) &&
+    facility.constructionKgco2eTotal === constructionKgco2eTotal &&
+    facility.constructionKgco2eEmitted === constructionKgco2eEmitted
+  );
+}
+
 /** Current saves contain one company and one bounded, receipt-owned acquisition ledger. */
 export function validUtilityExpansion(
   game: GameType,
@@ -62,7 +103,13 @@ export function validUtilityExpansion(
   if (obsoleteAreaState(game)) return false;
   const state = game.utilityExpansion;
   if (!isUtilityExpansionGame(game))
-    return state === undefined && validTerritoryNetwork(game, peers);
+    return (
+      state === undefined &&
+      game.facilities.every(
+        (facility) => facility.acquiredExpansion === undefined,
+      ) &&
+      validTerritoryNetwork(game, peers)
+    );
   if (
     !state ||
     !record(state) ||
@@ -218,7 +265,10 @@ export function validUtilityExpansion(
   const assetIds = new Set<string>();
   for (const facility of game.facilities) {
     const id = facility.startingAssetId;
-    if (!id) continue;
+    if (!id) {
+      if (facility.acquiredExpansion !== undefined) return false;
+      continue;
+    }
     const definition = Object.values(UTILITY_AREAS).find((portfolio) =>
       portfolio.facilities.some((asset) => asset.assetId === id),
     );
@@ -230,6 +280,7 @@ export function validUtilityExpansion(
       return false;
     assetIds.add(id);
     const expected = expectedAssets.get(id);
+    if (facility.acquiredExpansion !== undefined && !expected) return false;
     const packageCost = INHERITED_COLD_PACKAGE_COST_2005[id];
     if (
       packageCost !== undefined &&
@@ -243,16 +294,13 @@ export function validUtilityExpansion(
       (facility.name !== expected.name ||
         facility.fuel !== expected.fuel ||
         facility.gasCycle !== expected.gasCycle ||
-        facility.peakW !== expected.peakW ||
-        !close(facility.buildCost, expected.buildCost) ||
+        !validAcquiredFacilityExpansion(facility, expected) ||
         facility.minuteOperational !== expected.minuteOperational ||
         facility.minuteCreated !== expected.minuteCreated ||
         facility.loanAmountLeft !== 0 ||
         facility.loanAmountTotal !== 0 ||
         facility.loanMonthlyPayment !== 0 ||
-        facility.interestRate !== 0 ||
-        (facility.constructionKgco2eTotal ?? 0) !== 0 ||
-        (facility.constructionKgco2eEmitted ?? 0) !== 0)
+        facility.interestRate !== 0)
     )
       return false;
   }

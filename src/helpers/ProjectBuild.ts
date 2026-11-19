@@ -19,9 +19,7 @@ import {
   tileSupportsFacilityTechnology,
 } from "./TerritoryTiles";
 import { currentTick } from "./GameSelectors";
-import { facilityLoanMonths, purchaseTerms } from "./Financials";
-import { getDateFromMinute } from "./DateTime";
-import { TICK_MINUTES, YEARS_PER_TICK } from "../Constants";
+import { facilityConstructionReview } from "./FacilityConstructionReview";
 
 /** Only identity, options and size survive a site change; prices are always resolved again. */
 export type ProjectSelection =
@@ -178,31 +176,25 @@ export function projectReview(
   financed: boolean,
   availableCash = currentTick(game)?.cash ?? 0,
 ) {
-  const terms = purchaseTerms(
-    quote.facility.buildCost,
-    financed,
-    game.interestRate,
-    0,
-    facilityLoanMonths(quote.facility.lifespanYears),
-  );
-  const required = quote.connectionCost + terms.amountDue;
-  // Estimate with the fractional duration and live tick interval. Month-rollover pre-roll
-  // also advances construction, so completion near a boundary can fall in the prior month.
-  const online = getDateFromMinute(
-    game.date.minute +
-      Math.ceil(quote.facility.yearsToBuild / YEARS_PER_TICK) * TICK_MINUTES,
-    game.startingYear,
-  );
-  // A calendar month, price, financing, cash or named-site change needs explicit review again.
-  const key = JSON.stringify([
-    quote.tile.id,
-    quote.connection?.quoteKey,
+  const construction = facilityConstructionReview(
+    game,
     quote.facility,
     financed,
-    game.interestRate,
+    quote.tile.id,
+  );
+  const required = quote.connectionCost + construction.terms.amountDue;
+  const key = JSON.stringify([
+    quote.connection?.quoteKey,
+    construction.key,
     availableCash,
-    online.month,
-    online.year,
   ]);
-  return { terms, required, remaining: availableCash - required, online, key };
+  return {
+    terms: construction.terms,
+    required,
+    remaining: availableCash - required,
+    availableCash,
+    online: construction.online,
+    key,
+    buildKey: construction.key,
+  };
 }

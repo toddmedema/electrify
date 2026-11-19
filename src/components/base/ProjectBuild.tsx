@@ -14,7 +14,6 @@ import type { RootState } from "../../Store";
 import { useAppDispatch } from "../../Store";
 import { isStorage, type GameType, type TerritoryTileId } from "../../Types";
 import { facilityLoanMonths } from "../../helpers/Financials";
-import { currentTick } from "../../helpers/GameSelectors";
 import { formatWatts, formatWattHours } from "../../helpers/Format";
 import { sliderTickToW } from "../../helpers/BuildSizing";
 import { expectedMonthlyOutputShape } from "../../helpers/ExpectedOutput";
@@ -67,7 +66,8 @@ export default function ProjectBuild({
 }) {
   const dispatch = useAppDispatch();
   const store = useStore<RootState>();
-  const { purchase, availableCash, pendingCost } = useTerritoryTilePurchases();
+  const { purchase, availableCash, readAvailableCash } =
+    useTerritoryTilePurchases();
   const { formatMoneyConcise: money } = useMoney();
   const forecast = useBuildForecast(game);
   const [storage, setStorage] = useToolState("project.storage", false);
@@ -140,7 +140,7 @@ export default function ProjectBuild({
           initial.game,
           latest as ReadyProjectSite,
           financed,
-          (currentTick(initial.game)?.cash ?? 0) - pendingCost,
+          readAvailableCash(),
         )
       : undefined;
     if (!details || details.key !== reviewKey) {
@@ -185,17 +185,22 @@ export default function ProjectBuild({
             store.getState().game,
             owned as ReadyProjectSite,
             financed,
+            readAvailableCash(),
           )
         : undefined;
+      const expectedCash =
+        details.availableCash - (latest.connection?.price ?? 0);
+      // Cash and pending reservations can subtract in a different order after settlement.
+      const cashRounding =
+        Number.EPSILON * Math.max(1, Math.abs(details.availableCash)) * 4;
       if (
         !owned.facility ||
         !owned.owned ||
         !ownedReview ||
         ownedReview.remaining < 0 ||
-        JSON.stringify(owned.facility) !== JSON.stringify(latest.facility) ||
-        ownedReview.online.month !== details.online.month ||
-        ownedReview.online.year !== details.online.year ||
-        store.getState().game.interestRate !== initial.game.interestRate
+        ownedReview.buildKey !== details.buildKey ||
+        (connected &&
+          Math.abs(ownedReview.availableCash - expectedCash) > cashRounding)
       ) {
         setPartial(connected);
         setReviewKey(undefined);
@@ -213,6 +218,7 @@ export default function ProjectBuild({
           financed,
           owned.tile.territoryId,
           candidate,
+          details.buildKey,
         ),
       );
       if (!sameRun()) return;

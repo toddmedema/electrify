@@ -388,7 +388,7 @@ const migrations: readonly Migration[] = [
       },
     };
   },
-  // Standing facilities can retain paid capacity work; older clients must not discard it.
+  // Standing facilities can retain paid capacity work and reconcile it with acquisition terms.
   (save) => save,
 ];
 

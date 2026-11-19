@@ -631,6 +631,11 @@ interface SharedOperatingType
   expansionInProgress?: FacilityExpansionInProgressType;
   /** Last started expansion identity, retained after cancellation and completion. */
   expansionSequence?: number;
+  /** Capacity and construction booked by projects after an inherited facility was acquired. */
+  acquiredExpansion?: Required<ConstructionEmissions> & {
+    addedCapacityW: number;
+    investedCapital: number;
+  };
   startingAssetId?: string;
   territoryId?: TerritoryId;
   /** Exactly one developed map cell; absent outside the territory scenario. */

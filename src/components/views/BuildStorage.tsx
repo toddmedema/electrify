@@ -438,14 +438,15 @@ function StorageBuildDialog(props: Props): React.JSX.Element {
   );
 
   const cash = now?.cash ?? 0;
-  const minimumStorage = STORAGE(game, sliderTickToW(4), tileId);
-  const storage = STORAGE(game, sliderTickToW(sliderTick), tileId).map(
-    (candidate) =>
-      exactSizes[candidate.name] !== undefined
-        ? STORAGE(game, exactSizes[candidate.name], tileId).find(
-            (resized) => resized.name === candidate.name,
-          ) || candidate
-        : candidate,
+  const quoteStorage = (peakWh: number) =>
+    STORAGE(game, peakWh, tileId, territoryNetwork ? territoryId : undefined);
+  const minimumStorage = quoteStorage(sliderTickToW(4));
+  const storage = quoteStorage(sliderTickToW(sliderTick)).map((candidate) =>
+    exactSizes[candidate.name] !== undefined
+      ? quoteStorage(exactSizes[candidate.name]).find(
+          (resized) => resized.name === candidate.name,
+        ) || candidate
+      : candidate,
   );
   const territoryAvailabilityByName = new Map(
     storage.map((candidate) => [
@@ -536,9 +537,8 @@ function StorageBuildDialog(props: Props): React.JSX.Element {
                   buildSizeOptions(4, 37, peakWh),
                   readCash(),
                   (capacity) =>
-                    STORAGE(game, capacity, tileId).find(
-                      (item) => item.name === g.name,
-                    )!.buildCost,
+                    quoteStorage(capacity).find((item) => item.name === g.name)!
+                      .buildCost,
                 ) ?? peakWh;
               revealResizedRow(
                 g.name === "Battery" ? "Lithium Battery" : g.name,
@@ -550,7 +550,12 @@ function StorageBuildDialog(props: Props): React.JSX.Element {
             location={game.location}
             onBuild={(financed: boolean) => {
               if (territoryNetwork)
-                props.onBuildStorage(g, financed, territoryId, tileId);
+                props.onBuildStorage(
+                  g,
+                  financed,
+                  territoryId,
+                  tileId ?? territoryAvailabilityByName.get(g.name)?.tileId,
+                );
               else props.onBuildStorage(g, financed);
               (completeBuild ?? onBack)();
             }}

@@ -15,6 +15,18 @@ function nonNegative(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value) && value >= 0;
 }
 
+/** Storage may omit derived watts, but supplied dimensions must always be positive. */
+export function requestedFacilitySize(request: {
+  peakW?: unknown;
+  peakWh?: unknown;
+}): number | undefined {
+  const { peakW, peakWh } = request;
+  if (peakW !== undefined && (!nonNegative(peakW) || peakW === 0))
+    return undefined;
+  const size = peakWh === undefined ? peakW : peakWh;
+  return nonNegative(size) && size > 0 ? size : undefined;
+}
+
 const FACILITY_UPGRADES: readonly FacilityUpgradeType[] = [
   "coldWeatherPackage",
   "solarTrackers",

@@ -24,6 +24,10 @@ import {
   tileFitsFacility,
 } from "./TerritoryTiles";
 
+// Pumped hydro reaches twelve base years at the 1 TWh input cap. Scenario modifiers
+// can multiply that duration by ten; difficulty can only shorten it.
+const MAX_EXPANSION_CONSTRUCTION_YEARS = 120;
+
 export type FacilityExpansionQuote =
   | ({
       status: "ready";
@@ -186,6 +190,7 @@ export function facilityExpansionQuote(
         ((target.peakWh ?? 0) - (current.peakWh ?? 0)),
   );
   if (
+    yearsToBuild > MAX_EXPANSION_CONSTRUCTION_YEARS ||
     ![cost, yearsToBuild, targetPeakW].every(
       (value) => Number.isFinite(value) && value > 0,
     ) ||
@@ -216,6 +221,7 @@ export function facilityExpansionQuote(
     game.date.year,
     game.date.month,
     projectSequence,
+    facility.minuteCreated,
   ]);
   return {
     status: "ready",
@@ -239,12 +245,44 @@ export function facilityExpansionQuote(
   };
 }
 
+/** Retain post-acquisition changes separately from the immutable purchase terms. */
+export function recordAcquiredExpansion(
+  facility: FacilityOperatingType,
+  addedCapacityW: number,
+  investedCapital: number,
+  total: number,
+  emitted: number,
+): void {
+  if (
+    !facility.startingAssetId ||
+    (facility.territoryId !== "valley-electric" &&
+      facility.territoryId !== "ridge-electric") ||
+    (addedCapacityW === 0 && emitted === 0)
+  )
+    return;
+  const previous = facility.acquiredExpansion;
+  facility.acquiredExpansion = {
+    addedCapacityW: (previous?.addedCapacityW ?? 0) + addedCapacityW,
+    investedCapital: (previous?.investedCapital ?? 0) + investedCapital,
+    constructionKgco2eTotal: (previous?.constructionKgco2eTotal ?? 0) + total,
+    constructionKgco2eEmitted:
+      (previous?.constructionKgco2eEmitted ?? 0) + emitted,
+  };
+}
+
 /** Apply only extensive changes. Added investment shares the existing asset's depreciation age. */
 export function completeFacilityExpansion(
   facility: FacilityOperatingType,
 ): void {
   const expansion = facility.expansionInProgress;
   if (!expansion || expansion.yearsToBuildLeft > 0) return;
+  recordAcquiredExpansion(
+    facility,
+    expansion.targetPeakW - facility.peakW,
+    expansion.cost,
+    expansion.constructionKgco2eTotal ?? 0,
+    expansion.constructionKgco2eEmitted ?? 0,
+  );
   const scale = expansion.targetPeakW / facility.peakW;
   if (!isStorage(facility)) {
     if (facility.reservoirCapacityWh !== undefined)
@@ -337,7 +375,7 @@ export function validFacilityExpansion(
     raw.targetPeakW > 1e12 ||
     raw.targetSize <= (facility.peakWh ?? facility.peakW) ||
     raw.targetPeakW <= facility.peakW ||
-    raw.yearsToBuild > 100 ||
+    raw.yearsToBuild > MAX_EXPANSION_CONSTRUCTION_YEARS ||
     raw.yearsToBuildLeft > raw.yearsToBuild ||
     raw.startsMinute > game.date.minute ||
     typeof raw.quoteKey !== "string" ||
@@ -390,7 +428,8 @@ export function validFacilityExpansion(
   } catch {
     return false;
   }
-  if (!Array.isArray(reviewed) || reviewed.length !== 16) return false;
+  if (!Array.isArray(reviewed) || ![16, 17].includes(reviewed.length))
+    return false;
   const same = (actual: unknown, expected: number) =>
     typeof actual === "number" &&
     Number.isFinite(actual) &&
@@ -407,6 +446,7 @@ export function validFacilityExpansion(
     reviewed[4] !== raw.targetPeakW ||
     reviewed[5] !== raw.cost ||
     reviewed[15] !== raw.projectSequence ||
+    (reviewed.length === 17 && reviewed[16] !== facility.minuteCreated) ||
     reviewed[13] !== projectContext.date.year ||
     reviewed[14] !== projectContext.date.month ||
     reviewed[6] !== raw.yearsToBuild ||

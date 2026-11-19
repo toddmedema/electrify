@@ -4,6 +4,7 @@ import {
   validExpandFacilityAction,
   validCancelFacilityExpansionAction,
   completeFacilityExpansion,
+  recordAcquiredExpansion,
 } from "../helpers/FacilityExpansion";
 import { pooledPeerExportEmissions } from "../helpers/PeerExportEmissions";
 import { assignTerritoryTiles } from "../helpers/TerritoryTiles";
@@ -355,7 +356,7 @@ import {
 } from "../Constants";
 import {
   GENERATORS,
-  getBuildFacilityQuote,
+  getMatchingBuildFacilityQuote,
   IRON_AIR_AVAILABLE_YEAR,
   STORAGE,
   windAnnualOutputDegradation,
@@ -2813,7 +2814,7 @@ export function previewFacilityBuild(
     : undefined;
   if (placement && !placement.buildable) throw new Error(placement.reason);
   if (placement) {
-    const priced = priceTerritoryFacility(
+    const priced = getMatchingBuildFacilityQuote(
       snapshot,
       facility,
       territoryId,
@@ -2821,7 +2822,8 @@ export function previewFacilityBuild(
     );
     if (!priced)
       throw new Error("This facility is unavailable at the selected site");
-    facility = priced;
+    // Reprice the quote while retaining preview-only construction timing overrides.
+    facility = { ...priced, yearsToBuild: facility.yearsToBuild };
   }
   const hydroSite = isConventionalHydro(facility)
     ? getHydroAvailability(
@@ -2900,26 +2902,6 @@ function refreshInterestRate(
     getPrimeRate(state.date, state.seed) * state.creditPremium;
 }
 
-/** Reprice network builds without changing preview-only construction timing overrides. */
-function priceTerritoryFacility(
-  game: GameType,
-  facility: FacilityShoppingType,
-  territoryId: TerritoryId,
-  tileId?: import("../Types").TerritoryTileId,
-): FacilityShoppingType | undefined {
-  const canonical = getBuildFacilityQuote(game, facility, territoryId, tileId);
-  if (
-    !canonical ||
-    canonical.fuel !== facility.fuel ||
-    canonical.peakW !== facility.peakW
-  )
-    return undefined;
-  return {
-    ...canonical,
-    yearsToBuild: facility.yearsToBuild,
-  };
-}
-
 function applyBuildFacility(
   state: GameType,
   payload: BuildFacilityAction,
@@ -2942,18 +2924,13 @@ function applyBuildFacility(
     : undefined;
   if (placement && !placement.buildable) return false;
   if (placement) {
-    const priced = getBuildFacilityQuote(
+    const priced = getMatchingBuildFacilityQuote(
       state,
       requested,
       territoryId,
       placement.tileId,
     );
-    if (
-      !priced ||
-      priced.fuel !== requested.fuel ||
-      priced.peakW !== requested.peakW
-    )
-      return false;
+    if (!priced) return false;
     requested = priced;
   }
   if (isLegacyCampaignScenario(state.scenarioId) && !state.customScenario) {
@@ -3142,6 +3119,7 @@ function applyCancelFacilityExpansion(
   now.cash += expansion.cost;
   // Cancellation refunds committed capital, never construction emissions already released.
   const emitted = expansion.constructionKgco2eEmitted ?? 0;
+  recordAcquiredExpansion(facility, 0, 0, emitted, emitted);
   facility.constructionKgco2eTotal =
     (facility.constructionKgco2eTotal ?? 0) + emitted;
   facility.constructionKgco2eEmitted =

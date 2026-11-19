@@ -12,6 +12,12 @@ import { GeneratorShoppingType } from "../Types";
 import { registerMultiplayerRuntime } from "../multiplayer/Registry";
 import { availableTerritoryTiles } from "./TerritoryTiles";
 import { currentTick } from "./GameSelectors";
+import { getDateFromMinute, MINUTES_PER_MONTH } from "./DateTime";
+import {
+  withResilienceOptions,
+  trackerHailDamageFactorForYear,
+} from "./Hazards";
+import { TRACKER_HAIL_PRO_YEAR } from "../data/Hazards";
 
 it("acknowledges a purchase in the dispatching store, but not a rejected build", () => {
   const game = createGame({ scenarioId: 103 });
@@ -111,6 +117,7 @@ it("waits for the requested tile and project rather than acknowledging an unrela
 
 it.each([
   "same run",
+  "same options with updated equipment",
   "another tile",
   "another project",
   "another run",
@@ -119,6 +126,12 @@ it.each([
   const game = createGame({ scenarioId: 116, seed: 188 });
   currentTick(game)!.cash = 1e9;
   game.multiplayer = { seat: "0" };
+  const updatedEquipment = projection === "same options with updated equipment";
+  if (updatedEquipment)
+    game.date = getDateFromMinute(
+      (TRACKER_HAIL_PRO_YEAR - game.startingYear) * 12 * MINUTES_PER_MONTH,
+      game.startingYear,
+    );
   const store = configureStore({
     reducer: {
       game: gameReducer,
@@ -132,9 +145,23 @@ it.each([
     middleware: (defaults) =>
       defaults({ serializableCheck: false, immutableCheck: false }),
   });
-  const facility = GENERATORS(game, 20e6, [], []).find(
-    (option) => option.name === "Wind",
+  const available = GENERATORS(game, 20e6, [], []).find(
+    (option) => option.name === (updatedEquipment ? "Solar" : "Wind"),
   )!;
+  const facility = updatedEquipment
+    ? withResilienceOptions(available, game, { solarTrackers: true })
+    : available;
+  const reviewed = updatedEquipment
+    ? {
+        ...facility,
+        resilience: {
+          ...facility.resilience,
+          trackerHailDamageFactor: trackerHailDamageFactorForYear(
+            TRACKER_HAIL_PRO_YEAR - 1,
+          ),
+        },
+      }
+    : facility;
   const [target, other] = availableTerritoryTiles(game, facility, "champlain");
   expect(other).toBeDefined();
   const build = () =>
@@ -163,9 +190,9 @@ it.each([
   });
   try {
     const result = await store.dispatch(
-      purchaseFacility(facility, false, target.territoryId, target.id),
+      purchaseFacility(reviewed, false, target.territoryId, target.id),
     );
-    const accepted = projection === "same run";
+    const accepted = projection === "same run" || updatedEquipment;
     const built = store
       .getState()
       .game.facilities.find((candidate) => candidate.tileId === target.id);

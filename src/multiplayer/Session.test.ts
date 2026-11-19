@@ -1,3 +1,4 @@
+import { facilityConstructionReview } from "../helpers/FacilityConstructionReview";
 import "../Store";
 import { TextEncoder } from "util";
 import { webcrypto } from "crypto";
@@ -2070,6 +2071,12 @@ test("the host builds the exact project site selected through a public session",
     target.territoryId,
     target.id,
   )!;
+  const reviewKey = facilityConstructionReview(
+    game,
+    quote,
+    false,
+    target.id,
+  ).key;
   const beforeIds = new Set(game.facilities.map(({ id }) => id));
   const f = fixture();
   await f.session.initialize();
@@ -2082,8 +2089,10 @@ test("the host builds the exact project site selected through a public session",
       financed: false,
       territoryId: target.territoryId,
       tileId: target.id,
+      reviewKey,
     },
   });
+  expect(sentCommands(f)[0]).toMatchObject({ payload: { reviewKey } });
   expect(
     applyCommand(world, guest, {
       matchId: world.matchId,

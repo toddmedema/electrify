@@ -1,6 +1,6 @@
 import * as FacilityCatalog from "../data/Facilities";
 import cloneDeep from "lodash.clonedeep";
-import { YEARS_PER_TICK, TICKS_PER_MONTH } from "../Constants";
+import { YEARS_PER_TICK, TICKS_PER_MONTH, TICK_MINUTES } from "../Constants";
 import { getBuildFacilityQuote, STORAGE } from "../data/Facilities";
 import { createGame } from "../testing/Simulator";
 import reducer, {
@@ -14,6 +14,7 @@ import reducer, {
 import {
   expandFacility,
   cancelFacilityExpansion,
+  acquireUtility,
 } from "../reducers/GameActions";
 import { currentCash, currentTick } from "./GameSelectors";
 import { facilityCashBack } from "./Financials";
@@ -27,6 +28,8 @@ import { copyCommitmentMetadata } from "./Commitment";
 import { parseSave, serializeSave } from "../SaveGame";
 import { GameType, isStorage } from "../Types";
 import { validateGameCommand } from "../multiplayer/Commands";
+import { acquisitionQuote } from "./Expansion";
+import { modScenario } from "../mods/ModScenario";
 
 function setup(scenarioId = 104) {
   const game = createGame({ scenarioId, seed: 818 });
@@ -662,3 +665,140 @@ it("rejects imported storage targets over the era ceiling while preserving inher
   pending.quoteKey = JSON.stringify(key);
   expect(parseSave(malformed)).toBeNull();
 });
+
+it("round-trips a valid capacity project longer than 100 years", () => {
+  const scenario = modScenario(
+    {
+      schemaVersion: 1,
+      gameApi: 1,
+      id: "long-storage-expansion",
+      title: "Long storage expansion",
+      creator: "Test",
+      version: "1",
+      description: "Long lead times for closed-loop pumped storage.",
+      baseScenarioId: 100,
+      facilities: { "Pumped Hydro": { yearsToBuild: 10 } },
+    },
+    undefined,
+    "CEO",
+  );
+  const game = createGame({
+    scenarioId: scenario.id,
+    scenario,
+    difficulty: "CEO",
+  });
+  currentTick(game)!.cash = 1e12;
+  const storageQuote = STORAGE(game, 10e9).find(
+    ({ name }) => name === "Pumped Hydro",
+  )!;
+  const withStorage = cloneDeep(
+    reducer(game, buildFacility({ facility: storageQuote, financed: false })),
+  );
+  const storage = withStorage.facilities.find(isStorage)!;
+  storage.yearsToBuildLeft = 0;
+  storage.minuteOperational = 0;
+  const expanded = begin(withStorage, storage.id, 20e9);
+  const pending = expanded.facilities.find(
+    ({ id }) => id === storage.id,
+  )!.expansionInProgress;
+  expect(pending?.yearsToBuild).toBeGreaterThan(100);
+  const resumed = parseSave(serializeSave(expanded))?.game.facilities.find(
+    ({ id }) => id === storage.id,
+  );
+  expect(resumed?.expansionInProgress).toEqual(pending);
+});
+
+it("reconciles completed and canceled work on an acquired plant without relaxing provenance", () => {
+  const game = setup(116);
+  const acquisition = acquisitionQuote(game, "valley-electric")!;
+  const bought = cloneDeep(
+    reducer(
+      game,
+      acquireUtility({
+        targetId: "valley-electric",
+        financed: false,
+        quoteKey: acquisition.quoteKey,
+      }),
+    ),
+  );
+  const plant = bought.facilities.find(
+    ({ startingAssetId }) => startingAssetId === "scenario-116-valley-biomass",
+  )!;
+  let expanded = begin(bought, plant.id, 12e6);
+  const operated = expanded.facilities.find(({ id }) => id === plant.id)!;
+  operated.expansionInProgress!.yearsToBuildLeft = YEARS_PER_TICK / 2;
+  tickState(expanded);
+  expect(operated.expansionInProgress).toBeUndefined();
+  expect(operated.peakW).toBe(12e6);
+  expect(operated.acquiredExpansion?.addedCapacityW).toBe(1e6);
+  expect(
+    parseSave(serializeSave(expanded))?.game.facilities.find(
+      ({ id }) => id === plant.id,
+    ),
+  ).toEqual(operated);
+
+  expanded = begin(expanded, plant.id, 13e6);
+  tickState(expanded);
+  const second = expanded.facilities.find(
+    ({ id }) => id === plant.id,
+  )!.expansionInProgress!;
+  expect(second.constructionKgco2eEmitted).toBeGreaterThan(0);
+  const canceled = reducer(
+    expanded,
+    cancelFacilityExpansion({
+      facilityId: plant.id,
+      quoteKey: second.quoteKey,
+    }),
+  );
+  const saved = cloneDeep(serializeSave(canceled));
+  const savedPlant = saved.game.facilities.find(({ id }) => id === plant.id)!;
+  expect(savedPlant.peakW).toBe(12e6);
+  expect(savedPlant.constructionKgco2eEmitted).toBeGreaterThan(
+    operated.constructionKgco2eEmitted!,
+  );
+  expect(
+    parseSave(saved)?.game.facilities.find(({ id }) => id === plant.id),
+  ).toEqual(savedPlant);
+  savedPlant.peakW += 1;
+  expect(parseSave(saved)).toBeNull();
+});
+
+it("binds a new expansion to the particular installation when a facility ID is reused", () => {
+  const original = setup();
+  const initial = begin(original);
+  const facility = initial.facilities[0];
+  const replacement = cloneDeep(original);
+  replacement.facilities[0].minuteCreated -= TICK_MINUTES;
+  const started = begin(replacement);
+  expect(started.facilities[0].expansionInProgress!.quoteKey).not.toBe(
+    facility.expansionInProgress!.quoteKey,
+  );
+  const stale = cancelFacilityExpansion({
+    facilityId: facility.id,
+    quoteKey: facility.expansionInProgress!.quoteKey,
+  });
+  expect(reducer(started, stale)).toEqual(started);
+});
+
+it.each([null, "1000", 0, -1, Infinity, NaN])(
+  "declines an invalid storage dimension before pricing: %p",
+  (peakWh) => {
+    const game = setup(100);
+    const request = { name: "Battery", peakW: 1e6, peakWh };
+    expect(
+      getBuildFacilityQuote(
+        game,
+        request as Parameters<typeof getBuildFacilityQuote>[1],
+      ),
+    ).toBeUndefined();
+    expect(
+      validateGameCommand(game, "buildFacility", {
+        facility: request,
+        financed: false,
+      }),
+    ).toEqual({ error: "Choose a valid facility size" });
+    expect(
+      getBuildFacilityQuote(game, { name: "Battery", peakWh: 1e6 }),
+    ).toMatchObject({ name: "Battery", peakWh: 1e6 });
+  },
+);

@@ -208,6 +208,33 @@ it("locks repeated confirmation and waits for host ownership before building", a
       ),
   ).toMatchObject({ name: "Wind", peakW: 20e6 });
 });
+it("requires a new build review if a settlement changes cash during connection", async () => {
+  const { store, adjacent, game } = show(true);
+  const submit = jest.fn(async (command: Command) => {
+    if (command.kind !== "action" || command.name !== "acquireTile")
+      throw new Error("Construction started before a new review.");
+    store.dispatch(
+      acquireTile(command.payload as Parameters<typeof acquireTile>[0]),
+    );
+    const settled = JSON.parse(
+      JSON.stringify(store.getState().game),
+    ) as GameType;
+    currentTick(settled)!.cash -= 1;
+    store.dispatch(replace(settled));
+  });
+  runtime(submit);
+  adjacent();
+  fireEvent.click(screen.getByRole("button", { name: "Connect & build" }));
+  expect(
+    await screen.findByText(/Site connected. Construction did not start/),
+  ).toBeVisible();
+  expect(ownsTerritoryTile(store.getState().game, "green-uplands:site-1")).toBe(
+    true,
+  );
+  expect(store.getState().game.facilities).toHaveLength(game.facilities.length);
+  expect(submit).toHaveBeenCalledTimes(1);
+  expect(screen.getByRole("button", { name: "Review build" })).toBeEnabled();
+});
 it("preserves partial success and retries the build without charging another connection", async () => {
   const { store, adjacent, close, game } = show(true);
   let rejectBuild = true;

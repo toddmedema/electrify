@@ -22,6 +22,7 @@ export const purchaseFacility =
     financed: boolean,
     territoryId?: TerritoryId,
     tileId?: TerritoryTileId,
+    reviewKey?: string,
   ): AppThunk<Promise<FacilityPurchaseResult>> =>
   async (dispatch, getState) => {
     const initial = getState();
@@ -40,8 +41,10 @@ export const purchaseFacility =
           candidate.peakW === facility.peakW &&
           candidate.peakWh === facility.peakWh &&
           candidate.gasCycle === facility.gasCycle &&
-          JSON.stringify(candidate.resilience ?? {}) ===
-            JSON.stringify(facility.resilience ?? {}) &&
+          !!candidate.resilience?.coldWeatherPackage ===
+            !!facility.resilience?.coldWeatherPackage &&
+          !!candidate.resilience?.solarTrackers ===
+            !!facility.resilience?.solarTrackers &&
           (tileId === undefined || candidate.tileId === tileId) &&
           (territoryId === undefined || candidate.territoryId === territoryId),
       );
@@ -69,7 +72,8 @@ export const purchaseFacility =
         await multiplayer.submit({
           kind: "action",
           name: "buildFacility",
-          payload,
+          payload:
+            reviewKey === undefined ? payload : { ...payload, reviewKey },
         });
       } else dispatch(buildFacility(payload));
       if (!sameRun())

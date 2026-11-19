@@ -54,7 +54,10 @@ import {
   applyDefaultResilience,
   withResilienceOptions,
 } from "../helpers/Hazards";
-import { validResilienceRecord } from "../helpers/BuildValidation";
+import {
+  requestedFacilitySize,
+  validResilienceRecord,
+} from "../helpers/BuildValidation";
 import { pow } from "../helpers/Pow";
 import { exp, log10 } from "../helpers/Libm";
 import {
@@ -962,6 +965,7 @@ export function STORAGE(
   state: GameType,
   peakWh: number,
   tileId?: TerritoryTileId,
+  territoryId?: TerritoryId,
 ) {
   // 0 = 1MW, 4 = 10GW (+1 for each 10x)
   const magnitude = log10(peakWh) - 6;
@@ -1065,11 +1069,8 @@ export function STORAGE(
   // update with calculations that occur across all entries, like difficulty multipliers
   const difficulty = DIFFICULTIES[state.difficulty];
   const inflation = getCostInflation(state);
-  const { buildCost: terrainCost } = getTerrainModifiers(
-    state,
-    undefined,
-    tileId,
-  );
+  const terrainCost = getTerrainModifiers(state, undefined, tileId).buildCost;
+  const chooseTile = !tileId && territoryId && hasTerritoryNetwork(state);
   storage = storage.filter((g: StorageShoppingType) => {
     applyLegacyStorageEra(state, g);
     const mod = facilityModifier(state, g.name);
@@ -1089,7 +1090,13 @@ export function STORAGE(
       `facilities.${g.name}.yearsToBuild`,
     );
     g.buildCost *= difficulty.buildCost * inflation;
-    g.buildCost *= terrainCost;
+    g.buildCost *= chooseTile
+      ? getTerrainModifiers(
+          state,
+          undefined,
+          availableTerritoryTiles(state, g, territoryId)[0]?.id,
+        ).buildCost
+      : terrainCost;
     g.annualOperatingCost *= difficulty.expensesOM * inflation;
     g.yearsToBuild *= difficulty.buildTime;
     if (
@@ -1112,6 +1119,7 @@ export function getBuildFacilityQuote(
   tileId?: TerritoryTileId,
   pinnedHydroSiteId?: string,
 ): FacilityShoppingType | undefined {
+  if (requestedFacilitySize(requested) === undefined) return undefined;
   const options: FacilityShoppingType[] =
     requested.peakWh === undefined
       ? GENERATORS(
@@ -1127,7 +1135,7 @@ export function getBuildFacilityQuote(
           tileId,
           pinnedHydroSiteId,
         )
-      : STORAGE(game, requested.peakWh, tileId);
+      : STORAGE(game, requested.peakWh, tileId, territoryId);
   let quote = options.find(
     (candidate) =>
       candidate.available &&
@@ -1145,4 +1153,17 @@ export function getBuildFacilityQuote(
   if (!isStorage(quote) && requested.resilience)
     quote = withResilienceOptions(quote, game, requested.resilience);
   return quote;
+}
+
+/** Network placement and forecasts must retain the requested technology and power rating. */
+export function getMatchingBuildFacilityQuote(
+  game: GameType,
+  facility: FacilityShoppingType,
+  territoryId: TerritoryId,
+  tileId?: TerritoryTileId,
+): FacilityShoppingType | undefined {
+  const quote = getBuildFacilityQuote(game, facility, territoryId, tileId);
+  return quote?.fuel === facility.fuel && quote?.peakW === facility.peakW
+    ? quote
+    : undefined;
 }

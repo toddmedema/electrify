@@ -1507,7 +1507,7 @@ function BuildGenerators(props: Props): React.JSX.Element {
                       selected,
                       financed,
                       territoryId,
-                      tileId,
+                      tileId ?? territoryAvailabilityByName.get(g.name)?.tileId,
                     );
                   else props.onBuildGenerator(selected, financed);
                   (completeBuild ?? onBack)();

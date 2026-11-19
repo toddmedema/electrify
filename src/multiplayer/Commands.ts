@@ -23,10 +23,12 @@ import {
 import { currentTick } from "../helpers/GameSelectors";
 import { getBuildFacilityQuote } from "../data/Facilities";
 import {
+  requestedFacilitySize,
   validRetrofitFacility,
   validResilienceRecord,
 } from "../helpers/BuildValidation";
 import { withResilienceOptions } from "../helpers/Hazards";
+import { facilityConstructionReview } from "../helpers/FacilityConstructionReview";
 import { validPolicyChange } from "../helpers/Policies";
 import { validScenarioResponse } from "../helpers/ScenarioChoices";
 import { isStorage } from "../Types";
@@ -102,6 +104,7 @@ const buildFacility: Validator = (game, payload) => {
     financed?: boolean;
     territoryId?: unknown;
     tileId?: unknown;
+    reviewKey?: unknown;
   };
   if (!build || !build.facility || typeof build.financed !== "boolean")
     return { error: "That build is unavailable" };
@@ -126,13 +129,8 @@ const buildFacility: Validator = (game, payload) => {
     ? build.tileId
     : undefined;
   const requested = build.facility;
-  const size = requested.peakWh ?? requested.peakW;
-  if (
-    typeof size !== "number" ||
-    !Number.isFinite(size) ||
-    size <= 0 ||
-    size > 1e12
-  )
+  const size = requestedFacilitySize(requested);
+  if (size === undefined || size > 1e12)
     return { error: "Choose a valid facility size" };
   let quote = getBuildFacilityQuote(
     game,
@@ -158,6 +156,26 @@ const buildFacility: Validator = (game, payload) => {
         error: availability.reason ?? "That territory cannot host this build",
       };
     selectedTileId = availability.tileId;
+  }
+  if (build.reviewKey !== undefined) {
+    const selectedQuote =
+      selectedTileId !== tileId
+        ? getBuildFacilityQuote(game, requested, territoryId, selectedTileId)
+        : quote;
+    if (
+      !selectedQuote ||
+      build.reviewKey !==
+        facilityConstructionReview(
+          game,
+          selectedQuote,
+          build.financed,
+          selectedTileId,
+        ).key
+    )
+      return {
+        error: "Construction terms changed. Review the updated project.",
+      };
+    quote = selectedQuote;
   }
   return {
     payload: {
