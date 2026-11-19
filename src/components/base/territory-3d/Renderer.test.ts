@@ -1,7 +1,7 @@
 import { TICK_MS } from "../../../Constants";
 import { MeshBuilder } from "./MeshBuilder";
 import { MapRenderer } from "./Renderer";
-import { projectPoint } from "./Projection";
+import { projectPoint, tilePosition3D } from "./Projection";
 import { getStructureModel } from "./StructureModels";
 import { getTerrainModel } from "./TerrainModels";
 import type { MapCanvas, MapFrame, MapInstance, MapModel, Vec3 } from "./Types";
@@ -45,6 +45,8 @@ function mockContext() {
     createVertexArray: jest.fn(() => ({ id: ++identity })),
     getShaderParameter: jest.fn(() => true),
     getProgramParameter: jest.fn(() => true),
+    getShaderInfoLog: jest.fn(() => "compile error"),
+    getProgramInfoLog: jest.fn(() => "link error"),
     getUniformLocation: jest.fn((_program, name: string) => ({ name })),
     shaderSource: jest.fn(),
     compileShader: jest.fn(),
@@ -173,6 +175,77 @@ beforeEach(() => {
 afterEach(() => {
   jest.restoreAllMocks();
 });
+
+test.each([
+  [390, 216],
+  [1280, 360],
+])(
+  "submits at most %i px viewport's wildfire budget in one depth-tested pass",
+  (width, budget) => {
+    const { renderer, gl } = setup();
+    const flat = getTerrainModel("hills", { weather: "scorched" });
+    const burning = Array.from({ length: 8 }, (_, i): MapInstance => {
+      const coords = { q: (i % 4) - 2, r: Math.floor(i / 4) };
+      return {
+        id: `terrain:${i}`,
+        position: tilePosition3D(coords),
+        model: flat,
+        wildfire: { ...coords, clearance: 0, forest: false },
+        fog: 0,
+        active: false,
+      };
+    });
+    const visible = { ...frame, width, scale: 0.5 };
+    renderer.update(burning, visible);
+    flush(0);
+    const fire = () => renderer.diagnostics().wildfire;
+    expect(fire()).toMatchObject({ particles: budget, drawCalls: 1, time: 0 });
+    const draws = gl.drawArraysInstanced.mock;
+    expect(draws.lastCall).toEqual([gl.TRIANGLES, 0, 6, budget]);
+    const particleDraw = draws.invocationCallOrder.at(-1)!;
+    const depthEnabled = gl.enable.mock.calls.findIndex(
+      ([flag]) => flag === gl.DEPTH_TEST,
+    );
+    expect(gl.enable.mock.invocationCallOrder[depthEnabled]).toBeLessThan(
+      particleDraw,
+    );
+    expect(gl.disable).not.toHaveBeenCalledWith(gl.DEPTH_TEST);
+    const depthWritesOff = gl.depthMask.mock.calls.findIndex(
+      ([enabled]) => !enabled,
+    );
+    expect(gl.depthMask.mock.invocationCallOrder[depthWritesOff]).toBeLessThan(
+      particleDraw,
+    );
+    expect(gl.depthMask.mock.invocationCallOrder.at(-1)).toBeGreaterThan(
+      particleDraw,
+    );
+    const uploads = gl.bufferSubData.mock.calls.length;
+    flush(16);
+    expect(fire().time).toBeGreaterThan(0);
+    expect(gl.uniform1f).toHaveBeenCalledWith(
+      { name: "uFireTime" },
+      fire().time,
+    );
+    expect(gl.bufferSubData).toHaveBeenCalledTimes(uploads);
+
+    renderer.update(burning, { ...visible, motionAllowed: false });
+    const frozen = fire().time;
+    flush(32);
+    expect(fire().time).toBe(frozen);
+    expect(callbacks.size).toBe(0);
+
+    renderer.update(burning, { ...visible, cameraX: 10_000 });
+    flush(48);
+    expect(fire()).toMatchObject({ particles: 0, drawCalls: 0, time: frozen });
+    expect(callbacks.size).toBe(0);
+    renderer.update(burning, visible);
+    flush(500);
+    expect(fire()).toMatchObject({ particles: budget, time: frozen });
+    flush(516);
+    expect(fire().time).toBeGreaterThan(frozen);
+    renderer.dispose();
+  },
+);
 it.each(["wind", "offshore-wind"] as const)(
   "turns the actual %s mesh clockwise from its upwind hub and shares its shadow pose",
   (kind) => {

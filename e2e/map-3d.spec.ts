@@ -351,7 +351,8 @@ test("shows an advancing wildfire and scar with WebGL or the SVG fallback", asyn
   await expect
     .poll(async () => (await readSavedGame(page))?.scenarioId)
     .toBe(116);
-  const burned = "champlain:site-9";
+  const burned = "valley-electric:site-4";
+  const front = "champlain:site-9";
   const burning = "champlain:site-8";
   await editSavedGame(page, ({ game }) => {
     const wind = game.facilities.find(
@@ -369,7 +370,8 @@ test("shows an advancing wildfire and scar with WebGL or the SVG fallback", asyn
           startsMinute: 0,
           tiles: [
             { tileId: burned, ignitesMinute: 0 },
-            { tileId: burning, ignitesMinute: FIRE_SPREAD_MINUTES },
+            { tileId: front, ignitesMinute: FIRE_SPREAD_MINUTES },
+            { tileId: burning, ignitesMinute: 2 * FIRE_SPREAD_MINUTES },
           ],
         },
       ],
@@ -377,8 +379,8 @@ test("shows an advancing wildfire and scar with WebGL or the SVG fallback", asyn
     game.worldEvents.active.push({
       key: "review-wildfire",
       definitionId: WILDFIRE_DAMAGE_ID,
-      startsMinute: FIRE_SPREAD_MINUTES,
-      endsMinute: FIRE_SPREAD_MINUTES + FIRE_REPAIR_MINUTES,
+      startsMinute: 2 * FIRE_SPREAD_MINUTES,
+      endsMinute: 2 * FIRE_SPREAD_MINUTES + FIRE_REPAIR_MINUTES,
       attributes: { hazard: "WILDFIRE", facilityId: wind.id },
       effects: { facilityOutputMultipliersById: { [wind.id]: 0.55 } },
     });
@@ -388,6 +390,13 @@ test("shows an advancing wildfire and scar with WebGL or the SVG fallback", asyn
   const map = await returnToTerritoryMap(page);
   const canvas = map.locator("canvas.territory3DCanvas");
   await expect(canvas).toHaveAttribute("data-renderer", "ready");
+  const diagnostics = () =>
+    canvas.evaluate((element: MapCanvas) => element.map3DDiagnostics!());
+  const initial = await diagnostics();
+  expect(initial.motionAllowed).toBe(false);
+  expect(initial.wildfire).toMatchObject({ drawCalls: 1, time: 0 });
+  expect(initial.wildfire.particles).toBeGreaterThan(2 * 60);
+  expect(initial.wildfire.particles).toBeLessThanOrEqual(216);
   const active = map.locator(`[data-map-target="${burning}"]`);
   const scar = map.locator(`[data-map-target="${burned}"]`);
   await active.focus();
@@ -395,21 +404,40 @@ test("shows an advancing wildfire and scar with WebGL or the SVG fallback", asyn
     /Wildfire burning.*Wildfire damage.*55% available/,
   );
   await expect(active).toBeInViewport({ ratio: 0.75 });
-  await expect(scar).toBeInViewport({ ratio: 0.75 });
   await expect(scar).toHaveAccessibleDescription(/Scorched by wildfire/);
-  const flames = map.locator(
-    `[data-disaster-tile="${burning}"] [data-disaster="fire"]`,
-  );
-  await expect(flames).toBeVisible();
+  const flames = map.locator('[data-disaster="fire"]');
+  await expect(flames).toHaveCount(0);
+  await active.blur();
   await reviewScreenshot(map.locator(".territoryMapViewport"), {
     path: info.outputPath(`wildfire-map-${theme}.png`),
   });
 
-  await canvas.evaluate((element: MapCanvas) => {
-    element
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await expect
+    .poll(async () => (await diagnostics()).wildfire.time)
+    .toBeGreaterThan(0);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await expect
+    .poll(async () => (await diagnostics()).motionAllowed)
+    .toBe(false);
+  const frozen = await diagnostics();
+  await canvas.evaluate(
+    (element) =>
+      new Promise<void>((resolve) => {
+        const view = element.ownerDocument.defaultView!;
+        view.requestAnimationFrame(() =>
+          view.requestAnimationFrame(() => resolve()),
+        );
+      }),
+  );
+  expect((await diagnostics()).wildfire.time).toBe(frozen.wildfire.time);
+
+  const contextLoss = await canvas.evaluateHandle((element: MapCanvas) => {
+    const loss = element
       .getContext("webgl2")!
-      .getExtension("WEBGL_lose_context")!
-      .loseContext();
+      .getExtension("WEBGL_lose_context")!;
+    loss.loseContext();
+    return loss;
   });
   await expect(canvas).toHaveAttribute("data-renderer", "lost");
   await expect(
@@ -417,7 +445,12 @@ test("shows an advancing wildfire and scar with WebGL or the SVG fallback", asyn
       `[data-tile="${burned}"][data-ground-condition="scorched"] .territoryTerrainArtwork`,
     ),
   ).toBeVisible();
-  await expect(flames).toBeVisible();
+  await expect(flames).toHaveCount(2);
+  await expect(flames.first()).toBeVisible();
+  await contextLoss.evaluate((loss) => loss.restoreContext());
+  await expect(canvas).toHaveAttribute("data-renderer", "ready");
+  await expect(flames).toHaveCount(0);
+  expect((await diagnostics()).wildfire).toEqual(frozen.wildfire);
 });
 
 test("shows extreme cold on terrain and explains the plant derate in both renderers", async ({

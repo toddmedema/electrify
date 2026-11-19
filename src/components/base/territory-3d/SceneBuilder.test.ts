@@ -12,6 +12,7 @@ import type { MapModel, Vec3 } from "./Types";
 import { projectPoint, tilePosition3D } from "./Projection";
 import { getTerrainModel } from "./TerrainModels";
 import { getStructureModel } from "./StructureModels";
+import { buildWildfireEmitters, isBurningTerrain } from "./WildfireFront";
 
 const model: MapModel = {
   key: "test-structure",
@@ -56,6 +57,56 @@ function setup() {
     structure,
   };
 }
+
+test("a wildfire follows raised terrain and joins only adjacent active fuel", () => {
+  const burning = { ground: "burning", condition: "Wildfire burning" } as const;
+  const slope: TerritoryTileView = {
+    ...view(),
+    tile: { ...view().tile, terrain: "mountain" },
+    disaster: burning,
+  };
+  const forest: TerritoryTileView = {
+    ...view(1),
+    tile: { ...view(1).tile, terrain: "forest" },
+    disaster: { ground: "scorched", condition: "Scorched by wildfire" },
+  };
+  const firebreak: TerritoryTileView = {
+    ...view(2),
+    tile: { ...view(2).tile, id: "green-uplands:site-3" },
+    disaster: burning,
+  };
+  const views = [slope, forest, firebreak];
+  const board = views.map(({ tile }) => tile);
+  const builder = new SceneBuilder({
+    terrain: getTerrainModel,
+    structure: getStructureModel,
+  });
+  const initial = builder
+    .build(views, board, [], 0, "run")
+    .filter(isBurningTerrain);
+  expect(initial.map(({ id }) => id)).toEqual([`terrain:${slope.tile.id}`]);
+  const slopeOnly = buildWildfireEmitters(initial);
+  expect(slopeOnly.some(({ origin }) => origin[1] > 0.25)).toBe(true);
+  expect(slopeOnly.every(({ origin }) => Math.abs(origin[0]) < 0.5)).toBe(true);
+
+  const neighboringFire = {
+    ...forest,
+    disaster: burning,
+  };
+  const active = builder
+    .build([slope, neighboringFire, firebreak], board, [], 0, "run")
+    .filter(isBurningTerrain);
+  expect(active.map(({ id }) => id)).toEqual([
+    `terrain:${slope.tile.id}`,
+    `terrain:${forest.tile.id}`,
+  ]);
+  const joined = buildWildfireEmitters(active);
+  const forestOnly = buildWildfireEmitters(active.slice(1));
+  expect(joined).toEqual(expect.arrayContaining([...slopeOnly, ...forestOnly]));
+  expect(joined.filter(({ origin }) => origin[0] === 0.5)).toHaveLength(1);
+  expect(joined.every(({ origin }) => origin[0] < 1.5)).toBe(true);
+  expect(buildWildfireEmitters([...active].reverse())).toEqual(joined);
+});
 test("open water has no pylon while developed dry land has a quiet tower", () => {
   const land = view(),
     { builder, structure } = setup();

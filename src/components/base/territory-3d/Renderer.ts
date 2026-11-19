@@ -1,5 +1,6 @@
 import { HEX_WIDTH } from "../TerritoryHexGeometry";
 import { interpolateMapLighting } from "./Lighting";
+import { createMapProgram } from "./MapProgram";
 import { FacilityMotionClock, MOTION_CYCLE } from "./MotionClock";
 import {
   CAMERA_COS,
@@ -9,6 +10,7 @@ import {
 } from "./Projection";
 import { WATERSHED_LEVEL_OFFSETS, waterLevelOffset } from "./WaterSurface";
 import { rotorAngle } from "./RotorPose";
+import { WildfireParticles } from "./WildfireParticles";
 import type {
   MapCanvas,
   MapFrame,
@@ -245,6 +247,7 @@ export class MapRenderer {
   private sceneFrame: MapFrame | undefined;
   private sceneInstances: readonly MapInstance[] | undefined;
   private clock = new FacilityMotionClock();
+  private wildfire = new WildfireParticles();
   private raf: number | undefined;
   private state: State = "unavailable";
   private disposed = false;
@@ -319,14 +322,17 @@ export class MapRenderer {
       this.heldLighting = this.paintedLighting;
       this.lightingTransition = undefined;
     }
-    if (!frame.motionAllowed || frame.playbackRate <= 0)
+    if (!frame.motionAllowed || frame.playbackRate <= 0) {
       this.clock.resetTimestamp();
+      this.wildfire.resetTimestamp();
+    }
     if (this.isVisible()) this.schedule();
     else this.cancelFrame();
   }
 
   private prepareScene(frame: MapFrame): void {
-    if (!sameProjection(frame, this.projectionFrame)) {
+    const projectionChanged = !sameProjection(frame, this.projectionFrame);
+    if (projectionChanged) {
       this.projection = projectionMatrix(frame);
       this.projectionFrame = frame;
     }
@@ -339,6 +345,8 @@ export class MapRenderer {
       Math.abs(scene.cameraX - frame.cameraX) >= CAMERA_OVERSCAN ||
       Math.abs(scene.cameraY - frame.cameraY) >= CAMERA_OVERSCAN;
     const instancesChanged = this.sceneInstances !== this.instances;
+    if (projectionChanged || instancesChanged)
+      this.wildfire.prepare(this.instances, frame);
     const waterOnly =
       instancesChanged &&
       !viewChanged &&
@@ -374,6 +382,7 @@ export class MapRenderer {
       playbackRate: this.frame?.playbackRate ?? 0,
       motionAllowed: this.frame?.motionAllowed ?? false,
       visible: this.isVisible(),
+      wildfire: this.wildfire.diagnostics(),
       ...(includeScene ? { scene: this.sceneDiagnostics() } : {}),
     };
   }
@@ -485,30 +494,8 @@ export class MapRenderer {
       const gl = this.gl;
       if (!gl || gl.getContextAttributes()?.stencil === false)
         throw new Error("Map requires WebGL2 with a stencil buffer");
-      const shaders: WebGLShader[] = [];
-      const program = gl.createProgram();
-      if (!program) throw new Error("Map program allocation failed");
+      const program = createMapProgram(gl, VERTEX, FRAGMENT);
       this.program = program;
-      try {
-        for (const [type, source] of [
-          [gl.VERTEX_SHADER, VERTEX],
-          [gl.FRAGMENT_SHADER, FRAGMENT],
-        ] as const) {
-          const shader = gl.createShader(type);
-          if (!shader) throw new Error("Map shader allocation failed");
-          shaders.push(shader);
-          gl.shaderSource(shader, source);
-          gl.compileShader(shader);
-          if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS))
-            throw new Error("Map shader compilation failed");
-          gl.attachShader(program, shader);
-        }
-        gl.linkProgram(program);
-        if (!gl.getProgramParameter(program, gl.LINK_STATUS))
-          throw new Error("Map program link failed");
-      } finally {
-        for (const shader of shaders) gl.deleteShader(shader);
-      }
       this.uniforms = {
         projection: gl.getUniformLocation(program, "uProjection"),
         light: gl.getUniformLocation(program, "uLight"),
@@ -562,12 +549,12 @@ export class MapRenderer {
     );
   }
 
-  private canAnimate(): boolean {
+  private allowsMotion(): boolean {
     return (
       this.isVisible() &&
       !!this.frame?.motionAllowed &&
-      (this.frame?.playbackRate ?? 0) > 0 &&
-      this.motionItems.length > 0
+      Number.isFinite(this.frame?.playbackRate) &&
+      (this.frame?.playbackRate ?? 0) > 0
     );
   }
 
@@ -588,6 +575,7 @@ export class MapRenderer {
       this.canvas.ownerDocument.defaultView?.cancelAnimationFrame(this.raf);
     this.raf = undefined;
     this.clock.resetTimestamp();
+    this.wildfire.resetTimestamp();
   }
 
   private animate = (timestamp: number): void => {
@@ -600,15 +588,18 @@ export class MapRenderer {
       // prepare the scene that will actually be submitted, including on reveal.
       this.prepareScene(this.frame!);
       if (this.state !== "ready") return;
-      const moving = this.canAnimate();
+      const allowed = this.allowsMotion();
+      const moving = allowed && this.motionItems.length > 0;
       this.clock.tick(timestamp, moving, this.frame!.playbackRate);
+      this.wildfire.tick(timestamp, allowed, this.frame!.playbackRate);
       this.draw(moving, this.lightAt(timestamp));
       this.frameMs = performance.now() - started;
       if (this.readyPending) {
         this.readyPending = false;
         this.setState("ready");
       }
-      if (moving || this.lightingTransition) this.schedule();
+      if (moving || (allowed && this.wildfire.count) || this.lightingTransition)
+        this.schedule();
     } catch (_error) {
       this.fail();
     }
@@ -700,7 +691,8 @@ export class MapRenderer {
         previous.active !== next.active ||
         previous.frost !== next.frost ||
         previous.producing !== next.producing ||
-        previous.motionKey !== next.motionKey
+        previous.motionKey !== next.motionKey ||
+        previous.wildfire !== next.wildfire
       )
         return false;
       if (previous.waterLevel !== next.waterLevel) updates.set(next.id, next);
@@ -979,6 +971,12 @@ export class MapRenderer {
     gl.uniform1i(uniforms.shadow, 0);
     gl.disable(gl.STENCIL_TEST);
     this.drawBatches(this.passes.transparent);
+    if (this.wildfire.count) {
+      if (this.wildfire.draw(gl, frame, this.projection))
+        this.bufferUpdates = true;
+      this.drawCalls++;
+      this.triangles += this.wildfire.count * 2;
+    }
     gl.depthMask(true);
     gl.disable(gl.BLEND);
     gl.bindVertexArray(null);
@@ -1053,6 +1051,7 @@ export class MapRenderer {
   }
 
   private releaseResources(deleteGpu: boolean): void {
+    this.wildfire.release(this.gl, deleteGpu);
     if (deleteGpu) {
       for (const mesh of this.meshes.values()) this.deleteMesh(mesh);
       if (this.program) this.gl?.deleteProgram(this.program);

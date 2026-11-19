@@ -1083,7 +1083,8 @@ export default function TerritoryHexMap({
               {renderedViews.map(({ tile, disaster, visibilityDistance }) => {
                 if (
                   !disaster ||
-                  (disaster.ground !== "burning" && !disaster.hail)
+                  ((threeDReady || disaster.ground !== "burning") &&
+                    !disaster.hail)
                 )
                   return null;
                 const origin = foregroundOrigin(tile);
@@ -1100,7 +1101,10 @@ export default function TerritoryHexMap({
                     viewBox="0 0 500 500"
                     overflow="visible"
                   >
-                    <DisasterArtwork {...disaster} />
+                    <DisasterArtwork
+                      {...disaster}
+                      ground={threeDReady ? undefined : disaster.ground}
+                    />
                   </svg>
                 );
               })}

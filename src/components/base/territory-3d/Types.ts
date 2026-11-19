@@ -89,6 +89,8 @@ export interface MapInstance {
   waterLevel?: number;
   /** Actual facility identity: changing speed or rebuilding batches must not reset phase. */
   motionKey?: string;
+  /** Active wildfire on this terrain. The renderer joins only neighboring burning cells. */
+  wildfire?: { q: number; r: number; clearance: number; forest: boolean };
 }
 export interface MapLighting {
   direction: Vec3;
@@ -134,6 +136,12 @@ export interface RendererDiagnostics {
   playbackRate: number;
   motionAllowed: boolean;
   visible: boolean;
+  wildfire: {
+    emitters: number;
+    particles: number;
+    drawCalls: number;
+    time: number;
+  };
   /** Optional costly geometry snapshot, requested explicitly by a diagnostic consumer. */
   scene?: readonly RendererSceneInstance[];
 }

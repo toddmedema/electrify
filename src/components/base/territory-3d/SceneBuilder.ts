@@ -10,6 +10,7 @@ import {
   type TerritoryMapTileKey,
   type TerritoryTileView,
 } from "../../../helpers/TerritoryMapState";
+import { combustibleTile } from "../../../helpers/TerritoryWildfire";
 import {
   facilityMapStatus,
   facilityOperatingStatus,
@@ -234,6 +235,7 @@ export class SceneBuilder {
       const { tile } = view,
         tileKey = territoryMapTileKey(tile),
         kind = structureKind(view),
+        burning = view.disaster?.ground === "burning" && combustibleTile(tile),
         weather =
           view.disaster?.ground === "burning"
             ? "scorched"
@@ -245,6 +247,7 @@ export class SceneBuilder {
         cell.tile !== tile ||
         cell.kind !== kind ||
         cell.weather !== weather ||
+        !!cell.terrain.wildfire !== burning ||
         cell.terrain.fog !== view.visibilityDistance
       ) {
         const model = kind ? this.factories.structure(kind) : undefined;
@@ -279,6 +282,14 @@ export class SceneBuilder {
             active: false,
             frost,
             model: terrain,
+            ...(burning && {
+              wildfire: {
+                q: tile.q,
+                r: tile.r,
+                clearance: (model?.footprint ?? 0) / 2,
+                forest: tile.terrain === "forest",
+              },
+            }),
           },
           structure: model
             ? {
