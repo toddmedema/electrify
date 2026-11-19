@@ -91,6 +91,10 @@ import {
   upgradeInProgress,
   upgradeProgress,
 } from "../../helpers/Hazards";
+import {
+  COAL_REPOWER_OPTIONS,
+  coalRepowerInProgress,
+} from "../../helpers/CoalRepower";
 import { dayCount, resilienceName } from "../base/WeatherResilienceText";
 import TransmissionPanel, { TradingControls } from "./TransmissionPanel";
 import { BuyingRuleType, SellingRuleType } from "../../Types";
@@ -271,13 +275,14 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
     ? undefined
     : upgradeInProgress(facility);
   const upgrading = !!installing && isUpgradingAt(facility, game.date.minute);
+  const project = coalRepowerInProgress(facility);
+  const repowering = upgrading && !!project;
   const partialUpgrade =
     upgrading && retrofitOutputMultiplier(facility, game.date.minute) > 0;
   const offlineForWork = underConstruction || (upgrading && !partialUpgrade);
-  const activityLabel = partialUpgrade
-    ? "installing winterization, 90% capacity available"
-    : undefined;
   const storage = isStorage(facility) ? facility : undefined;
+  const disclosure = React.useRef<HTMLButtonElement>(null);
+  const repowerProgressId = React.useId();
   const wasBuilding = React.useRef(underConstruction);
   const [arriving, setArriving] = React.useState(arrivalRequested);
   const [ready, setReady] = React.useState(false);
@@ -308,7 +313,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
   let activity: FacilityActivityType = "RUNNING";
   if (underConstruction) {
     activity = "BUILDING";
-  } else if (upgrading) {
+  } else if (upgrading && !repowering) {
     activity = "UPGRADING";
   } else if (facility.paused) {
     activity = "PAUSED";
@@ -367,6 +372,12 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
   ) : (
     formatWattsOfPeak(outputW, facility.peakW)
   );
+  const repowerPercent = Math.floor(builtFraction * 100);
+  const activityLabel = repowering
+    ? `construction of ${COAL_REPOWER_OPTIONS[project.upgrade].name}, ${repowerPercent}% complete`
+    : partialUpgrade
+      ? "installing winterization, 90% capacity available"
+      : undefined;
   let reading: React.ReactNode = "";
   let detail: React.ReactNode = null;
   if (underConstruction) {
@@ -382,12 +393,16 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
     detail = (
       <>
         <span className="facilityStatusLong">
-          {partialUpgrade
-            ? `Winterizing ${Math.round(builtFraction * 100)}% · 90% capacity available`
-            : resilienceName(installing!.upgrade)}
+          {repowering
+            ? `Repowering ${repowerPercent}%`
+            : partialUpgrade
+              ? `Winterizing ${Math.round(builtFraction * 100)}% · 90% capacity available`
+              : resilienceName(installing!.upgrade)}
           , {dayCount(daysLeft)} left
         </span>
-        <span className="facilityStatusShort">{daysLeft}d left</span>
+        <span className="facilityStatusShort">
+          {repowering ? `Repowering ${repowerPercent}%` : `${daysLeft}d left`}
+        </span>
       </>
     );
   } else if (facility.peakWh) {
@@ -443,7 +458,9 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
   }
   // Output communicates normal operation; keep explicit labels for other states.
   const status =
-    offlineForWork || partialUpgrade || activity === "RUNNING" ? (
+    offlineForWork ||
+    (partialUpgrade && !repowering) ||
+    activity === "RUNNING" ? (
       reading
     ) : typeof reading === "string" ? (
       `${reading} · ${ACTIVITY_LABELS[activity]}`
@@ -546,7 +563,9 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
             )}
             <button
               type="button"
+              ref={disclosure}
               className="facilityDisclosure"
+              aria-describedby={repowering ? repowerProgressId : undefined}
               aria-label={
                 `Inspect ${facility.name}` +
                 (hasTerritoryNetwork(game)
@@ -618,6 +637,11 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                 <ChevronDownGlyph className="facilityChevron" aria-hidden />
               </ListItem>
             </button>
+            {repowering && (
+              <span id={repowerProgressId} className="srOnly">
+                {activityLabel}
+              </span>
+            )}
             {props.showCheckboxes && (
               <Checkbox
                 className="facilitySelectionCheckbox"
@@ -642,7 +666,13 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
               onRetrofit={props.onRetrofit}
               onExpand={props.onExpand}
               onCancelExpansion={props.onCancelExpansion}
-              onCancelRetrofit={props.onCancelRetrofit}
+              onCancelRetrofit={
+                props.onCancelRetrofit &&
+                ((id) => {
+                  props.onCancelRetrofit?.(id);
+                  if (repowering) disclosure.current?.focus();
+                })
+              }
             />
           )}
         </div>

@@ -45,7 +45,7 @@ it("enlarges canvas labels and their reserved chart space with the text preferen
 it.each([
   [1, 1, 1],
   [1.25, 2, 1],
-  [2.5, 2, 1.3],
+  [2, 2, 1.3],
 ])(
   "keeps multiline endpoint dates inside the canvas at scale %s, pixel ratio %s, inspection scale %s",
   (scale, ratio, fontScale) => {

@@ -38,10 +38,8 @@ import { cityCustomerCount } from "../../helpers/CityProfiles";
 import { citySizeLabel } from "../base/TerritoryTileFacts";
 import { cityDemandByType } from "../../helpers/CityDemand";
 import { facilityMapStatus } from "../base/FacilityMapStatus";
-import AcquiredUtilities from "./AcquiredUtilities";
 import TerritoryHexMap from "./TerritoryHexMap";
 import AcquisitionReviewDialog from "../base/AcquisitionReviewDialog";
-import { utilityAcquisitions } from "../../helpers/Expansion";
 import { useMoney } from "../base/CurrencyContext";
 import { useAppDispatch, useAppSelector } from "../../Store";
 import { generatorSizeChanged } from "../../reducers/GameActions";
@@ -162,25 +160,14 @@ function TileNetwork(props: Props) {
   const { purchase, pendingIds, availableCash } = useTerritoryTilePurchases();
   const dispatch = useAppDispatch();
   const { formatMoneyConcise: money } = useMoney();
-  const summaryRef = React.useRef<HTMLElement>(null);
-  const acquired = React.useRef(false);
-  const { utilityExpansion, territoryNetwork } = game;
-  const acquisitions = React.useMemo(
-    () => utilityAcquisitions({ utilityExpansion, territoryNetwork }),
-    [utilityExpansion, territoryNetwork],
-  );
-  React.useEffect(() => {
-    if (!review && acquired.current && summaryRef.current) {
-      acquired.current = false;
-      summaryRef.current.focus();
-    }
-  }, [review, acquisitions.length]);
   const views = React.useMemo(() => territoryTileViews(game), [game]);
   const view =
     inspected && !panel?.open && !planning
       ? views.find(({ tile }) => territoryMapTileKey(tile) === inspected)
       : undefined;
   const tile = view?.tile;
+  // Let the purchase dialog finish before moving focus to the updated inspector.
+  const inspectorOwner = review ? tile?.territoryId : view?.ownerKey;
   const operatingFacility = view?.operatingFacility;
   const utility = tile
     ? Object.values(UTILITY_AREAS).find(({ id }) => id === tile.territoryId)
@@ -389,15 +376,10 @@ function TileNetwork(props: Props) {
           }}
         />
       )}
-      <AcquiredUtilities
-        game={game}
-        acquisitions={acquisitions}
-        summaryRef={summaryRef}
-      />
       {view && tile && (
         <TileWorkspaceSurface
           title={title}
-          focusKey={`${inspected}:${activation}:${view.ownerKey ?? "unowned"}:${operatingFacility?.id ?? (view.facility ? "facility" : "empty")}`}
+          focusKey={`${inspected}:${activation}:${inspectorOwner ?? "unowned"}:${operatingFacility?.id ?? (view.facility ? "facility" : "empty")}`}
           subtitle={view.ownerKey ? view.ownerName : undefined}
           building={building && !desktopRail}
           initialFocusSelector={
@@ -539,11 +521,7 @@ function TileNetwork(props: Props) {
           game={game}
           targetId={review}
           onClose={() => setReview(undefined)}
-          onAcquire={async (payload) => {
-            const accepted = await props.onAcquire!(payload);
-            acquired.current = accepted;
-            return accepted;
-          }}
+          onAcquire={props.onAcquire}
         />
       )}
     </section>

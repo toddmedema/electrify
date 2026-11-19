@@ -245,7 +245,7 @@ export default function TerritoryHexMap({
         )
           return;
       }
-      // The nonmodal inspector permits focus in the map, receipts and workspace footer.
+      // The nonmodal inspector permits focus in the map and workspace footer.
       // Own one dismissal before the game's document-level navigation sees Escape.
       event.preventDefault();
       event.stopPropagation();

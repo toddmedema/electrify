@@ -95,6 +95,37 @@ function legacyPortfolio(
   raw.game.territoryNetwork = { version: 1 };
   return raw;
 }
+it.each([19, 20])(
+  "rebuilds Valley goals from schema%i without changing paid assets or history",
+  (schemaVersion) => {
+    const game = createGame({ scenarioId: 116, seed: 61 });
+    currentTick(game)!.cash = 3e9;
+    const quote = acquisitionQuote(game, "valley-electric")!;
+    applyAcquireUtility(game, {
+      targetId: "valley-electric",
+      financed: true,
+      quoteKey: quote.quoteKey,
+    });
+    const raw = JSON.parse(JSON.stringify(serializeSave(game)));
+    raw.schemaVersion = schemaVersion;
+    raw.game.objectiveProgress = { rulesDigest: "pre-acquisition-goals" };
+    const original = cloneDeep(raw);
+    const parsed = parseSave(raw);
+    expect(parsed).not.toBeNull();
+    expect(parsed!.schemaVersion).toBe(SAVE_SCHEMA_VERSION);
+    expect(parsed!.game.objectiveProgress?.entries.map(({ id }) => id)).toEqual(
+      ["acquire-neighbor", "retain-customers"],
+    );
+    expect(parsed!.game.facilities).toEqual(raw.game.facilities);
+    expect(parsed!.game.utilityExpansion).toEqual(raw.game.utilityExpansion);
+    expect(parsed!.game.monthlyHistory).toEqual(raw.game.monthlyHistory);
+    expect(currentTick(parsed!.game)!.cash).toBe(currentTick(raw.game)!.cash);
+    expect(parseSave(parsed)).toEqual(parsed);
+    expect(parseSave(serializeSave(parsed!.game))!.game).toEqual(parsed!.game);
+    expect(raw).toEqual(original);
+  },
+);
+
 it.each(["building", "paused", "upgrade"] as const)(
   "converts a %s land project to immediate rights without changing cash, history, debts or paid investment",
   (state) => {

@@ -91,41 +91,58 @@ function acquireVergennes(world: World, seat: string, quoteKey: string) {
     },
   });
 }
-it("serializes each parcel's claim while independent claims coexist through save/resume", () => {
-  const world = ready();
-  expect(buy(world, "0", "parcel-0")).toBeUndefined();
-  expect(buy(world, "1", "parcel-0")).toMatch(/owned/i);
-  const losingCash = currentTick(world.grids[1])!.cash;
-  expect(buy(world, "1", "parcel-0")).toMatch(/owned/i);
-  expect(currentTick(world.grids[1])!.cash).toBe(losingCash);
-  expect(buy(world, "1", "parcel-2")).toBeUndefined();
-  const quote = acquisitionQuote(roomView(world, "0").game!, "parcel-1")!;
-  expect(acquireVergennes(world, "0", quote.quoteKey)).toBeUndefined();
-  expect(roomView(world, "1").game!.multiplayer!.tileOwners).toMatchObject({
-    "parcel-0:site-0": { seat: "0" },
-    "parcel-1:city": { seat: "0" },
-    "parcel-2:site-0": { seat: "1" },
-  });
-  const saved = JSON.parse(JSON.stringify(checkpointWorld(world)));
-  saved.gameSchema = 19;
-  saved.rules =
-    "coop-2-fdb701fc666648e148ecc4d6a02e4b2001090bc79052092a4e567ea9184714ef";
-  saved.grids[0].objectiveProgress = { rulesDigest: "pre-acquisition-goals" };
-  const restored = restoreWorld(saved, "restored");
-  expect(
-    restored.grids[0].objectiveProgress?.entries.map(({ id }) => id),
-  ).toEqual(["acquire-neighbor", "retain-customers"]);
-  expect(currentTick(restored.grids[0])!.cash).toBe(
-    currentTick(world.grids[0])!.cash,
-  );
-  expect(ownedTerritories(restored.grids[0])).toEqual(
-    expect.arrayContaining(["parcel-0", "parcel-1"]),
-  );
-  expect(ownedTerritories(restored.grids[1])).toContain("parcel-2");
-  expect(acquireVergennes(restored, "1", quote.quoteKey)).toMatch(
-    /quote has changed/,
-  );
-});
+it.each([
+  [
+    19,
+    "coop-2-fdb701fc666648e148ecc4d6a02e4b2001090bc79052092a4e567ea9184714ef",
+  ],
+  [
+    20,
+    "coop-2-cf979e3b45deb328dd12a266f291e16398174095d47beca6df0d4f9da1dbd577",
+  ],
+] as const)(
+  "retains independent parcel claims and cash from published schema%i",
+  (schema, rules) => {
+    const world = ready();
+    expect(buy(world, "0", "parcel-0")).toBeUndefined();
+    expect(buy(world, "1", "parcel-0")).toMatch(/owned/i);
+    const losingCash = currentTick(world.grids[1])!.cash;
+    expect(buy(world, "1", "parcel-0")).toMatch(/owned/i);
+    expect(currentTick(world.grids[1])!.cash).toBe(losingCash);
+    expect(buy(world, "1", "parcel-2")).toBeUndefined();
+    const quote = acquisitionQuote(roomView(world, "0").game!, "parcel-1")!;
+    expect(acquireVergennes(world, "0", quote.quoteKey)).toBeUndefined();
+    expect(roomView(world, "1").game!.multiplayer!.tileOwners).toMatchObject({
+      "parcel-0:site-0": { seat: "0" },
+      "parcel-1:city": { seat: "0" },
+      "parcel-2:site-0": { seat: "1" },
+    });
+    const saved = JSON.parse(JSON.stringify(checkpointWorld(world)));
+    saved.gameSchema = schema;
+    saved.rules = rules;
+    saved.grids[0].objectiveProgress = { rulesDigest: "pre-acquisition-goals" };
+    const before = JSON.stringify(saved);
+    const restored = restoreWorld(saved, "restored");
+    expect(JSON.stringify(saved)).toBe(before);
+    expect(() =>
+      restoreWorld({ ...saved, rules: "unrecognized" }, "rejected"),
+    ).toThrow();
+    expect(restored.gameSchema).toBe(SAVE_SCHEMA_VERSION);
+    expect(
+      restored.grids[0].objectiveProgress?.entries.map(({ id }) => id),
+    ).toEqual(["acquire-neighbor", "retain-customers"]);
+    expect(currentTick(restored.grids[0])!.cash).toBe(
+      currentTick(world.grids[0])!.cash,
+    );
+    expect(ownedTerritories(restored.grids[0])).toEqual(
+      expect.arrayContaining(["parcel-0", "parcel-1"]),
+    );
+    expect(ownedTerritories(restored.grids[1])).toContain("parcel-2");
+    expect(acquireVergennes(restored, "1", quote.quoteKey)).toMatch(
+      /quote has changed/,
+    );
+  },
+);
 it("migrates only recognized published schema14 co-op rules and keeps paid claims and cash", () => {
   const world = ready();
   world.grids[0].territoryNetwork!.landPurchases.push({

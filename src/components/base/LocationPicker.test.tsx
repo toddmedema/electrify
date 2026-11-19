@@ -74,8 +74,8 @@ it("scales visible map targets and their clustering footprint without a layout p
   render(<LocationPicker locations={cities} onChange={jest.fn()} />);
   const map = screen.getByRole("group", { name: "Playable locations map" });
   expect(map).toHaveStyle({ "--map-marker-size": "40px" });
-  act(() => applyInterfaceScale(2.5));
-  expect(map).toHaveStyle({ "--map-marker-size": "100px" });
+  act(() => applyInterfaceScale(2));
+  expect(map).toHaveStyle({ "--map-marker-size": "80px" });
   act(() => applyInterfaceScale(1));
   expect(map).toHaveStyle({ "--map-marker-size": "40px" });
 });

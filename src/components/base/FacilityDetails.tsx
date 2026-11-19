@@ -1,6 +1,7 @@
 import { currencyForLocation } from "../../helpers/Currency";
 import { useMoney } from "./CurrencyContext";
 import GasConversion from "./GasConversion";
+import CoalRepower from "./CoalRepower";
 import FacilityUpgradeAction from "./FacilityUpgradeAction";
 import FacilityCapacityUpgrade, {
   FacilityCapacityUpgradeActions,
@@ -15,6 +16,7 @@ import ConfirmDialog from "./ConfirmDialog";
 import {
   facilityAgeYears,
   facilityCashBack,
+  facilityLoanBalance,
   facilityEquivalentCycles,
   facilityLifetime,
   facilityMaintenanceCost,
@@ -51,6 +53,7 @@ import { storyOutputMultiplier } from "../../helpers/Story";
 import {
   DateType,
   FacilityOperatingType,
+  isCoalRepower,
   isStorage,
   FuelNameType,
   GameType,
@@ -168,7 +171,8 @@ function WeatherResilienceSection(props: {
     ? retrofittedResilience(facility, game, summary.upgrade)
     : undefined;
   const hazard = facilityHazardStatus(game, facility);
-  const installing = upgradeInProgress(facility);
+  const project = upgradeInProgress(facility);
+  const installing = isCoalRepower(project?.upgrade) ? undefined : project;
   const activeOutage =
     hazard?.hazard === "EXTREME_COLD"
       ? "Doesn't end this month's cold outage."
@@ -367,7 +371,7 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
               value={
                 <>
                   {formatMoneyConcise(facilityCashBack(facility, date.minute))}
-                  {facility.loanAmountLeft > 0 && (
+                  {facilityLoanBalance(facility) > 0 && (
                     <span className="facilityStatNote">After loan payoff</span>
                   )}
                 </>
@@ -514,11 +518,11 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
                     : undefined
               }
             />
-            {facility.loanAmountLeft > 0 && (
+            {facilityLoanBalance(facility) > 0 && (
               <Stat
                 label="Loan balance"
                 entry={MANUAL_ENTRY.INTEREST_RATES}
-                value={formatMoneyConcise(facility.loanAmountLeft)}
+                value={formatMoneyConcise(facilityLoanBalance(facility))}
               />
             )}
             {/* Every operating facility pays this, whether or not it also pays per MWh: solar,
@@ -624,6 +628,13 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
           game={props.game}
           onExpand={props.onExpand}
           onCancelExpansion={props.onCancelExpansion}
+        />
+      )}
+      {props.game && facility.fuel === "Coal" && (
+        <CoalRepower
+          facility={facility}
+          game={props.game}
+          onRetrofit={props.onRetrofit}
         />
       )}
       {props.game && !permanentlyShutdown && (

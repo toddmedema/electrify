@@ -12,11 +12,7 @@ import {
 } from "../../desktop/InputPresentation";
 
 function hasReceipt(): boolean {
-  if (getLocalStorage().getItem("couchPromptShown") === "true") return true;
-  // Either valid legacy choice already answered the old couch suggestion. Its independent
-  // display preferences migrate in Settings; malformed text is not an intentional answer.
-  const legacy = getLocalStorage().getItem("tvMode");
-  return legacy === "true" || legacy === "false";
+  return getLocalStorage().getItem("couchPromptShown") === "true";
 }
 
 /** A title-screen suggestion in normal flow: it never opens a popup or moves focus. */

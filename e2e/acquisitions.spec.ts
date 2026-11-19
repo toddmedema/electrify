@@ -38,6 +38,7 @@ import { expect, test } from "./fixtures";
 import { reviewScreenshot } from "./review-screenshot";
 import { expectDialogToFit } from "./dialog-layout";
 import {
+  openPane,
   readTerritoryMapCamera,
   returnToTerritoryMap,
   selectTerritoryMapTile,
@@ -1319,6 +1320,7 @@ for (const theme of ["light", "dark"] as const) {
     await expect(
       surface.getByRole("region", { name: "City demand by use", exact: true }),
     ).toBeVisible();
+    await expect(page.getByText(/^Acquired utilities/)).toHaveCount(0);
     const saved = (await readSavedGame(page))!;
     expect(
       saved.utilityExpansion!.acquisitions.map((receipt) => receipt.targetId),
@@ -1366,6 +1368,20 @@ for (const theme of ["light", "dark"] as const) {
     await expect(
       page.getByRole("tab", { name: "Interties", exact: true }),
     ).toHaveCount(0);
+    await surface.getByRole("button", { name: "Close tile" }).click();
+    await reviewScreenshot(network, {
+      path: info.outputPath(`map-after-acquisition-${theme}.png`),
+      animations: "disabled",
+      scale: "css",
+    });
+    const events = page.locator(".eventLog");
+    await openPane(
+      events,
+      page.getByRole("button", { name: "Events", exact: true }),
+    );
+    await expect(
+      events.getByText(/^Acquired Ridge Electric: .+ customers$/),
+    ).toBeVisible();
   });
 
   test(`tile builder keeps project decisions together in ${theme}`, async ({
