@@ -1,4 +1,4 @@
-const { createHash } = require("node:crypto");
+const { createHash, randomUUID } = require("node:crypto");
 
 const EMAIL =
   /^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$/i;
@@ -58,13 +58,19 @@ function validateFeedback(data) {
   };
 }
 
-// One fixed-size document bounds delivery volume across cold starts and parallel instances.
-// Avoid storing network identifiers or feedback text in Firestore.
-async function reserveFeedback(db, now = Date.now()) {
+// Sheets can keep processing an append for up to 180 seconds after we stop waiting.
+const SHEETS_WRITE_LEASE_MS = 190_000;
+
+async function reserveFeedback(db, submissionId, now) {
+  const attemptId = randomUUID();
   const requestMinute = Math.floor(now / 60000);
-  const ref = db.doc("privateServiceLimits/feedback");
-  await db.runTransaction(async (transaction) => {
-    const previous = (await transaction.get(ref)).data();
+  const budget = db.doc("privateServiceLimits/feedback");
+  const receipt = budget.collection("submissions").doc(submissionId);
+  return db.runTransaction(async (transaction) => {
+    const existing = (await transaction.get(receipt)).data();
+    if (existing?.delivered) return null;
+    if (existing?.leaseUntil > now) throw new FeedbackError("unavailable");
+    const previous = (await transaction.get(budget)).data();
     // A delayed request still counts against the newest recorded window.
     const minute = Math.max(requestMinute, previous?.minute ?? requestMinute);
     const day = Math.floor(minute / 1440);
@@ -73,63 +79,72 @@ async function reserveFeedback(db, now = Date.now()) {
     if (today >= 80 || thisMinute >= 8) {
       throw new FeedbackError("resource-exhausted");
     }
-    transaction.set(ref, {
+    const receivedAt = existing?.receivedAt ?? now;
+    const leaseUntil = now + SHEETS_WRITE_LEASE_MS;
+    transaction.set(budget, {
       day,
       today: today + 1,
       minute,
       thisMinute: thisMinute + 1,
     });
+    transaction.set(receipt, {
+      attemptId,
+      receivedAt,
+      leaseUntil,
+    });
+    return { receipt, receivedAt, attemptId, retry: Boolean(existing) };
   });
 }
 
-async function deliverFeedback(data, { settings, reserve, send = fetch }) {
-  const feedback = validateFeedback(data);
-  const { apiKey, from, to } = settings ?? {};
-  if (typeof apiKey !== "string" || !apiKey || !mailbox(from) || !mailbox(to)) {
-    throw new FeedbackError("unavailable");
-  }
-  await reserve();
-  const {
-    message,
-    source,
-    scenarioId,
-    outcome,
-    appVersion,
-    replyEmail,
-    requestId,
-  } = feedback;
-  const text = [
-    message,
-    "",
-    `Source: ${source}`,
-    ...(scenarioId === undefined ? [] : [`Scenario: ${scenarioId}`]),
-    ...(outcome === undefined ? [] : [`Outcome: ${outcome}`]),
-    `Game version: ${appVersion}`,
-  ].join("\n");
-  // Tying the key to the exact email lets a retry recover after a lost response
-  // while a changed message is always a new submission.
-  const key = createHash("sha256")
-    .update(JSON.stringify([requestId, text, replyEmail]))
-    .digest("hex");
-  const response = await send("https://api.resend.com/emails", {
-    method: "POST",
-    redirect: "error",
-    signal: AbortSignal.timeout(6500),
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-      "Idempotency-Key": `electrify-feedback/${key}`,
-    },
-    body: JSON.stringify({
-      from,
-      to: [to],
-      subject: "Electrify player feedback",
-      text,
-      ...(replyEmail ? { reply_to: replyEmail } : {}),
-    }),
+async function releaseLease(db, receipt, attemptId) {
+  await db.runTransaction(async (transaction) => {
+    const state = (await transaction.get(receipt)).data();
+    if (state?.attemptId === attemptId) {
+      transaction.set(receipt, { ...state, leaseUntil: 0 });
+    }
   });
-  if (!response.ok) throw new FeedbackError("unavailable");
+}
+
+async function deliverFeedback(data, { db, openSheets, now = Date.now() }) {
+  const feedback = validateFeedback(data);
+  const submissionId = createHash("sha256")
+    .update(JSON.stringify(feedback))
+    .digest("hex");
+  const signal = AbortSignal.timeout(6_500);
+  const reservation = await reserveFeedback(db, submissionId, now);
+  if (!reservation) return { sent: true };
+
+  const { receivedAt, receipt, attemptId, retry } = reservation;
+  let sheets;
+  let alreadySaved;
+  // If the previous append succeeded but we lost the response, finish the receipt
+  // without appending a second row. The ID follows the row if reviewers sort it.
+  try {
+    signal.throwIfAborted();
+    sheets = await openSheets();
+    alreadySaved = retry && (await sheets.hasSubmission(submissionId, signal));
+    signal.throwIfAborted();
+  } catch (error) {
+    await releaseLease(db, receipt, attemptId);
+    throw error;
+  }
+  if (!alreadySaved) {
+    await sheets.appendRow(
+      [
+        new Date(receivedAt).toISOString(),
+        feedback.message,
+        feedback.replyEmail,
+        feedback.source,
+        feedback.scenarioId ?? "",
+        feedback.outcome ?? "",
+        feedback.appVersion,
+        submissionId,
+      ],
+      signal,
+    );
+  }
+  await receipt.set({ receivedAt, delivered: true });
   return { sent: true };
 }
 
-module.exports = { deliverFeedback, reserveFeedback, FeedbackError };
+module.exports = { deliverFeedback, FeedbackError };

@@ -1,6 +1,6 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { defineSecret } = require("firebase-functions/params");
-const { initializeApp } = require("firebase-admin/app");
+const { applicationDefault, initializeApp } = require("firebase-admin/app");
 const { getFirestore } = require("firebase-admin/firestore");
 const logger = require("firebase-functions/logger");
 const { subscribe, describeFailure } = require("./mailing-list.cjs");
@@ -27,12 +27,18 @@ exports.subscribeMailingList = onCall(
   },
 );
 
+const { deliverFeedback, FeedbackError } = require("./game-feedback.cjs");
 const {
-  deliverFeedback,
-  reserveFeedback,
-  FeedbackError,
-} = require("./game-feedback.cjs");
+  createFeedbackSheets,
+  createSheetsTokenProvider,
+  SheetsServiceError,
+} = require("./game-feedback-sheets.cjs");
 const adminApp = initializeApp();
+const credential = applicationDefault();
+const getSheetsToken = createSheetsTokenProvider(
+  () => process.env.GAME_FEEDBACK_SHEETS_WRITER,
+  async () => (await credential.getAccessToken()).access_token,
+);
 
 exports.submitGameFeedback = onCall(
   {
@@ -42,20 +48,31 @@ exports.submitGameFeedback = onCall(
       "https://www.electrifygame.com",
       "https://beta.electrifygame.com",
     ],
-    secrets: ["GAME_FEEDBACK_EMAIL"],
     timeoutSeconds: 10,
     maxInstances: 2,
   },
   async (request) => {
     try {
+      // Read just in this handler so the mailing-list deploy needs no feedback configuration.
+      const spreadsheetId = process.env.GAME_FEEDBACK_SPREADSHEET_ID;
+      if (!spreadsheetId || !process.env.GAME_FEEDBACK_SHEETS_WRITER) {
+        throw new FeedbackError("unavailable");
+      }
       return await deliverFeedback(request.data, {
-        settings: JSON.parse(process.env.GAME_FEEDBACK_EMAIL ?? "null"),
-        reserve: () => reserveFeedback(getFirestore(adminApp)),
+        db: getFirestore(adminApp),
+        openSheets: async () =>
+          createFeedbackSheets(spreadsheetId, await getSheetsToken()),
       });
     } catch (error) {
       const code = error instanceof FeedbackError ? error.code : "unavailable";
-      if (code === "unavailable")
+      if (error instanceof SheetsServiceError) {
+        logger.warn("Game feedback delivery unavailable", {
+          stage: error.stage,
+          status: error.status ?? null,
+        });
+      } else if (code === "unavailable") {
         logger.warn("Game feedback delivery unavailable");
+      }
       throw new HttpsError(code, "Feedback couldn't be sent.");
     }
   },
