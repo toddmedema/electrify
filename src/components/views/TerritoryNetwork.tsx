@@ -47,7 +47,10 @@ import { useMoney } from "../base/CurrencyContext";
 import { useAppDispatch, useAppSelector } from "../../Store";
 import { generatorSizeChanged } from "../../reducers/GameActions";
 import { purchaseFacility } from "../../helpers/PurchaseFacility";
-import TileWorkspaceSurface from "../base/TileWorkspaceSurface";
+import TileWorkspaceSurface, {
+  findTileControl,
+  TileInspectionSurface,
+} from "../base/TileWorkspaceSurface";
 import ExpandedFacilityDetails, {
   FacilityDetailActions,
 } from "../base/ExpandedFacilityDetails";
@@ -139,6 +142,11 @@ export default function TerritoryNetwork(props: Props) {
 function TileNetwork(props: Props) {
   const { game } = props;
   const panel = React.useContext(MapWorkspacePanelContext);
+  const { showTile, hideTile, tileWindow } = panel ?? {};
+  const map = React.useRef<HTMLElement>(null);
+  const lastTile = React.useRef<TerritoryMapTileKey>();
+  const focusAfterClose = React.useRef<TerritoryMapTileKey>();
+  const restoringFocus = React.useRef(false);
   const layout = React.useContext(GameWorkspaceLayoutContext);
   const desktopRail = (layout?.effectiveWidth ?? 0) >= SIDE_TOOL_MIN_WIDTH;
   const [railFocusRequest, setRailFocusRequest] = React.useState(0);
@@ -166,7 +174,7 @@ function TileNetwork(props: Props) {
   const { formatMoneyConcise: money } = useMoney();
   const views = React.useMemo(() => territoryTileViews(game), [game]);
   const view =
-    inspected && !panel?.open && !planning
+    inspected && (!panel?.open || tileWindow) && !planning
       ? views.find(({ tile }) => territoryMapTileKey(tile) === inspected)
       : undefined;
   const tile = view?.tile;
@@ -210,12 +218,42 @@ function TileNetwork(props: Props) {
     setSelected(undefined);
     setRailSite(undefined);
   }, [setSelected]);
+  const closeTileWindow = React.useCallback(() => {
+    focusAfterClose.current = lastTile.current;
+    close();
+  }, [close]);
+  const inspecting = !!view;
+  React.useLayoutEffect(() => {
+    if (!inspecting || !showTile) return;
+    showTile(closeTileWindow);
+    return hideTile;
+  }, [closeTileWindow, hideTile, inspecting, showTile]);
+  React.useLayoutEffect(() => {
+    const previous = focusAfterClose.current;
+    if (inspected || !previous || !map.current) return;
+    focusAfterClose.current = undefined;
+    const tile = findTileControl(map.current, previous);
+    const box = tile?.getBoundingClientRect();
+    const hit =
+      box &&
+      document.elementFromPoint(
+        box.left + box.width / 2,
+        box.top + box.height / 2,
+      );
+    const target = tile?.contains(hit ?? null)
+      ? tile
+      : map.current.querySelector<HTMLElement>(".territoryMapBuyToggle");
+    restoringFocus.current = true;
+    target?.focus({ preventScroll: true });
+    restoringFocus.current = false;
+  }, [inspected]);
+  const blocksInspection = panel?.open && (!tileWindow || planning);
   React.useEffect(() => {
-    if (panel?.open) close();
-  }, [panel?.open, close]);
+    if (blocksInspection) close();
+  }, [blocksInspection, close]);
   const startProject = React.useCallback(() => {
     if (projectBusy.current || pendingIds.size > 0) return;
-    panel?.inspect();
+    panel?.returnToMap();
     setInspected(undefined);
     setSelected(undefined);
     setCandidate(undefined);
@@ -259,7 +297,7 @@ function TileNetwork(props: Props) {
     dispatch(generatorSizeChanged());
   }, [dispatch]);
   const inspect = (key: TerritoryMapTileKey, activate = false) => {
-    if (projectBusy.current) return;
+    if (projectBusy.current || restoringFocus.current) return;
     setSelected(key);
     if (!activate) return;
     const activated = views.find(
@@ -272,7 +310,9 @@ function TileNetwork(props: Props) {
       setCandidate(activated.owned || id === key ? id : undefined);
       return;
     }
-    panel?.inspect();
+    if (tileWindow) tileWindow.raise();
+    else panel?.returnToMap();
+    lastTile.current = key;
     setActivation((value) => value + 1);
     setCategory("generators");
     setInspected(key);
@@ -299,6 +339,7 @@ function TileNetwork(props: Props) {
   const preferredSite = candidate ?? (building ? tile?.id : railSite);
   return (
     <section
+      ref={map}
       className="territoryNetwork"
       data-tile-inspection={view ? "open" : undefined}
       data-desktop-build-rail={desktopRail || undefined}
@@ -313,7 +354,7 @@ function TileNetwork(props: Props) {
           focusRequest={railFocusRequest}
           onProject={(selection) => {
             if (projectBusy.current || pendingIds.size > 0) return;
-            panel?.inspect();
+            panel?.returnToMap();
             setProject(selection);
             setCatalogue(false);
             setPlanning(true);
@@ -333,6 +374,13 @@ function TileNetwork(props: Props) {
       {views.length > 0 && (
         <TerritoryHexMap
           {...(view || planning ? { onCloseInspection: close } : {})}
+          inspectionWindow={
+            view && tileWindow
+              ? tileWindow.front
+                ? "front"
+                : "background"
+              : undefined
+          }
           projectPlanning={planning}
           projectPending={projectPending}
           projectSites={projectSites}
@@ -381,8 +429,10 @@ function TileNetwork(props: Props) {
           }}
         />
       )}
-      {view && tile && territory && (
-        <TileWorkspaceSurface
+      {view && tile && territory && inspected && (
+        <TileInspectionSurface
+          map={map}
+          tileKey={inspected}
           title={title}
           focusKey={`${inspected}:${activation}:${inspectorOwner ?? "unowned"}:${operatingFacility?.id ?? (view.facility ? "facility" : "empty")}`}
           subtitle={view.ownerKey ? view.ownerName : undefined}
@@ -540,7 +590,7 @@ function TileNetwork(props: Props) {
               )}
             </>
           )}
-        </TileWorkspaceSurface>
+        </TileInspectionSurface>
       )}
       {review && tile && props.onAcquire && (
         <AcquisitionReviewDialog

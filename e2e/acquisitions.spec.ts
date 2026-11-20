@@ -550,9 +550,7 @@ async function expectCityDemand(surface: Locator) {
 }
 
 for (const theme of ["light", "dark"] as const) {
-  test(`map persists beneath one right-hand panel in ${theme}`, async ({
-    page,
-  }, info) => {
+  test(`map persists beneath its tools in ${theme}`, async ({ page }, info) => {
     const network = await startMap(page, theme);
     const viewport = network.locator(".territoryMapViewport");
     const original = await viewport.elementHandle();
@@ -590,13 +588,16 @@ for (const theme of ["light", "dark"] as const) {
         )
         .toBe(width);
       const camera = await readTerritoryMapCamera(viewport);
-      for (const name of tools) {
+      const floating = width >= 1024;
+      for (const [index, name] of tools.entries()) {
         const trigger = page.getByRole("button", { name, exact: true });
         await trigger.click();
         const panel = page.getByRole("region", { name, exact: true });
         await expect(panel).toBeVisible();
-        await expect(page.locator(".gameToolPanel:visible")).toHaveCount(1);
-        await expect(panel).toHaveAttribute("data-tool-side", "right");
+        await expect(page.locator(".gameToolPanel:visible")).toHaveCount(
+          floating ? index + 1 : 1,
+        );
+        await expect(panel).toHaveAttribute("data-map-window-front", "true");
         await expect(trigger).toHaveAttribute("aria-expanded", "true");
         await expect(network).toBeVisible();
         expect(
@@ -629,10 +630,13 @@ for (const theme of ["light", "dark"] as const) {
             pageOverflow: document.documentElement.scrollWidth - innerWidth,
           };
         });
-        expect(
-          Math.abs(geometry.stageRight - geometry.right - geometry.rightInset),
-          "the panel uses its actual right inset, including on compact screens",
-        ).toBeLessThanOrEqual(1);
+        if (!floating)
+          expect(
+            Math.abs(
+              geometry.stageRight - geometry.right - geometry.rightInset,
+            ),
+            "the compact panel uses its actual right inset",
+          ).toBeLessThanOrEqual(1);
         expect(
           geometry.bottom,
           "panel controls remain above the floating dock",
@@ -687,15 +691,18 @@ for (const theme of ["light", "dark"] as const) {
           });
       }
       await page.keyboard.press("Escape");
-      await expect(page.locator(".gameToolPanel")).toHaveCount(0);
+      await expect(page.locator(".gameToolPanel")).toHaveCount(
+        floating ? tools.length - 1 : 0,
+      );
       await expect(
         page.getByRole("button", { name: "Scenario", exact: true }),
       ).toBeFocused();
+      await returnToTerritoryMap(page);
       const game = (await readSavedGame(page))!;
       const city = getTerritoryTile("champlain:city", game)!;
       const surface = await inspectTile(page, city);
       await page.getByRole("button", { name: "Fleet", exact: true }).click();
-      await expect(surface).toHaveCount(0);
+      await expect(surface).toHaveCount(floating ? 1 : 0);
       await expect(
         page.getByRole("region", { name: "Fleet", exact: true }),
       ).toBeVisible();
@@ -707,11 +714,17 @@ for (const theme of ["light", "dark"] as const) {
           .getByRole("button", { name: "Insights", exact: true })
           .click();
         await network.locator(`[data-map-target="${city.id}"]`).click();
-        await expect(page.locator(".gameToolPanel")).toHaveCount(0);
+        await expect(page.locator(".gameToolPanel")).toHaveCount(
+          floating ? 2 : 0,
+        );
         await expect(surface).toBeVisible();
         await surface
           .getByRole("button", { name: "Close tile", exact: true })
           .click();
+        await expect(page.locator(".gameToolPanel")).toHaveCount(
+          floating ? 1 : 0,
+        );
+        await returnToTerritoryMap(page);
       }
       await panToTile(page, city);
       const buy = network.getByRole("button", {
@@ -1227,17 +1240,20 @@ for (const theme of ["light", "dark"] as const) {
       animations: "disabled",
       scale: "css",
     });
+    const floatingInspector =
+      (await surface.getAttribute("data-game-tool")) === "TILE";
     await surface.locator(".tileWorkspaceHeading h3").press("Escape");
     await expect(surface).toHaveCount(0);
     await expect(
       network.locator('[data-map-target][aria-pressed="true"]'),
     ).toHaveCount(0);
-    await expect(
-      network.getByRole("button", {
-        name: "Rapid connection mode",
-        exact: true,
-      }),
-    ).toBeFocused();
+    const returnFocus = floatingInspector
+      ? network.locator(`[data-map-target="${city.id}"]`)
+      : network.getByRole("button", {
+          name: "Rapid connection mode",
+          exact: true,
+        });
+    await expect(returnFocus).toBeFocused();
     const occupied = territoryTileViews(before).find(
       (view) =>
         view.owned &&
