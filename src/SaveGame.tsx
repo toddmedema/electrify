@@ -1,3 +1,4 @@
+import { validTerritoryWeather } from "./helpers/TerritoryWildfire";
 import { validFacilityExpansion } from "./helpers/FacilityExpansion";
 import { validPowerAgreements } from "./helpers/PowerAgreements";
 import { POLICY_IDS } from "./data/Policies";
@@ -818,6 +819,7 @@ export function parseSave(
       !validLegacyCampaign(game as GameType) ||
       !validLegacyCampaignEvidence(game as GameType) ||
       !validUtilityExpansion(game as GameType, peers) ||
+      !validTerritoryWeather(game.territoryWeather, game as GameType) ||
       !validHydroClaims(game as GameType) ||
       !game.facilities.every((facility) =>
         validFacilityExpansion(facility, game as GameType),

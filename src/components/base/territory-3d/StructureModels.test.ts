@@ -9,6 +9,7 @@ const inventory: Record<StructureKind, true> = {
   "city-large": true,
   tower: true,
   solar: true,
+  "solar-hail-damaged": true,
   wind: true,
   "offshore-wind": true,
   "airborne-wind": true,

@@ -29,6 +29,8 @@ import {
 import useFacilityMapMotion, {
   FacilityMapMotionContext,
 } from "../base/useFacilityMapMotion";
+import DisasterArtwork from "../base/territory-art/DisasterArtwork";
+import { FrostGroundPatterns } from "../base/territory-art/FrostGround";
 import FacilityMapStatusArtwork from "../base/FacilityMapStatusArtwork";
 import MapStatusLayers from "../base/MapStatusLayers";
 import { useToolState } from "../base/GameToolMemory";
@@ -1048,47 +1050,60 @@ export default function TerritoryHexMap({
               <clipPath id={`${mapId}-terrain-clip`}>
                 <path d={hexFacePath} />
               </clipPath>
+              {!threeDReady && (
+                <FrostGroundPatterns id={`${mapId}-frost-cover`} />
+              )}
             </defs>
             <g aria-hidden="true">
               {!threeDReady &&
-                renderedViews.map(({ tile, owned, visibilityDistance }) => {
-                  const point = hexCenter(tile);
-                  const key = territoryMapTileKey(tile);
-                  return (
-                    <g
-                      key={key}
-                      className="territoryHex territoryFog"
-                      data-visibility-distance={visibilityDistance}
-                      data-terrain={tile.terrain}
-                      data-tile={key}
-                      data-owned={owned}
-                      transform={`translate(${point.x} ${point.y})`}
-                    >
-                      <path className="territoryHexRim" d={hexRimPath} />
-                      <g clipPath={`url(#${mapId}-terrain-clip)`}>
-                        <svg
-                          x={-HEX_WIDTH / 2}
-                          y={-HEX_HEIGHT / 2}
-                          width={HEX_WIDTH}
-                          height={HEX_HEIGHT}
-                          preserveAspectRatio="none"
-                          viewBox="0 0 500 500"
-                        >
-                          <TerrainArtwork
-                            terrain={tile.terrain}
-                            ports={
-                              tile.terrain === "river"
-                                ? riverPorts(tile, tiles)
-                                : undefined
-                            }
-                            className="territoryTerrainArtwork"
-                          />
-                        </svg>
+                renderedViews.map(
+                  ({ tile, owned, visibilityDistance, disaster }) => {
+                    const point = hexCenter(tile);
+                    const key = territoryMapTileKey(tile);
+                    return (
+                      <g
+                        key={key}
+                        className="territoryHex territoryFog"
+                        data-visibility-distance={visibilityDistance}
+                        data-terrain={tile.terrain}
+                        data-ground-condition={disaster?.ground}
+                        data-frost={disaster?.frost}
+                        data-tile={key}
+                        data-owned={owned}
+                        transform={`translate(${point.x} ${point.y})`}
+                      >
+                        <path className="territoryHexRim" d={hexRimPath} />
+                        <g clipPath={`url(#${mapId}-terrain-clip)`}>
+                          <svg
+                            x={-HEX_WIDTH / 2}
+                            y={-HEX_HEIGHT / 2}
+                            width={HEX_WIDTH}
+                            height={HEX_HEIGHT}
+                            preserveAspectRatio="none"
+                            viewBox="0 0 500 500"
+                          >
+                            <TerrainArtwork
+                              terrain={tile.terrain}
+                              weather={disaster?.ground}
+                              frostFill={
+                                disaster?.frost
+                                  ? `url(#${mapId}-frost-cover${(tile.q + tile.r) % 2 ? "-offset" : ""})`
+                                  : undefined
+                              }
+                              ports={
+                                tile.terrain === "river"
+                                  ? riverPorts(tile, tiles)
+                                  : undefined
+                              }
+                              className="territoryTerrainArtwork"
+                            />
+                          </svg>
+                        </g>
+                        <path className="territoryHexSeam" d={hexFacePath} />
                       </g>
-                      <path className="territoryHexSeam" d={hexFacePath} />
-                    </g>
-                  );
-                })}
+                    );
+                  },
+                )}
               {!threeDReady && (
                 <g className="territoryWires" data-wire-count={wires.length}>
                   {wires.map((wire) => (
@@ -1109,6 +1124,31 @@ export default function TerritoryHexMap({
                   ))}
                 </g>
               )}
+              {renderedViews.map(({ tile, disaster, visibilityDistance }) => {
+                if (
+                  threeDReady ||
+                  !disaster ||
+                  (disaster.ground !== "burning" && disaster.hail !== "impact")
+                )
+                  return null;
+                const origin = foregroundOrigin(tile);
+                return (
+                  <svg
+                    key={territoryMapTileKey(tile)}
+                    className="territoryFog territoryDisaster"
+                    data-visibility-distance={visibilityDistance}
+                    data-disaster-tile={territoryMapTileKey(tile)}
+                    x={origin.x}
+                    y={origin.y}
+                    width={HEX_WIDTH}
+                    height={HEX_WIDTH}
+                    viewBox="0 0 500 500"
+                    overflow="visible"
+                  >
+                    <DisasterArtwork {...disaster} />
+                  </svg>
+                );
+              })}
               {[...renderedViews]
                 .sort((a, b) => hexCenter(a.tile).y - hexCenter(b.tile).y)
                 .map((view) => {
@@ -1168,6 +1208,7 @@ export default function TerritoryHexMap({
                             <FacilityMapMotionContext.Provider value={motion}>
                               <FacilityArtwork
                                 facility={facility}
+                                hailDamaged={view.disaster?.hail !== undefined}
                                 className="territoryOccupantArtwork"
                                 active={
                                   operation?.kind === "producing" ||
@@ -1206,7 +1247,7 @@ export default function TerritoryHexMap({
             </g>
           </svg>
           {renderedViews.map((view) => {
-            const { tile, facility } = view,
+            const { tile, facility, disaster } = view,
               key = territoryMapTileKey(tile),
               point = hexCenter(tile);
             const status = facilityMapStatus(view, game.date.minute);
@@ -1236,6 +1277,7 @@ export default function TerritoryHexMap({
                 data-owner={view.ownerKey}
                 data-owned={view.owned}
                 data-terrain={tile.terrain}
+                data-ground-condition={disaster?.ground}
                 data-municipal-city={
                   tile.city && isLandTerritoryId(tile.territoryId)
                 }
@@ -1294,7 +1336,7 @@ export default function TerritoryHexMap({
                     rememberActivation(key);
                   navigate(event, key);
                 }}
-                title={`${TERRAIN_LABELS[tile.terrain]} · ${facility?.name ?? cityLabel ?? (view.developed ? (wireStructure(view) === "submerged" ? "Open water · submerged cable" : "Open site · transmission tower") : "Undeveloped site")}${status ? ` · ${status.label}` : ""} · ${hover.reason}`}
+                title={`${TERRAIN_LABELS[tile.terrain]} · ${facility?.name ?? cityLabel ?? (view.developed ? (wireStructure(view) === "submerged" ? "Open water · submerged cable" : "Open site · transmission tower") : "Undeveloped site")}${status ? ` · ${status.label}` : ""}${disaster ? ` · ${disaster.condition}` : ""}${disaster?.facilityImpact ? ` · ${disaster.facilityImpact}` : ""} · ${hover.reason}`}
               >
                 <span className="territoryTileHitArea" aria-hidden="true" />
                 {projectSite && (
@@ -1356,7 +1398,9 @@ export default function TerritoryHexMap({
                           ? "One building site; submerged cable"
                           : "One building site; transmission tower"
                         : "One building site"}
-                  . {hover.reason}
+                  . {disaster && `${disaster.condition}. `}
+                  {disaster?.facilityImpact && `${disaster.facilityImpact}. `}
+                  {hover.reason}
                 </span>
               </button>
             );

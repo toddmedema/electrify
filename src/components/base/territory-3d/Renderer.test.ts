@@ -1,7 +1,8 @@
+import { hailModel, hailstoneRise } from "./Hailstones";
 import { TICK_MS } from "../../../Constants";
 import { MeshBuilder } from "./MeshBuilder";
 import { MapRenderer } from "./Renderer";
-import { projectPoint } from "./Projection";
+import { projectPoint, tilePosition3D } from "./Projection";
 import { getStructureModel } from "./StructureModels";
 import { getTerrainModel } from "./TerrainModels";
 import type { MapCanvas, MapFrame, MapInstance, MapModel, Vec3 } from "./Types";
@@ -45,6 +46,8 @@ function mockContext() {
     createVertexArray: jest.fn(() => ({ id: ++identity })),
     getShaderParameter: jest.fn(() => true),
     getProgramParameter: jest.fn(() => true),
+    getShaderInfoLog: jest.fn(() => "compile error"),
+    getProgramInfoLog: jest.fn(() => "link error"),
     getUniformLocation: jest.fn((_program, name: string) => ({ name })),
     shaderSource: jest.fn(),
     compileShader: jest.fn(),
@@ -173,6 +176,77 @@ beforeEach(() => {
 afterEach(() => {
   jest.restoreAllMocks();
 });
+
+test.each([
+  [390, 216],
+  [1280, 360],
+])(
+  "submits at most %i px viewport's wildfire budget in one depth-tested pass",
+  (width, budget) => {
+    const { renderer, gl } = setup();
+    const flat = getTerrainModel("hills", { weather: "scorched" });
+    const burning = Array.from({ length: 8 }, (_, i): MapInstance => {
+      const coords = { q: (i % 4) - 2, r: Math.floor(i / 4) };
+      return {
+        id: `terrain:${i}`,
+        position: tilePosition3D(coords),
+        model: flat,
+        wildfire: { ...coords, clearance: 0, forest: false },
+        fog: 0,
+        active: false,
+      };
+    });
+    const visible = { ...frame, width, scale: 0.5 };
+    renderer.update(burning, visible);
+    flush(0);
+    const fire = () => renderer.diagnostics().wildfire;
+    expect(fire()).toMatchObject({ particles: budget, drawCalls: 1, time: 0 });
+    const draws = gl.drawArraysInstanced.mock;
+    expect(draws.lastCall).toEqual([gl.TRIANGLES, 0, 6, budget]);
+    const particleDraw = draws.invocationCallOrder.at(-1)!;
+    const depthEnabled = gl.enable.mock.calls.findIndex(
+      ([flag]) => flag === gl.DEPTH_TEST,
+    );
+    expect(gl.enable.mock.invocationCallOrder[depthEnabled]).toBeLessThan(
+      particleDraw,
+    );
+    expect(gl.disable).not.toHaveBeenCalledWith(gl.DEPTH_TEST);
+    const depthWritesOff = gl.depthMask.mock.calls.findIndex(
+      ([enabled]) => !enabled,
+    );
+    expect(gl.depthMask.mock.invocationCallOrder[depthWritesOff]).toBeLessThan(
+      particleDraw,
+    );
+    expect(gl.depthMask.mock.invocationCallOrder.at(-1)).toBeGreaterThan(
+      particleDraw,
+    );
+    const uploads = gl.bufferSubData.mock.calls.length;
+    flush(16);
+    expect(fire().time).toBeGreaterThan(0);
+    expect(gl.uniform1f).toHaveBeenCalledWith(
+      { name: "uFireTime" },
+      fire().time,
+    );
+    expect(gl.bufferSubData).toHaveBeenCalledTimes(uploads);
+
+    renderer.update(burning, { ...visible, motionAllowed: false });
+    const frozen = fire().time;
+    flush(32);
+    expect(fire().time).toBe(frozen);
+    expect(callbacks.size).toBe(0);
+
+    renderer.update(burning, { ...visible, cameraX: 10_000 });
+    flush(48);
+    expect(fire()).toMatchObject({ particles: 0, drawCalls: 0, time: frozen });
+    expect(callbacks.size).toBe(0);
+    renderer.update(burning, visible);
+    flush(500);
+    expect(fire()).toMatchObject({ particles: budget, time: frozen });
+    flush(516);
+    expect(fire().time).toBeGreaterThan(frozen);
+    renderer.dispose();
+  },
+);
 it.each(["wind", "offshore-wind"] as const)(
   "turns the actual %s mesh clockwise from its upwind hub and shares its shadow pose",
   (kind) => {
@@ -901,3 +975,79 @@ it("raises real Hydro and upper Pumped Hydro water while lowering the lower basi
   expect(gl.bufferSubData).toHaveBeenCalledTimes(1);
   renderer.dispose();
 });
+
+it("uploads the frost material when cold starts and ends while keeping surface water clear", () => {
+  const { renderer, gl } = setup();
+  const mesh = model.parts[0].mesh;
+  const shoreline: MapModel = {
+    ...model,
+    parts: [{ mesh }, { mesh, material: "watershed-water" }],
+  };
+  for (const frost of [false, true, false]) {
+    renderer.update([{ ...scene()[0], model: shoreline, frost }], frame);
+    gl.bufferSubData.mockClear();
+    flush(0);
+    expect(gl.bufferSubData).toHaveBeenCalledTimes(1);
+    const pose = gl.bufferSubData.mock.calls[0][2] as Float32Array;
+    expect(pose[23]).toBe(frost ? 1 : 0);
+    expect(pose[47]).toBe(0);
+    expect(renderer.diagnostics().meshCount).toBe(1);
+  }
+  renderer.dispose();
+});
+
+test("hail accelerates down and rebounds twice with decreasing height", () => {
+  expect(hailstoneRise(0.2) - hailstoneRise(0.1)).toBeGreaterThan(
+    hailstoneRise(0.5) - hailstoneRise(0.4),
+  );
+  expect(hailstoneRise(0.57)).toBe(0);
+  expect(hailstoneRise(0.69)).toBeGreaterThan(hailstoneRise(0.86));
+  expect(hailstoneRise(0.86)).toBeGreaterThan(hailstoneRise(0.99));
+  expect(hailstoneRise(0.99)).toBe(0);
+});
+
+test.each([
+  [390, 48],
+  [1280, 84],
+])(
+  "at %i px hail batches %i solid stones and stops offscreen",
+  (width, budget) => {
+    const { renderer, gl } = setup();
+    const hail = hailModel(
+      getTerrainModel("plains"),
+      getStructureModel("solar-hail-damaged"),
+      0,
+      0,
+    );
+    const instances = Array.from({ length: 8 }, (_, index): MapInstance => ({
+      id: `hail:${index}`,
+      position: [index * 0.08, 0, 0],
+      model: hail,
+      fog: 0,
+      active: true,
+    }));
+    const visible = { ...frame, width, scale: 0.5 };
+    renderer.update(instances, visible);
+    flush(0);
+    expect(gl.drawArraysInstanced).toHaveBeenCalledTimes(1);
+    expect(gl.drawArraysInstanced).toHaveBeenLastCalledWith(
+      gl.TRIANGLES,
+      0,
+      24,
+      budget,
+    );
+    const before = renderer.diagnostics(true).scene![0].max[1];
+    flush(150);
+    expect(renderer.diagnostics(true).scene![0].max[1]).not.toBe(before);
+    renderer.update(instances, { ...visible, motionAllowed: false });
+    flush(200);
+    const held = renderer.diagnostics().phases["hail:0"];
+    expect(callbacks.size).toBe(0);
+    renderer.update(instances, { ...visible, cameraX: 10_000 });
+    flush(400);
+    expect(renderer.diagnostics().drawCalls).toBe(0);
+    expect(renderer.diagnostics().phases["hail:0"]).toBe(held);
+    expect(callbacks.size).toBe(0);
+    renderer.dispose();
+  },
+);

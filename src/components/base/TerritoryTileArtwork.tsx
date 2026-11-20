@@ -1,3 +1,4 @@
+import type { TerrainWeather } from "../../helpers/TerritoryDisasters";
 import * as React from "react";
 import type {
   CitySizeType,
@@ -21,11 +22,10 @@ import StorageOccupant from "./territory-art/StorageOccupant";
 
 export { TERRAIN_LABELS } from "../../data/TerrainLabels";
 const terrainArt: Record<
-  TerrainType,
-  React.ComponentType<{ className?: string }>
+  Exclude<TerrainType, "forest">,
+  React.ComponentType<{ className?: string; frostFill?: string }>
 > = {
   plains: PlainsTerrain,
-  forest: ForestTerrain,
   hills: HillsTerrain,
   mountain: MountainTerrain,
   river: RiverTerrain,
@@ -36,16 +36,28 @@ export function TerrainArtwork({
   terrain,
   ports,
   className,
+  weather,
+  frostFill,
 }: {
   terrain: TerrainType;
   ports?: readonly number[];
   className?: string;
+  weather?: TerrainWeather;
+  frostFill?: string;
 }) {
+  if (terrain === "forest")
+    return (
+      <ForestTerrain
+        className={className}
+        weather={weather}
+        frostFill={frostFill}
+      />
+    );
   const Art = terrainArt[terrain];
   return terrain === "river" ? (
-    <RiverTerrain ports={ports} className={className} />
+    <RiverTerrain ports={ports} className={className} frostFill={frostFill} />
   ) : (
-    <Art className={className} />
+    <Art className={className} frostFill={frostFill} />
   );
 }
 /** Explicit mapping keeps a new domain fuel from silently becoming a generic power symbol. */
@@ -70,10 +82,12 @@ export function FacilityArtwork({
   facility,
   className,
   active = false,
+  hailDamaged = false,
 }: {
   facility: MapArtFacility;
   className?: string;
   active?: boolean;
+  hailDamaged?: boolean;
 }) {
   if (facility.peakWh !== undefined)
     return (
@@ -94,6 +108,7 @@ export function FacilityArtwork({
       variant={GENERATOR_ART[facility.fuel]}
       className={className}
       active={active}
+      hailDamaged={hailDamaged && facility.fuel === "Sun"}
     />
   ) : null;
 }
