@@ -71,9 +71,7 @@ it.each(["loading", "open"])(
   "retains feedback while an install prompt arrives with the dialog %s",
   async (phase) => {
     render(<Home />);
-    fireEvent.click(
-      screen.getByRole("button", { name: "Send feedback", exact: true }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Send feedback" }));
     if (phase === "open")
       await screen.findByRole("dialog", { name: "Share feedback" });
     const prompt = new Event("beforeinstallprompt");
