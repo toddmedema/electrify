@@ -74,6 +74,7 @@ export default function TerritoryScene3D({
   };
   dark: boolean;
   onState: (state: RendererState) => void;
+  /** Accept points relative to the center shared by the live viewport and the last paint. */
   onPicker: (picker: ScenePicker | undefined) => void;
 }) {
   const { x: cameraX, y: cameraY } = React.useSyncExternalStore(
@@ -119,17 +120,18 @@ export default function TerritoryScene3D({
     renderer.current = value;
   }, []);
   React.useLayoutEffect(() => {
-    onPicker((point) => {
+    onPicker(({ x, y }) => {
       const handle = renderer.current;
-      if (!handle) return;
-      const painted = handle.getPaintedScene();
-      if (painted)
-        return builder.pick(
-          point,
-          painted.frame,
-          handle.motionPhase,
-          painted.instances,
-        );
+      const painted = handle?.getPaintedScene();
+      if (!handle || !painted) return;
+      const { width, height } = painted.frame;
+      if (Math.abs(x) > width / 2 || Math.abs(y) > height / 2) return null;
+      return builder.pick(
+        { x: x + width / 2, y: y + height / 2 },
+        painted.frame,
+        handle.motionPhase,
+        painted.instances,
+      );
     });
     return () => onPicker(undefined);
   }, [builder, onPicker]);
