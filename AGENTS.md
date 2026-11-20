@@ -144,6 +144,10 @@ untracked. Agents without a verified hook should format the files they changed b
   validation for every unrelated base commit. Stop temporary preview servers when finished.
 - Stage explicit task files and inspect `git diff --cached` before committing; leave unrelated
   edits, generated hook configuration, scratch tests, and review artifacts out of the PR.
+- For user-visible UI work with design choices, share the first usable interaction in chat
+  before final QA. Use a reproducible game state and show desktop and mobile when the layout
+  reflows. Use a short clip when motion matters. Call out any open design decision and
+  continue routine verification while feedback is pending.
 - When opening a pull request with user-visible UI changes, capture 1-3 screenshots of the
   finished interface and embed them in the pull request description. Choose views that clearly
   show the change, including both desktop and mobile layouts when responsive behavior is relevant.

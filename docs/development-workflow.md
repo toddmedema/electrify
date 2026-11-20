@@ -66,6 +66,12 @@ lands on `master`, keep the monitor's existing metadata query. Do not execute a
 feature branch's copy as the shared monitor. Treat an API or helper error as a
 failed survey, preserve the ledger, and report the error.
 
+For repair pushes, have the monitor and its workers follow the
+[local verification policy in AGENTS.md](../AGENTS.md#start-here). Reproduce the
+failure where practical and check the fix and affected callers before pushing.
+Use the full local profile when the scope or failure warrants it. Hosted CI runs
+the full suite on the repair push.
+
 ### Validation evidence
 
 Run `npm run check -- --status` to inspect the latest recorded local run without
