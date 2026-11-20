@@ -1,4 +1,6 @@
+import type { Locator } from "@playwright/test";
 import { expect, test } from "./fixtures";
+import { pauseBrowserClock } from "./browser-clock";
 import type { MapCanvas } from "../src/components/base/territory-3d/Types";
 import type { TerritoryTileId } from "../src/Types";
 import {
@@ -11,6 +13,9 @@ import { reviewScreenshot } from "./review-screenshot";
 import { getBuildFacilityQuote } from "../src/data/Facilities";
 import gameReducer, { buildFacility } from "../src/reducers/Game";
 import { getTerritoryTile } from "../src/helpers/TerritoryTiles";
+import { SceneBuilder } from "../src/components/base/territory-3d/SceneBuilder";
+import { getStructureModel } from "../src/components/base/territory-3d/StructureModels";
+import { territoryTileViews } from "../src/helpers/TerritoryMapState";
 import { getTerrainModel } from "../src/components/base/territory-3d/TerrainModels";
 import { editSavedGame, readSavedGame } from "./save-fixture";
 import { TICK_MINUTES } from "../src/Constants";
@@ -93,7 +98,7 @@ for (const theme of ["light", "dark"] as const) {
       await expect
         .poll(async () => (await readTerritoryMapCamera(viewport)).x)
         .not.toBe(cameraX);
-      await expect(map.locator(".tileWorkspaceSurface")).toHaveCount(0);
+      await expect(page.locator(".tileWorkspaceSurface")).toHaveCount(0);
     }
     const contextLoss = await canvas.evaluateHandle((element: MapCanvas) => {
       const gl = element.getContext("webgl2")!;
@@ -161,11 +166,7 @@ for (const reducedMotion of ["no-preference", "reduce"] as const) {
 
       // Shared-runner frame gaps can skip the whole shift. Drive the real camera
       // through intermediate frames before checking its destination.
-      // Freeze wall time first so a delayed pause RPC cannot target the past.
-      const pauseTime = await page.evaluate(() => Date.now());
-      await page.clock.setFixedTime(pauseTime);
-      await page.clock.pauseAt(pauseTime);
-      await page.clock.setSystemTime(pauseTime);
+      await pauseBrowserClock(page);
       const positions = await viewport.evaluateHandle((element) => {
         const stage = element.querySelector<HTMLElement>(".territoryMapStage")!;
         const x: number[] = [];
@@ -296,7 +297,19 @@ test("clicking real mountain relief above its ground selects the mountain tile",
   }));
   const frame = { width, height, cameraX, cameraY, scale };
   // Take a point inside the actual highest relief triangle, close to its peak.
-  const mesh = getTerrainModel("mountain").parts[1].mesh.positions;
+  const views = territoryTileViews((await readSavedGame(page))!);
+  const site = views.find((v) => v.tile.id === tile.id)!;
+  const [terrain] = new SceneBuilder({
+    terrain: getTerrainModel,
+    structure: getStructureModel,
+  }).build(
+    [site],
+    views.map((v) => v.tile),
+    [],
+    0,
+    "run",
+  );
+  const mesh = terrain.model.parts[1].mesh.positions;
   let peak = [0, -Infinity, 0];
   for (let i = 0; i < mesh.length; i += 9) {
     const vertices = [0, 3, 6].map((offset) =>
@@ -454,6 +467,170 @@ test("unavailable WebGL leaves a fully operable simplified map", async ({
   await expect(
     map.locator('[data-project-site="owned"]').first(),
   ).toBeVisible();
+});
+
+test("map windows move, resize, stack and remember their bounds", async ({
+  page,
+}, info) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.addInitScript(() => {
+    localStorage.setItem("theme", "dark");
+    localStorage.setItem("audioEnabled", "false");
+  });
+  const startMap = async () => {
+    await page.goto("/?scenario=116");
+    await page.getByRole("button", { name: "Start game", exact: true }).click();
+    const map = await returnToTerritoryMap(page);
+    await expect(map.locator("canvas.territory3DCanvas")).toHaveAttribute(
+      "data-renderer",
+      "ready",
+    );
+    const pause = page.getByRole("button", { name: "pause", exact: true });
+    if ((await pause.getAttribute("aria-pressed")) !== "true")
+      await pause.click();
+    return map;
+  };
+  const map = await startMap();
+  const fleet = page.getByRole("region", { name: "Fleet", exact: true });
+  const agreements = page.getByRole("region", {
+    name: "Agreements",
+    exact: true,
+  });
+  const fleetAction = page.getByRole("button", { name: "Fleet", exact: true });
+  const agreementsAction = page.getByRole("button", {
+    name: "Agreements",
+    exact: true,
+  });
+  await fleetAction.click();
+  await expect(fleet).toBeVisible();
+
+  const viewport = page.viewportSize()!;
+  if (viewport.width < 1024) {
+    await expect(
+      fleet.getByRole("button", { name: "Resize Fleet" }),
+    ).toHaveCount(0);
+    await agreementsAction.click();
+    await expect(agreements).toBeVisible();
+    await expect(fleet).toHaveCount(0);
+    await expect(map).toBeVisible();
+    return;
+  }
+
+  const drag = async (target: Locator, dx: number, dy: number) => {
+    const { x, y, width, height } = (await target.boundingBox())!;
+    const startX = x + width / 2;
+    const startY = y + height / 2;
+    await page.mouse.move(startX, startY);
+    await page.mouse.down();
+    await page.mouse.move(startX + dx, startY + dy, { steps: 5 });
+    await page.mouse.up();
+  };
+  const title = fleet.getByRole("heading", { name: "Fleet", exact: true });
+  const resize = fleet.getByRole("button", { name: "Resize Fleet" });
+  const initial = (await fleet.boundingBox())!;
+  const camera = await readTerritoryMapCamera(
+    map.locator(".territoryMapViewport"),
+  );
+  await drag(title, -144, 48);
+  await expect
+    .poll(() => fleet.boundingBox())
+    .toEqual({ ...initial, x: initial.x - 144, y: initial.y + 48 });
+  await drag(resize, 64, 48);
+  const saved = {
+    x: initial.x - 144,
+    y: initial.y + 48,
+    width: initial.width + 64,
+    height: initial.height + 48,
+  };
+  await expect.poll(() => fleet.boundingBox()).toEqual(saved);
+  expect(
+    await readTerritoryMapCamera(map.locator(".territoryMapViewport")),
+  ).toEqual(camera);
+
+  await agreementsAction.click();
+  await expect(page.locator("#facilitiesPane")).toHaveCount(1);
+  await expect(page.locator("#agreementsPane")).toHaveCount(1);
+  const second = (await agreements.boundingBox())!;
+  const overlap = { x: second.x + 60, y: saved.y + 84 };
+  const atOverlap = () =>
+    page.evaluate(
+      ({ x, y }) =>
+        document
+          .elementFromPoint(x, y)
+          ?.closest(".gameToolPanel")
+          ?.getAttribute("aria-label"),
+      overlap,
+    );
+  await expect.poll(atOverlap).toBe("Agreements");
+  await reviewScreenshot(page.locator(".gameStage"), {
+    path: info.outputPath("stacked-map-windows.png"),
+    animations: "disabled",
+    scale: "css",
+  });
+  await page.mouse.click(saved.x + 16, saved.y + saved.height - 20);
+  await expect.poll(atOverlap).toBe("Fleet");
+  await expect(agreementsAction).toHaveAttribute("aria-expanded", "true");
+
+  await page.keyboard.press("Escape");
+  await expect(fleet).toHaveCount(0);
+  await expect(agreements).toBeVisible();
+  await expect(fleetAction).toBeFocused();
+  await fleetAction.click();
+  await expect.poll(() => fleet.boundingBox()).toEqual(saved);
+  await agreementsAction.click();
+  await expect(agreements).toHaveAttribute("data-map-window-front", "true");
+  await agreementsAction.click();
+  await expect(agreements).toHaveCount(0);
+  await expect(fleet).toBeVisible();
+
+  await page.setViewportSize({ width: 1060, height: 580 });
+  await expect(
+    fleet.getByRole("button", { name: "Close Fleet" }),
+  ).toBeInViewport();
+  await expect(resize).toBeInViewport();
+  await resize.press("ArrowRight");
+  await page.setViewportSize(viewport);
+  await expect.poll(() => fleet.boundingBox()).toEqual(saved);
+
+  await startMap();
+  await fleetAction.click();
+  await expect.poll(() => fleet.boundingBox()).toEqual(saved);
+  await title.press("ArrowLeft");
+  await resize.press("ArrowLeft");
+  await expect
+    .poll(() => fleet.boundingBox())
+    .toEqual({
+      ...saved,
+      x: saved.x - 16,
+      width: saved.width - 16,
+    });
+
+  await page.setViewportSize({ width: 1060, height: 580 });
+  await expect(resize).toBeInViewport();
+  // Wait for the workspace observer to fit the window to the smaller tray.
+  await expect
+    .poll(() =>
+      fleet.evaluate((element: HTMLElement) => {
+        const tray = element.parentElement!;
+        return {
+          rightGap: tray.clientWidth - element.offsetLeft - element.offsetWidth,
+          bottomGap:
+            tray.clientHeight - element.offsetTop - element.offsetHeight,
+        };
+      }),
+    )
+    .toEqual({ rightGap: 0, bottomGap: 0 });
+  const horizontalBounds = () =>
+    fleet.evaluate((element: HTMLElement) => ({
+      left: element.offsetLeft,
+      width: element.offsetWidth,
+    }));
+  const clamped = await horizontalBounds();
+  await drag(resize, -32, 0);
+  await expect.poll(horizontalBounds).toEqual({
+    left: clamped.left,
+    width: clamped.width - 32,
+  });
 });
 
 test("shows an advancing wildfire and scar with WebGL or the SVG fallback", async ({
@@ -633,7 +810,7 @@ test("shows extreme cold on terrain and explains the plant derate in both render
   });
 
   await gas.press("Enter");
-  const inspector = map.locator(".tileWorkspaceSurface");
+  const inspector = page.locator(".tileWorkspaceSurface");
   await expect(
     inspector.getByText("Extreme cold", { exact: true }).first(),
   ).toBeVisible();
@@ -813,4 +990,89 @@ test("hail falls on the struck solar site and leaves visibly broken panels durin
   await reviewScreenshot(map.locator(".territoryMapViewport"), {
     path: info.outputPath("hail-svg-map.png"),
   });
+});
+
+test("tile inspection shares the desktop window stack", async ({
+  page,
+}, info) => {
+  test.skip(
+    page.viewportSize()!.width < 1024,
+    "The compact map uses one panel",
+  );
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.addInitScript(() => {
+    localStorage.setItem("theme", "dark");
+    localStorage.setItem("audioEnabled", "false");
+  });
+  await page.goto("/?scenario=116");
+  await page.getByRole("button", { name: "Start game", exact: true }).click();
+  const map = await returnToTerritoryMap(page);
+  await expect(map.locator("canvas.territory3DCanvas")).toHaveAttribute(
+    "data-renderer",
+    "ready",
+  );
+  const capital = map.locator('[data-map-target="champlain:city"]');
+  const fleet = page.getByRole("region", { name: "Fleet", exact: true });
+  const agreements = page.getByRole("region", {
+    name: "Agreements",
+    exact: true,
+  });
+  await page.getByRole("button", { name: "Fleet", exact: true }).click();
+  await page.getByRole("button", { name: "Agreements", exact: true }).click();
+  const fleetBounds = await fleet.boundingBox();
+  const agreementsBounds = await agreements.boundingBox();
+
+  await capital.click();
+  const inspector = page.getByRole("dialog", {
+    name: "Burlington",
+    exact: true,
+  });
+  await expect(inspector).toBeVisible();
+  await expect(fleet).toBeVisible();
+  await expect(agreements).toBeVisible();
+  await expect(inspector).toHaveAttribute("data-map-window-front", "true");
+  await expect(
+    inspector.getByRole("heading", { name: "Burlington", exact: true }),
+  ).toBeFocused();
+  expect(await fleet.boundingBox()).toEqual(fleetBounds);
+  expect(await agreements.boundingBox()).toEqual(agreementsBounds);
+  await expect(capital).toHaveAttribute("aria-pressed", "true");
+  await capital.click({ trial: true });
+  await reviewScreenshot(page.locator(".gameStage"), {
+    path: info.outputPath("tile-window-stack.png"),
+    animations: "disabled",
+    scale: "css",
+  });
+
+  const sameWindow = await inspector.elementHandle();
+  const nextTile = map.locator('[data-map-target="champlain:site-1"]');
+  await nextTile.press("Enter");
+  await expect(inspector).toHaveCount(0);
+  await expect(nextTile).toHaveAttribute("aria-pressed", "true");
+  expect(
+    await sameWindow!.evaluate(
+      (element) => document.querySelector("#tool-TILE") === element,
+    ),
+  ).toBe(true);
+  await capital.click();
+  await expect(inspector).toHaveAttribute("data-map-window-front", "true");
+
+  await page.getByRole("button", { name: "Agreements", exact: true }).click();
+  await expect(agreements).toHaveAttribute("data-map-window-front", "true");
+  await page.keyboard.press("Escape");
+  await expect(agreements).toHaveCount(0);
+  await expect(inspector).toHaveAttribute("data-map-window-front", "true");
+  await page.keyboard.press("Escape");
+  await expect(inspector).toHaveCount(0);
+  await expect(capital).toHaveAttribute("aria-pressed", "false");
+  await expect(capital).toBeFocused();
+  await expect(fleet).toBeVisible();
+
+  await capital.press("Enter");
+  await expect(inspector).toBeVisible();
+  await fleet.getByRole("button", { name: "Close Fleet", exact: true }).focus();
+  await page.keyboard.press("Escape");
+  await expect(fleet).toHaveCount(0);
+  await expect(inspector).toBeVisible();
+  await expect(inspector).toHaveAttribute("data-map-window-front", "true");
 });

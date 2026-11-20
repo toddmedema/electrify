@@ -6,6 +6,7 @@ import {
 } from "../../helpers/GameSelectors";
 import * as React from "react";
 import { useToolState, useToolScroll } from "../base/GameToolMemory";
+import { MapWindowFrontContext } from "../base/GameWorkspaceContext";
 import {
   Alert,
   Avatar,
@@ -699,6 +700,8 @@ export function ProgramsScreen({
   const manualOpen = useAppSelector((s) => !!s.ui.manualHelpEntry);
   const activeCard = useAppSelector((s) => s.card?.name);
   const token = React.useId();
+  const mapWindowFront = React.useContext(MapWindowFrontContext);
+  const inMapWindow = mapWindowFront !== undefined;
   const [selected, setSelected] = useToolState<Selection | undefined>(
     "programs.selection",
     undefined,
@@ -716,12 +719,13 @@ export function ProgramsScreen({
   const headingRef = React.useRef<HTMLHeadingElement>(null);
   const lastSelection = React.useRef<Selection>();
   React.useLayoutEffect(() => {
-    if (!embedded) return;
+    const previous = lastSelection.current;
+    lastSelection.current = selected;
+    if (!embedded || mapWindowFront === false || previous === selected) return;
     if (selected) {
-      lastSelection.current = selected;
       headingRef.current?.focus({ preventScroll: true });
-    } else if (lastSelection.current) {
-      const name = POLICIES[lastSelection.current].name;
+    } else if (previous) {
+      const name = POLICIES[previous].name;
       Array.from(
         bodyRef.current?.querySelectorAll<HTMLButtonElement>("button") ?? [],
       )
@@ -730,9 +734,9 @@ export function ProgramsScreen({
         )
         ?.focus({ preventScroll: true });
     }
-  }, [bodyRef, embedded, selected]);
+  }, [bodyRef, embedded, mapWindowFront, selected]);
   React.useEffect(() => {
-    if (embedded && !selected) return;
+    if (inMapWindow || (embedded && !selected)) return;
     const closeOnEscape = (event: KeyboardEvent) => {
       if (
         embedded &&
@@ -754,7 +758,15 @@ export function ProgramsScreen({
     // Foreground menus and dialogs consume Escape before it reaches the decision behind them.
     document.addEventListener("keydown", closeOnEscape);
     return () => document.removeEventListener("keydown", closeOnEscape);
-  }, [onClose, manualOpen, embedded, selected, activeCard, setSelected]);
+  }, [
+    onClose,
+    manualOpen,
+    embedded,
+    selected,
+    activeCard,
+    setSelected,
+    inMapWindow,
+  ]);
   // A docked overview may stay open while playing. Freeze time only while reviewing an
   // individual decision; the standalone screen retains its existing pause behavior.
   const reviewingDecision = !embedded || !!selected;

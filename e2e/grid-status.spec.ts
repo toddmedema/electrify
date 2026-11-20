@@ -1,4 +1,5 @@
 /* eslint-disable testing-library/prefer-screen-queries -- Playwright owns browser queries. */
+import { SIDE_TOOL_MIN_WIDTH } from "../src/Globals";
 import { expect, test } from "./fixtures";
 import { reviewScreenshot } from "./review-screenshot";
 
@@ -60,18 +61,22 @@ for (const theme of ["light", "dark"] as const) {
       path: info.outputPath(`grid-status-header-${theme}.png`),
       animations: "disabled",
     });
-    for (const [action, region] of [
+    const floating = page.viewportSize()!.width >= SIDE_TOOL_MIN_WIDTH;
+    const destinations = [
       ["Manage fleet", "Fleet"],
       ["Manage agreements", "Agreements"],
       ["View supply forecast", "Insights"],
-    ]) {
+    ];
+    for (const [index, [action, region]] of destinations.entries()) {
       await status.click();
       await dialog.getByRole("button", { name: action, exact: true }).click();
       await expect(dialog).toHaveCount(0);
-      await expect(
-        page.getByRole("region", { name: region, exact: true }),
-      ).toBeVisible();
-      await expect(page.locator(".gameToolPanel:visible")).toHaveCount(1);
+      const panel = page.getByRole("region", { name: region, exact: true });
+      await expect(panel).toBeVisible();
+      await expect(panel).toHaveAttribute("data-map-window-front", "true");
+      await expect(page.locator(".gameToolPanel:visible")).toHaveCount(
+        floating ? index + 1 : 1,
+      );
     }
     await expect(page.locator("#chartForecastSupplyDemand")).toBeVisible();
   });

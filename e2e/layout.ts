@@ -189,7 +189,7 @@ export async function waitForSettled(
   ).toHaveCount(1);
 }
 
-/** Return to the persistent territory map by closing its one active dock panel. */
+/** Return to the persistent territory map by closing its dock panels front to back. */
 export async function returnToTerritoryMap(page: Page): Promise<Locator> {
   const workspace = page.locator('.gameWorkspace[data-persistent-map="true"]');
   const map = workspace.getByRole("region", {
@@ -198,9 +198,9 @@ export async function returnToTerritoryMap(page: Page): Promise<Locator> {
   });
   await expect(map).toBeVisible();
   const panel = workspace.locator(".gameToolPanel:visible");
-  expect(await panel.count()).toBeLessThanOrEqual(1);
-  if (await panel.count()) {
-    await panel
+  while (await panel.count()) {
+    await workspace
+      .locator('.gameToolPanel[data-map-window-front="true"]')
       .locator(":scope > .gameToolHeader")
       .getByRole("button", { name: /^Close / })
       .click();
@@ -335,7 +335,14 @@ export async function openPane(
       .locator(".gameToolHeader button[aria-label^='Close ']")
       .filter({ visible: true });
     const changed = (await closes.count()) > 0;
-    while ((await closes.count()) > 0) await closes.first().click();
+    while ((await closes.count()) > 0) {
+      const front = closes.and(
+        pane
+          .page()
+          .locator('[data-map-window-front="true"] > .gameToolHeader button'),
+      );
+      await ((await front.count()) ? front : closes.first()).click();
+    }
     await expect(pane.first()).toBeVisible();
     return changed;
   }

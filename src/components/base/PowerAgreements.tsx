@@ -31,6 +31,7 @@ import AgreementForecastDetails, {
 } from "./AgreementForecastDetails";
 import { useAgreementForecast } from "./useAgreementForecast";
 import DecisionDialog from "./DecisionDialog";
+import ConceptIcon from "./ConceptIcon";
 import BuildDetails, { BuildDetailRow } from "./BuildDetails";
 import { multiplayerRuntime } from "../../multiplayer/Registry";
 
@@ -79,6 +80,27 @@ function marketComparison(price: number, marketPrice?: number) {
     ? "About the same"
     : `${formatNumber(Math.abs(difference), { maximumFractionDigits: 1 })}% ${difference > 0 ? "higher" : "lower"}`;
 }
+function AgreementMetrics({
+  capacityW,
+  price,
+}: {
+  capacityW: number;
+  price: string;
+}) {
+  return (
+    <dl className="powerAgreementMetrics">
+      <div>
+        <dt>Max supply</dt>
+        <dd>{formatWatts(capacityW)}</dd>
+      </div>
+      <div>
+        <dt>Price</dt>
+        <dd>{price}</dd>
+      </div>
+    </dl>
+  );
+}
+
 function DetailValue({
   value,
   caption,
@@ -228,8 +250,8 @@ export default function PowerAgreements({
             key={source.id}
             className="powerAgreement"
           >
-            <Typography component="h4" className="powerAgreementHeading">
-              {source.name} ·{" "}
+            <header className="powerAgreementHeader">
+              <h4>{source.name}</h4>
               <span className="powerAgreementStatus">
                 {expired
                   ? `Expired ${agreementDate(source.endMinute)}`
@@ -239,16 +261,13 @@ export default function PowerAgreements({
                       ? `Scheduled · starts ${agreementDate(source.startMinute)}`
                       : "Active"}
               </span>
-            </Typography>
+            </header>
             {!expired && (
               <>
-                <Typography variant="body2" className="powerAgreementMetrics">
-                  Up to{" "}
-                  <strong>
-                    {formatWatts(source.nominalW * source.deliverability)}
-                  </strong>{" "}
-                  · <strong>{rate(source.priceToday)}</strong>
-                </Typography>
+                <AgreementMetrics
+                  capacityW={source.nominalW * source.deliverability}
+                  price={rate(source.priceToday)}
+                />
                 <Typography variant="body2" color="textSecondary">
                   Through {agreementDate(source.endMinute, true)}
                 </Typography>
@@ -324,13 +343,22 @@ export default function PowerAgreements({
                           0,
                         );
                         return (
-                          <Typography variant="body2" color="textSecondary">
-                            Recorded since{" "}
-                            {agreementDate(account.accountingStartMinute)} ·{" "}
-                            {available > 0
-                              ? `${formatPercent(useful / available, 1)} used`
-                              : "No available minimum"}
-                          </Typography>
+                          <div className="powerAgreementUsage">
+                            <Typography variant="body2" color="textSecondary">
+                              Recorded since{" "}
+                              {agreementDate(account.accountingStartMinute)} ·{" "}
+                              {available > 0
+                                ? `${formatPercent(useful / available, 1)} used`
+                                : "No available minimum"}
+                            </Typography>
+                            {available > 0 && (
+                              <meter
+                                aria-label="Share of available contracted energy used"
+                                value={useful}
+                                max={available}
+                              />
+                            )}
+                          </div>
                         );
                       })()}
                     <Button
@@ -375,17 +403,19 @@ export default function PowerAgreements({
               component="article"
               aria-label={quote.name}
               key={block.id}
-              className="powerAgreement"
+              className="powerAgreement powerAgreementOffer"
             >
-              <Typography component="h4" className="powerAgreementHeading">
-                {quote.name}
-              </Typography>
-              <Typography variant="body2" className="powerAgreementMetrics">
-                Up to <strong>{formatWatts(quote.deliverableW)}</strong> ·{" "}
-                <strong>{rate(quote.priceToday)}</strong>
-              </Typography>
+              <header className="powerAgreementHeader">
+                <h4>{quote.name}</h4>
+                <span className="powerAgreementStatus">Offer</span>
+              </header>
+              <AgreementMetrics
+                capacityW={quote.deliverableW}
+                price={rate(quote.priceToday)}
+              />
               <Button
                 variant="outlined"
+                startIcon={<ConceptIcon concept="buy" decorative />}
                 aria-label={`Review ${quote.name} agreement`}
                 onClick={(event) => {
                   restore.current = event.currentTarget;
@@ -394,7 +424,7 @@ export default function PowerAgreements({
                   setReview(quote);
                 }}
               >
-                Review terms
+                Review
               </Button>
             </Box>
           )
@@ -541,10 +571,6 @@ export default function PowerAgreements({
                   />
                 </Box>
               )}
-              <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
-                Delivery and emissions follow the supplier’s power mix and
-                availability.
-              </Typography>
               <Box className="powerAgreementTerms">
                 <BuildDetails
                   label={
@@ -613,18 +639,13 @@ export default function PowerAgreements({
                       />
                     }
                   />
-                  <BuildDetailRow
-                    label="Forecasted cash impact"
-                    value={
-                      <AgreementForecastDetails
-                        currency={currency}
-                        forecast={forecast}
-                        horizon={
-                          review
-                            ? `over ${years(review.durationYears)}`
-                            : `over ${years(remainingYears)} remaining`
-                        }
-                      />
+                  <AgreementForecastDetails
+                    currency={currency}
+                    forecast={forecast}
+                    horizon={
+                      review
+                        ? `over ${years(review.durationYears)}`
+                        : `over ${years(remainingYears)} remaining`
                     }
                   />
                 </BuildDetails>
