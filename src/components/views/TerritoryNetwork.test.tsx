@@ -166,7 +166,7 @@ function show(game = ready(), width?: number, scale = 1) {
     <Provider store={store}>
       <GameToolMemoryContext.Provider value={memory}>
         <MapWorkspacePanelContext.Provider
-          value={{ open, inspect: onInspect, projectRequested }}
+          value={{ open, returnToMap: onInspect, projectRequested }}
         >
           <GameWorkspaceLayoutContext.Provider
             value={

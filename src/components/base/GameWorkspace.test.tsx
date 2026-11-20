@@ -4,7 +4,7 @@ import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Provider } from "react-redux";
 import { flushSync } from "react-dom";
-import cardReducer, { initialCard } from "../../reducers/Card";
+import cardReducer, { initialCard, navigate } from "../../reducers/Card";
 import gameReducer from "../../reducers/Game";
 import settingsReducer, {
   initialSettings,
@@ -460,7 +460,7 @@ it("fits columns using the chosen scale, with Single tool overriding abundant sp
   });
 });
 
-it.each([360, 1280, 3840])(
+it.each([360, SIDE_TOOL_MIN_WIDTH - 1])(
   "keeps the map mounted beneath exactly one right panel at %ipx",
   async (width) => {
     const app = setup(width, {}, true);
@@ -501,3 +501,55 @@ it.each([360, 1280, 3840])(
     expect(screen.queryAllByRole("region")).toHaveLength(0);
   },
 );
+
+it("keeps desktop map tools open and only closes the selected window", async () => {
+  const app = setup(1280, {}, true);
+  const map = screen.getByTestId("base-view");
+  await app.user.click(app.action("Fleet"));
+  const fleet = screen.getByRole("region", { name: "Fleet" });
+  const notes = within(fleet).getByRole("textbox", { name: "Facility notes" });
+  fireEvent.change(notes, { target: { value: "Inspect this plant" } });
+  await app.user.click(app.action("Agreements"));
+  const agreements = screen.getByRole("region", { name: "Agreements" });
+  expect(agreements).toHaveAttribute("data-map-window-front", "true");
+
+  await app.user.click(notes);
+  expect(notes).toHaveFocus();
+  expect(fleet).toHaveAttribute("data-map-window-front", "true");
+  expect(app.store.getState().card.name).toBe("AGREEMENTS");
+
+  act(() => {
+    app.store.dispatch(
+      navigate({
+        name: "AGREEMENTS",
+        replaceCurrentCard: true,
+        skipBrowserHistory: true,
+      }),
+    );
+  });
+  expect(agreements).toHaveAttribute("data-map-window-front", "true");
+  await app.user.click(notes);
+  act(() => resize(800));
+  expect(notes).toHaveFocus();
+  expect(agreements).not.toBeInTheDocument();
+  act(() => resize(1280));
+  expect(screen.getByRole("region", { name: "Agreements" })).toBeVisible();
+
+  await app.user.click(app.action("Agreements"));
+  expect(screen.getByRole("region", { name: "Agreements" })).toHaveAttribute(
+    "data-map-window-front",
+    "true",
+  );
+  await app.user.click(app.action("Agreements"));
+  expect(
+    screen.queryByRole("region", { name: "Agreements" }),
+  ).not.toBeInTheDocument();
+  expect(fleet).toBeVisible();
+  expect(notes).toHaveValue("Inspect this plant");
+  expect(app.action("Agreements")).toHaveFocus();
+  expect(app.action("Fleet")).toHaveAttribute("aria-expanded", "true");
+  await app.user.keyboard("{Escape}");
+  expect(fleet).not.toBeInTheDocument();
+  expect(app.action("Fleet")).toHaveFocus();
+  expect(map).toBeVisible();
+});

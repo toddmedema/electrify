@@ -134,6 +134,7 @@ interface Props {
   selected?: TerritoryMapTileKey;
   onSelect: (id: TerritoryMapTileKey, inspect?: boolean) => void;
   onCloseInspection?: () => void;
+  inspectionWindow?: "front" | "background";
   onDeselect?: () => void;
   onTileMenu?: (anchor: MapTileMenuTarget) => void;
   projectPlanning?: boolean;
@@ -164,6 +165,7 @@ export default function TerritoryHexMap({
   selected,
   onSelect,
   onCloseInspection,
+  inspectionWindow,
   onDeselect,
   onTileMenu,
   projectPlanning = false,
@@ -230,7 +232,11 @@ export default function TerritoryHexMap({
     const escape = (event: KeyboardEvent) => {
       if (
         event.key !== "Escape" ||
+        event.repeat ||
         event.defaultPrevented ||
+        // The desktop stack owns window dismissal. The map still exits rapid
+        // connection mode when its own inspector has the foreground.
+        (inspectionWindow && (inspectionWindow !== "front" || !buyMode)) ||
         !(onCloseInspection || activeSelected || buyMode) ||
         hasVisibleEscapeOverlay()
       )
@@ -244,10 +250,13 @@ export default function TerritoryHexMap({
         map;
       if (!(event.target instanceof Node) || !workspace.contains(event.target))
         return;
-      if (
+      const tool =
         event.target instanceof Element &&
-        event.target.closest("[data-game-tool], .gameToolPanel") &&
-        !map.contains(event.target)
+        event.target.closest<HTMLElement>("[data-game-tool], .gameToolPanel");
+      if (
+        tool &&
+        !map.contains(event.target) &&
+        tool.dataset.gameTool !== "TILE"
       )
         return;
       for (
@@ -274,7 +283,13 @@ export default function TerritoryHexMap({
     };
     window.addEventListener("keydown", escape, true);
     return () => window.removeEventListener("keydown", escape, true);
-  }, [activeSelected, buyMode, onCloseInspection, onDeselect]);
+  }, [
+    activeSelected,
+    buyMode,
+    inspectionWindow,
+    onCloseInspection,
+    onDeselect,
+  ]);
   const homeTile =
     views.find(({ owned, tile }) => owned && tile.city)?.tile ??
     views.find(({ owned }) => owned)?.tile ??

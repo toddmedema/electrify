@@ -142,6 +142,19 @@
   }
 }
 
+.tileWorkspaceSurface.gameToolPanel {
+  right: auto;
+  max-height: none;
+
+  .tileWorkspaceBody {
+    display: block;
+    overflow: auto;
+    > * {
+      height: auto;
+    }
+  }
+}
+
 @media (max-width: 740px) {
   .tileWorkspaceSurface,
   .tileWorkspaceSurface.tileWorkspaceBuilding {
