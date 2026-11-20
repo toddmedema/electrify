@@ -409,10 +409,10 @@ function Workspace({
                 </div>
               </div>
               <Navigation
-                mapView={baseView}
-                onMapView={(view) => {
+                openMapViews={baseView === "FACILITIES" ? [] : [baseView]}
+                onToggleMapView={(view) => {
                   setRemembered([]);
-                  dispatch(navigate(view));
+                  dispatch(navigate(view === baseView ? "FACILITIES" : view));
                 }}
                 openTools={visible}
                 destination={destination}

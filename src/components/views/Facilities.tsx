@@ -1045,7 +1045,7 @@ export default class Facilities extends React.Component<Props, SelectionState> {
       event.key === "Escape" &&
       !event.defaultPrevented &&
       !this.dragging &&
-      !this.scrollBody?.closest("[inert]") &&
+      !this.scrollBody?.closest('[inert], [data-map-window-front="false"]') &&
       (this.liveSelectionCount() > (multiOnly ? 1 : 0) ||
         this.selectionModeActive())
     ) {
