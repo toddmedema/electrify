@@ -93,7 +93,9 @@ test("an inherited gas steam plant submits exhaust only while generating", async
     active: true,
     producing: true,
   });
-  const close = map.getByRole("button", { name: "Close tile", exact: true });
+  const close = page
+    .locator(".tileWorkspaceSurface")
+    .getByRole("button", { name: "Close tile", exact: true });
   await close.click();
   await reviewScreenshot(map.locator(".territoryMapViewport"), {
     path: info.outputPath("gas-steam-generating.png"),
@@ -122,9 +124,9 @@ for (const theme of ["light", "dark"] as const) {
   test(`city demand legend and plot share the inspector surface · ${theme}`, async ({
     page,
   }, info) => {
-    const map = await start(page, theme);
+    await start(page, theme);
     await selectTerritoryMapTile(page, getTerritoryTile("champlain:city")!);
-    const demand = map.getByRole("region", {
+    const demand = page.locator(".tileWorkspaceSurface").getByRole("region", {
       name: "City demand by use",
       exact: true,
     });
@@ -277,7 +279,7 @@ for (const theme of ["light", "dark"] as const) {
       facility.currentW = facility.peakW / 2;
       facility.paused = false;
     });
-    let map = await continueGame(page);
+    const map = await continueGame(page);
     const before = (await readSavedGame(page))!;
     const facility = before.facilities.find(
       (facility) => facility.name === "Natural Gas CC",
@@ -290,7 +292,8 @@ for (const theme of ["light", "dark"] as const) {
     expect(quote.cost).toBeLessThanOrEqual(currentTick(before)!.cash);
     const tile = getTerritoryTile(facility.tileId!)!;
     await selectTerritoryMapTile(page, tile);
-    let upgrade = map.getByRole("region", {
+    const inspector = page.locator(".tileWorkspaceSurface");
+    const upgrade = inspector.getByRole("region", {
       name: "Capacity upgrade",
       exact: true,
     });
@@ -340,8 +343,7 @@ for (const theme of ["light", "dark"] as const) {
       currentTick(before)!.cash - quote.cost,
       3,
     );
-    await map
-      .locator(".tileWorkspaceSurface")
+    await inspector
       .getByRole("button", { name: "Close tile", exact: true })
       .click();
     const occupant = map.locator(`[data-occupant-tile="${tile.id}"]`);
@@ -368,12 +370,8 @@ for (const theme of ["light", "dark"] as const) {
     });
     await layers.press("Escape");
 
-    map = await continueGame(page);
+    await continueGame(page);
     await selectTerritoryMapTile(page, tile);
-    upgrade = map.getByRole("region", {
-      name: "Capacity upgrade",
-      exact: true,
-    });
     await expect(
       upgrade.getByRole("progressbar", {
         name: "Capacity upgrade construction",
