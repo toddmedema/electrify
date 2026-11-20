@@ -14,6 +14,7 @@ jest.mock("./GameEntry", () => {
   mockLoaded();
   return { runHomeAction: (...args: unknown[]) => mockAction(...args) };
 });
+
 it("hands an install prompt captured before mounting to the full app", async () => {
   mockPendingPrompt.mockReturnValueOnce(new Event("beforeinstallprompt"));
   render(<Home />);
@@ -65,3 +66,36 @@ it("shows crawlable links without the engine and retries a failed first intent",
   await waitFor(() => expect(mockAction).toHaveBeenCalledTimes(2));
   expect(mockAction).toHaveBeenLastCalledWith("onAudioChange", true);
 });
+
+it.each(["loading", "open"])(
+  "retains feedback while an install prompt arrives with the dialog %s",
+  async (phase) => {
+    render(<Home />);
+    fireEvent.click(
+      screen.getByRole("button", { name: "Send feedback", exact: true }),
+    );
+    if (phase === "open")
+      await screen.findByRole("dialog", { name: "Share feedback" });
+    const prompt = new Event("beforeinstallprompt");
+    mockPendingPrompt.mockReturnValue(prompt);
+    try {
+      fireEvent(window, prompt);
+      const message = await screen.findByRole("textbox", {
+        name: "Your feedback",
+      });
+      fireEvent.change(message, { target: { value: "Retain my draft" } });
+      expect(message).toHaveValue("Retain my draft");
+      expect(screen.getByRole("main", { hidden: true })).toHaveAttribute(
+        "aria-busy",
+        "false",
+      );
+      fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+      await waitFor(() =>
+        expect(screen.getByRole("main")).toHaveAttribute("aria-busy", "true"),
+      );
+    } finally {
+      mockPendingPrompt.mockReset();
+      mockLoaded.mockClear();
+    }
+  },
+);

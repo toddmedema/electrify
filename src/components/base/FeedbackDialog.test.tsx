@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { StrictMode } from "react";
 import { submitFeedback } from "../../Feedback";
 import { logEvent } from "../../Globals";
@@ -12,6 +18,7 @@ jest.mock("../../Feedback", () => ({
 
 const submission = jest.mocked(submitFeedback);
 let mockAccountEmail: string | undefined;
+let mockAuthChanged: (user: { email: string } | null) => void;
 
 jest.mock("../../Globals", () => ({
   ...jest.requireActual("../../Globals"),
@@ -19,18 +26,22 @@ jest.mock("../../Globals", () => ({
     get currentUser() {
       return mockAccountEmail ? { email: mockAccountEmail } : null;
     },
-    onAuthStateChanged: () => () => undefined,
+    onAuthStateChanged: (callback: typeof mockAuthChanged) => {
+      mockAuthChanged = callback;
+      return () => undefined;
+    },
   },
   logEvent: jest.fn(),
 }));
 
 const requestId = "6699734c-5897-47e6-b12f-8a853140f46a";
+const randomUUID = jest.fn(() => requestId);
 const originalCrypto = Object.getOwnPropertyDescriptor(globalThis, "crypto");
 
 beforeAll(() => {
   Object.defineProperty(globalThis, "crypto", {
     configurable: true,
-    value: { randomUUID: () => requestId },
+    value: { randomUUID },
   });
 });
 
@@ -47,7 +58,84 @@ beforeEach(() => {
   submission.mockReset();
   jest.mocked(logEvent).mockClear();
   mockAccountEmail = undefined;
+  randomUUID.mockReset().mockReturnValue(requestId);
 });
+
+it.each([
+  [undefined, "player@example.com"],
+  ["player@example.com", "other@example.com"],
+  ["player@example.com", undefined],
+])(
+  "retries the original payload when auth changes from %s to %s",
+  async (before, after) => {
+    mockAccountEmail = before;
+    submission
+      .mockRejectedValueOnce(new Error("response lost"))
+      .mockResolvedValueOnce(undefined);
+    randomUUID.mockReturnValueOnce(requestId).mockReturnValue("new-request");
+    render(
+      <FeedbackDialog context={{ source: "game-menu" }} onClose={jest.fn()} />,
+    );
+    fireEvent.change(screen.getByRole("textbox", { name: "Your feedback" }), {
+      target: { value: "Keep my retry together" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Send feedback" }));
+    await screen.findByRole("alert");
+    act(() => mockAuthChanged(after ? { email: after } : null));
+    fireEvent.click(screen.getByRole("button", { name: "Send feedback" }));
+    await screen.findByRole("button", { name: "Done" });
+    expect(submission.mock.calls[1]).toEqual(submission.mock.calls[0]);
+    expect(randomUUID).toHaveBeenCalledTimes(1);
+  },
+);
+
+it.each(["message", "reply email", "account-email checkbox"])(
+  "creates a new attempt when the player edits the %s",
+  async (field) => {
+    mockAccountEmail =
+      field === "account-email checkbox" ? "player@example.com" : undefined;
+    submission
+      .mockRejectedValueOnce(new Error("offline"))
+      .mockResolvedValueOnce(undefined);
+    randomUUID.mockReturnValueOnce(requestId).mockReturnValue("new-request");
+    render(
+      <FeedbackDialog context={{ source: "game-menu" }} onClose={jest.fn()} />,
+    );
+    fireEvent.change(screen.getByRole("textbox", { name: "Your feedback" }), {
+      target: { value: "Original message" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Send feedback" }));
+    await screen.findByRole("alert");
+    if (field === "account-email checkbox") {
+      fireEvent.click(
+        screen.getByRole("checkbox", {
+          name: "Include account email for a reply (optional)",
+        }),
+      );
+    } else {
+      fireEvent.change(
+        screen.getByRole("textbox", {
+          name:
+            field === "message"
+              ? "Your feedback"
+              : "Email for a reply (optional)",
+        }),
+        {
+          target: {
+            value: field === "message" ? "Edited message" : "reply@example.com",
+          },
+        },
+      );
+    }
+    fireEvent.click(screen.getByRole("button", { name: "Send feedback" }));
+    await screen.findByRole("button", { name: "Done" });
+    expect(submission.mock.calls[1][0]).toMatchObject({
+      requestId: "new-request",
+      message: field === "message" ? "Edited message" : "Original message",
+      replyEmail: field === "reply email" ? "reply@example.com" : "",
+    });
+  },
+);
 
 it("retains a failed draft and reuses the request ID on retry", async () => {
   submission

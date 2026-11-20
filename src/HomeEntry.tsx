@@ -18,6 +18,7 @@ import { showBootstrapFailure } from "./StartupFailure";
 
 export function Home() {
   const actionPending = React.useRef(false);
+  const feedbackActive = React.useRef(false);
   const [failed, setFailed] = React.useState(false);
   const [pending, setPending] = React.useState(false);
   const [FeedbackDialog, setFeedbackDialog] =
@@ -91,7 +92,14 @@ export function Home() {
     },
     [],
   );
+  const closeFeedback = () => {
+    feedbackActive.current = false;
+    setFeedbackDialog(undefined);
+    if (getPendingInstallPrompt()) void run();
+  };
   const openFeedback = async () => {
+    if (actionPending.current || feedbackActive.current) return;
+    feedbackActive.current = true;
     setFailed(false);
     try {
       const { default: Dialog } = await import(
@@ -100,11 +108,12 @@ export function Home() {
       if (!actionPending.current) setFeedbackDialog(() => Dialog);
     } catch {
       setFailed(true);
+      closeFeedback();
     }
   };
   React.useEffect(() => {
     const activateInstall = () => {
-      void run();
+      if (!feedbackActive.current) void run();
     };
     window.addEventListener("beforeinstallprompt", activateInstall);
     if (getPendingInstallPrompt()) activateInstall();
@@ -147,7 +156,7 @@ export function Home() {
                 {FeedbackDialog && (
                   <FeedbackDialog
                     context={{ source: "game-menu" }}
-                    onClose={() => setFeedbackDialog(undefined)}
+                    onClose={closeFeedback}
                   />
                 )}
                 {pending && (

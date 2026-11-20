@@ -311,6 +311,64 @@ for (const entry of ["home", "game"] as const) {
   });
 }
 
+test("installation waits for loading and open homepage feedback to close", async ({
+  page,
+}) => {
+  test.skip(
+    !process.env.E2E_BASE_URL && !process.env.E2E_BUILD_DIR,
+    "Production chunk delivery.",
+  );
+  await page.goto("/");
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const feedbackChunk = "**/static/js/feedback.*.js";
+  await page.route(feedbackChunk, async (route) => {
+    await held;
+    await route.continue();
+  });
+  const requested = page.waitForRequest(feedbackChunk);
+  const gameRequests: string[] = [];
+  page.on("request", (request) => {
+    if (/\/static\/js\/game\.[^/]+\.js$/.test(request.url()))
+      gameRequests.push(request.url());
+  });
+  const prompt = () =>
+    page.evaluate(() => {
+      const event = new Event("beforeinstallprompt", { cancelable: true });
+      Object.assign(event, {
+        prompt: async () => {
+          document.documentElement.dataset.installPrompted = "true";
+        },
+        userChoice: Promise.resolve({ outcome: "accepted", platform: "web" }),
+      });
+      window.dispatchEvent(event);
+    });
+  try {
+    await page
+      .getByRole("button", { name: "Send feedback", exact: true })
+      .click();
+    await requested;
+    await prompt();
+    expect(gameRequests).toEqual([]);
+  } finally {
+    release();
+  }
+  const dialog = page.getByRole("dialog", { name: "Share feedback" });
+  const message = dialog.getByRole("textbox", { name: "Your feedback" });
+  await message.fill("Keep this draft until I close feedback.");
+  await prompt();
+  await expect(message).toHaveValue("Keep this draft until I close feedback.");
+  expect(gameRequests).toEqual([]);
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await page.getByRole("button", { name: "Install app", exact: true }).click();
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-install-prompted",
+    "true",
+  );
+});
+
 test("an installation prompt captured before Home mounts reaches the install control", async ({
   page,
 }) => {

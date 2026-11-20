@@ -16,6 +16,7 @@ import {
   FEEDBACK_EMAIL_LIMIT,
   FEEDBACK_MESSAGE_LIMIT,
   FeedbackContext,
+  FeedbackSubmission,
   submitFeedback,
 } from "../../Feedback";
 import { firebaseAppAuth, logEvent } from "../../Globals";
@@ -42,7 +43,7 @@ export default function FeedbackDialog({
   const [status, setStatus] = useState<"idle" | "sending" | "failed" | "sent">(
     "idle",
   );
-  const attempt = useRef<{ input: string; id: string }>();
+  const attempt = useRef<Omit<FeedbackSubmission, "appVersion">>();
   const trackedOpen = useRef(false);
   const sending = useRef(false);
   const closeButton = useRef<HTMLButtonElement>(null);
@@ -73,16 +74,15 @@ export default function FeedbackDialog({
     setStatus("sending");
     logEvent("feedback_submit", context);
     try {
-      const input = JSON.stringify([text, email]);
-      if (attempt.current?.input !== input) {
-        attempt.current = { input, id: crypto.randomUUID() };
+      if (!attempt.current) {
+        attempt.current = {
+          ...context,
+          requestId: crypto.randomUUID(),
+          message: text,
+          replyEmail: email,
+        };
       }
-      await submitFeedback({
-        ...context,
-        requestId: attempt.current.id,
-        message: text,
-        replyEmail: email,
-      });
+      await submitFeedback(attempt.current);
       setStatus("sent");
     } catch {
       setStatus("failed");
@@ -141,7 +141,10 @@ export default function FeedbackDialog({
               required
               label="Your feedback"
               value={message}
-              onChange={(event) => setMessage(event.target.value)}
+              onChange={(event) => {
+                attempt.current = undefined;
+                setMessage(event.target.value);
+              }}
               multiline
               minRows={3}
               maxRows={6}
@@ -156,7 +159,10 @@ export default function FeedbackDialog({
                 control={
                   <Checkbox
                     checked={includeAccountEmail}
-                    onChange={(_, checked) => setIncludeAccountEmail(checked)}
+                    onChange={(_, checked) => {
+                      attempt.current = undefined;
+                      setIncludeAccountEmail(checked);
+                    }}
                   />
                 }
               />
@@ -166,7 +172,10 @@ export default function FeedbackDialog({
                 type="email"
                 autoComplete="email"
                 value={replyEmail}
-                onChange={(event) => setReplyEmail(event.target.value)}
+                onChange={(event) => {
+                  attempt.current = undefined;
+                  setReplyEmail(event.target.value);
+                }}
                 disabled={busy}
                 slotProps={{ htmlInput: { maxLength: FEEDBACK_EMAIL_LIMIT } }}
               />
