@@ -88,12 +88,12 @@ it off for a decision before delivery.
   same filename. Reviewers sharing a checkout should use separate `--out` directories to avoid
   overwriting each other's PNGs. Each new game draws random weather,
   so compare layout, not figures, between runs. Look at each image once. Do not re-open unchanged
-  shots after later edits. Stop `npm start` when finished; it holds a validation reservation.
+  shots after later edits. Stop `npm start` when finished with the preview.
 
 ## 6. Integration and models
 
-- The integrating agent owns the final `npm run check:ci` (AGENTS.md "Start here" and "Pull
-  requests"), the PR, and its screenshots. Subagents never run the full check.
+- The integrating agent chooses local checks for the combined change, opens the PR with its
+  evidence and screenshots, and reports hosted CI status. Give subagents focused checks.
 - Cheaper model: read-only review, search, mechanical clusters. Stronger model: the brief,
   clustering, dedupe and synthesis, and hard fixes (simulation, saves, cross-file refactors).
 - For "have N agents discuss": ask each for a position of at most 150 words and its top three

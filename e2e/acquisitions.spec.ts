@@ -1314,6 +1314,33 @@ for (const theme of ["light", "dark"] as const) {
       .getByRole("button", { name: "Take loan", exact: true })
       .click();
     await expect(review).toHaveCount(0);
+    const header = page.locator("#appbar");
+    if (!info.project.use.hasTouch) {
+      const award = page.getByRole("button", {
+        name: "Dismiss Power Play achievement notification",
+        exact: true,
+      });
+      await expect(award).toBeVisible();
+      await expect
+        .poll(async () => {
+          const [toast, bar] = await Promise.all([
+            award.boundingBox(),
+            header.boundingBox(),
+          ]);
+          return Math.round(toast!.y - bar!.y - bar!.height);
+        })
+        .toBe(8);
+      const toast = (await award.boundingBox())!;
+      expect(toast.x + toast.width / 2).toBeCloseTo(
+        page.viewportSize()!.width / 2,
+        0,
+      );
+      await reviewScreenshot(page, {
+        path: info.outputPath(`map-achievement-${theme}.png`),
+      });
+      await award.click();
+      await expect(award).toBeHidden();
+    }
     await expect(
       surface.getByRole("button", { name: /^Acquire / }),
     ).toHaveCount(0);
@@ -1377,7 +1404,9 @@ for (const theme of ["light", "dark"] as const) {
     const events = page.locator(".eventLog");
     await openPane(
       events,
-      page.getByRole("button", { name: "Events", exact: true }),
+      desktop
+        ? header.getByRole("button", { name: "Unread events", exact: true })
+        : page.getByRole("button", { name: "Events", exact: true }),
     );
     await expect(
       events.getByText(/^Acquired Ridge Electric: .+ customers$/),

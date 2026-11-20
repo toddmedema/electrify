@@ -73,6 +73,60 @@ test("snackbars clear medium and large floating docks", async ({
   }
 });
 
+test("map notifications follow the full desktop header and clear the compact dock", async ({
+  page,
+}, info) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  if (!info.project.use.hasTouch)
+    await page.setViewportSize({ width: 1199, height: 800 });
+  await startGame(page, "light", 116);
+  const header = page.locator("#appbar");
+  const dock = page.locator("#navfooter");
+  const snackbar = page.locator(".snackbar-above-nav");
+  await page.keyboard.press("Shift+1");
+  await expect(snackbar).toBeVisible();
+
+  if (info.project.use.hasTouch) {
+    const toast = (await snackbar.boundingBox())!;
+    expect(toast.y).toBeGreaterThan(page.viewportSize()!.height / 2);
+    expect(toast.y + toast.height).toBeLessThan((await dock.boundingBox())!.y);
+    return;
+  }
+
+  const expectBelowHeader = async () => {
+    await expect
+      .poll(async () => {
+        const [toast, bar] = await Promise.all([
+          snackbar.boundingBox(),
+          header.boundingBox(),
+        ]);
+        return Math.round(toast!.y - bar!.y - bar!.height);
+      })
+      .toBe(8);
+    const toast = (await snackbar.boundingBox())!;
+    expect(toast.x + toast.width / 2).toBeCloseTo(
+      page.viewportSize()!.width / 2,
+      0,
+    );
+  };
+  await expect(header).not.toHaveClass(/appbarSingleRow/);
+  await expectBelowHeader();
+  await reviewScreenshot(page, {
+    path: info.outputPath("desktop-map-notification.png"),
+  });
+  await snackbar.getByRole("button", { name: "Dismiss notification" }).click();
+  await expect(snackbar).toBeHidden();
+
+  // A wider header folds into a single row. The toast tracks it even over an open tool.
+  await page.setViewportSize({ width: 1600, height: 900 });
+  await expect(header).toHaveClass(/appbarSingleRow/);
+  const insights = page.getByRole("region", { name: "Insights", exact: true });
+  await openPane(insights, dock.getByRole("button", { name: "Insights" }));
+  await page.keyboard.press("Shift+1");
+  await expect(snackbar).toBeVisible();
+  await expectBelowHeader();
+});
+
 for (const side of [false, true]) {
   test(`purchases ${side ? "keep Build open in a side panel" : "close Build in an overlay"}`, async ({
     page,
@@ -1303,11 +1357,11 @@ test("wide screens keep several tools beside the fleet and remember them across 
 });
 
 for (const theme of ["light", "dark"] as const) {
-  test(`desktop controls and side rails switch together at 1300px in ${theme}`, async ({
+  test(`header and desktop speed changes preserve focus in ${theme}`, async ({
     page,
   }, testInfo) => {
     test.skip(testInfo.project.name !== "desktop-chromium");
-    await page.setViewportSize({ width: 1299, height: 800 });
+    await page.setViewportSize({ width: 1199, height: 800 });
     await startGame(page, theme, 111);
     await page.locator("#programsNav").click();
     const rate = page.locator("#rateSlider input");
@@ -1320,7 +1374,7 @@ for (const theme of ["light", "dark"] as const) {
       name: "ultra speed",
       exact: true,
     });
-    for (const width of [1299, 1300, 1440, 1299]) {
+    for (const width of [1199, 1200, 1299, 1300, 1440, 1199]) {
       await page.setViewportSize({ width, height: 800 });
       const desktop = width >= 1300;
       const profit = appbar.getByLabel(/^Monthly profit forecast/);
@@ -1335,12 +1389,15 @@ for (const theme of ["light", "dark"] as const) {
       expect(profitBox!.x).toBeGreaterThan(cashBox!.x + cashBox!.width);
       expect(dateBox!.x).toBeGreaterThan(profitBox!.x + profitBox!.width);
       await expect(stage).toHaveAttribute("data-layout", "side");
-      if (desktop) {
+      if (width >= 1200) {
         await expect(appbar).toHaveClass(/appbarSingleRow/);
+      } else {
+        await expect(appbar).not.toHaveClass(/appbarSingleRow/);
+      }
+      if (desktop) {
         await expect(ultra).toBeInViewport();
         await expectSideRails(page);
       } else {
-        await expect(appbar).not.toHaveClass(/appbarSingleRow/);
         await expect(ultra).toHaveCount(0);
       }
       await expect(rate).toBeFocused();

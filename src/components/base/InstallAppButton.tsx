@@ -150,6 +150,7 @@ export function InstallPromptProvider(props: {
 
 export default function InstallAppButton(props: {
   label?: string;
+  "aria-label"?: string;
   afterMilestone?: boolean;
   showIcon?: boolean;
   iconOnly?: boolean;
@@ -174,7 +175,7 @@ export default function InstallAppButton(props: {
     <>
       {props.iconOnly ? (
         <MenuIconButton
-          label={props.label || "Install app"}
+          label={props["aria-label"] || props.label || "Install app"}
           onClick={onInstall}
         >
           <InstallMobileIcon />
@@ -183,6 +184,7 @@ export default function InstallAppButton(props: {
         <Button
           variant="text"
           color="primary"
+          aria-label={props["aria-label"]}
           startIcon={props.showIcon !== false && <InstallMobileIcon />}
           onClick={onInstall}
         >

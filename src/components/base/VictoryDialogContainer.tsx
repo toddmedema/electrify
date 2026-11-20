@@ -2,7 +2,7 @@ import { connect } from "react-redux";
 import type { AppDispatch } from "../../Store";
 import { delta, quit, start, startLegacyCampaign } from "../../reducers/Game";
 import { runSaveTransition } from "../../SaveSession";
-import { snackbarOpen, victoryClose } from "../../reducers/UI";
+import { feedbackOpen, snackbarOpen, victoryClose } from "../../reducers/UI";
 import { logEvent } from "../../Globals";
 import { AppStateType, VictoryType } from "../../Types";
 import VictoryDialog, { DispatchProps, StateProps } from "./VictoryDialog";
@@ -58,6 +58,9 @@ export const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
           }),
         );
       }
+    },
+    onFeedback: ({ scenarioId, outcome }) => {
+      dispatch(feedbackOpen({ source: "scenario", scenarioId, outcome }));
     },
     onShareFailed: () => {
       dispatch(

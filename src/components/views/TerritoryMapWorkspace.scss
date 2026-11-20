@@ -263,8 +263,9 @@
     inset: 0;
     clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
   }
-  &:focus-visible {
-    outline: none;
+  &[aria-pressed="true"]:focus-visible {
+    // Focusing a tile selects it and draws the dotted hex boundary.
+    outline: none !important;
   }
   &[data-model-hovered="true"] .territoryTileHitArea,
   &:focus-visible .territoryTileHitArea,
@@ -385,10 +386,6 @@
   filter: saturate(0.15);
 }
 .territoryTileTarget {
-  &:focus-visible .territoryTileHitArea {
-    outline: 3px solid var(--focus-ring);
-    outline-offset: -4px;
-  }
   .territoryTilePrice {
     position: absolute;
     pointer-events: auto;

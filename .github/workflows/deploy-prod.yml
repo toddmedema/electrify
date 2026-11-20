@@ -90,7 +90,7 @@ jobs:
           trap 'rm -f "$key"' EXIT
           printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$key"
           GOOGLE_APPLICATION_CREDENTIALS="$key" \
-            npx --yes firebase-tools@15 deploy --only firestore,functions:mailing-list --non-interactive
+            npx --yes firebase-tools@15 deploy --only firestore,functions:mailing-list:subscribeMailingList --non-interactive
 
       - name: Build and deploy to prod
         env:

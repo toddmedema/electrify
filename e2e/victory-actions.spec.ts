@@ -160,6 +160,12 @@ for (const { theme, native, currentRank } of [
     const dialog = page.getByRole("dialog", { name: "Mission complete" });
     await expect(dialog).toBeVisible();
     await expect(
+      dialog.getByText("How was your first scenario?"),
+    ).toBeVisible();
+    await expect(
+      dialog.getByRole("button", { name: "Share feedback" }),
+    ).toBeVisible();
+    await expect(
       dialog.getByRole("region", { name: "Objective results" }),
     ).toHaveCount(0);
     await expect(dialog.locator(".victoryStanding")).not.toContainText(
@@ -510,6 +516,10 @@ test("retrying a failed scenario keeps its difficulty in the game and mission de
     .click();
   const failure = page.getByRole("dialog", { name: "Bankrupt!" });
   await expect(failure).toBeVisible();
+  await expect(failure.getByText("How was your first scenario?")).toBeVisible();
+  await expect(
+    failure.getByRole("button", { name: "Share feedback" }),
+  ).toBeVisible();
   await expect(
     failure.getByRole("button", { name: /Share result|Challenge a friend/ }),
   ).toHaveCount(0);

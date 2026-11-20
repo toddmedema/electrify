@@ -285,7 +285,8 @@ async function expectSharedMenu(page: Page, menu: Locator) {
     exact: true,
   });
   await focused.focus();
-  const color = await focused.evaluate((button) => {
+  await expect(focused).toBeFocused();
+  const expectedColor = await focused.evaluate((button) => {
     const probe = document.createElement("span");
     probe.style.color = getComputedStyle(button).getPropertyValue(
       "--interactive-contrast",
@@ -293,9 +294,9 @@ async function expectSharedMenu(page: Page, menu: Locator) {
     button.appendChild(probe);
     const expected = getComputedStyle(probe).color;
     probe.remove();
-    return { expected, actual: getComputedStyle(button).color };
+    return expected;
   });
-  expect(color.actual).toBe(color.expected);
+  await expect(focused).toHaveCSS("color", expectedColor);
 }
 
 async function expectSharedCaptionSize(
@@ -668,6 +669,36 @@ test("TV couch player toolbars match named warning captions after a plant pause"
     await renderedFontSize(seat.locator(".gridHealth:visible")),
   );
   await expectSharedCaptionSize(page, seat, couch.layout()!.zoom);
+});
+
+test("TV shared menu retains focus while refreshing player captures", async ({
+  context,
+  page,
+}, info) => {
+  test.skip(
+    !["tv-1080-light", "tv-1080-dark"].includes(info.project.name),
+    "Embedded two-company capture in both palettes",
+  );
+  const couch = await createCouchFixture(context, page, { embedded: true });
+  await startCouch(page, couch);
+  await couch.input({ "101": ["menu"] });
+  const menu = page.getByRole("dialog", { name: "Game menu", exact: true });
+  await expect(menu).toBeVisible();
+  await couch.settleCaptures();
+  const focused = menu.getByRole("button", {
+    name: "Return to game",
+    exact: true,
+  });
+  await focused.focus();
+  await expect(focused).toBeFocused();
+  const revision = couch.backdropRevision();
+  await page.evaluate(() =>
+    window.electrifyDesktop!.couchRequest!({ kind: "refresh-overlay" }),
+  );
+  await couch.settleCaptures();
+  await expect.poll(couch.backdropRevision).toBeGreaterThan(revision);
+  await expect(focused).toBeFocused();
+  await expectSharedMenu(page, menu);
 });
 
 test("TV couch player toolbars own speed with edge-to-edge panes and global pause", async ({
