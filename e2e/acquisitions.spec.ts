@@ -2236,7 +2236,7 @@ test("map tile hover and right-click expose the tile's own actions", async ({
 
   await target.press("Shift+F10");
   await menu.getByRole("menuitem", { name: "Inspect", exact: true }).click();
-  const inspector = network.getByRole("dialog", {
+  const inspector = page.getByRole("dialog", {
     name: "Forest",
     exact: true,
   });
