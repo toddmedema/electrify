@@ -1,3 +1,4 @@
+import type { TerrainWeather } from "../../../helpers/TerritoryDisasters";
 import type { MapWeather } from "./MapWeather";
 
 export type Vec3 = readonly [number, number, number];
@@ -9,7 +10,7 @@ export interface MapMesh {
   normals: Float32Array;
   colors: Float32Array;
 }
-export type MapMotion = "rotor" | "steam" | "flow" | "pulse" | "sway";
+export type MapMotion = "rotor" | "steam" | "flow" | "pulse" | "sway" | "hail";
 export interface ModelPart {
   mesh: MapMesh;
   material?:
@@ -48,6 +49,7 @@ export interface MapWireConnection {
   lowY: number;
 }
 export interface TerrainModelOptions {
+  weather?: TerrainWeather;
   /** Zero for untouched land; otherwise reserve at least this width around the center. */
   footprint?: number;
   ports?: readonly number[];
@@ -60,6 +62,7 @@ export type StructureKind =
   | "city-large"
   | "tower"
   | "solar"
+  | "solar-hail-damaged"
   | "wind"
   | "offshore-wind"
   | "airborne-wind"
@@ -80,12 +83,16 @@ export interface MapInstance {
   position: Vec3;
   fog: 0 | 1 | 2 | 3;
   active: boolean;
+  /** Cold-weather deposit on exposed terrain. */
+  frost?: boolean;
   /** Measured generation/discharge only; charging may be active without producing. */
   producing?: boolean;
   /** Fraction of the actual reservoir capacity; undefined when no level is disclosed. */
   waterLevel?: number;
   /** Actual facility identity: changing speed or rebuilding batches must not reset phase. */
   motionKey?: string;
+  /** Active wildfire on this terrain. The renderer joins only neighboring burning cells. */
+  wildfire?: { q: number; r: number; clearance: number; forest: boolean };
 }
 export interface MapLighting {
   direction: Vec3;
@@ -131,6 +138,12 @@ export interface RendererDiagnostics {
   playbackRate: number;
   motionAllowed: boolean;
   visible: boolean;
+  wildfire: {
+    emitters: number;
+    particles: number;
+    drawCalls: number;
+    time: number;
+  };
   /** Optional costly geometry snapshot, requested explicitly by a diagnostic consumer. */
   scene?: readonly RendererSceneInstance[];
 }

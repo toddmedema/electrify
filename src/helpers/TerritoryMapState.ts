@@ -14,6 +14,10 @@ import {
 } from "./TerritoryTiles";
 import { municipalUtilityAt } from "../data/MunicipalUtilities";
 import { createTilePurchaseEligibility } from "./Territories";
+import {
+  readTerritoryDisasters,
+  type TileDisaster,
+} from "./TerritoryDisasters";
 export interface TileFacilityView {
   name: FacilityOperatingType["name"];
   fuel?: FuelNameType;
@@ -43,9 +47,11 @@ export interface TerritoryTileView {
   municipalCity?: TerritoryTileDefinition;
   reserved?: boolean;
   visibilityDistance: 0 | 1 | 2 | 3;
+  disaster?: TileDisaster;
 }
 /** One truthful foreground per cell; peer structures are projected by the shared world. */
 export function territoryTileViews(game: GameType): TerritoryTileView[] {
+  const readDisaster = readTerritoryDisasters(game);
   const owns = createTerritoryTileOwnership(game);
   const connectable = createTilePurchaseEligibility(game, owns);
   const facilities = new Map<
@@ -127,6 +133,7 @@ export function territoryTileViews(game: GameType): TerritoryTileView[] {
       developed: !!ownerKey,
       facility,
       operatingFacility,
+      disaster: readDisaster(tile, operatingFacility),
       connectable: connectable(tile),
       municipalCity:
         municipal?.plant?.tileId === tile.id ? municipal.city : undefined,

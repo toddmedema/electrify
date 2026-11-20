@@ -395,7 +395,9 @@ const migrations: readonly Migration[] = [
   // 20 -> 21: new ordinary tile receipts include connection distance. Existing receipts
   // keep their original parcel pricing and need no new field.
   (save) => save,
-  // 21 -> 22: capacity upgrades can carry a separate loan. Earlier upgrades were paid in cash.
+  // 21 -> 22: territory weather begins on the next monthly check for existing runs.
+  (save) => save,
+  // 22 -> 23: capacity upgrades can carry a separate loan. Earlier upgrades were paid in cash.
   (save) => save,
 ];
 

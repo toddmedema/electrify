@@ -16,6 +16,7 @@ type Props = {
   variant: GeneratorOccupantVariant;
   className?: string;
   active?: boolean;
+  hailDamaged?: boolean;
 };
 
 function WindStructure({ offshore }: { offshore: boolean }) {
@@ -48,7 +49,7 @@ function WindStructure({ offshore }: { offshore: boolean }) {
   );
 }
 
-function SolarOccupant() {
+function SolarOccupant({ damaged }: { damaged: boolean }) {
   return (
     <>
       <path d="M225 325H275V365H225Z" fill="#CFD8DC" />
@@ -62,6 +63,24 @@ function SolarOccupant() {
             stroke="#CFD8DC"
             strokeWidth={6}
           />
+          {damaged && offset > 0 && (
+            <g
+              data-solar-damage=""
+              transform={offset === 65 ? "translate(-37 0)" : "translate(49 0)"}
+              stroke="none"
+            >
+              <path
+                d="M226 162H291L281 174L290 180L270 197H205L216 185L212 177Z"
+                fill="#182b3a"
+              />
+              <path d="M228 163H273L247 177L226 174L212 180Z" fill="#76aaca" />
+              <path
+                d="M282 179L267 196H220L237 187L246 190L255 179Z"
+                fill="#557d9e"
+              />
+              <path d="M234 186L245 179L251 181L243 188Z" fill="#d4ecfa" />
+            </g>
+          )}
           <path d="M135 200H335L365 160H165Z" fill="none" />
         </g>
       ))}
@@ -69,7 +88,10 @@ function SolarOccupant() {
   );
 }
 
-function structure(variant: GeneratorOccupantVariant): React.ReactNode {
+function structure(
+  variant: GeneratorOccupantVariant,
+  hailDamaged: boolean,
+): React.ReactNode {
   switch (variant) {
     case "wind":
     case "offshore-wind":
@@ -94,7 +116,7 @@ function structure(variant: GeneratorOccupantVariant): React.ReactNode {
         </>
       );
     case "solar":
-      return <SolarOccupant />;
+      return <SolarOccupant damaged={hailDamaged} />;
     case "nuclear":
       return (
         <>
@@ -239,6 +261,7 @@ export default function GeneratorOccupant({
   variant,
   className,
   active = false,
+  hailDamaged = false,
 }: Props) {
   const { ref, moving } = useFacilityAnimation(active, variant);
   return (
@@ -256,9 +279,9 @@ export default function GeneratorOccupant({
       strokeLinecap="round"
       strokeLinejoin="round"
     >
-      {structure(variant)}
+      {structure(variant, hailDamaged)}
       <g className="mapFacilityEffect">
-        <WorkingEffects variant={variant} />
+        {!hailDamaged && <WorkingEffects variant={variant} />}
       </g>
     </svg>
   );

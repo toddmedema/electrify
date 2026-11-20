@@ -68,6 +68,7 @@ import {
   formatWattsInUnit,
   formatBuildMonths,
   getWattUnit,
+  formatDays,
 } from "../../helpers/Format";
 import ChartSupplyDemand from "../base/ChartSupplyDemand";
 import { getDispatchOrderedFuels } from "../../helpers/Energy";
@@ -95,7 +96,7 @@ import {
   COAL_REPOWER_OPTIONS,
   coalRepowerInProgress,
 } from "../../helpers/CoalRepower";
-import { dayCount, resilienceName } from "../base/WeatherResilienceText";
+import { resilienceName } from "../base/WeatherResilienceText";
 import TransmissionPanel, { TradingControls } from "./TransmissionPanel";
 import { facilityDisplayName } from "../base/FacilityLabels";
 import { BuyingRuleType, SellingRuleType } from "../../Types";
@@ -140,12 +141,12 @@ function hazardStatusText(status: FacilityHazardStatusType): {
   const longParts = [
     status.label,
     `${available}% available`,
-    days !== undefined ? `${dayCount(days)} to repair` : "",
+    days !== undefined ? `${formatDays(days)} to repair` : "",
   ].filter(Boolean);
   return {
     long: longParts.join(" · "),
     short: [
-      status.hazard === "HAIL" ? "Hail" : "Cold",
+      { HAIL: "Hail", EXTREME_COLD: "Cold", WILDFIRE: "Fire" }[status.hazard],
       `${available}%`,
       days !== undefined ? `${days}d` : "",
     ]
@@ -399,7 +400,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
             : partialUpgrade
               ? `Winterizing ${Math.round(builtFraction * 100)}% · 90% capacity available`
               : resilienceName(installing!.upgrade)}
-          , {dayCount(daysLeft)} left
+          , {formatDays(daysLeft)} left
         </span>
         <span className="facilityStatusShort">
           {repowering ? `Repowering ${repowerPercent}%` : `${daysLeft}d left`}

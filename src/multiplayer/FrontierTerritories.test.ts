@@ -1,5 +1,6 @@
 import { SAVE_SCHEMA_VERSION } from "../SaveSchema";
 import { LAND_TERRITORIES } from "../data/Territories";
+import { VALLEY_BOARD } from "../data/TerritoryTiles";
 import { UTILITY_AREAS } from "../data/UtilityExpansion";
 import { currentTick } from "../helpers/GameSelectors";
 import {
@@ -13,6 +14,7 @@ import {
   getTerritoryTile,
   territoryHexDistance,
 } from "../helpers/TerritoryTiles";
+import { combustibleTile } from "../helpers/TerritoryWildfire";
 import { loadSimData } from "../testing/SimData";
 import { coopSeats } from "../testing/MultiplayerFixtures";
 import {
@@ -85,15 +87,19 @@ const PUBLISHED_SCHEMA_20_RULES =
 const PUBLISHED_SCHEMA_21_RULES =
   "coop-2-fcb444f119733dd48aef5c28f13cb78fc856be210f448c495109eb5987d70476";
 
-// Exact published master bd312988 (same co-op inputs as 97024391 and 39a68b10).
+// Exact published master 095c194f (same co-op inputs as bd312988).
 const PUBLISHED_SCHEMA_21_FEEDBACK_RULES =
   "coop-2-8423406cc7fc00c2bcf0e3cd7b647ad746beabc840cbeb1fc847e15d0389d64c";
+
+const PUBLISHED_SCHEMA_22_RULES =
+  "coop-2-bddc08bd9f13d3fb912bccfa5401e85283039c61e31340ec6a252cd503884fef";
 
 it.each([
   [undefined, undefined],
   [20, PUBLISHED_SCHEMA_20_RULES],
   [21, PUBLISHED_SCHEMA_21_RULES],
   [21, PUBLISHED_SCHEMA_21_FEEDBACK_RULES],
+  [22, PUBLISHED_SCHEMA_22_RULES],
 ])(
   "retains independent parcel claims and cash through schema%s save/resume (%s)",
   (schema, rules) => {
@@ -110,14 +116,30 @@ it.each([
       "parcel-1:city": { seat: "0" },
       "parcel-2:site-0": { seat: "1" },
     });
+    if (schema === 22) {
+      const site = VALLEY_BOARD.find(combustibleTile)!;
+      for (const grid of world.grids)
+        grid.territoryWeather = {
+          dryness: 0.81,
+          fires: [
+            {
+              startsMinute: 0,
+              tiles: [{ tileId: site.id, ignitesMinute: 0 }],
+            },
+          ],
+        };
+    }
     const raw = JSON.parse(JSON.stringify(checkpointWorld(world)));
-    if (schema === 20 || schema === 21) {
+    if (schema !== undefined) {
       raw.gameSchema = schema;
       raw.rules = rules;
     }
     expect(savedMatchSpec(raw)).toEqual(world.spec);
     const restored = restoreWorld(raw, "restored");
     expect(restored.gameSchema).toBe(SAVE_SCHEMA_VERSION);
+    expect(restored.grids.map((grid) => grid.territoryWeather)).toEqual(
+      world.grids.map((grid) => grid.territoryWeather),
+    );
     expect(restored.grids.map((grid) => currentTick(grid)!.cash)).toEqual(
       world.grids.map((grid) => currentTick(grid)!.cash),
     );
@@ -140,6 +162,7 @@ it.each([
   [20, PUBLISHED_SCHEMA_20_RULES],
   [21, PUBLISHED_SCHEMA_21_RULES],
   [21, PUBLISHED_SCHEMA_21_FEEDBACK_RULES],
+  [22, PUBLISHED_SCHEMA_22_RULES],
 ])(
   "rejects unknown schema%s identities and corrupted published grids",
   (schema, rules) => {
@@ -150,7 +173,9 @@ it.each([
     expect(() => savedMatchSpec(raw)).toThrow();
     expect(() => restoreWorld(raw, "unknown")).toThrow();
     raw.rules = rules;
-    raw.grids[0].customerRate = -1;
+    if (schema === 22)
+      raw.grids[0].territoryWeather = { dryness: 1.01, fires: [] };
+    else raw.grids[0].customerRate = -1;
     expect(() => restoreWorld(raw, "corrupt")).toThrow();
   },
 );

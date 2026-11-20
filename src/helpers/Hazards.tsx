@@ -56,6 +56,7 @@ import { exp, sin } from "./Libm";
 
 export const HAIL_DEFINITION_ID = "weather-hail";
 export const COLD_DEFINITION_ID = "weather-cold";
+export const WILDFIRE_DAMAGE_ID = "weather-wildfire-damage";
 
 // A game month is one simulated day standing for a real month, so a repair measured in real days
 // lasts that share of the month's minutes.
@@ -684,10 +685,10 @@ export function applyDefaultResilience(
 
 /** A facility's current weather outage, for its fleet row. */
 export interface FacilityHazardStatusType {
-  hazard: WeatherHazardType;
-  label: "Hail damage" | "Extreme cold";
+  hazard: WeatherHazardType | "WILDFIRE";
+  label: "Hail damage" | "Extreme cold" | "Wildfire damage";
   availableFraction: number; // Product of every active weather multiplier on the facility
-  daysLeft?: number; // Hail repairs only; a cold snap lasts the month
+  daysLeft?: number; // Repairs only; a cold snap lasts the month
   endsMinute: number;
 }
 
@@ -703,7 +704,8 @@ export function activeWeatherHazardsFor(
   return (game.worldEvents?.active ?? []).filter((event) => {
     if (
       event.definitionId !== HAIL_DEFINITION_ID &&
-      event.definitionId !== COLD_DEFINITION_ID
+      event.definitionId !== COLD_DEFINITION_ID &&
+      event.definitionId !== WILDFIRE_DAMAGE_ID
     ) {
       return false;
     }
@@ -738,16 +740,19 @@ export function facilityHazardStatus(
       (event.effects.facilityOutputMultipliersById?.[String(facility.id)] ?? 1),
     1,
   );
-  const hailEvents = events.filter(
-    (event) => event.definitionId === HAIL_DEFINITION_ID,
+  const repairEvents = events.filter(
+    (event) => event.definitionId !== COLD_DEFINITION_ID,
   );
   const endsMinute = Math.max(
-    ...(hailEvents.length ? hailEvents : events).map((e) => e.endsMinute),
+    ...(repairEvents.length ? repairEvents : events).map((e) => e.endsMinute),
   );
-  if (hailEvents.length) {
+  if (repairEvents.length) {
+    const wildfire = repairEvents.some(
+      (event) => event.definitionId === WILDFIRE_DAMAGE_ID,
+    );
     return {
-      hazard: "HAIL",
-      label: "Hail damage",
+      hazard: wildfire ? "WILDFIRE" : "HAIL",
+      label: wildfire ? "Wildfire damage" : "Hail damage",
       availableFraction,
       daysLeft: Math.max(
         1,

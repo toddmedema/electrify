@@ -31,6 +31,7 @@ import {
   formatWattHoursOfPeak,
   formatWatts,
   formatCount,
+  formatDays,
 } from "../../helpers/Format";
 import { facilityColor } from "../../Theme";
 import {
@@ -45,7 +46,6 @@ import { STANDARD_GAS_DESIGN_MIN_TEMP_C } from "../../data/Hazards";
 import { useUnits } from "./UnitsContext";
 import {
   coldPackageEffect,
-  dayCount,
   formatDesignTemperature,
   resilienceName,
 } from "./WeatherResilienceText";
@@ -481,7 +481,7 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
                     {formatPercent(hazard.availableFraction)} available
                     <span className="facilityStatNote">
                       {hazard.daysLeft !== undefined
-                        ? `${dayCount(hazard.daysLeft)} to repair`
+                        ? `${formatDays(hazard.daysLeft)} to repair`
                         : "Until month end"}
                     </span>
                   </span>

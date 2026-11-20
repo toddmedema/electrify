@@ -2,6 +2,7 @@ import { getScenario } from "../data/Scenarios";
 import { STORAGE } from "../data/Facilities";
 import { LOCATIONS, TICK_MINUTES } from "../Constants";
 import { getScenarioLocation } from "../helpers/Locations";
+import { getDateFromMinute, MINUTES_PER_MONTH } from "../helpers/DateTime";
 import { currentTick } from "../helpers/GameSelectors";
 import {
   assignTerritoryTiles,
@@ -18,7 +19,7 @@ import {
   stepWorld,
 } from "./World";
 import type { StorageOperatingType } from "../Types";
-import type { World } from "./Types";
+import type { Command, World } from "./Types";
 function ready(scenarioId = 116) {
   loadSimData(getScenarioLocation(getScenario(scenarioId))!);
   return createWorld(
@@ -214,3 +215,44 @@ it.each([
     expect(JSON.stringify(raw)).toBe(before);
   },
 );
+
+it("blocks the same physical fire front at a retained plains footprint for every seat", () => {
+  const world = ready();
+  // At this seeded summer reading, fire reaches (6,-4) on the unmodified board.
+  const startsMinute = 7 * MINUTES_PER_MONTH;
+  for (const grid of world.grids) {
+    grid.seed = 11;
+    grid.date = getDateFromMinute(
+      startsMinute - TICK_MINUTES,
+      grid.startingYear,
+    );
+    grid.territoryWeather = { dryness: 0.81, fires: [] };
+  }
+  world.grids[0].territoryNetwork!.legacyTiles!.push({
+    id: "champlain:legacy-99",
+    territoryId: "champlain",
+    q: 6,
+    r: -4,
+    terrain: "plains",
+    siteKind: "industrial",
+    maxPeakW: 10e6,
+  });
+  for (const seat of world.seats) {
+    const send = (command: Command) =>
+      applyCommand(world, seat.id, {
+        matchId: world.matchId,
+        epoch: world.epoch,
+        sequence: (world.sequences[seat.id] ?? 0) + 1,
+        command,
+      });
+    expect(send({ kind: "speed", speed: "NORMAL" })).toBeUndefined();
+    expect(send({ kind: "ready" })).toBeUndefined();
+  }
+  stepWorld(world);
+  const fire = world.grids[0].territoryWeather!.fires[0];
+  expect(fire.startsMinute).toBe(startsMinute);
+  expect(fire.tiles.map(({ tileId }) => tileId)).not.toContain("frontier:6:-4");
+  expect(world.grids[1].territoryWeather).toEqual(
+    world.grids[0].territoryWeather,
+  );
+});

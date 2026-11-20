@@ -46,3 +46,26 @@ it("keeps more trees on untouched forest than beside a pylon or a facility", () 
   expect(pylon).toBeGreaterThan(facility);
   expect(facility).toBeGreaterThan(0);
 });
+
+it("shares dry canopy geometry and replaces burned crowns with fewer, shorter snags", () => {
+  const green = getTerrainModel("forest", { adjacentEdges: 1 });
+  const dry = getTerrainModel("forest", { adjacentEdges: 1, weather: "dry" });
+  const parched = getTerrainModel("forest", {
+    adjacentEdges: 1,
+    weather: "parched",
+  });
+  const ash = getTerrainModel("forest", {
+    adjacentEdges: 1,
+    weather: "scorched",
+  });
+  expect(dry.parts[1].mesh.positions).toBe(green.parts[1].mesh.positions);
+  expect(parched.parts[1].mesh.positions).toBe(green.parts[1].mesh.positions);
+  expect(dry.parts[1].mesh.colors).not.toEqual(green.parts[1].mesh.colors);
+  expect(parched.parts[1].mesh.colors).not.toEqual(dry.parts[1].mesh.colors);
+  expect(ash.height).toBeLessThan(green.height);
+  expect(ash.parts).toHaveLength(2);
+  expect(ash.parts[0].mesh.colors).not.toEqual(green.parts[0].mesh.colors);
+  expect(
+    getTerrainModel("forest", { adjacentEdges: 1, weather: "parched" }),
+  ).toBe(parched);
+});

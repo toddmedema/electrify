@@ -32,6 +32,8 @@ import {
 import useFacilityMapMotion, {
   FacilityMapMotionContext,
 } from "../base/useFacilityMapMotion";
+import DisasterArtwork from "../base/territory-art/DisasterArtwork";
+import { FrostGroundPatterns } from "../base/territory-art/FrostGround";
 import FacilityMapStatusArtwork from "../base/FacilityMapStatusArtwork";
 import MapStatusLayers from "../base/MapStatusLayers";
 import { useToolState } from "../base/GameToolMemory";
@@ -70,6 +72,7 @@ const TerritoryScene3D = React.lazy(
   () => import("../base/territory-3d/TerritoryScene3D"),
 );
 const PAN_OVERSCAN = HEX_WIDTH / 4;
+const CAMERA_SHIFT_MS = 180;
 
 class MapSceneBoundary extends React.Component<
   { children: React.ReactNode; onError: () => void },
@@ -328,8 +331,18 @@ export default function TerritoryHexMap({
       bottom: Math.max(...points.map(({ y }) => y)) + margin,
     };
   }, [tiles]);
+  const cameraShiftFrame = React.useRef<number>();
+  const cancelCameraShift = React.useCallback(() => {
+    if (cameraShiftFrame.current === undefined) return;
+    cancelAnimationFrame(cameraShiftFrame.current);
+    cameraShiftFrame.current = undefined;
+  }, []);
   const setCamera = React.useCallback(
-    (update: React.SetStateAction<ReturnType<typeof hexCenter>>) => {
+    (
+      update: React.SetStateAction<ReturnType<typeof hexCenter>>,
+      animate = false,
+    ) => {
+      cancelCameraShift();
       const current = camera.getSnapshot();
       const point = typeof update === "function" ? update(current) : update;
       const next = {
@@ -337,22 +350,48 @@ export default function TerritoryHexMap({
         y: Math.max(mapBounds.top, Math.min(mapBounds.bottom, point.y)),
       };
       if (next.x === current.x && next.y === current.y) return;
-      moveStage(next);
-      if (
-        Math.abs(next.x - cullAnchor.current.x) >= PAN_OVERSCAN ||
-        Math.abs(next.y - cullAnchor.current.y) >= PAN_OVERSCAN
-      ) {
-        cullAnchor.current = next;
-        setCullCenter(next);
+      const move = (position: typeof next) => {
+        moveStage(position);
+        if (
+          Math.abs(position.x - cullAnchor.current.x) >= PAN_OVERSCAN ||
+          Math.abs(position.y - cullAnchor.current.y) >= PAN_OVERSCAN
+        ) {
+          cullAnchor.current = position;
+          setCullCenter(position);
+        }
+        camera.move(position);
+      };
+      if (!animate) {
+        move(next);
+        return;
       }
-      camera.move(next);
+
+      // Advance the stage, scene and hit testing with the same camera coordinates.
+      let start: number | undefined;
+      const shift = (time: number) => {
+        start ??= time;
+        const elapsed = time - start;
+        if (elapsed >= CAMERA_SHIFT_MS) {
+          cameraShiftFrame.current = undefined;
+          move(next);
+          return;
+        }
+        const remaining = 1 - elapsed / CAMERA_SHIFT_MS;
+        const progress = 1 - remaining * remaining * remaining;
+        move({
+          x: current.x + (next.x - current.x) * progress,
+          y: current.y + (next.y - current.y) * progress,
+        });
+        cameraShiftFrame.current = requestAnimationFrame(shift);
+      };
+      cameraShiftFrame.current = requestAnimationFrame(shift);
     },
-    [camera, mapBounds, moveStage],
+    [camera, mapBounds, moveStage, cancelCameraShift],
   );
-  React.useLayoutEffect(
-    () => moveStage(camera.getSnapshot()),
-    [camera, moveStage],
-  );
+  React.useLayoutEffect(() => {
+    moveStage(camera.getSnapshot());
+    return cancelCameraShift;
+  }, [camera, mapBounds, moveStage, cancelCameraShift]);
   const focusAfterNavigation = React.useRef<TerritoryMapTileKey>();
   const pointer = React.useRef<{
     id: number;
@@ -654,14 +693,20 @@ export default function TerritoryHexMap({
         ),
     }));
   };
-  const inspectTile = (tile: TerritoryTileView["tile"]) => {
+  const inspectTile = (
+    tile: TerritoryTileView["tile"],
+    fromPointer: boolean,
+  ) => {
     if ((workspace?.effectiveWidth ?? size.width) <= 740) {
       const point = hexCenter(tile);
       // Leave the selected ground and occupant above the phone's inspection sheet.
-      setCamera({
-        x: point.x,
-        y: point.y + worldHeight * (projectPlanning ? 0.3 : 0.22),
-      });
+      setCamera(
+        {
+          x: point.x,
+          y: point.y + worldHeight * (projectPlanning ? 0.3 : 0.22),
+        },
+        fromPointer && motion.allowed,
+      );
     }
     onSelect(territoryMapTileKey(tile), true);
   };
@@ -680,7 +725,7 @@ export default function TerritoryHexMap({
         }
       : undefined;
   };
-  const activateTile = (key: TerritoryMapTileKey) => {
+  const activateTile = (key: TerritoryMapTileKey, fromPointer = false) => {
     const started = activation.current;
     activation.current = undefined;
     const view = byKey.get(key);
@@ -698,7 +743,7 @@ export default function TerritoryHexMap({
       !projectPlanning
     )
       void purchase(tile.id, expectedQuote);
-    else inspectTile(tile);
+    else inspectTile(tile, fromPointer);
   };
   const pointerTile = (event: {
     target: EventTarget;
@@ -907,6 +952,7 @@ export default function TerritoryHexMap({
         onPointerDown={(event) => {
           const middle = event.button === 1;
           if (event.button !== 0 && !middle) return;
+          cancelCameraShift();
           clearHover();
           if (middle) event.preventDefault();
           const id = middle ? undefined : pointerTile(event);
@@ -1025,7 +1071,7 @@ export default function TerritoryHexMap({
           if (id) {
             event.preventDefault();
             event.stopPropagation();
-            activateTile(id);
+            activateTile(id, true);
           }
         }}
       >
@@ -1079,47 +1125,60 @@ export default function TerritoryHexMap({
               <clipPath id={`${mapId}-terrain-clip`}>
                 <path d={hexFacePath} />
               </clipPath>
+              {!threeDReady && (
+                <FrostGroundPatterns id={`${mapId}-frost-cover`} />
+              )}
             </defs>
             <g aria-hidden="true">
               {!threeDReady &&
-                renderedViews.map(({ tile, owned, visibilityDistance }) => {
-                  const point = hexCenter(tile);
-                  const key = territoryMapTileKey(tile);
-                  return (
-                    <g
-                      key={key}
-                      className="territoryHex territoryFog"
-                      data-visibility-distance={visibilityDistance}
-                      data-terrain={tile.terrain}
-                      data-tile={key}
-                      data-owned={owned}
-                      transform={`translate(${point.x} ${point.y})`}
-                    >
-                      <path className="territoryHexRim" d={hexRimPath} />
-                      <g clipPath={`url(#${mapId}-terrain-clip)`}>
-                        <svg
-                          x={-HEX_WIDTH / 2}
-                          y={-HEX_HEIGHT / 2}
-                          width={HEX_WIDTH}
-                          height={HEX_HEIGHT}
-                          preserveAspectRatio="none"
-                          viewBox="0 0 500 500"
-                        >
-                          <TerrainArtwork
-                            terrain={tile.terrain}
-                            ports={
-                              tile.terrain === "river"
-                                ? riverPorts(tile, tiles)
-                                : undefined
-                            }
-                            className="territoryTerrainArtwork"
-                          />
-                        </svg>
+                renderedViews.map(
+                  ({ tile, owned, visibilityDistance, disaster }) => {
+                    const point = hexCenter(tile);
+                    const key = territoryMapTileKey(tile);
+                    return (
+                      <g
+                        key={key}
+                        className="territoryHex territoryFog"
+                        data-visibility-distance={visibilityDistance}
+                        data-terrain={tile.terrain}
+                        data-ground-condition={disaster?.ground}
+                        data-frost={disaster?.frost}
+                        data-tile={key}
+                        data-owned={owned}
+                        transform={`translate(${point.x} ${point.y})`}
+                      >
+                        <path className="territoryHexRim" d={hexRimPath} />
+                        <g clipPath={`url(#${mapId}-terrain-clip)`}>
+                          <svg
+                            x={-HEX_WIDTH / 2}
+                            y={-HEX_HEIGHT / 2}
+                            width={HEX_WIDTH}
+                            height={HEX_HEIGHT}
+                            preserveAspectRatio="none"
+                            viewBox="0 0 500 500"
+                          >
+                            <TerrainArtwork
+                              terrain={tile.terrain}
+                              weather={disaster?.ground}
+                              frostFill={
+                                disaster?.frost
+                                  ? `url(#${mapId}-frost-cover${(tile.q + tile.r) % 2 ? "-offset" : ""})`
+                                  : undefined
+                              }
+                              ports={
+                                tile.terrain === "river"
+                                  ? riverPorts(tile, tiles)
+                                  : undefined
+                              }
+                              className="territoryTerrainArtwork"
+                            />
+                          </svg>
+                        </g>
+                        <path className="territoryHexSeam" d={hexFacePath} />
                       </g>
-                      <path className="territoryHexSeam" d={hexFacePath} />
-                    </g>
-                  );
-                })}
+                    );
+                  },
+                )}
               {!threeDReady && (
                 <g className="territoryWires" data-wire-count={wires.length}>
                   {wires.map((wire) => (
@@ -1140,6 +1199,31 @@ export default function TerritoryHexMap({
                   ))}
                 </g>
               )}
+              {renderedViews.map(({ tile, disaster, visibilityDistance }) => {
+                if (
+                  threeDReady ||
+                  !disaster ||
+                  (disaster.ground !== "burning" && disaster.hail !== "impact")
+                )
+                  return null;
+                const origin = foregroundOrigin(tile);
+                return (
+                  <svg
+                    key={territoryMapTileKey(tile)}
+                    className="territoryFog territoryDisaster"
+                    data-visibility-distance={visibilityDistance}
+                    data-disaster-tile={territoryMapTileKey(tile)}
+                    x={origin.x}
+                    y={origin.y}
+                    width={HEX_WIDTH}
+                    height={HEX_WIDTH}
+                    viewBox="0 0 500 500"
+                    overflow="visible"
+                  >
+                    <DisasterArtwork {...disaster} />
+                  </svg>
+                );
+              })}
               {[...renderedViews]
                 .sort((a, b) => hexCenter(a.tile).y - hexCenter(b.tile).y)
                 .map((view) => {
@@ -1199,6 +1283,7 @@ export default function TerritoryHexMap({
                             <FacilityMapMotionContext.Provider value={motion}>
                               <FacilityArtwork
                                 facility={facility}
+                                hailDamaged={view.disaster?.hail !== undefined}
                                 className="territoryOccupantArtwork"
                                 active={
                                   operation?.kind === "producing" ||
@@ -1244,7 +1329,7 @@ export default function TerritoryHexMap({
             </g>
           </svg>
           {renderedViews.map((view) => {
-            const { tile, facility } = view,
+            const { tile, facility, disaster } = view,
               key = territoryMapTileKey(tile),
               point = hexCenter(tile);
             const status = facilityMapStatus(view, game.date.minute);
@@ -1280,6 +1365,8 @@ export default function TerritoryHexMap({
                   ? "Open site"
                   : undefined),
               status?.label,
+              disaster?.condition,
+              disaster?.facilityImpact,
               view.owned
                 ? "Your tile"
                 : view.ownerKey
@@ -1298,6 +1385,7 @@ export default function TerritoryHexMap({
                 data-owner={view.ownerKey}
                 data-owned={view.owned}
                 data-terrain={tile.terrain}
+                data-ground-condition={disaster?.ground}
                 data-municipal-city={
                   tile.city && isLandTerritoryId(tile.territoryId)
                 }
@@ -1338,7 +1426,12 @@ export default function TerritoryHexMap({
                 onFocus={(event) => {
                   setRovingId(key);
                   if (key !== selected) onSelect(key);
-                  if (!pointer.current && !touches.current.size) {
+                  // Touch focus can arrive between pointerup and click.
+                  if (
+                    !pointer.current &&
+                    !touches.current.size &&
+                    activation.current?.tileKey !== key
+                  ) {
                     clearHover();
                     revealTile(tile);
                     const source =

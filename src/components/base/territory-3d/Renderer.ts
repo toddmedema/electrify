@@ -1,5 +1,12 @@
 import { HEX_WIDTH } from "../TerritoryHexGeometry";
+import {
+  HAIL_MODEL_KEY,
+  HAILSTONE_LIMIT,
+  hailstoneAge,
+  hailstoneRise,
+} from "./Hailstones";
 import { interpolateMapLighting } from "./Lighting";
+import { createMapProgram } from "./MapProgram";
 import { FacilityMotionClock, MOTION_CYCLE } from "./MotionClock";
 import {
   CAMERA_COS,
@@ -9,6 +16,7 @@ import {
 } from "./Projection";
 import { WATERSHED_LEVEL_OFFSETS, waterLevelOffset } from "./WaterSurface";
 import { rotorAngle } from "./RotorPose";
+import { WildfireParticles } from "./WildfireParticles";
 import type {
   MapCanvas,
   MapFrame,
@@ -43,7 +51,7 @@ uniform vec4 uWeather;
 out vec3 vNormal;
 out vec3 vColor;
 out vec4 vStyle;
-flat out vec3 vMaterial;
+flat out vec4 vMaterial;
 out vec3 vSurfacePosition;
 void main() {
   vec4 world = aTransform * vec4(aPosition, 1.0);
@@ -62,14 +70,14 @@ void main() {
   vNormal = normalize(mat3(aTransform) * aNormal);
   vColor = aColor;
   vStyle = aStyle;
-  vMaterial = aMaterial.xyz;
+  vMaterial = aMaterial;
 }`;
 const FRAGMENT = `#version 300 es
 precision highp float;
 in vec3 vNormal;
 in vec3 vColor;
 in vec4 vStyle;
-flat in vec3 vMaterial;
+flat in vec4 vMaterial;
 in vec3 vSurfacePosition;
 uniform vec3 uLight;
 uniform vec3 uWaterHalfVector;
@@ -80,6 +88,21 @@ uniform float uAmbient;
 uniform float uShadowAlpha;
 uniform bool uShadow;
 out vec4 color;
+float frostGrain(vec2 point) {
+  vec3 hash = fract(vec3(point.xyx) * 0.1031);
+  hash += dot(hash, hash.yzx + 33.33);
+  return fract((hash.x + hash.y) * hash.z);
+}
+float frostPatch(vec2 point) {
+  vec2 cell = floor(point);
+  vec2 edge = fract(point);
+  edge = edge * edge * (3.0 - 2.0 * edge);
+  return mix(
+    mix(frostGrain(cell), frostGrain(cell + vec2(1.0, 0.0)), edge.x),
+    mix(frostGrain(cell + vec2(0.0, 1.0)), frostGrain(cell + 1.0), edge.x),
+    edge.y
+  );
+}
 void main() {
   float fog = vStyle.x;
   if (uShadow) {
@@ -100,6 +123,21 @@ void main() {
     // Snow clings more strongly to shoulders than to steep rock faces.
     base = mix(base, vec3(0.88, 0.93, 0.98),
       cap * smoothstep(0.0, 0.18, uWeather.w) * (0.52 + 0.48 * normal.y));
+  }
+  if (vMaterial.w > 0.0 && normal.y > 0.08) {
+    // Anchor the glaze to the landscape. Bare rock and shaded foliage show through.
+    vec2 surface = vSurfacePosition.xz + vSurfacePosition.y * vec2(0.22, -0.37);
+    float exposure = smoothstep(0.08, 0.76, normal.y);
+    float patches = frostPatch(surface * vec2(7.0, 10.0));
+    vec2 crystal = surface * vec2(28.0, 37.0);
+    float grain = frostGrain(floor(crystal));
+    vec2 facet = fract(crystal) - 0.5;
+    float facetEdge = abs(facet.x + facet.y * 0.7) + abs(facet.y) * 0.55;
+    float crystals = (1.0 - smoothstep(0.18, 0.39, facetEdge))
+      * smoothstep(0.55, 0.86, grain) * smoothstep(0.33, 0.58, patches);
+    float crust = smoothstep(0.42, 0.75, patches + (grain - 0.5) * 0.14);
+    float deposit = exposure * (0.12 + 0.61 * crust + 0.26 * crystals);
+    base = mix(base, vec3(0.88, 0.96, 0.99), deposit);
   }
   vec3 lit = base * (uAmbient + (1.0 - uAmbient) * band);
   lit *= mix(vec3(1.0), uLightColor, 0.65);
@@ -219,6 +257,7 @@ export class MapRenderer {
   private sceneFrame: MapFrame | undefined;
   private sceneInstances: readonly MapInstance[] | undefined;
   private clock = new FacilityMotionClock();
+  private wildfire = new WildfireParticles();
   private raf: number | undefined;
   private state: State = "unavailable";
   private disposed = false;
@@ -293,14 +332,17 @@ export class MapRenderer {
       this.heldLighting = this.paintedLighting;
       this.lightingTransition = undefined;
     }
-    if (!frame.motionAllowed || frame.playbackRate <= 0)
+    if (!frame.motionAllowed || frame.playbackRate <= 0) {
       this.clock.resetTimestamp();
+      this.wildfire.resetTimestamp();
+    }
     if (this.isVisible()) this.schedule();
     else this.cancelFrame();
   }
 
   private prepareScene(frame: MapFrame): void {
-    if (!sameProjection(frame, this.projectionFrame)) {
+    const projectionChanged = !sameProjection(frame, this.projectionFrame);
+    if (projectionChanged) {
       this.projection = projectionMatrix(frame);
       this.projectionFrame = frame;
     }
@@ -313,6 +355,8 @@ export class MapRenderer {
       Math.abs(scene.cameraX - frame.cameraX) >= CAMERA_OVERSCAN ||
       Math.abs(scene.cameraY - frame.cameraY) >= CAMERA_OVERSCAN;
     const instancesChanged = this.sceneInstances !== this.instances;
+    if (projectionChanged || instancesChanged)
+      this.wildfire.prepare(this.instances, frame);
     const waterOnly =
       instancesChanged &&
       !viewChanged &&
@@ -348,6 +392,7 @@ export class MapRenderer {
       playbackRate: this.frame?.playbackRate ?? 0,
       motionAllowed: this.frame?.motionAllowed ?? false,
       visible: this.isVisible(),
+      wildfire: this.wildfire.diagnostics(),
       ...(includeScene ? { scene: this.sceneDiagnostics() } : {}),
     };
   }
@@ -459,30 +504,8 @@ export class MapRenderer {
       const gl = this.gl;
       if (!gl || gl.getContextAttributes()?.stencil === false)
         throw new Error("Map requires WebGL2 with a stencil buffer");
-      const shaders: WebGLShader[] = [];
-      const program = gl.createProgram();
-      if (!program) throw new Error("Map program allocation failed");
+      const program = createMapProgram(gl, VERTEX, FRAGMENT);
       this.program = program;
-      try {
-        for (const [type, source] of [
-          [gl.VERTEX_SHADER, VERTEX],
-          [gl.FRAGMENT_SHADER, FRAGMENT],
-        ] as const) {
-          const shader = gl.createShader(type);
-          if (!shader) throw new Error("Map shader allocation failed");
-          shaders.push(shader);
-          gl.shaderSource(shader, source);
-          gl.compileShader(shader);
-          if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS))
-            throw new Error("Map shader compilation failed");
-          gl.attachShader(program, shader);
-        }
-        gl.linkProgram(program);
-        if (!gl.getProgramParameter(program, gl.LINK_STATUS))
-          throw new Error("Map program link failed");
-      } finally {
-        for (const shader of shaders) gl.deleteShader(shader);
-      }
       this.uniforms = {
         projection: gl.getUniformLocation(program, "uProjection"),
         light: gl.getUniformLocation(program, "uLight"),
@@ -536,12 +559,12 @@ export class MapRenderer {
     );
   }
 
-  private canAnimate(): boolean {
+  private allowsMotion(): boolean {
     return (
       this.isVisible() &&
       !!this.frame?.motionAllowed &&
-      (this.frame?.playbackRate ?? 0) > 0 &&
-      this.motionItems.length > 0
+      Number.isFinite(this.frame?.playbackRate) &&
+      (this.frame?.playbackRate ?? 0) > 0
     );
   }
 
@@ -562,6 +585,7 @@ export class MapRenderer {
       this.canvas.ownerDocument.defaultView?.cancelAnimationFrame(this.raf);
     this.raf = undefined;
     this.clock.resetTimestamp();
+    this.wildfire.resetTimestamp();
   }
 
   private animate = (timestamp: number): void => {
@@ -574,15 +598,18 @@ export class MapRenderer {
       // prepare the scene that will actually be submitted, including on reveal.
       this.prepareScene(this.frame!);
       if (this.state !== "ready") return;
-      const moving = this.canAnimate();
+      const allowed = this.allowsMotion();
+      const moving = allowed && this.motionItems.length > 0;
       this.clock.tick(timestamp, moving, this.frame!.playbackRate);
+      this.wildfire.tick(timestamp, allowed, this.frame!.playbackRate);
       this.draw(moving, this.lightAt(timestamp));
       this.frameMs = performance.now() - started;
       if (this.readyPending) {
         this.readyPending = false;
         this.setState("ready");
       }
-      if (moving || this.lightingTransition) this.schedule();
+      if (moving || (allowed && this.wildfire.count) || this.lightingTransition)
+        this.schedule();
     } catch (_error) {
       this.fail();
     }
@@ -672,8 +699,10 @@ export class MapRenderer {
         previous.position !== next.position ||
         previous.fog !== next.fog ||
         previous.active !== next.active ||
+        previous.frost !== next.frost ||
         previous.producing !== next.producing ||
-        previous.motionKey !== next.motionKey
+        previous.motionKey !== next.motionKey ||
+        previous.wildfire !== next.wildfire
       )
         return false;
       if (previous.waterLevel !== next.waterLevel) updates.set(next.id, next);
@@ -710,12 +739,18 @@ export class MapRenderer {
     this.motionItems = [];
     this.waterBatches = [];
     this.sceneInstanceCount = 0;
+    let hailBudget: number =
+      frame.width <= 600 ? HAILSTONE_LIMIT.mobile : HAILSTONE_LIMIT.desktop;
     try {
       for (const instance of this.instances) {
+        const hail = instance.model.key === HAIL_MODEL_KEY;
+        if (hail && hailBudget === 0) continue;
         const center = projectPoint(instance.position, frame);
         // Include offscreen tall models and the maximum three-tile shadow reach.
         const margin =
-          ((3 + Math.max(instance.model.height, instance.model.footprint)) *
+          ((hail
+            ? 1.25
+            : 3 + Math.max(instance.model.height, instance.model.footprint)) *
             HEX_WIDTH +
             CAMERA_OVERSCAN) *
           Math.abs(frame.scale);
@@ -728,6 +763,10 @@ export class MapRenderer {
           continue;
         this.sceneInstanceCount++;
         for (const part of instance.model.parts) {
+          if (hail) {
+            if (hailBudget === 0) break;
+            hailBudget--;
+          }
           if (part.hideWhenInactive && !instance.active) continue;
           let mesh = this.meshes.get(part.mesh);
           if (!mesh) {
@@ -826,6 +865,15 @@ export class MapRenderer {
       case "pulse":
         glow = (1 + Math.sin(phase)) * 0.07;
         break;
+      case "hail": {
+        const age = hailstoneAge(phase);
+        angle = phase * 5;
+        rise = hailstoneRise(age);
+        // Shrink into the air on spawning and into the ground after settling.
+        scale = Math.min(1, age / 0.05, (1 - age) / 0.125);
+        glow = 0.26;
+        break;
+      }
     }
     const c = Math.cos(angle) * scale,
       s = Math.sin(angle) * scale;
@@ -871,6 +919,7 @@ export class MapRenderer {
             : part.material === "map-border"
               ? 4
               : 0;
+    pose[23] = instance.frost && pose[22] !== 1 && pose[22] !== 2 ? 1 : 0;
   }
 
   private draw(moving: boolean, lighting: MapLighting): void {
@@ -953,6 +1002,12 @@ export class MapRenderer {
     gl.uniform1i(uniforms.shadow, 0);
     gl.disable(gl.STENCIL_TEST);
     this.drawBatches(this.passes.transparent);
+    if (this.wildfire.count) {
+      if (this.wildfire.draw(gl, frame, this.projection))
+        this.bufferUpdates = true;
+      this.drawCalls++;
+      this.triangles += this.wildfire.count * 2;
+    }
     gl.depthMask(true);
     gl.disable(gl.BLEND);
     gl.bindVertexArray(null);
@@ -1027,6 +1082,7 @@ export class MapRenderer {
   }
 
   private releaseResources(deleteGpu: boolean): void {
+    this.wildfire.release(this.gl, deleteGpu);
     if (deleteGpu) {
       for (const mesh of this.meshes.values()) this.deleteMesh(mesh);
       if (this.program) this.gl?.deleteProgram(this.program);

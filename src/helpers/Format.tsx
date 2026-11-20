@@ -475,6 +475,11 @@ function percentWithPrecision(
 }
 
 /** Round once to whole numbers or the significant-digit cap, whichever is coarser. */
+/** A whole-day count such as "9 days" or "1 day". */
+export function formatDays(days: number): string {
+  return `${days} ${days === 1 ? "day" : "days"}`;
+}
+
 export function formatCount(
   n: number,
   significantDigits: 2 | 3 = 3,
