@@ -61,7 +61,11 @@ library path and executes `Electrify.bin`; it preserves Steam's library path and
 Players using Steam on NixOS should not need `programs.steam.extraPackages = [ nspr nss ];`.
 Packaging verifies the manifest and runs `ldd` against the executable and bundled libraries,
 including proof that NSS/NSPR resolve inside the depot. CI's packaged Linux launch uses this wrapper.
-This is intended for Steam's Linux environment, not direct execution outside NixOS's Steam FHS.
+
+To run the unpacked Linux x64 build directly on NixOS, use `./Electrify` from the extracted depot.
+The launcher uses `nix-build` and your configured `<nixpkgs>` to prepare an FHS runtime with
+Electron's desktop libraries, including GLib. The first launch may download runtime dependencies.
+Launches from Steam and existing Nixpkgs FHS environments use the runtime they already provide.
 
 Steam builds select X11/XWayland before enabling the overlay's in-process GPU. This supports
 [Steam's overlay](https://github.com/ValveSoftware/steam-for-linux/issues/8020) and avoids the
