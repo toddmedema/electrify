@@ -2,6 +2,7 @@ import cloneDeep from "lodash.clonedeep";
 import { VALLEY_BOARD, isValleyBoardTile } from "../data/TerritoryTiles";
 import { municipalPlantAt } from "../data/MunicipalUtilities";
 import { createGame } from "../testing/Simulator";
+import { retiredValleyOpeningProgress } from "../testing/SaveTestHelpers";
 import { currentTick } from "./GameSelectors";
 import { territoryTileViews } from "./TerritoryMapState";
 import { purchaseTile, tilePrice, tilePurchaseQuote } from "./Territories";
@@ -236,9 +237,7 @@ it("serves each city with a utility and sells both sites from the plant border",
 
   const saved = JSON.parse(JSON.stringify(serializeSave(purchased)));
   saved.schemaVersion = 19;
-  saved.game.objectiveProgress = {
-    rulesDigest: "legacy-retirement-objectives",
-  };
+  saved.game.objectiveProgress = retiredValleyOpeningProgress(purchased);
   const restored = parseSave(saved)!.game;
   expect(restored.objectiveProgress!.entries.map(({ id }) => id)).toEqual([
     "acquire-neighbor",
