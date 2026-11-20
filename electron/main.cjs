@@ -29,6 +29,7 @@ const { CouchViews } = require("./couch.cjs");
 const { LocalCoopSaveStore } = require("./local-coop-storage.cjs");
 const { SteamService } = require("./steam.cjs");
 const { reserveSteamOverlayHotkey } = require("./steam-overlay.cjs");
+const { submitFeedback } = require("./feedback.cjs");
 const { openExternalUrl } = require("./external.cjs");
 const { SteamMultiplayer, lobbyFromArgs } = require("./steam-multiplayer.cjs");
 const { ModStore } = require("./mods.cjs");
@@ -380,6 +381,7 @@ handle("desktop:resume-ready", (generation) => {
 });
 handle("desktop:display", applyDisplay);
 handle("desktop:quit", requestQuit);
+handle("desktop:feedback", (input) => submitFeedback(input));
 handle("desktop:read-saves", () => saves.read());
 handle("desktop:write-saves", (library, sync) => saves.write(library, sync));
 handle("desktop:leaderboard", async (input) => {

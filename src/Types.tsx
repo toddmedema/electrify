@@ -1781,6 +1781,7 @@ export interface DialogType {
   // A milestone worth celebrating, where offering to install the app lands well
   offerInstall?: boolean;
   tutorialComplete?: boolean;
+  allTutorialsCompleted?: boolean;
   open: boolean;
 }
 
@@ -1957,6 +1958,7 @@ export interface CoopSelectionType {
   hasSaves?: boolean;
 }
 export interface UIType {
+  feedback?: import("./Feedback").FeedbackContext;
   /** Set while this player chooses a co-op game together with their lobby. */
   coop?: CoopSelectionType;
   // A one-time guide requested by the data center launch; never part of a save or scenario.

@@ -55,6 +55,7 @@ beforeEach(() => {
     ...originalMatchMedia(query),
     matches:
       ((query.includes("min-width:1300px") ||
+        query.includes("min-width:1200px") ||
         query.includes("min-width:700px")) &&
         mockDesktop) ||
       (query.includes("min-width:600px") && mockPaneLayout),
@@ -214,19 +215,12 @@ describe("GameAppBar", () => {
     renderAppBar();
     expect(screen.getByLabelText(/^Monthly profit forecast/)).toBeVisible();
   });
-  it("opens the feedback form directly from the game menu", () => {
-    const open = jest.spyOn(window, "open").mockImplementation(() => null);
-    try {
-      renderAppBar();
-      fireEvent.click(screen.getByRole("button", { name: "menu" }));
-      fireEvent.click(screen.getByRole("menuitem", { name: "Send feedback" }));
-      expect(open).toHaveBeenCalledWith(
-        "https://forms.gle/nSpkVzcFcXMQMMgb9",
-        "_system",
-      );
-    } finally {
-      open.mockRestore();
-    }
+  it("opens inline feedback with the active scenario from the game menu", () => {
+    const onFeedback = jest.fn();
+    renderAppBar({ onFeedback });
+    fireEvent.click(screen.getByRole("button", { name: "menu" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Share feedback" }));
+    expect(onFeedback).toHaveBeenCalledWith(101);
   });
 
   it("keeps the menu action named consistently while announcing offline saving", () => {
@@ -405,7 +399,7 @@ describe("GameAppBar", () => {
     window.matchMedia = (query: string) =>
       ({
         ...matchMedia(query),
-        matches: query.includes("min-width:1300px"),
+        matches: query.includes("min-width:1200px"),
       }) as MediaQueryList;
     try {
       const { container } = renderAppBar();
@@ -442,7 +436,7 @@ describe("GameAppBar", () => {
         ({
           ...matchMedia(query),
           get matches() {
-            return query.includes("min-width:1300px") && wide;
+            return /min-width:1[23]00px/.test(query) && wide;
           },
           addListener: (listener: () => void) => listeners.add(listener),
           removeListener: (listener: () => void) => listeners.delete(listener),

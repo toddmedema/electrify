@@ -17,6 +17,7 @@ import {
   victoryOpen,
   victoryClose,
 } from "./GameActions";
+import type { FeedbackContext } from "../Feedback";
 import { navigate, navigateBack } from "./Card";
 
 // Re-evaluate layout-dependent tutorial gates even while the simulation is paused.
@@ -42,6 +43,12 @@ export const uiSlice = createSlice({
   name: "ui",
   initialState: initialUI,
   reducers: {
+    feedbackOpen: (state, action: PayloadAction<FeedbackContext>) => {
+      state.feedback = action.payload;
+    },
+    feedbackClose: (state) => {
+      delete state.feedback;
+    },
     // Highlight the new row without expanding it: its controls are rarely the next decision
     facilityPurchased: (state, action: PayloadAction<number>) => {
       state.arrivingFacilityId = action.payload;
@@ -136,6 +143,7 @@ export const uiSlice = createSlice({
       state.victory = null;
     });
     builder.addCase(quit, (state) => {
+      delete state.feedback;
       delete state.dataCenterGuideRequested;
       delete state.arrivingFacilityId;
       state.snackbar = { ...initialUI.snackbar };
@@ -191,6 +199,8 @@ export {
   victoryClose,
 } from "./GameActions";
 export const {
+  feedbackOpen,
+  feedbackClose,
   facilityPurchased,
   acknowledgeFacilityArrival,
   requestEvidence,

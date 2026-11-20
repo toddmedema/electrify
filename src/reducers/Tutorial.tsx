@@ -1,6 +1,6 @@
 import type { Middleware } from "@reduxjs/toolkit";
 import { createSelector } from "@reduxjs/toolkit";
-import { recordScenarioPlayed } from "../LocalStorage";
+import { getPlayedScenarioIds, recordScenarioPlayed } from "../LocalStorage";
 import { getNextTutorial, getScenario, TUTORIALS } from "../data/Scenarios";
 import type { AppDispatch } from "../Store";
 import {
@@ -134,20 +134,23 @@ export function changeTutorialStep(
   // Finishing the walkthrough is what counts as doing the tutorial - the rest of the
   // scenario is optional practice, and requiring it meant a checkmark cost up to four
   // minutes of watching the sim run
+  const played = getPlayedScenarioIds();
+  const allTutorialsCompleted =
+    !played.includes(scenarioId) &&
+    TUTORIALS.every(({ id }) => id === scenarioId || played.includes(id));
   recordScenarioPlayed(scenarioId);
   const scenario = getScenario(scenarioId);
   dispatch({ type: "game/completeTutorial" });
-  dispatch(
-    tutorialCompleteDialog({
-      scenarioId,
-      title: scenario?.endTitle || "Tutorial complete!",
-      message:
-        leaving?.capstone?.successMessage ||
-        scenario?.endMessage ||
-        "Walkthrough complete.",
-      nextTutorial: getNextTutorial(scenarioId),
-    }),
-  );
+  const completion = tutorialCompleteDialog({
+    scenarioId,
+    title: scenario?.endTitle || "Tutorial complete!",
+    message:
+      leaving?.capstone?.successMessage ||
+      scenario?.endMessage ||
+      "Walkthrough complete.",
+    nextTutorial: getNextTutorial(scenarioId),
+  });
+  dispatch(dialogOpen({ ...completion.payload, allTutorialsCompleted }));
 }
 
 function matchesActionGate(
