@@ -1,4 +1,6 @@
+import { TUTORIALS } from "../src/data/Scenarios";
 import { reviewScreenshot } from "./review-screenshot";
+import { expectDialogActionsOnOneRow } from "./dialog-layout";
 import { expect, test, type Page, type TestInfo } from "./fixtures";
 
 async function completeMission(
@@ -133,6 +135,24 @@ async function completeMission(
     page.getByRole("button", { name: "Resume Coal", exact: true }),
   ).toHaveCount(0);
 
+  if (!keepPlaying) {
+    // Mission 1 can be the last tutorial the player completes.
+    await page.evaluate(
+      (ids) => {
+        localStorage.setItem(
+          "plays",
+          JSON.stringify({
+            plays: ids.map((scenarioId) => ({
+              scenarioId,
+              date: new Date().toISOString(),
+              timesPlayed: 1,
+            })),
+          }),
+        );
+      },
+      TUTORIALS.slice(1).map(({ id }) => id),
+    );
+  }
   await page.getByRole("button", { name: "fast speed" }).click();
   await expect(
     page.getByRole("heading", { name: /Mission complete!/ }),
@@ -152,36 +172,37 @@ async function completeMission(
   await expect(
     completionDialog.getByText("Build a generator", { exact: true }),
   ).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: "Next tutorial" }),
-  ).toBeVisible();
-  await expect(page.getByRole("button", { name: "Main menu" })).toBeVisible();
-  const primary = page.getByRole("button", { name: "Next tutorial" });
-  const secondary = page.getByRole("button", { name: "Main menu" });
-  const primaryBox = (await primary.boundingBox())!;
-  const secondaryBox = (await secondary.boundingBox())!;
-  if (testInfo.project.name.startsWith("mobile-")) {
-    expect(primaryBox.y).toBeGreaterThanOrEqual(
-      secondaryBox.y + secondaryBox.height,
-    );
-  } else {
-    expect(primaryBox.y).toBeCloseTo(secondaryBox.y, 0);
-    expect(primaryBox.x).toBeGreaterThanOrEqual(
-      secondaryBox.x + secondaryBox.width,
-    );
-  }
-  await expect(
-    completionDialog.getByRole("button", { name: "Keep playing" }),
-  ).toBeVisible();
+  const primary = completionDialog.getByRole("button", {
+    name: "Next tutorial",
+    exact: true,
+  });
+  const secondary = completionDialog.getByRole("button", {
+    name: "Menu",
+    exact: true,
+  });
+  await expect(primary).toBeVisible();
+  await expect(secondary).toBeVisible();
+  const practice = completionDialog.getByRole("button", {
+    name: /^(Practice|Keep playing)$/,
+  });
+  await expect(practice).toBeVisible();
+  await expectDialogActionsOnOneRow(
+    completionDialog,
+    4,
+    testInfo.project.use.hasTouch ? 44 : 40,
+  );
   await expect(primary).toBeFocused();
+  const shareFeedback = completionDialog.getByRole("button", {
+    name: "Feedback",
+    exact: true,
+  });
   if (keepPlaying) {
+    await expect(shareFeedback).toHaveClass(/MuiButton-text/);
     const fleetBefore = await page.locator(".facilityRow").allTextContents();
     const clock = page.locator("#appbar [data-game-minute]");
     const minuteBefore = await clock.getAttribute("data-game-minute");
     expect(minuteBefore).toMatch(/^\d+$/);
-    await completionDialog
-      .getByRole("button", { name: "Keep playing" })
-      .click();
+    await practice.click();
     await expect(completionDialog).toBeHidden();
     await expect(page.locator(".tutorialHud")).toHaveCount(0);
     expect(await page.locator(".facilityRow").allTextContents()).toEqual(
@@ -197,6 +218,48 @@ async function completeMission(
       .toBeGreaterThan(Number(minuteBefore));
     return;
   }
+  await expect(shareFeedback).toHaveClass(/MuiButton-outlined/);
+  await shareFeedback.click();
+  const feedback = page.getByRole("dialog", { name: "Share feedback" });
+  await expect(
+    feedback.getByRole("textbox", { name: "Your feedback" }),
+  ).toBeFocused();
+  let received: unknown;
+  await page.route("**/submitGameFeedback", async (route) => {
+    const headers = {
+      "Access-Control-Allow-Origin": new URL(page.url()).origin,
+      "Access-Control-Allow-Methods": "POST",
+      "Access-Control-Allow-Headers": "Content-Type",
+    };
+    if (route.request().method() === "OPTIONS") {
+      await route.fulfill({ status: 204, headers });
+      return;
+    }
+    received = route.request().postDataJSON();
+    await route.fulfill({ headers, json: { result: { sent: true } } });
+  });
+  await feedback
+    .getByRole("textbox", { name: "Your feedback" })
+    .fill("The capstone helped.");
+  await reviewScreenshot(feedback, {
+    path: testInfo.outputPath("share-feedback.png"),
+    animations: "disabled",
+  });
+  await feedback.getByRole("button", { name: "Send feedback" }).click();
+  await expect(feedback.getByRole("status")).toHaveText(
+    "Thanks for sharing your feedback.",
+  );
+  expect(received).toMatchObject({
+    data: {
+      source: "tutorial",
+      scenarioId: TUTORIALS[0].id,
+      message: "The capstone helped.",
+      replyEmail: "",
+    },
+  });
+  await expect(feedback.getByRole("button", { name: "Done" })).toBeFocused();
+  await feedback.getByRole("button", { name: "Done" }).click();
+  await expect(shareFeedback).toBeFocused();
   await primary.click();
   await expect(
     page.getByRole("region", { name: "Step 1 of 10", exact: true }),

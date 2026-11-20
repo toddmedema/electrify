@@ -1,8 +1,15 @@
 const path = require("node:path");
 const { fork, spawnSync } = require("node:child_process");
-const { acquireLease, reservePort, groupAlive } = require("./coordination");
+const {
+  acquireLease,
+  reservePort,
+  groupAlive,
+  inheritedLease,
+  heavySlots,
+  coordinationRoot,
+} = require("./coordination");
 const { setTimeout: delay } = require("node:timers/promises");
-const { claimTask } = require("./task");
+const { claimTask, taskId } = require("./task");
 const { checkAssets } = require("../check-assets");
 
 const generators = [
@@ -53,6 +60,7 @@ async function runCommand(command, args = [], options = {}) {
   const local = env.GITHUB_ACTIONS !== "true" && !diagnostic;
   const abort = new AbortController();
   let child, lease, portLease;
+  let previewRoot;
   let stopped;
   let escalation;
   // Only the outermost wrapper starts a process group. Nested npm wrappers stay
@@ -91,27 +99,39 @@ async function runCommand(command, args = [], options = {}) {
   process.on("SIGTERM", onTerm);
   try {
     if (local) {
-      claimTask(root);
-      lease = await acquireLease("heavy", {
-        slots: 3,
-        root: options.coordinationRoot,
+      claimTask(root, taskId(env));
+      const scheduling = {
+        slots: heavySlots,
+        root: path.resolve(options.coordinationRoot || coordinationRoot()),
         inherited: env.ELECTRIFY_DEVELOPMENT_LEASE,
         signal: abort.signal,
-        onWait: (owner) =>
+        command: [command, ...args].join(" "),
+        task: taskId(env),
+        cwd: root,
+        onWait: (owner, position) =>
           console.error(
-            `Waiting for validation in ${owner.cwd} (PID ${owner.pid}); running suites remain uninterrupted.`,
+            `Waiting for validation (queue position ${position}); ${owner.command || "work"} in ${owner.cwd} (PID ${owner.pid}). Use npm run task -- queue for details.`,
           ),
-      });
-      env.ELECTRIFY_DEVELOPMENT_LEASE = lease.token;
-      if (!lease.inherited) {
-        // An install mismatch is detected before any generator, build or test.
-        require("./preflight").checkDependencies(root);
-        checkAssets(root);
-        env.ELECTRIFY_COORDINATION_WAIT_MS = String(lease.waitMs);
-        console.error(
-          `Validation slot acquired after ${(lease.waitMs / 1000).toFixed(1)}s.`,
-        );
+      };
+      lease = inheritedLease("heavy", scheduling);
+      if (!lease) {
+        // Fail an unusable checkout before taking a place in the queue.
+        const { checkDependencies } = require("./preflight");
+        checkDependencies(root);
+        delete env.ELECTRIFY_DEVELOPMENT_LEASE;
+        delete env.ELECTRIFY_DEVELOPMENT_GROUP;
+        if (command === "start") previewRoot = scheduling.root;
+        else {
+          lease = await acquireLease("heavy", scheduling);
+          if (lease.queued) checkDependencies(root);
+          checkAssets(root);
+          env.ELECTRIFY_COORDINATION_WAIT_MS = String(lease.waitMs);
+          console.error(
+            `Validation slot acquired after ${(lease.waitMs / 1000).toFixed(1)}s.`,
+          );
+        }
       }
+      if (lease) env.ELECTRIFY_DEVELOPMENT_LEASE = lease.token;
       const needsPort =
         descriptor.port &&
         (command !== "check" ||
@@ -120,10 +140,17 @@ async function runCommand(command, args = [], options = {}) {
             .some(({ id }) =>
               ["browser", "multiplayer", "steam-input"].includes(id),
             ));
-      if (needsPort && !lease.inherited) {
+      if (needsPort && !lease?.inherited) {
         portLease = await reservePort(
           env.E2E_PORT || (command === "start" ? env.PORT : undefined),
-          { root: options.coordinationRoot, signal: abort.signal },
+          {
+            root: scheduling.root,
+            signal: abort.signal,
+            task: scheduling.task,
+            cwd: root,
+            command: scheduling.command,
+            preview: !!previewRoot,
+          },
         );
         env.E2E_PORT = String(portLease.port);
         console.error(`Reserved E2E_PORT=${portLease.port}`);
@@ -164,12 +191,22 @@ async function runCommand(command, args = [], options = {}) {
       child.once("close", (code, signal) =>
         resolve(code ?? (signal === "SIGINT" ? 130 : 1)),
       );
-      child.send({
+      const invocation = {
         entry: path.join(root, descriptor.entry),
         args,
         prepare,
-        ownsGroup,
-      });
+      };
+      // The preview process owns compilation leases. Its supervisor owns the
+      // port and command group for the entire lifetime of the HTTP server.
+      const launch = previewRoot
+        ? {
+            entry: require.resolve("./preview"),
+            args: [
+              JSON.stringify({ ...invocation, coordinationRoot: previewRoot }),
+            ],
+          }
+        : invocation;
+      child.send({ ...launch, ownsGroup });
     });
     return stopped ? (stopped === "SIGINT" ? 130 : 143) : result;
   } finally {

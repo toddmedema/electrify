@@ -105,6 +105,9 @@ export interface DesktopBridge {
   ): () => void;
   readyAfterResume?(generation: number): Promise<void>;
   onInput?(callback: (frame: DesktopInputFrame) => void): () => void;
+  submitFeedback?(
+    input: import("./Feedback").FeedbackSubmission,
+  ): Promise<void>;
   showTextInput?(input: DesktopTextInput): Promise<DesktopTextInputResult>;
   multiplayerRequest?(
     input: import("./multiplayer/Native").NativeRequest,

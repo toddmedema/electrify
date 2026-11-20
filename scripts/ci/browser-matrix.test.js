@@ -80,6 +80,7 @@ test("production browser shards run the complete PR matrix exactly once", () => 
       "modal-layout.spec.ts",
       "wildfire-scenario.spec.ts",
       "acquisitions.spec.ts",
+      "tutorial-capstone.spec.ts",
       "campaign.spec.ts",
       "difficulty-unlocks.spec.ts",
       "toggle-borders.spec.ts",

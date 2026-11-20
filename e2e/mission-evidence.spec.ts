@@ -29,6 +29,39 @@ async function waitForSave(page: Page) {
   await expect.poll(async () => Boolean(await readSavedGame(page))).toBe(true);
 }
 
+async function expectWideHeaderRow(page: Page, mission: string, alert: string) {
+  const toolbar = page.locator("#topbar");
+  const row = [
+    toolbar.locator(".gameStatusValue").first(),
+    toolbar.getByLabel(/^Monthly profit forecast/),
+    toolbar.locator("[data-game-minute]"),
+    toolbar.getByText(/^NOW /),
+    toolbar.getByText(/^FUTURE /),
+    toolbar.getByText(mission, { exact: true }),
+    toolbar.getByRole("button", { name: /months? left$/ }),
+    toolbar.getByRole("button", { name: alert, exact: true }),
+    toolbar.getByRole("group", { name: "game speed" }),
+  ];
+  // The bar folds at 1200 px and gains the fifth speed at 1300 px.
+  for (const width of [1200, 1280, 1300, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    const boxes = [];
+    for (const item of row) {
+      await expect(item).toBeInViewport({ ratio: 1 });
+      boxes.push((await item.boundingBox())!);
+    }
+    const middle = boxes[0].y + boxes[0].height / 2;
+    for (const [index, box] of boxes.entries()) {
+      expect(box.y).toBeLessThan(middle);
+      expect(box.y + box.height).toBeGreaterThan(middle);
+      if (index > 0) {
+        const previous = boxes[index - 1];
+        expect(box.x).toBeGreaterThanOrEqual(previous.x + previous.width);
+      }
+    }
+  }
+}
+
 async function range(page: Page) {
   return page
     .locator(".insights:visible .accessibleChart [role=img]")
@@ -44,9 +77,6 @@ for (const theme of ["light", "dark"]) {
   }, info) => {
     test.skip(!reviewProjects.has(info.project.name));
     await page.emulateMedia({ reducedMotion: "reduce" });
-    // Wide windows show the two tinted readouts together inside the top bar.
-    if (info.project.name === "desktop-chromium")
-      await page.setViewportSize({ width: 1440, height: 900 });
     await page.addInitScript((mode) => {
       localStorage.setItem("theme", mode);
       localStorage.setItem("audioEnabled", "false");
@@ -63,6 +93,15 @@ for (const theme of ["light", "dark"]) {
         tick.supplyW = tick.demandW;
         tick.reserveW = tick.demandW * 0.05;
       }
+      save.game.eventLog = [
+        {
+          id: 1,
+          kind: "WORLD_EVENT",
+          label: "Jan 2026",
+          message: "Regional power market update",
+        },
+      ];
+      save.game.eventLogReadThroughId = 0;
     });
     await page.reload();
     await page.getByRole("button", { name: "Continue", exact: true }).click();
@@ -81,6 +120,10 @@ for (const theme of ["light", "dark"]) {
     expect(await risk.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(
       true,
     );
+    if (info.project.name === "desktop-chromium") {
+      await expectWideHeaderRow(page, "Acquire a competitor", "Unread events");
+      await page.setViewportSize({ width: 1280, height: 900 });
+    }
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth - innerWidth,
@@ -112,6 +155,40 @@ for (const theme of ["light", "dark"]) {
     await expect(
       page.locator('.insights:visible [data-layer="supplyDemand"]'),
     ).toBeVisible();
+
+    if (info.project.name === "desktop-chromium") {
+      await editSavedGame(page, (save) => {
+        const game = save.game;
+        const minute = game.date.minute;
+        const later = game.timeline.find((tick) => tick.minute > minute);
+        if (!later)
+          throw new Error("Expected a future tick in the grid sample");
+        later.supplyW = later.demandW * 0.9;
+        game.worldEvents.active.push({
+          key: "header-storm-damage",
+          definitionId: "header-storm-damage",
+          title: "Storm damage",
+          message: "Storm damage disrupts the regional grid.",
+          importance: "CRITICAL",
+          startsMinute: minute,
+          endsMinute: minute + 1440,
+          attributes: {},
+          effects: {},
+        });
+      });
+      await page.reload();
+      await page.getByRole("button", { name: "Continue", exact: true }).click();
+      await expect(grid.getByText(/^FUTURE Short at/)).toBeVisible();
+      await expectWideHeaderRow(
+        page,
+        "Active: Storm damage",
+        "Ongoing emergency, unread events",
+      );
+      await reviewScreenshot(page.locator("#appbar:visible"), {
+        path: info.outputPath(`emergency-header-${theme}.png`),
+        animations: "disabled",
+      });
+    }
   });
 
   test(`compact mission tracker opens scenario info and stays usable during blackouts in ${theme}`, async ({

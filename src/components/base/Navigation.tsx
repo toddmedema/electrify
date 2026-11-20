@@ -84,6 +84,69 @@ export function gameToolForCard(card: CardNameType): GameTool | undefined {
     : GAME_TOOLS.find((tool) => tool.id === card)?.id;
 }
 
+function useEventStatus(enabled = true) {
+  const unreadEvents = useAppSelector(
+    (state) =>
+      enabled &&
+      (state.game.eventLog[0]?.id || 0) > state.game.eventLogReadThroughId,
+  );
+  const emergency = useAppSelector(
+    (state) =>
+      enabled &&
+      state.game.worldEvents.active.some(
+        (event) =>
+          event.importance === "CRITICAL" &&
+          event.startsMinute <= state.game.date.minute &&
+          event.endsMinute > state.game.date.minute,
+      ),
+  );
+  return { unreadEvents, emergency };
+}
+
+export const MapEventStatus = React.memo(function MapEventStatus({
+  open,
+  onToggle,
+}: {
+  open: boolean;
+  onToggle: (tool: "EVENTS") => void;
+}) {
+  const tutorialActions = useAppSelector(selectTutorialActions);
+  const { unreadEvents, emergency } = useEventStatus(
+    !tutorialActions || tutorialActions.includes("EVENTS"),
+  );
+  const [focused, setFocused] = React.useState(false);
+  // An emergency can end on a tick. Keep the focused control usable until the
+  // player tabs away or opens Events.
+  if (!emergency && !unreadEvents && !focused) return null;
+
+  const label = emergency
+    ? "Emergency"
+    : unreadEvents
+      ? "Unread events"
+      : "Event history";
+  return (
+    <Button
+      className="mapEventStatus"
+      data-emergency={emergency}
+      aria-label={
+        emergency
+          ? unreadEvents
+            ? "Ongoing emergency, unread events"
+            : "Ongoing emergency"
+          : label
+      }
+      aria-expanded={open}
+      aria-controls={open ? "tool-EVENTS" : undefined}
+      onClick={() => onToggle("EVENTS")}
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
+      startIcon={emergency ? <ErrorIcon /> : <HistoryIcon />}
+    >
+      {label}
+    </Button>
+  );
+});
+
 /** Expose the same accessible tool actions in card navigation and the pane workspace.
  * Couch docks can hide visible labels without changing names, tutorial restrictions or callbacks. */
 export default function Navigation({
@@ -93,10 +156,12 @@ export default function Navigation({
   mapView = "FACILITIES",
   onMapView,
   showMapBuild = false,
+  showEventStatus = true,
 }: {
   mapView?: MapWorkspaceView;
   onMapView?: (view: MapWorkspaceView) => void;
   showMapBuild?: boolean;
+  showEventStatus?: boolean;
   openTools?: GameTool[];
   onToggle?: (tool: GameTool) => void;
   destination?: (tool: GameTool) => CardNameType;
@@ -104,18 +169,7 @@ export default function Navigation({
   const dispatch = useAppDispatch();
   const controllerInput = useControllerInput();
   const cardName = useAppSelector(selectCardName);
-  const unreadEvents = useAppSelector(
-    (state) =>
-      (state.game.eventLog[0]?.id || 0) > state.game.eventLogReadThroughId,
-  );
-  const emergency = useAppSelector((state) =>
-    state.game.worldEvents.active.some(
-      (event) =>
-        event.importance === "CRITICAL" &&
-        event.startsMinute <= state.game.date.minute &&
-        event.endsMinute > state.game.date.minute,
-    ),
-  );
+  const { unreadEvents, emergency } = useEventStatus(showEventStatus);
   // Tutorials have no term goal or score to show; their own HUD carries the objective
   const hasScenarioDetails = useAppSelector(
     (state) =>

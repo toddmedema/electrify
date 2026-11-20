@@ -1,6 +1,5 @@
 import { useMoney } from "./CurrencyContext";
 import { useGameWorkspaceLayout } from "./GameWorkspaceContext";
-import { FEEDBACK_URL } from "../../CommunityLinks";
 import type { AppDispatch } from "../../Store";
 import * as React from "react";
 import {
@@ -15,7 +14,6 @@ import { formatNumber } from "../../helpers/Format";
 import { navigate } from "../../reducers/Card";
 import {
   isBigScreen,
-  openWindow,
   SIDE_LAYOUT_MEDIA,
   SIDE_LAYOUT_MIN_WIDTH,
 } from "../../Globals";
@@ -35,7 +33,11 @@ import { useOnline } from "./OnlineStatus";
 import { buildSpeedOptions, sharedClockSpeedProps } from "./SpeedControls";
 import MissionSummary from "./MissionSummary";
 import { EvidenceRequestType, EvidenceTargetType } from "../../Types";
-import { acknowledgeEvidence, manualHelpOpen } from "../../reducers/UI";
+import {
+  acknowledgeEvidence,
+  feedbackOpen,
+  manualHelpOpen,
+} from "../../reducers/UI";
 import { MANUAL_ENTRY } from "./ManualEntries";
 import { openEvidence } from "../../helpers/Evidence";
 import {
@@ -100,18 +102,23 @@ export interface DispatchProps {
   onSavedGames?: () => void;
   onSpeedChange: (speed: SpeedType) => void;
   onNextTutorial: (scenarioId: number) => void;
+  onFeedback?: (scenarioId: number) => void;
   onQuit: () => void;
 }
 
-export interface Props extends StateProps, DispatchProps {}
+export interface Props extends StateProps, DispatchProps {
+  eventStatus?: React.ReactNode;
+}
 
 /** Status controls retain focus when the row moves between header layouts. */
 const RESTORABLE_STATUS_FOCUS = [
   ".gridHealthSummary",
   ".missionRiskButton",
   ".missionSummaryMonths",
+  ".mapEventStatus",
 ];
 const NO_ACTIVE_EVENTS: ActiveEventGroupType[] = [];
+const SINGLE_ROW_MIN_WIDTH = 1200;
 
 /**
  * This month's profit, bit-identical to deriveExpandedSummary(summarizeTimeline(...)).profit
@@ -174,10 +181,13 @@ export function GameAppBar(props: Props) {
   const bigScreen = isBigScreen();
   // Tracks resizes even while paused, when the bar otherwise has no reason to re-render.
   const workspace = useGameWorkspaceLayout();
-  const wideRow = useMediaQuery(SIDE_LAYOUT_MEDIA, { noSsr: true });
+  const wideRow = useMediaQuery(`(min-width:${SINGLE_ROW_MIN_WIDTH}px)`, {
+    noSsr: true,
+  });
+  const wideSpeedControls = useMediaQuery(SIDE_LAYOUT_MEDIA, { noSsr: true });
   const singleRow = workspace
     ? workspace.layout === "side" &&
-      workspace.effectiveWidth >= SIDE_LAYOUT_MIN_WIDTH
+      workspace.effectiveWidth >= SINGLE_ROW_MIN_WIDTH
     : wideRow;
   const monthlyProfit = React.useMemo(
     () => monthProfit(game.timeline, date.monthsElapsed),
@@ -231,11 +241,10 @@ export function GameAppBar(props: Props) {
    * built once per actual change and handed back as the same elements. React then skips them
    * entirely on the frames in between, which is where a good quarter of the frame budget went.
    */
-  // Layout and speed availability must use the same media-query snapshot during resize.
   const desktop = workspace
     ? workspace.effectiveWidth >= SIDE_LAYOUT_MIN_WIDTH ||
       !!window.electrifyCouch
-    : singleRow;
+    : wideSpeedControls;
   const speedDisabled = !!multiplayer?.ending;
   const speedOptions = React.useMemo(
     () =>
@@ -286,9 +295,16 @@ export function GameAppBar(props: Props) {
         {!inMultiplayer && (
           <MenuItem onClick={props.onSavedGames}>Saved games</MenuItem>
         )}
-        <MenuItem onClick={() => openWindow(FEEDBACK_URL)}>
-          Send feedback
-        </MenuItem>
+        {props.onFeedback && (
+          <MenuItem
+            onClick={() => {
+              handleMenuClose();
+              props.onFeedback?.(game.scenarioId);
+            }}
+          >
+            Share feedback
+          </MenuItem>
+        )}
         {/* Mid-tutorial, the thing a player who has seen enough wants is the next tutorial,
               not the scenario list they would have to go back through to reach it */}
         {nextTutorial && (
@@ -324,6 +340,8 @@ export function GameAppBar(props: Props) {
       props.onAchievements,
       steamAvailable,
       onNextTutorial,
+      props.onFeedback,
+      game.scenarioId,
       handleQuit,
       nextTutorial,
       isTutorial,
@@ -363,6 +381,7 @@ export function GameAppBar(props: Props) {
           onEvidence={props.onEvidence}
         />
       )}
+      {props.eventStatus}
     </div>
   );
 
@@ -520,6 +539,9 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
     },
     onSpeedChange: (speed: SpeedType) => {
       dispatch(setSpeed(speed));
+    },
+    onFeedback: (scenarioId) => {
+      dispatch(feedbackOpen({ source: "game-menu", scenarioId }));
     },
     onNextTutorial: (scenarioId: number) => {
       void runSaveTransition(() => startTutorial(dispatch, scenarioId));

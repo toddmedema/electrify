@@ -631,7 +631,7 @@ async function main(argv = process.argv.slice(2)) {
     process.exitCode = 1;
   }
   console.error(
-    `\n${report.source.changedDuringRun ? `Invalidated ${results.length}` : failed.length ? `Failed ${failed.length}/${results.length}` : `Passed ${results.length}`} gates in ${((Date.now() - started) / 1000).toFixed(0)}s.${full ? "" : " Partial check only."}${full && !selected.some((step) => step.ci) ? " Run npm run check:ci before pushing a pull request." : ""}`,
+    `\n${report.source.changedDuringRun ? `Invalidated ${results.length}` : failed.length ? `Failed ${failed.length}/${results.length}` : `Passed ${results.length}`} gates in ${((Date.now() - started) / 1000).toFixed(0)}s.${full ? "" : " Partial check only."}${full && !selected.some((step) => step.ci) ? " Choose any additional local gates for the changed behavior and callers; hosted CI runs the full suite." : ""}`,
   );
   if (full && selected.some((step) => step.ci))
     console.error(

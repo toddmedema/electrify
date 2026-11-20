@@ -8,7 +8,6 @@ import { tickState } from "../reducers/Game";
 import { GameType } from "../Types";
 import { GameAppBar } from "../components/base/GameAppBar";
 import MissionSummary from "../components/base/MissionSummary";
-import { SIDE_LAYOUT_MEDIA, SIDE_LAYOUT_MIN_WIDTH } from "../Globals";
 import { TICK_MINUTES } from "../Constants";
 import { currentTick } from "../helpers/GameSelectors";
 import * as missionStatus from "../helpers/MissionStatus";
@@ -49,10 +48,13 @@ it("reports app bar and mission render cost at phone and desktop widths", () => 
         configurable: true,
         value: width,
       });
-      window.matchMedia = (query) => ({
-        ...originalMatchMedia(query),
-        matches: query === SIDE_LAYOUT_MEDIA && width >= SIDE_LAYOUT_MIN_WIDTH,
-      });
+      window.matchMedia = (query) => {
+        const minWidth = query.match(/min-width:\s*(\d+)px/);
+        return {
+          ...originalMatchMedia(query),
+          matches: minWidth !== null && width >= Number(minWidth[1]),
+        };
+      };
       window.dispatchEvent(new Event("resize"));
       for (const [name, game] of [
         ["fresh", fresh],
