@@ -1,3 +1,4 @@
+import userEvent from "@testing-library/user-event";
 import * as React from "react";
 import cloneDeep from "lodash.clonedeep";
 import {
@@ -507,9 +508,7 @@ it("shows purchased cities as customers rather than build destinations", async (
     return true;
   });
   inspect(target.id);
-  fireEvent.click(
-    within(surface()).getByRole("button", { name: /^Acquire Vergennes/ }),
-  );
+  fireEvent.click(within(surface()).getByRole("button", { name: "Acquire" }));
   const review = screen.getByRole("dialog", { name: /^Acquire Vergennes/ });
   expect(within(review).getByText("Sites transferred")).toBeVisible();
   fireEvent.click(within(review).getByText("Plants & purchased power"));
@@ -521,7 +520,7 @@ it("shows purchased cities as customers rather than build destinations", async (
   expect(within(review).getByText("Vergennes service area")).toBeVisible();
   expect(within(review).getByText("Plant site")).toBeVisible();
   expect(ownsTerritoryTile(store.getState().game, target)).toBe(false);
-  fireEvent.click(within(review).getByRole("button", { name: "Confirm" }));
+  fireEvent.click(within(review).getByRole("button", { name: "Pay cash" }));
   await waitFor(() => expect(review).not.toBeInTheDocument());
   expect(
     screen.queryByRole("dialog", { name: "Acquisition unavailable" }),
@@ -541,7 +540,9 @@ it("shows the same grown customer count before and after a delayed utility acqui
   const quote = acquisitionQuote(game, "ridge-electric")!;
   const app = show(game);
   inspect("ridge-electric:city");
-  expect(surface()).toHaveTextContent("Customers to connect");
+  expect(
+    within(surface()).getByText("Customers", { exact: true }),
+  ).toBeVisible();
   expect(surface()).toHaveTextContent(formatCount(quote.customers));
   act(() =>
     app.store.dispatch(
@@ -717,8 +718,8 @@ it("uses the persistent desktop rail for Build and owned empty tiles, preselecti
     within(surface()).queryByRole("tab", { name: "Generators" }),
   ).not.toBeInTheDocument();
   expect(
-    within(surface()).getByRole("region", { name: "Terrain modifiers" }),
-  ).toBeVisible();
+    within(surface()).queryByRole("region", { name: "Terrain modifiers" }),
+  ).not.toBeInTheDocument();
   const wind = within(rail).getByRole("button", {
     name: "Choose sites for Wind",
   });
@@ -950,19 +951,20 @@ it("takes facility actions from the map and confirms a sale of the same facility
   expect(facilityActions.onSell).toHaveBeenCalledWith(facility.id);
 });
 
-it("focuses the site inspector after a keyboard user chooses Inspect", async () => {
+it("keeps inspection available through primary activation", async () => {
   show();
   const tile = screen.getByRole("button", {
     name: "Inspect green-uplands:site-1",
   });
   act(() => tile.focus());
   fireEvent.contextMenu(tile);
-  fireEvent.click(
-    within(screen.getByRole("menu", { name: "Tile actions" })).getByRole(
-      "menuitem",
-      { name: "Inspect" },
-    ),
-  );
+  const actions = within(screen.getByRole("menu", { name: "Tile actions" }));
+  expect(actions.getByRole("menuitem", { name: /^Connect/ })).toBeVisible();
+  expect(
+    actions.queryByRole("menuitem", { name: "Inspect" }),
+  ).not.toBeInTheDocument();
+  await userEvent.keyboard("{Escape}");
+  fireEvent.click(tile);
   expect(await screen.findByRole("heading", { name: "Forest" })).toHaveFocus();
 });
 

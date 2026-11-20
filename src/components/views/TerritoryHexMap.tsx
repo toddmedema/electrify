@@ -1386,17 +1386,14 @@ export default function TerritoryHexMap({
               : undefined;
             const tileLabel = [
               cityLabel ?? TERRAIN_LABELS[tile.terrain],
-              facility?.name ??
-                (!tile.city && !view.reserved && !hover.reason
-                  ? "Open site"
-                  : undefined),
-              status?.label,
+              facility?.name,
+              status?.kind === "unknown" ? undefined : status?.label,
               disaster?.condition,
               disaster?.facilityImpact,
               view.owned
-                ? "Your tile"
+                ? undefined
                 : view.ownerKey
-                  ? `Owned by ${view.ownerName}`
+                  ? view.ownerName
                   : "Unconnected",
               hover.reason,
             ]

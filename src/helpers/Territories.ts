@@ -523,11 +523,12 @@ export function transferTerritorySites(
     NonNullable<ReturnType<typeof tilePurchaseQuote>>,
     "price" | "customers" | "purchases"
   >,
+  cashDue = quote.price,
 ): boolean {
   const now = currentTick(game);
-  if (!now || now.cash < quote.price || !game.territoryNetwork) return false;
+  if (!now || now.cash < cashDue || !game.territoryNetwork) return false;
   const oldProgramCustomers = programCustomers(game);
-  now.cash -= quote.price;
+  now.cash -= cashDue;
   now.customers += quote.customers;
   (game.territoryNetwork.tilePurchases ??= []).push(
     ...quote.purchases.map((site) => ({ ...site, minute: game.date.minute })),
@@ -552,7 +553,7 @@ export function transferTerritorySites(
       if (!buildoutComplete(program.adoption)) delete program.completedMonth;
     }
   }
-  // Land is a non-depreciating capital asset; exchanging cash for it preserves net worth.
+  // Land is a non-depreciating asset. A financed purchase covers the rest of the price with debt.
   return true;
 }
 

@@ -1484,9 +1484,7 @@ it.each([false, true])(
     await user.click(
       screen.getByRole("button", { name: `Inspect ${target.id}` }),
     );
-    const acquire = screen.getByRole("button", {
-      name: "Acquire Ridge Electric",
-    });
+    const acquire = screen.getByRole("button", { name: "Acquire" });
     expect(acquire).toBeEnabled();
     expect(game.transmission!.lines).toEqual([]);
     await user.click(acquire);

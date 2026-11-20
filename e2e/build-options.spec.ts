@@ -243,7 +243,7 @@ for (const theme of ["light", "dark"] as const) {
         const tile = page.locator(
           '[data-map-target="champlain:site-12"][data-owned="true"]',
         );
-        await expect(tile).toContainText("Open site");
+        await expect(tile).toBeVisible();
         await tile.focus();
         await tile.press("Enter");
         const rail = page.getByRole("complementary", {

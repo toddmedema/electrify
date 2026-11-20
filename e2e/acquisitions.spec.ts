@@ -1264,9 +1264,7 @@ for (const theme of ["light", "dark"] as const) {
     await inspectTile(page, lake);
     await expect(
       network.locator(`[data-map-target="${lake.id}"]`),
-    ).toHaveAccessibleDescription(
-      /Lake · Your tile · No compatible technology/,
-    );
+    ).toHaveAccessibleDescription(/Lake · No compatible technology/);
     await expect(surface).toHaveAccessibleName("Lake");
     await expect(surface).not.toContainText(
       /Hydropower site\. Plant construction|Build a generator or storage on this tile|general construction|300MW max/,
@@ -1322,10 +1320,31 @@ for (const theme of ["light", "dark"] as const) {
     const surface = await inspectTile(page, ridge);
     await expect(surface).toContainText("Estimated demand");
     await expectCityDemand(surface);
+    await expect(surface.getByText("Customers", { exact: true })).toBeVisible();
     const acquire = surface.getByRole("button", {
-      name: "Acquire Ridge Electric",
+      name: "Acquire",
       exact: true,
     });
+    const body = surface.locator(".tileWorkspaceBody");
+    await expect(acquire).toBeInViewport({ ratio: 1 });
+    expect(
+      await body.evaluate((node) => node.scrollHeight - node.clientHeight),
+    ).toBeLessThanOrEqual(1);
+    await reviewScreenshot(surface, {
+      path: info.outputPath(`city-inspector-${theme}.png`),
+      animations: "disabled",
+      scale: "css",
+    });
+    const viewport = page.viewportSize()!;
+    await page.setViewportSize({ ...viewport, height: 360 });
+    await expect
+      .poll(() =>
+        body.evaluate((node) => node.scrollHeight - node.clientHeight),
+      )
+      .toBeGreaterThan(0);
+    await acquire.scrollIntoViewIfNeeded();
+    await expect(acquire).toBeInViewport({ ratio: 1 });
+    await page.setViewportSize(viewport);
     await acquire.click();
     const review = page.getByRole("dialog", {
       name: "Acquire Ridge Electric?",
@@ -1373,7 +1392,7 @@ for (const theme of ["light", "dark"] as const) {
       await expect(award).toBeHidden();
     }
     await expect(
-      surface.getByRole("button", { name: /^Acquire / }),
+      surface.getByRole("button", { name: "Acquire", exact: true }),
     ).toHaveCount(0);
     await expect(
       surface.getByRole("region", { name: "City demand by use", exact: true }),
@@ -2085,7 +2104,7 @@ for (const theme of ["light", "dark"] as const) {
     await plantTarget.click();
     const surface = tileSurface(page);
     const acquire = surface.getByRole("button", {
-      name: `Acquire ${quote.name}`,
+      name: "Acquire",
       exact: true,
     });
     await acquire.click();
@@ -2096,20 +2115,13 @@ for (const theme of ["light", "dark"] as const) {
     await expectDialogToFit(review);
     await expect(review).toContainText("Sites transferred");
     await expect(review).toContainText("The seller removes its plant.");
-    await expect(review.getByRole("button", { name: "Take loan" })).toHaveCount(
-      0,
-    );
-    const cancel = review.getByRole("button", { name: "Cancel", exact: true });
-    const confirm = review.getByRole("button", {
-      name: "Confirm",
-      exact: true,
-    });
-    const [cancelBox, confirmBox] = await Promise.all([
-      cancel.boundingBox(),
-      confirm.boundingBox(),
-    ]);
-    expect(Math.abs(cancelBox!.y - confirmBox!.y)).toBeLessThan(2);
-    await cancel.click();
+    await expect(
+      review.getByRole("button", { name: "Pay cash" }),
+    ).toBeEnabled();
+    await expect(
+      review.getByRole("button", { name: "Take loan" }),
+    ).toBeEnabled();
+    await review.getByRole("button", { name: "Cancel", exact: true }).click();
     expect(ownsTerritoryTile((await readSavedGame(page))!, plant.id)).toBe(
       false,
     );
@@ -2127,7 +2139,13 @@ for (const theme of ["light", "dark"] as const) {
       animations: "disabled",
       scale: "css",
     });
-    await confirm.click();
+    const financed = theme === "dark";
+    await review
+      .getByRole("button", {
+        name: financed ? "Take loan" : "Pay cash",
+        exact: true,
+      })
+      .click();
     await expect(review).toHaveCount(0);
     const saved = (await readSavedGame(page))!;
     expect(ownsTerritoryTile(saved, plant.id)).toBe(true);
@@ -2136,9 +2154,15 @@ for (const theme of ["light", "dark"] as const) {
       quote.customers,
     );
     expect(currentTick(saved)!.cash).toBeCloseTo(
-      currentTick(before)!.cash - quote.cashDue,
+      currentTick(before)!.cash -
+        (financed ? quote.financedCashDue : quote.cashDue),
       1,
     );
+    expect(
+      saved.utilityExpansion!.loans.filter(
+        ({ targetId }) => targetId === quote.targetId,
+      ),
+    ).toHaveLength(financed ? 1 : 0);
     expect(saved.facilities).toHaveLength(before.facilities.length);
     await closeTileSurface(surface);
     await selectTerritoryMapTile(page, city);
@@ -2247,7 +2271,7 @@ test("map tile hover and right-click expose the tile's own actions", async ({
 
   await target.hover();
   const tooltip = network.getByRole("tooltip");
-  await expect(tooltip).toHaveText("Forest · Open site · Unconnected");
+  await expect(tooltip).toHaveText("Forest · Unconnected");
   await expect(target).not.toHaveAttribute("title", /.+/);
 
   await target.click({ button: "right" });
@@ -2257,6 +2281,9 @@ test("map tile hover and right-click expose the tile's own actions", async ({
     exact: true,
   });
   await expect(connect).toBeEnabled();
+  await expect(
+    menu.getByRole("menuitem", { name: "Inspect", exact: true }),
+  ).toHaveCount(0);
   await expect(tooltip).toHaveCount(0);
   await expect(connect).toBeFocused();
   await expect(menu).toBeInViewport({ ratio: 1 });
@@ -2269,8 +2296,7 @@ test("map tile hover and right-click expose the tile's own actions", async ({
   await expect(menu).toHaveCount(0);
   await expect(target).toBeFocused();
 
-  await target.press("Shift+F10");
-  await menu.getByRole("menuitem", { name: "Inspect", exact: true }).click();
+  await target.press("Enter");
   const inspector = page.getByRole("dialog", {
     name: "Forest",
     exact: true,
