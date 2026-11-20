@@ -4,6 +4,7 @@ import AgreementForecastDetails, {
   RecordedAgreementHistory,
 } from "./AgreementForecastDetails";
 import type { useAgreementForecast } from "./useAgreementForecast";
+import BuildDetails from "./BuildDetails";
 function forecast(
   partial: Partial<ReturnType<typeof useAgreementForecast>> = {},
 ) {
@@ -18,24 +19,24 @@ function forecast(
 }
 it("preserves negative savings and the requested horizon without competing metrics", () => {
   render(
-    <AgreementForecastDetails
-      forecast={forecast({
-        result: {
-          cashDifference: -1250000,
-          withAgreement: { demandMWh: 100, servedMWh: 100 },
-          withoutAgreement: { demandMWh: 100, servedMWh: 60 },
-        } as AgreementForecast,
-      })}
-      horizon="over 5 years"
-    />,
+    <BuildDetails label="Agreement forecast">
+      <AgreementForecastDetails
+        forecast={forecast({
+          result: {
+            cashDifference: -1250000,
+            withAgreement: { demandMWh: 100, servedMWh: 100 },
+            withoutAgreement: { demandMWh: 100, servedMWh: 60 },
+          } as AgreementForecast,
+        })}
+        horizon="over 5 years"
+      />
+    </BuildDetails>,
   );
   expect(screen.getByRole("status")).toHaveTextContent("-$1.3M over 5 years");
   expect(
     screen.getByText("Compared with omitting this agreement"),
   ).toBeVisible();
-  expect(
-    screen.getByText("Demand served: 100% with agreement · 60% without"),
-  ).toBeVisible();
+  expect(screen.getByText("60 → 100%")).toBeVisible();
   expect(screen.queryByRole("heading")).not.toBeInTheDocument();
 });
 it.each([
@@ -53,10 +54,12 @@ it.each([
   ],
 ])("keeps transient states in the savings cell", (partial, value, caption) => {
   render(
-    <AgreementForecastDetails
-      forecast={forecast(partial)}
-      horizon="over 5 years"
-    />,
+    <BuildDetails label="Agreement forecast">
+      <AgreementForecastDetails
+        forecast={forecast(partial)}
+        horizon="over 5 years"
+      />
+    </BuildDetails>,
   );
   expect(screen.getByRole("status")).toHaveTextContent(value);
   expect(screen.getByText(caption)).toBeVisible();
@@ -64,10 +67,12 @@ it.each([
 it("offers an inline retry when a forecast fails", () => {
   const retry = jest.fn();
   render(
-    <AgreementForecastDetails
-      forecast={forecast({ error: true, retry })}
-      horizon="over 5 years"
-    />,
+    <BuildDetails label="Agreement forecast">
+      <AgreementForecastDetails
+        forecast={forecast({ error: true, retry })}
+        horizon="over 5 years"
+      />
+    </BuildDetails>,
   );
   expect(screen.getByRole("status")).toHaveTextContent("Forecast unavailable");
   fireEvent.click(screen.getByRole("button", { name: "Retry" }));
