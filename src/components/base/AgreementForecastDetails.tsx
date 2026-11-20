@@ -7,7 +7,7 @@ import { formatNumber, formatPercent } from "../../helpers/Format";
 import type { useAgreementForecast } from "./useAgreementForecast";
 import BuildDetails, { BuildDetailRow } from "./BuildDetails";
 
-/** The comparison occupies one value cell; quoted terms stay available in every state. */
+/** Keep both comparison rows in place as the selected terms change. */
 export default function AgreementForecastDetails({
   forecast,
   horizon,
@@ -30,43 +30,71 @@ export default function AgreementForecastDetails({
       : forecast.blocked === "buying"
         ? "Turn on market buying to compare"
         : "Compared with omitting this agreement";
+  const { withAgreement, withoutAgreement } = forecast.result ?? {};
+  const demandServed =
+    withAgreement &&
+    withoutAgreement &&
+    withAgreement.demandMWh > 0 &&
+    withoutAgreement.demandMWh > 0
+      ? {
+          without: formatPercent(
+            withoutAgreement.servedMWh / withoutAgreement.demandMWh,
+          ),
+          with: formatPercent(
+            withAgreement.servedMWh / withAgreement.demandMWh,
+          ),
+        }
+      : undefined;
   return (
     <>
-      <span role="status" aria-live="polite">
-        {unavailable ??
-          (forecast.result
-            ? `${formatForecastMoney(forecast.result.cashDifference)} ${horizon}`
-            : forecast.error
-              ? "Forecast unavailable"
-              : forecast.updating
-                ? "Updating…"
-                : "Calculating…")}
-      </span>
-      {forecast.error && !unavailable && (
-        <Button size="small" onClick={forecast.retry}>
-          Retry
-        </Button>
-      )}
-      <Typography component="div" variant="caption" color="textSecondary">
-        {caption}
-      </Typography>
-      {forecast.result &&
-        forecast.result.withAgreement.demandMWh > 0 &&
-        forecast.result.withoutAgreement.demandMWh > 0 && (
-          <Typography component="div" variant="caption" color="textSecondary">
-            Demand served:{" "}
-            {formatPercent(
-              forecast.result.withAgreement.servedMWh /
-                forecast.result.withAgreement.demandMWh,
-            )}{" "}
-            with agreement ·{" "}
-            {formatPercent(
-              forecast.result.withoutAgreement.servedMWh /
-                forecast.result.withoutAgreement.demandMWh,
-            )}{" "}
-            without
-          </Typography>
-        )}
+      <BuildDetailRow
+        label="Forecasted cash impact"
+        value={
+          <>
+            <span role="status" aria-live="polite">
+              {unavailable ??
+                (forecast.result
+                  ? `${formatForecastMoney(forecast.result.cashDifference)} ${horizon}`
+                  : forecast.error
+                    ? "Forecast unavailable"
+                    : forecast.updating
+                      ? "Updating…"
+                      : "Calculating…")}
+            </span>
+            {forecast.error && !unavailable && (
+              <Button size="small" onClick={forecast.retry}>
+                Retry
+              </Button>
+            )}
+            <Typography component="div" variant="caption" color="textSecondary">
+              {caption}
+            </Typography>
+          </>
+        }
+      />
+      <BuildDetailRow
+        label="Forecasted grid impact"
+        value={
+          demandServed ? (
+            <span
+              className="powerAgreementGridImpact"
+              title="Demand served without → with agreement"
+            >
+              <span aria-hidden="true">
+                {demandServed.without.slice(0, -1)} → {demandServed.with}
+              </span>
+              <span className="srOnly">
+                Demand served: {demandServed.without} without agreement,{" "}
+                {demandServed.with} with agreement
+              </span>
+            </span>
+          ) : (
+            <Typography component="span" variant="body2" color="textSecondary">
+              —
+            </Typography>
+          )
+        }
+      />
     </>
   );
 }
