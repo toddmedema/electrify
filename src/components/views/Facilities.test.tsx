@@ -1594,7 +1594,10 @@ it.each([false, true])(
     await user.click(within(review).getByRole("button", { name: "Pay cash" }));
     expect(review).not.toBeInTheDocument();
     expect(line).not.toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Interties" })).toHaveFocus();
+    // Unmounting the async purchase review also restores the page's accessibility.
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { name: "Interties" })).toHaveFocus(),
+    );
   },
 );
 
