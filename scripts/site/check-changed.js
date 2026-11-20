@@ -4,7 +4,10 @@ const { STATIC_PAGES } = require("./registry");
 const sitePaths = [
   "site/",
   "scripts/site/",
+  "package.json",
+  "package-lock.json",
   ...STATIC_PAGES.map(({ source }) => source),
+  ":(glob)public/images/**/*.svg",
   "public/scenarios.html",
   "public/scenarios/",
   "public/sitemap.xml",
@@ -37,8 +40,10 @@ function checkChangedSite(args) {
     process.stdout.write("No site inputs or generated pages changed.\n");
     return 0;
   }
+  // Compare content so a freshly hydrated LFS working tree can still validate.
   if (
-    git("status", "--porcelain", "--untracked-files=all", "--", ...sitePaths)
+    git("diff", "--name-only", "HEAD", "--", ...sitePaths) ||
+    git("ls-files", "--others", "--exclude-standard", "--", ...sitePaths)
   ) {
     throw new Error(
       "Commit or set aside local site changes, then rerun npm run check:prepush on the commit you will push.",

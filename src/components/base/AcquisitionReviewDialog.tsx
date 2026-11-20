@@ -49,8 +49,11 @@ export default function AcquisitionReviewDialog({
   const dispatch = useAppDispatch();
   // A successful update can remove the quote before the request resolves.
   // Keep the same modal and focus trap mounted until the purchase closes it.
-  const [submittedGame, setSubmittedGame] = React.useState<GameType>();
-  const game = submittedGame ?? liveGame;
+  const [submission, setSubmission] = React.useState<{
+    game: GameType;
+    cash: number;
+  }>();
+  const game = submission?.game ?? liveGame;
   const { formatMoneyConcise } = useMoney(
     currencyForLocation(game.location, game.startingYear),
   );
@@ -64,7 +67,7 @@ export default function AcquisitionReviewDialog({
   }, [dispatch, targetId]);
   const quote = acquisitionQuote(game, targetId);
   const now = currentTick(game);
-  const cash = useBuildCash(now?.cash ?? 0);
+  const cash = useBuildCash(submission?.cash ?? now?.cash ?? 0, !submission);
   const preview = React.useMemo(
     () => previewUtilityAcquisition(game, targetId, true),
     [game, targetId],
@@ -266,7 +269,7 @@ export default function AcquisitionReviewDialog({
       onClose={onClose}
       onPurchase={async (financed) => {
         setError(undefined);
-        setSubmittedGame(game);
+        setSubmission({ game, cash });
         try {
           const accepted = await onAcquire({
             targetId: quote.targetId,
@@ -287,7 +290,7 @@ export default function AcquisitionReviewDialog({
               : "The purchase could not be completed. Please try again.",
           );
         }
-        setSubmittedGame(undefined);
+        setSubmission(undefined);
         return false;
       }}
     />

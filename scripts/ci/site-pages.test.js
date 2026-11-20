@@ -500,6 +500,17 @@ test("pre-push checks committed site changes and skips unrelated changes", async
   assert.match(stale.stderr, /public\/about.html has no matching source date/);
   assert.match(stale.stderr, /npm run site:generate -- --date YYYY-MM-DD/);
 
+  const packageFile = path.join(root, "package.json");
+  const originalPackage = fs.readFileSync(packageFile, "utf8");
+  write("package.json", {
+    scripts: {
+      "check:prepush": scripts["check:prepush"],
+      "site:check": "node --version",
+    },
+  });
+  assert.match(check().stderr, /Commit or set aside local site changes/);
+  write("package.json", originalPackage);
+
   await generate({ root, date: "2020-01-03" });
   const uncommitted = check();
   assert.equal(uncommitted.status, 1, uncommitted.stdout);
@@ -509,6 +520,13 @@ test("pre-push checks committed site changes and skips unrelated changes", async
   const repaired = check();
   assert.equal(repaired.status, 0, repaired.stderr);
   assert.match(repaired.stdout, /Site pages are current/);
+
+  fs.unlinkSync(path.join(root, "public/images/test icon.svg"));
+  record("Remove the referenced scenario icon");
+  git("update-ref", "refs/remotes/origin/master", "HEAD^");
+  const missingIcon = check();
+  assert.equal(missingIcon.status, 1, missingIcon.stdout);
+  assert.match(missingIcon.stderr, /icon must reference an existing SVG/);
 });
 
 test("learning pages provide breadcrumbs, concise metadata, and a substantial simulator guide", async (t) => {
