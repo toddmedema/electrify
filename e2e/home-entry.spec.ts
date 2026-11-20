@@ -143,6 +143,52 @@ test("a stalled logo cannot block the title actions", async ({ page }) => {
     .toBeGreaterThan(0);
 });
 
+for (const theme of ["light", "dark"] as const) {
+  test(`the startup logo has no unstyled fills in ${theme} mode`, async ({
+    page,
+  }, info) => {
+    test.skip(
+      !process.env.E2E_BASE_URL && !process.env.E2E_BUILD_DIR,
+      "Production stylesheet delivery.",
+    );
+    await page.emulateMedia({ colorScheme: theme });
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const appStyles = "**/static/css/main.*.css";
+    await page.route(appStyles, async (route) => {
+      await held;
+      await route.continue();
+    });
+    const stylesRequested = page.waitForRequest(appStyles);
+    try {
+      await page.goto("/", { waitUntil: "domcontentloaded" });
+      await stylesRequested;
+      const logo = page.locator("#appStartup .homeLogo");
+      await expect(logo).toBeVisible();
+      await logo
+        .getByRole("img", { name: "Electrify" })
+        .evaluate((image: HTMLImageElement) => image.decode());
+      await reviewScreenshot(logo, {
+        path: info.outputPath(`startup-logo-${theme}.png`),
+        scale: "css",
+      });
+      await expect(logo.locator(".homeEnergyPulse")).toHaveCSS("fill", "none");
+      await expect(logo.locator(".homeSmokePuff").first()).toHaveCSS(
+        "fill",
+        "none",
+      );
+    } finally {
+      release();
+    }
+    await expect(
+      page.getByRole("button", { name: "Play", exact: true }),
+    ).toBeVisible();
+    await expect(page.locator("#appStartup")).toHaveCount(0);
+  });
+}
+
 for (const entry of ["home", "game"] as const) {
   test(`a stylesheet failure before the ${entry} entry offers a working reload`, async ({
     page,
