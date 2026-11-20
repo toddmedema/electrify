@@ -10,6 +10,7 @@ import {
   formatWattHours,
   formatWatts,
 } from "../helpers/Format";
+import { getTotalDebt } from "../helpers/Financials";
 import { FacilityOperatingType, MonthlyHistoryType } from "../Types";
 import { SimResultType } from "./Simulator";
 
@@ -136,10 +137,9 @@ function formatFacilities(
       f.yearsToBuildLeft > 0
         ? ` -- ${f.yearsToBuildLeft.toFixed(1)}y left to build`
         : "";
+    const debt = getTotalDebt([f]);
     const loan =
-      f.loanAmountLeft > 0
-        ? ` -- ${formatMoneyConcise(f.loanAmountLeft, currency)} owed`
-        : "";
+      debt > 0 ? ` -- ${formatMoneyConcise(debt, currency)} owed` : "";
     return `  ${pad(f.name, 16)}${pad(size, 22)}${building}${loan}`;
   });
 }

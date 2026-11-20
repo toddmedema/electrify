@@ -32,13 +32,19 @@ import {
 } from "../../helpers/TerritoryMapState";
 import { TransmissionPanelProps } from "./TransmissionPanel";
 import { useToolState } from "../base/GameToolMemory";
+import { useBuildForecast } from "../base/BuildForecast";
+import { windOutputByTerrain } from "../../helpers/ExpectedOutput";
 import { terrainModifiers } from "../../helpers/TerrainModifiers";
 import { customerMarketSizeAt } from "../../helpers/Customers";
 import { cityCustomerCount } from "../../helpers/CityProfiles";
-import { citySizeLabel } from "../base/TerritoryTileFacts";
+import {
+  citySizeLabel,
+  formatTerrainPercent,
+} from "../base/TerritoryTileFacts";
 import { cityDemandByType } from "../../helpers/CityDemand";
 import { facilityMapStatus } from "../base/FacilityMapStatus";
-import TerritoryHexMap from "./TerritoryHexMap";
+import TerritoryHexMap, { type MapTileMenuTarget } from "./TerritoryHexMap";
+import TerritoryTileMenu from "./TerritoryTileMenu";
 import AcquisitionReviewDialog from "../base/AcquisitionReviewDialog";
 import { useMoney } from "../base/CurrencyContext";
 import { useAppDispatch, useAppSelector } from "../../Store";
@@ -157,6 +163,14 @@ function TileNetwork(props: Props) {
     "network.project",
     undefined,
   );
+  const windSpeeds = useBuildForecast(
+    game,
+    planning && !catalogue && project?.fuel === "Wind",
+  )?.windSpeeds;
+  const projectWindOutput = React.useMemo(
+    () => windSpeeds && windOutputByTerrain(windSpeeds),
+    [windSpeeds],
+  );
   const [candidate, setCandidate] = React.useState<TerritoryTileId>();
   const projectBusy = React.useRef(false);
   const [inspected, setInspected] = React.useState<TerritoryMapTileKey>();
@@ -164,9 +178,11 @@ function TileNetwork(props: Props) {
   const [siteCatalogue, setSiteCatalogue] = React.useState(false);
   const [category, setCategory] = React.useState("generators");
   const [review, setReview] = React.useState<UtilityAcquisitionId>();
+  const [menu, setMenu] = React.useState<MapTileMenuTarget | null>(null);
+  const [expandRequest, setExpandRequest] = React.useState<number>();
   const { purchase, pendingIds, availableCash } = useTerritoryTilePurchases();
   const dispatch = useAppDispatch();
-  const { formatMoneyConcise: money } = useMoney();
+  const { formatMoneyConcise: money, formatPurchasePrice } = useMoney();
   const views = React.useMemo(() => territoryTileViews(game), [game]);
   const view =
     inspected && (!panel?.open || tileWindow) && !planning
@@ -217,6 +233,8 @@ function TileNetwork(props: Props) {
     setSiteCatalogue(false);
     setSelected(undefined);
     setRailSite(undefined);
+    setExpandRequest(undefined);
+    setMenu(null);
   }, [setSelected]);
   const closeTileWindow = React.useCallback(() => {
     focusAfterClose.current = lastTile.current;
@@ -296,7 +314,11 @@ function TileNetwork(props: Props) {
   const sizeChanged = React.useCallback(() => {
     dispatch(generatorSizeChanged());
   }, [dispatch]);
-  const inspect = (key: TerritoryMapTileKey, activate = false) => {
+  const inspect = (
+    key: TerritoryMapTileKey,
+    activate = false,
+    mode?: "details" | "expand",
+  ) => {
     if (projectBusy.current || restoringFocus.current) return;
     setSelected(key);
     if (!activate) return;
@@ -305,7 +327,7 @@ function TileNetwork(props: Props) {
     );
     if (!activated) return;
     const id = activated.tile.id;
-    if (planning && !catalogue) {
+    if (!mode && planning && !catalogue) {
       // A peer's retained alias can share an economic ID with a local site.
       setCandidate(activated.owned || id === key ? id : undefined);
       return;
@@ -313,6 +335,11 @@ function TileNetwork(props: Props) {
     if (tileWindow) tileWindow.raise();
     else panel?.returnToMap();
     lastTile.current = key;
+    if (mode && planning) {
+      setPlanning(false);
+      setCandidate(undefined);
+    }
+    setExpandRequest(mode === "expand" ? activation + 1 : undefined);
     setActivation((value) => value + 1);
     setSiteCatalogue(false);
     setCategory("generators");
@@ -333,9 +360,7 @@ function TileNetwork(props: Props) {
       ? operatingFacility.name
       : tile.city
         ? (tile.city.name ?? citySizeLabel(tile.city.size))
-        : building
-          ? TERRAIN_LABELS[tile.terrain]
-          : `${TERRAIN_LABELS[tile.terrain]} site`
+        : TERRAIN_LABELS[tile.terrain]
     : "Tile";
   const preferredSite = candidate ?? (building ? tile?.id : railSite);
   return (
@@ -390,13 +415,35 @@ function TileNetwork(props: Props) {
           projectPlanning={planning}
           projectPending={projectPending}
           projectSites={projectSites}
+          projectWindOutput={projectWindOutput}
           onDeselect={close}
           game={game}
           views={views}
           selected={selected}
           onSelect={inspect}
+          onTileMenu={(target) => {
+            if (!projectBusy.current) setMenu(target);
+          }}
         />
       )}
+      <TerritoryTileMenu
+        game={game}
+        anchor={menu}
+        view={
+          menu
+            ? views.find(({ tile }) => territoryMapTileKey(tile) === menu.key)
+            : undefined
+        }
+        actions={props.facilityActions}
+        busy={projectPending}
+        canAcquire={!!props.onAcquire}
+        projectSite={!!menu && !!projectSites?.has(menu.key)}
+        onClose={() => setMenu(null)}
+        onChooseSite={() => menu && inspect(menu.key, true)}
+        onInspect={() => menu && inspect(menu.key, true, "details")}
+        onExpand={() => menu && inspect(menu.key, true, "expand")}
+        onAcquire={setReview}
+      />
       {planning && (!panel?.open || projectPending) && (
         <DeferredProjectBuild
           game={game}
@@ -535,6 +582,7 @@ function TileNetwork(props: Props) {
                   showStatus
                   facility={operatingFacility}
                   game={game}
+                  expandRequest={expandRequest}
                   {...props.facilityActions}
                 />
               ) : view.facility ? (
@@ -576,7 +624,7 @@ function TileNetwork(props: Props) {
                       {pendingIds.has(tile.id)
                         ? "Connecting…"
                         : quote
-                          ? `Connect · ${money(quote.price)}`
+                          ? `Connect · ${formatPurchasePrice(quote.price)}`
                           : "Connection unavailable"}
                     </Button>
                     {quote && availableCash < quote.price && (
@@ -659,8 +707,6 @@ function TileTerrainModifiers({
   terrain: TerritoryTileView["tile"]["terrain"];
 }) {
   const { onshoreWindSpeed, buildCost } = terrainModifiers(terrain, "Wind");
-  const percentage = (factor: number) =>
-    `${factor >= 1 ? "+" : "−"}${Math.round(Math.abs(factor - 1) * 100)}%`;
   const modifiers = [
     {
       label: "wind speed",
@@ -675,7 +721,10 @@ function TileTerrainModifiers({
         <ul className="tileTerrainModifiers">
           {modifiers.map(({ label, value, good }) => (
             <li key={label}>
-              <strong data-favorable={good}>{percentage(value)}</strong> {label}
+              <strong data-favorable={good}>
+                {formatTerrainPercent(value)}
+              </strong>{" "}
+              {label}
             </li>
           ))}
         </ul>

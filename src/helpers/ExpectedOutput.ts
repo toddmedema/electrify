@@ -3,9 +3,13 @@ import {
   GameType,
   GeneratorShoppingType,
   TickPresentFutureType,
+  TerrainType,
   TerritoryTileId,
 } from "../Types";
-import { getTerrainWindOutputFactor } from "./TerrainModifiers";
+import {
+  getTerrainWindOutputFactor,
+  terrainModifiers,
+} from "./TerrainModifiers";
 import { hasTerritoryNetwork } from "./TerritoryTiles";
 import { MINUTES_PER_MONTH } from "./DateTime";
 import {
@@ -55,6 +59,25 @@ const WEATHER_FUELS = new Set([
   "Offshore Wind",
   "Airborne Wind",
 ]);
+
+/** Compare like-for-like wind output using the same regional forecast at each site. */
+export function windOutputByTerrain(
+  windSpeeds: number[],
+): Partial<Record<TerrainType, number>> {
+  const baseline = getWindCapacityFactor(windSpeeds);
+  if (!baseline) return {};
+  return Object.fromEntries(
+    (["forest", "hills", "mountain"] as const).map((terrain) => {
+      const { onshoreWindSpeed } = terrainModifiers(terrain, "Wind");
+      return [
+        terrain,
+        getWindCapacityFactor(
+          windSpeeds.map((speed) => speed * onshoreWindSpeed),
+        ) / baseline,
+      ];
+    }),
+  );
+}
 
 export function technologyCapacityFactor(
   technology: OutputTechnology,

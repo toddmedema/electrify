@@ -5,8 +5,6 @@ import {
   Checkbox,
   Button,
   FormControlLabel,
-  Radio,
-  RadioGroup,
   Tab,
   Tabs,
 } from "@mui/material";
@@ -37,6 +35,7 @@ import { useBuildForecast } from "./BuildForecast";
 import { useMoney } from "./CurrencyContext";
 import { useToolState } from "./GameToolMemory";
 import { useTerritoryTilePurchases } from "./TerritoryTilePurchases";
+import ConceptIcon from "./ConceptIcon";
 import TileWorkspaceSurface from "./TileWorkspaceSurface";
 import "./ProjectBuild.scss";
 
@@ -68,7 +67,7 @@ export default function ProjectBuild({
   const store = useStore<RootState>();
   const { purchase, availableCash, readAvailableCash } =
     useTerritoryTilePurchases();
-  const { formatMoneyConcise: money } = useMoney();
+  const { formatMoneyConcise: money, formatPurchasePrice: price } = useMoney();
   const forecast = useBuildForecast(game);
   const [storage, setStorage] = useToolState("project.storage", false);
   const [generatorSize, setGeneratorSize] = useToolState(
@@ -76,8 +75,6 @@ export default function ProjectBuild({
     10,
   );
   const [storageSize, setStorageSize] = useToolState("project.storageSize", 18);
-  const [financed, setFinanced] = React.useState(false);
-  const [reviewKey, setReviewKey] = React.useState<string>();
   const [message, setMessage] = React.useState("");
   const [progress, setProgress] = React.useState("");
   const [partial, setPartial] = React.useState(false);
@@ -90,7 +87,6 @@ export default function ProjectBuild({
     };
   }, []);
   React.useEffect(() => {
-    setReviewKey(undefined);
     setMessage("");
     setPartial(false);
   }, [candidate, project, catalogue]);
@@ -105,9 +101,10 @@ export default function ProjectBuild({
     [pricingKey, project, candidate],
   );
   const ready = quote?.facility ? (quote as ReadyProjectSite) : undefined;
-  const review = ready
-    ? projectReview(game, ready, financed, availableCash)
-    : undefined;
+  const payment = ready && {
+    cash: projectReview(game, ready, false, availableCash),
+    loan: projectReview(game, ready, true, availableCash),
+  };
   const size = storage ? storageSize : generatorSize;
   const options = React.useMemo(
     () => projectCatalogue(game, sliderTickToW(size), storage),
@@ -119,20 +116,9 @@ export default function ProjectBuild({
     : project
       ? `${project.name} · ${formatWatts(project.peakW)}`
       : "Plan a project";
-  const reviewing = reviewKey !== undefined;
-  const change = () => {
-    if (!lock.current) {
-      setReviewKey(undefined);
-      onChangeProject();
-    }
-  };
-  const beginReview = () => {
-    if (!review || lock.current) return;
-    setMessage("");
-    setReviewKey(review.key);
-  };
-  const confirm = async () => {
-    if (lock.current || !project || !candidate || !reviewKey) return;
+  const confirm = async (financed: boolean) => {
+    if (lock.current || !project || !candidate || !payment) return;
+    const shown = financed ? payment.loan : payment.cash;
     const initial = store.getState();
     const latest = projectSiteQuote(initial.game, project, candidate);
     const details = latest.facility
@@ -143,9 +129,8 @@ export default function ProjectBuild({
           readAvailableCash(),
         )
       : undefined;
-    if (!details || details.key !== reviewKey) {
-      setReviewKey(undefined);
-      setMessage("Project changed. Review the updated details.");
+    if (!details || details.key !== shown.key) {
+      setMessage("Project changed. Check the updated costs before paying.");
       return;
     }
     if (details.remaining < 0) {
@@ -172,7 +157,6 @@ export default function ProjectBuild({
         if (!sameRun()) return;
         if (result.status !== "connected") {
           setMessage(result.message);
-          setReviewKey(undefined);
           return;
         }
         connected = true;
@@ -203,11 +187,10 @@ export default function ProjectBuild({
           Math.abs(ownedReview.availableCash - expectedCash) > cashRounding)
       ) {
         setPartial(connected);
-        setReviewKey(undefined);
         setMessage(
           connected
-            ? "Site connected. Construction did not start. Review the updated project."
-            : "Project changed. Review the updated details.",
+            ? "Site connected. Construction did not start. Check the updated costs before paying."
+            : "Project changed. Check the updated costs before paying.",
         );
         return;
       }
@@ -227,7 +210,6 @@ export default function ProjectBuild({
         onClose();
       } else {
         setPartial(connected);
-        setReviewKey(undefined);
         setMessage(
           connected
             ? `Site connected. Construction did not start. ${result.message}`
@@ -259,16 +241,12 @@ export default function ProjectBuild({
           : forecast
             ? "Estimate unavailable"
             : "Estimating…";
+  const loanLeads =
+    !!payment && payment.cash.remaining < 0 && payment.loan.remaining >= 0;
   return (
     <TileWorkspaceSurface
-      title={
-        catalogue
-          ? "Plan a project"
-          : reviewing
-            ? `${ready?.owned ? "Build" : "Connect and build"} ${project?.name}?`
-            : title
-      }
-      focusKey={`${catalogue}:${candidate ?? "sites"}:${reviewing}`}
+      title={catalogue ? "Plan a project" : title}
+      focusKey={`${catalogue}:${candidate ?? "sites"}`}
       projectCandidate={!catalogue}
       returnFocusSelector=".desktopBuildRail, #buildNav"
       onClose={() => {
@@ -332,7 +310,7 @@ export default function ProjectBuild({
                       {isStorage(option)
                         ? formatWattHours(option.peakWh)
                         : formatWatts(option.peakW)}{" "}
-                      · {money(option.buildCost)} before site costs
+                      · {price(option.buildCost)} before site costs
                     </small>
                     {tooLarge && (
                       <small>Maximum available size: {maxLabel}</small>
@@ -374,12 +352,17 @@ export default function ProjectBuild({
             <div className="projectCandidateHeader">
               {ready && (
                 <p className="projectLocation">
-                  {reviewing && <strong>{title} · </strong>}
                   {territoryTileLabel(ready.tile)} ·{" "}
                   {territoryMapLabel(ready.tile.territoryId)}
                 </p>
               )}
-              <Button size="small" disabled={!!progress} onClick={change}>
+              <Button
+                size="small"
+                disabled={!!progress}
+                onClick={() => {
+                  if (!lock.current) onChangeProject();
+                }}
+              >
                 Change project
               </Button>
             </div>
@@ -404,28 +387,31 @@ export default function ProjectBuild({
             {candidate && !ready && (
               <Alert severity="info">{quote?.reason}</Alert>
             )}
-            {ready && review && (
+            {ready && payment && (
               <>
                 <dl className="projectFacts">
                   <div>
-                    <dt>Connection cost</dt>
+                    <dt>Cash purchase</dt>
+                    <dd>{price(payment.cash.required)} now</dd>
+                  </div>
+                  <div>
+                    <dt>Loan option</dt>
                     <dd>
-                      {ready.owned
-                        ? `Already connected · ${money(0)}`
-                        : money(ready.connectionCost)}
+                      {price(payment.loan.required)} now +{" "}
+                      <span className="projectMonthlyPayment">
+                        {money(payment.loan.terms.monthlyPayment)}/mo
+                      </span>
                     </dd>
                   </div>
                   <div>
-                    <dt>Project cost</dt>
-                    <dd>{money(ready.facility.buildCost)}</dd>
+                    <dt>Connection</dt>
+                    <dd>
+                      {ready.owned ? "Connected" : price(ready.connectionCost)}
+                    </dd>
                   </div>
                   <div>
-                    <dt>Cash required now</dt>
-                    <dd>{money(review.required)}</dd>
-                  </div>
-                  <div>
-                    <dt>Cash remaining</dt>
-                    <dd>{money(review.remaining)}</dd>
+                    <dt>Build cost</dt>
+                    <dd>{price(ready.facility.buildCost)}</dd>
                   </div>
                   <div className="projectOutput">
                     <dt>Expected output</dt>
@@ -434,7 +420,7 @@ export default function ProjectBuild({
                   <div>
                     <dt>Estimated online</dt>
                     <dd>
-                      {review.online.month} {review.online.year}
+                      {payment.cash.online.month} {payment.cash.online.year}
                     </dd>
                   </div>
                 </dl>
@@ -472,57 +458,23 @@ export default function ProjectBuild({
                               }}
                             />
                           }
-                          label={`${option.label} +${money(option.extraBuildCost)}`}
+                          label={`${option.label} +${price(option.extraBuildCost)}`}
                         />
                       ),
                     )}
                   </div>
                 )}
-                {review.remaining < 0 && (
+                <p className="projectLoanTerms">
+                  {(game.interestRate * 100).toFixed(2)}% annual interest for{" "}
+                  {facilityLoanMonths(ready.facility.lifespanYears) / 12} years.{" "}
+                  {ready.connectionCost > 0 && "Connection is paid in cash."}
+                </p>
+                {payment.cash.remaining < 0 && (
                   <p role="status">
-                    {money(-review.remaining)} more cash needed
-                    {!reviewing && !financed
-                      ? "; review financing options."
-                      : "."}
+                    {payment.loan.remaining < 0
+                      ? `${money(-payment.loan.remaining)} more cash needed for a loan.`
+                      : `${money(-payment.cash.remaining)} more cash needed to pay in full.`}
                   </p>
-                )}
-                {reviewing && (
-                  <>
-                    <RadioGroup
-                      aria-label="Project payment"
-                      value={financed ? "loan" : "cash"}
-                      onChange={(_event, value) => {
-                        const loan = value === "loan";
-                        setFinanced(loan);
-                        setReviewKey(
-                          projectReview(game, ready, loan, availableCash).key,
-                        );
-                      }}
-                    >
-                      <FormControlLabel
-                        disabled={!!progress}
-                        value="cash"
-                        control={<Radio />}
-                        label={`Cash · ${money(ready.facility.buildCost)} project payment`}
-                      />
-                      <FormControlLabel
-                        disabled={!!progress}
-                        value="loan"
-                        control={<Radio />}
-                        label="Loan · connection paid in cash"
-                      />
-                    </RadioGroup>
-                    {financed && (
-                      <p className="projectLoanTerms">
-                        Down payment {money(review.terms.downpayment)} · Borrow{" "}
-                        {money(review.terms.loanAmount)} ·{" "}
-                        {money(review.terms.monthlyPayment)}/month ·{" "}
-                        {(game.interestRate * 100).toFixed(2)}% annual interest
-                        · {facilityLoanMonths(ready.facility.lifespanYears)}{" "}
-                        months
-                      </p>
-                    )}
-                  </>
                 )}
               </>
             )}
@@ -532,34 +484,33 @@ export default function ProjectBuild({
               </Alert>
             )}
           </div>
-          {ready && (
+          {payment && (
             <div className="projectCandidateActions">
-              {reviewing ? (
-                <>
-                  <Button
-                    disabled={!!progress}
-                    onClick={() => setReviewKey(undefined)}
-                  >
-                    Back to sites
-                  </Button>
-                  <Button
-                    variant="contained"
-                    disabled={!!progress || !review || review.remaining < 0}
-                    onClick={() => void confirm()}
-                  >
-                    {progress ||
-                      (ready.owned ? "Build project" : "Connect & build")}
-                  </Button>
-                </>
-              ) : (
-                <Button
-                  variant="contained"
-                  disabled={!!progress}
-                  onClick={beginReview}
-                >
-                  {progress || (partial ? "Review build" : "Review project")}
-                </Button>
-              )}
+              {progress && <span role="status">{progress}</span>}
+              <Button
+                disabled={!!progress}
+                onClick={() => {
+                  if (!lock.current) onClose();
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant={loanLeads ? "outlined" : "contained"}
+                disabled={!!progress || payment.cash.remaining < 0}
+                onClick={() => void confirm(false)}
+                startIcon={<ConceptIcon concept="money" fontSize="small" />}
+              >
+                Cash
+              </Button>
+              <Button
+                variant={loanLeads ? "contained" : "outlined"}
+                disabled={!!progress || payment.loan.remaining < 0}
+                onClick={() => void confirm(true)}
+                startIcon={<ConceptIcon concept="finances" fontSize="small" />}
+              >
+                Loan
+              </Button>
             </div>
           )}
         </div>

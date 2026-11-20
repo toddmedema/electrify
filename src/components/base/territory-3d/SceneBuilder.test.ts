@@ -9,9 +9,12 @@ import { HEX_NEIGHBORS, hexWires } from "../TerritoryHexGeometry";
 import { MeshBuilder } from "./MeshBuilder";
 import { SceneBuilder, structureKind } from "./SceneBuilder";
 import type { MapModel, Vec3 } from "./Types";
-import { projectPoint, tilePosition3D } from "./Projection";
+import { GROUND_HEX_CORNERS, projectPoint, tilePosition3D } from "./Projection";
+import { surfaceHeight } from "./SurfaceHeight";
 import { getTerrainModel } from "./TerrainModels";
 import { getStructureModel } from "./StructureModels";
+import { buildOwnershipBorder, buildSelectionBorder } from "./BorderGeometry";
+import { TERRITORY_OWNER_PALETTE } from "../TerritoryMapLayout";
 import { buildWildfireEmitters, isBurningTerrain } from "./WildfireFront";
 
 const model: MapModel = {
@@ -500,6 +503,46 @@ test("picking uses camera depth instead of tile iteration order", () => {
   expect(builder.pick(projectPoint([0, 0.8, 0], pickFrame), pickFrame)).toBe(
     front.tile.id,
   );
+});
+test("the selection mesh places two backed dashes on all six hex edges", () => {
+  const { model } = buildSelectionBorder(view().tile);
+  for (const [edge, [x, z]] of GROUND_HEX_CORNERS.entries()) {
+    const [nextX, nextZ] = GROUND_HEX_CORNERS[(edge + 1) % 6];
+    for (const along of [0.25, 0.75]) {
+      const dx = x + (nextX - x) * along;
+      const dz = z + (nextZ - z) * along;
+      // Sample slightly outward from the dash center to hit its wider backing.
+      const backing = surfaceHeight(model, dx * 1.034, dz * 1.034);
+      expect(backing).toBeGreaterThan(0);
+      expect(surfaceHeight(model, dx, dz)).toBeGreaterThan(backing);
+    }
+    expect(surfaceHeight(model, (x + nextX) / 2, (z + nextZ) / 2)).toBe(0);
+  }
+});
+
+test("ownership edges and selection dashes cannot intercept ground picking", () => {
+  const land = { ...view(), developed: false };
+  const neighbor = { ...view(1), developed: false };
+  const builder = new SceneBuilder({
+    terrain: getTerrainModel,
+    structure: getStructureModel,
+  });
+  const tiles = [land.tile, neighbor.tile];
+  const scene = builder.build([land, neighbor], tiles, [], 0, "run");
+  const ownership = buildOwnershipBorder(
+    [land, neighbor],
+    TERRITORY_OWNER_PALETTE.light,
+    {},
+    false,
+  )!;
+  const selection = buildSelectionBorder(land.tile);
+  // The joined area has ten exposed edges with two quads for each painted stroke.
+  expect(ownership.model.parts[0].mesh.positions.length / 9).toBe(40);
+  // This point is inside a selection dash and also over the terrain below it.
+  const point = projectPoint([0.494, 0.012, -0.17], pickFrame);
+  expect(
+    builder.pick(point, pickFrame, undefined, [...scene, ownership, selection]),
+  ).toBe(land.tile.id);
 });
 test.each(["wind", "offshore-wind"] as const)(
   "picks the actual %s blade at signed retained phases and misses its mirrored pose",

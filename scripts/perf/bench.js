@@ -13,6 +13,7 @@
  *   --months <n> shorten the workload while iterating locally (gating is skipped)
  *   --json       print only the machine-readable result on stdout
  *   --mods       maximum community rules,1200-month histories and four-company save/worker sizes
+ *   --valley     four companies with 20 tiles, four cities and six operating plants each
  *   --update     rewrite the ceilings from this run's ratios plus the tolerance headroom
  */
 const { spawnSync } = require("child_process");
@@ -29,7 +30,7 @@ const DEFAULT_TOLERANCE = 0.25;
 const GATED = ["immerOverheadRatio", "rolloverImmerRatio"];
 
 const USAGE = `
-Usage: npm run perf:bench -- [--runs <n>] [--months <n>] [--json] [--update] [--mods]
+Usage: npm run perf:bench -- [--runs <n>] [--months <n>] [--json] [--update] [--mods|--valley]
 `;
 
 function parseArgs(argv) {
@@ -39,6 +40,7 @@ function parseArgs(argv) {
     json: false,
     update: false,
     mods: false,
+    valley: false,
   };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
@@ -49,8 +51,8 @@ function parseArgs(argv) {
       options.json = true;
     } else if (arg === "--update") {
       options.update = true;
-    } else if (arg === "--mods") {
-      options.mods = true;
+    } else if (arg === "--mods" || arg === "--valley") {
+      options[arg.slice(2)] = true;
     } else if (arg === "--runs" || arg === "--months") {
       const value = Number(argv[i + 1]);
       if (!Number.isInteger(value) || value < 1) {
@@ -90,6 +92,12 @@ function gate(ratios, ceilings) {
 function main() {
   const options = parseArgs(process.argv.slice(2));
   const shortened = options.months !== undefined;
+  if (options.valley && (options.mods || options.update)) {
+    process.stderr.write(
+      "--valley cannot be combined with --mods or --update\n",
+    );
+    process.exit(1);
+  }
   if (options.mods && (shortened || options.update)) {
     process.stderr.write(
       "--mods has a fixed maximum workload and no recorded timing ceilings; drop --months and --update\n",
@@ -122,9 +130,11 @@ function main() {
       require.resolve("./jest-baseline"),
       "--watchAll=false",
       "--testMatch",
-      options.mods
-        ? "**/src/testing/ModPerfBench.tsx"
-        : "**/src/testing/PerfBench.tsx",
+      options.valley
+        ? "**/src/testing/ValleyPerfBench.ts"
+        : options.mods
+          ? "**/src/testing/ModPerfBench.tsx"
+          : "**/src/testing/PerfBench.tsx",
     ],
     // With --json, keep stdout for the JSON alone by sending jest's output to stderr
     {
@@ -141,6 +151,20 @@ function main() {
   fs.rmSync(path.dirname(resultFile), { recursive: true, force: true });
   result.wallSeconds = (Date.now() - started) / 1000;
   result.node = process.version;
+
+  if (options.valley) {
+    result.gates = [];
+    if (options.json) {
+      process.stdout.write(JSON.stringify(result, null, 2) + "\n");
+    } else {
+      process.stdout.write(
+        `  Valley co-op · ${result.players} players × ${result.tilesPerPlayer} tiles · ${result.months} simulated months\n` +
+          `  CPU ${result.cpuMsPerMonth.toFixed(2)} ms/month · rollover median ${result.rolloverMedianMs.toFixed(2)} ms · p95 ${result.rolloverP95Ms.toFixed(2)} ms\n` +
+          `  Tick output SHA-256 ${result.frameDigest}\n`,
+      );
+    }
+    return;
+  }
 
   if (options.mods) {
     result.gates = [];

@@ -1,12 +1,5 @@
 .territoryMap,
 .territoryResourceLegend {
-  --territory-owner-you: #006bbb;
-  --territory-owner-valley: #955b22;
-  --territory-owner-ridge: #7951a6;
-  --territory-owner-municipal: #646e47;
-  --territory-owner-peer-0: #32766a;
-  --territory-owner-peer-1: #96516c;
-  --territory-owner-peer-2: #926817;
   --territory-grass: #dfe9d5;
   --territory-grass-rim: #a1b5a1;
   --territory-hill: #e7e0d3;
@@ -24,13 +17,6 @@
 }
 [data-theme="dark"] .territoryMap,
 [data-theme="dark"] .territoryResourceLegend {
-  --territory-owner-you: #62acfa;
-  --territory-owner-valley: #d2a469;
-  --territory-owner-ridge: #b69bdf;
-  --territory-owner-municipal: #b0bd92;
-  --territory-owner-peer-0: #7dc9bf;
-  --territory-owner-peer-1: #d9a0bc;
-  --territory-owner-peer-2: #d5be7c;
   --territory-grass: #29382d;
   --territory-grass-rim: #1d2921;
   --territory-hill: #3a352d;
@@ -417,9 +403,10 @@
     flex-direction: column;
     justify-content: center;
     width: max-content;
-    max-width: 120px;
+    max-width: min(120px, 100% - 4px);
     min-height: 28px;
-    padding: 4px 8px;
+    padding-block: clamp(0px, 10% - 3px, 4px);
+    padding-inline: clamp(2px, 12% - 2px, 8px);
     box-sizing: border-box;
     border: 1px solid
       color-mix(in srgb, var(--interactive-strong) 40%, transparent);
@@ -585,5 +572,60 @@
 @media (max-width: 599px) {
   .territoryMapLayerToggle {
     right: 64px;
+  }
+}
+
+.territoryMapTooltip {
+  position: absolute;
+  z-index: 3;
+  top: 0;
+  left: 0;
+  width: max-content;
+  max-width: min(256px, calc(100% - 16px));
+  box-sizing: border-box;
+  padding: 8px 12px;
+  border: 1px solid var(--tooltip-border);
+  border-radius: var(--radius-md);
+  background: var(--tooltip-bg);
+  box-shadow: 0 4px 12px var(--tooltip-shadow);
+  color: var(--font-color-primary);
+  font-size: var(--font-size-body2);
+  font-weight: 600;
+  line-height: 1.4;
+  overflow-wrap: break-word;
+  pointer-events: none;
+}
+
+.territoryTileTarget .territoryTileProduction {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  font-weight: 600;
+  &[data-favorable="true"] {
+    color: var(--delta-good);
+  }
+  &[data-favorable="false"] {
+    color: var(--delta-bad);
+  }
+  svg {
+    width: 12px;
+    height: 12px;
+  }
+}
+
+.facilityContextMenu.territoryTileMenu {
+  min-width: 184px;
+  .MuiList-root {
+    padding-block: 4px;
+  }
+  .MuiListItemIcon-root {
+    min-width: 32px;
+    color: var(--interactive-strong);
+  }
+  .MuiListSubheader-root {
+    background: transparent;
+    color: var(--font-color-secondary);
+    font-weight: 600;
   }
 }

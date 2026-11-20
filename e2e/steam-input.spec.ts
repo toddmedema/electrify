@@ -1542,7 +1542,7 @@ test("TV saved display preferences style direct scenario links before play", asy
   await expect(buildEntry).toBeInViewport({ ratio: 1 });
   const tile = await selectMapTile(page, "champlain:site-13");
   await expect(tile).toHaveAttribute("data-owned", "true");
-  await expect(tile).toContainText("One building site; transmission tower");
+  await expect(tile).toContainText("Open site");
   await input(page, "confirm");
   await expect(tile).toHaveAttribute("aria-pressed", "true");
   const builder = page.getByRole("dialog", {

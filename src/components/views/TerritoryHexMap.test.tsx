@@ -40,7 +40,7 @@ import {
   selectProject,
 } from "../../helpers/ProjectBuild";
 import type { ReadyProjectSite } from "../../helpers/ProjectBuild";
-import { formatMoneyConcise } from "../../helpers/Format";
+import { formatPurchasePrice } from "../../helpers/Format";
 
 const mockPick = jest.fn();
 let mockSceneError = false;
@@ -133,6 +133,7 @@ function show(
     preloadedState: { game, ui: { evidenceRunId: 1 } },
   });
   const onSelect = jest.fn();
+  const onTileMenu = jest.fn();
   const closeInspection = jest.fn();
   function OtherPurchaseControl() {
     const { purchase, pendingCost } = useTerritoryTilePurchases();
@@ -160,6 +161,7 @@ function show(
           projectPlanning={!!projectSites}
           projectPending={projectPending}
           projectSites={projectSites}
+          projectWindOutput={projectSites && { forest: 0.8, mountain: 1.29 }}
           selected={selected}
           onCloseInspection={
             inspectionOpen
@@ -170,6 +172,7 @@ function show(
               : undefined
           }
           onDeselect={() => select(undefined)}
+          onTileMenu={onTileMenu}
           onSelect={(id, activate) => {
             select(id);
             onSelect(id, activate);
@@ -208,6 +211,7 @@ function show(
     candidates,
     buyMode,
     onSelect,
+    onTileMenu,
     closeInspection,
     setOtherTile: (id: TerritoryTileId) => {
       otherTile = id;
@@ -263,26 +267,24 @@ it("explains and colors physical building eligibility without guessing from terr
       (view) => view.operatingFacility,
     )!;
   expect(hoverColor(vacant)).toBe("var(--interactive-blue)");
-  expect(vacant).toHaveAccessibleDescription(/Vacant building site/);
+  expect(vacant).toHaveAccessibleDescription(/Open site/);
   expect(hoverColor(map.target("champlain:city"))).toBe("var(--blackout-red)");
-  expect(map.target("champlain:city")).toHaveAccessibleDescription(
-    /Cities have no building slot/,
-  );
+  expect(map.target("champlain:city")).toHaveAccessibleDescription(/Your tile/);
   expect(hoverColor(map.target(occupied.tile.id))).toBe("var(--blackout-red)");
   expect(map.target(occupied.tile.id)).toHaveAccessibleDescription(
-    /already has a facility or construction project/,
+    new RegExp(occupied.facility!.name),
   );
   expect(hoverColor(map.target("champlain:site-14"))).toBe(
     "var(--blackout-red)",
   );
   expect(map.target("champlain:site-14")).toHaveAccessibleDescription(
-    /No construction technology supports this site/,
+    /No compatible technology/,
   );
   expect(hoverColor(map.target("green-uplands:site-0"))).toBe(
     "var(--interactive-blue)",
   );
   expect(map.target("green-uplands:site-0")).toHaveAccessibleDescription(
-    /Connect this vacant site before building/,
+    /Unconnected/,
   );
 });
 
@@ -326,7 +328,7 @@ it("uses project candidates for construction and connection quotes for Rapid eli
     "var(--blackout-red)",
   );
   expect(rapid.target("champlain:site-13")).toHaveAccessibleDescription(
-    /Already connected/,
+    /Your tile/,
   );
   expect(
     rapid.store.getState().game.territoryNetwork!.tilePurchases,
@@ -361,7 +363,7 @@ it("keeps foreign company hover colors ahead of project eligibility", () => {
     "var(--territory-owner-peer-1)",
   );
   expect(map.target("green-uplands:site-2")).toHaveAccessibleDescription(
-    /Building unavailable while owned by Birch Utility/,
+    /Owned by Birch Utility/,
   );
 });
 
@@ -373,10 +375,14 @@ it("shows full terrain-specific capital costs on owned and unconnected project m
     await screen.findByTestId("map-scene");
     for (const [id, quote] of sites) {
       const target = map.target(id);
-      const price = formatMoneyConcise(projectSiteCapitalCost(quote));
+      const price = formatPurchasePrice(projectSiteCapitalCost(quote));
       const title = `Total project cost ${price} · ${quote.owned ? "Already connected" : "Connection included"}`;
       expect(target).toHaveAccessibleName(expect.stringContaining(title));
-      const marker = within(target).getByTitle(title);
+      act(() => target.focus());
+      expect(screen.getByRole("tooltip")).toHaveTextContent(title);
+      act(() => target.blur());
+      expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+      const marker = within(target).getByText(price, { exact: true });
       expect(marker).toHaveTextContent(price);
       expect(marker).not.toHaveTextContent(/^\$0$/);
       fireEvent.pointerMove(marker, {
@@ -384,7 +390,9 @@ it("shows full terrain-specific capital costs on owned and unconnected project m
         clientX: 100,
         clientY: 100,
       });
-      expect(marker).toHaveAttribute("title", title);
+      await waitFor(() =>
+        expect(screen.getByRole("tooltip")).toHaveTextContent(title),
+      );
     }
     expect(map.store.getState().game.territoryNetwork!.tilePurchases).toEqual(
       [],
@@ -501,10 +509,10 @@ it("describes ownership of each physical tile, including a partial purchase and 
   map.buyMode();
   tap(map.target("green-uplands:site-0"));
   expect(map.target("green-uplands:site-0")).toHaveAccessibleDescription(
-    /^Your tile\./,
+    /Your tile/,
   );
   expect(map.target("green-uplands:site-1")).toHaveAccessibleDescription(
-    /^Connection available\./,
+    /Unconnected/,
   );
   act(() => {
     map.store.dispatch(
@@ -519,11 +527,55 @@ it("describes ownership of each physical tile, including a partial purchase and 
     );
   });
   expect(map.target("green-uplands:site-2")).toHaveAccessibleDescription(
-    /^Owned by Birch Utility\./,
+    /Owned by Birch Utility/,
   );
   expect(map.target("green-uplands:site-1")).toHaveAccessibleDescription(
-    /^Connection available\./,
+    /Unconnected/,
   );
+});
+
+it("refreshes a stationary pointer tooltip after a peer claims its tile", async () => {
+  const map = show();
+  const tile = map.target("green-uplands:site-2");
+  fireEvent.pointerMove(tile, { pointerId: 1, clientX: 100, clientY: 100 });
+  await waitFor(() =>
+    expect(screen.getByRole("tooltip")).toHaveTextContent(/Unconnected/),
+  );
+  act(() => {
+    map.store.dispatch(
+      delta({
+        multiplayer: {
+          seat: "0",
+          tileOwners: {
+            "green-uplands:site-2": { seat: "1", name: "Birch Utility" },
+          },
+        },
+      }),
+    );
+  });
+  expect(tile).toHaveAccessibleDescription(/Owned by Birch Utility/);
+  expect(screen.getByRole("tooltip")).toHaveTextContent(
+    /Owned by Birch Utility/,
+  );
+  expect(screen.getByRole("tooltip")).not.toHaveTextContent(/Unconnected/);
+});
+
+it("shows the tile status tooltip on keyboard focus and dismisses it on blur", () => {
+  const map = show();
+  const tile = map.target("green-uplands:site-2");
+  act(() => tile.focus());
+  expect(tile).toHaveFocus();
+  expect(screen.getByRole("tooltip")).toHaveTextContent(/Unconnected/);
+  expect(tile).toHaveAccessibleDescription(
+    screen.getByRole("tooltip").textContent!,
+  );
+  act(() =>
+    screen.getByRole("button", { name: "Rapid connection mode" }).focus(),
+  );
+  expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+  expect(
+    map.store.getState().game.territoryNetwork!.tilePurchases,
+  ).toHaveLength(0);
 });
 
 it.each([360, 390])(
@@ -979,7 +1031,10 @@ it("activates and hovers the picked elevated model while keyboard and explicit p
     expect(mockPick).toHaveBeenCalledTimes(1);
     expect(hoverColor(model)).toBe("var(--blackout-red)");
     expect(ground).not.toHaveAttribute("data-model-hovered");
-    expect(ground).toHaveAttribute("title", model.title);
+    expect(screen.getByRole("tooltip")).toHaveTextContent(
+      facility.facility!.name,
+    );
+    expect(ground).not.toHaveAttribute("title");
     tap(ground);
     expect(map.onSelect).toHaveBeenLastCalledWith(facility.tile.id, true);
     expect(
@@ -987,6 +1042,7 @@ it("activates and hovers the picked elevated model while keyboard and explicit p
     ).toHaveLength(0);
     fireEvent.pointerLeave(map.viewport);
     expect(model).not.toHaveAttribute("data-model-hovered");
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
     const price = within(ground).getByText(/^\$/);
     fireEvent.pointerMove(price, { pointerId: 1, clientX: 100, clientY: 100 });
     await waitFor(() =>
@@ -1081,3 +1137,60 @@ it("retains the accessible map and Connect action after the lazy scene fails", a
     restore();
   }
 });
+
+it("opens the actions for the picked model on right-click and for the focused tile from the keyboard", async () => {
+  const restore = enable3D();
+  try {
+    const map = show();
+    await screen.findByTestId("map-scene");
+    const tile = map.target("champlain:city");
+    const picked = territoryTileViews(map.store.getState().game).find(
+      ({ operatingFacility }) => operatingFacility,
+    )!.tile.id;
+    mockPick.mockReturnValue(picked);
+
+    expect(fireEvent.contextMenu(tile, { clientX: 100, clientY: 120 })).toBe(
+      false,
+    );
+    expect(map.onTileMenu).toHaveBeenLastCalledWith({
+      key: picked,
+      left: 100,
+      top: 120,
+    });
+    expect(fireEvent.keyDown(tile, { key: "F10", shiftKey: true })).toBe(false);
+    expect(map.onTileMenu).toHaveBeenLastCalledWith(
+      expect.objectContaining({ key: "champlain:city" }),
+    );
+    // Opening the menu moves focus and its highlight, without activating inspection.
+    expect(map.onSelect.mock.calls).toEqual([
+      ["champlain:site-0", undefined],
+      ["champlain:city", undefined],
+    ]);
+  } finally {
+    restore();
+  }
+});
+
+it.each([
+  ["green-uplands:site-1", "−20%", "false"],
+  ["champlain:site-9", "+29%", "true"],
+] as const)(
+  "shows the estimated wind output modifier on %s",
+  (id, modifier, favorable) => {
+    const game = createGame({ scenarioId: 116, seed: 188 });
+    const wind = projectCatalogue(game, 20e6, false).find(
+      ({ name }) => name === "Wind",
+    )!;
+    const quote = projectSiteQuote(game, selectProject(wind), id);
+    if (!quote.facility) throw new Error(quote.reason);
+    const map = show(1e9, false, "champlain:city", new Map([[id, quote]]));
+    const target = map.target(id);
+    expect(target).toHaveAccessibleName(
+      expect.stringContaining(`${modifier} estimated output vs flat terrain`),
+    );
+    expect(within(target).getByText(modifier)).toHaveAttribute(
+      "data-favorable",
+      favorable,
+    );
+  },
+);

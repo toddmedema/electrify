@@ -9,7 +9,7 @@ export default function FacilityUpgradeAction(props: {
   onClick: () => void;
 }) {
   const shortfallId = React.useId();
-  const { formatMoneyConcise } = useMoney();
+  const { formatMoneyConcise, formatPurchasePrice } = useMoney();
   return (
     <div className="facilityRetrofit">
       <Button
@@ -18,7 +18,7 @@ export default function FacilityUpgradeAction(props: {
         aria-describedby={props.shortfall > 0 ? shortfallId : undefined}
         onClick={props.onClick}
       >
-        {props.label} · {formatMoneyConcise(props.cost)}
+        {props.label} · {formatPurchasePrice(props.cost)}
       </Button>
       {props.shortfall > 0 && (
         <Typography

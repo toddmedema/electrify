@@ -590,6 +590,11 @@ export function parseSave(
     game.timeline.some(
       (tick) =>
         !validEmissions(tick) ||
+        (tick.expensesExpansionInterest !== undefined &&
+          (!Number.isFinite(tick.expensesExpansionInterest) ||
+            tick.expensesExpansionInterest < 0 ||
+            !Number.isFinite(tick.expensesInterest) ||
+            tick.expensesExpansionInterest > tick.expensesInterest)) ||
         [
           tick.agreementAvailableMWh,
           tick.agreementUsefulMWh,

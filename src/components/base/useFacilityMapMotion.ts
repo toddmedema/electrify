@@ -40,17 +40,27 @@ export default function useFacilityMapMotion(speed: SpeedType = "PAUSED") {
 
 /** Keep the same CSS animations alive: pause retains phase; retiming never seeks. */
 export function useFacilityAnimation(active: boolean, variant: string) {
-  const ref = React.useRef<SVGSVGElement>(null);
   const { allowed, rate } = React.useContext(FacilityMapMotionContext);
   const moving = active && allowed;
+  const ref = useMapAnimationPlayback<SVGSVGElement>(moving, rate, variant);
+  return { ref, moving };
+}
+
+export function useMapAnimationPlayback<T extends Element>(
+  moving: boolean,
+  rate: number,
+  variant: string | number,
+) {
+  const ref = React.useRef<T>(null);
   React.useLayoutEffect(() => {
     for (const animation of ref.current?.getAnimations?.({ subtree: true }) ??
       []) {
+      if ("transitionProperty" in animation) continue;
       if (animation.playbackRate !== rate) animation.updatePlaybackRate(rate);
       if (moving) {
         if (animation.playState !== "running") animation.play();
       } else if (animation.playState !== "paused") animation.pause();
     }
   }, [moving, rate, variant]);
-  return { ref, moving };
+  return ref;
 }

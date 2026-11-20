@@ -1,3 +1,4 @@
+import { LOAN_MONTHS, TICK_MINUTES } from "../Constants";
 import { FACILITY_FUELS } from "../data/FacilityFuels";
 import {
   generatorMaxPeakW,
@@ -13,10 +14,17 @@ import {
   type ExpandFacilityAction,
   type CancelFacilityExpansionAction,
   type FacilityExpansionInProgressType,
+  type FacilityExpansionLoanType,
   type FacilityOperatingType,
   type GameType,
 } from "../Types";
-import { facilityPermanentlyShutdown } from "./Financials";
+import {
+  facilityLoanMonths,
+  facilityPermanentlyShutdown,
+  getMonthlyPayment,
+  loanBalanceAfterTicks,
+  purchaseTerms,
+} from "./Financials";
 import {
   getTerritoryTile,
   hasTerritoryNetwork,
@@ -29,16 +37,41 @@ import {
 const MAX_EXPANSION_CONSTRUCTION_YEARS = 120;
 export const MAX_FACILITY_EXPANSION_COST = 1e15;
 
+type ReadyFacilityExpansionQuote = {
+  status: "ready";
+  facilityId: number;
+  currentSize: number;
+  deltaSize: number;
+  maxSize: number;
+  amountDue: number;
+  constructionKgco2eTotal: number;
+} & FacilityExpansionInProgressType;
+
 export type FacilityExpansionQuote =
-  | ({
-      status: "ready";
-      facilityId: number;
-      currentSize: number;
-      deltaSize: number;
-      maxSize: number;
-      constructionKgco2eTotal: number;
-    } & FacilityExpansionInProgressType)
+  | ReadyFacilityExpansionQuote
   | { status: "unavailable"; reason: string; maxSize?: number };
+
+/** Reuse the capital quote for both payment options and bind the loan's reviewed terms. */
+export function financeFacilityExpansionQuote(
+  quote: ReadyFacilityExpansionQuote,
+  interestRate: number,
+  months: number,
+): ReadyFacilityExpansionQuote {
+  const terms = purchaseTerms(quote.cost, true, interestRate, 0, months);
+  return {
+    ...quote,
+    amountDue: terms.amountDue,
+    loan: {
+      loanAmountTotal: terms.loanAmount,
+      loanAmountLeft: terms.loanAmount,
+      loanMonthlyPayment: terms.monthlyPayment,
+      interestRate,
+      months,
+      startsMinute: quote.startsMinute,
+    },
+    quoteKey: `${quote.quoteKey.slice(0, -1)},${JSON.stringify(interestRate)},${months}]`,
+  };
+}
 
 /** Request identities only. Reject extra fields so a client cannot smuggle an alternate quote. */
 export function validExpandFacilityAction(
@@ -48,8 +81,9 @@ export function validExpandFacilityAction(
   const action = raw as Record<string, unknown>;
   return (
     Object.keys(action).every((key) =>
-      ["facilityId", "targetSize", "quoteKey"].includes(key),
+      ["facilityId", "targetSize", "quoteKey", "financed"].includes(key),
     ) &&
+    (action.financed === undefined || typeof action.financed === "boolean") &&
     Number.isSafeInteger(action.facilityId) &&
     (action.facilityId as number) >= 0 &&
     typeof action.targetSize === "number" &&
@@ -85,6 +119,7 @@ export function facilityExpansionQuote(
   game: GameType,
   facilityId: number,
   targetSize: number,
+  financed = false,
 ): FacilityExpansionQuote {
   const unavailable = (
     reason: string,
@@ -225,7 +260,7 @@ export function facilityExpansionQuote(
     projectSequence,
     facility.minuteCreated,
   ]);
-  return {
+  const ready: ReadyFacilityExpansionQuote = {
     status: "ready",
     projectSequence,
     facilityId,
@@ -236,6 +271,7 @@ export function facilityExpansionQuote(
     targetPeakW,
     ...(isStorage(facility) ? { targetPeakWh: targetSize } : {}),
     cost,
+    amountDue: cost,
     yearsToBuild,
     yearsToBuildLeft: yearsToBuild,
     startsMinute: game.date.minute,
@@ -245,6 +281,20 @@ export function facilityExpansionQuote(
     constructionKgco2eEmitted: 0,
     quoteKey,
   };
+  return financed
+    ? financeFacilityExpansionQuote(
+        ready,
+        game.interestRate,
+        facilityLoanMonths(facility.lifespanYears),
+      )
+    : ready;
+}
+
+/** Cancelling a financed project clears its debt and returns the equity paid so far. */
+export function facilityExpansionRefund(
+  expansion: FacilityExpansionInProgressType,
+): number {
+  return expansion.cost - (expansion.loan?.loanAmountLeft ?? 0);
 }
 
 /** Retain post-acquisition changes separately from the immutable purchase terms. */
@@ -296,6 +346,9 @@ export function completeFacilityExpansion(
     facility.peakWh = expansion.targetPeakWh;
   facility.peakW = expansion.targetPeakW;
   facility.buildCost += expansion.cost;
+  if (expansion.loan && expansion.loan.loanAmountLeft > 0) {
+    (facility.expansionLoans ??= []).push(expansion.loan);
+  }
   facility.annualOperatingCost += expansion.annualOperatingCostDelta;
   if (expansion.costPerStartDelta)
     facility.costPerStart =
@@ -342,6 +395,54 @@ export function validExpandedFacilityCapacity(
   );
 }
 
+function validFacilityExpansionLoan(
+  loan: FacilityExpansionLoanType,
+  nowMinute: number,
+): boolean {
+  if (!loan || typeof loan !== "object" || Array.isArray(loan)) return false;
+  const fields = [
+    "loanAmountTotal",
+    "loanAmountLeft",
+    "loanMonthlyPayment",
+    "interestRate",
+    "months",
+    "startsMinute",
+  ];
+  if (
+    Object.keys(loan).length !== fields.length ||
+    Object.keys(loan).some((key) => !fields.includes(key)) ||
+    !Number.isFinite(loan.loanAmountTotal) ||
+    loan.loanAmountTotal <= 0 ||
+    loan.loanAmountTotal > MAX_FACILITY_EXPANSION_COST ||
+    !Number.isFinite(loan.loanAmountLeft) ||
+    loan.loanAmountLeft < 0 ||
+    loan.loanAmountLeft > loan.loanAmountTotal ||
+    !Number.isFinite(loan.interestRate) ||
+    loan.interestRate < 0 ||
+    loan.interestRate > 1 ||
+    !Number.isInteger(loan.months) ||
+    loan.months < 1 ||
+    loan.months > LOAN_MONTHS ||
+    !Number.isSafeInteger(loan.startsMinute) ||
+    loan.startsMinute < 0 ||
+    loan.startsMinute > nowMinute ||
+    loan.startsMinute % TICK_MINUTES !== 0 ||
+    !Number.isFinite(loan.loanMonthlyPayment) ||
+    loan.loanMonthlyPayment !==
+      getMonthlyPayment(loan.loanAmountTotal, loan.interestRate, loan.months)
+  )
+    return false;
+  const reachable = loanBalanceAfterTicks(
+    loan.loanAmountTotal,
+    loan.loanMonthlyPayment,
+    loan.interestRate,
+    (nowMinute - loan.startsMinute) / TICK_MINUTES,
+  );
+  return (
+    Math.abs(loan.loanAmountLeft - reachable) <= loan.loanAmountTotal * 1e-7
+  );
+}
+
 /** Save validation deliberately uses no loaded weather/fuel tables. */
 export function validFacilityExpansion(
   facility: FacilityOperatingType,
@@ -353,6 +454,24 @@ export function validFacilityExpansion(
       facility.expansionSequence < 1)
   )
     return false;
+  if (
+    facility.expansionLoans !== undefined &&
+    (!Array.isArray(facility.expansionLoans) ||
+      facility.yearsToBuildLeft !== 0 ||
+      !facility.expansionSequence ||
+      facility.expansionLoans.length >
+        facility.expansionSequence - Number(!!facility.expansionInProgress) ||
+      !facility.expansionLoans.every(
+        (loan) =>
+          validFacilityExpansionLoan(loan, game.date.minute) &&
+          loan.startsMinute >= facility.minuteCreated,
+      ) ||
+      facility.expansionLoans.reduce(
+        (total, loan) => total + loan.loanAmountTotal,
+        0,
+      ) > facility.buildCost)
+  )
+    return false;
   const raw = facility.expansionInProgress;
   if (raw === undefined) return true;
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return false;
@@ -362,6 +481,7 @@ export function validFacilityExpansion(
     "targetPeakW",
     "targetPeakWh",
     "cost",
+    "loan",
     "annualOperatingCostDelta",
     "costPerStartDelta",
     "startsMinute",
@@ -469,8 +589,23 @@ export function validFacilityExpansion(
   } catch {
     return false;
   }
-  if (!Array.isArray(reviewed) || ![16, 17].includes(reviewed.length))
+  if (!Array.isArray(reviewed)) return false;
+  if (raw.loan !== undefined) {
+    if (
+      reviewed.length !== 19 ||
+      !validFacilityExpansionLoan(raw.loan, game.date.minute) ||
+      raw.loan.startsMinute !== raw.startsMinute ||
+      reviewed[17] !== raw.loan.interestRate ||
+      reviewed[18] !== raw.loan.months ||
+      raw.loan.months !== facilityLoanMonths(facility.lifespanYears) ||
+      raw.loan.loanAmountTotal !==
+        purchaseTerms(raw.cost, true, raw.loan.interestRate, 0, raw.loan.months)
+          .loanAmount
+    )
+      return false;
+  } else if (![16, 17].includes(reviewed.length)) {
     return false;
+  }
   const same = (actual: unknown, expected: number) =>
     typeof actual === "number" &&
     Number.isFinite(actual) &&
@@ -487,7 +622,7 @@ export function validFacilityExpansion(
     reviewed[4] !== raw.targetPeakW ||
     reviewed[5] !== raw.cost ||
     reviewed[15] !== raw.projectSequence ||
-    (reviewed.length === 17 && reviewed[16] !== facility.minuteCreated) ||
+    (reviewed.length >= 17 && reviewed[16] !== facility.minuteCreated) ||
     reviewed[13] !== projectContext.date.year ||
     reviewed[14] !== projectContext.date.month ||
     reviewed[6] !== raw.yearsToBuild ||

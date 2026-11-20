@@ -43,7 +43,7 @@ export function TerritoryTilePurchasesProvider({
   const dispatch = useAppDispatch();
   const store = useStore<RootState>();
   const runId = useAppSelector((state) => state.ui?.evidenceRunId);
-  const { formatMoneyConcise: money } = useMoney();
+  const { formatMoneyConcise: money, formatPurchasePrice: price } = useMoney();
   const pending = React.useRef(new Map<TerritoryTileId, PendingPurchase>());
   const currentGame = React.useRef(game);
   currentGame.current = game;
@@ -123,7 +123,7 @@ export function TerritoryTilePurchasesProvider({
     const entry = { price: quote.price, tileIds };
     const operationSession = session.current;
     pending.current.set(tileId, entry);
-    setMessage(`Connecting · ${money(quote.price)}…`);
+    setMessage(`Connecting · ${price(quote.price)}…`);
     refresh();
     try {
       const payload = { tileId, quoteKey: quote.quoteKey };

@@ -424,6 +424,9 @@ const migrations: readonly Migration[] = [
       return null;
     }
   },
+  // 23 -> 24: support expansion loans and reconcile Valley goals from the map branch.
+  (save, publishedValleyRules) =>
+    migrations[22 - FIRST_SUPPORTED_SAVE_SCHEMA](save, publishedValleyRules),
 ];
 
 /** Structure versions are independent of app releases and simulation compatibility. */
@@ -448,7 +451,8 @@ export function upgradeSave(
   for (let from = version; from < SAVE_SCHEMA_VERSION; from++) {
     const upgraded = migrations[from - FIRST_SUPPORTED_SAVE_SCHEMA](
       save,
-      publishedValleyRules,
+      // An identity describes the input schema. Later steps see already migrated data.
+      from === version ? publishedValleyRules : undefined,
     );
     if (!upgraded) return null;
     save = { ...upgraded, schemaVersion: from + 1 };

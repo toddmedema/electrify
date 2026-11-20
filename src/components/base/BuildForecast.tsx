@@ -34,12 +34,15 @@ export function BuildForecastProvider(props: { children: React.ReactNode }) {
 }
 
 /** Standalone catalogs also work without a game workspace (including component previews). */
-export function useBuildForecast(game: GameType): BuildForecast | undefined {
+export function useBuildForecast(
+  game: GameType,
+  enabled = true,
+): BuildForecast | undefined {
   const shared = React.useContext(BuildForecastContext);
   const local = useOutlookWorker(
     "build",
-    shared ? undefined : buildForecastKey(game),
+    enabled && !shared ? buildForecastKey(game) : undefined,
     game,
   );
-  return shared ? shared.forecast : local;
+  return enabled ? (shared ? shared.forecast : local) : undefined;
 }

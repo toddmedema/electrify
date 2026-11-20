@@ -24,7 +24,7 @@ import * as GameReducer from "../../reducers/Game";
 import * as Facilities from "../../data/Facilities";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "../../helpers/DateTime";
 import { DEFAULT_CUSTOM_SCENARIO, SCENARIOS } from "../../data/Scenarios";
-import { formatMoneyConcise } from "../../helpers/Format";
+import { formatPurchasePrice } from "../../helpers/Format";
 import {
   resilienceBuildOptions,
   withResilienceOptions,
@@ -644,8 +644,8 @@ it("shows natural-gas base, per-start, and daily-start estimated O&M", async () 
 
   const rows = screen.getAllByRole("row");
   for (const name of [
-    /Fixed upkeep.*\$2\.88M/,
-    /Variable upkeep.*\$1\.24\/MWh/,
+    /Fixed.*\$2\.88M/,
+    /Variable.*\$1\.24\/MWh/,
     /Non-fuel start cost.*\$23\.1k\/start/,
     /Estimated annual upkeep.*\$12M\/yr/,
   ]) {
@@ -784,12 +784,12 @@ it("shows Oil's fixed, variable, and expected-output O&M", () => {
 
   expect(
     screen.getByRole("row", {
-      name: /Fixed upkeep.*\$3\.09M\/yr/,
+      name: /Fixed.*\$3\.09M\/yr/,
     }),
   ).toBeInTheDocument();
   expect(
     screen.getByRole("row", {
-      name: /Variable upkeep.*\$25\.7\/MWh/,
+      name: /Variable.*\$25\.7\/MWh/,
     }),
   ).toBeInTheDocument();
   expect(
@@ -1684,19 +1684,19 @@ describe("weather hardening in the purchase dialog", () => {
       name: "Expected impact",
     });
     expect(impact).toHaveTextContent(
-      `${formatMoneyConcise(DOWNPAYMENT_PERCENT * packaged.buildCost)} now +`,
+      `${formatPurchasePrice(DOWNPAYMENT_PERCENT * packaged.buildCost)} now +`,
     );
     expect(impact).toHaveTextContent(
-      `${formatMoneyConcise(packaged.buildCost)} now`,
+      `${formatPurchasePrice(packaged.buildCost)} now`,
     );
     fireEvent.click(
       within(dialog).getByRole("checkbox", { name: /^Cold-weather package/ }),
     );
     expect(impact).toHaveTextContent(
-      `${formatMoneyConcise(plain.buildCost)} now`,
+      `${formatPurchasePrice(plain.buildCost)} now`,
     );
     expect(impact).toHaveTextContent(
-      `${formatMoneyConcise(DOWNPAYMENT_PERCENT * plain.buildCost)} now +`,
+      `${formatPurchasePrice(DOWNPAYMENT_PERCENT * plain.buildCost)} now +`,
     );
     fireEvent.click(within(dialog).getByRole("button", { name: "Take loan" }));
     expect(onBuild).toHaveBeenCalledWith(true, {
@@ -1833,13 +1833,13 @@ it("updates quoted build costs when the local currency context changes", () => {
   const view = render(quote("JPY"));
   expect(
     screen.getByText(
-      formatMoneyConcise(generator.buildCost, currencyByCode("JPY")),
+      formatPurchasePrice(generator.buildCost, currencyByCode("JPY")),
     ),
   ).toBeInTheDocument();
   view.rerender(quote("ZMW"));
   expect(
     screen.getByText(
-      formatMoneyConcise(generator.buildCost, currencyByCode("ZMW")),
+      formatPurchasePrice(generator.buildCost, currencyByCode("ZMW")),
     ),
   ).toBeInTheDocument();
 });

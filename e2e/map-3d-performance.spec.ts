@@ -78,11 +78,11 @@ async function panTo(
 }
 
 for (const theme of ["light", "dark"] as const) {
-  test(`real 3D phases follow operation, speed, visibility and simulated light · ${theme}`, async ({
+  test(`real 3D phases follow operation, speed and visibility · ${theme}`, async ({
     page,
-  }, info) => {
+  }) => {
     await page.emulateMedia({ reducedMotion: "no-preference" });
-    const { map, canvas, pause } = await startMap(page, theme);
+    const { map, canvas } = await startMap(page, theme);
     const game = (await readSavedGame(page))!;
     const wind = game.facilities.find(
       (facility) => facility.fuel === "Wind" && facility.currentW > 0,
@@ -196,6 +196,14 @@ for (const theme of ["light", "dark"] as const) {
     await expect
       .poll(async () => (await sample(canvas)).frames)
       .toBeGreaterThan(hidden.frames);
+  });
+
+  test(`real 3D shows idle foreign plants and simulation daylight · ${theme}`, async ({
+    page,
+  }, info) => {
+    await page.emulateMedia({ reducedMotion: "no-preference" });
+    const { map, canvas, pause } = await startMap(page, theme);
+    const game = (await readSavedGame(page))!;
     const foreign = territoryTileViews(game).find(
       (view) => !view.owned && view.facility,
     )!;
@@ -206,13 +214,7 @@ for (const theme of ["light", "dark"] as const) {
     )!;
     expect(foreignScene.active).toBe(false);
     expect(foreignScene.motionKey).toBeUndefined();
-    const light = (await sample(canvas)).light;
-    await page.getByRole("button", { name: "fast speed", exact: true }).click();
-    await expect
-      .poll(async () => (await sample(canvas)).light)
-      .not.toEqual(light);
-    // Slow the actual simulation before choosing the review instant, so browser input latency
-    // cannot carry 12× game time several hours beyond the observed sunlight.
+    // Keep the short clear January noon visible while the simulation advances.
     await page.getByRole("button", { name: "slow speed", exact: true }).click();
     await expect
       .poll(
@@ -220,7 +222,7 @@ for (const theme of ["light", "dark"] as const) {
           const current = await sample(canvas);
           return current.light[1] > 0.92 && current.lightColor[0] > 0.99;
         },
-        { timeout: 25000 },
+        { timeout: 25000, intervals: [100, 200] },
       )
       .toBe(true);
     await pause.click();
@@ -241,6 +243,11 @@ for (const theme of ["light", "dark"] as const) {
     await reviewScreenshot(map, {
       path: info.outputPath(`daylight-map-${theme}.png`),
     });
+
+    await page.getByRole("button", { name: "fast speed", exact: true }).click();
+    await expect
+      .poll(async () => (await sample(canvas)).light)
+      .not.toEqual(frozen);
   });
 }
 

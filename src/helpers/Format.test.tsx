@@ -1,6 +1,7 @@
 import {
   formatWattHours,
   formatMoneyConcise,
+  formatPurchasePrice,
   formatMoneyStable,
   formatWattHoursAxis,
   formatWattHoursOfPeak,
@@ -210,6 +211,14 @@ describe("money formatting of values that are not numbers", () => {
     expect(formatMoneyConcise(999000000)).toEqual("$999M");
     expect(formatMoneyConcise(999999999)).toEqual("$999M");
     expect(formatMoneyConcise(1000000000)).toEqual("$1B");
+    expect(formatMoneyConcise(3150000)).toEqual("$3.15M");
+  });
+
+  it("rounds a purchase price to one decimal and keeps three digits above that", () => {
+    expect(formatPurchasePrice(3150000)).toEqual("$3.2M");
+    expect(formatPurchasePrice(321000000)).toEqual("$321M");
+    expect(formatPurchasePrice(32100000)).toEqual("$32.1M");
+    expect(formatPurchasePrice(999500000)).toEqual("$999M");
   });
 
   it("shows a dash rather than a word for a value it cannot express", () => {

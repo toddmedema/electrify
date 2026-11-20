@@ -56,6 +56,20 @@ jest.mock("../base/ProjectBuild", () => {
   return jest.requireActual("../base/ProjectBuild");
 });
 
+jest.mock("../base/BuildForecast", () => {
+  const forecast = {
+    timeline: [],
+    windSpeeds: [24],
+    offshoreWindSpeeds: [],
+    airborneWindSpeeds: [],
+    solarIrradiances: [450],
+  };
+  return {
+    useBuildForecast: (_game: unknown, enabled = true) =>
+      enabled ? forecast : undefined,
+  };
+});
+
 jest.mock(
   "../base/ManualLink",
   () => (props: { children?: React.ReactNode }) => <>{props.children}</>,
@@ -67,6 +81,11 @@ jest.mock("./TerritoryHexMap", () => ({
     views: readonly TerritoryTileView[];
     selected?: TerritoryTileId;
     onSelect: (id: TerritoryTileId, activate?: boolean) => void;
+    onTileMenu: (anchor: {
+      key: TerritoryTileId;
+      top: number;
+      left: number;
+    }) => void;
   }) => (
     <div aria-label="Tile map">
       <button className="territoryMapBuyToggle">Rapid connection mode</button>
@@ -84,6 +103,9 @@ jest.mock("./TerritoryHexMap", () => ({
             aria-label={`Inspect ${tile.id}`}
             onFocus={() => props.onSelect(tile.id)}
             onClick={() => props.onSelect(tile.id, true)}
+            onContextMenu={() =>
+              props.onTileMenu({ key: tile.id, top: 100, left: 100 })
+            }
           >
             {tile.terrain}
           </button>
@@ -111,6 +133,7 @@ function show(game = ready(), width?: number, scale = 1) {
     onTogglePause: jest.fn(),
     onPause: jest.fn(),
     onRetrofit: jest.fn(),
+    onExpand: jest.fn(),
     onCancelRetrofit: jest.fn(),
   };
   const memory = new Map<string, unknown>([
@@ -620,10 +643,7 @@ it.each([undefined, 1280])(
       }),
     );
     inspect("green-uplands:site-1");
-    fireEvent.click(
-      await screen.findByText("Review project", { selector: "button" }),
-    );
-    fireEvent.click(screen.getByRole("button", { name: "Connect & build" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Cash" }));
     await act(async () => {
       await Promise.resolve();
     });
@@ -632,11 +652,11 @@ it.each([undefined, 1280])(
     inspect("champlain:site-13");
     fireEvent.keyDown(surface(), { key: "Escape" });
     showPanel(true);
-    expect(screen.getByRole("button", { name: "Connecting…" })).toBeDisabled();
+    expect(within(surface()).getByText("Connecting…")).toBeVisible();
+    for (const name of ["Cash", "Loan", "Cancel"])
+      expect(within(surface()).getByRole("button", { name })).toBeDisabled();
     expect(screen.queryByRole("slider")).not.toBeInTheDocument();
-    expect(
-      screen.getByRole("heading", { name: "Connect and build Wind?" }),
-    ).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Wind · 20MW" })).toBeVisible();
     expect(commands).toHaveLength(1);
     expect(store.getState().game.facilities).toHaveLength(
       game.facilities.length,
@@ -704,9 +724,7 @@ it("uses the persistent desktop rail for Build and owned empty tiles, preselecti
   });
   fireEvent.click(wind);
   expect(wind).toHaveAttribute("aria-pressed", "true");
-  expect(
-    await screen.findByText("Review project", { selector: "button" }),
-  ).toBeEnabled();
+  expect(await screen.findByRole("button", { name: "Cash" })).toBeEnabled();
   expect(screen.getByRole("button", { name: `Inspect ${id}` })).toHaveAttribute(
     "aria-pressed",
     "true",
@@ -782,10 +800,9 @@ it("keeps a candidate and canonical quote when generator upgrades change, then l
   fireEvent.click(option);
   expect(option).toBeChecked();
   expect(selected).toHaveAttribute("aria-pressed", "true");
-  expect(screen.getByRole("button", { name: "Review project" })).toBeEnabled();
-  fireEvent.click(screen.getByRole("button", { name: "Review project" }));
-  expect(screen.getByRole("heading", { name: "Build Solar?" })).toBeVisible();
-  fireEvent.click(screen.getByRole("button", { name: "Build project" }));
+  const cash = screen.getByRole("button", { name: "Cash" });
+  expect(cash).toBeEnabled();
+  fireEvent.click(cash);
   expect(option).toBeDisabled();
   fireEvent.click(option);
   inspect("champlain:site-12");
@@ -818,9 +835,7 @@ it("keeps the phone project sheet unchanged without desktop upgrade editing", as
     }),
   );
   inspect("champlain:site-13");
-  expect(
-    await screen.findByText("Review project", { selector: "button" }),
-  ).toBeEnabled();
+  expect(await screen.findByRole("button", { name: "Cash" })).toBeEnabled();
   expect(
     screen.queryByRole("checkbox", { name: /trackers/i }),
   ).not.toBeInTheDocument();
@@ -851,7 +866,10 @@ it.each([
         target: { value: wToSliderTick(8e7) },
       },
     );
-    fireEvent.click(screen.getByRole("button", { name: "Done" }));
+    fireEvent.keyDown(
+      screen.getByRole("slider", { name: "Generator capacity" }),
+      { key: "Escape" },
+    );
     fireEvent.mouseEnter(
       screen.getByRole("button", { name: `Choose sites for ${name}` }),
     );
@@ -861,9 +879,7 @@ it.each([
         { name: shortcut },
       ),
     );
-    expect(
-      await screen.findByText("Review project", { selector: "button" }),
-    ).toBeEnabled();
+    expect(await screen.findByRole("button", { name: "Cash" })).toBeEnabled();
     expect(
       screen.getByRole("heading", {
         name: `${name} · ${formatWatts(maximum)}`,
@@ -897,10 +913,75 @@ it("retains the inspected site when connecting transitions directly into desktop
   fireEvent.click(
     screen.getByRole("button", { name: "Choose sites for Wind" }),
   );
-  expect(
-    await screen.findByText("Review project", { selector: "button" }),
-  ).toBeEnabled();
+  expect(await screen.findByRole("button", { name: "Cash" })).toBeEnabled();
   expect(
     screen.getByRole("button", { name: `Inspect ${site.id}` }),
   ).toHaveAttribute("aria-pressed", "true");
+});
+
+it("takes facility actions from the map and confirms a sale of the same facility", () => {
+  const game = ready();
+  const facility = game.facilities.find(
+    (item) =>
+      item.tileId &&
+      !item.saleRestricted &&
+      !item.paused &&
+      item.yearsToBuildLeft <= 0,
+  )!;
+  const { facilityActions } = show(game);
+  const tile = screen.getByRole("button", {
+    name: `Inspect ${facility.tileId}`,
+  });
+  fireEvent.contextMenu(tile);
+  let menu = screen.getByRole("menu", { name: "Tile actions" });
+  fireEvent.click(within(menu).getByRole("menuitem", { name: "Pause" }));
+  expect(facilityActions.onPause).toHaveBeenCalledWith(
+    facility.id,
+    facility.name,
+  );
+  expect(facilityActions.onSell).not.toHaveBeenCalled();
+
+  fireEvent.contextMenu(tile);
+  menu = screen.getByRole("menu", { name: "Tile actions" });
+  fireEvent.click(within(menu).getByRole("menuitem", { name: "Sell" }));
+  const confirmation = screen.getByRole("dialog", { name: /^Sell:/ });
+  expect(facilityActions.onSell).not.toHaveBeenCalled();
+  fireEvent.click(within(confirmation).getByRole("button", { name: "Sell" }));
+  expect(facilityActions.onSell).toHaveBeenCalledWith(facility.id);
+});
+
+it("focuses the site inspector after a keyboard user chooses Inspect", async () => {
+  show();
+  const tile = screen.getByRole("button", {
+    name: "Inspect green-uplands:site-1",
+  });
+  act(() => tile.focus());
+  fireEvent.contextMenu(tile);
+  fireEvent.click(
+    within(screen.getByRole("menu", { name: "Tile actions" })).getByRole(
+      "menuitem",
+      { name: "Inspect" },
+    ),
+  );
+  expect(await screen.findByRole("heading", { name: "Forest" })).toHaveFocus();
+});
+
+it("opens the capacity upgrade directly from the tile actions", async () => {
+  const game = ready();
+  const facility = game.facilities.find(
+    (item) => item.tileId && item.name === "Wind",
+  )!;
+  show(game);
+  fireEvent.contextMenu(
+    screen.getByRole("button", { name: `Inspect ${facility.tileId}` }),
+  );
+  const menu = screen.getByRole("menu", { name: "Tile actions" });
+  fireEvent.click(
+    within(menu).getByRole("menuitem", {
+      name: "Upgrade capacity",
+    }),
+  );
+  expect(
+    await screen.findByRole("dialog", { name: "Upgrade Wind capacity?" }),
+  ).toBeVisible();
 });

@@ -58,6 +58,30 @@ for (const theme of ["light", "dark"] as const) {
       expect(artwork.length).toBeGreaterThan(5);
       for (const { name, source } of artwork)
         expect(source).toBe(`/images/${name.toLowerCase()}.svg`);
+      const energy = rail.getByRole("button", { name: /^Energy:/ });
+      await energy.hover();
+      const energySizing = rail.getByRole("region", { name: "Energy sizing" });
+      await expect(energySizing).toBeVisible();
+      const anchor = (await energy.boundingBox())!;
+      const sliderBounds = (await energySizing.boundingBox())!;
+      expect(sliderBounds.x).toBeGreaterThanOrEqual(anchor.x + anchor.width);
+      expect(
+        Math.abs(
+          sliderBounds.y +
+            sliderBounds.height / 2 -
+            anchor.y -
+            anchor.height / 2,
+        ),
+      ).toBeLessThanOrEqual(32);
+      await energySizing.hover();
+      await expect(energySizing.getByRole("slider")).toBeVisible();
+      await page.mouse.move(0, 0);
+      await expect(energySizing).toHaveCount(0);
+      await energy.click();
+      await page.mouse.move(0, 0);
+      await expect(energySizing.getByRole("slider")).toBeFocused();
+      await page.keyboard.press("Escape");
+      await expect(energySizing).toHaveCount(0);
       const wind = rail.getByRole("button", {
         name: "Choose sites for Wind",
         exact: true,

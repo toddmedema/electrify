@@ -32,7 +32,7 @@ import { CoalRepowerReview, coalRepowerActionLabel } from "../base/CoalRepower";
 import { currentCash } from "../../helpers/GameSelectors";
 import {
   facilityCashBack,
-  facilityLoanBalance,
+  getTotalDebt,
   facilityPermanentlyShutdown,
 } from "../../helpers/Financials";
 import { formatFacilitySize } from "../../helpers/Format";
@@ -43,6 +43,13 @@ export interface FacilityMenuTarget {
   ids: number[];
   top: number;
   left: number;
+}
+
+export interface ContextMenuAction {
+  label: string;
+  icon: React.ReactNode;
+  disabled?: boolean;
+  onSelect: () => void;
 }
 
 type ActionKey =
@@ -202,17 +209,20 @@ export default function FacilityContextMenu(props: {
   target: FacilityMenuTarget | null;
   onClose: () => void;
   onMenuExited?: () => void;
+  tileActions?: ContextMenuAction[];
+  tileCaption?: string;
   onSell: DispatchProps["onSell"];
   onTogglePause: DispatchProps["onTogglePause"];
   onPause: DispatchProps["onPause"];
   onRetrofit?: DispatchProps["onRetrofit"];
   onCancelRetrofit?: DispatchProps["onCancelRetrofit"];
 }) {
-  const { formatMoneyConcise } = useMoney();
+  const { formatMoneyConcise, formatPurchasePrice } = useMoney();
   const [pending, setPending] = React.useState<{
     key: ActionKey;
     ids: number[];
   } | null>(null);
+  const afterTileMenu = React.useRef<() => void>();
   const { game, target } = props;
   const selected = game.facilities.filter((f) => target?.ids.includes(f.id));
   const offered = actionsFor(game, selected).filter(
@@ -245,10 +255,7 @@ export default function FacilityContextMenu(props: {
     (sum, facility) => sum + facilityCashBack(facility, game.date.minute),
     0,
   );
-  const loans = affected.reduce(
-    (sum, facility) => sum + facilityLoanBalance(facility),
-    0,
-  );
+  const loans = getTotalDebt(affected);
   const execute = (action: FleetAction) => {
     for (const facility of action.facilities) {
       switch (action.key) {
@@ -273,27 +280,58 @@ export default function FacilityContextMenu(props: {
     }
   };
   const actionLabel = (action: FleetAction, bulk: boolean) =>
-    `${action.label}${bulk ? ` (${action.facilities.length})` : ""}${action.cost !== undefined ? ` · ${formatMoneyConcise(action.cost)}` : ""}`;
+    `${action.label}${bulk ? ` (${action.facilities.length})` : ""}${action.cost !== undefined ? ` · ${formatPurchasePrice(action.cost)}` : ""}`;
   const title =
-    selected.length === 1
+    props.tileCaption ??
+    (selected.length === 1
       ? `${formatFacilitySize(selected[0])} ${selected[0].name}`
-      : null;
+      : null);
   return (
     <>
       <Menu
-        open={!!target && selected.length > 0 && offered.length > 0}
+        open={!!target && (offered.length > 0 || !!props.tileActions?.length)}
         onClose={props.onClose}
         anchorReference="anchorPosition"
         anchorPosition={
           target ? { top: target.top, left: target.left } : undefined
         }
         slotProps={{
-          list: { "aria-label": "Facility actions" },
-          paper: { className: "facilityContextMenu" },
-          transition: { onExited: props.onMenuExited },
+          list: {
+            "aria-label": props.tileActions
+              ? "Tile actions"
+              : "Facility actions",
+          },
+          paper: {
+            className: props.tileActions
+              ? "facilityContextMenu territoryTileMenu"
+              : "facilityContextMenu",
+          },
+          transition: {
+            onExited: () => {
+              props.onMenuExited?.();
+              const select = afterTileMenu.current;
+              afterTileMenu.current = undefined;
+              select?.();
+            },
+          },
         }}
       >
         {title && <ListSubheader disableSticky>{title}</ListSubheader>}
+        {props.tileActions?.map(({ label, icon, disabled, onSelect }) => (
+          <MenuItem
+            key={label}
+            disabled={disabled}
+            onClick={() => {
+              // Let the menu restore focus before the new inspector or dialog opens.
+              afterTileMenu.current = onSelect;
+              props.onClose();
+            }}
+          >
+            <ListItemIcon>{icon}</ListItemIcon>
+            <ListItemText>{label}</ListItemText>
+          </MenuItem>
+        ))}
+        {!!props.tileActions?.length && !!offered.length && <Divider />}
         {offered.flatMap((action, index) => [
           ...(action.key === "sell" && index > 0
             ? [<Divider key="sale-divider" />]
@@ -343,7 +381,7 @@ export default function FacilityContextMenu(props: {
           title={`${confirmation.label}${affected.length === 1 ? `: ${formatFacilitySize(affected[0])} ${affected[0].name}` : `: ${affected.length} facilities`}?`}
           confirmLabel={
             cost !== undefined
-              ? `Pay ${formatMoneyConcise(cost)}`
+              ? `Pay ${formatPurchasePrice(cost)}`
               : confirmation.label
           }
           cancelLabel="Never mind"

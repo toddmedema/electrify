@@ -49,7 +49,7 @@ it("keeps owned open water free of unsupported towers while retaining the dam", 
   ).toBeNull();
   expect(
     map.querySelector(`[data-map-target="${water.tile.id}"]`),
-  ).toHaveAccessibleDescription(/submerged cable/);
+  ).toHaveAccessibleDescription(/Lake.*Your tile/);
   expect(
     map.querySelector(`[data-occupant-tile="${hydro.tile.id}"]`),
   ).toHaveAttribute("data-occupant", "generator");

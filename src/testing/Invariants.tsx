@@ -463,12 +463,22 @@ export function checkTick(
       (now.expensesImports || 0) +
       (now.expensesPolicy || 0);
     const maxPrincipal =
-      state.facilities.reduce(
-        (acc: number, f: FacilityOperatingType) =>
-          acc +
-          (f.loanAmountLeft > 0 ? f.loanMonthlyPayment / TICKS_PER_MONTH : 0),
-        0,
-      ) +
+      state.facilities.reduce((sum, facility) => {
+        const loans: Pick<
+          FacilityOperatingType,
+          "loanAmountLeft" | "loanMonthlyPayment"
+        >[] = [facility, ...(facility.expansionLoans ?? [])];
+        const pending = facility.expansionInProgress?.loan;
+        if (pending) loans.push(pending);
+        return loans.reduce(
+          (total, loan) =>
+            total +
+            (loan.loanAmountLeft > 0
+              ? loan.loanMonthlyPayment / TICKS_PER_MONTH
+              : 0),
+          sum,
+        );
+      }, 0) +
       [
         ...(state.transmission?.lines || []),
         ...legacyTerritoryConnections(state),

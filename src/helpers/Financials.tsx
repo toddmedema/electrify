@@ -193,10 +193,17 @@ const PREMIUM_PER_POINT = 0.05;
 // end of the scale stays a number rather than running away.
 export const MAX_CREDIT_POINTS = 40;
 
-type AssetDebt = Pick<FacilityOperatingType, "loanAmountLeft" | "repowerLoan">;
+type AssetDebt = Pick<
+  FacilityOperatingType,
+  "loanAmountLeft" | "repowerLoan" | "expansionInProgress" | "expansionLoans"
+>;
 
 export function facilityLoanBalance(asset: AssetDebt): number {
-  return asset.loanAmountLeft + (asset.repowerLoan?.loanAmountLeft ?? 0);
+  let debt = asset.loanAmountLeft + (asset.repowerLoan?.loanAmountLeft ?? 0);
+  if (asset.expansionInProgress?.loan)
+    debt += asset.expansionInProgress.loan.loanAmountLeft;
+  for (const loan of asset.expansionLoans ?? []) debt += loan.loanAmountLeft;
+  return debt;
 }
 
 export function getTotalDebt(assets: readonly AssetDebt[]): number {

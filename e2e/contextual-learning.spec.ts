@@ -42,7 +42,7 @@ for (const theme of ["light", "dark"] as const) {
     for (const [label, title] of [
       ["Capacity", "Power and energy"],
       ["Age", "Accounting lifetime"],
-      ["Fixed upkeep", "Operating costs"],
+      ["Fixed", "Operating costs"],
       ["Lifetime profit", "Profit"],
     ]) {
       const stat = details.locator(".facilityStat").filter({

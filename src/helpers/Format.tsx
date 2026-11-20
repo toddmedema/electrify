@@ -241,6 +241,18 @@ export function formatMoneyConcise(
   return signedMoney(i * currency.unitsPerDollar, currency.symbol, true);
 }
 
+/**
+ * A price the player pays to buy a facility, tile, or project. Three significant
+ * digits, and never two fraction digits: $3.2M, $32.1M, $321M.
+ */
+export function formatPurchasePrice(
+  i: number,
+  currency: CurrencyType = USD_CURRENCY,
+): string {
+  if (!Number.isFinite(i)) return NO_ESTIMATE;
+  return signedMoney(i * currency.unitsPerDollar, currency.symbol, true, 3, 1);
+}
+
 export function formatForecastMoney(
   i: number,
   currency: CurrencyType = USD_CURRENCY,
@@ -279,6 +291,8 @@ export function currencyFormatters(currency: CurrencyType) {
   return {
     currency,
     formatMoneyConcise: (value: number) => formatMoneyConcise(value, currency),
+    formatPurchasePrice: (value: number) =>
+      formatPurchasePrice(value, currency),
     formatMoneyStable: (value: number) => formatMoneyStable(value, currency),
     formatForecastMoney: (value: number) =>
       formatForecastMoney(value, currency),
@@ -295,11 +309,13 @@ function signedMoney(
   symbol: string,
   trimMantissa: boolean,
   significantDigits: 2 | 3 = 3,
+  maxFractionDigits?: number,
 ): string {
   const amount = formatMoneyAmount(
     Math.abs(i),
     trimMantissa,
     significantDigits,
+    maxFractionDigits,
   );
   return (i < 0 && /[1-9]/.test(amount) ? "-" : "") + symbol + amount;
 }
@@ -326,6 +342,7 @@ function formatMoneyAmount(
   i: number,
   trimMantissa: boolean,
   significantDigits: 2 | 3,
+  maxFractionDigits?: number,
 ): string {
   const abs = Math.abs(i);
   const unit =
@@ -342,7 +359,7 @@ function formatMoneyAmount(
     scaled = Math.sign(scaled) * (significantDigits === 2 ? 990 : 999);
   }
   const displayAbs = Math.abs(scaled);
-  const mantissa =
+  const uncapped =
     displayAbs < 1
       ? 2
       : displayAbs < 10
@@ -350,6 +367,10 @@ function formatMoneyAmount(
         : displayAbs < 100
           ? significantDigits - 2
           : 0;
+  const mantissa =
+    maxFractionDigits === undefined
+      ? uncapped
+      : Math.min(uncapped, maxFractionDigits);
   return (
     formatSignificantDecimal(scaled, significantDigits, {
       digits: mantissa,
