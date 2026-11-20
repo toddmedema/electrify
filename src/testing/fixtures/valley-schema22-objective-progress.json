@@ -1,0 +1,122 @@
+{
+  "master": {
+    "source": "ca7b8c4e",
+    "rules": "coop-2-bddc08bd9f13d3fb912bccfa5401e85283039c61e31340ec6a252cd503884fef",
+    "objectiveProgress": [
+      {
+        "version": 1,
+        "rulesDigest": "sha256-b085f20e415744410662014e3744cb9c618df7c6cb33d83a2063163817e1140f",
+        "retentionBaseline": 249002.05495198278,
+        "completedMonths": 1,
+        "entries": [
+          {
+            "id": "acquire-neighbor",
+            "observations": [],
+            "duplicateMonths": [],
+            "digest": "sha256-1fd52e252b76d7fb8e77bf3cadc2d8ced0af08fee6c425d3832c57526881f6d7"
+          },
+          {
+            "id": "retain-customers",
+            "observations": [],
+            "duplicateMonths": [],
+            "digest": "sha256-c055caebd95cfae44e9de0922bff723f55e120ebef522d521bb2e2b068d7e495"
+          },
+          {
+            "id": "retire-acquired-oil",
+            "observations": [],
+            "duplicateMonths": [],
+            "digest": "sha256-553c53c9ed1a6d2ac2d2df957468bdf9bf0caffdca881e23b806778e8bbb7bbc"
+          },
+          {
+            "id": "retire-champlain-oil",
+            "observations": [],
+            "duplicateMonths": [],
+            "digest": "sha256-57d69ee1fc8808d4436cecee6264d2aea7d7d45807d5484fe2cde0935eb7adac"
+          }
+        ],
+        "checksum": "sha256-fe76a5814fe4b04ce5403755b97699af6489e37bbba66ee35064441bf7acd025"
+      },
+      {
+        "version": 1,
+        "rulesDigest": "sha256-b085f20e415744410662014e3744cb9c618df7c6cb33d83a2063163817e1140f",
+        "retentionBaseline": 90000,
+        "completedMonths": 1,
+        "entries": [
+          {
+            "id": "acquire-neighbor",
+            "observations": [],
+            "duplicateMonths": [],
+            "digest": "sha256-aba9625aacb89cfcc326ba92fc7f4dd48b39cc0297d044d3194a6dec3f1219cd"
+          },
+          {
+            "id": "retain-customers",
+            "observations": [],
+            "duplicateMonths": [],
+            "digest": "sha256-786db3894c70d9e5d8c5ee70b584388395ce7017b291710d94d1f01696fe8e4d"
+          },
+          {
+            "id": "retire-acquired-oil",
+            "observations": [],
+            "duplicateMonths": [],
+            "digest": "sha256-5dffef4e17e00d1d6bb5b41d31069c897a497230d6e031137cdce4e08e173052"
+          },
+          {
+            "id": "retire-champlain-oil",
+            "observations": [],
+            "duplicateMonths": [],
+            "digest": "sha256-d9986c65ea87e9cd68e16a296a7c058041d43ed67e64afc53043db758aa0ca6d"
+          }
+        ],
+        "checksum": "sha256-67db2df9226869bbfd3d00ec466e51806a1fab2cf4ad553c022bd10a4ee850ad"
+      }
+    ]
+  },
+  "preview": {
+    "source": "e2abbfbb",
+    "rules": "coop-2-65d7bc6c94fc95425c4781b2a0039977949b473ac9928a597914f29b449643a6",
+    "objectiveProgress": [
+      {
+        "version": 1,
+        "rulesDigest": "sha256-8b910b942eb6a8509bb2d43a7aaa9b209772e1a02de6a97717990085c546e868",
+        "retentionBaseline": 249002.05495198278,
+        "completedMonths": 1,
+        "entries": [
+          {
+            "id": "acquire-neighbor",
+            "observations": [],
+            "duplicateMonths": [],
+            "digest": "sha256-9b38eac3eb4d3869e38174adc41318280d03e0f3f792ddeaaa3dbb64a73cc1f7"
+          },
+          {
+            "id": "retain-customers",
+            "observations": [],
+            "duplicateMonths": [],
+            "digest": "sha256-12d2479281fc5e227868efd15ac9037404762336eb1c3d6a12b112c99d353d38"
+          }
+        ],
+        "checksum": "sha256-eae69b850c502c7d0118ed70c5f7417b215245dc21def14baef9a1214d7dff2b"
+      },
+      {
+        "version": 1,
+        "rulesDigest": "sha256-8b910b942eb6a8509bb2d43a7aaa9b209772e1a02de6a97717990085c546e868",
+        "retentionBaseline": 90000,
+        "completedMonths": 1,
+        "entries": [
+          {
+            "id": "acquire-neighbor",
+            "observations": [],
+            "duplicateMonths": [],
+            "digest": "sha256-b8d5b42161686765620ffe5e395f441ffd6a01da06f53344633728deb91da40d"
+          },
+          {
+            "id": "retain-customers",
+            "observations": [],
+            "duplicateMonths": [],
+            "digest": "sha256-e9117cca3f901e797dc63ff32e0cfa5623b01d652c21fa091847d1922a291ee2"
+          }
+        ],
+        "checksum": "sha256-cf904acf8b4467cfb1060466f7a2e0960884332b739460a5551a03ca8ca2a665"
+      }
+    ]
+  }
+}

@@ -1934,7 +1934,7 @@ export const SCENARIOS: ScenarioType[] = [
     locationId: "BurlingtonVT",
     location: UTILITY_AREAS.champlain.location,
     summary:
-      "Build power, sign agreements and acquire utilities or land across the valley.",
+      "Acquire three competing utilities and keep your expanded customer base supplied.",
     threat:
       "Purchased-power coverage shrinks in 2017 and 2020. Plan replacement supply as you expand.",
     themes: ["Rapid growth"],

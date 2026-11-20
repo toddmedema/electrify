@@ -170,7 +170,7 @@ describe("SaveRepository", () => {
     );
   });
 
-  it("persists the natural terminal result after an acquisition before its deadline", async () => {
+  it("persists partial acquisition progress in a natural terminal result", async () => {
     let game = createGame({
       scenarioId: 116,
       difficulty: "Employee",
@@ -220,7 +220,11 @@ describe("SaveRepository", () => {
     const ownership = terminal!.debrief!.objectiveResults!.find(
       (result) => result.metric === "utilityOwnership",
     )!;
-    expect(ownership.status).toBe("completed");
+    expect(ownership).toMatchObject({
+      status: "inProgress",
+      observed: 1,
+      target: 3,
+    });
     const result = savedRunResult(terminal!);
     expect(ownership).not.toHaveProperty("reason");
     // Invalid untrusted neighbors still fail; the producer must emit canonical data.

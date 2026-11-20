@@ -1,6 +1,5 @@
 import type { AppDispatch } from "../../Store";
 import { acquireUtility } from "../../reducers/GameActions";
-import { ownedUtility } from "../../helpers/Expansion";
 import { connectToStore } from "../base/ConnectToStore";
 import { navigate } from "../../reducers/Card";
 import {
@@ -155,8 +154,9 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
         return true;
       }
       return dispatch((dispatch, getState) => {
+        const before = getState().game;
         dispatch(acquireUtility(payload));
-        return ownedUtility(getState().game, payload.targetId);
+        return getState().game !== before;
       });
     },
     onTransmissionUpgrade: (corridorId, financed) => {

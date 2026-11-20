@@ -189,7 +189,16 @@ export async function waitForSettled(
   ).toHaveCount(1);
 }
 
-/** Return to the persistent territory map by closing its dock panels front to back. */
+export async function closeTileSurface(surface: Locator): Promise<void> {
+  const close = surface.getByRole("button", {
+    name: "Close tile",
+    exact: true,
+  });
+  if (await close.count()) await close.click();
+  else await surface.locator(".tileWorkspaceHeading h3").press("Escape");
+}
+
+/** Return to the persistent territory map by closing its open surfaces front to back. */
 export async function returnToTerritoryMap(page: Page): Promise<Locator> {
   const workspace = page.locator('.gameWorkspace[data-persistent-map="true"]');
   const map = workspace.getByRole("region", {
@@ -197,15 +206,27 @@ export async function returnToTerritoryMap(page: Page): Promise<Locator> {
     exact: true,
   });
   await expect(map).toBeVisible();
-  const panel = workspace.locator(".gameToolPanel:visible");
-  while (await panel.count()) {
-    await workspace
-      .locator('.gameToolPanel[data-map-window-front="true"]')
-      .locator(":scope > .gameToolHeader")
-      .getByRole("button", { name: /^Close / })
-      .click();
+  const front = workspace.locator(
+    '[data-map-window-front="true"], .tileWorkspaceInspector:not([data-game-tool]), .tileWorkspaceBuilding',
+  );
+  while (await front.count()) {
+    if (
+      await front.evaluate((element) =>
+        element.classList.contains("tileWorkspaceSurface"),
+      )
+    )
+      await closeTileSurface(front);
+    else
+      await front
+        .locator(":scope > .gameToolHeader")
+        .getByRole("button", { name: /^Close / })
+        .click();
   }
-  await expect(panel).toHaveCount(0);
+  await expect(
+    workspace.locator(
+      ".gameToolPanel:visible, .tileWorkspaceInspector:visible, .tileWorkspaceBuilding:visible",
+    ),
+  ).toHaveCount(0);
   return map;
 }
 

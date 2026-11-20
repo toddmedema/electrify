@@ -214,19 +214,12 @@ for (const view of ["live", "saved"] as const) {
   );
 }
 
-it("shows the same combined retirement goal before starting Across the Valley", () => {
+it("shows both Across the Valley goals before starting", () => {
   render(
     <VictoryConditions scenario={getScenario(116)!} difficulty="Employee" />,
   );
   const requirements = screen.getByRole("region", { name: "Requirements" });
-  expect(
-    within(requirements).getAllByText("Retire original oil plants"),
-  ).toHaveLength(1);
-  expect(requirements).toHaveTextContent("Champlain’s Oil A by Dec 2020");
-  expect(requirements).toHaveTextContent(
-    "Acquired original oil plants by Dec 2023",
-  );
-  expect(requirements).not.toHaveTextContent(
-    "Retire acquired original oil assets",
-  );
+  expect(requirements).toHaveTextContent("Acquire 3 competitors");
+  expect(requirements).toHaveTextContent("Retain customers");
+  expect(requirements).not.toHaveTextContent(/retire|original oil/i);
 });

@@ -29,7 +29,7 @@ describe("simulation economics on CEO across seeds", () => {
           scenario.id,
           active.meaningfulDecisionCount,
           active.meaningfulDecisionCategoryCount >=
-            (scenario.id === 116 ? 3 : 4),
+            (scenario.id === 116 ? 2 : 4),
           active.outcome,
         ]).toEqual([scenario.id, 10, true, "completed"]);
       }),

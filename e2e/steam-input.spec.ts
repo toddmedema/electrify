@@ -68,6 +68,8 @@ async function select(
   action: InputAction = "down",
   limit = 100,
 ) {
+  // Entrance animations can expose controls while startup still owns an inert root.
+  await expect(page.locator("#appStartup")).toHaveCount(0);
   await expect(control).toBeVisible();
   await expect(control).toBeEnabled();
   const group = control.locator("..");
@@ -1279,9 +1281,7 @@ test("controller cycles six right-hand panels around the persistent map", async 
   ).toBeFocused();
 });
 
-test("controller buys one map tile and returns from map geography to navigation", async ({
-  page,
-}) => {
+async function startControllerMapAtToolbar(page: Page) {
   await page.goto("/?scenario=116");
   await select(
     page,
@@ -1292,18 +1292,51 @@ test("controller buys one map tile and returns from map geography to navigation"
   const pause = page.getByRole("button", { name: "pause", exact: true });
   if ((await pause.getAttribute("aria-pressed")) !== "true")
     await input(page, "pause");
-  await selectMapTile(page, "champlain:city");
-  await input(page, "back");
+  await input(page, "previousPane");
+  await expect(
+    page.getByRole("region", { name: "Scenario", exact: true }),
+  ).toBeVisible();
+  await input(page, "nextPane");
   const buy = page.getByRole("button", {
     name: "Rapid connection mode",
     exact: true,
   });
+  await expect(buy).toBeFocused();
+  return buy;
+}
+
+test("controller toggles rapid connection mode and returns from map geography to navigation", async ({
+  page,
+}) => {
+  const buy = await startControllerMapAtToolbar(page);
+  await selectMapTile(page, "champlain:city");
+  await input(page, "back");
   await expect(buy).toBeFocused();
   await input(page, "confirm");
   await expect(buy).toHaveAttribute("aria-pressed", "true");
   await expect(buy).toBeFocused();
   await input(page, "confirm");
   await expect(buy).toHaveAttribute("aria-pressed", "false");
+  await input(page, "confirm");
+  const tile = await selectMapTile(page, "green-uplands:site-0");
+  await input(page, "back");
+  await expect(buy).toHaveAttribute("aria-pressed", "false");
+  await expect(tile).toHaveAttribute("aria-pressed", "false");
+  await expect(buy).toBeFocused();
+  await select(
+    page,
+    page.getByRole("button", { name: "Programs", exact: true }),
+  );
+  await input(page, "confirm");
+  await expect(
+    page.getByRole("region", { name: "Programs", exact: true }),
+  ).toBeVisible();
+});
+
+test("controller buys one map tile, saves its receipt and returns to navigation", async ({
+  page,
+}) => {
+  const buy = await startControllerMapAtToolbar(page);
   await input(page, "confirm");
   const tile = await selectMapTile(page, "green-uplands:site-0");
   const before = await readSavedGame(page);
@@ -1448,7 +1481,7 @@ async function expectControllerGlyphScale(glyph: Locator) {
   expect(sizes.actual.height).toBeGreaterThan(24);
 }
 
-test("Saved display preferences style direct scenario links before play", async ({
+test("TV saved display preferences style direct scenario links before play", async ({
   page,
 }, info) => {
   skipNonTv(info);
@@ -1523,19 +1556,22 @@ test("Saved display preferences style direct scenario links before play", async 
   await expect(
     builder.getByRole("combobox", { name: /^Build (destination|tile)$/ }),
   ).toHaveCount(0);
+  const technologyPreview = rail.getByRole("region", {
+    name: "Wind technology preview",
+    exact: true,
+  });
   let metrics: Locator;
   if (await rail.isVisible()) {
     await expect(rail).toBeFocused();
     await rail
       .getByRole("button", { name: "Choose sites for Wind", exact: true })
       .hover();
-    const preview = rail.getByRole("region", {
-      name: "Wind technology preview",
-      exact: true,
-    });
-    await expect(preview).toBeVisible();
-    metrics = preview.locator(".buildOptionMetric");
+    await expect(technologyPreview).toBeVisible();
+    metrics = technologyPreview.locator(".buildOptionMetric");
   } else {
+    await builder
+      .getByRole("button", { name: "Build here", exact: true })
+      .click();
     metrics = builder
       .getByRole("list", { name: "Generator options" })
       .locator(".buildOptionMetric");
@@ -1551,9 +1587,12 @@ test("Saved display preferences style direct scenario links before play", async 
       "generator values stay within their own metric column",
     ).toBeLessThanOrEqual(1);
   }
-  await builder
-    .getByRole("button", { name: "Close tile", exact: true })
-    .click();
+  if (await technologyPreview.isVisible()) {
+    await input(page, "back");
+    await expect(technologyPreview).toHaveCount(0);
+    await expect(builder).toBeVisible();
+  }
+  await input(page, "back");
   await expect(builder).toHaveCount(0);
   await page.getByRole("button", { name: "Events", exact: true }).click();
   const goalWidth = await page

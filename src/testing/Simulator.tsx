@@ -1,5 +1,5 @@
 import { legacyTerritoryConnections } from "../helpers/Territories";
-import { landPurchaseQuote } from "../helpers/Territories";
+import { tilePurchaseQuote, landPurchaseQuote } from "../helpers/Territories";
 import { powerAgreementQuote } from "../helpers/PowerAgreements";
 import { getTotalDebt } from "../helpers/Financials";
 import { pendingScenarioChoice } from "../helpers/ScenarioChoices";
@@ -7,6 +7,7 @@ import {
   chooseScenarioResponse,
   acquireUtility,
   acquireLand,
+  acquireTile,
   acceptPowerAgreement,
 } from "../reducers/GameActions";
 import { acquisitionQuote } from "../helpers/Expansion";
@@ -89,14 +90,14 @@ export type ScheduledSimActionType =
       type: "land";
       territoryId?: import("../Types").LandTerritoryId;
     }
+  | { month: number; type: "tile"; tileId: import("../Types").TerritoryTileId }
   | { month: number; type: "agreement"; blockId: string }
   | {
       month: number;
       type: "acquire";
-      targetId: import("../Types").UtilityTargetId;
+      targetId: import("../Types").UtilityAcquisitionId;
       financed: boolean;
     }
-  | { month: number; type: "retire"; assetId: string }
   | { month: number; type: "rate"; dollarsPerkWh: number }
   | { month: number; type: "build"; build: InitialBuildType }
   | {
@@ -212,6 +213,7 @@ export interface SimResultType {
   months: MonthlyHistoryType[]; // Oldest first, unlike game.monthlyHistory which is newest first
   finalFacilities: FacilityOperatingType[];
   finalUtilityExpansion?: GameType["utilityExpansion"];
+  finalTerritoryNetwork?: GameType["territoryNetwork"];
   finalDebt: number;
   finalTransmissionLines: NonNullable<GameType["transmission"]>["lines"];
   finalCash: number;
@@ -536,6 +538,23 @@ export function runSimulation(options: SimOptionsType): SimResultType {
               throw new Error("Land purchase rejected");
             break;
           }
+          case "tile": {
+            const quote = tilePurchaseQuote(state, action.tileId);
+            if (!quote)
+              throw new Error(
+                `No connection to ${action.tileId} in month ${month}`,
+              );
+            const updated = gameReducer(
+              state,
+              acquireTile({ tileId: action.tileId, quoteKey: quote.quoteKey }),
+            );
+            if (updated === state)
+              throw new Error(
+                `Connection rejected: ${action.tileId} in month ${month}`,
+              );
+            state = cloneDeep(updated);
+            break;
+          }
           case "agreement": {
             const quote = powerAgreementQuote(state, action.blockId);
             if (!quote)
@@ -562,29 +581,19 @@ export function runSimulation(options: SimOptionsType): SimResultType {
               throw new Error(
                 `Cannot acquire ${action.targetId} in month ${month}`,
               );
-            const count = state.utilityExpansion?.acquisitions.length ?? 0;
-            state = cloneDeep(
-              gameReducer(
-                state,
-                acquireUtility({
-                  targetId: action.targetId,
-                  financed: action.financed,
-                  quoteKey: quote.quoteKey,
-                }),
-              ),
+            const updated = gameReducer(
+              state,
+              acquireUtility({
+                targetId: action.targetId,
+                financed: action.financed,
+                quoteKey: quote.quoteKey,
+              }),
             );
-            if (state.utilityExpansion?.acquisitions.length === count)
+            if (updated === state)
               throw new Error(
                 `Acquisition rejected: ${action.targetId} in month ${month}`,
               );
-            break;
-          }
-          case "retire": {
-            const facility = state.facilities.find(
-              (item) => item.startingAssetId === action.assetId,
-            );
-            if (facility)
-              state = cloneDeep(gameReducer(state, sellFacility(facility.id)));
+            state = cloneDeep(updated);
             break;
           }
           case "rate":
@@ -904,6 +913,7 @@ export function runSimulation(options: SimOptionsType): SimResultType {
     months: [...state.monthlyHistory].reverse(), // Game stores newest first
     finalFacilities: state.facilities as FacilityOperatingType[],
     finalUtilityExpansion: state.utilityExpansion,
+    finalTerritoryNetwork: state.territoryNetwork,
     ...(state.utilityExpansion
       ? {
           companyMetrics,

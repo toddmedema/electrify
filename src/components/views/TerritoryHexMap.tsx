@@ -125,6 +125,7 @@ interface Props {
   onCloseInspection?: () => void;
   inspectionWindow?: "front" | "background";
   onDeselect?: () => void;
+  dismissInspectionOnBlank?: boolean;
   projectPlanning?: boolean;
   projectPending?: boolean;
   projectSites?: ReadonlyMap<TerritoryMapTileKey, ReadyProjectSite>;
@@ -154,6 +155,7 @@ export default function TerritoryHexMap({
   onCloseInspection,
   inspectionWindow,
   onDeselect,
+  dismissInspectionOnBlank,
   projectPlanning = false,
   projectPending = false,
   projectSites,
@@ -685,11 +687,11 @@ export default function TerritoryHexMap({
   ) => {
     if ((workspace?.effectiveWidth ?? size.width) <= 740) {
       const point = hexCenter(tile);
-      // Leave the selected ground and occupant above the phone's inspection sheet.
+      // Leave the selected tile below the inspector or above project decisions.
       setCamera(
         {
           x: point.x,
-          y: point.y + worldHeight * (projectPlanning ? 0.3 : 0.22),
+          y: point.y + worldHeight * (projectPlanning ? 0.3 : -0.22),
         },
         fromPointer && motion.allowed,
       );
@@ -1012,6 +1014,8 @@ export default function TerritoryHexMap({
             event.preventDefault();
             event.stopPropagation();
             activateTile(id, true);
+          } else if (dismissInspectionOnBlank) {
+            onCloseInspection?.();
           }
         }}
       >
@@ -1324,7 +1328,7 @@ export default function TerritoryHexMap({
                   projectPlanning
                     ? `Inspect ${territoryTileLabel(tile)}${projectSite ? ` · Total project cost ${projectPrice} · ${projectSite.owned ? "Already connected" : "Connection included"}` : " · unavailable for this project"}`
                     : quote
-                      ? `${unaffordable ? "Inspect" : quote.utilityName ? "Acquire" : "Connect"} ${quote.utilityName ?? territoryTileLabel(tile)} · ${priceLabel}${unaffordable ? "; not enough available cash" : ""}`
+                      ? `${unaffordable ? "Inspect" : "Connect"} ${territoryTileLabel(tile)} · ${priceLabel}${unaffordable ? "; not enough available cash" : ""}`
                       : label
                 }
                 aria-pressed={key === activeSelected}

@@ -2,7 +2,6 @@ import { CurrencyType, USD_CURRENCY } from "./Currency";
 import { formatNumber, formatRateCompact, getWattUnit } from "./Format";
 import { roundToSignificantDigits } from "./Math";
 import type { CompiledRuleObjective } from "../data/ScenarioRules";
-import { UTILITY_TARGETS } from "../data/UtilityExpansion";
 import type { ObjectiveResult } from "../data/ScenarioObjectives";
 import { MONTHS } from "../Constants";
 import { objectiveTarget } from "./ScenarioObjectives";
@@ -78,7 +77,7 @@ function objectiveAmountText(
     case "utilityOwnership":
       return `${amount(value)} acquired ${value === 1 ? "utility" : "utilities"}`;
     case "assetRetirement":
-      return `${amount(value)} original oil ${value === 1 ? "asset" : "assets"}`;
+      return `${amount(value)} original ${value === 1 ? "asset" : "assets"}`;
     case "fuelRetirement":
       return `${amount(value)} owned ${objective.fuel} ${value === 1 ? "asset" : "assets"}${objective.commissionedBeforeYear === undefined ? "" : ` commissioned before ${objective.commissionedBeforeYear}`}`;
   }
@@ -117,15 +116,6 @@ export function objectiveTargetText(
   objective: CompiledRuleObjective,
   currency: CurrencyType = USD_CURRENCY,
 ): string {
-  if (
-    objective.metric === "utilityOwnership" &&
-    objective.id === "acquire-neighbor"
-  ) {
-    const names = UTILITY_TARGETS.filter(({ id }) =>
-      objective.targets.includes(id),
-    ).map(({ name }) => name);
-    if (names.length) return `Acquire ${names.join(" or ")}`;
-  }
   const target = objectiveValueText(
     objective,
     objectiveTarget(objective),
@@ -237,11 +227,7 @@ export function objectiveGoalText(
 
 /** A short heading names the goal; its target carries quantities, conditions and dates. */
 export function objectiveHeadingText(objective: CompiledRuleObjective): string {
-  if (
-    objective.metric === "utilityOwnership" &&
-    objective.id === "acquire-neighbor"
-  )
-    return "Acquire a competitor";
+  if (objective.metric === "utilityOwnership") return objective.label;
   if (
     objective.label !== objectiveTargetText(objective) &&
     !/\d/.test(objective.label)
@@ -250,8 +236,6 @@ export function objectiveHeadingText(objective: CompiledRuleObjective): string {
   switch (objective.metric) {
     case "customerRetention":
       return "Retain customers";
-    case "utilityOwnership":
-      return "Acquire a utility";
     case "assetRetirement":
       return "Retire original plants";
     case "emissionsBudget":
@@ -279,7 +263,6 @@ export function objectiveHeadingText(objective: CompiledRuleObjective): string {
   }
 }
 
-/** Combine the valley's two retirement deadlines for display, preserving both scored rules. */
 export function objectiveGoalGroups(
   objectives: CompiledRuleObjective[],
   startingYear: number,
@@ -287,49 +270,20 @@ export function objectiveGoalGroups(
   monthOffset = 0,
   currency: CurrencyType = USD_CURRENCY,
 ): { id: string; label: string; required: boolean; goals: string[] }[] {
-  const champlain = objectives.find(
-    (objective) =>
-      objective.id === "retire-champlain-oil" &&
-      objective.metric === "assetRetirement",
-  );
-  const acquired = objectives.find(
-    (objective) =>
-      objective.id === "retire-acquired-oil" &&
-      objective.metric === "assetRetirement",
-  );
-  const combine =
-    champlain && acquired && champlain.required === acquired.required;
-  return objectives.flatMap((objective) => {
-    if (combine && objective === acquired) return [];
-    if (combine && objective === champlain)
-      return [
-        {
-          id: objective.id,
-          label: "Retire original oil plants",
-          required: objective.required,
-          goals: [
-            `Champlain’s Oil A by ${objectiveWindowText(champlain, startingYear, durationMonths, monthOffset)}`,
-            `Acquired original oil plants by ${objectiveWindowText(acquired, startingYear, durationMonths, monthOffset)}`,
-          ],
-        },
-      ];
-    return [
-      {
-        id: objective.id,
-        label: objectiveHeadingText(objective),
-        required: objective.required,
-        goals: [
-          objectiveGoalText(
-            objective,
-            startingYear,
-            durationMonths,
-            monthOffset,
-            currency,
-          ),
-        ],
-      },
-    ];
-  });
+  return objectives.map((objective) => ({
+    id: objective.id,
+    label: objectiveHeadingText(objective),
+    required: objective.required,
+    goals: [
+      objectiveGoalText(
+        objective,
+        startingYear,
+        durationMonths,
+        monthOffset,
+        currency,
+      ),
+    ],
+  }));
 }
 
 /** The plain-language definition; the authored sentence stays canonical for saves and mods. */
@@ -366,12 +320,10 @@ export function objectiveObservedText(
   result: ObjectiveResult,
   currency: CurrencyType = USD_CURRENCY,
 ): string {
-  if (result.metric === "utilityOwnership")
-    return result.observed === 1
-      ? "Utility acquired"
-      : result.status === "failed"
-        ? "No utility acquired by the deadline"
-        : "No utility acquired yet";
+  if (result.metric === "utilityOwnership") {
+    const count = result.observed ?? 0;
+    return `${count} of ${result.target} acquired`;
+  }
   const months = result.objective.checkpoint
     ? undefined
     : completedMonthsText(result);

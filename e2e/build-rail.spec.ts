@@ -40,7 +40,8 @@ for (const theme of ["light", "dark"] as const) {
     });
     const desktop = page.viewportSize()!.width >= 1024;
     const surface = network.locator(".tileWorkspaceSurface");
-    await expect(surface).toHaveCount(0);
+    const tileSurfaces = page.locator(".tileWorkspaceSurface");
+    await expect(tileSurfaces).toHaveCount(0);
 
     if (desktop) {
       // Every available technology is discoverable before opening Build.
@@ -99,7 +100,7 @@ for (const theme of ["light", "dark"] as const) {
       await page.keyboard.press("Escape");
       await expect(preview).toHaveCount(0);
       await expect(wind).toBeFocused();
-      await expect(surface).toHaveCount(0);
+      await expect(tileSurfaces).toHaveCount(0);
     } else {
       await expect(rail).toHaveCount(0);
     }
@@ -152,7 +153,7 @@ for (const theme of ["light", "dark"] as const) {
 
     if (desktop) {
       await expect(rail).toBeFocused();
-      await expect(surface).toHaveCount(0);
+      await expect(tileSurfaces).toHaveCount(0);
       await expect(
         rail.getByRole("button", {
           name: "Power: 30MW",
