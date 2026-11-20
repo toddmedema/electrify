@@ -1,6 +1,6 @@
 import type { CitySizeType } from "../../../Types";
 import { MeshBuilder } from "./MeshBuilder";
-import { PALETTE as P } from "./Palette";
+import { PALETTE as P, rgb } from "./Palette";
 import type {
   MapMesh,
   MapModel,
@@ -363,17 +363,75 @@ function tower(): MapModel {
   return model("tower", body, terminals);
 }
 
-function solar(): MapModel {
+const shatteredBacking = rgb("#192b38");
+const fracturedGlass = rgb("#8bbbd7");
+
+function shatteredPanel(panel: MeshBuilder, center: number) {
+  const a = center - 0.106;
+  const b = center + 0.106;
+  // Leave dark backing exposed between the broken, uneven glass edges.
+  panel
+    .box([center, 0.009, 0], [0.212, 0.004, 0.14], shatteredBacking)
+    .triangle(
+      [a, 0.014, -0.07],
+      [center - 0.024, 0.021, 0.007],
+      [center + 0.042, 0.014, -0.07],
+      P.solar,
+    )
+    .triangle(
+      [a, 0.014, -0.07],
+      [a, 0.014, 0.048],
+      [center - 0.024, 0.021, 0.007],
+      fracturedGlass,
+    )
+    .triangle(
+      [b, 0.014, -0.061],
+      [center + 0.022, 0.019, 0.014],
+      [b, 0.014, 0.07],
+      P.solar,
+    )
+    .triangle(
+      [b, 0.014, 0.07],
+      [center + 0.022, 0.019, 0.014],
+      [center - 0.048, 0.017, 0.07],
+      fracturedGlass,
+    )
+    .triangle(
+      [center - 0.072, 0.013, 0.059],
+      [center - 0.03, 0.013, 0.052],
+      [center - 0.047, 0.023, 0.014],
+      P.steel,
+    );
+}
+
+function solar(damaged = false): MapModel {
   const body = new MeshBuilder(),
     glints = new MeshBuilder();
   const tilt = 0.36;
   for (const z of [-0.18, 0, 0.18]) {
-    const panel = new MeshBuilder()
-      .box([0, 0, 0], [0.612, 0.014, 0.152], P.steel)
-      .box([0, 0.009, 0], [0.6, 0.004, 0.14], P.solar);
+    const broken = damaged && z !== -0.18;
+    const center = z === 0 ? -0.164 : 0.164;
+    const panel = new MeshBuilder().box(
+      [0, 0, 0],
+      [0.612, 0.014, 0.152],
+      P.steel,
+    );
+    const intact = broken
+      ? [
+          [-0.3, center - 0.106],
+          [center + 0.106, 0.3],
+        ]
+      : [[-0.3, 0.3]];
+    for (const [left, right] of intact) {
+      const mid = (left + right) / 2;
+      panel
+        .box([mid, 0.009, 0], [right - left, 0.004, 0.14], P.solar)
+        .box([mid, 0.012, 0], [right - left, 0.002, 0.003], P.steel);
+    }
     for (const x of [-0.15, 0, 0.15])
-      panel.box([x, 0.012, 0], [0.003, 0.002, 0.14], P.steel);
-    panel.box([0, 0.012, 0], [0.6, 0.002, 0.003], P.steel);
+      if (!broken || Math.abs(center - x) > 0.106)
+        panel.box([x, 0.012, 0], [0.003, 0.002, 0.14], P.steel);
+    if (broken) shatteredPanel(panel, center);
     body.merge(panel.build(), [0, 0.115, z], [tilt, 0, 0]);
     for (const x of [-0.23, 0.23])
       for (const dz of [-0.045, 0.045]) {
@@ -384,17 +442,35 @@ function solar(): MapModel {
           P.steelShade,
         );
       }
-    glints.merge(
-      new MeshBuilder()
-        .box([0, 0.014, -0.037], [0.58, 0.002, 0.01], P.solar)
-        .build(),
-      [0, 0.115, z],
-      [tilt, 0, 0],
-    );
+    if (!broken)
+      glints.merge(
+        new MeshBuilder()
+          .box([0, 0.014, -0.037], [0.58, 0.002, 0.01], P.solar)
+          .build(),
+        [0, 0.115, z],
+        [tilt, 0, 0],
+      );
   }
-  return facilityModel("solar", body, switchgear(body, 0.29), [
-    effect(glints.build(), "pulse"),
-  ]);
+  if (damaged)
+    body
+      .triangle(
+        [0.24, 0.004, 0.27],
+        [0.28, 0.006, 0.28],
+        [0.26, 0.004, 0.31],
+        fracturedGlass,
+      )
+      .triangle(
+        [-0.26, 0.004, 0.29],
+        [-0.29, 0.006, 0.28],
+        [-0.247, 0.004, 0.268],
+        P.solar,
+      );
+  return facilityModel(
+    damaged ? "solar-hail-damaged" : "solar",
+    body,
+    switchgear(body, 0.29),
+    [effect(glints.build(), "pulse")],
+  );
 }
 
 /** A small solid loft: rounded +X leading edge, thin -X trailing edge. */
@@ -895,6 +971,7 @@ const factories: Record<StructureKind, () => MapModel> = {
   "city-large": () => city("large"),
   tower,
   solar,
+  "solar-hail-damaged": () => solar(true),
   wind: () => wind("wind"),
   "offshore-wind": () => wind("offshore-wind"),
   "airborne-wind": airborne,

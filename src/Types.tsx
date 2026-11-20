@@ -1537,6 +1537,7 @@ export interface LegacyCampaignType {
 }
 
 export interface GameType {
+  territoryWeather?: import("./helpers/TerritoryWildfire").TerritoryWeatherState;
   territoryNetwork?: {
     version: 3;
     landPurchases: {

@@ -1,3 +1,4 @@
+import { tintTerrainMesh } from "./TerrainWeatherMaterials";
 import type { TerrainType } from "../../../Types";
 import { getForestModel } from "./ForestModels";
 import { MeshBuilder } from "./MeshBuilder";
@@ -397,6 +398,23 @@ function build(
   };
 }
 
+const scarredModels = new WeakMap<MapModel, MapModel>();
+
+function scorchedRelief(model: MapModel): MapModel {
+  const cached = scarredModels.get(model);
+  if (cached) return cached;
+  const scarred = {
+    ...model,
+    key: `${model.key}:scorched`,
+    parts: model.parts.map((part) => ({
+      ...part,
+      mesh: tintTerrainMesh(part.mesh, "ash"),
+    })),
+  };
+  scarredModels.set(model, scarred);
+  return scarred;
+}
+
 /** Discrete clearing profiles and six edge bits bound the number of shared meshes. */
 export function getTerrainModel(
   terrain: TerrainType,
@@ -410,14 +428,17 @@ export function getTerrainModel(
       return floor.build();
     });
   const requested = options?.footprint ?? 0;
+  const scorched =
+    options?.weather === "burning" || options?.weather === "scorched";
   if (terrain === "mountain") {
     const profile = mountainProfile(requested);
     const edges = (options?.adjacentEdges ?? 0) & 63;
-    return (cache.mountain[profile * 64 + edges] ??= build(
+    const model = (cache.mountain[profile * 64 + edges] ??= build(
       "mountain",
       profile,
       edges,
     ));
+    return scorched ? scorchedRelief(model) : model;
   }
   const bucket =
     requested > 0.8 ? 3 : requested > 0.65 ? 2 : requested > 0.55 ? 1 : 0;
@@ -426,5 +447,6 @@ export function getTerrainModel(
     for (const port of options.ports)
       if (Number.isInteger(port) && port >= 0 && port < 6) ports |= 1 << port;
   const index = bucket * 64 + ports;
-  return (cache[terrain][index] ??= build(terrain, bucket, ports));
+  const model = (cache[terrain][index] ??= build(terrain, bucket, ports));
+  return terrain === "hills" && scorched ? scorchedRelief(model) : model;
 }

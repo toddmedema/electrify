@@ -95,7 +95,7 @@ function legacyPortfolio(
   raw.game.territoryNetwork = { version: 1 };
   return raw;
 }
-it.each([19, 20, 21])(
+it.each([19, 20, 21, 22])(
   "rebuilds Valley goals from schema%i without changing paid assets or history",
   (schemaVersion) => {
     const game = createGame({ scenarioId: 116, seed: 61 });
@@ -109,6 +109,8 @@ it.each([19, 20, 21])(
     const raw = JSON.parse(JSON.stringify(serializeSave(game)));
     raw.schemaVersion = schemaVersion;
     raw.game.objectiveProgress = { rulesDigest: "pre-acquisition-goals" };
+    if (schemaVersion === 22)
+      raw.game.territoryWeather = { dryness: 0.81, fires: [] };
     const original = cloneDeep(raw);
     const parsed = parseSave(raw);
     expect(parsed).not.toBeNull();
@@ -119,6 +121,7 @@ it.each([19, 20, 21])(
     expect(parsed!.game.facilities).toEqual(raw.game.facilities);
     expect(parsed!.game.utilityExpansion).toEqual(raw.game.utilityExpansion);
     expect(parsed!.game.monthlyHistory).toEqual(raw.game.monthlyHistory);
+    expect(parsed!.game.territoryWeather).toEqual(raw.game.territoryWeather);
     expect(currentTick(parsed!.game)!.cash).toBe(currentTick(raw.game)!.cash);
     expect(parseSave(parsed)).toEqual(parsed);
     expect(parseSave(serializeSave(parsed!.game))!.game).toEqual(parsed!.game);

@@ -256,6 +256,7 @@ import {
 } from "../helpers/Customers";
 import {
   formatMoneyConcise,
+  formatDays,
   formatRateCompact,
   formatWatts,
   formatWattHours,
@@ -316,6 +317,7 @@ import {
   activeWeatherHazardsFor,
   COLD_DEFINITION_ID,
   HAIL_DEFINITION_ID,
+  WILDFIRE_DAMAGE_ID,
   hailOccurs,
   hazardEventKey,
   isWeatherHazardEligible,
@@ -333,6 +335,11 @@ import {
   upgradeInProgress,
   isUpgradingAt,
 } from "../helpers/Hazards";
+import {
+  advanceTerritoryWeather,
+  FIRE_REPAIR_MINUTES,
+  wildfireContacts,
+} from "../helpers/TerritoryWildfire";
 import {
   getHydroConditions,
   HYDRO_DEADPOOL_FRACTION,
@@ -957,10 +964,6 @@ function trimWorldEventRecords(state: GameType) {
   trimWorldEventOccurrences(state);
 }
 
-function formatDays(days: number): string {
-  return `${days} day${days === 1 ? "" : "s"}`;
-}
-
 /**
  * Hail and extreme-cold checks at monthly rollover, after the authored story, before
  * the month's forecast is built. Each check is keyed by (hazard, location, absolute month) and
@@ -1057,6 +1060,84 @@ function recordHailStorm(state: GameType, key: string, startsMinute: number) {
     reportedKey: key,
     pause: true,
   });
+}
+
+/** Record only facilities present on the advancing front at the tick of contact. */
+function recordWildfireDamage(
+  state: GameType,
+  constructionYearsElapsed = 0,
+): boolean {
+  const contacts = wildfireContacts(state, constructionYearsElapsed);
+  if (!contacts.length) return false;
+  const startsMinute = state.date.minute;
+  const damage = contacts.map(
+    ({ facility, availableFraction }): ActiveWorldEventType => {
+      const key = `terrain-fire:${startsMinute}:f${facility.id}`;
+      const title = "Wildfire damage";
+      const message = `Fire reached ${facility.name}. It can operate at ${Math.round(availableFraction * 100)}% capacity during repairs.`;
+      const importance = "CRITICAL";
+      const actionTarget = { card: "FACILITIES", view: "FLEET" } as const;
+      logGameEvent(state, "WORLD_EVENT", message, {
+        title,
+        importance,
+        actionTarget,
+        concept: "severeWeather",
+        storyPhaseKey: key,
+        reportedKey: key,
+        pause: true,
+      });
+      return {
+        key,
+        definitionId: WILDFIRE_DAMAGE_ID,
+        startsMinute,
+        endsMinute: startsMinute + FIRE_REPAIR_MINUTES,
+        forecastable: false,
+        title,
+        message,
+        concept: "severeWeather",
+        importance,
+        actionTarget,
+        attributes: { hazard: "WILDFIRE", facilityId: facility.id },
+        effects: {
+          facilityOutputMultipliersById: {
+            [String(facility.id)]: availableFraction,
+          },
+        },
+      };
+    },
+  );
+  // A mid-month tick shares the previous state's immutable world events until it changes them.
+  state.worldEvents = {
+    ...state.worldEvents,
+    active: [...state.worldEvents.active, ...damage],
+    occurrences: [...state.worldEvents.occurrences, ...damage],
+  };
+  return true;
+}
+
+function updateTerritoryWeather(
+  state: GameType,
+  sharedFirebreaks?: ReadonlySet<string>,
+) {
+  const weather = advanceTerritoryWeather(state, sharedFirebreaks);
+  if (!weather) return;
+  state.territoryWeather = weather;
+  const fire = weather.fires.at(-1);
+  if (fire?.startsMinute !== state.date.minute) return;
+  const key = `terrain-fire:${fire.startsMinute}`;
+  logGameEvent(
+    state,
+    "WORLD_EVENT",
+    "A wildfire ignited on the territory map.",
+    {
+      title: "Wildfire",
+      importance: "NOTABLE",
+      concept: "severeWeather",
+      actionTarget: { card: "FACILITIES", view: "FLEET" },
+      reportedKey: key,
+    },
+  );
+  recordWildfireDamage(state);
 }
 
 /** Persists and announces this month's cold snap; returns whether gas prices spiked. */
@@ -1215,12 +1296,13 @@ function completeRetrofits(state: GameType, simulated = false): number {
  * weather hazard still limits. Driven from the clock rather than the timeline, whose prev and now
  * frames coincide on a month's rollover tick.
  */
-function logHailRepairsCompleted(state: GameType) {
+function logWeatherRepairsCompleted(state: GameType) {
   const minute = state.date.minute;
   const logged = new Set<number>();
   state.worldEvents.active.forEach((event) => {
     if (
-      event.definitionId !== HAIL_DEFINITION_ID ||
+      (event.definitionId !== HAIL_DEFINITION_ID &&
+        event.definitionId !== WILDFIRE_DAMAGE_ID) ||
       !(minute - TICK_MINUTES < event.endsMinute && event.endsMinute <= minute)
     ) {
       return;
@@ -1246,11 +1328,17 @@ function logHailRepairsCompleted(state: GameType) {
       {
         importance: "NOTABLE",
         actionTarget: { card: "FACILITIES", view: "FLEET" },
-        title: "Hail repairs complete",
+        title:
+          event.definitionId === WILDFIRE_DAMAGE_ID
+            ? "Wildfire repairs complete"
+            : "Hail repairs complete",
         // Restored output is good news, so it takes the green supply icon, not the amber storm.
         concept: "supply",
         storyPhaseKey: event.key,
-        reportedKey: `hail-repair:${event.key}`,
+        reportedKey:
+          event.definitionId === WILDFIRE_DAMAGE_ID
+            ? `wildfire-repair:${event.key}`
+            : `hail-repair:${event.key}`,
       },
     );
   });
@@ -1268,7 +1356,8 @@ function endWeatherHazardsForFacility(state: GameType, id: number) {
   state.worldEvents.active = state.worldEvents.active.map((event) => {
     if (
       (event.definitionId !== HAIL_DEFINITION_ID &&
-        event.definitionId !== COLD_DEFINITION_ID) ||
+        event.definitionId !== COLD_DEFINITION_ID &&
+        event.definitionId !== WILDFIRE_DAMAGE_ID) ||
       event.effects.facilityOutputMultipliersById?.[key] === undefined
     ) {
       return event;
@@ -1286,7 +1375,7 @@ function endWeatherHazardsForFacility(state: GameType, id: number) {
       ...event,
       effects,
       endsMinute:
-        event.definitionId === HAIL_DEFINITION_ID
+        event.definitionId !== COLD_DEFINITION_ID
           ? Math.min(event.endsMinute, minute)
           : event.endsMinute,
     };
@@ -1712,6 +1801,7 @@ export const gameSlice = createSlice({
     },
     initGame: (state, action: PayloadAction<NewGameAction>) => {
       delete state.territoryNetwork;
+      delete state.territoryWeather;
       delete state.campaign;
       delete state.desktopAchievements;
       delete state.lowCashWarningMonth;
@@ -4400,7 +4490,8 @@ function adoptTickWorkingState(
   // A pending choice can pause immediately before a rollover. No monthly inputs changed then.
   if (working.monthlyHistory.length === snapshot.monthlyHistory.length) {
     working.monthlyHistory = snapshot.monthlyHistory;
-    working.worldEvents = snapshot.worldEvents;
+    if (working.date.minute === snapshot.date.minute)
+      working.worldEvents = snapshot.worldEvents;
     if (snapshot.policies) working.policies = snapshot.policies;
   }
   if (snapshot.blackout && !working.blackout) delete draft.blackout;
@@ -4459,6 +4550,7 @@ export function* tickStatePhases(
   saveEffects?: RunSaveEffects,
   onCompletedMonth?: CompletedMonthObserver,
   sharedImportRounds?: SharedImportClearing[],
+  sharedFirebreaks?: ReadonlySet<string>,
 ): Generator<SharedTickPhase, void, PeerSettlement | undefined> {
   if (isDraft(state)) {
     const snapshot = current(state);
@@ -4496,6 +4588,8 @@ export function* tickStatePhases(
     state.timeline,
   );
   if (now && prev) {
+    // Contact is planned before live construction settles on this same tick.
+    const fireHit = recordWildfireDamage(state, YEARS_PER_TICK);
     yield* supplyFacilitiesFinancesPhases(
       state,
       prev,
@@ -4513,7 +4607,15 @@ export function* tickStatePhases(
       true,
     );
     desktopSimulationHooks()?.tick(state, now);
-    logHailRepairsCompleted(state);
+    logWeatherRepairsCompleted(state);
+    if (fireHit)
+      state.timeline = reforecastSupply(
+        state,
+        true,
+        TICK_MINUTES,
+        undefined,
+        true,
+      );
 
     const exercise = state.tutorialIntertieStress;
     if (exercise?.active) {
@@ -4605,6 +4707,7 @@ export function* tickStatePhases(
       recordExpansionMilestones(state);
       // Resolve recurring regional hazards after the authored story effects.
       updateWeatherHazards(state).forEach((fuel) => storyPriceFuels.add(fuel));
+      updateTerritoryWeather(state, sharedFirebreaks);
       const activatedPrograms = advanceGamePolicies(
         state,
         state.date.monthsElapsed,
@@ -5786,6 +5889,7 @@ function* supplyFacilitiesFinancesPhases(
     now.temperatureC,
   );
 
+  const tickStoryEffects = storyEffectsAt(tickDate, state);
   // Pre-check how much extra supply we'll need to charge batteries
   let indexOfLastUnchargedBattery = -1;
   let totalChargeNeeded = 0;
@@ -5800,7 +5904,7 @@ function* supplyFacilitiesFinancesPhases(
     ) {
       if (!peerSettlement) indexOfLastUnchargedBattery = i;
       const requestedW = Math.min(
-        g.peakW,
+        g.peakW * storyOutputMultiplier(g, tickStoryEffects, now.minute),
         ((g.peakWh - g.currentWh) * ticksPerHour) / g.roundTripEfficiency,
       );
       chargeRequests.set(g.id, requestedW);
@@ -5808,7 +5912,6 @@ function* supplyFacilitiesFinancesPhases(
     }
   });
 
-  const tickStoryEffects = storyEffectsAt(tickDate, state);
   if (tickStoryEffects.transmissionCapacityLimitsWByCorridor)
     now.transmissionCapacityLimitsWByCorridor =
       tickStoryEffects.transmissionCapacityLimitsWByCorridor;
@@ -6204,7 +6307,7 @@ function* supplyFacilitiesFinancesPhases(
           // The grid draw is capped before conversion losses. All round-trip losses are
           // applied on charging, so discharge can use the stored energy directly.
           const gridChargeW = Math.min(
-            g.peakW,
+            availablePeakW,
             supply - now.demandW - charge,
             ((g.peakWh - g.currentWh) * ticksPerHour) / g.roundTripEfficiency,
           );
@@ -6305,7 +6408,8 @@ function* supplyFacilitiesFinancesPhases(
             Math.max(
               0,
               Math.min(
-                battery.peakW - alreadyChargingW,
+                (storageHeadroom.get(battery.id)?.peakW ?? battery.peakW) -
+                  alreadyChargingW,
                 ((battery.peakWh - battery.currentWh) * ticksPerHour) /
                   battery.roundTripEfficiency,
               ),
@@ -6331,7 +6435,8 @@ function* supplyFacilitiesFinancesPhases(
         0,
         Math.min(
           remaining,
-          battery.peakW - alreadyChargingW,
+          (storageHeadroom.get(battery.id)?.peakW ?? battery.peakW) -
+            alreadyChargingW,
           ((battery.peakWh - battery.currentWh) * ticksPerHour) /
             battery.roundTripEfficiency,
         ),

@@ -10,12 +10,14 @@ import {
   type TerritoryMapTileKey,
   type TerritoryTileView,
 } from "../../../helpers/TerritoryMapState";
+import { combustibleTile } from "../../../helpers/TerritoryWildfire";
 import {
   facilityMapStatus,
   facilityOperatingStatus,
 } from "../FacilityMapStatus";
 import { HEX_NEIGHBORS, riverPorts } from "../TerritoryHexGeometry";
 import type { HexWire } from "../TerritoryHexGeometry";
+import { hailModel, HAIL_MODEL_KEY } from "./Hailstones";
 import { MeshBuilder } from "./MeshBuilder";
 import { PALETTE } from "./Palette";
 import { CAMERA_COS, CAMERA_SIN, tilePosition3D } from "./Projection";
@@ -43,11 +45,13 @@ type PickFrame = Pick<
   "width" | "height" | "cameraX" | "cameraY" | "scale" | "weather"
 >;
 interface TileScene {
+  weather?: TerrainModelOptions["weather"];
   tile: TerritoryTileDefinition;
   kind?: StructureKind;
   terrain: MapInstance;
   model?: MapModel;
   structure?: MapInstance;
+  hail?: MapInstance;
 }
 
 function waterRange(part: ModelPart) {
@@ -150,6 +154,8 @@ export function structureKind(
         : "battery";
   if (facility?.fuel === "Natural Gas" && facility.name === "Natural Gas Steam")
     return "gas-steam";
+  if (facility?.fuel === "Sun" && view.disaster?.hail)
+    return "solar-hail-damaged";
   if (facility?.fuel) return fuelModels[facility.fuel];
   if (!view.developed || ["river", "lake", "ocean"].includes(view.tile.terrain))
     return undefined;
@@ -232,18 +238,27 @@ export class SceneBuilder {
     for (const view of views) {
       const { tile } = view,
         tileKey = territoryMapTileKey(tile),
-        kind = structureKind(view);
+        kind = structureKind(view),
+        burning = view.disaster?.ground === "burning" && combustibleTile(tile),
+        weather =
+          view.disaster?.ground === "burning"
+            ? "scorched"
+            : view.disaster?.ground;
+      const frost = view.disaster?.frost !== undefined;
       let cell = this.cells.get(tileKey);
       if (
         !cell ||
         cell.tile !== tile ||
         cell.kind !== kind ||
+        cell.weather !== weather ||
+        !!cell.terrain.wildfire !== burning ||
         cell.terrain.fog !== view.visibilityDistance
       ) {
         const model = kind ? this.factories.structure(kind) : undefined;
         const position = tilePosition3D(tile);
         const terrain = this.factories.terrain(tile.terrain, {
           footprint: model?.footprint ?? 0,
+          weather,
           ports:
             tile.terrain === "river" ? riverPorts(tile, allTiles) : undefined,
           ...(tile.terrain === "mountain" || tile.terrain === "forest"
@@ -261,6 +276,7 @@ export class SceneBuilder {
         });
         cell = {
           tile,
+          weather,
           kind,
           model,
           terrain: {
@@ -268,7 +284,16 @@ export class SceneBuilder {
             position,
             fog: view.visibilityDistance,
             active: false,
+            frost,
             model: terrain,
+            ...(burning && {
+              wildfire: {
+                q: tile.q,
+                r: tile.r,
+                clearance: (model?.footprint ?? 0) / 2,
+                forest: tile.terrain === "forest",
+              },
+            }),
           },
           structure: model
             ? {
@@ -282,12 +307,24 @@ export class SceneBuilder {
         };
         this.cells.set(tileKey, cell);
       }
+      if (cell.terrain.frost !== frost)
+        cell.terrain = { ...cell.terrain, frost };
       const position = cell.structure?.position ?? cell.terrain.position;
       const model = cell.model;
       if (model) models.set(tileKey, model);
       positions.set(tileKey, position);
       instances.push(cell.terrain);
       if (!model) continue;
+      if (kind === "solar-hail-damaged" && view.disaster?.hail === "impact") {
+        cell.hail ??= {
+          id: `hail:${tileKey}`,
+          model: hailModel(cell.terrain.model, model, tile.q, tile.r),
+          position: cell.terrain.position,
+          fog: view.visibilityDistance,
+          active: true,
+        };
+        instances.push(cell.hail);
+      }
       // Map construction badges may describe added capacity while the base keeps running.
       const status =
         view.facility && !tile.city && view.operatingFacility
@@ -449,7 +486,11 @@ export class SceneBuilder {
     let depth = -Infinity,
       tileKey: TerritoryMapTileKey | undefined;
     for (const instance of instances) {
-      if (instance.id.startsWith("wires:")) continue;
+      if (
+        instance.id.startsWith("wires:") ||
+        instance.model.key === HAIL_MODEL_KEY
+      )
+        continue;
       const px = x - instance.position[0],
         py =
           y -

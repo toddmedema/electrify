@@ -94,12 +94,17 @@ Schema 21 records the distance to the nearest owned city on new ordinary tile
 receipts. Older receipts keep their exact parcel prices. Later city acquisitions
 leave previous receipts and invested capital intact.
 
-Schema 22 rebuilds the Valley's acquisition and retention goals from saved customer
-history and dated ownership receipts. Paid assets, customer history and finances
-remain intact.
+Schema 22 adds optional territory weather. Existing runs start tracking it at
+the next monthly check.
 
-Recognized published schema 13, 14, 15, 16, 17, 19, 20 and 21 co-op identities have ordered transitions.
-It preserves the run's original scoring provenance. Existing company-local land
-rights are retained, including old duplicate ownership; new claims are exclusive
-and checked in host command order. Other incompatible co-op identities retain
-their existing rejection behavior. See [territories](territories.md).
+Schema 23 rebuilds the Valley's acquisition and retention goals from saved customer
+history and dated ownership receipts. Paid assets, customer history and finances
+remain intact. Saves made with the schema 22 acquisition preview retain their
+recorded evidence for the new goals.
+
+Recognized published schema 13, 14, 15, 16, 17, 19, 20, 21 and 22 co-op identities
+have ordered transitions that preserve the run's original scoring provenance.
+Existing company-local land rights, including old duplicate ownership, are
+retained. New claims are exclusive and checked in host command order. Other
+incompatible co-op identities retain their existing rejection behavior. See
+[territories](territories.md).

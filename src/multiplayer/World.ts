@@ -52,7 +52,11 @@ import { getScenarioLocation, isValidLocation } from "../helpers/Locations";
 import { pendingScenarioChoice } from "../helpers/ScenarioChoices";
 import { gameObjectiveResults } from "../helpers/ObjectiveRules";
 import { validScenarioMod } from "../helpers/ScenarioMod";
-import { summarizeHistory } from "../helpers/DateTime";
+import { MINUTES_PER_MONTH, summarizeHistory } from "../helpers/DateTime";
+import {
+  retainedWildfireFirebreaks,
+  validTerritoryWeather,
+} from "../helpers/TerritoryWildfire";
 import { publicRateCap } from "../helpers/Customers";
 import { storyHash } from "../data/WorldEvents";
 import manifest from "../data/RunCompatibility.json";
@@ -659,6 +663,11 @@ export function stepWorld(world: World): void {
   );
   const sharedImportRounds: SharedImportClearing[] | undefined =
     world.grids.some((grid) => grid.utilityExpansion) ? [] : undefined;
+  // Frozen legacy footprints are physical firebreaks for every seat. Only the monthly check uses them.
+  const firebreaks =
+    sharedImportRounds && (minute + TICK_MINUTES) % MINUTES_PER_MONTH === 0
+      ? retainedWildfireFirebreaks(world.grids)
+      : undefined;
   const tradingPlan = (plan: PeerPlan, i: number) => {
     plan = { ...plan };
     const grid = world.grids[i];
@@ -685,7 +694,13 @@ export function stepWorld(world: World): void {
       };
     selectWeatherLocation(g.location.id);
     g.multiplayer!.pricePerMWh = world.pricePerMWh;
-    const phase = tickStatePhases(g, undefined, undefined, sharedImportRounds);
+    const phase = tickStatePhases(
+      g,
+      undefined,
+      undefined,
+      sharedImportRounds,
+      firebreaks,
+    );
     const planned = phase.next();
     if (
       planned.done ||
@@ -1406,6 +1421,16 @@ export function hydrateWorld(value: unknown): World {
     !validSharedLand(world)
   )
     throw new Error(INVALID_GRIDS);
+  if (world.grids.some(hasTerritoryNetwork)) {
+    const firebreaks = retainedWildfireFirebreaks(world.grids);
+    if (
+      firebreaks.size &&
+      !world.grids.every((grid) =>
+        validTerritoryWeather(grid.territoryWeather, grid, firebreaks),
+      )
+    )
+      throw new Error(INVALID_GRIDS);
+  }
   restoreCommitments(world, result);
   return result;
 }
@@ -1697,14 +1722,21 @@ function upgradeTerritoryWorld(value: unknown): unknown {
       (old.gameSchema === 20 &&
         old.rules ===
           "coop-2-cf979e3b45deb328dd12a266f291e16398174095d47beca6df0d4f9da1dbd577") ||
-      // Published masters 89557e6/9702439 and acquisition branch 755cf1d9 share schema 21.
+      // Published masters 89557e6/095c194 and acquisition branch 755cf1d9 share schema 21.
       (old.gameSchema === 21 &&
         (old.rules ===
           "coop-2-fcb444f119733dd48aef5c28f13cb78fc856be210f448c495109eb5987d70476" ||
           old.rules ===
             "coop-2-15c753596aead2c7b8214074ea6ee123deffa20b96db9d73b4abd0e420548a55" ||
           old.rules ===
-            "coop-2-8423406cc7fc00c2bcf0e3cd7b647ad746beabc840cbeb1fc847e15d0389d64c"))
+            "coop-2-8423406cc7fc00c2bcf0e3cd7b647ad746beabc840cbeb1fc847e15d0389d64c")) ||
+      // Published master ca7b8c4e adds weather. Published acquisition preview e2abbfbb
+      // already uses the new goals. Both shipped game schema 22 with distinct rules.
+      (old.gameSchema === 22 &&
+        (old.rules ===
+          "coop-2-bddc08bd9f13d3fb912bccfa5401e85283039c61e31340ec6a252cd503884fef" ||
+          old.rules ===
+            "coop-2-65d7bc6c94fc95425c4781b2a0039977949b473ac9928a597914f29b449643a6"))
     ) ||
     !Array.isArray(old.grids) ||
     !old.grids.every(
@@ -1717,6 +1749,7 @@ function upgradeTerritoryWorld(value: unknown): unknown {
           old.gameSchema === 19 ||
           old.gameSchema === 20 ||
           old.gameSchema === 21 ||
+          old.gameSchema === 22 ||
           isUtilityExpansionGame(grid)),
     )
   )

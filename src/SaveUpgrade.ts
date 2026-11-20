@@ -396,7 +396,9 @@ const migrations: readonly Migration[] = [
   // 20 -> 21: new ordinary tile receipts include connection distance. Existing receipts
   // keep their original parcel pricing and need no new field.
   (save) => save,
-  // 21 -> 22: rebuild the Valley's scored goals from saved customer history and purchase receipts.
+  // 21 -> 22: territory weather begins on the next monthly check for existing runs.
+  (save) => save,
+  // 22 -> 23: rebuild the Valley's scored goals from saved customer history and purchase receipts.
   (save) => {
     if (!object(save.game)) return null;
     if (
@@ -404,17 +406,16 @@ const migrations: readonly Migration[] = [
       save.game.objectiveProgress === undefined
     )
       return save;
-    if (
-      !object(save.game.objectiveProgress) ||
-      !Array.isArray(save.game.monthlyHistory)
-    )
+    const { objectiveProgress, ...game } = save.game;
+    if (!object(objectiveProgress) || !Array.isArray(game.monthlyHistory))
       return null;
-    const { objectiveProgress: _retiredRules, ...game } = save.game;
     try {
       const progress = gameObjectiveProgress(game as unknown as GameType);
-      return progress
-        ? { ...save, game: { ...game, objectiveProgress: progress } }
-        : null;
+      if (!progress) return null;
+      // The schema 22 acquisition preview already used these goals. Keep its evidence
+      // so the save validator can check the original observations and checksums.
+      if (objectiveProgress.rulesDigest === progress.rulesDigest) return save;
+      return { ...save, game: { ...game, objectiveProgress: progress } };
     } catch {
       return null;
     }

@@ -1,5 +1,6 @@
 import { MeshBuilder } from "./MeshBuilder";
-import { PALETTE } from "./Palette";
+import { PALETTE, rgb } from "./Palette";
+import { tintTerrainMesh } from "./TerrainWeatherMaterials";
 import { GROUND_RADIUS } from "./Projection";
 import type {
   MapMesh,
@@ -68,18 +69,34 @@ function clearsPad(x: number, z: number, radius: number, halfWidth: number) {
   );
 }
 
-function canopy(halfWidth: number) {
+const charredWood = rgb("#4a413d");
+
+function canopy(halfWidth: number, charred = false) {
   const builder = new MeshBuilder();
   let height = 0;
   for (const [index, [x, z, radius, top]] of crowns.entries()) {
     if (!clearsPad(x, z, radius, halfWidth)) continue;
-    conifer(builder, x, z, radius, top, index % 3 !== 1);
-    height = Math.max(height, top);
+    if (charred) {
+      if (index % 3 === 1) continue;
+      const snagHeight = top * 0.68;
+      builder.cylinder([x, 0, z], 0.018, 0.009, snagHeight, charredWood, 4);
+      builder.beam(
+        [x, snagHeight * 0.61, z],
+        [x + (index % 2 ? 0.039 : -0.041), snagHeight * 0.82, z + 0.018],
+        0.006,
+        charredWood,
+      );
+      height = Math.max(height, snagHeight);
+    } else {
+      conifer(builder, x, z, radius, top, index % 3 !== 1);
+      height = Math.max(height, top);
+    }
   }
   return { mesh: builder.build(), height };
 }
 
 const interiorCanopies = CLEAR_WIDTHS.map((width) => canopy(width / 2));
+const burnedCanopies = CLEAR_WIDTHS.map((width) => canopy(width / 2, true));
 const edgeTree = new MeshBuilder();
 conifer(edgeTree, 0, 0, EDGE_RADIUS, EDGE_HEIGHT, false);
 const edgeMesh = edgeTree.build();
@@ -103,7 +120,9 @@ const edgeCanopies: readonly (ModelPart & { position: Vec3 })[] = corners.map(
     };
   },
 );
-const models: (MapModel | undefined)[] = [];
+const models: Partial<
+  Record<"healthy" | "dry" | "parched" | "scorched", (MapModel | undefined)[]>
+> = {};
 let ground: MapMesh | undefined;
 
 export function getForestModel(
@@ -118,28 +137,45 @@ export function getForestModel(
   const bucket = match < 0 ? maxBucket : match;
   const edges = (options?.adjacentEdges ?? 0) & EDGE_MASK;
   const index = bucket * (1 << EDGES) + edges;
-  const cached = models[index];
+  const appearance =
+    options?.weather === "burning"
+      ? "scorched"
+      : (options?.weather ?? "healthy");
+  const variant = (models[appearance] ??= []);
+  const cached = variant[index];
   if (cached) return cached;
 
-  const interior = interiorCanopies[bucket];
+  const burned = appearance === "scorched";
+  const tint =
+    appearance === "dry" || appearance === "parched" ? appearance : undefined;
+  const interior = (burned ? burnedCanopies : interiorCanopies)[bucket];
+  const groundMesh = (ground ??= buildGround());
   const halfWidth = CLEAR_WIDTHS[bucket] / 2;
-  const border = edgeCanopies.filter(
+  const border = (burned ? [] : edgeCanopies).filter(
     ({ position }, edge) =>
       !!(edges & (1 << edge)) &&
       clearsPad(position[0], position[2], EDGE_RADIUS, halfWidth),
   );
-  return (models[index] = {
-    key: `terrain:forest:${bucket}:${edges}`,
+  return (variant[index] = {
+    key: `terrain:forest:${bucket}:${edges}${appearance === "healthy" ? "" : `:${appearance}`}`,
     parts: [
       {
-        mesh: (ground ??= buildGround()),
+        mesh: burned ? tintTerrainMesh(groundMesh, "ash") : groundMesh,
         castsShadow: false,
         receivesShadow: true,
       },
       ...(interior.mesh.positions.length
-        ? [{ mesh: interior.mesh, castsShadow: true, receivesShadow: false }]
+        ? [
+            {
+              mesh: tint ? tintTerrainMesh(interior.mesh, tint) : interior.mesh,
+              castsShadow: true,
+              receivesShadow: false,
+            },
+          ]
         : []),
-      ...border,
+      ...border.map((part) =>
+        tint ? { ...part, mesh: tintTerrainMesh(part.mesh, tint) } : part,
+      ),
     ],
     terminals: [],
     footprint: 1,

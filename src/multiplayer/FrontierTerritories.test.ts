@@ -112,6 +112,10 @@ it.each([
     21,
     "coop-2-8423406cc7fc00c2bcf0e3cd7b647ad746beabc840cbeb1fc847e15d0389d64c",
   ],
+  [
+    22,
+    "coop-2-bddc08bd9f13d3fb912bccfa5401e85283039c61e31340ec6a252cd503884fef",
+  ],
 ] as const)(
   "retains independent parcel claims and cash from published schema%i",
   (schema, rules) => {
@@ -133,6 +137,8 @@ it.each([
     saved.gameSchema = schema;
     saved.rules = rules;
     saved.grids[0].objectiveProgress = { rulesDigest: "pre-acquisition-goals" };
+    if (schema === 22)
+      saved.grids[0].territoryWeather = { dryness: 0.81, fires: [] };
     const before = JSON.stringify(saved);
     const restored = restoreWorld(saved, "restored");
     expect(JSON.stringify(saved)).toBe(before);
@@ -140,6 +146,9 @@ it.each([
       restoreWorld({ ...saved, rules: "unrecognized" }, "rejected"),
     ).toThrow();
     expect(restored.gameSchema).toBe(SAVE_SCHEMA_VERSION);
+    expect(restored.grids[0].territoryWeather).toEqual(
+      saved.grids[0].territoryWeather,
+    );
     expect(
       restored.grids[0].objectiveProgress?.entries.map(({ id }) => id),
     ).toEqual(["acquire-neighbor", "retain-customers"]);
@@ -155,6 +164,35 @@ it.each([
     );
   },
 );
+it("keeps the original validated acquisition evidence from the published schema 22 preview", () => {
+  const world = ready();
+  expect(buy(world, "0", "parcel-0")).toBeUndefined();
+  const quote = acquisitionQuote(roomView(world, "0").game!, "parcel-1")!;
+  expect(acquireVergennes(world, "0", quote.quoteKey)).toBeUndefined();
+
+  const saved = JSON.parse(JSON.stringify(checkpointWorld(world)));
+  saved.gameSchema = 22;
+  saved.rules =
+    "coop-2-65d7bc6c94fc95425c4781b2a0039977949b473ac9928a597914f29b449643a6";
+  const restored = restoreWorld(saved, "preview");
+  expect(restored.gameSchema).toBe(SAVE_SCHEMA_VERSION);
+  expect(restored.grids[0].objectiveProgress).toEqual(
+    saved.grids[0].objectiveProgress,
+  );
+  expect(restored.grids[0].territoryNetwork).toEqual(
+    saved.grids[0].territoryNetwork,
+  );
+  expect(currentTick(restored.grids[0])!.cash).toBe(
+    currentTick(world.grids[0])!.cash,
+  );
+  const roundTrip = restoreWorld(checkpointWorld(restored), "round-trip");
+  expect(roundTrip.grids[0].objectiveProgress).toEqual(
+    saved.grids[0].objectiveProgress,
+  );
+
+  saved.grids[0].objectiveProgress.checksum = `sha256-${"0".repeat(64)}`;
+  expect(() => restoreWorld(saved, "corrupt")).toThrow(/invalid grids/);
+});
 it("migrates only recognized published schema14 co-op rules and keeps paid claims and cash", () => {
   const world = ready();
   world.grids[0].territoryNetwork!.landPurchases.push({

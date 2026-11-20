@@ -389,6 +389,11 @@ function TileNetwork(props: Props) {
           }
           onClose={close}
         >
+          {view.disaster && (
+            <Typography variant="body2" className="tileFacilityStatus">
+              {view.disaster.condition}
+            </Typography>
+          )}
           {building && desktopRail ? (
             <TileTerrainModifiers terrain={tile.terrain} />
           ) : building ? (
