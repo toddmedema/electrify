@@ -216,10 +216,7 @@ if (typeof window !== "undefined") {
   window.addEventListener("orientationchange", invalidate);
 }
 
-/**
- * From this width the app bar folds its status row into the top bar, so the window gains one row
- * of game, and the desktop-only speed appears.
- */
+/** From this width the desktop-only speed and full fleet layout are available. */
 export const SIDE_LAYOUT_MIN_WIDTH = 1300;
 /** From this width the game workspace opens tools in side columns beside the fleet. */
 export const SIDE_TOOL_MIN_WIDTH = 1024;
@@ -235,7 +232,7 @@ export function isSideToolLayout(): boolean {
 }
 
 /**
- * Wide enough for the single-row app bar and the fastest speed.
+ * Wide enough for the full fleet layout and the fastest speed.
  * Keep in sync with $desktop_breakpoint in app.scss.
  */
 export function isDesktopScreen(): boolean {

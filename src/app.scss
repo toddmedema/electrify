@@ -1425,14 +1425,14 @@ $topbar_height: 56px;
 }
 
 // Wide windows fold the status row into the top bar (GameAppBar renders it inside the toolbar):
-// cash, profit and date, a hairline, the grid readout, then the mission, with the speed controls pinned
-// right. The bar never wraps. Only the mission's text gives up width, then the months label
-// abbreviates and the hour goes, so the grid state and its figure always stay whole.
+// cash, profit and date, then grid and mission status, with the speed controls pinned right.
+// Mission copy can truncate as the row tightens, keeping the operating readouts whole.
 #appbar.appbarSingleRow {
   container: appbar / inline-size;
 
   #topbar .gameStatus {
     flex: 0 0 auto;
+    gap: $space-2;
   }
 
   #speedChangeButtons {
@@ -1445,9 +1445,9 @@ $topbar_height: 56px;
     flex: 1 1 0;
     align-items: center;
     align-self: stretch;
-    gap: $space-3;
+    gap: $space-2;
     min-width: 0;
-    margin-inline: $space-4;
+    margin-inline: $space-3;
     border: 0;
     background: none;
 
@@ -1458,33 +1458,6 @@ $topbar_height: 56px;
       height: 24px;
       background: var(--border-subtle);
     }
-  }
-
-  // Warnings tint the readout itself, so the alarm stays the loudest thing in the bar without
-  // owning a row.
-  .gameStatusBar .gridHealth {
-    flex: 0 0 auto;
-    min-height: 32px;
-    padding-inline: $space-2;
-    border: 0;
-    border-radius: var(--radius-sm);
-    background: none;
-
-    &.statusWarning {
-      background: var(--warning-fill);
-    }
-
-    // Opaque under its tint: the whole bar pulses during a blackout, and a see-through fill
-    // would let that pulse wash out the red text.
-    &.gridHealth-blackout {
-      background:
-        linear-gradient(var(--blackout-tint), var(--blackout-tint)),
-        var(--bg-primary);
-    }
-  }
-
-  .gameStatusBar .gridHealthSummary {
-    flex-wrap: nowrap;
   }
 
   .gameStatusBar .missionSummary {
@@ -1502,16 +1475,13 @@ $topbar_height: 56px;
     background: var(--warning-fill);
   }
 
-  .missionRiskText,
-  .missionSummaryHeadline {
-    min-width: 96px;
+  .missionSummaryCopy {
+    gap: $space-2;
   }
 
-  // The first status icon sits 20px past the divider (the bar's gap plus the readout's own
-  // inset); the months left end the same 20px before the speed controls
-  .gameStatusBar .missionSummaryMonths {
-    margin-inline-end: 0;
-    padding-inline-end: $space-1;
+  .gameStatusBar .missionSummaryMonths.MuiButton-root {
+    margin-inline: 0;
+    padding-inline: $space-1;
   }
 }
 

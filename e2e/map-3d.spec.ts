@@ -115,7 +115,7 @@ for (const theme of ["light", "dark"] as const) {
 
 test("clicking real mountain relief above its ground selects the mountain tile", async ({
   page,
-}) => {
+}, info) => {
   await page.goto("/?scenario=116");
   await page.getByRole("button", { name: "Start game", exact: true }).click();
   const pause = page.getByRole("button", { name: "pause", exact: true });
@@ -150,9 +150,28 @@ test("clicking real mountain relief above its ground selects the mountain tile",
   const tile = getTerritoryTile(
     (await mountain.getAttribute("data-map-target"))!,
   )!;
+  // Force keyboard focus-visible before focusing a tile that is outside the tab order.
+  await page.keyboard.press("Tab");
   await mountain.focus();
+  await expect(mountain).toBeFocused();
+  await expect(mountain).toHaveAttribute("aria-pressed", "true");
+  if (!info.project.use.hasTouch)
+    expect(
+      await mountain.evaluate((button) => button.matches(":focus-visible")),
+    ).toBe(true);
+  await expect(mountain).toHaveCSS("outline-style", "none");
+  await expect(mountain.locator(".territoryTileHitArea")).toHaveCSS(
+    "outline-style",
+    "none",
+  );
+  const selection = map.locator(".territoryHexSelection");
+  await expect(selection).toHaveAttribute("d", /^(?:M[^M]+){6}$/);
+  await expect(selection).toHaveCSS("stroke-dasharray", "4px, 4px");
   await mountain.press("Escape");
   await expect(mountain).toHaveAttribute("aria-pressed", "false");
+  await expect(
+    map.getByRole("button", { name: "Rapid connection mode", exact: true }),
+  ).toBeFocused();
   const viewport = map.locator(".territoryMapViewport");
   const {
     x: cameraX,
