@@ -595,14 +595,30 @@ test("map windows move, resize, stack and remember their bounds", async ({
 
   await page.setViewportSize({ width: 1060, height: 580 });
   await expect(resize).toBeInViewport();
-  const clamped = (await fleet.boundingBox())!;
-  await drag(resize, -32, 0);
+  // Wait for the workspace observer to fit the window to the smaller tray.
   await expect
-    .poll(() => fleet.boundingBox())
-    .toEqual({
-      ...clamped,
-      width: clamped.width - 32,
-    });
+    .poll(() =>
+      fleet.evaluate((element: HTMLElement) => {
+        const tray = element.parentElement!;
+        return {
+          rightGap: tray.clientWidth - element.offsetLeft - element.offsetWidth,
+          bottomGap:
+            tray.clientHeight - element.offsetTop - element.offsetHeight,
+        };
+      }),
+    )
+    .toEqual({ rightGap: 0, bottomGap: 0 });
+  const horizontalBounds = () =>
+    fleet.evaluate((element: HTMLElement) => ({
+      left: element.offsetLeft,
+      width: element.offsetWidth,
+    }));
+  const clamped = await horizontalBounds();
+  await drag(resize, -32, 0);
+  await expect.poll(horizontalBounds).toEqual({
+    left: clamped.left,
+    width: clamped.width - 32,
+  });
 });
 
 test("shows an advancing wildfire and scar with WebGL or the SVG fallback", async ({
