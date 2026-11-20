@@ -25,11 +25,15 @@ export const objectiveDefinition = (
   metric: CompiledRuleObjective["metric"],
   objective?: CompiledRuleObjective,
 ): string =>
-  metric === "fuelRetirement" &&
-  objective?.metric === "fuelRetirement" &&
-  objective.commissionedBeforeYear !== undefined
-    ? `Own no ${objective.fuel} equipment commissioned before ${objective.commissionedBeforeYear} at the deadline${objective.checkpoint ? "" : " or any later month close"}. Paused equipment counts; newer and unfinished equipment is excluded.`
-    : OBJECTIVE_DEFINITIONS[metric];
+  metric === "utilityOwnership" &&
+  objective?.metric === "utilityOwnership" &&
+  objective.minUtilities !== undefined
+    ? `Acquire at least ${objective.minUtilities} of the named utilities by the deadline.`
+    : metric === "fuelRetirement" &&
+        objective?.metric === "fuelRetirement" &&
+        objective.commissionedBeforeYear !== undefined
+      ? `Own no ${objective.fuel} equipment commissioned before ${objective.commissionedBeforeYear} at the deadline${objective.checkpoint ? "" : " or any later month close"}. Paused equipment counts; newer and unfinished equipment is excluded.`
+      : OBJECTIVE_DEFINITIONS[metric];
 
 const byId = (a: { id: string }, b: { id: string }) =>
   a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
@@ -90,7 +94,7 @@ export function objectiveTarget(objective: CompiledRuleObjective): number {
     case "customerRetention":
       return objective.minRetainedShare;
     case "utilityOwnership":
-      return 1;
+      return objective.minUtilities ?? 1;
     case "emissionsBudget":
       return objective.budgetKgCO2e;
     case "emissionsPerDeliveredMWh":
@@ -248,6 +252,17 @@ export function rebaseObjectiveRetention(
   return { ...plain, checksum: progressChecksum(plain) };
 }
 
+export function acquiredUtilityCount(
+  objective: Extract<CompiledRuleObjective, { metric: "utilityOwnership" }>,
+  ownedUtilities: readonly string[],
+): number {
+  return Math.min(
+    objectiveTarget(objective),
+    objective.targets.filter((target) => ownedUtilities.includes(target))
+      .length,
+  );
+}
+
 export function objectiveMonthObservation(
   objective: CompiledRuleObjective,
   facts: ObjectiveMonthFacts,
@@ -296,11 +311,7 @@ export function objectiveMonthObservation(
       numerator =
         facts.ownedUtilities === undefined
           ? undefined
-          : Number(
-              objective.targets.some((target) =>
-                facts.ownedUtilities!.includes(target),
-              ),
-            );
+          : acquiredUtilityCount(objective, facts.ownedUtilities);
       break;
     case "assetRetirement":
       numerator =
@@ -668,9 +679,9 @@ export function evaluateScenarioObjectives(
               monthEndDebt:
                 "Loan principal at a completed month close exceeded the starting-year ceiling.",
               utilityOwnership:
-                "No target utility was acquired by the deadline.",
+                "Fewer than the required number of utilities were acquired by the deadline.",
               assetRetirement:
-                "An original oil asset remained owned at the retirement deadline.",
+                "A named asset remained owned at the retirement deadline.",
               financialCoverage:
                 objective.metric === "financialCoverage" &&
                 objective.basis === "cash"
@@ -890,6 +901,8 @@ export function validObjectiveProgress(
               )) ||
           (objective.metric === "fuelRetirement" &&
             !Number.isSafeInteger(numerator)) ||
+          (objective.metric === "utilityOwnership" &&
+            !integer(numerator, 0, objectiveTarget(objective))) ||
           ([
             "localFuelShare",
             "efficiencySavings",

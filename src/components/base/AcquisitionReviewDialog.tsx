@@ -10,7 +10,7 @@ import {
   closePolicyDecision,
 } from "../../reducers/GameActions";
 import { previewUtilityAcquisition } from "../../reducers/Game";
-import { acquisitionQuote } from "../../helpers/Expansion";
+import { acquisitionQuote, utilityOffer } from "../../helpers/Expansion";
 import {
   formatCount,
   formatNumber,
@@ -24,13 +24,13 @@ import DecisionImpactPreview from "./DecisionImpactPreview";
 import { useBuildCash } from "./useBuildCash";
 import { LOAN_MONTHS } from "../../Constants";
 import UtilityContractSchedule from "./UtilityContractSchedule";
-import { facilityDisplayName } from "./FacilityLabels";
+import { TERRITORY_TILES } from "../../data/TerritoryTiles";
 
 interface Props {
   game: GameType;
   targetId: string;
   onClose: () => void;
-  onAcquire: (payload: AcquireUtilityAction) => boolean | Promise<boolean>;
+  onAcquire?: (payload: AcquireUtilityAction) => boolean | Promise<boolean>;
 }
 
 function marginText(marginW: number): string {
@@ -65,14 +65,19 @@ export default function AcquisitionReviewDialog({
       dispatch(closePolicyDecision(token));
     };
   }, [dispatch, targetId]);
-  const quote = acquisitionQuote(game, targetId);
+  const { quote, offer } = React.useMemo(() => {
+    const quote = acquisitionQuote(game, targetId);
+    return { quote, offer: quote ?? utilityOffer(game, targetId) };
+  }, [game, targetId]);
   const now = currentTick(game);
   const cash = useBuildCash(submission?.cash ?? now?.cash ?? 0, !submission);
   const preview = React.useMemo(
-    () => previewUtilityAcquisition(game, targetId, true),
-    [game, targetId],
+    () =>
+      quote &&
+      previewUtilityAcquisition(game, targetId, quote.kind === "regional"),
+    [game, targetId, quote],
   );
-  if (!quote)
+  if (!offer)
     return (
       <DecisionDialog
         open
@@ -86,43 +91,52 @@ export default function AcquisitionReviewDialog({
         </Typography>
       </DecisionDialog>
     );
-  const valley = quote.targetId === "valley-electric";
+  const municipal = offer.kind === "municipal" ? offer.territory : undefined;
+  const sites =
+    municipal?.purchases.length ??
+    TERRITORY_TILES.filter((tile) => tile.territoryId === offer.targetId)
+      .length;
   const customersBefore = now?.customers ?? 0;
-  const customersAfter = customersBefore + quote.customers;
+  const customersAfter = customersBefore + offer.customers;
   const customerGrowth =
-    customersBefore > 0
-      ? ` (+${formatPercent(quote.customers / customersBefore)})`
+    customersBefore > 0 && offer.customers > 0
+      ? ` (+${formatPercent(offer.customers / customersBefore)})`
       : "";
-  const nuclear = quote.contracts.find(
-    (contract) => contract.name === "Regional nuclear",
-  );
-  const contractChange = valley
-    ? !nuclear
-      ? "Valley’s inherited nuclear purchase has expired."
-      : game.date.year >= 2017
-        ? `Valley’s nuclear purchase is now ${formatWatts(nuclear.deliverableW)}, reduced in January 2017.`
-        : "Valley’s nuclear purchase falls from 152 to 76 MW in January 2017."
-    : "";
+  const unavailable = !quote || !onAcquire;
+  const removedPlant = municipal?.removedPlant;
+  const valleyNuclear =
+    offer.targetId === "valley-electric" &&
+    offer.contracts.find(({ name }) => name === "Regional nuclear");
 
   return (
     <PurchaseReviewDialog
       open
       cancelLabel="Cancel"
-      title={`Acquire ${quote.name}?`}
+      title={`Acquire ${offer.name}?`}
       titleId="utility-acquisition-title"
       cash={cash}
-      buildCost={quote.equityPrice}
-      cashOnlyFee={quote.fee}
+      buildCost={offer.equityPrice}
+      cashOnlyFee={offer.fee}
       interestRate={game.interestRate}
-      upkeepPerMonth={quote.networkOMPerMonth}
-      cashLabel="Cash option"
+      upkeepPerMonth={offer.networkOMPerMonth}
+      cashLabel={municipal ? "Cash price" : "Cash option"}
+      cashButtonLabel={municipal ? "Confirm" : undefined}
+      cashOnly={!!municipal}
+      cashDisabled={unavailable}
+      loanDisabled={unavailable}
       paymentSummary={{
         cash: {
-          value: `${formatMoneyConcise(quote.cashDue)} now + ${formatMoneyConcise(quote.cashMonthlyDebtService + quote.networkOMPerMonth)}/mo`,
+          value: municipal
+            ? `${formatMoneyConcise(offer.cashDue)} now`
+            : `${formatMoneyConcise(offer.cashDue)} now + ${formatMoneyConcise(offer.cashMonthlyDebtService + offer.networkOMPerMonth)}/mo`,
         },
-        loan: {
-          value: `${formatMoneyConcise(quote.financedCashDue)} now + ${formatMoneyConcise(quote.monthlyDebtService + quote.networkOMPerMonth)}/mo`,
-        },
+        ...(municipal
+          ? {}
+          : {
+              loan: {
+                value: `${formatMoneyConcise(offer.financedCashDue)} now + ${formatMoneyConcise(offer.monthlyDebtService + offer.networkOMPerMonth)}/mo`,
+              },
+            }),
       }}
       extraFacts={[
         {
@@ -137,137 +151,173 @@ export default function AcquisitionReviewDialog({
             ? `${formatForecastWatts(preview.beforeMarginW)} → ${marginText(preview.afterMarginW)}`
             : "Forecast unavailable",
         },
+        {
+          concept: "build",
+          label: "Sites transferred",
+          value: String(sites),
+          detail:
+            municipal && removedPlant
+              ? "The seller removes its plant. Its site becomes available to build on."
+              : undefined,
+        },
       ]}
       preface={
-        error || cash < quote.financedCashDue ? (
+        error || !quote || (!municipal && cash < offer.financedCashDue) ? (
           <div className="acquisitionReviewIntro">
             {error && (
               <Typography role="alert" color="error">
                 {error}
               </Typography>
             )}
-            {cash < quote.financedCashDue && (
+            {!quote ? (
+              <Typography variant="body2">
+                Connect land along this utility’s border to acquire it.
+              </Typography>
+            ) : !municipal && cash < offer.financedCashDue ? (
               <Typography variant="body2" color="warning.main">
-                Need {formatMoneyConcise(quote.financedCashDue)} cash for the
+                Need {formatMoneyConcise(offer.financedCashDue)} cash for the
                 down payment and fee. You have {formatMoneyConcise(cash)}.
               </Typography>
-            )}
+            ) : null}
           </div>
         ) : undefined
       }
       afterFacts={
         <div className="acquisitionReviewDetails">
-          <Typography variant="caption" color="textSecondary" component="p">
-            Monthly figures include debt and utility operations.
-          </Typography>
-          <section
-            className="acquisitionObligations"
-            aria-label="Acquisition obligations"
-          >
-            <Typography component="h3" variant="subtitle2">
-              Your commitments
-            </Typography>
-            <ul>
-              {game.date.year <= 2023 && (
-                <li>Retire the acquired oil plants by December 2023.</li>
-              )}
-              <li>
-                Retain 90% of your expanded customer base at the end of 2024.
-              </li>
-            </ul>
-          </section>
           <details className="acquisitionDisclosure">
             <summary>Plants &amp; purchased power</summary>
             <div>
-              <Typography component="h3" variant="subtitle2">
-                Operating plants
-              </Typography>
-              <DecisionImpactPreview
-                label="Operating plants"
-                facts={[...quote.facilities]
-                  .sort((a, b) => b.peakW - a.peakW)
-                  .map((facility) => ({
-                    concept: "supply",
-                    label: facilityDisplayName(facility),
-                    value: formatWatts(facility.peakW),
-                    detail: `${formatNumber(facility.ageYears)} years old`,
-                  }))}
-              />
-              <Typography component="h3" variant="subtitle2">
-                Purchased power
-              </Typography>
-              {!!quote.contracts.length && (
+              {removedPlant ? (
+                <DecisionImpactPreview
+                  label="Seller’s plant"
+                  facts={[
+                    {
+                      concept: "supply",
+                      label: removedPlant.name,
+                      value: formatWatts(removedPlant.peakW),
+                      detail: "Removed by the seller on transfer.",
+                    },
+                  ]}
+                />
+              ) : (
+                !!offer.facilities.length && (
+                  <>
+                    <Typography component="h3" variant="subtitle2">
+                      Operating plants
+                    </Typography>
+                    <DecisionImpactPreview
+                      label="Operating plants"
+                      facts={[...offer.facilities]
+                        .sort((a, b) => b.peakW - a.peakW)
+                        .map((facility) => ({
+                          concept: "supply",
+                          label: facility.name,
+                          value: formatWatts(facility.peakW),
+                          detail: `${formatNumber(facility.ageYears)} years old`,
+                        }))}
+                    />
+                  </>
+                )
+              )}
+              {offer.kind === "regional" && (
+                <Typography component="h3" variant="subtitle2">
+                  Purchased power
+                </Typography>
+              )}
+              {!!offer.contracts.length ? (
                 <DecisionImpactPreview
                   label="Purchased power"
-                  facts={quote.contracts.map((contract) => ({
+                  facts={offer.contracts.map((contract) => ({
                     concept: "supply",
                     label: contract.name,
                     value: `${contract.balancing ? "Up to " : ""}${formatWatts(contract.deliverableW)} delivered`,
                     detail: `${formatMoneyConcise(contract.pricePerMWh)}/MWh${contract.balancing ? " reference · variable price and availability, not firm reserve" : ""}`,
                   }))}
                 />
-              )}
-              {!quote.contracts.length && (
+              ) : (
                 <Typography variant="body2">
-                  No inherited purchased-power rights remain.
+                  No purchased-power contracts transfer.
                 </Typography>
               )}
-              {contractChange && (
+              {offer.targetId === "valley-electric" && (
                 <Typography variant="body2" color="textSecondary">
-                  {contractChange}
+                  {!valleyNuclear
+                    ? "Valley’s inherited nuclear purchase has expired."
+                    : game.date.year >= 2017
+                      ? `Valley’s nuclear purchase is now ${formatWatts(valleyNuclear.deliverableW)}, reduced in January 2017.`
+                      : "Valley’s nuclear purchase falls from 152 to 76 MW in January 2017."}
                 </Typography>
               )}
             </div>
           </details>
           <details className="acquisitionDisclosure">
-            <summary>Financing breakdown</summary>
+            <summary>
+              {municipal ? "Price breakdown" : "Financing breakdown"}
+            </summary>
             <div>
               <DecisionImpactPreview
-                label="Financing breakdown"
-                facts={[
-                  {
-                    concept: "money",
-                    label: "Purchase price",
-                    value: formatMoneyConcise(quote.equityPrice),
-                  },
-                  {
-                    concept: "money",
-                    label: "Transaction fee",
-                    value: formatMoneyConcise(quote.fee),
-                    detail: "Paid in cash with either option",
-                  },
-                  {
-                    concept: "finances",
-                    label: "Inherited debt",
-                    value: formatMoneyConcise(quote.assumedDebt),
-                    detail: `5% over 20 years · ${formatMoneyConcise(quote.cashMonthlyDebtService)}/mo`,
-                  },
-                  {
-                    concept: "finances",
-                    label: "New loan",
-                    value: formatMoneyConcise(quote.newLoan),
-                    detail: `${formatNumber(game.interestRate * 100)}% over ${LOAN_MONTHS / 12} years · ${formatMoneyConcise(quote.monthlyDebtService - quote.cashMonthlyDebtService)}/mo`,
-                  },
-                  {
-                    concept: "money",
-                    label: "Added utility operations",
-                    value: `${formatMoneyConcise(quote.networkOMPerMonth)}/mo`,
-                    detail: "At today’s costs",
-                  },
-                ]}
+                label={municipal ? "Price breakdown" : "Financing breakdown"}
+                facts={
+                  municipal
+                    ? municipal.purchases.map(({ tileId, price }) => ({
+                        concept: "money",
+                        label:
+                          tileId === municipal.utility.city.id
+                            ? `${municipal.utility.city.city?.name ?? "City"} service area`
+                            : "Plant site",
+                        value: formatMoneyConcise(price),
+                      }))
+                    : [
+                        {
+                          concept: "money",
+                          label: "Purchase price",
+                          value: formatMoneyConcise(offer.equityPrice),
+                        },
+                        {
+                          concept: "money",
+                          label: "Transaction fee",
+                          value: formatMoneyConcise(offer.fee),
+                          detail: "Paid in cash with either option",
+                        },
+                        {
+                          concept: "finances",
+                          label: "Inherited debt",
+                          value: formatMoneyConcise(offer.assumedDebt),
+                          detail: `5% over 20 years · ${formatMoneyConcise(offer.cashMonthlyDebtService)}/mo`,
+                        },
+                        {
+                          concept: "finances",
+                          label: "New loan",
+                          value: formatMoneyConcise(offer.newLoan),
+                          detail: `${formatNumber(game.interestRate * 100)}% over ${LOAN_MONTHS / 12} years · ${formatMoneyConcise(offer.monthlyDebtService - offer.cashMonthlyDebtService)}/mo`,
+                        },
+                        {
+                          concept: "money",
+                          label: "Added utility operations",
+                          value: `${formatMoneyConcise(offer.networkOMPerMonth)}/mo`,
+                          detail: "At today’s costs",
+                        },
+                      ]
+                }
               />
             </div>
           </details>
-          <details className="acquisitionDisclosure">
-            <summary>Supply &amp; operating changes</summary>
-            <div>
-              <UtilityContractSchedule game={game} targetId={quote.targetId} />
-            </div>
-          </details>
+          {offer.kind === "regional" && (
+            <details className="acquisitionDisclosure">
+              <summary>Supply &amp; operating changes</summary>
+              <div>
+                <UtilityContractSchedule
+                  game={game}
+                  targetId={offer.targetId}
+                />
+              </div>
+            </details>
+          )}
         </div>
       }
       onClose={onClose}
       onPurchase={async (financed) => {
+        if (!quote || !onAcquire) return false;
         setError(undefined);
         setSubmission({ game, cash });
         try {

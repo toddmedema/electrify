@@ -5,11 +5,7 @@ import type { ProjectionView } from "./Projection";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "./DateTime";
 import { isUtilityExpansionGame } from "./ExpansionContext";
 import { activeScenario } from "./GameSelectors";
-import {
-  demandServed,
-  reliabilityThreshold,
-  scenarioObjectiveDefinitions,
-} from "./ObjectiveRules";
+import { demandServed, reliabilityThreshold } from "./ObjectiveRules";
 
 /** A reference project, not a promise that this one plant will cover the forecast gap. */
 export const UTILITY_PLANNING_REFERENCE_W = 150e6;
@@ -78,29 +74,6 @@ export function utilityPlanning(
         }));
     })
     .sort((a, b) => a.year - b.year || a.utility.localeCompare(b.utility));
-  const retirements = scenarioObjectiveDefinitions(
-    activeScenario(game),
-    game,
-  ).flatMap((objective) =>
-    objective.metric !== "assetRetirement"
-      ? []
-      : game.facilities
-          .filter(
-            (facility) =>
-              !!facility.startingAssetId &&
-              objective.assetIds.includes(facility.startingAssetId),
-          )
-          .map((facility) => ({
-            id: facility.id,
-            name: facility.name,
-            startingAssetId: facility.startingAssetId,
-            deadlineMonth: objective.deadlineMonth,
-            startMonth:
-              buildMonths === undefined
-                ? undefined
-                : objective.deadlineMonth - buildMonths,
-          })),
-  );
   const serviceThreshold = reliabilityThreshold(game.difficulty);
   const firstGap = forecast && utilityServiceGap(game, forecast);
   const nextYear = forecast?.forecast.filter(
@@ -116,7 +89,6 @@ export function utilityPlanning(
   return {
     buildMonths,
     supplyChanges,
-    retirements,
     serviceThreshold,
     nextCustomers,
     nextPeakW: nextYear?.length

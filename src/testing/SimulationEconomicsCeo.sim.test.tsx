@@ -35,7 +35,7 @@ describe("simulation economics on CEO", () => {
     113: ["asset", "dispatch", "operation", "policy", "rate", "trading"],
     114: ["asset", "dispatch", "operation", "policy", "rate", "trading"],
     115: ["asset", "dispatch", "operation", "policy", "rate", "trading"],
-    116: ["asset", "rate", "sale"],
+    116: ["asset", "rate"],
   };
   ECONOMICS_SCENARIOS.forEach((scenario) => {
     it(`validates the ten-decision balance playbook in "${scenario.name}" on CEO`, () => {
@@ -59,7 +59,7 @@ describe("simulation economics on CEO", () => {
       expectNoViolations(active);
       expect([
         active.meaningfulDecisionCount,
-        active.meaningfulDecisionCategoryCount >= (scenario.id === 116 ? 3 : 4),
+        active.meaningfulDecisionCategoryCount >= (scenario.id === 116 ? 2 : 4),
         new Set(active.meaningfulDecisionKeys).size,
         active.outcome,
         active.meaningfulDecisionLabels,

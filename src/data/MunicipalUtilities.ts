@@ -1,4 +1,4 @@
-import type { FuelNameType, TerritoryTileId } from "../Types";
+import type { FuelNameType, LandTerritoryId, TerritoryTileId } from "../Types";
 import { territoryCoordinateHash } from "./Territories";
 import {
   getAuthoredTerritoryTile,
@@ -26,6 +26,7 @@ interface MunicipalPlant {
 }
 
 interface MunicipalUtility {
+  id: LandTerritoryId;
   name: string;
   city: TerritoryTileDefinition;
   plant?: MunicipalPlant;
@@ -59,10 +60,11 @@ function utilityName(city: TerritoryTileDefinition) {
   return `${city.city?.name ?? "Township"} ${suffix}`;
 }
 
-const municipalUtilities = plantSpecs.map(
+export const MUNICIPAL_UTILITIES = plantSpecs.map(
   ([cityId, tileId, fuel, name, peakW]): MunicipalUtility => {
     const city = getAuthoredTerritoryTile(cityId)!;
     return {
+      id: city.territoryId as LandTerritoryId,
       city,
       name: utilityName(city),
       plant: { tileId, facility: { name, fuel, peakW, yearsToBuildLeft: 0 } },
@@ -70,16 +72,24 @@ const municipalUtilities = plantSpecs.map(
   },
 );
 const byCity = new Map(
-  municipalUtilities.map((utility) => [utility.city.id, utility]),
+  MUNICIPAL_UTILITIES.map((utility) => [utility.city.id, utility]),
 );
 export const municipalPlantAt = new Map(
-  municipalUtilities.map((utility) => [utility.plant!.tileId, utility]),
+  MUNICIPAL_UTILITIES.map((utility) => [utility.plant!.tileId, utility]),
 );
+
+export function municipalUtility(id: unknown): MunicipalUtility | undefined {
+  return MUNICIPAL_UTILITIES.find((utility) => utility.id === id);
+}
 
 export function municipalUtilityAt(
   tile: TerritoryTileDefinition,
 ): MunicipalUtility | undefined {
   if (tile.city && tile.territoryId.startsWith("frontier:"))
-    return { city: tile, name: utilityName(tile) };
+    return {
+      id: tile.territoryId as LandTerritoryId,
+      city: tile,
+      name: utilityName(tile),
+    };
   return byCity.get(tile.id) ?? municipalPlantAt.get(tile.id);
 }

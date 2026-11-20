@@ -62,7 +62,6 @@ export function expansionBalanceActions(
         seed,
       ),
     })),
-    { month: 180, type: "retire", assetId: "scenario-116-champlain-oil-a" },
   ];
   const prepared = fixture.portfolio !== "unprepared";
   // Cash buyers save through 2013 so the company purchase preserves a generation down payment.
@@ -73,6 +72,8 @@ export function expansionBalanceActions(
     fixture.targetId === "valley-electric" &&
     fixture.portfolio === "mixed" &&
     !fixture.financed;
+  // The municipal load draws on firm capacity before Valley's nuclear reduction.
+  const reserveBuildMonth = cashValleyMixed ? 126 : 144;
   if (prepared)
     actions.push(
       {
@@ -90,7 +91,7 @@ export function expansionBalanceActions(
         },
       },
       {
-        month: 144,
+        month: reserveBuildMonth,
         type: "build",
         build: { name: "Natural Gas CC", peakW: 100e6, financed: true },
       },
@@ -135,11 +136,6 @@ export function expansionBalanceActions(
           },
         },
       );
-    actions.push({
-      month: 216,
-      type: "retire",
-      assetId: `scenario-116-${target.id === "valley-electric" ? "valley" : "ridge"}-oil`,
-    });
   }
   if (fixture.portfolio === "both")
     actions.push(
@@ -167,8 +163,24 @@ export function expansionBalanceActions(
           financed: true,
         },
       },
-      { month: 216, type: "retire", assetId: "scenario-116-ridge-oil" },
     );
+  if (prepared && fixture.portfolio !== "standalone") {
+    actions.push(
+      { month: 100, type: "tile", tileId: "green-uplands:site-2" },
+      { month: 100, type: "tile", tileId: "green-uplands:site-5" },
+      { month: 110, type: "acquire", targetId: "parcel-1", financed: false },
+      ...(fixture.portfolio === "both"
+        ? []
+        : [
+            {
+              month: 114,
+              type: "acquire" as const,
+              targetId: "parcel-11" as const,
+              financed: false,
+            },
+          ]),
+    );
+  }
   // New capacity is sited where the expanded company needs it. The home fleet remains
   // responsible for Champlain; the acquired territory receives its own replacement plants.
   // Split wind projects at the authored 150 MW site limit instead of bypassing site budgets.
@@ -180,7 +192,7 @@ export function expansionBalanceActions(
         (action.month === 108 || action.month === 168)
           ? "ridge-electric"
           : action.month < purchaseMonth ||
-              action.month === 144 ||
+              action.month === reserveBuildMonth ||
               (cashValleyMixed && action.month === 156)
             ? "champlain"
             : fixture.targetId;

@@ -3,6 +3,7 @@ import type {
   FuelNameType,
   GameType,
   TerritoryTileId,
+  UtilityAcquisitionId,
 } from "../Types";
 import { UTILITY_AREAS } from "../data/UtilityExpansion";
 import { isLandTerritoryId } from "../data/Territories";
@@ -44,7 +45,7 @@ export interface TerritoryTileView {
   facility?: TileFacilityView;
   operatingFacility?: FacilityOperatingType;
   connectable?: boolean;
-  municipalCity?: TerritoryTileDefinition;
+  acquisitionId?: UtilityAcquisitionId;
   reserved?: boolean;
   visibilityDistance: 0 | 1 | 2 | 3;
   disaster?: TileDisaster;
@@ -82,6 +83,15 @@ export function territoryTileViews(game: GameType): TerritoryTileView[] {
         ? game.multiplayer?.landOwners?.[tile.territoryId]
         : undefined);
     const municipal = !isOwned && !claim ? municipalUtilityAt(tile) : undefined;
+    const acquisitionId =
+      !isOwned && !claim
+        ? municipal?.plant
+          ? municipal.id
+          : tile.territoryId === "valley-electric" ||
+              tile.territoryId === "ridge-electric"
+            ? tile.territoryId
+            : undefined
+        : undefined;
     const ownerKey = isOwned
       ? "you"
       : claim
@@ -135,8 +145,7 @@ export function territoryTileViews(game: GameType): TerritoryTileView[] {
       operatingFacility,
       disaster: readDisaster(tile, operatingFacility),
       connectable: connectable(tile),
-      municipalCity:
-        municipal?.plant?.tileId === tile.id ? municipal.city : undefined,
+      acquisitionId,
       reserved:
         !!operatingFacility ||
         (!!tile.hydroSiteId && usedHydroSites.has(tile.hydroSiteId)),

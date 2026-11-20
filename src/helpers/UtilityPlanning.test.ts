@@ -70,10 +70,6 @@ it("quotes reference lead times by difficulty and shows only owned or deliberate
     common.contracts.find((source) => source.id === "champlain-quebec")
       ?.nominalW,
   ).toBe(60e6);
-  easy.facilities = easy.facilities.filter(
-    (facility) => facility.startingAssetId !== "scenario-116-champlain-oil-a",
-  );
-  expect(utilityPlanning(easy)?.retirements).toEqual([]);
   easy.date = getDateFromMinute(180 * MINUTES_PER_MONTH, 2005);
   expect(utilityPlanning(easy)?.supplyChanges).toEqual([]);
 });

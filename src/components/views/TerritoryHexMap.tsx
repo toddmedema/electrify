@@ -1328,7 +1328,7 @@ export default function TerritoryHexMap({
                   projectPlanning
                     ? `Inspect ${territoryTileLabel(tile)}${projectSite ? ` · Total project cost ${projectPrice} · ${projectSite.owned ? "Already connected" : "Connection included"}` : " · unavailable for this project"}`
                     : quote
-                      ? `${unaffordable ? "Inspect" : quote.utilityName ? "Acquire" : "Connect"} ${quote.utilityName ?? territoryTileLabel(tile)} · ${priceLabel}${unaffordable ? "; not enough available cash" : ""}`
+                      ? `${unaffordable ? "Inspect" : "Connect"} ${territoryTileLabel(tile)} · ${priceLabel}${unaffordable ? "; not enough available cash" : ""}`
                       : label
                 }
                 aria-pressed={key === activeSelected}

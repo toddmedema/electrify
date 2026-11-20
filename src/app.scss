@@ -8665,21 +8665,6 @@ option {
 .acquisitionReviewDetails {
   padding: 16px;
 }
-.acquisitionTermsContent .buildDetailValue {
-  padding-right: 16px;
-}
-.acquisitionObligations {
-  padding-block: 16px;
-  ul {
-    margin: 8px 0 0;
-    padding-left: 20px;
-    font-size: var(--font-size-body2);
-    line-height: 1.5;
-  }
-  li + li {
-    margin-top: 4px;
-  }
-}
 .acquisitionDisclosure {
   border-top: 1px solid var(--border-subtle);
   > summary {
@@ -8745,6 +8730,10 @@ option {
     .purchaseReviewCancel,
     [role="status"] {
       grid-column: 1 / -1;
+    }
+
+    &.purchaseReviewCashOnly .purchaseReviewCancel {
+      grid-column: auto;
     }
 
     .MuiButton-root {

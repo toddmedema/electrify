@@ -57,6 +57,8 @@ export interface PurchaseReviewDialogProps {
   /** Gating beyond affordability (such as an invalid quote); affordability is checked here */
   cashDisabled?: boolean;
   loanDisabled?: boolean;
+  cashOnly?: boolean;
+  cashButtonLabel?: string;
   /** Shown above the facts: a site note, build options, a mission deadline */
   preface?: React.ReactNode;
   /** Facts that lead the list, before the money */
@@ -68,7 +70,7 @@ export interface PurchaseReviewDialogProps {
   /** Complete payment summaries when a purchase also assumes debts or running costs. */
   paymentSummary?: {
     cash: Pick<DecisionImpactFactType, "value" | "detail">;
-    loan: Pick<DecisionImpactFactType, "value" | "detail">;
+    loan?: Pick<DecisionImpactFactType, "value" | "detail">;
   };
   upkeepPerMonth: number;
   /** When set, upkeep reads as a change from this monthly figure */
@@ -146,7 +148,11 @@ export default function PurchaseReviewDialog(
     submitting || !!props.loanDisabled || cash < financedCashDue;
   // The loan takes the emphasis only when it is the one way forward; ignoring `submitting`
   // keeps the buttons from swapping weight mid-submit.
-  const loanLeads = cashShort && !props.loanDisabled && cash >= financedCashDue;
+  const loanLeads =
+    !props.cashOnly &&
+    cashShort &&
+    !props.loanDisabled &&
+    cash >= financedCashDue;
 
   const submit = async (financed: boolean, event: React.MouseEvent) => {
     event.stopPropagation();
@@ -184,24 +190,28 @@ export default function PurchaseReviewDialog(
           .join(" ") || undefined,
       detailId: cashDetailId,
     },
-    {
-      concept: "finances",
-      label: "Loan option",
-      entry: MANUAL_ENTRY.INTEREST_RATES,
-      helpLabel: "interest rate",
-      value:
-        props.paymentSummary?.loan.value ??
-        `${formatMoneyConcise(financedCashDue)} now + ${formatMoneyConcise(loan.monthlyPayment)}/mo`,
-      detail: [
-        `New loan: ${formatNumber(interestRate * 100)}% for ${loanMonths / 12} years.`,
-        props.paymentSummary?.loan.detail,
-        refinancedBalance > 0
-          ? `Includes refinancing the existing ${formatMoneyConcise(refinancedBalance)} balance at this rate and term.`
-          : undefined,
-      ]
-        .filter(Boolean)
-        .join(" "),
-    },
+    ...(!props.cashOnly
+      ? [
+          {
+            concept: "finances" as const,
+            label: "Loan option",
+            entry: MANUAL_ENTRY.INTEREST_RATES,
+            helpLabel: "interest rate",
+            value:
+              props.paymentSummary?.loan?.value ??
+              `${formatMoneyConcise(financedCashDue)} now + ${formatMoneyConcise(loan.monthlyPayment)}/mo`,
+            detail: [
+              `New loan: ${formatNumber(interestRate * 100)}% for ${loanMonths / 12} years.`,
+              props.paymentSummary?.loan?.detail,
+              refinancedBalance > 0
+                ? `Includes refinancing the existing ${formatMoneyConcise(refinancedBalance)} balance at this rate and term.`
+                : undefined,
+            ]
+              .filter(Boolean)
+              .join(" "),
+          },
+        ]
+      : []),
     ...(props.paymentSummary !== undefined
       ? []
       : [
@@ -239,7 +249,7 @@ export default function PurchaseReviewDialog(
       titleId={props.titleId}
       title={props.title}
       closable
-      actionsClassName={`purchaseReviewControls${props.cancelLabel ? " purchaseReviewActions" : ""}`}
+      actionsClassName={`purchaseReviewControls${props.cancelLabel ? " purchaseReviewActions" : ""}${props.cashOnly ? " purchaseReviewCashOnly" : ""}`}
       contentClassName="noPadding purchaseReviewContent"
       actions={
         <>
@@ -267,19 +277,21 @@ export default function PurchaseReviewDialog(
             onClick={(event) => submit(false, event)}
             startIcon={<ConceptIcon concept="money" fontSize="small" />}
           >
-            Pay cash
+            {props.cashButtonLabel ?? "Pay cash"}
           </Button>
           {/* When cash can't cover it, the loan is the one way forward and takes the emphasis. */}
-          <Button
-            id={props.loanButtonId}
-            color="primary"
-            variant={loanLeads ? "contained" : "outlined"}
-            disabled={loanDisabled}
-            onClick={(event) => submit(true, event)}
-            startIcon={<ConceptIcon concept="finances" fontSize="small" />}
-          >
-            Take loan
-          </Button>
+          {!props.cashOnly && (
+            <Button
+              id={props.loanButtonId}
+              color="primary"
+              variant={loanLeads ? "contained" : "outlined"}
+              disabled={loanDisabled}
+              onClick={(event) => submit(true, event)}
+              startIcon={<ConceptIcon concept="finances" fontSize="small" />}
+            >
+              Take loan
+            </Button>
+          )}
         </>
       }
     >
