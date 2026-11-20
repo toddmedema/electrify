@@ -32,6 +32,7 @@ import { isBlackoutToast } from "../helpers/BlackoutToast";
 import { TOOL_SHORTCUTS } from "./base/KeyboardShortcuts";
 import { listenForShortcuts } from "./base/GlobalShortcuts";
 import DisplayNameDialogContainer from "./base/DisplayNameDialogContainer";
+import FeedbackDialog from "./base/FeedbackDialog";
 import InstallAppButton from "./base/InstallAppButton";
 import TutorialHud from "./base/TutorialHud";
 import DataCenterGuide from "./base/DataCenterGuide";
@@ -52,7 +53,13 @@ import {
   selectTutorialActions,
   selectTutorialHiddenUi,
 } from "../reducers/Tutorial";
-import { snackbarOpen, manualHelpClose, manualHelpOpen } from "../reducers/UI";
+import {
+  feedbackClose,
+  feedbackOpen,
+  snackbarOpen,
+  manualHelpClose,
+  manualHelpOpen,
+} from "../reducers/UI";
 import {
   flingSwipe,
   followSwipe,
@@ -340,24 +347,31 @@ export function isGameCard(name: CardNameType) {
   return isNavCard(name) || name.startsWith("BUILD_");
 }
 
-// Completion layout belongs to this dialog, including its phone action order.
+const COMPACT_TUTORIAL_ACTIONS_MEDIA = "(max-width: 599px)";
 const tutorialCompletionSx = {
   "& .MuiDialog-paper": { width: 560, maxWidth: "calc(100% - 24px)" },
   "& .MuiDialogTitle-root": { padding: "24px 24px 12px" },
   "& .MuiDialogContent-root": { padding: "0 24px 24px" },
   "& .MuiDialogActions-root": {
     padding: "16px 24px",
-    flexWrap: "wrap",
-    gap: "8px",
+    flexWrap: "nowrap",
+    justifyContent: "flex-start",
+    overflowX: "auto",
+    gap: "4px",
     borderTop: "1px solid var(--border-subtle)",
-    "& .MuiButton-root": {
+    "& > .MuiButton-root": {
+      flex: "0 0 auto",
+      minWidth: 44,
       minHeight: 40,
+      paddingInline: "8px",
+      whiteSpace: "nowrap",
       "@media (pointer: coarse)": { minHeight: 44 },
     },
-    "@media (max-width: 599px)": {
+    "& > .MuiButton-root:first-of-type": { marginInlineEnd: "auto" },
+    [`@media ${COMPACT_TUTORIAL_ACTIONS_MEDIA}`]: {
+      paddingInline: "12px",
       paddingBottom: "max(16px, env(safe-area-inset-bottom))",
-      "& .MuiButton-root": { flex: "1 1 auto", margin: 0 },
-      "& .MuiButton-contained": { flexBasis: "100%", order: 1 },
+      "& > .MuiButton-root": { paddingInline: "4px" },
     },
   },
   "& .tutorialCompleteContent": {
@@ -585,6 +599,7 @@ export default class Compositor extends React.Component<Props, {}> {
 
     if (
       this.props.ui.dialog !== nextProps.ui.dialog ||
+      this.props.ui.feedback !== nextProps.ui.feedback ||
       this.props.ui.snackbar !== nextProps.ui.snackbar ||
       this.props.ui.manualHelpEntry !== nextProps.ui.manualHelpEntry
     ) {
@@ -605,6 +620,9 @@ export default class Compositor extends React.Component<Props, {}> {
   public render() {
     const { tutorialStep, ui, closeDialog, tutorialSteps, closeSnackbar } =
       this.props;
+    const compactTutorialActions =
+      ui.dialog.tutorialComplete &&
+      window.matchMedia(COMPACT_TUTORIAL_ACTIONS_MEDIA).matches;
     const currentTutorialStep =
       tutorialSteps && tutorialStep >= 0 && tutorialStep < tutorialSteps.length
         ? tutorialSteps[tutorialStep]
@@ -762,9 +780,31 @@ export default class Compositor extends React.Component<Props, {}> {
         >
           <DialogTitle id="app-dialog-title">{ui.dialog.title}</DialogTitle>
           <DialogContent>{ui.dialog.message}</DialogContent>
-          <DialogActions>
+          <DialogActions disableSpacing={Boolean(ui.dialog.tutorialComplete)}>
+            {ui.dialog.tutorialComplete && (
+              <Button
+                variant={ui.dialog.allTutorialsCompleted ? "outlined" : "text"}
+                onClick={() =>
+                  store.dispatch(
+                    feedbackOpen({
+                      source: "tutorial",
+                      scenarioId: this.props.scenarioId,
+                    }),
+                  )
+                }
+              >
+                Feedback
+              </Button>
+            )}
             {ui.dialog.offerInstall && (
-              <InstallAppButton label="Install for later" afterMilestone />
+              <InstallAppButton
+                label={compactTutorialActions ? "Install" : "Install for later"}
+                aria-label={
+                  compactTutorialActions ? "Install for later" : undefined
+                }
+                afterMilestone
+                showIcon={false}
+              />
             )}
             {ui.dialog.secondaryAction && (
               <Button
@@ -782,12 +822,14 @@ export default class Compositor extends React.Component<Props, {}> {
                     : undefined
                 }
               >
-                {ui.dialog.secondaryLabel || "Close"}
+                {ui.dialog.tutorialComplete
+                  ? "Menu"
+                  : ui.dialog.secondaryLabel || "Close"}
               </Button>
             )}
             {ui.dialog.tertiaryAction && (
               <Button color="primary" onClick={ui.dialog.tertiaryAction}>
-                {ui.dialog.tertiaryLabel}
+                {compactTutorialActions ? "Practice" : ui.dialog.tertiaryLabel}
               </Button>
             )}
             {!ui.dialog.notCancellable && (
@@ -805,6 +847,9 @@ export default class Compositor extends React.Component<Props, {}> {
                 color="primary"
                 variant="contained"
                 autoFocus={ui.dialog.tutorialComplete}
+                aria-label={
+                  compactTutorialActions ? ui.dialog.actionLabel : undefined
+                }
                 ref={
                   ui.dialog.tutorialComplete
                     ? this.tutorialPrimaryRef
@@ -812,7 +857,9 @@ export default class Compositor extends React.Component<Props, {}> {
                 }
                 onClick={ui.dialog.action}
               >
-                {ui.dialog.actionLabel || "OK"}
+                {compactTutorialActions
+                  ? "Next"
+                  : ui.dialog.actionLabel || "OK"}
               </Button>
             )}
           </DialogActions>
@@ -867,6 +914,12 @@ export default class Compositor extends React.Component<Props, {}> {
         {/* Connected, so they still update when shouldComponentUpdate blocks this component --
             neither is driven by the current card, and both can open over any of them */}
         <VictoryDialogContainer />
+        {ui.feedback && (
+          <FeedbackDialog
+            context={ui.feedback}
+            onClose={() => store.dispatch(feedbackClose())}
+          />
+        )}
         <CampaignHandoverContainer />
         <SaveTransitionDialog />
         <DisplayNameDialogContainer />

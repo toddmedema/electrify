@@ -4,7 +4,7 @@ import { Provider } from "react-redux";
 import { store } from "../../Store";
 import { delta, markEventsRead } from "../../reducers/Game";
 import { ActiveWorldEventType } from "../../Types";
-import Navigation from "./Navigation";
+import Navigation, { MapEventStatus } from "./Navigation";
 import { createGame } from "../../testing/Simulator";
 import {
   resetInputPresentation,
@@ -176,6 +176,59 @@ describe("Navigation", () => {
     );
     expect(screen.queryByTestId("ErrorIcon")).toBeNull();
     expect(events).not.toHaveAccessibleDescription();
+  });
+
+  it("shows desktop map event status in the header while keeping Events in the dock", () => {
+    const minute = store.getState().game.date.minute;
+    store.dispatch(
+      delta({
+        eventLog: [
+          { id: 1, kind: "WORLD_EVENT", label: "Now", message: "Wildfire" },
+        ],
+        worldEvents: {
+          active: [
+            {
+              key: "wildfire",
+              definitionId: "wildfire",
+              startsMinute: minute,
+              endsMinute: minute + 10,
+              importance: "CRITICAL",
+              attributes: {},
+              effects: {},
+            },
+          ],
+          occurrences: [],
+          checkedKeys: [],
+        },
+      }),
+    );
+    const onToggle = jest.fn();
+    render(
+      <Provider store={store}>
+        <MapEventStatus open={false} onToggle={onToggle} />
+        <Navigation showEventStatus={false} onToggle={onToggle} />
+      </Provider>,
+    );
+    const status = screen.getByRole("button", {
+      name: "Ongoing emergency, unread events",
+    });
+    const events = screen.getByRole("button", { name: "Events" });
+    expect(events).not.toHaveAccessibleDescription();
+    fireEvent.click(status);
+    expect(onToggle).toHaveBeenCalledWith("EVENTS");
+    act(() => store.dispatch(markEventsRead()));
+    expect(status).toHaveAccessibleName("Ongoing emergency");
+    act(() => status.focus());
+    act(() =>
+      store.dispatch(
+        delta({ date: { ...store.getState().game.date, minute: minute + 10 } }),
+      ),
+    );
+    expect(status).toHaveFocus();
+    expect(status).toHaveAccessibleName("Event history");
+    act(() => events.focus());
+    expect(status).not.toBeInTheDocument();
+    expect(events).toBeVisible();
   });
 
   it.each(["NOTABLE", "future", "expired"])(

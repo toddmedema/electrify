@@ -39,8 +39,8 @@ tutorial, fix a bug, or make the interface easier to use.
 
 For a quick feedback loop, run `npm run test:once -- <name>` for one test suite or
 `npm run sim -- --scenario 103` to try a scenario without a browser.
-Use `npm run check` during development and `npm run check:ci` before pushing code
-changes. For prose-only Markdown changes, review the text and run `git diff --check`.
+Run local checks that cover the change and its affected callers before pushing. Hosted CI runs the
+full suite on the PR. Use `npm run check` or `npm run check:ci` for broader local verification. For prose-only Markdown changes, review the text and run `git diff --check`.
 
 Each check invocation prints a report path under `.tmp/check-runs/`. The report records
 its source commit and working-tree fingerprint, runtime, selected gates, pass/fail/skip

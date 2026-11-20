@@ -41,9 +41,9 @@ coverage floor merely to turn a failure green; explain intended behavior changes
 
 ## Hand off evidence
 
-Run focused checks while iterating, then the integrated checks required by
-AGENTS.md. Distinguish passed, failed, skipped, and unrun checks, and invalidate
-earlier evidence when its inputs change. Report current remote CI after opening
+Choose local checks for the changed behavior and its integration points as described
+in AGENTS.md. Hosted CI verifies the full suite on the PR. Distinguish passed, failed,
+skipped, and unrun checks, and invalidate earlier evidence when its inputs change. Report current remote CI after opening
 the PR; monitor it only when requested.
 
 Identify any judgment still needed from a reviewer: whether the invariant matches

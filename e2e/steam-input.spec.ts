@@ -49,14 +49,15 @@ async function input(
           },
         }),
       );
+      // Await the post-dispatch frame in this browser call. A second round trip
+      // can wait behind another expensive map paint on software-rendered CI.
+      // Each journey still awaits the action's observable result: a frame alone
+      // does not establish dialog, native context, or text-entry readiness.
+      return new Promise<void>((resolve) =>
+        requestAnimationFrame(() => resolve()),
+      );
     },
     { action, connection, glyphs },
-  );
-  // Yield for DOM commits; each journey also awaits the action's observable result.
-  // A frame alone does not establish dialog, native context, or text-entry readiness.
-  await page.evaluate(
-    () =>
-      new Promise<void>((resolve) => requestAnimationFrame(() => resolve())),
   );
 }
 

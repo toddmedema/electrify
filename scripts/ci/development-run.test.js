@@ -47,7 +47,7 @@ function fixture(t) {
     `
     process.on('message',message=>{if(message==='cancel')process.emit('SIGTERM')});
     require(${JSON.stringify(require.resolve("../dev/run"))}).runCommand(process.argv[2],process.argv.slice(3),
-      {root:process.cwd(),coordinationRoot:require('node:path').join(process.cwd(),'locks')})
+      {root:process.env.SELECTED_CHECKOUT || process.cwd(),coordinationRoot:process.env.SELECTED_COORDINATION || require('node:path').join(process.cwd(),'locks')})
       .then(code=>{process.exitCode=code;if(process.connected)process.disconnect()})
       .catch(error=>{console.error(error.message);process.exitCode=1;if(process.connected)process.disconnect()});
   `,
@@ -122,6 +122,14 @@ test("bad dependency installations fail before generators or work execute", (t) 
   const { root, write, run } = fixture(t);
   fs.rmSync(path.join(root, "node_modules/.package-lock.json"));
   write("scripts/build.js", "require('node:fs').writeFileSync('ran','bad')");
+  // Fill every machine slot. A broken checkout must fail without joining the queue.
+  for (const label of ["heavy", "heavy-2", "heavy-3"]) {
+    write("locks/" + label + "/busy.json", {
+      token: "busy",
+      pid: process.pid,
+      cwd: root,
+    });
+  }
   const result = run("build");
   assert.equal(result.status, 1);
   assert.match(result.stderr, /Dependency preflight failed/);
@@ -397,3 +405,145 @@ test("abrupt supervisor death keeps the slot reserved while its command is alive
   );
   assert.equal(readOwner(path.join(root, "locks/heavy")).token, owner.token);
 });
+
+test(
+  "cross-checkout previews use the selected adapter and the supervisor's relative coordination root",
+  { timeout: 20000 },
+  async (t) => {
+    const supervisor = fixture(t);
+    const selected = fixture(t);
+    selected.write(
+      "scripts/start.js",
+      `exports.start = (compile) => {
+    require('node:fs').writeFileSync('selected-preview.json', JSON.stringify({cwd:process.cwd(), args:process.argv.slice(2)}));
+    compile.release();
+  };`,
+    );
+    const leases = [];
+    t.after(() => leases.forEach((lease) => lease.release()));
+    for (let i = 0; i < 3; i++)
+      leases.push(
+        await acquireLease("heavy", {
+          root: path.join(supervisor.root, "locks"),
+          slots: 3,
+        }),
+      );
+    const child = spawn(
+      process.execPath,
+      ["runner.cjs", "start", "literal argument"],
+      {
+        cwd: supervisor.root,
+        env: {
+          ...supervisor.env,
+          SELECTED_CHECKOUT: selected.root,
+          SELECTED_COORDINATION: "locks",
+        },
+        stdio: ["ignore", "pipe", "pipe"],
+      },
+    );
+    t.after(() => {
+      if (child.exitCode === null && child.signalCode === null) child.kill();
+    });
+    let stderr = "";
+    const queued = new Promise((resolve) =>
+      child.stderr.on("data", (data) => {
+        stderr += data;
+        if (stderr.includes("Preview compilation queued")) resolve();
+      }),
+    );
+    const exited = once(child, "exit");
+    await Promise.race([
+      queued,
+      exited.then(([code]) => {
+        throw new Error(`Preview exited ${code} before queueing: ${stderr}`);
+      }),
+    ]);
+    assert(!fs.existsSync(path.join(selected.root, "selected-preview.json")));
+    leases[0].release();
+    const [code] = await exited;
+    assert.equal(code, 0, stderr);
+    assert.deepEqual(
+      JSON.parse(
+        fs.readFileSync(path.join(selected.root, "selected-preview.json")),
+      ),
+      { cwd: fs.realpathSync(selected.root), args: ["literal argument"] },
+    );
+    assert(!fs.existsSync(path.join(selected.root, "locks")));
+  },
+);
+
+test(
+  "a failed queued rebuild shuts down the listening preview and releases its port",
+  { timeout: 25000 },
+  async (t) => {
+    const { root, write, env } = fixture(t);
+    fs.symlinkSync(
+      path.dirname(require.resolve("react-dev-utils/package.json")),
+      path.join(root, "node_modules/react-dev-utils"),
+      "junction",
+    );
+    write("index.js", "export default 1");
+    write(
+      "scripts/start.js",
+      `
+    const fs = require('node:fs');
+    const webpack = require(${JSON.stringify(require.resolve("webpack"))});
+    const DevServer = require(${JSON.stringify(require.resolve("webpack-dev-server"))});
+    exports.start = compile => {
+      const compiler = webpack({mode:'development',context:process.cwd(),entry:'./index.js',output:{path:require('node:path').join(process.cwd(),'dist')}});
+      compiler.hooks.afterDone.tap('ready', () => fs.writeFileSync('preview-ready', 'ready'));
+      const server = new DevServer({host:'127.0.0.1',port:Number(process.env.PORT),client:false,
+        setupMiddlewares:(middlewares,server) => {compile.apply(server.compiler);return middlewares;}}, compiler);
+      server.start().then(() => fs.writeFileSync('preview-port', String(server.server.address().port)));
+    };
+  `,
+    );
+    const child = spawn(process.execPath, ["runner.cjs", "start"], {
+      cwd: root,
+      env,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    const exited = once(child, "close");
+    t.after(() => {
+      if (child.exitCode === null && child.signalCode === null) child.kill();
+    });
+    let stderr = "";
+    child.stderr.on("data", (data) => {
+      stderr += data;
+    });
+    const waitFor = async (predicate) => {
+      const deadline = Date.now() + 10000;
+      while (!predicate() && child.exitCode === null && Date.now() < deadline)
+        await delay(10);
+      assert(predicate(), stderr);
+    };
+    await waitFor(
+      () =>
+        fs.existsSync(path.join(root, "preview-ready")) &&
+        fs.existsSync(path.join(root, "preview-port")),
+    );
+    const port = Number(
+      fs.readFileSync(path.join(root, "preview-port"), "utf8"),
+    );
+    const locks = path.join(root, "locks");
+    const leases = [];
+    t.after(() => leases.forEach((lease) => lease.release()));
+    for (let i = 0; i < 3; i++)
+      leases.push(await acquireLease("heavy", { root: locks, slots: 3 }));
+    write("index.js", "export default 2");
+    await waitFor(() => stderr.includes("Preview compilation queued"));
+    fs.rmSync(path.join(root, "node_modules/.package-lock.json"));
+    leases[0].release();
+    const [code] = await exited;
+    assert.equal(code, 1, stderr);
+    assert.match(stderr, /Dependency preflight failed/);
+    assert.match(stderr, /restart npm start/);
+    assert(!fs.existsSync(path.join(locks, `port-${port}`)));
+    const server = require("node:net").createServer();
+    t.after(() => server.close());
+    await new Promise((resolve, reject) => {
+      server.once("error", reject);
+      server.listen(port, "127.0.0.1", resolve);
+    });
+  },
+);

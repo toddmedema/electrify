@@ -15,32 +15,35 @@ before/after source fingerprint continues to reject validation of changing sourc
 
 ## Heavy work and ports
 
-The existing npm check, build, Jest, browser, simulation, benchmark, and typecheck
-commands acquire one of three machine-wide reservations before their generators or
-tests start. When all three slots are occupied, a competing invocation waits without
-suspending the current test. Nested commands inherit validated ownership, so
-`check:ci` can invoke builds and tests
-without waiting on itself. Direct Node invocations are for tooling tests and
-diagnostics; use the npm commands for development validation.
+Local check, build, Jest, browser, simulation, benchmark and typecheck commands share three
+machine-wide validation slots. Participating commands take the next available slot in queue
+order. Nested commands inherit a verified parent reservation. Older checkouts still respect
+the capacity limit and adopt queue ordering when updated. Use the npm entry points for
+development validation.
 
-Each top-level local command verifies that the installed dependency metadata and
-versions match the lockfile. A stale or incomplete installation fails early with
-an `npm ci` instruction. Electron's pristine lazy-download state is valid; an
-existing runtime must match its locked package version. This is an install
-consistency check, not a content-integrity audit of every dependency file.
+Run `npm run task -- queue` from any checkout for a read-only snapshot of slot holders,
+waiting commands in admission order, and standalone preview ports. Entries include the command,
+checkout, task (when supplied), PID and age in milliseconds since the request. Queue positions
+start at one. A cancelled or dead waiter gives up its place.
 
-Browser/check commands print their automatically reserved `E2E_PORT`. An explicit
-`E2E_PORT` is respected and rejected if already occupied or reserved. Port ownership
-is shared between participating commands; an unrelated program can still bind
-after the availability probe, in which case server startup must fail. Never reuse
-or terminate another task's listener. A standalone `npm start` holds its reservation
-until stopped; stop your preview when finished so queued validation can proceed.
+Top-level commands check the installation against the lockfile before entering the queue and
+recheck dependencies after a wait. A stale installation fails with an `npm ci` instruction.
+Electron's pristine lazy-download state is valid. An installed runtime must match its lockfile.
+
+Browser/check commands print their reserved `E2E_PORT`. An explicit port must be available.
+A standalone `npm start` keeps its port and checkout while serving. Startup and each webpack
+rebuild acquire a validation slot, including asynchronous TypeScript checking. Completed
+compilations release it while the HTTP server continues listening. Stop a preview when
+finished with it. A preview inside a browser test shares the test command’s reservation. Leave other tasks’ listeners alone.
 
 Reservations track processes, not elapsed-time limits. A live long-running check
 is never evicted for being slow. Dead owners can be recovered, and nested command
 lifetimes and cancellation are covered by child-process tests.
 
 ## Evidence and hosted CI
+
+Before pushing, run the local checks that exercise the affected paths and their callers.
+Record those results in the PR. Hosted CI supplies full-suite validation on each update.
 
 ### PR monitor survey
 
@@ -62,6 +65,12 @@ using a temporary file when its checkout is on another branch. Until this helper
 lands on `master`, keep the monitor's existing metadata query. Do not execute a
 feature branch's copy as the shared monitor. Treat an API or helper error as a
 failed survey, preserve the ledger, and report the error.
+
+For repair pushes, have the monitor and its workers follow the
+[local verification policy in AGENTS.md](../AGENTS.md#start-here). Reproduce the
+failure where practical and check the fix and affected callers before pushing.
+Use the full local profile when the scope or failure warrants it. Hosted CI runs
+the full suite on the repair push.
 
 ### Validation evidence
 
@@ -85,9 +94,9 @@ or authorizes skipping required gates. Use `--resume` for verified reuse decisio
 The existing `--report <report.json>` source-comparison summary remains available.
 
 Check reports retain separate `timing.queueMs` and `timing.executionMs` values.
-All existing gates, source-change detection, coverage thresholds, viewport
-projects, diagnostic retries, and flake rejection remain required. Run focused
-checks and requested reviews before the final integrated check.
+The complete hosted run covers all required gates, coverage thresholds, viewport
+projects, diagnostic retries and flake rejection. Local reports describe the checks
+selected for the change.
 
 GitHub Actions keeps its existing isolated jobs and full/trimmed dependency
 profiles. It bypasses local coordination and full-install preflight; its existing

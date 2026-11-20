@@ -86,3 +86,22 @@ export async function expectDialogToFit(dialog: Locator) {
     )
     .toEqual([]);
 }
+
+export async function expectDialogActionsOnOneRow(
+  dialog: Locator,
+  count: number,
+  minimumHeight: number,
+) {
+  const buttons = dialog.locator(".MuiDialogActions-root").getByRole("button");
+  await expect(buttons).toHaveCount(count);
+  await expectDialogToFit(dialog);
+  const boxes = await buttons.evaluateAll((elements) =>
+    elements.map((element) => element.getBoundingClientRect().toJSON()),
+  );
+  for (const [index, box] of boxes.entries()) {
+    expect(box.top).toBeCloseTo(boxes[0].top, 0);
+    expect(box.height).toBeGreaterThanOrEqual(minimumHeight);
+    if (index > 0)
+      expect(box.left).toBeGreaterThanOrEqual(boxes[index - 1].right);
+  }
+}
