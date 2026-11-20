@@ -176,7 +176,12 @@ export type RuleObjective = ObjectiveBase &
         fuels: FuelNameType[];
         minShare: number;
       })
-    | { metric: "utilityOwnership"; targets: string[]; deadlineMonth: number }
+    | {
+        metric: "utilityOwnership";
+        targets: string[];
+        minUtilities?: number;
+        deadlineMonth: number;
+      }
     | { metric: "assetRetirement"; assetIds: string[]; deadlineMonth: number }
     | {
         metric: "fuelRetirement";
@@ -286,7 +291,12 @@ export type CompiledRuleObjective = ObjectiveBase & {
         fuels: FuelNameType[];
         minShare: number;
       })
-    | { metric: "utilityOwnership"; targets: string[]; deadlineMonth: number }
+    | {
+        metric: "utilityOwnership";
+        targets: string[];
+        minUtilities?: number;
+        deadlineMonth: number;
+      }
     | { metric: "assetRetirement"; assetIds: string[]; deadlineMonth: number }
     | {
         metric: "fuelRetirement";

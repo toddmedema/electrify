@@ -142,17 +142,60 @@
   }
 }
 
-.tileWorkspaceSurface.gameToolPanel {
-  right: auto;
-  max-height: none;
+.tileWorkspaceSurface.tileWorkspaceInspector {
+  top: 8px;
+  right: 8px;
+  bottom: auto;
+  left: auto;
+  width: min(18rem, calc(100% - 16px));
+  max-height: min(22rem, 55%, calc(100% - var(--game-dock-clearance) - 16px));
+  pointer-events: auto;
+  box-shadow: 0 4px 16px var(--shadow-ring);
+
+  .tileWorkspaceHeading {
+    display: block;
+    padding: 8px 12px 6px;
+  }
+
+  .tileWorkspaceHeading > div {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 8px;
+  }
+
+  .tileWorkspaceHeading h3 {
+    order: -1;
+    font-size: var(--font-size-subtitle);
+    line-height: 1.4;
+  }
+
+  .tileWorkspaceHeading .MuiTypography-overline {
+    line-height: 1.4;
+    text-transform: none;
+  }
 
   .tileWorkspaceBody {
-    display: block;
-    overflow: auto;
-    > * {
-      height: auto;
-    }
+    padding: 8px 12px 12px;
   }
+
+  .tileCityMetrics {
+    gap: 4px;
+  }
+
+  .tileCityDemand {
+    margin-block: 12px 0;
+  }
+
+  .tileTerrainModifiers:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.gameToolTray > .tileWorkspaceSurface.tileWorkspaceInspector {
+  top: 0;
+  right: 0;
+  max-height: min(22rem, 100%);
 }
 
 @media (max-width: 740px) {

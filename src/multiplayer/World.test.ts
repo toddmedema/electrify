@@ -548,6 +548,20 @@ const publishedCoopIdentities = [
     22,
     "coop-2-bddc08bd9f13d3fb912bccfa5401e85283039c61e31340ec6a252cd503884fef",
   ],
+  // Published acquisition preview e2abbfbb89b93d3c90b5a4361bf22e975f8fccb1.
+  [
+    22,
+    "coop-2-65d7bc6c94fc95425c4781b2a0039977949b473ac9928a597914f29b449643a6",
+  ],
+  // Exact parent builds before reconciling the objectives and loan schemas.
+  [
+    23,
+    "coop-2-8bf797b211b8ee017e7f4e23f67019de651918233f43a90a2a047d0bec4e724d",
+  ],
+  [
+    23,
+    "coop-2-3a64b92f0462af2eb6286821f118c030f25aaf65b546a4a7652e87b1dbcd3e33",
+  ],
 ] as const;
 
 test.each(publishedCoopIdentities)(

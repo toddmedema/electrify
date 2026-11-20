@@ -121,7 +121,11 @@ for (const theme of ["light", "dark"]) {
       true,
     );
     if (info.project.name === "desktop-chromium") {
-      await expectWideHeaderRow(page, "Acquire a competitor", "Unread events");
+      await expectWideHeaderRow(
+        page,
+        "Acquire competitors (0/3)",
+        "Unread events",
+      );
       await page.setViewportSize({ width: 1280, height: 900 });
     }
     expect(

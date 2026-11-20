@@ -48,7 +48,6 @@ import type {
   FacilityExpansionCancellationResult,
 } from "../../helpers/RequestFacilityExpansion";
 import { CurrencyContext, useMoney } from "./CurrencyContext";
-import { facilityDisplayName } from "./FacilityLabels";
 import ConfirmDialog from "./ConfirmDialog";
 import PurchaseReviewDialog from "./PurchaseReviewDialog";
 import { signature } from "./DeferredProjection";
@@ -380,7 +379,7 @@ export default function FacilityCapacityUpgrade({
           <PurchaseReviewDialog
             open
             isolateClicks
-            title={`Upgrade ${facilityDisplayName(facility)} capacity?`}
+            title={`Upgrade ${facility.name} capacity?`}
             cash={cash}
             buildCost={ready?.cost ?? 0}
             interestRate={game.interestRate}
@@ -477,7 +476,7 @@ export default function FacilityCapacityUpgrade({
           }}
         >
           <DialogContentText>
-            Cancel the added capacity at {facilityDisplayName(facility)}.{" "}
+            Cancel the added capacity at {facility.name}.{" "}
             {cancelTerms.loan
               ? `The loan will be settled and ${money.formatPurchasePrice(facilityExpansionRefund(cancelTerms))} refunded.`
               : `You will receive a full refund of ${money.formatPurchasePrice(cancelTerms.cost)}.`}{" "}

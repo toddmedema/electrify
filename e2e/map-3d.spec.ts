@@ -4,6 +4,7 @@ import { pauseBrowserClock } from "./browser-clock";
 import type { MapCanvas } from "../src/components/base/territory-3d/Types";
 import type { TerritoryTileId } from "../src/Types";
 import {
+  closeTileSurface,
   readTerritoryMapCamera,
   openMapProjectCatalogue,
   returnToTerritoryMap,
@@ -260,11 +261,22 @@ for (const reducedMotion of ["no-preference", "reduce"] as const) {
       else await label.click();
       await page.clock.runFor(64);
       await page.clock.runFor(200);
+      const inspector = page.getByRole("dialog", {
+        name: "Burlington",
+        exact: true,
+      });
+      await expect(inspector).toBeVisible();
       await expect(
-        page.getByRole("button", { name: "Close tile" }),
-      ).toBeVisible();
+        inspector.getByRole("button", { name: "Close tile" }),
+      ).toHaveCount(0);
 
       if (phone) {
+        const corner = await inspector.evaluate((element) => {
+          const box = element.getBoundingClientRect();
+          const map = element.parentElement!.getBoundingClientRect();
+          return { top: box.top - map.top, right: map.right - box.right };
+        });
+        expect(corner).toEqual({ top: 8, right: 8 });
         await expect
           .poll(() =>
             capital.evaluate((element) => {
@@ -576,6 +588,16 @@ test("unavailable WebGL leaves a fully operable simplified map", async ({
   ).toBeVisible();
 });
 
+async function dragWindow(page: Page, target: Locator, dx: number, dy: number) {
+  const { x, y, width, height } = (await target.boundingBox())!;
+  const startX = x + width / 2;
+  const startY = y + height / 2;
+  await page.mouse.move(startX, startY);
+  await page.mouse.down();
+  await page.mouse.move(startX + dx, startY + dy, { steps: 5 });
+  await page.mouse.up();
+}
+
 test("map windows move, resize, stack and remember their bounds", async ({
   page,
 }, info) => {
@@ -613,9 +635,7 @@ test("map windows move, resize, stack and remember their bounds", async ({
 
   const viewport = page.viewportSize()!;
   if (viewport.width < 1024) {
-    await expect(
-      fleet.getByRole("button", { name: "Resize Fleet" }),
-    ).toHaveCount(0);
+    await expect(fleet.locator(".mapWindowResizeEdge")).toHaveCount(0);
     await agreementsAction.click();
     await expect(agreements).toBeVisible();
     await expect(fleet).toHaveCount(0);
@@ -623,26 +643,52 @@ test("map windows move, resize, stack and remember their bounds", async ({
     return;
   }
 
-  const drag = async (target: Locator, dx: number, dy: number) => {
-    const { x, y, width, height } = (await target.boundingBox())!;
-    const startX = x + width / 2;
-    const startY = y + height / 2;
-    await page.mouse.move(startX, startY);
-    await page.mouse.down();
-    await page.mouse.move(startX + dx, startY + dy, { steps: 5 });
-    await page.mouse.up();
-  };
   const title = fleet.getByRole("heading", { name: "Fleet", exact: true });
-  const resize = fleet.getByRole("button", { name: "Resize Fleet" });
+  const edge = (direction: string) =>
+    fleet.locator(`.mapWindowResizeEdge[data-edge="${direction}"]`);
+  const resize = edge("se");
+  for (const [direction, cursor] of Object.entries({
+    n: "ns-resize",
+    s: "ns-resize",
+    e: "ew-resize",
+    w: "ew-resize",
+    ne: "nesw-resize",
+    sw: "nesw-resize",
+    nw: "nwse-resize",
+    se: "nwse-resize",
+  })) {
+    await expect(edge(direction)).toHaveCSS("cursor", cursor);
+  }
   const initial = (await fleet.boundingBox())!;
   const camera = await readTerritoryMapCamera(
     map.locator(".territoryMapViewport"),
   );
-  await drag(title, -144, 48);
+  await dragWindow(page, title, -144, 48);
+  const moved = { ...initial, x: initial.x - 144, y: initial.y + 48 };
+  await expect.poll(() => fleet.boundingBox()).toEqual(moved);
+
+  await dragWindow(page, edge("w"), -16, 0);
   await expect
     .poll(() => fleet.boundingBox())
-    .toEqual({ ...initial, x: initial.x - 144, y: initial.y + 48 });
-  await drag(resize, 64, 48);
+    .toEqual({
+      ...moved,
+      x: moved.x - 16,
+      width: moved.width + 16,
+    });
+  await dragWindow(page, edge("w"), 16, 0);
+  await expect.poll(() => fleet.boundingBox()).toEqual(moved);
+
+  await dragWindow(page, edge("n"), 0, -16);
+  await expect
+    .poll(() => fleet.boundingBox())
+    .toEqual({
+      ...moved,
+      y: moved.y - 16,
+      height: moved.height + 16,
+    });
+  await dragWindow(page, edge("n"), 0, 16);
+  await expect.poll(() => fleet.boundingBox()).toEqual(moved);
+  await dragWindow(page, resize, 64, 48);
   const saved = {
     x: initial.x - 144,
     y: initial.y + 48,
@@ -695,7 +741,7 @@ test("map windows move, resize, stack and remember their bounds", async ({
     fleet.getByRole("button", { name: "Close Fleet" }),
   ).toBeInViewport();
   await expect(resize).toBeInViewport();
-  await resize.press("ArrowRight");
+  await title.press("Shift+ArrowRight");
   await page.setViewportSize(viewport);
   await expect.poll(() => fleet.boundingBox()).toEqual(saved);
 
@@ -703,7 +749,7 @@ test("map windows move, resize, stack and remember their bounds", async ({
   await fleetAction.click();
   await expect.poll(() => fleet.boundingBox()).toEqual(saved);
   await title.press("ArrowLeft");
-  await resize.press("ArrowLeft");
+  await title.press("Shift+ArrowLeft");
   await expect
     .poll(() => fleet.boundingBox())
     .toEqual({
@@ -733,7 +779,7 @@ test("map windows move, resize, stack and remember their bounds", async ({
       width: element.offsetWidth,
     }));
   const clamped = await horizontalBounds();
-  await drag(resize, -32, 0);
+  await dragWindow(page, resize, -32, 0);
   await expect.poll(horizontalBounds).toEqual({
     left: clamped.left,
     width: clamped.width - 32,
@@ -929,7 +975,7 @@ test("shows extreme cold on terrain and explains the plant derate in both render
       clip: { x: 210, y: 104, width: 1068, height: 610 },
     });
   }
-  await inspector.getByRole("button", { name: /^Close/ }).click();
+  await closeTileSurface(inspector);
 
   await canvas.evaluate((element: MapCanvas) => {
     element
@@ -1138,9 +1184,29 @@ test("tile inspection shares the desktop window stack", async ({
   await expect(fleet).toBeVisible();
   await expect(agreements).toBeVisible();
   await expect(inspector).toHaveAttribute("data-map-window-front", "true");
+  const heading = inspector.getByRole("heading", {
+    name: "Burlington",
+    exact: true,
+  });
+  await expect(heading).toBeFocused();
   await expect(
-    inspector.getByRole("heading", { name: "Burlington", exact: true }),
-  ).toBeFocused();
+    inspector.getByRole("button", { name: "Close tile" }),
+  ).toHaveCount(0);
+  await expect(inspector.locator(".mapWindowResizeEdge")).toHaveCount(0);
+  const placement = await inspector.evaluate((element) => {
+    const box = element.getBoundingClientRect();
+    const tray = element.parentElement!.getBoundingClientRect();
+    return {
+      right: tray.right - box.right,
+      top: box.top - tray.top,
+      width: box.width,
+      height: box.height,
+    };
+  });
+  expect(placement.right).toBe(0);
+  expect(placement.top).toBe(0);
+  expect(placement.width).toBeLessThanOrEqual(300);
+  expect(placement.height).toBeLessThanOrEqual(360);
   expect(await fleet.boundingBox()).toEqual(fleetBounds);
   expect(await agreements.boundingBox()).toEqual(agreementsBounds);
   await expect(capital).toHaveAttribute("aria-pressed", "true");
@@ -1151,6 +1217,9 @@ test("tile inspection shares the desktop window stack", async ({
     scale: "css",
   });
 
+  const fixedBounds = await inspector.boundingBox();
+  await dragWindow(page, heading, -64, 40);
+  expect(await inspector.boundingBox()).toEqual(fixedBounds);
   const sameWindow = await inspector.elementHandle();
   const nextTile = map.locator('[data-map-target="champlain:site-1"]');
   await nextTile.press("Enter");
@@ -1182,4 +1251,8 @@ test("tile inspection shares the desktop window stack", async ({
   await expect(fleet).toHaveCount(0);
   await expect(inspector).toBeVisible();
   await expect(inspector).toHaveAttribute("data-map-window-front", "true");
+  await map.getByRole("region", { name: "Territory map", exact: true }).click({
+    position: { x: 4, y: 4 },
+  });
+  await expect(inspector).toHaveCount(0);
 });

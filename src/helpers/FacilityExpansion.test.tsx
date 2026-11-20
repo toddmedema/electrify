@@ -231,26 +231,38 @@ it("finances added capacity independently, settles its equity on cancellation an
   expect(
     getTotalDebt(started.facilities) - getTotalDebt(game.facilities),
   ).toBeCloseTo(financed.loan.loanAmountTotal, 4);
-  const restored = parseSave(
-    JSON.parse(JSON.stringify(serializeSave(started))),
-  );
+  const raw = JSON.parse(JSON.stringify(serializeSave(started)));
+  const restored = parseSave(raw);
   expect(restored?.game.facilities[0].expansionInProgress).toEqual(job);
+  const mapBranchSave = { ...raw, schemaVersion: 23 };
+  const restoredMapBranch = parseSave(mapBranchSave);
+  expect(restoredMapBranch?.game.facilities[0].expansionInProgress).toEqual(
+    job,
+  );
+  expect(parseSave(restoredMapBranch)).toEqual(restoredMapBranch);
   for (const corrupt of [
     { interestRate: game.interestRate + 0.01 },
     { loanAmountLeft: 0 },
     { loanMonthlyPayment: Infinity },
     { startsMinute: game.date.minute + TICK_MINUTES },
   ]) {
-    const malformed = JSON.parse(JSON.stringify(serializeSave(started)));
+    const malformed = cloneDeep(mapBranchSave);
     Object.assign(
       malformed.game.facilities[0].expansionInProgress.loan,
       corrupt,
     );
     expect(parseSave(malformed)).toBeNull();
+    expect(
+      parseSave({ ...malformed, schemaVersion: raw.schemaVersion }),
+    ).toBeNull();
   }
 
   const advancing = cloneDeep(started);
   tickState(advancing);
+  tickState(restoredMapBranch!.game);
+  expect(restoredMapBranch!.game.facilities[0].expansionInProgress).toEqual(
+    advancing.facilities[0].expansionInProgress,
+  );
   const active = advancing.facilities[0].expansionInProgress!;
   expect(active.loan!.loanAmountLeft).toBeLessThan(job.loan!.loanAmountLeft);
   expect(facilityExpansionRefund(active)).toBeGreaterThan(financed.amountDue);

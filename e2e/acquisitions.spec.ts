@@ -1,3 +1,4 @@
+import { acquisitionQuote } from "../src/helpers/Expansion";
 import { TERRAIN_LABELS } from "../src/data/TerrainLabels";
 import type { JSHandle, Locator, Page } from "@playwright/test";
 import type { GameType } from "../src/Types";
@@ -38,6 +39,7 @@ import { expect, test } from "./fixtures";
 import { reviewScreenshot } from "./review-screenshot";
 import { expectDialogToFit } from "./dialog-layout";
 import {
+  closeTileSurface,
   openPane,
   readTerritoryMapCamera,
   returnToTerritoryMap,
@@ -128,9 +130,7 @@ async function panToTile(
 
 async function inspectTile(page: Page, tile: TerritoryTileDefinition) {
   if (await tileSurface(page).count())
-    await tileSurface(page)
-      .getByRole("button", { name: "Close tile", exact: true })
-      .click();
+    await closeTileSurface(tileSurface(page));
   await panToTile(page, tile);
   const target = mapWorkspace(page).locator(`[data-map-target="${tile.id}"]`);
   await target.click();
@@ -456,7 +456,7 @@ async function expectHeldFacilityPhase(
   return phase;
 }
 
-async function expectLockedBuild(surface: Locator) {
+async function openLockedBuild(surface: Locator) {
   const rail = buildRail(surface.page());
   if (await rail.isVisible()) {
     await expect(
@@ -466,9 +466,20 @@ async function expectLockedBuild(surface: Locator) {
       rail.getByRole("region", { name: "Storage technologies", exact: true }),
     ).toBeVisible();
   } else {
-    await expect(
-      surface.getByRole("tab", { name: "Generators", exact: true }),
-    ).toBeVisible();
+    const buildHere = surface.getByRole("button", {
+      name: "Build here",
+      exact: true,
+    });
+    const generators = surface.getByRole("tab", {
+      name: "Generators",
+      exact: true,
+    });
+    await expect(buildHere.or(generators)).toBeVisible();
+    if (await buildHere.isVisible()) {
+      await expect(surface).toHaveClass(/tileWorkspaceInspector/);
+      await buildHere.click();
+    }
+    await expect(generators).toBeVisible();
     await expect(
       surface.getByRole("tab", { name: "Storage", exact: true }),
     ).toBeVisible();
@@ -493,6 +504,7 @@ async function reviewTileBuild(page: Page, name: string) {
     ).toBeVisible();
     return surface;
   }
+  await openLockedBuild(surface);
   await surface
     .getByRole("button", {
       name: `Review purchase of ${name === "Battery" ? "Lithium Battery" : name}`,
@@ -709,12 +721,10 @@ for (const theme of ["light", "dark"] as const) {
           .click();
         await network.locator(`[data-map-target="${city.id}"]`).click();
         await expect(page.locator(".gameToolPanel")).toHaveCount(
-          floating ? 2 : 0,
+          floating ? 1 : 0,
         );
         await expect(surface).toBeVisible();
-        await surface
-          .getByRole("button", { name: "Close tile", exact: true })
-          .click();
+        await closeTileSurface(surface);
         await expect(page.locator(".gameToolPanel")).toHaveCount(
           floating ? 1 : 0,
         );
@@ -832,9 +842,7 @@ for (const theme of ["light", "dark"] as const) {
     expect(
       await animation.evaluate((value) => Number(value.currentTime)),
     ).toBeGreaterThanOrEqual(pausedPhase);
-    await surface
-      .getByRole("button", { name: "Close tile", exact: true })
-      .click();
+    await closeTileSurface(surface);
     await panToTile(page, getTerritoryTile(thermal.tileId, game)!);
     const thermalArt = art(thermal.tileId!);
     await expect(thermalArt).toHaveAttribute("data-facility-motion", "active");
@@ -1035,9 +1043,7 @@ for (const theme of ["light", "dark"] as const) {
     expect(plant.yearsToBuildLeft).toBeGreaterThan(0);
     expect(plant.currentW).toBe(0);
     expect(!!plant.paused).toBe(false);
-    await surface
-      .getByRole("button", { name: "Close tile", exact: true })
-      .click();
+    await closeTileSurface(surface);
     await expect(surface).toHaveCount(0);
     await expect(
       network.locator('[data-map-target][aria-pressed="true"]'),
@@ -1153,7 +1159,7 @@ for (const theme of ["light", "dark"] as const) {
     await expect(
       page
         .getByRole("region", { name: "Goals", exact: true })
-        .getByText("Acquire Valley Electric or Ridge Electric · Dec 2014", {
+        .getByText("Acquire 3 competitors · Dec 2014", {
           exact: true,
         }),
     ).toBeVisible();
@@ -1316,18 +1322,6 @@ for (const theme of ["light", "dark"] as const) {
     const surface = await inspectTile(page, ridge);
     await expect(surface).toContainText("Estimated demand");
     await expectCityDemand(surface);
-    await surface
-      .getByRole("button", { name: "Inspect Ridge Electric", exact: true })
-      .click();
-    const terms = page.getByRole("dialog", {
-      name: "Acquisition terms",
-      exact: true,
-    });
-    await expectDialogToFit(terms);
-    await expect(terms).toContainText("Assumed debt");
-    await terms
-      .getByRole("button", { name: "Back to territories", exact: true })
-      .click();
     const acquire = surface.getByRole("button", {
       name: "Acquire Ridge Electric",
       exact: true,
@@ -1418,7 +1412,7 @@ for (const theme of ["light", "dark"] as const) {
     } else {
       await inspectTile(page, windTile);
     }
-    await expectLockedBuild(surface);
+    await openLockedBuild(surface);
     const windChoice = desktop
       ? rail.getByRole("button", {
           name: "Choose sites for Wind",
@@ -1432,7 +1426,7 @@ for (const theme of ["light", "dark"] as const) {
     await expect(
       page.getByRole("tab", { name: "Interties", exact: true }),
     ).toHaveCount(0);
-    await surface.getByRole("button", { name: "Close tile" }).click();
+    await closeTileSurface(surface);
     await reviewScreenshot(network, {
       path: info.outputPath(`map-after-acquisition-${theme}.png`),
       animations: "disabled",
@@ -1461,7 +1455,7 @@ for (const theme of ["light", "dark"] as const) {
     )!;
     const tile = availableTerritoryTiles(game, wind, "champlain")[0];
     const surface = await inspectTile(page, tile);
-    await expectLockedBuild(surface);
+    await openLockedBuild(surface);
     const desktop = await buildRail(page).isVisible();
     let review: Locator;
     if (desktop) {
@@ -1653,10 +1647,7 @@ for (const theme of ["light", "dark"] as const) {
     expect(currentTick((await readSavedGame(page))!)!.cash).toBe(
       currentTick(game)!.cash,
     );
-    if (!desktop)
-      await surface
-        .getByRole("button", { name: "Close tile", exact: true })
-        .click();
+    if (!desktop) await closeTileSurface(surface);
     await expect(
       network.locator('[data-map-target][aria-pressed="true"]'),
     ).toHaveCount(0);
@@ -1720,7 +1711,7 @@ for (const theme of ["light", "dark"] as const) {
       }),
     ).toBeEnabled();
     await surface.getByRole("button", { name: /^Connect ·/ }).click();
-    await expectLockedBuild(surface);
+    await openLockedBuild(surface);
     await expect(surface.locator(".tileWorkspaceHeading h3")).toBeFocused();
     const owned = (await readSavedGame(page))!;
     expect(currentTick(owned)!.cash).toBeCloseTo(
@@ -1746,7 +1737,7 @@ for (const theme of ["light", "dark"] as const) {
     await page.getByRole("button", { name: "Continue", exact: true }).click();
     await openMap(page);
     await inspectTile(page, tile);
-    await expectLockedBuild(surface);
+    await openLockedBuild(surface);
     const review = await reviewTileBuild(page, "Wind");
     await expectDialogToFit(review);
     await confirmTileBuild(page, review, tile);
@@ -1814,12 +1805,12 @@ for (const theme of ["light", "dark"] as const) {
     const tile = view!.tile;
     await openMap(page);
     const surface = await inspectTile(page, tile);
-    await expectLockedBuild(surface);
+    await openLockedBuild(surface);
     if (await buildRail(page).isVisible()) {
       await setMapProjectCapacity(buildRail(page), true, "4");
     } else {
       await surface.getByRole("tab", { name: "Storage", exact: true }).click();
-      await expectLockedBuild(surface);
+      await openLockedBuild(surface);
       await surface.getByRole("slider", { name: /^Capacity/ }).press("Home");
     }
     const capacityWh = 5e6;
@@ -2065,7 +2056,7 @@ for (const theme of ["light", "dark"] as const) {
 
   test(`acquires Vergennes from its plant border in ${theme}`, async ({
     page,
-  }) => {
+  }, info) => {
     await startMap(page, theme);
     const city = getTerritoryTile("parcel-1:city")!;
     const plant = getTerritoryTile("parcel-0:site-1")!;
@@ -2085,13 +2076,59 @@ for (const theme of ["light", "dark"] as const) {
     const map = await openMap(page);
     const before = (await readSavedGame(page))!;
     expect(isAdjacentToOwnedTerritoryTile(before, city)).toBe(false);
-    const quote = tilePurchaseQuote(before, plant.id)!;
-    expect(tilePurchaseQuote(before, city.id)?.price).toBe(quote.price);
+    const quote = acquisitionQuote(before, "parcel-1")!;
+    expect(tilePurchaseQuote(before, city.id)).toBeUndefined();
+    await map.getByRole("button", { name: "Rapid connection mode" }).click();
     await panToTile(page, plant);
-    await map.locator(`[data-map-target="${plant.id}"]`).click();
+    const plantTarget = map.locator(`[data-map-target="${plant.id}"]`);
+    await expect(plantTarget).toHaveAttribute("data-purchasable", "false");
+    await plantTarget.click();
     const surface = tileSurface(page);
-    await expect(surface).toContainText(quote.utilityName!);
-    await surface.getByRole("button", { name: /^Acquire utility ·/ }).click();
+    const acquire = surface.getByRole("button", {
+      name: `Acquire ${quote.name}`,
+      exact: true,
+    });
+    await acquire.click();
+    const review = page.getByRole("dialog", {
+      name: `Acquire ${quote.name}?`,
+      exact: true,
+    });
+    await expectDialogToFit(review);
+    await expect(review).toContainText("Sites transferred");
+    await expect(review).toContainText("The seller removes its plant.");
+    await expect(review.getByRole("button", { name: "Take loan" })).toHaveCount(
+      0,
+    );
+    const cancel = review.getByRole("button", { name: "Cancel", exact: true });
+    const confirm = review.getByRole("button", {
+      name: "Confirm",
+      exact: true,
+    });
+    const [cancelBox, confirmBox] = await Promise.all([
+      cancel.boundingBox(),
+      confirm.boundingBox(),
+    ]);
+    expect(Math.abs(cancelBox!.y - confirmBox!.y)).toBeLessThan(2);
+    await cancel.click();
+    expect(ownsTerritoryTile((await readSavedGame(page))!, plant.id)).toBe(
+      false,
+    );
+    await plantTarget.press("Shift+F10");
+    await page
+      .getByRole("menu", { name: "Tile actions" })
+      .getByRole("menuitem", { name: "Acquire", exact: true })
+      .click();
+    await expect(review).toBeVisible();
+    expect(currentTick((await readSavedGame(page))!)!.cash).toBe(
+      currentTick(before)!.cash,
+    );
+    await reviewScreenshot(review, {
+      path: info.outputPath(`municipal-acquisition-${theme}.png`),
+      animations: "disabled",
+      scale: "css",
+    });
+    await confirm.click();
+    await expect(review).toHaveCount(0);
     const saved = (await readSavedGame(page))!;
     expect(ownsTerritoryTile(saved, plant.id)).toBe(true);
     expect(ownsTerritoryTile(saved, city.id)).toBe(true);
@@ -2099,13 +2136,11 @@ for (const theme of ["light", "dark"] as const) {
       quote.customers,
     );
     expect(currentTick(saved)!.cash).toBeCloseTo(
-      currentTick(before)!.cash - quote.price,
+      currentTick(before)!.cash - quote.cashDue,
       1,
     );
     expect(saved.facilities).toHaveLength(before.facilities.length);
-    await surface
-      .getByRole("button", { name: "Close tile", exact: true })
-      .click();
+    await closeTileSurface(surface);
     await selectTerritoryMapTile(page, city);
     const cityPanel = tileSurface(page);
     await expect(cityPanel).toHaveAccessibleName("Vergennes");
@@ -2138,7 +2173,7 @@ for (const theme of ["light", "dark"] as const) {
       }
       const surface = await inspectTile(page, tile);
       await surface.getByRole("button", { name: /^Connect ·/ }).click();
-      await expectLockedBuild(surface);
+      await openLockedBuild(surface);
       const plant = await reviewTileBuild(page, resource.name);
       await expectDialogToFit(plant);
       await confirmTileBuild(page, plant, tile, true);
@@ -2243,7 +2278,8 @@ test("map tile hover and right-click expose the tile's own actions", async ({
   await expect(
     inspector.getByRole("heading", { name: "Forest" }),
   ).toBeFocused();
-  await inspector.getByRole("button", { name: "Close tile" }).click();
+  await closeTileSurface(inspector);
+  await expect(inspector).toHaveCount(0);
 
   await target.press("Shift+F10");
   await connect.click();

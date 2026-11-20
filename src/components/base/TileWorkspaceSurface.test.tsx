@@ -5,21 +5,23 @@ import TileWorkspaceSurface from "./TileWorkspaceSurface";
 it("focuses new content without restoring the map until the surface closes", () => {
   const mapFocused = jest.fn();
   const show = (focusKey: number, title = "Build", open = true) => (
-    <div className="territoryNetwork">
-      <button className="territoryTileTarget" tabIndex={0}>
-        Selected tile
-      </button>
-      <button className="territoryMapBuyToggle">Rapid connection mode</button>
-      {open && (
-        <TileWorkspaceSurface
-          title={title}
-          focusKey={focusKey}
-          onClose={jest.fn()}
-        >
-          <button>Project control</button>
-        </TileWorkspaceSurface>
-      )}
-    </div>
+    <React.StrictMode>
+      <div className="territoryNetwork">
+        <button className="territoryTileTarget" tabIndex={0}>
+          Selected tile
+        </button>
+        <button className="territoryMapBuyToggle">Rapid connection mode</button>
+        {open && (
+          <TileWorkspaceSurface
+            title={title}
+            focusKey={focusKey}
+            onClose={jest.fn()}
+          >
+            <button>Project control</button>
+          </TileWorkspaceSurface>
+        )}
+      </div>
+    </React.StrictMode>
   );
   const { rerender } = render(show(1));
   screen

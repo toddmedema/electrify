@@ -71,27 +71,38 @@ it("host finances and cancels only the sender's expansion and restores its debt 
   const checkpoint = checkpointWorld(world);
   const restored = restoreWorld(checkpoint, "restored-epoch");
   expect(restored.grids[0].facilities).toEqual(world.grids[0].facilities);
-  const previewCheckpoint = {
-    ...checkpoint,
-    gameSchema: 20,
-    rules:
+  const mapLineages = [
+    [
+      20,
       "coop-2-f55523858de9d3d66c6be60626ffab92225cba0047b3e4611ad639f83b4aad90",
-  };
-  const restoredPreview = restoreWorld(previewCheckpoint, "preview-epoch");
-  expect(restoredPreview.gameSchema).toBe(SAVE_SCHEMA_VERSION);
-  expect(restoredPreview.grids[0].facilities).toEqual(
-    world.grids[0].facilities,
-  );
-  const badLoan = cloneDeep(previewCheckpoint);
-  badLoan.grids[0].facilities[0].expansionInProgress!.loan!.loanAmountLeft = -1;
-  expect(() => restoreWorld(badLoan, "corrupt-loan")).toThrow(/invalid grids/);
-  expect(() =>
-    restoreWorld(
-      { ...previewCheckpoint, rules: previewCheckpoint.rules + "-unknown" },
-      "unknown-preview",
-    ),
-  ).toThrow(/unsupported format/);
-  for (const match of [world, restored, restoredPreview]) {
+    ],
+    [
+      23,
+      "coop-2-3a64b92f0462af2eb6286821f118c030f25aaf65b546a4a7652e87b1dbcd3e33",
+    ],
+  ] as const;
+  const restoredPreviews = mapLineages.map(([gameSchema, rules]) => {
+    const previewCheckpoint = { ...checkpoint, gameSchema, rules };
+    const restoredPreview = restoreWorld(previewCheckpoint, "preview-epoch");
+    expect(restoredPreview.gameSchema).toBe(SAVE_SCHEMA_VERSION);
+    expect(restoredPreview.grids[0].facilities).toEqual(
+      world.grids[0].facilities,
+    );
+    const badLoan = cloneDeep(previewCheckpoint);
+    badLoan.grids[0].facilities[0].expansionInProgress!.loan!.loanAmountLeft =
+      -1;
+    expect(() => restoreWorld(badLoan, "corrupt-loan")).toThrow(
+      /invalid grids/,
+    );
+    expect(() =>
+      restoreWorld(
+        { ...previewCheckpoint, rules: previewCheckpoint.rules + "-unknown" },
+        "unknown-preview",
+      ),
+    ).toThrow(/unsupported format/);
+    return restoredPreview;
+  });
+  for (const match of [world, restored, ...restoredPreviews]) {
     for (const seat of match.seats) {
       expect(command(match, seat.id, { kind: "ready" })).toBeUndefined();
       expect(
@@ -102,10 +113,10 @@ it("host finances and cancels only the sender's expansion and restores its debt 
   const beforeMinute = world.grids[0].date.minute;
   stepWorld(world);
   stepWorld(restored);
-  stepWorld(restoredPreview);
-  expect(restoredPreview.grids[0].facilities).toEqual(
-    restored.grids[0].facilities,
-  );
+  for (const preview of restoredPreviews) {
+    stepWorld(preview);
+    expect(preview.grids[0].facilities).toEqual(restored.grids[0].facilities);
+  }
   expect(world.grids[0].date.minute).toBeGreaterThan(beforeMinute);
   expect(restored.grids[0].facilities).toEqual(world.grids[0].facilities);
   expect(

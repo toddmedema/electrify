@@ -1,4 +1,4 @@
-import { landPurchaseQuote } from "../helpers/Territories";
+import { landPurchaseQuote, tilePurchaseQuote } from "../helpers/Territories";
 import { powerAgreementQuote } from "../helpers/PowerAgreements";
 import { acceptPowerAgreement } from "../reducers/GameActions";
 import cloneDeep from "lodash.clonedeep";
@@ -29,6 +29,7 @@ import {
   chooseScenarioResponse,
   acquireUtility,
   acquireLand,
+  acquireTile,
   schedulePolicy,
 } from "../reducers/GameActions";
 import type { DifficultyType, GameType } from "../Types";
@@ -102,6 +103,14 @@ function applyScheduled(
         }),
       );
     }
+    case "tile": {
+      const quote = tilePurchaseQuote(game, action.tileId);
+      if (!quote) throw new Error(`Unavailable site: ${action.tileId}`);
+      return officialCommand(
+        game,
+        acquireTile({ tileId: action.tileId, quoteKey: quote.quoteKey }),
+      );
+    }
     case "agreement": {
       const quote = powerAgreementQuote(game, action.blockId);
       if (!quote) throw new Error(`Unavailable agreement: ${action.blockId}`);
@@ -124,12 +133,6 @@ function applyScheduled(
           quoteKey: quote.quoteKey,
         }),
       );
-    }
-    case "retire": {
-      const facility = game.facilities.find(
-        (item) => item.startingAssetId === action.assetId,
-      );
-      return facility ? officialCommand(game, sellFacility(facility.id)) : game;
     }
     case "rate":
       return officialCommand(

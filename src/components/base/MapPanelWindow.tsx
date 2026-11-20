@@ -1,5 +1,5 @@
 import * as React from "react";
-import { IconButton, Typography } from "@mui/material";
+import { IconButton } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import { getStorageJson, setStorageKeyValue } from "../../LocalStorage";
@@ -7,22 +7,15 @@ import { useToolScroll, useToolState } from "./GameToolMemory";
 import { MapWindowFrontContext } from "./GameWorkspaceContext";
 
 type Size = { width: number; height: number };
-type Point = { x: number; y: number };
-export type MapWindowLayout = {
+type MapWindowLayout = {
   area: Size;
   defaultWidth: number;
   scale: number;
   slot: number;
-  avoid?: Point;
-};
-type TileHeading = {
-  subtitle?: string;
-  focusKey: React.Key;
-  initialFocusSelector?: string;
-  map: React.RefObject<HTMLElement>;
 };
 type Rect = Size & { x: number; y: number };
-type Operation = "move" | "resize";
+const RESIZE_EDGES = ["n", "ne", "e", "se", "s", "sw", "w", "nw"] as const;
+type Operation = "move" | (typeof RESIZE_EDGES)[number];
 type Gesture = {
   operation: Operation;
   pointerId: number;
@@ -84,27 +77,6 @@ function fit(rect: Rect, area: Size, minimum: Size): Rect {
   };
 }
 
-function avoidTile(rect: Rect, area: Size, point: Point | undefined): Rect {
-  if (
-    !point ||
-    point.x < rect.x ||
-    point.x > rect.x + rect.width ||
-    point.y < rect.y ||
-    point.y > rect.y + rect.height
-  )
-    return rect;
-
-  const gap = 16;
-  const right = point.x + gap;
-  if (right + rect.width <= area.width) return { ...rect, x: right };
-  const left = point.x - rect.width - gap;
-  if (left >= 0) return { ...rect, x: left };
-  const below = point.y + gap;
-  if (below + rect.height <= area.height) return { ...rect, y: below };
-  const above = point.y - rect.height - gap;
-  return above >= 0 ? { ...rect, y: above } : rect;
-}
-
 function adjust(
   start: Rect,
   dx: number,
@@ -116,14 +88,29 @@ function adjust(
   if (operation === "move")
     return fit({ ...start, x: start.x + dx, y: start.y + dy }, area, minimum);
 
-  return {
-    ...start,
-    width: clamp(start.width + dx, minimum.width, area.width - start.x),
-    height: clamp(start.height + dy, minimum.height, area.height - start.y),
-  };
+  const right = start.x + start.width;
+  const bottom = start.y + start.height;
+  const x = operation.includes("w")
+    ? clamp(start.x + dx, 0, right - minimum.width)
+    : start.x;
+  const y = operation.includes("n")
+    ? clamp(start.y + dy, 0, bottom - minimum.height)
+    : start.y;
+  const endX = operation.includes("e")
+    ? clamp(right + dx, start.x + minimum.width, area.width)
+    : right;
+  const endY = operation.includes("s")
+    ? clamp(bottom + dy, start.y + minimum.height, area.height)
+    : bottom;
+
+  return { x, y, width: endX - x, height: endY - y };
 }
 
-const ARROW_KEYS = "ArrowLeft ArrowRight ArrowUp ArrowDown";
+const ARROW_KEYS = ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"];
+const WINDOW_SHORTCUTS = [
+  ...ARROW_KEYS,
+  ...ARROW_KEYS.map((key) => `Shift+${key}`),
+].join(" ");
 
 export default function MapPanelWindow({
   tool,
@@ -135,7 +122,6 @@ export default function MapPanelWindow({
   onRaise,
   onClose,
   onBack,
-  tile,
   children,
 }: {
   tool: string;
@@ -147,7 +133,6 @@ export default function MapPanelWindow({
   onRaise: () => void;
   onClose: () => void;
   onBack?: () => void;
-  tile?: TileHeading;
   children: React.ReactNode;
 }) {
   const storageKey = `electrify.mapWindow.${tool}`;
@@ -164,41 +149,23 @@ export default function MapPanelWindow({
     width: Math.min(320 * scale, area?.width ?? 0),
     height: Math.min(240 * scale, area?.height ?? 0),
   };
-  const placed = draft ?? preferred;
   const rect =
     floating && area && area.width > 0 && area.height > 0
-      ? placed
-        ? fit(placed, area, minimum)
-        : avoidTile(
-            fit(
-              {
-                x:
-                  area.width -
-                  floating.defaultWidth -
-                  (36 + floating.slot * 20) * scale,
-                y: floating.slot * 24 * scale,
-                width: floating.defaultWidth,
-                height: Math.round(area.height * 0.78),
-              },
-              area,
-              minimum,
-            ),
-            area,
-            floating.avoid,
-          )
+      ? fit(
+          draft ??
+            preferred ?? {
+              x:
+                area.width -
+                floating.defaultWidth -
+                (36 + floating.slot * 20) * scale,
+              y: floating.slot * 24 * scale,
+              width: floating.defaultWidth,
+              height: Math.round(area.height * 0.78),
+            },
+          area,
+          minimum,
+        )
       : undefined;
-  const { focusKey, map, initialFocusSelector } = tile ?? {};
-  const lastFocusKey = React.useRef<React.Key>();
-  React.useLayoutEffect(() => {
-    if (focusKey === undefined || lastFocusKey.current === focusKey) return;
-    lastFocusKey.current = focusKey;
-    if (front) {
-      const initialFocus = initialFocusSelector
-        ? map?.current?.querySelector<HTMLElement>(initialFocusSelector)
-        : undefined;
-      (initialFocus ?? title.current)?.focus({ preventScroll: true });
-    }
-  }, [focusKey, front, initialFocusSelector, map]);
 
   const remember = (next: Rect, start: Rect) => {
     if (
@@ -235,9 +202,7 @@ export default function MapPanelWindow({
     if (operation === "move" && (event.target as Element).closest("button"))
       return;
     event.preventDefault();
-    (operation === "move" ? title.current : event.currentTarget)?.focus({
-      preventScroll: true,
-    });
+    title.current?.focus({ preventScroll: true });
     event.currentTarget.setPointerCapture(event.pointerId);
     gesture.current = {
       operation,
@@ -278,10 +243,7 @@ export default function MapPanelWindow({
     gesture.current = undefined;
     setDraft(undefined);
   }, [movable]);
-  const keyAdjust = (
-    event: React.KeyboardEvent<HTMLElement>,
-    operation: Operation,
-  ) => {
+  const keyAdjust = (event: React.KeyboardEvent<HTMLElement>) => {
     if (
       !rect ||
       !area ||
@@ -289,7 +251,7 @@ export default function MapPanelWindow({
       event.altKey ||
       event.ctrlKey ||
       event.metaKey ||
-      !ARROW_KEYS.split(" ").includes(event.key)
+      !ARROW_KEYS.includes(event.key)
     )
       return;
     event.preventDefault();
@@ -298,15 +260,17 @@ export default function MapPanelWindow({
       event.key === "ArrowLeft" ? -step : event.key === "ArrowRight" ? step : 0;
     const dy =
       event.key === "ArrowUp" ? -step : event.key === "ArrowDown" ? step : 0;
-    remember(adjust(rect, dx, dy, operation, area, minimum), rect);
+    remember(
+      adjust(rect, dx, dy, event.shiftKey ? "se" : "move", area, minimum),
+      rect,
+    );
   };
 
-  const Title = tile ? "h3" : "h2";
   return (
     <section
       id={`tool-${tool}`}
-      className={tile ? "gameToolPanel tileWorkspaceSurface" : "gameToolPanel"}
-      role={tile ? "dialog" : undefined}
+      className="gameToolPanel"
+      data-resizable={floating ? "true" : undefined}
       aria-label={label}
       data-game-tool={tool}
       data-tool-side={floating ? undefined : "right"}
@@ -339,9 +303,7 @@ export default function MapPanelWindow({
       onLostPointerCapture={end}
     >
       <header
-        className={
-          tile ? "gameToolHeader tileWorkspaceHeading" : "gameToolHeader"
-        }
+        className="gameToolHeader"
         onPointerDown={(event) => begin(event, "move")}
       >
         {onBack && (
@@ -353,57 +315,40 @@ export default function MapPanelWindow({
             <ChevronLeftIcon />
           </IconButton>
         )}
-        <div className="mapWindowHeadingText">
-          {tile?.subtitle && (
-            <Typography variant="overline" color="textSecondary">
-              {tile.subtitle}
-            </Typography>
-          )}
-          <Title
-            className="gameToolTitle"
-            tabIndex={floating ? 0 : -1}
-            aria-keyshortcuts={floating ? ARROW_KEYS : undefined}
-            title={
-              floating
-                ? "Move window with the arrow keys or drag the title bar"
-                : undefined
-            }
-            onKeyDown={(event) => keyAdjust(event, "move")}
-            ref={title}
-          >
-            {icon && <span className="gameToolTitleIcon">{icon}</span>}
-            {label}
-          </Title>
-        </div>
-        <IconButton
-          aria-label={tile ? "Close tile" : `Close ${label}`}
-          onClick={onClose}
+        <h2
+          className="gameToolTitle"
+          tabIndex={floating ? 0 : -1}
+          aria-keyshortcuts={floating ? WINDOW_SHORTCUTS : undefined}
+          title={
+            floating
+              ? "Move with the arrow keys. Resize with Shift and the arrow keys."
+              : undefined
+          }
+          onKeyDown={keyAdjust}
+          ref={title}
         >
+          {icon && <span className="gameToolTitleIcon">{icon}</span>}
+          {label}
+        </h2>
+        <IconButton aria-label={`Close ${label}`} onClick={onClose}>
           <CloseIcon />
         </IconButton>
       </header>
-      <div
-        className={tile ? "gameToolBody tileWorkspaceBody" : "gameToolBody"}
-        data-chart-viewport
-        ref={body}
-      >
+      <div className="gameToolBody" data-chart-viewport ref={body}>
         <MapWindowFrontContext.Provider value={front}>
           {children}
         </MapWindowFrontContext.Provider>
       </div>
-      {floating && (
-        <div className="mapWindowFooter">
-          <button
-            className="mapWindowResize"
-            type="button"
-            aria-label={tile ? "Resize tile inspector" : `Resize ${label}`}
-            aria-keyshortcuts={ARROW_KEYS}
-            title="Resize with the arrow keys or drag this corner"
-            onPointerDown={(event) => begin(event, "resize")}
-            onKeyDown={(event) => keyAdjust(event, "resize")}
+      {floating &&
+        RESIZE_EDGES.map((edge) => (
+          <div
+            key={edge}
+            className="mapWindowResizeEdge"
+            data-edge={edge}
+            aria-hidden="true"
+            onPointerDown={(event) => begin(event, edge)}
           />
-        </div>
-      )}
+        ))}
     </section>
   );
 }

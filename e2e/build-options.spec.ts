@@ -136,6 +136,8 @@ test("ordinary starting hills offer general technologies and retain special-site
     exact: true,
   });
   await expect(panel).toBeVisible();
+  await expect(panel).toHaveClass(/tileWorkspaceInspector/);
+  await panel.getByRole("button", { name: "Build here", exact: true }).click();
   await panel.getByRole("slider").press("Home");
   const options = panel.getByRole("list", { name: "Generator options" });
   for (const name of [
@@ -291,9 +293,13 @@ for (const theme of ["light", "dark"] as const) {
           ).toBeDisabled();
           return;
         }
-        await expect(
-          page.getByRole("dialog", { name: "Plains", exact: true }),
-        ).toBeVisible();
+        const inspector = page.getByRole("dialog", {
+          name: "Plains",
+          exact: true,
+        });
+        await inspector
+          .getByRole("button", { name: "Build here", exact: true })
+          .click();
       } else {
         await openBuild(page);
       }

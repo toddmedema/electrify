@@ -68,6 +68,7 @@ import {
 import type { IntertieReservation } from "../helpers/Transmission";
 import {
   acquisitionQuote,
+  acquisitionPaymentDue,
   expansionNetWorth,
   expansionRetentionBaseline,
   ownedUtility,
@@ -2876,7 +2877,8 @@ export function previewUtilityAcquisition(
   const tick = getTimeFromTimeline(snapshot.date.minute, snapshot.timeline);
   if (!tick) return undefined;
   const before = generateForecastTimeline(snapshot, tick.cash, tick.customers);
-  const due = financed ? quote.financedCashDue : quote.cashDue;
+  const due = acquisitionPaymentDue(quote, financed);
+  if (!Number.isFinite(due)) return undefined;
   const cashBefore = tick.cash;
   tick.cash = Math.max(cashBefore, due);
   if (

@@ -45,6 +45,8 @@ for (const seed of [12345, 1, 7])
         scenarioId: 116,
         difficulty: "Employee",
         seed,
+        // Continue past the acquisition deadline to measure the physical supply failure.
+        endOnDecidedObjective: false,
         scheduledActions: expansionBalanceActions(fixture, seed),
       });
       expectNoViolations(result);
@@ -83,7 +85,7 @@ for (const seed of [12345, 1, 7])
         )!;
         const actions = expansionBalanceActions(fixture, seed)
           .map((action) =>
-            action.type === "acquire"
+            action.type === "acquire" && action.targetId === target
               ? { ...action, month: purchaseMonth }
               : action,
           )

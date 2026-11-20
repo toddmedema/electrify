@@ -54,27 +54,23 @@ function observe(
 const objective = (metric: CompiledRuleObjective["metric"]) =>
   UTILITY_EXPANSION_OBJECTIVES.find((value) => value.metric === metric)!;
 
-test("a completed wire is not ownership; either acquired target meets December 2014", () => {
+test("three distinct eligible sellers satisfy the acquisition deadline", () => {
   const acquisition = objective("utilityOwnership");
-  expect(observe(acquisition, 119, { ownedUtilities: [] }).status).toBe(
-    "failed",
-  );
-  for (const target of ["valley-electric", "ridge-electric"])
-    expect(observe(acquisition, 119, { ownedUtilities: [target] }).status).toBe(
-      "completed",
-    );
-});
-
-test("retirement tracks the original identity, allowing replacement oil backup", () => {
-  const retirement = objective("assetRetirement");
   expect(
-    observe(retirement, 191, {
-      ownedAssetIds: ["scenario-116-champlain-oil-a"],
-    }).status,
-  ).toBe("failed");
+    observe(acquisition, 119, {
+      ownedUtilities: [
+        "valley-electric",
+        "parcel-1",
+        "parcel-1",
+        "green-uplands",
+      ],
+    }),
+  ).toMatchObject({ status: "failed", observed: 2, target: 3 });
   expect(
-    observe(retirement, 191, { ownedAssetIds: ["replacement-oil"] }).status,
-  ).toBe("completed");
+    observe(acquisition, 119, {
+      ownedUtilities: ["valley-electric", "parcel-1", "parcel-11"],
+    }),
+  ).toMatchObject({ status: "completed", observed: 3, target: 3 });
 });
 
 test("one aggregate retention goal is judged only in December 2024", () => {

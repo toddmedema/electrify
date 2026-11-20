@@ -1,10 +1,8 @@
-import { getTerritoryDefinition } from "../../data/Territories";
 import { TERRAIN_LABELS } from "../../data/TerrainLabels";
-import { bordersUtility } from "../../helpers/Expansion";
 import { facilityExpansionQuote } from "../../helpers/FacilityExpansion";
 import type { TerritoryTileView } from "../../helpers/TerritoryMapState";
 import { tilePurchaseQuote } from "../../helpers/Territories";
-import type { GameType, TerritoryId } from "../../Types";
+import type { GameType, UtilityAcquisitionId } from "../../Types";
 import ConceptIcon from "../base/ConceptIcon";
 import { useMoney } from "../base/CurrencyContext";
 import type { FacilityDetailActions } from "../base/ExpandedFacilityDetails";
@@ -31,7 +29,7 @@ export default function TerritoryTileMenu({
   onChooseSite,
   onInspect,
   onExpand,
-  onUtility,
+  onAcquire,
 }: {
   game: GameType;
   anchor: MapTileMenuTarget | null;
@@ -44,15 +42,13 @@ export default function TerritoryTileMenu({
   onChooseSite: () => void;
   onInspect: () => void;
   onExpand: () => void;
-  onUtility: (action: "acquire" | "inspect", id: TerritoryId) => void;
+  onAcquire: (id: UtilityAcquisitionId) => void;
 }) {
   const { formatPurchasePrice } = useMoney();
   const { availableCash, pendingIds, purchase } = useTerritoryTilePurchases();
   const tile = view?.tile;
   const facility = view?.operatingFacility;
-  const territory = tile && getTerritoryDefinition(tile.territoryId);
-  const utility =
-    territory?.kind === "utility" && view?.ownerKey === territory.id;
+  const acquisitionId = view?.acquisitionId;
   const quote =
     tile && view?.connectable ? tilePurchaseQuote(game, tile.id) : undefined;
   const limit =
@@ -79,20 +75,19 @@ export default function TerritoryTileMenu({
       onSelect: onChooseSite,
     });
   }
-  if (quote) {
-    tileActions.push({
-      label: `${quote.utilityName ? "Acquire" : "Connect"} (${formatPurchasePrice(quote.price)})`,
-      icon: <ConceptIcon concept="buy" fontSize="small" decorative />,
-      disabled: busy || pendingIds.size > 0 || quote.price > availableCash,
-      onSelect: () => void purchase(quote.tileId, quote.quoteKey),
-    });
-  } else if (tile && utility) {
-    const id = tile.territoryId;
+  if (acquisitionId) {
     tileActions.push({
       label: "Acquire",
       icon: <ConceptIcon concept="buy" fontSize="small" decorative />,
-      disabled: busy || !canAcquire || !bordersUtility(game, id),
-      onSelect: () => onUtility("acquire", id),
+      disabled: busy || !canAcquire,
+      onSelect: () => onAcquire(acquisitionId),
+    });
+  } else if (quote) {
+    tileActions.push({
+      label: `Connect (${formatPurchasePrice(quote.price)})`,
+      icon: <ConceptIcon concept="buy" fontSize="small" decorative />,
+      disabled: busy || pendingIds.size > 0 || quote.price > availableCash,
+      onSelect: () => void purchase(quote.tileId, quote.quoteKey),
     });
   }
   tileActions.push({
@@ -105,8 +100,7 @@ export default function TerritoryTileMenu({
       />
     ),
     disabled: busy,
-    onSelect: () =>
-      tile && utility ? onUtility("inspect", tile.territoryId) : onInspect(),
+    onSelect: onInspect,
   });
   const canCancelCapacity = !!(
     facility?.expansionInProgress && actions.onCancelExpansion

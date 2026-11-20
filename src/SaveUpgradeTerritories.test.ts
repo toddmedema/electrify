@@ -8,6 +8,7 @@ import { SAVE_SCHEMA_VERSION } from "./SaveSchema";
 import { validTransmissionLine, parseSave, serializeSave } from "./SaveGame";
 import { upgradeSave } from "./SaveUpgrade";
 import { createGame } from "./testing/Simulator";
+import { retiredValleyOpeningProgress } from "./testing/SaveTestHelpers";
 import { currentTick } from "./helpers/GameSelectors";
 import { getBuildFacilityQuote } from "./data/Facilities";
 import { facilityExpansionQuote } from "./helpers/FacilityExpansion";
@@ -95,6 +96,89 @@ function legacyPortfolio(
   raw.game.territoryNetwork = { version: 1 };
   return raw;
 }
+it.each([
+  [19, "retired"],
+  [20, "retired"],
+  [21, "retired"],
+  [22, "retired"],
+  [23, "retired"],
+  [23, "current"],
+] as const)(
+  "restores Valley goals from schema %i with %s evidence without changing paid assets or history",
+  (schemaVersion, evidence) => {
+    const game = createGame({ scenarioId: 116, seed: 61 });
+    currentTick(game)!.cash = 3e9;
+    const quote = acquisitionQuote(game, "valley-electric")!;
+    applyAcquireUtility(game, {
+      targetId: "valley-electric",
+      financed: true,
+      quoteKey: quote.quoteKey,
+    });
+    const raw = JSON.parse(JSON.stringify(serializeSave(game)));
+    raw.schemaVersion = schemaVersion;
+    if (evidence === "retired")
+      raw.game.objectiveProgress = retiredValleyOpeningProgress(game);
+    if (schemaVersion >= 22)
+      raw.game.territoryWeather = { dryness: 0.81, fires: [] };
+    const original = cloneDeep(raw);
+    const parsed = parseSave(raw);
+    expect(parsed).not.toBeNull();
+    expect(parsed!.schemaVersion).toBe(SAVE_SCHEMA_VERSION);
+    const migratedProgress = expect.objectContaining({
+      entries: [
+        expect.objectContaining({ id: "acquire-neighbor" }),
+        expect.objectContaining({ id: "retain-customers" }),
+      ],
+    });
+    expect(parsed!.game.objectiveProgress).toEqual(
+      evidence === "current"
+        ? original.game.objectiveProgress
+        : migratedProgress,
+    );
+    expect(parsed!.game.facilities).toEqual(raw.game.facilities);
+    expect(parsed!.game.utilityExpansion).toEqual(raw.game.utilityExpansion);
+    expect(parsed!.game.monthlyHistory).toEqual(raw.game.monthlyHistory);
+    expect(parsed!.game.territoryWeather).toEqual(raw.game.territoryWeather);
+    expect(currentTick(parsed!.game)!.cash).toBe(currentTick(raw.game)!.cash);
+    expect(parseSave(parsed)).toEqual(parsed);
+    const roundTrip = parseSave(
+      JSON.parse(JSON.stringify(serializeSave(parsed!.game))),
+    )!.game;
+    expect(roundTrip).toEqual(parsed!.game);
+    expect(raw).toEqual(original);
+    expect(
+      parseSave({ ...raw, schemaVersion: SAVE_SCHEMA_VERSION + 1 }),
+    ).toBeNull();
+    const resumed = parsed!.game;
+    const start = resumed.date.minute;
+    for (let step = 0; step < 5; step++) {
+      tickState(resumed);
+      tickState(roundTrip);
+    }
+    expect(resumed.date.minute).toBeGreaterThan(start);
+    expect(JSON.stringify(roundTrip)).toEqual(JSON.stringify(resumed));
+  },
+);
+
+it.each([22, 23])(
+  "rejects corrupt evidence from either Valley ruleset through schema %i solo import",
+  (schemaVersion) => {
+    const game = createGame({ scenarioId: 116, seed: 61 });
+    const current = game.objectiveProgress!;
+    const retired = retiredValleyOpeningProgress(game);
+    for (const original of [current, retired]) {
+      const save = { ...serializeSave(game), schemaVersion };
+      const progress = { ...original, rulesDigest: `sha256-${"0".repeat(64)}` };
+      expect(
+        parseSave({ ...save, game: { ...game, objectiveProgress: original } }),
+      ).not.toBeNull();
+      expect(
+        parseSave({ ...save, game: { ...game, objectiveProgress: progress } }),
+      ).toBeNull();
+    }
+  },
+);
+
 it.each(["building", "paused", "upgrade"] as const)(
   "converts a %s land project to immediate rights without changing cash, history, debts or paid investment",
   (state) => {

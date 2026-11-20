@@ -503,7 +503,10 @@ function applyCommandOnce(
   if (command.kind === "action") {
     if (!isGameCommand(command.name)) return "That game action is unavailable";
     let name: GameCommandName = command.name;
-    const buying = name === "acquireLand" || name === "acquireTile";
+    const buying =
+      name === "acquireLand" ||
+      name === "acquireTile" ||
+      name === "acquireUtility";
     // Quotes see the current host ledger, including claims made since the sender's last view.
     const quotingGame = buying ? territoryGameForWorld(world, index) : game;
     const validation = validateGameCommand(quotingGame, name, command.payload);
@@ -532,10 +535,13 @@ function applyCommandOnce(
         validation.payload as { corridorId: string; financed: boolean },
       );
     const before = game.facilities.length;
-    const updated = commandResult(
-      game,
-      reducer(quotingGame, commandAction(name, validation.payload)),
+    const reduced = reducer(
+      quotingGame,
+      commandAction(name, validation.payload),
     );
+    if (name === "acquireUtility" && reduced === quotingGame)
+      return "This acquisition is no longer available";
+    const updated = commandResult(game, reduced);
     // Projection data is for the quote/reducer pass, never another persisted source of claims.
     world.grids[index] = buying
       ? { ...updated, multiplayer: game.multiplayer }
@@ -1685,6 +1691,18 @@ function worldTerritoryOwnership(world: World, grids = world.grids) {
   return { owns, ownedTiles, tileOwners, landOwners };
 }
 
+// Master ca7b8c4e shipped territory weather; preview e2abbfbb changed the Valley goals.
+const SCHEMA_22_MASTER_RULES =
+  "coop-2-bddc08bd9f13d3fb912bccfa5401e85283039c61e31340ec6a252cd503884fef";
+const SCHEMA_22_PREVIEW_RULES =
+  "coop-2-65d7bc6c94fc95425c4781b2a0039977949b473ac9928a597914f29b449643a6";
+
+// Master 16f9a7fa changed the Valley goals. Map branch 382cc36a added project loans.
+const SCHEMA_23_MASTER_RULES =
+  "coop-2-8bf797b211b8ee017e7f4e23f67019de651918233f43a90a2a047d0bec4e724d";
+const SCHEMA_23_MAP_RULES =
+  "coop-2-3a64b92f0462af2eb6286821f118c030f25aaf65b546a4a7652e87b1dbcd3e33";
+
 /** Recognized published worlds follow ordered migrations; arbitrary runtime identities never do. */
 function upgradeTerritoryWorld(value: unknown): unknown {
   const old = value as Partial<World> | null;
@@ -1718,16 +1736,20 @@ function upgradeTerritoryWorld(value: unknown): unknown {
           "coop-2-cf979e3b45deb328dd12a266f291e16398174095d47beca6df0d4f9da1dbd577" ||
           old.rules ===
             "coop-2-f55523858de9d3d66c6be60626ffab92225cba0047b3e4611ad639f83b4aad90")) ||
-      // Published schema 21 releases with connection pricing and player feedback.
+      // Published masters 89557e6/095c194 and acquisition branch 755cf1d9 share schema 21.
       (old.gameSchema === 21 &&
         (old.rules ===
           "coop-2-fcb444f119733dd48aef5c28f13cb78fc856be210f448c495109eb5987d70476" ||
           old.rules ===
+            "coop-2-15c753596aead2c7b8214074ea6ee123deffa20b96db9d73b4abd0e420548a55" ||
+          old.rules ===
             "coop-2-8423406cc7fc00c2bcf0e3cd7b647ad746beabc840cbeb1fc847e15d0389d64c")) ||
-      // Published master ca7b8c4e: territory weather precedes capacity-upgrade loans.
       (old.gameSchema === 22 &&
-        old.rules ===
-          "coop-2-bddc08bd9f13d3fb912bccfa5401e85283039c61e31340ec6a252cd503884fef")
+        (old.rules === SCHEMA_22_MASTER_RULES ||
+          old.rules === SCHEMA_22_PREVIEW_RULES)) ||
+      (old.gameSchema === 23 &&
+        (old.rules === SCHEMA_23_MASTER_RULES ||
+          old.rules === SCHEMA_23_MAP_RULES))
     ) ||
     !Array.isArray(old.grids) ||
     !old.grids.every(
@@ -1741,16 +1763,24 @@ function upgradeTerritoryWorld(value: unknown): unknown {
           old.gameSchema === 20 ||
           old.gameSchema === 21 ||
           old.gameSchema === 22 ||
+          old.gameSchema === 23 ||
           isUtilityExpansionGame(grid)),
     )
   )
     return value;
   const result = cloneDeep(old) as World;
+  const publishedValleyRules =
+    old.rules === SCHEMA_22_MASTER_RULES || old.rules === SCHEMA_23_MAP_RULES
+      ? "published-master"
+      : old.rules === SCHEMA_22_PREVIEW_RULES ||
+          old.rules === SCHEMA_23_MASTER_RULES
+        ? "acquisition-preview"
+        : undefined;
   for (let i = 0; i < result.grids.length; i++) {
-    const upgraded = upgradeSave({
-      schemaVersion: old.gameSchema,
-      game: result.grids[i],
-    });
+    const upgraded = upgradeSave(
+      { schemaVersion: old.gameSchema, game: result.grids[i] },
+      publishedValleyRules,
+    );
     if (!upgraded) return value;
     result.grids[i] = upgraded.game as GameType;
   }

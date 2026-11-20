@@ -1,3 +1,4 @@
+import { utilityAcquisitions } from "./Expansion";
 import { legacyTerritoryConnections } from "./Territories";
 import { needsObjectiveEnergyMeters } from "./ScenarioRules";
 import { GAME_TO_REAL_YEARS, TICK_MINUTES, TICKS_PER_YEAR } from "../Constants";
@@ -297,7 +298,7 @@ function buildProjection(
             ]),
             ...(state.utilityExpansion
               ? {
-                  ownedUtilities: state.utilityExpansion.acquisitions.map(
+                  ownedUtilities: utilityAcquisitions(state).map(
                     (a) => a.targetId,
                   ),
                   ownedAssetIds: state.facilities.flatMap((f) =>

@@ -1,6 +1,5 @@
 import { currencyForLocation } from "../../helpers/Currency";
 import { useMoney } from "./CurrencyContext";
-import { facilityDisplayName } from "./FacilityLabels";
 import GasConversion from "./GasConversion";
 import CoalRepower from "./CoalRepower";
 import FacilityUpgradeAction from "./FacilityUpgradeAction";
@@ -228,7 +227,7 @@ function WeatherResilienceSection(props: {
         <ConfirmDialog
           open
           isolateClicks
-          title={`${actionLabel} to ${facilityDisplayName(facility)}?`}
+          title={`${actionLabel} to ${facility.name}?`}
           contentClassName="facilityRetrofitDialog"
           confirmLabel={`Pay ${formatMoneyConcise(cost)}`}
           confirmDisabled={shortfall > 0}
