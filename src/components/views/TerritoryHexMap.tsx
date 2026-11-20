@@ -125,6 +125,7 @@ interface Props {
   onCloseInspection?: () => void;
   inspectionWindow?: "front" | "background";
   onDeselect?: () => void;
+  dismissInspectionOnBlank?: boolean;
   projectPlanning?: boolean;
   projectPending?: boolean;
   projectSites?: ReadonlyMap<TerritoryMapTileKey, ReadyProjectSite>;
@@ -154,6 +155,7 @@ export default function TerritoryHexMap({
   onCloseInspection,
   inspectionWindow,
   onDeselect,
+  dismissInspectionOnBlank,
   projectPlanning = false,
   projectPending = false,
   projectSites,
@@ -686,11 +688,11 @@ export default function TerritoryHexMap({
   ) => {
     if ((workspace?.effectiveWidth ?? size.width) <= 740) {
       const point = hexCenter(tile);
-      // Leave the selected ground and occupant above the phone's inspection sheet.
+      // Leave the selected tile below the inspector or above project decisions.
       setCamera(
         {
           x: point.x,
-          y: point.y + worldHeight * (projectPlanning ? 0.3 : 0.22),
+          y: point.y + worldHeight * (projectPlanning ? 0.3 : -0.22),
         },
         fromPointer && motion.allowed,
       );
@@ -1018,6 +1020,8 @@ export default function TerritoryHexMap({
             event.preventDefault();
             event.stopPropagation();
             activateTile(id, true);
+          } else if (dismissInspectionOnBlank) {
+            onCloseInspection?.();
           }
         }}
       >

@@ -79,8 +79,6 @@ import {
   useTerritoryTilePurchases,
 } from "../base/TerritoryTilePurchases";
 
-const keepTileOpen = () => undefined;
-
 function ProjectBuildUnavailable({ onClose }: { onClose: () => void }) {
   return (
     <TileWorkspaceSurface
@@ -166,6 +164,7 @@ function TileNetwork(props: Props) {
   const projectBusy = React.useRef(false);
   const [inspected, setInspected] = React.useState<TerritoryMapTileKey>();
   const [activation, setActivation] = React.useState(0);
+  const [siteCatalogue, setSiteCatalogue] = React.useState(false);
   const [category, setCategory] = React.useState("generators");
   const [review, setReview] = React.useState(false);
   const [terms, setTerms] = React.useState(false);
@@ -209,12 +208,18 @@ function TileNetwork(props: Props) {
         ).reduce((sum, watts) => sum + watts, 0)
       : 0;
   const building = !!(view?.owned && tile && !tile.city && !view.facility);
+  const showSiteCatalogue = building && !desktopRail && siteCatalogue;
   const storageFits = !!tile && tileFitsFacility(tile, { peakWh: 1, peakW: 1 });
+  const closeSiteCatalogue = React.useCallback(
+    () => setSiteCatalogue(false),
+    [],
+  );
   const close = React.useCallback(() => {
     if (projectBusy.current) return;
     setPlanning(false);
     setCandidate(undefined);
     setInspected(undefined);
+    setSiteCatalogue(false);
     setSelected(undefined);
     setRailSite(undefined);
   }, [setSelected]);
@@ -314,6 +319,7 @@ function TileNetwork(props: Props) {
     else panel?.returnToMap();
     lastTile.current = key;
     setActivation((value) => value + 1);
+    setSiteCatalogue(false);
     setCategory("generators");
     setInspected(key);
     setRailSite(undefined);
@@ -385,6 +391,7 @@ function TileNetwork(props: Props) {
                 : "background"
               : undefined
           }
+          dismissInspectionOnBlank={!!view && !showSiteCatalogue}
           projectPlanning={planning}
           projectPending={projectPending}
           projectSites={projectSites}
@@ -436,11 +443,10 @@ function TileNetwork(props: Props) {
       {view && tile && territory && inspected && (
         <TileInspectionSurface
           map={map}
-          tileKey={inspected}
           title={title}
-          focusKey={`${inspected}:${activation}:${inspectorOwner ?? "unowned"}:${operatingFacility?.id ?? (view.facility ? "facility" : "empty")}`}
+          focusKey={`${inspected}:${activation}:${inspectorOwner ?? "unowned"}:${operatingFacility?.id ?? (view.facility ? "facility" : "empty")}:${showSiteCatalogue}`}
           subtitle={view.ownerKey ? view.ownerName : undefined}
-          building={building && !desktopRail}
+          building={showSiteCatalogue}
           initialFocusSelector={
             building && desktopRail && railSite === tile.id
               ? ".desktopBuildRail"
@@ -453,11 +459,9 @@ function TileNetwork(props: Props) {
               {view.disaster.condition}
             </Typography>
           )}
-          {building && desktopRail ? (
-            <TileTerrainModifiers terrain={tile.terrain} />
-          ) : building ? (
+          {showSiteCatalogue ? (
             <GameWorkspaceContext.Provider value={true}>
-              <GameBuildCompleteContext.Provider value={keepTileOpen}>
+              <GameBuildCompleteContext.Provider value={closeSiteCatalogue}>
                 <TileTerrainModifiers terrain={tile.terrain} />
                 <Tabs
                   className="tileBuildTabs"
@@ -491,6 +495,18 @@ function TileNetwork(props: Props) {
                 )}
               </GameBuildCompleteContext.Provider>
             </GameWorkspaceContext.Provider>
+          ) : building ? (
+            <>
+              <TileTerrainModifiers terrain={tile.terrain} />
+              {!desktopRail && (
+                <Button
+                  variant="contained"
+                  onClick={() => setSiteCatalogue(true)}
+                >
+                  Build here
+                </Button>
+              )}
+            </>
           ) : (
             <>
               {tile.city ? (
