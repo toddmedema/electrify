@@ -9,7 +9,11 @@ import { formatMoneyConcise } from "../src/helpers/Format";
 import { loadSimData } from "../src/testing/SimData";
 import { expect, test } from "./fixtures";
 import { expectDialogToFit } from "./dialog-layout";
-import { returnToTerritoryMap, selectTerritoryMapTile } from "./layout";
+import {
+  closeTileSurface,
+  returnToTerritoryMap,
+  selectTerritoryMapTile,
+} from "./layout";
 import { editSavedGame, readSavedGame } from "./save-fixture";
 import { reviewScreenshot } from "./review-screenshot";
 
@@ -93,10 +97,8 @@ test("an inherited gas steam plant submits exhaust only while generating", async
     active: true,
     producing: true,
   });
-  const close = page
-    .locator(".tileWorkspaceSurface")
-    .getByRole("button", { name: "Close tile", exact: true });
-  await close.click();
+  const surface = page.locator(".tileWorkspaceSurface");
+  await closeTileSurface(surface);
   await reviewScreenshot(map.locator(".territoryMapViewport"), {
     path: info.outputPath("gas-steam-generating.png"),
   });
@@ -114,7 +116,7 @@ test("an inherited gas steam plant submits exhaust only while generating", async
     producing: false,
   });
   expect(active!.triangles).toBeGreaterThan(idle!.triangles);
-  await close.click();
+  await closeTileSurface(surface);
   await reviewScreenshot(map.locator(".territoryMapViewport"), {
     path: info.outputPath("gas-steam-idle.png"),
   });
@@ -195,14 +197,10 @@ for (const theme of ["light", "dark"] as const) {
     await expect
       .poll(async () => (await sceneFacility(map, city.id))?.modelKey)
       .toBe("structure:city-large");
-    await surface
-      .getByRole("button", { name: "Close tile", exact: true })
-      .click();
+    await closeTileSurface(surface);
 
     await selectTerritoryMapTile(page, getTerritoryTile(ids.active)!);
-    await surface
-      .getByRole("button", { name: "Close tile", exact: true })
-      .click();
+    await closeTileSurface(surface);
     const active = map.locator(`[data-occupant-tile="${ids.active}"]`);
     await expect(active).toHaveAttribute("data-facility-status", "producing");
     await expect(active.locator(".facilityMapStatusArtwork")).toBeVisible();
@@ -241,25 +239,19 @@ for (const theme of ["light", "dark"] as const) {
     await expect(map.locator(".facilityMapStatusArtwork")).toHaveCount(0);
     await selectTerritoryMapTile(page, city);
     await expect(capitalLabel).toHaveCount(0);
-    await surface
-      .getByRole("button", { name: "Close tile", exact: true })
-      .click();
+    await closeTileSurface(surface);
     await selectTerritoryMapTile(page, getTerritoryTile(ids.idle)!);
     const idle = map.locator(`[data-occupant-tile="${ids.idle}"]`);
     await expect(idle).toHaveAttribute("data-facility-status", "idle");
     await expect(idle.locator(".facilityMapStatusArtwork")).toHaveCount(0);
-    await surface
-      .getByRole("button", { name: "Close tile", exact: true })
-      .click();
+    await closeTileSurface(surface);
     await trigger.click();
     await status.check();
     await layers.press("Escape");
     await expect(idle.locator(".facilityMapStatusArtwork")).toBeVisible();
     await selectTerritoryMapTile(page, city);
     await expect(capitalLabel).toBeVisible();
-    await surface
-      .getByRole("button", { name: "Close tile", exact: true })
-      .click();
+    await closeTileSurface(surface);
     const after = (await readSavedGame(page))!;
     expect(after.facilities).toEqual(before.facilities);
     expect(currentTick(after)!.cash).toBe(currentTick(before)!.cash);
@@ -343,9 +335,7 @@ for (const theme of ["light", "dark"] as const) {
       currentTick(before)!.cash - quote.cost,
       3,
     );
-    await inspector
-      .getByRole("button", { name: "Close tile", exact: true })
-      .click();
+    await closeTileSurface(inspector);
     const occupant = map.locator(`[data-occupant-tile="${tile.id}"]`);
     await expect(occupant).toHaveAttribute(
       "data-facility-status",

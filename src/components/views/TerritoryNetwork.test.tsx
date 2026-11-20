@@ -225,8 +225,8 @@ it("keeps inspection on its activated tile while map focus moves", () => {
   expect(other).toHaveFocus();
   fireEvent.click(other);
   expect(
-    within(surface()).getByRole("tab", { name: "Generators" }),
-  ).toHaveAttribute("aria-selected", "true");
+    within(surface()).getByRole("button", { name: "Build here" }),
+  ).toBeEnabled();
   expect(within(surface()).getByRole("heading", { level: 3 })).toHaveFocus();
 });
 
@@ -258,13 +258,16 @@ it("focuses every explicit activation, including another tile with the same head
   fireEvent.click(other);
   expect(heading).toHaveFocus();
   inspect(freeTile(game).id);
+  fireEvent.click(
+    within(surface()).getByRole("button", { name: "Build here" }),
+  );
   const slider = within(surface()).getByRole("slider");
   act(() => slider.focus());
   fireEvent.change(slider, { target: { value: 9 } });
   expect(slider).toHaveFocus();
 });
 
-it("opens the actual locked catalogue immediately and switches between generators and storage", () => {
+it("opens the locked catalogue from the compact inspector and switches between generators and storage", () => {
   const game = ready();
   const solar = GENERATORS(game, 30e6, [], []).find(
     (item) => item.name === "Solar",
@@ -272,6 +275,15 @@ it("opens the actual locked catalogue immediately and switches between generator
   const tile = availableTerritoryTiles(game, solar, "champlain")[0];
   show(game);
   inspect(tile.id);
+  expect(surface()).toHaveClass("tileWorkspaceInspector");
+  expect(within(surface()).queryByRole("tab")).not.toBeInTheDocument();
+  expect(
+    within(surface()).queryByRole("button", { name: "Close tile" }),
+  ).not.toBeInTheDocument();
+  fireEvent.click(
+    within(surface()).getByRole("button", { name: "Build here" }),
+  );
+  expect(surface()).toHaveClass("tileWorkspaceBuilding");
   expect(
     within(surface()).getByRole("tab", { name: "Generators" }),
   ).toHaveAttribute("aria-selected", "true");
@@ -295,19 +307,22 @@ it("opens the actual locked catalogue immediately and switches between generator
   ).not.toBeInTheDocument();
 });
 
-it("builds on the activated tile and replaces the catalogue with the shared facility controls", () => {
+it("builds on the activated tile and replaces the catalogue with the shared facility controls", async () => {
   const game = ready();
   const tile = freeTile(game);
   const { store } = show(game);
   inspect(tile.id);
   fireEvent.click(
+    within(surface()).getByRole("button", { name: "Build here" }),
+  );
+  fireEvent.click(
     within(surface()).getByRole("button", { name: "Review purchase of Wind" }),
   );
   fireEvent.click(screen.getByRole("button", { name: "Pay cash" }));
+  await waitFor(() => expect(screen.getAllByRole("dialog")).toHaveLength(1));
   expect(
     store.getState().game.facilities.find((item) => item.tileId === tile.id),
   ).toMatchObject({ name: "Wind" });
-  expect(screen.getAllByRole("dialog")).toHaveLength(1);
   expect(within(surface()).getByRole("heading", { level: 3 })).toHaveFocus();
   expect(
     within(surface()).getByRole("button", {
@@ -393,7 +408,7 @@ it("shows researched terrain effects before purchase, with speed labelled separa
   );
 });
 
-it("buys exactly the inspected tile in one action and shows its build catalogue", () => {
+it("buys exactly the inspected tile in one action and offers to build there", () => {
   const game = ready();
   const tile = territoryTileViews(game).find(
     ({ tile }) => !tile.city && tilePurchaseQuote(game, tile.id),
@@ -410,8 +425,8 @@ it("buys exactly the inspected tile in one action and shows its build catalogue"
   expect(ownsTerritoryTile(store.getState().game, tile.id)).toBe(true);
   expect(screen.getAllByRole("dialog")).toHaveLength(1);
   expect(
-    within(surface()).getByRole("tab", { name: "Generators" }),
-  ).toHaveAttribute("aria-selected", "true");
+    within(surface()).getByRole("button", { name: "Build here" }),
+  ).toBeEnabled();
   expect(within(surface()).getByRole("heading", { level: 3 })).toHaveFocus();
   expect(store.getState().game.territoryNetwork!.tilePurchases).toHaveLength(1);
 });

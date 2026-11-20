@@ -6,7 +6,11 @@ import { hexCenter } from "../src/components/base/TerritoryHexGeometry";
 import { getTerritoryTile } from "../src/helpers/TerritoryTiles";
 import { territoryTileViews } from "../src/helpers/TerritoryMapState";
 import { expect, test } from "./fixtures";
-import { readTerritoryMapCamera, returnToTerritoryMap } from "./layout";
+import {
+  closeTileSurface,
+  readTerritoryMapCamera,
+  returnToTerritoryMap,
+} from "./layout";
 import { readSavedGame, readSaveRecords } from "./save-fixture";
 import { reviewScreenshot } from "./review-screenshot";
 
@@ -131,9 +135,7 @@ for (const theme of ["light", "dark"] as const) {
     expect(
       (resumedPhase - stopped.phases[key] + Math.PI * 2) % (Math.PI * 2),
     ).toBeLessThan(0.5);
-    await surface
-      .getByRole("button", { name: "Close tile", exact: true })
-      .click();
+    await closeTileSurface(surface);
     await page.emulateMedia({ reducedMotion: "reduce" });
     await expect
       .poll(async () => (await sample(canvas)).motionAllowed)
