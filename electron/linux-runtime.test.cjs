@@ -66,7 +66,7 @@ test(
     // It must still launch after the build machine's library tree disappears.
     fs.rmSync(f.libraries, { recursive: true });
     for (const previous of [undefined, "/steam/runtime/lib"]) {
-      const env = { ...process.env };
+      const env = { ...process.env, SteamAppId: "1234" };
       if (previous) env.LD_LIBRARY_PATH = previous;
       else delete env.LD_LIBRARY_PATH;
       const lines = execFileSync(
