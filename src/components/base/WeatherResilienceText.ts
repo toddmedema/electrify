@@ -34,8 +34,3 @@ export function coldPackageEffect(
 ): string {
   return `Rated to ${formatDesignTemperature(packagedMinTempC, units)} instead of ${formatDesignTemperature(standardMinTempC, units)}; halves losses from cold and freezes.`;
 }
-
-/** "9 days" or "1 day". */
-export function dayCount(days: number): string {
-  return `${days} ${days === 1 ? "day" : "days"}`;
-}

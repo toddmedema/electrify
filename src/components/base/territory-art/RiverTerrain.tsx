@@ -1,7 +1,9 @@
 import React from "react";
+import FrostGround from "./FrostGround";
 
 type RiverTerrainProps = {
   className?: string;
+  frostFill?: string;
   ports?: readonly number[];
 };
 
@@ -139,6 +141,7 @@ function ribbon(
 export default function RiverTerrain({
   className,
   ports = [0, 3],
+  frostFill,
 }: RiverTerrainProps) {
   const edges = Array.from(
     new Set(
@@ -183,7 +186,10 @@ export default function RiverTerrain({
       aria-hidden="true"
       focusable="false"
     >
-      <path d="M250 0 500 125V375L250 500 0 375V125Z" fill="#B8D9C3" />
+      <path
+        d="M250 0 500 125V375L250 500 0 375V125Z"
+        fill="var(--terrain-frost-field, #B8D9C3)"
+      />
       <path
         d="M0 200C108 145 165 176 250 192S414 211 500 165V244C397 272 328 250 243 238S84 203 0 257Z"
         fill="#587F69"
@@ -194,15 +200,30 @@ export default function RiverTerrain({
         fill="#587F69"
         opacity="0.16"
       />
+      <FrostGround fill={frostFill} />
       {routes.map(({ points, start, end }) => (
         <path
           key={`bank-${start}`}
           d={ribbon(points, start, end, true, headwater)}
-          fill="#C6B493"
+          fill="var(--terrain-frost-bank, #C6B493)"
         />
       ))}
-      {edges.length > 2 && <circle cx="250" cy="250" r="52" fill="#C6B493" />}
-      {headwater && <circle cx="250" cy="250" r="24" fill="#C6B493" />}
+      {edges.length > 2 && (
+        <circle
+          cx="250"
+          cy="250"
+          r="52"
+          fill="var(--terrain-frost-bank, #C6B493)"
+        />
+      )}
+      {headwater && (
+        <circle
+          cx="250"
+          cy="250"
+          r="24"
+          fill="var(--terrain-frost-bank, #C6B493)"
+        />
+      )}
       {routes.map(({ points, start, end }) => (
         <path
           key={`water-${start}`}

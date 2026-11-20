@@ -779,6 +779,12 @@ a:hover {
   font-size: 0.875rem;
 }
 
+.worksheet-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+}
+
 .worksheet-answer {
   min-height: 5rem;
   margin-top: 0.75rem;
@@ -791,6 +797,7 @@ a:hover {
 
 @media print {
   .classroom-page {
+    min-height: 0;
     background: white;
     color: black;
     font-size: 11pt;
@@ -802,7 +809,9 @@ a:hover {
 
   .classroom-page > :not(main),
   .classroom-page .hero,
-  .classroom-page .comparison-content > :not(.student-worksheet) {
+  .classroom-page .page-breadcrumb,
+  .classroom-page .comparison-content > :not(.student-worksheet),
+  .classroom-page .worksheet-download {
     display: none;
   }
 
@@ -830,7 +839,17 @@ a:hover {
   }
 
   .classroom-page .worksheet-answer {
-    min-height: 4rem;
+    min-height: 4.5rem;
+    margin-top: 1.5rem;
+    border-top: 1px solid var(--border);
+  }
+
+  .classroom-page .worksheet-answer::before,
+  .classroom-page .worksheet-answer::after {
+    display: block;
+    height: 1.5rem;
+    border-bottom: 1px solid var(--border);
+    content: "";
   }
 
   .classroom-page .student-worksheet a {

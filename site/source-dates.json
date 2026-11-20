@@ -1,7 +1,7 @@
 {
   "public/index.html": {
-    "date": "2026-11-17",
-    "sha256": "1faeafb42bc91f76dbb597f35b454cb8125b5c9cddbe112daffb1f1e87decd52"
+    "date": "2026-11-20",
+    "sha256": "4f25310f2cdc46b424f562a1a43912e7e78637f7b4c6845f1bf02bedfb8a3b0e"
   },
   "public/about.html": {
     "date": "2026-11-17",
@@ -16,12 +16,12 @@
     "sha256": "3ea9f415da634f6041778e0706ff5398d41f811dd942db4c0bc386664da331af"
   },
   "public/power-grid-simulator.html": {
-    "date": "2026-11-17",
-    "sha256": "bfcc424e4f6f382aeee225835898f7d94cfc917f6db89fb3406bfba388bcf70c"
+    "date": "2026-11-20",
+    "sha256": "031535e2f9a70011a27ee39f5ca618104d6e51a395108657e07884e5c58290b6"
   },
   "public/classroom.html": {
-    "date": "2026-11-17",
-    "sha256": "4f110eb8b8922f74c3e13c05f79c0e193e9093ba7536e86347f28a4eadfa6123"
+    "date": "2026-11-20",
+    "sha256": "c36781bf946d7520a44a4067a6c8051ea71c396d56d98f348ce9d2d0f6f50f7b"
   },
   "public/energy-simulators.html": {
     "date": "2026-11-17",
@@ -36,7 +36,7 @@
     "sha256": "8030ab7b4cb623333b17c776dd47ffefbb0fb8aecd217337e55b0fc0dfec796a"
   },
   "site/templates/pages.js": {
-    "date": "2026-11-17",
-    "sha256": "1b0c883bd820538686d9d4d1bf8947107c66126ef9adfa38271c1c25e84b38d3"
+    "date": "2026-11-20",
+    "sha256": "2786e0b973fbc77e15e2e1ba2a57df8550f0fcad001616c95ffa83d16c99e29b"
   }
 }
