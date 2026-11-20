@@ -10,10 +10,12 @@ import {
   landCustomerMarket,
 } from "./TerritoryCustomers";
 import {
-  connectionAgreements,
+  AGREEMENT_UTILITIES,
+  agreementBasePrice,
+  agreementPrice,
+  agreementTermsAt,
   compareAgreementDispatchPriority,
   agreementRate,
-  INHERITED_CONNECTIONS,
   utilityOwnedAt,
   inheritedConnection,
   agreementCorridorId,
@@ -460,78 +462,74 @@ export function entitlementSources(
   agreementMinute = now.minute,
 ) {
   if (!game.utilityExpansion) return [];
-  const context = intertieContextForGame(game);
-  const sources = (Object.keys(INHERITED_CONNECTIONS) as UtilityId[])
-    .flatMap((utilityId) => {
-      if (!utilityOwnedAt(game, utilityId, agreementMinute)) return [];
-      const line = inheritedConnection(
-        utilityId,
-        Object.keys(INHERITED_CONNECTIONS).indexOf(utilityId) + 100000,
-      );
-      return connectionAgreements(game, utilityId, agreementMinute)
-        .filter(
-          (source) =>
-            source.id !== excludedAgreementId &&
-            source.active &&
-            source.nominalW > 0 &&
-            (!supplierReady || source.termsVersion >= 2) &&
-            (!legacyOnly || source.termsVersion === 1),
-        )
-        .map((source) => {
-          const availableLine = {
-            ...line,
-            corridorId: agreementCorridorId(source.id, utilityId),
-            capacityW: UTILITY_AREAS[utilityId].sourceInterfaceW,
-          };
-          const limits = intertieOfferLimits(
-            availableLine,
-            context,
-            now.minute,
-            now,
-          );
-          const firmLimits = firmIntertieOfferLimits(
-            availableLine,
-            context,
-            now.minute,
-            now,
-          );
-          const pricePerMWh =
-            source.termsVersion === 3
-              ? agreementRate(
-                  game,
-                  source.pricePerMWh,
-                  source.durationYears,
-                  availableLine.corridorId,
-                  agreementMinute,
-                  now,
-                  now.minute,
-                )
-              : source.priceToday;
-          return {
-            id: source.id,
-            termsVersion: source.termsVersion,
-            startMinute: source.startMinute,
-            endMinute: source.endMinute,
-            paused: false,
-            utilityId,
-            lineId: line.id,
-            capacityW: source.nominalW * source.deliverability,
+  let context: ReturnType<typeof intertieContextForGame> | undefined;
+  const sources = AGREEMENT_UTILITIES.flatMap((utilityId, index) => {
+    if (!utilityOwnedAt(game, utilityId, agreementMinute)) return [];
+    const line = inheritedConnection(utilityId, index + 100000);
+    return agreementTermsAt(game, utilityId, agreementMinute)
+      .filter(
+        (source) =>
+          source.id !== excludedAgreementId &&
+          agreementMinute >= source.startMinute &&
+          agreementMinute < source.endMinute &&
+          source.nominalW > 0 &&
+          (!supplierReady || source.termsVersion >= 2) &&
+          (!legacyOnly || source.termsVersion === 1),
+      )
+      .map((source) => {
+        const availableLine = {
+          ...line,
+          corridorId: agreementCorridorId(source.id, utilityId),
+          capacityW: UTILITY_AREAS[utilityId].sourceInterfaceW,
+        };
+        const limits = (
+          source.termsVersion >= 2
+            ? firmIntertieOfferLimits
+            : intertieOfferLimits
+        )(
+          availableLine,
+          (context ??= intertieContextForGame(game)),
+          now.minute,
+          now,
+        );
+        const basePrice = agreementBasePrice(game, source);
+        const pricePerMWh =
+          source.termsVersion === 3
+            ? agreementRate(
+                game,
+                basePrice,
+                source.durationYears,
+                availableLine.corridorId,
+                agreementMinute,
+                now,
+                now.minute,
+              )
+            : agreementPrice(game, basePrice, agreementMinute);
+        return {
+          id: source.id,
+          termsVersion: source.termsVersion,
+          startMinute: source.startMinute,
+          endMinute: source.endMinute,
+          paused: false,
+          utilityId,
+          lineId: line.id,
+          capacityW: source.nominalW * source.deliverability,
+          pricePerMWh,
+          emissionsKgPerMWh: source.emissionsKgPerMWh,
+          offer: {
+            ...limits,
+            lineId: `${game.multiplayer?.seat ?? "local"}:supplier:${availableLine.corridorId}`,
+            lineImportLimitW: transmissionRatingW(availableLine, now),
+            importLimitW: Math.min(
+              limits.importLimitW,
+              source.nominalW * source.deliverability,
+            ),
             pricePerMWh,
-            emissionsKgPerMWh: source.emissionsKgPerMWh,
-            offer: {
-              ...(source.termsVersion >= 2 ? firmLimits : limits),
-              lineId: `${game.multiplayer?.seat ?? "local"}:supplier:${availableLine.corridorId}`,
-              lineImportLimitW: transmissionRatingW(availableLine, now),
-              importLimitW: Math.min(
-                (source.termsVersion >= 2 ? firmLimits : limits).importLimitW,
-                source.nominalW * source.deliverability,
-              ),
-              pricePerMWh,
-            },
-          };
-        });
-    })
-    .sort(compareAgreementDispatchPriority);
+          },
+        };
+      });
+  }).sort(compareAgreementDispatchPriority);
+  if (!sources.length) return [];
   const allocated = allocateIntertieFlows(
     sources.map((source) => source.offer),
     Infinity,

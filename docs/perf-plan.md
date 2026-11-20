@@ -1027,3 +1027,20 @@ cascade order, so it is not safe, and saves at most 120 bytes.
 
 The Main CSS ceiling therefore moves from 26,630 to 29,333 bytes, the value `perf:bundle --update`
 records, so the failing line moves from 29,293 to 32,266. The JS ceilings are untouched.
+
+## Four-company Valley dispatch
+
+Run `npm run perf:bench -- --valley --runs 5 --json` to measure the real
+authoritative host loop with four companies. Each company starts with five
+territories containing 20 tiles, including four cities, two hydro generators,
+one wind generator, one solar generator and two pumped-hydro storage plants. The fixture seeds land receipts and completed
+assets before timing: the standard board cannot supply this many cities, and
+Burlington has no purchasable pumped-storage sites. The fixture uses the game's
+terrain, customer profiles, hydro, storage and market calculations.
+
+The default workload plays 12 months (1,152 world ticks). CPU time includes
+process garbage collection. Rollover median and p95 measure tick wall time.
+Fixture setup and output hashing run outside the timed replays. The JSON carries
+a hash of the live frames and exact monthly replica checkpoints, with the
+source-derived rules identity normalized for comparison between revisions.
+Rendering, worker messages and network transport are outside this benchmark.

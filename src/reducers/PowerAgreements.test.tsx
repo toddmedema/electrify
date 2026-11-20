@@ -19,6 +19,7 @@ import {
 import { currentTick } from "../helpers/GameSelectors";
 import {
   INHERITED_CONNECTIONS,
+  acceptAgreement,
   agreementDate,
   agreementIntervalMinutes,
   validPowerAgreements,
@@ -824,6 +825,22 @@ it.each([20, -40])(
     }
   },
 );
+
+it("picks up a newly signed agreement on a previously read company ledger", () => {
+  const game = at();
+  game.transmission!.acceptedAgreements = [];
+  const quote = powerAgreementQuote(game, "champlain-nuclear")!;
+  const id = `${quote.id}:0`;
+  expect(
+    connectionAgreements(game, "champlain").some((term) => term.id === id),
+  ).toBe(false);
+  expect(
+    acceptAgreement(game, { blockId: quote.id, quoteKey: quote.quoteKey }),
+  ).toBe(true);
+  expect(connectionAgreements(game, "champlain")).toContainEqual(
+    expect.objectContaining({ id, startMinute: quote.receipt.startMinute }),
+  );
+});
 
 it("indexes each signed ceiling from its own signing CPI and preserves the authored older promises", () => {
   const game = at();

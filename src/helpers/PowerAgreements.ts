@@ -1,3 +1,4 @@
+import { isDraft } from "@reduxjs/toolkit";
 import { isUtilityExpansionGame } from "./ExpansionContext";
 import { GAME_TO_REAL_YEARS, TICK_MINUTES } from "../Constants";
 import type {
@@ -29,10 +30,11 @@ export const INHERITED_CONNECTIONS: Readonly<Record<UtilityId, string>> = {
   "valley-electric": "vt-valley-regional",
   "ridge-electric": "vt-ridge-regional",
 };
+export const AGREEMENT_UTILITIES = Object.keys(
+  INHERITED_CONNECTIONS,
+) as UtilityId[];
 export const inheritedUtilityForCorridor = (id: string) =>
-  (Object.keys(INHERITED_CONNECTIONS) as UtilityId[]).find(
-    (utility) => INHERITED_CONNECTIONS[utility] === id,
-  );
+  AGREEMENT_UTILITIES.find((utility) => INHERITED_CONNECTIONS[utility] === id);
 export function utilityOwnedAt(
   game: Pick<GameType, "utilityExpansion">,
   id: UtilityId,
@@ -330,26 +332,22 @@ export function acceptAgreement(game: GameType, value: unknown): boolean {
   (game.transmission.acceptedAgreements ??= []).push(quote.receipt);
   return true;
 }
-/** Coverage is nominal; delivery and physical/source limits are applied by transmission clearing. */
-export function connectionAgreements(
+function prepareAgreementTerms(
   game: GameType,
   utilityId: UtilityId,
-  minute = game.date.minute,
+  year: number,
 ) {
-  const date = getDateFromMinute(minute, 2005);
-  const inherited = utilityEntitlementsAt(utilityId, date.year).map(
-    (source) => ({
-      ...source,
-      inherited: true,
-      termsVersion: game.transmission?.inheritedAgreementTerms ?? 3,
-      durationYears:
-        (source.reducedNominalW === 0 ? source.reductionYear! : 2025) - 2005,
-      startMinute: 0,
-      endMinute: agreementYearMinute(
-        source.reducedNominalW === 0 ? source.reductionYear! : 2025,
-      ),
-    }),
-  );
+  const inherited = utilityEntitlementsAt(utilityId, year).map((source) => ({
+    ...source,
+    inherited: true,
+    termsVersion: game.transmission?.inheritedAgreementTerms ?? 3,
+    durationYears:
+      (source.reducedNominalW === 0 ? source.reductionYear! : 2025) - 2005,
+    startMinute: 0,
+    endMinute: agreementYearMinute(
+      source.reducedNominalW === 0 ? source.reductionYear! : 2025,
+    ),
+  }));
   // Retain expired inherited records for honest compact history in the connection disclosure.
   const records = UTILITY_AREAS[utilityId].entitlements
     .filter((source) => !source.balancing)
@@ -382,11 +380,14 @@ export function connectionAgreements(
               name: block.name,
               nominalW: block.nominalW,
               deliverability: 0.95,
-              pricePerMWh:
+              pricePerMWh: block.pricePerMWh,
+              signingPrice:
                 receipt.termsVersion === 3
-                  ? receipt.signingMarketPricePerMWh /
-                    agreementPrice(game, 1, receipt.acceptedMinute)
-                  : block.pricePerMWh,
+                  ? {
+                      price: receipt.signingMarketPricePerMWh,
+                      minute: receipt.acceptedMinute,
+                    }
+                  : undefined,
               marketId: "marketId" in block ? block.marketId : "vt-valley-pool",
               emissionsKgPerMWh: undefined as number | undefined,
               reductionYear: undefined as number | undefined,
@@ -416,33 +417,139 @@ export function connectionAgreements(
     ...source,
     billingEndMinute:
       "billingEndMinute" in source ? source.billingEndMinute : source.endMinute,
-    active: minute >= source.startMinute && minute < source.endMinute,
-    durationDiscount:
-      source.termsVersion === 3
-        ? agreementDurationDiscount(source.durationYears)
-        : 0,
-    ...agreementMonthlyEnergy(
-      source.nominalW * source.deliverability,
-      source.termsVersion,
-    ),
-    priceToday:
-      source.termsVersion === 3
-        ? agreementRate(
-            game,
-            source.pricePerMWh,
-            source.durationYears,
-            agreementCorridorId(source.id, utilityId),
-            minute,
-          )
-        : agreementPrice(game, source.pricePerMWh, minute),
     emissionsKgPerMWh:
       source.emissionsKgPerMWh ??
-      importEmissionsKgco2ePerMWh(
-        source.marketId ?? "vt-valley-pool",
-        date.year,
-      ),
+      importEmissionsKgco2ePerMWh(source.marketId ?? "vt-valley-pool", year),
   }));
 }
+
+type AgreementTerm = Readonly<ReturnType<typeof prepareAgreementTerms>[number]>;
+type PreparedCompanyAgreements = {
+  byUtility: Record<UtilityId, readonly AgreementTerm[]>;
+  byId: ReadonlyMap<string, AgreementTerm>;
+};
+type AgreementInputs = NonNullable<
+  GameType["utilityExpansion"]
+>["acquisitions"];
+type AcceptedAgreements = NonNullable<
+  GameType["transmission"]
+>["acceptedAgreements"];
+
+const preparedAgreements = new WeakMap<
+  AgreementInputs,
+  {
+    acquisitionCount: number;
+    receipts: AcceptedAgreements;
+    receiptCount: number;
+    inheritedVersion: PowerAgreementTermsVersion;
+    year: number;
+    terms: PreparedCompanyAgreements;
+  }
+>();
+
+function prepareCompanyAgreements(
+  game: GameType,
+  year: number,
+): PreparedCompanyAgreements {
+  const byUtility = {
+    champlain: prepareAgreementTerms(game, "champlain", year),
+    "valley-electric": prepareAgreementTerms(game, "valley-electric", year),
+    "ridge-electric": prepareAgreementTerms(game, "ridge-electric", year),
+  };
+  const byId = new Map<string, AgreementTerm>();
+  for (const utility of AGREEMENT_UTILITIES)
+    for (const term of byUtility[utility])
+      if (!byId.has(term.id)) byId.set(term.id, term);
+  return { byUtility, byId };
+}
+
+/** Receipts are append-only. Keep one year's structural terms per company ledger.
+ * Prices and finite supplier flows still use the actual dispatch frame. */
+function companyAgreementTerms(game: GameType, minute: number) {
+  const year = getDateFromMinute(minute, 2005).year;
+  const acquisitions = game.utilityExpansion?.acquisitions;
+  const receipts = game.transmission?.acceptedAgreements;
+  if (!acquisitions || isDraft(acquisitions) || isDraft(receipts))
+    return prepareCompanyAgreements(game, year);
+  const inheritedVersion = game.transmission?.inheritedAgreementTerms ?? 3;
+  const cached = preparedAgreements.get(acquisitions);
+  if (
+    cached &&
+    cached.acquisitionCount === acquisitions.length &&
+    cached.receipts === receipts &&
+    cached.receiptCount === (receipts?.length ?? 0) &&
+    cached.inheritedVersion === inheritedVersion &&
+    cached.year === year
+  )
+    return cached.terms;
+  const terms = prepareCompanyAgreements(game, year);
+  preparedAgreements.set(acquisitions, {
+    acquisitionCount: acquisitions.length,
+    receipts,
+    receiptCount: receipts?.length ?? 0,
+    inheritedVersion,
+    year,
+    terms,
+  });
+  return terms;
+}
+
+export function agreementTermsAt(
+  game: GameType,
+  utilityId: UtilityId,
+  minute: number,
+) {
+  return companyAgreementTerms(game, minute).byUtility[utilityId];
+}
+
+export function agreementBasePrice(
+  game: GameType,
+  source: AgreementTerm,
+): number {
+  const signing = "signingPrice" in source ? source.signingPrice : undefined;
+  return signing
+    ? signing.price / agreementPrice(game, 1, signing.minute)
+    : source.pricePerMWh;
+}
+
+/** Coverage is nominal; delivery and physical/source limits are applied by transmission clearing. */
+export function connectionAgreements(
+  game: GameType,
+  utilityId: UtilityId,
+  minute = game.date.minute,
+) {
+  return agreementTermsAt(game, utilityId, minute).map((term) => {
+    const { signingPrice: _signingPrice, ...source } = {
+      signingPrice: undefined,
+      ...term,
+    };
+    const pricePerMWh = agreementBasePrice(game, term);
+    return {
+      ...source,
+      pricePerMWh,
+      active: minute >= source.startMinute && minute < source.endMinute,
+      durationDiscount:
+        source.termsVersion === 3
+          ? agreementDurationDiscount(source.durationYears)
+          : 0,
+      ...agreementMonthlyEnergy(
+        source.nominalW * source.deliverability,
+        source.termsVersion,
+      ),
+      priceToday:
+        source.termsVersion === 3
+          ? agreementRate(
+              game,
+              pricePerMWh,
+              source.durationYears,
+              agreementCorridorId(source.id, utilityId),
+              minute,
+            )
+          : agreementPrice(game, pricePerMWh, minute),
+    };
+  });
+}
+
 export function validPowerAgreements(game: GameType): boolean {
   const receipts = game.transmission?.acceptedAgreements;
   if (
@@ -553,14 +660,10 @@ export function recordAgreementSettlements(
 ): number {
   if (!game.transmission || end <= start || !settlements.length) return 0;
   const accounts = (game.transmission.agreementAccounts ??= []);
-  const sources = (Object.keys(INHERITED_CONNECTIONS) as UtilityId[]).flatMap(
-    (id) => connectionAgreements(game, id, start),
-  );
+  const sources = companyAgreementTerms(game, start).byId;
   let topUps = 0;
   for (const settlement of settlements) {
-    const source = sources.find(
-      (entry) => entry.id === settlement.agreementId,
-    )!;
+    const source = sources.get(settlement.agreementId)!;
     const from = Math.max(start, source.startMinute);
     const through = Math.min(end, source.endMinute);
     if (through <= from) continue;

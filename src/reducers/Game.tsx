@@ -4371,6 +4371,28 @@ function copyTerritoryDebt(network: GameType["territoryNetwork"]) {
     : network;
 }
 
+/** Construction and accounting write the loans and assets, while receipts only change
+ * through acquisition commands. Retain the ledger identity for dispatch's dated indexes. */
+function copyUtilityExpansionForDispatch(
+  expansion: GameType["utilityExpansion"],
+) {
+  return (
+    expansion && {
+      ...expansion,
+      networkAssets: expansion.networkAssets.map((asset) => ({ ...asset })),
+      loans: expansion.loans.map((loan) => ({ ...loan })),
+    }
+  );
+}
+
+function copyTransmissionForForecast(transmission = emptyTransmissionState()) {
+  const { acceptedAgreements, ...mutable } = transmission;
+  const copy = cloneDeep(mutable);
+  return acceptedAgreements === undefined
+    ? copy
+    : { ...copy, acceptedAgreements };
+}
+
 /**
  * Give a live tick private mutable outputs while keeping large read-only inputs plain.
  * Only the frame being settled is written, preserving untouched chart rows.
@@ -4397,11 +4419,6 @@ function tickWorkingState(state: GameType): GameType {
                   state.transmission.agreementAccounts,
                 ),
               }),
-              ...(state.transmission.acceptedAgreements !== undefined && {
-                acceptedAgreements: state.transmission.acceptedAgreements.map(
-                  (receipt) => ({ ...receipt }),
-                ),
-              }),
               lines: state.transmission.lines.map((line) => ({
                 ...line,
                 ...(line.upgrade && { upgrade: { ...line.upgrade } }),
@@ -4411,7 +4428,7 @@ function tickWorkingState(state: GameType): GameType {
     }),
     eventLog: [...state.eventLog],
     reportedEventKeys: [...state.reportedEventKeys],
-    utilityExpansion: cloneDeep(state.utilityExpansion),
+    utilityExpansion: copyUtilityExpansionForDispatch(state.utilityExpansion),
     territoryNetwork: copyTerritoryDebt(state.territoryNetwork),
     ...(state.campaign && {
       campaign: {
@@ -5447,7 +5464,7 @@ function reforecastDemand(
   const projection = {
     ...state,
     policies: cloneDeep(state.policies),
-    utilityExpansion: cloneDeep(state.utilityExpansion),
+    utilityExpansion: copyUtilityExpansionForDispatch(state.utilityExpansion),
   };
   // A demand pass never changes ownership. Derive the seeded city mix once;
   // weather, policy and the evolving customer count still apply per frame.
@@ -5603,6 +5620,13 @@ function settleFacilityLoan(loan: LoanInfo, ticksPerMonth: number) {
   return { interest: monthlyInterest / ticksPerMonth, principal };
 }
 
+function createDispatchScratch() {
+  return {
+    chargeRequests: new Map<number, number>(),
+    storageHeadroom: new Map<number, { peakW: number; watts: number }>(),
+  };
+}
+
 function* supplyFacilitiesFinancesPhases(
   state: GameType,
   prev: TickPresentFutureType,
@@ -5618,6 +5642,7 @@ function* supplyFacilitiesFinancesPhases(
   settlementEndMinute = now.minute,
   repowerEmissions = 0,
   realSettlement = false,
+  scratch = createDispatchScratch(),
 ): Generator<
   SharedTickPhase,
   TickPresentFutureType,
@@ -5891,7 +5916,9 @@ function* supplyFacilitiesFinancesPhases(
   // Pre-check how much extra supply we'll need to charge batteries
   let indexOfLastUnchargedBattery = -1;
   let totalChargeNeeded = 0;
-  const chargeRequests = new Map<number, number>();
+  const { chargeRequests, storageHeadroom } = scratch;
+  chargeRequests.clear();
+  storageHeadroom.clear();
   facilities.forEach((g: FacilityOperatingType, i: number) => {
     if (
       (!peerSettlement || hasTerritoryNetwork(state)) &&
@@ -5986,7 +6013,6 @@ function* supplyFacilitiesFinancesPhases(
   let supply = entitlementDeliveredW;
   let spareGenerationW = 0;
   let reachableHeadroomW = 0;
-  const storageHeadroom = new Map<number, { peakW: number; watts: number }>();
   const supplyByFuel: FuelProductionType = {};
   let charge = 0;
   let dischargedW = 0;
@@ -7287,7 +7313,11 @@ function* supplyFacilitiesFinancesPhases(
     organicGrowthRate,
     tickScale,
   });
-  if (state.utilityExpansion && !preRoll && advanceConstruction) {
+  if (
+    state.utilityExpansion?.networkAssets.length &&
+    !preRoll &&
+    advanceConstruction
+  ) {
     const retention = Math.min(
       1,
       now.customers / expansionRetentionBaseline(state),
@@ -7465,6 +7495,7 @@ function advanceForecastConversions(
 
 function supplyForecastPass(
   state: GameType,
+  scratch: ReturnType<typeof createDispatchScratch>,
   simulated?: boolean,
   withoutMinimumStableOutput = false,
   stepMinutes = TICK_MINUTES,
@@ -7480,11 +7511,11 @@ function supplyForecastPass(
   const newState = {
     ...state,
     policies: cloneDeep(state.policies),
-    utilityExpansion: cloneDeep(state.utilityExpansion),
+    utilityExpansion: copyUtilityExpansionForDispatch(state.utilityExpansion),
     territoryNetwork: copyTerritoryDebt(state.territoryNetwork),
     commissionedHydroSiteIds: [...state.commissionedHydroSiteIds],
     facilities: cloneDeep(state.facilities),
-    transmission: cloneDeep(state.transmission ?? emptyTransmissionState()),
+    transmission: copyTransmissionForForecast(state.transmission),
   };
   if (withoutMinimumStableOutput) {
     newState.facilities.forEach((facility) => {
@@ -7528,6 +7559,8 @@ function supplyForecastPass(
         true,
         t.minute,
         repowerEmissions,
+        false,
+        scratch,
       );
       // The current tick already happened. Reforecast its supply against the player's action,
       // but keep the transaction and customer balance that caused this reforecast. Otherwise
@@ -7684,8 +7717,10 @@ function reforecastSupply(
   // constraints. The optimized pass then scans those per-facility requests to compare the cost
   // of remaining online with the cost of the next start. Keeping this as two linear passes avoids
   // recursively re-simulating the fleet for every plant on every tick.
+  const scratch = createDispatchScratch();
   const baseline = supplyForecastPass(
     state,
+    scratch,
     true,
     true,
     stepMinutes,
@@ -7751,6 +7786,7 @@ function reforecastSupply(
   }
   return supplyForecastPass(
     { ...state, timeline: baseline },
+    scratch,
     simulated,
     false,
     stepMinutes,
@@ -7825,12 +7861,12 @@ function generateTimeline(
   // simulation several times a second.
   const state = {
     ...readOnlyState,
-    utilityExpansion: cloneDeep(readOnlyState.utilityExpansion),
+    utilityExpansion: copyUtilityExpansionForDispatch(
+      readOnlyState.utilityExpansion,
+    ),
     commissionedHydroSiteIds: [...readOnlyState.commissionedHydroSiteIds],
     facilities: cloneDeep(readOnlyState.facilities),
-    transmission: cloneDeep(
-      readOnlyState.transmission ?? emptyTransmissionState(),
-    ),
+    transmission: copyTransmissionForForecast(readOnlyState.transmission),
     // Story checkpoints only need the trailing year, and scheduled forecast effects resolve from
     // the same immutable facts as live play. Keeping twelve entries is cheap and avoids a second
     // forecast-only narrative state.
