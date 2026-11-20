@@ -1,5 +1,5 @@
 import { useTheme } from "@mui/material/styles";
-import { DISCORD_URL, FEEDBACK_URL } from "../../CommunityLinks";
+import { DISCORD_URL } from "../../CommunityLinks";
 import * as React from "react";
 import { homeLogoSource } from "../../HomeLogo";
 import { Box, Button, Stack, SvgIcon, Typography } from "@mui/material";
@@ -40,6 +40,7 @@ export interface DispatchProps {
   onMods: () => void;
   onAchievements?: () => void;
   onManual: () => void;
+  onFeedback: () => void;
   onStart: () => void;
 }
 
@@ -326,12 +327,7 @@ const MainMenu = (props: Props): React.JSX.Element => {
         >
           <DiscordIcon />
         </MenuIconButton>
-        <MenuIconButton
-          href={FEEDBACK_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          label="Send feedback"
-        >
+        <MenuIconButton onClick={props.onFeedback} label="Send feedback">
           <EmailIcon />
         </MenuIconButton>
         <MenuIconButton {...sitePage("/about.html")} label="About Electrify">

@@ -34,6 +34,8 @@ export interface BuildOptionCardProps {
   headerActions?: React.ReactNode;
   /** Under Review: Use max size or Use site maximum. Moves the context line into the header. */
   sizeAction?: React.ReactNode;
+  /** Description directly beneath the card header */
+  description?: string;
   /** The short role line under the name */
   context?: React.ReactNode;
   /** Anything between the context line and the warning, such as hydro site availability */
@@ -139,6 +141,15 @@ export default function BuildOptionCard(
               : undefined
         }
       />
+      {props.description && (
+        <Typography
+          className="buildOptionDescription"
+          variant="body2"
+          color="textSecondary"
+        >
+          {props.description}
+        </Typography>
+      )}
       {metrics !== undefined && (
         <>
           {!contextInHeader && context && (

@@ -18,9 +18,14 @@ import {
 } from "../../helpers/TerritoryTiles";
 
 jest.mock("./BuildForecast", () => ({ useBuildForecast: () => undefined }));
-jest.mock("./ManualLink", () => (props: { children?: React.ReactNode }) => (
-  <>{props.children}</>
-));
+jest.mock(
+  "./ManualLink",
+  () => (props: { children?: React.ReactNode; label: string }) => (
+    <button type="button" aria-label={`What is ${props.label}?`}>
+      {props.children}
+    </button>
+  ),
+);
 
 function show(siteId?: TerritoryTileId, prepare?: (game: GameType) => void) {
   const game = createGame({ scenarioId: 116, seed: 188 });
@@ -152,11 +157,17 @@ it("opens just one full expanded card on hover without spending or stealing focu
   const button = wind();
   fireEvent.mouseEnter(button);
   const preview = screen.getByLabelText("Wind technology preview");
+  expect(
+    within(preview).queryByText("Weather-dependent supply"),
+  ).not.toBeInTheDocument();
+  expect(
+    within(preview).getByText(/Pair with backup or storage/),
+  ).toBeVisible();
   expect(within(preview).getByText("Build cost")).toBeInTheDocument();
   expect(within(preview).getByText("Accounting lifetime")).toBeInTheDocument();
   expect(
     within(preview).queryByRole("button", {
-      name: /Review purchase|Show.*details|Close technology preview|^Choose sites$/,
+      name: /Review purchase|Show.*details|Choose sites|Close technology preview/,
     }),
   ).not.toBeInTheDocument();
   expect(button).not.toHaveFocus();
@@ -171,6 +182,11 @@ it("opens just one full expanded card on hover without spending or stealing focu
       "Discharge power",
     ),
   ).toBeInTheDocument();
+  expect(
+    within(screen.getByLabelText("Battery technology preview")).getByText(
+      /Quick to build and nearly instant to respond/,
+    ),
+  ).toBeVisible();
   expect(onProject).not.toHaveBeenCalled();
   expect(JSON.stringify(game)).toBe(before);
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
@@ -287,6 +303,11 @@ it("enters a technology preview with Right Arrow and Escape returns to the icon"
   expect(preview).toHaveFocus();
   expect(wind()).toHaveAttribute("aria-keyshortcuts", "ArrowRight");
   expect(wind()).toHaveAccessibleDescription(/Right Arrow/);
+  await userEvent.tab();
+  expect(
+    within(preview).getByRole("button", { name: "What is build cost?" }),
+  ).toHaveFocus();
+  expect(preview).not.toHaveFocus();
   expect(preview).toBeInTheDocument();
   const mapEscape = jest.fn();
   const mapCapture = () => {
@@ -302,7 +323,7 @@ it("enters a technology preview with Right Arrow and Escape returns to the icon"
   window.removeEventListener("keydown", mapCapture, true);
 });
 
-it("returns keyboard focus to the trigger after explicit sizing and preview dismissal", async () => {
+it("returns keyboard focus after dismissing sizing and technology previews with Escape", async () => {
   const { onProject } = show();
   const size = screen.getByRole("button", { name: /Power:/ });
   await userEvent.tab();

@@ -98,6 +98,9 @@ test("ordinary starting hills offer general technologies and retain special-site
       });
       await expect(preview).not.toContainText("Not buildable on this tile");
       await expect(preview.locator(".buildOptionMetrics")).toBeVisible();
+      await expect(
+        preview.getByRole("button", { name: "Choose sites", exact: true }),
+      ).toHaveCount(0);
       await expect(trigger).toBeEnabled();
     }
     const nuclear = rail.getByRole("button", {
@@ -286,11 +289,8 @@ for (const theme of ["light", "dark"] as const) {
             scale: "css",
           });
           await expect(
-            rail.getByRole("button", {
-              name: "Choose sites for Geothermal",
-              exact: true,
-            }),
-          ).toBeDisabled();
+            preview.getByRole("button", { name: "Choose sites", exact: true }),
+          ).toHaveCount(0);
           return;
         }
         const inspector = page.getByRole("dialog", {

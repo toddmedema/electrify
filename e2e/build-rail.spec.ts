@@ -120,6 +120,19 @@ for (const theme of ["light", "dark"] as const) {
       await expect(preview).toHaveCount(0);
       await expect(wind).toBeFocused();
       await expect(tileSurfaces).toHaveCount(0);
+
+      await wind.click();
+      await expect(wind).toHaveAttribute("aria-pressed", "true");
+      await expect(
+        surface.getByText("Choose a highlighted site."),
+      ).toBeVisible();
+      await expect(
+        network.locator("[data-project-site]").first(),
+      ).toBeVisible();
+      await wind.click();
+      await expect(wind).toHaveAttribute("aria-pressed", "false");
+      await expect(tileSurfaces).toHaveCount(0);
+      await expect(network.locator("[data-project-site]")).toHaveCount(0);
     } else {
       await expect(rail).toHaveCount(0);
     }

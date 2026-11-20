@@ -719,15 +719,26 @@ it("uses the persistent desktop rail for Build and owned empty tiles, preselecti
   expect(
     within(surface()).getByRole("region", { name: "Terrain modifiers" }),
   ).toBeVisible();
-  fireEvent.click(
-    within(rail).getByRole("button", { name: "Choose sites for Wind" }),
-  );
+  const wind = within(rail).getByRole("button", {
+    name: "Choose sites for Wind",
+  });
+  fireEvent.click(wind);
+  expect(wind).toHaveAttribute("aria-pressed", "true");
   expect(await screen.findByRole("button", { name: "Cash" })).toBeEnabled();
   expect(screen.getByRole("button", { name: `Inspect ${id}` })).toHaveAttribute(
     "aria-pressed",
     "true",
   );
   expect(screen.getAllByRole("dialog")).toHaveLength(1);
+  fireEvent.click(wind);
+  expect(wind).toHaveAttribute("aria-pressed", "false");
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: `Inspect ${id}` })).toHaveAttribute(
+    "aria-pressed",
+    "false",
+  );
+  fireEvent.click(wind);
+  expect(wind).toHaveAttribute("aria-pressed", "true");
   expect(store.getState().game.facilities).toHaveLength(game.facilities.length);
   expect(currentTick(store.getState().game)!.cash).toBe(1e9);
 });

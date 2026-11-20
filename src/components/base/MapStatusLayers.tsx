@@ -1,14 +1,24 @@
 import * as React from "react";
-import { Checkbox, FormControlLabel, Popover, Tooltip } from "@mui/material";
+import {
+  Checkbox,
+  FormControlLabel,
+  FormGroup,
+  Popover,
+  Tooltip,
+} from "@mui/material";
 import LayersOutlinedIcon from "@mui/icons-material/LayersOutlined";
 
 /** Workspace-only visibility; facility operation and its accessible status remain intact. */
 export default function MapStatusLayers({
-  value,
-  onChange,
+  showStatus,
+  onStatusChange,
+  showNames,
+  onNamesChange,
 }: {
-  value: boolean;
-  onChange: (value: boolean) => void;
+  showStatus: boolean;
+  onStatusChange: (value: boolean) => void;
+  showNames: boolean;
+  onNamesChange: (value: boolean) => void;
 }) {
   const [anchor, setAnchor] = React.useState<HTMLButtonElement>();
   const trigger = React.useRef<HTMLButtonElement>(null);
@@ -46,15 +56,26 @@ export default function MapStatusLayers({
           },
         }}
       >
-        <FormControlLabel
-          control={
-            <Checkbox
-              checked={value}
-              onChange={(_, checked) => onChange(checked)}
-            />
-          }
-          label="Facility status"
-        />
+        <FormGroup>
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={showStatus}
+                onChange={(_, checked) => onStatusChange(checked)}
+              />
+            }
+            label="Facility status"
+          />
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={showNames}
+                onChange={(_, checked) => onNamesChange(checked)}
+              />
+            }
+            label="Names"
+          />
+        </FormGroup>
       </Popover>
     </>
   );

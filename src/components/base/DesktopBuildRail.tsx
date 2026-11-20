@@ -119,7 +119,7 @@ export default function DesktopBuildRail({
   siteId?: TerritoryTileId;
   busy: boolean;
   focusRequest: number;
-  onProject: (project: ProjectSelection) => void;
+  onProject: (project: ProjectSelection | undefined) => void;
 }) {
   const rail = React.useRef<HTMLElement>(null);
   const origin = React.useRef<HTMLButtonElement>();
@@ -173,7 +173,9 @@ export default function DesktopBuildRail({
   );
   const cash = currentTick(game)?.cash ?? 0;
   const canChoose = (facility: FacilityShoppingType) =>
-    !busy && (minimumDue.get(facility.name) ?? Infinity) <= cash;
+    !busy &&
+    (project?.name === facility.name ||
+      (minimumDue.get(facility.name) ?? Infinity) <= cash);
   const clearTimer = React.useCallback(() => {
     if (dismissTimer.current !== undefined) clearTimeout(dismissTimer.current);
   }, []);
@@ -451,7 +453,15 @@ export default function DesktopBuildRail({
                       show(item, event.currentTarget);
                       setPreviewEntry((value) => value + 1);
                     }}
-                    onClick={() => choose(item)}
+                    onClick={() => {
+                      if (busy) return;
+                      if (project?.name === item.name) {
+                        dismiss();
+                        onProject(undefined);
+                      } else {
+                        choose(item);
+                      }
+                    }}
                   >
                     <img
                       src={`/images/${item.name.toLowerCase()}.svg`}
@@ -510,8 +520,8 @@ export default function DesktopBuildRail({
           data-escape-overlay="true"
           aria-label={`${facility.name} technology preview`}
           id={previewId}
-          tabIndex={-1}
           ref={previewPanel}
+          tabIndex={-1}
           onMouseEnter={clearTimer}
           onMouseLeave={leave}
         >

@@ -196,6 +196,7 @@ export function StorageBuildItem(
       name={displayName}
       iconSrc={`/images/${storage.name.toLowerCase()}.svg`}
       preview={props.preview}
+      description={props.preview ? storage.description : undefined}
       review={
         props.preview
           ? undefined
@@ -235,13 +236,15 @@ export function StorageBuildItem(
             : undefined
       }
       summary={
-        <Typography
-          className="buildOptionDescription"
-          variant="body2"
-          color="textSecondary"
-        >
-          {storageBuildSummary(storage)}
-        </Typography>
+        !props.preview && (
+          <Typography
+            className="buildOptionDescription"
+            variant="body2"
+            color="textSecondary"
+          >
+            {storageBuildSummary(storage)}
+          </Typography>
+        )
       }
       warning={!buildable || shortfall ? buildSubtitle : undefined}
       metrics={

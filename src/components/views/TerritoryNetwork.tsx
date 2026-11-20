@@ -374,7 +374,7 @@ function TileNetwork(props: Props) {
       {desktopRail && views.length > 0 && (
         <DesktopBuildRail
           game={game}
-          project={project}
+          project={planning && !catalogue ? project : undefined}
           siteId={preferredSite}
           busy={projectPending || pendingIds.size > 0}
           focusRequest={railFocusRequest}
@@ -382,6 +382,10 @@ function TileNetwork(props: Props) {
             if (projectBusy.current || pendingIds.size > 0) return;
             panel?.returnToMap();
             setProject(selection);
+            if (!selection) {
+              close();
+              return;
+            }
             setCatalogue(false);
             setPlanning(true);
             setInspected(undefined);
