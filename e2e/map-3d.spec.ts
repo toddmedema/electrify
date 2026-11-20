@@ -147,7 +147,11 @@ for (const reducedMotion of ["no-preference", "reduce"] as const) {
 
       // Shared-runner frame gaps can skip the whole shift. Drive the real camera
       // through intermediate frames before checking its destination.
-      await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 200);
+      // Freeze wall time first so a delayed pause RPC cannot target the past.
+      const pauseTime = await page.evaluate(() => Date.now());
+      await page.clock.setFixedTime(pauseTime);
+      await page.clock.pauseAt(pauseTime);
+      await page.clock.setSystemTime(pauseTime);
       const positions = await viewport.evaluateHandle((element) => {
         const stage = element.querySelector<HTMLElement>(".territoryMapStage")!;
         const x: number[] = [];
