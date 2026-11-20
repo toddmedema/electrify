@@ -47,9 +47,13 @@ export default function AcquisitionReviewDialog({
   onAcquire,
 }: Props): React.JSX.Element | null {
   const dispatch = useAppDispatch();
-  // A successful store update can arrive before the purchase promise closes the dialog.
-  const [submittedGame, setSubmittedGame] = React.useState<GameType>();
-  const game = submittedGame ?? liveGame;
+  // A successful update can remove the quote before the request resolves.
+  // Keep the same modal and focus trap mounted until the purchase closes it.
+  const [submission, setSubmission] = React.useState<{
+    game: GameType;
+    cash: number;
+  }>();
+  const game = submission?.game ?? liveGame;
   const { formatMoneyConcise } = useMoney(
     currencyForLocation(game.location, game.startingYear),
   );
@@ -66,7 +70,7 @@ export default function AcquisitionReviewDialog({
     return { quote, offer: quote ?? utilityOffer(game, targetId) };
   }, [game, targetId]);
   const now = currentTick(game);
-  const cash = useBuildCash(now?.cash ?? 0);
+  const cash = useBuildCash(submission?.cash ?? now?.cash ?? 0, !submission);
   const preview = React.useMemo(
     () =>
       quote &&
@@ -315,7 +319,7 @@ export default function AcquisitionReviewDialog({
       onPurchase={async (financed) => {
         if (!quote || !onAcquire) return false;
         setError(undefined);
-        setSubmittedGame(game);
+        setSubmission({ game, cash });
         try {
           const accepted = await onAcquire({
             targetId: quote.targetId,
@@ -336,7 +340,7 @@ export default function AcquisitionReviewDialog({
               : "The purchase could not be completed. Please try again.",
           );
         }
-        setSubmittedGame(undefined);
+        setSubmission(undefined);
         return false;
       }}
     />

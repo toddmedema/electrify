@@ -48,7 +48,7 @@ import { modScenario } from "../../mods/ModScenario";
 import { acquireUtility, expandFacility } from "../../reducers/GameActions";
 import { facilityExpansionQuote } from "../../helpers/FacilityExpansion";
 import { currentTick } from "../../helpers/GameSelectors";
-import { ownedUtility } from "../../helpers/Expansion";
+import { acquisitionQuote, ownedUtility } from "../../helpers/Expansion";
 import {
   createWorld,
   checkpointWorld,
@@ -1506,7 +1506,10 @@ it.each([false, true])(
   "returns focus to Interties after an acquisition removes the trading row (available: %s)",
   async (available) => {
     const initialGame = createGame({ scenarioId: 116, seed: 12345 });
-    currentTick(initialGame)!.cash = 1e9;
+    currentTick(initialGame)!.cash = acquisitionQuote(
+      initialGame,
+      "ridge-electric",
+    )!.cashDue;
     const corridorId = "vt-champlain-ridge";
     const quote = transmission.intertieBuildQuote(
       corridorId,
@@ -1533,6 +1536,10 @@ it.each([false, true])(
       reducer: { game: gameReducer, ui: uiReducer },
       preloadedState: { game: initialGame },
     });
+    let acknowledgePurchase!: () => void;
+    const purchaseAcknowledged = new Promise<void>((resolve) => {
+      acknowledgePurchase = resolve;
+    });
     let acquisitionAvailable = true;
     function Interties() {
       const game = useSelector(
@@ -1547,8 +1554,9 @@ it.each([false, true])(
           onSellingRule={jest.fn()}
           onAcquire={
             acquisitionAvailable
-              ? (payload) => {
+              ? async (payload) => {
                   store.dispatch(acquireUtility(payload));
+                  await purchaseAcknowledged;
                   return ownedUtility(store.getState().game, payload.targetId);
                 }
               : undefined
@@ -1571,6 +1579,9 @@ it.each([false, true])(
     await user.click(purchase);
     await user.click(screen.getByRole("button", { name: "Cancel" }));
     expect(purchase).toHaveFocus();
+    await user.click(purchase);
+    await user.keyboard("{Escape}");
+    expect(purchase).toHaveFocus();
 
     await user.click(purchase);
     const review = screen.getByRole("dialog", {
@@ -1592,8 +1603,15 @@ it.each([false, true])(
     ).toHaveProperty("disabled", !available);
     if (!available) return;
     await user.click(within(review).getByRole("button", { name: "Pay cash" }));
-    expect(review).not.toBeInTheDocument();
     expect(line).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("dialog", { name: "Acquire Ridge Electric?" }),
+    ).toBe(review);
+    expect(
+      within(review).queryByText(/more cash needed/),
+    ).not.toBeInTheDocument();
+    await act(async () => acknowledgePurchase());
+    expect(review).not.toBeInTheDocument();
     // Unmounting the async purchase review also restores the page's accessibility.
     await waitFor(() =>
       expect(screen.getByRole("heading", { name: "Interties" })).toHaveFocus(),

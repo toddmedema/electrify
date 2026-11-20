@@ -45,6 +45,12 @@ lifetimes and cancellation are covered by child-process tests.
 Before pushing, run the local checks that exercise the affected paths and their callers.
 Record those results in the PR. Hosted CI supplies full-suite validation on each update.
 
+Run `npm run check:prepush` after committing and before pushing a PR. It compares
+`HEAD` with the merge base of `origin/master` and runs `npm run site:check` when
+site inputs or generated pages changed. Pass the PR's base ref after `--` for a
+different target. If the check finds stale metadata, use the actual authored
+date when regenerating the pages.
+
 ### PR monitor survey
 
 `node scripts/dev/pr-triage.js --repo toddmedema/electrify` prints one compact JSON

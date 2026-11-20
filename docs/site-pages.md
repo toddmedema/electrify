@@ -8,7 +8,7 @@ JavaScript.
 
 1. Edit its record in `site/scenarios.json`. Keep the existing `scenarioId` and
    `slug`: the ID opens the game, and the slug is the public URL.
-2. Run `npm run site:generate`.
+2. Run `npm run site:generate -- --date YYYY-MM-DD` with the actual authored-change date.
 3. Review the authored changes and generated HTML together. Run
    `npm run site:check` and `node --test scripts/ci/site-pages.test.js`.
 
