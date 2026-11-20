@@ -2,7 +2,6 @@ import * as React from "react";
 import { createPortal } from "react-dom";
 import { IconButton, Typography } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
-import MapPanelWindow from "./MapPanelWindow";
 import {
   MapWorkspacePanelContext,
   type MapTileWindow,
@@ -16,81 +15,7 @@ export function findTileControl(map: HTMLElement | null, tile: string) {
   );
 }
 
-/** Put inspection in the desktop window stack while leaving the sheet and project surfaces local. */
-export function TileInspectionSurface({
-  map,
-  tileKey,
-  ...props
-}: React.ComponentProps<typeof TileWorkspaceSurface> & {
-  map: React.RefObject<HTMLElement>;
-  tileKey: string;
-}) {
-  const tileWindow = React.useContext(MapWorkspacePanelContext)?.tileWindow;
-  if (!tileWindow) return <TileWorkspaceSurface {...props} />;
-  const tray = tileWindow.tray.current;
-  if (!tray || tileWindow.stackingIndex < 0) return null;
-  return createPortal(
-    <FloatingInspection
-      {...props}
-      map={map}
-      tileKey={tileKey}
-      tileWindow={tileWindow}
-    />,
-    tray,
-  );
-}
-
-function FloatingInspection({
-  map,
-  tileKey,
-  tileWindow,
-  title,
-  subtitle,
-  focusKey,
-  initialFocusSelector,
-  onClose,
-  children,
-}: React.ComponentProps<typeof TileInspectionSurface> & {
-  tileWindow: MapTileWindow;
-}) {
-  const [avoid] = React.useState(() => {
-    const tile = findTileControl(map.current, tileKey)?.getBoundingClientRect();
-    const tray = tileWindow.tray.current?.getBoundingClientRect();
-    if (tile && tray)
-      return {
-        x: tile.left + tile.width / 2 - tray.left,
-        y: tile.top + tile.height / 2 - tray.top,
-      };
-  });
-  return (
-    <MapPanelWindow
-      tool="TILE"
-      label={title}
-      icon={null}
-      stackingIndex={tileWindow.stackingIndex}
-      front={tileWindow.front}
-      floating={{ ...tileWindow.layout, avoid }}
-      onRaise={tileWindow.raise}
-      onClose={onClose}
-      tile={{ map, subtitle, focusKey, initialFocusSelector }}
-    >
-      {children}
-    </MapPanelWindow>
-  );
-}
-
-/** A nonmodal inspector: the map remains interactive behind the same desktop panel/phone sheet. */
-export default function TileWorkspaceSurface({
-  title,
-  focusKey,
-  subtitle,
-  building,
-  projectCandidate,
-  initialFocusSelector,
-  returnFocusSelector = ".territoryMapBuyToggle",
-  onClose,
-  children,
-}: {
+type SurfaceProps = {
   title: string;
   /** Changes only for explicit activation or a new kind of tile content. */
   focusKey: React.Key;
@@ -101,10 +26,46 @@ export default function TileWorkspaceSurface({
   returnFocusSelector?: string;
   onClose: () => void;
   children: React.ReactNode;
+};
+
+export function TileInspectionSurface({
+  map,
+  ...props
+}: SurfaceProps & { map: React.RefObject<HTMLElement> }) {
+  const tileWindow = React.useContext(MapWorkspacePanelContext)?.tileWindow;
+  const tray = tileWindow?.tray.current;
+  if (tileWindow && (!tray || tileWindow.stackingIndex < 0)) return null;
+
+  const surface = (
+    <TileWorkspaceSurface
+      {...props}
+      inspector={props.building ? undefined : { map, window: tileWindow }}
+    />
+  );
+  return tray ? createPortal(surface, tray) : surface;
+}
+
+/** A nonmodal surface for tile information and the map's build and project decisions. */
+export default function TileWorkspaceSurface({
+  title,
+  focusKey,
+  subtitle,
+  building,
+  projectCandidate,
+  initialFocusSelector,
+  returnFocusSelector = ".territoryMapBuyToggle",
+  onClose,
+  children,
+  inspector,
+}: SurfaceProps & {
+  inspector?: { map: React.RefObject<HTMLElement>; window?: MapTileWindow };
 }) {
   const titleId = React.useId();
   const heading = React.useRef<HTMLHeadingElement>(null);
+  const window = inspector?.window;
+  const stacked = !!window;
   React.useLayoutEffect(() => {
+    if (stacked) return;
     const origin = document.activeElement;
     const map = heading.current?.closest(".territoryNetwork");
     return () => {
@@ -117,22 +78,48 @@ export default function TileWorkspaceSurface({
       else if (origin instanceof HTMLElement && origin.isConnected)
         origin.focus({ preventScroll: true });
     };
-  }, [returnFocusSelector]);
+  }, [returnFocusSelector, stacked]);
+  const lastFocus = React.useRef<{ key: React.Key; selector?: string }>();
+  const mapRef = inspector?.map;
+  const front = window?.front;
   React.useLayoutEffect(() => {
+    if (
+      stacked &&
+      lastFocus.current?.key === focusKey &&
+      lastFocus.current.selector === initialFocusSelector
+    )
+      return;
+    lastFocus.current = { key: focusKey, selector: initialFocusSelector };
+    if (front === false) return;
+    const map =
+      mapRef?.current ?? heading.current?.closest(".territoryNetwork");
     const target = initialFocusSelector
-      ? heading.current
-          ?.closest(".territoryNetwork")
-          ?.querySelector<HTMLElement>(initialFocusSelector)
+      ? map?.querySelector<HTMLElement>(initialFocusSelector)
       : undefined;
     (target ?? heading.current)?.focus({ preventScroll: true });
-  }, [focusKey, initialFocusSelector]);
+  }, [focusKey, front, initialFocusSelector, mapRef, stacked]);
   return (
     <section
       role="dialog"
       aria-labelledby={titleId}
-      className={`tileWorkspaceSurface${building ? " tileWorkspaceBuilding" : ""}${projectCandidate ? " tileWorkspaceProject" : ""}`}
+      id={stacked ? "tool-TILE" : undefined}
+      className={`tileWorkspaceSurface${inspector ? " tileWorkspaceInspector" : ""}${building ? " tileWorkspaceBuilding" : ""}${projectCandidate ? " tileWorkspaceProject" : ""}`}
+      data-game-tool={stacked ? "TILE" : undefined}
+      data-map-window-front={front}
+      style={window && { zIndex: window.stackingIndex }}
+      onPointerDownCapture={(event) => {
+        if (
+          event.button === 0 &&
+          event.currentTarget.contains(event.target as Node)
+        )
+          window?.raise();
+      }}
+      onFocusCapture={(event) => {
+        if (event.currentTarget.contains(event.target)) window?.raise();
+      }}
       onKeyDown={(event) => {
         if (
+          !stacked &&
           event.key === "Escape" &&
           !event.defaultPrevented &&
           !hasVisibleEscapeOverlay()
@@ -160,9 +147,11 @@ export default function TileWorkspaceSurface({
             {title}
           </Typography>
         </div>
-        <IconButton aria-label="Close tile" onClick={onClose}>
-          <CloseIcon />
-        </IconButton>
+        {!inspector && (
+          <IconButton aria-label="Close tile" onClick={onClose}>
+            <CloseIcon />
+          </IconButton>
+        )}
       </header>
       <div className="tileWorkspaceBody">{children}</div>
     </section>

@@ -1448,7 +1448,7 @@ async function expectControllerGlyphScale(glyph: Locator) {
   expect(sizes.actual.height).toBeGreaterThan(24);
 }
 
-test("Saved display preferences style direct scenario links before play", async ({
+test("TV saved display preferences style direct scenario links before play", async ({
   page,
 }, info) => {
   skipNonTv(info);
@@ -1523,19 +1523,22 @@ test("Saved display preferences style direct scenario links before play", async 
   await expect(
     builder.getByRole("combobox", { name: /^Build (destination|tile)$/ }),
   ).toHaveCount(0);
+  const technologyPreview = rail.getByRole("region", {
+    name: "Wind technology preview",
+    exact: true,
+  });
   let metrics: Locator;
   if (await rail.isVisible()) {
     await expect(rail).toBeFocused();
     await rail
       .getByRole("button", { name: "Choose sites for Wind", exact: true })
       .hover();
-    const preview = rail.getByRole("region", {
-      name: "Wind technology preview",
-      exact: true,
-    });
-    await expect(preview).toBeVisible();
-    metrics = preview.locator(".buildOptionMetric");
+    await expect(technologyPreview).toBeVisible();
+    metrics = technologyPreview.locator(".buildOptionMetric");
   } else {
+    await builder
+      .getByRole("button", { name: "Build here", exact: true })
+      .click();
     metrics = builder
       .getByRole("list", { name: "Generator options" })
       .locator(".buildOptionMetric");
@@ -1551,9 +1554,12 @@ test("Saved display preferences style direct scenario links before play", async 
       "generator values stay within their own metric column",
     ).toBeLessThanOrEqual(1);
   }
-  await builder
-    .getByRole("button", { name: "Close tile", exact: true })
-    .click();
+  if (await technologyPreview.isVisible()) {
+    await input(page, "back");
+    await expect(technologyPreview).toHaveCount(0);
+    await expect(builder).toBeVisible();
+  }
+  await input(page, "back");
   await expect(builder).toHaveCount(0);
   await page.getByRole("button", { name: "Events", exact: true }).click();
   const goalWidth = await page

@@ -1,6 +1,5 @@
 import { createContext, useContext, type RefObject } from "react";
 import type { WorkspaceLayout } from "../../WorkspaceLayout";
-import type { MapWindowLayout } from "./MapPanelWindow";
 
 /** Prevent embedded game views from creating their own app bar and navigation. */
 export const GameWorkspaceContext = createContext(false);
@@ -24,7 +23,6 @@ export const useGameWorkspaceLayout = () =>
 
 export type MapTileWindow = {
   tray: RefObject<HTMLDivElement>;
-  layout: MapWindowLayout;
   stackingIndex: number;
   front: boolean;
   raise: () => void;

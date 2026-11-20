@@ -231,12 +231,6 @@ export default function MapWorkspace({
       tileWindow: floating
         ? {
             tray,
-            layout: {
-              area,
-              defaultWidth: 440 * presentation.scale,
-              scale: presentation.scale,
-              slot: 2,
-            },
             stackingIndex: inspectionIndex,
             front: inspectionFront,
             raise: () => raise("TILE"),
@@ -246,13 +240,11 @@ export default function MapWorkspace({
       onProjectBusyChange: setProjectBusy,
     }),
     [
-      area,
       floating,
       hideTile,
       inspectionFront,
       inspectionIndex,
       panelOpen,
-      presentation.scale,
       projectBusy,
       raise,
       requestedProject,
