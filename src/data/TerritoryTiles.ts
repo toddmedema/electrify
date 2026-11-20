@@ -282,6 +282,10 @@ export function territoryTileAt(
 export function getGeneratedTerritoryTile(
   id: unknown,
 ): TerritoryTileDefinition | undefined {
+  if (typeof id !== "string") return undefined;
+  // The fixed board already holds the deterministic generated geometry.
+  const mapped = valleyBoardById.get(id);
+  if (mapped?.id.startsWith("frontier:")) return mapped;
   const coordinates = frontierCoordinates(id);
   if (!coordinates) return undefined;
   const tile = territoryTileAt(coordinates.q, coordinates.r);
@@ -299,7 +303,9 @@ export const VALLEY_BOARD: readonly TerritoryTileDefinition[] = Array.from(
       q + r >= -10 && q + r <= 9 ? [territoryTileAt(q, r)!] : [],
     ),
 ).flat();
-const valleyBoardIds = new Set(VALLEY_BOARD.map(({ id }) => id));
+const valleyBoardById = new Map<string, TerritoryTileDefinition>(
+  VALLEY_BOARD.map((tile) => [tile.id, tile]),
+);
 
 export const isValleyBoardTile = (id: TerritoryTileId) =>
-  valleyBoardIds.has(id);
+  valleyBoardById.has(id);
