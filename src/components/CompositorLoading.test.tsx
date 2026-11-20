@@ -33,6 +33,57 @@ jest.mock("./base/GameWorkspace", () => () => {
   );
 });
 
+it("keeps focus in feedback when the tutorial completion dialog finishes opening", async () => {
+  jest.useFakeTimers();
+  const state = store.getState();
+  const props: Props = {
+    card: { ...state.card, name: "FACILITIES" },
+    settings: state.settings,
+    ui: {
+      ...state.ui,
+      dialog: {
+        open: true,
+        title: "Mission complete",
+        message: "Tutorial completed.",
+        action: jest.fn(),
+        actionLabel: "Next tutorial",
+        tutorialComplete: true,
+        notCancellable: true,
+      },
+    },
+    transition: "next",
+    scenarioId: 1,
+    tutorialStep: -1,
+    closeDialog: jest.fn(),
+    closeSnackbar: jest.fn(),
+    onTutorialStep: jest.fn(),
+    onTutorialEnd: jest.fn(),
+  };
+  const view = render(
+    <Provider store={store}>
+      <Compositor {...props} />
+    </Provider>,
+  );
+  try {
+    await act(async () => undefined);
+    view.rerender(
+      <Provider store={store}>
+        <Compositor
+          {...props}
+          ui={{ ...props.ui, feedback: { source: "tutorial", scenarioId: 1 } }}
+        />
+      </Provider>,
+    );
+    const message = screen.getByRole("textbox", { name: "Your feedback" });
+    expect(message).toHaveFocus();
+    act(() => jest.advanceTimersByTime(1000));
+    expect(message).toHaveFocus();
+  } finally {
+    view.unmount();
+    jest.useRealTimers();
+  }
+});
+
 it.each(["screen", "help"])(
   "contains a rejected %s download and preserves the app and game state",
   async (kind) => {
