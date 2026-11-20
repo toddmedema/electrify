@@ -113,6 +113,104 @@ for (const theme of ["light", "dark"] as const) {
   });
 }
 
+for (const reducedMotion of ["no-preference", "reduce"] as const) {
+  const animate = reducedMotion === "no-preference";
+  test(
+    animate
+      ? "tapping a tile shifts the phone camera"
+      : "reduced motion recenters the phone camera immediately",
+    async ({ page }, info) => {
+      const phone = page.viewportSize()!.width <= 740;
+      test.skip(!phone && !animate, "Desktop does not recenter");
+      await page.emulateMedia({ reducedMotion });
+      await page.clock.install();
+      await page.goto("/?scenario=116");
+      await page
+        .getByRole("button", { name: "Start game", exact: true })
+        .click();
+      const pause = page.getByRole("button", { name: "pause", exact: true });
+      if ((await pause.getAttribute("aria-pressed")) !== "true")
+        await pause.click();
+      const map = await returnToTerritoryMap(page);
+      await expect(map.locator("canvas.territory3DCanvas")).toHaveAttribute(
+        "data-renderer",
+        "ready",
+      );
+      const viewport = map.getByRole("region", { name: "Territory map" });
+      const capital = map.locator('[data-map-target="champlain:city"]');
+      const label = capital.getByText("Burlington", { exact: true });
+      await expect(label).toBeInViewport({ ratio: 1 });
+      if (phone && animate)
+        await reviewScreenshot(map, {
+          path: info.outputPath("before-tap.png"),
+        });
+
+      // Shared-runner frame gaps can skip the whole shift. Drive the real camera
+      // through intermediate frames before checking its destination.
+      // Freeze wall time first so a delayed pause RPC cannot target the past.
+      const pauseTime = await page.evaluate(() => Date.now());
+      await page.clock.setFixedTime(pauseTime);
+      await page.clock.pauseAt(pauseTime);
+      await page.clock.setSystemTime(pauseTime);
+      const positions = await viewport.evaluateHandle((element) => {
+        const stage = element.querySelector<HTMLElement>(".territoryMapStage")!;
+        const x: number[] = [];
+        const sample = () => x.push(new DOMMatrix(stage.style.transform).e);
+        sample();
+        const observer = new MutationObserver(sample);
+        observer.observe(stage, { attributeFilter: ["style"] });
+        return {
+          finish() {
+            observer.disconnect();
+            return x;
+          },
+        };
+      });
+      if (info.project.use.hasTouch) await label.tap();
+      else await label.click();
+      await page.clock.runFor(64);
+      await page.clock.runFor(200);
+      await expect(
+        page.getByRole("button", { name: "Close tile" }),
+      ).toBeVisible();
+
+      if (phone) {
+        await expect
+          .poll(() =>
+            capital.evaluate((element) => {
+              const tile = element.getBoundingClientRect();
+              const map = element
+                .closest(".territoryMapViewport")!
+                .getBoundingClientRect();
+              return tile.x + tile.width / 2 - map.x - map.width / 2;
+            }),
+          )
+          .toBeCloseTo(0, 0);
+        const [start, ...movement] = await positions.evaluate((p) =>
+          p.finish(),
+        );
+        const end = movement.at(-1)!;
+        expect(Math.abs(end - start)).toBeGreaterThan(20);
+        const intermediate = movement.filter(
+          (x) => x > Math.min(start, end) + 1 && x < Math.max(start, end) - 1,
+        );
+        if (animate) {
+          expect(intermediate.length).toBeGreaterThan(0);
+          await reviewScreenshot(map, {
+            path: info.outputPath("after-tap.png"),
+          });
+        } else {
+          expect(intermediate).toHaveLength(0);
+        }
+      } else {
+        expect(new Set(await positions.evaluate((p) => p.finish())).size).toBe(
+          1,
+        );
+      }
+    },
+  );
+}
+
 test("clicking real mountain relief above its ground selects the mountain tile", async ({
   page,
 }, info) => {
