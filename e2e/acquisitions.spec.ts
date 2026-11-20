@@ -550,9 +550,7 @@ async function expectCityDemand(surface: Locator) {
 }
 
 for (const theme of ["light", "dark"] as const) {
-  test(`map persists beneath one right-hand panel in ${theme}`, async ({
-    page,
-  }, info) => {
+  test(`map persists beneath its tools in ${theme}`, async ({ page }, info) => {
     const network = await startMap(page, theme);
     const viewport = network.locator(".territoryMapViewport");
     const original = await viewport.elementHandle();
@@ -590,13 +588,16 @@ for (const theme of ["light", "dark"] as const) {
         )
         .toBe(width);
       const camera = await readTerritoryMapCamera(viewport);
-      for (const name of tools) {
+      const floating = width >= 1024;
+      for (const [index, name] of tools.entries()) {
         const trigger = page.getByRole("button", { name, exact: true });
         await trigger.click();
         const panel = page.getByRole("region", { name, exact: true });
         await expect(panel).toBeVisible();
-        await expect(page.locator(".gameToolPanel:visible")).toHaveCount(1);
-        await expect(panel).toHaveAttribute("data-tool-side", "right");
+        await expect(page.locator(".gameToolPanel:visible")).toHaveCount(
+          floating ? index + 1 : 1,
+        );
+        await expect(panel).toHaveAttribute("data-map-window-front", "true");
         await expect(trigger).toHaveAttribute("aria-expanded", "true");
         await expect(network).toBeVisible();
         expect(
@@ -629,10 +630,13 @@ for (const theme of ["light", "dark"] as const) {
             pageOverflow: document.documentElement.scrollWidth - innerWidth,
           };
         });
-        expect(
-          Math.abs(geometry.stageRight - geometry.right - geometry.rightInset),
-          "the panel uses its actual right inset, including on compact screens",
-        ).toBeLessThanOrEqual(1);
+        if (!floating)
+          expect(
+            Math.abs(
+              geometry.stageRight - geometry.right - geometry.rightInset,
+            ),
+            "the compact panel uses its actual right inset",
+          ).toBeLessThanOrEqual(1);
         expect(
           geometry.bottom,
           "panel controls remain above the floating dock",
@@ -687,10 +691,13 @@ for (const theme of ["light", "dark"] as const) {
           });
       }
       await page.keyboard.press("Escape");
-      await expect(page.locator(".gameToolPanel")).toHaveCount(0);
+      await expect(page.locator(".gameToolPanel")).toHaveCount(
+        floating ? tools.length - 1 : 0,
+      );
       await expect(
         page.getByRole("button", { name: "Scenario", exact: true }),
       ).toBeFocused();
+      await returnToTerritoryMap(page);
       const game = (await readSavedGame(page))!;
       const city = getTerritoryTile("champlain:city", game)!;
       const surface = await inspectTile(page, city);

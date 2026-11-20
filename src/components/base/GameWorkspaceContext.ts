@@ -21,7 +21,7 @@ export const GameWorkspaceLayoutContext = createContext<
 export const useGameWorkspaceLayout = () =>
   useContext(GameWorkspaceLayoutContext);
 
-/** The persistent map and its single tool panel share one inspection destination. */
+/** The persistent map and its tools share one inspection destination. */
 export const MapWorkspacePanelContext = createContext<
   | {
       open: boolean;
@@ -31,3 +31,8 @@ export const MapWorkspacePanelContext = createContext<
     }
   | undefined
 >(undefined);
+
+// Embedded decisions defer Escape and focus ownership to the containing map window.
+export const MapWindowFrontContext = createContext<boolean | undefined>(
+  undefined,
+);

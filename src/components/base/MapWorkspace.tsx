@@ -1,9 +1,7 @@
 import * as React from "react";
-import { IconButton } from "@mui/material";
-import CloseIcon from "@mui/icons-material/Close";
-import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import { useAppDispatch, useAppSelector } from "../../Store";
 import { navigate } from "../../reducers/Card";
+import { useControllerInput } from "../../desktop/InputPresentation";
 import { SIDE_TOOL_MIN_WIDTH, useWorkspaceLayout } from "../../WorkspaceLayout";
 import { BuildForecastProvider } from "./BuildForecast";
 import GameAppBar from "./GameAppBar";
@@ -13,12 +11,10 @@ import Navigation, {
   gameToolForCard,
   GameTool,
   MapEventStatus,
+  MapPanelView,
 } from "./Navigation";
-import {
-  GameToolMemoryContext,
-  useToolFocusMemory,
-  useToolScroll,
-} from "./GameToolMemory";
+import { GameToolMemoryContext, useToolFocusMemory } from "./GameToolMemory";
+import MapPanelWindow, { useMapWindowArea } from "./MapPanelWindow";
 import {
   GameWorkspaceContext,
   GameWorkspaceLayoutContext,
@@ -32,35 +28,70 @@ import Insights from "../views/InsightsContainer";
 import EventLog from "../views/EventLogContainer";
 import ScenarioDetails from "./ScenarioDetails";
 
-type MapTool = Exclude<GameTool, "BUILD_GENERATORS"> | "FLEET" | "AGREEMENTS";
+type MapTool = Exclude<GameTool, "BUILD_GENERATORS"> | MapPanelView;
+const MAP_TOOLS = [...MAP_VIEWS, ...GAME_TOOLS].filter(
+  (tool): tool is typeof tool & { id: MapTool } =>
+    tool.id !== "BUILD_GENERATORS",
+);
 
-/** A stable map canvas with a single, replaceable right-hand decision surface. */
+const isMapView = (tool: MapTool): tool is MapPanelView =>
+  tool === "FLEET" || tool === "AGREEMENTS";
+
+/** Keep the terrain mounted beneath the open map tools. */
 export default function MapWorkspace({
   memory: sharedMemory,
 }: {
   memory?: Map<string, unknown>;
 }) {
   const dispatch = useAppDispatch();
-  const card = useAppSelector((state) => state.card.name);
+  const card = useAppSelector((state) => state.card);
   const settings = useAppSelector((state) => state.settings);
-  const candidate = gameToolForCard(card);
+  const candidate = gameToolForCard(card.name);
   const [projectBusy, setProjectBusy] = React.useState(false);
   const requestedPanel: MapTool | undefined =
-    card === "FLEET" || card === "AGREEMENTS"
-      ? card
+    card.name === "FLEET" || card.name === "AGREEMENTS"
+      ? card.name
       : candidate === "BUILD_GENERATORS"
         ? undefined
         : candidate;
   const requestedProject = candidate === "BUILD_GENERATORS";
-  const active = projectBusy ? undefined : requestedPanel;
+  const destination = projectBusy ? undefined : requestedPanel;
   const localMemory = React.useRef(new Map<string, unknown>());
   const memory = sharedMemory ?? localMemory.current;
   const workspace = React.useRef<HTMLDivElement>(null);
-  const heading = React.useRef<HTMLHeadingElement>(null);
+  const tray = React.useRef<HTMLDivElement>(null);
+  const area = useMapWindowArea(tray);
+  const retainFocus = React.useRef(false);
+
   const [programBack, setProgramBack] = React.useState<() => void>();
   const presentation = useWorkspaceLayout(workspace, settings);
   const { effectiveWidth } = presentation;
   const desktopMap = effectiveWidth >= SIDE_TOOL_MIN_WIDTH;
+  const controllerInput = useControllerInput();
+  const floating = presentation.layout === "side" && !controllerInput;
+  const [stack, setStack] = React.useState<{
+    card: typeof card;
+    destination?: MapTool;
+    tools: MapTool[];
+  }>(() => ({ card, destination, tools: destination ? [destination] : [] }));
+  const openPanels = floating ? stack.tools : stack.tools.slice(-1);
+  const active = openPanels.at(-1);
+  // Card navigation opens or selects a tool. A click inside an existing window
+  // only changes the stack, so it does not add a game navigation entry.
+  if (card !== stack.card || destination !== stack.destination) {
+    setStack({
+      card,
+      destination,
+      tools: destination
+        ? [
+            ...(floating
+              ? openPanels.filter((tool) => tool !== destination)
+              : []),
+            destination,
+          ]
+        : [],
+    });
+  }
   React.useLayoutEffect(() => {
     if (!desktopMap) return;
     const frame = workspace.current;
@@ -89,59 +120,82 @@ export default function MapWorkspace({
     };
   }, [desktopMap, settings.screenEdgePadding]);
   useToolFocusMemory(workspace, memory, active ?? "fleet", "map");
-  const config =
-    active && [...MAP_VIEWS, ...GAME_TOOLS].find((item) => item.id === active);
   const returnToMap = React.useCallback(
     () => dispatch(navigate("FACILITIES")),
     [dispatch],
   );
-  const toggleTool = React.useCallback(
-    (tool: GameTool) => {
-      if (!projectBusy)
-        dispatch(navigate(active === tool ? "FACILITIES" : tool));
-    },
-    [active, dispatch, projectBusy],
-  );
   React.useLayoutEffect(() => {
     if (projectBusy && (requestedPanel || requestedProject)) returnToMap();
   }, [projectBusy, requestedPanel, requestedProject, returnToMap]);
-  const close = React.useCallback(() => {
-    returnToMap();
-    if (config)
-      document.getElementById(config.triggerId)?.focus({ preventScroll: true });
-  }, [config, returnToMap]);
+  const close = React.useCallback(
+    (tool: MapTool) => {
+      const remaining = openPanels.filter((item) => item !== tool);
+      setStack({ card, destination, tools: remaining });
+      if (!floating || tool === destination) {
+        retainFocus.current = true;
+        dispatch(navigate(remaining.at(-1) ?? "FACILITIES"));
+      }
+      const trigger = MAP_TOOLS.find((item) => item.id === tool)!.triggerId;
+      document.getElementById(trigger)?.focus({ preventScroll: true });
+    },
+    [card, destination, dispatch, floating, openPanels],
+  );
+  const toggleTool = (tool: GameTool | MapPanelView) => {
+    if (projectBusy) return;
+    if (tool !== "BUILD_GENERATORS" && openPanels.includes(tool)) close(tool);
+    else dispatch(navigate(tool));
+  };
+  const raise = (tool: MapTool) => {
+    if (!floating) return;
+    setStack((current) =>
+      current.tools.at(-1) === tool || !current.tools.includes(tool)
+        ? current
+        : {
+            ...current,
+            tools: [...current.tools.filter((item) => item !== tool), tool],
+          },
+    );
+  };
+  React.useLayoutEffect(() => {
+    if (active && !floating && document.activeElement === document.body)
+      workspace.current
+        ?.querySelector<HTMLElement>(`#tool-${active} .gameToolTitle`)
+        ?.focus({ preventScroll: true });
+  }, [active, floating]);
   React.useEffect(() => {
-    heading.current?.focus({ preventScroll: true });
-  }, [active]);
+    if (retainFocus.current) retainFocus.current = false;
+    else if (destination)
+      workspace.current
+        ?.querySelector<HTMLElement>(`#tool-${destination} .gameToolTitle`)
+        ?.focus({ preventScroll: true });
+  }, [card, destination]);
   React.useEffect(() => {
     const escape = (event: KeyboardEvent) => {
       if (
         event.key !== "Escape" ||
+        event.repeat ||
         event.defaultPrevented ||
         !active ||
         hasVisibleEscapeOverlay()
       )
         return;
-      if (
-        active === "PROGRAMS" &&
-        document.querySelector('[data-program-decision="true"]')
-      )
-        return;
       event.preventDefault();
       event.stopImmediatePropagation();
-      close();
+      if (active === "PROGRAMS" && programBack) programBack();
+      else close(active);
     };
     document.addEventListener("keydown", escape);
     return () => document.removeEventListener("keydown", escape);
-  }, [active, close]);
+  }, [active, close, programBack]);
+  const panelOpen = openPanels.length > 0;
   const panel = React.useMemo(
     () => ({
-      open: !!active,
+      open: panelOpen,
       inspect: returnToMap,
       projectRequested: !projectBusy && requestedProject,
       onProjectBusyChange: setProjectBusy,
     }),
-    [active, returnToMap, projectBusy, requestedProject],
+    [panelOpen, returnToMap, projectBusy, requestedProject],
   );
   return (
     <GameToolMemoryContext.Provider value={memory}>
@@ -149,8 +203,8 @@ export default function MapWorkspace({
         <GameWorkspaceLayoutContext.Provider
           value={{
             ...presentation,
-            capacity: 1,
-            fleetVisible: active === "FLEET",
+            capacity: floating ? MAP_TOOLS.length : 1,
+            fleetVisible: openPanels.includes("FLEET"),
           }}
         >
           <MapWorkspacePanelContext.Provider value={panel}>
@@ -160,6 +214,7 @@ export default function MapWorkspace({
                 data-map-workspace="true"
                 data-persistent-map="true"
                 data-desktop-map={desktopMap || undefined}
+                data-map-windows={floating || undefined}
                 data-workspace-layout="map"
                 data-compact-dock={effectiveWidth < 700}
                 data-dock-size={
@@ -178,7 +233,7 @@ export default function MapWorkspace({
                   eventStatus={
                     desktopMap && (
                       <MapEventStatus
-                        open={active === "EVENTS"}
+                        open={openPanels.includes("EVENTS")}
                         onToggle={toggleTool}
                       />
                     )
@@ -187,89 +242,80 @@ export default function MapWorkspace({
                 <div
                   className="gameStage"
                   data-layout="map"
-                  data-panel-count={Number(!!active)}
+                  data-panel-count={openPanels.length}
                 >
                   <div className="gameFleet gameMapStage" data-chart-viewport>
                     <Facilities
                       paneId="mapPane"
                       territoryView="FACILITIES"
-                      onTerritoryView={(view) => dispatch(navigate(view))}
+                      onTerritoryView={(view) => {
+                        if (view !== "FACILITIES" && openPanels.includes(view))
+                          raise(view);
+                        else dispatch(navigate(view));
+                      }}
                     />
                   </div>
-                  <div className="gameToolTray">
-                    {active && config && (
-                      <section
-                        key={active}
-                        id={`tool-${active}`}
-                        className="gameToolPanel"
-                        aria-label={config.label}
-                        data-game-tool={active}
-                        data-tool-side="right"
-                      >
-                        <header className="gameToolHeader">
-                          {active === "PROGRAMS" && programBack && (
-                            <IconButton
-                              color="primary"
-                              aria-label="Back to programs"
-                              onClick={programBack}
-                            >
-                              <ChevronLeftIcon />
-                            </IconButton>
-                          )}
-                          <h2
-                            className="gameToolTitle"
-                            tabIndex={-1}
-                            ref={heading}
-                          >
-                            <span className="gameToolTitleIcon">
-                              {config.icon}
-                            </span>
-                            {config.label}
-                          </h2>
-                          <IconButton
-                            aria-label={`Close ${config.label}`}
-                            onClick={close}
-                          >
-                            <CloseIcon />
-                          </IconButton>
-                        </header>
-                        <MapToolBody tool={active}>
-                          <GameToolCloseContext.Provider value={close}>
-                            {(active === "FLEET" ||
-                              active === "AGREEMENTS") && (
-                              <Facilities territoryView={active} />
+                  <div className="gameToolTray" ref={tray}>
+                    {MAP_TOOLS.map((tool, slot) => {
+                      const stackingIndex = openPanels.indexOf(tool.id);
+                      if (stackingIndex < 0) return null;
+                      const closePanel = () => close(tool.id);
+                      return (
+                        <MapPanelWindow
+                          key={tool.id}
+                          tool={tool.id}
+                          label={tool.label}
+                          icon={tool.icon}
+                          stackingIndex={stackingIndex}
+                          front={tool.id === active}
+                          floating={
+                            floating
+                              ? {
+                                  area,
+                                  slot,
+                                  defaultWidth: presentation.toolWidth,
+                                  scale: presentation.scale,
+                                }
+                              : undefined
+                          }
+                          onRaise={() => raise(tool.id)}
+                          onClose={closePanel}
+                          onBack={
+                            tool.id === "PROGRAMS" ? programBack : undefined
+                          }
+                        >
+                          <GameToolCloseContext.Provider value={closePanel}>
+                            {isMapView(tool.id) && (
+                              <Facilities
+                                territoryView={tool.id}
+                                paneId={
+                                  tool.id === "AGREEMENTS"
+                                    ? "agreementsPane"
+                                    : undefined
+                                }
+                              />
                             )}
-                            {active === "PROGRAMS" && (
+                            {tool.id === "PROGRAMS" && (
                               <Programs
-                                onClose={close}
+                                onClose={closePanel}
                                 onBackChange={setProgramBack}
                               />
                             )}
-                            {active === "INSIGHTS" && <Insights />}
-                            {active === "EVENTS" && <EventLog />}
-                            {active === "SCENARIO" && <ScenarioDetails />}
+                            {tool.id === "INSIGHTS" && <Insights />}
+                            {tool.id === "EVENTS" && <EventLog />}
+                            {tool.id === "SCENARIO" && <ScenarioDetails />}
                           </GameToolCloseContext.Provider>
-                        </MapToolBody>
-                      </section>
-                    )}
+                        </MapPanelWindow>
+                      );
+                    })}
                   </div>
                 </div>
                 <Navigation
                   showMapBuild={!desktopMap}
                   showEventStatus={!desktopMap}
-                  mapView={
-                    active === "FLEET" || active === "AGREEMENTS"
-                      ? active
-                      : "FACILITIES"
-                  }
-                  onMapView={(view) => {
-                    if (!projectBusy) dispatch(navigate(view));
-                  }}
-                  openTools={
-                    active && active !== "FLEET" && active !== "AGREEMENTS"
-                      ? [active]
-                      : []
-                  }
+                  openMapViews={openPanels.filter(isMapView)}
+                  onToggleMapView={toggleTool}
+                  openTools={openPanels.filter((tool) => !isMapView(tool))}
                   onToggle={toggleTool}
                 />
               </div>
@@ -278,20 +324,5 @@ export default function MapWorkspace({
         </GameWorkspaceLayoutContext.Provider>
       </GameWorkspaceContext.Provider>
     </GameToolMemoryContext.Provider>
-  );
-}
-
-function MapToolBody({
-  tool,
-  children,
-}: {
-  tool: MapTool;
-  children: React.ReactNode;
-}) {
-  const ref = useToolScroll<HTMLDivElement>(`workspace.${tool}.scroll`);
-  return (
-    <div className="gameToolBody" data-chart-viewport ref={ref}>
-      {children}
-    </div>
   );
 }

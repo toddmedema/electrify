@@ -481,7 +481,7 @@ html:has(
   }
 }
 
-// The geographic workspace always retains its map; one right-hand surface floats above it.
+// The geographic workspace retains its map below the tools.
 .gameWorkspace[data-persistent-map="true"] {
   .gameMapStage {
     max-width: none;
@@ -517,6 +517,72 @@ html:has(
     .gameToolTray {
       inset: 8px 8px var(--game-dock-clearance) auto;
       width: min(var(--game-tool-width), calc(100% - 16px));
+    }
+  }
+}
+
+.gameWorkspace[data-map-windows="true"] {
+  .gameStage .gameToolTray {
+    display: block;
+    inset-inline: 12px;
+    width: auto;
+  }
+  .gameToolPanel {
+    position: absolute;
+    box-sizing: border-box;
+    &[data-map-window-front="true"] {
+      border-color: var(--border-strong);
+    }
+  }
+  .gameToolHeader {
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
+    &:active {
+      cursor: grabbing;
+    }
+    .gameToolTitle:focus-visible {
+      outline: 2px solid var(--focus-ring) !important;
+      outline-offset: 2px;
+    }
+  }
+  .gameStage .gameToolBody {
+    // Floating windows already stop above the dock.
+    --game-dock-clearance: 16px;
+  }
+  .mapWindowFooter {
+    display: flex;
+    justify-content: flex-end;
+    border-top: 1px solid var(--border-subtle);
+    background: var(--bg-raised);
+  }
+  .mapWindowResize {
+    position: relative;
+    width: var(--control-size);
+    height: var(--control-size);
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--font-color-faded);
+    cursor: nwse-resize;
+    touch-action: none;
+    &:focus-visible {
+      outline-offset: -3px;
+    }
+    &::before,
+    &::after {
+      position: absolute;
+      right: 8px;
+      bottom: 8px;
+      width: 14px;
+      height: 14px;
+      border-right: 2px solid currentColor;
+      border-bottom: 2px solid currentColor;
+      content: "";
+    }
+    &::after {
+      width: 6px;
+      height: 6px;
     }
   }
 }
