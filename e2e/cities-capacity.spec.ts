@@ -305,7 +305,7 @@ for (const theme of ["light", "dark"] as const) {
       upgrade.getByText("Capacity upgrade", { exact: true }),
     ).toHaveCount(0);
     await upgrade.scrollIntoViewIfNeeded();
-    await reviewScreenshot(map.locator(".tileWorkspaceSurface"), {
+    await reviewScreenshot(inspector, {
       path: info.outputPath(`capacity-offer-${theme}.png`),
       animations: "disabled",
     });
@@ -413,6 +413,7 @@ for (const theme of ["light", "dark"] as const) {
       .click();
     await expect(cancel).toHaveCount(0);
     await expect(upgrade.getByRole("progressbar")).toHaveCount(0);
+    await expect(upgrade).toBeFocused();
     await expect(
       upgrade.getByRole("button", { name: "Upgrade capacity", exact: true }),
     ).toBeEnabled();

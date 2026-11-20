@@ -1,6 +1,14 @@
 import { currencyForLocation } from "../../helpers/Currency";
 import * as React from "react";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { configureStore } from "@reduxjs/toolkit";
+import { Provider } from "react-redux";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import cloneDeep from "lodash.clonedeep";
 import { createGame } from "../../testing/Simulator";
 import { SCENARIOS } from "../../data/Scenarios";
@@ -16,6 +24,17 @@ import { FacilityOperatingType, GameType } from "../../Types";
 import userEvent from "@testing-library/user-event";
 import FacilityDetails from "./FacilityDetails";
 import { UnitsContext } from "./UnitsContext";
+import { useAppDispatch, useAppSelector } from "../../Store";
+import gameReducer from "../../reducers/Game";
+import cardReducer from "../../reducers/Card";
+import uiReducer from "../../reducers/UI";
+import userReducer from "../../reducers/User";
+import settingsReducer from "../../reducers/Settings";
+import savesReducer from "../../SaveLibrary";
+import { expandFacility } from "../../reducers/GameActions";
+import { facilityExpansionQuote } from "../../helpers/FacilityExpansion";
+import { currentTick } from "../../helpers/GameSelectors";
+import { requestCancelFacilityExpansion } from "../../helpers/RequestFacilityExpansion";
 
 // A dam's water section links to the manual, which reads the store; these tests have none
 jest.mock("./ManualLink", () => (props: { children?: React.ReactNode }) => (
@@ -111,6 +130,88 @@ function outage(
 function section() {
   return screen.getByRole("region", { name: "Upgrades" });
 }
+
+it.each([false, true])(
+  "restores focus after the confirmed cancellation removes the expansion (shut down=%s)",
+  async (shutdown) => {
+    let game = createGame({ scenarioId: 104, seed: 818 });
+    const facilityId = game.facilities[0].id;
+    currentTick(game)!.cash = 1e12;
+    const quote = facilityExpansionQuote(
+      game,
+      facilityId,
+      game.facilities[0].peakW * 1.2,
+    );
+    if (quote.status !== "ready") throw new Error(quote.reason);
+    game = cloneDeep(
+      gameReducer(
+        game,
+        expandFacility({
+          facilityId,
+          targetSize: quote.targetSize,
+          quoteKey: quote.quoteKey,
+        }),
+      ),
+    );
+    if (shutdown) game.facilities[0].permanentShutdownMonth = 1;
+    const store = configureStore({
+      reducer: {
+        game: gameReducer,
+        card: cardReducer,
+        ui: uiReducer,
+        user: userReducer,
+        settings: settingsReducer,
+        saves: savesReducer,
+      },
+      preloadedState: { game },
+      middleware: (defaults) =>
+        defaults({ serializableCheck: false, immutableCheck: false }),
+    });
+    function ConnectedDetails() {
+      const current = useAppSelector((state) => state.game);
+      const dispatch = useAppDispatch();
+      return details(current, current.facilities[0], jest.fn(), {
+        onExpand: jest.fn(),
+        onCancelExpansion: (id, key) =>
+          dispatch(requestCancelFacilityExpansion(id, key)),
+      });
+    }
+    render(
+      <Provider store={store}>
+        <ConnectedDetails />
+      </Provider>,
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "Cancel capacity upgrade" }),
+    );
+    await userEvent.click(
+      within(screen.getByRole("dialog")).getByRole("button", {
+        name: "Cancel upgrade",
+      }),
+    );
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+    );
+    expect(
+      store.getState().game.facilities[0].expansionInProgress,
+    ).toBeUndefined();
+    expect(currentTick(store.getState().game)!.cash).toBe(1e12);
+    expect(
+      screen.getByRole("region", {
+        name: shutdown ? "Operation" : "Capacity upgrade",
+      }),
+    ).toHaveFocus();
+    expect(
+      screen.queryAllByRole("region", { name: "Capacity upgrade" }),
+    ).toHaveLength(shutdown ? 0 : 1);
+    expect(
+      screen.queryAllByRole("button", { name: "Upgrade capacity" }),
+    ).toHaveLength(shutdown ? 0 : 1);
+    expect(
+      screen.queryByRole("heading", { name: "Capacity upgrade" }),
+    ).not.toBeInTheDocument();
+  },
+);
 
 describe("weather resilience details", () => {
   it("rates standard gas and offers the cold-weather package", () => {
