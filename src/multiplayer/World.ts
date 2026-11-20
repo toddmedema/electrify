@@ -1712,10 +1712,12 @@ function upgradeTerritoryWorld(value: unknown): unknown {
           "coop-2-c85efcd401375172030f9ab31b7b1f81f0ecf4f450732f36d86e265355e91bef" ||
           old.rules ===
             "coop-2-fdb701fc666648e148ecc4d6a02e4b2001090bc79052092a4e567ea9184714ef")) ||
-      // Published master 40c3cafc: coal repowers precede connection receipt pricing.
+      // Published schema 20: coal repowers in master 40c3cafc, and expansion loans in preview 7a1d58e.
       (old.gameSchema === 20 &&
-        old.rules ===
-          "coop-2-cf979e3b45deb328dd12a266f291e16398174095d47beca6df0d4f9da1dbd577") ||
+        (old.rules ===
+          "coop-2-cf979e3b45deb328dd12a266f291e16398174095d47beca6df0d4f9da1dbd577" ||
+          old.rules ===
+            "coop-2-f55523858de9d3d66c6be60626ffab92225cba0047b3e4611ad639f83b4aad90")) ||
       // Published schema 21 releases with connection pricing and player feedback.
       (old.gameSchema === 21 &&
         (old.rules ===

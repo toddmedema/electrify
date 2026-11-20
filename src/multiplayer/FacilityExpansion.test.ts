@@ -1,4 +1,5 @@
 import cloneDeep from "lodash.clonedeep";
+import { SAVE_SCHEMA_VERSION } from "../SaveSchema";
 import { createGame } from "../testing/Simulator";
 import { coopSeats } from "../testing/MultiplayerFixtures";
 import { currentTick } from "../helpers/GameSelectors";
@@ -70,7 +71,27 @@ it("host finances and cancels only the sender's expansion and restores its debt 
   const checkpoint = checkpointWorld(world);
   const restored = restoreWorld(checkpoint, "restored-epoch");
   expect(restored.grids[0].facilities).toEqual(world.grids[0].facilities);
-  for (const match of [world, restored]) {
+  const previewCheckpoint = {
+    ...checkpoint,
+    gameSchema: 20,
+    rules:
+      "coop-2-f55523858de9d3d66c6be60626ffab92225cba0047b3e4611ad639f83b4aad90",
+  };
+  const restoredPreview = restoreWorld(previewCheckpoint, "preview-epoch");
+  expect(restoredPreview.gameSchema).toBe(SAVE_SCHEMA_VERSION);
+  expect(restoredPreview.grids[0].facilities).toEqual(
+    world.grids[0].facilities,
+  );
+  const badLoan = cloneDeep(previewCheckpoint);
+  badLoan.grids[0].facilities[0].expansionInProgress!.loan!.loanAmountLeft = -1;
+  expect(() => restoreWorld(badLoan, "corrupt-loan")).toThrow(/invalid grids/);
+  expect(() =>
+    restoreWorld(
+      { ...previewCheckpoint, rules: previewCheckpoint.rules + "-unknown" },
+      "unknown-preview",
+    ),
+  ).toThrow(/unsupported format/);
+  for (const match of [world, restored, restoredPreview]) {
     for (const seat of match.seats) {
       expect(command(match, seat.id, { kind: "ready" })).toBeUndefined();
       expect(
@@ -81,6 +102,10 @@ it("host finances and cancels only the sender's expansion and restores its debt 
   const beforeMinute = world.grids[0].date.minute;
   stepWorld(world);
   stepWorld(restored);
+  stepWorld(restoredPreview);
+  expect(restoredPreview.grids[0].facilities).toEqual(
+    restored.grids[0].facilities,
+  );
   expect(world.grids[0].date.minute).toBeGreaterThan(beforeMinute);
   expect(restored.grids[0].facilities).toEqual(world.grids[0].facilities);
   expect(
