@@ -158,12 +158,15 @@ test("scatters the four farm layouts across open plains consistently on scene re
   const original = layouts(views);
   expect(new Set(original).size).toBe(4);
   for (const [i, { tile }] of views.entries()) {
-    for (const [dq, dr] of HEX_NEIGHBORS) {
-      const other = views.findIndex(
-        ({ tile: n }) => n.q === tile.q + dq && n.r === tile.r + dr,
-      );
-      if (other >= 0) expect(original[i]).not.toBe(original[other]);
-    }
+    const neighbors = HEX_NEIGHBORS.map(([dq, dr]) =>
+      views.findIndex(
+        ({ tile: neighbor }) =>
+          neighbor.q === tile.q + dq && neighbor.r === tile.r + dr,
+      ),
+    ).filter((index) => index >= 0);
+    expect(neighbors.map((index) => original[index])).not.toContain(
+      original[i],
+    );
   }
   expect(layouts([...views].reverse()).reverse()).toEqual(original);
   expect(layouts(views.slice(1))).toEqual(original.slice(1));
