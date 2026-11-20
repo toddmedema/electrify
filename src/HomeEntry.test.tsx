@@ -97,3 +97,27 @@ it.each(["loading", "open"])(
     }
   },
 );
+
+it("can reopen feedback after a manual action suppresses its download and then fails", async () => {
+  let rejectAction!: (error: Error) => void;
+  mockAction.mockReset().mockReturnValueOnce(
+    new Promise<void>((_, reject) => {
+      rejectAction = reject;
+    }),
+  );
+  render(<Home />);
+  fireEvent.click(screen.getByRole("button", { name: "Send feedback" }));
+  fireEvent.click(screen.getByRole("button", { name: "Play" }));
+  await waitFor(() =>
+    expect(mockAction).toHaveBeenCalledWith("onStart", undefined),
+  );
+  expect(
+    screen.queryByRole("dialog", { name: "Share feedback" }),
+  ).not.toBeInTheDocument();
+  rejectAction(new Error("game unavailable"));
+  await screen.findByRole("alert");
+  fireEvent.click(screen.getByRole("button", { name: "Send feedback" }));
+  expect(
+    await screen.findByRole("textbox", { name: "Your feedback" }),
+  ).toBeVisible();
+});

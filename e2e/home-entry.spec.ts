@@ -369,6 +369,46 @@ test("installation waits for loading and open homepage feedback to close", async
   );
 });
 
+test("feedback still opens when manual game entry fails before its download finishes", async ({
+  page,
+}) => {
+  test.skip(
+    !process.env.E2E_BASE_URL && !process.env.E2E_BUILD_DIR,
+    "Production chunk delivery.",
+  );
+  await page.goto("/");
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const feedbackChunk = "**/static/js/feedback.*.js";
+  await page.route(feedbackChunk, async (route) => {
+    await held;
+    await route.continue();
+  });
+  const requested = page.waitForRequest(feedbackChunk);
+  await page.route("**/static/js/game.*.js", (route) => route.abort());
+  try {
+    await page
+      .getByRole("button", { name: "Send feedback", exact: true })
+      .click();
+    await requested;
+    await page.getByRole("button", { name: "Play", exact: true }).click();
+    await expect(page.getByRole("alert")).toContainText("could not load");
+  } finally {
+    release();
+  }
+  const dialog = page.getByRole("dialog", { name: "Share feedback" });
+  await expect(
+    dialog.getByRole("textbox", { name: "Your feedback" }),
+  ).toBeFocused();
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await page
+    .getByRole("button", { name: "Send feedback", exact: true })
+    .click();
+  await expect(dialog).toBeVisible();
+});
+
 test("an installation prompt captured before Home mounts reaches the install control", async ({
   page,
 }) => {

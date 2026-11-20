@@ -106,6 +106,7 @@ export function Home() {
         /* webpackChunkName: "feedback" */ "./components/base/FeedbackDialog"
       );
       if (!actionPending.current) setFeedbackDialog(() => Dialog);
+      else feedbackActive.current = false;
     } catch {
       setFailed(true);
       closeFeedback();
