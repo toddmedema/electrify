@@ -1,5 +1,6 @@
 import type { Locator, Page } from "@playwright/test";
 import { expect, test } from "./fixtures";
+import { pauseBrowserClock } from "./browser-clock";
 import type { MapCanvas } from "../src/components/base/territory-3d/Types";
 import type { TerritoryTileId } from "../src/Types";
 import {
@@ -166,11 +167,7 @@ for (const reducedMotion of ["no-preference", "reduce"] as const) {
 
       // Shared-runner frame gaps can skip the whole shift. Drive the real camera
       // through intermediate frames before checking its destination.
-      // Freeze wall time first so a delayed pause RPC cannot target the past.
-      const pauseTime = await page.evaluate(() => Date.now());
-      await page.clock.setFixedTime(pauseTime);
-      await page.clock.pauseAt(pauseTime);
-      await page.clock.setSystemTime(pauseTime);
+      await pauseBrowserClock(page);
       const positions = await viewport.evaluateHandle((element) => {
         const stage = element.querySelector<HTMLElement>(".territoryMapStage")!;
         const x: number[] = [];
