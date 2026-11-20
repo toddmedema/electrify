@@ -123,6 +123,7 @@ for (const reducedMotion of ["no-preference", "reduce"] as const) {
       const phone = page.viewportSize()!.width <= 740;
       test.skip(!phone && !animate, "Desktop does not recenter");
       await page.emulateMedia({ reducedMotion });
+      await page.clock.install();
       await page.goto("/?scenario=116");
       await page
         .getByRole("button", { name: "Start game", exact: true })
@@ -144,6 +145,9 @@ for (const reducedMotion of ["no-preference", "reduce"] as const) {
           path: info.outputPath("before-tap.png"),
         });
 
+      // Shared-runner frame gaps can skip the whole shift. Drive the real camera
+      // through intermediate frames before checking its destination.
+      await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 200);
       const positions = await viewport.evaluateHandle((element) => {
         const stage = element.querySelector<HTMLElement>(".territoryMapStage")!;
         const x: number[] = [];
@@ -160,6 +164,8 @@ for (const reducedMotion of ["no-preference", "reduce"] as const) {
       });
       if (info.project.use.hasTouch) await label.tap();
       else await label.click();
+      await page.clock.runFor(64);
+      await page.clock.runFor(200);
       await expect(
         page.getByRole("button", { name: "Close tile" }),
       ).toBeVisible();
