@@ -160,6 +160,31 @@ it.each(TERRAINS)(
   },
 );
 
+it("keeps the rectangular field edges and crop rows on one survey grid across all four farms", () => {
+  let bearing: number | undefined;
+  for (let variant = 0; variant < 4; variant++) {
+    const floor = getTerrainModel("plains", { variant }).parts[0].mesh;
+    const farmland = triangles(floor).filter((face) =>
+      face.every((p) => p[1] > 0),
+    );
+    expect(farmland.length).toBeGreaterThan(0);
+    for (const face of farmland) {
+      // The two short sides of a triangulated rectangle follow its boundaries.
+      const edges = face
+        .map(([x, , z], i) => {
+          const next = face[(i + 1) % 3];
+          return { dx: next[0] - x, dz: next[2] - z };
+        })
+        .sort((a, b) => Math.hypot(a.dx, a.dz) - Math.hypot(b.dx, b.dz));
+      const angles = edges.slice(0, 2).map(({ dx, dz }) => Math.atan2(dz, dx));
+      bearing ??= angles[0];
+      expect(Math.cos(angles[0] - angles[1])).toBeCloseTo(0, 5);
+      for (const angle of angles)
+        expect(Math.sin(2 * (angle - bearing))).toBeCloseTo(0, 5);
+    }
+  }
+});
+
 it("draws four distinct farm footprints and keeps their fields and buildings clear of energy sites", () => {
   const fields = new Set<string>();
   for (let variant = 0; variant < 4; variant++) {
