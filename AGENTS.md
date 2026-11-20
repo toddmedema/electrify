@@ -24,6 +24,7 @@ files are large, so broad rewrites create expensive review diffs.
   `firebase/firestore.rules`. It checks assets first, prints each gate's result as it finishes,
   and continues after gate failures.
 - Before pushing, choose conservative local checks for the changed behavior and its callers.
+  Run `npm run check:prepush` on the commit you will push to check for stale site pages and metadata.
   Run the affected suites, types, lint and relevant integration or browser journeys. Broaden
   coverage for shared simulation, save, co-op, build or workflow changes. Record the commands
   and results in the PR. Hosted CI runs the complete suite on the pushed revision.

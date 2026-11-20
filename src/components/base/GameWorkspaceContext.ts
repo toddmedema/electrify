@@ -1,5 +1,6 @@
-import { createContext, useContext } from "react";
+import { createContext, useContext, type RefObject } from "react";
 import type { WorkspaceLayout } from "../../WorkspaceLayout";
+import type { MapWindowLayout } from "./MapPanelWindow";
 
 /** Prevent embedded game views from creating their own app bar and navigation. */
 export const GameWorkspaceContext = createContext(false);
@@ -21,13 +22,29 @@ export const GameWorkspaceLayoutContext = createContext<
 export const useGameWorkspaceLayout = () =>
   useContext(GameWorkspaceLayoutContext);
 
-/** The persistent map and its single tool panel share one inspection destination. */
+export type MapTileWindow = {
+  tray: RefObject<HTMLDivElement>;
+  layout: MapWindowLayout;
+  stackingIndex: number;
+  front: boolean;
+  raise: () => void;
+};
+
+/** Share tile activation and exclusive project navigation with the map workspace. */
 export const MapWorkspacePanelContext = createContext<
   | {
       open: boolean;
-      inspect: () => void;
+      returnToMap: () => void;
+      showTile?: (close: () => void) => void;
+      hideTile?: () => void;
+      tileWindow?: MapTileWindow;
       projectRequested?: boolean;
       onProjectBusyChange?: (busy: boolean) => void;
     }
   | undefined
 >(undefined);
+
+// Embedded decisions defer Escape and focus ownership to the containing map window.
+export const MapWindowFrontContext = createContext<boolean | undefined>(
+  undefined,
+);

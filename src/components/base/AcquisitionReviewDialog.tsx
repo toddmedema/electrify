@@ -41,12 +41,19 @@ function marginText(marginW: number): string {
 
 /** Reviews the same dated seller snapshot that the owning purchase API validates. */
 export default function AcquisitionReviewDialog({
-  game,
+  game: liveGame,
   targetId,
   onClose,
   onAcquire,
 }: Props): React.JSX.Element | null {
   const dispatch = useAppDispatch();
+  // A successful update can remove the quote before the request resolves.
+  // Keep the same modal and focus trap mounted until the purchase closes it.
+  const [submission, setSubmission] = React.useState<{
+    game: GameType;
+    cash: number;
+  }>();
+  const game = submission?.game ?? liveGame;
   const { formatMoneyConcise } = useMoney(
     currencyForLocation(game.location, game.startingYear),
   );
@@ -60,7 +67,7 @@ export default function AcquisitionReviewDialog({
   }, [dispatch, targetId]);
   const quote = acquisitionQuote(game, targetId);
   const now = currentTick(game);
-  const cash = useBuildCash(now?.cash ?? 0);
+  const cash = useBuildCash(submission?.cash ?? now?.cash ?? 0, !submission);
   const preview = React.useMemo(
     () => previewUtilityAcquisition(game, targetId, true),
     [game, targetId],
@@ -262,6 +269,7 @@ export default function AcquisitionReviewDialog({
       onClose={onClose}
       onPurchase={async (financed) => {
         setError(undefined);
+        setSubmission({ game, cash });
         try {
           const accepted = await onAcquire({
             targetId: quote.targetId,
@@ -282,6 +290,7 @@ export default function AcquisitionReviewDialog({
               : "The purchase could not be completed. Please try again.",
           );
         }
+        setSubmission(undefined);
         return false;
       }}
     />

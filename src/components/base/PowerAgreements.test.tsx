@@ -9,6 +9,7 @@ import {
 } from "@testing-library/react";
 import { Provider, useSelector } from "react-redux";
 import type { GameType, PowerAgreementTermsVersion } from "../../Types";
+import type { AgreementForecast } from "../../helpers/AgreementForecast";
 import { getDateFromMinute } from "../../helpers/DateTime";
 import { formatMoneyFull, formatNumber } from "../../helpers/Format";
 import { currentTick } from "../../helpers/GameSelectors";
@@ -123,9 +124,9 @@ it.each([1, 2, 3] as PowerAgreementTermsVersion[])(
     )!;
     mount(game);
     const agreement = screen.getByRole("article", { name: "Regional nuclear" });
-    expect(
-      within(agreement).getByText("Up to", { exact: false }),
-    ).toHaveTextContent(`Up to 95MW · ${rate(source.priceToday)}`);
+    expect(within(agreement).getByText("Max supply")).toBeVisible();
+    expect(within(agreement).getByText("95MW")).toBeVisible();
+    expect(within(agreement).getByText(rate(source.priceToday))).toBeVisible();
     expect(within(agreement).getByText("Through 31 Dec 2019")).toBeVisible();
     expect(
       within(agreement).getByText(
@@ -150,6 +151,37 @@ it.each([1, 2, 3] as PowerAgreementTermsVersion[])(
   },
 );
 
+it("shows recorded usage as a labeled share of available energy in Details", () => {
+  const game = fixture();
+  game.transmission!.agreementAccounts = [
+    {
+      agreementId: "champlain-nuclear",
+      termsVersion: 3,
+      accountingStartMinute: 0,
+      accountedThroughMinute: 1440,
+      months: [
+        {
+          month: 0,
+          availableMWh: 100,
+          usefulMWh: 65,
+          availableValue: 0,
+          usefulValue: 0,
+          payment: 0,
+        },
+      ],
+    },
+  ];
+  mount(game);
+  const agreement = screen.getByRole("article", { name: "Regional nuclear" });
+  fireEvent.click(within(agreement).getByText("Details"));
+  expect(
+    within(agreement).getByLabelText(
+      "Share of available contracted energy used",
+    ),
+  ).toHaveAttribute("value", "65");
+  expect(within(agreement).getByText(/65.0% used/)).toBeVisible();
+});
+
 it("uses a short offer action with a unique accessible contract name", () => {
   mount();
   expect(screen.getAllByRole("article")[0]).toHaveAccessibleName(
@@ -158,7 +190,7 @@ it("uses a short offer action with a unique accessible contract name", () => {
   const offer = screen.getByRole("button", {
     name: "Review Valley Electric supply agreement",
   });
-  expect(offer).toHaveTextContent("Review terms");
+  expect(offer).toHaveTextContent(/^Review$/);
   expect(
     screen.queryByRole("heading", {
       name: "Power purchase agreements",
@@ -199,7 +231,7 @@ it("retains expired recorded history without a live commitment or forecast", () 
   expect(
     within(agreement).queryByText(/Minimum payment/),
   ).not.toBeInTheDocument();
-  expect(within(agreement).queryByText(/Up to/)).not.toBeInTheDocument();
+  expect(within(agreement).queryByText("Max supply")).not.toBeInTheDocument();
   fireEvent.click(
     within(agreement).getByRole("button", {
       name: "Regional nuclear recorded history",
@@ -255,6 +287,7 @@ it("shows the direct discount alongside monthly energy and deliverable power", (
     "Maximum supply",
     "Duration",
     "Forecasted cash impact",
+    "Forecasted grid impact",
   ]);
   const max = within(table).getByRole("row", { name: /Maximum supply/ });
   expect(max).toHaveTextContent("57 MW");
@@ -270,7 +303,7 @@ it("shows the direct discount alongside monthly energy and deliverable power", (
   expect(
     within(table).getByRole("row", { name: /Duration/ }),
   ).toHaveTextContent("10 yearsEnds Dec 2029");
-  expect(dialog).not.toHaveTextContent("Demand served");
+  expect(dialog).not.toHaveTextContent("Delivery and emissions follow");
   expect(dialog).not.toHaveTextContent("2005 dollars");
   expect(dialog).not.toHaveTextContent("Local generation can reduce purchases");
   expect(dialog).not.toHaveTextContent("The price follows inflation");
@@ -282,6 +315,35 @@ it("shows the direct discount alongside monthly energy and deliverable power", (
       selector: ".powerAgreementDuration .MuiTypography-root",
     }),
   ).not.toBeInTheDocument();
+});
+
+it("keeps the grid impact row mounted while the duration changes", () => {
+  const initial = { blocked: undefined, error: false, retry: jest.fn() };
+  const result = {
+    cashDifference: 1000,
+    withAgreement: { demandMWh: 100, servedMWh: 100 },
+    withoutAgreement: { demandMWh: 100, servedMWh: 60 },
+  } as AgreementForecast;
+  mockForecast.mockImplementation((_game, _id, offer, committed) => ({
+    ...initial,
+    result: committed && offer?.durationYears === 10 ? result : undefined,
+    updating: offer?.durationYears === 1,
+  }));
+
+  const { dialog } = review();
+  const gridImpact = () =>
+    within(dialog).getByRole("row", { name: /^Forecasted grid impact/ });
+  const row = gridImpact();
+  expect(row).toHaveTextContent("60 → 100%");
+  expect(
+    within(dialog).getByRole("row", { name: /Forecasted cash impact/ }),
+  ).not.toHaveTextContent("Demand served");
+
+  fireEvent.change(within(dialog).getByRole("slider", { name: "Duration" }), {
+    target: { value: "1" },
+  });
+  expect(gridImpact()).toBe(row);
+  expect(row).not.toHaveTextContent("60 → 100%");
 });
 
 it.each([20, -40])(

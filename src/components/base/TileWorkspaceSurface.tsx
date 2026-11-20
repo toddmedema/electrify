@@ -1,8 +1,83 @@
 import * as React from "react";
+import { createPortal } from "react-dom";
 import { IconButton, Typography } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
+import MapPanelWindow from "./MapPanelWindow";
+import {
+  MapWorkspacePanelContext,
+  type MapTileWindow,
+} from "./GameWorkspaceContext";
 import { hasVisibleEscapeOverlay } from "./VisibleEscapeOverlay";
 import "./TileWorkspaceSurface.scss";
+
+export function findTileControl(map: HTMLElement | null, tile: string) {
+  return map?.querySelector<HTMLButtonElement>(
+    `[data-map-target="${CSS.escape(tile)}"]`,
+  );
+}
+
+/** Put inspection in the desktop window stack while leaving the sheet and project surfaces local. */
+export function TileInspectionSurface({
+  map,
+  tileKey,
+  ...props
+}: React.ComponentProps<typeof TileWorkspaceSurface> & {
+  map: React.RefObject<HTMLElement>;
+  tileKey: string;
+}) {
+  const tileWindow = React.useContext(MapWorkspacePanelContext)?.tileWindow;
+  if (!tileWindow) return <TileWorkspaceSurface {...props} />;
+  const tray = tileWindow.tray.current;
+  if (!tray || tileWindow.stackingIndex < 0) return null;
+  return createPortal(
+    <FloatingInspection
+      {...props}
+      map={map}
+      tileKey={tileKey}
+      tileWindow={tileWindow}
+    />,
+    tray,
+  );
+}
+
+function FloatingInspection({
+  map,
+  tileKey,
+  tileWindow,
+  title,
+  subtitle,
+  focusKey,
+  initialFocusSelector,
+  onClose,
+  children,
+}: React.ComponentProps<typeof TileInspectionSurface> & {
+  tileWindow: MapTileWindow;
+}) {
+  const [avoid] = React.useState(() => {
+    const tile = findTileControl(map.current, tileKey)?.getBoundingClientRect();
+    const tray = tileWindow.tray.current?.getBoundingClientRect();
+    if (tile && tray)
+      return {
+        x: tile.left + tile.width / 2 - tray.left,
+        y: tile.top + tile.height / 2 - tray.top,
+      };
+  });
+  return (
+    <MapPanelWindow
+      tool="TILE"
+      label={title}
+      icon={null}
+      stackingIndex={tileWindow.stackingIndex}
+      front={tileWindow.front}
+      floating={{ ...tileWindow.layout, avoid }}
+      onRaise={tileWindow.raise}
+      onClose={onClose}
+      tile={{ map, subtitle, focusKey, initialFocusSelector }}
+    >
+      {children}
+    </MapPanelWindow>
+  );
+}
 
 /** A nonmodal inspector: the map remains interactive behind the same desktop panel/phone sheet. */
 export default function TileWorkspaceSurface({

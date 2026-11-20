@@ -23,6 +23,9 @@ concurrency:
 
 # Eight jobs: shared renderers, three native builds, three test workers, and the required gate.
 # Tests share renderer artifacts but never wait for an OS build.
+env:
+  GIT_LFS_SKIP_SMUDGE: "1"
+
 jobs:
   build:
     name: Shared production builds
@@ -33,11 +36,9 @@ jobs:
       DISABLE_ESLINT_PLUGIN: "true"
     steps:
       - uses: actions/checkout@v7
-        with:
-          lfs: true
-          # Sitemap lastmod dates come from page source history.
-          fetch-depth: 0
       - uses: ./.github/actions/install
+      - name: Fetch and verify public assets
+        run: node scripts/ci/lfs-assets.js public
       - uses: ./.github/actions/build-cache
         with:
           edition: desktop
@@ -50,6 +51,8 @@ jobs:
             build/
             electron/steam-localization.cjs
             electron/achievement-catalog.cjs
+          # Native jobs verify the complete public tree copied into the renderer.
+          include-hidden-files: true
           retention-days: 2
           compression-level: 1
           if-no-files-found: error
@@ -102,10 +105,6 @@ jobs:
             directory: mac-arm64
     steps:
       - uses: actions/checkout@v7
-        with:
-          lfs: true
-          # Sitemap lastmod dates come from page source history.
-          fetch-depth: 0
       - uses: ./.github/actions/install
         with:
           profile: desktop
@@ -126,6 +125,8 @@ jobs:
       - uses: actions/download-artifact@v8
         with:
           name: desktop-renderer
+      - name: Restore verified public assets from the desktop renderer
+        run: node scripts/ci/lfs-assets.js renderer build
       - name: Install redistributable Linux runtime inputs
         if: matrix.platform == 'linux'
         run: |
@@ -164,11 +165,9 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
-        with:
-          lfs: true
-          # Sitemap lastmod dates come from page source history.
-          fetch-depth: 0
       - uses: ./.github/actions/install
+      - name: Fetch and verify CPU test fixtures
+        run: node scripts/ci/lfs-assets.js cpu
       - uses: ./.github/actions/jest-cache
         with:
           group: unit
@@ -215,10 +214,6 @@ jobs:
       E2E_PORT: "3189"
     steps:
       - uses: actions/checkout@v7
-        with:
-          lfs: true
-          # Sitemap lastmod dates come from page source history.
-          fetch-depth: 0
       - uses: ./.github/actions/install
       - name: Cache the locked headless browser
         uses: actions/cache@v6
@@ -265,10 +260,6 @@ jobs:
       ELECTRIFY_EXECUTABLE: ${{ github.workspace }}/dist/desktop/linux-unpacked/Electrify
     steps:
       - uses: actions/checkout@v7
-        with:
-          lfs: true
-          # Sitemap lastmod dates come from page source history.
-          fetch-depth: 0
       - uses: ./.github/actions/install
       - uses: ./.github/actions/jest-cache
         with:
@@ -297,6 +288,8 @@ jobs:
       - uses: actions/download-artifact@v8
         with:
           name: desktop-renderer
+      - name: Restore verified public assets from the desktop renderer
+        run: node scripts/ci/lfs-assets.js renderer build
       - name: Multiplayer, controller and full packaged desktop suites
         run: xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" sh -c 'openbox & npm run test:ci-all -- --group=desktop'
       - name: Measure helper startup (manual runs only)
