@@ -4,6 +4,7 @@ import type {
   TerrainType,
 } from "../../../Types";
 import { isStorage } from "../../../Types";
+import { farmLayout, terrainArtHash } from "./TerrainVariants";
 import type { TerritoryTileDefinition } from "../../../data/TerritoryTiles";
 import {
   territoryMapTileKey,
@@ -210,6 +211,7 @@ export class SceneBuilder {
   private wireModels: MapInstance[] = [];
   private tiles?: readonly TerritoryTileDefinition[];
   private terrainAt = new Map<string, TerrainType>();
+  private farms = new Map<string, number>();
   private cells = new Map<string, TileScene>();
   private instances: MapInstance[] = [];
   constructor(private factories: ModelFactories) {}
@@ -226,6 +228,7 @@ export class SceneBuilder {
       this.terrainAt = new Map(
         allTiles.map(({ q, r, terrain }) => [`${q},${r}`, terrain]),
       );
+      this.farms.clear();
       this.cells.clear();
       this.wireKey = undefined;
     }
@@ -259,6 +262,12 @@ export class SceneBuilder {
         const terrain = this.factories.terrain(tile.terrain, {
           footprint: model?.footprint ?? 0,
           weather,
+          variant:
+            tile.terrain === "plains"
+              ? farmLayout(tile.q, tile.r, this.farms)
+              : tile.terrain === "mountain"
+                ? terrainArtHash(tile.q, tile.r) >>> 30
+                : undefined,
           ports:
             tile.terrain === "river" ? riverPorts(tile, allTiles) : undefined,
           ...(tile.terrain === "mountain" || tile.terrain === "forest"
