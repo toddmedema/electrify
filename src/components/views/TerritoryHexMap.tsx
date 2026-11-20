@@ -65,6 +65,7 @@ const TerritoryScene3D = React.lazy(
   () => import("../base/territory-3d/TerritoryScene3D"),
 );
 const PAN_OVERSCAN = HEX_WIDTH / 4;
+const CAMERA_SHIFT_MS = 180;
 
 class MapSceneBoundary extends React.Component<
   { children: React.ReactNode; onError: () => void },
@@ -310,8 +311,18 @@ export default function TerritoryHexMap({
       bottom: Math.max(...points.map(({ y }) => y)) + margin,
     };
   }, [tiles]);
+  const cameraShiftFrame = React.useRef<number>();
+  const cancelCameraShift = React.useCallback(() => {
+    if (cameraShiftFrame.current === undefined) return;
+    cancelAnimationFrame(cameraShiftFrame.current);
+    cameraShiftFrame.current = undefined;
+  }, []);
   const setCamera = React.useCallback(
-    (update: React.SetStateAction<ReturnType<typeof hexCenter>>) => {
+    (
+      update: React.SetStateAction<ReturnType<typeof hexCenter>>,
+      animate = false,
+    ) => {
+      cancelCameraShift();
       const current = camera.getSnapshot();
       const point = typeof update === "function" ? update(current) : update;
       const next = {
@@ -319,22 +330,48 @@ export default function TerritoryHexMap({
         y: Math.max(mapBounds.top, Math.min(mapBounds.bottom, point.y)),
       };
       if (next.x === current.x && next.y === current.y) return;
-      moveStage(next);
-      if (
-        Math.abs(next.x - cullAnchor.current.x) >= PAN_OVERSCAN ||
-        Math.abs(next.y - cullAnchor.current.y) >= PAN_OVERSCAN
-      ) {
-        cullAnchor.current = next;
-        setCullCenter(next);
+      const move = (position: typeof next) => {
+        moveStage(position);
+        if (
+          Math.abs(position.x - cullAnchor.current.x) >= PAN_OVERSCAN ||
+          Math.abs(position.y - cullAnchor.current.y) >= PAN_OVERSCAN
+        ) {
+          cullAnchor.current = position;
+          setCullCenter(position);
+        }
+        camera.move(position);
+      };
+      if (!animate) {
+        move(next);
+        return;
       }
-      camera.move(next);
+
+      // Advance the stage, scene and hit testing with the same camera coordinates.
+      let start: number | undefined;
+      const shift = (time: number) => {
+        start ??= time;
+        const elapsed = time - start;
+        if (elapsed >= CAMERA_SHIFT_MS) {
+          cameraShiftFrame.current = undefined;
+          move(next);
+          return;
+        }
+        const remaining = 1 - elapsed / CAMERA_SHIFT_MS;
+        const progress = 1 - remaining * remaining * remaining;
+        move({
+          x: current.x + (next.x - current.x) * progress,
+          y: current.y + (next.y - current.y) * progress,
+        });
+        cameraShiftFrame.current = requestAnimationFrame(shift);
+      };
+      cameraShiftFrame.current = requestAnimationFrame(shift);
     },
-    [camera, mapBounds, moveStage],
+    [camera, mapBounds, moveStage, cancelCameraShift],
   );
-  React.useLayoutEffect(
-    () => moveStage(camera.getSnapshot()),
-    [camera, moveStage],
-  );
+  React.useLayoutEffect(() => {
+    moveStage(camera.getSnapshot());
+    return cancelCameraShift;
+  }, [camera, mapBounds, moveStage, cancelCameraShift]);
   const focusAfterNavigation = React.useRef<TerritoryMapTileKey>();
   const pointer = React.useRef<{
     id: number;
@@ -625,14 +662,20 @@ export default function TerritoryHexMap({
         ),
     }));
   };
-  const inspectTile = (tile: TerritoryTileView["tile"]) => {
+  const inspectTile = (
+    tile: TerritoryTileView["tile"],
+    fromPointer: boolean,
+  ) => {
     if ((workspace?.effectiveWidth ?? size.width) <= 740) {
       const point = hexCenter(tile);
       // Leave the selected ground and occupant above the phone's inspection sheet.
-      setCamera({
-        x: point.x,
-        y: point.y + worldHeight * (projectPlanning ? 0.3 : 0.22),
-      });
+      setCamera(
+        {
+          x: point.x,
+          y: point.y + worldHeight * (projectPlanning ? 0.3 : 0.22),
+        },
+        fromPointer && motion.allowed,
+      );
     }
     onSelect(territoryMapTileKey(tile), true);
   };
@@ -651,7 +694,7 @@ export default function TerritoryHexMap({
         }
       : undefined;
   };
-  const activateTile = (key: TerritoryMapTileKey) => {
+  const activateTile = (key: TerritoryMapTileKey, fromPointer = false) => {
     const started = activation.current;
     activation.current = undefined;
     const view = byKey.get(key);
@@ -669,7 +712,7 @@ export default function TerritoryHexMap({
       !projectPlanning
     )
       void purchase(tile.id, expectedQuote);
-    else inspectTile(tile);
+    else inspectTile(tile, fromPointer);
   };
   const pointerTile = (event: {
     target: EventTarget;
@@ -834,6 +877,7 @@ export default function TerritoryHexMap({
         onPointerDown={(event) => {
           const middle = event.button === 1;
           if (event.button !== 0 && !middle) return;
+          cancelCameraShift();
           clearHover();
           if (middle) event.preventDefault();
           const id = middle ? undefined : pointerTile(event);
@@ -950,7 +994,7 @@ export default function TerritoryHexMap({
           if (id) {
             event.preventDefault();
             event.stopPropagation();
-            activateTile(id);
+            activateTile(id, true);
           }
         }}
       >
@@ -1231,7 +1275,12 @@ export default function TerritoryHexMap({
                 onFocus={() => {
                   setRovingId(key);
                   if (key !== selected) onSelect(key);
-                  if (!pointer.current && !touches.current.size)
+                  // Touch focus can arrive between pointerup and click.
+                  if (
+                    !pointer.current &&
+                    !touches.current.size &&
+                    activation.current?.tileKey !== key
+                  )
                     revealTile(tile);
                 }}
                 onClick={() => {

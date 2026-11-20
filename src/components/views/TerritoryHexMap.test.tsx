@@ -804,7 +804,30 @@ it("requires a fresh activation if a displayed quote changes during a pointer ge
   expect(host.submit).toHaveBeenCalledTimes(1);
 });
 
-it("keeps phone targets large and unaffordable land inspectable with its currency, benefit and reason", () => {
+it("hands the phone camera back to a drag during a tile inspection shift", () => {
+  jest.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(390);
+  jest.useFakeTimers();
+  try {
+    const map = show();
+    const initial = map.stage.style.transform;
+    tap(map.target("champlain:city"));
+    act(() => jest.advanceTimersByTime(64));
+    const shifting = map.stage.style.transform;
+    expect(shifting).not.toBe(initial);
+
+    fireEvent.pointerDown(map.viewport, { clientX: 100 });
+    fireEvent.pointerMove(map.viewport, { clientX: 140 });
+    fireEvent.pointerUp(map.viewport, { clientX: 140 });
+    const dragged = map.stage.style.transform;
+    expect(dragged).not.toBe(shifting);
+    act(() => jest.advanceTimersByTime(300));
+    expect(map.stage.style.transform).toBe(dragged);
+  } finally {
+    jest.useRealTimers();
+  }
+});
+
+it("keeps phone targets large and unaffordable land inspectable with its currency, benefit and reason", async () => {
   jest.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(360);
   const map = show(1e6);
   map.buyMode();
@@ -817,7 +840,9 @@ it("keeps phone targets large and unaffordable land inspectable with its currenc
   tap(tile);
   expect(map.onSelect).toHaveBeenLastCalledWith(idOf(tile), true);
   // The shared phone sheet occupies at most 62%; leave the selected hex above it.
-  expect(tileCenter(tile, map.stage).y).toBeLessThan(900 * 0.38);
+  await waitFor(() => {
+    expect(tileCenter(tile, map.stage).y).toBeLessThan(900 * 0.38);
+  });
   expect(
     map.store.getState().game.territoryNetwork!.tilePurchases,
   ).toHaveLength(0);
