@@ -1,6 +1,7 @@
 import {
   capitalRecoveryFactor,
   facilityLoanMonths,
+  facilityLoanBalance,
   CreditInputsType,
   degradedLifetimeYears,
   facilityCashBack,
@@ -393,6 +394,43 @@ describe("getCreditPremium", () => {
 });
 
 describe("getTotalDebt", () => {
+  it("includes project debt in fleet totals and sale proceeds", () => {
+    const projectLoan = (amount: number) => ({
+      loanAmountTotal: amount,
+      loanAmountLeft: amount,
+      loanMonthlyPayment: 10,
+      interestRate: 0.05,
+      months: 120,
+      startsMinute: 0,
+    });
+    const converted = aFacility({
+      loanAmountLeft: 1000,
+      repowerLoan: projectLoan(200),
+      expansionLoans: [projectLoan(300)],
+    });
+    const expanding = aFacility({
+      loanAmountLeft: 400,
+      expansionInProgress: {
+        projectSequence: 1,
+        targetSize: 20e6,
+        targetPeakW: 20e6,
+        cost: 1000,
+        loan: projectLoan(500),
+        annualOperatingCostDelta: 0,
+        costPerStartDelta: 0,
+        startsMinute: 0,
+        yearsToBuild: 1,
+        yearsToBuildLeft: 1,
+        quoteKey: "expansion",
+      },
+    });
+    expect(facilityLoanBalance(converted)).toBe(1500);
+    expect(facilityLoanBalance(expanding)).toBe(900);
+    expect(getTotalDebt([converted, expanding])).toBe(2400);
+    expect(facilityCashBack(converted)).toBe(converted.buildCost - 1500);
+    expect(facilityCashBack(expanding)).toBe(expanding.buildCost + 1000 - 900);
+  });
+
   it("adds up what is still owed across the fleet", () => {
     expect(
       getTotalDebt([

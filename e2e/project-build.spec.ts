@@ -17,7 +17,7 @@ import {
   projectSiteQuote,
   selectProject,
 } from "../src/helpers/ProjectBuild";
-import { formatMoneyConcise } from "../src/helpers/Format";
+import { formatPurchasePrice } from "../src/helpers/Format";
 
 async function start(page: Page, theme: "light" | "dark") {
   await page.emulateMedia({ reducedMotion: "reduce" });
@@ -50,14 +50,10 @@ test("keeps project actions reachable on a short landscape display", async ({
     .click();
   await selectTerritoryMapTile(page, getTerritoryTile("champlain:site-13")!);
   const surface = page.getByRole("dialog", { name: "Wind · 20MW" });
-  const review = surface.getByRole("button", { name: "Review project" });
-  await expect(review).toBeInViewport({ ratio: 1 });
-  await review.click();
-  await expect(
-    page
-      .getByRole("dialog", { name: "Build Wind?" })
-      .getByRole("button", { name: "Build project" }),
-  ).toBeInViewport({ ratio: 1 });
+  for (const name of ["Cash", "Loan", "Cancel"])
+    await expect(
+      surface.getByRole("button", { name, exact: true }),
+    ).toBeInViewport({ ratio: 1 });
 });
 
 for (const theme of ["light", "dark"] as const) {
@@ -111,14 +107,14 @@ for (const theme of ["light", "dark"] as const) {
     expect(ownedQuote.facility).toBeDefined();
     if (!ownedQuote.facility)
       throw new Error("Owned site has no project quote");
-    await expect(owned.locator(".territoryTilePrice")).toHaveAttribute(
-      "title",
-      `Total project cost ${formatMoneyConcise(projectSiteCapitalCost(ownedQuote))} · Already connected`,
+    await expect(owned.locator(".territoryTilePrice")).toContainText(
+      formatPurchasePrice(projectSiteCapitalCost(ownedQuote)),
     );
+    await expect(owned).toHaveAccessibleName(/Already connected/);
     await expect(
       surface.getByRole("heading", { name: projectTitle, exact: true }),
     ).toBeVisible();
-    await expect(surface.getByText("Already connected · $0")).toBeVisible();
+    await expect(surface.getByText("Connected", { exact: true })).toBeVisible();
     const target = await selectTerritoryMapTile(
       page,
       getTerritoryTile("green-uplands:site-1")!,
@@ -135,18 +131,22 @@ for (const theme of ["light", "dark"] as const) {
     expect(connectionQuote.facility.buildCost).not.toBe(
       ownedQuote.facility.buildCost,
     );
-    await expect(target.locator(".territoryTilePrice")).toHaveAttribute(
-      "title",
-      `Total project cost ${formatMoneyConcise(projectSiteCapitalCost(connectionQuote))} · Connection included`,
+    await expect(target.locator(".territoryTilePrice")).toContainText(
+      formatPurchasePrice(projectSiteCapitalCost(connectionQuote)),
+    );
+    await expect(target).toHaveAccessibleName(/Connection included/);
+    await expect(target.locator(".territoryTileProduction")).toBeVisible();
+    await expect(target).toHaveAccessibleName(
+      /estimated output vs flat terrain/,
     );
     await expect(
       surface.getByRole("heading", { name: projectTitle, exact: true }),
     ).toBeVisible();
     for (const label of [
-      "Connection cost",
-      "Project cost",
-      "Cash required now",
-      "Cash remaining",
+      "Connection",
+      "Build cost",
+      "Cash purchase",
+      "Loan option",
       "Expected output",
       "Estimated online",
     ])
@@ -156,16 +156,23 @@ for (const theme of ["light", "dark"] as const) {
       .evaluateAll((facts) => {
         const scroll = facts[0].closest(".projectCandidateScroll")!;
         const bounds = scroll.getBoundingClientRect();
-        return facts.slice(0, 2).map((fact) => {
-          const value = fact.querySelector("dd")!.getBoundingClientRect();
-          return {
-            valueTop: value.top,
-            valueBottom: value.bottom,
-            visibleTop: bounds.top,
-            visibleBottom: bounds.bottom,
-          };
-        });
+        return facts
+          .filter((fact) =>
+            ["Cash purchase", "Loan option"].includes(
+              fact.querySelector("dt")!.textContent!,
+            ),
+          )
+          .map((fact) => {
+            const value = fact.querySelector("dd")!.getBoundingClientRect();
+            return {
+              valueTop: value.top,
+              valueBottom: value.bottom,
+              visibleTop: bounds.top,
+              visibleBottom: bounds.bottom,
+            };
+          });
       });
+    expect(initialCosts).toHaveLength(2);
     for (const cost of initialCosts) {
       expect(cost.valueTop).toBeGreaterThanOrEqual(cost.visibleTop);
       expect(cost.valueBottom).toBeLessThanOrEqual(cost.visibleBottom + 1);
@@ -186,33 +193,9 @@ for (const theme of ["light", "dark"] as const) {
     await reviewScreenshot(network, {
       path: testInfo.outputPath(`project-candidate-${theme}.png`),
     });
-    await surface
-      .getByRole("button", { name: "Review project", exact: true })
-      .click();
-    await expect(
-      surface.getByRole("heading", {
-        name: "Connect and build Wind?",
-        exact: true,
-      }),
-    ).toBeVisible();
-    await surface
-      .getByRole("radio", {
-        name: "Loan · connection paid in cash",
-        exact: true,
-      })
-      .check();
-    const loanTerms = surface.getByText(/Down payment/);
-    await expect(loanTerms).toBeVisible();
-    await loanTerms.scrollIntoViewIfNeeded();
-    const confirm = surface.getByRole("button", {
-      name: "Connect & build",
-      exact: true,
-    });
+    const confirm = surface.getByRole("button", { name: "Loan", exact: true });
     await expect(confirm).toBeEnabled();
     await expect(confirm).toBeInViewport();
-    await reviewScreenshot(network, {
-      path: testInfo.outputPath(`project-review-loan-${theme}.png`),
-    });
     await confirm.click();
     await expect(surface).toHaveCount(0);
     const built = (await readSavedGame(page))!;

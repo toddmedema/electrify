@@ -38,35 +38,58 @@ import {
   projectSiteQuote,
   selectProject,
 } from "../src/helpers/ProjectBuild";
-import { formatMoneyConcise } from "../src/helpers/Format";
+import { formatPurchasePrice } from "../src/helpers/Format";
 import {
   projectPoint,
   tilePosition3D,
 } from "../src/components/base/territory-3d/Projection";
 
-for (const theme of ["light", "dark"] as const) {
-  test(`renders real 3D, preserves map controls and recovers a lost context · ${theme}`, async ({
-    page,
-  }, info) => {
+async function startPausedMap(page: Page, theme?: "light" | "dark") {
+  if (theme)
     await page.addInitScript((mode) => {
       localStorage.setItem("theme", mode);
       localStorage.setItem("audioEnabled", "false");
     }, theme);
-    await page.goto("/?scenario=116");
-    await page.getByRole("button", { name: "Start game", exact: true }).click();
-    const pause = page.getByRole("button", { name: "pause", exact: true });
-    await expect(pause).toBeVisible();
-    if ((await pause.getAttribute("aria-pressed")) !== "true")
-      await pause.click();
-    const map = await returnToTerritoryMap(page);
-    const canvas = map.locator("canvas.territory3DCanvas");
-    await expect(canvas).toHaveAttribute("data-renderer", "ready");
-    const before = await canvas.evaluate((element: MapCanvas) =>
-      element.map3DDiagnostics!(),
+  await page.goto("/?scenario=116");
+  await page.getByRole("button", { name: "Start game", exact: true }).click();
+  const pause = page.getByRole("button", { name: "pause", exact: true });
+  await expect(pause).toBeVisible();
+  if ((await pause.getAttribute("aria-pressed")) !== "true")
+    await pause.click();
+  const map = await returnToTerritoryMap(page);
+  const canvas = map.locator("canvas.territory3DCanvas");
+  await expect(canvas).toHaveAttribute("data-renderer", "ready");
+  return { map, canvas };
+}
+
+async function readyDiagnostics(canvas: Locator, scene = false) {
+  const read = () =>
+    canvas.evaluate(
+      (element: MapCanvas, includeScene) =>
+        element.map3DDiagnostics?.(includeScene),
+      scene,
     );
-    expect(before.drawCalls).toBeGreaterThan(5);
+  let diagnostics: Awaited<ReturnType<typeof read>>;
+  await expect
+    .poll(async () => {
+      diagnostics = await read();
+      return diagnostics?.drawCalls ?? 0;
+    })
+    .toBeGreaterThan(5);
+  return diagnostics!;
+}
+
+for (const theme of ["light", "dark"] as const) {
+  test(`renders real 3D and recovers a lost context · ${theme}`, async ({
+    page,
+  }, info) => {
+    const { map, canvas } = await startPausedMap(page, theme);
+    const before = await readyDiagnostics(canvas, true);
     expect(before.triangles).toBeGreaterThan(100);
     expect(before.instanceCount).toBeGreaterThan(10);
+    const border = before.scene?.find(({ id }) => id === "border:ownership");
+    expect(border?.triangles).toBeGreaterThan(0);
+    await expect(map.locator(".territoryHexBoundary")).toHaveCount(0);
     await expect(map.locator(".territoryTerrainArtwork")).toHaveCount(0);
     await expect(map.locator(".territoryOccupantArtwork")).toHaveCount(0);
     await expect(
@@ -82,25 +105,6 @@ for (const theme of ["light", "dark"] as const) {
     await reviewScreenshot(map, {
       path: info.outputPath(`map-3d-${theme}.png`),
     });
-    if (!page.viewportSize() || page.viewportSize()!.width >= 1024) {
-      const viewport = map.locator(".territoryMapViewport");
-      const bounds = (await viewport.boundingBox())!;
-      const cameraX = (await readTerritoryMapCamera(viewport)).x;
-      const x = bounds.x + bounds.width / 2;
-      const y = bounds.y + bounds.height / 2;
-      await page.mouse.move(x, y);
-      const hovered = viewport.locator(
-        '[data-model-hovered="true"] .territoryTileHitArea',
-      );
-      await expect(hovered).toHaveCSS("background-image", /radial-gradient/);
-      await page.mouse.down({ button: "middle" });
-      await page.mouse.move(x + 40, y + 20, { steps: 4 });
-      await page.mouse.up({ button: "middle" });
-      await expect
-        .poll(async () => (await readTerritoryMapCamera(viewport)).x)
-        .not.toBe(cameraX);
-      await expect(page.locator(".tileWorkspaceSurface")).toHaveCount(0);
-    }
     const contextLoss = await canvas.evaluateHandle((element: MapCanvas) => {
       const gl = element.getContext("webgl2")!;
       const loss = gl.getExtension("WEBGL_lose_context");
@@ -111,6 +115,12 @@ for (const theme of ["light", "dark"] as const) {
     });
     await expect(canvas).toHaveAttribute("data-renderer", "lost");
     await expect(map.locator(".territoryTerrainArtwork").first()).toBeVisible();
+    await expect(map.locator(".territoryHexBoundary").first()).toBeVisible();
+    await capital.focus();
+    await expect(capital).toHaveAttribute("aria-pressed", "true");
+    const selection = map.locator(".territoryHexSelection");
+    await expect(selection).toHaveAttribute("d", /^(?:M[^M]+){6}$/);
+    await expect(selection).toHaveCSS("stroke-dasharray", "4px, 4px");
     await map
       .getByRole("button", { name: "Rapid connection mode", exact: true })
       .click();
@@ -121,9 +131,7 @@ for (const theme of ["light", "dark"] as const) {
     await contextLoss.evaluate((loss) => loss.restoreContext());
     await expect(canvas).toHaveAttribute("data-renderer", "ready");
     await expect(map.locator(".territoryTerrainArtwork")).toHaveCount(0);
-    const after = await canvas.evaluate((element: MapCanvas) =>
-      element.map3DDiagnostics!(),
-    );
+    const after = await readyDiagnostics(canvas);
     expect(after.frames).toBeGreaterThan(before.frames);
     expect(after.light).toEqual(before.light);
     await expect(map.locator(".territoryMap")).toHaveAttribute(
@@ -132,6 +140,80 @@ for (const theme of ["light", "dark"] as const) {
     );
   });
 }
+
+for (const theme of ["light", "dark"] as const) {
+  test(`hovers and pans the rendered map on desktop · ${theme}`, async ({
+    page,
+  }) => {
+    test.skip(
+      (page.viewportSize()?.width ?? 1024) < 1024,
+      "Desktop pointer controls",
+    );
+    const { map, canvas } = await startPausedMap(page, theme);
+    await readyDiagnostics(canvas);
+    const viewport = map.locator(".territoryMapViewport");
+    const bounds = (await viewport.boundingBox())!;
+    const cameraX = (await readTerritoryMapCamera(viewport)).x;
+    const x = Math.round(bounds.x + bounds.width / 2);
+    const y = Math.round(bounds.y + bounds.height / 2);
+    await page.mouse.move(x, y);
+    const hovered = viewport.locator(
+      '[data-model-hovered="true"] .territoryTileHitArea',
+    );
+    await expect(hovered).toHaveCSS("background-image", /radial-gradient/);
+    await page.mouse.down({ button: "middle" });
+    await page.mouse.move(x + 40, y + 20, { steps: 4 });
+    await page.mouse.up({ button: "middle" });
+    await expect
+      .poll(async () => (await readTerritoryMapCamera(viewport)).x)
+      .not.toBe(cameraX);
+    await expect(page.locator(".tileWorkspaceSurface")).toHaveCount(0);
+  });
+}
+
+test("desktop wheel zoom clamps to half and double scale around the pointer", async ({
+  page,
+}) => {
+  test.skip(
+    (page.viewportSize()?.width ?? 1024) < 1024,
+    "Desktop pointer controls",
+  );
+  const { map, canvas } = await startPausedMap(page, "light");
+  await readyDiagnostics(canvas);
+  const viewport = map.locator(".territoryMapViewport");
+  const center = await viewport.evaluate((element) => {
+    const { left, top } = element.getBoundingClientRect();
+    return {
+      x: left + element.clientWidth / 2,
+      y: top + element.clientHeight / 2,
+    };
+  });
+  const zoomX = Math.round(center.x) + 80;
+  const zoomY = Math.round(center.y) + 48;
+  await page.mouse.move(zoomX, zoomY);
+  const baseline = await readTerritoryMapCamera(viewport);
+
+  await page.mouse.wheel(0, -2000);
+  await expect(viewport).toHaveAttribute(
+    "data-camera-scale",
+    String(baseline.scale * 2),
+  );
+  await page.mouse.wheel(0, 2000);
+  await expect(viewport).toHaveAttribute(
+    "data-camera-scale",
+    String(baseline.scale / 2),
+  );
+
+  const camera = await readTerritoryMapCamera(viewport);
+  const offsetX = zoomX - center.x;
+  const offsetY = zoomY - center.y;
+  const driftX =
+    camera.x - baseline.x + offsetX / camera.scale - offsetX / baseline.scale;
+  const driftY =
+    camera.y - baseline.y + offsetY / camera.scale - offsetY / baseline.scale;
+  // Chromium rounds wheel coordinates to CSS pixels.
+  expect(Math.hypot(driftX, driftY) * camera.scale).toBeLessThan(1);
+});
 
 for (const reducedMotion of ["no-preference", "reduce"] as const) {
   const animate = reducedMotion === "no-preference";
@@ -238,20 +320,7 @@ for (const reducedMotion of ["no-preference", "reduce"] as const) {
   );
 }
 
-test("clicking real mountain relief above its ground selects the mountain tile", async ({
-  page,
-}, info) => {
-  await page.goto("/?scenario=116");
-  await page.getByRole("button", { name: "Start game", exact: true }).click();
-  const pause = page.getByRole("button", { name: "pause", exact: true });
-  await expect(pause).toBeVisible();
-  if ((await pause.getAttribute("aria-pressed")) !== "true")
-    await pause.click();
-  const map = await returnToTerritoryMap(page);
-  await expect(map.locator("canvas.territory3DCanvas")).toHaveAttribute(
-    "data-renderer",
-    "ready",
-  );
+async function nearestUnownedMountain(map: Locator) {
   const mountainId = await map
     .locator('[data-map-target][data-terrain="mountain"]:not([data-owner])')
     .evaluateAll((elements) => {
@@ -272,9 +341,14 @@ test("clicking real mountain relief above its ground selects the mountain tile",
         .sort((a, b) => a.distance - b.distance)[0].id;
     });
   const mountain = map.locator(`[data-map-target="${mountainId}"]`);
-  const tile = getTerritoryTile(
-    (await mountain.getAttribute("data-map-target"))!,
-  )!;
+  return { mountain, tile: getTerritoryTile(mountainId)! };
+}
+
+test("keyboard selection draws a centered 3D mountain outline and Escape clears it", async ({
+  page,
+}, info) => {
+  const { map, canvas } = await startPausedMap(page);
+  const { mountain, tile } = await nearestUnownedMountain(map);
   // Force keyboard focus-visible before focusing a tile that is outside the tab order.
   await page.keyboard.press("Tab");
   await mountain.focus();
@@ -289,14 +363,49 @@ test("clicking real mountain relief above its ground selects the mountain tile",
     "outline-style",
     "none",
   );
-  const selection = map.locator(".territoryHexSelection");
-  await expect(selection).toHaveAttribute("d", /^(?:M[^M]+){6}$/);
-  await expect(selection).toHaveCSS("stroke-dasharray", "4px, 4px");
+  await expect(map.locator(".territoryHexSelection")).toHaveCount(0);
+  const renderedSelection = () =>
+    canvas.evaluate((element: MapCanvas) =>
+      element
+        .map3DDiagnostics?.(true)
+        .scene?.find(({ id }) => id === "border:selection"),
+    );
+  let selection: Awaited<ReturnType<typeof renderedSelection>>;
+  // Six edges with two backed dashes each. Each dash has two triangles per layer.
+  await expect
+    .poll(
+      async () => {
+        selection = await renderedSelection();
+        return selection?.triangles;
+      },
+      {
+        message: "The 3D scene submits a complete six-edge selection outline",
+      },
+    )
+    .toBe(48);
+  const origin = tilePosition3D(tile);
+  for (const axis of [0, 2] as const)
+    expect((selection!.min[axis] + selection!.max[axis]) / 2).toBeCloseTo(
+      origin[axis],
+    );
   await mountain.press("Escape");
   await expect(mountain).toHaveAttribute("aria-pressed", "false");
+  await expect.poll(renderedSelection).toBeUndefined();
   await expect(
     map.getByRole("button", { name: "Rapid connection mode", exact: true }),
   ).toBeFocused();
+});
+
+test("clicking real mountain relief above its ground selects the mountain tile", async ({
+  page,
+}) => {
+  const { map } = await startPausedMap(page);
+  const { mountain, tile } = await nearestUnownedMountain(map);
+  // Reveal the same tile on compact viewports before testing pointer picking.
+  await mountain.focus();
+  await mountain.press("Escape");
+  await expect(mountain).toHaveAttribute("aria-pressed", "false");
+  const origin = tilePosition3D(tile);
   const viewport = map.locator(".territoryMapViewport");
   const {
     x: cameraX,
@@ -334,7 +443,6 @@ test("clicking real mountain relief above its ground selects the mountain tile",
         value * 0.9 + (vertices[1][axis] + vertices[2][axis]) * 0.05,
     );
   }
-  const origin = tilePosition3D(tile);
   const point = projectPoint(
     [origin[0] + peak[0], peak[1], origin[2] + peak[2]],
     frame,
@@ -358,7 +466,7 @@ test("clicking real mountain relief above its ground selects the mountain tile",
 });
 
 for (const theme of ["light", "dark"] as const) {
-  test(`connected project site markers fit on one line · ${theme}`, async ({
+  test(`connected project site markers fit inside their tiles · ${theme}`, async ({
     page,
   }, info) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
@@ -409,7 +517,7 @@ for (const theme of ["light", "dark"] as const) {
       expect(size.lines).toBe(1);
       expect(size.textWidth).toBeLessThanOrEqual(size.width);
       expect(size.width).toBeLessThanOrEqual(size.tileWidth);
-      expect(size.height).toBeLessThanOrEqual(size.tileHeight / 2);
+      expect(size.height).toBeLessThanOrEqual(size.tileHeight * 0.75);
     }
     const game = (await readSavedGame(page))!;
     loadSimData(game.location);
@@ -426,18 +534,24 @@ for (const theme of ["light", "dark"] as const) {
     const quote = projectSiteQuote(game, project, id);
     expect(quote.facility).toBeDefined();
     if (!quote.facility) throw new Error("Owned project site has no quote");
-    const total = formatMoneyConcise(projectSiteCapitalCost(quote));
-    const title = `Total project cost ${total} · Already connected`;
-    await expect(ownedMarker).toHaveAttribute("title", title);
-    await expect(ownedMarker).toHaveText(total);
+    const total = formatPurchasePrice(projectSiteCapitalCost(quote));
+    await expect(ownedMarker.locator("b")).toHaveText(total);
     await expect(owned).toHaveAccessibleName(
       /Total project cost .*Already connected/,
     );
     await owned.focus();
+    await expect(map.getByRole("tooltip")).toContainText(
+      `Total project cost ${total} · Already connected`,
+    );
+    await map.getByRole("button", { name: "Rapid connection mode" }).focus();
+    await expect(map.getByRole("tooltip")).toHaveCount(0);
+    await owned.focus();
     await owned.press("Enter");
-    await expect(surface.getByText("Already connected · $0")).toBeVisible();
+    await expect(surface.getByText("Connected", { exact: true })).toBeVisible();
     await ownedMarker.hover();
-    await expect(ownedMarker).toHaveAttribute("title", title);
+    await expect(map.getByRole("tooltip")).toContainText(
+      `Total project cost ${total} · Already connected`,
+    );
     await page.mouse.move(0, 0);
     await reviewScreenshot(map, {
       path: info.outputPath(`project-markers-${theme}.png`),

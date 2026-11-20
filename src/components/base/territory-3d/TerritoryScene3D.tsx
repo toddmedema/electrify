@@ -16,6 +16,7 @@ import type {
   RendererState,
 } from "./TerritoryCanvas3D";
 import { mapLighting } from "./Lighting";
+import { buildOwnershipBorder, buildSelectionBorder } from "./BorderGeometry";
 import type { MapFrame } from "./Types";
 
 const factories = { terrain: getTerrainModel, structure: getStructureModel };
@@ -34,6 +35,10 @@ export interface SceneCamera {
 export default function TerritoryScene3D({
   views,
   tiles,
+  ownership,
+  ownerPalette,
+  peerColors,
+  selectedTile,
   wires,
   minute,
   minuteOfDay,
@@ -48,6 +53,10 @@ export default function TerritoryScene3D({
 }: {
   views: readonly TerritoryTileView[];
   tiles: readonly TerritoryTileDefinition[];
+  ownership: readonly Pick<TerritoryTileView, "tile" | "ownerKey">[];
+  ownerPalette: Readonly<Record<string, string>>;
+  peerColors: Readonly<Record<string, string>>;
+  selectedTile?: TerritoryTileDefinition;
   wires: readonly HexWire[];
   minute: number;
   minuteOfDay: number;
@@ -73,9 +82,25 @@ export default function TerritoryScene3D({
   );
   const frame = { ...viewport, cameraX, cameraY };
   const builder = React.useMemo(() => new SceneBuilder(factories), []);
-  const instances = React.useMemo(
+  const scene = React.useMemo(
     () => builder.build(views, tiles, wires, minute, runKey),
     [builder, views, tiles, wires, minute, runKey],
+  );
+  const ownershipBorder = React.useMemo(
+    () => buildOwnershipBorder(ownership, ownerPalette, peerColors, dark),
+    [ownership, ownerPalette, peerColors, dark],
+  );
+  const selectionBorder = React.useMemo(
+    () => (selectedTile ? buildSelectionBorder(selectedTile) : undefined),
+    [selectedTile],
+  );
+  const instances = React.useMemo(
+    () => [
+      ...scene,
+      ...(ownershipBorder ? [ownershipBorder] : []),
+      ...(selectionBorder ? [selectionBorder] : []),
+    ],
+    [scene, ownershipBorder, selectionBorder],
   );
   const lighting = React.useMemo(
     () =>

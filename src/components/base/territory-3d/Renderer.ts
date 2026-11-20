@@ -109,6 +109,10 @@ void main() {
     color = vec4(0.08, 0.13, 0.17, uShadowAlpha * (1.0 - fog * 0.65));
     return;
   }
+  if (vMaterial.z == 4.0) {
+    color = vec4(vColor, 1.0);
+    return;
+  }
   vec3 normal = normalize(vNormal);
   float incidence = max(0.0, dot(normal, uLight));
   float band = incidence < 0.25 ? 0.48 : (incidence < 0.7 ? 0.76 : 1.0);
@@ -912,7 +916,9 @@ export class MapRenderer {
           ? 2
           : part.material === "mountain"
             ? 3
-            : 0;
+            : part.material === "map-border"
+              ? 4
+              : 0;
     pose[23] = instance.frost && pose[22] !== 1 && pose[22] !== 2 ? 1 : 0;
   }
 

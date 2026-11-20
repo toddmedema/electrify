@@ -166,11 +166,13 @@ export default function ExpandedFacilityDetails({
   facility,
   game,
   showStatus,
+  expandRequest,
   ...actions
 }: {
   facility: FacilityOperatingType;
   game: GameType;
   showStatus?: boolean;
+  expandRequest?: number;
 } & FacilityDetailActions) {
   const { formatMoneyConcise } = useMoney();
   const [open, setOpen] = React.useState(false);
@@ -247,6 +249,7 @@ export default function ExpandedFacilityDetails({
         game={game}
         onRetrofit={actions.onRetrofit}
         onExpand={actions.onExpand}
+        expandRequest={expandRequest}
         onCancelExpansion={actions.onCancelExpansion}
       />
       <MemoizedFacilityActions

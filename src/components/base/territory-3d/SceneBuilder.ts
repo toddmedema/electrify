@@ -18,7 +18,7 @@ import {
 } from "../FacilityMapStatus";
 import { HEX_NEIGHBORS, riverPorts } from "../TerritoryHexGeometry";
 import type { HexWire } from "../TerritoryHexGeometry";
-import { hailModel, HAIL_MODEL_KEY } from "./Hailstones";
+import { hailModel } from "./Hailstones";
 import { MeshBuilder } from "./MeshBuilder";
 import { PALETTE } from "./Palette";
 import { CAMERA_COS, CAMERA_SIN, tilePosition3D } from "./Projection";
@@ -496,8 +496,8 @@ export class SceneBuilder {
       tileKey: TerritoryMapTileKey | undefined;
     for (const instance of instances) {
       if (
-        instance.id.startsWith("wires:") ||
-        instance.model.key === HAIL_MODEL_KEY
+        !instance.id.startsWith("terrain:") &&
+        !instance.id.startsWith("structure:")
       )
         continue;
       const px = x - instance.position[0],

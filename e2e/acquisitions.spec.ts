@@ -13,6 +13,7 @@ import { currentTick } from "../src/helpers/GameSelectors";
 import {
   formatMoneyConcise,
   formatMoneyStable,
+  formatPurchasePrice,
   formatWattHours,
 } from "../src/helpers/Format";
 import {
@@ -424,6 +425,7 @@ async function expectPhysicalMap(network: Locator, game: GameType) {
       ),
     ).toBe(1);
   }
+  return scene;
 }
 
 async function hasRunningFacilityMotion(art: Locator) {
@@ -497,11 +499,8 @@ async function reviewTileBuild(page: Page, name: string) {
     await buildRail(page)
       .getByRole("button", { name: `Choose sites for ${name}`, exact: true })
       .click();
-    await surface
-      .getByRole("button", { name: "Review project", exact: true })
-      .click();
     await expect(
-      surface.getByRole("heading", { name: `Build ${name}?`, exact: true }),
+      surface.getByRole("button", { name: "Cash", exact: true }),
     ).toBeVisible();
     return surface;
   }
@@ -524,12 +523,7 @@ async function confirmTileBuild(
   const desktop = await buildRail(page).isVisible();
   if (desktop) {
     await review
-      .getByRole("radio", {
-        name: financed ? "Loan · connection paid in cash" : /^Cash ·/,
-      })
-      .check();
-    await review
-      .getByRole("button", { name: "Build project", exact: true })
+      .getByRole("button", { name: financed ? "Loan" : "Cash", exact: true })
       .click();
   } else {
     await review
@@ -1135,7 +1129,7 @@ for (const theme of ["light", "dark"] as const) {
     });
   });
 
-  test(`map fills the workspace and opens city charts and plant controls in ${theme}`, async ({
+  test(`map fills the workspace and culls offscreen tiles in ${theme}`, async ({
     page,
   }, info) => {
     const network = await startMap(page, theme);
@@ -1170,12 +1164,9 @@ for (const theme of ["light", "dark"] as const) {
         }),
     ).toBeVisible();
     await openMap(page);
-    await expectPhysicalMap(network, before);
     const canvas = network.locator("canvas.territory3DCanvas");
     await expect(canvas).toHaveAttribute("data-renderer", "ready");
-    const fogScene = await canvas.evaluate(
-      (element: MapCanvas) => element.map3DDiagnostics!(true).scene!,
-    );
+    const fogScene = (await expectPhysicalMap(network, before))!;
     for (const distance of [1, 2, 3]) {
       const ground = fogScene.find(
         (instance) =>
@@ -1236,6 +1227,13 @@ for (const theme of ["light", "dark"] as const) {
     expect(
       await network.locator("button[data-map-target]").count(),
     ).toBeLessThan(discovered.length);
+  });
+
+  test(`inspects city demand and the owned Lake in ${theme}`, async ({
+    page,
+  }, info) => {
+    const network = await startMap(page, theme);
+    const before = (await readSavedGame(page))!;
     const city = getTerritoryTile("champlain:city", before)!;
     const surface = await inspectTile(page, city);
     await expect(surface).toContainText("Opening customers");
@@ -1260,13 +1258,36 @@ for (const theme of ["light", "dark"] as const) {
           exact: true,
         });
     await expect(returnFocus).toBeFocused();
+    const lake = territoryTileViews(before).find(
+      (view) => view.owned && view.tile.terrain === "lake" && !view.facility,
+    )!.tile;
+    await inspectTile(page, lake);
+    await expect(
+      network.locator(`[data-map-target="${lake.id}"]`),
+    ).toHaveAccessibleDescription(
+      /Lake · Your tile · No compatible technology/,
+    );
+    await expect(surface).toHaveAccessibleName("Lake");
+    await expect(surface).not.toContainText(
+      /Hydropower site\. Plant construction|Build a generator or storage on this tile|general construction|300MW max/,
+    );
+    expect(
+      (await readSavedGame(page))!.territoryNetwork!.tilePurchases,
+    ).toEqual(before.territoryNetwork!.tilePurchases);
+  });
+
+  test(`pauses and resumes an operating plant from the map in ${theme}`, async ({
+    page,
+  }) => {
+    await startMap(page, theme);
+    const before = (await readSavedGame(page))!;
     const occupied = territoryTileViews(before).find(
       (view) =>
         view.owned &&
         view.operatingFacility &&
         view.operatingFacility.yearsToBuildLeft === 0,
     )!;
-    await inspectTile(page, occupied.tile);
+    const surface = await inspectTile(page, occupied.tile);
     await expect(surface.locator(".facilityDetails")).toBeVisible();
     await expect(
       surface.getByRole("button", { name: /^(Pause|Resume) / }),
@@ -1290,17 +1311,6 @@ for (const theme of ["light", "dark"] as const) {
     expect(
       (await readSavedGame(page))!.territoryNetwork!.tilePurchases,
     ).toEqual(before.territoryNetwork!.tilePurchases);
-    const lake = territoryTileViews(before).find(
-      (view) => view.owned && view.tile.terrain === "lake" && !view.facility,
-    )!.tile;
-    await inspectTile(page, lake);
-    await expect(
-      network.locator(`[data-map-target="${lake.id}"]`),
-    ).toHaveAccessibleDescription(/Enclosed lake basin/);
-    await expect(surface).toHaveAccessibleName("Lake");
-    await expect(surface).not.toContainText(
-      /Hydropower site\. Plant construction|Build a generator or storage on this tile|general construction|300MW max/,
-    );
   });
 
   test(`acquires a neighboring utility directly in ${theme}`, async ({
@@ -1478,13 +1488,13 @@ for (const theme of ["light", "dark"] as const) {
         network.locator(`[data-map-target="${tile.id}"]`),
       ).toHaveAttribute("aria-pressed", "true");
       await expect(
-        surface.getByText("Project cost", { exact: true }),
+        surface.getByText("Build cost", { exact: true }),
       ).toBeVisible();
       await expect(
-        surface.getByText("Cash required now", { exact: true }),
+        surface.getByText("Cash purchase", { exact: true }),
       ).toBeVisible();
       review = surface.getByRole("button", {
-        name: "Review project",
+        name: "Cancel",
         exact: true,
       });
     } else {
@@ -1621,17 +1631,12 @@ for (const theme of ["light", "dark"] as const) {
       animations: "disabled",
       scale: "css",
     });
-    await review.click();
     if (desktop) {
-      await expect(
-        surface.getByRole("heading", { name: "Build Wind?", exact: true }),
-      ).toBeVisible();
       await expectDialogToFit(surface);
-      await surface
-        .getByRole("button", { name: "Back to sites", exact: true })
-        .click();
-      await expect(review).toBeVisible();
+      await review.click();
+      await expect(surface).toHaveCount(0);
     } else {
+      await review.click();
       const confirmation = page.getByRole("dialog", {
         name: /^Build .* Wind\?/,
       });
@@ -1642,7 +1647,7 @@ for (const theme of ["light", "dark"] as const) {
     expect(currentTick((await readSavedGame(page))!)!.cash).toBe(
       currentTick(game)!.cash,
     );
-    await closeTileSurface(surface);
+    if (!desktop) await closeTileSurface(surface);
     await expect(
       network.locator('[data-map-target][aria-pressed="true"]'),
     ).toHaveCount(0);
@@ -1701,7 +1706,7 @@ for (const theme of ["light", "dark"] as const) {
     await expect(surface).not.toContainText("Cash after connection");
     await expect(
       surface.getByRole("button", {
-        name: `Connect · ${formatMoneyConcise(quote.price)}`,
+        name: `Connect · ${formatPurchasePrice(quote.price)}`,
         exact: true,
       }),
     ).toBeEnabled();
@@ -2108,7 +2113,15 @@ for (const theme of ["light", "dark"] as const) {
     expect(ownsTerritoryTile((await readSavedGame(page))!, plant.id)).toBe(
       false,
     );
-    await acquire.click();
+    await plantTarget.press("Shift+F10");
+    await page
+      .getByRole("menu", { name: "Tile actions" })
+      .getByRole("menuitem", { name: "Acquire", exact: true })
+      .click();
+    await expect(review).toBeVisible();
+    expect(currentTick((await readSavedGame(page))!)!.cash).toBe(
+      currentTick(before)!.cash,
+    );
     await reviewScreenshot(review, {
       path: info.outputPath(`municipal-acquisition-${theme}.png`),
       animations: "disabled",
@@ -2220,4 +2233,58 @@ test("normal valley play saves across the first year and resumes from IndexedDB"
   expect(after.transmission?.lines).toEqual(before.transmission?.lines);
   await expect(state).toHaveAttribute("data-save-state", "saved");
   await expect(page.getByText("Save failed", { exact: true })).toHaveCount(0);
+});
+
+test("map tile hover and right-click expose the tile's own actions", async ({
+  page,
+}, info) => {
+  const network = await startMap(page, "light");
+  const tile = TERRITORY_TILES.find(({ id }) => id === "green-uplands:site-1")!;
+  const game = (await readSavedGame(page))!;
+  const quote = tilePurchaseQuote(game, tile.id)!;
+  await panToTile(page, tile);
+  const target = network.locator(`[data-map-target="${tile.id}"]`);
+
+  await target.hover();
+  const tooltip = network.getByRole("tooltip");
+  await expect(tooltip).toHaveText("Forest · Open site · Unconnected");
+  await expect(target).not.toHaveAttribute("title", /.+/);
+
+  await target.click({ button: "right" });
+  const menu = page.getByRole("menu", { name: "Tile actions" });
+  const connect = menu.getByRole("menuitem", {
+    name: `Connect (${formatPurchasePrice(quote.price)})`,
+    exact: true,
+  });
+  await expect(connect).toBeEnabled();
+  await expect(tooltip).toHaveCount(0);
+  await expect(connect).toBeFocused();
+  await expect(menu).toBeInViewport({ ratio: 1 });
+  await reviewScreenshot(page, {
+    path: info.outputPath("tile-context-menu.png"),
+    animations: "disabled",
+    scale: "css",
+  });
+  await connect.press("Escape");
+  await expect(menu).toHaveCount(0);
+  await expect(target).toBeFocused();
+
+  await target.press("Shift+F10");
+  await menu.getByRole("menuitem", { name: "Inspect", exact: true }).click();
+  const inspector = page.getByRole("dialog", {
+    name: "Forest",
+    exact: true,
+  });
+  await expect(
+    inspector.getByRole("heading", { name: "Forest" }),
+  ).toBeFocused();
+  await closeTileSurface(inspector);
+  await expect(inspector).toHaveCount(0);
+
+  await target.press("Shift+F10");
+  await connect.click();
+  await expect(target).toHaveAttribute("data-owned", "true");
+  await expect
+    .poll(async () => ownsTerritoryTile((await readSavedGame(page))!, tile.id))
+    .toBe(true);
 });

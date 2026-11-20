@@ -24,6 +24,42 @@ export function territoryPeerColors(peerIds: readonly string[]) {
   );
 }
 
+/** The same utility colors drive SVG labels and the depth-tested map meshes. */
+export const TERRITORY_OWNER_PALETTE: Record<
+  "dark" | "light",
+  Readonly<Record<string, string>>
+> = {
+  light: {
+    "--territory-owner-you": "#006bbb",
+    "--territory-owner-valley": "#955b22",
+    "--territory-owner-ridge": "#7951a6",
+    "--territory-owner-municipal": "#646e47",
+    "--territory-owner-peer-0": "#32766a",
+    "--territory-owner-peer-1": "#96516c",
+    "--territory-owner-peer-2": "#926817",
+  },
+  dark: {
+    "--territory-owner-you": "#62acfa",
+    "--territory-owner-valley": "#d2a469",
+    "--territory-owner-ridge": "#b69bdf",
+    "--territory-owner-municipal": "#b0bd92",
+    "--territory-owner-peer-0": "#7dc9bf",
+    "--territory-owner-peer-1": "#d9a0bc",
+    "--territory-owner-peer-2": "#d5be7c",
+  },
+};
+
+export function territoryOwnerColor(
+  id: string,
+  peerColors: Readonly<Record<string, string>>,
+) {
+  if (id === "you") return "var(--territory-owner-you)";
+  if (id === "valley-electric") return "var(--territory-owner-valley)";
+  if (id === "ridge-electric") return "var(--territory-owner-ridge)";
+  if (id.startsWith("municipal:")) return "var(--territory-owner-municipal)";
+  return peerColors[id.slice(5)] ?? "var(--territory-owner-municipal)";
+}
+
 /** A short usable benefit shared by painted prices and their accessible names. */
 export function tilePurchaseBenefitLabel(quote: {
   benefit: "general" | "residential" | "industrial" | "hydro" | "geothermal";

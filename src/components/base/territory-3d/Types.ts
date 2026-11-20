@@ -18,7 +18,8 @@ export interface ModelPart {
     | "facility-window"
     | "water"
     | "watershed-water"
-    | "mountain";
+    | "mountain"
+    | "map-border";
   /** Tile-width offsets at empty and full storage, respectively. */
   waterLevelRange?: readonly [empty: number, full: number];
   position?: Vec3;

@@ -3,7 +3,7 @@ import {
   Button,
   DialogContentText,
   LinearProgress,
-  TextField,
+  Slider,
   Typography,
 } from "@mui/material";
 import type {
@@ -25,8 +25,16 @@ import {
   territoryTilePowerLimit,
   tileSupportsFacilityTechnology,
 } from "../../helpers/TerritoryTiles";
-import { facilityExpansionQuote } from "../../helpers/FacilityExpansion";
-import { facilityPermanentlyShutdown } from "../../helpers/Financials";
+import {
+  facilityExpansionQuote,
+  facilityExpansionRefund,
+  financeFacilityExpansionQuote,
+} from "../../helpers/FacilityExpansion";
+import {
+  facilityLoanMonths,
+  facilityPermanentlyShutdown,
+} from "../../helpers/Financials";
+import { getInflationIndex } from "../../data/Economy";
 import { currentCash } from "../../helpers/GameSelectors";
 import {
   formatBuildMonths,
@@ -39,9 +47,9 @@ import type {
   FacilityExpansionRequestResult,
   FacilityExpansionCancellationResult,
 } from "../../helpers/RequestFacilityExpansion";
-import { useMoney } from "./CurrencyContext";
+import { CurrencyContext, useMoney } from "./CurrencyContext";
 import ConfirmDialog from "./ConfirmDialog";
-import DecisionImpactPreview from "./DecisionImpactPreview";
+import PurchaseReviewDialog from "./PurchaseReviewDialog";
 import { signature } from "./DeferredProjection";
 import "./FacilityCapacityUpgrade.scss";
 
@@ -61,11 +69,14 @@ export default function FacilityCapacityUpgrade({
   game,
   onExpand,
   onCancelExpansion,
+  openOnMount = false,
 }: {
   facility: FacilityOperatingType;
   game: GameType;
+  openOnMount?: boolean;
 } & FacilityCapacityUpgradeActions) {
-  const money = useMoney(currencyForLocation(game.location, game.startingYear));
+  const currency = currencyForLocation(game.location, game.startingYear);
+  const money = useMoney(currency);
   const storage = isStorage(facility);
   const size = facility.peakWh ?? facility.peakW;
   const unit = storage ? "MWh" : "MW";
@@ -98,11 +109,32 @@ export default function FacilityCapacityUpgrade({
       : physicalMaximum <= size
         ? "This capacity exceeds the technology or site limit."
         : undefined;
-  const [open, setOpen] = React.useState(false);
-  const [target, setTarget] = React.useState("");
-  const [reviewedKey, setReviewedKey] = React.useState<string>();
-  const [cancelReview, setCancelReview] =
-    React.useState<FacilityExpansionInProgressType>();
+  const expandOnMount =
+    openOnMount &&
+    !!onExpand &&
+    !physicalUnavailable &&
+    !facility.expansionInProgress;
+  const initialTarget = Math.min(
+    physicalMaximum,
+    size + Math.max(1, Math.round(size / 4e6)) * 1e6,
+  );
+  const [open, setOpen] = React.useState(expandOnMount);
+  const [targetSize, setTargetSize] = React.useState(initialTarget);
+  const [reviewedKey, setReviewedKey] = React.useState(() => {
+    if (!expandOnMount) return undefined;
+    const initialQuote = facilityExpansionQuote(
+      game,
+      facility.id,
+      initialTarget,
+      true,
+    );
+    return initialQuote.status === "ready" ? initialQuote.quoteKey : undefined;
+  });
+  const [cancelReview, setCancelReview] = React.useState<
+    FacilityExpansionInProgressType | undefined
+  >(
+    openOnMount && onCancelExpansion ? facility.expansionInProgress : undefined,
+  );
   const [pending, setPending] = React.useState(false);
   const [message, setMessage] = React.useState<string>();
   const submitting = React.useRef(false);
@@ -115,13 +147,11 @@ export default function FacilityCapacityUpgrade({
       upgradeSection.current?.focus();
     }
   }, [open, cancelReview]);
-  const targetSize = target.trim() ? Number(target) * 1e6 : NaN;
   const pricingKey = open
     ? JSON.stringify([
         signature(game),
         game.date.month,
         game.date.monthNumber,
-        game.interestRate,
         game.commissionedHydroSiteIds,
         facility.name,
         facility.tileId,
@@ -144,19 +174,32 @@ export default function FacilityCapacityUpgrade({
     [pricingKey, facilityId, size],
   );
   const maximum = availability?.maxSize ?? physicalMaximum;
+  const selectedSize = Math.max(size, Math.min(targetSize, maximum));
+  const sliderSteps = Math.max(0, Math.ceil((maximum - size) / 1e6));
+  // Use integer slider steps, preserving both exact bounds even for fractional MW caps.
+  const capacityAtStep = (step: number) =>
+    Math.max(size, Math.min(maximum, size + step * 1e6));
+  const selectedStep =
+    selectedSize === maximum
+      ? sliderSteps
+      : Math.round((selectedSize - size) / 1e6);
   const quote = React.useMemo(
     () =>
       pricingKey === undefined
         ? undefined
-        : facilityExpansionQuote(game, facilityId, targetSize),
+        : facilityExpansionQuote(game, facilityId, selectedSize),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [pricingKey, facilityId, size, targetSize],
+    [pricingKey, facilityId, size, selectedSize],
   );
   const ready = quote?.status === "ready" ? quote : undefined;
   const cash = currentCash(game);
-  const shortfall = ready ? Math.max(0, ready.cost - cash) : 0;
-  const changed = !!ready && ready.quoteKey !== reviewedKey;
+  const months = facilityLoanMonths(facility.lifespanYears);
+  const loanQuote =
+    ready && financeFacilityExpansionQuote(ready, game.interestRate, months);
+  const changed = !!loanQuote && loanQuote.quoteKey !== reviewedKey;
   const expansion = facility.expansionInProgress;
+  const cancelTerms =
+    expansion?.quoteKey === cancelReview?.quoteKey ? expansion : cancelReview;
   const progress = expansion
     ? Math.max(
         0,
@@ -171,10 +214,10 @@ export default function FacilityCapacityUpgrade({
       ? availability.reason
       : physicalUnavailable;
   const offer = !!onExpand && !unavailable;
-  const changeTarget = (value: string) => {
-    setTarget(value);
+  const changeTarget = (value: number) => {
+    setTargetSize(value);
     setMessage(undefined);
-    const next = facilityExpansionQuote(game, facility.id, Number(value) * 1e6);
+    const next = facilityExpansionQuote(game, facility.id, value, true);
     setReviewedKey(next.status === "ready" ? next.quoteKey : undefined);
   };
   const close = () => {
@@ -183,32 +226,38 @@ export default function FacilityCapacityUpgrade({
     setCancelReview(undefined);
     setMessage(undefined);
   };
-  const start = async () => {
-    if (submitting.current || !ready || changed || shortfall > 0 || !onExpand)
-      return;
+  const start = async (financed: boolean) => {
+    const purchase = financed ? loanQuote : ready;
+    if (
+      submitting.current ||
+      !purchase ||
+      changed ||
+      cash < purchase.amountDue ||
+      !onExpand
+    )
+      return false;
     submitting.current = true;
     setPending(true);
     setMessage(undefined);
     try {
       const result = await onExpand({
         facilityId: facility.id,
-        targetSize: ready.targetSize,
-        quoteKey: ready.quoteKey,
+        targetSize: purchase.targetSize,
+        quoteKey: purchase.quoteKey,
+        ...(financed && { financed }),
       });
       if (result.status === "accepted") {
         focusUpgradeSection.current = true;
         setOpen(false);
-      } else {
-        setMessage(result.message);
-        setReviewedKey(undefined);
+        return true;
       }
-    } catch (cause) {
-      setMessage(
-        cause instanceof Error
-          ? cause.message
-          : "The upgrade was not confirmed. Try again.",
-      );
       setReviewedKey(undefined);
+      return result.message;
+    } catch (cause) {
+      setReviewedKey(undefined);
+      return cause instanceof Error
+        ? cause.message
+        : "The upgrade was not confirmed. Try again.";
     } finally {
       submitting.current = false;
       setPending(false);
@@ -231,7 +280,9 @@ export default function FacilityCapacityUpgrade({
         setMessage(
           result.status === "completed"
             ? result.message
-            : `Capacity upgrade canceled. ${money.formatMoneyConcise(result.refund)} refunded.`,
+            : result.refund === undefined
+              ? "Capacity upgrade canceled and its loan settled."
+              : `Capacity upgrade canceled. ${money.formatPurchasePrice(result.refund)} refunded.`,
         );
       }
     } catch (cause) {
@@ -298,11 +349,7 @@ export default function FacilityCapacityUpgrade({
             disabled={!offer || pending}
             aria-describedby={!offer ? unavailableId : undefined}
             onClick={() => {
-              const next = Math.min(
-                maximum ?? Infinity,
-                size + Math.max(1e6, size / 4),
-              );
-              changeTarget(String(next / 1e6));
+              changeTarget(initialTarget);
               setOpen(true);
             }}
           >
@@ -325,124 +372,91 @@ export default function FacilityCapacityUpgrade({
         </Typography>
       )}
       {open && (
-        <ConfirmDialog
-          open
-          isolateClicks
-          title={`Upgrade ${facility.name} capacity`}
-          contentClassName="facilityCapacityDialog"
-          pending={pending}
-          confirmLabel={
-            pending
-              ? "Waiting for confirmation…"
-              : ready
-                ? `Pay ${money.formatMoneyConcise(ready.cost)}`
-                : "Upgrade capacity"
-          }
-          confirmDisabled={!ready || changed || shortfall > 0}
-          onCancel={close}
-          onConfirm={() => {
-            void start();
-          }}
-        >
-          <div className="facilityCapacityControls">
-            <TextField
-              label={`New capacity (${unit})`}
-              type="number"
-              value={target}
-              disabled={pending}
-              onChange={(event) => changeTarget(event.target.value)}
-              slotProps={{
-                htmlInput: {
-                  min: size / 1e6,
-                  max: maximum === undefined ? undefined : maximum / 1e6,
-                  step: "any",
-                },
-              }}
-            />
-            <Button
-              variant="outlined"
-              disabled={pending || maximum === undefined || maximum <= size}
-              onClick={() => {
-                if (maximum !== undefined) changeTarget(String(maximum / 1e6));
-              }}
-            >
-              Use maximum
-            </Button>
-          </div>
-          {maximum !== undefined && (
-            <DialogContentText>
-              Site and technology limit: {formatNumber(maximum / 1e6)} {unit}.
-            </DialogContentText>
-          )}
-          {ready && (
-            <DecisionImpactPreview
-              facts={[
-                {
-                  concept: storage ? "storage" : "supply",
-                  label: "Capacity",
-                  value: `${capacity(ready.currentSize)} → ${capacity(ready.targetSize)}`,
-                  detail: `Adds ${capacity(ready.deltaSize)} at this plant.`,
-                },
-                {
-                  concept: "money",
-                  label: "Added capital cost",
-                  value: money.formatMoneyConcise(ready.cost),
-                  detail:
-                    "Larger plant quote minus the equivalent current-capacity quote, both at today's prices.",
-                },
-                {
-                  concept: "money",
-                  label: "Cash remaining",
-                  value: money.formatMoneyConcise(cash - ready.cost),
-                },
-                {
-                  concept: "time",
-                  label: "Construction time",
-                  value: formatBuildMonths(ready.yearsToBuild, "long"),
-                  detail:
-                    "Current capacity keeps operating. Added capacity becomes available on completion.",
-                },
-              ]}
-            />
-          )}
-          {!ready && (
-            <DialogContentText role="alert">
-              {quote?.status === "unavailable"
-                ? quote.reason
-                : "Choose a larger capacity."}
-            </DialogContentText>
-          )}
-          {shortfall > 0 && (
-            <DialogContentText role="alert">
-              {money.formatMoneyConcise(shortfall)} more cash needed.
-            </DialogContentText>
-          )}
-          {changed && (
-            <div className="facilityCapacityReview">
-              <DialogContentText>
-                The quote changed. Review these updated terms before paying.
-              </DialogContentText>
-              <Button
-                disabled={pending}
-                onClick={() => {
-                  setReviewedKey(ready?.quoteKey);
-                  setMessage(undefined);
-                }}
-              >
-                Review updated quote
-              </Button>
-            </div>
-          )}
-          {message && (
-            <DialogContentText role="alert">{message}</DialogContentText>
-          )}
-          <DialogContentText>
-            Cash purchase. Cancel before completion for a full refund.
-            Construction emissions already released remain recorded.
-          </DialogContentText>
-        </ConfirmDialog>
+        <CurrencyContext.Provider value={currency}>
+          <PurchaseReviewDialog
+            open
+            isolateClicks
+            title={`Upgrade ${facility.name} capacity?`}
+            cash={cash}
+            buildCost={ready?.cost ?? 0}
+            interestRate={game.interestRate}
+            loanMonths={months}
+            cashDisabled={!ready || changed}
+            loanDisabled={!ready || changed}
+            hideFacts={!ready}
+            cashLabel="Cash option"
+            upkeepLabel="Added maintenance"
+            upkeepPerMonth={
+              ((ready?.annualOperatingCostDelta ?? 0) *
+                getInflationIndex(game.date, game.startingYear, game.seed)) /
+              ((facility.costIndexAtBuild ?? 1) * 12)
+            }
+            onlineInMonths={ready && Math.round(ready.yearsToBuild * 12)}
+            onlineInLabel="Added capacity online in"
+            cancelLabel="Cancel"
+            onClose={close}
+            onPurchase={start}
+            preface={
+              <div className="facilityCapacityControls constructionControls">
+                <Typography className="constructionCapacity" variant="body2">
+                  <strong>
+                    {formatNumber(selectedSize / 1e6, { notation: "standard" })}{" "}
+                    {unit}
+                  </strong>
+                </Typography>
+                <Slider
+                  aria-label={`New capacity (${unit})`}
+                  className="constructionCapacitySlider"
+                  disabled={pending || sliderSteps === 0}
+                  scale={(step) => capacityAtStep(step) / 1e6}
+                  getAriaValueText={(value) =>
+                    `${formatNumber(value, { notation: "standard" })} ${unit}`
+                  }
+                  min={0}
+                  max={Math.max(1, sliderSteps)}
+                  step={1}
+                  value={selectedStep}
+                  onChange={(_event, value) => {
+                    if (typeof value === "number")
+                      changeTarget(capacityAtStep(value));
+                  }}
+                />
+              </div>
+            }
+            afterFacts={
+              <div className="facilityCapacityNotes">
+                {ready ? (
+                  <Typography variant="body2" color="textSecondary">
+                    Current capacity keeps operating during construction.
+                  </Typography>
+                ) : (
+                  <DialogContentText>
+                    {quote?.status === "unavailable"
+                      ? quote.reason
+                      : "Choose a larger capacity."}
+                  </DialogContentText>
+                )}
+                {changed && (
+                  <div className="facilityCapacityReview">
+                    <DialogContentText>
+                      The quote changed. Review the updated terms before paying.
+                    </DialogContentText>
+                    <Button
+                      disabled={pending}
+                      onClick={() => {
+                        setReviewedKey(loanQuote?.quoteKey);
+                      }}
+                    >
+                      Review updated quote
+                    </Button>
+                  </div>
+                )}
+              </div>
+            }
+          />
+        </CurrencyContext.Provider>
       )}
-      {cancelReview && (
+      {cancelReview && cancelTerms && (
         <ConfirmDialog
           open
           isolateClicks
@@ -459,10 +473,11 @@ export default function FacilityCapacityUpgrade({
           }}
         >
           <DialogContentText>
-            Cancel the added capacity at {facility.name} for a full refund of{" "}
-            {money.formatMoneyConcise(cancelReview.cost)}. The existing{" "}
-            {capacity(size)} plant keeps operating. Construction emissions
-            already released remain recorded.
+            Cancel the added capacity at {facility.name}.{" "}
+            {cancelTerms.loan
+              ? `The loan will be settled and ${money.formatPurchasePrice(facilityExpansionRefund(cancelTerms))} refunded.`
+              : `You will receive a full refund of ${money.formatPurchasePrice(cancelTerms.cost)}.`}{" "}
+            The existing {capacity(size)} plant keeps operating.
           </DialogContentText>
           {message && (
             <DialogContentText role="alert">{message}</DialogContentText>

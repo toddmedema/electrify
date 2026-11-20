@@ -1697,6 +1697,12 @@ const SCHEMA_22_MASTER_RULES =
 const SCHEMA_22_PREVIEW_RULES =
   "coop-2-65d7bc6c94fc95425c4781b2a0039977949b473ac9928a597914f29b449643a6";
 
+// Master 16f9a7fa changed the Valley goals. Map branch 382cc36a added project loans.
+const SCHEMA_23_MASTER_RULES =
+  "coop-2-8bf797b211b8ee017e7f4e23f67019de651918233f43a90a2a047d0bec4e724d";
+const SCHEMA_23_MAP_RULES =
+  "coop-2-3a64b92f0462af2eb6286821f118c030f25aaf65b546a4a7652e87b1dbcd3e33";
+
 /** Recognized published worlds follow ordered migrations; arbitrary runtime identities never do. */
 function upgradeTerritoryWorld(value: unknown): unknown {
   const old = value as Partial<World> | null;
@@ -1724,10 +1730,12 @@ function upgradeTerritoryWorld(value: unknown): unknown {
           "coop-2-c85efcd401375172030f9ab31b7b1f81f0ecf4f450732f36d86e265355e91bef" ||
           old.rules ===
             "coop-2-fdb701fc666648e148ecc4d6a02e4b2001090bc79052092a4e567ea9184714ef")) ||
-      // Published master 40c3cafc: coal repowers precede connection receipt pricing.
+      // Published schema 20: coal repowers in master 40c3cafc, and expansion loans in preview 7a1d58e.
       (old.gameSchema === 20 &&
-        old.rules ===
-          "coop-2-cf979e3b45deb328dd12a266f291e16398174095d47beca6df0d4f9da1dbd577") ||
+        (old.rules ===
+          "coop-2-cf979e3b45deb328dd12a266f291e16398174095d47beca6df0d4f9da1dbd577" ||
+          old.rules ===
+            "coop-2-f55523858de9d3d66c6be60626ffab92225cba0047b3e4611ad639f83b4aad90")) ||
       // Published masters 89557e6/095c194 and acquisition branch 755cf1d9 share schema 21.
       (old.gameSchema === 21 &&
         (old.rules ===
@@ -1738,7 +1746,10 @@ function upgradeTerritoryWorld(value: unknown): unknown {
             "coop-2-8423406cc7fc00c2bcf0e3cd7b647ad746beabc840cbeb1fc847e15d0389d64c")) ||
       (old.gameSchema === 22 &&
         (old.rules === SCHEMA_22_MASTER_RULES ||
-          old.rules === SCHEMA_22_PREVIEW_RULES))
+          old.rules === SCHEMA_22_PREVIEW_RULES)) ||
+      (old.gameSchema === 23 &&
+        (old.rules === SCHEMA_23_MASTER_RULES ||
+          old.rules === SCHEMA_23_MAP_RULES))
     ) ||
     !Array.isArray(old.grids) ||
     !old.grids.every(
@@ -1752,15 +1763,17 @@ function upgradeTerritoryWorld(value: unknown): unknown {
           old.gameSchema === 20 ||
           old.gameSchema === 21 ||
           old.gameSchema === 22 ||
+          old.gameSchema === 23 ||
           isUtilityExpansionGame(grid)),
     )
   )
     return value;
   const result = cloneDeep(old) as World;
   const publishedValleyRules =
-    old.rules === SCHEMA_22_MASTER_RULES
+    old.rules === SCHEMA_22_MASTER_RULES || old.rules === SCHEMA_23_MAP_RULES
       ? "published-master"
-      : old.rules === SCHEMA_22_PREVIEW_RULES
+      : old.rules === SCHEMA_22_PREVIEW_RULES ||
+          old.rules === SCHEMA_23_MASTER_RULES
         ? "acquisition-preview"
         : undefined;
   for (let i = 0; i < result.grids.length; i++) {

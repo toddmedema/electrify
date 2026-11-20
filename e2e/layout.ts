@@ -317,8 +317,7 @@ export async function setMapProjectCapacity(
       exact: true,
     })
     .fill(tick);
-  if (opened)
-    await catalogue.getByRole("button", { name: "Done", exact: true }).click();
+  if (opened) await sizing.page().keyboard.press("Escape");
 }
 
 /**

@@ -54,7 +54,7 @@ export default function AcquisitionReviewDialog({
     cash: number;
   }>();
   const game = submission?.game ?? liveGame;
-  const { formatMoneyConcise } = useMoney(
+  const { formatMoneyConcise, formatPurchasePrice } = useMoney(
     currencyForLocation(game.location, game.startingYear),
   );
   const [error, setError] = React.useState<string>();
@@ -127,14 +127,14 @@ export default function AcquisitionReviewDialog({
       paymentSummary={{
         cash: {
           value: municipal
-            ? `${formatMoneyConcise(offer.cashDue)} now`
-            : `${formatMoneyConcise(offer.cashDue)} now + ${formatMoneyConcise(offer.cashMonthlyDebtService + offer.networkOMPerMonth)}/mo`,
+            ? `${formatPurchasePrice(offer.cashDue)} now`
+            : `${formatPurchasePrice(offer.cashDue)} now + ${formatMoneyConcise(offer.cashMonthlyDebtService + offer.networkOMPerMonth)}/mo`,
         },
         ...(municipal
           ? {}
           : {
               loan: {
-                value: `${formatMoneyConcise(offer.financedCashDue)} now + ${formatMoneyConcise(offer.monthlyDebtService + offer.networkOMPerMonth)}/mo`,
+                value: `${formatPurchasePrice(offer.financedCashDue)} now + ${formatMoneyConcise(offer.monthlyDebtService + offer.networkOMPerMonth)}/mo`,
               },
             }),
       }}
@@ -175,7 +175,7 @@ export default function AcquisitionReviewDialog({
               </Typography>
             ) : !municipal && cash < offer.financedCashDue ? (
               <Typography variant="body2" color="warning.main">
-                Need {formatMoneyConcise(offer.financedCashDue)} cash for the
+                Need {formatPurchasePrice(offer.financedCashDue)} cash for the
                 down payment and fee. You have {formatMoneyConcise(cash)}.
               </Typography>
             ) : null}
@@ -265,18 +265,18 @@ export default function AcquisitionReviewDialog({
                           tileId === municipal.utility.city.id
                             ? `${municipal.utility.city.city?.name ?? "City"} service area`
                             : "Plant site",
-                        value: formatMoneyConcise(price),
+                        value: formatPurchasePrice(price),
                       }))
                     : [
                         {
                           concept: "money",
                           label: "Purchase price",
-                          value: formatMoneyConcise(offer.equityPrice),
+                          value: formatPurchasePrice(offer.equityPrice),
                         },
                         {
                           concept: "money",
                           label: "Transaction fee",
-                          value: formatMoneyConcise(offer.fee),
+                          value: formatPurchasePrice(offer.fee),
                           detail: "Paid in cash with either option",
                         },
                         {

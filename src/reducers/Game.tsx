@@ -1,6 +1,7 @@
 import { expandFacility, cancelFacilityExpansion } from "./GameActions";
 import {
   facilityExpansionQuote,
+  facilityExpansionRefund,
   validExpandFacilityAction,
   validCancelFacilityExpansionAction,
   completeFacilityExpansion,
@@ -3232,26 +3233,27 @@ function applyBuildFacility(
   return true;
 }
 
-/** Charge capital directly: forecasts preserve current cash and recompute asset equity. */
+/** Forecasts preserve the settled cash and recompute project equity. */
 function applyExpandFacility(state: GameType, payload: unknown): boolean {
   if (!validExpandFacilityAction(payload)) return false;
   const quote = facilityExpansionQuote(
     state,
     payload.facilityId,
     payload.targetSize,
+    payload.financed,
   );
   const now = getTimeFromTimeline(state.date.minute, state.timeline);
   if (
     quote.status !== "ready" ||
     quote.quoteKey !== payload.quoteKey ||
     !now ||
-    now.cash < quote.cost
+    now.cash < quote.amountDue
   )
     return false;
   const facility = state.facilities.find(
     ({ id }) => id === payload.facilityId,
   )!;
-  now.cash -= quote.cost;
+  now.cash -= quote.amountDue;
   facility.expansionSequence = quote.projectSequence;
   // Keep only the validated project terms, not UI quote metadata or a replacement plant.
   facility.expansionInProgress = {
@@ -3262,6 +3264,7 @@ function applyExpandFacility(state: GameType, payload: unknown): boolean {
       ? { targetPeakWh: quote.targetPeakWh }
       : {}),
     cost: quote.cost,
+    ...(quote.loan && { loan: quote.loan }),
     annualOperatingCostDelta: quote.annualOperatingCostDelta,
     costPerStartDelta: quote.costPerStartDelta,
     startsMinute: quote.startsMinute,
@@ -3271,6 +3274,7 @@ function applyExpandFacility(state: GameType, payload: unknown): boolean {
     constructionKgco2eEmitted: 0,
     quoteKey: quote.quoteKey,
   };
+  if (quote.loan) refreshInterestRate(state, now.cash);
   logGameEvent(
     state,
     "BUILD",
@@ -3299,8 +3303,9 @@ function applyCancelFacilityExpansion(
     !now
   )
     return false;
-  now.cash += expansion.cost;
-  // Cancellation refunds committed capital, never construction emissions already released.
+  const refund = facilityExpansionRefund(expansion);
+  now.cash += refund;
+  // Cancellation unwinds the investment. Already emitted construction carbon remains.
   const emitted = expansion.constructionKgco2eEmitted ?? 0;
   recordAcquiredExpansion(facility, 0, 0, emitted, emitted);
   facility.constructionKgco2eTotal =
@@ -3308,10 +3313,11 @@ function applyCancelFacilityExpansion(
   facility.constructionKgco2eEmitted =
     (facility.constructionKgco2eEmitted ?? 0) + emitted;
   delete facility.expansionInProgress;
+  if (expansion.loan) refreshInterestRate(state, now.cash);
   logGameEvent(
     state,
     "BUILD",
-    `Canceled capacity expansion of ${facility.name}; refunded ${formatMoneyConcise(expansion.cost, currencyForLocation(state.location, state.startingYear))}.`,
+    `Canceled capacity expansion of ${facility.name}; refunded ${formatMoneyConcise(refund, currencyForLocation(state.location, state.startingYear))}.`,
   );
   state.timeline = reforecastSupply(state, true);
   return true;
@@ -4404,9 +4410,20 @@ function tickWorkingState(state: GameType): GameType {
     ...state,
     timeline: [...state.timeline],
     facilities: state.facilities.map((facility) => {
-      const copy = { ...facility };
-      if (facility.expansionInProgress)
-        copy.expansionInProgress = { ...facility.expansionInProgress };
+      const copy = {
+        ...facility,
+        ...(facility.expansionInProgress && {
+          expansionInProgress: {
+            ...facility.expansionInProgress,
+            ...(facility.expansionInProgress.loan && {
+              loan: { ...facility.expansionInProgress.loan },
+            }),
+          },
+        }),
+        ...(facility.expansionLoans && {
+          expansionLoans: facility.expansionLoans.map((loan) => ({ ...loan })),
+        }),
+      };
       if (!isStorage(copy) && copy.repowerLoan)
         copy.repowerLoan = { ...copy.repowerLoan };
       return copy;
@@ -7057,6 +7074,11 @@ function* supplyFacilitiesFinancesPhases(
   expensesOM += oneTimeWorldEventCost(hazardOneTimeCosts, prev, now);
   let expensesFuel = 0;
   let expensesInterest = 0;
+  const settleExpansionLoans = !preRoll && advanceConstruction;
+  // A reforecast of the current frame retains the interest actually booked before any action.
+  let expansionInterest = !advanceConstruction
+    ? (now.expensesExpansionInterest ?? 0)
+    : 0;
   let principalRepayment = 0;
   // Hoisted out of the loop below, the way the demand pass at the top of this file already does
   // it: prices move by the month, and this is per facility per tick
@@ -7159,6 +7181,36 @@ function* supplyFacilitiesFinancesPhases(
         facilityExpenses += interest;
         if (!simulated && projectLoan.loanAmountLeft <= 0)
           logGameEvent(state, "LOAN", `Conversion loan paid off: ${g.name}`);
+      }
+      if (
+        settleExpansionLoans &&
+        (g.expansionLoans || g.expansionInProgress?.loan)
+      ) {
+        const pendingLoan = g.expansionInProgress?.loan;
+        const loans = pendingLoan
+          ? [...(g.expansionLoans ?? []), pendingLoan]
+          : g.expansionLoans!;
+        for (const loan of loans) {
+          if (loan.loanAmountLeft <= 0) continue;
+          const interest = getPaymentInterest(
+            loan.loanAmountLeft,
+            loan.interestRate,
+          );
+          const principal = Math.min(
+            (loan.loanMonthlyPayment - interest) / ticksPerMonth,
+            loan.loanAmountLeft,
+          );
+          principalRepayment += principal;
+          loan.loanAmountLeft -= principal;
+          expansionInterest += interest / ticksPerMonth;
+          facilityExpenses += interest / ticksPerMonth;
+        }
+        if (g.expansionLoans?.some((loan) => loan.loanAmountLeft === 0)) {
+          g.expansionLoans = g.expansionLoans.filter(
+            (loan) => loan.loanAmountLeft > 0,
+          );
+          if (!g.expansionLoans.length) delete g.expansionLoans;
+        }
       }
       // Only a real tick is a tick of this facility's life. The pre-roll frames after a month
       // rollover and every tick of every forecast come through here too, and neither happened
@@ -7277,6 +7329,12 @@ function* supplyFacilitiesFinancesPhases(
     expensesOM +=
       (annualNetworkOM * costIndexNow * difficulty.expensesOM) /
       (12 * ticksPerMonth);
+  }
+  if (expansionInterest > 0) {
+    expensesInterest += expansionInterest;
+    now.expensesExpansionInterest = expansionInterest;
+  } else if (now.expensesExpansionInterest !== undefined) {
+    delete now.expensesExpansionInterest;
   }
   const expensesCarbonFee = carbonFee * feeableKgco2e;
 

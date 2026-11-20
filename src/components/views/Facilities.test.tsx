@@ -431,9 +431,9 @@ describe("the fleet list", () => {
     const oil = oilGame.facilities.find((facility) => facility.name === "Oil")!;
     renderFacilities(oilGame, oil.id);
 
-    expect(screen.getByText("Fixed upkeep")).toBeInTheDocument();
+    expect(screen.getByText("Fixed")).toBeInTheDocument();
     expect(screen.getByText("$1.82M/yr")).toBeInTheDocument();
-    expect(screen.getByText("Variable upkeep")).toBeInTheDocument();
+    expect(screen.getByText("Variable")).toBeInTheDocument();
     expect(screen.getByText("$15.2/MWh")).toBeInTheDocument();
     expect(screen.queryByText("Starts")).toBeNull();
     expect(screen.queryByText("Non-fuel start cost")).toBeNull();
@@ -2458,10 +2458,10 @@ it.each(["FLEET", "FACILITIES"] as const)(
       );
     await user.click(screen.getByRole("button", { name: "Upgrade capacity" }));
     const review = screen.getByRole("dialog", {
-      name: `Upgrade ${plant.name} capacity`,
+      name: `Upgrade ${plant.name} capacity?`,
     });
-    const input = within(review).getByRole("spinbutton");
-    const targetSize = Number((input as HTMLInputElement).value) * 1e6;
+    const input = within(review).getByRole("slider");
+    const targetSize = Number(input.getAttribute("aria-valuenow")) * 1e6;
     const quote = facilityExpansionQuote(game, plant.id, targetSize);
     if (quote.status !== "ready") throw new Error(quote.reason);
     await user.click(within(review).getByRole("button", { name: /^Pay / }));

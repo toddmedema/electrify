@@ -128,7 +128,13 @@ export default function DesktopBuildRail({
   const suppressFocus = React.useRef(false);
   const [previewName, setPreviewName] = React.useState<string>();
   const [previewEntry, setPreviewEntry] = React.useState(0);
-  const [sizing, setSizing] = React.useState<"generator" | "storage">();
+  const sizingPanel = React.useRef<HTMLElement>(null);
+  const sizingInput = React.useRef<HTMLInputElement>(null);
+  const [sizing, setSizing] = React.useState<{
+    category: "generator" | "storage";
+    pinned: boolean;
+  }>();
+  const [sizingTop, setSizingTop] = React.useState(0);
   const [generatorSize, setGeneratorSize] = useToolState(
     "project.generatorSize",
     10,
@@ -186,7 +192,22 @@ export default function DesktopBuildRail({
       suppressFocus.current = false;
     }
   }, [dismiss]);
+  const positionSizing = React.useCallback(() => {
+    const button = origin.current?.getBoundingClientRect();
+    const bounds = rail.current?.getBoundingClientRect();
+    if (button && bounds) {
+      setSizingTop(button.top - bounds.top + button.height / 2);
+    }
+  }, []);
   React.useEffect(() => () => clearTimer(), [clearTimer]);
+  React.useLayoutEffect(() => {
+    if (sizing?.pinned) sizingInput.current?.focus({ preventScroll: true });
+  }, [sizing]);
+  React.useEffect(() => {
+    if (!sizing) return;
+    window.addEventListener("resize", positionSizing);
+    return () => window.removeEventListener("resize", positionSizing);
+  }, [sizing, positionSizing]);
   React.useLayoutEffect(() => {
     if (previewEntry) previewPanel.current?.focus({ preventScroll: true });
   }, [previewEntry]);
@@ -202,8 +223,16 @@ export default function DesktopBuildRail({
   React.useEffect(() => {
     if (!previewName && !sizing) return;
     const outside = (event: PointerEvent) => {
-      if (event.target instanceof Node && !rail.current?.contains(event.target))
+      if (!(event.target instanceof Node)) return;
+      if (sizing) {
+        if (
+          !origin.current?.contains(event.target) &&
+          !sizingPanel.current?.contains(event.target)
+        )
+          dismiss();
+      } else if (!rail.current?.contains(event.target)) {
         dismiss();
+      }
     };
     const escape = (event: KeyboardEvent) => {
       if (
@@ -224,7 +253,7 @@ export default function DesktopBuildRail({
     };
   }, [previewName, sizing, dismiss, dismissAndReturn]);
   const show = (option: FacilityShoppingType, button: HTMLButtonElement) => {
-    if (busy || suppressFocus.current) return;
+    if (busy || suppressFocus.current || sizing?.pinned) return;
     clearTimer();
     origin.current = button;
     setSizing(undefined);
@@ -233,8 +262,21 @@ export default function DesktopBuildRail({
   const leave = () => {
     clearTimer();
     dismissTimer.current = setTimeout(() => {
-      if (!rail.current?.contains(document.activeElement)) dismiss();
+      if (!rail.current?.contains(document.activeElement))
+        setPreviewName(undefined);
     }, 160);
+  };
+  const leaveSizing = () => {
+    clearTimer();
+    if (!sizing?.pinned) {
+      dismissTimer.current = setTimeout(() => {
+        if (
+          !origin.current?.contains(document.activeElement) &&
+          !sizingPanel.current?.contains(document.activeElement)
+        )
+          setSizing(undefined);
+      }, 160);
+    }
   };
   const choose = (option: FacilityShoppingType, exactSize?: number) => {
     if (busy) return;
@@ -285,17 +327,30 @@ export default function DesktopBuildRail({
     const category = storage ? "storage" : "generator";
     const label = storage ? "Energy" : "Power";
     const value = sliderTickToW(storage ? storageSize : generatorSize);
+    const expanded = sizing?.category === category;
+    const open = (button: HTMLButtonElement, pinned: boolean) => {
+      if (busy || suppressFocus.current || (!pinned && sizing?.pinned)) return;
+      clearTimer();
+      origin.current = button;
+      setPreviewName(undefined);
+      positionSizing();
+      setSizing({ category, pinned });
+    };
     return (
       <Button
         className="desktopBuildSize"
         disabled={busy}
         aria-label={`${label}: ${storage ? formatWattHours(value) : formatWatts(value)}`}
-        aria-expanded={sizing === category}
-        aria-controls={sizing === category ? sizingId : undefined}
+        aria-expanded={expanded}
+        aria-controls={expanded ? sizingId : undefined}
+        onMouseEnter={(event) => open(event.currentTarget, false)}
+        onMouseLeave={leaveSizing}
+        onFocus={(event) => {
+          if (event.currentTarget.matches(":focus-visible"))
+            open(event.currentTarget, false);
+        }}
         onClick={(event) => {
-          origin.current = event.currentTarget;
-          setPreviewName(undefined);
-          setSizing(sizing === category ? undefined : category);
+          if (!expanded || !sizing?.pinned) open(event.currentTarget, true);
         }}
       >
         <span>{label}</span>
@@ -327,19 +382,25 @@ export default function DesktopBuildRail({
         className="desktopBuildTechnologies"
         role="group"
         aria-label="Construction technology list"
-        onWheel={dismiss}
-        onPointerDown={dismiss}
+        onWheel={() => {
+          if (!sizing?.pinned) dismiss();
+        }}
+        onPointerDown={() => {
+          if (!sizing) dismiss();
+        }}
         onScroll={(event) => {
-          // Reaching Energy may scroll the list before the slider takes focus.
-          // Wheel and pointer handlers already dismiss on deliberate scrolling.
-          if (sizing) return;
-          // Native focus scrolling can arrive in several steps. Keep the
-          // focused technology's preview; explicit scrolling intent dismisses it.
+          if (sizing) {
+            positionSizing();
+            return;
+          }
+          // A scroll notification can arrive after a row receives hover or focus.
+          // Explicit wheel and scrollbar activity dismiss the preview separately.
+          const button = origin.current;
           if (
-            origin.current !== document.activeElement ||
-            !event.currentTarget.contains(document.activeElement)
+            !event.currentTarget.contains(button ?? null) ||
+            (button !== document.activeElement && !button?.matches(":hover"))
           )
-            dismiss();
+            setPreviewName(undefined);
         }}
       >
         {[false, true].map((storage) => (
@@ -418,46 +479,39 @@ export default function DesktopBuildRail({
           className="desktopBuildSizePopover"
           data-escape-overlay="true"
           id={sizingId}
-          aria-label={`${sizing === "storage" ? "Energy" : "Power"} sizing`}
+          ref={sizingPanel}
+          aria-label={`${sizing.category === "storage" ? "Energy" : "Power"} sizing`}
+          style={{
+            top: `clamp(8px, ${sizingTop - 24}px, calc(100% - var(--game-dock-clearance, 80px) - 56px))`,
+          }}
+          onMouseEnter={clearTimer}
+          onMouseLeave={leaveSizing}
         >
-          <label>
-            {sizing === "storage" ? "Energy (MWh)" : "Power (MW)"}
-            <strong>
-              {sizing === "storage"
+          <input
+            ref={sizingInput}
+            type="range"
+            aria-label={
+              sizing.category === "storage"
+                ? "Storage capacity"
+                : "Generator capacity"
+            }
+            aria-valuetext={
+              sizing.category === "storage"
                 ? formatWattHours(sliderTickToW(storageSize))
-                : formatWatts(sliderTickToW(generatorSize))}
-            </strong>
-            <input
-              autoFocus
-              type="range"
-              aria-label={
-                sizing === "storage" ? "Storage capacity" : "Generator capacity"
-              }
-              aria-valuetext={
-                sizing === "storage"
-                  ? formatWattHours(sliderTickToW(storageSize))
-                  : formatWatts(sliderTickToW(generatorSize))
-              }
-              min={sizing === "storage" ? 4 : 0}
-              max={sizing === "storage" ? 37 : 34}
-              step={1}
-              value={sizing === "storage" ? storageSize : generatorSize}
-              disabled={busy}
-              onChange={(event) => {
-                if (!busy)
-                  (sizing === "storage" ? setStorageSize : setGeneratorSize)(
-                    Number(event.target.value),
-                  );
-              }}
-            />
-          </label>
-          <p>
-            Sets the size of the next{" "}
-            {sizing === "storage"
-              ? "storage project you choose. Discharge power depends on the technology."
-              : "generator project you choose."}
-          </p>
-          <Button onClick={dismissAndReturn}>Done</Button>
+                : formatWatts(sliderTickToW(generatorSize))
+            }
+            min={sizing.category === "storage" ? 4 : 0}
+            max={sizing.category === "storage" ? 37 : 34}
+            step={1}
+            value={sizing.category === "storage" ? storageSize : generatorSize}
+            disabled={busy}
+            onChange={(event) => {
+              if (!busy)
+                (sizing.category === "storage"
+                  ? setStorageSize
+                  : setGeneratorSize)(Number(event.target.value));
+            }}
+          />
         </section>
       )}
       {facility && (

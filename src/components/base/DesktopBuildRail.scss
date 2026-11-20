@@ -88,6 +88,9 @@
   &[aria-disabled="true"] {
     cursor: default;
     opacity: 0.5;
+    img {
+      filter: saturate(20%);
+    }
   }
 }
 .desktopBuildPreview,
@@ -110,6 +113,10 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  &:focus-visible {
+    outline: 2px solid var(--interactive-strong);
+    outline-offset: -2px;
+  }
   .desktopBuildPreviewScroll {
     min-height: 0;
     overflow: auto;
@@ -131,19 +138,12 @@
   }
 }
 .desktopBuildSizePopover {
-  padding: 16px;
-  label {
-    display: grid;
-    gap: 12px;
-    font-size: 14px;
-  }
+  display: flex;
+  width: 208px;
+  padding: 1px 12px;
   input {
     width: 100%;
     min-height: 44px;
     accent-color: var(--interactive-strong);
-  }
-  p {
-    font-size: 12px;
-    line-height: 1.5;
   }
 }

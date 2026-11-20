@@ -13,42 +13,26 @@
   }
 }
 
-.facilityCapacityUpgrade,
-.facilityCapacityDialog {
-  .MuiButton-root {
-    min-height: 44px;
-    max-width: 100%;
-    white-space: normal;
-    text-transform: none;
-    overflow-wrap: anywhere;
-  }
+.facilityCapacityUpgrade .MuiButton-root {
+  min-height: 44px;
+  max-width: 100%;
+  white-space: normal;
+  text-transform: none;
+  overflow-wrap: anywhere;
 }
 
-.facilityCapacityDialog {
-  .facilityCapacityControls {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 8px;
-    margin: 8px 0 16px;
+.facilityCapacityControls.constructionControls {
+  grid-template-columns: max-content minmax(80px, 1fr);
+  padding-inline: var(--space-4);
+}
 
-    .MuiTextField-root {
-      flex: 1 1 160px;
-      min-width: 0;
-    }
+.facilityCapacityNotes {
+  padding: 0 var(--space-4) var(--space-4);
+}
 
-    .MuiInputBase-root {
-      min-height: 44px;
-    }
-  }
-
-  .decisionImpact {
-    padding-inline: 0;
-  }
-
-  .facilityCapacityReview {
-    padding: 8px 0;
-    border-block: 1px solid var(--border-subtle);
-    margin-bottom: 8px;
-  }
+.facilityCapacityReview {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-2);
+  padding-block: var(--space-2);
 }

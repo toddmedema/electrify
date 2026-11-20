@@ -76,7 +76,7 @@ test("ordinary starting hills offer general technologies and retain special-site
     await expect(
       rail.getByRole("slider", { name: "Generator capacity" }),
     ).toHaveValue("0");
-    await rail.getByRole("button", { name: "Done", exact: true }).click();
+    await page.keyboard.press("Escape");
     for (const name of [
       "Solar",
       "Wind",
@@ -103,12 +103,12 @@ test("ordinary starting hills offer general technologies and retain special-site
       ).toHaveCount(0);
       await expect(trigger).toBeEnabled();
     }
-    await expect(
-      rail.getByRole("button", {
-        name: "Choose sites for Nuclear",
-        exact: true,
-      }),
-    ).toBeDisabled();
+    const nuclear = rail.getByRole("button", {
+      name: "Choose sites for Nuclear",
+      exact: true,
+    });
+    await expect(nuclear).toBeDisabled();
+    await expect(nuclear.locator("img")).toHaveCSS("filter", "saturate(0.2)");
     await expect(
       rail.getByRole("button", {
         name: "Choose sites for Offshore Wind",
@@ -243,9 +243,7 @@ for (const theme of ["light", "dark"] as const) {
         const tile = page.locator(
           '[data-map-target="champlain:site-12"][data-owned="true"]',
         );
-        await expect(tile).toContainText(
-          "One building site; transmission tower",
-        );
+        await expect(tile).toContainText("Open site");
         await tile.focus();
         await tile.press("Enter");
         const rail = page.getByRole("complementary", {
@@ -1116,7 +1114,7 @@ for (const theme of ["light", "dark"] as const) {
         exact: true,
       })
       .click();
-    await expect(ironAir.getByRole("row", { name: /Upkeep/ })).toBeVisible();
+    await expect(ironAir.getByRole("row", { name: /^Fixed/ })).toBeVisible();
     await expect(ironAir.getByRole("row", { name: /Efficiency/ })).toHaveCount(
       0,
     );

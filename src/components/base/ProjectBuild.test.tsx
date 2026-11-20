@@ -119,7 +119,6 @@ function show(multiplayer = false, year?: number, compatibleSites = 2) {
   const adjacent = () => {
     choose();
     fireEvent.click(screen.getByRole("button", { name: "Adjacent site" }));
-    fireEvent.click(screen.getByRole("button", { name: "Review project" }));
   };
   return { game, store, close, choose, adjacent, onSelection };
 }
@@ -132,7 +131,7 @@ function runtime(submit: (command: Command) => Promise<void>) {
   });
 }
 
-it("explores two sites with the selected size and spends only after explicit review confirmation", async () => {
+it("explores two sites with the selected size and spends with one cash action after selecting a site", async () => {
   const { store, choose, close, game } = show();
   const cash = currentTick(game)!.cash;
   choose();
@@ -142,9 +141,8 @@ it("explores two sites with the selected size and spends only after explicit rev
   fireEvent.click(screen.getByRole("button", { name: "Owned site" }));
   expect(screen.getByRole("heading", { name: "Wind · 20MW" })).toBeVisible();
   expect(currentTick(store.getState().game)!.cash).toBe(cash);
-  fireEvent.click(screen.getByRole("button", { name: "Review project" }));
   expect(store.getState().game.facilities).toHaveLength(game.facilities.length);
-  fireEvent.click(screen.getByRole("button", { name: "Build project" }));
+  fireEvent.click(screen.getByRole("button", { name: "Cash" }));
   await waitFor(() => expect(close).toHaveBeenCalledTimes(1));
   expect(
     store
@@ -154,22 +152,24 @@ it("explores two sites with the selected size and spends only after explicit rev
       ),
   ).toMatchObject({ name: "Wind", peakW: 20e6 });
 });
-it("requires another review after cash changes and never submits the stale connection", () => {
+it("rejects a payment when cash changed after the displayed quote", () => {
   const { store, adjacent } = show();
   adjacent();
   const newer = JSON.parse(JSON.stringify(store.getState().game)) as GameType;
   currentTick(newer)!.cash -= 1;
+  const pay = screen.getByRole("button", { name: "Cash" });
+  // Click while React is still showing the preceding store snapshot.
   act(() => {
     store.dispatch(replace(newer));
+    pay.click();
   });
-  fireEvent.click(screen.getByRole("button", { name: "Connect & build" }));
   expect(
-    screen.getByText("Project changed. Review the updated details."),
+    screen.getByText("Project changed. Check the updated costs before paying."),
   ).toBeVisible();
   expect(ownsTerritoryTile(store.getState().game, "green-uplands:site-1")).toBe(
     false,
   );
-  expect(screen.getByRole("button", { name: "Review project" })).toBeEnabled();
+  expect(screen.getByRole("button", { name: "Cash" })).toBeEnabled();
 });
 it("locks repeated confirmation and waits for host ownership before building", async () => {
   const { store, adjacent, close, game } = show(true);
@@ -182,7 +182,7 @@ it("locks repeated confirmation and waits for host ownership before building", a
       );
   });
   adjacent();
-  const confirm = screen.getByRole("button", { name: "Connect & build" });
+  const confirm = screen.getByRole("button", { name: "Cash" });
   fireEvent.click(confirm);
   fireEvent.click(confirm);
   await act(async () => {
@@ -208,11 +208,11 @@ it("locks repeated confirmation and waits for host ownership before building", a
       ),
   ).toMatchObject({ name: "Wind", peakW: 20e6 });
 });
-it("requires a new build review if a settlement changes cash during connection", async () => {
+it("requires another build action if a settlement changes cash during connection", async () => {
   const { store, adjacent, game } = show(true);
   const submit = jest.fn(async (command: Command) => {
     if (command.kind !== "action" || command.name !== "acquireTile")
-      throw new Error("Construction started before a new review.");
+      throw new Error("Construction started before the second payment action.");
     store.dispatch(
       acquireTile(command.payload as Parameters<typeof acquireTile>[0]),
     );
@@ -224,7 +224,7 @@ it("requires a new build review if a settlement changes cash during connection",
   });
   runtime(submit);
   adjacent();
-  fireEvent.click(screen.getByRole("button", { name: "Connect & build" }));
+  fireEvent.click(screen.getByRole("button", { name: "Cash" }));
   expect(
     await screen.findByText(/Site connected. Construction did not start/),
   ).toBeVisible();
@@ -233,7 +233,7 @@ it("requires a new build review if a settlement changes cash during connection",
   );
   expect(store.getState().game.facilities).toHaveLength(game.facilities.length);
   expect(submit).toHaveBeenCalledTimes(1);
-  expect(screen.getByRole("button", { name: "Review build" })).toBeEnabled();
+  expect(screen.getByRole("button", { name: "Cash" })).toBeEnabled();
 });
 it("preserves partial success and retries the build without charging another connection", async () => {
   const { store, adjacent, close, game } = show(true);
@@ -254,7 +254,7 @@ it("preserves partial success and retries the build without charging another con
     }
   });
   adjacent();
-  fireEvent.click(screen.getByRole("button", { name: "Connect & build" }));
+  fireEvent.click(screen.getByRole("button", { name: "Cash" }));
   await waitFor(() =>
     expect(
       screen.getByText(/Site connected. Construction did not start/),
@@ -264,9 +264,8 @@ it("preserves partial success and retries the build without charging another con
     true,
   );
   expect(store.getState().game.facilities).toHaveLength(game.facilities.length);
-  fireEvent.click(screen.getByRole("button", { name: "Review build" }));
   rejectBuild = false;
-  fireEvent.click(screen.getByRole("button", { name: "Build project" }));
+  fireEvent.click(screen.getByRole("button", { name: "Cash" }));
   await waitFor(() => expect(close).toHaveBeenCalledTimes(1));
   expect(
     commands.filter(
@@ -281,7 +280,7 @@ it("keeps a rejected connection unowned with the project available for review", 
     throw new Error("Another utility claimed this site.");
   });
   adjacent();
-  fireEvent.click(screen.getByRole("button", { name: "Connect & build" }));
+  fireEvent.click(screen.getByRole("button", { name: "Cash" }));
   await waitFor(() =>
     expect(
       screen.getByText("Another utility claimed this site."),
@@ -316,7 +315,7 @@ it("cancels the pending project continuation when the run changes", async () => 
     commands.push(command);
   });
   adjacent();
-  fireEvent.click(screen.getByRole("button", { name: "Connect & build" }));
+  fireEvent.click(screen.getByRole("button", { name: "Cash" }));
   await act(async () => {
     await Promise.resolve();
   });
@@ -324,9 +323,7 @@ it("cancels the pending project continuation when the run changes", async () => 
     store.dispatch(replace({ ...store.getState().game, seed: game.seed + 1 }));
   });
   await waitFor(() =>
-    expect(
-      screen.queryByRole("button", { name: "Connecting…" }),
-    ).not.toBeInTheDocument(),
+    expect(screen.queryByText("Connecting…")).not.toBeInTheDocument(),
   );
   expect(commands).toHaveLength(1);
   expect(store.getState().game.facilities).toHaveLength(game.facilities.length);
@@ -345,13 +342,13 @@ it("corrects an oversized technology to the map's terrain maximum before choosin
   fireEvent.click(screen.getByRole("button", { name: "Owned site" }));
   expect(screen.getByRole("heading", { name: "Wind · 450MW" })).toBeVisible();
   expect(
-    screen.queryByRole("button", { name: "Review project" }),
+    screen.queryByRole("button", { name: "Cash" }),
   ).not.toBeInTheDocument();
   expect(screen.getByRole("alert")).toHaveTextContent(
     /project size.*compatible site/,
   );
   fireEvent.click(screen.getByRole("button", { name: "Ridge site" }));
-  expect(screen.getByRole("button", { name: "Review project" })).toBeEnabled();
+  expect(screen.getByRole("button", { name: "Cash" })).toBeEnabled();
   expect(currentTick(store.getState().game)!.cash).toBe(
     currentTick(game)!.cash,
   );
@@ -405,6 +402,7 @@ it("chooses the exact storage technology limit without requiring affordable cash
     }),
   ).toBeVisible();
   expect(screen.getByText(/more cash needed/)).toBeVisible();
-  expect(screen.getByRole("button", { name: "Review project" })).toBeEnabled();
+  expect(screen.getByRole("button", { name: "Cash" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Loan" })).toBeDisabled();
   expect(currentTick(store.getState().game)!.cash).toBe(0);
 });

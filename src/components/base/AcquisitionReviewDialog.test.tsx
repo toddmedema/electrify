@@ -6,6 +6,7 @@ import { acquisitionQuote } from "../../helpers/Expansion";
 import { currentTick } from "../../helpers/GameSelectors";
 import {
   formatMoneyConcise,
+  formatPurchasePrice,
   formatNumber,
   formatWatts,
   formatForecastWatts,
@@ -82,10 +83,10 @@ it.each(["valley-electric", "ridge-electric"] as const)(
     const payments = screen.getByRole("region", { name: "Expected impact" });
     expect(within(payments).getByText(expectedMargin(preview))).toBeVisible();
     expect(payments).toHaveTextContent(
-      `${formatMoneyConcise(quote.cashDue)} now + ${formatMoneyConcise(quote.cashMonthlyDebtService + quote.networkOMPerMonth)}/mo`,
+      `${formatPurchasePrice(quote.cashDue)} now + ${formatMoneyConcise(quote.cashMonthlyDebtService + quote.networkOMPerMonth)}/mo`,
     );
     expect(payments).toHaveTextContent(
-      `${formatMoneyConcise(quote.financedCashDue)} now + ${formatMoneyConcise(quote.monthlyDebtService + quote.networkOMPerMonth)}/mo`,
+      `${formatPurchasePrice(quote.financedCashDue)} now + ${formatMoneyConcise(quote.monthlyDebtService + quote.networkOMPerMonth)}/mo`,
     );
     expect(
       within(payments)
@@ -129,8 +130,8 @@ it.each(["valley-electric", "ridge-electric"] as const)(
     expect(within(financing).getByText("Inherited debt")).not.toBeVisible();
     await user.click(within(financing).getByText("Financing breakdown"));
     expect(financing).toHaveTextContent(formatMoneyConcise(quote.assumedDebt));
-    expect(financing).toHaveTextContent(formatMoneyConcise(quote.equityPrice));
-    expect(financing).toHaveTextContent(formatMoneyConcise(quote.fee));
+    expect(financing).toHaveTextContent(formatPurchasePrice(quote.equityPrice));
+    expect(financing).toHaveTextContent(formatPurchasePrice(quote.fee));
     expect(within(financing).getByText(/5% over 20 years/)).toBeVisible();
     expect(within(financing).getByText(/over 30 years/)).toBeVisible();
 

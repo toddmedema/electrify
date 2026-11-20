@@ -1,6 +1,7 @@
 import { acquisitionQuote } from "../helpers/Expansion";
 import { SAVE_SCHEMA_VERSION } from "../SaveSchema";
 import { LAND_TERRITORIES } from "../data/Territories";
+import { VALLEY_BOARD } from "../data/TerritoryTiles";
 import { UTILITY_AREAS } from "../data/UtilityExpansion";
 import { ruleDigest } from "../helpers/RuleIdentity";
 import { currentTick } from "../helpers/GameSelectors";
@@ -15,6 +16,7 @@ import {
   getTerritoryTile,
   territoryHexDistance,
 } from "../helpers/TerritoryTiles";
+import { combustibleTile } from "../helpers/TerritoryWildfire";
 import { loadSimData } from "../testing/SimData";
 import { coopSeats } from "../testing/MultiplayerFixtures";
 import { retiredValleyOpeningProgress } from "../testing/SaveTestHelpers";
@@ -25,6 +27,7 @@ import {
   createWorld,
   checkpointWorld,
   restoreWorld,
+  savedMatchSpec,
   roomView,
   stepWorld,
 } from "./World";
@@ -97,7 +100,8 @@ function acquireVergennes(world: World, seat: string, quoteKey: string) {
     },
   });
 }
-it.each([
+const parcelCheckpointLineages = [
+  [undefined, undefined],
   [
     19,
     "coop-2-fdb701fc666648e148ecc4d6a02e4b2001090bc79052092a4e567ea9184714ef",
@@ -105,6 +109,10 @@ it.each([
   [
     20,
     "coop-2-cf979e3b45deb328dd12a266f291e16398174095d47beca6df0d4f9da1dbd577",
+  ],
+  [
+    20,
+    "coop-2-f55523858de9d3d66c6be60626ffab92225cba0047b3e4611ad639f83b4aad90",
   ],
   [
     21,
@@ -122,8 +130,10 @@ it.each([
     22,
     "coop-2-bddc08bd9f13d3fb912bccfa5401e85283039c61e31340ec6a252cd503884fef",
   ],
-] as const)(
-  "retains independent parcel claims and cash from published schema%i",
+] as const;
+
+it.each(parcelCheckpointLineages)(
+  "retains independent parcel claims and cash through schema%s save and resume (%s)",
   (schema, rules) => {
     const world = ready();
     expect(buy(world, "0", "parcel-0")).toBeUndefined();
@@ -139,28 +149,47 @@ it.each([
       "parcel-1:city": { seat: "0" },
       "parcel-2:site-0": { seat: "1" },
     });
-    const saved = JSON.parse(JSON.stringify(checkpointWorld(world)));
-    saved.gameSchema = schema;
-    saved.rules = rules;
-    for (const [index, grid] of world.grids.entries())
-      saved.grids[index].objectiveProgress = retiredValleyOpeningProgress(grid);
-    if (schema === 22)
-      saved.grids[0].territoryWeather = { dryness: 0.81, fires: [] };
+    const saved: World = JSON.parse(JSON.stringify(checkpointWorld(world)));
+    if (schema !== undefined && rules !== undefined) {
+      saved.gameSchema = schema;
+      saved.rules = rules;
+      for (const [index, grid] of world.grids.entries())
+        saved.grids[index].objectiveProgress =
+          retiredValleyOpeningProgress(grid);
+    }
+    if (schema === 22) {
+      const site = VALLEY_BOARD.find(combustibleTile)!;
+      for (const grid of saved.grids)
+        grid.territoryWeather = {
+          dryness: 0.81,
+          fires: [
+            {
+              startsMinute: 0,
+              tiles: [{ tileId: site.id, ignitesMinute: 0 }],
+            },
+          ],
+        };
+    }
     const before = JSON.stringify(saved);
+    expect(savedMatchSpec(saved)).toEqual(world.spec);
     const restored = restoreWorld(saved, "restored");
     expect(JSON.stringify(saved)).toBe(before);
-    expect(() =>
-      restoreWorld({ ...saved, rules: "unrecognized" }, "rejected"),
-    ).toThrow();
     expect(restored.gameSchema).toBe(SAVE_SCHEMA_VERSION);
-    expect(restored.grids[0].territoryWeather).toEqual(
-      saved.grids[0].territoryWeather,
+    expect(restored.grids.map((grid) => grid.territoryWeather)).toEqual(
+      saved.grids.map((grid) => grid.territoryWeather),
     );
     expect(
       restored.grids[0].objectiveProgress?.entries.map(({ id }) => id),
     ).toEqual(["acquire-neighbor", "retain-customers"]);
-    expect(currentTick(restored.grids[0])!.cash).toBe(
-      currentTick(world.grids[0])!.cash,
+    expect(restored.grids.map((grid) => currentTick(grid)!.cash)).toEqual(
+      world.grids.map((grid) => currentTick(grid)!.cash),
+    );
+    const roundTrip = restoreWorld(
+      JSON.parse(JSON.stringify(checkpointWorld(restored))),
+      "roundtrip",
+    );
+    expect(checkpointWorld(roundTrip).grids).toEqual(
+      checkpointWorld(restored).grids,
     );
     expect(ownedTerritories(restored.grids[0])).toEqual(
       expect.arrayContaining(["parcel-0", "parcel-1"]),
@@ -171,7 +200,30 @@ it.each([
     );
   },
 );
-describe("published schema 22 Valley checkpoints", () => {
+it.each(parcelCheckpointLineages)(
+  "rejects unknown schema%s identities and corrupted grids (%s)",
+  (schema, rules) => {
+    const raw: World = JSON.parse(JSON.stringify(checkpointWorld(ready())));
+    if (schema !== undefined && rules !== undefined) {
+      raw.gameSchema = schema;
+      raw.rules = rules;
+      for (const grid of raw.grids)
+        grid.objectiveProgress = retiredValleyOpeningProgress(grid);
+    }
+    expect(() =>
+      savedMatchSpec({ ...raw, rules: raw.rules + "-unknown" }),
+    ).toThrow();
+    expect(() =>
+      restoreWorld({ ...raw, rules: raw.rules + "-unknown" }, "unknown"),
+    ).toThrow();
+    if (schema === 22)
+      raw.grids[0].territoryWeather = { dryness: 1.01, fires: [] };
+    else raw.grids[0].customerRate = -1;
+    expect(() => restoreWorld(raw, "corrupt")).toThrow();
+  },
+);
+
+describe("schema 22 and 23 Valley checkpoint lineages", () => {
   type Lineage = keyof typeof publishedEvidence;
   let played: World;
 
@@ -222,24 +274,36 @@ describe("published schema 22 Valley checkpoints", () => {
     played = JSON.parse(JSON.stringify(checkpointWorld(world)));
   });
 
-  function checkpoint(lineage: Lineage): World {
+  function checkpoint(lineage: Lineage, schema = 22): World {
     const { rules, objectiveProgress } = publishedEvidence[lineage];
     const saved = cloneDeep(played);
-    saved.gameSchema = 22;
-    saved.rules = rules;
+    saved.gameSchema = schema;
+    // The map branch kept the retired objectives. The acquisition release kept
+    // the preview's new definitions and added the earlier-save migration.
+    saved.rules =
+      schema === 22
+        ? rules
+        : lineage === "master"
+          ? "coop-2-3a64b92f0462af2eb6286821f118c030f25aaf65b546a4a7652e87b1dbcd3e33"
+          : "coop-2-8bf797b211b8ee017e7f4e23f67019de651918233f43a90a2a047d0bec4e724d";
     for (const [index, grid] of saved.grids.entries()) {
       grid.objectiveProgress = cloneDeep(
         objectiveProgress[index],
       ) as ObjectiveProgress;
-      if (lineage === "preview") delete grid.territoryWeather;
+      if (schema === 22 && lineage === "preview") delete grid.territoryWeather;
     }
     return saved;
   }
 
-  it.each(["master", "preview"] as const)(
-    "retains paid assets, history and weather on %s restore and deterministic resume",
-    (lineage) => {
-      const saved = checkpoint(lineage);
+  it.each([
+    [22, "master"],
+    [22, "preview"],
+    [23, "master"],
+    [23, "preview"],
+  ] as const)(
+    "retains paid assets, history and weather on schema %i with %s evidence and deterministic resume",
+    (schema, lineage) => {
+      const saved = checkpoint(lineage, schema);
       const before = cloneDeep(saved);
       const restored = restoreWorld(saved, "restored");
       expect(restored.gameSchema).toBe(SAVE_SCHEMA_VERSION);
@@ -325,12 +389,14 @@ describe("published schema 22 Valley checkpoints", () => {
   });
 
   it.each([
-    ["master", "preview"],
-    ["preview", "master"],
+    [22, "master", "preview"],
+    [22, "preview", "master"],
+    [23, "master", "preview"],
+    [23, "preview", "master"],
   ] as const)(
-    "rejects complete %s evidence under %s rules",
-    (evidence, rules) => {
-      const saved = checkpoint(rules);
+    "rejects complete schema %i %s evidence under %s rules",
+    (schema, evidence, rules) => {
+      const saved = checkpoint(rules, schema);
       saved.grids[0].objectiveProgress =
         checkpoint(evidence).grids[0].objectiveProgress;
       expect(() => restoreWorld(saved, "corrupt")).toThrow(

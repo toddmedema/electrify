@@ -37,7 +37,6 @@ import CloseIcon from "@mui/icons-material/Close";
 import { getTimeFromTimeline } from "../../helpers/DateTime";
 import {
   estimatedAnnualOperatingCost,
-  estimatedAnnualVariableOperatingCost,
   facilityLoanMonths,
   purchaseTerms,
 } from "../../helpers/Financials";
@@ -277,7 +276,8 @@ interface GeneratorBuildItemProps {
 export function GeneratorBuildItem(
   props: GeneratorBuildItemProps,
 ): React.JSX.Element {
-  const { formatMoneyConcise, formatForecastMoney } = useMoney();
+  const { formatMoneyConcise, formatForecastMoney, formatPurchasePrice } =
+    useMoney();
   const { generator, cash } = props;
   const units = useUnits();
   const kgCO2ePerBtu = FUELS[generator.fuel]?.kgCO2ePerBtu ?? 0;
@@ -377,7 +377,6 @@ export function GeneratorBuildItem(
     props.minimumBuildCost !== undefined &&
     minimumAffordable;
   const hasVariableOM = generator.variableOperatingCostPerMWh !== undefined;
-  const estimatedVariableOM = estimatedAnnualVariableOperatingCost(generator);
   // kg of CO2 equivalent released per MWh generated - 0 for carbon-free sources,
   // whose fuel either isn't in FUELS at all (sun, wind) or is emission-free (uranium)
   const kgCO2ePerMWh = Math.round(1000000 * generator.btuPerWh * kgCO2ePerBtu);
@@ -640,7 +639,7 @@ export function GeneratorBuildItem(
           <BuildMetric
             label="Build cost"
             entry={MANUAL_ENTRY.TOTAL_COST_OF_ENERGY}
-            value={formatMoneyConcise(generator.buildCost)}
+            value={formatPurchasePrice(generator.buildCost)}
             note={
               includedOptions.length
                 ? `Incl. ${includedOptions.map((option) => option.label.toLowerCase()).join(", ")}`
@@ -732,27 +731,20 @@ export function GeneratorBuildItem(
               />
             )}
             <BuildDetailRow
-              label={hasVariableOM ? "Fixed upkeep" : "Upkeep"}
+              label="Fixed"
               value={formatMoneyConcise(generator.annualOperatingCost) + "/yr"}
               entry={MANUAL_ENTRY.OPERATING_COSTS}
             />
             {hasVariableOM && (
-              <>
-                <BuildDetailRow
-                  label="Variable upkeep"
-                  value={
-                    formatMoneyConcise(
-                      generator.variableOperatingCostPerMWh || 0,
-                    ) + "/MWh"
-                  }
-                  entry={MANUAL_ENTRY.OPERATING_COSTS}
-                />
-                <BuildDetailRow
-                  label="Expected variable upkeep"
-                  value={formatForecastMoney(estimatedVariableOM) + "/yr"}
-                  entry={MANUAL_ENTRY.OPERATING_COSTS}
-                />
-              </>
+              <BuildDetailRow
+                label="Variable"
+                value={
+                  formatMoneyConcise(
+                    generator.variableOperatingCostPerMWh || 0,
+                  ) + "/MWh"
+                }
+                entry={MANUAL_ENTRY.OPERATING_COSTS}
+              />
             )}
             {generator.costPerStart !== undefined && (
               <BuildDetailRow
@@ -899,7 +891,7 @@ export function GeneratorBuildItem(
                           }}
                         />
                       }
-                      label={`${option.label} +${formatMoneyConcise(option.extraBuildCost)}`}
+                      label={`${option.label} +${formatPurchasePrice(option.extraBuildCost)}`}
                     />
                     <Box id={describedBy}>
                       {lines.map((line) => (
@@ -971,7 +963,7 @@ function GeneratorComparison(props: {
   onClear: () => void;
   onRemove: (name: string) => void;
 }): React.JSX.Element | null {
-  const { formatMoneyConcise, formatForecastMoney } = useMoney();
+  const { formatForecastMoney, formatPurchasePrice } = useMoney();
   if (props.generators.length === 0) {
     return null;
   }
@@ -1008,7 +1000,7 @@ function GeneratorComparison(props: {
               line with "·" */}
             <Typography variant="caption">
               <span className="nowrap">
-                {formatMoneyConcise(generator.buildCost)} ·
+                {formatPurchasePrice(generator.buildCost)} ·
               </span>{" "}
               <span className="nowrap">
                 {formatBuildMonths(generator.yearsToBuild)}
