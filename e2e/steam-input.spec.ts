@@ -67,6 +67,8 @@ async function select(
   action: InputAction = "down",
   limit = 100,
 ) {
+  // Entrance animations can expose controls while startup still owns an inert root.
+  await expect(page.locator("#appStartup")).toHaveCount(0);
   await expect(control).toBeVisible();
   await expect(control).toBeEnabled();
   const group = control.locator("..");
