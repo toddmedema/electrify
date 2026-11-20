@@ -75,6 +75,7 @@
     "typecheck": "node scripts/dev/run.js types",
     "check": "node scripts/dev/run.js check",
     "check:ci": "node scripts/dev/run.js check --ci",
+    "check:prepush": "node scripts/site/check-changed.js",
     "task": "node scripts/dev/task.js",
     "shot": "node scripts/dev/shot.js",
     "ci:failures": "node scripts/ci/failures.js",

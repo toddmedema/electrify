@@ -26,6 +26,7 @@ export interface StateProps {
 }
 export interface Props extends StateProps {}
 export type GameTool = GameToolType;
+export type MapPanelView = Exclude<MapWorkspaceView, "FACILITIES">;
 export const GAME_TOOLS: {
   id: GameTool;
   label: string;
@@ -64,7 +65,7 @@ export const GAME_TOOLS: {
   },
 ];
 export const MAP_VIEWS: {
-  id: Exclude<MapWorkspaceView, "FACILITIES">;
+  id: MapPanelView;
   label: string;
   triggerId: string;
   icon: React.ReactElement;
@@ -153,13 +154,13 @@ export default function Navigation({
   openTools,
   onToggle,
   destination,
-  mapView = "FACILITIES",
-  onMapView,
+  openMapViews = [],
+  onToggleMapView,
   showMapBuild = false,
   showEventStatus = true,
 }: {
-  mapView?: MapWorkspaceView;
-  onMapView?: (view: MapWorkspaceView) => void;
+  openMapViews?: MapPanelView[];
+  onToggleMapView?: (view: MapPanelView) => void;
   showMapBuild?: boolean;
   showEventStatus?: boolean;
   openTools?: GameTool[];
@@ -198,7 +199,7 @@ export default function Navigation({
     >
       {mapWorkspace &&
         MAP_VIEWS.map((view) => {
-          const open = mapView === view.id;
+          const open = openMapViews.includes(view.id);
           return (
             <Tooltip
               key={view.id}
@@ -219,8 +220,8 @@ export default function Navigation({
                 aria-controls={open ? `tool-${view.id}` : undefined}
                 data-game-destination={view.id}
                 onClick={() =>
-                  onMapView
-                    ? onMapView(open ? "FACILITIES" : view.id)
+                  onToggleMapView
+                    ? onToggleMapView(view.id)
                     : dispatch(navigate(open ? "FACILITIES" : view.id))
                 }
               >

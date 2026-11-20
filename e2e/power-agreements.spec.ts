@@ -28,17 +28,21 @@ for (const theme of ["light", "dark"] as const) {
       page.getByRole("button", { name: "Agreements", exact: true }),
     );
     let line = agreements.locator(".territoryAgreements");
-    await expect(line).toContainText("Regional nuclear · Inherited");
+    await expect(
+      line.getByRole("heading", { name: "You", exact: true }),
+    ).toHaveCount(0);
+    await expect(
+      line.getByRole("heading", { name: "Regional nuclear" }),
+    ).toBeVisible();
     await expect(
       agreements.getByRole("heading", { name: "Supply agreements" }),
     ).toHaveCount(0);
     await expect(
       agreements.getByRole("heading", { name: "Power purchase agreements" }),
     ).toHaveCount(0);
-    const inherited = line.locator(".powerAgreement").filter({
-      has: page.getByRole("heading", { name: "Regional nuclear · Inherited" }),
-    });
-    await expect(inherited.getByText(/Up to 95MW/)).toBeVisible();
+    const inherited = line.getByRole("article", { name: "Regional nuclear" });
+    await expect(inherited.getByText("95MW", { exact: true })).toBeVisible();
+    await expect(inherited.getByText("Max supply")).toBeVisible();
     await expect(
       inherited.getByText(/Minimum payment: .*even if unused/),
     ).toBeVisible();
@@ -89,7 +93,9 @@ for (const theme of ["light", "dark"] as const) {
       page.getByRole("button", { name: "Agreements", exact: true }),
     );
     line = agreements.locator(".territoryAgreements");
-    await expect(line).toContainText("Regional nuclear · Inherited");
+    await expect(
+      inherited.getByText("Inherited", { exact: true }),
+    ).toBeVisible();
     await expect(line).toContainText("Through 31 Dec 2019");
     await expect(line).toContainText("114MW → 57MW on 1 Jan 2020");
     const review = line.getByRole("button", {
@@ -97,14 +103,29 @@ for (const theme of ["light", "dark"] as const) {
       exact: true,
     });
     await expect(review).toBeVisible();
+    const offer = line.getByRole("button", {
+      name: "Review Valley Electric supply agreement",
+      exact: true,
+    });
+    await expect(offer).toHaveText("Review");
+    await expect(offer.locator('[data-concept="buy"]')).toBeVisible();
     await line.scrollIntoViewIfNeeded();
     await reviewScreenshot(page, {
       path: testInfo.outputPath(`ppa-workspace-${theme}.png`),
       animations: "disabled",
       scale: "css",
     });
-    await reviewScreenshot(line, {
+    await reviewScreenshot(agreements, {
       path: testInfo.outputPath(`ppa-agreements-${theme}.png`),
+      animations: "disabled",
+    });
+    const newSupply = line.getByRole("article", {
+      name: "Valley Electric supply",
+      exact: true,
+    });
+    await newSupply.scrollIntoViewIfNeeded();
+    await reviewScreenshot(newSupply, {
+      path: testInfo.outputPath(`ppa-offer-${theme}.png`),
       animations: "disabled",
     });
     await review.click();
@@ -113,6 +134,7 @@ for (const theme of ["light", "dark"] as const) {
       exact: true,
     });
     await expectDialogToFit(dialog);
+    await expect(dialog).not.toContainText("Delivery and emissions follow");
     await expect(dialog).not.toContainText("2005 dollars");
     await expect(dialog).not.toContainText(
       "Local generation can reduce purchases",
@@ -128,6 +150,7 @@ for (const theme of ["light", "dark"] as const) {
       "Maximum supply",
       "Duration",
       "Forecasted cash impact",
+      "Forecasted grid impact",
     ]);
     await expect(
       dialog.getByRole("row", { name: /Minimum supply/ }),
@@ -200,9 +223,38 @@ for (const theme of ["light", "dark"] as const) {
     await expect(savings).toContainText(
       "Compared with omitting this agreement",
     );
-    await expect(
-      dialog.getByRole("heading", { name: "Demand served" }),
-    ).toHaveCount(0);
+    const impactLabel = dialog.getByRole("rowheader", {
+      name: "Forecasted grid impact",
+    });
+    const impact = dialog.getByRole("row").filter({
+      has: page.getByRole("rowheader", { name: "Forecasted grid impact" }),
+    });
+    const comparison = impact.locator(".powerAgreementGridImpact");
+    await expect(comparison).toContainText(/\d+ → \d+%/);
+    await impact.scrollIntoViewIfNeeded();
+    expect(
+      await impactLabel.evaluate((cell) => {
+        const range = document.createRange();
+        range.selectNodeContents(cell);
+        return range.getClientRects().length;
+      }),
+    ).toBe(1);
+
+    const thumb = dialog.locator(".MuiSlider-thumb");
+    await thumb.scrollIntoViewIfNeeded();
+    const thumbBox = (await thumb.boundingBox())!;
+    const railBox = (await dialog.locator(".MuiSlider-rail").boundingBox())!;
+    const x = thumbBox.x + thumbBox.width / 2;
+    const y = thumbBox.y + thumbBox.height / 2;
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.mouse.move(x + railBox.width / 3, y);
+    await expect(slider).toHaveAttribute("aria-valuenow", "8");
+    await expect(impact.getByRole("cell")).toHaveText("—");
+    await page.mouse.move(x, y);
+    await page.mouse.up();
+    await expect(slider).toHaveAttribute("aria-valuenow", "5");
+    await expect(comparison).toContainText(/\d+ → \d+%/);
     await expectDialogToFit(dialog);
     await reviewScreenshot(dialog, {
       path: testInfo.outputPath(`ppa-review-${theme}.png`),
@@ -342,13 +394,9 @@ for (const theme of ["light", "dark"] as const) {
       agreements,
       page.getByRole("button", { name: "Agreements", exact: true }),
     );
-    await expect(line).toContainText("Regional nuclear · Expired 1 Jan 2020");
-    const expired = line.locator(".powerAgreement").filter({
-      has: page.getByRole("heading", {
-        name: "Regional nuclear · Expired 1 Jan 2020",
-      }),
-    });
-    await expect(expired.getByText(/Up to/)).toHaveCount(0);
+    const expired = line.getByRole("article", { name: "Regional nuclear" });
+    await expect(expired).toContainText("Expired 1 Jan 2020");
+    await expect(expired.getByText("Max supply")).toHaveCount(0);
     await expect(
       expired.getByRole("button", {
         name: "Regional nuclear recorded history",

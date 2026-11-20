@@ -85,12 +85,6 @@ test("PR CI runs three independent test groups and three native builds in eight 
     assert(
       job.steps.some(
         ({ uses, with: options }) =>
-          uses === "actions/checkout@v7" && options.lfs,
-      ),
-    );
-    assert(
-      job.steps.some(
-        ({ uses, with: options }) =>
           uses === "./.github/actions/install" && !options?.profile,
       ),
     );
@@ -162,6 +156,58 @@ test("PR CI runs three independent test groups and three native builds in eight 
       .with.path,
     /coverage\//,
   );
+});
+
+test("CI fetches public assets once and limits LFS to each job's inputs", () => {
+  const { env, jobs } = workflow();
+  const deploy = parse(
+    fs.readFileSync(".github/workflows/deploy-prod.yml", "utf8"),
+  ).jobs.deploy;
+  const checkout = (job) =>
+    job.steps.find(({ uses }) => uses === "actions/checkout@v7");
+  assert.equal(env.GIT_LFS_SKIP_SMUDGE, "1");
+  assert.equal(checkout(deploy).env.GIT_LFS_SKIP_SMUDGE, "1");
+  for (const job of [
+    jobs.build,
+    jobs.cpu,
+    jobs.browser,
+    jobs.desktop,
+    jobs.platform,
+    deploy,
+  ]) {
+    assert(!checkout(job).with?.lfs);
+  }
+
+  const assetSteps = (job) =>
+    job.steps.flatMap(({ run }) =>
+      run?.startsWith("node scripts/ci/lfs-assets.js ")
+        ? [run.split(" ").slice(2).join(" ")]
+        : [],
+    );
+  assert.deepEqual(assetSteps(jobs.build), ["public"]);
+  assert.deepEqual(assetSteps(jobs.cpu), ["cpu"]);
+  assert.deepEqual(assetSteps(jobs.browser), []);
+  assert.deepEqual(assetSteps(deploy), ["public"]);
+  for (const job of [jobs.desktop, jobs.platform]) {
+    assert.deepEqual(assetSteps(job), ["renderer build"]);
+    const artifact = job.steps.findIndex(
+      ({ with: options }) => options?.name === "desktop-renderer",
+    );
+    const restore = job.steps.findIndex(({ run }) =>
+      run?.endsWith("lfs-assets.js renderer build"),
+    );
+    const packageJob = job.steps.findIndex(({ run }) =>
+      /npm run (desktop:pack:offline|test:ci-all)/.test(run),
+    );
+    assert(artifact >= 0 && artifact < restore && restore < packageJob);
+  }
+  const verify = deploy.steps.findIndex(({ run }) =>
+    run?.endsWith("lfs-assets.js public"),
+  );
+  const credentials = deploy.steps.findIndex(
+    ({ id }) => id === "hosting-credentials",
+  );
+  assert(verify >= 0 && verify < credentials);
 });
 
 test("trusted master runs warm all three transform caches without adding jobs", () => {

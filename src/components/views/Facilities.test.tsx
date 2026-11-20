@@ -48,7 +48,7 @@ import { modScenario } from "../../mods/ModScenario";
 import { acquireUtility, expandFacility } from "../../reducers/GameActions";
 import { facilityExpansionQuote } from "../../helpers/FacilityExpansion";
 import { currentTick } from "../../helpers/GameSelectors";
-import { ownedUtility } from "../../helpers/Expansion";
+import { acquisitionQuote, ownedUtility } from "../../helpers/Expansion";
 import {
   createWorld,
   checkpointWorld,
@@ -1504,7 +1504,10 @@ it.each([false, true])(
 
 it("returns focus to Interties after an acquisition removes the trading row", async () => {
   const initialGame = createGame({ scenarioId: 116, seed: 12345 });
-  currentTick(initialGame)!.cash = 1e9;
+  currentTick(initialGame)!.cash = acquisitionQuote(
+    initialGame,
+    "ridge-electric",
+  )!.cashDue;
   const corridorId = "vt-champlain-ridge";
   const quote = transmission.intertieBuildQuote(
     corridorId,
@@ -1531,6 +1534,10 @@ it("returns focus to Interties after an acquisition removes the trading row", as
     reducer: { game: gameReducer, ui: uiReducer },
     preloadedState: { game: initialGame },
   });
+  let acknowledgePurchase!: () => void;
+  const purchaseAcknowledged = new Promise<void>((resolve) => {
+    acknowledgePurchase = resolve;
+  });
   function Interties() {
     const game = useSelector(
       (state: ReturnType<typeof store.getState>) => state.game,
@@ -1542,8 +1549,9 @@ it("returns focus to Interties after an acquisition removes the trading row", as
         onUpgrade={jest.fn()}
         onBuyingRule={jest.fn()}
         onSellingRule={jest.fn()}
-        onAcquire={(payload) => {
+        onAcquire={async (payload) => {
           store.dispatch(acquireUtility(payload));
+          await purchaseAcknowledged;
           return ownedUtility(store.getState().game, payload.targetId);
         }}
       />
@@ -1562,7 +1570,7 @@ it("returns focus to Interties after an acquisition removes the trading row", as
     name: "Acquire Ridge Electric",
   });
   await user.click(purchase);
-  await user.click(screen.getByRole("button", { name: "Cancel" }));
+  await user.keyboard("{Escape}");
   expect(purchase).toHaveFocus();
 
   await user.click(purchase);
@@ -1570,8 +1578,15 @@ it("returns focus to Interties after an acquisition removes the trading row", as
     name: "Acquire Ridge Electric?",
   });
   await user.click(within(review).getByRole("button", { name: "Pay cash" }));
-  expect(review).not.toBeInTheDocument();
   expect(line).not.toBeInTheDocument();
+  expect(screen.getByRole("dialog", { name: "Acquire Ridge Electric?" })).toBe(
+    review,
+  );
+  expect(
+    within(review).queryByText(/more cash needed/),
+  ).not.toBeInTheDocument();
+  await act(async () => acknowledgePurchase());
+  expect(review).not.toBeInTheDocument();
   expect(screen.getByRole("heading", { name: "Interties" })).toHaveFocus();
 });
 

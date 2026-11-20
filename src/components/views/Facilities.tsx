@@ -11,6 +11,7 @@ import {
   facilityTerritoryId,
 } from "../../helpers/Territories";
 import { territoryName } from "../base/TerritoryBuildDestination";
+import { getTerritoryDefinition } from "../../data/Territories";
 import {
   getInterfaceScale,
   subscribeInterfaceScale,
@@ -1047,7 +1048,7 @@ export default class Facilities extends React.Component<Props, SelectionState> {
       event.key === "Escape" &&
       !event.defaultPrevented &&
       !this.dragging &&
-      !this.scrollBody?.closest("[inert]") &&
+      !this.scrollBody?.closest('[inert], [data-map-window-front="false"]') &&
       (this.liveSelectionCount() > (multiOnly ? 1 : 0) ||
         this.selectionModeActive())
     ) {
@@ -1380,11 +1381,13 @@ export default class Facilities extends React.Component<Props, SelectionState> {
                   )}
                   {(Object.keys(INHERITED_CONNECTIONS) as UtilityId[])
                     .filter((id) => utilityOwnedAt(game, id, game.date.minute))
-                    .map((id, index) => (
+                    .map((id, index, portfolio) => (
                       <section key={id} className="powerAgreementPortfolio">
-                        <Typography component="h3" variant="subtitle2">
-                          {territoryName(id)}
-                        </Typography>
+                        {portfolio.length > 1 && (
+                          <Typography component="h3" variant="subtitle2">
+                            {getTerritoryDefinition(id)?.name}
+                          </Typography>
+                        )}
                         <PowerAgreements
                           game={game}
                           line={inheritedConnection(id, index + 1)}

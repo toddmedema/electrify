@@ -8771,8 +8771,21 @@ option {
     font-variant-numeric: tabular-nums;
   }
   .buildDetailLabel {
-    width: 40%;
+    width: 52%;
   }
+  @media (max-width: 399px) {
+    th,
+    td {
+      padding-inline: 4px;
+    }
+    .buildDetailLabel {
+      width: 56%;
+    }
+  }
+}
+
+.powerAgreementGridImpact {
+  white-space: nowrap;
 }
 
 .powerAgreementDuration {
@@ -8811,19 +8824,65 @@ option {
       min-height: 40px;
     }
   }
-  .powerAgreementHeading {
-    margin: 0 0 8px;
-    font-size: var(--font-size-body1);
-    font-weight: var(--font-weight-emphasis);
-    line-height: 1.5;
+  .powerAgreementHeader {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 8px;
+    margin-bottom: 8px;
+    h4 {
+      margin: 0;
+      font-size: var(--font-size-body1);
+      font-weight: var(--font-weight-emphasis);
+      line-height: 1.5;
+    }
   }
   .powerAgreementStatus {
+    padding: 2px 8px;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
     color: var(--font-color-faded);
-    font-size: var(--font-size-body2);
-    font-weight: var(--font-weight-regular);
+    font-size: var(--font-size-caption);
+    line-height: 1.5;
   }
   .powerAgreementMetrics {
-    font-variant-numeric: tabular-nums;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    margin: 0 0 8px;
+    padding: 8px 0;
+    background: var(--bg-raised);
+    border-radius: var(--radius-md);
+    > div {
+      min-width: 0;
+      padding: 0 12px;
+    }
+    > div + div {
+      border-inline-start: 1px solid var(--border-subtle);
+    }
+    dt {
+      color: var(--font-color-faded);
+      font-size: var(--font-size-caption);
+    }
+    dd {
+      margin: 0;
+      font-size: var(--font-size-body1);
+      font-weight: var(--font-weight-emphasis);
+      font-variant-numeric: tabular-nums;
+    }
+  }
+  .powerAgreement.powerAgreementOffer {
+    margin-top: 8px;
+    padding: 12px;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    .MuiButton-root {
+      min-width: 0;
+    }
+  }
+  .powerAgreementUsage meter {
+    display: block;
+    width: 100%;
+    height: 12px;
   }
   .powerAgreementMinimum {
     font-size: var(--font-size-caption);
@@ -8899,6 +8958,9 @@ option {
   }
   > h3 {
     color: var(--font-color-faded);
+  }
+  &:first-child > .powerAgreements > .powerAgreement:first-child {
+    padding-top: 0;
   }
 }
 
