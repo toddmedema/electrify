@@ -4,6 +4,7 @@ import type {
   TerrainType,
 } from "../../../Types";
 import { isStorage } from "../../../Types";
+import { territoryCoordinateHash } from "../../../data/Territories";
 import type { TerritoryTileDefinition } from "../../../data/TerritoryTiles";
 import {
   territoryMapTileKey,
@@ -35,6 +36,35 @@ import type {
 } from "./Types";
 
 import { WATERSHED_LEVEL_OFFSETS, waterLevelOffset } from "./WaterSurface";
+
+/** Fold the coordinate hash before taking two bits so neighboring fields do not cycle in rows. */
+export function terrainArtVariant({
+  q,
+  r,
+}: Pick<TerritoryTileDefinition, "q" | "r">) {
+  const hash = territoryCoordinateHash(q, r, "terrain-art");
+  return Math.imul(hash ^ (hash >>> 16), 0x85ebca6b) >>> 30;
+}
+
+function farmLayouts(tiles: readonly TerritoryTileDefinition[]) {
+  const layouts = new Map<string, number>();
+  // In row order each hex has at most three assigned neighbors. One of the
+  // four layouts is always free, even in a field of uninterrupted plains.
+  const plains = tiles
+    .filter((tile) => tile.terrain === "plains")
+    .sort((a, b) => a.r - b.r || a.q - b.q);
+  for (const tile of plains) {
+    let used = 0;
+    for (const [dq, dr] of HEX_NEIGHBORS) {
+      const neighbor = layouts.get(`${tile.q + dq},${tile.r + dr}`);
+      if (neighbor !== undefined) used |= 1 << neighbor;
+    }
+    let layout = terrainArtVariant(tile);
+    while (used & (1 << layout)) layout = (layout + 1) % 4;
+    layouts.set(`${tile.q},${tile.r}`, layout);
+  }
+  return layouts;
+}
 
 export type ScenePicker = (point: {
   x: number;
@@ -210,6 +240,7 @@ export class SceneBuilder {
   private wireModels: MapInstance[] = [];
   private tiles?: readonly TerritoryTileDefinition[];
   private terrainAt = new Map<string, TerrainType>();
+  private farms = new Map<string, number>();
   private cells = new Map<string, TileScene>();
   private instances: MapInstance[] = [];
   constructor(private factories: ModelFactories) {}
@@ -226,6 +257,7 @@ export class SceneBuilder {
       this.terrainAt = new Map(
         allTiles.map(({ q, r, terrain }) => [`${q},${r}`, terrain]),
       );
+      this.farms = farmLayouts(allTiles);
       this.cells.clear();
       this.wireKey = undefined;
     }
@@ -259,6 +291,12 @@ export class SceneBuilder {
         const terrain = this.factories.terrain(tile.terrain, {
           footprint: model?.footprint ?? 0,
           weather,
+          variant:
+            tile.terrain === "plains"
+              ? this.farms.get(`${tile.q},${tile.r}`)
+              : tile.terrain === "mountain"
+                ? terrainArtVariant(tile)
+                : undefined,
           ports:
             tile.terrain === "river" ? riverPorts(tile, allTiles) : undefined,
           ...(tile.terrain === "mountain" || tile.terrain === "forest"

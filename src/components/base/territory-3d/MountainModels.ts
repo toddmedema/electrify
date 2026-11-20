@@ -14,7 +14,7 @@ const CORNERS: readonly Vec3[] = [
 const SADDLE_ELEVATION = 0.31;
 const MOUNTAIN_PROFILES = [
   { pad: 0, elevation: 0 },
-  { pad: 0.26, elevation: 0.76 },
+  { pad: 0.26, elevation: 0.64 },
   { pad: 0.68, elevation: 0.46 },
   { pad: 0.96, elevation: 0.38 },
 ] as const;
@@ -22,7 +22,7 @@ const MOUNTAIN_PROFILES = [
 const LOWER_ROCK = [rgb("#879894"), rgb("#778986"), PALETTE.rockShade] as const;
 const UPPER_ROCK = [PALETTE.rock, rgb("#77858F"), rgb("#96A3AD")] as const;
 const STRATA = [
-  0.24, 0.39, 0.28, 0.46, 0.26, 0.32, 0.39, 0.52, 0.28, 0.47, 0.56, 0.34,
+  0.36, 0.57, 0.43, 0.64, 0.49, 0.32, 0.55, 0.4, 0.61, 0.44, 0.3, 0.53,
 ];
 
 export function mountainProfile(footprint: number) {
@@ -74,21 +74,71 @@ function cap(
   }
 }
 
+// The flanks meet along a broken crest. Its five stations run from one spur,
+// over two unequal summits and their intervening col, to the opposite spur.
+const CRESTS: readonly (readonly Vec3[])[] = [
+  [
+    [-0.34, 0.29, -0.02],
+    [-0.19, 0.48, 0.04],
+    [-0.035, 0.39, -0.015],
+    [0.1, 0.65, -0.045],
+    [0.3, 0.34, 0.025],
+  ],
+  [
+    [-0.33, 0.38, 0.015],
+    [-0.12, 0.58, -0.025],
+    [0.035, 0.47, 0.025],
+    [0.21, 0.5, 0.055],
+    [0.36, 0.25, 0.02],
+  ],
+  [
+    [-0.34, 0.24, 0.035],
+    [-0.17, 0.43, -0.015],
+    [-0.015, 0.37, 0.04],
+    [0.13, 0.53, 0.017],
+    [0.31, 0.46, -0.035],
+  ],
+  [
+    [-0.35, 0.33, -0.01],
+    [-0.14, 0.74, 0.035],
+    [0.025, 0.49, 0.0],
+    [0.17, 0.55, -0.05],
+    [0.35, 0.29, -0.015],
+  ],
+];
+const CREST_AT_RIM = [2, 3, 4, 4, 4, 3, 2, 1, 0, 0, 0, 1];
+
+/** Turn the crest toward adjoining saddles. A tile's artwork breaks ties. */
+function ridgeTurn(edges: number, variant: number) {
+  let best = variant % 3,
+    score = -1;
+  for (let i = 0; i < 3; i++) {
+    const turn = (variant + i) % 3;
+    const end = (turn + 1) % 6;
+    const connected = ((edges >> end) & 1) + ((edges >> ((end + 3) % 6)) & 1);
+    if (connected > score) {
+      best = turn;
+      score = connected;
+    }
+  }
+  return best;
+}
+
 /** The reciprocal edge saddle is shared by every profile, even across a cut terrace. */
 export function buildMountainRelief(
   builder: MeshBuilder,
   profile: number,
   adjacentEdges: number,
+  variant: number,
 ): number {
   const { pad, elevation } = MOUNTAIN_PROFILES[profile];
   const rim = perimeter(adjacentEdges);
   if (pad) {
-    const shoulderWidth = (1 + pad) / 2;
-    const shoulders = rim.map(([x, y, z], i): Vec3 => [
-      x * shoulderWidth,
-      y + (elevation - y) * (0.5 + (i % 3) * 0.08),
-      z * shoulderWidth,
-    ]);
+    const shoulders = rim.map(([x, y, z], i): Vec3 => {
+      const rib = STRATA[(i + adjacentEdges) % STRATA.length];
+      const width = pad + (1 - pad) * rib;
+      return [x * width, y + (elevation - y) * (0.85 - rib), z * width];
+    });
     const terrace = rim.map(([x, , z]): Vec3 => [x * pad, elevation, z * pad]);
     slope(builder, rim, shoulders, LOWER_ROCK);
     slope(builder, shoulders, terrace, UPPER_ROCK);
@@ -96,20 +146,37 @@ export function buildMountainRelief(
     return elevation;
   }
 
-  // Shift the strata as the range turns, while keeping adjacent silhouettes joined.
-  const phase = adjacentEdges % STRATA.length;
-  const shoulders = rim.map(([x, y, z], i): Vec3 => [
-    x * 0.68,
-    Math.max(y + 0.06, STRATA[(i + phase) % STRATA.length]),
-    z * 0.68,
+  const turn = ridgeTurn(adjacentEdges, variant);
+  const angle = (turn * Math.PI) / 3;
+  const crest = CRESTS[variant].map(([x, y, z]): Vec3 => [
+    x * Math.cos(angle) - z * Math.sin(angle),
+    y,
+    x * Math.sin(angle) + z * Math.cos(angle),
   ]);
-  const ridge = rim.map(([x, , z], i): Vec3 => [
-    x * 0.28 - 0.105,
-    0.48 + STRATA[(i + phase) % STRATA.length] * 0.46,
-    z * 0.28 - 0.16,
-  ]);
-  slope(builder, rim, shoulders, LOWER_ROCK);
-  slope(builder, shoulders, ridge, UPPER_ROCK);
-  cap(builder, ridge, [-0.105, 0.94, -0.16], UPPER_ROCK);
+  const foot = rim.map((_, i) => rim[(i + turn * 2) % rim.length]);
+  const shoulders = foot.map(([x, y, z], i): Vec3 => {
+    const summit = crest[CREST_AT_RIM[i]];
+    const spur = STRATA[(i + variant * 3) % STRATA.length];
+    return [
+      x + (summit[0] - x) * 0.44,
+      y + (summit[1] - y) * spur,
+      z + (summit[2] - z) * 0.44,
+    ];
+  });
+  // The broad apron gives way to steeper rock ribs and shaded gullies.
+  for (let i = 0; i < foot.length; i++) {
+    const next = (i + 1) % foot.length;
+    const a = crest[CREST_AT_RIM[i]],
+      b = crest[CREST_AT_RIM[next]];
+    builder.quad(
+      foot[i],
+      shoulders[i],
+      shoulders[next],
+      foot[next],
+      LOWER_ROCK[0],
+    );
+    builder.triangle(shoulders[i], a, shoulders[next], UPPER_ROCK[0]);
+    if (a !== b) builder.triangle(a, b, shoulders[next], UPPER_ROCK[2]);
+  }
   return 0;
 }

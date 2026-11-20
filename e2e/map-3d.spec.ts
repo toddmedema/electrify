@@ -11,6 +11,9 @@ import { reviewScreenshot } from "./review-screenshot";
 import { getBuildFacilityQuote } from "../src/data/Facilities";
 import gameReducer, { buildFacility } from "../src/reducers/Game";
 import { getTerritoryTile } from "../src/helpers/TerritoryTiles";
+import { SceneBuilder } from "../src/components/base/territory-3d/SceneBuilder";
+import { getStructureModel } from "../src/components/base/territory-3d/StructureModels";
+import { territoryTileViews } from "../src/helpers/TerritoryMapState";
 import { getTerrainModel } from "../src/components/base/territory-3d/TerrainModels";
 import { editSavedGame, readSavedGame } from "./save-fixture";
 import { TICK_MINUTES } from "../src/Constants";
@@ -296,7 +299,19 @@ test("clicking real mountain relief above its ground selects the mountain tile",
   }));
   const frame = { width, height, cameraX, cameraY, scale };
   // Take a point inside the actual highest relief triangle, close to its peak.
-  const mesh = getTerrainModel("mountain").parts[1].mesh.positions;
+  const views = territoryTileViews((await readSavedGame(page))!);
+  const site = views.find((v) => v.tile.id === tile.id)!;
+  const [terrain] = new SceneBuilder({
+    terrain: getTerrainModel,
+    structure: getStructureModel,
+  }).build(
+    [site],
+    views.map((v) => v.tile),
+    [],
+    0,
+    "run",
+  );
+  const mesh = terrain.model.parts[1].mesh.positions;
   let peak = [0, -Infinity, 0];
   for (let i = 0; i < mesh.length; i += 9) {
     const vertices = [0, 3, 6].map((offset) =>

@@ -127,9 +127,8 @@ it.each(TERRAINS)(
         0,
       ),
     ).toBeCloseTo(Math.sqrt(3) / 2, 6);
-    expect(
-      Math.max(...Array.from(floor.positions).filter((_p, i) => i % 3 === 1)),
-    ).toBe(0);
+    // Ground decoration sits below the projected shadow plane.
+    expect(Math.max(...faces.flat().map((p) => p[1]))).toBeLessThan(0.003);
     model.parts.slice(1).forEach((part) => {
       const water =
         part.material === "water" || part.material === "watershed-water";
@@ -145,6 +144,45 @@ it.each(TERRAINS)(
     expect(model.height).toBeCloseTo(Math.max(...heights), 6);
   },
 );
+
+it.each(TERRAINS)(
+  "uses one base color across level %s land and water",
+  (terrain) => {
+    const model = getTerrainModel(terrain);
+    for (const { mesh } of model.parts.filter((part) => part.receivesShadow)) {
+      const colors = new Set<string>();
+      triangles(mesh).forEach((face, index) => {
+        if (face.every((p) => p[1] === 0))
+          colors.add(mesh.colors.slice(index * 9, index * 9 + 3).join(","));
+      });
+      expect(colors.size).toBeLessThanOrEqual(1);
+    }
+  },
+);
+
+it("draws four distinct farm footprints and keeps their fields and buildings clear of energy sites", () => {
+  const fields = new Set<string>();
+  for (let variant = 0; variant < 4; variant++) {
+    const farm = getTerrainModel("plains", { variant });
+    const plots = triangles(farm.parts[0].mesh).filter((face) =>
+      face.every((p) => p[1] > 0),
+    );
+    expect(plots.length).toBeGreaterThan(0);
+    fields.add(JSON.stringify(plots));
+    expect(farm.height).toBeGreaterThan(0);
+    for (const footprint of [0.24, 0.6, 0.7, 0.9]) {
+      const occupied = getTerrainModel("plains", { variant, footprint });
+      for (const part of occupied.parts)
+        for (const face of triangles(part.mesh).filter((face) =>
+          face.some((p) => p[1] > 0),
+        ))
+          expect(projectedArea(insidePad(face, footprint / 2))).toBeLessThan(
+            1e-10,
+          );
+    }
+  }
+  expect(fields.size).toBe(4);
+});
 
 it("keeps every terrain mesh finite, flat shaded and inside its own ground hex", () => {
   for (const terrain of TERRAINS) {
@@ -184,7 +222,7 @@ it.each([0, 0.6, 0.8, 1.01])(
   "reserves the entire central square for a %s-wide occupant",
   (footprint) => {
     for (const terrain of TERRAINS) {
-      if (!footprint && (terrain === "mountain" || terrain === "forest"))
+      if (!footprint && ["mountain", "forest", "plains"].includes(terrain))
         continue;
       const model = getTerrainModel(terrain, { footprint });
       const halfWidth = Math.max(0.55, footprint) / 2;
@@ -349,7 +387,7 @@ it("canonicalizes repeated options into a bounded cache without leaking tile var
         const ports = [0, 1, 2, 3, 4, 5].filter((edge) => mask & (1 << edge));
         models.add(getTerrainModel(terrain, { footprint, ports }));
       }
-  expect(models.size).toBe(281);
+  expect(models.size).toBe(282);
   expect(
     getTerrainModel("mountain", { adjacentEdges: 65, footprint: 0.27 }),
   ).toBe(getTerrainModel("mountain", { adjacentEdges: 1, footprint: 0.67 }));
