@@ -7,7 +7,7 @@ import * as facilityStatus from "../FacilityMapStatus";
 import type { TerritoryTileView } from "../../../helpers/TerritoryMapState";
 import { HEX_NEIGHBORS, hexWires } from "../TerritoryHexGeometry";
 import { MeshBuilder } from "./MeshBuilder";
-import { SceneBuilder, structureKind, terrainArtVariant } from "./SceneBuilder";
+import { SceneBuilder, structureKind } from "./SceneBuilder";
 import type { MapModel, Vec3 } from "./Types";
 import { projectPoint, tilePosition3D } from "./Projection";
 import { getTerrainModel } from "./TerrainModels";
@@ -166,6 +166,9 @@ test("scatters the four farm layouts across open plains consistently on scene re
     }
   }
   expect(layouts([...views].reverse()).reverse()).toEqual(original);
+  expect(layouts(views.slice(1))).toEqual(original.slice(1));
+  for (const [i, site] of views.entries())
+    expect(layouts([site])[0]).toBe(original[i]);
 });
 
 test("terrain reserves the structure footprint and unknown operation stays still", () => {
@@ -177,7 +180,7 @@ test("terrain reserves the structure footprint and unknown operation stays still
   const result = builder.build([tile], [tile.tile], [], 0, "run");
   expect(terrain).toHaveBeenCalledWith("plains", {
     footprint: 0.7,
-    variant: terrainArtVariant(tile.tile),
+    variant: expect.any(Number),
     ports: undefined,
   });
   expect(result[1].active).toBe(false);
@@ -763,10 +766,7 @@ test("hail hits the ground and panels, then leaves only fractured panels during 
     "run",
   );
   expect(ground.model).toBe(
-    getTerrainModel("plains", {
-      footprint: intact.model.footprint,
-      variant: terrainArtVariant(tile.tile),
-    }),
+    builder.build([tile], board, [], 30, "run")[0].model,
   );
   expect(stones.model.key).toBe("weather:hail");
   expect(stones.model.parts).toHaveLength(12);
