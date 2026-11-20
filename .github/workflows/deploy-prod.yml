@@ -20,19 +20,17 @@ jobs:
     steps:
       - name: Check out repository code
         uses: actions/checkout@v7
-        with:
-          # Images and audio live in Git LFS (see .gitattributes). Without this
-          # the runner gets 130-byte pointer files, the build still succeeds, and
-          # every image and sound on the site ships as a stub.
-          lfs: true
-          # Sitemap lastmod dates come from page source history.
-          fetch-depth: 0
+        env:
+          GIT_LFS_SKIP_SMUDGE: "1"
 
       - name: Setup Node.js environment
         uses: actions/setup-node@v7
         with:
           node-version: 26.13.0
           cache: npm
+
+      - name: Fetch and verify public assets
+        run: node scripts/ci/lfs-assets.js public
 
       - run: npm ci
 
