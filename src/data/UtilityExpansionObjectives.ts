@@ -21,3 +21,39 @@ export const UTILITY_EXPANSION_OBJECTIVES: CompiledRuleObjective[] = [
     required: true,
   },
 ];
+
+/** The published Valley rules before acquisition goals replaced the oil deadlines. */
+export const RETIRED_UTILITY_EXPANSION_OBJECTIVES: CompiledRuleObjective[] = [
+  {
+    id: "acquire-neighbor",
+    label: "Acquire a competitor",
+    metric: "utilityOwnership",
+    targets: ["valley-electric", "ridge-electric"],
+    deadlineMonth: 119,
+    required: true,
+  },
+  {
+    id: "retire-champlain-oil",
+    label: "Retire Champlain's original Oil A",
+    metric: "assetRetirement",
+    assetIds: ["scenario-116-champlain-oil-a"],
+    deadlineMonth: 191,
+    required: true,
+  },
+  {
+    id: "retire-acquired-oil",
+    label: "Retire acquired original oil assets",
+    metric: "assetRetirement",
+    assetIds: ["scenario-116-valley-oil", "scenario-116-ridge-oil"],
+    deadlineMonth: 227,
+    required: true,
+  },
+  {
+    id: "retain-customers",
+    label: "Retain 90% of your expanded customer base",
+    metric: "customerRetention",
+    minRetainedShare: 0.9,
+    deadlineMonth: 239,
+    required: true,
+  },
+];

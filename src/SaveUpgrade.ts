@@ -1,4 +1,7 @@
-import { gameObjectiveProgress } from "./helpers/ObjectiveRules";
+import {
+  migrateValleyObjectiveProgress,
+  type ValleyObjectiveRules,
+} from "./helpers/ObjectiveRules";
 import {
   legacyTerritoryTiles,
   assignTerritoryTiles,
@@ -9,7 +12,10 @@ import { inheritedConnection } from "./helpers/PowerAgreements";
 import { facilityTerritoryId } from "./helpers/Territories";
 
 type DecodedSave = Record<string, unknown>;
-type Migration = (save: DecodedSave) => DecodedSave | null;
+type Migration = (
+  save: DecodedSave,
+  publishedValleyRules?: ValleyObjectiveRules,
+) => DecodedSave | null;
 
 const object = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === "object" && !Array.isArray(value);
@@ -398,24 +404,22 @@ const migrations: readonly Migration[] = [
   (save) => save,
   // 21 -> 22: territory weather begins on the next monthly check for existing runs.
   (save) => save,
-  // 22 -> 23: rebuild the Valley's scored goals from saved customer history and purchase receipts.
-  (save) => {
+  // 22 -> 23: replace verified retired Valley goals using customer history and purchase receipts.
+  (save, publishedValleyRules) => {
     if (!object(save.game)) return null;
-    if (
-      save.game.scenarioId !== 116 ||
-      save.game.objectiveProgress === undefined
-    )
+    const game = save.game;
+    if (game.scenarioId !== 116 || game.objectiveProgress === undefined)
       return save;
-    const { objectiveProgress, ...game } = save.game;
-    if (!object(objectiveProgress) || !Array.isArray(game.monthlyHistory))
+    if (!object(game.objectiveProgress) || !Array.isArray(game.monthlyHistory))
       return null;
     try {
-      const progress = gameObjectiveProgress(game as unknown as GameType);
-      if (!progress) return null;
-      // The schema 22 acquisition preview already used these goals. Keep its evidence
-      // so the save validator can check the original observations and checksums.
-      if (objectiveProgress.rulesDigest === progress.rulesDigest) return save;
-      return { ...save, game: { ...game, objectiveProgress: progress } };
+      const objectiveProgress = migrateValleyObjectiveProgress(
+        game as unknown as GameType,
+        publishedValleyRules,
+      );
+      return objectiveProgress
+        ? { ...save, game: { ...game, objectiveProgress } }
+        : null;
     } catch {
       return null;
     }
@@ -427,7 +431,10 @@ export const SAVE_SCHEMA_VERSION =
   FIRST_SUPPORTED_SAVE_SCHEMA + migrations.length;
 
 /** Receives decoded data; copy each changed branch and never overwrite the stored original. */
-export function upgradeSave(raw: unknown): DecodedSave | null {
+export function upgradeSave(
+  raw: unknown,
+  publishedValleyRules?: ValleyObjectiveRules,
+): DecodedSave | null {
   if (!object(raw)) return null;
   const version = raw.schemaVersion;
   if (
@@ -439,7 +446,10 @@ export function upgradeSave(raw: unknown): DecodedSave | null {
     return null;
   let save: DecodedSave = { ...raw };
   for (let from = version; from < SAVE_SCHEMA_VERSION; from++) {
-    const upgraded = migrations[from - FIRST_SUPPORTED_SAVE_SCHEMA](save);
+    const upgraded = migrations[from - FIRST_SUPPORTED_SAVE_SCHEMA](
+      save,
+      publishedValleyRules,
+    );
     if (!upgraded) return null;
     save = { ...upgraded, schemaVersion: from + 1 };
   }

@@ -7,7 +7,7 @@ import {
   isUtilityExpansionScenario,
 } from "./ExpansionContext";
 import { expansionRetentionBaseline, utilityAcquisitions } from "./Expansion";
-import { UTILITY_AREAS } from "../data/UtilityExpansion";
+import { EXPANSION_SCENARIO_ID, UTILITY_AREAS } from "../data/UtilityExpansion";
 import { formatCount, formatNumber, formatForecastNumber } from "./Format";
 import {
   DifficultyType,
@@ -28,7 +28,10 @@ import type {
   ObjectiveResult,
 } from "../data/ScenarioObjectives";
 import { getScenario } from "../data/Scenarios";
-import { UTILITY_EXPANSION_OBJECTIVES } from "../data/UtilityExpansionObjectives";
+import {
+  RETIRED_UTILITY_EXPANSION_OBJECTIVES,
+  UTILITY_EXPANSION_OBJECTIVES,
+} from "../data/UtilityExpansionObjectives";
 import { scenarioRules } from "./ScenarioRules";
 import { ruleDigest, canonicalRuleJson } from "./RuleIdentity";
 import { MINUTES_PER_MONTH } from "./DateTime";
@@ -259,17 +262,19 @@ const definitionIdentity = new WeakMap<
   ScenarioType,
   { key: string; definitions: CompiledRuleObjective[]; digest: string }
 >();
+type ObjectiveGameContext = Pick<
+  GameType,
+  "seed" | "startingYear" | "date" | "customerMarketSize"
+> &
+  Partial<
+    Pick<
+      GameType,
+      "difficulty" | "utilityExpansion" | "campaign" | "startingMonth"
+    >
+  >;
+
 export function objectiveContextForGame(
-  game: Pick<
-    GameType,
-    "seed" | "startingYear" | "date" | "customerMarketSize"
-  > &
-    Partial<
-      Pick<
-        GameType,
-        "difficulty" | "utilityExpansion" | "campaign" | "startingMonth"
-      >
-    >,
+  game: ObjectiveGameContext,
   scenario: ScenarioType,
 ): ObjectiveContext {
   const definitions = scenarioObjectiveDefinitions(scenario, {
@@ -278,6 +283,14 @@ export function objectiveContextForGame(
     campaign: game.campaign,
     customerMarketSize: game.customerMarketSize,
   });
+  return objectiveContextForDefinitions(game, scenario, definitions);
+}
+
+function objectiveContextForDefinitions(
+  game: ObjectiveGameContext,
+  scenario: ScenarioType,
+  definitions: CompiledRuleObjective[],
+): ObjectiveContext {
   const campaignInputs = game.campaign
     ? [
         game.campaign.generationIndex,
@@ -775,9 +788,17 @@ export function validGameObjectiveProgress(game: GameType): boolean {
   const scenario = getScenario(game.scenarioId, game.customScenario);
   if (!scenario) return game.objectiveProgress === undefined;
   const objectives = scenarioObjectiveDefinitions(scenario, game);
+  return validGameObjectiveProgressForDefinitions(game, scenario, objectives);
+}
+
+function validGameObjectiveProgressForDefinitions(
+  game: GameType,
+  scenario: ScenarioType,
+  objectives: CompiledRuleObjective[],
+): boolean {
   if (!objectives.length) return game.objectiveProgress === undefined;
   if (!game.objectiveProgress) return !scenario.mod && !game.campaign;
-  const context = objectiveContextForGame(game, scenario);
+  const context = objectiveContextForDefinitions(game, scenario, objectives);
   const progress = game.objectiveProgress;
   if (
     progress.retentionBaseline !==
@@ -885,6 +906,40 @@ export function validGameObjectiveProgress(game: GameType): boolean {
     }
   }
   return true;
+}
+
+export type ValleyObjectiveRules = "published-master" | "acquisition-preview";
+
+/** Check the original evidence against its own rules before replacing retired objectives. */
+export function migrateValleyObjectiveProgress(
+  game: GameType,
+  publishedRules?: ValleyObjectiveRules,
+): ObjectiveProgress | null {
+  const scenario = getScenario(EXPANSION_SCENARIO_ID)!;
+  const context = objectiveContextForGame(game, scenario);
+  const progress = game.objectiveProgress;
+  if (!progress) return null;
+  if (
+    publishedRules !== "published-master" &&
+    progress.rulesDigest === context.rulesDigest
+  )
+    return progress;
+  if (
+    publishedRules === "acquisition-preview" ||
+    !validGameObjectiveProgressForDefinitions(
+      game,
+      scenario,
+      RETIRED_UTILITY_EXPANSION_OBJECTIVES,
+    )
+  )
+    return null;
+  return historyProgress(
+    UTILITY_EXPANSION_OBJECTIVES,
+    game.monthlyHistory,
+    context,
+    objectiveRetentionBaseline(game, scenario),
+    utilityAcquisitions(game),
+  );
 }
 
 export interface RunFailureType {

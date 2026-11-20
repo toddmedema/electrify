@@ -1691,6 +1691,12 @@ function worldTerritoryOwnership(world: World, grids = world.grids) {
   return { owns, ownedTiles, tileOwners, landOwners };
 }
 
+// Master ca7b8c4e shipped territory weather; preview e2abbfbb changed the Valley goals.
+const SCHEMA_22_MASTER_RULES =
+  "coop-2-bddc08bd9f13d3fb912bccfa5401e85283039c61e31340ec6a252cd503884fef";
+const SCHEMA_22_PREVIEW_RULES =
+  "coop-2-65d7bc6c94fc95425c4781b2a0039977949b473ac9928a597914f29b449643a6";
+
 /** Recognized published worlds follow ordered migrations; arbitrary runtime identities never do. */
 function upgradeTerritoryWorld(value: unknown): unknown {
   const old = value as Partial<World> | null;
@@ -1730,13 +1736,9 @@ function upgradeTerritoryWorld(value: unknown): unknown {
             "coop-2-15c753596aead2c7b8214074ea6ee123deffa20b96db9d73b4abd0e420548a55" ||
           old.rules ===
             "coop-2-8423406cc7fc00c2bcf0e3cd7b647ad746beabc840cbeb1fc847e15d0389d64c")) ||
-      // Published master ca7b8c4e adds weather. Published acquisition preview e2abbfbb
-      // already uses the new goals. Both shipped game schema 22 with distinct rules.
       (old.gameSchema === 22 &&
-        (old.rules ===
-          "coop-2-bddc08bd9f13d3fb912bccfa5401e85283039c61e31340ec6a252cd503884fef" ||
-          old.rules ===
-            "coop-2-65d7bc6c94fc95425c4781b2a0039977949b473ac9928a597914f29b449643a6"))
+        (old.rules === SCHEMA_22_MASTER_RULES ||
+          old.rules === SCHEMA_22_PREVIEW_RULES))
     ) ||
     !Array.isArray(old.grids) ||
     !old.grids.every(
@@ -1755,11 +1757,17 @@ function upgradeTerritoryWorld(value: unknown): unknown {
   )
     return value;
   const result = cloneDeep(old) as World;
+  const publishedValleyRules =
+    old.rules === SCHEMA_22_MASTER_RULES
+      ? "published-master"
+      : old.rules === SCHEMA_22_PREVIEW_RULES
+        ? "acquisition-preview"
+        : undefined;
   for (let i = 0; i < result.grids.length; i++) {
-    const upgraded = upgradeSave({
-      schemaVersion: old.gameSchema,
-      game: result.grids[i],
-    });
+    const upgraded = upgradeSave(
+      { schemaVersion: old.gameSchema, game: result.grids[i] },
+      publishedValleyRules,
+    );
     if (!upgraded) return value;
     result.grids[i] = upgraded.game as GameType;
   }
