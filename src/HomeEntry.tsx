@@ -20,6 +20,8 @@ export function Home() {
   const actionPending = React.useRef(false);
   const [failed, setFailed] = React.useState(false);
   const [pending, setPending] = React.useState(false);
+  const [FeedbackDialog, setFeedbackDialog] =
+    React.useState<typeof import("./components/base/FeedbackDialog").default>();
   const [mode, setMode] = React.useState<"light" | "dark">(() =>
     document.documentElement.dataset.theme === "dark" ? "dark" : "light",
   );
@@ -89,6 +91,17 @@ export function Home() {
     },
     [],
   );
+  const openFeedback = async () => {
+    setFailed(false);
+    try {
+      const { default: Dialog } = await import(
+        /* webpackChunkName: "feedback" */ "./components/base/FeedbackDialog"
+      );
+      if (!actionPending.current) setFeedbackDialog(() => Dialog);
+    } catch {
+      setFailed(true);
+    }
+  };
   React.useEffect(() => {
     const activateInstall = () => {
       void run();
@@ -124,12 +137,19 @@ export function Home() {
                     onMods={() => void run("onMods")}
                     onAchievements={() => void run("onAchievements")}
                     onManual={() => void run("onManual")}
+                    onFeedback={() => void openFeedback()}
                     onAudioChange={(value) => {
                       if (value) unlockAudioContext();
                       void run("onAudioChange", value);
                     }}
                   />
                 </main>
+                {FeedbackDialog && (
+                  <FeedbackDialog
+                    context={{ source: "game-menu" }}
+                    onClose={() => setFeedbackDialog(undefined)}
+                  />
+                )}
                 {pending && (
                   <p className="homeLoadStatus" role="status">
                     Loading game…
@@ -137,8 +157,8 @@ export function Home() {
                 )}
                 {failed && (
                   <p className="homeLoadStatus" role="alert">
-                    The game could not load. Check your connection and try the
-                    action again.
+                    This action could not load. Check your connection and try
+                    again.
                   </p>
                 )}
               </div>

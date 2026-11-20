@@ -58,6 +58,7 @@ function props(overrides: Partial<Props> = {}): Props {
     onMods: jest.fn(),
     onAchievements: jest.fn(),
     onManual: jest.fn(),
+    onFeedback: jest.fn(),
     onStart: jest.fn(),
     ...overrides,
   };
@@ -297,14 +298,19 @@ describe("MainMenu", () => {
       name: "Join the Electrify Discord",
     });
     expect(discord).toHaveAttribute("href", "https://discord.gg/ethMFvvmup");
-    expect(screen.getByRole("link", { name: "Send feedback" })).toHaveAttribute(
-      "href",
-      "https://forms.gle/nSpkVzcFcXMQMMgb9",
-    );
     expect(
       screen.getAllByRole("link", {
-        name: /Discord|feedback|About|Privacy/,
+        name: /Discord|About|Privacy/,
       })[0],
     ).toBe(discord);
+  });
+
+  it("opens the feedback dialog from the footer button", () => {
+    const onFeedback = jest.fn();
+    renderMainMenu(
+      <MainMenu {...props({ onFeedback, deferServices: true })} />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Send feedback" }));
+    expect(onFeedback).toHaveBeenCalledTimes(1);
   });
 });

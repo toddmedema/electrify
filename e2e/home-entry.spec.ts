@@ -5,6 +5,82 @@ import { reviewScreenshot } from "./review-screenshot";
 // Held-download probes must own requests even after background offline caching starts.
 test.use({ serviceWorkers: "block" });
 
+test("homepage feedback opens in place and tracks each opening and submission", async ({
+  page,
+}, testInfo) => {
+  await page.emulateMedia({
+    colorScheme: testInfo.project.name.startsWith("mobile") ? "dark" : "light",
+  });
+  await page.route("https://www.googletagmanager.com/**", (route) =>
+    route.fulfill({ contentType: "application/javascript", body: "" }),
+  );
+  let received: unknown;
+  await page.route("**/submitGameFeedback", async (route) => {
+    const headers = {
+      "Access-Control-Allow-Origin": new URL(page.url()).origin,
+      "Access-Control-Allow-Methods": "POST",
+      "Access-Control-Allow-Headers": "Content-Type",
+    };
+    if (route.request().method() === "OPTIONS") {
+      await route.fulfill({ status: 204, headers });
+      return;
+    }
+    received = route.request().postDataJSON();
+    await route.fulfill({ headers, json: { result: { sent: true } } });
+  });
+  await page.goto("/");
+  const open = page.getByRole("button", { name: "Send feedback", exact: true });
+  const dialog = page.getByRole("dialog", { name: "Share feedback" });
+  const message = dialog.getByRole("textbox", { name: "Your feedback" });
+  const submit = dialog.getByRole("button", { name: "Send feedback" });
+  await open.click();
+  await expect(message).toBeFocused();
+  await expect(page).toHaveURL("/");
+  await expect(submit).toBeDisabled();
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await expect(open).toBeFocused();
+  await open.click();
+  await message.fill("The tutorial was helpful.");
+  await dialog
+    .getByRole("textbox", { name: "Email for a reply (optional)" })
+    .fill("player@example.com");
+  await reviewScreenshot(dialog, {
+    path: testInfo.outputPath("homepage-feedback.png"),
+    animations: "disabled",
+  });
+  await submit.click();
+  await expect(dialog.getByRole("status")).toHaveText(
+    "Thanks for sharing your feedback.",
+  );
+  expect(received).toMatchObject({
+    data: {
+      source: "game-menu",
+      message: "The tutorial was helpful.",
+      replyEmail: "player@example.com",
+    },
+  });
+  const eventParams = { source: "game-menu", app_version: expect.any(String) };
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const { dataLayer = [] } = window as typeof window & {
+          dataLayer?: ArrayLike<unknown>[];
+        };
+        return dataLayer
+          .map((command) => Array.from(command))
+          .filter(
+            ([command, name]) =>
+              command === "event" && String(name).startsWith("feedback_"),
+          );
+      }),
+    )
+    .toEqual([
+      ["event", "feedback_open", eventParams],
+      ["event", "feedback_open", eventParams],
+      ["event", "feedback_submit", eventParams],
+    ]);
+});
+
 test("a fresh production title defers the game until an action and preserves the selected destination", async ({
   page,
 }) => {
