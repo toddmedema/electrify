@@ -168,45 +168,52 @@ for (const theme of ["light", "dark"] as const) {
       .poll(async () => (await readTerritoryMapCamera(viewport)).x)
       .not.toBe(cameraX);
     await expect(page.locator(".tileWorkspaceSurface")).toHaveCount(0);
-    if (theme === "light") {
-      // A low-frequency wheel moves the map from half to double its starting scale.
-      const zoomX = x + 80;
-      const zoomY = y + 48;
-      const center = await viewport.evaluate((element) => {
-        const { left, top } = element.getBoundingClientRect();
-        return {
-          x: left + element.clientWidth / 2,
-          y: top + element.clientHeight / 2,
-        };
-      });
-      await page.mouse.move(zoomX, zoomY);
-      const baseline = await readTerritoryMapCamera(viewport);
-      await page.mouse.wheel(0, -2000);
-      await expect
-        .poll(async () => (await readTerritoryMapCamera(viewport)).scale)
-        .toBe(baseline.scale * 2);
-      await page.mouse.wheel(0, 2000);
-      await expect
-        .poll(async () => (await readTerritoryMapCamera(viewport)).scale)
-        .toBe(baseline.scale / 2);
-      const camera = await readTerritoryMapCamera(viewport);
-      const offsetX = zoomX - center.x;
-      const offsetY = zoomY - center.y;
-      const driftX =
-        camera.x -
-        baseline.x +
-        offsetX / camera.scale -
-        offsetX / baseline.scale;
-      const driftY =
-        camera.y -
-        baseline.y +
-        offsetY / camera.scale -
-        offsetY / baseline.scale;
-      // Chromium rounds wheel coordinates to CSS pixels.
-      expect(Math.hypot(driftX, driftY) * camera.scale).toBeLessThan(1);
-    }
   });
 }
+
+test("desktop wheel zoom clamps to half and double scale around the pointer", async ({
+  page,
+}) => {
+  test.skip(
+    (page.viewportSize()?.width ?? 1024) < 1024,
+    "Desktop pointer controls",
+  );
+  const { map, canvas } = await startPausedMap(page, "light");
+  await readyDiagnostics(canvas);
+  const viewport = map.locator(".territoryMapViewport");
+  const center = await viewport.evaluate((element) => {
+    const { left, top } = element.getBoundingClientRect();
+    return {
+      x: left + element.clientWidth / 2,
+      y: top + element.clientHeight / 2,
+    };
+  });
+  const zoomX = Math.round(center.x) + 80;
+  const zoomY = Math.round(center.y) + 48;
+  await page.mouse.move(zoomX, zoomY);
+  const baseline = await readTerritoryMapCamera(viewport);
+
+  await page.mouse.wheel(0, -2000);
+  await expect(viewport).toHaveAttribute(
+    "data-camera-scale",
+    String(baseline.scale * 2),
+  );
+  await page.mouse.wheel(0, 2000);
+  await expect(viewport).toHaveAttribute(
+    "data-camera-scale",
+    String(baseline.scale / 2),
+  );
+
+  const camera = await readTerritoryMapCamera(viewport);
+  const offsetX = zoomX - center.x;
+  const offsetY = zoomY - center.y;
+  const driftX =
+    camera.x - baseline.x + offsetX / camera.scale - offsetX / baseline.scale;
+  const driftY =
+    camera.y - baseline.y + offsetY / camera.scale - offsetY / baseline.scale;
+  // Chromium rounds wheel coordinates to CSS pixels.
+  expect(Math.hypot(driftX, driftY) * camera.scale).toBeLessThan(1);
+});
 
 for (const reducedMotion of ["no-preference", "reduce"] as const) {
   const animate = reducedMotion === "no-preference";
