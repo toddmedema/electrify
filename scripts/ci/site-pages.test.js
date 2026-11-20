@@ -4,7 +4,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { createHash } = require("node:crypto");
-const { execFileSync } = require("node:child_process");
+const { execFileSync, spawnSync } = require("node:child_process");
 // Use the HTML parser already supplied by CRA's test environment.
 const { JSDOM } = require(
   require.resolve("jsdom", {
@@ -456,6 +456,59 @@ test("source dates reject missing records, invalid dates, future dates and backd
   );
   write("site/source-dates.json", {});
   await assert.rejects(generate({ root, check: true }), /--date/);
+});
+
+test("pre-push checks committed site changes and skips unrelated changes", async (t) => {
+  const { root, write } = fixture(t);
+  await generate({ root });
+  const { scripts } = require("../../package.json");
+  write("package.json", {
+    scripts: {
+      "check:prepush": scripts["check:prepush"],
+      "site:check": scripts["site:check"],
+    },
+  });
+  for (const file of ["check-changed.js", "generate.js", "registry.js"]) {
+    const relative = `scripts/site/${file}`;
+    write(relative, fs.readFileSync(path.join(ROOT, relative), "utf8"));
+  }
+  const git = (...args) => execFileSync("git", args, { cwd: root });
+  const record = (message) => {
+    git("add", "-A");
+    commit(root, message, "2020-01-03T12:00:00Z");
+  };
+  record("Generate baseline pages");
+  git("update-ref", "refs/remotes/origin/master", "HEAD");
+  const check = () =>
+    spawnSync("npm", ["run", "check:prepush"], {
+      cwd: root,
+      encoding: "utf8",
+      shell: process.platform === "win32",
+      env: { ...process.env, NODE_PATH: path.join(ROOT, "node_modules") },
+    });
+
+  write("README.md", "Documentation edit");
+  record("Edit documentation");
+  const skipped = check();
+  assert.equal(skipped.status, 0, skipped.stderr);
+  assert.match(skipped.stdout, /No site inputs or generated pages changed/);
+
+  write("public/about.html", "<!doctype html>\n<p>New authored copy</p>");
+  record("Edit a public page without regenerating");
+  const stale = check();
+  assert.equal(stale.status, 1, stale.stdout);
+  assert.match(stale.stderr, /public\/about.html has no matching source date/);
+  assert.match(stale.stderr, /npm run site:generate -- --date YYYY-MM-DD/);
+
+  await generate({ root, date: "2020-01-03" });
+  const uncommitted = check();
+  assert.equal(uncommitted.status, 1, uncommitted.stdout);
+  assert.match(uncommitted.stderr, /Commit or set aside local site changes/);
+
+  record("Commit regenerated site files");
+  const repaired = check();
+  assert.equal(repaired.status, 0, repaired.stderr);
+  assert.match(repaired.stdout, /Site pages are current/);
 });
 
 test("learning pages provide breadcrumbs, concise metadata, and a substantial simulator guide", async (t) => {
