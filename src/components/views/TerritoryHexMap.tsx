@@ -185,6 +185,7 @@ export default function TerritoryHexMap({
     "network.showStatusLayer",
     true,
   );
+  const [showNames, setShowNames] = useToolState("network.showNames", true);
   const topology = useStableArray(
     views.map((view) => ({
       tile: view.tile,
@@ -830,7 +831,12 @@ export default function TerritoryHexMap({
       data-renderer={rendererState}
       aria-label="Terrain, structures and utility ownership"
     >
-      <MapStatusLayers value={showStatusLayer} onChange={setShowStatusLayer} />
+      <MapStatusLayers
+        showStatus={showStatusLayer}
+        onStatusChange={setShowStatusLayer}
+        showNames={showNames}
+        onNamesChange={setShowNames}
+      />
       <Tooltip
         title={
           buyMode
@@ -1273,6 +1279,7 @@ export default function TerritoryHexMap({
             const utility = !!tile.city && !!view.ownerKey;
             const cityLabel =
               tile.city?.name ?? (tile.city && citySizeLabel(tile.city.size));
+            const showName = showNames && !!cityLabel;
             const quote = purchaseQuotes?.get(tile.id);
             const projectSite = projectSites?.get(key);
             const projectPrice = projectSite
@@ -1310,7 +1317,7 @@ export default function TerritoryHexMap({
                 data-purchasable={!!quote}
                 data-unaffordable={unaffordable}
                 aria-busy={pending || undefined}
-                className={`territoryTileTarget${utility || (cityLabel && showStatusLayer) ? " territoryUtilityLabel" : ""}`}
+                className={`territoryTileTarget${showName ? " territoryUtilityLabel" : ""}`}
                 style={
                   {
                     left: point.x * scale,
@@ -1374,9 +1381,9 @@ export default function TerritoryHexMap({
                     )}
                   </svg>
                 )}
-                {(utility || (cityLabel && showStatusLayer)) && (
+                {showName && (
                   <strong>
-                    {cityLabel && showStatusLayer && <span>{cityLabel}</span>}
+                    <span>{cityLabel}</span>
                     {utility && (
                       <span>{view.owned ? "You" : view.ownerName}</span>
                     )}

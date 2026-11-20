@@ -201,7 +201,7 @@ it("renders and inspects separate peer properties with the same retained tile ID
   expect(southInspection.getByText("Coal")).toBeVisible();
 });
 
-it("hides and restores the construction badge with the facility status layer", () => {
+it("toggles map names and the construction badge independently", () => {
   const { game, facility } = ready();
   facility.expansionInProgress = {
     projectSequence: 1,
@@ -216,12 +216,28 @@ it("hides and restores the construction badge with the facility status layer", (
     quoteKey: "status-only-fixture",
   };
   const { occupant } = show(game, facility.tileId!);
+  const city = screen.getByRole("button", {
+    name: "Inspect Valley Electric territory · Winooski",
+  });
+  expect(within(city).getByText("Winooski")).toBeVisible();
+  expect(within(city).getByText("Valley Electric")).toBeVisible();
   expect(occupant).toHaveAttribute("data-facility-status", "construction");
   fireEvent.click(screen.getByRole("button", { name: "Map layers" }));
   const toggle = screen.getByRole("checkbox", { name: "Facility status" });
   fireEvent.click(toggle);
+  expect(within(city).getByText("Winooski")).toBeVisible();
+  expect(within(city).getByText("Valley Electric")).toBeVisible();
+  const names = screen.getByRole("checkbox", { name: "Names" });
+  fireEvent.click(names);
+  expect(within(city).queryByText("Winooski")).not.toBeInTheDocument();
+  expect(within(city).queryByText("Valley Electric")).not.toBeInTheDocument();
   expect(occupant).toHaveAttribute("data-facility-status", "construction");
   expect(decorativeChild(occupant, ".facilityMapStatusArtwork")).toBeNull();
   fireEvent.click(toggle);
   expect(decorativeChild(occupant, ".facilityMapStatusArtwork")).not.toBeNull();
+  expect(within(city).queryByText("Winooski")).not.toBeInTheDocument();
+  expect(within(city).queryByText("Valley Electric")).not.toBeInTheDocument();
+  fireEvent.click(names);
+  expect(within(city).getByText("Winooski")).toBeVisible();
+  expect(within(city).getByText("Valley Electric")).toBeVisible();
 });
