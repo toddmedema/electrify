@@ -5,6 +5,82 @@ import { reviewScreenshot } from "./review-screenshot";
 // Held-download probes must own requests even after background offline caching starts.
 test.use({ serviceWorkers: "block" });
 
+test("homepage feedback opens in place and tracks each opening and submission", async ({
+  page,
+}, testInfo) => {
+  await page.emulateMedia({
+    colorScheme: testInfo.project.name.startsWith("mobile") ? "dark" : "light",
+  });
+  await page.route("https://www.googletagmanager.com/**", (route) =>
+    route.fulfill({ contentType: "application/javascript", body: "" }),
+  );
+  let received: unknown;
+  await page.route("**/submitGameFeedback", async (route) => {
+    const headers = {
+      "Access-Control-Allow-Origin": new URL(page.url()).origin,
+      "Access-Control-Allow-Methods": "POST",
+      "Access-Control-Allow-Headers": "Content-Type",
+    };
+    if (route.request().method() === "OPTIONS") {
+      await route.fulfill({ status: 204, headers });
+      return;
+    }
+    received = route.request().postDataJSON();
+    await route.fulfill({ headers, json: { result: { sent: true } } });
+  });
+  await page.goto("/");
+  const open = page.getByRole("button", { name: "Send feedback", exact: true });
+  const dialog = page.getByRole("dialog", { name: "Share feedback" });
+  const message = dialog.getByRole("textbox", { name: "Your feedback" });
+  const submit = dialog.getByRole("button", { name: "Send feedback" });
+  await open.click();
+  await expect(message).toBeFocused();
+  await expect(page).toHaveURL("/");
+  await expect(submit).toBeDisabled();
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await expect(open).toBeFocused();
+  await open.click();
+  await message.fill("The tutorial was helpful.");
+  await dialog
+    .getByRole("textbox", { name: "Email for a reply (optional)" })
+    .fill("player@example.com");
+  await reviewScreenshot(dialog, {
+    path: testInfo.outputPath("homepage-feedback.png"),
+    animations: "disabled",
+  });
+  await submit.click();
+  await expect(dialog.getByRole("status")).toHaveText(
+    "Thanks for sharing your feedback.",
+  );
+  expect(received).toMatchObject({
+    data: {
+      source: "game-menu",
+      message: "The tutorial was helpful.",
+      replyEmail: "player@example.com",
+    },
+  });
+  const eventParams = { source: "game-menu", app_version: expect.any(String) };
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const { dataLayer = [] } = window as typeof window & {
+          dataLayer?: ArrayLike<unknown>[];
+        };
+        return dataLayer
+          .map((command) => Array.from(command))
+          .filter(
+            ([command, name]) =>
+              command === "event" && String(name).startsWith("feedback_"),
+          );
+      }),
+    )
+    .toEqual([
+      ["event", "feedback_open", eventParams],
+      ["event", "feedback_open", eventParams],
+      ["event", "feedback_submit", eventParams],
+    ]);
+});
+
 test("a fresh production title defers the game until an action and preserves the selected destination", async ({
   page,
 }) => {
@@ -234,6 +310,104 @@ for (const entry of ["home", "game"] as const) {
     ).toBeVisible();
   });
 }
+
+test("installation waits for loading and open homepage feedback to close", async ({
+  page,
+}) => {
+  test.skip(
+    !process.env.E2E_BASE_URL && !process.env.E2E_BUILD_DIR,
+    "Production chunk delivery.",
+  );
+  await page.goto("/");
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const feedbackChunk = "**/static/js/feedback.*.js";
+  await page.route(feedbackChunk, async (route) => {
+    await held;
+    await route.continue();
+  });
+  const requested = page.waitForRequest(feedbackChunk);
+  const gameRequests: string[] = [];
+  page.on("request", (request) => {
+    if (/\/static\/js\/game\.[^/]+\.js$/.test(request.url()))
+      gameRequests.push(request.url());
+  });
+  const prompt = () =>
+    page.evaluate(() => {
+      const event = new Event("beforeinstallprompt", { cancelable: true });
+      Object.assign(event, {
+        prompt: async () => {
+          document.documentElement.dataset.installPrompted = "true";
+        },
+        userChoice: Promise.resolve({ outcome: "accepted", platform: "web" }),
+      });
+      window.dispatchEvent(event);
+    });
+  try {
+    await page
+      .getByRole("button", { name: "Send feedback", exact: true })
+      .click();
+    await requested;
+    await prompt();
+    expect(gameRequests).toEqual([]);
+  } finally {
+    release();
+  }
+  const dialog = page.getByRole("dialog", { name: "Share feedback" });
+  const message = dialog.getByRole("textbox", { name: "Your feedback" });
+  await message.fill("Keep this draft until I close feedback.");
+  await prompt();
+  await expect(message).toHaveValue("Keep this draft until I close feedback.");
+  expect(gameRequests).toEqual([]);
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await page.getByRole("button", { name: "Install app", exact: true }).click();
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-install-prompted",
+    "true",
+  );
+});
+
+test("feedback still opens when manual game entry fails before its download finishes", async ({
+  page,
+}) => {
+  test.skip(
+    !process.env.E2E_BASE_URL && !process.env.E2E_BUILD_DIR,
+    "Production chunk delivery.",
+  );
+  await page.goto("/");
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const feedbackChunk = "**/static/js/feedback.*.js";
+  await page.route(feedbackChunk, async (route) => {
+    await held;
+    await route.continue();
+  });
+  const requested = page.waitForRequest(feedbackChunk);
+  await page.route("**/static/js/game.*.js", (route) => route.abort());
+  try {
+    await page
+      .getByRole("button", { name: "Send feedback", exact: true })
+      .click();
+    await requested;
+    await page.getByRole("button", { name: "Play", exact: true }).click();
+    await expect(page.getByRole("alert")).toContainText("could not load");
+  } finally {
+    release();
+  }
+  const dialog = page.getByRole("dialog", { name: "Share feedback" });
+  await expect(
+    dialog.getByRole("textbox", { name: "Your feedback" }),
+  ).toBeFocused();
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await page
+    .getByRole("button", { name: "Send feedback", exact: true })
+    .click();
+  await expect(dialog).toBeVisible();
+});
 
 test("an installation prompt captured before Home mounts reaches the install control", async ({
   page,

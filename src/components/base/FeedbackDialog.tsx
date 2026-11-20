@@ -2,10 +2,12 @@ import { FormEvent, useEffect, useId, useRef, useState } from "react";
 import {
   Alert,
   Button,
+  Checkbox,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
+  FormControlLabel,
   Stack,
   TextField,
   Typography,
@@ -14,8 +16,10 @@ import {
   FEEDBACK_EMAIL_LIMIT,
   FEEDBACK_MESSAGE_LIMIT,
   FeedbackContext,
+  FeedbackSubmission,
   submitFeedback,
 } from "../../Feedback";
+import { firebaseAppAuth, logEvent } from "../../Globals";
 
 const actionSize = {
   minHeight: 40,
@@ -32,31 +36,53 @@ export default function FeedbackDialog({
   const id = useId();
   const [message, setMessage] = useState("");
   const [replyEmail, setReplyEmail] = useState("");
+  const [accountEmail, setAccountEmail] = useState(
+    () => firebaseAppAuth?.currentUser?.email ?? "",
+  );
+  const [includeAccountEmail, setIncludeAccountEmail] = useState(true);
   const [status, setStatus] = useState<"idle" | "sending" | "failed" | "sent">(
     "idle",
   );
-  const attempt = useRef<{ input: string; id: string }>();
+  const attempt = useRef<Omit<FeedbackSubmission, "appVersion">>();
+  const trackedOpen = useRef(false);
   const sending = useRef(false);
   const closeButton = useRef<HTMLButtonElement>(null);
+
+  useEffect(
+    () =>
+      firebaseAppAuth?.onAuthStateChanged((user) => {
+        setAccountEmail(user?.email ?? "");
+      }),
+    [],
+  );
+  useEffect(() => {
+    if (trackedOpen.current) return;
+    trackedOpen.current = true;
+    logEvent("feedback_open", context);
+  }, [context]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const text = message.trim();
-    const email = replyEmail.trim();
+    const email = accountEmail
+      ? includeAccountEmail
+        ? accountEmail
+        : ""
+      : replyEmail.trim();
     if (!text || sending.current) return;
     sending.current = true;
     setStatus("sending");
+    logEvent("feedback_submit", context);
     try {
-      const input = JSON.stringify([text, email]);
-      if (attempt.current?.input !== input) {
-        attempt.current = { input, id: crypto.randomUUID() };
+      if (!attempt.current) {
+        attempt.current = {
+          ...context,
+          requestId: crypto.randomUUID(),
+          message: text,
+          replyEmail: email,
+        };
       }
-      await submitFeedback({
-        ...context,
-        requestId: attempt.current.id,
-        message: text,
-        replyEmail: email,
-      });
+      await submitFeedback(attempt.current);
       setStatus("sent");
     } catch {
       setStatus("failed");
@@ -115,22 +141,45 @@ export default function FeedbackDialog({
               required
               label="Your feedback"
               value={message}
-              onChange={(event) => setMessage(event.target.value)}
+              onChange={(event) => {
+                attempt.current = undefined;
+                setMessage(event.target.value);
+              }}
               multiline
               minRows={3}
               maxRows={6}
               disabled={busy}
               slotProps={{ htmlInput: { maxLength: FEEDBACK_MESSAGE_LIMIT } }}
             />
-            <TextField
-              label="Email for a reply (optional)"
-              type="email"
-              autoComplete="email"
-              value={replyEmail}
-              onChange={(event) => setReplyEmail(event.target.value)}
-              disabled={busy}
-              slotProps={{ htmlInput: { maxLength: FEEDBACK_EMAIL_LIMIT } }}
-            />
+            {accountEmail ? (
+              <FormControlLabel
+                label="Include account email for a reply (optional)"
+                disabled={busy}
+                sx={actionSize}
+                control={
+                  <Checkbox
+                    checked={includeAccountEmail}
+                    onChange={(_, checked) => {
+                      attempt.current = undefined;
+                      setIncludeAccountEmail(checked);
+                    }}
+                  />
+                }
+              />
+            ) : (
+              <TextField
+                label="Email for a reply (optional)"
+                type="email"
+                autoComplete="email"
+                value={replyEmail}
+                onChange={(event) => {
+                  attempt.current = undefined;
+                  setReplyEmail(event.target.value);
+                }}
+                disabled={busy}
+                slotProps={{ htmlInput: { maxLength: FEEDBACK_EMAIL_LIMIT } }}
+              />
+            )}
             {status === "failed" && (
               <Alert severity="error">
                 Feedback couldn’t be sent. Your message is still here. Try

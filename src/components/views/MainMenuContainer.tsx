@@ -8,6 +8,7 @@ import { getPlayedScenarioIds } from "../../LocalStorage";
 import { navigate } from "../../reducers/Card";
 import { startTutorial } from "../../reducers/Game";
 import { change as changeSettings } from "../../reducers/Settings";
+import { feedbackOpen } from "../../reducers/UI";
 import { selectContinueSave } from "../../SaveModel";
 import { resumeSavedGame, runSaveTransition } from "../../SaveSession";
 import MainMenu, { DispatchProps, StateProps } from "./MainMenu";
@@ -45,6 +46,9 @@ export const mapDispatchToProps = (
     },
     onManual: () => {
       dispatch(navigate("MANUAL"));
+    },
+    onFeedback: () => {
+      dispatch(feedbackOpen({ source: "game-menu" }));
     },
     onSettings: () => {
       dispatch(navigate("SETTINGS"));
