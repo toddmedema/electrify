@@ -5,7 +5,7 @@ import { isStorage } from "../../../Types";
 import type { StorageOperatingType } from "../../../Types";
 import * as facilityStatus from "../FacilityMapStatus";
 import type { TerritoryTileView } from "../../../helpers/TerritoryMapState";
-import { hexWires } from "../TerritoryHexGeometry";
+import { HEX_NEIGHBORS, hexWires } from "../TerritoryHexGeometry";
 import { MeshBuilder } from "./MeshBuilder";
 import { SceneBuilder, structureKind } from "./SceneBuilder";
 import type { MapModel, Vec3 } from "./Types";
@@ -132,6 +132,51 @@ test("open water has no pylon while developed dry land has a quiet tower", () =>
     "terrain:green-uplands:site-2",
   ]);
 });
+test("scatters the four farm layouts across open plains consistently on scene rebuilds", () => {
+  const views = Array.from({ length: 40 }, (_, i) => ({
+    ...view(),
+    developed: false,
+    tile: {
+      ...view().tile,
+      id: `frontier:${i % 8}:${Math.floor(i / 8)}` as const,
+      q: i % 8,
+      r: Math.floor(i / 8),
+    },
+  }));
+  const layouts = (order: typeof views) => {
+    const builder = new SceneBuilder({
+      terrain: getTerrainModel,
+      structure: getStructureModel,
+    });
+    return builder
+      .build(
+        order,
+        order.map((v) => v.tile),
+        [],
+        0,
+        "run",
+      )
+      .map(({ model }) => model);
+  };
+  const original = layouts(views);
+  expect(new Set(original).size).toBe(4);
+  for (const [i, { tile }] of views.entries()) {
+    const neighbors = HEX_NEIGHBORS.map(([dq, dr]) =>
+      views.findIndex(
+        ({ tile: neighbor }) =>
+          neighbor.q === tile.q + dq && neighbor.r === tile.r + dr,
+      ),
+    ).filter((index) => index >= 0);
+    expect(neighbors.map((index) => original[index])).not.toContain(
+      original[i],
+    );
+  }
+  expect(layouts([...views].reverse()).reverse()).toEqual(original);
+  expect(layouts(views.slice(1))).toEqual(original.slice(1));
+  for (const [i, site] of views.entries())
+    expect(layouts([site])[0]).toBe(original[i]);
+});
+
 test("terrain reserves the structure footprint and unknown operation stays still", () => {
   const tile = {
     ...view(),
@@ -141,6 +186,7 @@ test("terrain reserves the structure footprint and unknown operation stays still
   const result = builder.build([tile], [tile.tile], [], 0, "run");
   expect(terrain).toHaveBeenCalledWith("plains", {
     footprint: 0.7,
+    variant: expect.any(Number),
     ports: undefined,
   });
   expect(result[1].active).toBe(false);
@@ -354,7 +400,14 @@ test("real mountain relief picks its own tile above the neighboring ground hex",
     terrain: getTerrainModel,
     structure: getStructureModel,
   });
-  const relief = getTerrainModel("mountain").parts[1].mesh.positions;
+  const [terrain] = builder.build(
+    [mountain, north],
+    [mountain.tile, north.tile],
+    [],
+    0,
+    "run",
+  );
+  const relief = terrain.model.parts[1].mesh.positions;
   let face = 0;
   for (let i = 9; i < relief.length; i += 9) {
     const highest = (start: number) =>
@@ -759,7 +812,7 @@ test("hail hits the ground and panels, then leaves only fractured panels during 
     "run",
   );
   expect(ground.model).toBe(
-    getTerrainModel("plains", { footprint: intact.model.footprint }),
+    builder.build([tile], board, [], 30, "run")[0].model,
   );
   expect(stones.model.key).toBe("weather:hail");
   expect(stones.model.parts).toHaveLength(12);

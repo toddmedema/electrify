@@ -169,7 +169,8 @@ Include screenshots for visible interface changes, with desktop and mobile views
 when responsive behavior is involved. Keep review images out of the repository;
 attach them to the pull request.
 
-Run the relevant checks above and review `git diff --check` before pushing.
+Run the relevant checks above and review `git diff --check`. After committing,
+run `npm run check:prepush` to check for stale site pages and metadata before pushing.
 For simulation changes, include the scenario or invariant evidence that supports
 the new behavior. See [performance work](docs/perf-plan.md) before changing
 performance baselines.

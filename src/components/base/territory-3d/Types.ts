@@ -52,6 +52,8 @@ export interface TerrainModelOptions {
   weather?: TerrainWeather;
   /** Zero for untouched land; otherwise reserve at least this width around the center. */
   footprint?: number;
+  /** Stable tile artwork choice for plains and natural mountain relief. */
+  variant?: number;
   ports?: readonly number[];
   /** Bits for edges shared with the same terrain, in HEX_NEIGHBORS order. */
   adjacentEdges?: number;

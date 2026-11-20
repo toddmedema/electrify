@@ -118,7 +118,7 @@ void main() {
   float band = incidence < 0.25 ? 0.48 : (incidence < 0.7 ? 0.76 : 1.0);
   vec3 base = mix(vColor, vec3(1.0, 0.71, 0.32), vMaterial.x);
   if (vMaterial.z == 3.0) {
-    float snowLine = mix(0.96, 0.29, uWeather.w);
+    float snowLine = mix(0.75, 0.25, uWeather.w);
     float cap = smoothstep(snowLine, snowLine + 0.13, vSurfacePosition.y);
     // Snow clings more strongly to shoulders than to steep rock faces.
     base = mix(base, vec3(0.88, 0.93, 0.98),

@@ -1,5 +1,6 @@
 import { tintTerrainMesh } from "./TerrainWeatherMaterials";
 import type { TerrainType } from "../../../Types";
+import { buildFarms } from "./FarmModels";
 import { getForestModel } from "./ForestModels";
 import { MeshBuilder } from "./MeshBuilder";
 import { buildMountainRelief, mountainProfile } from "./MountainModels";
@@ -19,12 +20,8 @@ type GroundPoint = readonly [number, number];
 type RaisedPoint = readonly [number, number, number];
 
 const CLEAR_WIDTHS = [0.55, 0.65, 0.8, 1.2] as const;
+const FARM_CLEAR_WIDTHS = [0, 0.26, ...CLEAR_WIDTHS];
 const DEPTH = 0.055;
-const WATER_FACET: RGB = [
-  PALETTE.water[0] * 0.88 + PALETTE.deepWater[0] * 0.12,
-  PALETTE.water[1] * 0.88 + PALETTE.deepWater[1] * 0.12,
-  PALETTE.water[2] * 0.88 + PALETTE.deepWater[2] * 0.12,
-];
 const cache: Record<
   Exclude<TerrainType, "forest">,
   (MapModel | undefined)[]
@@ -71,13 +68,12 @@ function substrate(builder: MeshBuilder, water: boolean) {
   }
 }
 
-function ground(builder: MeshBuilder, color: RGB, alternate: RGB) {
-  for (let i = 0; i < 6; i++)
-    surface(
-      builder,
-      [[0, 0, 0], point(HEX[i]), point(HEX[(i + 1) % 6])],
-      i === 1 || i === 4 ? alternate : color,
-    );
+function ground(builder: MeshBuilder, color: RGB) {
+  surface(
+    builder,
+    HEX.map((p) => point(p)),
+    color,
+  );
 }
 
 /** Clip a convex raised face and grade its cut edge down to the level building pad. */
@@ -235,7 +231,7 @@ function river(
       surface(
         floor,
         [point(iwb), point(wb), point(b), point(ib)],
-        PALETTE.grassShade,
+        PALETTE.grass,
       );
       const iwaBed = lerp(iwa, iwb, 0.23);
       const iwbBed = lerp(iwb, iwa, 0.23);
@@ -296,8 +292,10 @@ function build(
   terrain: Exclude<TerrainType, "forest">,
   bucket: number,
   mask: number,
+  variant = 0,
 ): MapModel {
-  const clear = CLEAR_WIDTHS[bucket] / 2;
+  const clear =
+    (terrain === "plains" ? FARM_CLEAR_WIDTHS : CLEAR_WIDTHS)[bucket] / 2;
   const floor = new MeshBuilder();
   const relief = new MeshBuilder();
   const water = new MeshBuilder();
@@ -312,14 +310,14 @@ function build(
       lake(floor, relief, water, clear);
       break;
     case "ocean":
-      ground(water, PALETTE.water, WATER_FACET);
+      ground(water, PALETTE.water);
       break;
     case "mountain":
-      if (!sharedFloor) ground(floor, PALETTE.rock, PALETTE.rockShade);
-      supportY = buildMountainRelief(relief, bucket, mask);
+      if (!sharedFloor) ground(floor, PALETTE.rock);
+      supportY = buildMountainRelief(relief, bucket, mask, variant);
       break;
     case "hills":
-      ground(floor, PALETTE.grass, PALETTE.grassShade);
+      ground(floor, PALETTE.grass);
       mound(
         relief,
         [
@@ -349,7 +347,8 @@ function build(
       );
       break;
     case "plains":
-      ground(floor, PALETTE.grass, PALETTE.grassShade);
+      ground(floor, PALETTE.grass);
+      buildFarms(floor, relief, variant, clear);
       break;
   }
   const raised = relief.build();
@@ -366,7 +365,7 @@ function build(
   const floorMesh = sharedFloor ?? floor.build();
   if (terrain === "mountain") mountainFloor = floorMesh;
   return {
-    key: `terrain:${terrain}:${bucket}:${mask}`,
+    key: `terrain:${terrain}:${bucket}:${mask}${variant ? `:${variant}` : ""}`,
     parts: [
       { mesh: floorMesh, castsShadow: false, receivesShadow: true },
       ...(raised.positions.length
@@ -416,24 +415,37 @@ export function getTerrainModel(
     return getForestModel(options, () => {
       const floor = new MeshBuilder();
       substrate(floor, false);
-      ground(floor, PALETTE.grassShade, PALETTE.grass);
+      ground(floor, PALETTE.grassShade);
       return floor.build();
     });
   const requested = options?.footprint ?? 0;
   const scorched =
     options?.weather === "burning" || options?.weather === "scorched";
+  const variant = (options?.variant ?? 0) & 3;
   if (terrain === "mountain") {
     const profile = mountainProfile(requested);
     const edges = (options?.adjacentEdges ?? 0) & 63;
-    const model = (cache.mountain[profile * 64 + edges] ??= build(
+    const crest = profile ? 0 : variant;
+    const model = (cache.mountain[(crest * 4 + profile) * 64 + edges] ??= build(
       "mountain",
       profile,
       edges,
+      crest,
     ));
     return scorched ? scorchedRelief(model) : model;
   }
   const bucket =
     requested > 0.8 ? 3 : requested > 0.65 ? 2 : requested > 0.55 ? 1 : 0;
+  if (terrain === "plains") {
+    const match = FARM_CLEAR_WIDTHS.findIndex((width) => requested <= width);
+    const clearing = match < 0 ? FARM_CLEAR_WIDTHS.length - 1 : match;
+    return (cache.plains[clearing * 4 + variant] ??= build(
+      terrain,
+      clearing,
+      0,
+      variant,
+    ));
+  }
   let ports = terrain === "river" && options?.ports === undefined ? 9 : 0;
   if (terrain === "river" && options?.ports)
     for (const port of options.ports)
