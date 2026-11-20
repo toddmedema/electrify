@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import { expect, test } from "./fixtures";
 
 const pages = [
@@ -127,6 +128,31 @@ test.describe("learning pages without JavaScript", () => {
     }
   }
 
+  test("both game guides lead to a downloadable classroom worksheet", async ({
+    page,
+  }) => {
+    for (const pathname of ["/power-grid-simulator.html", "/scenarios.html"]) {
+      await page.goto(pathname);
+      await page
+        .getByRole("main")
+        .getByRole("link", { name: "classroom guide", exact: true })
+        .click();
+      await expect(page).toHaveURL(/\/classroom\.html$/);
+    }
+
+    const download = page.waitForEvent("download");
+    await page
+      .locator(".hero")
+      .getByRole("link", { name: "Download worksheet (PDF)" })
+      .click();
+    const worksheet = await download;
+    expect(worksheet.suggestedFilename()).toBe(
+      "electrify-student-worksheet.pdf",
+    );
+    const contents = await readFile(await worksheet.path());
+    expect(contents.subarray(0, 5).toString()).toBe("%PDF-");
+  });
+
   test("the classroom worksheet prints with answer space and without teacher notes", async ({
     page,
   }) => {
@@ -138,6 +164,8 @@ test.describe("learning pages without JavaScript", () => {
     await expect(page.locator(".hero")).toBeHidden();
     await expect(page.locator(".topbar")).toBeHidden();
     await expect(page.locator(".site-footer")).toBeHidden();
+    await expect(page.locator(".page-breadcrumb")).toBeHidden();
+    await expect(worksheet.getByText("Download worksheet (PDF)")).toBeHidden();
     for (const section of await page
       .locator(".comparison-content > :not(.student-worksheet)")
       .all()) {

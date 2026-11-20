@@ -279,7 +279,7 @@ function renderScenarioIndex(pages, context) {
         </div>
       </section>
       <div class="page-content scenario-catalog" id="scenario-catalog">
-        <div class="scenario-catalog__intro"><div><p class="eyebrow">Choose what matters to you</p><h2>Find a grid worth figuring out</h2></div><p>Every scenario puts reliability, costs, and emissions in your hands. Read the situation, pick your challenge, and try your plan.</p></div>
+        <div class="scenario-catalog__intro"><div><p class="eyebrow">Choose what matters to you</p><h2>Find a grid worth figuring out</h2></div><p>Every scenario puts reliability, costs, and emissions in your hands. Read the situation, pick your challenge, and try your plan. Teaching with Electrify? Start with the <a href="/classroom.html">classroom guide</a> before assigning a scenario.</p></div>
         <nav class="scenario-theme-nav" aria-label="Browse scenarios by theme">${themes.map((theme) => `<a href="#${themeId(theme)}">${e(theme)}<span aria-hidden="true">↓</span></a>`).join("\n")}</nav>
         ${themes
           .map(
