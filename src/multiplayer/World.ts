@@ -1691,10 +1691,13 @@ function upgradeTerritoryWorld(value: unknown): unknown {
       (old.gameSchema === 20 &&
         old.rules ===
           "coop-2-cf979e3b45deb328dd12a266f291e16398174095d47beca6df0d4f9da1dbd577") ||
-      // Published master 89557e6: connection receipt pricing precedes expansion loans.
+      // Published schema21 masters: 89557e6, then 97024391 through bd312988.
+      // Feedback changed the broad co-op identity without changing the save format.
       (old.gameSchema === 21 &&
-        old.rules ===
-          "coop-2-fcb444f119733dd48aef5c28f13cb78fc856be210f448c495109eb5987d70476")
+        (old.rules ===
+          "coop-2-fcb444f119733dd48aef5c28f13cb78fc856be210f448c495109eb5987d70476" ||
+          old.rules ===
+            "coop-2-8423406cc7fc00c2bcf0e3cd7b647ad746beabc840cbeb1fc847e15d0389d64c"))
     ) ||
     !Array.isArray(old.grids) ||
     !old.grids.every(

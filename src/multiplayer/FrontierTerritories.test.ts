@@ -85,9 +85,18 @@ const PUBLISHED_SCHEMA_20_RULES =
 const PUBLISHED_SCHEMA_21_RULES =
   "coop-2-fcb444f119733dd48aef5c28f13cb78fc856be210f448c495109eb5987d70476";
 
-it.each([undefined, 20, 21])(
-  "retains independent parcel claims and cash through schema%s save/resume",
-  (schema) => {
+// Exact published master bd312988 (same co-op inputs as 97024391 and 39a68b10).
+const PUBLISHED_SCHEMA_21_FEEDBACK_RULES =
+  "coop-2-8423406cc7fc00c2bcf0e3cd7b647ad746beabc840cbeb1fc847e15d0389d64c";
+
+it.each([
+  [undefined, undefined],
+  [20, PUBLISHED_SCHEMA_20_RULES],
+  [21, PUBLISHED_SCHEMA_21_RULES],
+  [21, PUBLISHED_SCHEMA_21_FEEDBACK_RULES],
+])(
+  "retains independent parcel claims and cash through schema%s save/resume (%s)",
+  (schema, rules) => {
     const world = ready();
     expect(buy(world, "0", "parcel-0")).toBeUndefined();
     expect(buy(world, "1", "parcel-0")).toMatch(/owned/i);
@@ -104,8 +113,7 @@ it.each([undefined, 20, 21])(
     const raw = JSON.parse(JSON.stringify(checkpointWorld(world)));
     if (schema === 20 || schema === 21) {
       raw.gameSchema = schema;
-      raw.rules =
-        schema === 20 ? PUBLISHED_SCHEMA_20_RULES : PUBLISHED_SCHEMA_21_RULES;
+      raw.rules = rules;
     }
     expect(savedMatchSpec(raw)).toEqual(world.spec);
     const restored = restoreWorld(raw, "restored");
@@ -131,6 +139,7 @@ it.each([undefined, 20, 21])(
 it.each([
   [20, PUBLISHED_SCHEMA_20_RULES],
   [21, PUBLISHED_SCHEMA_21_RULES],
+  [21, PUBLISHED_SCHEMA_21_FEEDBACK_RULES],
 ])(
   "rejects unknown schema%s identities and corrupted published grids",
   (schema, rules) => {
