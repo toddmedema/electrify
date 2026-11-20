@@ -757,6 +757,8 @@ export default class Compositor extends React.Component<Props, {}> {
           slotProps={{
             transition: {
               onEntered: () => {
+                // Feedback can open before the tutorial dialog finishes entering.
+                if (this.props.ui.feedback) return;
                 if (
                   this.props.ui.dialog.destructive ||
                   this.props.ui.dialog.focusCancel
