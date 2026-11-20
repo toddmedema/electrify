@@ -346,8 +346,10 @@ export async function createCouchFixture(
               });
               png = await route.page.locator("html").screenshot({
                 animations: "disabled",
+                // Suppress only painting: visibility:hidden would discard the
+                // shared menu's focus, unlike native capturePage.
                 style:
-                  'html:not([data-couch-seat]) body > :not(iframe[id^="couch-fixture-"]), html:not([data-couch-seat]) body > :not(iframe[id^="couch-fixture-"]) * { visibility: hidden !important; }',
+                  'html:not([data-couch-seat]) body > :not(iframe[id^="couch-fixture-"]) { opacity: 0 !important; }',
               });
             }
             if (!current()) return;

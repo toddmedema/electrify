@@ -1,7 +1,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const { createHash, randomUUID } = require("node:crypto");
-const { readOwner, removeOwner } = require("./coordination");
+const { readOwner, removeOwner, queueStatus } = require("./coordination");
 
 function taskId(env = process.env) {
   return env.ELECTRIFY_TASK_ID || env.CODEX_THREAD_ID;
@@ -63,6 +63,8 @@ if (require.main === module) {
         `Checkout reserved for ${claimTask(process.cwd(), id).task}`,
       );
     } else if (action === "release") releaseTask(process.cwd(), id);
+    else if (action === "queue")
+      process.stdout.write(`${JSON.stringify(queueStatus(), null, 2)}\n`);
     else if (action === "status")
       console.error(
         readOwner(path.resolve(".tmp/development-task")) ||
@@ -70,7 +72,7 @@ if (require.main === module) {
       );
     else
       throw new Error(
-        "Usage: npm run task -- [claim|release|status] [task-id]",
+        "Usage: npm run task -- [claim|release|status|queue] [task-id]",
       );
   } catch (error) {
     console.error(error.message);

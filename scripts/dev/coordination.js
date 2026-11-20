@@ -2,7 +2,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const net = require("node:net");
-const { randomUUID } = require("node:crypto");
+const { createHash, randomUUID } = require("node:crypto");
 const { setTimeout: delay } = require("node:timers/promises");
 
 function coordinationRoot() {
@@ -74,10 +74,12 @@ function ownerAlive(owner) {
 function removeOwner(directory, token) {
   // Remove only this owner's unique filename. Another reaper/acquirer can never
   // make us unlink a replacement owner, even between unlink and rmdir.
-  try {
-    fs.unlinkSync(path.join(directory, `${token}.json`));
-  } catch (error) {
-    if (error.code !== "ENOENT") throw error;
+  for (const extension of ["pending", "json"]) {
+    try {
+      fs.unlinkSync(path.join(directory, `${token}.${extension}`));
+    } catch (error) {
+      if (error.code !== "ENOENT") throw error;
+    }
   }
   try {
     fs.rmdirSync(directory);
@@ -86,86 +88,238 @@ function removeOwner(directory, token) {
   }
 }
 
+const heavySlots = 3;
+
+function entries(root) {
+  try {
+    return fs.readdirSync(root);
+  } catch (error) {
+    if (error.code === "ENOENT") return [];
+    throw error;
+  }
+}
+
+// Staging records are local-process identities, including Linux PID namespaces.
+// Never infer death from a PID that belongs to another host/namespace.
+function processScope() {
+  let namespace = "host";
+  if (process.platform === "linux") {
+    try {
+      namespace = fs.readlinkSync("/proc/self/ns/pid");
+    } catch {
+      return undefined;
+    }
+  }
+  return createHash("sha256")
+    .update(`${os.hostname()}:${namespace}`)
+    .digest("hex");
+}
+
+const scope = processScope();
+const requestPattern =
+  /^heavy-request-(\d+)-(\d+)-([a-f0-9]+|unknown)-([a-f0-9-]+)$/;
+
+function waitingOwners(root, reap = false) {
+  return entries(root)
+    .flatMap((name) => {
+      const request = requestPattern.exec(name);
+      if (!request && !name.startsWith("heavy-wait-")) return [];
+      const dir = path.join(root, name);
+      let owner = readOwner(dir);
+      if (!owner && request) {
+        // mkdir registers arrival before metadata publication. A live publisher
+        // in that short interval still owns its place, not a CPU slot.
+        if (!fs.existsSync(dir)) return [];
+        owner = {
+          pid: Number(request[2]),
+          scope: request[3],
+          token: request[4],
+        };
+      }
+      if (!owner) return [];
+      const order =
+        request?.[1] || name.slice("heavy-wait-".length).split("-")[0];
+      const inspectable = !request || (scope && owner.scope === scope);
+      if (!inspectable || ownerAlive(owner)) return [{ ...owner, order }];
+      if (reap) removeOwner(dir, owner.token);
+      return [];
+    })
+    .sort(
+      (a, b) =>
+        a.order.localeCompare(b.order) || a.token.localeCompare(b.token),
+    );
+}
+
+function reapAdmissionStaging(root) {
+  for (const name of entries(root)) {
+    if (!/^heavy-admission-[a-f0-9-]{36}$/.test(name)) continue;
+    const dir = path.join(root, name);
+    const owner = readOwner(dir);
+    if (owner && scope && owner.scope === scope && !ownerAlive(owner))
+      removeOwner(dir, owner.token);
+  }
+}
+
+function queueStatus(root = coordinationRoot()) {
+  const holders = [],
+    previews = [];
+  const now = Date.now();
+  const describe = (owner) => ({
+    command: owner.command || "unknown (older checkout)",
+    task: owner.task || null,
+    pid: owner.pid,
+    cwd: owner.cwd,
+    ageMs: owner.startedAt
+      ? Math.max(0, now - Date.parse(owner.startedAt))
+      : null,
+  });
+  for (const name of entries(root).sort()) {
+    if (!/^(heavy(?:-\d+)?|port-\d+)$/.test(name)) continue;
+    const owner = readOwner(path.join(root, name));
+    if (!owner || !ownerAlive(owner)) continue;
+    if (name.startsWith("heavy"))
+      holders.push({ slot: name, ...describe(owner) });
+    else if (owner.preview)
+      previews.push({ port: Number(name.slice(5)), ...describe(owner) });
+  }
+  const waiting = waitingOwners(root).map((owner, index) => ({
+    position: index + 1,
+    ...describe(owner),
+  }));
+  return { holders, waiting, previews };
+}
+
+function inheritedLease(
+  name,
+  { root = coordinationRoot(), slots = 1, inherited },
+) {
+  if (!inherited) return;
+  for (const dir of slotDirectories(root, name, slots)) {
+    const owner = readOwner(dir);
+    if (owner?.token === inherited && ownerAlive(owner))
+      return {
+        token: inherited,
+        groupId: owner.groupId,
+        inherited: true,
+        waitMs: 0,
+        release() {},
+      };
+  }
+}
+
+function slotDirectories(root, name, slots) {
+  // Keep the original slot names so older checkouts still respect the same cap.
+  return Array.from({ length: slots }, (_, index) =>
+    path.join(root, index === 0 ? name : `${name}-${index + 1}`),
+  );
+}
+
 async function acquireLease(name, options = {}) {
   const root = options.root || coordinationRoot();
   fs.mkdirSync(root, { recursive: true });
   const slots = options.slots ?? 1;
   if (!Number.isSafeInteger(slots) || slots < 1)
     throw new Error("Reservation slots must be a positive integer");
-  // Keep the original name for slot one so older checkouts still coordinate with us.
-  const directories = Array.from({ length: slots }, (_, index) =>
-    path.join(root, index === 0 ? name : `${name}-${index + 1}`),
-  );
-  const inherited = options.inherited;
-  if (inherited) {
-    for (const directory of directories) {
-      const owner = readOwner(directory);
-      if (owner?.token === inherited && ownerAlive(owner))
-        return {
-          token: inherited,
-          groupId: owner.groupId,
-          inherited: true,
-          waitMs: 0,
-          release() {},
-        };
-    }
-  }
+  const directories = slotDirectories(root, name, slots);
+  const nested = inheritedLease(name, options);
+  if (nested) return nested;
   const token = randomUUID();
-  const prepared = path.join(root, `${name}-${token}`);
+  const order = process.hrtime.bigint().toString().padStart(24, "0");
+  const prepared = path.join(
+    root,
+    name === "heavy"
+      ? `heavy-request-${order}-${process.pid}-${scope || "unknown"}-${token}`
+      : `${name}-${token}`,
+  );
+  const started = Date.now();
   const owner = {
     token,
     pid: process.pid,
-    cwd: process.cwd(),
-    startedAt: new Date().toISOString(),
+    scope,
+    cwd: options.cwd || process.cwd(),
+    command: options.command,
+    task: options.task,
+    preview: options.preview,
+    startedAt: new Date(started).toISOString(),
   };
   fs.mkdirSync(prepared);
-  fs.writeFileSync(path.join(prepared, `${token}.json`), JSON.stringify(owner));
-  const started = Date.now();
+  const metadata = path.join(prepared, `${token}.pending`);
+  fs.writeFileSync(metadata, JSON.stringify(owner));
+  fs.renameSync(metadata, path.join(prepared, `${token}.json`));
+  // The request is registered before waiting for the admission mutex. The mutex
+  // serializes publication and admission; all requests retain their arrival order.
+  let ticket = prepared;
   let announced = false;
+  let waitedForAdmission = false;
   try {
     for (;;) {
       options.signal?.throwIfAborted();
-      let occupied;
-      let recovered = false;
-      for (const directory of directories) {
-        try {
-          // The complete metadata becomes visible atomically with ownership.
-          fs.renameSync(prepared, directory);
-          return {
-            token,
-            inherited: false,
-            waitMs: Date.now() - started,
-            setChild(pid, groupId) {
-              owner.childPid = pid;
-              if (groupId !== undefined) owner.groupId = groupId;
-              const file = path.join(directory, `${token}.json`);
-              const temporary = path.join(root, `${token}.update`);
-              fs.writeFileSync(temporary, JSON.stringify(owner));
-              fs.renameSync(temporary, file);
-            },
-            release() {
-              removeOwner(directory, token);
-            },
-          };
-        } catch (error) {
-          if (!["EEXIST", "ENOTEMPTY", "EPERM"].includes(error.code))
-            throw error;
+      if (name === "heavy") reapAdmissionStaging(root);
+      const admission =
+        name === "heavy"
+          ? await acquireLease("heavy-admission", {
+              root,
+              signal: options.signal,
+              wait: options.wait,
+              pollMs: 10,
+            })
+          : undefined;
+      waitedForAdmission ||= !!admission?.queued;
+      let occupied,
+        position,
+        recovered = false;
+      try {
+        if (name === "heavy" && ticket === prepared) {
+          const published = path.join(root, `heavy-wait-${order}-${token}`);
+          fs.renameSync(prepared, published);
+          ticket = published;
         }
-        const current = readOwner(directory);
-        if (!current) {
-          recovered = true;
+        const waiting = name === "heavy" ? waitingOwners(root, true) : [];
+        position = waiting.findIndex((waiter) => waiter.token === token) + 1;
+        occupied = position > 1 ? waiting[0] : null;
+        for (const directory of occupied ? [] : directories) {
           try {
-            fs.rmdirSync(directory);
+            // The complete metadata becomes visible atomically with ownership.
+            fs.renameSync(ticket, directory);
+            return {
+              token,
+              inherited: false,
+              waitMs: Date.now() - started,
+              queued: announced || waitedForAdmission,
+              setChild(pid, groupId) {
+                owner.childPid = pid;
+                if (groupId !== undefined) owner.groupId = groupId;
+                const file = path.join(directory, `${token}.json`);
+                const temporary = path.join(root, `${token}.update`);
+                fs.writeFileSync(temporary, JSON.stringify(owner));
+                fs.renameSync(temporary, file);
+              },
+              release() {
+                removeOwner(directory, token);
+              },
+            };
           } catch (error) {
-            if (!["ENOENT", "ENOTEMPTY", "EEXIST"].includes(error.code))
+            if (!["EEXIST", "ENOTEMPTY", "EPERM"].includes(error.code))
               throw error;
           }
-        } else if (!ownerAlive(current)) {
-          removeOwner(directory, current.token);
-          recovered = true;
-        } else {
-          occupied = current;
+          const current = readOwner(directory);
+          if (!current) {
+            recovered = true;
+            try {
+              fs.rmdirSync(directory);
+            } catch (error) {
+              if (!["ENOENT", "ENOTEMPTY", "EEXIST"].includes(error.code))
+                throw error;
+            }
+          } else if (!ownerAlive(current)) {
+            removeOwner(directory, current.token);
+            recovered = true;
+          } else {
+            occupied = current;
+          }
         }
+      } finally {
+        admission?.release();
       }
       if (recovered) continue;
       if (occupied) {
@@ -174,14 +328,14 @@ async function acquireLease(name, options = {}) {
             `Reservation ${name} is held by PID ${occupied.pid} in ${occupied.cwd}`,
           );
         if (!announced) {
-          options.onWait?.(occupied);
+          options.onWait?.(occupied, position);
           announced = true;
         }
       }
       await delay(options.pollMs || 200, undefined, { signal: options.signal });
     }
   } finally {
-    fs.rmSync(prepared, { recursive: true, force: true });
+    fs.rmSync(ticket, { recursive: true, force: true });
   }
 }
 
@@ -222,6 +376,9 @@ async function reservePort(requested, options = {}) {
 module.exports = {
   coordinationRoot,
   acquireLease,
+  inheritedLease,
+  queueStatus,
+  heavySlots,
   reservePort,
   alive,
   groupAlive,

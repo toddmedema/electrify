@@ -16,19 +16,19 @@ files are large, so broad rewrites create expensive review diffs.
 - In a fresh worktree, run `npm run check:assets` before tests, builds or browser QA. If it finds
   Git LFS pointers, try `git lfs checkout` for cached objects, then `git lfs pull` if needed.
   For missing files, stage intentional deletions or renames; otherwise restore the files.
-- Use `npm run check` for an eight-gate check during iteration. It runs types (including `e2e/`),
+- For broader local coverage, `npm run check` runs eight gates. It checks types (including `e2e/`),
   lint, formatting, native unit tests, CI tooling, the covered Jest
   suite, the long simulation suites (`npm run test:sim`, which includes every scenario through
   the headless simulation), and a short run of the simulation CLI. CI also runs the Firestore
   rules tests (`npm run test:rules`, which needs Java 21); run them yourself when you change
   `firebase/firestore.rules`. It checks assets first, prints each gate's result as it finishes,
   and continues after gate failures.
-- Before pushing a pull request, run `npm run check:ci` once on the integrated code; there is no
-  need to run `check` immediately beforehand. Its fifteen gates add the CI checks that most
-  often fail pull requests: tick performance, the production web build and bundle-size
-  ceilings, the headless production browser suites at 1280, 390 and 360 px, and the multiplayer
-  and controller suites against the desktop renderer. Only the packaged Electron suite stays CI-only,
-  because it opens native windows.
+- Before pushing, choose conservative local checks for the changed behavior and its callers.
+  Run the affected suites, types, lint and relevant integration or browser journeys. Broaden
+  coverage for shared simulation, save, co-op, build or workflow changes. Record the commands
+  and results in the PR. Hosted CI runs the complete suite on the pushed revision.
+  The fifteen-gate `npm run check:ci` is available for broad local verification or reproducing
+  CI failures. A full local run is optional before opening or updating a PR.
 - After a failed check, fix the issue and rerun the failed gates with the printed command, such as
   `npm run check -- --steps lint,tests`. Keep the earlier passing results only while their inputs
   remain unchanged. A test-query lint fix does not require repeating successful simulations;
@@ -44,7 +44,7 @@ files are large, so broad rewrites create expensive review diffs.
   heavy suites serial. The simulation CLI runs its single suite in process. Override the cap with
   `ELECTRIFY_CHECK_WORKERS` only for a measured need. The npm build/test/check commands queue
   heavy work across local worktrees; do not pause a running test process to make room. When using
-  subagents, give them focused checks and let the integrating agent own the final full check.
+  subagents, give them focused checks and let the integrating agent own validation of the combined change.
 - `npm run fix` applies every mechanical fix: it runs `lint:fix` and `format`. Review its diff; it
   does not fix types or tests.
 - Iterate on one Jest suite with `npm run test:once -- <name>`. Plain `npm test` starts Jest's
