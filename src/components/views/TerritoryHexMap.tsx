@@ -1082,9 +1082,9 @@ export default function TerritoryHexMap({
               )}
               {renderedViews.map(({ tile, disaster, visibilityDistance }) => {
                 if (
+                  threeDReady ||
                   !disaster ||
-                  ((threeDReady || disaster.ground !== "burning") &&
-                    !disaster.hail)
+                  (disaster.ground !== "burning" && disaster.hail !== "impact")
                 )
                   return null;
                 const origin = foregroundOrigin(tile);
@@ -1101,10 +1101,7 @@ export default function TerritoryHexMap({
                     viewBox="0 0 500 500"
                     overflow="visible"
                   >
-                    <DisasterArtwork
-                      {...disaster}
-                      ground={threeDReady ? undefined : disaster.ground}
-                    />
+                    <DisasterArtwork {...disaster} />
                   </svg>
                 );
               })}
@@ -1167,6 +1164,7 @@ export default function TerritoryHexMap({
                             <FacilityMapMotionContext.Provider value={motion}>
                               <FacilityArtwork
                                 facility={facility}
+                                hailDamaged={view.disaster?.hail !== undefined}
                                 className="territoryOccupantArtwork"
                                 active={
                                   operation?.kind === "producing" ||

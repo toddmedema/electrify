@@ -82,10 +82,12 @@ export function FacilityArtwork({
   facility,
   className,
   active = false,
+  hailDamaged = false,
 }: {
   facility: MapArtFacility;
   className?: string;
   active?: boolean;
+  hailDamaged?: boolean;
 }) {
   if (facility.peakWh !== undefined)
     return (
@@ -106,6 +108,7 @@ export function FacilityArtwork({
       variant={GENERATOR_ART[facility.fuel]}
       className={className}
       active={active}
+      hailDamaged={hailDamaged && facility.fuel === "Sun"}
     />
   ) : null;
 }

@@ -1,4 +1,5 @@
 import { HEX_NEIGHBORS } from "../TerritoryHexGeometry";
+import { surfaceHeight } from "./SurfaceHeight";
 import type { MapInstance, Vec3 } from "./Types";
 
 export type BurningTerrain = MapInstance & {
@@ -25,43 +26,6 @@ export function fireVariation(seed: number, slot: number): number {
   return ((value ^ (value >>> 16)) >>> 0) / 0x100000000;
 }
 
-function surfaceHeight(cell: BurningTerrain, x: number, z: number): number {
-  let height = cell.position[1];
-  const parts = cell.model.parts;
-  for (const part of parts) {
-    // Forest emitters are rooted in the soil beneath the surviving snags.
-    if (cell.wildfire.forest && !part.receivesShadow) continue;
-    const { normals, positions } = part.mesh;
-    const [ox, oy, oz] = part.position ?? [0, 0, 0];
-    const px = x - cell.position[0] - ox;
-    const pz = z - cell.position[2] - oz;
-    for (let i = 0; i < positions.length; i += 9) {
-      if (normals[i + 1] <= 0.001) continue;
-      const ax = positions[i],
-        az = positions[i + 2];
-      const bx = positions[i + 3],
-        bz = positions[i + 5];
-      const cx = positions[i + 6],
-        cz = positions[i + 8];
-      const area = (bz - cz) * (ax - cx) + (cx - bx) * (az - cz);
-      if (Math.abs(area) < 1e-8) continue;
-      const a = ((bz - cz) * (px - cx) + (cx - bx) * (pz - cz)) / area;
-      const b = ((cz - az) * (px - cx) + (ax - cx) * (pz - cz)) / area;
-      const c = 1 - a - b;
-      if (Math.min(a, b, c) < -1e-6) continue;
-      height = Math.max(
-        height,
-        cell.position[1] +
-          oy +
-          a * positions[i + 1] +
-          b * positions[i + 4] +
-          c * positions[i + 7],
-      );
-    }
-  }
-  return height;
-}
-
 function emitter(
   cell: BurningTerrain,
   x: number,
@@ -71,10 +35,11 @@ function emitter(
   scale = 1,
   other?: BurningTerrain,
 ): WildfireEmitter {
-  const y = Math.max(
-    surfaceHeight(cell, x, z),
-    other ? surfaceHeight(other, x, z) : 0,
-  );
+  // Forest emitters are rooted in the soil beneath the surviving snags.
+  const height = ({ model, position, wildfire }: BurningTerrain) =>
+    position[1] +
+    surfaceHeight(model, x - position[0], z - position[2], wildfire.forest);
+  const y = Math.max(height(cell), other ? height(other) : 0);
   return {
     origin: [x, y + 0.012, z],
     seed,

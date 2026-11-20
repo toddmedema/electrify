@@ -44,34 +44,29 @@ export default function DisasterArtwork({ ground, hail }: TileDisaster) {
         </g>
       )}
       {hail === "impact" && (
-        <g data-disaster="hail" stroke="#2c4d60" strokeWidth="7" fill="#f5fcff">
-          <circle cx="325" cy="272" r="17" />
-          <circle cx="382" cy="284" r="14" />
-          <circle cx="353" cy="314" r="16" />
-          <path
-            d="M325 344q13-13 25-5m15-3 12-8"
-            strokeLinecap="round"
-            fill="none"
-          />
-        </g>
-      )}
-      {hail === "damage" && (
         <g
-          data-disaster="hail-repairs"
-          fill="none"
-          strokeLinecap="round"
-          strokeLinejoin="round"
+          data-disaster="hail"
+          fill="#eef8ff"
+          stroke="#6889a6"
+          strokeWidth="2.2"
         >
           <path
-            d="m324 350 25-6 10-31 21 33 27-9m-48-24 21-11"
-            stroke="#2f4657"
-            strokeWidth="19"
+            d="m96 197 10 31m89-111 10 30m128 0 11 34m50 53 10 30m-179-37 10 26m114 31 11 26m-224 3 9 25"
+            fill="none"
+            stroke="#d0e8fa"
+            strokeOpacity=".65"
+            strokeWidth="3"
+            strokeLinecap="round"
           />
-          <path
-            d="m324 350 25-6 10-31 21 33 27-9m-48-24 21-11"
-            stroke="#e0eef6"
-            strokeWidth="9"
-          />
+          <circle cx="106" cy="228" r="7" />
+          <circle cx="205" cy="147" r="6" />
+          <circle cx="344" cy="181" r="8" />
+          <circle cx="404" cy="264" r="7" />
+          <circle cx="235" cy="253" r="7" />
+          <circle cx="360" cy="310" r="6" />
+          <circle cx="145" cy="338" r="6" />
+          <circle cx="285" cy="362" r="6" />
+          <circle cx="172" cy="372" r="5" />
         </g>
       )}
     </>

@@ -10,7 +10,7 @@ export interface MapMesh {
   normals: Float32Array;
   colors: Float32Array;
 }
-export type MapMotion = "rotor" | "steam" | "flow" | "pulse" | "sway";
+export type MapMotion = "rotor" | "steam" | "flow" | "pulse" | "sway" | "hail";
 export interface ModelPart {
   mesh: MapMesh;
   material?:
@@ -61,6 +61,7 @@ export type StructureKind =
   | "city-large"
   | "tower"
   | "solar"
+  | "solar-hail-damaged"
   | "wind"
   | "offshore-wind"
   | "airborne-wind"

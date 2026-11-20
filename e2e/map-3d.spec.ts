@@ -8,12 +8,18 @@ import {
   setMapProjectCapacity,
 } from "./layout";
 import { reviewScreenshot } from "./review-screenshot";
+import { getBuildFacilityQuote } from "../src/data/Facilities";
+import gameReducer, { buildFacility } from "../src/reducers/Game";
 import { getTerritoryTile } from "../src/helpers/TerritoryTiles";
 import { getTerrainModel } from "../src/components/base/territory-3d/TerrainModels";
 import { editSavedGame, readSavedGame } from "./save-fixture";
 import { TICK_MINUTES } from "../src/Constants";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "../src/helpers/DateTime";
-import { COLD_DEFINITION_ID, WILDFIRE_DAMAGE_ID } from "../src/helpers/Hazards";
+import {
+  COLD_DEFINITION_ID,
+  HAIL_DEFINITION_ID,
+  WILDFIRE_DAMAGE_ID,
+} from "../src/helpers/Hazards";
 import {
   FIRE_BURN_MINUTES,
   FIRE_REPAIR_MINUTES,
@@ -564,5 +570,149 @@ test("shows extreme cold on terrain and explains the plant derate in both render
   await expect(gas).toHaveAccessibleDescription(/Extreme cold.*70% available/);
   await reviewScreenshot(viewport, {
     path: info.outputPath("frost-svg-map.png"),
+  });
+});
+
+test("hail falls on the struck solar site and leaves visibly broken panels during repairs", async ({
+  page,
+}, info) => {
+  const desktop = info.project.name === "desktop-chromium";
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.addInitScript(
+    (theme) => {
+      localStorage.setItem("theme", theme);
+      localStorage.setItem("audioEnabled", "false");
+    },
+    desktop ? "light" : "dark",
+  );
+  await page.goto("/?scenario=116");
+  await page.getByRole("button", { name: "Start game", exact: true }).click();
+  const pause = page.getByRole("button", { name: "pause", exact: true });
+  await expect(pause).toBeVisible();
+  if ((await pause.getAttribute("aria-pressed")) !== "true")
+    await pause.click();
+  await expect
+    .poll(async () => (await readSavedGame(page))?.scenarioId)
+    .toBe(116);
+
+  const struck = "champlain:site-12";
+  const repairing = "champlain:site-13";
+  await editSavedGame(page, (save) => {
+    loadSimData(save.game.location);
+    for (const tileId of [struck, repairing] as const) {
+      const facility = getBuildFacilityQuote(
+        save.game,
+        { name: "Solar", peakW: 6e6 },
+        "champlain",
+        tileId,
+      )!;
+      expect(facility?.fuel).toBe("Sun");
+      save.game = structuredClone(
+        gameReducer(
+          save.game,
+          buildFacility({
+            facility,
+            financed: false,
+            territoryId: "champlain",
+            tileId,
+          }),
+        ),
+      );
+      const built = save.game.facilities.find(
+        (entry) => entry.tileId === tileId,
+      )!;
+      expect(built?.fuel).toBe("Sun");
+      built.yearsToBuildLeft = 0;
+      built.minuteOperational = save.game.date.minute;
+    }
+
+    const game = save.game;
+    game.date = getDateFromMinute(720, game.startingYear);
+    game.speed = "PAUSED";
+    game.worldEvents.active = [struck, repairing].map((tileId, index) => {
+      const facility = game.facilities.find(
+        (entry) => entry.tileId === tileId,
+      )!;
+      return {
+        key: `review-hail:${facility.id}`,
+        definitionId: HAIL_DEFINITION_ID,
+        startsMinute: game.date.minute - (index ? 90 : 15),
+        endsMinute: game.date.minute + 180,
+        attributes: { hazard: "HAIL", facilityId: facility.id },
+        effects: {
+          facilityOutputMultipliersById: { [facility.id]: index ? 0.65 : 0.75 },
+        },
+      };
+    });
+  });
+
+  await page.goto("/");
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
+  const map = await returnToTerritoryMap(page);
+  const canvas = map.locator("canvas.territory3DCanvas");
+  await expect(canvas).toHaveAttribute("data-renderer", "ready");
+  const fresh = map.locator(`[data-map-target="${struck}"]`);
+  await fresh.focus();
+  await expect(fresh).toHaveAccessibleDescription(/Hail strike.*75% available/);
+  await expect(fresh).toBeInViewport({ ratio: 0.75 });
+  await expect(
+    map.locator(`[data-map-target="${repairing}"]`),
+  ).toHaveAccessibleDescription(/Hail repairs in progress.*65% available/);
+
+  const readRender = (includeScene = false) =>
+    canvas.evaluate(
+      (element: MapCanvas, inspect) => element.map3DDiagnostics!(inspect),
+      includeScene,
+    );
+  const initial = await readRender(true);
+  const hail = initial.scene!.filter(({ id }) => id.startsWith("hail:"));
+  expect(hail.map(({ id }) => id)).toEqual([`hail:${struck}`]);
+  expect(hail[0].triangles).toBe(12 * 8);
+  for (const tileId of [struck, repairing])
+    expect(
+      initial.scene!.find(({ id }) => id === `structure:${tileId}`)?.modelKey,
+    ).toBe("structure:solar-hail-damaged");
+  await expect(map.locator('[data-disaster^="hail"]')).toHaveCount(0);
+  await fresh.blur();
+  await reviewScreenshot(map.locator(".territoryMapViewport"), {
+    path: info.outputPath("hail-webgl-map.png"),
+  });
+
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await expect
+    .poll(async () => (await readRender()).phases[`hail:${struck}`])
+    .toBeGreaterThan(0);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await expect.poll(async () => (await readRender()).motionAllowed).toBe(false);
+  const held = (await readRender()).phases[`hail:${struck}`];
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+      ),
+  );
+  expect((await readRender()).phases[`hail:${struck}`]).toBe(held);
+
+  await canvas.evaluate((element: MapCanvas) => {
+    element
+      .getContext("webgl2")!
+      .getExtension("WEBGL_lose_context")!
+      .loseContext();
+  });
+  await expect(canvas).toHaveAttribute("data-renderer", "lost");
+  await expect(
+    map.locator(`[data-disaster-tile="${struck}"] [data-disaster="hail"]`),
+  ).toBeVisible();
+  await expect(map.locator(`[data-disaster-tile="${repairing}"]`)).toHaveCount(
+    0,
+  );
+  for (const tileId of [struck, repairing])
+    await expect(
+      map
+        .locator(`[data-occupant-tile="${tileId}"] [data-solar-damage]`)
+        .first(),
+    ).toBeVisible();
+  await reviewScreenshot(map.locator(".territoryMapViewport"), {
+    path: info.outputPath("hail-svg-map.png"),
   });
 });

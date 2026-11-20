@@ -1,3 +1,4 @@
+import { hailModel, hailstoneRise } from "./Hailstones";
 import { TICK_MS } from "../../../Constants";
 import { MeshBuilder } from "./MeshBuilder";
 import { MapRenderer } from "./Renderer";
@@ -994,3 +995,59 @@ it("uploads the frost material when cold starts and ends while keeping surface w
   }
   renderer.dispose();
 });
+
+test("hail accelerates down and rebounds twice with decreasing height", () => {
+  expect(hailstoneRise(0.2) - hailstoneRise(0.1)).toBeGreaterThan(
+    hailstoneRise(0.5) - hailstoneRise(0.4),
+  );
+  expect(hailstoneRise(0.57)).toBe(0);
+  expect(hailstoneRise(0.69)).toBeGreaterThan(hailstoneRise(0.86));
+  expect(hailstoneRise(0.86)).toBeGreaterThan(hailstoneRise(0.99));
+  expect(hailstoneRise(0.99)).toBe(0);
+});
+
+test.each([
+  [390, 48],
+  [1280, 84],
+])(
+  "at %i px hail batches %i solid stones and stops offscreen",
+  (width, budget) => {
+    const { renderer, gl } = setup();
+    const hail = hailModel(
+      getTerrainModel("plains"),
+      getStructureModel("solar-hail-damaged"),
+      0,
+      0,
+    );
+    const instances = Array.from({ length: 8 }, (_, index): MapInstance => ({
+      id: `hail:${index}`,
+      position: [index * 0.08, 0, 0],
+      model: hail,
+      fog: 0,
+      active: true,
+    }));
+    const visible = { ...frame, width, scale: 0.5 };
+    renderer.update(instances, visible);
+    flush(0);
+    expect(gl.drawArraysInstanced).toHaveBeenCalledTimes(1);
+    expect(gl.drawArraysInstanced).toHaveBeenLastCalledWith(
+      gl.TRIANGLES,
+      0,
+      24,
+      budget,
+    );
+    const before = renderer.diagnostics(true).scene![0].max[1];
+    flush(150);
+    expect(renderer.diagnostics(true).scene![0].max[1]).not.toBe(before);
+    renderer.update(instances, { ...visible, motionAllowed: false });
+    flush(200);
+    const held = renderer.diagnostics().phases["hail:0"];
+    expect(callbacks.size).toBe(0);
+    renderer.update(instances, { ...visible, cameraX: 10_000 });
+    flush(400);
+    expect(renderer.diagnostics().drawCalls).toBe(0);
+    expect(renderer.diagnostics().phases["hail:0"]).toBe(held);
+    expect(callbacks.size).toBe(0);
+    renderer.dispose();
+  },
+);

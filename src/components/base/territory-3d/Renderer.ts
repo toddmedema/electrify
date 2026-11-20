@@ -1,4 +1,10 @@
 import { HEX_WIDTH } from "../TerritoryHexGeometry";
+import {
+  HAIL_MODEL_KEY,
+  HAILSTONE_LIMIT,
+  hailstoneAge,
+  hailstoneRise,
+} from "./Hailstones";
 import { interpolateMapLighting } from "./Lighting";
 import { createMapProgram } from "./MapProgram";
 import { FacilityMotionClock, MOTION_CYCLE } from "./MotionClock";
@@ -729,12 +735,18 @@ export class MapRenderer {
     this.motionItems = [];
     this.waterBatches = [];
     this.sceneInstanceCount = 0;
+    let hailBudget: number =
+      frame.width <= 600 ? HAILSTONE_LIMIT.mobile : HAILSTONE_LIMIT.desktop;
     try {
       for (const instance of this.instances) {
+        const hail = instance.model.key === HAIL_MODEL_KEY;
+        if (hail && hailBudget === 0) continue;
         const center = projectPoint(instance.position, frame);
         // Include offscreen tall models and the maximum three-tile shadow reach.
         const margin =
-          ((3 + Math.max(instance.model.height, instance.model.footprint)) *
+          ((hail
+            ? 1.25
+            : 3 + Math.max(instance.model.height, instance.model.footprint)) *
             HEX_WIDTH +
             CAMERA_OVERSCAN) *
           Math.abs(frame.scale);
@@ -747,6 +759,10 @@ export class MapRenderer {
           continue;
         this.sceneInstanceCount++;
         for (const part of instance.model.parts) {
+          if (hail) {
+            if (hailBudget === 0) break;
+            hailBudget--;
+          }
           if (part.hideWhenInactive && !instance.active) continue;
           let mesh = this.meshes.get(part.mesh);
           if (!mesh) {
@@ -845,6 +861,15 @@ export class MapRenderer {
       case "pulse":
         glow = (1 + Math.sin(phase)) * 0.07;
         break;
+      case "hail": {
+        const age = hailstoneAge(phase);
+        angle = phase * 5;
+        rise = hailstoneRise(age);
+        // Shrink into the air on spawning and into the ground after settling.
+        scale = Math.min(1, age / 0.05, (1 - age) / 0.125);
+        glow = 0.26;
+        break;
+      }
     }
     const c = Math.cos(angle) * scale,
       s = Math.sin(angle) * scale;

@@ -696,3 +696,54 @@ test("frost follows the land surface as cold starts and ends, independently of s
   expect(thawed).not.toMatchObject({ frost: true });
   expect(thawed.model).toBe(ground.model);
 });
+
+test("hail hits the ground and panels, then leaves only fractured panels during repairs", () => {
+  const tile: TerritoryTileView = {
+    ...view(),
+    facility: { name: "Solar", fuel: "Sun", peakW: 6e6, yearsToBuildLeft: 0 },
+  };
+  const board = [tile.tile];
+  const builder = new SceneBuilder({
+    terrain: getTerrainModel,
+    structure: getStructureModel,
+  });
+  const [ground, intact] = builder.build([tile], board, [], 0, "run");
+  const [, stones, damaged] = builder.build(
+    [{ ...tile, disaster: { hail: "impact", condition: "Hail strike" } }],
+    board,
+    [],
+    15,
+    "run",
+  );
+  expect(ground.model).toBe(
+    getTerrainModel("plains", { footprint: intact.model.footprint }),
+  );
+  expect(stones.model.key).toBe("weather:hail");
+  expect(stones.model.parts).toHaveLength(12);
+  const heights = stones.model.parts.map((part) => part.position![1]);
+  expect(Math.min(...heights)).toBeLessThan(0.06);
+  expect(Math.max(...heights)).toBeGreaterThan(0.15);
+  expect(damaged.model.key).toBe("structure:solar-hail-damaged");
+  expect(damaged.model.terminals).toEqual(intact.model.terminals);
+  expect(damaged.model.parts[0].mesh.positions).not.toEqual(
+    intact.model.parts[0].mesh.positions,
+  );
+
+  const repairing = builder.build(
+    [
+      {
+        ...tile,
+        disaster: { hail: "damage", condition: "Hail repairs in progress" },
+      },
+    ],
+    board,
+    [],
+    90,
+    "run",
+  );
+  expect(repairing).toHaveLength(2);
+  expect(repairing[1].model).toBe(damaged.model);
+  expect(builder.build([tile], board, [], 720, "run")[1].model).toBe(
+    intact.model,
+  );
+});
