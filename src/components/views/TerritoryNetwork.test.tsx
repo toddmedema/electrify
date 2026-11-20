@@ -448,7 +448,7 @@ it("keeps unaffordable tiles inspectable without spending", () => {
   expect(store.getState().game.territoryNetwork!.tilePurchases).toHaveLength(0);
 });
 
-it("shows purchased cities as customers rather than build destinations", () => {
+it("shows purchased cities as customers rather than build destinations", async () => {
   let game = ready();
   const target = territoryTileViews(game).find(
     ({ tile }) => tile.id === "parcel-1:city",
@@ -459,12 +459,16 @@ it("shows purchased cities as customers rather than build destinations", () => {
       Math.abs(tile.r - target.r),
       Math.abs(tile.q + tile.r - target.q - target.r),
     );
-  for (let step = 0; step < 12 && !tilePurchaseQuote(game, target.id); step++) {
+  for (
+    let step = 0;
+    step < 12 && !acquisitionQuote(game, target.territoryId);
+    step++
+  ) {
     const current = game;
     const next = territoryTileViews(current)
       .filter(({ tile }) => {
         const quote = tilePurchaseQuote(current, tile.id);
-        return !tile.city && quote && !quote.utilityName;
+        return !tile.city && quote;
       })
       .sort((a, b) => distance(a.tile) - distance(b.tile))[0].tile;
     const quote = tilePurchaseQuote(game, next.id)!;
@@ -473,12 +477,32 @@ it("shows purchased cities as customers rather than build destinations", () => {
       acquireTile({ tileId: next.id, quoteKey: quote.quoteKey }),
     );
   }
-  expect(tilePurchaseQuote(game, target.id)).toBeDefined();
-  show(game);
+  expect(acquisitionQuote(game, target.territoryId)).toBeDefined();
+  const { onAcquire, store } = show(game);
+  onAcquire.mockImplementation((payload) => {
+    store.dispatch(acquireUtility(payload));
+    return true;
+  });
   inspect(target.id);
   fireEvent.click(
-    within(surface()).getByRole("button", { name: /Acquire utility/ }),
+    within(surface()).getByRole("button", { name: /^Acquire Vergennes/ }),
   );
+  const review = screen.getByRole("dialog", { name: /^Acquire Vergennes/ });
+  expect(within(review).getByText("Sites transferred")).toBeVisible();
+  fireEvent.click(within(review).getByText("Plants & purchased power"));
+  expect(within(review).getByText("Natural Gas Peaker")).toBeVisible();
+  expect(
+    within(review).getByText("Removed by the seller on transfer."),
+  ).toBeVisible();
+  fireEvent.click(within(review).getByText("Price breakdown"));
+  expect(within(review).getByText("Vergennes service area")).toBeVisible();
+  expect(within(review).getByText("Plant site")).toBeVisible();
+  expect(ownsTerritoryTile(store.getState().game, target)).toBe(false);
+  fireEvent.click(within(review).getByRole("button", { name: "Confirm" }));
+  await waitFor(() => expect(review).not.toBeInTheDocument());
+  expect(
+    screen.queryByRole("dialog", { name: "Acquisition unavailable" }),
+  ).not.toBeInTheDocument();
   expect(surface()).toHaveTextContent("Customers transferred");
   expect(
     within(surface()).queryByRole("tab", { name: "Generators" }),

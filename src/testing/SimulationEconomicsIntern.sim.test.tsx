@@ -1,3 +1,4 @@
+import { utilityAcquisitions } from "../helpers/Expansion";
 import { INTERN_ONE_BUILD_PLAYS } from "./BalancePlaybooks";
 import {
   baselineMeaningfulChoices,
@@ -34,11 +35,14 @@ describe("simulation economics", () => {
           : 1 + baselineMeaningfulChoices(scenario.id, active),
       );
       expect(active.builds).toHaveLength(scenario.id === 116 ? 6 : 1);
-      expect(active.finalUtilityExpansion?.acquisitions ?? []).toHaveLength(
-        scenario.id === 116 ? 1 : 0,
-      );
+      expect(
+        utilityAcquisitions({
+          utilityExpansion: active.finalUtilityExpansion,
+          territoryNetwork: active.finalTerritoryNetwork,
+        }),
+      ).toHaveLength(scenario.id === 116 ? 3 : 0);
       expect(active.meaningfulDecisionCategories).toEqual(
-        scenario.id === 116 ? ["asset", "rate", "sale"] : expect.any(Array),
+        scenario.id === 116 ? ["asset", "rate"] : expect.any(Array),
       );
       expect(active.outcome).toBe("completed");
     });

@@ -1,4 +1,3 @@
-import { UTILITY_EXPANSION_OBJECTIVES } from "../data/UtilityExpansionObjectives";
 import type { CompiledRuleObjective } from "../data/ScenarioRules";
 import type { ObjectiveResult } from "../data/ScenarioObjectives";
 import { objectiveDefinition } from "./ScenarioObjectives";
@@ -259,9 +258,24 @@ it("clears zero signs without hiding a genuinely negative objective measurement"
 });
 
 it("keeps lone retirement goals and optional obligations distinct", () => {
-  const retirements = UTILITY_EXPANSION_OBJECTIVES.filter(
-    (objective) => objective.metric === "assetRetirement",
-  );
+  const retirements: CompiledRuleObjective[] = [
+    {
+      id: "retire-a",
+      label: "Retire the first plant",
+      required: true,
+      metric: "assetRetirement",
+      assetIds: ["first"],
+      deadlineMonth: 60,
+    },
+    {
+      id: "retire-b",
+      label: "Retire the second plant",
+      required: true,
+      metric: "assetRetirement",
+      assetIds: ["second"],
+      deadlineMonth: 90,
+    },
+  ];
   const lone = objectiveGoalGroups(retirements.slice(0, 1), 2005, 240);
   expect(lone).toHaveLength(1);
   expect(lone[0].goals[0]).toContain(retirements[0].label);

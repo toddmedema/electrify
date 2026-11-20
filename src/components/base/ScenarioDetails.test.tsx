@@ -257,20 +257,6 @@ it("keeps the completed outlook while updating and replaces it when ready", () =
   }
 });
 
-it("combines the oil-retirement goal while retaining both fleet deadlines", () => {
-  const game = createGame({ scenarioId: 116 });
-  renderDetails(game);
-  const goals = screen.getByRole("region", { name: "Goals" });
-  expect(within(goals).getAllByText("Retire original oil plants")).toHaveLength(
-    1,
-  );
-  expect(within(goals).getAllByRole("listitem")).toHaveLength(2);
-  expect(goals).toHaveTextContent("Champlain’s Oil A by Dec 2020");
-  expect(goals).toHaveTextContent("Acquired original oil plants by Dec 2023");
-  expect(goals).not.toHaveTextContent("Retire acquired original oil assets");
-  expect(goals).not.toHaveTextContent("Retire Champlain's original Oil A");
-});
-
 it.each([-198, 198])(
   "uses monthly-profit theme colors for a score change of %s, including projected losses",
   (change) => {
@@ -328,21 +314,21 @@ it.each(SCENARIOS)("omits the supply plan from $name details", (scenario) => {
   }
 });
 
-it("keeps acquisition and retirement goals in scenario details", () => {
+it("shows the two Across the Valley goals in scenario details", () => {
   const game = createGame({ scenarioId: 116 });
   renderDetails(game);
   const goals = screen.getByRole("region", { name: "Goals" });
   expect(
-    within(goals).getByText("Acquire a competitor", { exact: true }),
+    within(goals).getByText("Acquire 3 competitors", { exact: true }),
   ).toBeInTheDocument();
   expect(
     within(goals).getByText("Retain customers", { exact: true }),
   ).toBeInTheDocument();
   expect(
-    within(goals).getByText(
-      "Acquire Valley Electric or Ridge Electric · Dec 2014",
-      { exact: true },
-    ),
+    within(goals).getByText("Acquire 3 competitors · Dec 2014", {
+      exact: true,
+    }),
   ).toBeInTheDocument();
   expect(goals).toHaveTextContent("Keep ≥90% of customer baseline by Dec 2024");
+  expect(goals).not.toHaveTextContent(/retire|original oil/i);
 });

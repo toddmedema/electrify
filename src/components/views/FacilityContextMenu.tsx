@@ -1,5 +1,4 @@
 import { useMoney } from "../base/CurrencyContext";
-import { facilityDisplayName } from "../base/FacilityLabels";
 import * as React from "react";
 import {
   DialogContentText,
@@ -255,7 +254,7 @@ export default function FacilityContextMenu(props: {
       switch (action.key) {
         case "pause":
           if (action.facilities.length === 1)
-            props.onPause(facility.id, facilityDisplayName(facility));
+            props.onPause(facility.id, facility.name);
           else props.onTogglePause(facility.id);
           break;
         case "resume":
@@ -277,7 +276,7 @@ export default function FacilityContextMenu(props: {
     `${action.label}${bulk ? ` (${action.facilities.length})` : ""}${action.cost !== undefined ? ` · ${formatMoneyConcise(action.cost)}` : ""}`;
   const title =
     selected.length === 1
-      ? `${formatFacilitySize(selected[0])} ${facilityDisplayName(selected[0])}`
+      ? `${formatFacilitySize(selected[0])} ${selected[0].name}`
       : null;
   return (
     <>
@@ -341,7 +340,7 @@ export default function FacilityContextMenu(props: {
       {pending && confirmation && !isCoalRepower(confirmation.key) && (
         <ConfirmDialog
           open
-          title={`${confirmation.label}${affected.length === 1 ? `: ${formatFacilitySize(affected[0])} ${facilityDisplayName(affected[0])}` : `: ${affected.length} facilities`}?`}
+          title={`${confirmation.label}${affected.length === 1 ? `: ${formatFacilitySize(affected[0])} ${affected[0].name}` : `: ${affected.length} facilities`}?`}
           confirmLabel={
             cost !== undefined
               ? `Pay ${formatMoneyConcise(cost)}`
@@ -358,7 +357,7 @@ export default function FacilityContextMenu(props: {
         >
           <DialogContentText>
             {affected
-              .map((f) => `${formatFacilitySize(f)} ${facilityDisplayName(f)}`)
+              .map((f) => `${formatFacilitySize(f)} ${f.name}`)
               .join(", ") ||
               "These facilities are no longer available for this action."}
           </DialogContentText>

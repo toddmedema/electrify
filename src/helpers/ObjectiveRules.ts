@@ -6,8 +6,8 @@ import {
   isUtilityExpansionGame,
   isUtilityExpansionScenario,
 } from "./ExpansionContext";
-import { expansionRetentionBaseline } from "./Expansion";
-import { UTILITY_AREAS } from "../data/UtilityExpansion";
+import { expansionRetentionBaseline, utilityAcquisitions } from "./Expansion";
+import { EXPANSION_SCENARIO_ID, UTILITY_AREAS } from "../data/UtilityExpansion";
 import { formatCount, formatNumber, formatForecastNumber } from "./Format";
 import {
   DifficultyType,
@@ -28,12 +28,16 @@ import type {
   ObjectiveResult,
 } from "../data/ScenarioObjectives";
 import { getScenario } from "../data/Scenarios";
-import { UTILITY_EXPANSION_OBJECTIVES } from "../data/UtilityExpansionObjectives";
+import {
+  RETIRED_UTILITY_EXPANSION_OBJECTIVES,
+  UTILITY_EXPANSION_OBJECTIVES,
+} from "../data/UtilityExpansionObjectives";
 import { scenarioRules } from "./ScenarioRules";
 import { ruleDigest, canonicalRuleJson } from "./RuleIdentity";
 import { MINUTES_PER_MONTH } from "./DateTime";
 import { getTotalDebt } from "./Financials";
 import {
+  acquiredUtilityCount,
   createObjectiveProgress,
   recordObjectiveMonth,
   evaluateScenarioObjectives,
@@ -258,17 +262,19 @@ const definitionIdentity = new WeakMap<
   ScenarioType,
   { key: string; definitions: CompiledRuleObjective[]; digest: string }
 >();
+type ObjectiveGameContext = Pick<
+  GameType,
+  "seed" | "startingYear" | "date" | "customerMarketSize"
+> &
+  Partial<
+    Pick<
+      GameType,
+      "difficulty" | "utilityExpansion" | "campaign" | "startingMonth"
+    >
+  >;
+
 export function objectiveContextForGame(
-  game: Pick<
-    GameType,
-    "seed" | "startingYear" | "date" | "customerMarketSize"
-  > &
-    Partial<
-      Pick<
-        GameType,
-        "difficulty" | "utilityExpansion" | "campaign" | "startingMonth"
-      >
-    >,
+  game: ObjectiveGameContext,
   scenario: ScenarioType,
 ): ObjectiveContext {
   const definitions = scenarioObjectiveDefinitions(scenario, {
@@ -277,6 +283,14 @@ export function objectiveContextForGame(
     campaign: game.campaign,
     customerMarketSize: game.customerMarketSize,
   });
+  return objectiveContextForDefinitions(game, scenario, definitions);
+}
+
+function objectiveContextForDefinitions(
+  game: ObjectiveGameContext,
+  scenario: ScenarioType,
+  definitions: CompiledRuleObjective[],
+): ObjectiveContext {
   const campaignInputs = game.campaign
     ? [
         game.campaign.generationIndex,
@@ -361,6 +375,7 @@ function historyProgress(
   history: readonly MonthlyHistoryType[],
   context: ObjectiveContext,
   startingCustomers: number,
+  acquisitions: ReturnType<typeof utilityAcquisitions> = [],
 ): ObjectiveProgress {
   let progress = createObjectiveProgress(
     objectives,
@@ -378,7 +393,15 @@ function historyProgress(
     progress = recordObjectiveMonth(
       progress,
       objectives,
-      { month, history: row },
+      {
+        month,
+        history: row,
+        ...(context.retentionAtDeadlineOnly && {
+          ownedUtilities: acquisitions
+            .filter(({ minute }) => minute < (month + 1) * MINUTES_PER_MONTH)
+            .map(({ targetId }) => targetId),
+        }),
+      },
       context,
     );
   }
@@ -563,6 +586,7 @@ export function gameObjectiveProgress(
       game.monthlyHistory,
       objectiveContextForGame(game, scenario),
       objectiveRetentionBaseline(game, scenario),
+      utilityAcquisitions(game),
     )
   );
 }
@@ -574,10 +598,10 @@ export function gameObjectiveResults(game: GameType): ObjectiveResult[] {
   if (!objectives.length) return [];
   const context = objectiveContextForGame(game, scenario);
   const progress = gameObjectiveProgress(game)!;
-  const acquisitionKey =
-    game.utilityExpansion?.acquisitions
-      .map(({ targetId, minute }) => `${targetId}:${minute}`)
-      .join("|") ?? "";
+  const acquisitions = game.utilityExpansion ? utilityAcquisitions(game) : [];
+  const acquisitionKey = acquisitions
+    .map(({ targetId, minute }) => `${targetId}:${minute}`)
+    .join("|");
   const cached = resultCache.get(progress);
   if (
     cached?.completedMonths === context.completedMonths &&
@@ -599,16 +623,25 @@ export function gameObjectiveResults(game: GameType): ObjectiveResult[] {
       context.completedMonths > objective.deadlineMonth
     )
       return result;
-    const acquired = game.utilityExpansion?.acquisitions.some(
-      (receipt) =>
-        objective.targets.includes(receipt.targetId) &&
-        receipt.minute < (objective.deadlineMonth + 1) * MINUTES_PER_MONTH,
+    const observed = acquiredUtilityCount(
+      objective,
+      acquisitions
+        .filter(
+          ({ minute }) =>
+            minute < (objective.deadlineMonth + 1) * MINUTES_PER_MONTH,
+        )
+        .map(({ targetId }) => targetId),
     );
-    if (!acquired) return result;
+    if (observed < result.target)
+      return {
+        ...result,
+        observed,
+        ...(observed > 0 && { status: "inProgress" as const }),
+      };
     const completed: ObjectiveResult = {
       ...result,
       status: "completed",
-      observed: 1,
+      observed,
       observedMonths: 1,
     };
     // A proven acquisition clears an earlier explanation. Omit the optional field:
@@ -703,6 +736,7 @@ export function recordGameObjectiveMonth(
       game.monthlyHistory.filter((existing) => existing !== row),
       { ...context, completedMonths: month },
       objectiveRetentionBaseline(game, scenario),
+      utilityAcquisitions(game),
     );
   const needsDebt = objectives.some(
     (objective) => objective.metric === "monthEndDebt",
@@ -725,7 +759,7 @@ export function recordGameObjectiveMonth(
       history: row,
       ...(game.utilityExpansion
         ? {
-            ownedUtilities: game.utilityExpansion.acquisitions.map(
+            ownedUtilities: utilityAcquisitions(game).map(
               ({ targetId }) => targetId,
             ),
             ownedAssetIds: game.facilities.flatMap((facility) =>
@@ -754,9 +788,17 @@ export function validGameObjectiveProgress(game: GameType): boolean {
   const scenario = getScenario(game.scenarioId, game.customScenario);
   if (!scenario) return game.objectiveProgress === undefined;
   const objectives = scenarioObjectiveDefinitions(scenario, game);
+  return validGameObjectiveProgressForDefinitions(game, scenario, objectives);
+}
+
+function validGameObjectiveProgressForDefinitions(
+  game: GameType,
+  scenario: ScenarioType,
+  objectives: CompiledRuleObjective[],
+): boolean {
   if (!objectives.length) return game.objectiveProgress === undefined;
   if (!game.objectiveProgress) return !scenario.mod && !game.campaign;
-  const context = objectiveContextForGame(game, scenario);
+  const context = objectiveContextForDefinitions(game, scenario, objectives);
   const progress = game.objectiveProgress;
   if (
     progress.retentionBaseline !==
@@ -790,12 +832,13 @@ export function validGameObjectiveProgress(game: GameType): boolean {
       if (objective.metric === "utilityOwnership") {
         for (const [month, numerator, denominator] of evidence?.observations ??
           []) {
-          const atClose = expansion.acquisitions.some(
-            (acquisition) =>
-              objective.targets.includes(acquisition.targetId) &&
-              acquisition.minute < (month + 1) * MINUTES_PER_MONTH,
+          const atClose = acquiredUtilityCount(
+            objective,
+            utilityAcquisitions(game)
+              .filter(({ minute }) => minute < (month + 1) * MINUTES_PER_MONTH)
+              .map(({ targetId }) => targetId),
           );
-          if (numerator !== Number(atClose) || denominator !== 1) return false;
+          if (numerator !== atClose || denominator !== 1) return false;
         }
       }
     }
@@ -865,6 +908,40 @@ export function validGameObjectiveProgress(game: GameType): boolean {
   return true;
 }
 
+export type ValleyObjectiveRules = "published-master" | "acquisition-preview";
+
+/** Check the original evidence against its own rules before replacing retired objectives. */
+export function migrateValleyObjectiveProgress(
+  game: GameType,
+  publishedRules?: ValleyObjectiveRules,
+): ObjectiveProgress | null {
+  const scenario = getScenario(EXPANSION_SCENARIO_ID)!;
+  const context = objectiveContextForGame(game, scenario);
+  const progress = game.objectiveProgress;
+  if (!progress) return null;
+  if (
+    publishedRules !== "published-master" &&
+    progress.rulesDigest === context.rulesDigest
+  )
+    return progress;
+  if (
+    publishedRules === "acquisition-preview" ||
+    !validGameObjectiveProgressForDefinitions(
+      game,
+      scenario,
+      RETIRED_UTILITY_EXPANSION_OBJECTIVES,
+    )
+  )
+    return null;
+  return historyProgress(
+    UTILITY_EXPANSION_OBJECTIVES,
+    game.monthlyHistory,
+    context,
+    objectiveRetentionBaseline(game, scenario),
+    utilityAcquisitions(game),
+  );
+}
+
 export interface RunFailureType {
   outcome: "bankrupt" | "fired";
   title: string;
@@ -885,6 +962,7 @@ export function runFailure(
         | "startingMonth"
         | "objectiveProgress"
         | "utilityExpansion"
+        | "territoryNetwork"
         | "scenarioId"
         | "customScenario"
         | "monthlyHistory"
@@ -924,6 +1002,7 @@ export function runFailure(
       history,
       context,
       objectiveRetentionBaseline(game, scenario),
+      utilityAcquisitions(game),
     );
   const results = inheritedResultReasons(
     evaluateScenarioObjectives(objectives, progress, context),

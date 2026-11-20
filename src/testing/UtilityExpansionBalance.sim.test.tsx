@@ -2,7 +2,7 @@ import compatibility from "../data/RunCompatibility.json";
 import fs from "fs";
 import { MINUTES_PER_MONTH } from "../helpers/DateTime";
 import { DIFFICULTY_IDS } from "../Constants";
-import { acquisitionAssets } from "../helpers/Expansion";
+import { acquisitionAssets, utilityAcquisitions } from "../helpers/Expansion";
 import { facilityCashBack } from "../helpers/Financials";
 import { UTILITY_TARGETS } from "../data/UtilityExpansion";
 import { DifficultyType } from "../Types";
@@ -110,6 +110,10 @@ for (const difficulty of difficulties)
           Math.abs(result.companyMetrics![key] - expected),
         ).toBeLessThanOrEqual(Math.max(1, expected * 1e-12));
       }
+      const acquisitions = utilityAcquisitions({
+        utilityExpansion: result.finalUtilityExpansion,
+        territoryNetwork: result.finalTerritoryNetwork,
+      });
       evidence.push({
         difficulty,
         seed,
@@ -127,16 +131,13 @@ for (const difficulty of difficulties)
         retentionBaseline: result.retentionBaseline,
         retainedShare:
           (result.months.at(-1)?.customers ?? 0) / result.retentionBaseline!,
-        acquisitions: result.finalUtilityExpansion?.acquisitions,
+        acquisitions,
         builds: result.builds,
         scheduledBuilds: scheduledActions.filter(
           (action) => action.type === "build",
         ),
         scheduledAcquisitions: scheduledActions.filter(
           (action) => action.type === "acquire",
-        ),
-        scheduledRetirements: scheduledActions.filter(
-          (action) => action.type === "retire",
         ),
         demandWh,
         supplyWh,
@@ -153,12 +154,12 @@ for (const difficulty of difficulties)
         ),
         objectives: result.objectiveResults,
         reached2017: result.months.length >= 145,
-        reachedRetirementDeadline: result.months.length >= 228,
+        reachedAcquisitionDeadline: result.months.length >= 120,
         reachedFinalRetention: result.months.length === 240,
       });
-      expect(result.retentionBaseline).toBe(
+      expect(result.retentionBaseline).toBeCloseTo(
         90000 +
-          (result.finalUtilityExpansion?.acquisitions.reduce(
+          acquisitions.reduce(
             (sum, receipt) =>
               sum +
               (receipt.minute <
@@ -166,7 +167,8 @@ for (const difficulty of difficulties)
                 ? receipt.transferredCustomers
                 : 0),
             0,
-          ) ?? 0),
+          ),
+        6,
       );
       expectNoViolations(result);
       expect(result.builds).toHaveLength(
@@ -184,6 +186,15 @@ for (const difficulty of difficulties)
       );
       const mustComplete = ["firm", "mixed", "both"].includes(
         fixture.portfolio,
+      );
+      expect(
+        result.objectiveResults?.find(
+          ({ metric }) => metric === "utilityOwnership",
+        ),
+      ).toMatchObject(
+        mustComplete
+          ? { status: "completed", observed: 3, target: 3 }
+          : { target: 3 },
       );
       expect({
         months: result.months.length,

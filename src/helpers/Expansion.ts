@@ -4,10 +4,16 @@ import {
   hasTerritoryNetwork,
   ownedTerritoryTiles,
 } from "./TerritoryTiles";
+import {
+  MUNICIPAL_UTILITIES,
+  municipalUtility,
+} from "../data/MunicipalUtilities";
+import { municipalTerritoryOffer, transferTerritorySites } from "./Territories";
 import { TERRITORY_TILES } from "../data/TerritoryTiles";
 import {
   landTransferredCustomerTotal,
   landCustomerMarket,
+  landCustomerReceipts,
 } from "./TerritoryCustomers";
 import {
   connectionAgreements,
@@ -57,6 +63,7 @@ import {
   getTimeFromTimeline,
   MINUTES_PER_MONTH,
 } from "./DateTime";
+import { cityCustomerCount } from "./CityProfiles";
 import { customerMarketSizeAt } from "./Customers";
 import { startingFacilityQuote } from "./StartingFacilities";
 import { startingFacilityStarts } from "./StartingFacilityStarts";
@@ -199,10 +206,10 @@ export function acquisitionAssets(
   }
   return result;
 }
-export interface AcquisitionQuote {
+interface RegionalUtilityOffer {
+  kind: "regional";
   targetId: UtilityTargetId;
   name: string;
-  quoteKey: string;
   customers: number;
   addressablePool: number;
   equityPrice: number;
@@ -230,10 +237,10 @@ export interface AcquisitionQuote {
   }[];
 }
 /** Read-only dated terms are visible before the player commits to a connection. */
-export function utilityOffer(
+function regionalUtilityOffer(
   game: GameType,
   targetId: string,
-): Omit<AcquisitionQuote, "quoteKey"> | undefined {
+): RegionalUtilityOffer | undefined {
   const target = UTILITY_TARGETS.find((entry) => entry.id === targetId);
   const expansion = game.utilityExpansion;
   if (
@@ -283,6 +290,7 @@ export function utilityOffer(
       currentCustomers + acquiredCustomers,
     ) - utilityNetworkAnnualOM(owned, currentCustomers);
   return {
+    kind: "regional",
     targetId: target.id,
     name: target.name,
     customers: acquiredCustomers,
@@ -328,14 +336,42 @@ export function bordersUtility(game: GameType, targetId: string): boolean {
   );
 }
 
+function municipalOffer(game: GameType, id: string) {
+  const territory = municipalTerritoryOffer(game, id);
+  if (!territory) return undefined;
+  return {
+    kind: "municipal" as const,
+    territory,
+    targetId: territory.utility.id,
+    name: territory.utility.name,
+    customers: territory.customers,
+    equityPrice: territory.price,
+    fee: 0,
+    assumedDebt: 0,
+    cashDue: territory.price,
+    financedCashDue: 0,
+    newLoan: 0,
+    monthlyDebtService: 0,
+    cashMonthlyDebtService: 0,
+    networkOMPerMonth: 0,
+    facilities: [],
+    contracts: [],
+  };
+}
+
+export function utilityOffer(game: GameType, targetId: string) {
+  return municipalOffer(game, targetId) ?? regionalUtilityOffer(game, targetId);
+}
+
 /** A neighboring utility can be bought without a power agreement or a line. */
-export function acquisitionQuote(
-  game: GameType,
-  targetId: string,
-): AcquisitionQuote | undefined {
-  if (!bordersUtility(game, targetId)) return undefined;
+export function acquisitionQuote(game: GameType, targetId: string) {
   const offer = utilityOffer(game, targetId);
   if (!offer) return undefined;
+  const reachable =
+    offer.kind === "municipal"
+      ? offer.territory.reachable
+      : bordersUtility(game, targetId);
+  if (!reachable) return undefined;
   return {
     ...offer,
     quoteKey: JSON.stringify([
@@ -345,20 +381,62 @@ export function acquisitionQuote(
       offer.equityPrice,
       offer.fee,
       offer.assumedDebt,
+      ...(offer.kind === "municipal"
+        ? [offer.territory.purchases, offer.customers]
+        : []),
     ]),
   };
 }
+export type AcquisitionQuote = NonNullable<ReturnType<typeof acquisitionQuote>>;
+
+export function acquisitionPaymentDue(
+  quote: AcquisitionQuote,
+  financed: boolean,
+): number {
+  if (!financed) return quote.cashDue;
+  return quote.kind === "regional" ? quote.financedCashDue : Infinity;
+}
+
 export function validAcquisitionAction(
   value: unknown,
 ): value is AcquireUtilityAction {
-  const action = value as Partial<AcquireUtilityAction> | null;
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const action = value as Partial<AcquireUtilityAction>;
   return (
-    !!action &&
-    UTILITY_TARGETS.some((target) => target.id === action.targetId) &&
+    Object.keys(value).length === 3 &&
+    (UTILITY_TARGETS.some((target) => target.id === action.targetId) ||
+      !!municipalUtility(action.targetId)) &&
     typeof action.financed === "boolean" &&
     typeof action.quoteKey === "string"
   );
 }
+
+/** Dated receipts for all competitors, including municipal customers transferred in older saves. */
+export function utilityAcquisitions(
+  game: Pick<GameType, "utilityExpansion" | "territoryNetwork">,
+) {
+  const receipts = landCustomerReceipts(game);
+  return [
+    ...(game.utilityExpansion?.acquisitions ?? []),
+    ...MUNICIPAL_UTILITIES.flatMap(({ id }) => {
+      const receipt = receipts.find(({ territoryId }) => territoryId === id);
+      return receipt
+        ? [
+            {
+              targetId: id,
+              minute: receipt.minute,
+              financed: false,
+              transferredCustomers: customerMarketSizeAt(
+                cityCustomerCount(id),
+                receipt.minute,
+              ),
+            },
+          ]
+        : [];
+    }),
+  ].sort((a, b) => a.minute - b.minute);
+}
+
 /** Every guard passes before ownership, money, equipment or the shared customer pool changes. */
 export function transferUtility(game: GameType, value: unknown): boolean {
   if (!validAcquisitionAction(value)) return false;
@@ -371,9 +449,11 @@ export function transferUtility(game: GameType, value: unknown): boolean {
     !game.utilityExpansion
   )
     return false;
-  const due = value.financed ? quote.financedCashDue : quote.cashDue;
+  const due = acquisitionPaymentDue(quote, value.financed);
   if (now.cash < due) return false;
-  const assets = acquisitionAssets(game, value.targetId);
+  if (quote.kind === "municipal")
+    return transferTerritorySites(game, quote.territory);
+  const assets = acquisitionAssets(game, quote.targetId);
   if (!assets) return false;
   const oldProgramCustomers = programCustomers(game);
   const loan = (
@@ -382,8 +462,8 @@ export function transferUtility(game: GameType, value: unknown): boolean {
     rate: number,
     months: number,
   ): AcquisitionLoan => ({
-    id: `scenario-116-${value.targetId}-${kind}`,
-    targetId: value.targetId,
+    id: `scenario-116-${quote.targetId}-${kind}`,
+    targetId: quote.targetId,
     kind,
     principal,
     loanAmountLeft: principal,
@@ -395,7 +475,7 @@ export function transferUtility(game: GameType, value: unknown): boolean {
   now.cash -= due;
   now.customers += quote.customers;
   game.utilityExpansion.acquisitions.push({
-    targetId: value.targetId,
+    targetId: quote.targetId,
     minute: game.date.minute,
     financed: value.financed,
     transferredCustomers: quote.customers,
@@ -408,7 +488,7 @@ export function transferUtility(game: GameType, value: unknown): boolean {
       0,
     );
   const network: UtilityNetworkAsset = {
-    targetId: value.targetId,
+    targetId: quote.targetId,
     activatedMinute: game.date.minute,
     initialValue: quote.networkInitialValue,
     retentionLowWatermark: Math.min(

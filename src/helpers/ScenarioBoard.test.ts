@@ -1,6 +1,8 @@
+import cloneDeep from "lodash.clonedeep";
 import { VALLEY_BOARD, isValleyBoardTile } from "../data/TerritoryTiles";
 import { municipalPlantAt } from "../data/MunicipalUtilities";
 import { createGame } from "../testing/Simulator";
+import { retiredValleyOpeningProgress } from "../testing/SaveTestHelpers";
 import { currentTick } from "./GameSelectors";
 import { territoryTileViews } from "./TerritoryMapState";
 import { purchaseTile, tilePrice, tilePurchaseQuote } from "./Territories";
@@ -13,7 +15,8 @@ import {
 import { parseSave, serializeSave } from "../SaveGame";
 import reducer, { applyAcquireUtility } from "../reducers/Game";
 import { acquisitionQuote } from "./Expansion";
-import { acquireTile } from "../reducers/GameActions";
+import { gameObjectiveResults } from "./ObjectiveRules";
+import { acquireTile, acquireUtility } from "../reducers/GameActions";
 import { validTerritoryNetwork } from "./TerritoryValidation";
 import type { TerritoryTileId } from "../Types";
 
@@ -88,7 +91,15 @@ it("prices ordinary building tiles by terrain and the nearest owned city", () =>
   const remaining = "green-uplands:site-4";
   const before = tilePurchaseQuote(game, remaining)!;
   expect(before.price).toBeCloseTo(4.8e6);
-  connect("parcel-0:site-1");
+  const town = acquisitionQuote(game, "parcel-1")!;
+  game = reducer(
+    game,
+    acquireUtility({
+      targetId: town.targetId,
+      financed: false,
+      quoteKey: town.quoteKey,
+    }),
+  );
   expect(price(remaining)).toBeCloseTo(3e6);
   expect(
     purchaseTile(game, { tileId: remaining, quoteKey: before.quoteKey }),
@@ -175,33 +186,42 @@ it("serves each city with a utility and sells both sites from the plant border",
   connect("green-uplands:site-5");
   expect(isAdjacentToOwnedTerritoryTile(game, city)).toBe(false);
   expect(isAdjacentToOwnedTerritoryTile(game, plant)).toBe(true);
-  const quote = tilePurchaseQuote(game, plant.id)!;
-  expect(tilePurchaseQuote(game, city.id)).toMatchObject({
-    utilityName: quote.utilityName,
-    price: quote.price,
-    purchases: quote.purchases,
-  });
-  expect(quote.utilityName).toMatch(/^Vergennes /);
-  expect(quote.price).toBe(
-    tilePrice(game, 0, plant.id) + tilePrice(game, 0, city.id),
-  );
-  expect(quote.purchases.map(({ tileId }) => tileId)).toEqual([
+  expect(tilePurchaseQuote(game, plant.id)).toBeUndefined();
+  expect(tilePurchaseQuote(game, city.id)).toBeUndefined();
+  const quote = acquisitionQuote(game, "parcel-1")!;
+  if (quote.kind !== "municipal")
+    throw new Error("Expected the Vergennes offer");
+  expect(quote.territory.purchases.map(({ tileId }) => tileId)).toEqual([
     plant.id,
     city.id,
   ]);
-  const payload = { tileId: plant.id, quoteKey: quote.quoteKey };
+  const payload = {
+    targetId: quote.targetId,
+    financed: false,
+    quoteKey: quote.quoteKey,
+  };
   const cash = currentTick(game)!.cash;
   const customers = currentTick(game)!.customers;
-  currentTick(game)!.cash = quote.price - 1;
-  const insufficient = JSON.stringify(game);
-  expect(purchaseTile(game, payload)).toBe(false);
-  expect(JSON.stringify(game)).toBe(insufficient);
-
-  currentTick(game)!.cash = cash;
-  const purchased = reducer(game, acquireTile(payload));
-  expect(reducer(purchased, acquireTile(payload))).toBe(purchased);
-  expect(currentTick(purchased)!.cash).toBeCloseTo(cash - quote.price);
+  const short = cloneDeep(game);
+  currentTick(short)!.cash = quote.cashDue - 1;
+  expect(reducer(short, acquireUtility(payload))).toBe(short);
+  expect(reducer(game, acquireUtility({ ...payload, financed: true }))).toBe(
+    game,
+  );
+  expect(reducer(game, acquireUtility({ ...payload, quoteKey: "stale" }))).toBe(
+    game,
+  );
+  const purchased = reducer(game, acquireUtility(payload));
+  expect(reducer(purchased, acquireUtility(payload))).toBe(purchased);
+  expect(currentTick(purchased)!.cash).toBeCloseTo(cash - quote.cashDue);
   expect(currentTick(purchased)!.customers).toBe(customers + quote.customers);
+  expect(
+    gameObjectiveResults(purchased).find(({ id }) => id === "acquire-neighbor"),
+  ).toMatchObject({
+    observed: 1,
+    target: 3,
+    status: "inProgress",
+  });
   for (const id of [plant.id, city.id]) {
     expect(
       territoryTileViews(purchased).find(({ tile }) => tile.id === id),
@@ -209,10 +229,49 @@ it("serves each city with a utility and sells both sites from the plant border",
       owned: true,
       facility: undefined,
     });
-    expect(tilePurchaseQuote(purchased, id)).toBeUndefined();
   }
   expect(validTerritoryNetwork(purchased)).toBe(true);
   expect(
     parseSave(JSON.parse(JSON.stringify(serializeSave(purchased)))),
   ).not.toBeNull();
+
+  const saved = JSON.parse(JSON.stringify(serializeSave(purchased)));
+  saved.schemaVersion = 19;
+  saved.game.objectiveProgress = retiredValleyOpeningProgress(purchased);
+  const restored = parseSave(saved)!.game;
+  expect(restored.objectiveProgress!.entries.map(({ id }) => id)).toEqual([
+    "acquire-neighbor",
+    "retain-customers",
+  ]);
+  expect(gameObjectiveResults(restored)).toEqual(
+    gameObjectiveResults(purchased),
+  );
+  expect(restored.territoryNetwork).toEqual(purchased.territoryNetwork);
+  let expanded = restored;
+  for (const targetId of ["parcel-11", "ridge-electric"] as const) {
+    const offer = acquisitionQuote(expanded, targetId)!;
+    expanded = reducer(
+      expanded,
+      acquireUtility({ targetId, financed: false, quoteKey: offer.quoteKey }),
+    );
+  }
+  const goal = gameObjectiveResults(expanded).find(
+    ({ id }) => id === "acquire-neighbor",
+  );
+  expect(goal).toMatchObject({ status: "completed", observed: 3, target: 3 });
+  expect(goal).not.toHaveProperty("reason");
+});
+
+it("rejects nonexistent municipal building sites at the purchase and restore boundaries", () => {
+  const game = ready();
+  const tileId = "parcel-1:site-0";
+  expect(getTerritoryTile(tileId, game)).toBeUndefined();
+  expect(tilePurchaseQuote(game, tileId)).toBeUndefined();
+  expect(purchaseTile(game, { tileId, quoteKey: "nonexistent-site" })).toBe(
+    false,
+  );
+  expect(game.territoryNetwork!.tilePurchases).toEqual([]);
+  game.territoryNetwork!.tilePurchases = [{ tileId, minute: 0, price: 32e6 }];
+  expect(validTerritoryNetwork(game)).toBe(false);
+  expect(parseSave(serializeSave(game))).toBeNull();
 });

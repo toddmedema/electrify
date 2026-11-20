@@ -543,6 +543,16 @@ const publishedCoopIdentities = [
     21,
     "coop-2-fcb444f119733dd48aef5c28f13cb78fc856be210f448c495109eb5987d70476",
   ],
+  // Published master ca7b8c4e6752937fbe5212baf8b9a09b3e59b8b6.
+  [
+    22,
+    "coop-2-bddc08bd9f13d3fb912bccfa5401e85283039c61e31340ec6a252cd503884fef",
+  ],
+  // Published acquisition preview e2abbfbb89b93d3c90b5a4361bf22e975f8fccb1.
+  [
+    22,
+    "coop-2-65d7bc6c94fc95425c4781b2a0039977949b473ac9928a597914f29b449643a6",
+  ],
 ] as const;
 
 test.each(publishedCoopIdentities)(

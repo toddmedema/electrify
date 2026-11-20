@@ -109,7 +109,10 @@ it("mod base 116 preserves source rights, company customers, obligations and exa
   expect(isUtilityExpansionGame(game)).toBe(true);
   expect(game.utilityExpansion!.networkAssets).toEqual([]);
   expect(game.objectiveProgress!.retentionBaseline).toBe(90000);
-  expect(game.objectiveProgress!.entries).toHaveLength(4);
+  expect(game.objectiveProgress!.entries.map(({ id }) => id)).toEqual([
+    "acquire-neighbor",
+    "retain-customers",
+  ]);
   expect(currentTick(game)!.entitlementImportCapacityW).toBeGreaterThan(0);
   const quote = acquisitionQuote(game, "ridge-electric")!;
   expect(quote).toBeDefined();

@@ -3,8 +3,12 @@ import {
   emptyTransmissionState,
   intertiesEnabledForScenario,
 } from "../data/AdjacentMarkets";
+import { RETIRED_UTILITY_EXPANSION_OBJECTIVES } from "../data/UtilityExpansionObjectives";
 import { getScenario } from "../data/Scenarios";
 import { getDateFromMinute } from "../helpers/DateTime";
+import { objectiveContextForGame } from "../helpers/ObjectiveRules";
+import { ruleDigest } from "../helpers/RuleIdentity";
+import { createObjectiveProgress } from "../helpers/ScenarioObjectives";
 import type { GameType, SaveFileType, SavedRunResult } from "../Types";
 import { serializeSave } from "../SaveGame";
 
@@ -62,4 +66,24 @@ export function fakeSavedResult(
     outcome: "completed",
     ...overrides,
   };
+}
+
+/** Opening evidence from the published Valley rule set, before any month has closed. */
+export function retiredValleyOpeningProgress(game: GameType) {
+  const scenario = getScenario(116)!;
+  const context = objectiveContextForGame(game, scenario);
+  return createObjectiveProgress(
+    RETIRED_UTILITY_EXPANSION_OBJECTIVES,
+    {
+      ...context,
+      rulesDigest: ruleDigest({
+        objectives: RETIRED_UTILITY_EXPANSION_OBJECTIVES,
+        seed: context.seed,
+        startingYear: context.startingYear,
+        durationMonths: context.durationMonths,
+        ownership: context.ownership,
+      }),
+    },
+    game.objectiveProgress!.retentionBaseline,
+  );
 }

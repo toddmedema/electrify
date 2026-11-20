@@ -22,7 +22,7 @@ import {
 import { cityProfile } from "./CityProfiles";
 import { cityDemandByType } from "./CityDemand";
 import { combinedUtilityDemandProfile } from "./CombinedUtilityDemand";
-import { expansionRetentionBaseline } from "./Expansion";
+import { acquisitionQuote, expansionRetentionBaseline } from "./Expansion";
 import { parseSave, serializeSave } from "../SaveGame";
 import { validUtilityExpansion } from "./ExpansionValidation";
 import { validHydroClaims, getHydroAvailability } from "../data/HydroSites";
@@ -38,6 +38,7 @@ import { programCustomers } from "./Policies";
 import {
   acquireLand,
   acquireTile,
+  acquireUtility,
   schedulePolicy,
 } from "../reducers/GameActions";
 import {
@@ -56,7 +57,11 @@ function buy(state: GameType, id: LandTerritoryId) {
   const target = getTerritoryTiles(state).find(
     (tile) => tile.territoryId === id,
   )!;
-  for (let step = 0; !landPurchaseQuote(state, id) && step < 20; step++) {
+  for (
+    let step = 0;
+    !landPurchaseQuote(state, id) && !acquisitionQuote(state, id) && step < 20;
+    step++
+  ) {
     const current = state;
     const nearest = [...tilePurchaseQuotes(current).keys()]
       .map((tileId) => getTerritoryTile(tileId, current)!)
@@ -75,6 +80,16 @@ function buy(state: GameType, id: LandTerritoryId) {
       ),
     );
   }
+  const acquisition = acquisitionQuote(state, id);
+  if (acquisition)
+    return reducer(
+      state,
+      acquireUtility({
+        targetId: acquisition.targetId,
+        financed: false,
+        quoteKey: acquisition.quoteKey,
+      }),
+    );
   const offer = landPurchaseQuote(state, id)!;
   expect(offer).toBeDefined();
   return reducer(
@@ -200,50 +215,50 @@ it.each(["parcel-1", "parcel-5"] as LandTerritoryId[])(
   },
 );
 it("general land shares its two reservations across gas, wind, solar and storage", () => {
-  let state = buy(game(), "parcel-0");
+  let state = buy(game(), "parcel-2");
   for (const name of ["Natural Gas CC", "Wind", "Solar"])
     expect(
       territoryBuildAvailability(
         state,
-        quote(state, name, "parcel-0"),
-        "parcel-0",
+        quote(state, name, "parcel-2"),
+        "parcel-2",
       ).buildable,
     ).toBe(true);
   const battery = STORAGE(
     { ...state, date: { ...state.date, year: 2025 } },
     50e6,
   ).find((f) => f.name === "Battery")!;
-  expect(territoryBuildAvailability(state, battery, "parcel-0").buildable).toBe(
+  expect(territoryBuildAvailability(state, battery, "parcel-2").buildable).toBe(
     true,
   );
   expect(
     territoryBuildAvailability(
       state,
-      quote(state, "Hydro", "parcel-0"),
-      "parcel-0",
+      quote(state, "Hydro", "parcel-2"),
+      "parcel-2",
     ).buildable,
   ).toBe(false);
   expect(
     territoryBuildAvailability(
       state,
-      quote(state, "Geothermal", "parcel-0"),
-      "parcel-0",
+      quote(state, "Geothermal", "parcel-2"),
+      "parcel-2",
     ).buildable,
   ).toBe(false);
-  state = build(state, quote(state, "Wind", "parcel-0"), "parcel-0");
-  state = buy(state, "parcel-0");
-  state = build(state, quote(state, "Natural Gas CC", "parcel-0"), "parcel-0");
-  expect(territorySiteInventory(state, "parcel-0", "general").remaining).toBe(
+  state = build(state, quote(state, "Wind", "parcel-2"), "parcel-2");
+  state = buy(state, "parcel-2");
+  state = build(state, quote(state, "Natural Gas CC", "parcel-2"), "parcel-2");
+  expect(territorySiteInventory(state, "parcel-2", "general").remaining).toBe(
     0,
   );
   const ids = state.facilities.map((f) => f.id);
-  state = build(state, quote(state, "Solar", "parcel-0"), "parcel-0");
+  state = build(state, quote(state, "Solar", "parcel-2"), "parcel-2");
   expect(state.facilities.map((f) => f.id)).toEqual(ids);
   const wind = state.facilities.find(
-    (f) => f.territoryId === "parcel-0" && f.fuel === "Wind",
+    (f) => f.territoryId === "parcel-2" && f.fuel === "Wind",
   )!;
   state = reducer(state, sellFacility(wind.id));
-  expect(territorySiteInventory(state, "parcel-0", "general").remaining).toBe(
+  expect(territorySiteInventory(state, "parcel-2", "general").remaining).toBe(
     1,
   );
 });

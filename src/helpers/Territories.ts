@@ -19,7 +19,10 @@ import {
   purchasedLandTerritories,
 } from "../data/Territories";
 import { isValleyBoardTile } from "../data/TerritoryTiles";
-import { municipalUtilityAt } from "../data/MunicipalUtilities";
+import {
+  municipalUtility,
+  municipalUtilityAt,
+} from "../data/MunicipalUtilities";
 import { UTILITY_AREAS } from "../data/UtilityExpansion";
 import { getInflationIndex, hasEconomy } from "../data/Economy";
 import { getDateFromMinute } from "./DateTime";
@@ -341,7 +344,6 @@ function availableLand(
   );
 }
 
-/** A seller is reachable at any available part of its border. */
 function tilePurchaseContext(
   game: GameType,
   owns = createTerritoryTileOwnership(game),
@@ -350,77 +352,92 @@ function tilePurchaseContext(
   const owned = ownedTerritoryTiles(game, owns);
   const adjacent = createTerritoryTileAdjacency(owned);
   const cities = owned.filter(({ city }) => city);
-  const sellerAt = (tile: TerritoryTile) => {
-    const utility = municipalUtilityAt(tile);
-    const otherId =
-      utility?.plant &&
-      (tile.id === utility.city.id ? utility.plant.tileId : utility.city.id);
-    const other = otherId ? getTerritoryTile(otherId, game) : undefined;
-    // Legacy purchases can leave the city and plant site under different owners.
-    return {
-      utility,
-      companion: other && availableLand(game, owns, other) ? other : undefined,
-    };
-  };
-  const eligible = (tile: TerritoryTile) => {
-    if (!enabled || !availableLand(game, owns, tile)) return false;
-    if (adjacent(tile)) return true;
-    const { companion } = sellerAt(tile);
-    return !!companion && adjacent(companion);
-  };
+  const eligible = (
+    tile: TerritoryTile,
+  ): tile is TerritoryTile & { territoryId: LandTerritoryId } =>
+    enabled &&
+    availableLand(game, owns, tile) &&
+    !municipalUtilityAt(tile)?.plant &&
+    adjacent(tile);
   const quote = (tile: TerritoryTile) => {
-    if (!enabled || !availableLand(game, owns, tile)) return undefined;
-    const { utility, companion: bundle } = sellerAt(tile);
-    const direct = adjacent(tile);
-    if (!direct && !(bundle && adjacent(bundle))) return undefined;
-    const sites = bundle ? (direct ? [tile, bundle] : [bundle, tile]) : [tile];
-    const city = tile.city ? tile : bundle?.city ? bundle : undefined;
-    const territory = getTerritoryDefinition(
-      city?.territoryId ?? tile.territoryId,
-    )!;
-    const baseCustomers = cityCustomerCount(
-      city?.territoryId ?? tile.territoryId,
-    );
+    if (!eligible(tile)) return undefined;
+    const territory = getTerritoryDefinition(tile.territoryId)!;
+    const baseCustomers = cityCustomerCount(tile.territoryId);
     const minute = game.date.minute;
-    const purchases = sites.map((site) => {
-      if (!isOrdinaryTileConnection(site))
-        return { tileId: site.id, price: tilePrice(game, minute, site.id) };
-      const connectionDistance = Math.min(
-        ...cities.map((city) => territoryHexDistance(city, site)),
-      );
-      return {
-        tileId: site.id,
-        price: ordinaryTileConnectionPrice(
-          game,
-          minute,
-          site.terrain,
-          connectionDistance,
-        ),
-        connectionDistance,
-      };
-    });
-    const price = purchases.reduce((total, part) => total + part.price, 0);
+    const connectionDistance = isOrdinaryTileConnection(tile)
+      ? Math.min(...cities.map((city) => territoryHexDistance(city, tile)))
+      : undefined;
+    const price =
+      connectionDistance === undefined
+        ? tilePrice(game, minute, tile.id)
+        : ordinaryTileConnectionPrice(
+            game,
+            minute,
+            tile.terrain,
+            connectionDistance,
+          );
+    const purchases = [
+      {
+        tileId: tile.id,
+        price,
+        ...(connectionDistance === undefined ? {} : { connectionDistance }),
+      },
+    ];
     return {
       tileId: tile.id,
       territoryId: tile.territoryId,
       price,
       benefit: territory.benefit!,
-      customers: city
+      customers: tile.city
         ? customerMarketSizeAt(baseCustomers, game.date.minute)
         : 0,
       purchases,
-      utilityName: bundle ? utility?.name : undefined,
-      // Bind the quote to the full transfer so a stale click cannot buy a smaller deal.
       quoteKey: JSON.stringify([
         tile.id,
         price,
         territory.benefit,
         baseCustomers,
-        ...(bundle ? [purchases] : []),
       ]),
     };
   };
   return { eligible, quote };
+}
+
+/** The seller's available sites form one offer, regardless of which border the player reached. */
+export function municipalTerritoryOffer(game: GameType, id: unknown) {
+  const utility = municipalUtility(id);
+  if (!utility || !hasTerritoryNetwork(game)) return undefined;
+  const owns = createTerritoryTileOwnership(game);
+  const candidates = [
+    utility.city,
+    utility.plant && getTerritoryTile(utility.plant.tileId, game),
+  ];
+  const sites = candidates.filter(
+    (tile): tile is TerritoryTile => !!tile && availableLand(game, owns, tile),
+  );
+  if (!sites.length) return undefined;
+  const adjacent = createTerritoryTileAdjacency(
+    ownedTerritoryTiles(game, owns),
+  );
+  // A legacy city or plant can already belong to a company independently.
+  const purchases = [...sites]
+    .sort((a, b) => Number(adjacent(b)) - Number(adjacent(a)))
+    .map(({ id: tileId }) => ({
+      tileId,
+      price: tilePrice(game, game.date.minute, tileId),
+    }));
+  return {
+    utility,
+    purchases,
+    reachable: sites.some(adjacent),
+    customers: sites.some((tile) => tile.id === utility.city.id)
+      ? customerMarketSizeAt(cityCustomerCount(utility.id), game.date.minute)
+      : 0,
+    removedPlant: sites.some((tile) => tile.id === utility.plant?.tileId)
+      ? utility.plant?.facility
+      : undefined,
+    price: purchases.reduce((total, part) => total + part.price, 0),
+  };
 }
 
 export function createTilePurchaseEligibility(
@@ -497,7 +514,16 @@ export function purchaseLand(game: GameType, value: unknown): boolean {
 }
 export function purchaseTile(game: GameType, value: unknown): boolean {
   if (!validTilePurchaseAction(game, value)) return false;
-  const quote = tilePurchaseQuote(game, value.tileId)!;
+  return transferTerritorySites(game, tilePurchaseQuote(game, value.tileId)!);
+}
+
+export function transferTerritorySites(
+  game: GameType,
+  quote: Pick<
+    NonNullable<ReturnType<typeof tilePurchaseQuote>>,
+    "price" | "customers" | "purchases"
+  >,
+): boolean {
   const now = currentTick(game);
   if (!now || now.cash < quote.price || !game.territoryNetwork) return false;
   const oldProgramCustomers = programCustomers(game);
