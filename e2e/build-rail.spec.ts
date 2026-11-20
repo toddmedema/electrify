@@ -90,16 +90,24 @@ for (const theme of ["light", "dark"] as const) {
       await wind.focus();
       await expect(wind).toHaveAttribute("aria-keyshortcuts", "ArrowRight");
       await wind.press("ArrowRight");
-      await expect(
-        preview.getByRole("button", {
-          name: "Close technology preview",
-          exact: true,
-        }),
-      ).toBeFocused();
+      await expect(preview).toBeFocused();
       await page.keyboard.press("Escape");
       await expect(preview).toHaveCount(0);
       await expect(wind).toBeFocused();
       await expect(surface).toHaveCount(0);
+
+      await wind.click();
+      await expect(wind).toHaveAttribute("aria-pressed", "true");
+      await expect(
+        surface.getByText("Choose a highlighted site."),
+      ).toBeVisible();
+      await expect(
+        network.locator("[data-project-site]").first(),
+      ).toBeVisible();
+      await wind.click();
+      await expect(wind).toHaveAttribute("aria-pressed", "false");
+      await expect(surface).toHaveCount(0);
+      await expect(network.locator("[data-project-site]")).toHaveCount(0);
     } else {
       await expect(rail).toHaveCount(0);
     }
@@ -233,12 +241,7 @@ for (const theme of ["light", "dark"] as const) {
     });
     await expect(lastPreview).toBeVisible();
     await last.press("ArrowRight");
-    await expect(
-      lastPreview.getByRole("button", {
-        name: "Close technology preview",
-        exact: true,
-      }),
-    ).toBeFocused();
+    await expect(lastPreview).toBeFocused();
     await page.keyboard.press("Escape");
     await expect(last).toBeFocused();
     await expect(lastPreview).toHaveCount(0);

@@ -107,13 +107,13 @@ export default function FacilityCapacityUpgrade({
   const [pending, setPending] = React.useState(false);
   const [message, setMessage] = React.useState<string>();
   const submitting = React.useRef(false);
-  const heading = React.useRef<HTMLHeadingElement>(null);
+  const upgradeSection = React.useRef<HTMLElement>(null);
   const unavailableId = React.useId();
-  const focusHeading = React.useRef(false);
+  const focusUpgradeSection = React.useRef(false);
   React.useEffect(() => {
-    if (!open && !cancelReview && focusHeading.current) {
-      focusHeading.current = false;
-      heading.current?.focus();
+    if (!open && !cancelReview && focusUpgradeSection.current) {
+      focusUpgradeSection.current = false;
+      upgradeSection.current?.focus();
     }
   }, [open, cancelReview]);
   const targetSize = target.trim() ? Number(target) * 1e6 : NaN;
@@ -197,7 +197,7 @@ export default function FacilityCapacityUpgrade({
         quoteKey: ready.quoteKey,
       });
       if (result.status === "accepted") {
-        focusHeading.current = true;
+        focusUpgradeSection.current = true;
         setOpen(false);
       } else {
         setMessage(result.message);
@@ -227,7 +227,7 @@ export default function FacilityCapacityUpgrade({
       );
       if (result.status === "rejected") setMessage(result.message);
       else {
-        focusHeading.current = true;
+        focusUpgradeSection.current = true;
         setCancelReview(undefined);
         setMessage(
           result.status === "completed"
@@ -256,17 +256,14 @@ export default function FacilityCapacityUpgrade({
     <section
       className="facilityDetailSection facilityCapacityUpgrade"
       aria-label="Capacity upgrade"
+      ref={upgradeSection}
+      tabIndex={-1}
     >
-      <Typography
-        component="h3"
-        className="facilityDetailHeading"
-        ref={heading}
-        tabIndex={-1}
-      >
-        Capacity upgrade
-      </Typography>
       {expansion ? (
         <>
+          <Typography component="h3" className="facilityDetailHeading">
+            Capacity upgrade
+          </Typography>
           <Typography variant="body2">
             {capacity(size)} → {capacity(expansion.targetSize)}
           </Typography>

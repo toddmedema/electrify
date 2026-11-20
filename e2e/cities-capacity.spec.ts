@@ -224,7 +224,8 @@ for (const theme of ["light", "dark"] as const) {
       exact: true,
     });
     await expect(status).toBeChecked();
-    await expect(layers.getByRole("checkbox")).toHaveCount(1);
+    const names = layers.getByRole("checkbox", { name: "Names", exact: true });
+    await expect(names).toBeChecked();
     await status.uncheck();
     await expect(active.locator(".facilityMapStatusArtwork")).toHaveCount(0);
     await expect(selected).toHaveAttribute("title", /Generating/);
@@ -233,12 +234,17 @@ for (const theme of ["light", "dark"] as const) {
       producing: true,
       saturation: operation!.saturation,
     });
+    await reviewScreenshot(page, {
+      path: info.outputPath(`map-layers-${theme}.png`),
+      animations: "disabled",
+    });
     await layers.press("Escape");
     await expect(layers).toHaveCount(0);
     await expect(trigger).toBeFocused();
     await expect(map.locator(".facilityMapStatusArtwork")).toHaveCount(0);
     await selectTerritoryMapTile(page, city);
-    await expect(capitalLabel).toHaveCount(0);
+    await expect(capitalLabel).toBeVisible();
+    await expect(cityTarget.getByText("You", { exact: true })).toBeVisible();
     await surface
       .getByRole("button", { name: "Close tile", exact: true })
       .click();
@@ -251,13 +257,19 @@ for (const theme of ["light", "dark"] as const) {
       .click();
     await trigger.click();
     await status.check();
+    await names.uncheck();
     await layers.press("Escape");
     await expect(idle.locator(".facilityMapStatusArtwork")).toBeVisible();
     await selectTerritoryMapTile(page, city);
-    await expect(capitalLabel).toBeVisible();
+    await expect(capitalLabel).toHaveCount(0);
+    await expect(cityTarget.getByText("You", { exact: true })).toHaveCount(0);
     await surface
       .getByRole("button", { name: "Close tile", exact: true })
       .click();
+    await trigger.click();
+    await names.check();
+    await layers.press("Escape");
+    await expect(capitalLabel).toBeVisible();
     const after = (await readSavedGame(page))!;
     expect(after.facilities).toEqual(before.facilities);
     expect(currentTick(after)!.cash).toBe(currentTick(before)!.cash);
@@ -293,6 +305,14 @@ for (const theme of ["light", "dark"] as const) {
     let upgrade = map.getByRole("region", {
       name: "Capacity upgrade",
       exact: true,
+    });
+    await expect(
+      upgrade.getByText("Capacity upgrade", { exact: true }),
+    ).toHaveCount(0);
+    await upgrade.scrollIntoViewIfNeeded();
+    await reviewScreenshot(map.locator(".tileWorkspaceSurface"), {
+      path: info.outputPath(`capacity-offer-${theme}.png`),
+      animations: "disabled",
     });
     await upgrade
       .getByRole("button", { name: "Upgrade capacity", exact: true })

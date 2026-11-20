@@ -156,7 +156,7 @@ it.each([false, true])(
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
     );
     expect(
-      screen.getByRole("heading", { name: "Capacity upgrade" }),
+      screen.getByRole("region", { name: "Capacity upgrade" }),
     ).toHaveFocus();
   },
 );
@@ -250,6 +250,9 @@ it("locks dismissal and duplicate submission until the host responds, keeping re
 it("closes on Escape and restores focus to the offer", async () => {
   show();
   const offer = screen.getByRole("button", { name: "Upgrade capacity" });
+  expect(
+    screen.queryByRole("heading", { name: "Capacity upgrade" }),
+  ).not.toBeInTheDocument();
   act(() => offer.focus());
   open();
   await userEvent.keyboard("{Escape}");

@@ -1,6 +1,5 @@
 import * as React from "react";
-import { Button, IconButton } from "@mui/material";
-import CloseIcon from "@mui/icons-material/Close";
+import { Button } from "@mui/material";
 import { DOWNPAYMENT_PERCENT } from "../../Constants";
 import { GENERATORS, STORAGE } from "../../data/Facilities";
 import { getHydroAvailability } from "../../data/HydroSites";
@@ -120,11 +119,11 @@ export default function DesktopBuildRail({
   siteId?: TerritoryTileId;
   busy: boolean;
   focusRequest: number;
-  onProject: (project: ProjectSelection) => void;
+  onProject: (project: ProjectSelection | undefined) => void;
 }) {
   const rail = React.useRef<HTMLElement>(null);
   const origin = React.useRef<HTMLButtonElement>();
-  const previewFirstControl = React.useRef<HTMLButtonElement>(null);
+  const previewPanel = React.useRef<HTMLElement>(null);
   const dismissTimer = React.useRef<ReturnType<typeof setTimeout>>();
   const suppressFocus = React.useRef(false);
   const [previewName, setPreviewName] = React.useState<string>();
@@ -168,7 +167,9 @@ export default function DesktopBuildRail({
   );
   const cash = currentTick(game)?.cash ?? 0;
   const canChoose = (facility: FacilityShoppingType) =>
-    !busy && (minimumDue.get(facility.name) ?? Infinity) <= cash;
+    !busy &&
+    (project?.name === facility.name ||
+      (minimumDue.get(facility.name) ?? Infinity) <= cash);
   const clearTimer = React.useCallback(() => {
     if (dismissTimer.current !== undefined) clearTimeout(dismissTimer.current);
   }, []);
@@ -187,8 +188,7 @@ export default function DesktopBuildRail({
   }, [dismiss]);
   React.useEffect(() => () => clearTimer(), [clearTimer]);
   React.useLayoutEffect(() => {
-    if (previewEntry)
-      previewFirstControl.current?.focus({ preventScroll: true });
+    if (previewEntry) previewPanel.current?.focus({ preventScroll: true });
   }, [previewEntry]);
   React.useEffect(() => {
     if (focusRequest) {
@@ -392,7 +392,15 @@ export default function DesktopBuildRail({
                       show(item, event.currentTarget);
                       setPreviewEntry((value) => value + 1);
                     }}
-                    onClick={() => choose(item)}
+                    onClick={() => {
+                      if (busy) return;
+                      if (project?.name === item.name) {
+                        dismiss();
+                        onProject(undefined);
+                      } else {
+                        choose(item);
+                      }
+                    }}
                   >
                     <img
                       src={`/images/${item.name.toLowerCase()}.svg`}
@@ -458,20 +466,11 @@ export default function DesktopBuildRail({
           data-escape-overlay="true"
           aria-label={`${facility.name} technology preview`}
           id={previewId}
+          ref={previewPanel}
+          tabIndex={-1}
           onMouseEnter={clearTimer}
           onMouseLeave={leave}
         >
-          <header>
-            <span>Technology preview · → to explore</span>
-            <IconButton
-              size="small"
-              aria-label="Close technology preview"
-              ref={previewFirstControl}
-              onClick={dismissAndReturn}
-            >
-              <CloseIcon />
-            </IconButton>
-          </header>
           <div className="desktopBuildPreviewScroll">
             {siteId && (
               <p className="desktopBuildPreviewSite">
@@ -536,13 +535,6 @@ export default function DesktopBuildRail({
               )}
             </ul>
           </div>
-          <Button
-            disabled={!canChoose(facility)}
-            onClick={() => choose(facility)}
-            variant="contained"
-          >
-            Choose sites
-          </Button>
         </section>
       )}
     </aside>

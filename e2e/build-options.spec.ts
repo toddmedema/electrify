@@ -100,7 +100,8 @@ test("ordinary starting hills offer general technologies and retain special-site
       await expect(preview.locator(".buildOptionMetrics")).toBeVisible();
       await expect(
         preview.getByRole("button", { name: "Choose sites", exact: true }),
-      ).toBeEnabled();
+      ).toHaveCount(0);
+      await expect(trigger).toBeEnabled();
     }
     await expect(
       rail.getByRole("button", {
@@ -289,7 +290,7 @@ for (const theme of ["light", "dark"] as const) {
           });
           await expect(
             preview.getByRole("button", { name: "Choose sites", exact: true }),
-          ).toBeDisabled();
+          ).toHaveCount(0);
           return;
         }
         await expect(

@@ -519,23 +519,27 @@ export function GeneratorBuildItem(
   const sizeAction = offerAffordableSize
     ? useMaxSizeAction
     : useSiteMaximumAction || useMaxSizeAction;
-  const context = (
+  const context = props.territoryAvailability ? (
+    props.tileId ? (
+      props.lockedTile ? (
+        `${formatWatts(maxSizeW)} max`
+      ) : (
+        `One building slot · ${formatWatts(maxSizeW)} max per project`
+      )
+    ) : (
+      `${props.territoryAvailability.remaining} local sites left · ${formatWatts(maxSizeW)} max per project`
+    )
+  ) : sites && sites.remaining > 0 ? (
     <>
-      {props.territoryAvailability
-        ? props.tileId
-          ? props.lockedTile
-            ? `${formatWatts(maxSizeW)} max`
-            : `One building slot · ${formatWatts(maxSizeW)} max per project`
-          : `${props.territoryAvailability.remaining} local sites left · ${formatWatts(maxSizeW)} max per project`
-        : role}
-      {!props.territoryAvailability && sites && sites.remaining > 0 && (
-        <>
-          {" · "}
-          <span className="nowrap">{siteCountLabel(sites)}</span>
-        </>
-      )}
+      {!props.preview && `${role} · `}
+      <span className="nowrap">{siteCountLabel(sites)}</span>
     </>
+  ) : props.preview ? undefined : (
+    role
   );
+  const description = [roleHint, generator.description]
+    .filter(Boolean)
+    .join(" ");
 
   const iconSrc = `/images/${generator.name.toLowerCase()}.svg`;
   if (
@@ -590,6 +594,7 @@ export function GeneratorBuildItem(
             }
       }
       sizeAction={sizeAction}
+      description={props.preview ? description : undefined}
       context={context}
       summary={
         <>
@@ -625,7 +630,11 @@ export function GeneratorBuildItem(
           )}
         </>
       }
-      warning={canBuild ? undefined : buildSubtitle}
+      warning={
+        canBuild || (props.preview && buildSubtitle === generator.description)
+          ? undefined
+          : buildSubtitle
+      }
       metrics={
         <>
           <BuildMetric
@@ -659,13 +668,15 @@ export function GeneratorBuildItem(
       footerActions={compareAction}
       details={
         <>
-          <Typography
-            className="buildOptionDescription"
-            variant="body2"
-            color="textSecondary"
-          >
-            {roleHint} {generator.description}
-          </Typography>
+          {!props.preview && (
+            <Typography
+              className="buildOptionDescription"
+              variant="body2"
+              color="textSecondary"
+            >
+              {description}
+            </Typography>
+          )}
           {(props.advantages || []).length > 0 && (
             <Box sx={{ px: 2, pb: 1 }}>
               <Stack

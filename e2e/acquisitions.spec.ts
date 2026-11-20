@@ -1459,7 +1459,7 @@ for (const theme of ["light", "dark"] as const) {
       ).toBeInViewport({ ratio: 1 });
       await expect(
         preview.getByRole("button", { name: "Choose sites", exact: true }),
-      ).toBeInViewport({ ratio: 1 });
+      ).toHaveCount(0);
       expect(currentTick((await readSavedGame(page))!)!.cash).toBe(
         currentTick(game)!.cash,
       );

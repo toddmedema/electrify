@@ -8,10 +8,18 @@ import {
 } from "@testing-library/react";
 import MapStatusLayers from "./MapStatusLayers";
 
-it("toggles facility status with a single checkbox and returns focus on Escape", async () => {
+it("keeps independent layer choices and returns focus on Escape", async () => {
   function ControlledLayers() {
-    const [value, setValue] = React.useState(true);
-    return <MapStatusLayers value={value} onChange={setValue} />;
+    const [showStatus, setShowStatus] = React.useState(true);
+    const [showNames, setShowNames] = React.useState(true);
+    return (
+      <MapStatusLayers
+        showStatus={showStatus}
+        onStatusChange={setShowStatus}
+        showNames={showNames}
+        onNamesChange={setShowNames}
+      />
+    );
   }
 
   render(<ControlledLayers />);
@@ -21,10 +29,14 @@ it("toggles facility status with a single checkbox and returns focus on Escape",
   const status = within(panel).getByRole("checkbox", {
     name: "Facility status",
   });
-  expect(within(panel).getAllByRole("checkbox")).toHaveLength(1);
+  const names = within(panel).getByRole("checkbox", { name: "Names" });
   expect(status).toBeChecked();
+  expect(names).toBeChecked();
   fireEvent.click(status);
   expect(status).not.toBeChecked();
+  expect(names).toBeChecked();
+  fireEvent.click(names);
+  expect(names).not.toBeChecked();
   fireEvent.keyDown(panel, { key: "Escape" });
   await waitFor(() =>
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
@@ -34,4 +46,5 @@ it("toggles facility status with a single checkbox and returns focus on Escape",
   expect(
     screen.getByRole("checkbox", { name: "Facility status" }),
   ).not.toBeChecked();
+  expect(screen.getByRole("checkbox", { name: "Names" })).not.toBeChecked();
 });
