@@ -536,6 +536,11 @@ it("keeps desktop map tools open and only closes the selected window", async () 
   expect(screen.getByRole("region", { name: "Agreements" })).toBeVisible();
 
   await app.user.click(app.action("Agreements"));
+  expect(screen.getByRole("region", { name: "Agreements" })).toHaveAttribute(
+    "data-map-window-front",
+    "true",
+  );
+  await app.user.click(app.action("Agreements"));
   expect(
     screen.queryByRole("region", { name: "Agreements" }),
   ).not.toBeInTheDocument();

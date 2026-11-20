@@ -221,7 +221,11 @@
     color: var(--font-color-faded);
     font-size: 1.25rem;
   }
-  h2 {
+  .mapWindowHeadingText {
+    flex: 1;
+    min-width: 0;
+  }
+  .gameToolTitle {
     display: flex;
     align-items: center;
     flex: 1;
@@ -241,7 +245,7 @@
   }
   // The heading only receives focus to place a keyboard user inside the tool; it is not a
   // control, so it never wears the global ring (which opening a tool by its shortcut triggers).
-  h2:focus {
+  .gameToolTitle:focus {
     outline: none !important;
   }
   .MuiIconButton-root {

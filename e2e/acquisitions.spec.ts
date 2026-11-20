@@ -702,7 +702,7 @@ for (const theme of ["light", "dark"] as const) {
       const city = getTerritoryTile("champlain:city", game)!;
       const surface = await inspectTile(page, city);
       await page.getByRole("button", { name: "Fleet", exact: true }).click();
-      await expect(surface).toHaveCount(0);
+      await expect(surface).toHaveCount(floating ? 1 : 0);
       await expect(
         page.getByRole("region", { name: "Fleet", exact: true }),
       ).toBeVisible();
@@ -714,11 +714,17 @@ for (const theme of ["light", "dark"] as const) {
           .getByRole("button", { name: "Insights", exact: true })
           .click();
         await network.locator(`[data-map-target="${city.id}"]`).click();
-        await expect(page.locator(".gameToolPanel")).toHaveCount(0);
+        await expect(page.locator(".gameToolPanel")).toHaveCount(
+          floating ? 2 : 0,
+        );
         await expect(surface).toBeVisible();
         await surface
           .getByRole("button", { name: "Close tile", exact: true })
           .click();
+        await expect(page.locator(".gameToolPanel")).toHaveCount(
+          floating ? 1 : 0,
+        );
+        await returnToTerritoryMap(page);
       }
       await panToTile(page, city);
       const buy = network.getByRole("button", {
@@ -1234,17 +1240,20 @@ for (const theme of ["light", "dark"] as const) {
       animations: "disabled",
       scale: "css",
     });
+    const floatingInspector =
+      (await surface.getAttribute("data-game-tool")) === "TILE";
     await surface.locator(".tileWorkspaceHeading h3").press("Escape");
     await expect(surface).toHaveCount(0);
     await expect(
       network.locator('[data-map-target][aria-pressed="true"]'),
     ).toHaveCount(0);
-    await expect(
-      network.getByRole("button", {
-        name: "Rapid connection mode",
-        exact: true,
-      }),
-    ).toBeFocused();
+    const returnFocus = floatingInspector
+      ? network.locator(`[data-map-target="${city.id}"]`)
+      : network.getByRole("button", {
+          name: "Rapid connection mode",
+          exact: true,
+        });
+    await expect(returnFocus).toBeFocused();
     const occupied = territoryTileViews(before).find(
       (view) =>
         view.owned &&

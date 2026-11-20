@@ -181,7 +181,7 @@ for (const theme of ["light", "dark"] as const) {
     const cityTarget = await selectTerritoryMapTile(page, city);
     const capitalLabel = cityTarget.getByText("Burlington", { exact: true });
     await expect(capitalLabel).toBeVisible();
-    const surface = map.locator(".tileWorkspaceSurface");
+    const surface = page.locator(".tileWorkspaceSurface");
     await expect(surface).toHaveAccessibleName("Burlington");
     const demand = surface.getByRole("region", {
       name: "City demand by use",

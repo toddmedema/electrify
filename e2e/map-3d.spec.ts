@@ -94,7 +94,7 @@ for (const theme of ["light", "dark"] as const) {
       await expect
         .poll(async () => (await readTerritoryMapCamera(viewport)).x)
         .not.toBe(cameraX);
-      await expect(map.locator(".tileWorkspaceSurface")).toHaveCount(0);
+      await expect(page.locator(".tileWorkspaceSurface")).toHaveCount(0);
     }
     const contextLoss = await canvas.evaluateHandle((element: MapCanvas) => {
       const gl = element.getContext("webgl2")!;
@@ -566,6 +566,8 @@ test("map windows move, resize, stack and remember their bounds", async ({
   await fleetAction.click();
   await expect.poll(() => fleet.boundingBox()).toEqual(saved);
   await agreementsAction.click();
+  await expect(agreements).toHaveAttribute("data-map-window-front", "true");
+  await agreementsAction.click();
   await expect(agreements).toHaveCount(0);
   await expect(fleet).toBeVisible();
 
@@ -780,7 +782,7 @@ test("shows extreme cold on terrain and explains the plant derate in both render
   });
 
   await gas.press("Enter");
-  const inspector = map.locator(".tileWorkspaceSurface");
+  const inspector = page.locator(".tileWorkspaceSurface");
   await expect(
     inspector.getByText("Extreme cold", { exact: true }).first(),
   ).toBeVisible();
@@ -960,4 +962,89 @@ test("hail falls on the struck solar site and leaves visibly broken panels durin
   await reviewScreenshot(map.locator(".territoryMapViewport"), {
     path: info.outputPath("hail-svg-map.png"),
   });
+});
+
+test("tile inspection shares the desktop window stack", async ({
+  page,
+}, info) => {
+  test.skip(
+    page.viewportSize()!.width < 1024,
+    "The compact map uses one panel",
+  );
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.addInitScript(() => {
+    localStorage.setItem("theme", "dark");
+    localStorage.setItem("audioEnabled", "false");
+  });
+  await page.goto("/?scenario=116");
+  await page.getByRole("button", { name: "Start game", exact: true }).click();
+  const map = await returnToTerritoryMap(page);
+  await expect(map.locator("canvas.territory3DCanvas")).toHaveAttribute(
+    "data-renderer",
+    "ready",
+  );
+  const capital = map.locator('[data-map-target="champlain:city"]');
+  const fleet = page.getByRole("region", { name: "Fleet", exact: true });
+  const agreements = page.getByRole("region", {
+    name: "Agreements",
+    exact: true,
+  });
+  await page.getByRole("button", { name: "Fleet", exact: true }).click();
+  await page.getByRole("button", { name: "Agreements", exact: true }).click();
+  const fleetBounds = await fleet.boundingBox();
+  const agreementsBounds = await agreements.boundingBox();
+
+  await capital.click();
+  const inspector = page.getByRole("dialog", {
+    name: "Burlington",
+    exact: true,
+  });
+  await expect(inspector).toBeVisible();
+  await expect(fleet).toBeVisible();
+  await expect(agreements).toBeVisible();
+  await expect(inspector).toHaveAttribute("data-map-window-front", "true");
+  await expect(
+    inspector.getByRole("heading", { name: "Burlington", exact: true }),
+  ).toBeFocused();
+  expect(await fleet.boundingBox()).toEqual(fleetBounds);
+  expect(await agreements.boundingBox()).toEqual(agreementsBounds);
+  await expect(capital).toHaveAttribute("aria-pressed", "true");
+  await capital.click({ trial: true });
+  await reviewScreenshot(page.locator(".gameStage"), {
+    path: info.outputPath("tile-window-stack.png"),
+    animations: "disabled",
+    scale: "css",
+  });
+
+  const sameWindow = await inspector.elementHandle();
+  const nextTile = map.locator('[data-map-target="champlain:site-1"]');
+  await nextTile.press("Enter");
+  await expect(inspector).toHaveCount(0);
+  await expect(nextTile).toHaveAttribute("aria-pressed", "true");
+  expect(
+    await sameWindow!.evaluate(
+      (element) => document.querySelector("#tool-TILE") === element,
+    ),
+  ).toBe(true);
+  await capital.click();
+  await expect(inspector).toHaveAttribute("data-map-window-front", "true");
+
+  await page.getByRole("button", { name: "Agreements", exact: true }).click();
+  await expect(agreements).toHaveAttribute("data-map-window-front", "true");
+  await page.keyboard.press("Escape");
+  await expect(agreements).toHaveCount(0);
+  await expect(inspector).toHaveAttribute("data-map-window-front", "true");
+  await page.keyboard.press("Escape");
+  await expect(inspector).toHaveCount(0);
+  await expect(capital).toHaveAttribute("aria-pressed", "false");
+  await expect(capital).toBeFocused();
+  await expect(fleet).toBeVisible();
+
+  await capital.press("Enter");
+  await expect(inspector).toBeVisible();
+  await fleet.getByRole("button", { name: "Close Fleet", exact: true }).focus();
+  await page.keyboard.press("Escape");
+  await expect(fleet).toHaveCount(0);
+  await expect(inspector).toBeVisible();
+  await expect(inspector).toHaveAttribute("data-map-window-front", "true");
 });
