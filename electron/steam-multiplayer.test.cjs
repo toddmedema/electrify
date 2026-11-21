@@ -1714,26 +1714,32 @@ test(
   },
 );
 
-test("a full guest checkpoint queue preserves admitted campaigns and permits retry", async (t) => {
+test("a full guest checkpoint queue keeps the two newest campaigns and permits retry", async (t) => {
   const { mp, writes, unblock } = blockedCheckpointGuest(t);
   const peer = connectedPeer(mp, mp.hostId);
   const first = { matchId: "first-campaign", revision: 1 };
   const pending = { ...first, revision: 2 };
-  const next = { matchId: "next-campaign", revision: 1 };
-  const overflow = { matchId: "overflow", revision: 1 };
+  const evicted = { matchId: "next-campaign", revision: 1 };
   const latest = { ...first, revision: 3 };
+  const final = { matchId: "final-campaign", revision: 1 };
   const invalid = { matchId: "x".repeat(201), revision: 1 };
-  for (const world of [first, invalid, pending, next, overflow, latest])
+  for (const world of [first, pending, evicted, latest, invalid, final])
     await mp.receive(mp.hostId, guestCheckpoint(world));
 
   unblock();
   await mp.checkpointWrite;
-  assert.deepEqual(writes, [first, next, latest]);
-  assert.equal(peer.queue.length, 3, "overflow is not acknowledged");
-  const retry = guestCheckpoint(overflow);
+  assert.deepEqual(writes, [first, latest, final]);
+  const receipts = await Promise.all(
+    peer.queue.map((message) => assemble(new Map(), chunk(message))),
+  );
+  assert.deepEqual(
+    receipts.map((receipt) => receipt.digest),
+    [first, latest, final].map((world) => guestCheckpoint(world).digest),
+  );
+  const retry = guestCheckpoint(evicted);
   await mp.receive(mp.hostId, retry);
   await mp.checkpointWrite;
-  assert.deepEqual(writes, [first, next, latest, overflow]);
+  assert.deepEqual(writes, [first, latest, final, evicted]);
   assert.deepEqual(await assemble(new Map(), chunk(peer.queue.at(-1))), {
     kind: "saved",
     digest: retry.digest,

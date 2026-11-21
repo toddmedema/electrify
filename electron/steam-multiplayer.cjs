@@ -975,11 +975,13 @@ class SteamMultiplayer {
   queueCheckpoint(sender, { world, digest }, connection) {
     const matchId = world?.matchId;
     if (!boundedText(matchId, 200)) return;
-    // Superseding a waiting write moves it to the tail in arrival order. At capacity, preserve
-    // already admitted campaigns and leave a new campaign unacknowledged for a periodic retry.
-    const replaced = this.pendingCheckpoints.delete(matchId);
-    if (!replaced && this.pendingCheckpoints.size >= MAX_PENDING_CHECKPOINTS)
-      return;
+    // Replace a waiting write in arrival order and evict the oldest if a new campaign fills
+    // the queue. The latest checkpoint might be the last one the host sends.
+    this.pendingCheckpoints.delete(matchId);
+    if (this.pendingCheckpoints.size >= MAX_PENDING_CHECKPOINTS)
+      this.pendingCheckpoints.delete(
+        this.pendingCheckpoints.keys().next().value,
+      );
     this.pendingCheckpoints.set(matchId, { sender, world, digest, connection });
     if (this.checkpointWrite) return;
     const current = (request) =>
