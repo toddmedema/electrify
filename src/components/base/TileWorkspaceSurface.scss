@@ -43,11 +43,6 @@
     }
   }
 
-  &.tileWorkspaceInspector .tileWorkspaceHeading {
-    border-bottom: 0;
-    padding-bottom: 4px;
-  }
-
   .tileWorkspaceBody {
     min-height: 0;
     overflow: auto;
@@ -148,13 +143,18 @@
   bottom: auto;
   left: auto;
   width: min(18rem, calc(100% - 16px));
-  max-height: min(22rem, 55%, calc(100% - var(--game-dock-clearance) - 16px));
+  max-height: calc(100% - var(--game-dock-clearance, 0px) - 16px);
   pointer-events: auto;
   box-shadow: 0 4px 16px var(--shadow-ring);
 
+  &.tileWorkspaceWide {
+    width: min(23.5rem, calc(100% - 16px));
+  }
+
   .tileWorkspaceHeading {
     display: block;
-    padding: 8px 12px 6px;
+    border-bottom: 0;
+    padding: 12px;
   }
 
   .tileWorkspaceHeading > div {
@@ -176,7 +176,15 @@
   }
 
   .tileWorkspaceBody {
-    padding: 8px 12px 12px;
+    padding: 0 12px 12px;
+
+    &:empty {
+      display: none;
+    }
+  }
+
+  .tilePurchaseSummary:not(:first-child) {
+    margin-top: 12px;
   }
 
   .tileCityMetrics {
@@ -195,7 +203,7 @@
 .gameToolTray > .tileWorkspaceSurface.tileWorkspaceInspector {
   top: 0;
   right: 0;
-  max-height: min(22rem, 100%);
+  max-height: 100%;
 }
 
 @media (max-width: 740px) {

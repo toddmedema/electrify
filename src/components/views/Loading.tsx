@@ -1,12 +1,7 @@
 import * as React from "react";
-import {
-  Button,
-  CircularProgress,
-  Stack,
-  Typography,
-  useTheme,
-} from "@mui/material";
+import { Button, Stack, Typography, useTheme } from "@mui/material";
 import { GameType } from "../../Types";
+import "./Loading.scss";
 
 export interface StateProps {
   game: GameType;
@@ -58,7 +53,7 @@ export default class Loading extends React.PureComponent<Props, LoadingState> {
 
   public render() {
     return (
-      <div className="flex-fully-centered">
+      <div className="flex-fully-centered missionLoading">
         <div id="logo" className="fadein-slow">
           <LoadingLogo />
         </div>
@@ -84,12 +79,18 @@ export default class Loading extends React.PureComponent<Props, LoadingState> {
             <Button onClick={this.props.onExit}>Back to missions</Button>
           </Stack>
         ) : (
-          <Stack spacing={2} sx={{ alignItems: "center" }}>
-            <CircularProgress className="fadein-fast" size={60} />
+          <>
+            <div className="missionLoadingArt" aria-hidden="true">
+              <span className="missionLoadingPlug" />
+              <span className="missionLoadingSpark" />
+              <span className="missionLoadingSpark missionLoadingSparkRight" />
+            </div>
             {/* One message for the whole load: a fast local load otherwise flashes past each
                 stage and reads as several loading screens. */}
-            <Typography role="status">Starting your mission…</Typography>
-          </Stack>
+            <Typography className="missionLoadingStatus" role="status">
+              Starting your mission…
+            </Typography>
+          </>
         )}
       </div>
     );

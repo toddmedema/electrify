@@ -72,9 +72,7 @@ export default function AcquisitionReviewDialog({
   const now = currentTick(game);
   const cash = useBuildCash(submission?.cash ?? now?.cash ?? 0, !submission);
   const preview = React.useMemo(
-    () =>
-      quote &&
-      previewUtilityAcquisition(game, targetId, quote.kind === "regional"),
+    () => quote && previewUtilityAcquisition(game, targetId, true),
     [game, targetId, quote],
   );
   if (!offer)
@@ -119,9 +117,7 @@ export default function AcquisitionReviewDialog({
       cashOnlyFee={offer.fee}
       interestRate={game.interestRate}
       upkeepPerMonth={offer.networkOMPerMonth}
-      cashLabel={municipal ? "Cash price" : "Cash option"}
-      cashButtonLabel={municipal ? "Confirm" : undefined}
-      cashOnly={!!municipal}
+      cashLabel="Cash option"
       cashDisabled={unavailable}
       loanDisabled={unavailable}
       paymentSummary={{
@@ -130,13 +126,9 @@ export default function AcquisitionReviewDialog({
             ? `${formatPurchasePrice(offer.cashDue)} now`
             : `${formatPurchasePrice(offer.cashDue)} now + ${formatMoneyConcise(offer.cashMonthlyDebtService + offer.networkOMPerMonth)}/mo`,
         },
-        ...(municipal
-          ? {}
-          : {
-              loan: {
-                value: `${formatPurchasePrice(offer.financedCashDue)} now + ${formatMoneyConcise(offer.monthlyDebtService + offer.networkOMPerMonth)}/mo`,
-              },
-            }),
+        loan: {
+          value: `${formatPurchasePrice(offer.financedCashDue)} now + ${formatMoneyConcise(offer.monthlyDebtService + offer.networkOMPerMonth)}/mo`,
+        },
       }}
       extraFacts={[
         {
@@ -162,7 +154,7 @@ export default function AcquisitionReviewDialog({
         },
       ]}
       preface={
-        error || !quote || (!municipal && cash < offer.financedCashDue) ? (
+        error || !quote || cash < offer.financedCashDue ? (
           <div className="acquisitionReviewIntro">
             {error && (
               <Typography role="alert" color="error">
@@ -173,10 +165,11 @@ export default function AcquisitionReviewDialog({
               <Typography variant="body2">
                 Connect land along this utility’s border to acquire it.
               </Typography>
-            ) : !municipal && cash < offer.financedCashDue ? (
+            ) : cash < offer.financedCashDue ? (
               <Typography variant="body2" color="warning.main">
                 Need {formatPurchasePrice(offer.financedCashDue)} cash for the
-                down payment and fee. You have {formatMoneyConcise(cash)}.
+                down payment{offer.fee > 0 ? " and fee" : ""}. You have{" "}
+                {formatMoneyConcise(cash)}.
               </Typography>
             ) : null}
           </div>

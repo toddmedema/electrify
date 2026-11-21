@@ -9051,15 +9051,6 @@ option {
     font-weight: 400;
   }
 }
-.territoryBuildActions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding: 0 16px 16px;
-  > .MuiButton-root:first-child {
-    flex: 1;
-  }
-}
 .territoryAgreements {
   > p {
     margin: 8px 0 16px;
@@ -9089,12 +9080,6 @@ option {
   }
   .territoryBalance {
     padding: 8px 12px;
-  }
-  .territoryBuildActions {
-    padding: 0 12px 12px;
-  }
-  .territoryBuildActions > .MuiButton-root {
-    min-height: 44px;
   }
   .facilityTerritoryLabel {
     display: block;

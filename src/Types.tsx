@@ -1466,7 +1466,7 @@ export interface TerritoryTick {
 }
 export interface AcquisitionLoan {
   id: string;
-  targetId: UtilityTargetId;
+  targetId: UtilityAcquisitionId;
   kind: "purchase" | "assumed";
   principal: number;
   loanAmountLeft: number;

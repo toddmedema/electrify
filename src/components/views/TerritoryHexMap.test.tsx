@@ -267,9 +267,12 @@ it("explains and colors physical building eligibility without guessing from terr
       (view) => view.operatingFacility,
     )!;
   expect(hoverColor(vacant)).toBe("var(--interactive-blue)");
-  expect(vacant).toHaveAccessibleDescription(/Open site/);
+  expect(vacant).toHaveAccessibleDescription("Plains");
   expect(hoverColor(map.target("champlain:city"))).toBe("var(--blackout-red)");
-  expect(map.target("champlain:city")).toHaveAccessibleDescription(/Your tile/);
+  const capital = map.target("champlain:city");
+  expect(capital).toHaveAccessibleName("Inspect You territory · Burlington");
+  expect(capital).not.toHaveAccessibleDescription();
+  expect(capital).toHaveAttribute("data-tooltip", "Burlington");
   expect(hoverColor(map.target(occupied.tile.id))).toBe("var(--blackout-red)");
   expect(map.target(occupied.tile.id)).toHaveAccessibleDescription(
     new RegExp(occupied.facility!.name),
@@ -328,7 +331,7 @@ it("uses project candidates for construction and connection quotes for Rapid eli
     "var(--blackout-red)",
   );
   expect(rapid.target("champlain:site-13")).toHaveAccessibleDescription(
-    /Your tile/,
+    /^Plains/,
   );
   expect(
     rapid.store.getState().game.territoryNetwork!.tilePurchases,
@@ -363,7 +366,7 @@ it("keeps foreign company hover colors ahead of project eligibility", () => {
     "var(--territory-owner-peer-1)",
   );
   expect(map.target("green-uplands:site-2")).toHaveAccessibleDescription(
-    /Owned by Birch Utility/,
+    / · Birch Utility/,
   );
 });
 
@@ -504,12 +507,12 @@ it.each([1280, 360])(
   },
 );
 
-it("describes ownership of each physical tile, including a partial purchase and a peer claim", () => {
+it("describes unconnected land and peer claims without repeating local ownership", () => {
   const map = show();
   map.buyMode();
   tap(map.target("green-uplands:site-0"));
   expect(map.target("green-uplands:site-0")).toHaveAccessibleDescription(
-    /Your tile/,
+    /^Plains/,
   );
   expect(map.target("green-uplands:site-1")).toHaveAccessibleDescription(
     /Unconnected/,
@@ -527,7 +530,7 @@ it("describes ownership of each physical tile, including a partial purchase and 
     );
   });
   expect(map.target("green-uplands:site-2")).toHaveAccessibleDescription(
-    /Owned by Birch Utility/,
+    / · Birch Utility/,
   );
   expect(map.target("green-uplands:site-1")).toHaveAccessibleDescription(
     /Unconnected/,
@@ -553,10 +556,8 @@ it("refreshes a stationary pointer tooltip after a peer claims its tile", async 
       }),
     );
   });
-  expect(tile).toHaveAccessibleDescription(/Owned by Birch Utility/);
-  expect(screen.getByRole("tooltip")).toHaveTextContent(
-    /Owned by Birch Utility/,
-  );
+  expect(tile).toHaveAccessibleDescription(/ · Birch Utility/);
+  expect(screen.getByRole("tooltip")).toHaveTextContent(/ · Birch Utility/);
   expect(screen.getByRole("tooltip")).not.toHaveTextContent(/Unconnected/);
 });
 

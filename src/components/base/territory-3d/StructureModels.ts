@@ -465,10 +465,30 @@ function solar(damaged = false): MapModel {
         [-0.247, 0.004, 0.268],
         P.solar,
       );
+  // Bring the conductors out beside the racks via low feeders under the panels.
+  const terminals: Vec3[] = [
+    [-0.34, 0.036, 0],
+    [0.34, 0.036, 0],
+    [0, 0.036, -0.29],
+    [0, 0.036, 0.29],
+  ];
+  body.box([0, 0.023, 0], [0.13, 0.046, 0.1], P.steel);
+  for (const terminal of terminals) {
+    body
+      .beam([0, terminal[1], 0], terminal, 0.006, P.ink)
+      .cylinder(
+        [terminal[0], 0.015, terminal[2]],
+        0.014,
+        0.014,
+        0.03,
+        P.steelShade,
+      )
+      .cylinder([terminal[0], 0.03, terminal[2]], 0.01, 0.01, 0.006, P.cream);
+  }
   return facilityModel(
     damaged ? "solar-hail-damaged" : "solar",
     body,
-    switchgear(body, 0.29),
+    terminals,
     [effect(glints.build(), "pulse")],
   );
 }

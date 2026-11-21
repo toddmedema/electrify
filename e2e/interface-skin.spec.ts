@@ -2,6 +2,7 @@ import path from "node:path";
 import { expect, test } from "./fixtures";
 import { foregroundContrast } from "./contrast";
 import { openPane } from "./layout";
+import { reviewScreenshot } from "./review-screenshot";
 
 for (const theme of ["light", "dark"] as const) {
   // Small text on a filled interactive surface. Light's fill is the logo blue by decision
@@ -157,3 +158,56 @@ for (const theme of ["light", "dark"] as const) {
     }
   });
 }
+
+test("Continue centers the loading plug and respects reduced motion", async ({
+  page,
+}, info) => {
+  await page.goto("/?scenario=108");
+  await page.getByRole("button", { name: "Start game", exact: true }).click();
+  await expect(
+    page.locator("#appbar:visible [data-save-state]").first(),
+  ).toHaveAttribute("data-save-state", "saved");
+
+  let releaseWeather!: () => void;
+  const weatherGate = new Promise<void>((resolve) => {
+    releaseWeather = resolve;
+  });
+  await page.route("**/data/weather/*.bin", async (route) => {
+    await weatherGate;
+    await route.continue();
+  });
+  try {
+    await page.goto("/");
+    await page.getByRole("button", { name: "Continue", exact: true }).click();
+    const status = page.getByText("Starting your mission…", { exact: true });
+    await expect(status).toHaveRole("status");
+    const art = page.locator(".missionLoadingArt");
+    const plug = art.locator(".missionLoadingPlug");
+    await expect(art).toBeVisible();
+    await expect(art).toHaveAttribute("aria-hidden", "true");
+    const box = (await art.boundingBox())!;
+    const viewport = page.viewportSize()!;
+    expect(
+      Math.abs(box.x + box.width / 2 - viewport.width / 2),
+    ).toBeLessThanOrEqual(1);
+    expect(
+      Math.abs(box.y + box.height / 2 - viewport.height / 2),
+    ).toBeLessThanOrEqual(1);
+    await expect(plug).toHaveCSS("animation-iteration-count", "infinite");
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await expect(plug).toHaveCSS("animation-name", "none");
+    await expect(art.locator(".missionLoadingSpark").first()).toHaveCSS(
+      "opacity",
+      "1",
+    );
+    // The previous card is still painted until the crossfade ends.
+    await expect(page.locator("#menuCard")).toHaveCount(0);
+    await reviewScreenshot(page, {
+      path: info.outputPath("scenario-loading-plug.png"),
+      scale: "css",
+    });
+  } finally {
+    releaseWeather();
+  }
+  await expect(page.locator("#appbar:visible")).toBeVisible();
+});

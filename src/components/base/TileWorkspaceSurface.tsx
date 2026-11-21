@@ -21,6 +21,7 @@ type SurfaceProps = {
   focusKey: React.Key;
   subtitle?: string;
   building?: boolean;
+  wide?: boolean;
   projectCandidate?: boolean;
   initialFocusSelector?: string;
   returnFocusSelector?: string;
@@ -51,6 +52,7 @@ export default function TileWorkspaceSurface({
   focusKey,
   subtitle,
   building,
+  wide,
   projectCandidate,
   initialFocusSelector,
   returnFocusSelector = ".territoryMapBuyToggle",
@@ -103,7 +105,7 @@ export default function TileWorkspaceSurface({
       role="dialog"
       aria-labelledby={titleId}
       id={stacked ? "tool-TILE" : undefined}
-      className={`tileWorkspaceSurface${inspector ? " tileWorkspaceInspector" : ""}${building ? " tileWorkspaceBuilding" : ""}${projectCandidate ? " tileWorkspaceProject" : ""}`}
+      className={`tileWorkspaceSurface${inspector ? " tileWorkspaceInspector" : ""}${wide ? " tileWorkspaceWide" : ""}${building ? " tileWorkspaceBuilding" : ""}${projectCandidate ? " tileWorkspaceProject" : ""}`}
       data-game-tool={stacked ? "TILE" : undefined}
       data-map-window-front={front}
       style={window && { zIndex: window.stackingIndex }}
