@@ -124,23 +124,26 @@ it("reports staged retrofit output rather than an outage in the inspector", () =
   ).toHaveTextContent("20/");
 });
 
-it("leaves completed foreign facilities unbadged and explains unavailable operation", () => {
+it("shows the foreign facility without an unavailable status", () => {
   const { game } = ready();
   const view = territoryTileViews(game).find(
     ({ owned, facility }) => !owned && facility,
   )!;
   const { target, occupant } = show(game, view.tile.id);
   expect(target).toHaveAccessibleDescription(
-    expect.stringContaining("Operating status unavailable"),
+    expect.stringContaining(view.facility!.name),
+  );
+  expect(target).not.toHaveAccessibleDescription(
+    /Operating status unavailable/,
   );
   expect(occupant).toHaveAttribute("data-facility-status", "unknown");
   expect(decorativeChild(occupant, ".facilityMapStatusArtwork")).toBeNull();
   fireEvent.click(target);
+  const inspector = within(screen.getByRole("dialog"));
+  expect(inspector.getByText(view.facility!.name)).toBeVisible();
   expect(
-    within(screen.getByRole("dialog")).getByText(
-      "Operating status unavailable",
-    ),
-  ).toBeInTheDocument();
+    inspector.queryByText("Operating status unavailable"),
+  ).not.toBeInTheDocument();
 });
 
 it("renders and inspects separate peer properties with the same retained tile ID", () => {

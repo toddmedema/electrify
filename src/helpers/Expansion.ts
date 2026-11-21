@@ -341,6 +341,7 @@ export function bordersUtility(game: GameType, targetId: string): boolean {
 function municipalOffer(game: GameType, id: string) {
   const territory = municipalTerritoryOffer(game, id);
   if (!territory) return undefined;
+  const financed = purchaseTerms(territory.price, true, game.interestRate);
   return {
     kind: "municipal" as const,
     territory,
@@ -351,9 +352,9 @@ function municipalOffer(game: GameType, id: string) {
     fee: 0,
     assumedDebt: 0,
     cashDue: territory.price,
-    financedCashDue: 0,
-    newLoan: 0,
-    monthlyDebtService: 0,
+    financedCashDue: financed.amountDue,
+    newLoan: financed.loanAmount,
+    monthlyDebtService: financed.monthlyPayment,
     cashMonthlyDebtService: 0,
     networkOMPerMonth: 0,
     facilities: [],
@@ -395,8 +396,7 @@ export function acquisitionPaymentDue(
   quote: AcquisitionQuote,
   financed: boolean,
 ): number {
-  if (!financed) return quote.cashDue;
-  return quote.kind === "regional" ? quote.financedCashDue : Infinity;
+  return financed ? quote.financedCashDue : quote.cashDue;
 }
 
 export function validAcquisitionAction(
@@ -427,7 +427,12 @@ export function utilityAcquisitions(
             {
               targetId: id,
               minute: receipt.minute,
-              financed: false,
+              financed:
+                game.utilityExpansion?.loans.some(
+                  (loan) =>
+                    loan.targetId === id &&
+                    loan.minuteCreated === receipt.minute,
+                ) ?? false,
               transferredCustomers: customerMarketSizeAt(
                 cityCustomerCount(id),
                 receipt.minute,
@@ -453,11 +458,6 @@ export function transferUtility(game: GameType, value: unknown): boolean {
     return false;
   const due = acquisitionPaymentDue(quote, value.financed);
   if (now.cash < due) return false;
-  if (quote.kind === "municipal")
-    return transferTerritorySites(game, quote.territory);
-  const assets = acquisitionAssets(game, quote.targetId);
-  if (!assets) return false;
-  const oldProgramCustomers = programCustomers(game);
   const loan = (
     kind: AcquisitionLoan["kind"],
     principal: number,
@@ -474,6 +474,17 @@ export function transferUtility(game: GameType, value: unknown): boolean {
     months,
     minuteCreated: game.date.minute,
   });
+  if (quote.kind === "municipal") {
+    if (!transferTerritorySites(game, quote.territory, due)) return false;
+    if (value.financed)
+      game.utilityExpansion.loans.push(
+        loan("purchase", quote.newLoan, game.interestRate, LOAN_MONTHS),
+      );
+    return true;
+  }
+  const assets = acquisitionAssets(game, quote.targetId);
+  if (!assets) return false;
+  const oldProgramCustomers = programCustomers(game);
   now.cash -= due;
   now.customers += quote.customers;
   game.utilityExpansion.acquisitions.push({

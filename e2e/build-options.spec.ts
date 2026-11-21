@@ -97,7 +97,7 @@ test("ordinary starting hills offer general technologies and retain special-site
         exact: true,
       });
       await expect(preview).not.toContainText("Not buildable on this tile");
-      await expect(preview.locator(".buildOptionMetrics")).toBeVisible();
+      await expect(preview.getByRole("table")).toBeVisible();
       await expect(
         preview.getByRole("button", { name: "Choose sites", exact: true }),
       ).toHaveCount(0);
@@ -125,8 +125,8 @@ test("ordinary starting hills offer general technologies and retain special-site
       });
       // A global technology preview keeps its details for comparing other sites.
       // It still explains why the inspected tile cannot host this technology.
-      await expect(preview).toContainText("vacant compatible site");
-      await expect(preview.locator(".buildOptionMetrics")).toBeVisible();
+      await expect(preview).toContainText("No sites available");
+      await expect(preview.getByRole("table")).toBeVisible();
       await expect(
         preview.getByRole("button", { name: /^Review purchase of/ }),
       ).toHaveCount(0);
@@ -243,7 +243,7 @@ for (const theme of ["light", "dark"] as const) {
         const tile = page.locator(
           '[data-map-target="champlain:site-12"][data-owned="true"]',
         );
-        await expect(tile).toContainText("Open site");
+        await expect(tile).toBeVisible();
         await tile.focus();
         await tile.press("Enter");
         const rail = page.getByRole("complementary", {
@@ -264,8 +264,8 @@ for (const theme of ["light", "dark"] as const) {
           const geothermal = preview.locator(
             '[data-build-option="Geothermal"]',
           );
-          await expect(preview).toContainText("vacant compatible site");
-          await expect(geothermal.locator(".buildOptionMetrics")).toBeVisible();
+          await expect(preview).toContainText("No sites available");
+          await expect(geothermal.getByRole("table")).toBeVisible();
           await expect(
             geothermal.getByRole("button", { name: /^Review purchase of/ }),
           ).toHaveCount(0);

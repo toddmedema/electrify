@@ -55,7 +55,7 @@ beforeEach(() => {
     ...originalMatchMedia(query),
     matches:
       ((query.includes("min-width:1300px") ||
-        query.includes("min-width:1200px") ||
+        query.includes("min-width:1120px") ||
         query.includes("min-width:700px")) &&
         mockDesktop) ||
       (query.includes("min-width:600px") && mockPaneLayout),
@@ -399,7 +399,7 @@ describe("GameAppBar", () => {
     window.matchMedia = (query: string) =>
       ({
         ...matchMedia(query),
-        matches: query.includes("min-width:1200px"),
+        matches: query.includes("min-width:1120px"),
       }) as MediaQueryList;
     try {
       const { container } = renderAppBar();
@@ -436,7 +436,7 @@ describe("GameAppBar", () => {
         ({
           ...matchMedia(query),
           get matches() {
-            return /min-width:1[23]00px/.test(query) && wide;
+            return /min-width:(1120|1300)px/.test(query) && wide;
           },
           addListener: (listener: () => void) => listeners.add(listener),
           removeListener: (listener: () => void) => listeners.delete(listener),

@@ -13,6 +13,10 @@ import {
 import { TICK_MINUTES, LOAN_MONTHS } from "../Constants";
 import { getInflationIndex, hasEconomy } from "../data/Economy";
 import {
+  MUNICIPAL_UTILITIES,
+  municipalUtility,
+} from "../data/MunicipalUtilities";
+import {
   UTILITY_AREAS,
   UTILITY_TARGETS,
   INHERITED_COLD_PACKAGE_COST_2005,
@@ -26,6 +30,7 @@ import {
   facilityCashBack,
   getMonthlyPayment,
   loanBalanceAfterTicks,
+  maxLoanAmount,
 } from "./Financials";
 import { getDateFromMinute, getTimeFromTimeline } from "./DateTime";
 import { customerMarketSizeAt } from "./Customers";
@@ -136,7 +141,8 @@ export function validUtilityExpansion(
     !Array.isArray(state.loans) ||
     state.acquisitions.length > 2 ||
     state.networkAssets.length !== state.acquisitions.length ||
-    state.loans.length > 4 ||
+    state.loans.length >
+      UTILITY_TARGETS.length * 2 + MUNICIPAL_UTILITIES.length ||
     !validUtilityExpansionHeader(game) ||
     (game.customScenario && !validUtilityExpansionSetup(game.customScenario))
   )
@@ -199,20 +205,13 @@ export function validUtilityExpansion(
   }
   const loanIds = new Set<string>();
   for (const loan of state.loans) {
-    const target = UTILITY_TARGETS.find(
-      (target) => target.id === loan?.targetId,
-    );
-    const receipt = state.acquisitions.find(
-      (receipt) => receipt.targetId === loan?.targetId,
-    );
     if (
       !record(loan) ||
-      !target ||
-      !receipt ||
+      typeof loan.targetId !== "string" ||
       !["assumed", "purchase"].includes(loan.kind) ||
-      loan.id !== `scenario-116-${target.id}-${loan.kind}` ||
+      loan.id !== `scenario-116-${loan.targetId}-${loan.kind}` ||
       loanIds.has(loan.id) ||
-      loan.minuteCreated !== receipt.minute ||
+      !minute(loan.minuteCreated, game.date.minute) ||
       ![
         loan.principal,
         loan.loanAmountLeft,
@@ -241,15 +240,44 @@ export function validUtilityExpansion(
       Math.max(1, loan.principal) * 1e-7
     )
       return false;
-    if (hasEconomy()) {
-      const index = getInflationIndex(
-        getDateFromMinute(receipt.minute, 2005),
-        2005,
-        game.seed,
+    const municipal = municipalUtility(loan.targetId);
+    if (municipal) {
+      const purchases =
+        game.territoryNetwork?.tilePurchases?.filter(
+          ({ tileId, minute, legacy }) =>
+            !legacy &&
+            minute === loan.minuteCreated &&
+            (tileId === municipal.city.id ||
+              tileId === municipal.plant?.tileId),
+        ) ?? [];
+      const totalPrice = purchases.reduce((sum, site) => sum + site.price, 0);
+      // A retained save can already own one of the sites at the same tick.
+      const lastPrice = purchases.at(-1)?.price ?? 0;
+      if (
+        loan.kind !== "purchase" ||
+        !purchases.length ||
+        (!close(loan.principal, maxLoanAmount(totalPrice)) &&
+          !close(loan.principal, maxLoanAmount(lastPrice)))
+      )
+        return false;
+    } else {
+      const target = UTILITY_TARGETS.find(({ id }) => id === loan.targetId);
+      const receipt = state.acquisitions.find(
+        ({ targetId }) => targetId === loan.targetId,
       );
-      const expected =
-        loan.kind === "assumed" ? target.assumedDebt : target.equityPrice * 0.8;
-      if (!close(loan.principal, expected * index)) return false;
+      if (!target || receipt?.minute !== loan.minuteCreated) return false;
+      if (hasEconomy()) {
+        const index = getInflationIndex(
+          getDateFromMinute(receipt.minute, 2005),
+          2005,
+          game.seed,
+        );
+        const expected =
+          loan.kind === "assumed"
+            ? target.assumedDebt
+            : maxLoanAmount(target.equityPrice);
+        if (!close(loan.principal, expected * index)) return false;
+      }
     }
     loanIds.add(loan.id);
   }

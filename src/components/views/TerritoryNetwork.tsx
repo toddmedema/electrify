@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Button, Tab, Tabs, Typography } from "@mui/material";
+import { Button, Tab, Tabs, Typography, useMediaQuery } from "@mui/material";
 import { SIDE_TOOL_MIN_WIDTH } from "../../WorkspaceLayout";
 import DesktopBuildRail from "../base/DesktopBuildRail";
 import {
@@ -46,6 +46,7 @@ import { facilityMapStatus } from "../base/FacilityMapStatus";
 import TerritoryHexMap, { type MapTileMenuTarget } from "./TerritoryHexMap";
 import TerritoryTileMenu from "./TerritoryTileMenu";
 import AcquisitionReviewDialog from "../base/AcquisitionReviewDialog";
+import ConceptIcon from "../base/ConceptIcon";
 import { useMoney } from "../base/CurrencyContext";
 import { useAppDispatch, useAppSelector } from "../../Store";
 import { generatorSizeChanged } from "../../reducers/GameActions";
@@ -192,6 +193,9 @@ function TileNetwork(props: Props) {
   // Let the purchase dialog finish before moving focus to the updated inspector.
   const inspectorOwner = review ? tile?.territoryId : view?.ownerKey;
   const operatingFacility = view?.operatingFacility;
+  const facilityStatus = view?.facility
+    ? facilityMapStatus(view, game.date.minute)
+    : undefined;
   const utility = tile
     ? Object.values(UTILITY_AREAS).find(({ id }) => id === tile.territoryId)
     : undefined;
@@ -317,7 +321,7 @@ function TileNetwork(props: Props) {
   const inspect = (
     key: TerritoryMapTileKey,
     activate = false,
-    mode?: "details" | "expand",
+    mode?: "build" | "expand",
   ) => {
     if (projectBusy.current || restoringFocus.current) return;
     setSelected(key);
@@ -440,7 +444,7 @@ function TileNetwork(props: Props) {
         projectSite={!!menu && !!projectSites?.has(menu.key)}
         onClose={() => setMenu(null)}
         onChooseSite={() => menu && inspect(menu.key, true)}
-        onInspect={() => menu && inspect(menu.key, true, "details")}
+        onBuild={() => menu && inspect(menu.key, true, "build")}
         onExpand={() => menu && inspect(menu.key, true, "expand")}
         onAcquire={setReview}
       />
@@ -489,6 +493,9 @@ function TileNetwork(props: Props) {
           focusKey={`${inspected}:${activation}:${inspectorOwner ?? "unowned"}:${operatingFacility?.id ?? (view.facility ? "facility" : "empty")}:${showSiteCatalogue}`}
           subtitle={view.ownerKey ? view.ownerName : undefined}
           building={showSiteCatalogue}
+          wide={
+            !!(tile.city || view.facility || (view.ownerKey && !view.owned))
+          }
           initialFocusSelector={
             building && desktopRail && railSite === tile.id
               ? ".desktopBuildRail"
@@ -557,7 +564,7 @@ function TileNetwork(props: Props) {
                     <div>
                       <span>
                         {!view.owned
-                          ? "Customers to connect"
+                          ? "Customers"
                           : utility && !acquisition
                             ? "Opening customers"
                             : "Customers transferred"}
@@ -591,21 +598,26 @@ function TileNetwork(props: Props) {
                     <span>{view.facility.name}</span>
                     <strong>{formatFacilitySize(view.facility)}</strong>
                   </div>
-                  <Typography variant="body2" className="tileFacilityStatus">
-                    {facilityMapStatus(view, game.date.minute)?.label}
-                  </Typography>
+                  {facilityStatus && facilityStatus.kind !== "unknown" && (
+                    <Typography variant="body2" className="tileFacilityStatus">
+                      {facilityStatus.label}
+                    </Typography>
+                  )}
                 </div>
               ) : null}
               {!view.owned && !tile.city && (
                 <TileTerrainModifiers terrain={tile.terrain} />
               )}
               {view.acquisitionId && props.onAcquire ? (
-                <div className="territoryBuildActions">
+                <div className="tilePurchaseSummary">
                   <Button
                     variant="contained"
+                    startIcon={
+                      <ConceptIcon concept="buy" fontSize="small" decorative />
+                    }
                     onClick={() => setReview(view.acquisitionId)}
                   >
-                    Acquire {view.ownerName}
+                    Acquire
                   </Button>
                 </div>
               ) : (
@@ -660,6 +672,7 @@ function CityDemand({
   territoryId: TerritoryId;
   owned: boolean;
 }) {
+  const compact = useMediaQuery("(max-width: 599px) and (max-height: 720px)");
   const runId = useAppSelector((state) => state.ui?.evidenceRunId);
   const forecastKey = signature(game);
   const first = game.timeline[0]?.minute ?? game.date.minute;
@@ -689,7 +702,7 @@ function CityDemand({
         }))}
       />
       <ChartForecastDemandByType
-        height={160}
+        height={compact ? 120 : 160}
         timeline={timeline}
         domain={domain}
         displayTypes={types}
@@ -715,24 +728,17 @@ function TileTerrainModifiers({
     },
     { label: "build cost", value: buildCost, good: buildCost < 1 },
   ].filter(({ value }) => value !== 1);
+  if (!modifiers.length) return null;
   return (
     <section aria-label="Terrain modifiers">
-      {modifiers.length ? (
-        <ul className="tileTerrainModifiers">
-          {modifiers.map(({ label, value, good }) => (
-            <li key={label}>
-              <strong data-favorable={good}>
-                {formatTerrainPercent(value)}
-              </strong>{" "}
-              {label}
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <Typography variant="body2" color="textSecondary">
-          Standard build cost
-        </Typography>
-      )}
+      <ul className="tileTerrainModifiers">
+        {modifiers.map(({ label, value, good }) => (
+          <li key={label}>
+            <strong data-favorable={good}>{formatTerrainPercent(value)}</strong>{" "}
+            {label}
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }

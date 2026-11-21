@@ -106,7 +106,7 @@ export function projectSiteQuote(
     !territoryTileInventory(game, tileId).remaining
   )
     return {
-      reason: "This technology or project size needs a vacant compatible site.",
+      reason: "No sites available",
     };
   const owned = ownsTerritoryTile(game, tile);
   const connection = owned ? undefined : connections.get(tileId);

@@ -1282,12 +1282,21 @@ test("tile inspection shares the desktop window stack", async ({
       top: box.top - tray.top,
       width: box.width,
       height: box.height,
+      availableWidth: tray.width,
+      availableHeight: tray.height,
     };
   });
   expect(placement.right).toBe(0);
   expect(placement.top).toBe(0);
-  expect(placement.width).toBeLessThanOrEqual(300);
-  expect(placement.height).toBeLessThanOrEqual(360);
+  expect(placement.width).toBeLessThanOrEqual(placement.availableWidth);
+  expect(placement.height).toBeLessThanOrEqual(placement.availableHeight);
+  await expect
+    .poll(() =>
+      inspector
+        .locator(".tileWorkspaceBody")
+        .evaluate((body) => body.scrollHeight - body.clientHeight),
+    )
+    .toBeLessThanOrEqual(1);
   expect(await fleet.boundingBox()).toEqual(fleetBounds);
   expect(await agreements.boundingBox()).toEqual(agreementsBounds);
   await expect(capital).toHaveAttribute("aria-pressed", "true");
@@ -1302,7 +1311,7 @@ test("tile inspection shares the desktop window stack", async ({
   await dragWindow(page, heading, -64, 40);
   expect(await inspector.boundingBox()).toEqual(fixedBounds);
   const sameWindow = await inspector.elementHandle();
-  const nextTile = map.locator('[data-map-target="champlain:site-1"]');
+  const nextTile = map.locator('[data-map-target="champlain:site-13"]');
   await nextTile.press("Enter");
   await expect(inspector).toHaveCount(0);
   await expect(nextTile).toHaveAttribute("aria-pressed", "true");
@@ -1311,6 +1320,19 @@ test("tile inspection shares the desktop window stack", async ({
       (element) => document.querySelector("#tool-TILE") === element,
     ),
   ).toBe(true);
+  const emptyInspector = page.getByRole("dialog", {
+    name: "Plains",
+    exact: true,
+  });
+  await expect(emptyInspector).toBeVisible();
+  await expect
+    .poll(() =>
+      emptyInspector.evaluate(
+        (element, width) => width / element.getBoundingClientRect().width,
+        placement.width,
+      ),
+    )
+    .toBeCloseTo(1.3, 1);
   await capital.click();
   await expect(inspector).toHaveAttribute("data-map-window-front", "true");
 

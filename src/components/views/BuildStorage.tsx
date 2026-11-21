@@ -79,6 +79,7 @@ function storageBuildSummary(storage: StorageShoppingType): string {
 interface StorageBuildItemProps {
   /** Expanded canonical card without purchasing controls or dialogs. */
   preview?: boolean;
+  previewSiteIssue?: string;
   game: GameType;
   cash: number;
   interestRate: number;
@@ -190,6 +191,45 @@ export function StorageBuildItem(
       ? `${formatWatts(siteMaxPower)} max power`
       : undefined;
 
+  const dischargePower = (
+    <BuildMetric
+      asDetailRow={props.preview}
+      label="Discharge power"
+      entry={MANUAL_ENTRY.POWER_AND_ENERGY}
+      value={formatWatts(storage.peakW)}
+    />
+  );
+  const metrics = (
+    <>
+      {!props.preview && dischargePower}
+      <BuildMetric
+        asDetailRow={props.preview}
+        label="Build cost"
+        entry={MANUAL_ENTRY.TOTAL_COST_OF_ENERGY}
+        value={formatPurchasePrice(storage.buildCost)}
+      />
+      <BuildMetric
+        asDetailRow={props.preview}
+        label="Build time"
+        entry={MANUAL_ENTRY.HOW_TO_PLAY}
+        value={`${Math.round(storage.yearsToBuild * 12)} mo`}
+      />
+      {props.preview && dischargePower}
+      <BuildMetric
+        asDetailRow={props.preview}
+        label={props.preview ? "Duration at full power" : "At full power"}
+        entry={MANUAL_ENTRY.POWER_AND_ENERGY}
+        value={`${formatNumber(storage.peakWh / storage.peakW)} hr`}
+      />
+      <BuildMetric
+        asDetailRow={props.preview}
+        label={props.preview ? "Round-trip efficiency" : "Efficiency"}
+        entry={MANUAL_ENTRY.ROUND_TRIP_EFFICIENCY}
+        value={`${Math.round(storage.roundTripEfficiency * 100)}%`}
+      />
+    </>
+  );
+
   return (
     <BuildOptionCard
       className="storageBuildOption"
@@ -246,40 +286,16 @@ export function StorageBuildItem(
           </Typography>
         )
       }
-      warning={!buildable || shortfall ? buildSubtitle : undefined}
-      metrics={
-        <>
-          <BuildMetric
-            label="Discharge power"
-            entry={MANUAL_ENTRY.POWER_AND_ENERGY}
-            value={formatWatts(storage.peakW)}
-          />
-          <BuildMetric
-            label="Build cost"
-            entry={MANUAL_ENTRY.TOTAL_COST_OF_ENERGY}
-            value={formatPurchasePrice(storage.buildCost)}
-          />
-          <BuildMetric
-            label="Build time"
-            entry={MANUAL_ENTRY.HOW_TO_PLAY}
-            value={`${Math.round(storage.yearsToBuild * 12)} mo`}
-          />
-          <BuildMetric
-            label="At full power"
-            entry={MANUAL_ENTRY.POWER_AND_ENERGY}
-            value={`${formatNumber(storage.peakWh / storage.peakW)} hr`}
-          />
-          <BuildMetric
-            label="Efficiency"
-            entry={MANUAL_ENTRY.ROUND_TRIP_EFFICIENCY}
-            value={`${Math.round(storage.roundTripEfficiency * 100)}%`}
-          />
-        </>
+      warning={
+        props.previewSiteIssue ??
+        (!buildable || shortfall ? buildSubtitle : undefined)
       }
+      metrics={props.preview ? undefined : metrics}
       details={
         <BuildDetails label="storage properties">
+          {props.preview && metrics}
           <BuildDetailRow
-            label="Fixed"
+            label={props.preview ? "Fixed operating cost" : "Fixed"}
             value={`${formatMoneyConcise(storage.annualOperatingCost)}/yr`}
             entry={MANUAL_ENTRY.OPERATING_COSTS}
           />

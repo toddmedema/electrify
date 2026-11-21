@@ -241,6 +241,46 @@ test("conductors use elevated real terminals and retain mesh identity across unr
   ]);
 });
 
+test.each([undefined, "impact"] as const)(
+  "keeps wires out of the solar panel racks from all six neighboring pylons (%s)",
+  (hail) => {
+    const solar: TerritoryTileView = {
+      ...view(),
+      facility: { name: "Solar", fuel: "Sun", peakW: 1, yearsToBuildLeft: 0 },
+      ...(hail && { disaster: { condition: "Hail", hail } }),
+    };
+    for (const [q, r] of HEX_NEIGHBORS) {
+      const neighbor = { ...view(1), tile: { ...view(1).tile, q, r } };
+      const views = [solar, neighbor];
+      const tiles = views.map(({ tile }) => tile);
+      const scene = new SceneBuilder({
+        terrain: getTerrainModel,
+        structure: getStructureModel,
+      }).build(
+        views,
+        tiles,
+        hexWires(tiles, () => true),
+        0,
+        "run",
+      );
+      const wire = scene.find(({ id }) => id === "wires:0")!;
+      const [connection] = wire.model.connections!;
+      const terminal =
+        connection.from === solar.tile.id ? connection.start : connection.end;
+      expect(terminal[1]).toBeLessThan(0.06);
+      const mesh = wire.model.parts[0].mesh.positions;
+      const aboveRacks = Array.from(mesh).some(
+        (x, i) =>
+          i % 3 === 0 &&
+          Math.abs(x + wire.position[0]) < 0.31 &&
+          Math.abs(mesh[i + 2] + wire.position[2]) < 0.26 &&
+          mesh[i + 1] + wire.position[1] > 0.07,
+      );
+      expect(aboveRacks).toBe(false);
+    }
+  },
+);
+
 test("mountain pylons stand on the raised summit pad and lift nearby wire terminals", () => {
   const peak = {
     ...view(),

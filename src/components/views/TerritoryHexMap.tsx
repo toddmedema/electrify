@@ -1401,22 +1401,24 @@ export default function TerritoryHexMap({
               : undefined;
             const tileLabel = [
               cityLabel ?? TERRAIN_LABELS[tile.terrain],
-              facility?.name ??
-                (!tile.city && !view.reserved && !hover.reason
-                  ? "Open site"
-                  : undefined),
-              status?.label,
+              facility?.name,
+              status?.kind === "unknown" ? undefined : status?.label,
               disaster?.condition,
               disaster?.facilityImpact,
               view.owned
-                ? "Your tile"
+                ? undefined
                 : view.ownerKey
-                  ? `Owned by ${view.ownerName}`
+                  ? view.ownerName
                   : "Unconnected",
               hover.reason,
             ]
               .filter(Boolean)
               .join(" · ");
+            // The city is already named in the button label.
+            const descriptionId =
+              utility && tileLabel === cityLabel
+                ? undefined
+                : `${mapId}-${key}-status`;
             return (
               <button
                 key={key}
@@ -1463,7 +1465,7 @@ export default function TerritoryHexMap({
                       : label
                 }
                 aria-pressed={key === activeSelected}
-                aria-describedby={`${mapId}-${key}-status`}
+                aria-describedby={descriptionId}
                 onFocus={(event) => {
                   setRovingId(key);
                   if (key !== selected) onSelect(key);
@@ -1571,9 +1573,11 @@ export default function TerritoryHexMap({
                     )}
                   </span>
                 )}
-                <span className="srOnly" id={`${mapId}-${key}-status`}>
-                  {tileLabel}
-                </span>
+                {descriptionId && (
+                  <span className="srOnly" id={descriptionId}>
+                    {tileLabel}
+                  </span>
+                )}
               </button>
             );
           })}
