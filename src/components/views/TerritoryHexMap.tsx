@@ -331,7 +331,7 @@ export default function TerritoryHexMap({
     openingWidth: 0,
   });
   const [zoom, setZoom] = React.useState(1);
-  const wheelZoom = React.useRef(zoom);
+  const zoomLevel = React.useRef(zoom);
   // Fit the starting view to the screen, then leave zoom under the player's control.
   const baseScale =
     size.openingWidth > 0 && size.openingWidth < 600 ? 0.75 : 0.875;
@@ -423,7 +423,10 @@ export default function TerritoryHexMap({
     y: number;
     dragging: boolean;
   }>();
-  const touches = React.useRef(new Set<number>());
+  const pointers = React.useRef(
+    new Map<number, { clientX: number; clientY: number } | null>(),
+  );
+  const gestureScale = React.useRef<number>();
   const suppressClick = React.useRef(false);
   const activation = React.useRef<{
     tileKey: TerritoryMapTileKey;
@@ -453,6 +456,13 @@ export default function TerritoryHexMap({
     if (tooltip.current) tooltip.current.hidden = true;
   }, []);
   React.useEffect(() => clearHover, [clearHover]);
+  const cancelPointer = (id: number) => {
+    clearHover();
+    pointers.current.delete(id);
+    pointer.current = undefined;
+    activation.current = undefined;
+    suppressClick.current = true;
+  };
   const framedRun = React.useRef<{
     runId?: number;
     seed: number;
@@ -468,7 +478,7 @@ export default function TerritoryHexMap({
     )
       return;
     framedRun.current = { runId, seed: game.seed, scenarioId: game.scenarioId };
-    wheelZoom.current = 1;
+    zoomLevel.current = 1;
     setZoom(1);
     const focus = hexCenter(
       byKey.get(activeSelected ?? activeRoving!)?.tile ?? { q: 0, r: 0 },
@@ -530,42 +540,45 @@ export default function TerritoryHexMap({
     observer.observe(element);
     return () => observer.disconnect();
   }, []);
+  const zoomAt = React.useCallback(
+    (factor: number, from: { clientX: number; clientY: number }, to = from) => {
+      const element = viewport.current;
+      if (!element) return;
+      const previous = zoomLevel.current;
+      const nextZoom = Math.max(0.5, Math.min(2, previous * factor));
+      const box = element.getBoundingClientRect();
+      const x = box.left + size.width / 2;
+      const y = box.top + size.height / 2;
+      const oldScale = baseScale * previous;
+      const newScale = baseScale * nextZoom;
+      // Keep the same point on the ground under the pointer or pinch midpoint.
+      setCamera((point) => ({
+        x:
+          point.x + (from.clientX - x) / oldScale - (to.clientX - x) / newScale,
+        y:
+          point.y + (from.clientY - y) / oldScale - (to.clientY - y) / newScale,
+      }));
+      if (nextZoom !== previous) {
+        zoomLevel.current = nextZoom;
+        setZoom(nextZoom);
+      }
+    },
+    [baseScale, setCamera, size.width, size.height],
+  );
   React.useEffect(() => {
     const element = viewport.current;
     if (!element) return;
     const wheel = (event: WheelEvent) => {
-      if (event.ctrlKey) return;
       event.preventDefault();
+      const deltaMode = event.deltaMode;
       const unit =
-        event.deltaMode === 1
-          ? 16
-          : event.deltaMode === 2
-            ? element.clientHeight
-            : 1;
+        deltaMode === 1 ? 16 : deltaMode === 2 ? element.clientHeight : 1;
       clearHover();
-      const currentScale = baseScale * wheelZoom.current;
-      if (!event.shiftKey && event.deltaY) {
-        const nextZoom = Math.max(
-          0.5,
-          Math.min(
-            2,
-            wheelZoom.current * Math.exp((-event.deltaY * unit) / 600),
-          ),
-        );
-        if (nextZoom === wheelZoom.current) return;
-        wheelZoom.current = nextZoom;
-        const box = element.getBoundingClientRect();
-        const scaleChange = 1 / currentScale - 1 / (baseScale * nextZoom);
-        // Keep the ground under the pointer fixed while the camera scales.
-        setCamera((point) => ({
-          x:
-            point.x + (event.clientX - box.left - size.width / 2) * scaleChange,
-          y:
-            point.y + (event.clientY - box.top - size.height / 2) * scaleChange,
-        }));
-        setZoom(nextZoom);
+      if ((event.ctrlKey || !event.shiftKey) && event.deltaY) {
+        zoomAt(Math.exp((-event.deltaY * unit) / 600), event);
         return;
       }
+      const currentScale = baseScale * zoomLevel.current;
       setCamera((point) => ({
         x:
           point.x +
@@ -578,9 +591,39 @@ export default function TerritoryHexMap({
             currentScale,
       }));
     };
+    // Safari sends trackpad pinches as GestureEvents. Touch pinches already
+    // use pointer events below, so only apply the gesture scale for a trackpad.
+    const gestureStart = (event: Event) => {
+      event.preventDefault();
+      gestureScale.current = 1;
+    };
+    const gestureChange = (event: Event) => {
+      event.preventDefault();
+      const gesture = event as MouseEvent & { scale: number };
+      const previous = gestureScale.current;
+      if (!previous || !Number.isFinite(gesture.scale) || gesture.scale <= 0)
+        return;
+      gestureScale.current = gesture.scale;
+      if (pointers.current.size) return;
+      clearHover();
+      zoomAt(gesture.scale / previous, gesture);
+    };
+    const gestureEnd = () => {
+      gestureScale.current = undefined;
+    };
     element.addEventListener("wheel", wheel, { passive: false });
-    return () => element.removeEventListener("wheel", wheel);
-  }, [baseScale, clearHover, setCamera, size.width, size.height]);
+    element.addEventListener("gesturestart", gestureStart, { passive: false });
+    element.addEventListener("gesturechange", gestureChange, {
+      passive: false,
+    });
+    element.addEventListener("gestureend", gestureEnd);
+    return () => {
+      element.removeEventListener("wheel", wheel);
+      element.removeEventListener("gesturestart", gestureStart);
+      element.removeEventListener("gesturechange", gestureChange);
+      element.removeEventListener("gestureend", gestureEnd);
+    };
+  }, [baseScale, clearHover, setCamera, zoomAt]);
   React.useLayoutEffect(() => {
     if (!focusAfterNavigation.current) return;
     const target = stage.current?.querySelector<HTMLButtonElement>(
@@ -993,9 +1036,18 @@ export default function TerritoryHexMap({
           const id = middle ? undefined : pointerTile(event);
           if (middle || id === null) event.preventDefault();
           rememberActivation(id ?? undefined);
-          touches.current.add(event.pointerId);
-          if (touches.current.size > 1) {
+          const { pointerId, pointerType, clientX, clientY } = event;
+          pointers.current.set(
+            pointerId,
+            pointerType === "touch" ? { clientX, clientY } : null,
+          );
+          if (pointers.current.size > 1) {
+            // The camera can cull the original touch targets while pinching.
+            for (const [id, point] of pointers.current) {
+              if (point) event.currentTarget.setPointerCapture?.(id);
+            }
             suppressClick.current = true;
+            activation.current = undefined;
             pointer.current = undefined;
             return;
           }
@@ -1021,13 +1073,46 @@ export default function TerritoryHexMap({
           if (event.button === 1) event.preventDefault();
         }}
         onPointerMove={(event) => {
+          const { pointerId, clientX, clientY } = event;
+          const previous = pointers.current.get(pointerId);
+          if (previous) {
+            pointers.current.set(pointerId, { clientX, clientY });
+            if (pointers.current.size === 2) {
+              const other = [...pointers.current].find(
+                ([id]) => id !== pointerId,
+              )?.[1];
+              if (!other) return;
+              const distance = Math.hypot(
+                previous.clientX - other.clientX,
+                previous.clientY - other.clientY,
+              );
+              const nextDistance = Math.hypot(
+                clientX - other.clientX,
+                clientY - other.clientY,
+              );
+              if (distance > 0 && nextDistance > 0) {
+                zoomAt(
+                  nextDistance / distance,
+                  {
+                    clientX: (previous.clientX + other.clientX) / 2,
+                    clientY: (previous.clientY + other.clientY) / 2,
+                  },
+                  {
+                    clientX: (clientX + other.clientX) / 2,
+                    clientY: (clientY + other.clientY) / 2,
+                  },
+                );
+              }
+              return;
+            }
+          }
           const drag = pointer.current;
           if (
             !drag ||
             drag.id !== event.pointerId ||
-            touches.current.size !== 1
+            pointers.current.size !== 1
           ) {
-            if (event.pointerType !== "touch" && !touches.current.size) {
+            if (event.pointerType !== "touch" && !pointers.current.size) {
               const { target, clientX, clientY } = event;
               hoverPoint.current = { target, clientX, clientY };
               hoverFrame.current ??= requestAnimationFrame(() => {
@@ -1056,18 +1141,20 @@ export default function TerritoryHexMap({
           }));
         }}
         onPointerUp={(event) => {
-          touches.current.delete(event.pointerId);
+          pointers.current.delete(event.pointerId);
           if (pointer.current?.id === event.pointerId)
             pointer.current = undefined;
           if (event.currentTarget.hasPointerCapture?.(event.pointerId))
             event.currentTarget.releasePointerCapture(event.pointerId);
         }}
-        onPointerCancel={(event) => {
-          clearHover();
-          touches.current.delete(event.pointerId);
-          pointer.current = undefined;
-          activation.current = undefined;
-          suppressClick.current = true;
+        onPointerCancel={(event) => cancelPointer(event.pointerId)}
+        onLostPointerCapture={(event) => {
+          if (
+            event.target === event.currentTarget &&
+            pointers.current.has(event.pointerId)
+          ) {
+            cancelPointer(event.pointerId);
+          }
         }}
         onPointerLeave={(event) => {
           clearHover();
@@ -1077,7 +1164,7 @@ export default function TerritoryHexMap({
             drag?.id === event.pointerId &&
             !drag.dragging
           ) {
-            touches.current.delete(event.pointerId);
+            pointers.current.delete(event.pointerId);
             pointer.current = undefined;
             activation.current = undefined;
             suppressClick.current = true;
@@ -1472,7 +1559,7 @@ export default function TerritoryHexMap({
                   // Touch focus can arrive between pointerup and click.
                   if (
                     !pointer.current &&
-                    !touches.current.size &&
+                    !pointers.current.size &&
                     activation.current?.tileKey !== key
                   ) {
                     clearHover();

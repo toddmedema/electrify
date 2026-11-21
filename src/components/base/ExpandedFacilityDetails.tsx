@@ -24,7 +24,9 @@ import { facilityOperatingStatus } from "./FacilityMapStatus";
 import { useMoney } from "./CurrencyContext";
 import ConfirmDialog from "./ConfirmDialog";
 import FacilityDetails from "./FacilityDetails";
-import type { FacilityCapacityUpgradeActions } from "./FacilityCapacityUpgrade";
+import FacilityCapacityUpgrade, {
+  type FacilityCapacityUpgradeActions,
+} from "./FacilityCapacityUpgrade";
 
 export interface FacilityDetailActions extends FacilityCapacityUpgradeActions {
   onSell: (id: number) => void;
@@ -54,20 +56,8 @@ function FacilityActions(props: {
   } = props;
   const underConstruction = facility.yearsToBuildLeft > 0;
   const repowering = !!coalRepowerInProgress(facility);
-  if (permanentlyShutdown && facility.saleRestricted)
-    return (
-      <div className="facilityActions">
-        <Typography
-          variant="caption"
-          color="textSecondary"
-          className="facilityActionNote"
-        >
-          This plant can't be sold.
-        </Typography>
-      </div>
-    );
   return (
-    <div className="facilityActions">
+    <>
       {upgrading && !permanentlyShutdown && onCancelRetrofit && (
         // Cancellation returns the paid project equity.
         <Button
@@ -134,7 +124,7 @@ function FacilityActions(props: {
           </Button>
         )
       )}
-    </div>
+    </>
   );
 }
 
@@ -176,6 +166,7 @@ export default function ExpandedFacilityDetails({
 } & FacilityDetailActions) {
   const { formatMoneyConcise } = useMoney();
   const [open, setOpen] = React.useState(false);
+  const operationSection = React.useRef<HTMLElement>(null);
   const underConstruction = facility.yearsToBuildLeft > 0;
   const installing = upgradeInProgress(facility);
   const repowering = !!coalRepowerInProgress(facility);
@@ -248,19 +239,27 @@ export default function ExpandedFacilityDetails({
         location={game.location}
         game={game}
         onRetrofit={actions.onRetrofit}
-        onExpand={actions.onExpand}
-        expandRequest={expandRequest}
-        onCancelExpansion={actions.onCancelExpansion}
+        operationSectionRef={operationSection}
       />
-      <MemoizedFacilityActions
+      <FacilityCapacityUpgrade
+        key={expandRequest}
+        openOnMount={expandRequest !== undefined}
         facility={facility}
-        upgrading={!!installing && isUpgradingAt(facility, game.date.minute)}
-        permanentlyShutdown={permanentlyShutdown}
-        onPause={actions.onPause}
-        onTogglePause={actions.onTogglePause}
-        onCancelRetrofit={actions.onCancelRetrofit}
-        onOpenSell={() => setOpen(true)}
-      />
+        game={game}
+        onExpand={actions.onExpand}
+        onCancelExpansion={actions.onCancelExpansion}
+        fallbackFocusRef={operationSection}
+      >
+        <MemoizedFacilityActions
+          facility={facility}
+          upgrading={!!installing && isUpgradingAt(facility, game.date.minute)}
+          permanentlyShutdown={permanentlyShutdown}
+          onPause={actions.onPause}
+          onTogglePause={actions.onTogglePause}
+          onCancelRetrofit={actions.onCancelRetrofit}
+          onOpenSell={() => setOpen(true)}
+        />
+      </FacilityCapacityUpgrade>
     </>
   );
 }

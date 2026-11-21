@@ -16,6 +16,7 @@ function showWater(
   fleet: boolean,
   points?: ReservoirOutlookPoint[],
   liveDate?: Pick<GameType["date"], "year" | "monthNumber">,
+  yearsToBuildLeft = 0,
 ) {
   const game = createGame({ scenarioId: 108 });
   if (points) {
@@ -24,6 +25,7 @@ function showWater(
   }
   Object.assign(game.date, liveDate);
   const dam = game.facilities.find((facility) => facility.fuel === "Hydro")!;
+  dam.yearsToBuildLeft = yearsToBuildLeft;
   if (fleet) game.facilities.push({ ...dam, id: dam.id + 100 });
   jest.mocked(useOutlookWorker).mockReturnValue(
     points ??
@@ -46,6 +48,15 @@ afterEach(() => {
   act(() => {
     store.dispatch(manualHelpClose());
   });
+});
+
+it("opens hydropower help from the construction status", () => {
+  const water = within(showWater(0.5, false, undefined, undefined, 1));
+  const heading = water.getByRole("heading", { name: "Water" });
+  expect(within(heading).queryByRole("button")).not.toBeInTheDocument();
+  expect(water.getByText(/opens half full/i)).toBeVisible();
+  fireEvent.click(water.getByRole("button", { name: /reservoir/i }));
+  expect(store.getState().ui.manualHelpEntry).toBe(MANUAL_ENTRY.HYDROPOWER);
 });
 
 it("announces the fleet forecast scope and no-refill warning when its chart is absent", () => {

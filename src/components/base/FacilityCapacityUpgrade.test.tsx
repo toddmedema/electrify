@@ -104,7 +104,7 @@ it("does not price catalogues while the upgrade review is closed or its clock ad
   }
 });
 
-it("keeps physical limits and retrofit availability visible without pricing a closed review", () => {
+it("explains unavailable upgrades on hover and focus without opening a review", async () => {
   const view = show();
   const retrofit = cloneDeep(view.game);
   retrofit.facilities[0].upgradeInProgress = {
@@ -114,19 +114,30 @@ it("keeps physical limits and retrofit availability visible without pricing a cl
     completesMinute: 100,
   };
   view.rerender(retrofit);
+  const offer = screen.getByRole("button", { name: "Upgrade capacity" });
+  expect(offer).toHaveAttribute("aria-disabled", "true");
   expect(
-    screen.getByRole("button", { name: "Upgrade capacity" }),
-  ).toBeDisabled();
-  expect(screen.getByText("Finish the existing retrofit first.")).toBeVisible();
+    screen.queryByText("Finish the existing retrofit first."),
+  ).not.toBeInTheDocument();
+  await userEvent.hover(offer);
+  expect(await screen.findByRole("tooltip")).toHaveTextContent(
+    "Finish the existing retrofit first.",
+  );
+  await userEvent.unhover(offer);
+  await waitFor(() =>
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument(),
+  );
+
   const capped = cloneDeep(view.game);
   capped.facilities[0].peakW = 6e9;
   view.rerender(capped);
-  expect(
-    screen.getByRole("button", { name: "Upgrade capacity" }),
-  ).toBeDisabled();
-  expect(
-    screen.getByText("This capacity exceeds the technology or site limit."),
-  ).toBeVisible();
+  await userEvent.tab();
+  expect(offer).toHaveFocus();
+  expect(await screen.findByRole("tooltip")).toHaveTextContent(
+    "This capacity exceeds the technology or site limit.",
+  );
+  await userEvent.keyboard("{Enter}");
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
 });
 
 it.each([false, true])(
@@ -164,7 +175,7 @@ it.each([false, true])(
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
     );
     expect(
-      screen.getByRole("region", { name: "Capacity upgrade" }),
+      screen.getByRole("button", { name: "Upgrade capacity" }),
     ).toHaveFocus();
   },
 );
