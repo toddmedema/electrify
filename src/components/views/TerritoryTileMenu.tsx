@@ -27,7 +27,7 @@ export default function TerritoryTileMenu({
   projectSite,
   onClose,
   onChooseSite,
-  onInspect,
+  onBuild,
   onExpand,
   onAcquire,
 }: {
@@ -40,7 +40,7 @@ export default function TerritoryTileMenu({
   projectSite: boolean;
   onClose: () => void;
   onChooseSite: () => void;
-  onInspect: () => void;
+  onBuild: () => void;
   onExpand: () => void;
   onAcquire: (id: UtilityAcquisitionId) => void;
 }) {
@@ -90,18 +90,14 @@ export default function TerritoryTileMenu({
       onSelect: () => void purchase(quote.tileId, quote.quoteKey),
     });
   }
-  tileActions.push({
-    label: showBuild ? "Build" : "Inspect",
-    icon: (
-      <ConceptIcon
-        concept={showBuild ? "build" : "forecast"}
-        fontSize="small"
-        decorative
-      />
-    ),
-    disabled: busy,
-    onSelect: onInspect,
-  });
+  if (showBuild) {
+    tileActions.push({
+      label: "Build",
+      icon: <ConceptIcon concept="build" fontSize="small" decorative />,
+      disabled: busy,
+      onSelect: onBuild,
+    });
+  }
   const canCancelCapacity = !!(
     facility?.expansionInProgress && actions.onCancelExpansion
   );

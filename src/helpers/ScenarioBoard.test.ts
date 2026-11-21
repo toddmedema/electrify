@@ -14,7 +14,7 @@ import {
 } from "./TerritoryTiles";
 import { parseSave, serializeSave } from "../SaveGame";
 import reducer, { applyAcquireUtility } from "../reducers/Game";
-import { acquisitionQuote } from "./Expansion";
+import { acquisitionQuote, utilityAcquisitions } from "./Expansion";
 import { gameObjectiveResults } from "./ObjectiveRules";
 import { acquireTile, acquireUtility } from "../reducers/GameActions";
 import { validTerritoryNetwork } from "./TerritoryValidation";
@@ -205,9 +205,37 @@ it("serves each city with a utility and sells both sites from the plant border",
   const short = cloneDeep(game);
   currentTick(short)!.cash = quote.cashDue - 1;
   expect(reducer(short, acquireUtility(payload))).toBe(short);
-  expect(reducer(game, acquireUtility({ ...payload, financed: true }))).toBe(
-    game,
+  const shortDownPayment = cloneDeep(game);
+  currentTick(shortDownPayment)!.cash = quote.financedCashDue - 1;
+  const financedAction = acquireUtility({ ...payload, financed: true });
+  expect(reducer(shortDownPayment, financedAction)).toBe(shortDownPayment);
+  const financedGame = cloneDeep(game);
+  currentTick(financedGame)!.cash = quote.financedCashDue;
+  const financed = reducer(financedGame, financedAction);
+  expect(reducer(financed, financedAction)).toBe(financed);
+  expect(currentTick(financed)!.cash).toBe(0);
+  expect(currentTick(financed)!.customers).toBe(customers + quote.customers);
+  expect(utilityAcquisitions(financed)).toMatchObject([
+    { targetId: quote.targetId, financed: true },
+  ]);
+  expect(financed.utilityExpansion?.loans).toMatchObject([
+    {
+      targetId: quote.targetId,
+      kind: "purchase",
+      principal: quote.newLoan,
+      loanAmountLeft: quote.newLoan,
+      loanMonthlyPayment: quote.monthlyDebtService,
+    },
+  ]);
+  const financedSave = cloneDeep(serializeSave(financed));
+  const reloaded = parseSave(financedSave);
+  expect(reloaded?.game.utilityExpansion?.loans).toEqual(
+    financed.utilityExpansion?.loans,
   );
+  financedSave.game.utilityExpansion!.loans[0].targetId = "parcel-5";
+  financedSave.game.utilityExpansion!.loans[0].id =
+    "scenario-116-parcel-5-purchase";
+  expect(parseSave(financedSave)).toBeNull();
   expect(reducer(game, acquireUtility({ ...payload, quoteKey: "stale" }))).toBe(
     game,
   );

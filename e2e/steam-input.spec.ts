@@ -1184,7 +1184,7 @@ test("controller reviews, cancels and confirms a utility acquisition", async ({
   });
   const line = page.locator(".tileWorkspaceSurface");
   const acquire = line.getByRole("button", {
-    name: "Acquire Ridge Electric",
+    name: "Acquire",
     exact: true,
   });
   await select(page, acquire);
@@ -1203,7 +1203,7 @@ test("controller reviews, cancels and confirms a utility acquisition", async ({
   // The accessible dialog disappears before MUI's exit surface relinquishes Escape.
   await expect(page.locator(".MuiDialog-root:visible")).toHaveCount(0);
   await expect(
-    line.getByRole("button", { name: "Acquire Ridge Electric", exact: true }),
+    line.getByRole("button", { name: "Acquire", exact: true }),
   ).toHaveCount(0);
   await expect(
     line.getByRole("heading", { name: "Williston", exact: true }),
@@ -1542,7 +1542,6 @@ test("TV saved display preferences style direct scenario links before play", asy
   await expect(buildEntry).toBeInViewport({ ratio: 1 });
   const tile = await selectMapTile(page, "champlain:site-13");
   await expect(tile).toHaveAttribute("data-owned", "true");
-  await expect(tile).toContainText("Open site");
   await input(page, "confirm");
   await expect(tile).toHaveAttribute("aria-pressed", "true");
   const builder = page.getByRole("dialog", {

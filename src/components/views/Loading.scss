@@ -1,0 +1,108 @@
+.missionLoading {
+  position: relative;
+
+  .missionLoadingArt {
+    position: relative;
+    width: 56px;
+    height: 56px;
+    color: var(--interactive-blue);
+  }
+
+  .missionLoadingPlug {
+    position: absolute;
+    top: 22px;
+    left: 16px;
+    width: 24px;
+    height: 16px;
+    border-radius: 4px 4px 8px 8px;
+    background: currentColor;
+
+    &::before,
+    &::after {
+      content: "";
+      position: absolute;
+      width: 4px;
+      border-radius: 2px;
+      background: currentColor;
+    }
+
+    &::before {
+      top: -8px;
+      left: 5px;
+      height: 9px;
+      box-shadow: 10px 0 currentColor;
+    }
+
+    &::after {
+      top: 14px;
+      left: 10px;
+      height: 9px;
+    }
+  }
+
+  .missionLoadingSpark {
+    position: absolute;
+    top: 12px;
+    left: 10px;
+    width: 3px;
+    height: 6px;
+    border-radius: 2px;
+    background: currentColor;
+    --spark-direction: -1;
+    transform: rotate(calc(var(--spark-direction) * 45deg));
+  }
+
+  .missionLoadingSparkRight {
+    left: auto;
+    right: 10px;
+    --spark-direction: 1;
+  }
+
+  .missionLoadingStatus {
+    position: absolute;
+    top: calc(50% + 44px);
+    inset-inline: 16px;
+    text-align: center;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .missionLoadingPlug {
+      animation: missionLoadingBob 1.6s ease-in-out infinite;
+    }
+
+    .missionLoadingSpark {
+      animation: missionLoadingWink 1.6s ease-out infinite;
+    }
+  }
+}
+
+@keyframes missionLoadingBob {
+  0%,
+  50%,
+  100% {
+    transform: translateY(0);
+  }
+
+  30% {
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes missionLoadingWink {
+  0%,
+  48% {
+    opacity: 0;
+    transform: rotate(calc(var(--spark-direction) * 45deg)) scale(0.5);
+  }
+
+  55% {
+    opacity: 1;
+  }
+
+  72%,
+  100% {
+    opacity: 0;
+    transform: translate(calc(var(--spark-direction) * 5px), -4px)
+      rotate(calc(var(--spark-direction) * 45deg));
+  }
+}

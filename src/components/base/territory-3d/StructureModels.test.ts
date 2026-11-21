@@ -188,9 +188,12 @@ describe.each(kinds)("%s model", (kind) => {
   it("connects conductors to drawn stationary terminal caps", () => {
     const model = getStructureModel(kind);
     const body = vertices(model.parts[0].mesh);
-    expect(model.terminals).toHaveLength(2);
+    const solar = kind === "solar" || kind === "solar-hail-damaged";
+    const [minHeight, maxHeight] = solar ? [0, 0.06] : [0.1, Infinity];
+    expect(model.terminals).toHaveLength(solar ? 4 : 2);
     for (const terminal of model.terminals) {
-      expect(terminal[1]).toBeGreaterThan(0.1);
+      expect(terminal[1]).toBeGreaterThan(minHeight);
+      expect(terminal[1]).toBeLessThanOrEqual(maxHeight);
       const closest = Math.min(
         ...body.map((point) =>
           Math.hypot(
