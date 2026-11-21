@@ -112,11 +112,14 @@ function objectiveRequirement(
         );
   const compact =
     objective.metric === "utilityOwnership"
-      ? `Acquire competitors (${result.observed ?? 0}/${result.target})`
+      ? `Acquire utilities (${result.observed ?? 0}/${result.target})`
       : `${target} (${observed})`;
   return {
     id: result.id,
-    label: result.label,
+    label:
+      objective.metric === "utilityOwnership"
+        ? objectiveTargetText(objective, currency)
+        : result.label,
     definition: objectiveDefinitionText(result),
     required: result.required,
     reason: result.reason,

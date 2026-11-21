@@ -72,6 +72,16 @@ export default function MapWorkspace({
   const controllerInput = useControllerInput();
   const floating = presentation.layout === "side" && !controllerInput;
   const tileClose = React.useRef<() => void>();
+  const projectClose = React.useRef<() => void>();
+  const [projectOpen, setProjectOpen] = React.useState(false);
+  const showProject = React.useCallback((close: () => void) => {
+    projectClose.current = close;
+    setProjectOpen(true);
+  }, []);
+  const hideProject = React.useCallback(() => {
+    projectClose.current = undefined;
+    setProjectOpen(false);
+  }, []);
   const [stack, setStack] = React.useState<{
     card: typeof card;
     destination?: MapTool;
@@ -132,13 +142,14 @@ export default function MapWorkspace({
     if (projectBusy && (requestedPanel || requestedProject)) returnToMap();
   }, [projectBusy, requestedPanel, requestedProject, returnToMap]);
   const close = React.useCallback(
-    (tool: MapTool) => {
+    (tool: MapTool, focusTrigger = true) => {
       const remaining = windows.filter((item) => item !== tool);
       setStack({ card, destination, windows: remaining });
       if (!floating || tool === destination) {
         retainFocus.current = true;
         dispatch(navigate(remaining.findLast(isDockTool) ?? "FACILITIES"));
       }
+      if (!focusTrigger) return;
       const trigger = MAP_TOOLS.find((item) => item.id === tool)!.triggerId;
       document.getElementById(trigger)?.focus({ preventScroll: true });
     },
@@ -168,6 +179,10 @@ export default function MapWorkspace({
   }, []);
   const toggleTool = (tool: GameTool | MapPanelView) => {
     if (projectBusy) return;
+    if (tool === "BUILD_GENERATORS" && projectClose.current) {
+      projectClose.current();
+      return;
+    }
     if (tool !== "BUILD_GENERATORS" && openPanels.includes(tool)) {
       if (floating && tool !== active) {
         raise(tool);
@@ -237,6 +252,8 @@ export default function MapWorkspace({
           }
         : undefined,
       projectRequested: !projectBusy && requestedProject,
+      showProject,
+      hideProject,
       onProjectBusyChange: setProjectBusy,
     }),
     [
@@ -250,6 +267,8 @@ export default function MapWorkspace({
       requestedProject,
       returnToMap,
       showTile,
+      showProject,
+      hideProject,
     ],
   );
   return (
@@ -285,6 +304,8 @@ export default function MapWorkspace({
                 }}
               >
                 <GameAppBar
+                  scenarioOpen={openPanels.includes("SCENARIO")}
+                  onCloseScenario={() => close("SCENARIO", false)}
                   eventStatus={
                     desktopMap && (
                       <MapEventStatus
@@ -372,7 +393,10 @@ export default function MapWorkspace({
                   showEventStatus={!desktopMap}
                   openMapViews={openPanels.filter(isMapView)}
                   onToggleMapView={toggleTool}
-                  openTools={openPanels.filter((tool) => !isMapView(tool))}
+                  openTools={[
+                    ...openPanels.filter((tool) => !isMapView(tool)),
+                    ...(projectOpen ? (["BUILD_GENERATORS"] as const) : []),
+                  ]}
                   onToggle={toggleTool}
                 />
               </div>

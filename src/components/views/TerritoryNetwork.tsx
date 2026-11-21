@@ -114,6 +114,7 @@ function DeferredProjectBuild(
     <React.Suspense
       fallback={
         <TileWorkspaceSurface
+          id="tool-BUILD_GENERATORS"
           title="Plan a project"
           focusKey="project-loading"
           returnFocusSelector=".desktopBuildRail, #buildNav"
@@ -144,7 +145,8 @@ export default function TerritoryNetwork(props: Props) {
 function TileNetwork(props: Props) {
   const { game } = props;
   const panel = React.useContext(MapWorkspacePanelContext);
-  const { showTile, hideTile, tileWindow } = panel ?? {};
+  const { showTile, hideTile, tileWindow, showProject, hideProject } =
+    panel ?? {};
   const map = React.useRef<HTMLElement>(null);
   const lastTile = React.useRef<TerritoryMapTileKey>();
   const focusAfterClose = React.useRef<TerritoryMapTileKey>();
@@ -287,6 +289,12 @@ function TileNetwork(props: Props) {
   React.useEffect(() => {
     if (panel?.projectRequested) startProject();
   }, [panel?.projectRequested, startProject]);
+  const projectVisible = planning && (!panel?.open || projectPending);
+  React.useLayoutEffect(() => {
+    if (!projectVisible || !showProject) return;
+    showProject(close);
+    return hideProject;
+  }, [projectVisible, showProject, hideProject, close]);
   const projectPricingKey =
     planning && project && !catalogue
       ? `${signature(game)}|${game.interestRate}|${JSON.stringify(views.map(({ tile }) => territoryMapTileKey(tile)))}|${JSON.stringify(game.multiplayer?.tileOwners)}|${JSON.stringify(game.multiplayer?.landOwners)}`
@@ -448,7 +456,7 @@ function TileNetwork(props: Props) {
         onExpand={() => menu && inspect(menu.key, true, "expand")}
         onAcquire={setReview}
       />
-      {planning && (!panel?.open || projectPending) && (
+      {projectVisible && (
         <DeferredProjectBuild
           game={game}
           project={project}

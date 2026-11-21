@@ -1184,7 +1184,7 @@ for (const theme of ["light", "dark"] as const) {
     await expect(
       page
         .getByRole("region", { name: "Goals", exact: true })
-        .getByText("Acquire 3 competitors · Dec 2014", {
+        .getByText("Acquire 3 utilities · Dec 2014", {
           exact: true,
         }),
     ).toBeVisible();
@@ -2139,7 +2139,15 @@ for (const theme of ["light", "dark"] as const) {
     });
     await expectDialogToFit(review);
     await expect(review).toContainText("Sites transferred");
-    await expect(review).toContainText("The seller removes its plant.");
+    await review.getByText("Plants & purchased power", { exact: true }).click();
+    await expect(
+      review.getByText("Operating plants", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      review
+        .getByLabel("Operating plants")
+        .getByText("Natural Gas Peaker", { exact: true }),
+    ).toBeVisible();
     await expect(
       review.getByRole("button", { name: "Pay cash" }),
     ).toBeEnabled();
@@ -2159,6 +2167,7 @@ for (const theme of ["light", "dark"] as const) {
     expect(currentTick((await readSavedGame(page))!)!.cash).toBe(
       currentTick(before)!.cash,
     );
+    await review.getByText("Plants & purchased power", { exact: true }).click();
     await reviewScreenshot(review, {
       path: info.outputPath(`municipal-acquisition-${theme}.png`),
       animations: "disabled",
@@ -2188,7 +2197,14 @@ for (const theme of ["light", "dark"] as const) {
         ({ targetId }) => targetId === quote.targetId,
       ),
     ).toHaveLength(financed ? 1 : 0);
-    expect(saved.facilities).toHaveLength(before.facilities.length);
+    expect(saved.facilities).toHaveLength(before.facilities.length + 1);
+    expect(
+      saved.facilities.find(({ tileId }) => tileId === plant.id),
+    ).toMatchObject({
+      name: "Natural Gas Peaker",
+      peakW: 55e6,
+      yearsToBuildLeft: 0,
+    });
     await closeTileSurface(surface);
     await selectTerritoryMapTile(page, city);
     const cityPanel = tileSurface(page);

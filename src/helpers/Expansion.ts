@@ -1,12 +1,14 @@
 import {
   createTerritoryTileAdjacency,
   getFacilityTile,
+  getTerritoryTile,
   hasTerritoryNetwork,
   ownedTerritoryTiles,
 } from "./TerritoryTiles";
 import {
   MUNICIPAL_UTILITIES,
   municipalUtility,
+  type MunicipalPlant,
 } from "../data/MunicipalUtilities";
 import { municipalTerritoryOffer, transferTerritorySites } from "./Territories";
 import { TERRITORY_TILES } from "../data/TerritoryTiles";
@@ -39,6 +41,10 @@ import {
   type AcquisitionLoan,
   type FacilityOperatingType,
   type GameType,
+  type LocationType,
+  type TerritoryId,
+  type TerritoryTileId,
+  type FacilityShoppingType,
   type UtilityId,
   type UtilityTargetId,
   type UtilityNetworkAsset,
@@ -56,6 +62,7 @@ import {
   utilityNetworkAnnualOM,
 } from "../data/UtilityExpansion";
 import {
+  facilityAgeYears,
   facilityCashBack,
   getMonthlyPayment,
   purchaseTerms,
@@ -67,6 +74,7 @@ import {
 } from "./DateTime";
 import { cityCustomerCount } from "./CityProfiles";
 import { customerMarketSizeAt } from "./Customers";
+import { defaultDispatchIndex } from "./DispatchOrder";
 import { startingFacilityQuote } from "./StartingFacilities";
 import { startingFacilityStarts } from "./StartingFacilityStarts";
 import { windAnnualOutputDegradation } from "../data/Facilities";
@@ -138,13 +146,8 @@ export function expansionNetWorth(
     ) ?? 0)
   );
 }
-/** Inherited assets use their opening technology and age, not a newly built 2017 plant. */
-export function acquisitionAssets(
-  game: GameType,
-  targetId: UtilityTargetId,
-): FacilityOperatingType[] | undefined {
-  const definition = UTILITY_AREAS[targetId];
-  const opening = {
+function sellerOpening(game: GameType, location: LocationType): GameType {
+  return {
     ...game,
     scenarioId: EXPANSION_SCENARIO_ID,
     customScenario: undefined,
@@ -152,59 +155,96 @@ export function acquisitionAssets(
     storyEffectsDisabled: false,
     weatherHazardsDisabled: false,
     utilityExpansion: undefined,
-    location: definition.location,
+    location,
     commissionedHydroSiteIds: [],
     date: getDateFromMinute(0, 2005),
     facilities: [],
     timeline: [],
   };
-  let nextId = game.facilities.reduce((max, f) => Math.max(max, f.id), 0) + 1;
+}
+
+function nextFacilityId(game: GameType): number {
+  return (
+    game.facilities.reduce((max, facility) => Math.max(max, facility.id), 0) + 1
+  );
+}
+
+function inheritedFacility(
+  game: GameType,
+  quote: FacilityShoppingType,
+  id: number,
+  territoryId: TerritoryId,
+  tileId: TerritoryTileId | undefined,
+  age: number,
+  startingAssetId?: string,
+  hydroSiteId = quote.hydroSiteId,
+): FacilityOperatingType {
+  const { viableLocationsRemaining: _remaining, ...technology } = quote;
+  const packageCost = INHERITED_COLD_PACKAGE_COST_2005[startingAssetId ?? ""];
+  if (packageCost !== undefined && !isStorage(technology)) {
+    technology.buildCost +=
+      packageCost - (technology.resilienceExtraBuildCost ?? 0);
+    technology.resilienceExtraBuildCost = packageCost;
+  }
+  return {
+    ...technology,
+    territoryId,
+    tileId,
+    startingAssetId,
+    hydroSiteId,
+    ...(quote.fuel === "Wind"
+      ? { annualOutputDegradation: windAnnualOutputDegradation(2005 - age) }
+      : {}),
+    id,
+    currentW: 0,
+    currentWh: quote.peakWh === undefined ? undefined : 0,
+    yearsToBuildLeft: 0,
+    minuteCreated: game.date.minute,
+    minuteOperational: age === 0 ? 0 : -age * DAYS_PER_YEAR * 24 * 60,
+    loanAmountTotal: 0,
+    loanAmountLeft: 0,
+    loanMonthlyPayment: 0,
+    interestRate: 0,
+    lifetimeWh: 0,
+    lifetimePotentialWh: 0,
+    lifetimeRevenue: 0,
+    lifetimeExpenses: 0,
+    lifetimeStarts: startingFacilityStarts(
+      quote,
+      age + game.date.monthsElapsed / 12,
+    ),
+    constructionKgco2eTotal: 0,
+    ...(quote.reservoirCapacityWh
+      ? { reservoirWh: quote.reservoirCapacityWh * 0.5 }
+      : {}),
+  } as FacilityOperatingType;
+}
+
+/** Inherited assets use their opening technology and age, not a newly built 2017 plant. */
+export function acquisitionAssets(
+  game: GameType,
+  targetId: UtilityTargetId,
+): FacilityOperatingType[] | undefined {
+  const definition = UTILITY_AREAS[targetId];
+  const opening = sellerOpening(game, definition.location);
+  let nextId = nextFacilityId(game);
   const result: FacilityOperatingType[] = [];
   for (const search of definition.facilities) {
     if (game.date.monthsElapsed > 227 && search.fuel === "Oil") continue;
     const quote = startingFacilityQuote(opening, search);
     if (!quote) return undefined;
-    const { viableLocationsRemaining: _remaining, ...technology } = quote;
-    const packageCost = INHERITED_COLD_PACKAGE_COST_2005[search.assetId ?? ""];
-    if (packageCost !== undefined && !isStorage(technology)) {
-      technology.buildCost +=
-        packageCost - (technology.resilienceExtraBuildCost ?? 0);
-      technology.resilienceExtraBuildCost = packageCost;
-    }
-
-    const age = search.initialAgeYears ?? 0;
-    result.push({
-      ...technology,
-      territoryId: targetId,
-      tileId: getFacilityTile({ startingAssetId: search.assetId })?.id,
-      startingAssetId: search.assetId,
-      hydroSiteId: search.hydroSiteId ?? quote.hydroSiteId,
-      ...(quote.fuel === "Wind"
-        ? { annualOutputDegradation: windAnnualOutputDegradation(2005 - age) }
-        : {}),
-      id: nextId++,
-      currentW: 0,
-      currentWh: quote.peakWh === undefined ? undefined : 0,
-      yearsToBuildLeft: 0,
-      minuteCreated: game.date.minute,
-      minuteOperational: -age * DAYS_PER_YEAR * 24 * 60,
-      loanAmountTotal: 0,
-      loanAmountLeft: 0,
-      loanMonthlyPayment: 0,
-      interestRate: 0,
-      lifetimeWh: 0,
-      lifetimePotentialWh: 0,
-      lifetimeRevenue: 0,
-      lifetimeExpenses: 0,
-      lifetimeStarts: startingFacilityStarts(
+    result.push(
+      inheritedFacility(
+        game,
         quote,
-        age + game.date.monthsElapsed / 12,
+        nextId++,
+        targetId,
+        getFacilityTile({ startingAssetId: search.assetId })?.id,
+        search.initialAgeYears ?? 0,
+        search.assetId,
+        search.hydroSiteId,
       ),
-      constructionKgco2eTotal: 0,
-      ...(quote.reservoirCapacityWh
-        ? { reservoirWh: quote.reservoirCapacityWh * 0.5 }
-        : {}),
-    } as FacilityOperatingType);
+    );
   }
   return result;
 }
@@ -338,26 +378,63 @@ export function bordersUtility(game: GameType, targetId: string): boolean {
   );
 }
 
+/** Resolve the seller's original plant even after it has been sold or expanded by the buyer. */
+export function municipalPlantAsset(
+  game: GameType,
+  { tileId, facility }: MunicipalPlant,
+) {
+  const tile = getTerritoryTile(tileId, game);
+  const { name, fuel, peakW } = facility;
+  const technology = startingFacilityQuote(
+    sellerOpening(game, UTILITY_AREAS.champlain.location),
+    { name, fuel, peakW },
+  );
+  return tile && technology
+    ? inheritedFacility(
+        game,
+        technology,
+        nextFacilityId(game),
+        tile.territoryId,
+        tileId,
+        0,
+      )
+    : undefined;
+}
+
 function municipalOffer(game: GameType, id: string) {
   const territory = municipalTerritoryOffer(game, id);
   if (!territory) return undefined;
-  const financed = purchaseTerms(territory.price, true, game.interestRate);
+  const plant = territory.plant && municipalPlantAsset(game, territory.plant);
+  if (territory.plant && !plant) return undefined;
+  const plantPrice = plant ? facilityCashBack(plant, game.date.minute) : 0;
+  const price = territory.price + plantPrice;
+  const financed = purchaseTerms(price, true, game.interestRate);
   return {
     kind: "municipal" as const,
     territory,
+    plant,
+    plantPrice,
     targetId: territory.utility.id,
     name: territory.utility.name,
     customers: territory.customers,
-    equityPrice: territory.price,
+    equityPrice: price,
     fee: 0,
     assumedDebt: 0,
-    cashDue: territory.price,
+    cashDue: price,
     financedCashDue: financed.amountDue,
     newLoan: financed.loanAmount,
     monthlyDebtService: financed.monthlyPayment,
     cashMonthlyDebtService: 0,
     networkOMPerMonth: 0,
-    facilities: [],
+    facilities: plant
+      ? [
+          {
+            name: plant.name,
+            peakW: plant.peakW,
+            ageYears: facilityAgeYears(plant, game.date.minute),
+          },
+        ]
+      : [],
     contracts: [],
   };
 }
@@ -476,6 +553,12 @@ export function transferUtility(game: GameType, value: unknown): boolean {
   });
   if (quote.kind === "municipal") {
     if (!transferTerritorySites(game, quote.territory, due)) return false;
+    if (quote.plant)
+      game.facilities.splice(
+        defaultDispatchIndex(game.facilities, quote.plant),
+        0,
+        quote.plant,
+      );
     if (value.financed)
       game.utilityExpansion.loans.push(
         loan("purchase", quote.newLoan, game.interestRate, LOAN_MONTHS),

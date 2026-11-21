@@ -433,8 +433,8 @@ export function municipalTerritoryOffer(game: GameType, id: unknown) {
     customers: sites.some((tile) => tile.id === utility.city.id)
       ? customerMarketSizeAt(cityCustomerCount(utility.id), game.date.minute)
       : 0,
-    removedPlant: sites.some((tile) => tile.id === utility.plant?.tileId)
-      ? utility.plant?.facility
+    plant: sites.some((tile) => tile.id === utility.plant?.tileId)
+      ? utility.plant
       : undefined,
     price: purchases.reduce((total, part) => total + part.price, 0),
   };

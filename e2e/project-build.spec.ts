@@ -45,9 +45,7 @@ test("keeps project actions reachable on a short landscape display", async ({
   await start(page, "light");
   const catalogue = await openMapProjectCatalogue(page);
   await setMapProjectCapacity(catalogue, false, "10");
-  await catalogue
-    .getByRole("button", { name: "Choose sites for Wind" })
-    .click();
+  await catalogue.getByRole("button", { name: "Pick site for Wind" }).click();
   await selectTerritoryMapTile(page, getTerritoryTile("champlain:site-13")!);
   const surface = page.getByRole("dialog", { name: "Wind · 20MW" });
   for (const name of ["Cash", "Loan", "Cancel"])
@@ -78,7 +76,7 @@ for (const theme of ["light", "dark"] as const) {
     const projectTitle = "Wind · 30MW";
     await setMapProjectCapacity(catalogue, false, "11");
     await catalogue
-      .getByRole("button", { name: "Choose sites for Wind", exact: true })
+      .getByRole("button", { name: /^(Choose sites|Pick site) for Wind$/ })
       .click();
     await expect(network.locator(".territoryMap")).toHaveAttribute(
       "data-buy-mode",

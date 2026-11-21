@@ -63,7 +63,10 @@ export default function ConstructionBuildHeader(
           value={props.sliderValue}
           disabled={props.sliderDisabled}
           getAriaValueText={props.sliderValueText}
-          aria-labelledby="construction-capacity"
+          aria-label={props.capacityLabel}
+          aria-labelledby={
+            props.capacityLabel ? undefined : "construction-capacity"
+          }
           valueLabelDisplay="off"
           min={props.sliderMin}
           step={1}

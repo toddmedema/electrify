@@ -16,6 +16,7 @@ export function findTileControl(map: HTMLElement | null, tile: string) {
 }
 
 type SurfaceProps = {
+  id?: string;
   title: string;
   /** Changes only for explicit activation or a new kind of tile content. */
   focusKey: React.Key;
@@ -48,6 +49,7 @@ export function TileInspectionSurface({
 
 /** A nonmodal surface for tile information and the map's build and project decisions. */
 export default function TileWorkspaceSurface({
+  id,
   title,
   focusKey,
   subtitle,
@@ -104,7 +106,7 @@ export default function TileWorkspaceSurface({
     <section
       role="dialog"
       aria-labelledby={titleId}
-      id={stacked ? "tool-TILE" : undefined}
+      id={stacked ? "tool-TILE" : id}
       className={`tileWorkspaceSurface${inspector ? " tileWorkspaceInspector" : ""}${wide ? " tileWorkspaceWide" : ""}${building ? " tileWorkspaceBuilding" : ""}${projectCandidate ? " tileWorkspaceProject" : ""}`}
       data-game-tool={stacked ? "TILE" : undefined}
       data-map-window-front={front}

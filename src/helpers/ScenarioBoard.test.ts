@@ -3,6 +3,7 @@ import { VALLEY_BOARD, isValleyBoardTile } from "../data/TerritoryTiles";
 import { municipalPlantAt } from "../data/MunicipalUtilities";
 import { createGame } from "../testing/Simulator";
 import { retiredValleyOpeningProgress } from "../testing/SaveTestHelpers";
+import { getMonthlyPayment, maxLoanAmount } from "./Financials";
 import { currentTick } from "./GameSelectors";
 import { territoryTileViews } from "./TerritoryMapState";
 import { purchaseTile, tilePrice, tilePurchaseQuote } from "./Territories";
@@ -195,6 +196,8 @@ it("serves each city with a utility and sells both sites from the plant border",
     plant.id,
     city.id,
   ]);
+  expect(quote.plantPrice).toBeGreaterThan(0);
+  expect(quote.cashDue).toBe(quote.territory.price + quote.plantPrice);
   const payload = {
     targetId: quote.targetId,
     financed: false,
@@ -229,9 +232,29 @@ it("serves each city with a utility and sells both sites from the plant border",
   ]);
   const financedSave = cloneDeep(serializeSave(financed));
   const reloaded = parseSave(financedSave);
+  expect(
+    reloaded?.game.facilities.find(({ tileId }) => tileId === plant.id),
+  ).toMatchObject({
+    name: "Natural Gas Peaker",
+    peakW: 55e6,
+    yearsToBuildLeft: 0,
+  });
   expect(reloaded?.game.utilityExpansion?.loans).toEqual(
     financed.utilityExpansion?.loans,
   );
+  const olderSave = cloneDeep(financedSave);
+  olderSave.game.facilities = olderSave.game.facilities.filter(
+    ({ tileId }) => tileId !== plant.id,
+  );
+  const olderLoan = olderSave.game.utilityExpansion!.loans[0];
+  olderLoan.principal = maxLoanAmount(quote.territory.price);
+  olderLoan.loanAmountLeft = olderLoan.principal;
+  olderLoan.loanMonthlyPayment = getMonthlyPayment(
+    olderLoan.principal,
+    olderLoan.interestRate,
+    olderLoan.months,
+  );
+  expect(parseSave(olderSave)).not.toBeNull();
   financedSave.game.utilityExpansion!.loans[0].targetId = "parcel-5";
   financedSave.game.utilityExpansion!.loans[0].id =
     "scenario-116-parcel-5-purchase";
@@ -250,14 +273,20 @@ it("serves each city with a utility and sells both sites from the plant border",
     target: 3,
     status: "inProgress",
   });
-  for (const id of [plant.id, city.id]) {
-    expect(
-      territoryTileViews(purchased).find(({ tile }) => tile.id === id),
-    ).toMatchObject({
+  const purchasedViews = territoryTileViews(purchased);
+  expect(purchasedViews.find(({ tile }) => tile.id === city.id)).toMatchObject({
+    owned: true,
+  });
+  expect(purchasedViews.find(({ tile }) => tile.id === plant.id)).toMatchObject(
+    {
       owned: true,
-      facility: undefined,
-    });
-  }
+      operatingFacility: {
+        name: "Natural Gas Peaker",
+        peakW: 55e6,
+        yearsToBuildLeft: 0,
+      },
+    },
+  );
   expect(validTerritoryNetwork(purchased)).toBe(true);
   expect(
     parseSave(JSON.parse(JSON.stringify(serializeSave(purchased)))),
