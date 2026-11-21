@@ -1,4 +1,5 @@
 import { defineConfig } from "@playwright/test";
+import { journeyTrace } from "./journey-trace";
 
 // Not 3000: with reuseExistingServer, a local `npm start` there would be reused without the
 // e2e environment below.
@@ -26,8 +27,7 @@ export default defineConfig({
     baseURL,
     headless: true,
     screenshot: "only-on-failure",
-    // Trace diagnostic retries in CI; keep first-attempt evidence during local iteration.
-    trace: process.env.CI ? "on-first-retry" : "retain-on-failure",
+    trace: journeyTrace,
   },
   projects: [
     {

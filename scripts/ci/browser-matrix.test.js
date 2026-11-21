@@ -1,6 +1,9 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const { spawnSync } = require("node:child_process");
+const fs = require("node:fs");
+const { parse } = require("yaml");
+const { planForRun } = require("./test-suites");
 
 function list(arguments_) {
   const result = spawnSync(
@@ -97,10 +100,21 @@ test("production browser shards run the complete PR matrix exactly once", () => 
       "--project=mobile-360px",
     ]),
   ].sort();
-  const actual = [1, 2]
-    .flatMap((shard) =>
-      list(["--config=e2e/ci.playwright.config.ts", `--shard=${shard}/2`]),
-    )
+  const { shard: shards } = parse(
+    fs.readFileSync(".github/workflows/workflow.yml", "utf8"),
+  ).jobs.browser.strategy.matrix;
+  const actual = shards
+    .flatMap((shard) => {
+      const plan = planForRun("browser", {
+        ELECTRIFY_BROWSER_SHARD: `${shard}/${shards.length}`,
+      });
+      const cases = list([
+        "--config=e2e/ci.playwright.config.ts",
+        ...plan.browser[0].args,
+      ]);
+      assert(cases.length > 0, `Hosted shard ${shard} collected no tests`);
+      return cases;
+    })
     .sort();
   assert(original.length > 0);
   assert.equal(
@@ -112,7 +126,6 @@ test("production browser shards run the complete PR matrix exactly once", () => 
 });
 
 test("native sharding preserves every packaged desktop case with one worker per isolated runner", (t) => {
-  const fs = require("node:fs");
   const path = require("node:path");
   const { discover, plan } = require("./desktop-tests");
   const parent = path.resolve(".tmp", "native-plan-tests");
