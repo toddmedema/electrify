@@ -511,8 +511,9 @@ it("shows purchased cities as customers rather than build destinations", async (
   inspect(target.id);
   fireEvent.click(within(surface()).getByRole("button", { name: "Acquire" }));
   const review = screen.getByRole("dialog", { name: /^Acquire Vergennes/ });
-  expect(within(review).getByText("Sites transferred")).toBeVisible();
-  fireEvent.click(within(review).getByText("Plants & purchased power"));
+  expect(
+    within(review).queryByText("Sites transferred"),
+  ).not.toBeInTheDocument();
   expect(
     within(within(review).getByLabelText("Operating plants")).getByText(
       "Natural Gas Peaker",

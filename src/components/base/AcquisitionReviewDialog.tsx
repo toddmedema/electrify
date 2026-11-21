@@ -24,7 +24,6 @@ import DecisionImpactPreview from "./DecisionImpactPreview";
 import { useBuildCash } from "./useBuildCash";
 import { LOAN_MONTHS } from "../../Constants";
 import UtilityContractSchedule from "./UtilityContractSchedule";
-import { TERRITORY_TILES } from "../../data/TerritoryTiles";
 
 interface Props {
   game: GameType;
@@ -90,10 +89,6 @@ export default function AcquisitionReviewDialog({
       </DecisionDialog>
     );
   const municipal = offer.kind === "municipal" ? offer.territory : undefined;
-  const sites =
-    municipal?.purchases.length ??
-    TERRITORY_TILES.filter((tile) => tile.territoryId === offer.targetId)
-      .length;
   const customersBefore = now?.customers ?? 0;
   const customersAfter = customersBefore + offer.customers;
   const customerGrowth =
@@ -142,15 +137,6 @@ export default function AcquisitionReviewDialog({
             ? `${formatForecastWatts(preview.beforeMarginW)} → ${marginText(preview.afterMarginW)}`
             : "Forecast unavailable",
         },
-        {
-          concept: "build",
-          label: "Sites transferred",
-          value: String(sites),
-          detail:
-            offer.kind === "municipal" && offer.plant
-              ? `Includes the ${formatWatts(offer.plant.peakW)} ${offer.plant.name}.`
-              : undefined,
-        },
       ]}
       preface={
         error || !quote || cash < offer.financedCashDue ? (
@@ -176,7 +162,7 @@ export default function AcquisitionReviewDialog({
       }
       afterFacts={
         <div className="acquisitionReviewDetails">
-          <details className="acquisitionDisclosure">
+          <details className="acquisitionDisclosure" open>
             <summary>Plants &amp; purchased power</summary>
             <div>
               {!!offer.facilities.length && (

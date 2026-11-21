@@ -82,6 +82,7 @@ it.each(["valley-electric", "ridge-electric"] as const)(
     ).not.toBeInTheDocument();
     const payments = screen.getByRole("region", { name: "Expected impact" });
     expect(within(payments).getByText(expectedMargin(preview))).toBeVisible();
+    expect(screen.queryByText("Sites transferred")).not.toBeInTheDocument();
     expect(payments).toHaveTextContent(
       `${formatPurchasePrice(quote.cashDue)} now + ${formatMoneyConcise(quote.cashMonthlyDebtService + quote.networkOMPerMonth)}/mo`,
     );
@@ -104,8 +105,6 @@ it.each(["valley-electric", "ridge-electric"] as const)(
     expect(screen.getByRole("button", { name: "Take loan" })).toBeEnabled();
 
     const assets = disclosure("Plants & purchased power");
-    expect(within(assets).getByText("Operating plants")).not.toBeVisible();
-    await user.click(within(assets).getByText("Plants & purchased power"));
     expect(within(assets).getByText("Operating plants")).toBeVisible();
     expect(
       within(assets)
@@ -125,6 +124,9 @@ it.each(["valley-electric", "ridge-electric"] as const)(
     }
     for (const contract of quote.contracts)
       expect(within(assets).getByText(contract.name)).toBeVisible();
+
+    await user.click(within(assets).getByText("Plants & purchased power"));
+    expect(within(assets).getByText("Operating plants")).not.toBeVisible();
 
     const financing = disclosure("Financing breakdown");
     expect(within(financing).getByText("Inherited debt")).not.toBeVisible();
@@ -151,7 +153,6 @@ it("keeps Valley’s inherited supply and future reduction discoverable", async 
   review("valley-electric");
   const assets = disclosure("Plants & purchased power");
   const schedule = disclosure("Supply & operating changes");
-  await userEvent.click(within(assets).getByText("Plants & purchased power"));
   await userEvent.click(
     within(schedule).getByText("Supply & operating changes"),
   );
@@ -168,10 +169,9 @@ it("keeps Valley’s inherited supply and future reduction discoverable", async 
 
 it.each([2017, 2024])(
   "keeps the current Valley supply and its reduction date discoverable in %i",
-  async (year) => {
+  (year) => {
     review("valley-electric", year);
     const assets = disclosure("Plants & purchased power");
-    await userEvent.click(within(assets).getByText("Plants & purchased power"));
     expect(
       within(assets).getByText(/nuclear purchase is now/),
     ).toHaveTextContent("76MW");
@@ -179,12 +179,11 @@ it.each([2017, 2024])(
   },
 );
 
-it("explains expired power rights from a 2025 purchase", async () => {
+it("explains expired power rights from a 2025 purchase", () => {
   const { quote, preview } = review("valley-electric", 2025);
   expect(quote.contracts).toEqual([]);
   expect(screen.getByText(expectedMargin(preview))).toBeVisible();
   const assets = disclosure("Plants & purchased power");
-  await userEvent.click(within(assets).getByText("Plants & purchased power"));
   expect(
     within(assets).getByText(/nuclear purchase has expired/),
   ).toBeVisible();

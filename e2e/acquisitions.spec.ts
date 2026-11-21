@@ -1376,6 +1376,12 @@ for (const theme of ["light", "dark"] as const) {
       exact: true,
     });
     await expectDialogToFit(review);
+    await expect(
+      review.getByRole("region", { name: "Operating plants" }),
+    ).toBeVisible();
+    await expect(
+      review.getByRole("region", { name: "Purchased power" }),
+    ).toBeVisible();
     await expect(review).toContainText("Inherited debt");
     await review.getByRole("button", { name: "Cancel", exact: true }).click();
     await expect(review).toHaveCount(0);
@@ -2142,8 +2148,7 @@ for (const theme of ["light", "dark"] as const) {
       exact: true,
     });
     await expectDialogToFit(review);
-    await expect(review).toContainText("Sites transferred");
-    await review.getByText("Plants & purchased power", { exact: true }).click();
+    await expect(review).not.toContainText("Sites transferred");
     await expect(
       review.getByText("Operating plants", { exact: true }),
     ).toBeVisible();
@@ -2171,7 +2176,9 @@ for (const theme of ["light", "dark"] as const) {
     expect(currentTick((await readSavedGame(page))!)!.cash).toBe(
       currentTick(before)!.cash,
     );
-    await review.getByText("Plants & purchased power", { exact: true }).click();
+    await expect(
+      review.getByRole("region", { name: "Operating plants" }),
+    ).toBeVisible();
     await reviewScreenshot(review, {
       path: info.outputPath(`municipal-acquisition-${theme}.png`),
       animations: "disabled",
