@@ -1399,6 +1399,11 @@ export default function TerritoryHexMap({
             ]
               .filter(Boolean)
               .join(" · ");
+            // The city is already named in the button label.
+            const descriptionId =
+              utility && tileLabel === cityLabel
+                ? undefined
+                : `${mapId}-${key}-status`;
             return (
               <button
                 key={key}
@@ -1445,7 +1450,7 @@ export default function TerritoryHexMap({
                       : label
                 }
                 aria-pressed={key === activeSelected}
-                aria-describedby={`${mapId}-${key}-status`}
+                aria-describedby={descriptionId}
                 onFocus={(event) => {
                   setRovingId(key);
                   if (key !== selected) onSelect(key);
@@ -1553,9 +1558,11 @@ export default function TerritoryHexMap({
                     )}
                   </span>
                 )}
-                <span className="srOnly" id={`${mapId}-${key}-status`}>
-                  {tileLabel}
-                </span>
+                {descriptionId && (
+                  <span className="srOnly" id={descriptionId}>
+                    {tileLabel}
+                  </span>
+                )}
               </button>
             );
           })}

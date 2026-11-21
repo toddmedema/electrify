@@ -269,9 +269,10 @@ it("explains and colors physical building eligibility without guessing from terr
   expect(hoverColor(vacant)).toBe("var(--interactive-blue)");
   expect(vacant).toHaveAccessibleDescription("Plains");
   expect(hoverColor(map.target("champlain:city"))).toBe("var(--blackout-red)");
-  expect(map.target("champlain:city")).toHaveAccessibleDescription(
-    /^Burlington/,
-  );
+  const capital = map.target("champlain:city");
+  expect(capital).toHaveAccessibleName("Inspect You territory · Burlington");
+  expect(capital).not.toHaveAccessibleDescription();
+  expect(capital).toHaveAttribute("data-tooltip", "Burlington");
   expect(hoverColor(map.target(occupied.tile.id))).toBe("var(--blackout-red)");
   expect(map.target(occupied.tile.id)).toHaveAccessibleDescription(
     new RegExp(occupied.facility!.name),
