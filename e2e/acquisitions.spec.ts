@@ -1048,11 +1048,36 @@ for (const theme of ["light", "dark"] as const) {
     await expect(
       network.locator('[data-map-target][aria-pressed="true"]'),
     ).toHaveCount(0);
-    const dismiss = page.getByRole("button", {
+    const snackbar = page.locator(".snackbar");
+    const message = snackbar.getByText(/^Construction started:/);
+    const dismiss = snackbar.getByRole("button", {
       name: "Dismiss notification",
       exact: true,
     });
-    if (await dismiss.isVisible()) await dismiss.click();
+    if (await dismiss.isVisible()) {
+      await dismiss.click();
+    } else if (await message.isVisible()) {
+      // Phones dismiss this toast by swiping its message away.
+      const bounds = (await message.boundingBox())!;
+      const x = bounds.x + bounds.width / 3;
+      const y = bounds.y + bounds.height / 2;
+      const touch = await page.context().newCDPSession(page);
+      await touch.send("Input.dispatchTouchEvent", {
+        type: "touchStart",
+        touchPoints: [{ x, y }],
+      });
+      for (const offset of [32, 64, 96]) {
+        await touch.send("Input.dispatchTouchEvent", {
+          type: "touchMove",
+          touchPoints: [{ x: x + offset, y }],
+        });
+      }
+      await touch.send("Input.dispatchTouchEvent", {
+        type: "touchEnd",
+        touchPoints: [],
+      });
+      await touch.detach();
+    }
     await expect(page.locator(".MuiSnackbar-root")).toHaveCount(0);
 
     const states = [
