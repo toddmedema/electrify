@@ -54,6 +54,11 @@ export default function DailySupplyMarginChart({
         </select>
       </div>
       <PolicyDemandLegend labels={labels} />
+      {forecast.estimatedHistory && (
+        <p className="dailySupplyMarginNote">
+          Missing historical readings are estimated.
+        </p>
+      )}
       <UPlotChart
         ariaLabel={`Estimated average daily supply margin before and after commissioning, ${MONTHS[month] ?? annual}`}
         height={160}

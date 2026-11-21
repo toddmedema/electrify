@@ -2563,6 +2563,12 @@ $pane_header_height: 48px;
     }
   }
 }
+.dailySupplyMarginNote {
+  margin: 0 12px 4px;
+  color: var(--font-color-faded);
+  font-size: var(--font-size-caption);
+  text-align: center;
+}
 .chartTooltipContext {
   margin-top: 8px;
   padding-top: 8px;
@@ -5198,6 +5204,11 @@ $homeSmokeCycle: 5.6s;
 
 @media (prefers-reduced-motion: reduce) {
   @include staticHomeLogo;
+}
+
+// The startup screen owns focus until the home menu's save catalog is ready.
+html.js:has(#appStartup) #root {
+  visibility: hidden;
 }
 
 #appStartup {
@@ -8855,6 +8866,9 @@ option {
 
 .powerAgreements {
   overflow-wrap: anywhere;
+  .buildDetails .MuiTableCell-root {
+    height: auto;
+  }
   .powerAgreement {
     padding: 16px 0;
     border-bottom: 1px solid var(--border-subtle);

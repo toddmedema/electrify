@@ -4,6 +4,7 @@ import reducer, {
   buildFacility,
   generateForecastTimeline,
   previewFacilityBuild,
+  tickState,
 } from "../../reducers/Game";
 import { TICK_MINUTES, TICKS_PER_YEAR } from "../../Constants";
 import {
@@ -326,6 +327,24 @@ it("uses recorded ticks for the completed part of the current month", () => {
     Array(4).fill(-777),
   );
   expect(result.before.averageDayByMonthW[0][4]).not.toBeNull();
+});
+
+it("recreates missing Valley history without resettling live agreement accounts", () => {
+  const game = createGame({ scenarioId: 116, seed: 12345 });
+  for (let i = 0; i < (2 * MINUTES_PER_MONTH) / TICK_MINUTES; i++)
+    tickState(game);
+  const accounts = game.transmission!.agreementAccounts!;
+  expect(accounts[0].accountedThroughMinute).toBeGreaterThan(0);
+  const before = JSON.stringify(accounts);
+  const facility = GENERATORS(game, 10e6, [], []).find(
+    (quote) => quote.name === "Solar",
+  )!;
+  const result = computeOutlook("buildImpact", game, facility)!;
+  expect(result.estimatedHistory).toBe(true);
+  expect(result.before.averageDayW.every(Number.isFinite)).toBe(true);
+  expect(result.before.monthlyMarginW.every(Number.isFinite)).toBe(true);
+  expect(result.before.unservedWh).toBeGreaterThanOrEqual(0);
+  expect(JSON.stringify(accounts)).toBe(before);
 });
 
 it("counts exactly one operating year of energy across partial calendar months", () => {

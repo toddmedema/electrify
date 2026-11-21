@@ -25,6 +25,7 @@ import type {
   TickPresentFutureType,
 } from "../../Types";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "../../helpers/DateTime";
+import { wrapIndex } from "../../helpers/Math";
 import { monthMinute } from "../../helpers/Projection";
 import type { OutputWeatherTick } from "../../helpers/ExpectedOutput";
 
@@ -73,6 +74,7 @@ interface BuildImpactPeriod {
 }
 export interface BuildImpactForecast {
   months: number[];
+  estimatedHistory: boolean;
   before: BuildImpactPeriod;
   after: BuildImpactPeriod;
 }
@@ -92,11 +94,25 @@ function estimateBuildHistory(
     {
       ...game,
       date: getDateFromMinute(start, game.startingYear),
-      facilities: game.facilities.filter(
-        (facility) =>
-          facility.yearsToBuildLeft === 0 &&
-          facility.minuteCreated <= Math.max(0, start),
-      ),
+      transmission: game.transmission && {
+        ...game.transmission,
+        // The live ledger is already settled beyond this private forecast's cutoff.
+        agreementAccounts: undefined,
+      },
+      facilities: game.facilities.flatMap((facility) => {
+        const opening = facility.minuteOperational ?? facility.minuteCreated;
+        if (facility.yearsToBuildLeft > 0 || opening >= end) return [];
+        // Existing opening assets also serve the estimated pregame period.
+        if (opening <= Math.max(0, start)) return [facility];
+        return [
+          {
+            ...facility,
+            currentW: 0,
+            yearsToBuildLeft:
+              (opening - start) / (TICKS_PER_YEAR * TICK_MINUTES),
+          },
+        ];
+      }),
     },
     now.cash,
     now.customers,
@@ -142,7 +158,7 @@ function buildImpactPeriod(
     const first = index;
     while (index < timeline.length && timeline[index].minute < finish) {
       const tick = timeline[index++];
-      const slot = (((tick.minute % 1440) + 1440) % 1440) / TICK_MINUTES;
+      const slot = wrapIndex(tick.minute, 1440) / TICK_MINUTES;
       const margin = supplyMargin(tick);
       minimum = Math.min(minimum, margin);
       shortage += Math.max(0, tick.demandW - tick.supplyW);
@@ -260,6 +276,7 @@ export function computeOutlook<K extends OutlookKind>(
             commissionedMinute / MINUTES_PER_MONTH,
         ),
       ),
+      estimatedHistory: estimatedHistory.length > 0,
       before: beforePeriod,
       after: afterPeriod,
     } as OutlookResults[K];

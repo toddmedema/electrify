@@ -275,7 +275,7 @@
   }
   .gameWorkspace:has(.territoryMap[data-renderer="ready"])
     .tileWorkspaceSurface.tileWorkspaceInspector {
-    max-height: calc(50% - 40px);
+    max-height: max(96px, min(calc(50% - 40px), calc(100% - 50dvh - 44px)));
   }
   .tileWorkspaceSurface.tileWorkspaceInspector .tileWorkspaceBody {
     padding-top: 0;

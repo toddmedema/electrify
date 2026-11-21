@@ -5967,6 +5967,8 @@ function* supplyFacilitiesFinancesPhases(
   const agreementEnd = settlementEndMinute;
   const agreementStart =
     preRoll || !advanceConstruction ? now.minute : agreementEnd - stepMinutes;
+  // A pregame build estimate includes the inherited supply already in place on opening day.
+  const entitlementMinute = simulated && now.minute < 0 ? 0 : agreementStart;
   // Eligibility belongs to the elapsed contract interval; physical readiness must
   // share this dispatch frame's weather/scarcity budget with ordinary imports.
   const readyAgreements = entitlementSources(
@@ -5976,7 +5978,7 @@ function* supplyFacilitiesFinancesPhases(
     true,
     false,
     excludedAgreementId,
-    agreementStart,
+    entitlementMinute,
   );
   if (sharedClearing) {
     sharedClearing.commitments.push(
@@ -6009,7 +6011,7 @@ function* supplyFacilitiesFinancesPhases(
     false,
     true,
     excludedAgreementId,
-    agreementStart,
+    entitlementMinute,
   );
   // Use fully paid blocks before adding monthly-minimum usage, then pay-as-used supply.
   const entitlementOffers = [

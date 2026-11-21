@@ -62,9 +62,9 @@ for (const theme of ["light", "dark"] as const) {
       }
     }
     expect(
-      await agreements.evaluate(
-        (element) => element.scrollWidth <= element.clientWidth,
-      ),
+      await agreements
+        .locator(".territoryWorkspace")
+        .evaluate((element) => element.scrollWidth <= element.clientWidth),
     ).toBe(true);
     const opening = await readSavedGame(page);
     expect(opening!.transmission!.lines).toEqual([]);
@@ -196,8 +196,11 @@ for (const theme of ["light", "dark"] as const) {
     await page.keyboard.press("Home");
     await expect(slider).toHaveAttribute("aria-valuenow", "1");
     await expect(dialog.getByRole("row", { name: /Duration/ })).toContainText(
-      "1 yearEnds Dec 2020",
+      "1 year",
     );
+    await expect(
+      dialog.getByRole("row", { name: /^Final month/ }),
+    ).toContainText("Dec 2020");
     const oneYearRate = await agreementRate();
     await expect(discount).toHaveText("Discount1%");
     expect(oneYearRate).toBeGreaterThan(tenYearRate);

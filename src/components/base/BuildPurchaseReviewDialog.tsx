@@ -85,14 +85,18 @@ export default function BuildPurchaseReviewDialog({
             territoryId,
             tileId,
           }),
-          fallback: () =>
-            computeOutlook(
-              "buildImpact",
-              snapshot,
-              facility,
-              territoryId,
-              tileId,
-            ),
+          // Long quarter-hour forecasts can block the main thread when a worker fails.
+          fallback:
+            facility.yearsToBuild <= 1
+              ? () =>
+                  computeOutlook(
+                    "buildImpact",
+                    snapshot,
+                    facility,
+                    territoryId,
+                    tileId,
+                  )
+              : undefined,
         }
       : undefined,
     {

@@ -125,6 +125,7 @@ it.each([0, 0.5])(
         : [0, ...Array.from({ length: 12 }, (_, index) => index + 0.5)];
     const forecast: BuildImpactForecast = {
       months,
+      estimatedHistory: false,
       before: {
         startMinute: (7 + offset - 12) * MINUTES_PER_MONTH,
         monthlyMarginW: months.map(() => 10e6),

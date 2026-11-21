@@ -174,6 +174,23 @@ test("ordinary starting hills offer general technologies and retain special-site
     await expect(row).toContainText("Not buildable on this tile");
     await expect(row.getByRole("button")).toHaveCount(0);
   }
+  await options
+    .getByRole("button", { name: "Review purchase of Solar", exact: true })
+    .click();
+  const review = page.getByRole("dialog", { name: /^Build .* Solar\?$/ });
+  await expect(review).toBeVisible();
+  await expect(review.getByText("Project site", { exact: true })).toHaveCount(
+    0,
+  );
+  await expect(review.getByText(/^Build in /)).toHaveCount(0);
+  const facts = review.getByRole("region", { name: "Expected impact" });
+  for (const label of ["Lowest supply margin", "Unserved energy"]) {
+    const value = facts
+      .locator(".decisionImpactFact")
+      .filter({ hasText: label })
+      .locator(".decisionImpactFactValue");
+    await expect(value).toHaveText(/^-?[\d.]+\S* → -?[\d.]+\S*$/);
+  }
 });
 
 for (const theme of ["light", "dark"] as const) {

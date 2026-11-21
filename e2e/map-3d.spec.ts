@@ -461,7 +461,7 @@ for (const reducedMotion of ["no-preference", "reduce"] as const) {
             .getBoundingClientRect();
           return Math.hypot(
             tile.x + tile.width / 2 - map.x - map.width / 2,
-            tile.y + tile.height / 2 - map.y - map.height / 2,
+            tile.y + tile.height / 2 - window.innerHeight / 2,
           );
         });
         expect(distanceFromCenter).toBeLessThan(1);
