@@ -119,6 +119,7 @@ const SCENARIO_SELECTION = /^[a-zA-Z0-9:|._-]{1,256}$/;
 
 const MAX_BYTES = 16 * 1024 * 1024;
 const MAX_COMPRESSED = 4 * 1024 * 1024;
+const MAX_PENDING_CHECKPOINTS = 2;
 const MAX_RECORD_BYTES = 64 * 1024;
 const MAX_RECORDS = 256;
 const CHUNK = 32 * 1024;
@@ -516,6 +517,7 @@ class SteamMultiplayer {
     if (!this.matchmaking || !this.sockets || !this.utils)
       throw new Error("Steam multiplayer interfaces unavailable");
     this.connections = new Map();
+    this.pendingCheckpoints = new Map();
     this.allowed = null;
     this.savedAt = null;
     this.sharedAt = null;
@@ -790,8 +792,9 @@ class SteamMultiplayer {
     );
     this.connections.delete(handle);
     if (connection) {
-      if (this.pendingCheckpoint?.connection === connection)
-        this.pendingCheckpoint = undefined;
+      for (const [matchId, request] of this.pendingCheckpoints)
+        if (request.connection === connection)
+          this.pendingCheckpoints.delete(matchId);
       this.emit({ kind: "disconnected", sender: connection.id });
       this.publish();
     }
@@ -968,39 +971,42 @@ class SteamMultiplayer {
         }
     return this.state();
   }
-  /** At most one disk write and the newest pending checkpoint; records never await storage. */
-  queueCheckpoint(sender, payload, connection) {
-    this.pendingCheckpoint = { sender, payload, connection };
+  /** One active disk write, with the newest pending checkpoint per admitted campaign. */
+  queueCheckpoint(sender, { world, digest }, connection) {
+    const matchId = world?.matchId;
+    if (!boundedText(matchId, 200)) return;
+    // Superseding a waiting write moves it to the tail in arrival order. At capacity, preserve
+    // already admitted campaigns and leave a new campaign unacknowledged for a periodic retry.
+    const replaced = this.pendingCheckpoints.delete(matchId);
+    if (!replaced && this.pendingCheckpoints.size >= MAX_PENDING_CHECKPOINTS)
+      return;
+    this.pendingCheckpoints.set(matchId, { sender, world, digest, connection });
     if (this.checkpointWrite) return;
     const current = (request) =>
       this.hostId === request.sender &&
       this.hostId !== this.service.identity.steamId &&
       request.connection.connected &&
       [...this.connections.values()].includes(request.connection);
-    this.checkpointWrite = (async () => {
-      while (this.pendingCheckpoint) {
-        const request = this.pendingCheckpoint;
-        this.pendingCheckpoint = undefined;
-        if (!current(request)) continue;
-        try {
-          const digest = await this.persist(request.payload.world);
-          if (digest !== request.payload.digest || !current(request)) continue;
-          this.sharedAt = this.savedAt;
-          this.publish();
-          this.send(request.sender, { kind: "saved", digest });
-        } catch {
-          // No receipt: the next periodic checkpoint retries failed writes.
+    this.checkpointWrite = Promise.resolve().then(async () => {
+      try {
+        while (this.pendingCheckpoints.size) {
+          const [pendingMatch, request] = this.pendingCheckpoints
+            .entries()
+            .next().value;
+          this.pendingCheckpoints.delete(pendingMatch);
+          if (!current(request)) continue;
+          try {
+            const savedDigest = await this.persist(request.world);
+            if (savedDigest !== request.digest || !current(request)) continue;
+            this.sharedAt = this.savedAt;
+            this.publish();
+            this.send(request.sender, { kind: "saved", digest: savedDigest });
+          } catch {
+            // No receipt: the next periodic checkpoint retries failed writes.
+          }
         }
-      }
-    })().finally(() => {
-      this.checkpointWrite = undefined;
-      if (this.pendingCheckpoint) {
-        const request = this.pendingCheckpoint;
-        this.queueCheckpoint(
-          request.sender,
-          request.payload,
-          request.connection,
-        );
+      } finally {
+        this.checkpointWrite = undefined;
       }
     });
   }
@@ -1276,7 +1282,7 @@ class SteamMultiplayer {
     this.error = undefined;
     this.sharedAt = null;
     this.pendingInvite = undefined;
-    this.pendingCheckpoint = undefined;
+    this.pendingCheckpoints.clear();
     this.publish();
   }
   async request(input) {

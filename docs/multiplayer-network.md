@@ -96,6 +96,11 @@ reconnect needs a complete copy and queueing changed contents invalidates the ol
 receipt for the current checkpoint queued on that connection advances the displayed remote
 confirmation time.
 
+While a guest writes a checkpoint, it retains the latest waiting checkpoint for each of up to two
+campaigns. A new campaign arriving at capacity receives no receipt and can retry if it is still
+current. This gives already queued campaigns a chance to reach disk while bounding memory during
+a storage stall. Ordered records continue to arrive while the disk write is pending.
+
 The benchmark calls native checkpoint, send and receive methods, then chunks and reassembles the
 actual compressed payloads. It checks initial copies, unacknowledged retries, zero bytes for
 acknowledged repeats and a full copy after one peer reconnects. Disk writes are counted and stubbed

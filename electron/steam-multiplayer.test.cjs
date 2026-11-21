@@ -1601,17 +1601,9 @@ test("slow checkpoint storage does not delay ordered records and only keeps the 
   clearInterval(mp.timer);
   t.after(() => mp.dispose());
   mp.hostId = "76561198000000002";
-  const checkpoints = [1, 2, 3].map((revision) => {
-    const world = { ...replicationIdentity, revision };
-    return {
-      kind: "checkpoint",
-      world,
-      digest: require("node:crypto")
-        .createHash("sha256")
-        .update(stringify(world))
-        .digest("hex"),
-    };
-  });
+  const checkpoints = [1, 2, 3].map((revision) =>
+    guestCheckpoint({ ...replicationIdentity, revision }),
+  );
   const firstWrite = Promise.withResolvers();
   const started = Promise.withResolvers();
   const writes = [];
@@ -1657,14 +1649,8 @@ test("slow checkpoint storage does not delay ordered records and only keeps the 
   );
 });
 
-test("checkpoint completion never acknowledges a departed connection or a failed disk write", async (t) => {
-  const { mp } = fixture();
-  clearInterval(mp.timer);
-  t.after(() => mp.dispose());
-  mp.hostId = "76561198000000002";
-  const peer = connectedPeer(mp, mp.hostId);
-  const world = { revision: 1 };
-  const payload = {
+function guestCheckpoint(world) {
+  return {
     kind: "checkpoint",
     world,
     digest: require("node:crypto")
@@ -1672,21 +1658,124 @@ test("checkpoint completion never acknowledges a departed connection or a failed
       .update(stringify(world))
       .digest("hex"),
   };
+}
+
+function blockedCheckpointGuest(t) {
+  const { mp, api } = fixture();
+  clearInterval(mp.timer);
+  mp.hostId = "76561198000000002";
   const disk = Promise.withResolvers();
-  t.mock.method(mp, "persist", () => disk.promise);
-  await mp.receive(mp.hostId, payload);
-  const replacement = { ...peer, queue: [] };
-  mp.connections.set(100, replacement);
-  disk.resolve(payload.digest);
+  t.after(() => {
+    disk.resolve();
+    mp.dispose();
+  });
+  const writes = [];
+  t.mock.method(mp, "persist", async (world) => {
+    writes.push(world);
+    if (writes.length === 1) await disk.promise;
+    return guestCheckpoint(world).digest;
+  });
+  return { mp, api, writes, unblock: disk.resolve };
+}
+
+test(
+  "blocked guest storage preserves each campaign's latest checkpoint in arrival order",
+  { timeout: 2000 },
+  async (t) => {
+    const { mp, api, writes, unblock } = blockedCheckpointGuest(t);
+    const first = { matchId: "first-campaign", revision: 1 };
+    const older = { ...first, revision: 2 };
+    const next = { matchId: "next-campaign", revision: 1 };
+    const latest = { ...first, revision: 3 };
+    const checkpoints = [first, older, latest, next].map(guestCheckpoint);
+    const { connection } = pumpFrames(
+      mp,
+      api,
+      checkpoints.flatMap((payload) => framesFor(encode(payload))),
+    );
+
+    mp.pump();
+    await connection.delivery;
+    assert.deepEqual(writes, [first], "only one guest write can be active");
+    assert.deepEqual(connection.queue, []);
+    unblock();
+    await mp.checkpointWrite;
+    assert.deepEqual(writes, [first, latest, next]);
+    const receipts = await Promise.all(
+      connection.queue.map((message) => assemble(new Map(), chunk(message))),
+    );
+    assert.deepEqual(
+      receipts,
+      [first, latest, next].map((world) => ({
+        kind: "saved",
+        digest: guestCheckpoint(world).digest,
+      })),
+    );
+  },
+);
+
+test("a full guest checkpoint queue preserves admitted campaigns and permits retry", async (t) => {
+  const { mp, writes, unblock } = blockedCheckpointGuest(t);
+  const peer = connectedPeer(mp, mp.hostId);
+  const first = { matchId: "first-campaign", revision: 1 };
+  const pending = { ...first, revision: 2 };
+  const next = { matchId: "next-campaign", revision: 1 };
+  const overflow = { matchId: "overflow", revision: 1 };
+  const latest = { ...first, revision: 3 };
+  const invalid = { matchId: "x".repeat(201), revision: 1 };
+  for (const world of [first, invalid, pending, next, overflow, latest])
+    await mp.receive(mp.hostId, guestCheckpoint(world));
+
+  unblock();
   await mp.checkpointWrite;
-  assert.deepEqual(replacement.queue, []);
-  assert.equal(mp.sharedAt, null);
+  assert.deepEqual(writes, [first, next, latest]);
+  assert.equal(peer.queue.length, 3, "overflow is not acknowledged");
+  const retry = guestCheckpoint(overflow);
+  await mp.receive(mp.hostId, retry);
+  await mp.checkpointWrite;
+  assert.deepEqual(writes, [first, next, latest, overflow]);
+  assert.deepEqual(await assemble(new Map(), chunk(peer.queue.at(-1))), {
+    kind: "saved",
+    digest: retry.digest,
+  });
+});
+
+test("checkpoint completion never acknowledges a departed connection or a failed disk write", async (t) => {
+  const { mp } = fixture();
+  clearInterval(mp.timer);
+  t.after(() => mp.dispose());
+  mp.hostId = "76561198000000002";
+  const peer = connectedPeer(mp, mp.hostId);
+  const payload = guestCheckpoint({ matchId: "campaign", revision: 1 });
+  const disk = Promise.withResolvers();
+  const writes = [];
+  t.mock.method(mp, "persist", async (world) => {
+    writes.push(world);
+    if (world === payload.world) await disk.promise;
+    return guestCheckpoint(world).digest;
+  });
+  await mp.receive(mp.hostId, payload);
+  for (const matchId of ["departed-first", "departed-second"])
+    await mp.receive(mp.hostId, guestCheckpoint({ matchId, revision: 1 }));
+  mp.drop(100);
+  const replacement = connectedPeer(mp, mp.hostId);
+  const fresh = guestCheckpoint({ matchId: "replacement", revision: 1 });
+  await mp.receive(mp.hostId, fresh);
+  disk.resolve();
+  await mp.checkpointWrite;
+  assert.deepEqual(writes, [payload.world, fresh.world]);
+  assert.deepEqual(peer.queue, []);
+  assert.equal(replacement.queue.length, 1);
+  assert.deepEqual(await assemble(new Map(), chunk(replacement.queue[0])), {
+    kind: "saved",
+    digest: fresh.digest,
+  });
   mp.persist = async () => {
     throw new Error("disk unavailable");
   };
   await mp.receive(mp.hostId, payload);
   await mp.checkpointWrite;
-  assert.deepEqual(replacement.queue, []);
+  assert.equal(replacement.queue.length, 1);
   await assert.rejects(
     mp.receive(mp.hostId, { ...payload, digest: "wrong" }),
     /checksum/,
