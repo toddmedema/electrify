@@ -1020,6 +1020,10 @@ export class MapRenderer {
       throw new Error("Map GPU buffer upload or draw failed");
     this.frames++;
     this.paintedLighting = lighting;
+    if (frame.width !== this.paintedScene?.frame.width)
+      this.canvas.style.width = `${frame.width}px`;
+    if (frame.height !== this.paintedScene?.frame.height)
+      this.canvas.style.height = `${frame.height}px`;
     if (
       this.paintedScene?.frame !== frame ||
       this.paintedScene.instances !== this.instances

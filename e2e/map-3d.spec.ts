@@ -141,6 +141,80 @@ for (const theme of ["light", "dark"] as const) {
   });
 }
 
+test("resizing keeps the painted terrain and map labels centered at the same zoom", async ({
+  page,
+}) => {
+  const original = page.viewportSize()!;
+  await page.clock.install();
+  const { map } = await startPausedMap(page);
+  const viewport = map.locator(".territoryMapViewport");
+  const scale = (await viewport.getAttribute("data-camera-scale"))!;
+  await pauseBrowserClock(page);
+
+  const geometry = () =>
+    viewport.evaluate((element) => {
+      const view = element.getBoundingClientRect();
+      const paint = element.querySelector("canvas")!.getBoundingClientRect();
+      const stage = element
+        .querySelector(".territoryMapStage")!
+        .getBoundingClientRect();
+      const markers = element
+        .querySelector<SVGGElement>(".territoryHexGrid > g")!
+        .getScreenCTM()!;
+      const centerX = view.left + view.width / 2;
+      const centerY = view.top + view.height / 2;
+      return {
+        viewSize: [view.width, view.height],
+        paintSize: [paint.width, paint.height],
+        paintDrift: Math.hypot(
+          paint.left + paint.width / 2 - centerX,
+          paint.top + paint.height / 2 - centerY,
+        ),
+        markerScale: [markers.a, markers.d],
+        labelX: stage.left - centerX,
+        labelY: stage.top - centerY,
+      };
+    });
+  const initial = await geometry();
+  let painted = initial;
+  for (const size of [
+    { width: 1147, height: 790 },
+    { width: 580, height: 670 },
+    { width: 630, height: 720 },
+    original,
+  ]) {
+    await page.setViewportSize(size);
+    await expect
+      .poll(async () => (await geometry()).viewSize)
+      .not.toEqual(painted.viewSize);
+    const frozen = await geometry();
+    expect(
+      frozen.paintSize,
+      "resizing never stretches the previous frame",
+    ).toEqual(painted.paintSize);
+    expect(frozen.paintDrift).toBeLessThan(1);
+    expect(frozen.markerScale).toEqual(initial.markerScale);
+    expect(
+      Math.hypot(
+        frozen.labelX - initial.labelX,
+        frozen.labelY - initial.labelY,
+      ),
+    ).toBeLessThan(1);
+    await expect
+      .poll(async () => {
+        await page.clock.runFor(32);
+        const current = await geometry();
+        return Math.hypot(
+          current.viewSize[0] - current.paintSize[0],
+          current.viewSize[1] - current.paintSize[1],
+        );
+      })
+      .toBeLessThan(1);
+    await expect(viewport).toHaveAttribute("data-camera-scale", scale);
+    painted = await geometry();
+  }
+});
+
 for (const theme of ["light", "dark"] as const) {
   test(`hovers and pans the rendered map on desktop · ${theme}`, async ({
     page,

@@ -235,12 +235,7 @@ export async function readTerritoryMapCamera(viewport: Locator) {
     const stage = element.querySelector<HTMLElement>(".territoryMapStage")!;
     const transform = new DOMMatrix(stage.style.transform || undefined);
     const scale = Number(element.getAttribute("data-camera-scale"));
-    const { clientWidth: width, clientHeight: height } = element;
-    return {
-      x: (width / 2 - transform.e) / scale,
-      y: (height / 2 - transform.f) / scale,
-      scale,
-    };
+    return { x: -transform.e / scale, y: -transform.f / scale, scale };
   });
 }
 
