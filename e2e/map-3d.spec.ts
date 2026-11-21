@@ -1241,12 +1241,24 @@ test("tile inspection shares the desktop window stack", async ({
   await nextTile.press("Enter");
   await expect(inspector).toHaveCount(0);
   await expect(nextTile).toHaveAttribute("aria-pressed", "true");
-  const emptyInspector = await sameWindow!.evaluate((element) => ({
-    reused: document.querySelector("#tool-TILE") === element,
-    width: element.getBoundingClientRect().width,
-  }));
-  expect(emptyInspector.reused).toBe(true);
-  expect(placement.width / emptyInspector.width).toBeCloseTo(1.3, 1);
+  expect(
+    await sameWindow!.evaluate(
+      (element) => document.querySelector("#tool-TILE") === element,
+    ),
+  ).toBe(true);
+  const emptyInspector = page.getByRole("dialog", {
+    name: "Plains",
+    exact: true,
+  });
+  await expect(emptyInspector).toBeVisible();
+  await expect
+    .poll(() =>
+      emptyInspector.evaluate(
+        (element, width) => width / element.getBoundingClientRect().width,
+        placement.width,
+      ),
+    )
+    .toBeCloseTo(1.3, 1);
   await capital.click();
   await expect(inspector).toHaveAttribute("data-map-window-front", "true");
 
