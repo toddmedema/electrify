@@ -407,9 +407,13 @@ function tileCenter(tile: HTMLButtonElement, stage: HTMLElement) {
     .slice("translate(".length)
     .split(", ")
     .map(Number.parseFloat);
+  // CSS puts the stage origin at the viewport center, which jsdom does not lay out.
+  const { clientWidth, clientHeight } = screen.getByRole("region", {
+    name: "Territory map",
+  });
   return {
-    x: x + Number.parseFloat(tile.style.left),
-    y: y + Number.parseFloat(tile.style.top),
+    x: clientWidth / 2 + x + Number.parseFloat(tile.style.left),
+    y: clientHeight / 2 + y + Number.parseFloat(tile.style.top),
   };
 }
 function fullyVisible(
@@ -1071,6 +1075,30 @@ it("activates and hovers the picked elevated model while keyboard and explicit p
       expect(company).toHaveAttribute("data-model-hovered", "true"),
     );
     expect(hoverColor(company)).toBe("var(--territory-owner-valley)");
+  } finally {
+    restore();
+  }
+});
+
+it("ignores presses outside the painted map even if the terrain draws before release", async () => {
+  const restore = enable3D();
+  try {
+    const map = show();
+    await screen.findByTestId("map-scene");
+    const tile = map.target("champlain:site-13");
+
+    mockPick.mockReturnValue(null);
+    tap(tile);
+    expect(map.onSelect).not.toHaveBeenCalled();
+
+    fireEvent.pointerDown(tile, { pointerId: 1, clientX: 100, clientY: 100 });
+    mockPick.mockReturnValue(undefined);
+    fireEvent.pointerUp(tile, { pointerId: 1, clientX: 100, clientY: 100 });
+    fireEvent.click(tile, { detail: 1 });
+    expect(map.onSelect).not.toHaveBeenCalled();
+
+    tap(tile);
+    expect(map.onSelect).toHaveBeenLastCalledWith(idOf(tile), true);
   } finally {
     restore();
   }

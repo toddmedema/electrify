@@ -37,10 +37,11 @@ import type {
 
 import { WATERSHED_LEVEL_OFFSETS, waterLevelOffset } from "./WaterSurface";
 
+/** Undefined allows ground hit testing; null means the point is outside the painted frame. */
 export type ScenePicker = (point: {
   x: number;
   y: number;
-}) => TerritoryMapTileKey | undefined;
+}) => TerritoryMapTileKey | null | undefined;
 type PickFrame = Pick<
   MapFrame,
   "width" | "height" | "cameraX" | "cameraY" | "scale" | "weather"
