@@ -433,7 +433,7 @@ const sortOptions: ReadonlyArray<readonly [StorageSortKey, string]> = [
 ];
 
 function valueLabelFormat(x: number) {
-  return formatWatts(sliderTickToW(x));
+  return formatWattHours(sliderTickToW(x));
 }
 
 export interface StateProps {
@@ -570,9 +570,10 @@ function StorageBuildDialog(props: Props): React.JSX.Element {
         />
       )}
       <ConstructionBuildHeader
-        capacity={`${valueLabelFormat(sliderTick)}h`}
+        capacity={valueLabelFormat(sliderTick)}
         capacityLabel={onPickSite ? "Storage capacity" : undefined}
         sliderValue={sliderTick}
+        sliderValueText={valueLabelFormat}
         sliderMin={4}
         sliderMax={37}
         sort={sort}

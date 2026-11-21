@@ -40,9 +40,11 @@ export default function FinishedObjective({
         calendar.durationMonths,
         monthOffset,
       )
-    : first === last
-      ? `Month ${first + 1}`
-      : `Months ${first + 1}–${last + 1}`;
+    : objective.checkpoint
+      ? `Month ${("deadlineMonth" in objective ? objective.deadlineMonth : objective.throughMonth) + 1}`
+      : first === last
+        ? `Month ${first + 1}`
+        : `Months ${first + 1}–${last + 1}`;
   const goal =
     target === heading
       ? acquisition
@@ -57,7 +59,7 @@ export default function FinishedObjective({
             currency,
           )
         : objective.checkpoint
-          ? target
+          ? `${target} by ${window}`
           : `${target} · ${window}`;
   const observed = objectiveObservedText(result, currency);
   const reason =

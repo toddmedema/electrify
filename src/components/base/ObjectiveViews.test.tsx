@@ -103,6 +103,53 @@ it("renders stored objective debrief facts and unavailability without re-evaluat
   expect(region).toHaveTextContent("10¢/kWh (above goal)");
 });
 
+it("shows the deadline month for both checkpoint shapes without a scenario calendar", () => {
+  const retention: ObjectiveResult = {
+    objective: {
+      id: "retention",
+      label: "Retain customers",
+      metric: "customerRetention",
+      required: true,
+      checkpoint: true,
+      minRetainedShare: 0.9,
+      deadlineMonth: 11,
+    },
+    id: "retention",
+    label: "Retain customers",
+    metric: "customerRetention",
+    required: true,
+    definition: objectiveDefinition("customerRetention"),
+    status: "failed",
+    observed: 0.8,
+    target: 0.9,
+    observedMonths: 1,
+    requiredMonths: 1,
+  };
+  render(
+    <RunDebrief
+      outcome="fired"
+      debrief={{
+        startingFleet: [],
+        finalFleet: [],
+        startingCash: 0,
+        finalCash: 0,
+        finalCustomers: 0,
+        reliability: 1,
+        unservedWh: 0,
+        kgco2e: 0,
+        highlights: [],
+        objectiveResults: [
+          retention,
+          { ...bills, objective: { ...bills.objective, checkpoint: true } },
+        ],
+      }}
+    />,
+  );
+  const region = screen.getByRole("region", { name: "Objective results" });
+  expect(region).toHaveTextContent("Retain 90% of customers by Month 12");
+  expect(region).toHaveTextContent("Billed rate ≤10¢/kWh by Month 2");
+});
+
 it("shows a past Valley acquisition goal as a heading and one result line", () => {
   const objective = UTILITY_EXPANSION_OBJECTIVES[0];
   render(
