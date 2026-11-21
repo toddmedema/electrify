@@ -234,14 +234,16 @@
       flex: none !important;
       overflow: visible;
     }
-    // Capacity stays with the decision as the tabs and projects scroll together.
-    .constructionHeader {
-      position: sticky;
-      top: 0;
-      z-index: 2;
-    }
-    .buildOption {
-      scroll-margin-top: 52px;
+    // Short landscape panels need the full scroll area to make the card actions reachable.
+    @media (min-height: 481px) {
+      .constructionHeader {
+        position: sticky;
+        top: 0;
+        z-index: 2;
+      }
+      .buildOption {
+        scroll-margin-top: 52px;
+      }
     }
   }
   .tileWorkspaceSurface .tileWorkspaceHeading {
