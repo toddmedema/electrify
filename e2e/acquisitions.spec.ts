@@ -1639,7 +1639,10 @@ for (const theme of ["light", "dark"] as const) {
     }
     await expect(review).toBeInViewport({ ratio: 1 });
     await expect(
-      surface.getByRole("button", { name: "Close tile", exact: true }),
+      surface.getByRole("button", {
+        name: desktop ? "Close project" : "Close tile",
+        exact: true,
+      }),
     ).toBeInViewport({ ratio: 1 });
     await expect(
       page.getByRole("button", { name: "pause", exact: true }),
@@ -2119,6 +2122,7 @@ for (const theme of ["light", "dark"] as const) {
     await page.getByRole("button", { name: "Continue", exact: true }).click();
     const map = await openMap(page);
     const before = (await readSavedGame(page))!;
+    loadSimData(before.location);
     expect(isAdjacentToOwnedTerritoryTile(before, city)).toBe(false);
     const quote = acquisitionQuote(before, "parcel-1")!;
     expect(tilePurchaseQuote(before, city.id)).toBeUndefined();

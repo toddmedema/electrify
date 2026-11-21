@@ -225,6 +225,7 @@ export default function ProjectBuild({
   return (
     <TileWorkspaceSurface
       id="tool-BUILD_GENERATORS"
+      closeLabel="Close project"
       building={catalogue}
       title={catalogue ? "Plan a project" : title}
       focusKey={`${catalogue}:${candidate ?? "sites"}`}

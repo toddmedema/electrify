@@ -219,6 +219,7 @@ export function StorageBuildItem(
         label="Build cost"
         entry={MANUAL_ENTRY.TOTAL_COST_OF_ENERGY}
         value={formatPurchasePrice(storage.buildCost)}
+        note={pickingSite ? "Before site costs" : undefined}
       />
       <BuildMetric
         asDetailRow={props.preview}
@@ -264,7 +265,13 @@ export function StorageBuildItem(
       sizeAction={
         (offerMaxSize || offerAffordableSize) &&
         (offerAffordableSize || storage.peakWh !== maxSizeWh) && (
-          <Button size="small" onClick={() => props.onUseMaxSize(maxSizeWh)}>
+          <Button
+            size="small"
+            aria-label={
+              pickingSite ? `Use max size for ${displayName}` : undefined
+            }
+            onClick={() => props.onUseMaxSize(maxSizeWh)}
+          >
             Use max size
           </Button>
         )
@@ -491,7 +498,12 @@ function StorageBuildDialog(props: Props): React.JSX.Element {
 
   const cash = now?.cash ?? 0;
   const quoteStorage = (peakWh: number) =>
-    STORAGE(game, peakWh, tileId, territoryNetwork ? territoryId : undefined);
+    STORAGE(
+      game,
+      peakWh,
+      onPickSite ? undefined : tileId,
+      territoryNetwork ? territoryId : undefined,
+    );
   const minimumStorage = quoteStorage(sliderTickToW(4));
   const sizedStorage = quoteStorage(sliderTickToW(sliderTick)).map(
     (candidate) =>

@@ -5,6 +5,7 @@ import type { CurrencyType } from "../../helpers/Currency";
 import {
   finishedObjectiveStatusText,
   objectiveGoalText,
+  objectiveHeadingText,
   objectiveObservedText,
   objectiveTargetText,
   objectiveWindowText,
@@ -27,7 +28,7 @@ export default function FinishedObjective({
   const { objective } = result;
   const target = objectiveTargetText(objective, currency);
   const acquisition = objective.metric === "utilityOwnership";
-  const heading = acquisition ? target : result.label;
+  const heading = objectiveHeadingText(objective);
   const first =
     "fromMonth" in objective ? objective.fromMonth : objective.deadlineMonth;
   const last = first + result.requiredMonths - 1;

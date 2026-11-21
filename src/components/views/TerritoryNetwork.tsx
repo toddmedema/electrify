@@ -86,6 +86,8 @@ import {
 function ProjectBuildUnavailable({ onClose }: { onClose: () => void }) {
   return (
     <TileWorkspaceSurface
+      id="tool-BUILD_GENERATORS"
+      closeLabel="Close project"
       title="Project planner unavailable"
       focusKey="project-unavailable"
       returnFocusSelector=".desktopBuildRail, #buildNav"
@@ -115,6 +117,7 @@ function DeferredProjectBuild(
       fallback={
         <TileWorkspaceSurface
           id="tool-BUILD_GENERATORS"
+          closeLabel="Close project"
           title="Plan a project"
           focusKey="project-loading"
           returnFocusSelector=".desktopBuildRail, #buildNav"

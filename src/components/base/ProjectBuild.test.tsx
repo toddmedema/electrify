@@ -5,7 +5,6 @@ import {
   render,
   screen,
   waitFor,
-  within,
 } from "@testing-library/react";
 import { configureStore, createAction } from "@reduxjs/toolkit";
 import { Provider, useSelector } from "react-redux";
@@ -336,10 +335,11 @@ it("corrects an oversized technology to the map's terrain maximum before choosin
     target: { value: "34" },
   });
   const choose = screen.getByRole("button", { name: "Pick site for Wind" });
-  const wind = within(choose.closest("li")!);
   expect(choose).toBeDisabled();
-  fireEvent.click(wind.getByRole("button", { name: "Use max size" }));
-  fireEvent.click(wind.getByRole("button", { name: "Pick site for Wind" }));
+  fireEvent.click(
+    screen.getByRole("button", { name: "Use max size for Wind" }),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Pick site for Wind" }));
   fireEvent.click(screen.getByRole("button", { name: "Owned site" }));
   expect(screen.getByRole("heading", { name: "Wind · 450MW" })).toBeVisible();
   expect(
@@ -387,13 +387,11 @@ it("chooses the exact storage technology limit without requiring affordable cash
   act(() => {
     store.dispatch(replace(newer));
   });
-  const pickBattery = screen.getByRole("button", {
-    name: "Pick site for Lithium Battery",
-  });
-  const batteryCard = within(pickBattery.closest("li")!);
-  fireEvent.click(batteryCard.getByRole("button", { name: "Use max size" }));
   fireEvent.click(
-    batteryCard.getByRole("button", { name: "Pick site for Lithium Battery" }),
+    screen.getByRole("button", { name: "Use max size for Lithium Battery" }),
+  );
+  fireEvent.click(
+    screen.getByRole("button", { name: "Pick site for Lithium Battery" }),
   );
   expect(onSelection).toHaveBeenLastCalledWith(
     expect.objectContaining({ peakWh: limit }),

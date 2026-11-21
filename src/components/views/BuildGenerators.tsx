@@ -525,7 +525,13 @@ export function GeneratorBuildItem(
   const useMaxSizeAction = (offerMaxSize || offerAffordableSize) &&
     (offerAffordableSize || generator.peakW !== maxSizeW) &&
     props.onUseMaxSize && (
-      <Button size="small" onClick={() => props.onUseMaxSize?.(maxSizeW)}>
+      <Button
+        size="small"
+        aria-label={
+          pickingSite ? `Use max size for ${generator.name}` : undefined
+        }
+        onClick={() => props.onUseMaxSize?.(maxSizeW)}
+      >
         Use max size
       </Button>
     );
@@ -600,9 +606,14 @@ export function GeneratorBuildItem(
         entry={MANUAL_ENTRY.TOTAL_COST_OF_ENERGY}
         value={formatPurchasePrice(generator.buildCost)}
         note={
-          includedOptions.length
-            ? `Incl. ${includedOptions.map((option) => option.label.toLowerCase()).join(", ")}`
-            : undefined
+          [
+            pickingSite && "Before site costs",
+            includedOptions.length
+              ? `Incl. ${includedOptions.map((option) => option.label.toLowerCase()).join(", ")}`
+              : undefined,
+          ]
+            .filter(Boolean)
+            .join(" · ") || undefined
         }
       />
       <BuildMetric

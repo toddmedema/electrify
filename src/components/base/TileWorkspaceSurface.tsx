@@ -17,6 +17,7 @@ export function findTileControl(map: HTMLElement | null, tile: string) {
 
 type SurfaceProps = {
   id?: string;
+  closeLabel?: string;
   title: string;
   /** Changes only for explicit activation or a new kind of tile content. */
   focusKey: React.Key;
@@ -50,6 +51,7 @@ export function TileInspectionSurface({
 /** A nonmodal surface for tile information and the map's build and project decisions. */
 export default function TileWorkspaceSurface({
   id,
+  closeLabel = "Close tile",
   title,
   focusKey,
   subtitle,
@@ -152,7 +154,7 @@ export default function TileWorkspaceSurface({
           )}
         </div>
         {!inspector && (
-          <IconButton aria-label="Close tile" onClick={onClose}>
+          <IconButton aria-label={closeLabel} onClick={onClose}>
             <CloseIcon />
           </IconButton>
         )}
