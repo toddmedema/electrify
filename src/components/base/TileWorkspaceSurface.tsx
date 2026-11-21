@@ -19,6 +19,7 @@ type SurfaceProps = {
   id?: string;
   closeLabel?: string;
   title: string;
+  titleIconSrc?: string;
   /** Changes only for explicit activation or a new kind of tile content. */
   focusKey: React.Key;
   subtitle?: string;
@@ -53,6 +54,7 @@ export default function TileWorkspaceSurface({
   id,
   closeLabel = "Close tile",
   title,
+  titleIconSrc,
   focusKey,
   subtitle,
   building,
@@ -145,6 +147,13 @@ export default function TileWorkspaceSurface({
             tabIndex={-1}
             ref={heading}
           >
+            {titleIconSrc && (
+              <img
+                className="tileWorkspaceTitleIcon"
+                src={titleIconSrc}
+                alt=""
+              />
+            )}
             {title}
           </Typography>
           {subtitle && (

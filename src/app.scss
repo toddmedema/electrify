@@ -6071,6 +6071,13 @@ $homeSmokeCycle: 5.6s;
     text-transform: none;
   }
 
+  .MuiButton-root[aria-disabled="true"] {
+    color: var(--font-color-faded);
+    border-color: var(--border-subtle);
+    background: transparent;
+    cursor: default;
+  }
+
   .facilityActionNote {
     align-self: center;
   }
@@ -6318,6 +6325,12 @@ $homeSmokeCycle: 5.6s;
 .MuiDialog-paper .MuiDialogActions-root {
   position: relative;
   border-top: 1px solid var(--border-subtle);
+}
+.decisionDialogActions > .MuiButton-root {
+  min-height: 40px;
+  @media (pointer: coarse) {
+    min-height: 44px;
+  }
 }
 .MuiDialog-paper .MuiDialogActions-root.campaignHandoverActions {
   border-top: 0;

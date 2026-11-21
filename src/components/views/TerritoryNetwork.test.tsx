@@ -877,13 +877,12 @@ it.each([
     fireEvent.mouseEnter(
       screen.getByRole("button", { name: `Choose sites for ${name}` }),
     );
-    fireEvent.click(
-      within(screen.getByLabelText(`${name} technology preview`)).getByRole(
-        "button",
-        { name: shortcut },
-      ),
-    );
-    expect(await screen.findByRole("button", { name: "Cash" })).toBeEnabled();
+    const useMaximum = within(
+      screen.getByLabelText(`${name} technology preview`),
+    ).getByRole("button", { name: shortcut });
+    // Opening the project planner mounts a lazy component. Flush its first render with the click.
+    await act(async () => useMaximum.click());
+    expect(screen.getByRole("button", { name: "Cash" })).toBeEnabled();
     expect(
       screen.getByRole("heading", {
         name: `${name} · ${formatWatts(maximum)}`,
@@ -969,6 +968,46 @@ it("keeps inspection available through primary activation", async () => {
   await userEvent.keyboard("{Escape}");
   fireEvent.click(tile);
   expect(await screen.findByRole("heading", { name: "Forest" })).toHaveFocus();
+});
+
+function openConnectMenu(game: GameType, tileId: TerritoryTileId) {
+  const { store } = show(game);
+  const tile = screen.getByRole("button", { name: `Inspect ${tileId}` });
+  act(() => tile.focus());
+  fireEvent.contextMenu(tile);
+  const menu = screen.getByRole("menu", { name: "Tile actions" });
+  const connect = within(menu).getByRole("menuitem", { name: /^Connect/ });
+  return { store, menu, connect };
+}
+
+it("lets keyboard players read the Connect shortfall without activating it", async () => {
+  const game = ready();
+  const tileId = "green-uplands:site-1";
+  currentTick(game)!.cash = 1;
+  const { store, menu, connect } = openConnectMenu(game, tileId);
+  await userEvent.keyboard("{ArrowDown}");
+  expect(connect).toHaveFocus();
+  expect(connect).toHaveAttribute("aria-disabled", "true");
+  expect(connect).toHaveAccessibleName(/more cash needed/);
+  await userEvent.keyboard("{Enter}[Space]");
+  expect(menu).toBeVisible();
+  expect(ownsTerritoryTile(store.getState().game, tileId)).toBe(false);
+  expect(currentTick(store.getState().game)!.cash).toBe(1);
+});
+
+it("connects an affordable tile from the keyboard", async () => {
+  const game = ready();
+  const tileId = "green-uplands:site-1";
+  currentTick(game)!.cash = tilePurchaseQuote(game, tileId)!.price;
+  const { store, connect } = openConnectMenu(game, tileId);
+  await userEvent.keyboard("{ArrowDown}");
+  expect(connect).toHaveFocus();
+  expect(connect).not.toHaveAttribute("aria-disabled", "true");
+  expect(connect).not.toHaveAccessibleName(/more cash needed/);
+  await userEvent.keyboard("{Enter}");
+  await waitFor(() =>
+    expect(ownsTerritoryTile(store.getState().game, tileId)).toBe(true),
+  );
 });
 
 it("opens the capacity upgrade directly from the tile actions", async () => {

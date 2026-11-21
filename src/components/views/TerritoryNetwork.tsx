@@ -7,6 +7,7 @@ import {
   landTransferredCustomers,
 } from "../../helpers/Territories";
 import { currentTick } from "../../helpers/GameSelectors";
+import { facilityIconSrc } from "../../helpers/FacilityIcon";
 import {
   formatCount,
   formatFacilitySize,
@@ -501,6 +502,7 @@ function TileNetwork(props: Props) {
         <TileInspectionSurface
           map={map}
           title={title}
+          titleIconSrc={operatingFacility && facilityIconSrc(operatingFacility)}
           focusKey={`${inspected}:${activation}:${inspectorOwner ?? "unowned"}:${operatingFacility?.id ?? (view.facility ? "facility" : "empty")}:${showSiteCatalogue}`}
           subtitle={view.ownerKey ? view.ownerName : undefined}
           building={showSiteCatalogue}
@@ -570,31 +572,24 @@ function TileNetwork(props: Props) {
           ) : (
             <>
               {tile.city ? (
-                <>
-                  <div className="tileCityMetrics">
-                    <div>
-                      <span>
-                        {!view.owned
-                          ? "Customers"
-                          : utility && !acquisition
-                            ? "Opening customers"
-                            : "Customers transferred"}
-                      </span>
-                      <strong>{formatCount(customers)}</strong>
-                    </div>
-                    <div>
-                      <span>
-                        {view.owned ? "Current demand" : "Estimated demand"}
-                      </span>
-                      <strong>{formatWatts(demandW)}</strong>
-                    </div>
+                <div className="tileCityMetrics">
+                  <div>
+                    <span>
+                      {!view.owned
+                        ? "Customers"
+                        : utility && !acquisition
+                          ? "Opening customers"
+                          : "Customers transferred"}
+                    </span>
+                    <strong>{formatCount(customers)}</strong>
                   </div>
-                  <CityDemand
-                    game={game}
-                    territoryId={tile.territoryId}
-                    owned={view.owned}
-                  />
-                </>
+                  <div>
+                    <span>
+                      {view.owned ? "Current demand" : "Estimated demand"}
+                    </span>
+                    <strong>{formatWatts(demandW)}</strong>
+                  </div>
+                </div>
               ) : operatingFacility ? (
                 <ExpandedFacilityDetails
                   showStatus
@@ -657,6 +652,13 @@ function TileNetwork(props: Props) {
                     )}
                   </div>
                 )
+              )}
+              {tile.city && (
+                <CityDemand
+                  game={game}
+                  territoryId={tile.territoryId}
+                  owned={view.owned}
+                />
               )}
             </>
           )}

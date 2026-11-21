@@ -73,7 +73,13 @@ export default function DecisionDialog({
       {children && (
         <DialogContent className={contentClassName}>{children}</DialogContent>
       )}
-      <DialogActions className={actionsClassName}>{actions}</DialogActions>
+      <DialogActions
+        className={["decisionDialogActions", actionsClassName]
+          .filter(Boolean)
+          .join(" ")}
+      >
+        {actions}
+      </DialogActions>
     </Dialog>
   );
 }

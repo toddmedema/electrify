@@ -44,7 +44,7 @@ export default function TerritoryTileMenu({
   onExpand: () => void;
   onAcquire: (id: UtilityAcquisitionId) => void;
 }) {
-  const { formatPurchasePrice } = useMoney();
+  const { formatMoneyConcise, formatPurchasePrice } = useMoney();
   const { availableCash, pendingIds, purchase } = useTerritoryTilePurchases();
   const tile = view?.tile;
   const facility = view?.operatingFacility;
@@ -85,6 +85,10 @@ export default function TerritoryTileMenu({
   } else if (quote) {
     tileActions.push({
       label: `Connect (${formatPurchasePrice(quote.price)})`,
+      detail:
+        quote.price > availableCash
+          ? `${formatMoneyConcise(quote.price - availableCash)} more cash needed.`
+          : undefined,
       icon: <ConceptIcon concept="buy" fontSize="small" decorative />,
       disabled: busy || pendingIds.size > 0 || quote.price > availableCash,
       onSelect: () => void purchase(quote.tileId, quote.quoteKey),

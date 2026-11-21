@@ -55,7 +55,7 @@ export default function ConfirmDialog({
           </Button>
           <Button
             onClick={onConfirm}
-            color="primary"
+            color={destructive ? "error" : "primary"}
             variant="contained"
             autoFocus={!destructive}
             disabled={confirmDisabled || pending}

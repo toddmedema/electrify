@@ -1,4 +1,17 @@
-.facilityCapacityUpgrade {
+.facilityCapacityMessage {
+  margin: 0 16px 12px;
+}
+
+.tileWorkspaceBody {
+  .base_main & .facilityDetailSection.facilityCapacityUpgrade,
+  .facilityCapacityMessage {
+    margin-inline: 0;
+  }
+}
+
+.base_main .facilityDetailSection.facilityCapacityUpgrade {
+  margin: 0 16px 12px;
+  padding: 8px 0 0;
   display: flex;
   flex-direction: column;
   align-items: flex-start;

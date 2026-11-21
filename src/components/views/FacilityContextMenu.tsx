@@ -47,6 +47,7 @@ export interface FacilityMenuTarget {
 
 export interface ContextMenuAction {
   label: string;
+  detail?: string;
   icon: React.ReactNode;
   disabled?: boolean;
   onSelect: () => void;
@@ -297,6 +298,7 @@ export default function FacilityContextMenu(props: {
         }
         slotProps={{
           list: {
+            disabledItemsFocusable: true,
             "aria-label": props.tileActions
               ? "Tile actions"
               : "Facility actions",
@@ -317,20 +319,22 @@ export default function FacilityContextMenu(props: {
         }}
       >
         {title && <ListSubheader disableSticky>{title}</ListSubheader>}
-        {props.tileActions?.map(({ label, icon, disabled, onSelect }) => (
-          <MenuItem
-            key={label}
-            disabled={disabled}
-            onClick={() => {
-              // Let the menu restore focus before the new inspector or dialog opens.
-              afterTileMenu.current = onSelect;
-              props.onClose();
-            }}
-          >
-            <ListItemIcon>{icon}</ListItemIcon>
-            <ListItemText>{label}</ListItemText>
-          </MenuItem>
-        ))}
+        {props.tileActions?.map(
+          ({ label, detail, icon, disabled, onSelect }) => (
+            <MenuItem
+              key={label}
+              disabled={disabled}
+              onClick={() => {
+                // Let the menu restore focus before the new inspector or dialog opens.
+                afterTileMenu.current = onSelect;
+                props.onClose();
+              }}
+            >
+              <ListItemIcon>{icon}</ListItemIcon>
+              <ListItemText primary={label} secondary={detail} />
+            </MenuItem>
+          ),
+        )}
         {!!props.tileActions?.length && !!offered.length && <Divider />}
         {offered.flatMap((action, index) => [
           ...(action.key === "sell" && index > 0
@@ -393,12 +397,14 @@ export default function FacilityContextMenu(props: {
             setPending(null);
           }}
         >
-          <DialogContentText>
-            {affected
-              .map((f) => `${formatFacilitySize(f)} ${f.name}`)
-              .join(", ") ||
-              "These facilities are no longer available for this action."}
-          </DialogContentText>
+          {affected.length !== 1 && (
+            <DialogContentText>
+              {affected
+                .map((f) => `${formatFacilitySize(f)} ${f.name}`)
+                .join(", ") ||
+                "These facilities are no longer available for this action."}
+            </DialogContentText>
+          )}
           {cost !== undefined ? (
             <>
               <DialogContentText>

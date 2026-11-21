@@ -34,7 +34,16 @@
       min-width: 0;
     }
     h3 {
+      display: flex;
+      align-items: center;
+      gap: 8px;
       outline-offset: 4px;
+    }
+    .tileWorkspaceTitleIcon {
+      flex: 0 0 24px;
+      width: 24px;
+      height: 24px;
+      object-fit: contain;
     }
     .MuiIconButton-root {
       flex: 0 0 auto;
@@ -126,14 +135,24 @@
     }
   }
   .tileWorkspaceBody .facilityDetails {
-    padding: 0 0 16px;
+    padding: 0 0 8px;
   }
   .tileWorkspaceBody .facilityActions {
     margin: 0;
     padding-bottom: 0;
+
+    .MuiButton-root {
+      padding-inline: 8px;
+    }
+    .MuiButton-startIcon {
+      margin-inline: 0 4px;
+    }
+    .MuiButton-startIcon > .MuiSvgIcon-root {
+      font-size: 16px;
+    }
   }
   .tileFacilityStatus {
-    margin-bottom: 12px;
+    margin-bottom: 8px;
   }
 }
 
@@ -160,7 +179,7 @@
   .tileWorkspaceHeading > div {
     display: flex;
     flex-wrap: wrap;
-    align-items: baseline;
+    align-items: center;
     gap: 4px 8px;
   }
 
@@ -189,6 +208,10 @@
 
   .tileCityMetrics {
     gap: 4px;
+  }
+
+  .tileCityMetrics + .tilePurchaseSummary {
+    margin-top: 8px;
   }
 
   .tileCityDemand {
@@ -251,6 +274,9 @@
   }
   .tileWorkspaceSurface .tileWorkspaceBody {
     padding: 12px;
+  }
+  .tileWorkspaceSurface.tileWorkspaceInspector .tileWorkspaceBody {
+    padding-top: 0;
   }
 }
 

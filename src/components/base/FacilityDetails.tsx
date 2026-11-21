@@ -3,9 +3,6 @@ import { useMoney } from "./CurrencyContext";
 import GasConversion from "./GasConversion";
 import CoalRepower from "./CoalRepower";
 import FacilityUpgradeAction from "./FacilityUpgradeAction";
-import FacilityCapacityUpgrade, {
-  FacilityCapacityUpgradeActions,
-} from "./FacilityCapacityUpgrade";
 import { currentCash } from "../../helpers/GameSelectors";
 import { HYDRO_SITES } from "../../data/HydroSites";
 import { combineStoryEffects } from "../../data/WorldEvents";
@@ -80,7 +77,7 @@ import { MONTHS } from "../../Constants";
 // enough that the last few months are still legible in 72 pixels
 const TREND_MONTHS = 12;
 
-export interface Props extends FacilityCapacityUpgradeActions {
+export interface Props {
   facility: FacilityOperatingType;
   date: DateType;
   seed: number;
@@ -88,7 +85,7 @@ export interface Props extends FacilityCapacityUpgradeActions {
   /** Needed by a hydro plant's water outlook and by the weather resilience section */
   game?: GameType;
   onRetrofit?: (payload: RetrofitFacilityAction) => void;
-  expandRequest?: number;
+  operationSectionRef?: React.Ref<HTMLElement>;
 }
 
 /**
@@ -280,7 +277,6 @@ function WeatherResilienceSection(props: {
  */
 export default function FacilityDetails(props: Props): React.JSX.Element {
   const { facility, date, seed, location } = props;
-  const operationSection = React.useRef<HTMLElement>(null);
   const { formatMoneyConcise, formatMoneyStable, formatPricePerMWh } = useMoney(
     currencyForLocation(location, props.game?.startingYear),
   );
@@ -387,7 +383,7 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
         <section
           className="facilityDetailSection"
           aria-label="Operation"
-          ref={operationSection}
+          ref={props.operationSectionRef}
           tabIndex={-1}
         >
           <Typography component="h3" className="facilityDetailHeading">
@@ -629,17 +625,6 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
             )}
           </dl>
         </section>
-      )}
-      {props.game && (
-        <FacilityCapacityUpgrade
-          key={props.expandRequest}
-          openOnMount={props.expandRequest !== undefined}
-          facility={facility}
-          game={props.game}
-          onExpand={props.onExpand}
-          onCancelExpansion={props.onCancelExpansion}
-          fallbackFocusRef={operationSection}
-        />
       )}
       {props.game && facility.fuel === "Coal" && (
         <CoalRepower

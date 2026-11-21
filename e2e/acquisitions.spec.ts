@@ -1350,6 +1350,14 @@ for (const theme of ["light", "dark"] as const) {
       name: "Acquire",
       exact: true,
     });
+    const demand = surface.getByRole("region", { name: "City demand by use" });
+    const [actionBounds, demandBounds] = await Promise.all([
+      acquire.boundingBox(),
+      demand.boundingBox(),
+    ]);
+    expect(actionBounds!.y + actionBounds!.height).toBeLessThanOrEqual(
+      demandBounds!.y,
+    );
     const body = surface.locator(".tileWorkspaceBody");
     await expect(acquire).toBeInViewport({ ratio: 1 });
     expect(
@@ -1367,7 +1375,11 @@ for (const theme of ["light", "dark"] as const) {
         body.evaluate((node) => node.scrollHeight - node.clientHeight),
       )
       .toBeGreaterThan(0);
-    await acquire.scrollIntoViewIfNeeded();
+    // Center the action in the shortened scrollport so fractional scroll offsets
+    // do not leave its last pixel under the panel's clipping edge.
+    await acquire.evaluate((button) =>
+      button.scrollIntoView({ block: "center" }),
+    );
     await expect(acquire).toBeInViewport({ ratio: 1 });
     await page.setViewportSize(viewport);
     await acquire.click();
