@@ -1,7 +1,7 @@
 import React from "react";
 import { root } from "./Root";
 import { Provider } from "react-redux";
-import { store } from "./Store";
+import { store, useAppSelector } from "./Store";
 import App from "./App";
 import { registerServiceWorker } from "./ServiceWorkerRegistration";
 import "./app.scss";
@@ -17,10 +17,14 @@ import {
 
 installFocusVisibility();
 
-function StartupHandoff(): null {
+function StartupHandoff({ seat = false }: { seat?: boolean }): null {
+  // Continue and Saves must be in place before the home menu measures its entrance.
+  const waitingForMenu = useAppSelector(
+    (state) => !seat && state.card.name === "MAIN_MENU" && state.saves.loading,
+  );
   React.useLayoutEffect(() => {
-    finishStartup();
-  }, []);
+    if (!waitingForMenu) finishStartup();
+  }, [waitingForMenu]);
   return null;
 }
 
@@ -102,7 +106,7 @@ if (
       root.render(
         <Provider store={store}>
           <Seat />
-          <StartupHandoff />
+          <StartupHandoff seat />
         </Provider>,
       );
     })

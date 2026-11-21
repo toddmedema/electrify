@@ -845,10 +845,7 @@ test("semantic actions play, build, adjust pricing, inspect charts and save at 1
     "data-mock-input-context",
     "Menu",
   );
-  await select(
-    page,
-    page.getByRole("button", { name: "Saved games", exact: true }),
-  );
+  await select(page, page.getByRole("button", { name: "Saves", exact: true }));
   await input(page, "confirm");
   await select(
     page,

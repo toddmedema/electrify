@@ -12,7 +12,6 @@ import { forecastWorkerSnapshot } from "./ForecastWorkerSnapshot";
 let nextSession = 0;
 export function useAgreementForecast(
   game: GameType,
-  agreementId?: string,
   offer?: PowerAgreementReceipt,
   committed = true,
 ) {
@@ -35,8 +34,8 @@ export function useAgreementForecast(
       ? "buying"
       : undefined;
   const key =
-    agreementId && !blocked
-      ? `${epoch}|${agreementForecastKey(game, agreementId, offer)}`
+    offer && !blocked
+      ? `${epoch}|${agreementForecastKey(game, offer)}`
       : undefined;
   const [retry, retryForecast] = React.useReducer(
     (value: number) => value + 1,
@@ -104,7 +103,6 @@ export function useAgreementForecast(
         kind: "agreement",
         requestId: id,
         cacheEpoch: epoch,
-        agreementId,
         offer,
         game: forecastWorkerSnapshot(game),
       });

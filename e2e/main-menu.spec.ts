@@ -53,7 +53,7 @@ test("loading hands off to a smooth logo rise and individually staggered control
   releaseBundle();
   await expect(page.locator("#appStartup")).toHaveCount(0);
   const menuLogo = page.locator("#menuCard .homeLogo");
-  const controls = page.locator("#menuCard button, #menuCard a[href]");
+  const controls = page.locator("#centeredMenu button");
   const duration = await menuLogo.evaluate((logo) =>
     Number(logo.getAnimations()[0].effect!.getTiming().duration),
   );
@@ -75,7 +75,7 @@ test("loading hands off to a smooth logo rise and individually staggered control
       Number(element.getAnimations()[0].effect!.getTiming().delay),
     ),
   );
-  expect(delays.length).toBeGreaterThan(5);
+  expect(delays.length).toBeGreaterThanOrEqual(3);
   for (let index = 1; index < delays.length; index++)
     expect(delays[index]).toBeGreaterThan(delays[index - 1]);
   await expect(controls.first()).toHaveCSS("opacity", "0");
@@ -88,6 +88,7 @@ test("loading hands off to a smooth logo rise and individually staggered control
     ),
   ).toBeGreaterThan(0);
   await expect(controls.nth(1)).toHaveCSS("opacity", "0");
+  const restingAction = (await controls.first().boundingBox())!;
   let previousY = start.y;
   for (const time of [duration / 3, (duration * 2) / 3, duration]) {
     await advance(time);
@@ -99,8 +100,11 @@ test("loading hands off to a smooth logo rise and individually staggered control
       0,
     );
     const firstAction = (await controls.first().boundingBox())!;
-    expect(firstAction.y).toBeGreaterThan(bounds.y + bounds.height);
+    expect(firstAction.y).toBe(restingAction.y);
+    if (time >= delays[0])
+      expect(firstAction.y).toBeGreaterThanOrEqual(bounds.y + bounds.height);
   }
+  await advance(delays.at(-1)! + 250);
   for (const control of await controls.all())
     await expect(control).toHaveCSS("opacity", "1");
   await expect(controls.first()).toHaveCSS("width", "208px");
@@ -331,6 +335,68 @@ for (const exit of ["Back", "Escape"]) {
   });
 }
 
+test("waits for saved games before revealing the returning menu in order", async ({
+  page,
+}) => {
+  await page.goto("/?scenario=103");
+  await page.getByRole("button", { name: "Start game", exact: true }).click();
+  await expect.poll(async () => Boolean(await readSavedGame(page))).toBe(true);
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.addInitScript(() => {
+    const open = IDBFactory.prototype.open;
+    const success = Object.getOwnPropertyDescriptor(
+      IDBRequest.prototype,
+      "onsuccess",
+    )!;
+    const release = new Promise<void>((resolve) => {
+      document.addEventListener("release-save-catalog", () => resolve(), {
+        once: true,
+      });
+    });
+    IDBFactory.prototype.open = function (...args) {
+      const request = open.apply(this, args);
+      if (args[0] === "electrify-saves") {
+        Object.defineProperty(request, "onsuccess", {
+          set(callback: (event: Event) => void) {
+            success.set!.call(request, (event: Event) => {
+              document.documentElement.dataset.saveCatalogHeld = "true";
+              void release.then(() => callback.call(request, event));
+            });
+          },
+        });
+      }
+      return request;
+    };
+    document.addEventListener(
+      "electrify-ready",
+      () => {
+        const labels = [
+          ...document.querySelectorAll("#centeredMenu .mainActions button"),
+        ].map((button) => button.textContent);
+        document.documentElement.dataset.openingActions = labels.join(",");
+      },
+      { once: true },
+    );
+  });
+  await page.goto("/");
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-save-catalog-held",
+    "true",
+  );
+  await expect(page.locator("#menuCard")).toBeAttached();
+  await expect(page.locator("#appStartup")).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Play", exact: true }),
+  ).toHaveCount(0);
+  await page.evaluate(() =>
+    document.dispatchEvent(new Event("release-save-catalog")),
+  );
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-opening-actions",
+    "Continue,Tutorials,Play,Saves",
+  );
+});
+
 test("loading and returning from Saved games select Continue at the top", async ({
   page,
 }) => {
@@ -341,7 +407,7 @@ test("loading and returning from Saved games select Continue at the top", async 
   await page.goto("/");
   const first = page.getByRole("button", { name: "Continue", exact: true });
   await expect(first).toBeFocused();
-  await page.getByRole("button", { name: "Saved games", exact: true }).click();
+  await page.getByRole("button", { name: "Saves", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "Saved games", exact: true }),
   ).toBeVisible();

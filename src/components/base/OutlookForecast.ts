@@ -1,4 +1,10 @@
-import { TICK_MINUTES, TICKS_PER_YEAR } from "../../Constants";
+import {
+  GAME_TO_REAL_YEARS,
+  MONTHS,
+  TICK_MINUTES,
+  TICKS_PER_DAY,
+  TICKS_PER_YEAR,
+} from "../../Constants";
 import { currentTick } from "../../helpers/GameSelectors";
 import {
   reservoirOutlook,
@@ -18,8 +24,7 @@ import type {
   TerritoryTileId,
   TickPresentFutureType,
 } from "../../Types";
-import { MINUTES_PER_MONTH } from "../../helpers/DateTime";
-import { forecastShortfalls } from "../../helpers/ForecastShortfalls";
+import { getDateFromMinute, MINUTES_PER_MONTH } from "../../helpers/DateTime";
 import { monthMinute } from "../../helpers/Projection";
 import type { OutputWeatherTick } from "../../helpers/ExpectedOutput";
 
@@ -63,6 +68,8 @@ interface BuildImpactPeriod {
   startMinute: number;
   monthlyMarginW: Array<number | null>;
   unservedWh: number | null;
+  averageDayW: Array<number | null>;
+  averageDayByMonthW: Array<Array<number | null>>;
 }
 export interface BuildImpactForecast {
   months: number[];
@@ -70,45 +77,56 @@ export interface BuildImpactForecast {
   after: BuildImpactPeriod;
 }
 
-function sampledBuildImpact(
-  timeline: readonly TickPresentFutureType[],
-  step: number,
+const supplyMargin = (tick: TickPresentFutureType) =>
+  tick.reserveW ?? tick.supplyW - tick.demandW;
+
+/** Reconstruct the absent detail using the fleet and load known when opening the review. */
+function estimateBuildHistory(
+  game: GameType,
+  now: TickPresentFutureType,
   start: number,
   end: number,
-): { marginW: number | null; unservedWh: number | null } {
-  let covered = 0;
-  let marginW = Infinity;
-  let unservedWh = 0;
-  for (const tick of timeline) {
-    const minutes =
-      Math.min(end, tick.minute + step) - Math.max(start, tick.minute);
-    if (minutes <= 0) continue;
-    covered += minutes;
-    marginW = Math.min(marginW, tick.reserveW ?? tick.supplyW - tick.demandW);
-    unservedWh += forecastShortfalls([tick], minutes, 0).blackoutTotalWh;
-  }
-  return covered === end - start
-    ? { marginW, unservedWh }
-    : { marginW: null, unservedWh: null };
+) {
+  if (start >= end) return [];
+  return generateForecastTimeline(
+    {
+      ...game,
+      date: getDateFromMinute(start, game.startingYear),
+      facilities: game.facilities.filter(
+        (facility) =>
+          facility.yearsToBuildLeft === 0 &&
+          facility.minuteCreated <= Math.max(0, start),
+      ),
+    },
+    now.cash,
+    now.customers,
+    (end - start) / TICK_MINUTES,
+  );
 }
 
 function buildImpactPeriod(
   game: GameType,
-  forecast: TickPresentFutureType[],
+  timeline: readonly TickPresentFutureType[],
   startMinute: number,
 ): BuildImpactPeriod {
-  const end = startMinute + 12 * MINUTES_PER_MONTH;
-  const recorded = game.timeline.filter(
-    (tick) => tick.minute < game.date.minute,
-  );
+  const end = startMinute + TICKS_PER_YEAR * TICK_MINUTES;
   const history = new Map(
     game.monthlyHistory.map((month) => [
       monthMinute(month, game.startingYear),
       month,
     ]),
   );
+  const dailyTotals = new Array<number>(TICKS_PER_DAY).fill(0);
+  const dailyCounts = new Array<number>(TICKS_PER_DAY).fill(0);
+  const monthTotals = MONTHS.map(() =>
+    new Array<number>(TICKS_PER_DAY).fill(0),
+  );
+  const monthCounts = MONTHS.map(() =>
+    new Array<number>(TICKS_PER_DAY).fill(0),
+  );
   const monthlyMarginW: Array<number | null> = [];
   let unservedWh: number | null = 0;
+  let index = 0;
   for (
     let month = Math.floor(startMinute / MINUTES_PER_MONTH) * MINUTES_PER_MONTH;
     month < end;
@@ -116,43 +134,51 @@ function buildImpactPeriod(
   ) {
     const start = Math.max(startMinute, month);
     const finish = Math.min(end, month + MINUTES_PER_MONTH);
-    const parts: Array<{ marginW: number | null; unservedWh: number | null }> =
-      [];
-    const pastEnd = Math.min(finish, game.date.minute);
-    if (start < pastEnd) {
-      let past = sampledBuildImpact(recorded, TICK_MINUTES, start, pastEnd);
-      const saved = history.get(month);
-      // Compact history retains exact extrema and energy for complete calendar months only.
-      if (
-        past.marginW === null &&
-        saved &&
-        start === month &&
-        pastEnd === month + MINUTES_PER_MONTH
-      ) {
-        past = {
-          marginW: saved.minimumSupplyMarginW ?? null,
-          unservedWh: Math.max(0, saved.demandWh - saved.supplyWh),
-        };
-      }
-      parts.push(past);
+    const calendarMonth =
+      getDateFromMinute(month, game.startingYear).monthNumber - 1;
+    let minimum = Infinity;
+    let shortage = 0;
+    while (index < timeline.length && timeline[index].minute < start) index++;
+    const first = index;
+    while (index < timeline.length && timeline[index].minute < finish) {
+      const tick = timeline[index++];
+      const slot = (((tick.minute % 1440) + 1440) % 1440) / TICK_MINUTES;
+      const margin = supplyMargin(tick);
+      minimum = Math.min(minimum, margin);
+      shortage += Math.max(0, tick.demandW - tick.supplyW);
+      dailyTotals[slot] += margin;
+      dailyCounts[slot]++;
+      monthTotals[calendarMonth][slot] += margin;
+      monthCounts[calendarMonth][slot]++;
     }
-    const futureStart = Math.max(start, game.date.minute);
-    if (futureStart < finish)
-      parts.push(sampledBuildImpact(forecast, 60, futureStart, finish));
-    const margins = parts.flatMap((part) =>
-      part.marginW === null ? [] : [part.marginW],
-    );
+    const saved =
+      start === month && finish === month + MINUTES_PER_MONTH
+        ? history.get(month)
+        : undefined;
+    const covered = (index - first) * TICK_MINUTES === finish - start;
     monthlyMarginW.push(
-      margins.length === parts.length ? Math.min(...margins) : null,
+      saved?.minimumSupplyMarginW ?? (covered ? minimum : null),
     );
-    for (const part of parts) {
-      unservedWh =
-        unservedWh === null || part.unservedWh === null
-          ? null
-          : unservedWh + part.unservedWh;
+    if (unservedWh !== null) {
+      if (saved) unservedWh += Math.max(0, saved.demandWh - saved.supplyWh);
+      else if (covered)
+        unservedWh += shortage * (TICK_MINUTES / 60) * GAME_TO_REAL_YEARS;
+      else unservedWh = null;
     }
   }
-  return { startMinute, monthlyMarginW, unservedWh };
+  return {
+    startMinute,
+    monthlyMarginW,
+    unservedWh,
+    averageDayW: dailyTotals.map((total, slot) =>
+      dailyCounts[slot] ? total / dailyCounts[slot] : null,
+    ),
+    averageDayByMonthW: monthTotals.map((totals, month) =>
+      totals.map((total, slot) =>
+        monthCounts[month][slot] ? total / monthCounts[month][slot] : null,
+      ),
+    ),
+  };
 }
 
 export interface CoalRepowerImpactRequest {
@@ -209,10 +235,20 @@ export function computeOutlook<K extends OutlookKind>(
       territoryId,
       tileId,
     );
+    const start = commissionedMinute - TICKS_PER_YEAR * TICK_MINUTES;
+    const recorded = game.timeline.filter(
+      (tick) => tick.minute >= start && tick.minute < game.date.minute,
+    );
+    const estimatedHistory = estimateBuildHistory(
+      game,
+      now,
+      start,
+      recorded[0]?.minute ?? game.date.minute,
+    );
     const beforePeriod = buildImpactPeriod(
       game,
-      before,
-      commissionedMinute - 12 * MINUTES_PER_MONTH,
+      [...estimatedHistory, ...recorded, ...before],
+      start,
     );
     const afterPeriod = buildImpactPeriod(game, after, commissionedMinute);
     return {

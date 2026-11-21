@@ -70,6 +70,9 @@
       html:not(.js) #appStartup {
         display: none;
       }
+      html.js:has(#appStartup) #root {
+        visibility: hidden;
+      }
       /* Lay out the startup entrance before the app stylesheet arrives. */
       #appStartup {
         position: fixed;

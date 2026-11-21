@@ -89,10 +89,8 @@ it.each(["generator", "storage"] as const)(
       purchased,
       now.cash,
       now.customers,
-      Math.ceil((facility.yearsToBuild * TICKS_PER_YEAR * TICK_MINUTES) / 60) +
-        (TICKS_PER_YEAR * TICK_MINUTES) / 60 +
-        2,
-      60,
+      Math.ceil(facility.yearsToBuild * TICKS_PER_YEAR) + TICKS_PER_YEAR + 2,
+      TICK_MINUTES,
     ).filter(
       (tick) =>
         tick.minute >= result.commissionedMinute &&
@@ -145,21 +143,22 @@ it("uses the actual purchased fleet around commissioning without changing the li
   const year = 12 * MINUTES_PER_MONTH;
   const ticks =
     Math.ceil(
-      ((generator.yearsToBuild + 1) * TICKS_PER_YEAR * TICK_MINUTES) / 60,
+      ((generator.yearsToBuild + 1) * TICKS_PER_YEAR * TICK_MINUTES) /
+        TICK_MINUTES,
     ) + 2;
   const actual = generateForecastTimeline(
     purchased,
     now.cash,
     now.customers,
     ticks,
-    60,
+    TICK_MINUTES,
   );
   const baseline = generateForecastTimeline(
     game,
     now.cash,
     now.customers,
     ticks,
-    60,
+    TICK_MINUTES,
   );
   const grid = (timeline: typeof actual) =>
     timeline.map((tick) => [
@@ -193,14 +192,18 @@ it("compares the twelve months immediately before and after a long build opens",
   const { game, generator } = fixture();
   const result = previewFacilityBuild(game, { ...generator, yearsToBuild: 2 });
   const year = 12 * MINUTES_PER_MONTH;
-  expect(result.before).toHaveLength(288);
-  expect(result.after).toHaveLength(288);
+  expect(result.before).toHaveLength(TICKS_PER_YEAR);
+  expect(result.after).toHaveLength(TICKS_PER_YEAR);
   expect(result.after[0].minute).toBeGreaterThanOrEqual(
     game.date.minute + 2 * year,
   );
   expect(result.before[0].minute).toBe(result.after[0].minute - year);
-  expect(result.before.at(-1)!.minute + 60).toBe(result.after[0].minute);
-  expect(result.after.at(-1)!.minute + 60).toBe(result.after[0].minute + year);
+  expect(result.before.at(-1)!.minute + TICK_MINUTES).toBe(
+    result.after[0].minute,
+  );
+  expect(result.after.at(-1)!.minute + TICK_MINUTES).toBe(
+    result.after[0].minute + year,
+  );
 });
 
 it("includes storage dispatch and keeps compact worker results identical", () => {
@@ -212,7 +215,7 @@ it("includes storage dispatch and keeps compact worker results identical", () =>
   expect(result).toEqual(
     computeOutlook("buildImpact", forecastWorkerSnapshot(game), storage),
   );
-  expect(result.before.monthlyMarginW).toContain(null);
+  expect(result.before.monthlyMarginW.every(Number.isFinite)).toBe(true);
   expect(
     result.after.monthlyMarginW.every(
       (value) => value !== null && Number.isFinite(value),
@@ -229,9 +232,10 @@ it("includes storage dispatch and keeps compact worker results identical", () =>
     now.cash,
     now.customers,
     Math.ceil(
-      ((storage.yearsToBuild + 1) * TICKS_PER_YEAR * TICK_MINUTES) / 60,
+      ((storage.yearsToBuild + 1) * TICKS_PER_YEAR * TICK_MINUTES) /
+        TICK_MINUTES,
     ) + 2,
-    60,
+    TICK_MINUTES,
   );
   const actual = previewFacilityBuild(game, storage).after;
   const opening = actual[0].minute;
@@ -269,18 +273,27 @@ it("uses recorded monthly extrema and energy in the year before an immediate ope
   expect(result.before.startMinute).toBe(0);
 });
 
-it("keeps missing pre-game history as gaps while forecasting the construction months", () => {
+it("estimates pregame history while forecasting the construction months", () => {
   const { game, generator } = fixture();
   const result = computeOutlook("buildImpact", game, {
     ...generator,
     yearsToBuild: 0.25,
   })!;
   expect(result.before.startMinute).toBeLessThan(0);
-  expect(result.before.monthlyMarginW).toContain(null);
+  expect(result.before.monthlyMarginW.every(Number.isFinite)).toBe(true);
   expect(result.before.monthlyMarginW.some((value) => value !== null)).toBe(
     true,
   );
-  expect(result.before.unservedWh).toBeNull();
+  expect(result.before.unservedWh).toBeGreaterThanOrEqual(0);
+  for (const period of [result.before, result.after]) {
+    expect(period.averageDayW).toHaveLength(96);
+    expect(period.averageDayW.every(Number.isFinite)).toBe(true);
+    expect(period.averageDayByMonthW).toHaveLength(12);
+    for (const month of period.averageDayByMonthW) {
+      expect(month).toHaveLength(96);
+      expect(month.every(Number.isFinite)).toBe(true);
+    }
+  }
   expect(
     result.after.monthlyMarginW.every(
       (value) => value !== null && Number.isFinite(value),
@@ -309,6 +322,10 @@ it("uses recorded ticks for the completed part of the current month", () => {
     yearsToBuild: 0,
   })!;
   expect(result.before.monthlyMarginW.at(-1)).toBe(-777);
+  expect(result.before.averageDayByMonthW[0].slice(0, 4)).toEqual(
+    Array(4).fill(-777),
+  );
+  expect(result.before.averageDayByMonthW[0][4]).not.toBeNull();
 });
 
 it("counts exactly one operating year of energy across partial calendar months", () => {
@@ -321,7 +338,7 @@ it("counts exactly one operating year of energy across partial calendar months",
     yearsToBuild: 0,
   };
   const ticks = previewFacilityBuild(game, storage).after;
-  const expected = forecastShortfalls(ticks, 60, 0).blackoutTotalWh;
+  const expected = forecastShortfalls(ticks, TICK_MINUTES, 0).blackoutTotalWh;
   const result = computeOutlook("buildImpact", game, storage)!;
   expect(expected).toBeGreaterThan(0);
   expect(result.months).toHaveLength(13);

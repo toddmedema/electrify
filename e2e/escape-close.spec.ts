@@ -237,7 +237,7 @@ test("Escape returns from main menu pages without starting a game", async ({
   await page.getByRole("button", { name: "Start game", exact: true }).click();
   await expect.poll(async () => Boolean(await readSavedGame(page))).toBe(true);
   await page.goto("/");
-  await page.getByRole("button", { name: "Saved games", exact: true }).click();
+  await page.getByRole("button", { name: "Saves", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "Saved games", exact: true }),
   ).toBeVisible();

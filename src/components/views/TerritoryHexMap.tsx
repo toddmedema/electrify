@@ -132,6 +132,7 @@ interface Props {
   game: GameType;
   views: readonly TerritoryTileView[];
   selected?: TerritoryMapTileKey;
+  inspected?: TerritoryMapTileKey;
   onSelect: (id: TerritoryMapTileKey, inspect?: boolean) => void;
   onCloseInspection?: () => void;
   inspectionWindow?: "front" | "background";
@@ -164,6 +165,7 @@ export default function TerritoryHexMap({
   game,
   views,
   selected,
+  inspected,
   onSelect,
   onCloseInspection,
   inspectionWindow,
@@ -772,12 +774,10 @@ export default function TerritoryHexMap({
   ) => {
     if ((workspace?.effectiveWidth ?? size.width) <= 740) {
       const point = hexCenter(tile);
-      // Leave the selected tile below the inspector or above project decisions.
+      // Project decisions use a bottom sheet. The 3D inspector leaves the map center clear.
+      const offset = projectPlanning ? 0.3 : threeDReady ? 0 : -0.22;
       setCamera(
-        {
-          x: point.x,
-          y: point.y + worldHeight * (projectPlanning ? 0.3 : -0.22),
-        },
+        { x: point.x, y: point.y + worldHeight * offset },
         fromPointer && motion.allowed,
       );
     }
@@ -816,6 +816,7 @@ export default function TerritoryHexMap({
       !projectPlanning
     )
       void purchase(tile.id, expectedQuote);
+    else if (key === inspected) onDeselect?.();
     else inspectTile(tile, fromPointer);
   };
   const pointerTile = (event: {

@@ -341,15 +341,14 @@ export function StorageBuildItem(
         onClose={() => setOpen(false)}
         title={`Build ${formatWattHours(storage.peakWh)} ${displayName}?`}
         preface={
-          props.territoryId && (
+          props.territoryId &&
+          !props.lockedTile && (
             <Typography sx={{ px: 2, mb: 2 }}>
               Build in {territoryName(props.territoryId)}
               {buildTileId
                 ? ` · ${territoryBuildTileName(buildTileId, props.game, storage)}`
                 : ""}
-              .
-              {!props.lockedTile &&
-                " Storage charges from and supplies your company power pool."}
+              . Storage charges from and supplies your company power pool.
             </Typography>
           )
         }
@@ -384,7 +383,7 @@ export function StorageBuildItem(
             label: "Efficiency",
             value: `${Math.round(storage.roundTripEfficiency * 100)}%`,
           },
-          ...(sites
+          ...(sites && !props.lockedTile
             ? [
                 {
                   concept: "build" as const,

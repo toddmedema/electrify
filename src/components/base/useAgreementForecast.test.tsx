@@ -32,6 +32,14 @@ beforeEach(() => {
 function fixture() {
   return createGame({ scenarioId: 116, seed: 12345 });
 }
+function testOffer(game: ReturnType<typeof fixture>, termsVersion: 2 | 3 = 3) {
+  const date = getDateFromMinute(agreementYearMinute(2018), game.startingYear);
+  return powerAgreementQuote(
+    { ...game, date },
+    "champlain-quebec",
+    termsVersion,
+  )!.receipt;
+}
 const result = { cutoffMinute: 0, cashDifference: 100 } as AgreementForecast;
 function reply(worker: Worker, requestId: number, forecast = result) {
   act(() =>
@@ -44,10 +52,10 @@ function reply(worker: Worker, requestId: number, forecast = result) {
 it("keeps legacy cutoffs stable over ordinary ticks and cancels superseded requests", () => {
   const game = fixture();
   game.transmission!.inheritedAgreementTerms = 2;
-  const view = renderHook(
-    ({ state }) => useAgreementForecast(state, "champlain-nuclear"),
-    { initialProps: { state: game } },
-  );
+  const offer = testOffer(game, 2);
+  const view = renderHook(({ state }) => useAgreementForecast(state, offer), {
+    initialProps: { state: game },
+  });
   reply(workers[0], 1);
   const next = cloneDeep(game);
   next.monthlyHistory = game.monthlyHistory;
@@ -76,10 +84,10 @@ it("keeps legacy cutoffs stable over ordinary ticks and cancels superseded reque
 
 it("invalidates current v3 cutoff and month meter inputs", () => {
   const game = fixture();
-  const view = renderHook(
-    ({ state }) => useAgreementForecast(state, "champlain-nuclear"),
-    { initialProps: { state: game } },
-  );
+  const offer = testOffer(game);
+  const view = renderHook(({ state }) => useAgreementForecast(state, offer), {
+    initialProps: { state: game },
+  });
   reply(workers[0], 1);
   const next = cloneDeep(game);
   next.monthlyHistory = game.monthlyHistory;
@@ -99,12 +107,7 @@ it("updates quote identity while dragging without launching heavy jobs, then run
     powerAgreementQuote(game, "champlain-quebec", 3, duration)!.receipt;
   const view = renderHook(
     ({ duration, committed, open }) =>
-      useAgreementForecast(
-        game,
-        open ? "champlain-quebec:0" : undefined,
-        quote(duration),
-        committed,
-      ),
+      useAgreementForecast(game, open ? quote(duration) : undefined, committed),
     { initialProps: { duration: 10, committed: true, open: true } },
   );
   reply(workers[0], 1);
@@ -135,10 +138,10 @@ it("updates quote identity while dragging without launching heavy jobs, then run
 
 it("invalidates load/reset and offers retry after failure", () => {
   const game = fixture();
-  const view = renderHook(
-    ({ state }) => useAgreementForecast(state, "champlain-nuclear"),
-    { initialProps: { state: game } },
-  );
+  const offer = testOffer(game);
+  const view = renderHook(({ state }) => useAgreementForecast(state, offer), {
+    initialProps: { state: game },
+  });
   reply(workers[0], 1);
   view.rerender({ state: cloneDeep(game) });
   expect(view.result.current.result).toBeUndefined();
@@ -157,9 +160,7 @@ it("invalidates load/reset and offers retry after failure", () => {
 it("compares pooled agreements even when uncovered market buying is disabled", () => {
   const game = fixture();
   game.transmission!.buyingRule = "NONE";
-  const view = renderHook(() =>
-    useAgreementForecast(game, "champlain-nuclear"),
-  );
+  const view = renderHook(() => useAgreementForecast(game, testOffer(game)));
   expect(view.result.current.blocked).toBeUndefined();
   expect(mockCreateWorker).toHaveBeenCalledTimes(1);
 });
@@ -167,7 +168,9 @@ it("compares pooled agreements even when uncovered market buying is disabled", (
 it("keeps disabled ordinary-market comparisons blocked outside the pooled scenario", () => {
   const game = createGame({ scenarioId: 100, seed: 12345 });
   game.transmission!.buyingRule = "NONE";
-  const view = renderHook(() => useAgreementForecast(game, "unavailable"));
+  const view = renderHook(() =>
+    useAgreementForecast(game, testOffer(fixture())),
+  );
   expect(view.result.current.blocked).toBe("buying");
   expect(mockCreateWorker).not.toHaveBeenCalled();
 });

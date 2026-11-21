@@ -873,14 +873,13 @@ export function GeneratorBuildItem(
         }
         preface={
           <>
-            {props.territoryId && (
+            {props.territoryId && !props.lockedTile && (
               <Typography variant="body2" sx={{ px: 2, mb: 2 }}>
                 Build in {territoryName(props.territoryId)}
                 {buildTileId
                   ? ` · ${territoryBuildTileName(buildTileId, props.game, generator)}`
                   : ""}
-                .
-                {!props.lockedTile && " Output serves your company power pool."}
+                . Output serves your company power pool.
               </Typography>
             )}
             {props.hydroAvailability?.selected && (
@@ -954,7 +953,7 @@ export function GeneratorBuildItem(
               detail: `${formatWatts(generator.peakW)} max; water limits it, lowest in ${MONTH_NAMES[waterShape.lowMonth]}.`,
             }),
           },
-          ...(sites
+          ...(sites && !props.lockedTile
             ? [
                 {
                   concept: "build" as const,

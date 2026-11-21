@@ -21,6 +21,7 @@ import {
 } from "./OutlookForecast";
 import { createOutlookWorker } from "./OutlookWorkerClient";
 import { useWorkerRequest } from "./useWorkerRequest";
+import DailySupplyMarginChart from "./DailySupplyMarginChart";
 import SupplyMarginComparisonChart from "./SupplyMarginComparisonChart";
 import type { DecisionImpactFactType } from "./DecisionImpactPreview";
 import {
@@ -154,6 +155,9 @@ export default function BuildPurchaseReviewDialog({
                 `${date.month} ${date.year - 1} → ${date.month} ${date.year}`
               }
             />
+          )}
+          {result && (
+            <DailySupplyMarginChart forecast={result} labels={LABELS} />
           )}
         </>
       }

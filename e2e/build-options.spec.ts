@@ -846,15 +846,38 @@ for (const theme of ["light", "dark"] as const) {
         "rgba(0, 0, 0, 0)",
       );
       await expect(impact).not.toContainText("Infinity");
+      const daily = dialog.locator(".dailySupplyMargin");
+      const period = daily.getByRole("combobox", {
+        name: "Average day period",
+      });
+      await expect(period.locator("option")).toHaveText([
+        "12 month avg",
+        "Jan",
+        "Feb",
+        "Mar",
+        "Apr",
+        "May",
+        "Jun",
+        "Jul",
+        "Aug",
+        "Sep",
+        "Oct",
+        "Nov",
+        "Dec",
+      ]);
+      await expect(
+        daily.getByRole("img", { name: /12 month avg/ }),
+      ).toBeVisible();
+      await period.selectOption({ label: "Jan" });
+      await expect(daily.getByRole("img", { name: /Jan/ })).toBeVisible();
+      await period.selectOption({ label: "12 month avg" });
+
       if (
         kind === "Generator" &&
         ((theme === "light" && testInfo.project.name === "desktop-chromium") ||
           (theme === "dark" && testInfo.project.name === "mobile-390px"))
       ) {
-        await impact
-          .getByRole("img", { name: /Estimated monthly supply margin/ })
-          .scrollIntoViewIfNeeded();
-        await reviewScreenshot(dialog, {
+        await reviewScreenshot(daily, {
           path: testInfo.outputPath("build-grid-impact.png"),
           animations: "disabled",
         });

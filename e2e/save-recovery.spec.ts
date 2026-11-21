@@ -429,7 +429,7 @@ test("a delayed Resume cannot commit after a fresh writer takes its expired leas
   await expireWriter(page, copyId);
   const other = await context.newPage();
   await other.goto("/");
-  await other.getByRole("button", { name: "Saved games", exact: true }).click();
+  await other.getByRole("button", { name: "Saves", exact: true }).click();
   await other
     .locator('[data-save-id="' + copyId + '"]')
     .getByRole("button", {

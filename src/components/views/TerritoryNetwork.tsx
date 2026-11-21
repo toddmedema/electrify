@@ -425,6 +425,7 @@ function TileNetwork(props: Props) {
           game={game}
           views={views}
           selected={selected}
+          inspected={view ? inspected : undefined}
           onSelect={inspect}
           onTileMenu={(target) => {
             if (!projectBusy.current) setMenu(target);

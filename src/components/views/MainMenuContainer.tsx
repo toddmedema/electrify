@@ -10,6 +10,7 @@ import { startTutorial } from "../../reducers/Game";
 import { change as changeSettings } from "../../reducers/Settings";
 import { feedbackOpen } from "../../reducers/UI";
 import { selectContinueSave } from "../../SaveModel";
+import { showMultiplayerLobby } from "../../multiplayer/Registry";
 import { resumeSavedGame, runSaveTransition } from "../../SaveSession";
 import MainMenu, { DispatchProps, StateProps } from "./MainMenu";
 
@@ -41,6 +42,7 @@ export const mapDispatchToProps = (
       const saved = selectContinueSave(getEntries());
       if (saved) void resumeSavedGame(saved.id);
     },
+    onPlayWithFriends: showMultiplayerLobby,
     onSavedGames: () => {
       dispatch(navigate("SAVED_GAMES"));
     },

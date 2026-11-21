@@ -2957,9 +2957,9 @@ export function previewFacilityBuild(
     added.tileId = placement?.tileId;
   }
   const year = TICKS_PER_YEAR * TICK_MINUTES;
-  const step = 60;
+  const step = TICK_MINUTES;
   let commissionedMinute: number | undefined;
-  // The extra two samples cover rounding at commissioning and the end of its first year.
+  // Cover rounding at commissioning and the end of its first year.
   const ticks =
     Math.ceil((facility.yearsToBuild * year) / step) + year / step + 2;
   const timeline = generateForecastTimeline(
@@ -5325,7 +5325,8 @@ type ResourceWeatherFields = Pick<
 
 /** Weather and basin inputs shared by full simulation and catalog resource forecasts. */
 function createResourceWeatherReader(state: GameType, forecastWeather = false) {
-  const modeledPast = isLegacyEraGame(state);
+  const modeledPast =
+    isLegacyEraGame(state) || (forecastWeather && state.date.minute < 0);
   const weatherAt = forecastWeather
     ? createWeatherForecast(
         state.date,

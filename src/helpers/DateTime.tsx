@@ -606,12 +606,12 @@ export function getDateFromMinute(
   minute: number,
   startingYear: number,
 ): DateType {
-  const minuteOfDay = minute % 1440;
-  const hourOfDay = Math.floor(minuteOfDay / 60);
   const dayOfGame = Math.floor(minute / 1440);
-  const dayOfYear = dayOfGame % DAYS_PER_YEAR;
-  const monthsElapsed = Math.floor(dayOfGame / DAYS_PER_MONTH);
+  const minuteOfDay = minute - dayOfGame * 1440;
+  const hourOfDay = Math.floor(minuteOfDay / 60);
   const yearsEllapsed = Math.floor(dayOfGame / DAYS_PER_YEAR);
+  const dayOfYear = dayOfGame - yearsEllapsed * DAYS_PER_YEAR;
+  const monthsElapsed = Math.floor(dayOfGame / DAYS_PER_MONTH);
   const year = yearsEllapsed + startingYear;
   const monthNumber = Math.floor(dayOfYear / DAYS_PER_MONTH) + 1;
   const month = MONTHS[monthNumber - 1];
