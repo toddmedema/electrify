@@ -108,7 +108,12 @@ function summarize(log) {
       add(found.errors, annotation[1]);
   }
   for (const [job, found] of jobs)
-    if (!found.gates.length && !found.tests.length && !found.errors.length)
+    if (
+      !found.gates.length &&
+      !found.tests.length &&
+      !found.flaky.length &&
+      !found.errors.length
+    )
       jobs.delete(job);
   return jobs;
 }
@@ -199,12 +204,24 @@ function summarizeHistory(runs) {
   const tests = new Map();
   const gates = new Map();
   const unclassified = [];
+  const signals = {
+    passedOnRetry: 0,
+    failedPlaywright: 0,
+    runnerAcquisition: 0,
+  };
+  const isPlaywright = /^(?:\[[\w-]+\] › )?e2e\//;
   for (const run of runs) {
     totals[Object.hasOwn(totals, run.conclusion) ? run.conclusion : "other"]++;
     const seenGates = new Set();
     let identifiedTest = false;
+    let passedOnRetry = false;
+    let failedPlaywright = false;
     for (const found of run.summary?.values() || []) {
       for (const gate of found.gates) seenGates.add(gate);
+      passedOnRetry ||= found.flaky.some((title) => isPlaywright.test(title));
+      failedPlaywright ||= found.tests.some((title) =>
+        isPlaywright.test(title),
+      );
       for (const [titles, flaky] of [
         [found.tests, false],
         [found.flaky, true],
@@ -232,6 +249,9 @@ function summarizeHistory(runs) {
       }
     }
     for (const gate of seenGates) gates.set(gate, (gates.get(gate) || 0) + 1);
+    if (passedOnRetry) signals.passedOnRetry++;
+    if (failedPlaywright) signals.failedPlaywright++;
+    if (run.runnerAcquisition) signals.runnerAcquisition++;
     if (
       run.conclusion === "failure" &&
       run.summary &&
@@ -242,6 +262,7 @@ function summarizeHistory(runs) {
   }
   return {
     totals,
+    signals,
     unclassified,
     gates: [...gates].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])),
     tests: [...tests.values()]
@@ -256,39 +277,90 @@ function summarizeHistory(runs) {
   };
 }
 
-function history(limit = "100") {
-  if (!/^\d+$/.test(limit) || Number(limit) < 1 || Number(limit) > 100)
-    throw new Error("Usage: npm run ci:history -- [1-100]");
+function history(args) {
+  const master = args[0] === "--master";
+  const [limit = master ? "20" : "100", extra] = master ? args.slice(1) : args;
+  if (
+    extra !== undefined ||
+    !/^\d+$/.test(limit) ||
+    Number(limit) < 1 ||
+    Number(limit) > 100
+  )
+    throw new Error("Usage: npm run ci:history -- [--master] [1-100]");
   const runs = JSON.parse(
     gh([
       "run",
       "list",
       "--workflow",
       workflow,
-      "--event",
-      "pull_request",
+      ...(master
+        ? ["--branch", "master", "--event", "push"]
+        : ["--event", "pull_request"]),
       "--limit",
       limit,
       "--json",
-      "databaseId,headBranch,headSha,conclusion,url,createdAt",
+      "databaseId,headBranch,conclusion,url,attempt",
     ]),
   );
   const unreadable = [];
+  const missingRunnerEvidence = new Set();
   for (const run of runs) {
     if (run.conclusion !== "failure") continue;
+    const selectedAttempt = [
+      "run",
+      "view",
+      String(run.databaseId),
+      "--attempt",
+      String(run.attempt),
+    ];
     try {
-      run.summary = summarize(
-        gh(["run", "view", String(run.databaseId), "--log-failed"]),
-      );
+      run.summary = summarize(gh([...selectedAttempt, "--log-failed"]));
     } catch {
       unreadable.push(run.url);
+    }
+    if (!master) continue;
+    let jobs;
+    try {
+      ({ jobs } = JSON.parse(gh([...selectedAttempt, "--json", "jobs"])));
+    } catch {
+      missingRunnerEvidence.add(run.url);
+      continue;
+    }
+    for (const job of jobs) {
+      if (job.conclusion !== "cancelled" || job.steps.length) continue;
+      try {
+        const { detail, annotations } = readRunnerDiagnostics(
+          job,
+          run.databaseId,
+          run.attempt,
+        );
+        if (
+          !detail.runner_id &&
+          annotations.some(({ message }) =>
+            message.includes("was not acquired by Runner"),
+          )
+        )
+          run.runnerAcquisition = true;
+      } catch {
+        missingRunnerEvidence.add(run.url);
+      }
     }
   }
   const result = summarizeHistory(runs);
   print(
-    `Latest ${runs.length} PR workflow runs (latest attempt per run; gate counts overlap):`,
+    `Latest ${runs.length} ${master ? "master push" : "PR"} workflow runs (latest attempt per run; failure counts overlap):`,
   );
   print(JSON.stringify(result.totals));
+  print(
+    `  ${result.signals.passedOnRetry} failed runs with Playwright cases that passed on retry`,
+  );
+  print(
+    `  ${result.signals.failedPlaywright} failed runs with Playwright cases that did not pass`,
+  );
+  if (master)
+    print(
+      `  ${result.signals.runnerAcquisition} failed runs with confirmed runner acquisition errors`,
+    );
   print("\nFailed gates:");
   for (const [gate, count] of result.gates) print(`  ${count} runs: ${gate}`);
   print(
@@ -304,6 +376,13 @@ function history(limit = "100") {
     );
     result.unclassified.forEach((url) => print(`  ${url}`));
   }
+  if (missingRunnerEvidence.size) {
+    print(
+      `\nUnreadable runner evidence (${missingRunnerEvidence.size}; not classified):`,
+    );
+    missingRunnerEvidence.forEach((url) => print(`  ${url}`));
+    process.exitCode = 1;
+  }
   if (unreadable.length) {
     print(`\nUnreadable failure logs (${unreadable.length}; not classified):`);
     unreadable.forEach((url) => print(`  ${url}`));
@@ -312,32 +391,30 @@ function history(limit = "100") {
 }
 
 // A job that never gets a runner has no logs; its check annotations hold the cause.
+function readRunnerDiagnostics(job, id, attempt) {
+  const detail = JSON.parse(
+    gh(["api", `repos/{owner}/{repo}/actions/jobs/${job.databaseId}`]),
+  );
+  if (String(detail.run_id) !== String(id) || detail.run_attempt !== attempt)
+    throw new Error("Job metadata belongs to a different run or attempt");
+  const pages = JSON.parse(
+    gh(["api", "--paginate", "--slurp", `${detail.check_run_url}/annotations`]),
+  );
+  return { detail, annotations: pages.flat() };
+}
+
 function printRunnerDiagnostics(job, id, attempt) {
   try {
-    const detail = JSON.parse(
-      gh(["api", `repos/{owner}/{repo}/actions/jobs/${job.databaseId}`]),
-    );
-    if (String(detail.run_id) !== String(id) || detail.run_attempt !== attempt)
-      throw new Error("Job metadata belongs to a different run or attempt");
+    const { detail, annotations } = readRunnerDiagnostics(job, id, attempt);
     print(
       `  Runner: ${detail.runner_id ? detail.runner_name : "not assigned"} (requested: ${detail.labels.join(", ")})`,
     );
-    const pages = JSON.parse(
-      gh([
-        "api",
-        "--paginate",
-        "--slurp",
-        `${detail.check_run_url}/annotations`,
-      ]),
-    );
-    const annotations = new Set(
-      pages
-        .flat()
-        .map(
-          ({ annotation_level, message }) => `${annotation_level}: ${message}`,
-        ),
-    );
-    for (const annotation of annotations) print(`  ${annotation}`);
+    for (const annotation of new Set(
+      annotations.map(
+        ({ annotation_level, message }) => `${annotation_level}: ${message}`,
+      ),
+    ))
+      print(`  ${annotation}`);
   } catch (error) {
     print(
       `  Could not read runner diagnostics: ${error.message.split("\n")[0]}`,
@@ -346,11 +423,7 @@ function printRunnerDiagnostics(job, id, attempt) {
 }
 
 function main(argv = process.argv.slice(2)) {
-  if (argv[0] === "--history") {
-    if (argv.length > 2)
-      throw new Error("Usage: npm run ci:history -- [1-100]");
-    return history(argv[1]);
-  }
+  if (argv[0] === "--history") return history(argv.slice(1));
   const id = findRun(argv);
   const run = JSON.parse(
     gh([

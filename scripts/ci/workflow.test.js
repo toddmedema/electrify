@@ -16,7 +16,7 @@ const { partition } = require("./jest-filter");
 const workflow = () =>
   parse(fs.readFileSync(".github/workflows/workflow.yml", "utf8"));
 
-test("PR CI runs three independent test groups and three native builds in eight jobs", () => {
+test("PR CI isolates three browser shards and retains every other build and test worker", () => {
   const { jobs } = workflow();
   assert.deepEqual(Object.keys(jobs).sort(), [
     "browser",
@@ -28,7 +28,12 @@ test("PR CI runs three independent test groups and three native builds in eight 
   ]);
   assert.deepEqual(Object.keys(jobs.platform.strategy.matrix), ["include"]);
   const workers = jobs.platform.strategy.matrix.include;
-  assert.equal(workers.length + Object.keys(jobs).length - 1, 8);
+  assert.deepEqual(jobs.browser.strategy.matrix, { shard: [1, 2, 3] });
+  assert.equal(jobs.browser.strategy["fail-fast"], false);
+  assert.equal(
+    jobs.browser.env.ELECTRIFY_BROWSER_SHARD,
+    `\${{ matrix.shard }}/\${{ strategy.job-total }}`,
+  );
   assert.deepEqual(workers.map(({ depot }) => depot).sort(), [
     "darwin-arm64",
     "linux-x64",
@@ -101,7 +106,13 @@ test("PR CI runs three independent test groups and three native builds in eight 
     );
     assert.equal(reports.if, "always()");
     assert.equal(reports["continue-on-error"], true);
-    assert.equal(reports.with.name, `diagnostics-${group}`);
+    assert.equal(
+      reports.with.name,
+      group === "browser"
+        ? `diagnostics-browser-\${{ matrix.shard }}-attempt-\${{ github.run_attempt }}`
+        : `diagnostics-${group}`,
+    );
+    if (group === "browser") assert.notEqual(reports.with.overwrite, true);
     assert.match(reports.with.path, /test-results\//);
   }
   const downloads = (job) =>
@@ -210,7 +221,7 @@ test("CI fetches public assets once and limits LFS to each job's inputs", () => 
   assert(verify >= 0 && verify < credentials);
 });
 
-test("trusted master runs warm all three transform caches without adding jobs", () => {
+test("trusted master runs warm all three transform caches", () => {
   const config = workflow();
   assert.deepEqual(config.on.push.branches, ["master"]);
   assert(Object.hasOwn(config.on, "pull_request"));
@@ -422,6 +433,17 @@ test("windowless groups retain worker limits and native windows remain CI-only o
   assert.deepEqual(planForRun("browser", {}, 4), {
     browser: commands(4).browser,
   });
+  const sharded = planForRun("browser", { ELECTRIFY_BROWSER_SHARD: "2/3" }, 4);
+  assert.deepEqual(sharded.browser[0].args, ["--workers=1", "--shard=2/3"]);
+  for (const shard of ["", "0/3", "4/3", "2/0", "2.5/3", "2/3 --grep=x"])
+    assert.throws(
+      () => planForRun("browser", { ELECTRIFY_BROWSER_SHARD: shard }),
+      /valid N\/T shard/,
+    );
+  assert.throws(
+    () => planForRun("all", { ELECTRIFY_BROWSER_SHARD: "2/3" }),
+    /requires --group=browser/,
+  );
   for (const group of ["all", "desktop"]) {
     assert.throws(
       () => planForRun(group, {}, 4, "linux"),
@@ -488,6 +510,7 @@ test("the real harness runs every selected phase after failure and retains timin
             GITHUB_ACTIONS: "true",
             npm_execpath: npm,
             GITHUB_STEP_SUMMARY: summary,
+            ...(group === "browser" ? { ELECTRIFY_BROWSER_SHARD: "2/3" } : {}),
             ELECTRIFY_CI_FIXTURE_RECORD: record,
             ELECTRIFY_CI_FIXTURE_FAIL: failing,
           },
@@ -530,6 +553,13 @@ test("the real harness runs every selected phase after failure and retains timin
       }
       const text = fs.readFileSync(summary, "utf8");
       assert.match(text, new RegExp(`## ${group} test phases`));
+      if (group === "browser") {
+        assert(actual[0].args.includes("--workers=1"));
+        assert(actual[0].args.includes("--shard=2/3"));
+        assert.equal(report.shard, "2/3");
+        assert.match(report.source.tree, /^[0-9a-f]{40}$/);
+        assert(report.runner.availableParallelism > 0);
+      }
       for (const phase of report.phases)
         assert(text.includes(`| ${phase.name} | ${phase.status} |`));
     }
@@ -548,7 +578,8 @@ test("manual diagnostics stay with the worker that produces their inputs", () =>
     assert(step, `${group} retains its optional diagnostic`);
     assert.equal(
       step.if,
-      "github.event_name == 'workflow_dispatch' && inputs.benchmark-work",
+      (group === "browser" ? "matrix.shard == 1 && " : "") +
+        "github.event_name == 'workflow_dispatch' && inputs.benchmark-work",
     );
   }
 });

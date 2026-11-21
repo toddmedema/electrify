@@ -42,7 +42,7 @@ test("production reproduction and CI use the same server and acceptance policy",
       assert.equal(
         config.workers,
         2,
-        "local and hosted production workloads must match",
+        "unsharded runs use two workers; the hosted shard overrides this via the harness",
       );
     }
     assert.deepEqual(configs[0].webServer, configs[1].webServer);
@@ -87,7 +87,6 @@ for (const name of ["production", "multiplayer"]) {
       `
     import { test, expect } from '@playwright/test';
     test('stable', ({}, info) => {
-      expect(info.project.use.trace).toBe('on-first-retry');
       expect(info.project.use.screenshot).toBe('only-on-failure');
     });
     test('flaky', ({}, info) => expect(info.retry).toBeGreaterThan(0));
@@ -129,6 +128,12 @@ for (const name of ["production", "multiplayer"]) {
         { status: "passed", retry: 1 },
       ],
     );
+    const firstTrace = attempts[0].attachments.find(
+      ({ name }) => name === "trace",
+    );
+    assert(firstTrace?.path, "the failed first attempt must retain its trace");
+    assert(fs.statSync(firstTrace.path).size > 0);
+    assert(!attempts[1].attachments.some(({ name }) => name === "trace"));
   });
 }
 

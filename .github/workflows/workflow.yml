@@ -21,8 +21,7 @@ concurrency:
   # Let a trusted seed finish even when another merge arrives; PR updates still cancel.
   cancel-in-progress: ${{ github.event_name != 'push' }}
 
-# Eight jobs: shared renderers, three native builds, three test workers, and the required gate.
-# Tests share renderer artifacts but never wait for an OS build.
+# Test workers share renderer artifacts and never wait for an OS build.
 env:
   GIT_LFS_SKIP_SMUDGE: "1"
 
@@ -204,11 +203,16 @@ jobs:
           if-no-files-found: ignore
 
   browser:
-    name: Production browser tests
+    name: Production browser tests (${{ matrix.shard }})
     needs: build
     runs-on: ubuntu-22.04
     timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
     env:
+      ELECTRIFY_BROWSER_SHARD: ${{ matrix.shard }}/${{ strategy.job-total }}
       PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/.tmp/playwright-browsers
       E2E_BUILD_DIR: ${{ github.workspace }}/.tmp/web-renderer
       E2E_PORT: "3189"
@@ -230,10 +234,10 @@ jobs:
         with:
           name: web-renderer
           path: .tmp/web-renderer
-      - name: Complete production browser matrix
+      - name: Run the production browser shard
         run: npm run test:ci-all -- --group=browser
       - name: Measure optional review captures (manual runs only)
-        if: github.event_name == 'workflow_dispatch' && inputs.benchmark-work
+        if: matrix.shard == 1 && github.event_name == 'workflow_dispatch' && inputs.benchmark-work
         run: npm run test:e2e -- --config=e2e/ci-work.bench.config.ts
       - name: Preserve browser reports and diagnostics
         if: always()
@@ -241,7 +245,7 @@ jobs:
         continue-on-error: true
         uses: actions/upload-artifact@v7
         with:
-          name: diagnostics-browser
+          name: diagnostics-browser-${{ matrix.shard }}-attempt-${{ github.run_attempt }}
           path: test-results/
           retention-days: 7
           compression-level: 1

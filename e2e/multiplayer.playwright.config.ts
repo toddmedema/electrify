@@ -1,4 +1,5 @@
 import { defineConfig } from "@playwright/test";
+import { journeyTrace } from "./journey-trace";
 import path from "node:path";
 
 const port = process.env.E2E_PORT || "3115";
@@ -66,7 +67,7 @@ export default defineConfig({
     baseURL: `http://127.0.0.1:${port}`,
     headless: true,
     viewport: { width: 1280, height: 900 },
-    trace: process.env.CI ? "on-first-retry" : "retain-on-failure",
+    trace: journeyTrace,
     screenshot: "only-on-failure",
   },
   webServer: {

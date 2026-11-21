@@ -1,7 +1,7 @@
 const os = require("node:os");
 const fs = require("node:fs");
 const path = require("node:path");
-const { spawn } = require("node:child_process");
+const { spawn, spawnSync } = require("node:child_process");
 
 function cpuSuites(cores = os.availableParallelism()) {
   const workers = Math.max(1, Math.min(4, cores));
@@ -118,6 +118,17 @@ function planForRun(
   if (group !== "all" && !Object.hasOwn(plan, group))
     throw new Error(`Unknown test group: ${group}`);
   const selected = group === "all" ? plan : { [group]: plan[group] };
+  const shard = env.ELECTRIFY_BROWSER_SHARD;
+  if (shard !== undefined) {
+    const match = /^([1-9]\d*)\/([1-9]\d*)$/.exec(shard);
+    if (group !== "browser" || !match || Number(match[1]) > Number(match[2]))
+      throw new Error(
+        "ELECTRIFY_BROWSER_SHARD requires --group=browser and a valid N/T shard",
+      );
+    // Each hosted shard has its own runner. Do not put competing Chromium
+    // workers back on that runner, or apply the shard to a local full check.
+    selected.browser[0].args = ["--workers=1", `--shard=${shard}`];
+  }
   if (selected.desktop) {
     if (env.GITHUB_ACTIONS !== "true")
       throw new Error(
@@ -132,6 +143,12 @@ function planForRun(
 async function main(args = process.argv.slice(2)) {
   const group = parseGroup(args);
   const plan = planForRun(group);
+  const source = spawnSync("git", ["show", "-s", "--format=%H %T", "HEAD"], {
+    encoding: "utf8",
+    windowsHide: true,
+  });
+  const [commit, tree] =
+    source.status === 0 ? source.stdout.trim().split(" ") : [];
   const startedAt = new Date().toISOString();
   const started = performance.now();
   const phases = [];
@@ -189,6 +206,19 @@ async function main(args = process.argv.slice(2)) {
   const report = {
     schemaVersion: 1,
     group,
+    ...(process.env.ELECTRIFY_BROWSER_SHARD
+      ? { shard: process.env.ELECTRIFY_BROWSER_SHARD }
+      : {}),
+    ...(commit && tree ? { source: { commit, tree } } : {}),
+    runner: {
+      platform: process.platform,
+      arch: process.arch,
+      node: process.version,
+      availableParallelism: os.availableParallelism(),
+      ...(process.env.ImageVersion
+        ? { imageVersion: process.env.ImageVersion }
+        : {}),
+    },
     startedAt,
     durationMs: Math.round(performance.now() - started),
     phases,
@@ -201,7 +231,11 @@ async function main(args = process.argv.slice(2)) {
   if (process.env.GITHUB_STEP_SUMMARY) {
     fs.appendFileSync(
       process.env.GITHUB_STEP_SUMMARY,
-      `## ${group} test phases\n\n| Phase | Result | Seconds |\n| --- | --- | ---: |\n` +
+      `## ${group} test phases${report.shard ? ` (shard ${report.shard})` : ""}\n\n` +
+        (report.source
+          ? `Checkout tree \`${report.source.tree}\` at commit \`${report.source.commit}\`.\n\n`
+          : "") +
+        "| Phase | Result | Seconds |\n| --- | --- | ---: |\n" +
         phases
           .map(
             (phase) =>
