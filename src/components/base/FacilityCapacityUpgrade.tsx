@@ -4,6 +4,7 @@ import {
   DialogContentText,
   LinearProgress,
   Slider,
+  Tooltip,
   Typography,
 } from "@mui/material";
 import type {
@@ -48,6 +49,7 @@ import type {
   FacilityExpansionCancellationResult,
 } from "../../helpers/RequestFacilityExpansion";
 import { CurrencyContext, useMoney } from "./CurrencyContext";
+import ConceptIcon from "./ConceptIcon";
 import ConfirmDialog from "./ConfirmDialog";
 import PurchaseReviewDialog from "./PurchaseReviewDialog";
 import { signature } from "./DeferredProjection";
@@ -71,11 +73,13 @@ export default function FacilityCapacityUpgrade({
   onCancelExpansion,
   openOnMount = false,
   fallbackFocusRef,
+  children,
 }: {
   facility: FacilityOperatingType;
   game: GameType;
   openOnMount?: boolean;
   fallbackFocusRef?: React.RefObject<HTMLElement>;
+  children?: React.ReactNode;
 } & FacilityCapacityUpgradeActions) {
   const currency = currencyForLocation(game.location, game.startingYear);
   const money = useMoney(currency);
@@ -141,11 +145,14 @@ export default function FacilityCapacityUpgrade({
   const [message, setMessage] = React.useState<string>();
   const submitting = React.useRef(false);
   const upgradeSection = React.useRef<HTMLElement>(null);
-  const unavailableId = React.useId();
+  const upgradeButton = React.useRef<HTMLButtonElement>(null);
   const focusUpgradeSection = React.useRef(false);
   React.useEffect(() => {
     if (!open && !cancelReview && focusUpgradeSection.current) {
-      const target = upgradeSection.current ?? fallbackFocusRef?.current;
+      const target =
+        upgradeSection.current ??
+        upgradeButton.current ??
+        fallbackFocusRef?.current;
       if (target) {
         focusUpgradeSection.current = false;
         target.focus();
@@ -301,21 +308,20 @@ export default function FacilityCapacityUpgrade({
       setPending(false);
     }
   };
-  if (
-    (!onExpand && !expansion) ||
-    facility.yearsToBuildLeft > 0 ||
-    (facilityPermanentlyShutdown(facility, game.date.minute) && !expansion)
-  )
-    return null;
+  const showOffer =
+    !!onExpand &&
+    !expansion &&
+    facility.yearsToBuildLeft <= 0 &&
+    !facilityPermanentlyShutdown(facility, game.date.minute);
   return (
-    <section
-      className="facilityDetailSection facilityCapacityUpgrade"
-      aria-label="Capacity upgrade"
-      ref={upgradeSection}
-      tabIndex={-1}
-    >
-      {expansion ? (
-        <>
+    <>
+      {expansion && facility.yearsToBuildLeft <= 0 && (
+        <section
+          className="facilityDetailSection facilityCapacityUpgrade"
+          aria-label="Capacity upgrade"
+          ref={upgradeSection}
+          tabIndex={-1}
+        >
           <Typography component="h3" className="facilityDetailHeading">
             Capacity upgrade
           </Typography>
@@ -346,35 +352,50 @@ export default function FacilityCapacityUpgrade({
               Cancel capacity upgrade
             </Button>
           )}
-        </>
-      ) : (
-        <>
-          <Button
-            variant="outlined"
-            disabled={!offer || pending}
-            aria-describedby={!offer ? unavailableId : undefined}
-            onClick={() => {
-              changeTarget(initialTarget);
-              setOpen(true);
-            }}
-          >
-            Upgrade capacity
-          </Button>
-          {unavailable && (
-            <Typography
-              id={unavailableId}
-              variant="body2"
-              color="textSecondary"
-            >
-              {unavailable}
-            </Typography>
-          )}
-        </>
+        </section>
       )}
       {message && !open && !cancelReview && (
-        <Typography role="status" variant="body2">
+        <Typography
+          role="status"
+          variant="body2"
+          className="facilityCapacityMessage"
+        >
           {message}
         </Typography>
+      )}
+      {(showOffer || children) && (
+        <div
+          className="facilityActions"
+          role="group"
+          aria-label="Facility actions"
+        >
+          {showOffer && (
+            <Tooltip
+              describeChild
+              title={
+                unavailable ??
+                "Add capacity while the existing facility keeps operating."
+              }
+              placement="top"
+              arrow
+            >
+              <Button
+                ref={upgradeButton}
+                variant="outlined"
+                startIcon={<ConceptIcon concept="build" decorative />}
+                aria-disabled={!offer || pending || undefined}
+                onClick={() => {
+                  if (!offer || pending) return;
+                  changeTarget(initialTarget);
+                  setOpen(true);
+                }}
+              >
+                Upgrade capacity
+              </Button>
+            </Tooltip>
+          )}
+          {children}
+        </div>
       )}
       {open && (
         <CurrencyContext.Provider value={currency}>
@@ -489,6 +510,6 @@ export default function FacilityCapacityUpgrade({
           )}
         </ConfirmDialog>
       )}
-    </section>
+    </>
   );
 }

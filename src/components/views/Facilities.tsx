@@ -1,3 +1,4 @@
+import { facilityIconSrc } from "../../helpers/FacilityIcon";
 import TerritoryNetwork from "./TerritoryNetwork";
 import PowerAgreements from "../base/PowerAgreements";
 import {
@@ -181,14 +182,6 @@ function isWeatherHazardEvent(definitionId: string): boolean {
   return (
     definitionId === HAIL_DEFINITION_ID || definitionId === COLD_DEFINITION_ID
   );
-}
-
-function facilityIconName(facility: FacilityOperatingType): string {
-  // Authored scenarios may give a plant a narrative label, but uranium facilities still use
-  // the standard Nuclear artwork instead of looking for an image named after that label.
-  return "fuel" in facility && facility.fuel === "Uranium"
-    ? "nuclear"
-    : facility.name.toLowerCase();
 }
 
 const getDraggableStyle = (
@@ -485,7 +478,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
         <Avatar
           className={activity === "IDLE" ? "facilityIconIdle" : ""}
           alt={facility.name}
-          src={`/images/${facilityIconName(facility)}.svg`}
+          src={facilityIconSrc(facility)}
         />
         {capacityFraction !== null && !underConstruction && (
           <div className="capacityProgressBar" aria-hidden="true">

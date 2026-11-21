@@ -215,6 +215,79 @@ test("desktop wheel zoom clamps to half and double scale around the pointer", as
   expect(Math.hypot(driftX, driftY) * camera.scale).toBeLessThan(1);
 });
 
+test("pinch zooms the 3D map without magnifying the page", async ({
+  page,
+  isMobile,
+}) => {
+  const { map, canvas } = await startPausedMap(page, "light");
+  await readyDiagnostics(canvas);
+  const viewport = map.locator(".territoryMapViewport");
+  const baseline = await readTerritoryMapCamera(viewport);
+  const pageScale = await page.evaluate(() => window.visualViewport!.scale);
+  const bounds = (await viewport.boundingBox())!;
+  const x = Math.round(bounds.x + bounds.width / 2);
+  const y = Math.round(bounds.y + bounds.height / 2);
+  const input = await page.context().newCDPSession(page);
+
+  if (isMobile) {
+    await input.send("Input.dispatchTouchEvent", {
+      type: "touchStart",
+      touchPoints: [
+        { x: x - 24, y, id: 1 },
+        { x: x + 24, y, id: 2 },
+      ],
+    });
+    await input.send("Input.dispatchTouchEvent", {
+      type: "touchMove",
+      touchPoints: [
+        { x: x - 42, y, id: 1 },
+        { x: x + 42, y, id: 2 },
+      ],
+    });
+    await input.send("Input.dispatchTouchEvent", {
+      type: "touchEnd",
+      touchPoints: [],
+    });
+  } else {
+    // Chromium exposes trackpad pinches as cancelable control-wheel events.
+    await input.send("Input.dispatchMouseEvent", {
+      type: "mouseWheel",
+      x,
+      y,
+      modifiers: 2,
+      deltaX: 0,
+      deltaY: -120,
+    });
+  }
+
+  await expect
+    .poll(async () => (await readTerritoryMapCamera(viewport)).scale)
+    .toBeGreaterThan(baseline.scale);
+  expect(await page.evaluate(() => window.visualViewport!.scale)).toBe(
+    pageScale,
+  );
+  await expect(page.locator(".tileWorkspaceInspector")).toHaveCount(0);
+
+  if (isMobile) {
+    const camera = await readTerritoryMapCamera(viewport);
+    await input.send("Input.dispatchTouchEvent", {
+      type: "touchStart",
+      touchPoints: [{ x, y, id: 3 }],
+    });
+    await input.send("Input.dispatchTouchEvent", {
+      type: "touchMove",
+      touchPoints: [{ x: x + 40, y: y + 16, id: 3 }],
+    });
+    await input.send("Input.dispatchTouchEvent", {
+      type: "touchEnd",
+      touchPoints: [],
+    });
+    await expect
+      .poll(async () => (await readTerritoryMapCamera(viewport)).x)
+      .toBeLessThan(camera.x);
+  }
+});
+
 for (const reducedMotion of ["no-preference", "reduce"] as const) {
   const animate = reducedMotion === "no-preference";
   test(

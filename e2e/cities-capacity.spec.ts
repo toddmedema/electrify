@@ -122,6 +122,60 @@ test("an inherited gas steam plant submits exhaust only while generating", async
   });
 });
 
+test("the Hydro inspector groups its facility actions and keeps reservoir help", async ({
+  page,
+  isMobile,
+}, info) => {
+  await start(page, "light");
+  const game = (await readSavedGame(page))!;
+  const dam = game.facilities.find((plant) => plant.fuel === "Hydro")!;
+  await selectTerritoryMapTile(page, getTerritoryTile(dam.tileId!)!);
+  const inspector = page.getByRole("dialog", { name: "Hydro", exact: true });
+  const title = inspector.getByRole("heading", { name: "Hydro", exact: true });
+  await expect(title.locator("img")).toHaveAttribute(
+    "src",
+    "/images/hydro.svg",
+  );
+  await expect(
+    inspector.getByRole("heading", { name: "Water", exact: true }),
+  ).toBeVisible();
+  await expect(
+    inspector.getByRole("button", { name: "Water", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    inspector.getByRole("button", { name: "What is reservoir?" }),
+  ).toBeVisible();
+  await expect(
+    inspector.getByText("Next 12 months", { exact: true }),
+  ).toBeVisible();
+  const actions = inspector.getByRole("group", { name: "Facility actions" });
+  const upgrade = actions.getByRole("button", { name: "Upgrade capacity" });
+  await expect(upgrade).toBeDisabled();
+  await expect(
+    actions.getByRole("button", { name: "Pause Hydro" }),
+  ).toBeVisible();
+  await expect(
+    actions.getByRole("button", { name: "Sell Hydro" }),
+  ).toBeVisible();
+  await title.evaluate((element) => element.blur());
+  await reviewScreenshot(inspector, {
+    path: info.outputPath("hydro-inspector.png"),
+    scale: "css",
+  });
+  await actions.scrollIntoViewIfNeeded();
+  await reviewScreenshot(inspector, {
+    path: info.outputPath("hydro-actions.png"),
+    scale: "css",
+  });
+  if (!isMobile) {
+    await page.mouse.move(1, 1);
+    await upgrade.hover();
+    await expect(page.getByRole("tooltip")).toHaveText(
+      "This capacity exceeds the technology or site limit.",
+    );
+  }
+});
+
 for (const theme of ["light", "dark"] as const) {
   test(`city demand legend and plot share the inspector surface · ${theme}`, async ({
     page,
@@ -296,17 +350,16 @@ for (const theme of ["light", "dark"] as const) {
       name: "Capacity upgrade",
       exact: true,
     });
-    await expect(
-      upgrade.getByText("Capacity upgrade", { exact: true }),
-    ).toHaveCount(0);
-    await upgrade.scrollIntoViewIfNeeded();
+    const upgradeButton = inspector
+      .getByRole("group", { name: "Facility actions" })
+      .getByRole("button", { name: "Upgrade capacity", exact: true });
+    await expect(upgrade).toHaveCount(0);
+    await upgradeButton.scrollIntoViewIfNeeded();
     await reviewScreenshot(inspector, {
       path: info.outputPath(`capacity-offer-${theme}.png`),
       animations: "disabled",
     });
-    await upgrade
-      .getByRole("button", { name: "Upgrade capacity", exact: true })
-      .click();
+    await upgradeButton.click();
     const dialog = page.getByRole("dialog", {
       name: /^Upgrade .* capacity\?$/,
     });
@@ -423,10 +476,8 @@ for (const theme of ["light", "dark"] as const) {
       .click();
     await expect(cancel).toHaveCount(0);
     await expect(upgrade.getByRole("progressbar")).toHaveCount(0);
-    await expect(upgrade).toBeFocused();
-    await expect(
-      upgrade.getByRole("button", { name: "Upgrade capacity", exact: true }),
-    ).toBeEnabled();
+    await expect(upgradeButton).toBeFocused();
+    await expect(upgradeButton).toBeEnabled();
     const canceled = (await readSavedGame(page))!;
     const retained = canceled.facilities.find(({ id }) => id === facility.id)!;
     expect(retained.expansionInProgress).toBeUndefined();

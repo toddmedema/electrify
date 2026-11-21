@@ -23,6 +23,7 @@ import { MINUTES_PER_MONTH } from "../../helpers/DateTime";
 import { FacilityOperatingType, GameType } from "../../Types";
 import userEvent from "@testing-library/user-event";
 import FacilityDetails from "./FacilityDetails";
+import ExpandedFacilityDetails from "./ExpandedFacilityDetails";
 import { UnitsContext } from "./UnitsContext";
 import { useAppDispatch, useAppSelector } from "../../Store";
 import gameReducer from "../../reducers/Game";
@@ -170,11 +171,19 @@ it.each([false, true])(
     function ConnectedDetails() {
       const current = useAppSelector((state) => state.game);
       const dispatch = useAppDispatch();
-      return details(current, current.facilities[0], jest.fn(), {
-        onExpand: jest.fn(),
-        onCancelExpansion: (id, key) =>
-          dispatch(requestCancelFacilityExpansion(id, key)),
-      });
+      return (
+        <ExpandedFacilityDetails
+          game={current}
+          facility={current.facilities[0]}
+          onSell={jest.fn()}
+          onPause={jest.fn()}
+          onTogglePause={jest.fn()}
+          onExpand={jest.fn()}
+          onCancelExpansion={(id, key) =>
+            dispatch(requestCancelFacilityExpansion(id, key))
+          }
+        />
+      );
     }
     render(
       <Provider store={store}>
@@ -197,13 +206,13 @@ it.each([false, true])(
     ).toBeUndefined();
     expect(currentTick(store.getState().game)!.cash).toBe(1e12);
     expect(
-      screen.getByRole("region", {
-        name: shutdown ? "Operation" : "Capacity upgrade",
-      }),
+      shutdown
+        ? screen.getByRole("region", { name: "Operation" })
+        : screen.getByRole("button", { name: "Upgrade capacity" }),
     ).toHaveFocus();
     expect(
       screen.queryAllByRole("region", { name: "Capacity upgrade" }),
-    ).toHaveLength(shutdown ? 0 : 1);
+    ).toHaveLength(0);
     expect(
       screen.queryAllByRole("button", { name: "Upgrade capacity" }),
     ).toHaveLength(shutdown ? 0 : 1);

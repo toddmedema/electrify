@@ -45,7 +45,7 @@ export default function HydroWaterSection(props: {
   const capacityWh = facility.reservoirCapacityWh || 0;
   const heading = (
     <Typography component="h3" className="facilityDetailHeading">
-      <ManualLink entry={MANUAL_ENTRY.HYDROPOWER} text="Water" />
+      Water
     </Typography>
   );
 

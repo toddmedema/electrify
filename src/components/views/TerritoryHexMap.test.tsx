@@ -989,9 +989,9 @@ it("retains ownership boundaries and wire topology through power ticks and camer
   expect(topology.mock.calls.length).toBeGreaterThan(firstPasses);
 });
 
-it("leaves browser zoom and uncaptured pointer exits to the browser", () => {
+it("consumes trackpad pinch without forwarding browser zoom", () => {
   const map = show();
-  const before = { ...map.viewport.dataset };
+  const before = Number(map.viewport.dataset.cameraScale);
   const zoom = new WheelEvent("wheel", {
     bubbles: true,
     cancelable: true,
@@ -999,8 +999,37 @@ it("leaves browser zoom and uncaptured pointer exits to the browser", () => {
     deltaY: 50,
   });
   fireEvent(map.viewport, zoom);
-  expect(zoom.defaultPrevented).toBe(false);
+  expect(zoom.defaultPrevented).toBe(true);
+  expect(Number(map.viewport.dataset.cameraScale)).toBeLessThan(before);
+});
 
+it("applies Safari trackpad gesture scales across renders", () => {
+  const map = show();
+  const scale = Number(map.viewport.dataset.cameraScale);
+  function gesture(type: string, magnification: number) {
+    const event = Object.assign(
+      new MouseEvent(type, {
+        bubbles: true,
+        cancelable: true,
+        clientX: 400,
+        clientY: 300,
+      }),
+      { scale: magnification },
+    );
+    fireEvent(map.viewport, event);
+    return event;
+  }
+  expect(gesture("gesturestart", 1).defaultPrevented).toBe(true);
+  expect(gesture("gesturechange", 1.2).defaultPrevented).toBe(true);
+  expect(Number(map.viewport.dataset.cameraScale)).toBeCloseTo(scale * 1.2);
+  gesture("gesturechange", 1.5);
+  expect(Number(map.viewport.dataset.cameraScale)).toBeCloseTo(scale * 1.5);
+  gesture("gestureend", 1.5);
+});
+
+it("leaves uncaptured pointer exits to the browser", () => {
+  const map = show();
+  const before = { ...map.viewport.dataset };
   const tile = map.target("champlain:city");
   fireEvent.pointerDown(tile, { clientX: 20, clientY: 20, buttons: 1 });
   fireEvent.pointerLeave(map.viewport, {
