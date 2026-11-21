@@ -44,7 +44,10 @@ export function failDesktopStartup(retry: () => void, quit: () => void): void {
 }
 
 /** Hold input under the startup screen until the app is ready and its minimum entrance has elapsed. */
-export function finishStartup(waiting = false): void {
+export function finishStartup({
+  home = false,
+  waiting = false,
+}: { home?: boolean; waiting?: boolean } = {}): void {
   const entrance = document.getElementById("appStartup");
   // StrictMode commits twice; only one handoff may own the overlay and animations.
   if (!entrance || entrance.dataset.handoffPending) return;
@@ -52,6 +55,11 @@ export function finishStartup(waiting = false): void {
   if (root) root.inert = true;
   if (waiting) return;
   entrance.dataset.handoffPending = "true";
+  // Direct links can mount their destination under the entrance before the handoff.
+  // On home, inherited visibility transitions can postpone focus past the first frames.
+  const destination = home ? null : root;
+  const visibility = destination?.style.visibility ?? "";
+  if (destination) destination.style.visibility = "hidden";
   const remaining = Math.max(
     0,
     Math.ceil(
@@ -59,6 +67,7 @@ export function finishStartup(waiting = false): void {
     ),
   );
   const handoff = () => {
+    if (destination) destination.style.visibility = visibility;
     if (root) root.inert = false;
     if (entrance.isConnected) revealMenu(entrance);
   };

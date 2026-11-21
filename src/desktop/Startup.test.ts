@@ -23,7 +23,7 @@ it("holds a warm startup until 500ms after the entrance appeared, including dupl
   finishStartup();
   expect(document.getElementById("appStartup")).not.toBeNull();
   expect(root.inert).toBe(true);
-  expect(document.getElementById("appStartup")).toBeVisible();
+  expect(root).not.toBeVisible();
   jest.advanceTimersByTime(399);
   expect(document.getElementById("appStartup")).not.toBeNull();
   jest.advanceTimersByTime(1);

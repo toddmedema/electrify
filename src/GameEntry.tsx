@@ -18,13 +18,15 @@ import {
 installFocusVisibility();
 
 function StartupHandoff({ seat = false }: { seat?: boolean }): null {
-  // Continue and Saves must be in place before the home menu measures its entrance.
-  const waitingForMenu = useAppSelector(
-    (state) => !seat && state.card.name === "MAIN_MENU" && state.saves.loading,
+  const home = useAppSelector(
+    (state) => !seat && state.card.name === "MAIN_MENU",
   );
+  const loadingSaves = useAppSelector((state) => state.saves.loading);
+  // Continue and Saves must be in place before the home menu measures its entrance.
+  const waiting = home && loadingSaves;
   React.useLayoutEffect(() => {
-    finishStartup(waitingForMenu);
-  }, [waitingForMenu]);
+    finishStartup({ home, waiting });
+  }, [home, waiting]);
   return null;
 }
 
