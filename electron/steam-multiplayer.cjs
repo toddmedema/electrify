@@ -824,6 +824,34 @@ class SteamMultiplayer {
       connection.transportGeneration =
         (connection.transportGeneration || 0) + 1;
     }
+    const matchId = payload.world?.matchId;
+    const digest = payload.digest;
+    if (
+      message.kind === "checkpoint" &&
+      typeof matchId === "string" &&
+      typeof digest === "string"
+    ) {
+      message.matchId = matchId;
+      message.digest = digest;
+      const queue = connection.checkpointQueue;
+      const latest = queue?.at(-1);
+      // Other campaigns have their own save slots and keep their place in the queue.
+      if (latest?.matchId === matchId) {
+        if (latest.digest === digest) return;
+        if (latest.offset === 0) {
+          const active = queue.at(-2);
+          // We can return to the save whose first frames are already on the wire.
+          if (
+            active?.matchId === matchId &&
+            active.digest === digest &&
+            active.offset > 0
+          )
+            queue.pop();
+          else queue[queue.length - 1] = message;
+          return;
+        }
+      }
+    }
     if (
       connection.queue.length + (connection.checkpointQueue?.length || 0) >=
       64
@@ -914,13 +942,19 @@ class SteamMultiplayer {
     // Only a receipt from this live connection proves the identical file is already there.
     // Keep writing locally, and retry peers whose last send or disk write never completed.
     for (const c of this.connections.values())
-      if (c.connected && c.savedDigest !== digest)
+      if (
+        c.connected &&
+        c.savedDigest !== digest &&
+        (c.checkpointDigest !== digest ||
+          c.checkpointQueue?.at(-1)?.digest !== digest)
+      )
         try {
           encoded ||= await encodeAsync(payload);
           if (
             !c.connected ||
             ![...this.connections.values()].includes(c) ||
             this.hostId !== this.service.identity.steamId ||
+            c.savedDigest === digest ||
             // A newer local save may finish encoding first. Never replace it on the guest.
             digest !== this.checkpointHash
           )

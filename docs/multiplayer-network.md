@@ -87,12 +87,14 @@ of the system; real calls also depend on the device, call software and network.
 
 ## Acknowledged checkpoint reuse
 
-The host persists every requested checkpoint. It skips sending an identical checkpoint to a
-connected peer only after that peer acknowledges successfully writing that exact digest. The
-proof belongs to the connection: a reconnect needs a complete copy, changed contents invalidate
-the old proof, and an unacknowledged or failed send is retried on the next checkpoint. Only a
-receipt for the current checkpoint queued on that connection counts. Repeated local saves do not
-advance the displayed remote confirmation time without a new receipt.
+The host persists every requested checkpoint. For each guest, it finishes transfers whose first
+frames have been sent, reuses an identical copy still in the send queue, and replaces an unsent
+copy with the latest checkpoint from the same campaign. Saves for distinct campaigns keep their
+order in the queue. A repeated checkpoint can retry a completed transfer if the guest has yet to
+acknowledge writing that digest. The proof belongs to the connection, so a
+reconnect needs a complete copy and queueing changed contents invalidates the old proof. Only a
+receipt for the current checkpoint queued on that connection advances the displayed remote
+confirmation time.
 
 The benchmark calls native checkpoint, send and receive methods, then chunks and reassembles the
 actual compressed payloads. It checks initial copies, unacknowledged retries, zero bytes for
