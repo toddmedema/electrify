@@ -325,19 +325,25 @@ export default function TerritoryHexMap({
   });
   const [cullCenter, setCullCenter] = React.useState(camera.getSnapshot);
   const cullAnchor = React.useRef(cullCenter);
-  const [size, setSize] = React.useState({ width: 0, height: 0 });
+  const [size, setSize] = React.useState({
+    width: 0,
+    height: 0,
+    openingWidth: 0,
+  });
   const [zoom, setZoom] = React.useState(1);
   const zoomLevel = React.useRef(zoom);
-  const baseScale = size.width > 0 && size.width < 600 ? 0.75 : 0.875;
+  // Fit the starting view to the screen, then leave zoom under the player's control.
+  const baseScale =
+    size.openingWidth > 0 && size.openingWidth < 600 ? 0.75 : 0.875;
   const scale = baseScale * zoom;
   const worldWidth = size.width / scale;
   const worldHeight = size.height / scale;
   const moveStage = React.useCallback(
     ({ x, y }: ReturnType<typeof hexCenter>) => {
       if (stage.current)
-        stage.current.style.transform = `translate(${size.width / 2 - x * scale}px, ${size.height / 2 - y * scale}px)`;
+        stage.current.style.transform = `translate(${-x * scale}px, ${-y * scale}px)`;
     },
-    [size.width, size.height, scale],
+    [scale],
   );
   const mapBounds = React.useMemo(() => {
     const points = tiles.map(hexCenter);
@@ -521,8 +527,14 @@ export default function TerritoryHexMap({
   React.useLayoutEffect(() => {
     const element = viewport.current;
     if (!element) return;
-    const measure = () =>
-      setSize({ width: element.clientWidth, height: element.clientHeight });
+    const measure = () => {
+      const { clientWidth: width, clientHeight: height } = element;
+      setSize((previous) =>
+        previous.width === width && previous.height === height
+          ? previous
+          : { width, height, openingWidth: previous.openingWidth || width },
+      );
+    };
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(element);
@@ -819,14 +831,15 @@ export default function TerritoryHexMap({
     )
       return ground?.dataset.mapTarget as TerritoryMapTileKey | undefined;
     const rect = viewport.current?.getBoundingClientRect();
-    return (
-      (rect &&
-        picker.current?.({
-          x: event.clientX - rect.left,
-          y: event.clientY - rect.top,
-        })) ??
-      (ground?.dataset.mapTarget as TerritoryMapTileKey | undefined)
-    );
+    const hit =
+      rect &&
+      picker.current?.({
+        x: event.clientX - rect.left - rect.width / 2,
+        y: event.clientY - rect.top - rect.height / 2,
+      });
+    return hit === undefined
+      ? (ground?.dataset.mapTarget as TerritoryMapTileKey | undefined)
+      : hit;
   };
   const showTooltip = React.useCallback(
     (anchor?: NonNullable<typeof tooltipAnchor.current>) => {
@@ -1020,9 +1033,9 @@ export default function TerritoryHexMap({
           if (event.button !== 0 && !middle) return;
           cancelCameraShift();
           clearHover();
-          if (middle) event.preventDefault();
           const id = middle ? undefined : pointerTile(event);
-          rememberActivation(id);
+          if (middle || id === null) event.preventDefault();
+          rememberActivation(id ?? undefined);
           const { pointerId, pointerType, clientX, clientY } = event;
           pointers.current.set(
             pointerId,
@@ -1038,7 +1051,7 @@ export default function TerritoryHexMap({
             pointer.current = undefined;
             return;
           }
-          suppressClick.current = false;
+          suppressClick.current = id === null;
           pointer.current = {
             id: event.pointerId,
             x: event.clientX,
@@ -1172,7 +1185,10 @@ export default function TerritoryHexMap({
           }
           if (event.detail === 0) return;
           const id = pointerTile(event);
-          if (activation.current && activation.current.tileKey !== id) {
+          if (
+            id === null ||
+            (activation.current && activation.current.tileKey !== id)
+          ) {
             activation.current = undefined;
             event.preventDefault();
             event.stopPropagation();
@@ -1226,7 +1242,6 @@ export default function TerritoryHexMap({
         <div className="territoryMapStage" ref={stage}>
           <svg
             className="territoryHexGrid"
-            viewBox={`0 0 ${Math.max(1, worldWidth)} ${Math.max(1, worldHeight)}`}
             role="img"
             aria-labelledby={`${mapId}-title`}
           >
@@ -1241,7 +1256,7 @@ export default function TerritoryHexMap({
                 <FrostGroundPatterns id={`${mapId}-frost-cover`} />
               )}
             </defs>
-            <g aria-hidden="true">
+            <g aria-hidden="true" transform={`scale(${scale})`}>
               {!threeDReady &&
                 renderedViews.map(
                   ({ tile, owned, visibilityDistance, disaster }) => {

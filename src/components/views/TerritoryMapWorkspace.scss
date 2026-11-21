@@ -376,6 +376,9 @@
     cursor: grabbing;
   }
 }
+.territoryMapStage {
+  inset: 50% auto auto 50%;
+}
 .territoryHexGrid {
   overflow: visible;
   pointer-events: none;
