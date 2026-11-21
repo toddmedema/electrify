@@ -78,7 +78,7 @@ test("map notifications follow the full desktop header and clear the compact doc
 }, info) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   if (!info.project.use.hasTouch)
-    await page.setViewportSize({ width: 1199, height: 800 });
+    await page.setViewportSize({ width: 1119, height: 800 });
   await startGame(page, "light", 116);
   const header = page.locator("#appbar");
   const dock = page.locator("#navfooter");
@@ -1361,7 +1361,7 @@ for (const theme of ["light", "dark"] as const) {
     page,
   }, testInfo) => {
     test.skip(testInfo.project.name !== "desktop-chromium");
-    await page.setViewportSize({ width: 1199, height: 800 });
+    await page.setViewportSize({ width: 1119, height: 800 });
     await startGame(page, theme, 111);
     await page.locator("#programsNav").click();
     const rate = page.locator("#rateSlider input");
@@ -1374,7 +1374,7 @@ for (const theme of ["light", "dark"] as const) {
       name: "ultra speed",
       exact: true,
     });
-    for (const width of [1199, 1200, 1299, 1300, 1440, 1199]) {
+    for (const width of [1119, 1120, 1299, 1300, 1440, 1119]) {
       await page.setViewportSize({ width, height: 800 });
       const desktop = width >= 1300;
       const profit = appbar.getByLabel(/^Monthly profit forecast/);
@@ -1389,7 +1389,7 @@ for (const theme of ["light", "dark"] as const) {
       expect(profitBox!.x).toBeGreaterThan(cashBox!.x + cashBox!.width);
       expect(dateBox!.x).toBeGreaterThan(profitBox!.x + profitBox!.width);
       await expect(stage).toHaveAttribute("data-layout", "side");
-      if (width >= 1200) {
+      if (width >= 1120) {
         await expect(appbar).toHaveClass(/appbarSingleRow/);
       } else {
         await expect(appbar).not.toHaveClass(/appbarSingleRow/);

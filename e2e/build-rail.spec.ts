@@ -6,7 +6,8 @@ import {
   setMapProjectCapacity,
 } from "./layout";
 import { currentTick } from "../src/helpers/GameSelectors";
-import { readSavedGame } from "./save-fixture";
+import { getDateFromMinute, MINUTES_PER_MONTH } from "../src/helpers/DateTime";
+import { editSavedGame, readSavedGame } from "./save-fixture";
 import { reviewScreenshot } from "./review-screenshot";
 
 async function startMap(page: Page, theme: "light" | "dark") {
@@ -98,18 +99,37 @@ for (const theme of ["light", "dark"] as const) {
         dockBounds.y - 8,
       );
       await expect(rail.locator(".desktopBuildPreview")).toHaveCount(1);
-      for (const label of [
+      const generator = preview.getByRole("table", {
+        name: "generator properties",
+      });
+      const headings = generator.getByRole("rowheader");
+      for (const [index, label] of [
         "Build cost",
         "Build time",
         "Lifetime cost",
         "Expected capacity factor",
-      ])
-        await expect(preview.getByText(label, { exact: true })).toBeVisible();
+      ].entries()) {
+        await expect(headings.nth(index)).toBeVisible();
+        await expect(headings.nth(index)).toHaveText(label);
+      }
+      const readouts = await generator.getByRole("row").evaluateAll((rows) =>
+        rows.slice(0, 4).map((row) => {
+          const label = row.children[0];
+          const value = row.children[1];
+          return {
+            labelLeft: label.getBoundingClientRect().left,
+            valueRight: value.getBoundingClientRect().right,
+            divider: getComputedStyle(value).borderBottom,
+            height: row.getBoundingClientRect().height,
+          };
+        }),
+      );
+      expect(readouts).toEqual(Array(4).fill(readouts[0]));
       await expect(preview.locator(".buildOptionDescription")).not.toBeEmpty();
       await expect(page.getByRole("dialog", { name: /^Build / })).toHaveCount(
         0,
       );
-      await reviewScreenshot(network, {
+      await reviewScreenshot(preview, {
         path: info.outputPath(`build-rail-preview-${theme}.png`),
       });
       await wind.focus();
@@ -216,6 +236,54 @@ for (const theme of ["light", "dark"] as const) {
       before.territoryNetwork!.tilePurchases,
     );
     expect(after.facilities).toEqual(before.facilities);
+  });
+
+  test(`storage hover orders its readouts like the generator card · ${theme}`, async ({
+    page,
+  }, info) => {
+    test.skip(
+      info.project.name !== "desktop-chromium",
+      "Hover rail uses the desktop project",
+    );
+    await startMap(page, theme);
+    await editSavedGame(page, ({ game }) => {
+      // The Valley starts before utility-scale batteries are available.
+      const minute = 180 * MINUTES_PER_MONTH;
+      const offset = minute - game.date.minute;
+      game.date = getDateFromMinute(minute, game.startingYear);
+      game.objectiveProgress = undefined;
+      for (const tick of game.timeline) tick.minute += offset;
+    });
+    await page.goto("/");
+    await page.getByRole("button", { name: "Continue", exact: true }).click();
+    const network = await returnToTerritoryMap(page);
+    const rail = network.getByRole("complementary", {
+      name: "Build facilities",
+      exact: true,
+    });
+    await rail
+      .getByRole("button", { name: "Choose sites for Battery", exact: true })
+      .hover();
+    const battery = rail.getByRole("region", {
+      name: "Battery technology preview",
+      exact: true,
+    });
+    const storage = battery.getByRole("table", { name: "storage properties" });
+    await expect(storage.getByRole("rowheader")).toHaveText([
+      "Build cost",
+      "Build time",
+      "Discharge power",
+      "Duration at full power",
+      "Round-trip efficiency",
+      "Fixed operating cost",
+      "Ramp up/down time",
+      "Accounting lifetime",
+      "Stored energy lost per hour",
+      "Construction emissions",
+    ]);
+    await reviewScreenshot(battery, {
+      path: info.outputPath(`build-rail-battery-${theme}.png`),
+    });
   });
 
   test(`short build rail keeps keyboard previews reachable while scrolling · ${theme}`, async ({

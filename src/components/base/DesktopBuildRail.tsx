@@ -323,6 +323,12 @@ export default function DesktopBuildRail({
         )
       : undefined;
   const facility = quote?.facility ?? option;
+  // An inspected tile without a slot can explain why more precisely than the quote.
+  const unavailableSiteReason =
+    siteAvailability?.remaining === 0 ? siteAvailability.reason : undefined;
+  const previewSiteIssue = quote?.facility
+    ? undefined
+    : (unavailableSiteReason ?? quote?.reason);
   const sizeControl = (storage: boolean) => {
     const category = storage ? "storage" : "generator";
     const label = storage ? "Energy" : "Power";
@@ -526,17 +532,11 @@ export default function DesktopBuildRail({
           onMouseLeave={leave}
         >
           <div className="desktopBuildPreviewScroll">
-            {siteId && (
-              <p className="desktopBuildPreviewSite">
-                {quote?.facility
-                  ? "Price for the inspected site"
-                  : quote?.reason}
-              </p>
-            )}
-            <ul className="cardList">
+            <ul>
               {isStorage(facility) ? (
                 <StorageBuildItem
                   preview
+                  previewSiteIssue={previewSiteIssue}
                   game={game}
                   cash={cash}
                   interestRate={game.interestRate}
@@ -553,6 +553,7 @@ export default function DesktopBuildRail({
               ) : (
                 <GeneratorBuildItem
                   preview
+                  previewSiteIssue={previewSiteIssue}
                   game={game}
                   generator={facility}
                   date={game.date}

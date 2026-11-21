@@ -1519,7 +1519,7 @@ for (const theme of ["light", "dark"] as const) {
         ratio: 1,
       });
       await expect(
-        card.locator(".buildOptionMetric").filter({ hasText: "Build cost" }),
+        card.getByRole("row", { name: /^Build cost/ }),
       ).toBeInViewport({ ratio: 1 });
       await expect(
         preview.getByRole("button", { name: "Choose sites", exact: true }),

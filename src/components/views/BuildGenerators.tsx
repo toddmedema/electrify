@@ -235,6 +235,7 @@ function typicalCapacityFactor(
 interface GeneratorBuildItemProps {
   /** Expanded canonical card without purchasing controls or dialogs. */
   preview?: boolean;
+  previewSiteIssue?: string;
   game?: GameType;
   hydroAvailability?: ReturnType<typeof getHydroAvailability>;
   onDismissHydroPrimer?: () => void;
@@ -577,6 +578,42 @@ export function GeneratorBuildItem(
     );
   }
 
+  const metrics = (
+    <>
+      <BuildMetric
+        asDetailRow={props.preview}
+        label="Build cost"
+        entry={MANUAL_ENTRY.TOTAL_COST_OF_ENERGY}
+        value={formatPurchasePrice(generator.buildCost)}
+        note={
+          includedOptions.length
+            ? `Incl. ${includedOptions.map((option) => option.label.toLowerCase()).join(", ")}`
+            : undefined
+        }
+      />
+      <BuildMetric
+        asDetailRow={props.preview}
+        label="Build time"
+        entry={MANUAL_ENTRY.HOW_TO_PLAY}
+        value={formatBuildMonths(generator.yearsToBuild)}
+      />
+      {!props.preview && (
+        <ExpectedOutputMetric
+          shape={outputShape}
+          ceiling={props.outputCeiling || 1}
+        />
+      )}
+      {props.secondaryMetric === "lcWh" && (
+        <BuildMetric
+          asDetailRow={props.preview}
+          label="Cost per MWh"
+          entry={MANUAL_ENTRY.TOTAL_COST_OF_ENERGY}
+          value={`${fuelPrices[generator.fuel] ? "~" : ""}${outputPending ? "Calculating…" : formatForecastMoney(generator.lcWh * 1000000)}`}
+        />
+      )}
+    </>
+  );
+
   return (
     <BuildOptionCard
       name={generator.name}
@@ -630,40 +667,12 @@ export function GeneratorBuildItem(
         </>
       }
       warning={
-        canBuild || (props.preview && buildSubtitle === generator.description)
+        props.previewSiteIssue ??
+        (canBuild || (props.preview && buildSubtitle === generator.description)
           ? undefined
-          : buildSubtitle
+          : buildSubtitle)
       }
-      metrics={
-        <>
-          <BuildMetric
-            label="Build cost"
-            entry={MANUAL_ENTRY.TOTAL_COST_OF_ENERGY}
-            value={formatPurchasePrice(generator.buildCost)}
-            note={
-              includedOptions.length
-                ? `Incl. ${includedOptions.map((option) => option.label.toLowerCase()).join(", ")}`
-                : undefined
-            }
-          />
-          <BuildMetric
-            label="Build time"
-            entry={MANUAL_ENTRY.HOW_TO_PLAY}
-            value={formatBuildMonths(generator.yearsToBuild)}
-          />
-          <ExpectedOutputMetric
-            shape={outputShape}
-            ceiling={props.outputCeiling || 1}
-          />
-          {props.secondaryMetric === "lcWh" && (
-            <BuildMetric
-              label="Cost per MWh"
-              entry={MANUAL_ENTRY.TOTAL_COST_OF_ENERGY}
-              value={`${fuelPrices[generator.fuel] ? "~" : ""}${outputPending ? "Calculating…" : formatForecastMoney(generator.lcWh * 1000000)}`}
-            />
-          )}
-        </>
-      }
+      metrics={props.preview ? undefined : metrics}
       footerActions={compareAction}
       details={
         <>
@@ -693,6 +702,7 @@ export function GeneratorBuildItem(
             </Box>
           )}
           <BuildDetails label="generator properties">
+            {props.preview && metrics}
             {props.secondaryMetric !== "lcWh" && (
               <BuildDetailRow
                 label="Lifetime cost"
@@ -719,6 +729,21 @@ export function GeneratorBuildItem(
               }
               entry={MANUAL_ENTRY.CAPACITY_FACTOR}
             />
+            {props.preview && (
+              <BuildDetailRow
+                label={
+                  waterShape
+                    ? "Typical monthly water inflow"
+                    : "Typical monthly output"
+                }
+                value={
+                  <ExpectedOutputMetric
+                    shape={outputShape}
+                    ceiling={props.outputCeiling || 1}
+                  />
+                }
+              />
+            )}
             {generator.minimumStableOutput !== undefined && (
               <BuildDetailRow
                 label="Minimum output"
@@ -731,7 +756,7 @@ export function GeneratorBuildItem(
               />
             )}
             <BuildDetailRow
-              label="Fixed"
+              label={props.preview ? "Fixed operating cost" : "Fixed"}
               value={formatMoneyConcise(generator.annualOperatingCost) + "/yr"}
               entry={MANUAL_ENTRY.OPERATING_COSTS}
             />
