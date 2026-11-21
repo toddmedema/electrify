@@ -298,9 +298,23 @@ test("pinch zooms the 3D map without magnifying the page", async ({
   const viewport = map.locator(".territoryMapViewport");
   const baseline = await readTerritoryMapCamera(viewport);
   const pageScale = await page.evaluate(() => window.visualViewport!.scale);
-  const bounds = (await viewport.boundingBox())!;
-  const x = Math.round(bounds.x + bounds.width / 2);
-  const y = Math.round(bounds.y + bounds.height / 2);
+  const center = await viewport.evaluate((element) => {
+    const { left, top } = element.getBoundingClientRect();
+    return {
+      x: left + element.clientWidth / 2,
+      y: top + element.clientHeight / 2,
+    };
+  });
+  const x = Math.round(center.x) - 56;
+  const y = Math.round(center.y) + 40;
+  const groundAtPinch = ({
+    x: cameraX,
+    y: cameraY,
+    scale,
+  }: typeof baseline) => ({
+    x: cameraX + (x - center.x) / scale,
+    y: cameraY + (y - center.y) / scale,
+  });
   const input = await page.context().newCDPSession(page);
 
   if (isMobile) {
@@ -342,8 +356,17 @@ test("pinch zooms the 3D map without magnifying the page", async ({
   );
   await expect(page.locator(".tileWorkspaceInspector")).toHaveCount(0);
 
+  const camera = await readTerritoryMapCamera(viewport);
+  const beforePinch = groundAtPinch(baseline);
+  const afterPinch = groundAtPinch(camera);
+  const drift = Math.hypot(
+    afterPinch.x - beforePinch.x,
+    afterPinch.y - beforePinch.y,
+  );
+  // Allow one CSS pixel for input-coordinate rounding.
+  expect(drift * camera.scale).toBeLessThan(1);
+
   if (isMobile) {
-    const camera = await readTerritoryMapCamera(viewport);
     await input.send("Input.dispatchTouchEvent", {
       type: "touchStart",
       touchPoints: [{ x, y, id: 3 }],

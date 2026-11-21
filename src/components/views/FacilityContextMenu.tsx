@@ -298,6 +298,7 @@ export default function FacilityContextMenu(props: {
         }
         slotProps={{
           list: {
+            disabledItemsFocusable: true,
             "aria-label": props.tileActions
               ? "Tile actions"
               : "Facility actions",

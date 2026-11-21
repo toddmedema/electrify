@@ -54,7 +54,10 @@ export default function HydroWaterSection(props: {
       <section className="facilityDetailSection" aria-label="Water">
         {heading}
         <Typography variant="body2" className="facilityWaterStatus">
-          Opens half full.
+          <ManualLink entry={MANUAL_ENTRY.HYDROPOWER} label="reservoir">
+            Reservoir
+          </ManualLink>{" "}
+          opens half full.
         </Typography>
       </section>
     );
