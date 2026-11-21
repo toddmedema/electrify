@@ -118,7 +118,7 @@ const RESTORABLE_STATUS_FOCUS = [
   ".mapEventStatus",
 ];
 const NO_ACTIVE_EVENTS: ActiveEventGroupType[] = [];
-const SINGLE_ROW_MIN_WIDTH = 1200;
+const SINGLE_ROW_MIN_WIDTH = 1120;
 
 /**
  * This month's profit, bit-identical to deriveExpandedSummary(summarizeTimeline(...)).profit

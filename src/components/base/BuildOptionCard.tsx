@@ -66,8 +66,11 @@ export default function BuildOptionCard(
   props: BuildOptionCardProps,
 ): React.JSX.Element {
   const [disclosed, setExpanded] = React.useState(false);
-  const expanded = props.preview || disclosed;
+  const expanded = !!props.preview || disclosed;
   const { name, sizeAction, context, metrics, details } = props;
+  const titleComponent = props.preview ? "h2" : props.titleComponent;
+  const detailContent =
+    typeof details === "function" ? details(expanded) : details;
   const warningId = React.useId();
   // A disabled Review says why through the visible shortfall rather than staying silent.
   const describedBy =
@@ -99,8 +102,9 @@ export default function BuildOptionCard(
       </Box>
     ) : undefined;
   // Without metrics, or with a resize shortcut under Review, the context line moves up beside it
-  const contextInHeader = metrics === undefined || !!sizeAction;
-  const warningInHeader = !!sizeAction && !!props.warning;
+  const contextInHeader =
+    !props.preview && (metrics === undefined || !!sizeAction);
+  const warningInHeader = !props.preview && !!sizeAction && !!props.warning;
 
   return (
     <Card
@@ -117,13 +121,13 @@ export default function BuildOptionCard(
       data-build-option={name}
     >
       <CardHeader
-        className={sizeAction ? "stackedActionsHeader" : undefined}
+        className={
+          sizeAction && !props.preview ? "stackedActionsHeader" : undefined
+        }
         avatar={<Avatar alt={props.iconAlt ?? name} src={props.iconSrc} />}
         action={action}
         slotProps={{
-          ...(props.titleComponent && {
-            title: { component: props.titleComponent },
-          }),
+          ...(titleComponent && { title: { component: titleComponent } }),
           ...(warningInHeader && {
             subheader: {
               component: "div",
@@ -150,7 +154,7 @@ export default function BuildOptionCard(
           {props.description}
         </Typography>
       )}
-      {metrics !== undefined && (
+      {(props.preview || metrics !== undefined) && (
         <>
           {!contextInHeader && context && (
             <Typography
@@ -172,8 +176,10 @@ export default function BuildOptionCard(
               {props.warning}
             </Typography>
           )}
-          <Box className="buildOptionMetrics">{metrics}</Box>
-          {(details || props.footerActions) && (
+          {!props.preview && (
+            <Box className="buildOptionMetrics">{metrics}</Box>
+          )}
+          {((details && !props.preview) || props.footerActions) && (
             <Box className="buildOptionFooter">
               {details && !props.preview && (
                 <Button
@@ -194,11 +200,14 @@ export default function BuildOptionCard(
               {props.footerActions}
             </Box>
           )}
-          {details && (
-            <Collapse in={expanded} timeout="auto" unmountOnExit>
-              {typeof details === "function" ? details(expanded) : details}
-            </Collapse>
-          )}
+          {details &&
+            (props.preview ? (
+              detailContent
+            ) : (
+              <Collapse in={expanded} timeout="auto" unmountOnExit>
+                {detailContent}
+              </Collapse>
+            ))}
         </>
       )}
       {!props.preview && props.children}

@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Badge, Button, Tooltip } from "@mui/material";
+import { Badge, Button, IconButton, Tooltip } from "@mui/material";
 import HistoryIcon from "@mui/icons-material/History";
 import InsertChartIcon from "@mui/icons-material/InsertChart";
 import FactoryIcon from "@mui/icons-material/Factory";
@@ -126,25 +126,29 @@ export const MapEventStatus = React.memo(function MapEventStatus({
       ? "Unread events"
       : "Event history";
   return (
-    <Button
-      className="mapEventStatus"
-      data-emergency={emergency}
-      aria-label={
-        emergency
-          ? unreadEvents
-            ? "Ongoing emergency, unread events"
-            : "Ongoing emergency"
-          : label
-      }
-      aria-expanded={open}
-      aria-controls={open ? "tool-EVENTS" : undefined}
-      onClick={() => onToggle("EVENTS")}
-      onFocus={() => setFocused(true)}
-      onBlur={() => setFocused(false)}
-      startIcon={emergency ? <ErrorIcon /> : <HistoryIcon />}
-    >
-      {label}
-    </Button>
+    <Tooltip title={label}>
+      <IconButton
+        className="mapEventStatus"
+        color="primary"
+        data-emergency={emergency}
+        aria-label={
+          emergency
+            ? unreadEvents
+              ? "Ongoing emergency, unread events"
+              : "Ongoing emergency"
+            : label
+        }
+        aria-expanded={open}
+        aria-controls={open ? "tool-EVENTS" : undefined}
+        onClick={() => onToggle("EVENTS")}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+      >
+        <Badge color="primary" variant="dot" invisible={!unreadEvents}>
+          {emergency ? <ErrorIcon /> : <HistoryIcon />}
+        </Badge>
+      </IconButton>
+    </Tooltip>
   );
 });
 

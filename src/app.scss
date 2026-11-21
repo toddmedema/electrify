@@ -1497,7 +1497,7 @@ $topbar_height: 56px;
 }
 
 // Abbreviate the months and hour together before the wide bar gets crowded.
-@container appbar (max-width: 1365px) {
+@container appbar (max-width: 1320px) {
   .missionSummaryMonthsTail,
   .gameStatusHour {
     display: none;

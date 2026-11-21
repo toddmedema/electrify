@@ -484,7 +484,7 @@ it("dismisses on outside activation and scrolling, and guards all rail actions d
   ).toHaveFocus();
 });
 
-it("uses the owning site quote for preview prices and explains incompatible sites", () => {
+it("shows the owning site quote directly in the preview build cost", () => {
   const { game, onProject } = show("champlain:site-13");
   const option = projectCatalogue(game, 2e7, false).find(
     ({ name }) => name === "Wind",
@@ -498,15 +498,28 @@ it("uses the owning site quote for preview prices and explains incompatible site
   fireEvent.mouseEnter(wind());
   const preview = screen.getByLabelText("Wind technology preview");
   expect(
-    within(preview).getByText("Price for the inspected site"),
-  ).toBeInTheDocument();
+    within(preview).queryByText("Price for the inspected site"),
+  ).not.toBeInTheDocument();
   expect(
-    within(preview).getByText(formatPurchasePrice(quote.facility.buildCost)),
+    within(within(preview).getByRole("row", { name: /^Build cost/ })).getByText(
+      formatPurchasePrice(quote.facility.buildCost),
+    ),
   ).toBeInTheDocument();
   expect(
     screen.queryByRole("button", { name: "Choose sites for Offshore Wind" }),
   ).not.toBeInTheDocument();
   expect(onProject).not.toHaveBeenCalled();
+});
+
+it("explains why construction is unavailable when inspecting a city", () => {
+  show("champlain:city");
+  fireEvent.mouseEnter(wind());
+  const preview = screen.getByRole("region", {
+    name: "Wind technology preview",
+  });
+  expect(
+    within(preview).getByText("Cities add demand and have no building slot."),
+  ).toBeVisible();
 });
 
 it("disables an oversized project until the player changes the sizing", () => {

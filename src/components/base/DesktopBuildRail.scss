@@ -121,20 +121,71 @@
     min-height: 0;
     overflow: auto;
     overscroll-behavior: contain;
+
+    > ul {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
   }
-  .cardList {
+  .build-list-item.buildOption {
     margin: 0;
-    padding: 0;
-  }
-  .buildOption {
-    margin: 0;
+    padding-block: 8px;
     border: 0;
     box-shadow: none;
     border-radius: 0;
-  }
-  .desktopBuildPreviewSite {
-    margin: 12px 16px;
-    font-size: 12px;
+
+    .MuiCardHeader-root {
+      gap: 8px;
+      padding: 4px 16px 8px;
+    }
+
+    .MuiCardHeader-title {
+      white-space: normal;
+    }
+
+    .buildOptionDescription,
+    .buildOptionContext,
+    .buildOptionWarning {
+      padding: 0 16px 8px;
+    }
+
+    .MuiTableContainer-root {
+      width: auto;
+      margin-inline: 16px;
+    }
+
+    .buildDetails .MuiTableCell-root {
+      height: var(--control-size);
+      padding: 4px 0;
+    }
+
+    .buildDetails .buildDetailLabel {
+      padding-inline-end: 8px;
+    }
+
+    .buildDetails .buildDetailValue {
+      font-weight: 600;
+    }
+
+    .buildDetails tr:first-child > .MuiTableCell-root {
+      border-top: 1px solid var(--border-subtle);
+    }
+
+    .buildDetails tr:last-child > .MuiTableCell-root {
+      border-bottom: 0;
+    }
+
+    .buildOptionOutput {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      justify-content: center;
+    }
+
+    .buildOptionOutputCaption {
+      white-space: normal;
+    }
   }
 }
 .desktopBuildSizePopover {

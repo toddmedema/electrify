@@ -344,9 +344,7 @@ it("corrects an oversized technology to the map's terrain maximum before choosin
   expect(
     screen.queryByRole("button", { name: "Cash" }),
   ).not.toBeInTheDocument();
-  expect(screen.getByRole("alert")).toHaveTextContent(
-    /project size.*compatible site/,
-  );
+  expect(screen.getByRole("alert")).toHaveTextContent("No sites available");
   fireEvent.click(screen.getByRole("button", { name: "Ridge site" }));
   expect(screen.getByRole("button", { name: "Cash" })).toBeEnabled();
   expect(currentTick(store.getState().game)!.cash).toBe(

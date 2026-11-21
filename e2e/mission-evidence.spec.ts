@@ -42,8 +42,8 @@ async function expectWideHeaderRow(page: Page, mission: string, alert: string) {
     toolbar.getByRole("button", { name: alert, exact: true }),
     toolbar.getByRole("group", { name: "game speed" }),
   ];
-  // The bar folds at 1200 px and gains the fifth speed at 1300 px.
-  for (const width of [1200, 1280, 1300, 1440]) {
+  // Check the single-row boundary and the points where extra content comes back.
+  for (const width of [1120, 1280, 1300, 1321, 1440]) {
     await page.setViewportSize({ width, height: 900 });
     const boxes = [];
     for (const item of row) {
@@ -121,12 +121,18 @@ for (const theme of ["light", "dark"]) {
       true,
     );
     if (info.project.name === "desktop-chromium") {
+      const events = page.getByRole("button", {
+        name: "Unread events",
+        exact: true,
+      });
+      await expect(events).toHaveText("");
+      await expect(events.locator(".MuiBadge-dot")).toBeVisible();
       await expectWideHeaderRow(
         page,
         "Acquire competitors (0/3)",
         "Unread events",
       );
-      await page.setViewportSize({ width: 1280, height: 900 });
+      await page.setViewportSize({ width: 1120, height: 900 });
     }
     expect(
       await page.evaluate(

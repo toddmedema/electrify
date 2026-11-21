@@ -1566,7 +1566,7 @@ test("TV saved display preferences style direct scenario links before play", asy
       .getByRole("button", { name: "Choose sites for Wind", exact: true })
       .hover();
     await expect(technologyPreview).toBeVisible();
-    metrics = technologyPreview.locator(".buildOptionMetric");
+    metrics = technologyPreview.getByRole("cell");
   } else {
     await builder
       .getByRole("button", { name: "Build here", exact: true })
