@@ -253,7 +253,7 @@ test("transport evidence survives an unrelated downstream UI assertion", () => {
 });
 
 // Exercise the command's real stdout/exit behavior while replacing only external commands.
-function report(fixture) {
+function report(fixture, argv = ["--run", "99"]) {
   return spawnSync(
     process.execPath,
     [
@@ -270,7 +270,16 @@ function report(fixture) {
           ]);
           return fixture.log || "";
         }
-        if (args[0] === "run" && args[1] === "view") return JSON.stringify(fixture.run);
+        if (args[0] === "run" && args[1] === "view") {
+          if (fixture.history) assert.deepEqual(args.slice(3), ["--attempt", "2", "--json", "jobs"]);
+          return JSON.stringify(fixture.run);
+        }
+        if (args[0] === "run" && args[1] === "list") {
+          assert.equal(args[args.indexOf("--branch") + 1], "master");
+          assert.equal(args[args.indexOf("--event") + 1], "push");
+          assert.equal(args[args.indexOf("--limit") + 1], "8");
+          return JSON.stringify(fixture.history);
+        }
         const endpoint = args.find(value => value.startsWith("repos/") || value.startsWith("https://"));
         assert.equal(args[0], "api");
         if (endpoint.includes("/actions/jobs/")) {
@@ -283,7 +292,7 @@ function report(fixture) {
         assert(annotations, "Only the selected job's annotations may be requested");
         return JSON.stringify(annotations);
       };
-      require(${JSON.stringify(require.resolve("./failures"))}).main(["--run", "99"]);
+      require(${JSON.stringify(require.resolve("./failures"))}).main(${JSON.stringify(argv)});
     `,
     ],
     { encoding: "utf8" },
@@ -344,6 +353,82 @@ test("the command reports cancelled unassigned workers and deduplicates paginate
   assert.match(result.stdout, /not acquired by Runner/);
   assert.equal(result.stdout.split(capacity).length - 1, 1);
   assert(result.stdout.includes(job("cancelled").url));
+});
+
+test("master history keeps cancelled runs, retry failures and confirmed runner shortages distinct", () => {
+  const run = failedRun([job("cancelled")], { databaseId: 99 });
+  const fixture = {
+    run,
+    history: [run, { databaseId: 98, conclusion: "cancelled" }],
+    details: { 42: detail() },
+    annotations: {
+      [`${detail().check_run_url}/annotations`]: [
+        [
+          {
+            message:
+              "The job was not acquired by Runner of type hosted even after multiple attempts",
+          },
+        ],
+      ],
+    },
+    log: [
+      line("Production browser tests (1)", "1 flaky"),
+      line(
+        "Production browser tests (1)",
+        "[desktop-chromium] › e2e/campaign.spec.ts:39:5 › continues",
+      ),
+      line("Production browser tests (2)", "1 failed"),
+      line(
+        "Production browser tests (2)",
+        "[mobile-390px] › e2e/map-3d.spec.ts:233:7 › pans",
+      ),
+    ].join("\n"),
+  };
+  const args = ["--history", "--master", "8"];
+  const result = report(fixture, args);
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /2 master push workflow runs/);
+  assert.match(result.stdout, /"failure":1,"cancelled":1/);
+  assert.match(
+    result.stdout,
+    /1 failed runs with Playwright cases that passed on retry/,
+  );
+  assert.match(
+    result.stdout,
+    /1 failed runs with Playwright cases that did not pass/,
+  );
+  assert.match(
+    result.stdout,
+    /1 failed runs with confirmed runner acquisition errors/,
+  );
+  const assigned = report(
+    {
+      ...fixture,
+      details: { 42: detail({ runner_id: 12 }) },
+    },
+    args,
+  );
+  assert.equal(assigned.status, 0, assigned.stderr);
+  assert.match(
+    assigned.stdout,
+    /0 failed runs with confirmed runner acquisition errors/,
+  );
+  const partial = report(
+    {
+      ...fixture,
+      run: {
+        ...run,
+        jobs: [job("cancelled", { databaseId: 12 }), ...run.jobs],
+      },
+    },
+    args,
+  );
+  assert.equal(partial.status, 1, partial.stderr);
+  assert.match(
+    partial.stdout,
+    /1 failed runs with confirmed runner acquisition errors/,
+  );
+  assert.match(partial.stdout, /Unreadable runner evidence \(1;/);
 });
 
 test("failed test summaries still include their assertions and reproduction commands for the selected attempt", () => {

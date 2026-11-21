@@ -24,7 +24,7 @@ export default defineConfig({
   forbidOnly: true,
   failOnFlakyTests: true,
   retries: 2,
-  // Match hosted concurrency so local evidence does not depend on spare machine cores.
+  // Bound unsharded reproductions. Hosted shards each override this to one worker.
   workers: 2,
   webServer: {
     command: "node scripts/ci/serve.js",

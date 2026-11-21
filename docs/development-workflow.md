@@ -51,6 +51,14 @@ site inputs or generated pages changed. Pass the PR's base ref after `--` for a
 different target. If the check finds stale metadata, use the actual authored
 date when regenerating the pages.
 
+### Merging to master
+
+The [Protect master ruleset](https://github.com/toddmedema/electrify/rules/528373)
+requires GitHub Actions' `check` on a branch that includes the current `master`.
+Keep feature branches in flight in parallel. When several are ready, merge one
+at a time and update the next candidate to the new base before relying on its
+checks. Routine merges use the ruleset with its empty bypass list.
+
 ### PR monitor survey
 
 `node scripts/dev/pr-triage.js --repo toddmedema/electrify` prints one compact JSON
@@ -109,12 +117,17 @@ profiles. It bypasses local coordination and full-install preflight; its existin
 dependency checks remain. Native workers still suppress generators when adopting
 verified shared build artifacts. Packaged Electron window tests remain CI-only.
 
-The same combined test job also runs on `master` pushes to populate trusted Jest
+The same Test Code workflow also runs on `master` pushes to populate trusted Jest
 transform caches for new PRs. A running master seed finishes even if another merge
 arrives. Unit, simulation and multiplayer save-advance transforms have separate
 caches; cached transforms never replace test execution.
 
-Routine browser runs capture screenshots on failure. Set `REVIEW_SCREENSHOT_DIR`
+Hosted browser, multiplayer and controller journeys retain the failing
+attempt's action trace and failure screenshot, including when a retry passes.
+The shared [CI performance guide](ci-performance.md#reliability-evidence)
+describes how to compare source trees and timings.
+
+Set `REVIEW_SCREENSHOT_DIR`
 to collect optional review captures as well; test/viewport subdirectories prevent
 collisions. The layout and interaction assertions run in either mode.
 
@@ -157,9 +170,7 @@ behavior inputs, including local environment files, invalidate a run just like t
 source changes. Cache reuse never authorizes a partial run to claim full coverage.
 
 For isolated runner measurements, manually dispatch Test Code with
-`benchmark-work=true`. Each of the three test workers runs its ordinary suites first, then
-measures its own workload: CPU checks compare four covered suites with cold/restored transforms,
-desktop integration measures one-shot/persistent save advancement, and the browser worker
-captures optional review images at all three CI viewport widths. Results are retained in
-`diagnostics-cpu`, `diagnostics-desktop` and `diagnostics-browser`; no additional job or
-required gate is added.
+`benchmark-work=true`. After ordinary suites finish, the CPU worker compares cold and
+restored transforms, the desktop worker compares one-shot and persistent save
+advancement, and browser shard 1 captures review images at all three CI widths.
+The reports are in `diagnostics-cpu`, `diagnostics-desktop`, and `diagnostics-browser-1-attempt-<attempt>`.
