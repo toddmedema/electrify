@@ -43,18 +43,15 @@ export function failDesktopStartup(retry: () => void, quit: () => void): void {
   actions.querySelector("button")?.focus();
 }
 
-/** Keep even a cached startup visible for 500ms, measured from the early HTML entrance. */
-export function finishStartup(): void {
+/** Hold input under the startup screen until the app is ready and its minimum entrance has elapsed. */
+export function finishStartup(waiting = false): void {
   const entrance = document.getElementById("appStartup");
   // StrictMode commits twice; only one handoff may own the overlay and animations.
   if (!entrance || entrance.dataset.handoffPending) return;
-  entrance.dataset.handoffPending = "true";
   const root = document.getElementById("root");
-  const visibility = root?.style.visibility ?? "";
-  if (root) {
-    root.inert = true;
-    root.style.visibility = "hidden";
-  }
+  if (root) root.inert = true;
+  if (waiting) return;
+  entrance.dataset.handoffPending = "true";
   const remaining = Math.max(
     0,
     Math.ceil(
@@ -62,10 +59,7 @@ export function finishStartup(): void {
     ),
   );
   const handoff = () => {
-    if (root) {
-      root.inert = false;
-      root.style.visibility = visibility;
-    }
+    if (root) root.inert = false;
     if (entrance.isConnected) revealMenu(entrance);
   };
   if (remaining > 0) window.setTimeout(handoff, remaining);

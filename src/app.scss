@@ -5206,11 +5206,6 @@ $homeSmokeCycle: 5.6s;
   @include staticHomeLogo;
 }
 
-// The startup screen owns focus until the home menu's save catalog is ready.
-html.js:has(#appStartup) #root {
-  visibility: hidden;
-}
-
 #appStartup {
   position: fixed;
   inset: 0;

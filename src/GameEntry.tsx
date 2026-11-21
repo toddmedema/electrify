@@ -23,7 +23,7 @@ function StartupHandoff({ seat = false }: { seat?: boolean }): null {
     (state) => !seat && state.card.name === "MAIN_MENU" && state.saves.loading,
   );
   React.useLayoutEffect(() => {
-    if (!waitingForMenu) finishStartup();
+    finishStartup(waitingForMenu);
   }, [waitingForMenu]);
   return null;
 }
