@@ -70,10 +70,12 @@ export default function FacilityCapacityUpgrade({
   onExpand,
   onCancelExpansion,
   openOnMount = false,
+  fallbackFocusRef,
 }: {
   facility: FacilityOperatingType;
   game: GameType;
   openOnMount?: boolean;
+  fallbackFocusRef?: React.RefObject<HTMLElement>;
 } & FacilityCapacityUpgradeActions) {
   const currency = currencyForLocation(game.location, game.startingYear);
   const money = useMoney(currency);
@@ -143,10 +145,13 @@ export default function FacilityCapacityUpgrade({
   const focusUpgradeSection = React.useRef(false);
   React.useEffect(() => {
     if (!open && !cancelReview && focusUpgradeSection.current) {
-      focusUpgradeSection.current = false;
-      upgradeSection.current?.focus();
+      const target = upgradeSection.current ?? fallbackFocusRef?.current;
+      if (target) {
+        focusUpgradeSection.current = false;
+        target.focus();
+      }
     }
-  }, [open, cancelReview]);
+  }, [open, cancelReview, fallbackFocusRef]);
   const pricingKey = open
     ? JSON.stringify([
         signature(game),
