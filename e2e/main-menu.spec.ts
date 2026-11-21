@@ -385,9 +385,11 @@ test("waits for saved games before revealing the returning menu in order", async
   );
   await expect(page.locator("#menuCard")).toBeAttached();
   await expect(page.locator("#appStartup")).toBeVisible();
+  await expect(page.locator("#root")).toHaveAttribute("inert", "");
+  await page.keyboard.press("Tab");
   await expect(
     page.getByRole("button", { name: "Play", exact: true }),
-  ).toHaveCount(0);
+  ).not.toBeFocused();
   await page.evaluate(() =>
     document.dispatchEvent(new Event("release-save-catalog")),
   );
