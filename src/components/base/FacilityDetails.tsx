@@ -280,6 +280,7 @@ function WeatherResilienceSection(props: {
  */
 export default function FacilityDetails(props: Props): React.JSX.Element {
   const { facility, date, seed, location } = props;
+  const operationSection = React.useRef<HTMLElement>(null);
   const { formatMoneyConcise, formatMoneyStable, formatPricePerMWh } = useMoney(
     currencyForLocation(location, props.game?.startingYear),
   );
@@ -383,7 +384,12 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
         </section>
       )}
       {!underConstruction && (
-        <section className="facilityDetailSection" aria-label="Operation">
+        <section
+          className="facilityDetailSection"
+          aria-label="Operation"
+          ref={operationSection}
+          tabIndex={-1}
+        >
           <Typography component="h3" className="facilityDetailHeading">
             Operation
           </Typography>
@@ -632,6 +638,7 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
           game={props.game}
           onExpand={props.onExpand}
           onCancelExpansion={props.onCancelExpansion}
+          fallbackFocusRef={operationSection}
         />
       )}
       {props.game && facility.fuel === "Coal" && (

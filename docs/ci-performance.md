@@ -1,12 +1,12 @@
 # PR testing performance
 
-CI uses **eight jobs per PR**: shared renderer builds, three native package builds, three
+CI uses **ten jobs per PR**: shared renderer builds, three native package builds, five
 Linux test workers, and the required `check` gate. Unit, simulation, security-rule, browser,
 multiplayer/mod and controller suites retain their existing cases, viewports, seeds and
 coverage floors. Packaged Electron journeys run once on Linux; Windows and macOS retain
 native packaging verification.
 
-## Eight-job layout
+## Job layout
 
 1. **Shared production builds** compiles/verifies the desktop renderer/catalogs and web build
    once each on Linux, checks bundle size, and uploads the artifacts. Separate input-validated
@@ -20,12 +20,13 @@ native packaging verification.
    types, strict lint, formatting, native Node units, CI tooling, Firestore rules, the isolated
    tick-ratio benchmark, every covered Jest unit and long simulation, coverage validation,
    and the simulation CLI. It needs no compiled renderer, browser or native window manager.
-6. **Production browser tests** downloads only the shared web renderer and runs the complete
-   PR smoke/layout matrix at the existing desktop, 390 px and 360 px viewports.
+6. **Production browser tests** runs three Playwright shards on separate Linux runners,
+   with one worker per runner and the same shared web renderer. The combined matrix covers
+   the existing desktop, 390 px and 360 px viewports.
 7. **Desktop integration tests** downloads only the shared desktop renderer, packages its own
    Linux test depot, and runs multiplayer/mod management, controller journeys and the full
    packaged Electron suite under Xvfb.
-8. **check** waits for both shared builds, all three native packages and all three test workers.
+8. **check** waits for both shared builds, all three native packages and all five test workers.
    It passes only when every dependency succeeds. Failed, skipped, cancelled and timed-out
    results cannot pass the required gate. Workflow tests execute the gate's shell command
    against each of these outcomes for every dependency.
@@ -38,11 +39,11 @@ Linux package job or transferring its large app directory. The required gate use
 Actions' dependency results directly, without polling the jobs API.
 
 Each worker runs its heavy phases sequentially so CPU work cannot make UI deadlines depend
-on load. Covered Jest and simulations use at most four workers, browser tests use two, and
-native Electron and controller journeys use one. A failed phase does not skip later phases
-in its worker. Unit and simulation discovery use a single `1/1` manifest; coverage validation
-still requires every discovered unit suite to have passed and retains zero-hit files before
-enforcing the unchanged `package.json` thresholds. The browser matrix runs without sharding.
+on load. Covered Jest and simulations use at most four workers. Each hosted browser shard,
+native Electron worker and controller worker uses one. The unsharded local browser run
+uses two. A failed phase does not skip later phases in its worker. Unit and simulation
+discovery use a single `1/1` manifest. Coverage validation still requires every discovered
+unit suite to pass and retains zero-hit files before enforcing the `package.json` thresholds.
 
 The harness selects one explicit group with `npm run test:ci-all -- --group=cpu`,
 `--group=browser` or `--group=desktop`. Unknown, conflicting and repeated options fail before
@@ -53,20 +54,22 @@ all CPU checks, use `--cpu-only` with Java 21 available for the Firestore emulat
 redundant generation pre-hooks. Ordinary local validation continues to use `npm run check`
 and `npm run check:ci`; the latter leaves native packaged journeys to CI.
 
-All three test workers restore the full locked toolchain. Each restores its own checkout and
+All test workers restore the full locked toolchain. Each restores its own checkout and
 cached dependencies, but production compilation stays in the shared build job. Only UI workers
 install the locked Chromium headless shell; only desktop integration installs Xvfb and Openbox.
 Unit/simulation transform caches belong to CPU checks, and the world-advance transform cache
 belongs to desktop integration. All three native package workers retain the lean locked
 profile and verify shared assets, native binaries and, on Mac, ARM64-only binaries and the signature.
 
-The workers upload separate `diagnostics-cpu`, `diagnostics-browser` and `diagnostics-desktop`
-artifacts even if a phase fails. CPU diagnostics include coverage and suite manifests; UI
-reports retain their existing structured results, traces and failure screenshots. Each harness
-run also saves `test-results/ci-<group>.json` and adds its phase results and execution durations
-to the Actions summary. Browser, multiplayer, controller and packaged-desktop reports keep
-separate directories. Native CI retains DOM/network traces and sources without a continuous
-screenshot filmstrip during passing tests.
+Workers upload `diagnostics-cpu`, one `diagnostics-browser-<shard>-attempt-<attempt>` per shard,
+and `diagnostics-desktop` even if a phase fails. CPU diagnostics include coverage and
+suite manifests. UI reports retain structured results and failure screenshots.
+Browser, multiplayer and controller journeys retain action-only traces of failing
+attempts in CI. Packaged Electron retains its existing DOM/network traces. Each
+harness saves `test-results/ci-<group>.json` with the checkout's Git commit and tree,
+runner metadata, and phase results and durations. The Actions summary includes the
+tree and phase durations. Compare trees on clean checkouts. A tree does not identify
+local edits, build artifacts or runner conditions.
 
 Jest 27 binds the sandbox's existing `Math`, `Number`, `Object`, `Array`, `JSON` and `BigInt`
 objects directly through `extraGlobals`, avoiding repeated VM global lookups in simulation loops.
@@ -83,7 +86,21 @@ so its existing draft/plain ratio ceilings still compare the same execution envi
 viewports, shifted source lines and branches. It counts each run once per test or gate,
 separates passed retries, and links the contributing runs. It reports unreadable logs instead
 of treating them as passes. Counts describe the latest attempt of each run; a later successful
-rerun does not establish that its earlier failure was unrelated.
+rerun provides another execution of that test.
+
+Run `npm run ci:history -- --master 20` for recent `master` pushes. It separates
+cancelled coverage, tests that passed on retry, tests that stayed red, and
+runner-acquisition failures confirmed by job annotations. These signals can
+overlap on the same run.
+
+To compare a green PR and a red `master` run, read `source.tree` in their
+`ci-browser.json` reports or use the trees of the actual checkout SHAs in the job
+logs. A different tree needs a diff before assigning a cause. On matching trees,
+compare first attempts by spec, test title and project in the Playwright JSON
+reports. Report the first-attempt failures, median and slow-tail case durations,
+and the slowest shard's elapsed time. Use the same Playwright version, artifact
+and runner settings when measuring a timing change. Include all shards in coverage
+counts and report queue time and total runner minutes separately.
 
 `npm run check -- --report <report.json>` summarizes a retained local check with its tested
 commit, source fingerprint, runtime and full or partial scope. It explicitly reports whether
@@ -95,7 +112,7 @@ a separate local command.
 
 Run **Test Code** manually with **Archive and upload all three verified offline desktop builds**
 enabled, or `gh workflow run workflow.yml --ref <branch> -f qa-artifacts=true`. This uses the same
-eight jobs and full tests. PRs retain diagnostics but omit downloadable archives. Tar preserves
+ten jobs and full tests. PRs retain diagnostics but omit downloadable archives. Tar preserves
 executable permissions; compressed archives upload without another compression pass.
 
 ## Timing
