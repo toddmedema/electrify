@@ -562,6 +562,11 @@ const publishedCoopIdentities = [
     23,
     "coop-2-3a64b92f0462af2eb6286821f118c030f25aaf65b546a4a7652e87b1dbcd3e33",
   ],
+  // Master 4e02930d shipped controller and recovery improvements to couch co-op.
+  [
+    24,
+    "coop-2-46e99cbb59338588fc28b819fef31298731f0309c3ec8a1434df3a1e4f5cd596",
+  ],
   // Published master a9209513, before the exact frame-pacing optimizations.
   [
     24,
@@ -571,6 +576,11 @@ const publishedCoopIdentities = [
   [
     24,
     "coop-2-b5084b0368736d579e1ffc5cfbcaf4b8a7b4a2b6097b45dfaafbf85556810755",
+  ],
+  // Master 0e009432 shipped the frame-pacing optimizations.
+  [
+    24,
+    "coop-2-70cc82f8acaacdd1aed5daf5fe8c078bccdf2873eeecdc58b7bcdb1973aa9bc7",
   ],
 ] as const;
 

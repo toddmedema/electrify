@@ -1,29 +1,19 @@
 import { formatNumber } from "./Format";
 import { ChallengeInvitation, VictoryType } from "../Types";
+import { validRunIdentity } from "./RunIdentity";
 import {
-  expandAuthoredRunReference,
-  projectAuthoredRunReference,
-  sameRunIdentity,
-} from "./RunIdentity";
+  challengeScenario,
+  readLegacyInvitation,
+  validInvitation,
+} from "./ChallengeInvitation";
 import { buildScoreShareContent, ShareContentType } from "./Share";
 import { DIFFICULTY_LABELS } from "../Constants";
-import { SCENARIOS } from "../data/Scenarios";
-
 export const MAX_CHALLENGE_URL = 2048;
 export type ChallengeRoute = {
   invitation?: ChallengeInvitation;
   scenarioId?: number;
   error?: string;
 };
-export function validInvitation(raw: unknown): raw is ChallengeInvitation {
-  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return false;
-  const value = raw as ChallengeInvitation;
-  return (
-    Object.keys(value).sort().join() === "run,target" &&
-    Number.isSafeInteger(value.target) &&
-    !!expandAuthoredRunReference(value.run)
-  );
-}
 export function parseChallengeUrl(href: string): ChallengeRoute | undefined {
   let url: URL;
   try {
@@ -41,21 +31,30 @@ export function parseChallengeUrl(href: string): ChallengeRoute | undefined {
   )
     return failed;
   try {
-    const value = JSON.parse(url.searchParams.get("challenge")!);
-    if (value && typeof value === "object") {
-      const id = (value as ChallengeInvitation).run?.scenarioId;
-      if (SCENARIOS.some((s) => s.id === id && !s.tutorialSteps))
-        failed.scenarioId = id;
-    }
-    if (!validInvitation(value)) return failed;
+    const value: unknown = JSON.parse(url.searchParams.get("challenge")!);
+    const legacy = readLegacyInvitation(value);
+    const invitation = legacy
+      ? {
+          scenarioId: legacy.run.scenarioId,
+          difficulty: legacy.run.difficulty,
+          target: legacy.target,
+        }
+      : value;
+    if (
+      invitation &&
+      typeof invitation === "object" &&
+      "scenarioId" in invitation
+    )
+      failed.scenarioId = challengeScenario(invitation.scenarioId)?.id;
+    if (!validInvitation(invitation)) return failed;
     const scenarioKeys = url.searchParams.getAll("scenario");
     if (
       scenarioKeys.length > 1 ||
       (scenarioKeys.length === 1 &&
-        scenarioKeys[0] !== String(value.run.scenarioId))
+        scenarioKeys[0] !== String(invitation.scenarioId))
     )
       return failed;
-    return { invitation: value, scenarioId: value.run.scenarioId };
+    return { invitation, scenarioId: invitation.scenarioId };
   } catch (_error) {
     return failed;
   }
@@ -81,17 +80,16 @@ export function challengeShareContent(
   victory: VictoryType,
   href?: string,
 ): { content: ShareContentType; challenge: boolean } {
-  const reference = projectAuthoredRunReference(victory.runIdentity);
-  const invitation: ChallengeInvitation | undefined =
+  const { scenarioId, difficulty, score: target } = victory;
+  const scenario = challengeScenario(scenarioId);
+  const url =
     victory.outcome === "completed" &&
-    reference &&
-    Number.isSafeInteger(victory.score)
-      ? { run: reference, target: victory.score }
-      : undefined;
-  const url = invitation && challengeUrl(invitation, href);
-  if (!url)
+    validRunIdentity(victory.runIdentity) &&
+    victory.runIdentity.scenarioId === scenarioId &&
+    victory.runIdentity.difficulty === difficulty &&
+    challengeUrl({ scenarioId, difficulty, target }, href);
+  if (!scenario || !url)
     return { content: buildScoreShareContent(victory), challenge: false };
-  const scenario = SCENARIOS.find((s) => s.id === reference!.scenarioId)!;
   const reliability = victory.debrief;
   const story =
     reliability && (reliability.demandWh ?? 0) > 0
@@ -112,12 +110,10 @@ export function challengeComparison(victory: VictoryType): string | undefined {
   if (victory.outcome !== "completed")
     return "Complete the mission to compare your score with the shared score.";
   if (
-    !sameRunIdentity(
-      victory.runIdentity,
-      expandAuthoredRunReference(invitation.run),
-    )
+    victory.scenarioId !== invitation.scenarioId ||
+    victory.difficulty !== invitation.difficulty
   )
-    return "Conditions differ — scores cannot be compared.";
+    return "Compare scores on the same scenario and difficulty.";
   const difference = BigInt(victory.score) - BigInt(invitation.target);
   return difference === BigInt(0)
     ? "You tied the shared score."
