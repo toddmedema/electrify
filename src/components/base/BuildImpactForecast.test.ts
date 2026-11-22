@@ -305,6 +305,24 @@ it("estimates pregame history while forecasting the construction months", () => 
   );
 });
 
+it("includes an inherited plant commissioned at minute zero in the pregame estimate", () => {
+  const { game, generator } = fixture();
+  expect(game.date.minute).toBe(0);
+  const openingPlant = { ...game.facilities[0], minuteOperational: 0 };
+  const purchase = { ...generator, yearsToBuild: 0 };
+  const estimate = (facilities: typeof game.facilities) =>
+    computeOutlook("buildImpact", { ...game, facilities }, purchase)!.before;
+  const withPlant = estimate([openingPlant]);
+  const withoutPlant = estimate([]);
+  expect(withPlant.monthlyMarginW[0]).toBeGreaterThan(
+    withoutPlant.monthlyMarginW[0]!,
+  );
+  expect(withPlant.unservedWh).toBeLessThan(withoutPlant.unservedWh!);
+  expect(estimate([{ ...openingPlant, yearsToBuildLeft: 0.5 }])).toEqual(
+    withoutPlant,
+  );
+});
+
 it("uses recorded ticks for the completed part of the current month", () => {
   const { game, generator } = fixture();
   const now = game.timeline[0];

@@ -17,10 +17,18 @@ export function registerMultiplayerRuntime(value: Runtime | undefined) {
   runtime = value;
 }
 let openLobby: (() => void) | undefined;
+let lobbyRequested = false;
 export const registerLobbyOpener = (open?: () => void) => {
   openLobby = open;
+  if (open && lobbyRequested) {
+    lobbyRequested = false;
+    open();
+  }
 };
-export const showMultiplayerLobby = () => openLobby?.();
+export const showMultiplayerLobby = () => {
+  if (openLobby) openLobby();
+  else lobbyRequested = true;
+};
 // Cards that hold the shared clock while a player reads them. The construction catalogs are not
 // here: a shared clock is every company's, so one player shopping does not freeze it, and
 // backgrounding the window does not either. A player who wants a pause chooses one.

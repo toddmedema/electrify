@@ -101,9 +101,10 @@ function estimateBuildHistory(
       },
       facilities: game.facilities.flatMap((facility) => {
         const opening = facility.minuteOperational ?? facility.minuteCreated;
-        if (facility.yearsToBuildLeft > 0 || opening >= end) return [];
+        if (facility.yearsToBuildLeft > 0) return [];
         // Existing opening assets also serve the estimated pregame period.
         if (opening <= Math.max(0, start)) return [facility];
+        if (opening >= end) return [];
         return [
           {
             ...facility,

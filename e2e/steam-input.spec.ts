@@ -673,10 +673,9 @@ test("semantic actions play, build, adjust pricing, inspect charts and save at 1
     localStorage.setItem("interfaceScale", "1.25"),
   );
   await page.goto("/");
-  await expect(page.locator("html")).toHaveAttribute(
-    "data-mock-input-context",
-    "Menu",
-  );
+  await waitForDesktopInput(page);
+  // The controller can be ready before startup releases the home controls.
+  await expect(page.locator("#appStartup")).toHaveCount(0);
   await expect(
     page.getByRole("button", { name: "Play", exact: true }),
   ).toBeFocused();
