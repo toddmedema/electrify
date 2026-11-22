@@ -117,10 +117,12 @@ export function TowerArtwork({ className }: { className?: string }) {
 }
 export function CityArtwork({
   size,
+  growth,
   className,
 }: {
   size: CitySizeType;
+  growth?: React.ComponentProps<typeof CityOccupant>["growth"];
   className?: string;
 }) {
-  return <CityOccupant size={size} className={className} />;
+  return <CityOccupant size={size} growth={growth} className={className} />;
 }

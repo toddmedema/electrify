@@ -2,7 +2,7 @@ import * as React from "react";
 import { Tooltip, useTheme } from "@mui/material";
 import ConceptIcon from "../base/ConceptIcon";
 import RapidConnectionIcon from "../base/RapidConnectionIcon";
-import type { GameType, TerrainType } from "../../Types";
+import type { GameType, TerrainType, TerritoryId } from "../../Types";
 import { isLandTerritoryId } from "../../data/Territories";
 import { TERRAIN_LABELS } from "../../data/TerrainLabels";
 import {
@@ -11,6 +11,7 @@ import {
   type TerritoryTileView,
 } from "../../helpers/TerritoryMapState";
 import { tilePurchaseQuotes } from "../../helpers/Territories";
+import { cityGrowthAt, type CityGrowthSector } from "../../helpers/CityDemand";
 import { projectSiteCapitalCost } from "../../helpers/ProjectBuild";
 import type { ReadyProjectSite } from "../../helpers/ProjectBuild";
 import { getSunriseSunset } from "../../helpers/DateTime";
@@ -73,6 +74,11 @@ const TerritoryScene3D = React.lazy(
 );
 const PAN_OVERSCAN = HEX_WIDTH / 4;
 const CAMERA_SHIFT_MS = 180;
+const CITY_GROWTH_LABEL: Record<CityGrowthSector, string> = {
+  Residential: "homes",
+  Commercial: "shops",
+  Industrial: "workshops",
+};
 
 class MapSceneBoundary extends React.Component<
   { children: React.ReactNode; onError: () => void },
@@ -222,6 +228,25 @@ export default function TerritoryHexMap({
     () => topology.map((view) => view.tile),
     [topology],
   );
+  const {
+    seed,
+    startingYear,
+    location,
+    date: { year },
+  } = game;
+  const cityGrowth = React.useMemo(() => {
+    const growth = new Map<TerritoryId, readonly CityGrowthSector[]>();
+    for (const tile of tiles) {
+      if (!tile.city) continue;
+      const sectors = cityGrowthAt(
+        { seed, startingYear, location },
+        year,
+        tile.territoryId,
+      );
+      if (sectors.length) growth.set(tile.territoryId, sectors);
+    }
+    return growth;
+  }, [tiles, seed, startingYear, location, year]);
   const byKey = React.useMemo(
     () => new Map(views.map((view) => [territoryMapTileKey(view.tile), view])),
     [views],
@@ -1239,6 +1264,7 @@ export default function TerritoryHexMap({
               <TerritoryScene3D
                 views={renderedViews}
                 tiles={tiles}
+                cityGrowth={cityGrowth}
                 ownership={topology}
                 ownerPalette={ownerPalette}
                 peerColors={peerColors}
@@ -1432,6 +1458,7 @@ export default function TerritoryHexMap({
                       ) : tile.city ? (
                         <CityArtwork
                           size={tile.city.size}
+                          growth={cityGrowth.get(tile.territoryId)}
                           className="territoryOccupantArtwork"
                         />
                       ) : facility ? (
@@ -1516,8 +1543,11 @@ export default function TerritoryHexMap({
             const projectLabel = projectSite
               ? `Total project cost ${projectPrice} · ${projectSite.owned ? "Already connected" : "Connection included"}${outputModifier ? ` · ${outputModifier} estimated output vs flat terrain` : ""}`
               : undefined;
+            const growth = tile.city && cityGrowth.get(tile.territoryId);
             const tileLabel = [
               cityLabel ?? TERRAIN_LABELS[tile.terrain],
+              growth &&
+                `New buildings: ${growth.map((sector) => CITY_GROWTH_LABEL[sector]).join(", ")}`,
               facility?.name,
               status?.kind === "unknown" ? undefined : status?.label,
               disaster?.condition,

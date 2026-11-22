@@ -46,6 +46,14 @@ float above their land, with the player labeled “You” and distinct ownership
 Neutral land has no proper name; symbols show its benefit. Native map buttons support
 keyboard, touch and controller selection without a numbered key.
 
+Towns add homes, shops and workshops as their modeled long-term residential,
+commercial and industrial demand grows. Each January the map compares the
+town's public sector profile with its opening profile. A sector adds one block
+once its increase reaches 5% of the town's opening demand across those three
+sectors. The buildings reflect regional market growth and each town's starting
+demand mix. The city inspector shows current demand for owned cities and
+estimated demand elsewhere.
+
 ## Champlain Valley-inspired geography
 
 The board is a schematic, not a surveyed map, a fixed-area GIS grid or a

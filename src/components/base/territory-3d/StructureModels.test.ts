@@ -27,6 +27,29 @@ const inventory: Record<StructureKind, true> = {
 };
 const kinds = Object.keys(inventory) as StructureKind[];
 
+it.each(["city-small", "city-medium", "city-large"] as const)(
+  "%s grows distinct solid buildings within the tile and retains its wire terminals",
+  (kind) => {
+    const opening = getStructureModel(kind);
+    const sectors = ["Residential", "Commercial", "Industrial"] as const;
+    const singleSector = sectors.map((sector) =>
+      getStructureModel(kind, [sector]),
+    );
+    const grown = getStructureModel(kind, sectors);
+
+    for (const model of [...singleSector, grown]) {
+      expect(model.parts[0].mesh.positions.length).toBeGreaterThan(
+        opening.parts[0].mesh.positions.length,
+      );
+      expect(model.parts[0].mesh.positions.length / 9).toBeLessThan(1500);
+      expect(model.terminals).toEqual(opening.terminals);
+      expect(model.footprint).toBeLessThan(1);
+    }
+    expect(new Set(singleSector.map((variant) => variant.key)).size).toBe(3);
+    expect(getStructureModel(kind, [...sectors])).toBe(grown);
+  },
+);
+
 function vertices(mesh: MapMesh): Vec3[] {
   const result: Vec3[] = [];
   for (let i = 0; i < mesh.positions.length; i += 3)

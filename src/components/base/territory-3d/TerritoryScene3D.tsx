@@ -1,6 +1,7 @@
 import * as React from "react";
 import { TICK_MS } from "../../../Constants";
-import type { SpeedType } from "../../../Types";
+import type { SpeedType, TerritoryId } from "../../../Types";
+import type { CityGrowthSector } from "../../../helpers/CityDemand";
 import type { TerritoryTileView } from "../../../helpers/TerritoryMapState";
 import type { TerritoryTileDefinition } from "../../../data/TerritoryTiles";
 import type { HexWire } from "../TerritoryHexGeometry";
@@ -35,6 +36,7 @@ export interface SceneCamera {
 export default function TerritoryScene3D({
   views,
   tiles,
+  cityGrowth,
   ownership,
   ownerPalette,
   peerColors,
@@ -54,6 +56,7 @@ export default function TerritoryScene3D({
 }: {
   views: readonly TerritoryTileView[];
   tiles: readonly TerritoryTileDefinition[];
+  cityGrowth: ReadonlyMap<TerritoryId, readonly CityGrowthSector[]>;
   ownership: readonly Pick<TerritoryTileView, "tile" | "ownerKey">[];
   ownerPalette: Readonly<Record<string, string>>;
   peerColors: Readonly<Record<string, string>>;
@@ -87,8 +90,8 @@ export default function TerritoryScene3D({
   const frame = { ...viewport, cameraX, cameraY, scale: baseScale * zoom };
   const builder = React.useMemo(() => new SceneBuilder(factories), []);
   const scene = React.useMemo(
-    () => builder.build(views, tiles, wires, minute, runKey),
-    [builder, views, tiles, wires, minute, runKey],
+    () => builder.build(views, tiles, wires, minute, runKey, cityGrowth),
+    [builder, views, tiles, wires, minute, runKey, cityGrowth],
   );
   const ownershipBorder = React.useMemo(
     () => buildOwnershipBorder(ownership, ownerPalette, peerColors, dark),
