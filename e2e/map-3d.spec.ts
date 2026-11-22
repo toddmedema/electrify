@@ -454,17 +454,17 @@ for (const reducedMotion of ["no-preference", "reduce"] as const) {
           return { top: box.top - map.top, right: map.right - box.right };
         });
         expect(corner).toEqual({ top: 8, right: 8 });
-        await expect
-          .poll(() =>
-            capital.evaluate((element) => {
-              const tile = element.getBoundingClientRect();
-              const map = element
-                .closest(".territoryMapViewport")!
-                .getBoundingClientRect();
-              return tile.x + tile.width / 2 - map.x - map.width / 2;
-            }),
-          )
-          .toBeCloseTo(0, 0);
+        const distanceFromCenter = await capital.evaluate((element) => {
+          const tile = element.getBoundingClientRect();
+          const map = element
+            .closest(".territoryMapViewport")!
+            .getBoundingClientRect();
+          return Math.hypot(
+            tile.x + tile.width / 2 - map.x - map.width / 2,
+            tile.y + tile.height / 2 - window.innerHeight / 2,
+          );
+        });
+        expect(distanceFromCenter).toBeLessThan(1);
         const [start, ...movement] = await positions.evaluate((p) =>
           p.finish(),
         );
@@ -486,6 +486,10 @@ for (const reducedMotion of ["no-preference", "reduce"] as const) {
           1,
         );
       }
+      if (info.project.use.hasTouch) await label.tap();
+      else await label.click();
+      await expect(inspector).toHaveCount(0);
+      await expect(capital).toHaveAttribute("aria-pressed", "false");
     },
   );
 }

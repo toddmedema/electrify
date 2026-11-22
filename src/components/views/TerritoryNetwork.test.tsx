@@ -601,18 +601,22 @@ it("keeps a failed planner load in one closable panel and retries on the next op
   mockProjectLoadFailure = true;
   const { store } = show();
   const cash = currentTick(store.getState().game)!.cash;
-  fireEvent.click(screen.getByRole("button", { name: "Build" }));
+  const build = screen.getByRole("button", { name: "Build" });
+  fireEvent.click(build);
+  // Flush the mocked lazy import and its Suspense retry.
+  await act(async () => Promise.resolve());
   expect(
-    await screen.findByRole("heading", { name: "Project planner unavailable" }),
+    screen.getByRole("heading", { name: "Project planner unavailable" }),
   ).toBeVisible();
   expect(screen.getAllByRole("dialog")).toHaveLength(1);
   expect(screen.getByLabelText("Tile map")).toBeVisible();
   fireEvent.keyDown(surface(), { key: "Escape" });
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   mockProjectLoadFailure = false;
-  fireEvent.click(screen.getByRole("button", { name: "Build" }));
+  fireEvent.click(build);
+  await act(async () => Promise.resolve());
   expect(
-    await screen.findByLabelText("Pick site for Wind", {
+    screen.getByLabelText("Pick site for Wind", {
       selector: "button",
     }),
   ).toBeEnabled();

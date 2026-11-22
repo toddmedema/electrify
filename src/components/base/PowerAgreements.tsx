@@ -13,7 +13,6 @@ import {
   powerAgreementQuote,
 } from "../../helpers/PowerAgreements";
 import { formatNumber, formatPercent, formatWatts } from "../../helpers/Format";
-import { MINUTES_PER_MONTH } from "../../helpers/DateTime";
 import { currentTick } from "../../helpers/GameSelectors";
 import {
   adjacentMarketPricePerMWh,
@@ -83,21 +82,47 @@ function marketComparison(price: number, marketPrice?: number) {
 function AgreementMetrics({
   capacityW,
   price,
+  endMinute,
+  minimum,
+  children,
 }: {
   capacityW: number;
   price: string;
+  endMinute: number;
+  minimum: React.ReactNode;
+  children?: React.ReactNode;
 }) {
   return (
-    <dl className="powerAgreementMetrics">
-      <div>
-        <dt>Max supply</dt>
-        <dd>{formatWatts(capacityW)}</dd>
-      </div>
-      <div>
-        <dt>Price</dt>
-        <dd>{price}</dd>
-      </div>
-    </dl>
+    <BuildDetails label="Agreement summary">
+      <BuildDetailRow label="Max supply" value={formatWatts(capacityW)} />
+      <BuildDetailRow label="Price" value={price} />
+      <BuildDetailRow label="Final month" value={finalMonth(endMinute)} />
+      <BuildDetailRow label="Min payment" value={minimum} />
+      {children}
+    </BuildDetails>
+  );
+}
+
+function finalMonth(endMinute: number) {
+  return agreementDate(endMinute, true).replace(/^\d+ /, "");
+}
+
+function minimumPayment(
+  version: number,
+  minimumMWh: number,
+  deliverableW: number,
+) {
+  return version === 1 ? (
+    "No minimum purchase"
+  ) : (
+    <DetailValue
+      value={
+        version === 2
+          ? `${formatWatts(deliverableW)} whenever available`
+          : monthlyEnergy(minimumMWh)
+      }
+      caption="Paid even if unused"
+    />
   );
 }
 
@@ -135,7 +160,7 @@ export default function PowerAgreements({
   const dispatch = useAppDispatch();
   const [review, setReview] =
     React.useState<ReturnType<typeof powerAgreementQuote>>();
-  const [assessmentId, setAssessmentId] = React.useState<string>();
+  const [historyId, setHistoryId] = React.useState<string>();
   const [forecastCommitted, setForecastCommitted] = React.useState(true);
   const [accepting, setAccepting] = React.useState(false);
   const [acceptanceError, setAcceptanceError] = React.useState<string>();
@@ -147,30 +172,23 @@ export default function PowerAgreements({
       (source) =>
         source.id === review.id || source.id.startsWith(`${review.id}:`),
     );
-  const assessment = sources.find((source) => source.id === assessmentId);
-  const expiredAssessment =
-    !!assessment && game.date.minute >= assessment.endMinute;
+  const recordedAgreement = sources.find((source) => source.id === historyId);
   const forecast = useAgreementForecast(
     game,
-    review
-      ? `${review.id}:${review.receipt.cycle}`
-      : expiredAssessment
-        ? undefined
-        : assessmentId,
     review?.receipt,
-    !review || forecastCommitted,
+    forecastCommitted,
   );
   const restore = React.useRef<HTMLElement | null>(null);
   const portfolio = React.useRef<HTMLElement | null>(null);
   const token = `power-agreement:${line.id}`;
   const reviewing = !!review;
   React.useEffect(() => {
-    if (!reviewing && !assessmentId) return;
+    if (!reviewing && !historyId) return;
     dispatch(openPolicyDecision(token));
     return () => {
       dispatch(closePolicyDecision(token));
     };
-  }, [dispatch, token, reviewing, assessmentId]);
+  }, [dispatch, token, reviewing, historyId]);
   if (!utility) return null;
   const now = currentTick(game);
   const marketContext = intertieContextForGame(game);
@@ -183,21 +201,9 @@ export default function PowerAgreements({
           now,
         )
       : undefined;
-  const referencePrice = review
-    ? (review.receipt.signingMarketPricePerMWh ?? marketPriceFor(review.id))
-    : assessment && marketPriceFor(assessment.id);
-  const terms = review
-    ? { ...review, termsVersion: review.receipt.termsVersion }
-    : assessment;
-  const deliverableW =
-    review?.deliverableW ??
-    (assessment ? assessment.nominalW * assessment.deliverability : 0);
-  const startMinute =
-    review?.receipt.startMinute ?? assessment?.startMinute ?? 0;
-  const endMinute = review?.receipt.endMinute ?? assessment?.endMinute ?? 0;
-  const remainingYears =
-    Math.max(0, endMinute - Math.max(game.date.minute, startMinute)) /
-    (12 * MINUTES_PER_MONTH);
+  const referencePrice =
+    review &&
+    (review.receipt.signingMarketPricePerMWh ?? marketPriceFor(review.id));
   const changeDuration = (value: number | number[]) => {
     if (!review) return;
     const quote = powerAgreementQuote(
@@ -213,7 +219,7 @@ export default function PowerAgreements({
   };
   const close = () => {
     setReview(undefined);
-    setAssessmentId(undefined);
+    setHistoryId(undefined);
     setAcceptanceError(undefined);
   };
   return (
@@ -263,38 +269,39 @@ export default function PowerAgreements({
               </span>
             </header>
             {!expired && (
-              <>
-                <AgreementMetrics
-                  capacityW={source.nominalW * source.deliverability}
-                  price={rate(source.priceToday)}
-                />
-                <Typography variant="body2" color="textSecondary">
-                  Through {agreementDate(source.endMinute, true)}
-                </Typography>
+              <AgreementMetrics
+                capacityW={source.nominalW * source.deliverability}
+                price={rate(source.priceToday)}
+                endMinute={source.endMinute}
+                minimum={minimumPayment(
+                  source.termsVersion,
+                  source.minimumMWhPerMonth,
+                  source.nominalW * source.deliverability,
+                )}
+              >
                 {source.reductionYear !== undefined &&
                   game.date.minute <
                     agreementYearMinute(source.reductionYear) &&
                   (source.reducedNominalW ?? 0) > 0 && (
-                    <Typography variant="body2" color="warning.main">
-                      {formatWatts(source.nominalW * source.deliverability)} →{" "}
-                      {formatWatts(
-                        source.reducedNominalW! * source.deliverability,
-                      )}{" "}
-                      on 1 Jan {source.reductionYear}
-                    </Typography>
+                    <BuildDetailRow
+                      label="Scheduled reduction"
+                      value={
+                        <Typography
+                          component="span"
+                          variant="body2"
+                          color="warning.main"
+                        >
+                          {formatWatts(source.nominalW * source.deliverability)}{" "}
+                          →{" "}
+                          {formatWatts(
+                            source.reducedNominalW! * source.deliverability,
+                          )}{" "}
+                          on 1 Jan {source.reductionYear}
+                        </Typography>
+                      }
+                    />
                   )}
-                <Typography
-                  variant="body2"
-                  color="textSecondary"
-                  className="powerAgreementMinimum"
-                >
-                  {source.termsVersion === 1
-                    ? "No minimum purchase"
-                    : source.termsVersion === 3
-                      ? `Minimum payment: ${monthlyEnergy(source.minimumMWhPerMonth)}, even if unused`
-                      : `Minimum payment: ${formatWatts(source.nominalW * source.deliverability)} whenever available, even if unused`}
-                </Typography>
-              </>
+              </AgreementMetrics>
             )}
             <div className="powerAgreementActions">
               {quote && (
@@ -318,60 +325,67 @@ export default function PowerAgreements({
                   aria-label={`${source.name} details`}
                 >
                   <summary>Details</summary>
-                  <div className="powerAgreementDetailBody">
-                    <Typography variant="body2" color="textSecondary">
-                      {agreementDate(source.startMinute)}–
-                      {agreementDate(source.endMinute, true)}
-                    </Typography>
-                    <Typography variant="body2" color="textSecondary">
-                      Maximum: {monthlyEnergy(source.maximumMWhPerMonth)}
-                    </Typography>
+                  <BuildDetails label="Agreement details">
+                    <BuildDetailRow
+                      label="First month"
+                      value={agreementDate(source.startMinute).replace(
+                        /^\d+ /,
+                        "",
+                      )}
+                    />
+                    <BuildDetailRow
+                      label="Max monthly supply"
+                      value={monthlyEnergy(source.maximumMWhPerMonth)}
+                    />
                     {marketPrice !== undefined && marketPrice > 0 && (
-                      <Typography variant="body2" color="textSecondary">
-                        Market now {rate(marketPrice)} ·{" "}
-                        {marketComparison(source.priceToday, marketPrice)}
-                      </Typography>
+                      <BuildDetailRow
+                        label="Market now"
+                        value={
+                          <DetailValue
+                            value={rate(marketPrice)}
+                            caption={marketComparison(
+                              source.priceToday,
+                              marketPrice,
+                            )}
+                          />
+                        }
+                      />
                     )}
                     {account &&
                       (() => {
-                        const available = account.months.reduce(
-                          (sum, row) => sum + row.availableMWh,
-                          0,
-                        );
-                        const useful = account.months.reduce(
-                          (sum, row) => sum + row.usefulMWh,
-                          0,
+                        const { available, useful } = account.months.reduce(
+                          (sum, row) => ({
+                            available: sum.available + row.availableMWh,
+                            useful: sum.useful + row.usefulMWh,
+                          }),
+                          { available: 0, useful: 0 },
                         );
                         return (
-                          <div className="powerAgreementUsage">
-                            <Typography variant="body2" color="textSecondary">
-                              Recorded since{" "}
-                              {agreementDate(account.accountingStartMinute)} ·{" "}
-                              {available > 0
-                                ? `${formatPercent(useful / available, 1)} used`
-                                : "No available minimum"}
-                            </Typography>
-                            {available > 0 && (
-                              <meter
-                                aria-label="Share of available contracted energy used"
-                                value={useful}
-                                max={available}
-                              />
-                            )}
-                          </div>
+                          <BuildDetailRow
+                            label="Contract energy used"
+                            value={
+                              <div className="powerAgreementUsage">
+                                <DetailValue
+                                  value={
+                                    available > 0
+                                      ? `${formatPercent(useful / available, 1)} used`
+                                      : "No available minimum"
+                                  }
+                                  caption={`Recorded since ${agreementDate(account.accountingStartMinute)}`}
+                                />
+                                {available > 0 && (
+                                  <meter
+                                    aria-label="Share of available contracted energy used"
+                                    value={useful}
+                                    max={available}
+                                  />
+                                )}
+                              </div>
+                            }
+                          />
                         );
                       })()}
-                    <Button
-                      size="small"
-                      onClick={(event) => {
-                        restore.current = event.currentTarget;
-                        setAssessmentId(source.id);
-                      }}
-                      aria-label={`Forecast ${source.name} remaining term`}
-                    >
-                      Forecast remaining term
-                    </Button>
-                  </div>
+                  </BuildDetails>
                 </details>
               )}
               {expired && account && (
@@ -379,7 +393,7 @@ export default function PowerAgreements({
                   size="small"
                   onClick={(event) => {
                     restore.current = event.currentTarget;
-                    setAssessmentId(source.id);
+                    setHistoryId(source.id);
                   }}
                   aria-label={`${source.name} recorded history`}
                 >
@@ -412,6 +426,12 @@ export default function PowerAgreements({
               <AgreementMetrics
                 capacityW={quote.deliverableW}
                 price={rate(quote.priceToday)}
+                endMinute={quote.receipt.endMinute}
+                minimum={minimumPayment(
+                  quote.receipt.termsVersion,
+                  quote.minimumMWhPerMonth,
+                  quote.deliverableW,
+                )}
               />
               <Button
                 variant="outlined"
@@ -431,7 +451,7 @@ export default function PowerAgreements({
         );
       })}
       <DecisionDialog
-        open={!!review || !!assessment}
+        open={!!review || !!recordedAgreement}
         fullWidth
         maxWidth="sm"
         closable
@@ -439,7 +459,7 @@ export default function PowerAgreements({
         title={
           review
             ? `Review ${review.name} ${replacement ? "replacement" : "agreement"}`
-            : `${assessment?.name ?? "Agreement"} ${expiredAssessment ? "recorded history" : "remaining term"}`
+            : `${recordedAgreement?.name ?? "Agreement"} recorded history`
         }
         onClose={close}
         disableRestoreFocus
@@ -540,52 +560,48 @@ export default function PowerAgreements({
             {acceptanceError}
           </Typography>
         )}
-        {expiredAssessment ? (
+        {recordedAgreement ? (
           <RecordedAgreementHistory
             currency={currency}
-            startMinute={assessment?.startMinute}
+            startMinute={recordedAgreement.startMinute}
             account={game.transmission?.agreementAccounts?.find(
-              (entry) => entry.agreementId === assessmentId,
+              (entry) => entry.agreementId === historyId,
             )}
           />
         ) : (
-          terms && (
+          review && (
             <>
-              {review && (
-                <Box className="powerAgreementDuration">
-                  <Typography variant="body2">
-                    <strong>{years(review.durationYears)}</strong>
-                  </Typography>
-                  <Slider
-                    disabled={accepting}
-                    className="constructionCapacitySlider"
-                    aria-label="Duration"
-                    value={review.durationYears}
-                    min={1}
-                    max={10}
-                    step={1}
-                    valueLabelDisplay="off"
-                    getAriaValueText={years}
-                    onChange={(_event, value) => changeDuration(value)}
-                    onChangeCommitted={() => setForecastCommitted(true)}
-                  />
-                </Box>
-              )}
+              <Box className="powerAgreementDuration">
+                <Typography variant="body2">
+                  <strong>{years(review.durationYears)}</strong>
+                </Typography>
+                <Slider
+                  disabled={accepting}
+                  className="constructionCapacitySlider"
+                  aria-label="Duration"
+                  value={review.durationYears}
+                  min={1}
+                  max={10}
+                  step={1}
+                  valueLabelDisplay="off"
+                  getAriaValueText={years}
+                  onChange={(_event, value) => changeDuration(value)}
+                  onChangeCommitted={() => setForecastCommitted(true)}
+                />
+              </Box>
               <Box className="powerAgreementTerms">
                 <BuildDetails
                   label={
-                    review
-                      ? replacement
-                        ? "Replacement agreement terms"
-                        : "Agreement terms"
-                      : "Active agreement terms"
+                    replacement
+                      ? "Replacement agreement terms"
+                      : "Agreement terms"
                   }
                 >
                   <BuildDetailRow
                     label="Agreement price"
                     value={
                       <DetailValue
-                        value={rate(terms.priceToday)}
+                        value={rate(review.priceToday)}
                         caption="Follows inflation"
                       />
                     }
@@ -600,53 +616,37 @@ export default function PowerAgreements({
                   />
                   <BuildDetailRow
                     label="Discount"
-                    value={discountRate(terms.priceToday, referencePrice)}
+                    value={discountRate(review.priceToday, referencePrice)}
                   />
                   <BuildDetailRow
-                    label="Minimum supply"
-                    value={
-                      <DetailValue
-                        value={
-                          terms.termsVersion === 1
-                            ? "No minimum purchase"
-                            : terms.termsVersion === 2
-                              ? `${formatWatts(deliverableW)} whenever available`
-                              : monthlyEnergy(terms.minimumMWhPerMonth)
-                        }
-                        caption={
-                          terms.termsVersion === 1
-                            ? "Pay for energy used"
-                            : "Paid for even if you don't use it"
-                        }
-                      />
-                    }
+                    label="Min payment"
+                    value={minimumPayment(
+                      review.receipt.termsVersion,
+                      review.minimumMWhPerMonth,
+                      review.deliverableW,
+                    )}
                   />
                   <BuildDetailRow
                     label="Maximum supply"
                     value={
                       <DetailValue
-                        value={`${formatNumber(deliverableW / 1e6, { maximumFractionDigits: 1 })} MW`}
-                        caption={monthlyEnergy(terms.maximumMWhPerMonth)}
+                        value={`${formatNumber(review.deliverableW / 1e6, { maximumFractionDigits: 1 })} MW`}
+                        caption={monthlyEnergy(review.maximumMWhPerMonth)}
                       />
                     }
                   />
                   <BuildDetailRow
                     label="Duration"
-                    value={
-                      <DetailValue
-                        value={years(terms.durationYears)}
-                        caption={`Ends ${agreementDate(endMinute, true).replace(/^\d+ /, "")}`}
-                      />
-                    }
+                    value={years(review.durationYears)}
+                  />
+                  <BuildDetailRow
+                    label="Final month"
+                    value={finalMonth(review.receipt.endMinute)}
                   />
                   <AgreementForecastDetails
                     currency={currency}
                     forecast={forecast}
-                    horizon={
-                      review
-                        ? `over ${years(review.durationYears)}`
-                        : `over ${years(remainingYears)} remaining`
-                    }
+                    horizon={`over ${years(review.durationYears)}`}
                   />
                 </BuildDetails>
               </Box>

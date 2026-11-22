@@ -16,13 +16,8 @@ import {
 import MenuIconButton from "../base/MenuIconButton";
 import { getDesktop, isDesktopApp } from "../../Desktop";
 import { useMenuKeys } from "../base/useMenuKeys";
-const InstallAppButton = React.lazy(() => import("../base/InstallAppButton"));
-// Keep Steam's co-op UI and authoritative worker out of the browser edition entirely.
-const MultiplayerButton =
-  process.env.REACT_APP_DESKTOP === "true"
-    ? React.lazy(() => import("../../multiplayer/Button"))
-    : () => null;
 
+const InstallAppButton = React.lazy(() => import("../base/InstallAppButton"));
 export interface StateProps {
   audioEnabled?: boolean;
   deferServices?: boolean;
@@ -34,6 +29,7 @@ export interface StateProps {
 export interface DispatchProps {
   onAudioChange: (change: boolean) => void;
   onContinue: () => void;
+  onPlayWithFriends?: () => void;
   onTutorials: () => void;
   onSavedGames: () => void;
   onSettings: () => void;
@@ -220,13 +216,18 @@ const MainMenu = (props: Props): React.JSX.Element => {
               color="primary"
               onClick={props.onSavedGames}
             >
-              Saved games
+              Saves
             </Button>
           )}
-          {desktopApp && (
-            <React.Suspense fallback={null}>
-              <MultiplayerButton />
-            </React.Suspense>
+          {desktopApp && props.onPlayWithFriends && (
+            <Button
+              data-main-action
+              size="large"
+              color="primary"
+              onClick={props.onPlayWithFriends}
+            >
+              Play with friends
+            </Button>
           )}
         </Stack>
         <Stack

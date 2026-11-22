@@ -43,18 +43,23 @@ export function failDesktopStartup(retry: () => void, quit: () => void): void {
   actions.querySelector("button")?.focus();
 }
 
-/** Keep even a cached startup visible for 500ms, measured from the early HTML entrance. */
-export function finishStartup(): void {
+/** Hold input under the startup screen until the app is ready and its minimum entrance has elapsed. */
+export function finishStartup({
+  home = false,
+  waiting = false,
+}: { home?: boolean; waiting?: boolean } = {}): void {
   const entrance = document.getElementById("appStartup");
   // StrictMode commits twice; only one handoff may own the overlay and animations.
   if (!entrance || entrance.dataset.handoffPending) return;
-  entrance.dataset.handoffPending = "true";
   const root = document.getElementById("root");
-  const visibility = root?.style.visibility ?? "";
-  if (root) {
-    root.inert = true;
-    root.style.visibility = "hidden";
-  }
+  if (root) root.inert = true;
+  if (waiting) return;
+  entrance.dataset.handoffPending = "true";
+  // Direct links can mount their destination under the entrance before the handoff.
+  // On home, inherited visibility transitions can postpone focus past the first frames.
+  const destination = home ? null : root;
+  const visibility = destination?.style.visibility ?? "";
+  if (destination) destination.style.visibility = "hidden";
   const remaining = Math.max(
     0,
     Math.ceil(
@@ -62,10 +67,8 @@ export function finishStartup(): void {
     ),
   );
   const handoff = () => {
-    if (root) {
-      root.inert = false;
-      root.style.visibility = visibility;
-    }
+    if (destination) destination.style.visibility = visibility;
+    if (root) root.inert = false;
     if (entrance.isConnected) revealMenu(entrance);
   };
   if (remaining > 0) window.setTimeout(handoff, remaining);
@@ -95,53 +98,45 @@ function revealMenu(entrance: HTMLElement): void {
   entrance.remove();
   document.dispatchEvent(new Event("electrify-ready"));
   if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-    const controls = Array.from(
-      menu?.querySelectorAll<HTMLElement>("button, a[href]") ?? [],
-    ).filter((control) => control.getClientRects().length > 0);
-    const animations = controls.map((control, index) =>
-      control.animate([{ opacity: 0 }, { opacity: 1 }], {
-        duration: 300,
-        delay: 180 + index * 80,
+    const actions = [
+      ...(menu?.querySelectorAll<HTMLElement>("#centeredMenu button") ?? []),
+    ].filter((control) => control.getClientRects().length > 0);
+    const fade = (element: Element, delay: number, duration: number) =>
+      element.animate([{ opacity: 0 }, { opacity: 1 }], {
+        duration,
+        delay,
         easing: "ease-out",
         fill: "backwards",
-      }),
+      });
+    const firstDelay = 190;
+    const stagger = 105;
+    const animations = actions.map((control, index) =>
+      fade(control, firstDelay + index * stagger, 140),
     );
+    for (const group of menu?.querySelectorAll(
+      ".mainMenuFooter, .homeExplore",
+    ) ?? [])
+      animations.push(fade(group, firstDelay + actions.length * stagger, 180));
     const after = logo?.getBoundingClientRect();
     if (logo && before && after) {
-      // Move the menu with the logo so fading controls always keep their final spacing.
-      for (const element of [logo, menu?.querySelector("#centeredMenu")]) {
-        if (element)
-          animations.push(
-            element.animate(
-              [
-                { transform: `translateY(${before.y - after.y}px)` },
-                { transform: "none" },
-              ],
-              {
-                duration: Math.max(900, 480 + (controls.length - 1) * 80),
-                easing: "cubic-bezier(0.25, 0.1, 0.25, 1)",
-              },
-            ),
-          );
-      }
+      animations.push(
+        logo.animate(
+          [
+            { transform: `translateY(${before.y - after.y}px)` },
+            { transform: "none" },
+          ],
+          { duration: 440, easing: "cubic-bezier(0.22, 1, 0.36, 1)" },
+        ),
+      );
     }
-    // Translated controls must not create a temporary scrollbar; restore normal scrolling
-    // when the entrance finishes, including on short screens that need it for the full menu.
-    const overflow = menu?.style.overflow ?? "";
-    if (menu) menu.style.overflow = "clip";
-    // Keyboard/controller or pointer input should reveal its target immediately.
+    // Input reveals the menu immediately and never has to wait for its animation.
     const finish = () => animations.forEach((animation) => animation.finish());
     const cleanup = () => {
-      if (menu) menu.style.overflow = overflow;
       menu?.removeEventListener("keydown", finish, true);
       menu?.removeEventListener("click", finish, true);
     };
     menu?.addEventListener("keydown", finish, { once: true, capture: true });
-    // Complete pointer activation before moving its target to the resting position.
-    menu?.addEventListener("click", finish, {
-      once: true,
-      capture: true,
-    });
+    menu?.addEventListener("click", finish, { once: true, capture: true });
     void Promise.all(animations.map((animation) => animation.finished)).then(
       cleanup,
       cleanup,

@@ -1,5 +1,12 @@
 import { pow } from "./Pow";
 import { cos, log } from "./Libm";
+
+/** Wrap a signed coordinate into the range [0, size). */
+export function wrapIndex(index: number, size: number): number {
+  const remainder = index % size;
+  return remainder < 0 ? remainder + size : remainder;
+}
+
 // http://jsfiddle.net/justin_c_rounds/Gd2S2/light/
 export function getIntersectionX(
   line1StartX: number,

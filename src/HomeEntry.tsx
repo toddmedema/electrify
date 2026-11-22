@@ -47,7 +47,7 @@ export function Home() {
     return () => query.removeEventListener("change", update);
   }, []);
   React.useLayoutEffect(() => {
-    finishStartup();
+    finishStartup({ home: true });
   }, []);
   React.useEffect(() => {
     if (

@@ -275,7 +275,7 @@ test("another tab cannot resume the live save", async ({ page, context }) => {
   const original = (await readSaveRecords(page))[0];
   const other = await context.newPage();
   await other.goto("/");
-  await other.getByRole("button", { name: "Saved games", exact: true }).click();
+  await other.getByRole("button", { name: "Saves", exact: true }).click();
   await other
     .locator(`[data-save-id="${original.metadata.id}"]`)
     .getByRole("button", { name: "Load", exact: true })

@@ -132,6 +132,7 @@ interface Props {
   game: GameType;
   views: readonly TerritoryTileView[];
   selected?: TerritoryMapTileKey;
+  inspected?: TerritoryMapTileKey;
   onSelect: (id: TerritoryMapTileKey, inspect?: boolean) => void;
   onCloseInspection?: () => void;
   inspectionWindow?: "front" | "background";
@@ -164,6 +165,7 @@ export default function TerritoryHexMap({
   game,
   views,
   selected,
+  inspected,
   onSelect,
   onCloseInspection,
   inspectionWindow,
@@ -772,12 +774,19 @@ export default function TerritoryHexMap({
   ) => {
     if ((workspace?.effectiveWidth ?? size.width) <= 740) {
       const point = hexCenter(tile);
-      // Leave the selected tile below the inspector or above project decisions.
+      let offsetY = worldHeight * (projectPlanning ? 0.3 : -0.22);
+      const map = viewport.current?.getBoundingClientRect();
+      if (threeDReady && !projectPlanning && map) {
+        // Center on the screen even when the game header wraps. Short views keep room
+        // for the inspector above the tile.
+        const targetY = Math.min(
+          map.height - 40,
+          Math.max(144, window.innerHeight / 2 - map.top),
+        );
+        offsetY = (map.height / 2 - targetY) / scale;
+      }
       setCamera(
-        {
-          x: point.x,
-          y: point.y + worldHeight * (projectPlanning ? 0.3 : -0.22),
-        },
+        { x: point.x, y: point.y + offsetY },
         fromPointer && motion.allowed,
       );
     }
@@ -816,6 +825,7 @@ export default function TerritoryHexMap({
       !projectPlanning
     )
       void purchase(tile.id, expectedQuote);
+    else if (key === inspected) onDeselect?.();
     else inspectTile(tile, fromPointer);
   };
   const pointerTile = (event: {
@@ -1511,6 +1521,7 @@ export default function TerritoryHexMap({
                 key={key}
                 type="button"
                 data-map-target={key}
+                data-map-inspected={key === inspected || undefined}
                 data-territory={tile.territoryId}
                 data-owner={view.ownerKey}
                 data-owned={view.owned}

@@ -401,10 +401,14 @@ it("locks storage to its activated tile without destination pickers", () => {
   fireEvent.click(
     screen.getByRole("button", { name: "Review purchase of Lithium Battery" }),
   );
-  expect(screen.getByRole("dialog")).toHaveTextContent(
+  const dialog = screen.getByRole("dialog");
+  expect(dialog).not.toHaveTextContent(
     territoryBuildTileName(tile.id, game, battery),
   );
-  fireEvent.click(screen.getByRole("button", { name: "Pay cash" }));
+  expect(
+    within(dialog).queryByText("Project site", { exact: true }),
+  ).not.toBeInTheDocument();
+  fireEvent.click(within(dialog).getByRole("button", { name: "Pay cash" }));
   expect(onBuild).toHaveBeenCalledWith(
     expect.objectContaining({ name: "Battery", peakWh: 100e6 }),
     false,

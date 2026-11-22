@@ -34,7 +34,6 @@ async function runPending(): Promise<void> {
       if ("kind" in request && request.kind === "agreement") {
         const agreementForecast = computeAgreementForecast(
           game,
-          request.agreementId,
           request.offer,
           request.cacheEpoch,
         );

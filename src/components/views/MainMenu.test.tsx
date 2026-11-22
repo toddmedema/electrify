@@ -159,7 +159,7 @@ describe("MainMenu", () => {
       screen.queryByRole("button", { name: "Tutorials" }),
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: "Saved games" }),
+      screen.queryByRole("button", { name: "Saves" }),
     ).not.toBeInTheDocument();
   });
 
@@ -192,19 +192,17 @@ describe("MainMenu", () => {
       "Continue",
       "Tutorials",
       "Play",
-      "Saved games",
+      "Saves",
     ]);
     await userEvent.click(screen.getByRole("button", { name: "Tutorials" }));
     expect(onTutorials).toHaveBeenCalledTimes(1);
-    await userEvent.click(screen.getByRole("button", { name: "Saved games" }));
+    await userEvent.click(screen.getByRole("button", { name: "Saves" }));
     expect(onSavedGames).toHaveBeenCalledTimes(1);
   });
 
   it("offers the library when only finished, unplayable saves exist", () => {
     renderMainMenu(<MainMenu {...props({ hasSavedGames: true })} />);
-    expect(
-      screen.getByRole("button", { name: "Saved games" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Saves" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Play" })).toHaveClass(
       "MuiButton-text",
     );

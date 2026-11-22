@@ -144,7 +144,6 @@ it("uses the existing serialized data loader for paired agreement forecasts with
       kind: "agreement",
       requestId: ++requestId,
       game,
-      agreementId: "nuclear",
       offer,
       cacheEpoch: "new-session",
     },
@@ -152,7 +151,6 @@ it("uses the existing serialized data loader for paired agreement forecasts with
   await response;
   expect(mockAgreementForecast).toHaveBeenCalledWith(
     game,
-    "nuclear",
     offer,
     "new-session",
   );

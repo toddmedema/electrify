@@ -13,9 +13,15 @@ import {
   pageHidden,
   pageVisible,
 } from "../reducers/GameActions";
-import { multiplayerMiddleware, registerMultiplayerRuntime } from "./Registry";
+import {
+  multiplayerMiddleware,
+  registerLobbyOpener,
+  registerMultiplayerRuntime,
+  showMultiplayerLobby,
+} from "./Registry";
 
 afterEach(() => {
+  registerLobbyOpener();
   registerMultiplayerRuntime(undefined);
   jest.clearAllTimers();
   jest.useRealTimers();
@@ -61,6 +67,21 @@ function fixture() {
   );
   return { local, runtime };
 }
+
+test("opens the lobby once after an early Play with friends activation", () => {
+  showMultiplayerLobby();
+  showMultiplayerLobby();
+  const open = jest.fn();
+  registerLobbyOpener(open);
+  expect(open).toHaveBeenCalledTimes(1);
+
+  registerLobbyOpener();
+  registerLobbyOpener(open);
+  expect(open).toHaveBeenCalledTimes(1);
+
+  showMultiplayerLobby();
+  expect(open).toHaveBeenCalledTimes(2);
+});
 
 test("nested dialogs and reading cards keep the shared pause until every local blocker closes", () => {
   const { local, runtime } = fixture();
