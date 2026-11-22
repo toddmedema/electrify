@@ -1703,6 +1703,10 @@ const SCHEMA_23_MASTER_RULES =
 const SCHEMA_23_MAP_RULES =
   "coop-2-3a64b92f0462af2eb6286821f118c030f25aaf65b546a4a7652e87b1dbcd3e33";
 
+// Master 11ff7f50 used the same world format before separating its transport.
+const SCHEMA_24_STEAM_RULES =
+  "coop-2-b5084b0368736d579e1ffc5cfbcaf4b8a7b4a2b6097b45dfaafbf85556810755";
+
 /** Recognized published worlds follow ordered migrations; arbitrary runtime identities never do. */
 function upgradeTerritoryWorld(value: unknown): unknown {
   const old = value as Partial<World> | null;
@@ -1749,7 +1753,8 @@ function upgradeTerritoryWorld(value: unknown): unknown {
           old.rules === SCHEMA_22_PREVIEW_RULES)) ||
       (old.gameSchema === 23 &&
         (old.rules === SCHEMA_23_MASTER_RULES ||
-          old.rules === SCHEMA_23_MAP_RULES))
+          old.rules === SCHEMA_23_MAP_RULES)) ||
+      (old.gameSchema === 24 && old.rules === SCHEMA_24_STEAM_RULES)
     ) ||
     !Array.isArray(old.grids) ||
     !old.grids.every(
@@ -1764,6 +1769,7 @@ function upgradeTerritoryWorld(value: unknown): unknown {
           old.gameSchema === 21 ||
           old.gameSchema === 22 ||
           old.gameSchema === 23 ||
+          old.gameSchema === 24 ||
           isUtilityExpansionGame(grid)),
     )
   )

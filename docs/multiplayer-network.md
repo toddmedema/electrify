@@ -168,3 +168,50 @@ Earlier Windows x64, Node 24.14.0 checkpoint measurements modeled four-company m
 host upload at 61.498 KB/s with complete-checkpoint sends and 0.375 KB/s after acknowledged reuse.
 The complete-checkpoint figure modeled the intended policy: the native schema-1 guard then
 rejected schema-2 worlds, so it was not observed deployed traffic.
+
+## TURN qualification for cross-play
+
+Issue [#546](https://github.com/toddmedema/electrify/issues/546) calls for authenticated
+private rooms shared by web and Steam. The session accepts a room transport and a
+checkpoint store separately. The Steam adapter still delegates checkpoint writes to the
+native operation that also distributes offline copies and publishes save confirmations.
+
+A local baseline for the four-company, month-48 benchmark on an Apple M5 Max with Node
+26.13.0 measured about 205 KiB for an initial baseline per guest, 3.1 ms per host view
+publication, and 58 ms of guest replay-thread CPU per virtual second at 24×. The total host
+application traffic at 24× was about 66 KiB/s across three guests, including about 61 KiB/s
+of checkpoint traffic when all three received a full checkpoint every ten seconds. The
+in-process command-to-view sample measured 100 ms p95. The numbers exclude real network
+latency and protocol overhead. They are a comparison point for the HTTPS checkpoint and
+WebRTC record paths in #546.
+
+The opt-in probe uses a dedicated Cloudflare Realtime TURN key. Store its ID and API token
+as `CLOUDFLARE_TURN_KEY_ID` and `CLOUDFLARE_TURN_KEY_API_TOKEN` in a private local environment
+file and run:
+
+```sh
+node --env-file=/path/to/private-turn.env scripts/testing/cloudflare-turn.js
+```
+
+It uses four isolated browser contexts, with the first acting as host to three concurrent
+guests. The last guest delays receipts by 1.2 seconds. Each pair uses short-lived credentials,
+separate UDP and TLS-on-443 runs, and a fresh ICE exchange before the second burst. Each
+selected pair must match its exchanged relay endpoints. Reports show setup and receipt
+times, ICE-pair byte counters, any available local relay protocol, and guest deliveries and
+returned receipts observed after revocation. The runner revokes outstanding test
+credentials on completion, interruption, and handled failures.
+Set `ELECTRIFY_TURN_BROWSERS=chromium,chromium,firefox,webkit` to use additional installed
+Playwright engines. The first entry hosts.
+
+The probe runs synthetic traffic with in-process signaling. Its delayed receipts measure
+one slow application participant. Network traffic shaping, deployed signaling, actual
+gameplay, native Steam, packet-level egress and provider billing require separate tests.
+The TLS run configures only TLS on port 443. With UDP blocked at the network boundary,
+set `ELECTRIFY_TURN_TRANSPORT=tls` to run that case in isolation. The diagnostic checks
+candidate types and public addresses. Production authorization needs independent Cloudflare
+relay-allocation provenance. Cloudflare documents TURN listeners, per-allocation limits
+and credential revocation. Production admission needs a provider-backed allocation
+policy and evidence of bounded aggregate spend and live allocation cutoff.
+[Cloudflare TURN FAQ](https://developers.cloudflare.com/realtime/turn/faq/) ·
+[Service limits](https://developers.cloudflare.com/realtime/turn/#limits) ·
+[Credential revocation](https://developers.cloudflare.com/realtime/turn/generate-credentials/#revoke-credentials)

@@ -1,3 +1,4 @@
+import { steamSessionServices } from "./SteamSessionServices";
 import { facilityConstructionReview } from "../helpers/FacilityConstructionReview";
 import "../Store";
 import { TextEncoder } from "util";
@@ -207,7 +208,7 @@ function fixture(isHost = false, deferLeave = false) {
     (bytes) => webcrypto.subtle.digest("SHA-256", bytes),
   );
   const session = new MultiplayerSession(
-    bridge,
+    steamSessionServices(bridge),
     async () => {
       if (failFactory) throw new Error("Factory failed");
       return worker as unknown as Worker;

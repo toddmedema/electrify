@@ -1,3 +1,4 @@
+import { steamSessionServices } from "./SteamSessionServices";
 import { act, render, screen } from "@testing-library/react";
 import type { DesktopBridge, DesktopInputFrame } from "../Desktop";
 import { store } from "../Store";
@@ -56,7 +57,11 @@ async function sessionFixture() {
           ? { ...lobby, lobbyId: request.lobbyId, hostId: "host" }
           : lobby,
   };
-  const session = new MultiplayerSession(bridge, jest.fn(), jest.fn());
+  const session = new MultiplayerSession(
+    steamSessionServices(bridge),
+    jest.fn(),
+    jest.fn(),
+  );
   sessions.push(session);
   await session.initialize();
   return { session, bridge };

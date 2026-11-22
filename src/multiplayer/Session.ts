@@ -1,4 +1,3 @@
-import type { DesktopBridge } from "../Desktop";
 import manifest from "../data/RunCompatibility.json";
 import type {
   Command,
@@ -6,16 +5,17 @@ import type {
   MatchSpec,
   RoomView,
   Seat,
-  World,
 } from "./Types";
+import { PeerDisconnectedError } from "./SessionTransport";
 import type {
   LobbyState,
-  NativeEvent,
-  NativeRequest,
+  SessionEvent,
+  SessionRequest,
+  SessionServices,
   PendingCampaign,
   SharedSaveLibrary,
   WireMessage,
-} from "./Native";
+} from "./SessionTransport";
 import type { ReplicaBaseline } from "./Replication";
 import type {
   ReplicaProgress,
@@ -107,17 +107,6 @@ export const offersDisconnect = ({
   selfId?: string;
 }) => !!hostId && hostId !== selfId && isConnectionLoss(error, lobbyError);
 
-/** Electron prefixes whatever the main process throws; a player should read only the message. */
-const IPC_ERROR_PREFIX = /^Error invoking remote method '[^']*': (?:Error: )?/;
-/** The native transport's refusal to send to a peer with no live connection
- * (`send` in electron/steam-multiplayer.cjs). */
-const PLAYER_DISCONNECTED = /\bPlayer is disconnected\b/;
-function playerFacing(error: unknown) {
-  if (!(error instanceof Error)) return error;
-  const message = error.message.replace(IPC_ERROR_PREFIX, "");
-  return message === error.message ? error : new Error(message);
-}
-
 export interface SessionState {
   lobby: LobbyState;
   view?: RoomView;
@@ -203,7 +192,7 @@ export class MultiplayerSession {
   private outboundScenario = new Map<string, string>();
   private receivedScenario?: { key: string; scenario: ScenarioType };
   constructor(
-    private bridge: DesktopBridge,
+    private services: SessionServices,
     private workerFactory: () => Promise<Worker>,
     private replicaFactory: () => Promise<Worker>,
   ) {}
@@ -218,24 +207,20 @@ export class MultiplayerSession {
     this.state = { ...this.state, ...update };
     this.listeners.forEach((l) => l());
   }
-  private async request(input: NativeRequest) {
-    if (!this.bridge.multiplayerRequest)
-      throw new Error("Update the desktop game to play online");
-    try {
-      return await this.bridge.multiplayerRequest(input);
-    } catch (error) {
-      throw playerFacing(error);
-    }
+  private request<Request extends SessionRequest>(input: Request) {
+    return this.services.transport.request(input);
   }
   private post(input: WorkerRequest) {
     this.worker?.postMessage(input);
   }
-  async initialize() {
+  async initialize(onInvite?: (lobbyId: string) => void) {
     const lifecycle = ++this.lifecycle;
-    this.stopEvents = this.bridge.onMultiplayerEvent?.((event) =>
-      this.event(event),
-    );
-    const lobby = (await this.request({ kind: "state" })) as LobbyState;
+    this.stopEvents = this.services.transport.subscribe((event) => {
+      if (lifecycle !== this.lifecycle) return;
+      if (event.kind === "invite") onInvite?.(event.lobbyId);
+      else this.event(event);
+    });
+    const lobby = await this.request({ kind: "state" });
     if (lifecycle !== this.lifecycle) return;
     this.update({ lobby });
     clearInterval(this.timer);
@@ -279,7 +264,7 @@ export class MultiplayerSession {
         this.update({ waitingForHost });
     }, SESSION_PUMP_MS);
   }
-  private event(event: NativeEvent) {
+  private event(event: Exclude<SessionEvent, { kind: "invite" }>) {
     if (event.kind === "state") {
       const { hostId, lobbyId, members } = event.state;
       // Before a match, a lobby without its host has nobody left to choose or start a game.
@@ -849,11 +834,10 @@ export class MultiplayerSession {
       });
     this.replicationSends.set(to, send);
     void send.catch((error: unknown) => {
-      // Native owns membership; its disconnect notice can follow this rejected send.
+      // The transport's disconnect notice can follow this rejected send.
       // A baseline on that dead channel would only spend the replica's recovery budget.
-      const disconnected =
-        error instanceof Error && PLAYER_DISCONNECTED.test(error.message);
-      if (current() && !disconnected) this.post({ kind: "baseline", to });
+      if (current() && !(error instanceof PeerDisconnectedError))
+        this.post({ kind: "baseline", to });
     });
   }
   /** Menu transitions cannot be dropped while a purchase or another command is in flight. */
@@ -913,7 +897,7 @@ export class MultiplayerSession {
       }).catch((error: Error) => {
         // The link dropped between the last lobby update and this send. Its disconnect notice
         // follows, and the command is resent on reconnect, so it is not a new failure.
-        if (!PLAYER_DISCONNECTED.test(error.message))
+        if (!(error instanceof PeerDisconnectedError))
           this.update({ error: error.message });
       });
   }
@@ -999,10 +983,10 @@ export class MultiplayerSession {
     this.update({ busy: true, error: undefined, pendingCampaign: undefined });
     try {
       this.update({
-        lobby: (await this.request({
+        lobby: await this.request({
           kind: "create",
           rules: manifest.multiplayerCompatibilityId,
-        })) as LobbyState,
+        }),
       });
     } finally {
       this.update({ busy: false });
@@ -1013,11 +997,11 @@ export class MultiplayerSession {
     this.update({ busy: true, error: undefined, pendingCampaign: undefined });
     try {
       this.update({
-        lobby: (await this.request({
+        lobby: await this.request({
           kind: "join",
           rules: manifest.multiplayerCompatibilityId,
           lobbyId,
-        })) as LobbyState,
+        }),
       });
     } finally {
       this.update({ busy: false });
@@ -1029,7 +1013,7 @@ export class MultiplayerSession {
   async reconnect() {
     try {
       this.update({
-        lobby: (await this.request({ kind: "reconnect" })) as LobbyState,
+        lobby: await this.request({ kind: "reconnect" }),
         error: undefined,
       });
     } catch (error) {
@@ -1047,13 +1031,7 @@ export class MultiplayerSession {
   }
   /** Reloads the multiplayer saves; only the newest request may replace the list. */
   async refreshSaves(sync = true) {
-    return this.loadLibrary(
-      () =>
-        this.request({
-          kind: "list-saves",
-          sync,
-        }) as Promise<SharedSaveLibrary>,
-    );
+    return this.loadLibrary(() => this.services.checkpoints.list(sync));
   }
   private async loadLibrary(read: () => Promise<SharedSaveLibrary>) {
     const request = ++this.libraryRequest;
@@ -1067,9 +1045,8 @@ export class MultiplayerSession {
     }
   }
   async deleteSharedSave(id: string) {
-    const library = await this.loadLibrary(
-      () =>
-        this.request({ kind: "delete-save", id }) as Promise<SharedSaveLibrary>,
+    const library = await this.loadLibrary(() =>
+      this.services.checkpoints.remove(id),
     );
     if (this.state.pendingCampaign?.id === id) {
       this.campaignGeneration++;
@@ -1086,10 +1063,7 @@ export class MultiplayerSession {
       generation === this.campaignGeneration && lifecycle === this.lifecycle;
     this.update({ busy: true, error: undefined });
     try {
-      const world = (await this.request({
-        kind: "read-checkpoint",
-        id,
-      })) as World | null;
+      const world = await this.services.checkpoints.read(id);
       if (!current()) return;
       if (!world) throw new Error("This multiplayer save could not be found");
       if (!Array.isArray(world.seats))
@@ -1117,10 +1091,10 @@ export class MultiplayerSession {
       if (this.state.lobby.lobbyId && !this.isHost())
         throw new Error("Only the host can choose a save");
       if (!this.state.lobby.lobbyId) {
-        const lobby = (await this.request({
+        const lobby = await this.request({
           kind: "create",
           rules: manifest.multiplayerCompatibilityId,
-        })) as LobbyState;
+        });
         if (!current()) return;
         this.update({ lobby });
       }
@@ -1145,11 +1119,11 @@ export class MultiplayerSession {
     const campaign = this.state.pendingCampaign;
     if (!campaign) return;
     this.update({
-      lobby: (await this.request({
+      lobby: await this.request({
         kind: "member",
         key: "slot",
         value: slotClaim(campaign.id, seatId),
-      })) as LobbyState,
+      }),
     });
   }
   /** Why the lobby cannot resume its saved campaign yet. */
@@ -1215,10 +1189,7 @@ export class MultiplayerSession {
       if (!current()) return;
       const world =
         "saved" in choice
-          ? ((await this.request({
-              kind: "read-checkpoint",
-              ...(choice.id && { id: choice.id }),
-            })) as World | null)
+          ? await this.services.checkpoints.read(choice.id)
           : null;
       if ("saved" in choice && !world)
         throw new Error("No multiplayer save on this computer yet");
@@ -1279,9 +1250,7 @@ export class MultiplayerSession {
         if (data.kind === "checkpoint") {
           this.saving = this.saving
             .catch(() => {})
-            .then(() =>
-              this.request({ kind: "checkpoint", world: data.world }),
-            );
+            .then(() => this.services.checkpoints.write(data.world));
           void this.saving.catch((error) =>
             this.update({ error: `Multiplayer save failed: ${error.message}` }),
           );
@@ -1718,11 +1687,11 @@ export class MultiplayerSession {
     )
       throw new Error("Receiving scenario…");
     this.update({
-      lobby: (await this.request({
+      lobby: await this.request({
         kind: "member",
         key: "ready",
         value: key,
-      })) as LobbyState,
+      }),
     });
   }
   /** The host closes a finished match and reopens the lobby to choose the next game. */

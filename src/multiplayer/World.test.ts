@@ -562,6 +562,11 @@ const publishedCoopIdentities = [
     23,
     "coop-2-3a64b92f0462af2eb6286821f118c030f25aaf65b546a4a7652e87b1dbcd3e33",
   ],
+  // Master 11ff7f50 used the same world format before separating its transport.
+  [
+    24,
+    "coop-2-b5084b0368736d579e1ffc5cfbcaf4b8a7b4a2b6097b45dfaafbf85556810755",
+  ],
 ] as const;
 
 test.each(publishedCoopIdentities)(

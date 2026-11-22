@@ -1,3 +1,4 @@
+import { steamSessionServices } from "./SteamSessionServices";
 import { achievementJournal } from "../achievements/Journal";
 import { unlockedDifficulty } from "../achievements/DifficultyUnlocks";
 import {
@@ -59,7 +60,7 @@ export default function MultiplayerRoot() {
   const [session] = useState(
     () =>
       new MultiplayerSession(
-        getDesktop()!,
+        steamSessionServices(getDesktop()),
         async () => (await import("./WorkerClient")).createMultiplayerWorker(),
         async () =>
           (await import("./WorkerClient")).createMultiplayerReplicaWorker(),
@@ -318,20 +319,16 @@ export default function MultiplayerRoot() {
       copyCode,
       openSaves: () => setSavesOpen(true),
     });
-    const stopNative = getDesktop()?.onMultiplayerEvent?.((event) => {
-      if (event.kind === "invite" && !session.getSnapshot().view) {
-        setOpen(true);
-        void session.join(event.lobbyId).catch(() => undefined);
-      }
-    });
+    const acceptInvite = (lobbyId: string) => {
+      if (!live || session.getSnapshot().view) return;
+      setOpen(true);
+      void session.join(lobbyId).catch(() => undefined);
+    };
     void session
-      .initialize()
+      .initialize(acceptInvite)
       .then(() => {
         const invite = session.getSnapshot().lobby.inviteLobbyId;
-        if (invite) {
-          setOpen(true);
-          void session.join(invite).catch(() => undefined);
-        }
+        if (invite) acceptInvite(invite);
       })
       // A desktop build without Steam multiplayer keeps the lobby unavailable.
       .catch(() => undefined);
@@ -341,7 +338,6 @@ export default function MultiplayerRoot() {
       stopCoop();
       stopStore();
       stopProgress();
-      stopNative?.();
       registerLobbyOpener(undefined);
       registerCoopControls(undefined);
       registerMultiplayerRuntime(undefined);
