@@ -837,8 +837,13 @@ test("TV couch resumes with an absent retired controller and completes the remai
     .getByRole("button", { name: "Go bankrupt", exact: true })
     .focus();
   await couch.input({ "101": ["confirm"] });
-  await expect(lowCash).toHaveCount(0);
-  await couch.input({ "101": ["speedUp"] });
+  await expect(p1.getByRole("dialog", { includeHidden: true })).toHaveCount(0);
+  const slow = speedControls(p1).getByRole("button", {
+    name: "slow speed",
+    exact: true,
+  });
+  await slow.focus();
+  await couch.input({ "101": ["confirm"] });
   await expect(clock(p1)).toHaveAttribute("data-active-speed", "SLOW");
 
   const results = page.getByRole("dialog", {
@@ -1000,7 +1005,13 @@ test("TV couch applies padded bounds and exposes shared clock reasons through co
   await padding.getByRole("button", { name: "0%", exact: true }).click();
   await expect.poll(() => couch.layout()?.fits).toBe(true);
   expect(couch.layout()?.inset).toBe(0);
+  const overlays = await couch.settledNativeRequests("overlay");
   await settings.getByRole("button", { name: "Back", exact: true }).click();
+  await expect(settings).toHaveCount(0);
+  await expect
+    .poll(() => couch.settledNativeRequests("overlay"))
+    .toBeGreaterThan(overlays);
+  await couch.settleCaptures();
   await expect(
     page.getByRole("heading", { name: "TV session paused", exact: true }),
   ).toHaveCount(0);
