@@ -289,7 +289,6 @@ class SteamRoom {
   campaignWarning?: string;
   campaignError?: string;
   campaignListHold?: Promise<void>;
-  invites: string[] = [];
   views = new Map<string, RoomView>();
   hostView?: RoomView;
   baselines = new Map<string, number>();
@@ -499,10 +498,6 @@ class SteamRoom {
     }
     if (input.kind === "read-checkpoint") return this.checkpoint;
     if (input.kind === "delete-save") this.checkpoint = undefined;
-    if (input.kind === "invite") {
-      this.invites.push(id);
-      return;
-    }
     if (input.kind === "list-saves" || input.kind === "delete-save") {
       if (input.kind === "list-saves") await this.campaignListHold;
       if (this.campaignError) throw new Error(this.campaignError);
@@ -983,11 +978,10 @@ for (const [width, theme] of [
     await expect(
       page.getByText("Someone must take WindyWren's company"),
     ).toBeVisible();
-    await page
-      .getByRole("dialog")
-      .getByRole("button", { name: "Invite via Steam", exact: true })
-      .click();
-    await expect.poll(() => room.invites).toEqual([room.host]);
+    const resumed = page.getByRole("dialog", { name: "Pick your company" });
+    await expect(
+      resumed.getByText(room.inviteCode, { exact: true }),
+    ).toBeVisible();
     await bounded();
     await capture("resume-invite");
     const guest = await room.player(browser, 1, mobile);
@@ -2582,7 +2576,6 @@ for (const width of [1280, 390]) {
       navigator.clipboard.readText(),
     );
     expect(sharedCode).toBe(room.inviteCode);
-    expect(room.invites).toEqual([]);
     const guestCode = guest.getByLabel("6-digit invite code", { exact: true });
     await guestCode.fill("999999");
     await guestCode.press("Enter");
@@ -2685,16 +2678,10 @@ for (const width of [1280, 390]) {
     await expect(
       host.getByRole("button", { name: "Resume game", exact: true }),
     ).toBeDisabled();
-    await host
-      .getByRole("dialog")
-      .getByRole("button", { name: "Invite via Steam", exact: true })
-      .click();
-    await expect.poll(() => room.invites).toEqual([room.host]);
     await capture("13-pick-companies");
-    await guest
-      .getByRole("button", { name: "Play with friends", exact: true })
-      .click();
-    await joinGame(guest, room);
+    const guestId = "76561198000000002";
+    // An accepted Steam friends-overlay invitation arrives through the native bridge.
+    await room.event(guestId, { kind: "invite", lobbyId: room.lobbyId });
     // The returning friend takes back their own company by default.
     await expect(company(guest, "WindyWren")).toContainText("You");
     await expect(

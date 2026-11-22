@@ -93,16 +93,3 @@
   flex: 0 0 20%;
   min-width: 72px;
 }
-
-.coopCampaignInvites {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 12px;
-}
-
-@media (max-width: 599px) {
-  .coopCampaignInvites .coopInviteCode {
-    flex-basis: 100%;
-  }
-}

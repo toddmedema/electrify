@@ -38,8 +38,9 @@ const DECLARATIONS = {
     "const char * SteamAPI_ISteamMatchmaking_GetLobbyMemberData(void *, uint64_t, uint64_t, const char *)",
   setMemberData:
     "void SteamAPI_ISteamMatchmaking_SetLobbyMemberData(void *, uint64_t, const char *, const char *)",
-  invite:
-    "void SteamAPI_ISteamFriends_ActivateGameOverlayInviteDialog(void *, uint64_t)",
+  apps: "void * SteamAPI_SteamApps_v008()",
+  launchCommandLine:
+    "int SteamAPI_ISteamApps_GetLaunchCommandLine(void *, void *, int)",
   listen:
     "uint32_t SteamAPI_ISteamNetworkingSockets_CreateListenSocketP2P(void *, int, int, void *)",
   connect:
@@ -67,6 +68,10 @@ const CONNECTION_STATUS_CHANGED_CALLBACK = 1221;
 // GameLobbyJoinRequested_t (k_iSteamFriendsCallbacks + 33): m_steamIDLobby, m_steamIDFriend.
 const LOBBY_JOIN_REQUESTED_CALLBACK = 333;
 const LOBBY_JOIN_REQUESTED_SIZE = 16;
+// GameRichPresenceJoinRequested_t: CSteamID followed by a 256-byte connect string.
+const PRESENCE_JOIN_REQUESTED_CALLBACK = 337;
+const PRESENCE_CONNECT_OFFSET = 8;
+const PRESENCE_CONNECT_BYTES = 256;
 // LobbyCreated_t (k_iSteamMatchmakingCallbacks + 13): EResult m_eResult, uint64 m_ulSteamIDLobby.
 const LOBBY_CREATED_CALLBACK = 513;
 const LOBBY_CREATED_SIZE = WIN32_PACKING ? 16 : 12;
@@ -148,14 +153,33 @@ const SCENARIO_MAGIC = "ELS1";
 const ID = /^[0-9]{17}$/;
 const LOBBY_ID = /^[0-9]{17,20}$/;
 const INVITE_CODE = /^[0-9]{6}$/;
-function lobbyFromArgs(args) {
-  const index = args.indexOf("+connect_lobby");
-  const id = index < 0 ? "" : args[index + 1];
+function validLobbyId(id) {
   return typeof id === "string" &&
     LOBBY_ID.test(id) &&
     BigInt(id) <= 18446744073709551615n
     ? id
     : undefined;
+}
+
+function lobbyFromArgs(args) {
+  const index = args.indexOf("+connect_lobby");
+  return index < 0 ? undefined : validLobbyId(args[index + 1]);
+}
+
+function lobbyFromConnect(bytes) {
+  const end = bytes.indexOf(0);
+  if (end < 0) return;
+  const command = bytes.toString("utf8", 0, end);
+  const match = /^\+connect_lobby ([0-9]{17,20})$/.exec(command);
+  return match?.[0] === command ? validLobbyId(match[1]) : undefined;
+}
+
+function lobbyFromSteamLaunch(api) {
+  const apps = api.apps();
+  if (!apps) return;
+  const command = Buffer.alloc(PRESENCE_CONNECT_BYTES);
+  const length = api.launchCommandLine(apps, command, command.length);
+  if (length > 0 && length < command.length) return lobbyFromConnect(command);
 }
 const RULES = /^[a-zA-Z0-9:._-]{1,128}$/;
 function loadMultiplayerFunctions(
@@ -519,6 +543,7 @@ class SteamMultiplayer {
     this.connections = new Map();
     this.pendingCheckpoints = new Map();
     this.allowed = null;
+    this.inviteConnect = null;
     this.savedAt = null;
     this.sharedAt = null;
     api.relay(this.utils);
@@ -530,11 +555,21 @@ class SteamMultiplayer {
       LOBBY_JOIN_REQUESTED_CALLBACK,
       (bytes) => {
         if (bytes.length !== LOBBY_JOIN_REQUESTED_SIZE) return;
-        this.pendingInvite = bytes.readBigUInt64LE(0).toString();
-        this.emit({ kind: "invite", lobbyId: this.pendingInvite });
+        this.receiveInvite(bytes.readBigUInt64LE(0).toString());
       },
     );
-    this.pendingInvite = lobbyFromArgs(process.argv);
+    this.stopPresenceInvite = dispatcher.onCallback(
+      PRESENCE_JOIN_REQUESTED_CALLBACK,
+      (bytes) => {
+        if (bytes.length !== PRESENCE_CONNECT_OFFSET + PRESENCE_CONNECT_BYTES)
+          return;
+        this.receiveInvite(
+          lobbyFromConnect(bytes.subarray(PRESENCE_CONNECT_OFFSET)),
+        );
+      },
+    );
+    this.pendingInvite =
+      lobbyFromSteamLaunch(api) ?? lobbyFromArgs(process.argv);
     this.timer = setInterval(() => {
       try {
         this.pump();
@@ -543,6 +578,22 @@ class SteamMultiplayer {
       }
     }, 33);
     this.timer.unref();
+  }
+  receiveInvite(id) {
+    const lobbyId = validLobbyId(id);
+    if (!lobbyId) return;
+    this.pendingInvite = lobbyId;
+    this.emit({ kind: "invite", lobbyId });
+  }
+  setInvitePresence(connect) {
+    if (connect === this.inviteConnect) return;
+    try {
+      const { native } = this.service;
+      if (native.presence(native.friends(), "connect", connect))
+        this.inviteConnect = connect;
+    } catch {
+      // A temporary Steam failure must leave code-based joining available.
+    }
   }
   state() {
     return {
@@ -911,6 +962,14 @@ class SteamMultiplayer {
       this.fail("The host left. Resume a multiplayer save in a new lobby.");
       return;
     }
+    this.setInvitePresence(
+      this.listener &&
+        this.hostId === this.service.identity.steamId &&
+        !this.allowed &&
+        this.roster.length < MAX_LOBBY_MEMBERS
+        ? `+connect_lobby ${this.lobby}`
+        : null,
+    );
     this.publish();
   }
   async persist(world) {
@@ -1136,11 +1195,12 @@ class SteamMultiplayer {
     this.emit({ kind: "message", sender, payload });
   }
   pump() {
-    if (!this.lobby) return;
     if (!this.lastRefresh || Date.now() - this.lastRefresh >= 1000) {
       this.lastRefresh = Date.now();
-      this.refresh();
+      if (this.lobby) this.refresh();
+      else this.setInvitePresence(null);
     }
+    if (!this.lobby) return;
     for (const [handle, c] of this.connections) {
       if (!c.connected) continue;
       if (
@@ -1267,11 +1327,13 @@ class SteamMultiplayer {
     }
   }
   fail(error) {
+    this.setInvitePresence(null);
     this.error = error;
     this.emit({ kind: "disconnected", sender: this.hostId });
     this.publish();
   }
   leave() {
+    this.setInvitePresence(null);
     for (const handle of [...this.connections.keys()]) this.drop(handle);
     if (this.listener) this.api.closeListen(this.sockets, this.listener);
     if (this.lobby) this.api.leave(this.matchmaking, this.lobby);
@@ -1334,12 +1396,8 @@ class SteamMultiplayer {
         if (this.hostId !== this.service.identity.steamId)
           throw new Error("Only the host can reopen the lobby");
         this.allowed = null;
+        this.refresh();
         return this.state();
-      case "invite":
-        if (!this.lobby) throw new Error("Host a game before inviting friends");
-        this.service.requireOverlay();
-        this.api.invite(this.service.native.friends(), this.lobby);
-        return;
       case "lock":
         if (
           this.hostId !== this.service.identity.steamId ||
@@ -1350,6 +1408,7 @@ class SteamMultiplayer {
         )
           throw new Error("Invalid match roster");
         this.allowed = new Set(input.ids);
+        this.setInvitePresence(null);
         return;
       case "send":
         return this.send(input.to, input.payload);
@@ -1371,6 +1430,7 @@ class SteamMultiplayer {
     clearInterval(this.timer);
     this.stopCallback();
     this.stopInvite();
+    this.stopPresenceInvite();
     this.leave();
   }
 }

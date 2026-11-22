@@ -21,7 +21,6 @@ const controls = {
   start: jest.fn(),
   ready: jest.fn(),
   back: jest.fn(),
-  invite: jest.fn(),
   copyCode: jest.fn(),
   openSaves: jest.fn(),
 };
@@ -69,9 +68,9 @@ test("a host alone invites friends first, can copy the code and cannot start yet
   expect(copy).toHaveClass("MuiButton-contained");
   fireEvent.click(copy);
   expect(controls.copyCode).toHaveBeenCalled();
-  expect(controls.invite).not.toHaveBeenCalled();
-  fireEvent.click(screen.getByRole("button", { name: "Invite via Steam" }));
-  expect(controls.invite).toHaveBeenCalled();
+  expect(
+    screen.queryByRole("button", { name: /invite.*steam/i }),
+  ).not.toBeInTheDocument();
   fireEvent.click(
     screen.getByRole("button", { name: "Load multiplayer save" }),
   );

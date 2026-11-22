@@ -1007,9 +1007,6 @@ export class MultiplayerSession {
       this.update({ busy: false });
     }
   }
-  async invite() {
-    await this.request({ kind: "invite" });
-  }
   async reconnect() {
     try {
       this.update({

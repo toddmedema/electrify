@@ -14,7 +14,6 @@ import {
   Typography,
 } from "@mui/material";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
-import PersonAddIcon from "@mui/icons-material/PersonAddAlt1";
 import type { MultiplayerSession } from "./Session";
 import { seatAssignments } from "./Slots";
 import CoopInviteCode from "../components/base/CoopInviteCode";
@@ -185,7 +184,7 @@ export default function Lobby({
                       inputMode: "numeric",
                       "aria-describedby": joinFailed
                         ? "coop-lobby-notice"
-                        : "coop-invite-code-hint",
+                        : undefined,
                     },
                   }}
                 />
@@ -193,13 +192,6 @@ export default function Lobby({
                   Join
                 </Button>
               </form>
-              <Typography
-                id="coop-invite-code-hint"
-                variant="body2"
-                color="text.secondary"
-              >
-                Ask your host for the invite code.
-              </Typography>
             </>
           )}
           {mode === "waiting" && (
@@ -354,23 +346,14 @@ function CampaignSlots({
       )}
       {host ? (
         <>
-          <div className="coopCampaignInvites">
-            {lobby.inviteCode && (
-              <CoopInviteCode
-                code={lobby.inviteCode}
-                onCopy={onCopyCode}
-                prominent={!!blocker}
-                disabled={busy}
-              />
-            )}
-            <Button
-              startIcon={<PersonAddIcon />}
+          {lobby.inviteCode && (
+            <CoopInviteCode
+              code={lobby.inviteCode}
+              onCopy={onCopyCode}
+              prominent={!!blocker}
               disabled={busy}
-              onClick={() => run(() => session.invite())}
-            >
-              Invite via Steam
-            </Button>
-          </div>
+            />
+          )}
           <Button
             variant="contained"
             size="large"

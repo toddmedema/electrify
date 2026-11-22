@@ -80,7 +80,7 @@ export type WireMessage =
   | { kind: "campaign"; campaign?: PendingCampaign };
 export type SessionRequest =
   | {
-      kind: "state" | "leave" | "reconnect" | "invite" | "unlock";
+      kind: "state" | "leave" | "reconnect" | "unlock";
     }
   | { kind: "create"; rules: string }
   | { kind: "join"; rules: string; lobbyId: string }

@@ -6,7 +6,6 @@ import HourglassIcon from "@mui/icons-material/HourglassEmpty";
 import StarIcon from "@mui/icons-material/StarBorder";
 import SyncIcon from "@mui/icons-material/Sync";
 import FolderOpenIcon from "@mui/icons-material/FolderOpenOutlined";
-import PersonAddIcon from "@mui/icons-material/PersonAddAlt1";
 import PlayCircleIcon from "@mui/icons-material/PlayCircleOutlined";
 import { coopControls } from "../../multiplayer/Registry";
 import type { CoopSelectionType } from "../../Types";
@@ -116,22 +115,12 @@ export default function CoopBrowseBar({
           </ul>
           {!coop.starting && (
             <div className="coopBrowseActions">
-              {host && (
-                <>
-                  {coop.inviteCode && (
-                    <CoopInviteCode
-                      code={coop.inviteCode}
-                      prominent={alone}
-                      onCopy={() => coopControls()?.copyCode()}
-                    />
-                  )}
-                  <Button
-                    startIcon={<PersonAddIcon />}
-                    onClick={() => coopControls()?.invite()}
-                  >
-                    Invite via Steam
-                  </Button>
-                </>
+              {host && coop.inviteCode && (
+                <CoopInviteCode
+                  code={coop.inviteCode}
+                  prominent={alone}
+                  onCopy={() => coopControls()?.copyCode()}
+                />
               )}
               <Button onClick={() => coopControls()?.back()}>Leave</Button>
             </div>

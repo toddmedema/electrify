@@ -185,16 +185,6 @@ export default function MultiplayerRoot() {
     );
   }, [session]);
 
-  const invite = useCallback(() => {
-    void session
-      .invite()
-      .catch((error) =>
-        store.dispatch(
-          snackbarOpen({ message: error.message, open: true, timeout: 6000 }),
-        ),
-      );
-  }, [session]);
-
   useEffect(() => {
     registerLobbyOpener(() => {
       const couch = getDesktop()?.couchRequest;
@@ -315,14 +305,39 @@ export default function MultiplayerRoot() {
           }),
         );
       },
-      invite,
       copyCode,
       openSaves: () => setSavesOpen(true),
     });
+    let joiningInvite = false;
     const acceptInvite = (lobbyId: string) => {
-      if (!live || session.getSnapshot().view) return;
+      const current = session.getSnapshot();
+      if (
+        !live ||
+        joiningInvite ||
+        current.view ||
+        current.lobby.lobbyId === lobbyId
+      )
+        return;
+      joiningInvite = true;
       setOpen(true);
-      void session.join(lobbyId).catch(() => undefined);
+      void session
+        .join(lobbyId)
+        .catch((error) => {
+          if (live)
+            store.dispatch(
+              snackbarOpen({
+                message:
+                  error instanceof Error
+                    ? error.message
+                    : "Could not join the invited game.",
+                open: true,
+                timeout: 6000,
+              }),
+            );
+        })
+        .finally(() => {
+          joiningInvite = false;
+        });
     };
     void session
       .initialize(acceptInvite)
@@ -343,7 +358,7 @@ export default function MultiplayerRoot() {
       registerMultiplayerRuntime(undefined);
       session.dispose();
     };
-  }, [session, syncCoop, leaveLobby, invite, copyCode]);
+  }, [session, syncCoop, leaveLobby, copyCode]);
   useEffect(() => {
     if (!hasView) return;
     return registerShutdownCheckpoint((reason) => {

@@ -723,8 +723,6 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
         store.dispatch(uiDelta({ coop: undefined }));
         store.dispatch(navigate("MAIN_MENU"));
       },
-      invite: () =>
-        setError("Each player joins with their own controller on this TV."),
       copyCode: () => {},
       openSaves: () => setStage("join"),
     });
