@@ -695,7 +695,7 @@ it("retains static uploads across animation and lighting-only updates", () => {
   renderer.dispose();
 });
 
-it("releases resources and exposes fallback when a frame upload fails", () => {
+it("releases resources and reports the renderer unavailable when a frame upload fails", () => {
   const { renderer, gl, state } = setup();
   renderer.update(scene(), frame);
   gl.bufferSubData.mockImplementationOnce(() => {
@@ -711,7 +711,7 @@ it("releases resources and exposes fallback when a frame upload fails", () => {
   expect(gl.deleteProgram).toHaveBeenCalledTimes(1);
 });
 
-it("keeps the fallback and discards buffers after an allocation reports OUT_OF_MEMORY", () => {
+it("stays unavailable and discards buffers after an allocation reports OUT_OF_MEMORY", () => {
   const { renderer, gl, state } = setup();
   gl.bufferData.mockImplementation((_target, _data, usage) => {
     if (usage === gl.DYNAMIC_DRAW)

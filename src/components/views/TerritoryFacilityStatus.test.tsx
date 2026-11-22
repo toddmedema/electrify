@@ -66,11 +66,11 @@ function show(game: GameType, tileId: TerritoryTileId) {
   const target = screen
     .getAllByRole<HTMLButtonElement>("button")
     .find((button) => button.dataset.mapTarget === tileId)!;
-  const occupant = decorativeChild(
-    screen.getByRole("img", { name: "Terrain and one structure per hex" }),
-    `[data-occupant-tile="${tileId}"]`,
-  )!;
-  return { target, occupant };
+  const map = screen.getByLabelText(
+    "Terrain, structures and utility ownership",
+  );
+  const badge = () => decorativeChild(map, `[data-status-tile="${tileId}"]`);
+  return { target, badge };
 }
 
 it.each([
@@ -83,14 +83,13 @@ it.each([
     const { game, facility } = ready();
     facility.paused = paused;
     facility.yearsToBuildLeft = years;
-    const { target, occupant } = show(game, facility.tileId!);
+    const { target, badge } = show(game, facility.tileId!);
     expect(target).toHaveAccessibleDescription(expect.stringContaining(label));
     expect(target).not.toHaveAttribute("title");
-    expect(occupant).toHaveAttribute("data-facility-status", kind);
-    expect(occupant).toHaveAttribute("data-visibility-distance", "0");
-    // The badge is a sibling of the faded facility body, under the same fog wrapper.
+    expect(badge()).toHaveAttribute("data-facility-status", kind);
+    expect(badge()).toHaveAttribute("data-visibility-distance", "0");
     expect(
-      decorativeChild(occupant, ":scope > .facilityMapStatusArtwork"),
+      decorativeChild(badge()!, ":scope > .facilityMapStatusArtwork"),
     ).toHaveAttribute("aria-hidden", "true");
     fireEvent.click(target);
     expect(
@@ -111,8 +110,8 @@ it("reports staged retrofit output rather than an outage in the inspector", () =
     startsMinute: game.date.minute,
     completesMinute: game.date.minute + 100,
   };
-  const { target, occupant } = show(game, facility.tileId!);
-  expect(occupant).toHaveAttribute("data-facility-status", "producing");
+  const { target, badge } = show(game, facility.tileId!);
+  expect(badge()).toHaveAttribute("data-facility-status", "producing");
   expect(target).toHaveAccessibleDescription(
     expect.stringContaining("Generating; retrofit in progress"),
   );
@@ -129,15 +128,14 @@ it("shows the foreign facility without an unavailable status", () => {
   const view = territoryTileViews(game).find(
     ({ owned, facility }) => !owned && facility,
   )!;
-  const { target, occupant } = show(game, view.tile.id);
+  const { target, badge } = show(game, view.tile.id);
   expect(target).toHaveAccessibleDescription(
     expect.stringContaining(view.facility!.name),
   );
   expect(target).not.toHaveAccessibleDescription(
     /Operating status unavailable/,
   );
-  expect(occupant).toHaveAttribute("data-facility-status", "unknown");
-  expect(decorativeChild(occupant, ".facilityMapStatusArtwork")).toBeNull();
+  expect(badge()).toBeNull();
   fireEvent.click(target);
   const inspector = within(screen.getByRole("dialog"));
   expect(inspector.getByText(view.facility!.name)).toBeVisible();
@@ -218,13 +216,13 @@ it("toggles map names and the construction badge independently", () => {
     yearsToBuildLeft: 1,
     quoteKey: "status-only-fixture",
   };
-  const { occupant } = show(game, facility.tileId!);
+  const { badge } = show(game, facility.tileId!);
   const city = screen.getByRole("button", {
     name: "Inspect Valley Electric territory · Winooski",
   });
   expect(within(city).getByText("Winooski")).toBeVisible();
   expect(within(city).getByText("Valley Electric")).toBeVisible();
-  expect(occupant).toHaveAttribute("data-facility-status", "construction");
+  expect(badge()).toHaveAttribute("data-facility-status", "construction");
   fireEvent.click(screen.getByRole("button", { name: "Map layers" }));
   const toggle = screen.getByRole("checkbox", { name: "Facility status" });
   fireEvent.click(toggle);
@@ -234,10 +232,9 @@ it("toggles map names and the construction badge independently", () => {
   fireEvent.click(names);
   expect(within(city).queryByText("Winooski")).not.toBeInTheDocument();
   expect(within(city).queryByText("Valley Electric")).not.toBeInTheDocument();
-  expect(occupant).toHaveAttribute("data-facility-status", "construction");
-  expect(decorativeChild(occupant, ".facilityMapStatusArtwork")).toBeNull();
+  expect(badge()).toBeNull();
   fireEvent.click(toggle);
-  expect(decorativeChild(occupant, ".facilityMapStatusArtwork")).not.toBeNull();
+  expect(decorativeChild(badge()!, ".facilityMapStatusArtwork")).not.toBeNull();
   expect(within(city).queryByText("Winooski")).not.toBeInTheDocument();
   expect(within(city).queryByText("Valley Electric")).not.toBeInTheDocument();
   fireEvent.click(names);

@@ -521,8 +521,7 @@ export class MapRenderer {
       this.fail();
       return;
     }
-    // Notify the host only after a real clear/draw, so fallback art never
-    // disappears between context creation and the first painted frame.
+    // Notify the host after the first draw so pointer picking uses a painted frame.
     this.state = "ready";
     this.readyPending = true;
     this.schedule();

@@ -979,7 +979,7 @@ function enable3D() {
     else Reflect.deleteProperty(window, "WebGL2RenderingContext");
   };
 }
-it("retains ownership boundaries and wire topology through power ticks and camera movement, then updates after a connection", () => {
+it("retains wire topology through power ticks and camera movement, then updates after a connection", () => {
   const topology = jest.spyOn(HexGeometry, "hexWires");
   const map = show();
   const firstPasses = topology.mock.calls.length;
@@ -1172,25 +1172,15 @@ it("binds a retargeted model gesture to the quote shown at pointer down", async 
   }
 });
 
-it("retains the accessible map and Connect action after the lazy scene fails", async () => {
+it("explains the WebGL2 requirement when the lazy scene fails", async () => {
   const restore = enable3D();
   jest.spyOn(console, "error").mockImplementation(() => undefined);
   mockSceneError = true;
   try {
-    const map = show();
-    await waitFor(() =>
-      expect(
-        screen.getByLabelText("Terrain, structures and utility ownership"),
-      ).toHaveAttribute("data-renderer", "unavailable"),
-    );
-    expect(map.target("champlain:city")).toHaveAccessibleName(
-      "Inspect You territory · Burlington",
-    );
-    map.buyMode();
-    tap(map.candidates()[0]);
+    show();
     expect(
-      map.store.getState().game.territoryNetwork!.tilePurchases,
-    ).toHaveLength(1);
+      await screen.findByText("The 3D map is unavailable. WebGL2 is required."),
+    ).toHaveAttribute("role", "status");
   } finally {
     restore();
   }

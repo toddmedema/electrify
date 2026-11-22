@@ -354,7 +354,7 @@ test("submerged cable geometry reaches the land terminal", () => {
     tiles,
     () => true,
     undefined,
-    ({ terrain }) => (terrain === "lake" ? "submerged" : "tower"),
+    ({ terrain }) => terrain === "lake",
   );
   const cable = builder
     .build(views, tiles, wires, 0, "run")

@@ -21,7 +21,7 @@ function glyph(kind: Exclude<FacilityMapStatusKind, "unknown">) {
   }
 }
 
-/** Decorative sibling of the facility body in its uniformly scaled 500-unit canvas. */
+/** Decorative map badge in a uniformly scaled 500-unit canvas. */
 export default function FacilityMapStatusArtwork({
   kind,
 }: {
