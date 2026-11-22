@@ -29,7 +29,7 @@ const loadRenderer: RendererLoader = async () => {
 
 export interface SceneCamera {
   subscribe: (listener: () => void) => () => void;
-  getSnapshot: () => { x: number; y: number };
+  getSnapshot: () => { x: number; y: number; zoom: number };
 }
 
 /** Lazy boundary keeps GPU/model code outside the initial game shell. */
@@ -48,6 +48,7 @@ export default function TerritoryScene3D({
   runKey,
   frame: viewport,
   camera,
+  baseScale,
   daylight,
   dark,
   onState,
@@ -67,9 +68,10 @@ export default function TerritoryScene3D({
   runKey: string;
   frame: Omit<
     MapFrame,
-    "lighting" | "lightingTransitionMs" | "cameraX" | "cameraY"
+    "lighting" | "lightingTransitionMs" | "cameraX" | "cameraY" | "scale"
   >;
   camera: SceneCamera;
+  baseScale: number;
   daylight: {
     sunrise: number;
     sunset: number;
@@ -80,11 +82,12 @@ export default function TerritoryScene3D({
   /** Accept points relative to the center shared by the live viewport and the last paint. */
   onPicker: (picker: ScenePicker | undefined) => void;
 }) {
-  const { x: cameraX, y: cameraY } = React.useSyncExternalStore(
-    camera.subscribe,
-    camera.getSnapshot,
-  );
-  const frame = { ...viewport, cameraX, cameraY };
+  const {
+    x: cameraX,
+    y: cameraY,
+    zoom,
+  } = React.useSyncExternalStore(camera.subscribe, camera.getSnapshot);
+  const frame = { ...viewport, cameraX, cameraY, scale: baseScale * zoom };
   const builder = React.useMemo(() => new SceneBuilder(factories), []);
   const scene = React.useMemo(
     () => builder.build(views, tiles, wires, minute, runKey, cityGrowth),
