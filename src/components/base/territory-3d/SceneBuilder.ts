@@ -2,8 +2,10 @@ import type {
   FacilityOperatingType,
   FuelNameType,
   TerrainType,
+  TerritoryId,
 } from "../../../Types";
 import { isStorage } from "../../../Types";
+import type { CityGrowthSector } from "../../../helpers/CityDemand";
 import { farmLayout, terrainArtHash } from "./TerrainVariants";
 import type { TerritoryTileDefinition } from "../../../data/TerritoryTiles";
 import {
@@ -50,6 +52,7 @@ interface TileScene {
   weather?: TerrainModelOptions["weather"];
   tile: TerritoryTileDefinition;
   kind?: StructureKind;
+  growth?: readonly CityGrowthSector[];
   terrain: MapInstance;
   model?: MapModel;
   structure?: MapInstance;
@@ -128,7 +131,10 @@ function bounds(model: MapModel): readonly number[] {
 
 export interface ModelFactories {
   terrain: (terrain: TerrainType, options?: TerrainModelOptions) => MapModel;
-  structure: (kind: StructureKind) => MapModel;
+  structure: (
+    kind: StructureKind,
+    growth?: readonly CityGrowthSector[],
+  ) => MapModel;
 }
 const fuelModels: Record<FuelNameType, StructureKind> = {
   Coal: "coal",
@@ -223,6 +229,7 @@ export class SceneBuilder {
     wires: readonly HexWire[],
     minute: number,
     runKey: string,
+    cityGrowth?: ReadonlyMap<TerritoryId, readonly CityGrowthSector[]>,
   ): MapInstance[] {
     if (allTiles !== this.tiles) {
       this.tiles = allTiles;
@@ -243,6 +250,7 @@ export class SceneBuilder {
       const { tile } = view,
         tileKey = territoryMapTileKey(tile),
         kind = structureKind(view),
+        growth = tile.city ? cityGrowth?.get(tile.territoryId) : undefined,
         burning = view.disaster?.ground === "burning" && combustibleTile(tile),
         weather =
           view.disaster?.ground === "burning"
@@ -254,11 +262,16 @@ export class SceneBuilder {
         !cell ||
         cell.tile !== tile ||
         cell.kind !== kind ||
+        cell.growth !== growth ||
         cell.weather !== weather ||
         !!cell.terrain.wildfire !== burning ||
         cell.terrain.fog !== view.visibilityDistance
       ) {
-        const model = kind ? this.factories.structure(kind) : undefined;
+        const model = kind
+          ? growth
+            ? this.factories.structure(kind, growth)
+            : this.factories.structure(kind)
+          : undefined;
         const position = tilePosition3D(tile);
         const terrain = this.factories.terrain(tile.terrain, {
           footprint: model?.footprint ?? 0,
@@ -288,6 +301,7 @@ export class SceneBuilder {
           tile,
           weather,
           kind,
+          growth,
           model,
           terrain: {
             id: `terrain:${tileKey}`,

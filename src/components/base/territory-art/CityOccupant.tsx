@@ -1,8 +1,10 @@
 import * as React from "react";
 import type { CitySizeType } from "../../../Types";
+import type { CityGrowthSector } from "../../../helpers/CityDemand";
 
 type Props = {
   size: CitySizeType;
+  growth?: readonly CityGrowthSector[];
   className?: string;
 };
 
@@ -64,7 +66,11 @@ function Townhouse({ x, roof = "#587F69" }: { x: number; roof?: string }) {
 }
 
 // Every size shares the ground anchor (250, 365) and covers the wire terminal (250, 350).
-export default function CityOccupant({ size = "medium", className }: Props) {
+export default function CityOccupant({
+  size = "medium",
+  growth,
+  className,
+}: Props) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
@@ -117,6 +123,30 @@ export default function CityOccupant({ size = "medium", className }: Props) {
           <Townhouse x={100} roof="#796B56" />
           <Block x={185} top={236} width={64} floors={2} />
         </>
+      )}
+      {growth?.includes("Residential") && (
+        <g data-city-growth="Residential">
+          <path d="M40 330H94L105 352H50Z" fill="#CFD8DC" strokeWidth={10} />
+          <g transform="translate(44 99) scale(.72)" strokeWidth={14}>
+            <Townhouse x={0} />
+          </g>
+        </g>
+      )}
+      {growth?.includes("Commercial") && (
+        <g data-city-growth="Commercial">
+          <path d="M390 333H443L455 359H405Z" fill="#CFD8DC" strokeWidth={10} />
+          <g transform="translate(397 112) scale(.7)" strokeWidth={14}>
+            <Block x={0} top={220} width={66} floors={2} roof="#796B56" />
+          </g>
+        </g>
+      )}
+      {growth?.includes("Industrial") && (
+        <g data-city-growth="Industrial" strokeWidth={10}>
+          <path d="M300 361H370L383 379H311Z" fill="#CFD8DC" />
+          <path d="M307 374V339L338 322V339L370 322V374Z" />
+          <path d="M317 350H329M339 350H351" stroke="#64DFC5" />
+          <path d="M355 374V355H363V374" fill="#71858A" />
+        </g>
       )}
     </svg>
   );
