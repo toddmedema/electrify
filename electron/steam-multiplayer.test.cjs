@@ -1459,22 +1459,160 @@ test("native send backpressure stops a pump without advancing or dropping the co
   assert.equal(peer.queue.length, 0);
 });
 
+function checkpointSender(t) {
+  const { mp, api } = fixture();
+  clearInterval(mp.timer);
+  t.after(() => mp.dispose());
+  mp.lastRefresh = Date.now();
+  const peer = connectedPeer(mp);
+  const writes = [];
+  t.mock.method(mp, "persist", async (world) => {
+    const digest = `${world.matchId}:${world.revision}`;
+    writes.push(digest);
+    mp.savedAt = writes.length;
+    return digest;
+  });
+  const incoming = new Map();
+  let framesAvailable;
+  const sent = [];
+  api.receive = () => 0;
+  api.send = (_sockets, _handle, bytes) => {
+    if (!framesAvailable) return 25;
+    framesAvailable--;
+    sent.push(bytes);
+    return 1;
+  };
+  return {
+    mp,
+    peer,
+    writes,
+    async pump(frames = 8) {
+      framesAvailable = frames;
+      mp.pump();
+      const received = [];
+      for (const frame of sent.splice(0)) {
+        const payload = await assemble(incoming, frame);
+        if (payload) received.push(payload);
+      }
+      return received;
+    },
+  };
+}
+
+test("backed-up checkpoints finish the active transfer and retry the newest only after it drains", async (t) => {
+  const { mp, peer, writes, pump } = checkpointSender(t);
+  const first = {
+    matchId: "campaign",
+    revision: 1,
+    data: require("node:crypto").randomBytes(65536).toString("base64"),
+  };
+  const second = { matchId: first.matchId, revision: 2 };
+  const third = { ...second, revision: 3 };
+
+  await mp.checkpoint(first);
+  assert.deepEqual(await pump(1), [], "the first transfer is incomplete");
+  await mp.checkpoint(first);
+  assert.equal(peer.checkpointQueue.length, 1, "reuse the active transfer");
+  await mp.checkpoint(second);
+  await mp.checkpoint(third);
+  await mp.checkpoint(third);
+  const sent = await pump();
+  assert.deepEqual(
+    sent.map((message) => message.world.revision),
+    [1, 3],
+  );
+  assert(
+    sent[0].world.data === first.data,
+    "the first transfer finishes intact",
+  );
+  assert.deepEqual(await pump(), []);
+
+  await mp.checkpoint(third);
+  assert.deepEqual(await pump(), [sent[1]], "a missing receipt permits retry");
+  await mp.receive(peer.id, { kind: "saved", digest: sent[1].digest });
+  assert.equal(mp.sharedAt, mp.checkpointAt);
+  await mp.checkpoint(third);
+  assert.deepEqual(await pump(), [], "a confirmed checkpoint needs no retry");
+  assert.deepEqual(
+    writes,
+    [1, 1, 2, 3, 3, 3, 3].map((revision) => `campaign:${revision}`),
+  );
+});
+
+test("returning to the partially sent checkpoint withdraws the unsent overwrite", async (t) => {
+  const { mp, peer, pump } = checkpointSender(t);
+  const first = {
+    matchId: "campaign",
+    revision: 1,
+    data: require("node:crypto").randomBytes(65536).toString("base64"),
+  };
+  await mp.checkpoint(first);
+  assert.deepEqual(await pump(1), []);
+  const other = { matchId: "other-campaign", revision: 1 };
+  await mp.checkpoint(other);
+  await mp.checkpoint({ matchId: first.matchId, revision: 2 });
+  await mp.checkpoint(first);
+
+  const sent = await pump();
+  assert.deepEqual(
+    sent.map((message) => message.digest),
+    ["campaign:1", "other-campaign:1"],
+  );
+  await mp.receive(peer.id, { kind: "saved", digest: "campaign:2" });
+  assert.equal(mp.sharedAt, null);
+  await mp.receive(peer.id, { kind: "saved", digest: sent[0].digest });
+  assert.equal(mp.sharedAt, mp.checkpointAt);
+});
+
+test("unsent checkpoint replacement uses its campaign's existing slot at the send limit", async (t) => {
+  const { mp, peer, pump } = checkpointSender(t);
+  const first = { matchId: "campaign", revision: 1 };
+  const newest = { ...first, revision: 2 };
+  const other = { matchId: "other-campaign", revision: 1 };
+  await mp.checkpoint(first);
+  await mp.checkpoint(other);
+  for (let i = 0; i < 62; i++) mp.send(peer.id, { kind: "heartbeat" });
+  assert.throws(() => mp.send(peer.id, { kind: "heartbeat" }), /catching up/);
+
+  await mp.checkpoint(newest);
+  assert.throws(() => mp.send(peer.id, { kind: "heartbeat" }), /catching up/);
+  for (let i = 0; i < 7; i++) {
+    const messages = await pump();
+    assert(messages.every((message) => message.kind === "heartbeat"));
+  }
+  const finalMessages = await pump();
+  assert.deepEqual(
+    finalMessages
+      .filter((message) => message.kind === "checkpoint")
+      .map((message) => message.world),
+    [newest, other],
+  );
+  assert.deepEqual(await pump(), []);
+});
+
+test("checkpoint coalescing preserves queued saves across campaign transitions", async (t) => {
+  const { mp, pump } = checkpointSender(t);
+  const first = { matchId: "first-campaign", revision: 1 };
+  const second = { matchId: "next-campaign", revision: 1 };
+  const newest = { ...second, revision: 2 };
+  await mp.checkpoint(first);
+  await mp.checkpoint(second);
+  await mp.checkpoint(newest);
+
+  assert.deepEqual(
+    (await pump()).map((message) => message.world),
+    [first, newest],
+  );
+});
+
 test("slow checkpoint storage does not delay ordered records and only keeps the newest pending write", async (t) => {
   const { mp, api, events } = fixture();
   clearInterval(mp.timer);
   t.after(() => mp.dispose());
   mp.hostId = "76561198000000002";
-  const checkpoints = [1, 2, 3].map((revision) => {
-    const world = { ...replicationIdentity, revision };
-    return {
-      kind: "checkpoint",
-      world,
-      digest: require("node:crypto")
-        .createHash("sha256")
-        .update(stringify(world))
-        .digest("hex"),
-    };
-  });
+  const checkpoints = [1, 2, 3].map((revision) =>
+    guestCheckpoint({ ...replicationIdentity, revision }),
+  );
   const firstWrite = Promise.withResolvers();
   const started = Promise.withResolvers();
   const writes = [];
@@ -1520,14 +1658,8 @@ test("slow checkpoint storage does not delay ordered records and only keeps the 
   );
 });
 
-test("checkpoint completion never acknowledges a departed connection or a failed disk write", async (t) => {
-  const { mp } = fixture();
-  clearInterval(mp.timer);
-  t.after(() => mp.dispose());
-  mp.hostId = "76561198000000002";
-  const peer = connectedPeer(mp, mp.hostId);
-  const world = { revision: 1 };
-  const payload = {
+function guestCheckpoint(world) {
+  return {
     kind: "checkpoint",
     world,
     digest: require("node:crypto")
@@ -1535,21 +1667,130 @@ test("checkpoint completion never acknowledges a departed connection or a failed
       .update(stringify(world))
       .digest("hex"),
   };
+}
+
+function blockedCheckpointGuest(t) {
+  const { mp, api } = fixture();
+  clearInterval(mp.timer);
+  mp.hostId = "76561198000000002";
   const disk = Promise.withResolvers();
-  t.mock.method(mp, "persist", () => disk.promise);
-  await mp.receive(mp.hostId, payload);
-  const replacement = { ...peer, queue: [] };
-  mp.connections.set(100, replacement);
-  disk.resolve(payload.digest);
+  t.after(() => {
+    disk.resolve();
+    mp.dispose();
+  });
+  const writes = [];
+  t.mock.method(mp, "persist", async (world) => {
+    writes.push(world);
+    if (writes.length === 1) await disk.promise;
+    return guestCheckpoint(world).digest;
+  });
+  return { mp, api, writes, unblock: disk.resolve };
+}
+
+test(
+  "blocked guest storage preserves each campaign's latest checkpoint in arrival order",
+  { timeout: 2000 },
+  async (t) => {
+    const { mp, api, writes, unblock } = blockedCheckpointGuest(t);
+    const first = { matchId: "first-campaign", revision: 1 };
+    const older = { ...first, revision: 2 };
+    const next = { matchId: "next-campaign", revision: 1 };
+    const latest = { ...first, revision: 3 };
+    const checkpoints = [first, older, latest, next].map(guestCheckpoint);
+    const { connection } = pumpFrames(
+      mp,
+      api,
+      checkpoints.flatMap((payload) => framesFor(encode(payload))),
+    );
+
+    mp.pump();
+    await connection.delivery;
+    assert.deepEqual(writes, [first], "only one guest write can be active");
+    assert.deepEqual(connection.queue, []);
+    unblock();
+    await mp.checkpointWrite;
+    assert.deepEqual(writes, [first, latest, next]);
+    const receipts = await Promise.all(
+      connection.queue.map((message) => assemble(new Map(), chunk(message))),
+    );
+    assert.deepEqual(
+      receipts,
+      [first, latest, next].map((world) => ({
+        kind: "saved",
+        digest: guestCheckpoint(world).digest,
+      })),
+    );
+  },
+);
+
+test("a full guest checkpoint queue keeps the two newest campaigns and permits retry", async (t) => {
+  const { mp, writes, unblock } = blockedCheckpointGuest(t);
+  const peer = connectedPeer(mp, mp.hostId);
+  const first = { matchId: "first-campaign", revision: 1 };
+  const pending = { ...first, revision: 2 };
+  const evicted = { matchId: "next-campaign", revision: 1 };
+  const latest = { ...first, revision: 3 };
+  const final = { matchId: "final-campaign", revision: 1 };
+  const invalid = { matchId: "x".repeat(201), revision: 1 };
+  for (const world of [first, pending, evicted, latest, invalid, final])
+    await mp.receive(mp.hostId, guestCheckpoint(world));
+
+  unblock();
   await mp.checkpointWrite;
-  assert.deepEqual(replacement.queue, []);
-  assert.equal(mp.sharedAt, null);
+  assert.deepEqual(writes, [first, latest, final]);
+  const receipts = await Promise.all(
+    peer.queue.map((message) => assemble(new Map(), chunk(message))),
+  );
+  assert.deepEqual(
+    receipts.map((receipt) => receipt.digest),
+    [first, latest, final].map((world) => guestCheckpoint(world).digest),
+  );
+  const retry = guestCheckpoint(evicted);
+  await mp.receive(mp.hostId, retry);
+  await mp.checkpointWrite;
+  assert.deepEqual(writes, [first, latest, final, evicted]);
+  assert.deepEqual(await assemble(new Map(), chunk(peer.queue.at(-1))), {
+    kind: "saved",
+    digest: retry.digest,
+  });
+});
+
+test("checkpoint completion never acknowledges a departed connection or a failed disk write", async (t) => {
+  const { mp } = fixture();
+  clearInterval(mp.timer);
+  t.after(() => mp.dispose());
+  mp.hostId = "76561198000000002";
+  const peer = connectedPeer(mp, mp.hostId);
+  const payload = guestCheckpoint({ matchId: "campaign", revision: 1 });
+  const disk = Promise.withResolvers();
+  const writes = [];
+  t.mock.method(mp, "persist", async (world) => {
+    writes.push(world);
+    if (world === payload.world) await disk.promise;
+    return guestCheckpoint(world).digest;
+  });
+  await mp.receive(mp.hostId, payload);
+  for (const matchId of ["departed-first", "departed-second"])
+    await mp.receive(mp.hostId, guestCheckpoint({ matchId, revision: 1 }));
+  mp.drop(100);
+  const replacement = connectedPeer(mp, mp.hostId);
+  const fresh = guestCheckpoint({ matchId: "replacement", revision: 1 });
+  await mp.receive(mp.hostId, fresh);
+  disk.resolve();
+  await mp.checkpointWrite;
+  assert.deepEqual(writes, [payload.world, fresh.world]);
+  assert.deepEqual(peer.queue, []);
+  assert.equal(replacement.queue.length, 1);
+  assert.deepEqual(await assemble(new Map(), chunk(replacement.queue[0])), {
+    kind: "saved",
+    digest: fresh.digest,
+  });
   mp.persist = async () => {
     throw new Error("disk unavailable");
   };
   await mp.receive(mp.hostId, payload);
   await mp.checkpointWrite;
-  assert.deepEqual(replacement.queue, []);
+  assert.equal(replacement.queue.length, 1);
   await assert.rejects(
     mp.receive(mp.hostId, { ...payload, digest: "wrong" }),
     /checksum/,
