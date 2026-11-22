@@ -1,6 +1,7 @@
 import "../Store";
 import cloneDeep from "lodash.clonedeep";
 import { loadSimData } from "../testing/SimData";
+import { summarizeTimeline } from "../helpers/DateTime";
 import { COOP_TEST_SPEC } from "../testing/MultiplayerFixtures";
 import {
   applyCommand,
@@ -11,7 +12,7 @@ import {
   pauseWorld,
   stepWorld,
 } from "../multiplayer/World";
-import type { World } from "../multiplayer/Types";
+import type { Seat, World } from "../multiplayer/Types";
 import type {
   WorkerRequest,
   WorkerResponse,
@@ -37,6 +38,8 @@ function fixture(
   onMenu = jest.fn(),
   onSharedView = jest.fn(),
   onSettings = jest.fn(),
+  roster = seats,
+  afterSeatPaint?: (callback: () => void) => () => void,
 ) {
   jest.useFakeTimers();
   let world: World;
@@ -47,7 +50,7 @@ function fixture(
     emit({
       kind: "views",
       views: Object.fromEntries(
-        seats.map((seat) => [seat.id, roomView(world, seat.id)]),
+        roster.map((seat) => [seat.id, roomView(world, seat.id)]),
       ),
     });
   const worker = {
@@ -97,9 +100,10 @@ function fixture(
     onMenu,
     onSharedView,
     onSettings,
+    afterSeatPaint,
   });
   const messages: Record<string, SeatEvent[]> = {};
-  const clients = seats.map((seat) => {
+  const clients = roster.map((seat) => {
     const client = new CouchClient(seat.id, 1, (message) =>
       coordinator.receive(seat.id, 1, message),
     );
@@ -110,7 +114,7 @@ function fixture(
     });
     return client;
   });
-  coordinator.start(COOP_TEST_SPEC, seats, "match", "epoch");
+  coordinator.start(COOP_TEST_SPEC, roster, "match", "epoch");
   const dispose = () => {
     clients.forEach((client) => client.dispose());
     coordinator.dispose();
@@ -308,6 +312,145 @@ it("excludes retired companies from controller recovery blockers", async () => {
     f.publish();
     await f.clients[0].submit({ kind: "speed", speed: "NORMAL" });
     expect(f.world().speed).toBe("NORMAL");
+  } finally {
+    f.dispose();
+  }
+});
+
+it("shares acknowledged month rows across skipped views and restores a missing baseline", () => {
+  const f = fixture();
+  const id = "local-p2";
+  const pending: Extract<SeatEvent, { kind: "view" }>[] = [];
+  let client: CouchClient | undefined;
+  try {
+    const game = f.world().grids[1];
+    const january = summarizeTimeline(game.timeline, game.startingYear);
+    game.monthlyHistory.unshift(january);
+    f.publish();
+    client = new CouchClient(id, 2, (message) =>
+      f.coordinator.receive(id, 2, message),
+    );
+    f.coordinator.attachSeat(id, 2, (event) => {
+      if (event.kind === "view") pending.push(event);
+    });
+    const baseline = pending.shift()!;
+    expect(baseline.historyFrom).toBeUndefined();
+    expect(baseline.view.game?.monthlyHistory).toEqual([january]);
+    for (const month of [2, 3]) {
+      game.monthlyHistory.unshift({ ...january, month });
+      f.world().revision++;
+      f.publish();
+    }
+    expect(pending).toHaveLength(0);
+
+    client.receive(baseline);
+    const delta = pending.shift()!;
+    expect(delta.historyFrom).toBe(baseline.delivery);
+    expect(delta.view.game?.monthlyHistory.map(({ month }) => month)).toEqual([
+      3, 2,
+    ]);
+    client.receive(delta);
+    const accepted = client.getSnapshot().view!;
+    expect(accepted.game?.monthlyHistory).toEqual(game.monthlyHistory);
+    expect(accepted.game?.monthlyHistory[2]).toBe(
+      baseline.view.game?.monthlyHistory[0],
+    );
+
+    f.publish();
+    const unchanged = pending.shift()!;
+    expect(unchanged.view.game?.monthlyHistory).toEqual([]);
+    client.receive({ ...unchanged, historyFrom: unchanged.delivery });
+    expect(client.getSnapshot().view).toBe(accepted);
+    const replacement = pending.shift()!;
+    expect(replacement.historyFrom).toBeUndefined();
+    expect(replacement.view.game?.monthlyHistory).toEqual(game.monthlyHistory);
+    expect(
+      f.coordinator.receive(id, 2, {
+        kind: "ack",
+        delivery: replacement.delivery,
+        history: "missing",
+      }),
+    ).toBe(true);
+    expect(pending).toHaveLength(0);
+    f.publish();
+    const nextBaseline = pending.shift()!;
+    expect(nextBaseline.historyFrom).toBeUndefined();
+    client.receive(nextBaseline);
+    expect(client.getSnapshot().view?.game?.monthlyHistory).toEqual(
+      game.monthlyHistory,
+    );
+  } finally {
+    client?.dispose();
+    f.dispose();
+  }
+});
+
+it("paces routine four-seat views across paints and delivers a pause immediately", async () => {
+  const roster: Seat[] = [
+    ...seats,
+    { id: "local-p3", name: "Lin" },
+    { id: "local-p4", name: "Jo" },
+  ];
+  const frames = new Set<() => void>();
+  const f = fixture(
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    roster,
+    (callback) => {
+      frames.add(callback);
+      return () => frames.delete(callback);
+    },
+  );
+  const deliveries = () =>
+    roster.map(
+      ({ id }) => f.messages[id].filter(({ kind }) => kind === "view").length,
+    );
+  const paint = () => {
+    const frame = [...frames][0];
+    frames.delete(frame);
+    frame();
+  };
+  const advance = (rollover = false) => {
+    const world = f.world();
+    world.revision++;
+    world.grids.forEach(({ date }) => {
+      date.minute += 15;
+      if (rollover) date.monthsElapsed++;
+    });
+    f.publish();
+  };
+  try {
+    await Promise.all(
+      f.clients.map((client) =>
+        client.submit({ kind: "speed", speed: "ULTRA" }),
+      ),
+    );
+    expect(f.world().speed).toBe("ULTRA");
+    for (const { id } of roster) f.messages[id].length = 0;
+
+    advance();
+    expect(deliveries()).toEqual([0, 0, 0, 0]);
+    advance(true);
+    expect(frames.size).toBe(1);
+    paint();
+    expect(deliveries()).toEqual([1, 0, 0, 0]);
+    expect(f.clients[0].getSnapshot().view?.revision).toBe(f.world().revision);
+    paint();
+    expect(deliveries()).toEqual([1, 1, 0, 0]);
+
+    await f.clients[3].submit({ kind: "speed", speed: "PAUSED" });
+    expect(deliveries()).toEqual([2, 2, 1, 1]);
+    expect(
+      f.clients.every(
+        (client) => client.getSnapshot().view?.speed === "PAUSED",
+      ),
+    ).toBe(true);
+    f.dispose();
+    expect(frames.size).toBe(0);
   } finally {
     f.dispose();
   }

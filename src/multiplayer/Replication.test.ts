@@ -139,6 +139,11 @@ test("failed baseline validation preserves the installed replica", () => {
   bad.epoch = "wrong";
   expect(() => replica.install(bad)).toThrow(ReplicaMismatch);
   expect(replica.world).toBe(before);
+  const oldRules = host.baseline();
+  oldRules.world.rules =
+    "coop-2-52b30cebdf5c08f453a29c4d1b445fa8a949e8c6f354f2f344683029b032f167";
+  expect(() => replica.install(oldRules)).toThrow(ReplicaMismatch);
+  expect(replica.world).toBe(before);
   const malformed = { ...bad, epoch: host.world.epoch, blockers: [4] };
   expect(() => replica.install(malformed as unknown as typeof bad)).toThrow(
     ReplicaMismatch,

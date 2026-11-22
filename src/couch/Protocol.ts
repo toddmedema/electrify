@@ -39,7 +39,11 @@ export interface CouchSummary {
 /** Main authenticates the seat/generation outside this payload. No sender/control-worker API. */
 export type SeatMessage =
   | { kind: "heartbeat" }
-  | { kind: "ack"; delivery: number }
+  | {
+      kind: "ack";
+      delivery: number;
+      history?: "stale" | "missing";
+    }
   | {
       kind: "command";
       command: Command;
@@ -51,7 +55,14 @@ export type SeatMessage =
   | { kind: "global-settings"; requestId: string }
   | { kind: "global-menu"; requestId: string };
 export type SeatEvent =
-  | { kind: "view"; generation: number; delivery: number; view: RoomView }
+  | {
+      kind: "view";
+      generation: number;
+      delivery: number;
+      view: RoomView;
+      /** When set, monthlyHistory holds only rows newer than this delivery. */
+      historyFrom?: number;
+    }
   | { kind: "error"; generation: number; message: string }
   | {
       kind: "shell-command";
@@ -86,7 +97,10 @@ export function isSeatMessage(input: unknown): input is SeatMessage {
   if (input.kind === "heartbeat") return Object.keys(input).length === 1;
   if (input.kind === "ack")
     return (
-      Object.keys(input).length === 2 &&
+      Object.keys(input).length === (input.history === undefined ? 2 : 3) &&
+      (input.history === undefined ||
+        input.history === "stale" ||
+        input.history === "missing") &&
       Number.isSafeInteger(input.delivery) &&
       Number(input.delivery) > 0
     );

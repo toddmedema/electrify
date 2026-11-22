@@ -5546,6 +5546,7 @@ function minimumStableOperatingCost(
   generator: GeneratorOperatingType,
   tick: TickPresentFutureType,
   stepMinutes = TICK_MINUTES,
+  effectsAt = (date: DateType) => storyEffectsAt(date, state),
 ): number {
   // An installation outage cannot incur the variable cost of staying online.
   if (retrofitOutputMultiplier(generator, tick.minute) === 0) return 0;
@@ -5553,7 +5554,7 @@ function minimumStableOperatingCost(
   const minimumW = generator.peakW * (generator.minimumStableOutput || 0);
   const generatedWh = (minimumW / ticksPerHour) * GAME_TO_REAL_YEARS;
   const tickDate = getDateFromMinute(tick.minute, state.startingYear);
-  const effects = storyEffectsAt(tickDate, state);
+  const effects = effectsAt(tickDate);
   const operatingCostMultiplier =
     effects.operatingCostMultipliersByFuel?.[generator.fuel] || 1;
   const variableOM =
@@ -5640,8 +5641,9 @@ function settleFacilityLoan(loan: LoanInfo, ticksPerMonth: number) {
   return { interest: monthlyInterest / ticksPerMonth, principal };
 }
 
-function createDispatchScratch() {
+function createDispatchScratch(retentionBaseline?: number) {
   return {
+    retentionBaseline,
     chargeRequests: new Map<number, number>(),
     storageHeadroom: new Map<number, { peakW: number; watts: number }>(),
   };
@@ -7383,7 +7385,8 @@ function* supplyFacilitiesFinancesPhases(
   ) {
     const retention = Math.min(
       1,
-      now.customers / expansionRetentionBaseline(state),
+      now.customers /
+        (scratch.retentionBaseline ?? expansionRetentionBaseline(state)),
     );
     state.utilityExpansion.networkAssets.forEach((asset) => {
       asset.retentionLowWatermark = Math.min(
@@ -7780,7 +7783,13 @@ function reforecastSupply(
   // constraints. The optimized pass then scans those per-facility requests to compare the cost
   // of remaining online with the cost of the next start. Keeping this as two linear passes avoids
   // recursively re-simulating the fleet for every plant on every tick.
-  const scratch = createDispatchScratch();
+  // Both private dispatch passes keep the ownership receipts fixed, even
+  // as facility construction, loans and policies advance.
+  const scratch = createDispatchScratch(
+    state.utilityExpansion?.networkAssets.length
+      ? expansionRetentionBaseline(state)
+      : undefined,
+  );
   const baseline = supplyForecastPass(
     state,
     scratch,
@@ -7797,6 +7806,17 @@ function reforecastSupply(
   const futureBaseline = baseline.slice(
     forecastIndexAt(state, state.date.minute) + (preserveCurrentFrame ? 1 : 0),
   );
+  // The commitment pass prices every plant from the same unchanged
+  // scenario state. Share each tick's resolved effects across the fleet.
+  const commitmentEffects = new Map<number, WorldEventEffectsType>();
+  const effectsAt = (date: DateType) => {
+    let effects = commitmentEffects.get(date.minute);
+    if (!effects) {
+      effects = storyEffectsAt(date, state);
+      commitmentEffects.set(date.minute, effects);
+    }
+    return effects;
+  };
   for (const facility of state.facilities) {
     if (isStorage(facility)) continue;
     const project = facility.upgradeInProgress;
@@ -7826,7 +7846,13 @@ function reforecastSupply(
           facilityId: unit.id,
           forecast: frames,
           minimumOperatingCost: (tick) =>
-            minimumStableOperatingCost(state, unit, tick, stepMinutes),
+            minimumStableOperatingCost(
+              state,
+              unit,
+              tick,
+              stepMinutes,
+              effectsAt,
+            ),
         });
       }
     } else if ((facility.minimumStableOutput || 0) > 0) {
@@ -7843,6 +7869,7 @@ function reforecastSupply(
               : facility,
             tick,
             stepMinutes,
+            effectsAt,
           ),
       });
     }
