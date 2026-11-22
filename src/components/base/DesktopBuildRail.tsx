@@ -63,6 +63,11 @@ const technologyOrder = [
   "Pumped Hydro",
 ];
 
+const sizeBounds = {
+  generator: { min: 0, max: 34 },
+  storage: { min: 4, max: 37 },
+};
+
 function railSites(game: GameType, options: FacilityShoppingType[]) {
   const tiles = getTerritoryTiles(game);
   const owns = createTerritoryTileOwnership(game);
@@ -128,6 +133,8 @@ export default function DesktopBuildRail({
   const suppressFocus = React.useRef(false);
   const [previewName, setPreviewName] = React.useState<string>();
   const [previewEntry, setPreviewEntry] = React.useState(0);
+  const generatorSizeButton = React.useRef<HTMLButtonElement>(null);
+  const storageSizeButton = React.useRef<HTMLButtonElement>(null);
   const sizingPanel = React.useRef<HTMLElement>(null);
   const sizingInput = React.useRef<HTMLInputElement>(null);
   const [sizing, setSizing] = React.useState<{
@@ -208,6 +215,34 @@ export default function DesktopBuildRail({
     window.addEventListener("resize", positionSizing);
     return () => window.removeEventListener("resize", positionSizing);
   }, [sizing, positionSizing]);
+  React.useEffect(() => {
+    if (busy) return;
+    const generator = generatorSizeButton.current;
+    const storage = storageSizeButton.current;
+    const adjustSize = (event: WheelEvent) => {
+      if (event.ctrlKey || event.metaKey) return;
+      const delta =
+        Math.abs(event.deltaX) > Math.abs(event.deltaY)
+          ? event.deltaX
+          : -event.deltaY;
+      if (!delta) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      const isStorageSize = event.currentTarget === storage;
+      const { min, max } = sizeBounds[isStorageSize ? "storage" : "generator"];
+      const setSize = isStorageSize ? setStorageSize : setGeneratorSize;
+      const step = Math.sign(delta);
+      setSize((tick) => Math.max(min, Math.min(max, tick + step)));
+    };
+    // Cancel the native scroll before the list can scroll or dismiss the popover.
+    generator?.addEventListener("wheel", adjustSize, { passive: false });
+    storage?.addEventListener("wheel", adjustSize, { passive: false });
+    return () => {
+      generator?.removeEventListener("wheel", adjustSize);
+      storage?.removeEventListener("wheel", adjustSize);
+    };
+  }, [busy, setGeneratorSize, setStorageSize]);
   React.useLayoutEffect(() => {
     if (previewEntry) previewPanel.current?.focus({ preventScroll: true });
   }, [previewEntry]);
@@ -344,6 +379,7 @@ export default function DesktopBuildRail({
     };
     return (
       <Button
+        ref={storage ? storageSizeButton : generatorSizeButton}
         className="desktopBuildSize"
         disabled={busy}
         aria-label={`${label}: ${storage ? formatWattHours(value) : formatWatts(value)}`}
@@ -506,8 +542,8 @@ export default function DesktopBuildRail({
                 ? formatWattHours(sliderTickToW(storageSize))
                 : formatWatts(sliderTickToW(generatorSize))
             }
-            min={sizing.category === "storage" ? 4 : 0}
-            max={sizing.category === "storage" ? 37 : 34}
+            min={sizeBounds[sizing.category].min}
+            max={sizeBounds[sizing.category].max}
             step={1}
             value={sizing.category === "storage" ? storageSize : generatorSize}
             disabled={busy}

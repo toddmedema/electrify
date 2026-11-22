@@ -79,6 +79,34 @@ async function readyDiagnostics(canvas: Locator, scene = false) {
   return diagnostics!;
 }
 
+test("mobile map tools leave even gutters around the live terrain", async ({
+  page,
+}, info) => {
+  test.skip(!info.project.use.hasTouch, "Requires the compact touch map");
+  const { canvas } = await startPausedMap(page);
+  const dock = page.locator("#navfooter");
+  const stage = page.locator(".gameStage");
+
+  for (const name of ["Insights", "Events", "Programs"]) {
+    await dock.getByRole("button", { name, exact: true }).click();
+    const panel = page.getByRole("region", { name, exact: true });
+    await expect(panel).toBeVisible();
+    await expect(canvas).toHaveAttribute("data-renderer", "ready");
+    const [tool, terrain, actions] = await Promise.all([
+      panel.boundingBox(),
+      stage.boundingBox(),
+      dock.boundingBox(),
+    ]);
+    const left = tool!.x - terrain!.x;
+    const right = terrain!.x + terrain!.width - (tool!.x + tool!.width);
+    expect(left).toBeCloseTo(right);
+    expect(left).toBeGreaterThanOrEqual(4);
+    expect(left).toBeLessThanOrEqual(12);
+    expect(tool!.y - terrain!.y).toBeGreaterThanOrEqual(4);
+    expect(actions!.y - (tool!.y + tool!.height)).toBeGreaterThanOrEqual(4);
+  }
+});
+
 for (const theme of ["light", "dark"] as const) {
   test(`renders real 3D and recovers a lost context · ${theme}`, async ({
     page,
