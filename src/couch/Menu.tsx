@@ -6,7 +6,7 @@ import {
   Stack,
 } from "@mui/material";
 import { useEffect, useRef, useState } from "react";
-import type { KeyboardEvent, ReactNode } from "react";
+import type { CSSProperties, KeyboardEvent, ReactNode } from "react";
 import CouchDialog from "./Dialog";
 
 /** A controller can pause from any company without exposing another navigation bar. */
@@ -14,6 +14,7 @@ export default function CouchMenu({
   open,
   controls,
   clockDetails,
+  clockStyle,
   onClose,
   onManual,
   onSettings,
@@ -22,6 +23,7 @@ export default function CouchMenu({
   open: boolean;
   controls?: ReactNode;
   clockDetails: ReactNode;
+  clockStyle: CSSProperties;
   onClose: () => void;
   onManual: () => void;
   onSettings: () => void;
@@ -64,7 +66,12 @@ export default function CouchMenu({
       onClose={clockOpen ? backToMenu : onClose}
       fullWidth
       maxWidth={clockOpen ? "sm" : "xs"}
-      slotProps={{ paper: { "aria-label": title } }}
+      slotProps={{
+        paper: {
+          "aria-label": title,
+          style: clockOpen ? clockStyle : undefined,
+        },
+      }}
       className={clockOpen ? "couchClockDialog" : "couchPauseDialog"}
     >
       {clockOpen ? (

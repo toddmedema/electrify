@@ -82,6 +82,7 @@ export default function CouchToolbar({
   onSaveQuit,
   onEvidence,
 }: CouchToolbarProps) {
+  const statusStyle = { "--couch-status-scale": statusScale } as CSSProperties;
   const pauses = pauseHolders(clock);
   const speedSetters = clock.players.flatMap((player, index) =>
     !player.retired && player.selectedSpeed === clock.speed
@@ -90,11 +91,7 @@ export default function CouchToolbar({
   );
   return (
     <>
-      <div
-        id="appbar"
-        className="couchSharedToolbar"
-        style={{ "--couch-status-scale": statusScale } as CSSProperties}
-      >
+      <div id="appbar" className="couchSharedToolbar" style={statusStyle}>
         <div id="topbar">
           <Toolbar>
             <Typography variant="h6" className="gameStatus couchCalendar">
@@ -133,6 +130,7 @@ export default function CouchToolbar({
       <CouchMenu
         open={menuOpen}
         controls={menuFooter}
+        clockStyle={statusStyle}
         clockDetails={
           pauses.length ? (
             <ul className="couchClockReasons" aria-label="Pause reasons">
@@ -148,9 +146,7 @@ export default function CouchToolbar({
               ))}
             </ul>
           ) : (
-            <Typography>
-              Clock running at {speedSelectionLabel(clock.speed)}.
-            </Typography>
+            <span>Clock running at {speedSelectionLabel(clock.speed)}.</span>
           )
         }
         onClose={onMenuClose}

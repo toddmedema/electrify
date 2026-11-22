@@ -65,10 +65,21 @@
   }
 }
 
-.couchClockDialog .MuiDialogActions-root .MuiButton-root {
-  min-height: 40px;
+.couchClockDialog .MuiDialog-paper {
+  max-width: min(calc(100% - 64px), calc(27.5rem * var(--couch-status-scale)));
 
-  @media (pointer: coarse) {
-    min-height: 44px;
+  .MuiDialogTitle-root {
+    font-size: calc(var(--font-size-subtitle) * var(--couch-status-scale));
+  }
+  .MuiDialogContent-root,
+  .MuiDialogActions-root .MuiButton-root {
+    font-size: calc(var(--font-size-caption) * var(--couch-status-scale));
+  }
+  .MuiDialogActions-root .MuiButton-root {
+    min-height: 40px;
+
+    @media (pointer: coarse) {
+      min-height: 44px;
+    }
   }
 }
