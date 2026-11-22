@@ -37,6 +37,7 @@ import {
 import { workspaceLayout } from "../../WorkspaceLayout";
 import TerritoryNetwork from "./TerritoryNetwork";
 import gameReducer, { buildFacility } from "../../reducers/Game";
+import cardReducer from "../../reducers/Card";
 import uiReducer from "../../reducers/UI";
 import { GENERATORS } from "../../data/Facilities";
 import { wToSliderTick } from "../../helpers/BuildSizing";
@@ -124,7 +125,7 @@ function ready() {
 }
 function show(game = ready(), width?: number, scale = 1) {
   const store = configureStore({
-    reducer: { game: gameReducer, ui: uiReducer },
+    reducer: { game: gameReducer, card: cardReducer, ui: uiReducer },
     preloadedState: { game },
     middleware: (getDefaultMiddleware) =>
       getDefaultMiddleware({ serializableCheck: false, immutableCheck: false }),
@@ -510,15 +511,19 @@ it("shows purchased cities as customers rather than build destinations", async (
   inspect(target.id);
   fireEvent.click(within(surface()).getByRole("button", { name: "Acquire" }));
   const review = screen.getByRole("dialog", { name: /^Acquire Vergennes/ });
-  expect(within(review).getByText("Sites transferred")).toBeVisible();
-  fireEvent.click(within(review).getByText("Plants & purchased power"));
-  expect(within(review).getByText("Natural Gas Peaker")).toBeVisible();
   expect(
-    within(review).getByText("Removed by the seller on transfer."),
+    within(review).queryByText("Sites transferred"),
+  ).not.toBeInTheDocument();
+  expect(
+    within(within(review).getByLabelText("Operating plants")).getByText(
+      "Natural Gas Peaker",
+    ),
   ).toBeVisible();
+  expect(within(review).getByText("Operating plants")).toBeVisible();
   fireEvent.click(within(review).getByText("Price breakdown"));
   expect(within(review).getByText("Vergennes service area")).toBeVisible();
   expect(within(review).getByText("Plant site")).toBeVisible();
+  expect(within(review).getAllByText("Natural Gas Peaker")).toHaveLength(2);
   expect(ownsTerritoryTile(store.getState().game, target)).toBe(false);
   fireEvent.click(within(review).getByRole("button", { name: "Pay cash" }));
   await waitFor(() => expect(review).not.toBeInTheDocument());
@@ -607,7 +612,7 @@ it("keeps a failed planner load in one closable panel and retries on the next op
   mockProjectLoadFailure = false;
   fireEvent.click(screen.getByRole("button", { name: "Build" }));
   expect(
-    await screen.findByLabelText("Choose sites for Wind", {
+    await screen.findByLabelText("Pick site for Wind", {
       selector: "button",
     }),
   ).toBeEnabled();
@@ -639,9 +644,12 @@ it.each([undefined, 1280])(
     });
     fireEvent.click(screen.getByRole("button", { name: "Build" }));
     fireEvent.click(
-      await screen.findByLabelText("Choose sites for Wind", {
-        selector: "button",
-      }),
+      await screen.findByLabelText(
+        width ? "Choose sites for Wind" : "Pick site for Wind",
+        {
+          selector: "button",
+        },
+      ),
     );
     inspect("green-uplands:site-1");
     fireEvent.click(await screen.findByRole("button", { name: "Cash" }));
@@ -684,23 +692,18 @@ it.each([undefined, 1280])(
   },
 );
 
-it("explains when a project has no compatible highlighted sites without requiring connection or cash", async () => {
+it("shows why an unavailable map technology cannot pick a site", async () => {
   const game = ready();
   currentTick(game)!.cash = 0;
   const { store } = show(game);
   fireEvent.click(screen.getByRole("button", { name: "Build" }));
-  fireEvent.click(
-    await screen.findByRole("button", {
-      name: "Choose sites for Offshore Wind",
-    }),
+  const pick = await screen.findByRole("button", {
+    name: "Pick site for Offshore Wind",
+  });
+  expect(pick).toBeDisabled();
+  expect(pick).toHaveAccessibleDescription(
+    "No suitable sites currently available.",
   );
-  expect(
-    screen.getByText(/No compatible connected or adjacent sites/),
-  ).toBeVisible();
-  expect(
-    screen.queryByText("Choose a highlighted site."),
-  ).not.toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Change project" })).toBeEnabled();
   expect(store.getState().game.territoryNetwork!.tilePurchases).toHaveLength(0);
   expect(currentTick(store.getState().game)!.cash).toBe(0);
 });
@@ -824,14 +827,14 @@ it("keeps a candidate and canonical quote when generator upgrades change, then l
   ).toMatchObject({ name: "Solar" });
 });
 
-it("keeps the phone project sheet unchanged without desktop upgrade editing", async () => {
+it("keeps desktop upgrade editing out of the phone site review", async () => {
   const game = ready();
   game.date.year = 2025;
   game.startingYear = 2025;
   show(game, 390);
   fireEvent.click(screen.getByRole("button", { name: "Build" }));
   fireEvent.click(
-    await screen.findByLabelText("Choose sites for Solar", {
+    await screen.findByLabelText("Pick site for Solar", {
       selector: "button",
     }),
   );

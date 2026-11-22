@@ -37,6 +37,8 @@ export const MapWorkspacePanelContext = createContext<
       hideTile?: () => void;
       tileWindow?: MapTileWindow;
       projectRequested?: boolean;
+      showProject?: (close: () => void) => void;
+      hideProject?: () => void;
       onProjectBusyChange?: (busy: boolean) => void;
     }
   | undefined

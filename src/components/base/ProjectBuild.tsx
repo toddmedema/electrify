@@ -1,22 +1,13 @@
 import * as React from "react";
 import { useStore } from "react-redux";
-import {
-  Alert,
-  Checkbox,
-  Button,
-  FormControlLabel,
-  Tab,
-  Tabs,
-} from "@mui/material";
+import { Alert, Checkbox, Button, FormControlLabel } from "@mui/material";
 import type { RootState } from "../../Store";
 import { useAppDispatch } from "../../Store";
 import { isStorage, type GameType, type TerritoryTileId } from "../../Types";
 import { facilityLoanMonths } from "../../helpers/Financials";
 import { formatWatts, formatWattHours } from "../../helpers/Format";
-import { sliderTickToW } from "../../helpers/BuildSizing";
 import { expectedMonthlyOutputShape } from "../../helpers/ExpectedOutput";
 import {
-  projectCatalogue,
   projectReview,
   projectSiteQuote,
   selectProject,
@@ -33,10 +24,10 @@ import { territoryMapLabel, territoryTileLabel } from "./TerritoryMapLayout";
 import { signature } from "./DeferredProjection";
 import { useBuildForecast } from "./BuildForecast";
 import { useMoney } from "./CurrencyContext";
-import { useToolState } from "./GameToolMemory";
 import { useTerritoryTilePurchases } from "./TerritoryTilePurchases";
 import ConceptIcon from "./ConceptIcon";
 import TileWorkspaceSurface from "./TileWorkspaceSurface";
+import BuildFacilities from "../views/BuildFacilities";
 import "./ProjectBuild.scss";
 
 export default function ProjectBuild({
@@ -69,12 +60,6 @@ export default function ProjectBuild({
     useTerritoryTilePurchases();
   const { formatMoneyConcise: money, formatPurchasePrice: price } = useMoney();
   const forecast = useBuildForecast(game);
-  const [storage, setStorage] = useToolState("project.storage", false);
-  const [generatorSize, setGeneratorSize] = useToolState(
-    "project.generatorSize",
-    10,
-  );
-  const [storageSize, setStorageSize] = useToolState("project.storageSize", 18);
   const [message, setMessage] = React.useState("");
   const [progress, setProgress] = React.useState("");
   const [partial, setPartial] = React.useState(false);
@@ -105,12 +90,6 @@ export default function ProjectBuild({
     cash: projectReview(game, ready, false, availableCash),
     loan: projectReview(game, ready, true, availableCash),
   };
-  const size = storage ? storageSize : generatorSize;
-  const options = React.useMemo(
-    () => projectCatalogue(game, sliderTickToW(size), storage),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [pricingKey, size, storage],
-  );
   const title = ready
     ? `${ready.facility.name} · ${formatWatts(ready.facility.peakW)}`
     : project
@@ -245,6 +224,9 @@ export default function ProjectBuild({
     !!payment && payment.cash.remaining < 0 && payment.loan.remaining >= 0;
   return (
     <TileWorkspaceSurface
+      id="tool-BUILD_GENERATORS"
+      closeLabel="Close project"
+      building={catalogue}
       title={catalogue ? "Plan a project" : title}
       focusKey={`${catalogue}:${candidate ?? "sites"}`}
       projectCandidate={!catalogue}
@@ -254,98 +236,10 @@ export default function ProjectBuild({
       }}
     >
       {catalogue ? (
-        <div className="projectCatalogue">
-          <Tabs
-            value={storage ? "storage" : "generators"}
-            variant="fullWidth"
-            aria-label="Project type"
-            onChange={(_event, value) => {
-              if (!lock.current) setStorage(value === "storage");
-            }}
-          >
-            <Tab value="generators" label="Generators" disabled={!!progress} />
-            <Tab value="storage" label="Storage" disabled={!!progress} />
-          </Tabs>
-          <label className="projectSize">
-            {storage ? "Storage capacity" : "Generator capacity"}
-            <strong>
-              {storage
-                ? formatWattHours(sliderTickToW(size))
-                : formatWatts(sliderTickToW(size))}
-            </strong>
-            <input
-              aria-label={storage ? "Storage capacity" : "Generator capacity"}
-              type="range"
-              min={storage ? 4 : 0}
-              max={storage ? 37 : 34}
-              step={1}
-              value={size}
-              disabled={!!progress}
-              onChange={(event) => {
-                if (!lock.current)
-                  (storage ? setStorageSize : setGeneratorSize)(
-                    Number(event.target.value),
-                  );
-              }}
-            />
-          </label>
-          <ul className="projectOptions">
-            {options.map((option) => {
-              const maxSize = isStorage(option)
-                ? option.maxPeakWh
-                : option.maxPeakW;
-              const requestedSize = isStorage(option)
-                ? option.peakWh
-                : option.peakW;
-              const tooLarge = maxSize > 0 && requestedSize > maxSize;
-              const maxLabel = isStorage(option)
-                ? formatWattHours(maxSize)
-                : formatWatts(maxSize);
-              return (
-                <li key={option.name}>
-                  <div>
-                    <strong>{option.name}</strong>
-                    <span>{option.description}</span>
-                    <small>
-                      {isStorage(option)
-                        ? formatWattHours(option.peakWh)
-                        : formatWatts(option.peakW)}{" "}
-                      · {price(option.buildCost)} before site costs
-                    </small>
-                    {tooLarge && (
-                      <small>Maximum available size: {maxLabel}</small>
-                    )}
-                    {maxSize <= 0 && (
-                      <small>No suitable sites currently available.</small>
-                    )}
-                  </div>
-                  <Button
-                    variant="outlined"
-                    disabled={!!progress}
-                    aria-label={
-                      tooLarge
-                        ? `Choose ${maxLabel} sites for ${option.name}`
-                        : `Choose sites for ${option.name}`
-                    }
-                    onClick={() => {
-                      if (lock.current) return;
-                      const selected = tooLarge
-                        ? projectCatalogue(
-                            game,
-                            maxSize,
-                            isStorage(option),
-                          ).find(({ name }) => name === option.name)
-                        : option;
-                      if (selected) onProject(selectProject(selected));
-                    }}
-                  >
-                    {tooLarge ? `Use ${maxLabel}` : "Choose sites"}
-                  </Button>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
+        <BuildFacilities
+          embedded
+          onPickSite={(option) => onProject(selectProject(option))}
+        />
       ) : (
         <div className="projectCandidateContent">
           <div className="projectCandidateScroll">

@@ -209,7 +209,7 @@ function Workspace({
   }, [active]);
   const destination = (tool: GameTool) =>
     tool === "BUILD_GENERATORS" ? buildCategory : tool;
-  const close = (tool: GameTool) => {
+  const close = (tool: GameTool, focusTrigger = true) => {
     // Only what is on screen stays open; a tool that didn't fit is not revealed by closing another.
     const remaining = visible.filter((item) => item !== tool);
     setRemembered(remaining);
@@ -222,6 +222,7 @@ function Workspace({
         ),
       );
     }
+    if (!focusTrigger) return;
     document
       .getElementById(GAME_TOOLS.find((item) => item.id === tool)!.triggerId)
       ?.focus({ preventScroll: true });
@@ -280,7 +281,10 @@ function Workspace({
                   : { ["--game-dock-left" as string]: `${dockLeft}px` }
               }
             >
-              <GameAppBar />
+              <GameAppBar
+                scenarioOpen={visible.includes("SCENARIO")}
+                onCloseScenario={() => close("SCENARIO", false)}
+              />
               <div
                 className="gameStage"
                 data-layout={layout}

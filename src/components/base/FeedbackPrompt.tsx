@@ -30,6 +30,7 @@ export default function FeedbackPrompt({
         display: "flex",
         flexWrap: "wrap",
         alignItems: "center",
+        justifyContent: "center",
         gap: 1,
       }}
     >

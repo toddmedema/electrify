@@ -122,6 +122,8 @@ export default function MissionSummary({
   activeEvents = [],
   onActiveEvents,
   onEvidence,
+  scenarioOpen,
+  onCloseScenario,
   eventsOnly = false,
   gridSupplyRiskVisible = false,
 }: {
@@ -130,6 +132,8 @@ export default function MissionSummary({
   activeEvents?: ActiveEventGroupType[];
   onActiveEvents?: () => void;
   onEvidence?: (target: EvidenceTargetType) => void;
+  scenarioOpen?: boolean;
+  onCloseScenario?: () => void;
   /** The shared couch bar reports common events, rather than one company's risk. */
   eventsOnly?: boolean;
   /** The actionable grid status already owns this supply forecast warning. */
@@ -241,7 +245,13 @@ export default function MissionSummary({
                 ? "Term complete"
                 : `${mission.monthsRemaining} ${mission.monthsRemaining === 1 ? "month" : "months"} left`
             }
-            onClick={() => onEvidence?.("mission-details")}
+            aria-expanded={scenarioOpen}
+            aria-controls={scenarioOpen ? "tool-SCENARIO" : undefined}
+            onClick={
+              scenarioOpen
+                ? onCloseScenario
+                : () => onEvidence?.("mission-details")
+            }
           >
             {/* A crowded single-row bar hides the tail to read "144 mo left"; the full text
                 stays in the DOM, so it reads the same everywhere else. */}

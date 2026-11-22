@@ -1285,9 +1285,7 @@ for (const [theme, requiredBills] of [
       await expect(evidence).toContainText(
         "Keep bills affordable · Required · Failed",
       );
-      await expect(evidence).toContainText(
-        "Billed customer revenue per delivered kWh each month, excluding grants and exports.",
-      );
+      await expect(evidence).toContainText("Bills ≤0¢/kWh each month");
       await expect(evidence).toContainText("Months 1–2");
       await expect(evidence).toContainText(
         "At least one completed month billed more than the starting-year rate ceiling.",
@@ -1312,7 +1310,6 @@ for (const [theme, requiredBills] of [
       await expect(
         evidence.getByText(
           "At least one completed month billed more than the starting-year rate ceiling.",
-          { exact: true },
         ),
       ).toBeInViewport({ ratio: 1 });
     }

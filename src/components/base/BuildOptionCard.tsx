@@ -26,6 +26,7 @@ export interface BuildOptionCardProps {
   /** Omitted to leave the card without a Review button */
   review?: {
     ariaLabel: string;
+    pickSite?: boolean;
     disabled: boolean;
     id?: string;
     onClick: (event: React.MouseEvent<HTMLElement>) => void;
@@ -84,11 +85,13 @@ export default function BuildOptionCard(
       color="primary"
       onClick={props.review.onClick}
       disabled={props.review.disabled}
-      startIcon={<ConceptIcon concept="buy" fontSize="small" />}
+      startIcon={
+        !props.review.pickSite && <ConceptIcon concept="buy" fontSize="small" />
+      }
       aria-label={props.review.ariaLabel}
       aria-describedby={describedBy}
     >
-      Review
+      {props.review.pickSite ? "Pick site" : "Review"}
     </Button>
   );
   const action =

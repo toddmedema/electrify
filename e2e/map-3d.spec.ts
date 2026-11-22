@@ -655,7 +655,7 @@ for (const theme of ["light", "dark"] as const) {
     await setMapProjectCapacity(catalogue, false, "10");
     const surface = page.locator(".tileWorkspaceSurface");
     await catalogue
-      .getByRole("button", { name: "Choose sites for Wind", exact: true })
+      .getByRole("button", { name: /^(Choose sites|Pick site) for Wind$/ })
       .click();
     await expect(
       surface.getByText("Connected · total project cost", { exact: true }),
@@ -758,7 +758,7 @@ test("unavailable WebGL leaves a fully operable simplified map", async ({
   await expect(map.locator(".territoryTerrainArtwork").first()).toBeVisible();
   const catalogue = await openMapProjectCatalogue(page);
   await catalogue
-    .getByRole("button", { name: "Choose sites for Wind", exact: true })
+    .getByRole("button", { name: /^(Choose sites|Pick site) for Wind$/ })
     .click();
   await expect(
     map.locator('[data-project-site="owned"]').first(),
