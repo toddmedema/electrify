@@ -16,6 +16,7 @@ import {
   Typography,
 } from "@mui/material";
 import { getDesktop } from "../Desktop";
+import { afterPaint } from "../components/base/AfterPaint";
 import type { DesktopInputFrame } from "../Desktop";
 import { shallowEqual } from "react-redux";
 import type { MatchSpec, Seat, World } from "../multiplayer/Types";
@@ -67,6 +68,24 @@ const defaultSeats: Seat[] = [
   { id: "local-p1", name: "P1 Utility" },
   { id: "local-p2", name: "P2 Utility" },
 ];
+
+/** Let the TV paint between company rollovers, with a deadline for hidden windows. */
+function afterSeatPaint(callback: () => void) {
+  let pending = true;
+  const deliver = () => {
+    if (!pending) return;
+    cancel();
+    callback();
+  };
+  const paint = afterPaint(deliver);
+  const timeout = setTimeout(deliver, 50);
+  const cancel = () => {
+    pending = false;
+    paint();
+    clearTimeout(timeout);
+  };
+  return cancel;
+}
 
 /** The shell owns the worker and persistence; native binds every inbound seat route. */
 export default function CouchRoot({ onClose }: { onClose: () => void }) {
@@ -836,6 +855,7 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
       if (!mounted.current || generation !== starts.current) return;
       const worker = createMultiplayerWorker();
       const owner = new CouchCoordinator(worker, {
+        afterSeatPaint,
         onAccountView: (view) => platform.current?.publish(view),
         /** Keep common calendar/event presentation separate from private company command replies. */
         onSharedView: (view) => {

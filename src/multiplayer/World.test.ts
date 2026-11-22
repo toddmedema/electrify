@@ -562,6 +562,11 @@ const publishedCoopIdentities = [
     23,
     "coop-2-3a64b92f0462af2eb6286821f118c030f25aaf65b546a4a7652e87b1dbcd3e33",
   ],
+  // Published master a9209513, before the exact frame-pacing optimizations.
+  [
+    24,
+    "coop-2-52b30cebdf5c08f453a29c4d1b445fa8a949e8c6f354f2f344683029b032f167",
+  ],
 ] as const;
 
 test.each(publishedCoopIdentities)(

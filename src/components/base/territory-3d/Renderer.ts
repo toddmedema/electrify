@@ -262,7 +262,7 @@ export class MapRenderer {
   private state: State = "unavailable";
   private disposed = false;
   private readyPending = false;
-  private bufferUpdates = false;
+  private storageAllocated = false;
   private frames = 0;
   private drawCalls = 0;
   private triangles = 0;
@@ -593,7 +593,7 @@ export class MapRenderer {
     if (!this.isVisible() || this.disposed || this.state !== "ready") return;
     const started = performance.now();
     try {
-      this.bufferUpdates = false;
+      this.storageAllocated = false;
       // Camera and simulation updates can arrive before the same paint. Only
       // prepare the scene that will actually be submitted, including on reveal.
       this.prepareScene(this.frame!);
@@ -649,7 +649,7 @@ export class MapRenderer {
       gl.bindVertexArray(vao);
       gl.bindBuffer(gl.ARRAY_BUFFER, vertices);
       gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW);
-      this.bufferUpdates = true;
+      this.storageAllocated = true;
       for (let attribute = 0; attribute < 3; attribute++) {
         gl.enableVertexAttribArray(attribute);
         gl.vertexAttribPointer(
@@ -942,8 +942,11 @@ export class MapRenderer {
     );
     const width = Math.max(1, Math.round(frame.width * dpr)),
       height = Math.max(1, Math.round(frame.height * dpr));
-    if (this.canvas.width !== width) this.canvas.width = width;
-    if (this.canvas.height !== height) this.canvas.height = height;
+    if (this.canvas.width !== width || this.canvas.height !== height) {
+      if (this.canvas.width !== width) this.canvas.width = width;
+      if (this.canvas.height !== height) this.canvas.height = height;
+      this.storageAllocated = true;
+    }
     gl.viewport(0, 0, width, height);
     gl.clearColor(...frame.background, 1);
     gl.clearDepth(1);
@@ -1004,17 +1007,18 @@ export class MapRenderer {
     this.drawBatches(this.passes.transparent);
     if (this.wildfire.count) {
       if (this.wildfire.draw(gl, frame, this.projection))
-        this.bufferUpdates = true;
+        this.storageAllocated = true;
       this.drawCalls++;
       this.triangles += this.wildfire.count * 2;
     }
     gl.depthMask(true);
     gl.disable(gl.BLEND);
     gl.bindVertexArray(null);
-    // WebGL errors do not throw. Check once per upload frame before exposing
-    // the paint. A failure discards every mesh and its upload metadata.
+    // Check new GPU storage before publishing the paint. An instance update
+    // fits in its existing buffer, and polling errors there would synchronize
+    // with the GPU on every animated frame.
     if (
-      (this.readyPending || this.bufferUpdates) &&
+      (this.readyPending || this.storageAllocated) &&
       gl.getError() !== gl.NO_ERROR
     )
       throw new Error("Map GPU buffer upload or draw failed");
@@ -1051,14 +1055,13 @@ export class MapRenderer {
           mesh.capacity * INSTANCE_FLOATS * 4,
           gl.DYNAMIC_DRAW,
         );
-        this.bufferUpdates = true;
+        this.storageAllocated = true;
       }
       if (
         mesh.uploadedData !== data ||
         mesh.uploadedRevision !== batch.revision
       ) {
         gl.bufferSubData(gl.ARRAY_BUFFER, 0, data, 0, data.length);
-        this.bufferUpdates = true;
         mesh.uploadedData = data;
         mesh.uploadedRevision = batch.revision;
       }

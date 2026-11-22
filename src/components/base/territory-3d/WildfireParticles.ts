@@ -291,10 +291,10 @@ export class WildfireParticles {
     projection: Float32Array,
   ): boolean {
     if (!this.count || !this.data) return false;
+    const allocated = !this.gpu;
     this.gpu ??= createGpu(gl);
     const { program, vao, instances, time, wind, background, sizeLimit } =
       this.gpu;
-    const uploaded = this.upload;
     gl.useProgram(program);
     gl.uniformMatrix4fv(this.gpu.projection, false, projection);
     gl.uniform1f(time, this.time);
@@ -306,7 +306,7 @@ export class WildfireParticles {
         (HEX_WIDTH * Math.max(0.01, frame.scale)),
     );
     gl.bindVertexArray(vao);
-    if (uploaded) {
+    if (this.upload) {
       gl.bindBuffer(gl.ARRAY_BUFFER, instances);
       gl.bufferSubData(
         gl.ARRAY_BUFFER,
@@ -318,7 +318,7 @@ export class WildfireParticles {
       this.upload = false;
     }
     gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, this.count);
-    return uploaded;
+    return allocated;
   }
 
   release(gl: WebGL2RenderingContext | null, deleteGpu: boolean): void {

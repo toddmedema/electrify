@@ -23,9 +23,18 @@ interface Route {
   seen: number;
   delivery: number;
   outstanding?: number;
+  outstandingDelta?: boolean;
   latest?: RoomView;
   failed?: boolean;
   pendingSequence?: number;
+  history?: {
+    matchId: string;
+    epoch: string;
+    delivery: number;
+    length: number;
+    month: number;
+    year: number;
+  };
 }
 export interface CouchState {
   phase: "setup" | "starting" | "playing" | "faulted" | "closed";
@@ -54,6 +63,7 @@ export interface CouchCoordinatorOptions {
   onSharedView?: (view: RoomView) => void;
   onError?: (message: string) => void;
   now?: () => number;
+  afterSeatPaint?: (callback: () => void) => () => void;
 }
 
 /** One shell owns this coordinator and worker. Every incoming route was bound by main. */
@@ -69,6 +79,8 @@ export class CouchCoordinator {
   private roster: Seat[] = [];
   private views = new Map<string, RoomView>();
   private sharedView?: RoomView;
+  private pacedSeats = new Set<string>();
+  private cancelSeatPaint?: () => void;
   private blockers = new Map<string, string>();
   private inputGates = new Set<string>();
   private saving: Promise<unknown> = Promise.resolve();
@@ -170,6 +182,7 @@ export class CouchCoordinator {
       throw new Error("Invalid local seat route");
     const previous = this.routes.get(seatId);
     if (previous && generation <= previous.generation) return false;
+    this.pacedSeats.delete(seatId);
     this.routes.set(seatId, {
       generation,
       send,
@@ -194,6 +207,7 @@ export class CouchCoordinator {
     if (!route || route.generation !== generation || route.failed) return;
     route.failed = true;
     route.latest = undefined;
+    this.pacedSeats.delete(seatId);
     if (this.active(seatId)) {
       this.setBlocker(
         `seat:${seatId}`,
@@ -287,12 +301,15 @@ export class CouchCoordinator {
     if (input.kind === "heartbeat") return true;
     if (input.kind === "ack") {
       if (input.delivery !== route.outstanding) return false;
+      const restoreHistory =
+        route.outstandingDelta && input.history === "missing";
       route.outstanding = undefined;
-      if (route.latest) {
-        const latest = route.latest;
-        route.latest = undefined;
-        this.publish(seatId, latest);
-      }
+      route.outstandingDelta = false;
+      if (input.history) route.history = undefined;
+      const latest = restoreHistory ? this.views.get(seatId) : route.latest;
+      route.latest = undefined;
+      if (restoreHistory && latest) this.pacedSeats.delete(seatId);
+      if (latest) this.publish(seatId, latest);
       return true;
     }
     if (input.kind === "global-settings") {
@@ -369,8 +386,96 @@ export class CouchCoordinator {
     }
     const delivery = ++route.delivery;
     route.outstanding = delivery;
+    const { game, matchId, epoch } = view;
+    const history = game?.monthlyHistory;
+    const base = route.history;
+    const head = history?.[0];
+    route.history = history &&
+      head && {
+        matchId,
+        epoch,
+        delivery,
+        length: history.length,
+        month: head.month,
+        year: head.year,
+      };
+    // Settled months are prepended. Only an acknowledged delivery from this
+    // route and match can supply the immutable suffix.
+    if (game && history && base?.matchId === matchId && base.epoch === epoch) {
+      const added = history.length - base.length;
+      const anchor = history[added];
+      if (anchor?.month === base.month && anchor.year === base.year) {
+        route.outstandingDelta = true;
+        route.send({
+          kind: "view",
+          generation: route.generation,
+          delivery,
+          historyFrom: base.delivery,
+          view: {
+            ...view,
+            game: { ...game, monthlyHistory: history.slice(0, added) },
+          },
+        });
+        return;
+      }
+    }
     route.send({ kind: "view", generation: route.generation, delivery, view });
   }
+  private scheduleSeatPaint() {
+    if (this.cancelSeatPaint || !this.pacedSeats.size) return;
+    this.cancelSeatPaint = this.options.afterSeatPaint?.(() => {
+      this.cancelSeatPaint = undefined;
+      if (this.state.phase !== "playing") {
+        this.pacedSeats.clear();
+        return;
+      }
+      const seat = this.pacedSeats.values().next().value;
+      if (seat === undefined) return;
+      this.pacedSeats.delete(seat);
+      const view = this.views.get(seat);
+      if (view) this.publish(seat, view);
+      this.scheduleSeatPaint();
+    });
+  }
+
+  private presentSeat(
+    id: string,
+    view: RoomView,
+    eligible: boolean,
+    previous?: RoomView,
+  ) {
+    if (
+      this.options.afterSeatPaint &&
+      previous?.game &&
+      view.game &&
+      view.speed !== "PAUSED" &&
+      view.speed === previous.speed &&
+      view.reason === previous.reason &&
+      view.readyRequired === previous.readyRequired &&
+      view.matchId === previous.matchId &&
+      view.epoch === previous.epoch &&
+      view.lastSequence === previous.lastSequence &&
+      view.receipt?.sequence === previous.receipt?.sequence &&
+      view.receipt?.error === previous.receipt?.error &&
+      (this.pacedSeats.has(id) ||
+        (eligible &&
+          view.game.date.monthsElapsed > previous.game.date.monthsElapsed)) &&
+      JSON.stringify(view.game.multiplayer?.clock) ===
+        JSON.stringify(previous.game.multiplayer?.clock) &&
+      JSON.stringify(view.grids) === JSON.stringify(previous.grids) &&
+      JSON.stringify(view.disconnected) ===
+        JSON.stringify(previous.disconnected)
+    ) {
+      // One rollover can invalidate all four renderers' forecasts at once.
+      // Spread these presents without delaying command replies or the shared clock.
+      this.pacedSeats.add(id);
+      this.scheduleSeatPaint();
+      return;
+    }
+    this.pacedSeats.delete(id);
+    this.publish(id, view);
+  }
+
   private broadcast(build: (generation: number) => SeatEvent) {
     this.routes.forEach((route) => {
       if (!route.failed) route.send(build(route.generation));
@@ -407,6 +512,17 @@ export class CouchCoordinator {
         if (this.blockers.size)
           this.post({ kind: "blockers", reasons: [...this.blockers.values()] });
       }
+      const canPace =
+        this.roster.length === 4 &&
+        this.roster.every((seat) => {
+          const route = this.routes.get(seat.id);
+          return (
+            route &&
+            !route.failed &&
+            route.outstanding === undefined &&
+            route.pendingSequence === undefined
+          );
+        });
       for (const [id, input] of Object.entries(data.views)) {
         if (!this.roster.some((seat) => seat.id === id)) continue;
         const view = {
@@ -419,6 +535,7 @@ export class CouchCoordinator {
             )
             .map((seat) => seat.id),
         };
+        const previous = this.views.get(id);
         this.views.set(id, view);
         if (id === "local-p1") this.options.onAccountView?.(view);
         const route = this.routes.get(id);
@@ -427,7 +544,7 @@ export class CouchCoordinator {
           view.lastSequence >= route.pendingSequence
         )
           route.pendingSequence = undefined;
-        this.publish(id, view);
+        this.presentSeat(id, view, canPace, previous);
       }
       // A partial worker reply cannot change which active company's view owns
       // shared presentation. Update the stored views before selecting in roster order.
@@ -584,6 +701,9 @@ export class CouchCoordinator {
       request.reject(new Error("The local session ended"));
     });
     this.requests.clear();
+    this.cancelSeatPaint?.();
+    this.cancelSeatPaint = undefined;
+    this.pacedSeats.clear();
     this.routes.clear();
     this.views.clear();
     this.sharedView = undefined;

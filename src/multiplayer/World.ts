@@ -1706,6 +1706,18 @@ const SCHEMA_23_MAP_RULES =
 /** Recognized published worlds follow ordered migrations; arbitrary runtime identities never do. */
 function upgradeTerritoryWorld(value: unknown): unknown {
   const old = value as Partial<World> | null;
+  // Published a9209513 uses the same rules and checkpoint layout. The
+  // compatibility hash also covers the optimized runtime's source.
+  const publishedSchema24 =
+    old?.gameSchema === 24 &&
+    old.rules ===
+      "coop-2-52b30cebdf5c08f453a29c4d1b445fa8a949e8c6f354f2f344683029b032f167";
+  if (
+    old?.schema === 3 &&
+    publishedSchema24 &&
+    old.gameSchema === SAVE_SCHEMA_VERSION
+  )
+    return { ...old, rules: RULES };
   if (
     !old ||
     old.schema !== 3 ||
@@ -1749,7 +1761,8 @@ function upgradeTerritoryWorld(value: unknown): unknown {
           old.rules === SCHEMA_22_PREVIEW_RULES)) ||
       (old.gameSchema === 23 &&
         (old.rules === SCHEMA_23_MASTER_RULES ||
-          old.rules === SCHEMA_23_MAP_RULES))
+          old.rules === SCHEMA_23_MAP_RULES)) ||
+      publishedSchema24
     ) ||
     !Array.isArray(old.grids) ||
     !old.grids.every(
@@ -1764,6 +1777,7 @@ function upgradeTerritoryWorld(value: unknown): unknown {
           old.gameSchema === 21 ||
           old.gameSchema === 22 ||
           old.gameSchema === 23 ||
+          publishedSchema24 ||
           isUtilityExpansionGame(grid)),
     )
   )

@@ -412,6 +412,23 @@ it("samples submitted geometry and GPU instance styles only when explicitly requ
   expect(renderer.diagnostics(true).scene).toEqual([]);
   renderer.dispose();
 });
+it("checks GPU errors on allocation without synchronizing an animated buffer update", () => {
+  const { renderer, gl } = setup();
+  renderer.update(scene(), frame);
+  flush(0);
+  expect(gl.getError).toHaveBeenCalledTimes(1);
+  gl.bufferSubData.mockClear();
+
+  flush(1000);
+  expect(gl.bufferSubData).toHaveBeenCalled();
+  expect(gl.getError).toHaveBeenCalledTimes(1);
+
+  renderer.update(scene(), { ...frame, width: frame.width + 1 });
+  flush(2000);
+  expect(gl.getError).toHaveBeenCalledTimes(2);
+  renderer.dispose();
+});
+
 it("draws idle/reduced scenes once, retains stopped poses and suspends hidden documents", () => {
   const { renderer, gl } = setup();
   renderer.update(scene(), frame);
@@ -722,6 +739,23 @@ it("keeps the fallback and discards buffers after an allocation reports OUT_OF_M
   expect(state.mock.calls).toEqual([["unavailable"]]);
   expect(renderer.diagnostics().meshCount).toBe(0);
   expect(gl.deleteBuffer).toHaveBeenCalledTimes(6);
+  expect(callbacks.size).toBe(0);
+  renderer.dispose();
+});
+
+it("retains the fallback if growing instance storage fails after the map is ready", () => {
+  const { renderer, gl, state } = setup();
+  const tiles = scene();
+  renderer.update(tiles, frame);
+  flush(0);
+  expect(state).toHaveBeenLastCalledWith("ready");
+  gl.bufferData.mockImplementation((_target, _data, usage) => {
+    if (usage === gl.DYNAMIC_DRAW)
+      gl.getError.mockReturnValue(gl.OUT_OF_MEMORY);
+  });
+  renderer.update([...tiles, { ...tiles[0], id: "another-tile" }], frame);
+  flush(16);
+  expect(state).toHaveBeenLastCalledWith("unavailable");
   expect(callbacks.size).toBe(0);
   renderer.dispose();
 });

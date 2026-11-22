@@ -12,6 +12,9 @@ interface Queued {
   resolve: () => void;
   reject: (error: Error) => void;
 }
+type PendingCommand = Queued & {
+  message: Extract<SeatMessage, { kind: "command" }>;
+};
 export interface CouchClientState {
   view?: RoomView;
   error?: string;
@@ -29,11 +32,10 @@ export class CouchClient {
   };
   private listeners = new Set<() => void>();
   private queue: Queued[] = [];
-  private pending?: Queued & {
-    message: Extract<SeatMessage, { kind: "command" }>;
-  };
+  private pending?: PendingCommand;
   private activityReason: string | null = null;
   private sequence = 0;
+  private appliedDelivery?: number;
   private lastMessage = Date.now();
   private lastSend = 0;
   private timer: ReturnType<typeof setInterval>;
@@ -134,17 +136,42 @@ export class CouchClient {
       !Number.isSafeInteger(event.delivery)
     )
       return;
-    const view = event.view;
+    const game = event.view.game;
+    if (!game || game.multiplayer?.seat !== this.seatId) return;
+    let view = event.view;
     const previous = this.state.view;
-    if (!view.game || view.game.multiplayer?.seat !== this.seatId) return;
     if (
       previous &&
       previous.epoch === view.epoch &&
       previous.matchId === view.matchId &&
       view.revision < previous.revision
     ) {
-      this.send({ kind: "ack", delivery: event.delivery });
+      this.send({ kind: "ack", delivery: event.delivery, history: "stale" });
       return;
+    }
+    if (event.historyFrom !== undefined) {
+      if (
+        !previous?.game ||
+        event.historyFrom !== this.appliedDelivery ||
+        previous.epoch !== view.epoch ||
+        previous.matchId !== view.matchId
+      ) {
+        this.send({
+          kind: "ack",
+          delivery: event.delivery,
+          history: "missing",
+        });
+        return;
+      }
+      view = {
+        ...view,
+        game: {
+          ...game,
+          monthlyHistory: game.monthlyHistory.length
+            ? [...game.monthlyHistory, ...previous.game.monthlyHistory]
+            : previous.game.monthlyHistory,
+        },
+      };
     }
     if (
       previous &&
@@ -156,7 +183,7 @@ export class CouchClient {
       this.sequence = 0;
     }
     this.sequence = Math.max(this.sequence, view.lastSequence);
-    let completed: typeof this.pending;
+    let completed: PendingCommand | undefined;
     if (
       this.pending &&
       (view.lastSequence >= this.pending.message.sequence ||
@@ -172,6 +199,7 @@ export class CouchClient {
       error: completed ? view.receipt?.error : this.state.error,
     });
     // Acknowledgment is sent after the owning store has synchronously observed this baseline.
+    this.appliedDelivery = event.delivery;
     this.send({ kind: "ack", delivery: event.delivery });
     if (completed) {
       if (view.receipt?.error) completed.reject(new Error(view.receipt.error));

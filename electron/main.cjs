@@ -10,6 +10,7 @@ const {
   screen,
   session,
   shell,
+  utilityProcess,
 } = require("electron");
 const fs = require("node:fs");
 const path = require("node:path");
@@ -26,7 +27,7 @@ const {
 } = require("./runtime.cjs");
 const { atomicWrite, readJson, DesktopSaveStore } = require("./storage.cjs");
 const { CouchViews } = require("./couch.cjs");
-const { LocalCoopSaveStore } = require("./local-coop-storage.cjs");
+const { LocalCoopSaveClient } = require("./local-coop-save-client.cjs");
 const { SteamService } = require("./steam.cjs");
 const { reserveSteamOverlayHotkey } = require("./steam-overlay.cjs");
 const { submitFeedback } = require("./feedback.cjs");
@@ -551,13 +552,11 @@ handle("desktop:couch", async (input) => {
       steam.textInput?.finish({ status: "cancelled" });
       return true;
     case "list-saves":
-      return localSaves.list();
     case "read-save":
-      return localSaves.select(input.id);
-    case "write-save":
-      return localSaves.save(input.world);
     case "delete-save":
-      return localSaves.remove(input.id);
+      return localSaves.request(input.kind, input.id);
+    case "write-save":
+      return localSaves.request(input.kind, input.world);
     default:
       throw new Error("Unknown local session request");
   }
@@ -884,10 +883,10 @@ async function createWindow() {
     },
     input: () => steam.input,
   });
-  localSaves = new LocalCoopSaveStore(
+  localSaves ??= new LocalCoopSaveClient(
+    (entry, args, options) => utilityProcess.fork(entry, args, options),
     saves.directory,
     steam.state().steamId || "offline",
-    require("./coop-codec.cjs"),
   );
   window.on("resize", () => {
     if (couch?.seats.size) couch.relayout();
