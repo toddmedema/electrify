@@ -1,4 +1,11 @@
-import { Button, Stack } from "@mui/material";
+import {
+  Button,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  Stack,
+} from "@mui/material";
+import { useEffect, useRef, useState } from "react";
 import type { KeyboardEvent, ReactNode } from "react";
 import CouchDialog from "./Dialog";
 
@@ -6,6 +13,7 @@ import CouchDialog from "./Dialog";
 export default function CouchMenu({
   open,
   controls,
+  clockDetails,
   onClose,
   onManual,
   onSettings,
@@ -13,11 +21,21 @@ export default function CouchMenu({
 }: {
   open: boolean;
   controls?: ReactNode;
+  clockDetails: ReactNode;
   onClose: () => void;
   onManual: () => void;
   onSettings: () => void;
   onQuit: () => void;
 }) {
+  const [view, setView] = useState<"menu" | "clock" | "back">("menu");
+  const clockOpen = view === "clock";
+  const clockBody = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) setView("menu");
+  }, [open]);
+  const backToMenu = () => setView("back");
+  const title = clockOpen ? "Clock status" : "Game menu";
+
   /** Wrap real focus across menu choices for either keyboard or controller arrow events.
    * Consume only unmodified navigation keys so native confirmation and dialog dismissal stay intact. */
   const navigate = (event: KeyboardEvent<HTMLDivElement>) => {
@@ -43,35 +61,66 @@ export default function CouchMenu({
     <CouchDialog
       open={open}
       controls={controls}
-      onClose={onClose}
+      onClose={clockOpen ? backToMenu : onClose}
       fullWidth
-      maxWidth="xs"
-      aria-label="Game menu"
-      slotProps={{ paper: { "aria-label": "Game menu" } }}
-      className="couchPauseDialog"
+      maxWidth={clockOpen ? "sm" : "xs"}
+      slotProps={{ paper: { "aria-label": title } }}
+      className={clockOpen ? "couchClockDialog" : "couchPauseDialog"}
     >
-      <Stack
-        className="couchPauseMenu keyboardMenu"
-        spacing={1}
-        onKeyDown={navigate}
-        onPointerMove={(event) => {
-          if (event.pointerType === "mouse")
-            (event.target as HTMLElement).closest("button")?.focus();
-        }}
-      >
-        <Button autoFocus size="large" onClick={onClose}>
-          Return to game
-        </Button>
-        <Button size="large" onClick={onManual}>
-          Manual
-        </Button>
-        <Button size="large" onClick={onSettings}>
-          Settings
-        </Button>
-        <Button size="large" onClick={onQuit}>
-          Quit
-        </Button>
-      </Stack>
+      {clockOpen ? (
+        <>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogContent ref={clockBody}>{clockDetails}</DialogContent>
+          <DialogActions>
+            <Button
+              autoFocus
+              onClick={backToMenu}
+              onKeyDown={(event) => {
+                if (event.key !== "ArrowUp" && event.key !== "ArrowDown")
+                  return;
+                event.preventDefault();
+                // Controller arrow events have no native scrolling default.
+                clockBody.current?.scrollBy(
+                  0,
+                  event.key === "ArrowUp" ? -48 : 48,
+                );
+              }}
+            >
+              Back to game menu
+            </Button>
+          </DialogActions>
+        </>
+      ) : (
+        <Stack
+          className="couchPauseMenu keyboardMenu"
+          spacing={1}
+          onKeyDown={navigate}
+          onPointerMove={(event) => {
+            if (event.pointerType === "mouse")
+              (event.target as HTMLElement).closest("button")?.focus();
+          }}
+        >
+          <Button autoFocus={view === "menu"} size="large" onClick={onClose}>
+            Return to game
+          </Button>
+          <Button size="large" onClick={onManual}>
+            Manual
+          </Button>
+          <Button size="large" onClick={onSettings}>
+            Settings
+          </Button>
+          <Button
+            autoFocus={view === "back"}
+            size="large"
+            onClick={() => setView("clock")}
+          >
+            Clock status
+          </Button>
+          <Button size="large" onClick={onQuit}>
+            Quit
+          </Button>
+        </Stack>
+      )}
     </CouchDialog>
   );
 }

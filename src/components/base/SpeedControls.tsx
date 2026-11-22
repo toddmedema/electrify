@@ -30,7 +30,7 @@ export interface MultiplayerSpeedOptionsProps {
 /** Labels follow the real clock instead of drifting from its tick intervals. */
 const RUNNING_SPEEDS: SpeedType[] = ["SLOW", "NORMAL", "FAST"];
 const DESKTOP_SPEEDS: SpeedType[] = [...RUNNING_SPEEDS, "ULTRA"];
-const selectionLabel = (speed: SpeedType) =>
+export const speedSelectionLabel = (speed: SpeedType) =>
   speed === "PAUSED"
     ? "Paused"
     : `${Math.round(TICK_MS.SLOW / TICK_MS[speed])}×`;
@@ -63,11 +63,11 @@ function describeSharedClock(
       const paused = player.pauseReason
         ? `; paused: ${player.pauseReason}`
         : "";
-      return `${player.name}${you} selected ${selectionLabel(player.selectedSpeed)}${paused}`;
+      return `${player.name}${you} selected ${speedSelectionLabel(player.selectedSpeed)}${paused}`;
     })
     .join(". ");
   const reason = multiplayer.reason ? `${multiplayer.reason}. ` : "";
-  return `Game speed: ${selectionLabel(multiplayer.activeSpeed)}. Your selection: ${selectionLabel(speed)}. The slowest player sets the game speed. Any paused player pauses everyone. ${reason}${players}.${resume ? " Select a speed to resume." : ""}`;
+  return `Game speed: ${speedSelectionLabel(multiplayer.activeSpeed)}. Your selection: ${speedSelectionLabel(speed)}. The slowest player sets the game speed. Any paused player pauses everyone. ${reason}${players}.${resume ? " Select a speed to resume." : ""}`;
 }
 
 /** What a screen reader hears when the shared clock stops or waits for you: pauses and the
@@ -101,7 +101,7 @@ function playersAtSpeed(
           : "";
       return `${player.name}${you}${why}`;
     });
-  return `${selectionLabel(option)}: ${names.length ? names.join(", ") : "nobody"}`;
+  return `${speedSelectionLabel(option)}: ${names.length ? names.join(", ") : "nobody"}`;
 }
 
 /** Keep a player's requested selection distinct from the clock's effective running speed.
@@ -214,7 +214,7 @@ function speedOptions(
                 {option === "PAUSED" ? (
                   <PauseIcon fontSize="small" />
                 ) : (
-                  selectionLabel(option)
+                  speedSelectionLabel(option)
                 )}
               </span>
             </ToggleButton>
