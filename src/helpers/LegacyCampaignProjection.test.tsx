@@ -5,7 +5,11 @@ import {
   getDateFromMinute,
   MINUTES_PER_MONTH,
 } from "./DateTime";
-import { cashRunwayHorizon, ProjectionView } from "./Projection";
+import {
+  cashRunwayHorizon,
+  ProjectionView,
+  topBarForecastEndMinute,
+} from "./Projection";
 import { projectMission } from "./MissionProjection";
 import type { MonthlyHistoryType } from "../Types";
 
@@ -38,6 +42,13 @@ test("the second CEO retains a full remaining cash runway instead of inheriting 
   expect(cashRunwayHorizon(game)).toBe(240);
   game.date = getDateFromMinute(246 * MINUTES_PER_MONTH, 1882);
   expect(cashRunwayHorizon(game)).toBe(234);
+});
+
+test("caps the top bar at the end of the active CEO term", () => {
+  const game = secondGeneration();
+  expect(topBarForecastEndMinute(game)).toBe(300 * MINUTES_PER_MONTH);
+  game.date = getDateFromMinute(478 * MINUTES_PER_MONTH, 1882);
+  expect(topBarForecastEndMinute(game)).toBe(480 * MINUTES_PER_MONTH);
 });
 
 test("forecast goals use the current CEO's local evidence and actual calendar dates", () => {

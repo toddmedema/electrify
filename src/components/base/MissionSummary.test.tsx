@@ -15,6 +15,7 @@ const mockRequirements: {
 const mockGetMissionStatus = jest.fn();
 jest.mock("../../helpers/Projection", () => ({
   projectionSignature: (game: GameType) => `month ${game.date.monthsElapsed}`,
+  topBarForecastEndMinute: () => Infinity,
   selectProjection: (...args: unknown[]) => mockSelectProjection(...args),
   cacheProjection: () => undefined,
 }));
