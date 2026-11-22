@@ -28,7 +28,7 @@ import {
 } from "../../helpers/DataCenterSetup";
 import { createDataCenterSetupWorker } from "../../helpers/DataCenterSetupClient";
 import { formatCount, formatWatts, formatNumber } from "../../helpers/Format";
-import { prefetchScenarioData } from "../../helpers/OfflineData";
+import { prefetchLocationWeather } from "../../OfflineWeatherData";
 import { ScenarioType } from "../../Types";
 import ScreenPage from "../base/ScreenPage";
 import LocationPicker from "../base/LocationPicker";
@@ -207,7 +207,8 @@ export default function DataCenterSetup({ onBack, onStart, onResume }: Props) {
             loading={loading}
             isLocationUnavailable={isLocationUnavailable}
             onChange={(selected) => {
-              if (!isLocationUnavailable) void prefetchScenarioData(selected);
+              if (!isLocationUnavailable)
+                void prefetchLocationWeather(selected);
               setLocation(selected);
               setDemandTick(wToSliderTick(100e6));
               setAccountsInput(undefined);

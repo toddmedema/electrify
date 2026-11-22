@@ -1,7 +1,7 @@
 import { LEGACY_SCENARIOS } from "./data/LegacyCampaign";
 import { SCENARIOS } from "./data/Scenarios";
 import { getScenarioLocation } from "./helpers/Locations";
-import { simulationDataRequest } from "./helpers/SimulationDataIntegrity";
+import { offlineWeatherFile } from "./OfflineWeatherData";
 import { weatherLocationIds } from "./helpers/WeatherLocations";
 
 export function officialOfflineWeather(): { id: string; integrity: string }[] {
@@ -14,8 +14,8 @@ export function officialOfflineWeather(): { id: string; integrity: string }[] {
     }),
   );
   return [...ids].map((id) => {
-    const { integrity } = simulationDataRequest(`/data/weather/${id}.bin`);
-    if (!integrity) throw new Error(`Missing shipped weather for ${id}`);
-    return { id, integrity };
+    const file = offlineWeatherFile(id);
+    if (!file) throw new Error(`Missing shipped weather for ${id}`);
+    return file;
   });
 }

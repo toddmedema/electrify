@@ -48,14 +48,28 @@ export function useOfflineWeather(
       setAvailable(undefined);
       return;
     }
-    let active = true;
-    void availableWeatherIds(
-      selected ? [...locations, selected] : locations,
-    ).then((ids) => {
-      if (active) setAvailable(ids);
-    });
+    let generation = 0;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const refresh = () => {
+      const current = ++generation;
+      void availableWeatherIds(
+        selected ? [...locations, selected] : locations,
+      ).then((ids) => {
+        if (generation === current) setAvailable(ids);
+      });
+    };
+    const onMessage = (event: MessageEvent) => {
+      if (event.data?.type !== "OFFLINE_WEATHER_CACHED") return;
+      clearTimeout(timer);
+      timer = setTimeout(refresh, 50);
+    };
+    const worker = navigator.serviceWorker;
+    worker?.addEventListener("message", onMessage);
+    refresh();
     return () => {
-      active = false;
+      ++generation;
+      clearTimeout(timer);
+      worker?.removeEventListener("message", onMessage);
     };
   }, [offline, locations, selected]);
 

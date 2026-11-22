@@ -7,14 +7,19 @@ type Listener = () => void;
 
 function fakeWindow({
   installed = false,
-  registration = Promise.resolve({}),
+  registration,
 }: { installed?: boolean; registration?: Promise<unknown> } = {}) {
   const postMessage = jest.fn();
-  const register = jest.fn(() => registration);
-  const serviceWorker = {
-    register,
-    ready: Promise.resolve({ active: { postMessage } }),
+  const registrationListeners = new Map<string, Listener>();
+  const workers = {
+    active: { postMessage },
+    waiting: null as { postMessage: jest.Mock } | null,
+    installing: null as { postMessage: jest.Mock } | null,
+    addEventListener: (name: string, listener: Listener) =>
+      registrationListeners.set(name, listener),
   };
+  const register = jest.fn(() => registration ?? Promise.resolve(workers));
+  const serviceWorker = { register, ready: Promise.resolve(workers) };
   const listeners = new Map<string, Listener[]>();
   const win = {
     navigator: { serviceWorker },
@@ -39,6 +44,8 @@ function fakeWindow({
     win: win as unknown as Window,
     register,
     postMessage,
+    workers,
+    fireRegistration: (name: string) => registrationListeners.get(name)?.(),
     fire: (name: string) => listeners.get(name)?.forEach((l) => l()),
     restore: () =>
       Object.defineProperty(navigator, "serviceWorker", {
@@ -157,6 +164,34 @@ describe("registerServiceWorker", () => {
     expect(weather).not.toEqual(
       expect.arrayContaining([expect.objectContaining({ id: "Tokyo" })]),
     );
+  });
+
+  it("warms waiting and newly installing workers during an update", async () => {
+    const sw = fakeWindow({ installed: true });
+    restore = sw.restore;
+    const waiting = { postMessage: jest.fn() };
+    const installing = { postMessage: jest.fn() };
+    sw.workers.waiting = waiting;
+    registerServiceWorker(sw.win);
+    await flush();
+    jest.advanceTimersByTime(BACKGROUND_CACHE_DELAY_MS);
+    await flush();
+
+    expect(messageTypes(sw.postMessage)).toEqual([
+      "CACHE_BUILD",
+      "CACHE_ICONS",
+    ]);
+    expect(messageTypes(waiting.postMessage)).toEqual([
+      "SYNC_OFFICIAL_OFFLINE_DATA",
+    ]);
+
+    sw.workers.installing = installing;
+    sw.fireRegistration("updatefound");
+    await flush();
+    expect(messageTypes(installing.postMessage)).toEqual([
+      "SYNC_OFFICIAL_OFFLINE_DATA",
+    ]);
+    expect(waiting.postMessage).toHaveBeenCalledTimes(1);
   });
 
   it("caches audio and data immediately when this session installs, and retries on reconnection", async () => {

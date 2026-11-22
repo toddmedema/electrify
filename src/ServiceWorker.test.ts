@@ -43,6 +43,7 @@ function worker() {
     [FetchRequest, { cache?: string }?]
   >();
   const put = jest.fn().mockResolvedValue(undefined);
+  const postMessage = jest.fn();
   const match = jest
     .fn<Promise<WorkerResponse | undefined>, [FetchRequest]>()
     .mockResolvedValue(undefined);
@@ -65,6 +66,7 @@ function worker() {
     caches: { match, open },
     self: {
       location: { origin: "https://electrify.test" },
+      clients: { matchAll: async () => [{ postMessage }] },
       addEventListener: (name: string, handler: (event: WorkerEvent) => void) =>
         handlers.set(name, handler),
     },
@@ -72,6 +74,7 @@ function worker() {
   return {
     fetch,
     put,
+    postMessage,
     addAll,
     match,
     cacheMatch,
@@ -314,9 +317,13 @@ describe("simulation data integrity", () => {
       });
       await received;
       expect(persisted).toBe(false);
+      expect(sw.postMessage).not.toHaveBeenCalled();
       finishWrite();
       await lifetime;
       expect(persisted).toBe(true);
+      expect(sw.postMessage).toHaveBeenCalledWith({
+        type: "OFFLINE_WEATHER_CACHED",
+      });
     } finally {
       finishWrite?.();
       await event.result;
@@ -332,6 +339,39 @@ describe("simulation data integrity", () => {
         await sw.request("cors", url, integrityFor("fresh")).result
       ).text(),
     ).toBe("fresh");
+  });
+
+  it("refreshes only the stale part of a selected location's weather", async () => {
+    const sw = dataWorker();
+    const watershed = "/data/weather/AlleghenyUpper.bin";
+    sw.entries.set(url, response(true, "fresh"));
+    sw.entries.set(watershed, response(true, "stale"));
+    sw.fetch.mockImplementation(async (request) =>
+      response(true, sw.path(request) === watershed ? "fresh watershed" : ""),
+    );
+
+    await Promise.all(
+      sw.message({
+        type: "CACHE_SCENARIO_DATA",
+        locationIds: ["PIT", "AlleghenyUpper"],
+        weather: [
+          { id: "PIT", integrity: integrityFor("fresh") },
+          { id: "AlleghenyUpper", integrity: integrityFor("fresh watershed") },
+        ],
+      }),
+    );
+
+    expect(await sw.entries.get(watershed)!.text()).toBe("fresh watershed");
+    expect(
+      sw.fetch.mock.calls.find(
+        ([request]) => sw.path(request) === watershed,
+      )?.[0],
+    ).toEqual(
+      expect.objectContaining({ integrity: integrityFor("fresh watershed") }),
+    );
+    expect(
+      sw.fetch.mock.calls.map(([request]) => sw.path(request)),
+    ).not.toContain(url);
   });
 
   it("never coalesces integrity-free prefetches or different build hashes", async () => {
@@ -395,6 +435,7 @@ describe("SYNC_OFFICIAL_OFFLINE_DATA", () => {
       "custom",
     );
     expect(sw.entries.has("/data/weather/Tokyo.bin")).toBe(false);
+    expect(sw.entries.has("/data/data-center-customers.json")).toBe(true);
     expect(
       sw.fetch.mock.calls.map(([request]) => sw.path(request)),
     ).not.toContain("/data/weather/Paris.bin");

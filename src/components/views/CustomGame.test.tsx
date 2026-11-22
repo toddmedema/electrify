@@ -14,13 +14,13 @@ import {
 import { getFuelEscalation } from "../../data/FuelPrices";
 import { inEraRate } from "../../data/RetailRates";
 import { LOCATIONS } from "../../Constants";
-import { prefetchScenarioData } from "../../helpers/OfflineData";
+import { prefetchLocationWeather } from "../../OfflineWeatherData";
 import { createCustomGameForecastWorker } from "../../helpers/CustomGameForecastClient";
 import { createGame } from "../../testing/Simulator";
 import CustomGame from "./CustomGame";
 
-jest.mock("../../helpers/OfflineData", () => ({
-  prefetchScenarioData: jest.fn(() => Promise.resolve()),
+jest.mock("../../OfflineWeatherData", () => ({
+  prefetchLocationWeather: jest.fn(() => Promise.resolve()),
 }));
 jest.mock("../../helpers/CustomGameForecastClient", () => ({
   createCustomGameForecastWorker: jest.fn(),
@@ -425,7 +425,7 @@ it("commits the complete location object when a map marker is selected", () => {
       location: expect.objectContaining(LOCATIONS.HNL),
     }),
   );
-  expect(prefetchScenarioData).toHaveBeenCalledWith(
+  expect(prefetchLocationWeather).toHaveBeenCalledWith(
     expect.objectContaining({ id: LOCATIONS.HNL.id }),
   );
 });

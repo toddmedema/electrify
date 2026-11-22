@@ -26,8 +26,8 @@ jest.setTimeout(30000);
 jest.mock("../../helpers/DataCenterSetupClient", () => ({
   createDataCenterSetupWorker: jest.fn(),
 }));
-jest.mock("../../helpers/OfflineData", () => ({
-  prefetchScenarioData: jest.fn(() => Promise.resolve()),
+jest.mock("../../OfflineWeatherData", () => ({
+  prefetchLocationWeather: jest.fn(() => Promise.resolve()),
 }));
 jest.mock("../../data/Cities", () => {
   const { LOCATIONS } = jest.requireActual("../../Constants");

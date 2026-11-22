@@ -114,6 +114,13 @@ test("installed play preloads official weather and enables custom cities after s
       cachedWeather(["SF", "PIT", "AlleghenyUpper", "Zurich", "Tokyo"]),
     )
     .toEqual([true, true, true, false, false]);
+  await expect
+    .poll(() =>
+      page.evaluate(async () =>
+        Boolean(await caches.match("/data/data-center-customers.json")),
+      ),
+    )
+    .toBe(true);
 
   await page.getByRole("button", { name: "Play", exact: true }).click();
   await page.getByRole("button", { name: "View Custom Game details" }).click();

@@ -47,7 +47,7 @@ import {
   standardCustomRate,
 } from "../../helpers/CustomScenarioEvents";
 import { getStartingCustomers } from "../../data/LocationProfiles";
-import { prefetchScenarioData } from "../../helpers/OfflineData";
+import { prefetchLocationWeather } from "../../OfflineWeatherData";
 import { createCustomGameForecastWorker } from "../../helpers/CustomGameForecastClient";
 import {
   useWorkerRequest,
@@ -513,7 +513,7 @@ export default function CustomGame(props: Props): React.JSX.Element {
             loading={citiesLoading}
             isLocationUnavailable={isLocationUnavailable}
             onChange={(picked: CityType) => {
-              if (!isLocationUnavailable) void prefetchScenarioData(picked);
+              if (!isLocationUnavailable) void prefetchLocationWeather(picked);
               changeStartingCustomers(getStartingCustomers(picked), {
                 locationId: picked.id,
                 location: picked,
