@@ -168,8 +168,12 @@ function seatMessage(message) {
     return false;
   const keys = Object.keys(message);
   if (message.kind === "heartbeat" || message.kind === "ack")
-    return keys.every((key) =>
-      ["kind", "revision", "sequence", "delivery"].includes(key),
+    return keys.every(
+      (key) =>
+        ["kind", "revision", "sequence", "delivery"].includes(key) ||
+        (message.kind === "ack" &&
+          key === "history" &&
+          (message.history === "stale" || message.history === "missing")),
     );
   if (message.kind === "global-settings" || message.kind === "global-menu")
     return (

@@ -562,10 +562,20 @@ const publishedCoopIdentities = [
     23,
     "coop-2-3a64b92f0462af2eb6286821f118c030f25aaf65b546a4a7652e87b1dbcd3e33",
   ],
-  // Master 11ff7f50 used the same world format before separating its transport.
+  // Published master a9209513, before the exact frame-pacing optimizations.
+  [
+    24,
+    "coop-2-52b30cebdf5c08f453a29c4d1b445fa8a949e8c6f354f2f344683029b032f167",
+  ],
+  // Published master 11ff7f50 includes the Steam checkpoint queue update.
   [
     24,
     "coop-2-b5084b0368736d579e1ffc5cfbcaf4b8a7b4a2b6097b45dfaafbf85556810755",
+  ],
+  // Master 0e009432 shipped the frame-pacing optimizations.
+  [
+    24,
+    "coop-2-70cc82f8acaacdd1aed5daf5fe8c078bccdf2873eeecdc58b7bcdb1973aa9bc7",
   ],
 ] as const;
 

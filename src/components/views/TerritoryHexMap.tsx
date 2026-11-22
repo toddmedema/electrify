@@ -2,7 +2,7 @@ import * as React from "react";
 import { Tooltip, useTheme } from "@mui/material";
 import ConceptIcon from "../base/ConceptIcon";
 import RapidConnectionIcon from "../base/RapidConnectionIcon";
-import type { GameType, TerrainType } from "../../Types";
+import type { GameType, TerrainType, TerritoryId } from "../../Types";
 import { isLandTerritoryId } from "../../data/Territories";
 import { TERRAIN_LABELS } from "../../data/TerrainLabels";
 import {
@@ -11,6 +11,7 @@ import {
   type TerritoryTileView,
 } from "../../helpers/TerritoryMapState";
 import { tilePurchaseQuotes } from "../../helpers/Territories";
+import { cityGrowthAt, type CityGrowthSector } from "../../helpers/CityDemand";
 import { projectSiteCapitalCost } from "../../helpers/ProjectBuild";
 import type { ReadyProjectSite } from "../../helpers/ProjectBuild";
 import { getSunriseSunset } from "../../helpers/DateTime";
@@ -73,6 +74,11 @@ const TerritoryScene3D = React.lazy(
 );
 const PAN_OVERSCAN = HEX_WIDTH / 4;
 const CAMERA_SHIFT_MS = 180;
+const CITY_GROWTH_LABEL: Record<CityGrowthSector, string> = {
+  Residential: "homes",
+  Commercial: "shops",
+  Industrial: "workshops",
+};
 
 class MapSceneBoundary extends React.Component<
   { children: React.ReactNode; onError: () => void },
@@ -117,6 +123,8 @@ function sameTile(a: TerritoryTileView["tile"], b: TerritoryTileView["tile"]) {
           a.hydroSiteId === b.hydroSiteId))
   );
 }
+
+type CameraTarget = ReturnType<typeof hexCenter> & { zoom?: number };
 
 type MapStyle = React.CSSProperties & {
   "--territory-owner-color"?: string;
@@ -220,6 +228,25 @@ export default function TerritoryHexMap({
     () => topology.map((view) => view.tile),
     [topology],
   );
+  const {
+    seed,
+    startingYear,
+    location,
+    date: { year },
+  } = game;
+  const cityGrowth = React.useMemo(() => {
+    const growth = new Map<TerritoryId, readonly CityGrowthSector[]>();
+    for (const tile of tiles) {
+      if (!tile.city) continue;
+      const sectors = cityGrowthAt(
+        { seed, startingYear, location },
+        year,
+        tile.territoryId,
+      );
+      if (sectors.length) growth.set(tile.territoryId, sectors);
+    }
+    return growth;
+  }, [tiles, seed, startingYear, location, year]);
   const byKey = React.useMemo(
     () => new Map(views.map((view) => [territoryMapTileKey(view.tile), view])),
     [views],
@@ -306,24 +333,31 @@ export default function TerritoryHexMap({
   const activeRoving =
     activeSelected ?? (rovingId && byKey.has(rovingId) ? rovingId : homeKey);
   const [camera] = React.useState(() => {
-    let center = hexCenter(
-      (selected ? byKey.get(selected)?.tile : undefined) ??
-        homeTile ?? { q: 0, r: 0 },
-    );
+    let pose = {
+      ...hexCenter(
+        (selected ? byKey.get(selected)?.tile : undefined) ??
+          homeTile ?? { q: 0, r: 0 },
+      ),
+      zoom: 1,
+    };
     const listeners = new Set<() => void>();
     return {
-      getSnapshot: () => center,
+      getSnapshot: () => pose,
+      getZoom: () => pose.zoom,
       subscribe: (listener: () => void) => {
         listeners.add(listener);
         return () => {
           listeners.delete(listener);
         };
       },
-      move(next: typeof center) {
-        center = next;
+      move(next: typeof pose) {
+        pose = next;
         listeners.forEach((listener) => listener());
       },
-    } satisfies SceneCamera & { move: (next: typeof center) => void };
+    } satisfies SceneCamera & {
+      getZoom: () => number;
+      move: (next: typeof pose) => void;
+    };
   });
   const [cullCenter, setCullCenter] = React.useState(camera.getSnapshot);
   const cullAnchor = React.useRef(cullCenter);
@@ -332,8 +366,8 @@ export default function TerritoryHexMap({
     height: 0,
     openingWidth: 0,
   });
-  const [zoom, setZoom] = React.useState(1);
-  const zoomLevel = React.useRef(zoom);
+  // Panning updates the scene without rerendering the map's overlays.
+  const zoom = React.useSyncExternalStore(camera.subscribe, camera.getZoom);
   // Fit the starting view to the screen, then leave zoom under the player's control.
   const baseScale =
     size.openingWidth > 0 && size.openingWidth < 600 ? 0.75 : 0.875;
@@ -365,7 +399,9 @@ export default function TerritoryHexMap({
   }, []);
   const setCamera = React.useCallback(
     (
-      update: React.SetStateAction<ReturnType<typeof hexCenter>>,
+      update:
+        | CameraTarget
+        | ((current: ReturnType<typeof camera.getSnapshot>) => CameraTarget),
       animate = false,
     ) => {
       cancelCameraShift();
@@ -374,10 +410,17 @@ export default function TerritoryHexMap({
       const next = {
         x: Math.max(mapBounds.left, Math.min(mapBounds.right, point.x)),
         y: Math.max(mapBounds.top, Math.min(mapBounds.bottom, point.y)),
+        zoom: point.zoom ?? current.zoom,
       };
-      if (next.x === current.x && next.y === current.y) return;
+      if (
+        next.x === current.x &&
+        next.y === current.y &&
+        next.zoom === current.zoom
+      )
+        return;
       const move = (position: typeof next) => {
-        moveStage(position);
+        // On zoom, the layout effect moves the stage with the new overlay scale.
+        if (position.zoom === zoom) moveStage(position);
         if (
           Math.abs(position.x - cullAnchor.current.x) >= PAN_OVERSCAN ||
           Math.abs(position.y - cullAnchor.current.y) >= PAN_OVERSCAN
@@ -407,12 +450,13 @@ export default function TerritoryHexMap({
         move({
           x: current.x + (next.x - current.x) * progress,
           y: current.y + (next.y - current.y) * progress,
+          zoom: current.zoom,
         });
         cameraShiftFrame.current = requestAnimationFrame(shift);
       };
       cameraShiftFrame.current = requestAnimationFrame(shift);
     },
-    [camera, mapBounds, moveStage, cancelCameraShift],
+    [camera, mapBounds, moveStage, cancelCameraShift, zoom],
   );
   React.useLayoutEffect(() => {
     moveStage(camera.getSnapshot());
@@ -480,8 +524,6 @@ export default function TerritoryHexMap({
     )
       return;
     framedRun.current = { runId, seed: game.seed, scenarioId: game.scenarioId };
-    zoomLevel.current = 1;
-    setZoom(1);
     const focus = hexCenter(
       byKey.get(activeSelected ?? activeRoving!)?.tile ?? { q: 0, r: 0 },
     );
@@ -511,6 +553,7 @@ export default function TerritoryHexMap({
     setCamera({
       x: Math.max(focus.x - rangeX, Math.min(center.x, focus.x + rangeX)),
       y: Math.max(focus.y - rangeY, Math.min(center.y, focus.y + rangeY)),
+      zoom: 1,
     });
     setBuyMode(false);
   }, [
@@ -546,26 +589,28 @@ export default function TerritoryHexMap({
     (factor: number, from: { clientX: number; clientY: number }, to = from) => {
       const element = viewport.current;
       if (!element) return;
-      const previous = zoomLevel.current;
-      const nextZoom = Math.max(0.5, Math.min(2, previous * factor));
       const box = element.getBoundingClientRect();
-      const x = box.left + size.width / 2;
-      const y = box.top + size.height / 2;
-      const oldScale = baseScale * previous;
-      const newScale = baseScale * nextZoom;
+      const x = box.left + box.width / 2;
+      const y = box.top + box.height / 2;
       // Keep the same point on the ground under the pointer or pinch midpoint.
-      setCamera((point) => ({
-        x:
-          point.x + (from.clientX - x) / oldScale - (to.clientX - x) / newScale,
-        y:
-          point.y + (from.clientY - y) / oldScale - (to.clientY - y) / newScale,
-      }));
-      if (nextZoom !== previous) {
-        zoomLevel.current = nextZoom;
-        setZoom(nextZoom);
-      }
+      setCamera((point) => {
+        const zoom = Math.max(0.5, Math.min(2, point.zoom * factor));
+        const oldScale = baseScale * point.zoom;
+        const newScale = baseScale * zoom;
+        return {
+          x:
+            point.x +
+            (from.clientX - x) / oldScale -
+            (to.clientX - x) / newScale,
+          y:
+            point.y +
+            (from.clientY - y) / oldScale -
+            (to.clientY - y) / newScale,
+          zoom,
+        };
+      });
     },
-    [baseScale, setCamera, size.width, size.height],
+    [baseScale, setCamera],
   );
   React.useEffect(() => {
     const element = viewport.current;
@@ -580,7 +625,7 @@ export default function TerritoryHexMap({
         zoomAt(Math.exp((-event.deltaY * unit) / 600), event);
         return;
       }
-      const currentScale = baseScale * zoomLevel.current;
+      const currentScale = baseScale * camera.getZoom();
       setCamera((point) => ({
         x:
           point.x +
@@ -625,7 +670,7 @@ export default function TerritoryHexMap({
       element.removeEventListener("gesturechange", gestureChange);
       element.removeEventListener("gestureend", gestureEnd);
     };
-  }, [baseScale, clearHover, setCamera, zoomAt]);
+  }, [baseScale, camera, clearHover, setCamera, zoomAt]);
   React.useLayoutEffect(() => {
     if (!focusAfterNavigation.current) return;
     const target = stage.current?.querySelector<HTMLButtonElement>(
@@ -1219,6 +1264,7 @@ export default function TerritoryHexMap({
               <TerritoryScene3D
                 views={renderedViews}
                 tiles={tiles}
+                cityGrowth={cityGrowth}
                 ownership={topology}
                 ownerPalette={ownerPalette}
                 peerColors={peerColors}
@@ -1231,11 +1277,11 @@ export default function TerritoryHexMap({
                 daylight={getSunriseSunset(game.date, game.location)}
                 dark={dark}
                 camera={camera}
+                baseScale={baseScale}
                 frame={{
                   width: size.width,
                   height: size.height,
                   dpr: window.devicePixelRatio || 1,
-                  scale,
                   background: dark ? [0.035, 0.055, 0.07] : [0.86, 0.9, 0.9],
                   visible: size.width > 0 && size.height > 0,
                   motionAllowed: motion.allowed,
@@ -1412,6 +1458,7 @@ export default function TerritoryHexMap({
                       ) : tile.city ? (
                         <CityArtwork
                           size={tile.city.size}
+                          growth={cityGrowth.get(tile.territoryId)}
                           className="territoryOccupantArtwork"
                         />
                       ) : facility ? (
@@ -1496,8 +1543,11 @@ export default function TerritoryHexMap({
             const projectLabel = projectSite
               ? `Total project cost ${projectPrice} · ${projectSite.owned ? "Already connected" : "Connection included"}${outputModifier ? ` · ${outputModifier} estimated output vs flat terrain` : ""}`
               : undefined;
+            const growth = tile.city && cityGrowth.get(tile.territoryId);
             const tileLabel = [
               cityLabel ?? TERRAIN_LABELS[tile.terrain],
+              growth &&
+                `New buildings: ${growth.map((sector) => CITY_GROWTH_LABEL[sector]).join(", ")}`,
               facility?.name,
               status?.kind === "unknown" ? undefined : status?.label,
               disaster?.condition,
