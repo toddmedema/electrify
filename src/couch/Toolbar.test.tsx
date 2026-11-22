@@ -162,6 +162,7 @@ it("shows readiness and decisions for the active seat while keeping retired seat
   const value = props();
   value.clock.speed = "PAUSED";
   value.clock.readyRequired = true;
+  value.clock.reason = "Controller replaced";
   value.clock.players[0] = {
     ...value.clock.players[0],
     selectedSpeed: "PAUSED",
@@ -169,13 +170,16 @@ it("shows readiness and decisions for the active seat while keeping retired seat
     retired: true,
   };
   value.clock.players[1].pendingChoice = "Winterization";
+  value.clock.players[1].selectedSpeed = "PAUSED";
   const { rerender } = show(value);
   const clock = screen.getByRole("group", { name: "Shared clock" });
   expect(clock).toHaveTextContent("P1 Retired");
-  expect(clock).toHaveTextContent("Held by P2");
+  expect(clock).toHaveTextContent("Held by System, P2");
   rerender(<CouchToolbar {...value} menuOpen />);
   fireEvent.click(screen.getByRole("button", { name: "Clock status" }));
   expect(screen.getByText("Select a running speed to resume")).toBeVisible();
+  expect(screen.getByText("Controller replaced")).toBeVisible();
+  expect(screen.getByText("Selected pause")).toBeVisible();
   expect(
     screen.getByText("Choosing a response for Winterization"),
   ).toBeVisible();

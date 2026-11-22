@@ -430,7 +430,9 @@ test("TV couch companies keep independent dialogs and purchases through atomic s
     !["tv-1080-light", "tv-1080-dark"].includes(info.project.name),
     "Two seat renderer journey at 1080p in each palette",
   );
-  const couch = await createCouchFixture(context, page);
+  const couch = await createCouchFixture(context, page, {
+    nativeBindings: true,
+  });
   await startCouch(page, couch);
   const p1 = couch.seats.get("local-p1")!.page;
   const p2 = couch.seats.get("local-p2")!.page;
@@ -603,10 +605,13 @@ test("TV couch companies keep independent dialogs and purchases through atomic s
   await couch.input({ "101": ["back"] });
   await expect(purchase1).toHaveCount(0);
   await couch.input({ "101": ["menu"] });
-  await page
-    .getByRole("dialog", { name: "Game menu", exact: true })
-    .getByRole("button", { name: "Quit", exact: true })
-    .click();
+  await expect(
+    gameMenu.getByRole("button", { name: "Return to game", exact: true }),
+  ).toBeFocused();
+  const quit = gameMenu.getByRole("button", { name: "Quit", exact: true });
+  await couch.input({ "202": ["up"] });
+  await expect(quit).toBeFocused();
+  await couch.input({ "202": ["confirm"] });
   const saveDialog = page.getByRole("dialog", {
     name: "Save & Quit for everyone?",
     exact: true,
@@ -615,13 +620,33 @@ test("TV couch companies keep independent dialogs and purchases through atomic s
     name: "Save & Quit",
     exact: true,
   });
+  await expect(saveDialog).toContainText(
+    "P2 Utility wants to end this TV session",
+  );
+  await expect(save).toBeEnabled();
   couch.setSaveFailure(true);
   const previousSave = couch.checkpoint();
+  await page.evaluate(() => {
+    const confirms: string[] = [];
+    Object.defineProperty(window, "__couchSaveConfirms", { value: confirms });
+    window.addEventListener("couchControllerInput", (event) => {
+      const { id, actions } = (
+        event as CustomEvent<{ id: string; actions: string[] }>
+      ).detail;
+      if (actions.includes("confirm")) confirms.push(id);
+    });
+  });
+  const routedConfirms = () =>
+    page.evaluate(
+      () =>
+        (window as Window & { __couchSaveConfirms?: string[] })
+          .__couchSaveConfirms,
+    );
   await save.focus();
-  await couch.input({ "202": ["confirm"] });
-  await expect(save).toBeEnabled();
-  await expect(saveDialog.getByRole("alert")).toHaveCount(0);
   await couch.input({ "101": ["confirm"] });
+  expect(await routedConfirms()).toEqual([]);
+  await couch.input({ "202": ["confirm"] });
+  expect(await routedConfirms()).toEqual(["202"]);
   await expect(saveDialog.getByRole("alert")).toContainText(
     "Fixture local storage is full",
   );
@@ -711,10 +736,11 @@ test("TV couch intertie construction requires approval from both company owners"
   const p2Cash = p2
     .getByRole("dialog")
     .getByRole("button", { name: "Pay cash" });
+  await inspectP2.focus();
   await p2Cash.focus();
-  await couch.input({ "101": ["back"] });
+  await couch.input({ "101": ["confirm"] });
   await expect(p2Cash).toBeFocused();
-  await p2Cash.click();
+  await couch.input({ "202": ["confirm"] });
   await expect(p2Cash).toHaveCount(0);
   await expect(p2.getByText(/P1 Utility requested this upgrade/)).toHaveCount(
     0,
@@ -786,6 +812,11 @@ test("TV couch resumes with an absent retired controller and completes the remai
     .click();
   await page.getByRole("button", { name: "On this TV", exact: true }).click();
   await page.getByRole("button", { name: /^Resume Local campaign/ }).click();
+  const review = page.getByRole("button", {
+    name: "Review saved game",
+    exact: true,
+  });
+  await expect(review).toBeDisabled();
   await couch.input({ "101": ["confirm"] });
   await page
     .getByRole("button", { name: "Review saved game", exact: true })
@@ -814,7 +845,9 @@ test("TV couch resumes with an absent retired controller and completes the remai
   await expect(results).toContainText("P2 · P2 Utility: Bankrupt!");
   await results.getByRole("button", { name: "Save & return to setup" }).focus();
   await couch.input({ "101": ["confirm"] });
-  await page.getByRole("button", { name: "Save & Quit", exact: true }).focus();
+  const save = page.getByRole("button", { name: "Save & Quit", exact: true });
+  await expect(save).toBeEnabled();
+  await save.focus();
   await couch.input({ "101": ["confirm"] });
   await expect.poll(() => couch.seats.size).toBe(0);
   await expect(
@@ -839,9 +872,8 @@ test("TV couch applies padded bounds and exposes shared clock reasons through co
     "Screen edge and clock verification at 1080p and 4K",
   );
   await context.addInitScript(() => {
-    if (!new URLSearchParams(location.search).has("couchSeat")) {
+    if (!new URLSearchParams(window.location.search).has("couchSeat")) {
       localStorage.setItem("screenEdgePadding", "4");
-      localStorage.setItem("interfaceScale", "1.5");
     }
   });
   const couch = await createCouchFixture(context, page, { embedded: true });
@@ -873,7 +905,7 @@ test("TV couch applies padded bounds and exposes shared clock reasons through co
   for (const seat of [p1, p2]) {
     await expect(seat.locator("html")).toHaveAttribute(
       "data-interface-scale",
-      "1.5",
+      "1.25",
     );
     await expect(seat.locator(".gameStage")).toHaveAttribute(
       "data-layout",
@@ -945,7 +977,24 @@ test("TV couch applies padded bounds and exposes shared clock reasons through co
   expect(couch.layout()?.fits).toBe(false);
   await expect(page.locator("#couch-fixture-local-p1")).toBeHidden();
 
-  await couch.resize(width, height);
+  const displaySettings = page.getByRole("button", {
+    name: "Display settings",
+    exact: true,
+  });
+  await displaySettings.focus();
+  await couch.input({ "101": ["confirm"] });
+  const settings = page.getByRole("dialog", { name: "Settings", exact: true });
+  await settings
+    .getByRole("button", { name: "Advanced display", exact: true })
+    .click();
+  const padding = settings.getByRole("group", {
+    name: "Screen-edge padding",
+    exact: true,
+  });
+  await padding.getByRole("button", { name: "0%", exact: true }).click();
+  await expect.poll(() => couch.layout()?.fits).toBe(true);
+  expect(couch.layout()?.inset).toBe(0);
+  await settings.getByRole("button", { name: "Back", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "TV session paused", exact: true }),
   ).toHaveCount(0);
@@ -2007,9 +2056,17 @@ test("TV couch play controller binding recovery preserves the other company and 
     },
     { generation: lost.generation },
   );
-  await expect(
-    paused.getByRole("button", { name: "Restore P2 Utility", exact: true }),
-  ).toBeVisible();
+  const restoreP2 = paused.getByRole("button", {
+    name: "Restore P2 Utility",
+    exact: true,
+  });
+  await expect(restoreP2).toBeVisible();
+  couch.failNextNative("reload-seat");
+  await restoreP2.click();
+  await expect(paused.getByRole("alert")).toContainText(
+    "Fixture reload-seat failure",
+  );
+  await expect(restoreP2).toBeEnabled();
   await couch.setConnected({ "303": false, "404": true });
   await couch.input({ "404": ["confirm"] });
   await expect

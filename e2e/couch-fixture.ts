@@ -65,7 +65,9 @@ export interface CouchFixture<Actor extends Page | Frame> {
   presentationMessages: () => number;
   settleCaptures: () => Promise<void>;
   cancelledText: () => readonly string[];
-  failNextNative: (kind: "setup" | "list-saves" | "close" | "status") => void;
+  failNextNative: (
+    kind: "setup" | "list-saves" | "close" | "status" | "reload-seat",
+  ) => void;
   input: (actions: Record<string, DesktopInputAction[]>) => Promise<void>;
 }
 const {
@@ -108,6 +110,7 @@ interface NativeHarness {
       active: boolean;
     };
     inputFrame: (frames: Device[]) => void;
+    shellFrame: (frames: Device[]) => Device | undefined;
     open: (input: Record<string, unknown>) => Promise<unknown>;
     close: () => void;
     overlay: (owner: string | null, shared: boolean) => unknown;
@@ -924,9 +927,12 @@ export async function createCouchFixture(
             )
           : undefined;
         const device = sampledBindings.get(sampledOverlay || "local-p1");
-        const frame = sampledShared
-          ? selected?.frame
-          : frames.find((item) => item.id === device);
+        const frame =
+          native && sampledOverlay && !sampledShared
+            ? native.manager.shellFrame(frames)
+            : sampledShared
+              ? selected?.frame
+              : frames.find((item) => item.id === device);
         if (selected && selected.seatId !== sharedInputSeat) {
           sharedInputSeat = selected.seatId;
           await emit({

@@ -27,7 +27,14 @@ function pauseHolders(clock: SharedClock) {
   if (clock.speed !== "PAUSED") return [];
   const systemReasons = clock.complete
     ? ["Match complete"]
-    : [...new Set(clock.systemBlockers)];
+    : [
+        ...new Set([
+          ...clock.systemBlockers,
+          ...(clock.readyRequired && clock.reason && clock.reason !== "Paused"
+            ? [clock.reason]
+            : []),
+        ]),
+      ];
   const holders: { label: string; name?: string; reasons: string[] }[] = [];
   if (systemReasons.length)
     holders.push({ label: "System", reasons: systemReasons });
@@ -39,7 +46,7 @@ function pauseHolders(clock: SharedClock) {
     if (player.pauseReason) reasons.push(player.pauseReason);
     if (clock.readyRequired && !clock.ready.includes(player.id))
       reasons.push("Select a running speed to resume");
-    else if (player.selectedSpeed === "PAUSED") reasons.push("Selected pause");
+    if (player.selectedSpeed === "PAUSED") reasons.push("Selected pause");
     if (reasons.length)
       holders.push({ label: `P${index + 1}`, name: player.name, reasons });
   });

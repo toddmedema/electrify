@@ -94,6 +94,7 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
   const [menuOwner, setMenuOwner] = useState<string>();
   const [manualOwner, setManualOwner] = useState<string>();
   const [exitOwner, setExitOwner] = useState<string>();
+  const [routedExit, setRoutedExit] = useState<string>();
   const [recovery, setRecovery] = useState<string[]>([]);
   const [invalidLayout, setInvalidLayout] = useState(false);
   const [nativeZoom, setNativeZoom] = useState(1);
@@ -112,6 +113,7 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
     id: string;
   }>();
   const routes = useRef(new Map<string, number>());
+  const shellController = useRef<{ seatId: string; generation: number }>();
   const deviceGlyphs = useRef(new Map<string, DesktopInputFrame["glyphs"]>());
   const platform = useRef<ReturnType<typeof beginCouchPlatform>>();
   const mounted = useRef(false);
@@ -323,7 +325,7 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
   const openSettings = (
     seatId: string,
     generation = routes.current.get(seatId) ?? 0,
-    id = crypto.randomUUID(),
+    id: string = crypto.randomUUID(),
   ) => {
     if (globalRequest.current) return;
     globalRequest.current = { kind: "settings", seatId, generation, id };
@@ -356,6 +358,7 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
       generation: generation ?? routes.current.get(owner) ?? 0,
       id: id ?? crypto.randomUUID(),
     };
+    shellController.current = undefined;
     gateGlobal();
     setMenuOwner(owner);
   };
@@ -364,7 +367,19 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
   const menuAction = (kind: "settings" | "manual" | "leave") => {
     const active = globalRequest.current;
     if (!active || active.kind !== "menu") return;
-    globalRequest.current = { ...active, kind };
+    const controller = shellController.current;
+    const requester =
+      kind === "leave" &&
+      controller &&
+      routes.current.get(controller.seatId) === controller.generation
+        ? controller
+        : active;
+    globalRequest.current = {
+      ...active,
+      kind,
+      seatId: requester.seatId,
+      generation: requester.generation,
+    };
     setMenuOwner(undefined);
     if (kind === "settings") {
       setSettingsOwner(active.seatId);
@@ -373,7 +388,7 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
       setManualOwner(active.seatId);
       store.dispatch(navigate("MANUAL"));
     } else {
-      setExitOwner(active.seatId);
+      setExitOwner(requester.seatId);
       setSaveFailed(false);
       setDiscarding(false);
     }
@@ -644,9 +659,15 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
       } else if (event.kind === "shell-controller") {
         if (
           event.controllerId &&
-          current.current.bindings[event.seatId] === event.controllerId
-        )
+          current.current.bindings[event.seatId] === event.controllerId &&
+          routes.current.get(event.seatId) === event.generation
+        ) {
+          shellController.current = {
+            seatId: event.seatId,
+            generation: event.generation,
+          };
           setControlsController(event.controllerId);
+        }
       } else if (event.kind === "seat-message") {
         coordinator.current?.receive(
           event.seatId,
@@ -1158,11 +1179,26 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
       globalOwner ? "TV session dialog open" : null,
     );
     coordinator.current?.setInputGate("global-dialog", !!globalOwner);
+    const leave = exitOwner ? globalRequest.current : undefined;
+    let live = true;
     void request({
       kind: "overlay",
       seatId: globalOwner ?? null,
       shared: !!globalOwner && !textOwner && !exitOwner,
-    }).catch((failure) => setError(String(failure)));
+    })
+      .then(() => {
+        if (live && leave && globalRequest.current === leave)
+          setRoutedExit(leave.id);
+      })
+      .catch((failure) => {
+        if (!live) return;
+        if (leave && globalRequest.current === leave)
+          cancelGlobal("Could not route the save confirmation");
+        setError(String(failure));
+      });
+    return () => {
+      live = false;
+    };
   }, [globalOwner, stage, textOwner, exitOwner]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const sharedGame = useMemo(
@@ -1171,6 +1207,7 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
     [commonGame, summary?.date],
   );
   const sharedState = sharedGame && { ...store.getState(), game: sharedGame };
+  const exitPending = !!exitOwner && routedExit !== globalRequest.current?.id;
   const controlsOwner = menuOwner || settingsOwner || manualOwner;
   const controlsDevice = devices.find(
     (device) =>
@@ -1450,7 +1487,7 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
         </DialogContent>
         <DialogActions>
           <Button
-            disabled={busy}
+            disabled={busy || exitPending}
             onClick={() => {
               if (leaveRequest.current) {
                 const { seatId, generation, requestId } = leaveRequest.current;
@@ -1469,7 +1506,7 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
           {saveFailed && (
             <Button
               color="error"
-              disabled={busy}
+              disabled={busy || exitPending}
               onClick={() => {
                 if (discarding) void close();
                 else setDiscarding(true);
@@ -1481,7 +1518,7 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
             </Button>
           )}
           <Button
-            disabled={busy}
+            disabled={busy || exitPending}
             onClick={() => {
               setBusy(true);
               setSaveFailed(false);
@@ -1568,12 +1605,17 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
               The other companies keep their assignments.
             </Typography>
           )}
+          {!!recovery.length && !sessionFault && error && (
+            <Typography role="alert">{error}</Typography>
+          )}
           {recovery.map((id) => (
             <Button
               key={id}
               onClick={() => {
-                void request({ kind: "reload-seat", seatId: id });
-                setRecovery((value) => value.filter((item) => item !== id));
+                setError("");
+                void request({ kind: "reload-seat", seatId: id }).catch(
+                  (failure) => setError(String(failure)),
+                );
               }}
             >
               Restore {seats.find((seat) => seat.id === id)?.name}
