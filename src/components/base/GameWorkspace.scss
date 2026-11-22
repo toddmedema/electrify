@@ -513,10 +513,12 @@ html:has(
       scroll-padding-bottom: 16px;
     }
   }
-  @media (max-width: 599px) {
-    .gameToolTray {
-      inset: 8px 8px var(--game-dock-clearance) auto;
-      width: min(var(--game-tool-width), calc(100% - 16px));
+  @media (max-width: 699px), (pointer: coarse) {
+    &:not([data-desktop-map="true"]) .gameToolTray {
+      inset-block: 8px var(--game-dock-clearance);
+      left: max(8px, env(safe-area-inset-left));
+      right: max(8px, env(safe-area-inset-right));
+      width: auto;
     }
   }
 }

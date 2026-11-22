@@ -29,6 +29,53 @@ async function startMap(page: Page, theme: "light" | "dark") {
   return network;
 }
 
+test("wheeling over Power or Energy steps its size in both axes", async ({
+  page,
+}, info) => {
+  test.skip(info.project.name !== "desktop-chromium", "Uses the desktop rail");
+  const network = await startMap(page, "dark");
+  const rail = network.getByRole("complementary", { name: "Build facilities" });
+  const technologies = rail.getByRole("group", {
+    name: "Construction technology list",
+  });
+
+  for (const [label, initial] of [
+    ["Power", 10],
+    ["Energy", 18],
+  ] as const) {
+    const control = rail.getByRole("button", {
+      name: new RegExp(`^${label}:`),
+    });
+    await control.hover();
+    const slider = rail
+      .getByRole("region", { name: `${label} sizing` })
+      .getByRole("slider");
+    await expect(slider).toHaveValue(String(initial));
+    const scrollTop = await technologies.evaluate((list) => list.scrollTop);
+
+    for (const [dx, dy, step] of [
+      [0, -100, 1],
+      [100, 0, 2],
+      [0, 100, 1],
+      [-100, 0, 0],
+    ]) {
+      await page.mouse.wheel(dx, dy);
+      await expect(slider).toHaveValue(String(initial + step));
+    }
+    expect(await technologies.evaluate((list) => list.scrollTop)).toBe(
+      scrollTop,
+    );
+    await expect(control).toHaveAttribute("aria-expanded", "true");
+  }
+  await page.mouse.wheel(0, -100);
+  await expect(
+    rail.getByRole("button", { name: "Energy: 200MWh" }),
+  ).toBeVisible();
+  await reviewScreenshot(page, {
+    path: info.outputPath("map-build-sizing.png"),
+  });
+});
+
 for (const theme of ["light", "dark"] as const) {
   test(`build catalogue preserves previews, sizing and responsive entry points · ${theme}`, async ({
     page,
