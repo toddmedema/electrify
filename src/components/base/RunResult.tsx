@@ -17,13 +17,7 @@ import {
 import { scoreLabel } from "../../helpers/Scoring";
 import { formatLargeMassSignificant } from "../../helpers/Units";
 import { useUnits } from "./UnitsContext";
-import {
-  finishedObjectiveStatusText,
-  objectiveDefinitionText,
-  objectiveObservedText,
-  objectiveTargetText,
-  objectiveGoalText,
-} from "../../helpers/ObjectivePresentation";
+import FinishedObjective from "./FinishedObjective";
 
 export function resultTitle(
   result: Pick<VictoryType, "outcome" | "endTitle">,
@@ -161,77 +155,17 @@ export function RunDebrief({
           >
             Objectives
           </Typography>
-          {objectiveResults.map((result) => {
-            // With one objective the ending above already gives its reason; with several,
-            // each keeps its own so the player can tell which one the ending meant.
-            const repeatsLead = objectiveResults.length === 1;
-            const first =
-              "fromMonth" in result.objective
-                ? result.objective.fromMonth
-                : result.objective.deadlineMonth;
-            const last =
-              "throughMonth" in result.objective
-                ? result.objective.throughMonth
-                : result.metric === "fuelRetirement"
-                  ? first + result.requiredMonths - 1
-                  : first;
-            return (
-              <Box
-                key={result.id}
-                sx={{ mt: 1.5, overflowWrap: "anywhere" }}
-                data-objective-status={result.status}
-              >
-                <Typography
-                  component="p"
-                  variant="body2"
-                  sx={{ fontWeight: 600 }}
-                >
-                  {result.label} · {result.required ? "Required" : "Optional"} ·{" "}
-                  {finishedObjectiveStatusText[result.status]}
-                </Typography>
-                <Typography
-                  component="p"
-                  variant="body2"
-                  color="text.secondary"
-                >
-                  {objectiveDefinitionText(result)}
-                </Typography>
-                <Typography component="p" variant="body2">
-                  {scenario !== undefined ? (
-                    objectiveGoalText(
-                      result.objective,
-                      scenario.startingYear,
-                      scenario.durationMonths,
-                      (scenario.startingMonth ?? 1) - 1,
-                      currency,
-                    )
-                  ) : result.objective.checkpoint ? (
-                    objectiveTargetText(result.objective, currency)
-                  ) : (
-                    <>
-                      {objectiveTargetText(result.objective, currency)} ·{" "}
-                      {first === last
-                        ? `Month ${first + 1}`
-                        : `Months ${first + 1}–${last + 1}`}
-                    </>
-                  )}
-                </Typography>
-                <Typography component="p" variant="body2">
-                  {objectiveObservedText(result, currency)}
-                </Typography>
-                {result.reason &&
-                  !(repeatsLead && leadMessage?.includes(result.reason)) && (
-                    <Typography
-                      component="p"
-                      variant="body2"
-                      color="text.secondary"
-                    >
-                      {result.reason}
-                    </Typography>
-                  )}
-              </Box>
-            );
-          })}
+          {objectiveResults.map((result) => (
+            <FinishedObjective
+              key={result.id}
+              result={result}
+              calendar={scenario}
+              currency={currency}
+              leadMessage={
+                objectiveResults.length === 1 ? leadMessage : undefined
+              }
+            />
+          ))}
         </Box>
       )}
     </section>

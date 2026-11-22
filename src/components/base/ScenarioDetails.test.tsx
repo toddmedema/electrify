@@ -319,13 +319,13 @@ it("shows the two Across the Valley goals in scenario details", () => {
   renderDetails(game);
   const goals = screen.getByRole("region", { name: "Goals" });
   expect(
-    within(goals).getByText("Acquire 3 competitors", { exact: true }),
+    within(goals).getByText("Acquire 3 utilities", { exact: true }),
   ).toBeInTheDocument();
   expect(
     within(goals).getByText("Retain customers", { exact: true }),
   ).toBeInTheDocument();
   expect(
-    within(goals).getByText("Acquire 3 competitors · Dec 2014", {
+    within(goals).getByText("Acquire 3 utilities · Dec 2014", {
       exact: true,
     }),
   ).toBeInTheDocument();

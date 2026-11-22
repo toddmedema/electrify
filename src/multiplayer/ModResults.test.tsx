@@ -44,7 +44,11 @@ function show(results: CompanyResultType[]) {
   const store = configureStore({
     reducer: {
       settings: settingsReducer,
-      game: () => ({ startingYear: 2020, multiplayer: { results } }),
+      game: () => ({
+        scenarioId: 100,
+        startingYear: 2020,
+        multiplayer: { results },
+      }),
     },
   });
   return render(
@@ -97,7 +101,8 @@ test("co-op debriefs display each company's supplied objective verdicts without 
   const hedy = screen.getByRole("region", { name: "Hedy objective results" });
   expect(grace).toHaveTextContent("Keep bills affordable · Optional · Failed");
   expect(grace).toHaveTextContent("10¢/kWh (above goal)");
-  expect(grace).toHaveTextContent(bills.definition);
+  expect(within(grace).getAllByRole("paragraph")).toHaveLength(2);
+  expect(grace).not.toHaveTextContent(bills.definition);
   expect(grace).toHaveTextContent("Jan–Feb 2020");
   expect(grace).toHaveTextContent(bills.reason!);
   expect(grace).not.toHaveTextContent("Unavailable");

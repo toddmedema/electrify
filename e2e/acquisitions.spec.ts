@@ -1184,7 +1184,7 @@ for (const theme of ["light", "dark"] as const) {
     await expect(
       page
         .getByRole("region", { name: "Goals", exact: true })
-        .getByText("Acquire 3 competitors · Dec 2014", {
+        .getByText("Acquire 3 utilities · Dec 2014", {
           exact: true,
         }),
     ).toBeVisible();
@@ -1399,6 +1399,12 @@ for (const theme of ["light", "dark"] as const) {
       exact: true,
     });
     await expectDialogToFit(review);
+    await expect(
+      review.getByRole("region", { name: "Operating plants" }),
+    ).toBeVisible();
+    await expect(
+      review.getByRole("region", { name: "Purchased power" }),
+    ).toBeVisible();
     await expect(review).toContainText("Inherited debt");
     await review.getByRole("button", { name: "Cancel", exact: true }).click();
     await expect(review).toHaveCount(0);
@@ -1662,7 +1668,10 @@ for (const theme of ["light", "dark"] as const) {
     }
     await expect(review).toBeInViewport({ ratio: 1 });
     await expect(
-      surface.getByRole("button", { name: "Close tile", exact: true }),
+      surface.getByRole("button", {
+        name: desktop ? "Close project" : "Close tile",
+        exact: true,
+      }),
     ).toBeInViewport({ ratio: 1 });
     await expect(
       page.getByRole("button", { name: "pause", exact: true }),
@@ -2142,6 +2151,7 @@ for (const theme of ["light", "dark"] as const) {
     await page.getByRole("button", { name: "Continue", exact: true }).click();
     const map = await openMap(page);
     const before = (await readSavedGame(page))!;
+    loadSimData(before.location);
     expect(isAdjacentToOwnedTerritoryTile(before, city)).toBe(false);
     const quote = acquisitionQuote(before, "parcel-1")!;
     expect(tilePurchaseQuote(before, city.id)).toBeUndefined();
@@ -2161,8 +2171,15 @@ for (const theme of ["light", "dark"] as const) {
       exact: true,
     });
     await expectDialogToFit(review);
-    await expect(review).toContainText("Sites transferred");
-    await expect(review).toContainText("The seller removes its plant.");
+    await expect(review).not.toContainText("Sites transferred");
+    await expect(
+      review.getByText("Operating plants", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      review
+        .getByLabel("Operating plants")
+        .getByText("Natural Gas Peaker", { exact: true }),
+    ).toBeVisible();
     await expect(
       review.getByRole("button", { name: "Pay cash" }),
     ).toBeEnabled();
@@ -2182,6 +2199,9 @@ for (const theme of ["light", "dark"] as const) {
     expect(currentTick((await readSavedGame(page))!)!.cash).toBe(
       currentTick(before)!.cash,
     );
+    await expect(
+      review.getByRole("region", { name: "Operating plants" }),
+    ).toBeVisible();
     await reviewScreenshot(review, {
       path: info.outputPath(`municipal-acquisition-${theme}.png`),
       animations: "disabled",
@@ -2211,7 +2231,14 @@ for (const theme of ["light", "dark"] as const) {
         ({ targetId }) => targetId === quote.targetId,
       ),
     ).toHaveLength(financed ? 1 : 0);
-    expect(saved.facilities).toHaveLength(before.facilities.length);
+    expect(saved.facilities).toHaveLength(before.facilities.length + 1);
+    expect(
+      saved.facilities.find(({ tileId }) => tileId === plant.id),
+    ).toMatchObject({
+      name: "Natural Gas Peaker",
+      peakW: 55e6,
+      yearsToBuildLeft: 0,
+    });
     await closeTileSurface(surface);
     await selectTerritoryMapTile(page, city);
     const cityPanel = tileSurface(page);

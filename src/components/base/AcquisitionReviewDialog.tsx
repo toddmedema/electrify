@@ -24,7 +24,6 @@ import DecisionImpactPreview from "./DecisionImpactPreview";
 import { useBuildCash } from "./useBuildCash";
 import { LOAN_MONTHS } from "../../Constants";
 import UtilityContractSchedule from "./UtilityContractSchedule";
-import { TERRITORY_TILES } from "../../data/TerritoryTiles";
 
 interface Props {
   game: GameType;
@@ -90,10 +89,6 @@ export default function AcquisitionReviewDialog({
       </DecisionDialog>
     );
   const municipal = offer.kind === "municipal" ? offer.territory : undefined;
-  const sites =
-    municipal?.purchases.length ??
-    TERRITORY_TILES.filter((tile) => tile.territoryId === offer.targetId)
-      .length;
   const customersBefore = now?.customers ?? 0;
   const customersAfter = customersBefore + offer.customers;
   const customerGrowth =
@@ -101,7 +96,6 @@ export default function AcquisitionReviewDialog({
       ? ` (+${formatPercent(offer.customers / customersBefore)})`
       : "";
   const unavailable = !quote || !onAcquire;
-  const removedPlant = municipal?.removedPlant;
   const valleyNuclear =
     offer.targetId === "valley-electric" &&
     offer.contracts.find(({ name }) => name === "Regional nuclear");
@@ -143,15 +137,6 @@ export default function AcquisitionReviewDialog({
             ? `${formatForecastWatts(preview.beforeMarginW)} → ${marginText(preview.afterMarginW)}`
             : "Forecast unavailable",
         },
-        {
-          concept: "build",
-          label: "Sites transferred",
-          value: String(sites),
-          detail:
-            municipal && removedPlant
-              ? "The seller removes its plant. Its site becomes available to build on."
-              : undefined,
-        },
       ]}
       preface={
         error || !quote || cash < offer.financedCashDue ? (
@@ -177,40 +162,26 @@ export default function AcquisitionReviewDialog({
       }
       afterFacts={
         <div className="acquisitionReviewDetails">
-          <details className="acquisitionDisclosure">
+          <details className="acquisitionDisclosure" open>
             <summary>Plants &amp; purchased power</summary>
             <div>
-              {removedPlant ? (
-                <DecisionImpactPreview
-                  label="Seller’s plant"
-                  facts={[
-                    {
-                      concept: "supply",
-                      label: removedPlant.name,
-                      value: formatWatts(removedPlant.peakW),
-                      detail: "Removed by the seller on transfer.",
-                    },
-                  ]}
-                />
-              ) : (
-                !!offer.facilities.length && (
-                  <>
-                    <Typography component="h3" variant="subtitle2">
-                      Operating plants
-                    </Typography>
-                    <DecisionImpactPreview
-                      label="Operating plants"
-                      facts={[...offer.facilities]
-                        .sort((a, b) => b.peakW - a.peakW)
-                        .map((facility) => ({
-                          concept: "supply",
-                          label: facility.name,
-                          value: formatWatts(facility.peakW),
-                          detail: `${formatNumber(facility.ageYears)} years old`,
-                        }))}
-                    />
-                  </>
-                )
+              {!!offer.facilities.length && (
+                <>
+                  <Typography component="h3" variant="subtitle2">
+                    Operating plants
+                  </Typography>
+                  <DecisionImpactPreview
+                    label="Operating plants"
+                    facts={[...offer.facilities]
+                      .sort((a, b) => b.peakW - a.peakW)
+                      .map((facility) => ({
+                        concept: "supply",
+                        label: facility.name,
+                        value: formatWatts(facility.peakW),
+                        detail: `${formatNumber(facility.ageYears)} years old`,
+                      }))}
+                  />
+                </>
               )}
               {offer.kind === "regional" && (
                 <Typography component="h3" variant="subtitle2">
@@ -252,14 +223,25 @@ export default function AcquisitionReviewDialog({
                 label={municipal ? "Price breakdown" : "Financing breakdown"}
                 facts={
                   municipal
-                    ? municipal.purchases.map(({ tileId, price }) => ({
-                        concept: "money",
-                        label:
-                          tileId === municipal.utility.city.id
-                            ? `${municipal.utility.city.city?.name ?? "City"} service area`
-                            : "Plant site",
-                        value: formatPurchasePrice(price),
-                      }))
+                    ? [
+                        ...municipal.purchases.map(({ tileId, price }) => ({
+                          concept: "money" as const,
+                          label:
+                            tileId === municipal.utility.city.id
+                              ? `${municipal.utility.city.city?.name ?? "City"} service area`
+                              : "Plant site",
+                          value: formatPurchasePrice(price),
+                        })),
+                        ...(offer.kind === "municipal" && offer.plant
+                          ? [
+                              {
+                                concept: "money" as const,
+                                label: offer.plant.name,
+                                value: formatPurchasePrice(offer.plantPrice),
+                              },
+                            ]
+                          : []),
+                      ]
                     : [
                         {
                           concept: "money",

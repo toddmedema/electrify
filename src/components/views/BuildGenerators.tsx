@@ -54,6 +54,7 @@ import {
   WEATHER_DEPENDENT_FUELS,
 } from "../../Constants";
 import { getHydroAvailability } from "../../data/HydroSites";
+import { withTerritoryCatalogueLimits } from "../../helpers/ProjectBuild";
 import { GENERATORS } from "../../data/Facilities";
 import {
   DateType,
@@ -272,6 +273,7 @@ interface GeneratorBuildItemProps {
     selection?: ResilienceSelectionType,
   ) => FacilityPurchaseSubmission;
   onBuilt?: () => void;
+  onPickSite?: () => void;
 }
 
 export function GeneratorBuildItem(
@@ -326,6 +328,7 @@ export function GeneratorBuildItem(
         remaining: props.territoryAvailability.remaining,
       }
     : undefined;
+  const pickingSite = !!props.onPickSite;
   const generalAvailability = getBuildAvailability({
     hydroAvailability: props.hydroAvailability,
     name: generator.name,
@@ -337,11 +340,15 @@ export function GeneratorBuildItem(
     viableLocationsRemaining: generator.viableLocationsRemaining,
     siteInventory: territorialSites,
   });
-  const buildable =
-    generalAvailability.buildable &&
-    (props.territoryAvailability?.buildable ?? true);
-  const secondaryText =
-    props.territoryAvailability && !props.territoryAvailability.buildable
+  const buildable = pickingSite
+    ? sizeBuildable && maxSizeW > 0
+    : generalAvailability.buildable &&
+      (props.territoryAvailability?.buildable ?? true);
+  const secondaryText = pickingSite
+    ? maxSizeW <= 0
+      ? "No suitable sites currently available."
+      : `Maximum size per site: ${formatWatts(maxSizeW)}`
+    : props.territoryAvailability && !props.territoryAvailability.buildable
       ? props.territoryAvailability.reason
       : generalAvailability.secondaryText;
   const tile = props.tileId
@@ -349,26 +356,29 @@ export function GeneratorBuildItem(
     : undefined;
   const offerMaxSize =
     (!tile || tileSupportsFacilityTechnology(tile, generator)) &&
-    (generalAvailability.offerMaxSize ||
+    ((pickingSite && !sizeBuildable && maxSizeW > 0) ||
+      generalAvailability.offerMaxSize ||
       (props.territoryAvailability &&
         generator.peakW > maxSizeW &&
         maxSizeW > 0));
-  const sites = props.hydroAvailability
-    ? undefined
-    : (territorialSites ??
-      getSiteInventory(
-        generator.name,
-        props.location,
-        generator.viableLocationsRemaining,
-      ));
-  const shortfall = !affordable ? (
-    <BuildCashWarning cash={cash} downpayment={downpayment} />
-  ) : undefined;
+  const sites =
+    pickingSite || props.hydroAvailability
+      ? undefined
+      : (territorialSites ??
+        getSiteInventory(
+          generator.name,
+          props.location,
+          generator.viableLocationsRemaining,
+        ));
+  const shortfall =
+    !pickingSite && !affordable ? (
+      <BuildCashWarning cash={cash} downpayment={downpayment} />
+    ) : undefined;
   const outputPending =
     props.forecastPending &&
     (generator.fuel === "Hydro" ||
       WEATHER_DEPENDENT_FUELS.includes(generator.fuel));
-  const canBuild = buildable && !shortfall && !outputPending;
+  const canBuild = buildable && !shortfall && (pickingSite || !outputPending);
   const buildSubtitle = (buildable && shortfall) || secondaryText;
   const offerAffordableSize =
     !!shortfall &&
@@ -412,9 +422,13 @@ export function GeneratorBuildItem(
               ? ["Steady supply", "Best for demand that lasts for hours."]
               : ["Fast response", ""];
   const openReview = (e: React.SyntheticEvent) => {
+    e.stopPropagation();
+    if (props.onPickSite) {
+      props.onPickSite();
+      return;
+    }
     setResilienceSelection(defaultSelection());
     setOpen(true);
-    e.stopPropagation();
   };
 
   // The dialog prices the quote with the player's hardening choice; the card keeps the default
@@ -511,7 +525,13 @@ export function GeneratorBuildItem(
   const useMaxSizeAction = (offerMaxSize || offerAffordableSize) &&
     (offerAffordableSize || generator.peakW !== maxSizeW) &&
     props.onUseMaxSize && (
-      <Button size="small" onClick={() => props.onUseMaxSize?.(maxSizeW)}>
+      <Button
+        size="small"
+        aria-label={
+          pickingSite ? `Use max size for ${generator.name}` : undefined
+        }
+        onClick={() => props.onUseMaxSize?.(maxSizeW)}
+      >
         Use max size
       </Button>
     );
@@ -586,9 +606,14 @@ export function GeneratorBuildItem(
         entry={MANUAL_ENTRY.TOTAL_COST_OF_ENERGY}
         value={formatPurchasePrice(generator.buildCost)}
         note={
-          includedOptions.length
-            ? `Incl. ${includedOptions.map((option) => option.label.toLowerCase()).join(", ")}`
-            : undefined
+          [
+            pickingSite && "Before site costs",
+            includedOptions.length
+              ? `Incl. ${includedOptions.map((option) => option.label.toLowerCase()).join(", ")}`
+              : undefined,
+          ]
+            .filter(Boolean)
+            .join(" · ") || undefined
         }
       />
       <BuildMetric
@@ -624,7 +649,10 @@ export function GeneratorBuildItem(
         props.preview
           ? undefined
           : {
-              ariaLabel: `Review purchase of ${generator.name}`,
+              pickSite: pickingSite,
+              ariaLabel: pickingSite
+                ? `Pick site for ${generator.name}`
+                : `Review purchase of ${generator.name}`,
               disabled: !canBuild,
               onClick: openReview,
             }
@@ -1093,13 +1121,18 @@ export interface DispatchProps {
 }
 
 export type Props = StateProps &
-  DispatchProps & { lockedTileId?: TerritoryTileId };
+  DispatchProps & {
+    lockedTileId?: TerritoryTileId;
+    onPickSite?: (facility: GeneratorShoppingType) => void;
+  };
 
 function BuildGenerators(props: Props): React.JSX.Element {
   const completeBuild = React.useContext(GameBuildCompleteContext);
   const workspace = useGameWorkspaceLayout();
   const comparisonInList =
-    workspace?.constrained || workspace?.fleetVisible === false;
+    !!props.onPickSite ||
+    workspace?.constrained ||
+    workspace?.fleetVisible === false;
   const { evidenceRequest, facilityDragActive, onEvidenceReady } = props;
   const evidenceAnchor = React.useRef<HTMLDivElement>(null);
   const { game, onBack } = props;
@@ -1111,7 +1144,9 @@ function BuildGenerators(props: Props): React.JSX.Element {
     (props.lockedTileId
       ? getTerritoryTile(props.lockedTileId, game)?.territoryId
       : undefined) ?? rememberedTerritoryId;
-  const territoryNetwork = hasTerritoryNetwork(game);
+  const { onPickSite } = props;
+  const territoryNetwork = hasTerritoryNetwork(game) && !onPickSite;
+  const memoryKey = onPickSite ? "project.generators" : "generators";
   const specialSite = territoryNetwork
     ? getTerritoryDefinition(territoryId)?.benefit
     : undefined;
@@ -1122,27 +1157,29 @@ function BuildGenerators(props: Props): React.JSX.Element {
     Math.max(minTick, Math.min(maxTick, tick));
   const now = getTimeFromTimeline(game.date.minute, game.timeline);
   const readCash = useBuildCashReader(now?.cash ?? 0);
-  const listRef = useToolScroll<HTMLUListElement>("generators.scroll");
+  const listRef = useToolScroll<HTMLUListElement>(`${memoryKey}.scroll`);
   const revealResizedRow = useBuildRowReveal(listRef);
   const [sliderTick, setSliderTick] = useToolState<number>(
-    "generators.size",
+    `${memoryKey}.size`,
     () =>
-      clampSizeTick(
-        wToSliderTick(
-          legacyBounds && game.date.year >= 1942
-            ? legacyBounds.defaultW
-            : game.facilities.length
-              ? averageBuildSize(game.facilities, false)
-              : (legacyBounds?.defaultW ??
-                averageBuildSize(game.facilities, false)),
-        ),
-      ),
+      onPickSite
+        ? 10
+        : clampSizeTick(
+            wToSliderTick(
+              legacyBounds && game.date.year >= 1942
+                ? legacyBounds.defaultW
+                : game.facilities.length
+                  ? averageBuildSize(game.facilities, false)
+                  : (legacyBounds?.defaultW ??
+                    averageBuildSize(game.facilities, false)),
+            ),
+          ),
   );
   // A generation change can keep this tool's saved choice outside the next era's range.
   const shownSliderTick = clampSizeTick(sliderTick);
   // Sizes between slider ticks, chosen per generator: hydro's site maximum or a technology's cap
   const [exactSizes, setExactSizes] = useToolState<Record<string, number>>(
-    "generators.exactSizes",
+    `${memoryKey}.exactSizes`,
     {},
   );
   // A remembered site/technology shortcut can outlive the era's minimum project size.
@@ -1158,11 +1195,11 @@ function BuildGenerators(props: Props): React.JSX.Element {
       )
     : exactSizes;
   const [sort, setSort] = useToolState<GeneratorSortKey>(
-    "generators.sort",
+    `${memoryKey}.sort`,
     "buildCost",
   );
   const [comparedNames, setComparedNames] = useToolState<string[]>(
-    "generators.compared",
+    `${memoryKey}.compared`,
     [],
   );
   const [primerVisible, dismissPrimer] = useHydroPrimer();
@@ -1203,38 +1240,24 @@ function BuildGenerators(props: Props): React.JSX.Element {
     !legacyBounds ||
     !hydroSiteMaximum ||
     hydroSiteMaximum.maxPeakW >= legacyBounds.minW;
-  const minimumGenerators = GENERATORS(
-    game,
-    sliderTickToW(minTick),
-    windSpeeds,
-    solarIrradiances,
-    offshoreWindSpeeds,
-    airborneWindSpeeds,
-    territoryNetwork ? territoryId : undefined,
-    territoryNetwork ? tileId : undefined,
-  );
-  const shownGenerators = GENERATORS(
-    game,
-    sliderTickToW(shownSliderTick),
-    windSpeeds,
-    solarIrradiances,
-    offshoreWindSpeeds,
-    airborneWindSpeeds,
-    territoryNetwork ? territoryId : undefined,
-    territoryNetwork ? tileId : undefined,
-  )
+  const quoteGenerators = (capacity: number) =>
+    GENERATORS(
+      game,
+      capacity,
+      windSpeeds,
+      solarIrradiances,
+      offshoreWindSpeeds,
+      airborneWindSpeeds,
+      territoryNetwork ? territoryId : undefined,
+      territoryNetwork ? tileId : undefined,
+    );
+  const minimumGenerators = quoteGenerators(sliderTickToW(minTick));
+  const sizedGenerators = quoteGenerators(sliderTickToW(shownSliderTick))
     .map((generator) =>
       shownExactSizes[generator.name] !== undefined
-        ? GENERATORS(
-            game,
-            shownExactSizes[generator.name],
-            windSpeeds,
-            solarIrradiances,
-            offshoreWindSpeeds,
-            airborneWindSpeeds,
-            territoryNetwork ? territoryId : undefined,
-            territoryNetwork ? tileId : undefined,
-          ).find((candidate) => candidate.name === generator.name) || generator
+        ? quoteGenerators(shownExactSizes[generator.name]).find(
+            (candidate) => candidate.name === generator.name,
+          ) || generator
         : generator,
     )
     .filter((generator) =>
@@ -1249,6 +1272,9 @@ function BuildGenerators(props: Props): React.JSX.Element {
         getTutorialStep(game)?.phase !== "GENERATOR_CHOICES" ||
         ["Natural Gas", "Sun", "Wind"].includes(generator.fuel),
     );
+  const shownGenerators = onPickSite
+    ? withTerritoryCatalogueLimits(game, sizedGenerators)
+    : sizedGenerators;
   const territoryAvailabilityByName = new Map(
     shownGenerators.map((generator) => [
       generator.name,
@@ -1289,9 +1315,11 @@ function BuildGenerators(props: Props): React.JSX.Element {
       });
       return [
         generator.name,
-        availability.buildable &&
-          (territoryAvailability?.buildable ?? true) &&
-          affordability[index] === "1",
+        onPickSite
+          ? generator.peakW <= generator.maxPeakW
+          : availability.buildable &&
+            (territoryAvailability?.buildable ?? true) &&
+            affordability[index] === "1",
       ];
     }),
   );
@@ -1325,7 +1353,7 @@ function BuildGenerators(props: Props): React.JSX.Element {
   const outputCeiling = sharedOutputCeiling(Array.from(outputShapes.values()));
   const buildableGenerators = generators.filter(
     (generator) =>
-      generator.available &&
+      (onPickSite || generator.available) &&
       generator.peakW <= generator.maxPeakW &&
       (territoryAvailabilityByName.get(generator.name)?.buildable ?? true),
   );
@@ -1357,6 +1385,7 @@ function BuildGenerators(props: Props): React.JSX.Element {
     remaining: hydroAvailability.remaining.length,
   };
   const showPrimer =
+    !onPickSite &&
     primerVisible &&
     !!hydro?.available &&
     !!hydroSites &&
@@ -1412,6 +1441,7 @@ function BuildGenerators(props: Props): React.JSX.Element {
       )}
       <ConstructionBuildHeader
         capacity={valueLabelFormat(shownSliderTick)}
+        capacityLabel={onPickSite ? "Generator capacity" : undefined}
         sliderValue={shownSliderTick}
         sliderValueText={valueLabelFormat}
         sliderMin={minTick}
@@ -1459,7 +1489,9 @@ function BuildGenerators(props: Props): React.JSX.Element {
                   showPrimer && g.name === "Hydro" ? dismissPrimer : undefined
                 }
                 hydroAvailability={
-                  g.name === "Hydro" ? hydroAvailability : undefined
+                  !onPickSite && g.name === "Hydro"
+                    ? hydroAvailability
+                    : undefined
                 }
                 onUseSiteMaximum={
                   canUseSiteMaximum
@@ -1470,36 +1502,35 @@ function BuildGenerators(props: Props): React.JSX.Element {
                       }
                     : undefined
                 }
+                onPickSite={onPickSite && (() => onPickSite(g))}
                 onUseMaxSize={
                   legacyBounds && g.maxPeakW < legacyBounds.minW
                     ? undefined
                     : (peakW) => {
                         const limit =
-                          g.name === "Hydro"
+                          g.name === "Hydro" && !onPickSite
                             ? Math.min(
                                 peakW,
                                 hydroAvailability.largest?.maxPeakW ?? peakW,
                               )
                             : peakW;
                         const size =
-                          largestAffordableBuildSize(
-                            buildSizeOptions(minTick, maxTick, limit),
-                            readCash(),
-                            (capacity) => {
-                              const candidate = GENERATORS(
-                                game,
-                                capacity,
-                                windSpeeds,
-                                solarIrradiances,
-                                offshoreWindSpeeds,
-                                airborneWindSpeeds,
-                                territoryNetwork ? territoryId : undefined,
-                                territoryNetwork ? tileId : undefined,
-                              ).find((item) => item.name === g.name)!;
-                              return withResilienceOptions(candidate, game, {})
-                                .buildCost;
-                            },
-                          ) ?? limit;
+                          (onPickSite
+                            ? undefined
+                            : largestAffordableBuildSize(
+                                buildSizeOptions(minTick, maxTick, limit),
+                                readCash(),
+                                (capacity) => {
+                                  const candidate = quoteGenerators(
+                                    capacity,
+                                  ).find((item) => item.name === g.name)!;
+                                  return withResilienceOptions(
+                                    candidate,
+                                    game,
+                                    {},
+                                  ).buildCost;
+                                },
+                              )) ?? limit;
                         revealResizedRow(g.name);
                         setSliderTick(clampSizeTick(wToSliderTick(size)));
                         setExactSizes((sizes) => ({

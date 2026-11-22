@@ -16,6 +16,8 @@ export function findTileControl(map: HTMLElement | null, tile: string) {
 }
 
 type SurfaceProps = {
+  id?: string;
+  closeLabel?: string;
   title: string;
   titleIconSrc?: string;
   /** Changes only for explicit activation or a new kind of tile content. */
@@ -49,6 +51,8 @@ export function TileInspectionSurface({
 
 /** A nonmodal surface for tile information and the map's build and project decisions. */
 export default function TileWorkspaceSurface({
+  id,
+  closeLabel = "Close tile",
   title,
   titleIconSrc,
   focusKey,
@@ -106,7 +110,7 @@ export default function TileWorkspaceSurface({
     <section
       role="dialog"
       aria-labelledby={titleId}
-      id={stacked ? "tool-TILE" : undefined}
+      id={stacked ? "tool-TILE" : id}
       className={`tileWorkspaceSurface${inspector ? " tileWorkspaceInspector" : ""}${wide ? " tileWorkspaceWide" : ""}${building ? " tileWorkspaceBuilding" : ""}${projectCandidate ? " tileWorkspaceProject" : ""}`}
       data-game-tool={stacked ? "TILE" : undefined}
       data-map-window-front={front}
@@ -159,7 +163,7 @@ export default function TileWorkspaceSurface({
           )}
         </div>
         {!inspector && (
-          <IconButton aria-label="Close tile" onClick={onClose}>
+          <IconButton aria-label={closeLabel} onClick={onClose}>
             <CloseIcon />
           </IconButton>
         )}

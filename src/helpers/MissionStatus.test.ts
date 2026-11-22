@@ -30,8 +30,8 @@ it("shows the acquisition target and live count", () => {
   const objective = getMissionStatus(game).requirements.find(
     (item) => item.id === "acquire-neighbor",
   )!;
-  expect(objective.compact).toBe("Acquire competitors (0/3)");
-  expect(objective.target).toBe("Acquire 3 competitors · Dec 2014");
+  expect(objective.compact).toBe("Acquire utilities (0/3)");
+  expect(objective.target).toBe("Acquire 3 utilities · Dec 2014");
   expect(objective.status).toBe("pending");
 });
 

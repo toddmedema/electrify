@@ -129,7 +129,7 @@ for (const theme of ["light", "dark"]) {
       await expect(events.locator(".MuiBadge-dot")).toBeVisible();
       await expectWideHeaderRow(
         page,
-        "Acquire competitors (0/3)",
+        "Acquire utilities (0/3)",
         "Unread events",
       );
       await page.setViewportSize({ width: 1120, height: 900 });
@@ -250,12 +250,20 @@ for (const theme of ["light", "dark"]) {
       ).toBeLessThanOrEqual(1);
     }
     await settle(page);
-    await page.getByRole("button", { name: "144 months left" }).click();
+    const months = page.getByRole("button", { name: "144 months left" });
+    await months.click();
     const dialog = page.getByRole("region", { name: "Scenario", exact: true });
     await expect(dialog).toContainText(
       "Serving less than 90% of demand for 3 months in a row ends the run.",
     );
     await expect(dialog).toContainText("month-end");
+    await expect(months).toHaveAttribute("aria-expanded", "true");
+    await months.click();
+    await expect(dialog).toHaveCount(0);
+    await expect(months).toHaveAttribute("aria-expanded", "false");
+    await expect(months).toBeFocused();
+    await months.click();
+    await expect(dialog).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(
       page.getByRole("button", { name: "Scenario", exact: true }),

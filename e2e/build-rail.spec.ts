@@ -157,6 +157,24 @@ for (const theme of ["light", "dark"] as const) {
       await expect(rail).toHaveCount(0);
     }
 
+    const build = page.getByRole("button", { name: "Build", exact: true });
+    if (!desktop) {
+      await build.click();
+      await expect(build).toHaveAttribute("aria-expanded", "true");
+      await expect(build).toHaveClass(/gameDockActionOpen/);
+      await build.click();
+      await expect(build).toHaveAttribute("aria-expanded", "false");
+      await expect(tileSurfaces).toHaveCount(0);
+    }
+    const months = page.getByRole("button", { name: /months left$/ });
+    const scenario = page.getByRole("region", {
+      name: "Scenario",
+      exact: true,
+    });
+    await months.click();
+    await expect(scenario).toBeVisible();
+    await months.click();
+    await expect(scenario).toHaveCount(0);
     const catalogue = await openMapProjectCatalogue(page);
     await setMapProjectCapacity(catalogue, false, "11");
     if (!desktop)
@@ -178,9 +196,9 @@ for (const theme of ["light", "dark"] as const) {
         }),
       ).toBeVisible();
     } else {
-      await expect(catalogue.locator(".projectSize strong")).toHaveText(
-        "60MWh",
-      );
+      await expect(
+        catalogue.locator(".constructionCapacity strong"),
+      ).toHaveText("60MWh");
       await catalogue
         .getByRole("tab", { name: "Generators", exact: true })
         .click();
@@ -190,15 +208,36 @@ for (const theme of ["light", "dark"] as const) {
           exact: true,
         }),
       ).toHaveValue("11");
-      await expect(catalogue.locator(".projectSize strong")).toHaveText("30MW");
+      await expect(
+        catalogue.locator(".constructionCapacity strong"),
+      ).toHaveText("30MW");
+    }
+    if (!desktop) {
+      const windCard = catalogue.locator('[data-build-option="Wind"]');
+      await expect(windCard.getByRole("img", { name: "Wind" })).toBeVisible();
+      await expect(
+        windCard.getByText("Build time", { exact: true }),
+      ).toBeVisible();
+      await expect(
+        windCard.getByRole("button", { name: "Show Wind details" }),
+      ).toBeVisible();
+      const screenshotDir = process.env.REVIEW_SCREENSHOT_DIR;
+      if (screenshotDir && info.project.name === "mobile-390px")
+        await catalogue.screenshot({
+          path: `${screenshotDir}/valley-project-${theme}.png`,
+        });
     }
     await catalogue
-      .getByRole("button", { name: "Choose sites for Wind", exact: true })
+      .getByRole("button", {
+        name: desktop ? "Choose sites for Wind" : "Pick site for Wind",
+        exact: true,
+      })
       .click();
     await expect(
       surface.getByRole("heading", { name: "Wind · 30MW", exact: true }),
     ).toBeVisible();
     await expect(surface.getByText("Choose a highlighted site.")).toBeVisible();
+    if (!desktop) await expect(build).toHaveAttribute("aria-expanded", "true");
     await surface
       .getByRole("button", { name: "Change project", exact: true })
       .click();

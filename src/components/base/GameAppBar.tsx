@@ -108,6 +108,8 @@ export interface DispatchProps {
 
 export interface Props extends StateProps, DispatchProps {
   eventStatus?: React.ReactNode;
+  scenarioOpen?: boolean;
+  onCloseScenario?: () => void;
 }
 
 /** Status controls retain focus when the row moves between header layouts. */
@@ -379,6 +381,8 @@ export function GameAppBar(props: Props) {
           activeEvents={activeEvents}
           onActiveEvents={openEvents}
           onEvidence={props.onEvidence}
+          scenarioOpen={props.scenarioOpen}
+          onCloseScenario={props.onCloseScenario}
         />
       )}
       {props.eventStatus}

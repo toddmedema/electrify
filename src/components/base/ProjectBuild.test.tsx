@@ -12,7 +12,7 @@ import ProjectBuild from "./ProjectBuild";
 import { TerritoryTilePurchasesProvider } from "./TerritoryTilePurchases";
 import { createGame } from "../../testing/Simulator";
 import { currentTick } from "../../helpers/GameSelectors";
-import { formatWatts, formatWattHours } from "../../helpers/Format";
+import { formatWatts } from "../../helpers/Format";
 import {
   projectCatalogue,
   type ProjectSelection,
@@ -25,6 +25,7 @@ import { tilePurchaseQuotes } from "../../helpers/Territories";
 import { registerMultiplayerRuntime } from "../../multiplayer/Registry";
 import { acquireTile } from "../../reducers/GameActions";
 import gameReducer, { buildFacility } from "../../reducers/Game";
+import cardReducer from "../../reducers/Card";
 import uiReducer from "../../reducers/UI";
 import type { GameType, TerritoryTileId } from "../../Types";
 import type { Command } from "../../multiplayer/Types";
@@ -49,6 +50,7 @@ function show(multiplayer = false, year?: number, compatibleSites = 2) {
         action: Parameters<typeof gameReducer>[1],
       ) =>
         replace.match(action) ? action.payload : gameReducer(state, action),
+      card: cardReducer,
       ui: uiReducer,
     },
     preloadedState: { game },
@@ -112,9 +114,7 @@ function show(multiplayer = false, year?: number, compatibleSites = 2) {
       screen.getByRole("slider", { name: "Generator capacity" }),
       { target: { value: "10" } },
     );
-    fireEvent.click(
-      screen.getByRole("button", { name: "Choose sites for Wind" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Pick site for Wind" }));
   };
   const adjacent = () => {
     choose();
@@ -295,7 +295,7 @@ it("shows a combined cash shortfall and charging requirements for storage", () =
   const { store } = show(false, 2031);
   fireEvent.click(screen.getByRole("tab", { name: "Storage" }));
   fireEvent.click(
-    screen.getByRole("button", { name: "Choose sites for Battery" }),
+    screen.getByRole("button", { name: "Pick site for Lithium Battery" }),
   );
   fireEvent.click(screen.getByRole("button", { name: "Owned site" }));
   expect(screen.getByText(/requires charging/)).toBeVisible();
@@ -334,11 +334,12 @@ it("corrects an oversized technology to the map's terrain maximum before choosin
   fireEvent.change(screen.getByRole("slider", { name: "Generator capacity" }), {
     target: { value: "34" },
   });
-  const choose = screen.getByRole("button", {
-    name: "Choose 450MW sites for Wind",
-  });
-  expect(screen.getByText("Maximum available size: 450MW")).toBeVisible();
-  fireEvent.click(choose);
+  const choose = screen.getByRole("button", { name: "Pick site for Wind" });
+  expect(choose).toBeDisabled();
+  fireEvent.click(
+    screen.getByRole("button", { name: "Use max size for Wind" }),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Pick site for Wind" }));
   fireEvent.click(screen.getByRole("button", { name: "Owned site" }));
   expect(screen.getByRole("heading", { name: "Wind · 450MW" })).toBeVisible();
   expect(
@@ -381,14 +382,16 @@ it("chooses the exact storage technology limit without requiring affordable cash
     ({ name }) => name === "Battery",
   )!;
   const limit = battery.maxPeakWh!;
-  const label = formatWattHours(limit);
   const newer = JSON.parse(JSON.stringify(store.getState().game)) as GameType;
   currentTick(newer)!.cash = 0;
   act(() => {
     store.dispatch(replace(newer));
   });
   fireEvent.click(
-    screen.getByRole("button", { name: `Choose ${label} sites for Battery` }),
+    screen.getByRole("button", { name: "Use max size for Lithium Battery" }),
+  );
+  fireEvent.click(
+    screen.getByRole("button", { name: "Pick site for Lithium Battery" }),
   );
   expect(onSelection).toHaveBeenLastCalledWith(
     expect.objectContaining({ peakWh: limit }),

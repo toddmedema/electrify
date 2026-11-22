@@ -31,6 +31,21 @@ jest.mock(
   () => (props: { children?: React.ReactNode }) => <>{props.children}</>,
 );
 
+it("exposes the selected energy capacity on the project picker slider", () => {
+  render(
+    <BuildStorage
+      game={createGame({ scenarioId: 116, seed: 611 })}
+      onBack={jest.fn()}
+      onBuildStorage={jest.fn()}
+      onPickSite={jest.fn()}
+    />,
+  );
+  const slider = screen.getByRole("slider", { name: "Storage capacity" });
+  expect(slider).toHaveAttribute("aria-valuetext", "100MWh");
+  fireEvent.change(slider, { target: { value: "19" } });
+  expect(slider).toHaveAttribute("aria-valuetext", "200MWh");
+});
+
 it.each([false, true])(
   "prices and builds the same physical tile when selected automatically: %p",
   (automatic) => {

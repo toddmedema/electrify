@@ -16,13 +16,9 @@ import {
 import { useAppSelector } from "../Store";
 import { formatPercent } from "../helpers/Format";
 import { formatLargeMassValueConcise, largeMassUnit } from "../helpers/Units";
-import {
-  finishedObjectiveStatusText,
-  objectiveObservedText,
-  objectiveTargetText,
-  objectiveWindowText,
-} from "../helpers/ObjectivePresentation";
+import FinishedObjective from "../components/base/FinishedObjective";
 import { KeepModCopy } from "../components/views/CoopModPreview";
+import { getScenario } from "../data/Scenarios";
 import type { CompanyOutcomeType } from "../Types";
 
 const OUTCOME_LABELS: Record<CompanyOutcomeType["outcome"], string> = {
@@ -61,8 +57,9 @@ export default function CoopResult({
   const results = useAppSelector(
     (state) => state.game.multiplayer?.results ?? [],
   );
-  const startingYear = useAppSelector((state) => state.game.startingYear);
-  const scenario = useAppSelector((state) => state.game.customScenario);
+  const scenario = useAppSelector((state) =>
+    getScenario(state.game.scenarioId, state.game.customScenario),
+  );
   const units = useAppSelector((state) => state.settings.units);
   const title = complete
     ? "Match complete"
@@ -142,40 +139,12 @@ export default function CoopResult({
                 {company.name} · Objectives
               </Typography>
               {company.objectiveResults?.map((result) => (
-                <Box
+                <FinishedObjective
                   key={result.id}
-                  sx={{ mt: 1.5 }}
-                  data-objective-status={result.status}
-                >
-                  <Typography variant="subtitle2">
-                    {result.label} · {result.required ? "Required" : "Optional"}{" "}
-                    · {finishedObjectiveStatusText[result.status]}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    {result.definition}
-                  </Typography>
-                  <Typography variant="body2">
-                    {objectiveTargetText(result.objective, currency)} ·{" "}
-                    {objectiveWindowText(
-                      result.objective,
-                      startingYear,
-                      scenario?.durationMonths ??
-                        ("throughMonth" in result.objective
-                          ? result.objective.throughMonth + 1
-                          : result.objective.deadlineMonth +
-                            result.requiredMonths),
-                      (scenario?.startingMonth ?? 1) - 1,
-                    )}
-                  </Typography>
-                  <Typography variant="body2">
-                    {objectiveObservedText(result, currency)}
-                  </Typography>
-                  {result.reason && (
-                    <Typography variant="body2" color="text.secondary">
-                      {result.reason}
-                    </Typography>
-                  )}
-                </Box>
+                  result={result}
+                  calendar={scenario}
+                  currency={currency}
+                />
               ))}
             </Box>
           ))}

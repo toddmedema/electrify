@@ -123,6 +123,11 @@ export function objectiveTargetText(
     3,
     currency,
   );
+  if (
+    objective.metric === "utilityOwnership" &&
+    objective.minUtilities !== undefined
+  )
+    return `Acquire ${objective.minUtilities} ${objective.minUtilities === 1 ? "utility" : "utilities"}`;
   if (objective.checkpoint) {
     switch (objective.metric) {
       case "customerRetention":
@@ -227,7 +232,8 @@ export function objectiveGoalText(
 
 /** A short heading names the goal; its target carries quantities, conditions and dates. */
 export function objectiveHeadingText(objective: CompiledRuleObjective): string {
-  if (objective.metric === "utilityOwnership") return objective.label;
+  if (objective.metric === "utilityOwnership")
+    return objectiveTargetText(objective);
   if (
     objective.label !== objectiveTargetText(objective) &&
     !/\d/.test(objective.label)
@@ -291,6 +297,11 @@ export function objectiveDefinitionText(
   result: Pick<ObjectiveResult, "metric" | "definition"> &
     Partial<Pick<ObjectiveResult, "objective">>,
 ): string {
+  if (
+    result.objective?.metric === "utilityOwnership" &&
+    result.objective.minUtilities !== undefined
+  )
+    return objectiveTargetText(result.objective);
   if (result.objective?.checkpoint) {
     switch (result.metric) {
       case "emissionsBudget":
