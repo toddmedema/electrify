@@ -44,6 +44,7 @@ export default function MultiplayerRoot() {
   const [couchOpen, setCouchOpen] = useState(false);
   const localSession = useRef(false);
   localSession.current = couchOpen;
+  const deferredInvite = useRef<string>();
   const [savesOpen, setSavesOpen] = useState(false);
   // The host has opened the scenario screens for the lobby; guests follow once it publishes.
   const choosing = useRef(false);
@@ -65,6 +66,26 @@ export default function MultiplayerRoot() {
   const reconnect = useCallback(() => {
     void session.reconnect();
   }, [session]);
+
+  const joinInvitedLobby = useCallback(
+    (lobbyId: string) => {
+      if (localSession.current) {
+        deferredInvite.current = lobbyId;
+        return;
+      }
+      deferredInvite.current = undefined;
+      if (session.getSnapshot().view) return;
+      setOpen(true);
+      void session.join(lobbyId).catch(() => undefined);
+    },
+    [session],
+  );
+
+  useEffect(() => {
+    // Let the couch shell unmount and release its controls before joining online.
+    const lobbyId = deferredInvite.current;
+    if (!couchOpen && lobbyId) joinInvitedLobby(lobbyId);
+  }, [couchOpen, joinInvitedLobby]);
 
   /** Choosing together ends with the lobby; scenario screens go back to single player. */
   const syncCoop = useCallback(() => {
@@ -191,6 +212,7 @@ export default function MultiplayerRoot() {
     let live = true,
       initialized = false,
       loading = false;
+    let receivedLiveInvite = false;
     let appliedGame: GameType | undefined;
     const sync = () => {
       const current = session.getSnapshot();
@@ -302,19 +324,16 @@ export default function MultiplayerRoot() {
       openSaves: () => setSavesOpen(true),
     });
     const stopNative = getDesktop()?.onMultiplayerEvent?.((event) => {
-      if (event.kind === "invite" && !session.getSnapshot().view) {
-        setOpen(true);
-        void session.join(event.lobbyId).catch(() => undefined);
+      if (live && event.kind === "invite") {
+        receivedLiveInvite = true;
+        joinInvitedLobby(event.lobbyId);
       }
     });
     void session
       .initialize()
       .then(() => {
         const invite = session.getSnapshot().lobby.inviteLobbyId;
-        if (invite) {
-          setOpen(true);
-          void session.join(invite).catch(() => undefined);
-        }
+        if (live && invite && !receivedLiveInvite) joinInvitedLobby(invite);
       })
       // A desktop build without Steam multiplayer keeps the lobby unavailable.
       .catch(() => undefined);
@@ -330,7 +349,7 @@ export default function MultiplayerRoot() {
       registerMultiplayerRuntime(undefined);
       session.dispose();
     };
-  }, [session, syncCoop, leaveLobby, invite, copyCode]);
+  }, [session, syncCoop, leaveLobby, invite, copyCode, joinInvitedLobby]);
   useEffect(() => {
     if (!hasView) return;
     return registerShutdownCheckpoint((reason) => {
@@ -456,6 +475,9 @@ export default function MultiplayerRoot() {
           onLocalPlay={
             getDesktop()?.couchRequest
               ? () => {
+                  const online = session.getSnapshot();
+                  if (online.busy || online.lobby.lobbyId) return;
+                  localSession.current = true;
                   setOpen(false);
                   setCouchOpen(true);
                 }
