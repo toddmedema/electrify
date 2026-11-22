@@ -1,3 +1,4 @@
+import { CouchPlayerText, couchPlayerColor } from "./PlayerColor";
 import {
   useCallback,
   useEffect,
@@ -1257,9 +1258,10 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
         <DialogTitle id="couch-title">On this TV · Two players</DialogTitle>
         <DialogContent>
           <Typography>
-            One controller per company. Each player presses Confirm to join. P1
-            chooses the game; both confirm before starting. The slowest speed
-            wins and either player can pause.
+            One controller per company. Each player presses Confirm to join.{" "}
+            <CouchPlayerText seatId="local-p1">P1</CouchPlayerText> chooses the
+            game; both confirm before starting. The slowest speed wins and
+            either player can pause.
           </Typography>
           {error && (
             <Typography role="alert" color="error">
@@ -1270,7 +1272,15 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
             {seats.map((seat, index) => (
               <div key={seat.id}>
                 <TextField
-                  label={`P${index + 1} company`}
+                  label={
+                    <CouchPlayerText seatId={seat.id}>
+                      P{index + 1} company
+                    </CouchPlayerText>
+                  }
+                  sx={(theme) => {
+                    const color = couchPlayerColor(seat.id, theme.palette.mode);
+                    return { "& input": { color, WebkitTextFillColor: color } };
+                  }}
                   value={seat.name}
                   slotProps={{ htmlInput: { maxLength: 80 } }}
                   disabled={busy || stage !== "join" || !!saved}
@@ -1402,7 +1412,10 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
       </Dialog>
       <Dialog open={!!textOwner} fullWidth maxWidth="sm">
         <DialogTitle>
-          {seats.find((seat) => seat.id === textOwner)?.name}: entering text
+          <CouchPlayerText seatId={textOwner}>
+            {seats.find((seat) => seat.id === textOwner)?.name}
+          </CouchPlayerText>
+          : entering text
         </DialogTitle>
         <DialogContent>
           Finish or cancel the Steam text dialog to return to all companies.
@@ -1448,13 +1461,18 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
           ) && (
             <Typography>
               Press Confirm on a controller to operate these results as{" "}
-              {seats[0].name}. Company results keep their original identities.
+              <CouchPlayerText seatId={seats[0].id}>
+                {seats[0].name}
+              </CouchPlayerText>
+              . Company results keep their original identities.
             </Typography>
           )}
           {summary?.players.map((player, index) => (
             <Typography key={player.id}>
-              P{index + 1} · {player.name}:{" "}
-              {summary.outcomes[player.id]?.title ?? "Company retired"}
+              <CouchPlayerText seatId={player.id}>
+                P{index + 1} · {player.name}
+              </CouchPlayerText>
+              : {summary.outcomes[player.id]?.title ?? "Company retired"}
             </Typography>
           ))}
         </DialogContent>
@@ -1472,9 +1490,12 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
         </DialogTitle>
         <DialogContent>
           <Typography>
-            {seats.find((seat) => seat.id === exitOwner)?.name} wants to end
-            this TV session. Save all companies together on this device.
-            Accepted decisions are saved; unsent decisions are cancelled.
+            <CouchPlayerText seatId={exitOwner}>
+              {seats.find((seat) => seat.id === exitOwner)?.name}
+            </CouchPlayerText>{" "}
+            wants to end this TV session. Save all companies together on this
+            device. Accepted decisions are saved; unsent decisions are
+            cancelled.
           </Typography>
           {error && <Typography role="alert">{error}</Typography>}
           {discarding && (
@@ -1595,14 +1616,17 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
           )}
           {missing.map((seat) => (
             <Typography key={seat.id}>
-              {seat.name}: controller disconnected. Reconnect its assigned
-              controller.
+              <CouchPlayerText seatId={seat.id}>{seat.name}</CouchPlayerText>:
+              controller disconnected. Reconnect its assigned controller.
             </Typography>
           ))}
           {!!missing.length && (
             <Typography>
-              Press Confirm on an unused controller to claim {missing[0].name}.
-              The other companies keep their assignments.
+              Press Confirm on an unused controller to claim{" "}
+              <CouchPlayerText seatId={missing[0].id}>
+                {missing[0].name}
+              </CouchPlayerText>
+              . The other companies keep their assignments.
             </Typography>
           )}
           {!!recovery.length && !sessionFault && error && (
@@ -1618,7 +1642,10 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
                 );
               }}
             >
-              Restore {seats.find((seat) => seat.id === id)?.name}
+              Restore{" "}
+              <CouchPlayerText seatId={id}>
+                {seats.find((seat) => seat.id === id)?.name}
+              </CouchPlayerText>
             </Button>
           ))}
           <Typography>

@@ -1,5 +1,6 @@
 import { Toolbar, Typography } from "@mui/material";
-import type { CSSProperties, ReactNode } from "react";
+import { Fragment, type CSSProperties, type ReactNode } from "react";
+import { CouchPlayerText } from "./PlayerColor";
 import { GameDate, YearProgressBar } from "../components/base/GameCalendar";
 import { speedSelectionLabel } from "../components/base/SpeedControls";
 import CouchMenu from "./Menu";
@@ -35,7 +36,12 @@ function pauseHolders(clock: SharedClock) {
             : []),
         ]),
       ];
-  const holders: { label: string; name?: string; reasons: string[] }[] = [];
+  const holders: {
+    label: string;
+    name?: string;
+    seatId?: string;
+    reasons: string[];
+  }[] = [];
   if (systemReasons.length)
     holders.push({ label: "System", reasons: systemReasons });
   clock.players.forEach((player, index) => {
@@ -48,7 +54,12 @@ function pauseHolders(clock: SharedClock) {
       reasons.push("Select a running speed to resume");
     if (player.selectedSpeed === "PAUSED") reasons.push("Selected pause");
     if (reasons.length)
-      holders.push({ label: `P${index + 1}`, name: player.name, reasons });
+      holders.push({
+        label: `P${index + 1}`,
+        name: player.name,
+        seatId: player.id,
+        reasons,
+      });
   });
   if (!holders.length)
     holders.push({
@@ -93,9 +104,10 @@ export default function CouchToolbar({
   const pauses = pauseHolders(clock);
   const speedSetters = clock.players.flatMap((player, index) =>
     !player.retired && player.selectedSpeed === clock.speed
-      ? [`P${index + 1}`]
+      ? [{ label: `P${index + 1}`, seatId: player.id }]
       : [],
   );
+  const clockOwners = clock.speed === "PAUSED" ? pauses : speedSetters;
   return (
     <>
       <div id="appbar" className="couchSharedToolbar" style={statusStyle}>
@@ -127,24 +139,32 @@ export default function CouchToolbar({
             <div className="couchClock" role="group" aria-label="Shared clock">
               <strong>Clock {speedSelectionLabel(clock.speed)}</strong>
               {clock.players.map((player, index) => (
-                <span key={player.id}>
+                <CouchPlayerText key={player.id} seatId={player.id}>
                   P{index + 1}{" "}
                   {player.retired
                     ? "Retired"
                     : speedSelectionLabel(player.selectedSpeed)}
-                </span>
+                </CouchPlayerText>
               ))}
               <span>
-                {clock.speed === "PAUSED"
-                  ? `Held by ${pauses.map(({ label }) => label).join(", ")}`
-                  : `Set by ${speedSetters.join(", ")}`}
+                {clock.speed === "PAUSED" ? "Held by " : "Set by "}
+                {clockOwners.map(({ label, seatId }, index) => (
+                  <Fragment key={label}>
+                    {index > 0 && ", "}
+                    <CouchPlayerText seatId={seatId}>{label}</CouchPlayerText>
+                  </Fragment>
+                ))}
               </span>
             </div>
             {!!pauses.length && (
               <ul className="couchClockReasons" aria-label="Pause reasons">
-                {pauses.map(({ label, name, reasons }) => (
+                {pauses.map(({ label, name, seatId, reasons }) => (
                   <li key={label}>
-                    <strong>{name ? `${label} · ${name}` : label}</strong>
+                    <strong>
+                      <CouchPlayerText seatId={seatId}>
+                        {name ? `${label} · ${name}` : label}
+                      </CouchPlayerText>
+                    </strong>
                     <ul>
                       {reasons.map((reason) => (
                         <li key={reason}>{reason}</li>

@@ -1,3 +1,4 @@
+import { CouchPlayerText } from "../../couch/PlayerColor";
 import { useMoney } from "./CurrencyContext";
 import { useGameWorkspaceLayout } from "./GameWorkspaceContext";
 import type { AppDispatch } from "../../Store";
@@ -396,11 +397,12 @@ export function GameAppBar(props: Props) {
           {!couchSeat && menu}
           <Typography variant="h6" component="div" className="gameStatus">
             <span className="gameBalance">
-              <span
+              <CouchPlayerText
+                seatId={multiplayer?.seat}
                 className={`gameStatusValue${now.cash < 0 ? " gameCashNegative" : ""}`}
               >
                 {formatMoneyStable(now.cash)}
-              </span>
+              </CouchPlayerText>
               <Tooltip title="Current month forecast: revenue minus operating expenses, including interest and imports.">
                 <Typography
                   // Tutorials lock navigation, so the figure opens nothing there.

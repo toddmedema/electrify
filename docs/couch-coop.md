@@ -12,7 +12,9 @@ or custom game; both players confirm that selection. The campaign roster then
 stays fixed. An assigned controller controls only its company's document. The
 shared bar shows the calendar and year progress, with the upcoming event and
 months left on the right. Each player selects a speed in their pane, and the
-slowest selection sets the pace. To see the shared speed, seat selections and
+slowest selection sets the pace. Each seat has a fixed color for the company
+name, cash, and speed selection outline. The blue fill marks the running speed.
+To see the shared speed, seat selections and
 full pause reasons, press Start/Menu or Select/View and choose **Clock status**
 in the Game menu. The shared menu pauses the match. Either
 controller can navigate the shared menu and Settings. Save & Quit confirmation

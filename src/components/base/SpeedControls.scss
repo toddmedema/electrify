@@ -139,17 +139,26 @@
       opacity: 0.85;
     }
 
-    // Your own request, whenever it isn't where the clock is. When the two agree the thumb says
-    // both and the ring steps aside, so an agreeing pair looks exactly like single-player.
+    // The ring marks your own request. On the TV it also identifies your company
+    // when the shared thumb is under the same speed.
     &.multiplayerSpeedToggles
-      > .MuiToggleButton-root.Mui-selected:not([data-thumb="true"])::before {
+      > .MuiToggleButton-root.Mui-selected:not([data-thumb="true"])::before,
+    &[data-couch-player] > .MuiToggleButton-root.Mui-selected::before {
       content: "";
       position: absolute;
       inset: var(--speed-inset);
       box-sizing: border-box;
-      border: 2px solid var(--interactive-strong);
+      border: 2px solid var(--couch-player-color, var(--interactive-strong));
       border-radius: var(--radius-pill);
       pointer-events: none;
+    }
+
+    &[data-couch-player] {
+      --speed-lift: 0px;
+
+      > .MuiToggleButton-root.Mui-selected[data-thumb="true"]::before {
+        inset: 1px;
+      }
     }
 
     // Still on your earlier pick but the clock is waiting for you: a dashed ring says the
@@ -195,7 +204,8 @@
       }
 
       &.multiplayerSpeedToggles
-        > .MuiToggleButton-root.Mui-selected:not([data-thumb="true"])::before {
+        > .MuiToggleButton-root.Mui-selected:not([data-thumb="true"])::before,
+      &[data-couch-player] > .MuiToggleButton-root.Mui-selected::before {
         border-color: ButtonText;
       }
 

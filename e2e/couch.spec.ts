@@ -946,7 +946,47 @@ test("TV couch applies padded bounds and exposes shared clock reasons through co
   const termBox = (await term.boundingBox())!;
   expect(eventBox.x).toBeGreaterThan(width / 2);
   expect(termBox.x - eventBox.x - eventBox.width).toBeLessThan(24);
-  if (process.env.REVIEW_SCREENSHOT_DIR)
+  const eventIcon = (await event.locator(".statusIcon svg").boundingBox())!;
+  const eventFontSize = await renderedFontSize(
+    event.locator(".missionRiskText"),
+  );
+  expect(eventIcon.height).toBeCloseTo(eventFontSize, 0);
+  expect(eventIcon.width).toBeCloseTo(eventFontSize, 0);
+
+  const verifySeatPalette = async (
+    seat: Frame,
+    seatId: string,
+    speed: string,
+  ) => {
+    const cash = seat.locator(".gameBalance > .gameStatusValue");
+    await expect(cash).toHaveAttribute("data-couch-player", seatId);
+    const color = await cash.evaluate((node) => getComputedStyle(node).color);
+    const group = speedControls(seat);
+    await expect(group.locator(".multiplayerSpeedPip")).toHaveCount(0);
+    const selection = group.getByRole("button", { name: speed, exact: true });
+    await expect(selection).toHaveAttribute("aria-pressed", "true");
+    expect(
+      await selection.evaluate((node) => {
+        const ring = getComputedStyle(node, "::before");
+        return { color: ring.borderTopColor, width: ring.borderTopWidth };
+      }),
+    ).toEqual({ color, width: "2px" });
+    return color;
+  };
+  const p1Color = await verifySeatPalette(p1, "local-p1", "fast speed");
+  const p2Color = await verifySeatPalette(p2, "local-p2", "normal speed");
+  expect(p1Color).not.toBe(p2Color);
+  const peerInP1 = p1
+    .getByRole("button", { name: /^Inspect P2 Utility,/ })
+    .getByText("P2 Utility", { exact: true });
+  const peerInP2 = p2
+    .getByRole("button", { name: /^Inspect P1 Utility,/ })
+    .getByText("P1 Utility", { exact: true });
+  await expect(peerInP1).toHaveAttribute("data-couch-player", "local-p2");
+  await expect(peerInP1).toHaveCSS("color", p2Color);
+  await expect(peerInP2).toHaveAttribute("data-couch-player", "local-p1");
+  await expect(peerInP2).toHaveCSS("color", p1Color);
+  if (process.env.REVIEW_SCREENSHOT_DIR) {
     await page.screenshot({
       path: path.join(
         process.env.REVIEW_SCREENSHOT_DIR,
@@ -954,6 +994,20 @@ test("TV couch applies padded bounds and exposes shared clock reasons through co
       ),
       animations: "disabled",
     });
+    if (info.project.name === "tv-1080-light") {
+      await Promise.all([
+        peerInP1.scrollIntoViewIfNeeded(),
+        peerInP2.scrollIntoViewIfNeeded(),
+      ]);
+      await page.screenshot({
+        path: path.join(
+          process.env.REVIEW_SCREENSHOT_DIR,
+          "couch-interties.png",
+        ),
+        animations: "disabled",
+      });
+    }
+  }
 
   await couch.input({ "202": ["pause"] });
   await expect(clock(p1)).toHaveAttribute("data-active-speed", "PAUSED");
@@ -974,13 +1028,13 @@ test("TV couch applies padded bounds and exposes shared clock reasons through co
     exact: true,
   });
   const sharedClock = details.getByRole("group", { name: "Shared clock" });
-  for (const label of [
-    "Clock Paused",
-    "P1 12×",
-    "P2 Paused",
-    "Held by System, P2",
-  ])
+  for (const label of ["Clock Paused", "P1 12×", "P2 Paused"])
     await expect(sharedClock.getByText(label, { exact: true })).toBeVisible();
+  await expect(sharedClock).toContainText("Held by System, P2");
+  await expect(sharedClock.getByText("P2 Paused", { exact: true })).toHaveCSS(
+    "color",
+    p2Color,
+  );
   await expect(details).toContainText("P2 · P2 Utility");
   await expect(details).toContainText("Selected pause");
   await expect(details).toContainText("TV session dialog open");

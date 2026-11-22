@@ -1,5 +1,7 @@
 import * as React from "react";
 import { ToggleButton, ToggleButtonGroup } from "@mui/material";
+import { useTheme } from "@mui/material/styles";
+import { couchPlayerColor } from "../../couch/PlayerColor";
 import PauseIcon from "@mui/icons-material/Pause";
 import { TICK_MS } from "../../Constants";
 import { GameType, SpeedType } from "../../Types";
@@ -113,6 +115,7 @@ function playersAtSpeed(
 function speedOptions(
   { speed, onSpeedChange, desktop, multiplayer, disabled }: SpeedOptionsProps,
   descriptionId?: string,
+  playerColor?: string,
 ): React.JSX.Element {
   const resume = !!multiplayer?.readyRequired && !multiplayer.ready;
   const description = multiplayer
@@ -143,6 +146,7 @@ function speedOptions(
         aria-label={multiplayer ? "your game speed" : "game speed"}
         aria-describedby={descriptionId}
         title={description}
+        data-couch-player={playerColor ? multiplayer?.selfId : undefined}
         data-active-speed={multiplayer?.activeSpeed}
         // Still on your earlier pick, but the clock is waiting for you to confirm it.
         data-resume={resume ? "true" : undefined}
@@ -152,17 +156,19 @@ function speedOptions(
           {
             "--speed-index": Math.max(thumbIndex, 0),
             "--speed-count": options.length,
+            "--couch-player-color": playerColor,
           } as React.CSSProperties
         }
       >
         {options.map((option) => {
-          const peers =
-            multiplayer?.players.filter(
-              (player) =>
-                player.id !== multiplayer.selfId &&
-                (player.pauseReason ? "PAUSED" : player.selectedSpeed) ===
-                  option,
-            ) || [];
+          const peers = playerColor
+            ? []
+            : multiplayer?.players.filter(
+                (player) =>
+                  player.id !== multiplayer.selfId &&
+                  (player.pauseReason ? "PAUSED" : player.selectedSpeed) ===
+                    option,
+              ) || [];
           return (
             <ToggleButton
               key={option}
@@ -237,7 +243,11 @@ function speedOptions(
 
 function MultiplayerSpeedControls(props: SpeedOptionsProps) {
   const id = React.useId();
-  return speedOptions(props, `${id}-clock`);
+  const playerColor = couchPlayerColor(
+    props.multiplayer?.selfId,
+    useTheme().palette.mode,
+  );
+  return speedOptions(props, `${id}-clock`, playerColor);
 }
 
 // Construct once per control-state change, independent of the live cash/date render.
