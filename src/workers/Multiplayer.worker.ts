@@ -3,6 +3,7 @@ import { initEconomy } from "../data/Economy";
 import { initFuelPrices } from "../data/FuelPrices";
 import { initWeather } from "../data/Weather";
 import { TICK_MS } from "../Constants";
+import { pendingScenarioChoice } from "../helpers/ScenarioChoices";
 import { waitForLoad } from "../helpers/WaitForLoad";
 import {
   checkpointWorld,
@@ -10,6 +11,7 @@ import {
   matchScenario,
   restoreWorld,
   savedMatchSpec,
+  worldBlockers,
 } from "../multiplayer/World";
 import { ReplicatedWorld } from "../multiplayer/Replication";
 import type { ReplicaRecord } from "../multiplayer/Replication";
@@ -141,31 +143,40 @@ function publish() {
     viewPending = true;
     post({ kind: "views", views });
     if (local) {
+      const match = world;
       // A retired P1 freezes. The shared calendar must follow a company still playing.
       const game =
-        world.grids.find((_grid, i) => !world!.outcomes[world!.seats[i].id]) ||
-        world.grids.reduce((latest, grid) =>
+        match.grids.find((_grid, i) => !match.outcomes[match.seats[i].id]) ||
+        match.grids.reduce((latest, grid) =>
           grid.date.minute > latest.date.minute ? grid : latest,
         );
       post({
         kind: "summary",
         summary: {
-          matchId: world.matchId,
-          epoch: world.epoch,
-          revision: world.revision,
+          matchId: match.matchId,
+          epoch: match.epoch,
+          revision: match.revision,
           date: game.date,
-          speed: world.speed,
-          reason: world.reason,
-          readyRequired: world.readyRequired,
-          ready: [...world.ready],
-          players: world.seats.map((seat) => ({
-            ...seat,
-            selectedSpeed: world!.selectedSpeeds[seat.id],
-            pauseReason: world!.activities[seat.id],
-            retired: !!world!.outcomes[seat.id],
-          })),
-          complete: world.seats.every((seat) => !!world!.outcomes[seat.id]),
-          outcomes: world.outcomes,
+          speed: match.speed,
+          reason: match.reason,
+          systemBlockers: worldBlockers(match),
+          readyRequired: match.readyRequired,
+          ready: [...match.ready],
+          players: match.seats.map((seat, index) => {
+            const retired = !!match.outcomes[seat.id];
+            return {
+              ...seat,
+              selectedSpeed: match.selectedSpeeds[seat.id],
+              pauseReason: match.activities[seat.id],
+              pendingChoice:
+                match.speed === "PAUSED" && !retired
+                  ? pendingScenarioChoice(match.grids[index])?.title
+                  : undefined,
+              retired,
+            };
+          }),
+          complete: match.seats.every((seat) => !!match.outcomes[seat.id]),
+          outcomes: match.outcomes,
         },
       });
     }

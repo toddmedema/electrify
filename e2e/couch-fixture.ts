@@ -29,6 +29,7 @@ const defaultDevices: Device[] = ["101", "202"].map((id) => ({
 
 interface CouchLayout {
   fits: boolean;
+  inset: number;
   zoom: number;
   cssWidth: number;
   cssHeight: number;
@@ -55,13 +56,18 @@ export interface CouchFixture<Actor extends Page | Frame> {
     settle: () => void;
   };
   checkpoint: () => World | undefined;
+  seedCheckpoint: (world: World) => void;
+  setSaveFailure: (failing: boolean) => void;
   layout: () => CouchLayout | undefined;
+  resize: (width: number, height: number) => Promise<void>;
   backdropRevision: () => number;
   refreshRequests: () => number;
   presentationMessages: () => number;
   settleCaptures: () => Promise<void>;
   cancelledText: () => readonly string[];
-  failNextNative: (kind: "setup" | "list-saves" | "close" | "status") => void;
+  failNextNative: (
+    kind: "setup" | "list-saves" | "close" | "status" | "reload-seat",
+  ) => void;
   input: (actions: Record<string, DesktopInputAction[]>) => Promise<void>;
 }
 const {
@@ -104,6 +110,7 @@ interface NativeHarness {
       active: boolean;
     };
     inputFrame: (frames: Device[]) => void;
+    shellFrame: (frames: Device[]) => Device | undefined;
     open: (input: Record<string, unknown>) => Promise<unknown>;
     close: () => void;
     overlay: (owner: string | null, shared: boolean) => unknown;
@@ -186,6 +193,7 @@ export async function createCouchFixture(
     | { ordinal: number; requested: () => void; outcome: Promise<void> }
     | undefined;
   let saved: World | undefined;
+  let saveFailure = false;
   let updatedAt = 0;
   let overlayOwner: string | null = null;
   let overlayShared = false;
@@ -327,6 +335,7 @@ export async function createCouchFixture(
             { seatId, route, generation },
           ] of capturedSeats.entries()) {
             if (!current()) return;
+            if (!capturedLayout.fits) break;
             let png: Buffer;
             if (isPage(route.page)) {
               try {
@@ -480,6 +489,7 @@ export async function createCouchFixture(
         case "read-save":
           return saved;
         case "write-save":
+          if (saveFailure) throw new Error("Fixture local storage is full");
           saved = structuredClone(raw.world) as World;
           updatedAt = Date.now();
           return { id: "saved-local", updatedAt };
@@ -552,14 +562,17 @@ export async function createCouchFixture(
           );
           return relayout(raw.options as Record<string, unknown>);
         case "send": {
-          const route = seats.get(String(raw.seatId));
+          const seatId = String(raw.seatId);
+          const route = seats.get(seatId);
           if (
-            route &&
-            route.generation === raw.generation &&
-            !actorClosed(route.page)
-          ) {
-            if ((raw.message as { kind?: string })?.kind === "presentation")
-              presentationMessages++;
+            !route ||
+            route.generation !== raw.generation ||
+            actorClosed(route.page)
+          )
+            return false;
+          if ((raw.message as { kind?: string })?.kind === "presentation")
+            presentationMessages++;
+          try {
             await route.page.evaluate(
               (detail) =>
                 window.dispatchEvent(
@@ -567,8 +580,13 @@ export async function createCouchFixture(
                 ),
               raw.message,
             );
+            return true;
+          } catch (error) {
+            // Native delivery drops a route revoked during teardown or replacement.
+            if (seats.get(seatId) !== route || actorClosed(route.page))
+              return false;
+            throw error;
           }
-          return;
         }
         case "open": {
           if (native) await native.manager.open(raw);
@@ -864,7 +882,25 @@ export async function createCouchFixture(
       return { requested: pending, settle };
     },
     checkpoint: () => saved,
+    seedCheckpoint: (world) => {
+      if (playing) throw new Error("Close the campaign before seeding a save");
+      saved = structuredClone(world);
+      updatedAt = Date.now();
+    },
+    setSaveFailure: (failing) => {
+      saveFailure = failing;
+    },
     layout: () => layout,
+    async resize(width, height) {
+      await settleCaptures();
+      await shell.setViewportSize({ width, height });
+      if (native) {
+        native.size[0] = width;
+        native.size[1] = height;
+        native.manager.relayout({});
+      }
+      await relayout();
+    },
     backdropRevision: () => readyCaptureId,
     refreshRequests: () => refreshRequests,
     presentationMessages: () => presentationMessages,
@@ -899,9 +935,12 @@ export async function createCouchFixture(
             )
           : undefined;
         const device = sampledBindings.get(sampledOverlay || "local-p1");
-        const frame = sampledShared
-          ? selected?.frame
-          : frames.find((item) => item.id === device);
+        const frame =
+          native && sampledOverlay && !sampledShared
+            ? native.manager.shellFrame(frames)
+            : sampledShared
+              ? selected?.frame
+              : frames.find((item) => item.id === device);
         if (selected && selected.seatId !== sharedInputSeat) {
           sharedInputSeat = selected.seatId;
           await emit({

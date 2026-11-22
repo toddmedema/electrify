@@ -1,3 +1,5 @@
+import { Fragment } from "react";
+import { CouchPlayerText } from "../../couch/PlayerColor";
 import { useMoney } from "./CurrencyContext";
 import { currentCash } from "../../helpers/GameSelectors";
 import {
@@ -26,9 +28,9 @@ export default function ScenarioChoiceDialog() {
     (player) => player.id === game.multiplayer?.seat,
   )?.name;
   const deciding =
-    game.multiplayer?.clock?.players
-      .filter((player) => player.pauseReason === "Choosing a response")
-      .map((player) => player.name) ?? [];
+    game.multiplayer?.clock?.players.filter(
+      (player) => player.pauseReason === "Choosing a response",
+    ) ?? [];
   const cash = currentCash(game);
   const options = decision.options.map((option) => {
     const cost = option.cost(game.difficulty);
@@ -91,7 +93,10 @@ export default function ScenarioChoiceDialog() {
             variant="subtitle2"
             sx={{ mb: 1, overflowWrap: "anywhere" }}
           >
-            Your company: {company}
+            Your company:{" "}
+            <CouchPlayerText seatId={game.multiplayer?.seat}>
+              {company}
+            </CouchPlayerText>
           </Typography>
         )}
         {!!deciding.length && (
@@ -101,8 +106,16 @@ export default function ScenarioChoiceDialog() {
             color="text.secondary"
             sx={{ mb: 2, overflowWrap: "anywhere" }}
           >
-            Still deciding: {deciding.join(", ")}. Each company chooses for its
-            own grid.
+            Still deciding:{" "}
+            {deciding.map((player, index) => (
+              <Fragment key={player.id}>
+                {index > 0 && ", "}
+                <CouchPlayerText seatId={player.id}>
+                  {player.name}
+                </CouchPlayerText>
+              </Fragment>
+            ))}
+            . Each company chooses for its own grid.
           </Typography>
         )}
         <Typography

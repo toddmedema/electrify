@@ -1,3 +1,4 @@
+import { CouchPlayerText } from "../../couch/PlayerColor";
 import { useMoney } from "./CurrencyContext";
 import * as React from "react";
 import { IconButton, Toolbar, Typography } from "@mui/material";
@@ -71,7 +72,7 @@ export default function CatalogTitleBar(
           className="weak constructionCash"
           aria-label={`Available cash ${cash}`}
         >
-          {cash}
+          <CouchPlayerText seatId={multiplayer?.seat}>{cash}</CouchPlayerText>
           {props.compactCash ? "" : " cash"}
         </span>
       </Typography>
