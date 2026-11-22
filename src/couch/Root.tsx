@@ -22,7 +22,7 @@ import type { MatchSpec, Seat, World } from "../multiplayer/Types";
 import { coopControls, registerCoopControls } from "../multiplayer/Registry";
 import { navigate } from "../reducers/Card";
 import { delta as uiDelta, dialogOpen } from "../reducers/UI";
-import { store } from "../Store";
+import { store, useAppSelector } from "../Store";
 import { getScenario } from "../data/Scenarios";
 import { registerShutdownCheckpoint } from "../desktop/Shutdown";
 import type { CouchSummary } from "./Protocol";
@@ -100,6 +100,9 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
   const [backdrop, setBackdrop] = useState<CouchOverlayBackdrop>();
   const [textOwner, setTextOwner] = useState<string>();
   const [settingsOwner, setSettingsOwner] = useState<string>();
+  const screenEdgePadding = useAppSelector(
+    (state) => state.settings.screenEdgePadding,
+  );
   const [controlsController, setControlsController] = useState<string>();
   const [sessionFault, setSessionFault] = useState(false);
   const globalRequest = useRef<{
@@ -123,6 +126,13 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
     requestId: string;
   }>();
   const band = useRef<HTMLDivElement>(null);
+  const measureLayout = useCallback(
+    () => ({
+      screenEdgePadding: store.getState().settings.screenEdgePadding,
+      bandHeight: Math.ceil(band.current?.getBoundingClientRect().height ?? 96),
+    }),
+    [],
+  );
   const coordinator = useRef<import("./Coordinator").CouchCoordinator>();
   const overlayOwner = useRef<string>();
   const acknowledgeBackdrop = useCallback(
@@ -308,6 +318,18 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
   const gateGlobal = () => {
     coordinator.current?.setInputGate("global-request", true);
     coordinator.current?.setBlocker("global-dialog", "TV session dialog open");
+  };
+  /** Keep settings and input ownership with the requesting seat during display recovery too. */
+  const openSettings = (
+    seatId: string,
+    generation = routes.current.get(seatId) ?? 0,
+    id = crypto.randomUUID(),
+  ) => {
+    if (globalRequest.current) return;
+    globalRequest.current = { kind: "settings", seatId, generation, id };
+    gateGlobal();
+    setSettingsOwner(seatId);
+    store.dispatch(navigate("SETTINGS"));
   };
   /** Any assigned controller may toggle shared navigation, but cannot interrupt a save.
    * A new menu records its requester before gating company commands synchronously. */
@@ -655,6 +677,7 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
       } else if (event.kind === "layout") {
         setInvalidLayout(!event.layout?.fits);
         if (event.layout?.zoom) setNativeZoom(event.layout.zoom);
+        coordinator.current?.setInputGate("layout", !event.layout?.fits);
         coordinator.current?.setBlocker(
           "layout",
           event.layout?.fits
@@ -874,19 +897,7 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
           setDiscarding(false);
           setExitOwner(seatId);
         },
-        /** Preserve request identity while shared Settings and its gameplay gate belong to everyone. */
-        onSettings: (seatId, generation, requestId) => {
-          if (globalRequest.current) return;
-          globalRequest.current = {
-            kind: "settings",
-            seatId,
-            generation,
-            id: requestId,
-          };
-          gateGlobal();
-          setSettingsOwner(seatId);
-          store.dispatch(navigate("SETTINGS"));
-        },
+        onSettings: openSettings,
         onMenu: (seatId, generation, requestId) =>
           openMenu(seatId, generation, requestId),
         /** Promote worker faults to session recovery so ordinary dialog dismissal cannot resume play. */
@@ -950,20 +961,13 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
       await request({
         kind: "open",
         seats,
-        inset: 0,
+        ...measureLayout(),
         gutter: 8,
-        bandHeight: Math.ceil(
-          band.current?.getBoundingClientRect().height ?? 96,
-        ),
       });
       if (!mounted.current || generation !== starts.current) return;
       await request({
         kind: "layout",
-        options: {
-          bandHeight: Math.ceil(
-            band.current?.getBoundingClientRect().height ?? 96,
-          ),
-        },
+        options: measureLayout(),
       });
     } catch (failure) {
       if (!mounted.current || generation !== starts.current) return;
@@ -988,17 +992,17 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
   };
   useEffect(() => {
     if (stage !== "play" || !band.current) return;
+    // A padding change can move the band without resizing it. Observe the new
+    // box so native positions also update when its measured height stays put.
     const resize = new ResizeObserver(() => {
       void request({
         kind: "layout",
-        options: {
-          bandHeight: Math.ceil(band.current!.getBoundingClientRect().height),
-        },
+        options: measureLayout(),
       }).catch((failure) => setError(String(failure)));
     });
     resize.observe(band.current);
     return () => resize.disconnect();
-  }, [stage]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [stage, screenEdgePadding, measureLayout]); // eslint-disable-line react-hooks/exhaustive-deps
   useLayoutEffect(() => {
     if (stage === "play")
       document.documentElement.dataset.couchShellActive = "true";
@@ -1547,8 +1551,8 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
           )}
           {invalidLayout && (
             <Typography>
-              Restore the display area and interface scale to fit readable
-              companies, or save and quit.
+              Increase the display area, reduce interface scale or screen-edge
+              padding, or save and quit.
             </Typography>
           )}
           {missing.map((seat) => (
@@ -1580,6 +1584,11 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
           </Typography>
         </DialogContent>
         <DialogActions>
+          {invalidLayout && !sessionFault && globalOwner && (
+            <Button onClick={() => openSettings(globalOwner)}>
+              Display settings
+            </Button>
+          )}
           {sessionFault ? (
             <Button onClick={() => void returnToSetup()}>
               Return to local saved games

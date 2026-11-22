@@ -87,7 +87,10 @@ async function captureSeat(seat, bounds, current) {
 /** Coordinates are DIPs; CSS dimensions are computed only after zoom. */
 function couchLayout(width, height, count, options = {}) {
   const zoom = options.zoom ?? Math.max(1.5, height / 720);
-  const inset = options.inset ?? 0;
+  const screenEdgePadding = options.screenEdgePadding ?? 0;
+  const inset =
+    options.inset ??
+    Math.ceil((Math.min(width, height) * screenEdgePadding) / 100);
   const gutter = options.gutter ?? 8;
   const bandHeight = options.bandHeight ?? 96;
   if (
@@ -95,6 +98,7 @@ function couchLayout(width, height, count, options = {}) {
     count < 2 ||
     count > 4 ||
     ![width, height, zoom, inset, gutter, bandHeight].every(Number.isFinite) ||
+    ![0, 2, 4].includes(screenEdgePadding) ||
     width <= 0 ||
     height <= 0 ||
     zoom < 1 ||
@@ -109,7 +113,7 @@ function couchLayout(width, height, count, options = {}) {
     throw new Error("Invalid couch layout");
   const availableWidth = width - inset * 2 - gutter * (count - 1);
   const seatWidth = Math.floor(availableWidth / count);
-  const seatHeight = Math.floor(height - bandHeight - inset);
+  const seatHeight = Math.floor(height - bandHeight - inset * 2);
   const fits = seatWidth / zoom >= 360 && seatHeight / zoom >= 360;
   return {
     fits,
@@ -130,7 +134,7 @@ function couchLayout(width, height, count, options = {}) {
       );
       return {
         x: left,
-        y: Math.round(bandHeight),
+        y: Math.round(inset + bandHeight),
         width: Math.max(0, right - left),
         height: Math.max(0, seatHeight),
       };
@@ -281,13 +285,13 @@ class CouchViews {
       }
     );
   }
-  /** Publish device presence while suppressing all seat input during global UI ownership. */
+  /** Publish device presence while suppressing seat input when seats are unavailable. */
   inputFrame(devices) {
     this.devices = devices.map((frame) => ({ ...frame, actions: [] }));
     if (!this.active()) return;
     this.publish({ kind: "devices", devices });
     for (const seat of this.seats.values()) {
-      if (this.overlayOwner) continue;
+      if (this.overlayOwner || !this.layout.fits) continue;
       const controller = this.bindings.get(seat.id);
       const frame = devices.find((device) => device.id === controller);
       if (frame) seat.view.webContents.send("desktop:input-event", frame);
@@ -404,13 +408,14 @@ class CouchViews {
     this.options = {
       zoom: input.zoom,
       inset: input.inset,
+      screenEdgePadding: input.screenEdgePadding,
       gutter: input.gutter,
       bandHeight: input.bandHeight,
     };
     this.layout = couchLayout(width, height, seats.length, this.options);
     if (!this.layout.fits)
       throw new Error(
-        "This display cannot fit two readable companies. Increase the display area or restore TV scale.",
+        "This display cannot fit two readable companies. Increase the display area or reduce interface scale or screen-edge padding in Display settings.",
       );
     const lifecycle = ++this.lifecycle;
     this.opening = true;
@@ -463,7 +468,7 @@ class CouchViews {
         // before that asynchronous work, including explicitly focused seat pages.
         for (const name of ["before-input-event", "before-mouse-event"])
           wc.on(name, (event) => {
-            if (this.overlayOwner) event.preventDefault();
+            if (this.overlayOwner || !this.layout.fits) event.preventDefault();
           });
         wc.on("focus", () => {
           if (this.overlayOwner) this.window.webContents.focus();
