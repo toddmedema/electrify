@@ -1,3 +1,4 @@
+import { CouchPlayerText } from "../../couch/PlayerColor";
 import { CurrencyType } from "../../helpers/Currency";
 import { currencyFormatters } from "../../helpers/Format";
 import { useMoney } from "../base/CurrencyContext";
@@ -454,6 +455,7 @@ function IntertieBuildItem(props: {
  */
 function IntertieUpgradeControl(props: {
   costIndex: number;
+  peerId?: string;
   line: TransmissionLineOperatingType;
   cash?: number;
   year: number;
@@ -528,7 +530,14 @@ function IntertieUpgradeControl(props: {
         <PurchaseReviewDialog
           open
           onClose={() => setReviewing(false)}
-          title={`Upgrade ${line.name}?`}
+          title={
+            <>
+              Upgrade{" "}
+              <CouchPlayerText seatId={props.peerId}>
+                {line.name}?
+              </CouchPlayerText>
+            </>
+          }
           cash={cash ?? 0}
           buildCost={quote.buildCost}
           interestRate={interestRate}
@@ -1097,9 +1106,12 @@ export default function TransmissionPanel({
                                   <FacilityRowText
                                     name={
                                       <>
-                                        <span className="facilityName">
+                                        <CouchPlayerText
+                                          className="facilityName"
+                                          seatId={peer?.id}
+                                        >
                                           {line.name}
-                                        </span>
+                                        </CouchPlayerText>
                                         {restricted && !building && (
                                           <Chip
                                             className="storyDerateBadge"
@@ -1365,9 +1377,25 @@ export default function TransmissionPanel({
                                         variant="body2"
                                         color="textSecondary"
                                       >
-                                        {peer.upgradeRequestedBySelf
-                                          ? `You requested this upgrade. Waiting for ${peer.name} to approve their half.`
-                                          : `${peer.upgradeRequestedBy} requested this upgrade. Review the upgrade to approve and fund your half.`}
+                                        {peer.upgradeRequestedBySelf ? (
+                                          <>
+                                            You requested this upgrade. Waiting
+                                            for{" "}
+                                            <CouchPlayerText seatId={peer.id}>
+                                              {peer.name}
+                                            </CouchPlayerText>{" "}
+                                            to approve their half.
+                                          </>
+                                        ) : (
+                                          <>
+                                            <CouchPlayerText seatId={peer.id}>
+                                              {peer.upgradeRequestedBy}
+                                            </CouchPlayerText>{" "}
+                                            requested this upgrade. Review the
+                                            upgrade to approve and fund your
+                                            half.
+                                          </>
+                                        )}
                                       </Typography>
                                     )}
                                     <div className="transmissionDecisionActions">
@@ -1391,6 +1419,7 @@ export default function TransmissionPanel({
                                           game.seed,
                                         )}
                                         line={line}
+                                        peerId={peer?.id}
                                         context={accessContextForGame(game)}
                                         cash={now?.cash}
                                         year={game.date.year}

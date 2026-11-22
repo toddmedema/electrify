@@ -23,11 +23,13 @@ export interface CouchSummary {
   date: DateType;
   speed: SpeedType;
   reason: string;
+  systemBlockers: string[];
   readyRequired: boolean;
   ready: string[];
   players: (Seat & {
     selectedSpeed: SpeedType;
     pauseReason?: string;
+    pendingChoice?: string;
     retired: boolean;
   })[];
   complete: boolean;

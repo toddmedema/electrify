@@ -85,3 +85,13 @@ export function soundEffectsForUpdate(
 
   return [...new Set(effects)];
 }
+
+/** Milestones use the same semantic event mapping for browser and seat haptics. */
+export function hasMilestoneFeedback(
+  previous: SoundEventSnapshot,
+  current: SoundEventSnapshot,
+): boolean {
+  return soundEffectsForUpdate(previous, current).some((effect) =>
+    ["VICTORY", "CONSTRUCTION_COMPLETE", "POWER_RESTORED"].includes(effect),
+  );
+}

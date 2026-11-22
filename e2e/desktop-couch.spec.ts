@@ -25,6 +25,8 @@ type Backdrop = {
   }[];
 };
 
+type NativeLayout = { kind: "layout"; layout: { fits: boolean } };
+
 type InputPhase =
   "baseline" | "overlayVisible" | "overlayHidden" | "afterClear";
 type InputProbe = Record<InputPhase, { keyboard: number; mouse: number }>;
@@ -94,7 +96,7 @@ test("native couch views isolate roles, storage, ports and zoom and dispose on e
         { id: "local-p2", name: "South Power" },
       ],
       zoom: 1.5,
-      inset: 0,
+      screenEdgePadding: 4,
       gutter: 8,
       bandHeight: 96,
     }),
@@ -162,6 +164,7 @@ test("native couch views isolate roles, storage, ports and zoom and dispose on e
       };
     },
   );
+  const inset = Math.ceil(Math.min(...native.contentSize) * 0.04);
   expect(native.separateSessions).toBe(true);
   expect(native.seats).toHaveLength(2);
   for (const seat of native.seats) {
@@ -170,16 +173,20 @@ test("native couch views isolate roles, storage, ports and zoom and dispose on e
     expect(seat.mode).toBe("isolated");
     expect(seat.protocol).toBe("electrify:");
     expect(seat.bounds.width / seat.zoom).toBeGreaterThanOrEqual(360);
-    expect(seat.bounds.y).toBe(96);
-    expect(seat.bounds.y + seat.bounds.height).toBe(native.contentSize[1]);
+    expect(seat.bounds.y).toBe(inset + 96);
+    expect(seat.bounds.y + seat.bounds.height).toBe(
+      native.contentSize[1] - inset,
+    );
   }
-  expect(native.seats[0].bounds.x).toBe(0);
+  expect(native.seats[0].bounds.x).toBe(inset);
   expect(native.seats[1].bounds.x + native.seats[1].bounds.width).toBe(
-    native.contentSize[0],
+    native.contentSize[0] - inset,
   );
-  expect(native.seats[0].bounds.x + native.seats[0].bounds.width).toBeLessThan(
-    native.seats[1].bounds.x,
-  );
+  expect(
+    native.seats[1].bounds.x -
+      native.seats[0].bounds.x -
+      native.seats[0].bounds.width,
+  ).toBe(8);
   // The shell cannot paint over native child views. Its menu backdrop must be
   // captured from the actual paused pages and painted before those views hide.
   for (const page of [p1, p2])
@@ -425,6 +432,44 @@ test("native couch views isolate roles, storage, ports and zoom and dispose on e
       }),
     )
     .toBe(1);
+  // Native resize events hide seats when they no longer fit, then restore the
+  // same renderer generations and port owners when the content area recovers.
+  const generations = await Promise.all(
+    [p1, p2].map((page) =>
+      page.evaluate(() => window.electrifyCouch!.getGeneration()),
+    ),
+  );
+  const latestFit = () =>
+    desktop.page.evaluate(
+      () =>
+        (
+          globalThis as unknown as { couchAudit: NativeLayout[] }
+        ).couchAudit.findLast((event) => event.kind === "layout")?.layout.fits,
+    );
+  const resize = (width: number, height: number) =>
+    desktop.app.evaluate(
+      ({ BrowserWindow }, area) => {
+        BrowserWindow.getAllWindows()[0].setContentSize(
+          area.width,
+          area.height,
+        );
+      },
+      { width, height },
+    );
+  await resize(980, 760);
+  await expect.poll(latestFit).toBe(false);
+  expect(await nativeVisibility()).toEqual([false, false]);
+  await resize(native.contentSize[0], native.contentSize[1]);
+  await expect.poll(latestFit).toBe(true);
+  expect(await nativeVisibility()).toEqual([true, true]);
+  expect(
+    await Promise.all(
+      [p1, p2].map((page) =>
+        page.evaluate(() => window.electrifyCouch!.getGeneration()),
+      ),
+    ),
+  ).toEqual(generations);
+
   // Changing just one view's isolated zoom must not alter its sibling or shell.
   await desktop.app.evaluate(({ BrowserWindow, WebContentsView }, targetId) => {
     const window = BrowserWindow.getAllWindows()[0];

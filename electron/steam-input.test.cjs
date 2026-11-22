@@ -86,6 +86,7 @@ function fixture(definition = manifest) {
     },
     label: (_input, origin) => (origin === 1 ? "A Button" : "Cross Button"),
     glyph: () => undefined,
+    vibration: (...args) => calls.push(["vibration", ...args]),
   };
   const input = new SteamInput(
     api,
@@ -368,12 +369,27 @@ test("optional native symbol failures do not disable other Steam APIs", () => {
   };
   const struct = {};
   assert.ok(loadInputFunctions(library, { struct: () => struct }));
-  assert.equal(calls.length, Object.keys(INPUT_DECLARATIONS).length + 1);
-  assert.deepEqual(calls.at(-1), [
+  assert.equal(calls.length, Object.keys(INPUT_DECLARATIONS).length + 2);
+  assert.deepEqual(calls.at(-2), [
     "SteamAPI_ISteamInput_GetDigitalActionData",
     struct,
     ["void *", "uint64_t", "uint64_t"],
   ]);
+  assert.deepEqual(calls.at(-1), [
+    "void SteamAPI_ISteamInput_TriggerVibration(void *, uint64_t, uint16_t, uint16_t)",
+  ]);
+  const withoutVibration = loadInputFunctions(
+    {
+      func: (declaration) => {
+        if (declaration.includes("_TriggerVibration"))
+          throw new Error("older SDK");
+        return () => {};
+      },
+    },
+    { struct: () => struct },
+  );
+  assert.ok(withoutVibration.data);
+  assert.equal(withoutVibration.vibration, undefined);
   assert.equal(
     loadInputFunctions(
       {
@@ -388,7 +404,68 @@ test("optional native symbol failures do not disable other Steam APIs", () => {
 });
 
 test("every SteamInput006 export and its returned bool struct resolves in the pinned SDK", () => {
-  assert.ok(loadInputFunctions());
+  assert.equal(typeof loadInputFunctions()?.vibration, "function");
+});
+
+test("couch vibration is bounded, targets exact 64-bit handles and stops on focus loss or disconnect", (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const { api, calls, input, state, poll } = fixture();
+  t.after(() => input.dispose());
+  const xbox = 9223372036854775809n;
+  const dualSense = 9223372036854775810n;
+  const replacement = 9223372036854775811n;
+  const haptics = () => calls.filter(([name]) => name === "vibration");
+  const broadcast = 0xffffffffffffffffn;
+  state.controllers = [dualSense, xbox, broadcast];
+  poll();
+  assert.equal(input.vibrate(String(xbox), "confirm"), false); // Solo uses its existing backend.
+  input.setDeviceMode(true);
+  assert.equal(input.vibrate(String(xbox), "confirm"), true);
+  assert.equal(input.vibrate(String(xbox), "confirm"), false); // No duplicate pulse in this sample.
+  assert.equal(input.vibrate(String(dualSense), "milestone"), true);
+  assert.equal(input.vibrate(String(broadcast), "confirm"), false);
+  assert.equal(input.vibrate("0", "confirm"), false);
+  assert.deepEqual(haptics(), [
+    ["vibration", "input", xbox, 8000, 12000],
+    ["vibration", "input", dualSense, 8000, 12000],
+  ]);
+  t.mock.timers.tick(35);
+  assert.deepEqual(haptics().at(-1), ["vibration", "input", xbox, 0, 0]);
+  input.setEnabled(false);
+  assert.deepEqual(haptics().at(-1), ["vibration", "input", dualSense, 0, 0]);
+  assert.equal(input.vibrate(String(xbox), "confirm"), false);
+  t.mock.timers.tick(70);
+  assert.equal(haptics().length, 4); // Cancelled timers cannot touch subsequent devices.
+
+  input.setEnabled(true);
+  poll(200);
+  assert.equal(input.vibrate(String(xbox), "milestone"), true);
+  state.controllers = [replacement, dualSense];
+  poll();
+  assert.deepEqual(haptics().at(-1), ["vibration", "input", xbox, 0, 0]);
+  assert.equal(input.vibrate(String(xbox), "confirm"), false);
+  assert.equal(input.vibrate(String(replacement), "milestone"), true);
+  t.mock.timers.tick(69);
+  assert.deepEqual(haptics().at(-1), [
+    "vibration",
+    "input",
+    replacement,
+    8000,
+    12000,
+  ]);
+  t.mock.timers.tick(1);
+  assert.deepEqual(haptics().at(-1), ["vibration", "input", replacement, 0, 0]);
+  poll(200);
+  assert.equal(input.vibrate(String(replacement), "confirm"), true);
+  input.releaseDevice(String(replacement));
+  assert.deepEqual(haptics().at(-1), ["vibration", "input", replacement, 0, 0]);
+
+  api.vibration = () => {
+    throw new Error("unsupported controller");
+  };
+  poll(200);
+  assert.equal(input.vibrate(String(replacement), "confirm"), false);
+  assert.equal(input.initialized, true);
 });
 
 test("couch input retains same-frame device actions and independent contexts", () => {

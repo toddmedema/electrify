@@ -22,7 +22,7 @@ type SurfaceProps = {
   titleIconSrc?: string;
   /** Changes only for explicit activation or a new kind of tile content. */
   focusKey: React.Key;
-  subtitle?: string;
+  subtitle?: React.ReactNode;
   building?: boolean;
   wide?: boolean;
   projectCandidate?: boolean;

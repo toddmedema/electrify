@@ -1,3 +1,4 @@
+import { CouchPlayerText } from "../../couch/PlayerColor";
 import * as React from "react";
 import { Button, Typography } from "@mui/material";
 import CheckIcon from "@mui/icons-material/Check";
@@ -98,7 +99,9 @@ export default function CoopBrowseBar({
           <ul className="coopBrowseRoster" aria-label="Players">
             {coop.players.map((player) => (
               <li key={player.id}>
-                <span className="coopBrowseName">{player.name}</span>
+                <CouchPlayerText className="coopBrowseName" seatId={player.id}>
+                  {player.name}
+                </CouchPlayerText>
                 <PlayerState player={player} />
               </li>
             ))}
