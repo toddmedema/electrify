@@ -136,7 +136,7 @@ export default function CityOccupant({
         <g data-city-growth="Commercial">
           <path d="M390 333H443L455 359H405Z" fill="#CFD8DC" strokeWidth={10} />
           <g transform="translate(397 112) scale(.7)" strokeWidth={14}>
-            <Block x={0} top={220} width={66} floors={2} />
+            <Block x={0} top={220} width={66} floors={2} roof="#796B56" />
           </g>
         </g>
       )}

@@ -139,6 +139,11 @@ test("Valley town growth survives resume and adds buildings to the map", async (
     await expect(
       fallbackCity.locator(`[data-city-growth="${sector}"]`),
     ).toBeVisible();
+  await expect(
+    fallbackCity.locator(
+      '[data-city-growth="Commercial"] path[fill="#796B56"]',
+    ),
+  ).toBeVisible();
   await reviewScreenshot(grown.map.locator(".territoryMapViewport"), {
     path: info.outputPath("burlington-grown-fallback.png"),
   });
