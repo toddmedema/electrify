@@ -87,7 +87,8 @@ function cloudflare(keyId, keyToken, interrupted) {
       if (!selected)
         throw new ProbeError("Expected Cloudflare TURN URL was absent");
       return {
-        urls: url,
+        // The scheme and port fix the transport. WebKit rejects the redundant query.
+        urls: url.split("?")[0],
         username: selected.username,
         credential: selected.credential,
       };
@@ -126,6 +127,7 @@ function inspectDescription(description, type) {
   if (!candidates.length)
     throw new ProbeError("No relay candidates were gathered");
   const endpoints = [];
+  const sanitizedCandidates = new Map();
   const relayAddresses = new Set();
   for (const line of candidates) {
     const [
@@ -155,20 +157,28 @@ function inspectDescription(description, type) {
       );
     relayAddresses.add(address);
     endpoints.push(`${address}:${Number(port)}`);
+    const tokens = line.split(" ");
     for (let i = 0; i < extensions.length; i += 2) {
       const key = extensions[i];
       const value = extensions[i + 1];
-      if (!(
-        (key === "raddr" && (value === "0.0.0.0" || value === "::")) ||
-        (key === "rport" && (value === "0" || value === "9")) ||
-        (["generation", "network-id", "network-cost"].includes(key) &&
-          /^\d+$/.test(value))
-      )) {
+      if (key === "raddr" && isIP(value)) {
+        tokens[i + 9] = "0.0.0.0";
+      } else if (
+        key === "rport" &&
+        /^\d{1,5}$/.test(value) &&
+        Number(value) <= 65535
+      ) {
+        tokens[i + 9] = "9";
+      } else if (
+        !["generation", "network-id", "network-cost"].includes(key) ||
+        !/^\d+$/.test(value)
+      ) {
         throw new ProbeError(
           "A generated ICE candidate contained unexpected address metadata",
         );
       }
     }
+    sanitizedCandidates.set(line, tokens.join(" "));
   }
   // This is a diagnostic on the two local browsers' SDP, not a parser for untrusted signaling.
   for (const line of lines) {
@@ -200,7 +210,15 @@ function inspectDescription(description, type) {
     throw new ProbeError(
       "Generated WebRTC description lacked a unique ICE username fragment",
     );
-  return { description, endpoints, fragment: fragments[0] };
+  return {
+    description: {
+      type,
+      sdp: lines
+        .map((line) => sanitizedCandidates.get(line) ?? line)
+        .join("\r\n"),
+    },
+    endpoints,
+  };
 }
 
 async function openBrowserPage(browser) {
@@ -217,9 +235,9 @@ async function openBrowserPage(browser) {
   return page;
 }
 
-async function exchangeDescriptions(host, guest, id, restart) {
+async function exchangeDescriptions(host, guest, id) {
   const offer = inspectDescription(
-    await host.evaluate(gatherDescription, { id, type: "offer", restart }),
+    await host.evaluate(gatherDescription, { id, type: "offer" }),
     "offer",
   );
   await guest.evaluate(
@@ -237,30 +255,31 @@ async function exchangeDescriptions(host, guest, id, restart) {
   return { offer, answer };
 }
 
-async function confirmRelayPair(page, id, protocol, local, remote, previous) {
-  const handle = await page.waitForFunction(
-    async ({ id, local, remote, previous }) => {
+async function confirmRelayPair(page, id, protocol, local, remote) {
+  const selected = await page.evaluate(
+    async ({ id, local, remote }) => {
       const probe = window.turnProbes[id];
-      if (probe.channel.readyState !== "open") return false;
-      const pair = await probe.selectedPair();
-      if (
-        !pair ||
-        !local.includes(pair.localEndpoint) ||
-        !remote.includes(pair.remoteEndpoint)
-      )
-        return false;
-      if (
-        previous?.localEndpoint === pair.localEndpoint ||
-        previous?.remoteEndpoint === pair.remoteEndpoint
-      )
-        return false;
-      return pair;
+      const deadline = performance.now() + 10000;
+      while (performance.now() < deadline) {
+        if (probe.channel.readyState === "open") {
+          const pair = await probe.selectedPair();
+          if (
+            pair &&
+            local.includes(pair.localEndpoint) &&
+            remote.includes(pair.remoteEndpoint)
+          )
+            return pair;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+      return null;
     },
-    { id, local: local.endpoints, remote: remote.endpoints, previous },
-    { timeout: 10000, polling: 50 },
+    { id, local: local.endpoints, remote: remote.endpoints },
   );
-  const selected = await handle.jsonValue();
-  await handle.dispose();
+  if (!selected)
+    throw new ProbeError(
+      "Selected WebRTC pair did not settle on the exchanged relay endpoints",
+    );
   if (!selected.relayToRelay)
     throw new ProbeError("Selected WebRTC candidates were not both relays");
   if (selected.relayProtocol !== null && selected.relayProtocol !== protocol)
@@ -314,8 +333,14 @@ async function sendBurst(page, id, from, observingRevocation = false) {
   return received;
 }
 
-async function runPair(provider, host, guest, protocol, id, delayedReceipts) {
-  const start = performance.now();
+async function connectPair(
+  provider,
+  host,
+  guest,
+  protocol,
+  id,
+  delayedReceipts,
+) {
   const hostGrant = await provider.issue(protocol);
   const guestGrant = await provider.issue(protocol);
   await Promise.all([
@@ -330,103 +355,42 @@ async function runPair(provider, host, guest, protocol, id, delayedReceipts) {
       receiptDelayMs: delayedReceipts ? 1200 : 0,
     }),
   ]);
-  const initialSignal = await exchangeDescriptions(host, guest, id, false);
-  const initial = await Promise.all([
-    confirmRelayPair(
-      host,
-      id,
-      protocol,
-      initialSignal.offer,
-      initialSignal.answer,
-    ),
-    confirmRelayPair(
-      guest,
-      id,
-      protocol,
-      initialSignal.answer,
-      initialSignal.offer,
-    ),
+  const { offer, answer } = await exchangeDescriptions(host, guest, id);
+  const selected = await Promise.all([
+    confirmRelayPair(host, id, protocol, offer, answer),
+    confirmRelayPair(guest, id, protocol, answer, offer),
   ]);
+  return { hostGrant, guestGrant, selected };
+}
+
+async function runPair(provider, host, guest, protocol, id, delayedReceipts) {
+  const start = performance.now();
+  const initial = await connectPair(
+    provider,
+    host,
+    guest,
+    protocol,
+    id,
+    delayedReceipts,
+  );
   const setupMs = Math.round(performance.now() - start);
   const burst = performance.now();
   await sendBurst(host, id, 1);
   const receiptMs = Math.round(performance.now() - burst);
 
-  const restartStart = performance.now();
-  const newHostGrant = await provider.issue(protocol);
-  const newGuestGrant = await provider.issue(protocol);
-  await Promise.all(
-    [
-      [host, newHostGrant],
-      [guest, newGuestGrant],
-    ].map(([page, iceServer]) =>
-      page.evaluate(
-        ({ id, iceServer }) => {
-          window.turnProbes[id].peer.setConfiguration({
-            iceServers: [iceServer],
-            iceTransportPolicy: "relay",
-          });
-        },
-        { id, iceServer },
-      ),
-    ),
-  );
-  const restartSignal = await exchangeDescriptions(host, guest, id, true);
-  if (
-    restartSignal.offer.fragment === initialSignal.offer.fragment ||
-    restartSignal.answer.fragment === initialSignal.answer.fragment
-  )
-    throw new ProbeError("ICE username fragment did not rotate on both peers");
-  const restarted = await Promise.all([
-    confirmRelayPair(
-      host,
-      id,
-      protocol,
-      restartSignal.offer,
-      restartSignal.answer,
-      initial[0],
-    ),
-    confirmRelayPair(
-      guest,
-      id,
-      protocol,
-      restartSignal.answer,
-      restartSignal.offer,
-      initial[1],
-    ),
-  ]);
-  const restartMs = Math.round(performance.now() - restartStart);
-  await sendBurst(host, id, BURST + 1);
-  const pairBytesReceived = await Promise.all(
-    [host, guest].map((page) =>
-      page.evaluate(
-        async (id) =>
-          (await window.turnProbes[id].selectedPair())?.bytesReceived ?? null,
-        id,
-      ),
-    ),
-  );
-
-  const revocation = await Promise.allSettled(
-    [hostGrant, guestGrant, newHostGrant, newGuestGrant].map(({ username }) =>
+  const revoked = await Promise.allSettled(
+    [initial.hostGrant, initial.guestGrant].map(({ username }) =>
       provider.revoke(username),
     ),
   );
-  if (revocation.some(({ status }) => status === "rejected"))
+  if (revoked.some(({ status }) => status === "rejected"))
     throw new ProbeError("Cloudflare did not confirm a credential revocation");
-
-  // A successful revoke API response does not by itself establish a live-traffic cutoff.
   const revokedAt = performance.now();
   await delay(1000);
-  const receiptsAfterRevocation = await sendBurst(
-    host,
-    id,
-    2 * BURST + 1,
-    true,
-  );
+  const receiptsAfterRevocation = await sendBurst(host, id, BURST + 1, true);
   const guestReceivedAfterRevocation = await guest.evaluate(
     ({ id, before }) => window.turnProbes[id].received() - before,
-    { id, before: 2 * BURST },
+    { id, before: BURST },
   );
   if (
     guestReceivedAfterRevocation < receiptsAfterRevocation ||
@@ -436,6 +400,57 @@ async function runPair(provider, host, guest, protocol, id, delayedReceipts) {
       "TURN channel returned inconsistent post-revocation counts",
     );
   const revocationObservationMs = Math.round(performance.now() - revokedAt);
+  await closePair(host, guest, id);
+
+  const replacementStart = performance.now();
+  const replacementId = id + 3;
+  const replacement = await connectPair(
+    provider,
+    host,
+    guest,
+    protocol,
+    replacementId,
+    delayedReceipts,
+  );
+  const replacementMs = Math.round(performance.now() - replacementStart);
+  await sendBurst(host, replacementId, 1);
+  const pairBytesReceived = await Promise.all(
+    [host, guest].map((page) =>
+      page.evaluate(
+        async (id) =>
+          (await window.turnProbes[id].selectedPair())?.bytesReceived ?? null,
+        replacementId,
+      ),
+    ),
+  );
+  await closePair(host, guest, replacementId);
+  const cleanup = await Promise.allSettled(
+    [replacement.hostGrant, replacement.guestGrant].map(({ username }) =>
+      provider.revoke(username),
+    ),
+  );
+  if (cleanup.some(({ status }) => status === "rejected"))
+    throw new ProbeError(
+      "Cloudflare did not confirm a replacement credential revocation",
+    );
+
+  const allPairs = [...initial.selected, ...replacement.selected];
+  return {
+    protocol,
+    delayedReceipts,
+    setupMs,
+    receiptMs,
+    replacementMs,
+    pairBytesReceived,
+    beforeAndAfterRelayPairs: allPairs.every((pair) => pair.relayToRelay),
+    localRelayProtocols: allPairs.map((pair) => pair.relayProtocol),
+    guestReceivedAfterRevocation,
+    receiptsAfterRevocation,
+    revocationObservationMs,
+  };
+}
+
+async function closePair(host, guest, id) {
   await Promise.all(
     [host, guest].map((page) =>
       page.evaluate((id) => {
@@ -444,23 +459,6 @@ async function runPair(provider, host, guest, protocol, id, delayedReceipts) {
       }, id),
     ),
   );
-  return {
-    protocol,
-    delayedReceipts,
-    setupMs,
-    receiptMs,
-    restartMs,
-    pairBytesReceived,
-    beforeAndAfterRelayPairs: [...initial, ...restarted].every(
-      (pair) => pair.relayToRelay,
-    ),
-    localRelayProtocols: [...initial, ...restarted].map(
-      (pair) => pair.relayProtocol,
-    ),
-    guestReceivedAfterRevocation,
-    receiptsAfterRevocation,
-    revocationObservationMs,
-  };
 }
 
 async function main() {

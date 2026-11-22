@@ -195,17 +195,34 @@ node --env-file=/path/to/private-turn.env scripts/testing/cloudflare-turn.js
 
 It uses four isolated browser contexts, with the first acting as host to three concurrent
 guests. The last guest delays receipts by 1.2 seconds. Each pair uses short-lived credentials,
-separate UDP and TLS-on-443 runs, and a fresh ICE exchange before the second burst. Each
-selected pair must match its exchanged relay endpoints. Reports show setup and receipt
-times, ICE-pair byte counters, any available local relay protocol, and guest deliveries and
-returned receipts observed after revocation. The runner revokes outstanding test
+separate UDP and TLS-on-443 runs, and a new connection with fresh credentials after
+revocation. Each selected pair must match its exchanged relay endpoints. The probe
+removes related addresses and ports from the generated descriptions before exchanging
+them. Reports show setup and receipt times, ICE-pair byte counters, any available local
+relay protocol, and guest deliveries and returned receipts observed after revocation. The runner revokes outstanding test
 credentials on completion, interruption, and handled failures.
 Set `ELECTRIFY_TURN_BROWSERS=chromium,chromium,firefox,webkit` to use additional installed
 Playwright engines. The first entry hosts.
 
+A live test with each of Chromium, Firefox and WebKit hosting passed all 18 pair runs over
+Cloudflare, including the replacement connections. WebKit exposed the selected relay
+addresses and candidate types, with no local relay-protocol statistic. A separate TLS
+run routed the last guest's encrypted TURN connection through a loopback TCP proxy
+capped at 128 KiB/s in each direction with 45 ms minimum delay per chunk. Its burst
+returned eight receipts in 2.8 seconds, including the 1.2-second application delay.
+
+A Chromium in-place ICE restart with new credentials kept selecting its old relay
+endpoints throughout a ten-second observation despite exchanging fresh candidates.
+Use full connection replacement to qualify credential rotation. One TURN credential
+also authorized concurrent allocations on both sides of each test pair. All three
+UDP pairs still delivered eight messages and eight receipts in a burst sent 30 seconds
+after Cloudflare confirmed revocation. In a separate run with a 60-second credential
+TTL, all three pairs still delivered a burst sent 66 seconds after the initial exchange.
+Admission needs a shutdown mechanism whose measured allocation lifetime bounds exposure.
+
 The probe runs synthetic traffic with in-process signaling. Its delayed receipts measure
-one slow application participant. Network traffic shaping, deployed signaling, actual
-gameplay, native Steam, packet-level egress and provider billing require separate tests.
+one slow application participant. Deployed signaling, actual gameplay, native Steam,
+packet-level egress and provider billing require separate tests.
 The TLS run configures only TLS on port 443. With UDP blocked at the network boundary,
 set `ELECTRIFY_TURN_TRANSPORT=tls` to run that case in isolation. The diagnostic checks
 candidate types and public addresses. Production authorization needs independent Cloudflare

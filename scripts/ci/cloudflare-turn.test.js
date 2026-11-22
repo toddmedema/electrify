@@ -27,11 +27,20 @@ test("accepts an embedded public relay and SDP privacy placeholders", () => {
   }
 });
 
+test("removes related addresses and ports before exchanging Firefox-style SDP", () => {
+  const raw = replace("raddr 0.0.0.0 rport 9", "raddr 192.168.1.1 rport 61234");
+  const { description, endpoints } = inspectDescription(raw, "offer");
+  assert.match(description.sdp, /raddr 0\.0\.0\.0 rport 9/);
+  assert.doesNotMatch(description.sdp, /192\.168\.1\.1|61234/);
+  assert.deepEqual(endpoints, ["1.1.1.1:1234"]);
+  assert.match(raw.sdp, /raddr 192\.168\.1\.1 rport 61234/);
+});
+
 test("rejects generated SDP with direct candidates or exposed addresses", () => {
   for (const invalid of [
     replace(candidate, candidate.replace("typ relay", "typ host")),
     replace(candidate, candidate.replace("1.1.1.1", "192.168.1.1")),
-    replace("raddr 0.0.0.0", "raddr 192.168.1.1"),
+    replace("raddr 0.0.0.0", "raddr peer.local"),
     replace("c=IN IP4 1.1.1.1", "c=IN IP4 192.168.1.1"),
     replace("o=- 1 2 IN IP4 127.0.0.1", "o=- 1 2 IN IP4 192.168.1.1"),
     replace(

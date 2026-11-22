@@ -73,30 +73,25 @@ function installTurnProbe({ iceServer, channelId, receiptDelayMs }) {
   };
 }
 
-async function gatherDescription({ id, type, restart = false }) {
+async function gatherDescription({ id, type }) {
   const { peer } = window.turnProbes[id];
-  const description =
-    type === "offer"
-      ? await peer.createOffer({ iceRestart: restart })
-      : await peer.createAnswer();
-  await peer.setLocalDescription(description);
-  if (peer.iceGatheringState !== "complete") {
-    await new Promise((resolve, reject) => {
-      const timer = setTimeout(() => {
-        peer.removeEventListener("icegatheringstatechange", onChange);
-        reject(new Error("ICE gathering timed out"));
-      }, 12000);
-      function onChange() {
-        if (peer.iceGatheringState !== "complete") return;
-        clearTimeout(timer);
-        peer.removeEventListener("icegatheringstatechange", onChange);
-        resolve();
-      }
-      peer.addEventListener("icegatheringstatechange", onChange);
-      onChange();
-    });
+  await peer.setLocalDescription(
+    type === "offer" ? await peer.createOffer() : await peer.createAnswer(),
+  );
+  // A single configured TURN URL is sufficient for this probe. WebKit can expose a
+  // usable relay while other interfaces are still trying to gather candidates.
+  const deadline = performance.now() + 12000;
+  for (;;) {
+    const description = peer.localDescription;
+    if (
+      !description ||
+      /^a=candidate:.* typ relay(?: |\r?$)/m.test(description.sdp) ||
+      peer.iceGatheringState === "complete" ||
+      performance.now() >= deadline
+    )
+      return description && { type: description.type, sdp: description.sdp };
+    await new Promise((resolve) => setTimeout(resolve, 50));
   }
-  return peer.localDescription?.toJSON();
 }
 
 module.exports = { installTurnProbe, gatherDescription };
