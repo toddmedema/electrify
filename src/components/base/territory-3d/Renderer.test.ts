@@ -197,8 +197,14 @@ test.each([
       };
     });
     const visible = { ...frame, width, scale: 0.5 };
+    renderer.update([], visible);
+    flush(0);
+    expect(gl.linkProgram).toHaveBeenCalledTimes(2);
+    expect(gl.createBuffer).not.toHaveBeenCalled();
     renderer.update(burning, visible);
     flush(0);
+    expect(gl.linkProgram).toHaveBeenCalledTimes(2);
+    expect(gl.getError).toHaveBeenCalledTimes(2);
     const fire = () => renderer.diagnostics().wildfire;
     expect(fire()).toMatchObject({ particles: budget, drawCalls: 1, time: 0 });
     const draws = gl.drawArraysInstanced.mock;
@@ -361,9 +367,9 @@ it("batches actual geometry, caps physical resolution, reuses buffers and expose
   expect(callbacks.size).toBe(0);
   expect(gl.deleteBuffer).toHaveBeenCalledTimes(6);
   expect(gl.deleteVertexArray).toHaveBeenCalledTimes(3);
-  expect(gl.deleteProgram).toHaveBeenCalledTimes(1);
+  expect(gl.deleteProgram).toHaveBeenCalledTimes(2);
   renderer.dispose();
-  expect(gl.deleteProgram).toHaveBeenCalledTimes(1);
+  expect(gl.deleteProgram).toHaveBeenCalledTimes(2);
 });
 it("samples submitted geometry and GPU instance styles only when explicitly requested", () => {
   const { renderer, canvas } = setup();
@@ -614,7 +620,7 @@ it("rebuilds lost GPU resources and notifies readiness only after restored drawi
   expect(renderer.diagnostics().meshCount).toBe(0);
   canvas.dispatchEvent(new Event("webglcontextrestored"));
   expect(state).toHaveBeenLastCalledWith("lost");
-  expect(gl.createProgram).toHaveBeenCalledTimes(2);
+  expect(gl.createProgram).toHaveBeenCalledTimes(4);
   expect(gl.createBuffer).toHaveBeenCalledTimes(6);
   flush(1000000);
   expect(gl.createBuffer).toHaveBeenCalledTimes(12);
@@ -639,6 +645,39 @@ it("fails gracefully without WebGL2 or when shader compilation fails", () => {
   expect(gl.deleteProgram).toHaveBeenCalledTimes(1);
   broken.renderer.dispose();
 });
+
+it.each([
+  [true, "ready"],
+  [false, "unavailable"],
+])(
+  "keeps a clear map after a shader warmup failure and handles retry result %s",
+  (retry, expectedState) => {
+    const gl = mockContext();
+    gl.getProgramParameter
+      .mockReturnValueOnce(true)
+      .mockReturnValueOnce(false)
+      .mockReturnValueOnce(retry);
+    const { renderer, state } = setup(gl);
+    renderer.update(scene(false), frame);
+    flush(0);
+    expect(state).toHaveBeenLastCalledWith("ready");
+    expect(gl.deleteProgram).toHaveBeenCalledTimes(1);
+
+    const terrain: MapInstance = {
+      id: "burning",
+      position: [0, 0, 0],
+      model: getTerrainModel("hills", { weather: "scorched" }),
+      wildfire: { q: 0, r: 0, clearance: 0, forest: false },
+      fog: 0,
+      active: false,
+    };
+    renderer.update([terrain], frame);
+    flush(16);
+    expect(gl.createProgram).toHaveBeenCalledTimes(3);
+    expect(state).toHaveBeenLastCalledWith(expectedState);
+    renderer.dispose();
+  },
+);
 
 it("bounds inactive GPU caches while keeping the current visible geometry", () => {
   const { renderer, gl } = setup();
@@ -723,9 +762,9 @@ it("releases resources and exposes fallback when a frame upload fails", () => {
   expect(renderer.diagnostics().meshCount).toBe(0);
   expect(callbacks.size).toBe(0);
   expect(gl.deleteBuffer).toHaveBeenCalledTimes(6);
-  expect(gl.deleteProgram).toHaveBeenCalledTimes(1);
+  expect(gl.deleteProgram).toHaveBeenCalledTimes(2);
   renderer.dispose();
-  expect(gl.deleteProgram).toHaveBeenCalledTimes(1);
+  expect(gl.deleteProgram).toHaveBeenCalledTimes(2);
 });
 
 it("keeps the fallback and discards buffers after an allocation reports OUT_OF_MEMORY", () => {

@@ -457,17 +457,15 @@ export class CouchCoordinator {
       view.lastSequence === previous.lastSequence &&
       view.receipt?.sequence === previous.receipt?.sequence &&
       view.receipt?.error === previous.receipt?.error &&
-      (this.pacedSeats.has(id) ||
-        (eligible &&
-          view.game.date.monthsElapsed > previous.game.date.monthsElapsed)) &&
+      (this.pacedSeats.has(id) || eligible) &&
       JSON.stringify(view.game.multiplayer?.clock) ===
         JSON.stringify(previous.game.multiplayer?.clock) &&
       JSON.stringify(view.grids) === JSON.stringify(previous.grids) &&
       JSON.stringify(view.disconnected) ===
         JSON.stringify(previous.disconnected)
     ) {
-      // One rollover can invalidate all four renderers' forecasts at once.
-      // Spread these presents without delaying command replies or the shared clock.
+      // Publishing four views at once can crowd out a paint even between rollovers.
+      // Spread routine views without delaying command replies or the shared clock.
       this.pacedSeats.add(id);
       this.scheduleSeatPaint();
       return;

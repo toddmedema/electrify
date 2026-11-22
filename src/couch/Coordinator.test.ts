@@ -385,7 +385,7 @@ it("shares acknowledged month rows across skipped views and restores a missing b
   }
 });
 
-it("paces ordinary four-seat rollovers across paints and delivers a pause immediately", async () => {
+it("paces routine four-seat views across paints and delivers a pause immediately", async () => {
   const roster: Seat[] = [
     ...seats,
     { id: "local-p3", name: "Lin" },
@@ -414,10 +414,13 @@ it("paces ordinary four-seat rollovers across paints and delivers a pause immedi
     frames.delete(frame);
     frame();
   };
-  const roll = () => {
+  const advance = (rollover = false) => {
     const world = f.world();
     world.revision++;
-    world.grids.forEach(({ date }) => date.monthsElapsed++);
+    world.grids.forEach(({ date }) => {
+      date.minute += 15;
+      if (rollover) date.monthsElapsed++;
+    });
     f.publish();
   };
   try {
@@ -429,10 +432,9 @@ it("paces ordinary four-seat rollovers across paints and delivers a pause immedi
     expect(f.world().speed).toBe("ULTRA");
     for (const { id } of roster) f.messages[id].length = 0;
 
-    roll();
+    advance();
     expect(deliveries()).toEqual([0, 0, 0, 0]);
-    f.world().revision++;
-    f.publish();
+    advance(true);
     expect(frames.size).toBe(1);
     paint();
     expect(deliveries()).toEqual([1, 0, 0, 0]);

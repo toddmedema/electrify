@@ -69,7 +69,7 @@ const defaultSeats: Seat[] = [
   { id: "local-p2", name: "P2 Utility" },
 ];
 
-/** Let the TV paint between company rollovers, with a deadline for hidden windows. */
+/** Let the TV paint between company views, with a deadline for hidden windows. */
 function afterSeatPaint(callback: () => void) {
   let pending = true;
   const deliver = () => {

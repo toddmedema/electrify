@@ -517,6 +517,7 @@ export class MapRenderer {
         shadowAlpha: gl.getUniformLocation(program, "uShadowAlpha"),
         shadow: gl.getUniformLocation(program, "uShadow"),
       };
+      this.wildfire.prepareProgram(gl);
     } catch (_error) {
       this.fail();
       return;

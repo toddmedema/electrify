@@ -110,10 +110,12 @@ void main() {
 }`;
 
 interface FireGpu {
-  program: WebGLProgram;
   vao: WebGLVertexArrayObject;
   quad: WebGLBuffer;
   instances: WebGLBuffer;
+}
+
+interface FireUniforms {
   projection: WebGLUniformLocation | null;
   time: WebGLUniformLocation | null;
   wind: WebGLUniformLocation | null;
@@ -122,12 +124,10 @@ interface FireGpu {
 }
 
 function createGpu(gl: WebGL2RenderingContext): FireGpu {
-  const program = createMapProgram(gl, VERTEX, FRAGMENT);
   const vao = gl.createVertexArray();
   const quad = gl.createBuffer();
   const instances = gl.createBuffer();
   if (!vao || !quad || !instances) {
-    gl.deleteProgram(program);
     gl.deleteVertexArray(vao);
     gl.deleteBuffer(quad);
     gl.deleteBuffer(instances);
@@ -156,17 +156,7 @@ function createGpu(gl: WebGL2RenderingContext): FireGpu {
     );
     gl.vertexAttribDivisor(attribute, 1);
   }
-  return {
-    program,
-    vao,
-    quad,
-    instances,
-    projection: gl.getUniformLocation(program, "uProjection"),
-    time: gl.getUniformLocation(program, "uFireTime"),
-    wind: gl.getUniformLocation(program, "uWind"),
-    background: gl.getUniformLocation(program, "uBackground"),
-    sizeLimit: gl.getUniformLocation(program, "uSizeLimit"),
-  };
+  return { vao, quad, instances };
 }
 
 const FOG = [0, 0.15, 0.35, 0.6];
@@ -177,10 +167,32 @@ export class WildfireParticles {
   private emitters: WildfireEmitter[] = [];
   private visible: WildfireEmitter[] = [];
   private data: Float32Array | undefined;
+  private program: WebGLProgram | undefined;
+  private uniforms: FireUniforms | undefined;
   private gpu: FireGpu | undefined;
   private upload = false;
   private time = 0;
   private timestamp: number | undefined;
+
+  prepareProgram(gl: WebGL2RenderingContext): void {
+    // Shader compilation can synchronize with the GPU. Pay for it when the
+    // map context opens so the first visible wildfire only allocates buffers.
+    try {
+      const program = createMapProgram(gl, VERTEX, FRAGMENT);
+      this.program = program;
+      this.uniforms = {
+        projection: gl.getUniformLocation(program, "uProjection"),
+        time: gl.getUniformLocation(program, "uFireTime"),
+        wind: gl.getUniformLocation(program, "uWind"),
+        background: gl.getUniformLocation(program, "uBackground"),
+        sizeLimit: gl.getUniformLocation(program, "uSizeLimit"),
+      };
+    } catch (_error) {
+      if (this.program) gl.deleteProgram(this.program);
+      this.program = undefined;
+      // A map with no fire can still draw if the particle shader failed.
+    }
+  }
 
   prepare(terrain: readonly MapInstance[], frame: MapFrame): void {
     if (terrain !== this.terrain) {
@@ -291,12 +303,16 @@ export class WildfireParticles {
     projection: Float32Array,
   ): boolean {
     if (!this.count || !this.data) return false;
+    // Keep the previous first-use retry if opening the clear map could not link it.
+    if (!this.program) this.prepareProgram(gl);
+    if (!this.program || !this.uniforms)
+      throw new Error("Wildfire particle shader unavailable");
     const allocated = !this.gpu;
     this.gpu ??= createGpu(gl);
-    const { program, vao, instances, time, wind, background, sizeLimit } =
-      this.gpu;
-    gl.useProgram(program);
-    gl.uniformMatrix4fv(this.gpu.projection, false, projection);
+    const { vao, instances } = this.gpu;
+    const { time, wind, background, sizeLimit } = this.uniforms;
+    gl.useProgram(this.program);
+    gl.uniformMatrix4fv(this.uniforms.projection, false, projection);
     gl.uniform1f(time, this.time);
     gl.uniform1f(wind, frame.weather?.wind ?? 0);
     gl.uniform3f(background, ...frame.background);
@@ -322,12 +338,16 @@ export class WildfireParticles {
   }
 
   release(gl: WebGL2RenderingContext | null, deleteGpu: boolean): void {
-    if (gl && this.gpu && deleteGpu) {
-      gl.deleteVertexArray(this.gpu.vao);
-      gl.deleteBuffer(this.gpu.quad);
-      gl.deleteBuffer(this.gpu.instances);
-      gl.deleteProgram(this.gpu.program);
+    if (gl && deleteGpu) {
+      if (this.gpu) {
+        gl.deleteVertexArray(this.gpu.vao);
+        gl.deleteBuffer(this.gpu.quad);
+        gl.deleteBuffer(this.gpu.instances);
+      }
+      if (this.program) gl.deleteProgram(this.program);
     }
+    this.program = undefined;
+    this.uniforms = undefined;
     this.gpu = undefined;
     this.visible = [];
     this.upload = true;
