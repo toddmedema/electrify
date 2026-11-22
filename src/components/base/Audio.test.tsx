@@ -7,7 +7,7 @@ import {
   pause,
   playSoundEffect,
   resume,
-  setMusicInGame,
+  setMusicRun,
   setMusicVolume,
   setSoundEffectsVolume,
   state,
@@ -24,7 +24,7 @@ jest.mock("../../data/Audio", () => ({
   pause: jest.fn(),
   resume: jest.fn(),
   unlockAudio: jest.fn(),
-  setMusicInGame: jest.fn(),
+  setMusicRun: jest.fn(),
   setMusicVolume: jest.fn(),
   setSoundEffectsVolume: jest.fn(),
   playSoundEffect: jest.fn(),
@@ -196,8 +196,8 @@ it("does not download audio when disabled before the delay", () => {
 });
 
 it("selects gameplay before delayed audio loading when mounted inside a game", () => {
-  render(<Audio {...props} inGame />);
-  expect(setMusicInGame).toHaveBeenCalledWith(true, 0);
+  render(<Audio {...props} inGame musicRunId="solo:1" />);
+  expect(setMusicRun).toHaveBeenCalledWith("solo:1", 0);
   expect(loadAudioFiles).not.toHaveBeenCalled();
   act(() => jest.advanceTimersByTime(INIT_DELAY.LOAD_AUDIO_MILLIS));
   expect(loadAudioFiles).toHaveBeenCalledTimes(1);
@@ -205,21 +205,27 @@ it("selects gameplay before delayed audio loading when mounted inside a game", (
 
 it("changes music on entering and leaving a game, including while muted", () => {
   const { rerender } = render(<Audio {...props} />);
-  expect(setMusicInGame).toHaveBeenLastCalledWith(false, 0);
-  rerender(<Audio {...props} inGame />);
-  expect(setMusicInGame).toHaveBeenLastCalledWith(true, 0);
-  const changes = (setMusicInGame as jest.Mock).mock.calls.length;
-  rerender(<Audio {...props} inGame musicVolume={0.4} />);
-  expect(setMusicInGame).toHaveBeenCalledTimes(changes);
+  expect(setMusicRun).toHaveBeenLastCalledWith(undefined, 0);
+  rerender(<Audio {...props} inGame musicRunId="solo:1" />);
+  expect(setMusicRun).toHaveBeenLastCalledWith("solo:1", 0);
+  const changes = (setMusicRun as jest.Mock).mock.calls.length;
+  rerender(<Audio {...props} inGame musicRunId="solo:1" musicVolume={0.4} />);
+  expect(setMusicRun).toHaveBeenCalledTimes(changes);
+  rerender(<Audio {...props} inGame musicRunId="online:1" />);
+  expect(setMusicRun).toHaveBeenLastCalledWith("online:1", 0);
   rerender(<Audio {...props} enabled={false} />);
-  expect(setMusicInGame).toHaveBeenLastCalledWith(false, 0);
+  expect(setMusicRun).toHaveBeenLastCalledWith(undefined, 0);
 });
 
 it.each([false, true])(
   "leaves playback alone during unrelated card/UI and volume updates (inGame=%s)",
   (inGame) => {
     state.loaded = "LOADED";
-    const initial = { ...props, inGame };
+    const initial = {
+      ...props,
+      inGame,
+      musicRunId: inGame ? "solo:7" : undefined,
+    };
     const { rerender } = render(<Audio {...initial} />);
     act(() => jest.advanceTimersByTime(INIT_DELAY.LOAD_AUDIO_MILLIS));
     jest.clearAllMocks();
@@ -238,7 +244,7 @@ it.each([false, true])(
     );
     expect(setMusicVolume).toHaveBeenCalledWith(0.4);
     expect(setSoundEffectsVolume).toHaveBeenCalledWith(0.3);
-    expect(setMusicInGame).not.toHaveBeenCalled();
+    expect(setMusicRun).not.toHaveBeenCalled();
     expect(loadAudioFiles).not.toHaveBeenCalled();
     expect(pause).not.toHaveBeenCalled();
     expect(resume).not.toHaveBeenCalled();
@@ -246,10 +252,20 @@ it.each([false, true])(
 );
 
 it("keeps live music pressure current while audio is loading or disabled", () => {
-  const { rerender } = render(<Audio {...props} inGame musicIntensity={0.3} />);
-  expect(setMusicInGame).toHaveBeenLastCalledWith(true, 0.3);
-  rerender(<Audio {...props} inGame musicIntensity={0.9} enabled={false} />);
-  expect(setMusicInGame).toHaveBeenLastCalledWith(true, 0.9);
+  const { rerender } = render(
+    <Audio {...props} inGame musicRunId="solo:1" musicIntensity={0.3} />,
+  );
+  expect(setMusicRun).toHaveBeenLastCalledWith("solo:1", 0.3);
+  rerender(
+    <Audio
+      {...props}
+      inGame
+      musicRunId="solo:1"
+      musicIntensity={0.9}
+      enabled={false}
+    />,
+  );
+  expect(setMusicRun).toHaveBeenLastCalledWith("solo:1", 0.9);
   expect(loadAudioFiles).not.toHaveBeenCalled();
 });
 

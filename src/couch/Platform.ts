@@ -21,6 +21,8 @@ const notify = () => {
 };
 
 export const couchPlatformActive = () => !!projection;
+export const couchPlatformMatch = () =>
+  projection?.game ? projection : undefined;
 /**
  * Observe shell projection changes and return cleanup for the same listener identity.
  */

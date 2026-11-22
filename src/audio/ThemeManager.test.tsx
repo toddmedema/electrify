@@ -3,11 +3,13 @@ import { AudioNode } from "./AudioNode";
 import {
   MUSIC_PRESSURE_HOLD_MS,
   MUSIC_PAUSE_FADE_SECONDS,
+  MUSIC_INTRO_FILE,
   ThemeManager,
 } from "./ThemeManager";
 
 const BASIC = MUSIC_DEFINITIONS.basic;
 const BASIC_DURATION_SECONDS = 391.99347;
+const INTRO_DURATION_SECONDS = 30;
 interface FakeSource {
   start: jest.Mock;
   stop: jest.Mock;
@@ -28,6 +30,7 @@ function fakeContext(tickPerSource: number = 0) {
     value: number;
     setValueAtTime: jest.Mock;
     cancelAndHoldAtTime: jest.Mock;
+    cancelScheduledValues: jest.Mock;
     linearRampToValueAtTime: jest.Mock;
   }> = [];
   const events = new EventTarget();
@@ -43,6 +46,7 @@ function fakeContext(tickPerSource: number = 0) {
         value: 1,
         setValueAtTime: jest.fn(),
         cancelAndHoldAtTime: jest.fn(),
+        cancelScheduledValues: jest.fn(),
         linearRampToValueAtTime: jest.fn(),
       };
       gains.push(gain);
@@ -89,7 +93,7 @@ function playingBasicTheme(tickPerSource: number = 0) {
   return { themeManager, context, sources };
 }
 
-function musicHarness() {
+function musicHarness(withIntro = false) {
   const { context, sources, gains } = fakeContext();
   const nodes: { [key: string]: AudioNode } = {};
   for (const theme of Object.values(MUSIC_DEFINITIONS)) {
@@ -104,6 +108,11 @@ function musicHarness() {
       );
     }
   }
+  if (withIntro)
+    nodes[MUSIC_INTRO_FILE] = new AudioNode(
+      context as unknown as AudioContext,
+      { duration: INTRO_DURATION_SECONDS } as AudioBuffer,
+    );
   return {
     themeManager: new ThemeManager(context as unknown as AudioContext, nodes),
     context,
@@ -244,6 +253,91 @@ describe("native music lifecycle", () => {
     expect(sources).toHaveLength(6);
     for (const source of sources.slice(3))
       expect(source.start.mock.calls[0][1]).toBe(0);
+  });
+});
+
+describe("game-opening intro", () => {
+  it("schedules a single one-shot and an aligned, gapless handoff on the audio clock", () => {
+    const { themeManager, context, gains, sources } = musicHarness(true);
+    themeManager.setIntensity(1);
+    context.currentTime = 2;
+    themeManager.setIntensity(2, "solo:1");
+    expect(sources[1].loop).toBe(false);
+    expect(sources[1].start).toHaveBeenCalledWith(2.02, 0);
+    expect(gains[1].linearRampToValueAtTime).toHaveBeenLastCalledWith(0, 32.02);
+    expect(gains[1].setValueAtTime).toHaveBeenLastCalledWith(1, 30.02);
+    for (const source of sources.slice(2)) {
+      expect(source.loop).toBe(true);
+      expect(source.start).toHaveBeenCalledWith(30.02, 0);
+    }
+    context.currentTime = 10;
+    themeManager.setIntensity(10, "solo:1");
+    expect(sources).toHaveLength(5);
+    for (const gain of gains.slice(2)) {
+      expect(gain.cancelScheduledValues).toHaveBeenCalledWith(30.02);
+      expect(gain.setValueAtTime).toHaveBeenLastCalledWith(0, 30.02);
+      const [target, at] = gain.linearRampToValueAtTime.mock.calls.at(-1)!;
+      expect(target).toBe(1);
+      expect(at).toBeCloseTo(32.02);
+    }
+  });
+
+  it("cancels queued stems on quit and plays the intro again for a replacement run", () => {
+    const { themeManager, context, sources } = musicHarness(true);
+    themeManager.setIntensity(2, "solo:1");
+    context.currentTime = 2;
+    themeManager.setIntensity(2, "solo:2");
+    for (const source of sources.slice(1, 4))
+      expect(source.stop).toHaveBeenLastCalledWith(2);
+    expect(sources[4].loop).toBe(false);
+    expect(sources[4].start).toHaveBeenCalledWith(2.02, 0);
+    context.currentTime = 3;
+    themeManager.setIntensity(1);
+    for (const source of sources.slice(5, 8))
+      expect(source.stop).toHaveBeenLastCalledWith(3);
+    expect(sources[8].loop).toBe(true);
+  });
+
+  it.each([10, 29])(
+    "resumes the intro and its handoff after a pause at %ss",
+    (offset) => {
+      const { themeManager, context, gains, sources } = musicHarness(true);
+      themeManager.setIntensity(2, "solo:1");
+      context.currentTime = 0.02 + offset;
+      themeManager.pause();
+      context.currentTime = 60;
+      themeManager.resume();
+      const [intro, ...stems] = sources.slice(4);
+      expect(intro.loop).toBe(false);
+      expect(intro.start.mock.calls[0][0]).toBeCloseTo(60.02);
+      expect(intro.start.mock.calls[0][1]).toBeCloseTo(offset);
+      const end = 60.02 + INTRO_DURATION_SECONDS - offset;
+      expect(
+        gains[4].linearRampToValueAtTime.mock.calls.at(-1)![1],
+      ).toBeCloseTo(end);
+      for (const stem of stems) {
+        expect(stem.start.mock.calls[0][0]).toBeCloseTo(
+          Math.max(60.02, end - 2),
+        );
+        expect(stem.start.mock.calls[0][1]).toBeCloseTo(
+          Math.max(0, offset - 28),
+        );
+      }
+    },
+  );
+
+  it("resumes only the looping stems after the intro finishes, even at a loop boundary", () => {
+    const { themeManager, context, sources } = musicHarness(true);
+    themeManager.setIntensity(2, "solo:1");
+    context.currentTime = 28.02 + BASIC_DURATION_SECONDS + 1;
+    themeManager.pause();
+    context.currentTime = 600;
+    themeManager.resume();
+    expect(sources).toHaveLength(7);
+    for (const stem of sources.slice(4)) {
+      expect(stem.loop).toBe(true);
+      expect(stem.start.mock.calls[0][1]).toBeCloseTo(1);
+    }
   });
 });
 

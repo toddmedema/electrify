@@ -1,5 +1,5 @@
 import { AudioNode } from "../audio/AudioNode";
-import { ThemeManager } from "../audio/ThemeManager";
+import { ThemeManager, MUSIC_INTRO_FILE } from "../audio/ThemeManager";
 import { SoundEffects, SoundEffectType } from "../audio/SoundEffects";
 import { MUSIC_DEFINITIONS, MUSIC_INTENSITY_MAX } from "../Constants";
 import { getAudioContext } from "../Globals";
@@ -11,24 +11,28 @@ export const state = {
   soundEffects: null as SoundEffects | null,
   musicOutput: null as GainNode | null,
   paused: true,
-  inGame: false,
+  musicRunId: undefined as string | undefined,
   musicIntensity: 0,
   nodes: {} as Record<string, AudioNode>,
 };
 
-/** Remember the latest grid state while files load or audio is disabled. */
-export function setMusicInGame(inGame: boolean, musicIntensity: number = 0) {
-  state.inGame = inGame;
+/** Remember which game was opened while files load or audio is disabled. */
+export function setMusicRun(musicRunId?: string, musicIntensity = 0) {
+  state.musicRunId = musicRunId;
   state.musicIntensity = musicIntensity;
-  state.themeManager?.setIntensity(playbackIntensity());
+  updateMusicScene();
 }
 
-function playbackIntensity(): number {
-  return state.inGame && state.loaded === "LOADED"
-    ? 2 +
-        Math.min(1, Math.max(0, state.musicIntensity)) *
-          (MUSIC_INTENSITY_MAX - 2)
-    : 1;
+function updateMusicScene() {
+  const runId = state.loaded === "LOADED" ? state.musicRunId : undefined;
+  if (runId === undefined) state.themeManager?.setIntensity(1);
+  else {
+    const pressure = Math.min(1, Math.max(0, state.musicIntensity));
+    state.themeManager?.setIntensity(
+      2 + pressure * (MUSIC_INTENSITY_MAX - 2),
+      runId,
+    );
+  }
 }
 
 export function pause() {
@@ -141,11 +145,16 @@ export async function loadAudioFiles(musicVolume = 1, soundEffectsVolume = 1) {
   if (state.paused) state.soundEffects?.pause();
 
   try {
-    for (const file of getAllMusicFiles()) {
+    for (const file of [...getAllMusicFiles(), MUSIC_INTRO_FILE]) {
       if (!state.nodes[file]) {
-        const node = await loadAudioLocalFile(ac, "audio/" + file);
-        node.setOutput(state.musicOutput);
-        state.nodes[file] = node;
+        try {
+          const node = await loadAudioLocalFile(ac, "audio/" + file);
+          node.setOutput(state.musicOutput);
+          state.nodes[file] = node;
+        } catch (error) {
+          // The music loop can still play when the optional intro cannot be downloaded or decoded.
+          if (file !== MUSIC_INTRO_FILE) throw error;
+        }
       }
       if (!state.themeManager) {
         // The short menu loop is first. Keep it available while loading gameplay or retrying.
@@ -155,7 +164,7 @@ export async function loadAudioFiles(musicVolume = 1, soundEffectsVolume = 1) {
       }
     }
     state.loaded = "LOADED";
-    state.themeManager?.setIntensity(playbackIntensity());
+    updateMusicScene();
   } catch (error) {
     // A download failure is retryable; it is not evidence that this device cannot play audio.
     state.loaded = "ERROR";

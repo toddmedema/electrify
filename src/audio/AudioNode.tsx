@@ -1,15 +1,17 @@
 import { MUSIC_FADE_SECONDS } from "../Constants";
 
+interface Playback {
+  source: AudioBufferSourceNode;
+  gain: GainNode;
+  startsAt: number;
+}
+
 export class AudioNode {
   private context: AudioContext;
   private buffer: AudioBuffer;
   private output: AudioDestinationNode | GainNode;
-  private gain: GainNode | null;
-  private source: AudioBufferSourceNode | null;
-  private playbacks = new Set<{
-    source: AudioBufferSourceNode;
-    gain: GainNode;
-  }>();
+  private current?: Playback;
+  private playbacks = new Set<Playback>();
 
   constructor(
     audioContext: AudioContext,
@@ -19,8 +21,6 @@ export class AudioNode {
     this.buffer = buffer;
     this.context = audioContext;
     this.output = output;
-    this.gain = null;
-    this.source = null;
   }
 
   public get duration(): number {
@@ -32,28 +32,41 @@ export class AudioNode {
     this.output = output;
   }
 
-  /** Every track loops natively; a shared future start time keeps the stems aligned. */
+  /** Loops are native. An ending fade instead plays the remaining buffer once. */
   public play(
     volume: number,
     offsetSeconds: number,
     when: number,
     fadeSeconds: number,
+    endingFadeSeconds?: number,
   ) {
-    const offset = Math.max(0, offsetSeconds) % this.buffer.duration;
+    const looping = endingFadeSeconds === undefined;
+    const offset = looping
+      ? Math.max(0, offsetSeconds) % this.duration
+      : Math.min(this.duration, Math.max(0, offsetSeconds));
+    const remaining = this.duration - offset;
+    const fadeIn = looping ? fadeSeconds : Math.min(fadeSeconds, remaining / 2);
     const gain = this.context.createGain();
-    this.gain = gain;
     gain.connect(this.output);
     gain.gain.setValueAtTime(0, when);
-    gain.gain.linearRampToValueAtTime(volume, when + fadeSeconds);
+    gain.gain.linearRampToValueAtTime(volume, when + fadeIn);
+    if (endingFadeSeconds !== undefined) {
+      gain.gain.setValueAtTime(
+        volume,
+        when + Math.max(fadeIn, remaining - endingFadeSeconds),
+      );
+      gain.gain.linearRampToValueAtTime(0, when + remaining);
+    }
     const source = this.context.createBufferSource();
-    this.source = source;
     source.buffer = this.buffer;
-    source.loop = true;
-    const playback = { source, gain };
+    source.loop = looping;
+    const playback = { source, gain, startsAt: when };
+    this.current = playback;
     this.playbacks.add(playback);
     source.connect(gain);
     source.onended = () => {
       this.playbacks.delete(playback);
+      if (this.current === playback) this.current = undefined;
       source.disconnect();
       gain.disconnect();
     };
@@ -62,10 +75,14 @@ export class AudioNode {
 
   /** Retarget an in-flight fade from its audible level rather than queueing competing ramps. */
   public fadeTo(volume: number, seconds: number) {
-    if (!this.gain) {
-      return;
-    }
-    this.fadeGain(this.gain, volume, seconds);
+    const playback = this.current;
+    if (!playback) return;
+    const { gain, startsAt } = playback;
+    if (this.context.currentTime < startsAt) {
+      gain.gain.cancelScheduledValues(startsAt);
+      gain.gain.setValueAtTime(0, startsAt);
+      gain.gain.linearRampToValueAtTime(volume, startsAt + seconds);
+    } else this.fadeGain(gain, volume, seconds);
   }
 
   /** Replace pending automation while preserving the current level on older Web Audio engines. */
@@ -84,20 +101,24 @@ export class AudioNode {
 
   /** Fade and stop the current source while retaining older crossfades until their own stops. */
   public fadeOut(seconds = MUSIC_FADE_SECONDS) {
-    if (!this.gain || !this.source) return;
-    this.fadeGain(this.gain, 0, seconds);
-    this.source.stop(this.context.currentTime + seconds);
-    this.gain = null;
-    this.source = null;
+    if (!this.current) return;
+    this.stopPlayback(this.current, seconds);
+    this.current = undefined;
   }
 
   /** Also silence outgoing crossfades, including an older copy of this same track. */
   public stopAll(seconds: number) {
-    for (const { source, gain } of this.playbacks) {
-      this.fadeGain(gain, 0, seconds);
-      source.stop(this.context.currentTime + seconds);
+    for (const playback of this.playbacks) this.stopPlayback(playback, seconds);
+    this.current = undefined;
+  }
+
+  private stopPlayback({ source, gain, startsAt }: Playback, seconds: number) {
+    const now = this.context.currentTime;
+    if (now < startsAt) {
+      source.stop(now);
+      return;
     }
-    this.gain = null;
-    this.source = null;
+    this.fadeGain(gain, 0, seconds);
+    source.stop(now + seconds);
   }
 }
