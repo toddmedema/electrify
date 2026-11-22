@@ -567,6 +567,11 @@ const publishedCoopIdentities = [
     24,
     "coop-2-52b30cebdf5c08f453a29c4d1b445fa8a949e8c6f354f2f344683029b032f167",
   ],
+  // Published master 11ff7f50 includes the Steam checkpoint queue update.
+  [
+    24,
+    "coop-2-b5084b0368736d579e1ffc5cfbcaf4b8a7b4a2b6097b45dfaafbf85556810755",
+  ],
 ] as const;
 
 test.each(publishedCoopIdentities)(

@@ -1703,15 +1703,20 @@ const SCHEMA_23_MASTER_RULES =
 const SCHEMA_23_MAP_RULES =
   "coop-2-3a64b92f0462af2eb6286821f118c030f25aaf65b546a4a7652e87b1dbcd3e33";
 
+// Both published schema-24 builds use this checkpoint layout. The rules
+// hash also covers Steam transport and the runtime's source.
+const SCHEMA_24_PUBLISHED_RULES = new Set([
+  "coop-2-52b30cebdf5c08f453a29c4d1b445fa8a949e8c6f354f2f344683029b032f167", // a9209513
+  "coop-2-b5084b0368736d579e1ffc5cfbcaf4b8a7b4a2b6097b45dfaafbf85556810755", // 11ff7f50
+]);
+
 /** Recognized published worlds follow ordered migrations; arbitrary runtime identities never do. */
 function upgradeTerritoryWorld(value: unknown): unknown {
   const old = value as Partial<World> | null;
-  // Published a9209513 uses the same rules and checkpoint layout. The
-  // compatibility hash also covers the optimized runtime's source.
   const publishedSchema24 =
     old?.gameSchema === 24 &&
-    old.rules ===
-      "coop-2-52b30cebdf5c08f453a29c4d1b445fa8a949e8c6f354f2f344683029b032f167";
+    typeof old.rules === "string" &&
+    SCHEMA_24_PUBLISHED_RULES.has(old.rules);
   if (
     old?.schema === 3 &&
     publishedSchema24 &&
