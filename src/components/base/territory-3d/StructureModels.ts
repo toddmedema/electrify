@@ -1,4 +1,5 @@
 import type { CitySizeType } from "../../../Types";
+import type { CityGrowthSector } from "../../../helpers/CityDemand";
 import { MeshBuilder } from "./MeshBuilder";
 import { PALETTE as P, rgb } from "./Palette";
 import type {
@@ -10,7 +11,7 @@ import type {
   Vec3,
 } from "./Types";
 
-const models = new Map<StructureKind, MapModel>();
+const models = new Map<string, MapModel>();
 const TAU = Math.PI * 2;
 const steamMesh = new MeshBuilder()
   .cylinder([0, -0.016, 0], 0.024, 0.034, 0.035, P.smoke, 6)
@@ -118,7 +119,7 @@ function effect(
 
 /** Include the renderer's entire motion envelope in terrain clearance and culling. */
 function model(
-  kind: StructureKind,
+  kind: string,
   body: MeshBuilder,
   terminals: readonly Vec3[],
   moving: ModelPart[] = [],
@@ -285,9 +286,52 @@ function cityBlock(
   }
 }
 
+function workshop(mesh: MeshBuilder, x: number, z: number): void {
+  mesh
+    .box([x, 0.018, z], [0.154, 0.036, 0.133], P.steel)
+    .box([x, 0.079, z], [0.136, 0.086, 0.099], P.cream)
+    .box([x + 0.025, 0.062, z + 0.05], [0.04, 0.052, 0.005], P.steelShade);
+  // Two short roof bays and high windows give the workshop a different silhouette from housing.
+  for (const offset of [-0.035, 0.035]) {
+    const left = x + offset - 0.035;
+    const right = left + 0.07;
+    const back = z - 0.055;
+    const front = z + 0.055;
+    mesh
+      .quad(
+        [left, 0.122, back],
+        [left, 0.122, front],
+        [right, 0.163, front],
+        [right, 0.163, back],
+        P.steelShade,
+      )
+      .quad(
+        [right, 0.122, back],
+        [right, 0.163, back],
+        [right, 0.163, front],
+        [right, 0.122, front],
+        P.steel,
+      )
+      .triangle(
+        [left, 0.122, front],
+        [right, 0.122, front],
+        [right, 0.163, front],
+        P.steel,
+      )
+      .triangle(
+        [right, 0.122, back],
+        [left, 0.122, back],
+        [right, 0.163, back],
+        P.steel,
+      );
+  }
+  mesh.box([x - 0.032, 0.101, z + 0.05], [0.035, 0.014, 0.003], P.mint);
+}
+
 function city(
   size: CitySizeType,
-  kind: StructureKind = `city-${size}`,
+  growth: readonly CityGrowthSector[],
+  key: string,
 ): MapModel {
   const body = new MeshBuilder();
   // A shared street and pocket park tie the three skylines into one city family.
@@ -326,7 +370,20 @@ function city(
     townhouse(body, -0.24, 0.16, P.timber);
     townhouse(body, 0.24, 0.16, P.forest);
   }
-  return model(kind, body, switchgear(body, 0.27));
+  // Each sector has a separate lot. Adding a block never moves an existing building or terminal.
+  if (growth.includes("Residential")) {
+    body.box([-0.334, 0.018, 0.025], [0.136, 0.036, 0.147], P.steel);
+    townhouse(body, -0.334, 0.025, P.forest);
+  }
+  if (growth.includes("Commercial")) {
+    const shopX = 0.356,
+      shopZ = 0.091;
+    body.box([shopX, 0.018, shopZ], [0.134, 0.036, 0.134], P.steel);
+    cityBlock(body, shopX, shopZ, 0.094, 0.104, 2, P.timber);
+    body.box([shopX, 0.104, shopZ + 0.057], [0.094, 0.025, 0.022], P.forest);
+  }
+  if (growth.includes("Industrial")) workshop(body, 0.198, 0.297);
+  return model(key, body, switchgear(body, 0.27));
 }
 
 function tower(): MapModel {
@@ -985,10 +1042,21 @@ function pumpedHydro(): MapModel {
   ]);
 }
 
-const factories: Record<StructureKind, () => MapModel> = {
-  "city-small": () => city("small"),
-  "city-medium": () => city("medium"),
-  "city-large": () => city("large"),
+const citySizes = {
+  "city-small": "small",
+  "city-medium": "medium",
+  "city-large": "large",
+} as const satisfies Record<`city-${CitySizeType}`, CitySizeType>;
+type CityStructureKind = keyof typeof citySizes;
+
+function isCityKind(kind: StructureKind): kind is CityStructureKind {
+  return kind.startsWith("city-");
+}
+
+const factories: Record<
+  Exclude<StructureKind, CityStructureKind>,
+  () => MapModel
+> = {
   tower,
   solar,
   "solar-hail-damaged": () => solar(true),
@@ -1008,11 +1076,21 @@ const factories: Record<StructureKind, () => MapModel> = {
   "pumped-hydro": pumpedHydro,
 };
 
-/** One immutable geometry identity per authored kind; no game or per-tile state. */
-export function getStructureModel(kind: StructureKind): MapModel {
-  const cached = models.get(kind);
+/** Cities share geometry by size and sector combination. Other structures retain one model per kind. */
+export function getStructureModel(
+  kind: StructureKind,
+  growth: readonly CityGrowthSector[] = [],
+): MapModel {
+  const isCity = isCityKind(kind);
+  const key =
+    isCity && growth.length
+      ? `${kind}:${growth.join("-").toLowerCase()}`
+      : kind;
+  const cached = models.get(key);
   if (cached) return cached;
-  const result = factories[kind]();
-  models.set(kind, result);
+  const result = isCity
+    ? city(citySizes[kind], growth, key)
+    : factories[kind]();
+  models.set(key, result);
   return result;
 }
