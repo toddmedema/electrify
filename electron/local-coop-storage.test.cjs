@@ -2,6 +2,10 @@ const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
+const { EventEmitter } = require("node:events");
+const { MessageChannel } = require("node:worker_threads");
+const { LocalCoopSaveClient } = require("./local-coop-save-client.cjs");
+const { serveLocalCoopSaves } = require("./local-coop-save-process.cjs");
 const { LocalCoopSaveStore } = require("./local-coop-storage.cjs");
 const { CoopSaveStore } = require("./coop-storage.cjs");
 const codec = require("./coop-codec.cjs");
@@ -227,3 +231,130 @@ test("future and unreadable libraries stay preserved; full libraries can still u
     await assert.rejects(store.save(world()), /preserved/);
     assert.equal(fs.readFileSync(store.filename, "utf8"), "unreadable current");
   }));
+
+test("native save messages share a queue and acknowledge durable checkpoints", () =>
+  fixture(async ({ directory, store }) => {
+    const { port1, port2 } = new MessageChannel();
+    const child = new EventEmitter();
+    port1.on("message", (result) => child.emit("message", result));
+    child.postMessage = (request) => port1.postMessage(request);
+    serveLocalCoopSaves(
+      {
+        on: (type, listener) => port2.on(type, (data) => listener({ data })),
+        postMessage: (message) => port2.postMessage(message),
+      },
+      directory,
+      owner,
+    );
+    const client = new LocalCoopSaveClient(() => child, directory, owner);
+    try {
+      const first = client.request("write-save", world(4));
+      child.emit("spawn");
+      const latest = world(4, { revision: 2 });
+      const second = client.request("write-save", latest);
+      const list = client.request("list-saves");
+      const [a, b, library] = await Promise.all([first, second, list]);
+      assert.equal(a.id, b.id);
+      assert.equal(library.slots[0].id, b.id);
+      assert.deepEqual(await store.select(b.id), latest);
+      await assert.rejects(client.request("write-save", world(4)), /newer/);
+      assert.deepEqual(await client.request("read-save", b.id), latest);
+    } finally {
+      port1.close();
+      port2.close();
+    }
+  }));
+
+test("a save process exit rejects its pending requests without replaying them", async () => {
+  const children = [];
+  const client = new LocalCoopSaveClient(
+    () => {
+      const child = Object.assign(new EventEmitter(), {
+        requests: [],
+        postMessage(request) {
+          this.requests.push(request);
+        },
+      });
+      children.push(child);
+      return child;
+    },
+    "/unused",
+    owner,
+  );
+  const write = client.request("write-save", world());
+  children[0].emit("error", new Error("Fatal process error"));
+  children[0].emit("exit", 1);
+  await assert.rejects(write, /save process stopped/);
+  const list = client.request("list-saves");
+  assert.deepEqual(
+    children[1].requests.map(({ kind }) => kind),
+    ["list-saves"],
+  );
+  children[1].emit("message", { id: children[1].requests[0].id, result: [] });
+  assert.deepEqual(await list, []);
+});
+
+test("a stalled process times out and must exit before the profile queue reopens", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const stalled = Object.assign(new EventEmitter(), {
+    postMessage() {},
+    kill: t.mock.fn(),
+  });
+  const next = Object.assign(new EventEmitter(), {
+    postMessage({ id }) {
+      this.emit("message", { id, result: [] });
+    },
+  });
+  const fork = t.mock.fn(() => stalled);
+  fork.mock.mockImplementationOnce(() => next, 1);
+  const client = new LocalCoopSaveClient(fork, "/unused", owner);
+
+  const write = client.request("write-save", world());
+  const read = client.request("list-saves");
+  t.mock.timers.tick(30_000);
+  await assert.rejects(write, /timed out/);
+  await assert.rejects(read, /timed out/);
+  assert.equal(stalled.kill.mock.callCount(), 1);
+  await assert.rejects(client.request("list-saves"), /stopping/);
+  assert.equal(fork.mock.callCount(), 1);
+
+  stalled.emit("exit", 1);
+  assert.deepEqual(await client.request("list-saves"), []);
+  assert.equal(fork.mock.callCount(), 2);
+});
+
+test("a save process that spawns after timing out is stopped before another starts", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  let spawned = false;
+  let terminationRequested = false;
+  const delayed = Object.assign(new EventEmitter(), {
+    postMessage() {},
+    kill() {
+      terminationRequested = spawned;
+      return terminationRequested;
+    },
+  });
+  const replacement = Object.assign(new EventEmitter(), {
+    postMessage({ id, kind }) {
+      assert.equal(kind, "list-saves");
+      this.emit("message", { id, result: [] });
+    },
+  });
+  const fork = t.mock.fn(() => delayed);
+  fork.mock.mockImplementationOnce(() => replacement, 1);
+  const client = new LocalCoopSaveClient(fork, "/unused", owner);
+
+  const write = client.request("write-save", world());
+  t.mock.timers.tick(30_000);
+  await assert.rejects(write, /timed out/);
+  spawned = true;
+  delayed.emit("spawn");
+  assert.ok(
+    terminationRequested,
+    "the late-starting process should be terminated",
+  );
+  await assert.rejects(client.request("list-saves"), /stopping/);
+
+  delayed.emit("exit", 0);
+  assert.deepEqual(await client.request("list-saves"), []);
+});

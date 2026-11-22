@@ -5,7 +5,7 @@ import {
   checkpointWorld,
   hydrateWorld,
   pauseWorld,
-  savedMatchSpec,
+  RULES,
   setWorldBlockers,
   stepWorld,
   worldBlockers,
@@ -251,7 +251,8 @@ export class Replica {
       !strings(baseline.blockers)
     )
       throw new ReplicaMismatch("Invalid replica baseline");
-    savedMatchSpec(baseline.world);
+    if (baseline.world?.rules !== RULES)
+      throw new ReplicaMismatch("The host uses different multiplayer rules");
     const world = hydrateWorld(baseline.world);
     if (world.matchId !== baseline.matchId || world.epoch !== baseline.epoch)
       throw new ReplicaMismatch("Baseline belongs to another session");
