@@ -10,29 +10,40 @@ import PersonAddIcon from "@mui/icons-material/PersonAddAlt1";
 import PlayCircleIcon from "@mui/icons-material/PlayCircleOutlined";
 import { coopControls } from "../../multiplayer/Registry";
 import type { CoopSelectionType } from "../../Types";
+import CoopInviteCode from "./CoopInviteCode";
 
-/** Each player's state beside their name, as an icon that names itself to hover and AT. */
+/** State labels stay visible alongside the roster icons. */
 function PlayerState({
   player,
 }: {
   player: CoopSelectionType["players"][number];
 }): React.JSX.Element {
-  if (player.host)
-    return <StarIcon className="coopBrowseState" titleAccess="Host" />;
-  if (!player.connected)
-    return (
-      <SyncIcon
-        className="coopBrowseState coopBrowseConnecting"
-        titleAccess="Connecting"
-      />
-    );
-  return player.ready ? (
-    <CheckCircleIcon
-      className="coopBrowseState coopBrowseReady"
-      titleAccess="Ready"
-    />
-  ) : (
-    <HourglassIcon className="coopBrowseState" titleAccess="Reviewing" />
+  const state = player.host
+    ? "Host"
+    : !player.connected
+      ? "Connecting"
+      : player.ready
+        ? "Ready"
+        : "Reviewing";
+  const Icon = {
+    Host: StarIcon,
+    Connecting: SyncIcon,
+    Ready: CheckCircleIcon,
+    Reviewing: HourglassIcon,
+  }[state];
+  const colorClass =
+    state === "Ready"
+      ? " coopBrowseReady"
+      : state === "Connecting"
+        ? " coopBrowseConnecting"
+        : "";
+  return (
+    <>
+      <Icon className={"coopBrowseState" + colorClass} titleAccess={state} />
+      <span className="coopBrowseStateLabel" aria-hidden="true">
+        {state}
+      </span>
+    </>
   );
 }
 
@@ -107,24 +118,19 @@ export default function CoopBrowseBar({
             <div className="coopBrowseActions">
               {host && (
                 <>
+                  {coop.inviteCode && (
+                    <CoopInviteCode
+                      code={coop.inviteCode}
+                      prominent={alone}
+                      onCopy={() => coopControls()?.copyCode()}
+                    />
+                  )}
                   <Button
-                    variant={alone ? "contained" : "outlined"}
                     startIcon={<PersonAddIcon />}
                     onClick={() => coopControls()?.invite()}
                   >
-                    Invite friends
+                    Invite via Steam
                   </Button>
-                  {coop.lobbyId && (
-                    <Button
-                      aria-label="Copy invite code"
-                      onClick={() => coopControls()?.copyCode()}
-                    >
-                      {/* Phones drop "invite" so the host's three actions share one row. */}
-                      <span>
-                        Copy <span className="coopWideOnly">invite </span>code
-                      </span>
-                    </Button>
-                  )}
                 </>
               )}
               <Button onClick={() => coopControls()?.back()}>Leave</Button>

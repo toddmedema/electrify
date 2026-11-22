@@ -891,12 +891,11 @@ for (const [width, theme] of [
     await expect(bar.getByText(/Invite friends to play|can join/)).toHaveCount(
       0,
     );
+    await expect(bar.getByText(room.inviteCode, { exact: true })).toBeVisible();
     await expect(
-      bar.getByRole("button", { name: "Invite friends", exact: true }),
+      bar.getByRole("button", { name: "Copy code", exact: true }),
     ).toHaveClass(/MuiButton-contained/);
-    await bar
-      .getByRole("button", { name: "Copy invite code", exact: true })
-      .click();
+    await bar.getByRole("button", { name: "Copy code", exact: true }).click();
     await expect(page.getByText("Invite code copied")).toBeVisible();
     await expect
       .poll(() => page.evaluate(() => navigator.clipboard.readText()))
@@ -986,7 +985,7 @@ for (const [width, theme] of [
     ).toBeVisible();
     await page
       .getByRole("dialog")
-      .getByRole("button", { name: "Invite friends", exact: true })
+      .getByRole("button", { name: "Invite via Steam", exact: true })
       .click();
     await expect.poll(() => room.invites).toEqual([room.host]);
     await bounded();
@@ -2570,26 +2569,43 @@ for (const width of [1280, 390]) {
     };
     await capture("01-play-with-friends");
     await hostGame(host);
-    await host
-      .getByRole("button", { name: "Invite friends", exact: true })
-      .click();
-    await expect.poll(() => room.invites).toEqual([room.host]);
-    await capture("02-host-and-invite");
-    await guest
-      .getByLabel("6-digit invite code", { exact: true })
-      .fill(room.inviteCode);
+    const hostBar = host
+      .getByRole("region", { name: "Playing together" })
+      .last();
     await expect(
-      guest.getByLabel("6-digit invite code", { exact: true }),
-    ).toHaveValue(room.inviteCode);
-    await guest.getByLabel("6-digit invite code", { exact: true }).blur();
+      hostBar.getByText(room.inviteCode, { exact: true }),
+    ).toBeVisible();
+    await capture("02-host-and-invite");
+    await hostBar.getByRole("button", { name: "Copy code" }).click();
+    await expect(host.getByText("Invite code copied")).toBeVisible();
+    const sharedCode = await host.evaluate(() =>
+      navigator.clipboard.readText(),
+    );
+    expect(sharedCode).toBe(room.inviteCode);
+    expect(room.invites).toEqual([]);
+    const guestCode = guest.getByLabel("6-digit invite code", { exact: true });
+    await guestCode.fill("999999");
+    await guestCode.press("Enter");
+    await expect(guest.getByRole("alert")).toContainText("Invalid lobby code");
+    await expect(guestCode).toHaveAttribute("aria-invalid", "true");
+    await guestCode.fill(sharedCode.slice(0, 3) + " " + sharedCode.slice(3));
+    await expect(guestCode).toHaveAttribute("aria-invalid", "false");
+    await expect(guestCode).toHaveValue(sharedCode);
+    await expect(
+      guest.getByRole("button", { name: "Join", exact: true }),
+    ).toBeEnabled();
     await capture("03-join-with-code", guest);
-    await guest.getByRole("button", { name: "Join", exact: true }).click();
+    await guestCode.press("Enter");
     const roster = host.getByRole("list", { name: "Players", exact: true });
     await expect(
       roster.last().getByRole("img", { name: "Reviewing", exact: true }),
     ).toBeVisible();
     await capture("04-friend-joined");
     await host.getByTestId("mission-row-999").click();
+    await host
+      .getByRole("textbox", { name: "Seed", exact: true })
+      .last()
+      .fill("42");
     await expect(
       host.getByRole("button", { name: "Start for everyone", exact: true }),
     ).toBeEnabled();
@@ -2598,6 +2614,15 @@ for (const width of [1280, 390]) {
     await expect(
       guest.getByText("Custom setup", { exact: true }).last(),
     ).toBeVisible();
+    await expect(
+      guest.getByRole("textbox", { name: "Seed", exact: true }).last(),
+    ).toHaveValue("42");
+    await expect(
+      guest
+        .getByRole("region", { name: "Playing together" })
+        .last()
+        .getByText(sharedCode, { exact: true }),
+    ).toHaveCount(0);
     await capture("06-friend-ready", guest, "I'm ready");
     await guest.getByRole("button", { name: "I'm ready", exact: true }).click();
     await expect(
@@ -2662,9 +2687,9 @@ for (const width of [1280, 390]) {
     ).toBeDisabled();
     await host
       .getByRole("dialog")
-      .getByRole("button", { name: "Invite friends", exact: true })
+      .getByRole("button", { name: "Invite via Steam", exact: true })
       .click();
-    await expect.poll(() => room.invites).toEqual([room.host, room.host]);
+    await expect.poll(() => room.invites).toEqual([room.host]);
     await capture("13-pick-companies");
     await guest
       .getByRole("button", { name: "Play with friends", exact: true })

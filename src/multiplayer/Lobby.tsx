@@ -17,6 +17,7 @@ import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import PersonAddIcon from "@mui/icons-material/PersonAddAlt1";
 import type { MultiplayerSession } from "./Session";
 import { seatAssignments } from "./Slots";
+import CoopInviteCode from "../components/base/CoopInviteCode";
 import "./Lobby.css";
 
 /**
@@ -46,6 +47,7 @@ export default function Lobby({
   );
   const [code, setCode] = useState("");
   const [failure, setFailure] = useState<string>();
+  const [entryAttempt, setEntryAttempt] = useState<"host" | "join">();
   const title = useRef<HTMLHeadingElement>(null);
   const mode = !lobby.lobbyId
     ? "entry"
@@ -59,13 +61,16 @@ export default function Lobby({
     "the host";
   const connected = (id: string) =>
     id === lobby.selfId || lobby.connected.includes(id);
-  const run = (action: () => Promise<unknown>) => {
+  const run = (action: () => Promise<unknown>, attempt: "host" | "join") => {
+    setEntryAttempt(attempt);
     setFailure(undefined);
     void action().catch((error) =>
       setFailure(error instanceof Error ? error.message : "Try again."),
     );
   };
   const notice = failure || error || lobby.error;
+  const canJoin = lobby.available && !busy && /^[0-9]{6}$/.test(code);
+  const joinFailed = entryAttempt === "join" && !!failure;
   return (
     <Dialog
       className="coopLobby"
@@ -127,6 +132,7 @@ export default function Lobby({
         <Stack spacing={2} sx={{ pt: 1 }}>
           {notice && (
             <Alert
+              id="coop-lobby-notice"
               severity="warning"
               onClose={() => {
                 setFailure(undefined);
@@ -138,6 +144,11 @@ export default function Lobby({
           )}
           {mode === "entry" && (
             <>
+              {!lobby.available && !notice && (
+                <Typography variant="body2" color="text.secondary">
+                  Connect to Steam to host or join online.
+                </Typography>
+              )}
               <Button
                 variant="contained"
                 size="large"
@@ -146,35 +157,49 @@ export default function Lobby({
                   run(async () => {
                     await session.create();
                     onHosted();
-                  })
+                  }, "host")
                 }
               >
                 Host a game
               </Button>
-              <Divider>or join a friend</Divider>
-              <div className="coopJoinRow">
+              <Divider>Join a friend</Divider>
+              <form
+                className="coopJoinRow"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  if (canJoin) run(() => session.join(code), "join");
+                }}
+              >
                 <TextField
                   label="6-digit invite code"
                   value={code}
-                  onChange={(event) => setCode(event.target.value.trim())}
+                  disabled={busy}
+                  error={joinFailed}
+                  onChange={(event) => {
+                    if (joinFailed) setFailure(undefined);
+                    setCode(event.target.value.replace(/[\s-]/g, ""));
+                  }}
+                  autoComplete="off"
                   slotProps={{
                     htmlInput: {
                       inputMode: "numeric",
-                      pattern: "[0-9]{6}",
-                      maxLength: 6,
+                      "aria-describedby": joinFailed
+                        ? "coop-lobby-notice"
+                        : "coop-invite-code-hint",
                     },
                   }}
                 />
-                <Button
-                  variant="outlined"
-                  disabled={
-                    !lobby.available || busy || !/^[0-9]{6}$/.test(code)
-                  }
-                  onClick={() => run(() => session.join(code))}
-                >
+                <Button type="submit" variant="outlined" disabled={!canJoin}>
                   Join
                 </Button>
-              </div>
+              </form>
+              <Typography
+                id="coop-invite-code-hint"
+                variant="body2"
+                color="text.secondary"
+              >
+                Ask your host for the invite code.
+              </Typography>
             </>
           )}
           {mode === "waiting" && (
@@ -203,7 +228,20 @@ export default function Lobby({
               onFailure={setFailure}
             />
           )}
-          {busy && mode !== "waiting" && (
+          {busy && mode === "entry" && (
+            <Stack
+              direction="row"
+              spacing={1}
+              role="status"
+              sx={{ alignItems: "center" }}
+            >
+              <CircularProgress size={20} aria-hidden="true" />
+              <Typography variant="body2">
+                {entryAttempt === "join" ? "Finding game…" : "Creating lobby…"}
+              </Typography>
+            </Stack>
+          )}
+          {busy && mode === "campaign" && (
             <CircularProgress size={20} aria-label="Loading multiplayer" />
           )}
         </Stack>
@@ -316,19 +354,23 @@ function CampaignSlots({
       )}
       {host ? (
         <>
-          <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
+          <div className="coopCampaignInvites">
+            {lobby.inviteCode && (
+              <CoopInviteCode
+                code={lobby.inviteCode}
+                onCopy={onCopyCode}
+                prominent={!!blocker}
+                disabled={busy}
+              />
+            )}
             <Button
-              variant="outlined"
               startIcon={<PersonAddIcon />}
               disabled={busy}
               onClick={() => run(() => session.invite())}
             >
-              Invite friends
+              Invite via Steam
             </Button>
-            <Button disabled={busy} onClick={onCopyCode}>
-              Copy invite code
-            </Button>
-          </Stack>
+          </div>
           <Button
             variant="contained"
             size="large"

@@ -35,7 +35,9 @@ test("guests see who they follow and every player's state as a named icon", () =
   render(<CoopBrowseBar coop={coop()} />);
   expect(screen.getByText("Following Alice")).toBeInTheDocument();
   const roster = screen.getByLabelText("Players");
-  // States are icons that name themselves, not words beside each name.
+  expect(
+    within(roster).getByText("Connecting", { selector: "span" }),
+  ).toBeVisible();
   expect(within(roster).getByRole("img", { name: "Host" })).toBeInTheDocument();
   expect(
     within(roster).getByRole("img", { name: "Ready" }),
@@ -43,7 +45,7 @@ test("guests see who they follow and every player's state as a named icon", () =
   expect(
     within(roster).getByRole("img", { name: "Connecting" }),
   ).toBeInTheDocument();
-  expect(screen.queryByText("Invite friends")).not.toBeInTheDocument();
+  expect(screen.queryByText("Invite via Steam")).not.toBeInTheDocument();
   fireEvent.click(screen.getByText("Leave"));
   expect(controls.back).toHaveBeenCalled();
 });
@@ -51,7 +53,7 @@ test("guests see who they follow and every player's state as a named icon", () =
 test("a host alone invites friends first, can copy the code and cannot start yet", () => {
   const host = coop({
     role: "host",
-    lobbyId: "109775242999999999",
+    inviteCode: "012345",
     hasSaves: true,
     players: [coop().players[0]],
   });
@@ -62,12 +64,14 @@ test("a host alone invites friends first, can copy the code and cannot start yet
     </>,
   );
   expect(screen.queryByText(/Invite friends to play|can join/)).toBeNull();
-  const invite = screen.getByRole("button", { name: "Invite friends" });
-  expect(invite).toHaveClass("MuiButton-contained");
-  fireEvent.click(invite);
-  expect(controls.invite).toHaveBeenCalled();
-  fireEvent.click(screen.getByRole("button", { name: "Copy invite code" }));
+  expect(screen.getByText("012345")).toBeVisible();
+  const copy = screen.getByRole("button", { name: "Copy code" });
+  expect(copy).toHaveClass("MuiButton-contained");
+  fireEvent.click(copy);
   expect(controls.copyCode).toHaveBeenCalled();
+  expect(controls.invite).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: "Invite via Steam" }));
+  expect(controls.invite).toHaveBeenCalled();
   fireEvent.click(
     screen.getByRole("button", { name: "Load multiplayer save" }),
   );
@@ -86,6 +90,7 @@ test("the host sees how many guests are ready and starts for everyone", () => {
   const onStart = jest.fn();
   const host = coop({
     role: "host",
+    inviteCode: "012345",
     players: coop().players.map((p) => ({ ...p, connected: true })),
   });
   render(
@@ -95,10 +100,10 @@ test("the host sees how many guests are ready and starts for everyone", () => {
     </>,
   );
   expect(screen.queryByText(/choosing for/)).toBeNull();
-  // The count stays for screen readers only; sighted hosts read the roster's icons.
+  // The count supplements the individual readiness labels for screen readers.
   expect(screen.getByText("1 of 2 ready")).toHaveClass("srOnly");
   expect(screen.getAllByRole("img", { name: "Reviewing" })).toHaveLength(1);
-  expect(screen.getByRole("button", { name: "Invite friends" })).toHaveClass(
+  expect(screen.getByRole("button", { name: "Copy code" })).toHaveClass(
     "MuiButton-outlined",
   );
   fireEvent.click(screen.getByText("Start for everyone"));
