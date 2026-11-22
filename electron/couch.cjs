@@ -171,6 +171,13 @@ function seatMessage(message) {
   if (!message || typeof message !== "object" || Array.isArray(message))
     return false;
   const keys = Object.keys(message);
+  if (message.kind === "haptic")
+    return (
+      keys.length === 2 &&
+      keys.includes("kind") &&
+      keys.includes("cue") &&
+      (message.cue === "confirm" || message.cue === "milestone")
+    );
   if (message.kind === "heartbeat" || message.kind === "ack")
     return keys.every((key) =>
       ["kind", "revision", "sequence", "delivery"].includes(key),
@@ -239,16 +246,19 @@ class CouchViews {
     return this.setup || this.seats.size > 0;
   }
   status() {
+    const hapticsSupported = !!this.input()?.supportsVibration?.();
     return {
       available: !!this.input()?.initialized,
       devices: this.devices,
       bindings: Object.fromEntries(this.bindings),
       active: this.active(),
-      haptics: {
-        supported: false,
-        reason:
-          "Assigned-controller vibration is unavailable with this Steam Input adapter.",
-      },
+      haptics: hapticsSupported
+        ? { supported: true }
+        : {
+            supported: false,
+            reason:
+              "Assigned-controller vibration is unavailable with this Steam Input adapter.",
+          },
       layout: this.layout,
       overlay: this.overlayOwner
         ? {
@@ -492,10 +502,14 @@ class CouchViews {
             if (
               this.seats.get(seat.id) !== seat ||
               seat.generation !== portGeneration ||
-              !seat.port ||
+              seat.port !== port1 ||
               !seatMessage(data)
             )
               return;
+            if (data.kind === "haptic") {
+              this.vibrateSeat(seat, data.cue);
+              return;
+            }
             this.publish({
               kind: "seat-message",
               seatId: seat.id,
@@ -548,6 +562,8 @@ class CouchViews {
     if (this.seats.get(seat.id) !== seat) return;
     seat.port?.close();
     seat.port = undefined;
+    seat.vibrationEnabled = false;
+    this.input()?.stopVibration?.(this.bindings.get(seat.id));
     // The old generation can never send another accepted command after reload/crash.
     const oldGeneration = seat.generation;
     seat.generation = ++this.generation;
@@ -559,9 +575,31 @@ class CouchViews {
     });
     if (this.overlayOwner) this.refreshOverlay();
   }
+  vibrateSeat(seat, cue) {
+    if (
+      !seat.vibrationEnabled ||
+      this.opening ||
+      this.overlayOwner ||
+      !this.layout?.fits
+    )
+      return;
+    const controller = this.bindings.get(seat.id);
+    if (
+      this.devices.some(
+        (device) => device.id === controller && device.connected,
+      )
+    )
+      this.input()?.vibrate?.(controller, cue);
+  }
   send({ seatId, generation, message }) {
     const seat = this.seats.get(seatId);
     if (!seat?.port || seat.generation !== generation) return false;
+    if (message?.kind === "presentation" && message.generation === generation) {
+      seat.vibrationEnabled =
+        message.settings?.controllerVibrationEnabled === true;
+      if (!seat.vibrationEnabled)
+        this.input()?.stopVibration?.(this.bindings.get(seatId));
+    }
     seat.port.postMessage(message);
     return true;
   }
@@ -592,7 +630,7 @@ class CouchViews {
       if (this.layout.fits) {
         seat.view.setBounds(this.layout.bounds[i]);
         seat.view.webContents.setZoomFactor(this.layout.zoom);
-      }
+      } else this.input()?.stopVibration?.(this.bindings.get(seat.id));
     });
     this.publish({ kind: "layout", layout: this.layout });
     if (this.overlayOwner) this.refreshOverlay();

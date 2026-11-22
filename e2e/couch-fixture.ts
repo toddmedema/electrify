@@ -29,6 +29,7 @@ const defaultDevices: Device[] = ["101", "202"].map((id) => ({
 
 interface CouchLayout {
   fits: boolean;
+  inset: number;
   zoom: number;
   cssWidth: number;
   cssHeight: number;
@@ -55,7 +56,10 @@ export interface CouchFixture<Actor extends Page | Frame> {
     settle: () => void;
   };
   checkpoint: () => World | undefined;
+  seedCheckpoint: (world: World) => void;
+  setSaveFailure: (failing: boolean) => void;
   layout: () => CouchLayout | undefined;
+  resize: (width: number, height: number) => Promise<void>;
   backdropRevision: () => number;
   refreshRequests: () => number;
   presentationMessages: () => number;
@@ -186,6 +190,7 @@ export async function createCouchFixture(
     | { ordinal: number; requested: () => void; outcome: Promise<void> }
     | undefined;
   let saved: World | undefined;
+  let saveFailure = false;
   let updatedAt = 0;
   let overlayOwner: string | null = null;
   let overlayShared = false;
@@ -327,6 +332,7 @@ export async function createCouchFixture(
             { seatId, route, generation },
           ] of capturedSeats.entries()) {
             if (!current()) return;
+            if (!capturedLayout.fits) break;
             let png: Buffer;
             if (isPage(route.page)) {
               try {
@@ -480,6 +486,7 @@ export async function createCouchFixture(
         case "read-save":
           return saved;
         case "write-save":
+          if (saveFailure) throw new Error("Fixture local storage is full");
           saved = structuredClone(raw.world) as World;
           updatedAt = Date.now();
           return { id: "saved-local", updatedAt };
@@ -864,7 +871,25 @@ export async function createCouchFixture(
       return { requested: pending, settle };
     },
     checkpoint: () => saved,
+    seedCheckpoint: (world) => {
+      if (playing) throw new Error("Close the campaign before seeding a save");
+      saved = structuredClone(world);
+      updatedAt = Date.now();
+    },
+    setSaveFailure: (failing) => {
+      saveFailure = failing;
+    },
     layout: () => layout,
+    async resize(width, height) {
+      await settleCaptures();
+      await shell.setViewportSize({ width, height });
+      if (native) {
+        native.size[0] = width;
+        native.size[1] = height;
+        native.manager.relayout({});
+      }
+      await relayout();
+    },
     backdropRevision: () => readyCaptureId,
     refreshRequests: () => refreshRequests,
     presentationMessages: () => presentationMessages,

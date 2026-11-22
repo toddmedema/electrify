@@ -1161,9 +1161,9 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
     void request({
       kind: "overlay",
       seatId: globalOwner ?? null,
-      shared: !!globalOwner && !textOwner,
+      shared: !!globalOwner && !textOwner && !exitOwner,
     }).catch((failure) => setError(String(failure)));
-  }, [globalOwner, stage, textOwner]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [globalOwner, stage, textOwner, exitOwner]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const sharedGame = useMemo(
     () =>
@@ -1196,6 +1196,7 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
           {sharedGame && summary && (
             <CouchToolbar
               game={sharedGame}
+              clock={summary}
               statusScale={nativeZoom}
               menuOpen={!!menuOwner}
               onMenuClose={() => cancelGlobal("Menu closed")}
