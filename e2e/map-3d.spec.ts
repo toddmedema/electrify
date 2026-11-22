@@ -273,48 +273,73 @@ for (const theme of ["light", "dark"] as const) {
   });
 }
 
-test("desktop wheel zoom clamps to half and double scale around the pointer", async ({
+test("desktop wheel zoom keeps the pointer anchored in every rendered frame", async ({
   page,
 }) => {
   test.skip(
     (page.viewportSize()?.width ?? 1024) < 1024,
     "Desktop pointer controls",
   );
+  type ProjectionCapture = Window & { mapZoomProjections?: number[][] };
+  await page.addInitScript(() => {
+    const projections: number[][] = [];
+    (window as ProjectionCapture).mapZoomProjections = projections;
+    const submit = WebGL2RenderingContext.prototype.uniformMatrix4fv;
+    WebGL2RenderingContext.prototype.uniformMatrix4fv = function (...args) {
+      if (
+        this.canvas instanceof HTMLCanvasElement &&
+        this.canvas.classList.contains("territory3DCanvas")
+      )
+        projections.push(Array.from(args[2]));
+      submit.apply(this, args);
+    };
+  });
   const { map, canvas } = await startPausedMap(page, "light");
   await readyDiagnostics(canvas);
   const viewport = map.locator(".territoryMapViewport");
-  const center = await viewport.evaluate((element) => {
-    const { left, top } = element.getBoundingClientRect();
-    return {
-      x: left + element.clientWidth / 2,
-      y: top + element.clientHeight / 2,
-    };
-  });
-  const zoomX = Math.round(center.x) + 80;
-  const zoomY = Math.round(center.y) + 48;
+  const paint = (await canvas.boundingBox())!;
+  const zoomX = Math.round(paint.x + paint.width / 2) + 180;
+  const zoomY = Math.round(paint.y + paint.height / 2) + 105;
   await page.mouse.move(zoomX, zoomY);
-  const baseline = await readTerritoryMapCamera(viewport);
+  const readProjections = () =>
+    page.evaluate(() => (window as ProjectionCapture).mapZoomProjections!);
+  const start = await readProjections();
+  const baseline = start.at(-1)!;
+  const scale = Number(await viewport.getAttribute("data-camera-scale"));
 
-  await page.mouse.wheel(0, -2000);
-  await expect(viewport).toHaveAttribute(
-    "data-camera-scale",
-    String(baseline.scale * 2),
-  );
-  await page.mouse.wheel(0, 2000);
-  await expect(viewport).toHaveAttribute(
-    "data-camera-scale",
-    String(baseline.scale / 2),
-  );
+  for (const [delta, zoom] of [
+    [-180, Math.exp(0.3)],
+    [180, 1],
+    [-2000, 2],
+    [2000, 0.5],
+  ]) {
+    await page.mouse.wheel(0, delta);
+    await expect
+      .poll(async () => (await readProjections()).at(-1)![0] / baseline[0])
+      .toBeCloseTo(zoom, 5);
+    await expect
+      .poll(async () =>
+        Number(await viewport.getAttribute("data-camera-scale")),
+      )
+      .toBeCloseTo(scale * zoom, 8);
+  }
 
-  const camera = await readTerritoryMapCamera(viewport);
-  const offsetX = zoomX - center.x;
-  const offsetY = zoomY - center.y;
-  const driftX =
-    camera.x - baseline.x + offsetX / camera.scale - offsetX / baseline.scale;
-  const driftY =
-    camera.y - baseline.y + offsetY / camera.scale - offsetY / baseline.scale;
-  // Chromium rounds wheel coordinates to CSS pixels.
-  expect(Math.hypot(driftX, driftY) * camera.scale).toBeLessThan(1);
+  // Unproject the cursor onto the ground (world Y = 0) in the initial
+  // frame, then follow that same point through each WebGL projection.
+  const clipX = (2 * (zoomX - paint.x)) / paint.width - 1;
+  const clipY = 1 - (2 * (zoomY - paint.y)) / paint.height;
+  const worldX = (clipX - baseline[12]) / baseline[0];
+  const worldZ = (clipY - baseline[13]) / baseline[9];
+  for (const matrix of (await readProjections()).slice(start.length)) {
+    const driftX =
+      ((worldX * matrix[0] + matrix[12] - clipX) * paint.width) / 2;
+    const driftY =
+      ((worldZ * matrix[9] + matrix[13] - clipY) * paint.height) / 2;
+    expect(
+      Math.hypot(driftX, driftY),
+      "terrain drift in CSS pixels",
+    ).toBeLessThan(1);
+  }
 });
 
 test("pinch zooms the 3D map without magnifying the page", async ({
