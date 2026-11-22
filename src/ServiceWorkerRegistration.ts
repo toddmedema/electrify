@@ -7,8 +7,8 @@ const registeringWindows = new WeakSet<Window>();
 
 /**
  * Registers the service worker, then warms its cache in the background. Every player gets the
- * deployed build and every icon; installed apps also get every weather location and fresh market
- * data and every audio file.
+ * deployed build and every icon; installed apps also get weather for the official scenarios,
+ * fresh market data, and every audio file.
  */
 export function registerServiceWorker(win: Window = window): void {
   if (process.env.REACT_APP_DESKTOP === "true" && isDesktopApp()) return;
@@ -36,9 +36,17 @@ export function registerServiceWorker(win: Window = window): void {
     // repeat load only pays for the manifest check.
     void prefetchIcons();
     if (installed) {
-      void serviceWorker.ready.then((registration) =>
-        registration.active?.postMessage({ type: "SYNC_OFFLINE_DATA" }),
-      );
+      void Promise.all([
+        serviceWorker.ready,
+        import("./OfficialOfflineWeather"),
+      ])
+        .then(([registration, { officialOfflineWeather }]) =>
+          registration.active?.postMessage({
+            type: "SYNC_OFFICIAL_OFFLINE_DATA",
+            weather: officialOfflineWeather(),
+          }),
+        )
+        .catch(() => undefined); // The next online launch can retry the warm-up.
     }
   };
 

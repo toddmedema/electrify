@@ -8139,6 +8139,11 @@ img[src$="/transmission.svg"] {
     }
   }
 
+  &[aria-disabled="true"] {
+    opacity: 0.5;
+    cursor: default;
+  }
+
   &.selected {
     background: $interactive_blue;
     background-clip: padding-box;

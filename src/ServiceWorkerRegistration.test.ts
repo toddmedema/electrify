@@ -125,11 +125,11 @@ describe("registerServiceWorker", () => {
     expect(messageTypes(sw.postMessage)).toEqual([
       "CACHE_BUILD",
       "CACHE_ICONS",
-      "SYNC_OFFLINE_DATA",
+      "SYNC_OFFICIAL_OFFLINE_DATA",
     ]);
   });
 
-  it("also syncs every weather location for an installed app", async () => {
+  it("sends the installed app the shipped hashes for official scenario weather", async () => {
     const sw = fakeWindow({ installed: true });
     restore = sw.restore;
 
@@ -141,8 +141,22 @@ describe("registerServiceWorker", () => {
     expect(messageTypes(sw.postMessage).sort()).toEqual([
       "CACHE_BUILD",
       "CACHE_ICONS",
-      "SYNC_OFFLINE_DATA",
+      "SYNC_OFFICIAL_OFFLINE_DATA",
     ]);
+    const { weather } = sw.postMessage.mock.calls.find(
+      ([message]) => message.type === "SYNC_OFFICIAL_OFFLINE_DATA",
+    )![0];
+    expect(weather).toEqual(
+      expect.arrayContaining([
+        { id: "PIT", integrity: expect.stringMatching(/^sha256-/) },
+        { id: "AlleghenyUpper", integrity: expect.stringMatching(/^sha256-/) },
+        { id: "BurlingtonVT", integrity: expect.stringMatching(/^sha256-/) },
+        { id: "Kyiv", integrity: expect.stringMatching(/^sha256-/) },
+      ]),
+    );
+    expect(weather).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: "Tokyo" })]),
+    );
   });
 
   it("caches audio and data immediately when this session installs, and retries on reconnection", async () => {
@@ -152,11 +166,15 @@ describe("registerServiceWorker", () => {
     await flush();
     sw.fire("appinstalled");
     await flush();
-    expect(messageTypes(sw.postMessage)).toContain("SYNC_OFFLINE_DATA");
+    expect(messageTypes(sw.postMessage)).toContain(
+      "SYNC_OFFICIAL_OFFLINE_DATA",
+    );
     sw.postMessage.mockClear();
     sw.fire("online");
     await flush();
-    expect(messageTypes(sw.postMessage)).toContain("SYNC_OFFLINE_DATA");
+    expect(messageTypes(sw.postMessage)).toContain(
+      "SYNC_OFFICIAL_OFFLINE_DATA",
+    );
   });
 
   it("re-requests icons when connectivity returns", async () => {

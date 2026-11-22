@@ -30,6 +30,7 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import InfoIcon from "@mui/icons-material/Info";
 import PlayCircleIcon from "@mui/icons-material/PlayCircleOutlined";
 import LocationPicker from "../base/LocationPicker";
+import { useOfflineWeather } from "../base/useOfflineWeather";
 import ConceptIcon from "../base/ConceptIcon";
 import InfoDialog from "../base/InfoDialog";
 import VictoryConditionsDialog from "../base/VictoryConditionsDialog";
@@ -377,11 +378,6 @@ export default function CustomGame(props: Props): React.JSX.Element {
   // one of its options renders blank and drops the choice on the next edit. Listed last, under
   // its own heading, so it doesn't shuffle the rest of the list around.
   const current = getScenarioLocation(scenario);
-  React.useEffect(() => {
-    if (current) {
-      void prefetchScenarioData(current);
-    }
-  }, [current]);
   const selectableLocations = React.useMemo(
     () =>
       current && !cities.some((c: CityType) => c.id === current.id)
@@ -392,6 +388,8 @@ export default function CustomGame(props: Props): React.JSX.Element {
   const location = selectableLocations.find(
     (c: CityType) => c.id === current?.id,
   );
+  const isLocationUnavailable = useOfflineWeather(selectableLocations, current);
+  const weatherUnavailable = !!current && !!isLocationUnavailable?.(current);
 
   // Rolling the year back past a technology's invention would otherwise leave a facility in the
   // list that quietly disappears once the game loads
@@ -416,7 +414,7 @@ export default function CustomGame(props: Props): React.JSX.Element {
   const forecastInvalid = unavailable.length > 0 || !!hydroSetup.error;
   const forecastLocation = getScenarioLocation(scenario);
   const forecast = useWorkerRequest(
-    forecastInvalid || !forecastLocation
+    forecastInvalid || weatherUnavailable || !forecastLocation
       ? undefined
       : {
           // Anything that changes the scenario is a new request
@@ -438,7 +436,7 @@ export default function CustomGame(props: Props): React.JSX.Element {
   // The outlook is optional: a worker failure reads as unavailable without blocking Play
   const outlook: OutlookState = forecastInvalid
     ? { status: "invalid" }
-    : !forecastLocation || forecast.status === "error"
+    : weatherUnavailable || !forecastLocation || forecast.status === "error"
       ? { status: "error" }
       : forecast.status === "ready"
         ? { status: "ready", outlook: forecast.result }
@@ -513,7 +511,9 @@ export default function CustomGame(props: Props): React.JSX.Element {
             locations={selectableLocations}
             value={location}
             loading={citiesLoading}
+            isLocationUnavailable={isLocationUnavailable}
             onChange={(picked: CityType) => {
+              if (!isLocationUnavailable) void prefetchScenarioData(picked);
               changeStartingCustomers(getStartingCustomers(picked), {
                 locationId: picked.id,
                 location: picked,
@@ -1040,7 +1040,7 @@ export default function CustomGame(props: Props): React.JSX.Element {
           {props.coop ? (
             <CoopStartButton
               coop={props.coop}
-              disabled={unavailable.length > 0 || !!hydroSetup.error}
+              disabled={forecastInvalid || weatherUnavailable}
               onStart={() =>
                 onStart({
                   ...scenario,
@@ -1055,7 +1055,7 @@ export default function CustomGame(props: Props): React.JSX.Element {
               variant="contained"
               color="primary"
               startIcon={<PlayCircleIcon />}
-              disabled={unavailable.length > 0 || !!hydroSetup.error}
+              disabled={forecastInvalid || weatherUnavailable}
               onClick={() =>
                 onStart({
                   ...scenario,

@@ -1,7 +1,5 @@
 const CACHE_VERSION = "electrify-v2";
 const WEATHER_INDEX = "/data/weather/index.json";
-// Separate from the normally refreshed catalog: only durable, complete syncs advance this.
-const OFFLINE_DATA_REVISION = "/__offline-data-revision";
 // Generated from public/images at build time (scripts/generate-icon-manifest.js).
 const ICON_MANIFEST = "/icons.json";
 // Audio paths are not content-hashed and cached tracks are never revalidated. Replacing an
@@ -209,43 +207,38 @@ async function cacheIcons() {
   await Promise.allSettled(missing.map((url) => fetchAndCache(cache, url)));
 }
 
-/**
- * An installed app asks for this after launch has gone idle. Compare the catalog first: an
- * unchanged one only fills holes, while a changed catalog refreshes every location because its
- * update date means the packed records may have changed in place.
- */
-async function syncOfflineData() {
+/** Warm the shipped missions' weather without downloading or evicting custom locations. */
+async function syncOfflineData(weather) {
   const cache = await caches.open(CACHE_VERSION);
-  const cachedIndex = await cache.match(OFFLINE_DATA_REVISION);
-  const cachedText = cachedIndex ? await cachedIndex.clone().text() : "";
-  const indexResponse = await fetchAndCache(cache, WEATHER_INDEX);
-  const indexText = await indexResponse.clone().text();
-  const index = JSON.parse(indexText);
-  const weatherUrls = Object.keys(index.cities || {}).map(
-    (id) => `/data/weather/${id}.bin`,
-  );
-  const cachedUrls = new Set(
-    (await cache.keys()).map((request) => new URL(request.url).pathname),
-  );
-  const weatherToFetch =
-    cachedText !== indexText
-      ? weatherUrls
-      : weatherUrls.filter((url) => !cachedUrls.has(url));
+  const requests = Array.isArray(weather)
+    ? weather
+        .filter(
+          (entry) =>
+            entry &&
+            typeof entry.id === "string" &&
+            LOCATION_ID.test(entry.id) &&
+            typeof entry.integrity === "string" &&
+            /^sha256-[A-Za-z0-9+/]{43}=$/.test(entry.integrity),
+        )
+        .map(
+          ({ id, integrity }) =>
+            new Request(absoluteUrl(`/data/weather/${id}.bin`), { integrity }),
+        )
+    : [];
 
-  const downloads = await Promise.allSettled(
-    [
-      ...MARKET_DATA,
-      ...weatherToFetch,
-      ...AUDIO_FILES.filter((url) => !cachedUrls.has(url)),
-    ].map((url) => fetchAndCache(cache, url, true)),
-  );
-  if (downloads.every((result) => result.status === "fulfilled")) {
-    try {
-      await cache.put(OFFLINE_DATA_REVISION, new Response(indexText));
-    } catch {
-      // Retry next time: network success alone does not establish an offline copy.
-    }
-  }
+  await Promise.allSettled([
+    ...[WEATHER_INDEX, ...MARKET_DATA].map((url) =>
+      fetchAndCache(cache, url, true),
+    ),
+    ...AUDIO_FILES.map(async (url) => {
+      if (!(await cache.match(url))) await fetchAndCache(cache, url, true);
+    }),
+    ...requests.map(async (request) => {
+      const cached = await cache.match(request);
+      if (!cached || !(await matchesIntegrity(cached, request.integrity)))
+        await fetchAndCache(cache, request, true);
+    }),
+  ]);
 }
 
 self.addEventListener("install", (event) => {
@@ -280,8 +273,8 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("message", (event) => {
-  if (event.data?.type === "SYNC_OFFLINE_DATA") {
-    event.waitUntil(syncOfflineData());
+  if (event.data?.type === "SYNC_OFFICIAL_OFFLINE_DATA") {
+    event.waitUntil(syncOfflineData(event.data.weather));
   } else if (event.data?.type === "CACHE_SCENARIO_DATA") {
     event.waitUntil(cacheScenarioData(event.data.locationIds));
   } else if (event.data?.type === "CACHE_ICONS") {
