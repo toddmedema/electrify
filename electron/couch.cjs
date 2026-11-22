@@ -87,7 +87,10 @@ async function captureSeat(seat, bounds, current) {
 /** Coordinates are DIPs; CSS dimensions are computed only after zoom. */
 function couchLayout(width, height, count, options = {}) {
   const zoom = options.zoom ?? Math.max(1.5, height / 720);
-  const inset = options.inset ?? 0;
+  const screenEdgePadding = options.screenEdgePadding ?? 0;
+  const inset =
+    options.inset ??
+    Math.ceil((Math.min(width, height) * screenEdgePadding) / 100);
   const gutter = options.gutter ?? 8;
   const bandHeight = options.bandHeight ?? 96;
   if (
@@ -95,6 +98,7 @@ function couchLayout(width, height, count, options = {}) {
     count < 2 ||
     count > 4 ||
     ![width, height, zoom, inset, gutter, bandHeight].every(Number.isFinite) ||
+    ![0, 2, 4].includes(screenEdgePadding) ||
     width <= 0 ||
     height <= 0 ||
     zoom < 1 ||
@@ -109,7 +113,7 @@ function couchLayout(width, height, count, options = {}) {
     throw new Error("Invalid couch layout");
   const availableWidth = width - inset * 2 - gutter * (count - 1);
   const seatWidth = Math.floor(availableWidth / count);
-  const seatHeight = Math.floor(height - bandHeight - inset);
+  const seatHeight = Math.floor(height - bandHeight - inset * 2);
   const fits = seatWidth / zoom >= 360 && seatHeight / zoom >= 360;
   return {
     fits,
@@ -130,7 +134,7 @@ function couchLayout(width, height, count, options = {}) {
       );
       return {
         x: left,
-        y: Math.round(bandHeight),
+        y: Math.round(inset + bandHeight),
         width: Math.max(0, right - left),
         height: Math.max(0, seatHeight),
       };
@@ -167,6 +171,13 @@ function seatMessage(message) {
   if (!message || typeof message !== "object" || Array.isArray(message))
     return false;
   const keys = Object.keys(message);
+  if (message.kind === "haptic")
+    return (
+      keys.length === 2 &&
+      keys.includes("kind") &&
+      keys.includes("cue") &&
+      (message.cue === "confirm" || message.cue === "milestone")
+    );
   if (message.kind === "heartbeat" || message.kind === "ack")
     return keys.every(
       (key) =>
@@ -239,16 +250,19 @@ class CouchViews {
     return this.setup || this.seats.size > 0;
   }
   status() {
+    const hapticsSupported = !!this.input()?.supportsVibration?.();
     return {
       available: !!this.input()?.initialized,
       devices: this.devices,
       bindings: Object.fromEntries(this.bindings),
       active: this.active(),
-      haptics: {
-        supported: false,
-        reason:
-          "Assigned-controller vibration is unavailable with this Steam Input adapter.",
-      },
+      haptics: hapticsSupported
+        ? { supported: true }
+        : {
+            supported: false,
+            reason:
+              "Assigned-controller vibration is unavailable with this Steam Input adapter.",
+          },
       layout: this.layout,
       overlay: this.overlayOwner
         ? {
@@ -285,13 +299,13 @@ class CouchViews {
       }
     );
   }
-  /** Publish device presence while suppressing all seat input during global UI ownership. */
+  /** Publish device presence while suppressing seat input when seats are unavailable. */
   inputFrame(devices) {
     this.devices = devices.map((frame) => ({ ...frame, actions: [] }));
     if (!this.active()) return;
     this.publish({ kind: "devices", devices });
     for (const seat of this.seats.values()) {
-      if (this.overlayOwner) continue;
+      if (this.overlayOwner || !this.layout.fits) continue;
       const controller = this.bindings.get(seat.id);
       const frame = devices.find((device) => device.id === controller);
       if (frame) seat.view.webContents.send("desktop:input-event", frame);
@@ -408,13 +422,14 @@ class CouchViews {
     this.options = {
       zoom: input.zoom,
       inset: input.inset,
+      screenEdgePadding: input.screenEdgePadding,
       gutter: input.gutter,
       bandHeight: input.bandHeight,
     };
     this.layout = couchLayout(width, height, seats.length, this.options);
     if (!this.layout.fits)
       throw new Error(
-        "This display cannot fit two readable companies. Increase the display area or restore TV scale.",
+        "This display cannot fit two readable companies. Increase the display area or reduce interface scale or screen-edge padding in Display settings.",
       );
     const lifecycle = ++this.lifecycle;
     this.opening = true;
@@ -467,7 +482,7 @@ class CouchViews {
         // before that asynchronous work, including explicitly focused seat pages.
         for (const name of ["before-input-event", "before-mouse-event"])
           wc.on(name, (event) => {
-            if (this.overlayOwner) event.preventDefault();
+            if (this.overlayOwner || !this.layout.fits) event.preventDefault();
           });
         wc.on("focus", () => {
           if (this.overlayOwner) this.window.webContents.focus();
@@ -491,10 +506,14 @@ class CouchViews {
             if (
               this.seats.get(seat.id) !== seat ||
               seat.generation !== portGeneration ||
-              !seat.port ||
+              seat.port !== port1 ||
               !seatMessage(data)
             )
               return;
+            if (data.kind === "haptic") {
+              this.vibrateSeat(seat, data.cue);
+              return;
+            }
             this.publish({
               kind: "seat-message",
               seatId: seat.id,
@@ -547,6 +566,8 @@ class CouchViews {
     if (this.seats.get(seat.id) !== seat) return;
     seat.port?.close();
     seat.port = undefined;
+    seat.vibrationEnabled = false;
+    this.input()?.stopVibration?.(this.bindings.get(seat.id));
     // The old generation can never send another accepted command after reload/crash.
     const oldGeneration = seat.generation;
     seat.generation = ++this.generation;
@@ -558,9 +579,31 @@ class CouchViews {
     });
     if (this.overlayOwner) this.refreshOverlay();
   }
+  vibrateSeat(seat, cue) {
+    if (
+      !seat.vibrationEnabled ||
+      this.opening ||
+      this.overlayOwner ||
+      !this.layout?.fits
+    )
+      return;
+    const controller = this.bindings.get(seat.id);
+    if (
+      this.devices.some(
+        (device) => device.id === controller && device.connected,
+      )
+    )
+      this.input()?.vibrate?.(controller, cue);
+  }
   send({ seatId, generation, message }) {
     const seat = this.seats.get(seatId);
     if (!seat?.port || seat.generation !== generation) return false;
+    if (message?.kind === "presentation" && message.generation === generation) {
+      seat.vibrationEnabled =
+        message.settings?.controllerVibrationEnabled === true;
+      if (!seat.vibrationEnabled)
+        this.input()?.stopVibration?.(this.bindings.get(seatId));
+    }
     seat.port.postMessage(message);
     return true;
   }
@@ -591,7 +634,7 @@ class CouchViews {
       if (this.layout.fits) {
         seat.view.setBounds(this.layout.bounds[i]);
         seat.view.webContents.setZoomFactor(this.layout.zoom);
-      }
+      } else this.input()?.stopVibration?.(this.bindings.get(seat.id));
     });
     this.publish({ kind: "layout", layout: this.layout });
     if (this.overlayOwner) this.refreshOverlay();

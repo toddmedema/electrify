@@ -1,7 +1,7 @@
 import { couchPlatformActive, subscribeCouchPlatform } from "../couch/Platform";
 import type { AppStore } from "../Store";
 import { getDesktop } from "../Desktop";
-import { soundEffectsForUpdate, SoundEventSnapshot } from "./SoundEvents";
+import { hasMilestoneFeedback, SoundEventSnapshot } from "./SoundEvents";
 import { ControllerFeedback, MenuFeedbackAudio, MenuCue } from "./MenuFeedback";
 
 const controlSelector = "button,a[href],input,select,textarea,[role=button]";
@@ -117,7 +117,7 @@ function snapshot(store: AppStore): SoundEventSnapshot {
 }
 
 /** Bind feedback to this desktop lifetime and stop it on blur, disconnect or disposal.
- * Account projection may continue during couch play, but unsupported per-seat haptics stay off. */
+ * The couch shell keeps account projection; company pulses use their native seat routes. */
 export function startDesktopFeedback(store: AppStore) {
   const desktop = getDesktop();
   if (!desktop)
@@ -183,12 +183,7 @@ export function startDesktopFeedback(store: AppStore) {
       current.ui.evidenceRunId === previousState.ui.evidenceRunId &&
       current.saves?.activeId === previousState.saves?.activeId &&
       current.game.date.minute >= previousState.game.date.minute;
-    if (
-      liveSegment &&
-      soundEffectsForUpdate(previous, next).some((effect) =>
-        ["VICTORY", "CONSTRUCTION_COMPLETE", "POWER_RESTORED"].includes(effect),
-      )
-    )
+    if (liveSegment && hasMilestoneFeedback(previous, next))
       haptics.play("milestone");
     previous = next;
     previousState = current;

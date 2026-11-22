@@ -2,6 +2,13 @@ import { expect, test } from "./fixtures";
 import type { Frame, Locator, Page, Route } from "@playwright/test";
 import { createHash } from "node:crypto";
 import path from "node:path";
+import { TICK_MINUTES } from "../src/Constants";
+import {
+  getDateFromMinute,
+  getTimeFromTimeline,
+  MINUTES_PER_MONTH,
+} from "../src/helpers/DateTime";
+import { peerCorridorId } from "../src/data/Multiplayer";
 import { createCouchFixture } from "./couch-fixture";
 import type { CouchFixture } from "./couch-fixture";
 
@@ -423,7 +430,9 @@ test("TV couch companies keep independent dialogs and purchases through atomic s
     !["tv-1080-light", "tv-1080-dark"].includes(info.project.name),
     "Two seat renderer journey at 1080p in each palette",
   );
-  const couch = await createCouchFixture(context, page);
+  const couch = await createCouchFixture(context, page, {
+    nativeBindings: true,
+  });
   await startCouch(page, couch);
   const p1 = couch.seats.get("local-p1")!.page;
   const p2 = couch.seats.get("local-p2")!.page;
@@ -596,14 +605,58 @@ test("TV couch companies keep independent dialogs and purchases through atomic s
   await couch.input({ "101": ["back"] });
   await expect(purchase1).toHaveCount(0);
   await couch.input({ "101": ["menu"] });
-  await page
-    .getByRole("dialog", { name: "Game menu", exact: true })
-    .getByRole("button", { name: "Quit", exact: true })
-    .click();
-  await page
-    .getByRole("dialog")
-    .getByRole("button", { name: "Save & Quit", exact: true })
-    .click();
+  await expect(
+    gameMenu.getByRole("button", { name: "Return to game", exact: true }),
+  ).toBeFocused();
+  const quit = gameMenu.getByRole("button", { name: "Quit", exact: true });
+  await couch.input({ "202": ["up"] });
+  await expect(quit).toBeFocused();
+  await couch.input({ "202": ["confirm"] });
+  const saveDialog = page.getByRole("dialog", {
+    name: "Save & Quit for everyone?",
+    exact: true,
+  });
+  const save = saveDialog.getByRole("button", {
+    name: "Save & Quit",
+    exact: true,
+  });
+  await expect(saveDialog).toContainText(
+    "P2 Utility wants to end this TV session",
+  );
+  await expect(save).toBeEnabled();
+  couch.setSaveFailure(true);
+  const previousSave = couch.checkpoint();
+  await page.evaluate(() => {
+    const confirms: string[] = [];
+    Object.defineProperty(window, "__couchSaveConfirms", { value: confirms });
+    window.addEventListener("couchControllerInput", (event) => {
+      const { id, actions } = (
+        event as CustomEvent<{ id: string; actions: string[] }>
+      ).detail;
+      if (actions.includes("confirm")) confirms.push(id);
+    });
+  });
+  const routedConfirms = () =>
+    page.evaluate(
+      () =>
+        (window as Window & { __couchSaveConfirms?: string[] })
+          .__couchSaveConfirms,
+    );
+  await save.focus();
+  await couch.input({ "101": ["confirm"] });
+  expect(await routedConfirms()).toEqual([]);
+  await couch.input({ "202": ["confirm"] });
+  expect(await routedConfirms()).toEqual(["202"]);
+  await expect(saveDialog.getByRole("alert")).toContainText(
+    "Fixture local storage is full",
+  );
+  await expect(save).toBeEnabled();
+  expect(couch.checkpoint()).toBe(previousSave);
+  expect(couch.seats.get("local-p1")?.page).toBe(p1);
+  expect(couch.seats.get("local-p2")?.page).toBe(p2);
+
+  couch.setSaveFailure(false);
+  await save.click();
   await expect.poll(() => couch.seats.size).toBe(0);
   const complete = couch.checkpoint()!;
   expect(complete.grids.map((grid) => grid.facilities.length)).toEqual(
@@ -641,6 +694,405 @@ test("TV couch companies keep independent dialogs and purchases through atomic s
   expect(
     couch.checkpoint()!.grids.map((grid) => grid.facilities.length),
   ).toEqual(complete.grids.map((grid) => grid.facilities.length));
+});
+
+test("TV couch intertie construction requires approval from both company owners", async ({
+  context,
+  page,
+}, info) => {
+  test.skip(
+    info.project.name !== "tv-1080-light",
+    "Shared intertie approval journey",
+  );
+  const couch = await createCouchFixture(context, page, {
+    nativeBindings: true,
+  });
+  await startCouch(page, couch);
+  const p1 = couch.seats.get("local-p1")!.page;
+  const p2 = couch.seats.get("local-p2")!.page;
+  await expect.poll(() => couch.checkpoint()?.edges.length).toBe(1);
+  const originalCapacity = couch.checkpoint()!.edges[0].capacityW;
+  const inspectP2 = p1.getByRole("button", { name: /^Inspect P2 Utility,/ });
+  const inspectP1 = p2.getByRole("button", { name: /^Inspect P1 Utility,/ });
+  await inspectP2.click();
+  await p1
+    .getByRole("button", { name: "Review upgrade of P2 Utility" })
+    .click();
+  const p1Cash = p1
+    .getByRole("dialog")
+    .getByRole("button", { name: "Pay cash" });
+  await p1Cash.focus();
+  await couch.input({ "101": ["confirm"] });
+  await expect(p1Cash).toHaveCount(0);
+  await expect(
+    p1.getByText(/Waiting for P2 Utility to approve their half/),
+  ).toBeVisible();
+
+  await inspectP1.click();
+  await expect(p2.getByText(/P1 Utility requested this upgrade/)).toBeVisible();
+  await p2
+    .getByRole("button", { name: "Review upgrade of P1 Utility" })
+    .click();
+  const p2Cash = p2
+    .getByRole("dialog")
+    .getByRole("button", { name: "Pay cash" });
+  await inspectP2.focus();
+  await p2Cash.focus();
+  await couch.input({ "101": ["confirm"] });
+  await expect(p2Cash).toBeFocused();
+  await couch.input({ "202": ["confirm"] });
+  await expect(p2Cash).toHaveCount(0);
+  await expect(p2.getByText(/P1 Utility requested this upgrade/)).toHaveCount(
+    0,
+  );
+
+  await couch.input({ "202": ["menu"] });
+  await page
+    .getByRole("dialog", { name: "Game menu", exact: true })
+    .getByRole("button", { name: "Quit", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Save & Quit", exact: true }).click();
+  await expect.poll(() => couch.seats.size).toBe(0);
+  const complete = couch.checkpoint()!;
+  const edge = complete.edges[0];
+  expect(edge.approval).toBeUndefined();
+  const lines = complete.grids.map(({ transmission }) =>
+    transmission!.lines.find(
+      (line) => line.corridorId === peerCorridorId(edge.id),
+    ),
+  );
+  expect(lines.map((line) => line?.upgrade?.targetCapacityW)).toEqual([
+    originalCapacity * 1.5,
+    originalCapacity * 1.5,
+  ]);
+});
+
+test("TV couch resumes with an absent retired controller and completes the remaining company", async ({
+  context,
+  page,
+}, info) => {
+  test.skip(
+    info.project.name !== "tv-1080-light",
+    "Retirement and results journey",
+  );
+  const couch = await createCouchFixture(context, page, {
+    nativeBindings: true,
+  });
+  await startCouch(page, couch);
+  await couch.input({ "101": ["menu"] });
+  await page
+    .getByRole("dialog", { name: "Game menu", exact: true })
+    .getByRole("button", { name: "Quit", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Save & Quit", exact: true }).click();
+  await expect.poll(() => couch.seats.size).toBe(0);
+
+  // Put the active grid within a few ticks of a real monthly bankruptcy check.
+  // Keep the retired grid frozen at its original minute and restore via the library.
+  const saved = structuredClone(couch.checkpoint()!);
+  const [active, retired] = saved.grids;
+  const retiredAt = retired.date.minute;
+  const beforeRollover = MINUTES_PER_MONTH - 16 * TICK_MINUTES;
+  const offset = beforeRollover - active.date.minute;
+  active.date = getDateFromMinute(beforeRollover, active.startingYear);
+  for (const tick of active.timeline) tick.minute += offset;
+  getTimeFromTimeline(beforeRollover, active.timeline)!.cash = -1e12;
+  const ending = {
+    title: "Bankrupt!",
+    outcome: "bankrupt",
+    month: retired.date.monthsElapsed,
+  } as const;
+  retired.multiplayer!.ending = ending;
+  saved.outcomes["local-p2"] = ending;
+  couch.seedCheckpoint(saved);
+  await couch.setConnected({ "202": false });
+
+  await page
+    .getByRole("button", { name: "Play with friends", exact: true })
+    .click();
+  await page.getByRole("button", { name: "On this TV", exact: true }).click();
+  await page.getByRole("button", { name: /^Resume Local campaign/ }).click();
+  const review = page.getByRole("button", {
+    name: "Review saved game",
+    exact: true,
+  });
+  await expect(review).toBeDisabled();
+  await couch.input({ "101": ["confirm"] });
+  await page
+    .getByRole("button", { name: "Review saved game", exact: true })
+    .click();
+  await couch.input({ "101": ["confirm"] });
+  await expect.poll(() => couch.seats.size).toBe(2);
+  const p1 = couch.seats.get("local-p1")!.page;
+  const p2 = couch.seats.get("local-p2")!.page;
+  await expect(
+    p2.getByRole("region", { name: "Company result" }),
+  ).toContainText("Bankrupt!");
+  await expect(
+    page.getByText(/P2 Utility: controller disconnected/),
+  ).toHaveCount(0);
+  await expect(clock(p1)).toHaveAttribute("data-active-speed", "PAUSED");
+  const lowCash = p1.getByRole("dialog", { name: "Low on cash", exact: true });
+  await lowCash
+    .getByRole("button", { name: "Go bankrupt", exact: true })
+    .focus();
+  await couch.input({ "101": ["confirm"] });
+  await expect(p1.getByRole("dialog", { includeHidden: true })).toHaveCount(0);
+  const slow = speedControls(p1).getByRole("button", {
+    name: "slow speed",
+    exact: true,
+  });
+  await slow.focus();
+  await couch.input({ "101": ["confirm"] });
+  await expect(clock(p1)).toHaveAttribute("data-active-speed", "SLOW");
+
+  const results = page.getByRole("dialog", {
+    name: "Match complete",
+    exact: true,
+  });
+  await expect(results).toContainText("P1 · P1 Utility: Bankrupt!", {
+    timeout: 30000,
+  });
+  await expect(results).toContainText("P2 · P2 Utility: Bankrupt!");
+  await results.getByRole("button", { name: "Save & return to setup" }).focus();
+  await couch.input({ "101": ["confirm"] });
+  const save = page.getByRole("button", { name: "Save & Quit", exact: true });
+  await expect(save).toBeEnabled();
+  await save.focus();
+  await couch.input({ "101": ["confirm"] });
+  await expect.poll(() => couch.seats.size).toBe(0);
+  await expect(
+    page.getByRole("heading", { name: "On this TV · Two players" }),
+  ).toBeVisible();
+  const finished = couch.checkpoint()!;
+  expect(finished.outcomes).toMatchObject({
+    "local-p1": { outcome: "bankrupt" },
+    "local-p2": { outcome: "bankrupt" },
+  });
+  expect(finished.grids[0].date.minute).toBeGreaterThan(beforeRollover);
+  expect(finished.grids[1].date.minute).toBe(retiredAt);
+  expect(finished.edges[0]).toMatchObject({ disabled: true, flowW: 0 });
+});
+
+test("TV couch applies padded bounds and exposes shared clock reasons through controller navigation", async ({
+  context,
+  page,
+}, info) => {
+  test.skip(
+    !["tv-1080-light", "tv-2160-dark"].includes(info.project.name),
+    "Screen edge and clock verification at 1080p and 4K",
+  );
+  await context.addInitScript(() => {
+    if (!new URLSearchParams(window.location.search).has("couchSeat")) {
+      localStorage.setItem("screenEdgePadding", "4");
+    }
+  });
+  const couch = await createCouchFixture(context, page, { embedded: true });
+  await startCouch(page, couch);
+  const route1 = couch.seats.get("local-p1")!;
+  const route2 = couch.seats.get("local-p2")!;
+  const p1 = route1.page;
+  const p2 = route2.page;
+  const { width, height } = page.viewportSize()!;
+  const inset = Math.ceil(height * 0.04);
+  const band = page.locator(".couchBand");
+  await expect
+    .poll(async () => Math.round((await band.boundingBox())!.y))
+    .toBe(inset);
+  await expect.poll(() => couch.layout()?.inset).toBe(inset);
+  await expect
+    .poll(async () => {
+      const rect = (await band.boundingBox())!;
+      return couch.layout()!.bounds[0].y - Math.ceil(rect.y + rect.height);
+    })
+    .toBe(0);
+  const layout = couch.layout()!;
+  expect(layout.fits).toBe(true);
+  const [left, right] = layout.bounds;
+  expect(left.x).toBe(inset);
+  expect(right.x - left.x - left.width).toBe(8);
+  expect(right.x + right.width).toBe(width - inset);
+  expect(right.y + right.height).toBe(height - inset);
+  for (const seat of [p1, p2]) {
+    await expect(seat.locator("html")).toHaveAttribute(
+      "data-interface-scale",
+      "1.25",
+    );
+    await expect(seat.locator(".gameStage")).toHaveAttribute(
+      "data-layout",
+      "single",
+    );
+  }
+
+  await runNormally(p1, p2);
+  await couch.input({ "101": ["speedUp"] });
+  await expect(clock(p1)).toHaveAttribute("data-active-speed", "NORMAL");
+  await expect(
+    speedControls(p1).getByRole("button", { name: "fast speed", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(band.getByRole("group", { name: "Shared clock" })).toHaveCount(
+    0,
+  );
+  const event = band.getByRole("button", {
+    name: /^Upcoming: Carbon fee rising/,
+  });
+  const term = band.getByRole("button", {
+    name: "144 months left",
+    exact: true,
+  });
+  await expect(event).toBeVisible();
+  await expect(term).toBeVisible();
+  const eventBox = (await event.boundingBox())!;
+  const termBox = (await term.boundingBox())!;
+  expect(eventBox.x).toBeGreaterThan(width / 2);
+  expect(termBox.x - eventBox.x - eventBox.width).toBeLessThan(24);
+  const eventIcon = (await event.locator(".statusIcon svg").boundingBox())!;
+  const eventFontSize = await renderedFontSize(
+    event.locator(".missionRiskText"),
+  );
+  expect(eventIcon.height).toBeCloseTo(eventFontSize, 0);
+  expect(eventIcon.width).toBeCloseTo(eventFontSize, 0);
+
+  const verifySeatPalette = async (
+    seat: Frame,
+    seatId: string,
+    speed: string,
+  ) => {
+    const cash = seat.locator(".gameBalance > .gameStatusValue");
+    await expect(cash).toHaveAttribute("data-couch-player", seatId);
+    const color = await cash.evaluate((node) => getComputedStyle(node).color);
+    const group = speedControls(seat);
+    await expect(group.locator(".multiplayerSpeedPip")).toHaveCount(0);
+    const selection = group.getByRole("button", { name: speed, exact: true });
+    await expect(selection).toHaveAttribute("aria-pressed", "true");
+    expect(
+      await selection.evaluate((node) => {
+        const ring = getComputedStyle(node, "::before");
+        return { color: ring.borderTopColor, width: ring.borderTopWidth };
+      }),
+    ).toEqual({ color, width: "2px" });
+    return color;
+  };
+  const p1Color = await verifySeatPalette(p1, "local-p1", "fast speed");
+  const p2Color = await verifySeatPalette(p2, "local-p2", "normal speed");
+  expect(p1Color).not.toBe(p2Color);
+  const peerInP1 = p1
+    .getByRole("button", { name: /^Inspect P2 Utility,/ })
+    .getByText("P2 Utility", { exact: true });
+  const peerInP2 = p2
+    .getByRole("button", { name: /^Inspect P1 Utility,/ })
+    .getByText("P1 Utility", { exact: true });
+  await expect(peerInP1).toHaveAttribute("data-couch-player", "local-p2");
+  await expect(peerInP1).toHaveCSS("color", p2Color);
+  await expect(peerInP2).toHaveAttribute("data-couch-player", "local-p1");
+  await expect(peerInP2).toHaveCSS("color", p1Color);
+  if (process.env.REVIEW_SCREENSHOT_DIR) {
+    await page.screenshot({
+      path: path.join(
+        process.env.REVIEW_SCREENSHOT_DIR,
+        `couch-preview-${info.project.name}.png`,
+      ),
+      animations: "disabled",
+    });
+    if (info.project.name === "tv-1080-light") {
+      await Promise.all([
+        peerInP1.scrollIntoViewIfNeeded(),
+        peerInP2.scrollIntoViewIfNeeded(),
+      ]);
+      await page.screenshot({
+        path: path.join(
+          process.env.REVIEW_SCREENSHOT_DIR,
+          "couch-interties.png",
+        ),
+        animations: "disabled",
+      });
+    }
+  }
+
+  await couch.input({ "202": ["pause"] });
+  await expect(clock(p1)).toHaveAttribute("data-active-speed", "PAUSED");
+  await couch.input({ "101": ["menu"] });
+  const menu = page.getByRole("dialog", { name: "Game menu", exact: true });
+  await expect(
+    menu.getByRole("button", { name: "Return to game", exact: true }),
+  ).toBeFocused();
+  for (const label of ["Manual", "Settings", "Clock status"]) {
+    await couch.input({ "101": ["down"] });
+    await expect(
+      menu.getByRole("button", { name: label, exact: true }),
+    ).toBeFocused();
+  }
+  await couch.input({ "101": ["confirm"] });
+  const details = page.getByRole("dialog", {
+    name: "Clock status",
+    exact: true,
+  });
+  const sharedClock = details.getByRole("group", { name: "Shared clock" });
+  for (const label of ["Clock Paused", "P1 12×", "P2 Paused"])
+    await expect(sharedClock.getByText(label, { exact: true })).toBeVisible();
+  await expect(sharedClock).toContainText("Held by System, P2");
+  await expect(sharedClock.getByText("P2 Paused", { exact: true })).toHaveCSS(
+    "color",
+    p2Color,
+  );
+  await expect(details).toContainText("P2 · P2 Utility");
+  await expect(details).toContainText("Selected pause");
+  await expect(details).toContainText("TV session dialog open");
+  await expect(
+    details.getByRole("button", { name: "Back to game menu", exact: true }),
+  ).toBeFocused();
+  await couch.input({ "101": ["confirm"] });
+  await expect(menu).toBeVisible();
+  await couch.input({ "101": ["menu"] });
+  await expect(menu).toHaveCount(0);
+  await expect(clock(p1)).toHaveAttribute("data-active-speed", "PAUSED");
+
+  await couch.resize(1130, 800);
+  await expect(
+    page.getByRole("heading", { name: "TV session paused", exact: true }),
+  ).toBeVisible();
+  expect(couch.layout()?.fits).toBe(false);
+  await expect(page.locator("#couch-fixture-local-p1")).toBeHidden();
+
+  const displaySettings = page.getByRole("button", {
+    name: "Display settings",
+    exact: true,
+  });
+  await displaySettings.focus();
+  await couch.input({ "101": ["confirm"] });
+  const settings = page.getByRole("dialog", { name: "Settings", exact: true });
+  await settings
+    .getByRole("button", { name: "Advanced display", exact: true })
+    .click();
+  const padding = settings.getByRole("group", {
+    name: "Screen-edge padding",
+    exact: true,
+  });
+  await padding.getByRole("button", { name: "0%", exact: true }).click();
+  await expect.poll(() => couch.layout()?.fits).toBe(true);
+  expect(couch.layout()?.inset).toBe(0);
+  const overlays = await couch.settledNativeRequests("overlay");
+  await settings.getByRole("button", { name: "Back", exact: true }).click();
+  await expect(settings).toHaveCount(0);
+  await expect
+    .poll(() => couch.settledNativeRequests("overlay"))
+    .toBeGreaterThan(overlays);
+  await couch.settleCaptures();
+  await expect(
+    page.getByRole("heading", { name: "TV session paused", exact: true }),
+  ).toHaveCount(0);
+  await expect(page.locator("#couch-fixture-local-p1")).toBeVisible();
+  expect(couch.seats.get("local-p1")).toBe(route1);
+  expect(couch.seats.get("local-p2")).toBe(route2);
+  await expect(clock(p1)).toHaveAttribute("data-active-speed", "PAUSED");
+  await speedControls(p1)
+    .getByRole("button", { name: "normal speed", exact: true })
+    .click();
+  await expect(clock(p1)).toHaveAttribute("data-active-speed", "PAUSED");
+  await speedControls(p2)
+    .getByRole("button", { name: "normal speed", exact: true })
+    .click();
+  await expect(clock(p1)).toHaveAttribute("data-active-speed", "NORMAL");
 });
 
 test("TV couch player toolbars match named warning captions after a plant pause", async ({
@@ -1687,9 +2139,17 @@ test("TV couch play controller binding recovery preserves the other company and 
     },
     { generation: lost.generation },
   );
-  await expect(
-    paused.getByRole("button", { name: "Restore P2 Utility", exact: true }),
-  ).toBeVisible();
+  const restoreP2 = paused.getByRole("button", {
+    name: "Restore P2 Utility",
+    exact: true,
+  });
+  await expect(restoreP2).toBeVisible();
+  couch.failNextNative("reload-seat");
+  await restoreP2.click();
+  await expect(paused.getByRole("alert")).toContainText(
+    "Fixture reload-seat failure",
+  );
+  await expect(restoreP2).toBeEnabled();
   await couch.setConnected({ "303": false, "404": true });
   await couch.input({ "404": ["confirm"] });
   await expect

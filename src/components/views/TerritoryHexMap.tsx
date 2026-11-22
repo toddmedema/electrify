@@ -1,3 +1,4 @@
+import { CouchPlayerText, couchPlayerColor } from "../../couch/PlayerColor";
 import * as React from "react";
 import { Tooltip, useTheme } from "@mui/material";
 import ConceptIcon from "../base/ConceptIcon";
@@ -709,12 +710,27 @@ export default function TerritoryHexMap({
     ].filter((id) => id !== game.multiplayer?.seat),
     (a, b) => a === b,
   );
+  const mode = dark ? "dark" : "light";
   const peerColors = React.useMemo(
     () => territoryPeerColors(peerIds),
     [peerIds],
   );
   const color = (id: string) => territoryOwnerColor(id, peerColors);
-  const ownerPalette = TERRITORY_OWNER_PALETTE[dark ? "dark" : "light"];
+  const ownColor = couchPlayerColor(game.multiplayer?.seat, mode);
+  const ownerPalette = React.useMemo(() => {
+    const palette = TERRITORY_OWNER_PALETTE[mode];
+    if (!ownColor) return palette;
+    // Both the SVG overlay and the 3D borders resolve these same palette variables.
+    const couchPalette: Record<string, string> = {
+      ...palette,
+      "--territory-owner-you": ownColor,
+    };
+    for (const [id, variable] of Object.entries(peerColors)) {
+      const peerColor = couchPlayerColor(id, mode);
+      if (peerColor) couchPalette[variable.slice(4, -1)] = peerColor;
+    }
+    return couchPalette;
+  }, [mode, ownColor, peerColors]);
   const tileHover = (view: TerritoryTileView) => {
     const { tile } = view;
     const unavailable = (reason: string) => ({
@@ -1686,7 +1702,19 @@ export default function TerritoryHexMap({
                   <strong>
                     <span>{cityLabel}</span>
                     {utility && (
-                      <span>{view.owned ? "You" : view.ownerName}</span>
+                      <span>
+                        <CouchPlayerText
+                          seatId={
+                            view.ownerKey?.startsWith("peer:")
+                              ? view.ownerKey.slice(5)
+                              : view.owned
+                                ? game.multiplayer?.seat
+                                : undefined
+                          }
+                        >
+                          {view.owned ? "You" : view.ownerName}
+                        </CouchPlayerText>
+                      </span>
                     )}
                   </strong>
                 )}

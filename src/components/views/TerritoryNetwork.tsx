@@ -1,3 +1,4 @@
+import { CouchPlayerText } from "../../couch/PlayerColor";
 import * as React from "react";
 import { Button, Tab, Tabs, Typography, useMediaQuery } from "@mui/material";
 import { SIDE_TOOL_MIN_WIDTH } from "../../WorkspaceLayout";
@@ -509,7 +510,21 @@ function TileNetwork(props: Props) {
           title={title}
           titleIconSrc={operatingFacility && facilityIconSrc(operatingFacility)}
           focusKey={`${inspected}:${activation}:${inspectorOwner ?? "unowned"}:${operatingFacility?.id ?? (view.facility ? "facility" : "empty")}:${showSiteCatalogue}`}
-          subtitle={view.ownerKey ? view.ownerName : undefined}
+          subtitle={
+            view.ownerKey && (
+              <CouchPlayerText
+                seatId={
+                  view.ownerKey.startsWith("peer:")
+                    ? view.ownerKey.slice(5)
+                    : view.owned
+                      ? game.multiplayer?.seat
+                      : undefined
+                }
+              >
+                {view.ownerName}
+              </CouchPlayerText>
+            )
+          }
           building={showSiteCatalogue}
           wide={
             !!(tile.city || view.facility || (view.ownerKey && !view.owned))

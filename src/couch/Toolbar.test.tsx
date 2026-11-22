@@ -8,6 +8,23 @@ import CouchToolbar, { CouchToolbarProps } from "./Toolbar";
 function props(overrides: Partial<CouchToolbarProps> = {}): CouchToolbarProps {
   return {
     game: createGame({ scenarioId: 101 }),
+    clock: {
+      speed: "NORMAL",
+      players: [
+        { id: "local-p1", name: "Ada", selectedSpeed: "FAST", retired: false },
+        {
+          id: "local-p2",
+          name: "Grace",
+          selectedSpeed: "NORMAL",
+          retired: false,
+        },
+      ],
+      reason: "",
+      systemBlockers: [],
+      readyRequired: false,
+      ready: [],
+      complete: false,
+    },
     menuOpen: false,
     onMenuClose: jest.fn(),
     onManual: jest.fn(),
@@ -18,11 +35,12 @@ function props(overrides: Partial<CouchToolbarProps> = {}): CouchToolbarProps {
 }
 
 function show(value: CouchToolbarProps) {
-  return render(
-    <ThemeProvider theme={createAppTheme("light")}>
-      <CouchToolbar {...value} />
-    </ThemeProvider>,
-  );
+  const theme = createAppTheme("light");
+  return render(<CouchToolbar {...value} />, {
+    wrapper: ({ children }) => (
+      <ThemeProvider theme={theme}>{children}</ThemeProvider>
+    ),
+  });
 }
 
 it("shows one shared calendar while speed controls stay in the player panes", () => {
@@ -39,10 +57,22 @@ it("shows one shared calendar while speed controls stay in the player panes", ()
     }),
   ).toBeVisible();
   expect(screen.queryAllByRole("group", { name: /speed/ })).toHaveLength(0);
+  expect(screen.queryByRole("group", { name: "Shared clock" })).toBeNull();
   expect(screen.queryByText(/On this TV|Unranked|Last local save/)).toBeNull();
   expect(
     screen.queryByRole("button", { name: "Save & Quit for everyone" }),
   ).toBeNull();
+});
+
+it("shows effective and selected speeds in Clock status", () => {
+  show(props({ menuOpen: true }));
+  fireEvent.click(screen.getByRole("button", { name: "Clock status" }));
+  const details = screen.getByRole("dialog", { name: "Clock status" });
+  const clock = within(details).getByRole("group", { name: "Shared clock" });
+  expect(clock).toHaveTextContent("Clock 3×");
+  expect(clock).toHaveTextContent("P1 12×");
+  expect(clock).toHaveTextContent("P2 3×");
+  expect(clock).toHaveTextContent("Set by P2");
 });
 
 it("shows common upcoming events even when the first company has a cash warning", () => {
@@ -74,7 +104,7 @@ it("shows the shared floating menu with Return to game first and delegates its a
     within(menu)
       .getAllByRole("button")
       .map((button) => button.textContent),
-  ).toEqual(["Return to game", "Manual", "Settings", "Quit"]);
+  ).toEqual(["Return to game", "Manual", "Settings", "Clock status", "Quit"]);
   fireEvent.click(within(menu).getByRole("button", { name: "Settings" }));
   expect(value.onSettings).toHaveBeenCalledTimes(1);
   fireEvent.click(within(menu).getByRole("button", { name: "Manual" }));
@@ -94,6 +124,71 @@ it("moves menu selection using the same real focus as the controller", () => {
   expect(manual).toHaveFocus();
   fireEvent.keyDown(manual, { key: "ArrowUp" });
   expect(resume).toHaveFocus();
+});
+
+it("names simultaneous holders and exposes all pause reasons through controller menu navigation", () => {
+  const value = props();
+  value.clock.speed = "PAUSED";
+  value.clock.players[1].selectedSpeed = "PAUSED";
+  value.clock.players[1].pauseReason = "New event requiring attention";
+  value.clock.systemBlockers = ["TV session dialog open", "Steam overlay open"];
+  show({ ...value, menuOpen: true });
+  const menu = screen.getByRole("dialog", { name: "Game menu" });
+  const settings = within(menu).getByRole("button", { name: "Settings" });
+  settings.focus();
+  fireEvent.keyDown(settings, { key: "ArrowDown" });
+  const clockStatus = within(menu).getByRole("button", {
+    name: "Clock status",
+  });
+  expect(clockStatus).toHaveFocus();
+  fireEvent.click(clockStatus);
+
+  const details = screen.getByRole("dialog", { name: "Clock status" });
+  const clock = within(details).getByRole("group", { name: "Shared clock" });
+  expect(clock).toHaveTextContent("Clock Paused");
+  expect(clock).toHaveTextContent("P2 Paused");
+  expect(clock).toHaveTextContent("Held by System, P2");
+  expect(within(details).getByText("P2 · Grace")).toBeVisible();
+  expect(within(details).getByText("Selected pause")).toBeVisible();
+  expect(
+    within(details).getByText("New event requiring attention"),
+  ).toBeVisible();
+  expect(within(details).getByText("TV session dialog open")).toBeVisible();
+  expect(within(details).getByText("Steam overlay open")).toBeVisible();
+  const back = within(details).getByRole("button", {
+    name: "Back to game menu",
+  });
+  expect(back).toHaveFocus();
+  fireEvent.keyDown(back, { key: "Escape" });
+  expect(screen.getByRole("button", { name: "Clock status" })).toHaveFocus();
+  expect(value.onMenuClose).not.toHaveBeenCalled();
+});
+
+it("shows readiness and decisions for the active seat while keeping retired seats out of clock ownership", () => {
+  const value = props();
+  value.clock.speed = "PAUSED";
+  value.clock.readyRequired = true;
+  value.clock.reason = "Controller replaced";
+  value.clock.players[0] = {
+    ...value.clock.players[0],
+    selectedSpeed: "PAUSED",
+    pauseReason: "Retired company notification",
+    retired: true,
+  };
+  value.clock.players[1].pendingChoice = "Winterization";
+  value.clock.players[1].selectedSpeed = "PAUSED";
+  show({ ...value, menuOpen: true });
+  fireEvent.click(screen.getByRole("button", { name: "Clock status" }));
+  const clock = screen.getByRole("group", { name: "Shared clock" });
+  expect(clock).toHaveTextContent("P1 Retired");
+  expect(clock).toHaveTextContent("Held by System, P2");
+  expect(screen.getByText("Select a running speed to resume")).toBeVisible();
+  expect(screen.getByText("Controller replaced")).toBeVisible();
+  expect(screen.getByText("Selected pause")).toBeVisible();
+  expect(
+    screen.getByText("Choosing a response for Winterization"),
+  ).toBeVisible();
+  expect(screen.queryByText("Retired company notification")).toBeNull();
 });
 
 it("keeps the controller legend accessible inside the active menu modal only while open", () => {

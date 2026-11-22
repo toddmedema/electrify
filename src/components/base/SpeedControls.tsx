@@ -1,5 +1,7 @@
 import * as React from "react";
 import { ToggleButton, ToggleButtonGroup } from "@mui/material";
+import { useTheme } from "@mui/material/styles";
+import { couchPlayerColor } from "../../couch/PlayerColor";
 import PauseIcon from "@mui/icons-material/Pause";
 import { TICK_MS } from "../../Constants";
 import { GameType, SpeedType } from "../../Types";
@@ -30,7 +32,7 @@ export interface MultiplayerSpeedOptionsProps {
 /** Labels follow the real clock instead of drifting from its tick intervals. */
 const RUNNING_SPEEDS: SpeedType[] = ["SLOW", "NORMAL", "FAST"];
 const DESKTOP_SPEEDS: SpeedType[] = [...RUNNING_SPEEDS, "ULTRA"];
-const selectionLabel = (speed: SpeedType) =>
+export const speedSelectionLabel = (speed: SpeedType) =>
   speed === "PAUSED"
     ? "Paused"
     : `${Math.round(TICK_MS.SLOW / TICK_MS[speed])}×`;
@@ -63,11 +65,11 @@ function describeSharedClock(
       const paused = player.pauseReason
         ? `; paused: ${player.pauseReason}`
         : "";
-      return `${player.name}${you} selected ${selectionLabel(player.selectedSpeed)}${paused}`;
+      return `${player.name}${you} selected ${speedSelectionLabel(player.selectedSpeed)}${paused}`;
     })
     .join(". ");
   const reason = multiplayer.reason ? `${multiplayer.reason}. ` : "";
-  return `Game speed: ${selectionLabel(multiplayer.activeSpeed)}. Your selection: ${selectionLabel(speed)}. The slowest player sets the game speed. Any paused player pauses everyone. ${reason}${players}.${resume ? " Select a speed to resume." : ""}`;
+  return `Game speed: ${speedSelectionLabel(multiplayer.activeSpeed)}. Your selection: ${speedSelectionLabel(speed)}. The slowest player sets the game speed. Any paused player pauses everyone. ${reason}${players}.${resume ? " Select a speed to resume." : ""}`;
 }
 
 /** What a screen reader hears when the shared clock stops or waits for you: pauses and the
@@ -101,7 +103,7 @@ function playersAtSpeed(
           : "";
       return `${player.name}${you}${why}`;
     });
-  return `${selectionLabel(option)}: ${names.length ? names.join(", ") : "nobody"}`;
+  return `${speedSelectionLabel(option)}: ${names.length ? names.join(", ") : "nobody"}`;
 }
 
 /** Keep a player's requested selection distinct from the clock's effective running speed.
@@ -113,6 +115,7 @@ function playersAtSpeed(
 function speedOptions(
   { speed, onSpeedChange, desktop, multiplayer, disabled }: SpeedOptionsProps,
   descriptionId?: string,
+  playerColor?: string,
 ): React.JSX.Element {
   const resume = !!multiplayer?.readyRequired && !multiplayer.ready;
   const description = multiplayer
@@ -143,6 +146,7 @@ function speedOptions(
         aria-label={multiplayer ? "your game speed" : "game speed"}
         aria-describedby={descriptionId}
         title={description}
+        data-couch-player={playerColor ? multiplayer?.selfId : undefined}
         data-active-speed={multiplayer?.activeSpeed}
         // Still on your earlier pick, but the clock is waiting for you to confirm it.
         data-resume={resume ? "true" : undefined}
@@ -152,17 +156,19 @@ function speedOptions(
           {
             "--speed-index": Math.max(thumbIndex, 0),
             "--speed-count": options.length,
+            "--couch-player-color": playerColor,
           } as React.CSSProperties
         }
       >
         {options.map((option) => {
-          const peers =
-            multiplayer?.players.filter(
-              (player) =>
-                player.id !== multiplayer.selfId &&
-                (player.pauseReason ? "PAUSED" : player.selectedSpeed) ===
-                  option,
-            ) || [];
+          const peers = playerColor
+            ? []
+            : multiplayer?.players.filter(
+                (player) =>
+                  player.id !== multiplayer.selfId &&
+                  (player.pauseReason ? "PAUSED" : player.selectedSpeed) ===
+                    option,
+              ) || [];
           return (
             <ToggleButton
               key={option}
@@ -214,7 +220,7 @@ function speedOptions(
                 {option === "PAUSED" ? (
                   <PauseIcon fontSize="small" />
                 ) : (
-                  selectionLabel(option)
+                  speedSelectionLabel(option)
                 )}
               </span>
             </ToggleButton>
@@ -237,7 +243,11 @@ function speedOptions(
 
 function MultiplayerSpeedControls(props: SpeedOptionsProps) {
   const id = React.useId();
-  return speedOptions(props, `${id}-clock`);
+  const playerColor = couchPlayerColor(
+    props.multiplayer?.selfId,
+    useTheme().palette.mode,
+  );
+  return speedOptions(props, `${id}-clock`, playerColor);
 }
 
 // Construct once per control-state change, independent of the live cash/date render.

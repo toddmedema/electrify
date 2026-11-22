@@ -53,6 +53,46 @@ test("couch layout fills the outer edges while retaining a center gutter and rea
   assert.throws(() => couchLayout(1920, 1080, 2, { zoom: 0.5 }));
 });
 
+test("couch padding uses the shorter content edge in DIPs and preserves the center gap", () => {
+  for (const [physicalWidth, physicalHeight, osScale, inset, zoom] of [
+    [1920, 1080, 1, 44, 1.5],
+    [3840, 2160, 1, 87, 3],
+    [3840, 2160, 2, 44, 1.5],
+    [2560, 1440, 1.25, 47, 1.6],
+  ]) {
+    const width = physicalWidth / osScale;
+    const height = physicalHeight / osScale;
+    const layout = couchLayout(width, height, 2, {
+      screenEdgePadding: 4,
+      bandHeight: 120,
+    });
+    const [left, right] = layout.bounds;
+    assert.equal(layout.fits, true);
+    assert.equal(layout.zoom, zoom);
+    assert.equal(layout.inset, inset);
+    assert.equal(left.x, inset);
+    assert.equal(right.x + right.width, width - inset);
+    assert.equal(right.x - (left.x + left.width), 8);
+    for (const bounds of layout.bounds) {
+      assert.equal(bounds.y, inset + 120);
+      assert.equal(bounds.y + bounds.height, height - inset);
+    }
+  }
+});
+
+test("couch width and measured band height can each take seats below the readable floor", () => {
+  assert.equal(couchLayout(1130, 800, 2).fits, true);
+  assert.equal(couchLayout(1130, 800, 2, { screenEdgePadding: 4 }).fits, false);
+  assert.equal(
+    couchLayout(1920, 720, 2, { screenEdgePadding: 4, bandHeight: 120 }).fits,
+    true,
+  );
+  assert.equal(
+    couchLayout(1920, 720, 2, { screenEdgePadding: 4, bandHeight: 132 }).fits,
+    false,
+  );
+});
+
 test("logical roster rejects hardware identities and seat ports cannot claim a sender or worker controls", () => {
   assert.deepEqual(validSeats(seats), seats);
   assert.throws(() =>
@@ -177,6 +217,73 @@ test("overlays retain paused screens until their captured backdrop is ready; inv
   manager.close();
 });
 
+test("seat opening checks padding before creating any native views", async () => {
+  const { manager, views, size } = fixture();
+  size.splice(0, 2, 1130, 800);
+  await assert.rejects(
+    manager.open({ seats, screenEdgePadding: 4 }),
+    /cannot fit two readable companies/,
+  );
+  assert.equal(views.length, 0);
+  await manager.open({ seats, screenEdgePadding: 0 });
+  assert.ok(views.every((view) => view.visible));
+  manager.close();
+});
+
+test("padded seats retain their views, ports and generations through resize recovery", async () => {
+  const { manager, views, size, events } = fixture();
+  await manager.open({ seats, screenEdgePadding: 4, bandHeight: 120 });
+  manager.bindings.set("local-p1", "101");
+  const delivered = [];
+  views[0].webContents.send = (channel) => delivered.push(channel);
+  const frames = [
+    { id: "101", connected: true, actions: ["confirm"], glyphs: {} },
+  ];
+  const routes = [...manager.seats.values()].map(({ generation, port }) => ({
+    generation,
+    port,
+  }));
+  try {
+    assert.equal(views[0].bounds.x, 44);
+    assert.equal(views[0].bounds.y, 164);
+    size[0] = 1130;
+    size[1] = 800;
+    assert.equal(manager.relayout().layout.fits, false);
+    assert.ok(views.every((view) => !view.visible));
+    manager.inputFrame(frames);
+    assert.deepEqual(delivered, []);
+    let blocked = false;
+    views[0].webContents.emit("before-input-event", {
+      preventDefault: () => (blocked = true),
+    });
+    assert.equal(blocked, true);
+    assert.equal(manager.relayout({ screenEdgePadding: 0 }).layout.fits, true);
+    assert.equal(views[0].bounds.x, 0);
+    assert.ok(views.every((view) => view.visible));
+    manager.inputFrame(frames);
+    assert.deepEqual(delivered, ["desktop:input-event"]);
+    size[0] = 3840;
+    size[1] = 2160;
+    assert.equal(manager.relayout({ screenEdgePadding: 4 }).layout.fits, true);
+    assert.equal(views[0].bounds.x, 87);
+    assert.equal(views[0].bounds.y, 207);
+    assert.deepEqual(
+      [...manager.seats.values()].map(({ generation, port }) => ({
+        generation,
+        port,
+      })),
+      routes,
+    );
+    assert.equal(views.length, 2);
+    assert.equal(
+      events.filter((event) => event.kind === "seat-lost").length,
+      0,
+    );
+  } finally {
+    manager.close();
+  }
+});
+
 test("rejected relayout options preserve valid state and later band-only resizing", async () => {
   const { manager, views, events } = fixture();
   await manager.open({ seats, zoom: 1.5, inset: 0, gutter: 8, bandHeight: 96 });
@@ -188,6 +295,7 @@ test("rejected relayout options preserve valid state and later band-only resizin
     for (const rejected of [
       { zoom: 10 },
       { inset: 201 },
+      { screenEdgePadding: 100 },
       { gutter: 101 },
       { bandHeight: 601 },
     ]) {
