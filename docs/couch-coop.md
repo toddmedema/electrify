@@ -10,17 +10,19 @@ another controller backend.
 Each controller explicitly joins a company. P1 chooses an existing co-op scenario
 or custom game; both players confirm that selection. The campaign roster then
 stays fixed. An assigned controller controls only its company's document. The
-shared bar reuses the single-player calendar and year progress, upcoming event
-and months-left display. Each player has an independent speed selector in their
-pane; the slowest selection wins. Start/Menu or Select/View opens a centered shared
-menu and pauses the match for everyone. Return to game, Manual, Settings and Quit
-use the home menu's button sizes. Press the menu control again to return to play.
-Either controller can navigate this menu and the shared Settings modal, whose
-preferences apply to every player. The active controller's complete bindings appear
-under Controls along the bottom while the menu, Settings or Manual is open.
-Player panes keep cash and grid state, with
-icon-only navigation and no duplicate menu, calendar, event or control-hint bars.
-The panes fill the left, right and bottom edges, retaining only the center separator.
+shared bar shows the calendar and year progress, with the upcoming event and
+months left on the right. Each player selects a speed in their pane, and the
+slowest selection sets the pace. Each seat has a fixed color for the company
+name, cash, and speed selection outline. The blue fill marks the running speed.
+To see the shared speed, seat selections and
+full pause reasons, press Start/Menu or Select/View and choose **Clock status**
+in the Game menu. The shared menu pauses the match. Either
+controller can navigate the shared menu and Settings. Save & Quit confirmation
+belongs to the named requesting company. The active controller's bindings
+appear under Controls while the menu, Settings or Manual is open.
+Player panes keep cash and grid state, with icon-only navigation. The shared
+screen-edge padding surrounds the status band and both panes. The center
+separator stays the same size as padding changes.
 The daily supply/demand plot is 20% shorter in split-screen to leave more room
 for the fleet.
 Cash and monthly profit share a row in each company pane. The shared date and
@@ -64,12 +66,27 @@ ticks. Renderer recovery uses the surviving worker; a worker failure requires th
 last complete saved checkpoint in a fresh epoch.
 
 Account services observe only the shell's authoritative P1 projection, including
-an inactive restore baseline before live telemetry. Guest companies never submit
-account achievements or timeline events. Music and platform services stay in the
-shell. Browser-gamepad vibration is suppressed throughout couch play: the pinned
-native binding does not provide a verified Steam-handle mapping for haptics.
-Seat vibration remains an explicit preview limitation until that mapping is
-implemented and tested; it is never sent to an arbitrary first browser gamepad.
+an inactive restore baseline before live telemetry. Guest companies never submit account achievements or timeline events. Music and
+platform services stay in the shell. When Controller vibration is enabled, seat
+confirmation and milestone cues go through Steam Input to that seat's current
+controller handle. The SDK may ignore cues on hardware that does not support
+vibration. Focus loss, overlays, invalid layouts and seat replacement stop or
+suppress cues. The shared preference also applies to replacement controllers.
+
+The flat Steam Input v006 vibration function is exported by all three pinned
+desktop SDK binaries. Automated checks cover distinct 64-bit handles,
+disconnection, replacement and stale renderer messages. Physical verification
+remains open. [Steam Input vibration API](https://partner.steamgames.com/doc/api/isteaminput#TriggerVibration)
+
+To record the physical check, launch a packaged Steam build with vibration
+enabled and join with two different controller families, such as Xbox and
+DualSense. Join in the opposite order from Steam's device list. Confirm a control
+in each company pane and verify that only its controller vibrates. Disconnect
+one controller, explicitly assign a third controller to that company, select
+running speeds to recover and repeat the checks for both companies. Verify that
+the original controller stays silent if it reconnects unassigned. Turn off
+Controller vibration and repeat both confirmations. Record the build, OS, Steam
+client, binding profiles, controller models and observed results.
 
 ## Local persistence
 
@@ -96,10 +113,19 @@ ports, controller identity, overlay context restoration and storage failures.
 
 `e2e/couch.spec.ts` runs through the normal Steam-input headless runner with only
 the native transport replaced. It uses the production shell, shared worker, seat
-bootstrap, clients and controls. `e2e/desktop-couch.spec.ts` is selected by the
-existing native desktop CI runner and checks actual Electron views, partitions,
-protocol loading, ports, zoom and disposal. Browser bridge mocks do not establish
-native focus, Steam overlay, physical controller or compositor behavior.
+bootstrap, clients and controls. The journeys cover two owners approving the same intertie,
+controller replacement and renderer recovery, an absent retired controller,
+match results, global dialog routing and a failed Save & Quit followed by a retry.
+They also exercise padded 1080p and 4K layouts at larger interface scale,
+controller navigation to full clock reasons and resize recovery with the same
+company documents.
+
+`e2e/desktop-couch.spec.ts` runs against packaged Electron in the existing
+desktop CI job. It checks actual native views, partitions, protocol loading,
+ports, input gating, padded bounds, resize recovery, isolated zoom and disposal.
+The Steam Input fixture supplies device frames and storage failures in the
+headless journeys. Native focus, overlay and compositor behavior still require
+the packaged fixture or a physical playthrough.
 
 The preview flag must remain opt-in until the issue's physical acceptance gates
 are recorded: a 55-inch TV at about nine feet, 1080p and 4K, both palettes, larger

@@ -1,3 +1,4 @@
+import { CouchPlayerText } from "../../couch/PlayerColor";
 import * as React from "react";
 import {
   Button,
@@ -248,7 +249,11 @@ export default function EventLog(props: Props): React.JSX.Element {
                 color="text.secondary"
                 sx={{ mb: 1, overflowWrap: "anywhere" }}
               >
-                Events for {companyName}.
+                Events for{" "}
+                <CouchPlayerText seatId={multiplayer?.seat}>
+                  {companyName}
+                </CouchPlayerText>
+                .
               </Typography>
             )}
             <ul className="eventLogList">
@@ -296,7 +301,11 @@ export default function EventLog(props: Props): React.JSX.Element {
                   color="text.secondary"
                   sx={{ mb: 1, overflowWrap: "anywhere" }}
                 >
-                  Events for {companyName}.
+                  Events for{" "}
+                  <CouchPlayerText seatId={multiplayer?.seat}>
+                    {companyName}
+                  </CouchPlayerText>
+                  .
                 </Typography>
               )}
               <ul className="eventLogList">
@@ -452,7 +461,11 @@ export default function EventLog(props: Props): React.JSX.Element {
                 color="text.secondary"
                 sx={{ mb: 1, overflowWrap: "anywhere" }}
               >
-                Events for {companyName}.
+                Events for{" "}
+                <CouchPlayerText seatId={multiplayer?.seat}>
+                  {companyName}
+                </CouchPlayerText>
+                .
               </Typography>
             )}
             <EventHistoryList events={visibleEvents} onSelect={onSelect} />

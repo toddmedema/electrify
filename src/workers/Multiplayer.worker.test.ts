@@ -16,6 +16,10 @@ jest.mock("../data/FuelPrices", () => ({
 jest.mock("../data/Weather", () => ({
   initWeather: jest.fn((_location: unknown, done: () => void) => done()),
 }));
+jest.mock("../helpers/ScenarioChoices", () => ({
+  ...jest.requireActual("../helpers/ScenarioChoices"),
+  pendingScenarioChoice: jest.fn(),
+}));
 jest.mock("../multiplayer/World", () => {
   const blockers = new WeakMap<World, string[]>();
   const roomView = jest.fn((_world: World, _seatId: string) => ({}));
@@ -457,16 +461,21 @@ test("a command that throws mid-match stops the shared clock for everyone and re
   }
 });
 
-test("local shell summaries follow an active company's calendar after P1 retires", async () => {
+test("local shell summaries follow an active company's calendar and publish current pause causes", async () => {
   jest.useFakeTimers();
   const scope = globalThis as unknown as Worker;
   const previousMessage = scope.onmessage;
   const post = jest.spyOn(scope, "postMessage").mockImplementation(() => {});
-  const { createWorld } = jest.requireMock("../multiplayer/World");
+  const { createWorld, setWorldBlockers } = jest.requireMock(
+    "../multiplayer/World",
+  );
+  const { pendingScenarioChoice } = jest.requireMock(
+    "../helpers/ScenarioChoices",
+  );
   const outcomes = {
     "local-p1": { outcome: "bankrupt", title: "Bankrupt", month: 1 },
   };
-  createWorld.mockReturnValue({
+  const world = {
     matchId: "local-match",
     epoch: "local-epoch",
     revision: 4,
@@ -481,9 +490,15 @@ test("local shell summaries follow an active company's calendar after P1 retires
     ],
     grids: [{ date: { minute: 10 } }, { date: { minute: 100 } }],
     outcomes,
-    activities: {},
+    activities: { "local-p2": "Plant notification open" },
     selectedSpeeds: { "local-p1": "PAUSED", "local-p2": "NORMAL" },
-  });
+  };
+  createWorld.mockReturnValue(world);
+  setWorldBlockers(world, [
+    "Controller disconnected",
+    "TV session dialog open",
+  ]);
+  pendingScenarioChoice.mockReturnValue({ title: "Winterization" });
   const create = createWorld.getMockImplementation();
   createWorld.mockImplementation((...args: unknown[]) => {
     // Local simulation must install the real telemetry hooks before creating any grid.
@@ -513,9 +528,20 @@ test("local shell summaries follow an active company's calendar after P1 retires
         date: { minute: 100 },
         outcomes,
         complete: false,
+        systemBlockers: ["Controller disconnected", "TV session dialog open"],
         players: [
-          expect.objectContaining({ id: "local-p1", retired: true }),
-          expect.objectContaining({ id: "local-p2", retired: false }),
+          expect.objectContaining({
+            id: "local-p1",
+            retired: true,
+            pendingChoice: undefined,
+          }),
+          expect.objectContaining({
+            id: "local-p2",
+            selectedSpeed: "NORMAL",
+            pauseReason: "Plant notification open",
+            pendingChoice: "Winterization",
+            retired: false,
+          }),
         ],
       }),
     });

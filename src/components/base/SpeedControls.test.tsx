@@ -90,6 +90,28 @@ test("multiplayer adds only other players' icons along the bottom of the standar
   expect(onSpeedChange).toHaveBeenCalledWith("NORMAL");
 });
 
+test("couch clocks keep named selections and omit peer pips", () => {
+  render(
+    buildSpeedOptions({
+      speed: "ULTRA",
+      onSpeedChange: jest.fn(),
+      desktop: true,
+      multiplayer: {
+        ...multiplayer,
+        selfId: "local-p1",
+        players: multiplayer.players.map((player, index) => ({
+          ...player,
+          id: `local-p${index + 1}`,
+        })),
+      },
+    }),
+  );
+  const group = screen.getByRole("group", { name: "your game speed" });
+  expect(group).toHaveAttribute("data-couch-player", "local-p1");
+  expect(group).toHaveAccessibleDescription(/Player 2 selected 3×/);
+  expect(screen.queryAllByTestId(/^speed-peer-/)).toHaveLength(0);
+});
+
 test("temporary pauses keep chosen speeds and identify the cause without a status strip", () => {
   render(
     buildSpeedOptions({

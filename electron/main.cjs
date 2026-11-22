@@ -525,6 +525,7 @@ handle("desktop:couch", async (input) => {
           bandHeight: input.bandHeight,
           zoom: input.zoom,
           inset: input.inset,
+          screenEdgePadding: input.screenEdgePadding,
           gutter: input.gutter,
         },
       );

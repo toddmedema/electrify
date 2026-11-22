@@ -25,7 +25,7 @@ html[data-couch-seat] {
 }
 .couchBand {
   position: fixed;
-  inset: 0 0 auto;
+  inset: var(--screen-edge-inset) var(--screen-edge-inset) auto;
   z-index: 1100;
   box-sizing: border-box;
   padding: 0;
@@ -50,7 +50,9 @@ html[data-couch-shell-active="true"]
   .couchDialogWithControls
   .MuiDialog-container {
   box-sizing: border-box;
-  padding-bottom: var(--couch-controls-height, 160px);
+  padding-bottom: calc(
+    var(--couch-controls-height, 160px) + var(--screen-edge-inset)
+  );
 }
 .couchSettingsDialog .MuiDialog-paper > .screenPage {
   flex: 1 1 auto;
@@ -83,7 +85,7 @@ html[data-interface-scale]:not([data-interface-scale="1"]) {
 .couchControlsLegend {
   position: fixed;
   z-index: 1400;
-  inset: auto 0 0;
+  inset: auto var(--screen-edge-inset) var(--screen-edge-inset);
   box-sizing: border-box;
   padding: 12px 24px;
   color: var(--font-color-primary);
@@ -103,8 +105,8 @@ html[data-interface-scale]:not([data-interface-scale="1"]) {
 }
 .couchMenuNotice {
   position: fixed;
-  bottom: 40vh;
-  left: 24px;
+  bottom: calc(40vh + var(--screen-edge-inset));
+  left: max(24px, var(--screen-edge-inset));
   z-index: 1400;
 }
 .couchRoster {

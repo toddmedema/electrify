@@ -3,7 +3,7 @@
   min-width: 0;
 
   #topbar > .MuiToolbar-root {
-    gap: 16px;
+    gap: 4px 16px;
     flex-wrap: wrap !important;
     padding-block: 8px;
   }
@@ -15,7 +15,7 @@
   // Match the player's grid status after native zoom, while retaining the shell's
   // shared interface scale.
   #topbar .couchCalendar .gameStatusValue.weak,
-  .couchSharedMission .missionRiskText,
+  .couchSharedMission .missionRiskButton.MuiButton-root,
   .couchSharedMission .missionSummaryMonths.MuiButton-root {
     font-size: calc(var(--font-size-caption) * var(--couch-status-scale));
   }
@@ -33,6 +33,63 @@
       padding: 0;
       width: 100%;
       background: none;
+    }
+    .missionRiskButton .statusIcon svg {
+      font-size: inherit;
+      width: 1em;
+      height: 1em;
+    }
+    .missionSummaryCopy {
+      justify-content: flex-end;
+    }
+    .missionSummaryMonths.MuiButton-root {
+      margin-inline-start: 0;
+    }
+  }
+}
+
+.couchClock {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin-bottom: 12px;
+  font-variant-numeric: tabular-nums;
+
+  > * {
+    white-space: nowrap;
+  }
+}
+
+.couchClockReasons {
+  display: grid;
+  gap: 12px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow-wrap: anywhere;
+
+  ul {
+    margin: 4px 0 0;
+    padding-inline-start: 24px;
+  }
+}
+
+.couchClockDialog .MuiDialog-paper {
+  max-width: min(calc(100% - 64px), calc(27.5rem * var(--couch-status-scale)));
+
+  .MuiDialogTitle-root {
+    font-size: calc(var(--font-size-subtitle) * var(--couch-status-scale));
+  }
+  .MuiDialogContent-root,
+  .MuiDialogActions-root .MuiButton-root {
+    font-size: calc(var(--font-size-caption) * var(--couch-status-scale));
+  }
+  .MuiDialogActions-root .MuiButton-root {
+    min-height: 40px;
+
+    @media (pointer: coarse) {
+      min-height: 44px;
     }
   }
 }
