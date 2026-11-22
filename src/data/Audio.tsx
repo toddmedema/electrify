@@ -5,6 +5,8 @@ import { MUSIC_DEFINITIONS, MUSIC_INTENSITY_MAX } from "../Constants";
 import { getAudioContext } from "../Globals";
 import { AudioLoadingType } from "../Types";
 
+const INTRO_REQUEST_TIMEOUT_MS = 15_000;
+
 export const state = {
   loaded: "UNLOADED" as AudioLoadingType,
   themeManager: null as ThemeManager | null,
@@ -102,11 +104,13 @@ export function getAllMusicFiles(): string[] {
 export function loadAudioLocalFile(
   context: AudioContext,
   url: string,
+  timeoutMs = 0,
 ): Promise<AudioNode> {
   return new Promise((resolve, reject) => {
     const request = new XMLHttpRequest();
     request.open("GET", url, true);
     request.responseType = "arraybuffer";
+    request.timeout = timeoutMs;
     request.onload = () => {
       if (request.status >= 400) {
         reject(new Error(`Audio request failed: ${request.status}`));
@@ -117,6 +121,7 @@ export function loadAudioLocalFile(
         .then((buffer) => resolve(new AudioNode(context, buffer)), reject);
     };
     request.onerror = () => reject(Error("Network error"));
+    request.ontimeout = () => reject(Error("Audio request timed out"));
     request.send();
   });
 }
@@ -148,7 +153,11 @@ export async function loadAudioFiles(musicVolume = 1, soundEffectsVolume = 1) {
     for (const file of [...getAllMusicFiles(), MUSIC_INTRO_FILE]) {
       if (!state.nodes[file]) {
         try {
-          const node = await loadAudioLocalFile(ac, "audio/" + file);
+          const node = await loadAudioLocalFile(
+            ac,
+            "audio/" + file,
+            file === MUSIC_INTRO_FILE ? INTRO_REQUEST_TIMEOUT_MS : undefined,
+          );
           node.setOutput(state.musicOutput);
           state.nodes[file] = node;
         } catch (error) {

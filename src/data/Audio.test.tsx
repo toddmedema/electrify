@@ -20,6 +20,8 @@ interface PendingRequest {
   open: jest.Mock;
   send: jest.Mock;
   onload: (() => void) | null;
+  ontimeout: (() => void) | null;
+  timeout: number;
   response: ArrayBuffer;
   status: number;
 }
@@ -60,8 +62,9 @@ it.each([
   [false, 200],
   [true, 200],
   [false, 404],
+  [false, "timeout"],
 ])(
-  "uses the latest game state when decoding finishes (initial inGame=%s, intro HTTP %s)",
+  "uses the latest game state when decoding finishes (initial inGame=%s, intro response=%s)",
   async (initialInGame, introStatus) => {
     const requests: PendingRequest[] = [];
     jest.spyOn(window, "XMLHttpRequest").mockImplementation(() => {
@@ -69,8 +72,10 @@ it.each([
         open: jest.fn(),
         send: jest.fn(),
         onload: null,
+        ontimeout: null,
+        timeout: 0,
         response: new ArrayBuffer(0),
-        status: requests.length === 4 ? introStatus : 200,
+        status: requests.length === 4 && introStatus === 404 ? 404 : 200,
       };
       requests.push(request);
       return request as unknown as XMLHttpRequest;
@@ -106,7 +111,10 @@ it.each([
     expect(state.loaded).toBe("LOADING");
     for (let i = 1; i < 5; i++) {
       await waitFor(() => expect(requests).toHaveLength(i + 1));
-      requests[i].onload?.();
+      if (i === 4 && introStatus === "timeout") {
+        expect(requests[i].timeout).toBeGreaterThan(0);
+        requests[i].ontimeout?.();
+      } else requests[i].onload?.();
     }
     await waitFor(() => expect(state.loaded).toBe("LOADED"));
     const constructor = ThemeManager as jest.MockedClass<typeof ThemeManager>;
