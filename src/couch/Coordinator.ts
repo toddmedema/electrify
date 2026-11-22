@@ -397,11 +397,10 @@ export class CouchCoordinator {
       if (this.state.phase === "starting") {
         this.update({ phase: "playing" });
         this.roster.forEach((seat) => {
-          if (!this.routes.has(seat.id))
+          if (this.active(seat.id) && !this.routes.has(seat.id))
             this.setBlocker(
               `seat:${seat.id}`,
               `${seat.name}: Assign a controller`,
-              true,
             );
         });
         if (this.blockers.size)

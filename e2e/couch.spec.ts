@@ -832,6 +832,12 @@ test("TV couch resumes with an absent retired controller and completes the remai
     page.getByText(/P2 Utility: controller disconnected/),
   ).toHaveCount(0);
   await expect(clock(p1)).toHaveAttribute("data-active-speed", "PAUSED");
+  const lowCash = p1.getByRole("dialog", { name: "Low on cash", exact: true });
+  await lowCash
+    .getByRole("button", { name: "Go bankrupt", exact: true })
+    .focus();
+  await couch.input({ "101": ["confirm"] });
+  await expect(lowCash).toHaveCount(0);
   await couch.input({ "101": ["speedUp"] });
   await expect(clock(p1)).toHaveAttribute("data-active-speed", "SLOW");
 

@@ -562,14 +562,17 @@ export async function createCouchFixture(
           );
           return relayout(raw.options as Record<string, unknown>);
         case "send": {
-          const route = seats.get(String(raw.seatId));
+          const seatId = String(raw.seatId);
+          const route = seats.get(seatId);
           if (
-            route &&
-            route.generation === raw.generation &&
-            !actorClosed(route.page)
-          ) {
-            if ((raw.message as { kind?: string })?.kind === "presentation")
-              presentationMessages++;
+            !route ||
+            route.generation !== raw.generation ||
+            actorClosed(route.page)
+          )
+            return false;
+          if ((raw.message as { kind?: string })?.kind === "presentation")
+            presentationMessages++;
+          try {
             await route.page.evaluate(
               (detail) =>
                 window.dispatchEvent(
@@ -577,8 +580,13 @@ export async function createCouchFixture(
                 ),
               raw.message,
             );
+            return true;
+          } catch (error) {
+            // Native delivery drops a route revoked during teardown or replacement.
+            if (seats.get(seatId) !== route || actorClosed(route.page))
+              return false;
+            throw error;
           }
-          return;
         }
         case "open": {
           if (native) await native.manager.open(raw);
