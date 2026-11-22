@@ -1548,13 +1548,15 @@ test("returning to the partially sent checkpoint withdraws the unsent overwrite"
   };
   await mp.checkpoint(first);
   assert.deepEqual(await pump(1), []);
+  const other = { matchId: "other-campaign", revision: 1 };
+  await mp.checkpoint(other);
   await mp.checkpoint({ matchId: first.matchId, revision: 2 });
   await mp.checkpoint(first);
 
   const sent = await pump();
   assert.deepEqual(
-    sent.map((message) => message.world.revision),
-    [1],
+    sent.map((message) => message.digest),
+    ["campaign:1", "other-campaign:1"],
   );
   await mp.receive(peer.id, { kind: "saved", digest: "campaign:2" });
   assert.equal(mp.sharedAt, null);
@@ -1562,12 +1564,14 @@ test("returning to the partially sent checkpoint withdraws the unsent overwrite"
   assert.equal(mp.sharedAt, mp.checkpointAt);
 });
 
-test("unsent checkpoint replacement uses its existing slot at the send limit", async (t) => {
+test("unsent checkpoint replacement uses its campaign's existing slot at the send limit", async (t) => {
   const { mp, peer, pump } = checkpointSender(t);
   const first = { matchId: "campaign", revision: 1 };
   const newest = { ...first, revision: 2 };
+  const other = { matchId: "other-campaign", revision: 1 };
   await mp.checkpoint(first);
-  for (let i = 0; i < 63; i++) mp.send(peer.id, { kind: "heartbeat" });
+  await mp.checkpoint(other);
+  for (let i = 0; i < 62; i++) mp.send(peer.id, { kind: "heartbeat" });
   assert.throws(() => mp.send(peer.id, { kind: "heartbeat" }), /catching up/);
 
   await mp.checkpoint(newest);
@@ -1577,7 +1581,12 @@ test("unsent checkpoint replacement uses its existing slot at the send limit", a
     assert(messages.every((message) => message.kind === "heartbeat"));
   }
   const finalMessages = await pump();
-  assert.deepEqual(finalMessages.at(-1).world, newest);
+  assert.deepEqual(
+    finalMessages
+      .filter((message) => message.kind === "checkpoint")
+      .map((message) => message.world),
+    [newest, other],
+  );
   assert.deepEqual(await pump(), []);
 });
 

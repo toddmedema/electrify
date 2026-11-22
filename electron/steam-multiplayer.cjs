@@ -837,22 +837,22 @@ class SteamMultiplayer {
       message.matchId = matchId;
       message.digest = digest;
       const queue = connection.checkpointQueue;
-      const latest = queue?.at(-1);
+      const latestIndex =
+        queue?.findLastIndex((queued) => queued.matchId === matchId) ?? -1;
+      const latest = queue?.[latestIndex];
+      if (latest?.digest === digest) return;
       // Other campaigns have their own save slots and keep their place in the queue.
-      if (latest?.matchId === matchId) {
-        if (latest.digest === digest) return;
-        if (latest.offset === 0) {
-          const active = queue.at(-2);
-          // We can return to the save whose first frames are already on the wire.
-          if (
-            active?.matchId === matchId &&
-            active.digest === digest &&
-            active.offset > 0
-          )
-            queue.pop();
-          else queue[queue.length - 1] = message;
-          return;
-        }
+      if (latest?.offset === 0) {
+        const active = queue[0];
+        // We can return to the save whose first frames are already on the wire.
+        if (
+          active.matchId === matchId &&
+          active.digest === digest &&
+          active.offset > 0
+        )
+          queue.splice(latestIndex, 1);
+        else queue[latestIndex] = message;
+        return;
       }
     }
     if (
@@ -949,7 +949,7 @@ class SteamMultiplayer {
         c.connected &&
         c.savedDigest !== digest &&
         (c.checkpointDigest !== digest ||
-          c.checkpointQueue?.at(-1)?.digest !== digest)
+          !c.checkpointQueue?.some((queued) => queued.digest === digest))
       )
         try {
           encoded ||= await encodeAsync(payload);
