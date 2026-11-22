@@ -23,6 +23,7 @@ import {
 } from "../data/UtilityExpansion";
 import {
   acquisitionAssets,
+  municipalPlantAsset,
   sellerCustomers,
   expansionRetentionBaseline,
 } from "./Expansion";
@@ -252,12 +253,28 @@ export function validUtilityExpansion(
         ) ?? [];
       const totalPrice = purchases.reduce((sum, site) => sum + site.price, 0);
       // A retained save can already own one of the sites at the same tick.
-      const lastPrice = purchases.at(-1)?.price ?? 0;
+      const last = purchases.at(-1);
+      const prices = [totalPrice, last?.price ?? 0];
+      if (
+        municipal.plant &&
+        purchases.some(({ tileId }) => tileId === municipal.plant?.tileId)
+      ) {
+        const atPurchase = {
+          ...game,
+          date: getDateFromMinute(loan.minuteCreated, game.startingYear),
+        };
+        const asset = municipalPlantAsset(atPurchase, municipal.plant);
+        if (asset) {
+          const plantPrice = facilityCashBack(asset, loan.minuteCreated);
+          prices.push(totalPrice + plantPrice);
+          if (last?.tileId === municipal.plant.tileId)
+            prices.push(last.price + plantPrice);
+        }
+      }
       if (
         loan.kind !== "purchase" ||
         !purchases.length ||
-        (!close(loan.principal, maxLoanAmount(totalPrice)) &&
-          !close(loan.principal, maxLoanAmount(lastPrice)))
+        !prices.some((price) => close(loan.principal, maxLoanAmount(price)))
       )
         return false;
     } else {

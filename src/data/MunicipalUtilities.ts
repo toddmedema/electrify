@@ -15,7 +15,7 @@ const suffixes = [
   "Energy",
 ] as const;
 
-interface MunicipalPlant {
+export interface MunicipalPlant {
   tileId: TerritoryTileId;
   facility: {
     name: string;

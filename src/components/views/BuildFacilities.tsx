@@ -1,7 +1,7 @@
 import { hasTerritoryNetwork } from "../../helpers/Territories";
 import { intertieApprovedMessage } from "../../helpers/BuildConsequences";
 import * as React from "react";
-import { useToolScroll } from "../base/GameToolMemory";
+import { useToolScroll, useToolState } from "../base/GameToolMemory";
 import { Tab, Tabs } from "@mui/material";
 import { useAppDispatch, useAppSelector } from "../../Store";
 import { navigate } from "../../reducers/Card";
@@ -36,9 +36,11 @@ const categories = [
 export default function BuildFacilities({
   embedded = false,
   category,
+  onPickSite,
 }: {
   embedded?: boolean;
   category?: string;
+  onPickSite?: (facility: import("../../Types").FacilityShoppingType) => void;
 }): React.JSX.Element {
   const dispatch = useAppDispatch();
   const closeTool = React.useContext(GameToolCloseContext);
@@ -55,17 +57,26 @@ export default function BuildFacilities({
   const visibleCategories = categories.filter(
     ([name]) => intertiesAvailable || name !== "BUILD_INTERTIES",
   );
+  const [projectCategory, setProjectCategory] = useToolState<
+    (typeof categories)[number][0]
+  >("project.category", "BUILD_GENERATORS");
   const active = introductoryChoices
     ? "BUILD_GENERATORS"
-    : visibleCategories.find(([name]) => name === (category ?? card))?.[0] ||
-      "BUILD_GENERATORS";
+    : visibleCategories.find(
+        ([name]) =>
+          name === (onPickSite ? projectCategory : (category ?? card)),
+      )?.[0] || "BUILD_GENERATORS";
   const cash = getTimeFromTimeline(game.date.minute, game.timeline)?.cash || 0;
   const intertiesRef = useToolScroll<HTMLDivElement>(`build.${active}.scroll`);
   const close = closeTool ?? (() => dispatch(navigate("FACILITIES")));
   const gesture = React.useRef<{ id: number; x: number; y: number } | null>(
     null,
   );
-  const changeCategory = (name: (typeof categories)[number][0]) =>
+  const changeCategory = (name: (typeof categories)[number][0]) => {
+    if (onPickSite) {
+      setProjectCategory(name);
+      return;
+    }
     dispatch(
       navigate({
         name,
@@ -74,6 +85,7 @@ export default function BuildFacilities({
         skipBrowserHistory: true,
       }),
     );
+  };
 
   return (
     <div
@@ -169,8 +181,12 @@ export default function BuildFacilities({
           if (next) changeCategory(next[0]);
         }}
       >
-        {active === "BUILD_GENERATORS" && <BuildGeneratorsContainer />}
-        {active === "BUILD_STORAGE" && <BuildStorageContainer />}
+        {active === "BUILD_GENERATORS" && (
+          <BuildGeneratorsContainer onPickSite={onPickSite} />
+        )}
+        {active === "BUILD_STORAGE" && (
+          <BuildStorageContainer onPickSite={onPickSite} />
+        )}
         {active === "BUILD_INTERTIES" && (
           <div ref={intertiesRef} className="scrollable constructionInterties">
             <TransmissionPanel

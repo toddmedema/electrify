@@ -1517,7 +1517,11 @@ test("TV saved display preferences style direct scenario links before play", asy
     edge.actual,
     "TV geometry must be loaded on the first direct-link screen",
   ).toBeCloseTo(edge.expected, 1);
-  await start.press("Enter");
+  // A rendered direct-link control can appear while startup still owns focus.
+  await expect(page.locator("#appStartup")).toHaveCount(0);
+  await start.focus();
+  await expect(start).toBeFocused();
+  await page.keyboard.press("Enter");
   await expect(page.locator(".gameStage")).toHaveAttribute(
     "data-layout",
     "map",

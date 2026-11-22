@@ -191,8 +191,7 @@ export async function waitForSettled(
 
 export async function closeTileSurface(surface: Locator): Promise<void> {
   const close = surface.getByRole("button", {
-    name: "Close tile",
-    exact: true,
+    name: /^Close (tile|project)$/,
   });
   if (await close.count()) await close.click();
   else await surface.locator(".tileWorkspaceHeading h3").press("Escape");

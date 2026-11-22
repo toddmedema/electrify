@@ -516,7 +516,9 @@ test("retrying a failed scenario keeps its difficulty in the game and mission de
     .click();
   const failure = page.getByRole("dialog", { name: "Bankrupt!" });
   await expect(failure).toBeVisible();
-  await expect(failure.getByText("How was your first scenario?")).toBeVisible();
+  const feedback = failure.getByText("How was your first scenario?");
+  await expect(feedback).toBeVisible();
+  await expect(feedback.locator("..")).toHaveCSS("justify-content", "center");
   await expect(
     failure.getByRole("button", { name: "Share feedback" }),
   ).toBeVisible();

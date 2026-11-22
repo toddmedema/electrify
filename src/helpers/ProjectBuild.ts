@@ -59,6 +59,18 @@ export function projectCatalogue(
 /** Catalogue-only ceilings leave canonical economics and retained-facility expansion quotes intact. */
 export function withTerritoryCatalogueLimits(
   game: GameType,
+  options: GeneratorShoppingType[],
+): GeneratorShoppingType[];
+export function withTerritoryCatalogueLimits(
+  game: GameType,
+  options: StorageShoppingType[],
+): StorageShoppingType[];
+export function withTerritoryCatalogueLimits(
+  game: GameType,
+  options: FacilityShoppingType[],
+): FacilityShoppingType[];
+export function withTerritoryCatalogueLimits(
+  game: GameType,
   options: FacilityShoppingType[],
 ): FacilityShoppingType[] {
   if (!hasTerritoryNetwork(game)) return options;
