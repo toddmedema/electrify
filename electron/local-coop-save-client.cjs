@@ -22,6 +22,10 @@ class LocalCoopSaveClient {
       { serviceName: "Electrify couch saves" },
     );
     this.process = child;
+    child.once("spawn", () => {
+      // A prior timeout could not kill this child before Electron assigned its PID.
+      if (this.process === child && this.retiring) child.kill();
+    });
     child.on("message", ({ id, result, error }) => {
       if (this.process !== child) return;
       const request = this.requests.get(id);

@@ -249,6 +249,7 @@ test("native save messages share a queue and acknowledge durable checkpoints", (
     const client = new LocalCoopSaveClient(() => child, directory, owner);
     try {
       const first = client.request("write-save", world(4));
+      child.emit("spawn");
       const latest = world(4, { revision: 2 });
       const second = client.request("write-save", latest);
       const list = client.request("list-saves");
@@ -320,4 +321,40 @@ test("a stalled process times out and must exit before the profile queue reopens
   stalled.emit("exit", 1);
   assert.deepEqual(await client.request("list-saves"), []);
   assert.equal(fork.mock.callCount(), 2);
+});
+
+test("a save process that spawns after timing out is stopped before another starts", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  let spawned = false;
+  let terminationRequested = false;
+  const delayed = Object.assign(new EventEmitter(), {
+    postMessage() {},
+    kill() {
+      terminationRequested = spawned;
+      return terminationRequested;
+    },
+  });
+  const replacement = Object.assign(new EventEmitter(), {
+    postMessage({ id, kind }) {
+      assert.equal(kind, "list-saves");
+      this.emit("message", { id, result: [] });
+    },
+  });
+  const fork = t.mock.fn(() => delayed);
+  fork.mock.mockImplementationOnce(() => replacement, 1);
+  const client = new LocalCoopSaveClient(fork, "/unused", owner);
+
+  const write = client.request("write-save", world());
+  t.mock.timers.tick(30_000);
+  await assert.rejects(write, /timed out/);
+  spawned = true;
+  delayed.emit("spawn");
+  assert.ok(
+    terminationRequested,
+    "the late-starting process should be terminated",
+  );
+  await assert.rejects(client.request("list-saves"), /stopping/);
+
+  delayed.emit("exit", 0);
+  assert.deepEqual(await client.request("list-saves"), []);
 });
