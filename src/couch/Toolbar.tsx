@@ -104,22 +104,6 @@ export default function CouchToolbar({
             <Typography variant="h6" className="gameStatus couchCalendar">
               <GameDate date={game.date} showTime />
             </Typography>
-            <div className="couchClock" role="group" aria-label="Shared clock">
-              <strong>Clock {speedSelectionLabel(clock.speed)}</strong>
-              {clock.players.map((player, index) => (
-                <span key={player.id}>
-                  P{index + 1}{" "}
-                  {player.retired
-                    ? "Retired"
-                    : speedSelectionLabel(player.selectedSpeed)}
-                </span>
-              ))}
-              <span>
-                {clock.speed === "PAUSED"
-                  ? `Held by ${pauses.map(({ label }) => label).join(", ")}`
-                  : `Set by ${speedSetters.join(", ")}`}
-              </span>
-            </div>
             <div className="gameStatusBar couchSharedMission">
               <MissionSummary
                 game={game}
@@ -139,22 +123,38 @@ export default function CouchToolbar({
         controls={menuFooter}
         clockStyle={statusStyle}
         clockDetails={
-          pauses.length ? (
-            <ul className="couchClockReasons" aria-label="Pause reasons">
-              {pauses.map(({ label, name, reasons }) => (
-                <li key={label}>
-                  <strong>{name ? `${label} · ${name}` : label}</strong>
-                  <ul>
-                    {reasons.map((reason) => (
-                      <li key={reason}>{reason}</li>
-                    ))}
-                  </ul>
-                </li>
+          <>
+            <div className="couchClock" role="group" aria-label="Shared clock">
+              <strong>Clock {speedSelectionLabel(clock.speed)}</strong>
+              {clock.players.map((player, index) => (
+                <span key={player.id}>
+                  P{index + 1}{" "}
+                  {player.retired
+                    ? "Retired"
+                    : speedSelectionLabel(player.selectedSpeed)}
+                </span>
               ))}
-            </ul>
-          ) : (
-            <span>Clock running at {speedSelectionLabel(clock.speed)}.</span>
-          )
+              <span>
+                {clock.speed === "PAUSED"
+                  ? `Held by ${pauses.map(({ label }) => label).join(", ")}`
+                  : `Set by ${speedSetters.join(", ")}`}
+              </span>
+            </div>
+            {!!pauses.length && (
+              <ul className="couchClockReasons" aria-label="Pause reasons">
+                {pauses.map(({ label, name, reasons }) => (
+                  <li key={label}>
+                    <strong>{name ? `${label} · ${name}` : label}</strong>
+                    <ul>
+                      {reasons.map((reason) => (
+                        <li key={reason}>{reason}</li>
+                      ))}
+                    </ul>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </>
         }
         onClose={onMenuClose}
         onManual={onManual}

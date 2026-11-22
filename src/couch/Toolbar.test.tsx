@@ -57,15 +57,22 @@ it("shows one shared calendar while speed controls stay in the player panes", ()
     }),
   ).toBeVisible();
   expect(screen.queryAllByRole("group", { name: /speed/ })).toHaveLength(0);
-  const clock = screen.getByRole("group", { name: "Shared clock" });
-  expect(clock).toHaveTextContent("Clock 3×");
-  expect(clock).toHaveTextContent("P1 12×");
-  expect(clock).toHaveTextContent("P2 3×");
-  expect(clock).toHaveTextContent("Set by P2");
+  expect(screen.queryByRole("group", { name: "Shared clock" })).toBeNull();
   expect(screen.queryByText(/On this TV|Unranked|Last local save/)).toBeNull();
   expect(
     screen.queryByRole("button", { name: "Save & Quit for everyone" }),
   ).toBeNull();
+});
+
+it("shows effective and selected speeds in Clock status", () => {
+  show(props({ menuOpen: true }));
+  fireEvent.click(screen.getByRole("button", { name: "Clock status" }));
+  const details = screen.getByRole("dialog", { name: "Clock status" });
+  const clock = within(details).getByRole("group", { name: "Shared clock" });
+  expect(clock).toHaveTextContent("Clock 3×");
+  expect(clock).toHaveTextContent("P1 12×");
+  expect(clock).toHaveTextContent("P2 3×");
+  expect(clock).toHaveTextContent("Set by P2");
 });
 
 it("shows common upcoming events even when the first company has a cash warning", () => {
@@ -125,12 +132,7 @@ it("names simultaneous holders and exposes all pause reasons through controller 
   value.clock.players[1].selectedSpeed = "PAUSED";
   value.clock.players[1].pauseReason = "New event requiring attention";
   value.clock.systemBlockers = ["TV session dialog open", "Steam overlay open"];
-  const { rerender } = show(value);
-  const clock = screen.getByRole("group", { name: "Shared clock" });
-  expect(clock).toHaveTextContent("Clock Paused");
-  expect(clock).toHaveTextContent("P2 Paused");
-  expect(clock).toHaveTextContent("Held by System, P2");
-  rerender(<CouchToolbar {...value} menuOpen />);
+  show({ ...value, menuOpen: true });
   const menu = screen.getByRole("dialog", { name: "Game menu" });
   const settings = within(menu).getByRole("button", { name: "Settings" });
   settings.focus();
@@ -142,6 +144,10 @@ it("names simultaneous holders and exposes all pause reasons through controller 
   fireEvent.click(clockStatus);
 
   const details = screen.getByRole("dialog", { name: "Clock status" });
+  const clock = within(details).getByRole("group", { name: "Shared clock" });
+  expect(clock).toHaveTextContent("Clock Paused");
+  expect(clock).toHaveTextContent("P2 Paused");
+  expect(clock).toHaveTextContent("Held by System, P2");
   expect(within(details).getByText("P2 · Grace")).toBeVisible();
   expect(within(details).getByText("Selected pause")).toBeVisible();
   expect(
@@ -171,12 +177,11 @@ it("shows readiness and decisions for the active seat while keeping retired seat
   };
   value.clock.players[1].pendingChoice = "Winterization";
   value.clock.players[1].selectedSpeed = "PAUSED";
-  const { rerender } = show(value);
+  show({ ...value, menuOpen: true });
+  fireEvent.click(screen.getByRole("button", { name: "Clock status" }));
   const clock = screen.getByRole("group", { name: "Shared clock" });
   expect(clock).toHaveTextContent("P1 Retired");
   expect(clock).toHaveTextContent("Held by System, P2");
-  rerender(<CouchToolbar {...value} menuOpen />);
-  fireEvent.click(screen.getByRole("button", { name: "Clock status" }));
   expect(screen.getByText("Select a running speed to resume")).toBeVisible();
   expect(screen.getByText("Controller replaced")).toBeVisible();
   expect(screen.getByText("Selected pause")).toBeVisible();

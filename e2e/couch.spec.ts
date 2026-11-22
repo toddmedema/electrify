@@ -926,12 +926,26 @@ test("TV couch applies padded bounds and exposes shared clock reasons through co
 
   await runNormally(p1, p2);
   await couch.input({ "101": ["speedUp"] });
-  const sharedClock = page.getByRole("group", {
-    name: "Shared clock",
+  await expect(clock(p1)).toHaveAttribute("data-active-speed", "NORMAL");
+  await expect(
+    speedControls(p1).getByRole("button", { name: "fast speed", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(band.getByRole("group", { name: "Shared clock" })).toHaveCount(
+    0,
+  );
+  const event = band.getByRole("button", {
+    name: /^Upcoming: Carbon fee rising/,
+  });
+  const term = band.getByRole("button", {
+    name: "144 months left",
     exact: true,
   });
-  for (const label of ["Clock 3×", "P1 12×", "P2 3×", "Set by P2"])
-    await expect(sharedClock.getByText(label, { exact: true })).toBeVisible();
+  await expect(event).toBeVisible();
+  await expect(term).toBeVisible();
+  const eventBox = (await event.boundingBox())!;
+  const termBox = (await term.boundingBox())!;
+  expect(eventBox.x).toBeGreaterThan(width / 2);
+  expect(termBox.x - eventBox.x - eventBox.width).toBeLessThan(24);
   if (process.env.REVIEW_SCREENSHOT_DIR)
     await page.screenshot({
       path: path.join(
@@ -942,15 +956,7 @@ test("TV couch applies padded bounds and exposes shared clock reasons through co
     });
 
   await couch.input({ "202": ["pause"] });
-  await expect(
-    sharedClock.getByText("Clock Paused", { exact: true }),
-  ).toBeVisible();
-  await expect(
-    sharedClock.getByText("P2 Paused", { exact: true }),
-  ).toBeVisible();
-  await expect(
-    sharedClock.getByText("Held by P2", { exact: true }),
-  ).toBeVisible();
+  await expect(clock(p1)).toHaveAttribute("data-active-speed", "PAUSED");
   await couch.input({ "101": ["menu"] });
   const menu = page.getByRole("dialog", { name: "Game menu", exact: true });
   await expect(
@@ -967,6 +973,14 @@ test("TV couch applies padded bounds and exposes shared clock reasons through co
     name: "Clock status",
     exact: true,
   });
+  const sharedClock = details.getByRole("group", { name: "Shared clock" });
+  for (const label of [
+    "Clock Paused",
+    "P1 12×",
+    "P2 Paused",
+    "Held by System, P2",
+  ])
+    await expect(sharedClock.getByText(label, { exact: true })).toBeVisible();
   await expect(details).toContainText("P2 · P2 Utility");
   await expect(details).toContainText("Selected pause");
   await expect(details).toContainText("TV session dialog open");
@@ -977,9 +991,7 @@ test("TV couch applies padded bounds and exposes shared clock reasons through co
   await expect(menu).toBeVisible();
   await couch.input({ "101": ["menu"] });
   await expect(menu).toHaveCount(0);
-  await expect(
-    sharedClock.getByText("Held by P2", { exact: true }),
-  ).toBeVisible();
+  await expect(clock(p1)).toHaveAttribute("data-active-speed", "PAUSED");
 
   await couch.resize(1130, 800);
   await expect(

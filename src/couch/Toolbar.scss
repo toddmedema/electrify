@@ -15,23 +15,9 @@
   // Match the player's grid status after native zoom, while retaining the shell's
   // shared interface scale.
   #topbar .couchCalendar .gameStatusValue.weak,
-  .couchClock,
   .couchSharedMission .missionRiskText,
   .couchSharedMission .missionSummaryMonths.MuiButton-root {
     font-size: calc(var(--font-size-caption) * var(--couch-status-scale));
-  }
-  .couchClock {
-    display: flex;
-    align-items: baseline;
-    flex-wrap: wrap;
-    gap: 4px 12px;
-    padding-block: 4px;
-    line-height: 1.25;
-    font-variant-numeric: tabular-nums;
-
-    > * {
-      white-space: nowrap;
-    }
   }
   .gameStatus .gameStatusHour {
     display: inline;
@@ -48,6 +34,25 @@
       width: 100%;
       background: none;
     }
+    .missionSummaryCopy {
+      justify-content: flex-end;
+    }
+    .missionSummaryMonths.MuiButton-root {
+      margin-inline-start: 0;
+    }
+  }
+}
+
+.couchClock {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin-bottom: 12px;
+  font-variant-numeric: tabular-nums;
+
+  > * {
+    white-space: nowrap;
   }
 }
 

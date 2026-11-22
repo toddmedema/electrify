@@ -10,11 +10,11 @@ another controller backend.
 Each controller explicitly joins a company. P1 chooses an existing co-op scenario
 or custom game; both players confirm that selection. The campaign roster then
 stays fixed. An assigned controller controls only its company's document. The
-shared bar shows the calendar, year progress, upcoming event and months left
-alongside the effective speed, each player's selection and who is holding the
-clock. Each player changes their own speed in their pane. The slowest selection
-wins. For full pause reasons, press Start/Menu or Select/View, then choose
-**Clock status** in the Game menu. The shared menu pauses the match. Either
+shared bar shows the calendar and year progress, with the upcoming event and
+months left on the right. Each player selects a speed in their pane, and the
+slowest selection sets the pace. To see the shared speed, seat selections and
+full pause reasons, press Start/Menu or Select/View and choose **Clock status**
+in the Game menu. The shared menu pauses the match. Either
 controller can navigate the shared menu and Settings. Save & Quit confirmation
 belongs to the named requesting company. The active controller's bindings
 appear under Controls while the menu, Settings or Manual is open.
