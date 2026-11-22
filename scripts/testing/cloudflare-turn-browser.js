@@ -20,14 +20,15 @@ function installTurnProbe({ iceServer, channelId, receiptDelayMs }) {
     }
     if (receiptDelayMs !== null) {
       const separator = data.indexOf(":");
-      const sequence = Number(data.slice(0, separator));
       if (
-        sequence !== expected++ ||
+        separator < 1 ||
+        data.slice(0, separator) !== String(expected) ||
         !/^x{8192}$/.test(data.slice(separator + 1))
       ) {
         invalid = true;
         return;
       }
+      const sequence = expected++;
       setTimeout(() => {
         if (channel.readyState === "open") channel.send(String(sequence));
       }, receiptDelayMs);

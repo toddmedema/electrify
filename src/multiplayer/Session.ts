@@ -112,6 +112,7 @@ export interface SessionState {
   view?: RoomView;
   pending: boolean;
   busy: boolean;
+  entryOperation?: "create" | "join";
   waitingForHost: boolean;
   /** A replica is receiving data or recovering; commands wait for a live local world. */
   synchronizing?: boolean;
@@ -169,6 +170,8 @@ export class MultiplayerSession {
   private activity: string | null = null;
   private sequence = 0;
   private closing = false;
+  private departingLobbyId?: string;
+  private interruptedJoinLobbyId?: string;
   private receiptSequence = 0;
   private lastHostMessage = Date.now();
   private lastSend = 0;
@@ -215,16 +218,33 @@ export class MultiplayerSession {
   }
   async initialize(onInvite?: (lobbyId: string) => void) {
     const lifecycle = ++this.lifecycle;
+    let ready = false;
+    let pendingInvite: string | undefined;
+    const deliverInvite = () => {
+      if (!ready || !pendingInvite || lifecycle !== this.lifecycle) return;
+      const { busy, lobby, view, synchronizing } = this.state;
+      if (this.closing || busy) return;
+      const lobbyId = pendingInvite;
+      pendingInvite = undefined;
+      if (!view && !synchronizing && lobby.lobbyId !== lobbyId)
+        onInvite?.(lobbyId);
+    };
     this.stopEvents = this.services.transport.subscribe((event) => {
       if (lifecycle !== this.lifecycle) return;
-      if (event.kind === "invite") onInvite?.(event.lobbyId);
-      else this.event(event);
+      if (event.kind === "invite") {
+        pendingInvite = event.lobbyId;
+        deliverInvite();
+      } else this.event(event);
     });
     const lobby = await this.request({ kind: "state" });
     if (lifecycle !== this.lifecycle) return;
     this.update({ lobby });
+    pendingInvite ??= lobby.inviteLobbyId;
+    ready = true;
     clearInterval(this.timer);
     this.timer = setInterval(() => {
+      // A Steam invitation can arrive while another lobby operation is awaiting IPC.
+      deliverInvite();
       if (this.worker) this.post({ kind: "heartbeat" });
       else if (
         this.state.lobby.hostId &&
@@ -263,10 +283,13 @@ export class MultiplayerSession {
       if (waitingForHost !== this.state.waitingForHost)
         this.update({ waitingForHost });
     }, SESSION_PUMP_MS);
+    deliverInvite();
   }
   private event(event: Exclude<SessionEvent, { kind: "invite" }>) {
     if (event.kind === "state") {
       const { hostId, lobbyId, members } = event.state;
+      // Steam can publish the old roster as it closes each peer connection.
+      if (lobbyId && lobbyId === this.departingLobbyId) return;
       // Before a match, a lobby without its host has nobody left to choose or start a game.
       if (
         lobbyId &&
@@ -278,7 +301,7 @@ export class MultiplayerSession {
         !members.some((member) => member.id === hostId)
       ) {
         this.update({ lobby: event.state });
-        void this.hostLeft();
+        this.handleHostLeft();
         return;
       }
       this.update({ lobby: event.state });
@@ -330,9 +353,13 @@ export class MultiplayerSession {
         this.post({ kind: "disconnect", sender: event.sender });
       }
       // A friend leaving before the match begins is routine; only a guest loses its game.
-      else if (this.isHost() || event.sender !== this.state.lobby.hostId)
+      else if (
+        this.isHost() ||
+        this.closing ||
+        event.sender !== this.state.lobby.hostId
+      )
         return;
-      else if (!this.state.view) void this.hostLeft();
+      else if (!this.state.view) this.handleHostLeft();
       else
         this.update({
           error: CONNECTION_LOST,
@@ -980,7 +1007,12 @@ export class MultiplayerSession {
   }
   async create() {
     this.campaignGeneration++;
-    this.update({ busy: true, error: undefined, pendingCampaign: undefined });
+    this.update({
+      busy: true,
+      entryOperation: "create",
+      error: undefined,
+      pendingCampaign: undefined,
+    });
     try {
       this.update({
         lobby: await this.request({
@@ -989,12 +1021,23 @@ export class MultiplayerSession {
         }),
       });
     } finally {
-      this.update({ busy: false });
+      this.update({ busy: false, entryOperation: undefined });
     }
   }
   async join(lobbyId: string) {
     this.campaignGeneration++;
-    this.update({ busy: true, error: undefined, pendingCampaign: undefined });
+    this.clearLobbySelection();
+    const { lobbyId: previousLobbyId, available, selfId } = this.state.lobby;
+    this.departingLobbyId = previousLobbyId;
+    this.update({
+      lobby: { available, selfId, members: [], connected: [] },
+      busy: true,
+      entryOperation: "join",
+      error: undefined,
+      pendingCampaign: undefined,
+      browse: undefined,
+      scenarioSnapshot: undefined,
+    });
     try {
       this.update({
         lobby: await this.request({
@@ -1004,7 +1047,12 @@ export class MultiplayerSession {
         }),
       });
     } finally {
-      this.update({ busy: false });
+      const interruptedLobbyId = this.interruptedJoinLobbyId;
+      this.interruptedJoinLobbyId = undefined;
+      this.departingLobbyId = undefined;
+      if (interruptedLobbyId && interruptedLobbyId === this.state.lobby.lobbyId)
+        void this.hostLeft();
+      this.update({ busy: false, entryOperation: undefined });
     }
   }
   async reconnect() {
@@ -1422,6 +1470,15 @@ export class MultiplayerSession {
       this.saveRequests.delete(requestId);
     }
   }
+  private clearLobbySelection() {
+    clearTimeout(this.browseTimer);
+    this.browseTimer = undefined;
+    this.browseSession = undefined;
+    this.publishedSelection = undefined;
+    this.browsePeers = new Set();
+    this.receivedScenario = undefined;
+    this.outboundScenario.clear();
+  }
   /**
    * Saves, then leaves the match: the host checkpoints its world and a guest waits for the
    * host's save. skipSave keeps the last multiplayer save instead, so a player can always leave a
@@ -1458,13 +1515,7 @@ export class MultiplayerSession {
       // leave any stale lobby first, so this is cleaned up when the next match starts.
     } finally {
       // Forget the departed lobby before reopening, so a late host update cannot revive it.
-      clearTimeout(this.browseTimer);
-      this.browseTimer = undefined;
-      this.browseSession = undefined;
-      this.publishedSelection = undefined;
-      this.browsePeers = new Set();
-      this.receivedScenario = undefined;
-      this.outboundScenario.clear();
+      this.clearLobbySelection();
       ++this.libraryRequest;
       this.update({
         browse: undefined,
@@ -1488,6 +1539,12 @@ export class MultiplayerSession {
       });
       this.closing = false;
     }
+  }
+  private handleHostLeft() {
+    // Let the native join settle before issuing a leave for the new room.
+    if (this.state.entryOperation === "join")
+      this.interruptedJoinLobbyId = this.state.lobby.lobbyId;
+    else void this.hostLeft();
   }
   /** The guest returns to the title screen, where the host's departure is explained. */
   private async hostLeft() {

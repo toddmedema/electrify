@@ -308,43 +308,26 @@ export default function MultiplayerRoot() {
       copyCode,
       openSaves: () => setSavesOpen(true),
     });
-    let joiningInvite = false;
     const acceptInvite = (lobbyId: string) => {
-      const current = session.getSnapshot();
-      if (
-        !live ||
-        joiningInvite ||
-        current.view ||
-        current.lobby.lobbyId === lobbyId
-      )
-        return;
-      joiningInvite = true;
+      if (!live) return;
+      choosing.current = false;
       setOpen(true);
-      void session
-        .join(lobbyId)
-        .catch((error) => {
-          if (live)
-            store.dispatch(
-              snackbarOpen({
-                message:
-                  error instanceof Error
-                    ? error.message
-                    : "Could not join the invited game.",
-                open: true,
-                timeout: 6000,
-              }),
-            );
-        })
-        .finally(() => {
-          joiningInvite = false;
-        });
+      void session.join(lobbyId).catch((error) => {
+        if (live)
+          store.dispatch(
+            snackbarOpen({
+              message:
+                error instanceof Error
+                  ? error.message
+                  : "Could not join the invited game.",
+              open: true,
+              timeout: 6000,
+            }),
+          );
+      });
     };
     void session
       .initialize(acceptInvite)
-      .then(() => {
-        const invite = session.getSnapshot().lobby.inviteLobbyId;
-        if (invite) acceptInvite(invite);
-      })
       // A desktop build without Steam multiplayer keeps the lobby unavailable.
       .catch(() => undefined);
     return () => {

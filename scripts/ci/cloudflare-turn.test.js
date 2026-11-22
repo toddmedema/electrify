@@ -1,5 +1,7 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
+const { runInNewContext } = require("node:vm");
+const { installTurnProbe } = require("../testing/cloudflare-turn-browser");
 const { inspectDescription } = require("../testing/cloudflare-turn");
 
 const candidate = "a=candidate:1 1 UDP 16777215 1.1.1.1 1234 typ relay";
@@ -73,4 +75,31 @@ test("requires a single data-only section, ICE username fragment and relay candi
       inspectDescription(replace(candidate, "a=end-of-candidates"), "offer"),
     /No relay/,
   );
+});
+
+test("a malformed guest packet cannot count as a delivered message", () => {
+  const receipts = [];
+  const window = {};
+  const channel = {
+    readyState: "open",
+    send: (receipt) => receipts.push(receipt),
+  };
+  runInNewContext(
+    `(${installTurnProbe})({ channelId: 1, receiptDelayMs: 0 })`,
+    {
+      window,
+      RTCPeerConnection: class {
+        createDataChannel() {
+          return channel;
+        }
+      },
+      setTimeout: (callback) => callback(),
+    },
+  );
+  const guest = window.turnProbes[1];
+  channel.onmessage({ data: "1:" + "x".repeat(8192) });
+  channel.onmessage({ data: "2:malformed" });
+  assert.equal(guest.healthy(), false);
+  assert.equal(guest.received(), 1);
+  assert.deepEqual(receipts, ["1"]);
 });

@@ -389,10 +389,14 @@ async function runPair(provider, host, guest, protocol, id, delayedReceipts) {
   await delay(1000);
   const receiptsAfterRevocation = await sendBurst(host, id, BURST + 1, true);
   const guestReceivedAfterRevocation = await guest.evaluate(
-    ({ id, before }) => window.turnProbes[id].received() - before,
+    ({ id, before }) => {
+      const probe = window.turnProbes[id];
+      return probe.healthy() ? probe.received() - before : null;
+    },
     { id, before: BURST },
   );
   if (
+    guestReceivedAfterRevocation === null ||
     guestReceivedAfterRevocation < receiptsAfterRevocation ||
     guestReceivedAfterRevocation > BURST
   )

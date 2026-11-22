@@ -40,19 +40,18 @@ export default function Lobby({
   onClose: () => void;
   onLeave: () => void;
 }) {
-  const { lobby, pendingCampaign, busy, error } = useSyncExternalStore(
-    session.subscribe,
-    session.getSnapshot,
-  );
+  const { lobby, pendingCampaign, busy, entryOperation, error } =
+    useSyncExternalStore(session.subscribe, session.getSnapshot);
   const [code, setCode] = useState("");
   const [failure, setFailure] = useState<string>();
   const [entryAttempt, setEntryAttempt] = useState<"host" | "join">();
   const title = useRef<HTMLHeadingElement>(null);
-  const mode = !lobby.lobbyId
-    ? "entry"
-    : pendingCampaign
-      ? "campaign"
-      : "waiting";
+  const mode =
+    !lobby.lobbyId || entryOperation === "join"
+      ? "entry"
+      : pendingCampaign
+        ? "campaign"
+        : "waiting";
   useEffect(() => title.current?.focus(), [mode]);
   const host = lobby.selfId === lobby.hostId;
   const hostName =
@@ -229,7 +228,9 @@ export default function Lobby({
             >
               <CircularProgress size={20} aria-hidden="true" />
               <Typography variant="body2">
-                {entryAttempt === "join" ? "Finding game…" : "Creating lobby…"}
+                {entryOperation === "join"
+                  ? "Finding game…"
+                  : "Creating lobby…"}
               </Typography>
             </Stack>
           )}
