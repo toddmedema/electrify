@@ -205,6 +205,11 @@ const inspect = (id: TerritoryTileId) =>
     screen.getByLabelText(`Inspect ${id}`, { selector: "button" }),
   );
 const surface = () => screen.getByRole("dialog");
+async function openProjectPlanner(button: HTMLElement) {
+  fireEvent.click(button);
+  // Let the mocked lazy import settle and flush the Suspense retry before reading the panel.
+  await act(async () => Promise.resolve());
+}
 function freeTile(game: GameType) {
   const wind = GENERATORS(game, 30e6, [], []).find(
     (item) => item.name === "Wind",
@@ -602,9 +607,7 @@ it("keeps a failed planner load in one closable panel and retries on the next op
   const { store } = show();
   const cash = currentTick(store.getState().game)!.cash;
   const build = screen.getByRole("button", { name: "Build" });
-  fireEvent.click(build);
-  // Flush the mocked lazy import and its Suspense retry.
-  await act(async () => Promise.resolve());
+  await openProjectPlanner(build);
   expect(
     screen.getByRole("heading", { name: "Project planner unavailable" }),
   ).toBeVisible();
@@ -613,8 +616,7 @@ it("keeps a failed planner load in one closable panel and retries on the next op
   fireEvent.keyDown(surface(), { key: "Escape" });
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   mockProjectLoadFailure = false;
-  fireEvent.click(build);
-  await act(async () => Promise.resolve());
+  await openProjectPlanner(build);
   expect(
     screen.getByLabelText("Pick site for Wind", {
       selector: "button",
@@ -646,17 +648,15 @@ it.each([undefined, 1280])(
       activity: jest.fn(),
       leave: async () => undefined,
     });
-    fireEvent.click(screen.getByRole("button", { name: "Build" }));
-    fireEvent.click(
-      await screen.findByLabelText(
+    await openProjectPlanner(screen.getByRole("button", { name: "Build" }));
+    await openProjectPlanner(
+      screen.getByLabelText(
         width ? "Choose sites for Wind" : "Pick site for Wind",
-        {
-          selector: "button",
-        },
+        { selector: "button" },
       ),
     );
     inspect("green-uplands:site-1");
-    fireEvent.click(await screen.findByRole("button", { name: "Cash" }));
+    fireEvent.click(within(surface()).getByRole("button", { name: "Cash" }));
     await act(async () => {
       await Promise.resolve();
     });
@@ -700,8 +700,8 @@ it("shows why an unavailable map technology cannot pick a site", async () => {
   const game = ready();
   currentTick(game)!.cash = 0;
   const { store } = show(game);
-  fireEvent.click(screen.getByRole("button", { name: "Build" }));
-  const pick = await screen.findByRole("button", {
+  await openProjectPlanner(screen.getByRole("button", { name: "Build" }));
+  const pick = within(surface()).getByRole("button", {
     name: "Pick site for Offshore Wind",
   });
   expect(pick).toBeDisabled();
@@ -730,9 +730,9 @@ it("uses the persistent desktop rail for Build and owned empty tiles, preselecti
   const wind = within(rail).getByRole("button", {
     name: "Choose sites for Wind",
   });
-  fireEvent.click(wind);
+  await openProjectPlanner(wind);
   expect(wind).toHaveAttribute("aria-pressed", "true");
-  expect(await screen.findByRole("button", { name: "Cash" })).toBeEnabled();
+  expect(within(surface()).getByRole("button", { name: "Cash" })).toBeEnabled();
   expect(screen.getByRole("button", { name: `Inspect ${id}` })).toHaveAttribute(
     "aria-pressed",
     "true",
@@ -745,7 +745,7 @@ it("uses the persistent desktop rail for Build and owned empty tiles, preselecti
     "aria-pressed",
     "false",
   );
-  fireEvent.click(wind);
+  await openProjectPlanner(wind);
   expect(wind).toHaveAttribute("aria-pressed", "true");
   expect(store.getState().game.facilities).toHaveLength(game.facilities.length);
   expect(currentTick(store.getState().game)!.cash).toBe(1e9);
@@ -763,9 +763,9 @@ it.each([
     expect(
       screen.queryByRole("complementary", { name: "Build facilities" }),
     ).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Build" }));
+    await openProjectPlanner(screen.getByRole("button", { name: "Build" }));
     expect(
-      await screen.findByRole("slider", { name: "Generator capacity" }),
+      within(surface()).getByRole("slider", { name: "Generator capacity" }),
     ).toBeInTheDocument();
   },
 );
@@ -795,11 +795,11 @@ it("keeps a candidate and canonical quote when generator upgrades change, then l
     leave: async () => undefined,
   });
   const rail = screen.getByRole("complementary", { name: "Build facilities" });
-  fireEvent.click(
+  await openProjectPlanner(
     within(rail).getByRole("button", { name: "Choose sites for Solar" }),
   );
   inspect("champlain:site-13");
-  const option = await screen.findByRole("checkbox", { name: /trackers/i });
+  const option = within(surface()).getByRole("checkbox", { name: /trackers/i });
   const selected = screen.getByRole("button", {
     name: "Inspect champlain:site-13",
   });
@@ -836,14 +836,14 @@ it("keeps desktop upgrade editing out of the phone site review", async () => {
   game.date.year = 2025;
   game.startingYear = 2025;
   show(game, 390);
-  fireEvent.click(screen.getByRole("button", { name: "Build" }));
+  await openProjectPlanner(screen.getByRole("button", { name: "Build" }));
   fireEvent.click(
-    await screen.findByLabelText("Pick site for Solar", {
+    within(surface()).getByLabelText("Pick site for Solar", {
       selector: "button",
     }),
   );
   inspect("champlain:site-13");
-  expect(await screen.findByRole("button", { name: "Cash" })).toBeEnabled();
+  expect(within(surface()).getByRole("button", { name: "Cash" })).toBeEnabled();
   expect(
     screen.queryByRole("checkbox", { name: /trackers/i }),
   ).not.toBeInTheDocument();
@@ -884,8 +884,7 @@ it.each([
     const useMaximum = within(
       screen.getByLabelText(`${name} technology preview`),
     ).getByRole("button", { name: shortcut });
-    // Opening the project planner mounts a lazy component. Flush its first render with the click.
-    await act(async () => useMaximum.click());
+    await openProjectPlanner(useMaximum);
     expect(screen.getByRole("button", { name: "Cash" })).toBeEnabled();
     expect(
       screen.getByRole("heading", {
@@ -917,10 +916,10 @@ it("retains the inspected site when connecting transitions directly into desktop
   expect(
     within(surface()).queryByRole("tab", { name: "Generators" }),
   ).not.toBeInTheDocument();
-  fireEvent.click(
+  await openProjectPlanner(
     screen.getByRole("button", { name: "Choose sites for Wind" }),
   );
-  expect(await screen.findByRole("button", { name: "Cash" })).toBeEnabled();
+  expect(within(surface()).getByRole("button", { name: "Cash" })).toBeEnabled();
   expect(
     screen.getByRole("button", { name: `Inspect ${site.id}` }),
   ).toHaveAttribute("aria-pressed", "true");
