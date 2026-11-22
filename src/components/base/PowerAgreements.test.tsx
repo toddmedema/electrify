@@ -127,14 +127,14 @@ it.each([1, 2, 3] as PowerAgreementTermsVersion[])(
     expect(within(agreement).getByText("Max supply")).toBeVisible();
     expect(within(agreement).getByText("95MW")).toBeVisible();
     expect(within(agreement).getByText(rate(source.priceToday))).toBeVisible();
-    expect(within(agreement).getByText("Through 31 Dec 2019")).toBeVisible();
     expect(
-      within(agreement).getByText(
-        version === 1
-          ? "No minimum purchase"
-          : /Minimum payment: .*even if unused/,
-      ),
-    ).toBeVisible();
+      within(agreement).getByRole("row", { name: /^Final month/ }),
+    ).toHaveTextContent("Dec 2019");
+    expect(
+      within(agreement).getByRole("row", { name: /^Min payment/ }),
+    ).toHaveTextContent(
+      version === 1 ? "No minimum purchase" : /Paid even if unused/,
+    );
     const details = within(agreement).getByRole("group", {
       name: "Regional nuclear details",
     });
@@ -144,9 +144,7 @@ it.each([1, 2, 3] as PowerAgreementTermsVersion[])(
     expect(details).toHaveAttribute("open");
     expect(within(agreement).getByText(/Market now/)).toBeVisible();
     expect(
-      within(agreement).getByRole("button", {
-        name: "Forecast Regional nuclear remaining term",
-      }),
+      within(details).getByRole("table", { name: "Agreement details" }),
     ).toBeVisible();
   },
 );
@@ -283,9 +281,10 @@ it("shows the direct discount alongside monthly energy and deliverable power", (
     "Agreement price",
     "Reference price",
     "Discount",
-    "Minimum supply",
+    "Min payment",
     "Maximum supply",
     "Duration",
+    "Final month",
     "Forecasted cash impact",
     "Forecasted grid impact",
   ]);
@@ -296,13 +295,16 @@ it("shows the direct discount alongside monthly energy and deliverable power", (
   );
   expect(max).not.toHaveTextContent("60 MW");
   expect(
-    within(table).getByRole("row", { name: /Minimum supply/ }),
+    within(table).getByRole("row", { name: /Min payment/ }),
   ).toHaveTextContent(
-    `${formatNumber(quote.minimumMWhPerMonth)} MWh/monthPaid for even if you don't use it`,
+    `${formatNumber(quote.minimumMWhPerMonth)} MWh/monthPaid even if unused`,
   );
   expect(
     within(table).getByRole("row", { name: /Duration/ }),
-  ).toHaveTextContent("10 yearsEnds Dec 2029");
+  ).toHaveTextContent("10 years");
+  expect(
+    within(dialog).getByRole("row", { name: /^Final month/ }),
+  ).toHaveTextContent("Dec 2029");
   expect(dialog).not.toHaveTextContent("Delivery and emissions follow");
   expect(dialog).not.toHaveTextContent("2005 dollars");
   expect(dialog).not.toHaveTextContent("Local generation can reduce purchases");
@@ -324,7 +326,7 @@ it("keeps the grid impact row mounted while the duration changes", () => {
     withAgreement: { demandMWh: 100, servedMWh: 100 },
     withoutAgreement: { demandMWh: 100, servedMWh: 60 },
   } as AgreementForecast;
-  mockForecast.mockImplementation((_game, _id, offer, committed) => ({
+  mockForecast.mockImplementation((_game, offer, committed) => ({
     ...initial,
     result: committed && offer?.durationYears === 10 ? result : undefined,
     updating: offer?.durationYears === 1,
@@ -381,10 +383,12 @@ it("changes price and end date with duration and signs that exact canonical quot
   ).toHaveTextContent("1%");
   expect(
     within(dialog).getByRole("row", { name: /Duration/ }),
-  ).toHaveTextContent("1 yearEnds Dec 2020");
+  ).toHaveTextContent("1 year");
+  expect(
+    within(dialog).getByRole("row", { name: /^Final month/ }),
+  ).toHaveTextContent("Dec 2020");
   expect(mockForecast).toHaveBeenLastCalledWith(
     store.getState().game,
-    `${short.id}:0`,
     short.receipt,
     true,
   );
@@ -395,7 +399,10 @@ it("changes price and end date with duration and signs that exact canonical quot
   ).toHaveTextContent("9.44%");
   expect(
     within(dialog).getByRole("row", { name: /Duration/ }),
-  ).toHaveTextContent("5 yearsEnds Dec 2024");
+  ).toHaveTextContent("5 years");
+  expect(
+    within(dialog).getByRole("row", { name: /^Final month/ }),
+  ).toHaveTextContent("Dec 2024");
   fireEvent.click(
     within(dialog).getByRole("button", { name: "Accept agreement" }),
   );
@@ -562,49 +569,6 @@ it("keeps a rejected co-op quote recoverable and submits the refreshed host term
   });
   expect(store.getState().ui.snackbar.message).toMatch(/Agreement accepted/);
 });
-
-it.each([1, 2, 3] as PowerAgreementTermsVersion[])(
-  "preserves v%s signed terms and a numeric remaining forecast horizon",
-  (version) => {
-    const game = fixture();
-    game.transmission!.inheritedAgreementTerms = version;
-    mockForecast.mockReturnValue({
-      blocked: undefined,
-      result: {
-        cashDifference: -1234,
-        withAgreement: { demandMWh: 100, servedMWh: 100 },
-        withoutAgreement: { demandMWh: 100, servedMWh: 60 },
-      } as NonNullable<ReturnType<typeof useAgreementForecast>["result"]>,
-      error: false,
-      updating: false,
-      retry: jest.fn(),
-    });
-    mount(game);
-    const agreement = screen.getByRole("article", { name: "Regional nuclear" });
-    fireEvent.click(within(agreement).getByText("Details"));
-    fireEvent.click(
-      screen.getByRole("button", {
-        name: "Forecast Regional nuclear remaining term",
-      }),
-    );
-    const dialog = screen.getByRole("dialog");
-    expect(within(dialog).queryByRole("slider")).not.toBeInTheDocument();
-    const minimum = within(dialog).getByRole("row", { name: /Minimum supply/ });
-    expect(minimum).toHaveTextContent(
-      version === 1
-        ? "No minimum purchasePay for energy used"
-        : version === 2
-          ? "95MW whenever availablePaid for even if you don't use it"
-          : "MWh/monthPaid for even if you don't use it",
-    );
-    expect(
-      within(dialog).getByRole("row", { name: /Forecasted cash impact/ }),
-    ).toHaveTextContent(
-      "-$1.2k over 2 years remainingCompared with omitting this agreement",
-    );
-    expect(dialog).not.toHaveTextContent("The price follows inflation");
-  },
-);
 
 it("displays exact converted agreement prices without changing the quoted terms", () => {
   const game = fixture();

@@ -1360,15 +1360,26 @@ for (const theme of ["light", "dark"] as const) {
     );
     const body = surface.locator(".tileWorkspaceBody");
     await expect(acquire).toBeInViewport({ ratio: 1 });
-    expect(
-      await body.evaluate((node) => node.scrollHeight - node.clientHeight),
-    ).toBeLessThanOrEqual(1);
+    const viewport = page.viewportSize()!;
+    if (viewport.width <= 740) {
+      // The compact inspector scrolls to leave the centered tile exposed.
+      const chart = demand.getByRole("img", {
+        name: /^Chart of predicted electricity demand by customer or use type/,
+      });
+      await chart.scrollIntoViewIfNeeded();
+      await expect(chart).toBeInViewport({ ratio: 0.5 });
+      await acquire.scrollIntoViewIfNeeded();
+      await expect(acquire).toBeInViewport({ ratio: 1 });
+    } else {
+      expect(
+        await body.evaluate((node) => node.scrollHeight - node.clientHeight),
+      ).toBeLessThanOrEqual(1);
+    }
     await reviewScreenshot(surface, {
       path: info.outputPath(`city-inspector-${theme}.png`),
       animations: "disabled",
       scale: "css",
     });
-    const viewport = page.viewportSize()!;
     await page.setViewportSize({ ...viewport, height: 360 });
     await expect
       .poll(() =>

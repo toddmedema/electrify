@@ -5,10 +5,7 @@ import { GAME_TO_REAL_YEARS, TICK_MINUTES } from "../Constants";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "./DateTime";
 import { currentTick } from "./GameSelectors";
 import { powerAgreementQuote } from "./PowerAgreements";
-import {
-  agreementForecastKey,
-  computeAgreementForecast,
-} from "./AgreementForecast";
+import { computeAgreementForecast } from "./AgreementForecast";
 import { generateForecastTimeline, tickState } from "../reducers/Game";
 import * as Transmission from "./Transmission";
 import * as Access from "../data/IntertieAccess";
@@ -26,7 +23,7 @@ function fixture(month = 299) {
   game.transmission!.acceptedAgreements = [offer];
   game.date = getDateFromMinute(month * MINUTES_PER_MONTH, 2005);
   for (const tick of game.timeline) tick.minute += game.date.minute;
-  return game;
+  return { game, offer };
 }
 
 afterEach(() => jest.restoreAllMocks());
@@ -37,28 +34,24 @@ it.each([20, 250])(
     jest
       .spyOn(Transmission, "adjacentMarketPricePerMWh")
       .mockReturnValue(price);
-    const game = fixture();
-    const before = JSON.stringify(game);
+    const { game, offer } = fixture();
+    const offeredGame = cloneDeep(game);
+    offeredGame.transmission!.acceptedAgreements = [];
+    const before = JSON.stringify(offeredGame);
     const forecast = computeAgreementForecast(
-      game,
-      "champlain-quebec:0",
-      undefined,
+      offeredGame,
+      offer,
       String(price),
     );
     expect(forecast.withAgreement.servedMWh).toBeGreaterThan(
       forecast.withoutAgreement.servedMWh,
     );
-    const noSpot = cloneDeep(game);
+    const noSpot = cloneDeep(offeredGame);
     noSpot.transmission!.buyingRule = "NONE";
-    expect(
-      computeAgreementForecast(
-        noSpot,
-        "champlain-quebec:0",
-        undefined,
-        String(price),
-      ),
-    ).toEqual(forecast);
-    expect(JSON.stringify(game)).toBe(before);
+    expect(computeAgreementForecast(noSpot, offer, String(price))).toEqual(
+      forecast,
+    );
+    expect(JSON.stringify(offeredGame)).toBe(before);
     const now = currentTick(game)!;
     const ticks = (forecast.endMinute - game.date.minute) / TICK_MINUTES + 1;
     const withAgreement = generateForecastTimeline(
@@ -90,20 +83,13 @@ it.each([20, 250])(
 );
 
 it("reaches the full exclusive delivery end beyond the mission and keeps unavailable comparisons explicit", () => {
-  const game = fixture(239);
-  const result = computeAgreementForecast(
-    game,
-    "champlain-quebec:0",
-    undefined,
-    "full-horizon",
-  );
+  const { game, offer } = fixture(239);
+  game.transmission!.acceptedAgreements = [];
+  const result = computeAgreementForecast(game, offer, "full-horizon");
   expect(result.endMinute).toBe(300 * MINUTES_PER_MONTH);
-  expect(result.remaining.availableMWh).toBeGreaterThan(
-    57 * 24 * GAME_TO_REAL_YEARS * 60 * 0.5,
-  );
   const closed = cloneDeep(game);
   closed.multiplayer = { seat: "0" };
-  expect(() => computeAgreementForecast(closed, "champlain-quebec:0")).toThrow(
+  expect(() => computeAgreementForecast(closed, offer)).toThrow(
     "Comparison unavailable",
   );
 });
@@ -115,25 +101,20 @@ it("can cost more while serving a larger share with constrained merchant access,
     return market && { ...market, availableSupplyW: 20e6 };
   });
   jest.spyOn(Transmission, "adjacentMarketPricePerMWh").mockReturnValue(20);
-  const result = computeAgreementForecast(
-    fixture(),
-    "champlain-quebec:0",
-    undefined,
-    "constrained-access",
-  );
+  const { game, offer } = fixture();
+  game.transmission!.acceptedAgreements = [];
+  const result = computeAgreementForecast(game, offer, "constrained-access");
   expect(result.cashDifference).toBeLessThan(0);
   expect(
     result.withAgreement.servedMWh / result.withAgreement.demandMWh,
   ).toBeGreaterThan(
     result.withoutAgreement.servedMWh / result.withoutAgreement.demandMWh,
   );
-  expect(result.remaining.availableMWh).toBeLessThanOrEqual(
-    20 * 24 * GAME_TO_REAL_YEARS + 1e-5,
-  );
 });
 
 it("reports equal service when owned generation covers demand without the agreement", () => {
-  const game = fixture();
+  const { game, offer } = fixture();
+  game.transmission!.acceptedAgreements = [];
   currentTick(game)!.customers = 10000;
   const native = createGame({ scenarioId: 116, seed: 12345 }).facilities.filter(
     (facility) => facility.fuel === "Natural Gas",
@@ -145,43 +126,13 @@ it("reports equal service when owned generation covers demand without the agreem
     facility.lifespanYears = 100;
   });
   game.facilities = native;
-  const result = computeAgreementForecast(
-    game,
-    "champlain-quebec:0",
-    undefined,
-    "ample-market",
-  );
+  const result = computeAgreementForecast(game, offer, "ample-market");
   expect(
     result.withAgreement.servedMWh / result.withAgreement.demandMWh,
   ).toBeCloseTo(1, 10);
   expect(
     result.withoutAgreement.servedMWh / result.withoutAgreement.demandMWh,
   ).toBeCloseTo(1, 10);
-});
-
-it("freezes recorded-plus-remaining totals at its accounting cutoff instead of overlapping newer actuals", () => {
-  const game = fixture();
-  tickState(game);
-  const first = computeAgreementForecast(
-    game,
-    "champlain-quebec:0",
-    undefined,
-    "frozen-cutoff",
-  );
-  const recorded = first.recorded.availableMWh;
-  tickState(game);
-  const cached = computeAgreementForecast(
-    game,
-    "champlain-quebec:0",
-    undefined,
-    "frozen-cutoff",
-  );
-  expect(cached).toBe(first);
-  expect(cached.cutoffMinute).toBe(299 * MINUTES_PER_MONTH + TICK_MINUTES);
-  expect(cached.recorded.availableMWh).toBe(recorded);
-  expect(
-    game.transmission!.agreementAccounts![0].months[0].availableMWh,
-  ).toBeGreaterThan(recorded);
 });
 
 it("carries actual v3 monthly usage into private forecast settlement and closing cash", () => {
@@ -200,7 +151,6 @@ it("carries actual v3 monthly usage into private forecast settlement and closing
   });
   for (let i = 0; i < 48; i++) tickState(game);
   const before = JSON.stringify(game.transmission!.agreementAccounts);
-  const key = agreementForecastKey(game, "champlain-nuclear");
   let finalAccounts: NonNullable<typeof game.transmission>["agreementAccounts"];
   const now = currentTick(game)!;
   const forecast = generateForecastTimeline(
@@ -227,17 +177,14 @@ it("carries actual v3 monthly usage into private forecast settlement and closing
   for (let i = 0; i < 48; i++) tickState(game);
   expect(game.transmission!.agreementAccounts).toEqual(finalAccounts!);
   expect(currentTick(game)!.cash).toBeCloseTo(closing.cash, 6);
-  expect(agreementForecastKey(game, "champlain-nuclear")).not.toBe(key);
 });
 
 it("allows a v3 forecast loss from unused monthly energy despite its below-market rate", () => {
   jest.spyOn(Transmission, "adjacentMarketPricePerMWh").mockReturnValue(20);
-  const game = fixture();
+  const { game } = fixture();
   game.date = getDateFromMinute(156 * MINUTES_PER_MONTH, 2005);
   game.transmission!.acceptedAgreements = [];
-  game.transmission!.acceptedAgreements = [
-    powerAgreementQuote(game, "champlain-quebec", 3, 10)!.receipt,
-  ];
+  const offer = powerAgreementQuote(game, "champlain-quebec", 3, 10)!.receipt;
   game.date = getDateFromMinute(299 * MINUTES_PER_MONTH, 2005);
   currentTick(game)!.customers = 100;
   jest.spyOn(Energy, "getWindOutputFactor").mockReturnValue(1);
@@ -251,20 +198,13 @@ it("allows a v3 forecast loss from unused monthly energy despite its below-marke
     facility.minuteOperational = game.date.minute;
     facility.lifespanYears = 100;
   });
-  const result = computeAgreementForecast(
-    game,
-    "champlain-quebec:0",
-    undefined,
-    "monthly-underuse",
-  );
+  const result = computeAgreementForecast(game, offer, "monthly-underuse");
   expect(result.cashDifference).toBeLessThan(0);
-  expect(result.remaining.unusedPayment).toBeGreaterThan(0);
-  expect(result.remaining.payment).toBe(result.remaining.unusedPayment);
 });
 
 it("uses each offered signing ceiling in the real-reducer forecast and its cache", () => {
   const spot = jest.spyOn(Transmission, "adjacentMarketPricePerMWh");
-  const game = fixture();
+  const { game } = fixture();
   game.transmission!.acceptedAgreements = [];
   game.date = getDateFromMinute(156 * MINUTES_PER_MONTH, 2005);
   spot.mockReturnValue(20);
@@ -275,24 +215,16 @@ it("uses each offered signing ceiling in the real-reducer forecast and its cache
   spot.mockReturnValue(500);
   const lowerForecast = computeAgreementForecast(
     game,
-    "champlain-quebec:0",
     lower.receipt,
     "signing-ceilings",
   );
   const higherForecast = computeAgreementForecast(
     game,
-    "champlain-quebec:0",
     higher.receipt,
     "signing-ceilings",
   );
   expect(lowerForecast.cashDifference).toBeGreaterThan(
     higherForecast.cashDifference,
-  );
-  expect(lowerForecast.remaining.payment).toBeLessThan(
-    higherForecast.remaining.payment,
-  );
-  expect(lowerForecast.remaining.availableMWh).toBe(
-    higherForecast.remaining.availableMWh,
   );
   expect(lowerForecast.withAgreement).toEqual(higherForecast.withAgreement);
 });

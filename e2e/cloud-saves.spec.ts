@@ -280,10 +280,10 @@ for (const theme of ["light", "dark"]) {
       "Continue",
       "Tutorials",
       "Play",
-      "Saved games",
+      "Saves",
     ]);
     await expect(
-      primary.getByRole("button", { name: "Saved games", exact: true }),
+      primary.getByRole("button", { name: "Saves", exact: true }),
     ).toHaveClass(/MuiButton-text/);
     if (theme === "light" && info.project.name === "desktop-chromium") {
       await screenshot(page, info, "main-menu-desktop-light.png");
@@ -398,7 +398,7 @@ test("Settings leaves saved games in the main menu", async ({ page }, info) => {
   ).toHaveCount(0);
   await screenshot(page, info, `settings-${info.project.name}.png`);
   await page.getByRole("button", { name: "Back", exact: true }).click();
-  await page.getByRole("button", { name: "Saved games", exact: true }).click();
+  await page.getByRole("button", { name: "Saves", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "Saved games", exact: true }),
   ).toBeVisible();

@@ -71,7 +71,13 @@ function fixture(territoryNetwork = false) {
 }
 
 const flush = () => act(() => jest.advanceTimersByTime(100));
-const chartState = () => jest.mocked(UPlotChart).mock.calls.at(-1)![0].state;
+const monthlyChart = () =>
+  jest
+    .mocked(UPlotChart)
+    .mock.calls.findLast(([props]) =>
+      props.ariaLabel?.startsWith("Estimated monthly"),
+    )![0];
+const chartState = () => monthlyChart().state;
 function reply(index: number) {
   const worker = workers[index];
   const { requestId, game, facility, territoryId, tileId } =
@@ -119,24 +125,27 @@ it.each([0, 0.5])(
         : [0, ...Array.from({ length: 12 }, (_, index) => index + 0.5)];
     const forecast: BuildImpactForecast = {
       months,
+      estimatedHistory: false,
       before: {
         startMinute: (7 + offset - 12) * MINUTES_PER_MONTH,
         monthlyMarginW: months.map(() => 10e6),
         unservedWh: 0,
+        averageDayW: [],
+        averageDayByMonthW: [],
       },
       after: {
         startMinute: (7 + offset) * MINUTES_PER_MONTH,
         monthlyMarginW: months.map(() => 20e6),
         unservedWh: 0,
+        averageDayW: [],
+        averageDayByMonthW: [],
       },
     };
     const { requestId } = workers[0].postMessage.mock.calls[0][0];
     act(() =>
       workers[0].onmessage?.({ data: { requestId, result: forecast } }),
     );
-    const chart = jest
-      .mocked(UPlotChart)
-      .mock.calls.at(-1)![0] as UPlotChartProps<BuildImpactForecast>;
+    const chart = monthlyChart() as UPlotChartProps<BuildImpactForecast>;
     const options = chart.buildOptions({ getState: () => forecast, scale: 1 });
     const plot = {} as uPlot;
     const range = options.scales!.x!.range;

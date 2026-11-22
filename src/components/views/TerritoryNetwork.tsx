@@ -345,7 +345,11 @@ function TileNetwork(props: Props) {
     const id = activated.tile.id;
     if (!mode && planning && !catalogue) {
       // A peer's retained alias can share an economic ID with a local site.
-      setCandidate(activated.owned || id === key ? id : undefined);
+      const site = activated.owned || id === key ? id : undefined;
+      if (site && site === candidate) {
+        setSelected(undefined);
+        setCandidate(undefined);
+      } else setCandidate(site);
       return;
     }
     if (tileWindow) tileWindow.raise();
@@ -436,6 +440,7 @@ function TileNetwork(props: Props) {
           game={game}
           views={views}
           selected={selected}
+          inspected={view ? inspected : undefined}
           onSelect={inspect}
           onTileMenu={(target) => {
             if (!projectBusy.current) setMenu(target);

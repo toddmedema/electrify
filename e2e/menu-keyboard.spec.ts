@@ -23,11 +23,13 @@ test("main menu and settings work entirely with the keyboard", async ({
   page,
 }) => {
   await page.goto("/");
+  await expect(page.locator("#appStartup")).toHaveCount(0);
   await verifyMenuKeyboard(page);
 });
 
 test("Space activates Play", async ({ page }) => {
   await page.goto("/");
+  await expect(page.locator("#appStartup")).toHaveCount(0);
   const start = page.getByRole("button", {
     name: "Play",
     exact: true,
@@ -42,6 +44,7 @@ test("Space activates Play", async ({ page }) => {
 
 test("Space opens Settings", async ({ page }) => {
   await page.goto("/");
+  await expect(page.locator("#appStartup")).toHaveCount(0);
   const settings = page.getByRole("button", { name: "Settings", exact: true });
   await settings.focus();
   await expect(settings).toBeFocused();

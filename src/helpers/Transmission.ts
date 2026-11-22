@@ -31,7 +31,7 @@ import {
 } from "../data/IntertieAccess";
 import { intertiePriceIndex } from "../data/IntertieTrends";
 import { isPeerCorridorId, PEER_CORRIDOR_DERATE } from "../data/Multiplayer";
-import { normalAt, randomAt, RANDOM_STREAM } from "./Math";
+import { normalAt, randomAt, RANDOM_STREAM, wrapIndex } from "./Math";
 import {
   AdjacentMarketDefinitionType,
   GameType,
@@ -281,7 +281,7 @@ function neighbourLuck(
 
 /** 0..11, shifted so archetype shapes written for the north line up with southern seasons */
 export function archetypeMonth(minute: number, southernHemisphere: boolean) {
-  const month = Math.floor(minute / (DAYS_PER_MONTH * 1440)) % 12;
+  const month = wrapIndex(Math.floor(minute / (DAYS_PER_MONTH * 1440)), 12);
   return southernHemisphere ? (month + 6) % 12 : month;
 }
 
@@ -333,7 +333,7 @@ export function importAvailabilityFraction(
   if (!market) return 0;
   const archetype = INTERTIE_ARCHETYPES[market.archetype];
   const month = archetypeMonth(minute, marketSouthern(market, context));
-  const hour = Math.floor((minute % 1440) / 60);
+  const hour = Math.floor(wrapIndex(minute, 1440) / 60);
   const stress = neighbourStress(archetype, conditions.temperatureC);
   const heatLoss = archetype.heatStressLoss ?? context.peakSharingImportLoss;
   const coldLoss = archetype.coldStressLoss ?? context.peakSharingImportLoss;
@@ -394,7 +394,7 @@ export function adjacentMarketPricePerMWh(
   const archetype = INTERTIE_ARCHETYPES[market.archetype];
   const tick = Math.floor(minute / TICK_MINUTES);
   const month = archetypeMonth(minute, marketSouthern(market, context));
-  const hour = Math.floor((minute % 1440) / 60);
+  const hour = Math.floor(wrapIndex(minute, 1440) / 60);
   const stress = neighbourStress(archetype, conditions.temperatureC);
   const scarcity = 1 - neighbourLuck(market, context, minute);
   const trend =

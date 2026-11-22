@@ -21,6 +21,7 @@ import {
 } from "./OutlookForecast";
 import { createOutlookWorker } from "./OutlookWorkerClient";
 import { useWorkerRequest } from "./useWorkerRequest";
+import DailySupplyMarginChart from "./DailySupplyMarginChart";
 import SupplyMarginComparisonChart from "./SupplyMarginComparisonChart";
 import type { DecisionImpactFactType } from "./DecisionImpactPreview";
 import {
@@ -84,14 +85,18 @@ export default function BuildPurchaseReviewDialog({
             territoryId,
             tileId,
           }),
-          fallback: () =>
-            computeOutlook(
-              "buildImpact",
-              snapshot,
-              facility,
-              territoryId,
-              tileId,
-            ),
+          // Long quarter-hour forecasts can block the main thread when a worker fails.
+          fallback:
+            facility.yearsToBuild <= 1
+              ? () =>
+                  computeOutlook(
+                    "buildImpact",
+                    snapshot,
+                    facility,
+                    territoryId,
+                    tileId,
+                  )
+              : undefined,
         }
       : undefined,
     {
@@ -154,6 +159,9 @@ export default function BuildPurchaseReviewDialog({
                 `${date.month} ${date.year - 1} → ${date.month} ${date.year}`
               }
             />
+          )}
+          {result && (
+            <DailySupplyMarginChart forecast={result} labels={LABELS} />
           )}
         </>
       }
