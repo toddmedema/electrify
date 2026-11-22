@@ -19,9 +19,19 @@ import { CouchClient } from "./Client";
 import { seatPresentation } from "./Presentation";
 import type { SettingsType } from "../Types";
 import type { GameType } from "../Types";
+import type { RoomView } from "../multiplayer/Types";
+import { hasMilestoneFeedback } from "../audio/SoundEvents";
 import type { EvidenceTargetType } from "../Types";
 import { openEvidence } from "../helpers/Evidence";
 import "./couch.scss";
+
+const hapticSnapshot = (game: GameType) => ({
+  inGame: game.inGame,
+  events: game.eventLog ?? [],
+  victoryOpen: game.multiplayer?.ending?.outcome === "completed",
+  dialogOpen: false,
+  dialogTitle: "",
+});
 
 /** A seat deliberately boots no save leases, account observers, music or solo clock. */
 export default function CouchSeat() {
@@ -39,16 +49,41 @@ export default function CouchSeat() {
         workspace: "single",
         screenEdgePadding: 0,
         audioEnabled: false,
+        controllerVibrationEnabled: false,
       }),
     );
     registerMultiplayerRuntime(client);
-    let previous: GameType | undefined;
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const canVibrate = () => {
+      const { connected, closing } = client.getSnapshot();
+      return (
+        connected &&
+        !closing &&
+        !reducedMotion.matches &&
+        store.getState().settings.controllerVibrationEnabled
+      );
+    };
+    let previous: RoomView | undefined;
     const stopStore = client.subscribe(() => {
       const view = client.getSnapshot().view;
-      if (view?.game && view.game !== previous) {
-        previous = view.game;
+      if (!view?.game || view === previous) return;
+      const old = previous;
+      previous = view;
+      if (view.game !== old?.game)
         store.dispatch(multiplayerSnapshot(view.game));
-      }
+      if (
+        old?.game &&
+        old.matchId === view.matchId &&
+        old.epoch === view.epoch &&
+        old.revision < view.revision &&
+        old.game.date.minute <= view.game.date.minute &&
+        canVibrate() &&
+        hasMilestoneFeedback(
+          hapticSnapshot(old.game),
+          hapticSnapshot(view.game),
+        )
+      )
+        bridge.post({ kind: "haptic", cue: "milestone" });
     });
     const stopMessages = bridge.onMessage((message) => {
       const event = message as {
@@ -62,7 +97,13 @@ export default function CouchSeat() {
         event.generation === client.generation &&
         event.settings
       ) {
-        store.dispatch(applyPresentation(seatPresentation(event.settings)));
+        store.dispatch(
+          applyPresentation({
+            ...seatPresentation(event.settings),
+            controllerVibrationEnabled:
+              event.settings.controllerVibrationEnabled,
+          }),
+        );
       } else if (
         event.kind === "evidence" &&
         event.generation === client.generation &&
@@ -71,7 +112,10 @@ export default function CouchSeat() {
         store.dispatch(openEvidence(event.target));
       } else client.receive(message);
     });
-    const stopInput = startDesktopInput(store, getDesktop()!);
+    const stopInput = startDesktopInput(store, getDesktop()!, (cue) => {
+      if (cue === "confirm" && canVibrate())
+        bridge.post({ kind: "haptic", cue });
+    });
     const resize = () => store.dispatch(layoutChanged());
     window.addEventListener("resize", resize);
     // The preload buffers the initial baseline until this subscription is installed.

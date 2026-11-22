@@ -27,6 +27,10 @@ const ACTION_SETS = {
   ],
 };
 const DIRECTIONS = new Set(["up", "down", "left", "right"]);
+const VIBRATION_DECLARATION =
+  "void SteamAPI_ISteamInput_TriggerVibration(void *, uint64_t, uint16_t, uint16_t)";
+const VIBRATION_INTERVAL_MS = 180;
+const ALL_CONTROLLERS = 0xffffffffffffffffn;
 
 // Match the SteamInput006 flat ABI in the SDK bundled with steamworks.js 0.4.0.
 // In particular, Init and RunFrame both take a bool, unlike the older web docs.
@@ -70,6 +74,11 @@ function loadInputFunctions(
       koffi.struct({ bState: "bool", bActive: "bool" }),
       ["void *", "uint64_t", "uint64_t"],
     );
+    try {
+      api.vibration = library.func(VIBRATION_DECLARATION);
+    } catch {
+      // An older Steam library can still provide controller input.
+    }
     return api;
   } catch {
     // Controller support is optional, including when an older SDK is installed.
@@ -108,6 +117,7 @@ class SteamInput {
     this.controllers = new Map();
     this.deviceContexts = new Map();
     this.connectedHandles = [];
+    this.vibrations = new Map();
     this.sets = new Map();
     this.handles = new Map();
     this.glyphCache = new Map();
@@ -134,6 +144,7 @@ class SteamInput {
   setEnabled(enabled) {
     if (this.enabled === enabled) return;
     this.enabled = enabled;
+    if (!enabled) this.stopAllVibration();
     // A button held over an overlay, focus change or quit cannot activate on return.
     for (const state of this.controllers.values()) state.armed = false;
   }
@@ -154,6 +165,7 @@ class SteamInput {
 
   setDeviceMode(enabled) {
     this.deviceMode = enabled;
+    if (!enabled) this.stopAllVibration();
     for (const state of this.controllers.values()) state.armed = false;
   }
 
@@ -179,12 +191,65 @@ class SteamInput {
   }
 
   releaseDevice(id) {
+    this.stopVibration(id);
     if (typeof id !== "string" || !/^\d+$/.test(id)) return;
     const state = this.controllers.get(BigInt(id));
     if (state) {
       state.armed = false;
       state.held.clear();
     }
+  }
+
+  supportsVibration() {
+    return !!this.initialized && typeof this.api.vibration === "function";
+  }
+
+  /** Steam routes to the same opaque 64-bit handle used to sample the device. */
+  vibrate(id, cue) {
+    const duration = cue === "confirm" ? 35 : cue === "milestone" ? 70 : 0;
+    if (
+      !duration ||
+      !this.enabled ||
+      !this.deviceMode ||
+      !this.supportsVibration()
+    )
+      return false;
+    const handle = this.connectedHandles.find((item) => String(item) === id);
+    const now = this.now();
+    if (
+      handle === undefined ||
+      now - (this.vibrations.get(id)?.at ?? -Infinity) < VIBRATION_INTERVAL_MS
+    )
+      return false;
+    this.stopVibration(id);
+    try {
+      this.api.vibration(this.input, handle, 8000, 12000);
+    } catch {
+      // Vibration is optional even when controller input continues to work.
+      return false;
+    }
+    this.vibrations.set(id, {
+      handle,
+      at: now,
+      timer: setTimeout(() => this.stopVibration(id), duration).unref(),
+    });
+    return true;
+  }
+
+  stopVibration(id) {
+    const pulse = this.vibrations.get(id);
+    if (!pulse?.timer) return;
+    clearTimeout(pulse.timer);
+    pulse.timer = undefined;
+    try {
+      this.api.vibration(this.input, pulse.handle, 0, 0);
+    } catch {
+      // A disconnected or unsupported controller may ignore the reset.
+    }
+  }
+
+  stopAllVibration() {
+    for (const id of this.vibrations.keys()) this.stopVibration(id);
   }
 
   handle(cache, name, getter) {
@@ -241,10 +306,16 @@ class SteamInput {
       throw new Error("Invalid Steam Input controller count");
     const handles = Array.from({ length: count }, (_, index) =>
       buffer.readBigUInt64LE(index * 8),
-    ).filter((handle) => handle !== 0n);
-    const disconnected = this.connectedHandles.some(
+    ).filter((handle) => handle !== 0n && handle !== ALL_CONTROLLERS);
+    const removed = this.connectedHandles.filter(
       (handle) => !handles.includes(handle),
     );
+    const disconnected = removed.length > 0;
+    for (const handle of removed) {
+      const id = String(handle);
+      this.stopVibration(id);
+      this.vibrations.delete(id);
+    }
     this.connectedHandles = handles;
     for (const handle of this.controllers.keys())
       if (!handles.includes(handle)) this.controllers.delete(handle);
@@ -414,6 +485,8 @@ class SteamInput {
     clearInterval(this.timer);
     this.timer = undefined;
     if (this.initialized) {
+      this.stopAllVibration();
+      this.vibrations.clear();
       this.initialized = false;
       try {
         this.api.shutdown(this.input);
