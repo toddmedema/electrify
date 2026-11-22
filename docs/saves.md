@@ -106,7 +106,7 @@ Schema 24 adds optional loans to capacity-expansion projects. Existing cash
 projects and loans retain their terms. Schema 23 saves from the map branch
 also migrate their earlier Valley goals using the same evidence as schema 22.
 
-Recognized published schema 13, 14, 15, 16, 17, 19, 20, 21, 22 and 23 co-op identities
+Recognized published schema 13, 14, 15, 16, 17, 19, 20, 21, 22, 23 and 24 co-op identities
 have ordered transitions that preserve the run's original scoring provenance.
 Existing company-local land rights, including old duplicate ownership, are
 retained. New claims are exclusive and checked in host command order. Other

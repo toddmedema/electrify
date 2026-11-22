@@ -55,7 +55,7 @@ async function seatPage(seatId: string): Promise<Page> {
 
 test.beforeEach(async () => {
   profile = await createDesktopProfile();
-  desktop = await launchDesktop(profile, { couchPreview: true });
+  desktop = await launchDesktop(profile);
 });
 
 test.afterEach(async ({}, info) => {

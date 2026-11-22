@@ -1,11 +1,8 @@
-# Local couch co-op preview
+# Local couch co-op
 
-The first vertical slice of issue [#703](https://github.com/toddmedema/electrify/issues/703)
-is an opt-in two-company preview. It is hidden during ordinary desktop play. Set
-`ELECTRIFY_COUCH_PREVIEW=1` when launching the desktop application to offer
-**Play with friends → On this TV**. Steam Input and installed controller bindings
-are required, including in Steam Offline Mode. The offline edition does not add
-another controller backend.
+Choose **Play with friends → On this TV** in the desktop game to play with two
+controllers. Steam Input and installed controller bindings are required. Local
+play works in Steam Offline Mode.
 
 Each controller explicitly joins a company. P1 chooses an existing co-op scenario
 or custom game; both players confirm that selection. The campaign roster then
@@ -127,8 +124,9 @@ The Steam Input fixture supplies device frames and storage failures in the
 headless journeys. Native focus, overlay and compositor behavior still require
 the packaged fixture or a physical playthrough.
 
-The preview flag must remain opt-in until the issue's physical acceptance gates
-are recorded: a 55-inch TV at about nine feet, 1080p and 4K, both palettes, larger
+Before shipping, record the physical acceptance checks from
+[#703](https://github.com/toddmedema/electrify/issues/703) on a 55-inch TV at
+about nine feet: 1080p and 4K, both palettes, larger
 text, mixed/remapped controllers, Steam Offline Mode, global text entry,
 background/sleep/wake, and the complete no-mouse journey. Windows, Linux, macOS
 and Deck require their own packaged evidence. Three/four players additionally
@@ -137,4 +135,4 @@ need their layout, controller and low-tier performance gates.
 No physical-TV readability or shipping performance budget is claimed by this PR.
 Record at least three repeatable production runs on the intended lowest hardware
 tier, including input latency, compositor frames, rollovers, CPU/RSS/GPU cost,
-save writes and memory after repeated entry/exit, before enabling a player count.
+save writes and memory after repeated entry/exit, before shipping that player count.

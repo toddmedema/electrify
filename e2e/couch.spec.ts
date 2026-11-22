@@ -12,6 +12,65 @@ import { peerCorridorId } from "../src/data/Multiplayer";
 import { createCouchFixture } from "./couch-fixture";
 import type { CouchFixture } from "./couch-fixture";
 
+test("TV Play with friends keeps couch play available when online play is disconnected", async ({
+  context,
+  page,
+}) => {
+  await createCouchFixture(context, page, { steamOnline: false });
+  await page.goto("/");
+  await page
+    .getByRole("button", { name: "Play with friends", exact: true })
+    .click();
+  const lobby = page.getByRole("dialog", { name: "Play with friends" });
+  await expect(
+    lobby.getByText("Connect to Steam to play online"),
+  ).toBeVisible();
+  await expect(
+    lobby.getByRole("button", { name: "Host a game" }),
+  ).toBeDisabled();
+  const local = lobby.getByRole("button", { name: "On this TV", exact: true });
+  await expect(local).toBeEnabled();
+  await local.click();
+  const setup = page.getByRole("dialog", { name: "On this TV · Two players" });
+  await expect(setup.getByText("Press Confirm on your controller")).toHaveCount(
+    2,
+  );
+  await expect(
+    setup.getByRole("button", { name: "Choose a game" }),
+  ).toBeDisabled();
+});
+
+test("TV couch setup explains missing Steam Input through the normal entry", async ({
+  context,
+  page,
+}, info) => {
+  await createCouchFixture(context, page, { steamInputAvailable: false });
+  await page.goto("/");
+  await page
+    .getByRole("button", { name: "Play with friends", exact: true })
+    .click();
+  const lobby = page.getByRole("dialog", { name: "Play with friends" });
+  await expect(
+    lobby.getByRole("button", { name: "Host a game" }),
+  ).toBeEnabled();
+  if (process.env.REVIEW_SCREENSHOT_DIR)
+    await lobby.screenshot({
+      path: path.join(
+        process.env.REVIEW_SCREENSHOT_DIR,
+        `couch-entry-${info.project.name}.png`,
+      ),
+      animations: "disabled",
+    });
+  await lobby.getByRole("button", { name: "On this TV", exact: true }).click();
+  const setup = page.getByRole("dialog", { name: "On this TV · Two players" });
+  await expect(setup.getByRole("alert")).toHaveText(
+    /requires Steam Input.*Offline Mode/,
+  );
+  await expect(
+    setup.getByRole("button", { name: "Choose a game" }),
+  ).toBeDisabled();
+});
+
 async function startCouch<Actor extends Page | Frame>(
   page: Page,
   couch: CouchFixture<Actor>,

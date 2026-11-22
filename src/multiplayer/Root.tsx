@@ -36,19 +36,11 @@ import { runSaveTransition } from "../SaveSession";
 import HostConnectionWarning from "./HostConnectionWarning";
 import { selectionKey } from "./Browse";
 import { coopSelection, hostSelection, isBrowseCard } from "./Choosing";
-import {
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Button,
-} from "@mui/material";
 import CouchRoot from "../couch/Root";
 
 /** Session lifetime follows the app; entering the normal game can unmount the main menu. */
 export default function MultiplayerRoot() {
   const [open, setOpen] = useState(false);
-  const [methodOpen, setMethodOpen] = useState(false);
   const [couchOpen, setCouchOpen] = useState(false);
   const localSession = useRef(false);
   localSession.current = couchOpen;
@@ -195,16 +187,7 @@ export default function MultiplayerRoot() {
   }, [session]);
 
   useEffect(() => {
-    registerLobbyOpener(() => {
-      const couch = getDesktop()?.couchRequest;
-      if (!couch) return setOpen(true);
-      void couch({ kind: "status" })
-        .then((status) => {
-          if ((status as { preview?: boolean })?.preview) setMethodOpen(true);
-          else setOpen(true);
-        })
-        .catch(() => setOpen(true));
-    });
+    registerLobbyOpener(() => setOpen(true));
     let live = true,
       initialized = false,
       loading = false;
@@ -442,30 +425,6 @@ export default function MultiplayerRoot() {
 
   return (
     <>
-      <Dialog open={methodOpen} onClose={() => setMethodOpen(false)}>
-        <DialogTitle>Play with friends</DialogTitle>
-        <DialogContent>Choose where to play together.</DialogContent>
-        <DialogActions>
-          <Button onClick={() => setMethodOpen(false)}>Back</Button>
-          <Button
-            onClick={() => {
-              setMethodOpen(false);
-              setOpen(true);
-            }}
-          >
-            Online
-          </Button>
-          <Button
-            variant="contained"
-            onClick={() => {
-              setMethodOpen(false);
-              setCouchOpen(true);
-            }}
-          >
-            On this TV
-          </Button>
-        </DialogActions>
-      </Dialog>
       {couchOpen && (
         <CouchRoot
           onClose={() => {
@@ -494,6 +453,14 @@ export default function MultiplayerRoot() {
             if (!state.lobby.lobbyId) choosing.current = false;
           }}
           onLeave={() => leaveLobby()}
+          onLocalPlay={
+            getDesktop()?.couchRequest
+              ? () => {
+                  setOpen(false);
+                  setCouchOpen(true);
+                }
+              : undefined
+          }
         />
       ) : null}
       {savesOpen && !open && !state.view && (

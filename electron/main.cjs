@@ -97,9 +97,6 @@ if (primaryInstance)
       (process.env.ELECTRIFY_TEST === "1" ||
         process.env.ELECTRIFY_OFFLINE === "1"),
   );
-const couchPreviewEnabled =
-  (!app.isPackaged && process.env.ELECTRIFY_TEST === "1") ||
-  process.env.ELECTRIFY_COUCH_PREVIEW === "1";
 let window;
 let saves;
 let couch;
@@ -449,9 +446,9 @@ function multiplayerRequest(input) {
         available: false,
         members: [],
         connected: [],
-        error: "Connect to Steam to play with friends",
+        error: "Connect to Steam to play online",
       };
-    throw new Error("Connect to Steam to play with friends");
+    throw new Error("Connect to Steam to play online");
   }
   steam.multiplayer ??= new SteamMultiplayer(
     steam,
@@ -476,35 +473,23 @@ handle("desktop:couch", async (input) => {
     throw new Error("Invalid local session request");
   switch (input.kind) {
     case "status":
-      return {
-        ...(couch?.status() ?? { available: false, devices: [] }),
-        preview: couchPreviewEnabled,
-      };
-    case "setup":
-      if (!couchPreviewEnabled)
-        throw new Error(
-          "On this TV is a development preview pending controller and hardware acceptance",
-        );
-      if (!couch?.status().available)
-        throw new Error(
-          "Steam Input is unavailable. Start through Steam with installed controller bindings, including Offline Mode.",
-        );
+      return couch.status();
+    case "setup": {
+      const status = couch.status();
+      if (!status.available) return status;
       if (couch.seats.size) throw new Error("A local session is already open");
       couch.setup = true;
       steam.input?.setDeviceMode(true);
       steam.input?.setContext("Menu");
       for (const device of couch.devices) steam.input?.releaseDevice(device.id);
       return couch.status();
+    }
     case "setup-confirm":
       if (typeof input.value !== "boolean")
         throw new Error("Invalid setup confirmation mode");
       couch.confirmOnly = input.value;
       return couch.status();
     case "open":
-      if (!couchPreviewEnabled)
-        throw new Error(
-          "On this TV is a development preview pending controller and hardware acceptance",
-        );
       return couch.open(input);
     case "close":
       closeCouch();
