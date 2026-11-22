@@ -79,6 +79,71 @@ async function readyDiagnostics(canvas: Locator, scene = false) {
   return diagnostics!;
 }
 
+test("Valley town growth survives resume and adds buildings to the map", async ({
+  page,
+}, info) => {
+  const capitalId = "champlain:city";
+  await startPausedMap(page, "light");
+  async function resumeTown(years: number) {
+    await editSavedGame(page, (save) => {
+      const game = save.game;
+      // Advance the presentation year while keeping the same local time and accounting month.
+      game.date = {
+        ...getDateFromMinute(720, game.startingYear),
+        year: game.startingYear + years,
+      };
+      game.speed = "PAUSED";
+    });
+    await page.goto("/");
+    await page.getByRole("button", { name: "Continue", exact: true }).click();
+    const map = await returnToTerritoryMap(page);
+    const canvas = map.locator("canvas.territory3DCanvas");
+    await expect(canvas).toHaveAttribute("data-renderer", "ready");
+    const capital = map.locator(`[data-map-target="${capitalId}"]`);
+    const diagnostics = await readyDiagnostics(canvas, true);
+    const city = diagnostics.scene!.find(
+      ({ id }) => id === `structure:${capitalId}`,
+    );
+    return { map, city, capital, canvas };
+  }
+
+  const opening = await resumeTown(0);
+  expect(opening.city?.modelKey).toBe("structure:city-large");
+  await expect(opening.capital).not.toHaveAccessibleDescription(
+    /New buildings/,
+  );
+  await reviewScreenshot(opening.map.locator(".territoryMapViewport"), {
+    path: info.outputPath("burlington-opening.png"),
+  });
+
+  const grown = await resumeTown(19);
+  expect(grown.city?.modelKey).toMatch(
+    /^structure:city-large:residential-commercial/,
+  );
+  expect(grown.city?.triangles).toBeGreaterThan(opening.city!.triangles);
+  await expect(grown.capital).toHaveAccessibleDescription(
+    /New buildings: homes, shops/,
+  );
+  await reviewScreenshot(grown.map.locator(".territoryMapViewport"), {
+    path: info.outputPath("burlington-grown.png"),
+  });
+  await grown.canvas.evaluate((element: MapCanvas) => {
+    element
+      .getContext("webgl2")!
+      .getExtension("WEBGL_lose_context")!
+      .loseContext();
+  });
+  await expect(grown.canvas).toHaveAttribute("data-renderer", "lost");
+  const fallbackCity = grown.map.locator(`[data-occupant-tile="${capitalId}"]`);
+  for (const sector of ["Residential", "Commercial"])
+    await expect(
+      fallbackCity.locator(`[data-city-growth="${sector}"]`),
+    ).toBeVisible();
+  await reviewScreenshot(grown.map.locator(".territoryMapViewport"), {
+    path: info.outputPath("burlington-grown-fallback.png"),
+  });
+});
+
 for (const theme of ["light", "dark"] as const) {
   test(`renders real 3D and recovers a lost context · ${theme}`, async ({
     page,

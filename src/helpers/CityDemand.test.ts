@@ -7,7 +7,42 @@ import { customerMarketSizeAt } from "./Customers";
 import { getDateFromMinute } from "./DateTime";
 import { acquisitionQuote, transferUtility } from "./Expansion";
 import { territoryDemandByType, territoryDemandShares } from "./Territories";
-import { cityDemandByType } from "./CityDemand";
+import { cityDemandByType, cityGrowthAt } from "./CityDemand";
+
+it("adds different blocks as sustained sector growth takes hold in Valley towns", () => {
+  const game = createGame({ scenarioId: 116, seed: 188 });
+  const openingYear = game.startingYear;
+  for (const id of ["champlain", "ridge-electric"] as const) {
+    expect(cityGrowthAt(game, openingYear, id)).toEqual([]);
+    expect(cityGrowthAt(game, openingYear + 4, id)).toEqual([]);
+  }
+  const later = openingYear + 11;
+  expect(cityGrowthAt(game, later, "champlain")).toContain("Commercial");
+  expect(cityGrowthAt(game, later, "champlain")).not.toContain("Industrial");
+  expect(cityGrowthAt(game, later, "ridge-electric")).toContain("Industrial");
+  expect(cityGrowthAt(game, openingYear + 19, "champlain")).toEqual(
+    expect.arrayContaining(["Residential", "Commercial"]),
+  );
+});
+
+it("keeps the public growth profile when ownership or short-term demand changes", () => {
+  const game = createGame({ scenarioId: 116, seed: 188 });
+  const year = game.startingYear + 11;
+  const before = cityGrowthAt(game, year, "ridge-electric");
+  const tick = currentTick(game)!;
+  tick.cash = 2e9;
+  const quote = acquisitionQuote(game, "ridge-electric")!;
+  expect(
+    transferUtility(game, {
+      targetId: "ridge-electric",
+      financed: false,
+      quoteKey: quote.quoteKey,
+    }),
+  ).toBe(true);
+  tick.temperatureC = -30;
+  tick.demandByType.Residential *= 10;
+  expect(cityGrowthAt(game, year, "ridge-electric")).toEqual(before);
+});
 
 it("retains actual sector allocation for owned cities", () => {
   const game = createGame({ scenarioId: 116, seed: 188 });
