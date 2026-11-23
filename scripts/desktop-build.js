@@ -1,4 +1,5 @@
 const fs = require("node:fs");
+const { coopRelayUrl } = require("../electron/coop-relay-url.cjs");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 const { verifyBuild } = require("./desktop-verify");
@@ -8,6 +9,7 @@ const { buildVersion, writeBuildVersion } = require("./build-version");
 function desktopBuild() {
   const version = buildVersion();
   const output = process.env.BUILD_PATH || "build";
+  const relay = coopRelayUrl(process.env.REACT_APP_COOP_RELAY_URL);
   if (Number(process.versions.node.split(".")[0]) !== 26)
     throw new Error("Use Node 26 to build Electrify");
   for (const script of [
@@ -24,6 +26,7 @@ function desktopBuild() {
         PUBLIC_URL: "",
         GENERATE_SOURCEMAP: "false",
         REACT_APP_DESKTOP: "true",
+        REACT_APP_COOP_RELAY_URL: "",
         REACT_APP_VERSION: version,
       },
     });
@@ -32,6 +35,10 @@ function desktopBuild() {
   }
   verifyEditionBundle(output, "desktop");
   writeBuildVersion(version, output);
+  fs.writeFileSync(
+    path.join(output, "coop-relay.json"),
+    JSON.stringify({ url: relay?.href }) + "\n",
+  );
   const assets = verifyBuild(output, "public");
   fs.writeFileSync(
     path.join(output, "desktop-assets.json"),

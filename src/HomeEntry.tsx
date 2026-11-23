@@ -141,6 +141,7 @@ export function Home() {
                     hasUnfinishedTutorials
                     onStart={() => void run("onStart")}
                     onContinue={() => void run("onContinue")}
+                    onPlayWithFriends={() => void run("onPlayWithFriends")}
                     onTutorials={() => void run("onTutorials")}
                     onSavedGames={() => void run("onSavedGames")}
                     onSettings={() => void run("onSettings")}

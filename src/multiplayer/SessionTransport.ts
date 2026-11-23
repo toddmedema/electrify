@@ -85,7 +85,7 @@ export type SessionRequest =
   | { kind: "create"; rules: string }
   | { kind: "join"; rules: string; lobbyId: string }
   | { kind: "member"; key: "ready" | "slot"; value: string }
-  | { kind: "lock"; ids: string[] }
+  | { kind: "lock"; ids: string[]; requiredIds: string[] }
   | { kind: "send"; to: string; payload: WireMessage };
 
 export type SessionEvent =
@@ -122,7 +122,11 @@ export interface CheckpointStore {
   read(id?: string): Promise<World | null>;
   list(sync: boolean): Promise<SharedSaveLibrary>;
   remove(id: string): Promise<SharedSaveLibrary>;
-  write(world: World): Promise<void>;
+  /** Supply the version read at startup when saving a restored world. */
+  write(
+    world: World,
+    source?: Readonly<Pick<World, "matchId" | "epoch" | "revision">>,
+  ): Promise<void>;
 }
 
 export interface SessionServices {
