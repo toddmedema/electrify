@@ -484,6 +484,7 @@ test("resuming a campaign creates its invitation lobby before starting and waits
   expect(f.requests).toContainEqual({
     kind: "lock",
     ids: [host, guest, "retired"],
+    requiredIds: [host, guest],
   });
   expect(
     f.posts.findLast((request) => request.kind === "restore"),
@@ -547,6 +548,7 @@ test("a friend who was not in the save claims an open company and resumes it", a
   expect(f.requests).toContainEqual({
     kind: "lock",
     ids: [host, "friend", "retired"],
+    requiredIds: [host, "friend"],
   });
   expect(
     f.posts.findLast((request) => request.kind === "restore"),

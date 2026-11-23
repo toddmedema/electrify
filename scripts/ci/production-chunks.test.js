@@ -13,7 +13,7 @@ const createConfig = require("react-scripts/config/webpack.config");
 const { productionCompression } = require("../production-build");
 
 test(
-  "the page and its worker share one emitted module and both execute",
+  "the page and its worker share one module when they use different exports",
   { timeout: 10000 },
   async () => {
     const directory = await fs.realpath(
@@ -24,7 +24,9 @@ test(
       await Promise.all([
         fs.writeFile(
           path.join(directory, "shared.js"),
-          "export function forecast(value) { return value * 3 + 7; }",
+          `export function forecast(value) { return value * 3 + 7; }
+           export function replay(value) { return value * 5 + 9; }
+           export function unused() { return "unused export marker"; }`,
         ),
         fs.writeFile(
           path.join(directory, "page.js"),
@@ -34,8 +36,8 @@ test(
         ),
         fs.writeFile(
           path.join(directory, "worker.js"),
-          `import { forecast } from "./shared.js";
-         postMessage(forecast(11));`,
+          `import { replay } from "./shared.js";
+         postMessage(replay(11));`,
         ),
       ]);
       const { optimization } = productionCompression(
@@ -115,7 +117,13 @@ test(
       for (const file of stats.compilation.entrypoints.get("main").getFiles())
         runScript(file, page);
       assert.equal(page.result, 22);
-      assert.equal(await workerResult, 40);
+      assert.equal(await workerResult, 64);
+      assert.equal(
+        [...scripts.values()].some((script) =>
+          script.includes("unused export marker"),
+        ),
+        false,
+      );
     } finally {
       await fs.rm(directory, { recursive: true, force: true });
     }

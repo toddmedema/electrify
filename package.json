@@ -95,6 +95,7 @@
     "desktop:verify": "node scripts/desktop-verify.js",
     "test:desktop:native": "node --test electron/*.test.cjs",
     "test:desktop": "playwright test --config e2e/desktop.playwright.config.ts",
+    "test:crossplay": "node scripts/dev/run.js playwright test --config e2e/crossplay.playwright.config.ts",
     "test:multiplayer": "node scripts/dev/run.js playwright test --config e2e/multiplayer.playwright.config.ts",
     "mods:validate": "node scripts/mods-validate.js",
     "premods:validate": "npm run compatibility:generate",

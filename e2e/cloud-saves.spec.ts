@@ -276,12 +276,14 @@ for (const theme of ["light", "dark"]) {
     await expect(invitation).toBeHidden();
     const originalId = (await readSaveRecords(page))[0].metadata.id;
     const primary = page.getByRole("region", { name: "Primary actions" });
-    await expect(primary.getByRole("button")).toHaveText([
-      "Continue",
-      "Tutorials",
-      "Play",
-      "Saves",
-    ]);
+    const expectedActions = ["Continue", "Tutorials", "Play", "Saves"];
+    if (
+      await primary
+        .getByRole("button", { name: "Play with friends", exact: true })
+        .isVisible()
+    )
+      expectedActions.push("Play with friends");
+    await expect(primary.getByRole("button")).toHaveText(expectedActions);
     await expect(
       primary.getByRole("button", { name: "Saves", exact: true }),
     ).toHaveClass(/MuiButton-text/);

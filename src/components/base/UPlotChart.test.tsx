@@ -610,7 +610,10 @@ describe("UPlotChart resizing", () => {
     plot.root = document.createElement("div");
     plot.root.appendChild(plot.over);
     chart.appendChild(plot.root);
-    Object.defineProperty(plot.root, "clientHeight", { value: 300 });
+    let chartHeight = 300;
+    Object.defineProperty(plot.root, "clientHeight", {
+      get: () => chartHeight,
+    });
     Object.defineProperty(plot.over, "clientHeight", { value: 160 });
     Object.defineProperty(plot.root, "clientWidth", { value: 400 });
     Object.defineProperty(plot.over, "clientWidth", { value: 320 });
@@ -636,6 +639,10 @@ describe("UPlotChart resizing", () => {
     expect(plot.over).not.toContainElement(values);
     expect(values).toHaveStyle({ maxHeight: "300px" });
     expect(values).toHaveStyle({ maxWidth: "304px" });
+    chartHeight = 260;
+    const resize = plugin.hooks.setSize;
+    if (typeof resize === "function") resize(plot);
+    expect(values).toHaveStyle({ maxHeight: "260px" });
     fireEvent.pointerDown(values);
     fireEvent.pointerMove(values);
     expect(screen.getByRole("status")).toHaveTextContent("Point 0");
