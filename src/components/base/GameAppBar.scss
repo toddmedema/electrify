@@ -210,8 +210,8 @@ html[data-couch-seat] #appbar #topbar {
 }
 .gridStatusDiagnosis {
   display: grid;
-  gap: 8px;
-  margin-top: 8px;
+  gap: 12px;
+  margin-block: 4px 12px;
 
   h3,
   p {
@@ -219,15 +219,10 @@ html[data-couch-seat] #appbar #topbar {
   }
 }
 .gridStatusCurrent {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
-  gap: 4px 8px;
-  padding: 8px 12px;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  background: var(--bg-primary);
+  gap: 8px;
 
   h3 {
     font-size: var(--font-size-caption);
@@ -235,9 +230,16 @@ html[data-couch-seat] #appbar #topbar {
   }
 
   strong {
-    font-size: var(--font-size-title);
+    display: block;
+    font-size: var(--font-size-display);
     font-weight: var(--font-weight-emphasis);
     font-variant-numeric: tabular-nums;
+    line-height: 1.2;
+  }
+
+  .MuiButton-root {
+    padding-inline: 4px;
+    font-size: var(--font-size-caption);
   }
 }
 .gridStatusCurrent-low-reserve .gridStatusReadout,
@@ -252,6 +254,12 @@ html[data-couch-seat] #appbar #topbar {
   padding-inline-start: 8px;
   border-inline-start: 2px solid var(--warning-dot-rim);
   font-weight: var(--font-weight-emphasis);
+
+  .gridStatusOutlookDetail {
+    margin-top: 4px;
+    color: var(--font-color-primary);
+    font-weight: var(--font-weight-regular);
+  }
 }
 .gridStatusContext {
   color: var(--font-color-faded);
@@ -259,13 +267,17 @@ html[data-couch-seat] #appbar #topbar {
 .gridStatusActions {
   display: grid;
   gap: 4px;
-  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-subtle);
 }
 .gridStatusSecondaryActions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 0 4px;
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+  gap: 4px;
+
+  .MuiButton-root {
+    padding-inline: 8px;
+  }
 }
 @media (max-width: 599px) {
   #appbar .gameStatusBar {

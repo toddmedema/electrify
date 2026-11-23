@@ -16,8 +16,7 @@ import gameReducer from "../../reducers/Game";
 import cardReducer, { navigate } from "../../reducers/Card";
 import uiReducer from "../../reducers/UI";
 import { openEvidence } from "../../helpers/Evidence";
-import { getDateFromMinute } from "../../helpers/DateTime";
-import { clearTransmissionMarket } from "../../helpers/Transmission";
+import { getDateFromMinute, MINUTES_PER_MONTH } from "../../helpers/DateTime";
 import { selectProjection } from "../../helpers/Projection";
 import Facilities from "../views/FacilitiesContainer";
 import { GameWorkspaceContext } from "./GameWorkspaceContext";
@@ -122,21 +121,34 @@ it("shows the estimated size and quarter-hour of a sampled shortfall while the l
   expect(dialog).not.toHaveTextContent("Updating forecast…");
 });
 
-it("surfaces a projected monthly reliability risk without implying a sampled shortfall", () => {
+it("shows the unmet energy and sampled peak in the first month below the reliability threshold", () => {
   const { props, rerender } = setup();
   const { game, now } = props;
   game.timeline = [now];
   const projection = selectProjection(game, now, undefined, "top-bar");
+  const july = 6 * MINUTES_PER_MONTH;
+  const shortfall = (minute: number, watts: number) => ({
+    ...now,
+    minute,
+    demandW: 100e6,
+    supplyW: 100e6 - watts,
+  });
   jest.mocked(projectionReady).mockReturnValue(true);
   jest.mocked(readProjection).mockReturnValue({
     ...projection,
+    forecast: [
+      shortfall(july - 60, 60e6),
+      shortfall(july + 12 * 60, 10e6),
+      shortfall(july + 18 * 60, 30e6),
+      shortfall(july + MINUTES_PER_MONTH, 80e6),
+    ],
     financeProjected: [
       {
         ...projection.financeProjected[0],
         year: game.startingYear,
         month: 7,
-        demandWh: 100,
-        supplyWh: 50,
+        demandWh: 70e9,
+        supplyWh: 65e9,
       },
     ],
   });
@@ -151,18 +163,22 @@ it("surfaces a projected monthly reliability risk without implying a sampled sho
   expect(dialog).toHaveTextContent(
     `Projected reliability risk in Jul ${game.startingYear}`,
   );
-  expect(dialog).not.toHaveTextContent(/short at|Updating forecast/);
+  expect(dialog).toHaveTextContent("About 5GWh unmet");
+  expect(dialog).toHaveTextContent("30MW peak shortfall at 6 PM");
+  expect(dialog).not.toHaveTextContent(
+    /in this month’s sample|Updating forecast/,
+  );
 });
 
 it.each([
-  [120e6, 20e6, "Stable", "20MW reserve", "View supply forecast"],
-  [105e6, 5e6, "Low reserve", "5MW reserve", "Manage fleet"],
-  [100e6, 0, "At limit", "0MW reserve", "Manage fleet"],
-  [70e6, 0, "Shortage", "30MW short", "Manage fleet"],
+  [120e6, 20e6, "Stable", "20MW reserve"],
+  [105e6, 5e6, "Low reserve", "5MW reserve"],
+  [100e6, 0, "At limit", "0MW reserve"],
+  [70e6, 0, "Shortage", "30MW short"],
 ])(
-  "prioritizes the action for a %s W supply with %s W of reserve",
-  (supplyW, reserveW, label, metric, action) => {
-    const { props, rerender } = setup(101);
+  "keeps the same actions for a %s W supply with %s W of reserve",
+  (supplyW, reserveW, label, metric) => {
+    const { props, rerender } = setup();
     const now = { ...props.now, demandW: 100e6, supplyW, reserveW };
     rerender(
       <ThemeProvider theme={createAppTheme("light")}>
@@ -177,9 +193,18 @@ it.each([
       within(dialog).getByRole("heading", { name: `Now · ${label}` }),
     ).toBeVisible();
     expect(dialog).toHaveTextContent(metric);
-    expect(within(dialog).getByRole("button", { name: action })).toHaveClass(
-      "MuiButton-contained",
-    );
+    const controls = within(dialog);
+    const forecast = controls.getByRole("button", {
+      name: "View supply forecast",
+    });
+    expect(controls.getAllByRole("button")).toEqual([
+      controls.getByRole("button", { name: "Close grid status" }),
+      controls.getByRole("button", { name: "About reserve" }),
+      forecast,
+      controls.getByRole("button", { name: "Manage fleet" }),
+      controls.getByRole("button", { name: "Manage agreements" }),
+    ]);
+    expect(forecast).toHaveClass("MuiButton-contained");
   },
 );
 
@@ -191,31 +216,17 @@ it("returns focus to the status trigger after closing", async () => {
   await waitFor(() => expect(status).toHaveFocus());
 });
 
-it("reports only imported power serving customers", () => {
-  const { props, rerender } = setup(101);
-  const cleared = clearTransmissionMarket({
-    localSupplyW: 0,
-    demandW: 40e6,
-    storageChargeW: 60e6,
-    capacityW: 100e6,
-    importLimitW: 100e6,
-    exportLimitW: 0,
-    buyingRule: "SHORTAGES_AND_STORAGE",
-    sellingRule: "NONE",
+it("leaves import accounting out of the diagnosis even during a shortage", () => {
+  const { props } = setup();
+  Object.assign(props.now, {
+    importedW: 100e6,
+    demandW: 200e6,
+    supplyW: 100e6,
   });
-  Object.assign(props.now, cleared, {
-    demandW: 40e6,
-    supplyW: cleared.localAvailableSupplyW,
-  });
-  rerender(
-    <ThemeProvider theme={createAppTheme("light")}>
-      <GridStatus {...props} />
-    </ThemeProvider>,
-  );
   fireEvent.click(screen.getByRole("button", { name: /^Current grid status/ }));
-  const dialog = screen.getByRole("dialog", { name: "Grid status" });
-  expect(dialog).toHaveTextContent("40MW imported for customers");
-  expect(dialog).not.toHaveTextContent(/100MW|60MW/);
+  expect(
+    screen.getByRole("dialog", { name: "Grid status" }),
+  ).not.toHaveTextContent(/imported for customers/i);
 });
 
 it.each([101, 105])(

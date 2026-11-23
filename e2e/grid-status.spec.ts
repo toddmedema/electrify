@@ -42,10 +42,12 @@ for (const theme of ["light", "dark"] as const) {
       dialog.getByRole("heading", { name: "Now · Stable" }),
     ).toBeVisible();
     await expect(dialog).toContainText(/\d.*MW reserve/);
-    await expect(dialog).toContainText(/\d.*MW imported for customers/);
+    await expect(dialog).not.toContainText(/imported for customers/);
     await expect(dialog).toContainText(/Projected reliability risk in/, {
       timeout: 60_000,
     });
+    await expect(dialog).toContainText(/About [\d.,]+[kMGT]?Wh unmet/);
+    await expect(dialog).toContainText(/[\d.,]+[kMGT]?W peak shortfall at/);
     await expect(
       dialog.getByRole("button", { name: "View supply forecast" }),
     ).toHaveClass(/MuiButton-contained/);

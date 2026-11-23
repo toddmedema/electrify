@@ -12,14 +12,19 @@ import type {
 import { getGridHealth, readyStorage } from "../../helpers/GridStatus";
 import {
   formatForecastWatts,
+  formatForecastWattHours,
   formatWatts,
   formatWattHours,
 } from "../../helpers/Format";
-import { formatClockTime, getDateFromMinute } from "../../helpers/DateTime";
+import {
+  formatClockTime,
+  getDateFromMinute,
+  MINUTES_PER_MONTH,
+} from "../../helpers/DateTime";
 import { projectedShortfall } from "../../helpers/MissionStatus";
 import { isUtilityExpansionGame } from "../../helpers/ExpansionContext";
 import { utilityServiceGap } from "../../helpers/UtilityPlanning";
-import { topBarForecastEndMinute } from "../../helpers/Projection";
+import { monthMinute, topBarForecastEndMinute } from "../../helpers/Projection";
 import { hasTerritoryNetwork } from "../../helpers/Territories";
 import { getScenario } from "../../data/Scenarios";
 import { corridorsForLocation } from "../../data/AdjacentMarkets";
@@ -48,10 +53,24 @@ function useSupplyRisk(
   React.useEffect(() => {
     if (enabled && !ready) requestProjection(game, now, "top-bar");
   }, [enabled, ready, game, now]);
-  const gap = ready
-    ? utilityServiceGap(game, readProjection(game, now, "top-bar"))
-    : undefined;
-  return { gap, updating: enabled && !ready };
+  const projection = ready ? readProjection(game, now, "top-bar") : undefined;
+  const gap = projection && utilityServiceGap(game, projection);
+  return { gap, forecast: projection?.forecast, updating: enabled && !ready };
+}
+
+function peakShortfallInMonth(
+  forecast: readonly TickPresentFutureType[],
+  monthStart: number,
+) {
+  const monthEnd = monthStart + MINUTES_PER_MONTH;
+  let peak: { minute: number; watts: number } | undefined;
+  for (const tick of forecast) {
+    if (tick.minute < monthStart) continue;
+    if (tick.minute >= monthEnd) break;
+    const watts = tick.demandW - tick.supplyW;
+    if (watts > (peak?.watts ?? 0)) peak = { minute: tick.minute, watts };
+  }
+  return peak;
 }
 
 function Power({ watts }: { watts: number }) {
@@ -83,7 +102,7 @@ export default function GridStatus({
   const health = getGridHealth(game, now);
   const edgeMargin = useScreenEdgeMargin(16);
   const forecastEnd = topBarForecastEndMinute(game);
-  const { gap, updating } = useSupplyRisk(
+  const { gap, forecast, updating } = useSupplyRisk(
     game,
     now,
     isUtilityExpansionGame(game) && game.date.minute < forecastEnd,
@@ -115,6 +134,16 @@ export default function GridStatus({
           ? "Updating forecast…"
           : undefined;
   const [anchor, setAnchor] = React.useState<HTMLElement | null>(null);
+  const riskMonthStart = gap && monthMinute(gap, game.startingYear);
+  // The current month's finance row comes from the separate month-closing timeline.
+  const riskPeak =
+    anchor &&
+    !ahead &&
+    forecast &&
+    riskMonthStart !== undefined &&
+    riskMonthStart > game.date.minute
+      ? peakShortfallInMonth(forecast, riskMonthStart)
+      : undefined;
   const title = React.useRef<HTMLHeadingElement>(null);
   const id = React.useId();
   const close = () => {
@@ -132,30 +161,13 @@ export default function GridStatus({
   };
   const stressed = health.state !== "stable";
   const storedWh = anchor && stressed ? readyStorage(game).storedWh : 0;
-  const customerImportedW = (now.importedW ?? 0) - (now.storageImportedW ?? 0);
   const territoryNetwork = hasTerritoryNetwork(game);
   const legacyInterties = !!(
     game.transmission?.lines.length &&
     (game.multiplayer || corridorsForLocation(game.location).length)
   );
-  const forecastAction =
-    forecastAllowed && onEvidence
-      ? {
-          label: "View supply forecast",
-          run: () => onEvidence({ card: "INSIGHTS", layer: "SUPPLY_DEMAND" }),
-        }
-      : undefined;
-  const fleetAction =
-    !tutorial && onNavigate
-      ? {
-          label: "Manage fleet",
-          run: () => onNavigate(territoryNetwork ? "FLEET" : "FACILITIES"),
-        }
-      : undefined;
-  const primaryAction =
-    stressed && fleetAction ? fleetAction : (forecastAction ?? fleetAction);
-  const secondaryAction =
-    primaryAction === fleetAction ? forecastAction : fleetAction;
+  const openForecast = forecastAllowed && onEvidence;
+  const openFleet = !tutorial && onNavigate;
   const externalPowerAction =
     !tutorial &&
     (territoryNetwork
@@ -249,14 +261,25 @@ export default function GridStatus({
             )}
           </div>
           {forecastMessage && (
-            <p className={future ? "gridStatusOutlook" : "gridStatusContext"}>
-              {forecastMessage}
-            </p>
-          )}
-          {customerImportedW > 0 && (
-            <p className="gridStatusContext">
-              {formatWatts(customerImportedW)} imported for customers
-            </p>
+            <div className={future ? "gridStatusOutlook" : "gridStatusContext"}>
+              <p>{forecastMessage}</p>
+              {gap && !ahead && (
+                <div className="gridStatusOutlookDetail">
+                  <p>
+                    About {formatForecastWattHours(gap.demandWh - gap.supplyWh)}{" "}
+                    unmet
+                  </p>
+                  {riskPeak && (
+                    <p>
+                      {formatForecastWatts(riskPeak.watts)} peak shortfall at{" "}
+                      {formatClockTime(
+                        getDateFromMinute(riskPeak.minute, game.startingYear),
+                      )}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
           )}
           {storedWh > 0 && (
             <p className="gridStatusContext">
@@ -264,21 +287,31 @@ export default function GridStatus({
             </p>
           )}
         </section>
-        {(primaryAction || externalPowerAction) && (
+        {(openForecast || openFleet || externalPowerAction) && (
           <div className="gridStatusActions">
-            {primaryAction && (
+            {openForecast && (
               <Button
                 variant="contained"
-                onClick={() => navigate(primaryAction.run)}
+                onClick={() =>
+                  navigate(() =>
+                    openForecast({ card: "INSIGHTS", layer: "SUPPLY_DEMAND" }),
+                  )
+                }
               >
-                {primaryAction.label}
+                View supply forecast
               </Button>
             )}
-            {(secondaryAction || externalPowerAction) && (
+            {(openFleet || externalPowerAction) && (
               <div className="gridStatusSecondaryActions">
-                {secondaryAction && (
-                  <Button onClick={() => navigate(secondaryAction.run)}>
-                    {secondaryAction.label}
+                {openFleet && (
+                  <Button
+                    onClick={() =>
+                      navigate(() =>
+                        openFleet(territoryNetwork ? "FLEET" : "FACILITIES"),
+                      )
+                    }
+                  >
+                    Manage fleet
                   </Button>
                 )}
                 {externalPowerAction && (

@@ -330,7 +330,7 @@ for (const theme of ["light", "dark"] as const) {
     ).toBeVisible();
     await expect(dialog).toContainText(/\d.*MW short/);
     await expect(
-      dialog.getByRole("button", { name: "Manage fleet" }),
+      dialog.getByRole("button", { name: "View supply forecast" }),
     ).toHaveClass(/MuiButton-contained/);
     await reviewScreenshot(dialog, {
       path: testInfo.outputPath(`grid-blackout-${theme}.png`),
