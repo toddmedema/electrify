@@ -118,6 +118,10 @@ function estimateBuildHistory(
     now.cash,
     now.customers,
     (end - start) / TICK_MINUTES,
+    TICK_MINUTES,
+    undefined,
+    undefined,
+    { estimateHistory: true },
   );
 }
 
