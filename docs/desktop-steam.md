@@ -62,10 +62,7 @@ Players using Steam on NixOS should not need `programs.steam.extraPackages = [ n
 Packaging verifies the manifest and runs `ldd` against the executable and bundled libraries,
 including proof that NSS/NSPR resolve inside the depot. CI's packaged Linux launch uses this wrapper.
 
-To run the unpacked Linux x64 build directly on NixOS, use `./Electrify` from the extracted depot.
-The launcher uses `nix-build` and your configured `<nixpkgs>` to prepare an FHS runtime with
-Electron's desktop libraries, including GLib. The first launch may download runtime dependencies.
-Launches from Steam and existing Nixpkgs FHS environments use the runtime they already provide.
+On NixOS, launch Electrify through Steam so it receives the Steam Linux Runtime.
 
 Steam builds select X11/XWayland before enabling the overlay's in-process GPU. This supports
 [Steam's overlay](https://github.com/ValveSoftware/steam-for-linux/issues/8020) and avoids the
@@ -414,6 +411,9 @@ running speed. Multiplayer sleep also preserves the shared save and requires con
 A wake checkpoint failure uses the existing visible save error and retry path.
 
 ### Couch display settings and controllers
+
+Open **Play with friends → Local Co-op** for [two-player couch co-op](couch-coop.md).
+Both players use Steam Input controllers, including in Steam Offline Mode.
 
 Settings offers one Interface scale for text, charts, icons and controls (100–200%), and
 Workspace: Automatic or Single tool. Automatic uses the available space at the chosen scale;

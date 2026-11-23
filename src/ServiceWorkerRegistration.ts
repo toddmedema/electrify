@@ -7,8 +7,8 @@ const registeringWindows = new WeakSet<Window>();
 
 /**
  * Registers the service worker, then warms its cache in the background. Every player gets the
- * deployed build and every icon; installed apps also get every weather location and fresh market
- * data and every audio file.
+ * deployed build and every icon; installed apps also get weather for the official scenarios,
+ * fresh market data, and every audio file.
  */
 export function registerServiceWorker(win: Window = window): void {
   if (process.env.REACT_APP_DESKTOP === "true" && isDesktopApp()) return;
@@ -16,7 +16,7 @@ export function registerServiceWorker(win: Window = window): void {
   if (registeringWindows.has(win)) return;
   registeringWindows.add(win);
   const serviceWorker = win.navigator.serviceWorker;
-  let registered = false;
+  let registration: ServiceWorkerRegistration | undefined;
   let installed = Boolean(
     (win.navigator as Navigator & { standalone?: boolean }).standalone ||
     win.matchMedia?.("(display-mode: standalone)").matches,
@@ -26,8 +26,22 @@ export function registerServiceWorker(win: Window = window): void {
     syncAssets();
   };
   win.addEventListener("appinstalled", onInstalled);
+  const syncOfficialData = () => {
+    if (!installed || !registration) return;
+    const worker =
+      registration.installing ?? registration.waiting ?? registration.active;
+    if (!worker) return;
+    void import("./OfficialOfflineWeather")
+      .then(({ officialOfflineWeather }) =>
+        worker.postMessage({
+          type: "SYNC_OFFICIAL_OFFLINE_DATA",
+          weather: officialOfflineWeather(),
+        }),
+      )
+      .catch(() => undefined); // The next online launch can retry the warm-up.
+  };
   const syncAssets = () => {
-    if (!registered) {
+    if (!registration) {
       return;
     }
     void prefetchBuild();
@@ -35,17 +49,16 @@ export function registerServiceWorker(win: Window = window): void {
     // installed apps -- before any game starts. The worker skips what it already has, so a
     // repeat load only pays for the manifest check.
     void prefetchIcons();
-    if (installed) {
-      void serviceWorker.ready.then((registration) =>
-        registration.active?.postMessage({ type: "SYNC_OFFLINE_DATA" }),
-      );
-    }
+    syncOfficialData();
   };
 
   serviceWorker
     .register("/service-worker.js")
-    .then(() => {
-      registered = true;
+    .then((result) => {
+      registration = result;
+      // An old active worker does not understand the new weather manifest. Warm the worker
+      // that is actually installing the current build, even if another tab keeps the old one active.
+      registration.addEventListener("updatefound", syncOfficialData);
       win.setTimeout(syncAssets, BACKGROUND_CACHE_DELAY_MS);
     })
     .catch((error) => {

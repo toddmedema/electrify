@@ -1,7 +1,6 @@
 const CACHE_VERSION = "electrify-v2";
 const WEATHER_INDEX = "/data/weather/index.json";
-// Separate from the normally refreshed catalog: only durable, complete syncs advance this.
-const OFFLINE_DATA_REVISION = "/__offline-data-revision";
+const DATA_CENTER_CUSTOMERS = "/data/data-center-customers.json";
 // Generated from public/images at build time (scripts/generate-icon-manifest.js).
 const ICON_MANIFEST = "/icons.json";
 // Audio paths are not content-hashed and cached tracks are never revalidated. Replacing an
@@ -65,6 +64,21 @@ async function matchesIntegrity(response, integrity) {
   );
 }
 
+async function notifyWeatherCached(url) {
+  const path = new URL(absoluteUrl(url)).pathname;
+  if (!/^\/data\/weather\/[A-Za-z0-9_-]{1,32}\.bin$/.test(path)) return;
+  try {
+    const clients = await self.clients.matchAll({
+      type: "window",
+      includeUncontrolled: true,
+    });
+    for (const client of clients)
+      client.postMessage({ type: "OFFLINE_WEATHER_CACHED" });
+  } catch {
+    // A closed page or unavailable channel cannot invalidate a successful cache write.
+  }
+}
+
 async function fetchAndCache(cache, url, durable = false, retainWrite) {
   const integrity = typeof url === "string" ? "" : url.integrity || "";
   // Neither prefetches nor a different build may lend unchecked bytes to an SRI request.
@@ -80,6 +94,7 @@ async function fetchAndCache(cache, url, durable = false, retainWrite) {
       const stored = (async () => {
         try {
           await cache.put(url, response.clone());
+          await notifyWeatherCached(url);
         } catch {
           if (durable) throw new Error(`Could not cache ${absoluteUrl(url)}`);
           // Optional persistence must not turn a good download into a failed game load.
@@ -144,24 +159,46 @@ async function cacheBuild() {
   await Promise.all(stale.map((request) => cache.delete(request)));
 }
 
-/** Fill any holes for one scenario without refreshing data that is already available offline. */
-async function cacheScenarioData(locationIds) {
-  const weatherUrls = Array.isArray(locationIds)
-    ? [...new Set(locationIds)]
-        .filter((id) => typeof id === "string" && LOCATION_ID.test(id))
-        .map((id) => `/data/weather/${id}.bin`)
+function weatherRequests(weather) {
+  return Array.isArray(weather)
+    ? weather
+        .filter(
+          (entry) =>
+            entry &&
+            typeof entry.id === "string" &&
+            LOCATION_ID.test(entry.id) &&
+            typeof entry.integrity === "string" &&
+            /^sha256-[A-Za-z0-9+/]{43}=$/.test(entry.integrity),
+        )
+        .map(
+          ({ id, integrity }) =>
+            new Request(absoluteUrl(`/data/weather/${id}.bin`), { integrity }),
+        )
     : [];
-  const urls = [...MARKET_DATA, ...weatherUrls];
-  const cache = await caches.open(CACHE_VERSION);
-  const missing = (
-    await Promise.all(
-      urls.map(async (url) => ({ url, cached: await cache.match(url) })),
-    )
-  )
-    .filter(({ cached }) => !cached)
-    .map(({ url }) => url);
+}
 
-  await Promise.allSettled(missing.map((url) => fetchAndCache(cache, url)));
+async function cacheWhenNeeded(cache, request) {
+  const cached = await cache.match(request);
+  const integrity = typeof request === "string" ? "" : request.integrity;
+  if (!cached?.ok || !(await matchesIntegrity(cached, integrity)))
+    await fetchAndCache(cache, request, true);
+}
+
+/** Fill holes and replace old bytes for a selected location and its watershed. */
+async function cacheScenarioData({ locationIds, weather }) {
+  const requests = Array.isArray(weather)
+    ? weatherRequests(weather)
+    : Array.isArray(locationIds)
+      ? [...new Set(locationIds)]
+          .filter((id) => typeof id === "string" && LOCATION_ID.test(id))
+          .map((id) => `/data/weather/${id}.bin`)
+      : [];
+  const cache = await caches.open(CACHE_VERSION);
+  await Promise.allSettled(
+    [...MARKET_DATA, ...requests].map((request) =>
+      cacheWhenNeeded(cache, request),
+    ),
+  );
 }
 
 /**
@@ -209,43 +246,17 @@ async function cacheIcons() {
   await Promise.allSettled(missing.map((url) => fetchAndCache(cache, url)));
 }
 
-/**
- * An installed app asks for this after launch has gone idle. Compare the catalog first: an
- * unchanged one only fills holes, while a changed catalog refreshes every location because its
- * update date means the packed records may have changed in place.
- */
-async function syncOfflineData() {
+/** Warm the shipped missions' weather without downloading or evicting custom locations. */
+async function syncOfflineData(weather) {
   const cache = await caches.open(CACHE_VERSION);
-  const cachedIndex = await cache.match(OFFLINE_DATA_REVISION);
-  const cachedText = cachedIndex ? await cachedIndex.clone().text() : "";
-  const indexResponse = await fetchAndCache(cache, WEATHER_INDEX);
-  const indexText = await indexResponse.clone().text();
-  const index = JSON.parse(indexText);
-  const weatherUrls = Object.keys(index.cities || {}).map(
-    (id) => `/data/weather/${id}.bin`,
-  );
-  const cachedUrls = new Set(
-    (await cache.keys()).map((request) => new URL(request.url).pathname),
-  );
-  const weatherToFetch =
-    cachedText !== indexText
-      ? weatherUrls
-      : weatherUrls.filter((url) => !cachedUrls.has(url));
-
-  const downloads = await Promise.allSettled(
-    [
-      ...MARKET_DATA,
-      ...weatherToFetch,
-      ...AUDIO_FILES.filter((url) => !cachedUrls.has(url)),
-    ].map((url) => fetchAndCache(cache, url, true)),
-  );
-  if (downloads.every((result) => result.status === "fulfilled")) {
-    try {
-      await cache.put(OFFLINE_DATA_REVISION, new Response(indexText));
-    } catch {
-      // Retry next time: network success alone does not establish an offline copy.
-    }
-  }
+  await Promise.allSettled([
+    ...[WEATHER_INDEX, DATA_CENTER_CUSTOMERS, ...MARKET_DATA].map((url) =>
+      fetchAndCache(cache, url, true),
+    ),
+    ...[...AUDIO_FILES, ...weatherRequests(weather)].map((request) =>
+      cacheWhenNeeded(cache, request),
+    ),
+  ]);
 }
 
 self.addEventListener("install", (event) => {
@@ -280,10 +291,10 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("message", (event) => {
-  if (event.data?.type === "SYNC_OFFLINE_DATA") {
-    event.waitUntil(syncOfflineData());
+  if (event.data?.type === "SYNC_OFFICIAL_OFFLINE_DATA") {
+    event.waitUntil(syncOfflineData(event.data.weather));
   } else if (event.data?.type === "CACHE_SCENARIO_DATA") {
-    event.waitUntil(cacheScenarioData(event.data.locationIds));
+    event.waitUntil(cacheScenarioData(event.data));
   } else if (event.data?.type === "CACHE_ICONS") {
     event.waitUntil(cacheIcons());
   } else if (event.data?.type === "CACHE_BUILD") {
