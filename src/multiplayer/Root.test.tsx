@@ -75,14 +75,19 @@ function renderRoot() {
 
 function renderWithSteamInvites() {
   let receive: (event: NativeEvent) => void = () => {};
-  jest.spyOn(desktop, "getDesktop").mockReturnValue({
-    apiVersion: 1,
+  const bridge: Pick<
+    desktop.DesktopBridge,
+    "couchRequest" | "onMultiplayerEvent"
+  > = {
     couchRequest: jest.fn(),
     onMultiplayerEvent: (listener) => {
       receive = listener;
       return () => {};
     },
-  } as desktop.DesktopBridge);
+  };
+  jest
+    .spyOn(desktop, "getDesktop")
+    .mockReturnValue(bridge as unknown as desktop.DesktopBridge);
   const { session } = renderRoot();
   const invite = async (lobbyId: string) => {
     await act(async () => receive({ kind: "invite", lobbyId }));
