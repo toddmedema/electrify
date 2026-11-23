@@ -95,6 +95,15 @@ export interface DesktopBridge {
   // Optional methods are feature-detected by the renderer, so adding one never bumps apiVersion.
   // apiVersion changes only when an existing method changes incompatibly.
   steamEdition?: boolean;
+  crossplayRequest?(
+    operation: string,
+    body: unknown,
+    requestId: string,
+    userAction: boolean,
+  ): Promise<import("./multiplayer/CrossplayApi").DesktopCrossplayResult>;
+  cancelCrossplayRequest?(requestId: string): Promise<void>;
+  takeCrossplayInvite?(): Promise<string | undefined>;
+  onCrossplayInvite?(callback: () => void): () => void;
   coopRelayUrl?: string;
   couchRequest?(input: Record<string, unknown>): Promise<unknown>;
   onCouchEvent?(callback: (event: unknown) => void): () => void;

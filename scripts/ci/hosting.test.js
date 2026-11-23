@@ -88,6 +88,7 @@ test("cache lifetimes follow content identity and mutable documents revalidate",
     "data/weather/index.json",
   ])
     assert.equal(cacheControl(file), CACHE.short, file);
+  assert.equal(cacheControl("invite/index.html"), "no-store");
   assert.equal(cacheControl("analytics.js"), CACHE.moderate);
   assert.equal(cacheControl("fonts/inter/inter.css"), CACHE.moderate);
   assert.equal(cacheControl("images/gameplay-preview.webp"), CACHE.media);
@@ -136,6 +137,16 @@ test("redirects cover authored clean URLs, preserve queries, and leave canonical
     response.headers.location.value,
     "/?scenario=108&campaign=heat%20wave&campaign=cold%2Bwind",
   );
+});
+
+test("the fixed invite route renders directly and drops referrers", () => {
+  const request = handler(requestCode(paths));
+  const response = handler(responseCode());
+  const origin = request({ request: { uri: "/invite/", querystring: {} } });
+  assert.equal(origin.uri, "/invite/index.html");
+  assert.equal(origin.headers, undefined);
+  const viewer = response({ request: origin, response: { headers: {} } });
+  assert.equal(viewer.headers["referrer-policy"].value, "no-referrer");
 });
 
 test("edge headers cover data without changing bodies, statuses, or existing headers", () => {
