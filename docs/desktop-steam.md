@@ -549,6 +549,8 @@ through Valve's normal review process.
 
 ## Realtime Steam co-op
 
+See [Web and Steam cross-play](crossplay.md) for shared browser and Steam invite-code rooms.
+
 **Play with friends** on the desktop title screen offers **Host a game** or joining with a
 six-digit invite code (including leading zeroes). Hosting opens an invisible Steam lobby and
 goes straight to the normal selection screens. **Copy code** copies the code on the selection

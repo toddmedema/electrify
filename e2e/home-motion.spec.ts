@@ -16,7 +16,9 @@ test("reduced motion keeps the home decoration still and actions usable", async 
     ),
   ).toBe(0);
   await expect(page.locator(".homeEnergyPulse")).toHaveCSS("opacity", "0");
-  await expect(page.getByRole("button", { name: "Play" })).toBeEnabled();
+  await expect(
+    page.getByRole("button", { name: "Play", exact: true }),
+  ).toBeEnabled();
 });
 
 for (const theme of ["light", "dark"] as const) {

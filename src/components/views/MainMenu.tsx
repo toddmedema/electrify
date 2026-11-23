@@ -219,16 +219,17 @@ const MainMenu = (props: Props): React.JSX.Element => {
               Saves
             </Button>
           )}
-          {desktopApp && props.onPlayWithFriends && (
-            <Button
-              data-main-action
-              size="large"
-              color="primary"
-              onClick={props.onPlayWithFriends}
-            >
-              Play with friends
-            </Button>
-          )}
+          {(desktopApp || process.env.REACT_APP_COOP_RELAY_URL) &&
+            props.onPlayWithFriends && (
+              <Button
+                data-main-action
+                size="large"
+                color="primary"
+                onClick={props.onPlayWithFriends}
+              >
+                Play with friends
+              </Button>
+            )}
         </Stack>
         <Stack
           component="nav"

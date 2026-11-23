@@ -757,6 +757,7 @@ export async function createCouchFixture(
     }
     window.electrifyDesktop = {
       apiVersion: 1,
+      steamEdition: true,
       getState: async () => ({
         display,
         steam: {
