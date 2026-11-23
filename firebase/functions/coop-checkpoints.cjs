@@ -1,12 +1,24 @@
 const { createHash, randomUUID } = require("node:crypto");
+const fs = require("node:fs");
+const path = require("node:path");
+const { Worker } = require("node:worker_threads");
 const { gunzip: decompress } = require("node:zlib");
 const { promisify } = require("node:util");
 const { CrossplayError } = require("./crossplay-errors.cjs");
+const {
+  MAX_COMPRESSED_BYTES,
+  MAX_DECODED_BYTES,
+  snapshotJson,
+} = require("./coop-checkpoint-wire.cjs");
 const gunzip = promisify(decompress);
 const { activeSignalPair } = require("./coop-signaling.cjs");
 
-const MAX_COMPRESSED_BYTES = 6 * 1024 * 1024;
-const MAX_DECODED_BYTES = 32 * 1024 * 1024;
+const CHECKPOINT_VALIDATION_MS = 8_000;
+const defaultValidatorPath = path.join(
+  __dirname,
+  "build/runtime/server/checkpoint.cjs",
+);
+let validating = false;
 const TRANSFER_MS = 60_000;
 const CHECKPOINT_INTERVAL_MS = 10_000;
 const TRANSFERS_PER_MINUTE = 8;
@@ -25,23 +37,7 @@ function hash(bytes) {
   return createHash("sha256").update(bytes).digest("hex");
 }
 
-function inspectStructure(json) {
-  let depth = 0;
-  let quoted = false;
-  let escaped = false;
-  for (const char of json) {
-    if (quoted) {
-      if (escaped) escaped = false;
-      else if (char === "\\") escaped = true;
-      else if (char === '"') quoted = false;
-    } else if (char === '"') quoted = true;
-    else if ((char === "{" || char === "[") && ++depth > 64)
-      refuse("snapshot-too-deep");
-    else if (char === "}" || char === "]") depth--;
-  }
-}
-
-async function decode(body) {
+function compressedBody(body) {
   if (
     typeof body.content !== "string" ||
     body.content.length > (MAX_COMPRESSED_BYTES / 3) * 4 ||
@@ -57,20 +53,60 @@ async function decode(body) {
     hash(bytes) !== body.digest
   )
     refuse("invalid-snapshot");
+  return { bytes, digest: body.digest };
+}
+
+async function decode(body) {
+  const packed = compressedBody(body);
   let snapshot;
   try {
-    const decoded = await gunzip(bytes, { maxOutputLength: MAX_DECODED_BYTES });
-    const json = new TextDecoder("utf-8", { fatal: true }).decode(decoded);
-    inspectStructure(json);
-    snapshot = JSON.parse(json);
+    const decoded = await gunzip(packed.bytes, {
+      maxOutputLength: MAX_DECODED_BYTES,
+    });
+    snapshot = JSON.parse(snapshotJson(decoded));
   } catch {
     refuse("invalid-snapshot");
   }
-  return { bytes, snapshot, digest: body.digest };
+  return { ...packed, snapshot };
+}
+
+function checkpointValidatorReady(runtimePath = defaultValidatorPath) {
+  return fs.existsSync(runtimePath);
+}
+
+async function validateCheckpoint(bytes, runtimePath = defaultValidatorPath) {
+  if (!checkpointValidatorReady(runtimePath))
+    refuse("checkpoint-validator-unavailable", 503);
+  if (validating) refuse("checkpoint-validator-busy", 429);
+  validating = true;
+  let worker;
+  try {
+    worker = new Worker(path.join(__dirname, "coop-checkpoint-worker.cjs"), {
+      workerData: { runtimePath, bytes },
+      resourceLimits: {
+        maxOldGenerationSizeMb: 160,
+        maxYoungGenerationSizeMb: 16,
+      },
+    });
+    let deadline;
+    const result = await new Promise((resolve, reject) => {
+      const fail = () => reject(new CrossplayError(400, "invalid-checkpoint"));
+      deadline = setTimeout(fail, CHECKPOINT_VALIDATION_MS);
+      worker.once("message", resolve);
+      worker.once("exit", fail);
+      worker.once("error", fail);
+    }).finally(() => clearTimeout(deadline));
+    if (result.unavailable) refuse("checkpoint-validator-unavailable", 503);
+    if (!result.fields) refuse("invalid-checkpoint");
+    return result.fields;
+  } finally {
+    await worker?.terminate().catch(() => {});
+    validating = false;
+  }
 }
 
 function validateWorld(world, room) {
-  const ids = room.members.map((member) => member.id);
+  const seats = new Map(room.members.map(({ id, name }) => [id, name]));
   if (
     !world ||
     world.schema !== 3 ||
@@ -82,13 +118,10 @@ function validateWorld(world, room) {
     world.epoch !== room.epoch ||
     world.rules !== room.rules ||
     !Array.isArray(world.seats) ||
-    !Array.isArray(world.grids) ||
-    world.seats.length !== ids.length ||
-    world.grids.length !== ids.length ||
-    new Set(world.seats.map((seat) => seat?.id)).size !== ids.length ||
-    !world.seats.every((seat) => seat && ids.includes(seat.id)) ||
-    !world.spec ||
-    !Number.isSafeInteger(world.spec.scenarioId)
+    world.seats.length !== seats.size ||
+    new Set(world.seats.map((seat) => seat?.id)).size !== seats.size ||
+    !world.seats.every((seat) => seat && seats.get(seat.id) === seat.name) ||
+    !HASH.test(world.scenarioDigest)
   )
     refuse("invalid-checkpoint");
 }
@@ -183,22 +216,55 @@ async function publish(context, body) {
     if (quota.count > 6) refuse("checkpoint-rate-limit", 429);
     return { room: { ...room, checkpointQuota: quota } };
   }, "host");
-  const result = await decode(body);
-  validateWorld(result.snapshot, context.room);
-  const { matchId, epoch, revision, schema, rules } = result.snapshot;
+  const result = compressedBody(body);
   const now = Date.now();
   const previous = context.room.head;
   if (
-    previous?.digest === result.digest &&
-    (!body.explicit || context.room.explicitHead?.id === previous.id)
-  )
-    return { savedAt: previous.savedAt };
+    previous?.epoch === context.room.epoch &&
+    previous.digest === result.digest
+  ) {
+    return context.updateRoom((room) => {
+      const head = room.head;
+      if (head?.id !== previous.id) refuse("checkpoint-conflict", 409);
+      return {
+        room: body.explicit ? { ...room, explicitHead: head } : undefined,
+        value: { savedAt: head.savedAt },
+      };
+    }, "host");
+  }
   if (
-    previous?.epoch === epoch &&
+    previous?.epoch === context.room.epoch &&
     now - previous.savedAt < CHECKPOINT_INTERVAL_MS &&
     !body.explicit
   )
     refuse("checkpoint-rate-limit", 429);
+  const fields = await validateCheckpoint(
+    result.bytes,
+    context.checkpointValidatorPath,
+  );
+  validateWorld(fields, context.room);
+  const {
+    matchId,
+    epoch,
+    revision,
+    schema,
+    gameSchema,
+    rules,
+    scenarioDigest,
+  } = fields;
+  function requireAdvance(head) {
+    if (
+      head &&
+      (head.matchId !== matchId ||
+        head.scenarioDigest !== scenarioDigest ||
+        !head.seats.every(
+          (entry, index) => entry.id === fields.seats[index]?.id,
+        ) ||
+        (head.epoch === epoch && head.revision >= revision))
+    )
+      refuse("checkpoint-conflict", 409);
+  }
+  requireAdvance(previous);
   const id = randomUUID();
   const key = `checkpoints/${context.roomId}/${id}`;
   const generation = await writeImmutable(
@@ -217,6 +283,10 @@ async function publish(context, body) {
     revision,
     rules,
     schema,
+    gameSchema,
+    scenarioDigest,
+    seats: fields.seats,
+    activeSeatIds: fields.activeSeatIds,
     savedAt: now,
     name:
       typeof body.name === "string" && body.name.trim()
@@ -224,26 +294,23 @@ async function publish(context, body) {
         : "Multiplayer campaign",
   };
   const { savedAt, discarded } = await context.updateRoom((room) => {
-    validateWorld(result.snapshot, room);
+    validateWorld(fields, room);
     if (!room.locked) refuse("roster-not-locked", 409);
     const head = room.head;
-    if (
-      head?.digest === manifest.digest &&
-      (!body.explicit || room.explicitHead?.id === head.id)
-    )
-      return { room, value: { savedAt: head.savedAt, discarded: [manifest] } };
-    if (
-      (head?.id ?? null) !== expected ||
-      (head && head.matchId !== matchId) ||
-      (head?.epoch === epoch && head.revision > revision)
-    )
-      refuse("checkpoint-conflict", 409);
+    if (head?.digest === manifest.digest)
+      return {
+        room: body.explicit ? { ...room, explicitHead: head } : undefined,
+        value: { savedAt: head.savedAt, discarded: [manifest] },
+      };
+    if ((head?.id ?? null) !== expected) refuse("checkpoint-conflict", 409);
+    requireAdvance(head);
     const updated = {
       ...room,
       head: manifest,
       previousHead: head ?? null,
       explicitHead: body.explicit ? manifest : (room.explicitHead ?? null),
-      restoreHead: room.restoreHead ?? null,
+      restoreHead: null,
+      requiredIds: [...new Set([...fields.activeSeatIds, room.hostId])],
     };
     const protectedIds = new Set(
       [
@@ -255,9 +322,11 @@ async function publish(context, body) {
         .filter(Boolean)
         .map((entry) => entry.id),
     );
-    const discarded = [room.previousHead, room.explicitHead].filter(
-      (entry) => entry && !protectedIds.has(entry.id),
-    );
+    const discarded = [
+      room.previousHead,
+      room.explicitHead,
+      room.restoreHead,
+    ].filter((entry) => entry && !protectedIds.has(entry.id));
     return { room: updated, value: { savedAt: now, discarded } };
   }, "host");
   for (const entry of discarded)
@@ -270,13 +339,23 @@ async function publish(context, body) {
   return { savedAt };
 }
 
-async function read(context) {
+function restoreManifest(room) {
+  return room.head?.epoch !== room.epoch
+    ? (room.restoreHead ?? room.head)
+    : room.head;
+}
+
+function sameGeneration(manifest, candidate) {
+  return (
+    candidate?.id === manifest.id &&
+    candidate.generation === manifest.generation
+  );
+}
+
+async function read(context, exporting) {
   await context.limit?.("coop-checkpoint-download", 6);
   const { room, roomId } = context;
-  const manifest =
-    room.restoreHead?.epoch !== room.epoch && room.head?.epoch !== room.epoch
-      ? (room.restoreHead ?? room.head)
-      : room.head;
+  const manifest = exporting ? room.head : restoreManifest(room);
   if (!manifest) refuse("checkpoint-unavailable", 404);
   const result = await download(
     bucketFor(context),
@@ -285,24 +364,39 @@ async function read(context) {
     manifest.digest,
     manifest.bytes,
   );
-  await context.recheck?.(false);
+  const current = (await context.recheck?.(false)) ?? room;
+  if (
+    !(exporting
+      ? [
+          current.head,
+          current.previousHead,
+          current.explicitHead,
+          current.restoreHead,
+        ].some((candidate) => sameGeneration(manifest, candidate))
+      : sameGeneration(manifest, restoreManifest(current)))
+  )
+    refuse("checkpoint-conflict", 409);
   return result;
 }
 
 async function storeTransfer(context, body) {
   requireHost(context);
+  await context.limit?.("coop-transfer-upload", 8);
   const bucket = bucketFor(context);
-  await context.updateRoom((room) => {
-    guardedPair(context, body, room, true);
-    const now = Date.now();
-    const current = room.transferQuota;
-    const quota =
-      current?.until > now
-        ? { ...current, count: current.count + 1 }
-        : { until: now + TRANSFER_MS, count: 1 };
-    if (quota.count > TRANSFERS_PER_MINUTE) refuse("transfer-limit", 429);
-    return { room: { ...room, transferQuota: quota }, value: undefined };
-  }, "host");
+  await context.updateRoom(
+    (room, _now, projected) => {
+      guardedPair(context, body, projected ?? room, true);
+      const now = Date.now();
+      const current = room.transferQuota;
+      const quota =
+        current?.until > now
+          ? { ...current, count: current.count + 1 }
+          : { until: now + TRANSFER_MS, count: 1 };
+      if (quota.count > TRANSFERS_PER_MINUTE) refuse("transfer-limit", 429);
+      return { room: { ...room, transferQuota: quota } };
+    },
+    { type: "host", peerId: body.to },
+  );
   const result = await decode(body);
   const { snapshot } = result;
   if (
@@ -366,7 +460,7 @@ async function readTransfer(context, body) {
 
 async function handle(operation, context, body) {
   if (operation === "save/read" || operation === "save/download")
-    return read(context);
+    return read(context, operation === "save/download");
   if (operation === "save/publish") return publish(context, body);
   if (operation === "transfer/put") return storeTransfer(context, body);
   if (operation === "transfer/get") return readTransfer(context, body);
@@ -382,7 +476,6 @@ async function reap(bucket, loadRoom, now = Date.now()) {
       maxResults: REAP_BATCH,
       pageToken: reaperCursors.get(prefix),
     });
-    reaperCursors.set(prefix, next?.pageToken);
     for (const file of files) {
       const [namespace, roomId, id, extra] = file.name.split("/");
       if (extra || !ID.test(roomId) || !ID.test(id)) continue;
@@ -413,9 +506,13 @@ async function reap(bucket, loadRoom, now = Date.now()) {
       }
       await bucket
         .file(file.name, { generation })
-        .delete({ ignoreNotFound: true, ifGenerationMatch: generation });
+        .delete({ ignoreNotFound: true, ifGenerationMatch: generation })
+        .catch((error) => {
+          if (error.code !== 404 && error.code !== 412) throw error;
+        });
     }
+    reaperCursors.set(prefix, next?.pageToken);
   }
 }
 
-module.exports = { handle, reap };
+module.exports = { checkpointValidatorReady, handle, reap };

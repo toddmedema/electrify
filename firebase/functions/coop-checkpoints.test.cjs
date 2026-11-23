@@ -1,11 +1,38 @@
 const assert = require("node:assert/strict");
 const { createHash, randomUUID } = require("node:crypto");
-const { test } = require("node:test");
+const { mkdtempSync, rmSync } = require("node:fs");
+const { tmpdir } = require("node:os");
+const path = require("node:path");
+const { after, before, test } = require("node:test");
 const { gzipSync } = require("node:zlib");
-const { handle } = require("./coop-checkpoints.cjs");
+const { handle, reap } = require("./coop-checkpoints.cjs");
+const {
+  buildCheckpointValidator,
+} = require("../../scripts/build-coop-checkpoint-validator");
+const output = mkdtempSync(
+  path.join(tmpdir(), "electrify-checkpoint-validator-"),
+);
+const checkpointValidatorPath = path.join(
+  output,
+  "runtime/server/checkpoint.cjs",
+);
+let createWorld, loadSimData, matchScenario, checkpointWorld, encodeWire;
+
+before(async () => {
+  await buildCheckpointValidator(output);
+  require("../../scripts/testing/replication-runtime")();
+  ({
+    createWorld,
+    matchScenario,
+    checkpointWorld,
+  } = require("../../src/multiplayer/World"));
+  ({ encodeWire } = require("../../src/multiplayer/WireJson"));
+  ({ loadSimData } = require("../../src/testing/SimData"));
+});
+after(() => rmSync(output, { recursive: true, force: true }));
 
 function encoded(value) {
-  const bytes = gzipSync(Buffer.from(JSON.stringify(value)));
+  const bytes = gzipSync(Buffer.from(encodeWire(value)));
   return {
     content: bytes.toString("base64"),
     digest: createHash("sha256").update(bytes).digest("hex"),
@@ -17,6 +44,16 @@ function fixture() {
   const objects = new Map();
   let generation = 0;
   const bucket = {
+    async getFiles({ prefix }) {
+      return [
+        [...objects]
+          .filter(([key]) => key.startsWith(prefix))
+          .map(([name, metadata]) => ({
+            name,
+            metadata,
+          })),
+      ];
+    },
     file(key, options = {}) {
       function entry() {
         const value = objects.get(key);
@@ -29,7 +66,11 @@ function fixture() {
         async save(bytes, options) {
           assert.equal(options.preconditionOpts.ifGenerationMatch, 0);
           assert.equal(objects.has(key), false);
-          objects.set(key, { bytes, generation: String(++generation) });
+          objects.set(key, {
+            bytes,
+            generation: String(++generation),
+            timeCreated: new Date().toISOString(),
+          });
         },
         async getMetadata() {
           const { generation, bytes } = entry();
@@ -38,8 +79,8 @@ function fixture() {
         async download() {
           return [entry().bytes];
         },
-        async delete() {
-          entry();
+        async delete(options) {
+          assert.equal(options.ifGenerationMatch, entry().generation);
           objects.delete(key);
         },
       };
@@ -47,16 +88,16 @@ function fixture() {
   };
   const host = randomUUID();
   const guest = randomUUID();
+  const roomId = randomUUID();
+  const spec = { scenarioId: 106, difficulty: "Employee" };
+  loadSimData(matchScenario(spec).location);
+  const seats = [
+    { id: host, name: "Host" },
+    { id: guest, name: "Guest" },
+  ];
   const world = {
-    schema: 3,
-    gameSchema: 1,
-    rules: "compatibility",
-    epoch: randomUUID(),
-    matchId: randomUUID(),
+    ...checkpointWorld(createWorld(spec, seats, randomUUID(), randomUUID())),
     revision: 4,
-    spec: { scenarioId: 1 },
-    seats: [{ id: host }, { id: guest }],
-    grids: [{}, {}],
   };
   const state = {
     hostId: host,
@@ -65,11 +106,13 @@ function fixture() {
     epoch: world.epoch,
     members: world.seats,
     head: null,
+    requiredIds: seats.map(({ id }) => id),
   };
   function context(seatId = host) {
     return {
       bucket,
-      roomId: "room",
+      roomId,
+      checkpointValidatorPath,
       seatId,
       hostId: host,
       room: { ...state },
@@ -79,9 +122,12 @@ function fixture() {
         Object.assign(state, room);
         return value;
       },
+      async recheck() {
+        return { ...state };
+      },
     };
   }
-  return { context, objects, state, world, guest };
+  return { bucket, context, objects, roomId, state, world, guest };
 }
 
 test("publishes immutable checkpoints and repeats an exact authorized save", async () => {
@@ -129,4 +175,119 @@ test("a superseded write cannot change a newer head", async () => {
     code: "checkpoint-conflict",
   });
   assert.equal(state.head.revision, 20);
+});
+
+test("rejects invalid grids and incompatible save schemas before writing an object", async () => {
+  const { context, objects, world, state } = fixture();
+  await assert.rejects(
+    handle("save/publish", context(), encoded({ ...world, grids: [{}, {}] })),
+    { code: "invalid-checkpoint" },
+  );
+  await assert.rejects(
+    handle(
+      "save/publish",
+      context(),
+      encoded({ ...world, gameSchema: world.gameSchema + 1 }),
+    ),
+    { code: "invalid-checkpoint" },
+  );
+  assert.equal(objects.size, 0);
+  assert.equal(state.head, null);
+});
+
+test("pins the campaign setup and disallows conflicting bytes at the same revision", async () => {
+  const { context, objects, world, state } = fixture();
+  const data = encoded(world);
+  await handle("save/publish", context(), { ...data, explicit: false });
+  assert.equal(state.explicitHead, null);
+  await handle("save/publish", context(), data);
+  assert.equal(state.explicitHead.id, state.head.id);
+  assert.equal(objects.size, 1);
+  await assert.rejects(
+    handle(
+      "save/publish",
+      context(),
+      encoded({ ...world, pricePerMWh: world.pricePerMWh + 1 }),
+    ),
+    { code: "checkpoint-conflict" },
+  );
+  const alternate = checkpointWorld(
+    createWorld(
+      {
+        ...world.spec,
+        difficulty: "Manager",
+      },
+      world.seats,
+      world.matchId,
+      world.epoch,
+    ),
+  );
+  await assert.rejects(
+    handle(
+      "save/publish",
+      context(),
+      encoded({ ...alternate, revision: world.revision + 1 }),
+    ),
+    { code: "checkpoint-conflict" },
+  );
+  assert.equal(state.head.digest, data.digest);
+  assert.equal(objects.size, 1);
+});
+
+test("requires the same restore generation after reading from storage", async () => {
+  const { context, world, state } = fixture();
+  await handle("save/publish", context(), encoded(world));
+  const reader = context();
+  await handle(
+    "save/publish",
+    context(),
+    encoded({ ...world, revision: world.revision + 1 }),
+  );
+  assert.notEqual(reader.room.head.id, state.head.id);
+  await assert.rejects(handle("save/read", reader, {}), {
+    code: "checkpoint-conflict",
+  });
+  const exportResult = await handle("save/download", reader, {});
+  assert.equal(exportResult.digest, reader.room.head.digest);
+});
+
+test("reaps abandoned objects by generation while preserving every pinned checkpoint", async () => {
+  const { bucket, context, objects, roomId, world, state } = fixture();
+  await handle("save/publish", context(), encoded(world));
+  const pinned = `checkpoints/${roomId}/${state.head.id}`;
+  const obsolete = `checkpoints/${roomId}/${randomUUID()}`;
+  const abandoned = `staging/${roomId}/${randomUUID()}`;
+  const now = Date.now();
+  for (const [key, age] of [
+    [pinned, 1_000_000],
+    [obsolete, 1_000_000],
+    [abandoned, 200_000],
+  ]) {
+    objects.set(key, {
+      generation: objects.get(key)?.generation ?? "4",
+      timeCreated: new Date(now - age).toISOString(),
+    });
+  }
+  await reap(
+    bucket,
+    async (id) => {
+      assert.equal(id, roomId);
+      return state;
+    },
+    now,
+  );
+  assert.deepEqual([...objects.keys()], [pinned]);
+});
+
+test("preserves the original roster and removes retired guests from required attendance", async () => {
+  const { context, guest, world, state } = fixture();
+  const hostId = state.hostId;
+  const ended = {
+    ...world,
+    outcomes: { [guest]: { outcome: "bankrupt", title: "Bankrupt", month: 0 } },
+  };
+  await handle("save/publish", context(), encoded(ended));
+  assert.deepEqual(state.head.seats, world.seats);
+  assert.deepEqual(state.requiredIds, [hostId]);
+  assert.deepEqual(state.members, world.seats);
 });
