@@ -45,7 +45,7 @@ test("the selected pair must match both authenticated relay endpoints", async ()
     address: "9.9.9.9",
     port: 8888,
   };
-  const stats = new Map([
+  const stats = new Map<string, object>([
     ["transport", { type: "transport", selectedCandidatePairId: "pair" }],
     [
       "pair",
