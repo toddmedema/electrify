@@ -274,14 +274,22 @@ test("first tutorial keeps its sources through the real native song boundary", a
   });
   await page.getByRole("button", { name: "Tutorials", exact: true }).click();
   await expect(page.locator(".tutorialHud")).toBeVisible();
-  await waitForGameplayLoop(page);
-  const before = await playbackSnapshot(page);
-  const durations = before.starts.slice(-3).map((entry) => entry.duration);
-  expect(new Set(durations).size).toBe(1);
   await expect
-    .poll(async () => (await playbackSnapshot(page)).active[0]?.position)
-    .toBeGreaterThan(durations[0] + 0.3);
-  await expectContinuousMusic(page, before);
+    .poll(() => page.evaluate(() => window.electrifyMusicStarts))
+    .toHaveLength(5);
+  const opening = await playbackSnapshot(page);
+  // The stems are scheduled during the intro. Waiting for it to end would miss their first wrap.
+  const stems = opening.active.filter(({ id }) => opening.starts[id].loop);
+  expect(stems).toHaveLength(3);
+  const durations = stems.map(({ id }) => opening.starts[id].duration);
+  expect(new Set(durations).size).toBe(1);
+  for (const stem of stems) expect(stem.position).toBeLessThan(durations[0]);
+
+  const before = { ...opening, active: stems };
+  await waitForGameplayLoop(page);
+  const playback = await expectContinuousMusic(page, before);
+  for (const stem of playback.active)
+    expect(stem.position).toBeGreaterThan(durations[0] + 0.3);
   await page.getByRole("button", { name: "Next", exact: true }).click();
   await expectContinuousMusic(page, before);
 });
