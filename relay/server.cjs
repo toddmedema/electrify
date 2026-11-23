@@ -351,7 +351,6 @@ function createRelay({
           typeof input.lobbyId === "string" && CODE.test(input.lobbyId),
           "Enter a six-digit invite code.",
         );
-        if (room) detach(peer, true);
         const next = codes.get(input.lobbyId);
         requireValue(
           next && next.members.get(next.hostId)?.peer,
@@ -428,7 +427,7 @@ function createRelay({
           room?.hostId === id,
           "Only the host can reopen the lobby.",
         );
-        room.locked = false;
+        room.locked = undefined;
         for (const [member, entry] of room.members)
           if (!entry.peer) room.members.delete(member);
         return state(peer);
@@ -482,12 +481,8 @@ function createRelay({
       let lastMessage = Date.now();
       const respond = (id, result) => send(websocket, { reply: id, result });
       const timer = setInterval(() => {
-        if (
-          !alive ||
-          !peer.id ||
-          (peer.room?.locked && Date.now() - lastMessage > 5000)
-        )
-          return websocket.terminate();
+        // Hidden tabs can suspend application timers while still answering WebSocket pings.
+        if (!alive || !peer.id) return websocket.terminate();
         alive = false;
         websocket.ping();
       }, 15_000);

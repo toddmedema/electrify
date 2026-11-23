@@ -10,8 +10,6 @@ const WORLDS = "worlds";
 const MAX_SAVES = 32;
 
 export function browserCheckpoints(): CheckpointStore {
-  const readEpochs = new Map<string, string>();
-
   async function transaction<Result>(
     mode: IDBTransactionMode,
     handle: (
@@ -76,30 +74,25 @@ export function browserCheckpoints(): CheckpointStore {
   }
 
   return {
-    async read(id) {
-      const world = await transaction<World | null>(
-        "readonly",
-        (campaigns, worlds, set) => {
-          const readWorld = (matchId: string) => {
-            const request = worlds.get(matchId);
-            request.onsuccess = () =>
-              set((request.result as World | undefined) ?? null);
+    read(id) {
+      return transaction<World | null>("readonly", (campaigns, worlds, set) => {
+        const readWorld = (matchId: string) => {
+          const request = worlds.get(matchId);
+          request.onsuccess = () =>
+            set((request.result as World | undefined) ?? null);
+        };
+        if (id) readWorld(id);
+        else {
+          const request = campaigns
+            .index("updatedAt")
+            .openKeyCursor(null, "prev");
+          request.onsuccess = () => {
+            const match = request.result;
+            if (match) readWorld(String(match.primaryKey));
+            else set(null);
           };
-          if (id) readWorld(id);
-          else {
-            const request = campaigns
-              .index("updatedAt")
-              .openKeyCursor(null, "prev");
-            request.onsuccess = () => {
-              const match = request.result;
-              if (match) readWorld(String(match.primaryKey));
-              else set(null);
-            };
-          }
-        },
-      );
-      if (world) readEpochs.set(world.matchId, world.epoch);
-      return world;
+        }
+      });
     },
     list,
     async remove(id) {
@@ -109,7 +102,7 @@ export function browserCheckpoints(): CheckpointStore {
       });
       return list();
     },
-    write(world) {
+    write(world, source) {
       return transaction<void>("readwrite", (campaigns, worlds, _, fail) => {
         const current = campaigns.get(world.matchId);
         current.onsuccess = () => {
@@ -119,12 +112,13 @@ export function browserCheckpoints(): CheckpointStore {
             previous.revision > world.revision
           )
             return;
-          // Concurrent tabs can both load a campaign. Only the first resumed epoch can
-          // replace its source checkpoint; the other must refresh before it can save.
+          // A continuation can replace the checkpoint it started from while that version is current.
           if (
             previous &&
             previous.epoch !== world.epoch &&
-            previous.epoch !== readEpochs.get(world.matchId)
+            (source?.matchId !== previous.matchId ||
+              source.epoch !== previous.epoch ||
+              source.revision !== previous.revision)
           ) {
             fail(new Error("This campaign has a newer save in another tab."));
             return;
@@ -147,11 +141,12 @@ export function browserCheckpoints(): CheckpointStore {
           const cursor = campaigns
             .index("updatedAt")
             .openKeyCursor(null, "prev");
-          let retained = 0;
+          // Reserve a slot for this save even if the system clock moved backwards.
+          let retained = 1;
           cursor.onsuccess = () => {
             const row = cursor.result;
             if (!row) return;
-            if (++retained > MAX_SAVES) {
+            if (row.primaryKey !== world.matchId && ++retained > MAX_SAVES) {
               campaigns.delete(row.primaryKey);
               worlds.delete(row.primaryKey);
             }

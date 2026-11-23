@@ -20,6 +20,7 @@ async function fixture(t) {
   });
   return {
     url,
+    sockets,
     async player(origin = WEB, token = randomUUID()) {
       const socket = new WebSocket(url, { origin });
       await once(socket, "open");
@@ -210,6 +211,117 @@ test(
         !event.state.error,
     );
     assert.equal(revived.state.lobbyId, lobby.lobbyId);
+  },
+);
+
+test(
+  "a rejected room switch keeps the hosted lobby open",
+  { timeout: 5000 },
+  async (t) => {
+    const relay = await fixture(t);
+    const host = await relay.player();
+    const guest = await relay.player();
+    const current = await host.ask({ kind: "create", rules: RULES });
+    await guest.ask({
+      kind: "join",
+      lobbyId: current.inviteCode,
+      rules: RULES,
+    });
+    const missing = String(
+      (Number(current.inviteCode) + 1) % 1_000_000,
+    ).padStart(6, "0");
+
+    await assert.rejects(
+      host.ask({ kind: "join", lobbyId: missing, rules: RULES }),
+      /No game found/,
+    );
+    assert.deepEqual((await guest.ask({ kind: "state" })).connected, [
+      host.selfId,
+    ]);
+    assert.equal((await host.ask({ kind: "state" })).lobbyId, current.lobbyId);
+
+    const friend = await relay.player();
+    const next = await friend.ask({ kind: "create", rules: RULES });
+    const joined = await host.ask({
+      kind: "join",
+      lobbyId: next.inviteCode,
+      rules: RULES,
+    });
+    assert.equal(joined.lobbyId, next.lobbyId);
+    const closed = await guest.next(
+      (event) => event.kind === "state" && event.state.error,
+    );
+    assert.equal(closed.state.lobbyId, current.lobbyId);
+  },
+);
+
+test(
+  "a disconnected guest can rejoin a reopened lobby",
+  { timeout: 5000 },
+  async (t) => {
+    const relay = await fixture(t);
+    const host = await relay.player();
+    const guest = await relay.player();
+    const current = await host.ask({ kind: "create", rules: RULES });
+    await guest.ask({
+      kind: "join",
+      lobbyId: current.inviteCode,
+      rules: RULES,
+    });
+    const ids = [host.selfId, guest.selfId];
+    await host.ask({ kind: "lock", ids, requiredIds: ids });
+    await host.ask({ kind: "unlock" });
+    await guest.close();
+
+    const disconnected = await host.next(
+      (event) => event.kind === "state" && !event.state.connected.length,
+    );
+    assert.deepEqual(
+      disconnected.state.members.map(({ id }) => id),
+      [host.selfId],
+    );
+    const returning = await relay.player(WEB, guest.token);
+    const rejoined = await returning.ask({
+      kind: "reconnect",
+      roomId: current.lobbyId,
+    });
+    assert.deepEqual(rejoined.connected, [host.selfId]);
+  },
+);
+
+test(
+  "a paused room stays connected on protocol heartbeats alone",
+  { timeout: 5000 },
+  async (t) => {
+    t.mock.timers.enable({ apis: ["setInterval", "Date"], now: 0 });
+    const relay = await fixture(t);
+    const host = await relay.player();
+    const guest = await relay.player();
+    const current = await host.ask({ kind: "create", rules: RULES });
+    await guest.ask({
+      kind: "join",
+      lobbyId: current.inviteCode,
+      rules: RULES,
+    });
+    const ids = [host.selfId, guest.selfId];
+    await host.ask({ kind: "lock", ids, requiredIds: ids });
+
+    for (let heartbeat = 0; heartbeat < 2; heartbeat++) {
+      const reply = Promise.all(
+        [...relay.sockets.clients].map((socket) =>
+          Promise.race([
+            once(socket, "pong").then(() => "pong"),
+            once(socket, "close").then(() => "close"),
+          ]),
+        ),
+      );
+      // A hidden tab's application timers may stop running while the browser handles Pong.
+      t.mock.timers.tick(15_000);
+      assert.deepEqual(await reply, ["pong", "pong"]);
+    }
+    assert.deepEqual((await guest.ask({ kind: "state" })).connected, [
+      host.selfId,
+    ]);
   },
 );
 

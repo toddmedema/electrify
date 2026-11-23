@@ -39,17 +39,73 @@ test("browser saves keep their checkpoint across storage instances and remove it
   expect(await afterReload.read(world.matchId)).toBeNull();
 });
 
-test("resuming and writing in two tabs cannot overwrite the first resumed checkpoint", async () => {
+test("a stale continuation cannot overwrite a newer revision of its source epoch", async () => {
+  const host = browserCheckpoints();
+  const resuming = browserCheckpoints();
+  const original = checkpoint();
+  await host.write(original);
+  const source = (await resuming.read(original.matchId))!;
+  const newer = { ...original, revision: 2 };
+  await host.write(newer);
+
+  const continuation = { ...source, epoch: "continued", revision: 3 };
+  await expect(resuming.write(continuation, source)).rejects.toThrow(
+    /newer save/,
+  );
+  const refreshed = (await resuming.read(original.matchId))!;
+  expect(refreshed).toEqual(newer);
+  const restarted = { ...refreshed, epoch: "restarted", revision: 3 };
+  await resuming.write(restarted, refreshed);
+  expect(await host.read(original.matchId)).toEqual(restarted);
+});
+
+test("reading another epoch cannot authorize a running continuation to replace it", async () => {
   const one = browserCheckpoints();
   const two = browserCheckpoints();
   const original = checkpoint();
   await one.write(original);
-  await Promise.all([one.read(original.matchId), two.read(original.matchId)]);
+  const [sourceA, sourceB] = await Promise.all([
+    one.read(original.matchId),
+    two.read(original.matchId),
+  ]);
   const first = { ...original, epoch: "continued-a", revision: 2 };
-  await one.write(first);
-  await expect(
-    two.write({ ...original, epoch: "continued-b", revision: 2 }),
-  ).rejects.toThrow(/newer save/);
+  await one.write(first, sourceA!);
+  const second = { ...original, epoch: "continued-b", revision: 2 };
+  await expect(two.write(second, sourceB!)).rejects.toThrow(/newer save/);
+  const refreshed = (await two.read(original.matchId))!;
+  expect(refreshed).toEqual(first);
+  await expect(two.write(second, sourceB!)).rejects.toThrow(/newer save/);
+
   await one.write({ ...first, revision: 1 });
   expect(await two.read(original.matchId)).toEqual(first);
+  const restarted = { ...refreshed, epoch: "restarted", revision: 3 };
+  await two.write(restarted, refreshed);
+  expect(await one.read(original.matchId)).toEqual(restarted);
+});
+
+test("retention keeps a newly saved campaign after the system clock goes back", async () => {
+  const storage = browserCheckpoints();
+  const start = Date.now() + 1000;
+  const now = jest.spyOn(Date, "now");
+  try {
+    const oldest = checkpoint();
+    now.mockReturnValue(start);
+    await storage.write(oldest);
+    for (let index = 1; index < 32; index++) {
+      now.mockReturnValue(start + index);
+      await storage.write(checkpoint());
+    }
+
+    const newSave = checkpoint();
+    now.mockReturnValue(start - 1000);
+    await storage.write(newSave);
+    const { slots } = await storage.list(false);
+    expect(slots).toHaveLength(32);
+    expect(slots.map(({ id }) => id)).toContain(newSave.matchId);
+    expect(slots.map(({ id }) => id)).not.toContain(oldest.matchId);
+    expect(await storage.read(newSave.matchId)).toEqual(newSave);
+    expect(await storage.read(oldest.matchId)).toBeNull();
+  } finally {
+    now.mockRestore();
+  }
 });

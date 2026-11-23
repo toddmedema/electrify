@@ -10,7 +10,6 @@ import type {
 import { decodeWire, encodeWire } from "./WireJson";
 
 const REQUEST_TIMEOUT = 10_000;
-const PULSE_INTERVAL = 2_000;
 const MAX_BUFFERED_BYTES = 16 * 1024 * 1024;
 const CONNECTION_ERROR = "Could not reach the multiplayer service. Try again.";
 const IDENTITY_KEY = "electrify-coop-player";
@@ -117,7 +116,6 @@ export function relaySessionServices(
 ): SessionServices {
   let token: string | undefined;
   let connection: ReturnType<typeof openRelay> | undefined;
-  let pulse: ReturnType<typeof setInterval> | undefined;
   let lobby: LobbyState = { available: true, members: [], connected: [] };
   const events = new Set<(event: SessionEvent) => void>();
 
@@ -174,17 +172,11 @@ export function relaySessionServices(
           throw new Error(CONNECTION_ERROR);
         }
         await current.ready;
-        const roomId = lobby.lobbyId;
-        if (input.kind === "join")
-          lobby = {
-            available: true,
-            selfId: lobby.selfId,
-            members: [],
-            connected: [],
-          };
         try {
           const result = await current.ask(
-            input.kind === "reconnect" ? { ...input, roomId } : input,
+            input.kind === "reconnect"
+              ? { ...input, roomId: lobby.lobbyId }
+              : input,
           );
           if (result) lobby = result as LobbyState;
           return result as SessionReply<Request>;
@@ -196,16 +188,9 @@ export function relaySessionServices(
       },
       subscribe(listener) {
         events.add(listener);
-        pulse ??= setInterval(() => {
-          if (lobby.lobbyId)
-            void connection?.ask({ kind: "pulse" }).catch(() => undefined);
-        }, PULSE_INTERVAL);
         return () => {
           events.delete(listener);
-          if (events.size) return;
-          clearInterval(pulse);
-          pulse = undefined;
-          connection?.close();
+          if (!events.size) connection?.close();
         };
       },
     },

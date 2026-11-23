@@ -191,6 +191,9 @@ for (const steamHost of [false, true]) {
           "data-active-speed",
           "PAUSED",
         );
+      await host.getByRole("button", { name: /^menu/ }).click();
+      await host.getByRole("menuitem", { name: "Save & Quit" }).click();
+      await expect(mainEntry(host)).toBeVisible();
     } finally {
       await otherContext.close();
     }

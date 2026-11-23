@@ -1237,6 +1237,13 @@ export class MultiplayerSession {
           : null;
       if ("saved" in choice && !world)
         throw new Error("No multiplayer save on this computer yet");
+      const checkpointSource = world
+        ? {
+            matchId: world.matchId,
+            epoch: world.epoch,
+            revision: world.revision,
+          }
+        : undefined;
       const { members } = this.state.lobby;
       if ("spec" in choice && choice.spec.customScenario?.mod) {
         const browse = this.state.browse;
@@ -1300,7 +1307,9 @@ export class MultiplayerSession {
         if (data.kind === "checkpoint") {
           this.saving = this.saving
             .catch(() => {})
-            .then(() => this.services.checkpoints.write(data.world));
+            .then(() =>
+              this.services.checkpoints.write(data.world, checkpointSource),
+            );
           void this.saving.catch((error) =>
             this.update({ error: `Multiplayer save failed: ${error.message}` }),
           );
