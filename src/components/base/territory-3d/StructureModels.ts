@@ -586,6 +586,8 @@ function solar(damaged: boolean, size: FacilitySize): MapModel {
   );
 }
 
+const turbineWhite: RGB = [1, 1, 1];
+
 /** A small solid loft: rounded +X leading edge, thin -X trailing edge. */
 function windBlade(spanScale: number, chordScale: number): MapMesh {
   const mesh = new MeshBuilder();
@@ -630,7 +632,7 @@ function windBlade(spanScale: number, chordScale: number): MapMesh {
         rings[span + 1][edge],
         rings[span + 1][next],
         rings[span][next],
-        edge < 2 ? P.steel : edge < 4 ? P.mint : P.cream,
+        turbineWhite,
       );
     }
   for (let edge = 0; edge < profile.length; edge++) {
@@ -640,13 +642,13 @@ function windBlade(spanScale: number, chordScale: number): MapMesh {
       [sections[0][1], sections[0][0], sections[0][2]],
       rings[0][edge],
       rings[0][next],
-      P.steel,
+      turbineWhite,
     );
     mesh.triangle(
       [sections[tip][1], sections[tip][0], sections[tip][2]],
       rings[tip][next],
       rings[tip][edge],
-      P.cream,
+      turbineWhite,
     );
   }
   return mesh.build();
@@ -721,12 +723,19 @@ function wind(kind: "wind" | "offshore-wind", size: FacilitySize): MapModel {
     body.box([0, deck / 2, 0], [width, deck, width - 0.01], P.steel);
   }
 
-  body.cylinder([0, deck, 0], 0.026 * tower, 0.015 * tower, mast, P.cream, 8);
+  body.cylinder(
+    [0, deck, 0],
+    0.026 * tower,
+    0.015 * tower,
+    mast,
+    turbineWhite,
+    8,
+  );
   const pivot: Vec3 = [0, deck + mast - 0.005, 0.045 * tower];
   body.box(
     [0, pivot[1], 0],
     [0.07 * tower, 0.045 * tower, 0.1 * tower],
-    P.steel,
+    turbineWhite,
   );
   const rotor = new MeshBuilder();
   const blade = windBlade(span, chord);
@@ -739,7 +748,7 @@ function wind(kind: "wind" | "offshore-wind", size: FacilitySize): MapModel {
         0.025 * chord,
         0.018 * chord,
         0.028 * chord,
-        P.cream,
+        turbineWhite,
         8,
       )
       .build(),
