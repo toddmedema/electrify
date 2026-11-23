@@ -544,7 +544,6 @@ type Extension = (
     updateRoom<Result>(
       update: (
         room: Room,
-        seat: RoomMember,
         now: number,
         projected: Room,
       ) => { room?: Room; value?: Result },
@@ -608,7 +607,7 @@ export function crossplayFixture() {
   });
 
   const signal: Extension = async (operation, context, body) =>
-    context.updateRoom<unknown>((draft, _seat, now, room) => {
+    context.updateRoom<unknown>((draft, now, room) => {
       const host = room.members.find(
         ({ id, active }) => id === room.hostId && active,
       );
