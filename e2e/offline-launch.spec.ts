@@ -88,7 +88,12 @@ test("installed play preloads official weather and enables custom cities after s
   page,
   context,
 }, { project }) => {
-  await page.addInitScript(() => {
+  const offlineKey = "electrify-test-offline";
+  await page.addInitScript((key) => {
+    // Keep the emulated offline state through the guided setup's new document.
+    Object.defineProperty(navigator, "onLine", {
+      get: () => sessionStorage.getItem(key) !== "true",
+    });
     Object.defineProperty(navigator, "standalone", { value: true });
     localStorage.setItem("audioEnabled", "false");
     localStorage.setItem(
@@ -97,7 +102,7 @@ test("installed play preloads official weather and enables custom cities after s
         plays: [{ scenarioId: 0, timesPlayed: 1, date: new Date().toString() }],
       }),
     );
-  });
+  }, offlineKey);
   await page.goto("/");
   const cachedWeather = (ids: string[]) =>
     page.evaluate(
@@ -133,6 +138,7 @@ test("installed play preloads official weather and enables custom cities after s
     .click();
   await expect.poll(() => cachedWeather(["Zurich"])).toEqual([true]);
 
+  await page.evaluate((key) => sessionStorage.setItem(key, "true"), offlineKey);
   await context.setOffline(true);
   await weatherSearch.fill("Tokyo");
   const unavailable = page.getByRole("option", {
@@ -165,4 +171,21 @@ test("installed play preloads official weather and enables custom cities after s
   await expect(
     page.getByRole("list", { name: "Plants and storage" }),
   ).toBeVisible();
+
+  await page.goto("/?dataCenters=1");
+  await expect(
+    page.getByRole("heading", { name: "Explore data center growth" }),
+  ).toBeVisible();
+  const guidedSearch = page.getByRole("combobox", { name: "Select a city" });
+  await guidedSearch.fill("Tokyo");
+  await expect(
+    page.getByRole("option", { name: "Tokyo, Japan", exact: true }),
+  ).toBeDisabled();
+  await guidedSearch.fill("Pittsburgh");
+  await page
+    .getByRole("option", { name: "Pittsburgh, PA", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Start exploring", exact: true }),
+  ).toBeEnabled();
 });
