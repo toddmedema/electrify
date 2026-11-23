@@ -1,4 +1,5 @@
 import { currentTick } from "../../helpers/GameSelectors";
+import { topBarForecastEndMinute } from "../../helpers/Projection";
 import * as React from "react";
 import { Button, useMediaQuery } from "@mui/material";
 import { EvidenceTargetType, GameType } from "../../Types";
@@ -22,8 +23,7 @@ import {
 
 type MissionStatus = ReturnType<typeof getMissionStatus>;
 
-// Risks selectMissionRisk returns before it reaches the cash runway, which is the only check that
-// reads the long-range projection
+// Risks selectMissionRisk returns before it reads the top-bar forecast.
 function readsProjection(risk: MissionRisk | undefined): boolean {
   return !(
     risk &&
@@ -85,15 +85,16 @@ function useMissionRisk(
   }>();
   const [, landed] = React.useReducer((count: number) => count + 1, 0);
   React.useEffect(
-    () => (enabled ? subscribeProjection(landed) : undefined),
+    () => (enabled ? subscribeProjection(landed, "top-bar") : undefined),
     [enabled],
   );
   const now = currentTick(game);
   const defer =
     enabled &&
     !!now &&
+    game.date.minute < topBarForecastEndMinute(game) &&
     (!!last.current || typeof Worker !== "undefined") &&
-    !projectionReady(game) &&
+    !projectionReady(game, "top-bar") &&
     !earlyRiskDue(game, mission);
   const previousRisk =
     last.current?.scope === scope &&
@@ -109,7 +110,7 @@ function useMissionRisk(
   React.useEffect(() => {
     if (!enabled) return;
     last.current = { risk, scope, month: game.date.monthsElapsed };
-    if (defer && now) requestProjection(game, now);
+    if (defer && now) requestProjection(game, now, "top-bar");
   });
   return risk;
 }

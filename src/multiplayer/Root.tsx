@@ -1,3 +1,4 @@
+import { steamSessionServices } from "./SteamSessionServices";
 import { achievementJournal } from "../achievements/Journal";
 import { unlockedDifficulty } from "../achievements/DifficultyUnlocks";
 import {
@@ -59,7 +60,7 @@ export default function MultiplayerRoot() {
   const [session] = useState(
     () =>
       new MultiplayerSession(
-        getDesktop()!,
+        steamSessionServices(getDesktop()),
         async () => (await import("./WorkerClient")).createMultiplayerWorker(),
         async () =>
           (await import("./WorkerClient")).createMultiplayerReplicaWorker(),
@@ -184,16 +185,6 @@ export default function MultiplayerRoot() {
     );
   }, [session]);
 
-  const invite = useCallback(() => {
-    void session
-      .invite()
-      .catch((error) =>
-        store.dispatch(
-          snackbarOpen({ message: error.message, open: true, timeout: 6000 }),
-        ),
-      );
-  }, [session]);
-
   useEffect(() => {
     registerLobbyOpener(() => {
       const couch = getDesktop()?.couchRequest;
@@ -314,25 +305,29 @@ export default function MultiplayerRoot() {
           }),
         );
       },
-      invite,
       copyCode,
       openSaves: () => setSavesOpen(true),
     });
-    const stopNative = getDesktop()?.onMultiplayerEvent?.((event) => {
-      if (event.kind === "invite" && !session.getSnapshot().view) {
-        setOpen(true);
-        void session.join(event.lobbyId).catch(() => undefined);
-      }
-    });
+    const acceptInvite = (lobbyId: string) => {
+      if (!live) return;
+      choosing.current = false;
+      setOpen(true);
+      void session.join(lobbyId).catch((error) => {
+        if (live)
+          store.dispatch(
+            snackbarOpen({
+              message:
+                error instanceof Error
+                  ? error.message
+                  : "Could not join the invited game.",
+              open: true,
+              timeout: 6000,
+            }),
+          );
+      });
+    };
     void session
-      .initialize()
-      .then(() => {
-        const invite = session.getSnapshot().lobby.inviteLobbyId;
-        if (invite) {
-          setOpen(true);
-          void session.join(invite).catch(() => undefined);
-        }
-      })
+      .initialize(acceptInvite)
       // A desktop build without Steam multiplayer keeps the lobby unavailable.
       .catch(() => undefined);
     return () => {
@@ -341,13 +336,12 @@ export default function MultiplayerRoot() {
       stopCoop();
       stopStore();
       stopProgress();
-      stopNative?.();
       registerLobbyOpener(undefined);
       registerCoopControls(undefined);
       registerMultiplayerRuntime(undefined);
       session.dispose();
     };
-  }, [session, syncCoop, leaveLobby, invite, copyCode]);
+  }, [session, syncCoop, leaveLobby, copyCode]);
   useEffect(() => {
     if (!hasView) return;
     return registerShutdownCheckpoint((reason) => {

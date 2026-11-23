@@ -62,7 +62,12 @@ it("computes a requested projection after paint and tells every subscriber at on
   expect(projectionReady(game)).toBe(false);
   jest.runAllTimers();
   expect(mockSelectProjection).toHaveBeenCalledTimes(1);
-  expect(mockSelectProjection).toHaveBeenCalledWith(game, now);
+  expect(mockSelectProjection).toHaveBeenCalledWith(
+    game,
+    now,
+    `month ${game.date.monthsElapsed}`,
+    "planning",
+  );
   expect(projectionReady(game)).toBe(true);
   expect(first).toHaveBeenCalledTimes(1);
   expect(second).toHaveBeenCalledTimes(1);
@@ -77,7 +82,12 @@ it("drops a request that newer inputs replaced before it ran", () => {
   requestProjection(newer, now);
   jest.runAllTimers();
   expect(mockSelectProjection).toHaveBeenCalledTimes(1);
-  expect(mockSelectProjection).toHaveBeenCalledWith(newer, now);
+  expect(mockSelectProjection).toHaveBeenCalledWith(
+    newer,
+    now,
+    "month 2",
+    "planning",
+  );
   unsubscribe();
 });
 
@@ -133,12 +143,63 @@ describe("worker forecasts", () => {
     });
     expect(mockCacheProjection).not.toHaveBeenCalled();
     jest.runAllTimers();
-    expect(mockCacheProjection).toHaveBeenCalledWith(game, projection);
+    expect(mockCacheProjection).toHaveBeenCalledWith(
+      game,
+      projection,
+      "planning",
+    );
     expect(projectionReady(game)).toBe(true);
     expect(changed).toHaveBeenCalledTimes(1);
     expect(mockSelectProjection).not.toHaveBeenCalled();
     unsubscribe();
     expect(worker.terminate).toHaveBeenCalledTimes(1);
+  });
+
+  it("settles concurrent top-bar and planning requests independently", () => {
+    const game = makeGame(18);
+    const topBarWorker: typeof worker = {
+      postMessage: jest.fn(),
+      terminate: jest.fn(),
+    };
+    mockCreateWorker.mockReturnValueOnce(topBarWorker);
+    const unsubscribeTopBar = subscribeProjection(jest.fn(), "top-bar");
+    const unsubscribePlanning = subscribeProjection(jest.fn());
+    try {
+      requestProjection(game, now, "top-bar");
+      requestProjection(game, now);
+      jest.runAllTimers();
+      const topBar = topBarWorker.postMessage.mock.calls[0][0];
+      const planning = worker.postMessage.mock.calls[0][0];
+      expect(topBar.scope).toBe("top-bar");
+      expect(planning.scope).toBe("planning");
+
+      topBarWorker.onmessage?.({
+        data: { requestId: topBar.requestId, transport: { months: 60 } },
+      });
+      jest.runAllTimers();
+      expect(projectionReady(game, "top-bar")).toBe(true);
+      expect(projectionReady(game)).toBe(false);
+      expect(mockCacheProjection).toHaveBeenCalledWith(
+        game,
+        { months: 60 },
+        "top-bar",
+      );
+
+      worker.onmessage?.({
+        data: { requestId: planning.requestId, transport: { months: 240 } },
+      });
+      jest.runAllTimers();
+      expect(projectionReady(game)).toBe(true);
+      expect(projectionReady(game, "top-bar")).toBe(true);
+      expect(mockCacheProjection).toHaveBeenCalledWith(
+        game,
+        { months: 240 },
+        "planning",
+      );
+    } finally {
+      unsubscribePlanning();
+      unsubscribeTopBar();
+    }
   });
 
   it("discards obsolete replies and collapses rapid edits to the newest snapshot", () => {
@@ -175,7 +236,12 @@ describe("worker forecasts", () => {
     worker.onerror?.();
     expect(mockSelectProjection).not.toHaveBeenCalled();
     jest.runAllTimers();
-    expect(mockSelectProjection).toHaveBeenCalledWith(game, now);
+    expect(mockSelectProjection).toHaveBeenCalledWith(
+      game,
+      now,
+      `month ${game.date.monthsElapsed}`,
+      "planning",
+    );
     expect(projectionReady(game)).toBe(true);
     unsubscribe();
   });
@@ -205,7 +271,11 @@ describe("worker forecasts", () => {
       data: { requestId: last.requestId, transport: { month: 11 } },
     });
     jest.runAllTimers();
-    expect(mockCacheProjection).toHaveBeenCalledWith(next, { month: 11 });
+    expect(mockCacheProjection).toHaveBeenCalledWith(
+      next,
+      { month: 11 },
+      "planning",
+    );
     expect(changed).toHaveBeenCalledTimes(1);
     unsubscribe();
   });
@@ -232,9 +302,13 @@ describe("worker forecasts", () => {
       data: { requestId: last.requestId, transport: { imported: true } },
     });
     jest.runAllTimers();
-    expect(mockCacheProjection).toHaveBeenCalledWith(imported, {
-      imported: true,
-    });
+    expect(mockCacheProjection).toHaveBeenCalledWith(
+      imported,
+      {
+        imported: true,
+      },
+      "planning",
+    );
     expect(changed).toHaveBeenCalledTimes(1);
     unsubscribe();
   });
@@ -253,7 +327,12 @@ describe("worker forecasts", () => {
     });
     expect(mockSelectProjection).not.toHaveBeenCalled();
     jest.runAllTimers();
-    expect(mockSelectProjection).toHaveBeenCalledWith(game, now);
+    expect(mockSelectProjection).toHaveBeenCalledWith(
+      game,
+      now,
+      `month ${game.date.monthsElapsed}`,
+      "planning",
+    );
     expect(projectionReady(game)).toBe(true);
     unsubscribe();
   });

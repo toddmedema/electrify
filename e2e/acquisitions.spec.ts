@@ -1,6 +1,6 @@
 import { acquisitionQuote } from "../src/helpers/Expansion";
 import { TERRAIN_LABELS } from "../src/data/TerrainLabels";
-import type { JSHandle, Locator, Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 import type { GameType } from "../src/Types";
 import type { MapCanvas } from "../src/components/base/territory-3d/Types";
 import { TERRITORY_TILES } from "../src/data/TerritoryTiles";
@@ -31,10 +31,7 @@ import {
 import { getTerrainModifiers } from "../src/helpers/TerrainModifiers";
 import { loadSimData } from "../src/testing/SimData";
 import { territoryTileViews } from "../src/helpers/TerritoryMapState";
-import {
-  groundAnchor,
-  hexCenter,
-} from "../src/components/base/TerritoryHexGeometry";
+import { hexCenter } from "../src/components/base/TerritoryHexGeometry";
 import { expect, test } from "./fixtures";
 import { reviewScreenshot } from "./review-screenshot";
 import { expectDialogToFit } from "./dialog-layout";
@@ -61,12 +58,8 @@ async function openMap(page: Page) {
   return returnToTerritoryMap(page);
 }
 
-async function startMap(
-  page: Page,
-  theme: "light" | "dark",
-  simplified = false,
-) {
-  if (!simplified) await page.emulateMedia({ reducedMotion: "reduce" });
+async function startMap(page: Page, theme: "light" | "dark") {
+  await page.emulateMedia({ reducedMotion: "reduce" });
   await page.addInitScript((mode) => {
     localStorage.setItem("theme", mode);
     localStorage.setItem("audioEnabled", "false");
@@ -80,7 +73,7 @@ async function startMap(
   const network = await openMap(page);
   await expect(network.locator("canvas.territory3DCanvas")).toHaveAttribute(
     "data-renderer",
-    simplified ? "unavailable" : "ready",
+    "ready",
   );
   // The map can render before the asynchronous save session has its first snapshot.
   const saveState = page.locator("#appbar:visible [data-save-state]").first();
@@ -180,98 +173,42 @@ function connectFrontierToSite(game: GameType, tile: TerritoryTileDefinition) {
 /** Every mounted tile is a truthful subset of the discovered map; offscreen cells are culled. */
 async function expectPhysicalMap(network: Locator, game: GameType) {
   const views = territoryTileViews(game);
+  await expect(network.locator("canvas.territory3DCanvas")).toHaveAttribute(
+    "data-renderer",
+    "ready",
+  );
   // Resize/focus can move the camera between awaits. Compare one physical render.
-  const {
-    targets,
-    viewport,
-    artworkCount,
-    occupants,
-    wires,
-    wireShapes,
-    scene,
-  } = await network.evaluate((element) => {
+  const { targets, viewport, scene } = await network.evaluate((element) => {
     const viewport = element
       .querySelector(".territoryMapViewport")!
       .getBoundingClientRect();
-    const canvas = element.querySelector<MapCanvas>("canvas.territory3DCanvas");
-    const scene =
-      canvas?.dataset.renderer === "ready"
-        ? canvas.map3DDiagnostics?.(true).scene
-        : undefined;
-    const connections = scene?.flatMap(
-      (instance) => instance.connections ?? [],
-    );
+    const canvas = element.querySelector<MapCanvas>(
+      "canvas.territory3DCanvas",
+    )!;
     return {
-      scene,
+      scene: canvas.map3DDiagnostics!(true).scene!,
       viewport: {
         x: viewport.x,
         y: viewport.y,
         width: viewport.width,
         height: viewport.height,
       },
-      artworkCount: element.querySelectorAll(".territoryTerrainArtwork").length,
       targets: Array.from(
-        element.querySelectorAll("button[data-map-target]"),
-      ).map((button) => ({
-        id: button.getAttribute("data-map-target")!,
-        territoryId: button.getAttribute("data-territory"),
-        terrain: button.getAttribute("data-terrain"),
-        owned: button.getAttribute("data-owned"),
-        width: button.getBoundingClientRect().width,
-        height: button.getBoundingClientRect().height,
-        x:
-          button.getBoundingClientRect().x +
-          button.getBoundingClientRect().width / 2,
-        y:
-          button.getBoundingClientRect().y +
-          button.getBoundingClientRect().height / 2,
-        selected: button.getAttribute("aria-pressed") === "true",
-        distance: scene
-          ? String(
-              scene.find(
-                (instance) =>
-                  instance.id ===
-                  `terrain:${button.getAttribute("data-map-target")}`,
-              )?.fog,
-            )
-          : element
-              .querySelector(
-                `[data-tile="${button.getAttribute("data-map-target")}"]`,
-              )
-              ?.getAttribute("data-visibility-distance"),
-      })),
-      occupants: Array.from(
-        element.querySelectorAll(".territoryTileOccupant"),
-      ).map((occupant) => ({
-        id: occupant.getAttribute("data-occupant-tile"),
-        kind: occupant.getAttribute("data-occupant"),
-        distance: occupant.getAttribute("data-visibility-distance"),
-      })),
-      wireShapes: connections
-        ? connections.map((wire) => ({ ...wire, path: null as string | null }))
-        : Array.from(
-            element.querySelectorAll("[data-wire-from][data-wire-to]"),
-          ).map((wire) => ({
-            from: wire.getAttribute("data-wire-from")!,
-            to: wire.getAttribute("data-wire-to")!,
-            kind: wire.getAttribute("data-wire-kind"),
-            path: wire.querySelector(".territoryWire")!.getAttribute("d")!,
-            start: undefined,
-            end: undefined,
-            lowY: undefined,
-          })),
-      wires: connections
-        ? connections.map((wire) => [wire.from, wire.to].sort().join("|"))
-        : Array.from(
-            element.querySelectorAll("[data-wire-from][data-wire-to]"),
-          ).map((wire) =>
-            [
-              wire.getAttribute("data-wire-from"),
-              wire.getAttribute("data-wire-to"),
-            ]
-              .sort()
-              .join("|"),
-          ),
+        element.querySelectorAll<HTMLButtonElement>("button[data-map-target]"),
+      ).map((button) => {
+        const bounds = button.getBoundingClientRect();
+        return {
+          id: button.dataset.mapTarget!,
+          territoryId: button.dataset.territory,
+          terrain: button.dataset.terrain,
+          owned: button.dataset.owned,
+          width: bounds.width,
+          height: bounds.height,
+          x: bounds.x + bounds.width / 2,
+          y: bounds.y + bounds.height / 2,
+          selected: button.getAttribute("aria-pressed") === "true",
+        };
+      }),
     };
   });
   expect(targets.length).toBeGreaterThan(0);
@@ -299,63 +236,44 @@ async function expectPhysicalMap(network: Locator, game: GameType) {
         viewport.y + viewport.height + padding,
       );
     }
-    expect(target.distance).toBe(String(view.visibilityDistance));
   }
-  if (scene) {
-    expect(artworkCount).toBe(0);
-    const terrain = scene.filter((instance) =>
-      instance.id.startsWith("terrain:"),
-    );
-    expect(terrain.map((instance) => instance.id.slice(8)).sort()).toEqual(
-      [...rendered].sort(),
-    );
-    expect(
-      scene
-        .filter((instance) => instance.id.startsWith("structure:"))
-        .map((instance) => instance.id.slice(10))
-        .sort(),
-    ).toEqual(occupants.map((occupant) => occupant.id!).sort());
-    for (const instance of scene) {
-      expect(instance.triangles).toBeGreaterThan(0);
-      expect(instance.max[1]).toBeGreaterThan(instance.min[1]);
-      if (!instance.id.startsWith("terrain:")) continue;
-      const view = views.find(({ tile }) => tile.id === instance.id.slice(8))!;
-      expect(instance.modelKey).toMatch(
-        new RegExp(`^terrain:${view.tile.terrain}:`),
-      );
-      expect(instance.fog).toBe(view.visibilityDistance);
-      expect(instance.fogMix).toBeCloseTo(
-        [0, 0.15, 0.35, 0.6][view.visibilityDistance],
-      );
-      expect(instance.saturation).toBeCloseTo(
-        [1, 0.8, 0.45, 0.15][view.visibilityDistance],
-      );
-    }
-  } else expect(artworkCount).toBe(targets.length);
-  expect(occupants.sort((a, b) => a.id!.localeCompare(b.id!))).toEqual(
-    views
-      .filter(
-        (view) =>
-          rendered.has(view.tile.id) &&
-          (view.tile.city ||
-            view.facility ||
-            (view.developed &&
-              !["lake", "river", "ocean"].includes(view.tile.terrain))),
-      )
-      .map((view) => ({
-        id: view.tile.id,
-        kind: view.tile.city
-          ? "city"
-          : view.facility
-            ? view.facility.peakWh !== undefined
-              ? "storage"
-              : "generator"
-            : "tower",
-        distance: String(view.visibilityDistance),
-      }))
-      .sort((a, b) => a.id.localeCompare(b.id)),
+  const terrain = scene.filter((instance) =>
+    instance.id.startsWith("terrain:"),
+  );
+  expect(terrain.map((instance) => instance.id.slice(8)).sort()).toEqual(
+    [...rendered].sort(),
   );
   const mounted = views.filter((view) => rendered.has(view.tile.id));
+  const structures = mounted.filter(
+    ({ tile, facility, developed }) =>
+      tile.city ||
+      facility ||
+      (developed && !["lake", "river", "ocean"].includes(tile.terrain)),
+  );
+  expect(
+    scene
+      .filter((instance) => instance.id.startsWith("structure:"))
+      .map((instance) => instance.id.slice(10))
+      .sort(),
+  ).toEqual(structures.map(({ tile }) => tile.id).sort());
+  for (const instance of scene) {
+    expect(instance.triangles).toBeGreaterThan(0);
+    expect(instance.max[1]).toBeGreaterThan(instance.min[1]);
+    if (!instance.id.startsWith("terrain:")) continue;
+    const view = views.find(({ tile }) => tile.id === instance.id.slice(8))!;
+    expect(instance.modelKey).toMatch(
+      new RegExp(`^terrain:${view.tile.terrain}:`),
+    );
+    expect(instance.fog).toBe(view.visibilityDistance);
+    expect(instance.fogMix).toBeCloseTo(
+      [0, 0.15, 0.35, 0.6][view.visibilityDistance],
+    );
+    expect(instance.saturation).toBeCloseTo(
+      [1, 0.8, 0.45, 0.15][view.visibilityDistance],
+    );
+  }
+  const connections = scene.flatMap((instance) => instance.connections ?? []);
+  const wires = connections.map(({ from, to }) => [from, to].sort().join("|"));
   const expectedWires = mounted.flatMap((from, index) =>
     mounted
       .slice(index + 1)
@@ -374,7 +292,7 @@ async function expectPhysicalMap(network: Locator, game: GameType) {
   );
   expect(wires.sort()).toEqual(expectedWires.sort());
   expect(new Set(wires).size).toBe(wires.length);
-  for (const shape of wireShapes) {
+  for (const shape of connections) {
     const from = views.find(({ tile }) => tile.id === shape.from)!;
     const to = views.find(({ tile }) => tile.id === shape.to)!;
     const submerged = [from, to].some(
@@ -384,31 +302,16 @@ async function expectPhysicalMap(network: Locator, game: GameType) {
         ["lake", "river", "ocean"].includes(view.tile.terrain),
     );
     expect(shape.kind).toBe(submerged ? "submerged" : "overhead");
-    if (shape.start && shape.end) {
-      expect(shape.start.every(Number.isFinite)).toBe(true);
-      expect(shape.end.every(Number.isFinite)).toBe(true);
-      if (submerged) expect(shape.lowY).toBeCloseTo(0.006);
-      else {
-        expect(shape.start[1]).toBeGreaterThan(0.1);
-        expect(shape.end[1]).toBeGreaterThan(0.1);
-        const [startY, endY] = [shape.start[1], shape.end[1]];
-        // A steep line can sag below its straight path while still climbing.
-        expect(shape.lowY).toBeLessThanOrEqual(Math.min(startY, endY));
-        expect(shape.lowY).toBeLessThan((startY + endY) / 2);
-        expect(shape.lowY).toBeGreaterThan(0);
-      }
-    } else if (submerged) {
-      expect(shape.path).toContain("L");
-    } else {
-      expect(shape.path).toContain("Q");
-      const points = shape.path!.match(/-?\d+(?:\.\d+)?/g)!.map(Number);
-      expect(points[1], "overhead origin stays above the ground").toBeLessThan(
-        groundAnchor(from.tile).y,
-      );
-      expect(
-        points[5],
-        "overhead destination stays above the ground",
-      ).toBeLessThan(groundAnchor(to.tile).y);
+    expect(shape.start.every(Number.isFinite)).toBe(true);
+    expect(shape.end.every(Number.isFinite)).toBe(true);
+    if (submerged) expect(shape.lowY).toBeCloseTo(0.006);
+    else {
+      expect(shape.start[1]).toBeGreaterThan(0.1);
+      expect(shape.end[1]).toBeGreaterThan(0.1);
+      const [startY, endY] = [shape.start[1], shape.end[1]];
+      // A steep line can sag below its straight path while still climbing.
+      expect((startY + endY) / 2 - shape.midY).toBeGreaterThan(0.001);
+      expect(shape.lowY).toBeGreaterThan(0);
     }
   }
   for (const wire of wires) {
@@ -426,34 +329,6 @@ async function expectPhysicalMap(network: Locator, game: GameType) {
     ).toBe(1);
   }
   return scene;
-}
-
-async function hasRunningFacilityMotion(art: Locator) {
-  return art.evaluate((element) =>
-    element
-      .getAnimations({ subtree: true })
-      .some(
-        (animation) => animation.pending || animation.playState === "running",
-      ),
-  );
-}
-
-async function expectHeldFacilityPhase(
-  animation: JSHandle<Animation>,
-): Promise<number> {
-  const { phase, frames } = await animation.evaluate(async (value) => {
-    const phase = Number(value.currentTime);
-    const frames = [];
-    for (let index = 0; index < 3; index++) {
-      await new Promise<void>((resolve) =>
-        requestAnimationFrame(() => resolve()),
-      );
-      frames.push(Number(value.currentTime));
-    }
-    return { phase, frames };
-  });
-  for (const sample of frames) expect(sample).toBe(phase);
-  return phase;
 }
 
 async function openLockedBuild(surface: Locator) {
@@ -756,223 +631,6 @@ for (const theme of ["light", "dark"] as const) {
     }
   });
 
-  test(`simplified map motion follows production and reduced-motion preferences in ${theme}`, async ({
-    page,
-  }) => {
-    await page.addInitScript(() => {
-      const getContext = HTMLCanvasElement.prototype.getContext;
-      HTMLCanvasElement.prototype.getContext = function (
-        this: HTMLCanvasElement,
-        contextId: string,
-        options?: unknown,
-      ) {
-        if (contextId === "webgl2") return null;
-        return getContext.call(this, contextId, options);
-      } as typeof getContext;
-    });
-    await page.emulateMedia({ reducedMotion: "no-preference" });
-    const network = await startMap(page, theme, true);
-    await expect(network.locator("canvas.territory3DCanvas")).toHaveAttribute(
-      "data-renderer",
-      "unavailable",
-    );
-    const game = (await readSavedGame(page))!;
-    const wind = game.facilities.find(
-      (facility) => facility.fuel === "Wind" && facility.currentW > 0,
-    )!;
-    const hydro = game.facilities.find(
-      (facility) => facility.fuel === "Hydro" && facility.currentW > 0,
-    )!;
-    const thermal = game.facilities.find(
-      (facility) => facility.fuel === "Natural Gas" && facility.currentW > 0,
-    )!;
-    expect(wind).toBeDefined();
-    expect(hydro).toBeDefined();
-    expect(thermal).toBeDefined();
-    const art = (id: string) =>
-      network.locator(`[data-occupant-tile="${id}"] .territoryOccupantArtwork`);
-    await expect(
-      page.getByRole("button", { name: "pause", exact: true }),
-    ).toHaveAttribute("aria-pressed", "true");
-    const surface = await inspectTile(
-      page,
-      getTerritoryTile(wind.tileId, game)!,
-    );
-    const windArt = art(wind.tileId!);
-    await expect(windArt).toHaveAttribute("data-facility-motion", "active");
-    const rotor = windArt.locator(".mapWindRotor");
-    const animation = await rotor.evaluateHandle(
-      (element) => element.getAnimations()[0],
-    );
-    await expect
-      .poll(() => animation.evaluate((value) => value.playbackRate))
-      .toBe(0.25);
-    const before = await rotor.evaluate(
-      (element) => getComputedStyle(element).transform,
-    );
-    await expect
-      .poll(() =>
-        rotor.evaluate((element) => getComputedStyle(element).transform),
-      )
-      .not.toBe(before);
-    await surface.getByRole("button", { name: /^Pause / }).click();
-    await expect(windArt).not.toHaveAttribute("data-facility-motion", "active");
-    await expect.poll(() => hasRunningFacilityMotion(windArt)).toBe(false);
-    const pausedPhase = await expectHeldFacilityPhase(animation);
-    expect(
-      await rotor.evaluate(
-        (element, original) => element.getAnimations()[0] === original,
-        animation,
-      ),
-    ).toBe(true);
-    const paused = (await readSavedGame(page))!.facilities.find(
-      (facility) => facility.id === wind.id,
-    )!;
-    expect(paused.paused).toBe(true);
-    expect(paused.currentW).toBeGreaterThan(0);
-    await surface.getByRole("button", { name: /^Resume / }).click();
-    await expect(windArt).toHaveAttribute("data-facility-motion", "active");
-    await expect.poll(() => hasRunningFacilityMotion(windArt)).toBe(true);
-    expect(
-      await rotor.evaluate(
-        (element, original) => element.getAnimations()[0] === original,
-        animation,
-      ),
-    ).toBe(true);
-    expect(
-      await animation.evaluate((value) => Number(value.currentTime)),
-    ).toBeGreaterThanOrEqual(pausedPhase);
-    await closeTileSurface(surface);
-    await panToTile(page, getTerritoryTile(thermal.tileId, game)!);
-    const thermalArt = art(thermal.tileId!);
-    await expect(thermalArt).toHaveAttribute("data-facility-motion", "active");
-    await expect(
-      thermalArt.locator(".mapFacilityExhaust").first(),
-    ).toBeVisible();
-    await expect.poll(() => hasRunningFacilityMotion(thermalArt)).toBe(true);
-    await expect
-      .poll(() =>
-        thermalArt
-          .locator(".mapFacilityExhaust")
-          .evaluateAll((elements) =>
-            Math.max(
-              ...elements.map((element) =>
-                Number(getComputedStyle(element).opacity),
-              ),
-            ),
-          ),
-      )
-      .toBeGreaterThan(0.5);
-    await panToTile(page, getTerritoryTile(hydro.tileId, game)!);
-    const hydroArt = art(hydro.tileId!);
-    await expect(hydroArt).toHaveAttribute("data-facility-motion", "active");
-    await expect(hydroArt.locator(".mapHydroFlow")).toBeVisible();
-    await expect.poll(() => hasRunningFacilityMotion(hydroArt)).toBe(true);
-    const flowPart = hydroArt.locator(".mapHydroFlow");
-    const flow = await flowPart.evaluateHandle(
-      (element) => element.getAnimations()[0],
-    );
-    await page.emulateMedia({ reducedMotion: "reduce" });
-    await expect(hydroArt).not.toHaveAttribute(
-      "data-facility-motion",
-      "active",
-    );
-    await expect.poll(() => hasRunningFacilityMotion(hydroArt)).toBe(false);
-    const reducedPhase = await expectHeldFacilityPhase(flow);
-    await expect(
-      network.locator(`[data-occupant-tile="${hydro.tileId}"]`),
-    ).toHaveAttribute("data-facility-status", "producing");
-    await page.emulateMedia({ reducedMotion: "no-preference" });
-    await expect(hydroArt).toHaveAttribute("data-facility-motion", "active");
-    await expect.poll(() => hasRunningFacilityMotion(hydroArt)).toBe(true);
-    expect(
-      await hydroArt
-        .locator(".mapHydroFlow")
-        .evaluate(
-          (element, original) => element.getAnimations()[0] === original,
-          flow,
-        ),
-    ).toBe(true);
-    expect(
-      await flow.evaluate((value) => Number(value.currentTime)),
-    ).toBeGreaterThanOrEqual(reducedPhase);
-
-    await page.evaluate(() => {
-      Object.defineProperty(document, "hidden", {
-        configurable: true,
-        value: true,
-      });
-      document.dispatchEvent(new Event("visibilitychange"));
-    });
-    await expect.poll(() => hasRunningFacilityMotion(hydroArt)).toBe(false);
-    const hiddenPhase = await expectHeldFacilityPhase(flow);
-    await page.evaluate(() => {
-      Reflect.deleteProperty(document, "hidden");
-      document.dispatchEvent(new Event("visibilitychange"));
-    });
-    await expect.poll(() => hasRunningFacilityMotion(hydroArt)).toBe(true);
-    expect(
-      await hydroArt
-        .locator(".mapHydroFlow")
-        .evaluate(
-          (element, original) => element.getAnimations()[0] === original,
-          flow,
-        ),
-    ).toBe(true);
-    expect(
-      await flow.evaluate((value) => Number(value.currentTime)),
-    ).toBeGreaterThanOrEqual(hiddenPhase);
-    const foreign = territoryTileViews(game).find(
-      (view) => !view.owned && view.facility,
-    )!;
-    expect(foreign).toBeDefined();
-    await panToTile(page, foreign.tile);
-    await expect(art(foreign.tile.id)).toBeVisible();
-    await expect(art(foreign.tile.id)).not.toHaveAttribute(
-      "data-facility-motion",
-      "active",
-    );
-    await expect
-      .poll(() => hasRunningFacilityMotion(art(foreign.tile.id)))
-      .toBe(false);
-    // Let the real game clock advance only after checking the initial production snapshot.
-    await panToTile(page, getTerritoryTile(wind.tileId, game)!);
-    const rateAnimation = await rotor.evaluateHandle(
-      (element) => element.getAnimations()[0],
-    );
-    for (const [label, rate] of [
-      ["slow speed", 0.7],
-      ["normal speed", 1],
-      ["fast speed", 1.2],
-      ["ultra speed", 1.5],
-      ["pause", 0.25],
-    ] as const) {
-      const control = page.getByRole("button", { name: label, exact: true });
-      if (!(await control.count())) continue; // 24× is desktop only.
-      const phase = await rateAnimation.evaluate((value) =>
-        Number(value.currentTime),
-      );
-      await control.click();
-      await expect
-        .poll(() => rateAnimation.evaluate((value) => value.playbackRate))
-        .toBe(rate);
-      expect(
-        await rotor.evaluate(
-          (element, original) => element.getAnimations()[0] === original,
-          rateAnimation,
-        ),
-      ).toBe(true);
-      expect(
-        await rateAnimation.evaluate((value) => Number(value.currentTime)),
-      ).toBeGreaterThanOrEqual(phase);
-      expect(
-        await rateAnimation.evaluate(
-          (value) => value.effect!.getTiming().duration,
-        ),
-      ).toBe(14000);
-    }
-  });
-
   test(`map facility states follow actual operation, pause and construction in ${theme}`, async ({
     page,
   }, info) => {
@@ -1099,11 +757,11 @@ for (const theme of ["light", "dark"] as const) {
     });
     for (const [tile, kind, label] of states) {
       const target = network.locator(`[data-map-target="${tile.id}"]`);
-      const occupant = network.locator(`[data-occupant-tile="${tile.id}"]`);
+      const badge = network.locator(`[data-status-tile="${tile.id}"]`);
       await expect(target).toHaveAccessibleDescription(new RegExp(label));
       await expect(target).toBeInViewport({ ratio: 1 });
-      await expect(occupant).toHaveAttribute("data-facility-status", kind);
-      await expect(occupant).toHaveAttribute("data-visibility-distance", "0");
+      await expect(badge).toHaveAttribute("data-facility-status", kind);
+      await expect(badge).toHaveAttribute("data-visibility-distance", "0");
       const geometry = await network
         .locator("canvas.territory3DCanvas")
         .evaluate(
@@ -1120,17 +778,14 @@ for (const theme of ["light", "dark"] as const) {
       expect(geometry!.active).toBe(kind === "producing");
       if (kind === "construction")
         expect(geometry!.modelKey).toMatch(/:construction$/);
-      await expect(occupant.locator(".territoryOccupantArtwork")).toHaveCount(
-        0,
-      );
       await expect(
-        occupant.locator(":scope > .facilityMapStatusArtwork"),
+        badge.locator(":scope > .facilityMapStatusArtwork"),
       ).toHaveAttribute("aria-hidden", "true");
     }
     await expectPhysicalMap(network, built);
     if (info.project.name === "desktop-chromium" && theme === "dark")
       await reviewScreenshot(
-        network.locator(`[data-occupant-tile="${hydro.tileId}"]`),
+        network.locator(`[data-status-tile="${hydro.tileId}"]`),
         {
           path: info.outputPath("hydro-map-detail-dark.png"),
           animations: "disabled",
@@ -1191,7 +846,7 @@ for (const theme of ["light", "dark"] as const) {
     await openMap(page);
     const canvas = network.locator("canvas.territory3DCanvas");
     await expect(canvas).toHaveAttribute("data-renderer", "ready");
-    const fogScene = (await expectPhysicalMap(network, before))!;
+    const fogScene = await expectPhysicalMap(network, before);
     for (const distance of [1, 2, 3]) {
       const ground = fogScene.find(
         (instance) =>
@@ -2038,23 +1693,18 @@ for (const theme of ["light", "dark"] as const) {
         ?.visibilityDistance,
     ).toBe(0);
     const canvas = network.locator("canvas.territory3DCanvas");
-    if ((await canvas.getAttribute("data-renderer")) === "ready") {
-      await expect
-        .poll(() =>
-          canvas.evaluate(
-            (element: MapCanvas, id) =>
-              element.map3DDiagnostics!(true).scene?.find(
-                (instance) => instance.id === `terrain:${id}`,
-              )?.fog,
-            frontier.id,
-          ),
-        )
-        .toBe(0);
-    } else {
-      await expect(
-        network.locator(`.territoryHex[data-tile="${frontier.id}"]`),
-      ).toHaveAttribute("data-visibility-distance", "0");
-    }
+    await expect(canvas).toHaveAttribute("data-renderer", "ready");
+    await expect
+      .poll(() =>
+        canvas.evaluate(
+          (element: MapCanvas, id) =>
+            element.map3DDiagnostics!(true).scene?.find(
+              (instance) => instance.id === `terrain:${id}`,
+            )?.fog,
+          frontier.id,
+        ),
+      )
+      .toBe(0);
     await expect(
       network.getByRole("status", { name: "Connection result" }),
     ).toContainText("Site connected");

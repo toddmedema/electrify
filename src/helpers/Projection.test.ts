@@ -20,6 +20,7 @@ import {
   ProjectionView,
   projectionSignature,
   selectProjection,
+  topBarForecastEndMinute,
 } from "./Projection";
 import { cashRunwayMonths } from "./MissionStatus";
 
@@ -44,6 +45,7 @@ afterEach(() => generate.mockRestore());
 function expectGeneratedForecast(
   game: Parameters<typeof selectProjection>[0],
   projection: ProjectionView,
+  observer?: ReturnType<typeof expect.any>,
 ) {
   // Inspect the real generation's inputs and output instead of running the same
   // twenty-year forecast a second time just to construct an expected value.
@@ -53,7 +55,7 @@ function expectGeneratedForecast(
     game.timeline[0].customers,
     projection.forecast.length,
     projection.projectionStepMinutes,
-    undefined,
+    observer,
   );
   expect(projection.forecast).toEqual(generatedForecast);
 }
@@ -67,6 +69,70 @@ it("adopts worker results with the original history identity without recalculati
   const changed = { ...game, dollarsPerkWh: game.dollarsPerkWh + 0.01 };
   expect(selectProjection(changed, changed.timeline[0])).not.toBe(
     workerProjection,
+  );
+});
+
+it("simulates five rolling years for the top bar beside the full planning forecast", () => {
+  const game = createGame({ scenarioId: 116, seed: 7 });
+  const now = game.timeline[0];
+  const status = selectProjection(game, now, undefined, "top-bar");
+  expect(status.forecast).toHaveLength(1_440);
+  expect(status.financeProjected).toHaveLength(60);
+  expectGeneratedForecast(game, status, expect.any(Function));
+
+  const planning = selectProjection(game, now);
+  expect(planning.forecast).toHaveLength(5_760);
+  expect(selectProjection(game, now, undefined, "top-bar")).toBe(status);
+  expect(selectProjection(game, now)).toBe(planning);
+});
+
+it("stops the top bar simulation at the custom scenario end, including a partial month", () => {
+  const game = createGame({ scenarioId: 101, seed: 7 });
+  game.customScenario = {
+    ...SCENARIOS.find(({ id }) => id === 101)!,
+    id: CUSTOM_SCENARIO_ID,
+    durationMonths: 2,
+  };
+  game.scenarioId = CUSTOM_SCENARIO_ID;
+  const end = 2 * MINUTES_PER_MONTH;
+  game.date = getDateFromMinute(end - 75, game.startingYear);
+  const now = { ...game.timeline[0], minute: game.date.minute };
+  game.timeline = [now];
+
+  const status = selectProjection(game, now, undefined, "top-bar");
+  expect(status.forecast.map(({ minute }) => minute)).toEqual([
+    end - 75,
+    end - 15,
+  ]);
+  expectGeneratedForecast(game, status);
+  expect(status.financeProjected).toHaveLength(1);
+
+  game.date = getDateFromMinute(end, game.startingYear);
+  generate.mockClear();
+  expect(selectProjection(game, now, undefined, "top-bar")).toMatchObject({
+    forecast: [],
+    financeProjected: [],
+    cashProjected: [],
+  });
+  expect(generate).not.toHaveBeenCalled();
+});
+
+it("uses the scenario opening month when capping a timed forecast", () => {
+  const game = createGame({ scenarioId: 126, seed: 7 });
+  game.date = getDateFromMinute(55 * MINUTES_PER_MONTH, game.startingYear);
+  expect(topBarForecastEndMinute(game)).toBe(
+    (60 + game.startingMonth! - 1) * MINUTES_PER_MONTH,
+  );
+});
+
+it("keeps a five-year horizon in the untimed tutorial capstone", () => {
+  const game = createGame({ scenarioId: 2, seed: 7 });
+  const tutorial = SCENARIOS.find(({ id }) => id === 2)!;
+  game.tutorialStep = tutorial.tutorialSteps!.findIndex(
+    ({ capstone }) => capstone,
+  );
+  expect(topBarForecastEndMinute(game) - game.date.minute).toBe(
+    60 * MINUTES_PER_MONTH,
   );
 });
 

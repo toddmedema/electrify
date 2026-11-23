@@ -2,9 +2,8 @@
 
 The map uses cached solid meshes and a WebGL2 renderer. Terrain, upright buildings,
 conductors and projected shadows share the existing map camera. HTML targets retain
-keyboard, touch, ownership and selection behavior. The detailed SVG renderer is
-mounted only when WebGL2 is unavailable or its context is lost; the healthy renderer
-keeps the SVG status and ownership overlays.
+keyboard and touch interaction. The scene draws ownership and selection outlines,
+and SVG facility status badges overlay the 3D map.
 
 `territory-3d/Types.ts` owns the model contract. Models use tile-width units with
 positive Y pointing upward. Terrain models have four clearing buckets and six-bit
@@ -41,9 +40,8 @@ updates carry the scene.
 
 `e2e/acquisitions.spec.ts` compares these submitted meshes and conductors with the
 discovered map, preserving the existing culling, ownership, adjacency, submerged
-wire, foreign-facility and facility-state checks. Its WAAPI motion journey explicitly
-forces the SVG fallback. `e2e/map-3d-performance.spec.ts` separately exercises real
-GPU phases, all available speed controls, operation pause, reduced motion, hidden
+wire, foreign-facility and facility-state checks. `e2e/map-3d-performance.spec.ts`
+exercises real GPU phases, all available speed controls, operation pause, reduced motion, hidden
 documents, foreign operation and frozen/advancing simulated lighting in both themes.
 Optional review captures wait for real near-noon sunlight and attach the saved
 simulation date alongside each picture.

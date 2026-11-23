@@ -1,3 +1,4 @@
+import { steamSessionServices } from "./SteamSessionServices";
 import "../Store";
 import { TextEncoder } from "util";
 import { webcrypto } from "crypto";
@@ -216,12 +217,16 @@ function fixture({
   );
   replicaFactory.mockResolvedValue(replicaWorker as unknown as Worker);
   const host = new MultiplayerSession(
-    bridge("host"),
+    steamSessionServices(bridge("host")),
     async () => hostWorker as unknown as Worker,
     replicaFactory,
   );
   const createGuest = () =>
-    new MultiplayerSession(bridge("guest"), jest.fn(), replicaFactory);
+    new MultiplayerSession(
+      steamSessionServices(bridge("guest")),
+      jest.fn(),
+      replicaFactory,
+    );
   let guest = createGuest();
   const start = async () => {
     await host.initialize();
