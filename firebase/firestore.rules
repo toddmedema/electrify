@@ -268,6 +268,113 @@ service cloud.firestore {
         || (resource.data.shareId == null && isOwner(resource.data.uid));
     }
 
+    // The control service reads through its IAM identity and commits with a separate,
+    // server-only Firebase custom claim so lease expiry uses Firestore's write clock.
+    match /coopRooms/{roomId} {
+      function serverWriter() {
+        return isSignedIn()
+          && request.auth.uid == 'electrify-coop-authority-v2'
+          && request.auth.token.electrifyCoopWriter == 2;
+      }
+      function serviceRunning() {
+        let settings = /databases/$(database)/documents/coopSettings/runtime;
+        return !exists(settings) || get(settings).data.get('stopped', false) == false;
+      }
+      function account(id) {
+        return get(/databases/$(database)/documents/coopAccounts/$(id)).data;
+      }
+      function activeAccount(data, binding) {
+        return data.binding == binding
+          && data.expiresAt > request.time
+          && data.revoked == false
+          && data.get('banned', false) == false;
+      }
+      function guard() {
+        return request.resource.data.writeGuard;
+      }
+      function activeSeat(data, id) {
+        let seat = data.bindings[id];
+        return seat.active
+          && seat.seenAt + duration.value(12, 's') > request.time
+          && activeAccount(account(seat.account), seat.binding);
+      }
+      function actorSeat(data) {
+        return data.bindings[guard().seatId].account == guard().account;
+      }
+      function boundActor(data) {
+        return actorSeat(data)
+          && data.bindings[guard().seatId].binding == guard().binding;
+      }
+      function activeActor(data) {
+        return boundActor(data) && activeSeat(data, guard().seatId);
+      }
+      function validGuard() {
+        let g = guard();
+        let identity = account(g.account);
+        return serverWriter()
+          && serviceRunning()
+          && g.deadline > request.time
+          && request.resource.data.room.id == roomId
+          && request.resource.data.leaseExpiry <= request.time + duration.value(12, 's')
+          && activeAccount(identity, g.binding)
+          && identity.tokenHash == g.tokenHash;
+      }
+      function liveHost() {
+        return resource.data.leaseExpiry > request.time
+          && activeSeat(resource.data, resource.data.room.hostId);
+      }
+      function afterLeaseSameOwner() {
+        return request.resource.data.room.epoch == resource.data.room.epoch
+          && request.resource.data.room.hostId == resource.data.room.hostId;
+      }
+      function liveMutation() {
+        return liveHost()
+          && afterLeaseSameOwner()
+          && activeActor(resource.data)
+          && (guard().peerId == '' || activeSeat(resource.data, guard().peerId))
+          && (guard().get('approvedId', '') == '' || activeSeat(request.resource.data, guard().approvedId))
+          && (guard().type != 'host' || guard().seatId == resource.data.room.hostId);
+      }
+      function acquire() {
+        return actorSeat(resource.data)
+          && resource.data.leaseExpiry <= request.time
+          && request.resource.data.leaseExpiry > request.time
+          && request.resource.data.room.epoch != resource.data.room.epoch
+          && request.resource.data.room.hostId == guard().seatId
+          && activeActor(request.resource.data)
+          && (resource.data.room.hostId == guard().seatId
+            || (resource.data.room.locked && resource.data.room.head != null))
+          && request.resource.data.room.get('restoreHead', null) == resource.data.room.head;
+      }
+      function lifecycleMutation() {
+        return afterLeaseSameOwner()
+          && request.resource.data.leaseExpiry <= resource.data.leaseExpiry
+          && request.resource.data.room.head == resource.data.room.head
+          && (guard().type == 'member' && actorSeat(resource.data)
+            || guard().type == 'bound' && boundActor(resource.data));
+      }
+      function inviteMutation() {
+        return liveHost()
+          && !resource.data.room.locked
+          && afterLeaseSameOwner()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['room', 'writeGuard'])
+          && request.resource.data.room.diff(resource.data.room).affectedKeys().hasOnly(['pending']);
+      }
+      allow create: if validGuard()
+        && guard().type == 'create'
+        && request.resource.data.room.hostId == guard().seatId
+        && request.resource.data.leaseExpiry > request.time
+        && request.resource.data.room.head == null
+        && activeActor(request.resource.data);
+      allow update: if validGuard()
+        && resource.data.roomExpiry > request.time
+        && ((guard().type in ['active', 'host'] && liveMutation())
+          || (guard().type == 'acquire' && acquire())
+          || (guard().type in ['member', 'bound'] && lifecycleMutation())
+          || (guard().type == 'invite' && inviteMutation()));
+      allow read, delete: if false;
+    }
+
     // Publicly readable: hiding the board from logged-out players inverts the incentive to sign
     // up, since seeing named strangers above you is the reason to bother.
     match /scores/{scoreId} {
