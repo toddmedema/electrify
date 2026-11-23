@@ -107,8 +107,7 @@ test("ordinary starting hills offer general technologies and retain special-site
       name: "Choose sites for Nuclear",
       exact: true,
     });
-    await expect(nuclear).toBeDisabled();
-    await expect(nuclear.locator("img")).toHaveCSS("filter", "saturate(0.2)");
+    await expect(nuclear).toBeEnabled();
     await expect(
       rail.getByRole("button", {
         name: "Choose sites for Offshore Wind",
@@ -131,6 +130,14 @@ test("ordinary starting hills offer general technologies and retain special-site
         preview.getByRole("button", { name: /^Review purchase of/ }),
       ).toHaveCount(0);
     }
+    // Site planning is available when a connection is affordable. The already
+    // connected hill still requires the usual construction down payment.
+    await nuclear.click();
+    const project = page.getByRole("dialog", { name: /^Nuclear ·/ });
+    await expect(project.getByText("Connected", { exact: true })).toBeVisible();
+    await expect(
+      project.getByRole("button", { name: "Loan", exact: true }),
+    ).toBeDisabled();
     return;
   }
   const tile = getAuthoredTerritoryTile("champlain:site-12")!;
