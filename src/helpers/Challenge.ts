@@ -1,13 +1,10 @@
 import { formatNumber } from "./Format";
 import { ChallengeInvitation, VictoryType } from "../Types";
 import { validRunIdentity } from "./RunIdentity";
-import {
-  challengeScenario,
-  readLegacyInvitation,
-  validInvitation,
-} from "./ChallengeInvitation";
+import { challengeScenario, validInvitation } from "./ChallengeInvitation";
 import { buildScoreShareContent, ShareContentType } from "./Share";
 import { DIFFICULTY_LABELS } from "../Constants";
+
 export const MAX_CHALLENGE_URL = 2048;
 export type ChallengeRoute = {
   invitation?: ChallengeInvitation;
@@ -31,15 +28,7 @@ export function parseChallengeUrl(href: string): ChallengeRoute | undefined {
   )
     return failed;
   try {
-    const value: unknown = JSON.parse(url.searchParams.get("challenge")!);
-    const legacy = readLegacyInvitation(value);
-    const invitation = legacy
-      ? {
-          scenarioId: legacy.run.scenarioId,
-          difficulty: legacy.run.difficulty,
-          target: legacy.target,
-        }
-      : value;
+    const invitation: unknown = JSON.parse(url.searchParams.get("challenge")!);
     if (
       invitation &&
       typeof invitation === "object" &&

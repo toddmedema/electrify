@@ -1706,7 +1706,6 @@ const SCHEMA_23_MAP_RULES =
 // These published schema-24 builds use this checkpoint layout. The rules
 // hash also covers Steam transport and the runtime's source.
 const SCHEMA_24_PUBLISHED_RULES = new Set([
-  "coop-2-46e99cbb59338588fc28b819fef31298731f0309c3ec8a1434df3a1e4f5cd596", // 4e02930d
   "coop-2-52b30cebdf5c08f453a29c4d1b445fa8a949e8c6f354f2f344683029b032f167", // a9209513
   "coop-2-b5084b0368736d579e1ffc5cfbcaf4b8a7b4a2b6097b45dfaafbf85556810755", // 11ff7f50
   "coop-2-70cc82f8acaacdd1aed5daf5fe8c078bccdf2873eeecdc58b7bcdb1973aa9bc7", // 0e009432
@@ -1719,6 +1718,12 @@ function upgradeTerritoryWorld(value: unknown): unknown {
     old?.gameSchema === 24 &&
     typeof old.rules === "string" &&
     SCHEMA_24_PUBLISHED_RULES.has(old.rules);
+  if (
+    old?.schema === 3 &&
+    publishedSchema24 &&
+    old.gameSchema === SAVE_SCHEMA_VERSION
+  )
+    return { ...old, rules: RULES };
   if (
     !old ||
     old.schema !== 3 ||

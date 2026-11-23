@@ -16,7 +16,6 @@ import type { SaveFileType, ScenarioType } from "./Types";
 import { validateSaveFileEnvelope } from "./SaveModel";
 import { SAVE_SCHEMA_VERSION } from "./SaveSchema";
 import { createGame } from "./testing/Simulator";
-import { projectAuthoredRunReference } from "./helpers/RunIdentity";
 
 describe("SaveFile", () => {
   it("uses a sanitized player name for filenames", () => {
@@ -102,11 +101,6 @@ describe("SaveFile", () => {
     });
     it("imports a packed prior-release save with progress intact and a repeatable current export", () => {
       const game = createGame({ scenarioId: 101, seed: 31337 });
-      game.challenge = {
-        scenarioId: game.scenarioId,
-        difficulty: game.difficulty,
-        target: 400,
-      };
       const raw = JSON.parse(
         JSON.stringify(
           encodeSaveFile(
@@ -118,19 +112,11 @@ describe("SaveFile", () => {
       );
       raw.save.schemaVersion = 8;
       raw.save.game.runIdentity.compatibilityId = `rules-1-${"a".repeat(64)}`;
-      raw.save.game.challenge = {
-        run: {
-          ...projectAuthoredRunReference(game.runIdentity),
-          compatibilityId: raw.save.game.runIdentity.compatibilityId,
-        },
-        target: 400,
-      };
       const original = JSON.stringify(raw);
       const imported = validateSaveFileEnvelope(raw, parseSave);
       expect(imported.save.schemaVersion).toBe(SAVE_SCHEMA_VERSION);
       expect(imported.save.game.rulesChanged).toBe(true);
       expect(imported.save.game.runIdentity).toBeUndefined();
-      expect(imported.save.game.challenge).toEqual(game.challenge);
       expect(imported.save.game.facilities).toEqual(game.facilities);
       expect(imported.save.game.date).toEqual(game.date);
       expect(JSON.stringify(raw)).toBe(original);

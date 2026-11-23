@@ -3,13 +3,7 @@ import manifest from "../data/RunCompatibility.json";
 import { getScenarioLocation, isValidLocation } from "./Locations";
 import { getStartingCustomers } from "../data/LocationProfiles";
 import { isValidDifficulty } from "./Difficulty";
-import {
-  AuthoredRunReference,
-  RunIdentity,
-  ScenarioType,
-  DifficultyType,
-  GameType,
-} from "../Types";
+import { RunIdentity, ScenarioType, DifficultyType, GameType } from "../Types";
 
 /** Stable object keys, ordered arrays; functions are covered by the build manifest. */
 export function normalizedInputs(value: unknown): string {
@@ -49,60 +43,30 @@ export function captureRunIdentity(
     },
   };
 }
-export function sameRunIdentity(
-  a: RunIdentity | undefined,
-  b: RunIdentity | undefined,
-): boolean {
-  if (!a || !b) return false;
-  const { origin: _a, ...left } = a;
-  const { origin: _b, ...right } = b;
-  return normalizedInputs(left) === normalizedInputs(right);
-}
-export function expandAuthoredRunReference(
-  raw: unknown,
-): RunIdentity | undefined {
-  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return;
-  const r = raw as AuthoredRunReference;
-  if (
-    Object.keys(r).sort().join() !==
-      ["scenarioId", "seed", "difficulty", "compatibilityId"].sort().join() ||
-    r.compatibilityId !== manifest.compatibilityId ||
-    !Number.isInteger(r.seed) ||
-    r.seed < 0 ||
-    r.seed > 0xffffffff ||
-    !isValidDifficulty(r.difficulty)
-  )
-    return;
-  const scenario = SCENARIOS.find(
-    (s) => s.id === r.scenarioId && !s.tutorialSteps,
-  );
-  if (
-    !scenario ||
-    !getScenarioLocation(scenario) ||
-    (scenario.seed !== undefined && scenario.seed !== r.seed)
-  )
-    return;
-  return captureRunIdentity(scenario, r.seed, r.difficulty);
-}
-export function projectAuthoredRunReference(
-  identity: RunIdentity | undefined,
-): AuthoredRunReference | undefined {
-  if (!identity || identity.origin !== "authored") return;
-  const { scenarioId, seed, difficulty, compatibilityId } = identity;
-  const reference: AuthoredRunReference = {
-    scenarioId,
-    seed,
-    difficulty,
-    compatibilityId,
-  };
-  return sameRunIdentity(identity, expandAuthoredRunReference(reference))
-    ? reference
-    : undefined;
-}
-/** Only canonical authored runs carry a shareable identity. */
+/** Validate an authored run against the current scenario and its starting inputs. */
 export function validRunIdentity(raw: unknown): raw is RunIdentity {
-  if (!raw || typeof raw !== "object") return false;
-  return !!projectAuthoredRunReference(raw as RunIdentity);
+  if (!record(raw)) return false;
+  const { scenarioId, seed, difficulty, compatibilityId, origin } = raw;
+  if (
+    origin !== "authored" ||
+    compatibilityId !== manifest.compatibilityId ||
+    typeof seed !== "number" ||
+    !Number.isInteger(seed) ||
+    seed < 0 ||
+    seed > 0xffffffff ||
+    !isValidDifficulty(difficulty)
+  )
+    return false;
+  const scenario = SCENARIOS.find(
+    (s) => s.id === scenarioId && !s.tutorialSteps,
+  );
+  return (
+    !!scenario &&
+    !!getScenarioLocation(scenario) &&
+    (scenario.seed === undefined || scenario.seed === seed) &&
+    normalizedInputs(raw) ===
+      normalizedInputs(captureRunIdentity(scenario, seed, difficulty))
+  );
 }
 
 const record = (value: unknown): value is Record<string, unknown> =>
@@ -112,7 +76,7 @@ const exactKeys = (value: Record<string, unknown>, keys: string[]): boolean =>
 
 /**
  * Validate a previous digest's self-contained authored setup before
- * continuing its progress. Remove the stale run identity and retain any challenge target.
+ * continuing its progress. Remove the stale run identity.
  * Current-digest identities still pass the canonical validation below this import boundary.
  */
 export function carrySavedRunForward<T extends Partial<GameType>>(

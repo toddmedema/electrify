@@ -562,11 +562,6 @@ const publishedCoopIdentities = [
     23,
     "coop-2-3a64b92f0462af2eb6286821f118c030f25aaf65b546a4a7652e87b1dbcd3e33",
   ],
-  // Master 4e02930d shipped controller and recovery improvements to couch co-op.
-  [
-    24,
-    "coop-2-46e99cbb59338588fc28b819fef31298731f0309c3ec8a1434df3a1e4f5cd596",
-  ],
   // Published master a9209513, before the exact frame-pacing optimizations.
   [
     24,
