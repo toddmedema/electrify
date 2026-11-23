@@ -10,7 +10,6 @@ import {
 import type { BuyingRuleType, SellingRuleType, GameType } from "./Types";
 import { inheritedConnection } from "./helpers/PowerAgreements";
 import { facilityTerritoryId } from "./helpers/Territories";
-import { readLegacyInvitation } from "./helpers/ChallengeInvitation";
 
 type DecodedSave = Record<string, unknown>;
 type Migration = (
@@ -428,33 +427,8 @@ const migrations: readonly Migration[] = [
   // 23 -> 24: support expansion loans and reconcile Valley goals from the map branch.
   (save, publishedValleyRules) =>
     migrations[22 - FIRST_SUPPORTED_SAVE_SCHEMA](save, publishedValleyRules),
-  // 24 -> 25: keep a friend's target while removing the original seed and rules from the challenge.
-  (save) => {
-    if (!object(save.game)) return null;
-    const { game } = save;
-    if (game.challenge === undefined) return save;
-    const challenge = readLegacyInvitation(game.challenge);
-    if (
-      !challenge ||
-      !object(game.runIdentity) ||
-      challenge.run.scenarioId !== game.scenarioId ||
-      challenge.run.difficulty !== game.difficulty ||
-      challenge.run.seed !== game.seed ||
-      challenge.run.compatibilityId !== game.runIdentity.compatibilityId
-    )
-      return null;
-    return {
-      ...save,
-      game: {
-        ...game,
-        challenge: {
-          scenarioId: challenge.run.scenarioId,
-          difficulty: challenge.run.difficulty,
-          target: challenge.target,
-        },
-      },
-    };
-  },
+  // 24 -> 25: retain the published schema. Current validation checks challenge metadata.
+  (save) => (object(save.game) ? save : null),
   // 25 -> 26: dated construction is optional. Existing tile receipts remain energized.
   (save) => save,
 ];

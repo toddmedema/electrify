@@ -2090,12 +2090,6 @@ export interface RunIdentity {
     meaningfulDecisionGateWaived: boolean;
   };
 }
-export interface AuthoredRunReference {
-  scenarioId: number;
-  seed: number;
-  difficulty: DifficultyType;
-  compatibilityId: string;
-}
 export interface ChallengeInvitation {
   scenarioId: number;
   difficulty: DifficultyType;

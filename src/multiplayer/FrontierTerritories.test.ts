@@ -134,6 +134,10 @@ const parcelCheckpointLineages = [
     25,
     "coop-2-165b41cf808b6f16d07c057c875ce7258bbdd83124e49b4443763d902d8a5fb1",
   ],
+  [
+    25,
+    "coop-2-3feb6e137a61620e3bbb4d9b0a6960226b5f8b6e8a358cae794ae5279836dff3",
+  ],
 ] as const;
 
 it.each(parcelCheckpointLineages)(

@@ -9,15 +9,6 @@ function invitation(scenarioId = 101, target = 12400): ChallengeInvitation {
   return { scenarioId, difficulty: "CEO", target };
 }
 const freshSeed = 12345;
-const oldSeed = 42;
-const oldRules = `rules-1-${"0".repeat(64)}`;
-function legacyInvitation(value = invitation()) {
-  const { scenarioId, difficulty, target } = value;
-  return {
-    run: { scenarioId, seed: oldSeed, difficulty, compatibilityId: oldRules },
-    target,
-  };
-}
 function link(value: unknown = invitation()) {
   return `/?challenge=${encodeURIComponent(JSON.stringify(value))}&utm_campaign=friend`;
 }
@@ -120,8 +111,7 @@ for (const theme of ["light", "dark"] as const) {
     );
     const value = theme === "light" ? invitation() : invitation(107, -10);
     const expectedSeed = theme === "light" ? freshSeed : 268107;
-    // The legacy link still launches the normal scenario seed path on the current build.
-    await page.goto(link(theme === "light" ? legacyInvitation(value) : value));
+    await page.goto(link(value));
     const start = page.getByRole("button", {
       name: "Start challenge",
       exact: true,

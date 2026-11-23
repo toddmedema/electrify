@@ -1714,13 +1714,13 @@ const SCHEMA_23_MAP_RULES =
 // These published schema-24 builds use this checkpoint layout. The rules
 // hash also covers Steam transport and the runtime's source.
 const SCHEMA_24_PUBLISHED_RULES = new Set([
-  "coop-2-46e99cbb59338588fc28b819fef31298731f0309c3ec8a1434df3a1e4f5cd596", // 4e02930d
   "coop-2-52b30cebdf5c08f453a29c4d1b445fa8a949e8c6f354f2f344683029b032f167", // a9209513
   "coop-2-b5084b0368736d579e1ffc5cfbcaf4b8a7b4a2b6097b45dfaafbf85556810755", // 11ff7f50
   "coop-2-70cc82f8acaacdd1aed5daf5fe8c078bccdf2873eeecdc58b7bcdb1973aa9bc7", // 0e009432
 ]);
 
 const SCHEMA_25_PUBLISHED_RULES = new Set([
+  "coop-2-3feb6e137a61620e3bbb4d9b0a6960226b5f8b6e8a358cae794ae5279836dff3", // 7e7ec8df
   "coop-2-160dd9f6da3cd8499431940cea88dcfd070d36e945c75655c7811f2e37c8edd5", // d43a3645
   "coop-2-f1cf5b58532f5e815675d7631016012d04330986791fcf22caf12648d7c03b37", // b9dc8ae5
   "coop-2-165b41cf808b6f16d07c057c875ce7258bbdd83124e49b4443763d902d8a5fb1", // 3f73fa5a
