@@ -19,7 +19,11 @@ import {
 import type { UpcomingStoryEventType } from "../components/views/StoryEventSelectors";
 import { TICK_MINUTES } from "../Constants";
 import { formatMoneyStable, formatForecastNumber } from "./Format";
-import { selectProjection } from "./Projection";
+import {
+  selectProjection,
+  topBarForecastEndMinute,
+  type ProjectionScope,
+} from "./Projection";
 import { isUtilityExpansionGame } from "./ExpansionContext";
 import { MONTHS } from "../Constants";
 import { utilityServiceGap } from "./UtilityPlanning";
@@ -296,11 +300,12 @@ export function projectedShortfall(
 export function cashRunwayMonths(
   game: GameType,
   projectionKey?: string,
+  scope: ProjectionScope = "planning",
 ): number | undefined {
   const now = currentTick(game);
   // Negative cash now has its own, more urgent warning; this one is about the months ahead
   if (!now || now.cash < 0) return undefined;
-  const projection = selectProjection(game, now, projectionKey);
+  const projection = selectProjection(game, now, projectionKey, scope);
   const expectedCash =
     getTimeFromTimeline(game.date.minute, projection.cashBaseline)?.cash ??
     projection.startingCash;
@@ -354,10 +359,16 @@ export function selectMissionRisk(
     };
   // A shortage later in today's operating sample is reported by the grid readout beside this
   // (see getGridHealth), the same way a shortage happening now is.
-  const runway = cashRunwayMonths(game, projectionKey);
+  const hasForecast = game.date.minute < topBarForecastEndMinute(game);
+  const runway = hasForecast
+    ? cashRunwayMonths(game, projectionKey, "top-bar")
+    : undefined;
   const gap =
-    isUtilityExpansionGame(game) && now
-      ? utilityServiceGap(game, selectProjection(game, now, projectionKey))
+    hasForecast && isUtilityExpansionGame(game) && now
+      ? utilityServiceGap(
+          game,
+          selectProjection(game, now, projectionKey, "top-bar"),
+        )
       : undefined;
   const gapMonth = gap
     ? (gap.year - game.startingYear) * 12 + gap.month - 1

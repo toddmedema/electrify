@@ -443,6 +443,7 @@ export class SceneBuilder {
           kind: wire.kind,
           start: a,
           end: b,
+          midY: point(0.5)[1],
           lowY,
         });
       }

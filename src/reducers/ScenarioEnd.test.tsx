@@ -1,4 +1,3 @@
-import { projectAuthoredRunReference } from "../helpers/RunIdentity";
 import { createNextState as produce } from "@reduxjs/toolkit";
 import cloneDeep from "lodash.clonedeep";
 import { CUSTOM_SCENARIO_ID, SCENARIOS, TUTORIALS } from "../data/Scenarios";
@@ -258,7 +257,8 @@ describe("ending a scenario from inside the reducer", () => {
     ) as ScenarioType;
     const state = createGame({ scenarioId: scenario.id });
     state.challenge = {
-      run: projectAuthoredRunReference(state.runIdentity)!,
+      scenarioId: state.scenarioId,
+      difficulty: state.difficulty,
       target: -25,
     };
     const identity = JSON.parse(JSON.stringify(state.runIdentity));

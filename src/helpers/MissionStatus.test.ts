@@ -453,8 +453,8 @@ test("public event selector remains the disclosure boundary", () => {
 
 test("immutable tick reads reuse cached projections without simulation mutations", () => {
   let game = createGame({ scenarioId: 103 });
-  // Warm the shared projection cache before checking per-tick reuse and rollover rebuilds.
-  selectProjection(game, game.timeline[0]);
+  // Warm the top-bar cache before checking per-tick reuse and rollover rebuilds.
+  selectProjection(game, game.timeline[0], undefined, "top-bar");
   const rebuilds = jest.spyOn(GameModule, "generateForecastTimeline");
   let changed = 0;
   let steadyTicks = 0;
@@ -470,7 +470,7 @@ test("immutable tick reads reuse cached projections without simulation mutations
     getMissionStatus(game);
     selectMissionRisk(game);
     projectedShortfall(game.timeline, game.date.minute);
-    // A month rollover rebuilds the long-range forecast; ordinary reads must reuse it.
+    // A month rollover rebuilds the top-bar forecast; ordinary reads reuse it.
     if (rebuilds.mock.calls.length > callsBefore) {
       rebuildCount++;
     } else {
@@ -486,11 +486,12 @@ test("immutable tick reads reuse cached projections without simulation mutations
 });
 
 test.each([
-  [0, 1200, 123, true, "120"],
-  [0, 1200, 240, true, "240"],
+  [0, 1200, 60, true, "60"],
+  [0, 1200, 61, true, undefined],
+  [0, 1200, 240, true, undefined],
   [0, 1200, 241, false, undefined],
-  [360, 1200, 240, true, "240"],
-  [360, 1200, 241, false, undefined],
+  [360, 1200, 60, true, "60"],
+  [360, 1200, 61, true, undefined],
   [0, 36, 13, true, "13"],
   [0, 36, 36, true, "36"],
   [0, 36, 37, false, undefined],
@@ -498,10 +499,10 @@ test.each([
   [34, 36, 3, false, undefined],
   [36, 36, 2, false, undefined],
   [0, undefined, 12, true, "12"],
-  [0, undefined, 13, false, undefined],
+  [0, undefined, 13, false, "13"],
 ])(
-  "cash warning at elapsed %i, duration %s, crossing %i: %s",
-  (elapsed, duration, crossing, warns, shownMonths) => {
+  "cash runway at elapsed %i, duration %s, crossing %i, planning %s, top bar %s",
+  (elapsed, duration, crossing, planningWarns, shownMonths) => {
     const game = createNextState(fixture(elapsed), (draft) => {
       draft.scenarioId = CUSTOM_SCENARIO_ID;
       draft.customScenario =
@@ -527,17 +528,17 @@ test.each([
         ),
       );
     try {
-      expect(cashRunwayMonths(game)).toBe(warns ? crossing : undefined);
+      expect(cashRunwayMonths(game)).toBe(planningWarns ? crossing : undefined);
       const risk = selectMissionRisk(game);
-      expect(warns ? risk?.label : undefined).toEqual(
-        warns
-          ? expect.stringContaining(`about ${shownMonths} months`)
-          : undefined,
+      const cashRisk = risk?.id === "cash-runway" ? risk : undefined;
+      expect(cashRisk).toEqual(
+        shownMonths === undefined
+          ? undefined
+          : expect.objectContaining({
+              label: expect.stringContaining(`about ${shownMonths} months`),
+              shortLabel: `Cash out in ~${shownMonths} mo`,
+            }),
       );
-      expect(warns ? risk?.shortLabel : undefined).toBe(
-        warns ? `Cash out in ~${shownMonths} mo` : undefined,
-      );
-      expect(selectMissionRisk(game)?.id === "cash-runway").toBe(warns);
     } finally {
       generate.mockRestore();
     }

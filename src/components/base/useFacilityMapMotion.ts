@@ -9,11 +9,6 @@ export const FACILITY_MAP_PLAYBACK_RATE: Record<SpeedType, number> = {
   ULTRA: 1.5,
 };
 
-export const FacilityMapMotionContext = React.createContext({
-  allowed: true,
-  rate: FACILITY_MAP_PLAYBACK_RATE.PAUSED,
-});
-
 /** One preference/visibility subscription for the whole map, never one per plant. */
 export default function useFacilityMapMotion(speed: SpeedType = "PAUSED") {
   const [reduced] = React.useState(() =>
@@ -36,14 +31,6 @@ export default function useFacilityMapMotion(speed: SpeedType = "PAUSED") {
     () => ({ allowed, rate: FACILITY_MAP_PLAYBACK_RATE[speed] }),
     [allowed, speed],
   );
-}
-
-/** Keep the same CSS animations alive: pause retains phase; retiming never seeks. */
-export function useFacilityAnimation(active: boolean, variant: string) {
-  const { allowed, rate } = React.useContext(FacilityMapMotionContext);
-  const moving = active && allowed;
-  const ref = useMapAnimationPlayback<SVGSVGElement>(moving, rate, variant);
-  return { ref, moving };
 }
 
 export function useMapAnimationPlayback<T extends Element>(

@@ -8,7 +8,6 @@ import { Button, Stack, Typography } from "@mui/material";
 import ScreenPage from "../base/ScreenPage";
 import { store, useAppSelector } from "../../Store";
 import { parseChallengeUrl } from "../../helpers/Challenge";
-import { expandAuthoredRunReference } from "../../helpers/RunIdentity";
 import { getHistoryApi, logEvent } from "../../Globals";
 import { scenarioDetailsUrl, scenarioListUrl } from "../../ScenarioUrl";
 import { navigate } from "../../reducers/Card";
@@ -94,9 +93,9 @@ export default function ChallengeLanding() {
       key={href}
       game={{
         ...game,
-        scenarioId: invitation.run.scenarioId,
+        scenarioId: invitation.scenarioId,
         customScenario: undefined,
-        difficulty: invitation.run.difficulty,
+        difficulty: invitation.difficulty,
       }}
       challenge={invitation}
       unlockedThrough={unlockedThrough}
@@ -107,16 +106,14 @@ export default function ChallengeLanding() {
         startWithSaveGuard(store.dispatch, () => {
           if (
             difficultyLockReason(
-              invitation.run.difficulty,
+              invitation.difficulty,
               unlockedDifficulty(achievementJournal.getSnapshot().progress),
             )
           )
             return;
-          const identity = expandAuthoredRunReference(invitation.run);
-          if (!identity) return;
-          logEvent("challenge_accept", { scenarioId: identity.scenarioId });
+          logEvent("challenge_accept", { scenarioId: invitation.scenarioId });
           getHistoryApi().replaceState(null, "", scenarioListUrl());
-          store.dispatch(launchRun({ identity, challenge: invitation }));
+          store.dispatch(launchRun(invitation));
         })
       }
     />

@@ -1259,8 +1259,7 @@ export default class Insights extends React.Component<Props, State> {
   }
 
   /**
-   * The game's long-range forecast, shared with the top bar's runway warning through the
-   * memoized helper: one simulation per set of inputs, read by both callers.
+   * The full planning forecast is independent of the shorter top-bar forecast.
    *
    * When a month rollover or a decision has made it stale, the pane keeps drawing the one it
    * already has, and componentDidUpdate asks for the new one after paint (see

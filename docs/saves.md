@@ -31,9 +31,9 @@ against the prior loader to demonstrate that it detects the missing migration.
 
 A coherent authored save from a different simulation fingerprint can continue under
 the running rules after its progress passes the current domain checks. The loader
-checks the prior identity against its embedded authored setup and any attached
-challenge, then removes its shared identity and challenge and sets the persistent
-`rulesChanged` marker. Upgraded runs retain leaderboard eligibility and normal
+checks the prior identity against its embedded authored setup, removes the stale
+identity, and sets the persistent `rulesChanged` marker. A friend’s score target
+remains attached to the same scenario and difficulty. Upgraded runs retain leaderboard eligibility and normal
 scenario-completion credit; the marker only controls forecast refresh. Once data
 loads, resumed continued runs rebuild only their future weather,
 fuel prices, demand and supply forecasts under the running rules; recorded frames,
@@ -43,8 +43,8 @@ Current fingerprints keep their existing canonical identity checks; corrupt
 identity or challenge relationships are rejected rather than repaired. Starting a
 new game clears the forecast-refresh marker.
 
-Authored challenge links still require the current fingerprint, and mod snapshots
-must match the current mod runtime and their frozen digests. See
+Friend challenge links retain their scenario, difficulty and target across rule
+updates. Mod snapshots must match the current mod runtime and their frozen digests. See
 [run compatibility](run-compatibility.md) for fingerprint generation. Historical
 custom/mod formats and old co-op worlds are outside the solo migration contract.
 
@@ -112,3 +112,6 @@ Existing company-local land rights, including old duplicate ownership, are
 retained. New claims are exclusive and checked in host command order. Other
 incompatible co-op identities retain their existing rejection behavior. See
 [territories](territories.md).
+
+Schema 25 migrates old friend challenges to a scenario, difficulty and score target.
+The save retains its original seed and progress.

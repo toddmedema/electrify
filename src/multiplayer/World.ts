@@ -1720,12 +1720,6 @@ function upgradeTerritoryWorld(value: unknown): unknown {
     typeof old.rules === "string" &&
     SCHEMA_24_PUBLISHED_RULES.has(old.rules);
   if (
-    old?.schema === 3 &&
-    publishedSchema24 &&
-    old.gameSchema === SAVE_SCHEMA_VERSION
-  )
-    return { ...old, rules: RULES };
-  if (
     !old ||
     old.schema !== 3 ||
     !(
