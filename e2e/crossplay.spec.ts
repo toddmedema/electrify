@@ -138,10 +138,12 @@ for (const steamHost of [false, true]) {
       if (!steamHost && testInfo.project.name === "mobile-360px")
         await reviewScreenshot(lobby(web), {
           path: testInfo.outputPath("web-crossplay.png"),
+          animations: "disabled",
         });
       if (steamHost)
         await reviewScreenshot(lobby(steam), {
           path: testInfo.outputPath("steam-crossplay.png"),
+          animations: "disabled",
         });
 
       const host = steamHost ? steam : web;
@@ -163,9 +165,32 @@ for (const steamHost of [false, true]) {
           .click();
       await lobby(host).getByRole("button", { name: "Host a game" }).click();
       await host.getByRole("button", { name: "Load multiplayer save" }).click();
-      await expect(
-        host.getByRole("button", { name: "Load save", exact: true }),
-      ).toBeVisible();
+      await host
+        .getByRole("button", { name: "Load save", exact: true })
+        .click();
+      const resume = host.getByRole("button", {
+        name: "Resume game",
+        exact: true,
+      });
+      await expect(resume).toBeDisabled();
+      const code = await host
+        .getByRole("dialog", { name: "Pick your company" })
+        .getByText(/^\d{6}$/, { exact: true })
+        .innerText();
+      await mainEntry(guest).click();
+      await lobby(guest)
+        .getByRole("textbox", { name: "6-digit invite code" })
+        .fill(code);
+      await lobby(guest)
+        .getByRole("button", { name: "Join", exact: true })
+        .click();
+      await expect(resume).toBeEnabled();
+      await resume.click();
+      for (const player of [host, guest])
+        await expect(clock(player)).toHaveAttribute(
+          "data-active-speed",
+          "PAUSED",
+        );
     } finally {
       await otherContext.close();
     }

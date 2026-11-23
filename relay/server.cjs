@@ -193,9 +193,7 @@ function createRelay({
       hostId: room?.hostId,
       error: room?.closed
         ? "The host closed the lobby. Resume the multiplayer save to continue."
-        : room && !room.members.get(room.hostId)?.peer
-          ? "The host lost connection. Waiting for them to reconnect."
-          : undefined,
+        : undefined,
       members: members.map(({ id, name, ready, slot }) => ({
         id,
         name,

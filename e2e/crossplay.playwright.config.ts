@@ -2,7 +2,7 @@ import { defineConfig } from "@playwright/test";
 import path from "node:path";
 
 const port = process.env.E2E_PORT || "3189";
-const baseURL = `http://127.0.0.1:${port}`;
+const baseURL = process.env.E2E_BASE_URL || `http://127.0.0.1:${port}`;
 
 export default defineConfig({
   testDir: ".",
@@ -30,6 +30,7 @@ export default defineConfig({
         hasTouch: true,
         isMobile: true,
         viewport: { width: 360, height: 640 },
+        colorScheme: "dark",
       },
     },
   ],
@@ -41,12 +42,14 @@ export default defineConfig({
     screenshot: "only-on-failure",
     trace: "retain-on-failure",
   },
-  webServer: {
-    command: "node scripts/ci/crossplay-test-server.js",
-    cwd: path.resolve(__dirname, ".."),
-    url: baseURL,
-    env: { E2E_PORT: port },
-    reuseExistingServer: false,
-    timeout: 180_000,
-  },
+  webServer: process.env.E2E_BASE_URL
+    ? undefined
+    : {
+        command: "node scripts/ci/crossplay-test-server.js",
+        cwd: path.resolve(__dirname, ".."),
+        url: baseURL,
+        env: { E2E_PORT: port },
+        reuseExistingServer: false,
+        timeout: 180_000,
+      },
 });

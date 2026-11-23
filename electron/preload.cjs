@@ -15,6 +15,9 @@ contextBridge.exposeInMainWorld(
   Object.freeze({
     apiVersion: 1,
     steamEdition: process.argv.includes("--electrify-steam-edition"),
+    coopRelayUrl: process.argv
+      .find((argument) => argument.startsWith("--electrify-coop-relay="))
+      ?.slice("--electrify-coop-relay=".length),
     couchRequest: (input) => ipcRenderer.invoke("desktop:couch", input),
     onCouchEvent: (callback) => subscribe("desktop:couch-event", callback),
     mods: (input) => ipcRenderer.invoke("desktop:mods", input),

@@ -660,12 +660,7 @@ function openSteamPage(url) {
  * Create a partition restricted to bundled resources, with browser permissions denied.
  * Its protocol serves verified asset paths with the shared CSP and media byte ranges.
  */
-async function prepareBundledSession(partition, allowCrossplay = false) {
-  const relayConfig = path.join(root, "coop-relay.json");
-  const relay =
-    allowCrossplay && fs.existsSync(relayConfig)
-      ? coopRelayUrl(readJson(relayConfig).url)
-      : undefined;
+async function prepareBundledSession(partition, relay) {
   const isolatedSession = session.fromPartition(partition);
   isolatedSession.setPermissionRequestHandler(
     (_contents, _permission, callback) => callback(false),
@@ -775,9 +770,13 @@ async function createWindow() {
     }
   }
   const player = steam.state().steamId || "offline";
+  const relayConfig = path.join(root, "coop-relay.json");
+  const relay = fs.existsSync(relayConfig)
+    ? coopRelayUrl(readJson(relayConfig).url)
+    : undefined;
   const isolatedSession = await prepareBundledSession(
     `persist:electrify-${player}`,
-    true,
+    relay,
   );
   window = new BrowserWindow({
     title: "Electrify",
@@ -793,8 +792,10 @@ async function createWindow() {
     icon: path.join(root, "images/icon/512x512.png"),
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
-      additionalArguments:
-        config.mode === "steam" ? ["--electrify-steam-edition"] : [],
+      additionalArguments: [
+        ...(config.mode === "steam" ? ["--electrify-steam-edition"] : []),
+        ...(relay ? [`--electrify-coop-relay=${relay.href}`] : []),
+      ],
       contextIsolation: true,
       sandbox: true,
       nodeIntegration: false,

@@ -42,6 +42,8 @@ jobs:
         with:
           edition: desktop
       - name: Compile and verify the shared desktop renderer
+        env:
+          REACT_APP_COOP_RELAY_URL: ws://127.0.0.1:3187/v1
         run: npm run desktop:build
       - uses: actions/upload-artifact@v7
         with:
@@ -59,6 +61,8 @@ jobs:
         with:
           edition: web
       - name: Production web build
+        env:
+          REACT_APP_COOP_RELAY_URL: ws://127.0.0.1:3187/v1
         run: npm run build
       - name: Bundle size
         run: npm run perf:bundle
@@ -262,6 +266,7 @@ jobs:
       PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/.tmp/playwright-browsers
       E2E_PORT: "3189"
       ELECTRIFY_EXECUTABLE: ${{ github.workspace }}/dist/desktop/linux-unpacked/Electrify
+      CROSSPLAY_TEST_RELAY_PORT: "3187"
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/install
@@ -296,6 +301,14 @@ jobs:
         run: node scripts/ci/lfs-assets.js renderer build
       - name: Cross-play relay tests
         run: npm ci --prefix relay && npm --prefix relay test && npm run test:crossplay
+      - uses: actions/download-artifact@v8
+        with:
+          name: web-renderer
+          path: .tmp/crossplay-web
+      - name: Cross-play from the lightweight production website
+        env:
+          CROSSPLAY_WEB_BUILD_DIR: .tmp/crossplay-web
+        run: npm run test:crossplay -- --project=mobile-390px --grep "two browsers"
       - name: Multiplayer, controller and full packaged desktop suites
         run: xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" sh -c 'openbox & npm run test:ci-all -- --group=desktop'
       - name: Measure helper startup (manual runs only)

@@ -209,6 +209,12 @@ test("the sandboxed preload forwards only the text request and result", async ()
   vm.runInNewContext(
     fs.readFileSync(require.resolve("./preload.cjs"), "utf8"),
     {
+      process: {
+        argv: [
+          "--electrify-steam-edition",
+          "--electrify-coop-relay=wss://relay.electrify.test/v1",
+        ],
+      },
       require: (name) => {
         assert.equal(name, "electron");
         return {
@@ -231,6 +237,8 @@ test("the sandboxed preload forwards only the text request and result", async ()
   assert.equal(await bridge.showTextInput(request), result);
   assert.deepEqual(calls, [["desktop:text-input", request]]);
   assert.equal(bridge.ipcRenderer, undefined);
+  assert.equal(bridge.steamEdition, true);
+  assert.equal(bridge.coopRelayUrl, "wss://relay.electrify.test/v1");
 });
 
 test("text input resolves every native export in the bundled Steam SDK and is optional", () => {

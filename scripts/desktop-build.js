@@ -26,7 +26,7 @@ function desktopBuild() {
         PUBLIC_URL: "",
         GENERATE_SOURCEMAP: "false",
         REACT_APP_DESKTOP: "true",
-        REACT_APP_COOP_RELAY_URL: relay?.href || "",
+        REACT_APP_COOP_RELAY_URL: "",
         REACT_APP_VERSION: version,
       },
     });

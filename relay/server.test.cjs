@@ -193,10 +193,10 @@ test(
     await host.close();
     const paused = await reconnected.next(
       (event) =>
-        event.kind === "state" &&
-        event.state.error?.includes("host lost connection"),
+        event.kind === "state" && !event.state.connected.includes(lobby.selfId),
     );
     assert.deepEqual(paused.state.connected, []);
+    assert.equal(paused.state.error, undefined);
     const restoredHost = await relay.player(WEB, host.token);
     const restored = await restoredHost.ask({
       kind: "reconnect",

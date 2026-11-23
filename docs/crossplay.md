@@ -37,6 +37,8 @@ npm run test:crossplay
 The browser tests launch an isolated relay on a random loopback port and run the
 existing host and replica workers in Chromium. The Steam renderer fixture supplies
 desktop identity and capabilities. Cross-play traffic goes through the real relay.
+CI also joins a game from the optimized website's first-visit menu and checks
+that a packaged desktop build can host using the configured relay.
 
 ## Deployment
 
