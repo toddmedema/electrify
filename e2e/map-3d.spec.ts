@@ -914,56 +914,60 @@ test("explains when WebGL2 cannot start and keeps the tile controls usable", asy
   }
 });
 
-test("reloads a failed scene while a tile inspector is open", async ({
-  page,
-}, info) => {
-  await page.emulateMedia({ reducedMotion: "reduce" });
-  const sceneChunk = "**/static/js/territory-scene.*.js";
-  let releaseScene!: () => void;
-  const pendingScene = new Promise<void>((resolve) => {
-    releaseScene = resolve;
-  });
-  await page.route(sceneChunk, async (route) => {
-    await pendingScene;
-    await route.abort();
-  });
-  const { map } = await startPausedMap(page, "dark", "loading");
-  const notice = map.getByRole("status", { name: "3D map" });
-  await expect(notice).toHaveText("Loading 3D map…");
-  await map.locator('[data-map-target="champlain:city"]').press("Enter");
-  const inspector = page.getByRole("dialog", { name: "Burlington" });
-  const inspectorTop = async () => (await inspector.boundingBox())!.y;
-  const loadingTop = await inspectorTop();
-  releaseScene();
+test.describe("scene delivery", () => {
+  test.use({ serviceWorkers: "block" });
 
-  await expect(notice).toHaveText("The 3D map couldn’t load.");
-  // The Reload control makes the status row taller than the loading message.
-  await expect.poll(inspectorTop).toBeGreaterThan(loadingTop);
-  const reload = map.getByRole("button", { name: "Reload page" });
-  const reloadBounds = (await reload.boundingBox())!;
-  expect(reloadBounds.y + reloadBounds.height).toBeLessThanOrEqual(
-    await inspectorTop(),
-  );
-  await reviewScreenshot(map, {
-    path: info.outputPath("map-scene-reload.png"),
-  });
+  test("reloads a failed scene while a tile inspector is open", async ({
+    page,
+  }, info) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    const sceneChunk = "**/static/js/territory-scene.*.js";
+    let releaseScene!: () => void;
+    const pendingScene = new Promise<void>((resolve) => {
+      releaseScene = resolve;
+    });
+    await page.route(sceneChunk, async (route) => {
+      await pendingScene;
+      await route.abort();
+    });
+    const { map } = await startPausedMap(page, "dark", "loading");
+    const notice = map.getByRole("status", { name: "3D map" });
+    await expect(notice).toHaveText("Loading 3D map…");
+    await map.locator('[data-map-target="champlain:city"]').press("Enter");
+    const inspector = page.getByRole("dialog", { name: "Burlington" });
+    const inspectorTop = async () => (await inspector.boundingBox())!.y;
+    const loadingTop = await inspectorTop();
+    releaseScene();
 
-  await expect(
-    page.locator("#appbar:visible [data-save-state]").first(),
-  ).toHaveAttribute("data-save-state", "saved");
-  await page.unroute(sceneChunk);
-  const navigated = page.waitForEvent("framenavigated", {
-    predicate: (frame) => frame === page.mainFrame(),
+    await expect(notice).toHaveText("The 3D map couldn’t load.");
+    // The Reload control makes the status row taller than the loading message.
+    await expect.poll(inspectorTop).toBeGreaterThan(loadingTop);
+    const reload = map.getByRole("button", { name: "Reload page" });
+    const reloadBounds = (await reload.boundingBox())!;
+    expect(reloadBounds.y + reloadBounds.height).toBeLessThanOrEqual(
+      await inspectorTop(),
+    );
+    await reviewScreenshot(map, {
+      path: info.outputPath("map-scene-reload.png"),
+    });
+
+    await expect(
+      page.locator("#appbar:visible [data-save-state]").first(),
+    ).toHaveAttribute("data-save-state", "saved");
+    await page.unroute(sceneChunk);
+    const navigated = page.waitForEvent("framenavigated", {
+      predicate: (frame) => frame === page.mainFrame(),
+    });
+    if (info.project.use.hasTouch) await reload.tap();
+    else await reload.click();
+    await navigated;
+    await page.getByRole("button", { name: "Continue", exact: true }).click();
+    const restored = await returnToTerritoryMap(page);
+    await expect(restored.locator("canvas.territory3DCanvas")).toHaveAttribute(
+      "data-renderer",
+      "ready",
+    );
   });
-  if (info.project.use.hasTouch) await reload.tap();
-  else await reload.click();
-  await navigated;
-  await page.getByRole("button", { name: "Continue", exact: true }).click();
-  const restored = await returnToTerritoryMap(page);
-  await expect(restored.locator("canvas.territory3DCanvas")).toHaveAttribute(
-    "data-renderer",
-    "ready",
-  );
 });
 
 async function dragWindow(page: Page, target: Locator, dx: number, dy: number) {
