@@ -28,10 +28,11 @@ import {
 } from "../../helpers/DataCenterSetup";
 import { createDataCenterSetupWorker } from "../../helpers/DataCenterSetupClient";
 import { formatCount, formatWatts, formatNumber } from "../../helpers/Format";
-import { prefetchScenarioData } from "../../helpers/OfflineData";
+import { prefetchLocationWeather } from "../../OfflineWeatherData";
 import { ScenarioType } from "../../Types";
 import ScreenPage from "../base/ScreenPage";
 import LocationPicker from "../base/LocationPicker";
+import { useOfflineWeather } from "../base/useOfflineWeather";
 import {
   useWorkerRequest,
   WorkerRequestOptions,
@@ -141,12 +142,11 @@ export default function DataCenterSetup({ onBack, onStart, onResume }: Props) {
     };
   }, [customerAttempt]);
 
-  React.useEffect(() => {
-    if (location) void prefetchScenarioData(location);
-  }, [location]);
-
+  const isLocationUnavailable = useOfflineWeather(cities);
+  const weatherUnavailable = !!location && !!isLocationUnavailable?.(location);
   const preparation = useWorkerRequest(
     location &&
+      !weatherUnavailable &&
       customerProfile &&
       validStartingYear(startingYear) &&
       validAccounts
@@ -165,7 +165,9 @@ export default function DataCenterSetup({ onBack, onStart, onResume }: Props) {
     SETUP_WORKER,
   );
   const growthScenario =
-    preparation.status === "ready" ? preparation.result : undefined;
+    !weatherUnavailable && preparation.status === "ready"
+      ? preparation.result
+      : undefined;
   const demandW = demandAtTick(demandTick);
   const validArrival = validYear(arrivalYear) && arrivalYear > startingYear;
   const scenario = React.useMemo(
@@ -203,7 +205,10 @@ export default function DataCenterSetup({ onBack, onStart, onResume }: Props) {
             locations={cities}
             value={location || undefined}
             loading={loading}
+            isLocationUnavailable={isLocationUnavailable}
             onChange={(selected) => {
+              if (!isLocationUnavailable)
+                void prefetchLocationWeather(selected);
               setLocation(selected);
               setDemandTick(wToSliderTick(100e6));
               setAccountsInput(undefined);
