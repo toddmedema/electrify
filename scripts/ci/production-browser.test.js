@@ -49,12 +49,15 @@ test("production reproduction and CI use the same server and acceptance policy",
     assert.equal(configs[0].workers, configs[1].workers);
   }
   // The reproduction entry point must reach specs outside CI's smoke allowlist.
-  const result = playwright([
-    "--config=e2e/production.playwright.config.ts",
-    "scenario-details.spec.ts",
-    "--project=desktop-1440px",
-    "--list",
-  ]);
+  const result = playwright(
+    [
+      "--config=e2e/production.playwright.config.ts",
+      "scenario-details.spec.ts",
+      "--project=desktop-1440px",
+      "--list",
+    ],
+    { ELECTRIFY_E2E_ALL_SPECS: "1" },
+  );
   assert.equal(result.status, 0, result.stderr);
   assert(JSON.parse(result.stdout).suites.length > 0);
 });

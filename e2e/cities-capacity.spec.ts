@@ -71,6 +71,49 @@ async function sceneFacility(map: Locator, tileId: string) {
     );
 }
 
+const capacityAction = (inspector: Locator) =>
+  inspector
+    .getByRole("group", { name: "Facility actions" })
+    .getByRole("button", { name: "Upgrade capacity", exact: true });
+
+const capacityDialog = (page: Page) =>
+  page.getByRole("dialog", { name: /^Upgrade .* capacity\?$/ });
+
+test(
+  "capacity review actions remain reachable at the minimum phone width",
+  {
+    tag: "@minimum-phone",
+  },
+  async ({ page }, info) => {
+    test.skip(info.project.name !== "mobile-360px");
+    await start(page, "dark");
+    const before = (await readSavedGame(page))!;
+    const facility = before.facilities.find(
+      ({ name }) => name === "Natural Gas CC",
+    )!;
+    await selectTerritoryMapTile(page, getTerritoryTile(facility.tileId!)!);
+    const upgradeButton = capacityAction(page.locator(".tileWorkspaceSurface"));
+    await upgradeButton.click();
+    const dialog = capacityDialog(page);
+    await expectDialogToFit(dialog);
+    const slider = dialog.getByRole("slider", {
+      name: "New capacity (MW)",
+      exact: true,
+    });
+    await slider.press("Home");
+    await slider.press("ArrowRight");
+    await expect(
+      dialog.getByText("Added capacity online in", { exact: true }),
+    ).toBeVisible();
+    const pay = dialog.getByRole("button", { name: "Pay cash", exact: true });
+    await expect(pay).toBeInViewport();
+    await expect(pay).toBeEnabled();
+    await dialog.press("Escape");
+    await expect(dialog).toHaveCount(0);
+    await expect(upgradeButton).toBeFocused();
+  },
+);
+
 test("an inherited gas steam plant submits exhaust only while generating", async ({
   page,
 }, info) => {
@@ -177,7 +220,7 @@ test("the Hydro inspector groups its facility actions and keeps reservoir help",
 });
 
 for (const theme of ["light", "dark"] as const) {
-  test(`city demand legend and plot share the inspector surface · ${theme}`, async ({
+  test(`city demand legend and plot share the inspector surface · ${theme} @minimum-phone`, async ({
     page,
   }, info) => {
     await start(page, theme);
@@ -350,9 +393,7 @@ for (const theme of ["light", "dark"] as const) {
       name: "Capacity upgrade",
       exact: true,
     });
-    const upgradeButton = inspector
-      .getByRole("group", { name: "Facility actions" })
-      .getByRole("button", { name: "Upgrade capacity", exact: true });
+    const upgradeButton = capacityAction(inspector);
     await expect(upgrade).toHaveCount(0);
     await upgradeButton.scrollIntoViewIfNeeded();
     await reviewScreenshot(inspector, {
@@ -360,9 +401,7 @@ for (const theme of ["light", "dark"] as const) {
       animations: "disabled",
     });
     await upgradeButton.click();
-    const dialog = page.getByRole("dialog", {
-      name: /^Upgrade .* capacity\?$/,
-    });
+    const dialog = capacityDialog(page);
     await expectDialogToFit(dialog);
     const slider = dialog.getByRole("slider", {
       name: "New capacity (MW)",

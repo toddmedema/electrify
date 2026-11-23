@@ -17,7 +17,7 @@ const missions = [
 ];
 
 for (const [index, mission] of missions.entries()) {
-  test(`${mission.name} keeps taught actions and a reachable tutorial target`, async ({
+  test(`${mission.name} keeps taught actions and a reachable tutorial target${mission.id === 0 ? " @phone" : mission.id === 112 ? " @minimum-phone" : ""}`, async ({
     page,
   }, testInfo) => {
     await page.addInitScript(

@@ -1,4 +1,5 @@
 import { defineConfig } from "@playwright/test";
+import { prBrowserViewports, focusBrowserProject } from "./browser-projects";
 import production from "./production.playwright.config";
 
 const smoke = [
@@ -52,29 +53,16 @@ const layout = [
   "wildfire-scenario.spec.ts",
   "acquisitions.spec.ts",
   "tutorial-capstone.spec.ts",
+  "short-pane-responsive.spec.ts",
 ];
 
-// Run the PR smoke matrix at 1280/390 px and layout checks at 1280/390/360 px.
-// One invocation lets Playwright shard all cases together without starting a dev compiler.
+// Desktop owns the full PR journeys. The phone owns touch interactions and the
+// minimum phone owns space-constrained layouts. One invocation shards them together.
 export default defineConfig({
   ...production,
-  projects: production
-    .projects!.filter((project) =>
-      ["desktop-chromium", "mobile-390px", "mobile-360px"].includes(
-        project.name!,
-      ),
-    )
-    .map((project) => ({
-      ...project,
-      testMatch:
-        project.name === "mobile-360px"
-          ? [
-              ...layout,
-              "tutorial-actions.spec.ts",
-              "main-menu.spec.ts",
-              "home-entry.spec.ts",
-              "home-motion.spec.ts",
-            ]
-          : [...smoke, ...layout],
-    })),
+  projects: prBrowserViewports.map((project) =>
+    project.name === "desktop-chromium"
+      ? { ...project, testMatch: [...smoke, ...layout] }
+      : focusBrowserProject(project, true),
+  ),
 });

@@ -411,7 +411,7 @@ test.beforeEach(async ({ page }, info) => {
   }, setup);
 });
 
-test("desktop home buttons share a width and Escape returns from menu pages", async ({
+test("desktop home buttons share a width and Escape returns from menu pages @short-deck", async ({
   page,
 }, testInfo) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
@@ -453,7 +453,7 @@ test("desktop home buttons share a width and Escape returns from menu pages", as
   }
 });
 
-test("menu movement under a stationary pointer preserves keyboard navigation", async ({
+test("menu movement under a stationary pointer preserves keyboard navigation @docked-controller", async ({
   page,
 }) => {
   await page.goto("/");
@@ -573,7 +573,7 @@ test("TV home controller navigation includes every footer icon and wraps", async
   ).toBeFocused();
 });
 
-test("TV footer tooltips follow controller selection after mouse input", async ({
+test("TV footer tooltips follow controller selection after mouse input @controller-palette @docked-controller", async ({
   page,
 }) => {
   await page.addInitScript(() => {
@@ -877,7 +877,7 @@ test("semantic actions play, build, adjust pricing, inspect charts and save at 1
   ).toBeVisible();
 });
 
-test("controller hints follow the active device without blocking keyboard navigation", async ({
+test("controller hints follow the active device without blocking keyboard navigation @controller-touch", async ({
   page,
 }, testInfo) => {
   await page.goto("/");
@@ -980,7 +980,7 @@ test("controller chooses an autocomplete city and starts a custom game", async (
   expect(save.game.location.name).toBe("Paris, France");
 });
 
-test("controller changes interface scale, keeps settings reachable and persists it", async ({
+test("controller changes interface scale, keeps settings reachable and persists it @short-deck @controller-minimum", async ({
   page,
 }, testInfo) => {
   await page.goto("/");
@@ -1370,7 +1370,7 @@ test("TV maximum interface scale and screen-edge padding keep focused controls c
   await tvJourney(page, info, true);
 });
 
-test("controller help accepts pointer and physical keyboard activation without a layout preference", async ({
+test("controller help accepts pointer and physical keyboard activation without a layout preference @controller-palette", async ({
   page,
 }) => {
   await page.goto("/");

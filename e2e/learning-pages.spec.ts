@@ -37,7 +37,11 @@ test.describe("learning pages without JavaScript", () => {
     });
 
     for (const pathname of pages) {
-      test(`${pathname} remains readable and navigable in ${theme} mode`, async ({
+      const tag =
+        pathname === "/data-centers.html" && theme === "dark"
+          ? " @minimum-phone"
+          : "";
+      test(`${pathname} remains readable and navigable in ${theme} mode${tag}`, async ({
         page,
       }) => {
         await page.emulateMedia({ colorScheme: theme });
