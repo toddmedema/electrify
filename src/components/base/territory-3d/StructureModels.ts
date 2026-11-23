@@ -672,15 +672,22 @@ function wind(kind: "wind" | "offshore-wind", size: FacilitySize): MapModel {
     deck = offshore ? platform.height : size === "large" ? 0.045 : 0.035;
   if (offshore) {
     const { legX, legZ, width, depth } = platform;
+    const legFootY = size === "large" ? 0.009 : 0.006;
+    const braceFootY = size === "large" ? 0.009 : 0.005;
     for (const x of [-legX, legX])
       for (const z of [-legZ, legZ]) {
         body.beam(
-          [x * 1.3, 0.006, z * 1.3],
+          [x * 1.3, legFootY, z * 1.3],
           [x, deck, z],
           0.012 * tower,
           P.steelShade,
         );
-        body.beam([-x, 0.005, z], [x, deck, z], 0.006 * tower, P.steelShade);
+        body.beam(
+          [-x, braceFootY, z],
+          [x, deck, z],
+          0.006 * tower,
+          P.steelShade,
+        );
       }
     body.box([0, deck, 0], [width, 0.025, depth], P.steel);
     if (size === "large") {
