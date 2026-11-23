@@ -1,5 +1,6 @@
 import { defineConfig } from "@playwright/test";
 import path from "node:path";
+import { browserViewports } from "./browser-projects";
 import base from "./playwright.config";
 
 const port = process.env.E2E_PORT || "3197";
@@ -35,6 +36,13 @@ export default defineConfig({
     ...([800, 720] as const).flatMap((height) =>
       (["light", "dark"] as const).map((colorScheme) => ({
         name: `deck-${height}-${colorScheme}`,
+        // The 800px light project owns the full controller journey.
+        grep:
+          height === 720
+            ? /@short-deck\b/
+            : colorScheme === "dark"
+              ? /@controller-palette\b/
+              : undefined,
         use: {
           browserName: "chromium" as const,
           viewport: { width: 1280, height },
@@ -44,6 +52,7 @@ export default defineConfig({
     ),
     {
       name: "docked-light",
+      grep: /@docked-controller\b/,
       use: {
         browserName: "chromium",
         viewport: { width: 1920, height: 1080 },
@@ -61,12 +70,16 @@ export default defineConfig({
         },
       })),
     ),
-    ...base
-      .projects!.filter((project) =>
+    ...browserViewports
+      .filter((project) =>
         ["mobile-390px", "mobile-360px"].includes(project.name!),
       )
       .map((project) => ({
         ...project,
+        grep:
+          project.name === "mobile-390px"
+            ? /@controller-touch\b/
+            : /@controller-minimum\b/,
         use: { ...project.use, colorScheme: "dark" as const },
       })),
   ],

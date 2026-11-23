@@ -1,6 +1,50 @@
 import { expect, test } from "./fixtures";
 import { openPane, openBuild } from "./layout";
 
+test("a live resize switches tablet, foldable and desktop game controls", async ({
+  page,
+}, info) => {
+  test.skip(info.project.name !== "desktop-chromium");
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.addInitScript(() => localStorage.setItem("audioEnabled", "false"));
+  await page.goto("/?scenario=106");
+  await page.getByRole("button", { name: "Start game", exact: true }).click();
+
+  const stage = page.locator(".gameStage");
+  const events = page.locator("#eventsPane");
+  const eventsButton = page
+    .getByRole("navigation", { name: "Game actions" })
+    .getByRole("button", { name: "Events", exact: true });
+  const goals = events.getByRole("heading", { name: "Goals", exact: true });
+  const ultra = page.getByRole("button", { name: "ultra speed", exact: true });
+
+  for (const [width, height, layout, operations, wide] of [
+    [768, 1024, "single", false, false],
+    [844, 690, "single", true, false],
+    [1280, 800, "side", true, false],
+    [1440, 900, "side", true, true],
+    [768, 1024, "single", false, false],
+  ] as const) {
+    await page.setViewportSize({ width, height });
+    await expect(stage).toHaveAttribute("data-layout", layout);
+    if (wide) await expect(ultra).toBeVisible();
+    else await expect(ultra).toHaveCount(0);
+
+    await openPane(events, eventsButton);
+    await expect(events).toBeVisible();
+    if (operations) await expect(goals).toBeVisible();
+    else await expect(goals).toHaveCount(0);
+    const history = events.getByRole("button", {
+      name: "Filter event history, All events",
+    });
+    await history.scrollIntoViewIfNeeded();
+    await expect(history).toBeInViewport();
+    await eventsButton.click();
+    await expect(events).toBeHidden();
+    await expect(page.locator(".facilities:visible")).toBeVisible();
+  }
+});
+
 for (const theme of ["light", "dark"] as const) {
   test(`short panes keep the fleet and trading controls reachable in ${theme}`, async ({
     page,

@@ -415,7 +415,7 @@ for (const theme of ["light", "dark"] as const) {
     ["Storage", "Pumped Hydro"],
     ["Interties", "Pacific Northwest"],
   ]) {
-    test(`${category} max affordable size stays visible after sorting in ${theme}`, async ({
+    test(`${category} max affordable size stays visible after sorting in ${theme} @minimum-phone`, async ({
       page,
     }, info) => {
       await page.addInitScript((mode) => {
@@ -509,7 +509,7 @@ for (const theme of ["light", "dark"] as const) {
 }
 
 for (const theme of ["light", "dark"] as const) {
-  test(`build options remain compact and usable in ${theme}`, async ({
+  test(`build options remain compact and usable in ${theme} @minimum-phone`, async ({
     page,
   }, testInfo) => {
     await page.addInitScript((mode) => {

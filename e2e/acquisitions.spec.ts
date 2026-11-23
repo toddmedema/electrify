@@ -433,7 +433,9 @@ async function expectCityDemand(surface: Locator) {
 }
 
 for (const theme of ["light", "dark"] as const) {
-  test(`map persists beneath its tools in ${theme}`, async ({ page }, info) => {
+  test(`map persists beneath its tools in ${theme} @phone @minimum-phone`, async ({
+    page,
+  }, info) => {
     const network = await startMap(page, theme);
     const viewport = network.locator(".territoryMapViewport");
     const original = await viewport.elementHandle();
@@ -1174,7 +1176,7 @@ for (const theme of ["light", "dark"] as const) {
     ).toBeVisible();
   });
 
-  test(`tile builder keeps project decisions together in ${theme}`, async ({
+  test(`tile builder keeps project decisions together in ${theme} @minimum-phone`, async ({
     page,
   }, info) => {
     const network = await startMap(page, theme);
@@ -1394,7 +1396,7 @@ for (const theme of ["light", "dark"] as const) {
     ).toBeFocused();
   });
 
-  test(`cash buys one tile and its locked generator survives resume in ${theme}`, async ({
+  test(`cash buys one tile and its locked generator survives resume in ${theme}${theme === "dark" ? " @phone" : ""}`, async ({
     page,
   }, info) => {
     const network = await startMap(page, theme);
@@ -1599,7 +1601,7 @@ for (const theme of ["light", "dark"] as const) {
     ).toEqual(storage);
   });
 
-  test(`rapid buying keeps the camera and mode while navigation cannot spend in ${theme}`, async ({
+  test(`rapid buying keeps the camera and mode while navigation cannot spend in ${theme}${theme === "dark" ? " @phone" : ""}`, async ({
     page,
   }, info) => {
     const network = await startMap(page, theme);

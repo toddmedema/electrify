@@ -439,7 +439,7 @@ test("selection is visible in both themes without horizontal overflow", async ({
     });
 });
 
-test("touch hides button focus rings while inputs and keyboard navigation retain focus indicators", async ({
+test("touch hides button focus rings while inputs and keyboard navigation retain focus indicators @phone", async ({
   page,
 }, info) => {
   test.skip(!info.project.use.hasTouch, "Requires actual touch input");

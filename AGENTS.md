@@ -62,12 +62,13 @@ files are large, so broad rewrites create expensive review diffs.
   to a dev URL for the frame-budget overlay.
 - Build with `npm run build`. For UI flow or layout changes, search affected `e2e/` specs for
   the old controls and reuse the navigation helpers in `e2e/layout.ts`. Run changed specs with
-  `npm run test:e2e -- <spec> --project=desktop-chromium --project=mobile-390px`; include
+  `ELECTRIFY_E2E_ALL_SPECS=1 npm run test:e2e -- <spec> --project=desktop-chromium --project=mobile-390px`. Include
   `--project=mobile-360px` when minimum-width layout changes. New assertions must be reached,
   even when an earlier failure also occurs on the base branch.
-- `check:ci` runs only the smoke/layout specs listed in `e2e/ci.playwright.config.ts`.
-  `test:e2e:ci -- <spec>` cannot select a spec outside that list. To test an arbitrary spec
-  against production, use `test:e2e` with `E2E_BASE_URL` pointing to your hosted web build.
+- `check:ci` runs the production browser selection in `e2e/ci.playwright.config.ts` and
+  `e2e/browser-projects.ts`. `test:e2e:ci -- <spec>` selects only cases already in that matrix.
+  To test an arbitrary spec against production, run `test:e2e` with
+  `ELECTRIFY_E2E_ALL_SPECS=1` and `E2E_BASE_URL` pointing to your hosted web build.
   Local `check:ci` keeps web and desktop artifacts in `.tmp/check-builds/web` and
   `.tmp/check-builds/desktop`. Standalone `build` and `desktop:build` still default to `build/`.
 - Local npm browser/check commands reserve and print an unused `E2E_PORT`. To keep a specific
