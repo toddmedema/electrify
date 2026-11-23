@@ -18,22 +18,11 @@ import { SAVE_DATABASE_NAME } from "../src/SaveRepository";
 import { decodeSave } from "../src/SaveEncoding";
 import type { SaveGameType } from "../src/Types";
 import { openPane } from "./layout";
-import type { ProjectionTransport } from "../src/components/base/ProjectionTransport";
-
-interface DesktopWorkerAudit {
-  requested: number;
-  completed: number;
-  errors: number;
-  workers: string[];
-  requests: { requestId: number; monthsElapsed: number; rate: number }[];
-  messages: { requestId?: number; keys: string[] }[];
-  replies: {
-    requestId: number;
-    numericBytes: number;
-    cashMonths: number;
-    forecastTicks: number;
-  }[];
-}
+import {
+  installDesktopWorkerAudit,
+  planningProjectionStatus,
+  type DesktopWorkerAudit,
+} from "./projection-worker-audit";
 
 const workspace = path.resolve(__dirname, "..");
 
@@ -676,74 +665,7 @@ test("production projection workers finish offline and native focus pauses and r
   await desktop.app.evaluate(({ BrowserWindow }) =>
     BrowserWindow.getAllWindows()[0].setContentSize(1008, 680),
   );
-  await page.addInitScript(() => {
-    const state: DesktopWorkerAudit = {
-      requested: 0,
-      completed: 0,
-      errors: 0,
-      workers: [],
-      requests: [],
-      messages: [],
-      replies: [],
-    };
-    Object.assign(window, { desktopWorkerAudit: state });
-    const NativeWorker = window.Worker;
-    window.Worker = class extends NativeWorker {
-      constructor(url: string | URL, options?: WorkerOptions) {
-        super(url, options);
-        state.workers.push(new URL(String(url), document.baseURI).href);
-        this.addEventListener(
-          "message",
-          (
-            event: MessageEvent<{
-              requestId: number;
-              transport?: ProjectionTransport;
-              error?: boolean;
-            }>,
-          ) => {
-            const data = event.data;
-            state.messages.push({
-              requestId: data?.requestId,
-              keys: data && typeof data === "object" ? Object.keys(data) : [],
-            });
-            if (data?.transport) {
-              state.completed++;
-              state.replies.push({
-                requestId: data.requestId,
-                numericBytes: data.transport.ticks.numbers.values.byteLength,
-                cashMonths: data.transport.cashMonths,
-                forecastTicks: data.transport.ticks.numbers.count,
-              });
-            } else if (data?.error) state.errors++;
-          },
-        );
-        this.addEventListener("error", () => state.errors++);
-        this.addEventListener("messageerror", () => state.errors++);
-      }
-      postMessage(message: unknown) {
-        if (
-          message &&
-          typeof message === "object" &&
-          "game" in message &&
-          "now" in message &&
-          "requestId" in message &&
-          typeof message.requestId === "number"
-        ) {
-          state.requested++;
-          const request = message as {
-            requestId: number;
-            game: { date: { monthsElapsed: number }; dollarsPerkWh: number };
-          };
-          state.requests.push({
-            requestId: request.requestId,
-            monthsElapsed: request.game.date.monthsElapsed,
-            rate: request.game.dollarsPerkWh,
-          });
-        }
-        super.postMessage(message);
-      }
-    };
-  });
+  await page.addInitScript(installDesktopWorkerAudit);
   await page.goto("electrify://app/index.html?scenario=103");
   await page.getByRole("button", { name: "Start game", exact: true }).click();
   await focusNativeWindow(desktop.app);
@@ -814,14 +736,14 @@ test("production projection workers finish offline and native focus pauses and r
   const rate = programs.getByRole("slider", {
     name: "The rate you charge for electricity generation",
   });
-  // Both decisions use new rates, including when the preceding transport is
-  // still being decoded across frames and the initial rate remains cached.
+  // Each rate edit must reach the planning worker and then render in Insights.
   for (const key of ["ArrowRight", "ArrowRight"]) {
     await openPane(
       programs,
       page.getByRole("button", { name: "Programs", exact: true }),
     );
-    const audit = await workerState();
+    await expect(insights).toHaveCount(0);
+    const firstRequest = (await workerState()).requests.length;
     const before = await rate.getAttribute("aria-valuenow");
     await rate.press(key);
     await expect(rate).not.toHaveAttribute("aria-valuenow", before!);
@@ -831,30 +753,29 @@ test("production projection workers finish offline and native focus pauses and r
       page.getByRole("button", { name: "Insights", exact: true }),
     );
     await expect
-      .poll(async () =>
-        (await workerState()).requests
-          .slice(audit.requests.length)
-          .some((request) => Math.abs(request.rate - selectedRate) < 1e-10),
-      )
-      .toBe(true);
-    const request = (await workerState()).requests
-      .slice(audit.requests.length)
-      .find((request) => Math.abs(request.rate - selectedRate) < 1e-10)!;
-    await expect
       .poll(
-        async () =>
-          (await workerState()).replies.some(
-            (reply) => reply.requestId === request.requestId,
-          ),
+        async () => {
+          const audit = await workerState();
+          expect(audit.errors).toEqual([]);
+          return planningProjectionStatus(audit, firstRequest, selectedRate);
+        },
         { timeout: 90_000 },
       )
-      .toBe(true);
+      .toEqual({ requested: true, completed: true });
+    // A reply can precede chunked decoding. Keep Insights open until it publishes.
+    await expect(
+      insights.getByRole("img", { name: /^Chart of / }).first(),
+    ).toBeVisible();
   }
   const audit = await workerState();
-  expect(audit.completed).toBeGreaterThanOrEqual(2);
-  expect(new Set(audit.replies.map((reply) => reply.requestId)).size).toBe(
-    audit.replies.length,
-  );
+  expect(audit.replies.length).toBeGreaterThanOrEqual(2);
+  expect(
+    new Set(
+      audit.replies.map(
+        ({ workerId, requestId }) => `${workerId}:${requestId}`,
+      ),
+    ).size,
+  ).toBe(audit.replies.length);
   for (const reply of audit.replies) {
     expect(reply.numericBytes).toBeGreaterThan(0);
     expect(reply.cashMonths).toBeGreaterThan(0);
@@ -863,8 +784,8 @@ test("production projection workers finish offline and native focus pauses and r
   expect(audit.workers.every((url) => url.startsWith("electrify://app/"))).toBe(
     true,
   );
-  expect((await workerState()).requested).toBeGreaterThanOrEqual(2);
-  expect((await workerState()).errors).toBe(0);
+  expect(audit.requests.length).toBeGreaterThanOrEqual(2);
+  expect(audit.errors).toEqual([]);
   expect(desktop.errors).toEqual([]);
   expect(desktop.externalRequests).toEqual([]);
   const auditPath = testInfo.outputPath("projection-worker-audit.json");
