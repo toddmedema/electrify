@@ -1,7 +1,7 @@
 import { utilityAcquisitions } from "./Expansion";
 import { legacyTerritoryConnections } from "./Territories";
 import { needsObjectiveEnergyMeters } from "./ScenarioRules";
-import { GAME_TO_REAL_YEARS, TICK_MINUTES, TICKS_PER_YEAR } from "../Constants";
+import { GAME_TO_REAL_YEARS } from "../Constants";
 import { getScenario } from "../data/Scenarios";
 import {
   MINUTES_PER_MONTH,
@@ -23,16 +23,10 @@ import {
 import { getTotalDebt } from "./Financials";
 import { legacyMonthOffset } from "./LegacyCampaign";
 
-/**
- * The one long-range projection a game has.
- *
- * Insights builds it for its charts, and MissionStatus reads its projected cash for the runway
- * warning. Both callers want the same forecast of the same game, so it lives here once and is
- * memoized on everything that can actually change it, instead of each component running its own
- * copy of a twenty-year simulation.
- */
+export type ProjectionScope = "planning" | "top-bar";
 
 const MAX_FORECAST_YEARS = 20;
+const TOP_BAR_FORECAST_MONTHS = 5 * 12;
 const HOURS_PER_RECORDED_MONTH = 24 * GAME_TO_REAL_YEARS;
 
 /** Warn through the scenario end, capped at 20 years; unbounded games get one year. */
@@ -50,6 +44,18 @@ export function cashRunwayHorizon(game: GameType): number {
         ),
       )
     : 12;
+}
+
+/** End of the top bar's rolling forecast, limited to the active scenario term. */
+export function topBarForecastEndMinute(game: GameType): number {
+  const limit = game.date.minute + TOP_BAR_FORECAST_MONTHS * MINUTES_PER_MONTH;
+  const scenario = getScenario(game.scenarioId, game.customScenario);
+  if (scenario?.tutorialSteps?.[game.tutorialStep]?.capstone) return limit;
+  const duration = scenario?.durationMonths || MAX_FORECAST_YEARS * 12;
+  return Math.min(
+    limit,
+    (duration + legacyMonthOffset(game)) * MINUTES_PER_MONTH,
+  );
 }
 
 /** The full span the forecast charts can be scrolled through, in game minutes. */
@@ -226,6 +232,8 @@ export function projectionSignature(game: GameType): string {
     game.storyEffectsDisabled,
     JSON.stringify(game.worldEvents),
     game.startingYear,
+    game.startingMonth,
+    game.tutorialStep,
     game.seed,
     game.customScenario ? JSON.stringify(game.customScenario) : "",
     game.date.monthsElapsed,
@@ -241,14 +249,21 @@ export function projectionSignature(game: GameType): string {
 function buildProjection(
   game: GameType,
   now: TickPresentFutureType,
+  scope: ProjectionScope,
 ): ProjectionView {
   const projectionStepMinutes = 60;
-  const tickScale = projectionStepMinutes / TICK_MINUTES;
-  const ticks = (TICKS_PER_YEAR * MAX_FORECAST_YEARS) / tickScale;
-  const monthsAhead = MAX_FORECAST_YEARS * 12;
-
-  // Cash risk and charts share one simulation, never longer than 20 years.
-  const cashMonths = cashRunwayHorizon(game);
+  const [rangeMin, planningEnd] = forecastViewportBounds(game);
+  const topBar = scope === "top-bar";
+  const rangeMax = topBar
+    ? Math.max(game.date.minute, topBarForecastEndMinute(game))
+    : planningEnd;
+  const ticks = Math.ceil(
+    (rangeMax - game.date.minute) / projectionStepMinutes,
+  );
+  const monthsAhead = topBar
+    ? TOP_BAR_FORECAST_MONTHS
+    : MAX_FORECAST_YEARS * 12;
+  const cashMonths = topBar ? monthsAhead : cashRunwayHorizon(game);
   const objectives = scenarioObjectiveDefinitions(
     getScenario(game.scenarioId, game.customScenario),
     game,
@@ -262,54 +277,49 @@ function buildProjection(
     ].includes(metric),
   );
   const objectiveAssets: NonNullable<ProjectionView["objectiveAssets"]> = [];
-  const timeline = generateForecastTimeline(
-    game,
-    now.cash,
-    now.customers,
-    ticks,
-    projectionStepMinutes,
-    needsAssets
-      ? (state, tick) => {
-          const month = Math.floor(tick.minute / MINUTES_PER_MONTH);
-          if (
-            Math.floor(
-              (tick.minute + projectionStepMinutes) / MINUTES_PER_MONTH,
-            ) === month
-          )
-            return;
-          const ownedFuels: ObjectiveMonthFacts["ownedFuels"] = {};
-          for (const facility of state.facilities) {
-            if (facility.fuel)
-              ownedFuels[facility.fuel] = (ownedFuels[facility.fuel] ?? 0) + 1;
+  const observeAssets = (state: GameType, tick: TickPresentFutureType) => {
+    const month = Math.floor(tick.minute / MINUTES_PER_MONTH);
+    if (
+      Math.floor((tick.minute + projectionStepMinutes) / MINUTES_PER_MONTH) ===
+      month
+    )
+      return;
+    const ownedFuels: ObjectiveMonthFacts["ownedFuels"] = {};
+    for (const facility of state.facilities) {
+      if (facility.fuel)
+        ownedFuels[facility.fuel] = (ownedFuels[facility.fuel] ?? 0) + 1;
+    }
+    const ownedVintageFuels = objectiveOwnedVintageFuels(state, objectives);
+    objectiveAssets.push({
+      month,
+      ownedFuels,
+      ...(ownedVintageFuels.length ? { ownedVintageFuels } : {}),
+      debtPrincipal: getTotalDebt([
+        ...state.facilities,
+        ...(state.transmission?.lines ?? []),
+        ...legacyTerritoryConnections(state),
+        ...(state.utilityExpansion?.loans ?? []),
+      ]),
+      ...(state.utilityExpansion
+        ? {
+            ownedUtilities: utilityAcquisitions(state).map((a) => a.targetId),
+            ownedAssetIds: state.facilities.flatMap((f) =>
+              f.startingAssetId ? [f.startingAssetId] : [],
+            ),
           }
-          const ownedVintageFuels = objectiveOwnedVintageFuels(
-            state,
-            objectives,
-          );
-          objectiveAssets.push({
-            month,
-            ownedFuels,
-            ...(ownedVintageFuels.length ? { ownedVintageFuels } : {}),
-            debtPrincipal: getTotalDebt([
-              ...state.facilities,
-              ...(state.transmission?.lines ?? []),
-              ...legacyTerritoryConnections(state),
-              ...(state.utilityExpansion?.loans ?? []),
-            ]),
-            ...(state.utilityExpansion
-              ? {
-                  ownedUtilities: utilityAcquisitions(state).map(
-                    (a) => a.targetId,
-                  ),
-                  ownedAssetIds: state.facilities.flatMap((f) =>
-                    f.startingAssetId ? [f.startingAssetId] : [],
-                  ),
-                }
-              : {}),
-          });
-        }
-      : undefined,
-  );
+        : {}),
+    });
+  };
+  const timeline = ticks
+    ? generateForecastTimeline(
+        game,
+        now.cash,
+        now.customers,
+        ticks,
+        projectionStepMinutes,
+        needsAssets ? observeAssets : undefined,
+      )
+    : [];
   const historicalSupplyDemand = [...game.monthlyHistory]
     .reverse()
     .map((month) => {
@@ -337,8 +347,6 @@ function buildProjection(
     domainMin = Math.min(domainMin, tick.supplyW, tick.demandW);
     domainMax = Math.max(domainMax, tick.supplyW, tick.demandW);
   }
-  const [rangeMin, rangeMax] = forecastViewportBounds(game);
-
   const { blackouts } = forecastShortfalls(
     timeline,
     projectionStepMinutes,
@@ -347,26 +355,35 @@ function buildProjection(
   blackouts.unshift({ minute: rangeMin, value: 0 });
   const sampled = sampleForecastTimeline(timeline, 240 * MAX_FORECAST_YEARS);
 
-  const currentMonth = summarizeTimeline(
-    game.utilityExpansion
-      ? (forecastMonthClosingTimelineAtCustomerRate(game, game.dollarsPerkWh) ??
-          game.timeline)
-      : game.timeline,
-    game.startingYear,
-    undefined,
-    needsObjectiveEnergyMeters(game),
-  );
-  const projectedMonths = summarizeTimelineByMonth(
-    timeline,
-    game.startingYear,
-    needsObjectiveEnergyMeters(game),
-  ).slice(1);
+  const financeProjected = ticks
+    ? [
+        summarizeTimeline(
+          game.utilityExpansion
+            ? (forecastMonthClosingTimelineAtCustomerRate(
+                game,
+                game.dollarsPerkWh,
+              ) ?? game.timeline)
+            : game.timeline,
+          game.startingYear,
+          undefined,
+          needsObjectiveEnergyMeters(game),
+        ),
+        ...summarizeTimelineByMonth(
+          timeline,
+          game.startingYear,
+          needsObjectiveEnergyMeters(game),
+        ).slice(1),
+      ]
+    : [];
   return {
     ...(needsAssets ? { objectiveAssets } : {}),
     timeline: [...historicalCharts, ...timeline],
     sampled: [...historicalCharts, ...sampled],
     supplyDemandTimeline: [...historicalSupplyDemand, ...timeline],
-    domain: { x: [rangeMin, rangeMax], y: [domainMin, domainMax] },
+    domain: {
+      x: [rangeMin, rangeMax],
+      y: [domainMin === Infinity ? 0 : domainMin, domainMax],
+    },
     blackouts,
     forecast: timeline,
     hasStorage: [...historicalCharts, ...timeline].some(
@@ -376,8 +393,8 @@ function buildProjection(
       game.facilities.some((facility) => facility.fuel === "Hydro") ||
       historicalCharts.some((tick) => tick.hydroReservoirCapacityWh > 0),
     financePast: game.monthlyHistory,
-    financeProjected: [currentMonth, ...projectedMonths.slice(0, monthsAhead)],
-    cashProjected: [currentMonth, ...projectedMonths].slice(0, cashMonths),
+    financeProjected: financeProjected.slice(0, monthsAhead + 1),
+    cashProjected: financeProjected.slice(0, cashMonths),
     projectionStepMinutes,
     startingCash: now.cash,
     startingCustomers: now.customers,
@@ -385,19 +402,21 @@ function buildProjection(
   };
 }
 
-// One entry is enough: a game has one game. Whichever caller asks last wins, and the key keeps
-// it honest, so the top bar and the Insights pane agree on the same numbers without one of them
-// paying for a rebuild the other just paid for.
-let cachedProjection:
-  | { key: string; history: MonthlyHistoryType[]; projection: ProjectionView }
-  | undefined;
+// Keep one result per scope so the top bar and an open Insights view can update independently.
+const cachedProjections: Partial<
+  Record<
+    ProjectionScope,
+    { key: string; history: MonthlyHistoryType[]; projection: ProjectionView }
+  >
+> = {};
 
 /** Adopt an isolated worker's result using the original main-thread history identity. */
 export function cacheProjection(
   game: GameType,
   projection: ProjectionView,
+  scope: ProjectionScope = "planning",
 ): void {
-  cachedProjection = {
+  cachedProjections[scope] = {
     key: projectionSignature(game),
     history: game.monthlyHistory,
     projection,
@@ -416,7 +435,9 @@ export function selectProjection(
   now: TickPresentFutureType,
   // Callers that already hold this game's signature pass it to skip rebuilding it
   key: string = projectionSignature(game),
+  scope: ProjectionScope = "planning",
 ): ProjectionView {
+  const cachedProjection = cachedProjections[scope];
   // History identity is stable during ordinary ticks, but changes on restart or save import,
   // even when both runs happen to have the same seed, decisions and month count.
   if (
@@ -425,7 +446,7 @@ export function selectProjection(
   ) {
     return cachedProjection.projection;
   }
-  const projection = buildProjection(game, now);
-  cachedProjection = { key, history: game.monthlyHistory, projection };
+  const projection = buildProjection(game, now, scope);
+  cachedProjections[scope] = { key, history: game.monthlyHistory, projection };
   return projection;
 }

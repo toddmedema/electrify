@@ -103,8 +103,6 @@ interface CoopControls {
   ready: (ready: boolean) => void;
   /** Leave the lobby, after confirming. */
   back: () => void;
-  /** Host: open Steam's invitation overlay. */
-  invite: () => void;
   /** Host: copy the lobby code for friends to enter. */
   copyCode: () => void;
   /** Host: choose a multiplayer save to resume instead. */

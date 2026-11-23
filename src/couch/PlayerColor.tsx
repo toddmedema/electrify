@@ -20,17 +20,19 @@ export function CouchPlayerText({
   seatId,
   children,
   className,
+  useSeatColor = true,
 }: {
   seatId?: string;
   children: ReactNode;
   className?: string;
+  useSeatColor?: boolean;
 }) {
   const color = couchPlayerColor(seatId, useTheme().palette.mode);
   return color || className ? (
     <span
       className={className}
       data-couch-player={color ? seatId : undefined}
-      style={color ? { color } : undefined}
+      style={color && useSeatColor ? { color } : undefined}
     >
       {children}
     </span>

@@ -67,9 +67,9 @@ terminals, bounded scene instances, camera frames and read-only diagnostics.
 models by a bounded visual key. Terrain and structures export separate model
 factories. A small WebGL2 renderer batches repeated meshes with instancing and
 one imperative animation loop. It owns buffers/programs/VAOs, releases them on
-disposal and rebuilds after context restoration. Healthy 3D presentation does
-not also render the old detailed SVG scene. The SVG fallback and labeled HTML
-tile targets preserve an operable map when WebGL is unavailable or lost.
+disposal and rebuilds after context restoration. Labeled HTML tile targets and
+SVG facility badges overlay the scene. A status message explains when WebGL2
+is unavailable or the context is lost.
 
 No render loop dispatches Redux actions, updates React state or writes frame
 poses to DOM attributes. Cap device pixel ratio, cull with model/shadow margins,

@@ -382,18 +382,26 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
     gateGlobal();
     setMenuOwner(owner);
   };
+  const activeShellRoute = () => {
+    const controller = shellController.current;
+    if (!controller) return;
+    const { bindings, devices } = current.current;
+    if (
+      routes.current.get(controller.seatId) === controller.generation &&
+      devices.some(
+        (device) =>
+          device.id === bindings[controller.seatId] && device.connected,
+      )
+    )
+      return controller;
+  };
   /** Transfer an open menu's request identity to its destination without releasing input.
    * The same pause and native overlay remain in force throughout the transition. */
   const menuAction = (kind: "settings" | "manual" | "leave") => {
     const active = globalRequest.current;
     if (!active || active.kind !== "menu") return;
-    const controller = shellController.current;
     const requester =
-      kind === "leave" &&
-      controller &&
-      routes.current.get(controller.seatId) === controller.generation
-        ? controller
-        : active;
+      kind === "leave" ? (activeShellRoute() ?? active) : active;
     globalRequest.current = {
       ...active,
       kind,
@@ -435,16 +443,19 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
       });
   };
   /** Gate every company while the requesting route confirms a single whole-world save and exit. */
-  const requestExit = (seatId: string) => {
+  const requestExit = (fallbackSeatId: string) => {
     if (globalRequest.current || current.current.busy) return;
+    const requester = activeShellRoute() ?? {
+      seatId: fallbackSeatId,
+      generation: routes.current.get(fallbackSeatId) ?? 0,
+    };
     globalRequest.current = {
       kind: "leave",
-      seatId,
-      generation: routes.current.get(seatId) ?? 0,
+      ...requester,
       id: crypto.randomUUID(),
     };
     gateGlobal();
-    setExitOwner(seatId);
+    setExitOwner(requester.seatId);
     setSaveFailed(false);
     setDiscarding(false);
   };
@@ -787,8 +798,6 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
         store.dispatch(uiDelta({ coop: undefined }));
         store.dispatch(navigate("MAIN_MENU"));
       },
-      invite: () =>
-        setError("Each player joins with their own controller on this TV."),
       copyCode: () => {},
       openSaves: () => setStage("join"),
     });
