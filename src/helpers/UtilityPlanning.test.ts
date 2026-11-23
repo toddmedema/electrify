@@ -18,12 +18,13 @@ it("shows executable dated offers without a wire and rejects forged terms withou
   const before = JSON.stringify(game);
   for (const target of UTILITY_TARGETS) {
     const offer = utilityOffer(game, target.id)!;
-    expect(offer.equityPrice).toBe(target.equityPrice);
-    expect(offer.assumedDebt).toBe(target.assumedDebt);
+    expect(offer.equityPrice).toBeGreaterThan(0);
     expect(offer.facilities).toHaveLength(3);
     expect(offer.contracts.length).toBeGreaterThan(0);
     expect(acquisitionQuote(game, target.id)).toMatchObject({
       targetId: target.id,
+      equityPrice: offer.equityPrice,
+      assumedDebt: target.assumedDebt,
     });
     expect(
       transferUtility(game, {

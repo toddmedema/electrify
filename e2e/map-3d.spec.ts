@@ -829,13 +829,13 @@ for (const theme of ["light", "dark"] as const) {
     expect(quote.facility).toBeDefined();
     if (!quote.facility) throw new Error("Owned project site has no quote");
     const total = formatPurchasePrice(projectSiteCapitalCost(quote));
-    await expect(ownedMarker.locator("b")).toHaveText(total);
+    await expect(ownedMarker.locator("b")).toHaveText(`(${total})`);
     await expect(owned).toHaveAccessibleName(
       /Total project cost .*Already connected/,
     );
     await owned.focus();
     await expect(map.getByRole("tooltip")).toContainText(
-      `Total project cost ${total} · Already connected`,
+      `Total project cost (${total}) · Already connected`,
     );
     await map.getByRole("button", { name: "Rapid connection mode" }).focus();
     await expect(map.getByRole("tooltip")).toHaveCount(0);
@@ -844,7 +844,7 @@ for (const theme of ["light", "dark"] as const) {
     await expect(surface.getByText("Connected", { exact: true })).toBeVisible();
     await ownedMarker.hover();
     await expect(map.getByRole("tooltip")).toContainText(
-      `Total project cost ${total} · Already connected`,
+      `Total project cost (${total}) · Already connected`,
     );
     await page.mouse.move(0, 0);
     await reviewScreenshot(map, {
@@ -1447,7 +1447,7 @@ test("hail falls on the struck solar site and leaves visibly broken panels durin
   for (const tileId of [struck, repairing])
     expect(
       initial.scene!.find(({ id }) => id === `structure:${tileId}`)?.modelKey,
-    ).toBe("structure:solar-hail-damaged");
+    ).toBe("structure:solar-hail-damaged:small");
   await fresh.blur();
   await reviewScreenshot(map.locator(".territoryMapViewport"), {
     path: info.outputPath("hail-webgl-map.png"),

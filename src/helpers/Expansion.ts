@@ -61,6 +61,7 @@ import {
   UTILITY_TARGETS,
   utilityEntitlementsAt,
   utilityNetworkAnnualOM,
+  type UtilityTargetDefinition,
 } from "../data/UtilityExpansion";
 import {
   facilityAgeYears,
@@ -76,6 +77,7 @@ import {
 import { cityCustomerCount } from "./CityProfiles";
 import { customerMarketSizeAt } from "./Customers";
 import { defaultDispatchIndex } from "./DispatchOrder";
+import { getRandomRangeAt, RANDOM_STREAM } from "./Math";
 import { startingFacilityQuote } from "./StartingFacilities";
 import { startingFacilityStarts } from "./StartingFacilityStarts";
 import { windAnnualOutputDegradation } from "../data/Facilities";
@@ -172,6 +174,16 @@ function nextFacilityId(game: GameType): number {
   );
 }
 
+/** Use immutable asset identities so inspecting, buying or restoring a fleet cannot reroll it. */
+function sellerGeneratorAge(seed: number, assetId: string): number {
+  let address = 2166136261;
+  for (const character of assetId)
+    address = Math.imul(address ^ character.charCodeAt(0), 16777619);
+  return Math.floor(
+    getRandomRangeAt(seed, RANDOM_STREAM.sellerGeneratorAge, address, 4, 31),
+  );
+}
+
 function inheritedFacility(
   game: GameType,
   quote: FacilityShoppingType,
@@ -227,6 +239,7 @@ function inheritedFacility(
 export function acquisitionAssets(
   game: GameType,
   targetId: UtilityTargetId,
+  sellerFleet = game.utilityExpansion?.sellerFleet,
 ): FacilityOperatingType[] | undefined {
   const definition = UTILITY_AREAS[targetId];
   const opening = sellerOpening(game, definition.location);
@@ -243,7 +256,9 @@ export function acquisitionAssets(
         nextId++,
         targetId,
         getFacilityTile({ startingAssetId: search.assetId })?.id,
-        search.initialAgeYears ?? 0,
+        sellerFleet === "seeded" && search.assetId && !isStorage(quote)
+          ? sellerGeneratorAge(game.seed, search.assetId)
+          : (search.initialAgeYears ?? 0),
         search.assetId,
         search.hydroSiteId,
       ),
@@ -251,6 +266,38 @@ export function acquisitionAssets(
   }
   return result;
 }
+
+/** Keep the regional network's value separate from the depreciating fleet. */
+export function regionalAcquisitionValuation(
+  game: GameType,
+  target: UtilityTargetDefinition,
+  index: number,
+) {
+  const assets = acquisitionAssets(game, target.id);
+  if (!assets) return undefined;
+  const generatorValue = assets.reduce(
+    (sum, asset) => sum + facilityCashBack(asset, game.date.minute),
+    0,
+  );
+  let equityPrice = target.equityPrice * index;
+  const assumedDebt = target.assumedDebt * index;
+  if (game.utilityExpansion?.sellerFleet === "seeded") {
+    // The listing's base price included its original opening fleet at book value.
+    // Replace that component with today's value of the actual seller fleet.
+    const opening = { ...game, date: getDateFromMinute(0, 2005) };
+    const referenceAssets = acquisitionAssets(opening, target.id, "authored");
+    if (!referenceAssets) return undefined;
+    const referenceValue = referenceAssets.reduce(
+      (sum, asset) => sum + facilityCashBack(asset, 0),
+      0,
+    );
+    equityPrice += generatorValue - referenceValue * index;
+  }
+  const networkInitialValue = equityPrice + assumedDebt - generatorValue;
+  if (networkInitialValue < 0 || equityPrice <= 0) return undefined;
+  return { assets, equityPrice, assumedDebt, networkInitialValue };
+}
+
 interface RegionalUtilityOffer {
   kind: "regional";
   targetId: UtilityTargetId;
@@ -295,19 +342,13 @@ function regionalUtilityOffer(
     ownedUtility(game, targetId)
   )
     return undefined;
-  const assets = acquisitionAssets(game, target.id);
-  if (!assets) return undefined;
   const index = hasEconomy()
     ? getInflationIndex(game.date, 2005, game.seed)
     : 1;
-  const equityPrice = target.equityPrice * index;
+  const valuation = regionalAcquisitionValuation(game, target, index);
+  if (!valuation) return undefined;
+  const { assets, equityPrice, assumedDebt, networkInitialValue } = valuation;
   const fee = target.fee * index;
-  const assumedDebt = target.assumedDebt * index;
-  const generatorValue = assets.reduce(
-    (sum, asset) => sum + facilityCashBack(asset, game.date.minute),
-    0,
-  );
-  if (generatorValue > equityPrice + assumedDebt) return undefined;
   const financed = purchaseTerms(
     equityPrice,
     true,
@@ -353,14 +394,12 @@ function regionalUtilityOffer(
     cashMonthlyDebtService: assumedPayment,
     networkOMPerMonth:
       (addedNetworkOM * index * DIFFICULTIES[game.difficulty].expensesOM) / 12,
-    networkInitialValue: equityPrice + assumedDebt - generatorValue,
+    networkInitialValue,
     facilities: assets.map((asset) => ({
       name: asset.name,
       startingAssetId: asset.startingAssetId,
       peakW: asset.peakW,
-      ageYears:
-        game.date.monthsElapsed / 12 -
-        (asset.minuteOperational ?? 0) / (DAYS_PER_YEAR * 24 * 60),
+      ageYears: facilityAgeYears(asset, game.date.minute),
     })),
     contracts: utilityEntitlementsAt(target.id, game.date.year).map(
       (source) => ({
@@ -402,7 +441,9 @@ export function municipalPlantAsset(
         nextFacilityId(game),
         tile.territoryId,
         tileId,
-        0,
+        game.utilityExpansion?.sellerFleet === "seeded"
+          ? sellerGeneratorAge(game.seed, tileId)
+          : 0,
       )
     : undefined;
 }

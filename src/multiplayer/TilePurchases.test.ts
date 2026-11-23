@@ -14,6 +14,7 @@ import {
 } from "../helpers/TerritoryTiles";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "../helpers/DateTime";
 import { TICK_MINUTES } from "../Constants";
+import { SAVE_SCHEMA_VERSION } from "../SaveSchema";
 import { acquisitionQuote } from "../helpers/Expansion";
 import { coopSeats } from "../testing/MultiplayerFixtures";
 import { loadSimData } from "../testing/SimData";
@@ -27,6 +28,7 @@ import {
 } from "./World";
 import type { World } from "./Types";
 import type { TerritoryTileId } from "../Types";
+const { parse, stringify } = require("../../electron/coop-codec.cjs");
 function ready() {
   loadSimData(UTILITY_AREAS.champlain.location);
   const world = createWorld(
@@ -76,6 +78,53 @@ function startClock(world: World) {
     ).toBeUndefined();
   });
 }
+
+it("restores a published schema 26 world during paid connection construction", () => {
+  const world = ready();
+  for (const grid of world.grids)
+    grid.utilityExpansion!.sellerFleet = "authored";
+  const offer = [
+    ...tilePurchaseQuotes(roomView(world, "0").game!).values(),
+  ].find(({ buildMonths }) => buildMonths > 0)!;
+  expect(buy(world, "0", offer.tileId, offer.quoteKey)).toBeUndefined();
+  const checkpoint: World = parse(stringify(checkpointWorld(world)));
+  const current = restoreWorld(checkpoint, "current");
+  const raw = cloneDeep(checkpoint);
+  raw.gameSchema = 26;
+  raw.rules =
+    "coop-2-034bb11beaf34e90f634716c1541df5fb10d056388b6455dbe92d64e8fdcd941";
+  for (const grid of raw.grids)
+    Reflect.deleteProperty(grid.utilityExpansion!, "sellerFleet");
+
+  const restored = restoreWorld(raw, "schema26");
+  expect(restored.gameSchema).toBe(SAVE_SCHEMA_VERSION);
+  expect(restored.grids).toEqual(current.grids);
+  expect(
+    roomView(restored, "0").game!.multiplayer!.tileOwners![offer.tileId]
+      ?.connection,
+  ).toBeDefined();
+  expect(() =>
+    restoreWorld({ ...raw, rules: `${raw.rules}-unknown` }, "unknown"),
+  ).toThrow();
+
+  const roundTrip = restoreWorld(
+    parse(stringify(checkpointWorld(restored))),
+    "schema27",
+  );
+  for (const candidate of [current, restored, roundTrip]) {
+    startClock(candidate);
+    const connectionMinute = offer.buildMonths * MINUTES_PER_MONTH;
+    for (let minute = 0; minute <= connectionMinute; minute += TICK_MINUTES)
+      stepWorld(candidate);
+  }
+  expect(restored.grids).toEqual(current.grids);
+  expect(roundTrip.grids).toEqual(current.grids);
+  expect(
+    roomView(restored, "0").game!.multiplayer!.tileOwners![offer.tileId]
+      ?.connection,
+  ).toBeUndefined();
+});
+
 it.each([
   [
     19,
@@ -303,6 +352,9 @@ it("rejects invalid retained tile IDs before replaying co-op purchases", () => {
 });
 it("reveals a connected peer's acquired utility without granting its ownership or future acquisition anchors", () => {
   const world = ready();
+  // This history also serves as a schema 17 fixture after the acquisition.
+  for (const grid of world.grids)
+    grid.utilityExpansion!.sellerFleet = "authored";
   const target = getTerritoryTile("frontier:7:-4")!;
   expect(
     territoryVisibilityDistance(roomView(world, "1").game!, target),
@@ -347,6 +399,7 @@ it("reveals a connected peer's acquired utility without granting its ownership o
   });
   expect(() => restoreWorld(raw, "new-peer-only-claim")).toThrow();
   raw.gameSchema = 17;
+  for (const grid of raw.grids) delete grid.utilityExpansion.sellerFleet;
   raw.rules =
     "coop-2-b590dfc2a358c3d4fd7c14330f8a5e92181b38944a04098dc416dcfbbf904907";
   const retained = restoreWorld(raw, "paid-schema17-peer-claim");

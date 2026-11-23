@@ -1,6 +1,13 @@
 import { PALETTE } from "./Palette";
 import { getStructureModel } from "./StructureModels";
-import type { MapMesh, ModelPart, RGB, StructureKind, Vec3 } from "./Types";
+import type {
+  FacilitySize,
+  MapMesh,
+  ModelPart,
+  RGB,
+  StructureKind,
+  Vec3,
+} from "./Types";
 
 // The union owns the inventory: adding a kind requires giving it these contracts.
 const inventory: Record<StructureKind, true> = {
@@ -26,6 +33,14 @@ const inventory: Record<StructureKind, true> = {
   "pumped-hydro": true,
 };
 const kinds = Object.keys(inventory) as StructureKind[];
+const facilityKinds = kinds.filter(
+  (kind) => kind !== "tower" && !kind.startsWith("city-"),
+);
+const variants: { kind: StructureKind; size: FacilitySize }[] = kinds.map(
+  (kind) => ({ kind, size: "medium" }),
+);
+for (const kind of facilityKinds)
+  variants.push({ kind, size: "small" }, { kind, size: "large" });
 
 it.each(["city-small", "city-medium", "city-large"] as const)(
   "%s grows distinct solid buildings within the tile and retains its wire terminals",
@@ -61,12 +76,14 @@ function vertices(mesh: MapMesh): Vec3[] {
   return result;
 }
 
-function coloredVertices(mesh: MapMesh, color: RGB): Vec3[] {
-  return vertices(mesh).filter((_point, i) =>
-    color.every(
-      (component, axis) =>
-        Math.abs(component - mesh.colors[i * 3 + axis]) < 0.000001,
-    ),
+function coloredVertices(mesh: MapMesh, color: RGB, normalY?: number): Vec3[] {
+  return vertices(mesh).filter(
+    (_point, i) =>
+      (normalY === undefined || mesh.normals[i * 3 + 1] === normalY) &&
+      color.every(
+        (component, axis) =>
+          Math.abs(component - mesh.colors[i * 3 + axis]) < 0.000001,
+      ),
   );
 }
 
@@ -147,11 +164,13 @@ function posed(part: ModelPart, point: Vec3, cycle: number): Vec3 {
   return [x + offset[0], y + offset[1], z + offset[2]];
 }
 
-describe.each(kinds)("%s model", (kind) => {
+describe.each(variants)("$kind $size model", ({ kind, size }) => {
   it("caches solid finite geometry with a bounded map-scale triangle count", () => {
-    const model = getStructureModel(kind);
-    expect(getStructureModel(kind)).toBe(model);
-    expect(model.key).toBe(`structure:${kind}`);
+    const model = getStructureModel(kind, [], size);
+    expect(getStructureModel(kind, [], size)).toBe(model);
+    expect(model.key).toBe(
+      size === "medium" ? `structure:${kind}` : `structure:${kind}:${size}`,
+    );
     expect(model.parts[0].motion).toBeUndefined();
     expect(model.parts[0].castsShadow).toBe(true);
     let triangles = 0;
@@ -190,7 +209,7 @@ describe.each(kinds)("%s model", (kind) => {
   });
 
   it("encloses the XZ diameter and the full animated height", () => {
-    const model = getStructureModel(kind);
+    const model = getStructureModel(kind, [], size);
     let diameter = 0,
       height = 0;
     for (const part of model.parts)
@@ -209,7 +228,7 @@ describe.each(kinds)("%s model", (kind) => {
   });
 
   it("connects conductors to drawn stationary terminal caps", () => {
-    const model = getStructureModel(kind);
+    const model = getStructureModel(kind, [], size);
     const body = vertices(model.parts[0].mesh);
     const solar = kind === "solar" || kind === "solar-hail-damaged";
     const [minHeight, maxHeight] = solar ? [0, 0.06] : [0.1, Infinity];
@@ -231,6 +250,16 @@ describe.each(kinds)("%s model", (kind) => {
     expect(model.terminals[0][0]).toBeLessThan(model.terminals[1][0]);
   });
 });
+
+it.each(facilityKinds)(
+  "builds distinct grounded geometry for every %s tier",
+  (kind) => {
+    const geometry = (["small", "medium", "large"] as const).map((size) =>
+      getStructureModel(kind, [], size).parts[0].mesh.positions.join(","),
+    );
+    expect(new Set(geometry).size).toBe(3);
+  },
+);
 
 it("keeps the empty-land tower small and quiet", () => {
   const model = getStructureModel("tower");
@@ -301,6 +330,36 @@ it.each(["wind", "offshore-wind"] as const)(
     expect(rotor.castsShadow).toBe(true);
   },
 );
+
+it("rests the small offshore switchgear's full footprint on the deck", () => {
+  const [body] = getStructureModel("offshore-wind", [], "small").parts;
+  const topFaces = coloredVertices(body.mesh, PALETTE.steel, 1).map((point) =>
+    posed(body, point, 0),
+  );
+  // The cabinet sits above the other horizontal steel surface, the deck.
+  const cabinetY = Math.max(...topFaces.map((point) => point[1]));
+  const cabinetTop = topFaces.filter((point) => point[1] === cabinetY);
+  const deckTop = topFaces.filter((point) => point[1] < cabinetY);
+  const cabinetBottom = coloredVertices(body.mesh, PALETTE.steel, -1)
+    .map((point) => posed(body, point, 0))
+    .filter(([x, , z]) =>
+      cabinetTop.some(([tx, , tz]) => tx === x && tz === z),
+    );
+  expect(cabinetBottom.length).toBeGreaterThan(0);
+
+  for (const axis of [2, 0] as const) {
+    const deckEdges = deckTop.map((point) => point[axis]);
+    const cabinetEdges = cabinetBottom.map((point) => point[axis]);
+    expect(Math.min(...cabinetEdges)).toBeGreaterThanOrEqual(
+      Math.min(...deckEdges),
+    );
+    expect(Math.max(...cabinetEdges)).toBeLessThanOrEqual(
+      Math.max(...deckEdges),
+    );
+  }
+  const deckY = Math.max(...deckTop.map((point) => point[1]));
+  for (const [, y] of cabinetBottom) expect(y).toBeCloseTo(deckY, 6);
+});
 
 it("shares the same blade and hub geometry between land and offshore wind", () => {
   const rotor = (kind: "wind" | "offshore-wind") =>
