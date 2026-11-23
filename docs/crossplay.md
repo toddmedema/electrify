@@ -49,23 +49,18 @@ that reach payload validation consume the budget even if validation fails. A
 handoff keeps the current window. A host who exhausts the account limit must
 wait for the next quota window before retrying recovery.
 
-## Web-only production playtest
+## Web-only production rollout
 
 Use `https://electrifygame.com` and leave the Actions variable `STEAM_APP_ID`
-unset. Firebase deploys the co-op service with the four web/TURN secrets.
-For each tester, find their Google-backed Firebase Authentication UID after
-they sign in. Set `webTesterUids` on the server-only Firestore document
-`coopSettings/runtime` to those UIDs. Start with `stopped: true` while setting
-up and qualifying TURN. Set `stopped: false` after two distinct testers are
-listed and TURN exposure is bounded. The deployment checks that the opened
-service is ready before it publishes the website. A removed tester loses
-access on their next service request. When Steam is configured, the standard
-Web and Steam account checks apply for general availability.
+unset. Firebase deploys co-op with the four web/TURN secrets. Any player who
+signs in with Google can host. Joining a private lobby requires its invite and
+the host's approval. The deployment checks co-op health before publishing the
+website. The operator can stop the service with `coopSettings/runtime.stopped`
+in Firestore.
 
 After deployment, use two signed-in browsers to verify host approval, play,
-Save & Quit, and recovery under a different host. Check that a third Google
-account cannot open a room. Use the deployed-stack acceptance cases below for
-more browsers, devices and network conditions.
+Save & Quit, and recovery under a different host. Verify the selected TURN
+relay path on a normal connection and over TLS with UDP blocked.
 
 ## Release access
 

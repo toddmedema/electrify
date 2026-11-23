@@ -7,10 +7,7 @@ const { onRequest } = require("firebase-functions/v2/https");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { CrossplayError } = require("./crossplay-errors.cjs");
 const { createCrossplay } = require("./crossplay-http.cjs");
-const {
-  googlePlaytestAccounts,
-  steamUser,
-} = require("./crossplay-identity.cjs");
+const { steamUser } = require("./crossplay-identity.cjs");
 const { createStore, createWriter } = require("./crossplay-store.cjs");
 
 const secrets = {
@@ -51,15 +48,8 @@ function registerCrossplay(adminApp) {
     const transfer = (operation, context, body) =>
       checkpoints.handle(operation, { ...context, bucket }, body);
 
-    const readAccess = async () => {
-      const settings = (await db.doc("coopSettings/runtime").get()).data();
-      return {
-        stopped: settings?.stopped === true,
-        allowedAccounts: steamKey
-          ? undefined
-          : googlePlaytestAccounts(settings?.webTesterUids),
-      };
-    };
+    const isStopped = async () =>
+      (await db.doc("coopSettings/runtime").get()).data()?.stopped === true;
     const service = createCrossplay({
       store,
       verifyGoogle: (token) => auth.verifyIdToken(token, true),
@@ -72,7 +62,7 @@ function registerCrossplay(adminApp) {
         : undefined,
       origins: ["https://electrifygame.com", "https://www.electrifygame.com"],
       quotaKey: secrets.quota.value(),
-      readAccess,
+      isStopped,
       healthy: async () => {
         const [, [metadata]] = await Promise.all([
           writerToken(),
@@ -99,7 +89,7 @@ function registerCrossplay(adminApp) {
     services = {
       service,
       signaling,
-      readAccess,
+      isStopped,
       reapCheckpoints: () =>
         checkpoints.reap(bucket, service.loadRoom, Date.now(), {
           load: async () => (await cleanup.get()).data(),
@@ -142,9 +132,9 @@ function registerCrossplay(adminApp) {
       },
       async () => {
         try {
-          const { signaling, readAccess, reapCheckpoints } = initialize();
+          const { signaling, isStopped, reapCheckpoints } = initialize();
           const results = await Promise.allSettled([
-            signaling.reap({ all: (await readAccess()).stopped }),
+            signaling.reap({ all: await isStopped() }),
             reapCheckpoints(),
           ]);
           if (results.some((operation) => operation.status === "rejected"))

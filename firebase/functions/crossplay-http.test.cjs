@@ -1,13 +1,12 @@
 const assert = require("node:assert/strict");
 const { test } = require("node:test");
 const { createCrossplay } = require("./crossplay-http.cjs");
-const { googlePlaytestAccounts } = require("./crossplay-identity.cjs");
 
 const ORIGIN = "https://electrifygame.com";
 const RULES = `coop-2-${"a".repeat(64)}`;
 const DEVICE = "d".repeat(43);
 
-function setup({ steamEnabled = true, webTesterUids } = {}) {
+function setup({ steamEnabled = true } = {}) {
   let now = 10_000;
   let stopped = false;
   const documents = new Map();
@@ -25,12 +24,7 @@ function setup({ steamEnabled = true, webTesterUids } = {}) {
     quotaKey: "fixture-does-not-leave-unit-tests",
     clock: () => now,
     audit: (event) => audits.push(event),
-    readAccess: async () => ({
-      stopped,
-      allowedAccounts: steamEnabled
-        ? undefined
-        : googlePlaytestAccounts(webTesterUids),
-    }),
+    isStopped: async () => stopped,
     verifyGoogle: async (token) => {
       const [provider, uid] = token.split(":");
       return { uid, firebase: { sign_in_provider: provider } };
@@ -201,9 +195,6 @@ function setup({ steamEnabled = true, webTesterUids } = {}) {
     shutdown() {
       stopped = true;
     },
-    setWebTesters(uids) {
-      webTesterUids = uids;
-    },
     audits,
     steamCalls,
     approve,
@@ -246,38 +237,25 @@ test("provider proofs have an explicit origin, provider identity, replay gate an
   assert.equal(ctx.steamCalls.length, 1);
 });
 
-test("web-only deployment admits the named Google testers and fences removed accounts", async () => {
+test("web-only deployment lets Google players host and join without Steam configuration", async () => {
   const ctx = setup({ steamEnabled: false });
-  const health = () => ctx.call("healthz", {}, { method: "GET" });
-  const google = (uid) =>
-    ctx.call("auth/google", { token: `google.com:${uid}`, device: DEVICE });
-
-  assert.equal((await health()).status, 503);
-  assert.equal((await google("host")).status, 403);
-  ctx.setWebTesters(["host", "host"]);
-  assert.equal((await health()).status, 503);
-  ctx.setWebTesters(["host", "guest"]);
-  assert.equal((await health()).status, 200);
-  assert.equal((await google("outsider")).status, 403);
-
+  assert.equal((await ctx.call("healthz", {}, { method: "GET" })).status, 200);
   const host = await ctx.login("host");
   const guest = await ctx.login("guest");
   const room = await ctx.create(host);
-  await ctx.join(room, guest);
-  await ctx.approve(room, host, guest);
-  ctx.setWebTesters(["host", "replacement"]);
-  assert.equal((await ctx.call("room/list", {}, { token: guest })).status, 403);
   assert.equal(
     (
       await ctx.call(
-        "save/read",
+        "room/state",
         { roomId: room.lobby.lobbyId },
         { token: guest },
       )
     ).status,
-    403,
+    404,
   );
-  assert.equal((await ctx.call("room/list", {}, { token: host })).status, 200);
+  const approved = await ctx.approve(room, host, guest);
+  assert.ok(approved.lobby.selfId);
+  assert.equal(approved.lobby.members.length, 2);
 
   const steam = await ctx.call(
     "auth/steam",
@@ -286,9 +264,6 @@ test("web-only deployment admits the named Google testers and fences removed acc
   );
   assert.equal(steam.status, 503);
   assert.equal(ctx.steamCalls.length, 0);
-  ctx.shutdown();
-  assert.equal((await health()).status, 503);
-  assert.equal((await google("host")).status, 503);
 });
 
 test("only host approval exposes the opaque roster and invite rotation invalidates previous requests", async () => {

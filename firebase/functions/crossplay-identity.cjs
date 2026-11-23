@@ -42,14 +42,6 @@ function text(value, max) {
   );
 }
 
-function googlePlaytestAccounts(uids) {
-  return new Set(
-    Array.isArray(uids)
-      ? uids.filter((uid) => text(uid, 128)).map((uid) => hash(`google:${uid}`))
-      : [],
-  );
-}
-
 async function steamUser(ticket, { appId, publisherKey, fetchImpl = fetch }) {
   requireValue(/^\d{1,10}$/.test(appId) && publisherKey, 503, "unavailable");
   const parameters = new URLSearchParams({
@@ -81,7 +73,7 @@ async function steamUser(ticket, { appId, publisherKey, fetchImpl = fetch }) {
 
 function createIdentity({ store, verifyGoogle, verifySteam, clock }) {
   return {
-    async exchange(provider, input, limit, authorization, allowedAccounts) {
+    async exchange(provider, input, limit, authorization) {
       const startedAt = clock();
       let externalId;
       let ticketDigest;
@@ -122,11 +114,6 @@ function createIdentity({ store, verifyGoogle, verifySteam, clock }) {
         externalId = await verifySteam(ticket);
       }
       const account = hash(`${provider}:${externalId}`);
-      requireValue(
-        !allowedAccounts || allowedAccounts.has(account),
-        403,
-        "forbidden",
-      );
       let priorTokenHash;
       if (authorization !== undefined) {
         const prior = BEARER.exec(authorization)?.[1];
@@ -176,7 +163,6 @@ function createIdentity({ store, verifyGoogle, verifySteam, clock }) {
 
 module.exports = {
   createIdentity,
-  googlePlaytestAccounts,
   hash,
   keys,
   randomSecret,
