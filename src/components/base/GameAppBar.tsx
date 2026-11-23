@@ -361,6 +361,7 @@ export function GameAppBar(props: Props) {
   }
 
   const gridHealth = getGridHealth(game, now);
+  const cashNegative = now.cash < 0;
   const inBlackout = gridHealth.state === "blackout";
   const activeEvents = (!isTutorial && props.activeEvents) || NO_ACTIVE_EVENTS;
   const statusRow = (
@@ -399,7 +400,8 @@ export function GameAppBar(props: Props) {
             <span className="gameBalance">
               <CouchPlayerText
                 seatId={multiplayer?.seat}
-                className={`gameStatusValue${now.cash < 0 ? " gameCashNegative" : ""}`}
+                useSeatColor={!cashNegative}
+                className={`gameStatusValue${cashNegative ? " gameCashNegative" : ""}`}
               >
                 {formatMoneyStable(now.cash)}
               </CouchPlayerText>
