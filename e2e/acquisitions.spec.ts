@@ -310,8 +310,7 @@ async function expectPhysicalMap(network: Locator, game: GameType) {
       expect(shape.end[1]).toBeGreaterThan(0.1);
       const [startY, endY] = [shape.start[1], shape.end[1]];
       // A steep line can sag below its straight path while still climbing.
-      expect(shape.lowY).toBeLessThanOrEqual(Math.min(startY, endY));
-      expect(shape.lowY).toBeLessThan((startY + endY) / 2);
+      expect((startY + endY) / 2 - shape.midY).toBeGreaterThan(0.001);
       expect(shape.lowY).toBeGreaterThan(0);
     }
   }

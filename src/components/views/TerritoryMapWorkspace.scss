@@ -16,13 +16,35 @@
     inset: 0;
     clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
 
-    .territoryMap[data-renderer="ready"] & {
-      pointer-events: auto;
+    pointer-events: auto;
+
+    .territoryMap:not([data-renderer="ready"]) &::before {
+      content: "";
+      position: absolute;
+      inset: 2px;
+      clip-path: inherit;
+      background: color-mix(
+        in srgb,
+        var(--border-subtle) 56%,
+        var(--bg-sunken)
+      );
     }
   }
   .territoryMap[data-renderer="ready"] &[aria-pressed="true"]:focus-visible {
     // Focusing a tile selects it and draws the dotted hex boundary.
     outline: none !important;
+  }
+  .territoryMap:not([data-renderer="ready"])
+    &[data-model-hovered="true"]
+    .territoryTileHitArea::before,
+  .territoryMap:not([data-renderer="ready"])
+    &[aria-pressed="true"]
+    .territoryTileHitArea::before {
+    background: color-mix(
+      in srgb,
+      var(--territory-hover-color) 24%,
+      var(--bg-raised)
+    );
   }
   &[data-model-hovered="true"] .territoryTileHitArea,
   &:focus-visible .territoryTileHitArea {
@@ -101,13 +123,14 @@
 }
 .territoryMap {
   position: relative;
+  display: flex;
+  flex-direction: column;
   flex: 1;
   min-width: 0;
   min-height: 0;
   overflow: hidden;
   background: var(--bg-sunken);
 }
-.territoryMapViewport,
 .territoryMapStage,
 .territoryFacilityStatusLayer {
   position: absolute;
@@ -116,6 +139,9 @@
   height: 100%;
 }
 .territoryMapViewport {
+  position: relative;
+  flex: 1;
+  min-height: 0;
   overflow: hidden;
   overscroll-behavior: contain;
   touch-action: none;
@@ -133,20 +159,26 @@
   pointer-events: none;
 }
 .territoryRendererMessage {
-  position: absolute;
-  z-index: 3;
-  pointer-events: none;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: max-content;
-  max-width: calc(100% - 32px);
-  padding: 12px 16px;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 4px 12px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-subtle);
   background: var(--bg-raised);
   color: var(--font-color-primary);
   text-align: center;
+  pointer-events: none;
+
+  button {
+    min-height: 40px;
+    pointer-events: auto;
+    @media (pointer: coarse) {
+      min-height: 44px;
+    }
+  }
 }
 .territoryFog[data-visibility-distance="1"] {
   opacity: 0.85;
@@ -239,9 +271,7 @@
   }
 }
 @media (max-width: 740px) {
-  .territoryMap[data-renderer="ready"]
-    .territoryUtilityLabel[data-map-inspected="true"]
-    strong {
+  .territoryUtilityLabel[data-map-inspected="true"] strong {
     top: calc(100% + 4px);
     bottom: auto;
   }

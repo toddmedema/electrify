@@ -1,6 +1,6 @@
 import { CouchPlayerText, couchPlayerColor } from "../../couch/PlayerColor";
 import * as React from "react";
-import { Tooltip, useTheme } from "@mui/material";
+import { Button, Tooltip, useTheme } from "@mui/material";
 import ConceptIcon from "../base/ConceptIcon";
 import RapidConnectionIcon from "../base/RapidConnectionIcon";
 import type { GameType, TerrainType, TerritoryId } from "../../Types";
@@ -56,6 +56,12 @@ import "./TerritoryMapWorkspace.scss";
 const TerritoryScene3D = React.lazy(
   () => import("../base/territory-3d/TerritoryScene3D"),
 );
+const RENDERER_MESSAGES = {
+  loading: "Loading 3D map…",
+  lost: "3D graphics disconnected. Waiting to reconnect.",
+  unavailable: "The 3D map is unavailable. WebGL2 is required.",
+  failed: "The 3D map couldn’t load.",
+};
 const PAN_OVERSCAN = HEX_WIDTH / 4;
 const CAMERA_SHIFT_MS = 180;
 const CITY_GROWTH_LABEL: Record<CityGrowthSector, string> = {
@@ -165,9 +171,9 @@ export default function TerritoryHexMap({
   const workspace = useGameWorkspaceLayout();
   const dark = useTheme().palette.mode === "dark";
   const webGLAvailable = typeof WebGL2RenderingContext !== "undefined";
-  const [rendererState, setRendererState] = React.useState<RendererState>(
-    webGLAvailable ? "loading" : "unavailable",
-  );
+  const [rendererState, setRendererState] = React.useState<
+    RendererState | "failed"
+  >(webGLAvailable ? "loading" : "unavailable");
   const threeDReady = rendererState === "ready";
   const picker = React.useRef<ScenePicker>();
   const setPicker = React.useCallback((value: ScenePicker | undefined) => {
@@ -1047,6 +1053,18 @@ export default function TerritoryHexMap({
       >
         {message}
       </span>
+      {rendererState !== "ready" && (
+        <div className="territoryRendererMessage">
+          <span role="status" aria-label="3D map">
+            {RENDERER_MESSAGES[rendererState]}
+          </span>
+          {rendererState === "failed" && (
+            <Button size="small" onClick={() => window.location.reload()}>
+              Reload page
+            </Button>
+          )}
+        </div>
+      )}
       <div
         className="territoryMapViewport"
         role="region"
@@ -1210,10 +1228,7 @@ export default function TerritoryHexMap({
           }
           if (event.detail === 0) return;
           const id = pointerTile(event);
-          if (
-            id === null ||
-            (activation.current && activation.current.tileKey !== id)
-          ) {
+          if (id === null || activation.current?.tileKey !== id) {
             activation.current = undefined;
             event.preventDefault();
             event.stopPropagation();
@@ -1229,7 +1244,7 @@ export default function TerritoryHexMap({
         }}
       >
         {webGLAvailable && (
-          <MapSceneBoundary onError={() => setRendererState("unavailable")}>
+          <MapSceneBoundary onError={() => setRendererState("failed")}>
             <React.Suspense fallback={null}>
               <TerritoryScene3D
                 views={renderedViews}
@@ -1525,13 +1540,6 @@ export default function TerritoryHexMap({
             );
           })}
         </div>
-        {(rendererState === "lost" || rendererState === "unavailable") && (
-          <div className="territoryRendererMessage" role="status">
-            {rendererState === "lost"
-              ? "3D graphics disconnected. Waiting to reconnect."
-              : "The 3D map is unavailable. WebGL2 is required."}
-          </div>
-        )}
         <div
           ref={tooltip}
           className="territoryMapTooltip"

@@ -206,6 +206,18 @@ for (const theme of ["light", "dark"] as const) {
       "data-buy-mode",
       "true",
     );
+    const viewport = map.getByRole("region", {
+      name: "Territory map",
+      exact: true,
+    });
+    await expect(
+      viewport.locator(".territoryTilePrice").first(),
+    ).toBeAttached();
+    const noticeBounds = (await graphicsStatus.boundingBox())!;
+    const viewportBounds = (await viewport.boundingBox())!;
+    expect(noticeBounds.y + noticeBounds.height).toBeLessThanOrEqual(
+      viewportBounds.y,
+    );
     await contextLoss.evaluate((loss) => loss.restoreContext());
     await expect(canvas).toHaveAttribute("data-renderer", "ready");
     await expect(graphicsStatus).toHaveCount(0);
@@ -839,9 +851,11 @@ for (const theme of ["light", "dark"] as const) {
   });
 }
 
-test("explains when WebGL2 cannot start and keeps labeled tile controls", async ({
+test("explains when WebGL2 cannot start and keeps the tile controls usable", async ({
   page,
-}) => {
+}, info) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  const mobile = info.project.name.startsWith("mobile-");
   await page.addInitScript(() => {
     const getContext = HTMLCanvasElement.prototype.getContext;
     HTMLCanvasElement.prototype.getContext = function (
@@ -853,21 +867,44 @@ test("explains when WebGL2 cannot start and keeps labeled tile controls", async 
       return getContext.call(this, contextId, options);
     } as typeof getContext;
   });
-  const { map } = await startPausedMap(page, "light", "unavailable");
+  const { map } = await startPausedMap(
+    page,
+    mobile ? "dark" : "light",
+    "unavailable",
+  );
   await expect(
     map.getByText("The 3D map is unavailable. WebGL2 is required."),
   ).toBeVisible();
   const capital = map.getByRole("button", {
     name: "Inspect You territory · Burlington",
   });
-  await expect(capital.locator(".territoryTileHitArea")).toHaveCSS(
-    "pointer-events",
-    "none",
-  );
+  await expect(map.getByRole("button", { name: "Reload page" })).toHaveCount(0);
+  const tile = map.locator('[data-map-target="champlain:site-13"]');
+  const hitArea = tile.locator(".territoryTileHitArea");
+  await expect(tile.locator("strong, .territoryTilePrice")).toHaveCount(0);
+  if (mobile) await hitArea.tap({ timeout: 5_000 });
+  else await hitArea.click({ timeout: 5_000 });
+  const inspector = page.locator(".tileWorkspaceSurface");
+  await expect(inspector).toHaveAccessibleName("Plains");
+  await closeTileSurface(inspector);
+
   await capital.press("Enter");
-  await expect(page.locator(".tileWorkspaceSurface")).toHaveAccessibleName(
-    "Burlington",
-  );
+  await expect(inspector).toHaveAccessibleName("Burlington");
+  const label = capital.getByText("Burlington", { exact: true });
+  if (mobile) {
+    const labelBounds = (await label.boundingBox())!;
+    const inspectorBounds = (await inspector.boundingBox())!;
+    expect(inspectorBounds.y + inspectorBounds.height).toBeLessThanOrEqual(
+      labelBounds.y,
+    );
+  }
+  await reviewScreenshot(map, {
+    path: info.outputPath("map-webgl2-unavailable.png"),
+  });
+  if (mobile) {
+    await label.tap();
+    await expect(inspector).toHaveCount(0);
+  }
 });
 
 async function dragWindow(page: Page, target: Locator, dx: number, dy: number) {

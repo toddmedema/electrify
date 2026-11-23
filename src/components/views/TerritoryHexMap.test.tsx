@@ -8,6 +8,7 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { configureStore } from "@reduxjs/toolkit";
 import { Provider } from "react-redux";
 import { useAppSelector } from "../../Store";
@@ -44,6 +45,8 @@ import { formatPurchasePrice } from "../../helpers/Format";
 
 const mockPick = jest.fn();
 let mockSceneError = false;
+let mockSceneGate: Promise<void> | undefined;
+let mockSetRendererState: (state: RendererState) => void;
 jest.mock("../base/territory-3d/TerritoryScene3D", () => {
   const React = jest.requireActual<typeof import("react")>("react");
   return {
@@ -56,11 +59,13 @@ jest.mock("../base/territory-3d/TerritoryScene3D", () => {
       onPicker: (picker: ScenePicker | undefined) => void;
     }) {
       React.useEffect(() => {
+        mockSetRendererState = onState;
         onPicker(mockPick);
         onState("ready");
         return () => onPicker(undefined);
       }, [onPicker, onState]);
       if (mockSceneError) throw new Error("3D chunk unavailable");
+      if (mockSceneGate) throw mockSceneGate;
       return <div data-testid="map-scene" />;
     },
   };
@@ -1044,6 +1049,30 @@ it("leaves uncaptured pointer exits to the browser", () => {
   fireEvent.pointerMove(tile, { clientX: 65, clientY: 20, buttons: 0 });
   expect({ ...map.viewport.dataset }).toEqual(before);
 });
+it("announces loading before the scene draws and clears the notice when ready", async () => {
+  const restore = enable3D();
+  let resolveScene!: () => void;
+  mockSceneGate = new Promise<void>((resolve) => {
+    resolveScene = resolve;
+  });
+  try {
+    show();
+    expect(screen.getByRole("status", { name: "3D map" })).toHaveTextContent(
+      "Loading 3D map",
+    );
+    mockSceneGate = undefined;
+    resolveScene();
+    await screen.findByTestId("map-scene");
+    expect(
+      screen.queryByRole("status", { name: "3D map" }),
+    ).not.toBeInTheDocument();
+  } finally {
+    mockSceneGate = undefined;
+    resolveScene();
+    restore();
+  }
+});
+
 it("activates and hovers the picked elevated model while keyboard and explicit price labels keep their own targets", async () => {
   const restore = enable3D();
   try {
@@ -1134,6 +1163,37 @@ it("ignores presses outside the painted map even if the terrain draws before rel
   }
 });
 
+function changeMockRendererState(state: RendererState) {
+  // The renderer callback updates React outside a DOM event.
+  // eslint-disable-next-line testing-library/no-unnecessary-act
+  act(() => mockSetRendererState(state));
+}
+
+it("requires a tile press before buying when the 3D picker recovers during a gesture", async () => {
+  const restore = enable3D();
+  try {
+    const map = show();
+    await screen.findByTestId("map-scene");
+    map.buyMode();
+    const candidate = map.candidates()[0];
+    const id = idOf(candidate);
+    mockPick.mockReturnValue(id);
+    const gesture = { pointerId: 1, clientX: 100, clientY: 100 };
+
+    changeMockRendererState("lost");
+    fireEvent.pointerDown(map.viewport, gesture);
+    changeMockRendererState("ready");
+    fireEvent.pointerUp(map.viewport, gesture);
+    fireEvent.click(map.viewport, { detail: 1, ...gesture });
+    expect(ownsTerritoryTile(map.store.getState().game, id)).toBe(false);
+
+    tap(candidate);
+    expect(ownsTerritoryTile(map.store.getState().game, id)).toBe(true);
+  } finally {
+    restore();
+  }
+});
+
 it("binds a retargeted model gesture to the quote shown at pointer down", async () => {
   const restore = enable3D();
   try {
@@ -1172,15 +1232,20 @@ it("binds a retargeted model gesture to the quote shown at pointer down", async 
   }
 });
 
-it("explains the WebGL2 requirement when the lazy scene fails", async () => {
+it("offers a reload and keeps keyboard inspection available when the lazy scene fails", async () => {
   const restore = enable3D();
   jest.spyOn(console, "error").mockImplementation(() => undefined);
   mockSceneError = true;
   try {
-    show();
+    const map = show();
     expect(
-      await screen.findByText("The 3D map is unavailable. WebGL2 is required."),
+      await screen.findByText("The 3D map couldn’t load."),
     ).toHaveAttribute("role", "status");
+    expect(screen.getByRole("button", { name: "Reload page" })).toBeEnabled();
+    const tile = map.target("champlain:site-13");
+    act(() => tile.focus());
+    await userEvent.setup().keyboard("{Enter}");
+    expect(map.onSelect).toHaveBeenLastCalledWith(idOf(tile), true);
   } finally {
     restore();
   }

@@ -380,6 +380,7 @@ it("samples submitted geometry and GPU instance styles only when explicitly requ
       kind: "overhead" as const,
       start: [0, 0.5, 0] as const,
       end: [1, 0.5, 0] as const,
+      midY: 0.4,
       lowY: 0.4,
     },
   ];
