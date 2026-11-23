@@ -46,6 +46,7 @@ function legacyPortfolio(
   state: "building" | "paused" | "upgrade" = "building",
 ) {
   const game = createGame({ scenarioId: 116, seed: 61 });
+  game.utilityExpansion!.sellerFleet = "authored";
   currentTick(game)!.cash = 3e9;
   const acquisition = acquisitionQuote(game, "valley-electric")!;
   applyAcquireUtility(game, {
@@ -107,6 +108,7 @@ it.each([
   "restores Valley goals from schema %i with %s evidence without changing paid assets or history",
   (schemaVersion, evidence) => {
     const game = createGame({ scenarioId: 116, seed: 61 });
+    game.utilityExpansion!.sellerFleet = "authored";
     currentTick(game)!.cash = 3e9;
     const quote = acquisitionQuote(game, "valley-electric")!;
     applyAcquireUtility(game, {

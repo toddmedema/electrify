@@ -7,6 +7,7 @@ import {
   tilePurchaseQuote,
   landTransferredCustomers,
 } from "../../helpers/Territories";
+import { utilityOffer } from "../../helpers/Expansion";
 import { currentTick } from "../../helpers/GameSelectors";
 import { facilityIconSrc } from "../../helpers/FacilityIcon";
 import {
@@ -209,6 +210,9 @@ function TileNetwork(props: Props) {
   const acquisition = game.utilityExpansion?.acquisitions.find(
     ({ targetId }) => targetId === tile?.territoryId,
   );
+  const offer = view?.acquisitionId
+    ? utilityOffer(game, view.acquisitionId)
+    : undefined;
   const quote =
     tile && view?.connectable ? tilePurchaseQuote(game, tile.id) : undefined;
   const tick = currentTick(game);
@@ -643,7 +647,9 @@ function TileNetwork(props: Props) {
                     }
                     onClick={() => setReview(view.acquisitionId)}
                   >
-                    Acquire
+                    {offer
+                      ? `Acquire (${formatPurchasePrice(offer.equityPrice)})`
+                      : "Acquire"}
                   </Button>
                 </div>
               ) : (
@@ -662,7 +668,7 @@ function TileNetwork(props: Props) {
                       {pendingIds.has(tile.id)
                         ? "Connecting…"
                         : quote
-                          ? `Connect · ${formatPurchasePrice(quote.price)}`
+                          ? `Connect (${formatPurchasePrice(quote.price)})`
                           : "Connection unavailable"}
                     </Button>
                     {quote && availableCash < quote.price && (

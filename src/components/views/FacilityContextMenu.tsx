@@ -281,7 +281,7 @@ export default function FacilityContextMenu(props: {
     }
   };
   const actionLabel = (action: FleetAction, bulk: boolean) =>
-    `${action.label}${bulk ? ` (${action.facilities.length})` : ""}${action.cost !== undefined ? ` · ${formatPurchasePrice(action.cost)}` : ""}`;
+    `${action.label}${bulk ? ` (${action.facilities.length})` : ""}${action.cost !== undefined ? ` (${formatPurchasePrice(action.cost)})` : ""}`;
   const title =
     props.tileCaption ??
     (selected.length === 1
@@ -385,7 +385,7 @@ export default function FacilityContextMenu(props: {
           title={`${confirmation.label}${affected.length === 1 ? `: ${formatFacilitySize(affected[0])} ${affected[0].name}` : `: ${affected.length} facilities`}?`}
           confirmLabel={
             cost !== undefined
-              ? `Pay ${formatPurchasePrice(cost)}`
+              ? `Pay (${formatPurchasePrice(cost)})`
               : confirmation.label
           }
           cancelLabel="Never mind"

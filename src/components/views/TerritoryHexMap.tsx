@@ -1339,16 +1339,13 @@ export default function TerritoryHexMap({
             const label = utility
               ? `Inspect ${view.owned ? "You" : view.ownerName} territory${cityLabel ? ` · ${cityLabel}` : ""}`
               : `Inspect ${territoryTileLabel(tile)}`;
-            const priceLabel = quote
-              ? `${money(quote.price)} · ${tilePurchaseBenefitLabel(quote)}`
-              : "";
             const outputFactor = projectWindOutput?.[tile.terrain] ?? 1;
             const outputModifier =
               Math.abs(outputFactor - 1) >= 0.005
                 ? formatTerrainPercent(outputFactor)
                 : undefined;
             const projectLabel = projectSite
-              ? `Total project cost ${projectPrice} · ${projectSite.owned ? "Already connected" : "Connection included"}${outputModifier ? ` · ${outputModifier} estimated output vs flat terrain` : ""}`
+              ? `Total project cost (${projectPrice}) · ${projectSite.owned ? "Already connected" : "Connection included"}${outputModifier ? ` · ${outputModifier} estimated output vs flat terrain` : ""}`
               : undefined;
             const growth = tile.city && cityGrowth.get(tile.territoryId);
             const tileLabel = [
@@ -1416,7 +1413,7 @@ export default function TerritoryHexMap({
                   projectPlanning
                     ? `Inspect ${territoryTileLabel(tile)} · ${projectLabel ?? "unavailable for this project"}`
                     : quote
-                      ? `${unaffordable ? "Inspect" : "Connect"} ${territoryTileLabel(tile)} · ${priceLabel}${unaffordable ? "; not enough available cash" : ""}`
+                      ? `${unaffordable ? "Inspect" : "Connect"} ${territoryTileLabel(tile)} (${money(quote.price)}) · ${tilePurchaseBenefitLabel(quote)}${unaffordable ? "; not enough available cash" : ""}`
                       : label
                 }
                 aria-pressed={key === activeSelected}
@@ -1515,7 +1512,7 @@ export default function TerritoryHexMap({
                     aria-hidden="true"
                     data-tooltip={projectLabel}
                   >
-                    <b>{projectPrice}</b>
+                    <b>{`(${projectPrice})`}</b>
                     {outputModifier && (
                       <span
                         className="territoryTileProduction"
@@ -1534,7 +1531,7 @@ export default function TerritoryHexMap({
                 )}
                 {quote && !projectPlanning && (
                   <span className="territoryTilePrice" aria-hidden="true">
-                    <b>{pending ? "Connecting…" : money(quote.price)}</b>
+                    <b>{pending ? "Connecting…" : `(${money(quote.price)})`}</b>
                     {quote.benefit !== "general" && (
                       <span>{tilePurchaseBenefitLabel(quote)}</span>
                     )}

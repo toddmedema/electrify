@@ -829,13 +829,13 @@ for (const theme of ["light", "dark"] as const) {
     expect(quote.facility).toBeDefined();
     if (!quote.facility) throw new Error("Owned project site has no quote");
     const total = formatPurchasePrice(projectSiteCapitalCost(quote));
-    await expect(ownedMarker.locator("b")).toHaveText(total);
+    await expect(ownedMarker.locator("b")).toHaveText(`(${total})`);
     await expect(owned).toHaveAccessibleName(
       /Total project cost .*Already connected/,
     );
     await owned.focus();
     await expect(map.getByRole("tooltip")).toContainText(
-      `Total project cost ${total} · Already connected`,
+      `Total project cost (${total}) · Already connected`,
     );
     await map.getByRole("button", { name: "Rapid connection mode" }).focus();
     await expect(map.getByRole("tooltip")).toHaveCount(0);
@@ -844,7 +844,7 @@ for (const theme of ["light", "dark"] as const) {
     await expect(surface.getByText("Connected", { exact: true })).toBeVisible();
     await ownedMarker.hover();
     await expect(map.getByRole("tooltip")).toContainText(
-      `Total project cost ${total} · Already connected`,
+      `Total project cost (${total}) · Already connected`,
     );
     await page.mouse.move(0, 0);
     await reviewScreenshot(map, {

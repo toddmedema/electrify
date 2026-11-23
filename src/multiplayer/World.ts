@@ -1711,6 +1711,13 @@ const SCHEMA_24_PUBLISHED_RULES = new Set([
   "coop-2-70cc82f8acaacdd1aed5daf5fe8c078bccdf2873eeecdc58b7bcdb1973aa9bc7", // 0e009432
 ]);
 
+const SCHEMA_25_PUBLISHED_RULES = new Set([
+  "coop-2-160dd9f6da3cd8499431940cea88dcfd070d36e945c75655c7811f2e37c8edd5", // d43a3645, 7d037aa8, bbbd78b4
+  "coop-2-f1cf5b58532f5e815675d7631016012d04330986791fcf22caf12648d7c03b37", // b9dc8ae5
+  "coop-2-165b41cf808b6f16d07c057c875ce7258bbdd83124e49b4443763d902d8a5fb1", // 3f73fa5a
+  "coop-2-3feb6e137a61620e3bbb4d9b0a6960226b5f8b6e8a358cae794ae5279836dff3", // 7e7ec8df
+]);
+
 /** Recognized published worlds follow ordered migrations; arbitrary runtime identities never do. */
 function upgradeTerritoryWorld(value: unknown): unknown {
   const old = value as Partial<World> | null;
@@ -1718,6 +1725,10 @@ function upgradeTerritoryWorld(value: unknown): unknown {
     old?.gameSchema === 24 &&
     typeof old.rules === "string" &&
     SCHEMA_24_PUBLISHED_RULES.has(old.rules);
+  const publishedSchema25 =
+    old?.gameSchema === 25 &&
+    typeof old.rules === "string" &&
+    SCHEMA_25_PUBLISHED_RULES.has(old.rules);
   if (
     !old ||
     old.schema !== 3 ||
@@ -1762,7 +1773,8 @@ function upgradeTerritoryWorld(value: unknown): unknown {
       (old.gameSchema === 23 &&
         (old.rules === SCHEMA_23_MASTER_RULES ||
           old.rules === SCHEMA_23_MAP_RULES)) ||
-      publishedSchema24
+      publishedSchema24 ||
+      publishedSchema25
     ) ||
     !Array.isArray(old.grids) ||
     !old.grids.every(
@@ -1778,6 +1790,7 @@ function upgradeTerritoryWorld(value: unknown): unknown {
           old.gameSchema === 22 ||
           old.gameSchema === 23 ||
           publishedSchema24 ||
+          publishedSchema25 ||
           isUtilityExpansionGame(grid)),
     )
   )

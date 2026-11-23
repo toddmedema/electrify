@@ -996,13 +996,18 @@ for (const theme of ["light", "dark"] as const) {
   }, info) => {
     const network = await startMap(page, theme);
     const initial = (await readSavedGame(page))!;
+    loadSimData(initial.location);
+    const purchasePrice = acquisitionQuote(
+      initial,
+      "ridge-electric",
+    )!.equityPrice;
     const ridge = getTerritoryTile("ridge-electric:city", initial)!;
     const surface = await inspectTile(page, ridge);
     await expect(surface).toContainText("Estimated demand");
     await expectCityDemand(surface);
     await expect(surface.getByText("Customers", { exact: true })).toBeVisible();
     const acquire = surface.getByRole("button", {
-      name: "Acquire",
+      name: `Acquire (${formatPurchasePrice(purchasePrice)})`,
       exact: true,
     });
     const demand = surface.getByRole("region", { name: "City demand by use" });
@@ -1101,7 +1106,7 @@ for (const theme of ["light", "dark"] as const) {
       await expect(award).toBeHidden();
     }
     await expect(
-      surface.getByRole("button", { name: "Acquire", exact: true }),
+      surface.getByRole("button", { name: /^Acquire \(/ }),
     ).toHaveCount(0);
     await expect(
       surface.getByRole("region", { name: "City demand by use", exact: true }),
@@ -1437,11 +1442,11 @@ for (const theme of ["light", "dark"] as const) {
     await expect(surface).not.toContainText("Cash after connection");
     await expect(
       surface.getByRole("button", {
-        name: `Connect · ${formatPurchasePrice(quote.price)}`,
+        name: `Connect (${formatPurchasePrice(quote.price)})`,
         exact: true,
       }),
     ).toBeEnabled();
-    await surface.getByRole("button", { name: /^Connect ·/ }).click();
+    await surface.getByRole("button", { name: /^Connect \(/ }).click();
     await openLockedBuild(surface);
     await expect(surface.locator(".tileWorkspaceHeading h3")).toBeFocused();
     const owned = (await readSavedGame(page))!;
@@ -1506,7 +1511,7 @@ for (const theme of ["light", "dark"] as const) {
     await expectPhysicalMap(network, built);
     await inspectTile(page, neighbor);
     await expect(
-      surface.getByRole("button", { name: /^Connect ·/ }),
+      surface.getByRole("button", { name: /^Connect \(/ }),
     ).toBeEnabled();
   });
 
@@ -1765,7 +1770,7 @@ for (const theme of ["light", "dark"] as const) {
     await target.click();
     const surface = tileSurface(page);
     await expect(
-      surface.getByRole("button", { name: /^Connect ·/ }),
+      surface.getByRole("button", { name: /^Connect \(/ }),
     ).toBeDisabled();
     await expect(surface.getByRole("status")).toContainText("more cash needed");
     expect(currentTick((await readSavedGame(page))!)!.cash).toBe(1);
@@ -1812,7 +1817,7 @@ for (const theme of ["light", "dark"] as const) {
     await plantTarget.click();
     const surface = tileSurface(page);
     const acquire = surface.getByRole("button", {
-      name: "Acquire",
+      name: `Acquire (${formatPurchasePrice(quote.equityPrice)})`,
       exact: true,
     });
     await acquire.click();
@@ -1843,7 +1848,10 @@ for (const theme of ["light", "dark"] as const) {
     await plantTarget.press("Shift+F10");
     await page
       .getByRole("menu", { name: "Tile actions" })
-      .getByRole("menuitem", { name: "Acquire", exact: true })
+      .getByRole("menuitem", {
+        name: `Acquire (${formatPurchasePrice(quote.equityPrice)})`,
+        exact: true,
+      })
       .click();
     await expect(review).toBeVisible();
     expect(currentTick((await readSavedGame(page))!)!.cash).toBe(
@@ -1921,7 +1929,7 @@ for (const theme of ["light", "dark"] as const) {
         await openMap(page);
       }
       const surface = await inspectTile(page, tile);
-      await surface.getByRole("button", { name: /^Connect ·/ }).click();
+      await surface.getByRole("button", { name: /^Connect \(/ }).click();
       await openLockedBuild(surface);
       const plant = await reviewTileBuild(page, resource.name);
       await expectDialogToFit(plant);

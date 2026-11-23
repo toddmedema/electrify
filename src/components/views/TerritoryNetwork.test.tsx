@@ -27,7 +27,11 @@ import {
   type TerritoryTileView,
 } from "../../helpers/TerritoryMapState";
 import { currentTick } from "../../helpers/GameSelectors";
-import { formatCount, formatWatts } from "../../helpers/Format";
+import {
+  formatCount,
+  formatPurchasePrice,
+  formatWatts,
+} from "../../helpers/Format";
 import type { GameType, TerritoryTileId } from "../../Types";
 import { GameToolMemoryContext } from "../base/GameToolMemory";
 import {
@@ -507,14 +511,19 @@ it("shows purchased cities as customers rather than build destinations", async (
       acquireTile({ tileId: next.id, quoteKey: quote.quoteKey }),
     );
   }
-  expect(acquisitionQuote(game, target.territoryId)).toBeDefined();
+  const offer = acquisitionQuote(game, target.territoryId)!;
+  expect(offer).toBeDefined();
   const { onAcquire, store } = show(game);
   onAcquire.mockImplementation((payload) => {
     store.dispatch(acquireUtility(payload));
     return true;
   });
   inspect(target.id);
-  fireEvent.click(within(surface()).getByRole("button", { name: "Acquire" }));
+  fireEvent.click(
+    within(surface()).getByRole("button", {
+      name: `Acquire (${formatPurchasePrice(offer.equityPrice)})`,
+    }),
+  );
   const review = screen.getByRole("dialog", { name: /^Acquire Vergennes/ });
   expect(
     within(review).queryByText("Sites transferred"),

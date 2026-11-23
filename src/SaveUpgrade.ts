@@ -429,6 +429,20 @@ const migrations: readonly Migration[] = [
     migrations[22 - FIRST_SUPPORTED_SAVE_SCHEMA](save, publishedValleyRules),
   // 24 -> 25: retain the published schema. Current validation checks challenge metadata.
   (save) => (object(save.game) ? save : null),
+  // 25 -> 26: existing sellers retain the fleet ages and purchase terms used in their receipts.
+  (save) => {
+    if (!object(save.game)) return null;
+    const { game } = save;
+    if (game.utilityExpansion === undefined) return save;
+    if (!object(game.utilityExpansion)) return null;
+    return {
+      ...save,
+      game: {
+        ...game,
+        utilityExpansion: { ...game.utilityExpansion, sellerFleet: "authored" },
+      },
+    };
+  },
 ];
 
 /** Structure versions are independent of app releases and simulation compatibility. */

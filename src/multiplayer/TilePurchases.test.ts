@@ -296,6 +296,9 @@ it("rejects invalid retained tile IDs before replaying co-op purchases", () => {
 });
 it("reveals a connected peer's acquired utility without granting its ownership or future acquisition anchors", () => {
   const world = ready();
+  // This history also serves as a schema 17 fixture after the acquisition.
+  for (const grid of world.grids)
+    grid.utilityExpansion!.sellerFleet = "authored";
   const target = getTerritoryTile("frontier:7:-4")!;
   expect(
     territoryVisibilityDistance(roomView(world, "1").game!, target),
@@ -340,6 +343,7 @@ it("reveals a connected peer's acquired utility without granting its ownership o
   });
   expect(() => restoreWorld(raw, "new-peer-only-claim")).toThrow();
   raw.gameSchema = 17;
+  for (const grid of raw.grids) delete grid.utilityExpansion.sellerFleet;
   raw.rules =
     "coop-2-b590dfc2a358c3d4fd7c14330f8a5e92181b38944a04098dc416dcfbbf904907";
   const retained = restoreWorld(raw, "paid-schema17-peer-claim");

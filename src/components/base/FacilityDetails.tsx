@@ -226,7 +226,7 @@ function WeatherResilienceSection(props: {
           isolateClicks
           title={`${actionLabel} to ${facility.name}?`}
           contentClassName="facilityRetrofitDialog"
-          confirmLabel={`Pay ${formatMoneyConcise(cost)}`}
+          confirmLabel={`Pay (${formatMoneyConcise(cost)})`}
           confirmDisabled={shortfall > 0}
           onCancel={() => setConfirming(false)}
           onConfirm={() => {

@@ -107,7 +107,10 @@ also migrate their earlier Valley goals using the same evidence as schema 22.
 Schema 25 introduced the scenario, difficulty and score target for saved friend
 challenges. Ordinary schema 24 saves advance to 25 without a data conversion.
 
-Recognized published schema 13, 14, 15, 16, 17, 19, 20, 21, 22, 23 and 24 co-op identities
+Schema 26 records the seller fleet rules for Across the Valley. Existing runs
+retain their original NPC generator ages and acquisition prices.
+
+Recognized published schema 13, 14, 15, 16, 17, 19, 20, 21, 22, 23, 24 and 25 co-op identities
 have ordered transitions that preserve the run's original scoring provenance.
 Existing company-local land rights, including old duplicate ownership, are
 retained. New claims are exclusive and checked in host command order. Other

@@ -52,6 +52,7 @@ const UNIFORM_STREAM = {
   wildfireHazards: 10,
   weatherHazards: 11,
   cityMix: 12,
+  sellerGeneratorAge: 13,
 } as const;
 
 const NORMAL_STREAM = {

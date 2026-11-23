@@ -232,7 +232,7 @@ describe("weather resilience details", () => {
     const cost = retrofitCost(gas, game, "coldWeatherPackage")!;
     expect(
       within(section()).getByRole("button", {
-        name: `Add cold-weather package · ${formatMoneyConcise(cost)}`,
+        name: `Add cold-weather package (${formatMoneyConcise(cost)})`,
       }),
     ).toBeEnabled();
   });
@@ -282,7 +282,7 @@ describe("weather resilience details", () => {
     const { onRetrofit } = showDetails(game, gas);
     fireEvent.click(
       within(section()).getByRole("button", {
-        name: `Add cold-weather package · ${formatMoneyConcise(cost)}`,
+        name: `Add cold-weather package (${formatMoneyConcise(cost)})`,
       }),
     );
     const dialog = screen.getByRole("dialog", {
@@ -295,7 +295,7 @@ describe("weather resilience details", () => {
     expect(dialog).not.toHaveTextContent("cash now");
     fireEvent.click(
       within(dialog).getByRole("button", {
-        name: `Pay ${formatMoneyConcise(cost)}`,
+        name: `Pay (${formatMoneyConcise(cost)})`,
       }),
     );
     expect(onRetrofit).toHaveBeenCalledWith({

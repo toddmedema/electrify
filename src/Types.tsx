@@ -1482,6 +1482,7 @@ export interface UtilityNetworkAsset {
   retentionLowWatermark: number;
 }
 export interface UtilityExpansionState {
+  sellerFleet: "authored" | "seeded";
   networkAssets: UtilityNetworkAsset[];
   loans: AcquisitionLoan[];
   acquisitions: {

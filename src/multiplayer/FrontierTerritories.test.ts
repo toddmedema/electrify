@@ -248,6 +248,8 @@ describe("schema 22 and 23 Valley checkpoint lineages", () => {
   beforeAll(() => {
     // Play the same shared seed and transfer as the published objective captures.
     const world = ready("published-schema22");
+    for (const grid of world.grids)
+      grid.utilityExpansion!.sellerFleet = "authored";
     resume(world);
     stepWorld(world);
     currentTick(world.grids[0])!.cash = 3e9;
@@ -287,6 +289,7 @@ describe("schema 22 and 23 Valley checkpoint lineages", () => {
           ? "coop-2-3a64b92f0462af2eb6286821f118c030f25aaf65b546a4a7652e87b1dbcd3e33"
           : "coop-2-8bf797b211b8ee017e7f4e23f67019de651918233f43a90a2a047d0bec4e724d";
     for (const [index, grid] of saved.grids.entries()) {
+      Reflect.deleteProperty(grid.utilityExpansion!, "sellerFleet");
       grid.objectiveProgress = cloneDeep(
         objectiveProgress[index],
       ) as ObjectiveProgress;
@@ -310,7 +313,10 @@ describe("schema 22 and 23 Valley checkpoint lineages", () => {
       expect(saved).toEqual(before);
       for (const [index, grid] of restored.grids.entries()) {
         const original = saved.grids[index];
-        expect(grid.utilityExpansion).toEqual(original.utilityExpansion);
+        expect(grid.utilityExpansion).toEqual({
+          ...original.utilityExpansion,
+          sellerFleet: "authored",
+        });
         expect(grid.territoryNetwork).toEqual(original.territoryNetwork);
         expect(grid.monthlyHistory).toEqual(original.monthlyHistory);
         expect(grid.territoryWeather).toEqual(original.territoryWeather);
@@ -333,6 +339,25 @@ describe("schema 22 and 23 Valley checkpoint lineages", () => {
       expect(roundTrip.grids).toEqual(restored.grids);
     },
   );
+
+  it("restores a published schema 25 co-op checkpoint with the original seller terms", () => {
+    const saved = cloneDeep(played);
+    saved.gameSchema = 25;
+    saved.rules =
+      "coop-2-3feb6e137a61620e3bbb4d9b0a6960226b5f8b6e8a358cae794ae5279836dff3";
+    for (const grid of saved.grids)
+      Reflect.deleteProperty(grid.utilityExpansion!, "sellerFleet");
+    const restored = restoreWorld(saved, "schema25");
+    expect(restored.gameSchema).toBe(SAVE_SCHEMA_VERSION);
+    for (const [index, grid] of restored.grids.entries()) {
+      const original = played.grids[index];
+      expect(grid.facilities).toEqual(original.facilities);
+      expect(grid.utilityExpansion).toEqual(original.utilityExpansion);
+      expect(acquisitionQuote(grid, "ridge-electric")).toEqual(
+        acquisitionQuote(original, "ridge-electric"),
+      );
+    }
+  });
 
   function recomputeChecksum(progress: ObjectiveProgress) {
     const {
