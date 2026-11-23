@@ -1,5 +1,6 @@
 import { defineConfig } from "@playwright/test";
 import path from "node:path";
+import { prBrowserViewports } from "./browser-projects";
 import production from "./production.playwright.config";
 
 // Explicit diagnostic workload; ordinary test discovery and the CI smoke matrix do not select it.
@@ -10,11 +11,7 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   retries: 0,
-  projects: production.projects!.filter((project) =>
-    ["desktop-chromium", "mobile-390px", "mobile-360px"].includes(
-      project.name!,
-    ),
-  ),
+  projects: prBrowserViewports,
   outputDir: path.resolve(
     __dirname,
     "../test-results/ci-work-bench/screenshots",

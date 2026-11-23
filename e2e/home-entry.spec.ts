@@ -81,7 +81,7 @@ test("homepage feedback opens in place and tracks each opening and submission", 
     ]);
 });
 
-test("a fresh production title defers the game until an action and preserves the selected destination", async ({
+test("a fresh production title defers the game until an action and preserves the selected destination @phone", async ({
   page,
 }) => {
   test.skip(
@@ -150,7 +150,7 @@ test("a failed direct-link entry download offers a working reload", async ({
   ).toBeVisible();
 });
 
-test("sound unlocks within the gesture while game chunks are still held", async ({
+test("sound unlocks within the gesture while game chunks are still held @phone", async ({
   page,
 }) => {
   test.skip(
@@ -409,7 +409,7 @@ test("feedback still opens when manual game entry fails before its download fini
   await expect(dialog).toBeVisible();
 });
 
-test("an installation prompt captured before Home mounts reaches the install control", async ({
+test("an installation prompt captured before Home mounts reaches the install control @phone", async ({
   page,
 }) => {
   test.skip(
