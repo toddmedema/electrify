@@ -694,6 +694,7 @@ it("rebuilds the same site at the exact rated power thresholds", () => {
     structure: getStructureModel,
   });
   const site = view();
+  const tiles = [site.tile];
   const build = (peakW: number) =>
     builder.build(
       [
@@ -702,7 +703,7 @@ it("rebuilds the same site at the exact rated power thresholds", () => {
           facility: { name: "Solar", fuel: "Sun", peakW, yearsToBuildLeft: 0 },
         },
       ],
-      [site.tile],
+      tiles,
       [],
       0,
       "run",

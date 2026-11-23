@@ -100,6 +100,17 @@ async function start(host: Page, guest: Page) {
     await expect(clock(player)).toHaveAttribute("data-active-speed", "SLOW");
 }
 
+async function saveAndQuit(page: Page) {
+  await page.getByRole("button", { name: "menu", exact: true }).click();
+  const menu = page.getByRole("menu", { name: "Game menu" });
+  // The menu paper scales into place and can move the item during the click.
+  await expect(menu.locator("..")).toHaveCSS("transform", "none");
+  await menu
+    .getByRole("menuitem", { name: "Save & Quit", exact: true })
+    .click();
+  await expect(mainEntry(page)).toBeVisible();
+}
+
 for (const steamHost of [false, true]) {
   test(`web and Steam play together with ${steamHost ? "a Steam" : "a web"} host`, async ({
     page,
@@ -149,12 +160,8 @@ for (const steamHost of [false, true]) {
       const host = steamHost ? steam : web;
       const guest = steamHost ? web : steam;
       await start(host, guest);
-      await guest.getByRole("button", { name: /^menu/ }).click();
-      await guest.getByRole("menuitem", { name: "Save & Quit" }).click();
-      await expect(mainEntry(guest)).toBeVisible();
-      await host.getByRole("button", { name: /^menu/ }).click();
-      await host.getByRole("menuitem", { name: "Save & Quit" }).click();
-      await expect(mainEntry(host)).toBeVisible();
+      await saveAndQuit(guest);
+      await saveAndQuit(host);
 
       // Refreshing proves the campaign is stored beyond the active session.
       await host.reload();
@@ -191,9 +198,7 @@ for (const steamHost of [false, true]) {
           "data-active-speed",
           "PAUSED",
         );
-      await host.getByRole("button", { name: /^menu/ }).click();
-      await host.getByRole("menuitem", { name: "Save & Quit" }).click();
-      await expect(mainEntry(host)).toBeVisible();
+      await saveAndQuit(host);
     } finally {
       await otherContext.close();
     }
