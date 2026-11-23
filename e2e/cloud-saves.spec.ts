@@ -89,7 +89,7 @@ async function screenshot(
 }
 
 for (const theme of ["light", "dark"]) {
-  test(`cloud status sits beside the title and explains itself in ${theme}`, async ({
+  test(`cloud status sits beside the title and explains itself in ${theme}${theme === "dark" ? " @phone" : ""}`, async ({
     page,
   }, info) => {
     await page.addInitScript((mode) => {

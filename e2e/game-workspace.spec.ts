@@ -1440,7 +1440,7 @@ for (const theme of ["light", "dark"] as const) {
 }
 
 for (const theme of ["light", "dark"] as const) {
-  test(`enlarged phone status and edge-padded diagnosis remain readable in ${theme}`, async ({
+  test(`enlarged phone status and edge-padded diagnosis remain readable in ${theme} @minimum-phone`, async ({
     page,
   }, info) => {
     test.skip(!info.project.use.hasTouch, "Phone status reflow");
@@ -1534,7 +1534,7 @@ for (const theme of ["light", "dark"] as const) {
     }
   });
 
-  test(`phone profit stacks beneath cash and opens finances in ${theme}`, async ({
+  test(`phone profit stacks beneath cash and opens finances in ${theme} @minimum-phone`, async ({
     page,
   }, info) => {
     test.skip(!info.project.use.hasTouch || page.viewportSize()!.width >= 700);

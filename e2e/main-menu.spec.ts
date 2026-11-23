@@ -501,7 +501,9 @@ test("reduced motion skips the logo movement and stagger", async ({ page }) => {
 });
 
 for (const theme of ["light", "dark"]) {
-  test(`the home menu leads directly to play in ${theme}`, async ({ page }) => {
+  test(`the home menu leads directly to play in ${theme}${theme === "dark" ? " @phone" : ""}`, async ({
+    page,
+  }) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.addInitScript(
       (value) => localStorage.setItem("theme", value),
@@ -523,7 +525,7 @@ for (const theme of ["light", "dark"]) {
     );
   });
 
-  test(`home install and sound prompts update independently in ${theme}`, async ({
+  test(`home install and sound prompts update independently in ${theme} @phone`, async ({
     page,
   }) => {
     await page.addInitScript(
@@ -559,7 +561,7 @@ for (const theme of ["light", "dark"]) {
   });
 }
 
-test("home actions and resources remain reachable at low height with and without a save", async ({
+test("home actions and resources remain reachable at low height with and without a save @minimum-phone", async ({
   page,
 }, testInfo) => {
   test.skip(testInfo.project.name !== "mobile-360px");
@@ -608,7 +610,7 @@ test("home actions and resources remain reachable at low height with and without
 });
 
 for (const theme of ["light", "dark"]) {
-  test(`all home menu buttons share the primary action width in ${theme}`, async ({
+  test(`all home menu buttons share the primary action width in ${theme} @minimum-phone`, async ({
     page,
   }, testInfo) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
@@ -668,7 +670,7 @@ for (const theme of ["light", "dark"]) {
 
 for (const theme of ["light", "dark"]) {
   for (const reducedMotion of ["reduce", "no-preference"] as const) {
-    test(`home touch feedback releases cleanly in ${theme}, motion ${reducedMotion}`, async ({
+    test(`home touch feedback releases cleanly in ${theme}, motion ${reducedMotion} @phone`, async ({
       page,
       context,
     }, testInfo) => {

@@ -131,6 +131,23 @@ Set `REVIEW_SCREENSHOT_DIR`
 to collect optional review captures as well; test/viewport subdirectories prevent
 collisions. The layout and interaction assertions run in either mode.
 
+The browser projects in `e2e/browser-projects.ts` have different jobs. Desktop covers
+the complete local browser suite. The 390px phone focuses on touch, phone navigation and
+representative gameplay. The 360px project exercises controls and content at the minimum
+width. The tablet, foldable and wide desktop run selected local layout and performance tests.
+PR CI runs the production selection at 1280px, 390px and 360px. Its desktop resize journey
+also exercises the tablet, foldable and wide desktop layout transitions.
+
+For a focused reproduction outside the default selection, set `ELECTRIFY_E2E_ALL_SPECS=1`
+and supply the spec and project explicitly. This restores local file and test discovery
+across projects while preserving each test's runtime requirements. The PR matrix uses its
+configured selection in either mode.
+
+```sh
+ELECTRIFY_E2E_ALL_SPECS=1 npm run test:e2e -- custom-location-picker.spec.ts --project=mobile-360px
+npm run test:e2e:ci -- --list
+```
+
 Multiplayer save advancement keeps one lazy CRA/Jest helper per Playwright worker.
 Every request reloads simulation data, restores its own UI-created save and runs
 the original advancement assertions. To compare it with the one-shot CLI on the

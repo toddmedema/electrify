@@ -3,11 +3,18 @@ import scenarios from "../site/scenarios.json";
 import { expect, test } from "./fixtures";
 import { openBuild, openPane } from "./layout";
 
+// The longest challenge and campaign headings stress wrapping in the shared template.
+const responsiveSlugs = new Set([
+  "sudden-nuclear-shutdown",
+  "legacy-a-different-kind-of-growth",
+  "deep-freeze", // Preserve the representative static scenario review capture.
+]);
+
 test.describe("scenario pages without JavaScript", () => {
   test.use({ javaScriptEnabled: false });
 
   for (const theme of ["light", "dark"] as const) {
-    test(`About opens the complete scenario directory in ${theme} mode`, async ({
+    test(`About opens the complete scenario directory in ${theme} mode @minimum-phone`, async ({
       page,
     }, info) => {
       await page.emulateMedia({ colorScheme: theme });
@@ -49,10 +56,16 @@ test.describe("scenario pages without JavaScript", () => {
       }
     });
 
-    // Each authored scenario keeps the same real directory → detail → directory
-    // journey and 45-second budget, independently of the catalog's total size.
+    // Verify every authored page in light mode. Sample the shared styling in dark
+    // mode and at the minimum width without repeating every document journey.
     for (const scenario of scenarios) {
-      test(`${scenario.slug} is readable in ${theme} mode`, async ({
+      const responsive = responsiveSlugs.has(scenario.slug);
+      if (theme === "dark" && !responsive) continue;
+      const tags = responsive ? ["@minimum-phone"] : [];
+      if (theme === "dark" && scenario.slug === "deep-freeze")
+        tags.push("@phone");
+      const tag = tags.length ? ` ${tags.join(" ")}` : "";
+      test(`${scenario.slug} is readable in ${theme} mode${tag}`, async ({
         page,
       }, info) => {
         await page.emulateMedia({ colorScheme: theme });
@@ -122,7 +135,7 @@ test.describe("scenario pages without JavaScript", () => {
   }
 });
 
-test("a landing page opens its challenge details", async ({ page }) => {
+test("a landing page opens its challenge details @phone", async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem("audioEnabled", "false"));
   const scenario = scenarios.find((entry) => entry.scenarioId === 107)!;
   await page.goto(`/scenarios/${scenario.slug}.html`);
@@ -148,7 +161,7 @@ for (const { id, symbol, theme } of [
   { id: 108, symbol: "€", theme: "light" },
   { id: 115, symbol: "₹", theme: "dark" },
 ]) {
-  test(`scenario ${id} uses local currency for cash, prices and rates in ${theme}`, async ({
+  test(`scenario ${id} uses local currency for cash, prices and rates in ${theme}${id === 115 ? " @minimum-phone" : ""}`, async ({
     page,
   }) => {
     await page.addInitScript((mode) => {

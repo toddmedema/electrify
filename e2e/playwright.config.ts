@@ -1,4 +1,5 @@
 import { defineConfig } from "@playwright/test";
+import { browserViewports, focusBrowserProject } from "./browser-projects";
 import { journeyTrace } from "./journey-trace";
 
 // Not 3000: with reuseExistingServer, a local `npm start` there would be reused without the
@@ -12,6 +13,7 @@ export default defineConfig({
   testDir: ".",
   testIgnore: [
     "desktop*.spec.ts",
+    "couch.spec.ts",
     "multiplayer.spec.ts",
     "steam-input.spec.ts",
   ],
@@ -29,51 +31,10 @@ export default defineConfig({
     screenshot: "only-on-failure",
     trace: journeyTrace,
   },
-  projects: [
-    {
-      name: "desktop-chromium",
-      use: { browserName: "chromium", viewport: { width: 1280, height: 800 } },
-    },
-    {
-      name: "mobile-390px",
-      use: {
-        browserName: "chromium",
-        hasTouch: true,
-        isMobile: true,
-        viewport: { width: 390, height: 844 },
-      },
-    },
-    {
-      name: "mobile-360px",
-      use: {
-        browserName: "chromium",
-        hasTouch: true,
-        isMobile: true,
-        viewport: { width: 360, height: 640 },
-      },
-    },
-    {
-      name: "tablet-768px",
-      use: {
-        browserName: "chromium",
-        hasTouch: true,
-        viewport: { width: 768, height: 1024 },
-      },
-    },
-    {
-      name: "foldable-unfolded",
-      use: {
-        browserName: "chromium",
-        hasTouch: true,
-        isMobile: true,
-        viewport: { width: 844, height: 690 },
-      },
-    },
-    {
-      name: "desktop-1440px",
-      use: { browserName: "chromium", viewport: { width: 1440, height: 900 } },
-    },
-  ],
+  projects:
+    process.env.ELECTRIFY_E2E_ALL_SPECS === "1"
+      ? browserViewports
+      : browserViewports.map((project) => focusBrowserProject(project)),
   webServer: process.env.E2E_BASE_URL
     ? undefined
     : {
