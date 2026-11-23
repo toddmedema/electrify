@@ -146,6 +146,7 @@ import {
   projectAuthoredRunReference,
 } from "../helpers/RunIdentity";
 import { launchRun } from "./GameActions";
+import { validInvitation } from "../helpers/ChallengeInvitation";
 import {
   generatorsAboveDemandFloor,
   mothballAdvice,
@@ -2444,8 +2445,8 @@ export const gameSlice = createSlice({
       state.timeline = reforecastSupply(state, true);
     });
     builder.addCase(launchRun, (_state, action) => {
-      const { identity, challenge } = action.payload;
-      if (!projectAuthoredRunReference(identity)) return;
+      const challenge = action.payload;
+      if (!validInvitation(challenge)) return;
       speedBeforeBlockingCard = undefined;
       speedBeforeManualHelp = undefined;
       speedBeforeCloudSavePrompt = undefined;
@@ -2454,11 +2455,8 @@ export const gameSlice = createSlice({
       dialogBlocksSpeed = false;
       return {
         ...cloneDeep(initialGame),
-        scenarioId: identity.scenarioId,
-        difficulty: identity.difficulty,
-        seed: identity.seed,
-        location: cloneDeep(identity.inputs.location),
-        runIdentity: cloneDeep(identity),
+        scenarioId: challenge.scenarioId,
+        difficulty: challenge.difficulty,
         challenge: cloneDeep(challenge),
       };
     });

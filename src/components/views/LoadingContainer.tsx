@@ -123,11 +123,8 @@ export const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
         loadListeners = [];
         return;
       }
-      // Resume and challenge runs keep the location their forecasts were built from.
-      const location =
-        resumed || game.runIdentity
-          ? game.location
-          : getScenarioLocation(scenario);
+      // Resumes keep the location their forecasts were built from.
+      const location = resumed ? game.location : getScenarioLocation(scenario);
       if (!location) {
         reportError("We couldn't find the location data for this mission.");
         if (loadingGeneration === request) loadingGeneration = undefined;
@@ -174,8 +171,7 @@ export const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
               customers:
                 scenario.startingCustomers || getStartingCustomers(location),
               location,
-              // Challenge runs keep their seed; ordinary missions draw a fresh seed.
-              seed: game.runIdentity ? game.seed : scenario.seed,
+              seed: scenario.seed,
             }),
           );
         }

@@ -23,15 +23,24 @@ it.each([
   },
 );
 
-it("never rewrites a run or challenge from another build to current rules", () => {
+it("validates new challenge metadata without rewriting an invalid run identity", () => {
   const save = JSON.parse(JSON.stringify(serializeSave(game)));
   save.game.challenge = {
-    run: projectAuthoredRunReference(game.runIdentity),
+    scenarioId: game.scenarioId,
+    difficulty: game.difficulty,
     target: 400,
   };
   expect(parseSave(save)?.game.challenge).toEqual(save.game.challenge);
+  expect(
+    parseSave({
+      ...save,
+      game: {
+        ...save.game,
+        challenge: { ...save.game.challenge, difficulty: "CEO" },
+      },
+    }),
+  ).toBeNull();
   save.game.runIdentity.compatibilityId = "different-rules";
-  save.game.challenge.run.compatibilityId = "different-rules";
   const original = JSON.stringify(save);
   expect(parseSave(save)).toBeNull();
   expect(JSON.stringify(save)).toBe(original);
@@ -59,7 +68,7 @@ it.each([6, 7])(
   },
 );
 
-it("continues an older rules digest without retaining stale challenge identity or mutating its source", () => {
+it("continues an older rules digest with the friend’s score target and unchanged progress", () => {
   const save = JSON.parse(JSON.stringify(serializeSave(game)));
   save.schemaVersion = 8;
   save.game.runIdentity.compatibilityId = `rules-1-${"0".repeat(64)}`;
@@ -76,14 +85,18 @@ it("continues an older rules digest without retaining stale challenge identity o
   expect(continued!.schemaVersion).toBe(SAVE_SCHEMA_VERSION);
   expect(continued!.game.rulesChanged).toBe(true);
   expect(continued!.game.runIdentity).toBeUndefined();
-  expect(continued!.game.challenge).toBeUndefined();
+  expect(continued!.game.challenge).toEqual({
+    scenarioId: game.scenarioId,
+    difficulty: game.difficulty,
+    target: 400,
+  });
   expect(continued!.game.date).toEqual(game.date);
   expect(continued!.game.timeline[0].cash).toBe(game.timeline[0].cash);
   expect(continued!.game.meaningfulDecisions).toEqual(game.meaningfulDecisions);
   expect(JSON.stringify(save)).toBe(original);
-  expect(
-    parseSave(JSON.parse(JSON.stringify(continued)))?.game.rulesChanged,
-  ).toBe(true);
+  expect(parseSave(serializeSave(continued!.game))?.game).toEqual(
+    continued!.game,
+  );
 });
 
 it.each([
@@ -134,6 +147,7 @@ it.each([
 
 function historicalSave() {
   const save = JSON.parse(JSON.stringify(serializeSave(game)));
+  save.schemaVersion = 24;
   save.game.runIdentity.compatibilityId = `rules-1-${"0".repeat(64)}`;
   save.game.challenge = {
     run: {

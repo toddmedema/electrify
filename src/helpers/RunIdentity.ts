@@ -111,8 +111,8 @@ const exactKeys = (value: Record<string, unknown>, keys: string[]): boolean =>
   Object.keys(value).sort().join() === keys.sort().join();
 
 /**
- * Validate a previous digest's self-contained authored setup and challenge linkage before
- * continuing its progress. Remove stale share references; scoring eligibility is unchanged.
+ * Validate a previous digest's self-contained authored setup before
+ * continuing its progress. Remove the stale run identity and retain any challenge target.
  * Current-digest identities still pass the canonical validation below this import boundary.
  */
 export function carrySavedRunForward<T extends Partial<GameType>>(
@@ -121,8 +121,7 @@ export function carrySavedRunForward<T extends Partial<GameType>>(
   if (
     (game.rulesChanged !== undefined &&
       typeof game.rulesChanged !== "boolean") ||
-    (game.rulesChanged &&
-      (game.runIdentity !== undefined || game.challenge !== undefined))
+    (game.rulesChanged && game.runIdentity !== undefined)
   )
     return null;
   const previous = game.runIdentity;
@@ -200,29 +199,9 @@ export function carrySavedRunForward<T extends Partial<GameType>>(
             scenario.startingCustomers !== inputs.customers)))
     )
       return null;
-    if (game.challenge !== undefined) {
-      const invitation = game.challenge;
-      if (
-        !record(invitation) ||
-        !exactKeys(invitation, ["run", "target"]) ||
-        !Number.isSafeInteger(invitation.target) ||
-        !record(invitation.run) ||
-        !exactKeys(invitation.run, [
-          "scenarioId",
-          "seed",
-          "difficulty",
-          "compatibilityId",
-        ]) ||
-        !(
-          ["scenarioId", "seed", "difficulty", "compatibilityId"] as const
-        ).every((key) => invitation.run[key] === previous[key])
-      )
-        return null;
-    }
     return {
       ...game,
       runIdentity: undefined,
-      challenge: undefined,
       rulesChanged: true,
     };
   } catch (_error) {

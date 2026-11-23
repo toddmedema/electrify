@@ -10,17 +10,18 @@ import {
 import {
   challengeUrl,
   parseChallengeUrl,
-  validInvitation,
   challengeShareContent,
   challengeComparison,
   MAX_CHALLENGE_URL,
 } from "./Challenge";
+import { validInvitation } from "./ChallengeInvitation";
 import { ChallengeInvitation, VictoryType } from "../Types";
 const scenario = SCENARIOS.find((s) => s.id === 101)!;
 const identity = captureRunIdentity(scenario, 42, "CEO");
 const run = projectAuthoredRunReference(identity)!;
 const invitation: ChallengeInvitation = {
-  run,
+  scenarioId: scenario.id,
+  difficulty: "CEO",
   target: 12400,
 };
 const victory: VictoryType = {
@@ -43,9 +44,13 @@ it("round trips canonical identity and preserves unrelated attribution", () => {
       challengeUrl(invitation, "https://electrifygame.com/?ref=friend")!,
     )?.invitation,
   ).toEqual(invitation);
-  expect(
-    challengeUrl(invitation, "https://electrifygame.com/?ref=friend"),
-  ).toContain("ref=friend");
+  const generated = new URL(
+    challengeUrl(invitation, "https://electrifygame.com/?ref=friend")!,
+  );
+  expect(generated.searchParams.get("ref")).toBe("friend");
+  expect(JSON.parse(generated.searchParams.get("challenge")!)).toEqual(
+    invitation,
+  );
 });
 it.each([0, -100, Number.MIN_SAFE_INTEGER, Number.MAX_SAFE_INTEGER])(
   "accepts integer target %p",
@@ -128,13 +133,12 @@ it("rejects transport ambiguity, malformed payload and obsolete fields without a
     parseChallengeUrl(url(invitation) + "&scenario=101")?.invitation,
   ).toEqual(invitation);
 });
-it("rejects a challenge from different rules", () => {
+it("accepts legacy links across rule updates and ignores their seed", () => {
   const old = {
-    ...invitation,
+    target: invitation.target,
     run: { ...run, compatibilityId: `rules-1-${"0".repeat(64)}` },
   };
-  expect(validInvitation(old)).toBe(false);
-  expect(parseChallengeUrl(url(old))?.error).toBeTruthy();
+  expect(parseChallengeUrl(url(old))?.invitation).toEqual(invitation);
   expect(
     parseChallengeUrl(url({ ...old, run: { ...old.run, seed: -1 } }))?.error,
   ).toBeTruthy();
@@ -172,7 +176,7 @@ it("uses bounded ordinary sharing when identity or URL is ineligible, without an
     expect(result.content.url).not.toContain("challenge");
   }
 });
-it("compares signed local scores only for matching conditions", () => {
+it("compares signed scores by scenario and difficulty across independent runs", () => {
   expect(challengeComparison({ ...victory, challenge: invitation })).toContain(
     "tied",
   );
@@ -189,10 +193,21 @@ it("compares signed local scores only for matching conditions", () => {
   expect(
     challengeComparison({
       ...victory,
+      runIdentity: captureRunIdentity(scenario, 1024, "CEO"),
+      challenge: invitation,
+    }),
+  ).toContain("tied");
+  expect(
+    challengeComparison({
+      ...victory,
       runIdentity: undefined,
       challenge: invitation,
     }),
-  ).toContain("cannot be compared");
+  ).toContain("tied");
+  for (const context of [{ difficulty: "VP" as const }, { scenarioId: 107 }])
+    expect(
+      challengeComparison({ ...victory, ...context, challenge: invitation }),
+    ).toBe("Compare scores on the same scenario and difficulty.");
   expect(challengeComparison(victory)).toBeUndefined();
   expect(
     challengeComparison({
