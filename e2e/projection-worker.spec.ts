@@ -19,10 +19,16 @@ test("month rollover forecasts finish in a worker while the UI keeps painting", 
     Object.assign(window, { projectionWorkerTest: state });
     const NativeWorker = window.Worker;
     window.Worker = class extends NativeWorker {
+      // The top bar and Insights can both request forecasts before the first chart paints.
+      private readonly planningRequests = new Set<number>();
+
       constructor(url: string | URL, options?: WorkerOptions) {
         super(url, options);
         this.addEventListener("message", (event) => {
-          if (event.data.transport) {
+          if (
+            event.data.transport &&
+            this.planningRequests.has(event.data.requestId)
+          ) {
             // Hold the refreshed reply before the application receives it. This lets the
             // month-driven viewport settle independently of forecast publication.
             if (state.completed === 1 && !state.held) {
@@ -36,6 +42,7 @@ test("month rollover forecasts finish in a worker while the UI keeps painting", 
               });
               return;
             }
+            this.planningRequests.delete(event.data.requestId);
             state.completed++;
             state.pending--;
           } else if (event.data.error) {
@@ -48,9 +55,12 @@ test("month rollover forecasts finish in a worker while the UI keeps painting", 
         if (
           message &&
           typeof message === "object" &&
-          "game" in message &&
-          "now" in message
+          "scope" in message &&
+          message.scope === "planning" &&
+          "requestId" in message &&
+          typeof message.requestId === "number"
         ) {
+          this.planningRequests.add(message.requestId);
           state.requested++;
           state.pending++;
         }
@@ -123,6 +133,7 @@ test("month rollover forecasts finish in a worker while the UI keeps painting", 
     timeout: 60_000,
   });
   const result = await workerState();
+  expect(result.completed).toBe(2);
   expect(result.errors).toBe(0);
   expect(result.framesWhilePending).toBeGreaterThan(0);
   await testInfo.attach("worker-responsiveness.json", {

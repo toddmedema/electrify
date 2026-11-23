@@ -70,7 +70,7 @@ export function coopSelection(
     receivingScenario,
     viewing: viewing(browse),
     ...(host && {
-      lobbyId: lobby.lobbyId,
+      inviteCode: lobby.inviteCode,
       hasSaves: !!library?.slots.length,
     }),
   };

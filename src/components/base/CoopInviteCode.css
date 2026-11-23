@@ -1,0 +1,25 @@
+.coopInviteCode {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+}
+
+.coopInviteValue {
+  display: grid;
+  min-width: 0;
+}
+
+.coopInviteDigits {
+  font-size: 1rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.1em;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
+.coopInviteCode .MuiButton-root {
+  flex-shrink: 0;
+}

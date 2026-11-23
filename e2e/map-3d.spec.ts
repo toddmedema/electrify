@@ -44,7 +44,11 @@ import {
   tilePosition3D,
 } from "../src/components/base/territory-3d/Projection";
 
-async function startPausedMap(page: Page, theme?: "light" | "dark") {
+async function startPausedMap(
+  page: Page,
+  theme?: "light" | "dark",
+  renderer: "ready" | "unavailable" | "loading" = "ready",
+) {
   if (theme)
     await page.addInitScript((mode) => {
       localStorage.setItem("theme", mode);
@@ -58,7 +62,9 @@ async function startPausedMap(page: Page, theme?: "light" | "dark") {
     await pause.click();
   const map = await returnToTerritoryMap(page);
   const canvas = map.locator("canvas.territory3DCanvas");
-  await expect(canvas).toHaveAttribute("data-renderer", "ready");
+  await expect(
+    renderer === "loading" ? map.locator(".territoryMap") : canvas,
+  ).toHaveAttribute("data-renderer", renderer);
   return { map, canvas };
 }
 
@@ -104,7 +110,7 @@ test("Valley town growth survives resume and adds buildings to the map", async (
     const city = diagnostics.scene!.find(
       ({ id }) => id === `structure:${capitalId}`,
     );
-    return { map, city, capital, canvas };
+    return { map, city, capital };
   }
 
   const opening = await resumeTown(0);
@@ -126,26 +132,6 @@ test("Valley town growth survives resume and adds buildings to the map", async (
   );
   await reviewScreenshot(grown.map.locator(".territoryMapViewport"), {
     path: info.outputPath("burlington-grown.png"),
-  });
-  await grown.canvas.evaluate((element: MapCanvas) => {
-    element
-      .getContext("webgl2")!
-      .getExtension("WEBGL_lose_context")!
-      .loseContext();
-  });
-  await expect(grown.canvas).toHaveAttribute("data-renderer", "lost");
-  const fallbackCity = grown.map.locator(`[data-occupant-tile="${capitalId}"]`);
-  for (const sector of ["Residential", "Commercial"])
-    await expect(
-      fallbackCity.locator(`[data-city-growth="${sector}"]`),
-    ).toBeVisible();
-  await expect(
-    fallbackCity.locator(
-      '[data-city-growth="Commercial"] path[fill="#796B56"]',
-    ),
-  ).toBeVisible();
-  await reviewScreenshot(grown.map.locator(".territoryMapViewport"), {
-    path: info.outputPath("burlington-grown-fallback.png"),
   });
 });
 
@@ -187,9 +173,6 @@ for (const theme of ["light", "dark"] as const) {
     expect(before.instanceCount).toBeGreaterThan(10);
     const border = before.scene?.find(({ id }) => id === "border:ownership");
     expect(border?.triangles).toBeGreaterThan(0);
-    await expect(map.locator(".territoryHexBoundary")).toHaveCount(0);
-    await expect(map.locator(".territoryTerrainArtwork")).toHaveCount(0);
-    await expect(map.locator(".territoryOccupantArtwork")).toHaveCount(0);
     await expect(
       map.getByRole("button", { name: "Build", exact: true }),
     ).toHaveCount(0);
@@ -212,13 +195,12 @@ for (const theme of ["light", "dark"] as const) {
       return loss;
     });
     await expect(canvas).toHaveAttribute("data-renderer", "lost");
-    await expect(map.locator(".territoryTerrainArtwork").first()).toBeVisible();
-    await expect(map.locator(".territoryHexBoundary").first()).toBeVisible();
+    const graphicsStatus = map.getByText("3D graphics disconnected.", {
+      exact: false,
+    });
+    await expect(graphicsStatus).toBeVisible();
     await capital.focus();
     await expect(capital).toHaveAttribute("aria-pressed", "true");
-    const selection = map.locator(".territoryHexSelection");
-    await expect(selection).toHaveAttribute("d", /^(?:M[^M]+){6}$/);
-    await expect(selection).toHaveCSS("stroke-dasharray", "4px, 4px");
     await map
       .getByRole("button", { name: "Rapid connection mode", exact: true })
       .click();
@@ -226,9 +208,25 @@ for (const theme of ["light", "dark"] as const) {
       "data-buy-mode",
       "true",
     );
+    const viewport = map.getByRole("region", {
+      name: "Territory map",
+      exact: true,
+    });
+    await expect(
+      viewport.locator(".territoryTilePrice").first(),
+    ).toBeAttached();
+    const noticeBounds = (await graphicsStatus.boundingBox())!;
+    const viewportBounds = (await viewport.boundingBox())!;
+    expect(noticeBounds.y + noticeBounds.height).toBeLessThanOrEqual(
+      viewportBounds.y,
+    );
     await contextLoss.evaluate((loss) => loss.restoreContext());
     await expect(canvas).toHaveAttribute("data-renderer", "ready");
-    await expect(map.locator(".territoryTerrainArtwork")).toHaveCount(0);
+    await expect(graphicsStatus).toHaveCount(0);
+    await expect(capital.locator(".territoryTileHitArea")).toHaveCSS(
+      "pointer-events",
+      "auto",
+    );
     const after = await readyDiagnostics(canvas);
     expect(after.frames).toBeGreaterThan(before.frames);
     expect(after.light).toEqual(before.light);
@@ -257,7 +255,7 @@ test("resizing keeps the painted terrain and map labels centered at the same zoo
         .querySelector(".territoryMapStage")!
         .getBoundingClientRect();
       const markers = element
-        .querySelector<SVGGElement>(".territoryHexGrid > g")!
+        .querySelector<SVGGElement>(".territoryFacilityStatusLayer > g")!
         .getScreenCTM()!;
       const centerX = view.left + view.width / 2;
       const centerY = view.top + view.height / 2;
@@ -660,7 +658,6 @@ test("keyboard selection draws a centered 3D mountain outline and Escape clears 
     "outline-style",
     "none",
   );
-  await expect(map.locator(".territoryHexSelection")).toHaveCount(0);
   const renderedSelection = () =>
     canvas.evaluate((element: MapCanvas) =>
       element
@@ -856,9 +853,11 @@ for (const theme of ["light", "dark"] as const) {
   });
 }
 
-test("unavailable WebGL leaves a fully operable simplified map", async ({
+test("explains when WebGL2 cannot start and keeps the tile controls usable", async ({
   page,
-}) => {
+}, info) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  const mobile = info.project.name.startsWith("mobile-");
   await page.addInitScript(() => {
     const getContext = HTMLCanvasElement.prototype.getContext;
     HTMLCanvasElement.prototype.getContext = function (
@@ -869,27 +868,106 @@ test("unavailable WebGL leaves a fully operable simplified map", async ({
       if (contextId === "webgl2") return null;
       return getContext.call(this, contextId, options);
     } as typeof getContext;
-    localStorage.setItem("audioEnabled", "false");
   });
-  await page.goto("/?scenario=116");
-  await page.getByRole("button", { name: "Start game", exact: true }).click();
-  const pause = page.getByRole("button", { name: "pause", exact: true });
-  await expect(pause).toBeVisible();
-  if ((await pause.getAttribute("aria-pressed")) !== "true")
-    await pause.click();
-  const map = await returnToTerritoryMap(page);
-  await expect(map.locator("canvas.territory3DCanvas")).toHaveAttribute(
-    "data-renderer",
+  const { map } = await startPausedMap(
+    page,
+    mobile ? "dark" : "light",
     "unavailable",
   );
-  await expect(map.locator(".territoryTerrainArtwork").first()).toBeVisible();
-  const catalogue = await openMapProjectCatalogue(page);
-  await catalogue
-    .getByRole("button", { name: /^(Choose sites|Pick site) for Wind$/ })
-    .click();
-  await expect(
-    map.locator('[data-project-site="owned"]').first(),
-  ).toBeVisible();
+  const notice = map.getByRole("status", { name: "3D map" });
+  await expect(notice).toHaveText(
+    "The 3D map is unavailable. WebGL2 is required.",
+  );
+  const capital = map.getByRole("button", {
+    name: "Inspect You territory · Burlington",
+  });
+  await expect(map.getByRole("button", { name: "Reload page" })).toHaveCount(0);
+  const tile = map.locator('[data-map-target="champlain:site-13"]');
+  const hitArea = tile.locator(".territoryTileHitArea");
+  await expect(tile.locator("strong, .territoryTilePrice")).toHaveCount(0);
+  if (mobile) await hitArea.tap({ timeout: 5_000 });
+  else await hitArea.click({ timeout: 5_000 });
+  const inspector = page.locator(".tileWorkspaceSurface");
+  await expect(inspector).toHaveAccessibleName("Plains");
+  await closeTileSurface(inspector);
+
+  await capital.press("Enter");
+  await expect(inspector).toHaveAccessibleName("Burlington");
+  const label = capital.getByText("Burlington", { exact: true });
+  if (mobile) {
+    const labelBounds = (await label.boundingBox())!;
+    const inspectorBounds = (await inspector.boundingBox())!;
+    const noticeBounds = (await notice.boundingBox())!;
+    expect(noticeBounds.y + noticeBounds.height).toBeLessThanOrEqual(
+      inspectorBounds.y,
+    );
+    expect(inspectorBounds.y + inspectorBounds.height).toBeLessThanOrEqual(
+      labelBounds.y,
+    );
+  }
+  await reviewScreenshot(map, {
+    path: info.outputPath("map-webgl2-unavailable.png"),
+  });
+  if (mobile) {
+    await label.tap();
+    await expect(inspector).toHaveCount(0);
+  }
+});
+
+test.describe("scene delivery", () => {
+  test.use({ serviceWorkers: "block" });
+
+  test("reloads a failed scene while a tile inspector is open", async ({
+    page,
+  }, info) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    const sceneChunk = "**/static/js/territory-scene.*.js";
+    let releaseScene!: () => void;
+    const pendingScene = new Promise<void>((resolve) => {
+      releaseScene = resolve;
+    });
+    await page.route(sceneChunk, async (route) => {
+      await pendingScene;
+      await route.abort();
+    });
+    const { map } = await startPausedMap(page, "dark", "loading");
+    const notice = map.getByRole("status", { name: "3D map" });
+    await expect(notice).toHaveText("Loading 3D map…");
+    await map.locator('[data-map-target="champlain:city"]').press("Enter");
+    const inspector = page.getByRole("dialog", { name: "Burlington" });
+    const inspectorTop = async () => (await inspector.boundingBox())!.y;
+    const loadingTop = await inspectorTop();
+    releaseScene();
+
+    await expect(notice).toHaveText("The 3D map couldn’t load.");
+    // The Reload control makes the status row taller than the loading message.
+    await expect.poll(inspectorTop).toBeGreaterThan(loadingTop);
+    const reload = map.getByRole("button", { name: "Reload page" });
+    const reloadBounds = (await reload.boundingBox())!;
+    expect(reloadBounds.y + reloadBounds.height).toBeLessThanOrEqual(
+      await inspectorTop(),
+    );
+    await reviewScreenshot(map, {
+      path: info.outputPath("map-scene-reload.png"),
+    });
+
+    await expect(
+      page.locator("#appbar:visible [data-save-state]").first(),
+    ).toHaveAttribute("data-save-state", "saved");
+    await page.unroute(sceneChunk);
+    const navigated = page.waitForEvent("framenavigated", {
+      predicate: (frame) => frame === page.mainFrame(),
+    });
+    if (info.project.use.hasTouch) await reload.tap();
+    else await reload.click();
+    await navigated;
+    await page.getByRole("button", { name: "Continue", exact: true }).click();
+    const restored = await returnToTerritoryMap(page);
+    await expect(restored.locator("canvas.territory3DCanvas")).toHaveAttribute(
+      "data-renderer",
+      "ready",
+    );
+  });
 });
 
 async function dragWindow(page: Page, target: Locator, dx: number, dy: number) {
@@ -1090,7 +1168,7 @@ test("map windows move, resize, stack and remember their bounds", async ({
   });
 });
 
-test("shows an advancing wildfire and scar with WebGL or the SVG fallback", async ({
+test("shows an advancing wildfire and scar on the 3D map", async ({
   page,
 }, info) => {
   const theme = info.project.name === "desktop-chromium" ? "light" : "dark";
@@ -1162,8 +1240,6 @@ test("shows an advancing wildfire and scar with WebGL or the SVG fallback", asyn
   );
   await expect(active).toBeInViewport({ ratio: 0.75 });
   await expect(scar).toHaveAccessibleDescription(/Scorched by wildfire/);
-  const flames = map.locator('[data-disaster="fire"]');
-  await expect(flames).toHaveCount(0);
   await active.blur();
   await reviewScreenshot(map.locator(".territoryMapViewport"), {
     path: info.outputPath(`wildfire-map-${theme}.png`),
@@ -1197,20 +1273,12 @@ test("shows an advancing wildfire and scar with WebGL or the SVG fallback", asyn
     return loss;
   });
   await expect(canvas).toHaveAttribute("data-renderer", "lost");
-  await expect(
-    map.locator(
-      `[data-tile="${burned}"][data-ground-condition="scorched"] .territoryTerrainArtwork`,
-    ),
-  ).toBeVisible();
-  await expect(flames).toHaveCount(2);
-  await expect(flames.first()).toBeVisible();
   await contextLoss.evaluate((loss) => loss.restoreContext());
   await expect(canvas).toHaveAttribute("data-renderer", "ready");
-  await expect(flames).toHaveCount(0);
   expect((await diagnostics()).wildfire).toEqual(frozen.wildfire);
 });
 
-test("shows extreme cold on terrain and explains the plant derate in both renderers", async ({
+test("shows extreme cold on the 3D map and explains the plant derate", async ({
   page,
 }, info) => {
   const desktop = info.project.name === "desktop-chromium";
@@ -1260,7 +1328,6 @@ test("shows extreme cold on terrain and explains the plant derate in both render
   await gas.focus();
   await expect(gas).toBeInViewport({ ratio: 0.75 });
   await expect(gas).toHaveAccessibleDescription(/Extreme cold.*70% available/);
-  await expect(map.locator("[data-disaster-tile]")).toHaveCount(0);
   await gas.blur();
   await reviewScreenshot(viewport, {
     path: info.outputPath("frost-webgl-map.png"),
@@ -1280,29 +1347,6 @@ test("shows extreme cold on terrain and explains the plant derate in both render
     });
   }
   await closeTileSurface(inspector);
-
-  await canvas.evaluate((element: MapCanvas) => {
-    element
-      .getContext("webgl2")!
-      .getExtension("WEBGL_lose_context")!
-      .loseContext();
-  });
-  await expect(canvas).toHaveAttribute("data-renderer", "lost");
-  const plantGround = map.locator(
-    `[data-tile="${gasTile}"][data-frost="derate"]`,
-  );
-  const regionalGround = map.locator(
-    '[data-frost="regional"] .territoryTerrainArtwork',
-  );
-  await expect(
-    plantGround.locator('.territoryTerrainArtwork path[fill*="frost-cover"]'),
-  ).toBeVisible();
-  await expect(regionalGround.first()).toBeVisible();
-  await expect(map.locator("[data-disaster-tile]")).toHaveCount(0);
-  await expect(gas).toHaveAccessibleDescription(/Extreme cold.*70% available/);
-  await reviewScreenshot(viewport, {
-    path: info.outputPath("frost-svg-map.png"),
-  });
 });
 
 test("hail falls on the struck solar site and leaves visibly broken panels during repairs", async ({
@@ -1404,7 +1448,6 @@ test("hail falls on the struck solar site and leaves visibly broken panels durin
     expect(
       initial.scene!.find(({ id }) => id === `structure:${tileId}`)?.modelKey,
     ).toBe("structure:solar-hail-damaged");
-  await expect(map.locator('[data-disaster^="hail"]')).toHaveCount(0);
   await fresh.blur();
   await reviewScreenshot(map.locator(".territoryMapViewport"), {
     path: info.outputPath("hail-webgl-map.png"),
@@ -1424,29 +1467,6 @@ test("hail falls on the struck solar site and leaves visibly broken panels durin
       ),
   );
   expect((await readRender()).phases[`hail:${struck}`]).toBe(held);
-
-  await canvas.evaluate((element: MapCanvas) => {
-    element
-      .getContext("webgl2")!
-      .getExtension("WEBGL_lose_context")!
-      .loseContext();
-  });
-  await expect(canvas).toHaveAttribute("data-renderer", "lost");
-  await expect(
-    map.locator(`[data-disaster-tile="${struck}"] [data-disaster="hail"]`),
-  ).toBeVisible();
-  await expect(map.locator(`[data-disaster-tile="${repairing}"]`)).toHaveCount(
-    0,
-  );
-  for (const tileId of [struck, repairing])
-    await expect(
-      map
-        .locator(`[data-occupant-tile="${tileId}"] [data-solar-damage]`)
-        .first(),
-    ).toBeVisible();
-  await reviewScreenshot(map.locator(".territoryMapViewport"), {
-    path: info.outputPath("hail-svg-map.png"),
-  });
 });
 
 test("tile inspection shares the desktop window stack", async ({

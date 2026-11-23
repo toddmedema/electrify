@@ -21,10 +21,10 @@ special hydro or geothermal sites have distinct cash prices and benefits. See
 
 The map uses a low-poly 3D hex board, following the visual direction in
 [issue 603](https://github.com/toddmedema/electrify/issues/603). Small, medium and large cities indicate
-customers. Plains, forest, hills, mountain, river and lake are illustrated
+customers. Plains, forest, hills, mountain, river and lake have distinct
 terrain meshes, with separate upright cities, generators, storage and towers.
-The simulated day drives sun/moon lighting and simple shadows. Devices without
-WebGL2 retain the simplified illustrated map; see [the 3D style](map-3d-style.md).
+The simulated day drives sun/moon lighting and simple shadows. The map requires
+WebGL2. See [the 3D style](map-3d-style.md).
 Each hex holds one facility or a city; construction reserves its slot immediately.
 Independent utilities show their authored starting fleet. Empty developed hexes
 show towers and automatic wires to adjacent developed cells of the same utility.

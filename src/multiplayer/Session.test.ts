@@ -1,3 +1,4 @@
+import { steamSessionServices } from "./SteamSessionServices";
 import { facilityConstructionReview } from "../helpers/FacilityConstructionReview";
 import "../Store";
 import { TextEncoder } from "util";
@@ -36,6 +37,7 @@ import { getBuildFacilityQuote } from "../data/Facilities";
 import { UTILITY_AREAS } from "../data/UtilityExpansion";
 import { availableTerritoryTiles } from "../helpers/TerritoryTiles";
 import { currentTick } from "../helpers/GameSelectors";
+import { SESSION_PUMP_MS } from "./Timing";
 
 const host = "host",
   guest = "guest";
@@ -207,7 +209,7 @@ function fixture(isHost = false, deferLeave = false) {
     (bytes) => webcrypto.subtle.digest("SHA-256", bytes),
   );
   const session = new MultiplayerSession(
-    bridge,
+    steamSessionServices(bridge),
     async () => {
       if (failFactory) throw new Error("Factory failed");
       return worker as unknown as Worker;
@@ -216,6 +218,7 @@ function fixture(isHost = false, deferLeave = false) {
   );
   return {
     session,
+    bridge,
     worker,
     requests,
     posts,
@@ -311,6 +314,131 @@ const savedCampaign = () =>
     seats: campaign.players,
     outcomes: { retired: { outcome: "completed" } },
   }) as unknown as World;
+
+test("an invite received during startup supersedes an older launch invite", async () => {
+  const f = fixture();
+  const initial = {
+    available: true,
+    selfId: guest,
+    members: [],
+    connected: [],
+    inviteLobbyId: "older-invite",
+  };
+  const state = Promise.withResolvers<LobbyState>();
+  jest.spyOn(f.bridge, "multiplayerRequest").mockReturnValueOnce(state.promise);
+  const accept = jest.fn();
+  const initialized = f.session.initialize(accept);
+  f.event({ kind: "invite", lobbyId: "new-invite" });
+  expect(accept).not.toHaveBeenCalled();
+  state.resolve(initial);
+  await initialized;
+  expect(accept.mock.calls).toEqual([["new-invite"]]);
+  f.session.dispose();
+});
+
+test("an accepted invitation waits for lobby creation to finish before joining", async () => {
+  const f = fixture(true);
+  const idle = { available: true, selfId: host, members: [], connected: [] };
+  const creating = Promise.withResolvers<LobbyState>();
+  const joined = { ...idle, lobbyId: "invited-lobby", hostId: guest };
+  const requests = jest
+    .spyOn(f.bridge, "multiplayerRequest")
+    .mockImplementation((request) => {
+      if (request.kind === "create") return creating.promise;
+      return Promise.resolve(request.kind === "join" ? joined : idle);
+    });
+  const accept = jest.fn((id: string) => f.session.join(id));
+  await f.session.initialize(accept);
+  const hosted = f.session.create();
+  f.event({ kind: "invite", lobbyId: "invited-lobby" });
+  jest.advanceTimersByTime(SESSION_PUMP_MS);
+  expect(accept).not.toHaveBeenCalled();
+  creating.resolve({ ...idle, lobbyId: "hosted-lobby", hostId: host });
+  await hosted;
+  expect(f.session.getSnapshot().lobby.lobbyId).toBe("hosted-lobby");
+  jest.advanceTimersByTime(SESSION_PUMP_MS);
+  await accept.mock.results[0].value;
+  expect(requests.mock.calls.map(([request]) => request.kind)).toEqual([
+    "state",
+    "create",
+    "join",
+  ]);
+  expect(f.session.getSnapshot().lobby.lobbyId).toBe("invited-lobby");
+  f.session.dispose();
+});
+
+test("switching rooms ignores late state, messages and disconnects from the old lobby", async () => {
+  const f = fixture();
+  await f.session.initialize();
+  const oldLobby = f.session.getSnapshot().lobby;
+  const joined = Promise.withResolvers<LobbyState>();
+  const request = jest
+    .spyOn(f.bridge, "multiplayerRequest")
+    .mockReturnValueOnce(joined.promise);
+  const joining = f.session.join("new-lobby");
+  f.event({ kind: "state", state: oldLobby });
+  f.event({
+    kind: "message",
+    sender: host,
+    payload: {
+      kind: "browse",
+      browse: browse({ session: "old-session" }),
+    },
+  });
+  f.event({ kind: "disconnected", sender: host });
+  expect(f.session.getSnapshot().browse).toBeUndefined();
+  const newLobby = {
+    ...oldLobby,
+    lobbyId: "new-lobby",
+    hostId: "other-host",
+    members: [{ id: "other-host", name: "New host" }],
+  };
+  f.event({ kind: "state", state: newLobby });
+  f.event({ kind: "state", state: oldLobby });
+  f.event({
+    kind: "message",
+    sender: "other-host",
+    payload: { kind: "browse", browse: browse({ session: "new-session" }) },
+  });
+  joined.resolve(newLobby);
+  await joining;
+  expect(f.session.getSnapshot().lobby.lobbyId).toBe("new-lobby");
+  expect(f.session.getSnapshot().browse?.session).toBe("new-session");
+  expect(request.mock.calls.map(([input]) => input.kind)).toEqual(["join"]);
+  f.session.dispose();
+});
+
+test("a new host disconnecting during join sends the guest back after the join settles", async () => {
+  const f = fixture();
+  await f.session.initialize();
+  const { selfId } = f.session.getSnapshot().lobby;
+  const newLobby: LobbyState = {
+    available: true,
+    selfId,
+    lobbyId: "new-lobby",
+    hostId: "other-host",
+    members: [{ id: "other-host", name: "New host" }],
+    connected: [],
+  };
+  const joined = Promise.withResolvers<LobbyState>();
+  const request = jest
+    .spyOn(f.bridge, "multiplayerRequest")
+    .mockReturnValueOnce(joined.promise);
+  const joining = f.session.join("new-lobby");
+  f.event({ kind: "state", state: newLobby });
+  f.event({ kind: "disconnected", sender: "other-host" });
+  expect(request.mock.calls.map(([input]) => input.kind)).toEqual(["join"]);
+  joined.resolve(newLobby);
+  await joining;
+  await flushReplica();
+  expect(request.mock.calls.map(([input]) => input.kind)).toEqual([
+    "join",
+    "leave",
+  ]);
+  expect(f.session.getSnapshot().lobby.lobbyId).toBeUndefined();
+  expect(f.session.getSnapshot().error).toBe(HOST_LEFT);
+  f.session.dispose();
+});
 
 test("resuming a campaign creates its invitation lobby before starting and waits for its saved players", async () => {
   const f = fixture(true);
