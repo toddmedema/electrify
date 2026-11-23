@@ -299,7 +299,6 @@ const captureState = (page: Page) =>
       scenarioId: view?.game?.scenarioId,
       seed: view?.game?.seed,
       facilities: view?.game?.facilities.length,
-      rate: view?.game?.dollarsPerkWh,
       month: view?.game?.date.monthsElapsed,
     };
   });
@@ -1061,8 +1060,30 @@ for (const [scenarioId, width] of [
       ...(scenarioId === 107 && { seed: 268107 }),
     });
     const peak = scenarioId === 106 ? 50e6 : 2e9;
-    for (const page of campaign.players)
-      await buyNativeBackup(page, peak, scenarioId === 106 ? 0.12 : 0.1);
+    const rate = scenarioId === 106 ? 0.12 : 0.1;
+    const goal =
+      scenarioId === 106 ? "Retain the community" : "Keep power flowing";
+    const target =
+      scenarioId === 106
+        ? "Keep ≥90% of customer baseline by Dec 2035"
+        : "Serving less than 95% of demand for 3 months in a row ends the run.";
+    const showGoal = async (page: Page) => {
+      const panel = page.getByRole("region", { name: "Scenario", exact: true });
+      await openPane(
+        panel,
+        page.getByRole("button", { name: "Scenario", exact: true }),
+      );
+      await expect(panel).toContainText(goal);
+      await expect(panel.getByRole("region", { name: "Goals" })).toContainText(
+        target,
+      );
+      await expect(panel).not.toContainText("Modded");
+      await page.keyboard.press("Escape");
+    };
+    for (const page of campaign.players) {
+      await buyNativeBackup(page, peak, rate);
+      await showGoal(page);
+    }
     await saveAndQuit(guest);
     await saveAndQuit(host);
     const world = await campaign.fixture.checkpoint();
@@ -1093,13 +1114,21 @@ for (const [scenarioId, width] of [
     );
     await expect(dialogs[0]).toBeVisible({ timeout: 120000 });
     await expect(dialogs[1]).toBeVisible();
+    await expect.poll(async () => (await captureState(guest)).month).toBe(due);
     for (const [index, dialog] of dialogs.entries()) {
       await expect(dialog).toContainText(`Your company: ${companies[index]}`);
       await expect(dialog).toContainText(
         "Each company chooses for its own grid.",
       );
-      expect((await dialog.boundingBox())!.width).toBeLessThanOrEqual(width);
+      for (const button of await dialog.getByRole("button").all()) {
+        const bounds = (await button.boundingBox())!;
+        expect(bounds.height).toBeGreaterThanOrEqual(44);
+        expect(bounds.x).toBeGreaterThanOrEqual(0);
+        expect(bounds.x + bounds.width).toBeLessThanOrEqual(width);
+      }
     }
+    await guest.keyboard.press("Escape");
+    await expect(dialogs[1]).toBeVisible();
     const key =
       scenarioId === 106
         ? "story:106:data-center-boom:connection"
@@ -1127,7 +1156,7 @@ for (const [scenarioId, width] of [
             page.evaluate(
               ({ key, option }) => {
                 const target = window as MultiplayerWindow;
-                return target.nativeForecasts?.some(
+                return target.nativeForecasts?.findLast(
                   (request) =>
                     request.responses.some(
                       (response) =>
@@ -1139,7 +1168,28 @@ for (const [scenarioId, width] of [
             ),
           { timeout: 60000 },
         )
-        .toBe(true);
+        .toMatchObject({
+          scenarioId,
+          seed: opening.seed,
+          hasCustomScenario: false,
+          ...(scenarioId === 106 && {
+            loads:
+              index === 0
+                ? [expect.objectContaining({ peakW: 100e6, startsYear: 2026 })]
+                : [
+                    expect.objectContaining({ peakW: 50e6, startsYear: 2026 }),
+                    expect.objectContaining({ peakW: 50e6, startsYear: 2028 }),
+                  ],
+          }),
+        });
+      await expect(
+        page
+          .locator(".insights:visible")
+          .getByRole("img", {
+            name: /^(Chart of|Monthly ranges of).*?(demand|supply)/i,
+          })
+          .first(),
+      ).toBeVisible({ timeout: 60000 });
       await page.keyboard.press("Escape");
     }
     await saveAndQuit(guest);
@@ -1161,7 +1211,31 @@ for (const [scenarioId, width] of [
           !game.runIdentity,
       ),
     ).toBe(true);
+    for (const [index, game] of latest!.grids.entries()) {
+      const receipt = game.worldEvents.occurrences.find(
+        (event) => event.key === key,
+      )!;
+      const retrofitPayments = game.worldEvents.occurrences.filter(
+        (event) =>
+          event.attributes.retrofit === true &&
+          event.startsMinute === receipt.startsMinute,
+      );
+      expect(receipt.attributes.cost).toBe(0);
+      expect(retrofitPayments.length > 0).toBe(
+        scenarioId === 107 && index === 0,
+      );
+      expect(Number(receipt.attributes.retrofitCost ?? 0)).toBe(
+        retrofitPayments.reduce(
+          (sum, event) => sum + Number(event.attributes.cost),
+          0,
+        ),
+      );
+      expect(receipt.attributes.upfrontGrant).toBe(
+        scenarioId === 106 && index === 0 ? 15e6 : 0,
+      );
+    }
     await campaign.resume(guest);
+    await showGoal(guest);
     expect((await captureState(guest)).seat).toBe(opening.seat);
     expect((await captureState(guest)).matchId).toBe(opening.matchId);
     expect(campaign.errors).toEqual([]);
