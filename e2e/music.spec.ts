@@ -1,4 +1,8 @@
-import { installMusicAudit } from "./music-audit";
+import {
+  expectOpeningMusic,
+  installMusicAudit,
+  waitForGameplayLoop,
+} from "./music-audit";
 import { expect, Page, test } from "./fixtures";
 import { writeFile } from "node:fs/promises";
 
@@ -7,9 +11,8 @@ import { writeFile } from "node:fs/promises";
 test.use({
   launchOptions: { args: ["--autoplay-policy=no-user-gesture-required"] },
 });
-// Readiness checks include three six-minute stems before gameplay assertions.
-// Leave room for that setup on CI without relaxing any navigation assertion.
-test.setTimeout(90000);
+// Allow the soundtrack to decode and the real 29-second intro to finish on CI.
+test.setTimeout(120000);
 
 test.beforeEach(async ({ page }) => {
   await installMusicAudit(page);
@@ -85,7 +88,7 @@ async function expectMenuMusic(page: Page) {
       timeout: 60000,
     })
     .toEqual(
-      Array.from({ length: 4 }, () =>
+      Array.from({ length: 5 }, () =>
         expect.objectContaining({ state: "decoded" }),
       ),
     );
@@ -132,24 +135,14 @@ test("menus keep the calm loop without advancing to gameplay music", async ({
   await expectMenuMusic(page);
 });
 
-test("starting a game selects the existing song and quitting restores the menu loop", async ({
+test("opening a game plays the intro before its loop, including when reopening a save", async ({
   page,
 }) => {
   await page.goto("/?scenario=111");
   await expectMenuMusic(page);
   await page.getByRole("button", { name: "Start game", exact: true }).click();
   await expect(page.locator(".gameMenuButton")).toBeVisible();
-  await expect
-    .poll(() => page.evaluate(() => window.electrifyMusicStarts))
-    .toHaveLength(4);
-  const gameplay = await page.evaluate(() =>
-    window.electrifyMusicStarts.slice(1),
-  );
-  for (const music of gameplay) {
-    expect(music.loop).toBe(true);
-    expect(music.duration).toBeGreaterThan(391);
-    expect(music.offset).toBe(0);
-  }
+  await expectOpeningMusic(page, 1);
   await page.locator(".gameMenuButton").click();
   await page
     .getByRole("menuitem", { name: "Save & Quit", exact: true })
@@ -157,13 +150,19 @@ test("starting a game selects the existing song and quitting restores the menu l
   await expect(page.locator("#menuCard")).toBeVisible();
   await expect
     .poll(() => page.evaluate(() => window.electrifyMusicStarts))
-    .toHaveLength(5);
+    .toHaveLength(6);
   const returned = await page.evaluate(() =>
     window.electrifyMusicStarts.at(-1)!,
   );
   expect(returned.loop).toBe(true);
   expect(returned.duration).toBeCloseTo(43.63637, 3);
   expect(returned.offset).toBe(0);
+  expect((await playbackSnapshot(page)).active.map(({ id }) => id)).toEqual([
+    5,
+  ]);
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
+  await expect(page.locator(".gameMenuButton")).toBeVisible();
+  await expectOpeningMusic(page, 6);
 });
 
 test("gameplay sources and playheads survive card changes and all Back paths", async ({
@@ -178,9 +177,7 @@ test("gameplay sources and playheads survive card changes and all Back paths", a
   await page.getByTestId("mission-row-111").click();
   await page.getByRole("button", { name: "Start game", exact: true }).click();
   await expect(page.locator(".gameMenuButton")).toBeVisible();
-  await expect
-    .poll(() => page.evaluate(() => window.electrifyMusicStarts))
-    .toHaveLength(4);
+  await waitForGameplayLoop(page);
   let playback = await playbackSnapshot(page);
   expect(playback.active).toHaveLength(3);
 
@@ -219,7 +216,7 @@ test("gameplay sources and playheads survive card changes and all Back paths", a
   }
 });
 
-test("a suspended audio clock does not restart gameplay early", async ({
+test("a suspended audio clock does not advance the intro-to-loop handoff", async ({
   page,
 }) => {
   await page.clock.install();
@@ -227,9 +224,7 @@ test("a suspended audio clock does not restart gameplay early", async ({
   await expectMenuMusic(page);
   await page.getByRole("button", { name: "Start game", exact: true }).click();
   await expect(page.locator(".gameMenuButton")).toBeVisible();
-  await expect
-    .poll(() => page.evaluate(() => window.electrifyMusicStarts))
-    .toHaveLength(4);
+  await expectOpeningMusic(page, 1);
   await expect
     .poll(async () => (await playbackSnapshot(page)).active[0].position)
     .toBeGreaterThan(0.1);
@@ -242,13 +237,17 @@ test("a suspended audio clock does not restart gameplay early", async ({
     );
   });
   const before = await playbackSnapshot(page);
-  expect(before.active).toHaveLength(3);
+  expect(before.active).toHaveLength(4);
   expect(before.active.map((entry) => entry.state)).toEqual([
     "suspended",
     "suspended",
     "suspended",
+    "suspended",
   ]);
-  // Advance the loop timer while the real audio clock stays at the saved playhead.
+  expect(before.active[0].position).toBeLessThan(27);
+  for (const stem of before.active.slice(1))
+    expect(stem.position).toBeLessThan(0);
+  // Advance JavaScript time while the real audio clock stays at the saved intro playhead.
   await page.clock.fastForward(392119);
   const after = await playbackSnapshot(page);
   expect(after.starts).toEqual(before.starts);
@@ -275,9 +274,7 @@ test("first tutorial keeps its sources through the real native song boundary", a
   });
   await page.getByRole("button", { name: "Tutorials", exact: true }).click();
   await expect(page.locator(".tutorialHud")).toBeVisible();
-  await expect
-    .poll(async () => (await playbackSnapshot(page)).active.length)
-    .toBe(3);
+  await waitForGameplayLoop(page);
   const before = await playbackSnapshot(page);
   const durations = before.starts.slice(-3).map((entry) => entry.duration);
   expect(new Set(durations).size).toBe(1);

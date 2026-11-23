@@ -111,11 +111,10 @@ it.each([
     expect(state.loaded).toBe("LOADING");
     for (let i = 1; i < 5; i++) {
       await waitFor(() => expect(requests).toHaveLength(i + 1));
-      if (i === 4 && introStatus === "timeout") {
-        expect(requests[i].timeout).toBeGreaterThan(0);
-        requests[i].ontimeout?.();
-      } else requests[i].onload?.();
+      if (i === 4 && introStatus === "timeout") requests[i].ontimeout?.();
+      else requests[i].onload?.();
     }
+    expect(requests[4].timeout).toBeGreaterThan(0);
     await waitFor(() => expect(state.loaded).toBe("LOADED"));
     const constructor = ThemeManager as jest.MockedClass<typeof ThemeManager>;
     const manager = constructor.mock.instances[0];
