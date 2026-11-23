@@ -93,7 +93,7 @@ test("an inherited gas steam plant submits exhaust only while generating", async
   await expect(target).toHaveAccessibleDescription(/Generating/);
   const active = await sceneFacility(map, tileId);
   expect(active).toMatchObject({
-    modelKey: "structure:gas-steam",
+    modelKey: "structure:gas-steam:small",
     active: true,
     producing: true,
   });
@@ -111,7 +111,7 @@ test("an inherited gas steam plant submits exhaust only while generating", async
   await expect(idleTarget).toHaveAccessibleDescription(/Idle/);
   const idle = await sceneFacility(map, tileId);
   expect(idle).toMatchObject({
-    modelKey: "structure:gas-steam",
+    modelKey: "structure:gas-steam:small",
     active: false,
     producing: false,
   });
