@@ -492,7 +492,11 @@ test("projected sample evidence and a deliberate purchase retain the bounded inv
     name: "Grid status",
     exact: true,
   });
-  await expect(diagnosis).toContainText(/Short at.*About .* short/);
+  await expect(
+    diagnosis.getByText(
+      /^About [\d.,]+[kMGT]?W short at .+ in this month’s sample$/,
+    ),
+  ).toBeVisible();
   await diagnosis.getByRole("button", { name: "Close grid status" }).click();
   await reviewScreenshot(
     info.project.name === "mobile-390px"
