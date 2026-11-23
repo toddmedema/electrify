@@ -914,9 +914,17 @@ test("hail hits the ground and panels, then leaves only fractured panels during 
   );
   expect(stones.model.key).toBe("weather:hail");
   expect(stones.model.parts).toHaveLength(12);
-  const heights = stones.model.parts.map((part) => part.position![1]);
-  expect(Math.min(...heights)).toBeLessThan(0.06);
-  expect(Math.max(...heights)).toBeGreaterThan(0.15);
+  const surfaces = stones.model.parts.map(({ mesh, position }) => {
+    const [x, y, z] = position!;
+    const groundY = surfaceHeight(ground.model, x, z);
+    const panelY = damaged.position[1] + surfaceHeight(damaged.model, x, z);
+    const stoneRadius = Math.max(
+      ...mesh.positions.filter((_value, index) => index % 3 === 1),
+    );
+    expect(y - stoneRadius).toBeCloseTo(Math.max(groundY, panelY), 6);
+    return panelY > groundY ? "panel" : "ground";
+  });
+  expect(surfaces).toEqual(expect.arrayContaining(["ground", "panel"]));
   expect(damaged.model.key).toBe("structure:solar-hail-damaged:small");
   expect(damaged.model.terminals).toEqual(intact.model.terminals);
   expect(damaged.model.parts[0].mesh.positions).not.toEqual(
