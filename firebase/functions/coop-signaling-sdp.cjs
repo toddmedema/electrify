@@ -36,7 +36,7 @@ const direct = new Set(["v=0", "s=-", "t=0 0", "a=sctp-port:5000"]);
 const optional = new Set(["a=msid-semantic: WMS", "a=end-of-candidates"]);
 
 function createRelayPolicy(config) {
-  if (typeof config !== "string" || !config.trim()) return () => false;
+  if (typeof config !== "string" || !config.trim()) return null;
   const ips = new BlockList();
   for (const range of config.trim().split(/[\s,]+/)) {
     const [address, mask, extra] = range.split("/");
@@ -46,7 +46,7 @@ function createRelayPolicy(config) {
       nonPublic.check(address) ||
       !/^(?:1[6-9]|2\d|3[0-2])$/.test(mask)
     ) {
-      return () => false;
+      return null;
     }
     ips.addSubnet(address, Number(mask));
   }
@@ -56,6 +56,7 @@ function createRelayPolicy(config) {
 
 function validateDescription(value, type, isRelay) {
   if (
+    !isRelay ||
     value?.type !== type ||
     Object.keys(value).length !== 2 ||
     typeof value.sdp !== "string" ||

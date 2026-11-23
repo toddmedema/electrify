@@ -163,6 +163,7 @@ function createTurnSignaling({
   }
 
   async function issue(context, pair, to) {
+    if (!relay) throw new CrossplayError(503, "turn-unavailable");
     const { roomId, seatId } = context;
     const ref = grants.doc(credentialId(roomId, pair.generation, seatId));
     const now = clock();
@@ -199,14 +200,14 @@ function createTurnSignaling({
       const server =
         Array.isArray(iceServers) &&
         iceServers.find(
-          ({ urls, username, credential }) =>
-            Array.isArray(urls) &&
-            urls.includes(`${UDP}?transport=udp`) &&
-            urls.includes(`${TLS}?transport=tcp`) &&
-            typeof username === "string" &&
-            CREDENTIAL.test(username) &&
-            typeof credential === "string" &&
-            CREDENTIAL.test(credential),
+          (entry) =>
+            Array.isArray(entry?.urls) &&
+            entry.urls.includes(`${UDP}?transport=udp`) &&
+            entry.urls.includes(`${TLS}?transport=tcp`) &&
+            typeof entry.username === "string" &&
+            CREDENTIAL.test(entry.username) &&
+            typeof entry.credential === "string" &&
+            CREDENTIAL.test(entry.credential),
         );
       if (!server) throw new CrossplayError(503, "turn-unavailable");
       ice = {
@@ -214,7 +215,14 @@ function createTurnSignaling({
         username: server.username,
         credential: server.credential,
       };
-      await ref.update({ ice });
+      try {
+        await ref.update({ ice });
+      } catch (error) {
+        await provider(`${encodeURIComponent(ice.username)}/revoke`, 204).catch(
+          () => undefined,
+        );
+        throw error;
+      }
     }
     if (!ice || claimed.existing?.revoked)
       throw new CrossplayError(409, "turn-pending");
