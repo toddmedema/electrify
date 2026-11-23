@@ -43,6 +43,7 @@ function worker() {
     [FetchRequest, { cache?: string }?]
   >();
   const put = jest.fn().mockResolvedValue(undefined);
+  const postMessage = jest.fn();
   const match = jest
     .fn<Promise<WorkerResponse | undefined>, [FetchRequest]>()
     .mockResolvedValue(undefined);
@@ -55,6 +56,9 @@ function worker() {
     URL,
     crypto: webcrypto,
     btoa: (value: string) => Buffer.from(value, "binary").toString("base64"),
+    Request: function (url: string, { integrity }: { integrity: string }) {
+      return { url, integrity, method: "GET", mode: "cors" };
+    },
     Response: function (body: string) {
       return response(true, body);
     },
@@ -62,6 +66,7 @@ function worker() {
     caches: { match, open },
     self: {
       location: { origin: "https://electrify.test" },
+      clients: { matchAll: async () => [{ postMessage }] },
       addEventListener: (name: string, handler: (event: WorkerEvent) => void) =>
         handlers.set(name, handler),
     },
@@ -69,6 +74,7 @@ function worker() {
   return {
     fetch,
     put,
+    postMessage,
     addAll,
     match,
     cacheMatch,
@@ -311,9 +317,13 @@ describe("simulation data integrity", () => {
       });
       await received;
       expect(persisted).toBe(false);
+      expect(sw.postMessage).not.toHaveBeenCalled();
       finishWrite();
       await lifetime;
       expect(persisted).toBe(true);
+      expect(sw.postMessage).toHaveBeenCalledWith({
+        type: "OFFLINE_WEATHER_CACHED",
+      });
     } finally {
       finishWrite?.();
       await event.result;
@@ -329,6 +339,39 @@ describe("simulation data integrity", () => {
         await sw.request("cors", url, integrityFor("fresh")).result
       ).text(),
     ).toBe("fresh");
+  });
+
+  it("refreshes only the stale part of a selected location's weather", async () => {
+    const sw = dataWorker();
+    const watershed = "/data/weather/AlleghenyUpper.bin";
+    sw.entries.set(url, response(true, "fresh"));
+    sw.entries.set(watershed, response(true, "stale"));
+    sw.fetch.mockImplementation(async (request) =>
+      response(true, sw.path(request) === watershed ? "fresh watershed" : ""),
+    );
+
+    await Promise.all(
+      sw.message({
+        type: "CACHE_SCENARIO_DATA",
+        locationIds: ["PIT", "AlleghenyUpper"],
+        weather: [
+          { id: "PIT", integrity: integrityFor("fresh") },
+          { id: "AlleghenyUpper", integrity: integrityFor("fresh watershed") },
+        ],
+      }),
+    );
+
+    expect(await sw.entries.get(watershed)!.text()).toBe("fresh watershed");
+    expect(
+      sw.fetch.mock.calls.find(
+        ([request]) => sw.path(request) === watershed,
+      )?.[0],
+    ).toEqual(
+      expect.objectContaining({ integrity: integrityFor("fresh watershed") }),
+    );
+    expect(
+      sw.fetch.mock.calls.map(([request]) => sw.path(request)),
+    ).not.toContain(url);
   });
 
   it("never coalesces integrity-free prefetches or different build hashes", async () => {
@@ -363,51 +406,79 @@ describe("simulation data integrity", () => {
   });
 });
 
-describe("SYNC_OFFLINE_DATA", () => {
-  it.each(["network", "cache", "marker"])(
-    "retries a failed %s write/download even when the ordinary index is current",
+describe("SYNC_OFFICIAL_OFFLINE_DATA", () => {
+  const weather = [
+    { id: "PIT", integrity: integrityFor("fresh") },
+    { id: "AlleghenyUpper", integrity: integrityFor("watershed") },
+  ];
+  const sync = (sw: ReturnType<typeof dataWorker>) =>
+    Promise.all(sw.message({ type: "SYNC_OFFICIAL_OFFLINE_DATA", weather }));
+
+  it("caches official weather outside the city catalog and preserves selected custom weather", async () => {
+    const sw = dataWorker();
+    sw.entries.set("/data/weather/Paris.bin", response(true, "custom"));
+    sw.fetch.mockImplementation(async (request) => {
+      const path = sw.path(request);
+      if (path === "/data/weather/index.json")
+        return jsonResponse({ cities: { PIT: {}, Paris: {}, Tokyo: {} } });
+      return response(
+        true,
+        path === "/data/weather/AlleghenyUpper.bin" ? "watershed" : "fresh",
+      );
+    });
+    await sync(sw);
+    expect(await sw.entries.get("/data/weather/PIT.bin")?.text()).toBe("fresh");
+    expect(
+      await sw.entries.get("/data/weather/AlleghenyUpper.bin")?.text(),
+    ).toBe("watershed");
+    expect(await sw.entries.get("/data/weather/Paris.bin")?.text()).toBe(
+      "custom",
+    );
+    expect(sw.entries.has("/data/weather/Tokyo.bin")).toBe(false);
+    expect(sw.entries.has("/data/data-center-customers.json")).toBe(true);
+    expect(
+      sw.fetch.mock.calls.map(([request]) => sw.path(request)),
+    ).not.toContain("/data/weather/Paris.bin");
+  });
+
+  it.each(["network", "cache", "integrity"])(
+    "retries a failed %s refresh and reuses matching offline copies",
     async (failure) => {
       const sw = dataWorker();
-      const weather = "/data/weather/PIT.bin";
-      const index = JSON.stringify({ updated: "new", cities: { PIT: {} } });
-      sw.entries.set("/data/weather/index.json", response(true, index));
-      sw.entries.set(weather, response(true, "old"));
+      const pit = "/data/weather/PIT.bin";
+      sw.entries.set(pit, response(true, "old"));
+      sw.entries.set(
+        "/data/weather/AlleghenyUpper.bin",
+        response(true, "watershed"),
+      );
       let failing = true;
       sw.fetch.mockImplementation(async (request) => {
-        const path = sw.path(request);
-        if (path === "/data/weather/index.json") return response(true, index);
-        if (path === weather && failing && failure === "network")
-          throw new Error("offline");
-        return response(true, "fresh");
+        if (sw.path(request) !== pit) return response();
+        if (failing && failure === "network") throw new Error("offline");
+        return response(
+          true,
+          failing && failure === "integrity" ? "wrong" : "fresh",
+        );
       });
       const durablePut = sw.put.getMockImplementation()!;
       sw.put.mockImplementation(
         async (request: FetchRequest, value: WorkerResponse) => {
-          if (
-            failing &&
-            ((failure === "cache" && sw.path(request) === weather) ||
-              (failure === "marker" &&
-                sw.path(request) === "/__offline-data-revision"))
-          )
+          if (failing && failure === "cache" && sw.path(request) === pit)
             throw new Error("quota");
           return durablePut(request, value);
         },
       );
-      await Promise.all(sw.message({ type: "SYNC_OFFLINE_DATA" }));
-      expect(sw.entries.has("/__offline-data-revision")).toBe(false);
-      expect(await sw.entries.get(weather)!.text()).toBe(
-        failure === "marker" ? "fresh" : "old",
-      );
+      await sync(sw);
+      expect(await sw.entries.get(pit)!.text()).toBe("old");
       failing = false;
-      await Promise.all(sw.message({ type: "SYNC_OFFLINE_DATA" }));
-      expect(await sw.entries.get(weather)!.text()).toBe("fresh");
+      await sync(sw);
+      expect(await sw.entries.get(pit)!.text()).toBe("fresh");
+      await sync(sw);
       expect(
-        sw.fetch.mock.calls.filter(([request]) => sw.path(request) === weather),
-      ).toHaveLength(2);
-      await Promise.all(sw.message({ type: "SYNC_OFFLINE_DATA" }));
-      expect(
-        sw.fetch.mock.calls.filter(([request]) => sw.path(request) === weather),
-      ).toHaveLength(2);
+        sw.fetch.mock.calls
+          .map(([request]) => sw.path(request))
+          .filter((path) => path.endsWith(".bin")),
+      ).toEqual([pit, pit]);
     },
   );
 });
@@ -810,7 +881,7 @@ it("prepares every shipped audio file for offline play even before sound has bee
       ? jsonResponse({ cities: {} })
       : response(),
   );
-  await Promise.all(sw.message({ type: "SYNC_OFFLINE_DATA" }));
+  await Promise.all(sw.message({ type: "SYNC_OFFICIAL_OFFLINE_DATA" }));
   const audio = readdirSync(resolve(process.cwd(), "public/audio"), {
     recursive: true,
   }) as string[];
@@ -839,8 +910,7 @@ it("retries an incomplete offline audio cache and does not re-download stored tr
     if (sw.path(request) === missing) throw new Error("offline");
     return response();
   });
-  await Promise.all(sw.message({ type: "SYNC_OFFLINE_DATA" }));
-  expect(sw.entries.has("/__offline-data-revision")).toBe(false);
+  await Promise.all(sw.message({ type: "SYNC_OFFICIAL_OFFLINE_DATA" }));
   expect(sw.entries.has(missing)).toBe(false);
   expect(sw.entries.has("/audio/basic/high.mp3")).toBe(true);
   sw.fetch.mockImplementation(async (request) =>
@@ -848,9 +918,8 @@ it("retries an incomplete offline audio cache and does not re-download stored tr
       ? jsonResponse({ cities: {} })
       : response(),
   );
-  await Promise.all(sw.message({ type: "SYNC_OFFLINE_DATA" }));
+  await Promise.all(sw.message({ type: "SYNC_OFFICIAL_OFFLINE_DATA" }));
   expect(sw.entries.has(missing)).toBe(true);
-  expect(sw.entries.has("/__offline-data-revision")).toBe(true);
   expect(
     sw.fetch.mock.calls.filter(
       ([request]) => sw.path(request) === "/audio/basic/high.mp3",
