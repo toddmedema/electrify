@@ -10,6 +10,12 @@ for the twelve days a year the game actually simulates, packed into about 66KB, 
 offshore wind. Whichever cities have been downloaded are exactly the ones the custom game screen
 offers - `public/data/weather/index.json` is written by the same script and is what the picker reads.
 
+Installed web apps prepare weather for every official scenario, including tutorials, the
+Legacy campaign, and each scenario’s separate watershed when it has one. Selecting a
+custom location lets the app download its weather on demand. While offline, custom setup
+shows uncached locations as disabled and uses the current build’s weather records for the
+locations still available to play.
+
 ```sh
 npm run fetch-weather -- --list
 ```

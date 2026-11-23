@@ -7,14 +7,19 @@ type Listener = () => void;
 
 function fakeWindow({
   installed = false,
-  registration = Promise.resolve({}),
+  registration,
 }: { installed?: boolean; registration?: Promise<unknown> } = {}) {
   const postMessage = jest.fn();
-  const register = jest.fn(() => registration);
-  const serviceWorker = {
-    register,
-    ready: Promise.resolve({ active: { postMessage } }),
+  const registrationListeners = new Map<string, Listener>();
+  const workers = {
+    active: { postMessage },
+    waiting: null as { postMessage: jest.Mock } | null,
+    installing: null as { postMessage: jest.Mock } | null,
+    addEventListener: (name: string, listener: Listener) =>
+      registrationListeners.set(name, listener),
   };
+  const register = jest.fn(() => registration ?? Promise.resolve(workers));
+  const serviceWorker = { register, ready: Promise.resolve(workers) };
   const listeners = new Map<string, Listener[]>();
   const win = {
     navigator: { serviceWorker },
@@ -39,6 +44,8 @@ function fakeWindow({
     win: win as unknown as Window,
     register,
     postMessage,
+    workers,
+    fireRegistration: (name: string) => registrationListeners.get(name)?.(),
     fire: (name: string) => listeners.get(name)?.forEach((l) => l()),
     restore: () =>
       Object.defineProperty(navigator, "serviceWorker", {
@@ -125,11 +132,11 @@ describe("registerServiceWorker", () => {
     expect(messageTypes(sw.postMessage)).toEqual([
       "CACHE_BUILD",
       "CACHE_ICONS",
-      "SYNC_OFFLINE_DATA",
+      "SYNC_OFFICIAL_OFFLINE_DATA",
     ]);
   });
 
-  it("also syncs every weather location for an installed app", async () => {
+  it("sends the installed app the shipped hashes for official scenario weather", async () => {
     const sw = fakeWindow({ installed: true });
     restore = sw.restore;
 
@@ -141,8 +148,50 @@ describe("registerServiceWorker", () => {
     expect(messageTypes(sw.postMessage).sort()).toEqual([
       "CACHE_BUILD",
       "CACHE_ICONS",
-      "SYNC_OFFLINE_DATA",
+      "SYNC_OFFICIAL_OFFLINE_DATA",
     ]);
+    const { weather } = sw.postMessage.mock.calls.find(
+      ([message]) => message.type === "SYNC_OFFICIAL_OFFLINE_DATA",
+    )![0];
+    expect(weather).toEqual(
+      expect.arrayContaining([
+        { id: "PIT", integrity: expect.stringMatching(/^sha256-/) },
+        { id: "AlleghenyUpper", integrity: expect.stringMatching(/^sha256-/) },
+        { id: "BurlingtonVT", integrity: expect.stringMatching(/^sha256-/) },
+        { id: "Kyiv", integrity: expect.stringMatching(/^sha256-/) },
+      ]),
+    );
+    expect(weather).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: "Tokyo" })]),
+    );
+  });
+
+  it("warms waiting and newly installing workers during an update", async () => {
+    const sw = fakeWindow({ installed: true });
+    restore = sw.restore;
+    const waiting = { postMessage: jest.fn() };
+    const installing = { postMessage: jest.fn() };
+    sw.workers.waiting = waiting;
+    registerServiceWorker(sw.win);
+    await flush();
+    jest.advanceTimersByTime(BACKGROUND_CACHE_DELAY_MS);
+    await flush();
+
+    expect(messageTypes(sw.postMessage)).toEqual([
+      "CACHE_BUILD",
+      "CACHE_ICONS",
+    ]);
+    expect(messageTypes(waiting.postMessage)).toEqual([
+      "SYNC_OFFICIAL_OFFLINE_DATA",
+    ]);
+
+    sw.workers.installing = installing;
+    sw.fireRegistration("updatefound");
+    await flush();
+    expect(messageTypes(installing.postMessage)).toEqual([
+      "SYNC_OFFICIAL_OFFLINE_DATA",
+    ]);
+    expect(waiting.postMessage).toHaveBeenCalledTimes(1);
   });
 
   it("caches audio and data immediately when this session installs, and retries on reconnection", async () => {
@@ -152,11 +201,15 @@ describe("registerServiceWorker", () => {
     await flush();
     sw.fire("appinstalled");
     await flush();
-    expect(messageTypes(sw.postMessage)).toContain("SYNC_OFFLINE_DATA");
+    expect(messageTypes(sw.postMessage)).toContain(
+      "SYNC_OFFICIAL_OFFLINE_DATA",
+    );
     sw.postMessage.mockClear();
     sw.fire("online");
     await flush();
-    expect(messageTypes(sw.postMessage)).toContain("SYNC_OFFLINE_DATA");
+    expect(messageTypes(sw.postMessage)).toContain(
+      "SYNC_OFFICIAL_OFFLINE_DATA",
+    );
   });
 
   it("re-requests icons when connectivity returns", async () => {
