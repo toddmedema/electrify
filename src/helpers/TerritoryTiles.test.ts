@@ -1,3 +1,6 @@
+import { tileConnectionDuration } from "./TerritoryConnections";
+import { MINUTES_PER_MONTH } from "./DateTime";
+import { runMonths } from "../testing/SimulationTestHelpers";
 import cloneDeep from "lodash.clonedeep";
 import { LOCATIONS } from "../Constants";
 import { GENERATORS, STORAGE } from "../data/Facilities";
@@ -205,6 +208,7 @@ it("retains the territory build API while requiring each new physical cell to be
         quoteKey: next.quoteKey,
       }),
     ).toBe(true);
+    runMonths(game, next.buildMonths);
     game = cloneDeep(
       reducer(
         game,
@@ -515,6 +519,9 @@ it("retains Enhanced Geothermal on its paid named site without permitting a new 
     ).toBe(true);
   }
   expect(ownsTerritoryTile(game, tile)).toBe(true);
+  tickState(game);
+  runMonths(game, tileConnectionDuration(game.difficulty) / MINUTES_PER_MONTH);
+  tickState(game);
   const quote = GENERATORS(
     { ...game, date: { ...game.date, year: 2030 } },
     10e6,

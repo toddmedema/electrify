@@ -455,6 +455,8 @@ const migrations: readonly Migration[] = [
       },
     };
   },
+  // 25 -> 26: dated construction is optional. Existing tile receipts remain energized.
+  (save) => save,
 ];
 
 /** Structure versions are independent of app releases and simulation compatibility. */

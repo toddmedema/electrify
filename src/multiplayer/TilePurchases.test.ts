@@ -134,14 +134,16 @@ it.each([
 it("accepts unchanged land quotes after a host clock tick and rejects real CPI repricing", () => {
   const world = ready();
   buyToward(world, "0", "green-uplands:site-4");
+  startClock(world);
+  while (world.grids[0].date.monthsElapsed < 2) stepWorld(world);
+  const purchaseMinute = world.grids[0].date.minute;
   const offer = tilePurchaseQuote(
     roomView(world, "0").game!,
     "green-uplands:site-0",
   )!;
   const city = acquisitionQuote(roomView(world, "0").game!, "parcel-1")!;
-  startClock(world);
   stepWorld(world);
-  expect(world.grids[0].date.minute).toBe(TICK_MINUTES);
+  expect(world.grids[0].date.minute).toBe(purchaseMinute + TICK_MINUTES);
   expect(
     tilePurchaseQuote(roomView(world, "0").game!, offer.tileId)!.price,
   ).toBe(offer.price);
@@ -162,7 +164,10 @@ it("accepts unchanged land quotes after a host clock tick and rejects real CPI r
     "green-uplands:site-2",
   )!;
   world.grids.forEach((grid) => {
-    grid.date = getDateFromMinute(MINUTES_PER_MONTH, grid.startingYear);
+    grid.date = getDateFromMinute(
+      purchaseMinute + MINUTES_PER_MONTH,
+      grid.startingYear,
+    );
   });
   expect(
     tilePurchaseQuote(roomView(world, "0").game!, next.tileId)!.price,
@@ -243,12 +248,14 @@ it("reveals connected peer land but requires each company's own physical path fo
   future.grids[0].territoryNetwork.tilePurchases[0].minute = 2 * TICK_MINUTES;
   expect(() => restoreWorld(future, "future-anchor")).toThrow();
   future.grids[0].territoryNetwork.tilePurchases.forEach(
-    (receipt: { minute: number }) => {
+    (receipt: { minute: number; connectionMinute: number }) => {
+      receipt.connectionMinute = 2 * (MINUTES_PER_MONTH + TICK_MINUTES);
       receipt.minute = 2 * TICK_MINUTES;
     },
   );
   future.grids[1].territoryNetwork.tilePurchases.forEach(
-    (receipt: { minute: number }) => {
+    (receipt: { minute: number; connectionMinute: number }) => {
+      receipt.connectionMinute = 2 * (MINUTES_PER_MONTH + TICK_MINUTES);
       receipt.minute = 2 * TICK_MINUTES;
     },
   );
@@ -438,6 +445,8 @@ it.each([
 it("rejects stale, unaffordable and duplicate city claims without duplicate customer credit", () => {
   const world = ready();
   buyToward(world, "0", "green-uplands:site-4");
+  startClock(world);
+  while (world.grids[0].date.monthsElapsed < 2) stepWorld(world);
   const game = world.grids[0];
   const quote = acquisitionQuote(game, "parcel-1")!;
   const before = JSON.stringify(world.grids);

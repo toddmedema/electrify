@@ -1,3 +1,5 @@
+import cloneDeep from "lodash.clonedeep";
+import { runMonths } from "../../testing/SimulationTestHelpers";
 import * as React from "react";
 import {
   act,
@@ -136,7 +138,7 @@ it("explores two sites with the selected size and spends with one cash action af
   const cash = currentTick(game)!.cash;
   choose();
   fireEvent.click(screen.getByRole("button", { name: "Adjacent site" }));
-  expect(screen.getByText("Estimated online")).toBeVisible();
+  expect(screen.getByText("Estimated build cost")).toBeVisible();
   expect(screen.getByRole("heading", { name: "Wind · 20MW" })).toBeVisible();
   fireEvent.click(screen.getByRole("button", { name: "Owned site" }));
   expect(screen.getByRole("heading", { name: "Wind · 20MW" })).toBeVisible();
@@ -153,8 +155,9 @@ it("explores two sites with the selected size and spends with one cash action af
   ).toMatchObject({ name: "Wind", peakW: 20e6 });
 });
 it("rejects a payment when cash changed after the displayed quote", () => {
-  const { store, adjacent } = show();
-  adjacent();
+  const { store, choose } = show();
+  choose();
+  fireEvent.click(screen.getByRole("button", { name: "Owned site" }));
   const newer = JSON.parse(JSON.stringify(store.getState().game)) as GameType;
   currentTick(newer)!.cash -= 1;
   const pay = screen.getByRole("button", { name: "Cash" });
@@ -171,7 +174,7 @@ it("rejects a payment when cash changed after the displayed quote", () => {
   );
   expect(screen.getByRole("button", { name: "Cash" })).toBeEnabled();
 });
-it("locks repeated confirmation and waits for host ownership before building", async () => {
+it("locks repeated Connect and requires a separate payment after energization", async () => {
   const { store, adjacent, close, game } = show(true);
   const commands: Command[] = [];
   runtime(async (command) => {
@@ -182,7 +185,7 @@ it("locks repeated confirmation and waits for host ownership before building", a
       );
   });
   adjacent();
-  const confirm = screen.getByRole("button", { name: "Cash" });
+  const confirm = screen.getByRole("button", { name: /^Connect ·/ });
   fireEvent.click(confirm);
   fireEvent.click(confirm);
   await act(async () => {
@@ -198,6 +201,21 @@ it("locks repeated confirmation and waits for host ownership before building", a
       acquireTile(connect.payload as Parameters<typeof acquireTile>[0]),
     );
   });
+  expect(
+    await screen.findByText(/Connection under construction/),
+  ).toBeVisible();
+  expect(
+    screen.queryByRole("button", { name: "Cash" }),
+  ).not.toBeInTheDocument();
+  expect(commands).toHaveLength(1);
+  const connected = cloneDeep(store.getState().game);
+  runMonths(connected, 2);
+  act(() => {
+    store.dispatch(replace(connected));
+  });
+  const pay = screen.getByRole("button", { name: "Cash" });
+  await waitFor(() => expect(pay).toBeEnabled());
+  fireEvent.click(pay);
   await waitFor(() => expect(close).toHaveBeenCalledTimes(1));
   expect(commands).toHaveLength(2);
   expect(
@@ -208,79 +226,13 @@ it("locks repeated confirmation and waits for host ownership before building", a
       ),
   ).toMatchObject({ name: "Wind", peakW: 20e6 });
 });
-it("requires another build action if a settlement changes cash during connection", async () => {
-  const { store, adjacent, game } = show(true);
-  const submit = jest.fn(async (command: Command) => {
-    if (command.kind !== "action" || command.name !== "acquireTile")
-      throw new Error("Construction started before the second payment action.");
-    store.dispatch(
-      acquireTile(command.payload as Parameters<typeof acquireTile>[0]),
-    );
-    const settled = JSON.parse(
-      JSON.stringify(store.getState().game),
-    ) as GameType;
-    currentTick(settled)!.cash -= 1;
-    store.dispatch(replace(settled));
-  });
-  runtime(submit);
-  adjacent();
-  fireEvent.click(screen.getByRole("button", { name: "Cash" }));
-  expect(
-    await screen.findByText(/Site connected. Construction did not start/),
-  ).toBeVisible();
-  expect(ownsTerritoryTile(store.getState().game, "green-uplands:site-1")).toBe(
-    true,
-  );
-  expect(store.getState().game.facilities).toHaveLength(game.facilities.length);
-  expect(submit).toHaveBeenCalledTimes(1);
-  expect(screen.getByRole("button", { name: "Cash" })).toBeEnabled();
-});
-it("preserves partial success and retries the build without charging another connection", async () => {
-  const { store, adjacent, close, game } = show(true);
-  let rejectBuild = true;
-  const commands: Command[] = [];
-  runtime(async (command) => {
-    commands.push(command);
-    if (command.kind !== "action") return;
-    if (command.name === "acquireTile")
-      store.dispatch(
-        acquireTile(command.payload as Parameters<typeof acquireTile>[0]),
-      );
-    if (command.name === "buildFacility") {
-      if (rejectBuild) throw new Error("Host rejected construction.");
-      store.dispatch(
-        buildFacility(command.payload as Parameters<typeof buildFacility>[0]),
-      );
-    }
-  });
-  adjacent();
-  fireEvent.click(screen.getByRole("button", { name: "Cash" }));
-  await waitFor(() =>
-    expect(
-      screen.getByText(/Site connected. Construction did not start/),
-    ).toBeVisible(),
-  );
-  expect(ownsTerritoryTile(store.getState().game, "green-uplands:site-1")).toBe(
-    true,
-  );
-  expect(store.getState().game.facilities).toHaveLength(game.facilities.length);
-  rejectBuild = false;
-  fireEvent.click(screen.getByRole("button", { name: "Cash" }));
-  await waitFor(() => expect(close).toHaveBeenCalledTimes(1));
-  expect(
-    commands.filter(
-      (command) => command.kind === "action" && command.name === "acquireTile",
-    ),
-  ).toHaveLength(1);
-  expect(store.getState().game.territoryNetwork!.tilePurchases).toHaveLength(1);
-});
 it("keeps a rejected connection unowned with the project available for review", async () => {
   const { store, adjacent } = show(true);
   runtime(async () => {
     throw new Error("Another utility claimed this site.");
   });
   adjacent();
-  fireEvent.click(screen.getByRole("button", { name: "Cash" }));
+  fireEvent.click(screen.getByRole("button", { name: /^Connect ·/ }));
   await waitFor(() =>
     expect(
       screen.getByText("Another utility claimed this site."),
@@ -291,7 +243,7 @@ it("keeps a rejected connection unowned with the project available for review", 
   );
   expect(screen.getByRole("heading", { name: "Wind · 20MW" })).toBeVisible();
 });
-it("shows a combined cash shortfall and charging requirements for storage", () => {
+it("shows a construction cash shortfall and charging requirements for storage", () => {
   const { store } = show(false, 2031);
   fireEvent.click(screen.getByRole("tab", { name: "Storage" }));
   fireEvent.click(
@@ -315,7 +267,7 @@ it("cancels the pending project continuation when the run changes", async () => 
     commands.push(command);
   });
   adjacent();
-  fireEvent.click(screen.getByRole("button", { name: "Cash" }));
+  fireEvent.click(screen.getByRole("button", { name: /^Connect ·/ }));
   await act(async () => {
     await Promise.resolve();
   });
@@ -347,7 +299,7 @@ it("corrects an oversized technology to the map's terrain maximum before choosin
   ).not.toBeInTheDocument();
   expect(screen.getByRole("alert")).toHaveTextContent("No sites available");
   fireEvent.click(screen.getByRole("button", { name: "Ridge site" }));
-  expect(screen.getByRole("button", { name: "Cash" })).toBeEnabled();
+  expect(screen.getByRole("button", { name: /^Connect ·/ })).toBeEnabled();
   expect(currentTick(store.getState().game)!.cash).toBe(
     currentTick(game)!.cash,
   );

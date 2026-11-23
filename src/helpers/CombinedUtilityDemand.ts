@@ -16,7 +16,8 @@ export interface CombinedUtilityDemandProfile {
  * The single evolving customer count and Burlington weather are applied by the demand owner.
  */
 export function combinedUtilityDemandProfile(
-  game: Pick<GameType, "utilityExpansion" | "territoryNetwork" | "seed">,
+  game: Pick<GameType, "utilityExpansion" | "territoryNetwork" | "seed"> &
+    Partial<Pick<GameType, "date">>,
 ): CombinedUtilityDemandProfile {
   const owned = new Set(
     game.utilityExpansion?.acquisitions.map(({ targetId }) => targetId),

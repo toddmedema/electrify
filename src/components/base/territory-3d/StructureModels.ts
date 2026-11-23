@@ -386,38 +386,64 @@ function city(
   return model(key, body, switchgear(body, 0.27));
 }
 
-function tower(): MapModel {
+const towerConstructionStages = 16;
+
+export function getTowerConstructionModel(progress: number): MapModel {
+  const stage = Math.floor(
+    Math.max(0, Math.min(1, progress)) * towerConstructionStages,
+  );
+  const key = `tower:construction:${stage}`;
+  const cached = models.get(key);
+  if (cached) return cached;
+  const result = tower(stage / towerConstructionStages, key);
+  models.set(key, result);
+  return result;
+}
+
+function tower(progress = 1, key = "tower"): MapModel {
   const body = new MeshBuilder();
+  const height = 0.29 * progress;
+  const steel = P.steelShade;
   for (const x of [-1, 1])
-    for (const z of [-1, 1])
-      body.beam(
-        [x * 0.045, 0, z * 0.025],
-        [x * 0.017, 0.29, z * 0.012],
-        0.006,
-        P.steelShade,
-      );
+    for (const z of [-1, 1]) {
+      body.box([x * 0.045, 0.008, z * 0.025], [0.024, 0.016, 0.024], P.rock);
+      if (height > 0)
+        body.beam(
+          [x * 0.045, 0, z * 0.025],
+          [
+            x * (0.045 - progress * 0.028),
+            height,
+            z * (0.025 - progress * 0.013),
+          ],
+          0.006,
+          steel,
+        );
+    }
   for (const y of [0.09, 0.18]) {
+    if (height <= y) break;
     const width = 0.045 - y * 0.095;
-    body.beam(
-      [-width, y, 0.018],
-      [width, y + 0.075, 0.014],
-      0.0035,
-      P.steelShade,
-    );
-    body.beam(
-      [width, y, 0.018],
-      [-width, y + 0.075, 0.014],
-      0.0035,
-      P.steelShade,
-    );
+    const ratio = Math.min(1, (height - y) / 0.075);
+    for (const side of [-1, 1])
+      body.beam(
+        [side * width, y, 0.018],
+        [
+          side * width * (1 - 2 * ratio),
+          y + 0.075 * ratio,
+          0.018 - 0.004 * ratio,
+        ],
+        0.0035,
+        steel,
+      );
   }
-  body.box([0, 0.245, 0], [0.17, 0.012, 0.016], P.steelShade);
   const terminals: Vec3[] = [];
-  for (const x of [-0.08, 0.08]) {
-    body.cylinder([x, 0.251, 0], 0.009, 0.009, 0.018, P.steel);
-    terminals.push([x, 0.269, 0]);
+  if (height >= 0.269) {
+    body.box([0, 0.245, 0], [0.17, 0.012, 0.016], steel);
+    for (const x of [-0.08, 0.08]) {
+      body.cylinder([x, 0.251, 0], 0.009, 0.009, 0.018, P.steel);
+      terminals.push([x, 0.269, 0]);
+    }
   }
-  return model("tower", body, terminals);
+  return model(key, body, terminals);
 }
 
 const shatteredBacking = rgb("#192b38");

@@ -14,6 +14,10 @@ import {
   createTerritoryTileOwnership,
 } from "./TerritoryTiles";
 import { municipalUtilityAt } from "../data/MunicipalUtilities";
+import {
+  pendingTileConnections,
+  type TileConnection,
+} from "./TerritoryConnections";
 import { createTilePurchaseEligibility } from "./Territories";
 import {
   readTerritoryDisasters,
@@ -42,6 +46,7 @@ export interface TerritoryTileView {
   ownerName: string;
   owned: boolean;
   developed: boolean;
+  connection?: TileConnection;
   facility?: TileFacilityView;
   operatingFacility?: FacilityOperatingType;
   connectable?: boolean;
@@ -54,6 +59,7 @@ export interface TerritoryTileView {
 export function territoryTileViews(game: GameType): TerritoryTileView[] {
   const readDisaster = readTerritoryDisasters(game);
   const owns = createTerritoryTileOwnership(game);
+  const pending = pendingTileConnections(game);
   const connectable = createTilePurchaseEligibility(game, owns);
   const facilities = new Map<
     TerritoryTileView["tile"]["id"],
@@ -82,6 +88,11 @@ export function territoryTileViews(game: GameType): TerritoryTileView[] {
       (isLandTerritoryId(tile.territoryId)
         ? game.multiplayer?.landOwners?.[tile.territoryId]
         : undefined);
+    const connection = isOwned
+      ? pending.get(tile.id)
+      : !retainedClaim && claim
+        ? game.multiplayer?.tileOwners?.[tile.id]?.connection
+        : undefined;
     const municipal = !isOwned && !claim ? municipalUtilityAt(tile) : undefined;
     const acquisitionId =
       !isOwned && !claim
@@ -140,7 +151,8 @@ export function territoryTileViews(game: GameType): TerritoryTileView[] {
       ownerKey,
       ownerName,
       owned: isOwned,
-      developed: !!ownerKey,
+      developed: !!ownerKey && !connection,
+      connection,
       facility,
       operatingFacility,
       disaster: readDisaster(tile, operatingFacility),

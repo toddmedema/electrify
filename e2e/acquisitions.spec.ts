@@ -42,6 +42,7 @@ import {
   returnToTerritoryMap,
   selectTerritoryMapTile,
   setMapProjectCapacity,
+  waitForTileConnection,
 } from "./layout";
 import { editSavedGame, readSavedGame, readSaveRecords } from "./save-fixture";
 
@@ -133,6 +134,7 @@ async function inspectTile(page: Page, tile: TerritoryTileDefinition) {
   if (
     (await buildRail(page).isVisible()) &&
     (await target.getAttribute("data-owned")) === "true" &&
+    (await target.getAttribute("data-connection-building")) !== "true" &&
     (await surface
       .getByRole("heading", { name: TERRAIN_LABELS[tile.terrain], exact: true })
       .count())
@@ -1442,8 +1444,7 @@ for (const theme of ["light", "dark"] as const) {
       }),
     ).toBeEnabled();
     await surface.getByRole("button", { name: /^Connect ·/ }).click();
-    await openLockedBuild(surface);
-    await expect(surface.locator(".tileWorkspaceHeading h3")).toBeFocused();
+    await expect(surface).toContainText("Connection under construction");
     const owned = (await readSavedGame(page))!;
     expect(currentTick(owned)!.cash).toBeCloseTo(
       currentTick(before)!.cash - quote.price,
@@ -1468,6 +1469,8 @@ for (const theme of ["light", "dark"] as const) {
     await page.getByRole("button", { name: "Continue", exact: true }).click();
     await openMap(page);
     await inspectTile(page, tile);
+    await waitForTileConnection(page, tile.id);
+    const commissioned = (await readSavedGame(page))!;
     await openLockedBuild(surface);
     const review = await reviewTileBuild(page, "Wind");
     await expectDialogToFit(review);
@@ -1484,15 +1487,15 @@ for (const theme of ["light", "dark"] as const) {
         peakW: 20e6,
       }),
     );
-    loadSimData(owned.location);
+    loadSimData(commissioned.location);
     const buildQuote = getBuildFacilityQuote(
-      owned,
+      commissioned,
       plant,
       tile.territoryId,
       tile.id,
     )!;
     expect(currentTick(built)!.cash).toBeCloseTo(
-      currentTick(owned)!.cash - buildQuote.buildCost,
+      currentTick(commissioned)!.cash - buildQuote.buildCost,
       1,
     );
     await expect(surface.locator(".facilityDetails")).toBeVisible();
@@ -1707,7 +1710,7 @@ for (const theme of ["light", "dark"] as const) {
       .toBe(0);
     await expect(
       network.getByRole("status", { name: "Connection result" }),
-    ).toContainText("Site connected");
+    ).toContainText("Connection construction started");
     await expect(
       network.getByRole("status", { name: "Connection result" }),
     ).toContainText(
@@ -1800,6 +1803,12 @@ for (const theme of ["light", "dark"] as const) {
     await page.goto("/");
     await page.getByRole("button", { name: "Continue", exact: true }).click();
     const map = await openMap(page);
+    await selectTerritoryMapTile(
+      page,
+      getTerritoryTile("green-uplands:site-5")!,
+    );
+    await waitForTileConnection(page, "green-uplands:site-5");
+    await closeTileSurface(tileSurface(page));
     const before = (await readSavedGame(page))!;
     loadSimData(before.location);
     expect(isAdjacentToOwnedTerritoryTile(before, city)).toBe(false);
@@ -1868,9 +1877,9 @@ for (const theme of ["light", "dark"] as const) {
     const saved = (await readSavedGame(page))!;
     expect(ownsTerritoryTile(saved, plant.id)).toBe(true);
     expect(ownsTerritoryTile(saved, city.id)).toBe(true);
-    expect(currentTick(saved)!.customers - currentTick(before)!.customers).toBe(
-      quote.customers,
-    );
+    expect(
+      currentTick(saved)!.customers - currentTick(before)!.customers,
+    ).toBeCloseTo(quote.customers, 8);
     expect(currentTick(saved)!.cash).toBeCloseTo(
       currentTick(before)!.cash -
         (financed ? quote.financedCashDue : quote.cashDue),
@@ -1922,6 +1931,7 @@ for (const theme of ["light", "dark"] as const) {
       }
       const surface = await inspectTile(page, tile);
       await surface.getByRole("button", { name: /^Connect ·/ }).click();
+      await waitForTileConnection(page, tile.id);
       await openLockedBuild(surface);
       const plant = await reviewTileBuild(page, resource.name);
       await expectDialogToFit(plant);

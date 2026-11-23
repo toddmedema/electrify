@@ -21,6 +21,7 @@ import {
 import { HEX_NEIGHBORS, riverPorts } from "../TerritoryHexGeometry";
 import type { HexWire } from "../TerritoryHexGeometry";
 import { hailModel } from "./Hailstones";
+import { getTowerConstructionModel } from "./StructureModels";
 import { MeshBuilder } from "./MeshBuilder";
 import { PALETTE } from "./Palette";
 import { CAMERA_COS, CAMERA_SIN, tilePosition3D } from "./Projection";
@@ -165,7 +166,10 @@ export function structureKind(
   if (facility?.fuel === "Sun" && view.disaster?.hail)
     return "solar-hail-damaged";
   if (facility?.fuel) return fuelModels[facility.fuel];
-  if (!view.developed || ["river", "lake", "ocean"].includes(view.tile.terrain))
+  if (
+    (!view.developed && !view.connection) ||
+    ["river", "lake", "ocean"].includes(view.tile.terrain)
+  )
     return undefined;
   return "tower";
 }
@@ -354,8 +358,16 @@ export class SceneBuilder {
         view.facility && !tile.city && view.operatingFacility
           ? facilityOperatingStatus(view.operatingFacility, minute)
           : facilityMapStatus(view, minute);
+      const connection = view.connection;
       const displayedModel =
-          status?.kind === "construction" ? underConstruction(model) : model,
+          kind === "tower" && connection
+            ? getTowerConstructionModel(
+                (minute - connection.startedMinute) /
+                  (connection.towerMinute - connection.startedMinute),
+              )
+            : status?.kind === "construction"
+              ? underConstruction(model)
+              : model,
         producing = status?.kind === "producing",
         active = producing || status?.kind === "charging",
         motionKey = view.operatingFacility

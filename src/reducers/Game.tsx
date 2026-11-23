@@ -15,6 +15,7 @@ import {
   legacyTerritoryConnections,
   purchaseLand,
   purchaseTile,
+  energizeTileCustomers,
 } from "../helpers/Territories";
 import { isTerritoryId } from "../data/Territories";
 import type { TerritoryId } from "../Types";
@@ -4524,7 +4525,11 @@ function adoptTickWorkingState(
     working.monthlyHistory = snapshot.monthlyHistory;
     if (working.date.minute === snapshot.date.minute)
       working.worldEvents = snapshot.worldEvents;
-    if (snapshot.policies) working.policies = snapshot.policies;
+    if (
+      snapshot.policies &&
+      working.customerMarketSize === snapshot.customerMarketSize
+    )
+      working.policies = snapshot.policies;
   }
   if (snapshot.blackout && !working.blackout) delete draft.blackout;
   // Compare against the plain snapshot so unchanged fields never enter Immer's set trap.
@@ -4638,6 +4643,22 @@ export function* tickStatePhases(
       repowerEmissions,
       true,
     );
+    const rollingOver = completedMonthCount(state) < state.date.monthsElapsed;
+    if (!rollingOver) {
+      const customers = energizeTileCustomers(state);
+      if (customers) {
+        now.customers += customers;
+        rebaseGameRetentionBaseline(state, expansionRetentionBaseline(state));
+        state.timeline = reforecastDemand(state, 1, [], [], undefined, true);
+        state.timeline = reforecastSupply(
+          state,
+          true,
+          TICK_MINUTES,
+          undefined,
+          true,
+        );
+      }
+    }
     desktopSimulationHooks()?.tick(state, now);
     logWeatherRepairsCompleted(state);
     if (fireHit)
@@ -4716,7 +4737,7 @@ export function* tickStatePhases(
     // One row per completed month is both the rollover signal and the persisted checkpoint. It
     // avoids module-level calendar state leaking between concurrent simulations or a second game,
     // and unlike an empty sentinel it cannot count the opening forecast as completed history.
-    if (completedMonthCount(state) < state.date.monthsElapsed) {
+    if (rollingOver) {
       const { cash, customers } = now;
       state.customerRate = now.customerRate;
 
@@ -4732,6 +4753,9 @@ export function* tickStatePhases(
         ),
       );
       recordGameObjectiveMonth(state, history[0]);
+      const connectedCustomers = energizeTileCustomers(state);
+      if (connectedCustomers)
+        rebaseGameRetentionBaseline(state, expansionRetentionBaseline(state));
       // Reprice the company's credit off the year that just closed, before the forecast is built
       // against it. Operating results reprice monthly; new borrowing reprices immediately.
       refreshInterestRate(state, cash, now.netWorth);
@@ -4774,7 +4798,7 @@ export function* tickStatePhases(
       state.timeline = generateNewTimeline(
         state,
         cash + openingRuleTransactions(state),
-        customers,
+        customers + connectedCustomers,
       );
       resolveAutomaticScenarioChoices(state);
       logFuelPriceMoves(state, storyPriceFuels);
@@ -7384,7 +7408,8 @@ function* supplyFacilitiesFinancesPhases(
     const retention = Math.min(
       1,
       now.customers /
-        (scratch.retentionBaseline ?? expansionRetentionBaseline(state)),
+        (scratch.retentionBaseline ??
+          expansionRetentionBaseline(state, now.minute)),
     );
     state.utilityExpansion.networkAssets.forEach((asset) => {
       asset.retentionLowWatermark = Math.min(

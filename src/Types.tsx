@@ -1571,6 +1571,8 @@ export interface GameType {
       price: number;
       /** Hexes to the nearest owned city when quoted; absent for parcel-priced receipts. */
       connectionDistance?: number;
+      /** First minute with both a completed tower and a live route to the grid. */
+      connectionMinute?: number;
       /** Paid under the pre-adjacency visibility rule; new actions never create this marker. */
       legacy?: true;
     }[];
@@ -1600,7 +1602,14 @@ export interface GameType {
       };
     }[];
     tileOwners?: Partial<
-      Record<TerritoryTileId, { seat: string; name: string }>
+      Record<
+        TerritoryTileId,
+        {
+          seat: string;
+          name: string;
+          connection?: import("./helpers/TerritoryConnections").TileConnection;
+        }
+      >
     >;
     /** Visible foregrounds on claimed land and acquired utility tiles. */
     tileFacilities?: Partial<

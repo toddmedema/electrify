@@ -130,6 +130,10 @@ const parcelCheckpointLineages = [
     22,
     "coop-2-bddc08bd9f13d3fb912bccfa5401e85283039c61e31340ec6a252cd503884fef",
   ],
+  [
+    25,
+    "coop-2-165b41cf808b6f16d07c057c875ce7258bbdd83124e49b4443763d902d8a5fb1",
+  ],
 ] as const;
 
 it.each(parcelCheckpointLineages)(
@@ -142,6 +146,25 @@ it.each(parcelCheckpointLineages)(
     expect(buy(world, "1", "parcel-0")).toMatch(/owned/i);
     expect(currentTick(world.grids[1])!.cash).toBe(losingCash);
     expect(buy(world, "1", "parcel-2")).toBeUndefined();
+    const speedErrors = [];
+    if (schema === undefined) {
+      for (const seat of world.seats)
+        speedErrors.push(
+          applyCommand(world, seat.id, {
+            matchId: world.matchId,
+            epoch: world.epoch,
+            sequence: (world.sequences[seat.id] ?? 0) + 1,
+            command: { kind: "speed", speed: "FAST" },
+          }),
+        );
+      while (world.grids[0].date.monthsElapsed < 2) stepWorld(world);
+      for (const seat of world.seats) world.selectedSpeeds[seat.id] = "PAUSED";
+    } else {
+      for (const grid of world.grids)
+        for (const receipt of grid.territoryNetwork!.tilePurchases!)
+          delete receipt.connectionMinute;
+    }
+    expect(speedErrors.filter(Boolean)).toEqual([]);
     const quote = acquisitionQuote(roomView(world, "0").game!, "parcel-1")!;
     expect(acquireVergennes(world, "0", quote.quoteKey)).toBeUndefined();
     expect(roomView(world, "1").game!.multiplayer!.tileOwners).toMatchObject({
@@ -153,9 +176,10 @@ it.each(parcelCheckpointLineages)(
     if (schema !== undefined && rules !== undefined) {
       saved.gameSchema = schema;
       saved.rules = rules;
-      for (const [index, grid] of world.grids.entries())
-        saved.grids[index].objectiveProgress =
-          retiredValleyOpeningProgress(grid);
+      if (schema < 23)
+        for (const [index, grid] of world.grids.entries())
+          saved.grids[index].objectiveProgress =
+            retiredValleyOpeningProgress(grid);
     }
     if (schema === 22) {
       const site = VALLEY_BOARD.find(combustibleTile)!;

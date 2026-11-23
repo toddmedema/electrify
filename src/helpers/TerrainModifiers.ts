@@ -19,7 +19,7 @@ export function getTerrainModifiers(
   game: GameType,
   fuel: FuelNameType | undefined,
   tileId?: TerritoryTileId,
-): { onshoreWindSpeed: number; buildCost: number } {
+): { onshoreWindSpeed: number; buildCost: number; buildTime: number } {
   const terrain = hasTerritoryNetwork(game)
     ? getTerritoryTile(tileId, game)?.terrain
     : undefined;
@@ -29,7 +29,7 @@ export function getTerrainModifiers(
 export function terrainModifiers(
   terrain: TerrainType | undefined,
   fuel: FuelNameType | undefined,
-): { onshoreWindSpeed: number; buildCost: number } {
+): { onshoreWindSpeed: number; buildCost: number; buildTime: number } {
   const windSpeed =
     terrain === "forest"
       ? 0.95
@@ -49,6 +49,7 @@ export function terrainModifiers(
   return {
     onshoreWindSpeed: fuel === "Wind" ? windSpeed : 1,
     buildCost,
+    buildTime: terrain === "mountain" ? 1.5 : 1,
   };
 }
 

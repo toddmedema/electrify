@@ -450,3 +450,15 @@ export async function dragCoalAbovePumpedHydro(page: Page) {
     await page.mouse.up();
   }
 }
+
+/** Let a paid tile finish through the normal simulation clock. */
+export async function waitForTileConnection(page: Page, tileId: string) {
+  const tile = page.locator(`[data-map-target="${tileId}"]`);
+  await expect(tile).toHaveAttribute("data-connection-building", "true");
+  await page.getByRole("button", { name: "fast speed", exact: true }).click();
+  await expect(tile).toHaveAttribute("data-owned", "true");
+  await expect(tile).not.toHaveAttribute("data-connection-building", "true", {
+    timeout: 20_000,
+  });
+  await page.getByRole("button", { name: "pause", exact: true }).click();
+}
