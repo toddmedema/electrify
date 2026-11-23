@@ -75,7 +75,12 @@ function registerCrossplay(adminApp) {
         signaling.reap().catch(() => logger.warn("Co-op revocation retry")),
       audit: (event) => logger.info("Co-op control request", event),
     });
-    services = { service, signaling, isStopped };
+    services = {
+      service,
+      signaling,
+      isStopped,
+      reapCheckpoints: () => checkpoints.reap(bucket, service.loadRoom),
+    };
     return services;
   }
 
@@ -110,8 +115,13 @@ function registerCrossplay(adminApp) {
       },
       async () => {
         try {
-          const { signaling, isStopped } = initialize();
-          await signaling.reap({ all: await isStopped() });
+          const { signaling, isStopped, reapCheckpoints } = initialize();
+          const results = await Promise.allSettled([
+            signaling.reap({ all: await isStopped() }),
+            reapCheckpoints(),
+          ]);
+          if (results.some((operation) => operation.status === "rejected"))
+            logger.warn("Co-op scheduled cleanup needs retry");
         } catch {
           logger.warn("Co-op scheduled revocation needs retry");
         }

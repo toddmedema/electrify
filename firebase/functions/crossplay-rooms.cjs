@@ -216,6 +216,7 @@ function createRooms({ store, extensions = {}, onRoomChanged }) {
       authority: {
         epoch: room.epoch,
         binding: actor.binding,
+        presence: self.presence,
         hostBinding: host?.binding,
         leaseRemainingMs: isLive(room, now) ? room.leaseUntil - now : 0,
         head: room.head,
@@ -253,6 +254,7 @@ function createRooms({ store, extensions = {}, onRoomChanged }) {
           id: seat,
           account: actor.account,
           binding: actor.binding,
+          presence: randomUUID(),
           name: body.name,
           active: true,
           seenAt: now,
@@ -292,33 +294,40 @@ function createRooms({ store, extensions = {}, onRoomChanged }) {
     invalidInvite(found?.room);
     const id = found.room.id;
     await limit("room-invitations", id, 40);
-    await edit(id, actor, "invite", (room, self, now, projected) => {
-      invalidInvite(
-        !room.locked &&
-          room.rules === body.rules &&
-          isLive(projected, now) &&
-          room.invite?.expiresAt > now &&
-          [room.invite.codeHash, room.invite.linkHash].includes(digest),
-      );
-      if (self) return { value: null };
-      room.pending = room.pending.filter((entry) => entry.expiresAt > now);
-      const previous = room.pending.find(
-        ({ account }) => account === actor.account,
-      );
-      if (previous?.binding === actor.binding) return { value: null };
-      invalidInvite(previous || room.pending.length < 8);
-      room.pending = room.pending.filter(
-        ({ account }) => account !== actor.account,
-      );
-      room.pending.push({
-        id: randomUUID(),
-        account: actor.account,
-        binding: actor.binding,
-        name: body.name,
-        expiresAt: Math.min(room.invite.expiresAt, now + 5 * 60_000),
-      });
-      return { room };
-    });
+    const reclaim = await edit(
+      id,
+      actor,
+      "invite",
+      (room, self, now, projected) => {
+        invalidInvite(
+          !room.locked &&
+            room.rules === body.rules &&
+            isLive(projected, now) &&
+            room.invite?.expiresAt > now &&
+            [room.invite.codeHash, room.invite.linkHash].includes(digest),
+        );
+        if (self)
+          return { value: self.binding !== actor.binding || !self.active };
+        room.pending = room.pending.filter((entry) => entry.expiresAt > now);
+        const previous = room.pending.find(
+          ({ account }) => account === actor.account,
+        );
+        if (previous?.binding === actor.binding) return { value: null };
+        invalidInvite(previous || room.pending.length < 8);
+        room.pending = room.pending.filter(
+          ({ account }) => account !== actor.account,
+        );
+        room.pending.push({
+          id: randomUUID(),
+          account: actor.account,
+          binding: actor.binding,
+          name: body.name,
+          expiresAt: Math.min(room.invite.expiresAt, now + 5 * 60_000),
+        });
+        return { room };
+      },
+    );
+    if (reclaim) return reconnect(id, actor, { roomId: id, rules: body.rules });
     return response(id, actor);
   }
 
@@ -394,6 +403,7 @@ function createRooms({ store, extensions = {}, onRoomChanged }) {
         forgetPair(room, self.id);
       }
       member.binding = actor.binding;
+      member.presence = randomUUID();
       member.seenAt = now;
       member.active = true;
       return { room, guard };
@@ -424,6 +434,7 @@ function createRooms({ store, extensions = {}, onRoomChanged }) {
           id: approvedId,
           account: pending.account,
           binding: pending.binding,
+          presence: randomUUID(),
           name: pending.name,
           seenAt: now,
           active: true,
@@ -553,7 +564,10 @@ function createRooms({ store, extensions = {}, onRoomChanged }) {
       case "room/suspend":
       case "room/leave":
       case "room/withdraw": {
-        withOnlyRoom();
+        if (operation === "room/suspend") {
+          keys(body, "roomId", "presence");
+          requireValue(ROOM_ID.test(body.presence));
+        } else withOnlyRoom();
         const withdraw = operation === "room/withdraw";
         const leave = operation === "room/leave";
         await edit(
@@ -569,6 +583,11 @@ function createRooms({ store, extensions = {}, onRoomChanged }) {
               409,
               "seat_reclaim_required",
             );
+            if (
+              operation === "room/suspend" &&
+              member.presence !== body.presence
+            )
+              return {};
             forgetPair(room, member.id);
             if (!room.locked && leave && room.hostId !== member.id) {
               room.members = room.members.filter(({ id }) => id !== member.id);
@@ -614,7 +633,7 @@ function createRooms({ store, extensions = {}, onRoomChanged }) {
               updatedAt: room.head.savedAt,
               matchId: room.head.matchId,
               schema: room.head.schema,
-              players: room.members.map(({ id }) => id),
+              players: room.members.map(({ name }) => name),
             }))
             .sort((a, b) => b.updatedAt - a.updatedAt),
         };
@@ -647,6 +666,24 @@ function createRooms({ store, extensions = {}, onRoomChanged }) {
           epoch: room.epoch,
           room,
           now: loaded.now,
+          limit: (bucket, cap) => limit(bucket, actor.account, cap),
+          async recheck(requireLease = true) {
+            const fresh = await loadRoom(id);
+            requireValue(fresh, 404, "room_unavailable");
+            const projected = await project(fresh.room, fresh.now);
+            const seat = accountSeat(projected, actor.account);
+            requireValue(seat, 403, "forbidden");
+            if (requireLease)
+              requireValue(
+                projected.epoch === room.epoch &&
+                  seat.active &&
+                  seat.binding === actor.binding &&
+                  isLive(projected, fresh.now),
+                409,
+                "authority_changed",
+              );
+            return projected;
+          },
           updateRoom(apply, guard = "active") {
             return edit(id, actor, guard, (current, seat, now, projected) => {
               requireValue(

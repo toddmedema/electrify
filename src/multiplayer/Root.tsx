@@ -1,4 +1,3 @@
-import { steamSessionServices } from "./SteamSessionServices";
 import { achievementJournal } from "../achievements/Journal";
 import { unlockedDifficulty } from "../achievements/DifficultyUnlocks";
 import {
@@ -11,6 +10,7 @@ import {
   useSyncExternalStore,
 } from "react";
 import { getDesktop } from "../Desktop";
+import { firebaseAppAuth, login } from "../Globals";
 import type { GameType } from "../Types";
 import { initEconomy } from "../data/Economy";
 import { initFuelPrices } from "../data/FuelPrices";
@@ -31,6 +31,7 @@ import {
   registerCoopControls,
   registerLobbyOpener,
   registerMultiplayerRuntime,
+  showMultiplayerLobby,
 } from "./Registry";
 import Lobby from "./Lobby";
 import SavesDialog from "./SavesDialog";
@@ -40,58 +41,27 @@ import HostConnectionWarning from "./HostConnectionWarning";
 import { selectionKey } from "./Browse";
 import { coopSelection, hostSelection, isBrowseCard } from "./Choosing";
 import { useDesktopState } from "../DesktopState";
-import { coopRelayUrl } from "./RelayConfig";
-import { relaySessionServices } from "./RelaySessionServices";
+import { createCrossplayApi } from "./CrossplayApi";
+import {
+  captureCrossplayInvite,
+  clearCrossplayInvite,
+  crossplayInviteLink,
+} from "./CrossplayInvite";
+import { onlineSessionServices } from "./OnlineSessionServices";
 
 const CouchRoot =
   process.env.REACT_APP_DESKTOP === "true"
     ? lazy(() => import("../couch/Root"))
     : undefined;
 
-type OnlineMode = "steam" | "crossplay";
-
+/** Session lifetime follows the app; entering the normal game can unmount the main menu. */
 export default function MultiplayerRoot() {
   const desktop = getDesktop();
-  const steamEdition = desktop?.steamEdition === true;
-  const [choice, setChoice] = useState<{
-    mode: OnlineMode;
-    inviteCode?: string;
-  }>();
-  const mode =
-    choice?.mode ?? (coopRelayUrl && !steamEdition ? "crossplay" : "steam");
-  const changeMode = useCallback(
-    (inviteCode?: string) =>
-      setChoice({ mode: mode === "steam" ? "crossplay" : "steam", inviteCode }),
-    [mode],
-  );
-  return (
-    <OnlineMultiplayer
-      key={mode}
-      mode={mode}
-      openOnMount={choice !== undefined}
-      initialInviteCode={choice?.inviteCode}
-      canPlayLocally={steamEdition && !!desktop?.couchRequest}
-      onChangeMode={steamEdition && coopRelayUrl ? changeMode : undefined}
-    />
-  );
-}
-
-/** Session lifetime follows the app; entering the normal game can unmount the main menu. */
-function OnlineMultiplayer({
-  mode,
-  openOnMount,
-  initialInviteCode,
-  canPlayLocally,
-  onChangeMode,
-}: {
-  mode: OnlineMode;
-  openOnMount: boolean;
-  initialInviteCode?: string;
-  canPlayLocally: boolean;
-  onChangeMode?: (inviteCode?: string) => void;
-}) {
-  const [open, setOpen] = useState(openOnMount);
-  const [entryInviteCode, setEntryInviteCode] = useState(initialInviteCode);
+  const canPlayLocally =
+    desktop?.steamEdition === true && !!desktop.couchRequest;
+  const [initialInvite] = useState(() => captureCrossplayInvite());
+  const [open, setOpen] = useState(!!initialInvite);
+  const [entryInviteCode, setEntryInviteCode] = useState(initialInvite);
   const steamName = useDesktopState()?.steam.displayName;
   const currentSteamName = useRef(steamName);
   currentSteamName.current = steamName;
@@ -106,39 +76,16 @@ function OnlineMultiplayer({
   const [session] = useState(
     () =>
       new MultiplayerSession(
-        mode === "crossplay" && coopRelayUrl
-          ? relaySessionServices(
-              coopRelayUrl,
-              () =>
-                currentSteamName.current ?? store.getState().user.displayName,
-            )
-          : steamSessionServices(getDesktop()),
+        onlineSessionServices(
+          createCrossplayApi(),
+          () => currentSteamName.current ?? store.getState().user.displayName,
+        ),
         async () => (await import("./WorkerClient")).createMultiplayerWorker(),
         async () =>
           (await import("./WorkerClient")).createMultiplayerReplicaWorker(),
       ),
   );
   const state = useSyncExternalStore(session.subscribe, session.getSnapshot);
-  useEffect(() => {
-    if (mode !== "crossplay" || !onChangeMode) return;
-    return getDesktop()?.onMultiplayerEvent?.((event) => {
-      if (event.kind !== "invite") return;
-      const { busy, lobby } = session.getSnapshot();
-      if (busy || lobby.lobbyId || localSession.current) {
-        store.dispatch(
-          snackbarOpen({
-            open: true,
-            message:
-              "Steam invite received. Open Steam friends to join after this session.",
-            timeout: 6000,
-          }),
-        );
-      } else {
-        // Steam keeps the invitation pending until its session joins the lobby.
-        onChangeMode();
-      }
-    });
-  }, [mode, onChangeMode, session]);
   const hasView = !!state.view;
   const lobbyId = state.lobby.lobbyId;
   const pendingCampaignId = state.pendingCampaign?.id;
@@ -203,7 +150,6 @@ function OnlineMultiplayer({
   }, [session]);
 
   useEffect(() => {
-    // Friends already following the scenario picker return to the campaign's invitation lobby.
     if (pendingCampaignId && lobbyId && !hasView) setOpen(true);
   }, [pendingCampaignId, lobbyId, hasView]);
 
@@ -262,11 +208,47 @@ function OnlineMultiplayer({
     );
   }, [session]);
 
+  const copyLink = useCallback(async () => {
+    const token = session.getSnapshot().lobby.inviteToken;
+    if (!token) return;
+    const link = crossplayInviteLink(token);
+    if (!link) return;
+    try {
+      await navigator.clipboard.writeText(link);
+      store.dispatch(
+        snackbarOpen({
+          message: "Invite link copied",
+          open: true,
+          timeout: 4000,
+        }),
+      );
+    } catch {
+      store.dispatch(
+        dialogOpen({
+          open: true,
+          title: "Invite link",
+          message: link,
+          closeText: "OK",
+        }),
+      );
+    }
+  }, [session]);
+
+  const authorize = useCallback(async () => {
+    if (
+      desktop?.steamEdition ||
+      !firebaseAppAuth ||
+      firebaseAppAuth.currentUser?.providerData.some(
+        ({ providerId }) => providerId === "google.com",
+      )
+    )
+      return;
+    if (!(await login({ provider: "google" })))
+      throw new Error("Sign in with Google to play online.");
+  }, [desktop]);
+
   useEffect(() => {
-    registerLobbyOpener(() => {
-      setEntryInviteCode(undefined);
-      setOpen(true);
-    });
+    registerLobbyOpener(() => setOpen(true));
     let live = true,
       initialized = false,
       loading = false;
@@ -377,40 +359,41 @@ function OnlineMultiplayer({
         );
       },
       copyCode,
+      manageLobby: showMultiplayerLobby,
       openSaves: () => setSavesOpen(true),
     });
-    const acceptInvite = (lobbyId: string) => {
+    const acceptInvite = (invite: string) => {
       if (!live) return;
       if (localSession.current) {
-        deferredInvite.current = () => acceptInvite(lobbyId);
+        deferredInvite.current = () => acceptInvite(invite);
         return;
       }
       deferredInvite.current = undefined;
       if (session.getSnapshot().view) return;
       choosing.current = false;
       setOpen(true);
-      void session.join(lobbyId).catch((error) => {
-        if (live)
-          store.dispatch(
-            snackbarOpen({
-              message:
-                error instanceof Error
-                  ? error.message
-                  : "Could not join the invited game.",
-              open: true,
-              timeout: 6000,
-            }),
-          );
-      });
+      setEntryInviteCode(invite);
     };
-    void session
-      .initialize(acceptInvite)
-      // A desktop build without Steam multiplayer keeps the lobby unavailable.
+    desktop
+      ?.takeCrossplayInvite?.()
+      .then((invite) => {
+        if (invite) acceptInvite(invite);
+      })
       .catch(() => undefined);
+    const stopInvites = desktop?.onCrossplayInvite?.(() => {
+      void desktop
+        .takeCrossplayInvite?.()
+        .then((invite) => {
+          if (invite) acceptInvite(invite);
+        })
+        .catch(() => undefined);
+    });
+    void session.initialize().catch(() => undefined);
     return () => {
       live = false;
       deferredInvite.current = undefined;
       stop();
+      stopInvites?.();
       stopCoop();
       stopStore();
       stopProgress();
@@ -419,7 +402,7 @@ function OnlineMultiplayer({
       registerMultiplayerRuntime(undefined);
       session.dispose();
     };
-  }, [session, syncCoop, leaveLobby, copyCode]);
+  }, [session, syncCoop, leaveLobby, copyCode, desktop]);
   useEffect(() => {
     if (!hasView) return;
     return registerShutdownCheckpoint((reason) => {
@@ -530,13 +513,19 @@ function OnlineMultiplayer({
         onReconnect={reconnect}
         onDisconnect={disconnect}
       />
-      {open && !state.view ? (
+      {open && !savesOpen && !state.view ? (
         <Lobby
           session={session}
-          onlineMode={mode}
           initialInviteCode={entryInviteCode}
-          onChangeMode={onChangeMode}
-          onHosted={startChoosing}
+          canAuthenticate={!!firebaseAppAuth || desktop?.steamEdition === true}
+          onAuthorize={authorize}
+          onJoined={() => {
+            clearCrossplayInvite();
+            setEntryInviteCode(undefined);
+          }}
+          onChooseGame={startChoosing}
+          onOpenSaves={() => setSavesOpen(true)}
+          onCopyLink={() => void copyLink()}
           onChooseNew={() => {
             session.cancelCampaign();
             startChoosing();
@@ -560,9 +549,37 @@ function OnlineMultiplayer({
           }
         />
       ) : null}
-      {savesOpen && !open && !state.view && (
-        <SavesDialog session={session} onClose={() => setSavesOpen(false)} />
+      {savesOpen && !state.view && (
+        <SavesDialog
+          session={session}
+          onClose={() => {
+            setSavesOpen(false);
+            if (session.getSnapshot().lobby.campaignLocked) setOpen(true);
+          }}
+        />
       )}
+      {hasView &&
+        state.lobby.recoveryAvailable &&
+        state.lobby.selfId === state.lobby.hostId && (
+          <dialog
+            open
+            aria-label="Recover multiplayer campaign"
+            className="coopRecovery"
+          >
+            <p>
+              Resume from the last confirmed online save when the original
+              players reconnect.
+            </p>
+            <button
+              disabled={!session.canRecover()}
+              onClick={() => {
+                void session.recover().catch(() => undefined);
+              }}
+            >
+              Resume campaign
+            </button>
+          </dialog>
+        )}
       {showResult && (
         <CoopResult
           ending={ending}
@@ -573,7 +590,19 @@ function OnlineMultiplayer({
           onWatch={() => setWatching(endingKey)}
           onBackToLobby={() => {
             choosing.current = true;
-            void session.backToLobby().then(startChoosing);
+            void session
+              .leave({ skipSave: false })
+              .then(() => setOpen(true))
+              .catch((error) => {
+                store.dispatch(
+                  dialogOpen({
+                    open: true,
+                    title: "Multiplayer save",
+                    message: error.message,
+                    closeText: "OK",
+                  }),
+                );
+              });
           }}
           onLeave={() => leaveLobby(true)}
         />

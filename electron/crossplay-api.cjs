@@ -69,7 +69,7 @@ const REQUESTS = {
   "room/lock": [{ ...room, ids: list, requiredIds: list }],
   "room/unlock": [room],
   "room/leave": [room],
-  "room/suspend": [room],
+  "room/suspend": [{ ...room, presence: id }],
   "room/withdraw": [room],
   "room/approve": [{ ...room, requestId: id, approve: flag }],
   "room/rotate-invite": [room],

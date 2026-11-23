@@ -99,7 +99,7 @@ async function crossplayPost(operation, body, options = {}) {
     if (!response.ok) {
       const code = value?.error;
       throw new CrossplayApiError(
-        typeof code === "string" && /^[a-z_]{1,40}$/.test(code)
+        typeof code === "string" && /^[a-z_-]{1,40}$/.test(code)
           ? code
           : response.status === 401
             ? "unauthenticated"

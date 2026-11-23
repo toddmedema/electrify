@@ -11,13 +11,12 @@ import {
   IconButton,
   Stack,
   TextField,
-  ToggleButton,
-  ToggleButtonGroup,
   Typography,
 } from "@mui/material";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import type { MultiplayerSession } from "./Session";
 import { seatAssignments } from "./Slots";
+import { parseCrossplayInvite } from "./CrossplayInvite";
 import CoopInviteCode from "../components/base/CoopInviteCode";
 import "./Lobby.css";
 
@@ -28,27 +27,35 @@ import "./Lobby.css";
 export default function Lobby({
   session,
   onHosted,
+  onAuthorize,
+  onJoined,
+  onChooseGame,
+  onOpenSaves,
+  onCopyLink,
+  canAuthenticate = true,
   onChooseNew,
   onCopyCode,
   onClose,
   onLeave,
   onLocalPlay,
-  onlineMode = "steam",
   initialInviteCode,
-  onChangeMode,
 }: {
   session: MultiplayerSession;
   /** The host's new lobby goes straight to choosing a game. */
-  onHosted: () => void;
+  onHosted?: () => void;
+  onAuthorize?: () => Promise<void>;
+  onJoined?: () => void;
+  onChooseGame?: () => void;
+  onOpenSaves?: () => void;
+  onCopyLink?: () => void;
+  canAuthenticate?: boolean;
   /** Host: set the multiplayer save aside and choose a new game. */
   onChooseNew: () => void;
   onCopyCode: () => void;
   onClose: () => void;
   onLeave: () => void;
   onLocalPlay?: () => void;
-  onlineMode?: "steam" | "crossplay";
   initialInviteCode?: string;
-  onChangeMode?: (inviteCode: string) => void;
 }) {
   const { lobby, pendingCampaign, busy, entryOperation, error } =
     useSyncExternalStore(session.subscribe, session.getSnapshot);
@@ -56,17 +63,17 @@ export default function Lobby({
   const [failure, setFailure] = useState<string>();
   const [entryAttempt, setEntryAttempt] = useState<"host" | "join">();
   const title = useRef<HTMLHeadingElement>(null);
-  const selectedMode = useRef<HTMLButtonElement>(null);
   const mode =
     !lobby.lobbyId || entryOperation === "join"
       ? "entry"
       : pendingCampaign
         ? "campaign"
         : "waiting";
-  const lobbyFocus =
-    mode === "entry" && initialInviteCode !== undefined ? selectedMode : title;
-  useEffect(() => lobbyFocus.current?.focus(), [lobbyFocus, mode]);
-  const host = lobby.selfId === lobby.hostId;
+  useEffect(() => title.current?.focus(), [mode]);
+  useEffect(() => {
+    if (initialInviteCode) setCode(initialInviteCode);
+  }, [initialInviteCode]);
+  const host = !!lobby.selfId && lobby.selfId === lobby.hostId;
   const hostName =
     lobby.members.find((member) => member.id === lobby.hostId)?.name ||
     "the host";
@@ -80,7 +87,12 @@ export default function Lobby({
     );
   };
   const notice = failure || error || lobby.error;
-  const canJoin = lobby.available && !busy && /^[0-9]{6}$/.test(code);
+  const invite = session.onlineCampaigns
+    ? parseCrossplayInvite(code)
+    : /^[0-9]{6}$/.test(code)
+      ? code
+      : undefined;
+  const canJoin = canAuthenticate && lobby.available && !busy && invite;
   const joinFailed = entryAttempt === "join" && !!failure;
   return (
     <Dialog
@@ -106,7 +118,7 @@ export default function Lobby({
               document.activeElement ===
               title.current?.closest('[role="dialog"]')
             )
-              lobbyFocus.current?.focus();
+              title.current?.focus();
           },
         },
       }}
@@ -155,58 +167,27 @@ export default function Lobby({
           )}
           {mode === "entry" && (
             <>
-              {onChangeMode && (
-                <ToggleButtonGroup
-                  aria-label="Online play"
-                  value={onlineMode}
-                  exclusive
-                  fullWidth
-                  disabled={busy}
-                  onChange={(_, mode) => {
-                    if (mode) onChangeMode(code);
-                  }}
-                >
-                  <ToggleButton
-                    value="steam"
-                    ref={onlineMode === "steam" ? selectedMode : undefined}
-                  >
-                    Steam friends
-                  </ToggleButton>
-                  <ToggleButton
-                    value="crossplay"
-                    ref={onlineMode === "crossplay" ? selectedMode : undefined}
-                  >
-                    Web &amp; Steam
-                  </ToggleButton>
-                </ToggleButtonGroup>
-              )}
-              {onlineMode === "crossplay" && (
+              {session.onlineCampaigns && (
                 <Typography variant="body2" color="text.secondary">
-                  {onChangeMode
-                    ? "Use this mode for codes from a Web & Steam lobby."
-                    : "Share an invite code with friends on the web or on Steam."}
+                  Private games are unranked. Approved players receive the full
+                  simulation and can keep a copy of the campaign.
                 </Typography>
               )}
-              {onlineMode === "steam" && onChangeMode && lobby.available && (
+              {(!lobby.available || !canAuthenticate) && !notice && (
                 <Typography variant="body2" color="text.secondary">
-                  Use this mode for codes from a Steam friends lobby.
-                </Typography>
-              )}
-              {!lobby.available && !notice && (
-                <Typography variant="body2" color="text.secondary">
-                  {onlineMode === "steam"
-                    ? "Connect to Steam to host or join online."
-                    : "Connecting to online multiplayer…"}
+                  Connect to Steam or open Electrify in your browser to play
+                  online.
                 </Typography>
               )}
               <Button
                 variant="contained"
                 size="large"
-                disabled={!lobby.available || busy}
+                disabled={!canAuthenticate || !lobby.available || busy}
                 onClick={() =>
                   run(async () => {
+                    await onAuthorize?.();
                     await session.create();
-                    onHosted();
+                    onHosted?.();
                   }, "host")
                 }
               >
@@ -217,22 +198,37 @@ export default function Lobby({
                 className="coopJoinRow"
                 onSubmit={(event) => {
                   event.preventDefault();
-                  if (canJoin) run(() => session.join(code), "join");
+                  if (canJoin)
+                    run(async () => {
+                      await onAuthorize?.();
+                      await session.join(invite);
+                      onJoined?.();
+                    }, "join");
                 }}
               >
                 <TextField
-                  label="6-digit invite code"
+                  label={
+                    session.onlineCampaigns
+                      ? "Invite code"
+                      : "6-digit invite code"
+                  }
                   value={code}
                   disabled={busy}
                   error={joinFailed}
                   onChange={(event) => {
                     if (joinFailed) setFailure(undefined);
-                    setCode(event.target.value.replace(/[\s-]/g, ""));
+                    setCode(
+                      session.onlineCampaigns
+                        ? event.target.value.slice(0, 160)
+                        : event.target.value.replace(/[\s-]/g, "").slice(0, 6),
+                    );
                   }}
                   autoComplete="off"
                   slotProps={{
                     htmlInput: {
-                      inputMode: "numeric",
+                      inputMode: session.onlineCampaigns ? "text" : "numeric",
+                      autoCapitalize: "off",
+                      spellCheck: false,
                       "aria-describedby": joinFailed
                         ? "coop-lobby-notice"
                         : undefined,
@@ -243,25 +239,139 @@ export default function Lobby({
                   Join
                 </Button>
               </form>
+              {onOpenSaves && (
+                <Button
+                  disabled={!canAuthenticate || busy}
+                  onClick={() =>
+                    run(async () => {
+                      await onAuthorize?.();
+                      onOpenSaves();
+                    }, "join")
+                  }
+                >
+                  Multiplayer saves
+                </Button>
+              )}
             </>
           )}
-          {mode === "waiting" && (
-            <Stack
-              direction="row"
-              spacing={1}
-              role="status"
-              sx={{ alignItems: "center" }}
-            >
-              <CircularProgress size={20} />
+          {mode === "waiting" &&
+            host &&
+            session.onlineCampaigns &&
+            !lobby.campaignLocked && (
+              <>
+                {lobby.inviteCode && (
+                  <CoopInviteCode code={lobby.inviteCode} onCopy={onCopyCode} />
+                )}
+                <Stack
+                  direction="row"
+                  spacing={1}
+                  useFlexGap
+                  sx={{ flexWrap: "wrap" }}
+                >
+                  {lobby.inviteToken && (
+                    <Button onClick={onCopyLink}>Copy invite link</Button>
+                  )}
+                  <Button
+                    onClick={() => run(() => session.rotateInvite(), "host")}
+                  >
+                    Replace invite
+                  </Button>
+                </Stack>
+                {lobby.pendingApprovals?.map((request) => (
+                  <Stack key={request.id} spacing={1}>
+                    <Typography sx={{ overflowWrap: "anywhere" }}>
+                      {request.name} asked to join
+                    </Typography>
+                    <Stack direction="row" spacing={1}>
+                      <Button
+                        variant="contained"
+                        onClick={() =>
+                          run(() => session.approve(request.id, true), "host")
+                        }
+                      >
+                        Approve
+                      </Button>
+                      <Button
+                        onClick={() =>
+                          run(() => session.approve(request.id, false), "host")
+                        }
+                      >
+                        Decline
+                      </Button>
+                    </Stack>
+                  </Stack>
+                ))}
+                {lobby.members.map((member) => (
+                  <Typography key={member.id} sx={{ overflowWrap: "anywhere" }}>
+                    {member.name} ·{" "}
+                    {member.id === lobby.selfId
+                      ? "Host"
+                      : connected(member.id)
+                        ? "Connected"
+                        : "Connecting"}
+                  </Typography>
+                ))}
+                <Button
+                  variant="contained"
+                  disabled={
+                    busy ||
+                    !lobby.members.some(
+                      (member) =>
+                        member.id !== lobby.selfId && connected(member.id),
+                    )
+                  }
+                  onClick={onChooseGame}
+                >
+                  Choose a game
+                </Button>
+              </>
+            )}
+          {mode === "waiting" && lobby.campaignLocked && (
+            <>
               <Typography>
-                {host
-                  ? "Opening your lobby…"
-                  : connected(lobby.hostId!)
-                    ? `Waiting for ${hostName} to choose a game…`
-                    : `Connecting to ${hostName}…`}
+                {lobby.sharedAt
+                  ? `Online save confirmed ${new Date(lobby.sharedAt).toLocaleString()}`
+                  : "Waiting for the confirmed online save."}
               </Typography>
-            </Stack>
+              <Typography>
+                The campaign resumes with its original players.
+              </Typography>
+              {host && lobby.recoveryAvailable ? (
+                <Button
+                  variant="contained"
+                  disabled={!session.canRecover()}
+                  onClick={() => run(() => session.recover(), "host")}
+                >
+                  Resume campaign
+                </Button>
+              ) : (
+                <Button onClick={() => run(() => session.reconnect(), "join")}>
+                  Reconnect
+                </Button>
+              )}
+            </>
           )}
+          {mode === "waiting" &&
+            !lobby.campaignLocked &&
+            (!host || !session.onlineCampaigns) && (
+              <Stack
+                direction="row"
+                spacing={1}
+                role="status"
+                sx={{ alignItems: "center" }}
+              >
+                <CircularProgress size={20} />
+                <Typography>
+                  {lobby.joinPending
+                    ? "Waiting for the host to approve your request…"
+                    : host
+                      ? "Opening your lobby…"
+                      : connected(lobby.hostId!)
+                        ? `Waiting for ${hostName} to choose a game…`
+                        : `Connecting to ${hostName}…`}
+                </Typography>
+              </Stack>
+            )}
           {mode === "campaign" && pendingCampaign && (
             <CampaignSlots
               session={session}
@@ -300,6 +410,10 @@ export default function Lobby({
       )}
       {mode !== "entry" && (
         <DialogActions>
+          {mode === "waiting" &&
+            host &&
+            session.onlineCampaigns &&
+            !lobby.campaignLocked && <Button onClick={onClose}>Close</Button>}
           {mode === "campaign" && host && (
             <Button disabled={busy} onClick={onChooseNew}>
               Choose a new game

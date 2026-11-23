@@ -11,12 +11,6 @@ import MultiplayerRoot from "./Root";
 
 jest.mock("../DesktopState", () => ({ useDesktopState: () => undefined }));
 jest.mock("./WorkerClient", () => ({}));
-let mockRelayUrl: string | undefined;
-jest.mock("./RelayConfig", () => ({
-  get coopRelayUrl() {
-    return mockRelayUrl;
-  },
-}));
 jest.mock("./Session", () => ({
   ...jest.requireActual("./Session"),
   MultiplayerSession: jest.fn(),
@@ -36,7 +30,7 @@ jest.mock("../SaveSession", () => ({
 }));
 
 afterEach(() => {
-  mockRelayUrl = undefined;
+  sessionStorage.clear();
   jest.restoreAllMocks();
   store.dispatch(quit());
 });
@@ -61,6 +55,7 @@ function renderRoot(
       };
     },
     initialize,
+    onlineCampaigns: true,
     dispose: () => {},
     setActivity: () => {},
     join: jest.fn().mockResolvedValue(undefined),
@@ -82,56 +77,72 @@ function renderRoot(
   return { session, notify, unmount };
 }
 
+const invitation = "abcdefghijklmnopqrstuv";
+const newerInvitation = "zyxwvutsrqponmlkjihgfe";
+
 function renderWithSteamInvites() {
-  let receive: ((lobbyId: string) => void) | undefined;
+  let receive: (() => void) | undefined;
+  let token: string | undefined;
   const bridge: Pick<
     desktop.DesktopBridge,
-    "apiVersion" | "couchRequest" | "steamEdition"
+    | "apiVersion"
+    | "couchRequest"
+    | "steamEdition"
+    | "onCrossplayInvite"
+    | "takeCrossplayInvite"
   > = {
     apiVersion: 1,
     steamEdition: true,
     couchRequest: jest.fn(),
+    onCrossplayInvite: (callback) => {
+      receive = callback;
+      return () => {};
+    },
+    takeCrossplayInvite: async () => {
+      const pending = token;
+      token = undefined;
+      return pending;
+    },
   };
   jest
     .spyOn(desktop, "getDesktop")
     .mockReturnValue(bridge as desktop.DesktopBridge);
-  const { session } = renderRoot(async (onInvite) => {
-    receive = onInvite;
-  });
-  const invite = async (lobbyId: string) => {
-    await act(async () => receive?.(lobbyId));
+  const { session } = renderRoot();
+  const invite = async (value: string) => {
+    token = value;
+    await act(async () => receive?.());
   };
   return { join: session.join, invite };
 }
 
-test("a Steam invitation joins normally outside couch play", async () => {
+test("an incoming Steam link fills the join prompt and waits for consent", async () => {
   const { join, invite } = renderWithSteamInvites();
-  await invite("10977524123456789");
-  expect(join).toHaveBeenCalledWith("10977524123456789");
-  expect(
-    screen.getByRole("dialog", { name: "Play with friends" }),
-  ).toBeVisible();
+  await invite(invitation);
+  expect(join).not.toHaveBeenCalled();
+  expect(screen.getByRole("textbox", { name: "Invite code" })).toHaveValue(
+    invitation,
+  );
+  await userEvent.click(screen.getByRole("button", { name: "Join" }));
+  expect(join).toHaveBeenCalledWith(invitation);
 });
 
-test("changing multiplayer mode keeps the invite code and focus on the selected mode", async () => {
-  mockRelayUrl = "wss://relay.example.com/v1";
-  renderWithSteamInvites();
+test("the unified lobby accepts a pasted link and a code", async () => {
+  const { join } = renderWithSteamInvites();
   const user = userEvent.setup();
   act(showMultiplayerLobby);
-  const codeField = () =>
-    screen.getByRole("textbox", { name: "6-digit invite code" });
-  await user.type(codeField(), "042816");
-  const crossplay = () => screen.getByRole("button", { name: "Web & Steam" });
-  act(() => crossplay().focus());
-  await user.keyboard("{Enter}");
-
-  expect(crossplay()).toHaveAttribute("aria-pressed", "true");
-  expect(codeField()).toHaveValue("042816");
-  await waitFor(() => expect(crossplay()).toHaveFocus());
-
-  await user.click(screen.getByRole("button", { name: "Back" }));
-  act(showMultiplayerLobby);
-  expect(codeField()).toHaveValue("");
+  const title = screen.getByRole("heading", { name: "Play with friends" });
+  await waitFor(() => expect(title).toHaveFocus());
+  const code = screen.getByRole("textbox", { name: "Invite code" });
+  await user.type(
+    code,
+    "https://electrifygame.com/invite/#invite=" + invitation,
+  );
+  await user.click(screen.getByRole("button", { name: "Join" }));
+  expect(join).toHaveBeenCalledWith(invitation);
+  await user.clear(code);
+  await user.type(code, "001122334455AABBCCDD");
+  await user.click(screen.getByRole("button", { name: "Join" }));
+  expect(join).toHaveBeenLastCalledWith("001122334455aabbccdd");
 });
 
 test("a couch session keeps the latest invitation until local play closes", async () => {
@@ -140,19 +151,20 @@ test("a couch session keeps the latest invitation until local play closes", asyn
   act(showMultiplayerLobby);
   await user.click(screen.getByRole("button", { name: "Local Co-op" }));
   const leave = screen.getByRole("button", { name: "Leave couch setup" });
-  await invite("10977524123456789");
-  await invite("10977524123456780");
+  await invite(invitation);
+  await invite(newerInvitation);
   expect(join).not.toHaveBeenCalled();
   expect(
     screen.queryByRole("dialog", { name: "Play with friends" }),
   ).not.toBeInTheDocument();
   await user.click(leave);
   expect(leave).not.toBeInTheDocument();
-  expect(join).toHaveBeenCalledTimes(1);
-  expect(join).toHaveBeenCalledWith("10977524123456780");
-  expect(
-    screen.getByRole("dialog", { name: "Play with friends" }),
-  ).toBeVisible();
+  expect(join).not.toHaveBeenCalled();
+  expect(screen.getByRole("textbox", { name: "Invite code" })).toHaveValue(
+    newerInvitation,
+  );
+  await user.click(screen.getByRole("button", { name: "Join" }));
+  expect(join).toHaveBeenCalledWith(newerInvitation);
 });
 
 test("session status notifications do not replay a grid before sending the player's command", async () => {

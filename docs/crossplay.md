@@ -1,63 +1,90 @@
 # Web and Steam cross-play
 
-Open **Play with friends** from the title screen. On Steam, choose **Web & Steam**
-when a friend is on the website or uses the standalone desktop edition. Host a game
-and send the six-digit invite code to your friends. They enter it on the same screen.
-Steam players also have **Steam friends** for Steam-only lobbies and **Local Co-op**
-on the same screen. Steam-only and cross-play invite codes belong to their own lobbies.
+Open **Play with friends** to host or join a private game for two to four players.
+The website uses Google sign-in and the Steam edition uses your signed-in Steam
+account. Share the lobby's invite link or code. The host approves requests before
+the game starts. Each approved account keeps its company for the campaign.
 
-The host runs the same unranked multiplayer simulation as a Steam friends lobby.
-Players need matching game builds. Cross-play campaigns are stored on the host's
-device and appear under **Load multiplayer save** when the host opens a new lobby
-in **Web & Steam**. The Steam friends campaign library remains separate. A relay
-restart or an extended host disconnect ends the live room. The host can use a
-checkpoint to reopen the campaign and invite players with a new code.
+Any player can host. The host's device runs the simulation and each guest's
+device replays the records to produce its own views. Backgrounding or losing a
+required device pauses play. If the host lease expires, an original player can
+reconnect to acquire it and resume from the last confirmed online save. Progress
+since that save can be lost. **Save & Quit** asks the host for a fresh confirmed
+save and pauses the campaign until the original players return.
 
-## Development
+Private co-op is unranked. Approved players receive the entire world and can keep
+an offline copy after leaving. The host can change or stall the simulation.
+Google and Steam provide identity to the service. Other players see an opaque
+seat ID and your display name. The service handles room and connection metadata.
+Cloudflare sees relay network metadata including client IPs and traffic volume.
+WebRTC DTLS encrypts gameplay traffic in transit.
 
-Use Node 26. In separate terminals run:
+## Service contract
 
-```sh
-npm ci --prefix relay
-npm --prefix relay start
-REACT_APP_COOP_RELAY_URL=ws://127.0.0.1:8787/v1 npm start
-```
+The browser posts authenticated JSON to the fixed `coopV2` HTTPS function. Steam
+requests go through Electron main. Steam tickets and temporary service tokens
+stay in main. The renderer receives validated responses and temporary TURN
+credentials. Invite landing pages permit only the first-party fragment route and
+a configured Steam App ID. The launch argument opens a prompt.
 
-The relay defaults to the loopback interface and allows `http://localhost:3000`
-for local development. Include the actual frontend origin in `COOP_RELAY_ORIGINS`
-if you use a different URL. To exercise the same room in a desktop package, provide
-the same `REACT_APP_COOP_RELAY_URL` to `npm run desktop:build` or `npm run desktop:pack`.
-The browser and desktop packages should be built from the same commit.
+Firebase verifies Google accounts and Valve verifies Steam ticket proofs. A
+bearer expires in five minutes. Each account has one active device binding.
+Seats and invites belong to a room. Invite links contain 128 bits and invite
+codes contain 80 bits of randomness, expire after 15 minutes, and request
+approval. The host can replace an invite. Once locked, a room cannot add a
+different account.
 
-```sh
-npm --prefix relay test
-npm run test:crossplay
-```
+Firestore stores the roster, lease, epoch, and checkpoint manifests. The
+12-second lease renews using a write-time expiry guard. A client accepts
+authority grants for at most four seconds from its request start. An active
+host and guest use authenticated SDP bound to one generation and must both
+verify the selected candidate pair as relay–relay. TURN permits UDP and TLS over
+port 443. HTTPS handles large replication baselines, scenario snapshots and
+checkpoints. Checkpoints are pinned to an immutable Cloud Storage generation
+and checked against the room epoch, roster, compatibility ID and head.
 
-The browser tests launch an isolated relay on a random loopback port and run the
-existing host and replica workers in Chromium. The Steam renderer fixture supplies
-desktop identity and capabilities. Cross-play traffic goes through the real relay.
-CI also joins a game from the optimized website's first-visit menu and checks
-that a packaged desktop build can host using the configured relay.
+## Production prerequisites and release acceptance
 
-## Deployment
+Provision the following before merging a production rollout. The deployment
+workflow publishes the control service and Firestore rules before the web
+bundle. The same compatible build must ship to the Steam depot.
 
-Build the relay container with `docker build -t electrify-relay relay` and run it
-behind a TLS ingress that supports WebSocket upgrades to `/v1`. HTTP health checks
-use `/healthz`. Set `COOP_RELAY_ORIGINS` to a comma-separated list of allowed origins,
-including the production website and `electrify://app` for desktop. Configure ingress
-timeouts for long-running connections. The process keeps rooms in memory, so run a
-single relay instance until room routing and shared state are available. Deployments
-of the relay disconnect live games. The relay stores neither names nor game saves
-after a room ends.
+- Set the repository variables `STEAM_APP_ID`, `COOP_CHECKPOINT_BUCKET`, and
+  `COOP_TURN_RELAY_CIDRS`. Use provider-confirmed **allocation** CIDRs. The TURN
+  service's ingress A records describe a different network path. Enable Steamworks
+  **Use launch command line** for the production App ID.
+- In Google Secret Manager provision `STEAM_PUBLISHER_KEY`,
+  `COOP_FIREBASE_WRITER_API_KEY`, `COOP_RATE_LIMIT_KEY`,
+  `CLOUDFLARE_TURN_KEY_ID`, and `CLOUDFLARE_TURN_KEY_API_TOKEN`. Keep staging
+  and production provider keys separate.
+- Bind the functions to
+  `coop-service@electrify-game.iam.gserviceaccount.com`. Grant the narrow IAM
+  access needed for verified Firebase sessions, Firestore, the dedicated co-op
+  writer token, the five specified secrets and the private bucket. Prevent
+  public access on the bucket, use uniform bucket-level access, and verify the
+  Firebase player identities cannot list or read objects. Review staging
+  lifecycle and soft deletion together with the final retention period.
+- Obtain provider-backed limits or prove that shutdown bounds outstanding TURN
+  allocations. The service limits application-issued grants to 120, with a
+  drain period. Cloudflare's published limits are per allocation. One grant can
+  allow separate allocations, and traffic on a live allocation has continued
+  after revocation or the nominal credential expiry in diagnostics. The
+  grant limit alone cannot establish a maximum billed spend. For shutdown,
+  set `coopSettings/runtime.stopped` and verify new requests stop, the reaper
+  revokes issued keys, in-progress downloads end and existing relay traffic
+  stops within the agreed time and byte limits.
+- Run a four-player production-equivalent session rotating host across iPhone
+  Safari, Android Chrome, desktop web and packaged Steam. Repeat with UDP
+  blocked to prove the TLS/443 path. Measure late-game traffic, checkpoint
+  transfers, control latency, service calls and peak memory. Verify account
+  replacement, mobile backgrounding, network changes, fixed-roster gameplay,
+  recovery, save access, quota exhaustion and the shutdown drill. Inspect
+  access logs and traces for credentials, invite secrets and simulation data.
 
-Set the GitHub repository variable `COOP_RELAY_URL` to the public `wss://…/v1`
-endpoint for the website deploy workflow. Pass it as `REACT_APP_COOP_RELAY_URL` to
-the Steam packaging build as well. The desktop shell allows only that configured
-WebSocket destination. Leaving the build variable empty keeps the website's
-multiplayer entry hidden and the existing Steam modes available.
+Relay cost estimates and application bounds are distinct. At the historical
+5 MiB live-payload measurement and a rate of $0.05 per GB, the payload alone
+would cost approximately $0.00026 for that session. Actual egress, relay overhead,
+large transfers, backend writes and abuse exposure need live measurement.
 
-The ingress should rate-limit upgrade connections. Set `COOP_RELAY_TRUST_PROXY=1`
-only if the relay is reachable solely through a proxy that supplies a trusted
-client IP in the last `X-Forwarded-For` position. Without that setting, the relay
-uses the socket's remote address for its lobby-attempt limit.
+Provider references are available in [the issue](https://github.com/toddmedema/electrify/issues/546)
+and the [Cloudflare TURN documentation](https://developers.cloudflare.com/realtime/turn/).

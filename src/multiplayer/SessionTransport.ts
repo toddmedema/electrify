@@ -14,6 +14,15 @@ export interface LobbyState {
   available: boolean;
   lobbyId?: string;
   inviteCode?: string;
+  inviteToken?: string;
+  inviteExpiresAt?: number;
+  inviteVersion?: string;
+  pendingApprovals?: { id: string; name: string }[];
+  joinPending?: boolean;
+  campaignLocked?: boolean;
+  requiredPlayers?: string[];
+  recoveryAvailable?: boolean;
+  authorityEpoch?: string;
   hostId?: string;
   selfId?: string;
   members: LobbyMember[];
@@ -80,8 +89,10 @@ export type WireMessage =
   | { kind: "campaign"; campaign?: PendingCampaign };
 export type SessionRequest =
   | {
-      kind: "state" | "leave" | "reconnect" | "unlock";
+      kind: "state" | "leave" | "unlock" | "rotate-invite";
     }
+  | { kind: "reconnect"; roomId?: string }
+  | { kind: "approve"; requestId: string; approve: boolean }
   | { kind: "create"; rules: string }
   | { kind: "join"; rules: string; lobbyId: string }
   | { kind: "member"; key: "ready" | "slot"; value: string }
@@ -95,7 +106,15 @@ export type SessionEvent =
   | { kind: "disconnected"; sender: string };
 
 type LobbyRequest =
-  "state" | "create" | "join" | "leave" | "reconnect" | "member" | "unlock";
+  | "state"
+  | "create"
+  | "join"
+  | "leave"
+  | "reconnect"
+  | "member"
+  | "unlock"
+  | "approve"
+  | "rotate-invite";
 
 type SessionReplies = {
   [Kind in SessionRequest["kind"]]: Kind extends LobbyRequest
@@ -126,10 +145,19 @@ export interface CheckpointStore {
   write(
     world: World,
     source?: Readonly<Pick<World, "matchId" | "epoch" | "revision">>,
+    explicit?: boolean,
   ): Promise<void>;
+}
+
+export interface AuthorityWindow {
+  epoch: string;
+  monotonicDeadline: number;
+  wallDeadline: number;
 }
 
 export interface SessionServices {
   transport: SessionTransport;
   checkpoints: CheckpointStore;
+  authority?: () => AuthorityWindow | undefined;
+  onlineCampaigns?: boolean;
 }

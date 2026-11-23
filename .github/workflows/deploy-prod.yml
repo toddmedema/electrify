@@ -73,9 +73,12 @@ jobs:
       - name: Install mailing-list function dependencies
         run: npm ci --prefix firebase/functions
 
-      - name: Deploy Firestore and mailing-list function
+      - name: Deploy Firestore and Firebase functions
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          STEAM_APP_ID: ${{ vars.STEAM_APP_ID }}
+          COOP_CHECKPOINT_BUCKET: ${{ vars.COOP_CHECKPOINT_BUCKET }}
+          COOP_TURN_RELAY_CIDRS: ${{ vars.COOP_TURN_RELAY_CIDRS }}
         run: |
           if [ -z "$FIREBASE_SERVICE_ACCOUNT" ]; then
             echo "FIREBASE_SERVICE_ACCOUNT is not set; refusing to deploy prod." >&2
@@ -84,11 +87,26 @@ jobs:
           fi
           # Written outside the workspace so a stray build glob can never sweep a
           # private key into the bundle, and removed even if the deploy fails.
+          if [[ ! "$STEAM_APP_ID" =~ ^[1-9][0-9]{0,9}$ ||
+                ! "$COOP_CHECKPOINT_BUCKET" =~ ^[a-z0-9][a-z0-9.-]+$ ||
+                ! "$COOP_TURN_RELAY_CIDRS" =~ ^[0-9./,[:blank:]]+$ ]]; then
+            echo "Set STEAM_APP_ID, COOP_CHECKPOINT_BUCKET, and COOP_TURN_RELAY_CIDRS before deploying co-op." >&2
+            exit 1
+          fi
+          if [[ -e firebase/functions/.env.electrify-game ]]; then
+            echo "The production functions environment already exists." >&2
+            exit 1
+          fi
           key="$(mktemp -d)/firebase-service-account.json"
-          trap 'rm -f "$key"' EXIT
+          trap 'rm -f "$key" firebase/functions/.env.electrify-game' EXIT
           printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$key"
+          printf 'STEAM_APP_ID=%s\nCOOP_CHECKPOINT_BUCKET=%s\nCOOP_TURN_RELAY_CIDRS="%s"\n' \
+            "$STEAM_APP_ID" "$COOP_CHECKPOINT_BUCKET" "$COOP_TURN_RELAY_CIDRS" > firebase/functions/.env.electrify-game
           GOOGLE_APPLICATION_CREDENTIALS="$key" \
-            npx --yes firebase-tools@15 deploy --only firestore,functions:mailing-list:subscribeMailingList --non-interactive
+            npx --yes firebase-tools@15 deploy --only firestore,functions:mailing-list:subscribeMailingList,functions:mailing-list:coopV2,functions:mailing-list:coopV2Reap --non-interactive
+
+      - name: Check co-op service readiness
+        run: curl --fail-with-body --retry 4 --silent --show-error https://us-central1-electrify-game.cloudfunctions.net/coopV2/healthz
 
       - name: Build and deploy to prod
         env:
@@ -96,7 +114,7 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ steps.hosting-credentials.outputs.aws-secret-access-key }}
           # Baked into the JS bundle at build time by create-react-app.
           REACT_APP_FIREBASE_API_KEY: ${{ secrets.REACT_APP_FIREBASE_API_KEY }}
-          REACT_APP_COOP_RELAY_URL: ${{ vars.COOP_RELAY_URL }}
+          REACT_APP_STEAM_APP_ID: ${{ vars.STEAM_APP_ID }}
         run: ./scripts/deploy.sh ci-prod
 
       - name: Verify deployed SEO pages and hosting

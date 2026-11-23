@@ -19,6 +19,8 @@ export const COMMAND_RESEND_MS = 1500;
 export const HOST_SILENCE_MS = 5000;
 /** A save that has not finished in this long fails, so leaving never hangs. */
 export const SAVE_TIMEOUT_MS = 5000;
+/** Durable saves can wait for a baseline transfer and a separate storage write. */
+export const ONLINE_SAVE_TIMEOUT_MS = 45000;
 /** Commands a player can queue behind one that the host has not yet acknowledged. */
 export const MAX_QUEUED_COMMANDS = 64;
 /** An unchanged scenario selection is resent this often, so guests catch up after a miss. */

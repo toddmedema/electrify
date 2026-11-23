@@ -34,6 +34,37 @@ let local = false;
 let replicated: ReplicatedWorld | undefined;
 let hostSeat: string | undefined;
 let recovery: ReplicaRecovery | undefined;
+let online = false;
+let replicationOpen = true;
+let authority: Extract<WorkerRequest, { kind: "heartbeat" }>["authority"];
+let authorityPaused = false;
+
+function hasAuthority(epoch: string) {
+  return (
+    !online ||
+    (authority?.epoch === epoch &&
+      performance.timeOrigin + performance.now() <
+        authority.monotonicDeadline &&
+      Date.now() < authority.wallDeadline)
+  );
+}
+
+function enforceAuthority(running: World) {
+  if (hasAuthority(running.epoch)) {
+    authorityPaused = false;
+    return true;
+  }
+  if (!authorityPaused) {
+    authorityPaused = true;
+    replicated!.pause(
+      "Host authority was interrupted. Reconnect and ready up before resuming.",
+    );
+    requestRecords(true);
+    requestViews({ force: true });
+  }
+  return false;
+}
+
 let recoveryTimer: ReturnType<typeof setInterval> | undefined;
 let recordTimer: ReturnType<typeof setTimeout> | undefined;
 let recordDue = Infinity;
@@ -125,7 +156,7 @@ function requestRecords(urgent = false) {
   }, delay);
 }
 function sendBaseline(to: string) {
-  if (recovery?.baseline(to)) requestViews({ force: true });
+  if (replicationOpen && recovery?.baseline(to)) requestViews({ force: true });
 }
 /** Flush due seat projections and report a local summary from the same authoritative world.
  * Its date follows an active company, or the latest retired grid once the whole match has ended. */
@@ -234,7 +265,7 @@ function loop() {
       );
       requestRecords(true);
     }
-    replicated!.step();
+    if (enforceAuthority(world)) replicated!.step();
     requestRecords();
     requestViews();
     if (started - lastSave >= CHECKPOINT_INTERVAL_MS) {
@@ -258,6 +289,8 @@ async function startMatch(
 ) {
   busy = true;
   local = !!request.local;
+  online = !request.local && !!request.online;
+  replicationOpen = !online;
   if (local) {
     const { achievementHooks } = await import("../achievements/Achievements");
     installSimulationHooks(achievementHooks);
@@ -327,7 +360,13 @@ function handle(request: WorkerRequest, running: World) {
     else replicated!.setBlockers(request.reasons);
     requestRecords(true);
     requestViews({ force: true });
+  } else if (request.kind === "replication-open") {
+    if (replicationOpen || !hasAuthority(running.epoch)) return;
+    replicationOpen = true;
+    recovery?.connected(request.connected);
+    for (const to of request.connected) sendBaseline(to);
   } else if (request.kind === "command") {
+    if (!replicationOpen || !enforceAuthority(running)) return;
     const previousSpeed = running.speed;
     const { error, recorded } = replicated!.command(
       request.sender,
@@ -396,6 +435,8 @@ const refuse = (message: string) => post({ kind: "error", message });
 worker.onmessage = async ({ data: request }: MessageEvent<WorkerRequest>) => {
   if (request.kind === "heartbeat") {
     lastControlHeartbeat = performance.now();
+    authority = request.authority;
+    if (online && world) enforceAuthority(world);
     return;
   }
   if (request.kind === "views-applied") {

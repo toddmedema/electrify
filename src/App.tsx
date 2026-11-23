@@ -15,6 +15,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
 } from "react";
 import type { User } from "firebase/auth";
 import CompositorContainer from "./components/CompositorContainer";
@@ -65,6 +66,11 @@ import {
   screenEdgePaddingPixels,
 } from "./ScreenEdgePadding";
 import { getDesktop, isDesktopApp } from "./Desktop";
+import { captureCrossplayInvite } from "./multiplayer/CrossplayInvite";
+import {
+  multiplayerStartupRequested,
+  subscribeMultiplayerStartup,
+} from "./multiplayer/Registry";
 
 const AchievementNotifications = lazy(
   () =>
@@ -72,11 +78,20 @@ const AchievementNotifications = lazy(
       /* webpackChunkName: "achievements-ui" */ "./achievements/Interface"
     ),
 );
-const MultiplayerRoot =
-  process.env.REACT_APP_DESKTOP === "true" ||
-  process.env.REACT_APP_COOP_RELAY_URL
-    ? lazy(() => import("./multiplayer/Root"))
-    : undefined;
+const MultiplayerRoot = lazy(() => import("./multiplayer/Root"));
+function MultiplayerEntry() {
+  const requested = useSyncExternalStore(
+    subscribeMultiplayerStartup,
+    multiplayerStartupRequested,
+  );
+  const [invited] = useState(() => !!captureCrossplayInvite());
+  if (!requested && !invited && !isDesktopApp()) return null;
+  return (
+    <Suspense fallback={null}>
+      <MultiplayerRoot />
+    </Suspense>
+  );
+}
 const CouchSettingsPrompt =
   process.env.REACT_APP_DESKTOP === "true"
     ? lazy(() => import("./components/base/CouchSettingsPrompt"))
@@ -622,12 +637,7 @@ export default function App() {
                 <ScenarioChoiceDialog />
                 <CloudSavePrompt />
                 <SharedGameDialog />
-                {MultiplayerRoot &&
-                  (process.env.REACT_APP_COOP_RELAY_URL || isDesktopApp()) && (
-                    <Suspense fallback={null}>
-                      <MultiplayerRoot />
-                    </Suspense>
-                  )}
+                <MultiplayerEntry />
                 <Suspense fallback={null}>
                   <AchievementNotifications />
                 </Suspense>
