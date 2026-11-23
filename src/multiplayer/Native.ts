@@ -1,98 +1,19 @@
-import type { ScenarioType } from "../Types";
-import type { BrowseState } from "./Browse";
-import type { CommandEnvelope, Seat, World } from "./Types";
-import type { ReplicaBaseline, ReplicaRecord } from "./Replication";
-import type { ReplicaProgress } from "./ReplicaProtocol";
-/** A lobby member, with the selection they last marked Ready for (see selectionKey). */
-export interface LobbyMember extends Seat {
-  ready?: string;
-  /** The saved company this member claimed while resuming (see slotClaim). */
-  slot?: string;
-}
-export interface LobbyState {
-  inviteLobbyId?: string;
-  available: boolean;
-  lobbyId?: string;
-  inviteCode?: string;
-  hostId?: string;
-  selfId?: string;
-  members: LobbyMember[];
-  connected: string[];
-  savedAt?: number | null;
-  sharedAt?: number | null;
-  error?: string;
-}
-export interface SharedSaveLibrary {
-  warning?: string;
-  slots: {
-    id: string;
-    name: string;
-    updatedAt: number;
-    matchId: string;
-    schema: number;
-    players: string[];
-  }[];
-  cloudState: "disabled" | "offline" | "ready" | "failed";
-}
-export interface PendingCampaign {
-  id: string;
-  name: string;
-  players: Seat[];
-  requiredPlayerIds: string[];
-}
-export type WireMessage =
-  | { kind: "heartbeat" }
-  | {
-      kind: "keepalive";
-      matchId: string;
-      epoch: string;
-      revision: number;
-      disconnected?: string[];
-    }
-  | ({ kind: "baseline" } & ReplicaBaseline)
-  | {
-      kind: "records";
-      matchId: string;
-      epoch: string;
-      from: number;
-      records: ReplicaRecord[];
-    }
-  | {
-      kind: "rejected";
-      matchId: string;
-      epoch: string;
-      sequence: number;
-      error: string;
-    }
-  | ({ kind: "progress" } & ReplicaProgress)
-  | {
-      kind: "resync";
-      matchId: string;
-      epoch: string;
-      applied: number;
-      reason: string;
-    }
-  | { kind: "save-request"; requestId: string; suspended?: boolean }
-  | { kind: "save-result"; requestId: string; error?: string }
-  | { kind: "command"; envelope: CommandEnvelope }
-  | { kind: "browse"; browse: BrowseState }
-  | { kind: "scenario"; selectionKey: string; scenario: ScenarioType }
-  | { kind: "campaign"; campaign?: PendingCampaign };
+import type { SessionEvent, SessionRequest } from "./SessionTransport";
+import type { World } from "./Types";
+
+export type {
+  LobbyMember,
+  LobbyState,
+  PendingCampaign,
+  SharedSaveLibrary,
+  WireMessage,
+} from "./SessionTransport";
+
 export type NativeRequest =
-  | {
-      kind: "state" | "leave" | "reconnect" | "invite" | "unlock";
-    }
+  | SessionRequest
   | { kind: "read-checkpoint"; id?: string }
   | { kind: "list-saves"; sync?: boolean }
   | { kind: "delete-save"; id: string }
-  | { kind: "create"; rules: string }
-  | { kind: "join"; rules: string; lobbyId: string }
-  | { kind: "member"; key: "ready" | "slot"; value: string }
-  | { kind: "lock"; ids: string[] }
-  | { kind: "send"; to: string; payload: WireMessage }
   | { kind: "checkpoint"; world: World };
-export type NativeEvent =
-  | { kind: "invite"; lobbyId: string }
-  | { kind: "state"; state: LobbyState }
-  | { kind: "message"; sender: string; payload: WireMessage }
-  | { kind: "disconnected"; sender: string };
+
+export type NativeEvent = SessionEvent;
