@@ -19,7 +19,7 @@ test("one online visit stores everything a styled offline launch needs", async (
     return route.fulfill({ contentType: "application/javascript", body: "" });
   });
   await page.goto("/");
-  const play = page.getByRole("button", { name: "Play" });
+  const play = page.getByRole("button", { name: "Play", exact: true });
   await expect(play).toBeVisible();
   // Activation follows install, which stores the build. A browser HTTP cache could otherwise
   // hide a missing file on this reload, so check the worker's own cache as well.

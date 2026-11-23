@@ -334,6 +334,14 @@ for (const theme of ["light", "dark"]) {
     await page.getByRole("button", { name: "Start game" }).click();
     const chart = page.locator("#chartSupplyDemand [role=img]");
     const plot = chart.locator(".u-over");
+    // Open the details on the chart that will receive the swipe. Loading the
+    // interface font can resize the plot and replace its first canvas.
+    await page.evaluate(async () => {
+      await document.fonts.ready;
+      await new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+      );
+    });
     await scrollPlotIntoView(plot);
     const session = await page.context().newCDPSession(page);
     const tooltip = chart.locator(".chartTooltip-breakdown");
