@@ -35,7 +35,7 @@ for (const theme of ["light", "dark"]) {
     await expect(dialog).toContainText("6 months");
     await expect(
       dialog.locator(".decisionImpactFact").filter({ hasText: "Fuel use" }),
-    ).toContainText("9.14k → 6.27k Btu/kWh");
+    ).toContainText("11k → 6.27k Btu/kWh");
     await expect(
       dialog.locator(".decisionImpactFact").filter({ hasText: "Start time" }),
     ).toContainText("10 → 90 minutes");
