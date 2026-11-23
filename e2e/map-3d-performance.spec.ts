@@ -144,7 +144,7 @@ for (const theme of ["light", "dark"] as const) {
     await page.waitForTimeout(180);
     expect((await sample(canvas)).phases[key]).toBe(reduced.phases[key]);
     await expect(
-      map.locator(`[data-occupant-tile="${wind.tileId}"]`),
+      map.locator(`[data-status-tile="${wind.tileId}"]`),
     ).toHaveAttribute("data-facility-status", "producing");
     // Retiming while reduced motion freezes the exact phase: neither speed nor scene updates reset it.
     const rates: [string, number][] = [

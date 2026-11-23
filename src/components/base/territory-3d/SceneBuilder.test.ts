@@ -236,6 +236,7 @@ test("conductors use elevated real terminals and retain mesh identity across unr
       kind: "overhead",
       start: [0.1, 0.3, 0],
       end: [0.9, 0.3, 0],
+      midY: 0.195,
       lowY: 0.195,
     },
   ]);
@@ -312,6 +313,7 @@ test("mountain pylons stand on the raised summit pad and lift nearby wire termin
   expect(tower.position[1]).toBe(mountain.model.supportY);
   expect(tower.position[1]).toBeCloseTo(mountain.model.height);
   expect(wire.start[1] - wire.end[1]).toBeCloseTo(tower.position[1]);
+  expect((wire.start[1] + wire.end[1]) / 2 - wire.midY).toBeGreaterThan(0.001);
   expect(wire.lowY).toBeGreaterThan(0.2);
 });
 
@@ -354,7 +356,7 @@ test("submerged cable geometry reaches the land terminal", () => {
     tiles,
     () => true,
     undefined,
-    ({ terrain }) => (terrain === "lake" ? "submerged" : "tower"),
+    ({ terrain }) => terrain === "lake",
   );
   const cable = builder
     .build(views, tiles, wires, 0, "run")

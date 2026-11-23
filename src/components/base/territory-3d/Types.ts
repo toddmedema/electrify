@@ -46,6 +46,7 @@ export interface MapWireConnection {
   kind: "overhead" | "submerged";
   start: Vec3;
   end: Vec3;
+  midY: number;
   lowY: number;
 }
 export interface TerrainModelOptions {

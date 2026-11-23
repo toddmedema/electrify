@@ -255,7 +255,7 @@ for (const theme of ["light", "dark"] as const) {
 
     await selectTerritoryMapTile(page, getTerritoryTile(ids.active)!);
     await closeTileSurface(surface);
-    const active = map.locator(`[data-occupant-tile="${ids.active}"]`);
+    const active = map.locator(`[data-status-tile="${ids.active}"]`);
     await expect(active).toHaveAttribute("data-facility-status", "producing");
     await expect(active.locator(".facilityMapStatusArtwork")).toBeVisible();
     const operation = await sceneFacility(map, ids.active);
@@ -301,14 +301,14 @@ for (const theme of ["light", "dark"] as const) {
     await expect(cityTarget.getByText("You", { exact: true })).toBeVisible();
     await closeTileSurface(surface);
     await selectTerritoryMapTile(page, getTerritoryTile(ids.idle)!);
-    const idle = map.locator(`[data-occupant-tile="${ids.idle}"]`);
-    await expect(idle).toHaveAttribute("data-facility-status", "idle");
+    const idle = map.locator(`[data-status-tile="${ids.idle}"]`);
     await expect(idle.locator(".facilityMapStatusArtwork")).toHaveCount(0);
     await closeTileSurface(surface);
     await trigger.click();
     await status.check();
     await names.uncheck();
     await layers.press("Escape");
+    await expect(idle).toHaveAttribute("data-facility-status", "idle");
     await expect(idle.locator(".facilityMapStatusArtwork")).toBeVisible();
     await selectTerritoryMapTile(page, city);
     await expect(capitalLabel).toHaveCount(0);
@@ -419,7 +419,7 @@ for (const theme of ["light", "dark"] as const) {
       3,
     );
     await closeTileSurface(inspector);
-    const occupant = map.locator(`[data-occupant-tile="${tile.id}"]`);
+    const occupant = map.locator(`[data-status-tile="${tile.id}"]`);
     await expect(occupant).toHaveAttribute(
       "data-facility-status",
       "construction",
