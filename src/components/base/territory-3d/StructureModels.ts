@@ -3,6 +3,7 @@ import type { CityGrowthSector } from "../../../helpers/CityDemand";
 import { MeshBuilder } from "./MeshBuilder";
 import { PALETTE as P, rgb } from "./Palette";
 import type {
+  FacilitySize,
   MapMesh,
   MapModel,
   ModelPart,
@@ -461,7 +462,7 @@ function shatteredPanel(panel: MeshBuilder, center: number) {
     );
 }
 
-function solar(damaged = false): MapModel {
+function solar(damaged: boolean, _size: FacilitySize): MapModel {
   const body = new MeshBuilder(),
     glints = new MeshBuilder();
   const tilt = 0.36;
@@ -609,7 +610,7 @@ function windBlade(): MapMesh {
   return mesh.build();
 }
 
-function wind(kind: "wind" | "offshore-wind"): MapModel {
+function wind(kind: "wind" | "offshore-wind", _size: FacilitySize): MapModel {
   const offshore = kind === "offshore-wind",
     body = new MeshBuilder();
   const deck = offshore ? 0.09 : 0.035;
@@ -645,7 +646,7 @@ function wind(kind: "wind" | "offshore-wind"): MapModel {
   ]);
 }
 
-function airborne(): MapModel {
+function airborne(_size: FacilitySize): MapModel {
   const body = new MeshBuilder();
   base(body, 0.3, 0.23);
   body.box([0, 0.078, 0], [0.23, 0.085, 0.17], P.cream);
@@ -688,7 +689,10 @@ function airborne(): MapModel {
   ]);
 }
 
-function thermal(kind: "gas" | "oil" | "coal" | "biomass"): MapModel {
+function thermal(
+  kind: "gas" | "oil" | "coal" | "biomass",
+  _size: FacilitySize,
+): MapModel {
   const body = new MeshBuilder(),
     moving: ModelPart[] = [];
   base(body);
@@ -748,7 +752,7 @@ function thermal(kind: "gas" | "oil" | "coal" | "biomass"): MapModel {
   return facilityModel(kind, body, switchgear(body), moving);
 }
 
-function gasSteam(): MapModel {
+function gasSteam(_size: FacilitySize): MapModel {
   const body = new MeshBuilder();
   base(body);
 
@@ -775,7 +779,7 @@ function gasSteam(): MapModel {
   ]);
 }
 
-function nuclear(): MapModel {
+function nuclear(_size: FacilitySize): MapModel {
   const body = new MeshBuilder();
   base(body);
   const cx = -0.16,
@@ -837,7 +841,7 @@ function reservoir(
   };
 }
 
-function hydro(): MapModel {
+function hydro(_size: FacilitySize): MapModel {
   const body = new MeshBuilder(),
     water = new MeshBuilder(),
     flow = new MeshBuilder();
@@ -914,7 +918,7 @@ function hydro(): MapModel {
   ]);
 }
 
-function geothermal(): MapModel {
+function geothermal(_size: FacilitySize): MapModel {
   const body = new MeshBuilder();
   base(body);
   body.box([0.105, 0.09, 0.06], [0.38, 0.12, 0.24], P.cream);
@@ -938,7 +942,7 @@ function geothermal(): MapModel {
   ]);
 }
 
-function storage(kind: "battery" | "iron-air"): MapModel {
+function storage(kind: "battery" | "iron-air", _size: FacilitySize): MapModel {
   const body = new MeshBuilder(),
     flow = new MeshBuilder();
   base(body);
@@ -973,7 +977,7 @@ function storage(kind: "battery" | "iron-air"): MapModel {
   ]);
 }
 
-function pumpedHydro(): MapModel {
+function pumpedHydro(_size: FacilitySize): MapModel {
   const body = new MeshBuilder(),
     flow = new MeshBuilder();
   base(body, 0.66, 0.45);
@@ -1053,44 +1057,53 @@ function isCityKind(kind: StructureKind): kind is CityStructureKind {
   return kind.startsWith("city-");
 }
 
-const factories: Record<
-  Exclude<StructureKind, CityStructureKind>,
-  () => MapModel
+const facilityFactories: Record<
+  FacilityStructureKind,
+  (size: FacilitySize) => MapModel
 > = {
-  tower,
-  solar,
-  "solar-hail-damaged": () => solar(true),
-  wind: () => wind("wind"),
-  "offshore-wind": () => wind("offshore-wind"),
+  solar: (size) => solar(false, size),
+  "solar-hail-damaged": (size) => solar(true, size),
+  wind: (size) => wind("wind", size),
+  "offshore-wind": (size) => wind("offshore-wind", size),
   "airborne-wind": airborne,
-  gas: () => thermal("gas"),
+  gas: (size) => thermal("gas", size),
   "gas-steam": gasSteam,
-  oil: () => thermal("oil"),
-  coal: () => thermal("coal"),
-  biomass: () => thermal("biomass"),
+  oil: (size) => thermal("oil", size),
+  coal: (size) => thermal("coal", size),
+  biomass: (size) => thermal("biomass", size),
   nuclear,
   hydro,
   geothermal,
-  battery: () => storage("battery"),
-  "iron-air": () => storage("iron-air"),
+  battery: (size) => storage("battery", size),
+  "iron-air": (size) => storage("iron-air", size),
   "pumped-hydro": pumpedHydro,
 };
 
-/** Cities share geometry by size and sector combination. Other structures retain one model per kind. */
+/** Share city geometry by sector combination and facility geometry by nameplate tier. */
 export function getStructureModel(
   kind: StructureKind,
   growth: readonly CityGrowthSector[] = [],
+  size: FacilitySize = "medium",
 ): MapModel {
   const isCity = isCityKind(kind);
+  const facility = !isCity && kind !== "tower";
   const key =
-    isCity && growth.length
-      ? `${kind}:${growth.join("-").toLowerCase()}`
-      : kind;
+    facility && size !== "medium"
+      ? `${kind}:${size}`
+      : isCity && growth.length
+        ? `${kind}:${growth.join("-").toLowerCase()}`
+        : kind;
   const cached = models.get(key);
   if (cached) return cached;
   const result = isCity
     ? city(citySizes[kind], growth, key)
-    : factories[kind]();
-  models.set(key, result);
-  return result;
+    : kind === "tower"
+      ? tower()
+      : facilityFactories[kind](size);
+  const keyed =
+    facility && size !== "medium"
+      ? { ...result, key: `structure:${key}` }
+      : result;
+  models.set(key, keyed);
+  return keyed;
 }

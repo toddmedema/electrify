@@ -59,6 +59,7 @@ export interface TerrainModelOptions {
   /** Bits for edges shared with the same terrain, in HEX_NEIGHBORS order. */
   adjacentEdges?: number;
 }
+export type FacilitySize = "small" | "medium" | "large";
 export type StructureKind =
   | "city-small"
   | "city-medium"
