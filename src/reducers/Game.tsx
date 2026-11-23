@@ -141,10 +141,7 @@ import {
   isConventionalHydro,
   resolveStartingHydroSites,
 } from "../data/HydroSites";
-import {
-  captureRunIdentity,
-  projectAuthoredRunReference,
-} from "../helpers/RunIdentity";
+import { captureRunIdentity, validRunIdentity } from "../helpers/RunIdentity";
 import { launchRun } from "./GameActions";
 import { validInvitation } from "../helpers/ChallengeInvitation";
 import {
@@ -1869,8 +1866,7 @@ export const gameSlice = createSlice({
             : "authored",
       );
       state.runIdentity =
-        !state.storyEffectsDisabled &&
-        projectAuthoredRunReference(canonicalIdentity)
+        !state.storyEffectsDisabled && validRunIdentity(canonicalIdentity)
           ? canonicalIdentity
           : undefined;
       const checkpoint =

@@ -5,7 +5,7 @@ import { achievementHooks } from "../achievements/Achievements";
 import { currentTick } from "../helpers/GameSelectors";
 import { gameObjectiveResults } from "../helpers/ObjectiveRules";
 import { pendingScenarioChoice } from "../helpers/ScenarioChoices";
-import { projectAuthoredRunReference } from "../helpers/RunIdentity";
+import { validRunIdentity } from "../helpers/RunIdentity";
 import { modScenario } from "../mods/ModScenario";
 import type { ModPackage } from "../mods/ModSchema";
 import { modPackage } from "../testing/ModFixtures";
@@ -303,7 +303,7 @@ test("every modded company remains unranked and cannot accrue desktop achievemen
         selected.mod!.runtimeDigest,
       );
       expect(game.runIdentity).toBeUndefined();
-      expect(projectAuthoredRunReference(game.runIdentity)).toBeUndefined();
+      expect(validRunIdentity(game.runIdentity)).toBe(false);
       achievementHooks.initialize?.(game);
       achievementHooks.tick?.(game, currentTick(game)!);
       expect(game.desktopAchievements).toBeUndefined();

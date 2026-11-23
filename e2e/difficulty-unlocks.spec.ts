@@ -2,7 +2,7 @@ import path from "node:path";
 import { expect, test } from "./fixtures";
 import { DIFFICULTY_STORAGE_KEY } from "./difficulty-fixture";
 import { readSavedGame } from "./save-fixture";
-import manifest from "../src/data/RunCompatibility.json";
+import type { ChallengeInvitation } from "../src/Types";
 
 for (const theme of ["light", "dark"]) {
   test(`locked levels explain their requirements and react to progress in ${theme}`, async ({
@@ -136,16 +136,12 @@ for (const theme of ["light", "dark"]) {
   });
 }
 
-test("a locked friend challenge keeps its advertised rules and explains why it cannot start", async ({
+test("a locked friend challenge keeps its selected difficulty and explains why it cannot start", async ({
   page,
 }) => {
-  const challenge = {
-    run: {
-      scenarioId: 101,
-      difficulty: "CEO",
-      seed: 42,
-      compatibilityId: manifest.compatibilityId,
-    },
+  const challenge: ChallengeInvitation = {
+    scenarioId: 101,
+    difficulty: "CEO",
     target: 500,
   };
   await page.goto(
