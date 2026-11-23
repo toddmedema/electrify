@@ -104,6 +104,37 @@ it("selects the same city from the map and searchable list", async () => {
   expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
 });
 
+it("keeps the typed city query when the catalogue refreshes the selected city", async () => {
+  const user = userEvent.setup();
+  const onChange = jest.fn();
+  const [builtIn, remote] = cities;
+  const { rerender } = render(
+    <LocationPicker
+      locations={[builtIn]}
+      value={builtIn}
+      onChange={onChange}
+    />,
+  );
+  const search = screen.getByRole("combobox", {
+    name: "Search playable cities",
+  });
+  await user.click(search);
+  fireEvent.change(search, { target: { value: "East" } });
+
+  const selectedFromCatalogue = { ...builtIn, elevation: 21 };
+  rerender(
+    <LocationPicker
+      locations={[selectedFromCatalogue, remote]}
+      value={selectedFromCatalogue}
+      onChange={onChange}
+    />,
+  );
+
+  expect(search).toHaveValue("East");
+  await user.click(screen.getByRole("option", { name: "East City" }));
+  expect(onChange).toHaveBeenCalledWith(remote);
+});
+
 it("releases the search field after choosing a city with the keyboard", async () => {
   const user = userEvent.setup();
   const onChange = jest.fn();

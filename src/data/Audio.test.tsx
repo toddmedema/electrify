@@ -7,7 +7,7 @@ import {
   loadAudioLocalFile,
   pause,
   resume,
-  setMusicInGame,
+  setMusicRun,
   state,
   unlockAudio,
 } from "./Audio";
@@ -20,7 +20,10 @@ interface PendingRequest {
   open: jest.Mock;
   send: jest.Mock;
   onload: (() => void) | null;
+  ontimeout: (() => void) | null;
+  timeout: number;
   response: ArrayBuffer;
+  status: number;
 }
 
 beforeEach(() => {
@@ -31,7 +34,7 @@ beforeEach(() => {
     soundEffects: null,
     musicOutput: null,
     paused: false,
-    inGame: false,
+    musicRunId: undefined,
     musicIntensity: 0,
     nodes: {},
   });
@@ -55,16 +58,24 @@ it.each(["load", "unlock"])(
   },
 );
 
-it.each([false, true])(
-  "uses the latest game state when decoding finishes (initial inGame=%s)",
-  async (initialInGame) => {
+it.each([
+  [false, 200],
+  [true, 200],
+  [false, 404],
+  [false, "timeout"],
+])(
+  "uses the latest game state when decoding finishes (initial inGame=%s, intro response=%s)",
+  async (initialInGame, introStatus) => {
     const requests: PendingRequest[] = [];
     jest.spyOn(window, "XMLHttpRequest").mockImplementation(() => {
       const request: PendingRequest = {
         open: jest.fn(),
         send: jest.fn(),
         onload: null,
+        ontimeout: null,
+        timeout: 0,
         response: new ArrayBuffer(0),
+        status: requests.length === 4 && introStatus === 404 ? 404 : 200,
       };
       requests.push(request);
       return request as unknown as XMLHttpRequest;
@@ -82,7 +93,7 @@ it.each([false, true])(
     };
     (getAudioContext as jest.Mock).mockReturnValue(context);
 
-    setMusicInGame(initialInGame);
+    setMusicRun(initialInGame ? "solo:7" : undefined);
     loadAudioFiles();
     loadAudioFiles(); // A second owner must not duplicate requests, decoding, or output buses.
     expect(requests).toHaveLength(1);
@@ -91,17 +102,19 @@ it.each([false, true])(
       "audio/menu/quiet-current.wav",
       true,
     );
-    setMusicInGame(!initialInGame, 0.5);
+    setMusicRun(initialInGame ? undefined : "solo:9", 0.5);
     requests[0].onload?.();
     await waitFor(() => expect(ThemeManager).toHaveBeenCalledTimes(1));
     const earlyManager = (ThemeManager as jest.MockedClass<typeof ThemeManager>)
       .mock.instances[0];
     expect(earlyManager.setIntensity).toHaveBeenLastCalledWith(1);
     expect(state.loaded).toBe("LOADING");
-    for (let i = 1; i < 4; i++) {
+    for (let i = 1; i < 5; i++) {
       await waitFor(() => expect(requests).toHaveLength(i + 1));
-      requests[i].onload?.();
+      if (i === 4 && introStatus === "timeout") requests[i].ontimeout?.();
+      else requests[i].onload?.();
     }
+    expect(requests[4].timeout).toBeGreaterThan(0);
     await waitFor(() => expect(state.loaded).toBe("LOADED"));
     const constructor = ThemeManager as jest.MockedClass<typeof ThemeManager>;
     const manager = constructor.mock.instances[0];
@@ -111,14 +124,12 @@ it.each([false, true])(
         "menu/quiet-current.wav": expect.any(AudioNode),
       }),
     );
-    expect(manager.setIntensity).toHaveBeenLastCalledWith(
-      initialInGame ? 1 : 6,
-    );
-
-    setMusicInGame(initialInGame);
-    expect(manager.setIntensity).toHaveBeenLastCalledWith(
-      initialInGame ? 2 : 1,
-    );
+    const latestScene = () =>
+      jest.mocked(manager.setIntensity).mock.calls.at(-1);
+    expect(latestScene()).toEqual(initialInGame ? [1] : [6, "solo:9"]);
+    expect(Boolean(state.nodes["intro/intro.mp3"])).toBe(introStatus === 200);
+    setMusicRun(initialInGame ? "solo:7" : undefined);
+    expect(latestScene()).toEqual(initialInGame ? [2, "solo:7"] : [1]);
   },
 );
 
