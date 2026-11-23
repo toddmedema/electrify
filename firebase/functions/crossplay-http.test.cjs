@@ -1,12 +1,13 @@
 const assert = require("node:assert/strict");
 const { test } = require("node:test");
 const { createCrossplay } = require("./crossplay-http.cjs");
+const { googlePlaytestAccounts } = require("./crossplay-identity.cjs");
 
 const ORIGIN = "https://electrifygame.com";
 const RULES = `coop-2-${"a".repeat(64)}`;
 const DEVICE = "d".repeat(43);
 
-function setup() {
+function setup({ steamEnabled = true, webTesterUids } = {}) {
   let now = 10_000;
   let stopped = false;
   const documents = new Map();
@@ -24,15 +25,22 @@ function setup() {
     quotaKey: "fixture-does-not-leave-unit-tests",
     clock: () => now,
     audit: (event) => audits.push(event),
-    isStopped: async () => stopped,
+    readAccess: async () => ({
+      stopped,
+      allowedAccounts: steamEnabled
+        ? undefined
+        : googlePlaytestAccounts(webTesterUids),
+    }),
     verifyGoogle: async (token) => {
       const [provider, uid] = token.split(":");
       return { uid, firebase: { sign_in_provider: provider } };
     },
-    verifySteam: async (ticket) => {
-      steamCalls.push(ticket);
-      return "76561198000000000";
-    },
+    verifySteam: steamEnabled
+      ? async (ticket) => {
+          steamCalls.push(ticket);
+          return "76561198000000000";
+        }
+      : undefined,
     store: {
       account: async (id) => accounts.get(id),
       accounts: async (ids) => ids.map((id) => accounts.get(id)),
@@ -108,7 +116,7 @@ function setup() {
   async function call(
     operation,
     body,
-    { token, origin = ORIGIN, headers = {} } = {},
+    { token, origin = ORIGIN, method = "POST", headers = {} } = {},
   ) {
     const observed = {};
     const requestHeaders = {
@@ -124,7 +132,7 @@ function setup() {
         socket: { remoteAddress: "127.0.0.1" },
         get: (key) => requestHeaders[key],
         rawBody: Buffer.from(JSON.stringify(body)),
-        method: "POST",
+        method,
       },
       {
         set: (name, value) => (observed[name] = value),
@@ -193,6 +201,9 @@ function setup() {
     shutdown() {
       stopped = true;
     },
+    setWebTesters(uids) {
+      webTesterUids = uids;
+    },
     audits,
     steamCalls,
     approve,
@@ -233,6 +244,51 @@ test("provider proofs have an explicit origin, provider identity, replay gate an
     401,
   );
   assert.equal(ctx.steamCalls.length, 1);
+});
+
+test("web-only deployment admits the named Google testers and fences removed accounts", async () => {
+  const ctx = setup({ steamEnabled: false });
+  const health = () => ctx.call("healthz", {}, { method: "GET" });
+  const google = (uid) =>
+    ctx.call("auth/google", { token: `google.com:${uid}`, device: DEVICE });
+
+  assert.equal((await health()).status, 503);
+  assert.equal((await google("host")).status, 403);
+  ctx.setWebTesters(["host", "host"]);
+  assert.equal((await health()).status, 503);
+  ctx.setWebTesters(["host", "guest"]);
+  assert.equal((await health()).status, 200);
+  assert.equal((await google("outsider")).status, 403);
+
+  const host = await ctx.login("host");
+  const guest = await ctx.login("guest");
+  const room = await ctx.create(host);
+  await ctx.join(room, guest);
+  await ctx.approve(room, host, guest);
+  ctx.setWebTesters(["host", "replacement"]);
+  assert.equal((await ctx.call("room/list", {}, { token: guest })).status, 403);
+  assert.equal(
+    (
+      await ctx.call(
+        "save/read",
+        { roomId: room.lobby.lobbyId },
+        { token: guest },
+      )
+    ).status,
+    403,
+  );
+  assert.equal((await ctx.call("room/list", {}, { token: host })).status, 200);
+
+  const steam = await ctx.call(
+    "auth/steam",
+    { ticket: "1a".repeat(64), device: DEVICE },
+    { origin: null },
+  );
+  assert.equal(steam.status, 503);
+  assert.equal(ctx.steamCalls.length, 0);
+  ctx.shutdown();
+  assert.equal((await health()).status, 503);
+  assert.equal((await google("host")).status, 503);
 });
 
 test("only host approval exposes the opaque roster and invite rotation invalidates previous requests", async () => {

@@ -7,11 +7,13 @@ const { onRequest } = require("firebase-functions/v2/https");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { CrossplayError } = require("./crossplay-errors.cjs");
 const { createCrossplay } = require("./crossplay-http.cjs");
-const { steamUser } = require("./crossplay-identity.cjs");
+const {
+  googlePlaytestAccounts,
+  steamUser,
+} = require("./crossplay-identity.cjs");
 const { createStore, createWriter } = require("./crossplay-store.cjs");
 
 const secrets = {
-  steam: defineSecret("STEAM_PUBLISHER_KEY"),
   writer: defineSecret("COOP_FIREBASE_WRITER_API_KEY"),
   quota: defineSecret("COOP_RATE_LIMIT_KEY"),
   turnId: defineSecret("CLOUDFLARE_TURN_KEY_ID"),
@@ -21,15 +23,16 @@ const projectId = "electrify-game";
 const serviceAccount = `coop-service@${projectId}.iam.gserviceaccount.com`;
 
 function registerCrossplay(adminApp) {
+  const steamAppId = process.env.STEAM_APP_ID;
+  const steamKey = steamAppId ? defineSecret("STEAM_PUBLISHER_KEY") : undefined;
   let services;
   function initialize() {
     if (services) return services;
     const db = getFirestore(adminApp);
     const auth = getAuth(adminApp);
-    const steamAppId = process.env.STEAM_APP_ID;
     const checkpointBucket = process.env.COOP_CHECKPOINT_BUCKET;
     const relayCidrs = process.env.COOP_TURN_RELAY_CIDRS;
-    if (!/^\d{1,10}$/.test(steamAppId) || !checkpointBucket || !relayCidrs)
+    if (!checkpointBucket || !relayCidrs)
       throw new CrossplayError(503, "unavailable");
 
     const writerToken = createWriter({ auth, apiKey: secrets.writer.value() });
@@ -48,20 +51,28 @@ function registerCrossplay(adminApp) {
     const transfer = (operation, context, body) =>
       checkpoints.handle(operation, { ...context, bucket }, body);
 
-    const isStopped = async () =>
-      (await db.collection("coopSettings").doc("runtime").get()).data()
-        ?.stopped === true;
+    const readAccess = async () => {
+      const settings = (await db.doc("coopSettings/runtime").get()).data();
+      return {
+        stopped: settings?.stopped === true,
+        allowedAccounts: steamKey
+          ? undefined
+          : googlePlaytestAccounts(settings?.webTesterUids),
+      };
+    };
     const service = createCrossplay({
       store,
       verifyGoogle: (token) => auth.verifyIdToken(token, true),
-      verifySteam: (ticket) =>
-        steamUser(ticket, {
-          appId: steamAppId,
-          publisherKey: secrets.steam.value(),
-        }),
+      verifySteam: steamKey
+        ? (ticket) =>
+            steamUser(ticket, {
+              appId: steamAppId,
+              publisherKey: steamKey.value(),
+            })
+        : undefined,
       origins: ["https://electrifygame.com", "https://www.electrifygame.com"],
       quotaKey: secrets.quota.value(),
-      isStopped,
+      readAccess,
       healthy: async () => {
         const [, [metadata]] = await Promise.all([
           writerToken(),
@@ -88,7 +99,7 @@ function registerCrossplay(adminApp) {
     services = {
       service,
       signaling,
-      isStopped,
+      readAccess,
       reapCheckpoints: () =>
         checkpoints.reap(bucket, service.loadRoom, Date.now(), {
           load: async () => (await cleanup.get()).data(),
@@ -104,7 +115,7 @@ function registerCrossplay(adminApp) {
       {
         region: "us-central1",
         serviceAccount,
-        secrets: Object.values(secrets),
+        secrets: [...Object.values(secrets), ...(steamKey ? [steamKey] : [])],
         maxInstances: 4,
         concurrency: 8,
         timeoutSeconds: 25,
@@ -131,9 +142,9 @@ function registerCrossplay(adminApp) {
       },
       async () => {
         try {
-          const { signaling, isStopped, reapCheckpoints } = initialize();
+          const { signaling, readAccess, reapCheckpoints } = initialize();
           const results = await Promise.allSettled([
-            signaling.reap({ all: await isStopped() }),
+            signaling.reap({ all: (await readAccess()).stopped }),
             reapCheckpoints(),
           ]);
           if (results.some((operation) => operation.status === "rejected"))

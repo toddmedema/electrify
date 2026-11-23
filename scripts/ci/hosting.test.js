@@ -476,6 +476,29 @@ test("production workflow rejects unusable cross-play configuration before Fireb
   }
 });
 
+test("production workflow deploys the Firebase web service without a Steam App ID", (t) => {
+  const fixture = fakeDeployment(t, distribution(), undefined, "", {
+    args: ["--preflight"],
+    env: {
+      STEAM_APP_ID: "",
+      COOP_CHECKPOINT_BUCKET: "test-electrify-checkpoints",
+      COOP_TURN_RELAY_CIDRS: "141.101.64.0/18",
+    },
+  });
+  const { jobs } = parse(
+    fs.readFileSync(".github/workflows/deploy-prod.yml", "utf8"),
+  );
+  const deploy = jobs.deploy.steps.find(({ run }) =>
+    run?.includes("firebase-tools@15 deploy"),
+  );
+  const result = fixture.runShell(resolveDeploymentScripts(deploy.run));
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(
+    fixture.calls.filter(({ args }) => args[0] === "firebase").length,
+    1,
+  );
+});
+
 test("production workflow checks hosting readiness before Firebase or AWS mutations", (t) => {
   const fixture = fakeDeployment(t, distribution(), undefined, "", {
     args: ["--preflight"],

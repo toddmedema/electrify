@@ -97,8 +97,11 @@ jobs:
           key="$(mktemp -d)/firebase-service-account.json"
           trap 'rm -f "$key" firebase/functions/.env.electrify-game' EXIT
           printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$key"
-          printf 'STEAM_APP_ID=%s\nCOOP_CHECKPOINT_BUCKET=%s\nCOOP_TURN_RELAY_CIDRS="%s"\n' \
-            "$STEAM_APP_ID" "$COOP_CHECKPOINT_BUCKET" "$COOP_TURN_RELAY_CIDRS" > firebase/functions/.env.electrify-game
+          printf 'COOP_CHECKPOINT_BUCKET=%s\nCOOP_TURN_RELAY_CIDRS="%s"\n' \
+            "$COOP_CHECKPOINT_BUCKET" "$COOP_TURN_RELAY_CIDRS" > firebase/functions/.env.electrify-game
+          if [[ -n "$STEAM_APP_ID" ]]; then
+            printf 'STEAM_APP_ID=%s\n' "$STEAM_APP_ID" >> firebase/functions/.env.electrify-game
+          fi
           GOOGLE_APPLICATION_CREDENTIALS="$key" \
             npx --yes firebase-tools@15 deploy --only firestore,functions:mailing-list:subscribeMailingList,functions:mailing-list:coopV2,functions:mailing-list:coopV2Reap --non-interactive
 

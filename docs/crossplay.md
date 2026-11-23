@@ -49,15 +49,33 @@ that reach payload validation consume the budget even if validation fails. A
 handoff keeps the current window. A host who exhausts the account limit must
 wait for the next quota window before retrying recovery.
 
+## Web-only production playtest
+
+Use `https://electrifygame.com` and leave the Actions variable `STEAM_APP_ID`
+unset. Firebase deploys the co-op service with the four web/TURN secrets.
+For each tester, find their Google-backed Firebase Authentication UID after
+they sign in. Set `webTesterUids` on the server-only Firestore document
+`coopSettings/runtime` to those UIDs. Start with `stopped: true` while setting
+up and qualifying TURN. Set `stopped: false` after two distinct testers are
+listed and TURN exposure is bounded. The deployment checks that the opened
+service is ready before it publishes the website. A removed tester loses
+access on their next service request. When Steam is configured, the standard
+Web and Steam account checks apply for general availability.
+
+After deployment, use two signed-in browsers to verify host approval, play,
+Save & Quit, and recovery under a different host. Check that a third Google
+account cannot open a room. Use the deployed-stack acceptance cases below for
+more browsers, devices and network conditions.
+
 ## Release access
 
 Provision these resources through the provider consoles before a production
 rollout. Keep tokens and keys in the named secret stores. Share the project ID,
 App ID, endpoint, bucket name, provider policy and pass/fail evidence in the PR.
 
-- **GitHub repository maintainer.** Set Actions variables `STEAM_APP_ID`,
+- **GitHub repository maintainer.** Set Actions variables
   `COOP_CHECKPOINT_BUCKET` and `COOP_TURN_RELAY_CIDRS` on the repository or
-  its `production` environment. Use the public IPv4 networks Cloudflare
+  its `production` environment. Add `STEAM_APP_ID` when Steam is ready. Use the public IPv4 networks Cloudflare
   confirms for **relay allocations**. The preflight validates the same CIDR
   syntax as the application. It runs before Firebase changes. The existing
   `FIREBASE_SERVICE_ACCOUNT` deploy identity needs permission to deploy
@@ -79,7 +97,8 @@ App ID, endpoint, bucket name, provider policy and pass/fail evidence in the PR.
   Give it Firebase Auth user lookup for revocation checks (`firebaseauth.users.get`),
   Firestore data read/write, and `iam.serviceAccounts.signBlob` on the account
   used to sign the Firebase writer token. Give it Secret Manager Secret
-  Accessor on the five co-op secrets. Create `COOP_FIREBASE_WRITER_API_KEY`
+  Accessor on the four web/TURN secrets, and grant access to the publisher
+  key when adding Steam. Create `COOP_FIREBASE_WRITER_API_KEY`
   in the Firebase project for the server-side Identity Toolkit token exchange
   and `COOP_RATE_LIMIT_KEY` from at least 32 random bytes. Grant bucket metadata
   read and object create, get, list and delete on the dedicated checkpoint

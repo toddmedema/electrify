@@ -37,7 +37,7 @@ function createCrossplay({
   origins,
   quotaKey,
   extensions,
-  isStopped = async () => false,
+  readAccess = async () => ({ stopped: false }),
   healthy = async () => true,
   onRoomChanged,
   audit = () => undefined,
@@ -94,8 +94,11 @@ function createCrossplay({
         return;
       }
       if (request.method === "GET" && operation === "healthz") {
+        const { stopped, allowedAccounts } = await readAccess();
         requireValue(
-          !(await isStopped()) && (await healthy()),
+          !stopped &&
+            (!allowedAccounts || allowedAccounts.size >= 2) &&
+            (await healthy()),
           503,
           "unavailable",
         );
@@ -123,12 +126,20 @@ function createCrossplay({
         413,
         "payload_too_large",
       );
-      requireValue(!(await isStopped()), 503, "unavailable");
+      const { stopped, allowedAccounts } = await readAccess();
+      requireValue(!stopped, 503, "unavailable");
       const exchange =
         operation === "auth/google" || operation === "auth/steam";
       const authorization = request.get("authorization");
       const actor = exchange ? undefined : await identity.auth(authorization);
-      if (actor && bulk) await limit("bulk", actor.account, 20);
+      if (actor) {
+        requireValue(
+          !allowedAccounts || allowedAccounts.has(actor.account),
+          403,
+          "forbidden",
+        );
+        if (bulk) await limit("bulk", actor.account, 20);
+      }
       let requestBody;
       try {
         requestBody = JSON.parse(request.rawBody.toString("utf8"));
@@ -150,6 +161,7 @@ function createCrossplay({
           requestBody,
           limit,
           authorization,
+          allowedAccounts,
         );
       } else {
         if (operation === "auth/revoke") {
@@ -163,10 +175,17 @@ function createCrossplay({
             await limit("join-ip", hashedIp(request), 80);
           result = await rooms.handle(operation, actor, requestBody, limit);
           if (bulk) {
+            const access = await readAccess();
             requireValue(
-              !response.destroyed && !(await isStopped()),
+              !response.destroyed && !access.stopped,
               503,
               "unavailable",
+            );
+            requireValue(
+              !access.allowedAccounts ||
+                access.allowedAccounts.has(actor.account),
+              403,
+              "forbidden",
             );
             await identity.auth(authorization);
           }
