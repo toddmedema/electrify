@@ -1246,53 +1246,199 @@ function gasSteam(size: FacilitySize): MapModel {
   );
 }
 
-function nuclear(_size: FacilitySize): MapModel {
+function nuclear(size: FacilitySize): MapModel {
   const body = new MeshBuilder();
-  base(body);
-  const cx = -0.16,
-    cz = -0.035;
-  const profile = [
-    [0.036, 0.142],
-    [0.125, 0.105],
-    [0.24, 0.078],
-    [0.365, 0.112],
-  ];
-  for (let ring = 0; ring < profile.length - 1; ring++)
+  const site = {
+    small: {
+      pad: [0.46, 0.32],
+      reactor: [0.114, -0.031],
+      annex: [
+        [0.074, 0.067, 0.093],
+        [0.229, 0.081, 0.104],
+      ],
+      glazing: [0.075, 0.148, 0.145],
+      switchgear: 0.172,
+    },
+    medium: {
+      pad: [0.64, 0.4],
+      reactor: [0.17, -0.04],
+      annex: [
+        [0.13, 0.075, 0.13],
+        [0.32, 0.1, 0.13],
+      ],
+      glazing: [0.085, 0.198, 0.23],
+      switchgear: 0.22,
+    },
+    large: {
+      pad: [0.76, 0.46],
+      reactor: [0.012, 0.048],
+      annex: [
+        [-0.104, 0.075, 0.158],
+        [0.42, 0.1, 0.122],
+      ],
+      glazing: [0.085, 0.222, 0.3],
+      switchgear: 0.246,
+    },
+  } as const;
+  const layout = site[size];
+  const [padWidth, padDepth] = layout.pad;
+  base(body, padWidth, padDepth);
+
+  function coolingTower(
+    x: number,
+    z: number,
+    profile: readonly (readonly [height: number, radius: number])[],
+    throatRadius: number,
+    throatHeight: number,
+    phase = 0,
+  ): ModelPart[] {
+    const [crest, rim] = profile[profile.length - 1];
+    const ringPoint = (angle: number, y: number, radius: number): Vec3 => [
+      x + Math.cos(angle) * radius,
+      y,
+      z + Math.sin(angle) * radius,
+    ];
+    for (let ring = 0; ring < profile.length - 1; ring++)
+      for (let side = 0; side < 10; side++) {
+        const a = (side * TAU) / 10,
+          b = ((side + 1) * TAU) / 10;
+        const [low, lr] = profile[ring],
+          [high, hr] = profile[ring + 1];
+        body.quad(
+          ringPoint(b, low, lr),
+          ringPoint(a, low, lr),
+          ringPoint(a, high, hr),
+          ringPoint(b, high, hr),
+          P.cream,
+        );
+      }
+    body.cylinder(
+      [x, throatHeight, z],
+      throatRadius,
+      throatRadius,
+      0.006,
+      P.ink,
+      10,
+    );
     for (let side = 0; side < 10; side++) {
       const a = (side * TAU) / 10,
         b = ((side + 1) * TAU) / 10;
-      const [low, lr] = profile[ring],
-        [high, hr] = profile[ring + 1];
       body.quad(
-        [cx + Math.cos(b) * lr, low, cz + Math.sin(b) * lr],
-        [cx + Math.cos(a) * lr, low, cz + Math.sin(a) * lr],
-        [cx + Math.cos(a) * hr, high, cz + Math.sin(a) * hr],
-        [cx + Math.cos(b) * hr, high, cz + Math.sin(b) * hr],
-        P.cream,
+        ringPoint(a, crest, rim),
+        ringPoint(a, crest, throatRadius),
+        ringPoint(b, crest, throatRadius),
+        ringPoint(b, crest, rim),
+        P.steel,
       );
     }
-  body.cylinder([cx, 0.335, cz], 0.092, 0.092, 0.006, P.ink, 10);
-  for (let side = 0; side < 10; side++) {
-    const a = (side * TAU) / 10,
-      b = ((side + 1) * TAU) / 10;
-    body.quad(
-      [cx + Math.cos(a) * 0.112, 0.365, cz + Math.sin(a) * 0.112],
-      [cx + Math.cos(a) * 0.092, 0.365, cz + Math.sin(a) * 0.092],
-      [cx + Math.cos(b) * 0.092, 0.365, cz + Math.sin(b) * 0.092],
-      [cx + Math.cos(b) * 0.112, 0.365, cz + Math.sin(b) * 0.112],
-      P.steel,
-    );
+    return [
+      steam([x, crest + 0.025, z], phase),
+      steam([x, crest + 0.025, z], phase + 0.5),
+    ];
   }
-  body.cylinder([0.17, 0.036, -0.04], 0.115, 0.115, 0.125, P.steel, 10);
-  body.cylinder([0.17, 0.161, -0.04], 0.115, 0.089, 0.065, P.cream, 10);
-  body.cylinder([0.17, 0.226, -0.04], 0.089, 0.035, 0.035, P.cream, 10);
-  body.cylinder([0.17, 0.261, -0.04], 0.035, 0, 0.01, P.cream, 10);
-  body.box([0.13, 0.075, 0.13], [0.32, 0.1, 0.13], P.cream);
-  const glazing = windows(body, 0.13, 0.085, 0.198, 0.23);
-  return facilityModel("nuclear", body, switchgear(body), [
+
+  const exhaust =
+    size === "small"
+      ? coolingTower(
+          -0.112,
+          -0.027,
+          [
+            [0.036, 0.097],
+            [0.097, 0.071],
+            [0.171, 0.052],
+            [0.244, 0.076],
+          ],
+          0.06,
+          0.221,
+        )
+      : size === "large"
+        ? [
+            ...coolingTower(
+              -0.228,
+              -0.081,
+              [
+                [0.036, 0.134],
+                [0.142, 0.102],
+                [0.291, 0.075],
+                [0.432, 0.112],
+              ],
+              0.091,
+              0.401,
+            ),
+            ...coolingTower(
+              0.232,
+              -0.087,
+              [
+                [0.036, 0.127],
+                [0.131, 0.091],
+                [0.249, 0.068],
+                [0.386, 0.101],
+              ],
+              0.082,
+              0.355,
+              0.22,
+            ),
+          ]
+        : coolingTower(
+            -0.16,
+            -0.035,
+            [
+              [0.036, 0.142],
+              [0.125, 0.105],
+              [0.24, 0.078],
+              [0.365, 0.112],
+            ],
+            0.092,
+            0.335,
+          );
+
+  // The containment roof stays visible between the cooling towers on the largest site.
+  const [reactorX, reactorZ] = layout.reactor;
+  const dome =
+    size === "small"
+      ? [
+          [0.036, 0.082, 0.082, 0.085],
+          [0.121, 0.082, 0.061, 0.047],
+          [0.168, 0.061, 0.022, 0.024],
+          [0.192, 0.022, 0, 0.008],
+        ]
+      : size === "large"
+        ? [
+            [0.036, 0.119, 0.119, 0.138],
+            [0.174, 0.119, 0.092, 0.078],
+            [0.252, 0.092, 0.035, 0.043],
+            [0.295, 0.035, 0, 0.011],
+          ]
+        : [
+            [0.036, 0.115, 0.115, 0.125],
+            [0.161, 0.115, 0.089, 0.065],
+            [0.226, 0.089, 0.035, 0.035],
+            [0.261, 0.035, 0, 0.01],
+          ];
+  dome.forEach(([y, baseRadius, topRadius, height], ring) => {
+    body.cylinder(
+      [reactorX, y, reactorZ],
+      baseRadius,
+      topRadius,
+      height,
+      ring === 0 ? P.steel : P.cream,
+      10,
+    );
+  });
+
+  const [annexCenter, annexDimensions] = layout.annex;
+  const [annexX, , annexZ] = annexCenter;
+  body.box(annexCenter, annexDimensions, P.cream);
+  if (size === "large") {
+    body.box([annexX, 0.127, annexZ], [0.428, 0.014, 0.13], P.steel);
+    body.box([0.218, 0.084, 0.138], [0.121, 0.095, 0.128], P.steel);
+    body.box([0.218, 0.135, 0.138], [0.143, 0.014, 0.14], P.steelShade);
+  }
+  const [windowY, windowZ, windowWidth] = layout.glazing;
+  const glazing = windows(body, annexX, windowY, windowZ, windowWidth);
+  return facilityModel("nuclear", body, switchgear(body, layout.switchgear), [
     glazing,
-    steam([cx, 0.39, cz]),
-    steam([cx, 0.39, cz], 0.5),
+    ...exhaust,
   ]);
 }
 
@@ -1385,28 +1531,140 @@ function hydro(_size: FacilitySize): MapModel {
   ]);
 }
 
-function geothermal(_size: FacilitySize): MapModel {
+function geothermal(size: FacilitySize): MapModel {
   const body = new MeshBuilder();
-  base(body);
-  body.box([0.105, 0.09, 0.06], [0.38, 0.12, 0.24], P.cream);
-  gable(body, [0.105, 0.15, 0.06], [0.4, 0.035, 0.26], P.steel);
-  const glazing = windows(body, 0.105, 0.09, 0.183, 0.25);
-  for (const [x, z, height] of [
-    [-0.235, -0.09, 0.24],
-    [-0.15, 0.1, 0.19],
-  ]) {
-    body.cylinder([x, 0.035, z], 0.035, 0.035, 0.025, P.ink);
-    body.beam([x, 0.045, z], [x, height, z], 0.019, P.steel, 6);
-    body.beam([x, height, z], [x + 0.1, height, z], 0.019, P.steel, 6);
-    body.beam([x + 0.1, height, z], [x + 0.1, 0.13, z], 0.019, P.steel, 6);
+  const small = size === "small",
+    large = size === "large";
+  const site = {
+    small: {
+      pad: [0.459, 0.32],
+      hall: [
+        [0.066, 0.08, 0.025],
+        [0.272, 0.09, 0.171],
+      ],
+      roof: [
+        [0.066, 0.125, 0.025],
+        [0.288, 0.027, 0.186],
+      ],
+      glazing: [0.078, 0.114, 0.178],
+      switchgear: 0.181,
+    },
+    medium: {
+      pad: [0.64, 0.4],
+      hall: [
+        [0.105, 0.09, 0.06],
+        [0.38, 0.12, 0.24],
+      ],
+      roof: [
+        [0.105, 0.15, 0.06],
+        [0.4, 0.035, 0.26],
+      ],
+      glazing: [0.09, 0.183, 0.25],
+      switchgear: 0.22,
+    },
+    large: {
+      pad: [0.752, 0.46],
+      hall: [
+        [0.13, 0.11, -0.046],
+        [0.39, 0.162, 0.246],
+      ],
+      roof: [
+        [0.13, 0.191, -0.046],
+        [0.413, 0.043, 0.265],
+      ],
+      glazing: [0.114, 0.08, 0.255],
+      switchgear: 0.227,
+    },
+  } as const;
+  const layout = site[size];
+  const [padWidth, padDepth] = layout.pad;
+  const [hallCenter, hallDimensions] = layout.hall;
+  const [roofBase, roofDimensions] = layout.roof;
+  const [windowY, windowZ, windowWidth] = layout.glazing;
+  base(body, padWidth, padDepth);
+  body.box(hallCenter, hallDimensions, P.cream);
+  gable(body, roofBase, roofDimensions, P.steel);
+  const glazing = windows(body, hallCenter[0], windowY, windowZ, windowWidth);
+
+  const wells = small
+    ? [[-0.16, 0.067, 0.185]]
+    : large
+      ? [
+          [-0.278, -0.128, 0.312],
+          [-0.212, 0.022, 0.27],
+          [-0.288, 0.166, 0.227],
+        ]
+      : [
+          [-0.235, -0.09, 0.24],
+          [-0.15, 0.1, 0.19],
+        ];
+  const pipeRadius = small ? 0.016 : large ? 0.022 : 0.019;
+  for (const [x, z, height] of wells) {
+    const returnX = large ? -0.11 : x + (small ? 0.081 : 0.1);
+    const returnY = small ? 0.09 : large ? 0.145 : 0.13;
+    body.cylinder(
+      [x, 0.035, z],
+      small ? 0.027 : 0.035,
+      small ? 0.027 : 0.035,
+      0.025,
+      P.ink,
+    );
+    body.beam([x, 0.045, z], [x, height, z], pipeRadius, P.steel, 6);
+    body.beam([x, height, z], [returnX, height, z], pipeRadius, P.steel, 6);
+    body.beam(
+      [returnX, height, z],
+      [returnX, returnY, z],
+      pipeRadius,
+      P.steel,
+      6,
+    );
     body.box([x, height - 0.045, z], [0.05, 0.012, 0.05], P.mint);
   }
-  body.cylinder([0.2, 0.15, -0.075], 0.025, 0.025, 0.14, P.steel, 6);
-  return facilityModel("geothermal", body, switchgear(body), [
-    glazing,
-    steam([0.2, 0.31, -0.075]),
-    steam([0.2, 0.31, -0.075], 0.5),
-  ]);
+  if (large) {
+    // Three doglegs feed a common header connected to the process hall.
+    body
+      .beam(
+        [-0.11, 0.145, -0.151],
+        [-0.11, 0.145, 0.184],
+        0.024,
+        P.steelShade,
+        6,
+      )
+      .beam([-0.11, 0.145, 0.02], [0.06, 0.145, 0.02], 0.024, P.steel, 6)
+      .box([-0.11, 0.145, 0.093], [0.061, 0.061, 0.018], P.mint)
+      .cylinder([0.254, 0.036, 0.149], 0.061, 0.061, 0.129, P.steel, 8)
+      .cylinder([0.254, 0.165, 0.149], 0.061, 0.035, 0.027, P.cream, 8)
+      .beam(
+        [0.254, 0.171, 0.149],
+        [0.254, 0.171, 0.049],
+        0.018,
+        P.steelShade,
+        6,
+      );
+  } else if (small) {
+    body.beam([-0.079, 0.09, 0.067], [-0.054, 0.09, 0.067], 0.016, P.steel, 6);
+  }
+
+  const vents = small
+    ? [[0.136, 0.113, -0.046, 0.107, 0.238]]
+    : large
+      ? [
+          [0.108, 0.191, -0.132, 0.173, 0.384],
+          [0.271, 0.191, -0.102, 0.126, 0.339],
+        ]
+      : [[0.2, 0.15, -0.075, 0.14, 0.31]];
+  const exhaust: ModelPart[] = [];
+  for (const [x, y, z, height, outlet] of vents) {
+    const radius = small ? 0.019 : large ? 0.028 : 0.025;
+    body.cylinder([x, y, z], radius, radius, height, P.steel, 6);
+    exhaust.push(steam([x, outlet, z]), steam([x, outlet, z], 0.5));
+  }
+  return facilityModel(
+    "geothermal",
+    body,
+    switchgear(body, layout.switchgear),
+    [glazing, ...exhaust],
+  );
 }
 
 function storage(kind: "battery" | "iron-air", _size: FacilitySize): MapModel {
