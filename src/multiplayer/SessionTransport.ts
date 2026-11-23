@@ -85,7 +85,7 @@ export type SessionRequest =
   | { kind: "create"; rules: string }
   | { kind: "join"; rules: string; lobbyId: string }
   | { kind: "member"; key: "ready" | "slot"; value: string }
-  | { kind: "lock"; ids: string[] }
+  | { kind: "lock"; ids: string[]; requiredIds: string[] }
   | { kind: "send"; to: string; payload: WireMessage };
 
 export type SessionEvent =

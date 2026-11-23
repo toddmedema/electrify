@@ -1057,10 +1057,9 @@ export class MultiplayerSession {
   }
   async reconnect() {
     try {
-      this.update({
-        lobby: await this.request({ kind: "reconnect" }),
-        error: undefined,
-      });
+      const lobby = await this.request({ kind: "reconnect" });
+      this.update({ error: undefined });
+      this.event({ kind: "state", state: lobby });
     } catch (error) {
       // A failed reconnect means the host link is gone. Surface it as a lobby connection
       // error (the channel reserved for connection failures) so the notice offers Disconnect
@@ -1269,7 +1268,13 @@ export class MultiplayerSession {
         ? this.resumeBlocker()
         : this.rosterError(seats, seats);
       if (rosterError) throw new Error(rosterError);
-      await this.request({ kind: "lock", ids: seats.map((s) => s.id) });
+      await this.request({
+        kind: "lock",
+        ids: seats.map((seat) => seat.id),
+        requiredIds: seats
+          .filter((_, index) => !world?.outcomes?.[world.seats[index].id])
+          .map((seat) => seat.id),
+      });
       locked = true;
       if (!current()) {
         await this.request({ kind: "unlock" }).catch(() => undefined);

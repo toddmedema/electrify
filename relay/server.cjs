@@ -9,7 +9,17 @@ const MINUTE = 60_000;
 const CODE = /^\d{6}$/;
 const RULES = /^coop-\d+-[a-f0-9]{64}$/;
 const TOKEN = /^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/;
-const MEMBER_DATA = /^[a-zA-Z0-9_.:-]*$/;
+const PLAYER_ID = /^web-[a-f0-9]{32}$/;
+const MEMBER_DATA = /^[a-zA-Z0-9_.:|-]*$/;
+const COMMANDS = new Set([
+  "pause",
+  "ready",
+  "speed",
+  "activity",
+  "action",
+  "rate",
+]);
+
 const HOST_MESSAGES = new Set([
   "baseline",
   "records",
@@ -38,6 +48,95 @@ class RelayError extends Error {
 const requireValue = (condition, message) => {
   if (!condition) throw new RelayError(message);
 };
+
+const object = (value) =>
+  !!value && typeof value === "object" && !Array.isArray(value);
+const boundedText = (value, length = 64) =>
+  typeof value === "string" && value.length > 0 && value.length <= length;
+const sequence = (value, minimum = 0) =>
+  Number.isSafeInteger(value) && value >= minimum;
+
+// The renderer validates scenario and simulation semantics. Bound and check the wire
+// envelopes here before an untrusted roommate can reach the React shell or host worker.
+function validMessage(payload, inputBytes) {
+  switch (payload.kind) {
+    case "command": {
+      const command = payload.envelope;
+      return (
+        inputBytes <= 2560 &&
+        object(command) &&
+        boundedText(command.matchId) &&
+        boundedText(command.epoch) &&
+        sequence(command.sequence, 1) &&
+        COMMANDS.has(command.command?.kind)
+      );
+    }
+    case "save-request":
+    case "save-result":
+      return (
+        inputBytes <= 4096 &&
+        boundedText(payload.requestId) &&
+        (payload.error === undefined || boundedText(payload.error, 2048)) &&
+        (payload.suspended === undefined ||
+          typeof payload.suspended === "boolean")
+      );
+    case "browse":
+      return inputBytes <= 17 * 1024 && object(payload.browse);
+    case "campaign":
+      return (
+        inputBytes <= 5 * 1024 &&
+        (payload.campaign === undefined || object(payload.campaign))
+      );
+    case "scenario":
+      return (
+        inputBytes <= 514 * 1024 &&
+        boundedText(payload.selectionKey, 256) &&
+        object(payload.scenario)
+      );
+    case "baseline":
+      return (
+        boundedText(payload.matchId) &&
+        boundedText(payload.epoch) &&
+        sequence(payload.index) &&
+        object(payload.world) &&
+        payload.world.matchId === payload.matchId &&
+        payload.world.epoch === payload.epoch
+      );
+    case "records":
+      return (
+        inputBytes <= 65 * 1024 &&
+        boundedText(payload.matchId) &&
+        boundedText(payload.epoch) &&
+        sequence(payload.from, 1) &&
+        Array.isArray(payload.records) &&
+        payload.records.length > 0 &&
+        payload.records.length <= 256
+      );
+    case "keepalive":
+      return (
+        inputBytes <= 4096 &&
+        boundedText(payload.matchId) &&
+        boundedText(payload.epoch) &&
+        sequence(payload.revision) &&
+        (payload.disconnected === undefined ||
+          (Array.isArray(payload.disconnected) &&
+            payload.disconnected.length <= MAX_PEERS &&
+            payload.disconnected.every(
+              (id) => typeof id === "string" && PLAYER_ID.test(id),
+            )))
+      );
+    case "resync":
+    case "progress":
+    case "rejected":
+      return (
+        inputBytes <= 4096 &&
+        boundedText(payload.matchId) &&
+        boundedText(payload.epoch)
+      );
+    default:
+      return inputBytes <= 512;
+  }
+}
 
 // The relay owns membership and routing. Only the host runs the game simulation.
 function createRelay({
@@ -78,13 +177,25 @@ function createRelay({
 
   function state(peer) {
     const { room, id } = peer;
-    const members = room ? [...room.members.values()] : [];
+    const members = room
+      ? [...room.members.values()].filter(
+          (member) =>
+            member.peer ||
+            room.locked?.has(member.id) ||
+            member.id === room.hostId,
+        )
+      : [];
     return {
       available: true,
       selfId: id,
       lobbyId: room?.id,
       inviteCode: room?.code,
       hostId: room?.hostId,
+      error: room?.closed
+        ? "The host closed the lobby. Resume the multiplayer save to continue."
+        : room && !room.members.get(room.hostId)?.peer
+          ? "The host lost connection. Waiting for them to reconnect."
+          : undefined,
       members: members.map(({ id, name, ready, slot }) => ({
         id,
         name,
@@ -108,6 +219,7 @@ function createRelay({
     codes.delete(room.code);
     clearTimeout(room.expiration);
     room.members.delete(room.hostId);
+    room.closed = true;
     // Keep the old ID in this final event so guests can finish the proper leave flow.
     broadcast(room);
     for (const member of room.members.values())
@@ -126,24 +238,29 @@ function createRelay({
       room.expiration = setTimeout(() => destroy(room), roomGraceMs);
       room.expiration.unref();
     } else if (!room.locked) {
-      room.members.delete(id);
+      if (explicit) room.members.delete(id);
+      else member.expires = Date.now() + roomGraceMs;
     }
-    if (room.locked)
-      for (const { peer: other } of room.members.values())
-        if (other)
-          send(other.socket, { event: { kind: "disconnected", sender: id } });
     broadcast(room);
   }
 
   function attach(peer, room) {
-    if (peer.room && peer.room !== room) detach(peer, true);
     const member = room.members.get(peer.id) ?? {
       id: peer.id,
       name: peer.name,
     };
     if (member.peer && member.peer !== peer)
       throw new RelayError("This player is already connected in another tab.");
+    if (!room.members.has(peer.id) && room.members.size >= MAX_PEERS) {
+      const parked = [...room.members.values()].find(
+        (entry) => !entry.peer && entry.id !== room.hostId,
+      );
+      requireValue(parked && !room.locked, "This lobby is full.");
+      room.members.delete(parked.id);
+    }
+    if (peer.room && peer.room !== room) detach(peer, true);
     member.peer = peer;
+    member.expires = undefined;
     room.members.set(peer.id, member);
     peer.room = room;
     if (peer.id === room.hostId) clearTimeout(room.expiration);
@@ -172,14 +289,17 @@ function createRelay({
     );
   }
 
-  function handleRequest(peer, input) {
+  function handleRequest(peer, input, inputBytes) {
     requireValue(
       input && typeof input.kind === "string",
       "Invalid multiplayer request.",
     );
     if (input.kind === "hello") {
       requireValue(
-        !peer.id && TOKEN.test(input.token) && typeof input.token === "string",
+        !peer.id &&
+          inputBytes <= 4096 &&
+          typeof input.token === "string" &&
+          TOKEN.test(input.token),
         "Invalid multiplayer identity.",
       );
       const digest = createHash("sha256").update(input.token).digest("hex");
@@ -201,6 +321,8 @@ function createRelay({
     requireValue(peer.id, "Connect to the multiplayer service first.");
     const { room, id } = peer;
     switch (input.kind) {
+      case "pulse":
+        return;
       case "state":
         return state(peer);
       case "create": {
@@ -231,6 +353,7 @@ function createRelay({
           typeof input.lobbyId === "string" && CODE.test(input.lobbyId),
           "Enter a six-digit invite code.",
         );
+        if (room) detach(peer, true);
         const next = codes.get(input.lobbyId);
         requireValue(
           next && next.members.get(next.hostId)?.peer,
@@ -241,12 +364,8 @@ function createRelay({
           "Update Electrify to the same version as your friend.",
         );
         requireValue(
-          !next.locked || next.members.has(id),
+          !next.locked || next.locked.has(id),
           "This game has already started.",
-        );
-        requireValue(
-          next.members.has(id) || next.members.size < MAX_PEERS,
-          "This lobby is full.",
         );
         return attach(peer, next);
       }
@@ -254,8 +373,9 @@ function createRelay({
         if (room) return state(peer);
         const previous =
           typeof input.roomId === "string" && rooms.get(input.roomId);
+        const member = previous && previous.members.get(id);
         requireValue(
-          previous && previous.members.has(id),
+          member && (!member.expires || member.expires > Date.now()),
           "The lobby closed. Reopen the multiplayer save to continue.",
         );
         return attach(peer, previous);
@@ -269,7 +389,7 @@ function createRelay({
         requireValue(
           (key === "ready" || key === "slot") &&
             typeof value === "string" &&
-            value.length <= (key === "ready" ? 256 : 64) &&
+            value.length <= (key === "ready" ? 256 : 128) &&
             MEMBER_DATA.test(value),
           "Invalid lobby member data.",
         );
@@ -278,17 +398,31 @@ function createRelay({
       }
       case "lock": {
         requireValue(room?.hostId === id, "Only the host can start the game.");
-        const { ids } = input;
+        const { ids, requiredIds } = input;
         requireValue(
           Array.isArray(ids) &&
             ids.length >= 2 &&
             ids.length <= MAX_PEERS &&
             new Set(ids).size === ids.length &&
             ids.includes(id) &&
-            ids.every((member) => room.members.get(member)?.peer),
+            Array.isArray(requiredIds) &&
+            requiredIds.length <= ids.length &&
+            requiredIds.every(
+              (member) =>
+                ids.includes(member) && room.members.get(member)?.peer,
+            ) &&
+            ids.every(
+              (member) => typeof member === "string" && PLAYER_ID.test(member),
+            ) &&
+            [...room.members.values()].every(
+              (member) => !member.peer || ids.includes(member.id),
+            ),
           "Wait for everyone to connect.",
         );
-        room.locked = true;
+        // Some saved seats belong to retired companies whose players stayed away.
+        room.locked = new Set(ids);
+        for (const member of room.members.values())
+          if (!room.locked.has(member.id)) room.members.delete(member.id);
         return;
       }
       case "unlock":
@@ -308,7 +442,9 @@ function createRelay({
           room &&
             input.to !== id &&
             (host || input.to === room.hostId) &&
-            allowed.has(input.payload?.kind),
+            object(input.payload) &&
+            allowed.has(input.payload.kind) &&
+            validMessage(input.payload, inputBytes),
           "Invalid game message.",
         );
         if (
@@ -348,7 +484,12 @@ function createRelay({
       let lastMessage = Date.now();
       const respond = (id, result) => send(websocket, { reply: id, result });
       const timer = setInterval(() => {
-        if (!alive || !peer.id) return websocket.terminate();
+        if (
+          !alive ||
+          !peer.id ||
+          (peer.room?.locked && Date.now() - lastMessage > 5000)
+        )
+          return websocket.terminate();
         alive = false;
         websocket.ping();
       }, 15_000);
@@ -380,7 +521,9 @@ function createRelay({
         if (!Number.isSafeInteger(packet?.id) || packet.id < 1)
           return websocket.close(1008, "Invalid request ID");
         try {
-          const result = handleRequest(peer, packet.input);
+          if (packet.input?.kind !== "send" && bytes.length > 4096)
+            throw new RelayError("Invalid multiplayer request.");
+          const result = handleRequest(peer, packet.input, bytes.length);
           respond(packet.id, result);
           if (
             peer.room &&
@@ -423,9 +566,15 @@ if (require.main === module) {
     origins,
     trustProxy: process.env.COOP_RELAY_TRUST_PROXY === "1",
   });
-  server.listen(Number(process.env.PORT || 8787), () => {
-    console.log(`Multiplayer relay listening on port ${server.address().port}`);
-  });
+  server.listen(
+    Number(process.env.PORT || 8787),
+    process.env.HOST || "127.0.0.1",
+    () => {
+      console.log(
+        `Multiplayer relay listening on port ${server.address().port}`,
+      );
+    },
+  );
 }
 
 module.exports = { createRelay };
