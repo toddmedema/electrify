@@ -27,6 +27,7 @@ const {
 } = require("./runtime.cjs");
 const { atomicWrite, readJson, DesktopSaveStore } = require("./storage.cjs");
 const { CouchViews } = require("./couch.cjs");
+const { coopRelayUrl } = require("./coop-relay-url.cjs");
 const { LocalCoopSaveClient } = require("./local-coop-save-client.cjs");
 const { SteamService } = require("./steam.cjs");
 const { reserveSteamOverlayHotkey } = require("./steam-overlay.cjs");
@@ -136,7 +137,7 @@ const contentTypes = {
   ".ico": "image/x-icon",
 };
 
-function contentPolicy() {
+function contentPolicy(relay) {
   const html = fs.readFileSync(path.join(root, "index.html"), "utf8");
   const hashes = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)]
     .filter((match) => match[1].trim())
@@ -144,7 +145,7 @@ function contentPolicy() {
       (match) =>
         `'sha256-${crypto.createHash("sha256").update(match[1]).digest("base64")}'`,
     );
-  return `default-src 'self'; script-src 'self' ${hashes.join(" ")}; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; media-src 'self' blob: data:; connect-src 'self' blob:; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-src 'none'; form-action 'none'`;
+  return `default-src 'self'; script-src 'self' ${hashes.join(" ")}; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; media-src 'self' blob: data:; connect-src 'self' blob:${relay ? ` ${relay.origin}` : ""}; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-src 'none'; form-action 'none'`;
 }
 
 function state() {
@@ -659,23 +660,30 @@ function openSteamPage(url) {
  * Create a partition restricted to bundled resources, with browser permissions denied.
  * Its protocol serves verified asset paths with the shared CSP and media byte ranges.
  */
-async function prepareBundledSession(partition) {
+async function prepareBundledSession(partition, allowCrossplay = false) {
+  const relayConfig = path.join(root, "coop-relay.json");
+  const relay =
+    allowCrossplay && fs.existsSync(relayConfig)
+      ? coopRelayUrl(readJson(relayConfig).url)
+      : undefined;
   const isolatedSession = session.fromPartition(partition);
   isolatedSession.setPermissionRequestHandler(
     (_contents, _permission, callback) => callback(false),
   );
   isolatedSession.setPermissionCheckHandler(() => false);
   isolatedSession.webRequest.onBeforeRequest((details, callback) => {
-    // All gameplay resources are in this bundle. Steam networking uses its native client APIs.
+    const relaySocket =
+      details.resourceType === "webSocket" && details.url === relay?.href;
     callback({
       cancel:
+        !relaySocket &&
         !isAppUrl(details.url) &&
         !details.url.startsWith("devtools:") &&
         !details.url.startsWith("blob:") &&
         !details.url.startsWith("data:"),
     });
   });
-  const policy = contentPolicy();
+  const policy = contentPolicy(relay);
   await isolatedSession.protocol.handle("electrify", async (request) => {
     try {
       const filename = resolveAsset(root, request.url);
@@ -769,6 +777,7 @@ async function createWindow() {
   const player = steam.state().steamId || "offline";
   const isolatedSession = await prepareBundledSession(
     `persist:electrify-${player}`,
+    true,
   );
   window = new BrowserWindow({
     title: "Electrify",
@@ -784,6 +793,8 @@ async function createWindow() {
     icon: path.join(root, "images/icon/512x512.png"),
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
+      additionalArguments:
+        config.mode === "steam" ? ["--electrify-steam-edition"] : [],
       contextIsolation: true,
       sandbox: true,
       nodeIntegration: false,

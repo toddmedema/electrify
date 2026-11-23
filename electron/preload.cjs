@@ -14,6 +14,7 @@ contextBridge.exposeInMainWorld(
   "electrifyDesktop",
   Object.freeze({
     apiVersion: 1,
+    steamEdition: process.argv.includes("--electrify-steam-edition"),
     couchRequest: (input) => ipcRenderer.invoke("desktop:couch", input),
     onCouchEvent: (callback) => subscribe("desktop:couch-event", callback),
     mods: (input) => ipcRenderer.invoke("desktop:mods", input),

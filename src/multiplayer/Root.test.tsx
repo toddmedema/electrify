@@ -9,6 +9,7 @@ import { MultiplayerSession, SessionState } from "./Session";
 import { showMultiplayerLobby } from "./Registry";
 import MultiplayerRoot from "./Root";
 
+jest.mock("../DesktopState", () => ({ useDesktopState: () => undefined }));
 jest.mock("./WorkerClient", () => ({}));
 jest.mock("./Session", () => ({
   ...jest.requireActual("./Session"),
@@ -76,8 +77,12 @@ function renderRoot(
 
 function renderWithSteamInvites() {
   let receive: ((lobbyId: string) => void) | undefined;
-  const bridge: Pick<desktop.DesktopBridge, "apiVersion" | "couchRequest"> = {
+  const bridge: Pick<
+    desktop.DesktopBridge,
+    "apiVersion" | "couchRequest" | "steamEdition"
+  > = {
     apiVersion: 1,
+    steamEdition: true,
     couchRequest: jest.fn(),
   };
   jest

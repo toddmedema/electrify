@@ -31,6 +31,8 @@ export default function Lobby({
   onClose,
   onLeave,
   onLocalPlay,
+  onlineMode = "steam",
+  onChangeMode,
 }: {
   session: MultiplayerSession;
   /** The host's new lobby goes straight to choosing a game. */
@@ -41,6 +43,8 @@ export default function Lobby({
   onClose: () => void;
   onLeave: () => void;
   onLocalPlay?: () => void;
+  onlineMode?: "steam" | "crossplay";
+  onChangeMode?: () => void;
 }) {
   const { lobby, pendingCampaign, busy, entryOperation, error } =
     useSyncExternalStore(session.subscribe, session.getSnapshot);
@@ -144,9 +148,17 @@ export default function Lobby({
           )}
           {mode === "entry" && (
             <>
+              {onlineMode === "crossplay" && (
+                <Typography variant="body2" color="text.secondary">
+                  Share an invite code with friends playing on the web or on
+                  Steam.
+                </Typography>
+              )}
               {!lobby.available && !notice && (
                 <Typography variant="body2" color="text.secondary">
-                  Connect to Steam to host or join online.
+                  {onlineMode === "steam"
+                    ? "Connect to Steam to host or join online."
+                    : "Connecting to online multiplayer…"}
                 </Typography>
               )}
               <Button
@@ -241,11 +253,20 @@ export default function Lobby({
           )}
         </Stack>
       </DialogContent>
-      {mode === "entry" && onLocalPlay && (
-        <DialogActions>
-          <Button size="large" disabled={busy} onClick={onLocalPlay}>
-            Local Co-op
-          </Button>
+      {mode === "entry" && (onLocalPlay || onChangeMode) && (
+        <DialogActions sx={{ flexWrap: "wrap" }}>
+          {onLocalPlay && (
+            <Button size="large" disabled={busy} onClick={onLocalPlay}>
+              Local Co-op
+            </Button>
+          )}
+          {onChangeMode && (
+            <Button size="large" disabled={busy} onClick={onChangeMode}>
+              {onlineMode === "steam"
+                ? "Web & Steam Cross-play"
+                : "Steam Friends"}
+            </Button>
+          )}
         </DialogActions>
       )}
       {mode !== "entry" && (

@@ -73,7 +73,8 @@ const AchievementNotifications = lazy(
     ),
 );
 const MultiplayerRoot =
-  process.env.REACT_APP_DESKTOP === "true"
+  process.env.REACT_APP_DESKTOP === "true" ||
+  process.env.REACT_APP_COOP_RELAY_URL
     ? lazy(() => import("./multiplayer/Root"))
     : undefined;
 const CouchSettingsPrompt =
@@ -621,11 +622,12 @@ export default function App() {
                 <ScenarioChoiceDialog />
                 <CloudSavePrompt />
                 <SharedGameDialog />
-                {MultiplayerRoot && isDesktopApp() && (
-                  <Suspense fallback={null}>
-                    <MultiplayerRoot />
-                  </Suspense>
-                )}
+                {MultiplayerRoot &&
+                  (process.env.REACT_APP_COOP_RELAY_URL || isDesktopApp()) && (
+                    <Suspense fallback={null}>
+                      <MultiplayerRoot />
+                    </Suspense>
+                  )}
                 <Suspense fallback={null}>
                   <AchievementNotifications />
                 </Suspense>

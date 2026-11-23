@@ -2,6 +2,8 @@ import { steamSessionServices } from "./SteamSessionServices";
 import { achievementJournal } from "../achievements/Journal";
 import { unlockedDifficulty } from "../achievements/DifficultyUnlocks";
 import {
+  lazy,
+  Suspense,
   useCallback,
   useEffect,
   useRef,
@@ -37,11 +39,54 @@ import { runSaveTransition } from "../SaveSession";
 import HostConnectionWarning from "./HostConnectionWarning";
 import { selectionKey } from "./Browse";
 import { coopSelection, hostSelection, isBrowseCard } from "./Choosing";
-import CouchRoot from "../couch/Root";
+import { useDesktopState } from "../DesktopState";
+import { coopRelayUrl } from "./RelayConfig";
+import { relaySessionServices } from "./RelaySessionServices";
+
+const CouchRoot =
+  process.env.REACT_APP_DESKTOP === "true"
+    ? lazy(() => import("../couch/Root"))
+    : undefined;
+
+type OnlineMode = "steam" | "crossplay";
+
+export default function MultiplayerRoot() {
+  const desktop = getDesktop();
+  const steamEdition = desktop?.steamEdition === true;
+  const [choice, setChoice] = useState<OnlineMode>();
+  const mode =
+    choice ?? (coopRelayUrl && !steamEdition ? "crossplay" : "steam");
+  return (
+    <OnlineMultiplayer
+      key={mode}
+      mode={mode}
+      openOnMount={choice !== undefined}
+      canPlayLocally={steamEdition && !!desktop?.couchRequest}
+      onChangeMode={
+        steamEdition && coopRelayUrl
+          ? () => setChoice(mode === "steam" ? "crossplay" : "steam")
+          : undefined
+      }
+    />
+  );
+}
 
 /** Session lifetime follows the app; entering the normal game can unmount the main menu. */
-export default function MultiplayerRoot() {
-  const [open, setOpen] = useState(false);
+function OnlineMultiplayer({
+  mode,
+  openOnMount,
+  canPlayLocally,
+  onChangeMode,
+}: {
+  mode: OnlineMode;
+  openOnMount: boolean;
+  canPlayLocally: boolean;
+  onChangeMode?: () => void;
+}) {
+  const [open, setOpen] = useState(openOnMount);
+  const steamName = useDesktopState()?.steam.displayName;
+  const currentSteamName = useRef(steamName);
+  currentSteamName.current = steamName;
   const [couchOpen, setCouchOpen] = useState(false);
   const localSession = useRef(false);
   localSession.current = couchOpen;
@@ -53,7 +98,13 @@ export default function MultiplayerRoot() {
   const [session] = useState(
     () =>
       new MultiplayerSession(
-        steamSessionServices(getDesktop()),
+        mode === "crossplay" && coopRelayUrl
+          ? relaySessionServices(
+              coopRelayUrl,
+              () =>
+                currentSteamName.current ?? store.getState().user.displayName,
+            )
+          : steamSessionServices(getDesktop()),
         async () => (await import("./WorkerClient")).createMultiplayerWorker(),
         async () =>
           (await import("./WorkerClient")).createMultiplayerReplicaWorker(),
@@ -432,13 +483,15 @@ export default function MultiplayerRoot() {
 
   return (
     <>
-      {couchOpen && (
-        <CouchRoot
-          onClose={() => {
-            setCouchOpen(false);
-            syncCoop();
-          }}
-        />
+      {couchOpen && CouchRoot && (
+        <Suspense fallback={null}>
+          <CouchRoot
+            onClose={() => {
+              setCouchOpen(false);
+              syncCoop();
+            }}
+          />
+        </Suspense>
       )}
       <HostConnectionWarning
         waiting={hasView && state.waitingForHost}
@@ -449,6 +502,8 @@ export default function MultiplayerRoot() {
       {open && !state.view ? (
         <Lobby
           session={session}
+          onlineMode={mode}
+          onChangeMode={onChangeMode}
           onHosted={startChoosing}
           onChooseNew={() => {
             session.cancelCampaign();
@@ -461,7 +516,7 @@ export default function MultiplayerRoot() {
           }}
           onLeave={() => leaveLobby()}
           onLocalPlay={
-            getDesktop()?.couchRequest
+            canPlayLocally
               ? () => {
                   const online = session.getSnapshot();
                   if (online.busy || online.lobby.lobbyId) return;
