@@ -1,4 +1,5 @@
 import { LocationType } from "../Types";
+import { prefetchLocationWeather } from "../OfflineWeatherData";
 import {
   prefetchBuild,
   prefetchIcons,
@@ -33,6 +34,28 @@ describe("prefetchScenarioData", () => {
     expect(postMessage).toHaveBeenCalledWith({
       type: "CACHE_SCENARIO_DATA",
       locationIds: ["PIT", "AlleghenyUpper"],
+    });
+  });
+
+  it("sends the current build's weather hashes when a custom location is picked", async () => {
+    const postMessage = jest.fn();
+    Object.defineProperty(navigator, "serviceWorker", {
+      configurable: true,
+      value: { ready: Promise.resolve({ active: { postMessage } }) },
+    });
+
+    await prefetchLocationWeather({
+      id: "PIT",
+      watershedId: "AlleghenyUpper",
+    } as LocationType);
+
+    expect(postMessage).toHaveBeenCalledWith({
+      type: "CACHE_SCENARIO_DATA",
+      locationIds: ["PIT", "AlleghenyUpper"],
+      weather: [
+        { id: "PIT", integrity: expect.stringMatching(/^sha256-/) },
+        { id: "AlleghenyUpper", integrity: expect.stringMatching(/^sha256-/) },
+      ],
     });
   });
 

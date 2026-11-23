@@ -45,11 +45,14 @@ interface Props {
   allowNearest?: boolean;
   searchLabel?: string;
   showHeading?: boolean;
+  isLocationUnavailable?: (location: CityType) => boolean;
   onChange: (location: CityType) => void;
 }
 
 const WORLD_VIEW: MapViewport = { center: { x: 0.5, y: 0.5 }, zoom: 0 };
 const MAX_ZOOM = MAP_ZOOM_SCALES.length - 1;
+const INTERNET_REQUIRED =
+  "An internet connection is required to download location weather data.";
 
 interface MapDrag {
   pointerId: number;
@@ -105,8 +108,15 @@ export default function LocationPicker({
   allowNearest = false,
   searchLabel = "Search playable cities",
   showHeading = true,
+  isLocationUnavailable,
   onChange,
 }: Props): React.JSX.Element {
+  const offlineReasonId = React.useId();
+  const unavailable = React.useRef(isLocationUnavailable);
+  unavailable.current = isLocationUnavailable;
+  const availableCount = isLocationUnavailable
+    ? locations.filter((location) => !isLocationUnavailable(location)).length
+    : locations.length;
   const controllerInput = useControllerInput();
   const coarsePointer = useMediaQuery("(pointer: coarse)");
   const textScale = React.useSyncExternalStore(
@@ -249,6 +259,7 @@ export default function LocationPicker({
   };
 
   const select = (location: CityType, centerSearch = false) => {
+    if (unavailable.current?.(location)) return;
     nearestRequest.current++;
     setFindingNearest(false);
     setNearestMessage("");
@@ -497,13 +508,15 @@ export default function LocationPicker({
         ({ coords }) => {
           if (request !== nearestRequest.current) return;
           const nearest = nearestGeographicLocation(
-            locations,
+            locations.filter((location) => !unavailable.current?.(location)),
             coords.latitude,
             coords.longitude,
           );
           if (!nearest) {
             fail(
-              "No nearby location could be found. Search for a city or use the map.",
+              unavailable.current
+                ? INTERNET_REQUIRED
+                : "No nearby location could be found. Search for a city or use the map.",
             );
             return;
           }
@@ -543,6 +556,34 @@ export default function LocationPicker({
             options={locations}
             groupBy={(location: CityType) => location.region}
             getOptionLabel={(location: CityType) => location.name}
+            getOptionDisabled={isLocationUnavailable}
+            renderOption={(props, location) => {
+              const { key, ...option } = props;
+              return (
+                <li
+                  key={key}
+                  {...option}
+                  aria-describedby={
+                    isLocationUnavailable?.(location)
+                      ? offlineReasonId
+                      : undefined
+                  }
+                >
+                  <div>
+                    {location.name}
+                    {isLocationUnavailable?.(location) && (
+                      <Typography
+                        variant="caption"
+                        component="div"
+                        aria-hidden="true"
+                      >
+                        Internet required
+                      </Typography>
+                    )}
+                  </div>
+                </li>
+              );
+            }}
             isOptionEqualToValue={(a: CityType, b: CityType) => a.id === b.id}
             value={value ?? null}
             onChange={(_event, picked: CityType | null) => {
@@ -581,7 +622,7 @@ export default function LocationPicker({
                       ? "Finding your location…"
                       : "Find nearest city"
                   }
-                  disabled={loading || findingNearest || locations.length === 0}
+                  disabled={loading || findingNearest || availableCount === 0}
                   onClick={findNearest}
                 >
                   {findingNearest ? (
@@ -610,8 +651,13 @@ export default function LocationPicker({
         >
           {loading
             ? "Loading playable locations"
-            : `${locations.length} available cities`}
+            : `${availableCount} available cities`}
         </Typography>
+        {isLocationUnavailable && availableCount < locations.length && (
+          <Typography variant="caption" id={offlineReasonId}>
+            {INTERNET_REQUIRED}
+          </Typography>
+        )}
       </div>
 
       <div
@@ -667,6 +713,9 @@ export default function LocationPicker({
             const selected =
               control.kind === "marker" &&
               control.locations[0].id === value?.id;
+            const disabled =
+              control.kind === "marker" &&
+              isLocationUnavailable?.(control.locations[0]);
             const label =
               control.kind === "marker"
                 ? `Select ${accessibleLocationName(control.locations[0])}`
@@ -686,12 +735,16 @@ export default function LocationPicker({
                   top: `${control.y * 100}%`,
                 }}
                 aria-label={label}
+                aria-disabled={disabled || undefined}
+                aria-describedby={disabled ? offlineReasonId : undefined}
                 aria-pressed={control.kind === "marker" ? selected : undefined}
                 tabIndex={control.id === rovingId ? 0 : -1}
                 title={
-                  control.kind === "marker"
-                    ? `${control.locations[0].name} — ${locationDetail(control.locations[0])}`
-                    : label
+                  disabled
+                    ? INTERNET_REQUIRED
+                    : control.kind === "marker"
+                      ? `${control.locations[0].name} — ${locationDetail(control.locations[0])}`
+                      : label
                 }
                 onFocus={() => setRovingId(control.id)}
                 onKeyDown={(event) => handleMapKey(event, control)}
@@ -765,6 +818,10 @@ export default function LocationPicker({
         {menuLocations.map((location) => (
           <MenuItem
             key={location.id}
+            disabled={isLocationUnavailable?.(location)}
+            aria-describedby={
+              isLocationUnavailable?.(location) ? offlineReasonId : undefined
+            }
             onClick={() => {
               select(location);
               setMenuAnchor(null);
