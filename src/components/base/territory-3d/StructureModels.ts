@@ -776,14 +776,21 @@ function thermal(
       P.mint,
     );
   } else if (kind === "oil") {
-    const tankX = small ? -0.145 : large ? -0.25 : -0.23,
-      radius = small ? 0.061 : large ? 0.075 : 0.08,
+    const radius = small ? 0.061 : large ? 0.075 : 0.08,
       height = small ? 0.117 : large ? 0.178 : 0.15;
-    for (const z of small
-      ? [0.028]
-      : large
-        ? [-0.166, 0, 0.166]
-        : [-0.1, 0.09]) {
+    const tanks = {
+      small: [[-0.145, 0.028]],
+      medium: [
+        [-0.23, -0.1],
+        [-0.23, 0.09],
+      ],
+      large: [
+        [-0.275, -0.169],
+        [-0.21, 0.002],
+        [-0.31, 0.154],
+      ],
+    }[size];
+    for (const [tankX, z] of tanks) {
       body.cylinder([tankX, 0.036, z], radius, radius, height, P.cream, 8);
       body.cylinder(
         [tankX, 0.036 + height, z],
@@ -809,7 +816,7 @@ function thermal(
     );
     if (large)
       body.beam(
-        [-0.25, 0.075, 0.17],
+        [-0.31, 0.075, 0.154],
         [-0.125, 0.075, 0.126],
         0.014,
         P.steelShade,
@@ -850,16 +857,16 @@ function thermal(
     );
     if (large) stack(0.147, -0.145, 0.486, 0.031);
   } else {
-    const siloX = small ? -0.143 : large ? -0.259 : -0.225,
-      radius = small ? 0.059 : large ? 0.077 : 0.082;
-    for (const [z, height] of small
-      ? [[-0.024, 0.144]]
-      : large
-        ? [
-            [-0.119, 0.305],
-            [0.064, 0.25],
-          ]
-        : [[-0.02, 0.23]]) {
+    const radius = small ? 0.059 : large ? 0.077 : 0.082;
+    const silos = {
+      small: [[-0.143, -0.024, 0.144]],
+      medium: [[-0.225, -0.02, 0.23]],
+      large: [
+        [-0.304, -0.119, 0.305],
+        [-0.217, 0.064, 0.25],
+      ],
+    }[size];
+    for (const [siloX, z, height] of silos) {
       body.cylinder([siloX, 0.036, z], radius, radius, height, P.cream, 8);
       body.cylinder(
         [siloX, height + 0.036, z],
@@ -938,20 +945,6 @@ function gasSteam(size: FacilitySize): MapModel {
     ],
     P.steel,
   );
-  body.box(
-    [
-      boilerX,
-      small ? 0.072 : large ? 0.101 : 0.085,
-      boilerZ + boilerDepth / 2 + 0.007,
-    ],
-    [
-      small ? 0.072 : large ? 0.129 : 0.098,
-      small ? 0.072 : large ? 0.13 : 0.098,
-      0.016,
-    ],
-    P.steelShade,
-  );
-
   const hallX = small ? 0.112 : large ? 0.144 : 0.13,
     hallZ = large ? 0.03 : 0.023,
     hallWidth = small ? 0.216 : large ? 0.417 : 0.31,
@@ -988,15 +981,21 @@ function gasSteam(size: FacilitySize): MapModel {
     8,
   );
 
-  const moving = [
-    windows(
-      body,
-      hallX,
-      small ? 0.087 : large ? 0.135 : 0.113,
-      hallZ + hallDepth / 2 + 0.004,
-      small ? 0.152 : large ? 0.306 : 0.227,
-    ),
-  ];
+  body.box(
+    [
+      boilerX,
+      small ? 0.072 : large ? 0.101 : 0.085,
+      boilerZ + boilerDepth / 2 + 0.007,
+    ],
+    [
+      small ? 0.072 : large ? 0.129 : 0.098,
+      small ? 0.072 : large ? 0.13 : 0.098,
+      0.016,
+    ],
+    P.steelShade,
+  );
+
+  const moving: ModelPart[] = [];
   const chimney = (x: number, z: number, outletY: number, radius: number) => {
     body
       .cylinder(
@@ -1039,7 +1038,16 @@ function gasSteam(size: FacilitySize): MapModel {
     "gas-steam",
     body,
     switchgear(body, small ? 0.17 : 0.22),
-    moving,
+    [
+      windows(
+        body,
+        hallX,
+        small ? 0.087 : large ? 0.135 : 0.113,
+        hallZ + hallDepth / 2 + 0.004,
+        small ? 0.152 : large ? 0.306 : 0.227,
+      ),
+      ...moving,
+    ],
   );
 }
 
