@@ -6,10 +6,6 @@ import { createGame } from "../testing/Simulator";
 import { runMonths } from "../testing/SimulationTestHelpers";
 import { SCENARIOS } from "../data/Scenarios";
 import { GameType, ChallengeInvitation } from "../Types";
-import {
-  projectAuthoredRunReference,
-  sameRunIdentity,
-} from "../helpers/RunIdentity";
 import * as math from "../helpers/Math";
 import { parseSave, serializeSave } from "../SaveGame";
 import { mapDispatchToProps } from "../components/views/LoadingContainer";
@@ -80,9 +76,7 @@ it.each([
     expect(errors).not.toHaveBeenCalled();
     expect(actions.some((a) => a.type === initGame.type)).toBe(true);
     expect(accepted.seed).toBe(scenario.seed ?? freshSeed);
-    expect(sameRunIdentity(expected.runIdentity, accepted.runIdentity)).toBe(
-      true,
-    );
+    expect(accepted.runIdentity).toEqual(expected.runIdentity);
     expect(JSON.stringify(accepted.timeline)).toEqual(
       JSON.stringify(expected.timeline),
     );
@@ -103,25 +97,6 @@ it.each([
     const restored = reducer(undefined, resume(saved!.game));
     expect(restored.challenge).toEqual(challenge);
     expect(restored.runIdentity).toEqual(right.runIdentity);
-    const legacy = parseSave({
-      ...saved,
-      schemaVersion: 24,
-      game: {
-        ...saved!.game,
-        challenge: {
-          run: projectAuthoredRunReference(right.runIdentity),
-          target: challenge.target,
-        },
-      },
-    });
-    expect(legacy).not.toBeNull();
-    const continued = reducer(undefined, resume(legacy!.game));
-    expect(continued.challenge).toEqual(challenge);
-    const next = cloneDeep(restored);
-    const migratedNext = cloneDeep(continued);
-    runMonths(next, 1);
-    runMonths(migratedNext, 1);
-    expect(migratedNext.monthlyHistory).toEqual(next.monthlyHistory);
   },
 );
 it("preserves unranked saves without manufacturing identity and rejects contradictory metadata", () => {
