@@ -415,7 +415,7 @@ A wake checkpoint failure uses the existing visible save error and retry path.
 
 ### Couch display settings and controllers
 
-Open **Play with friends → On this TV** for [two-player couch co-op](couch-coop.md).
+Open **Play with friends → Local Co-op** for [two-player couch co-op](couch-coop.md).
 Both players use Steam Input controllers, including in Steam Offline Mode.
 
 Settings offers one Interface scale for text, charts, icons and controls (100–200%), and

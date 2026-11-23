@@ -1,6 +1,6 @@
 # Local couch co-op
 
-Choose **Play with friends → On this TV** in the desktop game to play with two
+Choose **Play with friends → Local Co-op** in the desktop game to play with two
 controllers. Steam Input and installed controller bindings are required. Local
 play works in Steam Offline Mode.
 

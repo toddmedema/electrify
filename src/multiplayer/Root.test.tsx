@@ -105,7 +105,7 @@ test("a couch session keeps the latest invitation until local play closes", asyn
   const { join, invite } = renderWithSteamInvites();
   const user = userEvent.setup();
   act(showMultiplayerLobby);
-  await user.click(screen.getByRole("button", { name: "On this TV" }));
+  await user.click(screen.getByRole("button", { name: "Local Co-op" }));
   const leave = screen.getByRole("button", { name: "Leave couch setup" });
   await invite("10977524123456789");
   await invite("10977524123456780");

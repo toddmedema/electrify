@@ -244,7 +244,7 @@ export default function Lobby({
       {mode === "entry" && onLocalPlay && (
         <DialogActions>
           <Button size="large" disabled={busy} onClick={onLocalPlay}>
-            On this TV
+            Local Co-op
           </Button>
         </DialogActions>
       )}

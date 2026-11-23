@@ -34,10 +34,10 @@ test("TV Play with friends keeps couch play available when online play is discon
   await expect(
     lobby.getByRole("button", { name: "Host a game" }),
   ).toBeDisabled();
-  const local = lobby.getByRole("button", { name: "On this TV", exact: true });
+  const local = lobby.getByRole("button", { name: "Local Co-op", exact: true });
   await expect(local).toBeEnabled();
   await local.click();
-  const setup = page.getByRole("dialog", { name: "On this TV · Two players" });
+  const setup = page.getByRole("dialog", { name: "Local Co-op · Two players" });
   await expect(setup.getByText("Press Confirm on your controller")).toHaveCount(
     2,
   );
@@ -67,8 +67,8 @@ test("TV couch setup explains missing Steam Input through the normal entry", asy
       ),
       animations: "disabled",
     });
-  await lobby.getByRole("button", { name: "On this TV", exact: true }).click();
-  const setup = page.getByRole("dialog", { name: "On this TV · Two players" });
+  await lobby.getByRole("button", { name: "Local Co-op", exact: true }).click();
+  const setup = page.getByRole("dialog", { name: "Local Co-op · Two players" });
   await expect(setup.getByRole("alert")).toHaveText(
     /requires Steam Input.*Offline Mode/,
   );
@@ -86,9 +86,9 @@ async function startCouch<Actor extends Page | Frame>(
   await page
     .getByRole("button", { name: "Play with friends", exact: true })
     .click();
-  await page.getByRole("button", { name: "On this TV", exact: true }).click();
+  await page.getByRole("button", { name: "Local Co-op", exact: true }).click();
   await expect(
-    page.getByRole("heading", { name: "On this TV · Two players" }),
+    page.getByRole("heading", { name: "Local Co-op · Two players" }),
   ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Choose a game", exact: true }),
@@ -734,7 +734,7 @@ test("TV couch companies keep independent dialogs and purchases through atomic s
   await page
     .getByRole("button", { name: "Play with friends", exact: true })
     .click();
-  await page.getByRole("button", { name: "On this TV", exact: true }).click();
+  await page.getByRole("button", { name: "Local Co-op", exact: true }).click();
   await page.getByRole("button", { name: /^Resume Local campaign/ }).click();
   for (const name of ["P1 company", "P2 company"])
     await expect(
@@ -908,7 +908,7 @@ async function verifyMonthlyBankruptcyResults(
   await page
     .getByRole("button", { name: "Play with friends", exact: true })
     .click();
-  await page.getByRole("button", { name: "On this TV", exact: true }).click();
+  await page.getByRole("button", { name: "Local Co-op", exact: true }).click();
   await page.getByRole("button", { name: /^Resume Local campaign/ }).click();
   const review = page.getByRole("button", {
     name: "Review saved game",
@@ -986,7 +986,7 @@ async function verifyMonthlyBankruptcyResults(
   await couch.input({ [requester]: ["confirm"] });
   await expect.poll(() => couch.seats.size).toBe(0);
   await expect(
-    page.getByRole("heading", { name: "On this TV · Two players" }),
+    page.getByRole("heading", { name: "Local Co-op · Two players" }),
   ).toBeVisible();
   const finished = couch.checkpoint()!;
   expect(finished.outcomes).toMatchObject({
@@ -1880,9 +1880,11 @@ test("TV couch native promise failures return control to the main menu", async (
     await page
       .getByRole("button", { name: "Play with friends", exact: true })
       .click();
-    await page.getByRole("button", { name: "On this TV", exact: true }).click();
+    await page
+      .getByRole("button", { name: "Local Co-op", exact: true })
+      .click();
     const setup = page.getByRole("dialog", {
-      name: "On this TV · Two players",
+      name: "Local Co-op · Two players",
       exact: true,
     });
     await expect(setup).toBeVisible();
@@ -1910,7 +1912,7 @@ test("TV couch native promise failures return control to the main menu", async (
   await expect(failure).toContainText("Fixture close failure");
   await expect(
     page.getByRole("heading", {
-      name: "On this TV · Two players",
+      name: "Local Co-op · Two players",
       exact: true,
     }),
   ).toHaveCount(0);
@@ -2076,9 +2078,11 @@ for (const committed of [false, true]) {
     await page
       .getByRole("button", { name: "Play with friends", exact: true })
       .click();
-    await page.getByRole("button", { name: "On this TV", exact: true }).click();
+    await page
+      .getByRole("button", { name: "Local Co-op", exact: true })
+      .click();
     const setup = page.getByRole("dialog", {
-      name: "On this TV · Two players",
+      name: "Local Co-op · Two players",
       exact: true,
     });
     await expect(setup).toBeVisible();
@@ -2149,10 +2153,10 @@ for (const outcome of ["resolve", "reject"] as const) {
         .getByRole("button", { name: "Play with friends", exact: true })
         .click();
       await page
-        .getByRole("button", { name: "On this TV", exact: true })
+        .getByRole("button", { name: "Local Co-op", exact: true })
         .click();
       const setup = page.getByRole("dialog", {
-        name: "On this TV · Two players",
+        name: "Local Co-op · Two players",
         exact: true,
       });
       await expect(setup).toBeVisible();
