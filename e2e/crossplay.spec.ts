@@ -84,6 +84,67 @@ async function attachOperations(
   });
 }
 
+async function saveAndQuit(page: Page) {
+  await page.getByRole("button", { name: "menu", exact: true }).click();
+  const menu = page.getByRole("menu", { name: "Game menu" });
+  // The menu paper scales into place and can move the item during the click.
+  await expect(menu.locator("..")).toHaveCSS("transform", "none");
+  await menu
+    .getByRole("menuitem", { name: "Save & Quit", exact: true })
+    .click();
+  await expect(mainEntry(page)).toBeVisible();
+}
+
+async function loadCampaign(page: Page) {
+  await mainEntry(page).click();
+  await lobby(page)
+    .getByRole("button", { name: "Multiplayer saves", exact: true })
+    .click();
+  await page
+    .getByRole("dialog", { name: "Multiplayer saves", exact: true })
+    .getByRole("button", { name: "Load save", exact: true })
+    .click();
+}
+
+async function saveAndResume(
+  host: Page,
+  guest: Page,
+  fixture: ReturnType<typeof crossplayFixture>,
+) {
+  const operationsBeforeQuit = fixture.operations.length;
+  await saveAndQuit(guest);
+  await expect
+    .poll(() =>
+      fixture.operations
+        .slice(operationsBeforeQuit)
+        .some(
+          ({ operation, status }) =>
+            operation === "save/publish" && status === 200,
+        ),
+    )
+    .toBe(true);
+  await saveAndQuit(host);
+  const confirmed = await fixture.checkpoint();
+  expect(confirmed?.matchId).toBeTruthy();
+
+  // A reload removes the active session. Both players reclaim their approved seats.
+  await Promise.all([host.reload(), guest.reload()]);
+  await loadCampaign(host);
+  const resume = lobby(host).getByRole("button", {
+    name: "Resume campaign",
+    exact: true,
+  });
+  await expect(resume).toBeDisabled();
+  await loadCampaign(guest);
+  await expect(resume).toBeEnabled();
+  await resume.click();
+  for (const player of [host, guest])
+    await expect(clock(player)).toHaveAttribute("data-active-speed", "PAUSED");
+  const resumed = await fixture.checkpoint();
+  expect(resumed?.matchId).toBe(confirmed?.matchId);
+  expect(resumed?.epoch).not.toBe(confirmed?.epoch);
+}
+
 for (const steamHost of [false, true]) {
   test(`simulated relay lets ${steamHost ? "Steam" : "web"} host cross-play`, async ({
     page,
@@ -144,22 +205,8 @@ for (const steamHost of [false, true]) {
       expect(operations.indexOf("save/publish")).toBeLessThan(
         operations.indexOf("transfer/put"),
       );
-      if (steamHost) {
-        const saved = operations.filter(
-          (operation) => operation === "save/publish",
-        ).length;
-        await guest.getByRole("button", { name: /^menu/ }).click();
-        await guest.getByRole("menuitem", { name: "Save & Quit" }).click();
-        await expect(mainEntry(guest)).toBeVisible();
-        await expect
-          .poll(
-            () =>
-              fixture.operations.filter(
-                ({ operation }) => operation === "save/publish",
-              ).length,
-          )
-          .toBeGreaterThan(saved);
-      } else {
+      await saveAndResume(host, guest, fixture);
+      if (!steamHost) {
         fixture.loseAuthority();
         await expect(
           guest.getByRole("dialog", { name: "Multiplayer" }),
@@ -190,6 +237,7 @@ test("two browsers can start and advance a shared game with simulated relay", as
     ]);
     await Promise.all([enter(page), enter(guest)]);
     await start(page, guest);
+    await saveAndResume(page, guest, fixture);
   } catch (error) {
     await attachOperations(testInfo, fixture, page);
     throw error;

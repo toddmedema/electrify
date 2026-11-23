@@ -10,8 +10,11 @@ import cloneDeep from "lodash.clonedeep";
 import { createGame } from "../testing/Simulator";
 import { copyOfficialGame } from "../testing/OfficialScenarioExecutionFixtures";
 import { GENERATORS } from "../data/Facilities";
+import { MUNICIPAL_UTILITIES } from "../data/MunicipalUtilities";
 import { MINUTES_PER_MONTH, getDateFromMinute } from "../helpers/DateTime";
+import { facilityCashBack } from "../helpers/Financials";
 import { currentTick } from "../helpers/GameSelectors";
+import { parseSave, serializeSave } from "../SaveGame";
 import {
   acquisitionAssets,
   acquisitionQuote,
@@ -19,6 +22,7 @@ import {
   entitlementSources,
   networkCarryingValue,
   ownedUtility,
+  utilityOffer,
 } from "../helpers/Expansion";
 import {} from "../helpers/Transmission";
 import type { GameType, UtilityTargetId } from "../Types";
@@ -58,6 +62,78 @@ function buy(
     ),
   );
 }
+
+it("gives regional and municipal sellers stable, seed-specific opening ages", () => {
+  const game = ready();
+  const sellers = [
+    "valley-electric",
+    "ridge-electric",
+    ...MUNICIPAL_UTILITIES.map(({ id }) => id),
+  ];
+  const sellerAges = (state: GameType) =>
+    sellers.flatMap((id) =>
+      utilityOffer(state, id)!.facilities.map(({ ageYears }) => ageYears),
+    );
+  const ages = sellerAges(game);
+  expect(ages).toHaveLength(10);
+  for (const age of ages) {
+    expect(Number.isInteger(age)).toBe(true);
+    expect(age).toBeGreaterThanOrEqual(4);
+    expect(age).toBeLessThanOrEqual(30);
+  }
+  expect(new Set(ages).size).toBeGreaterThan(1);
+  expect(sellerAges(ready())).toEqual(ages);
+  expect(sellerAges({ ...game, seed: 61 })).not.toEqual(ages);
+  const restored = parseSave(serializeSave(game))!.game;
+  expect(sellerAges(restored)).toEqual(ages);
+  restored.date = getDateFromMinute(12 * MINUTES_PER_MONTH, game.startingYear);
+  expect(sellerAges(restored)).toEqual(ages.map((age) => age + 1));
+});
+
+it("updates the listing and financed purchase when a seller's generators are older", () => {
+  const game = ready();
+  const original = cloneDeep(game);
+  original.utilityExpansion!.sellerFleet = "authored";
+  const originalPurchase = utilityOffer(original, "valley-electric")!;
+  const purchase = utilityOffer(game, "valley-electric")!;
+  const totalPlantValue = (state: GameType) =>
+    acquisitionAssets(state, "valley-electric")!.reduce(
+      (sum, plant) => sum + facilityCashBack(plant, state.date.minute),
+      0,
+    );
+  expect(purchase.equityPrice).not.toBe(originalPurchase.equityPrice);
+  expect(purchase.equityPrice - originalPurchase.equityPrice).toBeCloseTo(
+    totalPlantValue(game) - totalPlantValue(original),
+    4,
+  );
+  expect(utilityOffer(game, "parcel-1")!.equityPrice).toBeLessThan(
+    utilityOffer(original, "parcel-1")!.equityPrice,
+  );
+  const bought = buy(game);
+  expect(
+    parseSave(serializeSave(bought))?.game.utilityExpansion?.loans,
+  ).toEqual(bought.utilityExpansion!.loans);
+});
+
+it("retains existing regional purchases and municipal listings from schema 25", () => {
+  const game = ready();
+  game.utilityExpansion!.sellerFleet = "authored";
+  const originalOffer = utilityOffer(game, "parcel-1");
+  const bought = buy(game);
+  const save = JSON.parse(JSON.stringify(serializeSave(bought)));
+  const legacy = cloneDeep(save);
+  legacy.schemaVersion = 25;
+  delete legacy.game.utilityExpansion.sellerFleet;
+  const restored = parseSave(legacy);
+  expect(restored).toEqual(parseSave(save));
+  expect(utilityOffer(restored!.game, "parcel-1")).toEqual(
+    expect.objectContaining({ equityPrice: originalOffer!.equityPrice }),
+  );
+  legacy.game.utilityExpansion.sellerFleet = "unknown";
+  expect(
+    parseSave({ ...legacy, schemaVersion: save.schemaVersion }),
+  ).toBeNull();
+});
 
 it("requires a current quote and enough cash without a connection before changing any state", () => {
   const game = ready();

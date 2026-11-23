@@ -41,7 +41,7 @@ import {
   HAIL_DEFINITION_ID,
   retrofitCost,
 } from "../../helpers/Hazards";
-import { formatMoneyConcise } from "../../helpers/Format";
+import { formatMoneyConcise, formatPurchasePrice } from "../../helpers/Format";
 import { GAME_TO_REAL_YEARS, TICKS_PER_HOUR } from "../../Constants";
 import { purchaseTerms } from "../../helpers/Financials";
 import { modScenario } from "../../mods/ModScenario";
@@ -1484,7 +1484,7 @@ it.each([false, true])(
     await user.click(
       screen.getByRole("button", { name: `Inspect ${target.id}` }),
     );
-    const acquire = screen.getByRole("button", { name: "Acquire" });
+    const acquire = screen.getByRole("button", { name: /^Acquire \(\$/ });
     expect(acquire).toBeEnabled();
     expect(game.transmission!.lines).toEqual([]);
     await user.click(acquire);
@@ -1572,7 +1572,7 @@ it.each([false, true])(
     });
     await user.click(line);
     const purchase = screen.getByRole("button", {
-      name: "Acquire Ridge Electric",
+      name: /^Acquire \(\$.*\) · Ridge Electric$/,
     });
     await user.click(purchase);
     await user.click(screen.getByRole("button", { name: "Cancel" }));
@@ -2299,7 +2299,7 @@ describe("mouse facility selection", () => {
     expect(view.onRetrofit).not.toHaveBeenCalled();
     await user.click(
       within(dialog).getByRole("button", {
-        name: `Pay ${formatMoneyConcise(total)}`,
+        name: `Pay (${formatPurchasePrice(total)})`,
       }),
     );
     expect(utils.onRetrofit.mock.calls).toEqual([

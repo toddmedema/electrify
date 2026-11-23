@@ -431,6 +431,20 @@ const migrations: readonly Migration[] = [
   (save) => (object(save.game) ? save : null),
   // 25 -> 26: dated construction is optional. Existing tile receipts remain energized.
   (save) => save,
+  // 26 -> 27: existing sellers retain the fleet ages and purchase terms used in their receipts.
+  (save) => {
+    if (!object(save.game)) return null;
+    const { game } = save;
+    if (game.utilityExpansion === undefined) return save;
+    if (!object(game.utilityExpansion)) return null;
+    return {
+      ...save,
+      game: {
+        ...game,
+        utilityExpansion: { ...game.utilityExpansion, sellerFleet: "authored" },
+      },
+    };
+  },
 ];
 
 /** Structure versions are independent of app releases and simulation compatibility. */

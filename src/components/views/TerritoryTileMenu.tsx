@@ -1,4 +1,5 @@
 import { TERRAIN_LABELS } from "../../data/TerrainLabels";
+import { utilityOffer } from "../../helpers/Expansion";
 import { facilityExpansionQuote } from "../../helpers/FacilityExpansion";
 import type { TerritoryTileView } from "../../helpers/TerritoryMapState";
 import { tilePurchaseQuote } from "../../helpers/Territories";
@@ -49,6 +50,7 @@ export default function TerritoryTileMenu({
   const tile = view?.tile;
   const facility = view?.operatingFacility;
   const acquisitionId = view?.acquisitionId;
+  const offer = acquisitionId ? utilityOffer(game, acquisitionId) : undefined;
   const quote =
     tile && view?.connectable ? tilePurchaseQuote(game, tile.id) : undefined;
   const limit =
@@ -78,7 +80,9 @@ export default function TerritoryTileMenu({
   }
   if (acquisitionId) {
     tileActions.push({
-      label: "Acquire",
+      label: offer
+        ? `Acquire (${formatPurchasePrice(offer.equityPrice)})`
+        : "Acquire",
       icon: <ConceptIcon concept="buy" fontSize="small" decorative />,
       disabled: busy || !canAcquire,
       onSelect: () => onAcquire(acquisitionId),

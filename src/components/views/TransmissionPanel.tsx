@@ -131,7 +131,7 @@ import {
 } from "../../helpers/ExpansionContext";
 import {
   acquisitionTargetForCorridor,
-  bordersUtility,
+  acquisitionQuote,
   utilityOffer,
 } from "../../helpers/Expansion";
 
@@ -688,7 +688,7 @@ export default function TransmissionPanel({
   onDragEnd,
   projectsOnly = false,
 }: TransmissionPanelProps) {
-  const { formatMoneyConcise } = useMoney();
+  const { formatMoneyConcise, formatPurchasePrice } = useMoney();
   const units = useUnits();
   const intertiesHeadingRef = React.useRef<HTMLHeadingElement>(null);
   const focusIntertiesAfterAcquisition = React.useRef(false);
@@ -943,9 +943,12 @@ export default function TransmissionPanel({
                       ? acquisitionTargetForCorridor(line.corridorId)
                       : undefined;
                     const availableAcquisition =
-                      acquisitionTarget &&
-                      line.yearsToBuildLeft <= 0 &&
-                      bordersUtility(game, acquisitionTarget.id);
+                      acquisitionTarget && line.yearsToBuildLeft <= 0
+                        ? acquisitionQuote(game, acquisitionTarget.id)
+                        : undefined;
+                    const acquisitionLabel = availableAcquisition
+                      ? `Acquire (${formatPurchasePrice(availableAcquisition.equityPrice)})`
+                      : undefined;
                     const peer = game.multiplayer?.peers?.find(
                       (p) => p.corridor.id === line.corridorId,
                     );
@@ -1402,14 +1405,14 @@ export default function TransmissionPanel({
                                       {availableAcquisition && onAcquire && (
                                         <Button
                                           variant="contained"
-                                          aria-label={`Acquire ${acquisitionTarget.name}`}
+                                          aria-label={`${acquisitionLabel} · ${availableAcquisition.name}`}
                                           onClick={() =>
                                             setAcquisitionTargetId(
-                                              acquisitionTarget.id,
+                                              availableAcquisition.targetId,
                                             )
                                           }
                                         >
-                                          Acquire
+                                          {acquisitionLabel}
                                         </Button>
                                       )}
                                       <IntertieUpgradeControl

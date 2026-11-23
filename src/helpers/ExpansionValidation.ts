@@ -24,6 +24,7 @@ import {
 import {
   acquisitionAssets,
   municipalPlantAsset,
+  regionalAcquisitionValuation,
   sellerCustomers,
   expansionRetentionBaseline,
 } from "./Expansion";
@@ -135,8 +136,12 @@ export function validUtilityExpansion(
     !state ||
     !record(state) ||
     Object.keys(state).some(
-      (key) => !["networkAssets", "loans", "acquisitions"].includes(key),
+      (key) =>
+        !["sellerFleet", "networkAssets", "loans", "acquisitions"].includes(
+          key,
+        ),
     ) ||
+    (state.sellerFleet !== "authored" && state.sellerFleet !== "seeded") ||
     !Array.isArray(state.networkAssets) ||
     !Array.isArray(state.acquisitions) ||
     !Array.isArray(state.loans) ||
@@ -283,18 +288,6 @@ export function validUtilityExpansion(
         ({ targetId }) => targetId === loan.targetId,
       );
       if (!target || receipt?.minute !== loan.minuteCreated) return false;
-      if (hasEconomy()) {
-        const index = getInflationIndex(
-          getDateFromMinute(receipt.minute, 2005),
-          2005,
-          game.seed,
-        );
-        const expected =
-          loan.kind === "assumed"
-            ? target.assumedDebt
-            : maxLoanAmount(target.equityPrice);
-        if (!close(loan.principal, expected * index)) return false;
-      }
     }
     loanIds.add(loan.id);
   }
@@ -403,19 +396,10 @@ function validNetworkValue(
   );
   if (!target) return false;
   const date = getDateFromMinute(network.activatedMinute, 2005);
-  const assets = acquisitionAssets(
-    { ...game, date, commissionedHydroSiteIds: [] },
-    network.targetId,
-  );
   const assumed = game.utilityExpansion?.loans.find(
     (loan) => loan.targetId === network.targetId && loan.kind === "assumed",
   );
-  if (
-    !assets ||
-    !assumed ||
-    !nonnegative(assumed.principal) ||
-    assumed.principal <= 0
-  )
+  if (!assumed || !nonnegative(assumed.principal) || assumed.principal <= 0)
     return false;
   const index = assumed.principal / target.assumedDebt;
   if (hasEconomy() && !close(index, getInflationIndex(date, 2005, game.seed)))
@@ -423,15 +407,15 @@ function validNetworkValue(
   const purchase = game.utilityExpansion?.loans.find(
     (loan) => loan.targetId === network.targetId && loan.kind === "purchase",
   );
-  if (purchase && !close(purchase.principal, target.equityPrice * 0.8 * index))
-    return false;
-  const enterprise = (target.equityPrice + target.assumedDebt) * index;
-  const generators = assets.reduce(
-    (sum, asset) => sum + facilityCashBack(asset, date.minute),
-    0,
+  const valuation = regionalAcquisitionValuation(
+    { ...game, date },
+    target,
+    index,
   );
   return (
-    generators <= enterprise &&
-    close(network.initialValue, enterprise - generators)
+    !!valuation &&
+    close(network.initialValue, valuation.networkInitialValue) &&
+    (!purchase ||
+      close(purchase.principal, maxLoanAmount(valuation.equityPrice)))
   );
 }

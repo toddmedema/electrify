@@ -84,7 +84,7 @@ location metadata. The four smaller settlements each have a local utility and ne
 ## Authored portfolios and historical references
 
 The three utilities, their ownership, fleet capacities,
-asset ages, source entitlements, network costs, prices, deadlines and geographic
+source entitlements, network costs, base prices, deadlines and geographic
 service areas are game assumptions from [issue 683](https://github.com/toddmedema/electrify/issues/683).
 They are not a reconstruction of Green Mountain Power, Central Vermont Public
 Service, VELCO, Hydro-Québec or ISO New England ownership or contracts.
@@ -102,9 +102,13 @@ The 2011 CVPS acquisition headline was approximately $472.3M equity and $230M de
 The [BLS annual CPI-U series](https://www.bls.gov/opub/mlr/2019/highcharts/data/paulin-fig2.stm)
 converts these to approximately $410M and $200M in 2005 dollars, using
 195.3/224.939. These are valuation references, not exact adjusted closing cash.
-All acquisition prices, assumed debt, fees and service-network O&M are authored
-2005-dollar values; the transaction indexes once to its purchase month's nominal
-money. Plant quotes retain their existing pricing owner.
+Regional base prices, assumed debt, fees and service-network O&M are authored
+in 2005 dollars and indexed to the purchase month. In new games, regional and
+municipal generators start between four and 30 years old, using the game seed
+and each plant's identity. The regional equity quote replaces the original
+opening fleet value in the base price with the seller fleet's current depreciated
+value. Municipal quotes add the plant's depreciated value to the price of the
+sites. Earlier saves retain their original seller ages and pricing rules.
 
 The $0.105/kWh retail-style rate accompanies explicit service-network O&M; no
 additional generation-share discount applies. Assumed loans use 5% fixed interest

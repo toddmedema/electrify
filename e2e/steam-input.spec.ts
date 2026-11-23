@@ -1171,8 +1171,7 @@ test("controller reviews, cancels and confirms a utility acquisition", async ({
   });
   const line = page.locator(".tileWorkspaceSurface");
   const acquire = line.getByRole("button", {
-    name: "Acquire",
-    exact: true,
+    name: /^Acquire \(/,
   });
   await select(page, acquire);
   await input(page, "confirm");
@@ -1189,9 +1188,9 @@ test("controller reviews, cancels and confirms a utility acquisition", async ({
   await expect(dialog).toHaveCount(0);
   // The accessible dialog disappears before MUI's exit surface relinquishes Escape.
   await expect(page.locator(".MuiDialog-root:visible")).toHaveCount(0);
-  await expect(
-    line.getByRole("button", { name: "Acquire", exact: true }),
-  ).toHaveCount(0);
+  await expect(line.getByRole("button", { name: /^Acquire \(/ })).toHaveCount(
+    0,
+  );
   await expect(
     line.getByRole("heading", { name: "Williston", exact: true }),
   ).toBeFocused();

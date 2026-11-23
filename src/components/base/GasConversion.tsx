@@ -62,7 +62,7 @@ export default function GasConversion(props: {
           isolateClicks
           contentClassName="noPadding"
           title={`Convert ${props.facility.name} to combined cycle?`}
-          confirmLabel={`Pay ${formatPurchasePrice(quote.cost)}`}
+          confirmLabel={`Pay (${formatPurchasePrice(quote.cost)})`}
           confirmDisabled={shortfall > 0}
           onCancel={() => setConfirming(false)}
           onConfirm={() => {

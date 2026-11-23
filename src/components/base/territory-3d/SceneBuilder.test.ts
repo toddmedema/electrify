@@ -125,7 +125,7 @@ test("open water has no pylon while developed dry land has a quiet tower", () =>
     "run",
   );
   expect(structure).toHaveBeenCalledTimes(1);
-  expect(structure).toHaveBeenCalledWith("tower");
+  expect(structure).toHaveBeenCalledWith("tower", undefined, undefined);
   expect(result.map((item) => item.id)).toEqual([
     "terrain:green-uplands:site-1",
     "structure:green-uplands:site-1",
@@ -241,6 +241,62 @@ test("conductors use elevated real terminals and retain mesh identity across unr
     },
   ]);
 });
+
+test.each([
+  ["small", 50e6],
+  ["medium", 150e6],
+] as const)(
+  "lands the submerged wire on %s offshore switchgear",
+  (size, peakW) => {
+    const ocean: TerritoryTileView = {
+      ...view(),
+      tile: {
+        ...view().tile,
+        q: 2,
+        r: 1,
+        terrain: "ocean",
+        city: undefined,
+        siteKind: "wind",
+        maxPeakW: Infinity,
+      },
+      facility: {
+        name: "Offshore Wind",
+        fuel: "Offshore Wind",
+        peakW,
+        yearsToBuildLeft: 0,
+      },
+    };
+    const shore = { ...view(1), tile: { ...view(1).tile, q: 3, r: 1 } };
+    const tiles = [ocean.tile, shore.tile];
+    const scene = new SceneBuilder({
+      terrain: getTerrainModel,
+      structure: getStructureModel,
+    }).build(
+      [ocean, shore],
+      tiles,
+      hexWires(
+        tiles,
+        () => true,
+        () => true,
+        (tile) => tile.terrain === "ocean",
+      ),
+      0,
+      "run",
+    );
+    const turbine = scene.find(
+      ({ id }) => id === `structure:${ocean.tile.id}`,
+    )!;
+    expect(turbine.model).toBe(getStructureModel("offshore-wind", [], size));
+    const terminal = turbine.model.terminals[1];
+    const wire = scene.find(({ id }) => id === "wires:0")!;
+    const [connection] = wire.model.connections!;
+    expect(connection.from).toBe(ocean.tile.id);
+    expect(connection.kind).toBe("submerged");
+    expect(connection.start).toEqual(
+      terminal.map((axis, i) => axis + turbine.position[i]),
+    );
+  },
+);
 
 test.each([undefined, "impact"] as const)(
   "keeps wires out of the solar panel racks from all six neighboring pylons (%s)",
@@ -656,7 +712,7 @@ it("selects the distinct boiler and switches its production effects off as the p
     facility: {
       name: "Natural Gas Steam",
       fuel: "Natural Gas",
-      peakW: facility.peakW,
+      peakW: 250e6,
       yearsToBuildLeft: 0,
     },
     operatingFacility: {
@@ -664,6 +720,7 @@ it("selects the distinct boiler and switches its production effects off as the p
       name: "Natural Gas Steam",
       fuel: "Natural Gas",
       gasCycle: "steam",
+      peakW: 250e6,
       peakWh: undefined,
     },
   };
@@ -685,6 +742,62 @@ it("selects the distinct boiler and switches its production effects off as the p
   const stopped = builder.build([idle], tiles, [], 60, "run")[1];
   expect(stopped).toMatchObject({ active: false, producing: false });
   expect(stopped.model).toBe(active.model);
+});
+
+it("rebuilds the same site at the exact rated power thresholds", () => {
+  const builder = new SceneBuilder({
+    terrain: getTerrainModel,
+    structure: getStructureModel,
+  });
+  const site = view();
+  const tiles = [site.tile];
+  const build = (peakW: number) =>
+    builder.build(
+      [
+        {
+          ...site,
+          facility: { name: "Solar", fuel: "Sun", peakW, yearsToBuildLeft: 0 },
+        },
+      ],
+      tiles,
+      [],
+      0,
+      "run",
+    )[1];
+  const small = build(100e6 - 1);
+  expect(small.model).toBe(getStructureModel("solar", [], "small"));
+
+  const medium = build(100e6);
+  expect(medium.id).toBe(small.id);
+  expect(medium.model).toBe(getStructureModel("solar", [], "medium"));
+  expect(build(500e6 - 1).model).toBe(medium.model);
+  expect(build(500e6).model).toBe(getStructureModel("solar", [], "large"));
+});
+
+it("uses storage power instead of energy capacity for the construction model", () => {
+  const builder = new SceneBuilder({
+    terrain: getTerrainModel,
+    structure: getStructureModel,
+  });
+  const site = view();
+  const [, building] = builder.build(
+    [
+      {
+        ...site,
+        facility: {
+          name: "Battery",
+          peakW: 99e6,
+          peakWh: 600e6,
+          yearsToBuildLeft: 1,
+        },
+      },
+    ],
+    [site.tile],
+    [],
+    0,
+    "run",
+  );
+  expect(building.model.key).toBe("structure:battery:small:construction");
 });
 
 it("follows measured production through idle, pause and construction without changing motion identity", () => {
@@ -858,10 +971,18 @@ test("hail hits the ground and panels, then leaves only fractured panels during 
   );
   expect(stones.model.key).toBe("weather:hail");
   expect(stones.model.parts).toHaveLength(12);
-  const heights = stones.model.parts.map((part) => part.position![1]);
-  expect(Math.min(...heights)).toBeLessThan(0.06);
-  expect(Math.max(...heights)).toBeGreaterThan(0.15);
-  expect(damaged.model.key).toBe("structure:solar-hail-damaged");
+  const surfaces = stones.model.parts.map(({ mesh, position }) => {
+    const [x, y, z] = position!;
+    const groundY = surfaceHeight(ground.model, x, z);
+    const panelY = damaged.position[1] + surfaceHeight(damaged.model, x, z);
+    const stoneRadius = Math.max(
+      ...mesh.positions.filter((_value, index) => index % 3 === 1),
+    );
+    expect(y - stoneRadius).toBeCloseTo(Math.max(groundY, panelY), 6);
+    return panelY > groundY ? "panel" : "ground";
+  });
+  expect(surfaces).toEqual(expect.arrayContaining(["ground", "panel"]));
+  expect(damaged.model.key).toBe("structure:solar-hail-damaged:small");
   expect(damaged.model.terminals).toEqual(intact.model.terminals);
   expect(damaged.model.parts[0].mesh.positions).not.toEqual(
     intact.model.parts[0].mesh.positions,
