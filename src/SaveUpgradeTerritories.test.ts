@@ -2,6 +2,7 @@ import { validUtilityExpansion } from "./helpers/ExpansionValidation";
 import { validPowerAgreements } from "./helpers/PowerAgreements";
 import { validTerritoryNetwork } from "./helpers/TerritoryValidation";
 import type { GameType } from "./Types";
+import { runMonths } from "./testing/SimulationTestHelpers";
 import cloneDeep from "lodash.clonedeep";
 import { createNextState, freeze } from "@reduxjs/toolkit";
 import { SAVE_SCHEMA_VERSION } from "./SaveSchema";
@@ -366,6 +367,7 @@ it("rejects malformed retained tiles even when a generated tile has a pending pr
   expect(
     purchaseTile(game, { tileId: tile.id, quoteKey: offer.quoteKey }),
   ).toBe(true);
+  runMonths(game, offer.buildMonths);
   const order = getBuildFacilityQuote(
     game,
     { name: "Wind", peakW: 10e6 },
