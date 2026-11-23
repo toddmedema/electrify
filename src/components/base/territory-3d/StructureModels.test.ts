@@ -1,6 +1,13 @@
 import { PALETTE } from "./Palette";
 import { getStructureModel } from "./StructureModels";
-import type { MapMesh, ModelPart, RGB, StructureKind, Vec3 } from "./Types";
+import type {
+  FacilitySize,
+  MapMesh,
+  ModelPart,
+  RGB,
+  StructureKind,
+  Vec3,
+} from "./Types";
 
 // The union owns the inventory: adding a kind requires giving it these contracts.
 const inventory: Record<StructureKind, true> = {
@@ -26,6 +33,14 @@ const inventory: Record<StructureKind, true> = {
   "pumped-hydro": true,
 };
 const kinds = Object.keys(inventory) as StructureKind[];
+const facilityKinds = kinds.filter(
+  (kind) => kind !== "tower" && !kind.startsWith("city-"),
+);
+const variants: { kind: StructureKind; size: FacilitySize }[] = kinds.map(
+  (kind) => ({ kind, size: "medium" }),
+);
+for (const kind of facilityKinds)
+  variants.push({ kind, size: "small" }, { kind, size: "large" });
 
 it.each(["city-small", "city-medium", "city-large"] as const)(
   "%s grows distinct solid buildings within the tile and retains its wire terminals",
@@ -147,11 +162,13 @@ function posed(part: ModelPart, point: Vec3, cycle: number): Vec3 {
   return [x + offset[0], y + offset[1], z + offset[2]];
 }
 
-describe.each(kinds)("%s model", (kind) => {
+describe.each(variants)("$kind $size model", ({ kind, size }) => {
   it("caches solid finite geometry with a bounded map-scale triangle count", () => {
-    const model = getStructureModel(kind);
-    expect(getStructureModel(kind)).toBe(model);
-    expect(model.key).toBe(`structure:${kind}`);
+    const model = getStructureModel(kind, [], size);
+    expect(getStructureModel(kind, [], size)).toBe(model);
+    expect(model.key).toBe(
+      size === "medium" ? `structure:${kind}` : `structure:${kind}:${size}`,
+    );
     expect(model.parts[0].motion).toBeUndefined();
     expect(model.parts[0].castsShadow).toBe(true);
     let triangles = 0;
@@ -190,7 +207,7 @@ describe.each(kinds)("%s model", (kind) => {
   });
 
   it("encloses the XZ diameter and the full animated height", () => {
-    const model = getStructureModel(kind);
+    const model = getStructureModel(kind, [], size);
     let diameter = 0,
       height = 0;
     for (const part of model.parts)
@@ -209,7 +226,7 @@ describe.each(kinds)("%s model", (kind) => {
   });
 
   it("connects conductors to drawn stationary terminal caps", () => {
-    const model = getStructureModel(kind);
+    const model = getStructureModel(kind, [], size);
     const body = vertices(model.parts[0].mesh);
     const solar = kind === "solar" || kind === "solar-hail-damaged";
     const [minHeight, maxHeight] = solar ? [0, 0.06] : [0.1, Infinity];
@@ -231,6 +248,16 @@ describe.each(kinds)("%s model", (kind) => {
     expect(model.terminals[0][0]).toBeLessThan(model.terminals[1][0]);
   });
 });
+
+it.each(facilityKinds)(
+  "builds distinct grounded geometry for every %s tier",
+  (kind) => {
+    const geometry = (["small", "medium", "large"] as const).map((size) =>
+      getStructureModel(kind, [], size).parts[0].mesh.positions.join(","),
+    );
+    expect(new Set(geometry).size).toBe(3);
+  },
+);
 
 it("keeps the empty-land tower small and quiet", () => {
   const model = getStructureModel("tower");
