@@ -1,5 +1,11 @@
 import { expect, test } from "./fixtures";
-import type { Frame, Locator, Page, Route } from "@playwright/test";
+import type {
+  BrowserContext,
+  Frame,
+  Locator,
+  Page,
+  Route,
+} from "@playwright/test";
 import { createHash } from "node:crypto";
 import path from "node:path";
 import { TICK_MINUTES } from "../src/Constants";
@@ -783,9 +789,10 @@ test("TV couch intertie construction requires approval from both company owners"
   await p1Cash.focus();
   await couch.input({ "101": ["confirm"] });
   await expect(p1Cash).toHaveCount(0);
-  await expect(
-    p1.getByText(/Waiting for P2 Utility to approve their half/),
-  ).toBeVisible();
+  const waitingForP2 = p1.getByText(
+    /Waiting for P2 Utility to approve their half/,
+  );
+  await expect(waitingForP2).toBeVisible();
 
   await inspectP1.click();
   await expect(p2.getByText(/P1 Utility requested this upgrade/)).toBeVisible();
@@ -795,10 +802,18 @@ test("TV couch intertie construction requires approval from both company owners"
   const p2Cash = p2
     .getByRole("dialog")
     .getByRole("button", { name: "Pay cash" });
-  await inspectP2.focus();
+  const p1Normal = speedControls(p1).getByRole("button", {
+    name: "normal speed",
+    exact: true,
+  });
+  await expect(p1Normal).toHaveAttribute("aria-pressed", "false");
+  await p1Normal.focus();
   await p2Cash.focus();
   await couch.input({ "101": ["confirm"] });
-  await expect(p2Cash).toBeFocused();
+  // Observe P1's selection change before checking that the approval is still pending.
+  await expect(p1Normal).toHaveAttribute("aria-pressed", "true");
+  await expect(waitingForP2).toBeVisible();
+  await expect(p2Cash).toBeEnabled();
   await couch.input({ "202": ["confirm"] });
   await expect(p2Cash).toHaveCount(0);
   await expect(p2.getByText(/P1 Utility requested this upgrade/)).toHaveCount(
@@ -826,14 +841,32 @@ test("TV couch intertie construction requires approval from both company owners"
   ]);
 });
 
-test("TV couch resumes with an absent retired controller and completes the remaining company", async ({
-  context,
-  page,
-}, info) => {
-  test.skip(
-    info.project.name !== "tv-1080-light",
-    "Retirement and results journey",
+for (const withP2 of [false, true]) {
+  test(
+    withP2
+      ? "TV couch lets P2 save monthly bankruptcy results"
+      : "TV couch resumes with an absent retired controller and completes the remaining company",
+    async ({ context, page, colorScheme }, info) => {
+      test.skip(
+        info.project.name !== (withP2 ? "tv-1080-dark" : "tv-1080-light"),
+        "Monthly bankruptcy and results routing",
+      );
+      await verifyMonthlyBankruptcyResults(
+        context,
+        page,
+        withP2,
+        colorScheme === "dark" ? "rgb(239, 83, 80)" : "rgb(198, 40, 40)",
+      );
+    },
   );
+}
+
+async function verifyMonthlyBankruptcyResults(
+  context: BrowserContext,
+  page: Page,
+  withP2: boolean,
+  warningColor: string,
+) {
   const couch = await createCouchFixture(context, page, {
     nativeBindings: true,
   });
@@ -846,25 +879,31 @@ test("TV couch resumes with an absent retired controller and completes the remai
   await page.getByRole("button", { name: "Save & Quit", exact: true }).click();
   await expect.poll(() => couch.seats.size).toBe(0);
 
-  // Put the active grid within a few ticks of a real monthly bankruptcy check.
-  // Keep the retired grid frozen at its original minute and restore via the library.
+  // Resume just before a real monthly bankruptcy check. A retired P2 stays at its original minute.
   const saved = structuredClone(couch.checkpoint()!);
-  const [active, retired] = saved.grids;
-  const retiredAt = retired.date.minute;
+  const [firstGrid, secondGrid] = saved.grids;
+  const retiredAt = secondGrid.date.minute;
   const beforeRollover = MINUTES_PER_MONTH - 16 * TICK_MINUTES;
-  const offset = beforeRollover - active.date.minute;
-  active.date = getDateFromMinute(beforeRollover, active.startingYear);
-  for (const tick of active.timeline) tick.minute += offset;
-  getTimeFromTimeline(beforeRollover, active.timeline)!.cash = -1e12;
-  const ending = {
-    title: "Bankrupt!",
-    outcome: "bankrupt",
-    month: retired.date.monthsElapsed,
-  } as const;
-  retired.multiplayer!.ending = ending;
-  saved.outcomes["local-p2"] = ending;
+  for (const grid of withP2 ? saved.grids : [firstGrid]) {
+    const offset = beforeRollover - grid.date.minute;
+    grid.date = getDateFromMinute(beforeRollover, grid.startingYear);
+    for (const tick of grid.timeline) tick.minute += offset;
+    getTimeFromTimeline(beforeRollover, grid.timeline)!.cash = -1e12;
+  }
+  if (!withP2) {
+    const ending = {
+      title: "Bankrupt!",
+      outcome: "bankrupt",
+      month: secondGrid.date.monthsElapsed,
+    } as const;
+    secondGrid.multiplayer!.ending = ending;
+    saved.outcomes["local-p2"] = ending;
+    await couch.setConnected({ "202": false });
+  }
   couch.seedCheckpoint(saved);
-  await couch.setConnected({ "202": false });
+  const confirmPlayers: Record<string, ["confirm"]> = withP2
+    ? { "101": ["confirm"], "202": ["confirm"] }
+    : { "101": ["confirm"] };
 
   await page
     .getByRole("button", { name: "Play with friends", exact: true })
@@ -876,33 +915,49 @@ test("TV couch resumes with an absent retired controller and completes the remai
     exact: true,
   });
   await expect(review).toBeDisabled();
-  await couch.input({ "101": ["confirm"] });
+  await couch.input(confirmPlayers);
   await page
     .getByRole("button", { name: "Review saved game", exact: true })
     .click();
-  await couch.input({ "101": ["confirm"] });
+  await couch.input(confirmPlayers);
   await expect.poll(() => couch.seats.size).toBe(2);
   const p1 = couch.seats.get("local-p1")!.page;
   const p2 = couch.seats.get("local-p2")!.page;
-  await expect(
-    p2.getByRole("region", { name: "Company result" }),
-  ).toContainText("Bankrupt!");
+  if (!withP2)
+    await expect(
+      p2.getByRole("region", { name: "Company result" }),
+    ).toContainText("Bankrupt!");
   await expect(
     page.getByText(/P2 Utility: controller disconnected/),
   ).toHaveCount(0);
   await expect(clock(p1)).toHaveAttribute("data-active-speed", "PAUSED");
-  const lowCash = p1.getByRole("dialog", { name: "Low on cash", exact: true });
-  await lowCash
-    .getByRole("button", { name: "Go bankrupt", exact: true })
-    .focus();
-  await couch.input({ "101": ["confirm"] });
-  await expect(p1.getByRole("dialog", { includeHidden: true })).toHaveCount(0);
-  const slow = speedControls(p1).getByRole("button", {
-    name: "slow speed",
-    exact: true,
-  });
-  await slow.focus();
-  await couch.input({ "101": ["confirm"] });
+  const players = [{ seat: p1, device: "101", id: "local-p1" }];
+  if (withP2) players.push({ seat: p2, device: "202", id: "local-p2" });
+  for (const { seat, device, id } of players) {
+    await seat
+      .getByRole("dialog", { name: "Low on cash", exact: true })
+      .getByRole("button", { name: "Go bankrupt", exact: true })
+      .focus();
+    await couch.input({ [device]: ["confirm"] });
+    await expect(seat.getByRole("dialog", { includeHidden: true })).toHaveCount(
+      0,
+    );
+    const cash = seat.locator(".gameBalance > .gameStatusValue");
+    await expect(cash).toHaveAttribute("data-couch-player", id);
+    await expect(cash).toHaveCSS("color", warningColor);
+    if (process.env.REVIEW_SCREENSHOT_DIR && id === "local-p1")
+      await seat.locator("#topbar").screenshot({
+        path: path.join(
+          process.env.REVIEW_SCREENSHOT_DIR,
+          `couch-cash-${withP2 ? "dark" : "light"}.png`,
+        ),
+        animations: "disabled",
+      });
+    await speedControls(seat)
+      .getByRole("button", { name: "slow speed", exact: true })
+      .focus();
+    await couch.input({ [device]: ["confirm"] });
+  }
   await expect(clock(p1)).toHaveAttribute("data-active-speed", "SLOW");
 
   const results = page.getByRole("dialog", {
@@ -914,11 +969,21 @@ test("TV couch resumes with an absent retired controller and completes the remai
   });
   await expect(results).toContainText("P2 · P2 Utility: Bankrupt!");
   await results.getByRole("button", { name: "Save & return to setup" }).focus();
-  await couch.input({ "101": ["confirm"] });
-  const save = page.getByRole("button", { name: "Save & Quit", exact: true });
+  const requester = withP2 ? "202" : "101";
+  await couch.input({ [requester]: ["confirm"] });
+  const confirmation = page.getByRole("dialog", {
+    name: "Save & Quit for everyone?",
+  });
+  await expect(confirmation).toContainText(
+    `P${withP2 ? 2 : 1} Utility wants to end this TV session`,
+  );
+  const save = confirmation.getByRole("button", {
+    name: "Save & Quit",
+    exact: true,
+  });
   await expect(save).toBeEnabled();
   await save.focus();
-  await couch.input({ "101": ["confirm"] });
+  await couch.input({ [requester]: ["confirm"] });
   await expect.poll(() => couch.seats.size).toBe(0);
   await expect(
     page.getByRole("heading", { name: "On this TV · Two players" }),
@@ -928,10 +993,18 @@ test("TV couch resumes with an absent retired controller and completes the remai
     "local-p1": { outcome: "bankrupt" },
     "local-p2": { outcome: "bankrupt" },
   });
-  expect(finished.grids[0].date.minute).toBeGreaterThan(beforeRollover);
-  expect(finished.grids[1].date.minute).toBe(retiredAt);
-  expect(finished.edges[0]).toMatchObject({ disabled: true, flowW: 0 });
-});
+  expect(finished.grids[0].date.minute).toBeGreaterThanOrEqual(
+    MINUTES_PER_MONTH,
+  );
+  if (withP2) {
+    expect(finished.grids[1].date.minute).toBeGreaterThanOrEqual(
+      MINUTES_PER_MONTH,
+    );
+  } else {
+    expect(finished.grids[1].date.minute).toBe(retiredAt);
+    expect(finished.edges[0]).toMatchObject({ disabled: true, flowW: 0 });
+  }
+}
 
 test("TV couch applies padded bounds and exposes shared clock reasons through controller navigation", async ({
   context,
@@ -1112,6 +1185,30 @@ test("TV couch applies padded bounds and exposes shared clock reasons through co
   ).toBeVisible();
   expect(couch.layout()?.fits).toBe(false);
   await expect(page.locator("#couch-fixture-local-p1")).toBeHidden();
+  const fastSelection = clock(p1).getByRole("button", {
+    name: "fast speed",
+    exact: true,
+    includeHidden: true,
+  });
+  await couch.input({ "101": ["speedDown"] });
+  await expect(fastSelection).toHaveAttribute("aria-pressed", "true");
+
+  await page
+    .getByRole("button", { name: "Save & Quit for everyone", exact: true })
+    .focus();
+  await couch.input({ "202": ["confirm"] });
+  const exit = page.getByRole("dialog", { name: "Save & Quit for everyone?" });
+  await expect(exit).toContainText("P2 Utility wants to end this TV session");
+  const keepPlaying = exit.getByRole("button", {
+    name: "Keep playing",
+    exact: true,
+  });
+  await expect(keepPlaying).toBeEnabled();
+  await keepPlaying.focus();
+  await couch.input({ "101": ["confirm"] });
+  await expect(exit).toBeVisible();
+  await couch.input({ "202": ["confirm"] });
+  await expect(exit).toHaveCount(0);
 
   const displaySettings = page.getByRole("button", {
     name: "Display settings",
@@ -1144,9 +1241,14 @@ test("TV couch applies padded bounds and exposes shared clock reasons through co
   expect(couch.seats.get("local-p1")).toBe(route1);
   expect(couch.seats.get("local-p2")).toBe(route2);
   await expect(clock(p1)).toHaveAttribute("data-active-speed", "PAUSED");
-  await speedControls(p1)
-    .getByRole("button", { name: "normal speed", exact: true })
-    .click();
+  await expect(fastSelection).toHaveAttribute("aria-pressed", "true");
+  await couch.input({ "101": ["speedDown"] });
+  await expect(
+    speedControls(p1).getByRole("button", {
+      name: "normal speed",
+      exact: true,
+    }),
+  ).toHaveAttribute("aria-pressed", "true");
   await expect(clock(p1)).toHaveAttribute("data-active-speed", "PAUSED");
   await speedControls(p2)
     .getByRole("button", { name: "normal speed", exact: true })
