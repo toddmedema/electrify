@@ -1447,7 +1447,7 @@ test("hail falls on the struck solar site and leaves visibly broken panels durin
   for (const tileId of [struck, repairing])
     expect(
       initial.scene!.find(({ id }) => id === `structure:${tileId}`)?.modelKey,
-    ).toBe("structure:solar-hail-damaged");
+    ).toBe("structure:solar-hail-damaged:small");
   await fresh.blur();
   await reviewScreenshot(map.locator(".territoryMapViewport"), {
     path: info.outputPath("hail-webgl-map.png"),

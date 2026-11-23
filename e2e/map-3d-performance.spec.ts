@@ -99,7 +99,7 @@ for (const theme of ["light", "dark"] as const) {
     )!;
     expect(windScene).toMatchObject({
       active: true,
-      modelKey: "structure:wind",
+      modelKey: "structure:wind:small",
     });
     expect(windScene.triangles).toBeGreaterThan(0);
     const key = windScene.motionKey!;
