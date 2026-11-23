@@ -58,7 +58,7 @@ it("shows one shared calendar while speed controls stay in the player panes", ()
   ).toBeVisible();
   expect(screen.queryAllByRole("group", { name: /speed/ })).toHaveLength(0);
   expect(screen.queryByRole("group", { name: "Shared clock" })).toBeNull();
-  expect(screen.queryByText(/On this TV|Unranked|Last local save/)).toBeNull();
+  expect(screen.queryByText(/Local Co-op|Unranked|Last local save/)).toBeNull();
   expect(
     screen.queryByRole("button", { name: "Save & Quit for everyone" }),
   ).toBeNull();

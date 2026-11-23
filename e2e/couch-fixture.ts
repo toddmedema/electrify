@@ -131,19 +131,20 @@ const isPage = (actor: Page | Frame): actor is Page =>
 const actorClosed = (actor: Page | Frame) =>
   isPage(actor) ? actor.isClosed() : actor.isDetached();
 
+interface CouchCapabilities {
+  steamOnline?: boolean;
+  steamInputAvailable?: boolean;
+}
+
 export function createCouchFixture(
   context: BrowserContext,
   shell: Page,
-): Promise<CouchFixture<Page>>;
-export function createCouchFixture(
-  context: BrowserContext,
-  shell: Page,
-  options: { embedded: true },
+  options: CouchCapabilities & { embedded: true },
 ): Promise<CouchFixture<Frame>>;
 export function createCouchFixture(
   context: BrowserContext,
   shell: Page,
-  options: { nativeBindings: true },
+  options?: CouchCapabilities & { nativeBindings?: true },
 ): Promise<CouchFixture<Page>>;
 /** Replace native transport only. Shell coordinator, simulation worker, seat clients,
  * Redux stores, controls and data loading are the production implementations. Embedded
@@ -152,12 +153,13 @@ export function createCouchFixture(
 export async function createCouchFixture(
   context: BrowserContext,
   shell: Page,
-  options?: { embedded?: true; nativeBindings?: true },
+  options?: CouchCapabilities & { embedded?: true; nativeBindings?: true },
 ): Promise<CouchFixture<Page | Frame>> {
   const seats = new Map<string, { page: Page | Frame; generation: number }>();
   let nativeEvents = Promise.resolve();
+  const { steamOnline = true, steamInputAvailable = true } = options ?? {};
   const inputAdapter = {
-    initialized: true,
+    initialized: steamInputAvailable,
     deviceContexts: new Map(),
     releaseDevice: () => {},
     setDeviceMode: () => {},
@@ -179,7 +181,7 @@ export async function createCouchFixture(
   const bindings = native?.manager.bindings ?? new Map<string, string>();
   const nativeErrors: string[] = [];
   const nativeCalls = { bind: 0, status: 0, inputFrame: 0 };
-  const devices = structuredClone(defaultDevices);
+  const devices = steamInputAvailable ? structuredClone(defaultDevices) : [];
   const bindAttempts: { seatId: string; controllerId: string }[] = [];
   let deferredBind:
     | {
@@ -417,20 +419,19 @@ export async function createCouchFixture(
         throw new Error(`Fixture ${String(raw.kind)} failure`);
       switch (raw.kind) {
         case "setup":
-          if (native) {
+          if (native && steamInputAvailable) {
             native.manager.setup = true;
             await feedDevices(devices);
-            return { ...native.manager.status(), preview: true };
+            return native.manager.status();
           }
-          return { available: true, preview: true, devices };
+          return { available: steamInputAvailable, devices };
         case "status":
           if (native) {
             nativeCalls.status++;
-            return { ...native.manager.status(), preview: true };
+            return native.manager.status();
           }
           return {
-            available: true,
-            preview: true,
+            available: steamInputAvailable,
             devices,
             active: playing,
             bindings: Object.fromEntries(bindings),
@@ -679,7 +680,7 @@ export async function createCouchFixture(
       }
     },
   );
-  await context.addInitScript(() => {
+  await context.addInitScript((online) => {
     if (!/^https?:$/.test(location.protocol)) return;
     localStorage.setItem("audioEnabled", "false");
     localStorage.setItem("interfaceScale", "1.25");
@@ -760,7 +761,7 @@ export async function createCouchFixture(
         display,
         steam: {
           available: true,
-          online: true,
+          online,
           steamId: "76561198000000001",
           displayName: "TV host",
           cloudEnabled: false,
@@ -785,10 +786,11 @@ export async function createCouchFixture(
       }),
       openFriends: async () => {},
       multiplayerRequest: async () => ({
-        available: true,
+        available: online,
         selfId: "76561198000000001",
         members: [],
         connected: [],
+        ...(online ? {} : { error: "Connect to Steam to play online" }),
       }),
       onMultiplayerEvent: noop,
       setActivity: async () => {},
@@ -808,7 +810,7 @@ export async function createCouchFixture(
               subscribe("couchNativeEvent", callback),
           }),
     };
-  });
+  }, steamOnline);
   return {
     seats,
     nativeBindings: () => Object.fromEntries(bindings),

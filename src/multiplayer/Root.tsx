@@ -37,22 +37,15 @@ import { runSaveTransition } from "../SaveSession";
 import HostConnectionWarning from "./HostConnectionWarning";
 import { selectionKey } from "./Browse";
 import { coopSelection, hostSelection, isBrowseCard } from "./Choosing";
-import {
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Button,
-} from "@mui/material";
 import CouchRoot from "../couch/Root";
 
 /** Session lifetime follows the app; entering the normal game can unmount the main menu. */
 export default function MultiplayerRoot() {
   const [open, setOpen] = useState(false);
-  const [methodOpen, setMethodOpen] = useState(false);
   const [couchOpen, setCouchOpen] = useState(false);
   const localSession = useRef(false);
   localSession.current = couchOpen;
+  const deferredInvite = useRef<() => void>();
   const [savesOpen, setSavesOpen] = useState(false);
   // The host has opened the scenario screens for the lobby; guests follow once it publishes.
   const choosing = useRef(false);
@@ -74,6 +67,11 @@ export default function MultiplayerRoot() {
   const reconnect = useCallback(() => {
     void session.reconnect();
   }, [session]);
+
+  useEffect(() => {
+    // Let the couch shell unmount and release its controls before joining online.
+    if (!couchOpen) deferredInvite.current?.();
+  }, [couchOpen]);
 
   /** Choosing together ends with the lobby; scenario screens go back to single player. */
   const syncCoop = useCallback(() => {
@@ -186,16 +184,7 @@ export default function MultiplayerRoot() {
   }, [session]);
 
   useEffect(() => {
-    registerLobbyOpener(() => {
-      const couch = getDesktop()?.couchRequest;
-      if (!couch) return setOpen(true);
-      void couch({ kind: "status" })
-        .then((status) => {
-          if ((status as { preview?: boolean })?.preview) setMethodOpen(true);
-          else setOpen(true);
-        })
-        .catch(() => setOpen(true));
-    });
+    registerLobbyOpener(() => setOpen(true));
     let live = true,
       initialized = false,
       loading = false;
@@ -310,6 +299,12 @@ export default function MultiplayerRoot() {
     });
     const acceptInvite = (lobbyId: string) => {
       if (!live) return;
+      if (localSession.current) {
+        deferredInvite.current = () => acceptInvite(lobbyId);
+        return;
+      }
+      deferredInvite.current = undefined;
+      if (session.getSnapshot().view) return;
       choosing.current = false;
       setOpen(true);
       void session.join(lobbyId).catch((error) => {
@@ -332,6 +327,7 @@ export default function MultiplayerRoot() {
       .catch(() => undefined);
     return () => {
       live = false;
+      deferredInvite.current = undefined;
       stop();
       stopCoop();
       stopStore();
@@ -436,30 +432,6 @@ export default function MultiplayerRoot() {
 
   return (
     <>
-      <Dialog open={methodOpen} onClose={() => setMethodOpen(false)}>
-        <DialogTitle>Play with friends</DialogTitle>
-        <DialogContent>Choose where to play together.</DialogContent>
-        <DialogActions>
-          <Button onClick={() => setMethodOpen(false)}>Back</Button>
-          <Button
-            onClick={() => {
-              setMethodOpen(false);
-              setOpen(true);
-            }}
-          >
-            Online
-          </Button>
-          <Button
-            variant="contained"
-            onClick={() => {
-              setMethodOpen(false);
-              setCouchOpen(true);
-            }}
-          >
-            On this TV
-          </Button>
-        </DialogActions>
-      </Dialog>
       {couchOpen && (
         <CouchRoot
           onClose={() => {
@@ -488,6 +460,17 @@ export default function MultiplayerRoot() {
             if (!state.lobby.lobbyId) choosing.current = false;
           }}
           onLeave={() => leaveLobby()}
+          onLocalPlay={
+            getDesktop()?.couchRequest
+              ? () => {
+                  const online = session.getSnapshot();
+                  if (online.busy || online.lobby.lobbyId) return;
+                  localSession.current = true;
+                  setOpen(false);
+                  setCouchOpen(true);
+                }
+              : undefined
+          }
         />
       ) : null}
       {savesOpen && !open && !state.view && (

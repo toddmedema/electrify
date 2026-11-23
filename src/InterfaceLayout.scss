@@ -6,6 +6,8 @@
 .appFrame {
   box-sizing: border-box;
   padding: var(--screen-edge-inset);
+  // Screen geometry must apply immediately, including under reduced motion.
+  transition-property: none;
 }
 .MuiDialog-container {
   padding: var(--screen-edge-inset);

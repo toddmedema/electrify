@@ -808,7 +808,7 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
         setDevices(status.devices ?? []);
         if (!status.available)
           setError(
-            "On this TV requires Steam Input. Start Electrify through Steam with installed controller bindings, including in Offline Mode.",
+            "Local Co-op requires Steam Input. Start Electrify through Steam with installed controller bindings, including in Offline Mode.",
           );
       })
       .catch((failure) => setError(String(failure)));
@@ -1284,7 +1284,7 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
         maxWidth="sm"
         aria-labelledby="couch-title"
       >
-        <DialogTitle id="couch-title">On this TV · Two players</DialogTitle>
+        <DialogTitle id="couch-title">Local Co-op · Two players</DialogTitle>
         <DialogContent>
           <Typography>
             One controller per company. Each player presses Confirm to join.{" "}

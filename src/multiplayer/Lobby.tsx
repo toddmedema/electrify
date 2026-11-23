@@ -30,6 +30,7 @@ export default function Lobby({
   onCopyCode,
   onClose,
   onLeave,
+  onLocalPlay,
 }: {
   session: MultiplayerSession;
   /** The host's new lobby goes straight to choosing a game. */
@@ -39,6 +40,7 @@ export default function Lobby({
   onCopyCode: () => void;
   onClose: () => void;
   onLeave: () => void;
+  onLocalPlay?: () => void;
 }) {
   const { lobby, pendingCampaign, busy, entryOperation, error } =
     useSyncExternalStore(session.subscribe, session.getSnapshot);
@@ -239,6 +241,13 @@ export default function Lobby({
           )}
         </Stack>
       </DialogContent>
+      {mode === "entry" && onLocalPlay && (
+        <DialogActions>
+          <Button size="large" disabled={busy} onClick={onLocalPlay}>
+            Local Co-op
+          </Button>
+        </DialogActions>
+      )}
       {mode !== "entry" && (
         <DialogActions>
           {mode === "campaign" && host && (
