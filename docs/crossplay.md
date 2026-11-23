@@ -43,44 +43,108 @@ port 443. HTTPS handles large replication baselines, scenario snapshots and
 checkpoints. Checkpoints are pinned to an immutable Cloud Storage generation
 and checked against the room epoch, roster, compatibility ID and head.
 
-## Production prerequisites and release acceptance
+## Release access
 
-Provision the following before merging a production rollout. The deployment
-workflow publishes the control service and Firestore rules before the web
-bundle. The same compatible build must ship to the Steam depot.
+Provision these resources through the provider consoles before a production
+rollout. Keep tokens and keys in the named secret stores. Share the project ID,
+App ID, endpoint, bucket name, provider policy and pass/fail evidence in the PR.
 
-- Set the repository variables `STEAM_APP_ID`, `COOP_CHECKPOINT_BUCKET`, and
-  `COOP_TURN_RELAY_CIDRS`. Use provider-confirmed **allocation** CIDRs. The TURN
-  service's ingress A records describe a different network path. Enable Steamworks
-  **Use launch command line** for the production App ID.
-- In Google Secret Manager provision `STEAM_PUBLISHER_KEY`,
-  `COOP_FIREBASE_WRITER_API_KEY`, `COOP_RATE_LIMIT_KEY`,
-  `CLOUDFLARE_TURN_KEY_ID`, and `CLOUDFLARE_TURN_KEY_API_TOKEN`. Keep staging
-  and production provider keys separate.
-- Bind the functions to
-  `coop-service@electrify-game.iam.gserviceaccount.com`. Grant the narrow IAM
-  access needed for verified Firebase sessions, Firestore, the dedicated co-op
-  writer token, the five specified secrets and the private bucket. Prevent
-  public access on the bucket, use uniform bucket-level access, and verify the
-  Firebase player identities cannot list or read objects. Review staging
-  lifecycle and soft deletion together with the final retention period.
-- Obtain provider-backed limits or prove that shutdown bounds outstanding TURN
-  allocations. The service admits two live rooms and limits application-issued grants to 120
-  with a ten-minute drain period. The conservative room cap reserves space for
-  routine credential rotation. Cloudflare's published limits are per allocation. One grant can
-  allow separate allocations, and traffic on a live allocation has continued
-  after revocation or the nominal credential expiry in diagnostics. The
-  grant limit alone cannot establish a maximum billed spend. For shutdown,
-  set `coopSettings/runtime.stopped` and verify new requests stop, the reaper
-  revokes issued keys, in-progress downloads end and existing relay traffic
-  stops within the agreed time and byte limits.
-- Run a four-player production-equivalent session rotating host across iPhone
-  Safari, Android Chrome, desktop web and packaged Steam. Repeat with UDP
-  blocked to prove the TLS/443 path. Measure late-game traffic, checkpoint
-  transfers, control latency, service calls and peak memory. Verify account
-  replacement, mobile backgrounding, network changes, fixed-roster gameplay,
-  recovery, save access, quota exhaustion and the shutdown drill. Inspect
-  access logs and traces for credentials, invite secrets and simulation data.
+- **GitHub repository maintainer.** Set Actions variables `STEAM_APP_ID`,
+  `COOP_CHECKPOINT_BUCKET` and `COOP_TURN_RELAY_CIDRS` on the repository or
+  its `production` environment. Use the public IPv4 networks Cloudflare
+  confirms for **relay allocations**. The preflight validates the same CIDR
+  syntax as the application. It runs before Firebase changes. The existing
+  `FIREBASE_SERVICE_ACCOUNT` deploy identity needs permission to deploy
+  Firestore rules and indexes, the two co-op functions and their scheduler,
+  and to act as the runtime service account. The workflow deploys Firebase
+  and checks its health before publishing the AWS web bundle.
+- **Steamworks administrator and build operator.** Confirm the production App
+  ID and enable **Use launch command line**. Have a Steamworks administrator
+  create a publisher Web API key for the group containing Electrify and put it
+  in Secret Manager as `STEAM_PUBLISHER_KEY`. Use the dedicated build account
+  with **Edit App Metadata** and **Publish App Changes To Steam** for the
+  protected beta build. Give the Steam tester an account entitled to the game
+  and access to that branch. The web bundle and Steam depot must use the same
+  compatibility version. [Ticket verification](https://partner.steamgames.com/doc/webapi/isteamuserauth)
+  · [Build permissions](https://partner.steamgames.com/doc/sdk/uploading)
+  · [Beta branches](https://partner.steamgames.com/doc/store/application/builds)
+- **Firebase and Google Cloud administrator.** Enable Google sign-in for the
+  approved test web origin. Create `coop-service@electrify-game.iam.gserviceaccount.com`.
+  Give it Firebase Auth user lookup for revocation checks (`firebaseauth.users.get`),
+  Firestore data read/write, and `iam.serviceAccounts.signBlob` on the account
+  used to sign the Firebase writer token. Give it Secret Manager Secret
+  Accessor on the five co-op secrets. Create `COOP_FIREBASE_WRITER_API_KEY`
+  in the Firebase project for the server-side Identity Toolkit token exchange
+  and `COOP_RATE_LIMIT_KEY` from at least 32 random bytes. Grant bucket metadata
+  read and object create, get, list and delete on the dedicated checkpoint
+  bucket. Enable uniform bucket-level access and enforce public access
+  prevention on that bucket. Confirm player identities have no direct bucket
+  access and check its lifecycle and soft-delete settings against retention.
+  [Firebase Auth permissions](https://firebase.google.com/docs/projects/iam/roles-predefined-product#firebase_authentication_roles)
+  · [Writer signing](https://firebase.google.com/docs/auth/admin/create-custom-tokens)
+  · [Storage permissions](https://docs.cloud.google.com/storage/docs/access-control/iam-permissions)
+- **Cloudflare Realtime account owner or delegated operator.** Provision a
+  dedicated test TURN key and a separate production key. Store the production
+  key ID and token in Secret Manager as `CLOUDFLARE_TURN_KEY_ID` and
+  `CLOUDFLARE_TURN_KEY_API_TOKEN`. Provide the provider-confirmed allocation
+  CIDRs, applicable destination rules, enforceable account-level or key-level
+  limits and access to usage measurements. If approval relies on shutdown,
+  obtain the cutoff and billing behavior for already allocated relays and
+  demonstrate a maximum time and outbound byte count after the stop. The
+  service admits two live rooms and limits issuance to 120 tracked grants with
+  a ten-minute drain period. One grant can authorize multiple allocations, so
+  use provider enforcement or a measured cutoff to establish the aggregate
+  exposure. [Credential operations](https://developers.cloudflare.com/realtime/turn/generate-credentials/)
+  · [Per-allocation limits](https://developers.cloudflare.com/realtime/turn/#limits)
+  · [Allocation expiry and billing](https://developers.cloudflare.com/realtime/turn/faq/#what-will-happen-if-turn-credentials-expire-while-the-turn-allocation-is-in-use)
+
+For a separate staging deployment, provide the HTTPS origin, Firebase project
+and web app configuration, Steam App ID and test depot, checkpoint bucket, and
+provider allocation CIDRs. The checked-in browser and Steam build target the
+production function, Firebase project, and Steam ticket audience. A separate
+deployment needs the matching endpoint, auth audience, runtime service account,
+and invite settings wired into its build before end-to-end testing. Protect that
+deployment and its Steam build for the approved test group.
+
+## Live acceptance
+
+Arrange four devices with distinct co-op identities and access to the same test
+build. Use Google test accounts on iPhone Safari, Android Chrome, and desktop
+web, and an entitled account in the live Steam client on the fourth device.
+Have an operator who can block UDP for those devices while leaving HTTPS and
+TURN over TLS on TCP 443 available. Have a Cloudflare usage observer and a
+Firebase operator who can toggle `coopSettings/runtime.stopped` on the test
+deployment and inspect aggregate logs.
+
+1. Over an ordinary network, rotate hosting through each of the four devices.
+   Join by code and link, including **Open in Steam** with the game closed and
+   already running. Confirm host approval and play through a late checkpoint.
+   Record the selected relay-to-relay path on the host and all three guests.
+   Repeat on the UDP-blocked network and confirm the selected TCP 443 TLS path.
+2. On the same locked roster, background and reconnect a required mobile
+   device, change networks, replace an account session, and expire the host
+   lease. Compete for takeover and recover from the confirmed checkpoint.
+   Exercise Save & Quit, returning to the game, downloading a permitted save,
+   and denying access to outsiders and displaced sessions. Verify the campaign
+   remains unranked.
+3. Exercise malformed and oversized input and exhaust the room and grant
+   quotas in the protected deployment. Measure late-game command latency,
+   relay and checkpoint bytes, control service calls and client memory.
+   Inspect the service logs for credential, invite, SDP and player-data redaction.
+4. Drill the emergency stop while a room is active and a checkpoint transfer
+   is in flight. Record when room admission and grants stop, when active
+   credentials are revoked, when transfers end, and when already allocated
+   provider relays stop sending and billing traffic. Use the provider usage
+   record to check the aggregate exposure before widening admission.
+
+Record the commit and compatibility ID, OS/browser/Steam versions, host order,
+transports, measured limits and pass/fail for each case. The repository's
+[TURN probe](multiplayer-network.md#turn-qualification-for-cross-play) can measure
+synthetic browser relay paths and traffic after revocation using a dedicated
+test key. Supply the provider-confirmed `COOP_TURN_RELAY_CIDRS` to check
+each observed candidate against the production policy. Preserve the report's
+`allocationCidrsChecked` result with the measured traffic. Run the four-device
+matrix against the deployed stack for release acceptance.
 
 Relay cost estimates and application bounds are distinct. At the historical
 5 MiB live-payload measurement and a rate of $0.05 per GB, the payload alone

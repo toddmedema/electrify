@@ -88,18 +88,12 @@ jobs:
             echo "Add it as a repository secret, or the client will ship against stale rules." >&2
             exit 1
           fi
-          # Written outside the workspace so a stray build glob can never sweep a
-          # private key into the bundle, and removed even if the deploy fails.
-          if [[ ! "$STEAM_APP_ID" =~ ^[1-9][0-9]{0,9}$ ||
-                ! "$COOP_CHECKPOINT_BUCKET" =~ ^[a-z0-9][a-z0-9.-]+$ ||
-                ! "$COOP_TURN_RELAY_CIDRS" =~ ^[0-9./,[:blank:]]+$ ]]; then
-            echo "Set STEAM_APP_ID, COOP_CHECKPOINT_BUCKET, and COOP_TURN_RELAY_CIDRS before deploying co-op." >&2
-            exit 1
-          fi
+          node scripts/hosting/check-crossplay-config.js
           if [[ -e firebase/functions/.env.electrify-game ]]; then
             echo "The production functions environment already exists." >&2
             exit 1
           fi
+          # Keep the deploy credential outside the workspace and dispose of it on exit.
           key="$(mktemp -d)/firebase-service-account.json"
           trap 'rm -f "$key" firebase/functions/.env.electrify-game' EXIT
           printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$key"

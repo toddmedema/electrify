@@ -432,6 +432,50 @@ test("readiness succeeds without a build or any AWS writes", (t) => {
   assert.ok(calls.every(isRead));
 });
 
+function resolveDeploymentScripts(run) {
+  for (const script of [
+    "scripts/hosting/deploy.js",
+    "scripts/hosting/check-crossplay-config.js",
+  ])
+    run = run.replaceAll(`node ${script}`, `node ${path.resolve(script)}`);
+  return run;
+}
+
+test("production workflow rejects unusable cross-play configuration before Firebase deploy", (t) => {
+  const fixture = fakeDeployment(t, distribution(), undefined, "", {
+    args: ["--preflight"],
+    env: {
+      STEAM_APP_ID: "123456",
+      COOP_CHECKPOINT_BUCKET: "test-electrify-checkpoints",
+      COOP_TURN_RELAY_CIDRS: "141.101.64.0/18",
+    },
+  });
+  const { jobs } = parse(
+    fs.readFileSync(".github/workflows/deploy-prod.yml", "utf8"),
+  );
+  const firebase = resolveDeploymentScripts(
+    jobs.deploy.steps.find(({ run }) =>
+      run?.includes("firebase-tools@15 deploy"),
+    ).run,
+  );
+  for (const [variable, value] of [
+    ["STEAM_APP_ID", "2147483648"],
+    ["COOP_TURN_RELAY_CIDRS", "141.101.64.0/18,192.168.1.0/24"],
+    ["COOP_TURN_RELAY_CIDRS", "999.101.64.0/18"],
+  ]) {
+    const result = fixture.runShell(
+      `export ${variable}="${value}"\n${firebase}`,
+    );
+    assert.equal(result.status, 1, variable);
+    assert.match(result.stderr, new RegExp(variable));
+    assert.ok(!result.stderr.includes(value));
+    assert.equal(
+      fixture.calls.filter(({ args }) => args[0] === "firebase").length,
+      0,
+    );
+  }
+});
+
 test("production workflow checks hosting readiness before Firebase or AWS mutations", (t) => {
   const fixture = fakeDeployment(t, distribution(), undefined, "", {
     args: ["--preflight"],
@@ -488,10 +532,7 @@ test("production workflow checks hosting readiness before Firebase or AWS mutati
       );
   }
   const commands = [steps[preflight], steps[firebase]].map(({ run }) =>
-    run.replaceAll(
-      "node scripts/hosting/deploy.js",
-      `node ${path.resolve("scripts/hosting/deploy.js")}`,
-    ),
+    resolveDeploymentScripts(run),
   );
   const result = fixture.runShell(commands.join("\n"));
   assert.equal(result.status, 1);
