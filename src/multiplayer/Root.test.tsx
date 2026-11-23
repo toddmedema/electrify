@@ -76,6 +76,7 @@ function renderRoot() {
 function renderWithSteamInvites() {
   let receive: (event: NativeEvent) => void = () => {};
   jest.spyOn(desktop, "getDesktop").mockReturnValue({
+    apiVersion: 1,
     couchRequest: jest.fn(),
     onMultiplayerEvent: (listener) => {
       receive = listener;
