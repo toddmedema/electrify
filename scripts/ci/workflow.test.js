@@ -126,22 +126,24 @@ test("PR CI isolates three browser shards and retains every other build and test
     "web-renderer",
   ]);
   const desktopCrossplay = jobs.desktop.steps.find(
-    ({ env }) => env?.CROSSPLAY_WEB_BUILD_DIR,
+    ({ env }) => env?.CROSSPLAY_BUILD_DIR === "build",
+  );
+  const webCrossplay = jobs.desktop.steps.find(
+    ({ env }) => env?.CROSSPLAY_WEB_ONLY === "1",
   );
   const crossplayDownload = jobs.desktop.steps.find(
     ({ with: options }) => options?.name === "web-renderer",
   );
   assert.equal(
     crossplayDownload.with.path,
-    desktopCrossplay.env.CROSSPLAY_WEB_BUILD_DIR,
+    webCrossplay.env.CROSSPLAY_BUILD_DIR,
   );
   assert.match(desktopCrossplay.run, /npm run test:crossplay/);
-  const relayUrl = `ws://127.0.0.1:${jobs.desktop.env.CROSSPLAY_TEST_RELAY_PORT}/v1`;
+  assert.match(webCrossplay.run, /npm run test:crossplay/);
+  assert.equal(jobs.desktop.env.CROSSPLAY_TEST_RELAY_PORT, undefined);
   assert.equal(
-    jobs.build.steps.filter(
-      ({ env }) => env?.REACT_APP_COOP_RELAY_URL === relayUrl,
-    ).length,
-    2,
+    jobs.build.steps.some(({ env }) => env?.REACT_APP_COOP_RELAY_URL),
+    false,
   );
   const webDownload = jobs.browser.steps.find(
     ({ with: options }) => options?.name === "web-renderer",

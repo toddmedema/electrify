@@ -1,54 +1,8 @@
 import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
+import { crossplayFixture, installSteamBridge } from "./crossplay-fixture";
 import { isolateAnalytics } from "./fixtures";
 import { reviewScreenshot } from "./review-screenshot";
-
-async function installDesktopBridge(page: Page, steamEdition: boolean) {
-  await page.addInitScript((steamEdition) => {
-    const noop = () => () => {};
-    const display = {
-      fullscreen: false,
-      width: 1280,
-      height: 900,
-      resolutions: [],
-    };
-    window.electrifyDesktop = {
-      apiVersion: 1,
-      steamEdition,
-      getState: async () => ({
-        display,
-        steam: {
-          available: steamEdition,
-          online: steamEdition,
-          cloudEnabled: false,
-          displayName: "Steam Engineer",
-        },
-      }),
-      setDisplay: async () => display,
-      couchRequest: async () => ({ available: steamEdition, devices: [] }),
-      multiplayerRequest: async () => ({
-        available: steamEdition,
-        members: [],
-        connected: [],
-      }),
-      onMultiplayerEvent: noop,
-      onStateChanged: noop,
-      onGameFocusChanged: noop,
-      onBeforeQuit: noop,
-      readyToQuit: () => {},
-      quit: async () => {},
-      readSaveLibrary: async () => ({
-        local: null,
-        cloud: null,
-        cloudState: "disabled",
-      }),
-      writeSaveLibrary: async () => ({ cloudState: "disabled" }),
-      getLeaderboard: async () => [],
-      submitScore: async () => {},
-      openFriends: async () => {},
-    };
-  }, steamEdition);
-}
 
 const lobby = (page: Page) =>
   page.getByRole("dialog", { name: "Play with friends" });
@@ -66,18 +20,21 @@ async function enter(page: Page) {
 
 async function start(host: Page, guest: Page) {
   await lobby(host).getByRole("button", { name: "Host a game" }).click();
-  await expect(host.getByTestId("mission-row-999")).toBeVisible();
-  const invite = host
-    .getByRole("region", { name: "Playing together" })
-    .last()
-    .getByText(/^\d{6}$/, { exact: true });
-  const code = await invite.innerText();
-  await lobby(guest)
-    .getByRole("textbox", { name: "6-digit invite code" })
-    .fill(code);
+  const code = await lobby(host)
+    .getByText(/^[a-f0-9]{20}$/i, { exact: true })
+    .innerText();
+  await lobby(guest).getByRole("textbox", { name: "Invite code" }).fill(code);
   await lobby(guest).getByRole("button", { name: "Join", exact: true }).click();
-
+  await expect(lobby(guest)).toContainText(/waiting for.*approv/i);
+  const choose = lobby(host).getByRole("button", { name: "Choose a game" });
+  await expect(choose).toBeDisabled();
+  await lobby(host)
+    .getByRole("button", { name: "Approve", exact: true })
+    .click();
+  await expect(choose).toBeEnabled();
+  await choose.click();
   await host.getByTestId("mission-row-999").click();
+
   const ready = guest.getByRole("button", { name: "I'm ready", exact: true });
   await expect(ready).toBeEnabled();
   await ready.click();
@@ -101,116 +58,103 @@ async function start(host: Page, guest: Page) {
 }
 
 for (const steamHost of [false, true]) {
-  test(`web and Steam play together with ${steamHost ? "a Steam" : "a web"} host`, async ({
+  test(`simulated relay lets ${steamHost ? "Steam" : "web"} host cross-play`, async ({
     page,
-    context,
     browser,
   }, testInfo) => {
     test.skip(
-      steamHost && testInfo.project.name !== "desktop-chromium",
-      "Steam host uses the desktop viewport.",
+      testInfo.project.name !== "desktop-chromium" ||
+        process.env.CROSSPLAY_WEB_ONLY === "1",
+      "Mixed desktop bridge coverage runs with the desktop renderer.",
     );
     const otherContext = await browser.newContext({ ...testInfo.project.use });
-    const other = await otherContext.newPage();
-    const steam = steamHost ? page : other;
-    const web = steamHost ? other : page;
-    await installDesktopBridge(steam, true);
     try {
+      const other = await otherContext.newPage();
+      const steam = steamHost ? page : other;
+      const web = steamHost ? other : page;
+      const fixture = crossplayFixture();
+      await Promise.all([
+        fixture.install(web, "web"),
+        fixture.install(steam, "steam"),
+      ]);
       await Promise.all([enter(web), enter(steam)]);
+      await expect(
+        lobby(steam).getByRole("button", { name: "Local Co-op" }),
+      ).toBeVisible();
       await expect(
         lobby(web).getByRole("button", { name: "Local Co-op" }),
       ).toHaveCount(0);
       await expect(
-        lobby(steam).getByRole("button", { name: "Local Co-op" }),
-      ).toBeVisible();
-      await lobby(steam)
-        .getByRole("button", { name: "Web & Steam", exact: true })
-        .click();
-      await expect(
-        lobby(steam).getByRole("button", { name: "Web & Steam", exact: true }),
-      ).toHaveAttribute("aria-pressed", "true");
-      await expect(
-        lobby(web).getByRole("button", { name: "Host a game" }),
-      ).toBeInViewport();
-      await expect(
-        lobby(web).getByRole("textbox", { name: "6-digit invite code" }),
-      ).toBeInViewport();
-      if (!steamHost && testInfo.project.name === "mobile-360px")
-        await reviewScreenshot(lobby(web), {
-          path: testInfo.outputPath("web-crossplay.png"),
-          animations: "disabled",
-        });
-      if (steamHost)
+        lobby(steam).getByRole("button", { name: "Steam friends" }),
+      ).toHaveCount(0);
+      if (steamHost) {
         await reviewScreenshot(lobby(steam), {
           path: testInfo.outputPath("steam-crossplay.png"),
           animations: "disabled",
         });
+      }
 
       const host = steamHost ? steam : web;
       const guest = steamHost ? web : steam;
       await start(host, guest);
-      await guest.getByRole("button", { name: /^menu/ }).click();
-      await guest.getByRole("menuitem", { name: "Save & Quit" }).click();
-      await expect(mainEntry(guest)).toBeVisible();
-      await host.getByRole("button", { name: /^menu/ }).click();
-      await host.getByRole("menuitem", { name: "Save & Quit" }).click();
-      await expect(mainEntry(host)).toBeVisible();
 
-      // Refreshing proves the campaign is stored beyond the active session.
-      await host.reload();
-      await mainEntry(host).click();
-      if (steamHost)
-        await lobby(host)
-          .getByRole("button", { name: "Web & Steam", exact: true })
-          .click();
-      await lobby(host).getByRole("button", { name: "Host a game" }).click();
-      await host.getByRole("button", { name: "Load multiplayer save" }).click();
-      await host
-        .getByRole("button", { name: "Load save", exact: true })
-        .click();
-      const resume = host.getByRole("button", {
-        name: "Resume game",
-        exact: true,
-      });
-      await expect(resume).toBeDisabled();
-      const code = await host
-        .getByRole("dialog", { name: "Pick your company" })
-        .getByText(/^\d{6}$/, { exact: true })
-        .innerText();
-      await mainEntry(guest).click();
-      await lobby(guest)
-        .getByRole("textbox", { name: "6-digit invite code" })
-        .fill(code);
-      await lobby(guest)
-        .getByRole("button", { name: "Join", exact: true })
-        .click();
-      await expect(resume).toBeEnabled();
-      await resume.click();
-      for (const player of [host, guest])
-        await expect(clock(player)).toHaveAttribute(
-          "data-active-speed",
-          "PAUSED",
-        );
-      await host.getByRole("button", { name: /^menu/ }).click();
-      await host.getByRole("menuitem", { name: "Save & Quit" }).click();
-      await expect(mainEntry(host)).toBeVisible();
+      const operations = fixture.operations.map(({ operation }) => operation);
+      expect(operations).toEqual(
+        expect.arrayContaining([
+          "auth/google",
+          "auth/steam",
+          "room/approve",
+          "room/lock",
+          "signal/describe",
+          "signal/turn",
+          "save/publish",
+          "transfer/put",
+          "transfer/get",
+        ]),
+      );
+      expect(operations.indexOf("save/publish")).toBeLessThan(
+        operations.indexOf("transfer/put"),
+      );
+      if (steamHost) {
+        const saved = operations.filter(
+          (operation) => operation === "save/publish",
+        ).length;
+        await guest.getByRole("button", { name: /^menu/ }).click();
+        await guest.getByRole("menuitem", { name: "Save & Quit" }).click();
+        await expect(mainEntry(guest)).toBeVisible();
+        await expect
+          .poll(
+            () =>
+              fixture.operations.filter(
+                ({ operation }) => operation === "save/publish",
+              ).length,
+          )
+          .toBeGreaterThan(saved);
+      } else {
+        fixture.loseAuthority();
+        await expect(
+          guest.getByRole("dialog", { name: "Multiplayer" }),
+        ).toContainText(/connection|reconnect/i);
+      }
     } finally {
       await otherContext.close();
     }
   });
 }
 
-test("two browsers can start and advance a shared game", async ({
+test("two browsers can start and advance a shared game with simulated relay", async ({
   page,
   browser,
 }, testInfo) => {
-  test.skip(
-    testInfo.project.name !== "mobile-390px",
-    "Cover browser-only play on a phone.",
-  );
+  test.skip(testInfo.project.name !== "mobile-390px", "Phone hosting journey.");
   const guestContext = await browser.newContext({ ...testInfo.project.use });
   try {
     const guest = await guestContext.newPage();
+    const fixture = crossplayFixture();
+    await Promise.all([
+      fixture.install(page, "web"),
+      fixture.install(guest, "web"),
+    ]);
     await Promise.all([enter(page), enter(guest)]);
     await start(page, guest);
   } finally {
@@ -218,22 +162,48 @@ test("two browsers can start and advance a shared game", async ({
   }
 });
 
-test("a non-Steam desktop build offers online play without local co-op", async ({
+test("the unified web lobby keeps the join and host controls visible", async ({
   page,
 }, testInfo) => {
-  test.skip(
-    testInfo.project.name !== "desktop-chromium",
-    "Desktop standalone edition.",
-  );
-  await installDesktopBridge(page, false);
   await enter(page);
   await expect(
     lobby(page).getByRole("button", { name: "Host a game" }),
+  ).toBeInViewport();
+  await expect(
+    lobby(page).getByRole("textbox", { name: "Invite code" }),
+  ).toBeInViewport();
+  await expect(
+    lobby(page).getByRole("button", { name: "Join", exact: true }),
+  ).toBeDisabled();
+  const code = lobby(page).getByRole("textbox", { name: "Invite code" });
+  await code.fill("0123456789abcdefghij");
+  await expect(
+    lobby(page).getByRole("button", { name: "Join", exact: true }),
+  ).toBeDisabled();
+  await code.fill("0123456789abcdef0123");
+  await expect(
+    lobby(page).getByRole("button", { name: "Join", exact: true }),
   ).toBeEnabled();
+  await code.clear();
+  if (testInfo.project.name === "mobile-360px")
+    await reviewScreenshot(lobby(page), {
+      path: testInfo.outputPath("web-crossplay.png"),
+      animations: "disabled",
+    });
+});
+
+test("offline desktop cannot start online play", async ({ page }, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "desktop-chromium" ||
+      process.env.CROSSPLAY_WEB_ONLY === "1",
+    "Offline desktop bridge coverage runs with the desktop renderer.",
+  );
+  await installSteamBridge(page, false);
+  await enter(page);
+  await expect(
+    lobby(page).getByRole("button", { name: "Host a game" }),
+  ).toBeDisabled();
   await expect(
     lobby(page).getByRole("button", { name: "Local Co-op" }),
-  ).toHaveCount(0);
-  await expect(
-    lobby(page).getByRole("button", { name: "Steam friends" }),
   ).toHaveCount(0);
 });
