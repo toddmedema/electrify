@@ -1461,79 +1461,195 @@ function reservoir(
   };
 }
 
-function hydro(_size: FacilitySize): MapModel {
+function hydro(size: FacilitySize): MapModel {
   const body = new MeshBuilder(),
     water = new MeshBuilder(),
     flow = new MeshBuilder();
-  base(body, 0.7, 0.45);
-  // Basin floor stays exposed at empty. The front dam and back retaining wall
-  // still frame the water as it rises beneath the crest.
-  body.box([0, 0.063, -0.105], [0.66, 0.08, 0.26], P.steelShade);
-  body.box([0, 0.167, -0.242], [0.69, 0.29, 0.025], P.steel);
-  const front = (x: number) => 0.12 - 0.15 * (x / 0.32) ** 2;
-  for (let i = 0; i < 8; i++) {
-    const x = -0.32 + i * 0.08,
-      next = x + 0.08,
-      a = front(x),
-      b = front(next);
+  const layout = {
+    small: {
+      span: 0.22,
+      crest: 0.225,
+      bow: 0.085,
+      front: 0.09,
+      back: -0.183,
+      baseDepth: 0.36,
+    },
+    medium: {
+      span: 0.32,
+      crest: 0.32,
+      bow: 0.15,
+      front: 0.12,
+      back: -0.242,
+      baseDepth: 0.45,
+    },
+    large: {
+      span: 0.353,
+      crest: 0.385,
+      bow: 0.165,
+      front: 0.143,
+      back: -0.265,
+      baseDepth: 0.49,
+    },
+  }[size];
+  const { span, crest, bow, front, back, baseDepth } = layout;
+  base(body, span * 2 + 0.06, baseDepth);
+
+  // The fill range runs from the basin floor to just below the crest.
+  const floor = 0.103 + (crest - 0.32) * 0.18;
+  const basinBack = back + 0.014;
+  const floorBack = back + 0.007;
+  const floorFront = front - 0.095;
+  const waterY = crest - 0.045;
+  body.box(
+    [0, floor - 0.04, (floorBack + floorFront) / 2],
+    [span * 2 + 0.02, 0.08, floorFront - floorBack],
+    P.steelShade,
+  );
+  body.box(
+    [0, (crest + 0.014) / 2, back],
+    [span * 2 + 0.05, crest - 0.03, 0.025],
+    P.steel,
+  );
+  const damFace = (x: number) => front - bow * (x / span) ** 2;
+  const panelCount = size === "large" ? 10 : size === "small" ? 6 : 8;
+  for (let i = 0; i < panelCount; i++) {
+    const x = -span + (i * 2 * span) / panelCount;
+    const next = -span + ((i + 1) * 2 * span) / panelCount;
+    const a = damFace(x),
+      b = damFace(next);
     body
       .quad(
         [x, 0.035, a + 0.07],
         [next, 0.035, b + 0.07],
-        [next, 0.32, b],
-        [x, 0.32, a],
+        [next, crest, b],
+        [x, crest, a],
         i % 2 ? P.cream : P.steel,
       )
       .quad(
-        [x, 0.32, a],
-        [next, 0.32, b],
-        [next, 0.32, b - 0.065],
-        [x, 0.32, a - 0.065],
+        [x, crest, a],
+        [next, crest, b],
+        [next, crest, b - 0.065],
+        [x, crest, a - 0.065],
         P.cream,
       )
       .quad(
         [next, 0.035, b - 0.08],
         [x, 0.035, a - 0.08],
-        [x, 0.32, a - 0.065],
-        [next, 0.32, b - 0.065],
+        [x, crest, a - 0.065],
+        [next, crest, b - 0.065],
         P.steel,
       );
     water.quad(
-      [x, 0.275, -0.228],
-      [x, 0.275, a - 0.067],
-      [next, 0.275, b - 0.067],
-      [next, 0.275, -0.228],
+      [x, waterY, basinBack],
+      [x, waterY, a - 0.067],
+      [next, waterY, b - 0.067],
+      [next, waterY, basinBack],
       P.water,
     );
     body.beam(
-      [x, 0.337, a - 0.012],
-      [next, 0.337, b - 0.012],
+      [x, crest + 0.017, a - 0.012],
+      [next, crest + 0.017, b - 0.012],
       0.01,
       P.steelShade,
     );
   }
-  for (const x of [-0.335, 0.335])
-    body.box([x, 0.17, -0.08], [0.03, 0.3, 0.33], P.cream);
-  // A real sloping water chute runs down the convex downstream face.
-  body.quad(
-    [-0.067, 0.055, 0.199],
-    [0.067, 0.055, 0.199],
-    [0.052, 0.306, 0.124],
-    [-0.052, 0.306, 0.124],
-    P.deepWater,
-  );
-  for (const x of [-0.065, 0.065])
-    body.beam([x, 0.32, 0.12], [x * 1.15, 0.046, 0.205], 0.011, P.cream);
-  for (const y of [0.12, 0.2, 0.27]) {
-    const z = 0.124 + ((0.306 - y) / 0.251) * 0.075;
-    flow.box([0, y, z + 0.004], [0.087, 0.008, 0.008], P.water);
+  for (const x of [-span - 0.015, span + 0.015]) {
+    const frontAnchor = size === "small" ? 0.084 : 0.085;
+    const backAnchor = size === "small" ? -0.186 : back - 0.003;
+    body.box(
+      [x, crest / 2 + 0.01, (frontAnchor + backAnchor) / 2],
+      [0.03, crest - 0.02, frontAnchor - backAnchor],
+      P.cream,
+    );
   }
-  body.box([-0.22, 0.084, 0.145], [0.17, 0.12, 0.14], P.cream);
-  gable(body, [-0.22, 0.144, 0.145], [0.19, 0.025, 0.155], P.steel);
-  const glazing = windows(body, -0.22, 0.085, 0.218, 0.11);
-  return facilityModel("hydro", body, switchgear(body, 0.245), [
+
+  // Separate discharge lanes follow the slope of the downstream dam face.
+  const spillways = size === "large" ? [-0.075, 0.095] : [0];
+  const chuteHalfWidth = size === "medium" ? 0.067 : 0.05;
+  for (const x of spillways) {
+    const topY = crest - 0.014,
+      bottomY = 0.055;
+    const topZ = damFace(x) + 0.004,
+      bottomZ = topZ + 0.075;
+    const crestHalfWidth = chuteHalfWidth * (0.052 / 0.067);
+    body.quad(
+      [x - chuteHalfWidth, bottomY, bottomZ],
+      [x + chuteHalfWidth, bottomY, bottomZ],
+      [x + crestHalfWidth, topY, topZ],
+      [x - crestHalfWidth, topY, topZ],
+      P.deepWater,
+    );
+    for (const dx of [-chuteHalfWidth + 0.002, chuteHalfWidth - 0.002])
+      body.beam(
+        [x + dx, crest, topZ - 0.004],
+        [x + dx * 1.15, 0.046, bottomZ + 0.006],
+        0.011,
+        P.cream,
+      );
+    for (const height of [0.065, 0.145, 0.215]) {
+      const y = bottomY + (height * (topY - bottomY)) / 0.251;
+      const z = topZ + ((topY - y) / (topY - bottomY)) * 0.075;
+      flow.box(
+        [x, y, z + 0.004],
+        [chuteHalfWidth * (0.087 / 0.067), 0.008, 0.008],
+        P.water,
+      );
+    }
+    if (size === "large")
+      body.box(
+        [x, topY + 0.021, topZ + 0.008],
+        [0.087, 0.025, 0.027],
+        P.steelShade,
+      );
+  }
+  const house = {
+    small: {
+      x: -0.151,
+      z: 0.118,
+      width: 0.121,
+      depth: 0.104,
+      height: 0.08,
+      windowWidth: 0.077,
+    },
+    medium: {
+      x: -0.22,
+      z: 0.145,
+      width: 0.17,
+      depth: 0.14,
+      height: 0.12,
+      windowWidth: 0.11,
+    },
+    large: {
+      x: -0.266,
+      z: 0.158,
+      width: 0.185,
+      depth: 0.149,
+      height: 0.15,
+      windowWidth: 0.122,
+    },
+  }[size];
+  body.box(
+    [house.x, 0.024 + house.height / 2, house.z],
+    [house.width, house.height, house.depth],
+    P.cream,
+  );
+  gable(
+    body,
+    [house.x, 0.024 + house.height, house.z],
+    [house.width + 0.02, 0.025, house.depth + 0.015],
+    P.steel,
+  );
+  const glazing = windows(
+    body,
+    house.x,
+    0.025 + house.height / 2,
+    house.z + house.depth / 2 + 0.003,
+    house.windowWidth,
+  );
+  const terminals = switchgear(body, size === "small" ? 0.185 : 0.245);
+  return facilityModel("hydro", body, terminals, [
     glazing,
-    reservoir(water, [-0.174, 0.021]),
+    reservoir(water, [floor - 0.002 - waterY, 0.021]),
     effect(flow.build(), "flow"),
   ]);
 }
@@ -1674,51 +1790,213 @@ function geothermal(size: FacilitySize): MapModel {
   );
 }
 
-function storage(kind: "battery" | "iron-air", _size: FacilitySize): MapModel {
+function storage(kind: "battery" | "iron-air", size: FacilitySize): MapModel {
   const body = new MeshBuilder(),
     flow = new MeshBuilder();
-  base(body);
+  if (size === "small") base(body, kind === "battery" ? 0.35 : 0.41, 0.28);
+  else if (size === "large") base(body, 0.76, kind === "battery" ? 0.49 : 0.45);
+  else base(body);
+
   if (kind === "battery") {
-    for (const x of [-0.16, 0.16]) {
-      body.box([x, 0.17, 0], [0.21, 0.27, 0.26], P.cream);
-      body.box([x, 0.312, 0], [0.13, 0.016, 0.13], P.steelShade);
-      body.box([x, 0.19, 0.133], [0.105, 0.1, 0.006], P.mint);
+    const layout = {
+      small: [[0, -0.02, 0.17, 0.18, 0.206]],
+      medium: [
+        [-0.16, 0, 0.21, 0.26, 0.27],
+        [0.16, 0, 0.21, 0.26, 0.27],
+      ],
+      large: [
+        [-0.235, -0.119, 0.201, 0.201, 0.32],
+        [0.235, -0.119, 0.201, 0.201, 0.32],
+        [-0.139, 0.108, 0.201, 0.201, 0.253],
+        [0.139, 0.108, 0.201, 0.201, 0.253],
+      ],
+    }[size];
+    for (const [x, z, width, depth, height] of layout) {
+      const face = z + depth / 2;
+      const indicatorY = 0.19 + (height - 0.27) * 0.6;
+      const panelWidth = width * 0.5;
+      const panelHeight = size === "small" ? 0.069 : 0.1;
+      body.box([x, 0.035 + height / 2, z], [width, height, depth], P.cream);
+      const cap = size === "small" ? 0.097 : 0.13;
+      body.box([x, 0.042 + height, z], [cap, 0.016, cap], P.steelShade);
+      body.box(
+        [x, indicatorY, face + 0.003],
+        [panelWidth, panelHeight, 0.006],
+        P.mint,
+      );
       for (const y of [0.085, 0.105])
-        body.box([x, y, 0.134], [0.12, 0.006, 0.007], P.steelShade);
-      flow.box([x, 0.19, 0.139], [0.07, 0.008, 0.005], P.cream);
+        body.box(
+          [x, y, face + 0.004],
+          [width - 0.09, 0.006, 0.007],
+          P.steelShade,
+        );
+      flow.box(
+        [x, indicatorY, face + 0.009],
+        [panelWidth * (2 / 3), 0.008, 0.005],
+        P.cream,
+      );
     }
   } else {
-    body.box([0, 0.15, 0], [0.58, 0.23, 0.29], P.cream);
-    body.box([0, 0.279, 0], [0.61, 0.03, 0.32], P.steel);
-    body.box([0, 0.185, 0.148], [0.48, 0.095, 0.007], P.steelShade);
-    for (let i = 0; i < 7; i++)
+    const layout = {
+      small: [
+        { x: 0, width: 0.34, depth: 0.235, height: 0.17, fans: [0], slats: 4 },
+      ],
+      medium: [
+        {
+          x: 0,
+          width: 0.58,
+          depth: 0.29,
+          height: 0.23,
+          fans: [-0.15, 0.15],
+          slats: 7,
+        },
+      ],
+      large: [
+        {
+          x: -0.181,
+          width: 0.321,
+          depth: 0.31,
+          height: 0.305,
+          fans: [0],
+          slats: 4,
+        },
+        {
+          x: 0.181,
+          width: 0.321,
+          depth: 0.31,
+          height: 0.27,
+          fans: [0],
+          slats: 4,
+        },
+      ],
+    }[size];
+    for (const { x, width, depth, height, fans, slats } of layout) {
+      const face = depth / 2;
+      const louverY = 0.07 + height / 2;
+      const louverHeight = size === "small" ? 0.071 : 0.095;
+      body.box([x, 0.035 + height / 2, 0], [width, height, depth], P.cream);
       body.box(
-        [-0.21 + i * 0.07, 0.185, 0.155],
-        [0.013, 0.095, 0.008],
+        [x, 0.049 + height, 0],
+        [width + 0.03, 0.03, depth + 0.03],
         P.steel,
       );
-    for (const x of [-0.15, 0.15]) {
-      body.cylinder([x, 0.295, 0], 0.055, 0.055, 0.006, P.steelShade, 8);
-      body.beam([x - 0.04, 0.302, 0], [x + 0.04, 0.302, 0], 0.005, P.steel);
-      body.box([x, 0.085, 0.15], [0.12, 0.045, 0.007], P.mint);
-      flow.box([x, 0.085, 0.157], [0.075, 0.008, 0.005], P.cream);
+      body.box(
+        [x, louverY, face + 0.003],
+        [width - 0.1, louverHeight, 0.007],
+        P.steelShade,
+      );
+      const slatSpacing = (width - 0.16) / (slats - 1);
+      for (let i = 0; i < slats; i++)
+        body.box(
+          [x + (i - (slats - 1) / 2) * slatSpacing, louverY, face + 0.01],
+          [0.013, louverHeight, 0.008],
+          P.steel,
+        );
+      const fanRadius =
+        size === "small" ? 0.044 : size === "medium" ? 0.055 : 0.079;
+      for (const offset of fans) {
+        const fanX = x + offset;
+        body.cylinder(
+          [fanX, 0.065 + height, 0],
+          fanRadius,
+          fanRadius,
+          0.006,
+          P.steelShade,
+          8,
+        );
+        const fanBlade = fanRadius * (0.04 / 0.055);
+        body.beam(
+          [fanX - fanBlade, 0.072 + height, 0],
+          [fanX + fanBlade, 0.072 + height, 0],
+          0.005,
+          P.steel,
+        );
+        if (size === "large")
+          body.beam(
+            [fanX, 0.072 + height, -fanBlade],
+            [fanX, 0.072 + height, fanBlade],
+            0.005,
+            P.steel,
+          );
+        body.box([fanX, 0.085, face + 0.005], [0.12, 0.045, 0.007], P.mint);
+        flow.box([fanX, 0.085, face + 0.012], [0.075, 0.008, 0.005], P.cream);
+      }
     }
   }
-  return facilityModel(kind, body, switchgear(body), [
-    effect(flow.build(), "flow"),
-  ]);
+  return facilityModel(
+    kind,
+    body,
+    switchgear(body, size === "small" ? 0.152 : 0.22),
+    [effect(flow.build(), "flow")],
+  );
 }
 
-function pumpedHydro(_size: FacilitySize): MapModel {
+function pumpedHydro(size: FacilitySize): MapModel {
   const body = new MeshBuilder(),
     flow = new MeshBuilder();
-  base(body, 0.66, 0.45);
+  const layout = {
+    small: {
+      base: [0.46, 0.38],
+      upper: [-0.103, -0.086, 0.179, 0.245, 0.156],
+      lower: [0.111, 0.105, 0.066, 0.213, 0.146],
+      pipe: [
+        [0.027, 0.154, -0.086],
+        [0.07, 0.154, -0.086],
+        [0.07, 0.076, 0.032],
+        [-0.065, 0.076, 0.086],
+      ],
+      indicators: [
+        [0.047, 0.154, -0.086],
+        [0.07, 0.115, -0.027],
+        [0.005, 0.076, 0.058],
+      ],
+      house: [-0.14, 0.104, 0.151, 0.111, 0.087, 0.094],
+    },
+    medium: {
+      base: [0.66, 0.45],
+      upper: [-0.13, -0.105, 0.26, 0.33, 0.2],
+      lower: [0.17, 0.13, 0.075, 0.26, 0.17],
+      pipe: [
+        [0.048, 0.22, -0.1],
+        [0.105, 0.22, -0.1],
+        [0.105, 0.09, 0.035],
+        [-0.1, 0.09, 0.11],
+      ],
+      indicators: [
+        [0.07, 0.22, -0.1],
+        [0.105, 0.15, -0.03],
+        [0, 0.09, 0.07],
+      ],
+      house: [-0.19, 0.13, 0.21, 0.15, 0.12, 0.14],
+    },
+    large: {
+      base: [0.76, 0.5],
+      upper: [-0.135, -0.122, 0.335, 0.421, 0.224],
+      lower: [0.17, 0.145, 0.1, 0.339, 0.217],
+      pipe: [
+        [0.084, 0.278, -0.115],
+        [0.158, 0.278, -0.115],
+        [0.082, 0.116, 0.025],
+        [-0.093, 0.116, 0.109],
+      ],
+      indicators: [
+        [0.123, 0.278, -0.115],
+        [0.12, 0.197, -0.045],
+        [-0.006, 0.116, 0.067],
+      ],
+      house: [-0.209, 0.148, 0.246, 0.172, 0.16, 0.163],
+    },
+  } as const;
+  const site = layout[size];
+  base(body, site.base[0], site.base[1]);
   const basin = (
-    x: number,
-    z: number,
-    top: number,
-    width: number,
-    depth: number,
+    [x, z, top, width, depth]: readonly [
+      number,
+      number,
+      number,
+      number,
+      number,
+    ],
     upper: boolean,
   ) => {
     const bottom = Math.max(0.037, top * 0.24);
@@ -1746,36 +2024,56 @@ function pumpedHydro(_size: FacilitySize): MapModel {
         P.cream,
       );
     }
+    if (size === "large" && upper)
+      for (const sign of [-1, 1])
+        body.box(
+          [x + (sign * width) / 2, top * 0.22, z],
+          [0.057, top * 0.44, depth + 0.022],
+          P.steel,
+        );
     // Stored energy tracks the upper basin. The lower basin declines as the upper fills.
-    const empty = bottom - top - 0.001,
-      full = 0.01;
+    const empty = bottom - top - 0.001;
+    const full = 0.01;
     return reservoir(water, upper ? [empty, full] : [full, empty]);
   };
-  const upper = basin(-0.13, -0.105, 0.26, 0.33, 0.2, true);
-  const lower = basin(0.17, 0.13, 0.075, 0.26, 0.17, false);
-  const pipe: Vec3[] = [
-    [0.048, 0.22, -0.1],
-    [0.105, 0.22, -0.1],
-    [0.105, 0.09, 0.035],
-    [-0.1, 0.09, 0.11],
-  ];
-  for (let i = 0; i < pipe.length - 1; i++)
-    body.beam(pipe[i], pipe[i + 1], 0.022, P.steel, 8);
-  for (const [x, y, z] of [
-    [0.07, 0.22, -0.1],
-    [0.105, 0.15, -0.03],
-    [0, 0.09, 0.07],
-  ])
+  const upper = basin(site.upper, true);
+  const lower = basin(site.lower, false);
+  for (let i = 0; i < site.pipe.length - 1; i++) {
+    const a = site.pipe[i];
+    const b = site.pipe[i + 1];
+    body.beam(a, b, size === "small" ? 0.016 : 0.022, P.steel, 8);
+    if (size === "large")
+      body.beam(
+        [a[0], a[1], a[2] + 0.046],
+        [b[0], b[1], b[2] + 0.046],
+        0.017,
+        P.steelShade,
+        8,
+      );
+  }
+  for (const [x, y, z] of site.indicators)
     flow.box([x, y, z], [0.02, 0.025, 0.02], P.mint);
-  body.box([-0.19, 0.077, 0.13], [0.21, 0.12, 0.15], P.cream);
-  gable(body, [-0.19, 0.137, 0.13], [0.23, 0.025, 0.17], P.steel);
-  const glazing = windows(body, -0.19, 0.085, 0.208, 0.14);
-  return facilityModel("pumped-hydro", body, switchgear(body, 0.245), [
-    glazing,
-    upper,
-    lower,
-    effect(flow.build(), "flow"),
-  ]);
+  const [x, z, width, depth, height, windowWidth] = site.house;
+  body.box([x, 0.017 + height / 2, z], [width, height, depth], P.cream);
+  gable(
+    body,
+    [x, 0.017 + height, z],
+    [width + 0.02, 0.025, depth + 0.02],
+    P.steel,
+  );
+  const glazing = windows(
+    body,
+    x,
+    0.025 + height / 2,
+    z + depth / 2 + 0.003,
+    windowWidth,
+  );
+  return facilityModel(
+    "pumped-hydro",
+    body,
+    switchgear(body, size === "small" ? 0.19 : 0.245),
+    [glazing, upper, lower, effect(flow.build(), "flow")],
+  );
 }
 
 const citySizes = {
