@@ -2088,6 +2088,7 @@ export interface AuthoredRunReference {
   compatibilityId: string;
 }
 export interface ChallengeInvitation {
-  run: AuthoredRunReference;
+  scenarioId: number;
+  difficulty: DifficultyType;
   target: number;
 }

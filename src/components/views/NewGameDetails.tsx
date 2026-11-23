@@ -169,7 +169,7 @@ export default class NewGameDetails extends React.Component<Props, State> {
                       </strong>
                     </Typography>
                     <Typography variant="body2">
-                      {DIFFICULTY_LABELS[game.difficulty]}
+                      {DIFFICULTY_LABELS[game.difficulty]} · New run
                     </Typography>
                   </div>
                 ) : (

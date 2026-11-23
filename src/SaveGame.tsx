@@ -23,11 +23,9 @@ import { validHydroClaims } from "./data/HydroSites";
 import {
   validRunIdentity,
   carrySavedRunForward,
-  sameRunIdentity,
-  expandAuthoredRunReference,
   normalizedInputs,
 } from "./helpers/RunIdentity";
-import { validInvitation } from "./helpers/Challenge";
+import { validInvitation } from "./helpers/ChallengeInvitation";
 import {
   validPolicies,
   validDeferredResidential,
@@ -968,12 +966,13 @@ export function parseSave(
   )
     return null;
   if (
-    normalized.challenge &&
+    normalized.challenge !== undefined &&
     (!validInvitation(normalized.challenge) ||
-      !sameRunIdentity(
-        normalized.runIdentity,
-        expandAuthoredRunReference(normalized.challenge.run),
-      ))
+      normalized.challenge.scenarioId !== normalized.scenarioId ||
+      normalized.challenge.difficulty !== normalized.difficulty ||
+      normalized.customScenario ||
+      normalized.meaningfulDecisionGateWaived ||
+      normalized.storyEffectsDisabled)
   )
     return null;
   if (
