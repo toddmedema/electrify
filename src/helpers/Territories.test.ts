@@ -1,4 +1,5 @@
 import { GENERATORS, STORAGE } from "../data/Facilities";
+import { runMonths } from "../testing/SimulationTestHelpers";
 import { createGame } from "../testing/Simulator";
 import { cityProfile } from "./CityProfiles";
 import {
@@ -38,7 +39,7 @@ it("enables site budgets only in the expansion scenario", () => {
   expect(hasTerritoryNetwork({ ...game, scenarioId: 100 })).toBe(false);
   expect(ownedTerritories(game)).toEqual(["champlain"]);
 });
-it("pays the connection quote for one immediately available building site", () => {
+it("pays the connection quote before the building site comes online", () => {
   const game = createGame({ scenarioId: 116, seed: 61 });
   const before = {
     cash: currentTick(game)!.cash,
@@ -55,8 +56,10 @@ it("pays the connection quote for one immediately available building site", () =
   expect(currentTick(game)!.customers).toBe(before.customers);
   expect(game.facilities).toHaveLength(before.facilities);
   expect(game.transmission!.lines).toEqual([]);
-  expect(ownedTerritories(game)).toContain("green-uplands");
+  expect(ownedTerritories(game)).not.toContain("green-uplands");
   expect(landPurchaseQuote(game)?.tileId).not.toBe(quote.tileId);
+  runMonths(game, quote.buildMonths);
+  expect(ownedTerritories(game)).toContain("green-uplands");
 });
 it.each([
   null,
@@ -96,9 +99,10 @@ it("reserves shared general sites through construction and pause; selling frees 
   expect(
     territoryBuildAvailability(game, wind, "green-uplands").buildable,
   ).toBe(false);
-  buyLand(game);
+  const quote = landPurchaseQuote(game)!;
+  for (let i = 0; i < 7; i++) buyLand(game);
+  runMonths(game, quote.buildMonths);
   for (let i = 0; i < 7; i++) {
-    if (i > 0) buyLand(game);
     game = JSON.parse(
       JSON.stringify(
         reducer(

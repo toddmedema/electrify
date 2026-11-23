@@ -1,3 +1,4 @@
+import { pendingTileConnections } from "../../helpers/TerritoryConnections";
 import * as React from "react";
 import {
   FormControl,
@@ -101,11 +102,13 @@ export default function TerritoryBuildDestination({
   const owned = new Set(ownedTerritories(game));
   const destinations = new Set([...owned, value]);
   const ownsTile = createTerritoryTileOwnership(game);
+  const pending = pendingTileConnections(game);
   const freeTiles = getTerritoryTiles(game).filter(
     (tile) =>
       !tile.city &&
       tile.territoryId === value &&
       ownsTile(tile) &&
+      !pending.has(tile.id) &&
       !facilityOnTile(game, tile.id) &&
       (!tile.hydroSiteId ||
         !game.commissionedHydroSiteIds?.includes(tile.hydroSiteId)),

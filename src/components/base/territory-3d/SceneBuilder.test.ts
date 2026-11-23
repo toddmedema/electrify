@@ -885,3 +885,41 @@ test("hail hits the ground and panels, then leaves only fractured panels during 
     intact.model,
   );
 });
+
+test("raises a tower from the foundation, then connects wires to its finished terminals", () => {
+  const neighbor = view(1);
+  const site = view();
+  const pending: TerritoryTileView = {
+    ...site,
+    developed: false,
+    connection: { startedMinute: 0, towerMinute: 120, connectionMinute: 120 },
+  };
+  const tiles = [site.tile, neighbor.tile];
+  const builder = new SceneBuilder({
+    terrain: getTerrainModel,
+    structure: getStructureModel,
+  });
+  const snapshot = (minute: number) => {
+    const views = [minute >= 120 ? site : pending, neighbor];
+    const wires = hexWires(
+      tiles,
+      ({ id }) => !!views.find(({ tile }) => tile.id === id)?.developed,
+    );
+    const scene = builder.build(views, tiles, wires, minute, "run");
+    const tower = scene.find(({ id }) => id === `structure:${site.tile.id}`)!;
+    return {
+      height: tower.model.height,
+      terminal: tower.model.terminals[0],
+      wires: scene.flatMap(({ model }) => model.connections ?? []),
+    };
+  };
+  const foundation = snapshot(0);
+  const framing = snapshot(60);
+  const ready = snapshot(120);
+  expect(foundation.height).toBeLessThan(framing.height);
+  expect(framing.height).toBeLessThan(ready.height);
+  expect(foundation.wires).toHaveLength(0);
+  expect(framing.wires).toHaveLength(0);
+  expect(ready.wires).toHaveLength(1);
+  expect(ready.wires[0].start[1]).toBeCloseTo(ready.terminal[1]);
+});

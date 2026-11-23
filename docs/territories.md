@@ -15,7 +15,7 @@ Unowned tiles have no proper names. Terrain is a separate 3D surface
 beneath cities, generators, storage or transmission towers. Empty developed sites
 show towers, with automatic wires joining adjacent developed cells of the same
 company. Wires are visual: they add no transfer limit, price or upkeep. Selecting
-a hex opens its floating inspection or construction surface. Empty owned sites
+a hex opens its floating inspection or construction surface. Empty connected sites
 open the generator/storage catalogue already locked to that tile; occupied sites
 show the actual facility controls. City tiles show customers and demand by use.
 
@@ -25,7 +25,7 @@ stay within the board. Older saves retain their paid sites beyond its edge.
 The board uses the same versioned coordinates in single-player and co-op.
 
 Open any competitor's tile and choose **Acquire** to review its deal. A shared
-border with any of the seller's sites enables confirmation. The same review
+border between a connected tile and any of the seller's sites enables confirmation. The same review
 shows the cash price, customers, sites, and the change in expected supply margin.
 
 The municipal utilities in Vergennes, Waterbury, Bristol, and Middlebury
@@ -79,19 +79,24 @@ The line terrain ratios come from the
 The study models clearing and access in forests as more expensive than the
 mountain category. The game uses the destination terrain as a proxy for the route.
 
-Land has no construction clock or recurring upkeep. Its dated receipt records the
-price, and land remains a non-depreciating capital asset. Exchanging cash for land
-preserves net worth while reducing cash available for facilities. A utility acquisition credits customers once and counts toward the competitor
-goal. Its customers join the retention baseline.
+The connection cost is paid when work starts. Land is a non-depreciating capital
+asset with no recurring upkeep. The price reduces cash available for facilities.
+Utility acquisitions credit customers once and count toward the competitor goal.
+The transferred customers join the retention baseline.
 
-Ordinary inspection offers one clearly priced **Connect** action. “Connection cost”
-is the same instant land transaction described above; the wording adds no line
-capacity, recurring fee or construction delay. The explicit
-**Rapid connection mode** icon toggles price labels and supports repeated purchases without
-opening construction after each one. A successful purchase keeps the mode on.
-Toggle it off, press Escape with focus on the map, or start planning a project
-to exit. Dragging, focus changes and arrow navigation never spend cash. Both entry points
-share pending commitments, and co-op ownership appears only after host acceptance.
+A new connection takes 1 month on Intern, 2 on Employee, 3 on Manager, 4 on
+VP and 6 on CEO. You can start connections from tiles already under construction.
+Tower assembly progresses with the game clock. Wires appear once the tower is
+complete and has a live route to the grid. At that point, the tile can host
+facility construction or add its customers. Planning a facility on a new site lets
+you review the project and pay for the connection first. You can buy the facility
+as soon as the tile is live.
+
+The **Rapid connection mode** icon displays prices and supports repeated purchases
+while the map stays open. Toggle it off, press Escape with focus on the map, or
+start planning a project to exit. Dragging, changing focus and using the arrow keys
+leave cash available. Both purchase entry points share pending payments. In co-op,
+the host confirms the claim before the work appears on either map.
 
 The historical industrial, wind and open-land labels all describe ordinary
 building land. Any ordinary onshore generator or storage technology can use those

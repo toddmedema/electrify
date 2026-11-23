@@ -1,4 +1,5 @@
 import { expect, test } from "./fixtures";
+import type { MapCanvas } from "../src/components/base/territory-3d/Types";
 import type { Page } from "@playwright/test";
 import { readSavedGame } from "./save-fixture";
 import {
@@ -6,6 +7,7 @@ import {
   returnToTerritoryMap,
   selectTerritoryMapTile,
   setMapProjectCapacity,
+  waitForTileConnection,
 } from "./layout";
 import { getTerritoryTile } from "../src/helpers/TerritoryTiles";
 import { currentTick } from "../src/helpers/GameSelectors";
@@ -142,39 +144,13 @@ for (const theme of ["light", "dark"] as const) {
     ).toBeVisible();
     for (const label of [
       "Connection",
-      "Build cost",
-      "Cash purchase",
-      "Loan option",
+      "Estimated build cost",
       "Expected output",
-      "Estimated online",
     ])
       await expect(surface.getByText(label, { exact: true })).toBeVisible();
-    const initialCosts = await surface
-      .locator(".projectFacts > div")
-      .evaluateAll((facts) => {
-        const scroll = facts[0].closest(".projectCandidateScroll")!;
-        const bounds = scroll.getBoundingClientRect();
-        return facts
-          .filter((fact) =>
-            ["Cash purchase", "Loan option"].includes(
-              fact.querySelector("dt")!.textContent!,
-            ),
-          )
-          .map((fact) => {
-            const value = fact.querySelector("dd")!.getBoundingClientRect();
-            return {
-              valueTop: value.top,
-              valueBottom: value.bottom,
-              visibleTop: bounds.top,
-              visibleBottom: bounds.bottom,
-            };
-          });
-      });
-    expect(initialCosts).toHaveLength(2);
-    for (const cost of initialCosts) {
-      expect(cost.valueTop).toBeGreaterThanOrEqual(cost.visibleTop);
-      expect(cost.valueBottom).toBeLessThanOrEqual(cost.visibleBottom + 1);
-    }
+    await expect(
+      surface.getByRole("button", { name: "Loan", exact: true }),
+    ).toHaveCount(0);
     const explored = (await readSavedGame(page))!;
     expect(currentTick(explored)!.cash).toBe(currentTick(before)!.cash);
     expect(explored.territoryNetwork!.tilePurchases).toEqual(
@@ -191,6 +167,35 @@ for (const theme of ["light", "dark"] as const) {
     await reviewScreenshot(network, {
       path: testInfo.outputPath(`project-candidate-${theme}.png`),
     });
+    const connect = surface.getByRole("button", { name: /^Connect ·/ });
+    await expect(connect).toBeEnabled();
+    await expect(connect).toBeInViewport();
+    await connect.click();
+    await expect(
+      surface.getByText(/Connection under construction/),
+    ).toBeVisible();
+    const wireCount = () =>
+      network.locator("canvas.territory3DCanvas").evaluate(
+        (canvas: MapCanvas) =>
+          canvas.map3DDiagnostics!(true)
+            .scene?.flatMap((instance) => instance.connections ?? [])
+            .filter(
+              ({ from, to }) =>
+                from === "green-uplands:site-1" ||
+                to === "green-uplands:site-1",
+            ).length,
+      );
+    await expect.poll(wireCount).toBe(0);
+    const pending = (await readSavedGame(page))!;
+    expect(pending.facilities).toHaveLength(before.facilities.length);
+    expect(pending.territoryNetwork!.tilePurchases).toHaveLength(
+      before.territoryNetwork!.tilePurchases!.length + 1,
+    );
+    await reviewScreenshot(network, {
+      path: testInfo.outputPath(`connection-construction-${theme}.png`),
+    });
+    await waitForTileConnection(page, "green-uplands:site-1");
+    await expect.poll(wireCount).toBeGreaterThan(0);
     const confirm = surface.getByRole("button", { name: "Loan", exact: true });
     await expect(confirm).toBeEnabled();
     await expect(confirm).toBeInViewport();

@@ -1,3 +1,4 @@
+import { runMonths } from "../testing/SimulationTestHelpers";
 import cloneDeep from "lodash.clonedeep";
 import { GENERATORS, STORAGE } from "../data/Facilities";
 import type { TerritoryTileDefinition } from "../data/TerritoryTiles";
@@ -86,6 +87,7 @@ function readyMountain() {
       acquireTile({ tileId: connection.tileId, quoteKey: connection.quoteKey }),
     ),
   );
+  runMonths(game, connection.buildMonths);
   const tile = getTerritoryTile(connection.tileId)!;
   expect(territoryTileInventory(game, tile.id)).toMatchObject({
     remaining: 1,
@@ -216,4 +218,23 @@ it("retains a previously purchased oversized frontier plant without granting a n
       tile.id,
     ),
   ).toMatchObject({ buildable: false, maxPeakW: 25e6 });
+});
+
+it("quotes 50 percent longer construction for generators and storage on mountains", () => {
+  const { game, tile } = readyMountain();
+  const flat = "champlain:site-12";
+  const wind = (tileId: typeof tile.id) =>
+    GENERATORS(game, 20e6, [], [], [], [], undefined, tileId).find(
+      ({ name }) => name === "Wind",
+    )!;
+  const battery = (tileId: typeof tile.id) =>
+    STORAGE(
+      { ...game, date: { ...game.date, year: 2035 } },
+      100e6,
+      tileId,
+    ).find(({ name }) => name === "Battery")!;
+  expect(wind(tile.id).yearsToBuild).toBeCloseTo(wind(flat).yearsToBuild * 1.5);
+  expect(battery(tile.id).yearsToBuild).toBeCloseTo(
+    battery(flat).yearsToBuild * 1.5,
+  );
 });

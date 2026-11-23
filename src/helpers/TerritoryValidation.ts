@@ -1,9 +1,11 @@
+import { pendingTileConnections } from "./TerritoryConnections";
 import {
   getTerritoryTile,
   tileFitsFacility,
   isRetainedEnhancedGeothermalSite,
   ownsTerritoryTile,
   ownedTerritoryTiles,
+  createTileConnectionSchedule,
   territoryVisibilityDistance,
   territoryHexDistance,
   isAdjacentToOwnedTerritoryTile,
@@ -107,9 +109,10 @@ function validConnectionDistance(
     game.utilityExpansion?.acquisitions
       .filter(({ minute }) => minute === game.date.minute)
       .map(({ targetId }): TerritoryTileId => `${targetId}:city`) ?? [];
+  const pending = pendingTileConnections(game);
   const distances = new Map(
     ownedTerritoryTiles(game)
-      .filter(({ city }) => city)
+      .filter(({ id, city }) => city && !pending.has(id))
       .map((city) => [city.id, territoryHexDistance(tile, city)]),
   );
   let nearest = Infinity;
@@ -313,7 +316,7 @@ export function validTerritoryNetwork(
       !nonnegative(receipt.price)
     )
       return false;
-    const { legacy, connectionDistance } = receipt;
+    const { legacy, connectionDistance, connectionMinute } = receipt;
     if (
       (legacy !== undefined && legacy !== true) ||
       (connectionDistance !== undefined &&
@@ -322,14 +325,24 @@ export function validTerritoryNetwork(
           connectionDistance < 1 ||
           !isValleyBoardTile(tile.id) ||
           !isOrdinaryTileConnection(tile))) ||
+      (connectionMinute !== undefined &&
+        (legacy === true || !Number.isSafeInteger(connectionMinute))) ||
       Object.keys(receipt).length !==
-        3 + Number(legacy === true || connectionDistance !== undefined)
+        3 +
+          Number(legacy === true || connectionDistance !== undefined) +
+          Number(connectionMinute !== undefined)
     )
       return false;
     const earlier = (state.tilePurchases ?? []).slice(0, purchased.size);
     const historical = territoryGameAtPurchase(game, receipt.minute, earlier);
     if (
       earlier.some((entry) => entry.minute > receipt.minute) ||
+      (connectionMinute !== undefined &&
+        connectionMinute !==
+          createTileConnectionSchedule(
+            historical,
+            ownedTerritoryTiles(historical),
+          )(tile)) ||
       (receipt.legacy === true
         ? territoryVisibilityDistance(historical, tile) === undefined &&
           !peers
@@ -425,7 +438,10 @@ export function validTerritoryNetwork(
           !tile ||
           !ownsTerritoryTile(game, tile) ||
           !purchase ||
-          facility.minuteCreated < purchase.minute
+          facility.minuteCreated <
+            ("connectionMinute" in purchase
+              ? (purchase.connectionMinute ?? purchase.minute)
+              : purchase.minute)
         )
           return true;
       }

@@ -1,3 +1,8 @@
+import { tileConnectionDuration } from "./TerritoryConnections";
+import { MINUTES_PER_MONTH } from "./DateTime";
+import { municipalUtilityAt } from "../data/MunicipalUtilities";
+import { isAdjacentToOwnedTerritoryTile } from "./TerritoryTiles";
+import { runMonths } from "../testing/SimulationTestHelpers";
 import cloneDeep from "lodash.clonedeep";
 import { GENERATORS } from "../data/Facilities";
 import {
@@ -64,6 +69,19 @@ function reveal(game: GameType, target: { q: number; r: number }) {
       ownsTerritoryTile(game, tile)
     )
       return tile;
+    const municipal = municipalUtilityAt(tile);
+    if (
+      municipal?.plant &&
+      [tile, getTerritoryTile(municipal.plant.tileId)!].some((site) =>
+        isAdjacentToOwnedTerritoryTile(game, site),
+      )
+    ) {
+      runMonths(
+        game,
+        tileConnectionDuration(game.difficulty) / MINUTES_PER_MONTH,
+      );
+      continue;
+    }
     const candidates = [...tilePurchaseQuotes(game).keys()]
       .map((id) => getTerritoryTile(id, game)!)
       .sort((a, b) => distance(a) - distance(b));
@@ -222,7 +240,8 @@ it.each(["general", "hydro", "geothermal"] as const)(
     let game = ready();
     const target = generatedTarget(benefit);
     reveal(game, target);
-    buy(game, target.id);
+    const connection = buy(game, target.id);
+    runMonths(game, connection.buildMonths);
     const name =
       benefit === "hydro"
         ? "Hydro"

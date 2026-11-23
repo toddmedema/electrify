@@ -402,7 +402,12 @@ export function GENERATORS(
   const hydroLocationsRemaining = hydroAvailability.remaining.length;
   const frontierGeothermal =
     state.utilityExpansion && isUtilityExpansionGame(state)
-      ? availableTerritorySpecialSites(state, "geothermal", territoryId).length
+      ? availableTerritorySpecialSites(
+          state,
+          "geothermal",
+          territoryId,
+          state.date.minute,
+        ).length
       : undefined;
   const geothermalLocations =
     frontierGeothermal ?? getViableLocationCount(state.location, "Geothermal");
@@ -954,7 +959,7 @@ export function GENERATORS(
     if (g.costPerStart !== undefined) {
       g.costPerStart *= difficulty.expensesOM * inflation;
     }
-    g.yearsToBuild *= difficulty.buildTime;
+    g.yearsToBuild *= difficulty.buildTime * terrain.buildTime;
     if (
       ![g.buildCost, g.annualOperatingCost, g.yearsToBuild].every(
         Number.isFinite,
@@ -1111,7 +1116,6 @@ export function STORAGE(
   // update with calculations that occur across all entries, like difficulty multipliers
   const difficulty = DIFFICULTIES[state.difficulty];
   const inflation = getCostInflation(state);
-  const terrainCost = getTerrainModifiers(state, undefined, tileId).buildCost;
   const chooseTile = !tileId && territoryId && hasTerritoryNetwork(state);
   storage = storage.filter((g: StorageShoppingType) => {
     applyLegacyStorageEra(state, g);
@@ -1132,15 +1136,16 @@ export function STORAGE(
       `facilities.${g.name}.yearsToBuild`,
     );
     g.buildCost *= difficulty.buildCost * inflation;
-    g.buildCost *= chooseTile
-      ? getTerrainModifiers(
-          state,
-          undefined,
-          availableTerritoryTiles(state, g, territoryId)[0]?.id,
-        ).buildCost
-      : terrainCost;
+    const terrain = getTerrainModifiers(
+      state,
+      undefined,
+      chooseTile
+        ? availableTerritoryTiles(state, g, territoryId)[0]?.id
+        : tileId,
+    );
+    g.buildCost *= terrain.buildCost;
     g.annualOperatingCost *= difficulty.expensesOM * inflation;
-    g.yearsToBuild *= difficulty.buildTime;
+    g.yearsToBuild *= difficulty.buildTime * terrain.buildTime;
     if (
       ![g.buildCost, g.annualOperatingCost, g.yearsToBuild].every(
         Number.isFinite,

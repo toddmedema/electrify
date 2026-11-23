@@ -1,3 +1,7 @@
+import { municipalUtility } from "../data/MunicipalUtilities";
+import { tileConnectionDuration } from "./TerritoryConnections";
+import { MINUTES_PER_MONTH } from "./DateTime";
+import { isAdjacentToOwnedTerritoryTile } from "./TerritoryTiles";
 import cloneDeep from "lodash.clonedeep";
 import { GENERATORS, STORAGE } from "../data/Facilities";
 import {
@@ -52,7 +56,7 @@ function game() {
   currentTick(result)!.cash = 2e9;
   return result;
 }
-function buy(state: GameType, id: LandTerritoryId) {
+function approach(state: GameType, id: LandTerritoryId) {
   state = cloneDeep(state);
   const target = getTerritoryTiles(state).find(
     (tile) => tile.territoryId === id,
@@ -63,6 +67,19 @@ function buy(state: GameType, id: LandTerritoryId) {
     step++
   ) {
     const current = state;
+    const plant = municipalUtility(id)?.plant;
+    if (
+      plant &&
+      [target, getTerritoryTile(plant.tileId)!].some((site) =>
+        isAdjacentToOwnedTerritoryTile(current, site),
+      )
+    ) {
+      runMonths(
+        state,
+        tileConnectionDuration(state.difficulty) / MINUTES_PER_MONTH,
+      );
+      continue;
+    }
     const nearest = [...tilePurchaseQuotes(current).keys()]
       .map((tileId) => getTerritoryTile(tileId, current)!)
       .sort(
@@ -80,6 +97,11 @@ function buy(state: GameType, id: LandTerritoryId) {
       ),
     );
   }
+  return state;
+}
+
+function buy(state: GameType, id: LandTerritoryId) {
+  state = approach(state, id);
   const acquisition = acquisitionQuote(state, id);
   if (acquisition)
     return reducer(
@@ -92,10 +114,13 @@ function buy(state: GameType, id: LandTerritoryId) {
     );
   const offer = landPurchaseQuote(state, id)!;
   expect(offer).toBeDefined();
-  return reducer(
-    state,
-    acquireLand({ territoryId: id, quoteKey: offer.quoteKey }),
+  const bought = cloneDeep(
+    reducer(state, acquireLand({ territoryId: id, quoteKey: offer.quoteKey })),
   );
+  const minute =
+    bought.territoryNetwork!.tilePurchases!.at(-1)!.connectionMinute!;
+  while (bought.date.minute < minute) tickState(bought);
+  return bought;
 }
 
 function quote(
@@ -157,6 +182,7 @@ it("quotes visible neutral cells and allows independent purchases without duplic
       quoteKey: second.quoteKey,
     }),
   ).toBe(true);
+  runMonths(state, first.buildMonths);
   expect(ownedTerritories(state)).toEqual(
     expect.arrayContaining([
       "champlain",
@@ -168,7 +194,7 @@ it("quotes visible neutral cells and allows independent purchases without duplic
 it.each(["parcel-1", "parcel-5"] as LandTerritoryId[])(
   "transfers %s mixed city accounts, market and retention benchmark once and round-trips",
   (id) => {
-    let state = game();
+    let state = approach(game(), id);
     const before = currentTick(state)!.customers;
     const originalMarket = state.customerMarketSize;
     const originalBaseline = expansionRetentionBaseline(state);
@@ -343,10 +369,14 @@ it("upgrades schema14 paid land without changing cash, receipts, assets or prove
 });
 
 it("keeps already-paid program coverage, spending, rollout dates and current meters after buying customers", () => {
-  let state = game();
+  let state = approach(game(), "parcel-1");
   state = reducer(
     state,
-    schedulePolicy({ id: "efficiency", tier: "On", month: 1 }),
+    schedulePolicy({
+      id: "efficiency",
+      tier: "On",
+      month: state.date.monthsElapsed + 1,
+    }),
   );
   const working = cloneDeep(state);
   runMonths(working, 2);

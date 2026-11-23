@@ -514,7 +514,7 @@ it.each([1280, 360])(
     ).toHaveAttribute("aria-pressed", "true");
     expect(
       screen.getByRole("status", { name: "Connection result" }),
-    ).toHaveTextContent("Site connected");
+    ).toHaveTextContent("Connection construction started");
   },
 );
 
@@ -729,7 +729,7 @@ it("shares pending cash with surface purchases, prevents duplicates, and waits f
   expect(map.target(id)).not.toHaveAttribute("aria-busy");
   expect(
     screen.getByRole("status", { name: "Connection result" }),
-  ).toHaveTextContent("Site connected");
+  ).toHaveTextContent("Connection construction started");
   expect(screen.getByTestId("other-buy")).toHaveTextContent("committed 0");
 });
 
@@ -896,7 +896,7 @@ it("keeps phone targets large and unaffordable land inspectable with its currenc
   const map = show(1e6);
   map.buyMode();
   const tile = screen.getAllByRole<HTMLButtonElement>("button", {
-    name: /Inspect.*\$.*General site; not enough available cash/,
+    name: /Inspect.*\$.*General site · 2 months; not enough available cash/,
   })[0];
   expect(Number.parseFloat(tile.style.width)).toBe(96);
   expect(Number.parseFloat(tile.style.height)).toBeGreaterThanOrEqual(44);
@@ -936,7 +936,7 @@ it.each([
     expect(tile).not.toHaveTextContent(/General site|Not enough cash/);
     expect(tile).toHaveAttribute("data-unaffordable", String(unaffordable));
     expect(tile).toHaveAccessibleName(
-      new RegExp(`^${action} .*General site${reason}$`),
+      new RegExp(`^${action} .*General site · 2 months${reason}$`),
     );
   },
 );

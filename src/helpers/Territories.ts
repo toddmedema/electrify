@@ -25,7 +25,13 @@ import {
 } from "../data/MunicipalUtilities";
 import { UTILITY_AREAS } from "../data/UtilityExpansion";
 import { getInflationIndex, hasEconomy } from "../data/Economy";
-import { getDateFromMinute } from "./DateTime";
+import cloneDeep from "lodash.clonedeep";
+import { getDateFromMinute, MINUTES_PER_MONTH } from "./DateTime";
+import {
+  pendingTileConnections,
+  tileConnectionDuration,
+  tileConnectionLabel,
+} from "./TerritoryConnections";
 import { currentTick } from "./GameSelectors";
 import { customerMarketSizeAt } from "./Customers";
 import { cityCustomerCount, cityProfile } from "./CityProfiles";
@@ -51,6 +57,7 @@ import {
   scenarioMapTiles,
   createTerritoryTileOwnership,
   createTerritoryTileAdjacency,
+  createTileConnectionSchedule,
   ownedTerritoryTiles,
   territoryHexDistance,
   isGeneralBuildingLand,
@@ -107,6 +114,9 @@ export function territoryBuildAvailability(
   )
     return reject("Acquire this tile before building.");
   if (tileId !== undefined) {
+    const connection = pendingTileConnections(game).get(tileId);
+    if (connection)
+      return reject(tileConnectionLabel(connection, game.date.minute));
     if (!requested || requested.territoryId !== id)
       return reject("Choose a valid tile in this territory.");
     if (requested.city)
@@ -156,7 +166,7 @@ function territoryDemandAreas(game: GameType, minute: number) {
             )),
       )
       .map(({ id }) => cityProfile(game.seed, id)!),
-    ...landCustomerProfiles(game, minute),
+    ...landCustomerProfiles(game, Math.min(game.date.minute, minute)),
   ];
 }
 /** Actual demand allocation shared by the map total and the city end-use chart. */
@@ -199,10 +209,13 @@ export function territoryDemandShares(
   tick: Pick<TickPresentFutureType, "demandW" | "demandByType" | "minute">,
 ): Record<TerritoryId, number> {
   const result = Object.fromEntries(
-    [...TERRITORIES, ...purchasedLandTerritories(game)].map(({ id }) => [
-      id,
-      0,
-    ]),
+    [
+      ...TERRITORIES,
+      ...purchasedLandTerritories(
+        game,
+        Math.min(game.date.minute, tick.minute),
+      ),
+    ].map(({ id }) => [id, 0]),
   ) as Record<TerritoryId, number>;
   const areas = territoryDemandAreas(game, tick.minute);
   const totalWeight = areas.reduce(
@@ -351,7 +364,9 @@ function tilePurchaseContext(
   const enabled = hasTerritoryNetwork(game);
   const owned = ownedTerritoryTiles(game, owns);
   const adjacent = createTerritoryTileAdjacency(owned);
-  const cities = owned.filter(({ city }) => city);
+  const schedule = createTileConnectionSchedule(game, owned);
+  const pending = pendingTileConnections(game);
+  const cities = owned.filter(({ id, city }) => city && !pending.has(id));
   const eligible = (
     tile: TerritoryTile,
   ): tile is TerritoryTile & { territoryId: LandTerritoryId } =>
@@ -380,6 +395,7 @@ function tilePurchaseContext(
       {
         tileId: tile.id,
         price,
+        connectionMinute: schedule(tile),
         ...(connectionDistance === undefined ? {} : { connectionDistance }),
       },
     ];
@@ -389,14 +405,17 @@ function tilePurchaseContext(
       price,
       benefit: territory.benefit!,
       customers: tile.city
-        ? customerMarketSizeAt(baseCustomers, game.date.minute)
+        ? customerMarketSizeAt(baseCustomers, purchases[0].connectionMinute)
         : 0,
+      connectionMinute: purchases[0].connectionMinute,
+      buildMonths: tileConnectionDuration(game.difficulty) / MINUTES_PER_MONTH,
       purchases,
       quoteKey: JSON.stringify([
         tile.id,
         price,
         territory.benefit,
         baseCustomers,
+        tileConnectionDuration(game.difficulty),
       ]),
     };
   };
@@ -416,8 +435,9 @@ export function municipalTerritoryOffer(game: GameType, id: unknown) {
     (tile): tile is TerritoryTile => !!tile && availableLand(game, owns, tile),
   );
   if (!sites.length) return undefined;
+  const pending = pendingTileConnections(game);
   const adjacent = createTerritoryTileAdjacency(
-    ownedTerritoryTiles(game, owns),
+    ownedTerritoryTiles(game, owns).filter(({ id }) => !pending.has(id)),
   );
   // A legacy city or plant can already belong to a company independently.
   const purchases = [...sites]
@@ -514,47 +534,85 @@ export function purchaseLand(game: GameType, value: unknown): boolean {
 }
 export function purchaseTile(game: GameType, value: unknown): boolean {
   if (!validTilePurchaseAction(game, value)) return false;
-  return transferTerritorySites(game, tilePurchaseQuote(game, value.tileId)!);
+  const quote = tilePurchaseQuote(game, value.tileId)!;
+  return transferTerritorySites(game, { ...quote, customers: 0 });
 }
 
 export function transferTerritorySites(
   game: GameType,
   quote: Pick<
     NonNullable<ReturnType<typeof tilePurchaseQuote>>,
-    "price" | "customers" | "purchases"
-  >,
+    "price" | "customers"
+  > & {
+    purchases: Omit<
+      NonNullable<
+        NonNullable<GameType["territoryNetwork"]>["tilePurchases"]
+      >[number],
+      "minute"
+    >[];
+  },
   cashDue = quote.price,
 ): boolean {
   const now = currentTick(game);
   if (!now || now.cash < cashDue || !game.territoryNetwork) return false;
-  const oldProgramCustomers = programCustomers(game);
+  const priorProgramCustomers =
+    quote.customers > 0 ? programCustomers(game) : undefined;
   now.cash -= cashDue;
-  now.customers += quote.customers;
   (game.territoryNetwork.tilePurchases ??= []).push(
     ...quote.purchases.map((site) => ({ ...site, minute: game.date.minute })),
   );
-  if (quote.customers > 0) {
-    game.customerMarketSize =
-      UTILITY_AREAS.champlain.addressablePool +
-      (game.utilityExpansion?.acquisitions.reduce(
-        (sum, receipt) => sum + UTILITY_AREAS[receipt.targetId].addressablePool,
-        0,
-      ) ?? 0) +
-      landCustomerMarket(game);
-    const ratio = oldProgramCustomers / programCustomers(game);
-    for (const [id, program] of Object.entries(game.policies?.programs ?? {})) {
-      if (isOperatingPolicy(id as import("../Types").PolicyId)) continue;
-      program.adoption *= ratio;
-      if (program.installs)
-        program.installs = program.installs.map(([month, share]) => [
-          month,
-          share * ratio,
-        ]);
-      if (!buildoutComplete(program.adoption)) delete program.completedMonth;
-    }
+  if (priorProgramCustomers !== undefined) {
+    now.customers += quote.customers;
+    updateTileCustomerMarket(game, priorProgramCustomers);
   }
   // Land is a non-depreciating asset. A financed purchase covers the rest of the price with debt.
   return true;
+}
+
+/** Tick settlement credits newly energized towns once, including after loading a save. */
+export function energizeTileCustomers(game: GameType): number {
+  let customers = 0;
+  for (const receipt of game.territoryNetwork?.tilePurchases ?? []) {
+    if (receipt.connectionMinute !== game.date.minute) continue;
+    const tile = getTerritoryTile(receipt.tileId, game);
+    if (tile?.city)
+      customers += customerMarketSizeAt(
+        cityCustomerCount(tile.territoryId),
+        game.date.minute,
+      );
+  }
+  if (!customers) return 0;
+  const priorProgramCustomers = programCustomers({
+    ...game,
+    date: { ...game.date, minute: game.date.minute - 1 },
+  });
+  if (game.policies) game.policies = cloneDeep(game.policies);
+  updateTileCustomerMarket(game, priorProgramCustomers);
+  return customers;
+}
+
+function updateTileCustomerMarket(
+  game: GameType,
+  priorProgramCustomers: number,
+) {
+  game.customerMarketSize =
+    UTILITY_AREAS.champlain.addressablePool +
+    (game.utilityExpansion?.acquisitions.reduce(
+      (sum, receipt) => sum + UTILITY_AREAS[receipt.targetId].addressablePool,
+      0,
+    ) ?? 0) +
+    landCustomerMarket(game);
+  const ratio = priorProgramCustomers / programCustomers(game);
+  for (const [id, program] of Object.entries(game.policies?.programs ?? {})) {
+    if (isOperatingPolicy(id as import("../Types").PolicyId)) continue;
+    program.adoption *= ratio;
+    if (program.installs)
+      program.installs = program.installs.map(([month, share]) => [
+        month,
+        share * ratio,
+      ]);
+    if (!buildoutComplete(program.adoption)) delete program.completedMonth;
+  }
 }
 
 /** Owned, unreserved fictional special sites; the normal technology owner still prices plants. */

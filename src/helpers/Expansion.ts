@@ -10,6 +10,7 @@ import {
   municipalUtility,
   type MunicipalPlant,
 } from "../data/MunicipalUtilities";
+import { pendingTileConnections } from "./TerritoryConnections";
 import { municipalTerritoryOffer, transferTerritorySites } from "./Territories";
 import { TERRITORY_TILES } from "../data/TerritoryTiles";
 import {
@@ -101,9 +102,11 @@ export function ownedUtility(
 }
 /** Immutable transfer receipts extend the one company's retention benchmark. */
 export function expansionRetentionBaseline(
-  game: Pick<GameType, "utilityExpansion" | "territoryNetwork">,
+  game: Pick<GameType, "utilityExpansion" | "territoryNetwork"> &
+    Partial<Pick<GameType, "date">>,
   beforeMinute = Infinity,
 ): number {
+  if (game.date) beforeMinute = Math.min(beforeMinute, game.date.minute + 1);
   return (
     UTILITY_AREAS.champlain.customers +
     landTransferredCustomerTotal(game, beforeMinute) +
@@ -372,7 +375,10 @@ function regionalUtilityOffer(
 }
 export function bordersUtility(game: GameType, targetId: string): boolean {
   if (!hasTerritoryNetwork(game)) return true;
-  const adjacent = createTerritoryTileAdjacency(ownedTerritoryTiles(game));
+  const pending = pendingTileConnections(game);
+  const adjacent = createTerritoryTileAdjacency(
+    ownedTerritoryTiles(game).filter(({ id }) => !pending.has(id)),
+  );
   return TERRITORY_TILES.some(
     (tile) => tile.territoryId === targetId && adjacent(tile),
   );
@@ -492,9 +498,12 @@ export function validAcquisitionAction(
 
 /** Dated receipts for all competitors, including municipal customers transferred in older saves. */
 export function utilityAcquisitions(
-  game: Pick<GameType, "utilityExpansion" | "territoryNetwork">,
+  game: Pick<GameType, "utilityExpansion" | "territoryNetwork"> &
+    Partial<Pick<GameType, "date">>,
 ) {
-  const receipts = landCustomerReceipts(game);
+  const receipts = landCustomerReceipts(game).filter(
+    ({ minute }) => minute <= (game.date?.minute ?? Infinity),
+  );
   return [
     ...(game.utilityExpansion?.acquisitions ?? []),
     ...MUNICIPAL_UTILITIES.flatMap(({ id }) => {

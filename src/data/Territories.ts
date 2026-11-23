@@ -212,6 +212,7 @@ export function isTerritoryId(value: unknown): value is TerritoryId {
 /** Land regions with paid physical or retained whole-region rights, each listed once. */
 export function purchasedLandTerritories(
   game: Pick<import("../Types").GameType, "territoryNetwork">,
+  minute = Infinity,
 ): TerritoryDefinition[] {
   const ids = new Set<TerritoryId>(
     game.territoryNetwork?.landPurchases.map(
@@ -221,7 +222,12 @@ export function purchasedLandTerritories(
   for (const receipt of Array.isArray(game.territoryNetwork?.tilePurchases)
     ? game.territoryNetwork.tilePurchases
     : []) {
-    if (!receipt || typeof receipt.tileId !== "string") continue;
+    if (
+      !receipt ||
+      typeof receipt.tileId !== "string" ||
+      (receipt.connectionMinute ?? receipt.minute) > minute
+    )
+      continue;
     const territoryId = receipt.tileId.startsWith("frontier:")
       ? receipt.tileId
       : receipt.tileId.split(":")[0];
@@ -241,8 +247,9 @@ export function availableTerritorySpecialSites(
   >,
   benefit: "hydro" | "geothermal",
   id?: TerritoryId,
+  minute = Infinity,
 ) {
-  return purchasedLandTerritories(game).filter(
+  return purchasedLandTerritories(game, minute).filter(
     (territory) =>
       territory.benefit === benefit &&
       (!id || territory.id === id) &&

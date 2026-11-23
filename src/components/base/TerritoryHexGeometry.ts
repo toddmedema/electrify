@@ -1,14 +1,9 @@
+import { HEX_NEIGHBORS } from "../../helpers/HexNeighbors";
+
 /** Shared board projection for the scene and its HTML and SVG overlays. */
 export const HEX_WIDTH = 128;
 export const HEX_HEIGHT = HEX_WIDTH * 0.72;
-export const HEX_NEIGHBORS = [
-  [1, -1],
-  [1, 0],
-  [0, 1],
-  [-1, 1],
-  [-1, 0],
-  [0, -1],
-] as const;
+export { HEX_NEIGHBORS };
 export interface HexPosition {
   id: string;
   q: number;

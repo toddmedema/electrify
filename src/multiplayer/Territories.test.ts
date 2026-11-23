@@ -9,6 +9,7 @@ import {
   ownedTerritories,
   territoryBuildAvailability,
 } from "../helpers/Territories";
+import { ownsTerritoryTile } from "../helpers/TerritoryTiles";
 import { loadSimData } from "../testing/SimData";
 import { coopSeats } from "../testing/MultiplayerFixtures";
 import {
@@ -17,6 +18,7 @@ import {
   createWorld,
   restoreWorld,
   roomView,
+  stepWorld,
 } from "./World";
 import type { Command, World } from "./Types";
 function command(world: World, seat: string, action: Command) {
@@ -83,7 +85,8 @@ it("first accepted claim owns finite shared land; the loser keeps cash and canno
     winningCash - quotes[0].price,
     5,
   );
-  expect(ownedTerritories(world.grids[0])).toContain("green-uplands");
+  expect(ownsTerritoryTile(world.grids[0], quotes[0].tileId)).toBe(true);
+  expect(ownedTerritories(world.grids[0])).not.toContain("green-uplands");
   expect(ownedTerritories(world.grids[1])).not.toContain("green-uplands");
   expect(
     roomView(world, "1").game!.multiplayer!.tileOwners?.["green-uplands:site-0"]
@@ -94,7 +97,8 @@ it("first accepted claim owns finite shared land; the loser keeps cash and canno
     JSON.parse(JSON.stringify(checkpointWorld(world))),
     "restart",
   );
-  expect(ownedTerritories(restored.grids[0])).toContain("green-uplands");
+  expect(ownsTerritoryTile(restored.grids[0], quotes[0].tileId)).toBe(true);
+  expect(ownedTerritories(restored.grids[0])).not.toContain("green-uplands");
   expect(
     command(restored, "1", {
       kind: "action",
@@ -143,8 +147,17 @@ it("host uses its own facility price and reserves each land site", () => {
         payload: { territoryId: next.territoryId, quoteKey: next.quoteKey },
       }),
     ).toBeUndefined();
-    expect(command(world, "0", wind("green-uplands"))).toBeUndefined();
   }
+  for (const seat of world.seats)
+    expect(
+      command(world, seat.id, { kind: "speed", speed: "FAST" }),
+    ).toBeUndefined();
+  const connectionMinute =
+    world.grids[0].territoryNetwork!.tilePurchases![0].connectionMinute!;
+  expect(command(world, "0", wind("green-uplands"))).toBeDefined();
+  while (world.grids[0].date.minute < connectionMinute) stepWorld(world);
+  for (let i = 0; i < 7; i++)
+    expect(command(world, "0", wind("green-uplands"))).toBeUndefined();
   const built = world.grids[0].facilities.find(
     (f) => f.territoryId === "green-uplands",
   )!;
