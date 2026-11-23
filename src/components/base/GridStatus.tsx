@@ -97,11 +97,23 @@ export default function GridStatus({
   const sameDay =
     ahead &&
     Math.floor(ahead.minute / 1440) === Math.floor(game.date.minute / 1440);
-  const future = when
-    ? `Short at ${sameDay ? "" : `${when.month} ${when.year}, `}${formatClockTime(when)}`
-    : gap
-      ? `Supply risk: ${MONTHS[gap.month - 1]} ${gap.year}`
+  const shortfallTime = when
+    ? `${sameDay ? "" : `${when.month} ${when.year}, `}${formatClockTime(when)}`
+    : undefined;
+  const riskMonth = gap ? `${MONTHS[gap.month - 1]} ${gap.year}` : undefined;
+  const future = shortfallTime
+    ? `Short at ${shortfallTime}`
+    : riskMonth
+      ? `Supply risk: ${riskMonth}`
       : undefined;
+  const forecastMessage =
+    ahead && shortfallTime
+      ? `About ${formatForecastWatts(ahead.demandW - ahead.supplyW)} short at ${shortfallTime} in this month’s sample`
+      : riskMonth
+        ? `Projected reliability risk in ${riskMonth}`
+        : updating
+          ? "Updating forecast…"
+          : undefined;
   const [anchor, setAnchor] = React.useState<HTMLElement | null>(null);
   const title = React.useRef<HTMLHeadingElement>(null);
   const id = React.useId();
@@ -118,22 +130,44 @@ export default function GridStatus({
     flushSync(() => setAnchor(null));
     action();
   };
-  const storage = anchor ? readyStorage(game) : undefined;
+  const stressed = health.state !== "stable";
+  const storedWh = anchor && stressed ? readyStorage(game).storedWh : 0;
+  const customerImportedW = (now.importedW ?? 0) - (now.storageImportedW ?? 0);
   const territoryNetwork = hasTerritoryNetwork(game);
   const legacyInterties = !!(
     game.transmission?.lines.length &&
     (game.multiplayer || corridorsForLocation(game.location).length)
   );
-  const importedW = now.importedW;
-  const storageImportedW = now.storageImportedW ?? 0;
-  const customerImportedW =
-    importedW === undefined
-      ? undefined
-      : Math.max(0, importedW - storageImportedW);
-  const importedShare =
-    customerImportedW !== undefined && now.supplyW > 0
-      ? Math.round((100 * customerImportedW) / now.supplyW)
+  const forecastAction =
+    forecastAllowed && onEvidence
+      ? {
+          label: "View supply forecast",
+          run: () => onEvidence({ card: "INSIGHTS", layer: "SUPPLY_DEMAND" }),
+        }
       : undefined;
+  const fleetAction =
+    !tutorial && onNavigate
+      ? {
+          label: "Manage fleet",
+          run: () => onNavigate(territoryNetwork ? "FLEET" : "FACILITIES"),
+        }
+      : undefined;
+  const primaryAction =
+    stressed && fleetAction ? fleetAction : (forecastAction ?? fleetAction);
+  const secondaryAction =
+    primaryAction === fleetAction ? forecastAction : fleetAction;
+  const externalPowerAction =
+    !tutorial &&
+    (territoryNetwork
+      ? onNavigate && {
+          label: "Manage agreements",
+          run: () => onNavigate("AGREEMENTS"),
+        }
+      : legacyInterties &&
+        onEvidence && {
+          label: "Manage interties",
+          run: () => onEvidence("interties"),
+        });
   const warning =
     health.state === "low-reserve" || health.state === "at-limit" || !!future;
   return (
@@ -191,127 +225,71 @@ export default function GridStatus({
             <CloseIcon />
           </IconButton>
         </div>
-        <section aria-labelledby={`${id}-now`}>
-          <h3 id={`${id}-now`}>Now</h3>
-          <dl>
-            <div>
-              <dt>Demand</dt>
-              <dd>{formatWatts(now.demandW)}</dd>
+        <section aria-labelledby={`${id}-now`} className="gridStatusDiagnosis">
+          <div
+            className={`gridStatusCurrent gridStatusCurrent-${health.state}`}
+          >
+            <div className="gridStatusReadout">
+              <h3 id={`${id}-now`}>Now · {health.label}</h3>
+              <strong>{health.metric}</strong>
             </div>
-            <div>
-              <dt>Supply</dt>
-              <dd>{formatWatts(now.supplyW)}</dd>
-            </div>
-            <div>
-              <dt>{health.state === "blackout" ? "Shortage" : "Reserve"}</dt>
-              <dd>{health.metric}</dd>
-            </div>
-          </dl>
-        </section>
-        <section aria-labelledby={`${id}-future`}>
-          <h3 id={`${id}-future`}>Future</h3>
-          <p>
-            {future
-              ? `${future}${ahead ? ` · About ${formatForecastWatts(ahead.demandW - ahead.supplyW)} short` : ""}`
-              : "No shortfall in this month’s sample"}
-          </p>
-          {updating && <p className="gridStatusMuted">Updating forecast…</p>}
-        </section>
-        <section aria-label="Supply resources">
-          <p>
-            {storage && storage.storedWh > 0
-              ? `Storage ready: ${formatWattHours(storage.storedWh)} stored`
-              : "No storage ready"}
-            <br />
-            {storage
-              ? `${formatWatts(storage.dischargingW)} discharging`
-              : "Unavailable"}
-          </p>
-          <p>
-            {importedW === undefined
-              ? "Purchased power now: Unavailable"
-              : importedW > 0
-                ? `Purchased power now: ${formatWatts(importedW)} total`
-                : "No purchased power now"}
-            {importedW !== undefined && importedW > 0 && (
-              <>
-                <br />
-                For customers: {formatWatts(customerImportedW ?? 0)}
-                {importedShare === undefined
-                  ? ""
-                  : ` · ${importedShare}% of supply`}
-                {storageImportedW > 0 && (
-                  <>
-                    <br />
-                    Charging storage: {formatWatts(storageImportedW)}
-                  </>
-                )}
-              </>
-            )}
-            {now.entitlementImportCapacityW !== undefined && (
-              <>
-                <br />
-                Under agreement: {formatWatts(now.entitlementImportCapacityW)}
-              </>
-            )}
-          </p>
-        </section>
-        <div className="gridStatusActions">
-          {forecastAllowed && onEvidence && (
-            <Button
-              variant="contained"
-              onClick={() =>
-                navigate(() =>
-                  onEvidence({ card: "INSIGHTS", layer: "SUPPLY_DEMAND" }),
-                )
-              }
-            >
-              View supply forecast
-            </Button>
-          )}
-          {!tutorial && onNavigate && (
-            <Button
-              variant="outlined"
-              onClick={() =>
-                navigate(() =>
-                  onNavigate(territoryNetwork ? "FLEET" : "FACILITIES"),
-                )
-              }
-            >
-              Manage fleet
-            </Button>
-          )}
-          {!tutorial &&
-            ((territoryNetwork && onNavigate) ||
-              (legacyInterties && onEvidence)) && (
+            {onReserveHelp && (
               <Button
-                variant="outlined"
-                onClick={() =>
-                  navigate(() =>
-                    territoryNetwork
-                      ? onNavigate?.("AGREEMENTS")
-                      : onEvidence?.("interties"),
-                  )
-                }
+                onClick={() => {
+                  const trigger = anchor;
+                  navigate(() => {
+                    trigger?.focus({ preventScroll: true });
+                    setManualHelpAnchor(trigger);
+                    onReserveHelp();
+                  });
+                }}
               >
-                Manage agreements
+                About reserve
               </Button>
             )}
-          {onReserveHelp && (
-            <Button
-              onClick={() => {
-                const trigger = anchor;
-                navigate(() => {
-                  trigger?.focus({ preventScroll: true });
-                  setManualHelpAnchor(trigger);
-                  onReserveHelp();
-                });
-              }}
-            >
-              About reserve
-            </Button>
+          </div>
+          {forecastMessage && (
+            <p className={future ? "gridStatusOutlook" : "gridStatusContext"}>
+              {forecastMessage}
+            </p>
           )}
-        </div>
+          {customerImportedW > 0 && (
+            <p className="gridStatusContext">
+              {formatWatts(customerImportedW)} imported for customers
+            </p>
+          )}
+          {storedWh > 0 && (
+            <p className="gridStatusContext">
+              {formatWattHours(storedWh)} stored in operating facilities
+            </p>
+          )}
+        </section>
+        {(primaryAction || externalPowerAction) && (
+          <div className="gridStatusActions">
+            {primaryAction && (
+              <Button
+                variant="contained"
+                onClick={() => navigate(primaryAction.run)}
+              >
+                {primaryAction.label}
+              </Button>
+            )}
+            {(secondaryAction || externalPowerAction) && (
+              <div className="gridStatusSecondaryActions">
+                {secondaryAction && (
+                  <Button onClick={() => navigate(secondaryAction.run)}>
+                    {secondaryAction.label}
+                  </Button>
+                )}
+                {externalPowerAction && (
+                  <Button onClick={() => navigate(externalPowerAction.run)}>
+                    {externalPowerAction.label}
+                  </Button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </Popover>
     </div>
   );

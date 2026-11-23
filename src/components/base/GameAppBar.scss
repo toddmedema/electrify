@@ -200,30 +200,6 @@ html[data-couch-seat] #appbar #topbar {
     margin: 0;
     font-size: var(--font-size-body1);
   }
-  h3 {
-    margin: 0 0 8px;
-    font-size: inherit;
-  }
-  section {
-    margin-block: 12px;
-  }
-  p {
-    margin: 8px 0;
-  }
-  dl {
-    margin: 0;
-  }
-  dl > div {
-    display: flex;
-    justify-content: space-between;
-    gap: 16px;
-    margin-block: 4px;
-  }
-  dd {
-    margin: 0;
-    text-align: right;
-    font-variant-numeric: tabular-nums;
-  }
   .MuiButton-root,
   .MuiIconButton-root {
     min-height: 40px;
@@ -232,14 +208,64 @@ html[data-couch-seat] #appbar #topbar {
     min-width: 40px;
   }
 }
-.gridStatusMuted {
+.gridStatusDiagnosis {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+
+  h3,
+  p {
+    margin: 0;
+  }
+}
+.gridStatusCurrent {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-primary);
+
+  h3 {
+    font-size: var(--font-size-caption);
+    font-weight: var(--font-weight-emphasis);
+  }
+
+  strong {
+    font-size: var(--font-size-title);
+    font-weight: var(--font-weight-emphasis);
+    font-variant-numeric: tabular-nums;
+  }
+}
+.gridStatusCurrent-low-reserve .gridStatusReadout,
+.gridStatusCurrent-at-limit .gridStatusReadout,
+.gridStatusOutlook {
+  color: var(--warning-on-fill);
+}
+.gridStatusCurrent-blackout .gridStatusReadout {
+  color: var(--blackout-on-tint);
+}
+.gridStatusOutlook {
+  padding-inline-start: 8px;
+  border-inline-start: 2px solid var(--warning-dot-rim);
+  font-weight: var(--font-weight-emphasis);
+}
+.gridStatusContext {
   color: var(--font-color-faded);
 }
 .gridStatusActions {
+  display: grid;
+  gap: 4px;
+  margin-top: 12px;
+}
+.gridStatusSecondaryActions {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-top: 16px;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0 4px;
 }
 @media (max-width: 599px) {
   #appbar .gameStatusBar {

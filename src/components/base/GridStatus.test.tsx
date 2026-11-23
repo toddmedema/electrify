@@ -18,10 +18,15 @@ import uiReducer from "../../reducers/UI";
 import { openEvidence } from "../../helpers/Evidence";
 import { getDateFromMinute } from "../../helpers/DateTime";
 import { clearTransmissionMarket } from "../../helpers/Transmission";
+import { selectProjection } from "../../helpers/Projection";
 import Facilities from "../views/FacilitiesContainer";
 import { GameWorkspaceContext } from "./GameWorkspaceContext";
 import GridStatus from "./GridStatus";
-import { readProjection, requestProjection } from "./DeferredProjection";
+import {
+  projectionReady,
+  readProjection,
+  requestProjection,
+} from "./DeferredProjection";
 
 jest.mock("./DeferredProjection", () => ({
   projectionReady: jest.fn(() => false),
@@ -47,7 +52,10 @@ function setup(scenarioId = 116) {
   };
 }
 
-beforeEach(() => jest.clearAllMocks());
+beforeEach(() => {
+  jest.clearAllMocks();
+  jest.mocked(projectionReady).mockReturnValue(false);
+});
 
 it("keeps current facts visible while requesting the shared forecast, never reading stale projection", () => {
   const { props } = setup();
@@ -60,22 +68,15 @@ it("keeps current facts visible while requesting the shared forecast, never read
     "top-bar",
   );
   expect(readProjection).not.toHaveBeenCalled();
+  props.game.timeline = [props.now];
   fireEvent.click(screen.getByRole("button", { name: /^Current grid status/ }));
   expect(screen.getByRole("dialog", { name: "Grid status" })).toHaveTextContent(
     "Updating forecast…",
   );
 });
 
-it("shows live import exposure and agreement capacity, then closes before each navigation callback", () => {
-  const { props, rerender } = setup();
-  props.now.importedW = 25e6;
-  props.now.supplyW = 100e6;
-  props.now.entitlementImportCapacityW = 40e6;
-  rerender(
-    <ThemeProvider theme={createAppTheme("light")}>
-      <GridStatus {...props} />
-    </ThemeProvider>,
-  );
+it("closes before navigating from the diagnosis", () => {
+  const { props } = setup();
   const status = screen.getByRole("button", { name: /^Current grid status/ });
   for (const [name, target] of [
     ["Manage fleet", "FLEET"],
@@ -88,9 +89,6 @@ it("shows live import exposure and agreement capacity, then closes before each n
     );
     fireEvent.click(status);
     const dialog = screen.getByRole("dialog", { name: "Grid status" });
-    expect(dialog).toHaveTextContent("Purchased power now: 25MW total");
-    expect(dialog).toHaveTextContent("For customers: 25MW · 25% of supply");
-    expect(dialog).toHaveTextContent("Under agreement: 40MW");
     fireEvent.click(within(dialog).getByRole("button", { name }));
     expect(props.onNavigate).toHaveBeenLastCalledWith(target);
   }
@@ -102,7 +100,7 @@ it("shows live import exposure and agreement capacity, then closes before each n
   });
 });
 
-it("shows the quarter-hour of the next shortage", () => {
+it("shows the estimated size and quarter-hour of a sampled shortfall while the long-range forecast updates", () => {
   const { props, rerender } = setup();
   const minute = 18 * 60 + 15;
   props.game.date = getDateFromMinute(minute, props.game.startingYear);
@@ -116,7 +114,74 @@ it("shows the quarter-hour of the next shortage", () => {
     </ThemeProvider>,
   );
   expect(screen.getByText("Short at 6:45 PM")).toBeVisible();
+  fireEvent.click(screen.getByRole("button", { name: /^Current grid status/ }));
+  const dialog = screen.getByRole("dialog", { name: "Grid status" });
+  expect(dialog).toHaveTextContent(
+    "About 50MW short at 6:45 PM in this month’s sample",
+  );
+  expect(dialog).not.toHaveTextContent("Updating forecast…");
 });
+
+it("surfaces a projected monthly reliability risk without implying a sampled shortfall", () => {
+  const { props, rerender } = setup();
+  const { game, now } = props;
+  game.timeline = [now];
+  const projection = selectProjection(game, now, undefined, "top-bar");
+  jest.mocked(projectionReady).mockReturnValue(true);
+  jest.mocked(readProjection).mockReturnValue({
+    ...projection,
+    financeProjected: [
+      {
+        ...projection.financeProjected[0],
+        year: game.startingYear,
+        month: 7,
+        demandWh: 100,
+        supplyWh: 50,
+      },
+    ],
+  });
+  rerender(
+    <ThemeProvider theme={createAppTheme("light")}>
+      <GridStatus {...props} />
+    </ThemeProvider>,
+  );
+  fireEvent.click(screen.getByRole("button", { name: /^Current grid status/ }));
+  const dialog = screen.getByRole("dialog", { name: "Grid status" });
+  expect(readProjection).toHaveBeenCalledWith(game, now, "top-bar");
+  expect(dialog).toHaveTextContent(
+    `Projected reliability risk in Jul ${game.startingYear}`,
+  );
+  expect(dialog).not.toHaveTextContent(/short at|Updating forecast/);
+});
+
+it.each([
+  [120e6, 20e6, "Stable", "20MW reserve", "View supply forecast"],
+  [105e6, 5e6, "Low reserve", "5MW reserve", "Manage fleet"],
+  [100e6, 0, "At limit", "0MW reserve", "Manage fleet"],
+  [70e6, 0, "Shortage", "30MW short", "Manage fleet"],
+])(
+  "prioritizes the action for a %s W supply with %s W of reserve",
+  (supplyW, reserveW, label, metric, action) => {
+    const { props, rerender } = setup(101);
+    const now = { ...props.now, demandW: 100e6, supplyW, reserveW };
+    rerender(
+      <ThemeProvider theme={createAppTheme("light")}>
+        <GridStatus {...props} now={now} />
+      </ThemeProvider>,
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: /^Current grid status/ }),
+    );
+    const dialog = screen.getByRole("dialog", { name: "Grid status" });
+    expect(
+      within(dialog).getByRole("heading", { name: `Now · ${label}` }),
+    ).toBeVisible();
+    expect(dialog).toHaveTextContent(metric);
+    expect(within(dialog).getByRole("button", { name: action })).toHaveClass(
+      "MuiButton-contained",
+    );
+  },
+);
 
 it("returns focus to the status trigger after closing", async () => {
   setup(101);
@@ -126,7 +191,7 @@ it("returns focus to the status trigger after closing", async () => {
   await waitFor(() => expect(status).toHaveFocus());
 });
 
-it("separates purchased power serving customers from imports charging storage", () => {
+it("reports only imported power serving customers", () => {
   const { props, rerender } = setup(101);
   const cleared = clearTransmissionMarket({
     localSupplyW: 0,
@@ -149,9 +214,8 @@ it("separates purchased power serving customers from imports charging storage", 
   );
   fireEvent.click(screen.getByRole("button", { name: /^Current grid status/ }));
   const dialog = screen.getByRole("dialog", { name: "Grid status" });
-  expect(dialog).toHaveTextContent("Purchased power now: 100MW total");
-  expect(dialog).toHaveTextContent("For customers: 40MW · 100% of supply");
-  expect(dialog).toHaveTextContent("Charging storage: 60MW");
+  expect(dialog).toHaveTextContent("40MW imported for customers");
+  expect(dialog).not.toHaveTextContent(/100MW|60MW/);
 });
 
 it.each([101, 105])(
@@ -162,7 +226,9 @@ it.each([101, 105])(
       screen.getByRole("button", { name: /^Current grid status/ }),
     );
     expect(
-      screen.queryByRole("button", { name: "Manage agreements" }),
+      screen.queryByRole("button", {
+        name: /Manage agreements|Manage interties/,
+      }),
     ).not.toBeInTheDocument();
   },
 );
@@ -202,7 +268,7 @@ it("repeatedly opens and focuses the legacy trading controls, which still update
     fireEvent.click(
       screen.getByRole("button", { name: /^Current grid status/ }),
     );
-    fireEvent.click(screen.getByRole("button", { name: "Manage agreements" }));
+    fireEvent.click(screen.getByRole("button", { name: "Manage interties" }));
     const controls = screen.getByRole("region", {
       name: "Intertie management",
     });
@@ -218,10 +284,10 @@ it("repeatedly opens and focuses the legacy trading controls, which still update
 it("retains tutorial facts while allowing only revealed navigation", () => {
   const { props, rerender } = setup(0);
   fireEvent.click(screen.getByRole("button", { name: /^Current grid status/ }));
-  expect(screen.getByRole("heading", { name: "Now" })).toBeVisible();
+  expect(screen.getByRole("heading", { name: /^Now ·/ })).toBeVisible();
   expect(
     screen.queryByRole("button", {
-      name: /Manage fleet|Manage agreements|View supply forecast/,
+      name: /Manage fleet|Manage agreements|Manage interties|View supply forecast/,
     }),
   ).not.toBeInTheDocument();
   rerender(

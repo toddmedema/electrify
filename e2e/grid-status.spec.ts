@@ -38,19 +38,35 @@ for (const theme of ["light", "dark"] as const) {
     await expect(
       dialog.getByRole("heading", { name: "Grid status", exact: true }),
     ).toBeFocused();
-    await expect(dialog).toContainText(/Purchased power now: \d.*W total/);
-    await expect(dialog).toContainText(/For customers: \d.*W.*% of supply/);
-    await expect(dialog).toContainText("Under agreement:");
-    await expect(dialog).toContainText(/Storage ready:|No storage ready/);
+    await expect(
+      dialog.getByRole("heading", { name: "Now · Stable" }),
+    ).toBeVisible();
+    await expect(dialog).toContainText(/\d.*MW reserve/);
+    await expect(dialog).toContainText(/\d.*MW imported for customers/);
+    await expect(dialog).toContainText(/Projected reliability risk in/, {
+      timeout: 60_000,
+    });
+    await expect(
+      dialog.getByRole("button", { name: "View supply forecast" }),
+    ).toHaveClass(/MuiButton-contained/);
     expect(
-      await dialog.evaluate((el) => el.scrollWidth <= el.clientWidth),
+      await dialog.evaluate(
+        (el) =>
+          el.scrollWidth <= el.clientWidth &&
+          el.scrollHeight <= el.clientHeight,
+      ),
     ).toBe(true);
+    for (const button of await dialog.getByRole("button").all()) {
+      expect((await button.boundingBox())!.height).toBeGreaterThanOrEqual(
+        info.project.use.hasTouch ? 44 : 40,
+      );
+    }
     const box = (await dialog.boundingBox())!;
     expect(box.x).toBeGreaterThanOrEqual(16);
     expect(box.x + box.width).toBeLessThanOrEqual(
       page.viewportSize()!.width - 16,
     );
-    await reviewScreenshot(page, {
+    await reviewScreenshot(dialog, {
       path: info.outputPath(`grid-status-${theme}.png`),
       animations: "disabled",
     });
@@ -110,7 +126,7 @@ for (const theme of ["light", "dark"] as const) {
     const controls = page.getByRole("region", { name: "Intertie management" });
     for (const choice of ["None", "Shortages + Charging"]) {
       await status.click();
-      await dialog.getByRole("button", { name: "Manage agreements" }).click();
+      await dialog.getByRole("button", { name: "Manage interties" }).click();
       await expect(dialog).toHaveCount(0);
       await expect(controls).toBeVisible();
       await expect(controls).toBeFocused();
@@ -135,7 +151,9 @@ for (const theme of ["light", "dark"] as const) {
     await status.click();
     await expect(dialog).toBeVisible();
     await expect(
-      dialog.getByRole("button", { name: "Manage agreements" }),
+      dialog.getByRole("button", {
+        name: /Manage agreements|Manage interties/,
+      }),
     ).toHaveCount(0);
   });
 }
