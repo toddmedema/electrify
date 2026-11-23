@@ -1,7 +1,6 @@
 import { parseSave, serializeSave } from "./SaveGame";
 import { SAVE_SCHEMA_VERSION } from "./SaveSchema";
 import { createGame } from "./testing/Simulator";
-import { projectAuthoredRunReference } from "./helpers/RunIdentity";
 
 const game = createGame({ scenarioId: 101, seed: 31337 });
 
@@ -25,21 +24,22 @@ it.each([
 
 it("validates new challenge metadata without rewriting an invalid run identity", () => {
   const save = JSON.parse(JSON.stringify(serializeSave(game)));
+  save.schemaVersion = 25;
   save.game.challenge = {
     scenarioId: game.scenarioId,
     difficulty: game.difficulty,
     target: 400,
   };
   expect(parseSave(save)?.game.challenge).toEqual(save.game.challenge);
-  expect(
-    parseSave({
-      ...save,
-      game: {
-        ...save.game,
-        challenge: { ...save.game.challenge, difficulty: "CEO" },
-      },
-    }),
-  ).toBeNull();
+  const { scenarioId, seed, difficulty, compatibilityId } = game.runIdentity!;
+  for (const challenge of [
+    { ...save.game.challenge, difficulty: "CEO" },
+    { run: { scenarioId, seed, difficulty, compatibilityId }, target: 400 },
+  ]) {
+    expect(
+      parseSave({ ...save, game: { ...save.game, challenge } }),
+    ).toBeNull();
+  }
   save.game.runIdentity.compatibilityId = "different-rules";
   const original = JSON.stringify(save);
   expect(parseSave(save)).toBeNull();
@@ -68,36 +68,28 @@ it.each([6, 7])(
   },
 );
 
-it("continues an older rules digest with the friend’s score target and unchanged progress", () => {
-  const save = JSON.parse(JSON.stringify(serializeSave(game)));
-  save.schemaVersion = 8;
-  save.game.runIdentity.compatibilityId = `rules-1-${"0".repeat(64)}`;
-  save.game.challenge = {
-    run: {
-      ...projectAuthoredRunReference(game.runIdentity),
-      compatibilityId: save.game.runIdentity.compatibilityId,
-    },
-    target: 400,
-  };
-  const original = JSON.stringify(save);
-  const continued = parseSave(save);
-  expect(continued).not.toBeNull();
-  expect(continued!.schemaVersion).toBe(SAVE_SCHEMA_VERSION);
-  expect(continued!.game.rulesChanged).toBe(true);
-  expect(continued!.game.runIdentity).toBeUndefined();
-  expect(continued!.game.challenge).toEqual({
-    scenarioId: game.scenarioId,
-    difficulty: game.difficulty,
-    target: 400,
-  });
-  expect(continued!.game.date).toEqual(game.date);
-  expect(continued!.game.timeline[0].cash).toBe(game.timeline[0].cash);
-  expect(continued!.game.meaningfulDecisions).toEqual(game.meaningfulDecisions);
-  expect(JSON.stringify(save)).toBe(original);
-  expect(parseSave(serializeSave(continued!.game))?.game).toEqual(
-    continued!.game,
-  );
-});
+it.each([8, 24, 25])(
+  "continues schema %i from an older rules digest with unchanged progress",
+  (schemaVersion) => {
+    const save = historicalSave();
+    save.schemaVersion = schemaVersion;
+    const original = JSON.stringify(save);
+    const continued = parseSave(save);
+    expect(continued).not.toBeNull();
+    expect(continued!.schemaVersion).toBe(SAVE_SCHEMA_VERSION);
+    expect(continued!.game.rulesChanged).toBe(true);
+    expect(continued!.game.runIdentity).toBeUndefined();
+    expect(continued!.game.date).toEqual(game.date);
+    expect(continued!.game.timeline[0].cash).toBe(game.timeline[0].cash);
+    expect(continued!.game.meaningfulDecisions).toEqual(
+      game.meaningfulDecisions,
+    );
+    expect(JSON.stringify(save)).toBe(original);
+    expect(parseSave(serializeSave(continued!.game))?.game).toEqual(
+      continued!.game,
+    );
+  },
+);
 
 it.each([
   (save: ReturnType<typeof historicalSave>) => {
@@ -125,19 +117,13 @@ it.each([
     save.game.runIdentity.unexpected = true;
   },
   (save: ReturnType<typeof historicalSave>) => {
-    save.game.challenge.run.seed++;
-  },
-  (save: ReturnType<typeof historicalSave>) => {
-    save.game.challenge.target = "400";
-  },
-  (save: ReturnType<typeof historicalSave>) => {
     save.game.rulesChanged = true;
   },
   (save: ReturnType<typeof historicalSave>) => {
     save.game.rulesChanged = "true";
   },
 ])(
-  "does not carry malformed historical identity or challenge into a playable save",
+  "does not carry malformed historical identity into a playable save",
   (corrupt) => {
     const save = historicalSave();
     corrupt(save);
@@ -147,14 +133,6 @@ it.each([
 
 function historicalSave() {
   const save = JSON.parse(JSON.stringify(serializeSave(game)));
-  save.schemaVersion = 24;
   save.game.runIdentity.compatibilityId = `rules-1-${"0".repeat(64)}`;
-  save.game.challenge = {
-    run: {
-      ...projectAuthoredRunReference(game.runIdentity),
-      compatibilityId: save.game.runIdentity.compatibilityId,
-    },
-    target: 400,
-  };
   return save;
 }

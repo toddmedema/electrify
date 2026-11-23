@@ -32,19 +32,17 @@ against the prior loader to demonstrate that it detects the missing migration.
 A coherent authored save from a different simulation fingerprint can continue under
 the running rules after its progress passes the current domain checks. The loader
 checks the prior identity against its embedded authored setup, removes the stale
-identity, and sets the persistent `rulesChanged` marker. A friend’s score target
-remains attached to the same scenario and difficulty. Upgraded runs retain leaderboard eligibility and normal
-scenario-completion credit; the marker only controls forecast refresh. Once data
-loads, resumed continued runs rebuild only their future weather,
+identity, and sets the persistent `rulesChanged` marker. Upgraded runs retain
+leaderboard eligibility and normal scenario-completion credit. The marker calls
+for a forecast refresh. Once data loads, resumed runs rebuild only their future weather,
 fuel prices, demand and supply forecasts under the running rules; recorded frames,
 current-frame finances and history are retained. Repeated loads rebuild the same
 forecast and also pick up later runtime changes after the old identity is gone.
-Current fingerprints keep their existing canonical identity checks; corrupt
-identity or challenge relationships are rejected rather than repaired. Starting a
-new game clears the forecast-refresh marker.
+Current fingerprints use canonical identity checks. Saved friend challenges require
+a score target and a matching scenario and difficulty. Starting a new game clears
+the forecast-refresh marker.
 
-Friend challenge links retain their scenario, difficulty and target across rule
-updates. Mod snapshots must match the current mod runtime and their frozen digests. See
+Mod snapshots must match the current mod runtime and their frozen digests. See
 [run compatibility](run-compatibility.md) for fingerprint generation. Historical
 custom/mod formats and old co-op worlds are outside the solo migration contract.
 
@@ -106,12 +104,12 @@ Schema 24 adds optional loans to capacity-expansion projects. Existing cash
 projects and loans retain their terms. Schema 23 saves from the map branch
 also migrate their earlier Valley goals using the same evidence as schema 22.
 
+Schema 25 introduced the scenario, difficulty and score target for saved friend
+challenges. Ordinary schema 24 saves advance to 25 without a data conversion.
+
 Recognized published schema 13, 14, 15, 16, 17, 19, 20, 21, 22, 23 and 24 co-op identities
 have ordered transitions that preserve the run's original scoring provenance.
 Existing company-local land rights, including old duplicate ownership, are
 retained. New claims are exclusive and checked in host command order. Other
 incompatible co-op identities retain their existing rejection behavior. See
 [territories](territories.md).
-
-Schema 25 migrates old friend challenges to a scenario, difficulty and score target.
-The save retains its original seed and progress.

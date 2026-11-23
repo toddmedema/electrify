@@ -1,12 +1,6 @@
 import cloneDeep from "lodash.clonedeep";
 import { SCENARIOS } from "../data/Scenarios";
-import {
-  captureRunIdentity,
-  expandAuthoredRunReference,
-  projectAuthoredRunReference,
-  sameRunIdentity,
-  validRunIdentity,
-} from "./RunIdentity";
+import { captureRunIdentity, validRunIdentity } from "./RunIdentity";
 import {
   challengeUrl,
   parseChallengeUrl,
@@ -18,7 +12,6 @@ import { validInvitation } from "./ChallengeInvitation";
 import { ChallengeInvitation, VictoryType } from "../Types";
 const scenario = SCENARIOS.find((s) => s.id === 101)!;
 const identity = captureRunIdentity(scenario, 42, "CEO");
-const run = projectAuthoredRunReference(identity)!;
 const invitation: ChallengeInvitation = {
   scenarioId: scenario.id,
   difficulty: "CEO",
@@ -36,17 +29,11 @@ const victory: VictoryType = {
 };
 const url = (raw: unknown) =>
   `https://electrifygame.com/?challenge=${encodeURIComponent(JSON.stringify(raw))}`;
-it("round trips canonical identity and preserves unrelated attribution", () => {
-  expect(sameRunIdentity(identity, expandAuthoredRunReference(run))).toBe(true);
-  expect(validRunIdentity(identity)).toBe(true);
-  expect(
-    parseChallengeUrl(
-      challengeUrl(invitation, "https://electrifygame.com/?ref=friend")!,
-    )?.invitation,
-  ).toEqual(invitation);
+it("round trips an invitation and preserves unrelated attribution", () => {
   const generated = new URL(
     challengeUrl(invitation, "https://electrifygame.com/?ref=friend")!,
   );
+  expect(parseChallengeUrl(generated.href)?.invitation).toEqual(invitation);
   expect(generated.searchParams.get("ref")).toBe("friend");
   expect(JSON.parse(generated.searchParams.get("challenge")!)).toEqual(
     invitation,
@@ -76,19 +63,14 @@ it.each([
   { difficulty: "constructor" },
   { scenarioId: 0 },
   { scenarioId: 99999 },
-  { identitySchemaVersion: 2 },
-  { optionsProfile: "anything" },
-  { scenarioRevision: "old" },
-  { compatibilityId: "old" },
+  { compatibilityId: "invalid" },
   { extra: true },
-])("rejects incompatible reference %p", (patch) =>
-  expect(expandAuthoredRunReference({ ...run, ...patch })).toBeUndefined(),
+])("rejects invalid run identity %p", (patch) =>
+  expect(validRunIdentity({ ...identity, ...patch })).toBe(false),
 );
 it("rejects overrides, waived gates, changed inputs, and custom/tutorial origins", () => {
   for (const origin of ["custom", "tutorial"] as const)
-    expect(
-      projectAuthoredRunReference({ ...identity, origin }),
-    ).toBeUndefined();
+    expect(validRunIdentity({ ...identity, origin })).toBe(false);
   for (const inputs of [
     { cash: 1 },
     { meaningfulDecisionGateWaived: true },
@@ -96,23 +78,20 @@ it("rejects overrides, waived gates, changed inputs, and custom/tutorial origins
     { facilities: [] },
   ])
     expect(
-      projectAuthoredRunReference({
+      validRunIdentity({
         ...identity,
         inputs: { ...identity.inputs, ...inputs },
       }),
-    ).toBeUndefined();
+    ).toBe(false);
   const fixed = SCENARIOS.find(
     (s) => !s.tutorialSteps && s.seed !== undefined,
   )!;
   const fixedIdentity = captureRunIdentity(fixed, fixed.seed!, "Intern");
-  expect(projectAuthoredRunReference(fixedIdentity)).toBeDefined();
-  expect(
-    projectAuthoredRunReference({ ...fixedIdentity, seed: fixed.seed! + 1 }),
-  ).toBeUndefined();
-  expect(sameRunIdentity(identity, { ...identity, origin: "tutorial" })).toBe(
-    true,
+  expect(validRunIdentity(identity)).toBe(true);
+  expect(validRunIdentity(fixedIdentity)).toBe(true);
+  expect(validRunIdentity({ ...fixedIdentity, seed: fixed.seed! + 1 })).toBe(
+    false,
   );
-  expect(sameRunIdentity(identity, undefined)).toBe(false);
   expect(validRunIdentity(null)).toBe(false);
 });
 it("rejects transport ambiguity, malformed payload and obsolete fields without a fallback challenge", () => {
@@ -133,14 +112,11 @@ it("rejects transport ambiguity, malformed payload and obsolete fields without a
     parseChallengeUrl(url(invitation) + "&scenario=101")?.invitation,
   ).toEqual(invitation);
 });
-it("accepts legacy links across rule updates and ignores their seed", () => {
-  const old = {
-    target: invitation.target,
-    run: { ...run, compatibilityId: `rules-1-${"0".repeat(64)}` },
-  };
-  expect(parseChallengeUrl(url(old))?.invitation).toEqual(invitation);
+it("rejects links outside the current invitation format", () => {
+  const { scenarioId, seed, difficulty, compatibilityId } = identity;
+  const run = { scenarioId, seed, difficulty, compatibilityId };
   expect(
-    parseChallengeUrl(url({ ...old, run: { ...old.run, seed: -1 } }))?.error,
+    parseChallengeUrl(url({ run, target: invitation.target }))?.error,
   ).toBeTruthy();
 });
 it("bounds the whole generated URL and incoming input before JSON decoding", () => {
