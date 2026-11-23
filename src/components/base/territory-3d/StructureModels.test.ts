@@ -76,12 +76,14 @@ function vertices(mesh: MapMesh): Vec3[] {
   return result;
 }
 
-function coloredVertices(mesh: MapMesh, color: RGB): Vec3[] {
-  return vertices(mesh).filter((_point, i) =>
-    color.every(
-      (component, axis) =>
-        Math.abs(component - mesh.colors[i * 3 + axis]) < 0.000001,
-    ),
+function coloredVertices(mesh: MapMesh, color: RGB, normalY?: number): Vec3[] {
+  return vertices(mesh).filter(
+    (_point, i) =>
+      (normalY === undefined || mesh.normals[i * 3 + 1] === normalY) &&
+      color.every(
+        (component, axis) =>
+          Math.abs(component - mesh.colors[i * 3 + axis]) < 0.000001,
+      ),
   );
 }
 
@@ -328,6 +330,36 @@ it.each(["wind", "offshore-wind"] as const)(
     expect(rotor.castsShadow).toBe(true);
   },
 );
+
+it("rests the small offshore switchgear's full footprint on the deck", () => {
+  const [body] = getStructureModel("offshore-wind", [], "small").parts;
+  const topFaces = coloredVertices(body.mesh, PALETTE.steel, 1).map((point) =>
+    posed(body, point, 0),
+  );
+  // The cabinet sits above the other horizontal steel surface, the deck.
+  const cabinetY = Math.max(...topFaces.map((point) => point[1]));
+  const cabinetTop = topFaces.filter((point) => point[1] === cabinetY);
+  const deckTop = topFaces.filter((point) => point[1] < cabinetY);
+  const cabinetBottom = coloredVertices(body.mesh, PALETTE.steel, -1)
+    .map((point) => posed(body, point, 0))
+    .filter(([x, , z]) =>
+      cabinetTop.some(([tx, , tz]) => tx === x && tz === z),
+    );
+  expect(cabinetBottom.length).toBeGreaterThan(0);
+
+  for (const axis of [2, 0] as const) {
+    const deckEdges = deckTop.map((point) => point[axis]);
+    const cabinetEdges = cabinetBottom.map((point) => point[axis]);
+    expect(Math.min(...cabinetEdges)).toBeGreaterThanOrEqual(
+      Math.min(...deckEdges),
+    );
+    expect(Math.max(...cabinetEdges)).toBeLessThanOrEqual(
+      Math.max(...deckEdges),
+    );
+  }
+  const deckY = Math.max(...deckTop.map((point) => point[1]));
+  for (const [, y] of cabinetBottom) expect(y).toBeCloseTo(deckY, 6);
+});
 
 it("shares the same blade and hub geometry between land and offshore wind", () => {
   const rotor = (kind: "wind" | "offshore-wind") =>
