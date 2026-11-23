@@ -3,6 +3,7 @@ const { spawnSync } = require("node:child_process");
 const path = require("node:path");
 const { buildVersion, writeBuildVersion } = require("./build-version");
 const { verifyEditionBundle } = require("./verify-edition-bundle");
+const { coopRelayUrl } = require("../electron/coop-relay-url.cjs");
 
 const site = spawnSync(
   process.execPath,
@@ -16,12 +17,17 @@ if (site.status !== 0) process.exit(site.status || 1);
 
 const version = buildVersion();
 const output = process.env.BUILD_PATH || "build";
+const relay = coopRelayUrl(process.env.REACT_APP_COOP_RELAY_URL);
 const result = spawnSync(
   process.execPath,
   [path.join(__dirname, "production-build.js"), ...process.argv.slice(2)],
   {
     stdio: "inherit",
-    env: { ...process.env, REACT_APP_VERSION: version },
+    env: {
+      ...process.env,
+      REACT_APP_VERSION: version,
+      REACT_APP_COOP_RELAY_URL: relay?.href || "",
+    },
   },
 );
 if (result.error) throw result.error;

@@ -94,6 +94,8 @@ export type DesktopTextInputResult =
 export interface DesktopBridge {
   // Optional methods are feature-detected by the renderer, so adding one never bumps apiVersion.
   // apiVersion changes only when an existing method changes incompatibly.
+  steamEdition?: boolean;
+  coopRelayUrl?: string;
   couchRequest?(input: Record<string, unknown>): Promise<unknown>;
   onCouchEvent?(callback: (event: unknown) => void): () => void;
   mods?(

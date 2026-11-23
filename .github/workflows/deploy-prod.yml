@@ -96,6 +96,7 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ steps.hosting-credentials.outputs.aws-secret-access-key }}
           # Baked into the JS bundle at build time by create-react-app.
           REACT_APP_FIREBASE_API_KEY: ${{ secrets.REACT_APP_FIREBASE_API_KEY }}
+          REACT_APP_COOP_RELAY_URL: ${{ vars.COOP_RELAY_URL }}
         run: ./scripts/deploy.sh ci-prod
 
       - name: Verify deployed SEO pages and hosting
