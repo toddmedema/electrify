@@ -236,14 +236,9 @@ export default function MultiplayerRoot() {
   }, [session]);
 
   const authorize = useCallback(async () => {
-    if (
-      desktop?.steamEdition ||
-      !firebaseAppAuth ||
-      firebaseAppAuth.currentUser?.providerData.some(
-        ({ providerId }) => providerId === "google.com",
-      )
-    )
-      return;
+    if (desktop?.steamEdition || !firebaseAppAuth) return;
+    const token = await firebaseAppAuth.currentUser?.getIdTokenResult();
+    if (token?.signInProvider === "google.com") return;
     if (!(await login({ provider: "google" })))
       throw new Error("Sign in with Google to play online.");
   }, [desktop]);

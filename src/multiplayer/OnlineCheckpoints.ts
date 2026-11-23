@@ -170,7 +170,20 @@ export function onlineCheckpoints(
       if (!roomId || !seatId)
         throw new Error("Multiplayer room is no longer active.");
       try {
-        await browserCheckpoints(seatId).write(world, source);
+        const cache = browserCheckpoints(seatId);
+        const local = source && (await cache.read(world.matchId));
+        const superseded =
+          source &&
+          local &&
+          local.epoch === source.epoch &&
+          local.revision >= source.revision
+            ? {
+                matchId: local.matchId,
+                epoch: local.epoch,
+                revision: local.revision,
+              }
+            : source;
+        await cache.write(world, superseded);
         saved(Date.now());
       } catch {
         // Durable saves still work with an unavailable or full local store.
@@ -180,27 +193,24 @@ export function onlineCheckpoints(
         published?.roomId === roomId &&
         published.epoch === world.epoch &&
         (published.revision === world.revision ||
-          Date.now() - published.at < ONLINE_AUTOSAVE_MS)
+          performance.now() - published.at < ONLINE_AUTOSAVE_MS)
       )
         return;
       const name = getScenario(
         world.spec.scenarioId,
         world.spec.customScenario,
       )?.name;
-      const { savedAt } = await api.request<{ savedAt: number }>(
-        "save/publish",
-        {
-          roomId,
-          ...(await encodeSnapshot(world)),
-          explicit,
-          ...(name && { name: name.slice(0, 72) }),
-        },
-      );
+      await api.request("save/publish", {
+        roomId,
+        ...(await encodeSnapshot(world)),
+        explicit,
+        ...(name && { name: name.slice(0, 72) }),
+      });
       published = {
         roomId,
         epoch: world.epoch,
         revision: world.revision,
-        at: savedAt,
+        at: performance.now(),
       };
     },
   };

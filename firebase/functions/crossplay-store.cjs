@@ -207,7 +207,11 @@ function createStore({ db, projectId, writerToken, fetchImpl = fetch }) {
     },
     async listRooms(account) {
       const result = await rooms
-        .where("accounts", "array-contains", account)
+        .where("savedAccounts", "array-contains", account)
+        .where("savedAt", ">", 0)
+        .where("roomExpiry", ">", Timestamp.now())
+        .orderBy("savedAt", "desc")
+        .orderBy("roomExpiry", "desc")
         .limit(24)
         .get();
       return result.docs.map(roomData);
@@ -221,6 +225,12 @@ function createStore({ db, projectId, writerToken, fetchImpl = fetch }) {
           ? [room.invite.codeHash, room.invite.linkHash]
           : [],
         accounts: room.members.map(({ account }) => account),
+        savedAt: room.head?.savedAt ?? 0,
+        savedAccounts: room.head
+          ? room.members
+              .filter(({ withdrawn }) => !withdrawn)
+              .map(({ account }) => account)
+          : [],
         bindings: Object.fromEntries(
           room.members.map(({ id, account, binding, active, seenAt }) => [
             id,

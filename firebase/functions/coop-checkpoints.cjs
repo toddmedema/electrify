@@ -19,7 +19,6 @@ const TRANSFERS_PER_MINUTE = 12;
 const STAGING_GRACE_MS = 60_000;
 const CHECKPOINT_ORPHAN_AGE_MS = 10 * 60_000;
 const REAP_BATCH = 300;
-const reaperCursors = new Map();
 const ID = /^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/;
 const HASH = /^[a-f0-9]{64}$/;
 
@@ -465,14 +464,15 @@ async function handle(operation, context, body) {
   refuse("unknown-operation", 404);
 }
 
-async function reap(bucket, loadRoom, now = Date.now()) {
+async function reap(bucket, loadRoom, now = Date.now(), pagination) {
   const rooms = new Map();
+  const cursors = await pagination?.load();
   for (const prefix of ["staging/", "checkpoints/"]) {
     const [files, next] = await bucket.getFiles({
       prefix,
       autoPaginate: false,
       maxResults: REAP_BATCH,
-      pageToken: reaperCursors.get(prefix),
+      pageToken: cursors?.[prefix] ?? undefined,
     });
     for (const file of files) {
       const [namespace, roomId, id, extra] = file.name.split("/");
@@ -509,7 +509,7 @@ async function reap(bucket, loadRoom, now = Date.now()) {
           if (error.code !== 404 && error.code !== 412) throw error;
         });
     }
-    reaperCursors.set(prefix, next?.pageToken);
+    await pagination?.save(prefix, next?.pageToken ?? null);
   }
 }
 

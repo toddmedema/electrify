@@ -1,6 +1,15 @@
 {
   "indexes": [
     {
+      "collectionGroup": "coopRooms",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "savedAccounts", "arrayConfig": "CONTAINS" },
+        { "fieldPath": "savedAt", "order": "DESCENDING" },
+        { "fieldPath": "roomExpiry", "order": "DESCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "scores",
       "queryScope": "COLLECTION",
       "fields": [

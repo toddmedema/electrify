@@ -238,7 +238,8 @@ export function onlineSessionServices(
       );
       publish({
         ...result.lobby,
-        savedAt: lobby.savedAt,
+        savedAt:
+          lobby.lobbyId === result.lobby.lobbyId ? lobby.savedAt : undefined,
         sharedAt: grant.head?.savedAt,
         confirmedRevision: grant.head?.revision,
         inviteCode: refreshedInvite?.code,
@@ -266,6 +267,9 @@ export function onlineSessionServices(
       expire();
       publish({
         ...result.lobby,
+        savedAt:
+          lobby.lobbyId === result.lobby.lobbyId ? lobby.savedAt : undefined,
+        sharedAt: grant?.head?.savedAt ?? result.lobby.sharedAt,
         authorityEpoch: grant?.epoch,
         campaignLocked: grant?.locked,
         confirmedRevision: grant?.head?.revision,

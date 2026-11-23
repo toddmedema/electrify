@@ -84,11 +84,17 @@ function registerCrossplay(adminApp) {
         signaling.reap().catch(() => logger.warn("Co-op revocation retry")),
       audit: (event) => logger.info("Co-op control request", event),
     });
+    const cleanup = db.doc("coopOperations/checkpointReaper");
     services = {
       service,
       signaling,
       isStopped,
-      reapCheckpoints: () => checkpoints.reap(bucket, service.loadRoom),
+      reapCheckpoints: () =>
+        checkpoints.reap(bucket, service.loadRoom, Date.now(), {
+          load: async () => (await cleanup.get()).data(),
+          save: (prefix, pageToken) =>
+            cleanup.set({ [prefix]: pageToken }, { merge: true }),
+        }),
     };
     return services;
   }
@@ -120,6 +126,7 @@ function registerCrossplay(adminApp) {
         serviceAccount,
         secrets: Object.values(secrets),
         maxInstances: 1,
+        concurrency: 1,
         timeoutSeconds: 120,
       },
       async () => {
