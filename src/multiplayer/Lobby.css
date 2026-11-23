@@ -12,6 +12,7 @@
 }
 
 .coopLobby .MuiButton-root,
+.coopLobby .MuiToggleButton-root,
 .coopLobby .MuiIconButton-root {
   min-height: 40px;
 }
@@ -55,6 +56,7 @@
 
 @media (pointer: coarse) {
   .coopLobby .MuiButton-root,
+  .coopLobby .MuiToggleButton-root,
   .coopLobby .MuiIconButton-root {
     min-height: 44px;
   }

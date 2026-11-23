@@ -56,17 +56,17 @@ export default function MultiplayerRoot() {
   const [choice, setChoice] = useState<OnlineMode>();
   const mode =
     choice ?? (coopRelayUrl && !steamEdition ? "crossplay" : "steam");
+  const changeMode = useCallback(
+    () => setChoice(mode === "steam" ? "crossplay" : "steam"),
+    [mode],
+  );
   return (
     <OnlineMultiplayer
       key={mode}
       mode={mode}
       openOnMount={choice !== undefined}
       canPlayLocally={steamEdition && !!desktop?.couchRequest}
-      onChangeMode={
-        steamEdition && coopRelayUrl
-          ? () => setChoice(mode === "steam" ? "crossplay" : "steam")
-          : undefined
-      }
+      onChangeMode={steamEdition && coopRelayUrl ? changeMode : undefined}
     />
   );
 }
@@ -111,6 +111,26 @@ function OnlineMultiplayer({
       ),
   );
   const state = useSyncExternalStore(session.subscribe, session.getSnapshot);
+  useEffect(() => {
+    if (mode !== "crossplay" || !onChangeMode) return;
+    return getDesktop()?.onMultiplayerEvent?.((event) => {
+      if (event.kind !== "invite") return;
+      const { busy, lobby } = session.getSnapshot();
+      if (busy || lobby.lobbyId || localSession.current) {
+        store.dispatch(
+          snackbarOpen({
+            open: true,
+            message:
+              "Steam invite received. Open Steam friends to join after this session.",
+            timeout: 6000,
+          }),
+        );
+      } else {
+        // Steam keeps the invitation pending until its session joins the lobby.
+        onChangeMode();
+      }
+    });
+  }, [mode, onChangeMode, session]);
   const hasView = !!state.view;
   const lobbyId = state.lobby.lobbyId;
   const pendingCampaignId = state.pendingCampaign?.id;

@@ -294,6 +294,8 @@ jobs:
           name: desktop-renderer
       - name: Restore verified public assets from the desktop renderer
         run: node scripts/ci/lfs-assets.js renderer build
+      - name: Cross-play relay tests
+        run: npm ci --prefix relay && npm --prefix relay test && npm run test:crossplay
       - name: Multiplayer, controller and full packaged desktop suites
         run: xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" sh -c 'openbox & npm run test:ci-all -- --group=desktop'
       - name: Measure helper startup (manual runs only)

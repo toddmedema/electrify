@@ -11,6 +11,8 @@ import {
   IconButton,
   Stack,
   TextField,
+  ToggleButton,
+  ToggleButtonGroup,
   Typography,
 } from "@mui/material";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
@@ -148,10 +150,24 @@ export default function Lobby({
           )}
           {mode === "entry" && (
             <>
+              {onChangeMode && (
+                <ToggleButtonGroup
+                  aria-label="Online play"
+                  value={onlineMode}
+                  exclusive
+                  fullWidth
+                  disabled={busy}
+                  onChange={(_, mode) => {
+                    if (mode) onChangeMode();
+                  }}
+                >
+                  <ToggleButton value="steam">Steam friends</ToggleButton>
+                  <ToggleButton value="crossplay">Web &amp; Steam</ToggleButton>
+                </ToggleButtonGroup>
+              )}
               {onlineMode === "crossplay" && (
                 <Typography variant="body2" color="text.secondary">
-                  Share an invite code with friends playing on the web or on
-                  Steam.
+                  Share an invite code with friends on the web or on Steam.
                 </Typography>
               )}
               {!lobby.available && !notice && (
@@ -253,20 +269,11 @@ export default function Lobby({
           )}
         </Stack>
       </DialogContent>
-      {mode === "entry" && (onLocalPlay || onChangeMode) && (
-        <DialogActions sx={{ flexWrap: "wrap" }}>
-          {onLocalPlay && (
-            <Button size="large" disabled={busy} onClick={onLocalPlay}>
-              Local Co-op
-            </Button>
-          )}
-          {onChangeMode && (
-            <Button size="large" disabled={busy} onClick={onChangeMode}>
-              {onlineMode === "steam"
-                ? "Web & Steam Cross-play"
-                : "Steam Friends"}
-            </Button>
-          )}
+      {mode === "entry" && onLocalPlay && (
+        <DialogActions>
+          <Button size="large" disabled={busy} onClick={onLocalPlay}>
+            Local Co-op
+          </Button>
         </DialogActions>
       )}
       {mode !== "entry" && (

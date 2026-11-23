@@ -13,6 +13,7 @@ export default defineConfig({
   testIgnore: [
     "desktop*.spec.ts",
     "multiplayer.spec.ts",
+    "crossplay.spec.ts",
     "steam-input.spec.ts",
   ],
   timeout: 45000,
