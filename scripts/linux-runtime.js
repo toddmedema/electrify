@@ -28,21 +28,9 @@ const CHECKSUMS = [
 ];
 const NOTICES = ["libnss3", "libnspr4", "libsqlite3-0"];
 const LICENSES = ["MPL-2.0", "LGPL-2.1", "GPL-2"];
-const NIX_RUNTIME = "electrify-nixos.nix";
-const nixRuntimeSource = path.join(__dirname, NIX_RUNTIME);
 const launcher = `#!/bin/sh
 set -eu
 depot_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-# Standalone NixOS needs a loader and desktop libraries in standard Linux locations.
-# Steam supplies its own runtime, and Nixpkgs FHS wrappers already mount /.host-etc.
-if [ -z "\${SteamAppId:-}" ] && [ ! -d "/.host-etc" ] &&
-   grep -Eq '^ID=(nixos|"nixos")$' "/etc/os-release" 2>/dev/null; then
-  if ! runtime=$(nix-build --no-out-link "$depot_dir/lib/${NIX_RUNTIME}"); then
-    printf '%s\\n' 'Electrify could not prepare its NixOS runtime. Check that nix-build can find <nixpkgs> from your NixOS channel or flake registry.' >&2
-    exit 1
-  fi
-  exec "$runtime/bin/electrify-nixos" "$depot_dir/Electrify.bin" "$@"
-fi
 export LD_LIBRARY_PATH="$depot_dir/lib\${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 # Lets the game keep these libraries out of programs it opens, such as the browser.
 export ELECTRIFY_RUNTIME_LIB="$depot_dir/lib"
@@ -89,9 +77,6 @@ function bundleLinuxRuntime(
     fs.writeFileSync(path.join(target, name), bytes);
     records.push({ name, sha256: digest(bytes) });
   }
-  const nixRuntime = fs.readFileSync(nixRuntimeSource);
-  fs.writeFileSync(path.join(target, NIX_RUNTIME), nixRuntime);
-  records.push({ name: NIX_RUNTIME, sha256: digest(nixRuntime) });
   fs.writeFileSync(
     path.join(target, "manifest.json"),
     JSON.stringify(records) + "\n",
@@ -115,7 +100,6 @@ function verifyLinuxRuntime(directory, checkDependencies = true) {
     ...CHECKSUMS,
     ...NOTICES.map((name) => `${name}.copyright`),
     ...LICENSES,
-    NIX_RUNTIME,
   ];
   if (
     JSON.stringify(records.map((entry) => entry.name)) !==
