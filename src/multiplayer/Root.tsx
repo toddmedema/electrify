@@ -53,11 +53,15 @@ type OnlineMode = "steam" | "crossplay";
 export default function MultiplayerRoot() {
   const desktop = getDesktop();
   const steamEdition = desktop?.steamEdition === true;
-  const [choice, setChoice] = useState<OnlineMode>();
+  const [choice, setChoice] = useState<{
+    mode: OnlineMode;
+    inviteCode?: string;
+  }>();
   const mode =
-    choice ?? (coopRelayUrl && !steamEdition ? "crossplay" : "steam");
+    choice?.mode ?? (coopRelayUrl && !steamEdition ? "crossplay" : "steam");
   const changeMode = useCallback(
-    () => setChoice(mode === "steam" ? "crossplay" : "steam"),
+    (inviteCode?: string) =>
+      setChoice({ mode: mode === "steam" ? "crossplay" : "steam", inviteCode }),
     [mode],
   );
   return (
@@ -65,6 +69,7 @@ export default function MultiplayerRoot() {
       key={mode}
       mode={mode}
       openOnMount={choice !== undefined}
+      initialInviteCode={choice?.inviteCode}
       canPlayLocally={steamEdition && !!desktop?.couchRequest}
       onChangeMode={steamEdition && coopRelayUrl ? changeMode : undefined}
     />
@@ -75,15 +80,18 @@ export default function MultiplayerRoot() {
 function OnlineMultiplayer({
   mode,
   openOnMount,
+  initialInviteCode,
   canPlayLocally,
   onChangeMode,
 }: {
   mode: OnlineMode;
   openOnMount: boolean;
+  initialInviteCode?: string;
   canPlayLocally: boolean;
-  onChangeMode?: () => void;
+  onChangeMode?: (inviteCode?: string) => void;
 }) {
   const [open, setOpen] = useState(openOnMount);
+  const [entryInviteCode, setEntryInviteCode] = useState(initialInviteCode);
   const steamName = useDesktopState()?.steam.displayName;
   const currentSteamName = useRef(steamName);
   currentSteamName.current = steamName;
@@ -255,7 +263,10 @@ function OnlineMultiplayer({
   }, [session]);
 
   useEffect(() => {
-    registerLobbyOpener(() => setOpen(true));
+    registerLobbyOpener(() => {
+      setEntryInviteCode(undefined);
+      setOpen(true);
+    });
     let live = true,
       initialized = false,
       loading = false;
@@ -523,6 +534,7 @@ function OnlineMultiplayer({
         <Lobby
           session={session}
           onlineMode={mode}
+          initialInviteCode={entryInviteCode}
           onChangeMode={onChangeMode}
           onHosted={startChoosing}
           onChooseNew={() => {

@@ -1,4 +1,4 @@
-import { act, render, screen } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Provider } from "react-redux";
 import * as desktop from "../Desktop";
@@ -11,6 +11,12 @@ import MultiplayerRoot from "./Root";
 
 jest.mock("../DesktopState", () => ({ useDesktopState: () => undefined }));
 jest.mock("./WorkerClient", () => ({}));
+let mockRelayUrl: string | undefined;
+jest.mock("./RelayConfig", () => ({
+  get coopRelayUrl() {
+    return mockRelayUrl;
+  },
+}));
 jest.mock("./Session", () => ({
   ...jest.requireActual("./Session"),
   MultiplayerSession: jest.fn(),
@@ -30,6 +36,7 @@ jest.mock("../SaveSession", () => ({
 }));
 
 afterEach(() => {
+  mockRelayUrl = undefined;
   jest.restoreAllMocks();
   store.dispatch(quit());
 });
@@ -104,6 +111,27 @@ test("a Steam invitation joins normally outside couch play", async () => {
   expect(
     screen.getByRole("dialog", { name: "Play with friends" }),
   ).toBeVisible();
+});
+
+test("changing multiplayer mode keeps the invite code and focus on the selected mode", async () => {
+  mockRelayUrl = "wss://relay.example.com/v1";
+  renderWithSteamInvites();
+  const user = userEvent.setup();
+  act(showMultiplayerLobby);
+  const codeField = () =>
+    screen.getByRole("textbox", { name: "6-digit invite code" });
+  await user.type(codeField(), "042816");
+  const crossplay = () => screen.getByRole("button", { name: "Web & Steam" });
+  act(() => crossplay().focus());
+  await user.keyboard("{Enter}");
+
+  expect(crossplay()).toHaveAttribute("aria-pressed", "true");
+  expect(codeField()).toHaveValue("042816");
+  await waitFor(() => expect(crossplay()).toHaveFocus());
+
+  await user.click(screen.getByRole("button", { name: "Back" }));
+  act(showMultiplayerLobby);
+  expect(codeField()).toHaveValue("");
 });
 
 test("a couch session keeps the latest invitation until local play closes", async () => {

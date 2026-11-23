@@ -34,6 +34,7 @@ export default function Lobby({
   onLeave,
   onLocalPlay,
   onlineMode = "steam",
+  initialInviteCode,
   onChangeMode,
 }: {
   session: MultiplayerSession;
@@ -46,21 +47,25 @@ export default function Lobby({
   onLeave: () => void;
   onLocalPlay?: () => void;
   onlineMode?: "steam" | "crossplay";
-  onChangeMode?: () => void;
+  initialInviteCode?: string;
+  onChangeMode?: (inviteCode: string) => void;
 }) {
   const { lobby, pendingCampaign, busy, entryOperation, error } =
     useSyncExternalStore(session.subscribe, session.getSnapshot);
-  const [code, setCode] = useState("");
+  const [code, setCode] = useState(initialInviteCode ?? "");
   const [failure, setFailure] = useState<string>();
   const [entryAttempt, setEntryAttempt] = useState<"host" | "join">();
   const title = useRef<HTMLHeadingElement>(null);
+  const selectedMode = useRef<HTMLButtonElement>(null);
   const mode =
     !lobby.lobbyId || entryOperation === "join"
       ? "entry"
       : pendingCampaign
         ? "campaign"
         : "waiting";
-  useEffect(() => title.current?.focus(), [mode]);
+  const lobbyFocus =
+    mode === "entry" && initialInviteCode !== undefined ? selectedMode : title;
+  useEffect(() => lobbyFocus.current?.focus(), [lobbyFocus, mode]);
   const host = lobby.selfId === lobby.hostId;
   const hostName =
     lobby.members.find((member) => member.id === lobby.hostId)?.name ||
@@ -101,7 +106,7 @@ export default function Lobby({
               document.activeElement ===
               title.current?.closest('[role="dialog"]')
             )
-              title.current?.focus();
+              lobbyFocus.current?.focus();
           },
         },
       }}
@@ -158,16 +163,33 @@ export default function Lobby({
                   fullWidth
                   disabled={busy}
                   onChange={(_, mode) => {
-                    if (mode) onChangeMode();
+                    if (mode) onChangeMode(code);
                   }}
                 >
-                  <ToggleButton value="steam">Steam friends</ToggleButton>
-                  <ToggleButton value="crossplay">Web &amp; Steam</ToggleButton>
+                  <ToggleButton
+                    value="steam"
+                    ref={onlineMode === "steam" ? selectedMode : undefined}
+                  >
+                    Steam friends
+                  </ToggleButton>
+                  <ToggleButton
+                    value="crossplay"
+                    ref={onlineMode === "crossplay" ? selectedMode : undefined}
+                  >
+                    Web &amp; Steam
+                  </ToggleButton>
                 </ToggleButtonGroup>
               )}
               {onlineMode === "crossplay" && (
                 <Typography variant="body2" color="text.secondary">
-                  Share an invite code with friends on the web or on Steam.
+                  {onChangeMode
+                    ? "Use this mode for codes from a Web & Steam lobby."
+                    : "Share an invite code with friends on the web or on Steam."}
+                </Typography>
+              )}
+              {onlineMode === "steam" && onChangeMode && lobby.available && (
+                <Typography variant="body2" color="text.secondary">
+                  Use this mode for codes from a Steam friends lobby.
                 </Typography>
               )}
               {!lobby.available && !notice && (
