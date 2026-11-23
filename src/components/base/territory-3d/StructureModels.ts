@@ -480,7 +480,7 @@ const solarLayouts = {
     feederZ: 0.29,
   },
   large: {
-    rows: [-0.245, -0.085, 0.085, 0.245],
+    rows: [-0.25, -0.122, 0.122, 0.25],
     width: 0.66,
     height: 0.127,
     supportX: 0.25,
@@ -520,6 +520,8 @@ function solar(damaged: boolean, size: FacilitySize): MapModel {
       if (!broken || Math.abs(center - x) > 0.106)
         panel.box([x, 0.012, 0], [0.003, 0.002, 0.14], P.steel);
     if (broken) shatteredPanel(panel, center);
+    if (size !== "medium")
+      panel.box([0, 0.015, -0.071], [width + 0.012, 0.004, 0.01], P.steelShade);
     body.merge(panel.build(), [0, height, z], [tilt, 0, 0]);
     for (const x of [-supportX, supportX])
       for (const dz of [-0.045, 0.045]) {
