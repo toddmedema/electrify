@@ -54,7 +54,10 @@ import {
 import "./TerritoryMapWorkspace.scss";
 
 const TerritoryScene3D = React.lazy(
-  () => import("../base/territory-3d/TerritoryScene3D"),
+  () =>
+    import(
+      /* webpackChunkName: "territory-scene" */ "../base/territory-3d/TerritoryScene3D"
+    ),
 );
 const RENDERER_MESSAGES = {
   loading: "Loading 3D map…",
@@ -555,8 +558,11 @@ export default function TerritoryHexMap({
   React.useLayoutEffect(() => {
     const element = viewport.current;
     if (!element) return;
+    const gameStage = element.closest<HTMLElement>(".gameStage");
     const measure = () => {
-      const { clientWidth: width, clientHeight: height } = element;
+      const { clientWidth: width, clientHeight: height, offsetTop } = element;
+      // Share the row height with both the map and portaled inspector layouts.
+      gameStage?.style.setProperty("--territory-map-inset", `${offsetTop}px`);
       setSize((previous) =>
         previous.width === width && previous.height === height
           ? previous
@@ -566,7 +572,10 @@ export default function TerritoryHexMap({
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(element);
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      gameStage?.style.removeProperty("--territory-map-inset");
+    };
   }, []);
   const zoomAt = React.useCallback(
     (factor: number, from: { clientX: number; clientY: number }, to = from) => {

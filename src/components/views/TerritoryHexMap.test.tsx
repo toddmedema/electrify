@@ -188,7 +188,9 @@ function show(
   }
   const utils = render(
     <Provider store={store}>
-      <Workspace />
+      <div className="gameStage" data-testid="game-stage">
+        <Workspace />
+      </div>
     </Provider>,
   );
   const viewport = screen.getByRole("region", { name: "Territory map" });
@@ -1049,6 +1051,15 @@ it("leaves uncaptured pointer exits to the browser", () => {
   fireEvent.pointerMove(tile, { clientX: 65, clientY: 20, buttons: 0 });
   expect({ ...map.viewport.dataset }).toEqual(before);
 });
+it("clears the inspector inset from the owning stage when the map unmounts", () => {
+  jest.spyOn(HTMLElement.prototype, "offsetTop", "get").mockReturnValue(56);
+  const map = show();
+  const gameStage = screen.getByTestId("game-stage");
+  expect(gameStage).toHaveStyle("--territory-map-inset: 56px");
+  map.unmount();
+  expect(gameStage.style.getPropertyValue("--territory-map-inset")).toBe("");
+});
+
 it("announces loading before the scene draws and clears the notice when ready", async () => {
   const restore = enable3D();
   let resolveScene!: () => void;

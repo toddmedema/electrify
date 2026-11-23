@@ -47,7 +47,7 @@ import {
 async function startPausedMap(
   page: Page,
   theme?: "light" | "dark",
-  renderer: "ready" | "unavailable" = "ready",
+  renderer: "ready" | "unavailable" | "loading" = "ready",
 ) {
   if (theme)
     await page.addInitScript((mode) => {
@@ -62,7 +62,9 @@ async function startPausedMap(
     await pause.click();
   const map = await returnToTerritoryMap(page);
   const canvas = map.locator("canvas.territory3DCanvas");
-  await expect(canvas).toHaveAttribute("data-renderer", renderer);
+  await expect(
+    renderer === "loading" ? map.locator(".territoryMap") : canvas,
+  ).toHaveAttribute("data-renderer", renderer);
   return { map, canvas };
 }
 
@@ -872,9 +874,10 @@ test("explains when WebGL2 cannot start and keeps the tile controls usable", asy
     mobile ? "dark" : "light",
     "unavailable",
   );
-  await expect(
-    map.getByText("The 3D map is unavailable. WebGL2 is required."),
-  ).toBeVisible();
+  const notice = map.getByRole("status", { name: "3D map" });
+  await expect(notice).toHaveText(
+    "The 3D map is unavailable. WebGL2 is required.",
+  );
   const capital = map.getByRole("button", {
     name: "Inspect You territory · Burlington",
   });
@@ -894,6 +897,10 @@ test("explains when WebGL2 cannot start and keeps the tile controls usable", asy
   if (mobile) {
     const labelBounds = (await label.boundingBox())!;
     const inspectorBounds = (await inspector.boundingBox())!;
+    const noticeBounds = (await notice.boundingBox())!;
+    expect(noticeBounds.y + noticeBounds.height).toBeLessThanOrEqual(
+      inspectorBounds.y,
+    );
     expect(inspectorBounds.y + inspectorBounds.height).toBeLessThanOrEqual(
       labelBounds.y,
     );
@@ -905,6 +912,58 @@ test("explains when WebGL2 cannot start and keeps the tile controls usable", asy
     await label.tap();
     await expect(inspector).toHaveCount(0);
   }
+});
+
+test("reloads a failed scene while a tile inspector is open", async ({
+  page,
+}, info) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  const sceneChunk = "**/static/js/territory-scene.*.js";
+  let releaseScene!: () => void;
+  const pendingScene = new Promise<void>((resolve) => {
+    releaseScene = resolve;
+  });
+  await page.route(sceneChunk, async (route) => {
+    await pendingScene;
+    await route.abort();
+  });
+  const { map } = await startPausedMap(page, "dark", "loading");
+  const notice = map.getByRole("status", { name: "3D map" });
+  await expect(notice).toHaveText("Loading 3D map…");
+  await map.locator('[data-map-target="champlain:city"]').press("Enter");
+  const inspector = page.getByRole("dialog", { name: "Burlington" });
+  const inspectorTop = async () => (await inspector.boundingBox())!.y;
+  const loadingTop = await inspectorTop();
+  releaseScene();
+
+  await expect(notice).toHaveText("The 3D map couldn’t load.");
+  // The Reload control makes the status row taller than the loading message.
+  await expect.poll(inspectorTop).toBeGreaterThan(loadingTop);
+  const reload = map.getByRole("button", { name: "Reload page" });
+  const reloadBounds = (await reload.boundingBox())!;
+  expect(reloadBounds.y + reloadBounds.height).toBeLessThanOrEqual(
+    await inspectorTop(),
+  );
+  await reviewScreenshot(map, {
+    path: info.outputPath("map-scene-reload.png"),
+  });
+
+  await expect(
+    page.locator("#appbar:visible [data-save-state]").first(),
+  ).toHaveAttribute("data-save-state", "saved");
+  await page.unroute(sceneChunk);
+  const navigated = page.waitForEvent("framenavigated", {
+    predicate: (frame) => frame === page.mainFrame(),
+  });
+  if (info.project.use.hasTouch) await reload.tap();
+  else await reload.click();
+  await navigated;
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
+  const restored = await returnToTerritoryMap(page);
+  await expect(restored.locator("canvas.territory3DCanvas")).toHaveAttribute(
+    "data-renderer",
+    "ready",
+  );
 });
 
 async function dragWindow(page: Page, target: Locator, dx: number, dy: number) {
