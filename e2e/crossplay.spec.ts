@@ -1,5 +1,8 @@
+/* eslint-disable testing-library/prefer-screen-queries -- Playwright owns browser queries. */
 import { expect, test } from "@playwright/test";
-import type { Page } from "@playwright/test";
+import type { Page, TestInfo } from "@playwright/test";
+import { mkdir, writeFile } from "node:fs/promises";
+import path from "node:path";
 import { crossplayFixture, installSteamBridge } from "./crossplay-fixture";
 import { isolateAnalytics } from "./fixtures";
 import { reviewScreenshot } from "./review-screenshot";
@@ -51,10 +54,34 @@ async function start(host: Page, guest: Page) {
     await expect(clock(player)).toBeVisible();
     await clock(player)
       .getByRole("button", { name: "slow speed", exact: true })
-      .click();
+      .click({ timeout: 20_000 });
   }
   for (const player of [host, guest])
     await expect(clock(player)).toHaveAttribute("data-active-speed", "SLOW");
+}
+
+async function attachOperations(
+  info: TestInfo,
+  fixture: ReturnType<typeof crossplayFixture>,
+  host: Page | undefined,
+) {
+  const file = info.outputPath("room-operations.json");
+  await mkdir(path.dirname(file), { recursive: true });
+  await writeFile(
+    file,
+    JSON.stringify(
+      fixture.operations.slice(-80).map(({ page, ...operation }) => ({
+        ...operation,
+        role: page === host ? "host" : "guest",
+      })),
+      null,
+      2,
+    ),
+  );
+  await info.attach("room-operations", {
+    contentType: "application/json",
+    path: file,
+  });
 }
 
 for (const steamHost of [false, true]) {
@@ -67,12 +94,15 @@ for (const steamHost of [false, true]) {
         process.env.CROSSPLAY_WEB_ONLY === "1",
       "Mixed desktop bridge coverage runs with the desktop renderer.",
     );
+    const fixture = crossplayFixture();
+    await fixture.prepareCheckpoints();
     const otherContext = await browser.newContext({ ...testInfo.project.use });
+    let host: Page | undefined;
     try {
       const other = await otherContext.newPage();
       const steam = steamHost ? page : other;
       const web = steamHost ? other : page;
-      const fixture = crossplayFixture();
+      host = steamHost ? steam : web;
       await Promise.all([
         fixture.install(web, "web"),
         fixture.install(steam, "steam"),
@@ -94,7 +124,6 @@ for (const steamHost of [false, true]) {
         });
       }
 
-      const host = steamHost ? steam : web;
       const guest = steamHost ? web : steam;
       await start(host, guest);
 
@@ -136,6 +165,9 @@ for (const steamHost of [false, true]) {
           guest.getByRole("dialog", { name: "Multiplayer" }),
         ).toContainText(/connection|reconnect/i);
       }
+    } catch (error) {
+      await attachOperations(testInfo, fixture, host);
+      throw error;
     } finally {
       await otherContext.close();
     }
@@ -147,16 +179,20 @@ test("two browsers can start and advance a shared game with simulated relay", as
   browser,
 }, testInfo) => {
   test.skip(testInfo.project.name !== "mobile-390px", "Phone hosting journey.");
+  const fixture = crossplayFixture();
+  await fixture.prepareCheckpoints();
   const guestContext = await browser.newContext({ ...testInfo.project.use });
   try {
     const guest = await guestContext.newPage();
-    const fixture = crossplayFixture();
     await Promise.all([
       fixture.install(page, "web"),
       fixture.install(guest, "web"),
     ]);
     await Promise.all([enter(page), enter(guest)]);
     await start(page, guest);
+  } catch (error) {
+    await attachOperations(testInfo, fixture, page);
+    throw error;
   } finally {
     await guestContext.close();
   }

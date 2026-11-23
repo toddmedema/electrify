@@ -64,6 +64,7 @@ class V2Campaign {
 
   async addPlayer(width = 1280, open = true) {
     const index = this.players.length;
+    if (index === 0) await this.fixture.prepareCheckpoints();
     const name = this.names[index];
     const context = await this.browser.newContext({
       viewport: { width, height: width < 600 ? 844 : 900 },

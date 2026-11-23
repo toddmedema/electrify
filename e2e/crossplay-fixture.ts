@@ -584,11 +584,15 @@ export function crossplayFixture() {
   const acceptedSteamProofs = new Map<string, string>();
   const steamUsers = new Map<string, string>();
   const usedTickets = new Set<string>();
+  const fixtureStarted = Date.now();
   const operations: {
     operation: string;
     page?: Page;
     status: number;
+    startedMs: number;
     error?: string;
+    durationMs?: number;
+    leaseRemainingMs?: number;
   }[] = [];
   const players = new Map<Page, BrowserPlayer>();
   const pageRooms = new Map<Page, string>();
@@ -779,6 +783,7 @@ export function crossplayFixture() {
     bearer?: string,
     origin?: string,
   ) {
+    const started = Date.now();
     const result = { status: 500, body: {} as RequestData };
     const headers: Record<string, string | undefined> = {
       origin,
@@ -790,7 +795,13 @@ export function crossplayFixture() {
       (operation === "room/state" &&
         (allAuthorityLost || lostAuthority.has(page)))
     ) {
-      operations.push({ operation, page, status: 503 });
+      operations.push({
+        operation,
+        page,
+        startedMs: started - fixtureStarted,
+        status: 503,
+        error: "unavailable",
+      });
       return { status: 503, body: { error: "unavailable" } as RequestData };
     }
     await service.handle(
@@ -815,10 +826,15 @@ export function crossplayFixture() {
     );
     const lobby = result.body?.lobby as { lobbyId?: string } | undefined;
     if (lobby?.lobbyId) pageRooms.set(page, lobby.lobbyId);
+    const authority = result.body?.authority as
+      { leaseRemainingMs?: number } | undefined;
     operations.push({
       operation,
       page,
+      startedMs: started - fixtureStarted,
       status: result.status,
+      leaseRemainingMs: authority?.leaseRemainingMs,
+      durationMs: Date.now() - started,
       ...(typeof result.body?.error === "string" && {
         error: result.body.error,
       }),
@@ -852,6 +868,8 @@ export function crossplayFixture() {
 
   return {
     operations,
+    // Compile outside the running campaign so the fixture cannot stall its lease clock.
+    prepareCheckpoints: checkpointValidator,
     roomId,
     seatId,
     checkpoint: savedCheckpoint,
