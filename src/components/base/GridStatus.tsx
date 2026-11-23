@@ -19,6 +19,7 @@ import { formatClockTime, getDateFromMinute } from "../../helpers/DateTime";
 import { projectedShortfall } from "../../helpers/MissionStatus";
 import { isUtilityExpansionGame } from "../../helpers/ExpansionContext";
 import { utilityServiceGap } from "../../helpers/UtilityPlanning";
+import { topBarForecastEndMinute } from "../../helpers/Projection";
 import { hasTerritoryNetwork } from "../../helpers/Territories";
 import { getScenario } from "../../data/Scenarios";
 import { corridorsForLocation } from "../../data/AdjacentMarkets";
@@ -33,16 +34,22 @@ import {
 } from "./DeferredProjection";
 
 /** Subscribe to the existing deferred owner; a stale forecast is never read synchronously. */
-function useSupplyRisk(game: GameType, now: TickPresentFutureType) {
+function useSupplyRisk(
+  game: GameType,
+  now: TickPresentFutureType,
+  enabled: boolean,
+) {
   const [, landed] = React.useReducer((count: number) => count + 1, 0);
-  React.useEffect(() => subscribeProjection(landed), []);
-  const enabled = isUtilityExpansionGame(game);
-  const ready = enabled && projectionReady(game);
+  React.useEffect(
+    () => (enabled ? subscribeProjection(landed, "top-bar") : undefined),
+    [enabled],
+  );
+  const ready = enabled && projectionReady(game, "top-bar");
   React.useEffect(() => {
-    if (enabled && !ready) requestProjection(game, now);
+    if (enabled && !ready) requestProjection(game, now, "top-bar");
   }, [enabled, ready, game, now]);
   const gap = ready
-    ? utilityServiceGap(game, readProjection(game, now))
+    ? utilityServiceGap(game, readProjection(game, now, "top-bar"))
     : undefined;
   return { gap, updating: enabled && !ready };
 }
@@ -75,8 +82,15 @@ export default function GridStatus({
 }) {
   const health = getGridHealth(game, now);
   const edgeMargin = useScreenEdgeMargin(16);
-  const { gap, updating } = useSupplyRisk(game, now);
-  const ahead = projectedShortfall(game.timeline, game.date.minute);
+  const forecastEnd = topBarForecastEndMinute(game);
+  const { gap, updating } = useSupplyRisk(
+    game,
+    now,
+    isUtilityExpansionGame(game) && game.date.minute < forecastEnd,
+  );
+  const shortfall = projectedShortfall(game.timeline, game.date.minute);
+  const ahead =
+    shortfall && shortfall.minute < forecastEnd ? shortfall : undefined;
   const when = ahead
     ? getDateFromMinute(ahead.minute, game.startingYear)
     : undefined;
