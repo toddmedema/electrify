@@ -584,7 +584,12 @@ export function crossplayFixture() {
   const acceptedSteamProofs = new Map<string, string>();
   const steamUsers = new Map<string, string>();
   const usedTickets = new Set<string>();
-  const operations: { operation: string; page?: Page; status: number }[] = [];
+  const operations: {
+    operation: string;
+    page?: Page;
+    status: number;
+    error?: string;
+  }[] = [];
   const players = new Map<Page, BrowserPlayer>();
   const pageRooms = new Map<Page, string>();
   const ports = new Map<number, Page>();
@@ -810,7 +815,14 @@ export function crossplayFixture() {
     );
     const lobby = result.body?.lobby as { lobbyId?: string } | undefined;
     if (lobby?.lobbyId) pageRooms.set(page, lobby.lobbyId);
-    operations.push({ operation, page, status: result.status });
+    operations.push({
+      operation,
+      page,
+      status: result.status,
+      ...(typeof result.body?.error === "string" && {
+        error: result.body.error,
+      }),
+    });
     return result;
   }
 
