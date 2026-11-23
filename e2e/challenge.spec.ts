@@ -2,26 +2,23 @@ import { waitForSettled } from "./layout";
 import { unlockAllDifficulties } from "./difficulty-fixture";
 import path from "path";
 import { expect, test, Page } from "./fixtures";
-import manifest from "../src/data/RunCompatibility.json";
 import type { ChallengeInvitation } from "../src/Types";
 import { readSavedGame, readSaveRecords } from "./save-fixture";
 
-function invitation(
-  scenarioId = 101,
-  seed = 42,
-  target = 12400,
-): ChallengeInvitation {
+function invitation(scenarioId = 101, target = 12400): ChallengeInvitation {
+  return { scenarioId, difficulty: "CEO", target };
+}
+const freshSeed = 12345;
+const oldSeed = 42;
+const oldRules = `rules-1-${"0".repeat(64)}`;
+function legacyInvitation(value = invitation()) {
+  const { scenarioId, difficulty, target } = value;
   return {
-    run: {
-      scenarioId,
-      seed,
-      difficulty: "CEO",
-      compatibilityId: manifest.compatibilityId,
-    },
+    run: { scenarioId, seed: oldSeed, difficulty, compatibilityId: oldRules },
     target,
   };
 }
-function link(value = invitation()) {
+function link(value: unknown = invitation()) {
   return `/?challenge=${encodeURIComponent(JSON.stringify(value))}&utm_campaign=friend`;
 }
 async function savedGame(page: Page) {
@@ -29,9 +26,10 @@ async function savedGame(page: Page) {
 }
 test.beforeEach(async ({ page }) => {
   await unlockAllDifficulties(page);
-  await page.addInitScript(() => {
+  await page.addInitScript((seed) => {
     localStorage.setItem("audioEnabled", "false");
-  });
+    Math.random = () => seed / 2 ** 32;
+  }, freshSeed);
 });
 
 test("an active run stays paused while browsing and cancelling a challenge", async ({
@@ -120,15 +118,18 @@ for (const theme of ["light", "dark"] as const) {
       (mode) => localStorage.setItem("theme", mode),
       theme,
     );
-    const value =
-      theme === "light" ? invitation() : invitation(107, 268107, -10);
-    await page.goto(link(value));
+    const value = theme === "light" ? invitation() : invitation(107, -10);
+    const expectedSeed = theme === "light" ? freshSeed : 268107;
+    // The legacy link still launches the normal scenario seed path on the current build.
+    await page.goto(link(theme === "light" ? legacyInvitation(value) : value));
     const start = page.getByRole("button", {
       name: "Start challenge",
       exact: true,
     });
     await expect(start).toBeVisible();
-    await expect(page.getByText("Expert", { exact: true })).toBeVisible();
+    await expect(
+      page.getByText("Expert · New run", { exact: true }),
+    ).toBeVisible();
     await expect(page.getByRole("group", { name: "Difficulty" })).toHaveCount(
       0,
     );
@@ -165,13 +166,13 @@ for (const theme of ["light", "dark"] as const) {
     await start.click();
     await expect
       .poll(async () => (await savedGame(page))?.seed)
-      .toBe(value.run.seed);
+      .toBe(expectedSeed);
     const game = await savedGame(page);
-    expect(game.scenarioId).toBe(value.run.scenarioId);
+    expect(game.scenarioId).toBe(value.scenarioId);
     expect(game.difficulty).toBe("CEO");
     expect(game.challenge).toEqual(value);
     expect(game.runIdentity!.inputs.location).toEqual(game.location);
-    expect(game.runIdentity!.seed).toBe(value.run.seed);
+    expect(game.runIdentity!.seed).toBe(expectedSeed);
     expect(game.facilities.length).toBeGreaterThan(0);
     await page.reload();
     await page
@@ -214,7 +215,7 @@ test("landing and history preserve a save, and a challenge creates another", asy
     .getByRole("button", { name: "Start challenge", exact: true })
     .click();
   await expect.poll(async () => (await savedGame(page))?.scenarioId).toBe(101);
-  expect((await savedGame(page)).seed).toBe(42);
+  expect((await savedGame(page)).seed).toBe(freshSeed);
   expect((await savedGame(page)).challenge).toEqual(invitation());
   const records = await readSaveRecords(page);
   expect(records).toHaveLength(2);
@@ -223,9 +224,10 @@ test("landing and history preserve a save, and a challenge creates another", asy
   );
 });
 
-test("an invitation from different rules is unavailable", async ({ page }) => {
-  const value = invitation();
-  value.run.compatibilityId = "different-rules";
+test("an invitation for an unknown scenario is unavailable", async ({
+  page,
+}) => {
+  const value = invitation(99999);
   await page.goto(link(value));
   await expect(
     page.getByRole("heading", { name: "Challenge unavailable" }),
@@ -239,9 +241,7 @@ test.describe("challenge data integrity", () => {
   // Control the response consumed by fetch, including when this spec targets a production build.
   test.use({ serviceWorkers: "block" });
 
-  test("mismatched market bytes cannot initialize an equivalent challenge", async ({
-    page,
-  }) => {
+  test("mismatched market bytes cannot start a challenge", async ({ page }) => {
     let alteredRequests = 0;
     await page.route("**/data/EconomyRaw.csv", async (route) => {
       alteredRequests += 1;
