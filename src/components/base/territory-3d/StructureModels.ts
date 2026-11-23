@@ -462,38 +462,68 @@ function shatteredPanel(panel: MeshBuilder, center: number) {
     );
 }
 
-function solar(damaged: boolean, _size: FacilitySize): MapModel {
+const solarLayouts = {
+  small: {
+    rows: [-0.09, 0.09],
+    width: 0.41,
+    height: 0.098,
+    supportX: 0.15,
+    feederX: 0.25,
+    feederZ: 0.206,
+  },
+  medium: {
+    rows: [-0.18, 0, 0.18],
+    width: 0.6,
+    height: 0.115,
+    supportX: 0.23,
+    feederX: 0.34,
+    feederZ: 0.29,
+  },
+  large: {
+    rows: [-0.245, -0.085, 0.085, 0.245],
+    width: 0.66,
+    height: 0.127,
+    supportX: 0.25,
+    feederX: 0.37,
+    feederZ: 0.353,
+  },
+};
+
+function solar(damaged: boolean, size: FacilitySize): MapModel {
   const body = new MeshBuilder(),
     glints = new MeshBuilder();
-  const tilt = 0.36;
-  for (const z of [-0.18, 0, 0.18]) {
-    const broken = damaged && z !== -0.18;
-    const center = z === 0 ? -0.164 : 0.164;
+  const { rows, width, height, supportX, feederX, feederZ } =
+    solarLayouts[size];
+  const halfWidth = width / 2,
+    tilt = 0.36;
+  for (const [index, z] of rows.entries()) {
+    const broken = damaged && (index === 1 || index === rows.length - 1);
+    const center = (halfWidth - 0.136) * (index === 1 ? -1 : 1);
     const panel = new MeshBuilder().box(
       [0, 0, 0],
-      [0.612, 0.014, 0.152],
+      [width + 0.012, 0.014, 0.152],
       P.steel,
     );
     const intact = broken
       ? [
-          [-0.3, center - 0.106],
-          [center + 0.106, 0.3],
+          [-halfWidth, center - 0.106],
+          [center + 0.106, halfWidth],
         ]
-      : [[-0.3, 0.3]];
+      : [[-halfWidth, halfWidth]];
     for (const [left, right] of intact) {
       const mid = (left + right) / 2;
       panel
         .box([mid, 0.009, 0], [right - left, 0.004, 0.14], P.solar)
         .box([mid, 0.012, 0], [right - left, 0.002, 0.003], P.steel);
     }
-    for (const x of [-0.15, 0, 0.15])
+    for (const x of [-width / 4, 0, width / 4])
       if (!broken || Math.abs(center - x) > 0.106)
         panel.box([x, 0.012, 0], [0.003, 0.002, 0.14], P.steel);
     if (broken) shatteredPanel(panel, center);
-    body.merge(panel.build(), [0, 0.115, z], [tilt, 0, 0]);
-    for (const x of [-0.23, 0.23])
+    body.merge(panel.build(), [0, height, z], [tilt, 0, 0]);
+    for (const x of [-supportX, supportX])
       for (const dz of [-0.045, 0.045]) {
-        const top = 0.107 - Math.sin(tilt) * dz;
+        const top = height - 0.008 - Math.sin(tilt) * dz;
         body.box(
           [x, top / 2, z + dz * Math.cos(tilt)],
           [0.012, top, 0.012],
@@ -503,32 +533,35 @@ function solar(damaged: boolean, _size: FacilitySize): MapModel {
     if (!broken)
       glints.merge(
         new MeshBuilder()
-          .box([0, 0.014, -0.037], [0.58, 0.002, 0.01], P.solar)
+          .box([0, 0.014, -0.037], [width - 0.02, 0.002, 0.01], P.solar)
           .build(),
-        [0, 0.115, z],
+        [0, height, z],
         [tilt, 0, 0],
       );
   }
-  if (damaged)
+  if (damaged) {
+    const shardsX = halfWidth - (size === "large" ? 0.07 : 0.06),
+      shardsZ = feederZ - 0.02;
     body
       .triangle(
-        [0.24, 0.004, 0.27],
-        [0.28, 0.006, 0.28],
-        [0.26, 0.004, 0.31],
+        [shardsX, 0.004, shardsZ],
+        [shardsX + 0.04, 0.006, shardsZ + 0.01],
+        [shardsX + 0.02, 0.004, shardsZ + 0.04],
         fracturedGlass,
       )
       .triangle(
-        [-0.26, 0.004, 0.29],
-        [-0.29, 0.006, 0.28],
-        [-0.247, 0.004, 0.268],
+        [-shardsX - 0.02, 0.004, shardsZ + 0.02],
+        [-shardsX - 0.05, 0.006, shardsZ + 0.01],
+        [-shardsX - 0.007, 0.004, shardsZ - 0.002],
         P.solar,
       );
+  }
   // Bring the conductors out beside the racks via low feeders under the panels.
   const terminals: Vec3[] = [
-    [-0.34, 0.036, 0],
-    [0.34, 0.036, 0],
-    [0, 0.036, -0.29],
-    [0, 0.036, 0.29],
+    [-feederX, 0.036, 0],
+    [feederX, 0.036, 0],
+    [0, 0.036, -feederZ],
+    [0, 0.036, feederZ],
   ];
   body.box([0, 0.023, 0], [0.13, 0.046, 0.1], P.steel);
   for (const terminal of terminals) {
@@ -552,7 +585,7 @@ function solar(damaged: boolean, _size: FacilitySize): MapModel {
 }
 
 /** A small solid loft: rounded +X leading edge, thin -X trailing edge. */
-function windBlade(): MapMesh {
+function windBlade(spanScale: number, chordScale: number): MapMesh {
   const mesh = new MeshBuilder();
   // Span, backward sweep, upwind prebend, chord, depth, pitch (radians).
   // Sweep changes the front silhouette; prebend independently clears the tower.
@@ -563,7 +596,14 @@ function windBlade(): MapMesh {
     [0.2, -0.009, 0.003, 0.027, 0.006, 0.07],
     [0.255, -0.016, 0.005, 0.012, 0.003, 0.03],
     [0.28, -0.023, 0.006, 0.003, 0.0015, 0],
-  ] as const;
+  ].map(([span, sweep, prebend, chord, depth, pitch]) => [
+    span * spanScale,
+    sweep * spanScale,
+    prebend,
+    chord * chordScale,
+    depth * chordScale,
+    pitch,
+  ]);
   const profile = [
     [-0.5, -0.03],
     [-0.05, -0.5],
@@ -610,56 +650,203 @@ function windBlade(): MapMesh {
   return mesh.build();
 }
 
-function wind(kind: "wind" | "offshore-wind", _size: FacilitySize): MapModel {
+const windDesigns = {
+  small: { mast: 0.327, tower: 0.8, span: 0.71, chord: 0.84 },
+  medium: { mast: 0.48, tower: 1, span: 1, chord: 1 },
+  large: { mast: 0.59, tower: 1.24, span: 1.34, chord: 1.25 },
+};
+
+const offshoreDecks = {
+  small: { height: 0.062, width: 0.23, depth: 0.175, legX: 0.076, legZ: 0.06 },
+  medium: { height: 0.09, width: 0.3, depth: 0.25, legX: 0.1, legZ: 0.08 },
+  large: { height: 0.107, width: 0.435, depth: 0.29, legX: 0.154, legZ: 0.1 },
+};
+
+function wind(kind: "wind" | "offshore-wind", size: FacilitySize): MapModel {
   const offshore = kind === "offshore-wind",
     body = new MeshBuilder();
-  const deck = offshore ? 0.09 : 0.035;
+  const { mast, tower, span, chord } = windDesigns[size],
+    platform = offshoreDecks[size],
+    deck = offshore ? platform.height : size === "large" ? 0.045 : 0.035;
   if (offshore) {
-    for (const x of [-0.1, 0.1])
-      for (const z of [-0.08, 0.08]) {
-        body.beam([x * 1.3, 0.006, z * 1.3], [x, deck, z], 0.012, P.steelShade);
-        body.beam([-x, 0.005, z], [x, deck, z], 0.006, P.steelShade);
+    const { legX, legZ, width, depth } = platform;
+    for (const x of [-legX, legX])
+      for (const z of [-legZ, legZ]) {
+        body.beam(
+          [x * 1.3, 0.006, z * 1.3],
+          [x, deck, z],
+          0.012 * tower,
+          P.steelShade,
+        );
+        body.beam([-x, 0.005, z], [x, deck, z], 0.006 * tower, P.steelShade);
       }
-    body.box([0, deck, 0], [0.3, 0.025, 0.25], P.steel);
-  } else body.box([0, deck / 2, 0], [0.16, deck, 0.15], P.steel);
-  body.cylinder([0, deck, 0], 0.026, 0.015, 0.48, P.cream, 8);
-  const pivot: Vec3 = [0, deck + 0.475, 0.045];
-  body.box([0, pivot[1], 0], [0.07, 0.045, 0.1], P.steel);
+    body.box([0, deck, 0], [width, 0.025, depth], P.steel);
+    if (size === "large") {
+      // The service deck carries a crane and has a separate landing for switchgear.
+      body.box([0, 0.045, 0.16], [0.255, 0.06, 0.082], P.steelShade);
+      body.box([-0.153, deck + 0.045, 0.057], [0.071, 0.064, 0.075], P.cream);
+      body.box([0.151, deck + 0.028, 0.06], [0.085, 0.03, 0.067], P.timber);
+      body.beam(
+        [0.15, deck + 0.037, 0.06],
+        [0.15, 0.228, 0.06],
+        0.016,
+        P.timber,
+        4,
+      );
+      body.beam([0.15, 0.221, 0.06], [0.225, 0.254, 0.06], 0.012, P.timber, 4);
+      body.beam(
+        [0.225, 0.254, 0.06],
+        [0.225, 0.209, 0.06],
+        0.005,
+        P.steelShade,
+        4,
+      );
+    }
+  } else if (size === "large") {
+    body.box([0, deck / 2, 0], [0.335, deck, 0.205], P.steel);
+    body.box([-0.117, 0.072, 0.027], [0.069, 0.054, 0.092], P.steelShade);
+    body.box([-0.117, 0.101, 0.027], [0.073, 0.008, 0.097], P.cream);
+    body.box([0.118, 0.064, 0.027], [0.064, 0.04, 0.092], P.steelShade);
+  } else {
+    const width = size === "small" ? 0.128 : 0.16;
+    body.box([0, deck / 2, 0], [width, deck, width - 0.01], P.steel);
+  }
+
+  body.cylinder([0, deck, 0], 0.026 * tower, 0.015 * tower, mast, P.cream, 8);
+  const pivot: Vec3 = [0, deck + mast - 0.005, 0.045 * tower];
+  body.box(
+    [0, pivot[1], 0],
+    [0.07 * tower, 0.045 * tower, 0.1 * tower],
+    P.steel,
+  );
   const rotor = new MeshBuilder();
-  const blade = windBlade();
+  const blade = windBlade(span, chord);
   for (let i = 0; i < 3; i++)
     rotor.merge(blade, [0, 0, 0], [0, 0, (i * TAU) / 3]);
   rotor.merge(
     new MeshBuilder()
-      .cylinder([0, 0, 0], 0.025, 0.018, 0.028, P.cream, 8)
+      .cylinder(
+        [0, 0, 0],
+        0.025 * chord,
+        0.018 * chord,
+        0.028 * chord,
+        P.cream,
+        8,
+      )
       .build(),
     [0, 0, 0.022],
     [Math.PI / 2, 0, 0],
   );
-  return facilityModel(kind, body, switchgear(body, 0.12), [
-    {
-      mesh: rotor.build(),
-      position: pivot,
-      motion: "rotor",
-      castsShadow: true,
-    },
-  ]);
+  return facilityModel(
+    kind,
+    body,
+    switchgear(body, offshore && size === "large" ? 0.169 : 0.12),
+    [
+      {
+        mesh: rotor.build(),
+        position: pivot,
+        motion: "rotor",
+        castsShadow: true,
+      },
+    ],
+  );
 }
 
-function airborne(_size: FacilitySize): MapModel {
+const kiteDesigns = {
+  small: {
+    baseWidth: 0.242,
+    baseDepth: 0.185,
+    hallWidth: 0.17,
+    hallDepth: 0.13,
+    hallHeight: 0.067,
+    wingHeight: 0.453,
+    span: 0.72,
+    chord: 0.78,
+  },
+  medium: {
+    baseWidth: 0.3,
+    baseDepth: 0.23,
+    hallWidth: 0.23,
+    hallDepth: 0.17,
+    hallHeight: 0.085,
+    wingHeight: 0.64,
+    span: 1,
+    chord: 1,
+  },
+  large: {
+    baseWidth: 0.51,
+    baseDepth: 0.37,
+    hallWidth: 0.267,
+    hallDepth: 0.22,
+    hallHeight: 0.12,
+    wingHeight: 0.665,
+    span: 1.29,
+    chord: 1.24,
+  },
+};
+
+function airborne(size: FacilitySize): MapModel {
   const body = new MeshBuilder();
-  base(body, 0.3, 0.23);
-  body.box([0, 0.078, 0], [0.23, 0.085, 0.17], P.cream);
-  body.merge(
-    new MeshBuilder()
-      .cylinder([0, 0, 0], 0.046, 0.046, 0.13, P.steelShade, 8)
-      .build(),
-    [-0.065, 0.09, 0.065],
-    [0, 0, -Math.PI / 2],
+  const {
+    baseWidth,
+    baseDepth,
+    hallWidth,
+    hallDepth,
+    hallHeight,
+    wingHeight,
+    span,
+    chord,
+  } = kiteDesigns[size];
+  base(body, baseWidth, baseDepth);
+  body.box(
+    [0, 0.0355 + hallHeight / 2, 0],
+    [hallWidth, hallHeight, hallDepth],
+    P.cream,
   );
-  body.beam([0, 0.12, 0], [0, 0.64, 0], 0.004, P.steelShade);
+  const winchRadius = size === "small" ? 0.033 : 0.046;
+  const launchDrum = new MeshBuilder()
+    .cylinder(
+      [0, 0, 0],
+      winchRadius,
+      winchRadius,
+      size === "small" ? 0.086 : 0.13,
+      P.steelShade,
+      8,
+    )
+    .build();
+  if (size === "large") {
+    body.box([0, 0.162, 0], [0.285, 0.014, 0.238], P.steel);
+    for (const x of [-0.184, 0.184]) {
+      body.box([x, 0.052, 0.061], [0.095, 0.04, 0.132], P.steel);
+      body.merge(launchDrum, [x, 0.093, 0.007], [Math.PI / 2, 0, 0]);
+      body.beam(
+        [x, 0.13, 0.072],
+        [0, wingHeight - 0.18, 0],
+        0.005,
+        P.steelShade,
+      );
+    }
+    body.beam(
+      [0, wingHeight - 0.18, 0],
+      [0, wingHeight, 0],
+      0.005,
+      P.steelShade,
+    );
+  } else {
+    body.merge(
+      launchDrum,
+      size === "small" ? [-0.05, 0.075, 0.047] : [-0.065, 0.09, 0.065],
+      [0, 0, -Math.PI / 2],
+    );
+    body.beam(
+      [0, size === "small" ? 0.101 : 0.12, 0],
+      [0, wingHeight, 0],
+      0.004,
+      P.steelShade,
+    );
+  }
   const wing = new MeshBuilder();
-  const rim: Vec3[] = [
+  const outline: Vec3[] = [
     [-0.33, 0, 0.01],
     [-0.11, 0.025, -0.12],
     [0, 0.045, -0.075],
@@ -669,6 +856,7 @@ function airborne(_size: FacilitySize): MapModel {
     [0, -0.005, 0.075],
     [-0.1, -0.015, 0.12],
   ];
+  const rim = outline.map(([x, y, z]): Vec3 => [x * span, y, z * chord]);
   for (let i = 0; i < rim.length; i++) {
     const a = rim[i],
       b = rim[(i + 1) % rim.length];
@@ -678,15 +866,20 @@ function airborne(_size: FacilitySize): MapModel {
   wing
     .beam(rim[0], [0, 0.045, 0], 0.004, P.steelShade)
     .beam([0, 0.045, 0], rim[4], 0.004, P.steelShade);
-  return facilityModel("airborne-wind", body, switchgear(body, 0.14), [
-    {
-      mesh: wing.build(),
-      position: [0, 0.64, 0],
-      motion: "sway",
-      castsShadow: true,
-    },
-    windows(body, 0, 0.08, 0.088, 0.14),
-  ]);
+  return facilityModel(
+    "airborne-wind",
+    body,
+    switchgear(body, size === "large" ? 0.168 : 0.14),
+    [
+      {
+        mesh: wing.build(),
+        position: [0, wingHeight, 0],
+        motion: "sway",
+        castsShadow: true,
+      },
+      windows(body, 0, 0.08, hallDepth / 2 + 0.003, hallWidth - 0.09),
+    ],
+  );
 }
 
 function thermal(
