@@ -71,8 +71,7 @@ Steam builds select X11/XWayland before enabling the overlay's in-process GPU. T
 [Steam's overlay](https://github.com/ValveSoftware/steam-for-linux/issues/8020) and avoids the
 [Electron 44 Wayland shutdown deadlock](https://github.com/electerm/electerm/issues/4654).
 Shift-Tab is withheld from Chromium in every game view so it cannot also move focus or trigger a
-modal focus trap. If Steam reports that its overlay is disabled, Invite friends shows an error
-with the invite-code alternative. Validate both Shift-Tab and Invite friends, clean Quit, and the
+modal focus trap. Validate Shift-Tab, the friends list's **Invite to Game**, clean Quit, and the
 bundled libraries on a real NixOS Steam install with the extraPackages workaround removed.
 
 The Mac app requires macOS 13 Ventura or later, matching the
@@ -551,12 +550,19 @@ through Valve's normal review process.
 ## Realtime Steam co-op
 
 **Play with friends** on the desktop title screen offers **Host a game** or joining with a
-six-digit invite code (including leading zeroes). Hosting opens an invisible Steam lobby and goes straight to the normal selection
-screens, where the top bar's **Invite friends** opens Steam's invitation overlay and **Copy invite
-code** copies the six-digit code. Code lookup searches worldwide; missing or colliding codes
-produce an error rather than joining an arbitrary lobby. Native Steam invitations still use the
-full 64-bit lobby ID. Invisible lobbies support lookup without advertising a public game browser;
-friends-only lobbies cannot be found by Steam's lobby search. Two to four players can join or leave at any time before
+six-digit invite code (including leading zeroes). Hosting opens an invisible Steam lobby and
+goes straight to the normal selection screens. **Copy code** copies the code on the selection
+screen or in a saved lobby. To send an invitation in Steam, press Shift-Tab, select a friend,
+and choose **Invite to Game**. Steam receives the full lobby ID through rich presence for
+an open lobby with room for another player. Code lookup searches worldwide and rejects
+missing or ambiguous codes.
+
+Enable **Use launch command line** in Steamworks under **Installation → General** to pass
+cold-launch invitations through the Steam Apps API. When verifying a private build,
+accept one invitation with the guest already in Electrify and one while the game is closed,
+then check that both guests enter the host's lobby. [Steam Apps launch command line](https://partner.steamgames.com/doc/api/ISteamApps#GetLaunchCommandLine)
+
+Two to four players can join or leave at any time before
 the start. The host picks any authored scenario or a custom game. Guests follow the host's screen,
 scenario, difficulty and custom settings read-only, and mark **Ready** for exactly what is shown;
 any change by the host clears it. **Start for everyone** launches that scenario for the lobby once

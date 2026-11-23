@@ -20,7 +20,6 @@ const controls = {
   start: jest.fn(),
   ready: jest.fn(),
   back: jest.fn(),
-  invite: jest.fn(),
   copyCode: jest.fn(),
   openSaves: jest.fn(),
 };

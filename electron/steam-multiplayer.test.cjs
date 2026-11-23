@@ -333,10 +333,12 @@ test("scenario malformed, truncated, mixed-class and unsafe envelopes never deli
   await assert.rejects(failure, /unexpected end|invalid/i);
   assert.equal(incomplete.size, 0);
 });
-function fixture(directory = "unused-test-path") {
+function fixture(directory = "unused-test-path", launchCommand = "") {
   const events = [],
     calls = [];
   const api = {
+    apps: () => "apps",
+    launchCommandLine: (_self, buffer) => buffer.write(launchCommand),
     matchmaking: () => "matchmaking",
     sockets: () => "sockets",
     utils: () => "utils",
@@ -362,12 +364,20 @@ function fixture(directory = "unused-test-path") {
   };
   const service = {
     identity: { steamId: "76561198000000001" },
-    native: { friends: () => "friends", persona: () => "Player" },
+    native: {
+      friends: () => "friends",
+      persona: () => "Player",
+      presence: (_friends, key, value) => {
+        calls.push(["presence", key, value]);
+        return true;
+      },
+    },
   };
+  const callbacks = new Map();
   const dispatcher = {
-    onCallback: (_id, fn) => {
-      calls.push(["callback", fn]);
-      return () => {};
+    onCallback: (id, fn) => {
+      callbacks.set(id, fn);
+      return () => callbacks.delete(id);
     },
   };
   const mp = new SteamMultiplayer(
@@ -380,7 +390,7 @@ function fixture(directory = "unused-test-path") {
   );
   mp.lobby = 109775242999999999n;
   mp.hostId = service.identity.steamId;
-  return { mp, api, calls, events, dispatcher, service };
+  return { mp, api, calls, events, callbacks, dispatcher, service };
 }
 
 function lobbyFixture(t) {
@@ -599,27 +609,96 @@ test("code lookup rejects missing and ambiguous codes, malformed input and incom
   assert.equal(f.mp.state().lobbyId, undefined);
 });
 
-test("native invites validate overlay availability and pass the complete lobby ID", async (t) => {
-  const f = fixture();
-  t.after(() => f.mp.dispose());
-  let invited;
-  f.api.invite = (_friends, id) => {
-    invited = id;
-  };
-  f.service.requireOverlay = () => {
-    throw new Error("Enable the Steam overlay");
-  };
-  await assert.rejects(
-    f.mp.request({ kind: "invite" }),
-    /Enable the Steam overlay/,
-  );
-  assert.equal(invited, undefined);
-  f.service.requireOverlay = () => {};
-  await f.mp.request({ kind: "invite" });
-  assert.equal(invited, 109775242999999999n);
+test("Steam friends can join an open host through rich presence without losing code lookup", async (t) => {
+  const f = lobbyFixture(t);
+  const link = `+connect_lobby ${f.lobby}`;
+  const published = () => f.calls.filter(([name]) => name === "presence");
+  await f.mp.create("rules-v1");
+  assert.deepEqual(published(), [["presence", "connect", link]]);
+  assert.match(f.mp.state().inviteCode, /^[0-9]{6}$/);
+
+  f.mp.refresh();
+  assert.equal(published().length, 1);
+  f.api.members = () => 4;
+  f.mp.refresh();
+  assert.deepEqual(published().at(-1), ["presence", "connect", null]);
+  f.api.members = () => 2;
+  f.mp.refresh();
+  assert.deepEqual(published().at(-1), ["presence", "connect", link]);
+
+  await f.mp.request({
+    kind: "lock",
+    ids: [f.service.identity.steamId, "76561198000000002"],
+  });
+  f.mp.refresh();
+  assert.deepEqual(published().at(-1), ["presence", "connect", null]);
+  await f.mp.request({ kind: "unlock" });
+  assert.deepEqual(published().at(-1), ["presence", "connect", link]);
   f.mp.leave();
-  await assert.rejects(f.mp.request({ kind: "invite" }), /Host a game/);
+  assert.deepEqual(published().at(-1), ["presence", "connect", null]);
 });
+
+test("Steam friends-list invitations accept both callback formats and retain the complete lobby ID", async (t) => {
+  const f = lobbyFixture(t);
+  const link = `+connect_lobby ${f.lobby}`;
+  const presence = f.callbacks.get(337);
+  const writeConnect = (command) => {
+    const bytes = Buffer.alloc(264);
+    bytes.write(command, 8);
+    presence(bytes);
+  };
+  for (const invalid of [
+    "https://example.test/",
+    link + " --args",
+    link + "\n",
+    "+connect_lobby 18446744073709551616",
+  ])
+    writeConnect(invalid);
+  presence(Buffer.alloc(263));
+  presence(Buffer.alloc(264, 1));
+  assert.equal(f.mp.state().inviteLobbyId, undefined);
+
+  writeConnect(link);
+  assert.deepEqual(f.events.at(-1), {
+    kind: "invite",
+    lobbyId: f.lobby.toString(),
+  });
+  f.mp.connectHost = () => {};
+  f.service.state = () => ({ online: true });
+  Object.entries({
+    electrify: "realtime-v1",
+    rules: "rules-v1",
+    host: f.service.identity.steamId,
+  }).forEach(([key, value]) => f.metadata.set(key, value));
+  await f.mp.request({
+    kind: "join",
+    lobbyId: f.mp.state().inviteLobbyId,
+    rules: "rules-v1",
+  });
+  assert.equal(f.mp.state().lobbyId, f.lobby.toString());
+  assert.equal(f.mp.state().inviteLobbyId, undefined);
+
+  const lobbyInvite = Buffer.alloc(16);
+  lobbyInvite.writeBigUInt64LE(f.lobby);
+  f.callbacks.get(333)(lobbyInvite);
+  assert.deepEqual(f.events.at(-1), {
+    kind: "invite",
+    lobbyId: f.lobby.toString(),
+  });
+});
+
+test("Steam can supply the pending lobby at startup through GetLaunchCommandLine", (t) => {
+  const id = "109775242999999999";
+  const valid = fixture(undefined, `+connect_lobby ${id}`);
+  const invalid = fixture(undefined, `+connect_lobby ${id} extra`);
+  t.after(() => {
+    valid.mp.dispose();
+    invalid.mp.dispose();
+  });
+  assert.equal(valid.mp.state().inviteLobbyId, id);
+  assert.equal(invalid.mp.state().inviteLobbyId, undefined);
+});
+
 function pumpFrames(mp, api, frames) {
   clearInterval(mp.timer);
   mp.lastRefresh = Date.now();

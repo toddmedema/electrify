@@ -1965,7 +1965,7 @@ export interface CoopSelectionType {
   /** What the host has open, in words, such as "Deep Freeze on Easy". */
   viewing?: string;
   /** Host only: the code friends can enter to join. */
-  lobbyId?: string;
+  inviteCode?: string;
   /** Host only: this computer has multiplayer saves to load instead. */
   hasSaves?: boolean;
 }
