@@ -8299,6 +8299,10 @@ img[src$="/transmission.svg"] {
     color: var(--font-color-faded);
   }
 
+  .coopBrowseStateLabel {
+    color: var(--font-color-faded);
+  }
+
   .coopBrowseReady {
     color: var(--delta-good);
   }
@@ -8319,8 +8323,12 @@ img[src$="/transmission.svg"] {
 }
 
 @media screen and (max-width: ($phone_width - 1px)) {
-  .coopBrowseBar .coopWideOnly {
-    display: none;
+  .coopBrowseBar .coopBrowseActions:has(.coopInviteCode) {
+    flex-basis: 100%;
+
+    .coopInviteCode {
+      flex-basis: 100%;
+    }
   }
 }
 
