@@ -3,6 +3,16 @@ import { foregroundContrast } from "./contrast";
 import { TUTORIALS } from "../src/data/Scenarios";
 import { readSavedGame } from "./save-fixture";
 
+async function actionAfterPlay(page: Page) {
+  const friends = page.getByRole("button", {
+    name: "Play with friends",
+    exact: true,
+  });
+  return (await friends.isVisible())
+    ? friends
+    : page.getByRole("button", { name: "Settings", exact: true });
+}
+
 async function expectFooterTooltip(page: Page, action: Locator) {
   const footerAction = await action.evaluate(
     (element) => !!element.closest(".mainMenuFooter"),
@@ -216,12 +226,9 @@ test("keyboard and pointer actions work during the entrance", async ({
   await page.goto("/");
   await expect(page.locator("#appStartup")).toHaveCount(0);
   await page.keyboard.press("ArrowDown");
-  await expect(
-    page.getByRole("button", { name: "Settings", exact: true }),
-  ).toBeFocused();
-  await expect(
-    page.getByRole("button", { name: "Settings", exact: true }),
-  ).toHaveCSS("opacity", "1");
+  const next = await actionAfterPlay(page);
+  await expect(next).toBeFocused();
+  await expect(next).toHaveCSS("opacity", "1");
   await page.reload();
   await expect(page.locator("#appStartup")).toHaveCount(0);
   await page.getByRole("button", { name: "Play", exact: true }).click();
@@ -244,7 +251,16 @@ test("hovering a home control makes it the active button, and keyboard continues
   await settings.hover();
   await expect(settings).toBeFocused(); // the pointer moved the active button to Settings
   await page.keyboard.press("ArrowUp");
-  await expect(play).toBeFocused(); // keyboard continues from the hovered control
+  const previous = page.getByRole("button", {
+    name: "Play with friends",
+    exact: true,
+  });
+  // Continue from the hovered control through the full order of the actions.
+  if (await previous.isVisible()) {
+    await expect(previous).toBeFocused();
+    await page.keyboard.press("ArrowUp");
+  }
+  await expect(play).toBeFocused();
 });
 
 for (const theme of ["light", "dark"]) {
@@ -324,13 +340,10 @@ for (const exit of ["Back", "Escape"]) {
       await expect(play).toBeFocused();
       // A fresh return must also leave subsequent navigation alone.
       await page.keyboard.press("ArrowDown");
-      const firstResource = page.getByRole("button", {
-        name: "Settings",
-        exact: true,
-      });
-      await expect(firstResource).toBeFocused();
+      const next = await actionAfterPlay(page);
+      await expect(next).toBeFocused();
       await page.clock.runFor(1000);
-      await expect(firstResource).toBeFocused();
+      await expect(next).toBeFocused();
     }
   });
 }
@@ -393,9 +406,16 @@ test("waits for saved games before revealing the returning menu in order", async
   await page.evaluate(() =>
     document.dispatchEvent(new Event("release-save-catalog")),
   );
+  await expect(page.locator("#appStartup")).toHaveCount(0);
+  const friends = page.getByRole("button", {
+    name: "Play with friends",
+    exact: true,
+  });
   await expect(page.locator("html")).toHaveAttribute(
     "data-opening-actions",
-    "Continue,Tutorials,Play,Saves",
+    (await friends.isVisible())
+      ? "Continue,Tutorials,Play,Saves,Play with friends"
+      : "Continue,Tutorials,Play,Saves",
   );
 });
 
@@ -755,6 +775,14 @@ for (const theme of ["light", "dark"]) {
 
       // A physical keyboard on a touch device immediately restores selection feedback.
       await page.keyboard.press("ArrowDown");
+      const friends = page.getByRole("button", {
+        name: "Play with friends",
+        exact: true,
+      });
+      if (await friends.isVisible()) {
+        await expect(friends).toBeFocused();
+        await page.keyboard.press("ArrowDown");
+      }
       await expect(settings).toBeFocused();
       await page.keyboard.press("ArrowDown");
       await expect(sound).toBeFocused();

@@ -334,6 +334,14 @@ for (const theme of ["light", "dark"]) {
     await page.getByRole("button", { name: "Start game" }).click();
     const chart = page.locator("#chartSupplyDemand [role=img]");
     const plot = chart.locator(".u-over");
+    // Open the details on the chart that will receive the swipe. Loading the
+    // interface font can resize the plot and replace its first canvas.
+    await page.evaluate(async () => {
+      await document.fonts.ready;
+      await new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+      );
+    });
     await scrollPlotIntoView(plot);
     const session = await page.context().newCDPSession(page);
     const tooltip = chart.locator(".chartTooltip-breakdown");
@@ -343,8 +351,21 @@ for (const theme of ["light", "dark"]) {
       await expect
         .poll(() => tooltip.evaluate((el) => el.scrollHeight - el.clientHeight))
         .toBeGreaterThan(30);
-      const bounds = (await tooltip.boundingBox())!;
-      const chartBounds = (await chart.boundingBox())!;
+      // Focusing the chart can scroll its container. Measure all three surfaces
+      // together so their viewport coordinates describe the same layout.
+      const { bounds, chartBounds, pane } = await tooltip.evaluate(
+        (element) => {
+          const chart = element.closest('[role="img"]')!;
+          return {
+            bounds: element.getBoundingClientRect().toJSON(),
+            chartBounds: chart.getBoundingClientRect().toJSON(),
+            pane: chart
+              .closest(".facilitiesBody")!
+              .getBoundingClientRect()
+              .toJSON(),
+          };
+        },
+      );
       expect(bounds.x).toBeGreaterThanOrEqual(chartBounds.x - 1);
       expect(bounds.y).toBeGreaterThanOrEqual(chartBounds.y - 1);
       expect(bounds.x + bounds.width).toBeLessThanOrEqual(
@@ -353,7 +374,6 @@ for (const theme of ["light", "dark"]) {
       expect(bounds.y + bounds.height).toBeLessThanOrEqual(
         chartBounds.y + chartBounds.height + 1,
       );
-      const pane = (await page.locator(".facilitiesBody").boundingBox())!;
       const top = Math.max(bounds.y, pane.y, 0);
       const bottom = Math.min(
         bounds.y + bounds.height,

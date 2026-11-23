@@ -11,7 +11,7 @@ const settle = () => new Promise(setImmediate);
 /** Run the real main entry point without loading Electron or opening a native window. */
 async function startup(
   t,
-  { preferences = null, rejectFirstEntry = false, steamInput } = {},
+  { preferences = null, rejectFirstEntry = false, steamInput, relayUrl } = {},
 ) {
   const created = Promise.withResolvers();
   const shown = Promise.withResolvers();
@@ -29,6 +29,7 @@ async function startup(
   const display = { workAreaSize: { width: 1920, height: 1080 } };
   let game;
   let modOptions;
+  let beforeRequest;
   const nativeDialogs = [];
   const launcherChanges = [];
   const openNativeDialog = () => {
@@ -187,7 +188,11 @@ async function startup(
       fromPartition: () => ({
         setPermissionRequestHandler() {},
         setPermissionCheckHandler() {},
-        webRequest: { onBeforeRequest() {} },
+        webRequest: {
+          onBeforeRequest(handler) {
+            beforeRequest = handler;
+          },
+        },
         protocol: { handle() {} },
       }),
     },
@@ -201,11 +206,16 @@ async function startup(
   const dependencies = {
     electron,
     "node:fs": {
-      existsSync: (filename) => path.basename(filename) === "index.html",
+      existsSync: (filename) =>
+        path.basename(filename) === "index.html" ||
+        (!!relayUrl && path.basename(filename) === "coop-relay.json"),
       readFileSync: () => "<html></html>",
     },
     "./storage.cjs": {
-      readJson: () => preferences,
+      readJson: (filename) =>
+        path.basename(filename) === "coop-relay.json"
+          ? { url: relayUrl }
+          : preferences,
       atomicWrite: (_filename, value) => {
         const saved = JSON.parse(value);
         writes.push(saved);
@@ -267,6 +277,13 @@ async function startup(
   await settle();
   return {
     game,
+    networkCancelled: (resourceType, url) => {
+      let cancelled;
+      beforeRequest({ resourceType, url }, ({ cancel }) => {
+        cancelled = cancel;
+      });
+      return cancelled;
+    },
     calls,
     externalUrls,
     powerMonitor,
@@ -293,6 +310,18 @@ async function startup(
       ),
   };
 }
+
+test("the desktop shell permits only a WebSocket to its configured relay", async (t) => {
+  const url = "wss://relay.electrify.test/v1";
+  const { networkCancelled } = await startup(t, { relayUrl: url });
+  assert.equal(networkCancelled("webSocket", url), false);
+  assert.equal(networkCancelled("xhr", url), true);
+  assert.equal(networkCancelled("webSocket", url + "/different"), true);
+  assert.equal(
+    networkCancelled("webSocket", "wss://other.electrify.test/v1"),
+    true,
+  );
+});
 
 test("main starts fullscreen visibly, confirms native entry, and serializes the next display request", async (t) => {
   const fixture = await startup(t);

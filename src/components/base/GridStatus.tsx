@@ -12,14 +12,19 @@ import type {
 import { getGridHealth, readyStorage } from "../../helpers/GridStatus";
 import {
   formatForecastWatts,
+  formatForecastWattHours,
   formatWatts,
   formatWattHours,
 } from "../../helpers/Format";
-import { formatClockTime, getDateFromMinute } from "../../helpers/DateTime";
+import {
+  formatClockTime,
+  getDateFromMinute,
+  MINUTES_PER_MONTH,
+} from "../../helpers/DateTime";
 import { projectedShortfall } from "../../helpers/MissionStatus";
 import { isUtilityExpansionGame } from "../../helpers/ExpansionContext";
 import { utilityServiceGap } from "../../helpers/UtilityPlanning";
-import { topBarForecastEndMinute } from "../../helpers/Projection";
+import { monthMinute, topBarForecastEndMinute } from "../../helpers/Projection";
 import { hasTerritoryNetwork } from "../../helpers/Territories";
 import { getScenario } from "../../data/Scenarios";
 import { corridorsForLocation } from "../../data/AdjacentMarkets";
@@ -48,10 +53,24 @@ function useSupplyRisk(
   React.useEffect(() => {
     if (enabled && !ready) requestProjection(game, now, "top-bar");
   }, [enabled, ready, game, now]);
-  const gap = ready
-    ? utilityServiceGap(game, readProjection(game, now, "top-bar"))
-    : undefined;
-  return { gap, updating: enabled && !ready };
+  const projection = ready ? readProjection(game, now, "top-bar") : undefined;
+  const gap = projection && utilityServiceGap(game, projection);
+  return { gap, forecast: projection?.forecast, updating: enabled && !ready };
+}
+
+function peakShortfallInMonth(
+  forecast: readonly TickPresentFutureType[],
+  monthStart: number,
+) {
+  const monthEnd = monthStart + MINUTES_PER_MONTH;
+  let peak: { minute: number; watts: number } | undefined;
+  for (const tick of forecast) {
+    if (tick.minute < monthStart) continue;
+    if (tick.minute >= monthEnd) break;
+    const watts = tick.demandW - tick.supplyW;
+    if (watts > (peak?.watts ?? 0)) peak = { minute: tick.minute, watts };
+  }
+  return peak;
 }
 
 function Power({ watts }: { watts: number }) {
@@ -83,7 +102,7 @@ export default function GridStatus({
   const health = getGridHealth(game, now);
   const edgeMargin = useScreenEdgeMargin(16);
   const forecastEnd = topBarForecastEndMinute(game);
-  const { gap, updating } = useSupplyRisk(
+  const { gap, forecast, updating } = useSupplyRisk(
     game,
     now,
     isUtilityExpansionGame(game) && game.date.minute < forecastEnd,
@@ -97,12 +116,34 @@ export default function GridStatus({
   const sameDay =
     ahead &&
     Math.floor(ahead.minute / 1440) === Math.floor(game.date.minute / 1440);
-  const future = when
-    ? `Short at ${sameDay ? "" : `${when.month} ${when.year}, `}${formatClockTime(when)}`
-    : gap
-      ? `Supply risk: ${MONTHS[gap.month - 1]} ${gap.year}`
+  const shortfallTime = when
+    ? `${sameDay ? "" : `${when.month} ${when.year}, `}${formatClockTime(when)}`
+    : undefined;
+  const riskMonth = gap ? `${MONTHS[gap.month - 1]} ${gap.year}` : undefined;
+  const future = shortfallTime
+    ? `Short at ${shortfallTime}`
+    : riskMonth
+      ? `Supply risk: ${riskMonth}`
       : undefined;
+  const forecastMessage =
+    ahead && shortfallTime
+      ? `About ${formatForecastWatts(ahead.demandW - ahead.supplyW)} short at ${shortfallTime} in this month’s sample`
+      : riskMonth
+        ? `Projected reliability risk in ${riskMonth}`
+        : updating
+          ? "Updating forecast…"
+          : undefined;
   const [anchor, setAnchor] = React.useState<HTMLElement | null>(null);
+  const riskMonthStart = gap && monthMinute(gap, game.startingYear);
+  // The current month's finance row comes from the separate month-closing timeline.
+  const riskPeak =
+    anchor &&
+    !ahead &&
+    forecast &&
+    riskMonthStart !== undefined &&
+    riskMonthStart > game.date.minute
+      ? peakShortfallInMonth(forecast, riskMonthStart)
+      : undefined;
   const title = React.useRef<HTMLHeadingElement>(null);
   const id = React.useId();
   const close = () => {
@@ -118,22 +159,27 @@ export default function GridStatus({
     flushSync(() => setAnchor(null));
     action();
   };
-  const storage = anchor ? readyStorage(game) : undefined;
+  const stressed = health.state !== "stable";
+  const storedWh = anchor && stressed ? readyStorage(game).storedWh : 0;
   const territoryNetwork = hasTerritoryNetwork(game);
   const legacyInterties = !!(
     game.transmission?.lines.length &&
     (game.multiplayer || corridorsForLocation(game.location).length)
   );
-  const importedW = now.importedW;
-  const storageImportedW = now.storageImportedW ?? 0;
-  const customerImportedW =
-    importedW === undefined
-      ? undefined
-      : Math.max(0, importedW - storageImportedW);
-  const importedShare =
-    customerImportedW !== undefined && now.supplyW > 0
-      ? Math.round((100 * customerImportedW) / now.supplyW)
-      : undefined;
+  const openForecast = forecastAllowed && onEvidence;
+  const openFleet = !tutorial && onNavigate;
+  const externalPowerAction =
+    !tutorial &&
+    (territoryNetwork
+      ? onNavigate && {
+          label: "Manage agreements",
+          run: () => onNavigate("AGREEMENTS"),
+        }
+      : legacyInterties &&
+        onEvidence && {
+          label: "Manage interties",
+          run: () => onEvidence("interties"),
+        });
   const warning =
     health.state === "low-reserve" || health.state === "at-limit" || !!future;
   return (
@@ -191,127 +237,92 @@ export default function GridStatus({
             <CloseIcon />
           </IconButton>
         </div>
-        <section aria-labelledby={`${id}-now`}>
-          <h3 id={`${id}-now`}>Now</h3>
-          <dl>
-            <div>
-              <dt>Demand</dt>
-              <dd>{formatWatts(now.demandW)}</dd>
+        <section aria-labelledby={`${id}-now`} className="gridStatusDiagnosis">
+          <div
+            className={`gridStatusCurrent gridStatusCurrent-${health.state}`}
+          >
+            <div className="gridStatusReadout">
+              <h3 id={`${id}-now`}>Now · {health.label}</h3>
+              <strong>{health.metric}</strong>
             </div>
-            <div>
-              <dt>Supply</dt>
-              <dd>{formatWatts(now.supplyW)}</dd>
-            </div>
-            <div>
-              <dt>{health.state === "blackout" ? "Shortage" : "Reserve"}</dt>
-              <dd>{health.metric}</dd>
-            </div>
-          </dl>
-        </section>
-        <section aria-labelledby={`${id}-future`}>
-          <h3 id={`${id}-future`}>Future</h3>
-          <p>
-            {future
-              ? `${future}${ahead ? ` · About ${formatForecastWatts(ahead.demandW - ahead.supplyW)} short` : ""}`
-              : "No shortfall in this month’s sample"}
-          </p>
-          {updating && <p className="gridStatusMuted">Updating forecast…</p>}
-        </section>
-        <section aria-label="Supply resources">
-          <p>
-            {storage && storage.storedWh > 0
-              ? `Storage ready: ${formatWattHours(storage.storedWh)} stored`
-              : "No storage ready"}
-            <br />
-            {storage
-              ? `${formatWatts(storage.dischargingW)} discharging`
-              : "Unavailable"}
-          </p>
-          <p>
-            {importedW === undefined
-              ? "Purchased power now: Unavailable"
-              : importedW > 0
-                ? `Purchased power now: ${formatWatts(importedW)} total`
-                : "No purchased power now"}
-            {importedW !== undefined && importedW > 0 && (
-              <>
-                <br />
-                For customers: {formatWatts(customerImportedW ?? 0)}
-                {importedShare === undefined
-                  ? ""
-                  : ` · ${importedShare}% of supply`}
-                {storageImportedW > 0 && (
-                  <>
-                    <br />
-                    Charging storage: {formatWatts(storageImportedW)}
-                  </>
-                )}
-              </>
-            )}
-            {now.entitlementImportCapacityW !== undefined && (
-              <>
-                <br />
-                Under agreement: {formatWatts(now.entitlementImportCapacityW)}
-              </>
-            )}
-          </p>
-        </section>
-        <div className="gridStatusActions">
-          {forecastAllowed && onEvidence && (
-            <Button
-              variant="contained"
-              onClick={() =>
-                navigate(() =>
-                  onEvidence({ card: "INSIGHTS", layer: "SUPPLY_DEMAND" }),
-                )
-              }
-            >
-              View supply forecast
-            </Button>
-          )}
-          {!tutorial && onNavigate && (
-            <Button
-              variant="outlined"
-              onClick={() =>
-                navigate(() =>
-                  onNavigate(territoryNetwork ? "FLEET" : "FACILITIES"),
-                )
-              }
-            >
-              Manage fleet
-            </Button>
-          )}
-          {!tutorial &&
-            ((territoryNetwork && onNavigate) ||
-              (legacyInterties && onEvidence)) && (
+            {onReserveHelp && (
               <Button
-                variant="outlined"
+                onClick={() => {
+                  const trigger = anchor;
+                  navigate(() => {
+                    trigger?.focus({ preventScroll: true });
+                    setManualHelpAnchor(trigger);
+                    onReserveHelp();
+                  });
+                }}
+              >
+                About reserve
+              </Button>
+            )}
+          </div>
+          {forecastMessage && (
+            <div className={future ? "gridStatusOutlook" : "gridStatusContext"}>
+              <p>{forecastMessage}</p>
+              {gap && !ahead && (
+                <div className="gridStatusOutlookDetail">
+                  <p>
+                    About {formatForecastWattHours(gap.demandWh - gap.supplyWh)}{" "}
+                    unmet
+                  </p>
+                  {riskPeak && (
+                    <p>
+                      {formatForecastWatts(riskPeak.watts)} peak shortfall at{" "}
+                      {formatClockTime(
+                        getDateFromMinute(riskPeak.minute, game.startingYear),
+                      )}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+          {storedWh > 0 && (
+            <p className="gridStatusContext">
+              {formatWattHours(storedWh)} stored in operating facilities
+            </p>
+          )}
+        </section>
+        {(openForecast || openFleet || externalPowerAction) && (
+          <div className="gridStatusActions">
+            {openForecast && (
+              <Button
+                variant="contained"
                 onClick={() =>
                   navigate(() =>
-                    territoryNetwork
-                      ? onNavigate?.("AGREEMENTS")
-                      : onEvidence?.("interties"),
+                    openForecast({ card: "INSIGHTS", layer: "SUPPLY_DEMAND" }),
                   )
                 }
               >
-                Manage agreements
+                View supply forecast
               </Button>
             )}
-          {onReserveHelp && (
-            <Button
-              onClick={() => {
-                const trigger = anchor;
-                navigate(() => {
-                  trigger?.focus({ preventScroll: true });
-                  setManualHelpAnchor(trigger);
-                  onReserveHelp();
-                });
-              }}
-            >
-              About reserve
-            </Button>
-          )}
-        </div>
+            {(openFleet || externalPowerAction) && (
+              <div className="gridStatusSecondaryActions">
+                {openFleet && (
+                  <Button
+                    onClick={() =>
+                      navigate(() =>
+                        openFleet(territoryNetwork ? "FLEET" : "FACILITIES"),
+                      )
+                    }
+                  >
+                    Manage fleet
+                  </Button>
+                )}
+                {externalPowerAction && (
+                  <Button onClick={() => navigate(externalPowerAction.run)}>
+                    {externalPowerAction.label}
+                  </Button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </Popover>
     </div>
   );

@@ -321,10 +321,18 @@ for (const theme of ["light", "dark"] as const) {
       await readout.evaluate((el) => el.scrollWidth <= el.clientWidth),
     ).toBe(true);
     await readout.tap();
+    const dialog = page.getByRole("dialog", {
+      name: "Grid status",
+      exact: true,
+    });
     await expect(
-      page.getByRole("dialog", { name: "Grid status", exact: true }),
+      dialog.getByRole("heading", { name: "Now · Shortage" }),
     ).toBeVisible();
-    await reviewScreenshot(page, {
+    await expect(dialog).toContainText(/\d.*MW short/);
+    await expect(
+      dialog.getByRole("button", { name: "View supply forecast" }),
+    ).toHaveClass(/MuiButton-contained/);
+    await reviewScreenshot(dialog, {
       path: testInfo.outputPath(`grid-blackout-${theme}.png`),
       animations: "disabled",
     });

@@ -19,8 +19,10 @@ function productionCompression(
     ...config,
     optimization: {
       ...config.optimization,
-      // Workers have separate runtimes, but can load the same emitted module
-      // chunks. Include the page entry so those modules are not shipped twice.
+      // Webpack otherwise emits a separate version of a shared module whenever a
+      // worker uses different exports. Keep the union of used exports across the
+      // page and workers so their common simulation code can share one chunk.
+      usedExports: "global",
       splitChunks: {
         ...config.optimization.splitChunks,
         chunks: "all",

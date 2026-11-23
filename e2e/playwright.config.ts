@@ -15,6 +15,7 @@ export default defineConfig({
     "desktop*.spec.ts",
     "couch.spec.ts",
     "multiplayer.spec.ts",
+    "crossplay.spec.ts",
     "steam-input.spec.ts",
   ],
   timeout: 45000,
