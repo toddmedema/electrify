@@ -1,3 +1,4 @@
+import { steamSessionServices } from "./SteamSessionServices";
 import { act, render, screen } from "@testing-library/react";
 import type { DesktopBridge, DesktopInputFrame } from "../Desktop";
 import { store } from "../Store";
@@ -56,7 +57,11 @@ async function sessionFixture() {
           ? { ...lobby, lobbyId: request.lobbyId, hostId: "host" }
           : lobby,
   };
-  const session = new MultiplayerSession(bridge, jest.fn(), jest.fn());
+  const session = new MultiplayerSession(
+    steamSessionServices(bridge),
+    jest.fn(),
+    jest.fn(),
+  );
   sessions.push(session);
   await session.initialize();
   return { session, bridge };
@@ -91,6 +96,25 @@ test("the lobby heading receives initial focus and focus on a new lobby mode", a
     screen.queryByRole("textbox", { name: "6-digit invite code" }),
   ).toBeNull();
   expect(title).toHaveFocus();
+});
+
+test("joining a Steam invitation shows join progress without submitting the code form", async () => {
+  const { session, bridge } = await showLobby();
+  const joined = Promise.withResolvers<LobbyState>();
+  jest.spyOn(bridge, "multiplayerRequest").mockReturnValueOnce(joined.promise);
+  let joining: Promise<void>;
+  await act(async () => {
+    joining = session.join("10977524123456789");
+  });
+  expect(screen.getByRole("status")).toHaveTextContent("Finding game…");
+  await act(async () => {
+    joined.resolve({
+      ...session.getSnapshot().lobby,
+      lobbyId: "10977524123456789",
+      hostId: "host",
+    });
+    await joining;
+  });
 });
 
 test.each(["6-digit invite code", "Host a game"])(

@@ -37,11 +37,6 @@
   }
 }
 
-// The 2D fallback paints terrain in the DOM stage above the WebGL layer.
-.territoryMap:not([data-renderer="ready"]) .territoryMapWeather {
-  z-index: 1;
-}
-
 .mapWeatherClouds {
   background:
     radial-gradient(

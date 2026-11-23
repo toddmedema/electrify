@@ -572,6 +572,11 @@ const publishedCoopIdentities = [
     24,
     "coop-2-b5084b0368736d579e1ffc5cfbcaf4b8a7b4a2b6097b45dfaafbf85556810755",
   ],
+  // Master 0e009432 shipped the frame-pacing optimizations.
+  [
+    24,
+    "coop-2-70cc82f8acaacdd1aed5daf5fe8c078bccdf2873eeecdc58b7bcdb1973aa9bc7",
+  ],
 ] as const;
 
 test.each(publishedCoopIdentities)(

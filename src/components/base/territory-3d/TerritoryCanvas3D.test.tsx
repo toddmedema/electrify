@@ -150,7 +150,7 @@ test("unmounting during a delayed import never creates a renderer", async () => 
   expect(factory).not.toHaveBeenCalled();
 });
 
-test("renderer import failure reports the standard-map fallback and retains no diagnostics", async () => {
+test("renderer import failure reports an unavailable renderer and retains no diagnostics", async () => {
   const state = jest.fn(),
     connected = jest.fn();
   const utils = render(

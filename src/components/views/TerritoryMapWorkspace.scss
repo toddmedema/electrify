@@ -1,256 +1,3 @@
-.territoryMap,
-.territoryResourceLegend {
-  --territory-grass: #dfe9d5;
-  --territory-grass-rim: #a1b5a1;
-  --territory-hill: #e7e0d3;
-  --territory-hill-rim: #b9ad97;
-  --territory-water: #d6e4e7;
-  --territory-water-rim: #9eb8bf;
-  --territory-built: #dfe4ea;
-  --territory-built-rim: #a5b0bb;
-  --territory-outline: #536157;
-  --territory-art-mint: #64dfc5;
-  --territory-art-cream: #fff8e1;
-  --territory-art-steel: #cfd8dc;
-  --territory-art-grass: #b8d9c3;
-  --territory-art-water: #7fc8ce;
-}
-[data-theme="dark"] .territoryMap,
-[data-theme="dark"] .territoryResourceLegend {
-  --territory-grass: #29382d;
-  --territory-grass-rim: #1d2921;
-  --territory-hill: #3a352d;
-  --territory-hill-rim: #28251f;
-  --territory-water: #23373e;
-  --territory-water-rim: #17272d;
-  --territory-built: #303944;
-  --territory-built-rim: #202934;
-  --territory-outline: #78877b;
-  --territory-art-mint: #67cbb8;
-  --territory-art-cream: #ddd7c0;
-  --territory-art-steel: #aebec7;
-  --territory-art-grass: #88af96;
-  --territory-art-water: #78acb7;
-}
-
-.territoryHex {
-  --territory-tile-rim: #92ad99;
-}
-.territoryHex[data-terrain="forest"] {
-  --territory-tile-rim: #486e59;
-}
-.territoryHex[data-terrain="hills"] {
-  --territory-tile-rim: #9c8c70;
-}
-.territoryHex[data-terrain="mountain"] {
-  --territory-tile-rim: #7d898d;
-}
-// The SVG fallback retains relief silhouettes and uses the same ash state as the 3D materials.
-.territoryHex:is(
-  [data-ground-condition="burning"],
-  [data-ground-condition="scorched"]
-) {
-  --territory-tile-rim: #47484b;
-
-  &:is([data-terrain="mountain"], [data-terrain="hills"])
-    .territoryTerrainArtwork {
-    filter: grayscale(0.85) brightness(0.63);
-  }
-}
-.territoryHex[data-terrain="river"],
-.territoryHex[data-terrain="lake"] {
-  --territory-tile-rim: #7ca6ac;
-}
-.territoryHex[data-terrain="ocean"] {
-  --territory-tile-rim: #356c78;
-}
-.territoryHex[data-frost] {
-  --territory-tile-rim: #85999b;
-  --terrain-frost-field: #cddedc;
-  --terrain-frost-field-shade: #b3c9c6;
-  --terrain-frost-rock: #b9cbd0;
-  --terrain-frost-rock-shade: #93a7b0;
-  --terrain-frost-bank: #b3bfb7;
-  --terrain-frost-canopy: #789b92;
-}
-.territoryHexRim,
-.territoryHexSeam {
-  stroke: #52645d;
-  stroke-width: 1;
-  stroke-linejoin: round;
-  vector-effect: non-scaling-stroke;
-}
-.territoryHexRim {
-  fill: var(--territory-tile-rim);
-}
-.territoryHexSeam {
-  fill: none;
-}
-.territoryTerrainArtwork,
-.territoryOccupantArtwork {
-  display: block;
-  width: 100%;
-  height: 100%;
-}
-.territoryTileOccupant {
-  pointer-events: none;
-}
-.territoryTileOccupant[data-facility-status="construction"]
-  .territoryFacilityBody {
-  opacity: 0.55;
-}
-
-// Animations always exist; the map's WAAPI controller pauses and retimes them
-// without replacing their timeline. Supporting structures and cable entries stay still.
-.mapFacilityArtwork {
-  &:not([data-facility-motion="active"]) .mapFacilityEffect {
-    visibility: hidden;
-  }
-  .mapWindRotor {
-    transform-box: view-box;
-    transform-origin: 250px 225px;
-    animation: mapWindSpin 14s linear infinite paused;
-  }
-  .mapAirborneWing {
-    transform-box: view-box;
-    transform-origin: 250px 210px;
-    animation: mapAirborneSway 10s ease-in-out infinite paused;
-  }
-  .mapGeothermalVapor {
-    animation: mapGeothermalLift 6s ease-in-out infinite paused;
-  }
-  .mapFacilityExhaust {
-    opacity: 0;
-    animation: mapExhaustLift 5.2s linear infinite paused;
-  }
-  .mapFacilityExhaust-1 {
-    animation-delay: -2.6s;
-  }
-  .mapHydroFlow {
-    opacity: 0.75;
-    animation: mapHydroFlow 2.8s linear infinite paused;
-  }
-  .mapSolarFlow {
-    opacity: 0.7;
-    animation: mapPowerFlow 3.6s linear infinite paused;
-  }
-  .mapStorageFlow {
-    opacity: 0.7;
-    animation: mapStorageFlow 3.6s linear infinite paused;
-  }
-}
-@keyframes mapWindSpin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-@keyframes mapAirborneSway {
-  0%,
-  100% {
-    transform: rotate(-2deg);
-  }
-  50% {
-    transform: rotate(2deg);
-  }
-}
-@keyframes mapGeothermalLift {
-  0%,
-  100% {
-    transform: translateY(0);
-    opacity: 0.8;
-  }
-  50% {
-    transform: translateY(-8px);
-    opacity: 0.55;
-  }
-}
-@keyframes mapExhaustLift {
-  from {
-    transform: translate(0, 0) scale(0.65);
-    opacity: 0;
-  }
-  25%,
-  55% {
-    opacity: 0.75;
-  }
-  to {
-    transform: translate(16px, -52px) scale(1.2);
-    opacity: 0;
-  }
-}
-@keyframes mapHydroFlow {
-  to {
-    stroke-dashoffset: -48;
-  }
-}
-@keyframes mapPowerFlow {
-  to {
-    stroke-dashoffset: -100;
-  }
-}
-@keyframes mapStorageFlow {
-  to {
-    stroke-dashoffset: -46;
-  }
-}
-.territoryWires {
-  pointer-events: none;
-}
-.territoryWire,
-.territoryWireBacking {
-  fill: none;
-  stroke-linejoin: round;
-  stroke-linecap: round;
-  vector-effect: non-scaling-stroke;
-}
-.territoryWireBacking {
-  stroke: #fff8e1;
-  stroke-width: 2.5;
-  opacity: 0.6;
-}
-.territoryWire {
-  stroke: #25393d;
-  stroke-width: 1.25;
-  opacity: 0.85;
-}
-[data-wire-kind="submerged"] {
-  .territoryWireBacking {
-    display: none;
-  }
-  .territoryWire {
-    stroke: #355c68;
-    stroke-dasharray: 3 4;
-    opacity: 0.5;
-  }
-}
-.territoryHexBorderBacking,
-.territoryHexBoundary,
-.territoryHexSelection,
-.territoryHexSelectionBacking {
-  fill: none;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  pointer-events: none;
-  vector-effect: non-scaling-stroke;
-}
-.territoryHexBorderBacking {
-  stroke: var(--bg-primary);
-  stroke-width: 6;
-}
-.territoryHexBoundary {
-  stroke: var(--territory-owner-color);
-  stroke-width: 3;
-}
-.territoryHexSelectionBacking {
-  stroke: #17252c;
-  stroke-width: 5;
-  stroke-dasharray: 4 4;
-}
-.territoryHexSelection {
-  stroke: #fff8e1;
-  stroke-width: 2;
-  stroke-dasharray: 4 4;
-}
 .territoryTileTarget {
   pointer-events: none;
   position: absolute;
@@ -265,18 +12,42 @@
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
   .territoryTileHitArea {
-    pointer-events: auto;
     position: absolute;
     inset: 0;
     clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+
+    pointer-events: auto;
+
+    .territoryMap:not([data-renderer="ready"]) &::before {
+      content: "";
+      position: absolute;
+      inset: 2px;
+      clip-path: inherit;
+      background: color-mix(
+        in srgb,
+        var(--border-subtle) 56%,
+        var(--bg-sunken)
+      );
+    }
   }
-  &[aria-pressed="true"]:focus-visible {
+  .territoryMap[data-renderer="ready"] &[aria-pressed="true"]:focus-visible {
     // Focusing a tile selects it and draws the dotted hex boundary.
     outline: none !important;
   }
+  .territoryMap:not([data-renderer="ready"])
+    &[data-model-hovered="true"]
+    .territoryTileHitArea::before,
+  .territoryMap:not([data-renderer="ready"])
+    &[aria-pressed="true"]
+    .territoryTileHitArea::before {
+    background: color-mix(
+      in srgb,
+      var(--territory-hover-color) 24%,
+      var(--bg-raised)
+    );
+  }
   &[data-model-hovered="true"] .territoryTileHitArea,
-  &:focus-visible .territoryTileHitArea,
-  .territoryMap:not([data-renderer="ready"]) &:hover .territoryTileHitArea {
+  &:focus-visible .territoryTileHitArea {
     background: radial-gradient(
       ellipse closest-side,
       color-mix(in srgb, var(--territory-hover-color) 8%, transparent) 42%,
@@ -352,21 +123,25 @@
 }
 .territoryMap {
   position: relative;
+  display: flex;
+  flex-direction: column;
   flex: 1;
   min-width: 0;
   min-height: 0;
   overflow: hidden;
   background: var(--bg-sunken);
 }
-.territoryMapViewport,
 .territoryMapStage,
-.territoryHexGrid {
+.territoryFacilityStatusLayer {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
 }
 .territoryMapViewport {
+  position: relative;
+  flex: 1;
+  min-height: 0;
   overflow: hidden;
   overscroll-behavior: contain;
   touch-action: none;
@@ -379,9 +154,31 @@
 .territoryMapStage {
   inset: 50% auto auto 50%;
 }
-.territoryHexGrid {
+.territoryFacilityStatusLayer {
   overflow: visible;
   pointer-events: none;
+}
+.territoryRendererMessage {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 4px 12px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-raised);
+  color: var(--font-color-primary);
+  text-align: center;
+  pointer-events: none;
+
+  button {
+    min-height: 40px;
+    pointer-events: auto;
+    @media (pointer: coarse) {
+      min-height: 44px;
+    }
+  }
 }
 .territoryFog[data-visibility-distance="1"] {
   opacity: 0.85;
@@ -474,9 +271,7 @@
   }
 }
 @media (max-width: 740px) {
-  .territoryMap[data-renderer="ready"]
-    .territoryUtilityLabel[data-map-inspected="true"]
-    strong {
+  .territoryUtilityLabel[data-map-inspected="true"] strong {
     top: calc(100% + 4px);
     bottom: auto;
   }

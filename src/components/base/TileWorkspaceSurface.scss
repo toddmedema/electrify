@@ -157,12 +157,15 @@
 }
 
 .tileWorkspaceSurface.tileWorkspaceInspector {
-  top: 8px;
+  top: calc(8px + var(--territory-map-inset, 0px));
   right: 8px;
   bottom: auto;
   left: auto;
   width: min(18rem, calc(100% - 16px));
-  max-height: calc(100% - var(--game-dock-clearance, 0px) - 16px);
+  max-height: calc(
+    100% - var(--game-dock-clearance, 0px) - var(--territory-map-inset, 0px) -
+      16px
+  );
   pointer-events: auto;
   box-shadow: 0 4px 16px var(--shadow-ring);
 
@@ -224,9 +227,9 @@
 }
 
 .gameToolTray > .tileWorkspaceSurface.tileWorkspaceInspector {
-  top: 0;
+  top: var(--territory-map-inset, 0px);
   right: 0;
-  max-height: 100%;
+  max-height: calc(100% - var(--territory-map-inset, 0px));
 }
 
 @media (max-width: 740px) {
@@ -275,9 +278,17 @@
   .tileWorkspaceSurface .tileWorkspaceBody {
     padding: 12px;
   }
-  .gameWorkspace:has(.territoryMap[data-renderer="ready"])
+  .gameWorkspace:has(.territoryMap)
     .tileWorkspaceSurface.tileWorkspaceInspector {
-    max-height: max(96px, min(calc(50% - 40px), calc(100% - 50dvh - 44px)));
+    max-height: max(
+      96px,
+      calc(
+        min(calc(50% - 40px), calc(100% - 50dvh - 44px)) - var(
+            --territory-map-inset,
+            0px
+          )
+      )
+    );
 
     .tileWorkspaceBody:has(> .tilePurchaseSummary) {
       display: flex;

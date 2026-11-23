@@ -2,7 +2,7 @@ import {
   computeAgreementForecast,
   AgreementForecastRequest,
 } from "../helpers/AgreementForecast";
-import { selectProjection } from "../helpers/Projection";
+import { selectProjection, type ProjectionScope } from "../helpers/Projection";
 import type { GameType, TickPresentFutureType } from "../Types";
 import { createForecastDataLoader } from "./ForecastData";
 import { packProjection } from "../components/base/ProjectionTransport";
@@ -14,6 +14,7 @@ type Request =
       requestId: number;
       game: GameType;
       now: TickPresentFutureType;
+      scope: ProjectionScope;
     };
 let pending: Request | undefined;
 let running = false;
@@ -42,7 +43,7 @@ async function runPending(): Promise<void> {
       }
       if (!("now" in request)) throw new Error("Missing projection frame");
       const { transport, transfers } = packProjection(
-        selectProjection(game, request.now),
+        selectProjection(game, request.now, undefined, request.scope),
       );
       worker.postMessage({ requestId, transport }, transfers);
     } catch (_error) {
