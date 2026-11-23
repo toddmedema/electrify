@@ -31,6 +31,7 @@ function syntheticGoogleToken(user: string) {
     aud: "electrify-game",
     sub: user,
     iat: now,
+    auth_time: now,
     exp: now + 3600,
     firebase: { sign_in_provider: "google.com" },
   };
