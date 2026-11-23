@@ -142,7 +142,7 @@ function tooltipPlugin<S>(
   // A synced chart moves its cursor when a neighbour is hovered, which is the point -- but it
   // should not also open a tooltip over data the pointer isn't anywhere near
   let hovering = !hoverOnly;
-  return {
+  const plugin = {
     hooks: {
       init: (u: uPlot) => {
         el = document.createElement("div");
@@ -330,6 +330,12 @@ function tooltipPlugin<S>(
         el.style.left = `${Math.max(minLeft, Math.min(maxLeft, flipX ? left - TOOLTIP_OFFSET - el.offsetWidth : left + TOOLTIP_OFFSET))}px`;
         el.style.top = `${Math.max(0, Math.min(host.clientHeight - el.offsetHeight, flipY ? top - TOOLTIP_OFFSET - el.offsetHeight : top + TOOLTIP_OFFSET))}px`;
       },
+      setSize: (u: uPlot) => {
+        // A resized plot can keep its keyboard cursor without firing a cursor hook.
+        // Refresh the visible details after uPlot commits the new bounds.
+        if (keyboardSelected() && el?.style.display === "block")
+          plugin.hooks.setCursor(u);
+      },
       destroy: (u: uPlot) => {
         document.removeEventListener("pointerdown", outsidePointer, true);
         u.over.removeEventListener("touchstart", touchStart);
@@ -342,6 +348,7 @@ function tooltipPlugin<S>(
       },
     },
   };
+  return plugin;
 }
 
 function containerChartHeight(
