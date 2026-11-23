@@ -115,6 +115,7 @@ function legacyPortfolio(tier = 1, pendingUpgrade = false) {
   game.transmission!.lines = [inheritedConnection("champlain", 1), ...lines];
   const raw = JSON.parse(JSON.stringify(serializeSave(game)));
   raw.schemaVersion = 13;
+  delete raw.game.utilityExpansion.sellerFleet;
   raw.game.territoryNetwork = { version: 1 };
   return raw;
 }
@@ -173,13 +174,12 @@ it.each([1, 2, 3, 4])(
     expect(game.territoryNetwork!.legacyConnections).toEqual(
       raw.game.transmission.lines,
     );
-    for (const key of [
-      "timeline",
-      "monthlyHistory",
-      "date",
-      "utilityExpansion",
-    ] as const)
+    for (const key of ["timeline", "monthlyHistory", "date"] as const)
       expect(game[key]).toEqual(raw.game[key]);
+    expect(game.utilityExpansion).toEqual({
+      ...raw.game.utilityExpansion,
+      sellerFleet: "authored",
+    });
     expect(game.transmission!.lines).toEqual([]);
     const investments = cloneDeep(game.territoryNetwork!.legacyConnections);
     expect(investments.filter((line) => line.buildCost > 0)).toHaveLength(2);

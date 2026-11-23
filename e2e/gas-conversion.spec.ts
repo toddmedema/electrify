@@ -22,13 +22,20 @@ for (const theme of ["light", "dark"]) {
       has: page.locator(".facilityName", { hasText: /^Natural Gas Peaker$/ }),
     });
     await row.locator(".facilityDisclosure").click();
-    await row.getByRole("button", { name: /^Convert ·/ }).click();
+    const conversion = row.getByRole("region", {
+      name: "Combined-cycle conversion",
+      exact: true,
+    });
+    const action = conversion.getByRole("button", {
+      name: /^Convert \([^)]+\)$/,
+    });
+    await action.click();
     const dialog = page.getByRole("dialog");
     await expectDialogToFit(dialog);
     await expect(dialog).toContainText("6 months");
     await expect(
       dialog.locator(".decisionImpactFact").filter({ hasText: "Fuel use" }),
-    ).toContainText("9.14k → 6.27k Btu/kWh");
+    ).toContainText("11k → 6.27k Btu/kWh");
     await expect(
       dialog.locator(".decisionImpactFact").filter({ hasText: "Start time" }),
     ).toContainText("10 → 90 minutes");
@@ -45,6 +52,6 @@ for (const theme of ["light", "dark"]) {
     await expect(dialog).toHaveCount(0);
     await expect(row).toContainText("combined-cycle generation");
     await row.getByRole("button", { name: /^Cancel upgrade of/ }).click();
-    await expect(row.getByRole("button", { name: /^Convert ·/ })).toBeVisible();
+    await expect(action).toBeVisible();
   });
 }

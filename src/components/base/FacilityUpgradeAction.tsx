@@ -18,7 +18,7 @@ export default function FacilityUpgradeAction(props: {
         aria-describedby={props.shortfall > 0 ? shortfallId : undefined}
         onClick={props.onClick}
       >
-        {props.label} · {formatPurchasePrice(props.cost)}
+        {props.label} ({formatPurchasePrice(props.cost)})
       </Button>
       {props.shortfall > 0 && (
         <Typography

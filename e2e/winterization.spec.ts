@@ -41,7 +41,7 @@ for (const theme of ["light", "dark"]) {
       await dialog.getByRole("button", { name: "close", exact: true }).click();
       await expect(dialog).toBeHidden();
     }
-    const fleet = page.locator(".facilities:visible");
+    const fleet = page.locator(".facilities");
     await openPane(
       fleet,
       page.getByRole("button", { name: "Facilities", exact: true }),
@@ -53,7 +53,7 @@ for (const theme of ["light", "dark"]) {
       .click();
     const dialog = page.getByRole("dialog");
     await expect(dialog).toContainText("90% of capacity available for a month");
-    await dialog.getByRole("button", { name: /^Pay \$/ }).click();
+    await dialog.getByRole("button", { name: /^Pay \(\$/ }).click();
     await expect(row).toContainText("90% capacity available");
     await expect(
       row.getByRole("img", { name: /installing winterization/ }),

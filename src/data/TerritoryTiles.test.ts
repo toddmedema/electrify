@@ -180,19 +180,24 @@ it("restores parcel-priced saves built on the published terrain and resumes repr
     const oldWindFactor = getTerrainWindOutputFactor(game, wind, 20);
     // Retain real in-progress construction and its outstanding financed balance.
     tickState(game);
-    return {
-      raw: JSON.parse(
-        JSON.stringify({ ...serializeSave(game), schemaVersion: 19 }),
-      ),
-      oldWindFactor,
-    };
+    const raw = JSON.parse(
+      JSON.stringify({ ...serializeSave(game), schemaVersion: 19 }),
+    );
+    delete raw.game.utilityExpansion.sellerFleet;
+    return { raw, oldWindFactor };
   });
   const untouched = JSON.stringify(retained.raw);
   const loaded = parseSave(retained.raw);
   expect(loaded).not.toBeNull();
   expect(JSON.stringify(retained.raw)).toBe(untouched);
   const restored = loaded!.game;
-  expect(restored).toEqual(retained.raw.game);
+  expect(restored).toEqual({
+    ...retained.raw.game,
+    utilityExpansion: {
+      ...retained.raw.game.utilityExpansion,
+      sellerFleet: "authored",
+    },
+  });
   expect(restored.territoryNetwork!.tilePurchases).toHaveLength(2);
   const wind = facilityOnTile(restored, "green-uplands:site-2")!;
   expect(wind.loanAmountLeft).toBeGreaterThan(0);

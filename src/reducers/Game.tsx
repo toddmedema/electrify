@@ -2128,6 +2128,7 @@ export const gameSlice = createSlice({
           throw new Error("Invalid starting tile placement");
         state.transmission!.inheritedAgreementTerms = 3;
         state.utilityExpansion = {
+          sellerFleet: "seeded",
           networkAssets: [],
           loans: [],
           acquisitions: [],

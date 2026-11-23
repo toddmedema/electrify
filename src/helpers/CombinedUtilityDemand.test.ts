@@ -9,6 +9,7 @@ function ownership(
   return {
     seed: 188,
     utilityExpansion: {
+      sellerFleet: "seeded",
       networkAssets: [],
       loans: [],
       acquisitions: targets.map((targetId, index) => ({

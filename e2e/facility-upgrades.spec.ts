@@ -24,7 +24,9 @@ for (const theme of ["light", "dark"]) {
     const conversion = row.getByRole("region", {
       name: "Combined-cycle conversion",
     });
-    const action = conversion.getByRole("button", { name: /^Convert ·/ });
+    const action = conversion.getByRole("button", {
+      name: /^Convert \([^)]+\)$/,
+    });
     await expect(action).toBeDisabled();
     await expect(action).toHaveAccessibleDescription(/more cash needed/);
     const resilience = row.getByRole("region", { name: "Upgrades" });
