@@ -973,14 +973,7 @@ if (!primaryInstance) app.quit();
 else {
   app.on("second-instance", (_event, args) => {
     const lobbyId = lobbyFromArgs(args);
-    if (lobbyId && steam.multiplayer) {
-      steam.multiplayer.pendingInvite = lobbyId;
-      if (window && !window.isDestroyed())
-        window.webContents.send("desktop:multiplayer-event", {
-          kind: "invite",
-          lobbyId,
-        });
-    }
+    if (lobbyId) steam.multiplayer?.receiveInvite(lobbyId);
     if (window) {
       if (window.isMinimized()) window.restore();
       window.focus();

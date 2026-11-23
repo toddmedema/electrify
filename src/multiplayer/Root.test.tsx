@@ -7,7 +7,6 @@ import { quit } from "../reducers/GameActions";
 import { createGame } from "../testing/Simulator";
 import { MultiplayerSession, SessionState } from "./Session";
 import { showMultiplayerLobby } from "./Registry";
-import type { NativeEvent } from "./Native";
 import MultiplayerRoot from "./Root";
 
 jest.mock("./WorkerClient", () => ({}));
@@ -34,7 +33,9 @@ afterEach(() => {
   store.dispatch(quit());
 });
 
-function renderRoot() {
+function renderRoot(
+  initialize: MultiplayerSession["initialize"] = async () => {},
+) {
   const listeners = new Set<() => void>();
   let snapshot: SessionState = {
     lobby: { available: true, selfId: "host", members: [], connected: [] },
@@ -51,7 +52,7 @@ function renderRoot() {
         listeners.delete(listener);
       };
     },
-    initialize: async () => {},
+    initialize,
     dispose: () => {},
     setActivity: () => {},
     join: jest.fn().mockResolvedValue(undefined),
@@ -74,23 +75,19 @@ function renderRoot() {
 }
 
 function renderWithSteamInvites() {
-  let receive: (event: NativeEvent) => void = () => {};
-  const bridge: Pick<
-    desktop.DesktopBridge,
-    "couchRequest" | "onMultiplayerEvent"
-  > = {
+  let receive: ((lobbyId: string) => void) | undefined;
+  const bridge: Pick<desktop.DesktopBridge, "apiVersion" | "couchRequest"> = {
+    apiVersion: 1,
     couchRequest: jest.fn(),
-    onMultiplayerEvent: (listener) => {
-      receive = listener;
-      return () => {};
-    },
   };
   jest
     .spyOn(desktop, "getDesktop")
-    .mockReturnValue(bridge as unknown as desktop.DesktopBridge);
-  const { session } = renderRoot();
+    .mockReturnValue(bridge as desktop.DesktopBridge);
+  const { session } = renderRoot(async (onInvite) => {
+    receive = onInvite;
+  });
   const invite = async (lobbyId: string) => {
-    await act(async () => receive({ kind: "invite", lobbyId }));
+    await act(async () => receive?.(lobbyId));
   };
   return { join: session.join, invite };
 }

@@ -1,3 +1,4 @@
+import { steamSessionServices } from "./SteamSessionServices";
 import { achievementJournal } from "../achievements/Journal";
 import { unlockedDifficulty } from "../achievements/DifficultyUnlocks";
 import {
@@ -44,7 +45,7 @@ export default function MultiplayerRoot() {
   const [couchOpen, setCouchOpen] = useState(false);
   const localSession = useRef(false);
   localSession.current = couchOpen;
-  const deferredInvite = useRef<string>();
+  const deferredInvite = useRef<() => void>();
   const [savesOpen, setSavesOpen] = useState(false);
   // The host has opened the scenario screens for the lobby; guests follow once it publishes.
   const choosing = useRef(false);
@@ -52,7 +53,7 @@ export default function MultiplayerRoot() {
   const [session] = useState(
     () =>
       new MultiplayerSession(
-        getDesktop()!,
+        steamSessionServices(getDesktop()),
         async () => (await import("./WorkerClient")).createMultiplayerWorker(),
         async () =>
           (await import("./WorkerClient")).createMultiplayerReplicaWorker(),
@@ -67,25 +68,10 @@ export default function MultiplayerRoot() {
     void session.reconnect();
   }, [session]);
 
-  const joinInvitedLobby = useCallback(
-    (lobbyId: string) => {
-      if (localSession.current) {
-        deferredInvite.current = lobbyId;
-        return;
-      }
-      deferredInvite.current = undefined;
-      if (session.getSnapshot().view) return;
-      setOpen(true);
-      void session.join(lobbyId).catch(() => undefined);
-    },
-    [session],
-  );
-
   useEffect(() => {
     // Let the couch shell unmount and release its controls before joining online.
-    const lobbyId = deferredInvite.current;
-    if (!couchOpen && lobbyId) joinInvitedLobby(lobbyId);
-  }, [couchOpen, joinInvitedLobby]);
+    if (!couchOpen) deferredInvite.current?.();
+  }, [couchOpen]);
 
   /** Choosing together ends with the lobby; scenario screens go back to single player. */
   const syncCoop = useCallback(() => {
@@ -197,22 +183,11 @@ export default function MultiplayerRoot() {
     );
   }, [session]);
 
-  const invite = useCallback(() => {
-    void session
-      .invite()
-      .catch((error) =>
-        store.dispatch(
-          snackbarOpen({ message: error.message, open: true, timeout: 6000 }),
-        ),
-      );
-  }, [session]);
-
   useEffect(() => {
     registerLobbyOpener(() => setOpen(true));
     let live = true,
       initialized = false,
       loading = false;
-    let receivedLiveInvite = false;
     let appliedGame: GameType | undefined;
     const sync = () => {
       const current = session.getSnapshot();
@@ -319,37 +294,50 @@ export default function MultiplayerRoot() {
           }),
         );
       },
-      invite,
       copyCode,
       openSaves: () => setSavesOpen(true),
     });
-    const stopNative = getDesktop()?.onMultiplayerEvent?.((event) => {
-      if (live && event.kind === "invite") {
-        receivedLiveInvite = true;
-        joinInvitedLobby(event.lobbyId);
+    const acceptInvite = (lobbyId: string) => {
+      if (!live) return;
+      if (localSession.current) {
+        deferredInvite.current = () => acceptInvite(lobbyId);
+        return;
       }
-    });
+      deferredInvite.current = undefined;
+      if (session.getSnapshot().view) return;
+      choosing.current = false;
+      setOpen(true);
+      void session.join(lobbyId).catch((error) => {
+        if (live)
+          store.dispatch(
+            snackbarOpen({
+              message:
+                error instanceof Error
+                  ? error.message
+                  : "Could not join the invited game.",
+              open: true,
+              timeout: 6000,
+            }),
+          );
+      });
+    };
     void session
-      .initialize()
-      .then(() => {
-        const invite = session.getSnapshot().lobby.inviteLobbyId;
-        if (live && invite && !receivedLiveInvite) joinInvitedLobby(invite);
-      })
+      .initialize(acceptInvite)
       // A desktop build without Steam multiplayer keeps the lobby unavailable.
       .catch(() => undefined);
     return () => {
       live = false;
+      deferredInvite.current = undefined;
       stop();
       stopCoop();
       stopStore();
       stopProgress();
-      stopNative?.();
       registerLobbyOpener(undefined);
       registerCoopControls(undefined);
       registerMultiplayerRuntime(undefined);
       session.dispose();
     };
-  }, [session, syncCoop, leaveLobby, invite, copyCode, joinInvitedLobby]);
+  }, [session, syncCoop, leaveLobby, copyCode]);
   useEffect(() => {
     if (!hasView) return;
     return registerShutdownCheckpoint((reason) => {

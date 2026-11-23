@@ -289,7 +289,6 @@ class SteamRoom {
   campaignWarning?: string;
   campaignError?: string;
   campaignListHold?: Promise<void>;
-  invites: string[] = [];
   views = new Map<string, RoomView>();
   hostView?: RoomView;
   baselines = new Map<string, number>();
@@ -499,10 +498,6 @@ class SteamRoom {
     }
     if (input.kind === "read-checkpoint") return this.checkpoint;
     if (input.kind === "delete-save") this.checkpoint = undefined;
-    if (input.kind === "invite") {
-      this.invites.push(id);
-      return;
-    }
     if (input.kind === "list-saves" || input.kind === "delete-save") {
       if (input.kind === "list-saves") await this.campaignListHold;
       if (this.campaignError) throw new Error(this.campaignError);
@@ -891,12 +886,11 @@ for (const [width, theme] of [
     await expect(bar.getByText(/Invite friends to play|can join/)).toHaveCount(
       0,
     );
+    await expect(bar.getByText(room.inviteCode, { exact: true })).toBeVisible();
     await expect(
-      bar.getByRole("button", { name: "Invite friends", exact: true }),
+      bar.getByRole("button", { name: "Copy code", exact: true }),
     ).toHaveClass(/MuiButton-contained/);
-    await bar
-      .getByRole("button", { name: "Copy invite code", exact: true })
-      .click();
+    await bar.getByRole("button", { name: "Copy code", exact: true }).click();
     await expect(page.getByText("Invite code copied")).toBeVisible();
     await expect
       .poll(() => page.evaluate(() => navigator.clipboard.readText()))
@@ -984,11 +978,10 @@ for (const [width, theme] of [
     await expect(
       page.getByText("Someone must take WindyWren's company"),
     ).toBeVisible();
-    await page
-      .getByRole("dialog")
-      .getByRole("button", { name: "Invite friends", exact: true })
-      .click();
-    await expect.poll(() => room.invites).toEqual([room.host]);
+    const resumed = page.getByRole("dialog", { name: "Pick your company" });
+    await expect(
+      resumed.getByText(room.inviteCode, { exact: true }),
+    ).toBeVisible();
     await bounded();
     await capture("resume-invite");
     const guest = await room.player(browser, 1, mobile);
@@ -2570,26 +2563,42 @@ for (const width of [1280, 390]) {
     };
     await capture("01-play-with-friends");
     await hostGame(host);
-    await host
-      .getByRole("button", { name: "Invite friends", exact: true })
-      .click();
-    await expect.poll(() => room.invites).toEqual([room.host]);
-    await capture("02-host-and-invite");
-    await guest
-      .getByLabel("6-digit invite code", { exact: true })
-      .fill(room.inviteCode);
+    const hostBar = host
+      .getByRole("region", { name: "Playing together" })
+      .last();
     await expect(
-      guest.getByLabel("6-digit invite code", { exact: true }),
-    ).toHaveValue(room.inviteCode);
-    await guest.getByLabel("6-digit invite code", { exact: true }).blur();
+      hostBar.getByText(room.inviteCode, { exact: true }),
+    ).toBeVisible();
+    await capture("02-host-and-invite");
+    await hostBar.getByRole("button", { name: "Copy code" }).click();
+    await expect(host.getByText("Invite code copied")).toBeVisible();
+    const sharedCode = await host.evaluate(() =>
+      navigator.clipboard.readText(),
+    );
+    expect(sharedCode).toBe(room.inviteCode);
+    const guestCode = guest.getByLabel("6-digit invite code", { exact: true });
+    await guestCode.fill("999999");
+    await guestCode.press("Enter");
+    await expect(guest.getByRole("alert")).toContainText("Invalid lobby code");
+    await expect(guestCode).toHaveAttribute("aria-invalid", "true");
+    await guestCode.fill(sharedCode.slice(0, 3) + " " + sharedCode.slice(3));
+    await expect(guestCode).toHaveAttribute("aria-invalid", "false");
+    await expect(guestCode).toHaveValue(sharedCode);
+    await expect(
+      guest.getByRole("button", { name: "Join", exact: true }),
+    ).toBeEnabled();
     await capture("03-join-with-code", guest);
-    await guest.getByRole("button", { name: "Join", exact: true }).click();
+    await guestCode.press("Enter");
     const roster = host.getByRole("list", { name: "Players", exact: true });
     await expect(
       roster.last().getByRole("img", { name: "Reviewing", exact: true }),
     ).toBeVisible();
     await capture("04-friend-joined");
     await host.getByTestId("mission-row-999").click();
+    await host
+      .getByRole("textbox", { name: "Seed", exact: true })
+      .last()
+      .fill("42");
     await expect(
       host.getByRole("button", { name: "Start for everyone", exact: true }),
     ).toBeEnabled();
@@ -2598,6 +2607,15 @@ for (const width of [1280, 390]) {
     await expect(
       guest.getByText("Custom setup", { exact: true }).last(),
     ).toBeVisible();
+    await expect(
+      guest.getByRole("textbox", { name: "Seed", exact: true }).last(),
+    ).toHaveValue("42");
+    await expect(
+      guest
+        .getByRole("region", { name: "Playing together" })
+        .last()
+        .getByText(sharedCode, { exact: true }),
+    ).toHaveCount(0);
     await capture("06-friend-ready", guest, "I'm ready");
     await guest.getByRole("button", { name: "I'm ready", exact: true }).click();
     await expect(
@@ -2660,16 +2678,10 @@ for (const width of [1280, 390]) {
     await expect(
       host.getByRole("button", { name: "Resume game", exact: true }),
     ).toBeDisabled();
-    await host
-      .getByRole("dialog")
-      .getByRole("button", { name: "Invite friends", exact: true })
-      .click();
-    await expect.poll(() => room.invites).toEqual([room.host, room.host]);
     await capture("13-pick-companies");
-    await guest
-      .getByRole("button", { name: "Play with friends", exact: true })
-      .click();
-    await joinGame(guest, room);
+    const guestId = "76561198000000002";
+    // An accepted Steam friends-overlay invitation arrives through the native bridge.
+    await room.event(guestId, { kind: "invite", lobbyId: room.lobbyId });
     // The returning friend takes back their own company by default.
     await expect(company(guest, "WindyWren")).toContainText("You");
     await expect(
