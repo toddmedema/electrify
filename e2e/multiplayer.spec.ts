@@ -323,6 +323,46 @@ async function selectSpeed(page: Page, label: string) {
   await clock(page).getByRole("button", { name: label, exact: true }).click();
 }
 
+async function approveIntertieUpgrade(host: Page, guest: Page) {
+  const upgradeCapacity =
+    (await projection(host))!.game!.transmission!.lines[0].capacityW * 1.5;
+  const hostLine = host.getByRole("button", {
+    name: /^Inspect WindyWren,/,
+  });
+  const guestLine = guest.getByRole("button", {
+    name: /^Inspect SolarSam,/,
+  });
+  await hostLine.click();
+  await host
+    .getByRole("button", {
+      name: "Review upgrade of WindyWren",
+      exact: true,
+    })
+    .click();
+  await host.getByRole("button", { name: "Pay cash", exact: true }).click();
+  await guestLine.click();
+  await expect(
+    guest.getByText(/SolarSam requested this upgrade/),
+  ).toBeVisible();
+  await guest
+    .getByRole("button", {
+      name: "Review upgrade of SolarSam",
+      exact: true,
+    })
+    .click();
+  await guest.getByRole("button", { name: "Pay cash", exact: true }).click();
+  for (const page of [host, guest])
+    await expect
+      .poll(
+        async () =>
+          (await projection(page))?.game?.transmission?.lines[0].upgrade
+            ?.targetCapacityW,
+      )
+      .toBe(upgradeCapacity);
+  await hostLine.click();
+  await guestLine.click();
+}
+
 test("desktop menu keyboard journey includes Play with friends in both directions", async ({
   browser,
 }) => {
@@ -412,6 +452,7 @@ for (const count of [2, 4]) {
         "data-active-speed",
         count === 2 ? "NORMAL" : "SLOW",
       );
+      if (count === 2) await approveIntertieUpgrade(host, buyer);
       await saveAndQuit(buyer);
       await expect(clock(host)).toHaveAttribute("data-active-speed", "PAUSED");
       await expect
@@ -508,13 +549,15 @@ test("V2 saves export the confirmed campaign and require confirmation to withdra
 });
 
 test(
-  "V2 rejects a stale local authority grant when the host remains connected",
+  "V2 rejects stale guest authority and reconnects to the original host",
   { tag: "@mobile" },
   async ({ browser }, info) => {
     const campaign = await startCustom(browser, 2, !!info.project.use.isMobile);
     const [host, guest] = campaign.players;
     for (const page of campaign.players) await selectSpeed(page, "slow speed");
     await expect(clock(host)).toHaveAttribute("data-active-speed", "SLOW");
+    const original = await captureState(guest);
+    const operationCount = campaign.fixture.operations.length;
     campaign.fixture.loseAuthority(guest);
     const warning = guest.getByRole("dialog", {
       name: "Multiplayer",
@@ -524,6 +567,29 @@ test(
     await expect(
       warning.getByRole("button", { name: "Disconnect", exact: true }),
     ).toBeVisible();
+    campaign.fixture.restoreAuthority(guest);
+    await warning
+      .getByRole("button", { name: "Reconnect", exact: true })
+      .click();
+    await expect
+      .poll(() =>
+        campaign.fixture.operations
+          .slice(operationCount)
+          .some(
+            ({ page, operation, status }) =>
+              page === guest && operation === "transfer/get" && status === 200,
+          ),
+      )
+      .toBe(true);
+    await expect(warning).toBeHidden();
+    expect(await captureState(guest)).toMatchObject({
+      epoch: original.epoch,
+      matchId: original.matchId,
+      seat: original.seat,
+    });
+    for (const page of campaign.players) await selectSpeed(page, "slow speed");
+    for (const page of campaign.players)
+      await expect(clock(page)).toHaveAttribute("data-active-speed", "SLOW");
     expect(campaign.errors).toEqual([]);
   },
 );

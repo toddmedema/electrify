@@ -46,7 +46,8 @@ Checkpoint uploads are capped at six attempts per account per minute. A room
 has six ordinary attempts and two reserved attempts for publishing a recovered
 checkpoint after host handoff, all within the same 60-second window. Attempts
 that reach payload validation consume the budget even if validation fails. A
-handoff keeps the current window.
+handoff keeps the current window. A host who exhausts the account limit must
+wait for the next quota window before retrying recovery.
 
 ## Release access
 
