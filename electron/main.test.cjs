@@ -11,7 +11,7 @@ const settle = () => new Promise(setImmediate);
 /** Run the real main entry point without loading Electron or opening a native window. */
 async function startup(
   t,
-  { preferences = null, rejectFirstEntry = false } = {},
+  { preferences = null, rejectFirstEntry = false, steamInput } = {},
 ) {
   const created = Promise.withResolvers();
   const shown = Promise.withResolvers();
@@ -159,7 +159,9 @@ async function startup(
     }
     configureScoreQueue() {}
     configureAchievements() {}
-    configureInput() {}
+    configureInput() {
+      this.input = steamInput;
+    }
     setInputEnabled(enabled) {
       inputEnabled.push(enabled);
     }
@@ -503,10 +505,21 @@ test("feedback opens in the system browser while unapproved URLs stay blocked", 
   assert.deepEqual(f.externalUrls, [feedback, discord, feedback]);
 });
 
-test("unaccepted couch play is disabled in the ordinary desktop runtime", async (t) => {
-  const { request } = await startup(t);
+test("couch setup follows Steam Input capability in the packaged Steam-offline runtime", async (t) => {
+  const deviceModes = [];
+  const contexts = [];
+  const steamInput = {
+    initialized: false,
+    deviceContexts: new Map(),
+    dispose() {},
+    setDevicePublisher() {},
+    setDeviceMode: (enabled) => deviceModes.push(enabled),
+    setContext: (context) => contexts.push(context),
+  };
+  const { request } = await startup(t, { steamInput });
   const status = await request("desktop:couch", { kind: "status" });
-  assert.equal(status.preview, false);
+  assert.equal(status.available, false);
+  assert.equal(status.active, false);
   assert.equal(
     await request("desktop:couch", {
       kind: "cancel-text",
@@ -514,14 +527,18 @@ test("unaccepted couch play is disabled in the ordinary desktop runtime", async 
     }),
     false,
   );
-  await assert.rejects(
-    request("desktop:couch", { kind: "setup" }),
-    /development preview/,
-  );
-  await assert.rejects(
-    request("desktop:couch", { kind: "open", seats: [] }),
-    /development preview/,
-  );
+  const unavailable = await request("desktop:couch", { kind: "setup" });
+  assert.equal(unavailable.available, false);
+  assert.equal(unavailable.active, false);
+  assert.deepEqual(deviceModes, []);
+  const online = await request("desktop:multiplayer", { kind: "state" });
+  assert.equal(online.available, false);
+  steamInput.initialized = true;
+  const local = await request("desktop:couch", { kind: "setup" });
+  assert.equal(local.available, true);
+  assert.equal(local.active, true);
+  assert.deepEqual(deviceModes, [true]);
+  assert.deepEqual(contexts, ["Menu"]);
 });
 
 test("graceful solo quit finishes the main closed listener without publishing to destroyed web contents", async (t) => {

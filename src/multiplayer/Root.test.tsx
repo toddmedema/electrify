@@ -1,9 +1,12 @@
-import { act, render } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { Provider } from "react-redux";
+import * as desktop from "../Desktop";
 import { store } from "../Store";
 import { quit } from "../reducers/GameActions";
 import { createGame } from "../testing/Simulator";
 import { MultiplayerSession, SessionState } from "./Session";
+import { showMultiplayerLobby } from "./Registry";
 import MultiplayerRoot from "./Root";
 
 jest.mock("./WorkerClient", () => ({}));
@@ -11,7 +14,9 @@ jest.mock("./Session", () => ({
   ...jest.requireActual("./Session"),
   MultiplayerSession: jest.fn(),
 }));
-jest.mock("../couch/Root", () => () => null);
+jest.mock("../couch/Root", () => ({ onClose }: { onClose: () => void }) => (
+  <button onClick={onClose}>Leave couch setup</button>
+));
 jest.mock("../helpers/WaitForLoad", () => ({
   waitForLoad: () => Promise.resolve(),
 }));
@@ -28,7 +33,9 @@ afterEach(() => {
   store.dispatch(quit());
 });
 
-test("session status notifications do not replay a grid before sending the player's command", async () => {
+function renderRoot(
+  initialize: MultiplayerSession["initialize"] = async () => {},
+) {
   const listeners = new Set<() => void>();
   let snapshot: SessionState = {
     lobby: { available: true, selfId: "host", members: [], connected: [] },
@@ -45,9 +52,10 @@ test("session status notifications do not replay a grid before sending the playe
         listeners.delete(listener);
       };
     },
-    initialize: async () => {},
+    initialize,
     dispose: () => {},
     setActivity: () => {},
+    join: jest.fn().mockResolvedValue(undefined),
   };
   jest
     .mocked(MultiplayerSession)
@@ -63,6 +71,59 @@ test("session status notifications do not replay a grid before sending the playe
       listeners.forEach((listener) => listener());
     });
   };
+  return { session, notify, unmount };
+}
+
+function renderWithSteamInvites() {
+  let receive: ((lobbyId: string) => void) | undefined;
+  const bridge: Pick<desktop.DesktopBridge, "apiVersion" | "couchRequest"> = {
+    apiVersion: 1,
+    couchRequest: jest.fn(),
+  };
+  jest
+    .spyOn(desktop, "getDesktop")
+    .mockReturnValue(bridge as desktop.DesktopBridge);
+  const { session } = renderRoot(async (onInvite) => {
+    receive = onInvite;
+  });
+  const invite = async (lobbyId: string) => {
+    await act(async () => receive?.(lobbyId));
+  };
+  return { join: session.join, invite };
+}
+
+test("a Steam invitation joins normally outside couch play", async () => {
+  const { join, invite } = renderWithSteamInvites();
+  await invite("10977524123456789");
+  expect(join).toHaveBeenCalledWith("10977524123456789");
+  expect(
+    screen.getByRole("dialog", { name: "Play with friends" }),
+  ).toBeVisible();
+});
+
+test("a couch session keeps the latest invitation until local play closes", async () => {
+  const { join, invite } = renderWithSteamInvites();
+  const user = userEvent.setup();
+  act(showMultiplayerLobby);
+  await user.click(screen.getByRole("button", { name: "Local Co-op" }));
+  const leave = screen.getByRole("button", { name: "Leave couch setup" });
+  await invite("10977524123456789");
+  await invite("10977524123456780");
+  expect(join).not.toHaveBeenCalled();
+  expect(
+    screen.queryByRole("dialog", { name: "Play with friends" }),
+  ).not.toBeInTheDocument();
+  await user.click(leave);
+  expect(leave).not.toBeInTheDocument();
+  expect(join).toHaveBeenCalledTimes(1);
+  expect(join).toHaveBeenCalledWith("10977524123456780");
+  expect(
+    screen.getByRole("dialog", { name: "Play with friends" }),
+  ).toBeVisible();
+});
+
+test("session status notifications do not replay a grid before sending the player's command", async () => {
+  const { session, notify, unmount } = renderRoot();
   const game = createGame({ scenarioId: 101, seed: 12345 });
   game.multiplayer = { seat: "host" };
   await notify({
@@ -84,10 +145,15 @@ test("session status notifications do not replay a grid before sending the playe
   expect(applied.multiplayer?.seat).toBe("host");
   await notify({ pending: true });
   expect(store.getState().game).toBe(applied);
-  await notify({ lobby: { ...snapshot.lobby, connected: ["guest"] } });
+  await notify({
+    lobby: { ...session.getSnapshot().lobby, connected: ["guest"] },
+  });
   expect(store.getState().game).toBe(applied);
   await notify({
-    view: { ...snapshot.view!, game: { ...game, dollarsPerkWh: 0.15 } },
+    view: {
+      ...session.getSnapshot().view!,
+      game: { ...game, dollarsPerkWh: 0.15 },
+    },
   });
   expect(store.getState().game.dollarsPerkWh).toBe(0.15);
   unmount();

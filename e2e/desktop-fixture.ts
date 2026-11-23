@@ -47,10 +47,7 @@ export async function removeDesktopProfile(profile: string): Promise<void> {
   await fs.rm(resolved, { recursive: true, force: true });
 }
 
-export async function launchDesktop(
-  profile: string,
-  options: { couchPreview?: boolean } = {},
-): Promise<DesktopSession> {
+export async function launchDesktop(profile: string): Promise<DesktopSession> {
   // Also protect direct Playwright runs that bypass desktop.playwright.config.ts.
   requireHeadedDesktop({ projects: [test.info().project] });
   const env = Object.fromEntries(
@@ -72,7 +69,6 @@ export async function launchDesktop(
       ELECTRIFY_USER_DATA_DIR: profile,
       ELECTRIFY_OFFLINE: "1",
       ELECTRIFY_TEST: "1",
-      ...(options.couchPreview ? { ELECTRIFY_COUCH_PREVIEW: "1" } : {}),
     },
     timeout: 30_000,
   });
