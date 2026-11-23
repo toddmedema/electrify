@@ -691,19 +691,42 @@ function airborne(_size: FacilitySize): MapModel {
 
 function thermal(
   kind: "gas" | "oil" | "coal" | "biomass",
-  _size: FacilitySize,
+  size: FacilitySize,
 ): MapModel {
   const body = new MeshBuilder(),
     moving: ModelPart[] = [];
-  base(body);
-  body.box([0.075, 0.105, 0.015], [0.4, 0.15, 0.28], P.cream);
+  const small = size === "small",
+    large = size === "large";
+  base(
+    body,
+    small ? 0.46 : large ? 0.77 : 0.64,
+    small ? 0.36 : large ? 0.51 : 0.4,
+  );
+  const hallX = small ? 0.055 : large ? 0.105 : 0.075,
+    hallZ = large ? -0.015 : 0.015,
+    width = small ? 0.245 : large ? 0.47 : 0.4,
+    depth = small ? 0.2 : large ? 0.33 : 0.28,
+    eave = small ? 0.135 : large ? 0.228 : 0.18;
+  body.box(
+    [hallX, (eave + 0.03) / 2, hallZ],
+    [width, eave - 0.03, depth],
+    P.cream,
+  );
   gable(
     body,
-    [0.075, 0.18, 0.015],
-    [0.42, 0.045, 0.3],
+    [hallX, eave, hallZ],
+    [width + 0.02, small ? 0.032 : large ? 0.055 : 0.045, depth + 0.02],
     kind === "biomass" ? P.forest : P.steel,
   );
-  moving.push(windows(body, 0.08, 0.1, 0.159, 0.29));
+  moving.push(
+    windows(
+      body,
+      hallX + 0.005,
+      small ? 0.082 : large ? 0.124 : 0.1,
+      hallZ + depth / 2 + 0.004,
+      small ? 0.17 : large ? 0.34 : 0.29,
+    ),
+  );
   const stack = (x: number, z: number, height: number, radius = 0.027) => {
     body.cylinder([x, 0.03, z], radius, radius * 0.82, height, P.steelShade, 8);
     body.cylinder(
@@ -720,63 +743,304 @@ function thermal(
     );
   };
   if (kind === "gas") {
-    for (const x of [0.03, 0.19]) stack(x, -0.1, 0.3, 0.022);
-    body.merge(
-      new MeshBuilder()
-        .cylinder([0, 0, 0], 0.066, 0.066, 0.22, P.steel, 8)
-        .build(),
-      [-0.24, 0.105, 0.12],
-      [Math.PI / 2, 0, 0],
-    );
-    body.beam([-0.3, 0.06, -0.15], [-0.14, 0.06, -0.15], 0.014, P.mint);
-  } else if (kind === "oil") {
-    for (const z of [-0.1, 0.09]) {
-      body.cylinder([-0.23, 0.036, z], 0.08, 0.08, 0.15, P.cream, 8);
-      body.cylinder([-0.23, 0.186, z], 0.081, 0.025, 0.035, P.steel, 8);
-      body.cylinder([-0.23, 0.085, z], 0.081, 0.081, 0.013, P.steelShade, 8);
+    const vents = small
+      ? [0.132]
+      : large
+        ? [-0.018, 0.14, 0.298]
+        : [0.03, 0.19];
+    for (const x of vents)
+      stack(
+        x,
+        large ? -0.154 : -0.1,
+        small ? 0.218 : large ? 0.37 : 0.3,
+        0.022,
+      );
+    const radius = small ? 0.047 : large ? 0.051 : 0.066,
+      length = small ? 0.155 : large ? 0.25 : 0.22,
+      skidZ = small ? -0.022 : large ? -0.057 : 0.12;
+    const skid = new MeshBuilder()
+      .cylinder([0, 0, 0], radius, radius, length, P.steel, 8)
+      .build();
+    for (const x of small ? [-0.146] : large ? [-0.296, -0.183] : [-0.24]) {
+      body.merge(skid, [x, small ? 0.09 : 0.105, skidZ], [Math.PI / 2, 0, 0]);
+      if (small || large)
+        for (const z of [skidZ + 0.035, skidZ + length - 0.035])
+          body.box([x, 0.05, z], [radius * 1.2, 0.03, 0.024], P.steelShade);
     }
-    stack(0.21, -0.11, 0.4);
+    const pipeX = small ? -0.194 : large ? -0.337 : -0.3;
+    const pipeZ = small ? 0.124 : large ? 0.181 : -0.15;
+    body.beam(
+      [pipeX, 0.06, pipeZ],
+      [hallX - width / 2 - 0.015, 0.06, pipeZ],
+      0.014,
+      P.mint,
+    );
+  } else if (kind === "oil") {
+    const tankX = small ? -0.145 : large ? -0.25 : -0.23,
+      radius = small ? 0.061 : large ? 0.075 : 0.08,
+      height = small ? 0.117 : large ? 0.178 : 0.15;
+    for (const z of small
+      ? [0.028]
+      : large
+        ? [-0.166, 0, 0.166]
+        : [-0.1, 0.09]) {
+      body.cylinder([tankX, 0.036, z], radius, radius, height, P.cream, 8);
+      body.cylinder(
+        [tankX, 0.036 + height, z],
+        radius + 0.001,
+        radius * 0.3125,
+        0.035,
+        P.steel,
+        8,
+      );
+      body.cylinder(
+        [tankX, 0.085, z],
+        radius + 0.001,
+        radius + 0.001,
+        0.013,
+        P.steelShade,
+        8,
+      );
+    }
+    stack(
+      small ? 0.132 : large ? 0.259 : 0.21,
+      -0.11,
+      small ? 0.266 : large ? 0.49 : 0.4,
+    );
+    if (large)
+      body.beam(
+        [-0.25, 0.075, 0.17],
+        [-0.125, 0.075, 0.126],
+        0.014,
+        P.steelShade,
+      );
   } else if (kind === "coal") {
-    body.box([-0.225, 0.075, -0.025], [0.17, 0.08, 0.29], P.steelShade);
-    gable(body, [-0.225, 0.115, -0.025], [0.14, 0.07, 0.25], P.ink);
-    body.beam([-0.22, 0.15, 0.08], [-0.035, 0.22, 0.02], 0.022, P.steelShade);
-    stack(0.21, -0.11, 0.43, 0.031);
+    const bunkerX = small ? -0.143 : large ? -0.25 : -0.225,
+      bunkerWidth = small ? 0.105 : large ? 0.195 : 0.17;
+    const piles = small ? [0] : large ? [-0.123, 0.103] : [-0.025];
+    const pileLength = small ? 0.2 : large ? 0.195 : 0.29;
+    for (const z of piles) {
+      body.box(
+        [bunkerX, 0.075, z],
+        [bunkerWidth, 0.08, pileLength],
+        P.steelShade,
+      );
+      gable(
+        body,
+        [bunkerX, 0.115, z],
+        [bunkerWidth - 0.03, 0.07, pileLength - 0.04],
+        P.ink,
+      );
+    }
+    body.beam(
+      [bunkerX + 0.005, 0.15, large ? 0.103 : 0.08],
+      [
+        small ? 0.02 : large ? 0.008 : -0.035,
+        large ? 0.286 : small ? 0.159 : 0.22,
+        0.02,
+      ],
+      large ? 0.033 : 0.022,
+      P.steelShade,
+    );
+    stack(
+      small ? 0.135 : large ? 0.29 : 0.21,
+      -0.11,
+      small ? 0.292 : large ? 0.55 : 0.43,
+      0.031,
+    );
+    if (large) stack(0.147, -0.145, 0.486, 0.031);
   } else {
-    body.cylinder([-0.225, 0.036, -0.02], 0.082, 0.082, 0.23, P.cream, 8);
-    body.cylinder([-0.225, 0.266, -0.02], 0.087, 0.02, 0.06, P.forest, 8);
-    for (const y of [0.1, 0.21])
-      body.cylinder([-0.225, y, -0.02], 0.084, 0.084, 0.01, P.steelShade, 8);
-    stack(0.22, -0.11, 0.33);
-    body.box([-0.19, 0.06, 0.155], [0.19, 0.045, 0.055], P.timber);
+    const siloX = small ? -0.143 : large ? -0.259 : -0.225,
+      radius = small ? 0.059 : large ? 0.077 : 0.082;
+    for (const [z, height] of small
+      ? [[-0.024, 0.144]]
+      : large
+        ? [
+            [-0.119, 0.305],
+            [0.064, 0.25],
+          ]
+        : [[-0.02, 0.23]]) {
+      body.cylinder([siloX, 0.036, z], radius, radius, height, P.cream, 8);
+      body.cylinder(
+        [siloX, height + 0.036, z],
+        radius + 0.005,
+        0.02,
+        small ? 0.048 : 0.06,
+        P.forest,
+        8,
+      );
+      for (const y of small ? [0.114] : [0.1, 0.21])
+        body.cylinder(
+          [siloX, y, z],
+          radius + 0.002,
+          radius + 0.002,
+          0.01,
+          P.steelShade,
+          8,
+        );
+    }
+    stack(
+      small ? 0.138 : large ? 0.266 : 0.22,
+      -0.11,
+      small ? 0.246 : large ? 0.437 : 0.33,
+    );
+    body.box(
+      [
+        small ? -0.143 : large ? -0.243 : -0.19,
+        0.06,
+        small ? 0.12 : large ? 0.183 : 0.155,
+      ],
+      [
+        small ? 0.127 : large ? 0.224 : 0.19,
+        large ? 0.06 : 0.045,
+        large ? 0.07 : 0.055,
+      ],
+      P.timber,
+    );
   }
-  return facilityModel(kind, body, switchgear(body), moving);
+  return facilityModel(
+    kind,
+    body,
+    switchgear(body, small ? 0.166 : 0.22),
+    moving,
+  );
 }
 
-function gasSteam(_size: FacilitySize): MapModel {
+function gasSteam(size: FacilitySize): MapModel {
   const body = new MeshBuilder();
-  base(body);
+  const small = size === "small",
+    large = size === "large";
+  base(
+    body,
+    small ? 0.48 : large ? 0.77 : 0.64,
+    small ? 0.36 : large ? 0.51 : 0.4,
+  );
 
-  // A tall boiler house supplies steam to the lower turbine hall through the overhead pipe.
-  body.box([-0.15, 0.169, -0.04], [0.25, 0.266, 0.25], P.cream);
-  gable(body, [-0.15, 0.302, -0.04], [0.27, 0.041, 0.27], P.steel);
-  body.box([0.13, 0.104, 0.023], [0.31, 0.136, 0.26], P.cream);
-  gable(body, [0.13, 0.172, 0.023], [0.33, 0.034, 0.28], P.steelShade);
-  body.beam([-0.026, 0.25, -0.07], [0.102, 0.25, -0.07], 0.027, P.steel, 8);
-  body.beam([0.102, 0.25, -0.07], [0.102, 0.161, -0.07], 0.027, P.steel, 8);
-  body.box([-0.15, 0.085, 0.092], [0.098, 0.098, 0.016], P.steelShade);
+  // The high boiler and its overhead steam pipe remain distinct from the lower turbine hall.
+  const boilerX = small ? -0.111 : large ? -0.196 : -0.15,
+    boilerZ = small ? -0.026 : large ? -0.052 : -0.04,
+    boilerWidth = small ? 0.197 : large ? 0.315 : 0.25,
+    boilerDepth = small ? 0.198 : large ? 0.337 : 0.25,
+    boilerHeight = small ? 0.19 : large ? 0.349 : 0.266,
+    boilerEave = 0.036 + boilerHeight;
+  body.box(
+    [boilerX, 0.036 + boilerHeight / 2, boilerZ],
+    [boilerWidth, boilerHeight, boilerDepth],
+    P.cream,
+  );
+  gable(
+    body,
+    [boilerX, boilerEave, boilerZ],
+    [
+      boilerWidth + 0.02,
+      small ? 0.032 : large ? 0.053 : 0.041,
+      boilerDepth + 0.02,
+    ],
+    P.steel,
+  );
+  body.box(
+    [
+      boilerX,
+      small ? 0.072 : large ? 0.101 : 0.085,
+      boilerZ + boilerDepth / 2 + 0.007,
+    ],
+    [
+      small ? 0.072 : large ? 0.129 : 0.098,
+      small ? 0.072 : large ? 0.13 : 0.098,
+      0.016,
+    ],
+    P.steelShade,
+  );
 
-  const stackX = 0.27,
-    stackZ = 0.12,
-    outletY = 0.473;
-  body
-    .cylinder([stackX, 0.036, stackZ], 0.041, 0.031, 0.437, P.steel, 8)
-    .cylinder([stackX, 0.443, stackZ], 0.038, 0.038, 0.03, P.steelShade, 8)
-    .cylinder([stackX, outletY, stackZ], 0.026, 0.026, 0.002, P.ink, 8);
-  return facilityModel("gas-steam", body, switchgear(body), [
-    windows(body, 0.13, 0.113, 0.157, 0.227),
-    steam([stackX, outletY + 0.012, stackZ]),
-    steam([stackX, outletY + 0.012, stackZ], 0.5),
-  ]);
+  const hallX = small ? 0.112 : large ? 0.144 : 0.13,
+    hallZ = large ? 0.03 : 0.023,
+    hallWidth = small ? 0.216 : large ? 0.417 : 0.31,
+    hallDepth = small ? 0.192 : large ? 0.326 : 0.26,
+    hallHeight = small ? 0.093 : large ? 0.194 : 0.136,
+    hallEave = 0.036 + hallHeight;
+  body.box(
+    [hallX, 0.036 + hallHeight / 2, hallZ],
+    [hallWidth, hallHeight, hallDepth],
+    P.cream,
+  );
+  gable(
+    body,
+    [hallX, hallEave, hallZ],
+    [hallWidth + 0.02, small ? 0.027 : large ? 0.049 : 0.034, hallDepth + 0.02],
+    P.steelShade,
+  );
+  const pipeZ = small ? -0.035 : large ? 0.052 : -0.07,
+    pipeY = boilerEave - (small ? 0.036 : large ? 0.067 : 0.052),
+    pipeX = hallX - 0.028,
+    thickness = small ? 0.021 : large ? 0.037 : 0.027;
+  body.beam(
+    [boilerX + boilerWidth / 2 - 0.001, pipeY, pipeZ],
+    [pipeX, pipeY, pipeZ],
+    thickness,
+    P.steel,
+    8,
+  );
+  body.beam(
+    [pipeX, pipeY, pipeZ],
+    [pipeX, hallEave - 0.011, pipeZ],
+    thickness,
+    P.steel,
+    8,
+  );
+
+  const moving = [
+    windows(
+      body,
+      hallX,
+      small ? 0.087 : large ? 0.135 : 0.113,
+      hallZ + hallDepth / 2 + 0.004,
+      small ? 0.152 : large ? 0.306 : 0.227,
+    ),
+  ];
+  const chimney = (x: number, z: number, outletY: number, radius: number) => {
+    body
+      .cylinder(
+        [x, 0.036, z],
+        radius,
+        radius - 0.01,
+        outletY - 0.036,
+        P.steel,
+        8,
+      )
+      .cylinder(
+        [x, outletY - 0.03, z],
+        radius - 0.003,
+        radius - 0.003,
+        0.03,
+        P.steelShade,
+        8,
+      )
+      .cylinder(
+        [x, outletY, z],
+        radius - 0.015,
+        radius - 0.015,
+        0.002,
+        P.ink,
+        8,
+      );
+    moving.push(
+      steam([x, outletY + 0.012, z]),
+      steam([x, outletY + 0.012, z], 0.5),
+    );
+  };
+  chimney(
+    small ? 0.193 : large ? 0.321 : 0.27,
+    small ? 0.105 : 0.12,
+    small ? 0.335 : large ? 0.55 : 0.473,
+    small ? 0.032 : large ? 0.044 : 0.041,
+  );
+  if (large) chimney(0.26, -0.178, 0.483, 0.041);
+  return facilityModel(
+    "gas-steam",
+    body,
+    switchgear(body, small ? 0.17 : 0.22),
+    moving,
+  );
 }
 
 function nuclear(_size: FacilitySize): MapModel {
