@@ -233,7 +233,7 @@ for (const theme of ["light", "dark"]) {
 }
 
 for (const theme of ["light", "dark"]) {
-  test(`storage and complete demand remain compact and inspectable in ${theme}`, async ({
+  test(`storage and complete demand remain compact and inspectable in ${theme} @phone`, async ({
     page,
   }, info) => {
     await page.clock.install();
@@ -695,7 +695,7 @@ test("blackout periods remain visible when imports supplement fuel production", 
   }
 });
 
-test("a full fuel mix and concurrent flows retain readable source keys on narrow screens", async ({
+test("a full fuel mix and concurrent flows retain readable source keys on narrow screens @minimum-phone", async ({
   page,
 }, info) => {
   await page.addInitScript(() => {

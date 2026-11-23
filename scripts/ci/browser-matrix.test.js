@@ -34,72 +34,18 @@ function list(arguments_) {
   return cases;
 }
 
+function assertProjects(cases, title, expected) {
+  const projects = new Set(
+    cases
+      .filter((entry) => entry.includes(title))
+      .map((entry) => entry.split(":")[0]),
+  );
+  assert.deepEqual([...projects].sort(), [...expected].sort(), title);
+}
+
 test("production browser shards run the complete PR matrix exactly once", () => {
-  const projects = ["--project=desktop-chromium", "--project=mobile-390px"];
-  const original = [
-    ...list([
-      "--config=e2e/playwright.config.ts",
-      "build-options.spec.ts",
-      "contextual-learning.spec.ts",
-      "manual-help-interaction.spec.ts",
-      "escape-close.spec.ts",
-      "game-workspace.spec.ts",
-      "insights-policy-projection.spec.ts",
-      "mission-evidence.spec.ts",
-      "tutorial-exit.spec.ts",
-      "cloud-saves.spec.ts",
-      "menu-keyboard.spec.ts",
-      "music.spec.ts",
-      "music-startup.spec.ts",
-      "pwa-sound.spec.ts",
-      "achievements.spec.ts",
-      "browser-environment.spec.ts",
-      "loading-navigation.spec.ts",
-      "facilities-production-chart.spec.ts",
-      "production-chart-motion.spec.ts",
-      "intertie-order.spec.ts",
-      "facility-selection.spec.ts",
-      "operations-priorities.spec.ts",
-      "offline-launch.spec.ts",
-      ...projects,
-    ]),
-    ...list([
-      "--config=e2e/playwright.config.ts",
-      "build-rail.spec.ts",
-      "grid-status.spec.ts",
-      "project-build.spec.ts",
-      "cities-capacity.spec.ts",
-      "map-3d.spec.ts",
-      "chart-touch.spec.ts",
-      "chernobyl-recovery.spec.ts",
-      "insights-expanded-chart.spec.ts",
-      "insights-shortfall.spec.ts",
-      "build-generator-loading.spec.ts",
-      "sign-in.spec.ts",
-      "multiline-text.spec.ts",
-      "learning-pages.spec.ts",
-      "scenario-pages.spec.ts",
-      "ui-chart-build-polish.spec.ts",
-      "modal-layout.spec.ts",
-      "wildfire-scenario.spec.ts",
-      "acquisitions.spec.ts",
-      "tutorial-capstone.spec.ts",
-      "campaign.spec.ts",
-      "difficulty-unlocks.spec.ts",
-      "toggle-borders.spec.ts",
-      ...projects,
-      "--project=mobile-360px",
-    ]),
-    ...list([
-      "--config=e2e/playwright.config.ts",
-      "tutorial-actions.spec.ts",
-      "main-menu.spec.ts",
-      "home-entry.spec.ts",
-      "home-motion.spec.ts",
-      ...projects,
-      "--project=mobile-360px",
-    ]),
-  ].sort();
+  const config = "--config=e2e/ci.playwright.config.ts";
+  const original = list([config]).sort();
   const { shard: shards } = parse(
     fs.readFileSync(".github/workflows/workflow.yml", "utf8"),
   ).jobs.browser.strategy.matrix;
@@ -108,10 +54,7 @@ test("production browser shards run the complete PR matrix exactly once", () => 
       const plan = planForRun("browser", {
         ELECTRIFY_BROWSER_SHARD: `${shard}/${shards.length}`,
       });
-      const cases = list([
-        "--config=e2e/ci.playwright.config.ts",
-        ...plan.browser[0].args,
-      ]);
+      const cases = list([config, ...plan.browser[0].args]);
       assert(cases.length > 0, `Hosted shard ${shard} collected no tests`);
       return cases;
     })
@@ -123,6 +66,90 @@ test("production browser shards run the complete PR matrix exactly once", () => 
     "A browser case ran in multiple shards",
   );
   assert.deepEqual(actual, original);
+});
+
+test("viewport routing keeps shared behavior and distinct browser contracts", () => {
+  const desktop = "desktop-chromium";
+  const phone = "mobile-390px";
+  const minimum = "mobile-360px";
+  const cases = list(["--config=e2e/ci.playwright.config.ts"]);
+
+  assertProjects(cases, "first year and resumes from IndexedDB", [desktop]);
+  assertProjects(cases, "locked generator survives resume", [desktop, phone]);
+  assertProjects(cases, "capacity review actions remain reachable", [
+    desktop,
+    minimum,
+  ]);
+  assertProjects(cases, "a live resize switches tablet, foldable and desktop", [
+    desktop,
+  ]);
+  assertProjects(
+    cases,
+    "interties support keyboard and pointer trading reordering",
+    [desktop, phone],
+  );
+  assertProjects(cases, "/data-centers.html remains readable and navigable", [
+    desktop,
+    minimum,
+  ]);
+
+  for (const { slug } of require("../../site/scenarios.json"))
+    assert(
+      cases.some(
+        (entry) =>
+          entry.startsWith(`${desktop}:`) &&
+          entry.includes(`:${slug} is readable in light mode`),
+      ),
+      `missing authored scenario page: ${slug}`,
+    );
+
+  const local = list(["--config=e2e/playwright.config.ts"]);
+  assertProjects(
+    local,
+    "short panes keep the fleet and trading controls reachable",
+    [desktop, "foldable-unfolded"],
+  );
+  assertProjects(local, "insights header controls stay aligned", [
+    desktop,
+    phone,
+    minimum,
+    "tablet-768px",
+  ]);
+  assertProjects(local, "settings fill the shared menu container", [
+    desktop,
+    phone,
+    minimum,
+    "desktop-1440px",
+  ]);
+});
+
+test("controller routing keeps the full journey and focused display checks", () => {
+  const cases = list(["--config=e2e/steam-input.playwright.config.ts"]);
+  assertProjects(
+    cases,
+    "semantic actions play, build, adjust pricing, inspect charts and save",
+    ["deck-800-light"],
+  );
+  assertProjects(
+    cases,
+    "controller changes interface scale, keeps settings reachable",
+    ["deck-800-light", "deck-720-light", "deck-720-dark", "mobile-360px"],
+  );
+  assertProjects(cases, "controller hints follow the active device", [
+    "deck-800-light",
+    "mobile-390px",
+  ]);
+  assertProjects(cases, "menu movement under a stationary pointer", [
+    "deck-800-light",
+    "docked-light",
+  ]);
+  assertProjects(cases, "TV maximum interface scale and screen-edge padding", [
+    "deck-800-light",
+    "tv-1080-light",
+    "tv-1080-dark",
+    "tv-2160-light",
+    "tv-2160-dark",
+  ]);
 });
 
 test("native sharding preserves every packaged desktop case with one worker per isolated runner", (t) => {
