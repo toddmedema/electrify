@@ -42,6 +42,11 @@ verify the selected candidate pair as relay–relay. TURN permits UDP and TLS ov
 port 443. HTTPS handles large replication baselines, scenario snapshots and
 checkpoints. Checkpoints are pinned to an immutable Cloud Storage generation
 and checked against the room epoch, roster, compatibility ID and head.
+Checkpoint uploads are capped at six attempts per account per minute. A room
+has six ordinary attempts and two reserved attempts for publishing a recovered
+checkpoint after host handoff, all within the same 60-second window. Attempts
+that reach payload validation consume the budget even if validation fails. A
+handoff keeps the current window.
 
 ## Release access
 

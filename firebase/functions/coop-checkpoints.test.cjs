@@ -108,13 +108,13 @@ function fixture() {
     head: null,
     requiredIds: seats.map(({ id }) => id),
   };
-  function context(seatId = host) {
+  function context(seatId = state.hostId) {
     return {
       bucket,
       roomId,
       checkpointValidatorPath,
       seatId,
-      hostId: host,
+      hostId: state.hostId,
       room: { ...state },
       async updateRoom(update, guard) {
         assert.equal(guard, "host");
@@ -141,6 +141,52 @@ test("publishes immutable checkpoints and repeats an exact authorized save", asy
     content: body.content,
     digest: body.digest,
   });
+});
+
+test("reserves bounded recovery uploads when ordinary checkpoint attempts run out", async (t) => {
+  t.mock.timers.enable({ apis: ["Date"] });
+  const { context, world, state, guest } = fixture();
+  const ordinary = encoded(world);
+  for (let attempt = 0; attempt < 6; attempt++)
+    await handle("save/publish", context(), ordinary);
+  await assert.rejects(handle("save/publish", context(), ordinary), {
+    code: "checkpoint-rate-limit",
+  });
+
+  state.hostId = guest;
+  state.epoch = randomUUID();
+  state.restoreHead = state.head;
+  const recovery = {
+    ...encoded({ ...world, epoch: state.epoch }),
+    explicit: false,
+  };
+  await assert.rejects(
+    handle("save/publish", context(), {
+      ...recovery,
+      digest: "a".repeat(64),
+    }),
+    { code: "invalid-snapshot" },
+  );
+  await handle("save/publish", context(), recovery);
+  assert.equal(state.head.epoch, state.epoch);
+  assert.equal(state.restoreHead, null);
+  await assert.rejects(handle("save/publish", context(), recovery), {
+    code: "checkpoint-rate-limit",
+  });
+
+  state.hostId = world.seats[0].id;
+  state.epoch = randomUUID();
+  state.restoreHead = state.head;
+  const nextRecovery = {
+    ...encoded({ ...world, epoch: state.epoch }),
+    explicit: false,
+  };
+  await assert.rejects(handle("save/publish", context(), nextRecovery), {
+    code: "checkpoint-rate-limit",
+  });
+  t.mock.timers.tick(60_000);
+  await handle("save/publish", context(), nextRecovery);
+  assert.equal(state.head.epoch, state.epoch);
 });
 
 test("guests, wrong epochs and corrupt compressed uploads cannot publish a head", async () => {

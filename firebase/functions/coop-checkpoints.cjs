@@ -15,6 +15,8 @@ let validating = Promise.resolve();
 let waitingValidators = 0;
 const TRANSFER_MS = 60_000;
 const CHECKPOINT_INTERVAL_MS = 10_000;
+const CHECKPOINT_UPLOADS_PER_MINUTE = 6;
+const EXTRA_RECOVERY_UPLOADS_PER_MINUTE = 2;
 const TRANSFERS_PER_MINUTE = 12;
 const STAGING_GRACE_MS = 60_000;
 const CHECKPOINT_ORPHAN_AGE_MS = 10 * 60_000;
@@ -196,7 +198,10 @@ async function download(bucket, key, generation, digest, size) {
 
 async function publish(context, body) {
   requireHost(context);
-  await context.limit?.("coop-checkpoint-upload", 6);
+  await context.limit?.(
+    "coop-checkpoint-upload",
+    CHECKPOINT_UPLOADS_PER_MINUTE,
+  );
   if (typeof body.explicit !== "boolean") refuse("invalid-checkpoint");
   const bucket = bucketFor(context);
   const expected = context.room.head?.id ?? null;
@@ -208,7 +213,21 @@ async function publish(context, body) {
       current?.until > now
         ? { ...current, count: current.count + 1 }
         : { until: now + TRANSFER_MS, count: 1 };
-    if (quota.count > 6) refuse("checkpoint-rate-limit", 429);
+    if (quota.count > CHECKPOINT_UPLOADS_PER_MINUTE) {
+      // A new host must commit its restored epoch before the room can play.
+      // Keep the reserve in the same room window across host changes.
+      const recovering =
+        !body.explicit &&
+        room.head &&
+        room.head.epoch !== room.epoch &&
+        room.restoreHead?.id === room.head.id;
+      if (
+        !recovering ||
+        quota.count >
+          CHECKPOINT_UPLOADS_PER_MINUTE + EXTRA_RECOVERY_UPLOADS_PER_MINUTE
+      )
+        refuse("checkpoint-rate-limit", 429);
+    }
     return { room: { ...room, checkpointQuota: quota } };
   }, "host");
   const result = compressedBody(body);
