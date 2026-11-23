@@ -242,6 +242,62 @@ test("conductors use elevated real terminals and retain mesh identity across unr
   ]);
 });
 
+test.each([
+  ["small", 50e6],
+  ["medium", 150e6],
+] as const)(
+  "lands the submerged wire on %s offshore switchgear",
+  (size, peakW) => {
+    const ocean: TerritoryTileView = {
+      ...view(),
+      tile: {
+        ...view().tile,
+        q: 2,
+        r: 1,
+        terrain: "ocean",
+        city: undefined,
+        siteKind: "wind",
+        maxPeakW: Infinity,
+      },
+      facility: {
+        name: "Offshore Wind",
+        fuel: "Offshore Wind",
+        peakW,
+        yearsToBuildLeft: 0,
+      },
+    };
+    const shore = { ...view(1), tile: { ...view(1).tile, q: 3, r: 1 } };
+    const tiles = [ocean.tile, shore.tile];
+    const scene = new SceneBuilder({
+      terrain: getTerrainModel,
+      structure: getStructureModel,
+    }).build(
+      [ocean, shore],
+      tiles,
+      hexWires(
+        tiles,
+        () => true,
+        () => true,
+        (tile) => tile.terrain === "ocean",
+      ),
+      0,
+      "run",
+    );
+    const turbine = scene.find(
+      ({ id }) => id === `structure:${ocean.tile.id}`,
+    )!;
+    expect(turbine.model).toBe(getStructureModel("offshore-wind", [], size));
+    const terminal = turbine.model.terminals[1];
+    const wire = scene.find(({ id }) => id === "wires:0")!;
+    const [connection] = wire.model.connections!;
+    expect(connection.from).toBe(ocean.tile.id);
+    expect(connection.kind).toBe("submerged");
+    expect(connection.start).toEqual(
+      terminal.map((axis, i) => axis + turbine.position[i]),
+    );
+  },
+);
+
 test.each([undefined, "impact"] as const)(
   "keeps wires out of the solar panel racks from all six neighboring pylons (%s)",
   (hail) => {

@@ -60,16 +60,27 @@ function base(mesh: MeshBuilder, width = 0.64, depth = 0.4): void {
   mesh.box([0, 0.018, 0], [width, 0.036, depth], P.steelShade);
 }
 
+const switchgearDepth = 0.06;
+
 /** Drawn cap centers are the conductor endpoints exported to the network. */
-function switchgear(mesh: MeshBuilder, z = 0.22): readonly Vec3[] {
-  mesh.box([0, 0.065, z], [0.24, 0.09, 0.06], P.steel);
+function switchgear(
+  mesh: MeshBuilder,
+  z = 0.22,
+  { bottom = 0.02, width = 0.24, height = 0.09 } = {},
+): readonly Vec3[] {
+  const top = bottom + height;
+  mesh.box(
+    [0, bottom + height / 2, z],
+    [width, height, switchgearDepth],
+    P.steel,
+  );
   const terminals: Vec3[] = [];
   for (const x of [-0.085, 0.085]) {
     mesh
-      .cylinder([x, 0.11, z], 0.012, 0.012, 0.032, P.cream)
-      .cylinder([x, 0.119, z], 0.018, 0.018, 0.008, P.steelShade)
-      .cylinder([x, 0.142, z], 0.014, 0.014, 0.008, P.steelShade);
-    terminals.push([x, 0.15, z]);
+      .cylinder([x, top, z], 0.012, 0.012, 0.032, P.cream)
+      .cylinder([x, top + 0.009, z], 0.018, 0.018, 0.008, P.steelShade)
+      .cylinder([x, top + 0.032, z], 0.014, 0.014, 0.008, P.steelShade);
+    terminals.push([x, top + 0.04, z]);
   }
   return terminals;
 }
@@ -686,6 +697,7 @@ const windDesigns = {
   large: { mast: 0.59, tower: 1.24, span: 1.34, chord: 1.25 },
 };
 
+const offshoreDeckThickness = 0.025;
 const offshoreDecks = {
   small: { height: 0.062, width: 0.23, depth: 0.175, legX: 0.076, legZ: 0.06 },
   medium: { height: 0.09, width: 0.3, depth: 0.25, legX: 0.1, legZ: 0.08 },
@@ -717,7 +729,7 @@ function wind(kind: "wind" | "offshore-wind", size: FacilitySize): MapModel {
           P.steelShade,
         );
       }
-    body.box([0, deck, 0], [width, 0.025, depth], P.steel);
+    body.box([0, deck, 0], [width, offshoreDeckThickness, depth], P.steel);
     if (size === "large") {
       // The service deck carries a crane and has a separate landing for switchgear.
       body.box([0, 0.045, 0.16], [0.255, 0.06, 0.082], P.steelShade);
@@ -781,19 +793,22 @@ function wind(kind: "wind" | "offshore-wind", size: FacilitySize): MapModel {
     [0, 0, 0.022],
     [Math.PI / 2, 0, 0],
   );
-  return facilityModel(
-    kind,
-    body,
-    switchgear(body, offshore && size === "large" ? 0.169 : 0.12),
-    [
-      {
-        mesh: rotor.build(),
-        position: pivot,
-        motion: "rotor",
-        castsShadow: true,
-      },
-    ],
-  );
+  const terminals =
+    offshore && size === "small"
+      ? switchgear(body, (platform.depth - switchgearDepth) / 2 - 0.005, {
+          bottom: deck + offshoreDeckThickness / 2,
+          width: platform.width - 0.01,
+          height: 0.07,
+        })
+      : switchgear(body, offshore && size === "large" ? 0.169 : 0.12);
+  return facilityModel(kind, body, terminals, [
+    {
+      mesh: rotor.build(),
+      position: pivot,
+      motion: "rotor",
+      castsShadow: true,
+    },
+  ]);
 }
 
 const kiteDesigns = {
