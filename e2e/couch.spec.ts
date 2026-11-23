@@ -29,7 +29,9 @@ test("TV Play with friends keeps couch play available when online play is discon
     .click();
   const lobby = page.getByRole("dialog", { name: "Play with friends" });
   await expect(
-    lobby.getByText("Connect to Steam to play online"),
+    lobby.getByText(
+      "Connect to Steam or open Electrify in your browser to play online.",
+    ),
   ).toBeVisible();
   await expect(
     lobby.getByRole("button", { name: "Host a game" }),

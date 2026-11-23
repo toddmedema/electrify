@@ -12,7 +12,7 @@ import type {
   DesktopState,
 } from "../src/Desktop";
 import type { InstalledMod } from "../src/mods/Types";
-import type { LobbyState } from "../src/multiplayer/Native";
+import type { LobbyState } from "../src/multiplayer/SessionTransport";
 import { editSavedGame, readSavedGame, readSaveRecords } from "./save-fixture";
 
 const glyphs: InputFrame["glyphs"] = {
@@ -306,14 +306,16 @@ test.beforeEach(async ({ page }, info) => {
         },
       },
     ];
-    let lobby: LobbyState = {
+    const pendingLobby: LobbyState = {
       available: true,
-      selfId,
+      lobbyId: "fe2b3691-dbef-4db3-bc2c-87760dddbc56",
       members: [],
       connected: [],
+      joinPending: true,
     };
     window.electrifyDesktop = {
       apiVersion: 1,
+      steamEdition: true,
       getState: async () => ({
         display,
         steam: {
@@ -338,36 +340,22 @@ test.beforeEach(async ({ page }, info) => {
           );
         return { entries };
       },
-      multiplayerRequest: async (request) => {
-        document.documentElement.dataset.mockMultiplayerRequest = request.kind;
-        if (request.kind === "list-saves")
-          return { slots: [], cloudState: "disabled" };
-        if (request.kind === "join") {
-          document.documentElement.dataset.mockJoinedLobby = request.lobbyId;
-          lobby = {
-            ...lobby,
-            lobbyId: "10977524123456789",
-            inviteCode: request.lobbyId,
-            hostId: "76561198000000002",
-            members: [
-              { id: selfId, name: "Deck player" },
-              { id: "76561198000000002", name: "Friend" },
-            ],
-            connected: ["76561198000000002"],
-          };
+      crossplayRequest: async (operation, body, _requestId, userAction) => {
+        if (operation === "room/state")
+          return { ok: true, value: { lobby: pendingLobby, authority: null } };
+        if (
+          operation === "room/join" &&
+          userAction &&
+          body &&
+          typeof body === "object" &&
+          "invite" in body &&
+          typeof body.invite === "string"
+        ) {
+          document.documentElement.dataset.mockJoinedInvite = body.invite;
+          return { ok: true, value: { lobby: pendingLobby, authority: null } };
         }
-        if (request.kind === "create")
-          lobby = {
-            ...lobby,
-            lobbyId: "10977524123456789",
-            inviteCode: "012345",
-            hostId: selfId,
-            members: [{ id: selfId, name: "Deck player" }],
-            connected: [],
-          };
-        return lobby;
+        return { ok: false, code: "unavailable" };
       },
-      onMultiplayerEvent: noop,
       onStateChanged: noop,
       onGameFocusChanged: noop,
       onBeforeQuit: noop,
@@ -1080,16 +1068,17 @@ test("controller opens Workshop and enters a multiplayer invite with Steam text 
     page.getByRole("dialog", { name: "Play with friends", exact: true }),
   ).toBeVisible();
   const code = page.getByRole("textbox", {
-    name: "6-digit invite code",
+    name: "Invite code",
     exact: true,
   });
   await select(page, code);
   await input(page, "confirm");
   await expect(page.locator("html")).toHaveAttribute(
     "data-mock-text-input",
-    /6-digit invite code/,
+    /Invite code/,
   );
-  await submitText(page, "012345", code);
+  const invite = "0123456789abcdef0123";
+  await submitText(page, invite, code);
   if (process.env.REVIEW_SCREENSHOT_DIR)
     await page.screenshot({
       path: path.join(
@@ -1101,11 +1090,13 @@ test("controller opens Workshop and enters a multiplayer invite with Steam text 
   await select(page, page.getByRole("button", { name: "Join", exact: true }));
   await input(page, "confirm");
   await expect(page.locator("html")).toHaveAttribute(
-    "data-mock-joined-lobby",
-    "012345",
+    "data-mock-joined-invite",
+    invite,
   );
   await expect(
-    page.getByText("Waiting for Friend to choose a game…", { exact: true }),
+    page
+      .getByRole("status")
+      .filter({ hasText: "Waiting for the host to approve your request…" }),
   ).toBeVisible();
 });
 

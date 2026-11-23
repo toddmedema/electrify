@@ -2,6 +2,7 @@ import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Provider } from "react-redux";
 import * as desktop from "../Desktop";
+import { useDesktopState } from "../DesktopState";
 import { store } from "../Store";
 import { quit } from "../reducers/GameActions";
 import { createGame } from "../testing/Simulator";
@@ -9,7 +10,7 @@ import { MultiplayerSession, SessionState } from "./Session";
 import { showMultiplayerLobby } from "./Registry";
 import MultiplayerRoot from "./Root";
 
-jest.mock("../DesktopState", () => ({ useDesktopState: () => undefined }));
+jest.mock("../DesktopState", () => ({ useDesktopState: jest.fn() }));
 jest.mock("./WorkerClient", () => ({}));
 jest.mock("./Session", () => ({
   ...jest.requireActual("./Session"),
@@ -31,6 +32,7 @@ jest.mock("../SaveSession", () => ({
 
 afterEach(() => {
   sessionStorage.clear();
+  jest.mocked(useDesktopState).mockReset();
   jest.restoreAllMocks();
   store.dispatch(quit());
 });
@@ -80,7 +82,11 @@ function renderRoot(
 const invitation = "abcdefghijklmnopqrstuv";
 const newerInvitation = "zyxwvutsrqponmlkjihgfe";
 
-function renderWithSteamInvites() {
+function renderWithSteamInvites(online = true) {
+  jest.mocked(useDesktopState).mockReturnValue({
+    display: { width: 1280, height: 720, fullscreen: false, resolutions: [] },
+    steam: { available: true, online, cloudEnabled: false },
+  });
   let receive: (() => void) | undefined;
   let token: string | undefined;
   const bridge: Pick<
@@ -88,11 +94,13 @@ function renderWithSteamInvites() {
     | "apiVersion"
     | "couchRequest"
     | "steamEdition"
+    | "crossplayRequest"
     | "onCrossplayInvite"
     | "takeCrossplayInvite"
   > = {
     apiVersion: 1,
     steamEdition: true,
+    crossplayRequest: jest.fn(),
     couchRequest: jest.fn(),
     onCrossplayInvite: (callback) => {
       receive = callback;
@@ -143,6 +151,18 @@ test("the unified lobby accepts a pasted link and a code", async () => {
   await user.type(code, "001122334455AABBCCDD");
   await user.click(screen.getByRole("button", { name: "Join" }));
   expect(join).toHaveBeenLastCalledWith("001122334455aabbccdd");
+});
+
+test("Steam Offline Mode disables online play and keeps Local Co-op available", async () => {
+  const { join, invite } = renderWithSteamInvites(false);
+  await invite(invitation);
+  expect(screen.getByRole("button", { name: "Host a game" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Join" })).toBeDisabled();
+  expect(
+    screen.getByRole("button", { name: "Multiplayer saves" }),
+  ).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Local Co-op" })).toBeEnabled();
+  expect(join).not.toHaveBeenCalled();
 });
 
 test("a couch session keeps the latest invitation until local play closes", async () => {

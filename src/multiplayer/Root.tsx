@@ -62,7 +62,13 @@ export default function MultiplayerRoot() {
   const [initialInvite] = useState(() => captureCrossplayInvite());
   const [open, setOpen] = useState(!!initialInvite);
   const [entryInviteCode, setEntryInviteCode] = useState(initialInvite);
-  const steamName = useDesktopState()?.steam.displayName;
+  const steam = useDesktopState()?.steam;
+  const steamName = steam?.displayName;
+  const canAuthenticate = desktop
+    ? desktop.steamEdition === true &&
+      !!desktop.crossplayRequest &&
+      steam?.online === true
+    : !!firebaseAppAuth;
   const currentSteamName = useRef(steamName);
   currentSteamName.current = steamName;
   const [couchOpen, setCouchOpen] = useState(false);
@@ -533,7 +539,7 @@ export default function MultiplayerRoot() {
         <Lobby
           session={session}
           initialInviteCode={entryInviteCode}
-          canAuthenticate={!!firebaseAppAuth || desktop?.steamEdition === true}
+          canAuthenticate={canAuthenticate}
           onAuthorize={authorize}
           onJoined={() => {
             clearCrossplayInvite();
