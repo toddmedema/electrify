@@ -1,6 +1,7 @@
 import {
   cacheProjection,
   ProjectionView,
+  ProjectionScope,
   projectionSignature,
   selectProjection,
 } from "../../helpers/Projection";
@@ -14,135 +15,192 @@ import { createProjectionWorker } from "./ProjectionWorkerClient";
 import { forecastWorkerSnapshot } from "./ForecastWorkerSnapshot";
 import { projectionDecoder, ProjectionTransport } from "./ProjectionTransport";
 
-/**
- * Takes the game's long-range projection off the frame that invalidates it.
- *
- * selectProjection is memoized on projectionSignature, which changes on every month rollover
- * (and on rate, fleet and policy decisions). Its first caller after a change pays for a
- * twenty-year simulation in render, and at a rollover that is the same frame as the reducer's
- * own month-end work. Both on-screen readers, Insights and the top bar's runway warning, go
- * through this module instead. When the projection is stale they keep drawing the previous one
- * and ask for the new one here. It is computed in a persistent worker for every reader, and they all
- * re-render in a single commit when it lands.
- *
- * The worker calls selectProjection with the game and tick from the render that first saw
- * the new signature, which is what the synchronous call would have used. Once it lands, every
- * reader's own selectProjection call is a cache hit with the same result as before.
- */
+/** Each forecast keeps its own worker and latest result. A short top-bar reply
+ * cannot settle or cancel the longer planning request when Insights is open. */
+function deferProjection(scope: ProjectionScope) {
+  let ready: { key: string; history: MonthlyHistoryType[] } | undefined;
+  let pending:
+    | {
+        key: string;
+        history: MonthlyHistoryType[];
+        game: GameType;
+        now: TickPresentFutureType;
+        requestId: number;
+        cancel: () => void;
+      }
+    | undefined;
+  const listeners = new Set<() => void>();
+  let worker: Worker | undefined;
+  let workerUnavailable = false;
+  let nextRequestId = 0;
+  let inFlight: number | undefined;
+  let decoding = false;
+  const DECODE_BUDGET_MS = 3;
 
-let ready: { key: string; history: MonthlyHistoryType[] } | undefined;
-let pending:
-  | {
-      key: string;
-      history: MonthlyHistoryType[];
-      game: GameType;
-      now: TickPresentFutureType;
-      requestId: number;
-      cancel: () => void;
+  function cancelPending(): void {
+    pending?.cancel();
+    if (decoding) {
+      decoding = false;
+      inFlight = undefined;
     }
-  | undefined;
-const listeners = new Set<() => void>();
-let worker: Worker | undefined;
-let workerUnavailable = false;
-let nextRequestId = 0;
-let inFlight: number | undefined;
-let decoding = false;
-const DECODE_BUDGET_MS = 3;
+  }
 
-function cancelPending(): void {
-  pending?.cancel();
-  if (decoding) {
-    decoding = false;
+  function publish(game: GameType, projection: ProjectionView): void {
+    cacheProjection(game, projection, scope);
+    ready = { key: signature(game), history: game.monthlyHistory };
+    pending = undefined;
+    listeners.forEach((listener) => listener());
+  }
+
+  function fallback(): void {
+    cancelPending();
+    worker?.terminate();
+    worker = undefined;
     inFlight = undefined;
+    workerUnavailable = true;
+    if (!pending) return;
+    const request = pending;
+    request.cancel = afterPaint(() => {
+      if (pending === request) {
+        publish(
+          request.game,
+          selectProjection(request.game, request.now, request.key, scope),
+        );
+      }
+    });
   }
-}
 
-function publish(game: GameType, projection: ProjectionView): void {
-  cacheProjection(game, projection);
-  ready = { key: signature(game), history: game.monthlyHistory };
-  pending = undefined;
-  listeners.forEach((listener) => listener());
-}
-
-function fallback(): void {
-  cancelPending();
-  worker?.terminate();
-  worker = undefined;
-  inFlight = undefined;
-  workerUnavailable = true;
-  if (!pending) return;
-  const request = pending;
-  request.cancel = afterPaint(() => {
-    if (pending === request) {
-      publish(request.game, selectProjection(request.game, request.now));
+  function dispatchPending(): void {
+    if (!pending || inFlight !== undefined) return;
+    if (workerUnavailable || typeof Worker === "undefined") {
+      fallback();
+      return;
     }
-  });
-}
-
-function dispatchPending(): void {
-  if (!pending || inFlight !== undefined) return;
-  if (workerUnavailable || typeof Worker === "undefined") {
-    fallback();
-    return;
-  }
-  try {
-    if (!worker) {
-      worker = createProjectionWorker();
-      worker.onmessage = (
-        event: MessageEvent<{
-          requestId: number;
-          transport?: ProjectionTransport;
-          error?: boolean;
-        }>,
-      ) => {
-        if (event.data.requestId !== inFlight) return;
-        if (pending?.requestId === event.data.requestId) {
-          if (event.data.error || !event.data.transport) {
-            fallback();
+    try {
+      if (!worker) {
+        worker = createProjectionWorker();
+        worker.onmessage = (
+          event: MessageEvent<{
+            requestId: number;
+            transport?: ProjectionTransport;
+            error?: boolean;
+          }>,
+        ) => {
+          if (event.data.requestId !== inFlight) return;
+          if (pending?.requestId === event.data.requestId) {
+            if (event.data.error || !event.data.transport) {
+              fallback();
+              return;
+            }
+            const request = pending;
+            const decode = projectionDecoder(
+              event.data.transport,
+              request.game,
+              request.now,
+            );
+            decoding = true;
+            const step = () => {
+              if (pending !== request) return;
+              try {
+                const projection = decode(performance.now() + DECODE_BUDGET_MS);
+                if (!projection) {
+                  request.cancel = afterPaint(step);
+                  return;
+                }
+                decoding = false;
+                inFlight = undefined;
+                publish(request.game, projection);
+                dispatchPending();
+              } catch (_error) {
+                fallback();
+              }
+            };
+            request.cancel = afterPaint(step);
             return;
           }
-          const request = pending;
-          const decode = projectionDecoder(
-            event.data.transport,
-            request.game,
-            request.now,
-          );
-          decoding = true;
-          const step = () => {
-            if (pending !== request) return;
-            try {
-              const projection = decode(performance.now() + DECODE_BUDGET_MS);
-              if (!projection) {
-                request.cancel = afterPaint(step);
-                return;
-              }
-              decoding = false;
-              inFlight = undefined;
-              publish(request.game, projection);
-              dispatchPending();
-            } catch (_error) {
-              fallback();
-            }
-          };
-          request.cancel = afterPaint(step);
-          return;
-        }
-        inFlight = undefined;
-        // Only the newest edit is queued; old replies never replace current forecasts.
-        dispatchPending();
-      };
-      worker.onerror = fallback;
-      worker.onmessageerror = fallback;
+          inFlight = undefined;
+          // Only the newest edit is queued; old replies never replace current forecasts.
+          dispatchPending();
+        };
+        worker.onerror = fallback;
+        worker.onmessageerror = fallback;
+      }
+      inFlight = pending.requestId;
+      worker.postMessage({
+        requestId: pending.requestId,
+        game: forecastWorkerSnapshot(pending.game),
+        now: pending.now,
+        scope,
+      });
+    } catch (_error) {
+      fallback();
     }
-    inFlight = pending.requestId;
-    worker.postMessage({
-      requestId: pending.requestId,
-      game: forecastWorkerSnapshot(pending.game),
-      now: pending.now,
-    });
-  } catch (_error) {
-    fallback();
   }
+
+  /** Whether selectProjection already holds this game's projection, so reading it is cheap. */
+  function projectionReady(game: GameType): boolean {
+    return (
+      ready !== undefined &&
+      ready.history === game.monthlyHistory &&
+      ready.key === signature(game)
+    );
+  }
+
+  /** The projection, now. Cheap when projectionReady; otherwise it simulates in the caller's frame. */
+  function readProjection(
+    game: GameType,
+    now: TickPresentFutureType,
+  ): ProjectionView {
+    const projection = selectProjection(game, now, signature(game), scope);
+    // A synchronous initial/new-run render supersedes any older worker snapshot too.
+    cancelPending();
+    pending = undefined;
+    ready = { key: signature(game), history: game.monthlyHistory };
+    return projection;
+  }
+
+  /**
+   * Asks for this game's projection in the worker, then tells every subscriber. Asking again for the
+   * same inputs is free, and asking for different ones cancels the older request.
+   */
+  function requestProjection(game: GameType, now: TickPresentFutureType): void {
+    if (projectionReady(game)) return;
+    const key = signature(game);
+    const history = game.monthlyHistory;
+    if (pending && pending.key === key && pending.history === history) return;
+    cancelPending();
+    pending = {
+      key,
+      history,
+      game,
+      now,
+      requestId: ++nextRequestId,
+      // Even snapshot cloning and worker startup stay off the rollover's paint.
+      cancel: afterPaint(dispatchPending),
+    };
+  }
+
+  /** Called after a requested projection lands. Returns the unsubscribe function. */
+  function subscribeProjection(listener: () => void): () => void {
+    listeners.add(listener);
+    return () => {
+      listeners.delete(listener);
+      if (!listeners.size) {
+        cancelPending();
+        pending = undefined;
+        worker?.terminate();
+        worker = undefined;
+        inFlight = undefined;
+        workerUnavailable = false;
+      }
+    };
+  }
+  return {
+    projectionReady,
+    readProjection,
+    requestProjection,
+    subscribeProjection,
+  };
 }
 
 // Every reader asks about the same game object in the same render pass, and the signature
@@ -157,64 +215,37 @@ export function signature(game: GameType): string {
   return key;
 }
 
-/** Whether selectProjection already holds this game's projection, so reading it is cheap. */
-export function projectionReady(game: GameType): boolean {
-  return (
-    ready !== undefined &&
-    ready.history === game.monthlyHistory &&
-    ready.key === signature(game)
-  );
+const deferred = {
+  planning: deferProjection("planning"),
+  "top-bar": deferProjection("top-bar"),
+};
+
+export function projectionReady(
+  game: GameType,
+  scope: ProjectionScope = "planning",
+): boolean {
+  return deferred[scope].projectionReady(game);
 }
 
-/** The projection, now. Cheap when projectionReady; otherwise it simulates in the caller's frame. */
 export function readProjection(
   game: GameType,
   now: TickPresentFutureType,
+  scope: ProjectionScope = "planning",
 ): ProjectionView {
-  const projection = selectProjection(game, now, signature(game));
-  // A synchronous initial/new-run render supersedes any older worker snapshot too.
-  cancelPending();
-  pending = undefined;
-  ready = { key: signature(game), history: game.monthlyHistory };
-  return projection;
+  return deferred[scope].readProjection(game, now);
 }
 
-/**
- * Asks for this game's projection in the worker, then tells every subscriber. Asking again for the
- * same inputs is free, and asking for different ones cancels the older request.
- */
 export function requestProjection(
   game: GameType,
   now: TickPresentFutureType,
+  scope: ProjectionScope = "planning",
 ): void {
-  if (projectionReady(game)) return;
-  const key = signature(game);
-  const history = game.monthlyHistory;
-  if (pending && pending.key === key && pending.history === history) return;
-  cancelPending();
-  pending = {
-    key,
-    history,
-    game,
-    now,
-    requestId: ++nextRequestId,
-    // Even snapshot cloning and worker startup stay off the rollover's paint.
-    cancel: afterPaint(dispatchPending),
-  };
+  deferred[scope].requestProjection(game, now);
 }
 
-/** Called after a requested projection lands. Returns the unsubscribe function. */
-export function subscribeProjection(listener: () => void): () => void {
-  listeners.add(listener);
-  return () => {
-    listeners.delete(listener);
-    if (!listeners.size) {
-      cancelPending();
-      pending = undefined;
-      worker?.terminate();
-      worker = undefined;
-      inFlight = undefined;
-      workerUnavailable = false;
-    }
-  };
+export function subscribeProjection(
+  listener: () => void,
+  scope: ProjectionScope = "planning",
+): () => void {
+  return deferred[scope].subscribeProjection(listener);
 }

@@ -50,11 +50,15 @@ function setup(scenarioId = 116) {
 beforeEach(() => jest.clearAllMocks());
 
 it("keeps current facts visible while requesting the shared forecast, never reading stale projection", () => {
-  setup();
+  const { props } = setup();
   expect(
     screen.getByRole("button", { name: /^Current grid status: NOW/ }),
   ).toBeVisible();
-  expect(requestProjection).toHaveBeenCalled();
+  expect(requestProjection).toHaveBeenCalledWith(
+    props.game,
+    props.now,
+    "top-bar",
+  );
   expect(readProjection).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole("button", { name: /^Current grid status/ }));
   expect(screen.getByRole("dialog", { name: "Grid status" })).toHaveTextContent(
