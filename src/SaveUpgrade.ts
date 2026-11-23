@@ -427,6 +427,8 @@ const migrations: readonly Migration[] = [
   // 23 -> 24: support expansion loans and reconcile Valley goals from the map branch.
   (save, publishedValleyRules) =>
     migrations[22 - FIRST_SUPPORTED_SAVE_SCHEMA](save, publishedValleyRules),
+  // 24 -> 25: retain the published schema. Current validation checks challenge metadata.
+  (save) => (object(save.game) ? save : null),
 ];
 
 /** Structure versions are independent of app releases and simulation compatibility. */

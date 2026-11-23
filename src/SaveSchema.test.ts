@@ -24,6 +24,7 @@ it.each([
 
 it("validates new challenge metadata without rewriting an invalid run identity", () => {
   const save = JSON.parse(JSON.stringify(serializeSave(game)));
+  save.schemaVersion = 25;
   save.game.challenge = {
     scenarioId: game.scenarioId,
     difficulty: game.difficulty,
@@ -67,23 +68,28 @@ it.each([6, 7])(
   },
 );
 
-it("continues an older rules digest with unchanged progress", () => {
-  const save = historicalSave();
-  save.schemaVersion = 8;
-  const original = JSON.stringify(save);
-  const continued = parseSave(save);
-  expect(continued).not.toBeNull();
-  expect(continued!.schemaVersion).toBe(SAVE_SCHEMA_VERSION);
-  expect(continued!.game.rulesChanged).toBe(true);
-  expect(continued!.game.runIdentity).toBeUndefined();
-  expect(continued!.game.date).toEqual(game.date);
-  expect(continued!.game.timeline[0].cash).toBe(game.timeline[0].cash);
-  expect(continued!.game.meaningfulDecisions).toEqual(game.meaningfulDecisions);
-  expect(JSON.stringify(save)).toBe(original);
-  expect(parseSave(serializeSave(continued!.game))?.game).toEqual(
-    continued!.game,
-  );
-});
+it.each([8, 24, 25])(
+  "continues schema %i from an older rules digest with unchanged progress",
+  (schemaVersion) => {
+    const save = historicalSave();
+    save.schemaVersion = schemaVersion;
+    const original = JSON.stringify(save);
+    const continued = parseSave(save);
+    expect(continued).not.toBeNull();
+    expect(continued!.schemaVersion).toBe(SAVE_SCHEMA_VERSION);
+    expect(continued!.game.rulesChanged).toBe(true);
+    expect(continued!.game.runIdentity).toBeUndefined();
+    expect(continued!.game.date).toEqual(game.date);
+    expect(continued!.game.timeline[0].cash).toBe(game.timeline[0].cash);
+    expect(continued!.game.meaningfulDecisions).toEqual(
+      game.meaningfulDecisions,
+    );
+    expect(JSON.stringify(save)).toBe(original);
+    expect(parseSave(serializeSave(continued!.game))?.game).toEqual(
+      continued!.game,
+    );
+  },
+);
 
 it.each([
   (save: ReturnType<typeof historicalSave>) => {

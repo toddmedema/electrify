@@ -99,7 +99,7 @@ describe("SaveFile", () => {
       );
       expect(roundTrip(exported)).toEqual(exported);
     });
-    it("imports a packed prior-release save with progress intact and a repeatable current export", () => {
+    it("imports a packed schema 25 save with progress intact and a repeatable export", () => {
       const game = createGame({ scenarioId: 101, seed: 31337 });
       const raw = JSON.parse(
         JSON.stringify(
@@ -110,7 +110,7 @@ describe("SaveFile", () => {
           ),
         ),
       );
-      raw.save.schemaVersion = 8;
+      raw.save.schemaVersion = 25;
       raw.save.game.runIdentity.compatibilityId = `rules-1-${"a".repeat(64)}`;
       const original = JSON.stringify(raw);
       const imported = validateSaveFileEnvelope(raw, parseSave);
