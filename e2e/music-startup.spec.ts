@@ -1,10 +1,15 @@
 import { expect, test } from "./fixtures";
-import { installMusicAudit } from "./music-audit";
+import {
+  expectOpeningMusic,
+  installMusicAudit,
+  waitForGameplayLoop,
+} from "./music-audit";
 
 test.use({
   launchOptions: { args: ["--autoplay-policy=user-gesture-required"] },
 });
-test.setTimeout(90000);
+// The native focus test waits for the real 29-second intro before checking loop positions.
+test.setTimeout(120000);
 
 async function prepared(page: import("@playwright/test").Page) {
   await expect
@@ -12,7 +17,7 @@ async function prepared(page: import("@playwright/test").Page) {
       timeout: 60000,
     })
     .toEqual(
-      Array.from({ length: 4 }, () =>
+      Array.from({ length: 5 }, () =>
         expect.objectContaining({ state: "decoded" }),
       ),
     );
@@ -105,16 +110,7 @@ test("enabling prepared installed-app sound starts on that gesture and quick tog
   await page.getByRole("button", { name: "Back", exact: true }).click();
   await page.getByRole("button", { name: "Tutorials", exact: true }).click();
   await expect(page.locator(".tutorialHud")).toBeVisible();
-  await expect
-    .poll(() =>
-      page.evaluate(
-        () =>
-          window.electrifyMusicPlayback.filter(
-            (entry) => !entry.stopped && !entry.ended,
-          ).length,
-      ),
-    )
-    .toBe(3);
+  await waitForGameplayLoop(page);
   for (let i = 0; i < 2; i++) {
     const before = await page.evaluate(readPlayhead);
     await page.evaluate(async () => {
@@ -229,16 +225,7 @@ test("a muted installed app caches every audio file before its first offline sou
   await page.getByRole("button", { name: "Back", exact: true }).click();
   await page.getByRole("button", { name: "Tutorials", exact: true }).click();
   await expect(page.locator(".tutorialHud")).toBeVisible();
-  await expect
-    .poll(() =>
-      page.evaluate(
-        () =>
-          window.electrifyMusicPlayback.filter(
-            (entry) => !entry.stopped && !entry.ended,
-          ).length,
-      ),
-    )
-    .toBe(3);
+  await expectOpeningMusic(page, 1);
 });
 
 test.describe("cold gesture startup", () => {

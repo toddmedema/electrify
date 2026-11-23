@@ -78,7 +78,16 @@ for (const theme of ["light", "dark"] as const) {
         floating ? index + 1 : 1,
       );
     }
-    await expect(page.locator("#chartForecastSupplyDemand")).toBeVisible();
+    const forecast = page
+      .getByRole("region", { name: "Insights", exact: true })
+      .getByRole("region", { name: "Supply & Demand evidence", exact: true });
+    // Insights opens before the long-range forecast worker has finished.
+    await expect(
+      forecast.getByRole("img", {
+        name: /^Monthly ranges of estimated electricity supply and demand/,
+      }),
+    ).toBeVisible({ timeout: 60_000 });
+    await expect(forecast.locator("#chartForecastSupplyDemand")).toBeVisible();
   });
 
   test(`legacy grid status opens existing trading controls in ${theme}`, async ({

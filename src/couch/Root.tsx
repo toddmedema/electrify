@@ -908,9 +908,10 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
         ]);
       if (!mounted.current || generation !== starts.current) return;
       const worker = createMultiplayerWorker();
+      const accountPlatform = platform.current;
       const owner = new CouchCoordinator(worker, {
         afterSeatPaint,
-        onAccountView: (view) => platform.current?.publish(view),
+        onAccountView: (view) => accountPlatform?.publish(view),
         /** Keep common calendar/event presentation separate from private company command replies. */
         onSharedView: (view) => {
           if (view.game) setCommonGame(view.game);
@@ -1025,6 +1026,9 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
       setError(String(failure));
       coordinator.current?.dispose();
       coordinator.current = undefined;
+      // Clear any published match so the next start owns a fresh account and music run.
+      platform.current?.dispose();
+      platform.current = beginCouchPlatform();
       const failures = [String(failure)];
       try {
         await request({ kind: "close" });

@@ -5,6 +5,11 @@ import { snackbarOpen } from "../../reducers/UI";
 import { AppStateType } from "../../Types";
 import Audio, { DispatchProps, StateProps } from "./Audio";
 import { musicIntensityForGame } from "../../audio/MusicIntensity";
+import {
+  couchPlatformMatch,
+  subscribeCouchPlatform,
+} from "../../couch/Platform";
+import { useSyncExternalStore } from "react";
 
 const NO_EVENTS: NonNullable<AppStateType["game"]["eventLog"]> = [];
 
@@ -14,6 +19,9 @@ const mapStateToProps = (state: AppStateType): StateProps => {
     musicVolume: state.settings.musicVolume,
     soundEffectsVolume: state.settings.soundEffectsVolume,
     musicIntensity: musicIntensityForGame(state.game),
+    musicRunId: state.game.inGame
+      ? `${state.game.multiplayer ? "online" : "solo"}:${state.ui.evidenceRunId ?? 0}`
+      : undefined,
     inGame: state.game.inGame,
     events: state.game.eventLog || NO_EVENTS,
     victoryOpen: Boolean(state.ui.victory),
@@ -29,6 +37,26 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => ({
   },
 });
 
-const AudioContainer = connect(mapStateToProps, mapDispatchToProps)(Audio);
+/** Couch seats do not play music. The shell follows its authoritative match. */
+function DesktopAudio(props: StateProps & DispatchProps) {
+  const match = useSyncExternalStore(
+    subscribeCouchPlatform,
+    couchPlatformMatch,
+  );
+  return match?.game ? (
+    <Audio
+      {...props}
+      musicRunId={`couch:${match.token}`}
+      musicIntensity={musicIntensityForGame(match.game)}
+    />
+  ) : (
+    <Audio {...props} />
+  );
+}
+
+const AudioContainer = connect(
+  mapStateToProps,
+  mapDispatchToProps,
+)(process.env.REACT_APP_DESKTOP === "true" ? DesktopAudio : Audio);
 
 export default AudioContainer;

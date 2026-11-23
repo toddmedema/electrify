@@ -3,7 +3,7 @@ import {
   pause,
   playSoundEffect,
   resume,
-  setMusicInGame,
+  setMusicRun,
   setMusicVolume,
   setSoundEffectsVolume,
   state as audioState,
@@ -23,6 +23,7 @@ export interface StateProps extends SoundEventSnapshot {
   musicVolume: number;
   soundEffectsVolume: number;
   musicIntensity: number;
+  musicRunId?: string;
 }
 
 export interface DispatchProps {
@@ -37,7 +38,7 @@ export default class Audio extends React.Component<Props, {}> {
 
   /** Track scene and gesture changes, then prepare installed-app music after startup settles. */
   componentDidMount() {
-    setMusicInGame(this.props.inGame, this.props.musicIntensity);
+    setMusicRun(this.props.musicRunId, this.props.musicIntensity);
     if (!this.props.enabled || document.visibilityState === "hidden") pause();
     // Only new live notifications deserve a chime. Consume them even while muted/hidden so
     // enabling sound or returning to the tab cannot replay an old award. Steam owns its cues.
@@ -116,10 +117,10 @@ export default class Audio extends React.Component<Props, {}> {
   /** Keep scene mixing, volume controls and event cues aligned with the latest game state. */
   componentDidUpdate(prevProps: StateProps) {
     if (
-      this.props.inGame !== prevProps.inGame ||
+      this.props.musicRunId !== prevProps.musicRunId ||
       this.props.musicIntensity !== prevProps.musicIntensity
     ) {
-      setMusicInGame(this.props.inGame, this.props.musicIntensity);
+      setMusicRun(this.props.musicRunId, this.props.musicIntensity);
     }
     if (this.props.enabled !== prevProps.enabled) {
       this.handleEnableState(this.props.enabled);

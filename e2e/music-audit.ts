@@ -1,4 +1,52 @@
-import { Page } from "./fixtures";
+import { expect, Page } from "./fixtures";
+
+export async function expectOpeningMusic(page: Page, previousSources: number) {
+  await expect
+    .poll(() => page.evaluate(() => window.electrifyMusicStarts.length))
+    .toBe(previousSources + 4);
+  const [intro, ...stems] = await page.evaluate(
+    (count) =>
+      window.electrifyMusicPlayback.slice(count).map((entry) => ({
+        startsAt: entry.startTime,
+        duration: entry.source.buffer!.duration,
+        loop: entry.source.loop,
+        offset: entry.offset,
+      })),
+    previousSources,
+  );
+  expect(intro.duration).toBeCloseTo(29.3, 1);
+  expect(intro.loop).toBe(false);
+  expect(intro.offset).toBe(0);
+  const loopStart = stems[0].startsAt;
+  expect(loopStart).toBeGreaterThan(intro.startsAt);
+  expect(intro.startsAt + intro.duration - loopStart).toBeCloseTo(2, 3);
+  for (const stem of stems) {
+    expect(stem.loop).toBe(true);
+    expect(stem.duration).toBeGreaterThan(391);
+    expect(stem.offset).toBe(0);
+    expect(stem.startsAt).toBe(loopStart);
+  }
+}
+
+export async function waitForGameplayLoop(page: Page) {
+  await expect
+    .poll(
+      () =>
+        page.evaluate(() =>
+          window.electrifyMusicPlayback
+            .filter(
+              ({ source, startTime, stopped, ended }) =>
+                !stopped && !ended && source.context.currentTime >= startTime,
+            )
+            .map(({ source }) => source.loop && source.buffer!.duration > 391),
+        ),
+      {
+        timeout: 45000,
+        message: "The intro ends and the three gameplay stems keep playing",
+      },
+    )
+    .toEqual([true, true, true]);
+}
 
 declare global {
   interface Window {

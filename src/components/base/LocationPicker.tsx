@@ -136,6 +136,11 @@ export default function LocationPicker({
   const [nearestMessage, setNearestMessage] = React.useState("");
   const nearestRequest = React.useRef(0);
   const searchSelection = React.useRef<CityType>();
+  // Stable city IDs preserve an active query when the downloaded catalogue replaces city objects.
+  const searchCities = React.useMemo(() => {
+    const byId = new Map(locations.map((location) => [location.id, location]));
+    return { byId, ids: [...byId.keys()] };
+  }, [locations]);
   React.useEffect(
     () => () => {
       nearestRequest.current++;
@@ -553,11 +558,18 @@ export default function LocationPicker({
         <div className="locationPickerSearchRow">
           <Autocomplete
             id="location"
-            options={locations}
-            groupBy={(location: CityType) => location.region}
-            getOptionLabel={(location: CityType) => location.name}
-            getOptionDisabled={isLocationUnavailable}
-            renderOption={(props, location) => {
+            options={searchCities.ids}
+            groupBy={(id) => searchCities.byId.get(id)!.region}
+            getOptionKey={(id) => id}
+            getOptionLabel={(id) =>
+              searchCities.byId.get(id)?.name ??
+              (value?.id === id ? value.name : id)
+            }
+            getOptionDisabled={(id) =>
+              !!isLocationUnavailable?.(searchCities.byId.get(id)!)
+            }
+            renderOption={(props, id) => {
+              const location = searchCities.byId.get(id)!;
               const { key, ...option } = props;
               return (
                 <li
@@ -584,9 +596,9 @@ export default function LocationPicker({
                 </li>
               );
             }}
-            isOptionEqualToValue={(a: CityType, b: CityType) => a.id === b.id}
-            value={value ?? null}
-            onChange={(_event, picked: CityType | null) => {
+            value={value?.id ?? null}
+            onChange={(_event, id) => {
+              const picked = id && searchCities.byId.get(id);
               if (!picked) return;
               searchSelection.current = picked;
               select(picked, true);
