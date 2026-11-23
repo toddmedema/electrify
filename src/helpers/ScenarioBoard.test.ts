@@ -1,4 +1,8 @@
 import cloneDeep from "lodash.clonedeep";
+import { tileConnectionDuration } from "./TerritoryConnections";
+import { MINUTES_PER_MONTH } from "./DateTime";
+import { ordinaryTileConnectionPrice } from "./Territories";
+import { runMonths } from "../testing/SimulationTestHelpers";
 import { VALLEY_BOARD, isValleyBoardTile } from "../data/TerritoryTiles";
 import { municipalPlantAt } from "../data/MunicipalUtilities";
 import { createGame } from "../testing/Simulator";
@@ -92,6 +96,8 @@ it("prices ordinary building tiles by terrain and the nearest owned city", () =>
   const remaining = "green-uplands:site-4";
   const before = tilePurchaseQuote(game, remaining)!;
   expect(before.price).toBeCloseTo(4.8e6);
+  game = cloneDeep(game);
+  runMonths(game, tileConnectionDuration(game.difficulty) / MINUTES_PER_MONTH);
   const town = acquisitionQuote(game, "parcel-1")!;
   game = reducer(
     game,
@@ -101,7 +107,9 @@ it("prices ordinary building tiles by terrain and the nearest owned city", () =>
       quoteKey: town.quoteKey,
     }),
   );
-  expect(price(remaining)).toBeCloseTo(3e6);
+  expect(price(remaining)).toBeCloseTo(
+    ordinaryTileConnectionPrice(game, game.date.minute, "plains", 1),
+  );
   expect(
     purchaseTile(game, { tileId: remaining, quoteKey: before.quoteKey }),
   ).toBe(false);
@@ -189,6 +197,10 @@ it("serves each city with a utility and sells both sites from the plant border",
   expect(isAdjacentToOwnedTerritoryTile(game, plant)).toBe(true);
   expect(tilePurchaseQuote(game, plant.id)).toBeUndefined();
   expect(tilePurchaseQuote(game, city.id)).toBeUndefined();
+  const legacy = cloneDeep(game);
+  for (const receipt of legacy.territoryNetwork!.tilePurchases!)
+    delete receipt.connectionMinute;
+  runMonths(game, tileConnectionDuration(game.difficulty) / MINUTES_PER_MONTH);
   const quote = acquisitionQuote(game, "parcel-1")!;
   if (quote.kind !== "municipal")
     throw new Error("Expected the Vergennes offer");
@@ -292,18 +304,23 @@ it("serves each city with a utility and sells both sites from the plant border",
     parseSave(JSON.parse(JSON.stringify(serializeSave(purchased)))),
   ).not.toBeNull();
 
-  const saved = JSON.parse(JSON.stringify(serializeSave(purchased)));
+  const legacyQuote = acquisitionQuote(legacy, "parcel-1")!;
+  const legacyPurchased = reducer(
+    legacy,
+    acquireUtility({ ...payload, quoteKey: legacyQuote.quoteKey }),
+  );
+  const saved = JSON.parse(JSON.stringify(serializeSave(legacyPurchased)));
   saved.schemaVersion = 19;
-  saved.game.objectiveProgress = retiredValleyOpeningProgress(purchased);
+  saved.game.objectiveProgress = retiredValleyOpeningProgress(legacyPurchased);
   const restored = parseSave(saved)!.game;
   expect(restored.objectiveProgress!.entries.map(({ id }) => id)).toEqual([
     "acquire-neighbor",
     "retain-customers",
   ]);
   expect(gameObjectiveResults(restored)).toEqual(
-    gameObjectiveResults(purchased),
+    gameObjectiveResults(legacyPurchased),
   );
-  expect(restored.territoryNetwork).toEqual(purchased.territoryNetwork);
+  expect(restored.territoryNetwork).toEqual(legacyPurchased.territoryNetwork);
   let expanded = restored;
   for (const targetId of ["parcel-11", "ridge-electric"] as const) {
     const offer = acquisitionQuote(expanded, targetId)!;

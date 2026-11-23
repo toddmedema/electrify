@@ -91,15 +91,15 @@ function quote(
 }
 
 it.each([
-  ["plains", 1, 1],
-  ["forest", 0.95, 1.05],
-  ["hills", 1.1, 1.1],
-  ["mountain", 1.15, 1.2],
-  ["river", 1, 1],
-  ["lake", 1, 1],
+  ["plains", 1, 1, 1],
+  ["forest", 0.95, 1.05, 1],
+  ["hills", 1.1, 1.1, 1],
+  ["mountain", 1.15, 1.2, 1.5],
+  ["river", 1, 1, 1],
+  ["lake", 1, 1, 1],
 ] as const)(
   "applies %s siting costs to all technologies and residual speed to fixed onshore wind",
-  (terrain, speed, cost) => {
+  (terrain, speed, cost, time) => {
     const game = fixture();
     const tileId = TERRITORY_TILES.find(
       (candidate) => candidate.terrain === terrain && !candidate.city,
@@ -107,10 +107,12 @@ it.each([
     expect(getTerrainModifiers(game, "Wind", tileId)).toEqual({
       onshoreWindSpeed: speed,
       buildCost: cost,
+      buildTime: time,
     });
     expect(getTerrainModifiers(game, "Sun", tileId)).toEqual({
       onshoreWindSpeed: 1,
       buildCost: cost,
+      buildTime: time,
     });
     for (const fuel of [
       "Coal",
@@ -123,11 +125,13 @@ it.each([
       expect(getTerrainModifiers(game, fuel, tileId)).toEqual({
         onshoreWindSpeed: 1,
         buildCost: cost,
+        buildTime: time,
       });
     }
     expect(getTerrainModifiers(game, "Wind")).toEqual({
       onshoreWindSpeed: 1,
       buildCost: 1,
+      buildTime: 1,
     });
   },
 );
@@ -546,5 +550,6 @@ it("retains terrain effects in a custom package based on scenario116", () => {
   expect(getTerrainModifiers(game, "Wind", tile("mountain"))).toEqual({
     onshoreWindSpeed: 1.15,
     buildCost: 1.2,
+    buildTime: 1.5,
   });
 });

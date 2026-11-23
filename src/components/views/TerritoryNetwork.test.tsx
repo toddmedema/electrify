@@ -1,3 +1,4 @@
+import { runMonths } from "../../testing/SimulationTestHelpers";
 import userEvent from "@testing-library/user-event";
 import * as React from "react";
 import cloneDeep from "lodash.clonedeep";
@@ -438,7 +439,7 @@ it("shows researched terrain effects before purchase, with speed labelled separa
   );
 });
 
-it("buys exactly the inspected tile in one action and offers to build there", () => {
+it("starts construction on exactly the inspected tile and keeps building locked", () => {
   const game = ready();
   const tile = territoryTileViews(game).find(
     ({ tile }) => !tile.city && tilePurchaseQuote(game, tile.id),
@@ -454,9 +455,10 @@ it("buys exactly the inspected tile in one action and offers to build there", ()
   expect(currentTick(store.getState().game)!.cash).toBe(before - quote.price);
   expect(ownsTerritoryTile(store.getState().game, tile.id)).toBe(true);
   expect(screen.getAllByRole("dialog")).toHaveLength(1);
+  expect(surface()).toHaveTextContent(/Connection under construction/);
   expect(
-    within(surface()).getByRole("button", { name: "Build here" }),
-  ).toBeEnabled();
+    within(surface()).queryByRole("button", { name: "Build here" }),
+  ).not.toBeInTheDocument();
   expect(within(surface()).getByRole("heading", { level: 3 })).toHaveFocus();
   expect(store.getState().game.territoryNetwork!.tilePurchases).toHaveLength(1);
 });
@@ -507,6 +509,8 @@ it("shows purchased cities as customers rather than build destinations", async (
       acquireTile({ tileId: next.id, quoteKey: quote.quoteKey }),
     );
   }
+  game = cloneDeep(game);
+  runMonths(game, 2);
   expect(acquisitionQuote(game, target.territoryId)).toBeDefined();
   const { onAcquire, store } = show(game);
   onAcquire.mockImplementation((payload) => {
@@ -656,7 +660,9 @@ it.each([undefined, 1280])(
       ),
     );
     inspect("green-uplands:site-1");
-    fireEvent.click(within(surface()).getByRole("button", { name: "Cash" }));
+    fireEvent.click(
+      within(surface()).getByRole("button", { name: /^Connect ·/ }),
+    );
     await act(async () => {
       await Promise.resolve();
     });
@@ -666,8 +672,9 @@ it.each([undefined, 1280])(
     fireEvent.keyDown(surface(), { key: "Escape" });
     showPanel(true);
     expect(within(surface()).getByText("Connecting…")).toBeVisible();
-    for (const name of ["Cash", "Loan", "Cancel"])
-      expect(within(surface()).getByRole("button", { name })).toBeDisabled();
+    expect(
+      within(surface()).getByRole("button", { name: /^Connect ·/ }),
+    ).toBeDisabled();
     expect(screen.queryByRole("slider")).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Wind · 20MW" })).toBeVisible();
     expect(commands).toHaveLength(1);
@@ -682,17 +689,13 @@ it.each([undefined, 1280])(
         acquireTile(connect.payload as Parameters<typeof acquireTile>[0]),
       );
     });
-    await waitFor(() =>
-      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
-    );
-    expect(commands).toHaveLength(2);
     expect(
-      store
-        .getState()
-        .game.facilities.find(
-          ({ tileId }) => tileId === "green-uplands:site-1",
-        ),
-    ).toMatchObject({ name: "Wind", peakW: 20e6 });
+      await within(surface()).findByText(/Connection under construction/),
+    ).toBeVisible();
+    expect(
+      within(surface()).queryByRole("button", { name: "Cash" }),
+    ).not.toBeInTheDocument();
+    expect(commands).toHaveLength(1);
   },
 );
 
@@ -901,7 +904,7 @@ it.each([
   },
 );
 
-it("retains the inspected site when connecting transitions directly into desktop construction", async () => {
+it("retains the inspected site while a desktop connection is being built", async () => {
   const game = ready();
   const site = territoryTileViews(game).find(
     ({ tile }) =>
@@ -919,7 +922,10 @@ it("retains the inspected site when connecting transitions directly into desktop
   await openProjectPlanner(
     screen.getByRole("button", { name: "Choose sites for Wind" }),
   );
-  expect(within(surface()).getByRole("button", { name: "Cash" })).toBeEnabled();
+  expect(surface()).toHaveTextContent(/Connection under construction/);
+  expect(
+    within(surface()).queryByRole("button", { name: "Cash" }),
+  ).not.toBeInTheDocument();
   expect(
     screen.getByRole("button", { name: `Inspect ${site.id}` }),
   ).toHaveAttribute("aria-pressed", "true");

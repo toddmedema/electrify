@@ -63,6 +63,7 @@ export default function TerritoryTileMenu({
     !projectSite &&
     tile &&
     view?.owned &&
+    view.developed &&
     !view.reserved &&
     !view.facility &&
     tileHasConstructionTechnology(tile);

@@ -27,7 +27,12 @@ import {
   UTILITY_AREAS,
 } from "../data/UtilityExpansion";
 import { isUtilityExpansionGame } from "./ExpansionContext";
+import { HEX_NEIGHBORS } from "./HexNeighbors";
 import { terrainBuildingPowerLimit } from "./TerritoryCapacity";
+import {
+  pendingTileConnections,
+  tileConnectionDuration,
+} from "./TerritoryConnections";
 
 export function hasTerritoryNetwork(
   game: Pick<GameType, "scenarioId" | "customScenario" | "territoryNetwork">,
@@ -45,7 +50,7 @@ export function ownedTerritories(game: GameType): TerritoryId[] {
             ({ targetId }) => targetId === id,
           )),
     ),
-    ...purchasedLandTerritories(game),
+    ...purchasedLandTerritories(game, game.date.minute),
   ].map(({ id }) => id);
 }
 export function facilityTerritoryId(
@@ -317,6 +322,31 @@ export function ownedTerritoryTiles(
     }),
   ].filter(owns);
 }
+/** Construction can overlap, and a new tower energizes through the earliest live neighbor. */
+export function createTileConnectionSchedule(
+  game: GameType,
+  owned: readonly TerritoryTileDefinition[],
+) {
+  const pending = pendingTileConnections(game);
+  const availableAt = new Map(
+    owned.map(({ id, q, r }) => [
+      `${q},${r}`,
+      pending.get(id)?.connectionMinute ?? game.date.minute,
+    ]),
+  );
+  const towerMinute =
+    game.date.minute + tileConnectionDuration(game.difficulty);
+  return ({ q, r }: TerritoryTileDefinition) =>
+    Math.max(
+      towerMinute,
+      Math.min(
+        ...HEX_NEIGHBORS.map(
+          ([dq, dr]) => availableAt.get(`${q + dq},${r + dr}`) ?? Infinity,
+        ),
+      ),
+    );
+}
+
 /** Index physical property once per quote pass; each candidate checks only six neighbors. */
 export function createTerritoryTileAdjacency(
   owned: readonly TerritoryTileDefinition[],
@@ -587,10 +617,12 @@ function technologyTiles(
   id: TerritoryId,
 ): TerritoryTileDefinition[] {
   const owns = createTerritoryTileOwnership(game);
+  const pending = pendingTileConnections(game);
   return getTerritoryTiles(game).filter(
     (tile) =>
       tile.territoryId === id &&
       owns(tile) &&
+      !pending.has(tile.id) &&
       tileSupportsFacilityTechnology(tile, facility),
   );
 }

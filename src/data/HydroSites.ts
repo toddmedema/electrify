@@ -100,7 +100,10 @@ type HydroState = Pick<
   | "customScenario"
   | "utilityExpansion"
   | "territoryNetwork"
-> & { date?: Pick<GameType["date"], "year"> };
+> & {
+  date?: Pick<GameType["date"], "year"> &
+    Partial<Pick<GameType["date"], "minute">>;
+};
 /**
  * The most sites one location offers for new construction: its largest. A longer researched list
  * is a long scroll in the build card for sites too small to matter, so the rest stay in the
@@ -239,7 +242,12 @@ export function getHydroAvailability(
       ? undefined
       : (getAuthoredTerritoryTile(tileId) ?? getGeneratedTerritoryTile(tileId));
   const sites = frontier
-    ? availableTerritorySpecialSites(state, "hydro", territoryId)
+    ? availableTerritorySpecialSites(
+        state,
+        "hydro",
+        territoryId,
+        state.date?.minute,
+      )
         .flatMap((territory) => {
           const site = getHydroSite(territoryHydroSiteId(territory.id));
           return site ? [site] : [];

@@ -11,6 +11,10 @@ import {
   type TerritoryMapTileKey,
   type TerritoryTileView,
 } from "../../helpers/TerritoryMapState";
+import {
+  formatConnectionDuration,
+  tileConnectionLabel,
+} from "../../helpers/TerritoryConnections";
 import { tilePurchaseQuotes } from "../../helpers/Territories";
 import { cityGrowthAt, type CityGrowthSector } from "../../helpers/CityDemand";
 import { projectSiteCapitalCost } from "../../helpers/ProjectBuild";
@@ -741,6 +745,7 @@ export default function TerritoryHexMap({
         reason: "",
       };
     if (projectPlanning) return unavailable("Unavailable for this project");
+    if (view.connection) return unavailable("");
     if (buyMode || tile.city) return unavailable("");
     if (view.reserved)
       return unavailable(view.facility ? "" : "Site already used");
@@ -1295,7 +1300,8 @@ export default function TerritoryHexMap({
               <g transform={`scale(${scale})`}>
                 {renderedViews.map((view) => {
                   const status = facilityMapStatus(view, game.date.minute);
-                  if (!status || status.kind === "unknown") return null;
+                  const kind = view.connection ? "construction" : status?.kind;
+                  if (!kind || kind === "unknown") return null;
                   const key = territoryMapTileKey(view.tile);
                   const origin = foregroundOrigin(view.tile);
                   return (
@@ -1303,7 +1309,10 @@ export default function TerritoryHexMap({
                       key={key}
                       className="territoryFog"
                       data-visibility-distance={view.visibilityDistance}
-                      data-facility-status={status.kind}
+                      data-facility-status={view.connection ? undefined : kind}
+                      data-connection-status={
+                        view.connection ? kind : undefined
+                      }
                       data-status-tile={key}
                       x={origin.x}
                       y={origin.y}
@@ -1312,7 +1321,7 @@ export default function TerritoryHexMap({
                       viewBox="0 0 500 500"
                       overflow="visible"
                     >
-                      <FacilityMapStatusArtwork kind={status.kind} />
+                      <FacilityMapStatusArtwork kind={kind} />
                     </svg>
                   );
                 })}
@@ -1340,7 +1349,7 @@ export default function TerritoryHexMap({
               ? `Inspect ${view.owned ? "You" : view.ownerName} territory${cityLabel ? ` · ${cityLabel}` : ""}`
               : `Inspect ${territoryTileLabel(tile)}`;
             const priceLabel = quote
-              ? `${money(quote.price)} · ${tilePurchaseBenefitLabel(quote)}`
+              ? `${money(quote.price)} · ${tilePurchaseBenefitLabel(quote)} · ${formatConnectionDuration(quote.buildMonths)}`
               : "";
             const outputFactor = projectWindOutput?.[tile.terrain] ?? 1;
             const outputModifier =
@@ -1357,6 +1366,8 @@ export default function TerritoryHexMap({
                 `New buildings: ${growth.map((sector) => CITY_GROWTH_LABEL[sector]).join(", ")}`,
               facility?.name,
               status?.kind === "unknown" ? undefined : status?.label,
+              view.connection &&
+                tileConnectionLabel(view.connection, game.date.minute),
               disaster?.condition,
               disaster?.facilityImpact,
               view.owned
@@ -1382,6 +1393,7 @@ export default function TerritoryHexMap({
                 data-territory={tile.territoryId}
                 data-owner={view.ownerKey}
                 data-owned={view.owned}
+                data-connection-building={view.connection ? true : undefined}
                 data-terrain={tile.terrain}
                 data-ground-condition={disaster?.ground}
                 data-municipal-city={

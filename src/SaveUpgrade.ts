@@ -429,6 +429,8 @@ const migrations: readonly Migration[] = [
     migrations[22 - FIRST_SUPPORTED_SAVE_SCHEMA](save, publishedValleyRules),
   // 24 -> 25: retain the published schema. Current validation checks challenge metadata.
   (save) => (object(save.game) ? save : null),
+  // 25 -> 26: dated construction is optional. Existing tile receipts remain energized.
+  (save) => save,
 ];
 
 /** Structure versions are independent of app releases and simulation compatibility. */

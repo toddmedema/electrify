@@ -156,6 +156,7 @@ it("restores parcel-priced saves built on the published terrain and resumes repr
       currentTick(game)!.cash += receipt.price - price;
       receipt.price = price;
       delete receipt.connectionDistance;
+      delete receipt.connectionMinute;
       const quote = getBuildFacilityQuote(
         game,
         { name, peakW: 20e6 },

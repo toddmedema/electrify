@@ -36,6 +36,10 @@ import { TransmissionPanelProps } from "./TransmissionPanel";
 import { useToolState } from "../base/GameToolMemory";
 import { useBuildForecast } from "../base/BuildForecast";
 import { windOutputByTerrain } from "../../helpers/ExpectedOutput";
+import {
+  formatConnectionDuration,
+  tileConnectionStatus,
+} from "../../helpers/TerritoryConnections";
 import { terrainModifiers } from "../../helpers/TerrainModifiers";
 import { customerMarketSizeAt } from "../../helpers/Customers";
 import { cityCustomerCount } from "../../helpers/CityProfiles";
@@ -213,7 +217,7 @@ function TileNetwork(props: Props) {
     tile && view?.connectable ? tilePurchaseQuote(game, tile.id) : undefined;
   const tick = currentTick(game);
   const customers = tile?.city
-    ? view?.owned
+    ? view?.owned && view.developed
       ? (acquisition?.transferredCustomers ??
         utility?.customers ??
         landTransferredCustomers(game, tile.territoryId))
@@ -226,10 +230,21 @@ function TileNetwork(props: Props) {
   const demandW =
     tick && tile?.city
       ? Object.values(
-          cityDemandByType(game, tick, tile.territoryId, !!view?.owned),
+          cityDemandByType(
+            game,
+            tick,
+            tile.territoryId,
+            !!(view?.owned && view.developed),
+          ),
         ).reduce((sum, watts) => sum + watts, 0)
       : 0;
-  const building = !!(view?.owned && tile && !tile.city && !view.facility);
+  const building = !!(
+    view?.developed &&
+    view.owned &&
+    tile &&
+    !tile.city &&
+    !view.facility
+  );
   const showSiteCatalogue = building && !desktopRail && siteCatalogue;
   const storageFits = !!tile && tileFitsFacility(tile, { peakWh: 1, peakW: 1 });
   const closeSiteCatalogue = React.useCallback(
@@ -369,6 +384,7 @@ function TileNetwork(props: Props) {
     if (
       desktopRail &&
       activated.owned &&
+      activated.developed &&
       !activated.tile.city &&
       !activated.facility
     ) {
@@ -383,7 +399,9 @@ function TileNetwork(props: Props) {
         ? (tile.city.name ?? citySizeLabel(tile.city.size))
         : TERRAIN_LABELS[tile.terrain]
     : "Tile";
-  const preferredSite = candidate ?? (building ? tile?.id : railSite);
+  const preferredSite =
+    candidate ??
+    (building || (view?.owned && view.connection) ? tile?.id : railSite);
   return (
     <section
       ref={map}
@@ -412,7 +430,10 @@ function TileNetwork(props: Props) {
             setInspected(undefined);
             const preferred =
               preferredSite &&
-              projectSiteQuote(game, selection, preferredSite).facility
+              ((view?.connection &&
+                tile?.id === preferredSite &&
+                tileFitsFacility(tile, selection)) ||
+                projectSiteQuote(game, selection, preferredSite).facility)
                 ? preferredSite
                 : undefined;
             setCandidate(preferred);
@@ -591,11 +612,16 @@ function TileNetwork(props: Props) {
             </>
           ) : (
             <>
+              {view.connection && (
+                <Typography role="status" variant="body2">
+                  {tileConnectionStatus(view.connection, game)}
+                </Typography>
+              )}
               {tile.city ? (
                 <div className="tileCityMetrics">
                   <div>
                     <span>
-                      {!view.owned
+                      {!view.developed || !view.owned
                         ? "Customers"
                         : utility && !acquisition
                           ? "Opening customers"
@@ -605,7 +631,9 @@ function TileNetwork(props: Props) {
                   </div>
                   <div>
                     <span>
-                      {view.owned ? "Current demand" : "Estimated demand"}
+                      {view.owned && view.developed
+                        ? "Current demand"
+                        : "Estimated demand"}
                     </span>
                     <strong>{formatWatts(demandW)}</strong>
                   </div>
@@ -665,6 +693,11 @@ function TileNetwork(props: Props) {
                           ? `Connect · ${formatPurchasePrice(quote.price)}`
                           : "Connection unavailable"}
                     </Button>
+                    {quote && (
+                      <Typography variant="body2">
+                        {formatConnectionDuration(quote.buildMonths)} to connect
+                      </Typography>
+                    )}
                     {quote && availableCash < quote.price && (
                       <Typography role="status" variant="body2">
                         {money(quote.price - availableCash)} more cash needed.
@@ -677,7 +710,7 @@ function TileNetwork(props: Props) {
                 <CityDemand
                   game={game}
                   territoryId={tile.territoryId}
-                  owned={view.owned}
+                  owned={view.owned && view.developed}
                 />
               )}
             </>
@@ -752,7 +785,10 @@ function TileTerrainModifiers({
 }: {
   terrain: TerritoryTileView["tile"]["terrain"];
 }) {
-  const { onshoreWindSpeed, buildCost } = terrainModifiers(terrain, "Wind");
+  const { onshoreWindSpeed, buildCost, buildTime } = terrainModifiers(
+    terrain,
+    "Wind",
+  );
   const modifiers = [
     {
       label: "wind speed",
@@ -760,6 +796,7 @@ function TileTerrainModifiers({
       good: onshoreWindSpeed > 1,
     },
     { label: "build cost", value: buildCost, good: buildCost < 1 },
+    { label: "build time", value: buildTime, good: buildTime < 1 },
   ].filter(({ value }) => value !== 1);
   if (!modifiers.length) return null;
   return (

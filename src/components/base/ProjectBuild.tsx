@@ -19,6 +19,7 @@ import {
   resilienceSelection,
   withResilienceOptions,
 } from "../../helpers/Hazards";
+import { formatConnectionDuration } from "../../helpers/TerritoryConnections";
 import { purchaseFacility } from "../../helpers/PurchaseFacility";
 import { territoryMapLabel, territoryTileLabel } from "./TerritoryMapLayout";
 import { signature } from "./DeferredProjection";
@@ -62,7 +63,6 @@ export default function ProjectBuild({
   const forecast = useBuildForecast(game);
   const [message, setMessage] = React.useState("");
   const [progress, setProgress] = React.useState("");
-  const [partial, setPartial] = React.useState(false);
   const lock = React.useRef(false);
   const alive = React.useRef(true);
   React.useEffect(() => {
@@ -73,7 +73,6 @@ export default function ProjectBuild({
   }, []);
   React.useEffect(() => {
     setMessage("");
-    setPartial(false);
   }, [candidate, project, catalogue]);
   const pricingKey = `${signature(game)}|${game.interestRate}|${JSON.stringify(game.multiplayer?.tileOwners)}|${JSON.stringify(game.multiplayer?.landOwners)}`;
   const quote = React.useMemo(
@@ -86,7 +85,8 @@ export default function ProjectBuild({
     [pricingKey, project, candidate],
   );
   const ready = quote?.facility ? (quote as ReadyProjectSite) : undefined;
-  const payment = ready && {
+  const connection = ready?.connection;
+  const payment = ready?.owned && {
     cash: projectReview(game, ready, false, availableCash),
     loan: projectReview(game, ready, true, availableCash),
   };
@@ -95,25 +95,35 @@ export default function ProjectBuild({
     : project
       ? `${project.name} · ${formatWatts(project.peakW)}`
       : "Plan a project";
-  const confirm = async (financed: boolean) => {
-    if (lock.current || !project || !candidate || !payment) return;
-    const shown = financed ? payment.loan : payment.cash;
+  const confirm = async (financed?: boolean) => {
+    if (lock.current || !project || !candidate) return;
+    const shown = payment && (financed ? payment.loan : payment.cash);
     const initial = store.getState();
     const latest = projectSiteQuote(initial.game, project, candidate);
-    const details = latest.facility
-      ? projectReview(
-          initial.game,
-          latest as ReadyProjectSite,
-          financed,
-          readAvailableCash(),
-        )
-      : undefined;
-    if (!details || details.key !== shown.key) {
+    const details =
+      financed !== undefined && latest.facility
+        ? projectReview(
+            initial.game,
+            latest as ReadyProjectSite,
+            financed,
+            readAvailableCash(),
+          )
+        : undefined;
+    if (financed === undefined) {
+      if (!connection || latest.connection?.quoteKey !== connection.quoteKey) {
+        setMessage(
+          "Connection changed. Check the updated costs before paying.",
+        );
+        return;
+      }
+    } else if (
+      !shown ||
+      !details ||
+      details.key !== shown.key ||
+      details.remaining < 0 ||
+      !latest.owned
+    ) {
       setMessage("Project changed. Check the updated costs before paying.");
-      return;
-    }
-    if (details.remaining < 0) {
-      setMessage("More cash is needed before this project can start.");
       return;
     }
     lock.current = true;
@@ -128,57 +138,21 @@ export default function ProjectBuild({
         state.game.scenarioId === initial.game.scenarioId
       );
     };
-    let connected = false;
     try {
-      if (latest.connection) {
+      if (financed === undefined && latest.connection) {
         setProgress("Connecting…");
         const result = await purchase(candidate, latest.connection.quoteKey);
-        if (!sameRun()) return;
-        if (result.status !== "connected") {
+        if (sameRun() && result.status !== "started")
           setMessage(result.message);
-          return;
-        }
-        connected = true;
-      }
-      if (!sameRun()) return;
-      // Host ownership must already be in the dispatching store. Recheck economics after Connect.
-      const owned = projectSiteQuote(store.getState().game, project, candidate);
-      const ownedReview = owned.facility
-        ? projectReview(
-            store.getState().game,
-            owned as ReadyProjectSite,
-            financed,
-            readAvailableCash(),
-          )
-        : undefined;
-      const expectedCash =
-        details.availableCash - (latest.connection?.price ?? 0);
-      // Cash and pending reservations can subtract in a different order after settlement.
-      const cashRounding =
-        Number.EPSILON * Math.max(1, Math.abs(details.availableCash)) * 4;
-      if (
-        !owned.facility ||
-        !owned.owned ||
-        !ownedReview ||
-        ownedReview.remaining < 0 ||
-        ownedReview.buildKey !== details.buildKey ||
-        (connected &&
-          Math.abs(ownedReview.availableCash - expectedCash) > cashRounding)
-      ) {
-        setPartial(connected);
-        setMessage(
-          connected
-            ? "Site connected. Construction did not start. Check the updated costs before paying."
-            : "Project changed. Check the updated costs before paying.",
-        );
         return;
       }
+      if (financed === undefined || !latest.facility || !details) return;
       setProgress("Starting construction…");
       const result = await dispatch(
         purchaseFacility(
-          owned.facility,
+          latest.facility,
           financed,
-          owned.tile.territoryId,
+          latest.tile.territoryId,
           candidate,
           details.buildKey,
         ),
@@ -187,14 +161,7 @@ export default function ProjectBuild({
       if (result.status === "accepted") {
         onBusy(false);
         onClose();
-      } else {
-        setPartial(connected);
-        setMessage(
-          connected
-            ? `Site connected. Construction did not start. ${result.message}`
-            : result.message,
-        );
-      }
+      } else setMessage(result.message);
     } finally {
       lock.current = false;
       onBusy(false);
@@ -281,6 +248,25 @@ export default function ProjectBuild({
             {candidate && !ready && (
               <Alert severity="info">{quote?.reason}</Alert>
             )}
+            {ready && connection && (
+              <dl className="projectFacts">
+                <div>
+                  <dt>Connection</dt>
+                  <dd>
+                    {price(connection.price)} ·{" "}
+                    {formatConnectionDuration(connection.buildMonths)}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Estimated build cost</dt>
+                  <dd>{price(ready.facility.buildCost)}</dd>
+                </div>
+                <div>
+                  <dt>Expected output</dt>
+                  <dd>{output}</dd>
+                </div>
+              </dl>
+            )}
             {ready && payment && (
               <>
                 <dl className="projectFacts">
@@ -299,9 +285,7 @@ export default function ProjectBuild({
                   </div>
                   <div>
                     <dt>Connection</dt>
-                    <dd>
-                      {ready.owned ? "Connected" : price(ready.connectionCost)}
-                    </dd>
+                    <dd>Connected</dd>
                   </div>
                   <div>
                     <dt>Build cost</dt>
@@ -360,8 +344,8 @@ export default function ProjectBuild({
                 )}
                 <p className="projectLoanTerms">
                   {(game.interestRate * 100).toFixed(2)}% annual interest for{" "}
-                  {facilityLoanMonths(ready.facility.lifespanYears) / 12} years.{" "}
-                  {ready.connectionCost > 0 && "Connection is paid in cash."}
+                  {facilityLoanMonths(ready.facility.lifespanYears) / 12}{" "}
+                  years.{" "}
                 </p>
                 {payment.cash.remaining < 0 && (
                   <p role="status">
@@ -373,11 +357,23 @@ export default function ProjectBuild({
               </>
             )}
             {message && (
-              <Alert severity={partial ? "warning" : "info"} role="status">
+              <Alert severity="info" role="status">
                 {message}
               </Alert>
             )}
           </div>
+          {connection && (
+            <div className="projectCandidateActions">
+              {progress && <span role="status">{progress}</span>}
+              <Button
+                variant="contained"
+                disabled={!!progress || connection.price > availableCash}
+                onClick={() => void confirm()}
+              >
+                Connect · {price(connection.price)}
+              </Button>
+            </div>
+          )}
           {payment && (
             <div className="projectCandidateActions">
               {progress && <span role="status">{progress}</span>}

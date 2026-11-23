@@ -531,7 +531,7 @@ function historyObjectiveResults(
 /** The scored term freezes before any optional Keep playing acquisition. */
 function objectiveRetentionBaseline(
   game: Pick<GameType, "customerMarketSize"> &
-    Partial<Pick<GameType, "utilityExpansion" | "campaign">>,
+    Partial<Pick<GameType, "utilityExpansion" | "campaign" | "date">>,
   scenario: ScenarioType,
 ): number {
   if (game.campaign) return game.campaign.openingCustomers;

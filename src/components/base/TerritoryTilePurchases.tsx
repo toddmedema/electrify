@@ -12,8 +12,7 @@ import { multiplayerRuntime } from "../../multiplayer/Registry";
 import { useMoney } from "./CurrencyContext";
 
 export type TilePurchaseResult =
-  | { status: "connected" }
-  | { status: "rejected" | "cancelled"; message: string };
+  { status: "started" } | { status: "rejected" | "cancelled"; message: string };
 
 interface Purchases {
   pendingIds: ReadonlySet<TerritoryTileId>;
@@ -66,7 +65,7 @@ export function TerritoryTilePurchasesProvider({
     if (!accepted.length) return;
     accepted.forEach((id) => pending.current.delete(id));
     setMessage(
-      `${accepted.length === 1 ? "Site connected" : `${accepted.length} sites connected`}. ${money(currentTick(game)?.cash ?? 0)} cash remaining.`,
+      `${accepted.length === 1 ? "Connection construction started" : `Construction started on ${accepted.length} connections`}. ${money(currentTick(game)?.cash ?? 0)} cash remaining.`,
     );
     refresh();
   }, [game, money]);
@@ -137,24 +136,24 @@ export function TerritoryTilePurchasesProvider({
             "Connection unavailable. Review the site and try again.",
           );
       }
-      const connected = await waitForPurchase(
+      const started = await waitForPurchase(
         () => store.getState(),
         (state) => (ownsTerritoryTile(state.game, tileId) ? true : undefined),
       );
       if (operationSession !== session.current)
         return { status: "cancelled", message: "The run changed." };
-      if (!connected)
+      if (!started)
         throw new Error(
           "Connection is not confirmed. Review the site before trying again.",
         );
       if (pending.current.delete(tileId)) refresh();
-      return { status: "connected" };
+      return { status: "started" };
     } catch (cause) {
       if (operationSession !== session.current)
         return { status: "cancelled", message: "The run changed." };
       // Projected ownership is authoritative even if the receipt connection drops afterward.
       if (ownsTerritoryTile(store.getState().game, tileId))
-        return { status: "connected" };
+        return { status: "started" };
       pending.current.delete(tileId);
       setMessage(
         cause instanceof Error ? cause.message : "Connection unavailable.",

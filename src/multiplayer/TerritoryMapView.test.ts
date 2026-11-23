@@ -1,6 +1,7 @@
 import {
   createWorld,
   applyCommand,
+  stepWorld,
   roomView,
   checkpointWorld,
   restoreWorld,
@@ -46,18 +47,30 @@ it("projects actual foregrounds on other companies' claimed land without changin
     }),
   ).toBeUndefined();
   const tile = getTerritoryTile(quote.tileId)!;
-  expect(
-    command(world, "0", {
-      kind: "action",
-      name: "buildFacility",
-      payload: {
-        facility: { name: "Wind", peakW: 50e6 },
-        financed: false,
-        territoryId: tile.territoryId,
-        tileId: tile.id,
-      },
-    }),
-  ).toBeUndefined();
+  const build: Command = {
+    kind: "action",
+    name: "buildFacility",
+    payload: {
+      facility: { name: "Wind", peakW: 50e6 },
+      financed: false,
+      territoryId: tile.territoryId,
+      tileId: tile.id,
+    },
+  };
+  const pending = territoryTileViews(roomView(world, "1").game!).find(
+    (view) => view.tile.id === tile.id,
+  );
+  expect(pending).toMatchObject({
+    developed: false,
+    connection: { connectionMinute: quote.connectionMinute },
+  });
+  expect(command(world, "0", build)).toMatch(/under construction/);
+  for (const seat of world.seats)
+    expect(
+      command(world, seat.id, { kind: "speed", speed: "FAST" }),
+    ).toBeUndefined();
+  while (world.grids[0].date.minute < quote.connectionMinute) stepWorld(world);
+  expect(command(world, "0", build)).toBeUndefined();
   const before = JSON.stringify(checkpointWorld(world));
   const publication = new ViewPublication();
   publication.request(world, 0, { force: true });

@@ -216,6 +216,11 @@ export function projectionSignature(game: GameType): string {
       ? JSON.stringify([
           territory.landPurchases,
           territory.tilePurchases,
+          territory.tilePurchases?.filter(
+            ({ connectionMinute }) =>
+              connectionMinute !== undefined &&
+              connectionMinute <= game.date.minute,
+          ).length,
           territory.legacyConnections.map(
             ({
               id,

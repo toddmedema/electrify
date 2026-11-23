@@ -15,7 +15,9 @@ import {
   legacyTerritoryConnections,
   purchaseLand,
   purchaseTile,
+  energizeTileCustomers,
 } from "../helpers/Territories";
+import { pendingTileConnections } from "../helpers/TerritoryConnections";
 import { isTerritoryId } from "../data/Territories";
 import type { TerritoryId } from "../Types";
 import { getTerrainWindOutputFactor } from "../helpers/TerrainModifiers";
@@ -4520,7 +4522,11 @@ function adoptTickWorkingState(
     working.monthlyHistory = snapshot.monthlyHistory;
     if (working.date.minute === snapshot.date.minute)
       working.worldEvents = snapshot.worldEvents;
-    if (snapshot.policies) working.policies = snapshot.policies;
+    if (
+      snapshot.policies &&
+      working.customerMarketSize === snapshot.customerMarketSize
+    )
+      working.policies = snapshot.policies;
   }
   if (snapshot.blackout && !working.blackout) delete draft.blackout;
   // Compare against the plain snapshot so unchanged fields never enter Immer's set trap.
@@ -4634,6 +4640,21 @@ export function* tickStatePhases(
       repowerEmissions,
       true,
     );
+    const rollingOver = completedMonthCount(state) < state.date.monthsElapsed;
+    if (!rollingOver) {
+      const customers = connectTileCustomers(state);
+      if (customers) {
+        now.customers += customers;
+        state.timeline = reforecastDemand(state, 1, [], [], undefined, true);
+        state.timeline = reforecastSupply(
+          state,
+          true,
+          TICK_MINUTES,
+          undefined,
+          true,
+        );
+      }
+    }
     desktopSimulationHooks()?.tick(state, now);
     logWeatherRepairsCompleted(state);
     if (fireHit)
@@ -4712,7 +4733,7 @@ export function* tickStatePhases(
     // One row per completed month is both the rollover signal and the persisted checkpoint. It
     // avoids module-level calendar state leaking between concurrent simulations or a second game,
     // and unlike an empty sentinel it cannot count the opening forecast as completed history.
-    if (completedMonthCount(state) < state.date.monthsElapsed) {
+    if (rollingOver) {
       const { cash, customers } = now;
       state.customerRate = now.customerRate;
 
@@ -4728,6 +4749,7 @@ export function* tickStatePhases(
         ),
       );
       recordGameObjectiveMonth(state, history[0]);
+      const connectedCustomers = connectTileCustomers(state);
       // Reprice the company's credit off the year that just closed, before the forecast is built
       // against it. Operating results reprice monthly; new borrowing reprices immediately.
       refreshInterestRate(state, cash, now.netWorth);
@@ -4770,7 +4792,7 @@ export function* tickStatePhases(
       state.timeline = generateNewTimeline(
         state,
         cash + openingRuleTransactions(state),
-        customers,
+        customers + connectedCustomers,
       );
       resolveAutomaticScenarioChoices(state);
       logFuelPriceMoves(state, storyPriceFuels);
@@ -5202,6 +5224,7 @@ export {
 function getDemandW(
   date: DateType,
   game: GameType,
+  forecast: GameType,
   prev: TickPresentFutureType,
   now: TickPresentFutureType,
   tickScale: number,
@@ -5230,9 +5253,9 @@ function getDemandW(
   // A current-frame reforecast is not another customer-growth interval.
   if (
     (game.utilityExpansion || game.campaign) &&
-    now.minute === game.date.minute
+    now.minute === forecast.date.minute
   ) {
-    const current = getTimeFromTimeline(game.date.minute, game.timeline);
+    const current = getTimeFromTimeline(forecast.date.minute, game.timeline);
     now.customers = current?.customers ?? prev.customers;
     now.customerRate = current?.customerRate ?? prev.customerRate;
   }
@@ -5244,7 +5267,7 @@ function getDemandW(
     profile?.demandScale ?? game.startingDemandScale,
     profile?.demandShapeExponent ?? game.demandShapeExponent ?? 1,
   );
-  const effects = storyEffectsAt(date, game);
+  const effects = storyEffectsAt(date, forecast);
   const baselineDemandW =
     baselineW *
     (effects.demandMultiplier || 1) *
@@ -5467,6 +5490,57 @@ function reforecastWeatherAndPrices(
   });
 }
 
+function connectTileCustomers(state: GameType): number {
+  const customers = energizeTileCustomers(state);
+  if (customers)
+    rebaseGameRetentionBaseline(state, expansionRetentionBaseline(state));
+  return customers;
+}
+
+/** Within a month activation follows settlement. At rollover it precedes the opening frame. */
+function connectionsBeforeForecastFrame(minute: number): number {
+  return minute % MINUTES_PER_MONTH === 0 ? minute : minute - 1;
+}
+
+/** Replay each receipt on the private demand or dispatch ledger, at its actual minute even
+ * when the forecast samples every hour. Keep the story and weather clock anchored at the start. */
+function replayTileConnections(
+  state: GameType,
+  minutes: readonly number[],
+  representedTransportationW?: number,
+) {
+  let next = 0;
+  let market = state;
+  return {
+    get market() {
+      return market;
+    },
+    through(minute: number) {
+      let customers = 0;
+      while (next < minutes.length && minutes[next] <= minute) {
+        const connectionMinute = minutes[next++];
+        advanceGamePolicies(
+          market,
+          Math.floor((connectionMinute - 1) / MINUTES_PER_MONTH),
+          representedTransportationW,
+        );
+        const connected = {
+          ...state,
+          date: getDateFromMinute(connectionMinute, state.startingYear),
+        };
+        const added = connectTileCustomers(connected);
+        if (!added) continue;
+        market = connected;
+        state.customerMarketSize = market.customerMarketSize;
+        state.policies = market.policies;
+        state.objectiveProgress = market.objectiveProgress;
+        customers += added;
+      }
+      return customers;
+    },
+  };
+}
+
 function reforecastDemand(
   state: GameType,
   tickScale = 1,
@@ -5474,17 +5548,30 @@ function reforecastDemand(
   initialCharging: TickPresentFutureType["deferredCharging"] = [],
   representedTransportationW?: number,
   preserveCurrentFrame = false,
+  connectionMinutes: readonly number[] = [],
 ): TickPresentFutureType[] {
   const projection = {
     ...state,
     policies: cloneDeep(state.policies),
     utilityExpansion: copyUtilityExpansionForDispatch(state.utilityExpansion),
   };
-  // A demand pass never changes ownership. Derive the seeded city mix once;
-  // weather, policy and the evolving customer count still apply per frame.
-  const profile = projection.utilityExpansion
+  // Property receipts are fixed. Refresh the seeded city mix only when a town is energized.
+  let profile = projection.utilityExpansion
     ? combinedUtilityDemandProfile(projection)
     : undefined;
+  const connections = connectionMinutes.length
+    ? replayTileConnections(
+        projection,
+        connectionMinutes,
+        representedTransportationW,
+      )
+    : undefined;
+  const connectThrough = (minute: number) => {
+    const added = connections?.through(minute) ?? 0;
+    if (connections && added && projection.utilityExpansion)
+      profile = combinedUtilityDemandProfile(connections.market);
+    return added;
+  };
   let prev = {
     ...state.timeline[0],
     deferredResidential: initialDeferred,
@@ -5496,8 +5583,12 @@ function reforecastDemand(
       !(preserveCurrentFrame && t.minute === state.date.minute)
     ) {
       const date = getDateFromMinute(t.minute, state.startingYear);
+      const openingCustomers = connections
+        ? connectThrough(connectionsBeforeForecastFrame(t.minute))
+        : 0;
+      const market = connections?.market ?? projection;
       advanceGamePolicies(
-        projection,
+        market,
         date.monthsElapsed,
         representedTransportationW,
       );
@@ -5509,7 +5600,18 @@ function reforecastDemand(
         ) *
           tickScale) /
         TICKS_PER_MONTH;
-      t.demandW = getDemandW(date, projection, prev, t, tickScale, profile);
+      t.demandW = getDemandW(
+        date,
+        market,
+        projection,
+        openingCustomers
+          ? { ...prev, customers: prev.customers + openingCustomers }
+          : prev,
+        t,
+        tickScale,
+        profile,
+      );
+      if (connections) t.customers += connectThrough(t.minute);
       prev = t;
       return t;
     }
@@ -5638,6 +5740,7 @@ function settleFacilityLoan(loan: LoanInfo, ticksPerMonth: number) {
 function createDispatchScratch(retentionBaseline?: number) {
   return {
     retentionBaseline,
+    customerMarketDate: undefined as DateType | undefined,
     chargeRequests: new Map<number, number>(),
     storageHeadroom: new Map<number, { peakW: number; watts: number }>(),
   };
@@ -5727,7 +5830,11 @@ function* supplyFacilitiesFinancesPhases(
           batteryProgram,
           tickDate.monthsElapsed,
           state.startingYear,
-          programCustomers(state),
+          programCustomers(
+            scratch.customerMarketDate
+              ? { ...state, date: scratch.customerMarketDate }
+              : state,
+          ),
           state.location,
         )
       : EMPTY_CUSTOMER_BATTERY_FLEET;
@@ -7380,7 +7487,8 @@ function* supplyFacilitiesFinancesPhases(
     const retention = Math.min(
       1,
       now.customers /
-        (scratch.retentionBaseline ?? expansionRetentionBaseline(state)),
+        (scratch.retentionBaseline ??
+          expansionRetentionBaseline(state, now.minute)),
     );
     state.utilityExpansion.networkAssets.forEach((asset) => {
       asset.retentionLowWatermark = Math.min(
@@ -7562,6 +7670,7 @@ function supplyForecastPass(
   observe?: ForecastObserver,
   preserveCurrentFrame = false,
   excludedAgreementId?: string,
+  connectionMinutes: readonly number[] = [],
 ): TickPresentFutureType[] {
   // updateSupplyFacilitiesFinances ramps generators, charges batteries and pays down loans by
   // mutating the facilities in place, so forecasting has to run against a copy of them. A shallow
@@ -7576,6 +7685,20 @@ function supplyForecastPass(
     commissionedHydroSiteIds: [...state.commissionedHydroSiteIds],
     facilities: cloneDeep(state.facilities),
     transmission: copyTransmissionForForecast(state.transmission),
+  };
+  const connections = connectionMinutes.length
+    ? replayTileConnections(newState, connectionMinutes)
+    : undefined;
+  if (connections) scratch = { ...scratch };
+  const connectThrough = (minute: number) => {
+    const added = connections?.through(minute) ?? 0;
+    if (connections && added) {
+      scratch.customerMarketDate = connections.market.date;
+      scratch.retentionBaseline = expansionRetentionBaseline(
+        connections.market,
+      );
+    }
+    return added;
   };
   if (withoutMinimumStableOutput) {
     newState.facilities.forEach((facility) => {
@@ -7594,7 +7717,13 @@ function supplyForecastPass(
       t.minute >= state.date.minute &&
       !(preserveCurrentFrame && t.minute === state.date.minute)
     ) {
-      advanceGamePolicies(newState, Math.floor(t.minute / MINUTES_PER_MONTH));
+      const openingCustomers = connections
+        ? connectThrough(connectionsBeforeForecastFrame(t.minute))
+        : 0;
+      advanceGamePolicies(
+        connections?.market ?? newState,
+        Math.floor(t.minute / MINUTES_PER_MONTH),
+      );
       const repowerEmissions = advanceForecastConversions(
         newState,
         t.minute,
@@ -7605,7 +7734,9 @@ function supplyForecastPass(
       copyCommitmentMetadata(sourceTick, t);
       t = updateSupplyFacilitiesFinances(
         newState,
-        prev,
+        openingCustomers
+          ? { ...prev, customers: prev.customers + openingCustomers }
+          : prev,
         t,
         simulated,
         undefined,
@@ -7622,6 +7753,7 @@ function supplyForecastPass(
         false,
         scratch,
       );
+      if (connections) t.customers += connectThrough(t.minute);
       // The current tick already happened. Reforecast its supply against the player's action,
       // but keep the transaction and customer balance that caused this reforecast. Otherwise
       // rebuilding from the previous tick erases a purchase refund (and, symmetrically, a cost).
@@ -7700,11 +7832,13 @@ function supplyForecastPass(
         true,
         closesMinute,
         repowerEmissions,
+        false,
+        scratch,
       );
       copyCommitmentMetadata(t, settled);
       t = settled;
     }
-    observe?.(newState, t);
+    observe?.(connections?.market ?? newState, t);
     prev = t;
     return t;
   });
@@ -7772,6 +7906,7 @@ function reforecastSupply(
   observe?: ForecastObserver,
   preserveCurrentFrame = false,
   excludedAgreementId?: string,
+  connectionMinutes: readonly number[] = [],
 ): TickPresentFutureType[] {
   // First record the merit-order request each generator would receive without minimum-load
   // constraints. The optimized pass then scans those per-facility requests to compare the cost
@@ -7793,6 +7928,7 @@ function reforecastSupply(
     undefined,
     preserveCurrentFrame,
     excludedAgreementId,
+    connectionMinutes,
   );
   // Recorded ticks can be Immer drafts when this is called from a reducer. Commitment metadata
   // is deliberately attached with Object.defineProperty, which Immer forbids on a draft; the
@@ -7877,6 +8013,7 @@ function reforecastSupply(
     observe,
     preserveCurrentFrame,
     excludedAgreementId,
+    connectionMinutes,
   );
 }
 
@@ -7909,6 +8046,7 @@ export function generateForecastTimeline(
   stepMinutes = TICK_MINUTES,
   observe?: ForecastObserver,
   excludedAgreementId?: string,
+  { estimateHistory = false } = {},
 ): TickPresentFutureType[] {
   return generateTimeline(
     state,
@@ -7919,6 +8057,7 @@ export function generateForecastTimeline(
     true,
     observe,
     excludedAgreementId,
+    !estimateHistory,
   );
 }
 
@@ -7931,6 +8070,7 @@ function generateTimeline(
   forecastWeather: boolean,
   observe?: ForecastObserver,
   excludedAgreementId?: string,
+  includePendingConnections = false,
 ): TickPresentFutureType[] {
   // Forecasts only read the live state. Snapshot a draft once so the horizon does not repeatedly
   // traverse Immer proxies for location, events, history and other shared inputs. `current`, not
@@ -8042,6 +8182,14 @@ function generateTimeline(
   const previousDemandTick = readOnlyState.timeline.findLast(
     (tick) => tick.minute < state.date.minute,
   );
+  const lastMinute = state.date.minute + (ticks - 1) * stepMinutes;
+  const pendingMinutes = new Set<number>();
+  if (includePendingConnections) {
+    for (const { connectionMinute } of pendingTileConnections(state).values()) {
+      if (connectionMinute <= lastMinute) pendingMinutes.add(connectionMinute);
+    }
+  }
+  const connectionMinutes = [...pendingMinutes].sort((a, b) => a - b);
   state.timeline = reforecastWeatherAndPrices(state, forecastWeather);
   state.timeline = reforecastDemand(
     state,
@@ -8060,6 +8208,8 @@ function generateTimeline(
           0,
         ) / readOnlyState.timeline.length
       : 0,
+    false,
+    connectionMinutes,
   );
   const batteryCarry =
     previousDemandTick?.customerBatteryWh ??
@@ -8077,6 +8227,7 @@ function generateTimeline(
     observe,
     false,
     excludedAgreementId,
+    connectionMinutes,
   );
   return state.timeline;
 }

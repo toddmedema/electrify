@@ -7,7 +7,6 @@ import {
   isStorage,
   type FacilityShoppingType,
   type GameType,
-  type TerrainType,
   type TerritoryTileId,
 } from "../../Types";
 import { sliderTickToW } from "../../helpers/BuildSizing";
@@ -89,19 +88,17 @@ function railSites(game: GameType, options: FacilityShoppingType[]) {
         const selection = selectProject(facility);
         let minimumDue = Infinity;
         // Within one terrain, the cheapest legal connection also has the cheapest project.
-        const pricedTerrain = new Set<TerrainType>();
+        const pricedSites = new Set<string>();
         for (const tile of candidates) {
-          if (
-            pricedTerrain.has(tile.terrain) ||
-            !tileFitsFacility(tile, selection)
-          )
+          const siteType = `${tile.terrain}:${connections.has(tile.id)}`;
+          if (pricedSites.has(siteType) || !tileFitsFacility(tile, selection))
             continue;
           const quote = projectSiteQuote(game, selection, tile.id, connections);
           if (!quote.facility) continue;
-          pricedTerrain.add(tile.terrain);
+          pricedSites.add(siteType);
           minimumDue = Math.min(
             minimumDue,
-            quote.connectionCost +
+            quote.connection?.price ??
               quote.facility.buildCost * DOWNPAYMENT_PERCENT,
           );
         }
